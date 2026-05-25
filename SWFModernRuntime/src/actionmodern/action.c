@@ -40400,7 +40400,19 @@ void actionDefineLocal(SWFAppContext* app_context)
 					POP();
 				}
 			}
-			// Path resolution failed — fall through to normal scope chain
+			// Path resolution failed. When there's no function-local scope on the
+			// stack, silently no-op rather than storing the literal `path:var`
+			// key — matches Ruffle `set_variable` (activation.rs:2782). Common
+			// case: AS2 type-annotated declarations like `var x:Boolean = false`
+			// where the compiler emitted `DefineLocal "x:Boolean"` at root level
+			// or inside a scopeless type-1 callback (where the literal-name
+			// fallback would otherwise leak the typed key onto _root). With a
+			// proper local scope the literal-name storage path below keeps the
+			// variable function-private, matching Ruffle's `define_local`.
+			if (scope_depth == 0) {
+				POP_2();
+				return;
+			}
 		}
 	}
 
@@ -40650,8 +40662,11 @@ void actionDeclareLocal(SWFAppContext* app_context)
 
 	// Handle slash-path variable names (e.g., "/:ghi" → declare ghi on root)
 	// DeclareLocal (var with no value) only creates the property if it doesn't already exist.
-	// Only at timeline level — inside functions, DeclareLocal stores with the literal name
-	if (g_call_depth == 0) {
+	// Only fires when there's no function-local scope to define into (scope_depth == 0):
+	// at the timeline, or inside a type-1 callback whose caller didn't push a scope.
+	// With a proper local scope the literal-name storage path (below) keeps the
+	// variable function-private — matching Ruffle's `define_local` (activation.rs:2940).
+	if (scope_depth == 0) {
 		const char* colon = NULL;
 		for (int ci = (int)var_name_len - 1; ci >= 0; ci--) {
 			if (var_name[ci] == ':') { colon = var_name + ci; break; }
@@ -40682,6 +40697,13 @@ void actionDeclareLocal(SWFAppContext* app_context)
 					POP();
 					return;
 				}
+				// Path didn't resolve: silently no-op. Matches Ruffle
+				// `set_variable` (activation.rs:2782) — when the path before
+				// `:` doesn't match any scope, no property is created. Covers
+				// `var isError:Boolean;` patterns where the AS2 compiler
+				// emitted the type annotation as part of the local name.
+				POP();
+				return;
 			}
 		}
 	}
@@ -42357,6 +42379,25 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					}
 				} else {
 					ng_enumerateChildren(mc->name, enum_child_callback, app_context);
+				}
+
+				// Dynamic children (createEmptyMovieClip / attachMovie-without-placement)
+				// live in child_mc_cache but not on a sprite_display_list, so the
+				// branches above don't see them. Ruffle pushes every render-list
+				// entry independently — Flash matches by walking the dynamic
+				// child cache. Filter by `parent == mc` and `display_obj == NULL`
+				// so timeline children (already enumerated via the display list
+				// above) aren't pushed a second time.
+				extern MovieClip* child_mc_cache[];
+				extern int child_mc_count;
+				for (int _ci = 0; _ci < child_mc_count; _ci++) {
+					MovieClip* _cc = child_mc_cache[_ci];
+					if (_cc == NULL || _cc == mc) continue;
+					if (_cc->parent != mc) continue;
+					if (_cc->display_obj != NULL) continue;
+					if (_cc->depth == INT_MIN) continue;
+					if (_cc->name[0] == '\0') continue;
+					enum_child_callback(_cc->name, (u32)strlen(_cc->name), app_context);
 				}
 			}
 #endif
@@ -49108,6 +49149,44 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 				pushVar(app_context, &_mc_ap_result);
 				return;
+			}
+
+			// Walk __proto__ chain for addProperty getters defined on the prototype.
+			// Required for class-style setups: SpyConnection1.prototype.addProperty("mcSpies", getter, setter)
+			// then attachMovie creates an instance whose __proto__ is SpyConnection1.prototype.
+			ASObject* _proto_cur = NULL;
+			ActionVar* _proto_var = getProperty((ASObject*)mc->dynamic_props, "__proto__", 9);
+			if (_proto_var != NULL && _proto_var->type == ACTION_STACK_VALUE_OBJECT)
+				_proto_cur = (ASObject*)_proto_var->data.numeric_value;
+			int _proto_depth = 0;
+			const int MAX_PROTO_DEPTH = 100;
+			while (_proto_cur != NULL && _proto_depth < MAX_PROTO_DEPTH)
+			{
+				_proto_depth++;
+				ASProperty* _pp_prop = findPropertyRaw(_proto_cur, prop_name, prop_name_len);
+				if (_pp_prop != NULL && (_pp_prop->getter != NULL || _pp_prop->setter != NULL))
+				{
+					ActionVar _pp_result;
+					void* _pp_key = (void*)mc->dynamic_props;
+					if (_pp_prop->getter == NULL ||
+					    countActiveAccessor(_pp_key, prop_name, prop_name_len, 0) >= accessorReentryLimit())
+					{
+						_pp_result = _pp_prop->value;
+					}
+					else
+					{
+						pushActiveAccessor(_pp_key, prop_name, prop_name_len, 0);
+						_pp_result = invokePropertyGetter(app_context, (ASFunction*)_pp_prop->getter, (void*)mc->dynamic_props);
+						popActiveAccessor();
+					}
+					pushVar(app_context, &_pp_result);
+					return;
+				}
+				ActionVar* _pp_next = getProperty(_proto_cur, "__proto__", 9);
+				if (_pp_next != NULL && _pp_next->type == ACTION_STACK_VALUE_OBJECT)
+					_proto_cur = (ASObject*)_pp_next->data.numeric_value;
+				else
+					_proto_cur = NULL;
 			}
 		}
 
