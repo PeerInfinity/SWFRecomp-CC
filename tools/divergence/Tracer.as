@@ -22,7 +22,7 @@ class Tracer {
     static var emitted_mc_count:Number = 0;
 
     static function main(mc:MovieClip):Void {
-        trace("TRACER: start");
+        trace("TRACER: start _currentframe=" + _root._currentframe);
         // Hook _root.onEnterFrame. Runs after each frame's script + display update.
         _root.onEnterFrame = function():Void {
             Tracer.dump_tick();
