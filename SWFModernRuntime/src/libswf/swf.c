@@ -248,6 +248,10 @@ void tagMain(SWFAppContext* app_context)
 		if (tick_count >= max_ticks) break;
 		tick_count++;
 #endif
+		// Bump global tick counter so DisplayObject.placed_at_tick stamps
+		// from this tick can be distinguished from earlier ticks. See
+		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
+		{ extern size_t g_tick_count; g_tick_count++; }
 
 #ifdef OFFSCREEN_RENDER
 		// Mirror swf_core.c's exit condition (around line 1056). The

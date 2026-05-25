@@ -746,6 +746,14 @@ void ng_set_script_only_mode(int mode)
 // performed by advance_nested_sprite_frames() after the root frame script.
 int g_advance_defer_nested = 0;
 
+// Monotonic tick counter, incremented at the top of every tick by swf.c
+// (OFFSCREEN_RENDER) and swf_core.c (NO_GRAPHICS). Used in conjunction with
+// DisplayObject.placed_at_tick so advance_nested_sprite_frames can skip
+// sprites placed during the current tick — mirrors Ruffle's clip_exec_list
+// iteration where mid-iter additions are never visited. See
+// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
+size_t g_tick_count = 0;
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Forward decl — defined alongside tagRemoveObject2 below. Recursively queues
 // CLIP_EVENT_UNLOAD clip-action callbacks for a display list's children and
@@ -808,6 +816,13 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		}
 		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
+		// Skip sprites placed this same tick — mirrors Ruffle's
+		// clip_exec_list "captured next before processing" semantics.
+		// tagPlaceObject2 ran the sprite's frame_0 eagerly during the
+		// placement (tag.c:5690) and set sprite_current_frame=1; visiting
+		// it again here would run frame_1 in the same tick. See
+		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
+		{ extern size_t g_tick_count; if (obj->placed_at_tick == g_tick_count) continue; }
 		Character* ch = &dictionary[obj->char_id];
 
 		// Recurse into button display lists to advance their sprite children
@@ -1166,6 +1181,15 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
 		if (obj->sprite_display_list == NULL) continue;
+		// Skip sprites placed this same tick — Ruffle's clip_exec_list iteration
+		// captures `next` before processing each clip, so clips added mid-iter
+		// (e.g. via PlaceObject2 from a parent's frame func) are never visited
+		// the same tick. Without this skip, Pong's sprite_9 (nested inside
+		// sprite_10) gets advanced from its just-set sprite_current_frame=1 to
+		// sprite_frame_funcs[1] (script_2 → _root.play()) in tick 1, causing
+		// root to advance one tick early in F1. See plan:
+		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
+		{ extern size_t g_tick_count; if (obj->placed_at_tick == g_tick_count) continue; }
 
 		// Swap to sprite's display list context
 		DisplayObject* saved_dl = display_list;
@@ -5562,6 +5586,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	}
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
+	{ extern size_t g_tick_count; display_list[depth].placed_at_tick = g_tick_count; }
 	display_list[depth].place_gen = g_place_gen;
 	display_list[depth].place_seq = ++g_place_seq;
 	display_list[depth].constructor_invoked = 0;
@@ -6017,6 +6042,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	}
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
+	{ extern size_t g_tick_count; display_list[depth].placed_at_tick = g_tick_count; }
 	display_list[depth].place_gen = g_place_gen;
 	display_list[depth].place_seq = ++g_place_seq;
 	display_list[depth].constructor_invoked = 0;

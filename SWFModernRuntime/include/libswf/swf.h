@@ -173,6 +173,10 @@ typedef struct DisplayObject
 	u8 transformed_by_script; // 1 if AS-level setter wrote a transform attribute (matrix), Ruffle DisplayObjectFlags::TRANSFORMED_BY_SCRIPT
 	u8 name_overridden;     // 1 if instance name was overridden (script _name= or modify-branch rename)
 	size_t placed_at_frame; // frame index when this object was placed
+	size_t placed_at_tick;  // value of g_tick_count when this object was placed (new-entry path only).
+	                        // Used by advance_sprite_frames to skip newly-placed sprites in the same tick,
+	                        // matching Ruffle's clip_exec_list iteration which never visits clips added
+	                        // mid-iter (see SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md).
 	size_t place_gen;       // monotonic generation counter for same-frame detection
 	size_t place_seq;       // monotonic per-placement counter (NOT per-frame).
 	                        // Reverse order = most-recently-placed first =

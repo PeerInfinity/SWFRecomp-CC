@@ -85,62 +85,224 @@ specific, not a generic enterFrame ordering bug.
 
 ## What we don't know yet
 
-These need a controlled experiment before committing to a fix:
-- **Does Ruffle defer Load too, or just frame advance?**
-  Ruffle's `Avm1::run_frame` iteration captures `next = clip.next_avm1_clip()`
-  *before* processing each clip (see `~/CC/ruffle/core/src/avm1/runtime.rs`
-  line ~491). Clips added mid-iteration are skipped that tick. So a
-  sprite placed during root's tick-1 processing doesn't fire Load until
-  tick 2, and doesn't advance to its frame 2 until tick 3. **Confirm
-  this hypothesis with a controlled SWF.**
-- **What's the exact order of root vs child `run_frame_avm1` on tick N?**
-  `add_to_exec_list` prepends, so the most recently added clip is at the
-  head; iteration starts from head. If sprite 9 was added after root,
-  sprite 9 is head and runs *before* root each tick. This matters for
-  determining when `_root.play()` (called from sprite 9's frame 2)
-  takes effect on the root's same-tick advance.
+**Phase 0 (2026-05-24) — controlled experiments confirmed/refuted the
+following.** Two minimal SWFs built via
+`tools/divergence/make_controlled_swfs.py`:
+
+- `sprite_first_tick_load.swf` — root frame 1 places a 1-frame sprite
+  that traces `SP-load`. Root has 2 frames, no stop.
+- `sprite_first_tick_advance.swf` — root frame 1 has `stop()` + places
+  a 2-frame sprite. Sprite frame 1: `SP-f1`. Sprite frame 2: `SP-f2`.
+- `sprite_calls_root_play.swf` — added to probe Pong's `_root.play()`
+  pattern: root has 3 frames (stop on f1, `ROOT-f2` trace on f2,
+  `ROOT-f3` stop on f3). Sprite frame 2 calls `_root.play()`.
+
+Confirmed:
+
+- **Sprite Load is NOT deferred in Ruffle.** Both runtimes fire the
+  sprite's frame-0 script during placement (`SP-load` / `SP-f1` appear
+  in tick 1 in both `sprite_first_tick_load` and `sprite_first_tick_advance`).
+  The plan's original "Ruffle defers Load to tick N+1" hypothesis is
+  wrong. The Ruffle exec-list iterator skipping mid-iter additions does
+  NOT mean placement-time frame-0 is skipped — placement itself runs the
+  initial frame synchronously via Ruffle's MovieClip construction path,
+  before the exec-list iteration would have visited that clip.
+- **Sprite frame-counter advance happens in tick 2 in both runtimes.**
+  In `sprite_first_tick_advance`, both runtimes report
+  `F1 _root.sprite1 _cf=2` (so by the time tick 2's `onEnterFrame`
+  reads `sprite1._currentframe`, the sprite has already advanced).
+- **The real divergence is script-execution ORDER within tick 2+.**
+  In `sprite_first_tick_advance`:
+  - Ruffle: `SP-f2` → `F1` (sprite frame-2 script runs BEFORE root
+    `onEnterFrame`)
+  - SWFRecomp: `F1` → `SP-f2` (root `onEnterFrame` runs BEFORE sprite
+    frame-2 script)
+- **Root-vs-child iteration order matches the prepend model.** Sprite
+  is at head of Ruffle's `clip_exec_list` (added during root's tick-1
+  processing). Iteration starts from head → sprite first, root second.
+  This explains the SCRIPT-before-onEnterFrame order.
+
+Mechanism in SWFRecomp (the recompiler emits sprite frame funcs as
+`actionQueueSpriteScript` wrappers — they QUEUE rather than execute
+inline; see recompiled `sprite_1_frame_1` in any test build). On tick
+2 in `sprite_first_tick_advance`:
+  1. `advance_sprite_frames` at top of tick calls `sprite_1_frame_funcs[1]`
+     which queues `script_1` (= SP-f2 trace).
+  2. Root is stopped → `frame_funcs[0]` is skipped (gated on
+     `is_playing || manual_next_frame`); the recompiler-emitted
+     `actionDrainAllInPriorityOrder` inside root frame func therefore
+     doesn't run either.
+  3. `tagFlushPendingEnterFrame` fallback fires (`swf.c` ~line 631 /
+     `swf_core.c` ~line 1050) → tracer `onEnterFrame` → `F1` trace.
+  4. `advance_nested_sprite_frames`.
+  5. `actionDrainActionQueueByKind(AQ_KIND_SCRIPT)` at `swf.c:659` /
+     `swf_core.c:1064` drains `script_1` → SP-f2 trace.
+  → Steps 3 (onEnterFrame) and 5 (sprite script) are inverted vs Ruffle.
+
+**Pong-specific mechanism (confirmed 2026-05-24 via printf
+instrumentation):** Pong's preloader uses **nested sprites**:
+`_root` places `sprite_10` (instance2), which during frame 1 places
+`sprite_9` (instance3), which during frame 1 places `sprite_7` (progbar).
+The bug fires in `advance_nested_sprite_frames` at end of tick 1:
+
+1. Root frame 1 runs. tagPlaceObject2 for sprite_10 triggers eager init
+   at `tag.c:5690` (the Phase-1 catch-up-mode-1 path) — runs
+   sprite_10's frame_funcs[0], which places sprite_9 inside it. The
+   eager init recurses: sprite_9's frame_funcs[0] runs, placing
+   sprite_7 (progbar) inside it; sprite_7's frame_funcs[0] runs.
+   Each level sets `sprite_current_frame = 1`.
+2. tagShowFrame's process_sprite_needs_init handles the
+   needs-init bookkeeping (sni=2 = eager-already-done branch). It does
+   NOT re-fire frame_funcs[0].
+3. **End of tick 1, after frame_funcs[0] returns:**
+   `advance_nested_sprite_frames(app_context)` runs (swf.c line 654).
+   It iterates root display_list, for each sprite swaps to its
+   children display_list, then calls `advance_sprite_frames`
+   recursively (with `g_advance_defer_nested = 0`).
+4. For sprite_10: swap to sprite_10's children (containing sprite_9).
+   advance_sprite_frames iterates sprite_10's children:
+   - Finds sprite_9. `sprite_display_list != NULL`, `init = 2`
+     (upgraded by tagShowFrame), `is_playing = 1`,
+     `sprite_current_frame = 1` (set by eager init).
+   - 3 frames, not <= 1 — proceeds to advance.
+   - Calls `sprite_9_frame_funcs[1]`, which queues `script_2`. That
+     script: sets `pcent_loaded`, sets `progbar._width`, calls
+     `_root.play()`.
+5. SCRIPT queue drain at end of tick 1: `script_2` fires →
+   `_root.play()` sets `root.is_playing = 1`.
+6. End of tick 1: `is_playing = 1` → next tick advances root to
+   frame 2.
+7. Tick 2: `current_frame = 1`, `root._currentframe = 2`. F1 tracer
+   reads 2.
+
+In Ruffle, the equivalent mechanism is `Avm1::run_frame`'s exec-list
+iteration. After tick 1: sprite_9 added to exec_list during placement.
+Iteration's captured `next` was from before sprite_9 was added, so
+sprite_9 is NOT visited in tick 1. It IS advanced in tick 2 (via
+Avm1::run_frame → exec_list iterator visits it). So Ruffle's
+`_root.play()` fires in tick 2, root advances in tick 3.
+
+**Decision after instrumentation: the plan's Option A / B / C concept
+WAS correct.** A newly-placed nested sprite (one created mid-tick by
+its parent's frame_funcs[0]) needs to be skipped by
+advance_nested_sprite_frames in the same tick. The original plan got
+the divergent path approximately right; the specifics were just under
+nailed-down (the actual trigger is the eager-init + advance_nested
+combination, not advance_sprite_frames at top of tick).
+
+What this means for fix choice:
+
+- **Option B (place_at_tick flag) is now the recommended approach**
+  rather than C (snapshot). The bug is specifically about
+  `advance_nested_sprite_frames` (line 654) visiting children-of-root
+  that were just placed; threading a snapshot through nested
+  recursion is more invasive than a per-DisplayObject flag.
+- **Option C (snapshot) would still work** but it's overkill — the
+  snapshot needs to be taken at the start of each
+  advance_sprite_frames recursion level, propagated through the swap
+  to children's DL, etc. More invasive than necessary.
+- **Option A (placed_in_current_tick) is identical to B in effect**;
+  B is marginally better because the explicit tick counter is also
+  useful for debugging and survives multi-tick re-entries.
+- **Trace-ordering divergence in `sprite_first_tick_advance.swf`** (the
+  `SP-f2` ↔ `F1` swap) is a SEPARATE bug from the Pong one and
+  Option A/B/C does NOT fix it. That's about `actionDrainActionQueueByKind`
+  running AFTER `tagFlushPendingEnterFrame` at swf.c:631/659 when root
+  is stopped. Leave it for a follow-up — it doesn't cause behavioral
+  divergence in any test we know of, only trace-line ordering.
+
+What this means for the fix:
+
+- The plan's original framing — "defer newly-placed sprite advance by
+  one tick" — does NOT match Ruffle. Ruffle does the OPPOSITE: it runs
+  newly-placed sprites' frame-0 SYNCHRONOUSLY at placement time, then
+  iterates them via exec_list on subsequent ticks just like any other
+  clip. The Pong divergence is something else (likely script-ordering
+  or a different code path triggered by Pong's structure).
+- **Option C (snapshot display list) does NOT directly fix the
+  trace-ordering divergence found here.** A snapshot iterates the
+  sprite either way (it was placed in a prior tick, so it's in the
+  snapshot); the issue is when the QUEUED script gets drained relative
+  to `onEnterFrame`. Options A and B are similarly orthogonal.
+- The actual fix likely needs to either (i) drain `AQ_KIND_SCRIPT`
+  BEFORE `tagFlushPendingEnterFrame` when root frame func skipped, or
+  (ii) restructure the tick to iterate clips Ruffle-style (per-clip
+  enterFrame+advance+frame-tags atomically, in exec-list order). Each
+  is a different, smaller change than the snapshot-threading work in
+  Phases 1-2.
+
+Older open questions, not yet addressed:
+
 - **`sprite_frame_funcs[0]` (the load frame) — does it run inside
-  `advance_sprite_frames` or somewhere else?** Track this through
-  `tagPlaceObject2` → first call to `advance_sprite_frames` for the new
-  depth. The `just_allocated` branch at `tag.c:838` allocates the
-  sprite's display list on first encounter but doesn't appear to skip
-  the frame advancement that follows.
+  `advance_sprite_frames` or somewhere else?** Confirmed:
+  `process_sprite_needs_init` (called from `tagShowFrame`, `tag.c:550`)
+  runs `sprite_frame_funcs[0]` for newly-placed sprites and post-sets
+  `sprite_current_frame = 1` (line 597). So advancement of newly placed
+  sprites happens at placement time, not in `advance_sprite_frames`.
 - **`g_advance_defer_nested` semantics.** Phase 1 (`advance_sprite_frames`)
   runs with `g_advance_defer_nested = 1`. Phase 3
   (`advance_nested_sprite_frames`) runs after root `frame_funcs` with
-  the flag cleared. The defer split exists for a different reason —
-  document why, since it overlaps the area we want to change.
+  the flag cleared. The split exists so that root-level sprites advance
+  before the root frame_func runs (so they can queue scripts that root
+  drains at the top of its frame_func), while their children advance
+  after, mirroring Ruffle's depth-ordering. Confirmed unrelated to the
+  trace-ordering bug here.
 
 ## Ruffle's behavior — the canonical reference
 
-Hypothesized but unconfirmed-in-experiment:
+**Updated 2026-05-24 after Phase 0 experiments** (see
+"What we don't know yet"). The actual model:
 
 ```
 Tick 1 (first run_frame from exporter):
-  Root: Load fires (no enterFrame; INITIALIZED flag flips). run_frame_internal:
-    increment current_frame 0→1, run frame 1 tags (DoInit, PlaceObject sprite 9,
-    DoAction stop). After: current_frame=1, playing=false.
-  Sprite 9: just added to exec_list during root processing; iteration captured
-    next pointer before sprite 9 was added; sprite 9 is NOT visited this tick.
+  Avm1::run_frame iterates clip_exec_list. Initially: just root.
+  Root.run_frame_avm1:
+    - Advance current_frame 0→1
+    - Process frame 1 tags:
+      - DefineSprite (definition)
+      - DoAction (ROOT-f1 trace + stop)
+      - PlaceObject2 sprite_1:
+        - Sprite instantiated, added to clip_exec_list HEAD.
+        - **Sprite's frame-0 (Load frame) is run synchronously** during
+          this placement, BEFORE the exec-list iterator advances —
+          so `SP-f1` traces in tick 1, same tick as placement. After:
+          sprite_1.current_frame=1.
+    - After: root.current_frame=1, root.playing=false.
+  exec_list iterator's captured `next` was None (sprite added during
+    root visit isn't reachable from old `next`), so loop ends.
 
 Tick 2:
-  Sprite 9: head of exec_list. Load fires (first visit), run_frame_internal:
-    increment 0→1, run frame 1 tags (script_1 = _parent.stop, a no-op
-    on already-stopped root). After: sprite 9 current_frame=1.
-  Root: enterFrame fires (TRACER F1: _currentframe=1). playing=false, no advance.
+  Avm1::run_frame iterates clip_exec_list. Now: [sprite_1, root].
+  Sprite_1.run_frame_avm1 (head of list, visited first):
+    - Fire `onEnterFrame` (none registered)
+    - Advance 1→2, run frame 2 tags (DoAction → SP-f2 trace).
+    - After: sprite_1.current_frame=2.
+  Root.run_frame_avm1:
+    - Fire `onEnterFrame` (tracer's → TRACER F1: _currentframe=1).
+    - playing=false → no advance, no tags.
 
 Tick 3:
-  Sprite 9: enterFrame fires. run_frame_internal: increment 1→2, run frame 2
-    tags (script_2 = update pcent_loaded, set progbar._width=100, call
-    _root.play()). After: root.playing=true (sprite 9 set it mid-tick).
-  Root: enterFrame fires (TRACER F2: _currentframe=1 still — set BEFORE
-    advance). playing=true → increment 1→2, run frame 2 tags (stop).
-    After: current_frame=2, playing=false.
+  Sprite_1: advance 2→1 (wrap, 2-frame sprite), run frame 1 → SP-f1.
+  Root: onEnterFrame → F2 _currentframe=1 still, sprite._cf=1.
 ```
 
-This predicts Ruffle's trace `F1=1, F2=1, F3=2` — but observed Ruffle
-trace is `F1=1, F2=2, F3=3`. So our hypothesis is wrong somewhere.
-**Run the controlled experiment before assuming.**
+This matches the observed Ruffle traces for both
+`sprite_first_tick_advance.swf` (where the divergence is purely the
+ordering of sprite scripts vs root onEnterFrame) and `Pong.swf` (where
+the divergence is bigger — Pong does something extra that we haven't
+yet pinned down, see "What we don't know yet").
+
+Key facts the model establishes:
+
+- Sprite frame-0 (Load) is run AT PLACEMENT TIME, not deferred to the
+  next tick. The exec-list iterator's "captured next" behavior is what
+  prevents sprites from being VISITED twice in the same tick — but
+  placement itself already ran their initial frame.
+- On subsequent ticks, exec-list iteration order is "most recently
+  added first" (prepend-on-add). For a root-and-one-sprite SWF, that
+  means sprite runs BEFORE root each tick, so sprite scripts that
+  reference root state see root's prior-tick state, not its current
+  one.
 
 ## SWFRecomp's current behavior
 
@@ -291,7 +453,7 @@ patterns we care about.
 
 ## Phases
 
-### Phase 0 — Investigation (no code change to runtime)
+### Phase 0 — Investigation (no code change to runtime) — DONE 2026-05-24
 - Build the two controlled SWFs from
   [Investigation phase](#investigation-phase-confirm-the-model).
 - Run both through both runtimes; record exact trace per tick.
@@ -301,6 +463,37 @@ patterns we care about.
   `~/CC/ruffle/core/src/avm1/runtime.rs::Avm1::run_frame`
   (around line 479) end-to-end and cross-checking with the controlled
   experiments.
+
+**Result (initial reading): the plan's original framing seemed wrong**
+— sprite frame-0 (Load) runs synchronously at placement time in BOTH
+runtimes — but **printf instrumentation on Pong revealed the plan's
+mechanism is correct, just slightly mis-located**:
+
+- The "place + advance in same tick" pattern requires a sprite
+  **placed inside another sprite's frame_funcs[0]**. The outer
+  sprite's eager init in tagPlaceObject2 (tag.c:5690) advances the
+  outer sprite to `sprite_current_frame=1`. The placed sprite (now in
+  the outer's children DL) is then visited by
+  `advance_nested_sprite_frames` at end of the same tick and runs its
+  frame_funcs[1].
+- Pong: root places sprite_10, which during its frame_funcs[0] places
+  sprite_9, which during its frame_funcs[0] places progbar. After
+  root frame_funcs[0] returns, advance_nested_sprite_frames swaps into
+  sprite_10's children DL and advances sprite_9 to frame_funcs[1] —
+  which calls `_root.play()`.
+- My simple controlled SWFs don't exhibit this because their sprites
+  are at root level with no children — advance_nested_sprite_frames
+  swaps to an empty children DL.
+
+**Two distinct divergences in scope:**
+
+1. **Pong's "nested sprite advances same tick"** — fix matches the
+   plan's Option A/B/C concept. Use **Option B (placed_at_tick flag)**
+   per the analysis in "Still unexplained" above. Most surgical.
+2. **`sprite_first_tick_advance.swf`'s trace-ordering** (`F1` before
+   `SP-f2` instead of after) — separate bug at
+   swf.c:631/659. Leave for follow-up; no known test depends on this
+   ordering.
 
 ### Phase 1 — Build the snapshot infrastructure
 - Add a small per-tick snapshot struct (`DisplayListSnapshot` or

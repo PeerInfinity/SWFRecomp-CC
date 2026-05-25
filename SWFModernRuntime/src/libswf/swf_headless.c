@@ -768,6 +768,11 @@ void swfStart(SWFAppContext* app_context)
 	{
 		tick_count++;
 
+		// Bump global tick counter so DisplayObject.placed_at_tick stamps
+		// from this tick can be distinguished from earlier ticks. See
+		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
+		{ extern size_t g_tick_count; g_tick_count++; }
+
 		// Flash clears the action stack at each frame boundary — see swf_core.c
 		// for rationale. Key test: misc-swfc/stackscope.
 		app_context->sp = INITIAL_SP;
