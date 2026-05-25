@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-25T02:45:09.134187+00:00",
-    "old_git_sha": "fd99759a0576e7fa04d2092d46444204818492b5",
-    "new_timestamp": "2026-05-25T02:58:54.050338+00:00",
-    "new_git_sha": "d018fcc20f02c992a5e95c3c766e89bbe4928f30",
+    "old_timestamp": "2026-05-25T02:58:54.050338+00:00",
+    "old_git_sha": "d018fcc20f02c992a5e95c3c766e89bbe4928f30",
+    "new_timestamp": "2026-05-25T20:45:01.291767+00:00",
+    "new_git_sha": "e6a7f49230118957b7c44b05875a1c6f44f790b8",
     "partial": false,
     "same_commit": false
   },
@@ -25,26 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 109,
+    "unchanged": 110,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "action_order/PlaceAndRemove",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 15,
-        "expected_lines": 96,
-        "matching_lines": 15
-      },
-      "new_lines": {
-        "actual_lines": 45,
-        "expected_lines": 96,
-        "matching_lines": 15
-      }
-    }
-  ]
+  "changes": []
 }
