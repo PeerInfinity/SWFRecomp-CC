@@ -54161,8 +54161,15 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	extern MovieClip root_movieclip;
 	int _df1_is_child = (g_child_swf_init > 0 && g_current_context != NULL && g_current_context != &root_movieclip);
 
-	// Register function in global registry (unless in child SWF init)
-	if (!_df1_is_child) {
+	// Register function in global registry (unless in child SWF init).
+	// Skip anonymous functions: function_registry is consulted only by
+	// lookupFunctionByName, which matches on a non-empty name; anonymous
+	// entries can never satisfy a lookup, so registering them just leaks
+	// slots and eventually overflows the cap (Doodle Jump fills it in ~70
+	// timeline loops).  The pushed function value is always consumed by
+	// the next opcode (SetMember / SetVariable / StoreRegister / call-arg),
+	// which retains it through the normal reference path.
+	if (!_df1_is_child && name[0] != '\0') {
 		if (function_count < MAX_FUNCTIONS) {
 			function_registry[function_count++] = as_func;
 		} else {
@@ -54280,8 +54287,9 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	extern MovieClip root_movieclip;
 	int _df2_is_child = (g_child_swf_init > 0 && g_current_context != NULL && g_current_context != &root_movieclip);
 
-	// Register function in global registry (unless in child SWF init)
-	if (!_df2_is_child) {
+	// Register function in global registry (unless in child SWF init).
+	// Skip anonymous functions — see actionDefineFunction for rationale.
+	if (!_df2_is_child && name[0] != '\0') {
 		if (function_count < MAX_FUNCTIONS) {
 			function_registry[function_count++] = as_func;
 		} else {
