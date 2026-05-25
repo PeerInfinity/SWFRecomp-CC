@@ -816,13 +816,6 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		}
 		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
-		// Skip sprites placed this same tick — mirrors Ruffle's
-		// clip_exec_list "captured next before processing" semantics.
-		// tagPlaceObject2 ran the sprite's frame_0 eagerly during the
-		// placement (tag.c:5690) and set sprite_current_frame=1; visiting
-		// it again here would run frame_1 in the same tick. See
-		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
-		{ extern size_t g_tick_count; if (obj->placed_at_tick == g_tick_count) continue; }
 		Character* ch = &dictionary[obj->char_id];
 
 		// Recurse into button display lists to advance their sprite children
