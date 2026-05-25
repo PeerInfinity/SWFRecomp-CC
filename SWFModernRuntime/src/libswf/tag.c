@@ -6459,6 +6459,13 @@ void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth) {
 }
 void run_pending_finalize_mark_only(SWFAppContext* app_context) { (void)app_context; }
 void run_pending_finalize(SWFAppContext* app_context) { (void)app_context; }
+// Stub for browser-WASM graphics build: there's no pending-finalize queue
+// in this path (run_pending_finalize / queue_pending_finalize_mc are no-ops
+// above), so no depth can ever have a pending finalize. Returning 0 lets
+// tagPlaceObject2 / tagPlaceObject2WithClipActions / tagPlaceObject2Ratio
+// link cleanly when called from this build mode — they reference the
+// function unconditionally via `extern int ng_depth_has_pending_finalize`.
+int ng_depth_has_pending_finalize(size_t depth) { (void)depth; return 0; }
 #endif
 
 static void clear_display_entry(SWFAppContext* app_context, size_t depth)
