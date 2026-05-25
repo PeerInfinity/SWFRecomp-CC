@@ -154,8 +154,15 @@ ruffle-image-results.html
 # Local-only SWF batch artifacts (build_swf_batch.sh / clean_swf_batch.sh)
 docs/examples/local_batch/
 docs2/examples/local_batch/
+docs2/examples/glaiel/
+docs2/examples/flasharchive/
 docs/local_catalog.json
+docs2/local_catalog.json
+docs2/glaiel_catalog.json
+docs2/flasharchive_catalog.json
 SWFRecomp/tests/local_batch/
+SWFRecomp/tests/glaiel/
+SWFRecomp/tests/flasharchive/
 local_swf_batch/*.swf
 local_swf_batch/*.SWF
 

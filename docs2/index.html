@@ -371,6 +371,8 @@
 
             <!-- Demo cards -->
             <section class="demo-section" id="demo-section" style="display:none;">
+                <div id="glaiel-demos"></div>
+                <div id="flasharchive-demos"></div>
                 <div id="local-batch-demos"></div>
                 <div id="graphics-demos"></div>
                 <div id="trace-demos"></div>
@@ -412,19 +414,29 @@
         var searchQuery = '';
 
         // Fetch catalog.json (upstream-tracked: trace + graphics tests),
-        // local_catalog.json (gitignored: local-batch tests, may 404), and
-        // opcode-index.json in parallel. Local-batch entries get merged
-        // into the catalog.tests array if local_catalog.json is present.
+        // local_catalog.json + glaiel_catalog.json (gitignored, may 404), and
+        // opcode-index.json in parallel. Local-batch and glaiel entries get
+        // merged into the catalog.tests array if their catalog files are present.
         Promise.all([
             fetch('catalog.json').then(function(r) { return r.ok ? r.json() : null; }),
             fetch('local_catalog.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+            fetch('glaiel_catalog.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+            fetch('flasharchive_catalog.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
             fetch('opcode-index.json').then(function(r) { return r.ok ? r.json() : null; })
         ]).then(function(results) {
             catalog = results[0];
             var localCatalog = results[1];
-            opcodeIndex = results[2];
+            var glaielCatalog = results[2];
+            var flasharchiveCatalog = results[3];
+            opcodeIndex = results[4];
             if (catalog && localCatalog && Array.isArray(localCatalog.tests)) {
                 catalog.tests = (catalog.tests || []).concat(localCatalog.tests);
+            }
+            if (catalog && glaielCatalog && Array.isArray(glaielCatalog.tests)) {
+                catalog.tests = (catalog.tests || []).concat(glaielCatalog.tests);
+            }
+            if (catalog && flasharchiveCatalog && Array.isArray(flasharchiveCatalog.tests)) {
+                catalog.tests = (catalog.tests || []).concat(flasharchiveCatalog.tests);
             }
             document.getElementById('loading').style.display = 'none';
             renderPage();
@@ -453,6 +465,14 @@
             var localBatchCount = tests.filter(function(t) { return t.type === 'local_batch'; }).length;
             if (localBatchCount > 0) {
                 statsHtml += '<div class="stat"><span class="stat-value">' + localBatchCount + '</span><span class="stat-label">local batch demos</span></div>';
+            }
+            var glaielCount = tests.filter(function(t) { return t.type === 'glaiel'; }).length;
+            if (glaielCount > 0) {
+                statsHtml += '<div class="stat"><span class="stat-value">' + glaielCount + '</span><span class="stat-label">glaiel demos</span></div>';
+            }
+            var flasharchiveCount = tests.filter(function(t) { return t.type === 'flasharchive'; }).length;
+            if (flasharchiveCount > 0) {
+                statsHtml += '<div class="stat"><span class="stat-value">' + flasharchiveCount + '</span><span class="stat-label">flasharchive demos</span></div>';
             }
             statsBar.innerHTML = statsHtml;
             statsBar.style.display = 'flex';
@@ -547,18 +567,50 @@
             var graphics = tests.filter(function(t) { return t.type === 'graphics'; });
             var trace = tests.filter(function(t) { return t.type === 'trace'; });
             var localBatch = tests.filter(function(t) { return t.type === 'local_batch'; });
+            var glaiel = tests.filter(function(t) { return t.type === 'glaiel'; });
+            var flasharchive = tests.filter(function(t) { return t.type === 'flasharchive'; });
 
             // Apply filters
-            if (currentFilter === 'trace') { graphics = []; localBatch = []; }
-            if (currentFilter === 'graphics') { trace = []; localBatch = []; }
-            if (currentFilter === 'local_batch') { graphics = []; trace = []; }
+            if (currentFilter === 'trace') { graphics = []; localBatch = []; glaiel = []; flasharchive = []; }
+            if (currentFilter === 'graphics') { trace = []; localBatch = []; glaiel = []; flasharchive = []; }
+            if (currentFilter === 'local_batch') { graphics = []; trace = []; glaiel = []; flasharchive = []; }
+            if (currentFilter === 'glaiel') { graphics = []; trace = []; localBatch = []; flasharchive = []; }
+            if (currentFilter === 'flasharchive') { graphics = []; trace = []; localBatch = []; glaiel = []; }
 
             if (searchQuery) {
                 var q = searchQuery;
                 graphics = graphics.filter(function(t) { return matchesSearch(t, q); });
                 trace = trace.filter(function(t) { return matchesSearch(t, q); });
                 localBatch = localBatch.filter(function(t) { return matchesSearch(t, q); });
+                glaiel = glaiel.filter(function(t) { return matchesSearch(t, q); });
+                flasharchive = flasharchive.filter(function(t) { return matchesSearch(t, q); });
             }
+
+            var glHtml = '';
+            if (glaiel.length > 0) {
+                glHtml += '<h2 class="collapsible-header open" onclick="toggleSection(\'gl\')" id="gl-toggle" style="color: #00ACC1; border-bottom: 2px solid #00ACC1;">';
+                glHtml += '<span class="arrow">&#9654;</span> Glaiel <span style="color:#999;font-size:0.6em;font-weight:400;margin-left:8px;">' + glaiel.length + ' demos</span></h2>';
+                glHtml += '<div class="collapsible-body open" id="gl-body">';
+                glHtml += '<p style="margin-bottom: 15px; color: #b0b0b0;">SWFs from the glaiel game corpus, built locally via <code>build_swf_batch.sh --namespace glaiel</code>. Not part of the live demo on the project site.</p>';
+                glHtml += '<div class="demo-grid">';
+                glaiel.forEach(function(t) { glHtml += renderCard(t); });
+                glHtml += '</div></div>';
+            }
+            var glContainer = document.getElementById('glaiel-demos');
+            if (glContainer) glContainer.innerHTML = glHtml;
+
+            var faHtml = '';
+            if (flasharchive.length > 0) {
+                faHtml += '<h2 class="collapsible-header open" onclick="toggleSection(\'fa\')" id="fa-toggle" style="color: #66BB6A; border-bottom: 2px solid #66BB6A;">';
+                faHtml += '<span class="arrow">&#9654;</span> Flash Archive <span style="color:#999;font-size:0.6em;font-weight:400;margin-left:8px;">' + flasharchive.length + ' demos</span></h2>';
+                faHtml += '<div class="collapsible-body open" id="fa-body">';
+                faHtml += '<p style="margin-bottom: 15px; color: #b0b0b0;">SWFs from a Flash archive, built locally via <code>build_swf_batch.sh --namespace flasharchive</code>. Not part of the live demo on the project site.</p>';
+                faHtml += '<div class="demo-grid">';
+                flasharchive.forEach(function(t) { faHtml += renderCard(t); });
+                faHtml += '</div></div>';
+            }
+            var faContainer = document.getElementById('flasharchive-demos');
+            if (faContainer) faContainer.innerHTML = faHtml;
 
             var lbHtml = '';
             if (localBatch.length > 0) {
@@ -598,16 +650,20 @@
             document.getElementById('trace-demos').innerHTML = traceHtml;
 
             document.getElementById('demo-section').style.display =
-                (graphics.length > 0 || trace.length > 0 || localBatch.length > 0) ? 'block' : 'none';
+                (graphics.length > 0 || trace.length > 0 || localBatch.length > 0 || glaiel.length > 0 || flasharchive.length > 0) ? 'block' : 'none';
         }
 
         function renderCard(t) {
-            var isGfx = t.type === 'graphics' || t.type === 'local_batch';
+            var isGfx = t.type === 'graphics' || t.type === 'local_batch' || t.type === 'glaiel' || t.type === 'flasharchive';
             var cls = isGfx ? 'demo-card graphics' : 'demo-card';
             var badge = isGfx ? '<span class="card-badge">WebGPU</span>' : '';
             var defaultDesc = t.type === 'local_batch'
                 ? 'Local batch SWF (WebGPU build).'
-                : (isGfx ? 'WebGPU-rendered Flash graphics demo.' : 'Flash SWF trace demo.');
+                : (t.type === 'glaiel'
+                    ? 'Glaiel-corpus SWF (WebGPU build).'
+                    : (t.type === 'flasharchive'
+                        ? 'Flash-archive SWF (WebGPU build).'
+                        : (isGfx ? 'WebGPU-rendered Flash graphics demo.' : 'Flash SWF trace demo.')));
             var desc = t.description || defaultDesc;
             var demoUrl = 'demo.html?test=' + t.id;
             var compareUrl = demoUrl + '&compare=true';

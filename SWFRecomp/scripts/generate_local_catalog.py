@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
-"""Generate docs/local_catalog.json from docs/examples/local_batch/.
+"""Generate <docs_dir>/<catalog_name> from <docs_dir>/examples/<namespace>/.
 
 Mirrors the per-entry schema used by docs/catalog.json's `tests` array:
-each test gets id="local_batch/<name>", type="local_batch", path,
+each test gets id="<namespace>/<name>", type=<type>, path,
 js_file/wasm_file, has_swf, plus metadata pulled from test_info.json.
 
 Kept separate from the official catalog.json so build_swf_batch.sh /
 clean_swf_batch.sh can manage local builds without touching the
 upstream-tracked catalog. docs/index.html fetches both files.
+
+Defaults preserve the original behavior:
+    namespace    = local_batch
+    catalog_name = local_catalog.json
+    type         = local_batch
 """
+import argparse
 import json
 import os
-import sys
 from datetime import datetime, timezone
 
 
-def collect_tests(local_batch_dir):
+def collect_tests(local_batch_dir, namespace, demo_type):
     tests = []
     if not os.path.isdir(local_batch_dir):
         return tests
@@ -30,10 +35,10 @@ def collect_tests(local_batch_dir):
             continue
 
         entry = {
-            "id": f"local_batch/{name}",
+            "id": f"{namespace}/{name}",
             "name": name,
-            "type": "local_batch",
-            "path": f"examples/local_batch/{name}",
+            "type": demo_type,
+            "path": f"examples/{namespace}/{name}",
             "has_swf": os.path.exists(os.path.join(test_dir, "test.swf")),
             "wasm_file": wasm_files[0],
         }
@@ -59,21 +64,31 @@ def collect_tests(local_batch_dir):
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: generate_local_catalog.py <docs_dir>", file=sys.stderr)
-        sys.exit(1)
-    docs_dir = sys.argv[1]
-    local_batch_dir = os.path.join(docs_dir, "examples", "local_batch")
-    out_path = os.path.join(docs_dir, "local_catalog.json")
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("docs_dir", help="Path to docs (or docs2) directory")
+    ap.add_argument("--namespace", default="local_batch",
+                    help="Subdir name under <docs_dir>/examples/ to scan, also "
+                         "the id prefix (default: local_batch)")
+    ap.add_argument("--catalog-name", default="local_catalog.json",
+                    help="Output filename written under <docs_dir> "
+                         "(default: local_catalog.json)")
+    ap.add_argument("--type", default=None,
+                    help="Value for each entry's 'type' field "
+                         "(default: same as --namespace)")
+    args = ap.parse_args()
 
-    tests = collect_tests(local_batch_dir)
+    demo_type = args.type if args.type is not None else args.namespace
+    local_batch_dir = os.path.join(args.docs_dir, "examples", args.namespace)
+    out_path = os.path.join(args.docs_dir, args.catalog_name)
+
+    tests = collect_tests(local_batch_dir, args.namespace, demo_type)
     catalog = {
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "tests": tests,
     }
     with open(out_path, "w") as f:
         json.dump(catalog, f, indent=2)
-    print(f"Wrote {out_path} with {len(tests)} local-batch tests")
+    print(f"Wrote {out_path} with {len(tests)} {demo_type} tests")
 
 
 if __name__ == "__main__":

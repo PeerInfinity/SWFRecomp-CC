@@ -471,7 +471,10 @@
         document.getElementById('test-section').style.display = 'block';
 
         // Determine if graphics test (local_batch demos are also WebGPU-rendered)
-        const isGraphics = testId.startsWith('graphics/') || testId.startsWith('local_batch/');
+        const isGraphics = testId.startsWith('graphics/')
+            || testId.startsWith('local_batch/')
+            || testId.startsWith('glaiel/')
+            || testId.startsWith('flasharchive/');
         const baseName = testId.includes('/') ? testId.split('/').pop() : testId;
         const testDir = 'examples/' + testId + '/';
 

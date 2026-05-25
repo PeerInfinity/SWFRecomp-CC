@@ -1,15 +1,23 @@
 #!/bin/bash
-# Batch-build a directory of SWF files as graphics demos and add them to the
-# local "Local Batch" category on the demo page.
+# Batch-build a directory of SWF files as graphics demos and add them to a
+# category on the demo page.
 #
 # Intended for LOCAL testing only. The build artifacts and test-scratch dirs
 # can all be removed by clean_swf_batch.sh.
 #
 # Usage:
 #   ./scripts/build_swf_batch.sh [swf_dir] [--skip-existing]
+#                                [--docs-dir <relpath>]
+#                                [--namespace <name>]
+#                                [--catalog-name <file>]
+#                                [--demo-type <type>]
 #
 # Defaults:
-#   swf_dir = <repo_root>/local_swf_batch/
+#   swf_dir       = <repo_root>/local_swf_batch/
+#   --docs-dir    = docs            (relative to <repo_root>)
+#   --namespace   = local_batch     (used for tests/<ns>/, examples/<ns>/, id prefix)
+#   --catalog-name = local_catalog.json
+#   --demo-type   = <namespace>     (value written to .demo_type and catalog "type")
 #
 # Modes:
 #   default        — every SWF in swf_dir is rebuilt from scratch each run.
@@ -20,9 +28,9 @@
 #                    Only new SWFs get processed. Useful for incremental
 #                    additions to an existing batch.
 #
-# Each *.swf in swf_dir becomes a test under SWFRecomp/tests/local_batch/<name>/
-# and gets deployed to docs/examples/local_batch/<name>/. Ruffle comparison is
-# enabled automatically by copying the original test.swf into the deploy dir.
+# Each *.swf in swf_dir becomes a test under SWFRecomp/tests/<namespace>/<name>/
+# and gets deployed to <docs-dir>/examples/<namespace>/<name>/. Ruffle comparison
+# is enabled automatically by copying the original test.swf into the deploy dir.
 
 set -e
 
@@ -33,9 +41,28 @@ REPO_ROOT="$(cd "${SWFRECOMP_ROOT}/.." && pwd)"
 # Parse args: first non-flag is swf_dir; flags can appear in any position.
 SKIP_EXISTING=0
 SWF_DIR=""
+DOCS_DIR_REL="docs"
+BATCH_NAMESPACE="local_batch"
+CATALOG_NAME="local_catalog.json"
+DEMO_TYPE=""
+EXPECT_VALUE=""
 for arg in "$@"; do
+    if [ -n "$EXPECT_VALUE" ]; then
+        case "$EXPECT_VALUE" in
+            docs-dir) DOCS_DIR_REL="$arg" ;;
+            namespace) BATCH_NAMESPACE="$arg" ;;
+            catalog-name) CATALOG_NAME="$arg" ;;
+            demo-type) DEMO_TYPE="$arg" ;;
+        esac
+        EXPECT_VALUE=""
+        continue
+    fi
     case "$arg" in
         --skip-existing) SKIP_EXISTING=1 ;;
+        --docs-dir) EXPECT_VALUE=docs-dir ;;
+        --namespace) EXPECT_VALUE=namespace ;;
+        --catalog-name) EXPECT_VALUE=catalog-name ;;
+        --demo-type) EXPECT_VALUE=demo-type ;;
         --*) echo "Error: unknown flag: $arg"; exit 1 ;;
         *)
             if [ -z "$SWF_DIR" ]; then
@@ -47,10 +74,14 @@ for arg in "$@"; do
             ;;
     esac
 done
+if [ -n "$EXPECT_VALUE" ]; then
+    echo "Error: --${EXPECT_VALUE} requires a value"
+    exit 1
+fi
 SWF_DIR=${SWF_DIR:-"${REPO_ROOT}/local_swf_batch"}
-DOCS_DIR="${REPO_ROOT}/docs"
+DEMO_TYPE=${DEMO_TYPE:-"${BATCH_NAMESPACE}"}
+DOCS_DIR="${REPO_ROOT}/${DOCS_DIR_REL}"
 EXAMPLES_DIR="${DOCS_DIR}/examples"
-BATCH_NAMESPACE="local_batch"
 TESTS_BATCH_ROOT="${SWFRECOMP_ROOT}/tests/${BATCH_NAMESPACE}"
 DEPLOY_BATCH_ROOT="${EXAMPLES_DIR}/${BATCH_NAMESPACE}"
 
@@ -190,7 +221,7 @@ PY_EOF
     fi
 
     # Override .demo_type so the index/catalog can group these separately.
-    echo "${BATCH_NAMESPACE}" > "${EXAMPLES_DIR}/${rel_test_name}/.demo_type"
+    echo "${DEMO_TYPE}" > "${EXAMPLES_DIR}/${rel_test_name}/.demo_type"
 
     SUCCESS=$((SUCCESS + 1))
     echo "  OK"
@@ -198,12 +229,15 @@ PY_EOF
 done
 
 # ---------------------------------------------------------------
-# Generate docs/local_catalog.json (separate from the upstream-tracked
+# Generate <docs-dir>/<catalog-name> (separate from the upstream-tracked
 # catalog.json so the local build process doesn't dirty the live demo
-# catalog). docs/index.html fetches both files and merges them.
+# catalog). The index page fetches both files and merges them.
 # ---------------------------------------------------------------
-echo "Generating local_catalog.json..."
-python3 "${SCRIPT_DIR}/generate_local_catalog.py" "${DOCS_DIR}"
+echo "Generating ${CATALOG_NAME}..."
+python3 "${SCRIPT_DIR}/generate_local_catalog.py" "${DOCS_DIR}" \
+    --namespace "${BATCH_NAMESPACE}" \
+    --catalog-name "${CATALOG_NAME}" \
+    --type "${DEMO_TYPE}"
 
 echo ""
 echo "========================================="
@@ -219,5 +253,5 @@ if [ ${FAIL} -gt 0 ]; then
     done
 fi
 echo ""
-echo "Open ${DOCS_DIR}/index.html (or serve docs/) to see the new"
-echo "\"Local Batch\" category. Run clean_swf_batch.sh to remove everything."
+echo "Open ${DOCS_DIR}/index.html (or serve ${DOCS_DIR_REL}/) to see the"
+echo "\"${BATCH_NAMESPACE}\" category. Run clean_swf_batch.sh to remove everything."
