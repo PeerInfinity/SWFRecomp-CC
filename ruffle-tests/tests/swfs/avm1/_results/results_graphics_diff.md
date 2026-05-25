@@ -1,26 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6fe6fb1a2f62` (2026-05-24T23:52:34.184519+00:00)
-**Current:** `fd99759a0576` (2026-05-25T02:45:09.096122+00:00)
+**Previous:** `fd99759a0576` (2026-05-25T02:45:09.096122+00:00)
+**Current:** `d018fcc20f02` (2026-05-25T02:58:54.011837+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 614 | 613 | -1 |
+| Passing | 613 | 614 | +1 |
 | Total | 671 | 671 | 0 |
-| Pass rate | 91.5% | 91.4% | -0.1% |
-| Mismatched lines | 9598 | 9715 | +117 |
-|   Increased | | | +117 |
+| Pass rate | 91.4% | 91.5% | +0.1% |
+| Mismatched lines | 9715 | 9598 | -117 |
+|   Decreased | | | -117 |
 
-## Newly Failing (1)
+## Newly Passing (1)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `execution_order4` | output_mismatch | 12/12 | 8/12 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `execution_order4` | output_mismatch | 8/12 | 12/12 |
 
 ## Status Changed (1)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `native_objects_swf6` | output_mismatch | segfault | 114/115 | 1/115 |
+| `native_objects_swf6` | segfault | output_mismatch | 1/115 | 114/115 |

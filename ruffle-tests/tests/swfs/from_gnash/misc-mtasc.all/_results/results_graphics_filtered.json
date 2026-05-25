@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-05-25T02:45:09.130796+00:00",
-    "git_sha": "fd99759a0576e7fa04d2092d46444204818492b5",
-    "duration_seconds": 134.75,
+    "timestamp": "2026-05-25T02:58:54.046949+00:00",
+    "git_sha": "d018fcc20f02c992a5e95c3c766e89bbe4928f30",
+    "duration_seconds": 8.08,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30,
@@ -24,8 +24,8 @@
       "test": "TextFieldTest",
       "phases": {
         "recomp": 0.006,
-        "compile": 20.973,
-        "run": 0.348
+        "compile": 0.57,
+        "run": 0.333
       },
       "num_frames": 30,
       "lines": {
@@ -33,7 +33,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 21.33,
+      "duration": 0.92,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -43,8 +43,8 @@
       "test": "enum",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.344,
-        "run": 0.178
+        "compile": 0.572,
+        "run": 0.207
       },
       "num_frames": 30,
       "lines": {
@@ -52,15 +52,15 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 20.53,
+      "duration": 0.79,
       "status": "pass"
     },
     {
       "test": "exception",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.158,
-        "run": 0.204
+        "compile": 0.612,
+        "run": 0.218
       },
       "num_frames": 30,
       "lines": {
@@ -68,15 +68,15 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 20.37,
+      "duration": 0.84,
       "status": "pass"
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.539,
-        "run": 0.214
+        "compile": 0.561,
+        "run": 0.206
       },
       "num_frames": 30,
       "lines": {
@@ -84,15 +84,15 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 20.76,
+      "duration": 0.77,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.898,
-        "run": 0.205
+        "compile": 0.474,
+        "run": 0.177
       },
       "num_frames": 30,
       "lines": {
@@ -100,15 +100,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 20.11,
+      "duration": 0.66,
       "status": "pass"
     },
     {
       "test": "implementsOpTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.089,
-        "run": 0.222
+        "compile": 0.654,
+        "run": 0.22
       },
       "num_frames": 30,
       "lines": {
@@ -116,15 +116,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 22.32,
+      "duration": 0.88,
       "status": "pass"
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.181,
-        "run": 0.208
+        "compile": 0.624,
+        "run": 0.221
       },
       "num_frames": 30,
       "lines": {
@@ -132,15 +132,15 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 2.4,
+      "duration": 0.85,
       "status": "pass"
     },
     {
       "test": "levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.143,
-        "run": 0.237
+        "compile": 0.729,
+        "run": 0.252
       },
       "num_frames": 30,
       "lines": {
@@ -148,7 +148,7 @@
         "expected_lines": 68,
         "matching_lines": 49
       },
-      "duration": 4.39,
+      "duration": 0.99,
       "ruffle_diff_count": 21,
       "ours_diff_count": 19,
       "status": "ruffle_matched",
@@ -158,8 +158,8 @@
       "test": "super_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.842,
-        "run": 0.173
+        "compile": 0.63,
+        "run": 0.218
       },
       "num_frames": 30,
       "lines": {
@@ -167,7 +167,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 2.02,
+      "duration": 0.85,
       "status": "pass"
     }
   ]
