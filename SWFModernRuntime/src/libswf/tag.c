@@ -3360,10 +3360,27 @@ void tagShowFrame(SWFAppContext* app_context)
 		MovieClip* _si_parent = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 		process_sprite_needs_init(app_context, _si_parent);
 	}
-#  endif
 
 	// --- Advance sprite timelines (recursive) ---
 	advance_sprite_frames(app_context);
+#  else
+	// Browser-WASM: tagShowFrame is the only sprite-advance pump in this
+	// build (unlike OFFSCREEN_RENDER, where swf.c's main tick loop runs
+	// the same defer+nested pattern). Without the nested pass, sprites
+	// parented to 1-frame containers never advance: advance_sprite_frames
+	// short-circuits at the 1-frame !just_allocated check and the inline
+	// recursion is skipped along with it. Key symptom: Pong stuck at
+	// preloader (sprite_9 inside 1-frame sprite_10). See
+	// SWFRecompDocs/status/2026-05-25-pong-browser-diagnosis.md.
+	{
+		extern int g_advance_defer_nested;
+		extern void advance_nested_sprite_frames(SWFAppContext* app_context);
+		g_advance_defer_nested = 1;
+		advance_sprite_frames(app_context);
+		g_advance_defer_nested = 0;
+		advance_nested_sprite_frames(app_context);
+	}
+#  endif
 
 	// Enable root onEnterFrame dispatch after first frame
 	{

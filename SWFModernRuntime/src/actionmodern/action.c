@@ -63487,6 +63487,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					return;
 				}
 			}
+#else
+			// Browser-WASM: same root-receiver short-circuit as the
+			// NO_GRAPHICS/OFFSCREEN_RENDER block above. Without it, an
+			// `_root.play()` issued from inside a sprite (the standard
+			// preloader pattern) falls through to actionPlay, which acts
+			// on the current sprite (via targeted_sprite/g_current_context)
+			// rather than the root timeline.
+			{
+				extern MovieClip root_movieclip;
+				extern int is_playing;
+				if (mc == &root_movieclip) {
+					is_playing = 1;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+			}
 #endif
 			actionPlay(app_context);
 			if (args != NULL) FREE(args);
@@ -63514,6 +63531,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (depth != SIZE_MAX) {
 					extern DisplayObject* display_list;
 					display_list[depth].sprite_is_playing = 0;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+			}
+#else
+			// Browser-WASM: symmetric with the play arm above.
+			{
+				extern MovieClip root_movieclip;
+				extern int is_playing;
+				if (mc == &root_movieclip) {
+					is_playing = 0;
 					if (args != NULL) FREE(args);
 					pushUndefined(app_context);
 					return;
