@@ -1,28 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6fe6fb1a2f62` (2026-05-24T23:16:42.727939+00:00)
-**Current:** `fd99759a0576` (2026-05-25T02:39:06.042821+00:00)
+**Previous:** `fd99759a0576` (2026-05-25T02:39:06.042821+00:00)
+**Current:** `d018fcc20f02` (2026-05-25T03:01:17.928031+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 67 | 66 | -1 |
+| Passing | 66 | 66 | 0 |
 | Total | 110 | 110 | 0 |
-| Pass rate | 60.9% | 60.0% | -0.9% |
-| Mismatched lines | 1204 | 1217 | +13 |
-|   Increased | | | +13 |
+| Pass rate | 60.0% | 60.0% | 0% |
+| Mismatched lines | 1217 | 1217 | 0 |
 
-## Newly Failing (1)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `action_order/action_execution_order_test` | output_mismatch | 19/19 | 7/19 |
-
-## Line Count Changed (3)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
 | `action_order/PlaceAndRemove` | output_mismatch | 15/96 | 15/96 | 0 |
-| `action_order/action_execution_order_test5` | output_mismatch | 26/35 | 26/35 | 0 |
-| `action_order/action_execution_order_extend_test` | output_mismatch | 8/32 | 7/32 | +1 |
