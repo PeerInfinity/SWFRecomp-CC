@@ -4583,33 +4583,27 @@ void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* variable_name, u16 flags,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// EditText registration is required wherever actionIterateTextFieldGlyphs
+	// runs — including browser-WASM (USE_WEBGPU without OFFSCREEN_RENDER) —
+	// otherwise dynamic glyph rendering finds nothing to iterate and the
+	// static-glyph skip in render_single_object/render_display_list can't
+	// recognize the char as an EditText. The bounds are also needed for
+	// sprite content bounds and SetVariable resolution against
+	// `variable_name`, so just always record.
 	ng_record_textfield_props(app_context, char_id, plain_text, raw_html_text, text_color,
 		font_id, font_height, max_length,
 		align, left_margin, right_margin, indent, leading,
 		variable_name, flags,
 		bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
-	// Also record char bounds so edittext participates in sprite content bounds
 	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
-#else
-	// Graphics mode doesn't need separate EditText properties tracking
-	(void)app_context; (void)char_id; (void)plain_text; (void)raw_html_text;
-	(void)text_color; (void)font_id; (void)font_height; (void)max_length;
-	(void)align; (void)left_margin; (void)right_margin; (void)indent;
-	(void)leading; (void)variable_name; (void)flags;
-	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
-#endif
 }
 
 void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char* grid_fit_type,
     float thickness, float sharpness)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// CSMTextSettings is anti-aliasing/grid-fit metadata used by glyph
+	// rendering; needed wherever text rendering runs (incl. browser-WASM).
 	ng_record_csm(text_id, anti_alias_type, grid_fit_type, thickness, sharpness);
-#else
-	(void)text_id; (void)anti_alias_type; (void)grid_fit_type;
-	(void)thickness; (void)sharpness;
-#endif
 }
 
 // Initialize cx_* fields of a display object to identity color transform.

@@ -54248,13 +54248,33 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 	// timeline loops).  The pushed function value is always consumed by
 	// the next opcode (SetMember / SetVariable / StoreRegister / call-arg),
 	// which retains it through the normal reference path.
+	//
+	// Dedup by name: if a named function is redefined (e.g. a prototype
+	// method redefined every timeline loop), replace the existing registry
+	// slot rather than appending. lookupFunctionByName already returns the
+	// most recently registered match (reverse search), so replacing in place
+	// preserves semantics while keeping the registry bounded under repeated
+	// redefinition. Without this Doodle Jump's browser-WASM path overflows
+	// MAX_FUNCTIONS once tagDefineEditTextProps starts firing AS scripts
+	// that redefine SpyConnection1 prototype methods on every tick.
 	if (!_df1_is_child && name[0] != '\0') {
-		if (function_count < MAX_FUNCTIONS) {
-			function_registry[function_count++] = as_func;
-		} else {
-			fprintf(stderr, "ERROR: Function registry full\n");
-			free(as_func);
-			return;
+		int _df1_replaced = 0;
+		for (u32 _df1_i = 0; _df1_i < function_count; _df1_i++) {
+			if (function_registry[_df1_i] != NULL &&
+			    strcmp(function_registry[_df1_i]->name, name) == 0) {
+				function_registry[_df1_i] = as_func;
+				_df1_replaced = 1;
+				break;
+			}
+		}
+		if (!_df1_replaced) {
+			if (function_count < MAX_FUNCTIONS) {
+				function_registry[function_count++] = as_func;
+			} else {
+				fprintf(stderr, "ERROR: Function registry full\n");
+				free(as_func);
+				return;
+			}
 		}
 	}
 
@@ -54367,14 +54387,26 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 	int _df2_is_child = (g_child_swf_init > 0 && g_current_context != NULL && g_current_context != &root_movieclip);
 
 	// Register function in global registry (unless in child SWF init).
-	// Skip anonymous functions — see actionDefineFunction for rationale.
+	// Skip anonymous functions, dedup named redefinitions — see
+	// actionDefineFunction for rationale.
 	if (!_df2_is_child && name[0] != '\0') {
-		if (function_count < MAX_FUNCTIONS) {
-			function_registry[function_count++] = as_func;
-		} else {
-			fprintf(stderr, "ERROR: Function registry full\n");
-			free(as_func);
-			return;
+		int _df2_replaced = 0;
+		for (u32 _df2_i = 0; _df2_i < function_count; _df2_i++) {
+			if (function_registry[_df2_i] != NULL &&
+			    strcmp(function_registry[_df2_i]->name, name) == 0) {
+				function_registry[_df2_i] = as_func;
+				_df2_replaced = 1;
+				break;
+			}
+		}
+		if (!_df2_replaced) {
+			if (function_count < MAX_FUNCTIONS) {
+				function_registry[function_count++] = as_func;
+			} else {
+				fprintf(stderr, "ERROR: Function registry full\n");
+				free(as_func);
+				return;
+			}
 		}
 	}
 
