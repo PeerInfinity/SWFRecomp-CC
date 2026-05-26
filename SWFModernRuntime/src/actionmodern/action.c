@@ -21032,6 +21032,19 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					}
 				}
 				mc->ng_textfield_idx = tf_idx;
+				// Set width/height from the EditText bounds so
+				// actionIterateTextFieldGlyphs builds the right stencil mask
+				// (without this, info.w/h are 0, the mask shrinks to nothing,
+				// and per-glyph layout reads zero-extent bounds). The root
+				// branch below already sets these for top-level EditTexts;
+				// nested EditTexts (e.g. labels inside a button sprite) reach
+				// this branch and would otherwise keep mc->width/height at 0.
+				{
+					s32 _bxmin, _bxmax, _bymin, _bymax;
+					ng_getTextFieldBounds(tf_idx, &_bxmin, &_bxmax, &_bymin, &_bymax);
+					mc->width = (float)(_bxmax - _bxmin) / 20.0f;
+					mc->height = (float)(_bymax - _bymin) / 20.0f;
+				}
 				u16 tf_flags = ng_getTextFieldFlags(tf_idx);
 				// text (initial)
 				const char* init_text = ng_getTextFieldInitialTextByIdx(tf_idx);

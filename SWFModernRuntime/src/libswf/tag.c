@@ -777,6 +777,14 @@ static void fire_recursive_child_unloads(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc);
 #endif
 
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+// Forward decls — defined alongside tagRemoveObject2 below. Browser-WASM only:
+// invalidate cached descendant MCs of a removed/replaced sprite, so iteration
+// walks (e.g. actionIterateTextFieldGlyphs) stop drawing their glyphs.
+static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* parent);
+static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject* obj);
+#endif
+
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
@@ -5604,6 +5612,21 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	int is_cross_frame_replace = display_list[depth].char_id != 0
 	                              && display_list[depth].place_gen != g_place_gen;
 
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM: before we overwrite this slot's char_id and drop the old
+	// sprite_display_list pointer, invalidate the cached MC bound to this
+	// display entry and all its descendants. Without this,
+	// actionIterateTextFieldGlyphs keeps rendering their glyphs after the new
+	// char_id has replaced the old at this depth (Doodle Jump menu→gameplay
+	// transition: depth 8's "play" button is PlaceObject2-replaced rather
+	// than RemoveObject2'd, so the tagRemoveObject2 cleanup path doesn't
+	// see it).
+	if (display_list[depth].char_id != 0)
+	{
+		invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
+	}
+#endif
+
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
 	ng_cache_transform(&display_list[depth], transform_id);
@@ -6668,6 +6691,56 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	display_list[depth].clone_replaced = 0;
 }
 
+// Browser-WASM cleanup helper: find any cached MC bound to a specific
+// DisplayObject (via mc->display_obj), invalidate it, and recursively
+// invalidate all its descendants. Used by tagRemoveObject2 / tagPlaceObject2
+// in browser-WASM to mirror the invalidation side-effect of
+// fire_recursive_child_unloads, without queueing AS-level UNLOAD handlers
+// (browser-WASM lacks the actionFirePendingUnloads drain path that the
+// NO_GRAPHICS||OFFSCREEN_RENDER builds run from tagShowFrame). Identifying
+// the MC by DisplayObject pointer is essential because multiple sprite
+// instances of the same character (e.g. Doodle Jump's 4 menu button sprites)
+// hold child MCs that share name+depth — actionInvalidateCachedMovieClip
+// can't tell them apart and would invalidate the wrong instance's child.
+// Without this, when the 4 menu buttons are removed, 3 children get
+// invalidated and 1 keeps rendering after menu→gameplay.
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+extern void actionInvalidateCachedMovieClipDirect(SWFAppContext* app_context, MovieClip* mc);
+static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* parent)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	if (parent == NULL) return;
+	// Iterate child_mc_cache for direct children of `parent`, recursing into
+	// each. O(N²) worst case but N is small for typical SWFs.
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (mc->parent != parent) continue;
+		invalidate_descendants_of_mc(app_context, mc);
+		actionInvalidateCachedMovieClipDirect(app_context, mc);
+	}
+}
+
+// Find the cached MC whose display_obj == `obj`, then invalidate it and all
+// its descendants. NULL display_obj match is skipped because many cached MCs
+// (e.g. dynamically-created clones) have display_obj=NULL legitimately.
+static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject* obj)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	if (obj == NULL) return;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (mc->display_obj != (void*)obj) continue;
+		invalidate_descendants_of_mc(app_context, mc);
+		actionInvalidateCachedMovieClipDirect(app_context, mc);
+		break;
+	}
+}
+#endif
+
 // Recursively fire CLIP_EVENT_UNLOAD for children of a display object.
 // Fires children-first (depth order within each sprite's display list),
 // recursing into nested sprites before firing the child's own unload.
@@ -6788,6 +6861,9 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 			clear_display_entry(app_context, depth);
 		}
 #else
+		// Browser-WASM: mirror tagRemoveObject2 cleanup so descendants don't
+		// keep rendering after the parent sprite is removed.
+		invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
 		clear_display_entry(app_context, depth);
 #endif
 	}
@@ -6978,6 +7054,13 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			clear_display_entry(app_context, depth);
 		}
 #else
+		// Browser-WASM: invalidate the cached MC bound to this display entry
+		// and recursively its descendants (EditText children, nested sprites)
+		// before clearing the slot. Identifies the MC via display_obj pointer
+		// equality — name+depth lookup is ambiguous when multiple sprite
+		// instances of the same character share child names (e.g. Doodle
+		// Jump's 4 menu buttons each contain a "button_txt" EditText).
+		invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
 		clear_display_entry(app_context, depth);
 #endif
 	}
