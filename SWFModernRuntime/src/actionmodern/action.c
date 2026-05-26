@@ -20345,7 +20345,6 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline);
 static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size, int is_multiline);
 static TFRun* tf_find_run_at_index(TFRunTable* table, u32 char_idx);
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Find a display entry by name, first in root display list, then in parent sprite.
 // Returns the root depth or encoded depth, SIZE_MAX if not found.
 // Also fills *out_char_id with the found entry's char_id.
@@ -20407,7 +20406,6 @@ static int mc_is_nonscriptable_shape(MovieClip* mc) {
 	if (cid == 0) return 0;
 	return !ng_isScriptableChar(cid);
 }
-#endif
 
 // Unbound-TextField retry queue. Mirrors Ruffle's
 // `context.unbound_text_fields: Vec<EditText>` (core/src/context.rs). When a
@@ -20586,7 +20584,6 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
 	(void)condense_white; (void)is_multiline;
 
 	char plain_buf[16384];
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Run-table system available: full HTML parse + derived-prop sync.
 	TFRunTable* table = tf_get_table(mc);
 	table->from_html_text = 1;
@@ -20645,19 +20642,6 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
 
 	// Extract plain text (with \r as paragraph separator for storage)
 	tf_get_plain_text(table, plain_buf, sizeof(plain_buf), is_multiline);
-#else
-	// Graphics-mode WASM: simple tag-strip fallback.
-	u32 pi = 0;
-	for (u32 si = 0; _ht_buf[si] && pi < sizeof(plain_buf) - 1; si++) {
-		if (_ht_buf[si] == '<') {
-			while (_ht_buf[si] && _ht_buf[si] != '>') si++;
-			if (!_ht_buf[si]) break;
-		} else {
-			plain_buf[pi++] = _ht_buf[si];
-		}
-	}
-	plain_buf[pi] = '\0';
-#endif
 	u32 plain_len = (u32)strlen(plain_buf);
 
 	// Convert plain text to UTF-16 and store as "text" + "length"
@@ -20981,7 +20965,6 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 		}
 	}
 	if (mc != NULL) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Check if textfield was re-placed with a different char_id
 		size_t cdepth = ng_findDisplayEntryByName(instance_name);
 		if (cdepth != SIZE_MAX && ng_isTextFieldAtDepth(cdepth)) {
@@ -20991,13 +20974,11 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				is_new = 1;
 			}
 		}
-#endif
 		if (!is_new) return mc;
 	} else {
 		// Use the actual display list instance name (not the lookup name)
 		// so the MC's name/target reflect the canonical name
 		const char* canonical_name = instance_name;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		{
 			size_t d = ng_findDisplayEntryByName(instance_name);
 			if (d != SIZE_MAX) {
@@ -21006,12 +20987,10 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					canonical_name = display_list[d].instance_name;
 			}
 		}
-#endif
 		mc = createMovieClip(canonical_name, parent);
 		is_new = 1;
 	}
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Init or re-init: sync x/y from transform_data
 	if (mc != NULL) {
 		size_t depth = ng_findDisplayEntryByName(instance_name);
@@ -21604,21 +21583,6 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			}
 		}
 	}
-#else
-	// Graphics mode: sync initial x/y from display list transform
-	if (is_new && mc != NULL) {
-		size_t depth = ng_findDisplayEntryByName(instance_name);
-		if (depth != SIZE_MAX) {
-			mc->depth = (int)depth - 16384;
-			extern DisplayObject* display_list;
-			u32 tid = display_list[depth].transform_id;
-			float* xform = (float*)app_context->transform_data + tid * 16;
-			mc->x = xform[12] / 20.0f;  // twips to pixels
-			mc->y = xform[13] / 20.0f;
-			mc->display_obj = (void*)&display_list[depth];
-		}
-	}
-#endif
 	if (is_new && mc != NULL) {
 		// Only add to cache if it's a brand new MC (not a re-init of cached one)
 		int already_cached = 0;
@@ -45637,7 +45601,6 @@ void actionSetMember(SWFAppContext* app_context)
 					// Quantize through 8.8 fixed-point like Flash's color transform
 					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
 					mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 					// Sync with display list cx_aa so Color.getTransform() reads the updated value
 					{
 						extern size_t ng_findDisplayEntryByName(const char* name);
@@ -45645,7 +45608,6 @@ void actionSetMember(SWFAppContext* app_context)
 						if (_dep != SIZE_MAX)
 							ng_setCTAlpha(_dep, (double)mc->cx_aa);
 					}
-#endif
 					return;
 				}
 				if (strcasecmp(prop_name, "_visible") == 0) {
@@ -45805,10 +45767,8 @@ void actionSetMember(SWFAppContext* app_context)
 						char old_name[256];
 						strncpy(old_name, mc->name, sizeof(old_name) - 1);
 						old_name[sizeof(old_name) - 1] = '\0';
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						extern void ng_renameDisplayEntry(const char* old_name, const char* new_name);
 						ng_renameDisplayEntry(mc->name, new_name);
-#endif
 						strncpy(mc->name, new_name, sizeof(mc->name) - 1);
 						mc->name[sizeof(mc->name) - 1] = '\0';
 						if (mc->parent != NULL)
@@ -46267,7 +46227,6 @@ void actionSetMember(SWFAppContext* app_context)
 				len_val.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &len_val.data.numeric_value) = (double)_txt_len;
 				setProperty(app_context, props, "length", 6, &len_val);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Sync text → variable binding
 				ng_syncTextToVar(app_context, mc, &value_var);
 				// Sync text → htmlText (they should stay in sync)
@@ -46369,7 +46328,6 @@ void actionSetMember(SWFAppContext* app_context)
 						}
 					}
 				}
-#endif
 			}
 			// TextField htmlText: parse HTML into format runs, extract plain text
 			if (strcmp(prop_name, "htmlText") == 0 && mc->dynamic_props != NULL
@@ -46404,8 +46362,7 @@ void actionSetMember(SWFAppContext* app_context)
 					if (ml_prop != NULL && ml_prop->type == ACTION_STACK_VALUE_BOOLEAN && ml_prop->data.numeric_value)
 						is_multiline = 1;
 
-					// Parse HTML into format runs (NO_GRAPHICS only — tf_* system not available in graphics mode)
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+					// Parse HTML into format runs
 					TFRunTable* table = tf_get_table(mc);
 					table->from_html_text = 1; // Content set via .htmlText
 					TFRun defaults;
@@ -46472,20 +46429,6 @@ void actionSetMember(SWFAppContext* app_context)
 					// Extract plain text (with \r as paragraph separator for storage)
 					char plain_buf[16384];
 					tf_get_plain_text(table, plain_buf, sizeof(plain_buf), is_multiline);
-#else
-					// In graphics mode, simple tag-stripping fallback
-					char plain_buf[16384];
-					u32 pi = 0;
-					for (u32 si = 0; _ht_buf[si] && pi < sizeof(plain_buf) - 1; si++) {
-						if (_ht_buf[si] == '<') {
-							while (_ht_buf[si] && _ht_buf[si] != '>') si++;
-							if (!_ht_buf[si]) break;
-						} else {
-							plain_buf[pi++] = _ht_buf[si];
-						}
-					}
-					plain_buf[pi] = '\0';
-#endif
 					u32 plain_len = (u32)strlen(plain_buf);
 
 					// Convert plain text to UTF-16 and store as "text"
@@ -46569,7 +46512,6 @@ void actionSetMember(SWFAppContext* app_context)
 						len_val.type = ACTION_STACK_VALUE_F64;
 						VAL(double, &len_val.data.numeric_value) = (double)value_var.str_size;
 						setProperty(app_context, props, "length", 6, &len_val);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						// Invalidate any existing run table so a subsequent htmlText read
 						// (after html is re-enabled or a stylesheet is attached) regenerates
 						// from the new plain text via the raw-content fallback path — not
@@ -46583,14 +46525,12 @@ void actionSetMember(SWFAppContext* app_context)
 								_inv_table->from_html_text = 0;
 							}
 						}
-#endif
 					}
 				}
 			}
 			// TextField variable: changing binding breaks old, creates new
 			if (strcmp(prop_name, "variable") == 0 && mc->ng_textfield_idx >= 0 && mc->dynamic_props != NULL)
 			{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// When variable binding changes: read new variable (or use initial text)
 				// and reset the text field, then create the variable if needed.
 				if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size > 0) {
@@ -46654,10 +46594,8 @@ void actionSetMember(SWFAppContext* app_context)
 						setProperty(app_context, tf_props, "length", 6, &len_val);
 					}
 				}
-#endif
 			}
 			// TextField styleSheet setter: on removal, sync text/htmlText to stripped plain text
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (prop_name_len == 10 && strncmp(prop_name, "styleSheet", 10) == 0
 				&& MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL)
 			{
@@ -46767,7 +46705,6 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 				}
 			}
-#endif
 			// TextField autoSize setter coercion
 			if (prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0
 				&& MC_IS_TEXTFIELD(mc))
@@ -46949,12 +46886,10 @@ void actionSetMember(SWFAppContext* app_context)
 							mc->xscale = src_mc->xscale; mc->yscale = src_mc->yscale;
 							mc->rotation = src_mc->rotation;
 							mc->skew = src_mc->skew;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 							mc->as_set_flags |= (1|2|4|8|16);
 							s16 sra, sga, sba, saa, srb, sgb, sbb, sab;
 							getLocalCTRaw(src_mc, &sra, &sga, &sba, &saa, &srb, &sgb, &sbb, &sab);
 							setLocalCTRaw(mc, sra, sga, sba, saa, srb, sgb, sbb, sab);
-#endif
 							markTransformedByScript(mc);
 						}
 					}
@@ -47183,7 +47118,6 @@ void actionSetMember(SWFAppContext* app_context)
 				retainObject((ASObject*) mc->dynamic_props);
 			}
 			setProperty(app_context, (ASObject*) mc->dynamic_props, prop_name, prop_name_len, &value_var);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Trigger autoSize recalculation when autoSize, text, or htmlText changes
 			if (MC_IS_TEXTFIELD(mc) && (
 				(prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0) ||
@@ -47192,12 +47126,10 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				applyAutoSize(app_context, mc);
 			}
-#endif
 			// Only propagate to global variable table for root movieclip
 			// (timeline variables on root are also accessible as globals)
 			// Child MC properties must NOT leak into global scope.
 			extern MovieClip root_movieclip;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Phase C: fast path — notify TF bindings registered against
 			// this MC's property scope. Covers every TF placed via the
 			// tag stream (Phase B eager wrapper registers them). When this
@@ -47205,20 +47137,14 @@ void actionSetMember(SWFAppContext* app_context)
 			// scans below are skipped to avoid double-handling +
 			// double-allocating the HTML-strip buffer.
 			int _notified = actionNotifyPropertyChange(app_context, mc, prop_name, prop_name_len, &value_var);
-#else
-			int _notified = 0;
-#endif
 			if (mc == &root_movieclip) {
 				setGlobalVariableByName(prop_name, &value_var);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Fallback for dynamic TFs (createTextField + later
 				// `tf.variable = "name"`) whose binding isn't in the
 				// per-container registry.
 				if (_notified == 0)
 					ng_syncVarToTextFields(app_context, prop_name, prop_name_len, &value_var);
-#endif
 			}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Path-binding fallback scan (skipped when the Phase C registry
 			// already covered the write).
 			if (_notified == 0)
@@ -47281,7 +47207,6 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 				}
 			}
-#endif
 		}
 	}
 	// If it's not an object, array, function, or movieclip type, we silently ignore the operation
@@ -47667,7 +47592,6 @@ void actionDelete(SWFAppContext* app_context)
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Separate noinline function to prevent GCC -O2 from misoptimizing the
 // textWidth/textHeight computation when inlined into the large actionGetMember.
 static __attribute__((noinline)) int computeTextFieldDimension(
@@ -48245,7 +48169,6 @@ static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc)
 	if (maxscroll < 1) maxscroll = 1;
 	return maxscroll;
 }
-#endif
 
 void actionGetMember(SWFAppContext* app_context)
 {
@@ -49041,7 +48964,6 @@ void actionGetMember(SWFAppContext* app_context)
 		// In Flash/Ruffle, child clip names take priority over builtin MC properties
 		// (e.g., a child named "_x" shadows the builtin _x property)
 		// Exception: _levelN/_flashN names are resolved as level references, not child clips
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (mc != NULL && prop_name_len > 1 && prop_name[0] == '_' &&
 		    !(prop_name_len >= 6 && (strncmp(prop_name, "_level", 6) == 0 || strncmp(prop_name, "_flash", 6) == 0)))
 		{
@@ -49130,7 +49052,6 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 			}
 		}
-#endif
 
 		// addProperty virtual properties installed on a MovieClip's
 		// dynamic_props shadow builtin MC properties (_x, _target, _name,
@@ -49431,7 +49352,6 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 
 		// Dynamically compute textWidth/textHeight/maxscroll/bottomScroll for TextField MovieClips
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (mc != NULL && MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL) {
 			double _tw_result = -999.0;
 			int _tw_matched = computeTextFieldDimension(app_context, mc, prop_name, prop_name_len, &_tw_result);
@@ -49445,7 +49365,6 @@ void actionGetMember(SWFAppContext* app_context)
 				return;
 			}
 		}
-#endif
 
 		// Check user-defined dynamic properties (walks __proto__ chain for TextField prototype)
 		if (mc != NULL && mc->dynamic_props != NULL)
@@ -49453,7 +49372,6 @@ void actionGetMember(SWFAppContext* app_context)
 			ActionVar* prop = getPropertyWithPrototype((ASObject*) mc->dynamic_props, prop_name, prop_name_len);
 			if (prop != NULL)
 			{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// TextField htmlText getter: re-serialize from format runs.
 				// Ruffle returns the format-serialized HTML only when the field is
 				// "effectively HTML" — the html flag is set OR a styleSheet is active.
@@ -49579,7 +49497,6 @@ void actionGetMember(SWFAppContext* app_context)
 						return;
 					}
 				}
-#endif
 				pushVar(app_context, prop);
 				return;
 			}
@@ -49644,7 +49561,6 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 
 		// Check child instance names (in Flash, mc.childName resolves to child clips)
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (mc != NULL)
 		{
 			char child_name_buf[64];
@@ -49802,7 +49718,6 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 			}
 		}
-#endif
 
 		// Built-in defaults for non-underscore properties
 		if (mc != NULL && prop_name_len == 13 && strncmp(prop_name, "useHandCursor", 13) == 0)
