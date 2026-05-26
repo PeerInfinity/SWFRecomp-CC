@@ -145,11 +145,22 @@ void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* par
 // ng_set_script_only_mode: NO_GRAPHICS script-only re-run phase.
 void ng_set_script_only_mode(int mode) { (void)mode; }
 
-// exec_sprite_frame: in wasm graphics this is a bare call (no context
-// switch). In --mode=graphics tag.c provides the real impl.
+// exec_sprite_frame: in wasm graphics this is a minimal context tracker.
+// Sets g_current_sprite_obj for the duration of the frame call so that
+// ng_isInsideSprite() / ng_stopCurrentSprite() / ng_playCurrentSprite() —
+// which the recompiler-emitted scripts hit when a sprite frame calls
+// actionStop/actionPlay directly — can identify "we're inside a sprite"
+// and route the call to the sprite's display entry rather than falling
+// through to the root timeline's is_playing flag. (Doodle Jump's hero
+// sprite has a frame-0 actionStop() that was stopping the root and
+// leaving the sprite cycling.) --mode=graphics native uses tag.c's
+// full impl which does the same plus context/base-clip/transform swaps.
 void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f) {
-    (void)obj;
+    extern DisplayObject* g_current_sprite_obj;
+    DisplayObject* saved = g_current_sprite_obj;
+    g_current_sprite_obj = obj;
     if (f) f(app_context);
+    g_current_sprite_obj = saved;
 }
 
 #endif // !OFFSCREEN_RENDER

@@ -29838,10 +29838,12 @@ void actionPlay(SWFAppContext* app_context)
 		return;
 	}
 #endif
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	{ extern int g_settarget_none; if (g_settarget_none) return; }
-	if (ng_isInsideSprite()) { ng_playCurrentSprite(); return; }
-#endif
+	// Modern arm: see comment in actionStop. Same widening applies.
+	{
+		extern int g_settarget_none;
+		if (g_settarget_none) return;
+		if (ng_isInsideSprite()) { ng_playCurrentSprite(); return; }
+	}
 	is_playing = 1;
 }
 
@@ -29855,10 +29857,18 @@ void actionStop(SWFAppContext* app_context)
 		return;
 	}
 #endif
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	{ extern int g_settarget_none; if (g_settarget_none) return; }
-	if (ng_isInsideSprite()) { ng_stopCurrentSprite(); return; }
-#endif
+	// Modern arm: route to the currently-executing sprite (set by
+	// exec_sprite_frame). Works in all 3 build modes — graphics_stubs.c's
+	// exec_sprite_frame stub now sets g_current_sprite_obj in browser-WASM
+	// too, so a sprite's frame_func calling actionStop() directly (the
+	// recompiler's emit pattern for an in-sprite stop()) correctly stops
+	// the sprite rather than the root. g_settarget_none is browser-WASM-safe
+	// (defined zero-init in graphics_stubs.c, never set).
+	{
+		extern int g_settarget_none;
+		if (g_settarget_none) return;
+		if (ng_isInsideSprite()) { ng_stopCurrentSprite(); return; }
+	}
 	is_playing = 0;
 }
 

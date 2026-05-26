@@ -631,8 +631,17 @@ static void aq_dispatch_sprite_script(SWFAppContext* app_context, void* user)
 	if (p->ctx_mc) {
 		actionSetCurrentContext(p->ctx_mc);
 		actionSetBaseClip(p->ctx_base ? p->ctx_base : p->ctx_mc);
-		g_current_sprite_obj = p->ctx_sprite_obj;
 	}
+	// Restore g_current_sprite_obj unconditionally. In browser-WASM
+	// (USE_WEBGPU without OFFSCREEN_RENDER) the exec_sprite_frame stub
+	// in graphics_stubs.c sets g_current_sprite_obj but doesn't swap
+	// g_current_context, so ctx_mc captured here is NULL even though
+	// ctx_sprite_obj is valid. Without restoring it, the dispatched
+	// sprite script sees g_current_sprite_obj == NULL and an inline
+	// actionStop()/actionPlay() routes via the root-timeline fallback
+	// (is_playing = 0) instead of stopping the sprite — Doodle Jump's
+	// hero kept cycling through its 4-frame timeline.
+	g_current_sprite_obj = p->ctx_sprite_obj;
 	ng_bumpSpriteInitDepth();
 	if (p->fn) p->fn(app_context);
 	ng_unbumpSpriteInitDepth();
