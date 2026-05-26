@@ -1860,8 +1860,24 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				// actionDispatchMCMouseMove.
 				extern int actionMCHasButtonHandlers(MovieClip* mc);
 				extern int actionMCMouseInsidePick(MovieClip* mc, float mx, float my);
+				// Also treat sprites with mouse-related CLIP_EVENT clip-actions
+				// (press/release/rollOver/rollOut/dragOver/dragOut) as button-mode
+				// for hover/cursor purposes — Doodle Jump's menu buttons attach
+				// CLIP_EVENT_RELEASE handlers via PlaceObject2 ClipActions but
+				// never set onPress/onRelease as MC properties, so
+				// actionMCHasButtonHandlers misses them.
+				int has_mouse_clip_event = 0;
+				const uint32_t mouse_clip_mask = CLIP_EVENT_PRESS | CLIP_EVENT_RELEASE
+				    | CLIP_EVENT_RELEASE_OUTSIDE | CLIP_EVENT_ROLL_OVER | CLIP_EVENT_ROLL_OUT
+				    | CLIP_EVENT_DRAG_OVER | CLIP_EVENT_DRAG_OUT;
+				for (size_t a = 0; a < obj->clip_action_count; a++) {
+					if (obj->clip_actions[a].event_flags & mouse_clip_mask) {
+						has_mouse_clip_event = 1;
+						break;
+					}
+				}
 				if (sprite_mc != NULL && !*found_hover &&
-				    actionMCHasButtonHandlers(sprite_mc))
+				    (actionMCHasButtonHandlers(sprite_mc) || has_mouse_clip_event))
 				{
 					float mx_px = app_context->mouse.stage_x / 20.0f;
 					float my_px = app_context->mouse.stage_y / 20.0f;
@@ -4185,10 +4201,14 @@ int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
 	    skip_name, out_path, out_size);
 }
 
+#endif // close NO_GRAPHICS||OFFSCREEN_RENDER for sprite_content_bounds + droptarget;
+       // the clip-event dispatchers below need to compile in browser-WASM too.
+
 // ---------------------------------------------------------------------------
 // CLIP_EVENT_PRESS / CLIP_EVENT_RELEASE dispatch
 // ---------------------------------------------------------------------------
-// Called from swf_core.c's input_events_deliver on EV_MOUSE_DOWN_LEFT / UP_LEFT.
+// Called from swf_core.c's input_events_deliver on EV_MOUSE_DOWN_LEFT / UP_LEFT,
+// and from swf.c's per-tick mouse handler in browser-WASM.
 
 // Recursive helper for dispatch_clip_event_press — walks into nested sprite
 // display lists to find entries with CLIP_EVENT_PRESS clip actions.
@@ -4532,8 +4552,6 @@ void dispatch_clip_event_flag(SWFAppContext* app_context, uint32_t flag)
 	dispatch_clip_event_flag_dl(app_context, display_list, max_depth, flag,
 	    &root_movieclip);
 }
-
-#endif // NO_GRAPHICS
 
 void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_id,
     size_t shape_offset, size_t shape_size,

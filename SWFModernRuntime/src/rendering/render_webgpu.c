@@ -442,11 +442,37 @@ static void run_compute_pass(WebGPURenderContext* ctx);
 #ifdef __EMSCRIPTEN__
 static SWFAppContext* g_mouse_app_context = NULL;
 
+// EmscriptenMouseEvent's targetX/Y are CSS-pixel coordinates relative to the
+// canvas element. When the canvas is displayed at a different size than its
+// internal pixel buffer (e.g. canvas.style.width=100% but canvas.width=320),
+// targetX needs to be rescaled to canvas-internal pixel coordinates before
+// being converted to twips. Without this scaling, button hit-tests miss
+// whenever the canvas is rendered at a non-1:1 CSS:internal ratio.
+// canvasX/canvasY in EmscriptenMouseEvent are deprecated and not populated
+// (see html5.h note), so compute the scale here via canvas.width / clientWidth.
+static void compute_canvas_mouse_pos(int target_x, int target_y, float* out_x, float* out_y) {
+	double sx = (double)target_x;
+	double sy = (double)target_y;
+	EM_ASM({
+		var c = document.getElementById('canvas');
+		if (c) {
+			var rw = c.clientWidth || c.width;
+			var rh = c.clientHeight || c.height;
+			if (rw > 0) HEAPF64[$0 >> 3] = HEAPF64[$0 >> 3] * c.width / rw;
+			if (rh > 0) HEAPF64[$1 >> 3] = HEAPF64[$1 >> 3] * c.height / rh;
+		}
+	}, &sx, &sy);
+	*out_x = (float)sx;
+	*out_y = (float)sy;
+}
+
 static EM_BOOL on_mouse_move(int type, const EmscriptenMouseEvent* evt, void* ud) {
 	(void)type; (void)ud;
 	if (g_mouse_app_context) {
-		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
-		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+		float px, py;
+		compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
+		g_mouse_app_context->mouse.stage_x = px * 20.0f;
+		g_mouse_app_context->mouse.stage_y = py * 20.0f;
 	}
 	return EM_TRUE;
 }
@@ -456,8 +482,10 @@ static EM_BOOL on_mouse_down(int type, const EmscriptenMouseEvent* evt, void* ud
 	if (g_mouse_app_context && evt->button == 0) {
 		g_mouse_app_context->mouse.button_down = 1;
 		g_mouse_app_context->mouse.clicked = 1;
-		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
-		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+		float px, py;
+		compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
+		g_mouse_app_context->mouse.stage_x = px * 20.0f;
+		g_mouse_app_context->mouse.stage_y = py * 20.0f;
 	}
 	return EM_TRUE;
 }
@@ -467,8 +495,10 @@ static EM_BOOL on_mouse_up(int type, const EmscriptenMouseEvent* evt, void* ud) 
 	if (g_mouse_app_context && evt->button == 0) {
 		g_mouse_app_context->mouse.button_down = 0;
 		g_mouse_app_context->mouse.released = 1;
-		g_mouse_app_context->mouse.stage_x = (float)evt->targetX * 20.0f;
-		g_mouse_app_context->mouse.stage_y = (float)evt->targetY * 20.0f;
+		float px, py;
+		compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
+		g_mouse_app_context->mouse.stage_x = px * 20.0f;
+		g_mouse_app_context->mouse.stage_y = py * 20.0f;
 	}
 	return EM_TRUE;
 }

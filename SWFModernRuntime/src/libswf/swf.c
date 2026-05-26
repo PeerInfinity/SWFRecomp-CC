@@ -423,6 +423,14 @@ void tagMain(SWFAppContext* app_context)
 			prev_stage_y = my;
 			prev_mouse_initialized = 1;
 			if (moved) {
+				// CLIP_EVENT_MOUSE_MOVE and CLIP_EVENT_ROLL_*/DRAG_* clip-action
+				// dispatch. Matches swf_core.c's EV_MOUSE_MOVE handler (line ~501-503).
+				// Without these, sprites with PlaceObject2 onClipEvent(mouseMove) /
+				// onClipEvent(rollOver/Out/dragOver/Out) handlers never fire in
+				// browser-WASM. Doodle Jump's button cursor and roll handlers
+				// rely on dispatch_clip_event_roll.
+				dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_MOVE);
+				dispatch_clip_event_roll(app_context);
 				actionEndVirtualHoverOnMouse(app_context);
 				actionDispatchMCMouseMove(app_context);
 				actionDispatchMCMouseMoveGlobal(app_context);
@@ -435,18 +443,35 @@ void tagMain(SWFAppContext* app_context)
 				}
 			}
 			if (app_context->mouse.clicked) {
+				// CLIP_EVENT_MOUSE_DOWN / PRESS clip-action dispatch. Matches
+				// swf_core.c's EV_MOUSE_DOWN_LEFT (line ~538/547/549). Without
+				// these, PlaceObject2 onClipEvent(mouseDown)/onClipEvent(press)
+				// handlers never fire in browser-WASM. Doodle Jump's button
+				// CLIP_EVENT_RELEASE handlers also depend on PRESS being
+				// dispatched first so clip_mc_pressed is set, gating the
+				// subsequent RELEASE dispatch on mouseup.
+				dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_DOWN);
 				actionDispatchMouseDown(app_context);       // Mouse listener broadcast
 				actionDispatchMCMouseDown(app_context);      // Per-MC AS2 dispatch
 				actionMouseClickFocus(app_context);          // Focus acquisition
+				dispatch_clip_event_press(app_context);      // onClipEvent(press)
+				dispatch_clip_event_roll(app_context);       // ROLL→DRAG transition
 				actionDispatchMCPress(app_context);          // onPress
 				actionResetHighlightForEvent(1);             // 1=left_down
 				actionClearVirtualHover();
 			}
 			if (app_context->mouse.released) {
+				// CLIP_EVENT_MOUSE_UP / RELEASE clip-action dispatch. Matches
+				// swf_core.c's EV_MOUSE_UP_LEFT (line ~566/573/575). The DJ
+				// button handlers (clip_action_17/19/21/23) are
+				// CLIP_EVENT_RELEASE actions that change game state on click.
+				dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_UP);
 				extern void actionTextFieldDragEnd(SWFAppContext*);
 				actionTextFieldDragEnd(app_context);         // Finalize drag selection
 				actionDispatchMouseUp(app_context);          // Mouse listener broadcast
 				actionDispatchMCMouseUp(app_context);        // Per-MC AS2 dispatch
+				dispatch_clip_event_release(app_context);    // onClipEvent(release)
+				dispatch_clip_event_roll(app_context);       // DRAG→ROLL transition
 				actionDispatchMCRelease(app_context);        // onRelease/onReleaseOutside
 				actionResetHighlightForEvent(2);             // 2=left_up
 			}

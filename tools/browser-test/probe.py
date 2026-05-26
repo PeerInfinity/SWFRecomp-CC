@@ -193,6 +193,22 @@ async def run(args):
             print(f"[run]   #btn-run clicked at t={run_clicked_at - t_start:.2f}s",
                   flush=True)
 
+            def _parse_event_spec(s):
+                # "X,Y@T" -> (x, y, t)
+                xy, _, t = s.partition("@")
+                x, _, y = xy.partition(",")
+                return float(x), float(y), float(t)
+
+            # Build a sorted timeline of synthetic input events.
+            input_events = []
+            for spec in getattr(args, "move", []) or []:
+                x, y, t = _parse_event_spec(spec)
+                input_events.append((t, "move", x, y))
+            for spec in getattr(args, "click", []) or []:
+                x, y, t = _parse_event_spec(spec)
+                input_events.append((t, "click", x, y))
+            input_events.sort()
+
             # Snapshot loop: every `snapshot_interval_seconds` for up to
             # `wall_clock_seconds`. snapshots are 1-indexed so output paths
             # sort naturally.
@@ -200,8 +216,32 @@ async def run(args):
             n_snapshots = max(
                 1, int(args.wall_clock_seconds / args.snapshot_interval_seconds)
             )
+            input_ev_idx = 0
             for i in range(1, n_snapshots + 1):
                 target_t = run_clicked_at + i * args.snapshot_interval_seconds
+                # Fire any input events scheduled before target_t.
+                while input_ev_idx < len(input_events):
+                    ev_t, ev_kind, ev_x, ev_y = input_events[input_ev_idx]
+                    fire_at = run_clicked_at + ev_t
+                    if fire_at >= target_t:
+                        break
+                    now = time.time()
+                    if fire_at > now:
+                        await asyncio.sleep(fire_at - now)
+                    canvas_box = await page.locator("#canvas").bounding_box()
+                    abs_x = (canvas_box["x"] if canvas_box else 0) + ev_x
+                    abs_y = (canvas_box["y"] if canvas_box else 0) + ev_y
+                    if ev_kind == "move":
+                        await page.mouse.move(abs_x, abs_y)
+                        print(f"  [input] move @ t={ev_t:.2f}s → ({ev_x}, {ev_y})",
+                              flush=True)
+                    elif ev_kind == "click":
+                        await page.mouse.move(abs_x, abs_y)
+                        await page.mouse.down()
+                        await page.mouse.up()
+                        print(f"  [input] click @ t={ev_t:.2f}s → ({ev_x}, {ev_y})",
+                              flush=True)
+                    input_ev_idx += 1
                 now = time.time()
                 if target_t > now:
                     await asyncio.sleep(target_t - now)
@@ -352,6 +392,15 @@ def parse_args():
                          "probes, and avoids the per-snapshot timeout cost "
                          "on continuously-redrawing demos where the "
                          "locator.screenshot stability check never resolves.")
+    ap.add_argument("--click", action="append", default=[],
+                    metavar="X,Y@T",
+                    help="Send a synthetic mouse click at canvas-relative "
+                         "(X, Y) pixel position at time T seconds after "
+                         "Run-SWF. May be repeated. Example: --click '160,200@2.0'.")
+    ap.add_argument("--move", action="append", default=[],
+                    metavar="X,Y@T",
+                    help="Send a synthetic mouse move at canvas-relative "
+                         "(X, Y) pixel position at time T. May be repeated.")
     args = ap.parse_args()
 
     if args.out is None:

@@ -28,19 +28,20 @@ int ng_update_button_states(SWFAppContext* app_context);
 u32 ng_get_original_transform_id(DisplayObject* obj);
 #endif
 
-#ifdef NO_GRAPHICS
 // Dispatch CLIP_EVENT_PRESS for all sprites whose hit area contains the mouse.
-// Called from swf_core.c on EV_MOUSE_DOWN_LEFT.
+// Called from swf_core.c on EV_MOUSE_DOWN_LEFT, input_events.c, and from
+// swf.c's per-tick mouse handler in browser-WASM.
 void dispatch_clip_event_press(SWFAppContext* app_context);
 // Dispatch CLIP_EVENT_RELEASE for sprites that had PRESS fired (clip_mc_pressed=1).
-// Called from swf_core.c on EV_MOUSE_UP_LEFT.
+// Called from swf_core.c on EV_MOUSE_UP_LEFT and from swf.c in browser-WASM.
 void dispatch_clip_event_release(SWFAppContext* app_context);
 // Dispatch CLIP_EVENT_ROLL_OVER/ROLL_OUT/DRAG_OVER/DRAG_OUT on hit-area transitions.
-// Called from swf_core.c on EV_MOUSE_MOVE (and EV_MOUSE_DOWN/UP for button-state edges).
+// Called from swf_core.c on EV_MOUSE_MOVE and from swf.c in browser-WASM.
 void dispatch_clip_event_roll(SWFAppContext* app_context);
 // Dispatch a generic clip event flag (CLIP_EVENT_MOUSE_DOWN/UP/MOVE, KEY_DOWN/UP)
 // to ALL clips in the display list (global events, no hit-test).
 void dispatch_clip_event_flag(SWFAppContext* app_context, uint32_t flag);
+#ifdef NO_GRAPHICS
 // Compute the _droptarget slash-path for a point (in stage twips), skipping skip_name.
 // Writes result to out_path (at most out_size-1 chars + NUL). Returns 1 if found, 0 if not.
 int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
