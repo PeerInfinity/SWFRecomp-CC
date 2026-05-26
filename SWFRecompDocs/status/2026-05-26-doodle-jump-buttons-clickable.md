@@ -14,8 +14,12 @@ Sixth handoff in the Doodle Jump browser-WASM debugging chain:
    AS-side bounds/hitTest (`68889f5ed`).
 6. **This doc** — buttons-now-clickable fix landed (`92606558b`).
 
-**Branch state at writing:** `master`, ahead of `origin/master` by 1
-commit. Working tree clean. Push when ready.
+**Branch state at writing:** `master`, ahead of `origin/master` by 3
+commits (`92606558b`, `48ae5cf16`, `7e9b53a6a`). Working tree clean.
+Push when ready.
+
+**Update after initial doc:** found+fixed the cursor-not-changing-on-
+hover follow-up in `7e9b53a6a` — see "Cursor follow-up" section below.
 
 ## TL;DR
 
@@ -270,6 +274,59 @@ Branch `master` is 1 commit ahead of `origin/master`:
 - `92606558b browser-WASM: wire CLIP_EVENT_PRESS/RELEASE/ROLL dispatch + canvas-px mouse coords`
 
 Push when ready.
+
+## Cursor follow-up (`7e9b53a6a`)
+
+After the buttons-clickable landing, the cursor still didn't change to
+`'pointer'` when hovering over DJ menu buttons (despite Snake-style
+buttons working). Diagnosis path:
+
+1. `ng_update_button_states_in_dl`'s sprite-button-mode catcher
+   (extended to recognize CLIP_EVENT clip-actions in `92606558b`)
+   was matching the buttons correctly: `has_clip=1`, the catcher fired.
+2. But `actionMCMouseInsidePick(sprite_mc, mx, my)` returned 0 even
+   when the mouse was demonstrably inside the visible button bounds.
+3. Drilling into `mc_get_pixel_aabb_ng`: `has_bounds=0` (no bounds
+   found at all). The function depends on `mc->display_obj` to walk
+   `sprite_display_list` for child shape bounds.
+4. `mc->display_obj=NULL` for every DJ button MC.
+
+Root cause: in graphics-native, `process_sprite_needs_init` walks
+display_list at tagShowFrame time and sets `child_mc->display_obj`
+for each placed sprite (tag.c line ~470). Browser-WASM doesn't call
+`process_sprite_needs_init` — it advances sprites via
+`advance_sprite_frames` + `advance_nested_sprite_frames` instead.
+So sprite-named MCs created lazily by `actionFindOrCreateMovieClip`
+(during LOAD handler dispatch or button-state catcher itself) have
+`display_obj=NULL`.
+
+Fix: in `ng_update_button_states_in_dl`'s `CHAR_TYPE_SPRITE` branch,
+after `actionFindOrCreateMovieClip` resolves `sprite_mc`, set
+`sprite_mc->display_obj = obj` when it's NULL. The block is the
+latest convenient point where both pointers are known. Guarded on
+NULL so graphics-native (where it's already set) doesn't double-write.
+
+Verification (via `tools/browser-test` direct Playwright eval):
+```
+cursor over play button : 'pointer'
+cursor off button       : 'default'
+```
+
+This may be only the first manifestation of the broader gap: any
+sprite-named MC accessed via AS in browser-WASM has `display_obj=NULL`
+until its first access in `ng_update_button_states_in_dl`. Other
+paths that read `mc->display_obj` (mc_get_pixel_aabb_ng, the EditText
+register-class child resolution, the `_droptarget` walk) may also
+silently get wrong values for non-button sprites. If a future
+browser-WASM bug surfaces with the symptom "AS read of a sprite
+child property returns wrong/undefined", check whether the receiver
+MC has `display_obj` set.
+
+Two broader fixes deferred until that symptom appears:
+1. Set `display_obj` inside `actionFindOrCreateMovieClip` itself,
+   whenever the resolved name matches a `display_list[*].instance_name`.
+2. Run an equivalent of `process_sprite_needs_init` in browser-WASM's
+   tagShowFrame to mirror graphics-native's wiring step.
 
 ## Pattern note (7th instance)
 
