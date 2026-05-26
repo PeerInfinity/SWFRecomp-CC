@@ -1850,6 +1850,17 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				if (obj->instance_name != NULL)
 					sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
 
+				// In browser-WASM (USE_WEBGPU, no OFFSCREEN_RENDER), process_sprite_needs_init
+				// isn't called from tagShowFrame, so sprite-named MCs created lazily by
+				// actionFindOrCreateMovieClip don't get display_obj set. Without it,
+				// mc_get_pixel_aabb_ng can't walk the sprite_display_list to find child
+				// bounds → AABB returns 0 → hover never claimed → cursor never changes.
+				// Set it here as the latest convenient point where both pointers are
+				// known. Safe to set unconditionally: in graphics-native this just
+				// overwrites with the same value process_sprite_needs_init already set.
+				if (sprite_mc != NULL && sprite_mc->display_obj == NULL)
+					sprite_mc->display_obj = (void*)obj;
+
 				// Ruffle's mouse_pick_avm1 returns the topmost button-mode MC
 				// when its hit area contains the mouse. If this sprite is
 				// button-mode (has onRollOver/onRollOut/onPress/etc.) and the
