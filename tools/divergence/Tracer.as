@@ -87,6 +87,10 @@ class Tracer {
             trace(frame_prefix + " " + path
                   + " _x=" + mc._x
                   + " _y=" + mc._y
+                  + " _xs=" + mc._xscale
+                  + " _ys=" + mc._yscale
+                  + " _rot=" + mc._rotation
+                  + " _a=" + mc._alpha
                   + " _cf=" + mc._currentframe
                   + " _vis=" + mc._visible);
         }
