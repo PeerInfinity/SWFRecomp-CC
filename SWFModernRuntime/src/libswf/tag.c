@@ -5959,6 +5959,47 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		return;
 	}
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM frame_func re-run protection. The browser-WASM main
+	// loop in swf.c lacks the `is_playing || manual_next_frame` gate
+	// (gated #ifdef OFFSCREEN_RENDER), so frame_funcs[current_frame]
+	// re-executes every tick even when the timeline is stopped. On
+	// stopped frames containing tagPlaceObject2Ratio (e.g. Doodle Jump
+	// gameplay frame_1, depth 7 via the Replace path), each re-run
+	// would create a fresh MC because the prior tick's MC was just
+	// invalidated by the same frame_func's tagReplaceObject2RatioWith
+	// ClipActions hook or tagRemoveObject2. Mirror tagPlaceObject2's
+	// same-char/same-depth modify-detect (lines 5501-5517) but ALSO
+	// require ratio match — Ratio placements with different ratio are
+	// genuine modifications (see Ruffle's survives_rewind logic
+	// referenced at tag.c:5290-5294). place_gen!=g_place_gen scopes
+	// the gate to cross-frame_func-run re-entries.
+	if (display_list[depth].char_id == char_id && display_list[depth].char_id != 0
+	    && display_list[depth].ratio == ratio
+	    && display_list[depth].place_gen != g_place_gen)
+	{
+		if (!display_list[depth].transformed_by_script) {
+			display_list[depth].transform_id = transform_id;
+			ng_cache_transform(&display_list[depth], transform_id);
+		}
+		if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+			init_cx_fields(&display_list[depth]);
+		}
+		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+		display_list[depth].placed_at_frame = current_frame;
+		display_list[depth].place_gen = g_place_gen;
+		ng_on_place_object2(app_context, depth, char_id);
+		display_list[depth].sprite_needs_init = 0;
+		if (depth > max_depth) max_depth = depth;
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
+		g_pending_instance_name = NULL;
+		return;
+	}
+#endif
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// During backward goto catch-up, preserve existing sprite at same depth/char
 	{
@@ -6432,16 +6473,50 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 	// so a fresh MC is created for the new display entry.
 	g_skip_pending_removal_mc = 1;
 #else
-	// Browser-WASM: invalidate the cached MC bound to this display entry and
-	// all its descendants before the old clip's slot is overwritten. Unlike
-	// tagRemoveObject2 + tagPlaceObject2 (each of which now has its own
-	// browser-WASM hook), Replace is a collapsed Remove+Place that never
-	// clears char_id between the two halves, so tagPlaceObject2Ratio's
-	// is_replace=1 path sees no transition and our existing hooks don't fire.
-	// Doodle Jump's menu→gameplay transition at depth 7 (same char_id=46 —
-	// menu "info" button → gameplay back "menu" button) goes through this
-	// path, and without the hook the old "button_txt" EditText child stays
-	// in child_mc_cache and keeps rendering "info" after the transition.
+	// Browser-WASM frame_func re-run protection. The browser-WASM main
+	// loop in swf.c re-runs frame_funcs every tick (no `is_playing`
+	// gate), so stopped frames containing this tag would invalidate +
+	// recreate the MC every tick — leaking ~1-2 MCs/tick into
+	// child_mc_cache until MAX_CHILD_MOVIECLIPS=128 caps it (Doodle Jump
+	// gameplay frame_1 depth 7 'instanceN'). Skip both invalidation and
+	// the inner tagPlaceObject2Ratio when this is a re-run on the same
+	// (char_id, ratio) at the same depth — matched by place_gen !=
+	// g_place_gen (place_gen advances in tagShowFrame, so a re-entry of
+	// the same frame_func body sees the same display entry from the
+	// previous tick with a different gen). Updates transform / cxform /
+	// clip_depth / placed_at_frame as a normal modify would.
+	if (display_list[depth].char_id == char_id && display_list[depth].char_id != 0
+	    && display_list[depth].ratio == ratio
+	    && display_list[depth].place_gen != g_place_gen)
+	{
+		if (!display_list[depth].transformed_by_script) {
+			display_list[depth].transform_id = transform_id;
+			ng_cache_transform(&display_list[depth], transform_id);
+		}
+		if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+			init_cx_fields(&display_list[depth]);
+		}
+		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+		display_list[depth].placed_at_frame = current_frame;
+		display_list[depth].place_gen = g_place_gen;
+		return;
+	}
+
+	// Genuine replace (different char_id OR different ratio OR first
+	// time this generation): invalidate the cached MC bound to this
+	// display entry and all its descendants before the old clip's slot
+	// is overwritten. Unlike tagRemoveObject2 + tagPlaceObject2 (each
+	// of which now has its own browser-WASM hook), Replace is a
+	// collapsed Remove+Place that never clears char_id between the two
+	// halves, so tagPlaceObject2Ratio's is_replace=1 path sees no
+	// transition and our existing hooks don't fire. Doodle Jump's
+	// menu→gameplay transition at depth 7 (same char_id=46 — menu
+	// "info" button → gameplay back "menu" button, different ratio)
+	// goes through this path, and without the hook the old "button_txt"
+	// EditText child stays in child_mc_cache and keeps rendering "info"
+	// after the transition.
 	invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
 #endif
 
