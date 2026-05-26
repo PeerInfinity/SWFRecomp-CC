@@ -1628,7 +1628,7 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 				obj->transform_id, obj->cxform_id);
 			break;
 		case CHAR_TYPE_TEXT:
-#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 			// DefineEditText reuses CHAR_TYPE_TEXT in the dictionary so the
 			// recompiler can pre-bake glyph transforms for the initial text,
 			// but the EditText is rendered dynamically via
@@ -1637,6 +1637,10 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 			// here too would double-render unclipped and leak the initial
 			// 'a' glyph (16x16, anchored to the field's top) up into the
 			// inter-field gap region above each field.
+			// Gate matches the `#if` around the actionIterateTextFieldGlyphs
+			// call site in tagShowFrame (~line 3406) and tagRerenderFrame so
+			// the skip fires wherever dynamic glyph rendering does — including
+			// browser-WASM graphics (USE_WEBGPU without OFFSCREEN_RENDER).
 			if (ng_getCharTextfieldIdx(obj->char_id) >= 0) break;
 #endif
 			for (size_t j = 0; j < ch->text_size; ++j)
@@ -1704,7 +1708,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				break;
 
 			case CHAR_TYPE_TEXT:
-#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 				// See render_single_object — skip static draw for EditTexts;
 				// they render dynamically via actionIterateTextFieldGlyphs.
 				if (ng_getCharTextfieldIdx(obj->char_id) >= 0) break;
