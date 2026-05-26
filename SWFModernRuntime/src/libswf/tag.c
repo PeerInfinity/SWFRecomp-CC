@@ -6431,6 +6431,18 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 	// Tell findOrCreateMovieClip to skip the old MC (with pending_removal)
 	// so a fresh MC is created for the new display entry.
 	g_skip_pending_removal_mc = 1;
+#else
+	// Browser-WASM: invalidate the cached MC bound to this display entry and
+	// all its descendants before the old clip's slot is overwritten. Unlike
+	// tagRemoveObject2 + tagPlaceObject2 (each of which now has its own
+	// browser-WASM hook), Replace is a collapsed Remove+Place that never
+	// clears char_id between the two halves, so tagPlaceObject2Ratio's
+	// is_replace=1 path sees no transition and our existing hooks don't fire.
+	// Doodle Jump's menu→gameplay transition at depth 7 (same char_id=46 —
+	// menu "info" button → gameplay back "menu" button) goes through this
+	// path, and without the hook the old "button_txt" EditText child stays
+	// in child_mc_cache and keeps rendering "info" after the transition.
+	invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
 #endif
 
 	// Place the new clip (clears all fields including clip_actions).
