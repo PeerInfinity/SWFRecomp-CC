@@ -191,6 +191,13 @@ typedef struct DisplayObject
 	u8 clone_replaced;      // 1 if slot was overwritten by an AS clone (CloneSprite / duplicateMovieClip).
 	                        // Mirrors Ruffle's `avm1_clone_target.is_some()` — survives_rewind returns false
 	                        // so backward goto removes the clone and freshly re-places the static MC.
+	u8 pending_remove;      // browser-WASM only: tagRemoveObject(2) deferred the
+	                        // immediate invalidate+clear so a same-tick Place at the
+	                        // same depth can reclaim the cached MC instead of leaking
+	                        // a fresh one each frame_func re-run. Cleared by
+	                        // tagPlaceObject2/Ratio (reclaim path) or finalized by
+	                        // tagShowFrame fallback. See browser_wasm_frame_func_rerun
+	                        // auto-memory.
 	// Cached transform values (populated at placement time for correct bounds on child SWFs)
 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
 	// Child movie transform data override (set during placement when g_active_transform_data != NULL)

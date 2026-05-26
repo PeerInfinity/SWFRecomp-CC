@@ -785,6 +785,11 @@ static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* 
 static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject* obj);
 #endif
 
+// Forward decl — definition further down in this file. Used by both
+// browser-WASM (pending_remove finalize path in tagShowFrame and the
+// Place tags' consume_pending_remove block) and NO_GRAPHICS/OFFSCREEN_RENDER.
+static void clear_display_entry(SWFAppContext* app_context, size_t depth);
+
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
@@ -3456,6 +3461,28 @@ void tagShowFrame(SWFAppContext* app_context)
 		extern int g_root_enterframe_eligible;
 		g_root_enterframe_eligible = 1;
 	}
+
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM: finalize any tagRemoveObject(2)'d entries that weren't
+	// reclaimed by a same-tick tagPlaceObject2(Ratio). pending_remove was
+	// deferred at tagRemoveObject2 time to give Remove+Place pairs in
+	// re-running frame_funcs a chance to skip the invalidate+recreate
+	// churn. Anything still flagged here is a genuine removal — fire the
+	// invalidate + clear now, before button hit-testing and rendering see
+	// stale state.
+	for (size_t _pr_d = 1; _pr_d <= max_depth; _pr_d++)
+	{
+		if (display_list[_pr_d].pending_remove)
+		{
+			display_list[_pr_d].pending_remove = 0;
+			if (display_list[_pr_d].char_id != 0)
+			{
+				invalidate_mc_for_dl_entry(app_context, &display_list[_pr_d]);
+				clear_display_entry(app_context, _pr_d);
+			}
+		}
+	}
+#endif
 #endif
 
 	// --- Button hit testing + state machine + action dispatch ---
@@ -5095,6 +5122,66 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 #endif
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM: consume any deferred pending_remove from a same-tick
+	// tagRemoveObject(2) at this depth.
+	//  * Same char_id  -> reclaim the cached MC by running a modify-style
+	//    update inline (mirrors line ~5528's modify-detect for sprites,
+	//    extended to textfields/buttons which the existing gate skips via
+	//    its `sprite_display_list != NULL` requirement). Also refresh any
+	//    textfield variable binding so a bound TF re-reads its AS variable
+	//    on every same-(char, depth) re-placement — without this the TF
+	//    would stick on whatever value was set the first time it was
+	//    placed.
+	//  * Different char_id -> fire the deferred invalidate + clear now, then
+	//    fall through to the fresh-place path so a new MC is constructed.
+	if (display_list[depth].pending_remove)
+	{
+		display_list[depth].pending_remove = 0;
+		if (display_list[depth].char_id != 0
+		    && display_list[depth].char_id == char_id)
+		{
+			if (!display_list[depth].transformed_by_script) {
+				display_list[depth].transform_id = transform_id;
+				ng_cache_transform(&display_list[depth], transform_id);
+			}
+			if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
+				display_list[depth].cxform_id = cxform_id;
+				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+				init_cx_fields(&display_list[depth]);
+			}
+			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+			display_list[depth].placed_at_frame = current_frame;
+			display_list[depth].place_gen = g_place_gen;
+			if (depth > max_depth) max_depth = depth;
+			// Modify-path discards any pending instance_name / clip_actions
+			// (Ruffle apply_place_object behaviour).
+			g_pending_clip_actions = NULL;
+			g_pending_clip_action_count = 0;
+			g_pending_instance_name = NULL;
+			// Refresh textfield variable binding so bound TFs re-read their
+			// AS variable on every same-(char, depth) re-placement.
+			{
+				int _tf_idx = ng_find_textfield(char_id);
+				if (_tf_idx >= 0 && display_list[depth].instance_name != NULL)
+				{
+					extern MovieClip root_movieclip;
+					MovieClip* _tf_mc = actionFindOrCreateMovieClip(app_context,
+						display_list[depth].instance_name, &root_movieclip);
+					if (_tf_mc != NULL)
+						actionTryBindTextFieldVariable(app_context, _tf_mc, /*set_initial_value=*/1);
+				}
+			}
+			return;
+		}
+		if (display_list[depth].char_id != 0)
+		{
+			invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
+			clear_display_entry(app_context, depth);
+		}
+	}
+#endif
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// In script_only_mode (Phase 2), placement is already done from Phase 1 — skip entirely.
 	if (g_script_only_mode) return;
@@ -5942,6 +6029,29 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	if (g_tag_skip_mode) return;
 #endif
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
+
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM: consume any deferred pending_remove from a same-tick
+	// tagRemoveObject(2) at this depth. Different (char_id, ratio) -> fire
+	// the deferred invalidate + clear now and fall through to fresh-place.
+	// Same (char_id, ratio) -> fall through; the existing modify-detect
+	// below reuses the cached MC, closing the leak for Doodle Jump
+	// gameplay frame_1 depth 2 'container' (the canonical case:
+	// tagRemoveObject2(2) + tagSetInstanceName(2, "container") +
+	// tagPlaceObject2Ratio(2, 25, ..., ratio=1, ...) repeated each tick
+	// while frame is stopped).
+	if (display_list[depth].pending_remove)
+	{
+		display_list[depth].pending_remove = 0;
+		if (display_list[depth].char_id != 0
+		    && (display_list[depth].char_id != char_id
+		        || display_list[depth].ratio != ratio))
+		{
+			invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
+			clear_display_entry(app_context, depth);
+		}
+	}
+#endif
 
 	// Phase 3: Refuse Place (move=0, has_character=1) of a DIFFERENT character on
 	// an already-occupied depth. See tagPlaceObject2 for full rationale.
@@ -6948,10 +7058,9 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 			clear_display_entry(app_context, depth);
 		}
 #else
-		// Browser-WASM: mirror tagRemoveObject2 cleanup so descendants don't
-		// keep rendering after the parent sprite is removed.
-		invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
-		clear_display_entry(app_context, depth);
+		// Browser-WASM: defer invalidate + clear to tagShowFrame fallback or
+		// same-tick Place reclaim. See tagRemoveObject2 for the full rationale.
+		display_list[depth].pending_remove = 1;
 #endif
 	}
 #if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
@@ -7141,14 +7250,21 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			clear_display_entry(app_context, depth);
 		}
 #else
-		// Browser-WASM: invalidate the cached MC bound to this display entry
-		// and recursively its descendants (EditText children, nested sprites)
-		// before clearing the slot. Identifies the MC via display_obj pointer
-		// equality — name+depth lookup is ambiguous when multiple sprite
-		// instances of the same character share child names (e.g. Doodle
-		// Jump's 4 menu buttons each contain a "button_txt" EditText).
-		invalidate_mc_for_dl_entry(app_context, &display_list[depth]);
-		clear_display_entry(app_context, depth);
+		// Browser-WASM frame_func re-run protection. The browser-WASM main
+		// loop re-runs frame_funcs every tick (no `is_playing` gate), so the
+		// recompiler-emitted tagRemoveObject2 + tagPlaceObject2(Ratio) pair
+		// for a stopped frame would invalidate + recreate the cached MC every
+		// tick — leaking ~1 MC/tick into child_mc_cache until
+		// MAX_CHILD_MOVIECLIPS=128 caps it (Doodle Jump gameplay frame_1
+		// depth 2 'container' via the same-(char,ratio) RemoveObject2 +
+		// PlaceObject2Ratio pair). Defer invalidate + clear by marking
+		// pending_remove=1; subsequent same-tick Place at the same depth
+		// reclaims via the modify-detect path in tagPlaceObject2 /
+		// tagPlaceObject2Ratio (consume_pending_remove). Unreclaimed
+		// entries are finalized at tagShowFrame's fallback walk. Preserves
+		// the orphan-text fix from c2147d58e because the deferred
+		// invalidate still fires before render (tagShowFrame → render).
+		display_list[depth].pending_remove = 1;
 #endif
 	}
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
