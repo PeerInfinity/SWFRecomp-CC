@@ -3448,28 +3448,21 @@ void tagShowFrame(SWFAppContext* app_context)
 		void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max);
 		upgrade_sprite_initialized(display_list, max_depth);
 	}
-	// Browser-WASM: drain deferred LOAD clip-actions queued onto
-	// AQ_KIND_LOAD at placement time. By now advance_sprite_frames has
-	// populated sprite children (e.g. button_txt inside Doodle Jump's
-	// button sprites), so LOAD scripts that touch children see the
-	// expected DisplayObject layout.
-	actionDrainActionQueueByKind(app_context, AQ_KIND_LOAD);
-#  endif
-
-	// Enable root onEnterFrame dispatch after first frame
-	{
-		extern int g_root_enterframe_eligible;
-		g_root_enterframe_eligible = 1;
-	}
-
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#if !defined(HEADLESS_GRAPHICS)
 	// Browser-WASM: finalize any tagRemoveObject(2)'d entries that weren't
-	// reclaimed by a same-tick tagPlaceObject2(Ratio). pending_remove was
-	// deferred at tagRemoveObject2 time to give Remove+Place pairs in
-	// re-running frame_funcs a chance to skip the invalidate+recreate
-	// churn. Anything still flagged here is a genuine removal — fire the
-	// invalidate + clear now, before button hit-testing and rendering see
-	// stale state.
+	// reclaimed by a same-tick tagPlaceObject2(Ratio) BEFORE the AQ_KIND_LOAD
+	// drain. pending_remove was deferred at tagRemoveObject2 time to give
+	// Remove+Place pairs in re-running frame_funcs a chance to skip the
+	// invalidate+recreate churn. Anything still flagged here is a genuine
+	// removal — fire the invalidate + clear now so LOAD handlers don't bind
+	// to stale cached MCs. Concrete case: Doodle Jump gameplay frame_1 places
+	// a fresh "hero" at depth 4 (queues LOAD on AQ_KIND_LOAD) and removes the
+	// menu's "hero" at depth 9 (sets pending_remove). When LOAD drains,
+	// findOrCreateMovieClip("hero", root) would otherwise pick up the menu
+	// hero MC still in the cache, store `var score = 0` on it, and then
+	// (post-drain) the finalize walk would invalidate it — so the next
+	// tick's ENTER_FRAME dispatch creates a fresh hero MC with no score
+	// property, and `_root.score_txt.text = "" + score` produces "undefined".
 	for (size_t _pr_d = 1; _pr_d <= max_depth; _pr_d++)
 	{
 		if (display_list[_pr_d].pending_remove)
@@ -3483,6 +3476,19 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 	}
 #endif
+	// Browser-WASM: drain deferred LOAD clip-actions queued onto
+	// AQ_KIND_LOAD at placement time. By now advance_sprite_frames has
+	// populated sprite children (e.g. button_txt inside Doodle Jump's
+	// button sprites), so LOAD scripts that touch children see the
+	// expected DisplayObject layout.
+	actionDrainActionQueueByKind(app_context, AQ_KIND_LOAD);
+#  endif
+
+	// Enable root onEnterFrame dispatch after first frame
+	{
+		extern int g_root_enterframe_eligible;
+		g_root_enterframe_eligible = 1;
+	}
 #endif
 
 	// --- Button hit testing + state machine + action dispatch ---
