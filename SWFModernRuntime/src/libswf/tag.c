@@ -45,15 +45,20 @@ float (*ng_getMovieTransformData(u8 movie_id))[16] {
 	return g_movie_transform_data[movie_id];
 }
 
-#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
-// NO_GRAPHICS / HEADLESS / graphics-native: extern data arrays from generated code
 extern float transform_data[][16];
+
+#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// NO_GRAPHICS / HEADLESS / graphics-native: cxform_data is graphics-side only here.
 extern float cxform_data[];
 
 // Active transform data pointer — defaults to main SWF's transform_data.
 // Swapped to child SWF's array during child movie init so that tagPlaceObject2
 // caches correct transform values on display objects (needed for getBounds on loaded movies).
+// Browser-WASM graphics gets this from graphics_stubs.c.
 float (*g_active_transform_data)[16] = NULL;
+#else
+extern float (*g_active_transform_data)[16];
+#endif
 
 static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
 	float (*td)[16] = g_active_transform_data ? g_active_transform_data : transform_data;
@@ -64,7 +69,6 @@ static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
 	obj->place_tx = td[tid][12];
 	obj->place_ty = td[tid][13];
 }
-#endif
 
 size_t dictionary_capacity = INITIAL_DICTIONARY_CAPACITY;
 size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
@@ -4542,11 +4546,10 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
 	dictionary[char_id].shape_offset = shape_offset;
 	dictionary[char_id].size = shape_size;
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Bounds always recorded — AS-visible _width/_height/getBounds need them
+	// in browser-WASM (USE_WEBGPU without OFFSCREEN_RENDER) too, so the
+	// mcGetOriginalBounds path can find shape extents via ng_getCharBounds.
 	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
-#else
-	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
-#endif
 }
 
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
@@ -4565,13 +4568,8 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
 	dictionary[char_id].morph_color_start = morph_color_start;
 	dictionary[char_id].morph_color_count = morph_color_count;
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
 	ng_record_morph_end_bounds(char_id, end_bounds_xmin, end_bounds_xmax, end_bounds_ymin, end_bounds_ymax);
-#else
-	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
-	(void)end_bounds_xmin; (void)end_bounds_xmax; (void)end_bounds_ymin; (void)end_bounds_ymax;
-#endif
 }
 
 void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start, size_t text_size, u32 transform_start, u32 cxform_id, s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
@@ -4594,11 +4592,7 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 		dictionary[char_id].text_size = text_size;
 		dictionary[char_id].transform_start = transform_start;
 		dictionary[char_id].cxform_id = cxform_id;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
-#else
-		(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
-#endif
 	}
 }
 
@@ -5472,9 +5466,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	    && display_list[depth].place_gen != g_place_gen)
 	{
 		display_list[depth].transform_id = transform_id;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		ng_cache_transform(&display_list[depth], transform_id);
-#endif
 		display_list[depth].cxform_id = cxform_id;
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -5561,9 +5553,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		// any pending instance_name without consuming it.
 		g_pending_instance_name = NULL;
 		display_list[depth].transform_id = transform_id;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		ng_cache_transform(&display_list[depth], transform_id);
-#endif
 		display_list[depth].cxform_id = cxform_id;
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -5587,9 +5577,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_cache_transform(&display_list[depth], transform_id);
-#endif
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
@@ -6105,9 +6093,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_cache_transform(&display_list[depth], transform_id);
-#endif
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;

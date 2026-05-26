@@ -26584,7 +26584,6 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h);
 // Returns 1 if bounds found, 0 if not.
 static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat_h)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern MovieClip root_movieclip;
 	float gxmin, gxmax, gymin, gymax;
 
@@ -26746,7 +26745,6 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 			return 1;
 		}
 	}
-#endif
 	*out_nat_w = 0.0;
 	*out_nat_h = 0.0;
 	return 0;
@@ -26756,17 +26754,11 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 {
 	double nat_w = 0.0, nat_h = 0.0;
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Always compute from original bounds + xscale/yscale
 	// For textfields, mcGetOriginalBounds uses mc->width/mc->height as natural bounds.
 	// For sprites/shapes, it uses ng_getDisplayEntryBounds.
 	mcGetOriginalBounds(mc, &nat_w, &nat_h);
-#else
-	nat_w = (double)mc->width;
-	nat_h = (double)mc->height;
-#endif
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// When the MC's transform comes from the timeline (no AS-set scale/rotation),
 	// use the actual matrix from transform_data — which preserves skew that
 	// xscale/yscale/rotation lose under decomposition. Round each transformed
@@ -26826,7 +26818,6 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 		*eff_h = (round(max_y) - round(min_y)) / 20.0;
 		return;
 	}
-#endif
 
 	double scaled_w = nat_w * mc->xscale / 100.0;
 	double scaled_h = nat_h * mc->yscale / 100.0;
@@ -65867,7 +65858,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ActionVar ht_args[3] = {0};
 			for (int hi = 0; hi < num_args && hi < 3; hi++) ht_args[hi] = args[hi];
 			if (args != NULL) FREE(args);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			{
 				extern DisplayObject* display_list;
 				extern size_t max_depth;
@@ -66237,8 +66227,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				#undef COMPUTE_GLOBAL_AABB
 			}
-#endif
-			// No args or non-NO_GRAPHICS fallback
+			// No args
 			pushUndefined(app_context);
 			return;
 		}
