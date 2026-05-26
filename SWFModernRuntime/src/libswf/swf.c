@@ -573,16 +573,19 @@ void tagMain(SWFAppContext* app_context)
 			advance_sprite_frames(app_context);
 			g_advance_defer_nested = 0;
 		}
+#endif
 
 		// Mark ENTER_FRAME dispatch pending. tagFlushPendingEnterFrame is
 		// called by the recompiler-emitted code right before each DoAction
 		// (after RemoveObject) and dispatches clip event ENTER_FRAME +
 		// AS2 onEnterFrame handlers. Mirrors swf_core.c line ~985.
+		// Unguarded so browser-WASM also fires CLIP_EVENT_ENTER_FRAME
+		// handlers — without this Doodle Jump's hero never bounces because
+		// clip_action_26 (its physics handler) never dispatches.
 		{
 			extern int g_enterframe_flush_pending;
 			g_enterframe_flush_pending = 1;
 		}
-#endif
 
 		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL
 #ifdef OFFSCREEN_RENDER
