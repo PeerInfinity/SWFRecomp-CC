@@ -2660,10 +2660,18 @@ namespace SWFRecomp
 						break;
 					}
 
+					// Per SWF File Format Spec §11.3 TEXTRECORD: bit 1 is
+					// StyleFlagsHasYOffset, bit 0 is StyleFlagsHasXOffset. Field
+					// data still appears X-before-Y in the byte stream when both
+					// are present, so the configureNextField order below is
+					// already correct — only the bit interpretation was swapped.
+					// Before the fix, an SWF that set only Y_OFFSET (e.g.
+					// Snake's "SNAKE" title record) had its Y value read as
+					// X_OFFSET, shifting all glyphs left+up by the ascent value.
 					bool has_font = (flags & 0b1000);
 					bool has_color = (flags & 0b0100);
-					bool has_x_offset = (flags & 0b0010);
-					bool has_y_offset = (flags & 0b0001);
+					bool has_y_offset = (flags & 0b0010);
+					bool has_x_offset = (flags & 0b0001);
 
 					u32 color_fields = text_has_alpha ? 4 : 3;
 					u32 field_count = 2*has_font + color_fields*has_color + has_x_offset + has_y_offset + 1;
