@@ -97,6 +97,67 @@ const char* getDisplayListJSON(void)
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 #endif
+const char* getSpriteChildrenJSON(int root_depth)
+{
+    static char child_buf[8192];
+    int pos = 0;
+    pos += snprintf(child_buf + pos, sizeof(child_buf) - pos,
+                    "{\"rootDepth\":%d,\"children\":[", root_depth);
+
+    if (root_depth < 1 || (size_t)root_depth > max_depth) {
+        pos += snprintf(child_buf + pos, sizeof(child_buf) - pos, "]}");
+        return child_buf;
+    }
+
+    DisplayObject* parent = &display_list[root_depth];
+    if (parent->char_id == 0 || parent->sprite_display_list == NULL) {
+        pos += snprintf(child_buf + pos, sizeof(child_buf) - pos, "]}");
+        return child_buf;
+    }
+
+    int first = 1;
+    /* sprite_display_list is indexed by relative depth; iterate up to
+     * sprite_max_depth and any AVM1-attached depths that may exceed it. */
+    size_t scan = parent->sprite_max_depth;
+    if (scan < 64) scan = 64; /* attachMovie depths start near 0 */
+    if (scan > parent->sprite_dl_capacity) scan = parent->sprite_dl_capacity;
+    for (size_t d = 0; d <= scan; d++) {
+        DisplayObject* obj = &parent->sprite_display_list[d];
+        if (obj->char_id == 0) continue;
+
+        const char* type_name = "unknown";
+        Character* ch = &dictionary[obj->char_id];
+        switch (ch->type) {
+        case CHAR_TYPE_SHAPE:       type_name = "shape"; break;
+        case CHAR_TYPE_MORPH_SHAPE: type_name = "morph"; break;
+        case CHAR_TYPE_TEXT:        type_name = "text"; break;
+        case CHAR_TYPE_SPRITE:      type_name = "sprite"; break;
+        case CHAR_TYPE_BUTTON:      type_name = "button"; break;
+        }
+
+        float* slot = (float*)app_context.transform_data + obj->transform_id * 16;
+        float x = slot[12] / 20.0f;
+        float y = slot[13] / 20.0f;
+
+        if (!first) pos += snprintf(child_buf + pos, sizeof(child_buf) - pos, ",");
+        first = 0;
+
+        const char* name = obj->instance_name ? obj->instance_name : "";
+        pos += snprintf(child_buf + pos, sizeof(child_buf) - pos,
+            "{\"depth\":%zu,\"charId\":%zu,\"type\":\"%s\","
+            "\"name\":\"%s\",\"x\":%.1f,\"y\":%.1f}",
+            d, obj->char_id, type_name, name, x, y);
+
+        if (pos >= (int)sizeof(child_buf) - 100) break;
+    }
+
+    pos += snprintf(child_buf + pos, sizeof(child_buf) - pos, "]}");
+    return child_buf;
+}
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
 void setObjectTransform(int depth, float x, float y,
                         float xscale, float yscale, float rotation)
 {

@@ -1456,6 +1456,44 @@ static void build_cxform_from_obj(float out[20], const DisplayObject* obj)
 // slot, and updates the child's transform_id to point to the new slot.
 // Original transform_ids are saved via xform_overrides for restoration after
 // rendering.
+// Build a local transform matrix for an attached MC (one placed via attachMovie
+// into a non-root parent's sprite_display_list). ng_attachMovie leaves the
+// entry's transform_id at 0 (slot 0 = identity), so compose_children would
+// otherwise render the child at the parent's origin regardless of mc->x/y.
+//
+// Returns 1 if `obj` is an attached MC entry and `out` was populated with the
+// AS-state local matrix; 0 otherwise (caller should fall back to transforms[
+// obj->transform_id * 16]).
+static int build_attached_mc_local_xform(DisplayObject* obj, float out[16])
+{
+	if (obj == NULL || obj->instance_name == NULL) return 0;
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->display_obj == NULL) continue;
+		// Attached MCs have a STANDALONE display_obj (allocated in
+		// ng_attachMovie). The parent's sprite_display_list entry (which is
+		// what `obj` is) is a SEPARATE allocation. If they were equal this
+		// would be a timeline-placed child, not attached.
+		if ((DisplayObject*)mc->display_obj == obj) continue;
+		if (mc->parent == NULL || mc->parent->display_obj == NULL) continue;
+		DisplayObject* pdobj = (DisplayObject*)mc->parent->display_obj;
+		if (pdobj->sprite_display_list == NULL) continue;
+		size_t target_d = (size_t)(mc->depth + 16384);
+		if (target_d >= pdobj->sprite_dl_capacity) continue;
+		if (&pdobj->sprite_display_list[target_d] != obj) continue;
+		// Match found — build local from mc's AS-state.
+		out[0]  = 1.0f; out[1]  = 0.0f; out[2]  = 0.0f; out[3]  = 0.0f;
+		out[4]  = 0.0f; out[5]  = 1.0f; out[6]  = 0.0f; out[7]  = 0.0f;
+		out[8]  = 0.0f; out[9]  = 0.0f; out[10] = 1.0f; out[11] = 0.0f;
+		out[12] = 0.0f; out[13] = 0.0f; out[14] = 0.0f; out[15] = 1.0f;
+		apply_as_transform(out, mc, (u8)(1|2|4|8|16));
+		return 1;
+	}
+	return 0;
+}
+
 static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 	size_t dl_max_depth, const float parent_composed[16],
 	int parent_cx_override, u32 parent_cxform_id)
@@ -1469,8 +1507,18 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 
 		Character* ch = &dictionary[obj->char_id];
 
-		// Compose this child's local transform with the parent's global transform
-		const float* local_xform = &transforms[obj->transform_id * 16];
+		// Compose this child's local transform with the parent's global transform.
+		// For attachMovie-placed entries (nested-attached MCs), build the local
+		// matrix from the MC's AS-state (mc->x/y/xscale/yscale/rotation) instead
+		// of reading from transform_data — ng_attachMovie leaves the entry's
+		// transform_id at 0, so otherwise children render at the parent origin.
+		const float* local_xform;
+		float attached_xform[16];
+		if (build_attached_mc_local_xform(obj, attached_xform)) {
+			local_xform = attached_xform;
+		} else {
+			local_xform = &transforms[obj->transform_id * 16];
+		}
 		float composed[16];
 		hit_test_mat4_multiply(composed, parent_composed, local_xform);
 

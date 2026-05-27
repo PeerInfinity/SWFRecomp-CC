@@ -275,7 +275,7 @@ if [ "$TARGET" == "wasm" ]; then
     # composition listeners registered by ng_register_ime_listeners.
     EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_ng_ime_compose_set","_ng_ime_commit_set"]'
     if [ "$DISPLAY_BRIDGE" = true ]; then
-        EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_setObjectTransform","_ng_ime_compose_set","_ng_ime_commit_set"]'
+        EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_getSpriteChildrenJSON","_setObjectTransform","_ng_ime_compose_set","_ng_ime_commit_set"]'
     fi
 
     if [ "$GRAPHICS_FLAG" = true ]; then
