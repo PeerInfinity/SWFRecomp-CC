@@ -5778,8 +5778,20 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 #endif
 
 	display_list[depth].char_id = char_id;
-	display_list[depth].transform_id = transform_id;
-	ng_cache_transform(&display_list[depth], transform_id);
+	// Cross-frame REPLACE without HasMatrix: preserve the prior transform.
+	// Recompiler emits transform_id=0 as the "SWF tag had no HasMatrix" sentinel
+	// (swf.cpp:3478-3480). Ruffle's apply_place_object only writes the matrix
+	// when HasMatrix is true. Without this gate the existing transform is
+	// clobbered to identity (transform_data[0]) on a Move=1+HasCharacter=1
+	// re-place — Snake countdown frame_16/29 PlaceObject2(d=2, char=19/20,
+	// transform=0, replace=1) drops chars 19/20 ("2"/"1") to the canvas origin
+	// instead of inheriting frame_4's centered transform 131 from char 18 ("3").
+	// Fresh placements (is_cross_frame_replace=false, slot was empty) fall
+	// through unchanged because the existing transform_id was already 0.
+	if (!(is_replace && transform_id == 0 && is_cross_frame_replace)) {
+		display_list[depth].transform_id = transform_id;
+		ng_cache_transform(&display_list[depth], transform_id);
+	}
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;

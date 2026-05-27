@@ -2811,9 +2811,6 @@ namespace SWFRecomp
 
 					u32 cur_byte_bits_left = 8;
 
-					recompileMatrix(temp_matrix, transform_data);
-					current_transform += 1;
-
 					for (u8 i = 0; i < glyph_count; ++i)
 					{
 						tag.clearFields();
@@ -2830,9 +2827,24 @@ namespace SWFRecomp
 						// Store for deferred char code lookup (font may not be parsed yet)
 						text_glyph_entries.push_back({font_id, glyph_index});
 
-						temp_matrix.translate_x += advance;
+						// Emit transform for glyph i at its pre-advance position,
+						// then accumulate the advance for the next glyph. Previously
+						// a pre-loop recompileMatrix wrote glyph 0's position and
+						// each iteration wrote the POST-advance position (the next
+						// glyph's start) — total glyph_count+1 transforms per record
+						// with a wasted trailing entry. Inert for single-record
+						// DefineText (renderer reads only glyph_count entries), but
+						// in multi-record DefineText the trailing transform of
+						// record N collided with the first glyph of record N+1
+						// (tagDefineText accumulates text_size across records but
+						// keeps a single contiguous transform_start). Snake's
+						// "GAMEOVER" (GAME + OVER on two y-offsets) wrapped as
+						// "GAMEO/VER" because record 1's trailing transform 174
+						// became the position of record 2's first glyph "O".
 						recompileMatrix(temp_matrix, transform_data);
 						current_transform += 1;
+
+						temp_matrix.translate_x += advance;
 
 						current_text += 1;
 					}
@@ -3035,9 +3047,6 @@ namespace SWFRecomp
 					size_t text_start = current_text;
 					size_t transform_start = current_transform;
 
-					recompileMatrix(temp_matrix, transform_data);
-					current_transform += 1;
-
 					// Emit glyph indices for each character in InitialText
 					for (size_t i = 0; i < initial_text.size(); ++i)
 					{
@@ -3050,14 +3059,18 @@ namespace SWFRecomp
 						// Store for deferred char code lookup
 						text_glyph_entries.push_back({font_id, glyph_index});
 
+						// One transform per glyph at its pre-advance position
+						// (see the DefineText loop above for the rationale on
+						// dropping the pre-loop + trailing pair).
+						recompileMatrix(temp_matrix, transform_data);
+						current_transform += 1;
+
 						// Advance by per-glyph width if available, otherwise full EM
 						s32 advance = (s32) em;
 						auto ait = font_advance_tables.find(font_id);
 						if (ait != font_advance_tables.end() && glyph_index < ait->second.size())
 							advance = (s32) ait->second[glyph_index];
 						temp_matrix.translate_x += advance;
-						recompileMatrix(temp_matrix, transform_data);
-						current_transform += 1;
 
 						current_text += 1;
 					}
