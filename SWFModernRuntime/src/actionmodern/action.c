@@ -63425,8 +63425,82 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						if (is_play) is_playing = 1;
 					}
 #else
-					actionGotoFrame(app_context, (u16)(frame_num - 1));
-					if (is_play) is_playing = 1;
+					// Browser-WASM root goto: run intermediate frames'
+					// tags so depths placed by frame_0 (and only removed
+					// in frame_1) get cleared before the natural advance
+					// runs the target frame. Without this, gotoAndStop(N>1)
+					// from a clip RELEASE handler leaves frame_0's
+					// PlaceObject2 entries (menu buttons + hero + block)
+					// stacked over the sub-screen. We run frames
+					// original..target-1 with catch_up_mode=1 (tags run,
+					// scripts suppressed via the recompiler-emitted gate);
+					// natural advance (swf.c:334 `current_frame = next_frame`)
+					// runs frame_target itself next tick, so we avoid
+					// double-script-fire from inlining target here.
+					// For backward goto, also clear depths placed at
+					// frames > target (mirrors ng_display_cleanup_unplaced_after,
+					// which IS linkable in graphics — actionRewindCleanup is not).
+					// Key reproducer: Doodle Jump menu Info / Scores /
+					// Options buttons.
+					{
+						u16 frame0 = (u16)(frame_num - 1);
+						if (mc == &root_movieclip && frame0 < g_frame_count) {
+							extern size_t current_frame;
+							extern size_t next_frame;
+							extern int manual_next_frame;
+							extern int catch_up_mode;
+							extern int g_tag_skip_mode;
+							extern size_t g_place_gen;
+							extern frame_func* g_frame_funcs;
+							extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+
+							size_t saved_current = current_frame;
+							if ((size_t)frame0 != saved_current) {
+								g_place_gen++;
+								int saved_catch_up = catch_up_mode;
+								int saved_tag_skip = g_tag_skip_mode;
+								catch_up_mode = 1;
+								g_tag_skip_mode = 0;
+								if ((size_t)frame0 < saved_current) {
+									// Backward: clear depths placed at
+									// frames > target so the upcoming
+									// frame_target run sees a clean slate.
+									ng_display_cleanup_unplaced_after(app_context, (size_t)frame0);
+									for (size_t f = 0; f < (size_t)frame0 && f < g_frame_count; f++) {
+										current_frame = f;
+										if (g_frame_funcs[f]) g_frame_funcs[f](app_context);
+									}
+								} else {
+									// Forward: run frames between current
+									// and target (exclusive) so their
+									// RemoveObject2 tags execute.
+									for (size_t f = saved_current + 1; f < (size_t)frame0 && f < g_frame_count; f++) {
+										current_frame = f;
+										if (g_frame_funcs[f]) g_frame_funcs[f](app_context);
+									}
+								}
+								catch_up_mode = saved_catch_up;
+								g_tag_skip_mode = saved_tag_skip;
+							}
+							// Land on the target frame so swf.c's
+							// already-passed `current_frame = next_frame`
+							// line (top of THIS tick — we got here from a
+							// mouse-release handler that fires AFTER the
+							// top-of-tick advance) doesn't end up re-running
+							// the original frame (frame_0 menu) at the
+							// pending frame_funcs[current_frame] call later
+							// this tick. Setting current_frame = frame0
+							// makes that call land on frame_target instead.
+							current_frame = (size_t)frame0;
+							next_frame = frame0;
+							manual_next_frame = 1;
+							is_playing = is_play ? 1 : 0;
+							root_movieclip.currentframe = frame0 + 1;
+						} else {
+							actionGotoFrame(app_context, frame0);
+							if (is_play) is_playing = 1;
+						}
+					}
 #endif
 				}
 			}

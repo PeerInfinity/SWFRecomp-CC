@@ -3423,6 +3423,15 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Advance sprite timelines (recursive) ---
 	advance_sprite_frames(app_context);
 #  else
+	// Browser-WASM: during goto catch-up (called from actionCallMethod's
+	// gotoAndStop/Play dispatch when target is root) skip per-tick
+	// pumping — advance_sprite_frames, LOAD drain, button hit-test, etc.
+	// The recompiler-emitted RemoveObject2/PlaceObject2 tags in each
+	// catch-up frame have already executed before this call; they're the
+	// only thing the catch-up needs from frame_funcs. Pumping sprite
+	// advance / draining LOAD while nested inside a CLIP_RELEASE handler
+	// corrupts global state used by getDisplayListJSON and other consumers.
+	if (catch_up_mode) return;
 	// Browser-WASM: tagShowFrame is the only sprite-advance pump in this
 	// build (unlike OFFSCREEN_RENDER, where swf.c's main tick loop runs
 	// the same defer+nested pattern). Without the nested pass, sprites

@@ -120,7 +120,8 @@ async def _try_display_list_json(page) -> tuple[str, str | None]:
             return ("error", parsed["_probe_err"])
         return ("json", raw)
     except Exception:
-        return ("error", f"unparseable ({len(raw)} chars)")
+        snippet = (raw or "")[:200]
+        return ("error", f"unparseable ({len(raw or '')} chars): {snippet!r}")
 
 
 async def run(args):
@@ -280,6 +281,13 @@ async def run(args):
                         pass
                 else:
                     rec["display_list_error"] = payload
+                    # Dump raw bytes for debugging unparseable cases
+                    err_path = out / "display_list" / f"t{i:02d}.raw"
+                    try:
+                        err_path.parent.mkdir(parents=True, exist_ok=True)
+                        err_path.write_text(payload if payload is not None else "")
+                    except Exception:
+                        pass
 
                 snapshots.append(rec)
                 if args.no_canvas:
