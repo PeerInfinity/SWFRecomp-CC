@@ -9,6 +9,10 @@
 #include <setjmp.h>
 #include "tesselator.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 // WASI compatibility: isnanf/isinff are GCC extensions not in WASI libc;
 // C99 isnan/isinf are type-generic and work on floats
 #ifndef isnanf
@@ -25688,10 +25692,20 @@ static void otf_walk_dl(SWFAppContext* app_context,
 			continue;
 		}
 
-		// Recurse into sprite children. Buttons (CHAR_TYPE_BUTTON) intentionally
-		// skipped — their child display list is reconstructed per state by
-		// button_state_funcs and not represented as a persistent DL.
-		if (dictionary[obj->char_id].type == CHAR_TYPE_SPRITE
+		// Recurse into sprite children. CHAR_TYPE_BUTTON entries also recurse:
+		// process_sprite_needs_init runs button_state_funcs[0] (the UP state)
+		// at init time and persists the resulting DL in obj->sprite_display_list,
+		// so the up-state placement is accessible the same way it is for sprites.
+		// (The compose_children button branch later builds a fresh temp DL per
+		// render frame to support state changes, but does not affect the
+		// init-time persisted UP DL.) Without this, an EditText placed inside
+		// a button's up state (e.g. Snake's "www.neave.com/webgames" link
+		// rendered as button_7's visual at depth 1) never reaches the dynamic
+		// glyph render path: render_display_list skips its static glyphs via
+		// the ng_getCharTextfieldIdx textfield check, and actionIterateTextField
+		// Glyphs walks child_mc_cache where no AS-resolved wrapper exists.
+		u8 ctype = dictionary[obj->char_id].type;
+		if ((ctype == CHAR_TYPE_SPRITE || ctype == CHAR_TYPE_BUTTON)
 		    && obj->sprite_display_list != NULL)
 		{
 			MovieClip* child_mc = otf_find_child_mc(parent_mc, obj->instance_name);
@@ -31209,8 +31223,17 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		return;
 	}
 
-	// Handle named clip targets (non-_level)
-	if (target != NULL && target[0] != '\0') {
+	// Reserved browser frame targets are handled by the browser-navigation
+	// branch below (browser-WASM) or silently ignored (native / trace).
+	// Skipping them here so they don't fall into the named-clip loadMovie path.
+	int is_browser_target = (target != NULL && (
+		strcmp(target, "_blank") == 0 ||
+		strcmp(target, "_self") == 0 ||
+		strcmp(target, "_parent") == 0 ||
+		strcmp(target, "_top") == 0));
+
+	// Handle named clip targets (non-_level, non-browser-reserved)
+	if (!is_browser_target && target != NULL && target[0] != '\0') {
 		// Try to find MC by name
 		MovieClip* mc = NULL;
 		for (int i = 0; i < child_mc_count; i++) {
@@ -31273,6 +31296,24 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		}
 		return;
 	}
+
+	// Browser navigation: open the URL in a new tab / current window.
+	// Only browser-WASM builds have a window to open; native / trace / headless
+	// builds fall through to silent-ignore. `_blank` / `_self` / `_parent` /
+	// `_top` are the canonical browser frame targets; any other non-_level
+	// target (including the empty / NULL default) is treated as `_blank`,
+	// matching Flash's GetURL behavior on the standalone player and the
+	// projector's web-page fallback.
+#ifdef __EMSCRIPTEN__
+	if (url != NULL && url[0] != '\0') {
+		const char* nav_target = (target != NULL && target[0] != '\0') ? target : "_blank";
+		EM_ASM({
+			try { window.open(UTF8ToString($0), UTF8ToString($1)); }
+			catch (e) {}
+		}, url, nav_target);
+		return;
+	}
+#endif
 
 	// No target or unrecognized target — silently ignore
 	// (browser navigation targets like _blank, _self, etc. are not applicable in trace mode)

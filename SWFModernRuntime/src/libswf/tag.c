@@ -8145,35 +8145,33 @@ DisplayObject* findDisplayObjectByName(const char* name)
 	return NULL;
 }
 
+// Font registration runs in all build modes. NO_GRAPHICS / OFFSCREEN_RENDER
+// need it for trace-harness textfield value resolution; browser-WASM graphics
+// needs it for actionIterateTextFieldGlyphs (the dynamic glyph render path
+// used by EditTexts, MC textfields, and orphan textfields placed without an
+// AS-resolved wrapper). Without these in graphics mode,
+// ng_find_font_with_metrics falls back to the builtin Noto Sans entry whose
+// glyph_base is 0 — that produces correct results only by coincidence when a
+// SWF has exactly one font at glyph_base 0 (e.g. Doodle Jump), and garbled
+// glyphs whenever a SWF has multiple fonts (Snake: font 4 at glyph_base 40
+// was looked up as Noto Sans at glyph_base 0, reading shape rows from the
+// wrong region of glyph_data).
 void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_font(app_context, font_id, name, bold, italic);
-#else
-	(void)app_context; (void)font_id; (void)name; (void)bold; (void)italic;
-#endif
 }
 
 void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s16* advance_table, size_t glyph_count)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_font_metrics(app_context, font_id, ascent, descent, leading, em_square,
 	    code_table, advance_table, glyph_count);
-#else
-	(void)app_context; (void)font_id; (void)ascent; (void)descent; (void)leading;
-	(void)em_square; (void)code_table; (void)advance_table; (void)glyph_count;
-#endif
 }
 
 void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_font_glyph_base(font_id, glyph_base);
-#else
-	(void)font_id; (void)glyph_base;
-#endif
 }
 
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
