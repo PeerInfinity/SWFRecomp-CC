@@ -4729,7 +4729,8 @@ int g_skip_pending_removal_mc = 0;  // When set, findOrCreateMovieClip skips pen
 // tagPlaceObject2 call site (constructors now queue through the ActionQueue
 // at placement time); this helper is still called from ng_fire_child_constructors
 // for the attachMovie AS-level path, which follows a different flow.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Compiled in all three builds — attachMovie now runs in browser-WASM too,
+// and the function body has no graphics-specific dependencies.
 static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
 	extern const char* ng_lookupExportName(size_t char_id);
@@ -4766,7 +4767,6 @@ static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* d
 			fire_eager_constructors(app_context, obj->sprite_display_list, obj->sprite_max_depth, mc ? mc : parent_mc);
 	}
 }
-#endif
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Phase 4 of ACTION_QUEUE_PLAN: CLIP_EVENT_INITIALIZE handlers are routed
@@ -8244,7 +8244,10 @@ static void ng_run_deferred_sprite_init_impl(SWFAppContext* app_context, int fil
 // Called after attachMovie fires the parent's constructor so that child
 // constructors (e.g. "box" inside an attached "a" clip) fire immediately
 // during the attachMovie call, before any goto catch-up places new sprites.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Compiled in all three builds (attachMovie runs everywhere now) — temporarily
+// close + reopen the surrounding NO_GRAPHICS/OFFSCREEN_RENDER block so this
+// symbol exists in browser-WASM where attachMovie now references it.
+#endif // NO_GRAPHICS — opens at line 8163, reopen below
 void ng_fire_child_constructors(SWFAppContext* app_context, MovieClip* mc)
 {
 	if (mc == NULL || mc->display_obj == NULL) return;
@@ -8252,7 +8255,7 @@ void ng_fire_child_constructors(SWFAppContext* app_context, MovieClip* mc)
 	if (dobj->sprite_display_list == NULL || dobj->sprite_max_depth == 0) return;
 	fire_eager_constructors(app_context, dobj->sprite_display_list, dobj->sprite_max_depth, mc);
 }
-#endif
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) // reopen the block
 
 // Fire registered class constructors for ALL pending sprites (root + children),
 // without running Phase 2 scripts. Uses process_sprite_needs_init in constructor_only

@@ -56401,10 +56401,22 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// attachMovie(linkageId, newName, depth [, initObject]) — MC method called as CallFunction
 	else if (func_name_len == 11 && strncmp(func_name, "attachMovie", 11) == 0)
 	{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+		// Runs in all three builds (NO_GRAPHICS, OFFSCREEN_RENDER, browser-WASM).
 		if (num_args >= 3) {
 			extern MovieClip root_movieclip;
 			MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
+			// Browser-WASM only: root attaches are no-ops. Same reason as the
+			// method-form gate (CallMethod path) — root frame_funcs re-run every
+			// tick, so a root attachMovie's class constructor would fire every
+			// tick. See the longer comment on the CallMethod gate.
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+			if (mc == &root_movieclip) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				builtin_handled = 1;
+				goto _am_func_done;
+			}
+#endif
 			char _am_buf1[256], _am_buf2[256];
 			if (args[0].type == ACTION_STACK_VALUE_STRING) {
 				const uint16_t* _u16 = varGetU16Ptr(&args[0]);
@@ -56539,11 +56551,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 		}
-#else
-		if (args != NULL) FREE(args);
-		pushUndefined(app_context);
-#endif
 		builtin_handled = 1;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	_am_func_done: ;
+#endif
 	}
 	// getNextHighestDepth() — as a global function, operates on root
 	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
@@ -63931,8 +63942,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 11 && strncasecmp(method_name, "attachMovie", 11) == 0)
 		{
 			// attachMovie(linkageId, newName, depth [, initObject])
-			// Instantiates an exported library symbol as a child clip
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Instantiates an exported library symbol as a child clip.
+			// Runs in all three builds (NO_GRAPHICS, OFFSCREEN_RENDER, browser-WASM).
+			// Browser-WASM key test: Doodle_Jump platforms — container.onEnterFrame
+			// calls this.attachMovie("cloud", ...) every tick to spawn blocks.
 			if (num_args >= 3) {
 				char _am_id_buf[512], _am_name_buf[512];
 				const char* linkage_id = "";
@@ -63948,6 +63961,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					new_name = _am_name_buf;
 				}
 				int depth_val = ecmaToInt32(varToDouble(&args[2]));
+
+				// Browser-WASM only: root attaches are no-ops. Root frame_funcs
+				// re-execute every tick (no is_playing gate), so a root-targeted
+				// attachMovie fires its registered class constructor every tick
+				// and accumulates state until the menu hangs after ~45 frames
+				// (Doodle_Jump script_15 _root.attachMovie("MCSpyConnection", ...)
+				// regression after enabling this codepath for browser-WASM —
+				// SpyConnection1 constructor opens LocalConnections and similar
+				// that aren't fully wired up in browser-WASM yet). Non-root
+				// attaches still run (DJ platforms via container.attachMovie).
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+				{
+					extern MovieClip root_movieclip;
+					if (mc == &root_movieclip) {
+						if (args != NULL) FREE(args);
+						pushUndefined(app_context);
+						return;
+					}
+				}
+#endif
 
 				// Lookup exported symbol (per-movie isolation)
 				size_t char_id = ng_lookupExportForMovie(linkage_id, mc->movie_id);
@@ -64088,10 +64121,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 			}
-#else
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-#endif
 			return;
 		}
 		else if (method_name_len == 12 && strncasecmp(method_name, "attachBitmap", 12) == 0)

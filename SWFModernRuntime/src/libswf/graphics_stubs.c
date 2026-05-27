@@ -159,7 +159,40 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
     extern DisplayObject* g_current_sprite_obj;
     DisplayObject* saved = g_current_sprite_obj;
     g_current_sprite_obj = obj;
+
+    // Browser-WASM doesn't run process_sprite_needs_init (gated to
+    // NO_GRAPHICS/OFFSCREEN_RENDER) which is where timeline-placed sprites
+    // normally get their MovieClip created & the frame-script context swap
+    // happens. For sprites WITHOUT clip actions (Doodle Jump's "container"
+    // at depth 2, an attachMovie target whose sprite-frame-script
+    // `this.attachMovie("cloud", ...)` needs `this`=container, not root),
+    // we mirror tag.c here: find-or-create the MC + swap g_current_context.
+    // Sprites WITH clip actions (DJ's menu buttons sprite_46 at depths
+    // 3/5/7/8 — clip_actions_145..148) are skipped because their MCs are
+    // already created via the clip-event LOAD dispatch path; creating a
+    // shadow MC here breaks button hit-test + the LOAD-set button label.
+    MovieClip* saved_ctx = g_current_context;
+    MovieClip* saved_base = actionGetBaseClip();
+    int did_swap = 0;
+    if (obj != NULL && obj->instance_name != NULL && obj->clip_action_count == 0) {
+        extern MovieClip* actionFindOrCreateMovieClip(SWFAppContext*, const char*, MovieClip*);
+        extern MovieClip root_movieclip;
+        MovieClip* parent = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+        MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent);
+        if (mc) {
+            mc->display_obj = (void*)obj;
+            actionSetCurrentContext(mc);
+            actionSetBaseClip(mc);
+            did_swap = 1;
+        }
+    }
+
     if (f) f(app_context);
+
+    if (did_swap) {
+        actionSetCurrentContext(saved_ctx);
+        actionSetBaseClip(saved_base);
+    }
     g_current_sprite_obj = saved;
 }
 
