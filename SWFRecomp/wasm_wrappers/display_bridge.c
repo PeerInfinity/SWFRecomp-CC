@@ -14,6 +14,7 @@
 #endif
 
 #include <swf.h>
+#include <action.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -143,10 +144,26 @@ const char* getSpriteChildrenJSON(int root_depth)
         first = 0;
 
         const char* name = obj->instance_name ? obj->instance_name : "";
+
+        /* For attached MCs the entry's transform_id stays at 0 (identity);
+         * compose_children builds the local matrix from mc->x/y in flight,
+         * so the slot read above shows (0,0). Look up the MC by name and
+         * report mc->x/y when available. */
+        float mc_x = x, mc_y = y;
+        if (name[0] != '\0') {
+            extern MovieClip* child_mc_cache[];
+            extern int child_mc_count;
+            for (int i = 0; i < child_mc_count; i++) {
+                MovieClip* mc = child_mc_cache[i];
+                if (mc != NULL && mc->name[0] != '\0' && strcmp(mc->name, name) == 0) {
+                    mc_x = mc->x; mc_y = mc->y; break;
+                }
+            }
+        }
         pos += snprintf(child_buf + pos, sizeof(child_buf) - pos,
             "{\"depth\":%zu,\"charId\":%zu,\"type\":\"%s\","
             "\"name\":\"%s\",\"x\":%.1f,\"y\":%.1f}",
-            d, obj->char_id, type_name, name, x, y);
+            d, obj->char_id, type_name, name, mc_x, mc_y);
 
         if (pos >= (int)sizeof(child_buf) - 100) break;
     }

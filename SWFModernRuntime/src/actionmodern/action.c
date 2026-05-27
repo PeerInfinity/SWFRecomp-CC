@@ -63529,8 +63529,30 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							is_playing = is_play ? 1 : 0;
 							root_movieclip.currentframe = frame0 + 1;
 						} else {
-							actionGotoFrame(app_context, frame0);
-							if (is_play) is_playing = 1;
+							// Browser-WASM: MC-targeted gotoAndStop/Play
+							// (mc != &root_movieclip). Do NOT call
+							// actionGotoFrame here — it treats
+							// targeted_sprite==NULL as a ROOT goto and sets
+							// next_frame/manual_next_frame on the root
+							// timeline. For Doodle Jump, attached platform
+							// MCs' physics handler calls block.gotoAndStop(1)
+							// every hit, which would otherwise advance the
+							// root timeline (e.g., to frame_2 gameover) and
+							// terminate gameplay in under a second. Set the
+							// sprite-local navigation fields on the MC's
+							// display_obj instead. For timeline-placed
+							// sprites the display_obj is in display_list and
+							// advance_sprite_frames consumes the flags; for
+							// attached MCs the display_obj is a standalone
+							// allocation, and the goto is effectively a
+							// no-op (cloud platforms are single-frame).
+							if (mc != NULL && mc->display_obj != NULL) {
+								DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+								dobj->sprite_next_frame = (size_t)frame0;
+								dobj->sprite_manual_next_frame = 1;
+								dobj->sprite_is_playing = is_play ? 1 : 0;
+								mc->currentframe = frame0 + 1;
+							}
 						}
 					}
 #endif
@@ -66139,6 +66161,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 					// Check bounding box first (fast reject)
 					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
+
 
 					// If shapeFlag=true and BB says hit, refine with shape-accurate test
 					if (hit && shape_flag) {
