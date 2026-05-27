@@ -63459,6 +63459,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								g_place_gen++;
 								int saved_catch_up = catch_up_mode;
 								int saved_tag_skip = g_tag_skip_mode;
+								// We're called from a clip RELEASE handler
+								// (or similar) that already pushed the
+								// clicked MC into g_current_context. The
+								// catch-up frames' tags run at root scope —
+								// in particular, sprite placements queue
+								// CLIP_EVENT_LOAD entries that capture
+								// g_current_context as their parent_mc, then
+								// at drain time resolve the placement's
+								// instance_name against that parent. Leaving
+								// g_current_context as the clicked MC makes
+								// the LOAD bind to a phantom MC instead of
+								// the real depth-N sprite MC — the LOAD
+								// handler's setMember writes onto the
+								// phantom, and the real sprite's button_txt
+								// keeps its default text. Force root here.
+								// Key reproducer: DJ Info-button click,
+								// the back-button label staying "menu"
+								// instead of getting set to "back".
+								MovieClip* saved_ctx = g_current_context;
+								actionSetCurrentContext(&root_movieclip);
 								catch_up_mode = 1;
 								g_tag_skip_mode = 0;
 								if ((size_t)frame0 < saved_current) {
@@ -63481,6 +63501,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								}
 								catch_up_mode = saved_catch_up;
 								g_tag_skip_mode = saved_tag_skip;
+								actionSetCurrentContext(saved_ctx);
 							}
 							// Land on the target frame so swf.c's
 							// already-passed `current_frame = next_frame`
