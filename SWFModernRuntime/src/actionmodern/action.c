@@ -53274,25 +53274,35 @@ void actionCloneSprite(SWFAppContext* app_context)
  */
 void actionRemoveSprite(SWFAppContext* app_context)
 {
-	// toString coercion on target for proper side effects
-	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT ||
-	    STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY ||
-	    STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
-		convertString(app_context, NULL);
+	// Peek target's type BEFORE toString coercion so we can short-circuit
+	// the MovieClip-by-reference path (mirrors actionCloneSprite). Otherwise
+	// convertString would coerce the MC to a string and we'd lose the
+	// direct mc->name access.
+	MovieClip* _rs_target_mc = NULL;
+	{
+		ActionVar _peek;
+		peekVar(app_context, &_peek);
+		if (_peek.type == ACTION_STACK_VALUE_MOVIECLIP && _peek.data.numeric_value != 0)
+			_rs_target_mc = (MovieClip*)(uintptr_t)_peek.data.numeric_value;
 	}
+	// toString coercion on target for proper side effects. Always convert
+	// (not just for OBJECT/ARRAY/FUNCTION) — Snake's gameplay path pushes the
+	// `tail` counter as an integer, and without a numeric→string conversion
+	// the popped target is type F64, target_name stays empty, and the call
+	// returns early with no removal.
+	convertString(app_context, NULL);
 	// Pop target sprite name from stack
 	ActionVar target;
 	popVar(app_context, &target);
 	char _remove_tgt_buf[512];
 	const char* target_name = "";
-	if (target.type == ACTION_STACK_VALUE_STRING && target.str_size > 0) {
+	if (_rs_target_mc != NULL) {
+		// Pre-coercion MovieClip reference: use its name directly.
+		target_name = _rs_target_mc->name;
+	} else if (target.type == ACTION_STACK_VALUE_STRING && target.str_size > 0) {
 		const uint16_t* _remove_tgt_u16 = varGetU16Ptr(&target);
 		u16_to_utf8(_remove_tgt_u16, target.str_size, _remove_tgt_buf, sizeof(_remove_tgt_buf));
 		target_name = _remove_tgt_buf;
-	} else if (target.type == ACTION_STACK_VALUE_MOVIECLIP && target.data.numeric_value != 0) {
-		// MovieClip reference: use its name directly
-		MovieClip* _rs_target_mc = (MovieClip*)(uintptr_t)target.data.numeric_value;
-		target_name = _rs_target_mc->name;
 	}
 
 	// Handle null/empty gracefully
@@ -53300,16 +53310,18 @@ void actionRemoveSprite(SWFAppContext* app_context)
 		return;
 	}
 
-	#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM graphics: stubbed. Graphics-native (OFFSCREEN_RENDER)
-	// falls through to the NO_GRAPHICS implementation below — same
-	// child_mc_cache / display_list / queueOnUnload primitives are
-	// available, so the real removal path runs (gotcha #13).
-	#ifdef DEBUG
-	printf("[RemoveSprite] Graphics mode stub: would remove %s\n", target_name);
-	#endif
-	#else
-	// NO_GRAPHICS / OFFSCREEN_RENDER mode: find the clip by name and remove it if dynamically created
+	// All three build modes (NO_GRAPHICS / OFFSCREEN_RENDER graphics-native /
+	// browser-WASM graphics) route through the same child_mc_cache removal
+	// path. The display_list-clearing arm is a no-op in browser-WASM because
+	// ng_cloneSprite skips the display_list[clone_depth] write there (see
+	// tag_stubs.c gate), so ng_findDisplayEntryByName returns SIZE_MAX for
+	// clones — meaning the inner clear block doesn't run. The child_mc_cache
+	// walk + queueOnUnload + queueChildOnUnloads + parent.dynamic_props
+	// deletion + var_map sentinel are the part that actually removes the
+	// clone in browser-WASM. Without this widening, Snake's segments
+	// accumulate (the column "extrudes" rather than the snake "moving")
+	// because every makeMove tick creates a new head via actionCloneSprite
+	// but the corresponding removeMovieClip on the tail no-ops.
 	{
 		MovieClip* _rs_mc = NULL;
 		for (int _rs_i = 0; _rs_i < child_mc_count; _rs_i++) {
@@ -53452,6 +53464,8 @@ void actionRemoveSprite(SWFAppContext* app_context)
 							_fallback = &root_movieclip;
 						g_current_context = _fallback;
 					} else if (g_settarget_context_changed) {
+						extern int g_settarget_invalid;  /* action.c (NO_GRAPHICS/OFFSCREEN_RENDER) or graphics_stubs.c (browser-WASM) */
+						extern int g_settarget_none;
 						g_current_context = &root_movieclip;
 						g_settarget_invalid = 1;
 						g_settarget_none = 1;
@@ -53460,7 +53474,6 @@ void actionRemoveSprite(SWFAppContext* app_context)
 			}
 		}
 	}
-	#endif
 }
 
 // Helper: convert a MovieClip's slash-path target to dot-notation base path

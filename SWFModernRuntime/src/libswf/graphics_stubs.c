@@ -100,6 +100,18 @@ int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
 void ng_queue_placement_clip_events(SWFAppContext* app_context, size_t depth) {
     (void)app_context; (void)depth;
 }
+
+// actionRemoveSprite (action.c) calls this when a clone has a backing
+// display_list slot — but in browser-WASM graphics ng_cloneSprite skips
+// the display_list write (see tag_stubs.c gate), so the lookup that gates
+// the call returns SIZE_MAX and this stub is never actually reached for
+// clones. Stub exists only to satisfy the linker. attachMovie clones go
+// through ng_attachMovie which uses a separate display_obj wrapper outside
+// the global display_list, so they don't have UNLOAD clip-action events
+// queued through this path either.
+void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, MovieClip* mc) {
+    (void)app_context; (void)depth; (void)mc;
+}
 #endif
 
 // ---------------------------------------------------------------------------
