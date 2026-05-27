@@ -21896,6 +21896,35 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 				}
 			}
 			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead
+			// Cascade invalidation to descendant MCs whose parent chain
+			// includes this MC. Without this, child MCs (e.g. button_txt
+			// EditText inside a sprite-button placeholder) remain in
+			// child_mc_cache with their stale state — actionIterateTextField
+			// Glyphs then renders their old text at their old world position
+			// after the parent was unloaded. Surfaces in Doodle Jump as the
+			// "back" label sticking around at the options-screen position
+			// after the user clicks back to the menu (backward goto invalidates
+			// the back button MC but its button_txt child kept rendering).
+			MovieClip* dead_parent = child_mc_cache[i];
+			for (int j = 0; j < child_mc_count; j++) {
+				if (j == i) continue;
+				MovieClip* dch = child_mc_cache[j];
+				if (dch == NULL || dch->depth == INT_MIN) continue;
+				// Walk parent chain looking for the dead MC.
+				MovieClip* p = dch->parent;
+				int hops = 0;
+				while (p != NULL && hops < 64) {
+					if (p == dead_parent) {
+						dch->avm1_removed = 1;
+						dch->dynamic_props = NULL;
+						dch->ng_textfield_idx = -1;
+						dch->depth = INT_MIN;
+						break;
+					}
+					p = p->parent;
+					hops++;
+				}
+			}
 			break;
 		}
 	}
