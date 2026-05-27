@@ -126,6 +126,60 @@ Each sub-screen's "back" button (depth 3 with `clip_actions_197`) clicks return 
 - **Pong preloader transition.** Pre-existing; not affected by this fix.
 - **Other goto entry points.** This fix is specifically the `actionCallMethod` gotoAndStop/Play dispatch (called when AS does `_root.gotoAndStop(N)` etc.). Other goto entry points — `actionGotoFrame` opcode (0x81), `actionGotoFrame2` (0x9F), label-based `actionGoToLabel` — still take their pre-existing paths. If a test exercises non-sequential root goto via one of those opcodes and shows similar menu-overlay symptoms, mirror the same catch-up pattern there.
 
+## Follow-up (same session, commit `c14b36aef`)
+
+User reported: clicking Info shows the right sub-screen, the back-button
+sprite IS placed (cleanup worked, dl_count=3), BUT its label reads "menu"
+instead of "back" and hovering doesn't change the cursor. Options
+sub-screen showed "back" correctly. Click-to-return-to-menu works in both.
+
+**Root cause:** the catch-up runs nested inside a clip RELEASE handler
+that has already set `g_current_context` to the clicked MC (info button =
+instance4 on info click). The intermediate frames' sprite placements
+call `queue_clip_load_events_kind`, which captures `g_current_context`
+at queue time as the LOAD entry's `parent_mc` (tag.c:5068). At drain
+time `aq_dispatch_clip_load` resolves the placement's instance_name
+against that parent — `actionFindOrCreateMovieClip(instance_name=instance10, parent=info_button_MC)`
+creates a phantom child of the info button instead of finding the real
+depth-3 sprite MC. The LOAD's `setMember(this.button_txt, "text", "back")`
+writes onto the phantom; the real sprite's button_txt keeps its
+EditText-default "menu\r" text. Same root MC mismatch breaks
+`ng_update_button_states`'s cursor lookup.
+
+Diagnostic: logged `parent_mc` + resolved `mc` from `aq_dispatch_clip_load`:
+```
+dispatch obj=0x15e0470 name=instance10 parent=0x415c3638 action=0x21a
+resolved mc=0x42291e88 obj_sprite_dl=0x18ef610 obj_sprite_max=1
+```
+`parent=0x415c3638` was the info-button MC from earlier `instance4` lookup.
+
+**Why Options worked:** Options is `gotoAndStop(4) → frame_3`. My catch-up
+runs frames 1, 2 only (target=3 exclusive), then `current_frame=3` is
+set and frame_funcs[3] runs INLINE (line ~63498). The frame_3 placement
+queues the LOAD with whatever g_current_context was at that point — but
+by then we'd already restored `current_frame` from the catch-up loop
+exit, *and the inline run was outside the catch_up_mode=1 block*.
+Actually no — inline frame_3 also runs after `current_frame = frame0`,
+which is still inside the same outer braces. Let me re-check… actually
+options worked because `aq_dispatch_clip_load`'s `actionFindOrCreateMovieClip`
+falls back to a search-by-name when the parent_mc lookup fails (any
+child MC with that name), and on the Options click the search happened
+to land on the correct MC. On Info, the search produced the phantom
+because instance10 had no prior cache entry under any parent. Either
+way, root is the correct parent and forcing it makes both paths
+deterministic.
+
+**Fix:** save `g_current_context` at entry to the catch-up branch, set
+it to `&root_movieclip` for the duration of the catch-up frames'
+execution, then restore on exit. All `queue_clip_load_events_kind` calls
+from the catch-up now capture root as `parent_mc`, so LOAD resolves
+against root and finds the real depth-N sprite MC by instance_name.
+
+Verified post-fix: Info → back button labeled "back", cursor `pointer`
+over back / `default` off, click returns to menu. Options + Scores
+unchanged (still "back" label, still navigate). Play still transitions
+to gameplay. All baselines clean.
+
 ## Don't-touch list (cumulative)
 
 (All entries from handoff #11 remain. Adding:)
@@ -133,6 +187,8 @@ Each sub-screen's "back" button (depth 3 with `clip_actions_197`) clicks return 
 - **Browser-WASM `tagShowFrame` `if (catch_up_mode) return;` gate (tag.c:3434).** Required: without it, in-tick catch-up calling `tagShowFrame` corrupts global state (`getDisplayListJSON` returns garbage like `{"displayList":[,,,,,`). The recompiler-emitted display tags in each catch-up frame_func *have already executed* before `tagShowFrame` is reached; `tagShowFrame`'s per-tick pumping (advance_sprite_frames, AQ_KIND_LOAD drain, pending_remove finalize, button hit-test) isn't needed during catch-up and actively breaks things when invoked nested inside a CLIP_RELEASE handler.
 
 - **`actionCallMethod` browser-WASM gotoAndStop/Play: `current_frame = (size_t)frame0` after the catch-up loop.** Required: without it, swf.c:615's pending `frame_funcs[current_frame]` call (which runs AFTER the mouse-release handler) re-executes `frame_funcs[saved_current]` (typically frame_0), re-placing every menu depth the catch-up just cleared, exactly undoing the fix. The assignment makes that swf.c:615 call land on `frame_funcs[target]` instead.
+
+- **`actionCallMethod` browser-WASM gotoAndStop/Play: `g_current_context = &root_movieclip` during the catch-up loop** (save/restore around the `for (f...) frame_funcs[f]()` block, commit `c14b36aef`). Required: the catch-up runs nested inside a clip RELEASE handler that left `g_current_context` pointing at the clicked MC. Intermediate frames' sprite placements queue LOAD entries that capture `g_current_context` as `parent_mc`; if that's the clicked MC instead of root, `actionFindOrCreateMovieClip` at drain time creates a phantom MC under the clicked button instead of finding the real depth-N sprite, and the LOAD's `setMember` writes onto the phantom. Symptom: DJ Info-screen back-button label stays at EditText default "menu" instead of getting set to "back", and cursor doesn't change on hover.
 
 ## Tools / state
 
