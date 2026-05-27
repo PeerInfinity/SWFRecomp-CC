@@ -3063,7 +3063,21 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		cxform_overrides_reset();
 	}
 
-	// Runtime transform updates (AS _x/_y/_xscale/_rotation changes)
+	// Runtime transform updates (AS _x/_y/_xscale/_rotation changes).
+	//
+	// In-place mutation hazard: this loop mutates `transform_data[obj->transform_id]`
+	// CPU-side, then uploads the mutated matrix to GPU at the same slot. The
+	// recompiler dedupes identical matrices into one transform_data slot, so
+	// multiple display entries can share a transform_id — and the in-place
+	// mutation drags every sharer along. For SPRITE / BUTTON entries the
+	// compose loop below builds its own effective parent matrix on a local
+	// stack buffer (`mc->as_set_flags`-aware) and passes that to
+	// compose_children, so SPRITE / BUTTON entries DON'T need this in-place
+	// mutation. Skipping them here avoids the shared-slot displacement
+	// without losing AS-set positioning. SHAPE / TEXT / MORPH entries still
+	// go through this path because they're leaf nodes — render_display_list
+	// draws them via obj->transform_id directly, so the GPU slot must hold
+	// the AS-overlaid matrix.
 	{
 		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
 		for (size_t i = 1; i <= max_depth; ++i)
@@ -3072,6 +3086,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			if (obj->char_id == 0 || obj->instance_name == NULL) continue;
 			MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
 			if (mc == NULL || mc->as_set_flags == 0) continue;
+			// Skip sprites and buttons — the compose loop below handles them.
+			Character* ch_ = &dictionary[obj->char_id];
+			if (ch_->type == CHAR_TYPE_SPRITE || ch_->type == CHAR_TYPE_BUTTON) continue;
 			float* slot = transform_data[obj->transform_id];
 			apply_as_transform(slot, mc, mc->as_set_flags);
 			renderer_write_transform(context, obj->transform_id, slot);
@@ -3098,7 +3115,18 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		__asm__ volatile("" ::: "memory");
 	}
 
-	// Compose children transforms (sprites, buttons, text)
+	// Compose children transforms (sprites, buttons, text).
+	//
+	// For SPRITE / BUTTON entries with as_set_flags != 0, build the effective
+	// parent matrix on a LOCAL stack buffer (apply_as_transform overlay on
+	// top of the original CPU-side transform_data). The runtime-transform
+	// loop above explicitly skips SPRITE / BUTTON entries, so the CPU-side
+	// transform_data slot still holds the un-mutated timeline matrix — that
+	// way we can read it here without dragging along any other display
+	// entries that share the same transform_id (the recompiler dedupes
+	// identical matrices into one slot, so sharing is the common case).
+	{
+	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
 		DisplayObject* obj = &display_list[i];
@@ -3108,7 +3136,19 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		{
 			if (obj->sprite_display_list != NULL)
 			{
-				const float* sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				const float* sprite_xform;
+				float sprite_xform_buf[16];
+				MovieClip* mc_for_xform = (obj->instance_name != NULL)
+					? actionFindMovieClipByName(obj->instance_name) : NULL;
+				if (mc_for_xform != NULL && mc_for_xform->as_set_flags != 0) {
+					memcpy(sprite_xform_buf,
+						(const float*)app_context->transform_data + obj->transform_id * 16,
+						sizeof(sprite_xform_buf));
+					apply_as_transform(sprite_xform_buf, mc_for_xform, mc_for_xform->as_set_flags);
+					sprite_xform = sprite_xform_buf;
+				} else {
+					sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				}
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					sprite_xform,
@@ -3127,7 +3167,19 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			// other display-list entries.
 			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
 			{
-				const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				const float* btn_xform;
+				float btn_xform_buf[16];
+				MovieClip* mc_for_xform = (obj->instance_name != NULL)
+					? actionFindMovieClipByName(obj->instance_name) : NULL;
+				if (mc_for_xform != NULL && mc_for_xform->as_set_flags != 0) {
+					memcpy(btn_xform_buf,
+						(const float*)app_context->transform_data + obj->transform_id * 16,
+						sizeof(btn_xform_buf));
+					apply_as_transform(btn_xform_buf, mc_for_xform, mc_for_xform->as_set_flags);
+					btn_xform = btn_xform_buf;
+				} else {
+					btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				}
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					btn_xform,
@@ -3140,6 +3192,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				app_context->transform_data,
 				obj->transform_id, ch->transform_start, ch->text_size);
 		}
+	}
 	}
 
 	// --- Render pass ---

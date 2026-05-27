@@ -19281,13 +19281,15 @@ extern MovieClip* g_levels[MAX_LEVELS];
 // Helper function to get MovieClip by target path
 static MovieClip* getMovieClipByTarget(const char* target) {
 	if (!target || strlen(target) == 0) {
-		// Empty target = "this clip" = current execution context (not necessarily root).
-		// When running inside a sprite frame, g_current_context points to the sprite's MC.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+		// Empty target = "this clip" = current execution context (not necessarily
+		// root). When running inside a sprite frame, g_current_context points to
+		// the sprite's MC. Also: within a `SetTarget "Foo"` block, SetProperty
+		// with empty target should operate on Foo — Snake's gameplay does this
+		// for the random food position (`SetTarget "Food"; Food._x = ...; SetTarget ""`),
+		// and without g_current_context routing the SetProperty wrote to root,
+		// which then set root.as_set_flags and shifted the entire stage at
+		// render time.
 		return g_current_context ? g_current_context : &root_movieclip;
-#else
-		return &root_movieclip;
-#endif
 	}
 	if (strcmp(target, "_root") == 0 || strcmp(target, "/") == 0 ||
 	    strcmp(target, "_level0") == 0) {
@@ -52883,30 +52885,29 @@ void actionSetProperty(SWFAppContext* app_context)
 	switch (prop_index) {
 		case 0:  // _x
 			mc->x = num_value;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Unconditional in all modes (matches actionSetMember). Browser-WASM
+			// previously left as_set_flags alone here, which meant opcode-form
+			// SetProperty `_x` wrote mc->x but apply_as_transform's compose-time
+			// gate skipped the entry, leaving the renderer at the timeline
+			// position. tag.c's compose-time apply now sidesteps shared-slot
+			// corruption for sprites/buttons by overlay-ing on a local buffer
+			// instead of mutating transform_data in place.
 			mc->as_set_flags |= 1;
-#endif
 			markTransformedByScript(mc);
 			break;
 		case 1:  // _y
 			mc->y = num_value;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 2;
-#endif
 			markTransformedByScript(mc);
 			break;
 		case 2:  // _xscale
 			mc->xscale = num_value;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 4;
-#endif
 			markTransformedByScript(mc);
 			break;
 		case 3:  // _yscale
 			mc->yscale = num_value;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 8;
-#endif
 			markTransformedByScript(mc);
 			break;
 		case 6:  // _alpha
@@ -52931,9 +52932,7 @@ void actionSetProperty(SWFAppContext* app_context)
 			break;
 		case 10: // _rotation
 			mc->rotation = normalizeRotation(num_value);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 16;
-#endif
 			markTransformedByScript(mc);
 			break;
 		case 13: // _name
