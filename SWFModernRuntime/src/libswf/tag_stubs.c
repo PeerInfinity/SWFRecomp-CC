@@ -2069,7 +2069,21 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 			}
 		}
 
-		// Copy display entry to clone depth (clones live up to AVM_CLONE_SLOT_CAP)
+		// Copy display entry to clone depth (clones live up to AVM_CLONE_SLOT_CAP).
+		// Browser-WASM graphics: skip the global display_list write. Reason: the
+		// struct copy shares the source's transform_id with the clone, and tag.c's
+		// runtime-transform-update loop (tag.c:~3070) then mutates the shared
+		// transform_data[transform_id] slot every tick for whichever entry it
+		// processes last — corrupting the source MC's stage transform (the visible
+		// "play area shifts to match the snake clone's position" symptom in
+		// Snake). In browser-WASM the clone is rendered exclusively through the
+		// child_mc_cache loop (tag.c:~3912), which uses the separately-calloc'd
+		// clone_mc->display_obj wrapper and applies the AS-set transform via
+		// apply_as_transform without touching transform_data. NO_GRAPHICS /
+		// OFFSCREEN_RENDER (trace + graphics-native) still need the display_list
+		// write — they don't have the child_mc_cache render fallback and they
+		// rely on display_list[clone_depth] for name lookups / instance walks.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (target_swf_depth < AVM_CLONE_SLOT_CAP)
 		{
 			// Ensure capacity — use HCALLOC/FREE because display_list may be
@@ -2124,6 +2138,7 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		{
 			ng_queue_placement_clip_events(app_context, target_swf_depth);
 		}
+#endif
 
 		// CloneSprite fires onLoad for the clone (unlike duplicateMovieClip).
 		if (display_list[src_depth].clip_action_count > 0)
@@ -2318,6 +2333,9 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	               : ((depth >= AVM_DEPTH_BIAS) ? (depth - AVM_DEPTH_BIAS) : depth);
 	int swf_depth_for_table = is_stripped ? (as_depth + AVM_DEPTH_BIAS) : depth;
 	size_t target_swf_depth = (size_t)(unsigned int)swf_depth_for_table;
+	// Browser-WASM graphics: skip the global display_list write. See
+	// the corresponding comment in ng_cloneSprite for rationale.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (src_depth != SIZE_MAX && target_swf_depth < AVM_CLONE_SLOT_CAP)
 	{
 		// Pre-clear target depth if occupied
@@ -2363,6 +2381,7 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 		display_list[target_swf_depth].clone_replaced = 1;
 		if (target_swf_depth > max_depth) max_depth = target_swf_depth;
 	}
+#endif
 
 	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
 	if (clone_mc == NULL) return NULL;
@@ -2440,12 +2459,17 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 
 	// CLONE_CLIP_EVENT_DISPATCH Phase 4: drain INIT/CONSTRUCT inline for the
 	// clone slot. LOAD goes through the existing pending-load queue for
-	// FIFO ordering with out-of-cap clones (see ng_cloneSprite).
+	// FIFO ordering with out-of-cap clones (see ng_cloneSprite). Gated on
+	// NO_GRAPHICS||OFFSCREEN_RENDER because browser-WASM doesn't grow
+	// display_list past 1024 — display_list[target_swf_depth] would read
+	// out-of-bounds when target_swf_depth is in the 16384+ range.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (src_depth != SIZE_MAX && target_swf_depth < AVM_CLONE_SLOT_CAP &&
 	    display_list[target_swf_depth].clip_action_count > 0)
 	{
 		ng_queue_placement_clip_events(app_context, target_swf_depth);
 	}
+#endif
 	if (src_depth != SIZE_MAX && display_list[src_depth].clip_action_count > 0)
 	{
 		ng_queue_pending_load(target_name,

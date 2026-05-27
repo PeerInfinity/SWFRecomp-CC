@@ -20136,17 +20136,6 @@ extern void ng_updateDisplayDepth(const char* name, int new_as_depth);
 extern void ng_swapDisplayDepths(const char* name1, const char* name2);
 #endif
 
-#ifndef NO_GRAPHICS
-/**
- * Stub for cloneMovieClip - not yet implemented
- * Called by ActionCloneSprite in graphics mode
- */
-static void cloneMovieClip(const char* source_name, const char* target_name, int depth) {
-	(void)source_name;
-	(void)target_name;
-	(void)depth;
-}
-#endif
 
 /**
  * Create a new MovieClip with the specified instance name and parent
@@ -53070,9 +53059,8 @@ void actionSetProperty(SWFAppContext* app_context)
 void actionMarkCloneStripped(SWFAppContext* app_context)
 {
 	(void)app_context;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	extern int g_clone_depth_already_unbiased;  // action.c (NO_GRAPHICS/OFFSCREEN_RENDER) or graphics_stubs.c (browser-WASM)
 	g_clone_depth_already_unbiased = 1;
-#endif
 }
 
 void actionCloneSprite(SWFAppContext* app_context)
@@ -53120,14 +53108,11 @@ void actionCloneSprite(SWFAppContext* app_context)
 		target_name = _clone_tgt_buf;
 	}
 
-	#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM graphics path is still a stub. Graphics-native
-	// (OFFSCREEN_RENDER) is routed through the NO_GRAPHICS implementation
-	// below — it uses ng_cloneSprite / ng_cloneSpriteFromMC + child_mc_cache,
-	// which exist in both modes. Without this gate widening, opcode-form
-	// duplicateMovieClip silently no-ops in graphics-native (gotcha #13).
-	cloneMovieClip(source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
-	#else
+	// All three build modes (NO_GRAPHICS, OFFSCREEN_RENDER graphics-native,
+	// and browser-WASM graphics) route to the same ng_cloneSprite /
+	// ng_cloneSpriteFromMC + child_mc_cache primitives. tag_stubs.c (where
+	// those live) is compiled in every mode; browser-WASM renders clones via
+	// tag.c's child_mc_cache loop (the same path attachMovie uses).
 	{
 		int depth_int = ecmaToInt32(VAL(double, &depth.data.numeric_value));
 		// AVM1 valid AS-depth range is [-16384, 2130690044]. Validate against
@@ -53138,6 +53123,7 @@ void actionCloneSprite(SWFAppContext* app_context)
 		// itself, NOT here — the runtime functions need to read it to choose
 		// between the raw-AS-depth path (Phase 2c slot biasing) and the legacy
 		// raw-SWF-depth path (target_swf_depth = depth, heuristic for clone.depth).
+		extern int g_clone_depth_already_unbiased;  // action.c (NO_GRAPHICS/OFFSCREEN_RENDER) or graphics_stubs.c (browser-WASM)
 		int _check_as = g_clone_depth_already_unbiased
 		                ? depth_int
 		                : ((depth_int >= 16384) ? (depth_int - 16384) : depth_int);
@@ -53264,7 +53250,6 @@ void actionCloneSprite(SWFAppContext* app_context)
 			            (u32)strlen(new_name), &mc_var);
 		}
 	}
-	#endif
 }
 
 /**

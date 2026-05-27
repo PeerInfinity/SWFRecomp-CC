@@ -3945,9 +3945,18 @@ void tagShowFrame(SWFAppContext* app_context)
 				0.0f, 0.0f, 1.0f, 0.0f,
 				0.0f, 0.0f, 0.0f, 1.0f,
 			};
-			if (mc->as_set_flags != 0) {
-				apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
-			}
+			// Always overlay mc->x/y/xscale/yscale/rotation. Even when
+			// as_set_flags is 0, mc->x/y hold valid values (defaulting to 0/
+			// scales 100). This matters for duplicateMovieClip clones whose
+			// _x/_y were set via opcode SetProperty (action.c:~52883) — in
+			// browser-WASM that opcode writes mc->x but doesn't set the
+			// as_set_flags bit, so without forcing here clones render at the
+			// composed identity (origin) instead of their AS-set position.
+			// attachMovie / SetMember already set as_set_flags so they're
+			// unaffected. For Snake's gameplay where script_14 uses opcode
+			// SetProperty to place every snake segment, this is the path that
+			// makes the segments visible at their grid cells.
+			apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
 			compose_children(app_context, d->sprite_display_list,
 				d->sprite_max_depth, mc_xform, 0, 0);
 			render_display_list(app_context, d->sprite_display_list,
