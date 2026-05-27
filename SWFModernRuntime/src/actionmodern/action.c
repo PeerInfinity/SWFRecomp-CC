@@ -21045,6 +21045,39 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					mc->width = (float)(_bxmax - _bxmin) / 20.0f;
 					mc->height = (float)(_bymax - _bymin) / 20.0f;
 				}
+				// Set mc->x/mc->y from the nested display entry's transform_id.
+				// findDisplayEntryInParent located the entry inside parent's
+				// sprite_display_list; the root branch below sets mc->x/y via
+				// ng_getTransformXY which reads the global display_list, so
+				// nested EditTexts (e.g. button labels) would otherwise keep
+				// mc->x/y at 0 and render at the parent's origin. Without this,
+				// actionIterateTextFieldGlyphs's world_x = mc->x + parent.x
+				// drops the placement offset, leaving text shifted by exactly
+				// the placement transform's translation.
+				{
+					extern MovieClip root_movieclip;
+					extern DisplayObject* display_list;
+					extern size_t max_depth;
+					extern float transform_data[][16];
+					if (parent != NULL && parent != &root_movieclip && parent->name != NULL) {
+						size_t _pdepth = ng_findDisplayEntryByName(parent->name);
+						if (_pdepth != SIZE_MAX && _pdepth <= max_depth) {
+							DisplayObject* _pobj = &display_list[_pdepth];
+							if (_pobj->sprite_display_list != NULL) {
+								for (size_t _cd = 1; _cd <= _pobj->sprite_max_depth; _cd++) {
+									DisplayObject* _cobj = &_pobj->sprite_display_list[_cd];
+									if (_cobj->char_id == 0 || _cobj->instance_name == NULL) continue;
+									if (swf_name_match(_cobj->instance_name, instance_name)) {
+										u32 _tid = _cobj->transform_id;
+										if (!(mc->as_set_flags & 1)) mc->x = transform_data[_tid][12] / 20.0f;
+										if (!(mc->as_set_flags & 2)) mc->y = transform_data[_tid][13] / 20.0f;
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
 				u16 tf_flags = ng_getTextFieldFlags(tf_idx);
 				// text (initial)
 				const char* init_text = ng_getTextFieldInitialTextByIdx(tf_idx);
@@ -25307,6 +25340,22 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			utf8_len = strlen(_tfg_utf8);
 			if (utf8_len == 0) continue;
 			text_utf8 = _tfg_utf8;
+			// Synthesize a single run carrying the DefineEditText tag's static
+			// alignment so the renderer's paragraph layout applies center /
+			// right alignment. Without a run, the renderer defaults cur_align
+			// to 0 (left) regardless of what the tag specified. Static
+			// textfields without a TFRunTable (no htmlText, no styleSheet)
+			// need this to position centered button labels correctly.
+			if (mc->ng_textfield_idx >= 0) {
+				_tfg_runs[0].byte_start = 0;
+				_tfg_runs[0].byte_length = (u32)utf8_len;
+				_tfg_runs[0].color = text_color & 0x00FFFFFF;
+				_tfg_runs[0].font_height = font_height;
+				_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
+				_tfg_runs[0].bullet = 0;
+				runs_out = _tfg_runs;
+				run_count_out = 1;
+			}
 		}
 
 		// Layout margins/indent. _tf_* dynamic props (pixels) override the
