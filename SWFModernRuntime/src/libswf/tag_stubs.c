@@ -64,7 +64,15 @@ static CloneDepthEntry g_clone_depth_table[MAX_CLONE_DEPTH_ENTRIES];
 static size_t g_clone_depth_count = 0;
 
 // Evict any clone registered at swf_depth: clear its global variable to undefined.
-static void clone_depth_evict(int swf_depth)
+// `keep` is the freshly-created MC about to be re-registered at this depth; it
+// must NOT be matched/nuked by the name walk. After game-over → restart in
+// SWFs that re-clone the same names at the same SWF depths (e.g. Snake's
+// duplicateMovieClip("Snake", "<head>", 16384+head) loop), the stale table
+// entry from the prior session would otherwise find the fresh MC by name and
+// stamp depth=INT_MIN on it, hiding the clone forever — even though the OLD
+// MC of the same name was long gone (NULL'd in child_mc_cache by an earlier
+// actionRemoveSprite or alive but no longer needing eviction).
+static void clone_depth_evict(int swf_depth, MovieClip* keep)
 {
 	for (size_t i = 0; i < g_clone_depth_count; i++)
 	{
@@ -78,6 +86,7 @@ static void clone_depth_evict(int swf_depth)
 				extern int child_mc_count;
 				for (int ci = 0; ci < child_mc_count; ci++) {
 					if (child_mc_cache[ci] != NULL &&
+					    child_mc_cache[ci] != keep &&
 					    strcmp(child_mc_cache[ci]->name, old_name) == 0) {
 						child_mc_cache[ci]->avm1_removed = 1;
 						child_mc_cache[ci]->depth = INT_MIN;
@@ -109,9 +118,11 @@ static void clone_depth_evict(int swf_depth)
 }
 
 // Register a clone variable name at a SWF depth (evicts old entry first).
-static void clone_depth_register(int swf_depth, const char* name)
+// `keep` is the freshly-created MC being registered; eviction must not match
+// it by name even if a stale entry from a prior session shares the name.
+static void clone_depth_register(int swf_depth, const char* name, MovieClip* keep)
 {
-	clone_depth_evict(swf_depth);
+	clone_depth_evict(swf_depth, keep);
 	if (g_clone_depth_count < MAX_CLONE_DEPTH_ENTRIES)
 	{
 		g_clone_depth_table[g_clone_depth_count].swf_depth = swf_depth;
@@ -367,7 +378,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// children have independent depth spaces and must not collide.
 	int swf_depth = as_depth + 16384;
 	if (parent == &root_movieclip)
-		clone_depth_register(swf_depth, new_name);
+		clone_depth_register(swf_depth, new_name, new_mc);
 
 	new_mc->depth = as_depth;
 	new_mc->x = 0.0f;
@@ -2238,7 +2249,10 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 
 	// Evict any old clone registered at this SWF depth, then register new one.
 	// Use swf_depth_for_table (post-strip biased; unstripped uses raw depth).
-	clone_depth_register(swf_depth_for_table, target_name);
+	// Pass clone_mc so the by-name walk skips the freshly-created clone — a
+	// stale entry from a prior session with the same name would otherwise
+	// match it and stamp depth=INT_MIN, hiding the clone from the render loop.
+	clone_depth_register(swf_depth_for_table, target_name, clone_mc);
 
 	// Register as global variable
 	ActionVar _clone_mc_var = {0};
@@ -2478,7 +2492,7 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	}
 
 	// Evict any old clone at this SWF depth, then register new one.
-	clone_depth_register(swf_depth_for_table, target_name);
+	clone_depth_register(swf_depth_for_table, target_name, clone_mc);
 
 	ActionVar _clone_mc_var = {0};
 	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -2546,7 +2560,7 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 	clone_mc->depth = as_depth;
 
 	// Evict any old clone at this SWF depth, then register this one
-	clone_depth_register(swf_depth, target_name);
+	clone_depth_register(swf_depth, target_name, clone_mc);
 
 	// Register as global variable so GetVariable(target_name) finds the clone
 	ActionVar _dup_mc_var = {0};
