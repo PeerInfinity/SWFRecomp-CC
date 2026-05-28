@@ -2270,11 +2270,14 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		// (INITIAL_DISPLAYLIST_CAPACITY guard), so without this the dup
 		// returns 0 for _width/_height. Dynamic clones with drawing API
 		// bounds already have draw_xmin/xmax/ymin/ymax copied above.
-		if (!clone_mc->draw_has_bounds && src_depth != SIZE_MAX) {
-			float bxmin, bxmax, bymin, bymax;
-			if (ng_getDisplayEntryBounds(src_depth, &bxmin, &bxmax, &bymin, &bymax)) {
-				clone_mc->width = bxmax - bxmin;
-				clone_mc->height = bymax - bymin;
+		if (!clone_mc->draw_has_bounds && src_depth != SIZE_MAX && src_depth <= max_depth
+		    && display_list[src_depth].sprite_display_list != NULL) {
+			double bxmin, bymin, bxmax, bymax;
+			if (ng_localBoundsOfDL(display_list[src_depth].sprite_display_list,
+			                       display_list[src_depth].sprite_max_depth,
+			                       &bxmin, &bymin, &bxmax, &bymax)) {
+				clone_mc->width  = (float)((bxmax - bxmin) / 20.0);
+				clone_mc->height = (float)((bymax - bymin) / 20.0);
 			}
 		}
 		// Inherit the source's TextSnapshot stale flag BEFORE marking the

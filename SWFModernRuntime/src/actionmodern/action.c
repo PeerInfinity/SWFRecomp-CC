@@ -9159,9 +9159,11 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 	if (!mc) return r;
 	if (!flashGeomClassAvailable("Rectangle", 9)) return r;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	size_t entry_idx = getDisplayEntryIdxForMC(mc);
-	float lxmin, lxmax, lymin, lymax;
-	if (!ng_getDisplayEntryBounds(entry_idx, &lxmin, &lxmax, &lymin, &lymax)) {
+	DisplayObject* _pb_dl = NULL; size_t _pb_dl_max = 0;
+	double _pb_xmin_tw, _pb_ymin_tw, _pb_xmax_tw, _pb_ymax_tw;
+	int _pb_has = resolveMCDisplayList(mc, &_pb_dl, &_pb_dl_max)
+		&& ng_localBoundsOfDL(_pb_dl, _pb_dl_max, &_pb_xmin_tw, &_pb_ymin_tw, &_pb_xmax_tw, &_pb_ymax_tw);
+	if (!_pb_has) {
 		if (mc->loaded_image_width > 0) {
 			// Image-loaded MC: return image dimensions as pixelBounds
 			ActionVar rx = makeF64(0.0), ry = makeF64(0.0);
@@ -9181,8 +9183,8 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 	}
 	double ca, cb, cc, cd, ctx, cty;
 	getConcatMatrixForMC(mc, &ca, &cb, &cc, &cd, &ctx, &cty);
-	double lx0 = (double)lxmin, lx1 = (double)lxmax;
-	double ly0 = (double)lymin, ly1 = (double)lymax;
+	double lx0 = _pb_xmin_tw / 20.0, lx1 = _pb_xmax_tw / 20.0;
+	double ly0 = _pb_ymin_tw / 20.0, ly1 = _pb_ymax_tw / 20.0;
 	double cx0 = ca*lx0 + cc*ly0 + ctx, cy0 = cb*lx0 + cd*ly0 + cty;
 	double cx1 = ca*lx1 + cc*ly0 + ctx, cy1 = cb*lx1 + cd*ly0 + cty;
 	double cx2 = ca*lx0 + cc*ly1 + ctx, cy2 = cb*lx0 + cd*ly1 + cty;
@@ -26877,18 +26879,23 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 		return (*out_nat_w > 0.0 || *out_nat_h > 0.0) ? 1 : 0;
 	}
 
-	// For sprites/shapes, use display entry bounds (these are unscaled by AS xscale/yscale)
-	size_t entry_idx;
-	int has_entry = 1;
-	if (mc == &root_movieclip) {
-		entry_idx = (size_t)-1;
-	} else {
-		entry_idx = ng_findDisplayEntryIdx(mc->name);
-		if (entry_idx == (size_t)-1) has_entry = 0;
+	// For sprites/shapes, use display entry bounds (these are unscaled by AS xscale/yscale).
+	// Children-composed local bounds (twips) via the unified full-matrix engine,
+	// converted to pixel floats; the final round((max-min)*20)/20 below recovers
+	// the exact twip extent from the float storage. resolveMCDisplayList handles
+	// root / attached / nested (arbitrary depth) — superseding the old root-only
+	// ng_findDisplayEntryIdx, which is what pegged nested MCs' _width/_height.
+	int has_static = 0;
+	{
+		DisplayObject* _ob_dl = NULL; size_t _ob_dl_max = 0;
+		double _ob_xmin, _ob_ymin, _ob_xmax, _ob_ymax;
+		if (resolveMCDisplayList(mc, &_ob_dl, &_ob_dl_max)
+		    && ng_localBoundsOfDL(_ob_dl, _ob_dl_max, &_ob_xmin, &_ob_ymin, &_ob_xmax, &_ob_ymax)) {
+			gxmin = (float)(_ob_xmin / 20.0); gxmax = (float)(_ob_xmax / 20.0);
+			gymin = (float)(_ob_ymin / 20.0); gymax = (float)(_ob_ymax / 20.0);
+			has_static = 1;
+		}
 	}
-	int has_static = has_entry
-		? ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)
-		: 0;
 
 	// Union with Drawing API bounds if present
 	if (mc->draw_has_bounds) {
@@ -26987,23 +26994,16 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 		double bxmin_t = 0.0, bymin_t = 0.0;
 		double bxmax_t = nat_w * 20.0, bymax_t = nat_h * 20.0;
 		if (!MC_IS_TEXTFIELD(mc) && !mc->is_button_mc && mc->loaded_image_width <= 0) {
-			size_t entry_idx;
-			int has_entry = 1;
-			if (mc == &root_movieclip) {
-				entry_idx = (size_t)-1;
-			} else {
-				entry_idx = ng_findDisplayEntryIdx(mc->name);
-				if (entry_idx == (size_t)-1) has_entry = 0;
-			}
-			if (has_entry) {
-				float gxmin, gxmax, gymin, gymax;
-				if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
-					// Convert pixel float bounds to twip doubles.
-					bxmin_t = round((double)gxmin * 20.0);
-					bymin_t = round((double)gymin * 20.0);
-					bxmax_t = round((double)gxmax * 20.0);
-					bymax_t = round((double)gymax * 20.0);
-				}
+			// Children-composed local bounds straight in twips (the engine's
+			// per-corner rounding already yields integer twips, matching the old
+			// round(px*20) conversion bit-for-bit on axis-aligned content while
+			// being correct for rotated/skewed children).
+			DisplayObject* _es_dl = NULL; size_t _es_dl_max = 0;
+			double _es_xmin, _es_ymin, _es_xmax, _es_ymax;
+			if (resolveMCDisplayList(mc, &_es_dl, &_es_dl_max)
+			    && ng_localBoundsOfDL(_es_dl, _es_dl_max, &_es_xmin, &_es_ymin, &_es_xmax, &_es_ymax)) {
+				bxmin_t = _es_xmin; bymin_t = _es_ymin;
+				bxmax_t = _es_xmax; bymax_t = _es_ymax;
 			}
 		}
 		// Transform 4 corners by (a, b, c, d), round only at min/max (translation-invariant).
@@ -69716,10 +69716,11 @@ int actionGetFocusRectInfo(FocusRectInfo* out)
 	// Default (null/-1) = true; 0 = false; > 0 = true
 	if (fr == 0.0f) return 0;
 
-	// Get local content bounds (in pixels) for the focused MC
-	size_t entry_idx = getDisplayEntryIdxForMC(g_focused_mc);
-	float lxmin, lxmax, lymin, lymax;
-	if (!ng_getDisplayEntryBounds(entry_idx, &lxmin, &lxmax, &lymin, &lymax))
+	// Get local content bounds for the focused MC (children-composed, twips)
+	DisplayObject* _fr_dl = NULL; size_t _fr_dl_max = 0;
+	double _fr_xmin_tw, _fr_ymin_tw, _fr_xmax_tw, _fr_ymax_tw;
+	if (!(resolveMCDisplayList(g_focused_mc, &_fr_dl, &_fr_dl_max)
+	      && ng_localBoundsOfDL(_fr_dl, _fr_dl_max, &_fr_xmin_tw, &_fr_ymin_tw, &_fr_xmax_tw, &_fr_ymax_tw)))
 		return 0;
 
 	// Get concatenated world transform (in pixels)
@@ -69727,8 +69728,8 @@ int actionGetFocusRectInfo(FocusRectInfo* out)
 	getConcatMatrixForMC(g_focused_mc, &ca, &cb, &cc, &cd, &ctx, &cty);
 
 	// Transform 4 corners to world space (pixels)
-	double lx0 = (double)lxmin, lx1 = (double)lxmax;
-	double ly0 = (double)lymin, ly1 = (double)lymax;
+	double lx0 = _fr_xmin_tw / 20.0, lx1 = _fr_xmax_tw / 20.0;
+	double ly0 = _fr_ymin_tw / 20.0, ly1 = _fr_ymax_tw / 20.0;
 	double cx0 = ca*lx0 + cc*ly0 + ctx, cy0 = cb*lx0 + cd*ly0 + cty;
 	double cx1 = ca*lx1 + cc*ly0 + ctx, cy1 = cb*lx1 + cd*ly0 + cty;
 	double cx2 = ca*lx0 + cc*ly1 + ctx, cy2 = cb*lx0 + cd*ly1 + cty;
