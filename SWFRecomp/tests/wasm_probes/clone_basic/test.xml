@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <!--
+    A1 clone_basic — verifies 7fd96e6f2's actionCloneSprite widening (gate
+    lifted in browser-WASM so the opcode no longer no-ops).
+
+    One named sprite `src` (red 40x40) at center (160,120). DoAction:
+
+        CloneSprite("src" -> "dup" at depth 16384)
+        dup._x = 80
+
+    Stack layout for CloneSprite (opcode 0x24): bottom-to-top
+      target = "/src"   (3rd pop — existing clip to clone from)
+      source = "dup"    (2nd pop — new clone's instance name)
+      depth  = 16384    (1st pop)
+
+    Post-fix: clone is created, then SetMember moves dup._x to 80. Two red
+    squares visible: src at x=160, dup at x=80.
+
+    Pre-fix: cloneMovieClip was a no-op stub in browser-WASM (printf only).
+    Only src visible.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="220" green="40" blue="40"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="2" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="2" name="src">
+        <transform><Transform transX="3200" transY="2400"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="/src"/>
+              <StackString value="dup"/>
+              <StackInteger value="16384"/>
+            </items>
+          </PushData>
+          <DuplicateSprite/>
+          <PushData>
+            <items>
+              <StackString value="dup"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="_x"/>
+              <StackInteger value="80"/>
+            </items>
+          </PushData>
+          <SetMember/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

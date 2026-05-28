@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "description": "duplicateMovieClip('/src', 'dup', 16384); dup._x = 80. Verifies 7fd96e6f2's actionCloneSprite widening in browser-WASM.",
+    "width": 320,
+    "height": 240,
+    "swf_version": 6
+  },
+  "opcodes": {
+    "tested": ["CloneSprite"],
+    "supporting": ["GetVariable", "SetMember"]
+  }
+}
