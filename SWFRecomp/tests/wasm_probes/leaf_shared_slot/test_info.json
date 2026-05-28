@@ -1,0 +1,8 @@
+{
+  "metadata": {
+    "description": "Leaf-class shared-slot probe: two named shapes at identical matrices; shapeA._x=80 should move red, leave blue at center.",
+    "width": 320,
+    "height": 240,
+    "version": 6
+  }
+}
