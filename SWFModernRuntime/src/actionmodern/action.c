@@ -26890,7 +26890,13 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 		DisplayObject* _ob_dl = NULL; size_t _ob_dl_max = 0;
 		double _ob_xmin, _ob_ymin, _ob_xmax, _ob_ymax;
 		if (resolveMCDisplayList(mc, &_ob_dl, &_ob_dl_max)
-		    && ng_localBoundsOfDL(_ob_dl, _ob_dl_max, &_ob_xmin, &_ob_ymin, &_ob_xmax, &_ob_ymax)) {
+		    && ng_localBoundsOfDL(_ob_dl, _ob_dl_max, &_ob_xmin, &_ob_ymin, &_ob_xmax, &_ob_ymax)
+		    && (_ob_xmax > _ob_xmin || _ob_ymax > _ob_ymin)) {
+			// Non-degenerate static bounds. A zero-extent result is ignored so the
+			// child_mc_cache fallback below fires instead: dynamically-attached
+			// child entries (ng_attachMovie) lack cached place_* transforms, so the
+			// full-matrix engine collapses them to the origin — the fallback honours
+			// their AS-set _x/_y and matches the legacy path. (issue_2084)
 			gxmin = (float)(_ob_xmin / 20.0); gxmax = (float)(_ob_xmax / 20.0);
 			gymin = (float)(_ob_ymin / 20.0); gymax = (float)(_ob_ymax / 20.0);
 			has_static = 1;
@@ -27001,7 +27007,11 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 			DisplayObject* _es_dl = NULL; size_t _es_dl_max = 0;
 			double _es_xmin, _es_ymin, _es_xmax, _es_ymax;
 			if (resolveMCDisplayList(mc, &_es_dl, &_es_dl_max)
-			    && ng_localBoundsOfDL(_es_dl, _es_dl_max, &_es_xmin, &_es_ymin, &_es_xmax, &_es_ymax)) {
+			    && ng_localBoundsOfDL(_es_dl, _es_dl_max, &_es_xmin, &_es_ymin, &_es_xmax, &_es_ymax)
+			    && (_es_xmax > _es_xmin || _es_ymax > _es_ymin)) {
+				// Skip degenerate (zero-extent) results — see mcGetOriginalBounds
+				// (issue_2084); the default (0,0,nat_w,nat_h) box from the
+				// fallback-derived nat_w/nat_h is used instead.
 				bxmin_t = _es_xmin; bymin_t = _es_ymin;
 				bxmax_t = _es_xmax; bymax_t = _es_ymax;
 			}
