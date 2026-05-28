@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <!--
+    A2 remove_basic — verifies 2d792bde3's actionRemoveSprite widening AND
+    unconditional convertString on numeric targets.
+
+    Mirrors the Snake gameplay pattern: clone into a name that is a
+    stringified integer ("1"), then remove with a numeric target. Without
+    convertString on the integer the popped target stays type F64 and
+    `target_name` ends up empty — actionRemoveSprite returns without
+    touching child_mc_cache. The Snake symptom was tail segments
+    accumulating instead of being removed.
+
+    DoAction:
+      DuplicateSprite("/src" -> "1" at depth 16385)
+      ("1")._x = 80                          ; move clone left so we can
+                                             ; visually see if it survives
+      RemoveSprite(1)                        ; integer target — needs
+                                             ; convertString coercion
+
+    Post-fix: only src visible at center. Clone at x=80 was removed.
+    Pre-fix: two squares (src at x=160, leftover clone at x=80).
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="220" green="40" blue="40"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="2" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="2" name="src">
+        <transform><Transform transX="3200" transY="2400"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <!-- Clone src -> "1" at AS depth 16385 -->
+          <PushData>
+            <items>
+              <StackString value="/src"/>
+              <StackString value="1"/>
+              <StackInteger value="16385"/>
+            </items>
+          </PushData>
+          <DuplicateSprite/>
+
+          <!-- Resolve clone and shift it left to x=80 (so it's visible if not removed) -->
+          <PushData>
+            <items>
+              <StackString value="1"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="_x"/>
+              <StackInteger value="80"/>
+            </items>
+          </PushData>
+          <SetMember/>
+
+          <!-- Remove clone using numeric (not string!) target -->
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+            </items>
+          </PushData>
+          <RemoveSprite/>
+
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>
