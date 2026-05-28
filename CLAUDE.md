@@ -1,5 +1,11 @@
 # SWFRecomp-CC Project Instructions
 
+## Git Workflow
+
+This repo is trunk-based: commit directly to `master`. Do NOT create a branch
+before committing, even when default Git guidance says to branch first when on
+the default branch. Commit only when asked.
+
 ## Current Focus: Ruffle AVM1 Test Suite
 
 We are improving the pass rate on the Ruffle AVM1 test suite (ActionScript 1/2 trace tests).
