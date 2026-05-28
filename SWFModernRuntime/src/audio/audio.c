@@ -460,6 +460,32 @@ void tagStartSound(SWFAppContext* app_context, u16 sound_id,
 	if (!app_context->audio_ctx)
 		audio_init(app_context);
 
+	// Browser-WASM swf.c re-runs frame_funcs[current_frame] every tick
+	// (no is_playing gate outside OFFSCREEN_RENDER — see [[browser-wasm-frame-func-rerun]]).
+	// Without dedup, a stopped frame holding a StartSound tag re-triggers the
+	// sound every tick → audible cacophony (Snake frame_56 game-over SFX).
+	// SWF semantics: StartSound is a frame tag and fires once per frame entry.
+	// Dedup by (sound_id, current_frame): suppress repeats until current_frame
+	// changes. Stop=1 passes through unconditionally.
+	if (!stop)
+	{
+		extern size_t current_frame;
+		static size_t s_dedup_frame = (size_t)-1;
+		static u16    s_dedup_ids[32];
+		static int    s_dedup_count = 0;
+		if (current_frame != s_dedup_frame)
+		{
+			s_dedup_frame = current_frame;
+			s_dedup_count = 0;
+		}
+		for (int i = 0; i < s_dedup_count; i++)
+		{
+			if (s_dedup_ids[i] == sound_id) return;
+		}
+		if (s_dedup_count < (int)(sizeof(s_dedup_ids)/sizeof(s_dedup_ids[0])))
+			s_dedup_ids[s_dedup_count++] = sound_id;
+	}
+
 	audio_start_sound(app_context, sound_id, stop, loop_count, in_point, out_point);
 }
 
