@@ -647,7 +647,35 @@ void tagMain(SWFAppContext* app_context)
 		{
 			g_loopback_replay = g_loopback_replay_armed;
 			g_loopback_replay_armed = 0;
+#ifndef OFFSCREEN_RENDER
+			// Browser-WASM Flash-accurate frame-entry gate. This loop re-runs
+			// frame_funcs[current_frame] every tick (no is_playing gate — that
+			// gate is OFFSCREEN_RENDER-only) because tagShowFrame, which pumps
+			// rendering + sprite advance + button hover, lives inside the
+			// frame_func body. But a frame's root DoAction must run only ONCE,
+			// when the playhead ENTERS the frame — not on every parked re-run.
+			// Otherwise a Stop() on a stopped frame re-fires each tick and
+			// clobbers a sprite-driven _root.play() (Pong court sprite_54's
+			// script_11 _root.play() vs frame_3's script_10 Stop; identical to
+			// the preloader→title transition where sprite_9's _root.play()
+			// races frame_0's script_0 Stop). We suppress only the
+			// recompiler-emitted actionQueueScript (root DoAction) when the
+			// playhead has not advanced since the last tick; tags + tagShowFrame
+			// still run every tick so the sprite pump and renderer keep ticking.
+			// Mirrors swf_core.c / OFFSCREEN_RENDER, which simply don't run the
+			// frame_func at all while parked. See [[browser-wasm-frame-func-rerun]].
+			{
+				extern int g_suppress_root_doaction;
+				static long s_wasm_last_doaction_frame = -1;
+				g_suppress_root_doaction =
+				    ((long)current_frame == s_wasm_last_doaction_frame) ? 1 : 0;
+				s_wasm_last_doaction_frame = (long)current_frame;
+			}
+#endif
 			frame_funcs[current_frame](app_context);
+#ifndef OFFSCREEN_RENDER
+			{ extern int g_suppress_root_doaction; g_suppress_root_doaction = 0; }
+#endif
 			g_loopback_replay = 0;
 #ifdef OFFSCREEN_RENDER
 			// If a goto inside the script inlined the target frame's body

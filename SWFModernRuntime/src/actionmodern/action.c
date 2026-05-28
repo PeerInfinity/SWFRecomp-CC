@@ -63822,14 +63822,30 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					pushUndefined(app_context);
 					return;
 				}
-				// Non-root receiver: play the receiver's DisplayObject
-				// directly. Falling through to actionPlay would route to
-				// the currently-executing sprite (via the post-98b388e46
-				// ng_isInsideSprite() branch) instead of the actual
-				// receiver — `mc.play()` and `_parent.play()` from
-				// inside a sprite would both target the wrong clip.
-				if (mc != NULL && mc->display_obj != NULL) {
-					((DisplayObject*)mc->display_obj)->sprite_is_playing = 1;
+				// Non-root receiver: play the receiver's clip directly and
+				// NEVER fall through to actionPlay — that routes to the
+				// currently-executing sprite (via the post-98b388e46
+				// ng_isInsideSprite() arm) or, failing that, the root
+				// timeline. `mc.play()`, `_parent.play()`, and `gab.play()`
+				// (a nested child sprite) must all act on the receiver only.
+				// A valid MovieClip whose display_obj isn't linked yet
+				// (browser-WASM nested sprite child — e.g. Pong's paddle
+				// child "gab" before it materializes) must STILL not advance
+				// root: Pong's paddle enterFrame calls gab.play() every frame
+				// the AI moves; with the old fall-through that flipped the
+				// root's is_playing back to 1 each tick and bounced the
+				// gameplay frame straight to the win screen.
+				if (mc != NULL) {
+					extern DisplayObject* display_list;
+					if (mc->display_obj != NULL) {
+						((DisplayObject*)mc->display_obj)->sprite_is_playing = 1;
+					} else {
+						size_t depth = ng_findDisplayEntryByName(mc->name);
+						if (depth != SIZE_MAX)
+							display_list[depth].sprite_is_playing = 1;
+						// else: valid clip, no linked display object yet — no-op
+						// (do NOT touch root).
+					}
 					if (args != NULL) FREE(args);
 					pushUndefined(app_context);
 					return;
@@ -63878,18 +63894,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					pushUndefined(app_context);
 					return;
 				}
-				// Non-root receiver: stop the receiver's DisplayObject
-				// directly. See play-arm comment above — falling through
-				// to actionStop would route to the currently-executing
-				// sprite, not the receiver. Pong's preloader sprite_9
-				// calls `_parent.stop()` (intended to stop the 1-frame
-				// container sprite_10); without this, actionStop's
-				// ng_isInsideSprite() arm stops sprite_9 itself,
-				// freezing the preloader on frame 1 forever and
-				// preventing the bytesLoaded == bytesTotal check that
-				// would call `_root.play()`.
-				if (mc != NULL && mc->display_obj != NULL) {
-					((DisplayObject*)mc->display_obj)->sprite_is_playing = 0;
+				// Non-root receiver: stop the receiver directly; NEVER fall
+				// through to actionStop (see play-arm comment above). Pong's
+				// preloader sprite_9 calls `_parent.stop()` (intended to stop
+				// the 1-frame container sprite_10); without this, actionStop's
+				// ng_isInsideSprite() arm stops sprite_9 itself, freezing the
+				// preloader. A valid clip whose display_obj isn't linked yet
+				// must not touch root either.
+				if (mc != NULL) {
+					extern DisplayObject* display_list;
+					if (mc->display_obj != NULL) {
+						((DisplayObject*)mc->display_obj)->sprite_is_playing = 0;
+					} else {
+						size_t depth = ng_findDisplayEntryByName(mc->name);
+						if (depth != SIZE_MAX)
+							display_list[depth].sprite_is_playing = 0;
+						// else: valid clip, no linked display object yet — no-op.
+					}
 					if (args != NULL) FREE(args);
 					pushUndefined(app_context);
 					return;

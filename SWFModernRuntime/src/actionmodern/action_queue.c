@@ -36,6 +36,20 @@ void actionDrainSuppressEnter(void) { g_drain_suppress_depth++; }
 void actionDrainSuppressLeave(void) { g_drain_suppress_depth--; }
 int  actionDrainSuppressed(void)    { return g_drain_suppress_depth; }
 
+// Browser-WASM frame-entry gate for the root timeline's DoAction.
+// In real Flash a frame's DoAction runs ONCE when the playhead enters the
+// frame, then the frame sits parked (no re-execution) until the playhead
+// advances. The browser-WASM main loop (swf.c) re-runs frame_funcs[current_frame]
+// every tick to keep rendering + sprite advance pumping (tagShowFrame lives
+// inside the frame_func body), so without a gate the recompiler-emitted
+// actionQueueScript would re-queue the root DoAction every tick — a Stop() on
+// a parked frame would re-fire and clobber a sprite-driven _root.play().
+// swf.c sets this to 1 while re-running a parked root frame and back to 0 on a
+// fresh frame entry. Always 0 under NO_GRAPHICS / OFFSCREEN_RENDER, whose loops
+// gate the whole frame_func on (is_playing || manual_next_frame) instead.
+// See [[browser-wasm-frame-func-rerun]].
+int g_suppress_root_doaction = 0;
+
 // Phase D (GOTO_FIFO_UNIFICATION_INCREMENTAL): default flipped from 0 → 1.
 // Activates the unified sprite-script dispatch path: gotos issued from inside
 // sprite frame scripts FIFO-interleave with the surrounding drain instead of
@@ -534,6 +548,9 @@ void actionQueueScript(SWFAppContext* app_context,
                        void (*fn)(SWFAppContext*))
 {
 	if (!fn) return;
+	// Browser-WASM: skip re-queueing the root DoAction while the playhead is
+	// parked on a stopped frame (set by swf.c). See g_suppress_root_doaction.
+	if (g_suppress_root_doaction) return;
 	PendingScript* p = (PendingScript*)malloc(sizeof(*p));
 	if (!p) return;
 	p->fn = fn;
