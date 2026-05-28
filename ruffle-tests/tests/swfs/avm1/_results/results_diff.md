@@ -1,26 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `fc1fed4aba95` (2026-05-25T20:10:49.910823+00:00)
-**Current:** `dbbac2761e17` (2026-05-28T22:09:37.545508+00:00)
+**Previous:** `dbbac2761e17` (2026-05-28T22:09:37.545508+00:00)
+**Current:** `eef77ea7b72c` (2026-05-28T23:39:42.775519+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 614 | 614 | 0 |
-| Total | 672 | 673 | +1 |
-| Pass rate | 91.4% | 91.2% | -0.2% |
-| Mismatched lines | 9587 | 9630 | +43 |
-|   Decreased | | | -1 |
+| Passing | 614 | 613 | -1 |
+| Total | 673 | 673 | 0 |
+| Pass rate | 91.2% | 91.1% | -0.1% |
+| Mismatched lines | 9630 | 9631 | +1 |
+|   Increased | | | +1 |
 
-## Added Tests (1)
+## Newly Failing (1)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `delete2` | output_mismatch | 30/74 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `movieclip_hittest_shapeflag` | output_mismatch | 330/338 | 331/338 | -1 |
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `issue_2084` | output_mismatch | 16/16 | 15/16 |
