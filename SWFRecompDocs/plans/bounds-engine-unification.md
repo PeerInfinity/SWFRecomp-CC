@@ -246,3 +246,90 @@ recursion). The only red is the upstream-`delete` fixture update. This is the
 clean pre-refactor baseline; the bounds work must hold every passing count above
 (especially the `_width`/`_height`/getBounds/hitTest-adjacent tests) and may
 *improve* nested-sprite bounds cases.
+
+---
+
+## EXPANDED SCOPE + decisions (2026-05-28, implementation session)
+
+### Decisions resolved with the user
+- **D1 — canonical engine = `_matrix` (double).** `ng_computeBoundsFromDL_fp16`
+  is **already dead** (only an unused `extern` decl at action.c:65881, zero call
+  sites; getBounds uses `_matrix`). Delete `_fp16`; standardize on `_matrix`.
+- **D2 = (b)** — pointer/`MovieClip*` API; delete the `entry_idx` encoding.
+- **D3 — return twips (double).** New helpers return twips; each caller rounds at
+  its own boundary exactly like getBounds (`round(twips)/20.0`). This removes the
+  lossy px→twip float round-trip the current bounds callers do (their own
+  comments complain about it).
+- **Helper shape** — twips out + **extract** getBounds' MC→display-list tree walk
+  into a shared resolver (verbatim/behavior-preserving), so all callers gain the
+  arbitrary-depth resolution.
+- **Cleanup scope (user expanded):** *also* migrate the matrix/CT/filter
+  accessors off `entry_idx` and **fully delete the encoding** — not just the
+  bounds engine.
+
+### Full `entry_idx` consumer inventory (P0 — complete)
+
+The encoding `(parent_d<<20)|child_d` (2-level cap) is the currency of an entire
+accessor family, all funnelling through `ng_entry_to_obj` (duplicated in
+**tag_stubs.c:176** and **shape_hit_test.c:41**) — *except* the depth-keyed
+filter side-tables. Every consumer:
+
+| Accessor (def) | Reads | Caller(s) in action.c | Pointer-native? |
+|---|---|---|---|
+| `ng_getDisplayEntryBounds` (tag_stubs.c:1467) **legacy bounds** | composes child DL | 9061, 26787, 26897, 69619; tag_stubs.c:2206 | → replace w/ `ng_localBoundsOfDL` |
+| `ng_getMatrixFromEntry` (tag_stubs.c:1335) | `obj->transform_id` | 8452 (`getLocalMatrixForMC`) | yes |
+| `ng_getMatrixFromEntry_render` (shape_hit_test.c:68) | `obj->transform_id` | 8513 (`getLocalMatrixForMC_render`) | yes |
+| `ng_getCTFromEntry` (tag_stubs.c:1351) | `obj->cx_*` | 8571 (`getLocalCTRaw`) | yes |
+| `ng_setCTOnEntry` (tag_stubs.c:1364) | `obj->cx_*` | 8613 (`setLocalCTRaw`) | yes |
+| `ng_getDisplayEntryFilterData` (tag_stubs.c:1436) | `obj->filter_*` (own inline decode, **opposite** bit convention!) | 50214 | yes |
+| `ng_getExtFilterData` (tag.c:7971) | **depth-keyed side-table** `g_ext_filters` | 50114 | **no** — flat depth |
+| `ng_getFilterListData` (tag.c:8100) | **depth-keyed side-table** `g_filter_lists` | 49939 | **no** — flat depth |
+
+All matrix usage funnels through `getLocalMatrixForMC` / `_render` (2 fns); all
+CT through `getLocalCTRaw` / `setLocalCTRaw` (2 fns); filters through one region
+(`getDisplayEntryIdxForMC` computed once at 49936, reused at 49939/50114/50214).
+`ng_findDisplayEntryIdx` (root-only) only used by the two bounds sites
+(26783/26892); deletable after they migrate.
+
+### Filter-storage finding (constrains the filter migration)
+
+`ng_getExtFilterData`/`ng_getFilterListData` read **flat depth-keyed** side-tables
+populated by the tag parser (`tagBeginFilterList`/`tagSetFilter`, keyed by a root
+placement `depth`). They are *not* `DisplayObject`-field reads, so they can't take
+a bare pointer. They also key on `entry_idx & 0xFFFFF`, so for **nested** MCs
+today's lookup uses child-within-parent depth against a root-depth table → effectively
+never matches (filters only resolve at root level today; worse, a coincidental
+root-depth collision is a latent false-positive).
+
+**Resolution (behavior-preserving, no tag-parser rewrite):** the resolver yields a
+`DisplayObject*`; derive a flat root depth via `ng_objRootDepth(obj)` = `obj -
+display_list` when `obj` lies within `[display_list, display_list+max_depth]`,
+else `(size_t)-1`. Pass that depth to depth-keyed filter accessors
+(`*ByDepth`); skip the lookup when `-1`. Root MCs match as before; nested MCs get
+no filter (matches today, and removes the latent false-positive — watch CI for any
+filter test that relied on the collision).
+
+### Target API
+- action.c: `static DisplayObject* resolveMCDisplayEntry(MovieClip* mc)` — MC's
+  **own** entry, arbitrary depth via name-chain walk; NULL for root/dynamic/not-found.
+  `static int resolveMCDisplayList(MovieClip*, DisplayObject** dl, size_t* max)` —
+  the MC's **children** DL (entry->sprite_display_list, or root display_list for
+  root MC), extracted verbatim from getBounds 65889–65935.
+- tag_stubs.c / shape_hit_test.c: pointer-form `ng_getMatrixFromObj[_render]`,
+  `ng_getCTFromObj`, `ng_setCTOnObj`, `ng_getObjFilterData`, plus
+  `ng_localBoundsOfDL(dl, dl_max, double* xmin,ymin,xmax,ymax)` (twips, == `_matrix`
+  identity) and `size_t ng_objRootDepth(DisplayObject*)`.
+- tag.c: `ng_getExtFilterDataByDepth` / `ng_getFilterListDataByDepth` (flat depth).
+
+### Revised phasing (each its own commit; CI both modes between P2 steps)
+- **P1** — add resolvers + pointer-form accessors + `ng_localBoundsOfDL` +
+  `ng_objRootDepth`; no caller changes. Build all 3 modes.
+- **P2a** — clone width/height (tag_stubs.c:2206) → `ng_localBoundsOfDL`.
+- **P2b** — `transform.pixelBounds` (9061) + focusrect (69619) → `ng_localBoundsOfDL`.
+- **P2c** — `mcGetOriginalBounds`/`mcGetEffectiveSize` (26787/26897) — **highest bounds risk** (`_width`/`_height`).
+- **P2d** — matrix accessors: `getLocalMatrixForMC` + `_render` → resolver + `*FromObj`.
+- **P2e** — CT accessors: `getLocalCTRaw`/`setLocalCTRaw` → resolver + `*FromObj`/`*OnObj`.
+- **P2f** — filter accessors → resolver + `ng_objRootDepth` + `*ByDepth` / `ng_getObjFilterData`.
+- **P3** — delete `ng_getDisplayEntryBounds`, `ng_computeBoundsFromDL_fp16`,
+  both `ng_entry_to_obj`, `getDisplayEntryIdxForMC`, `ng_findDisplayEntryIdxWithParent`,
+  `ng_findDisplayEntryIdx` (verify unreferenced), and old `*FromEntry`/`*OnEntry` decls.

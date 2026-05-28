@@ -7968,13 +7968,18 @@ void tagSetFilterGradient(SWFAppContext* app_context, size_t depth,
 	ef->flags = flags;
 }
 
-const ExtFilterData* ng_getExtFilterData(size_t entry_idx)
+const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth)
 {
-	size_t depth = entry_idx & 0xFFFFF;
+	if (depth == (size_t)-1) return NULL;
 	for (int i = 0; i < g_ext_filter_count; i++) {
 		if (g_ext_filter_depths[i] == depth) return &g_ext_filters[i];
 	}
 	return NULL;
+}
+
+const ExtFilterData* ng_getExtFilterData(size_t entry_idx)
+{
+	return ng_getExtFilterDataByDepth(entry_idx & 0xFFFFF);
 }
 
 // Multi-filter list storage
@@ -8097,14 +8102,19 @@ void tagEndFilterList(SWFAppContext* app_context, size_t depth)
 	g_current_filter_list_idx = -1;
 }
 
-const FilterListData* ng_getFilterListData(size_t entry_idx)
+const FilterListData* ng_getFilterListDataByDepth(size_t depth)
 {
-	size_t depth = entry_idx & 0xFFFFF;
+	if (depth == (size_t)-1) return NULL;
 	for (int i = 0; i < g_filter_list_count; i++) {
 		if (g_filter_lists[i].depth == depth && g_filter_lists[i].count > 0)
 			return &g_filter_lists[i];
 	}
 	return NULL;
+}
+
+const FilterListData* ng_getFilterListData(size_t entry_idx)
+{
+	return ng_getFilterListDataByDepth(entry_idx & 0xFFFFF);
 }
 
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)

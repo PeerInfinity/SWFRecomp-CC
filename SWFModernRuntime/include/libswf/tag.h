@@ -120,6 +120,7 @@ typedef struct ExtFilterData {
     u8 quality, flags;
 } ExtFilterData;
 const ExtFilterData* ng_getExtFilterData(size_t entry_idx);
+const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth);
 
 // Multi-filter list: stores ALL SWF-authored filters per display entry
 typedef struct FilterListEntry {
@@ -169,6 +170,7 @@ void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
     u8 quality, u8 flags);
 void tagEndFilterList(SWFAppContext* app_context, size_t depth);
 const FilterListData* ng_getFilterListData(size_t entry_idx);
+const FilterListData* ng_getFilterListDataByDepth(size_t depth);
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth);
@@ -372,6 +374,27 @@ int ng_getMatrixFromEntry(size_t entry_idx, double* out_a, double* out_b, double
 // Get/set color transform on a display entry by index. Returns 1 if found, 0 if not.
 int ng_getCTFromEntry(size_t entry_idx, double* ra, double* ga, double* ba, double* aa, double* rb, double* gb, double* bb, double* ab);
 int ng_setCTOnEntry(size_t entry_idx, double ra, double ga, double ba, double aa, double rb, double gb, double bb, double ab);
+
+// ---------------------------------------------------------------------------
+// Pointer-form display-entry accessors (bounds-engine unification, 2026-05-28).
+// These supersede the entry_idx-encoded variants above; callers resolve a
+// DisplayObject* directly (arbitrary depth, no 2-level encoding cap).
+// ---------------------------------------------------------------------------
+// Flat root depth of a display entry, or (size_t)-1 if NULL / not a root-level
+// entry. Used to key the depth-keyed filter side-tables off a DisplayObject*.
+size_t ng_objRootDepth(DisplayObject* obj);
+int ng_getMatrixFromObj(DisplayObject* obj, double* out_a, double* out_b, double* out_c, double* out_d, double* out_tx, double* out_ty);
+int ng_getMatrixFromObj_render(DisplayObject* obj, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
+int ng_getCTFromObj(DisplayObject* obj, double* ra, double* ga, double* ba, double* aa, double* rb, double* gb, double* bb, double* ab);
+int ng_setCTOnObj(DisplayObject* obj, double ra, double ga, double ba, double aa, double rb, double gb, double bb, double ab);
+int ng_getObjFilterData(DisplayObject* obj, u8* type, float* blur_x, float* blur_y,
+    u8* quality, u8* flags, float* r, float* g, float* b, float* a,
+    float* strength, float* angle, float* distance,
+    float* hr, float* hg, float* hb, float* ha);
+// Local content bounds (twips, double) of a display list, queried object's own
+// transform NOT applied. == ng_computeBoundsFromDL_matrix with identity.
+int ng_localBoundsOfDL(DisplayObject* dl, size_t dl_max,
+    double* out_xmin, double* out_ymin, double* out_xmax, double* out_ymax);
 // TextField variable binding — called from tag_stubs.c at placement time
 void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_name, const char* init_text);
 

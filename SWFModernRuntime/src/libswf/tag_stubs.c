@@ -1332,11 +1332,22 @@ int ng_getTransformScaleRotationSkew(size_t depth, float* out_xscale, float* out
 // Matrix and color transform queries by entry_idx
 // ---------------------------------------------------------------------------
 
-int ng_getMatrixFromEntry(size_t entry_idx,
+// Flat root depth of a display entry, or (size_t)-1 if obj is NULL or not a
+// root-level entry (e.g. a pointer into a nested sprite_display_list[]). Used to
+// key the depth-keyed filter side-tables (tag.c) off a DisplayObject*.
+size_t ng_objRootDepth(DisplayObject* obj)
+{
+	if (obj == NULL) return (size_t)-1;
+	if (obj >= display_list && obj <= &display_list[max_depth])
+		return (size_t)(obj - display_list);
+	return (size_t)-1;
+}
+
+// Pointer-form matrix/CT accessors (the entry_idx variants below delegate here).
+int ng_getMatrixFromObj(DisplayObject* obj,
     double* out_a, double* out_b, double* out_c, double* out_d,
     double* out_tx, double* out_ty)
 {
-	DisplayObject* obj = ng_entry_to_obj(entry_idx);
 	if (!obj) return 0;
 	u32 tid = obj->transform_id;
 	if (out_a)  *out_a  = (double)transform_data[tid][0];
@@ -1348,11 +1359,18 @@ int ng_getMatrixFromEntry(size_t entry_idx,
 	return 1;
 }
 
-int ng_getCTFromEntry(size_t entry_idx,
+int ng_getMatrixFromEntry(size_t entry_idx,
+    double* out_a, double* out_b, double* out_c, double* out_d,
+    double* out_tx, double* out_ty)
+{
+	return ng_getMatrixFromObj(ng_entry_to_obj(entry_idx),
+		out_a, out_b, out_c, out_d, out_tx, out_ty);
+}
+
+int ng_getCTFromObj(DisplayObject* obj,
     double* ra, double* ga, double* ba, double* aa,
     double* rb, double* gb, double* bb, double* ab)
 {
-	DisplayObject* obj = ng_entry_to_obj(entry_idx);
 	if (!obj) return 0;
 	if (ra) *ra = obj->cx_ra; if (ga) *ga = obj->cx_ga;
 	if (ba) *ba = obj->cx_ba; if (aa) *aa = obj->cx_aa;
@@ -1361,16 +1379,31 @@ int ng_getCTFromEntry(size_t entry_idx,
 	return 1;
 }
 
-int ng_setCTOnEntry(size_t entry_idx,
+int ng_getCTFromEntry(size_t entry_idx,
+    double* ra, double* ga, double* ba, double* aa,
+    double* rb, double* gb, double* bb, double* ab)
+{
+	return ng_getCTFromObj(ng_entry_to_obj(entry_idx),
+		ra, ga, ba, aa, rb, gb, bb, ab);
+}
+
+int ng_setCTOnObj(DisplayObject* obj,
     double ra, double ga, double ba, double aa,
     double rb, double gb, double bb, double ab)
 {
-	DisplayObject* obj = ng_entry_to_obj(entry_idx);
 	if (!obj) return 0;
 	obj->cx_ra = ra; obj->cx_ga = ga; obj->cx_ba = ba; obj->cx_aa = aa;
 	obj->cx_rb = rb; obj->cx_gb = gb; obj->cx_bb = bb; obj->cx_ab = ab;
 	obj->cx_overridden = 1;
 	return 1;
+}
+
+int ng_setCTOnEntry(size_t entry_idx,
+    double ra, double ga, double ba, double aa,
+    double rb, double gb, double bb, double ab)
+{
+	return ng_setCTOnObj(ng_entry_to_obj(entry_idx),
+		ra, ga, ba, aa, rb, gb, bb, ab);
 }
 
 // ---------------------------------------------------------------------------
@@ -1433,18 +1466,16 @@ void ng_setCTAlpha(size_t depth, double aa)
 static int g_bounds_recursion_depth = 0;
 #define MAX_BOUNDS_RECURSION 16
 
-int ng_getDisplayEntryFilterData(size_t entry_idx, u8* type, float* blur_x, float* blur_y,
+// Pointer-form filter-data accessor: reads single-filter fields directly off a
+// DisplayObject. The entry_idx variant below keeps its (legacy, nested-swapped)
+// decode for P1; callers migrate to this form via resolveMCDisplayEntry in P2f,
+// which also corrects the nested decode.
+int ng_getObjFilterData(DisplayObject* obj, u8* type, float* blur_x, float* blur_y,
     u8* quality, u8* flags, float* r, float* g, float* b, float* a,
     float* strength, float* angle, float* distance,
     float* hr, float* hg, float* hb, float* ha)
 {
-	size_t root_depth = entry_idx & 0xFFFFF;
-	if (root_depth > max_depth) return 0;
-	DisplayObject* obj = &display_list[root_depth];
-	size_t nested = entry_idx >> 20;
-	if (nested > 0 && obj->sprite_display_list)
-		obj = &obj->sprite_display_list[nested];
-	if (obj->filter_type == 0) return 0;
+	if (obj == NULL || obj->filter_type == 0) return 0;
 	*type = obj->filter_type;
 	*blur_x = obj->filter_blur_x;
 	*blur_y = obj->filter_blur_y;
@@ -1462,6 +1493,21 @@ int ng_getDisplayEntryFilterData(size_t entry_idx, u8* type, float* blur_x, floa
 	*hb = obj->filter_highlight_b;
 	*ha = obj->filter_highlight_a;
 	return 1;
+}
+
+int ng_getDisplayEntryFilterData(size_t entry_idx, u8* type, float* blur_x, float* blur_y,
+    u8* quality, u8* flags, float* r, float* g, float* b, float* a,
+    float* strength, float* angle, float* distance,
+    float* hr, float* hg, float* hb, float* ha)
+{
+	size_t root_depth = entry_idx & 0xFFFFF;
+	if (root_depth > max_depth) return 0;
+	DisplayObject* obj = &display_list[root_depth];
+	size_t nested = entry_idx >> 20;
+	if (nested > 0 && obj->sprite_display_list)
+		obj = &obj->sprite_display_list[nested];
+	return ng_getObjFilterData(obj, type, blur_x, blur_y, quality, flags,
+		r, g, b, a, strength, angle, distance, hr, hg, hb, ha);
 }
 
 int ng_getDisplayEntryBounds(size_t entry_idx,
@@ -1757,6 +1803,29 @@ int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
 		}
 	}
 	return *has;
+}
+
+// Unified local-bounds helper (the engine getBounds already trusts). Returns the
+// content bounds (twips, double) of a display list, the queried object's own
+// transform NOT applied — i.e. ng_computeBoundsFromDL_matrix with an identity
+// matrix. Full 2x3 matrix, arbitrary nesting depth. Returns 1 if any bounds
+// found. This supersedes the legacy ng_getDisplayEntryBounds (pixels/float,
+// scale+translate-only, 2-level cap).
+int ng_localBoundsOfDL(DisplayObject* dl, size_t dl_max,
+    double* out_xmin, double* out_ymin, double* out_xmax, double* out_ymax)
+{
+	int has = 0;
+	double xmin = 0, ymin = 0, xmax = 0, ymax = 0;
+	if (dl != NULL)
+		ng_computeBoundsFromDL_matrix(dl, dl_max, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+			&has, &xmin, &ymin, &xmax, &ymax);
+	if (has) {
+		if (out_xmin) *out_xmin = xmin;
+		if (out_ymin) *out_ymin = ymin;
+		if (out_xmax) *out_xmax = xmax;
+		if (out_ymax) *out_ymax = ymax;
+	}
+	return has;
 }
 
 // Simple wrapper: compute bounds in local space (identity matrix)

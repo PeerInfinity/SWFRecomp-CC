@@ -65,11 +65,10 @@ static DisplayObject* ng_entry_to_obj(size_t entry_idx)
 // Render-format matrix accessor (f32 a/b/c/d, i32 twips tx/ty)
 // ---------------------------------------------------------------------------
 // Variant: f32 a/b/c/d, i32 twips tx/ty (matches Ruffle render Matrix)
-int ng_getMatrixFromEntry_render(size_t entry_idx,
+int ng_getMatrixFromObj_render(DisplayObject* obj,
     float* out_a, float* out_b, float* out_c, float* out_d,
     int32_t* out_tx_twips, int32_t* out_ty_twips)
 {
-	DisplayObject* obj = ng_entry_to_obj(entry_idx);
 	if (!obj) return 0;
 	u32 tid = obj->transform_id;
 	if (out_a)  *out_a  = transform_data[tid][0];
@@ -79,6 +78,14 @@ int ng_getMatrixFromEntry_render(size_t entry_idx,
 	if (out_tx_twips) *out_tx_twips = (int32_t)rintf(transform_data[tid][12]);
 	if (out_ty_twips) *out_ty_twips = (int32_t)rintf(transform_data[tid][13]);
 	return 1;
+}
+
+int ng_getMatrixFromEntry_render(size_t entry_idx,
+    float* out_a, float* out_b, float* out_c, float* out_d,
+    int32_t* out_tx_twips, int32_t* out_ty_twips)
+{
+	return ng_getMatrixFromObj_render(ng_entry_to_obj(entry_idx),
+		out_a, out_b, out_c, out_d, out_tx_twips, out_ty_twips);
 }
 
 extern u32 shape_data[][4];

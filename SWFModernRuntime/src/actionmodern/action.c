@@ -8440,6 +8440,109 @@ static size_t getDisplayEntryIdxForMC(MovieClip* mc)
 	return ng_findDisplayEntryIdxWithParent(mc->name, parent_idx);
 }
 
+// Resolve a MovieClip to its OWN static display-list entry pointer, walking the
+// name chain to arbitrary depth (the pointer analog of getDisplayEntryIdxForMC,
+// without the encoding's 2-level cap). Uses swf_name_match for parity with the
+// old ng_findDisplayEntryIdx* path. Returns NULL for root, name-less/dynamic
+// MCs, or when any chain step is not found. Used by the matrix/CT/filter
+// accessors during the entry_idx-encoding migration.
+static DisplayObject* resolveMCDisplayEntry(MovieClip* mc) __attribute__((unused));
+static DisplayObject* resolveMCDisplayEntry(MovieClip* mc)
+{
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern MovieClip root_movieclip;
+	if (mc == NULL || mc == &root_movieclip || mc->name[0] == '\0') return NULL;
+	MovieClip* chain[16];
+	int chain_len = 0;
+	for (MovieClip* cur = mc; cur != NULL && cur != &root_movieclip && chain_len < 16; cur = cur->parent) {
+		chain[chain_len++] = cur;
+	}
+	DisplayObject* cur_dl = display_list;
+	size_t cur_max = max_depth;
+	DisplayObject* found_entry = NULL;
+	for (int ci = chain_len - 1; ci >= 0; ci--) {
+		size_t found_d = SIZE_MAX;
+		for (size_t d = 1; d <= cur_max; d++) {
+			if (cur_dl[d].char_id == 0) continue;
+			if (cur_dl[d].instance_name && swf_name_match(cur_dl[d].instance_name, chain[ci]->name)) {
+				found_d = d; break;
+			}
+		}
+		if (found_d == SIZE_MAX) return NULL;
+		found_entry = &cur_dl[found_d];
+		if (ci > 0) {
+			if (cur_dl[found_d].sprite_display_list == NULL) return NULL;
+			cur_max = cur_dl[found_d].sprite_max_depth;
+			cur_dl = cur_dl[found_d].sprite_display_list;
+		}
+	}
+	return found_entry;
+}
+
+// Resolve a MovieClip to the display list of its CHILDREN (for content-bounds
+// queries). Extracted verbatim from the getBounds path (the validated bounds
+// resolver): MC's own display_obj first, then root, then a strcmp name-walk to
+// arbitrary depth. Returns 1 and sets *out_dl/*out_max if a child DL is found.
+static int resolveMCDisplayList(MovieClip* mc, DisplayObject** out_dl, size_t* out_max) __attribute__((unused));
+static int resolveMCDisplayList(MovieClip* mc, DisplayObject** out_dl, size_t* out_max)
+{
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern MovieClip root_movieclip;
+	DisplayObject* mc_dl = NULL;
+	size_t mc_dl_max = 0;
+
+	// 1. MC's own display_obj (for attached clips)
+	if (mc != NULL && mc->display_obj != NULL) {
+		DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+		if (dobj->sprite_display_list != NULL) {
+			mc_dl = dobj->sprite_display_list;
+			mc_dl_max = dobj->sprite_max_depth;
+		}
+	}
+	// 2. Root MC: global display list
+	if (mc_dl == NULL && mc == &root_movieclip) {
+		mc_dl = display_list;
+		mc_dl_max = max_depth;
+	}
+	// 3. Navigate the display tree by name to the MC's sprite entry
+	if (mc_dl == NULL && mc != NULL && mc->name[0] != '\0') {
+		MovieClip* chain[16];
+		int chain_len = 0;
+		for (MovieClip* cur = mc; cur != NULL && cur != &root_movieclip && chain_len < 16; cur = cur->parent) {
+			chain[chain_len++] = cur;
+		}
+		DisplayObject* cur_dl = display_list;
+		size_t cur_max = max_depth;
+		for (int ci = chain_len - 1; ci >= 0; ci--) {
+			size_t found_d = SIZE_MAX;
+			for (size_t d = 1; d <= cur_max; d++) {
+				if (cur_dl[d].char_id == 0) continue;
+				if (cur_dl[d].instance_name && strcmp(cur_dl[d].instance_name, chain[ci]->name) == 0) {
+					found_d = d; break;
+				}
+			}
+			if (found_d == SIZE_MAX) break;
+			if (ci == 0) {
+				if (cur_dl[found_d].sprite_display_list != NULL) {
+					mc_dl = cur_dl[found_d].sprite_display_list;
+					mc_dl_max = cur_dl[found_d].sprite_max_depth;
+				}
+			} else {
+				if (cur_dl[found_d].sprite_display_list == NULL) break;
+				size_t next_max = cur_dl[found_d].sprite_max_depth;
+				cur_dl = cur_dl[found_d].sprite_display_list;
+				cur_max = next_max;
+			}
+		}
+	}
+	if (mc_dl == NULL) return 0;
+	if (out_dl) *out_dl = mc_dl;
+	if (out_max) *out_max = mc_dl_max;
+	return 1;
+}
+
 // Get local matrix (in pixels) for a MC.
 // Uses ng_getMatrixFromEntry as the base (from transform_data), then overlays any
 // AS-set fields (xscale/yscale/rotation via as_set_flags bits 4/8/16, tx/ty via bits 1/2).
