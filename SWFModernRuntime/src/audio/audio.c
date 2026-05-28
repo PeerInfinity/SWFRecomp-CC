@@ -273,6 +273,7 @@ void audio_stream_head(SWFAppContext* app_context,
 	ctx->stream.pcm_buffer = (float*)calloc(buf_samples * ctx->stream.channels, sizeof(float));
 	ctx->stream.write_pos = 0;
 	ctx->stream.read_pos = 0;
+	ctx->stream.read_pos_frac = 0.0;
 }
 
 void audio_stream_block(SWFAppContext* app_context,
@@ -399,6 +400,17 @@ void audio_mix(AudioContext* ctx, float* output, size_t frames, int out_channels
 		if (ctx->stream.started)
 		{
 			int ch = ctx->stream.channels;
+
+			// Resample stream rate → output rate. Same chipmunk-effect bug
+			// as event sounds: a 22050 Hz stream against a 44100 Hz output
+			// played 2× too fast / pitched without this. read_pos stays an
+			// integer source-sample index (so buffer-occupancy and underrun
+			// checks against write_pos remain correct); read_pos_frac
+			// accumulates the fractional advance and promotes whole steps.
+			double rate_ratio = (out_rate > 0)
+				? ((double)ctx->stream.sample_rate / (double)out_rate)
+				: 1.0;
+
 			for (size_t f = 0; f < frames; f++)
 			{
 				if (ctx->stream.read_pos >= ctx->stream.write_pos)
@@ -415,7 +427,10 @@ void audio_mix(AudioContext* ctx, float* output, size_t frames, int out_channels
 					output[f * out_channels + c] +=
 						ctx->stream.pcm_buffer[rp * ch + src_c] * ctx->master_volume;
 				}
-				ctx->stream.read_pos++;
+				ctx->stream.read_pos_frac += rate_ratio;
+				size_t step = (size_t)ctx->stream.read_pos_frac;
+				ctx->stream.read_pos += step;
+				ctx->stream.read_pos_frac -= (double)step;
 			}
 		}
 	}

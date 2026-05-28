@@ -60,7 +60,8 @@ typedef struct StreamingSound {
 	float* pcm_buffer;    // Ring buffer of decoded streaming PCM
 	size_t buffer_size;   // Total buffer capacity (samples)
 	size_t write_pos;     // Next write position
-	size_t read_pos;      // Next read position
+	size_t read_pos;      // Next read position (integer source-rate sample index)
+	double read_pos_frac; // Fractional remainder for resampling
 	int sample_rate;
 	int channels;
 	size_t prebuffer;     // Samples to buffer before starting playback
