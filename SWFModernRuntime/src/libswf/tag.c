@@ -1611,38 +1611,49 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 
 			case CHAR_TYPE_BUTTON:
 			{
-				DisplayObject* saved_display_list = display_list;
-				size_t saved_max_depth = max_depth;
-				size_t saved_capacity = display_list_capacity;
+				// Compose the button's PERSISTENT sprite_display_list in place,
+				// exactly like the SPRITE branch above and the top-level button
+				// loops in tagShowFrame / tagRerenderFrame. render_single_object /
+				// render_display_list draw obj->sprite_display_list, so the old
+				// approach here — build a throwaway temp display_list via
+				// button_state_funcs, compose THAT, then free it — left those draws
+				// using the un-composed local transforms. A button NESTED inside a
+				// sprite (reached only via this recursive branch, never the top-
+				// level loops) therefore rendered its up-state shape at the parent's
+				// origin. Pong's title-screen "2 Player"/"1 Player" button rectangles
+				// (buttons 19/20 inside sprite_26) appeared in the top-left corner.
+				if (obj->sprite_display_list == NULL && ch->button_state_funcs != NULL)
+				{
+					obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+					obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
+					obj->sprite_max_depth = 0;
 
-				display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-				display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
-				max_depth = 0;
+					u8 state = obj->button_state;
+					u8 effective = (state == 3) ? 1 : state; // OUT_DOWN shows OVER
+					if (effective < 3 && ch->button_state_funcs[effective] != NULL)
+					{
+						DisplayObject* saved_dl = display_list;
+						size_t saved_max = max_depth;
+						size_t saved_cap = display_list_capacity;
+						display_list = obj->sprite_display_list;
+						max_depth = obj->sprite_max_depth;
+						display_list_capacity = obj->sprite_dl_capacity;
 
-				u8 state = obj->button_state;
-				if (ch->button_state_funcs[state] != NULL)
-					ch->button_state_funcs[state](app_context);
+						ch->button_state_funcs[effective](app_context);
 
-				// Save override counts so we can restore button-local overrides
-				// before freeing the temporary display list (they hold pointers into it).
-				int saved_xform_count = g_xform_override_count;
-				int saved_cxform_count = g_cxform_override_count;
+						obj->sprite_display_list = display_list;
+						obj->sprite_max_depth = max_depth;
+						obj->sprite_dl_capacity = display_list_capacity;
+						display_list = saved_dl;
+						max_depth = saved_max;
+						display_list_capacity = saved_cap;
+					}
+				}
 
-				compose_children(app_context, display_list, max_depth, composed,
-					parent_cx_override, parent_cxform_id);
-
-				// Restore overrides that compose_children added for the temp display list
-				for (int k = g_xform_override_count - 1; k >= saved_xform_count; --k)
-					g_xform_overrides[k].obj->transform_id = g_xform_overrides[k].original_id;
-				g_xform_override_count = saved_xform_count;
-				for (int k = g_cxform_override_count - 1; k >= saved_cxform_count; --k)
-					g_cxform_overrides[k].obj->cxform_id = g_cxform_overrides[k].original_id;
-				g_cxform_override_count = saved_cxform_count;
-
-				free(display_list);
-				display_list = saved_display_list;
-				max_depth = saved_max_depth;
-				display_list_capacity = saved_capacity;
+				if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+					compose_children(app_context,
+						obj->sprite_display_list, obj->sprite_max_depth,
+						composed, parent_cx_override, parent_cxform_id);
 				break;
 			}
 
@@ -1805,27 +1816,17 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				break;
 
 			case CHAR_TYPE_BUTTON:
-			{
-				DisplayObject* saved_display_list = display_list;
-				size_t saved_max_depth = max_depth;
-				size_t saved_capacity = display_list_capacity;
-
-				display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-				display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
-				max_depth = 0;
-
-				u8 state = obj->button_state;
-				if (ch->button_state_funcs[state] != NULL)
-					ch->button_state_funcs[state](app_context);
-
-				render_display_list(app_context, display_list, max_depth);
-
-				free(display_list);
-				display_list = saved_display_list;
-				max_depth = saved_max_depth;
-				display_list_capacity = saved_capacity;
+				// Draw the button's PERSISTENT sprite_display_list, which
+				// compose_children's BUTTON branch initialized and composed in
+				// place. The old approach here built a fresh temp display_list via
+				// button_state_funcs and drew it with un-composed (button-local)
+				// transforms, so a button NESTED inside a sprite rendered its
+				// up-state shape at the parent's origin (Pong title-screen button
+				// rectangles in the top-left corner). Mirrors render_single_object
+				// and the CHAR_TYPE_SPRITE case above.
+				if (obj->sprite_display_list != NULL)
+					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 				break;
-			}
 		}
 	}
 }
