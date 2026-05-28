@@ -8411,8 +8411,19 @@ void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t 
 	ng_run_deferred_sprite_init_impl(app_context, 2, target_frame);
 }
 
+#endif // NO_GRAPHICS — close of the block opened at line 6968. The
+       // post-catch-up cleanup below is referenced from action_queue.c via
+       // extern, so it must be visible to graphics builds too. The call
+       // site there is gated on `catch_up_backward && g_natural_wrap_cleanup_pending`,
+       // both 0 in graphics mode, so this function is inert at runtime —
+       // but the linker still needs the symbol.
+
 // Clear display entries whose placed_at_frame is after target_frame.
-// Used by swf_core.c when seeking backward on the main timeline.
+// Used by swf_core.c when seeking backward on the main timeline, and by
+// swf.c's natural-wrap-back cleanup (called in browser-WASM too — Snake's
+// game-over → menu → restart flow leaves stale gameplay entries on the
+// display list without it, so the snake re-placement at frame 50 is
+// treated as a modify and the sprite never re-initializes).
 // Entries at SWF depth >= AVM_DEPTH_BIAS (16384, i.e. AS depth >= 0, the
 // "dynamic" range) survive backward jumps, matching Ruffle's AVM1
 // survives_rewind rule: `old_object.depth() < AVM_DEPTH_BIAS` is the
@@ -8429,6 +8440,7 @@ void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t 
 // be modified by subsequent PlaceObject tags").
 void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame)
 {
+	(void)app_context;
 	for (size_t i = 1; i <= max_depth; i++)
 	{
 		if (i >= 16384) break;  // dynamic-range entries survive rewind
@@ -8442,13 +8454,6 @@ void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame)
 		}
 	}
 }
-
-#endif // NO_GRAPHICS — close of the block opened at line 6968. The
-       // post-catch-up cleanup below is referenced from action_queue.c via
-       // extern, so it must be visible to graphics builds too. The call
-       // site there is gated on `catch_up_backward && g_natural_wrap_cleanup_pending`,
-       // both 0 in graphics mode, so this function is inert at runtime —
-       // but the linker still needs the symbol.
 
 // Post-catch-up cleanup: clear any entries whose placed_at_frame is still
 // > target_frame. These are sprites preserved by ng_display_clear_after

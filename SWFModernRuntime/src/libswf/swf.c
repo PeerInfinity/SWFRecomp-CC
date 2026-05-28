@@ -888,26 +888,36 @@ void tagMain(SWFAppContext* app_context)
 #endif
 		if (manual_next_frame)
 		{
-#ifdef OFFSCREEN_RENDER
 			// Natural backward wrap (recompiler-emitted at end of last frame
 			// when total frame count > 1): invalidate cached MCs and clear
 			// display entries placed at frames > target so names placed only
 			// at later frames don't bleed into the next loop's frame 0.
 			// Mirrors swf_core.c (line ~1395). Goto-from-action wraps go
 			// through ng_executeGotoCatchUp / the outer catch-up loop above,
-			// which handle their own cleanup. Key test: avm1/default_names —
-			// without this, the second-iteration auto-instance counter is
-			// short by the number of stale-depth modifies that would have
-			// been fresh placements.
+			// which handle their own cleanup. Key test (OFFSCREEN_RENDER):
+			// avm1/default_names — without this, the second-iteration
+			// auto-instance counter is short by the number of stale-depth
+			// modifies that would have been fresh placements. Key
+			// browser-WASM scenario: Snake game-over → menu → restart. The
+			// game-over button's Play() advances the timeline; frame 56
+			// natural-wraps to frame 0; without this cleanup the gameplay
+			// display-list entries (Snake/Food at depths 6/8 plus the
+			// SCORE/LEVEL textfields at 3/4/5) survive into the menu —
+			// "SCORE:" lingers on the title screen and a stale-depth black
+			// square paints over the countdown. After this widened cleanup
+			// the menu re-renders correctly. (A separate clone-rendering
+			// issue may still leave the snake invisible on restart even
+			// after this cleanup — tracked as a follow-up.)
 			//
-			// Skip on the last tick of the run: the wrap-back is preparation
-			// for the next tick's frame_0 which will re-place the cleared
-			// entries. If no next tick is going to run, the cleanup just
-			// destroys the display_list and leaves last_frame captures
-			// rendering blank. Key test: from_shumway/avm1/text-bind.
-			// (Per-iteration captures happen *before* this wrap-back so
-			// they're unaffected.)
-#ifdef MAX_FRAMES
+			// OFFSCREEN_RENDER skip on the last tick of the run: the
+			// wrap-back is preparation for the next tick's frame_0 which
+			// will re-place the cleared entries. If no next tick is going
+			// to run, the cleanup just destroys the display_list and leaves
+			// last_frame captures rendering blank. Key test:
+			// from_shumway/avm1/text-bind. (Per-iteration captures happen
+			// *before* this wrap-back so they're unaffected.) Browser-WASM
+			// runs forever — no "last tick" concern there.
+#if defined(OFFSCREEN_RENDER) && defined(MAX_FRAMES)
 			int _wrap_is_last_tick = (tick_count >= max_ticks);
 #else
 			int _wrap_is_last_tick = 0;
@@ -932,7 +942,6 @@ void tagMain(SWFAppContext* app_context)
 				// than refuses a Place on a swapDepths-occupied depth.
 				g_loopback_replay_armed = 1;
 			}
-#endif
 			// Goto/play command set next_frame directly
 			manual_next_frame = 0;
 		}
