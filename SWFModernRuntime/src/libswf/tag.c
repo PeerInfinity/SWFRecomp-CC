@@ -1888,6 +1888,7 @@ static Character* resolve_hit_shape(size_t hit_char_id, u32* out_hit_transform_i
 static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max,
 	const float* parent_xf, MovieClip* parent_mc,
+	DisplayObject* enclosing_sprite_obj,
 	int* found_hover)
 {
 	for (size_t i = dl_max; i >= 1; i--)
@@ -1961,9 +1962,18 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 					}
 				}
 
+				// Pass this sprite's display object down as the enclosing
+				// timeline for any nested buttons. AVM1 button actions run
+				// relative to the timeline CONTAINING the button, so a bare
+				// Play/Stop/GotoFrame from a button inside this sprite must
+				// target this sprite — even when the sprite is unnamed (no MC,
+				// so parent_mc falls back to root). Pong's "2 Player" button
+				// (button_20 inside the unnamed sprite_26) does a bare Play to
+				// advance sprite_26 frame 0→1 (the Enter Names screen).
 				ng_update_button_states_in_dl(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					child_parent_xf, sprite_mc ? sprite_mc : parent_mc,
+					obj,
 					found_hover);
 			}
 			continue;
@@ -1985,9 +1995,12 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 			if (obj->instance_name != NULL)
 				btn_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
 
+			// A button is not a timeline; keep the same enclosing sprite for
+			// any buttons nested in this button's state display list.
 			ng_update_button_states_in_dl(app_context,
 				obj->sprite_display_list, obj->sprite_max_depth,
 				child_parent_xf, btn_mc ? btn_mc : parent_mc,
+				enclosing_sprite_obj,
 				found_hover);
 		}
 
@@ -2333,12 +2346,22 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 					MovieClip* saved_ctx = g_current_context;
 					DisplayObject* saved_sprite_obj = g_current_sprite_obj;
 					actionSetCurrentContext(parent_mc);
-					// If the parent is a button MC, set g_current_sprite_obj to
-					// the parent's display object so that GotoFrame targets the
-					// button (a non-sprite), making it a no-op.  This matches
-					// Ruffle where button parents can't navigate frames.
+					// Establish the "current sprite" so a bare Play/Stop/GotoFrame
+					// in the button's action targets the timeline CONTAINING the
+					// button (AVM1 runs button actions relative to the parent
+					// timeline), not the root.
+					//   - parent is a button MC: target the button's display object
+					//     so GotoFrame is a no-op (a button can't navigate frames).
+					//     Matches Ruffle where button parents can't navigate.
+					//   - otherwise: target the nearest enclosing sprite's display
+					//     object (NULL at root → bare Play/Stop hits the root
+					//     timeline, unchanged). Fixes Pong "2 Player" (button_20 in
+					//     the unnamed sprite_26): bare Play now advances sprite_26
+					//     frame 0→1 (Enter Names) instead of root frame 2→3 (court).
 					if (parent_mc && parent_mc->is_button_mc && parent_mc->display_obj)
 						g_current_sprite_obj = (DisplayObject*)parent_mc->display_obj;
+					else
+						g_current_sprite_obj = enclosing_sprite_obj;
 					for (size_t a = 0; a < ch->button_action_count; a++)
 					{
 						if (ch->button_actions[a].condition & transition)
@@ -2367,6 +2390,7 @@ int ng_update_button_states(SWFAppContext* app_context)
 	ng_update_button_states_in_dl(app_context,
 		display_list, max_depth,
 		identity, &root_movieclip,
+		NULL,
 		&found_hover);
 	return found_hover;
 }
@@ -3379,6 +3403,54 @@ void tagRerenderFrame(SWFAppContext* app_context)
 }
 #endif
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+// Browser-WASM: recursively finalize tagRemoveObject(2)'d entries that weren't
+// reclaimed by a same-tick Place. tagRemoveObject2 only marks pending_remove=1;
+// the finalize walk used to scan the ROOT display list only, so a remove inside
+// a NESTED sprite that advanced this tick (and had no replacement placement at
+// that depth) was never cleared and kept rendering. Pong's "2 Player" advances
+// the unnamed sprite_26 frame 0→1, whose frame_1 removes the depth-1 label and
+// the depth-4 "1 Player" button with no replacement — they ghosted on top of
+// the Enter Names form. Recurse into sprite children (operating on the global
+// display_list so clear_display_entry/invalidate target the right list) so
+// those nested removals are finalized before render. Buttons are skipped:
+// their state display lists are rebuilt by ng_update_button_states.
+static void finalize_pending_removes_recursive(SWFAppContext* app_context)
+{
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		DisplayObject* obj = &display_list[d];
+		if (obj->char_id != 0 && dictionary[obj->char_id].type == CHAR_TYPE_SPRITE
+		    && obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+		{
+			DisplayObject* saved_dl = display_list;
+			size_t saved_max = max_depth;
+			size_t saved_cap = display_list_capacity;
+			display_list = obj->sprite_display_list;
+			max_depth = obj->sprite_max_depth;
+			display_list_capacity = obj->sprite_dl_capacity;
+			finalize_pending_removes_recursive(app_context);
+			obj->sprite_display_list = display_list;
+			obj->sprite_max_depth = max_depth;
+			obj->sprite_dl_capacity = display_list_capacity;
+			display_list = saved_dl;
+			max_depth = saved_max;
+			display_list_capacity = saved_cap;
+			obj = &display_list[d];
+		}
+		if (obj->pending_remove)
+		{
+			obj->pending_remove = 0;
+			if (obj->char_id != 0)
+			{
+				invalidate_mc_for_dl_entry(app_context, obj);
+				clear_display_entry(app_context, d);
+			}
+		}
+	}
+}
+#endif
+
 void tagShowFrame(SWFAppContext* app_context)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
@@ -3574,18 +3646,7 @@ void tagShowFrame(SWFAppContext* app_context)
 	// (post-drain) the finalize walk would invalidate it — so the next
 	// tick's ENTER_FRAME dispatch creates a fresh hero MC with no score
 	// property, and `_root.score_txt.text = "" + score` produces "undefined".
-	for (size_t _pr_d = 1; _pr_d <= max_depth; _pr_d++)
-	{
-		if (display_list[_pr_d].pending_remove)
-		{
-			display_list[_pr_d].pending_remove = 0;
-			if (display_list[_pr_d].char_id != 0)
-			{
-				invalidate_mc_for_dl_entry(app_context, &display_list[_pr_d]);
-				clear_display_entry(app_context, _pr_d);
-			}
-		}
-	}
+	finalize_pending_removes_recursive(app_context);
 #endif
 	// Browser-WASM: drain deferred LOAD clip-actions queued onto
 	// AQ_KIND_LOAD at placement time. By now advance_sprite_frames has
