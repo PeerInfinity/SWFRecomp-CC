@@ -188,7 +188,61 @@ Process directives:
 - **Implement the plan in a fresh session** (this planning session only writes the
   plan + captures the baseline).
 
-### CI baseline (current master, pre-refactor)
-(to be filled from the pipeline run)
-- no-graphics: _pending_
-- graphics: _pending_
+### CI baseline (current master @ `dbbac2761`, pre-refactor)
+
+**no-graphics** (run 26604640699, completed success; diff vs 2026-05-25 baseline `fc1fed4aba95`):
+
+| Suite | Passing | Total |
+|---|---|---|
+| avm1 | 614 | 673 |
+| from_shumway | 73 | 92 |
+| from_shumway/avm1 | 46 | 47 |
+| from_gnash/actionscript.all | 124 | 243 |
+| from_gnash/misc-ming.all | 66 | 110 |
+| from_gnash/misc-swfmill.all | 19 | 20 |
+| from_gnash/misc-mtasc.all | 7 | 9 |
+| from_gnash/misc-swfc.all | 8 | 19 |
+
+Only delta vs the 2026-05-25 baseline: **actionscript.all −4** (`delete-v5/v6/v7/v8`,
+60/60→42/61) plus avm1 added `delete2`. **Root cause: stale local fixtures +
+a real upstream test update — NOT a code regression and NOT this session's
+work.** CI runs `ruffle-tests/download_tests.sh` every run, so it tests against
+the latest ruffle-rs/ruffle fixtures; the local checkout was stale (`delete-v5`
+expected was 60 lines locally, 61 upstream; `delete2` didn't exist locally).
+After running `download_tests.sh avm1 from_shumway from_gnash`, local reproduces
+the CI failures exactly. The actual gap is **one missing trace line**: the
+updated `delete.as` expects Flash's warning `"Parameters of primitive types are
+no longer coerced into the required type - Object."`; we don't emit it, so
+output is shifted by one line (the other 18 "diffs" are just the off-by-one
+alignment). Pre-existing `delete`-opcode diagnostic gap, surfaced by the upstream
+update; unrelated to the bounds work. Flag for a separate fix. **Process note:
+run `download_tests.sh` locally before the implementation session so local
+matches CI.**
+
+**graphics** (run 26605500025, completed success; offscreen Dawn):
+
+| Suite | Passing | Total |
+|---|---|---|
+| avm1 | 614 | 673 |
+| from_shumway | 73 | 92 |
+| from_shumway/avm1 | 46 | 47 |
+| from_gnash/actionscript.all | 122 | 243 |
+| from_gnash/misc-ming.all | 65 | 110 |
+| from_gnash/misc-swfmill.all | 19 | 20 |
+| from_gnash/misc-mtasc.all | 7 | 9 |
+| from_gnash/misc-swfc.all | 8 | 19 |
+
+Deltas vs the previous graphics baseline:
+- **Regressions:** actionscript.all −4 (`delete-v5/v6/v7/v8`) — same stale-fixture /
+  upstream-`delete.as`-update cause as no-graphics; not a code regression.
+- **Improvements** (from the 2026-05-27/28 nested-button + native-objects work,
+  not the bounds work): `native_objects_swf6` segfault→output_mismatch
+  (1/115→114/115); `ButtonEventsTest` segfault→**ruffle_matched** (40/679→676/679);
+  `ButtonPropertiesTest` segfault→ruffle_matched.
+
+**Bottom line for the refactor:** no graphics or trace regressions attributable
+to this session's three commits (frame-entry gate, paddle play/stop, bounds
+recursion). The only red is the upstream-`delete` fixture update. This is the
+clean pre-refactor baseline; the bounds work must hold every passing count above
+(especially the `_width`/`_height`/getBounds/hitTest-adjacent tests) and may
+*improve* nested-sprite bounds cases.
