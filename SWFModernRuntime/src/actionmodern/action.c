@@ -19289,6 +19289,17 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		// and without g_current_context routing the SetProperty wrote to root,
 		// which then set root.as_set_flags and shifted the entire stage at
 		// render time.
+		//
+		// Exception: after a failed SetTarget("nonexistent"), Ruffle's
+		// target_clip() returns None — opcode-form SetProperty / GetProperty
+		// with empty target should silently no-op (return NULL so callers fall
+		// through their `if (!mc) return;` guard). g_current_context was reset
+		// to root_movieclip by actionSetTarget's failure path; without this
+		// short-circuit, the SetProperty would write to root and shift the
+		// stage (B2 wasm probe). The flag is now set in all build modes
+		// (graphics_stubs.c provides the storage for browser-WASM).
+		extern int g_settarget_none;
+		if (g_settarget_none) return NULL;
 		return g_current_context ? g_current_context : &root_movieclip;
 	}
 	if (strcmp(target, "_root") == 0 || strcmp(target, "/") == 0 ||
@@ -40950,7 +40961,6 @@ void actionSetTarget2(SWFAppContext* app_context)
 			setCurrentContext(base);
 			picked = base;
 		}
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Mirror actionSetTarget's bookkeeping so subsequent GotoFrame /
 		// Play / Stop pick the correct branch. Without this, SetTarget2(_root)
 		// where the stack already holds the MOVIECLIP-typed _root reference
@@ -40966,7 +40976,6 @@ void actionSetTarget2(SWFAppContext* app_context)
 		g_settarget_explicit_root = (picked == &root_movieclip) ? 1 : 0;
 		g_settarget_invalid = 0;
 		g_settarget_none = 0;
-#endif
 		return;
 	}
 
@@ -40980,7 +40989,6 @@ void actionSetTarget2(SWFAppContext* app_context)
 		POP();
 		MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
 		setCurrentContext(base);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		extern int g_settarget_explicit_root;
 		extern int g_settarget_invalid;
 		extern int g_settarget_none;
@@ -40995,7 +41003,6 @@ void actionSetTarget2(SWFAppContext* app_context)
 			g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
 		}
-#endif
 		return;
 	}
 
@@ -53493,37 +53500,29 @@ static const char* mcToDotBasePath(MovieClip* mc) {
 
 void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern int g_settarget_explicit_root;
 	extern int g_settarget_invalid;
 	extern int g_settarget_none;
 	extern int g_settarget_context_changed;
 	extern MovieClip* g_settarget_saved_context;
-#endif
 	MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
 
 	// Empty string or NULL means return to base clip (the clip whose script is running)
 	if (!target_name || strlen(target_name) == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		g_settarget_context_changed = 0;
 		g_settarget_saved_context = NULL;
-#endif
 		if (base->avm1_removed || base->depth == INT_MIN) {
 			// Base clip is removed/dead: Ruffle treats target_clip() as None.
 			// GotoFrame/Play/Stop become no-ops; scope falls back to root for variables.
 			setCurrentContext(&root_movieclip);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = 0;
 			g_settarget_invalid = 1;
 			g_settarget_none = 1;
-#endif
 		} else {
 			setCurrentContext(base);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
-#endif
 		}
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
@@ -53534,11 +53533,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// Check for _root
 	if (strcmp(target_name, "_root") == 0 || strcmp(target_name, "/") == 0) {
 		setCurrentContext(&root_movieclip);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		g_settarget_explicit_root = 1;
 		g_settarget_invalid = 0;
 		g_settarget_none = 0;
-#endif
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
 #endif
@@ -53548,24 +53545,20 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// --- SetTarget path resolution ---
 	// Uses the Flash/Ruffle resolve_target_path algorithm.
 	// For tellTarget, first_element is false (this/_root are not keywords).
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Save current context before SetTarget changes it.
 	// GetVariable("this") uses this to return the correct clip.
 	if (!g_settarget_context_changed) {
 		g_settarget_saved_context = g_current_context;
 	}
 	g_settarget_context_changed = 1;
-#endif
 	{
 		u32 tn_len = (u32)strlen(target_name);
 		MovieClip* target_mc = resolveFlashPathToMC(app_context, target_name, tn_len, base, 0);
 		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
-#endif
 			return;
 		}
 
@@ -53576,11 +53569,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			MovieClip* obj_target_mc = resolveObjectPathToMC(app_context, target_name, tn_len, base, 0);
 			if (obj_target_mc && obj_target_mc->depth != INT_MIN) {
 				setCurrentContext(obj_target_mc);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				g_settarget_explicit_root = (obj_target_mc == &root_movieclip) ? 1 : 0;
 				g_settarget_invalid = 0;
 				g_settarget_none = 0;
-#endif
 				return;
 			}
 		}
@@ -53593,11 +53584,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		MovieClip* target_mc = resolveSlashPathToMC(app_context, target_name, (u32)strlen(target_name), base);
 		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
-#endif
 			return;
 		}
 
@@ -53615,6 +53604,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		DisplayObject* obj = findDisplayObjectByName(target_name);
 		if (obj != NULL) {
 			targeted_sprite = obj;
+			g_settarget_explicit_root = 0;
+			g_settarget_invalid = 0;
+			g_settarget_none = 0;
 			return;
 		}
 #endif
@@ -53623,11 +53615,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		target_mc = getMovieClipByTarget(target_name);
 		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = 0;
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
-#endif
 			return;
 		}
 
@@ -53667,11 +53657,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// GotoFrame/Play/Stop use target_clip() → no-op when None.
 	// GotoFrame2 uses target_clip_or_root() → falls back to root.
 	setCurrentContext(&root_movieclip);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	g_settarget_explicit_root = 0;
 	g_settarget_invalid = 1;
 	g_settarget_none = 1;
-#endif
 #ifndef NO_GRAPHICS
 	targeted_sprite = NULL;
 #endif

@@ -1,3 +1,3 @@
-known_red = true
+known_red = false
 golden_source = "ruffle"
-description = "B2 — missing g_settarget_invalid flag-tracking in browser-WASM. Failed SetTarget should make subsequent SetProperty a no-op; our impl writes to root instead, shifting the stage. Golden captured from ~/CC/ruffle/target/release/exporter."
+description = "B2 — g_settarget_* flag writes un-gated in actionSetTarget/actionSetTarget2 + getMovieClipByTarget(\"\") short-circuits to NULL when g_settarget_none. Failed SetTarget now makes subsequent SetProperty a silent no-op in browser-WASM, matching Ruffle. Golden captured from ~/CC/ruffle/target/release/exporter."
