@@ -1,0 +1,3 @@
+known_red = true
+golden_source = "ruffle"
+description = "B2 — missing g_settarget_invalid flag-tracking in browser-WASM. Failed SetTarget should make subsequent SetProperty a no-op; our impl writes to root instead, shifting the stage. Golden captured from ~/CC/ruffle/target/release/exporter."

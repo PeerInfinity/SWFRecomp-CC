@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "description": "Clone a sprite with onClipEvent(load){_x+=50}. The inherited load handler should fire on the duplicate; in our browser-WASM the placement-clip-events queue is a stub so onLoad never fires.",
+    "width": 320,
+    "height": 240,
+    "swf_version": 6
+  },
+  "opcodes": {
+    "tested": ["DuplicateSprite"],
+    "supporting": ["onClipEvent(load)", "GetProperty", "SetProperty", "Add2"]
+  }
+}

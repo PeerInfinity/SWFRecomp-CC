@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <!--
+    B2 settarget_failure_flag — surfaces the missing g_settarget_invalid /
+    g_settarget_none flag-tracking in browser-WASM after a failed SetTarget.
+
+    Stage 320x240 with two named sprites: `valid` (blue 40x40) at top-left
+    (40,40) and `ref` (red 40x40) at center (160,120). DoAction:
+
+        SetTarget "nonexistent"   ; fails — target_clip should become None
+        PushString ""             ; current target
+        PushFloat 0.0             ; _x
+        PushInteger 100           ; value
+        SetProperty               ; should no-op (Ruffle: target_clip=None)
+        SetTarget ""
+
+    Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER (graphics-native): the failed
+    SetTarget sets g_settarget_invalid=1 and g_settarget_none=1. SetProperty
+    with empty path then sees an invalid target and silently no-ops. Both
+    sprites stay where they were placed.
+
+    Our browser-WASM: the flag-set lines at action.c:~53672 are gated
+    `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)` and never fire,
+    but setCurrentContext(&root_movieclip) at line 53669 still runs. So
+    after the failed SetTarget, g_current_context = root. Then SetProperty
+    with empty path routes through getMovieClipByTarget("") = root (post-
+    aaaf111b4) and writes root._x = 100, shifting the whole stage 100 px
+    left at compose time. Both `valid` and `ref` slide off the left edge.
+
+    KNOWN_RED until the g_settarget_invalid gate is widened to all build
+    modes. Golden captured from ~/CC/ruffle/target/release/exporter.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="220" green="40" blue="40"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="valid">
+        <transform><Transform transX="800" transY="800"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="ref">
+        <transform><Transform transX="3200" transY="2400"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <SetTarget label="nonexistent"/>
+          <PushData>
+            <items>
+              <StackString value=""/>
+              <StackFloat value="0.0"/>
+              <StackInteger value="100"/>
+            </items>
+          </PushData>
+          <SetProperty/>
+          <SetTarget label=""/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

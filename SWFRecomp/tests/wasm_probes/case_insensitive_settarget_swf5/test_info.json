@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "description": "SWF v5: SetTarget('myclip') with sprite named 'MyClip' should case-fold per the SWF<=6 spec. Surfaces case-insensitivity gaps in browser-WASM SetTarget path lookup.",
+    "width": 320,
+    "height": 240,
+    "swf_version": 5
+  },
+  "opcodes": {
+    "tested": ["SetTarget", "SetProperty"]
+  }
+}

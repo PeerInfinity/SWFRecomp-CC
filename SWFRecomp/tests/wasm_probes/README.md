@@ -57,13 +57,44 @@ Exit code is non-zero iff any non-KNOWN_RED probe fails.
 
 ## Probes
 
-| Slug | Group | Verifies |
-|------|-------|----------|
-| `leaf_shared_slot` | C — future-proofing | Recompiler doesn't dedupe matrices; per-PlaceObject2 transform_data rows are independent. |
-| `clone_basic` | A — regression | `actionCloneSprite` widening (`7fd96e6f2`). |
-| `remove_basic` | A — regression | `actionRemoveSprite` + numeric-target coercion (`2d792bde3`). |
-| `set_property_x` | A — regression | `actionSetProperty` `as_set_flags` un-gate (`aaaf111b4`). |
-| `settarget_empty_to_child` | A — regression | `getMovieClipByTarget("")` un-gate (`aaaf111b4`). |
-| `case_insensitive_settarget_swf5` | B — known-red | SWF≤6 case-folding gap in `findDisplayObjectByName`. |
-| `settarget_failure_flag` | B — known-red | Missing `g_settarget_invalid` flag-tracking in browser-WASM. |
-| `clone_clip_actions` | B — known-red | `ng_queue_placement_clip_events` stub no-ops on cloned sprites. |
+| Slug | Group | Status | Verifies |
+|------|-------|--------|----------|
+| `leaf_shared_slot` | C — future-proofing | green | Recompiler doesn't dedupe matrices; per-PlaceObject2 transform_data rows are independent. |
+| `clone_basic` | A — regression | green | `actionCloneSprite` widening (`7fd96e6f2`). |
+| `remove_basic` | A — regression | green | `actionRemoveSprite` + numeric-target coercion (`2d792bde3`). |
+| `set_property_x` | A — regression | green | `actionSetProperty` `as_set_flags` un-gate (`aaaf111b4`). |
+| `settarget_empty_to_child` | A — regression | green | `getMovieClipByTarget("")` un-gate (`aaaf111b4`). |
+| `case_insensitive_settarget_swf5` | B — Ruffle parity | green | SWF≤6 SetTarget case-folding via `swf_name_match`. Originally hypothesized as known-red; landed green after the probe surprise-passed. |
+| `settarget_failure_flag` | B — known-red | red | Missing `g_settarget_invalid` flag-tracking in browser-WASM after failed SetTarget. |
+| `clone_clip_actions` | B — known-red | red | `ng_queue_placement_clip_events` stub no-ops on cloned sprites; inherited `onClipEvent(load)` doesn't fire on the duplicate. |
+
+## Capturing a Ruffle reference (B-group / known-red probes)
+
+`tools/capture_ruffle_golden.sh [<slug>]` invokes `~/CC/ruffle/target/
+release/exporter` to render `test.swf` at the probe's intrinsic canvas
+size (read from `test_info.json`'s `metadata.width`/`metadata.height`) into
+`<probe>/golden_ruffle.png`. Override `RUFFLE_EXPORTER=/path/to/exporter`
+to use a different build. Build the exporter with `cd ~/CC/ruffle && cargo
+build --release -p exporter`.
+
+The probe.toml's `golden_source = "ruffle"` selects `golden_ruffle.png` as
+the comparison target for that probe. Pair it with `known_red = true` for
+gap probes whose graphics-WASM output is *expected* to diverge from
+Ruffle — the harness reports them in a separate "red as expected"
+section. A KNOWN_RED probe that suddenly passes flips to "surprise pass"
+and prompts manual promotion (clear `known_red` in probe.toml).
+
+## swfmill encoding gotchas
+
+- swfmill 0.3.6 silently drops unrecognized XML elements (returns success,
+  emits the SWF without them). After every `xml2swf`, run
+  `swfmill swf2xml test.swf - | grep <element>` to verify the structure
+  survived. The first probes hit this with `<CloneSprite/>` (correct name
+  is `<DuplicateSprite/>`) and again with `<clipActions>` (correct name
+  is `<events>` containing `<Event flags1="..." flags2="...">`).
+- Top-level XML comments (`<!-- ... -->` before `<swf>`) make swfmill
+  reject the file as "not a swfml file." Put commentary inside the `<swf>`
+  element.
+- swfmill's reference.html (`/usr/share/doc/swfmill/reference.html`) is
+  incomplete on PlaceObject2's sub-elements. Trust round-trips, not the
+  docs.

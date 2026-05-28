@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="5" compressed="0">
+  <!--
+    B1 case_insensitive_settarget_swf5 — surfaces SWF<=6 case-folding
+    behavior for SetTarget path lookup.
+
+    SWF version 5. Two named sprites: `MyClip` (red 40x40, camelCase) at
+    center (160,120) and `ref` (blue 40x40) at top-left (40,40).
+    DoAction does SetTarget "myclip" (lowercase) + SetProperty("",
+    _x, 100). In Flash and Ruffle, SWF<=6 SetTarget is case-insensitive
+    (Unicode case-folded), so "myclip" resolves to MyClip and the red
+    square moves to x=100. The blue reference stays at the corner.
+
+    Our browser-WASM behavior is mostly correct: resolveSlashPathToMC's
+    ng_findDisplayEntryByName branch uses swf_name_match (case-folding for
+    SWF<=6). The known broken sites are getMovieClipByTarget /
+    getMovieClipByRelativeName (both use strcmp), and findDisplayObjectByName
+    (strcmp) at the tag.c line-53615 fallback. Whether this concrete probe
+    catches the divergence depends on which resolver wins first — empirical
+    Ruffle-reference comparison is the authoritative check.
+
+    golden_ruffle.png comes from ~/CC/ruffle/target/release/exporter; ours
+    captures via canvas.toDataURL into the harness's <out>/<slug>_actual.png.
+    Marked known_red so diff is reported separately from green-status probes.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="220" green="40" blue="40"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="MyClip">
+        <transform><Transform transX="3200" transY="2400"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="ref">
+        <transform><Transform transX="800" transY="800"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <SetTarget label="myclip"/>
+          <PushData>
+            <items>
+              <StackString value=""/>
+              <StackFloat value="0.0"/>
+              <StackInteger value="100"/>
+            </items>
+          </PushData>
+          <SetProperty/>
+          <SetTarget label=""/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

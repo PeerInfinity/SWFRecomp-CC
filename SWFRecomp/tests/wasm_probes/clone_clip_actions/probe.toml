@@ -1,0 +1,3 @@
+known_red = true
+golden_source = "ruffle"
+description = "B3 — ng_queue_placement_clip_events is a stub in browser-WASM. Cloned sprite's inherited onClipEvent(load) handler should add 50 to _x but never fires, so the clone overlaps the source. Golden captured from ~/CC/ruffle/target/release/exporter."

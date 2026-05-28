@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <!--
+    B3 clone_clip_actions — surfaces the ng_queue_placement_clip_events
+    stub in browser-WASM (graphics_stubs.c:100, no-op).
+
+    Sprite `src` (red 40x40) at center (160,120) has an onClipEvent(load)
+    handler attached that adds 50 to its _x. DoAction clones src into
+    `dup` at AS depth 16385.
+
+    Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER: ng_cloneSprite copies the
+    source's clip_actions onto the clone slot, then dispatches CONSTRUCT
+    + LOAD. The clone's inherited onLoad fires, dup._x becomes
+    (initial _x) + 50 = 210. Two red squares: src at x=160, dup at x=210.
+
+    Our browser-WASM: ng_queue_placement_clip_events is a no-op. The
+    clone is created at the same x as src and overlaps it. Only one
+    square visible.
+
+    Encoding note: swfmill's `<events>/<Event>` sub-element on PlaceObject2
+    *is* preserved by xml2swf (the docs don't mention it, but a round-trip
+    confirms). flags1=1 / flags2=0 = onClipEvent(load).
+
+    KNOWN_RED until the placement_clip_events stub is implemented. Golden
+    captured from ~/CC/ruffle/target/release/exporter.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="220" green="40" blue="40"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="2" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="2" name="src" allflags1="1" allflags2="0">
+        <transform><Transform transX="3200" transY="2400"/></transform>
+        <events>
+          <Event flags1="1" flags2="0">
+            <actions>
+              <PushData>
+                <items>
+                  <StackString value=""/>
+                  <StackFloat value="0.0"/>
+                </items>
+              </PushData>
+              <PushData>
+                <items>
+                  <StackString value=""/>
+                  <StackFloat value="0.0"/>
+                </items>
+              </PushData>
+              <GetProperty/>
+              <PushData>
+                <items>
+                  <StackFloat value="50.0"/>
+                </items>
+              </PushData>
+              <AddTyped/>
+              <SetProperty/>
+              <EndAction/>
+            </actions>
+          </Event>
+        </events>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="/src"/>
+              <StackString value="dup"/>
+              <StackInteger value="16385"/>
+            </items>
+          </PushData>
+          <DuplicateSprite/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

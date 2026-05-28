@@ -1,0 +1,2 @@
+golden_source = "ruffle"
+description = "B1 — SWF<=6 SetTarget case-folding. Both Ruffle and our browser-WASM resolve 'myclip' to 'MyClip' via swf_name_match in resolveSlashPathToMC's ng_findDisplayEntryByName branch. Golden captured from ~/CC/ruffle/target/release/exporter; promoted from known_red after probe surprise-passed at landing."
