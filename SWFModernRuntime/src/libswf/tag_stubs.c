@@ -1532,14 +1532,25 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 
 		if (dictionary[cid].type == CHAR_TYPE_SPRITE && obj->sprite_display_list != NULL)
 		{
-			// Recursively get sprite's local bounds
+			// Recursively get sprite's local bounds. Encode the child's
+			// position so the recursion descends into THIS sprite's child
+			// (not root depth `i`). For a root-level placement (entry_idx
+			// == -1) the child is itself a root-depth sprite, so the entry
+			// is just `i`. For a root-depth sprite (entry_idx == child_d,
+			// parent_d == 0) the grandchild is encoded as (child_d << 20) | i
+			// so the recursion takes the level-1-nested branch. Passing bare
+			// `i` here was a latent bug: it read root depth `i` instead of
+			// this sprite's child, so e.g. Pong's paddle (root depth 9,
+			// containing child "gab") reported the bounds of root depth 1
+			// (the full-stage background) — 551x401 instead of the paddle's
+			// own ~50px height, which broke the paddle's on-screen clamp
+			// math (`25 + _height/2` .. `375 - _height/2` became an inverted
+			// range, pegging the paddle and blocking keyboard movement).
 			float lxmin, lxmax, lymin, lymax;
 			size_t child_entry = (entry_idx == (size_t)-1)
-				? (i)                         // root sprite: entry_idx = depth
-				: (((entry_idx & 0xFFFFF) << 20) | i);  // nested: encode (but bounds are simplified)
-			(void)child_entry;
-			// Simplified: use sprite's own sprite_display_list directly
-			if (ng_getDisplayEntryBounds(i, &lxmin, &lxmax, &lymin, &lymax))
+				? (i)                                    // root sprite: entry_idx = depth
+				: (((entry_idx & 0xFFFFF) << 20) | i);   // nested: encode (parent_d << 20) | child_d
+			if (ng_getDisplayEntryBounds(child_entry, &lxmin, &lxmax, &lymin, &lymax))
 			{
 				bxmin = lxmin * sx + tx;
 				bxmax = lxmax * sx + tx;
