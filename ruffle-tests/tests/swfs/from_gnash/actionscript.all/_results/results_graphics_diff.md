@@ -1,23 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `e6a7f4923011` (2026-05-25T20:45:01.282921+00:00)
-**Current:** `dbbac2761e17` (2026-05-28T22:50:01.204226+00:00)
+**Previous:** `dbbac2761e17` (2026-05-28T22:50:01.204226+00:00)
+**Current:** `eef77ea7b72c` (2026-05-28T23:44:51.360113+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 126 | 122 | -4 |
+| Passing | 122 | 122 | 0 |
 | Total | 243 | 243 | 0 |
-| Pass rate | 51.9% | 50.2% | -1.7% |
-| Mismatched lines | 9227 | 9303 | +76 |
-|   Increased | | | +76 |
+| Pass rate | 50.2% | 50.2% | 0% |
+| Mismatched lines | 9303 | 9303 | 0 |
 
-## Newly Failing (4)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `delete-v5` | output_mismatch | 60/60 | 42/61 |
-| `delete-v6` | output_mismatch | 60/60 | 42/61 |
-| `delete-v7` | output_mismatch | 60/60 | 42/61 |
-| `delete-v8` | output_mismatch | 60/60 | 42/61 |
+No changes detected.
