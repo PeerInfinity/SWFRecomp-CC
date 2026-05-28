@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d018fcc20f02` (2026-05-25T02:58:54.050338+00:00)
-**Current:** `e6a7f4923011` (2026-05-25T20:45:01.291767+00:00)
+**Previous:** `e6a7f4923011` (2026-05-25T20:45:01.291767+00:00)
+**Current:** `dbbac2761e17` (2026-05-28T22:50:01.214434+00:00)
 
 ## Summary
 
@@ -10,6 +10,12 @@
 | Passing | 65 | 65 | 0 |
 | Total | 110 | 110 | 0 |
 | Pass rate | 59.1% | 59.1% | 0% |
-| Mismatched lines | 1860 | 1860 | 0 |
+| Mismatched lines | 1860 | 1223 | -637 |
+|   Decreased | | | -637 |
 
-No changes detected.
+## Status Changed (2)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `ButtonEventsTest` | segfault | ruffle_matched | 40/679 | 676/679 |
+| `ButtonPropertiesTest` | segfault | ruffle_matched | 3/23 | 4/23 |
