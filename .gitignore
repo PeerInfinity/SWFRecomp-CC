@@ -156,6 +156,7 @@ docs/examples/local_batch/
 docs2/examples/local_batch/
 docs2/examples/glaiel/
 docs2/examples/flasharchive/
+docs2/examples/graphics/
 docs2/examples/wasm_probes/
 
 # Per-probe generated artifacts (probe sources live at wasm_probes/<slug>/test.xml
