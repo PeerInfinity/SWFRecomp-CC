@@ -44,7 +44,7 @@ typedef struct SoundChannel {
 	const SoundAsset* asset;
 	float* pcm_data;      // Decoded PCM (float, interleaved)
 	size_t pcm_samples;   // Total decoded samples (per channel)
-	size_t pcm_position;  // Current playback position
+	double pcm_position;  // Current playback position (fractional, resampled)
 	int channels;         // 1=mono, 2=stereo
 	int sample_rate;      // Actual sample rate in Hz
 	u32 loop_count;       // 0 = no loop, >0 = remaining loops

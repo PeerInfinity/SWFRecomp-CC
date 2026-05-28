@@ -220,7 +220,7 @@ void audio_start_sound(SWFAppContext* app_context, u16 sound_id,
 	channel->asset = asset;
 	channel->pcm_data = pcm;
 	channel->pcm_samples = pcm_samples;
-	channel->pcm_position = (in_point < pcm_samples) ? in_point : 0;
+	channel->pcm_position = (in_point < pcm_samples) ? (double)in_point : 0.0;
 	channel->channels = channels;
 	channel->sample_rate = sample_rate;
 	channel->loop_count = loop_count;
@@ -345,14 +345,25 @@ void audio_mix(AudioContext* ctx, float* output, size_t frames, int out_channels
 		SoundChannel* ch = &ctx->channels[i];
 		if (!ch->active) continue;
 
+		// Resample source → output rate. Without this, sources at
+		// 22050 Hz / 11025 Hz play 2× / 4× faster + higher-pitched at
+		// the 44100 Hz hardware output (classic chipmunk effect).
+		// Nearest-neighbor is adequate for game SFX and avoids the
+		// complexity of linear interpolation.
+		double rate_ratio = (out_rate > 0)
+			? ((double)ch->sample_rate / (double)out_rate)
+			: 1.0;
+
 		for (size_t f = 0; f < frames; f++)
 		{
-			if (ch->pcm_position >= ch->pcm_samples)
+			size_t int_pos = (size_t)ch->pcm_position;
+			if (int_pos >= ch->pcm_samples)
 			{
 				if (ch->loop_count > 0)
 				{
 					ch->loop_count--;
-					ch->pcm_position = 0;
+					ch->pcm_position = 0.0;
+					int_pos = 0;
 				}
 				else
 				{
@@ -367,9 +378,9 @@ void audio_mix(AudioContext* ctx, float* output, size_t frames, int out_channels
 			{
 				int src_c = (c < ch->channels) ? c : 0;
 				output[f * out_channels + c] +=
-					ch->pcm_data[ch->pcm_position * ch->channels + src_c] * ctx->master_volume;
+					ch->pcm_data[int_pos * ch->channels + src_c] * ctx->master_volume;
 			}
-			ch->pcm_position++;
+			ch->pcm_position += rate_ratio;
 		}
 	}
 
