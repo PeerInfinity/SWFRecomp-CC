@@ -30405,6 +30405,27 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	}
 #endif
 
+	// Browser-WASM: route in-sprite gotos to the current sprite, not root.
+	// Mirrors actionPlay/actionStop's post-98b388e46 widening of the
+	// ng_isInsideSprite() route. Without this, sprite_9's script_3
+	// actionGotoFrame(1) (preloader loop's `gotoAndPlay(2)` — the SWF
+	// frame 2 maps to runtime frame 1) falls through to the root-goto
+	// path below which sets is_playing=0, stopping the root timeline
+	// and freezing Pong's preloader after `_root.play()` had just
+	// kicked it off. exec_sprite_frame in graphics_stubs.c populates
+	// g_current_sprite_obj so ng_isInsideSprite() / ng_gotoFrameCurrentSprite
+	// work the same way they do under OFFSCREEN_RENDER.
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	{
+		extern int g_settarget_none;
+		if (g_settarget_none) return;
+		if (ng_isInsideSprite()) {
+			ng_gotoFrameCurrentSprite(frame);
+			return;
+		}
+	}
+#endif
+
 	extern size_t current_frame;
 	extern size_t next_frame;
 	extern int manual_next_frame;
@@ -63801,6 +63822,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					pushUndefined(app_context);
 					return;
 				}
+				// Non-root receiver: play the receiver's DisplayObject
+				// directly. Falling through to actionPlay would route to
+				// the currently-executing sprite (via the post-98b388e46
+				// ng_isInsideSprite() branch) instead of the actual
+				// receiver — `mc.play()` and `_parent.play()` from
+				// inside a sprite would both target the wrong clip.
+				if (mc != NULL && mc->display_obj != NULL) {
+					((DisplayObject*)mc->display_obj)->sprite_is_playing = 1;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
 			}
 #endif
 			actionPlay(app_context);
@@ -63841,6 +63874,22 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				extern int is_playing;
 				if (mc == &root_movieclip) {
 					is_playing = 0;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				// Non-root receiver: stop the receiver's DisplayObject
+				// directly. See play-arm comment above — falling through
+				// to actionStop would route to the currently-executing
+				// sprite, not the receiver. Pong's preloader sprite_9
+				// calls `_parent.stop()` (intended to stop the 1-frame
+				// container sprite_10); without this, actionStop's
+				// ng_isInsideSprite() arm stops sprite_9 itself,
+				// freezing the preloader on frame 1 forever and
+				// preventing the bytesLoaded == bytesTotal check that
+				// would call `_root.play()`.
+				if (mc != NULL && mc->display_obj != NULL) {
+					((DisplayObject*)mc->display_obj)->sprite_is_playing = 0;
 					if (args != NULL) FREE(args);
 					pushUndefined(app_context);
 					return;
