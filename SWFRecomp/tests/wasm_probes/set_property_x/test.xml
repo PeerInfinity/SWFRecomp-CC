@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <!--
+    A3 set_property_x — verifies aaaf111b4's actionSetProperty as_set_flags
+    un-gate.
+
+    One named sprite `mover` (red 40x40) starts at center (160,120). DoAction
+    runs SetProperty("/mover", _x, 100). The leading slash is required to
+    route the lookup through resolveSlashPathToMC — bare "mover" tries the
+    relative-name walker against child_mc_cache, which doesn't get populated
+    for a sprite until its first ShowFrame after PlaceObject2 (the DoAction
+    that immediately follows the placement runs first).
+
+    Post-fix: SetProperty resolves "/mover" to the placed sprite and runs the
+    case-0 (_x) branch, which now does `mc->x = num_value; mc->as_set_flags
+    |= 1` unconditionally. The compose-time apply_as_transform path picks up
+    the new x and renders the red square at x=100.
+
+    Pre-fix: as_set_flags stayed 0 (the |= was gated on build mode), so
+    apply_as_transform skipped at compose time and the square stayed at its
+    timeline center (x=160).
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="220" green="40" blue="40"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="2" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="2" name="mover">
+        <transform><Transform transX="3200" transY="2400"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="/mover"/>
+              <StackFloat value="0.0"/>
+              <StackInteger value="100"/>
+            </items>
+          </PushData>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>
