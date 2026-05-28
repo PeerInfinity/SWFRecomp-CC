@@ -487,15 +487,36 @@ void tagMain(SWFAppContext* app_context)
 				prev_keys_initialized = 1;
 			}
 			int ctrl_held = (app_context->keys.down[17] != 0);
+			extern int  dispatch_button_key_actions(SWFAppContext*, int code);
 			for (int code = 0; code < 256; code++) {
 				u8 cur = app_context->keys.down[code];
 				u8 prev = prev_keys_down[code];
-				if (cur && !prev) {
+				// Edge latch from DOM callbacks lets us catch keys that were
+				// pressed and released inside one 60Hz tick (e.g. Playwright's
+				// keyboard.press) — the snapshot alone would miss them.
+				u8 edge = app_context->keys.edge_down[code];
+				app_context->keys.edge_down[code] = 0;
+				if ((cur && !prev) || edge) {
 					app_context->keys.last_key_down = code;
 					app_context->keys.last_key_ascii = (code >= 32 && code <= 126) ? code : 0;
+					// onClipEvent(keyDown) dispatch. Matches swf_core.c
+					// EV_KEY_DOWN line ~616. Without it, sprites with
+					// PlaceObject2 onClipEvent(keyDown) handlers never fire
+					// under browser-WASM.
+					dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_DOWN);
 					actionDispatchKeyDownToFocused(app_context, code);
 					actionDispatchKeyDown(app_context);
-					actionDispatchKeyPressToFocused(app_context, code);
+					// SWF5-era on(keyPress "X") button conditions. Walks the
+					// display list, fires the first visible button whose
+					// keyPress condition matches `code`. Snake (SWF5) steers
+					// the snake via this path — without it the snake walks
+					// straight into the wall. swf_core.c calls this from
+					// EV_KEY_DOWN (line ~672/682); browser-WASM was missing it.
+					// First button to handle stops propagation; only then do
+					// we fall back to the focused-MC simulated press (Enter/Space).
+					int key_press_handled = dispatch_button_key_actions(app_context, code);
+					if (!key_press_handled)
+						actionDispatchKeyPressToFocused(app_context, code);
 					if (code == 9) { // Tab
 						int shift_held = (app_context->keys.down[16] != 0);
 						actionAdvanceTabFocus(app_context, shift_held);
@@ -518,11 +539,17 @@ void tagMain(SWFAppContext* app_context)
 							case 39: actionTextControlMoveRight(app_context); break; // Right arrow
 						}
 					}
-				} else if (!cur && prev) {
-					app_context->keys.last_key_down = code;
-					app_context->keys.last_key_ascii = (code >= 32 && code <= 126) ? code : 0;
-					actionDispatchKeyUpToFocused(app_context, code);
-					actionDispatchKeyUp(app_context);
+				} else {
+					u8 edge_up = app_context->keys.edge_up[code];
+					app_context->keys.edge_up[code] = 0;
+					if ((!cur && prev) || edge_up) {
+						app_context->keys.last_key_down = code;
+						app_context->keys.last_key_ascii = (code >= 32 && code <= 126) ? code : 0;
+						// onClipEvent(keyUp) dispatch — symmetric to KEY_DOWN above.
+						dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_UP);
+						actionDispatchKeyUpToFocused(app_context, code);
+						actionDispatchKeyUp(app_context);
+					}
 				}
 				prev_keys_down[code] = cur;
 			}

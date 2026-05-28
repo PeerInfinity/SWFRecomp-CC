@@ -509,6 +509,9 @@ static EM_BOOL on_key_down(int type, const EmscriptenKeyboardEvent* evt, void* u
 		int code = evt->keyCode;
 		if (code >= 0 && code < 256) {
 			g_mouse_app_context->keys.down[code] = 1;
+			// Latch a press-edge so swf.c can dispatch keyPress / keyDown
+			// even if a paired keyup arrives in the same 60Hz tick.
+			g_mouse_app_context->keys.edge_down[code] = 1;
 		}
 		g_mouse_app_context->keys.last_key_down = code;
 		g_mouse_app_context->keys.last_key_ascii = evt->which;
@@ -523,6 +526,7 @@ static EM_BOOL on_key_up(int type, const EmscriptenKeyboardEvent* evt, void* ud)
 		int code = evt->keyCode;
 		if (code >= 0 && code < 256) {
 			g_mouse_app_context->keys.down[code] = 0;
+			g_mouse_app_context->keys.edge_up[code] = 1;
 		}
 	}
 	return EM_TRUE;

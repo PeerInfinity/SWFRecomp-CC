@@ -207,6 +207,13 @@ typedef struct DisplayObject
 typedef struct KeyState {
 	uint8_t down[256];     // 1 if key currently held (indexed by ASCII/keyCode)
 	uint8_t toggled[256];  // toggle state for lock keys (CapsLock=20, NumLock=144, ScrollLock=145)
+	// Edge latches set from DOM event callbacks (render_webgpu.c on_key_down /
+	// on_key_up). swf.c's per-tick transition loop also fires on these so a
+	// keydown+keyup pair that collapses inside a single 60Hz tick still
+	// dispatches keyPress / KeyDown handlers (otherwise fast Playwright/JS
+	// keys are silently lost). Cleared by swf.c after firing.
+	uint8_t edge_down[256];
+	uint8_t edge_up[256];
 	int last_key_down;     // keyCode of most recently pressed key (-1 if none)
 	int last_key_ascii;    // ASCII value of last key press (for Key.getAscii())
 } KeyState;
