@@ -156,6 +156,7 @@ docs/examples/local_batch/
 docs2/examples/local_batch/
 docs2/examples/glaiel/
 docs2/examples/flasharchive/
+docs2/examples/wasm_probes/
 docs/local_catalog.json
 docs2/local_catalog.json
 docs2/glaiel_catalog.json

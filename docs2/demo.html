@@ -474,7 +474,8 @@
         const isGraphics = testId.startsWith('graphics/')
             || testId.startsWith('local_batch/')
             || testId.startsWith('glaiel/')
-            || testId.startsWith('flasharchive/');
+            || testId.startsWith('flasharchive/')
+            || testId.startsWith('wasm_probes/');
         const baseName = testId.includes('/') ? testId.split('/').pop() : testId;
         const testDir = 'examples/' + testId + '/';
 
