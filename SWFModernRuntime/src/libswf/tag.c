@@ -6987,6 +6987,13 @@ void run_pending_finalize(SWFAppContext* app_context) { (void)app_context; }
 int ng_depth_has_pending_finalize(size_t depth) { (void)depth; return 0; }
 #endif
 
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+// Forward decls — defined later (~line 7074). Needed in clear_display_entry's
+// freed-DL invalidation walk below.
+static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* parent);
+extern void actionInvalidateCachedMovieClipDirect(SWFAppContext* app_context, MovieClip* mc);
+#endif
+
 static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 {
 	if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
@@ -6995,6 +7002,37 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	}
 	if (display_list[depth].sprite_display_list != NULL)
 	{
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser-WASM: before freeing the persistent sprite_display_list,
+		// invalidate any cached MovieClips whose display_obj points into it.
+		// Button state-change handlers (line ~2275) write state-func placements
+		// into this DL; sprite children placed there (e.g. SLUG button's
+		// down-state → sprite_11) get MCs registered in child_mc_cache via
+		// process_sprite_needs_init's actionFindOrCreateMovieClip. The MC's
+		// `display_obj` is &sprite_display_list[child_depth]. When the button
+		// is removed (tagRemoveObject2 → pending_remove → finalize walk →
+		// clear_display_entry), this FREE invalidates that pointer — but the
+		// MC is still in child_mc_cache and would still be rendered by the
+		// root-attached-MC render pass in tagShowFrame (which reads
+		// d->sprite_display_list and walks the freed memory). Surfaces as
+		// Snake's 9x9 black square at world (0,0) after clicking the SLUG
+		// button (sprite_11_frame_0 places shape 6 at transform 85 = identity).
+		DisplayObject* freed_dl = display_list[depth].sprite_display_list;
+		size_t freed_cap = display_list[depth].sprite_dl_capacity;
+		uintptr_t freed_lo = (uintptr_t)freed_dl;
+		uintptr_t freed_hi = freed_lo + freed_cap * sizeof(DisplayObject);
+		extern MovieClip* child_mc_cache[];
+		extern int child_mc_count;
+		for (int ci = 0; ci < child_mc_count; ci++) {
+			MovieClip* leaked = child_mc_cache[ci];
+			if (leaked == NULL || leaked->depth == INT_MIN) continue;
+			uintptr_t dobj_p = (uintptr_t)leaked->display_obj;
+			if (dobj_p >= freed_lo && dobj_p < freed_hi) {
+				invalidate_descendants_of_mc(app_context, leaked);
+				actionInvalidateCachedMovieClipDirect(app_context, leaked);
+			}
+		}
+#endif
 		FREE(display_list[depth].sprite_display_list);  // heap free: HCALLOC'd buffer
 		display_list[depth].sprite_display_list = NULL;
 	}
