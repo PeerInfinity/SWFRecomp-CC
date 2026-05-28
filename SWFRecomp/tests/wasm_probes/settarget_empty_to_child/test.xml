@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <!--
+    A4 settarget_empty_to_child — verifies aaaf111b4's
+    getMovieClipByTarget("") un-gate in graphics-native and browser-WASM.
+
+    Two named sprites: `child` (red 40x40) at center (160,120) and `ref`
+    (blue 40x40) at top-left (40,40). DoAction does:
+
+        SetTarget "child"
+        PushString ""    ; current target
+        PushFloat 0.0    ; _x
+        PushInteger 50   ; value
+        SetProperty
+        SetTarget ""
+
+    Post-fix: SetProperty hits the child (because getMovieClipByTarget("")
+    returns g_current_context = child). Red square moves to x=50; blue
+    square stays at x=40.
+
+    Pre-fix: getMovieClipByTarget("") returned root, so the SetProperty
+    hit the root, shifting the whole stage left by 50 px. The blue
+    reference square would slide off the canvas's left edge — visible
+    regression.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <!-- Shape 1: red 40x40 square centered on local origin -->
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="220" green="40" blue="40"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <!-- Shape 2: blue 40x40 square centered on local origin -->
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="-400" right="400" top="-400" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="-400" y="-400" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <!-- Sprite wrapping the red shape (becomes MovieClip "child") -->
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <!-- Sprite wrapping the blue shape (becomes MovieClip "ref") -->
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="child">
+        <transform><Transform transX="3200" transY="2400"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="ref">
+        <transform><Transform transX="800" transY="800"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <SetTarget label="child"/>
+          <PushData>
+            <items>
+              <StackString value=""/>
+              <StackFloat value="0.0"/>
+              <StackInteger value="50"/>
+            </items>
+          </PushData>
+          <SetProperty/>
+          <SetTarget label=""/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>
