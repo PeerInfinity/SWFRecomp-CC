@@ -1615,6 +1615,29 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			local_xform = attached_xform;
 		} else {
 			local_xform = &transforms[obj->transform_id * 16];
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+			// Browser-WASM: a nested timeline child whose clip action mutated
+			// its spatial props (e.g. Doodle Jump blue platform charId 32 "aaa"
+			// doing `this._x += ac` each enterFrame). Overlay the MC's
+			// as_set_flags onto the static placement transform so the per-tick
+			// change renders. Match by display_obj==obj — NOT by name, since
+			// every recycled platform owns a distinct "aaa" instance.
+			if (obj->instance_name != NULL) {
+				extern MovieClip* child_mc_cache[];
+				extern int child_mc_count;
+				for (int _ci = 0; _ci < child_mc_count; _ci++) {
+					MovieClip* _nmc = child_mc_cache[_ci];
+					if (_nmc == NULL || _nmc->depth == INT_MIN) continue;
+					if ((DisplayObject*)_nmc->display_obj != obj) continue;
+					if (_nmc->as_set_flags != 0) {
+						memcpy(attached_xform, local_xform, 16 * sizeof(float));
+						apply_as_transform(attached_xform, _nmc, _nmc->as_set_flags);
+						local_xform = attached_xform;
+					}
+					break;
+				}
+			}
+#endif
 		}
 		float composed[16];
 		hit_test_mat4_multiply(composed, parent_composed, local_xform);
@@ -2708,6 +2731,45 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	}
 }
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+// Browser-WASM: dispatch CLIP_EVENT_ENTER_FRAME for sprites nested inside
+// attachMovie'd clips. The root walk above (over display_list) cannot reach
+// these: ng_attachMovie copies a parent display-list entry that it never marks
+// sprite_initialized, so gather_clip_ef_entries skips it (< 2) and never
+// recurses into the attached clip's sub-list. Concrete case: Doodle Jump's
+// blue platform is charId 32 instance "aaa" placed inside the attached "cloud"
+// clip; its onEnterFrame clip action (clip_action_8) slides it left-right.
+//
+// Dispatch directly over each attached clip's AUTHORITATIVE standalone
+// sprite_display_list (the one advance_attached_clip_frames rebuilds), not the
+// stale parent copy. No double-fire with the root walk for the reasons above.
+void dispatch_attached_clip_enterframe(SWFAppContext* app_context)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	uintptr_t dl_lo = (uintptr_t)display_list;
+	uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
+	for (int i = 0; i < child_mc_count; i++)
+	{
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN || mc->display_obj == NULL) continue;
+		if (mc->avm1_removed || mc->pending_removal) continue;
+		DisplayObject* d = (DisplayObject*)mc->display_obj;
+		// Only standalone attachMovie'd clips — skip timeline-placed clips
+		// whose display_obj lives in the global display_list array (those are
+		// covered by the root walk).
+		if ((uintptr_t)d >= dl_lo && (uintptr_t)d < dl_hi) continue;
+		if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) continue;
+
+		MovieClip* saved_ctx = g_current_context;
+		actionSetCurrentContext(mc);
+		dispatch_enterframe_clip_actions(app_context, d->sprite_display_list,
+			d->sprite_max_depth, mc);
+		actionSetCurrentContext(saved_ctx);
+	}
+}
+#endif
+
 // Recursively set enterframe_eligible=1 for all display entries with sprite_initialized >= 2.
 // Walks into sprite and button child display lists. This ensures button children get the flag
 // (advance_sprite_frames only iterates root-level sprites, missing button children).
@@ -2753,6 +2815,12 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 		extern MovieClip root_movieclip;
 		dispatch_enterframe_clip_actions(app_context, display_list, max_depth, &root_movieclip);
 	}
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	// Browser-WASM: fire enterFrame for clip actions on sprites nested inside
+	// attachMovie'd clips (e.g. Doodle Jump blue platform charId 32 "aaa"),
+	// which the root walk above structurally can't reach.
+	dispatch_attached_clip_enterframe(app_context);
+#endif
 	// Dispatch AS2 mc.onEnterFrame property handlers
 	actionDispatchEnterFrameHandlers(app_context);
 	actionDispatchRootVarMapEnterFrame(app_context);
