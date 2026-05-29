@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-29 20:41 UTC
+**Date**: 2026-05-29 21:04 UTC
 
-**Git SHA**: `921eeb06c4`
+**Git SHA**: `dfd7d61889`
 
-**Run Duration**: 2m 4s
+**Run Duration**: 2m 10s
 
 **Filtered**: 0 tests ignored out of 9 available
 
@@ -14,18 +14,12 @@
 |--------|-------|
 | Total tests | 9 |
 | Passing | **7** (77.8%) |
-| Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **8** (88.9%) |
-| Failing | 1 |
+| Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **9** (100.0%) |
+| Failing | 0 |
 | Total expected lines | 231 |
-| Matching lines | 209 (90.5%) |
-| Mismatched lines | 22 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Matching lines | 211 (91.3%) |
+| Mismatched lines | 20 |
 
 ## Passing Tests
 
@@ -33,31 +27,30 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 15.7s |  |
-| 2 | `exception` | 35 | 19.2s |  |
-| 3 | `function_test` | 26 | 11.0s |  |
-| 4 | `hello` | 8 | 18.3s |  |
-| 5 | `implementsOpTest` | 28 | 19.4s |  |
-| 6 | `inheritance` | 22 | 19.1s |  |
+| 1 | `enum` | 19 | 18.9s |  |
+| 2 | `exception` | 35 | 20.6s |  |
+| 3 | `function_test` | 26 | 20.3s |  |
+| 4 | `hello` | 8 | 19.1s |  |
+| 5 | `implementsOpTest` | 28 | 12.2s |  |
+| 6 | `inheritance` | 22 | 18.6s |  |
 | 7 | `super_test1` | 17 | 0.3s |  |
 
 ## Ruffle-Matched Tests
 
-**1 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**2 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `TextFieldTest` | 1 | 1 | 20.2s |  |
+| 1 | `TextFieldTest` | 1 | 1 | 19.5s |  |
+| 2 | `levels` | 19 | 21 | 0.3s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**1 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `levels` | 69.1% | 47 | 68 | 21 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -73,8 +66,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `levels` | 69.1% | 47/68 | 68 | 68 |  |
+No output mismatches.
