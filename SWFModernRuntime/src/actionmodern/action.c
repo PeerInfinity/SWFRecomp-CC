@@ -41758,21 +41758,35 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
-			// Dot-path resolution: "o.b" → look up "o", delete "b" from it
-			if (var_name != NULL && var_name_len > 0 && memchr(var_name, '.', var_name_len) != NULL)
+			// Path resolution: "o.b"/"o:b" → look up "o", delete "b" from it.
+			// AVM1 treats '.' and ':' equivalently as member separators; split at
+			// the LAST of either (matches Ruffle action_delete_2's rsplit_once(b":.")).
+			if (var_name != NULL && var_name_len > 0 &&
+			    (memchr(var_name, '.', var_name_len) != NULL || memchr(var_name, ':', var_name_len) != NULL))
 			{
-				// Find the last dot
-				const char* last_dot = var_name;
+				// Find the last '.' or ':'
+				const char* last_sep = NULL;
 				for (u32 dp = 0; dp < var_name_len; dp++) {
-					if (var_name[dp] == '.') last_dot = &var_name[dp];
+					if (var_name[dp] == '.' || var_name[dp] == ':') last_sep = &var_name[dp];
 				}
-				u32 container_len = (u32)(last_dot - var_name);
-				const char* final_prop = last_dot + 1;
-				u32 final_prop_len = var_name_len - container_len - 1;
+				u32 container_len = last_sep ? (u32)(last_sep - var_name) : 0;
+				const char* final_prop = last_sep + 1;
+				u32 final_prop_len = last_sep ? var_name_len - container_len - 1 : 0;
 
-				if (container_len > 0 && final_prop_len > 0) {
-					// Resolve the container via GetVariable (handles nested dots, scope chain, etc.)
-					PUSH_STR(var_name, container_len);
+				if (last_sep != NULL && container_len > 0 && final_prop_len > 0) {
+					// Resolve the container via GetVariable. GetVariable only resolves
+					// ':' within slash-paths, so for a non-slash container normalize
+					// ':' → '.' (equivalent member access) so nested colons resolve.
+					char _d2_cont[512];
+					if (container_len < sizeof(_d2_cont) &&
+					    memchr(var_name, '/', container_len) == NULL) {
+						memcpy(_d2_cont, var_name, container_len);
+						for (u32 ci = 0; ci < container_len; ci++)
+							if (_d2_cont[ci] == ':') _d2_cont[ci] = '.';
+						PUSH_STR(_d2_cont, container_len);
+					} else {
+						PUSH_STR(var_name, container_len);
+					}
 					actionGetVariable(app_context);
 					ActionVar _d2_container;
 					peekVar(app_context, &_d2_container);
@@ -41786,6 +41800,20 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 						MovieClip* _d2_mc = (MovieClip*)_d2_container.data.numeric_value;
 						if (_d2_mc->dynamic_props != NULL) {
 							success = deleteProperty(app_context, (ASObject*)_d2_mc->dynamic_props, final_prop, final_prop_len);
+							// Root MC variables live in BOTH dynamic_props and the global
+							// var_map (SetMember on root writes both); clean var_map too so
+							// e.g. `_root.y` reads undefined after `delete o.t.y` when
+							// o.t === _root. Mirrors the single-name delete path above.
+							extern MovieClip root_movieclip;
+							if (_d2_mc == &root_movieclip && hasVariable(final_prop, final_prop_len)) {
+								ActionVar* _rv = getVariable(final_prop, final_prop_len);
+								if (_rv != NULL && !(_rv->type == ACTION_STACK_VALUE_STRING && _rv->str_size == 0 && _rv->data.string_data.heap_ptr == NULL)) {
+									if (_rv->type == ACTION_STACK_VALUE_STRING && _rv->data.string_data.owns_memory)
+										free(_rv->data.string_data.heap_ptr);
+									memset(_rv, 0, sizeof(ActionVar));
+									success = true;
+								}
+							}
 							PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 							return;
 						}
@@ -41803,6 +41831,17 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 							PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 							return;
 						}
+					} else if (_d2_container.type == ACTION_STACK_VALUE_STRING ||
+					           _d2_container.type == ACTION_STACK_VALUE_F32 ||
+					           _d2_container.type == ACTION_STACK_VALUE_F64 ||
+					           _d2_container.type == ACTION_STACK_VALUE_BOOLEAN) {
+						// Container is a primitive: deletion fails. Flash logs this
+						// diagnostic when coercing a primitive to Object for member
+						// access (NOT for null/undefined). Matches Ruffle's avm_trace
+						// in action_delete_2. Key test: avm1/delete2 ("o.t.y" cases).
+						fputs("Parameters of primitive types are no longer coerced into the required type - Object.\n", stdout);
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+						return;
 					}
 				}
 			}
