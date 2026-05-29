@@ -20064,7 +20064,18 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 			}
 			first_element = 0;
 		} else {
-			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
+			if (strcmp(seg_buf, "_level0") == 0) {
+				// Nested `_level0` (non-first segment) is NOT a MovieClip
+				// property in Flash — only a path-prefix token. So
+				// `this._root._level0.var` resolves to undefined, even though
+				// `_root`/`_parent` (real MC properties) resolve nested.
+				// Matches Flash for gnash getvariable.as:105
+				// ("this._root._level0.variable_in_root"). Must fail here
+				// rather than fall through to the child lookup, since
+				// resolveSlashPathToMC would otherwise treat `_level0` as root.
+				// `_levelN` (N>0) is handled above via _resolved_level.
+				return NULL;
+			} else if (strcmp(seg_buf, "_root") == 0) {
 				mc = &root_movieclip;
 			} else if (strcmp(seg_buf, "_parent") == 0) {
 				if (mc->parent) mc = mc->parent;
@@ -49874,9 +49885,14 @@ void actionGetMember(SWFAppContext* app_context)
 			if (is_negative) level_id = -level_id;
 
 			if (level_id == 0) {
-				extern MovieClip root_movieclip;
-				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
-				return;
+				// `_level0` is NOT a MovieClip member in Flash — it is only a
+				// top-level path token (resolved as a bare variable inside
+				// actionGetVariable, not here). Nested member access such as
+				// `this._root._level0` returns undefined, even though `_root` /
+				// `_parent` (real MC properties) resolve nested. Fall through to
+				// the undefined return below. Matches Flash for gnash
+				// getvariable.as:105 ("this._root._level0.variable_in_root").
+				// `_levelN` (N>0) still resolves to the loaded level.
 			} else if (level_id > 0 && level_id < MAX_LEVELS && g_levels[level_id] != NULL) {
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_levels[level_id]);
 				return;
