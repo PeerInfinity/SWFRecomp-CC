@@ -110,6 +110,72 @@ snapshotted at attach) — stale copies are a recurring hazard.
 
 ---
 
+## 5. Progress log (2026-05-29 session)
+
+### Issue A (blue platform movement) — FIXED, committed `8deefbb5c`
+Two browser-WASM gaps (both in `tag.c`): (1) the per-tick enterFrame walk
+couldn't reach `clip_action_8` on the nested `"aaa"` (charId 32) because
+`gather_clip_ef_entries` gates recursion on `sprite_initialized>=2` and
+`ng_attachMovie`'s copied parent entry is never marked initialized → new
+`dispatch_attached_clip_enterframe()` (called from `tagFlushPendingEnterFrame`
+after the root walk) dispatches over each attached clip's standalone
+`sprite_display_list`. (2) the moved `_x` didn't render because `"aaa"` is a
+nested timeline child (not an attachMovie'd MC), so `compose_children` used the
+static transform → now overlays the nested MC's `as_set_flags` onto the static
+matrix, matched by `display_obj==obj` (NOT by name; every recycled platform owns
+its own `"aaa"`). User-confirmed working; DJ divergence 407=407. The "menu text
+shifted left after game-over" report was a STALE BUILD artifact — gone after the
+clean rebuild, not a separate bug.
+
+### Issue D (restart insta-game-over) — root cause NARROWED, not yet fixed
+Game-logic map (verified from `RecompiledScripts`/`tagMain.c`):
+- Root frames are AS-1-based: **menu=`frame_0`, gameplay=`frame_1`,
+  gameover=`frame_2`**.
+- **Game-over trigger** = hero's onEnterFrame (`clip_action_29`/`script_29`,
+  `this`=hero): `this._y + this._height/2 > 400` → `_root.gameOver=true` +
+  `_root.gotoAndStop(3)`.
+- Hero **LOAD** (`clip_action_28`) resets `vy=0`,`gravity=4`,`maxjump`,... but
+  does **NOT** reset `this._y` — spawn `_y` comes only from the placement
+  transform (frame_1 places hero charId 40 at transform 54).
+- **Restart button** = `clip_action_33`: `gameOver=false` (SetVariable, current
+  scope — NOT `_root`) then **`_root.gotoAndStop(2)`** (→ gameplay frame_1).
+- **Menu button** = `clip_action_31`/`34`: `_root.gameOver=false` (SetMember on
+  _root) + `_root.gotoAndPlay(1)` (→ menu). Menu button WORKS per user.
+
+**Diagnostic findings (temporary logging, see stash below):** on a normal
+play→death cycle the hero spawns FRESH on gameplay entry (`flags=0, y≈179`),
+falls, and at death `y≈438 (>400) flags=3`. **Crucially: clicking the restart
+button produces NO root-frame transition at all — the root stays on frame_2
+(gameover).** So this is NOT the stale-hero-`_y` nor the level-teardown
+hypothesis from §C/D above: the restart's `_root.gotoAndStop(2)` simply isn't
+moving the root timeline (while the menu button's `_root.gotoAndPlay(1)` does).
+
+**Next step (instrumentation already written, currently stashed):** determine
+which of these the restart click hits — added `[DJ-GOTO]` logging at the
+`gotoAndStop`/`gotoAndPlay` handler in `action.c` (~63619) printing
+`method / mc==root / num_args / cur` plus ROOT-branch vs MC-targeted-else-branch
+markers. Hypotheses to distinguish: (a) button handler never fires (gameover-
+screen button hit-detection); (b) `_root` resolves to a non-root MOVIECLIP so it
+falls into the MC-targeted `else` (`action.c` ~63820) which sets sprite-local
+nav and never touches the root timeline — **most likely**; (c) goto runs but
+something snaps the frame back. The browser-WASM root-goto path itself
+(`action.c` ~63742, backward-goto branch) looks correct on read.
+
+Also observed (relevant to §C, stale game-over UI): attached platform clips
+named `block*` in `child_mc_cache` accumulate (`blocks=18/19 live/total` at
+death) and are never cleaned across the gameover transition.
+
+### Temporary diagnostics — STASHED
+`git stash list` → `stash@{0}` "DJ #4 restart insta-game-over diagnostics
+([DJ-RESTART] in tag.c tagShowFrame + [DJ-GOTO] in action.c gotoAndStop/Play
+handler)". Two browser-WASM-gated `printf` blocks: `[DJ-RESTART]` (frame-
+transition-gated hero/container/block-count dump in `tagShowFrame`) and
+`[DJ-GOTO]` (every gotoAndStop/Play call). REMOVE before committing any fix. If
+the stash won't reapply cleanly after intervening commits, just re-add
+equivalent logging at the two sites named above.
+
+---
+
 ## 3. Validation constraints & gotchas (read before iterating)
 
 - **Game-over / restart states are NOT reliably reachable by Playwright.** The
