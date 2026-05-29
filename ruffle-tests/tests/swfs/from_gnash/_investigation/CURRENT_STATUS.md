@@ -1,29 +1,30 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-29 (pending CI — `getvariable-v5/v7/v8` (actionscript.all)
-output_mismatch → PASS (+3 PASSes). Two paired fixes in
-`SWFModernRuntime/src/actionmodern/action.c` so that `_level0` accessed as a
-NESTED path segment / MovieClip member resolves to `undefined` instead of the
-root, matching Flash: (1) `resolveFlashPathToMC`'s non-first-element branch
-now `return NULL` for a `_level0` segment (instead of resolving to
-`&root_movieclip`); (2) `actionGetMember`'s MOVIECLIP `_levelN`/`_flashN`
-branch no longer treats `_level0` (level_id==0) as the root — it falls to the
-undefined return. Both are needed because the GetVariable dotted-path handler
-first tries `resolveFlashPathToMC`, then falls back to a per-segment
-`GetVariable`+`GetMember` walk; either path alone would still resolve the
-insane chain. `_root`/`_parent` (real MC properties) still resolve nested;
-bare/first-element `_level0` and `_levelN` (N>0) are unaffected (handled by
-their own code in `actionGetVariable` / the `_resolved_level` block / the N>0
-GetMember branch). Fixes gnash getvariable.as:105
-(`this._root._level0.variable_in_root` → Flash returns undefined; the .as
-comment notes "this fails in all versions from 5 to 8"). All three were
-`known_failure` with the only ours-vs-Flash diff being this one checkpoint;
-now full PASS. No regressions across a 14-test AVM1 path/level battery
-(string_paths_*, path_string, tell_target, target_path, loadmovienum,
-movieclip_lockroot, function_base_clip, define_local_with_paths) +
-target_clip_swf5/6, removed_target_clip_scope, gnash getvariable-v6, case-v5/6,
-with-v5 (ruffle_matched, unchanged). `geturl_target_normalize` fails on baseline
-too (pre-existing, unrelated).)
+Last updated: 2026-05-29 (pending CI — `getvariable-v5/v6/v7/v8` (actionscript.all)
+output_mismatch/ruffle_matched → PASS (+4, v6 was already RM). The fix makes a
+`_level0` segment resolve to `undefined` ONLY when it appears as an INTERMEDIATE
+segment of a getVariable dotted-path walk (`this._root._level0.variable_in_root`
+→ Flash returns undefined; gnash getvariable.as:105, whose comment notes "this
+fails in all versions from 5 to 8"). Direct/final member access still resolves
+`_level0`/`_level` to root (`_root['_level0']`, `_root._level`; gnash
+MovieClip.as:149/153/600/601, avm1 stage_object_children). Two paired changes in
+`SWFModernRuntime/src/actionmodern/action.c`: (1) `resolveFlashPathToMC`'s
+non-first-element branch `return NULL` for a `_level0` segment (so the
+GetVariable dotted-path handler's primary resolve fails and it falls to the
+per-segment `GetVariable`+`GetMember` walk); (2) that walk sets a new global
+`g_path_walk_level0_undef = 1` around its INTERMEDIATE-segment GetMember calls,
+and `actionGetMember`'s MOVIECLIP `_level0` (level_id==0) branch returns
+undefined when the flag is set, else root as before. The flag is clear for the
+primary/final-prop GetMember and for explicit bytecode GetMember, so direct
+member access is unaffected. `_root`/`_parent` (real MC properties) resolve
+nested; bare/first-element `_level0` and `_levelN` (N>0) unaffected.
+**First attempt (commit 921eeb06c) wrongly made `actionGetMember` return
+undefined for `_level0` unconditionally** — that regressed avm1
+`stage_object_children` (pass→mismatch) and gnash `MovieClip-v5` (RM→mismatch,
+plus line drops in MovieClip-v6/v7, TextField-v6/v7/v8). The flag-scoped
+follow-up restores all of those. No regressions across a 13-test AVM1 path/level
+battery + gnash MovieClip-v5 (RM, restored) and stage_object_children (PASS,
+restored). `geturl_target_normalize` fails on baseline too (pre-existing).)
 
 Last updated: 2026-05-29 (pending CI — `with-v5/v6/v7/v8` (actionscript.all)
 output_mismatch → `ruffle_matched` (+4 effective). Single fix in

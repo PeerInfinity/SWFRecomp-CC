@@ -38240,6 +38240,13 @@ static ASObject* getVersionedArrayProto(SWFAppContext* app_context)
 	return g_array_prototype;
 }
 
+// Set to 1 only while the getVariable dotted-path fallback walks INTERMEDIATE
+// segments via GetMember. Tells actionGetMember's `_level0` (level 0) branch to
+// return undefined instead of root, so `this._root._level0.var` resolves to
+// undefined (Flash; gnash getvariable.as:105) while direct/final member access
+// (`_root['_level0']`, `_root._level`) still resolves to root.
+int g_path_walk_level0_undef = 0;
+
 void actionGetVariable(SWFAppContext* app_context)
 {
 	// Clear callable_this tracking — will be set if value is found on a WITH scope
@@ -38620,6 +38627,15 @@ void actionGetVariable(SWFAppContext* app_context)
 				if (first_sep_t != NULL) {
 					const char* rest = first_sep_t + 1;
 					u32 rest_len = target_len - first_len_t - 1;
+					// While walking INTERMEDIATE path segments via GetMember, a
+					// `_level0` segment must NOT resolve to root — Flash returns
+					// undefined for `this._root._level0.var` (gnash getvariable.as:105).
+					// Direct/final member access (`_root['_level0']`, `_root._level`)
+					// is unaffected: it goes through the primary GetMember above or the
+					// final-prop GetMember below, where this flag is clear.
+					extern int g_path_walk_level0_undef;
+					int _saved_pw_lvl = g_path_walk_level0_undef;
+					g_path_walk_level0_undef = 1;
 					while (rest_len > 0) {
 						const char* next_sep = NULL;
 						for (u32 ri = 0; ri < rest_len; ri++) {
@@ -38633,6 +38649,7 @@ void actionGetVariable(SWFAppContext* app_context)
 						if (next_sep) { rest = next_sep + 1; rest_len -= seg_len + 1; }
 						else { rest_len = 0; }
 					}
+					g_path_walk_level0_undef = _saved_pw_lvl;
 				}
 				if (prop_len > 0) {
 					PUSH_STR(prop_name, prop_len);
@@ -49885,14 +49902,21 @@ void actionGetMember(SWFAppContext* app_context)
 			if (is_negative) level_id = -level_id;
 
 			if (level_id == 0) {
-				// `_level0` is NOT a MovieClip member in Flash — it is only a
-				// top-level path token (resolved as a bare variable inside
-				// actionGetVariable, not here). Nested member access such as
-				// `this._root._level0` returns undefined, even though `_root` /
-				// `_parent` (real MC properties) resolve nested. Fall through to
-				// the undefined return below. Matches Flash for gnash
-				// getvariable.as:105 ("this._root._level0.variable_in_root").
-				// `_levelN` (N>0) still resolves to the loaded level.
+				// `_level0` / `_level` resolve to the root level when accessed as
+				// a direct member (`_root['_level0']`, `_root._level`) — see
+				// gnash MovieClip.as:149/153/600/601. The ONE exception is a
+				// getVariable dotted-path *walk* where `_level0` is an
+				// intermediate segment (`this._root._level0.var`), which Flash
+				// resolves to undefined (gnash getvariable.as:105). That walk
+				// sets g_path_walk_level0_undef so we return undefined here.
+				extern int g_path_walk_level0_undef;
+				if (g_path_walk_level0_undef) {
+					pushUndefined(app_context);
+					return;
+				}
+				extern MovieClip root_movieclip;
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+				return;
 			} else if (level_id > 0 && level_id < MAX_LEVELS && g_levels[level_id] != NULL) {
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_levels[level_id]);
 				return;
