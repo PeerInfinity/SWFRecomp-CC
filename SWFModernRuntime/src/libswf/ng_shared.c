@@ -63,6 +63,20 @@ static size_t ng_morph_end_bounds_count = 0;
 
 void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax)
 {
+	// Idempotent per char_id: a character is defined once per id (last-wins,
+	// matching dictionary[].type). Without this, define tags that re-execute
+	// (e.g. browser-WASM frame_func re-runs, where DefineShape lives in the
+	// re-running root frame functions) append duplicates and overflow the
+	// fixed table, silently dropping later-defined chars — which broke Pong's
+	// ball-vs-paddle hitTest (the ball's collision shape charId 63 fell off
+	// the end, so ng_getCharBounds returned 0 and the AABB was empty).
+	for (size_t i = 0; i < ng_char_bounds_count; i++) {
+		if (ng_char_bounds[i].char_id == char_id) {
+			ng_char_bounds[i].xmin = xmin; ng_char_bounds[i].xmax = xmax;
+			ng_char_bounds[i].ymin = ymin; ng_char_bounds[i].ymax = ymax;
+			return;
+		}
+	}
 	if (ng_char_bounds_count >= MAX_CHAR_BOUNDS_NG) return;
 	ng_char_bounds[ng_char_bounds_count].char_id = char_id;
 	ng_char_bounds[ng_char_bounds_count].xmin = xmin;
@@ -74,6 +88,14 @@ void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 yma
 
 void ng_record_morph_end_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax)
 {
+	// Idempotent per char_id (see ng_record_char_bounds).
+	for (size_t i = 0; i < ng_morph_end_bounds_count; i++) {
+		if (ng_morph_end_bounds[i].char_id == char_id) {
+			ng_morph_end_bounds[i].xmin = xmin; ng_morph_end_bounds[i].xmax = xmax;
+			ng_morph_end_bounds[i].ymin = ymin; ng_morph_end_bounds[i].ymax = ymax;
+			return;
+		}
+	}
 	if (ng_morph_end_bounds_count >= MAX_MORPH_END_BOUNDS_NG) return;
 	ng_morph_end_bounds[ng_morph_end_bounds_count].char_id = char_id;
 	ng_morph_end_bounds[ng_morph_end_bounds_count].xmin = xmin;
@@ -152,6 +174,15 @@ static size_t ng_winding_count = 0;
 
 void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size)
 {
+	// Idempotent per char_id (see ng_record_char_bounds): prevents re-running
+	// define tags from overflowing the table and dropping later chars' paths.
+	for (size_t i = 0; i < ng_char_paths_count; i++) {
+		if (ng_char_paths[i].char_id == char_id) {
+			ng_char_paths[i].path_offset = path_offset;
+			ng_char_paths[i].path_size = path_size;
+			return;
+		}
+	}
 	if (ng_char_paths_count >= MAX_CHAR_PATHS_NG) return;
 	ng_char_paths[ng_char_paths_count].char_id = char_id;
 	ng_char_paths[ng_char_paths_count].path_offset = path_offset;
@@ -161,6 +192,14 @@ void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size)
 
 void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size)
 {
+	// Idempotent per char_id (see ng_record_char_bounds).
+	for (size_t i = 0; i < ng_morph_paths_count; i++) {
+		if (ng_morph_paths[i].char_id == char_id) {
+			ng_morph_paths[i].path_offset = path_offset;
+			ng_morph_paths[i].path_size = path_size;
+			return;
+		}
+	}
 	if (ng_morph_paths_count >= MAX_MORPH_PATHS_NG) return;
 	ng_morph_paths[ng_morph_paths_count].char_id = char_id;
 	ng_morph_paths[ng_morph_paths_count].path_offset = path_offset;
@@ -170,6 +209,9 @@ void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size)
 
 void ng_record_char_winding(size_t char_id)
 {
+	// Idempotent per char_id (see ng_record_char_bounds).
+	for (size_t i = 0; i < ng_winding_count; i++)
+		if (ng_winding_ids[i] == char_id) return;
 	if (ng_winding_count < MAX_WINDING_NG)
 		ng_winding_ids[ng_winding_count++] = char_id;
 }
@@ -246,6 +288,14 @@ int ng_find_video(size_t char_id)
 void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
 {
 	(void)app_context;
+	// Idempotent per char_id (see ng_record_char_bounds).
+	for (size_t i = 0; i < ng_video_count; i++) {
+		if (ng_video_ids[i] == (size_t)char_id) {
+			ng_video_widths[i] = width; ng_video_heights[i] = height;
+			ng_video_codecs[i] = codec_id;
+			return;
+		}
+	}
 	if (ng_video_count < MAX_VIDEOS_NG) {
 		ng_video_ids[ng_video_count] = (size_t)char_id;
 		ng_video_widths[ng_video_count] = width;
@@ -446,13 +496,23 @@ s16 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx)
 void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
 {
 	(void)app_context;
-	if (ng_font_count >= MAX_FONTS_NG) return;
-	ng_fonts[ng_font_count].font_id = font_id;
-	strncpy(ng_fonts[ng_font_count].name, name ? name : "", sizeof(ng_fonts[ng_font_count].name) - 1);
-	ng_fonts[ng_font_count].name[sizeof(ng_fonts[ng_font_count].name) - 1] = '\0';
-	ng_fonts[ng_font_count].bold = bold;
-	ng_fonts[ng_font_count].italic = italic;
-	ng_font_count++;
+	// Idempotent per font_id (see ng_record_char_bounds): update in place if
+	// already registered, so re-running DefineFont tags don't append duplicate
+	// slots and overflow the table (which would drop later fonts; the metrics/
+	// glyph-base setters resolve the first matching font_id anyway).
+	size_t slot = ng_font_count;
+	for (size_t i = 0; i < ng_font_count; i++) {
+		if (ng_fonts[i].font_id == font_id) { slot = i; break; }
+	}
+	if (slot == ng_font_count) {
+		if (ng_font_count >= MAX_FONTS_NG) return;
+		ng_font_count++;
+	}
+	ng_fonts[slot].font_id = font_id;
+	strncpy(ng_fonts[slot].name, name ? name : "", sizeof(ng_fonts[slot].name) - 1);
+	ng_fonts[slot].name[sizeof(ng_fonts[slot].name) - 1] = '\0';
+	ng_fonts[slot].bold = bold;
+	ng_fonts[slot].italic = italic;
 }
 
 void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
@@ -565,8 +625,17 @@ void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
 	(void)app_context;
-	if (ng_textfield_count >= MAX_TEXTFIELDS_NG) return;
-	size_t i = ng_textfield_count;
+	// Idempotent per char_id (see ng_record_char_bounds): reuse the existing
+	// slot if this textfield was already recorded, so re-running define tags
+	// don't overflow the table and drop later textfields' bounds.
+	int _existing = ng_find_textfield(char_id);
+	size_t i;
+	if (_existing >= 0) {
+		i = (size_t)_existing;
+	} else {
+		if (ng_textfield_count >= MAX_TEXTFIELDS_NG) return;
+		i = ng_textfield_count++;
+	}
 	ng_textfields[i].char_id = char_id;
 	strncpy(ng_textfields[i].plain_text, plain_text ? plain_text : "", sizeof(ng_textfields[i].plain_text) - 1);
 	ng_textfields[i].plain_text[sizeof(ng_textfields[i].plain_text) - 1] = '\0';
@@ -589,7 +658,6 @@ void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
 	ng_textfields[i].bounds_ymin = bounds_ymin;
 	ng_textfields[i].bounds_ymax = bounds_ymax;
 	ng_textfields[i].csm_applied = 0;
-	ng_textfield_count++;
 }
 
 void ng_record_csm(size_t text_id, const char* anti_alias_type, const char* grid_fit_type,
