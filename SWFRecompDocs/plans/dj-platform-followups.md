@@ -127,7 +127,37 @@ its own `"aaa"`). User-confirmed working; DJ divergence 407=407. The "menu text
 shifted left after game-over" report was a STALE BUILD artifact — gone after the
 clean rebuild, not a separate bug.
 
-### Issue D (restart insta-game-over) — root cause NARROWED, not yet fixed
+### Issue D (restart insta-game-over) — FIXED, committed `fffdb5194` (2026-05-29)
+Two independent bugs in shared graphics code (`tag.c`, compiled in browser-WASM
+AND OFFSCREEN_RENDER), found via the browser `[DJ-*]` diagnostics:
+1. **`tagShowFrame` corrupted the hero's placement transform.** Its per-tick
+   runtime-transform loop applied AS-set `_x/_y` by mutating
+   `transform_data[transform_id]` IN PLACE for ALL entries including
+   SPRITE/BUTTON. The hero is a sprite (charId 40, transform 54); its static
+   placement slot got overwritten with its runtime `_y` every tick. On restart
+   the freshly re-placed hero synced `_y` from the corrupted slot → spawned at
+   the death position (~419) not the spawn (179). Fix: skip SPRITE/BUTTON in the
+   in-place loop + build their matrix on a LOCAL buffer in the compose loop,
+   mirroring `tagRerenderFrame` (which already did exactly this; its "in-place
+   mutation hazard" comment documents the fix). Also needed `extern
+   actionFindMovieClipByName` in the compose-loop scope for the native build.
+2. **`clear_display_entry` didn't reset `sprite_initialized`/`enterframe_eligible`.**
+   A removed depth kept stale `sprite_initialized>=2`, so the fresh re-placed
+   hero was immediately enterFrame-eligible and fired `clip_action_29` on its
+   placement tick — before frame_1's `script_27` reset `_root.gameOver=false` —
+   hitting `if (_root.gameOver) gotoAndStop(3)` (script_29 lines 738-796) and
+   snapping back to game-over. Fix: reset both flags to 0 on clear so a fresh
+   placement re-runs the 0→1→2 init cycle (Flash fires enterFrame only from the
+   frame AFTER instantiation).
+Both needed together. DJ divergence 407=407; user-confirmed restart now starts a
+fresh game. **Still open:** attached platform clips (`block*`) accumulate in
+`child_mc_cache` unboundedly (`blocks=N/36+` and growing across games) and are
+never cleaned — relevant to §C (stale game-over UI / memory growth). Also the
+user reported a breakable platform replaying its break animation then
+**reappearing** (a recent regression) — investigate next; may share the
+backward-goto/recycle or transform area.
+
+### (historical) Issue D investigation notes — root cause NARROWED
 Game-logic map (verified from `RecompiledScripts`/`tagMain.c`):
 - Root frames are AS-1-based: **menu=`frame_0`, gameplay=`frame_1`,
   gameover=`frame_2`**.
