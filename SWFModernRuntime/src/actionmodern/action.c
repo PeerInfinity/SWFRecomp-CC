@@ -54086,7 +54086,9 @@ int actionWithStart(SWFAppContext* app_context)
 		scope_is_with[scope_depth] = 1;
 		scope_mc[scope_depth] = NULL;
 		scope_chain[scope_depth++] = NULL;
-		actionTrace_str(app_context, "Error: A 'with' action failed because the specified object did not exist.\n\n");
+		// Flash's standalone player does not trace any error for with(invalid);
+		// the body is simply skipped (return 0). Ruffle emits an error here, but
+		// Flash's output.txt for every with/case test omits it — so we don't trace.
 		return 0;
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
@@ -54108,7 +54110,9 @@ int actionWithStart(SWFAppContext* app_context)
 		scope_is_with[scope_depth] = 1;
 		scope_mc[scope_depth] = NULL;
 		scope_chain[scope_depth++] = NULL;
-		actionTrace_str(app_context, "Error: A 'with' action failed because the specified object did not exist.\n\n");
+		// Flash's standalone player does not trace any error for with(invalid);
+		// the body is simply skipped (return 0). Ruffle emits an error here, but
+		// Flash's output.txt for every with/case test omits it — so we don't trace.
 		return 0;
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
@@ -54133,7 +54137,9 @@ int actionWithStart(SWFAppContext* app_context)
 		scope_is_with[scope_depth] = 1;
 		scope_mc[scope_depth] = NULL;
 		scope_chain[scope_depth++] = NULL;
-		actionTrace_str(app_context, "Error: A 'with' action failed because the specified object did not exist.\n\n");
+		// Flash's standalone player does not trace any error for with(invalid);
+		// the body is simply skipped (return 0). Ruffle emits an error here, but
+		// Flash's output.txt for every with/case test omits it — so we don't trace.
 		return 0;
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_STRING)

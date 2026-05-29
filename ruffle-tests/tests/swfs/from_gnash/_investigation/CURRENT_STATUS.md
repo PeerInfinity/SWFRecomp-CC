@@ -1,5 +1,21 @@
 # Gnash Test Suite Status
 
+Last updated: 2026-05-29 (pending CI — `with-v5/v6/v7/v8` (actionscript.all)
+output_mismatch → `ruffle_matched` (+4 effective). Single fix in
+`SWFModernRuntime/src/actionmodern/action.c::actionWithStart`: removed the
+three `actionTrace_str("Error: A 'with' action failed because the specified
+object did not exist.")` emissions (OBJECT-null, MOVIECLIP-null, UNDEFINED/NULL
+branches). Flash's standalone player does NOT trace this error for
+`with(invalid)` — no Flash `output.txt` in any suite contains the string; only
+Ruffle emits it (case-v6/7/8 `output.ruffle.txt`). The body is still skipped
+(return 0 unchanged), so `with(undefined){checkpoint=2}` followed by
+`check(checkpoint==1)` still passes. The spurious 2-line error+blank was
+shifting every downstream assertion line, collapsing with-v6/7/8 to 21%
+line-match. Also flips AVM1 `with` output_mismatch → PASS. No regressions:
+case-v5/6/7/8 still PASS (they resolve a valid `with` target, never hit the
+error path); closure_scope/set_variable_scope/function_base_clip/tell_target
+all PASS.)
+
 Last updated: 2026-05-23 (pending CI — `loop/loop_test2` and `loop/loop_test3`
 (misc-ming.all) output_mismatch → PASS (+2 PASSes). Single fix in
 `SWFModernRuntime/src/libswf/tag.c::tagPlaceObject2`: added
