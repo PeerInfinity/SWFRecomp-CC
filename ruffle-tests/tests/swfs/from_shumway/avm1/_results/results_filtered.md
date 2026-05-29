@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-29 19:16 UTC
+**Date**: 2026-05-29 20:06 UTC
 
-**Git SHA**: `b53e09d3d7`
+**Git SHA**: `15eef2ba90`
 
-**Run Duration**: 1m 33s
+**Run Duration**: 1m 32s
 
 **Filtered**: 3 tests ignored out of 47 available
 
@@ -41,7 +41,7 @@
 | 14 | `haxe/flocons1` | 2 | 0.3s |  |
 | 15 | `haxe/flocons2` | 3 | 0.3s |  |
 | 16 | `label` | 4 | 19.4s |  |
-| 17 | `levels` | 9 | 0.3s |  |
+| 17 | `levels` | 9 | 0.4s |  |
 | 18 | `loadevent` | 9 | 0.3s |  |
 | 19 | `loadvariables/loadvariables` | 7 | 0.3s |  |
 | 20 | `loadvariables/loadvars` | 2 | 0.3s |  |
@@ -58,13 +58,13 @@
 | 31 | `rollover` | 4 | 0.3s |  |
 | 32 | `scope` | 14 | 0.3s |  |
 | 33 | `setinterval` | 20 | 0.3s |  |
-| 34 | `settimeout` | 17 | 0.3s |  |
+| 34 | `settimeout` | 17 | 0.2s |  |
 | 35 | `super` | 11 | 0.3s |  |
 | 36 | `target` | 18 | 0.3s |  |
-| 37 | `textfield/textfield-html` | 4 | 0.2s |  |
+| 37 | `textfield/textfield-html` | 4 | 0.3s |  |
 | 38 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
 | 39 | `undefined/undefined-swf6` | 39 | 0.3s |  |
-| 40 | `undefined/undefined-swf7` | 39 | 0.3s |  |
+| 40 | `undefined/undefined-swf7` | 39 | 0.2s |  |
 | 41 | `watch` | 2 | 0.3s |  |
 | 42 | `xml/xmlbuild` | 1 | 0.3s |  |
 | 43 | `xml/xmlload` | 4 | 0.3s |  |
