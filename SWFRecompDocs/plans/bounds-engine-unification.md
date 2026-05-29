@@ -1,6 +1,6 @@
 # Bounds engine unification — Flash-accurate `_width`/`_height`/getBounds/hitTest
 
-Status: **DONE pending final CI** (P1–P3 implemented; bounds phase already CI-green both modes; P2d/e/f + P3 in final CI). Created 2026-05-28.
+Status: **DONE** (P1–P3 landed & CI-green in both modes; legacy engine + entry_idx encoding deleted). Created 2026-05-28.
 
 ## Progress log
 
@@ -26,7 +26,10 @@ Status: **DONE pending final CI** (P1–P3 implemented; bounds phase already CI-
   decls + dead externs. The `entry_idx` encoding is gone. Surviving engine: the single
   double-precision `ng_computeBoundsFromDL_matrix` (+ `ng_localBoundsOfDL`/`ng_computeBoundsFromDL`).
   Local-pass NO_GRAPHICS: movieclip_getbounds, issue_2084, transform, color_transform, bitmap_filters.
-- **Final CI** (P2d/e/f + P3) pending — pure-deletion P3 is behavior-neutral over P2d/e/f.
+- **Final CI** (P2d/e/f + P3, no-graphics run 26610397596, graphics run 26610398457) —
+  **green both modes, every suite delta 0, zero newly-failing.** Bounds-engine
+  unification complete. Out-of-scope `delete-v5..v8`/`delete2` red remains (separate
+  delete-opcode fix, see baseline note above).
 
 ## Motivation
 
