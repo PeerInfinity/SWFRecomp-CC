@@ -26942,10 +26942,30 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 			mcGetEffectiveSize(child, &cw, &ch);
 			double cx = (double)child->x;
 			double cy = (double)child->y;
-			if (cx < cxmin) cxmin = cx;
-			if (cx + cw > cxmax) cxmax = cx + cw;
-			if (cy < cymin) cymin = cy;
-			if (cy + ch > cymax) cymax = cy + ch;
+			// Default extent assumes the child's content origin coincides with the
+			// child's registration point (left/top = child->x/y). For a child that
+			// drew via the Drawing API at a non-zero offset (e.g. moveTo(60,20)),
+			// the content's left/top is shifted by the (scaled) draw_xmin/draw_ymin,
+			// so the registration-point assumption underestimates the parent's
+			// bounds. Use the child's actual scaled drawing AABB in that case.
+			double left = cx, right = cx + cw, top = cy, bot = cy + ch;
+			if (child->draw_has_bounds && !MC_IS_TEXTFIELD(child)
+			    && child->rotation == 0.0f && child->skew == 0.0f) {
+				double sx = (double)child->xscale / 100.0;
+				double sy = (double)child->yscale / 100.0;
+				double lx0 = (double)child->draw_xmin * sx;
+				double lx1 = (double)child->draw_xmax * sx;
+				double ly0 = (double)child->draw_ymin * sy;
+				double ly1 = (double)child->draw_ymax * sy;
+				left = cx + (lx0 < lx1 ? lx0 : lx1);
+				right = cx + (lx0 > lx1 ? lx0 : lx1);
+				top = cy + (ly0 < ly1 ? ly0 : ly1);
+				bot = cy + (ly0 > ly1 ? ly0 : ly1);
+			}
+			if (left < cxmin) cxmin = left;
+			if (right > cxmax) cxmax = right;
+			if (top < cymin) cymin = top;
+			if (bot > cymax) cymax = bot;
 			found_child = 1;
 		}
 		if (found_child) {
@@ -66128,6 +66148,60 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 
+				// Include drawing bounds of AS-created child MovieClips
+				// (createEmptyMovieClip children that drew via the Drawing API).
+				// These live only in child_mc_cache (not in mc's
+				// sprite_display_list), so ng_computeBoundsFromDL_matrix above
+				// never sees them. Transform each child's local draw AABB by the
+				// child's local matrix (scale/rotation/skew + _x/_y translation)
+				// into mc's own coordinate space and union it in. Only dynamic
+				// children (display_obj == NULL) are considered, so timeline
+				// children already counted via the display-list walk aren't
+				// double-counted.
+				if (mc != NULL) {
+					extern MovieClip* child_mc_cache[];
+					extern int child_mc_count;
+					for (int ci = 0; ci < child_mc_count; ci++) {
+						MovieClip* child = child_mc_cache[ci];
+						if (child == NULL || child->parent != mc) continue;
+						if (child->display_obj != NULL) continue;       // timeline child, already counted
+						if (MC_IS_TEXTFIELD(child)) continue;           // handled separately below
+						if (!child->draw_has_bounds) continue;
+						if (child->avm1_removed || child->pending_removal) continue;
+						// Child-local draw AABB in twips
+						double cpx[2] = { child->draw_xmin * 20.0, child->draw_xmax * 20.0 };
+						double cpy[2] = { child->draw_ymin * 20.0, child->draw_ymax * 20.0 };
+						// Child local matrix from struct fields
+						double cxs = (double)child->xscale / 100.0;
+						double cys = (double)child->yscale / 100.0;
+						double crot = (double)child->rotation * 3.14159265358979323846 / 180.0;
+						double cskew = (double)child->skew;
+						double ccr = cos(crot), csr = sin(crot);
+						double ccs = cos(crot + cskew), css = sin(crot + cskew);
+						if (fabs(ccr) < 1e-12) ccr = 0.0;
+						if (fabs(csr) < 1e-12) csr = 0.0;
+						if (fabs(ccs) < 1e-12) ccs = 0.0;
+						if (fabs(css) < 1e-12) css = 0.0;
+						double ca = cxs * ccr, cb = cxs * csr;
+						double cc = -(cys * css), cd = cys * ccs;
+						double ctx = (double)child->x * 20.0;
+						double cty = (double)child->y * 20.0;
+						for (int corner = 0; corner < 4; corner++) {
+							double px = cpx[corner & 1];
+							double py = cpy[(corner >> 1) & 1];
+							double ox = ca * px + cc * py + ctx;
+							double oy = cb * px + cd * py + cty;
+							if (!has_bounds) {
+								lxmin = lxmax = ox; lymin = lymax = oy;
+								has_bounds = 1;
+							} else {
+								if (ox < lxmin) lxmin = ox; if (ox > lxmax) lxmax = ox;
+								if (oy < lymin) lymin = oy; if (oy > lymax) lymax = oy;
+							}
+						}
+					}
+				}
+
 				// Include text field bounds (this MC is a text field)
 				if (mc != NULL && MC_IS_TEXTFIELD(mc) && !has_bounds) {
 					// Text field's own bounds in parent space (twips)
@@ -66227,14 +66301,33 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 									if (_wdl[_d].instance_name && strcmp(_wdl[_d].instance_name, _names[_wi]) == 0) \
 										{ _wd = _d; break; } \
 								} \
-								if (_wd == SIZE_MAX) break; \
-								u32 _tid = _wdl[_wd].transform_id; \
-								extern float transform_data[][16]; \
-								double _la = (double)transform_data[_tid][0], _lb = (double)transform_data[_tid][1]; \
-								double _lc = (double)transform_data[_tid][4], _ld = (double)transform_data[_tid][5]; \
-								double _ltx = (double)transform_data[_tid][12], _lty = (double)transform_data[_tid][13]; \
 								MovieClip* _step_mc = _mcs[_wi]; \
-								if (_step_mc != NULL && (_step_mc->as_set_flags & (4|8|16))) { \
+								double _la, _lb, _lc, _ld, _ltx, _lty; \
+								if (_wd != SIZE_MAX) { \
+									u32 _tid = _wdl[_wd].transform_id; \
+									extern float transform_data[][16]; \
+									_la = (double)transform_data[_tid][0]; _lb = (double)transform_data[_tid][1]; \
+									_lc = (double)transform_data[_tid][4]; _ld = (double)transform_data[_tid][5]; \
+									_ltx = (double)transform_data[_tid][12]; _lty = (double)transform_data[_tid][13]; \
+									if (_step_mc != NULL && (_step_mc->as_set_flags & (4|8|16))) { \
+										double _xs = (double)_step_mc->xscale / 100.0; \
+										double _ys = (double)_step_mc->yscale / 100.0; \
+										double _rot = (double)_step_mc->rotation * 3.14159265358979323846 / 180.0; \
+										double _skew = (double)_step_mc->skew; \
+										double _crx = cos(_rot), _srx = sin(_rot); \
+										double _cry = cos(_rot + _skew), _sry = sin(_rot + _skew); \
+										if (fabs(_crx) < 1e-12) _crx = 0.0; \
+										if (fabs(_srx) < 1e-12) _srx = 0.0; \
+										if (fabs(_cry) < 1e-12) _cry = 0.0; \
+										if (fabs(_sry) < 1e-12) _sry = 0.0; \
+										_la = _xs * _crx; _lb = _xs * _srx; \
+										_lc = -(_ys * _sry); _ld = _ys * _cry; \
+									} \
+									if (_step_mc != NULL && (_step_mc->as_set_flags & 1)) _ltx = (double)_step_mc->x * 20.0; \
+									if (_step_mc != NULL && (_step_mc->as_set_flags & 2)) _lty = (double)_step_mc->y * 20.0; \
+								} else if (_step_mc != NULL) { \
+									/* AS-created clip not on the timeline display list: */ \
+									/* compose its local matrix entirely from struct fields. */ \
 									double _xs = (double)_step_mc->xscale / 100.0; \
 									double _ys = (double)_step_mc->yscale / 100.0; \
 									double _rot = (double)_step_mc->rotation * 3.14159265358979323846 / 180.0; \
@@ -66247,15 +66340,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 									if (fabs(_sry) < 1e-12) _sry = 0.0; \
 									_la = _xs * _crx; _lb = _xs * _srx; \
 									_lc = -(_ys * _sry); _ld = _ys * _cry; \
+									_ltx = (double)_step_mc->x * 20.0; _lty = (double)_step_mc->y * 20.0; \
+								} else { \
+									break; \
 								} \
-								if (_step_mc != NULL && (_step_mc->as_set_flags & 1)) _ltx = (double)_step_mc->x * 20.0; \
-								if (_step_mc != NULL && (_step_mc->as_set_flags & 2)) _lty = (double)_step_mc->y * 20.0; \
 								double _na = wa*_la + wc*_lb, _nb = wb*_la + wd*_lb; \
 								double _nc = wa*_lc + wc*_ld, _nd = wb*_lc + wd*_ld; \
 								double _ntx = wa*_ltx + wc*_lty + wtx; \
 								double _nty = wb*_ltx + wd*_lty + wty; \
 								wa=_na; wb=_nb; wc=_nc; wd=_nd; wtx=_ntx; wty=_nty; \
-								if (_wi < _nlen - 1 && _wdl[_wd].sprite_display_list) { \
+								if (_wd != SIZE_MAX && _wi < _nlen - 1 && _wdl[_wd].sprite_display_list) { \
 									_wmax = _wdl[_wd].sprite_max_depth; _wdl = _wdl[_wd].sprite_display_list; \
 								} \
 							} \

@@ -1,6 +1,40 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
+Last updated: 2026-05-29 (Phases 9 + 10 + 12 landed, pending CI —
+getBounds for AS-created (createEmptyMovieClip) clips. MovieClip-v6
+dropped 91 → 57 mismatched lines (−34). Three changes in
+`SWFModernRuntime/src/actionmodern/action.c`, all in the
+NO_GRAPHICS/OFFSCREEN_RENDER getBounds path + `mcGetOriginalBounds`:
+(1) **`COMPUTE_WORLD_MATRIX_DBL`** (the getBounds cross-target world
+matrix) now composes a chain step's local matrix from the MC struct
+(`xscale`/`yscale`/`rotation`/`skew`/`x`/`y`) when the step's name is
+NOT found in the timeline display_list — i.e. it's an AS-created clip
+living only in `child_mc_cache`. Previously the name-walk `break`ed on
+the first not-found step, leaving the world matrix at identity, so
+`draw.getBounds(container)` ignored draw's `_x`/scale and returned raw
+local bounds. Fixes the 1402–1541 cluster (`draw.getBounds(container)`
+under `_x`/`_xscale`/`_yscale` changes). (2) **getBounds Step-1 local
+bounds** now unions the drawing bounds of dynamic (`display_obj==NULL`)
+non-textfield child clips with `draw_has_bounds`, transformed by each
+child's local matrix into the parent's space — so
+`container.getBounds()` aggregates its `draw`/`draw2` children (1604–1623).
+(3) **`mcGetOriginalBounds` child-fallback** (drives `_width`/`_height`
+via `mcGetEffectiveSize`) now uses each drawing child's actual scaled
+`draw_xmin..draw_xmax` offset instead of assuming content starts at the
+child's registration point — fixes `container._width==90` /
+`container._height==30` (1615/1616). The (3) adjustment is gated to
+non-rotated/non-skewed children to avoid touching rotated dynamic clips.
+Residual MovieClip-v6 ours-only blockers are now the soft/hard-reference
+cluster (Phase 6) + the unloadMovie binding (Phase 7) + a few singletons;
+the `mcm` loadVariables/getURL/loadMovie cluster (Phase 15) is shared
+with Ruffle so it doesn't block promotion. v7/v8 share the code path —
+CI will confirm the parallel gains. Zero regressions: 8-test AVM1 bounds
+battery (movieclip_getbounds, movieclip_state_values,
+movieclip_default_state, movieclip_setmask, local_to_global,
+clone_sprite_edittext, movieclip_create_text_field,
+display_object_properties) all PASS.)
+
 Last updated: 2026-05-23 (Phase 16 landed, pending CI. **Phase 16:**
 re-diagnosed cluster 2343/2345/2347/2349 — not parent→child cascading;
 the test exercises `_visible` coercion on unparseable strings ("true",
@@ -92,16 +126,16 @@ phases:
     status: in_progress
   - id: 9
     name: "getBounds with reference-clip argument (transform into ref's coord space)"
-    status: pending
+    status: completed
   - id: 10
     name: "getBounds reflects _xscale/_yscale transforms"
-    status: pending
+    status: completed
   - id: 11
     name: "_yscale assignment after negative value preserves new sign"
     status: not_actionable
   - id: 12
-    name: "getBounds with plain-Object reference (Object treated as identity)"
-    status: pending
+    name: "getBounds with plain-Object reference (Object treated as identity) / container aggregates AS-created child bounds"
+    status: completed
   - id: 13
     name: "setProperty (SWF action 0x23) on MC properties returning the assigned value"
     status: pending
