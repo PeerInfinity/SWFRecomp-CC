@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-29T20:41:42.677881+00:00",
-    "old_git_sha": "921eeb06c40f5ca5b8e1b17202aa945f1f6ce196",
-    "new_timestamp": "2026-05-29T21:04:46.161548+00:00",
-    "new_git_sha": "dfd7d618896de90153f73e06c6803d8f2c9616be",
+    "old_timestamp": "2026-05-29T21:04:46.161548+00:00",
+    "old_git_sha": "dfd7d618896de90153f73e06c6803d8f2c9616be",
+    "new_timestamp": "2026-05-29T22:31:05.616981+00:00",
+    "new_git_sha": "55d725fb0c25a146d598a8d25118c32088e23fa0",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 132,
-    "old_ruffle_matched": 97,
-    "old_effective_pass": 229,
+    "old_ruffle_matched": 98,
+    "old_effective_pass": 230,
     "old_total": 243,
     "old_pass_rate": 54.3,
     "new_pass": 132,
@@ -18,129 +18,16 @@
     "new_effective_pass": 230,
     "new_total": 243,
     "new_pass_rate": 54.3,
-    "old_mismatched_lines": 8973,
+    "old_mismatched_lines": 8952,
     "new_mismatched_lines": 8952,
     "increased_mismatches": 0,
-    "decreased_mismatches": 21,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 236,
+    "status_changed": 0,
+    "unchanged": 243,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "MovieClip-v5",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 350,
-        "expected_lines": 363,
-        "matching_lines": 335
-      },
-      "new_lines": {
-        "actual_lines": 350,
-        "expected_lines": 363,
-        "matching_lines": 339
-      }
-    },
-    {
-      "test": "MovieClip-v6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 921,
-        "expected_lines": 936,
-        "matching_lines": 876
-      },
-      "new_lines": {
-        "actual_lines": 921,
-        "expected_lines": 936,
-        "matching_lines": 880
-      }
-    },
-    {
-      "test": "MovieClip-v7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 956,
-        "expected_lines": 969,
-        "matching_lines": 898
-      },
-      "new_lines": {
-        "actual_lines": 956,
-        "expected_lines": 969,
-        "matching_lines": 902
-      }
-    },
-    {
-      "test": "MovieClip-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 1074,
-        "expected_lines": 1087,
-        "matching_lines": 984
-      },
-      "new_lines": {
-        "actual_lines": 1074,
-        "expected_lines": 1087,
-        "matching_lines": 988
-      }
-    },
-    {
-      "test": "TextField-v6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 455
-      },
-      "new_lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 456
-      }
-    },
-    {
-      "test": "TextField-v7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 570,
-        "expected_lines": 570,
-        "matching_lines": 463
-      },
-      "new_lines": {
-        "actual_lines": 570,
-        "expected_lines": 570,
-        "matching_lines": 465
-      }
-    },
-    {
-      "test": "TextField-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 465
-      },
-      "new_lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 467
-      }
-    }
-  ]
+  "changes": []
 }
