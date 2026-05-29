@@ -157,6 +157,31 @@ user reported a breakable platform replaying its break animation then
 **reappearing** (a recent regression) — investigate next; may share the
 backward-goto/recycle or transform area.
 
+### Blue platform collision lags graphics — FIXED, committed `fc25fa5f5` (2026-05-29)
+DJ collision is `block.hitTest(heroX, heroY)` (bbox point test, 2 args →
+shapeFlag=0) → `COMPUTE_GLOBAL_AABB(block)` → `ng_computeBoundsFromDL_matrix`
+(tag_stubs.c). That engine walked each child via its STATIC cached placement
+(`place_*`/`transform_data`) with NO MovieClip lookup, so the AS-moved blue
+"aaa" (charId 32, _x via clip_action_8) contributed its un-moved bounds →
+collision pinned at the left edge while the render overlay (#1) drew it moving.
+Fix: `ng_overlay_entry_as_transform()` looks up an entry's MC by `display_obj`
+and overlays its `as_set_flags` transform (mirrors `apply_as_transform`), applied
+in `ng_computeBoundsFromDL_matrix` (bbox) + `ng_hitTestShapeFromDL` (shape).
+No-op for un-moved/unnamed children. **Shared engine, both CI modes, feeds
+getBounds/_width/_height/hitTest** — general correctness fix. Divergence 407=407;
+user-confirmed blue collision tracks the visual, green unaffected.
+
+### Brown breakable still collides after break animation — OPEN (next)
+User report (2026-05-29): brown breakable platforms play their break/fall
+animation, but **collision persists after the animation finishes** (hero can
+still land on the broken platform). Earlier phrased as "breakable reappears when
+the animation finishes." Distinct from blue. Likely the cloud's break is a
+nested sub-sprite that plays its frames, but either (a) the cloud doesn't advance
+to a no-platform frame, or (b) the bounds/collision still sees the pre-break
+shape after the visual broke. Investigate the brown breakable charId (31 per
+mapping, but "plays animation" implies a nested sprite) and how break removes
+collision (frame advance / recycle vs. the hitTest bounds source).
+
 ### (historical) Issue D investigation notes — root cause NARROWED
 Game-logic map (verified from `RecompiledScripts`/`tagMain.c`):
 - Root frames are AS-1-based: **menu=`frame_0`, gameplay=`frame_1`,
