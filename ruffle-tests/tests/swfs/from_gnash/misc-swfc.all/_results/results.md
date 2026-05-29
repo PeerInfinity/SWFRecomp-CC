@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-29 22:31 UTC
+**Date**: 2026-05-29 23:58 UTC
 
-**Git SHA**: `55d725fb0c`
+**Git SHA**: `99221dcfc6`
 
 **Run Duration**: 0m 5s
 
@@ -46,9 +46,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 0.2s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 0.3s |  |
 | 2 | `action_execution_order_test12` | 2 | 2 | 0.2s |  |
-| 3 | `movieclip_destruction_test1` | 43 | 52 | 0.3s |  |
+| 3 | `movieclip_destruction_test1` | 43 | 52 | 0.2s |  |
 | 4 | `opcode_guard_test2` | 5 | 5 | 0.2s |  |
 | 5 | `registerclass_test3` | 12 | 20 | 0.2s |  |
 | 6 | `soft_reference_test1` | 3 | 4 | 0.2s |  |
