@@ -36,35 +36,8 @@ extern void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s
 extern int ng_getCharBoundsForRatio(size_t char_id, u16 ratio, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
 
 // ---------------------------------------------------------------------------
-// Display-list entry to DisplayObject* (encoded entry index = parent<<20 | child)
+// Render-format matrix accessor (f32 a/b/c/d, i32 twips tx/ty — matches Ruffle render Matrix)
 // ---------------------------------------------------------------------------
-static DisplayObject* ng_entry_to_obj(size_t entry_idx)
-{
-	if (entry_idx == (size_t)-1) return NULL;
-	size_t parent_depth = entry_idx >> 20;
-	size_t child_depth  = entry_idx & 0xFFFFF;
-	if (parent_depth == 0) {
-		// Root level. Depth 0 is a valid root-level placement (Ming
-		// SWFDisplayItem_setDepth(it, 0)); the char_id check below guards
-		// against unused slots.
-		if (child_depth > max_depth) return NULL;
-		if (display_list[child_depth].char_id == 0) return NULL;
-		return &display_list[child_depth];
-	} else {
-		// Level-1 nested: parent is at display_list[parent_depth]
-		if (parent_depth > max_depth) return NULL;
-		DisplayObject* parent = &display_list[parent_depth];
-		if (parent->sprite_display_list == NULL) return NULL;
-		if (child_depth < 1 || child_depth > parent->sprite_max_depth) return NULL;
-		if (parent->sprite_display_list[child_depth].char_id == 0) return NULL;
-		return &parent->sprite_display_list[child_depth];
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Render-format matrix accessor (f32 a/b/c/d, i32 twips tx/ty)
-// ---------------------------------------------------------------------------
-// Variant: f32 a/b/c/d, i32 twips tx/ty (matches Ruffle render Matrix)
 int ng_getMatrixFromObj_render(DisplayObject* obj,
     float* out_a, float* out_b, float* out_c, float* out_d,
     int32_t* out_tx_twips, int32_t* out_ty_twips)
@@ -78,14 +51,6 @@ int ng_getMatrixFromObj_render(DisplayObject* obj,
 	if (out_tx_twips) *out_tx_twips = (int32_t)rintf(transform_data[tid][12]);
 	if (out_ty_twips) *out_ty_twips = (int32_t)rintf(transform_data[tid][13]);
 	return 1;
-}
-
-int ng_getMatrixFromEntry_render(size_t entry_idx,
-    float* out_a, float* out_b, float* out_c, float* out_d,
-    int32_t* out_tx_twips, int32_t* out_ty_twips)
-{
-	return ng_getMatrixFromObj_render(ng_entry_to_obj(entry_idx),
-		out_a, out_b, out_c, out_d, out_tx_twips, out_ty_twips);
 }
 
 extern u32 shape_data[][4];

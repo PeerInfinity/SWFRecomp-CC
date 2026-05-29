@@ -1,6 +1,6 @@
 # Bounds engine unification — Flash-accurate `_width`/`_height`/getBounds/hitTest
 
-Status: **IN PROGRESS** (P1 + P2 bounds done & CI-green both modes; P2d/e/f + P3 remain). Created 2026-05-28.
+Status: **DONE pending final CI** (P1–P3 implemented; bounds phase already CI-green both modes; P2d/e/f + P3 in final CI). Created 2026-05-28.
 
 ## Progress log
 
@@ -14,9 +14,19 @@ Status: **IN PROGRESS** (P1 + P2 bounds done & CI-green both modes; P2d/e/f + P3
 - **CI confirmed green both modes** (no-graphics run 26609151375, graphics run 26609152488):
   every suite holds its pre-refactor baseline (avm1 614/614, shumway 73, shumway/avm1 46,
   actionscript.all 124/122, ming 66/65, swfmill 19, mtasc 7, swfc 8). Zero net regressions.
-- **Remaining:** P2d (matrix accessors), P2e (CT accessors), P2f (filters) → `resolveMCDisplayEntry`
-  + `ng_objRootDepth`; P3 delete `ng_getDisplayEntryBounds`, `_fp16`, both `ng_entry_to_obj`,
-  `getDisplayEntryIdxForMC`, `ng_findDisplayEntryIdxWithParent`, `ng_findDisplayEntryIdx`.
+- **P2d/e/f** (`bb75d3120`) — matrix (`getLocalMatrixForMC[_render]`), CT (`getLocalCTRaw`/
+  `setLocalCTRaw`), filter accessors migrated to `resolveMCDisplayEntry` + `ng_objRootDepth` +
+  the pointer/`*ByDepth` forms. No `entry_idx` callers remain. Local-pass: transform,
+  color_transform, color, matrix, bitmap_filters, as_transformed_flag.
+- **P3** (next commit) — deleted the legacy `ng_getDisplayEntryBounds`, the dead
+  `ng_computeBoundsFromDL_fp16` (+ FP16 macros / `boundsUnionCornerFP` / `g_bounds_recursion_depth`),
+  both `ng_entry_to_obj` copies, `getDisplayEntryIdxForMC`, `ng_findDisplayEntryIdx[WithParent]`,
+  `ng_getMatrixFromEntry[_render]`, `ng_getCTFromEntry`, `ng_setCTOnEntry`,
+  `ng_getDisplayEntryFilterData`, `ng_getExtFilterData`, `ng_getFilterListData`, and their
+  decls + dead externs. The `entry_idx` encoding is gone. Surviving engine: the single
+  double-precision `ng_computeBoundsFromDL_matrix` (+ `ng_localBoundsOfDL`/`ng_computeBoundsFromDL`).
+  Local-pass NO_GRAPHICS: movieclip_getbounds, issue_2084, transform, color_transform, bitmap_filters.
+- **Final CI** (P2d/e/f + P3) pending — pure-deletion P3 is behavior-neutral over P2d/e/f.
 
 ## Motivation
 

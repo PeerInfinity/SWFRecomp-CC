@@ -8424,29 +8424,18 @@ static int varToStringBufFull(SWFAppContext* app_context, ActionVar* v, char* bu
 // Transform helper functions (NO_GRAPHICS only) and getter/setter implementations
 // ============================================================================
 
-// (was: #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) — un-gated for getDisplayEntryIdxForMC and friends)
 // Root MovieClip CT globals (root has no ng_display entry)
 static double g_root_cx_ra = 100.0, g_root_cx_ga = 100.0;
 static double g_root_cx_ba = 100.0, g_root_cx_aa = 100.0;
 static double g_root_cx_rb = 0.0,   g_root_cx_gb = 0.0;
 static double g_root_cx_bb = 0.0,   g_root_cx_ab = 0.0;
 
-// Get ng_display entry index for a MC. Returns (size_t)-1 for root or not found.
-static size_t getDisplayEntryIdxForMC(MovieClip* mc)
-{
-	extern MovieClip root_movieclip;
-	if (mc == NULL || mc == &root_movieclip) return (size_t)-1;
-	size_t parent_idx = getDisplayEntryIdxForMC(mc->parent);
-	return ng_findDisplayEntryIdxWithParent(mc->name, parent_idx);
-}
-
 // Resolve a MovieClip to its OWN static display-list entry pointer, walking the
-// name chain to arbitrary depth (the pointer analog of getDisplayEntryIdxForMC,
-// without the encoding's 2-level cap). Uses swf_name_match for parity with the
-// old ng_findDisplayEntryIdx* path. Returns NULL for root, name-less/dynamic
-// MCs, or when any chain step is not found. Used by the matrix/CT/filter
-// accessors during the entry_idx-encoding migration.
-static DisplayObject* resolveMCDisplayEntry(MovieClip* mc) __attribute__((unused));
+// name chain to arbitrary depth (replaces the old getDisplayEntryIdxForMC +
+// entry_idx encoding, which capped at 2 levels). Uses swf_name_match for parity
+// with the old path. Returns NULL for root, name-less/dynamic MCs, or when any
+// chain step is not found. Used by the matrix/CT/filter accessors.
+static DisplayObject* resolveMCDisplayEntry(MovieClip* mc);
 static DisplayObject* resolveMCDisplayEntry(MovieClip* mc)
 {
 	extern DisplayObject* display_list;
@@ -8603,9 +8592,6 @@ static void getLocalMatrixForMC(MovieClip* mc,
 }
 
 // Variant returning f32 a/b/c/d and i32 twips tx/ty (matches Ruffle render Matrix)
-extern int ng_getMatrixFromEntry_render(size_t entry_idx,
-    float* out_a, float* out_b, float* out_c, float* out_d,
-    int32_t* out_tx_twips, int32_t* out_ty_twips);
 static void getLocalMatrixForMC_render(MovieClip* mc,
 	float* a, float* b, float* c, float* d, int32_t* tx_twips, int32_t* ty_twips)
 {
@@ -65994,9 +65980,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				extern size_t max_depth;
 				extern int ng_computeBoundsFromDL(DisplayObject* dl, size_t dl_max,
 					int32_t* out_xmin, int32_t* out_ymin, int32_t* out_xmax, int32_t* out_ymax);
-				extern int ng_computeBoundsFromDL_fp16(DisplayObject* dl, size_t dl_max,
-					int32_t fa, int32_t fb, int32_t fc, int32_t fd, int32_t ftx, int32_t fty,
-					int* has, int32_t* gxmin, int32_t* gymin, int32_t* gxmax, int32_t* gymax);
 
 				// Find the sprite_display_list for this MC by navigating the display tree
 				DisplayObject* mc_dl = NULL;
@@ -68391,7 +68374,6 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 	// Also compute bounds from the MC's sprite display list children.
 	// This handles shapes placed by tagPlaceObject2 (not the Drawing API).
 	extern int ng_getCharBoundsForRatio(size_t char_id, u16 ratio, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
-	extern int ng_getMatrixFromEntry_render(size_t entry_idx, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
 	DisplayObject* dobj = (DisplayObject*)mc->display_obj;
 	if (dobj != NULL && dobj->sprite_display_list != NULL) {
 		DisplayObject* sdl = dobj->sprite_display_list;

@@ -7977,10 +7977,6 @@ const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth)
 	return NULL;
 }
 
-const ExtFilterData* ng_getExtFilterData(size_t entry_idx)
-{
-	return ng_getExtFilterDataByDepth(entry_idx & 0xFFFFF);
-}
 
 // Multi-filter list storage
 #define MAX_FILTER_LISTS 32
@@ -8112,10 +8108,6 @@ const FilterListData* ng_getFilterListDataByDepth(size_t depth)
 	return NULL;
 }
 
-const FilterListData* ng_getFilterListData(size_t entry_idx)
-{
-	return ng_getFilterListDataByDepth(entry_idx & 0xFFFFF);
-}
 
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {

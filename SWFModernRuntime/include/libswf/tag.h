@@ -119,7 +119,6 @@ typedef struct ExtFilterData {
     float blur_x, blur_y, angle, distance, strength;
     u8 quality, flags;
 } ExtFilterData;
-const ExtFilterData* ng_getExtFilterData(size_t entry_idx);
 const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth);
 
 // Multi-filter list: stores ALL SWF-authored filters per display entry
@@ -169,7 +168,6 @@ void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
     float blur_x, float blur_y, float angle, float distance, float strength,
     u8 quality, u8 flags);
 void tagEndFilterList(SWFAppContext* app_context, size_t depth);
-const FilterListData* ng_getFilterListData(size_t entry_idx);
 const FilterListData* ng_getFilterListDataByDepth(size_t depth);
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);
@@ -273,10 +271,6 @@ extern u8 g_current_movie_id;
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth);
 size_t ng_findDisplayEntryByName(const char* name);
-int ng_getDisplayEntryFilterData(size_t idx, u8* type, float* blur_x, float* blur_y,
-    u8* quality, u8* flags, float* r, float* g, float* b, float* a,
-    float* strength, float* angle, float* distance,
-    float* hr, float* hg, float* hb, float* ha);
 
 // Currently-executing sprite DisplayObject (set by advance_sprite_frames in NO_GRAPHICS,
 // or defined as dummy in swf.c for GRAPHICS mode). Used by action.c in all modes.
@@ -361,19 +355,6 @@ int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
     float* xmin_out, float* xmax_out, float* ymin_out, float* ymax_out);
 int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
     s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
-// Compute content bounds (union of child bounds in pixels) for a display entry.
-// entry_idx = (size_t)-1 for root-level children. Returns 1 if any bounds found, 0 if empty.
-int ng_getDisplayEntryBounds(size_t entry_idx,
-    float* out_xmin_px, float* out_xmax_px, float* out_ymin_px, float* out_ymax_px);
-// Find display entry index by instance name. Returns (size_t)-1 if not found.
-size_t ng_findDisplayEntryIdx(const char* name);
-// Find display entry index by name AND parent display index. parent_idx=(size_t)-1 for root-level.
-size_t ng_findDisplayEntryIdxWithParent(const char* name, size_t parent_idx);
-// Get matrix components from a display entry (column-major SWF format). Returns 1 if found, 0 if not.
-int ng_getMatrixFromEntry(size_t entry_idx, double* out_a, double* out_b, double* out_c, double* out_d, double* out_tx, double* out_ty);
-// Get/set color transform on a display entry by index. Returns 1 if found, 0 if not.
-int ng_getCTFromEntry(size_t entry_idx, double* ra, double* ga, double* ba, double* aa, double* rb, double* gb, double* bb, double* ab);
-int ng_setCTOnEntry(size_t entry_idx, double ra, double ga, double ba, double aa, double rb, double gb, double bb, double ab);
 
 // ---------------------------------------------------------------------------
 // Pointer-form display-entry accessors (bounds-engine unification, 2026-05-28).

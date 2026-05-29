@@ -166,36 +166,6 @@ void ng_clone_update_swf_depth(const char* name, int new_swf_depth)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// entry_idx encoding for ng_* query functions
-// ---------------------------------------------------------------------------
-// Root-level: entry_idx = depth (1..max_depth), upper bits == 0
-// Level-1 nested: entry_idx = (parent_root_depth << 20) | child_depth
-// Level-2+ nested: not supported (returns (size_t)-1)
-
-static DisplayObject* ng_entry_to_obj(size_t entry_idx)
-{
-	if (entry_idx == (size_t)-1) return NULL;
-	size_t parent_depth = entry_idx >> 20;
-	size_t child_depth  = entry_idx & 0xFFFFF;
-	if (parent_depth == 0) {
-		// Root level. Depth 0 is a valid root-level placement (Ming
-		// SWFDisplayItem_setDepth(it, 0)); the char_id check below guards
-		// against unused slots.
-		if (child_depth > max_depth) return NULL;
-		if (display_list[child_depth].char_id == 0) return NULL;
-		return &display_list[child_depth];
-	} else {
-		// Level-1 nested: parent is at display_list[parent_depth]
-		if (parent_depth > max_depth) return NULL;
-		DisplayObject* parent = &display_list[parent_depth];
-		if (parent->sprite_display_list == NULL) return NULL;
-		if (child_depth < 1 || child_depth > parent->sprite_max_depth) return NULL;
-		if (parent->sprite_display_list[child_depth].char_id == 0) return NULL;
-		return &parent->sprite_display_list[child_depth];
-	}
-}
-
 // ng_sync_root_display_obj, ng_get_root_display_obj — now in ng_shared.c
 
 // ---------------------------------------------------------------------------
@@ -1147,51 +1117,6 @@ size_t ng_findDisplayEntryByName(const char* name)
 	return result;
 }
 
-// Find display entry index by instance name (root-level only).
-// Returns entry_idx = depth, or (size_t)-1 if not found.
-size_t ng_findDisplayEntryIdx(const char* name)
-{
-	if (!name || name[0] == '\0') return (size_t)-1;
-	for (size_t d = 0; d <= max_depth; d++)
-	{
-		if (display_list[d].char_id == 0) continue;
-		if (display_list[d].instance_name != NULL &&
-		    swf_name_match(display_list[d].instance_name, name))
-			return d;  // entry_idx = root depth (upper bits = 0)
-	}
-	return (size_t)-1;
-}
-
-// Find display entry by name within a parent.
-// parent_idx = (size_t)-1: root level (same as ng_findDisplayEntryIdx).
-// parent_idx = root depth: search that sprite's sprite_display_list.
-// Returns encoded entry_idx, or (size_t)-1 if not found.
-size_t ng_findDisplayEntryIdxWithParent(const char* name, size_t parent_idx)
-{
-	if (!name || name[0] == '\0') return (size_t)-1;
-
-	if (parent_idx == (size_t)-1)
-	{
-		// Root level
-		return ng_findDisplayEntryIdx(name);
-	}
-
-	// Nested: parent_idx encodes the parent's entry (root depth for level-1 nesting)
-	size_t parent_root_depth = parent_idx & 0xFFFFF;  // lower 20 bits = root depth for level-1
-	if (parent_root_depth < 1 || parent_root_depth > max_depth) return (size_t)-1;
-	DisplayObject* parent_obj = &display_list[parent_root_depth];
-	if (parent_obj->char_id == 0 || parent_obj->sprite_display_list == NULL) return (size_t)-1;
-
-	for (size_t d = 1; d <= parent_obj->sprite_max_depth; d++)
-	{
-		DisplayObject* child = &parent_obj->sprite_display_list[d];
-		if (child->char_id == 0) continue;
-		if (child->instance_name != NULL && swf_name_match(child->instance_name, name))
-			return (parent_root_depth << 20) | d;  // encoded nested entry_idx
-	}
-	return (size_t)-1;
-}
-
 // Find root-level SWF depth by entry name (returns depth, SIZE_MAX if not found).
 // Alias used by action.c for timeline targeting.
 size_t ng_findDisplayEntryByName_depth(const char* name)
@@ -1359,14 +1284,6 @@ int ng_getMatrixFromObj(DisplayObject* obj,
 	return 1;
 }
 
-int ng_getMatrixFromEntry(size_t entry_idx,
-    double* out_a, double* out_b, double* out_c, double* out_d,
-    double* out_tx, double* out_ty)
-{
-	return ng_getMatrixFromObj(ng_entry_to_obj(entry_idx),
-		out_a, out_b, out_c, out_d, out_tx, out_ty);
-}
-
 int ng_getCTFromObj(DisplayObject* obj,
     double* ra, double* ga, double* ba, double* aa,
     double* rb, double* gb, double* bb, double* ab)
@@ -1379,14 +1296,6 @@ int ng_getCTFromObj(DisplayObject* obj,
 	return 1;
 }
 
-int ng_getCTFromEntry(size_t entry_idx,
-    double* ra, double* ga, double* ba, double* aa,
-    double* rb, double* gb, double* bb, double* ab)
-{
-	return ng_getCTFromObj(ng_entry_to_obj(entry_idx),
-		ra, ga, ba, aa, rb, gb, bb, ab);
-}
-
 int ng_setCTOnObj(DisplayObject* obj,
     double ra, double ga, double ba, double aa,
     double rb, double gb, double bb, double ab)
@@ -1396,14 +1305,6 @@ int ng_setCTOnObj(DisplayObject* obj,
 	obj->cx_rb = rb; obj->cx_gb = gb; obj->cx_bb = bb; obj->cx_ab = ab;
 	obj->cx_overridden = 1;
 	return 1;
-}
-
-int ng_setCTOnEntry(size_t entry_idx,
-    double ra, double ga, double ba, double aa,
-    double rb, double gb, double bb, double ab)
-{
-	return ng_setCTOnObj(ng_entry_to_obj(entry_idx),
-		ra, ga, ba, aa, rb, gb, bb, ab);
 }
 
 // ---------------------------------------------------------------------------
@@ -1457,19 +1358,7 @@ void ng_setCTAlpha(size_t depth, double aa)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Composite bounds computation (union of child content bounds in pixels)
-// entry_idx == (size_t)-1: root-level children
-// entry_idx is a root depth: children are sprite_display_list of that entry
-// ---------------------------------------------------------------------------
-
-static int g_bounds_recursion_depth = 0;
-#define MAX_BOUNDS_RECURSION 16
-
-// Pointer-form filter-data accessor: reads single-filter fields directly off a
-// DisplayObject. The entry_idx variant below keeps its (legacy, nested-swapped)
-// decode for P1; callers migrate to this form via resolveMCDisplayEntry in P2f,
-// which also corrects the nested decode.
+// Single-filter accessor: reads filter fields directly off a DisplayObject.
 int ng_getObjFilterData(DisplayObject* obj, u8* type, float* blur_x, float* blur_y,
     u8* quality, u8* flags, float* r, float* g, float* b, float* a,
     float* strength, float* angle, float* distance,
@@ -1493,251 +1382,6 @@ int ng_getObjFilterData(DisplayObject* obj, u8* type, float* blur_x, float* blur
 	*hb = obj->filter_highlight_b;
 	*ha = obj->filter_highlight_a;
 	return 1;
-}
-
-int ng_getDisplayEntryFilterData(size_t entry_idx, u8* type, float* blur_x, float* blur_y,
-    u8* quality, u8* flags, float* r, float* g, float* b, float* a,
-    float* strength, float* angle, float* distance,
-    float* hr, float* hg, float* hb, float* ha)
-{
-	size_t root_depth = entry_idx & 0xFFFFF;
-	if (root_depth > max_depth) return 0;
-	DisplayObject* obj = &display_list[root_depth];
-	size_t nested = entry_idx >> 20;
-	if (nested > 0 && obj->sprite_display_list)
-		obj = &obj->sprite_display_list[nested];
-	return ng_getObjFilterData(obj, type, blur_x, blur_y, quality, flags,
-		r, g, b, a, strength, angle, distance, hr, hg, hb, ha);
-}
-
-int ng_getDisplayEntryBounds(size_t entry_idx,
-    float* out_xmin_px, float* out_xmax_px,
-    float* out_ymin_px, float* out_ymax_px)
-{
-	if (g_bounds_recursion_depth >= MAX_BOUNDS_RECURSION) return 0;
-	g_bounds_recursion_depth++;
-
-	int found = 0;
-	float gxmin = 1e30f, gxmax = -1e30f;
-	float gymin = 1e30f, gymax = -1e30f;
-
-	// Determine which display list to iterate
-	DisplayObject* dl;
-	size_t dl_max;
-
-	if (entry_idx == (size_t)-1)
-	{
-		// Root level
-		dl = display_list;
-		dl_max = max_depth;
-	}
-	else
-	{
-		// Must be a root-depth entry (level-0 nesting only for bounds)
-		size_t parent_d = entry_idx >> 20;
-		size_t child_d  = entry_idx & 0xFFFFF;
-		if (parent_d == 0)
-		{
-			// Root-depth sprite: iterate its sprite_display_list. Depth 0 is a
-			// valid root-level placement (Ming SWFDisplayItem_setDepth(it, 0));
-			// the char_id check guards against unused slots.
-			if (child_d > max_depth || display_list[child_d].char_id == 0) { g_bounds_recursion_depth--; return 0; }
-			if (display_list[child_d].sprite_display_list == NULL) { g_bounds_recursion_depth--; return 0; }
-			dl     = display_list[child_d].sprite_display_list;
-			dl_max = display_list[child_d].sprite_max_depth;
-		}
-		else
-		{
-			// Level-1 nested: find child in parent's sprite display list
-			if (parent_d < 1 || parent_d > max_depth || display_list[parent_d].char_id == 0) { g_bounds_recursion_depth--; return 0; }
-			DisplayObject* parent_obj = &display_list[parent_d];
-			if (parent_obj->sprite_display_list == NULL) { g_bounds_recursion_depth--; return 0; }
-			if (child_d < 1 || child_d > parent_obj->sprite_max_depth) { g_bounds_recursion_depth--; return 0; }
-			DisplayObject* child_obj = &parent_obj->sprite_display_list[child_d];
-			if (child_obj->char_id == 0 || child_obj->sprite_display_list == NULL) { g_bounds_recursion_depth--; return 0; }
-			dl     = child_obj->sprite_display_list;
-			dl_max = child_obj->sprite_max_depth;
-		}
-	}
-
-	for (size_t i = 1; i <= dl_max; i++)
-	{
-		DisplayObject* obj = &dl[i];
-		if (obj->char_id == 0) continue;
-
-		u32 tid = obj->transform_id;
-		float tx = transform_data[tid][12] / 20.0f;
-		float ty = transform_data[tid][13] / 20.0f;
-		float sx = transform_data[tid][0];
-		float sy = transform_data[tid][5];
-
-		float bxmin, bxmax, bymin, bymax;
-		int child_found = 0;
-
-		size_t cid = obj->char_id;
-
-		if (dictionary[cid].type == CHAR_TYPE_SPRITE && obj->sprite_display_list != NULL)
-		{
-			// Recursively get sprite's local bounds. Encode the child's
-			// position so the recursion descends into THIS sprite's child
-			// (not root depth `i`). For a root-level placement (entry_idx
-			// == -1) the child is itself a root-depth sprite, so the entry
-			// is just `i`. For a root-depth sprite (entry_idx == child_d,
-			// parent_d == 0) the grandchild is encoded as (child_d << 20) | i
-			// so the recursion takes the level-1-nested branch. Passing bare
-			// `i` here was a latent bug: it read root depth `i` instead of
-			// this sprite's child, so e.g. Pong's paddle (root depth 9,
-			// containing child "gab") reported the bounds of root depth 1
-			// (the full-stage background) — 551x401 instead of the paddle's
-			// own ~50px height, which broke the paddle's on-screen clamp
-			// math (`25 + _height/2` .. `375 - _height/2` became an inverted
-			// range, pegging the paddle and blocking keyboard movement).
-			float lxmin, lxmax, lymin, lymax;
-			size_t child_entry = (entry_idx == (size_t)-1)
-				? (i)                                    // root sprite: entry_idx = depth
-				: (((entry_idx & 0xFFFFF) << 20) | i);   // nested: encode (parent_d << 20) | child_d
-			if (ng_getDisplayEntryBounds(child_entry, &lxmin, &lxmax, &lymin, &lymax))
-			{
-				bxmin = lxmin * sx + tx;
-				bxmax = lxmax * sx + tx;
-				bymin = lymin * sy + ty;
-				bymax = lymax * sy + ty;
-				if (bxmin > bxmax) { float t = bxmin; bxmin = bxmax; bxmax = t; }
-				if (bymin > bymax) { float t = bymin; bymin = bymax; bymax = t; }
-				child_found = 1;
-			}
-		}
-		else if (ng_find_textfield(cid) >= 0)
-		{
-			int tf_idx = ng_find_textfield(cid);
-			s32 _tfbxmin, _tfbxmax, _tfbymin, _tfbymax;
-			ng_getTextFieldBounds(tf_idx, &_tfbxmin, &_tfbxmax, &_tfbymin, &_tfbymax);
-			float bxf  = _tfbxmin / 20.0f;
-			float bxf2 = _tfbxmax / 20.0f;
-			float byf  = _tfbymin / 20.0f;
-			float byf2 = _tfbymax / 20.0f;
-			bxmin = bxf  * sx + tx;
-			bxmax = bxf2 * sx + tx;
-			bymin = byf  * sy + ty;
-			bymax = byf2 * sy + ty;
-			if (bxmin > bxmax) { float t = bxmin; bxmin = bxmax; bxmax = t; }
-			if (bymin > bymax) { float t = bymin; bymin = bymax; bymax = t; }
-			child_found = 1;
-		}
-		else if (!ng_find_button(cid))
-		{
-			// Shape: look up char bounds
-			s32 cbxmin, cbxmax, cbymin, cbymax;
-			if (ng_getCharBounds(cid, &cbxmin, &cbxmax, &cbymin, &cbymax))
-			{
-				bxmin = cbxmin / 20.0f * sx + tx;
-				bxmax = cbxmax / 20.0f * sx + tx;
-				bymin = cbymin / 20.0f * sy + ty;
-				bymax = cbymax / 20.0f * sy + ty;
-				if (bxmin > bxmax) { float t = bxmin; bxmin = bxmax; bxmax = t; }
-				if (bymin > bymax) { float t = bymin; bymin = bymax; bymax = t; }
-				child_found = 1;
-			}
-		}
-
-		if (child_found)
-		{
-			if (!found || bxmin < gxmin) gxmin = bxmin;
-			if (!found || bxmax > gxmax) gxmax = bxmax;
-			if (!found || bymin < gymin) gymin = bymin;
-			if (!found || bymax > gymax) gymax = bymax;
-			found = 1;
-		}
-	}
-
-	if (found)
-	{
-		if (out_xmin_px) *out_xmin_px = gxmin;
-		if (out_xmax_px) *out_xmax_px = gxmax;
-		if (out_ymin_px) *out_ymin_px = gymin;
-		if (out_ymax_px) *out_ymax_px = gymax;
-	}
-	g_bounds_recursion_depth--;
-	return found;
-}
-
-// ---------------------------------------------------------------------------
-// getBounds helper: compute local content bounds for a MovieClip (twips)
-// ---------------------------------------------------------------------------
-
-// Recursively compute union of child bounds in a display list (results in twips)
-// Uses Fixed16 integer arithmetic to match Ruffle/Flash's truncating behavior.
-// Fixed16: 16.16 signed fixed-point. Matrix entries stored as Fixed16 raw i32 values.
-// wrapping_mul_int(fixed16, twips_i32) = (int32_t)(((int64_t)fixed16 * twips_i32) >> 16)
-#define FP16_ONE 65536
-#define FP_MUL(f16, tw) ((int32_t)(((int64_t)(f16) * (int64_t)(tw)) >> 16))
-// Compose two Fixed16 values: (a * b) >> 16  (both are 16.16)
-#define FP_MUL16(a, b) ((int32_t)(((int64_t)(a) * (int64_t)(b)) >> 16))
-// Convert float matrix entry to Fixed16 raw i32
-#define FLOAT_TO_FP16(f) ((int32_t)((f) * 65536.0f))
-// Convert twips (float, from transform_data) to i32 twips
-#define FLOAT_TO_TWIPS(f) ((int32_t)(f))
-
-static void boundsUnionCornerFP(int32_t px, int32_t py,
-	int32_t fa, int32_t fb, int32_t fc, int32_t fd, int32_t ftx, int32_t fty,
-	int* has, int32_t* gxmin, int32_t* gymin, int32_t* gxmax, int32_t* gymax)
-{
-	int32_t tx = FP_MUL(fa, px) + FP_MUL(fc, py) + ftx;
-	int32_t ty = FP_MUL(fb, px) + FP_MUL(fd, py) + fty;
-	if (!*has) { *gxmin = *gxmax = tx; *gymin = *gymax = ty; *has = 1; }
-	else {
-		if (tx < *gxmin) *gxmin = tx;
-		if (tx > *gxmax) *gxmax = tx;
-		if (ty < *gymin) *gymin = ty;
-		if (ty > *gymax) *gymax = ty;
-	}
-}
-
-// Compute bounds using Fixed16 integer arithmetic matching Ruffle/Flash.
-// Matrix entries (fa,fb,fc,fd) are Fixed16 raw i32 values; ftx,fty are i32 twips.
-int ng_computeBoundsFromDL_fp16(DisplayObject* dl, size_t dl_max,
-    int32_t fa, int32_t fb, int32_t fc, int32_t fd, int32_t ftx, int32_t fty,
-    int* has, int32_t* gxmin, int32_t* gymin, int32_t* gxmax, int32_t* gymax)
-{
-	for (size_t i = 1; i <= dl_max; i++) {
-		DisplayObject* child = &dl[i];
-		if (child->char_id == 0) continue;
-		u32 tid = child->transform_id;
-		int32_t ca = FLOAT_TO_FP16(transform_data[tid][0]);
-		int32_t cb = FLOAT_TO_FP16(transform_data[tid][1]);
-		int32_t cc = FLOAT_TO_FP16(transform_data[tid][4]);
-		int32_t cd = FLOAT_TO_FP16(transform_data[tid][5]);
-		int32_t ctx_tw = FLOAT_TO_TWIPS(transform_data[tid][12]);
-		int32_t cty_tw = FLOAT_TO_TWIPS(transform_data[tid][13]);
-		// Compose: new_matrix = outer * child  (Fixed16 composition)
-		int32_t na = FP_MUL16(fa, ca) + FP_MUL16(fc, cb);
-		int32_t nb = FP_MUL16(fb, ca) + FP_MUL16(fd, cb);
-		int32_t nc = FP_MUL16(fa, cc) + FP_MUL16(fc, cd);
-		int32_t nd = FP_MUL16(fb, cc) + FP_MUL16(fd, cd);
-		int32_t ntx = FP_MUL(fa, ctx_tw) + FP_MUL(fc, cty_tw) + ftx;
-		int32_t nty = FP_MUL(fb, ctx_tw) + FP_MUL(fd, cty_tw) + fty;
-
-		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
-			ng_computeBoundsFromDL_fp16(child->sprite_display_list, child->sprite_max_depth,
-				na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
-		} else {
-			s32 cxmin, cxmax, cymin, cymax;
-			int child_has = ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax);
-			if (!child_has) {
-				int tf_idx = ng_find_textfield(child->char_id);
-				if (tf_idx >= 0) {
-					ng_getTextFieldBounds(tf_idx, &cxmin, &cxmax, &cymin, &cymax);
-					child_has = 1;
-				}
-			}
-			if (!child_has) continue;
-			boundsUnionCornerFP(cxmin, cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
-			boundsUnionCornerFP(cxmax, cymin, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
-			boundsUnionCornerFP(cxmin, cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
-			boundsUnionCornerFP(cxmax, cymax, na, nb, nc, nd, ntx, nty, has, gxmin, gymin, gxmax, gymax);
-		}
-	}
-	return *has;
 }
 
 // Double-precision wrappers kept for non-getBounds uses
