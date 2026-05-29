@@ -1402,6 +1402,48 @@ static void boundsUnionCorner(double px, double py,
 	}
 }
 
+// Overlay an AS-set (_x/_y/scale/rotation) transform onto a display entry's
+// cached LOCAL placement matrix for the bounds / hit-test engines. The placement
+// cache (place_*) and transform_data slots hold only the STATIC timeline
+// transform; when ActionScript moves a nested child (e.g. Doodle Jump's blue
+// platform charId 32 "aaa" sliding via clip_action_8's `this._x += ac`), that
+// delta lives solely on the child MovieClip's as_set_flags — so a pure
+// display-list walk contributes the child's original, un-moved bounds (the blue
+// platform's collision stayed pinned at the left edge while it visibly slid).
+// Mirrors apply_as_transform() in tag.c (the render path's equivalent overlay).
+// Matches the entry by display_obj pointer — every recycled instance owns a
+// distinct MC, and only that MC's display_obj points at THIS entry. a/b/c/d are
+// the 2x2; tx/ty are in twips. No-op unless the entry has a named, AS-moved MC.
+static void ng_overlay_entry_as_transform(DisplayObject* child,
+    float* a, float* b, float* c, float* d, float* tx, float* ty)
+{
+    if (child == NULL || child->instance_name == NULL) return;
+    extern MovieClip* child_mc_cache[];
+    extern int child_mc_count;
+    for (int i = 0; i < child_mc_count; i++) {
+        MovieClip* mc = child_mc_cache[i];
+        if (mc == NULL || mc->depth == INT_MIN) continue;
+        if ((DisplayObject*)mc->display_obj != child) continue;
+        u8 flags = mc->as_set_flags;
+        if (flags == 0) return;  // matched but identity — nothing to overlay
+        if (flags & (4|8|16)) {
+            float sx = mc->xscale / 100.0f;
+            float sy = mc->yscale / 100.0f;
+            float rad = mc->rotation * 3.14159265358979323846f / 180.0f;
+            float skew = mc->skew;
+            float cr_x = cosf(rad),        sr_x = sinf(rad);
+            float cr_y = cosf(rad + skew), sr_y = sinf(rad + skew);
+            *a = sx * cr_x;
+            *b = sx * sr_x;
+            *c = -(sy * sr_y);
+            *d = sy * cr_y;
+        }
+        if (flags & 1) *tx = rintf(mc->x * 20.0f);
+        if (flags & 2) *ty = rintf(mc->y * 20.0f);
+        return;
+    }
+}
+
 int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
     double ma, double mb, double mc, double md, double mtx, double mty,
     int* has, double* gxmin, double* gymin, double* gxmax, double* gymax)
@@ -1418,6 +1460,10 @@ int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
 		float cd = child->place_d;
 		float ctxf = child->place_tx;
 		float ctyf = child->place_ty;
+		// Overlay any AS-set transform on this child (nested AS-moved clips —
+		// e.g. Doodle Jump's blue platform — are otherwise frozen at their
+		// placement position). No-op for un-moved / unnamed children.
+		ng_overlay_entry_as_transform(child, &ca, &cb, &cc, &cd, &ctxf, &ctyf);
 		// Ruffle composes matrices in f32 arithmetic
 		float fma = (float)ma, fmb = (float)mb, fmc = (float)mc, fmd = (float)md;
 		float fmtx = (float)mtx, fmty = (float)mty;
@@ -1504,12 +1550,18 @@ int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
 		if (child->char_id == 0) continue;
 
 		u32 tid = child->transform_id;
-		double ca = (double)transform_data[tid][0];
-		double cb = (double)transform_data[tid][1];
-		double cc = (double)transform_data[tid][4];
-		double cd = (double)transform_data[tid][5];
-		double ctx_v = (double)transform_data[tid][12];
-		double cty_v = (double)transform_data[tid][13];
+		float oa = transform_data[tid][0], ob = transform_data[tid][1];
+		float oc = transform_data[tid][4], od = transform_data[tid][5];
+		float otx = transform_data[tid][12], oty = transform_data[tid][13];
+		// Overlay any AS-set transform (nested AS-moved clips otherwise hit-test
+		// at their static placement — same gap as the bounds engine above).
+		ng_overlay_entry_as_transform(child, &oa, &ob, &oc, &od, &otx, &oty);
+		double ca = (double)oa;
+		double cb = (double)ob;
+		double cc = (double)oc;
+		double cd = (double)od;
+		double ctx_v = (double)otx;
+		double cty_v = (double)oty;
 		double na = ma*ca + mc_m*cb, nb = mb*ca + md*cb;
 		double nc = ma*cc + mc_m*cd, nd = mb*cc + md*cd;
 		double ntx = ma*ctx_v + mc_m*cty_v + mtx;
