@@ -3882,6 +3882,20 @@ void tagShowFrame(SWFAppContext* app_context)
 			MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
 			if (mc == NULL || mc->as_set_flags == 0) continue;
 
+			// Skip SPRITE / BUTTON — the compose loop below builds their
+			// effective parent matrix on a LOCAL stack buffer (mirroring
+			// tagRerenderFrame, which already does this; see the in-place
+			// mutation hazard note there). Mutating transform_data in place
+			// here permanently corrupts the (often recompiler-deduped, shared)
+			// CPU-side placement slot. Concrete case: Doodle Jump's hero
+			// (sprite, transform_id 54) had its static placement slot
+			// overwritten with its runtime _y each tick, so a freshly
+			// re-placed hero on restart-after-game-over synced from slot 54 to
+			// the death position (~419) instead of the spawn (179) and
+			// instantly re-triggered the fall→game-over check.
+			Character* ch_ = &dictionary[obj->char_id];
+			if (ch_->type == CHAR_TYPE_SPRITE || ch_->type == CHAR_TYPE_BUTTON) continue;
+
 			// Update CPU-side transform_data so compose_children picks it up
 			float* slot = (float*)app_context->transform_data + obj->transform_id * 16;
 			apply_as_transform(slot, mc, mc->as_set_flags);
@@ -3929,6 +3943,7 @@ void tagShowFrame(SWFAppContext* app_context)
 	// passing the composed parent transform down so nested text/sprite/button
 	// children get correctly composed global transforms.
 	// For top-level text/morph: compose directly (parent is identity/self).
+	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
 		DisplayObject* obj = &display_list[i];
@@ -3939,7 +3954,23 @@ void tagShowFrame(SWFAppContext* app_context)
 		{
 			if (obj->sprite_display_list != NULL)
 			{
-				const float* sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				// Build the sprite's effective matrix on a LOCAL buffer (AS
+				// overlay on top of the un-mutated CPU transform_data slot) so
+				// the in-place loop above no longer needs to corrupt the shared
+				// placement slot. Mirrors tagRerenderFrame.
+				const float* sprite_xform;
+				float sprite_xform_buf[16];
+				MovieClip* mc_for_xform = (obj->instance_name != NULL)
+					? actionFindMovieClipByName(obj->instance_name) : NULL;
+				if (mc_for_xform != NULL && mc_for_xform->as_set_flags != 0) {
+					memcpy(sprite_xform_buf,
+						(const float*)app_context->transform_data + obj->transform_id * 16,
+						sizeof(sprite_xform_buf));
+					apply_as_transform(sprite_xform_buf, mc_for_xform, mc_for_xform->as_set_flags);
+					sprite_xform = sprite_xform_buf;
+				} else {
+					sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				}
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					sprite_xform,
@@ -3979,7 +4010,21 @@ void tagShowFrame(SWFAppContext* app_context)
 
 			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
 			{
-				const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				// Local-buffer AS overlay (mirrors tagRerenderFrame); see the
+				// sprite branch above for the shared-slot corruption rationale.
+				const float* btn_xform;
+				float btn_xform_buf[16];
+				MovieClip* mc_for_xform = (obj->instance_name != NULL)
+					? actionFindMovieClipByName(obj->instance_name) : NULL;
+				if (mc_for_xform != NULL && mc_for_xform->as_set_flags != 0) {
+					memcpy(btn_xform_buf,
+						(const float*)app_context->transform_data + obj->transform_id * 16,
+						sizeof(btn_xform_buf));
+					apply_as_transform(btn_xform_buf, mc_for_xform, mc_for_xform->as_set_flags);
+					btn_xform = btn_xform_buf;
+				} else {
+					btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				}
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					btn_xform,
@@ -7291,6 +7336,18 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	display_list[depth].transformed_by_script = 0;
 	display_list[depth].cx_overridden = 0;
 	display_list[depth].clone_replaced = 0;
+	// Reset enterFrame-eligibility so a subsequent fresh placement at this depth
+	// re-runs the init cycle (sprite_initialized 0→1 on place, 1→2 next tick) and
+	// therefore does NOT fire its clip-event enterFrame on the placement tick —
+	// Flash fires enterFrame only from the frame AFTER a clip is instantiated.
+	// The place path only bumps 0→1 (tag.c ~6286/6840), so a stale value left
+	// here would make the fresh clip enterFrame-eligible immediately. Concrete
+	// case: Doodle Jump restart-after-game-over — the re-placed hero's
+	// enterFrame fired on its placement tick, before frame_1's script reset
+	// _root.gameOver=false, hitting `if (_root.gameOver) gotoAndStop(3)` and
+	// snapping straight back to the game-over screen.
+	display_list[depth].sprite_initialized = 0;
+	display_list[depth].enterframe_eligible = 0;
 }
 
 // Browser-WASM cleanup helper: find any cached MC bound to a specific
