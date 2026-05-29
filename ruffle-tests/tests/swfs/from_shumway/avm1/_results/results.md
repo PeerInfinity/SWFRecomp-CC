@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-29 22:31 UTC
+**Date**: 2026-05-29 23:58 UTC
 
-**Git SHA**: `55d725fb0c`
+**Git SHA**: `99221dcfc6`
 
-**Run Duration**: 0m 13s
+**Run Duration**: 0m 12s
 
 ## Summary
 
@@ -53,19 +53,19 @@
 | 26 | `operations` | 13 | 0.2s |  |
 | 27 | `property-paths/property-paths-6` | 6 | 0.2s |  |
 | 28 | `property-paths/property-paths-7` | 7 | 0.2s |  |
-| 29 | `propertycase/propertycase` | 7 | 0.2s |  |
+| 29 | `propertycase/propertycase` | 7 | 0.1s |  |
 | 30 | `propertycase/propertycase-preserving-6` | 2 | 0.2s |  |
 | 31 | `propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
 | 32 | `rollover` | 4 | 0.2s |  |
 | 33 | `scope` | 14 | 0.2s |  |
 | 34 | `setinterval` | 20 | 0.2s |  |
 | 35 | `settimeout` | 17 | 0.2s |  |
-| 36 | `super` | 11 | 0.2s |  |
-| 37 | `target` | 18 | 0.2s |  |
+| 36 | `super` | 11 | 0.1s |  |
+| 37 | `target` | 18 | 0.3s |  |
 | 38 | `text-bind` | 0 | 0.2s |  |
 | 39 | `textfield/textfield-html` | 4 | 0.2s |  |
 | 40 | `textfield/textfield-text-setters` | 8 | 0.2s |  |
-| 41 | `undefined/undefined-swf6` | 39 | 0.2s |  |
+| 41 | `undefined/undefined-swf6` | 39 | 0.1s |  |
 | 42 | `undefined/undefined-swf7` | 39 | 0.2s |  |
 | 43 | `watch` | 2 | 0.2s |  |
 | 44 | `xml/xmlbuild` | 1 | 0.2s |  |
