@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-29T18:56:36.854697+00:00",
-    "old_git_sha": "d78853f5ab16fad36cf54a64dd59d169852b701e",
-    "new_timestamp": "2026-05-29T19:16:36.670222+00:00",
-    "new_git_sha": "b53e09d3d7dc1868aac5ebb674251c3fd3dfe2ae",
+    "old_timestamp": "2026-05-29T19:16:36.670222+00:00",
+    "old_git_sha": "b53e09d3d7dc1868aac5ebb674251c3fd3dfe2ae",
+    "new_timestamp": "2026-05-29T20:06:05.553556+00:00",
+    "new_git_sha": "15eef2ba9087273729d264f030aa6b57cd76f6bc",
     "partial": false,
     "same_commit": false
   },
@@ -18,64 +18,80 @@
     "new_effective_pass": 227,
     "new_total": 243,
     "new_pass_rate": 52.7,
-    "old_mismatched_lines": 8974,
-    "new_mismatched_lines": 8968,
+    "old_mismatched_lines": 8968,
+    "new_mismatched_lines": 8964,
     "increased_mismatches": 0,
-    "decreased_mismatches": 6,
+    "decreased_mismatches": 4,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 240,
+    "unchanged": 239,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "TextField-v6",
+      "test": "MovieClip-v5",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 454
+        "actual_lines": 350,
+        "expected_lines": 363,
+        "matching_lines": 338
       },
       "new_lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 456
+        "actual_lines": 350,
+        "expected_lines": 363,
+        "matching_lines": 339
       }
     },
     {
-      "test": "TextField-v7",
+      "test": "MovieClip-v6",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 570,
-        "expected_lines": 570,
-        "matching_lines": 463
+        "actual_lines": 921,
+        "expected_lines": 936,
+        "matching_lines": 879
       },
       "new_lines": {
-        "actual_lines": 570,
-        "expected_lines": 570,
-        "matching_lines": 465
+        "actual_lines": 921,
+        "expected_lines": 936,
+        "matching_lines": 880
       }
     },
     {
-      "test": "TextField-v8",
+      "test": "MovieClip-v7",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 465
+        "actual_lines": 956,
+        "expected_lines": 969,
+        "matching_lines": 901
       },
       "new_lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 467
+        "actual_lines": 956,
+        "expected_lines": 969,
+        "matching_lines": 902
+      }
+    },
+    {
+      "test": "MovieClip-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1074,
+        "expected_lines": 1087,
+        "matching_lines": 987
+      },
+      "new_lines": {
+        "actual_lines": 1074,
+        "expected_lines": 1087,
+        "matching_lines": 988
       }
     }
   ]
