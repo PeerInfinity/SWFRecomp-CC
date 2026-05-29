@@ -63814,42 +63814,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							root_movieclip.currentframe = frame0 + 1;
 						} else {
 							// Browser-WASM: MC-targeted gotoAndStop/Play
-							// (mc != &root_movieclip). Navigate the sprite's
-							// OWN frames synchronously via ng_gotoFrameByMC: it
-							// rebuilds the MC's sprite_display_list — whether the
-							// display_obj is a nested-timeline entry or a
-							// standalone attachMovie allocation — and never
-							// touches the root timeline. This matches the
-							// NO_GRAPHICS/OFFSCREEN_RENDER arm above.
-							//
-							// Do NOT fall back to actionGotoFrame for non-root
-							// MCs — it treats targeted_sprite==NULL as a ROOT
-							// goto (Doodle Jump's platforms call
-							// block.gotoAndStop(1) on every hit, which would
-							// otherwise advance the root timeline to frame_2
-							// gameover and terminate gameplay in under a second).
-							//
-							// The attachMovie'd "cloud" platform is a 4-frame
-							// sprite whose frame selects the platform colour
-							// (frame 1 green/normal, frame 2 blue/moving, frame 3
-							// brown/breakable). The previous flag-only path was a
-							// no-op for attached MCs — nothing consumes the
-							// sprite-local nav flags (advance_sprite_frames only
-							// scans the root display list and recurses into
-							// timeline-placed sprites, never the standalone
-							// display_obj of an attached clip), so every platform
-							// stayed on frame 1 and rendered green.
-							if (!ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
-								// Fallback for clips ng_gotoFrameByMC can't
-								// resolve (e.g. unnamed): set sprite-local nav
-								// flags for advance_sprite_frames to consume.
-								if (mc != NULL && mc->display_obj != NULL) {
-									DisplayObject* dobj = (DisplayObject*)mc->display_obj;
-									dobj->sprite_next_frame = (size_t)frame0;
-									dobj->sprite_manual_next_frame = 1;
-									dobj->sprite_is_playing = is_play ? 1 : 0;
-									mc->currentframe = frame0 + 1;
-								}
+							// (mc != &root_movieclip). Do NOT call
+							// actionGotoFrame here — it treats
+							// targeted_sprite==NULL as a ROOT goto and sets
+							// next_frame/manual_next_frame on the root
+							// timeline. For Doodle Jump, attached platform
+							// MCs' physics handler calls block.gotoAndStop(1)
+							// every hit, which would otherwise advance the
+							// root timeline (e.g., to frame_2 gameover) and
+							// terminate gameplay in under a second. Set the
+							// sprite-local navigation fields on the MC's
+							// display_obj instead. For timeline-placed
+							// sprites the display_obj is in display_list and
+							// advance_sprite_frames consumes the flags; for
+							// attached MCs the display_obj is a standalone
+							// allocation, and the goto is effectively a
+							// no-op (cloud platforms are single-frame).
+							if (mc != NULL && mc->display_obj != NULL) {
+								DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+								dobj->sprite_next_frame = (size_t)frame0;
+								dobj->sprite_manual_next_frame = 1;
+								dobj->sprite_is_playing = is_play ? 1 : 0;
+								mc->currentframe = frame0 + 1;
 							}
 						}
 					}
