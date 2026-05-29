@@ -14971,6 +14971,22 @@ static ActionVar builtin_mc_meth(SWFAppContext* app_context, ActionVar* args,
 	return result;
 }
 
+// MovieClip.prototype.getSWFVersion as a real builtin so it works when aliased
+// onto a plain Object (e.g. `o.getSWFVersion = MovieClip.prototype.getSWFVersion`).
+// MOVIECLIP/TextField receivers are handled by the dedicated case in
+// actionCallMethod's MOVIECLIP arm before reaching this function, so the only
+// callers that arrive here have a non-MovieClip `this` — Flash returns -1 for
+// those (MovieClip.as:2539: `o.getSWFVersion() == -1`).
+static ActionVar builtin_mc_getSWFVersion(SWFAppContext* app_context, ActionVar* args,
+                                          u32 num_args, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)num_args; (void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &result.data.numeric_value) = -1.0;
+	return result;
+}
+
 static void initMovieClipPrototype(SWFAppContext* app_context)
 {
 	if (g_movieclip_constructor_init) return;
@@ -15060,6 +15076,16 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		{
 			g_mc_method_funcs[i].function_type = 2;
 			g_mc_method_funcs[i].advanced_func = (Function2Ptr) builtin_mc_meth;
+		}
+
+		// MovieClip.prototype.getSWFVersion is likewise a real function so that
+		// aliasing it onto a plain Object (`o.getSWFVersion = ...`) returns -1
+		// rather than the stub's undefined. MOVIECLIP receivers are intercepted
+		// by the dedicated case in actionCallMethod before reaching here.
+		if (mc_methods[i].len == 13 && strcmp(mc_methods[i].name, "getSWFVersion") == 0)
+		{
+			g_mc_method_funcs[i].function_type = 2;
+			g_mc_method_funcs[i].advanced_func = (Function2Ptr) builtin_mc_getSWFVersion;
 		}
 
 		if (function_count < MAX_FUNCTIONS)

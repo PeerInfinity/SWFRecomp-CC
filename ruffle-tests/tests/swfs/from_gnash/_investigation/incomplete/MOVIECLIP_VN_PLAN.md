@@ -364,6 +364,36 @@ singleton.
 
 ### B. getSWFVersion returning 5 (Phase 2)
 
+**Partial follow-up landed 2026-05-29 (pending CI): `o.getSWFVersion() == -1`
+on a plain-Object receiver (MovieClip.as:2539, result line 909).** When
+`MovieClip.prototype.getSWFVersion` is aliased onto a plain Object
+(`o = {}; o.getSWFVersion = MovieClip.prototype.getSWFVersion`), Flash
+returns -1 (it's not a real MovieClip). The MC prototype method was a
+function_type=1 stub returning undefined. Made it a real function_type=2
+builtin (`builtin_mc_getSWFVersion`) returning -1, wired exactly like the
+existing `meth` builtin in `initMovieClipPrototype`. MOVIECLIP / TextField
+receivers are intercepted by the dedicated `getSWFVersion` case in
+`actionCallMethod`'s MOVIECLIP arm *before* reaching the prototype function,
+so this builtin only fires for non-MC `this`. v6/v7/v8 each +1 matching line.
+Zero regressions: function introspection is unchanged (`global_proto_decls`
+still shows `getSWFVersion, own, DONT_ENUM, type=[function]` byte-identical);
+AVM1 `movieclip_methods_with_loaded_image`, `movieclip_state_values`,
+`movieclip_default_state`, `loadmovienum_cross_version_prototype`,
+`swf5_to_6_cross_call` all PASS.
+
+**Still failing — result line 910, `_level0.t1.getSWFVersion() == undefined`
+(MovieClip.as:2542).** A bare TextField's default (inherited) `getSWFVersion`
+should be undefined — TextField.prototype's chain does not include
+MovieClip.prototype's getSWFVersion. We return the version because the
+MOVIECLIP arm intercepts `getSWFVersion` by name for *all* MOVIECLIP-typed
+receivers (TextFields included). Can't simply return undefined for TextFields
+there: line 912 (`t1.getSWFVersion = MovieClip.prototype.getSWFVersion;
+t1.getSWFVersion() == OUTPUT_VERSION`) reaches the *same* arm and needs the
+version. Distinguishing default-inherited vs explicitly-assigned would require
+the arm to consult t1's own `dynamic_props` for `getSWFVersion` before the
+builtin case — deferred (fragile, TextField-specific, doesn't unblock
+promotion on its own).
+
 Lines: 184.
 
 ```
