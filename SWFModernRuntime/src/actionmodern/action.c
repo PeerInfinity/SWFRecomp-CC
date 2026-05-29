@@ -66325,9 +66325,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 									} \
 									if (_step_mc != NULL && (_step_mc->as_set_flags & 1)) _ltx = (double)_step_mc->x * 20.0; \
 									if (_step_mc != NULL && (_step_mc->as_set_flags & 2)) _lty = (double)_step_mc->y * 20.0; \
-								} else if (_step_mc != NULL) { \
+								} else if (_step_mc != NULL && !MC_IS_TEXTFIELD(_step_mc)) { \
 									/* AS-created clip not on the timeline display list: */ \
 									/* compose its local matrix entirely from struct fields. */ \
+									/* Textfields are excluded: their _x/_y is already baked */ \
+									/* into the local-bounds block above, so adding it to the */ \
+									/* world matrix here would double-count the position. */ \
 									double _xs = (double)_step_mc->xscale / 100.0; \
 									double _ys = (double)_step_mc->yscale / 100.0; \
 									double _rot = (double)_step_mc->rotation * 3.14159265358979323846 / 180.0; \
