@@ -8549,10 +8549,10 @@ static int resolveMCDisplayList(MovieClip* mc, DisplayObject** out_dl, size_t* o
 static void getLocalMatrixForMC(MovieClip* mc,
 	double* a, double* b, double* c, double* d, double* tx, double* ty)
 {
-	// Try to get base matrix from ng_display (transform_data)
-	size_t idx = getDisplayEntryIdxForMC(mc);
+	// Try to get base matrix from the MC's display entry (transform_data)
+	DisplayObject* entry = resolveMCDisplayEntry(mc);
 	double ba = 1.0, bb = 0.0, bc = 0.0, bd = 1.0, btx = 0.0, bty = 0.0;
-	int has_base = (idx != (size_t)-1) && ng_getMatrixFromEntry(idx, &ba, &bb, &bc, &bd, &btx, &bty);
+	int has_base = (entry != NULL) && ng_getMatrixFromObj(entry, &ba, &bb, &bc, &bd, &btx, &bty);
 	if (!has_base) {
 		// Fall back to AS-set values (or defaults)
 		double xs = (double)mc->xscale / 100.0;
@@ -8609,11 +8609,11 @@ extern int ng_getMatrixFromEntry_render(size_t entry_idx,
 static void getLocalMatrixForMC_render(MovieClip* mc,
 	float* a, float* b, float* c, float* d, int32_t* tx_twips, int32_t* ty_twips)
 {
-	size_t idx = getDisplayEntryIdxForMC(mc);
+	DisplayObject* entry = resolveMCDisplayEntry(mc);
 	float ba = 1.0f, bb = 0.0f, bc = 0.0f, bd = 1.0f;
 	int32_t btx = 0, bty = 0;
-	int has_base = (idx != (size_t)-1) &&
-		ng_getMatrixFromEntry_render(idx, &ba, &bb, &bc, &bd, &btx, &bty);
+	int has_base = (entry != NULL) &&
+		ng_getMatrixFromObj_render(entry, &ba, &bb, &bc, &bd, &btx, &bty);
 	if (!has_base) {
 		double xs = (double)mc->xscale / 100.0;
 		double ys = (double)mc->yscale / 100.0;
@@ -8656,8 +8656,8 @@ static void getLocalCTRaw(MovieClip* mc,
 		*ab = (s16)lround(g_root_cx_ab);
 		return;
 	}
-	size_t idx = getDisplayEntryIdxForMC(mc);
-	if (idx == (size_t)-1) {
+	DisplayObject* entry = resolveMCDisplayEntry(mc);
+	if (entry == NULL) {
 		// Dynamic MC (createEmptyMovieClip / attachMovie) — read from MC's
 		// cx_* fields, kept in sync by `_alpha` setter and Color.setTransform.
 		*ra = (s16)lround((double)mc->cx_ra * 256.0 / 100.0);
@@ -8671,7 +8671,7 @@ static void getLocalCTRaw(MovieClip* mc,
 		return;
 	}
 	double dra, dga, dba, daa, drb, dgb, dbb, dab;
-	ng_getCTFromEntry(idx, &dra, &dga, &dba, &daa, &drb, &dgb, &dbb, &dab);
+	ng_getCTFromObj(entry, &dra, &dga, &dba, &daa, &drb, &dgb, &dbb, &dab);
 	*ra = (s16)lround(dra * 256.0 / 100.0);
 	*ga = (s16)lround(dga * 256.0 / 100.0);
 	*ba = (s16)lround(dba * 256.0 / 100.0);
@@ -8711,9 +8711,9 @@ static void setLocalCTRaw(MovieClip* mc,
 	mc->cx_bb = (float)bb;
 	mc->cx_ab = (float)ab;
 	mc->alpha = (float)mc->cx_aa;
-	size_t idx = getDisplayEntryIdxForMC(mc);
-	if (idx == (size_t)-1) return;
-	ng_setCTOnEntry(idx,
+	DisplayObject* entry = resolveMCDisplayEntry(mc);
+	if (entry == NULL) return;
+	ng_setCTOnObj(entry,
 		(double)ra * 100.0 / 256.0,
 		(double)ga * 100.0 / 256.0,
 		(double)ba * 100.0 / 256.0,
@@ -50046,10 +50046,13 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 			// Fallback: check display list for SWF-authored filters (from tagSetFilter)
 			{
-				size_t entry_idx = getDisplayEntryIdxForMC(mc);
+				DisplayObject* entry = resolveMCDisplayEntry(mc);
+				size_t entry_depth = ng_objRootDepth(entry);
 
-				// Check multi-filter list first (from tagBeginFilterList/tagAdd*/tagEndFilterList)
-				const FilterListData* fld = (entry_idx != (size_t)-1) ? ng_getFilterListData(entry_idx) : NULL;
+				// Check multi-filter list first (from tagBeginFilterList/tagAdd*/tagEndFilterList).
+				// The filter side-tables are flat root-depth-keyed (filters only resolve at
+				// root level today; entry_depth is -1 for nested/dynamic entries).
+				const FilterListData* fld = (entry_depth != (size_t)-1) ? ng_getFilterListDataByDepth(entry_depth) : NULL;
 				if (fld && fld->count > 0) {
 					// Ensure filter prototypes are initialized (they live in flash.filters package
 					// which is lazily created on first access to the "flash" global)
@@ -50224,7 +50227,7 @@ void actionGetMember(SWFAppContext* app_context)
 				u8 fquality=0, fflags=0;
 
 				// Check extended filter data first (ColorMatrix, Convolution, Gradient*)
-				const ExtFilterData* efd = (entry_idx != (size_t)-1) ? ng_getExtFilterData(entry_idx) : NULL;
+				const ExtFilterData* efd = (entry_depth != (size_t)-1) ? ng_getExtFilterDataByDepth(entry_depth) : NULL;
 				if (efd && efd->type >= 5 && efd->type <= 8) {
 					ASObject* proto = g_filter_protos_by_type[efd->type];
 					if (proto) {
@@ -50323,8 +50326,8 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 
-				if (entry_idx != (size_t)-1 &&
-				    ng_getDisplayEntryFilterData(entry_idx, &ftype, &fblur_x, &fblur_y,
+				if (entry != NULL &&
+				    ng_getObjFilterData(entry, &ftype, &fblur_x, &fblur_y,
 				        &fquality, &fflags, &fr, &fg, &fb, &fa, &fstrength, &fangle, &fdistance,
 				        &fhr, &fhg, &fhb, &fha) && ftype != 0 && ftype <= 4) {
 					ASObject* proto = g_filter_protos_by_type[ftype];

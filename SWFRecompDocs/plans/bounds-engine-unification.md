@@ -1,6 +1,22 @@
 # Bounds engine unification — Flash-accurate `_width`/`_height`/getBounds/hitTest
 
-Status: **PLANNING** (no code yet). Created 2026-05-28.
+Status: **IN PROGRESS** (P1 + P2 bounds done & CI-green both modes; P2d/e/f + P3 remain). Created 2026-05-28.
+
+## Progress log
+
+- **P1** (`12a7bb799`) — pointer-form accessors + `resolveMCDisplayEntry`/`resolveMCDisplayList`
+  + `ng_localBoundsOfDL`/`ng_objRootDepth`/`*ByDepth`; `*FromEntry` delegate. Additive.
+- **P2 bounds** (`eef77ea7b`) — all 5 `ng_getDisplayEntryBounds` callers → `ng_localBoundsOfDL`.
+- **P2 fix** (`432dccb03`) — degenerate (zero-extent) `_matrix` result is ignored in the
+  `_width`/`_height` path so the `child_mc_cache` fallback fires for dynamically-attached
+  children (ng_attachMovie doesn't cache `place_*`). Fixed the one CI regression (avm1
+  `issue_2084`).
+- **CI confirmed green both modes** (no-graphics run 26609151375, graphics run 26609152488):
+  every suite holds its pre-refactor baseline (avm1 614/614, shumway 73, shumway/avm1 46,
+  actionscript.all 124/122, ming 66/65, swfmill 19, mtasc 7, swfc 8). Zero net regressions.
+- **Remaining:** P2d (matrix accessors), P2e (CT accessors), P2f (filters) → `resolveMCDisplayEntry`
+  + `ng_objRootDepth`; P3 delete `ng_getDisplayEntryBounds`, `_fp16`, both `ng_entry_to_obj`,
+  `getDisplayEntryIdxForMC`, `ng_findDisplayEntryIdxWithParent`, `ng_findDisplayEntryIdx`.
 
 ## Motivation
 
