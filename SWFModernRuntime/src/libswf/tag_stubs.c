@@ -1425,19 +1425,17 @@ static void ng_overlay_entry_as_transform(DisplayObject* child,
         if (mc == NULL || mc->depth == INT_MIN) continue;
         if ((DisplayObject*)mc->display_obj != child) continue;
         u8 flags = mc->as_set_flags;
-        if (flags == 0) return;  // matched but identity — nothing to overlay
-        if (flags & (4|8|16)) {
-            float sx = mc->xscale / 100.0f;
-            float sy = mc->yscale / 100.0f;
-            float rad = mc->rotation * 3.14159265358979323846f / 180.0f;
-            float skew = mc->skew;
-            float cr_x = cosf(rad),        sr_x = sinf(rad);
-            float cr_y = cosf(rad + skew), sr_y = sinf(rad + skew);
-            *a = sx * cr_x;
-            *b = sx * sr_x;
-            *c = -(sy * sr_y);
-            *d = sy * cr_y;
-        }
+        // Overlay TRANSLATION only (_x/_y). Deliberately NOT scale/rotation
+        // (bits 4|8|16): a clip's mc->xscale/yscale can hold extreme or
+        // placement-synced values that are flagged AS-set, and replacing the
+        // cached placement matrix with a scale-only reconstruction blew up
+        // getBounds for movieclip_invalid_get_bounds_6/7 (boundingBox_mc,
+        // yscale~110462 → bounds exploded). The placement matrix (place_*)
+        // already carries the correct scale, and the moving-platform case this
+        // fix targets (Doodle Jump blue "aaa") only slides via _x. Nested-child
+        // AS scale/rotation inside a parent's bounds is a known gap that matches
+        // current Ruffle expectations.
+        if ((flags & 3) == 0) return;  // no _x/_y AS-set — leave placement as-is
         if (flags & 1) *tx = rintf(mc->x * 20.0f);
         if (flags & 2) *ty = rintf(mc->y * 20.0f);
         return;
