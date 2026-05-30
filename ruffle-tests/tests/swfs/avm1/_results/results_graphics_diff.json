@@ -1,66 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-29T23:57:57.964646+00:00",
-    "old_git_sha": "99221dcfc682a72a006278f84687c70ffaa2d5fb",
-    "new_timestamp": "2026-05-30T00:21:05.613468+00:00",
-    "new_git_sha": "ff04de9186b15f106ec637f68e52e2dab697d530",
+    "old_timestamp": "2026-05-30T00:21:05.613468+00:00",
+    "old_git_sha": "ff04de9186b15f106ec637f68e52e2dab697d530",
+    "new_timestamp": "2026-05-30T01:35:50.644395+00:00",
+    "new_git_sha": "2b8f8a6e77e50e978169006543ec79d8a727b636",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 614,
+    "old_pass": 616,
     "old_ruffle_matched": 11,
-    "old_effective_pass": 625,
+    "old_effective_pass": 627,
     "old_total": 673,
-    "old_pass_rate": 91.2,
+    "old_pass_rate": 91.5,
     "new_pass": 616,
     "new_ruffle_matched": 11,
     "new_effective_pass": 627,
     "new_total": 673,
     "new_pass_rate": 91.5,
-    "old_mismatched_lines": 9622,
+    "old_mismatched_lines": 9620,
     "new_mismatched_lines": 9620,
     "increased_mismatches": 0,
-    "decreased_mismatches": 2,
-    "newly_passing": 2,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 2,
-    "unchanged": 671,
+    "status_changed": 0,
+    "unchanged": 673,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "movieclip_invalid_get_bounds_6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 9
-      },
-      "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      }
-    },
-    {
-      "test": "movieclip_invalid_get_bounds_7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 9
-      },
-      "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      }
-    }
-  ]
+  "changes": []
 }
