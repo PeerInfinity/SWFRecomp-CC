@@ -177,7 +177,18 @@ scale). Limited to translation; both tests restored, CI clean both modes.
 Nested-child AS scale/rotation in a parent's bounds is a known gap matching
 current Ruffle expectations.
 
-### Brown breakable still collides after break animation — OPEN (next)
+### Brown breakable — NOT A BUG (resolved `f8c522630`, 2026-05-29)
+Verified against Ruffle: you CAN repeatedly bounce a breaking brown platform and
+it FALLS when broken — the original "collision persists" report was a
+misunderstanding of expected behavior. While investigating, found+fixed a real
+Flash-correctness bug it exposed: `gotoAndStop(N)` on an attached clip must be a
+no-op when already stopped on frame N (Ruffle `goto_frame_now`, movie_clip.rs:931
+— same-frame goto = `no_op_goto`, does not re-run frame tags). Our browser-WASM
+MC-targeted gotoAndStop re-ran the frame each re-break, re-placing the break piece
+(charId 37) at _y=0 and pinning its collision bounds; with the no-op the piece
+falls smoothly (the bounds overlay follows its _y). Browser-WASM only.
+
+### (historical) Brown breakable investigation notes
 User report (2026-05-29): brown breakable platforms play their break/fall
 animation, but **collision persists after the animation finishes** (hero can
 still land on the broken platform). Earlier phrased as "breakable reappears when
