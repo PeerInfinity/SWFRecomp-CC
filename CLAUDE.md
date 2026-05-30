@@ -14,6 +14,7 @@ We are improving the pass rate on the Ruffle AVM1 test suite (ActionScript 1/2 t
 - `ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md` — architecture, how to run tests, infrastructure (all suites)
 - `ruffle-tests/tests/swfs/_investigation/OVERVIEW.md` — cross-suite summary (avm1, gnash, shumway)
 - Per-suite status: `ruffle-tests/tests/swfs/{suite}/_investigation/CURRENT_STATUS.md`
+- For debugging full games (flasharchive/glaiel): `SWFRecompDocs/guides/wasm-game-debugging-session-guide.md` — divergence-harness-first workflow, headless-vs-browser task triage, tools, session-prompt template
 
 **Quick test commands:**
 ```bash
