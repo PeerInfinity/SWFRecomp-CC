@@ -30002,6 +30002,48 @@ void actionNextFrame(SWFAppContext* app_context)
 		}
 		return;
 	}
+
+	// Root onEnterFrame calling this.nextFrame() on a STOPPED root.
+	// g_inside_enterframe_dispatch is set (not g_inside_event_handler — root
+	// onEnterFrame is dispatched directly by actionDispatchEnterFrameHandlers,
+	// not through mc_call_as2_handler_ng). On a stopped root the deferred
+	// advance (manual_next_frame without goto_from_action) is silently dropped:
+	// the main-loop frame_funcs gate requires (is_playing || manual_next_frame)
+	// but manual_next_frame is cleared at end-of-tick BEFORE current_frame
+	// reaches the target, so the target frame's tags+script never run. Unlike a
+	// Dejagnu enterFrame goto (which retries every tick on a playing root), a
+	// byte preloader does `delete this.onEnterFrame; this.nextFrame()` exactly
+	// once, so there is no retry to fall back on.
+	//
+	// Set the deferred-goto state (goto_from_action) instead of advancing
+	// inline: the main loop's catch-up block — swf.c's
+	// `while (goto_from_action && manual_next_frame)` (after the enterFrame
+	// flush returns) / swf_core.c's equivalent after its enterFrame dispatch —
+	// then runs funcs[target] with catch_up_mode=0 in this same tick, so the
+	// target frame's DoAction is queued AND drained normally (and its sprites
+	// init normally). Running ng_executeGotoCatchUp inline HERE instead would
+	// execute while g_inside_enterframe_dispatch is still set, which defers the
+	// queued script + sprite init by ~2 ticks (level/score and the menu clip's
+	// animation lag). Gated to the root (g_current_context == &root_movieclip)
+	// and to a stopped root (a playing root advances naturally). Key game:
+	// flasharchive/Tetris (preloader→menu transition).
+	{
+		extern int g_inside_enterframe_dispatch;
+		extern int is_playing;
+		if (g_inside_enterframe_dispatch && !is_playing
+		    && g_current_context == &root_movieclip && !ng_isInsideSprite()) {
+			extern int goto_from_action;
+			extern size_t g_frame_count;
+			size_t target = current_frame + 1;
+			if (target < g_frame_count) {
+				goto_from_action = 1;
+				next_frame = target;
+				manual_next_frame = 1;
+				root_movieclip.currentframe = target + 1;
+			}
+			return;
+		}
+	}
 #endif
 
 	next_frame = current_frame + 1;
