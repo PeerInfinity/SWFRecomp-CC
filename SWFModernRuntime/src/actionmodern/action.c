@@ -63924,10 +63924,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							// no-op (cloud platforms are single-frame).
 							if (mc != NULL && mc->display_obj != NULL) {
 								DisplayObject* dobj = (DisplayObject*)mc->display_obj;
-								dobj->sprite_next_frame = (size_t)frame0;
-								dobj->sprite_manual_next_frame = 1;
-								dobj->sprite_is_playing = is_play ? 1 : 0;
-								mc->currentframe = frame0 + 1;
+								// Flash: gotoAndStop(N) while already stopped on frame N
+								// is a no-op — it does NOT re-run the frame's content.
+								// For attachMovie'd clips, re-running rebuilds the
+								// sub-list and RESETS any playing nested clip. Doodle
+								// Jump's breakable: the break handler re-calls
+								// block.gotoAndStop(4) on EVERY re-collision; without
+								// this guard each call re-places the break piece
+								// (charId 37) at _y=0, restarting its fall animation
+								// and pinning the platform's collision bounds at the
+								// hero forever. Skip when already settled on frame N.
+								if (!is_play
+								    && dobj->sprite_current_frame == (size_t)frame0
+								    && !dobj->sprite_manual_next_frame) {
+									// already stopped on this frame — no-op
+								} else {
+									dobj->sprite_next_frame = (size_t)frame0;
+									dobj->sprite_manual_next_frame = 1;
+									dobj->sprite_is_playing = is_play ? 1 : 0;
+									mc->currentframe = frame0 + 1;
+								}
 							}
 						}
 					}
