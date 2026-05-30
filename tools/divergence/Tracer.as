@@ -23,8 +23,14 @@ class Tracer {
 
     static function main(mc:MovieClip):Void {
         trace("TRACER: start _currentframe=" + _root._currentframe);
-        // Hook _root.onEnterFrame. Runs after each frame's script + display update.
-        _root.onEnterFrame = function():Void {
+        // Hook frame ticks via a DEDICATED empty clip's onEnterFrame rather than
+        // _root.onEnterFrame. Many SWFs drive their preloader / main loop through
+        // _root.onEnterFrame, and overwriting it silently breaks them (e.g. a
+        // preloader that advances to the menu once loaded would never fire). The
+        // tracer clip lives at a very high depth so it can't collide with the
+        // game's display list, and dump_display_list skips it by name.
+        var tracerClip:MovieClip = _root.createEmptyMovieClip("__tracer__", 1048575);
+        tracerClip.onEnterFrame = function():Void {
             Tracer.dump_tick();
         };
     }
@@ -98,6 +104,7 @@ class Tracer {
         // Recurse into MC children, sorted by name for stable ordering.
         var children:Array = [];
         for (var n:String in mc) {
+            if (n == "__tracer__") continue;  // skip our own frame-tick hook clip
             if (typeof(mc[n]) == "movieclip") children.push(n);
         }
         children.sort();
