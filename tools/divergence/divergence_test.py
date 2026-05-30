@@ -14,6 +14,10 @@ Default output: tools/divergence/runs/<swf_stem>/
   ruffle/trace.txt            Ruffle trace log
   swfrecomp/build/F<NNNN>.png per-frame PNG from SWFRecomp graphics-native
   swfrecomp/trace.txt         SWFRecomp trace log (raw stdout)
+  compare/f<NN>.ruffle.png    side-by-side comparison set (all frames):
+  compare/f<NN>.swfrecomp.png   the Ruffle + SWFRecomp frame, co-located, plus
+  compare/f<NN>.swfrecomp.difference.png  a per-frame difference image (written
+                              for every frame that differs at all)
   divergence.txt              first divergence report
 """
 import argparse
@@ -74,12 +78,22 @@ def swfrecomp_png_for_frame(build_dir: Path, frame: int) -> Path:
     return build_dir / f"F{frame:04d}.png"
 
 
-def first_image_divergence(ruffle_dir: Path, swfrecomp_build: Path, total: int,
-                           tolerance: int, max_outliers: int) -> tuple[int, str]:
-    """Walk frames in order, return (frame, message) of first frame whose PNG
-    pair fails the tolerance check. Returns (-1, '') if all match. Frames
-    where either PNG is missing are skipped (with a note) since absence may
-    just mean the run ended early on one side."""
+def build_comparison(ruffle_dir: Path, swfrecomp_build: Path, total: int,
+                     tolerance: int, max_outliers: int,
+                     compare_dir: Path) -> tuple[int, str]:
+    """Walk every frame in order. For each frame where both PNGs exist, co-locate
+    the Ruffle and SWFRecomp renders side-by-side in compare_dir as
+    f<NN>.ruffle.png / f<NN>.swfrecomp.png, and (via compare_images) write a
+    per-frame difference image f<NN>.swfrecomp.difference.png whenever the pair
+    differs at all. Returns (frame, message) of the FIRST frame whose PNG pair
+    fails the tolerance check, or (-1, '') if all match. Frames where either PNG
+    is missing are skipped (with a note) since absence may just mean the run
+    ended early on one side."""
+    if compare_dir.exists():
+        shutil.rmtree(compare_dir)
+    compare_dir.mkdir(parents=True)
+    digits = max(2, len(str(total)))
+    first_frame, first_msg = -1, ""
     notes = []
     for frame in range(1, total + 1):
         a = ruffle_png_for_frame(ruffle_dir, frame, total)
@@ -88,15 +102,23 @@ def first_image_divergence(ruffle_dir: Path, swfrecomp_build: Path, total: int,
             notes.append(f"  frame {frame}: missing ({'ruffle' if not a.exists() else ''} "
                          f"{'swfrecomp' if not b.exists() else ''})".strip())
             continue
+        # Co-locate the pair so all three (ruffle / swfrecomp / diff) sit together
+        # under compare/ and sort by frame for easy side-by-side browsing.
+        r_copy = compare_dir / f"f{frame:0{digits}d}.ruffle.png"
+        s_copy = compare_dir / f"f{frame:0{digits}d}.swfrecomp.png"
+        shutil.copy2(a, r_copy)
+        shutil.copy2(b, s_copy)
+        # compare_images writes "<actual_stem>.difference.png" next to s_copy
+        # whenever there is any pixel difference (independent of pass/fail).
         passed, msg, max_diff = vo.compare_images(
-            a, b, [{"tolerance": tolerance, "max_outliers": max_outliers}])
-        if not passed:
-            return frame, f"max_diff={max_diff} ({msg})"
+            s_copy, r_copy, [{"tolerance": tolerance, "max_outliers": max_outliers}])
+        if not passed and first_frame < 0:
+            first_frame, first_msg = frame, f"max_diff={max_diff} ({msg})"
     if notes:
         print("Image comparison notes:", file=sys.stderr)
         for n in notes[:5]:
             print(n, file=sys.stderr)
-    return -1, ""
+    return first_frame, first_msg
 
 
 def run(cmd, **kw):
@@ -178,10 +200,10 @@ def main():
         for j in range(ctx_start, idx):
             report.append(f"    {j:>4}: {a[j]}")
 
-    # 5. Diff images
-    img_frame, img_msg = first_image_divergence(
+    # 5. Diff images (also builds the side-by-side compare/ set for all frames)
+    img_frame, img_msg = build_comparison(
         ruffle_dir, swfrecomp_dir / "build", args.frames,
-        args.tolerance, args.max_outliers)
+        args.tolerance, args.max_outliers, out_dir / "compare")
     if img_frame < 0:
         report.append(f"Image: identical (tolerance={args.tolerance}/{args.max_outliers})")
     else:
