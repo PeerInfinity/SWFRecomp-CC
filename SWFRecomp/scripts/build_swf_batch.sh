@@ -131,7 +131,9 @@ SUCCESS=0
 FAIL=0
 SKIPPED=0
 FAILED_NAMES=()
-GRAPHICS_BUILD_TIMEOUT=180
+# Per-SWF graphics build timeout (seconds). Override via env for large SWFs:
+#   GRAPHICS_BUILD_TIMEOUT=900 ./scripts/build_swf_batch.sh ...
+GRAPHICS_BUILD_TIMEOUT="${GRAPHICS_BUILD_TIMEOUT:-600}"
 
 for swf_path in "${SWF_FILES[@]}"; do
     swf_basename="$(basename "$swf_path")"
