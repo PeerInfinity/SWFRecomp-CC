@@ -1613,6 +1613,31 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		float attached_xform[16];
 		if (build_attached_mc_local_xform(obj, attached_xform)) {
 			local_xform = attached_xform;
+		} else if (obj->transform_id >= (u32)(app_context->transform_data_size / (16 * sizeof(float)))) {
+			// Dynamic GPU transform slot (transform_id >= the number of
+			// recompiler-baked slots): allocated at runtime for a clip that has
+			// no baked transform_data entry — e.g. a createEmptyMovieClip /
+			// createTextField overlay such as the gnash/Dejagnu "_xtrace_win"
+			// trace window. The CPU-side `transform_data` global only holds the
+			// baked slots [0, orig_count), so reading transforms[transform_id]
+			// here is an out-of-bounds read past the global (crashes under the
+			// OFFSCREEN_RENDER global layout; UB everywhere). Build the local
+			// matrix from the MC's AS-state (mc->x/y/scale/rotation) instead,
+			// matching apply_dynamic_mc_transforms; fall back to identity.
+			attached_xform[0]  = 1.0f; attached_xform[1]  = 0.0f; attached_xform[2]  = 0.0f; attached_xform[3]  = 0.0f;
+			attached_xform[4]  = 0.0f; attached_xform[5]  = 1.0f; attached_xform[6]  = 0.0f; attached_xform[7]  = 0.0f;
+			attached_xform[8]  = 0.0f; attached_xform[9]  = 0.0f; attached_xform[10] = 1.0f; attached_xform[11] = 0.0f;
+			attached_xform[12] = 0.0f; attached_xform[13] = 0.0f; attached_xform[14] = 0.0f; attached_xform[15] = 1.0f;
+			extern MovieClip* child_mc_cache[];
+			extern int child_mc_count;
+			for (int _ci = 0; _ci < child_mc_count; _ci++) {
+				MovieClip* _nmc = child_mc_cache[_ci];
+				if (_nmc == NULL || _nmc->depth == INT_MIN) continue;
+				if ((DisplayObject*)_nmc->display_obj != obj) continue;
+				apply_as_transform(attached_xform, _nmc, (u8)(1|2|4|8|16));
+				break;
+			}
+			local_xform = attached_xform;
 		} else {
 			local_xform = &transforms[obj->transform_id * 16];
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
@@ -2873,9 +2898,16 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 // vertically. Without this, long text overflows into neighboring fields.
 static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
 {
-	(void)user_data;
 	extern u32 shape_data[][4];
 	extern u32 glyph_data[][1];
+
+	// Number of u32 entries in the generated glyph_data global (4 per glyph:
+	// offset, size, +2 reserved). Passed via user_data so the draw pass can
+	// bound-check glyph indices — trace-only SWFs (no embedded font outlines)
+	// emit a 1-element placeholder, and a font with metrics but no shapes would
+	// otherwise index past the global.
+	SWFAppContext* _gd_ctx = (SWFAppContext*)user_data;
+	size_t glyph_data_entries = _gd_ctx ? (_gd_ctx->glyph_data_size / sizeof(u32)) : 0;
 
 	int font_idx = ng_find_font_with_metrics(info->font_id);
 	if (font_idx < 0) return;
@@ -3123,6 +3155,14 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 		// Global glyph index
 		size_t global_idx = glyph_base + (size_t)glyph_idx;
+		// Skip the glyph-shape read/draw when there's no outline to draw:
+		//  - the built-in fallback font carries metrics + advances only, and
+		//  - a trace-only SWF (or a metrics-only embedded font) emits a tiny
+		//    glyph_data placeholder, so indexing it here would read past the
+		//    global (the OFFSCREEN_RENDER layout turns that OOB into a SIGABRT).
+		// Bound-check against the actual glyph_data length (4 u32 per glyph).
+		// The pen still advances below for layout either way.
+		if (!ng_font_is_builtin(font_idx) && (4 * global_idx + 1) < glyph_data_entries) {
 		size_t g_offset = (size_t)glyph_data[4 * global_idx][0];
 		size_t g_size = (size_t)glyph_data[4 * global_idx + 1][0];
 
@@ -3137,6 +3177,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			}
 			renderer_draw_tris(context, xy_buf, (u32)g_size, r, g, b, 1.0f, 0, 0);
 		}
+		} // end glyph-outline-available guard
 
 		// Advance x by glyph advance width
 		s16 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
@@ -3540,9 +3581,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 
 	// Text field backgrounds/borders and glyph rendering
 	actionIterateTextFields(textfield_render_cb, NULL);
-	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, NULL);
+	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, app_context);
 	actionIterateOrphanTextFields(app_context, textfield_render_cb,
-		textfield_glyph_render_cb, NULL);
+		textfield_glyph_render_cb, app_context);
 
 	// Drawing API fills and strokes
 	actionIterateDrawings(drawing_render_cb, NULL);
@@ -4296,9 +4337,9 @@ void tagShowFrame(SWFAppContext* app_context)
 	// Dynamic text fields (createTextField) are tracked in child_mc_cache but not
 	// on the tag display list. Render their background/border rectangles here.
 	actionIterateTextFields(textfield_render_cb, NULL);
-	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, NULL);
+	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, app_context);
 	actionIterateOrphanTextFields(app_context, textfield_render_cb,
-		textfield_glyph_render_cb, NULL);
+		textfield_glyph_render_cb, app_context);
 
 	// --- Render Drawing API fills and strokes ---
 	actionIterateDrawings(drawing_render_cb, NULL);

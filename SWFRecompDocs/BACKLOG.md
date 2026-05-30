@@ -38,11 +38,23 @@ first).
 
 ## Deferred test failures
 
-- **`from_gnash/actionscript.all/case-v6` CI-only flake.** Passes
-  locally after follow-up #4's wrap-back undo but CI ends with exit
-  code -6 ("output matches"). Same CI-environment category as
-  `avm1/native_objects_swf6`. Don't chase locally; needs a separate
-  CI-environment investigation. (2026-05-11)
+- ~~**`from_gnash/actionscript.all/case-v6` CI-only flake.**~~ FIXED
+  2026-05-30. Was never CI-environment-specific — it was a real
+  heap bug masked by heap layout. `case-v5` reproduced the same
+  SIGABRT-after-correct-output locally in `--mode=graphics`; ASAN
+  pinned three distinct OOBs (all fixed): (1) `compose_children`
+  read CPU `transform_data[]` at a runtime-allocated dynamic GPU
+  transform slot (no CPU backing) for the gnash `_xtrace_win` trace
+  overlay; (2) `textfield_glyph_render_cb` indexed the `glyph_data`
+  global for a metrics-only/built-in font with no outlines; (3) the
+  load-bearing one — a heap-use-after-free in the variable map:
+  `actionSetVariable`/`actionDefineLocal` freed an `old_hash`
+  `ActionVar` still owned by `var_array` (SWF≤6 case-folded
+  `_LEVEL0`/`_level0` collide to one hashmap key but get distinct
+  `var_array` slots), leaving a dangling slot that `freeMap` reads.
+  Guarded the free with `variableIsArrayOwned`. case-v5 + case-v6
+  now 10/10 in graphics, both still pass NO_GRAPHICS, ASAN clean
+  (only pre-existing `u16_concat` Dejagnu leaks). (2026-05-30)
 - **`from_gnash/misc-ming.all/place_and_remove_object_insane_test`
   15/19 in graphics-native vs 19/19 NO_GRAPHICS.** Same diff appears
   in `--mode=graphics-headless-legacy`, so the bug is in shared code

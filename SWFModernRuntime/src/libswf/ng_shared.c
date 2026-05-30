@@ -476,6 +476,17 @@ size_t ng_font_get_glyph_base(int font_idx)
 	return ng_fonts[font_idx].glyph_base;
 }
 
+// The built-in Noto Sans fallback font carries metrics + advance widths only —
+// it has NO glyph outlines in the generated `glyph_data` global. Callers that
+// render glyph shapes must skip it (reading glyph_data at its glyph indices is
+// out of bounds, e.g. for trace-only SWFs whose glyph_data is a 1-element
+// placeholder).
+int ng_font_is_builtin(int font_idx)
+{
+	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return 0;
+	return ng_fonts[font_idx].is_builtin;
+}
+
 int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square)
 {
 	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return 0;

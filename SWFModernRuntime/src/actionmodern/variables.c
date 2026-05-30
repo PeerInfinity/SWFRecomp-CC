@@ -112,6 +112,22 @@ void freeMap()
 	}
 }
 
+// Returns 1 if `var` is currently owned by var_array (the primary owner that
+// freeMap's var_array loop will free). The var_map hashmap is a secondary index
+// that may alias the same ActionVar — callers that replace/free a hashmap entry
+// must NOT free it when it is array-owned, or freeMap later double-frees /
+// reads a dangling var_array slot. This mirrors free_variable_callback's own
+// "skip entries shared with var_array" ownership rule. The collision arises for
+// SWF<=6 case-folded keys: e.g. `_LEVEL0` and `_level0` get distinct var_array
+// slots but fold to one hashmap key (see actionSetVariable's hashmap sync).
+int variableIsArrayOwned(ActionVar* var)
+{
+	if (!var || !var_array) return 0;
+	for (size_t i = 0; i < var_array_size; i++)
+		if (var_array[i] == var) return 1;
+	return 0;
+}
+
 ActionVar* getVariableById(u32 string_id)
 {
 	if (string_id == 0 || string_id >= var_array_size)

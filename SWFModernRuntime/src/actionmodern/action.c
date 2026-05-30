@@ -40476,7 +40476,7 @@ void actionSetVariable(SWFAppContext* app_context)
 							_wf_key = _wf_buf;
 						}
 						if (hashmap_get(var_map, _wf_key, var_name_len, (uintptr_t*)&old_hash)) {
-							if (old_hash != var) {
+							if (old_hash != var && !variableIsArrayOwned(old_hash)) {
 								if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
 									free(old_hash->data.string_data.heap_ptr);
 								free(old_hash);
@@ -40523,7 +40523,7 @@ void actionSetVariable(SWFAppContext* app_context)
 			_sv_key = _sv_folded;
 		}
 		if (hashmap_get(var_map, _sv_key, var_name_len, (uintptr_t*)&old_hash)) {
-			if (old_hash != var) {
+			if (old_hash != var && !variableIsArrayOwned(old_hash)) {
 				// Free the old hashmap entry being replaced
 				if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
 					free(old_hash->data.string_data.heap_ptr);
@@ -40889,7 +40889,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 			hm_lookup_key = _dl_folded2;
 		}
 		if (hashmap_get(var_map, hm_lookup_key, var_name_len, (uintptr_t*)&old_hash)) {
-			if (old_hash != var) {
+			if (old_hash != var && !variableIsArrayOwned(old_hash)) {
 				if (old_hash->type == ACTION_STACK_VALUE_STRING && old_hash->data.string_data.owns_memory)
 					free(old_hash->data.string_data.heap_ptr);
 				free(old_hash);

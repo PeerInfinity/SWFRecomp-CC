@@ -483,6 +483,7 @@ void ng_record_font_glyph_base(u16 font_id, size_t glyph_base);
 int ng_find_font_with_metrics(u16 font_id);
 int ng_font_find_glyph(int font_idx, u16 code_point);
 size_t ng_font_get_glyph_base(int font_idx);
+int ng_font_is_builtin(int font_idx);
 int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square);
 s16 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx);
 void ng_setTabStops(const int* stops_twips, int count, u16 font_height);
