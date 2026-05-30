@@ -34,13 +34,24 @@ deploy debugging targets there.)
 `~/CC/glaiel/` — see the AS-extraction recipe in
 `SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md`.
 
-### Scope: AVM1 only
+### Scope: AVM1 only — exclude AVM2/AS3 SWFs
 
-The recompiler and the divergence tracer are **AVM1**. Of this corpus, **QWOP is
-the only AVM2/AS3 SWF — exclude it.** (AVM2 SWFs are SWF version ≥ 9; the tracer
-won't execute and recompiler support is limited. Detect with
-`head -c 4 game.swf | xxd` → byte 3 is the version.) If a game unexpectedly
-produces no trace lines on the Ruffle side either, check whether it's AVM2.
+The recompiler and the divergence tracer are **AVM1**. AVM2/AS3 SWFs won't run.
+
+**Do NOT use the SWF version byte to detect AVM2 — it is unreliable.** AVM1
+content is routinely published as SWF v9+ (Age of War is v9 AVM1, Duck Life 2 is
+v15 AVM1). The authoritative signal is the tag stream: a `DoABC` tag (82) ⇒
+AVM2; `DoAction`/`DoInitAction` (12/59) ⇒ AVM1. Use the classifier:
+
+```bash
+python3 tools/divergence/classify_avm.py ~/CC/flasharchive/*.swf
+python3 tools/divergence/classify_avm.py --avm1-only ~/CC/glaiel/swfs/*.swf  # AVM1 names only
+```
+
+Known AVM2 exclusions in this corpus (classified 2026-05-30):
+- **flasharchive:** `QWOP` (only one).
+- **glaiel:** `Aether`, `Closure`, `Pilgrimage`, `Spectrum`, `attractor`,
+  `nutcracker`, and `helenkellergame` (AS3 flag set, no AVM1 actions — verify).
 
 ### Work smallest-first
 
