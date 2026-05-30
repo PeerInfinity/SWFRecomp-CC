@@ -6057,47 +6057,72 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	}
 #endif
 
-	// Within-same-frame placement conflict handling
+	// Within-same-frame placement handling, mapped to Ruffle's PlaceObjectAction:
+	//  - PLACE (Move=0, is_replace=0) of a DIFFERENT character at a depth occupied
+	//    this generation: instantiate_child refuses + warns ("Failed to place
+	//    object at depth N"). (avm1/placeobject_occupied_depth's frame-1 pair.)
+	//  - SAME character (either Move setting): replace_with(same id) is a modify —
+	//    update matrix/cxform, do NOT re-instantiate. (placeobject_occupied_depth
+	//    frame 2: a Move=1 re-place of the just-placed char must not re-trigger
+	//    "Instantiated ID 4".)
+	//  - REPLACE (Move=1, is_replace=1) of a DIFFERENT character: replace_with(id)
+	//    swaps the character in place, never warns. g_place_gen only advances on
+	//    root-timeline frame changes, so a sprite playing frame-by-frame shape
+	//    swaps while the root is stopped keeps a single generation; those legit
+	//    replaces must fall through to the replace path below rather than be
+	//    rejected (Tetris "Dots" char-17: shapes 13->14->15->16 at depth 1).
 	if (display_list[depth].char_id != 0 && display_list[depth].place_gen == g_place_gen)
 	{
 		if (display_list[depth].char_id != char_id)
 		{
-			// Flash rejects placing a different character at a depth already occupied this frame.
-			// Discard any pending instance_name set by a preceding tagSetInstanceName so the
-			// rejected placement's name doesn't leak to the next placement (and doesn't
-			// overwrite the surviving first placement's name either). Required for
-			// gnash misc-ming place_object_test where the first placement's name (sh1/mc2)
-			// must survive the second placement's rejection.
+			if (!is_replace)
+			{
+				// PLACE of a different character at an occupied depth: refuse + warn.
+				// Discard any pending instance_name set by a preceding
+				// tagSetInstanceName so the rejected placement's name doesn't leak to
+				// the next placement (and doesn't overwrite the surviving first
+				// placement's name either). Required for gnash misc-ming
+				// place_object_test where the first placement's name (sh1/mc2) must
+				// survive the second placement's rejection.
+				g_pending_instance_name = NULL;
+				printf("Warning: Failed to place object at depth %zu.\n", depth);
+				return;
+			}
+			// REPLACE of a different character: fall through to the replace path.
+		}
+		else
+		{
+			// Same character at same depth in same generation: treat as modify
+			// (don't re-init). Per Ruffle apply_place_object, name is "Purposely
+			// omitted" on modify — discard any pending instance_name without
+			// consuming it.
 			g_pending_instance_name = NULL;
-			printf("Warning: Failed to place object at depth %zu.\n", depth);
+			display_list[depth].transform_id = transform_id;
+			ng_cache_transform(&display_list[depth], transform_id);
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+			init_cx_fields(&display_list[depth]);
+			if (depth > max_depth) max_depth = depth;
 			return;
 		}
-		// Same character at same depth in same frame: treat as modify (don't re-init).
-		// Per Ruffle apply_place_object, name is "Purposely omitted" on modify — discard
-		// any pending instance_name without consuming it.
-		g_pending_instance_name = NULL;
-		display_list[depth].transform_id = transform_id;
-		ng_cache_transform(&display_list[depth], transform_id);
-		display_list[depth].cxform_id = cxform_id;
-		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
-		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
-		init_cx_fields(&display_list[depth]);
-		if (depth > max_depth) max_depth = depth;
-		return;
 	}
 
-	// Cross-frame non-sprite REPLACE detection: existing entry from a prior
-	// frame is being replaced with a different non-sprite character (sprite
-	// case is handled above and returns early). Per Ruffle apply_place_object
-	// (display_object.rs:2536-2539), name / clip_depth / clip_actions are
-	// purposely omitted on subsequent PlaceObject tags — only matrix, cxform,
-	// ratio update. For shapes, replace_with hot-swaps the graphic data
-	// (we update char_id below) but the AS-visible name binding is preserved.
-	// Targets misc-ming/replace_shapes1test where the frame-3 REPLACE supplies
-	// a new name "static2"; the existing "static1" binding must remain and
-	// "static2" must NOT be registered.
-	int is_cross_frame_replace = display_list[depth].char_id != 0
-	                              && display_list[depth].place_gen != g_place_gen;
+	// REPLACE of an existing occupied slot. Matches Ruffle's
+	// PlaceObjectAction::Replace -> child.replace_with(id) + apply_place_object:
+	// name / clip_depth / clip_actions are purposely omitted, and matrix / cxform
+	// / ratio are applied only when the tag carries them (HasMatrix etc.); the
+	// char_id is hot-swapped below. Two cases:
+	//   - is_replace: an explicit Move=1+HasCharacter=1 replace at ANY generation
+	//     (e.g. a playing sprite's per-frame shape swap while the root — which is
+	//     what bumps g_place_gen — is stopped; Tetris "Dots" char 17).
+	//   - cross-generation re-place: a prior-frame entry replaced with a different
+	//     character. Targets misc-ming/replace_shapes1test where the frame-3
+	//     REPLACE supplies a new name "static2"; the existing "static1" binding
+	//     must remain and "static2" must NOT be registered.
+	int is_replace_of_existing = display_list[depth].char_id != 0
+	                              && (is_replace
+	                                  || display_list[depth].place_gen != g_place_gen);
 
 #if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: before we overwrite this slot's char_id and drop the old
@@ -6123,9 +6148,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// re-place — Snake countdown frame_16/29 PlaceObject2(d=2, char=19/20,
 	// transform=0, replace=1) drops chars 19/20 ("2"/"1") to the canvas origin
 	// instead of inheriting frame_4's centered transform 131 from char 18 ("3").
-	// Fresh placements (is_cross_frame_replace=false, slot was empty) fall
+	// Fresh placements (is_replace_of_existing=false, slot was empty) fall
 	// through unchanged because the existing transform_id was already 0.
-	if (!(is_replace && transform_id == 0 && is_cross_frame_replace)) {
+	if (!(is_replace && transform_id == 0 && is_replace_of_existing)) {
 		display_list[depth].transform_id = transform_id;
 		ng_cache_transform(&display_list[depth], transform_id);
 	}
@@ -6145,7 +6170,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].child_transform_data = NULL;
 	if (g_char_movie_id != NULL && char_id < g_char_movie_id_capacity && g_char_movie_id[char_id] != 0)
 		display_list[depth].child_transform_data = g_movie_transform_data[g_char_movie_id[char_id]];
-	if (is_cross_frame_replace) {
+	if (is_replace_of_existing) {
 		// REPLACE preserves existing instance_name and clip_actions; discard
 		// any pending values so they don't leak to the next placement.
 		g_pending_instance_name = NULL;
