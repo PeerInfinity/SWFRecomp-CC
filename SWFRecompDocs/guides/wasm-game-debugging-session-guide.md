@@ -73,17 +73,21 @@ is easier to localize. Sizes (run `ls -laS ~/CC/flasharchive/*.swf` to refresh):
 
 ## 2. How to check current status
 
-1. **`tools/divergence/RESULTS.md`** — the current divergence baseline for the
-   14 `local_batch` demos (trace + image divergence per game, plus cross-cutting
-   patterns). Start here; it's the closest thing to a "what's broken" board.
-2. **`SWFRecompDocs/games/FLASHARCHIVE_BUILD_RESULTS.md`** — which games build.
-3. **`SWFRecompDocs/status/<date>-<game>-*.md`** — per-game investigation logs
+1. **`tools/divergence/PROGRESS.md`** — the living progress tracker: per-game
+   status board, fixes landed (with commits), hard-won gotchas, and the
+   prioritized open follow-ups. **Start here** — it's "where we left off".
+2. **`tools/divergence/RESULTS.md`** — the per-game divergence board (trace +
+   image divergence per game, plus cross-cutting patterns); the raw "what's
+   broken". (Note: results predating the tracer fix `6a08f06aa` are invalid for
+   `_root.onEnterFrame`-driven games — see PROGRESS.md.)
+3. **`SWFRecompDocs/games/FLASHARCHIVE_BUILD_RESULTS.md`** — which games build.
+4. **`SWFRecompDocs/status/<date>-<game>-*.md`** — per-game investigation logs
    (Doodle Jump and Snake have extensive histories; grep `SWFRecompDocs/status/`
    for the game name).
-4. **Auto-memory (`MEMORY.md`)** — load-bearing runtime gotchas. The
+5. **Auto-memory (`MEMORY.md`)** — load-bearing runtime gotchas. The
    game-relevant clusters: MovieClip timeline control, graphics/tag
    implementation, browser-WASM frame-func re-run, getBounds, clone/depth.
-5. **`SWFRecompDocs/plans/<game-or-feature>*.md`** — open plans (e.g.
+6. **`SWFRecompDocs/plans/<game-or-feature>*.md`** — open plans (e.g.
    `dj-platform-followups.md`).
 
 ---
@@ -241,8 +245,12 @@ single-game divergence. Commit to master only when asked; never branch first.
 
 ## 7. Session prompt template
 
-We've been hand-writing a prompt per session. Use this skeleton (fill the
-brackets); it mirrors the structure that has worked:
+To **resume the effort** from where we left off, paste the ready-made prompt in
+`tools/divergence/SESSION_RESUME_PROMPT.md` (it points the new session at
+PROGRESS.md → guide → RESULTS.md and the top open follow-up).
+
+For a **specific, scoped task**, use this skeleton instead (fill the brackets);
+it mirrors the structure that has worked:
 
 ```
 <One-sentence task>: <game> (<flasharchive|glaiel>, browser-WASM graphics /
@@ -252,7 +260,8 @@ Symptom: <what diverges from Ruffle/Flash, observed where>.
 
 Read first (session start):
 - SWFRecompDocs/guides/wasm-game-debugging-session-guide.md (this guide)
-- tools/divergence/RESULTS.md (current divergence baseline)
+- tools/divergence/PROGRESS.md (where we left off + gotchas)
+- tools/divergence/RESULTS.md (per-game divergence board)
 - <relevant SWFRecompDocs/status/*.md and MEMORY.md entries>
 
 Reproduce:
