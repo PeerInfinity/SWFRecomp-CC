@@ -1488,6 +1488,18 @@ def recompile_swf(test_dir, force=False):
         if p.exists():
             shutil.rmtree(p)
 
+    # Recompiler wall-clock timeout (seconds). Default 30; override with the
+    # SWFRECOMP_RECOMPILE_TIMEOUT env var for large SWFs (e.g. multi-MB games).
+    recompile_timeout = 30
+    _to_env = os.environ.get("SWFRECOMP_RECOMPILE_TIMEOUT")
+    if _to_env:
+        try:
+            _to = int(_to_env)
+            if _to > 0:
+                recompile_timeout = _to
+        except ValueError:
+            pass
+
     try:
         proc = subprocess.Popen(
             ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
@@ -1496,7 +1508,7 @@ def recompile_swf(test_dir, force=False):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        _, stderr = proc.communicate(timeout=30)
+        _, stderr = proc.communicate(timeout=recompile_timeout)
         return proc.returncode == 0, stderr.decode("utf-8", errors="replace")
     except subprocess.TimeoutExpired:
         proc.kill()

@@ -17,7 +17,10 @@
 // swf_headless.c). We borrow it via extern.
 extern RenderContext* context;
 
-#define MAX_CAPTURES 16
+// Default capacity for the capture-trigger table. Override at runtime with the
+// CAPTURE_MAX env var (e.g. CAPTURE_MAX=64) to capture more than 16 frames; the
+// default is unchanged so existing behavior is identical when it's unset.
+#define DEFAULT_MAX_CAPTURES 16
 
 typedef enum {
 	CAPTURE_LAST_FRAME,
@@ -32,7 +35,10 @@ typedef struct {
 	int saved;
 } CaptureEntry;
 
-static CaptureEntry g_captures[MAX_CAPTURES];
+// Dynamically sized to g_capture_cap (default DEFAULT_MAX_CAPTURES, or the
+// CAPTURE_MAX env value) by parse_capture_triggers.
+static CaptureEntry* g_captures = NULL;
+static int g_capture_cap = 0;
 static int g_capture_count = 0;
 static char g_capture_output_dir[512] = ".";
 static int g_has_last_frame_capture = 0;
@@ -54,13 +60,25 @@ void parse_capture_triggers(void)
 	const char* env = getenv("CAPTURE_TRIGGERS");
 	if (!env || !*env) return;
 
+	// Capacity: CAPTURE_MAX env override, else DEFAULT_MAX_CAPTURES.
+	int cap = DEFAULT_MAX_CAPTURES;
+	const char* cap_env = getenv("CAPTURE_MAX");
+	if (cap_env && *cap_env) {
+		int v = atoi(cap_env);
+		if (v > 0) cap = v;
+	}
+	if (g_captures) { free(g_captures); g_captures = NULL; g_capture_count = 0; }
+	g_captures = (CaptureEntry*) calloc((size_t)cap, sizeof(CaptureEntry));
+	if (!g_captures) { g_capture_cap = 0; return; }
+	g_capture_cap = cap;
+
 	char buf[4096];
 	strncpy(buf, env, sizeof(buf) - 1);
 	buf[sizeof(buf) - 1] = '\0';
 
 	char* saveptr = NULL;
 	for (char* token = strtok_r(buf, ",", &saveptr);
-	     token && g_capture_count < MAX_CAPTURES;
+	     token && g_capture_count < g_capture_cap;
 	     token = strtok_r(NULL, ",", &saveptr))
 	{
 		CaptureEntry* e = &g_captures[g_capture_count];
