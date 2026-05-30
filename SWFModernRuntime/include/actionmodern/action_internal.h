@@ -172,6 +172,14 @@ extern MovieClip* g_event_this_mc;
 // MovieClip currently executing (targetClip/base_clip interaction).
 extern MovieClip* g_current_context;
 
+// Type tag of the thisArg passed through Function.prototype.call/apply
+// (ACTION_STACK_VALUE_*). Lets builtin wrappers distinguish an ASArray
+// receiver (this_obj is a raw ASArray*, NOT an ASObject*) from a real
+// ASObject. Builtins that cast this_obj to ASObject* must check this
+// first — see builtin_array_method / date_has_backing. 0 when not in a
+// call/apply dispatch.
+extern u8 g_call_this_type;
+
 // Super context stack — (this, depth, mc) triple tracks prototype
 // chain position for super() / super.method() resolution.
 void pushSuperContextWithMC(void* this_obj, u8 depth, void* mc);

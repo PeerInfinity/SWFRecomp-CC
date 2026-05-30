@@ -3,6 +3,42 @@
 Historical session-by-session notes documenting changes, fixes, and investigations.
 For current test status, see `CURRENT_STATUS.md`.
 
+## Session notes (2026-05-29 — `native_objects_swf6` graphics-mode segfault flake FIXED)
+
+`native_objects_swf6` was a non-deterministic crash in **graphics mode only**
+(OFFSCREEN_RENDER / `--mode=graphics`): most runs `output_mismatch` (114/115),
+but ~1–3 in 8 runs `runtime_segfault`. ASAN made it deterministic: a
+**heap-buffer-overflow READ in `getProperty` (object.c:302)** — an
+**ASArray-as-ASObject type confusion** (the documented family; see MEMORY.md
+"ASArray vs ASObject"). NOT the `varToDouble` pointer-as-float family.
+
+Two distinct sites, both reached when the test calls a method on an array
+receiver (`getNativeStatus([])` / `getNativeStatus(new Array())`):
+
+1. **`actionCallMethod` array user-method dispatch** (`action.c` ~62165/62189):
+   `pushSuperContext((void*)arr, 1)` pushed the raw `ASArray*` as super-`this`.
+   `super()` inside the test's `__initializeNative` then ran
+   `walkProtoChain(arr,1)` → `getProperty((ASObject*)arr,...)`, reading
+   `arr->elements` as `obj->properties` (same struct offset 16) past the end.
+   Fix: push `arr->props` (the array's string-keyed property bag — a real
+   `ASObject*`, the same thing `resolveProtoVar` returns for an ARRAY proto).
+
+2. **Date builtins via `Function.prototype.call`** (`Date.prototype.getDate.call([])`,
+   test.as:31): `.call`/`.apply` pass a raw `ASArray*` as `this_obj` (by design —
+   `builtin_array_method` recovers it via `g_call_this_type == ARRAY`), but
+   `date_has_backing` (date.c) cast it straight to `ASObject*`. Fix: guard
+   `date_has_backing` on `g_call_this_type == ACTION_STACK_VALUE_ARRAY → return 0`
+   (an array is never Date-backed; Flash returns undefined). Exposed
+   `g_call_this_type` via `action_internal.h` (was file-static in action.c).
+
+Graphics-mode-only because the misread `num_used`/`properties` fields land on a
+crashing address only under the full-graphics build's heap layout; ASAN's
+redzones make it fire every time. Verified: ASAN clean (only pre-existing
+LeakSan string-concat leaks remain), 8/8 plain graphics runs now stable
+`output_mismatch` (0 segfaults), and a 9-test super/array/call battery passes in
+both modes. The remaining 114/115 line-56 diff is the pre-existing accepted
+Ruffle-vs-Flash `new TextField()` diff below — unchanged.
+
 ## Session notes (2026-05-07 — `native_objects_swf6` `new TextField()` triage, no-op outcome)
 
 Investigated `native_objects_swf6` (`output_mismatch` 114/115, single-line diff at line 56:

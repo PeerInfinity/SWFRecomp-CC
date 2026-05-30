@@ -212,6 +212,12 @@ static double date_get_time(ASObject* obj) {
 // Check if an object has native Date backing (__date_time__ property exists)
 static int date_has_backing(void* this_obj) {
 	if (this_obj == NULL) return 0;
+	// When a Date method is invoked via Function.prototype.call/apply with an
+	// ARRAY thisArg (e.g. `Date.prototype.getDate.call([])`), this_obj is a raw
+	// ASArray*, NOT an ASObject* — casting it and walking ->properties reads off
+	// the end of the array's element buffer (heap-buffer-overflow). An array is
+	// never Date-backed, so report "no backing" (Flash returns undefined here).
+	if (g_call_this_type == ACTION_STACK_VALUE_ARRAY) return 0;
 	ActionVar* v = getProperty((ASObject*)this_obj, "__date_time__", 13);
 	return (v != NULL);
 }

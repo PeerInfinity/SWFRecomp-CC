@@ -4566,7 +4566,7 @@ static ASObject* g_bitmapdata_prototype = NULL;
 static ASObject* g_bitmapdata_ctor_own_props = NULL;
 // Type tag of the receiver for the current method dispatch (set to
 // ACTION_STACK_VALUE_OBJECT only when this_obj is a genuine ASObject).
-static u8 g_call_this_type = 0;
+u8 g_call_this_type = 0;
 // Methods: getPixel, getPixel32, setPixel, setPixel32, fillRect, clone, dispose,
 //          copyChannel, floodFill, colorTransform, getColorBoundsRect, toString,
 //          applyFilter, copyPixels, draw, generateFilterRect, hitTest, loadBitmap,
@@ -62162,7 +62162,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// arr->props is the addProperty/named-prop store, not the array's identity.
 			ASFunction* func = lookupFunctionFromVar(user_method_prop);
 			if (func != NULL && func->function_type == 2 && func->advanced_func != NULL) {
-				pushSuperContext((void*)arr, 1);
+				pushSuperContext((void*)arr->props, 1);  /* super_this must be the property bag, not the raw ASArray (walkProtoChain casts to ASObject*) */
 				ASObject* local_scope = allocObject(app_context, 8);
 				if (scope_depth < MAX_SCOPE_DEPTH) {
 					scope_is_with[scope_depth] = 0;
@@ -62186,7 +62186,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				pushVar(app_context, &result);
 			} else if (func != NULL && func->function_type == 1 && func->simple_func != NULL) {
-				pushSuperContext((void*)arr, 1);
+				pushSuperContext((void*)arr->props, 1);  /* super_this must be the property bag, not the raw ASArray (walkProtoChain casts to ASObject*) */
 				ActionVar this_var = {0};
 				this_var.type = ACTION_STACK_VALUE_ARRAY;
 				this_var.data.numeric_value = (u64)arr;

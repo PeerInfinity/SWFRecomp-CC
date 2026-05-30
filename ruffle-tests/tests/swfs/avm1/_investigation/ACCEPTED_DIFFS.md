@@ -81,6 +81,11 @@ Ruffle test-generation bug affecting only the extreme negative boundary.
 
 ### `native_objects_swf6` — `new TextField()` typeof check (1 diff line, line 56)
 
+> Note (2026-05-29): a *separate*, graphics-mode-only segfault flake in this test
+> was root-caused and fixed (ASArray-as-ASObject type confusion in `super()` over an
+> array receiver + `Date.prototype.getDate.call([])`). See SESSION_NOTES.md. The
+> remaining single-line diff below is unchanged and still accepted.
+
 **Diff:**
 ```
 - new TextField(): non-object: non-object: undefined
