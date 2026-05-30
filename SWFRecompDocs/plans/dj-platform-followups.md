@@ -165,11 +165,17 @@ shapeFlag=0) → `COMPUTE_GLOBAL_AABB(block)` → `ng_computeBoundsFromDL_matrix
 "aaa" (charId 32, _x via clip_action_8) contributed its un-moved bounds →
 collision pinned at the left edge while the render overlay (#1) drew it moving.
 Fix: `ng_overlay_entry_as_transform()` looks up an entry's MC by `display_obj`
-and overlays its `as_set_flags` transform (mirrors `apply_as_transform`), applied
-in `ng_computeBoundsFromDL_matrix` (bbox) + `ng_hitTestShapeFromDL` (shape).
-No-op for un-moved/unnamed children. **Shared engine, both CI modes, feeds
-getBounds/_width/_height/hitTest** — general correctness fix. Divergence 407=407;
-user-confirmed blue collision tracks the visual, green unaffected.
+and overlays its `as_set_flags` **translation only** (`_x`/`_y`, bits 1|2),
+applied in `ng_computeBoundsFromDL_matrix` (bbox) + `ng_hitTestShapeFromDL`
+(shape). No-op for un-moved/unnamed children. **Shared engine, both CI modes,
+feeds getBounds/_width/_height/hitTest.** Divergence 407=407; user-confirmed blue
+collision tracks the visual, green unaffected. **Refinement `ff04de918`:** the
+first attempt overlaid the FULL transform incl. scale/rotation, which regressed
+`movieclip_invalid_get_bounds_6/7` (boundingBox_mc carries an AS-flagged
+yscale~110462 → exploded getBounds; placement matrix already has the right
+scale). Limited to translation; both tests restored, CI clean both modes.
+Nested-child AS scale/rotation in a parent's bounds is a known gap matching
+current Ruffle expectations.
 
 ### Brown breakable still collides after break animation — OPEN (next)
 User report (2026-05-29): brown breakable platforms play their break/fall
