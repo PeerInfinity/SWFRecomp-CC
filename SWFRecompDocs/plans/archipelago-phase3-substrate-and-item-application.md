@@ -207,11 +207,21 @@ transport refactor: the AS-facing API is unchanged, so they must stay green.
   harness requires an interactive display and cannot run from a headless agent
   session (it preflights `DISPLAY`).
 
-**Slice 3 — SWF substrate module (cross-repo, Topology B):** in Archipelago-CC, a
-sibling to `textAdventureSubstrateWrapper`: a panel that iframes the SWF demo page
-+ an in-iframe bridge wiring `HostPostMessageTransport` ↔ the existing
-`iframeAdapter` protocol, plus a registry entry with an action-game-appropriate
-`supportedFeatures` set. **Coordination point** — see §8.
+**Slice 3 — AVM1 `Rando` games as a procgen *substrate* (cross-repo). RECONCILED 2026-05-31.**
+Investigation (2026-05-31) found the AP side already has a plan-of-record
+(`NewDocs/plans/procedural-generation/swfrecomp-substrate.md`) — but for a
+*different* track: AVM2/AS3 full-game injection with SWFRecomp as a runtime swap,
+gated on the AVM2 milestone, AVM1 an explicit non-goal. Per maintainer direction,
+**AVM1 games integrate as a procgen *substrate* (a component/"minigame" within a
+generated world), not a standalone apworld and not via flashPanel.** That makes
+the **substrate registry** the contract (sibling to `textAdventureSubstrateWrapper`),
+with our Rando glue + a new **host transport** (re-point `__randoBridge` from its
+own WebSocket to the host as AP client) as the runtime mechanism. Full design,
+two-track reconciliation, and open coordination questions:
+**[archipelago-phase3-slice3-reconciliation.md](archipelago-phase3-slice3-reconciliation.md).**
+Implementation is Archipelago-CC-side, in a fresh session, coordinated with that
+repo's owner. (Supersedes the earlier "iframe the SWF demo + HostPostMessageTransport"
+sketch — in-page direct calls are likely simpler; embed model TBD.)
 
 **Slice 4 — real game (deferred):** apply the proven prelude/glue to a real game
 (Doodle Jump / Pong / Snake), find hook points, validate in the browser via the
