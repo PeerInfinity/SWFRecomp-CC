@@ -32,6 +32,8 @@ sup*.swf
 !docs/injector/**/*.swf
 # Allow the divergence harness's prebuilt tracer SWF (compiled from Tracer.as)
 !tools/divergence/tracer.swf
+# Allow Archipelago Rando integration-test SWFs (hand-built MTASC test inputs)
+!ruffle-tests/tests/swfs/_rando/**/*.swf
 
 # Libraries
 zlib.dll

@@ -1,0 +1,8 @@
+[prelude] glue ready; connected=true; starting items=1
+[game] start; canAttack=false
+apply: sword -> attack enabled
+[game] after tick 1; canAttack=true
+[game] reached chest -> check(bottom_left_chest)
+[game] chest checked=true
+apply: key -> door unlocked
+[game] after tick 2; doorUnlocked=true

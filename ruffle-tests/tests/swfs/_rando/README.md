@@ -38,6 +38,53 @@ A full live-server test (connect + receive items + send a location) is a manual
 step requiring a running Archipelago server — now automated by `livetest/`
 (below).
 
+## rando_item_application — deterministic item-application glue test
+
+A two-SWF trace test (Phase 3 Slice 1, Layer 1) of the **item-application glue**,
+driven by the synthetic native stub backend (no server, no network → fully
+deterministic). It models the real prelude/game split:
+
+- `prelude_rando.swf` (from `Prelude.as`) — the Archipelago-**aware** glue. Owns
+  the `Rando`, installs `_global.rg`, holds the config-driven ITEM/LOCATION
+  "enums" (`ap_items`: id→flash_name; `ap_locations`: flash_name→id), and applies
+  items per "frame" by polling. Recompiled **before** the game (the harness
+  detects `prelude_*.swf`).
+- `test.swf` (from `Game.as`) — the Archipelago-**naive** game. Reads
+  `_global.gameState` and calls `_global.rg`; never touches `Rando` or AP numbers.
+
+The stub (`SWFModernRuntime/src/actionmodern/rando_stub.c`) delivers item 2
+("Sword") on connect and grants item 1 ("Key") when location 100 is checked, so
+the trace proves: id→flash_name→effect mapping, per-frame polling, event→location
+check, and grant-on-check. Built with **`RANDO_STUB=1`** (not `WITH_AP`):
+
+```bash
+RANDO_STUB=1 python3 ruffle-tests/verify_output.py \
+    --test=rando_item_application --tests-dir=ruffle-tests/tests/swfs/_rando --diff
+```
+
+Rebuild the SWFs (only if you edit `Prelude.as` / `Game.as` / `Rando.as`):
+
+```bash
+cd ruffle-tests/tests/swfs/_rando/rando_item_application
+~/CC/mtasc/bin/mtasc -cp ~/CC/mtasc/ocaml/mtasc/std -cp . -main -header 200:150:30 \
+    Prelude.as -swf prelude_rando.swf -version 8
+~/CC/mtasc/bin/mtasc -cp ~/CC/mtasc/ocaml/mtasc/std -cp . -main -header 200:150:30 \
+    Game.as -swf test.swf -version 8
+```
+
+## bridge_unit — StubTransport unit test (browser, no server)
+
+`bridge_unit/run_stub_test.sh` is the WASM-side counterpart: a **server-free**
+transport-contract test of `rando_bridge.js`'s `StubTransport`. Headless chromium
+(Playwright) drives `window.__randoBridge` with `window.__randoBridgeTransport =
+"stub"` and a synthetic fixture — no Archipelago server, no WebSocket — asserting
+connect + starting item + sendLocation-grant. Faster and lighter than
+`livetest/browser/` (only needs Playwright + chromium, not the AP server/venv).
+
+```bash
+ruffle-tests/tests/swfs/_rando/bridge_unit/run_stub_test.sh   # exit 0 = PASS
+```
+
 ## livetest/ — automated native round-trip test
 
 `livetest/run_livetest.sh` is a **fully automated** integration test of the

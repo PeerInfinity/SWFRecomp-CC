@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>rando_bridge.js StubTransport unit harness</title>
+<!-- Force the stub transport and supply a synthetic fixture BEFORE the bridge
+     module loads. createTransport() reads these globals. No server, no
+     WebSocket — a pure transport-contract test of rando_bridge.js. -->
+<script>
+  window.__randoBridgeTransport = "stub";
+  window.__randoBridgeStubFixture = {
+    startingItems: [80002],
+    locationGrants: { 81001: [80000] },
+  };
+</script>
+<script type="module" src="rando_bridge.js"></script>
+</head>
+<body>
+<h1>rando_bridge.js StubTransport unit harness</h1>
+<p>Playwright drives <code>window.__randoBridge</code> with the stub transport
+(no server). See run_stub_test.sh.</p>
+</body>
+</html>

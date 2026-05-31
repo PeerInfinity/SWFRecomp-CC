@@ -165,14 +165,18 @@ transport refactor: the AS-facing API is unchanged, so they must stay green.
 
 ## 7. Sequenced execution plan
 
-**Slice 1 — pluggable transport + deterministic toy test (repo-local, committable):**
-- Refactor `rando_bridge.js` to select a transport behind the unchanged AS API;
-  add `WebSocketTransport` (= today) and `StubTransport`.
-- Build a toy prelude SWF + toy game SWF (MTASC, prelude recompiled first):
-  prelude defines toy ITEM/LOCATION enums + glue mapping item→effect and
-  event→`sendLocation`.
-- Layer-1 test in the `_rando` suite. Deterministic.
-- Guard: `rando_smoke` + both livetests stay green.
+**Slice 1 — pluggable transport + deterministic toy test (repo-local, committable). ✅ DONE 2026-05-31.**
+- ✅ Refactored `rando_bridge.js` to select a transport behind the unchanged AS
+  API; `WebSocketTransport` (= today) + `StubTransport`, `createTransport()`
+  factory (seam for `HostPostMessageTransport` in Slice 3).
+- ✅ Native synthetic backend `rando_stub.c` (third `rando_ap.h` impl), selected
+  by `RANDO_STUB=1` in `verify_output.py` (plain C, no APCpp/g++ shim/link).
+- ✅ Toy prelude SWF (`Prelude.as`) + game SWF (`Game.as`) in
+  `_rando/rando_item_application`: config-driven ITEM/LOCATION enums + glue
+  (id→flash_name→effect, per-frame poll, event→`sendLocation`), AP-naive game.
+  Deterministic trace test, built with `RANDO_STUB=1`.
+- ✅ `_rando/bridge_unit` — server-free Playwright `StubTransport` contract test.
+- ✅ Guard: `rando_smoke` + the WebSocket browser livetest stay green.
 
 **Slice 2 — live toy test (Layer 2):** toy game against the APQuest seed-1
 fixture via the native + browser livetest harnesses. Add an APQuest preset path
