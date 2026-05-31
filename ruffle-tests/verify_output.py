@@ -1597,14 +1597,21 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
 
-    # Archipelago Rando class (opt-in via WITH_AP=1 env var). rando.c compiles
-    # under -DWITH_AP; rando_ap.cpp is the C++ shim, compiled separately with
-    # g++ in the link section. See
-    # SWFRecompDocs/plans/archipelago-randomizer-integration.md.
+    # Archipelago Rando class. Two opt-in backends, both define -DWITH_AP so
+    # rando.c references the seam; only the backend differs:
+    #   WITH_AP=1    — native APCpp (rando_ap.cpp, g++ shim, links APCpp).
+    #   RANDO_STUB=1 — synthetic no-network stub (rando_stub.c, plain C). The
+    #                  deterministic Phase-3 Layer-1 glue substrate; no APCpp.
+    # See archipelago-randomizer-integration.md and
+    # archipelago-phase3-substrate-and-item-application.md.
     with_ap = os.environ.get("WITH_AP", "") in ("1", "true")
-    if with_ap:
+    rando_stub = os.environ.get("RANDO_STUB", "") in ("1", "true")
+    if with_ap or rando_stub:
         shutil.copy2(SWFMODERN / "src/actionmodern/rando.c", build_dir)
-        shutil.copy2(SWFMODERN / "src/actionmodern/rando_ap.cpp", build_dir)
+        if rando_stub:
+            shutil.copy2(SWFMODERN / "src/actionmodern/rando_stub.c", build_dir)
+        else:
+            shutil.copy2(SWFMODERN / "src/actionmodern/rando_ap.cpp", build_dir)
 
     shutil.copy2(SWFMODERN / "lib/c-hashmap/map.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
@@ -1822,6 +1829,11 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     ap_includes = []
     ap_libs = []
     ap_root = Path(os.environ.get("AP_ROOT", Path.home() / "CC" / "APCpp"))
+    # Either backend makes rando.c reference the seam.
+    if with_ap or rando_stub:
+        mode_defines.append("-DWITH_AP")
+    # Only the real APCpp backend needs the include path + static libs; the stub
+    # (rando_stub.c) is plain C in the *.c glob with no external deps.
     if with_ap:
         ap_build = ap_root / "build"
         ap_static = ap_build / "libAPCpp-static.a"
@@ -1829,7 +1841,6 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             return False, (f"WITH_AP set but APCpp not built at {ap_build}. "
                            f"Build it: cmake -S {ap_root} -B {ap_build} "
                            f"-DCMAKE_BUILD_TYPE=Release && cmake --build {ap_build} -j")
-        mode_defines.append("-DWITH_AP")
         ap_includes = [f"-I{ap_root}"]
         ap_libs = [
             str(ap_static),
