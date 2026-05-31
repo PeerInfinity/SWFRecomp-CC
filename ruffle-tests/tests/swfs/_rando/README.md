@@ -35,4 +35,34 @@ WITH_AP=1 python3 ruffle-tests/verify_output.py \
 ```
 
 A full live-server test (connect + receive items + send a location) is a manual
-step requiring a running Archipelago server.
+step requiring a running Archipelago server — now automated by `livetest/`
+(below).
+
+## livetest/ — automated native round-trip test
+
+`livetest/run_livetest.sh` is a **fully automated** integration test of the
+native Rando backend (`rando_ap.h` → `rando_ap.cpp` → APCpp) against a real
+Archipelago server. It builds the shim + a small C harness, starts a local AP
+server, runs the harness, and tears the server down.
+
+Prerequisites: APCpp built (above), and **Archipelago-CC** at `~/CC/Archipelago-CC`
+with its `.venv` set up. The server is launched via that repo's
+`scripts/setup/setup_ap_server.py --game checksfinder --seed 1 --port 38281`.
+
+```bash
+ruffle-tests/tests/swfs/_rando/livetest/run_livetest.sh   # exit 0 = PASS
+```
+
+What it asserts (ChecksFinder seed 1, slot `Player1`, no password):
+1. connects to `localhost:38281`;
+2. receives starting item `80002` (Map Bombs);
+3. `sendLocation(81001)` (Tile 2) → `81001` becomes checked (round-trip confirmed).
+
+The item Tile 2 grants (`80000` Map Width) is the player's OWN item at their OWN
+location, which APCpp intentionally excludes from `received_items`
+(`Archipelago.cpp` filters `sending_player == self && location > 0`) — so that's
+logged as info, not asserted. Real multiworld items (from other players) would
+appear in `received_items`.
+
+Paths are overridable via env: `APCPP_ROOT`, `APCPP_BUILD`, `AP_REPO`, `AP_PY`,
+`PORT`.

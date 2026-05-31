@@ -258,9 +258,19 @@ Run: `WITH_AP=1 python3 ruffle-tests/verify_output.py --test=rando_smoke \
 --tests-dir=ruffle-tests/tests/swfs/_rando --diff` → **PASS**. This exercises
 the real link (AP_New/AP_Init/AP_IsConnected/AP_GetReceivedItemsSize/
 AP_GetLocationIsChecked are actually called) and the AVM1 construct + method
-dispatch. A live-server test (connect + receive items + send a location) remains
-a manual step. The `_rando` suite is excluded from the default Ruffle runs (it
+dispatch. The `_rando` suite is excluded from the default Ruffle runs (it
 lives outside `tests/swfs/avm1` and requires `WITH_AP`).
+
+A live-server round-trip test (connect + receive items + send a location) is now
+**fully automated** for the native path:
+`ruffle-tests/tests/swfs/_rando/livetest/run_livetest.sh` builds the shim +
+a C harness on `rando_ap.h`, starts a local Archipelago server (ChecksFinder
+seed 1) via Archipelago-CC's `scripts/setup/setup_ap_server.py`, asserts connect
++ starting item (80002) + `sendLocation(81001)`→checked, and tears the server
+down. PASSES end-to-end. Note: the item a self-location grants is filtered from
+`received_items` by APCpp (`sending_player == self && location > 0`), so the
+round-trip is asserted via the checked-locations signal, not a received item.
+(The WASM/browser path's live test — Playwright-driven — is still pending.)
 
 ---
 
