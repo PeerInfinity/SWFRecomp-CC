@@ -193,6 +193,10 @@ typedef struct {
 	char export_name[128];  // For registered class constructor invocation
 	frame_func func;
 	int swf_depth;
+	MovieClip* parent;      // Actual parent of the attached clip (NULL ⇒ _root).
+	                        // Without this, deferred init re-resolved the clip
+	                        // against _root and minted a ghost root-child for any
+	                        // non-root attachMovie (see aq_dispatch_pending_attach_init).
 } PendingAttachInit;
 
 static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* user)
@@ -206,7 +210,8 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
 	extern MovieClip* actionGetBaseClip(void);
 	MovieClip* saved_base = actionGetBaseClip();
 	MovieClip* mc = actionFindOrCreateMovieClip(
-		app_context, pai->instance_name, &root_movieclip);
+		app_context, pai->instance_name,
+		pai->parent ? pai->parent : &root_movieclip);
 	if (mc) { actionSetCurrentContext(mc); actionSetBaseClip(mc); }
 
 	// Save display list state and switch to the MC's sprite display list
@@ -309,11 +314,15 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
 	free(pai);
 }
 
+struct AttachInitMatchCtx { MovieClip* parent; int swf_depth; };
 static int attach_init_match_depth(void* user, void* ctx)
 {
 	PendingAttachInit* pai = (PendingAttachInit*) user;
-	int swf_depth = *(int*) ctx;
-	return pai && pai->swf_depth == swf_depth;
+	struct AttachInitMatchCtx* mc = (struct AttachInitMatchCtx*) ctx;
+	// Depth spaces are per-parent for non-root attaches, so dedup must key on
+	// both parent and depth — otherwise e.g. three sibling radio buttons each
+	// attaching a "fLabel_mc" at the same depth would collapse to one PAI.
+	return pai && pai->swf_depth == mc->swf_depth && pai->parent == mc->parent;
 }
 
 void ng_fire_pending_attach_inits(SWFAppContext* app_context)
@@ -366,11 +375,33 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	new_mc->as_set_flags = 0;
 #endif
 
-	// Register as a variable so GetVariable finds it
+	// Register the attached clip so name resolution finds it.
 	ActionVar mc_var = {0};
 	mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 	mc_var.data.numeric_value = (u64)(uintptr_t)new_mc;
-	setVariableByName(new_name, &mc_var);
+	if (parent == &root_movieclip) {
+		// Root attach: _root[name] = clip. _root's named properties live in
+		// var_map, so the global setter is the correct binding here.
+		setVariableByName(new_name, &mc_var);
+	} else if (new_name != NULL && new_name[0] != '\0') {
+		// Non-root attach: in AVM1, mc.attachMovie(id, name, depth) binds the
+		// clip only as a property of `mc` — it must NOT create a global/_root
+		// variable. Routing through setVariableByName lands in the global
+		// var_map whenever no function activation is on the scope stack (the
+		// common case for deferred component init), leaking an enumerable
+		// _root.<name> set to undefined once the clip is later invalidated —
+		// e.g. Minesweeper's Flash v2 UI-component children (fLabel_mc,
+		// frb_hitArea_mc, frb_states_mc) which Ruffle never exposes on _root.
+		// child_mc_cache already makes parent.<name> resolvable; mirror
+		// createEmptyMovieClip by also binding on parent->dynamic_props for
+		// GetMember parity.
+		if (parent->dynamic_props == NULL) {
+			parent->dynamic_props = (void*) allocObject(app_context, 8);
+			retainObject((ASObject*) parent->dynamic_props);
+		}
+		setProperty(app_context, (ASObject*) parent->dynamic_props,
+			new_name, (u32)strlen(new_name), &mc_var);
+	}
 
 	// Execute the sprite's frame 0 placement tags (scripts deferred to end of frame)
 	frame_func* funcs = dictionary[char_id].sprite_frame_funcs;
@@ -511,9 +542,10 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		// place (re-attaching at the same depth supersedes the previous init).
 		{
 			const char* exp_name = ng_lookupExportName(char_id);
+			struct AttachInitMatchCtx _aim = { parent, swf_depth };
 			PendingAttachInit* pai = (PendingAttachInit*)
 				actionQueueFindUserByKind(AQ_KIND_ATTACH_INIT,
-				                          attach_init_match_depth, &swf_depth);
+				                          attach_init_match_depth, &_aim);
 			if (pai == NULL) {
 				pai = (PendingAttachInit*) malloc(sizeof(PendingAttachInit));
 				if (pai == NULL) goto skip_attach_init_queue;
@@ -525,6 +557,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 				                      /*is_unload=*/0,
 				                      AQ_KIND_ATTACH_INIT);
 			}
+			pai->parent = parent;
 			strncpy(pai->instance_name, new_name, sizeof(pai->instance_name) - 1);
 			pai->instance_name[sizeof(pai->instance_name) - 1] = '\0';
 			pai->func = funcs[0];

@@ -7120,7 +7120,12 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 	// Keep g_skip_pending_removal_mc=1 so we create a fresh MC (not reuse the old one).
 	if (display_list[depth].instance_name != NULL) {
 		extern MovieClip root_movieclip;
-		actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
+		// Resolve against the owner of the current display list (the sprite MC
+		// when inside exec_sprite_frame, &root_movieclip at root) — not always
+		// _root, which would mint a ghost root-child for nested clips. Mirrors
+		// the clip_load parent-capture convention (pcl->parent_mc).
+		MovieClip* _ro_parent = g_current_context ? g_current_context : &root_movieclip;
+		actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _ro_parent);
 	}
 	g_skip_pending_removal_mc = 0;
 #endif
@@ -7543,8 +7548,13 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 		// dropping the accumulated_clip_actions array reference is safe.
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		MovieClip* _ro_parent_mc1 = NULL;
-		if (display_list[depth].instance_name != NULL)
-			_ro_parent_mc1 = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
+		if (display_list[depth].instance_name != NULL) {
+			// Owner of the current display list (sprite MC inside a sprite frame,
+			// else _root) — passing &root_movieclip unconditionally would create
+			// a ghost root-child for a nested clip.
+			MovieClip* _ro_p1 = g_current_context ? g_current_context : &root_movieclip;
+			_ro_parent_mc1 = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _ro_p1);
+		}
 #else
 		MovieClip* _ro_parent_mc1 = NULL;
 #endif
@@ -7705,8 +7715,14 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 #endif
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		MovieClip* _remove_parent_mc = NULL;
-		if (display_list[depth].instance_name != NULL)
-			_remove_parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
+		if (display_list[depth].instance_name != NULL) {
+			// Owner of the current display list (sprite MC inside a sprite frame,
+			// else _root) — passing &root_movieclip unconditionally would create
+			// a ghost root-child for a nested clip (e.g. Minesweeper's Flash v2
+			// component boundingBox removed inside its sprite frame).
+			MovieClip* _rm_p = g_current_context ? g_current_context : &root_movieclip;
+			_remove_parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _rm_p);
+		}
 #else
 		MovieClip* _remove_parent_mc = NULL;
 #endif
