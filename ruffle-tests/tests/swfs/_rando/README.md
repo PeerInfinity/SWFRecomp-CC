@@ -72,6 +72,36 @@ cd ruffle-tests/tests/swfs/_rando/rando_item_application
     Game.as -swf test.swf -version 8
 ```
 
+## livetest/toy_browser — live item-application toy (real browser, APQuest)
+
+`livetest/toy_browser/run_toy_livetest.sh` is the browser counterpart of
+`rando_item_application`: it runs the **actual toy SWF** live against an APQuest
+server, exercising the item-application glue end-to-end (connect → location check
+→ granted item → effect applied) in a real browser frame loop. Source:
+`SWFRecomp/tests/rando_browser_toy/Main.as` (single SWF — the glue + game together;
+async `onEnterFrame` state machine).
+
+It must be a **graphics** WASM build: only the graphics runtime (`swf.c`) paces
+frames in real time (`emscripten_sleep` + ASYNCIFY), which is what lets the
+WebSocket connect across frames. The runner regenerates the SWF (MTASC), builds
+(`WITH_AP=1 build_test.sh rando_browser_toy wasm --graphics`), starts the AP
+server, serves the assets, and drives **real headed google-chrome**.
+
+**Requires an interactive display.** WebGPU needs a GPU compositor: Playwright's
+bundled headless chromium has no `navigator.gpu`; the working path is headed
+`/usr/bin/google-chrome` via WSLg/`DISPLAY` on a localhost (secure-context) page.
+The runner preflights `DISPLAY` and refuses to run headless. Prereqs: emsdk,
+Archipelago-CC venv, Playwright + chromium, `/usr/bin/google-chrome`.
+
+```bash
+ruffle-tests/tests/swfs/_rando/livetest/toy_browser/run_toy_livetest.sh   # exit 0 = PASS
+#   --rebuild   force MTASC + graphics-WASM rebuild
+```
+
+Asserts (APQuest seed 1, `Player1`): connect → `sendLocation(2)` (Top Middle
+Chest) + `sendLocation(10)` (Enemy Drop) → Sword (2) + Key (1) received (browser
+doesn't filter own-location items) → both effects applied → `[toy] DONE`.
+
 ## bridge_unit — StubTransport unit test (browser, no server)
 
 `bridge_unit/run_stub_test.sh` is the WASM-side counterpart: a **server-free**

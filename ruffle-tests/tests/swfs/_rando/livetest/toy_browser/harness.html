@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rando browser item-application toy harness</title>
+</head>
+<body>
+<h1>Rando browser item-application toy</h1>
+<!-- Self-contained loader for the graphics-WASM toy (rando_browser_toy), modeled
+     on docs2/demo.html's Module setup. rando_bridge.js (ES module) installs
+     window.__randoBridge (importing archipelago.js); the WASM module's EM_JS
+     thunks call into it. We trigger runSWF via a real button click (a user
+     gesture, matching the viewer) once both the WASM runtime and the bridge are
+     ready. trace()/printf land in console (captured by the Playwright driver). -->
+<canvas id="canvas" width="200" height="150"></canvas>
+<button id="btn-run" disabled>Run SWF</button>
+<script type="module" src="rando_bridge.js"></script>
+<script>
+  window.__runtimeReady = false;
+  window.Module = {
+    locateFile: function (p) { return p; },           // assets served from this dir
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.log('[err] ' + t); },
+    onRuntimeInitialized: function () { window.__runtimeReady = true; },
+  };
+  // Enable the Run button only once BOTH the WASM runtime and the bridge exist.
+  (function waitReady(n) {
+    if (window.__runtimeReady && window.__randoBridge) {
+      document.getElementById('btn-run').disabled = false;
+      console.log('[harness] runtime + bridge ready');
+    } else if (n > 0) {
+      setTimeout(function () { waitReady(n - 1); }, 50);
+    } else {
+      console.log('[harness] ERROR: runtime/bridge not ready (runtime=' +
+        !!window.__runtimeReady + ' bridge=' + !!window.__randoBridge + ')');
+    }
+  })(400);
+  document.getElementById('btn-run').addEventListener('click', function () {
+    this.disabled = true;
+    console.log('[harness] running SWF');
+    Module.ccall('runSWF', null, [], [], { async: true });
+  });
+</script>
+<script src="rando_browser_toy.js"></script>
+</body>
+</html>

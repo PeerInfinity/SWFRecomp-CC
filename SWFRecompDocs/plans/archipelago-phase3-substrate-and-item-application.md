@@ -187,10 +187,25 @@ transport refactor: the AS-facing API is unchanged, so they must stay green.
   (archipelago.js doesn't filter). All 4 (apquest+checksfinder × native+browser)
   PASS. Confirmed live fixture: slot `Player1`, `ap_id_offset = 0`, 0 precollected,
   Top Middle Chest(2)→Sword(2), Right Room Enemy Drop(10)→Key(1).
-- ⏳ **Stage 2b — full toy-SWF live.** Adapt the toy glue for async connect +
-  multi-frame polling; run the prelude/game SWF live (native WITH_AP/APCpp +
-  browser WITH_AP/archipelago.js+Playwright) applying Sword/Key from the two
-  checks. `run_livetest`-style harnesses (non-deterministic → not suite tests).
+- ✅ **Stage 2b — full toy-SWF live (browser-only). DONE 2026-05-31.** Native
+  toy-SWF-live was dropped by decision: the NO_GRAPHICS native runtime runs frames
+  flat-out (no wall-clock pacing), so a frame-based SWF can't await an async
+  connect — and the native transport is already proven live in Stage 2a's C
+  harness. Browser path built: `SWFRecomp/tests/rando_browser_toy` (single-SWF —
+  build_test.sh has no prelude mechanism — `Main.as` async `onEnterFrame` glue),
+  built as a **graphics** WASM (`WITH_AP=1 build_test.sh rando_browser_toy wasm
+  --graphics`; graphics `swf.c` is the only runtime that paces frames in real time
+  via `emscripten_sleep` + ASYNCIFY, letting the WebSocket connect). Harness
+  `livetest/toy_browser/run_toy_livetest.sh` regenerates the SWF (MTASC), builds,
+  starts an APQuest server, serves the assets + `harness.html`, and drives it in
+  **real headed google-chrome** (Playwright `executablePath=/usr/bin/google-chrome`,
+  `--enable-unsafe-webgpu`). PASS: connect → 2 checks → Sword + Key applied → DONE.
+
+  **Env note:** browser-graphics WASM needs real WebGPU — Playwright's bundled
+  headless chromium has NO `navigator.gpu`; the working recipe is headed
+  google-chrome via WSLg/`DISPLAY` on a localhost (secure-context) page. So this
+  harness requires an interactive display and cannot run from a headless agent
+  session (it preflights `DISPLAY`).
 
 **Slice 3 — SWF substrate module (cross-repo, Topology B):** in Archipelago-CC, a
 sibling to `textAdventureSubstrateWrapper`: a panel that iframes the SWF demo page
