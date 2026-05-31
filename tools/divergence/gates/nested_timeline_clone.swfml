@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <Header framerate="12" frames="1">
+    <size><Rectangle left="0" right="4000" top="0" bottom="3000"/></size>
+    <tags>
+      <SetBackgroundColor><color><Color red="255" green="255" blue="255"/></color></SetBackgroundColor>
+
+      <!-- leaf: innermost sprite, observable child of inner -->
+      <DefineSprite objectID="2" frames="1">
+        <tags>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <!-- inner: timeline-places leaf -->
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2" name="leaf"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <!-- container: timeline-places inner, then duplicates it from its own script -->
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="3" name="inner"/>
+          <DoAction>
+            <actions>
+              <!-- trace("typeof inner.leaf=" + typeof(inner.leaf)) -->
+              <PushData><items><StackString value="typeof inner.leaf="/></items></PushData>
+              <PushData><items><StackString value="inner"/></items></PushData>
+              <GetVariable/>
+              <PushData><items><StackString value="leaf"/></items></PushData>
+              <GetMember/>
+              <TypeOf/>
+              <AddTyped/>
+              <Trace/>
+
+              <!-- inner.duplicateMovieClip("dup", 5) -->
+              <PushData><items>
+                <StackInteger value="5"/>
+                <StackString value="dup"/>
+                <StackInteger value="2"/>
+                <StackString value="inner"/>
+              </items></PushData>
+              <GetVariable/>
+              <PushData><items><StackString value="duplicateMovieClip"/></items></PushData>
+              <CallMethod/>
+              <Pop/>
+
+              <!-- trace("dup._parent._name=" + dup._parent._name) -->
+              <PushData><items><StackString value="dup._parent._name="/></items></PushData>
+              <PushData><items><StackString value="dup"/></items></PushData>
+              <GetVariable/>
+              <PushData><items><StackString value="_parent"/></items></PushData>
+              <GetMember/>
+              <PushData><items><StackString value="_name"/></items></PushData>
+              <GetMember/>
+              <AddTyped/>
+              <Trace/>
+
+              <!-- trace("typeof dup.leaf=" + typeof(dup.leaf)) -->
+              <PushData><items><StackString value="typeof dup.leaf="/></items></PushData>
+              <PushData><items><StackString value="dup"/></items></PushData>
+              <GetVariable/>
+              <PushData><items><StackString value="leaf"/></items></PushData>
+              <GetMember/>
+              <TypeOf/>
+              <AddTyped/>
+              <Trace/>
+
+              <EndAction/>
+            </actions>
+          </DoAction>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <!-- root: place container -->
+      <PlaceObject2 replace="0" depth="1" objectID="4" name="container"/>
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>
