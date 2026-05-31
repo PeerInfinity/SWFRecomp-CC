@@ -61106,6 +61106,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else
 		{
 			// super.method() call via CallMethod(super, "method")
+			// Capture the companion MovieClip (set when this super context belongs
+			// to a registerClass instance) BEFORE any pushSuperContext below clears
+			// it — the dispatched method must run with `this` = the MovieClip, not
+			// the dynamic_props object, so `this._name` / `this.<child>` resolve.
+			// Minesweeper's FRadioButton init reaches FUIComponent.init via
+			// super.init(); that method gates its deadPreview setup on
+			// `this._name != undefined`, which is undefined when `this` is the bare
+			// dynamic_props object → the whole block (deadPreview._visible/_width)
+			// was silently skipped. Mirrors the super() constructor path above.
+			void* super_mc = getSuperMC();
 			ASObject* search_start = walkProtoChain(super_this, super_depth + 1);
 			ASFunction* method_func = NULL;
 			u8 found_depth = 0;
@@ -61126,7 +61136,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 			if (method_func != NULL) {
 				u8 new_depth = super_depth + found_depth + 1;
-				pushSuperContext(super_this, new_depth);
+				// Propagate the companion MC so nested super.method()/super() calls
+				// inside the dispatched method keep resolving `this` to the MovieClip.
+				if (super_mc != NULL)
+					pushSuperContextWithMC(super_this, new_depth, super_mc);
+				else
+					pushSuperContext(super_this, new_depth);
 
 				// Update the existing "super" variable on the scope chain in-place
 				// so that GetVariable("super") inside the dispatched function finds
@@ -61157,13 +61172,27 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				if (method_func->function_type == 2 && method_func->advanced_func != NULL) {
 					ActionVar registers[256] = {0};
+					// registerClass instance: pass the MC via g_event_this_mc so
+					// preload_this binds `this` as MOVIECLIP (mirrors super() ctor path).
+					MovieClip* _saved_etm = g_event_this_mc;
+					void* _meth_this = super_this;
+					if (super_mc != NULL) {
+						g_event_this_mc = (MovieClip*)super_mc;
+						_meth_this = NULL;
+					}
 					g_call_depth++;
-					result = method_func->advanced_func(app_context, args, num_args, registers, super_this);
+					result = method_func->advanced_func(app_context, args, num_args, registers, _meth_this);
 					g_call_depth--;
+					if (super_mc != NULL) g_event_this_mc = _saved_etm;
 				} else if (method_func->function_type == 1 && method_func->simple_func != NULL) {
 					ActionVar this_var = {0};
-					this_var.type = ACTION_STACK_VALUE_OBJECT;
-					this_var.data.numeric_value = (u64)super_this;
+					if (super_mc != NULL) {
+						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+						this_var.data.numeric_value = (u64)super_mc;
+					} else {
+						this_var.type = ACTION_STACK_VALUE_OBJECT;
+						this_var.data.numeric_value = (u64)super_this;
+					}
 					setVariableByName("this", &this_var);
 					u32 _saved_this_depth2 = g_this_depth;
 					if (g_this_depth < MAX_THIS_DEPTH) {
@@ -67660,6 +67689,31 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						actionSetCurrentContext(_ul_s);
 					}
 				}
+			}
+			// Transform to unloaded state synchronously (Ruffle avm1_unload_movie +
+			// transform_to_unloaded_state). Unlike the loadMovie/_level unload paths
+			// (which defer the byte/frame-property reset one tick for the async-load
+			// quirk), a plain timeline clip's unloadMovie empties it immediately:
+			// child display objects removed and the playhead reset to frame 0, both
+			// observable on the SAME frame the call runs. Minesweeper's FRadioButton
+			// init does `this.boundingBox_mc.unloadMovie()` — Ruffle reports the
+			// emptied clip's _currentframe as 0 (and no surviving `boundingBox`
+			// child) on the construct frame; our deferred queue would have lagged it
+			// a tick, leaving _cf=1 + a stale child.
+			if (mc != NULL && mc != &root_movieclip) {
+				DisplayObject* _ul_dobj = (DisplayObject*) mc->display_obj;
+				if (_ul_dobj != NULL && _ul_dobj->sprite_display_list != NULL) {
+					for (size_t _ud = 0; _ud <= _ul_dobj->sprite_max_depth; _ud++) {
+						_ul_dobj->sprite_display_list[_ud].char_id = 0;
+						_ul_dobj->sprite_display_list[_ud].instance_name = NULL;
+					}
+					_ul_dobj->sprite_max_depth = 0;
+					_ul_dobj->sprite_current_frame = 0;
+					_ul_dobj->sprite_is_playing = 0;
+				}
+				mc->currentframe = 0;
+				mc->totalframes = 0;
+				mc->framesloaded = 0;
 			}
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
