@@ -55,6 +55,9 @@ cat tools/divergence/runs/Pong/divergence.txt
 | `--out DIR` | `tools/divergence/runs/<stem>/` | Output directory. |
 | `--tolerance N` | 0 | Per-channel pixel tolerance (0-255). 0 = exact match. |
 | `--max-outliers N` | 0 | Max channels allowed to exceed tolerance per frame. |
+| `--trace-rel-tol R` | 1e-5 | Relative tolerance for numeric tokens in the trace diff. Absorbs f32-vs-f64 precision noise (e.g. an `_xscale` differing at the 8th sig-fig because SWFRecomp stores scale as `float` while Ruffle derives it in f64 from an f32 matrix). |
+| `--trace-abs-tol A` | 1e-4 | Absolute tolerance for numeric tokens near zero, where relative tolerance breaks down. |
+| `--trace-exact` | off | Byte-exact trace comparison (both trace tolerances → 0). Use to inspect the absorbed float-precision lines directly. |
 | `--skip-ruffle` | off | Reuse existing Ruffle outputs (e.g. when only the SWFRecomp side has changed). |
 | `--skip-swfrecomp` | off | Same for the other side. |
 | `--recompile` | off | Force SWFRecomp to re-run the recompiler (otherwise it reuses cached `RecompiledScripts/`). |
@@ -113,7 +116,14 @@ Image: first divergence at frame 1: max_diff=255 (50459 outliers exceed limit of
   not always a bug (`fscommand("quit")` from the tracer), but worth checking
   the last few lines of each `trace.txt`.
 - **Trace: first divergence**: line index into the filtered traces. Context
-  shows the 3 preceding identical lines for orientation.
+  shows the 3 preceding identical lines for orientation. Numbers are compared
+  with tolerance (see `--trace-rel-tol`), so this is the first *meaningful*
+  divergence, skipping float-precision noise.
+- **Trace: N line(s) differed only within numeric tolerance**: appears when
+  float-precision noise was absorbed (e.g. f32 scale storage). It is NOT a bug;
+  re-run with `--trace-exact` if you want to see those lines. Without this, the
+  harness used to get permanently stuck on the first computed scale/position in
+  component-heavy games.
 - **Image: first divergence**: lowest 1-based frame number whose PNG pair
   fails the tolerance check. `max_diff` is the largest single-channel
   absolute difference (0-255); `outliers` is the number of channels (R, G,

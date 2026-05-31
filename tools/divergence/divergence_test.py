@@ -7,6 +7,16 @@ Usage:
   python3 tools/divergence/divergence_test.py <input.swf> [--frames N]
                                               [--out DIR] [--tolerance N]
                                               [--max-outliers N]
+                                              [--trace-rel-tol R] [--trace-abs-tol A]
+                                              [--trace-exact]
+
+The trace diff compares numbers with a relative+absolute tolerance by default
+(rel 1e-5 / abs 1e-4), so float-precision noise — e.g. an _xscale that differs
+only at the 8th significant digit because SWFRecomp stores scale in f32 while
+Ruffle derives it in f64 — does NOT register as a divergence. The non-numeric
+skeleton (clip paths, property keys, booleans, line structure) must still match
+exactly, so real bugs (a missing property, a renamed clip, _y=-5 vs -4.3) are
+still flagged. Pass --trace-exact for byte-exact comparison.
 
 Default output: tools/divergence/runs/<swf_stem>/
   injected.swf                injected tracer SWF (input to both runtimes)
@@ -56,15 +66,70 @@ def filter_trace(text: str) -> list[str]:
     return out
 
 
-def first_trace_divergence(a_lines: list[str], b_lines: list[str]) -> tuple[int, str, str]:
-    """Return (index, a_line, b_line) of first differing line, or (-1, '', '')."""
+# A numeric token: optional sign, digits, optional fraction, optional exponent.
+# Matches integers AND floats anywhere in a line — the value after "=", a frame
+# number ("F4"), and the trailing digits of an instance name ("instance4"). That
+# is intentional: a real structural divergence (instance4 vs instance5) keeps the
+# same skeleton but its numbers differ far beyond tolerance, so it is still
+# flagged; only genuine float-precision noise is absorbed.
+_NUM_RE = re.compile(r"[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+
+
+def _skeleton_and_nums(line: str):
+    """Replace every numeric token with \\0 (the skeleton) and return the ordered
+    list of the numeric values that were removed."""
+    nums = []
+
+    def repl(m):
+        nums.append(float(m.group(0)))
+        return "\0"
+
+    return _NUM_RE.sub(repl, line), nums
+
+
+def _nums_close(x: float, y: float, rel_tol: float, abs_tol: float) -> bool:
+    if x == y:
+        return True
+    diff = abs(x - y)
+    return diff <= abs_tol or diff <= rel_tol * max(abs(x), abs(y))
+
+
+def lines_equivalent(a: str, b: str, rel_tol: float, abs_tol: float) -> bool:
+    """True if a == b, or if they differ ONLY in numeric tokens that all agree
+    within (rel_tol, abs_tol). The non-numeric skeleton (clip paths, property
+    keys, true/false, line structure) must match exactly — so a missing property,
+    a renamed clip, or an extra line is never absorbed; only float-precision
+    differences (e.g. f32 scale storage vs Ruffle's f64) are."""
+    if a == b:
+        return True
+    sa, na = _skeleton_and_nums(a)
+    sb, nb = _skeleton_and_nums(b)
+    if sa != sb or len(na) != len(nb):
+        return False
+    return all(_nums_close(x, y, rel_tol, abs_tol) for x, y in zip(na, nb))
+
+
+def first_trace_divergence(a_lines: list[str], b_lines: list[str],
+                           rel_tol: float = 0.0, abs_tol: float = 0.0
+                           ) -> tuple[int, str, str, int]:
+    """Return (index, a_line, b_line, absorbed) of the first line that differs
+    beyond numeric tolerance. `absorbed` counts earlier lines that differed only
+    within tolerance (float-precision noise that was skipped). With
+    rel_tol=abs_tol=0 this is an exact line comparison. index=-1 = no divergence.
+    Skeletons match per-line so absorbing a line preserves positional alignment."""
     n = max(len(a_lines), len(b_lines))
+    absorbed = 0
     for i in range(n):
         a = a_lines[i] if i < len(a_lines) else "<EOF>"
         b = b_lines[i] if i < len(b_lines) else "<EOF>"
-        if a != b:
-            return i, a, b
-    return -1, "", ""
+        if a == b:
+            continue
+        if (rel_tol > 0 or abs_tol > 0) and a != "<EOF>" and b != "<EOF>" \
+                and lines_equivalent(a, b, rel_tol, abs_tol):
+            absorbed += 1
+            continue
+        return i, a, b, absorbed
+    return -1, "", "", absorbed
 
 
 def ruffle_png_for_frame(ruffle_dir: Path, frame: int, total: int) -> Path:
@@ -137,6 +202,17 @@ def main():
                     help="Per-channel pixel tolerance, 0-255 (default 0=exact)")
     ap.add_argument("--max-outliers", type=int, default=0,
                     help="Max channels allowed to exceed tolerance (default 0)")
+    ap.add_argument("--trace-rel-tol", type=float, default=1e-5,
+                    help="Relative tolerance for numeric tokens in the trace diff "
+                         "(default 1e-5). Absorbs f32-vs-f64 precision noise (e.g. "
+                         "an _xscale that differs at the 8th significant digit) "
+                         "while still flagging real value bugs.")
+    ap.add_argument("--trace-abs-tol", type=float, default=1e-4,
+                    help="Absolute tolerance for numeric tokens near zero "
+                         "(default 1e-4), where relative tolerance breaks down.")
+    ap.add_argument("--trace-exact", action="store_true",
+                    help="Byte-exact trace comparison (sets both trace tolerances "
+                         "to 0). Use to inspect float-precision noise directly.")
     ap.add_argument("--skip-ruffle", action="store_true",
                     help="Skip Ruffle run (reuse existing outputs)")
     ap.add_argument("--skip-swfrecomp", action="store_true",
@@ -183,14 +259,21 @@ def main():
     swfrecomp_trace = (swfrecomp_dir / "trace.txt").read_text()
     a = filter_trace(ruffle_trace)
     b = filter_trace(swfrecomp_trace)
-    idx, a_line, b_line = first_trace_divergence(a, b)
+    rel_tol = 0.0 if args.trace_exact else args.trace_rel_tol
+    abs_tol = 0.0 if args.trace_exact else args.trace_abs_tol
+    idx, a_line, b_line, absorbed = first_trace_divergence(a, b, rel_tol, abs_tol)
 
     report = []
     report.append(f"=== Divergence report: {stem} ===")
     report.append(f"Frames compared: {args.frames}")
     report.append(f"Trace lines: ruffle={len(a)}, swfrecomp={len(b)}")
+    if absorbed:
+        report.append(f"Trace: {absorbed} line(s) differed only within numeric "
+                      f"tolerance (rel={rel_tol:g}, abs={abs_tol:g}) — float-precision "
+                      f"noise, not flagged. Use --trace-exact to see them.")
     if idx < 0:
-        report.append("Trace: identical")
+        report.append("Trace: identical" if not absorbed
+                      else "Trace: equivalent within tolerance")
     else:
         report.append(f"Trace: first divergence at filtered line {idx}")
         report.append(f"  ruffle:    {a_line}")
