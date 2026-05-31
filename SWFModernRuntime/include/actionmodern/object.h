@@ -63,6 +63,7 @@ enum NativeType {
 	NATIVE_FILTER = 20,
 	NATIVE_STYLESHEET = 21,
 	NATIVE_FILEREF = 22,
+	NATIVE_RANDO = 23,  // Archipelago Rando client (see rando.c, WITH_AP)
 };
 
 typedef struct ASObject

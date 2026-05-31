@@ -40,6 +40,7 @@
 #include <actionmodern/action_internal.h>
 #include <actionmodern/actionmath.h>
 #include <actionmodern/actiondate.h>
+#include <actionmodern/actionrando.h>
 #include <actionmodern/actionregclass.h>
 #include <actionmodern/actiontimer.h>
 #include <actionmodern/action_queue.h>
@@ -36844,6 +36845,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		makeProtoReadOnly(math_obj);
 	}
 	initDatePrototype(app_context);
+#ifdef WITH_AP
+	initRandoPrototype(app_context);
+#endif
 
 	// ---- Error constructor ----
 	static ASFunction g_error_ctor;
@@ -37305,6 +37309,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("Number", 6, &g_ctors[3]);
 	REG_FUNC("Boolean", 7, &g_ctors[4]);
 	REG_FUNC("Date", 4, actionDateGetConstructor(app_context));
+#ifdef WITH_AP
+	REG_FUNC("Rando", 5, actionRandoGetConstructor(app_context));
+#endif
 	REG_FUNC("String", 6, &g_ctors[2]);
 	REG_FUNC("Array", 5, &g_ctors[1]);
 	REG_OBJ("Math", 4, actionMathGetObject(app_context));

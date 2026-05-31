@@ -175,6 +175,15 @@ cp "${SWFMODERN_SRC}/actionmodern/registered_class.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/utils.c" "${BUILD_DIR}/"
 
+# Archipelago Rando class (opt-in via WITH_AP=1). rando.c is a no-op stub
+# unless compiled with -DWITH_AP; rando_ap.cpp is the C++ shim over APCpp,
+# compiled separately with g++ in the native link step below. See
+# SWFRecompDocs/plans/archipelago-randomizer-integration.md.
+if [ "${WITH_AP:-}" = "1" ] || [ "${WITH_AP:-}" = "true" ]; then
+    cp "${SWFMODERN_SRC}/actionmodern/rando.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/actionmodern/rando_ap.cpp" "${BUILD_DIR}/"
+fi
+
 if [ "$HEADLESS_FLAG" = true ]; then
     echo "Using HEADLESS_GRAPHICS mode (offscreen WebGPU + trace) for ${TARGET} build..."
     cp "${SWFMODERN_SRC}/libswf/swf_headless.c" "${BUILD_DIR}/"
@@ -354,8 +363,37 @@ else
         NATIVE_GRAPHICS_FLAGS="-DNO_GRAPHICS"
     fi
 
+    # Archipelago (opt-in via WITH_AP=1): pre-compile the C++ shim with g++ and
+    # link the prebuilt APCpp static libs. See the archipelago plan doc.
+    AP_OBJS=""
+    if [ "${WITH_AP:-}" = "1" ] || [ "${WITH_AP:-}" = "true" ]; then
+        AP_ROOT="${AP_ROOT:-$HOME/CC/APCpp}"
+        AP_BUILD="${AP_ROOT}/build"
+        if [ ! -f "${AP_BUILD}/libAPCpp-static.a" ]; then
+            echo "Error: APCpp not built at ${AP_BUILD}"
+            echo "Build it: cmake -S ${AP_ROOT} -B ${AP_BUILD} -DCMAKE_BUILD_TYPE=Release && cmake --build ${AP_BUILD} -j"
+            exit 1
+        fi
+        echo "Compiling APCpp shim (rando_ap.cpp) with g++..."
+        g++ -c rando_ap.cpp \
+            -std=c++11 -DWITH_AP \
+            -I"${AP_ROOT}" \
+            -I"${AP_ROOT}/jsoncpp/include" \
+            -I"${SWFMODERN_INC}" \
+            -I"${SWFMODERN_INC}/actionmodern" \
+            -I"${SWFMODERN_INC}/memory" \
+            -o rando_ap.o
+        AP_OBJS="rando_ap.o"
+        NATIVE_GRAPHICS_FLAGS="$NATIVE_GRAPHICS_FLAGS -DWITH_AP -I${AP_ROOT}"
+        NATIVE_EXTRA_LIBS="$NATIVE_EXTRA_LIBS \
+            ${AP_BUILD}/libAPCpp-static.a \
+            ${AP_BUILD}/IXWebSocket/libixwebsocket.a \
+            ${AP_BUILD}/lib/libjsoncpp.a \
+            -lz -lssl -lcrypto -lpthread -lstdc++"
+    fi
+
     gcc \
-        *.c \
+        *.c $AP_OBJS \
         $NATIVE_GRAPHICS_FLAGS \
         -D_POSIX_C_SOURCE=199309L \
         -I. \

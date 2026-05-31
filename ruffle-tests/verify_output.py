@@ -1597,6 +1597,15 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
 
+    # Archipelago Rando class (opt-in via WITH_AP=1 env var). rando.c compiles
+    # under -DWITH_AP; rando_ap.cpp is the C++ shim, compiled separately with
+    # g++ in the link section. See
+    # SWFRecompDocs/plans/archipelago-randomizer-integration.md.
+    with_ap = os.environ.get("WITH_AP", "") in ("1", "true")
+    if with_ap:
+        shutil.copy2(SWFMODERN / "src/actionmodern/rando.c", build_dir)
+        shutil.copy2(SWFMODERN / "src/actionmodern/rando_ap.cpp", build_dir)
+
     shutil.copy2(SWFMODERN / "lib/c-hashmap/map.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.h", build_dir)
@@ -1808,6 +1817,27 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     else:
         mode_defines = ["-DNO_GRAPHICS"]
 
+    # Archipelago (opt-in via WITH_AP=1): define WITH_AP + add APCpp include for
+    # the C sources, and collect the prebuilt static libs for the link step.
+    ap_includes = []
+    ap_libs = []
+    ap_root = Path(os.environ.get("AP_ROOT", Path.home() / "CC" / "APCpp"))
+    if with_ap:
+        ap_build = ap_root / "build"
+        ap_static = ap_build / "libAPCpp-static.a"
+        if not ap_static.exists():
+            return False, (f"WITH_AP set but APCpp not built at {ap_build}. "
+                           f"Build it: cmake -S {ap_root} -B {ap_build} "
+                           f"-DCMAKE_BUILD_TYPE=Release && cmake --build {ap_build} -j")
+        mode_defines.append("-DWITH_AP")
+        ap_includes = [f"-I{ap_root}"]
+        ap_libs = [
+            str(ap_static),
+            str(ap_build / "IXWebSocket" / "libixwebsocket.a"),
+            str(ap_build / "lib" / "libjsoncpp.a"),
+            "-lssl", "-lcrypto", "-lpthread", "-lstdc++",
+        ]
+
     # Sanitizer flags for crash debugging
     sanitizer_flags = []
     opt_level = "-O2"
@@ -1856,6 +1886,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         f"-I{inc}/memory",
         f"-I{SWFMODERN}/lib/c-hashmap",
         *mode_includes,
+        *ap_includes,
         *prefix_map_flags,
         "-w",
         "-std=c17",
@@ -1879,6 +1910,24 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             if proc.returncode != 0:
                 return False, stderr.decode("utf-8", errors="replace")
 
+        # Compile the APCpp C++ shim with g++ (rando_ap.cpp is not in the C
+        # glob). Its .o joins the link below.
+        if with_ap:
+            shim_obj = build_dir / "rando_ap.o"
+            objects.append(shim_obj)
+            proc = subprocess.Popen(
+                ["g++", "-c", "rando_ap.cpp", "-std=c++11", "-DWITH_AP",
+                 f"-I{ap_root}", f"-I{ap_root}/jsoncpp/include",
+                 f"-I{inc}", f"-I{inc}/actionmodern", f"-I{inc}/memory",
+                 *sanitizer_flags, opt_level, "-o", "rando_ap.o"],
+                cwd=str(build_dir),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            stdout, stderr = proc.communicate(timeout=300)
+            if proc.returncode != 0:
+                return False, stderr.decode("utf-8", errors="replace")
+
         # Link (no ccache; linking is not the bottleneck)
         proc = subprocess.Popen(
             [
@@ -1888,6 +1937,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
                 "-o", str(build_dir / "test_run"),
                 "-lm", "-lz",
                 *mode_libs,
+                *ap_libs,
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

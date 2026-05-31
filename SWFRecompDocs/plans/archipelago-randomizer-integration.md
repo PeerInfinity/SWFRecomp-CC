@@ -1,7 +1,9 @@
 # Archipelago Randomizer Integration (APCpp ↔ AVM1 `Rando` class)
 
-**Status:** Planning. Phase 0 (download + build + link de-risk) **complete** as of
-2026-05-31. No SWFRecomp tree changes yet.
+**Status:** Phase 0 (download + build + link de-risk) **complete** 2026-05-31.
+Phase 1 (native proof-of-pipe) **implemented + verified** 2026-05-31 — `Rando`
+builtin class lands in the runtime, gated on `WITH_AP`; a smoke test passes
+end-to-end (see §5.6). Phases 2–3 pending.
 
 **Owner:** PeerInfinity / Claude. Originated from a conversation with LittleCube
 (EVRS) about turning SWFRecomp games (Pong, Snake, Doodle Jump) into Archipelago
@@ -126,10 +128,44 @@ APCpp static libs  →  IXWebSocket  →  TCP/TLS websocket  →  Archipelago se
 
 ---
 
-## 5. Phase 1 — Native proof-of-pipe
+## 5. Phase 1 — Native proof-of-pipe  ✅ IMPLEMENTED 2026-05-31
 
 Smallest thing that demonstrates AVM1 ↔ APCpp. Native NO_GRAPHICS build only, no
 game logic. **Verified file:line anchors below.**
+
+### As-built summary
+
+Files added:
+- `SWFModernRuntime/include/actionmodern/rando_ap.h` — pure-POD bridge header.
+- `SWFModernRuntime/src/actionmodern/rando_ap.cpp` — C++ shim over APCpp (g++).
+- `SWFModernRuntime/include/actionmodern/actionrando.h` — public runtime header.
+- `SWFModernRuntime/src/actionmodern/rando.c` — the `Rando` builtin class.
+
+Edits:
+- `include/actionmodern/object.h` — added `NATIVE_RANDO = 23` to `enum NativeType`.
+- `src/actionmodern/action.c` — `#include actionrando.h`; `initRandoPrototype()`
+  in `ensureGlobalInit`; `REG_FUNC("Rando", 5, …)` (both `#ifdef WITH_AP`).
+- `SWFRecomp/scripts/build_test.sh` — `WITH_AP=1` gate: copy rando sources,
+  g++-compile the shim, link APCpp libs. (NOTE: `build_test.sh`'s NO_GRAPHICS
+  path is pre-existingly broken — missing `action_queue.c`/
+  `sprite_frame_scripts.c` — so the **maintained** build path is verify_output.py
+  below; the build_test.sh hooks are kept for parity but untested via that path.)
+- `ruffle-tests/verify_output.py` — `WITH_AP=1` env gate in `compile_native`:
+  copies rando sources, adds `-DWITH_AP` + APCpp include, g++-compiles
+  `rando_ap.cpp`, links `libAPCpp-static.a` + `libixwebsocket.a` +
+  `libjsoncpp.a` + `-lssl -lcrypto -lpthread -lstdc++`. **This is the working
+  native build path.**
+
+The AVM1 `new Rando(...)` reaches the generic native-constructor path in
+`actionNewObject` (no special-case needed): `lookupFunctionByName` finds the
+registered `g_rando_constructor`, the path allocates the instance, wires
+`__proto__` to `g_rando_prototype`, and calls `advanced_func(…, this_obj=obj)`
+(action.c:51805/51891/`function_type==2` branch). The `AP_State*` handle is
+stashed via the wrapper `RandoAP*` as a hidden DontEnum `__ap_handle__` property.
+
+Default builds (no `WITH_AP`) are entirely unaffected: rando.c isn't copied,
+action.c's Rando references are `#ifdef`'d out, and the verify_output.py hooks
+are env-gated. Confirmed: an existing `typeof` test still passes without WITH_AP.
 
 ### 5.1 New files
 
@@ -201,6 +237,30 @@ A tiny hand-authored SWF/AS (or a recompiled test) that:
 
 Native-only; runs locally (not in the no-graphics CI trace harness, which has no
 network). Document as a manual/integration test, not a suite test.
+
+### 5.6 Phase 1 acceptance result ✅
+
+Smoke test at `ruffle-tests/tests/swfs/_rando/rando_smoke/` (`Test.as` +
+intrinsic `Rando.as`, compiled with MTASC to `test.swf`). It constructs a Rando
+and polls it **without** calling `connect()` — no server, no network thread, so
+output is deterministic in any environment:
+
+```
+function          // typeof Rando
+object            // typeof new Rando(...)
+false             // isConnected()  (not connected)
+0                 // receivedItemsSize()
+false             // hasItem(42)
+false             // locationIsChecked(1)
+```
+
+Run: `WITH_AP=1 python3 ruffle-tests/verify_output.py --test=rando_smoke \
+--tests-dir=ruffle-tests/tests/swfs/_rando --diff` → **PASS**. This exercises
+the real link (AP_New/AP_Init/AP_IsConnected/AP_GetReceivedItemsSize/
+AP_GetLocationIsChecked are actually called) and the AVM1 construct + method
+dispatch. A live-server test (connect + receive items + send a location) remains
+a manual step. The `_rando` suite is excluded from the default Ruffle runs (it
+lives outside `tests/swfs/avm1` and requires `WITH_AP`).
 
 ---
 
