@@ -264,23 +264,28 @@ lives outside `tests/swfs/avm1` and requires `WITH_AP`).
 
 ---
 
-## 6. Phase 2 — WASM transport bridge (the hard part)
+## 6. Phase 2 — WASM transport bridge
 
-IXWebSocket can't reach the browser WebSocket API. Options, roughly increasing
-effort / decreasing hackiness:
+**Full plan: [archipelago-phase2-wasm-bridge.md](archipelago-phase2-wasm-bridge.md).**
 
-1. **Replace IXWebSocket's socket layer under emscripten** with an
-   emscripten-websocket-backed `IXSocket` implementation (emscripten provides a
-   POSIX-ish websocket shim + `emscripten/websocket.h`). Keeps APCpp's JSON/proto
-   logic intact; isolates the change to the transport.
-2. **Stub APCpp's transport** and route its outbound/inbound JSON frames over a
-   small emscripten-websocket bridge of our own (JS `WebSocket` ↔ WASM).
-3. **Proxy:** native AP client process + browser talks to it over local
-   websocket. Defeats the "runs in the browser demo" goal; fallback only.
+IXWebSocket can't reach the browser WebSocket API (raw BSD sockets, no emscripten
+path). Rather than port the transport, we **bypass APCpp in the browser** and
+talk to the AP server through **`archipelago.js`** (v2.1.0, browser-native
+WebSocket) — the JS transport already proven in `~/CC/flash-ap-api`. Phase 2 is
+just a second implementation of the `rando_ap.h` seam (`rando_ap_wasm.c` → EM_JS
+→ `window.__randoBridge` → archipelago.js); `rando.c` and the AVM1 surface are
+unchanged. Locked decisions:
 
-ASYNCIFY is already in the WASM build (audio/render) — a per-frame poll pump fits.
-Decision deferred until Phase 1 lands. **This phase gates the peerinfinity.com
-browser demos; native works without it.**
+- **Hybrid connect** via a single `bridge.connect(host,port,slot,pw)` chokepoint,
+  callable from both AS (`new Rando(...); connect()`, args stashed at construct)
+  and an **HTML connect form** (convenience override) — one AS codebase across
+  backends, with an idempotency guard.
+- **Vendor archipelago.js** into the demo assets (self-contained, version-pinned).
+- **No ASYNCIFY** for the Rando path (fire-and-forget connect + synchronous POD
+  state reads); hot path is POD-only, strings cross once at construct/connect.
+- **Transport only** — item *application* + `ITEM`/`LOCATION` enums are Phase 3.
+
+This phase gates the peerinfinity.com browser demos; native works without it.
 
 ---
 
