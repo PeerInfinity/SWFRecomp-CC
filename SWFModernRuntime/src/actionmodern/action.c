@@ -34673,6 +34673,47 @@ static void initNetStreamPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "backBufferTime", 14, &undef_val, 0);
 }
 
+// SharedObject.getLocal(name[, localPath, secure]) — headless stub.
+// Returns a fresh SharedObject-like instance with an empty `.data` bag rather
+// than undefined. Two reasons:
+//   (a) typeof parity — Ruffle's getLocal returns a SharedObject instance
+//       (typeof "object"), so `_root.<var> = SharedObject.getLocal(...)` is a
+//       non-enumerated object, not a spurious enumerable `<var>=undefined`
+//       global (the Tetris `game_so=undefined` divergence).
+//   (b) game code reading `so.data.<key>` then gets undefined gracefully
+//       instead of dereferencing undefined.
+// No disk persistence: matches Ruffle's headless/--deterministic exporter,
+// which also starts each run with empty local storage. The `__proto__` points
+// at SharedObject.prototype so flush()/clear()/getSize()/... resolve as the
+// existing no-op stubs.
+static ActionVar builtin_sharedobject_getLocal(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers; (void)this_obj;
+	extern ASFunction g_stub_ctors[];
+	ASObject* so = allocObject(app_context, 4);
+	retainObject(so);
+	// __proto__ → SharedObject.prototype (falls back to Object.prototype)
+	if (g_stub_ctors[13].prototype_obj != NULL) {
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64) g_stub_ctors[13].prototype_obj;
+		setPropertyWithFlags(app_context, so, "__proto__", 9, &pv, PROPERTY_FLAG_WRITABLE);
+	} else {
+		setObjectProto(app_context, so);
+	}
+	// data → fresh empty object
+	ASObject* data = allocObject(app_context, 4);
+	setObjectProto(app_context, data);
+	ActionVar dv = {0};
+	dv.type = ACTION_STACK_VALUE_OBJECT;
+	dv.data.numeric_value = (u64) data;
+	setProperty(app_context, so, "data", 4, &dv);
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_OBJECT;
+	ret.data.numeric_value = (u64) so;
+	return ret;
+}
+
 // SharedObject: 4 static methods + 7 prototype methods
 static void initSharedObjectPrototype(SWFAppContext* app_context, ASFunction* ctor)
 {
@@ -34706,7 +34747,7 @@ static void initSharedObjectPrototype(SWFAppContext* app_context, ASFunction* ct
 	memset(getLocal_fn, 0, sizeof(ASFunction));
 	strncpy(getLocal_fn->name, "getLocal", 255);
 	getLocal_fn->function_type = 2;
-	getLocal_fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	getLocal_fn->advanced_func = (Function2Ptr) builtin_sharedobject_getLocal;
 	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = getLocal_fn;
 	fv.data.numeric_value = (u64) getLocal_fn;
 	setProperty(app_context, ctor->own_props, "getLocal", 8, &fv);
