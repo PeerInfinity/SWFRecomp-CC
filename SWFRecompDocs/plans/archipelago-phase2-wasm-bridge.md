@@ -1,11 +1,20 @@
 # Archipelago Phase 2 — WASM transport bridge (`Rando` in the browser)
 
-**Status:** Core **implemented + verified** 2026-05-31 via the `verify_output.py`
-WASM path (build + link + run + deploy all green). Depends on Phase 1 (native
-`Rando`, shipped 2026-05-31 —
+**Status:** **Implemented + verified** 2026-05-31 (build + link + run + deploy +
+demo-viewer panel all green via the `verify_output.py` WASM path). Depends on
+Phase 1 (native `Rando`, shipped 2026-05-31 —
 see [archipelago-randomizer-integration.md](archipelago-randomizer-integration.md)).
-Remaining: `deploy_example.sh` + `index_template.html` form injection for the
-peerinfinity.com demo deploy, and a manual live-server browser test (§11).
+Only remaining step is a **manual live-server browser test** (§8/§11) — connect to
+a running Archipelago server and confirm the item/location round-trip.
+
+Demo viewer note: the real viewer is the shared dynamic `docs2/demo.html?test=<id>`
+(docs2 = local hosting, where non-open-source game SWFs live — the AP target
+games), **not** the legacy `index_template.html`. The AP UI is a self-contained
+fragment (`rando_panel.js`, the single UI source) that `docs2/demo.html` loads
+only when it HEAD-probes a staged `rando_bridge.js` — zero config, no
+`test_info.json` schema change, non-AP demos untouched. `docs/demo.html` (public
+GitHub Pages, open-source SWFs only) can get the same one-line hook later if an
+OSS AP demo is ever wanted.
 
 This doc plans the browser-WASM backend for the `Rando` builtin. Phase 1 made
 `Rando` work in native builds via APCpp; Phase 2 makes it work in the
@@ -178,10 +187,17 @@ connect form, and both JS assets. In the headless test-run (node, no bridge)
 as native. A normal (non-AP) `typeof` WASM build still passes (video_codec.c
 addition caused no regression).
 
-Remaining (not yet wired/validated): `index_template.html` form injection for the
-`build_test.sh`/`deploy_example.sh` demo-deploy path (the `verify_output.py`
-`deploy_wasm` form is proven; the demo template mirror is pending), and the §8/§11
-live-server browser test.
+Demo viewer (2026-05-31, done): `rando_panel.js` is a self-contained connect
+panel (the single UI source). `docs2/demo.html` HEAD-probes `rando_bridge.js` and,
+if present, loads the bridge module + panel — non-AP demos never see it.
+`build_test.sh` (wasm) stages all three JS assets into the build dir;
+`deploy_example.sh` already copies `*.js` to the deploy dir. `verify_output.py`'s
+`deploy_wasm` loads the same `rando_panel.js` (replaced its earlier inline form,
+so there's one UI source). Verified: the deployed page ships archipelago.js +
+rando_bridge.js + rando_panel.js and loads bridge+panel.
+
+Remaining (not yet validated): the §8/§11 **live-server browser test** (needs a
+running AP server + browser).
 
 ## 9. Open questions (defer until bring-up)
 

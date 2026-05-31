@@ -615,6 +615,24 @@
         };
         document.body.appendChild(script);
 
+        // --- Archipelago panel (WITH_AP demos only) ---
+        // The WITH_AP build stages rando_bridge.js + archipelago.js +
+        // rando_panel.js next to the demo. HEAD-probe the bridge; if present,
+        // load it (module) and the self-contained connect panel. Non-AP demos
+        // never see this (probe 404s). See archipelago-phase2-wasm-bridge.md.
+        fetch(testDir + 'rando_bridge.js', { method: 'HEAD' })
+            .then(function(r) {
+                if (!r.ok) return;
+                var bridge = document.createElement('script');
+                bridge.type = 'module';
+                bridge.src = testDir + 'rando_bridge.js';
+                document.body.appendChild(bridge);
+                var panel = document.createElement('script');
+                panel.src = testDir + 'rando_panel.js';
+                document.body.appendChild(panel);
+            })
+            .catch(function() {});
+
         // --- Run SWF ---
         var swfRunning = false;
         window.runSwf = function() {

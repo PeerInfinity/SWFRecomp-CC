@@ -134,6 +134,22 @@ window.__randoBridge = {
 		e.params.password = password;
 		doConnect(e);
 	},
+
+	// Human-readable status of the most recently created handle, for the demo
+	// panel's status line. Returns "" before any Rando is constructed.
+	latestStatus: function () {
+		const e = entry(nextId - 1);
+		if (!e) {
+			return "no Rando yet (game hasn't called new Rando())";
+		}
+		if (this.isConnected(nextId - 1)) {
+			return "connected — " + this.receivedItemsSize(nextId - 1) + " item(s) received";
+		}
+		if (e.connecting) {
+			return "connecting…";
+		}
+		return "not connected";
+	},
 };
 
 console.log("[rando] bridge ready (archipelago.js loaded)");

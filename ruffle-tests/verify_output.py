@@ -2204,33 +2204,20 @@ def deploy_wasm(test_name, build_dir, deploy_dir):
     # Archipelago (WITH_AP): ship the JS bridge + vendored archipelago.js next to
     # the page, and inject the bridge module + a connect form. rando_bridge.js
     # imports ./archipelago.js, so loading the bridge module pulls in both.
+    # WITH_AP: ship the JS bridge + vendored archipelago.js + the self-contained
+    # connect panel (rando_panel.js, the single UI source shared with
+    # docs2/demo.html), and load the bridge (module) + panel. rando_panel.js
+    # builds its own DOM, so no inline form here.
     rando_scripts = ""
-    rando_form = ""
+    rando_form = ""  # panel injects its own DOM
     if os.environ.get("WITH_AP", "") in ("1", "true"):
         rando_assets = PROJECT_ROOT / "SWFRecomp" / "wasm_wrappers" / "rando"
-        for asset in ("archipelago.js", "rando_bridge.js"):
+        for asset in ("archipelago.js", "rando_bridge.js", "rando_panel.js"):
             src = rando_assets / asset
             if src.exists():
                 shutil.copy2(src, deploy_dir / asset)
-        rando_scripts = '<script type="module" src="rando_bridge.js"></script>'
-        rando_form = (
-            '<div id="ap-connect" style="margin:10px 0;">'
-            '<input id="ap-host" placeholder="host" value="archipelago.gg" size="14">'
-            '<input id="ap-port" placeholder="port" value="38281" size="6">'
-            '<input id="ap-slot" placeholder="slot" size="12">'
-            '<input id="ap-pw" placeholder="password" size="10">'
-            '<button onclick="apConnect()">Connect AP</button>'
-            '<span id="ap-status" class="info"> not connected</span>'
-            '</div>'
-            '<script>function apConnect(){'
-            'if(!window.__randoBridge){document.getElementById("ap-status").textContent=" bridge not loaded";return;}'
-            'window.__randoBridge.connectFromForm('
-            'document.getElementById("ap-host").value,'
-            'document.getElementById("ap-port").value,'
-            'document.getElementById("ap-slot").value,'
-            'document.getElementById("ap-pw").value);'
-            'document.getElementById("ap-status").textContent=" connecting…";}</script>'
-        )
+        rando_scripts = ('<script type="module" src="rando_bridge.js"></script>'
+                         '<script src="rando_panel.js"></script>')
 
     # Generate standalone HTML page
     html = f"""<!DOCTYPE html>

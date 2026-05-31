@@ -265,6 +265,7 @@ if [ "${WITH_AP:-}" = "1" ] || [ "${WITH_AP:-}" = "true" ]; then
     if [ "$TARGET" == "wasm" ]; then
         cp "${SWFRECOMP_ROOT}/wasm_wrappers/rando/archipelago.js" "${BUILD_DIR}/"
         cp "${SWFRECOMP_ROOT}/wasm_wrappers/rando/rando_bridge.js" "${BUILD_DIR}/"
+        cp "${SWFRECOMP_ROOT}/wasm_wrappers/rando/rando_panel.js" "${BUILD_DIR}/"
     fi
 fi
 
