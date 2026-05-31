@@ -1,3 +1,0 @@
-typeof inner.leaf=movieclip
-dup._parent._name=container
-typeof dup.leaf=undefined

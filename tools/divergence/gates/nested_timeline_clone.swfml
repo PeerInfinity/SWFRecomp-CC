@@ -71,6 +71,38 @@
               <AddTyped/>
               <Trace/>
 
+              <!-- function-form: duplicateMovieClip(inner, "dup2", 6) -> ActionCloneSprite -> ng_cloneSprite.
+                   Runtime stack layout is [source-mc] [new-name] [depth]; push the
+                   source as a MovieClip ref (GetVariable) so it clones for real. -->
+              <PushData><items><StackString value="inner"/></items></PushData>
+              <GetVariable/>
+              <PushData><items>
+                <StackString value="dup2"/>
+                <StackInteger value="6"/>
+              </items></PushData>
+              <CloneSprite/>
+
+              <!-- trace("typeof dup2.leaf=" + typeof(dup2.leaf)) -->
+              <PushData><items><StackString value="typeof dup2.leaf="/></items></PushData>
+              <PushData><items><StackString value="dup2"/></items></PushData>
+              <GetVariable/>
+              <PushData><items><StackString value="leaf"/></items></PushData>
+              <GetMember/>
+              <TypeOf/>
+              <AddTyped/>
+              <Trace/>
+
+              <!-- trace("dup2._parent._name=" + dup2._parent._name) -->
+              <PushData><items><StackString value="dup2._parent._name="/></items></PushData>
+              <PushData><items><StackString value="dup2"/></items></PushData>
+              <GetVariable/>
+              <PushData><items><StackString value="_parent"/></items></PushData>
+              <GetMember/>
+              <PushData><items><StackString value="_name"/></items></PushData>
+              <GetMember/>
+              <AddTyped/>
+              <Trace/>
+
               <EndAction/>
             </actions>
           </DoAction>

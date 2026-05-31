@@ -2097,10 +2097,18 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	// If source is a sprite, run frame 0 to populate clone's sprite_display_list.
 	// After cloning, clear the source MC's display_obj so TextSnapshot of source
 	// returns empty (Flash behavior: text "moves" from source to clone).
+	//
+	// Source char_id falls back to the source MC's DisplayObject when the global
+	// display_list lookup misses (nested timeline source — see ng_duplicateMovieClip
+	// + gates/nested_timeline_clone).
+	size_t src_cid = 0;
 	if (src_depth != SIZE_MAX)
+		src_cid = display_list[src_depth].char_id;
+	else if (src_mc != NULL && src_mc->display_obj != NULL)
+		src_cid = ((DisplayObject*)src_mc->display_obj)->char_id;
 	{
-		size_t cid = display_list[src_depth].char_id;
-		if (dictionary[cid].type == CHAR_TYPE_SPRITE)
+		size_t cid = src_cid;
+		if (cid != 0 && dictionary[cid].type == CHAR_TYPE_SPRITE)
 		{
 			frame_func* funcs = dictionary[cid].sprite_frame_funcs;
 			size_t frame_count = dictionary[cid].sprite_frame_count;
@@ -2401,11 +2409,22 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 
 	// If source is a sprite, run frame 0 to populate clone's sprite_display_list
 	// (so children like text objects are available for TextSnapshot etc.)
+	//
+	// Source char_id: the global display_list only holds root-level entries, so a
+	// NESTED timeline source (placed inside another sprite) misses the
+	// ng_findDisplayEntryByName lookup above (src_depth==SIZE_MAX). Fall back to
+	// the source MC's own DisplayObject, which carries char_id at any nesting
+	// depth — without it the clone's frame 0 never runs and nested children
+	// (e.g. `dup.leaf`) are missing. See gates/nested_timeline_clone.
+	size_t src_cid = 0;
 	if (src_depth != SIZE_MAX)
+		src_cid = display_list[src_depth].char_id;
+	else if (src_mc != NULL && src_mc->display_obj != NULL)
+		src_cid = ((DisplayObject*)src_mc->display_obj)->char_id;
 	{
 		extern size_t display_list_capacity;
-		size_t cid = display_list[src_depth].char_id;
-		if (dictionary[cid].type == CHAR_TYPE_SPRITE)
+		size_t cid = src_cid;
+		if (cid != 0 && dictionary[cid].type == CHAR_TYPE_SPRITE)
 		{
 			frame_func* funcs = dictionary[cid].sprite_frame_funcs;
 			size_t frame_count = dictionary[cid].sprite_frame_count;

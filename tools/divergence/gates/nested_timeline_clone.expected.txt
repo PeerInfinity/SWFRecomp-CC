@@ -1,3 +1,5 @@
 typeof inner.leaf=movieclip
 dup._parent._name=container
 typeof dup.leaf=movieclip
+typeof dup2.leaf=undefined
+dup2._parent._name=
