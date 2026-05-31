@@ -53581,7 +53581,7 @@ void actionCloneSprite(SWFAppContext* app_context)
 		MovieClip* clone_mc = NULL;
 		if (reachable_via_dl || (has_explicit_target && resolved_src->display_obj != NULL)) {
 			clone_mc = ng_cloneSprite(app_context, resolved_src->name,
-			                          new_name, depth_int);
+			                          new_name, depth_int, caller_ctx);
 		} else {
 			clone_mc = ng_cloneSpriteFromMC(app_context, resolved_src,
 			                                new_name, depth_int);
@@ -64924,7 +64924,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 
 				// Use ng_duplicateMovieClip: stores at SWF depth (depth+16384), no variable registration
-				MovieClip* clone_mc = ng_duplicateMovieClip(app_context, mc->name, tgt_name, depth_val);
+				// Parent the clone under the source's parent (mc->parent) — for
+				// nested / script-created sources the clone is a sibling of mc,
+				// not a _root ghost. NULL (mc==_root) → _root inside the callee.
+				MovieClip* clone_mc = ng_duplicateMovieClip(app_context, mc->name, tgt_name, depth_val, mc->parent);
 				if (clone_mc == NULL) {
 					// Source not in ng_display (script-created MC): direct clone via MC
 					clone_mc = ng_cloneSpriteFromMC(app_context, mc, tgt_name, depth_val);

@@ -430,12 +430,16 @@ void ng_iterateTransientButtonChildren(void* button_dobj, void (*callback)(const
 int ng_isTransientButtonChildName(void* button_dobj, const char* name, size_t name_len);
 // Check if a tag-placed display entry at the given root depth is scriptable (sprite/button/textfield)
 int ng_isScriptableAtDepth(size_t depth);
-// Clone a tag-placed sprite to target_name at AS depth. Returns clone MC, or NULL if non-scriptable/not found.
-MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name, const char* target_name, int depth);
+// Clone a tag-placed sprite to target_name at AS depth. `parent` is the clone's
+// intended parent (the source's timeline owner / caller context); NULL → _root.
+// Returns clone MC, or NULL if non-scriptable/not found.
+MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name, const char* target_name, int depth, MovieClip* parent);
 // Clone a script-created MovieClip (not in ng_display) to target_name at AS depth.
+// The clone is parented under src_mc->parent (AVM1 sibling clone semantics).
 MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc, const char* target_name, int depth);
-// duplicateMovieClip clone: stores at SWF depth (as_depth+16384), no variable registration, no onLoad.
-MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_name, const char* target_name, int as_depth);
+// duplicateMovieClip clone: stores at SWF depth (as_depth+16384), no onLoad.
+// `parent` is the clone's intended parent (the source's parent); NULL → _root.
+MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_name, const char* target_name, int as_depth, MovieClip* parent);
 
 // Active transform data pointer — swapped to child SWF's array during child movie init.
 // Defined in tag.c (NO_GRAPHICS builds only). NULL = use main SWF's transform_data.

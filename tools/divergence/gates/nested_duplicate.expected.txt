@@ -1,0 +1,5 @@
+typeof p.dupChild=movieclip
+d._target=/parentClip/dupChild
+d._parent._name=[parentClip]
+d._parent==parentClip:true
+typeof _root.dupChild=undefined

@@ -22,6 +22,8 @@ RecompiledScripts/
 sup*.swf
 # Allow deployed test SWFs (needed for Ruffle comparison on GitHub Pages)
 !docs/examples/**/test.swf
+# Allow divergence regression-gate fixture SWFs (hand-built, tracked)
+!tools/divergence/gates/*.swf
 # Allow demo SWFs for in-browser recompiler
 !docs/recompiler/*.swf
 # Allow demo SWFs for runtime-swf experiments

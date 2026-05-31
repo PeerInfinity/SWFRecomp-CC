@@ -1831,11 +1831,40 @@ int ng_getTextFieldIdx(size_t depth)
 // Clone/duplicate sprite helpers
 // ---------------------------------------------------------------------------
 
+// Register a freshly-created clone under its real parent. AVM1 clone semantics:
+// duplicate/clone binds the new clip as a property of its parent (the source's
+// parent), NOT as a global _root variable. Root clones keep the historical
+// behavior (global clone-depth table + _root var_map, the only mode that makes
+// the global depth table meaningful); non-root clones bind only on the parent's
+// dynamic_props — mirrors ng_attachMovie's #8 fix. Without this, a nested
+// `child.duplicateMovieClip("dup", n)` minted the clone as a _root ghost and
+// `parent.dup` never resolved (Ruffle: parent.dup is a movieclip).
+static void ng_register_clone_under_parent(SWFAppContext* app_context,
+                                           MovieClip* parent, const char* name,
+                                           MovieClip* clone_mc, int swf_depth_for_table)
+{
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_MOVIECLIP;
+	v.data.numeric_value = (u64)(uintptr_t)clone_mc;
+	if (parent == NULL || parent == &root_movieclip) {
+		clone_depth_register(swf_depth_for_table, name, clone_mc);
+		setVariableByName(name, &v);
+	} else if (name != NULL && name[0] != '\0') {
+		if (parent->dynamic_props == NULL) {
+			parent->dynamic_props = (void*) allocObject(app_context, 8);
+			retainObject((ASObject*) parent->dynamic_props);
+		}
+		setProperty(app_context, (ASObject*) parent->dynamic_props,
+		            name, (u32)strlen(name), &v);
+	}
+}
+
 MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
-                           const char* target_name, int depth)
+                           const char* target_name, int depth, MovieClip* parent)
 {
 	if (!source_name || !target_name) return NULL;
 	if (depth > 2130706428) return NULL;
+	MovieClip* clone_parent = parent ? parent : &root_movieclip;
 
 	// Phase 2c (CLONESPRITE_DEPTH_BIAS): two callers with different conventions.
 	// (1) Phase 2a stripped (recompiler set g_clone_depth_already_unbiased=1):
@@ -1967,10 +1996,10 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		}
 	}
 
-	// Find source MC and create clone MC
-	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
+	// Find source MC and create clone MC under the clone's real parent.
+	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, clone_parent);
 	if (src_mc == NULL || src_mc == &root_movieclip) return NULL; // cannot clone root
-	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, clone_parent);
 	if (clone_mc == NULL) return NULL;
 
 	if (src_mc != NULL)
@@ -2062,13 +2091,8 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	// Pass clone_mc so the by-name walk skips the freshly-created clone — a
 	// stale entry from a prior session with the same name would otherwise
 	// match it and stamp depth=INT_MIN, hiding the clone from the render loop.
-	clone_depth_register(swf_depth_for_table, target_name, clone_mc);
-
-	// Register as global variable
-	ActionVar _clone_mc_var = {0};
-	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-	_clone_mc_var.data.numeric_value = (u64)clone_mc;
-	setVariableByName(target_name, &_clone_mc_var);
+	ng_register_clone_under_parent(app_context, clone_parent, target_name,
+	                               clone_mc, swf_depth_for_table);
 
 	// If source is a sprite, run frame 0 to populate clone's sprite_display_list.
 	// After cloning, clear the source MC's display_obj so TextSnapshot of source
@@ -2207,7 +2231,10 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	}
 #endif
 
-	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	// Clone is a sibling of the source → child of the source's parent (AVM1
+	// clone semantics). src_mc->parent is guaranteed non-NULL by the guard above.
+	MovieClip* clone_parent = src_mc->parent;
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, clone_parent);
 	if (clone_mc == NULL) return NULL;
 
 	clone_mc->x       = src_mc->x;
@@ -2301,21 +2328,19 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 			display_list[src_depth].clip_action_count);
 	}
 
-	// Evict any old clone at this SWF depth, then register new one.
-	clone_depth_register(swf_depth_for_table, target_name, clone_mc);
-
-	ActionVar _clone_mc_var = {0};
-	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-	_clone_mc_var.data.numeric_value = (u64)clone_mc;
-	setVariableByName(target_name, &_clone_mc_var);
+	// Register under the clone's real parent (root → depth table + var_map;
+	// non-root → parent->dynamic_props only).
+	ng_register_clone_under_parent(app_context, clone_parent, target_name,
+	                               clone_mc, swf_depth_for_table);
 
 	return clone_mc;
 }
 
 MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_name,
-                                  const char* target_name, int as_depth)
+                                  const char* target_name, int as_depth, MovieClip* parent)
 {
 	if (!source_name || !target_name) return NULL;
+	MovieClip* clone_parent = parent ? parent : &root_movieclip;
 
 	int swf_depth = as_depth + 16384;
 
@@ -2330,8 +2355,8 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 		// Note: duplicateMovieClip does NOT fire onLoad for the clone (unlike CloneSprite).
 	}
 
-	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, &root_movieclip);
-	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
+	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, clone_parent);
+	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, clone_parent);
 	if (clone_mc == NULL) return NULL;
 
 	if (src_mc != NULL)
@@ -2369,14 +2394,10 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 	clone_mc->currentframe = 1;
 	clone_mc->depth = as_depth;
 
-	// Evict any old clone at this SWF depth, then register this one
-	clone_depth_register(swf_depth, target_name, clone_mc);
-
-	// Register as global variable so GetVariable(target_name) finds the clone
-	ActionVar _dup_mc_var = {0};
-	_dup_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-	_dup_mc_var.data.numeric_value = (u64)clone_mc;
-	setVariableByName(target_name, &_dup_mc_var);
+	// Register under the clone's real parent so name resolution finds it
+	// (root → depth table + var_map; non-root → parent->dynamic_props only).
+	ng_register_clone_under_parent(app_context, clone_parent, target_name,
+	                               clone_mc, swf_depth);
 
 	// If source is a sprite, run frame 0 to populate clone's sprite_display_list
 	// (so children like text objects are available for TextSnapshot etc.)
