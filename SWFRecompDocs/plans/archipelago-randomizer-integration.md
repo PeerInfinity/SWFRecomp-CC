@@ -318,7 +318,13 @@ queue, DeathLink.
 
 ---
 
-## 8. Phase 3 — Doodle Jump apworld (later)
+## 8. Phase 3 — item application, pluggable transport, SWF substrate
+
+**Now planned in detail in
+[archipelago-phase3-substrate-and-item-application.md](archipelago-phase3-substrate-and-item-application.md)**
+(item application, pluggable `__randoBridge` transport, the SWF-as-substrate
+topology, APQuest as the new test fixture, and a 4-slice execution plan). The
+sketch below is the original seed; the dedicated doc supersedes it.
 
 - **AS injection** via the **prelude-SWF** mechanism already prototyped in
   `SWFRecompDocs/plans/runtime-swf-injection-demos.md` (Demo 4,
