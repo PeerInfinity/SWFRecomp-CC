@@ -64550,13 +64550,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args[0].type == ACTION_STACK_VALUE_STRING) {
 					const uint16_t* _u16 = varGetU16Ptr(&args[0]);
 					u16_to_utf8(_u16, args[0].str_size, _am_id_buf, sizeof(_am_id_buf));
-					linkage_id = _am_id_buf;
+				} else {
+					varToStringBuf(app_context, &args[0], _am_id_buf, sizeof(_am_id_buf));
 				}
+				linkage_id = _am_id_buf;
+				// newName may be passed as a NUMBER (e.g. Pacman's
+				// G.attachMovie("Ghost", i, i) with i=0..3) — Ruffle coerces it
+				// to "0".."3". Coerce non-string names so the attach isn't
+				// silently skipped by the new_name[0] != '\0' guard below.
 				if (args[1].type == ACTION_STACK_VALUE_STRING) {
 					const uint16_t* _u16 = varGetU16Ptr(&args[1]);
 					u16_to_utf8(_u16, args[1].str_size, _am_name_buf, sizeof(_am_name_buf));
-					new_name = _am_name_buf;
+				} else {
+					varToStringBuf(app_context, &args[1], _am_name_buf, sizeof(_am_name_buf));
 				}
+				new_name = _am_name_buf;
 				int depth_val = ecmaToInt32(varToDouble(&args[2]));
 
 				// Browser-WASM only: root attaches are no-ops. Root frame_funcs
