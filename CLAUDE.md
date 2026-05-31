@@ -4,7 +4,26 @@
 
 This repo is trunk-based: commit directly to `master`. Do NOT create a branch
 before committing, even when default Git guidance says to branch first when on
-the default branch. Commit only when asked.
+the default branch.
+
+**Autonomous commit / push / CI is authorized** (standing approval — you do NOT
+need to ask first). When a task is finished, blocked, or paused with meaningful
+progress, run the pipeline end-to-end per `.claude/pipeline-handoff.md`: stage
+the relevant files by name (never `git add -A`), commit with the standard
+`Co-Authored-By` trailer, push to `master`, trigger the `ruffle-tests.yml`
+workflow in the matching mode, wait for completion with `gh run watch`, merge the
+`ruffle-test-results` branch, and report any regressions. End commit messages
+with the project's standard trailer. Use the `.pipeline-state` file (gitignored)
+to make the pipeline resumable across sessions.
+
+- **Match the CI mode to the change** (`.claude/pipeline-handoff.md` §"Build
+  mode"): `no-graphics` by default; `graphics` when the change touches graphics /
+  renderer / tag-render paths or shared `OFFSCREEN_RENDER` code. When in doubt for
+  shared runtime code, run **both** modes.
+- Still ask before anything genuinely irreversible or out of scope (force-pushing
+  over others' work, rewriting published history, deleting branches, etc.).
+- A failing-but-completed CI run is a result to report, not a blocker — surface
+  regressions (pass→fail) by name.
 
 ## Current Focus: Ruffle AVM1 Test Suite
 
@@ -33,7 +52,7 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --mode=graphics --diff
 gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f single_test=TEST_NAME
 ```
 
-**IMPORTANT: Do NOT run full test suites.** Never run `all_tests.sh`, `verify_output.py` without `--test`, or any command that runs all tests. Both the Ruffle suite and the old test suite have CI workflows — commit your changes and the user will trigger them. Only run individual tests with `--test=TEST_NAME`.
+**IMPORTANT: Do NOT run full test suites locally.** Never run `all_tests.sh`, `verify_output.py` without `--test`, or any command that runs all tests on this machine. Only run individual tests locally with `--test=TEST_NAME`. To run the full suite, commit and trigger CI yourself via the pipeline (`.claude/pipeline-handoff.md`) — autonomous CI is authorized (see Git Workflow above).
 
 ## Project Structure
 

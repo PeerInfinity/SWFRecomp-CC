@@ -239,7 +239,13 @@ python3 tools/divergence/divergence_test.py "<swf>" --frames 16 --skip-ruffle
 ```
 
 Don't run full test suites locally (CLAUDE.md). Only `--test=NAME` /
-single-game divergence. Commit to master only when asked; never branch first.
+single-game divergence. Never branch first (trunk-based). **Autonomous
+commit / push / CI is authorized** — when a piece of work is done or paused with
+progress, run the pipeline end-to-end per `.claude/pipeline-handoff.md`
+(commit → push `master` → trigger `ruffle-tests.yml` in the matching mode → `gh
+run watch` → merge results → report regressions). For shared
+`OFFSCREEN_RENDER` / graphics changes, run **both** CI modes (or `graphics` at
+minimum); `no-graphics` otherwise.
 
 ---
 
@@ -279,9 +285,10 @@ Regression gates to hold:
 - <divergence_test.py command(s) that must stay green>.
 - <other already-landed fixes that must keep working>.
 
-Constraints (CLAUDE.md): commit to master only when asked; never run full
-suites (only --test / single-game divergence); shared OFFSCREEN_RENDER code
-must be validated via .claude/pipeline-handoff.md (CI both modes); strip any
+Constraints (CLAUDE.md): autonomous commit/push/CI is authorized — run the
+pipeline (.claude/pipeline-handoff.md) when work is done/paused; never run full
+suites locally (only --test / single-game divergence); shared OFFSCREEN_RENDER
+code must be validated via .claude/pipeline-handoff.md (CI both modes); strip any
 browser printf diagnostics before committing.
 ```
 

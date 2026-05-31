@@ -27,10 +27,14 @@ Then pick the highest-priority unblocked item from PROGRESS.md's "Open follow-up
   bug (UAF/OOB), NOT a CI flake.
 - Deploy demos into the per-corpus namespace (flasharchive / glaiel), not local_batch.
 
-Constraints (CLAUDE.md): commit to master ONLY when I ask; never run full test
-suites (only --test=NAME / single-game divergence); validate shared
-OFFSCREEN_RENDER / graphics changes via .claude/pipeline-handoff.md (CI both modes);
-strip any temporary printf/diagnostics before committing.
+Constraints (CLAUDE.md): autonomous commit/push/CI is authorized — when a piece
+of work is done or paused with progress, run the pipeline end-to-end per
+.claude/pipeline-handoff.md (commit → push master → trigger ruffle-tests.yml in
+the matching mode → gh run watch → merge results → report regressions); validate
+shared OFFSCREEN_RENDER / graphics changes in CI both modes (or graphics at
+minimum), no-graphics otherwise; never run full test suites locally (only
+--test=NAME / single-game divergence); strip any temporary printf/diagnostics
+before committing.
 
 When you finish or pause a piece of work, UPDATE tools/divergence/PROGRESS.md
 (status board, fixes-landed + commit hash, session log, open follow-ups) so the
