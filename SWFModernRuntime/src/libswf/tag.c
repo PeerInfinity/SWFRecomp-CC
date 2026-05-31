@@ -2153,8 +2153,8 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		u8 new_state = old_state;
 
 		// Check _visible and enabled on the button's MovieClip
-		int mc_visible = actionGetMCVisible(app_context, obj->instance_name);
-		int mc_enabled = actionGetMCEnabled(app_context, obj->instance_name);
+		int mc_visible = actionGetMCVisible(app_context, obj->instance_name, parent_mc);
+		int mc_enabled = actionGetMCEnabled(app_context, obj->instance_name, parent_mc);
 
 		if (!mc_visible)
 		{
@@ -8093,7 +8093,7 @@ int dispatch_button_key_actions(SWFAppContext* app_context, int key_code)
 		if (ch->type != CHAR_TYPE_BUTTON) continue;
 		if (ch->button_action_count == 0) continue;
 		// Skip invisible buttons — _visible=false suppresses keyPress conditions
-		if (obj->instance_name != NULL && !actionGetMCVisible(app_context, obj->instance_name))
+		if (obj->instance_name != NULL && !actionGetMCVisible(app_context, obj->instance_name, &root_movieclip))
 			continue;
 		int handled = 0;
 		for (size_t a = 0; a < ch->button_action_count; a++)

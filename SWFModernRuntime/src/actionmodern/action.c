@@ -32815,19 +32815,21 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
 }
 
 // Query button MC visibility for button state machine (tag.c)
-int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name)
+int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name, MovieClip* parent)
 {
 	if (instance_name == NULL) return 1;
-	MovieClip* mc = actionFindOrCreateMovieClip(app_context, instance_name, &root_movieclip);
+	if (parent == NULL) parent = &root_movieclip;
+	MovieClip* mc = actionFindOrCreateMovieClip(app_context, instance_name, parent);
 	if (mc == NULL) return 1;
 	return mc->visible;
 }
 
 // Query button MC 'enabled' property for button state machine (tag.c)
-int actionGetMCEnabled(SWFAppContext* app_context, const char* instance_name)
+int actionGetMCEnabled(SWFAppContext* app_context, const char* instance_name, MovieClip* parent)
 {
 	if (instance_name == NULL) return 1;
-	MovieClip* mc = actionFindOrCreateMovieClip(app_context, instance_name, &root_movieclip);
+	if (parent == NULL) parent = &root_movieclip;
+	MovieClip* mc = actionFindOrCreateMovieClip(app_context, instance_name, parent);
 	if (mc == NULL) return 1;
 	// Check dynamic_props for 'enabled' property (may be overridden from prototype default of true)
 	ASObject* obj = (ASObject*)mc->dynamic_props;
