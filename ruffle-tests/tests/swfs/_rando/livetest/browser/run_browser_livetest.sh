@@ -23,6 +23,14 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RANDO_ASSETS="$(cd "${HERE}/../../../../../../SWFRecomp/wasm_wrappers/rando" && pwd)"
 
+# Game selects the AP server + the driver's fixture (browser_livetest.js
+# FIXTURES). Default checksfinder; apquest is the Phase 3 fixture.
+GAME="${1:-checksfinder}"
+case "$GAME" in
+    checksfinder|apquest) ;;
+    *) echo "ERROR: unknown game '$GAME' (expected checksfinder | apquest)"; exit 2 ;;
+esac
+
 AP_REPO="${AP_REPO:-$HOME/CC/Archipelago-CC}"
 AP_PY="${AP_PY:-${AP_REPO}/.venv/bin/python}"
 AP_SETUP="${AP_REPO}/scripts/setup/setup_ap_server.py"
@@ -41,7 +49,7 @@ cleanup() {
     if [ "$SERVER_STARTED" = "1" ]; then
         echo "--- stopping AP server ---"
         "$AP_PY" "$AP_SETUP" --stop-only --port "$AP_PORT" >/dev/null 2>&1 || true
-        "$AP_PY" "$AP_SETUP" --cleanup-only --game checksfinder --seed 1 >/dev/null 2>&1 || true
+        "$AP_PY" "$AP_SETUP" --cleanup-only --game "$GAME" --seed 1 >/dev/null 2>&1 || true
     fi
     rm -rf "$TMP"
 }
@@ -65,9 +73,9 @@ cp "${RANDO_ASSETS}/archipelago.js" "${TMP}/"
 cp "${RANDO_ASSETS}/rando_bridge.js" "${TMP}/"
 
 # --- start the AP server -----------------------------------------------------
-echo "--- starting AP server (ChecksFinder, seed 1, port ${AP_PORT}) ---"
-"$AP_PY" "$AP_SETUP" --cleanup-only --game checksfinder --seed 1 >/dev/null 2>&1 || true
-"$AP_PY" "$AP_SETUP" --game checksfinder --seed 1 --port "$AP_PORT" --no-monitor
+echo "--- starting AP server (${GAME}, seed 1, port ${AP_PORT}) ---"
+"$AP_PY" "$AP_SETUP" --cleanup-only --game "$GAME" --seed 1 >/dev/null 2>&1 || true
+"$AP_PY" "$AP_SETUP" --game "$GAME" --seed 1 --port "$AP_PORT" --no-monitor
 SERVER_STARTED=1
 
 wait_port() {  # $1=host $2=port $3=label
@@ -96,6 +104,8 @@ wait_port 127.0.0.1 "$HTTP_PORT" "http server" || exit 2
 # --- run the Playwright driver ----------------------------------------------
 echo "--- running Playwright transport test (headless chromium) ---"
 HARNESS_URL="http://localhost:${HTTP_PORT}/harness.html" \
+    AP_PORT="$AP_PORT" \
+    GAME="$GAME" \
     NODE_PATH="$PLAYWRIGHT_NODE_MODULES" \
     node "${HERE}/browser_livetest.js"
 rc=$?

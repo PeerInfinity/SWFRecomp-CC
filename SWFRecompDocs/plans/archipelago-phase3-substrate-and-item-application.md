@@ -178,10 +178,19 @@ transport refactor: the AS-facing API is unchanged, so they must stay green.
 - ✅ `_rando/bridge_unit` — server-free Playwright `StubTransport` contract test.
 - ✅ Guard: `rando_smoke` + the WebSocket browser livetest stay green.
 
-**Slice 2 — live toy test (Layer 2):** toy game against the APQuest seed-1
-fixture via the native + browser livetest harnesses. Add an APQuest preset path
-(preset already exists) and a small APQuest fixture description (a starting item,
-an early location). Not CI.
+**Slice 2 — live test against APQuest (both staged, both runtimes). Stage 2a ✅ DONE 2026-05-31.**
+- ✅ **Stage 2a — transport re-point.** Both livetest harnesses parameterized by
+  `[game]` (default `checksfinder`, unchanged; `apquest` added). Native:
+  `rando_ap_livetest_apquest.c` (no starting item; `sendLocation(2)` + `(10)`
+  round-trip; own-location items filtered by APCpp). Browser: `browser_livetest.js`
+  fixture-driven (`FIXTURES` map), APQuest checks assert the granted Sword(2)/Key(1)
+  (archipelago.js doesn't filter). All 4 (apquest+checksfinder × native+browser)
+  PASS. Confirmed live fixture: slot `Player1`, `ap_id_offset = 0`, 0 precollected,
+  Top Middle Chest(2)→Sword(2), Right Room Enemy Drop(10)→Key(1).
+- ⏳ **Stage 2b — full toy-SWF live.** Adapt the toy glue for async connect +
+  multi-frame polling; run the prelude/game SWF live (native WITH_AP/APCpp +
+  browser WITH_AP/archipelago.js+Playwright) applying Sword/Key from the two
+  checks. `run_livetest`-style harnesses (non-deterministic → not suite tests).
 
 **Slice 3 — SWF substrate module (cross-repo, Topology B):** in Archipelago-CC, a
 sibling to `textAdventureSubstrateWrapper`: a panel that iframes the SWF demo page

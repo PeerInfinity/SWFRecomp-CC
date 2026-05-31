@@ -3,13 +3,14 @@
 // (rando_bridge.js + archipelago.js) against a live local AP server, asserting
 // the full round-trip. Transport-level: no WASM/SWF/WebGPU.
 //
-// Reuses Playwright via NODE_PATH (the runner points it at a node_modules that
-// has 'playwright' — currently the Archipelago-CC repo; set NODE_PATH to a
-// SWFRecomp-local install later). Run by run_browser_livetest.sh.
+// Fixture-driven: process.env.GAME (default 'checksfinder') selects a FIXTURES
+// entry below; run_browser_livetest.sh starts the matching server. Unlike the
+// native APCpp path, archipelago.js does NOT filter own-location items, so the
+// item a checked location grants DOES appear in received items here — hence
+// every check asserts its granted item.
 //
-// Fixture: ChecksFinder seed 1, slot Player1, no password. Unlike the native
-// APCpp path, archipelago.js does NOT filter own-location items, so the item
-// granted by checking Tile 2 (80000) DOES appear in received items here.
+// Reuses Playwright via NODE_PATH (the runner points it at a node_modules that
+// has 'playwright' — currently the Archipelago-CC repo).
 
 const { chromium } = require('playwright');
 
@@ -17,9 +18,31 @@ const URL = process.env.HARNESS_URL || 'http://localhost:8076/harness.html';
 // Use 127.0.0.1, not "localhost": setup_ap_server.py binds the AP server to
 // 127.0.0.1 only, and headless chromium resolves "localhost" to IPv6 (::1)
 // first → connection refused. Forcing IPv4 matches the server's bind.
-const HOST = '127.0.0.1', PORT = '38281', GAME = 'ChecksFinder', SLOT = 'Player1', PW = '';
-const ITEM_ON_CONNECT = 80002, LOCATION = 81001, ITEM_FROM_CHECK = 80000;
+const HOST = '127.0.0.1';
+const PORT = process.env.AP_PORT || '38281';
 const T = 25000;
+
+// Per-game fixtures. Verified live against setup_ap_server.py --game <g> --seed 1
+// (ids used directly; ap_id_offset = 0 for both).
+const FIXTURES = {
+	checksfinder: {
+		game: 'ChecksFinder', slot: 'Player1',
+		startingItems: [{ id: 80002, name: 'Map Bombs' }],
+		checks: [{ loc: 81001, name: 'Tile 2', grants: { id: 80000, name: 'Map Width' } }],
+	},
+	apquest: {
+		game: 'APQuest', slot: 'Player1',
+		startingItems: [],   // Start With One Confetti Cannon: No → nothing on connect
+		checks: [
+			{ loc: 2,  name: 'Top Middle Chest',      grants: { id: 2, name: 'Sword' } },
+			{ loc: 10, name: 'Right Room Enemy Drop', grants: { id: 1, name: 'Key' } },
+		],
+	},
+};
+
+const GAME = process.env.GAME || 'checksfinder';
+const F = FIXTURES[GAME];
+if (!F) { console.error(`unknown GAME '${GAME}' (expected: ${Object.keys(FIXTURES).join(' | ')})`); process.exit(2); }
 
 (async () => {
 	let failures = 0;
@@ -33,45 +56,52 @@ const T = 25000;
 		await page.waitForFunction(() => !!window.__randoBridge, null, { timeout: 10000 });
 
 		const id = await page.evaluate(
-			([h, p, g, s, pw]) => window.__randoBridge.init(h, p, g, s, pw),
-			[HOST, PORT, GAME, SLOT, PW]);
+			([h, p, g, s]) => window.__randoBridge.init(h, p, g, s, ''),
+			[HOST, PORT, F.game, F.slot]);
 		await page.evaluate((i) => window.__randoBridge.connect(i), id);
 
 		// 1) connected
 		try {
 			await page.waitForFunction((i) => window.__randoBridge.isConnected(i), id, { timeout: T });
-			console.log(`PASS: connected to ${HOST}:${PORT} as ${GAME}/${SLOT}`);
+			console.log(`PASS: connected to ${HOST}:${PORT} as ${F.game}/${F.slot}`);
 		} catch {
 			console.log('FAIL: not connected within timeout');
 			failures++;
 		}
 
-		// 2) starting item on connect
-		try {
-			await page.waitForFunction((i) => window.__randoBridge.hasItem(i, 80002), id, { timeout: T });
-			console.log(`PASS: received starting item ${ITEM_ON_CONNECT} (Map Bombs)`);
-		} catch {
-			console.log(`FAIL: starting item ${ITEM_ON_CONNECT} not received`);
-			failures++;
+		// 2) starting items on connect (if any)
+		for (const it of F.startingItems) {
+			try {
+				await page.waitForFunction((args) => window.__randoBridge.hasItem(args[0], args[1]), [id, it.id], { timeout: T });
+				console.log(`PASS: received starting item ${it.id} (${it.name})`);
+			} catch {
+				console.log(`FAIL: starting item ${it.id} (${it.name}) not received`);
+				failures++;
+			}
+		}
+		if (F.startingItems.length === 0) {
+			console.log('info: no starting items expected on connect');
 		}
 
-		// 3) sendLocation -> checked (round-trip confirmation)
-		await page.evaluate((i) => window.__randoBridge.sendLocation(i, 81001), id);
-		try {
-			await page.waitForFunction((i) => window.__randoBridge.locationIsChecked(i, 81001), id, { timeout: T });
-			console.log(`PASS: location ${LOCATION} (Tile 2) checked (sendLocation round-trip)`);
-		} catch {
-			console.log(`FAIL: location ${LOCATION} not checked`);
-			failures++;
-		}
-
-		// 4) granted item (archipelago.js does NOT filter own-location items)
-		try {
-			await page.waitForFunction((i) => window.__randoBridge.hasItem(i, 80000), id, { timeout: T });
-			console.log(`PASS: received granted item ${ITEM_FROM_CHECK} (Map Width)`);
-		} catch {
-			console.log(`FAIL: granted item ${ITEM_FROM_CHECK} not received`);
-			failures++;
+		// 3) each location check → checked (round-trip) → granted item appears
+		for (const c of F.checks) {
+			await page.evaluate((args) => window.__randoBridge.sendLocation(args[0], args[1]), [id, c.loc]);
+			try {
+				await page.waitForFunction((args) => window.__randoBridge.locationIsChecked(args[0], args[1]), [id, c.loc], { timeout: T });
+				console.log(`PASS: location ${c.loc} (${c.name}) checked (sendLocation round-trip)`);
+			} catch {
+				console.log(`FAIL: location ${c.loc} (${c.name}) not checked`);
+				failures++;
+			}
+			if (c.grants) {
+				try {
+					await page.waitForFunction((args) => window.__randoBridge.hasItem(args[0], args[1]), [id, c.grants.id], { timeout: T });
+					console.log(`PASS: received granted item ${c.grants.id} (${c.grants.name})`);
+				} catch {
+					console.log(`FAIL: granted item ${c.grants.id} (${c.grants.name}) not received`);
+					failures++;
+				}
+			}
 		}
 
 		const size = await page.evaluate((i) => window.__randoBridge.receivedItemsSize(i), id);

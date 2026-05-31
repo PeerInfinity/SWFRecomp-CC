@@ -97,19 +97,24 @@ with its `.venv` set up. The server is launched via that repo's
 `scripts/setup/setup_ap_server.py --game checksfinder --seed 1 --port 38281`.
 
 ```bash
-ruffle-tests/tests/swfs/_rando/livetest/run_livetest.sh   # exit 0 = PASS
+ruffle-tests/tests/swfs/_rando/livetest/run_livetest.sh            # checksfinder (default)
+ruffle-tests/tests/swfs/_rando/livetest/run_livetest.sh apquest    # APQuest (Phase 3 fixture)
 ```
 
-What it asserts (ChecksFinder seed 1, slot `Player1`, no password):
-1. connects to `localhost:38281`;
-2. receives starting item `80002` (Map Bombs);
-3. `sendLocation(81001)` (Tile 2) → `81001` becomes checked (round-trip confirmed).
+The `[game]` arg (default `checksfinder`) selects the AP server + the C harness:
 
-The item Tile 2 grants (`80000` Map Width) is the player's OWN item at their OWN
-location, which APCpp intentionally excludes from `received_items`
-(`Archipelago.cpp` filters `sending_player == self && location > 0`) — so that's
-logged as info, not asserted. Real multiworld items (from other players) would
-appear in `received_items`.
+- **checksfinder** (`rando_ap_livetest.c`) — slot `Player1`: connect; receive
+  starting item `80002` (Map Bombs); `sendLocation(81001)` (Tile 2) → checked.
+- **apquest** (`rando_ap_livetest_apquest.c`) — slot `Player1`: connect; **no**
+  starting item (seed has none); `sendLocation(2)` (Top Middle Chest) → checked;
+  `sendLocation(10)` (Right Room Enemy Drop) → checked.
+
+In both, the items the checked locations grant are the player's OWN items, which
+APCpp intentionally excludes from `received_items` (`Archipelago.cpp` filters
+`sending_player == self && location > 0`) — logged as info, not asserted. So the
+round-trip is asserted via the checked-location signal. Real multiworld items
+(from other players) would appear in `received_items`. (The browser path below
+does **not** filter — it asserts the granted items directly.)
 
 Paths are overridable via env: `APCPP_ROOT`, `APCPP_BUILD`, `AP_REPO`, `AP_PY`,
 `PORT`.
@@ -131,19 +136,23 @@ Playwright, so the runner defaults `PLAYWRIGHT_NODE_MODULES` to
 install. Also needs `node` and `python3`.
 
 ```bash
-ruffle-tests/tests/swfs/_rando/livetest/browser/run_browser_livetest.sh  # exit 0 = PASS
+ruffle-tests/tests/swfs/_rando/livetest/browser/run_browser_livetest.sh          # checksfinder (default)
+ruffle-tests/tests/swfs/_rando/livetest/browser/run_browser_livetest.sh apquest  # APQuest
 ```
 
-What it asserts (same ChecksFinder seed 1 / `Player1` fixture):
-1. connects to `127.0.0.1:38281` (forced IPv4 — chromium resolves `localhost`
-   to IPv6 first, but the server binds v4 only);
-2. receives starting item `80002` (Map Bombs);
-3. `sendLocation(81001)` (Tile 2) → `81001` becomes checked (round-trip confirmed);
-4. receives granted item `80000` (Map Width).
+The `[game]` arg (default `checksfinder`) selects the AP server + a fixture from
+`browser_livetest.js`'s `FIXTURES` map. All connect to `127.0.0.1:38281` (forced
+IPv4 — chromium resolves `localhost` to IPv6 first, but the server binds v4 only):
+
+- **checksfinder** / `Player1`: starting item `80002` (Map Bombs); `sendLocation(81001)`
+  (Tile 2) → checked, grants `80000` (Map Width).
+- **apquest** / `Player1`: no starting item; `sendLocation(2)` (Top Middle Chest)
+  → checked, grants Sword (`2`); `sendLocation(10)` (Right Room Enemy Drop) →
+  checked, grants Key (`1`).
 
 Unlike the native APCpp path, **archipelago.js does NOT filter own-location
-items**, so the item Tile 2 grants (`80000`) DOES appear in received items here —
-hence assertion 4, which the native test only logs as info.
+items**, so the items those locations grant DO appear in received items here —
+each check asserts its granted item, which the native test only logs as info.
 
 Paths/ports are overridable via env: `AP_REPO`, `AP_PY`,
 `PLAYWRIGHT_NODE_MODULES`, `AP_PORT`, `HTTP_PORT`.
