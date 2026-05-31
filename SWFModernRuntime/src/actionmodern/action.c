@@ -29284,11 +29284,22 @@ static void freeEnumeratedNames(EnumeratedName* head)
 	}
 }
 
-// Callback for ng_enumerateChildren — pushes child instance name onto the ActionScript stack
+// Callback for ng_enumerateChildren — pushes a child instance name onto the AS stack,
+// deduping against names already enumerated. The prototype-chain / var_map / dynamic_props
+// walks share the same EnumeratedName list, so a child that is ALSO an enumerable dynamic
+// property (e.g. an attachMovie'd clip bound on parent->dynamic_props by the #8 fix) is
+// enumerated exactly once. user_data is an EnumChildState*; head may be NULL (no dedup).
+struct EnumChildState { SWFAppContext* ctx; EnumeratedName** head; };
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 static void enum_child_callback(const char* name, u32 name_len, void* user_data)
 {
-	SWFAppContext* app_context = (SWFAppContext*)user_data;
+	struct EnumChildState* st = (struct EnumChildState*)user_data;
+	SWFAppContext* app_context = st->ctx;
+	if (st->head != NULL) {
+		if (isPropertyEnumerated(*st->head, name, name_len))
+			return;
+		addEnumeratedName(st->head, name, name_len);
+	}
 	PUSH_STR(name, name_len);
 }
 #endif
@@ -29626,17 +29637,19 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 			current_obj = NULL;
 	}
 
-	freeEnumeratedNames(enumerated_head);
-
-	// Enumerate child MovieClip instance names (pushed after own props = popped before)
+	// Enumerate child MovieClip instance names (pushed after own props = popped before).
+	// Dedup against the prototype-chain names recorded above so an attachMovie'd child that
+	// is also an enumerable dynamic property isn't enumerated twice (enumerated_head is freed
+	// after this walk, not before it).
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (mc != NULL)
 	{
+		struct EnumChildState _ecs = { app_context, &enumerated_head };
 		// Prefer mc->display_obj walk so nested MCs (e.g. button MCs whose
 		// display_obj points into a parent's sprite_display_list, not the
 		// root display_list) enumerate correctly.
 		if (mc == &root_movieclip) {
-			ng_enumerateChildren(NULL, enum_child_callback, app_context);
+			ng_enumerateChildren(NULL, enum_child_callback, &_ecs);
 		} else if (mc->display_obj != NULL) {
 			DisplayObject* _enum_dobj = (DisplayObject*)mc->display_obj;
 			if (_enum_dobj->sprite_display_list != NULL) {
@@ -29645,14 +29658,15 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 					if (_ec->char_id == 0) continue;
 					if (_ec->instance_name != NULL && _ec->instance_name[0] != '\0')
 						enum_child_callback(_ec->instance_name,
-							(u32)strlen(_ec->instance_name), app_context);
+							(u32)strlen(_ec->instance_name), &_ecs);
 				}
 			}
 		} else {
-			ng_enumerateChildren(mc->name, enum_child_callback, app_context);
+			ng_enumerateChildren(mc->name, enum_child_callback, &_ecs);
 		}
 	}
 #endif
+	freeEnumeratedNames(enumerated_head);
 }
 
 
@@ -42758,9 +42772,17 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
 		if (mc != NULL)
 		{
+			// enumerated_head is shared across the child walk and the var_map /
+			// dynamic_props / prototype walks below so a child that is ALSO an
+			// enumerable dynamic property (e.g. an attachMovie'd clip) is enumerated
+			// once. Declared here (before the child walk, which runs first) rather
+			// than after it.
+			EnumeratedName* enumerated_head = NULL;
+
 			// Enumerate child MovieClip instance names first (pushed early = popped late)
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			{
+				struct EnumChildState _ecs = { app_context, &enumerated_head };
 				// Phase 1e: push transient (just-removed previous-state) button
 				// children FIRST so LIFO yields them LAST in for-in order.
 				// Expected: live children, then transient children (e.g.
@@ -42770,7 +42792,7 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 				// of removed button-state children for one tick.
 				if (mc->is_button_mc && mc->display_obj != NULL) {
 					ng_iterateTransientButtonChildren(mc->display_obj,
-						enum_child_callback, app_context);
+						enum_child_callback, &_ecs);
 				}
 
 				// Prefer mc->display_obj walk so nested MCs (e.g. button MCs whose
@@ -42778,7 +42800,7 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 				// root display_list) enumerate correctly. Fall back to root-name
 				// lookup if display_obj isn't set (legacy path).
 				if (mc == &root_movieclip) {
-					ng_enumerateChildren(NULL, enum_child_callback, app_context);
+					ng_enumerateChildren(NULL, enum_child_callback, &_ecs);
 				} else if (mc->display_obj != NULL) {
 					DisplayObject* _enum_dobj = (DisplayObject*)mc->display_obj;
 					if (_enum_dobj->sprite_display_list != NULL) {
@@ -42787,11 +42809,11 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 							if (_ec->char_id == 0) continue;
 							if (_ec->instance_name != NULL && _ec->instance_name[0] != '\0')
 								enum_child_callback(_ec->instance_name,
-									(u32)strlen(_ec->instance_name), app_context);
+									(u32)strlen(_ec->instance_name), &_ecs);
 						}
 					}
 				} else {
-					ng_enumerateChildren(mc->name, enum_child_callback, app_context);
+					ng_enumerateChildren(mc->name, enum_child_callback, &_ecs);
 				}
 
 				// Dynamic children (createEmptyMovieClip / attachMovie-without-placement)
@@ -42810,12 +42832,10 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					if (_cc->display_obj != NULL) continue;
 					if (_cc->depth == INT_MIN) continue;
 					if (_cc->name[0] == '\0') continue;
-					enum_child_callback(_cc->name, (u32)strlen(_cc->name), app_context);
+					enum_child_callback(_cc->name, (u32)strlen(_cc->name), &_ecs);
 				}
 			}
 #endif
-
-			EnumeratedName* enumerated_head = NULL;
 
 			// Enumerate var_map variables for root movieclip
 			if (mc == &root_movieclip) {
