@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `5d27de9a7dce`  
-**Date:** 2026-05-31 02:39 UTC  
-**Total duration:** 3h10m39s
+**Commit:** `c5535fe1189a`  
+**Date:** 2026-05-31 03:20 UTC  
+**Total duration:** 2h31m12s
 
 ## Results by Suite
 
@@ -78,62 +78,62 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 *No changes since last run.*
 
-*Comparing `17256ff005a3` → `5d27de9a7dce`*
+*Comparing `5d27de9a7dce` → `c5535fe1189a`*
 
 ## Per-Suite Details
 
 ### avm1
 
 - **Pass:** 616/673 (91.5%)
-- **Duration:** 1h22m39s across 30 shards
+- **Duration:** 1h10m25s across 30 shards
 - **Lines:** 106,865/116,485 matching (91.7%)
-- **Avg test duration:** 7.3s — slowest: `netstream_play_flv_screen` (37.0s)
+- **Avg test duration:** 6.2s — slowest: `looping_real_1_declared_1` (37.6s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 132/243 (54.3%)
-- **Duration:** 38m21s across 30 shards
+- **Duration:** 20m13s across 30 shards
 - **Lines:** 29,839/38,791 matching (76.9%)
-- **Avg test duration:** 9.4s — slowest: `MovieClip-v8` (69.5s)
+- **Avg test duration:** 4.9s — slowest: `Color-v8` (27.1s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 65/110 (59.1%)
-- **Duration:** 36m02s across 30 shards
+- **Duration:** 30m00s across 30 shards
 - **Lines:** 4,014/5,239 matching (76.6%)
-- **Avg test duration:** 19.6s — slowest: `matrix_test` (101.5s)
+- **Avg test duration:** 16.3s — slowest: `NetStream-SquareTest` (33.2s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m29s across 30 shards
+- **Duration:** 2m19s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 16.5s — slowest: `hello` (22.7s)
+- **Avg test duration:** 15.5s — slowest: `function_test` (22.5s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 8/19 (42.1%)
-- **Duration:** 5m26s across 30 shards
+- **Duration:** 4m59s across 30 shards
 - **Lines:** 424/557 matching (76.1%)
-- **Avg test duration:** 17.1s — slowest: `gotoFrameLabelAsFunction` (24.9s)
+- **Avg test duration:** 15.7s — slowest: `edittext_test1` (22.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 6m45s across 30 shards
+- **Duration:** 6m33s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 20.2s — slowest: `trace-as2/root_onload` (22.4s)
+- **Avg test duration:** 19.6s — slowest: `trace-as2/root_onload` (21.7s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 16m26s across 30 shards
+- **Duration:** 14m34s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 10.7s — slowest: `fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77` (23.7s)
+- **Avg test duration:** 9.4s — slowest: `button3` (22.2s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 2m28s across 30 shards
+- **Duration:** 2m05s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 3.1s — slowest: `text-bind` (21.5s)
+- **Avg test duration:** 2.6s — slowest: `duplicateMovieClip/dontremove` (21.5s)
