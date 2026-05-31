@@ -2821,6 +2821,24 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 	if (!g_enterframe_flush_pending) return;
 	g_enterframe_flush_pending = 0;
 
+	// Construct clips placed by this frame's tags BEFORE dispatching
+	// enterFrame. PlaceObject2 queues a placed clip's CLIP_EVENT_INITIALIZE,
+	// CLIP_EVENT_CONSTRUCT, and registerClass constructor (AQ_KIND_CLIP_INIT /
+	// CLIP_CONSTRUCT / REGISTER_CTOR); the recompiler drains them at the
+	// post-flush SHOW_FRAME site (actionDrainAllInPriorityOrder). That left
+	// the constructor running AFTER a pre-existing clip's onEnterFrame
+	// sampled the placement frame, so an onEnterFrame observing a freshly
+	// placed registered-class clip saw it placed-but-unconstructed for one
+	// frame (e.g. Flash MX v2 UI components: an FRadioButton's _xscale=100
+	// reset / attached children / handlerObj group appeared one frame late).
+	// Ruffle constructs at place time, before that frame's enterFrame. Drain
+	// only the construction kinds here (frame DoAction stays at NORMAL
+	// priority for the SHOW_FRAME drain); the later drain is then a no-op for
+	// these kinds.
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Mark (but don't clear display_list) any MCs queued for finalize, so
 	// ENTER_FRAME skips MCs being removed by tag-stream tagRemoveObject2 in
