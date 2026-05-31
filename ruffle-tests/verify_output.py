@@ -1974,6 +1974,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
         "src/actionmodern/action_queue.c",
         "src/actionmodern/sprite_frame_scripts.c",
         "src/actionmodern/image_decode.c",
+        "src/actionmodern/video_codec.c",
         "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
         "src/libswf/tag.c",
@@ -1987,6 +1988,15 @@ def compile_wasm(test_dir, num_frames, build_dir):
     ]
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
+
+    # Archipelago Rando (opt-in via WITH_AP=1). WASM uses the EM_JS impl
+    # (rando_ap_wasm.c → archipelago.js), NOT the native APCpp shim. See
+    # SWFRecompDocs/plans/archipelago-phase2-wasm-bridge.md.
+    with_ap = os.environ.get("WITH_AP", "") in ("1", "true")
+    if with_ap:
+        shutil.copy2(SWFMODERN / "src/actionmodern/rando.c", build_dir)
+        shutil.copy2(SWFMODERN / "src/actionmodern/rando_ap_wasm.c", build_dir)
+
     shutil.copy2(SWFMODERN / "lib/c-hashmap/map.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.h", build_dir)
@@ -2097,6 +2107,8 @@ def compile_wasm(test_dir, num_frames, build_dir):
     # Build defines
     inc = SWFMODERN / "include"
     extra_defines = ["-DNO_GRAPHICS", f"-DMAX_FRAMES={num_frames}"]
+    if with_ap:
+        extra_defines.append("-DWITH_AP")
     mock_time = get_mock_date_time(test_dir)
     if mock_time is None:
         mock_time = 981152406000
@@ -2189,6 +2201,37 @@ def deploy_wasm(test_name, build_dir, deploy_dir):
         if src.exists():
             shutil.copy2(src, out_dir / f"{flat_name}{ext}")
 
+    # Archipelago (WITH_AP): ship the JS bridge + vendored archipelago.js next to
+    # the page, and inject the bridge module + a connect form. rando_bridge.js
+    # imports ./archipelago.js, so loading the bridge module pulls in both.
+    rando_scripts = ""
+    rando_form = ""
+    if os.environ.get("WITH_AP", "") in ("1", "true"):
+        rando_assets = PROJECT_ROOT / "SWFRecomp" / "wasm_wrappers" / "rando"
+        for asset in ("archipelago.js", "rando_bridge.js"):
+            src = rando_assets / asset
+            if src.exists():
+                shutil.copy2(src, deploy_dir / asset)
+        rando_scripts = '<script type="module" src="rando_bridge.js"></script>'
+        rando_form = (
+            '<div id="ap-connect" style="margin:10px 0;">'
+            '<input id="ap-host" placeholder="host" value="archipelago.gg" size="14">'
+            '<input id="ap-port" placeholder="port" value="38281" size="6">'
+            '<input id="ap-slot" placeholder="slot" size="12">'
+            '<input id="ap-pw" placeholder="password" size="10">'
+            '<button onclick="apConnect()">Connect AP</button>'
+            '<span id="ap-status" class="info"> not connected</span>'
+            '</div>'
+            '<script>function apConnect(){'
+            'if(!window.__randoBridge){document.getElementById("ap-status").textContent=" bridge not loaded";return;}'
+            'window.__randoBridge.connectFromForm('
+            'document.getElementById("ap-host").value,'
+            'document.getElementById("ap-port").value,'
+            'document.getElementById("ap-slot").value,'
+            'document.getElementById("ap-pw").value);'
+            'document.getElementById("ap-status").textContent=" connecting…";}</script>'
+        )
+
     # Generate standalone HTML page
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -2214,7 +2257,9 @@ button:disabled {{ background: #555; cursor: default; }}
 <h1>{test_name}</h1>
 <p class="info">Recompiled SWF running in WebAssembly (trace output below)</p>
 <button id="btn-run" disabled onclick="startDemo()">Run SWF</button>
+{rando_form}
 <div id="output"></div>
+{rando_scripts}
 <script>
 var output = document.getElementById('output');
 window.Module = {{
