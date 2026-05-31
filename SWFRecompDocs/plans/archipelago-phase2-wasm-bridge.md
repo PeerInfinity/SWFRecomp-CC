@@ -1,8 +1,11 @@
 # Archipelago Phase 2 — WASM transport bridge (`Rando` in the browser)
 
-**Status:** Planning. Depends on Phase 1 (native `Rando`, shipped 2026-05-31 —
+**Status:** Core **implemented + verified** 2026-05-31 via the `verify_output.py`
+WASM path (build + link + run + deploy all green). Depends on Phase 1 (native
+`Rando`, shipped 2026-05-31 —
 see [archipelago-randomizer-integration.md](archipelago-randomizer-integration.md)).
-No code written yet.
+Remaining: `deploy_example.sh` + `index_template.html` form injection for the
+peerinfinity.com demo deploy, and a manual live-server browser test (§11).
 
 This doc plans the browser-WASM backend for the `Rando` builtin. Phase 1 made
 `Rando` work in native builds via APCpp; Phase 2 makes it work in the
@@ -143,6 +146,42 @@ EM_JS precedent already exists in the runtime (`audio_output_web.c`,
    `receivedItemsSize()` reflects granted items, `sendLocation(id)` registers a
    check server-side, `locationIsChecked(id)` then returns true.
 4. Repeat with AS-driven `rando.connect()` (no form) to confirm the hybrid path.
+
+## 8b. As-built (2026-05-31)
+
+Implemented:
+- `SWFModernRuntime/src/actionmodern/rando_ap_wasm.c` — EM_JS thunks over
+  `window.__randoBridge`, guarded `WITH_AP && __EMSCRIPTEN__`. Built **instead of**
+  `rando_ap.cpp` in the WASM target (each build copies exactly one impl, so the
+  `rando_ap.h` symbols are never doubly defined).
+- `SWFRecomp/wasm_wrappers/rando/archipelago.js` — vendored ThePhar
+  archipelago.js v2.1.0.
+- `SWFRecomp/wasm_wrappers/rando/rando_bridge.js` — ES-module glue exposing
+  `window.__randoBridge` (init/connect/isConnected/receivedItemsSize/receivedItem/
+  hasItem/locationIsChecked/sendLocation/storyComplete + `connectFromForm`),
+  hybrid connect with idempotency guard.
+- `ruffle-tests/verify_output.py`: `compile_wasm` WITH_AP gate (copy `rando.c` +
+  `rando_ap_wasm.c`, `-DWITH_AP`); `deploy_wasm` ships the JS assets + injects the
+  bridge module `<script type="module">` and an HTML connect form. Also added
+  `video_codec.c` to the WASM `core_sources` (action.c references
+  `video_codec_supported`; normal builds survived on DCE — the WITH_AP build
+  surfaced the latent gap; matches `compile_native`).
+- `SWFRecomp/scripts/build_test.sh`: target-aware copy (`rando_ap_wasm.c` for
+  wasm, `rando_ap.cpp` for native) + `-DWITH_AP` + stages the JS assets next to
+  the wasm output.
+
+Verified: `WITH_AP=1 verify_output.py --test=rando_smoke
+--tests-dir=ruffle-tests/tests/swfs/_rando --wasm --deploy-dir=…` →
+**builds, links, runs (PASS), and deploys** the page with the bridge module,
+connect form, and both JS assets. In the headless test-run (node, no bridge)
+`new Rando()` gracefully no-ops to the same `function/object/false/0/false/false`
+as native. A normal (non-AP) `typeof` WASM build still passes (video_codec.c
+addition caused no regression).
+
+Remaining (not yet wired/validated): `index_template.html` form injection for the
+`build_test.sh`/`deploy_example.sh` demo-deploy path (the `verify_output.py`
+`deploy_wasm` form is proven; the demo template mirror is pending), and the §8/§11
+live-server browser test.
 
 ## 9. Open questions (defer until bring-up)
 

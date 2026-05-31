@@ -176,12 +176,18 @@ cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/utils.c" "${BUILD_DIR}/"
 
 # Archipelago Rando class (opt-in via WITH_AP=1). rando.c is a no-op stub
-# unless compiled with -DWITH_AP; rando_ap.cpp is the C++ shim over APCpp,
-# compiled separately with g++ in the native link step below. See
-# SWFRecompDocs/plans/archipelago-randomizer-integration.md.
+# unless compiled with -DWITH_AP. The backend impl differs by target:
+#   native → rando_ap.cpp     (C++ shim over APCpp; g++-compiled in the link step)
+#   wasm   → rando_ap_wasm.c  (EM_JS → archipelago.js; compiled by emcc *.c)
+# Exactly one is copied so the rando_ap.h symbols aren't doubly defined. See
+# SWFRecompDocs/plans/archipelago-randomizer-integration.md (+ phase2 doc).
 if [ "${WITH_AP:-}" = "1" ] || [ "${WITH_AP:-}" = "true" ]; then
     cp "${SWFMODERN_SRC}/actionmodern/rando.c" "${BUILD_DIR}/"
-    cp "${SWFMODERN_SRC}/actionmodern/rando_ap.cpp" "${BUILD_DIR}/"
+    if [ "$TARGET" == "wasm" ]; then
+        cp "${SWFMODERN_SRC}/actionmodern/rando_ap_wasm.c" "${BUILD_DIR}/"
+    else
+        cp "${SWFMODERN_SRC}/actionmodern/rando_ap.cpp" "${BUILD_DIR}/"
+    fi
 fi
 
 if [ "$HEADLESS_FLAG" = true ]; then
@@ -249,6 +255,17 @@ if [ -f "${TEST_DIR}/test_harness.c" ]; then
     cp "${TEST_DIR}/test_harness.c" "${BUILD_DIR}/"
     EXTRA_DEFINES="-DHAS_TEST_HARNESS"
     echo "Found test_harness.c"
+fi
+
+# Archipelago (WITH_AP): define WITH_AP for both targets; for wasm, stage the
+# JS bridge + vendored archipelago.js next to the build output so the demo page
+# can load them. See SWFRecompDocs/plans/archipelago-phase2-wasm-bridge.md.
+if [ "${WITH_AP:-}" = "1" ] || [ "${WITH_AP:-}" = "true" ]; then
+    EXTRA_DEFINES="${EXTRA_DEFINES} -DWITH_AP"
+    if [ "$TARGET" == "wasm" ]; then
+        cp "${SWFRECOMP_ROOT}/wasm_wrappers/rando/archipelago.js" "${BUILD_DIR}/"
+        cp "${SWFRECOMP_ROOT}/wasm_wrappers/rando/rando_bridge.js" "${BUILD_DIR}/"
+    fi
 fi
 
 # Copy display bridge if present in test dir or wasm_wrappers
