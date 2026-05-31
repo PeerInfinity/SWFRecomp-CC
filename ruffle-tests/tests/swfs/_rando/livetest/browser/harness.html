@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rando bridge transport harness</title>
+</head>
+<body>
+<h1>Rando bridge transport harness</h1>
+<p>Loads the Archipelago bridge so Playwright can drive <code>window.__randoBridge</code>
+directly — a transport-level test of rando_bridge.js + archipelago.js + the
+browser WebSocket against a live AP server. No WASM/SWF/WebGPU involved.</p>
+<!-- rando_bridge.js is an ES module that imports ./archipelago.js and installs
+     window.__randoBridge. Both files are copied next to this page by the runner. -->
+<script type="module" src="rando_bridge.js"></script>
+</body>
+</html>

@@ -66,3 +66,37 @@ appear in `received_items`.
 
 Paths are overridable via env: `APCPP_ROOT`, `APCPP_BUILD`, `AP_REPO`, `AP_PY`,
 `PORT`.
+
+## livetest/browser/ — automated WASM/browser transport round-trip test
+
+`livetest/browser/run_browser_livetest.sh` is the WASM/browser counterpart of the
+native test above. It exercises the Phase-2 bridge — `rando_bridge.js` +
+`archipelago.js` + the browser `WebSocket` — against a real AP server, driving
+`window.__randoBridge` from headless chromium via Playwright. It serves a minimal
+page (`harness.html`), starts a local AP server, runs the driver, and tears the
+server down. **Transport-level only: no WASM/SWF/WebGPU** (those layers are
+covered by the `rando_smoke` unit test and manual demo).
+
+Prerequisites: **Archipelago-CC** at `~/CC/Archipelago-CC` with its `.venv`
+(server) AND Playwright + chromium installed. Currently only the AP repo has
+Playwright, so the runner defaults `PLAYWRIGHT_NODE_MODULES` to
+`~/CC/Archipelago-CC/node_modules`; override it once this repo gets its own
+install. Also needs `node` and `python3`.
+
+```bash
+ruffle-tests/tests/swfs/_rando/livetest/browser/run_browser_livetest.sh  # exit 0 = PASS
+```
+
+What it asserts (same ChecksFinder seed 1 / `Player1` fixture):
+1. connects to `127.0.0.1:38281` (forced IPv4 — chromium resolves `localhost`
+   to IPv6 first, but the server binds v4 only);
+2. receives starting item `80002` (Map Bombs);
+3. `sendLocation(81001)` (Tile 2) → `81001` becomes checked (round-trip confirmed);
+4. receives granted item `80000` (Map Width).
+
+Unlike the native APCpp path, **archipelago.js does NOT filter own-location
+items**, so the item Tile 2 grants (`80000`) DOES appear in received items here —
+hence assertion 4, which the native test only logs as info.
+
+Paths/ports are overridable via env: `AP_REPO`, `AP_PY`,
+`PLAYWRIGHT_NODE_MODULES`, `AP_PORT`, `HTTP_PORT`.

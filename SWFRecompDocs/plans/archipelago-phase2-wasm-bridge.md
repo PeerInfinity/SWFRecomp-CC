@@ -4,8 +4,11 @@
 demo-viewer panel all green via the `verify_output.py` WASM path). Depends on
 Phase 1 (native `Rando`, shipped 2026-05-31 —
 see [archipelago-randomizer-integration.md](archipelago-randomizer-integration.md)).
-Only remaining step is a **manual live-server browser test** (§8/§11) — connect to
-a running Archipelago server and confirm the item/location round-trip.
+The live-server browser test (§8/§11) is now **automated and passing** —
+`ruffle-tests/tests/swfs/_rando/livetest/browser/run_browser_livetest.sh` drives
+`window.__randoBridge` (rando_bridge.js + archipelago.js + browser WebSocket) from
+headless chromium against a real AP server, asserting the connect + item +
+location round-trip. Transport-level (no WASM/SWF/WebGPU).
 
 Demo viewer note: the real viewer is the shared dynamic `docs2/demo.html?test=<id>`
 (docs2 = local hosting, where non-open-source game SWFs live — the AP target
@@ -196,8 +199,13 @@ if present, loads the bridge module + panel — non-AP demos never see it.
 so there's one UI source). Verified: the deployed page ships archipelago.js +
 rando_bridge.js + rando_panel.js and loads bridge+panel.
 
-Remaining (not yet validated): the §8/§11 **live-server browser test** (needs a
-running AP server + browser).
+Live-server browser test (2026-05-31, done + automated): the §8/§11 round-trip is
+covered by `ruffle-tests/tests/swfs/_rando/livetest/browser/run_browser_livetest.sh`
+(headless chromium via Playwright → `window.__randoBridge` → real AP server).
+Asserts connect + starting item 80002 + `sendLocation(81001)` checked + granted
+item 80000. Unlike native APCpp, archipelago.js does not filter own-location
+items, so 80000 appears in received items here. Not in CI (network timing); needs
+Archipelago-CC + Playwright. See `ruffle-tests/tests/swfs/_rando/README.md`.
 
 ## 9. Open questions (defer until bring-up)
 
