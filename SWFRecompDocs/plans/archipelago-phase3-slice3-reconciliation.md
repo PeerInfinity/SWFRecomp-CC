@@ -277,3 +277,38 @@ add the real recompiled-game page as an opt-in/parameterized `SWF_IFRAME_SRC` (o
 separate "live" preset), and add a headed-Chrome e2e leg for it — rather than a global
 swap. The recompiled-game page itself is just `harness.html` minus the mock-host script
 (the page exposes `__swfBridge`; AP's injected `bridge.js` plays host).
+
+## `__swfBridge` is RUNTIME-NEUTRAL — confirmed empirically under Ruffle web (2026-06-01)
+
+Archipelago-CC's unified `flashSubstrate` wants to run the same `__swfBridge`
+contract under multiple runtimes (SWFRecomp WASM **and** Ruffle/native Flash).
+Confirmed empirically that the **same** `swf_bridge.js` shim + the **same** AVM1
+minigame (`swfbridge_toy/test.swf`) round-trip identically under **Ruffle web** —
+so Ruffle is a drop-in runtime behind the same shim, no in-page adapter needed.
+
+**Harness:** `ruffle-tests/tests/swfs/_swfbridge/livetest/toy_browser/`
+`ruffle_harness.html` + `ruffle_test.js` + `run_ruffle_livetest.sh`. Identical to
+the WASM harness except it embeds `test.swf` in Ruffle (the official
+`@ruffle-rs/ruffle` selfhosted CDN bundle — the exact loader `docs/demo.html`'s
+"View in Ruffle" / Compare tool uses) instead of the SWFRecomp WASM module; same
+`swf_bridge.js`, same mock host. `allowScriptAccess: true` set (required for EI).
+No WASM build, no AP server — only MTASC + the CDN.
+
+**Result: 8/8 PASS** (headed google-chrome, Ruffle 0.2.0, AVM1/SWF8):
+`ExternalInterface.available=true`, host `configure()` reached the bridge, the game
+sent both objectives **outward** (`EI.call("__swfSendLocation", flashName)` →
+`window.__swfSendLocation` → host recorded `chest`/`enemy`), and the **inward
+return-value pull** worked (`EI.call("__swfPoll")` → JS string `"sword,key"`
+marshaled back to AVM1 → split + applied → `[toy] DONE`). Matches the WASM
+livetest's 8/8 exactly. This validates the source analysis: Ruffle web's
+`callExternalInterface` resolves the method name as `new Function("return (<name>)(...)")`
+= a window-scope lookup, the same resolution the SWFRecomp `EM_ASM` handler does, so
+the top-level `__swfPoll`/`__swfConfig`/`__swfSendLocation` fns resolve identically.
+
+**Only divergence (not the contract — observability plumbing):** AVM `trace()`
+visibility. The SWFRecomp WASM runtime emits trace via `printf` straight to the
+console; Ruffle defaults `logLevel: Error` and surfaces AVM trace only through its
+`avm_trace` channel — set `logLevel: 'info'` (the per-player `traceObserver` setter
+did **not** fire in the 0.2.0 unpkg bundle). No divergence in return-value
+marshaling, arg coercion, or `available` gating (all true with `allowScriptAccess`).
+AVM2/AS3 was not exercised (the toy is AVM1, matching Mode 1).

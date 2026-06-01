@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>__swfBridge under Ruffle web (AVM1) — runtime-neutral check</title>
+</head>
+<body>
+<h1>__swfBridge under Ruffle web (AVM1)</h1>
+<!-- Runtime-neutrality check for the converged Archipelago "swfrecomp" substrate.
+     Runs the SAME AVM1 minigame (swfbridge_toy/test.swf) and the SAME production
+     bridge shim (swf_bridge.js) + the SAME mock host as harness.html — but under
+     Ruffle web instead of the SWFRecomp WASM runtime. If the contract round-trips
+     here too, Ruffle is a drop-in runtime behind the same shim.
+
+     Ruffle web's callExternalInterface resolves a method name via
+     `new Function("return (<name>)(...)")` = a window-scope lookup, the same
+     resolution the SWFRecomp EM_ASM handler does — so __swfPoll/__swfConfig/
+     __swfSendLocation (top-level window fns installed by swf_bridge.js) should
+     resolve identically. allowScriptAccess MUST be on for ExternalInterface. -->
+
+<button id="btn-run" disabled>Run SWF (Ruffle)</button>
+<div id="ruffle-container" style="width:200px;height:150px;background:#fff;"></div>
+
+<!-- 1) Production bridge shim — installs window.__swfBridge (runtime-neutral). -->
+<script src="swf_bridge.js"></script>
+
+<!-- 2) Mock host: identical to harness.html (Archipelago-CC bridge.js role). -->
+<script>
+  window.__sentLocations = [];
+  window.__swfBridge.sendLocation = function (flashName) {
+    window.__sentLocations.push(flashName);
+    console.log('[host] location check:', flashName);
+  };
+  window.__hostDrive = function () {
+    window.__swfBridge.configure({
+      gameId: 'swfbridge_toy',
+      params: { difficulty: 'normal' },
+      ap_items: { Sword: 'sword', Key: 'key' },
+      ap_locations: { chest: 'Top Middle Chest', enemy: 'Right Room Enemy Drop' },
+      regionId: 'r1',
+    });
+    setTimeout(function () {
+      console.log('[host] delivering items: Sword, Key');
+      window.__swfBridge.pollItems([{ name: 'Sword' }, { name: 'Key' }]);
+    }, 1200);
+  };
+</script>
+
+<!-- 3) Load Ruffle from the official selfhosted CDN bundle (same source the
+        demo.html "View in Ruffle" / Compare tool uses), embed test.swf with
+        allowScriptAccess enabled, and run. -->
+<script>
+  window.__ruffleReady = false;
+  var rs = document.createElement('script');
+  rs.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+  rs.onload = function () {
+    // Global config: turn on ExternalInterface + autoplay, silence the splash.
+    window.RufflePlayer = window.RufflePlayer || {};
+    window.RufflePlayer.config = {
+      allowScriptAccess: true,
+      autoplay: 'on',
+      unmuteOverlay: 'hidden',
+      splashScreen: false,
+      warnOnUnsupportedContent: false,
+      // Ruffle defaults logLevel to Error, which suppresses the avm_trace info
+      // channel. Raise it so AVM trace() reaches the console (belt-and-braces
+      // with the per-player traceObserver below).
+      logLevel: 'info',
+    };
+    window.__ruffleReady = true;
+    document.getElementById('btn-run').disabled = false;
+    console.log('[harness] Ruffle + bridge ready');
+  };
+  rs.onerror = function () { console.log('[harness] ERROR: failed to load Ruffle from CDN'); };
+  document.head.appendChild(rs);
+
+  document.getElementById('btn-run').addEventListener('click', function () {
+    this.disabled = true;
+    console.log('[harness] running SWF (Ruffle)');
+    window.__hostDrive();   // configure + schedule item delivery
+    var ruffle = window.RufflePlayer.newest();
+    var player = ruffle.createPlayer();
+    player.style.width = '200px';
+    player.style.height = '150px';
+    document.getElementById('ruffle-container').appendChild(player);
+    // Surface AVM trace(). What actually works in the 0.2.0 unpkg bundle is
+    // logLevel:'info' (above), which routes trace through the avm_trace channel
+    // to the console (web/src/log_adapter.rs). The per-element traceObserver
+    // setter did NOT fire here (left in as harmless belt-and-braces); logLevel
+    // is the reliable path. Contrast: the SWFRecomp WASM runtime emits trace via
+    // printf straight to console — the only runtime divergence we found, and it
+    // is observability plumbing, not part of the __swfBridge contract.
+    player.traceObserver = function (message) { console.log(message); };
+    fetch('test.swf').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      player.load({ data: buf, allowScriptAccess: true, autoplay: 'on' })
+        .catch(function (e) { console.log('[harness] ruffle load error: ' + e); });
+    }).catch(function (e) { console.log('[harness] fetch test.swf error: ' + e); });
+  });
+</script>
+</body>
+</html>
