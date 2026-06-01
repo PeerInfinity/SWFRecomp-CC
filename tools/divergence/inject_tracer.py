@@ -78,8 +78,201 @@ def find_first_showframe(data: bytes) -> int:
     return -1
 
 
+# ---------------------------------------------------------------------------
+# SWF5 -> SWF6+ CLIPACTIONS rewrite.
+#
+# The tracer needs the SWF declared >= 6 (its onEnterFrame hook is a SWF6+
+# feature), so inject() bumps the header version. But CLIPACTIONS event-flag
+# fields are version-dependent in the SWF format: UI16 in SWF<=5, UI32 in
+# SWF>=6 (SWF File Format Spec, CLIPEVENTFLAGS). Re-declaring a v5 SWF as v8
+# without rewriting those fields makes any spec-correct parser (Ruffle AND
+# SWFRecomp) read 2 extra bytes per flag field, desyncing the whole tag/action
+# stream. So when we cross the v6 boundary we must widen every UI16 flag field
+# to UI32. Zero-extension preserves the value: the SWF6 UI32 layout keeps the
+# SWF5 low-16 event bits at the same positions and only adds new events in the
+# upper bits, so a v5 flag widened to 32 bits means the same set of events.
+#
+# v5 SWFs cannot contain PlaceObject3 (SWF8+), so only PlaceObject2 (tag 26)
+# carries clip actions, possibly nested inside DefineSprite (tag 39).
+
+
+class _BitReader:
+    """Big-endian bit reader over a bytes buffer, for MATRIX / CXFORM skip."""
+
+    def __init__(self, data: bytes, byte_pos: int):
+        self.data = data
+        self.bytepos = byte_pos
+        self.bitpos = 0
+
+    def read_ub(self, n: int) -> int:
+        v = 0
+        for _ in range(n):
+            bit = (self.data[self.bytepos] >> (7 - self.bitpos)) & 1
+            v = (v << 1) | bit
+            self.bitpos += 1
+            if self.bitpos == 8:
+                self.bitpos = 0
+                self.bytepos += 1
+        return v
+
+    def align(self) -> int:
+        if self.bitpos != 0:
+            self.bitpos = 0
+            self.bytepos += 1
+        return self.bytepos
+
+
+def _skip_matrix(data: bytes, pos: int) -> int:
+    br = _BitReader(data, pos)
+    if br.read_ub(1):  # HasScale
+        nb = br.read_ub(5)
+        br.read_ub(nb)
+        br.read_ub(nb)
+    if br.read_ub(1):  # HasRotate
+        nb = br.read_ub(5)
+        br.read_ub(nb)
+        br.read_ub(nb)
+    nb = br.read_ub(5)  # NTranslateBits
+    br.read_ub(nb)
+    br.read_ub(nb)
+    return br.align()
+
+
+def _skip_cxform_with_alpha(data: bytes, pos: int) -> int:
+    br = _BitReader(data, pos)
+    has_add = br.read_ub(1)
+    has_mult = br.read_ub(1)
+    nb = br.read_ub(4)
+    if has_mult:
+        for _ in range(4):
+            br.read_ub(nb)
+    if has_add:
+        for _ in range(4):
+            br.read_ub(nb)
+    return br.align()
+
+
+def _widen_clipactions_u16_to_u32(data: bytes, pos: int):
+    """Rewrite a CLIPACTIONS block (data[pos:]) from UI16 to UI32 flag widths.
+
+    Returns (new_clipactions_bytes, end_pos, records_widened).
+    """
+    out = bytearray()
+    out += data[pos:pos + 2]  # Reserved UI16 (always UI16, unchanged)
+    pos += 2
+    all_flags = struct.unpack_from('<H', data, pos)[0]  # AllEventFlags UI16
+    pos += 2
+    out += struct.pack('<I', all_flags)
+    widened = 1  # AllEventFlags
+    while True:
+        ev = struct.unpack_from('<H', data, pos)[0]  # EventFlags UI16
+        pos += 2
+        if ev == 0:  # ClipActionEndFlag
+            out += struct.pack('<I', 0)
+            widened += 1
+            break
+        out += struct.pack('<I', ev)
+        widened += 1
+        size = struct.unpack_from('<I', data, pos)[0]  # ActionRecordSize UI32
+        pos += 4
+        out += struct.pack('<I', size)
+        out += data[pos:pos + size]  # KeyCode (if any) + action bytes
+        pos += size
+    return bytes(out), pos, widened
+
+
+def _rewrite_place_object2(body: bytes):
+    """Rewrite a PlaceObject2 tag body's clip actions (if present)."""
+    flags = body[0]
+    if not (flags & 0x80):  # HasClipActions
+        return body, 0
+    pos = 1
+    pos += 2  # Depth
+    if flags & 0x02:  # HasCharacter
+        pos += 2
+    if flags & 0x04:  # HasMatrix
+        pos = _skip_matrix(body, pos)
+    if flags & 0x08:  # HasColorTransform
+        pos = _skip_cxform_with_alpha(body, pos)
+    if flags & 0x10:  # HasRatio
+        pos += 2
+    if flags & 0x20:  # HasName
+        while body[pos] != 0:
+            pos += 1
+        pos += 1
+    if flags & 0x40:  # HasClipDepth
+        pos += 2
+    new_clip, end_pos, widened = _widen_clipactions_u16_to_u32(body, pos)
+    return body[:pos] + new_clip + body[end_pos:], widened
+
+
+def _emit_tag(tag_type: int, body: bytes) -> bytes:
+    n = len(body)
+    if n >= 0x3F:
+        return struct.pack('<H', (tag_type << 6) | 0x3F) + struct.pack('<I', n) + body
+    return struct.pack('<H', (tag_type << 6) | n) + body
+
+
+def _rewrite_tag_stream(body: bytes) -> "tuple[bytes, int]":
+    """Walk a tag stream (top-level or DefineSprite body), widening clip actions.
+
+    Returns (rewritten_bytes, total_records_widened).
+    """
+    out = bytearray()
+    pos = 0
+    widened_total = 0
+    while pos < len(body):
+        if pos + 2 > len(body):
+            out += body[pos:]
+            break
+        cl = struct.unpack_from('<H', body, pos)[0]
+        tag_type = cl >> 6
+        length = cl & 0x3F
+        hdr_end = pos + 2
+        if length == 0x3F:
+            length = struct.unpack_from('<I', body, hdr_end)[0]
+            hdr_end += 4
+        tag_body = body[hdr_end:hdr_end + length]
+        new_body = tag_body
+        if tag_type == 26:  # PlaceObject2
+            new_body, w = _rewrite_place_object2(tag_body)
+            widened_total += w
+        elif tag_type == 39:  # DefineSprite: SpriteID(2)+FrameCount(2)+subtags
+            sub, w = _rewrite_tag_stream(tag_body[4:])
+            new_body = tag_body[:4] + sub
+            widened_total += w
+        out += _emit_tag(tag_type, new_body)
+        pos = hdr_end + length
+        if tag_type == 0:  # End — copy any trailing bytes verbatim
+            out += body[pos:]
+            break
+    return bytes(out), widened_total
+
+
+def upgrade_clipactions_to_v6(fws: bytearray) -> int:
+    """In place: rewrite all CLIPACTIONS flag fields from UI16 to UI32.
+
+    Returns the number of flag fields widened (0 if none / nothing to do).
+    """
+    tag_start = skip_rect(fws, 8)
+    tag_start += 4  # frame rate(2) + frame count(2)
+    rewritten, widened = _rewrite_tag_stream(bytes(fws[tag_start:]))
+    if widened:
+        fws[tag_start:] = rewritten
+        struct.pack_into('<I', fws, 4, len(fws))  # fix header file length
+    return widened
+
+
 def inject(swf_bytes: bytes, bytecode: bytes, min_version: int = 8) -> bytes:
     fws = bytearray(decompress_swf(swf_bytes))
+
+    orig_version = fws[3]
+    target_version = max(orig_version, min_version)
+    # Crossing the v6 boundary changes CLIPACTIONS flag widths (UI16 -> UI32);
+    # rewrite the existing clip actions before bumping so the SWF stays valid.
+    widened = 0
+    if orig_version < 6 <= target_version:
+        widened = upgrade_clipactions_to_v6(fws)
 
     insert_pos = find_first_showframe(fws)
     if insert_pos < 0:
@@ -87,6 +280,8 @@ def inject(swf_bytes: bytes, bytecode: bytes, min_version: int = 8) -> bytes:
 
     if fws[3] < min_version:
         fws[3] = min_version
+
+    inject._last_clipactions_widened = widened
 
     new_bytes = bytearray(len(fws) + len(bytecode))
     new_bytes[:insert_pos] = fws[:insert_pos]
@@ -121,6 +316,10 @@ def main():
 
     print(f"Injected {len(bytecode)} bytes of tracer into {args.input.name}",
           file=sys.stderr)
+    widened = getattr(inject, "_last_clipactions_widened", 0)
+    if widened:
+        print(f"  upgraded {widened} CLIPACTIONS flag field(s) UI16->UI32 "
+              f"(SWF v{swf_in[3]} -> v{args.min_version})", file=sys.stderr)
     print(f"  input:  {len(swf_in)} bytes ({swf_in[:3].decode()})", file=sys.stderr)
     print(f"  output: {len(result)} bytes (FWS) -> {args.output}", file=sys.stderr)
 
