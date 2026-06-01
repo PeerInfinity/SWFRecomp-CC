@@ -218,10 +218,22 @@ the **substrate registry** the contract (sibling to `textAdventureSubstrateWrapp
 with our Rando glue + a new **host transport** (re-point `__randoBridge` from its
 own WebSocket to the host as AP client) as the runtime mechanism. Full design,
 two-track reconciliation, and open coordination questions:
-**[archipelago-phase3-slice3-reconciliation.md](archipelago-phase3-slice3-reconciliation.md).**
+[archipelago-phase3-slice3-reconciliation.md](archipelago-phase3-slice3-reconciliation.md).
 Implementation is Archipelago-CC-side, in a fresh session, coordinated with that
-repo's owner. (Supersedes the earlier "iframe the SWF demo + HostPostMessageTransport"
-sketch — in-page direct calls are likely simpler; embed model TBD.)
+repo's owner.
+
+**CONVERGED 2026-05-31 (plan-of-record): Archipelago-CC's
+`NewDocs/plans/procedural-generation/swfrecomp-substrate-converged.md` —
+"one substrate, two modes."** The Track A / Track B split collapses into a single
+`swfrecomp` substrate defined by a stable JS bridge contract (`window.__swfBridge`):
+**mode 1** opaque fixed minigame (ships now, AVM1), **mode 2** procgen-rendered
+content (later, AVM2-gated). Embed = iframe via `iframeAdapter`. SWFRecomp-CC's only
+new code is the host transport (`rando_bridge.js` → `__swfBridge` over the iframe
+path). **An AS→JS outward-call experiment (2026-05-31) confirmed the cooperative
+AS→JS path works in the recompiled WASM runtime** — so injected AS fulfills the
+bridge for AVM1 and the `Rando` C builtin is no longer required (it remains a
+verified fallback). Details + the experiment in the reconciliation note's
+"AS→JS outward-call experiment" section.
 
 **Slice 4 — real game (deferred):** apply the proven prelude/glue to a real game
 (Doodle Jump / Pong / Snake), find hook points, validate in the browser via the

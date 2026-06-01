@@ -1,11 +1,24 @@
 # Phase 3 Slice 3 — reconciliation: AVM1 `Rando` games as a procgen *substrate*
 
-**Status: RECONCILIATION / ROUGH PLAN, 2026-05-31.** Output of a cross-repo design
-discussion. Reconciles our Phase 1–2 work (AVM1 native `Rando` builtin, shipped +
-live-tested) with the Archipelago-CC procgen system and its existing
-`NewDocs/plans/procedural-generation/swfrecomp-substrate.md` plan-of-record.
-Implementation belongs in **Archipelago-CC**, coordinated with that repo's owner,
-in a fresh session. This note is the handoff artifact, not an implementation.
+> **SUPERSEDED 2026-05-31** by Archipelago-CC's
+> `NewDocs/plans/procedural-generation/swfrecomp-substrate-converged.md`
+> ("one substrate, two modes"). That plan collapses this note's **Track A / Track B**
+> split: there is **one** `swfrecomp` substrate defined by a stable JS bridge
+> contract (`window.__swfBridge`), with an opaque-fixed-minigame **mode 1** (ships
+> now, AVM1) and a procgen-content **mode 2** (later, AVM2-gated) — *modes, not
+> tracks*. Embed = iframe via `iframeAdapter`. The convergence rests on the finding
+> recorded in **"AS→JS outward-call experiment"** below (the cooperative AS→JS path
+> works in the recompiled WASM runtime, so injected AS can fulfill the bridge for
+> AVM1 — the `Rando` C builtin is no longer required). This note is kept for the
+> reasoning trail; the converged plan is the plan-of-record.
+
+**Status: RECONCILIATION / ROUGH PLAN, 2026-05-31 (superseded — see banner).** Output
+of a cross-repo design discussion. Reconciles our Phase 1–2 work (AVM1 native
+`Rando` builtin, shipped + live-tested) with the Archipelago-CC procgen system and
+its existing `NewDocs/plans/procedural-generation/swfrecomp-substrate.md`
+plan-of-record. Implementation belongs in **Archipelago-CC**, coordinated with that
+repo's owner, in a fresh session. This note is the handoff artifact, not an
+implementation.
 
 See [archipelago-phase3-substrate-and-item-application.md](archipelago-phase3-substrate-and-item-application.md)
 for Phase 3 Slices 1–2 (done) and the original (now-superseded for Slice 3)
@@ -131,3 +144,45 @@ Proven and reusable as the substrate's *runtime mechanism*:
   build-time-content questions above; from those answers, the substrate's
   registry-entry + panel shape falls out, and the only SWFRecomp-CC code change is
   the host transport in `rando_bridge.js` (the seam already exists).
+
+## AS→JS outward-call experiment (2026-05-31) — resolved the converged plan's decisive question
+
+The converged plan asks whether SWFRecomp's recompiled output can make a
+**cooperative AS→JS *outward* call** (game AS → JS, not just JS→AS injection). If
+yes, injected AS fulfills the `__swfBridge` contract and the `Rando` C builtin can
+be dropped. **Experiment result: YES** (for AVM1).
+
+Findings:
+- The `ruffle-inject` demos do **not** answer this — they run in **Ruffle** (the
+  real Flash player, full native `ExternalInterface`), not SWFRecomp's recompiled
+  C/WASM runtime.
+- But the recompiled runtime **already implements `flash.external.ExternalInterface`**
+  on the AVM1/AS2 path — `available` / `addCallback` / `call`
+  (`SWFModernRuntime/src/actionmodern/action.c:5596+`), with the outward call
+  delegating to a pluggable `g_external_call_handler`. It was only ever wired by a
+  **native mock test harness** (`ruffle-tests/tests/swfs/avm1/external_interface/test_harness.c`);
+  in the WASM/browser build the handler was NULL → `available` false, `.call` a no-op.
+- **Probe (run then reverted):** added a minimal `#ifdef __EMSCRIPTEN__` `EM_ASM`
+  handler forwarding `ExternalInterface.call(name, arg0)` → `window[name](arg0)`,
+  built a probe SWF (`ExternalInterface.call("swfEiProbe", "hello-from-as")`) as
+  graphics WASM, ran it in headed google-chrome. Result:
+  `[ei] available=true` and `EI_PROBE_CALLED:hello-from-as` — the outward call
+  reached `window` with its argument. The probe (`action.c` change +
+  `SWFRecomp/tests/ei_outward_probe/`) was **reverted** after confirming; it was a
+  capability probe, not the feature.
+
+Implications:
+- **"Yes" branch is viable.** The AS→JS outward seam is architecturally present and
+  natively tested; only a small EM_JS browser handler was missing. So injected /
+  cooperative AS can fulfill the bridge for AVM1 — **the `Rando` C builtin is no
+  longer required** (it remains a working, live-verified fallback — Phase 2b).
+- **The real SWFRecomp-CC change** is still the host-transport `__swfBridge` surface
+  (`configure`/`pollItems`/`sendLocation` over the iframeAdapter path) — a more
+  specific interface than this generic `ExternalInterface` probe. The probe proved
+  the *enabling capability*; production marshaling (multi-arg, return values,
+  inward `addCallback`→JS) lands in the coordinated Slice-3 implementation.
+- **AVM2 caveat:** the EI implementation exercised is the AVM1/AS2 path. AVM2/AS3
+  fulfillment (mode 2) is gated on AVM2 support existing at all — unchanged.
+
+The converged plan's §"Open question that decides the SWFRecomp-CC side" can be
+marked resolved (Yes) on the AP side — flagged here for that doc's owner.
