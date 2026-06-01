@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-31T16:45:48.097141+00:00",
-    "old_git_sha": "24cbf0ff5bc660062e4f725a5d261509361296c8",
-    "new_timestamp": "2026-05-31T17:58:05.469600+00:00",
-    "new_git_sha": "d5b8dce255c7a800b7088cf832112ff735eff1e8",
+    "old_timestamp": "2026-05-31T18:38:04.972445+00:00",
+    "old_git_sha": "aabce6a9c8799635b595e564ee2c6838dc68ac08",
+    "new_timestamp": "2026-06-01T00:46:02.867174+00:00",
+    "new_git_sha": "0973204c3999890d063dbb0acf6eab4207f18c2b",
     "partial": false,
     "same_commit": false
   },
@@ -14,20 +14,85 @@
     "old_total": 243,
     "old_pass_rate": 54.3,
     "new_pass": 132,
-    "new_ruffle_matched": 98,
-    "new_effective_pass": 230,
+    "new_ruffle_matched": 97,
+    "new_effective_pass": 229,
     "new_total": 243,
     "new_pass_rate": 54.3,
     "old_mismatched_lines": 8952,
-    "new_mismatched_lines": 8952,
-    "increased_mismatches": 0,
+    "new_mismatched_lines": 8960,
+    "increased_mismatches": 8,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 243,
+    "newly_failing": 1,
+    "status_changed": 1,
+    "unchanged": 239,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "MovieClip-v5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 350,
+        "expected_lines": 363,
+        "matching_lines": 339
+      },
+      "new_lines": {
+        "actual_lines": 350,
+        "expected_lines": 363,
+        "matching_lines": 337
+      }
+    },
+    {
+      "test": "MovieClip-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 921,
+        "expected_lines": 936,
+        "matching_lines": 880
+      },
+      "new_lines": {
+        "actual_lines": 921,
+        "expected_lines": 936,
+        "matching_lines": 878
+      }
+    },
+    {
+      "test": "MovieClip-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 956,
+        "expected_lines": 969,
+        "matching_lines": 902
+      },
+      "new_lines": {
+        "actual_lines": 956,
+        "expected_lines": 969,
+        "matching_lines": 900
+      }
+    },
+    {
+      "test": "MovieClip-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1074,
+        "expected_lines": 1087,
+        "matching_lines": 988
+      },
+      "new_lines": {
+        "actual_lines": 1074,
+        "expected_lines": 1087,
+        "matching_lines": 986
+      }
+    }
+  ]
 }

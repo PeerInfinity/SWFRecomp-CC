@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `24cbf0ff5bc6` (2026-05-31T16:45:48.070906+00:00)
-**Current:** `d5b8dce255c7` (2026-05-31T17:58:05.398083+00:00)
+**Previous:** `aabce6a9c879` (2026-05-31T18:38:04.946336+00:00)
+**Current:** `0973204c3999` (2026-06-01T00:46:02.841306+00:00)
 
 ## Summary
 
@@ -10,6 +10,11 @@
 | Passing | 616 | 616 | 0 |
 | Total | 673 | 673 | 0 |
 | Pass rate | 91.5% | 91.5% | 0% |
-| Mismatched lines | 9584 | 9584 | 0 |
+| Mismatched lines | 9584 | 9585 | +1 |
+|   Increased | | | +1 |
 
-No changes detected.
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `movieclip_library_state_values` | ruffle_matched | output_mismatch | 76/78 | 75/78 |
