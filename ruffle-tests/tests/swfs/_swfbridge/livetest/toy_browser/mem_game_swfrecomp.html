@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>memprobe — SWFRecomp WASM game page</title></head>
+<body>
+<!-- The recompiled-game page for the memory-poke probe, SWFRecomp graphics WASM.
+     Exposes window.__swfEICall, which the host (the parent harness, across the
+     iframe boundary) uses to invoke the AS-registered ExternalInterface callbacks
+     (configure/readState/wireCheck) via the runtime's host->AS inward bridge
+     (swf_ei_call_internal in main.c). __swfBridge must exist so the runtime
+     installs its EI handler (addCallback no-ops + available=false otherwise).
+
+     SWFRecomp's graphics renderer init needs a user gesture (renderer_init's
+     emscripten_sleep consumes the activation), so the SWF starts on a button
+     click. Inside an iframe the gesture must occur in the iframe document — the
+     Playwright driver clicks #swf-run inside the iframe. The graphics frame loop
+     then stays alive (parked at emscripten_sleep), and swf_ei_call_internal runs
+     between frames on a clean wasm stack. -->
+<canvas id="canvas" width="200" height="150" style="width:200px;height:150px;"></canvas>
+<button id="swf-run" disabled>start</button>
+<script>
+  // Expose a (stub) bridge object so the SWFRecomp runtime installs its EI handler.
+  window.__swfBridge = {};
+  window.__swfReady = false;
+  window.Module = {
+    locateFile: function (p) { return p; },
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log('[swf] ' + t); },
+    printErr: function (t) { console.log('[swf-err] ' + t); },
+    onRuntimeInitialized: function () {
+      // Host->AS ExternalInterface inward bridge (addCallback direction).
+      window.__swfEICall = function (name, arg) {
+        return Module.ccall('swf_ei_call_internal', 'string', ['string', 'string'],
+                            [name, arg == null ? '' : arg]);
+      };
+      document.getElementById('swf-run').disabled = false;
+      console.log('[swf-game] runtime initialized; awaiting gesture');
+    },
+  };
+  document.getElementById('swf-run').addEventListener('click', function () {
+    this.disabled = true;
+    console.log('[swf-game] gesture received; starting SWF');
+    Module.ccall('runSWF', null, [], [], { async: true });
+    // main() registers the callbacks during frame 1; the host polls wireCheck.
+    setTimeout(function () { window.__swfReady = true; console.log('[swf-game] ready'); }, 1000);
+  });
+</script>
+<script src="memprobe.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>memprobe — Ruffle game page</title></head>
+<body>
+<!-- The recompiled-game page for the memory-poke probe, Ruffle runtime. Loads the
+     official @ruffle-rs/ruffle selfhosted bundle and embeds memprobe/test.swf with
+     allowScriptAccess on. When the SWF registers ExternalInterface.addCallback(name),
+     Ruffle defines window-element methods player[name](...) (Object.defineProperty
+     → callExternalInterface). The host (parent harness, across the iframe boundary)
+     calls window.__memPlayer.configure(json) / .readState(). -->
+<div id="ruffle-container" style="width:200px;height:150px;"></div>
+<script>
+  window.__memReady = false;
+  var rs = document.createElement('script');
+  rs.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+  rs.onload = function () {
+    window.RufflePlayer = window.RufflePlayer || {};
+    window.RufflePlayer.config = {
+      allowScriptAccess: true, autoplay: 'on', unmuteOverlay: 'hidden',
+      splashScreen: false, warnOnUnsupportedContent: false, logLevel: 'info',
+    };
+    var ruffle = window.RufflePlayer.newest();
+    var player = ruffle.createPlayer();
+    player.style.width = '200px';
+    player.style.height = '150px';
+    document.getElementById('ruffle-container').appendChild(player);
+    player.traceObserver = function (m) { console.log('[ruffle-trace] ' + m); };
+    window.__memPlayer = player;
+    fetch('test.swf').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      player.load({ data: buf, allowScriptAccess: true, autoplay: 'on' })
+        .catch(function (e) { console.log('[ruffle-game] load error: ' + e); });
+      window.__memReady = true;
+    }).catch(function (e) { console.log('[ruffle-game] fetch test.swf error: ' + e); });
+  };
+  rs.onerror = function () { console.log('[ruffle-game] ERROR: CDN load failed'); };
+  document.head.appendChild(rs);
+</script>
+</body>
+</html>

@@ -310,9 +310,11 @@ if [ "$TARGET" == "wasm" ]; then
     # Build exported functions list
     # ng_ime_compose_set / ng_ime_commit_set are called from JS-side
     # composition listeners registered by ng_register_ime_listeners.
-    EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_ng_ime_compose_set","_ng_ime_commit_set"]'
+    # _swf_ei_call_internal: host->AS ExternalInterface inward bridge (addCallback
+    # direction; used by the memory-poke / readState style). KEEPALIVE in main.c.
+    EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_swf_ei_call_internal","_ng_ime_compose_set","_ng_ime_commit_set"]'
     if [ "$DISPLAY_BRIDGE" = true ]; then
-        EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_getSpriteChildrenJSON","_setObjectTransform","_ng_ime_compose_set","_ng_ime_commit_set"]'
+        EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_getSpriteChildrenJSON","_setObjectTransform","_swf_ei_call_internal","_ng_ime_compose_set","_ng_ime_commit_set"]'
     fi
 
     if [ "$GRAPHICS_FLAG" = true ]; then

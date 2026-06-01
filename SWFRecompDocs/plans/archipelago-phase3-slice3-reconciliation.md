@@ -312,3 +312,59 @@ console; Ruffle defaults `logLevel: Error` and surfaces AVM trace only through i
 did **not** fire in the 0.2.0 unpkg bundle). No divergence in return-value
 marshaling, arg coercion, or `available` gating (all true with `allowScriptAccess`).
 AVM2/AS3 was not exercised (the toy is AVM1, matching Mode 1).
+
+## Memory-poke (`readState`) over the iframe boundary — confirmed, both runtimes (2026-06-01)
+
+The unified `flashSubstrate` plan
+([flash-substrate-unification.md](file:../../../Archipelago-CC/NewDocs/plans/procedural-generation/flash-substrate-unification.md))
+needs the *other* integration style — flashPanel's **memory-poke**: the host polls
+the game's live state instead of receiving cooperative reports. flashPanel's actual
+mechanism is the **host-initiated `addCallback` direction** — the SWF registers
+`ExternalInterface.addCallback("configure"/"readState"/"wireCheck")` and JS calls
+those (e.g. `player.readState()` → a JSON string of walked fields). This is the
+*opposite* EI direction from the cooperative `__swfPoll` pull (which is AS-initiated
+`ExternalInterface.call` → `window[name]`). The narrow question: does the heavier
+**configure-in / readState-out** round-trip (multi-field nested JSON) survive the
+**iframe** boundary under both runtimes?
+
+**Probe:** `ruffle-tests/tests/swfs/_swfbridge/livetest/toy_browser/` —
+`memprobe` (AVM1 stand-in: registers the three callbacks; `configure` echoes its arg
+back; `readState` returns a realistic ~10-field JSON with mixed types, a nested
+object + array, and a non-ASCII field `café→☃`). `mem_parent.html` mounts two
+sandboxed (`allow-scripts allow-same-origin`) game-page iframes (Ruffle +
+SWFRecomp), and the host calls `configure(cfg)` + `readState()` **across the iframe
+boundary** into each. `mem_test.js` / `run_mem_livetest.sh` drive headed Chrome.
+The real `BridgeGeneric.as` walker is AS3/AVM2 — which SWFRecomp can't run yet — so
+the stand-in is AVM1 (the stub result is the load-bearing answer; walker-vs-runtime
+is deferred).
+
+**Result: 7/7 PASS on BOTH runtimes.** `configure(cfg)` echoed the full 241-char
+config intact (size + UTF on IN); `readState()` returned the full nested JSON
+across the boundary with all fields, correct JS types, nested object+array, the
+non-ASCII field, and `cfg_len` matching — no truncation, no encoding loss, no
+size/marshaling divergence from the single-string `__swfPoll` case. So
+**memory-poke games can use the same iframe path as cooperative games** → rung 1 of
+the unification plan's risk ladder; no `embed:'in-page'` fallback needed for the
+transport.
+
+**Two SWFRecomp-specific notes (Ruffle needed neither):**
+1. **A new runtime primitive was required.** SWFRecomp's WASM build only exposed the
+   AS-initiated *outward* EI direction (the cooperative `__swfBridge` handler);
+   host-initiated calls into `addCallback`'d AS functions were not JS-reachable (a
+   deliberate choice to avoid JS→AS reentrancy for the pull contract). Added
+   `swf_ei_call_internal` (KEEPALIVE export in `wasm_wrappers/main.c`): JS calls
+   `Module.ccall('swf_ei_call_internal', 'string', ['string','string'], [name, arg])`,
+   it builds a string `ActionVar`, invokes the registered callback via the existing
+   `actionEI_callInternalInterface`, and returns the string result as UTF-8. Ruffle
+   exposes this natively (`addCallback` defines `player[name](...)` on the element).
+   Safe because the graphics frame loop parks at `emscripten_sleep` between frames,
+   so the call runs on a clean wasm stack and never itself suspends — the same
+   quiescent window flashPanel polls in.
+2. **Graphics renderer needs an in-iframe user gesture.** SWFRecomp's WebGPU
+   renderer init stalls in a sandboxed auto-start iframe (the `renderer_init`
+   `emscripten_sleep` consumes a user activation that an iframe load doesn't grant);
+   the probe clicks a start button inside the iframe. This is a *rendering-init*
+   constraint, not an EI one — the AP panel mounts the game with a real user
+   interaction anyway. (build_test.sh's NO_GRAPHICS-wasm path is independently
+   broken — `ng_shared.c` lacks an `ng_find_textfield` declaration — so the graphics
+   build is the path; the EI bridge itself is renderer-agnostic.)

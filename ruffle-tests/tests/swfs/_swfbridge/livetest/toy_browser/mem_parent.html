@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>memory-poke (readState) over the iframe boundary — Ruffle vs SWFRecomp</title></head>
+<body>
+<h1>memory-poke (configure/readState) over the iframe boundary</h1>
+<!-- Probes whether flashPanel's host-initiated ExternalInterface.addCallback
+     direction (configure-in / readState-out) survives the iframe boundary, under
+     BOTH Ruffle and SWFRecomp. The host (this parent) plays Archipelago-CC's
+     bridge.js role and calls into each game iframe ACROSS THE BOUNDARY:
+       Ruffle    : iframe.contentWindow.__memPlayer.configure(json)/.readState()
+       SWFRecomp : iframe.contentWindow.__swfEICall('configure', json)/('readState')
+     The iframes use sandbox="allow-scripts allow-same-origin" (the AP substrate's
+     sandbox) so cross-realm access works and we also test EI under the sandbox.
+     Setting iframe.src on the Run click gives each runtime's init a user-gesture
+     activation. -->
+<button id="btn-run">Run probe (both runtimes)</button>
+<div style="display:flex;gap:8px;margin-top:8px;">
+  <iframe id="if-ruffle" title="ruffle" sandbox="allow-scripts allow-same-origin"
+          style="width:210px;height:160px;border:1px solid #999;"></iframe>
+  <iframe id="if-swf" title="swfrecomp" sandbox="allow-scripts allow-same-origin"
+          style="width:210px;height:160px;border:1px solid #999;"></iframe>
+</div>
+<pre id="log" style="white-space:pre-wrap;font-size:12px;"></pre>
+<script>
+  window.__probeResults = {};
+
+  // A non-trivial path_reads-style config with nested arrays/objects, a number,
+  // and a non-ASCII note (café→☃ ✓) to exercise size + UTF on the IN direction.
+  var CFG = '{"path_reads":[{"name":"player_x","path":"_root.game.hero.x"},'
+          + '{"name":"boss_dead","path":"_root.game.boss.dead"},'
+          + '{"name":"powers","path":"_root.game.hero.powers"}],'
+          + '"ap_id_offset":12345,"note":"café→☃ test ✓","classes":["Hero","Boss","Item"]}';
+
+  function logln(s) { document.getElementById('log').textContent += s + '\n'; console.log(s); }
+
+  function waitFor(predicate, timeoutMs) {
+    return new Promise(function (resolve) {
+      var t0 = Date.now();
+      (function tick() {
+        var ok = false;
+        try { ok = predicate(); } catch (e) { ok = false; }
+        if (ok) return resolve(true);
+        if (Date.now() - t0 > timeoutMs) return resolve(false);
+        setTimeout(tick, 100);
+      })();
+    });
+  }
+
+  // Run the configure/readState probe given a host-side call function
+  // call(name, argOrNull) -> string return value.
+  function runProbe(runtime, call) {
+    var res = { runtime: runtime };
+    try {
+      var echo = String(call('configure', CFG));
+      res.configEcho = echo;
+      res.configOk = (echo === CFG);          // full IN integrity (size + UTF)
+      res.configLen = CFG.length;
+
+      var stateStr = String(call('readState', null));
+      res.stateRaw = stateStr;
+      res.stateLen = stateStr.length;
+      var st = null;
+      try { st = JSON.parse(stateStr); } catch (e) { res.parseError = String(e); }
+      res.state = st;
+      if (st) {
+        res.fieldsOk = (st.player_x === 123 && st.player_y === 45 && st.hp === 100 &&
+                        st.coins === 7 && st.boss_dead === true && st.name === 'hero');
+        res.nestedOk = (st.pos && st.pos.x === 1 && st.pos.y === 2 && st.pos.z === 3 &&
+                        Array.isArray(st.powers) && st.powers.length === 3 &&
+                        st.powers[2] === 'double_jump');
+        res.utfOk = (st.label === 'café→☃');           // OUT UTF round-trip
+        res.cfgLenOk = (st.cfg_len === CFG.length);     // AS saw the full IN arg
+        res.typesOk = (typeof st.player_x === 'number' && typeof st.boss_dead === 'boolean' &&
+                       typeof st.name === 'string' && typeof st.pos === 'object');
+      }
+    } catch (e) {
+      res.error = String(e && e.stack ? e.stack : e);
+    }
+    return res;
+  }
+
+  async function driveRuffle() {
+    var ifr = document.getElementById('if-ruffle');
+    ifr.src = 'mem_game_ruffle.html';
+    var ready = await waitFor(function () {
+      var w = ifr.contentWindow;
+      return w && w.__memPlayer && typeof w.__memPlayer.readState === 'function';
+    }, 25000);
+    if (!ready) { window.__probeResults.ruffle = { runtime: 'ruffle', error: 'not ready (player/readState method absent)' }; logln('[ruffle] NOT READY'); return; }
+    var w = ifr.contentWindow;
+    var p = w.__memPlayer;
+    var r = runProbe('ruffle', function (name, arg) { return arg == null ? p[name]() : p[name](arg); });
+    window.__probeResults.ruffle = r;
+    logln('[ruffle] ' + JSON.stringify(r));
+  }
+
+  async function driveSwf() {
+    var ifr = document.getElementById('if-swf');
+    ifr.src = 'mem_game_swfrecomp.html';
+    var ready = await waitFor(function () {
+      var w = ifr.contentWindow;
+      return w && w.__swfReady && typeof w.__swfEICall === 'function' &&
+             w.__swfEICall('wireCheck', '') === 'ok';
+    }, 25000);
+    if (!ready) { window.__probeResults.swfrecomp = { runtime: 'swfrecomp', error: 'not ready (wireCheck != ok)' }; logln('[swfrecomp] NOT READY'); return; }
+    var w = ifr.contentWindow;
+    var r = runProbe('swfrecomp', function (name, arg) { return w.__swfEICall(name, arg); });
+    window.__probeResults.swfrecomp = r;
+    logln('[swfrecomp] ' + JSON.stringify(r));
+  }
+
+  document.getElementById('btn-run').addEventListener('click', async function () {
+    this.disabled = true;
+    logln('[host] starting probe across the iframe boundary…');
+    await Promise.all([driveRuffle(), driveSwf()]);
+    logln('PROBE_DONE');
+  });
+</script>
+</body>
+</html>

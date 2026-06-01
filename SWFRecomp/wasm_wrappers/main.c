@@ -24,11 +24,54 @@ SWFAppContext app_context = {
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <string.h>
+#include <actionmodern/action.h>
+#include <actionmodern/stackvalue.h>
 
 EMSCRIPTEN_KEEPALIVE
 void runSWF() {
     printf("Starting SWF execution from JavaScript...\n");
     swfStart(&app_context);
+}
+
+// Host->AS inward bridge: synchronously invoke an ExternalInterface callback the
+// SWF registered via ExternalInterface.addCallback(name, ...), passing one
+// optional string arg, and return its string result as UTF-8. This is the
+// host-initiated (addCallback) EI direction — the opposite of the cooperative
+// __swfBridge pull (AS-initiated ExternalInterface.call -> window[name]) — and
+// is what flashPanel's memory-poke style needs (configure(json) / readState()).
+// The browser exposes this to JS via Module.ccall('swf_ei_call_internal', ...).
+//
+// Safe to call from a JS timer: the movie loop parks at emscripten_sleep between
+// frames (ASYNCIFY), so this runs while no frame is mid-execution — the same
+// quiescent window where the cooperative pull observes state. addCallback only
+// registers when g_external_call_handler is installed (page exposed
+// window.__swfBridge), so ExternalInterface.available must be true first.
+extern uint16_t* utf8_to_u16(SWFAppContext* app_context, const char* utf8, u32 byte_len, u32* out_u16_len);
+
+EMSCRIPTEN_KEEPALIVE
+const char* swf_ei_call_internal(const char* name, const char* arg) {
+    static char out_buf[262144];   // 256 KB — ample for a realistic readState JSON
+    out_buf[0] = '\0';
+
+    ActionVar av;
+    memset(&av, 0, sizeof(av));
+    int argc = 0;
+    if (arg && arg[0]) {
+        u32 n16 = 0;
+        uint16_t* u16 = utf8_to_u16(&app_context, arg, (u32)strlen(arg), &n16);
+        av.type = ACTION_STACK_VALUE_STRING;
+        av.str_size = n16;
+        av.data.string_data.heap_ptr = u16;
+        av.data.string_data.owns_memory = true;
+        argc = 1;
+    } else {
+        av.type = ACTION_STACK_VALUE_UNDEFINED;
+    }
+
+    ActionVar r = actionEI_callInternalInterface(&app_context, name, &av, argc);
+    ei_actionvar_to_utf8(&r, out_buf, sizeof(out_buf));   // STRING -> UTF-8; else ""
+    return out_buf;
 }
 #endif
 
