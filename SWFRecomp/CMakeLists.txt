@@ -29,6 +29,15 @@ set(RENAME_ZCONF OFF)
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/zlib)
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/lzma)
 
+# libtess2 — winding-rule polygon tessellation. Single source of truth shared
+# with the runtime (SWFModernRuntime/third_party/libtess2); the recompiler uses
+# it for shape/glyph fills (even-odd / non-zero), matching how the runtime's
+# drawing API already tessellates.
+set(LIBTESS2_DIR ${CMAKE_SOURCE_DIR}/../SWFModernRuntime/third_party/libtess2)
+file(GLOB LIBTESS2_SOURCES ${LIBTESS2_DIR}/*.c)
+add_library(libtess2_recomp STATIC ${LIBTESS2_SOURCES})
+target_include_directories(libtess2_recomp PUBLIC ${LIBTESS2_DIR})
+
 if(EMSCRIPTEN)
     # Bundled lzma has uint64_t*/size_t* mismatch (size_t is 32-bit on wasm32)
     target_compile_options(lzma PRIVATE -Wno-incompatible-pointer-types)
@@ -37,6 +46,7 @@ endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE
     zlibstatic
     lzma
+    libtess2_recomp
 )
 
 # frick u ninja
@@ -55,6 +65,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/earcut/include/mapbox
     ${CMAKE_SOURCE_DIR}/lib/tomlplusplus/include
     ${CMAKE_SOURCE_DIR}/lib/stb
+    ${LIBTESS2_DIR}
 )
 
 if(EMSCRIPTEN)

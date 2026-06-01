@@ -10,6 +10,8 @@
 #include <lzma.h>
 #include <earcut.hpp>
 
+#include <tesselator.h>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -211,6 +213,82 @@ using Point = std::array<Coord, 2>;
 
 namespace SWFRecomp
 {
+	// Tessellate a set of contours with libtess2 under the given winding rule
+	// (TESS_WINDING_ODD = SWF even-odd, the default for DefineShape/2/3 and
+	// DefineShape4 without NON_ZERO_WINDING_RULE; TESS_WINDING_NONZERO otherwise).
+	// libtess2 natively resolves multi-contour overlap, self-intersection, and
+	// holes the way Flash/Ruffle (lyon) do — unlike earcut, which needs pre-split,
+	// pre-classified, non-self-intersecting input. This matches the runtime's own
+	// drawing-API tessellation (action.c). Output vertices may be NEW points (at
+	// intersections), so morph_index is NOT preserved on the result — callers that
+	// need per-vertex morph correspondence must keep using the earcut path.
+	static void tessellateContours(const std::vector<std::vector<Vertex>>& contours,
+	                               int winding_rule, std::vector<Tri>& tris)
+	{
+		TESStesselator* tess = tessNewTess(NULL);
+		if (!tess)
+		{
+			return;
+		}
+
+		std::vector<float> coords;
+		for (const std::vector<Vertex>& c : contours)
+		{
+			if (c.size() < 3)
+			{
+				continue;
+			}
+
+			coords.clear();
+			coords.reserve(c.size() * 2);
+			for (const Vertex& v : c)
+			{
+				coords.push_back((float) v.x);
+				coords.push_back((float) v.y);
+			}
+
+			tessAddContour(tess, 2, coords.data(), sizeof(float) * 2, (int) c.size());
+		}
+
+		if (!tessTesselate(tess, winding_rule, TESS_POLYGONS, 3, 2, NULL))
+		{
+			tessDeleteTess(tess);
+			return;
+		}
+
+		const TESSreal* verts = tessGetVertices(tess);
+		const TESSindex* elems = tessGetElements(tess);
+		const int nelems = tessGetElementCount(tess);
+
+		for (int i = 0; i < nelems; ++i)
+		{
+			const TESSindex* poly = &elems[i * 3];
+
+			Tri t;
+			bool ok = true;
+			for (int j = 0; j < 3; ++j)
+			{
+				TESSindex idx = poly[j];
+				if (idx == TESS_UNDEF)
+				{
+					ok = false;
+					break;
+				}
+
+				t.verts[j].x = (s32) std::lround(verts[idx * 2 + 0]);
+				t.verts[j].y = (s32) std::lround(verts[idx * 2 + 1]);
+				t.verts[j].morph_index = -1;
+			}
+
+			if (ok)
+			{
+				tris.push_back(t);
+			}
+		}
+
+		tessDeleteTess(tess);
+	}
+
 	SWFHeader::SWFHeader()
 	{
 		
@@ -8557,10 +8635,109 @@ namespace SWFRecomp
 				size_t tris_size = 0;
 				size_t morph_end_start_vertex = current_morph_end_vertex;
 
-				for (size_t i = 0; i < shapes.size(); ++i)
+				// Morph and font glyphs keep the earcut path: morph needs a
+				// per-vertex morph_index that libtess2 can't preserve (it invents
+				// vertices at intersections), and embedded font glyphs are
+				// tessellated separately. Plain DefineShape fills go through the
+				// libtess2 even-odd path below (prototype scope — see
+				// tessellation-libtess2-migration).
+				if (is_morph || is_font)
 				{
-					if (!shapes[i].invalid && shapes[i].closed && shapes[i].inner_fill != 0 && !shapes[i].hole)
+					for (size_t i = 0; i < shapes.size(); ++i)
 					{
+						if (!shapes[i].invalid && shapes[i].closed && shapes[i].inner_fill != 0 && !shapes[i].hole)
+						{
+							// Bounds check: ensure fill_style_list and inner_fill index are valid
+							if (shapes[i].fill_style_list >= all_fill_styles.size() ||
+								shapes[i].inner_fill > all_fill_style_counts[shapes[i].fill_style_list])
+							{
+								continue;
+							}
+
+							std::vector<Tri> tris;
+
+							fillShape(shapes[i], tris);
+
+							tris_size += tris.size();
+
+							for (Tri t : tris)
+							{
+								for (int j = 0; j < 3; ++j)
+								{
+									float x_f = (float) t.verts[j].x;
+									float y_f = (float) (FRAME_HEIGHT - t.verts[j].y);
+
+									FillStyle& fs = all_fill_styles[shapes[i].fill_style_list][shapes[i].inner_fill - 1];
+									// Encode spread_mode in bits 8-9 of the style type for gradients
+									u32 style_type_packed = (u32) fs.type;
+									if (fs.type == FILL_GRAD_LINEAR || fs.type == FILL_GRAD_RADIAL || fs.type == FILL_GRAD_FOCAL)
+									{
+										style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
+									}
+
+									shape_data << "\t" << "{ "
+											   << std::hex << std::uppercase
+											   << "0x" << VAL(u32, &x_f) << ", "
+											   << "0x" << VAL(u32, &y_f) << ", "
+											   << "0x" << style_type_packed << ", "
+											   << "0x" << (u32) fs.index
+											   << " }," << endl;
+
+									if (is_morph && t.verts[j].morph_index >= 0 && (size_t)t.verts[j].morph_index < morph_end_positions.size())
+									{
+										Vertex& end_v = morph_end_positions[t.verts[j].morph_index];
+										float end_x_f = (float) end_v.x;
+										float end_y_f = (float) (FRAME_HEIGHT - end_v.y);
+										morph_end_shape_data << "\t" << "{ "
+															 << std::dec << std::fixed << std::setprecision(1)
+															 << end_x_f << "f, "
+															 << end_y_f << "f"
+															 << " }," << endl;
+									}
+									else if (is_morph)
+									{
+										// Fallback: use start position
+										morph_end_shape_data << "\t" << "{ "
+															 << std::dec << std::fixed << std::setprecision(1)
+															 << x_f << "f, "
+															 << y_f << "f"
+															 << " }," << endl;
+									}
+
+									if (is_morph)
+									{
+										current_morph_end_vertex += 1;
+									}
+								}
+							}
+						}
+					}
+				}
+				else
+				{
+					// Group fill contours by (fill_style_list, inner_fill) and
+					// tessellate each group together with libtess2 under the
+					// even-odd rule (SWF default for DefineShape/2/3). Even-odd
+					// natively cuts holes from self-touching / overlapping
+					// sub-loops — the case earcut + spatial containment can't
+					// handle (shape_test's C-shapes). Hole-marked shapes are
+					// included as ordinary contours; the fill rule resolves them.
+					// Insertion order is preserved for stable z-order.
+					struct FillGroup
+					{
+						u32 fsl;
+						u32 inner_fill;
+						std::vector<std::vector<Vertex>> contours;
+					};
+					std::vector<FillGroup> groups;
+					std::unordered_map<u64, size_t> group_index;
+
+					for (size_t i = 0; i < shapes.size(); ++i)
+					{
+						if (shapes[i].invalid || !shapes[i].closed || shapes[i].inner_fill == 0)
+						{
+							continue;
+						}
 						// Bounds check: ensure fill_style_list and inner_fill index are valid
 						if (shapes[i].fill_style_list >= all_fill_styles.size() ||
 							shapes[i].inner_fill > all_fill_style_counts[shapes[i].fill_style_list])
@@ -8568,11 +8745,38 @@ namespace SWFRecomp
 							continue;
 						}
 
+						u64 key = ((u64) shapes[i].fill_style_list << 32) | (u64) shapes[i].inner_fill;
+						auto it = group_index.find(key);
+						size_t gi;
+						if (it == group_index.end())
+						{
+							gi = groups.size();
+							group_index[key] = gi;
+							groups.push_back({ shapes[i].fill_style_list, shapes[i].inner_fill, {} });
+						}
+						else
+						{
+							gi = it->second;
+						}
+
+						groups[gi].contours.push_back(shapes[i].verts);
+					}
+
+					for (FillGroup& g : groups)
+					{
 						std::vector<Tri> tris;
 
-						fillShape(shapes[i], tris);
+						tessellateContours(g.contours, TESS_WINDING_ODD, tris);
 
 						tris_size += tris.size();
+
+						FillStyle& fs = all_fill_styles[g.fsl][g.inner_fill - 1];
+						// Encode spread_mode in bits 8-9 of the style type for gradients
+						u32 style_type_packed = (u32) fs.type;
+						if (fs.type == FILL_GRAD_LINEAR || fs.type == FILL_GRAD_RADIAL || fs.type == FILL_GRAD_FOCAL)
+						{
+							style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
+						}
 
 						for (Tri t : tris)
 						{
@@ -8581,14 +8785,6 @@ namespace SWFRecomp
 								float x_f = (float) t.verts[j].x;
 								float y_f = (float) (FRAME_HEIGHT - t.verts[j].y);
 
-								FillStyle& fs = all_fill_styles[shapes[i].fill_style_list][shapes[i].inner_fill - 1];
-								// Encode spread_mode in bits 8-9 of the style type for gradients
-								u32 style_type_packed = (u32) fs.type;
-								if (fs.type == FILL_GRAD_LINEAR || fs.type == FILL_GRAD_RADIAL || fs.type == FILL_GRAD_FOCAL)
-								{
-									style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
-								}
-
 								shape_data << "\t" << "{ "
 										   << std::hex << std::uppercase
 										   << "0x" << VAL(u32, &x_f) << ", "
@@ -8596,32 +8792,6 @@ namespace SWFRecomp
 										   << "0x" << style_type_packed << ", "
 										   << "0x" << (u32) fs.index
 										   << " }," << endl;
-
-								if (is_morph && t.verts[j].morph_index >= 0 && (size_t)t.verts[j].morph_index < morph_end_positions.size())
-								{
-									Vertex& end_v = morph_end_positions[t.verts[j].morph_index];
-									float end_x_f = (float) end_v.x;
-									float end_y_f = (float) (FRAME_HEIGHT - end_v.y);
-									morph_end_shape_data << "\t" << "{ "
-														 << std::dec << std::fixed << std::setprecision(1)
-														 << end_x_f << "f, "
-														 << end_y_f << "f"
-														 << " }," << endl;
-								}
-								else if (is_morph)
-								{
-									// Fallback: use start position
-									morph_end_shape_data << "\t" << "{ "
-														 << std::dec << std::fixed << std::setprecision(1)
-														 << x_f << "f, "
-														 << y_f << "f"
-														 << " }," << endl;
-								}
-
-								if (is_morph)
-								{
-									current_morph_end_vertex += 1;
-								}
 							}
 						}
 					}
