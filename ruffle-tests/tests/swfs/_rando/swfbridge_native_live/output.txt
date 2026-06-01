@@ -1,0 +1,5 @@
+EI available=true
+config nonempty=true
+send tile2
+tile2 checked=true
+DONE

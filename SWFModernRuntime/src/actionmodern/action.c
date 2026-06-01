@@ -5794,6 +5794,7 @@ static ActionVar swf_browser_external_call(SWFAppContext* app_context, const cha
 // native builds without it are unchanged (handler NULL, available=false).
 
 #include <actionmodern/rando_ap.h>
+#include <time.h>
 
 #define SBN_MAX_ITEMS 256
 #define SBN_MAX_LOCS  256
@@ -5956,9 +5957,17 @@ static void sbn_parse_ap_locations(const char* json) {
 	}
 }
 
+static void sbn_sleep_ms(long ms) {
+	struct timespec ts;
+	ts.tv_sec = ms / 1000;
+	ts.tv_nsec = (ms % 1000) * 1000000L;
+	nanosleep(&ts, NULL);
+}
+
 // Load + parse the JSON config, then create + connect the AP backend. Returns 1
-// on success (config readable). The backend connect is synchronous for the stub;
-// for APCpp it begins async networking (the live-frame-pacing caveat is unchanged).
+// on success (config readable). Blocks until the backend reports connected (see
+// the block-until-connected note in the body) so a frame-based SWF can poll
+// immediately — the stub connects synchronously, so its tests stay deterministic.
 static int sbn_load_config(const char* path) {
 	FILE* f = fopen(path, "rb");
 	if (!f) return 0;
@@ -5978,8 +5987,37 @@ static int sbn_load_config(const char* path) {
 	sbn_get_string_field(g_sbn_config_raw, "password", password, sizeof(password));
 
 	g_sbn_handle = rando_ap_new(host, port, game, slot, password);
-	if (g_sbn_handle) rando_ap_connect(g_sbn_handle);
 	g_sbn_poll_cursor = 0;
+	if (g_sbn_handle) {
+		rando_ap_connect(g_sbn_handle);
+		// Native has no wall-clock-paced frame loop, so a frame-based SWF can't
+		// await an async connect (the Slice-2b flat-out-frames issue). Block here
+		// until the backend reports connected (bounded), so by the time the SWF's
+		// first frame polls, the connection is up and starting items are in.
+		//
+		// The synchronous stub reports connected immediately (zero iterations), so
+		// deterministic stub tests stay fast + unchanged. Only a real async backend
+		// (APCpp) actually waits — and then we add a short settle window to let the
+		// background thread flush starting inventory + the datapackage before the
+		// game polls. Both bounds are env-overridable for live tuning.
+		double timeout_s = 20.0;
+		const char* to_env = getenv("SWF_BRIDGE_CONNECT_TIMEOUT_S");
+		if (to_env && to_env[0]) timeout_s = atof(to_env);
+		long settle_ms = 1500;
+		const char* st_env = getenv("SWF_BRIDGE_SETTLE_MS");
+		if (st_env && st_env[0]) settle_ms = atol(st_env);
+
+		int max_iters = (int)(timeout_s * 10.0);   // 100 ms per iteration
+		int waited = 0;
+		for (int it = 0; it < max_iters && !rando_ap_is_connected(g_sbn_handle); it++) {
+			sbn_sleep_ms(100);
+			waited = 1;
+		}
+		// Only an async backend reaches here having waited; give it a settle window.
+		if (waited && settle_ms > 0 && rando_ap_is_connected(g_sbn_handle)) {
+			sbn_sleep_ms(settle_ms);
+		}
+	}
 	return 1;
 }
 
@@ -6041,6 +6079,28 @@ static ActionVar swf_bridge_native_external_call(SWFAppContext* app_context, con
 				rando_ap_send_location(g_sbn_handle, loc_id);
 		}
 		return sbn_string_result(app_context, "", 0);
+	}
+
+	if (strcmp(name, "__swfLocationChecked") == 0) {
+		// Read-back: has the AP server confirmed this flash_name's location as
+		// checked? The native-standalone analog of Rando's locationIsChecked (in
+		// the browser substrate the host observes checks, so this is native-only).
+		// The server's check ack is async; native's flat-out frames can't wait, so
+		// poll the backend up to ~5s for the ack before answering.
+		int checked = 0;
+		if (arg_count >= 1 && g_sbn_handle) {
+			char flash[SBN_FLASH_MAX];
+			int n = varToStringBuf(app_context, &args[0], flash, sizeof(flash) - 1);
+			flash[n] = '\0';
+			int64_t loc_id = 0;
+			if (sbn_loc_for_flash(flash, &loc_id)) {
+				for (int it = 0; it < 50 && !rando_ap_location_is_checked(g_sbn_handle, loc_id); it++)
+					sbn_sleep_ms(100);
+				checked = rando_ap_location_is_checked(g_sbn_handle, loc_id);
+			}
+		}
+		return checked ? sbn_string_result(app_context, "true", 4)
+		               : sbn_string_result(app_context, "false", 5);
 	}
 
 	ActionVar result = {0};

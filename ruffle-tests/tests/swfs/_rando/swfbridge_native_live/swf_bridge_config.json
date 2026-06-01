@@ -1,0 +1,10 @@
+{
+  "gameId": "swfbridge_native_live",
+  "host": "localhost",
+  "port": "38281",
+  "game": "ChecksFinder",
+  "slot": "Player1",
+  "password": "",
+  "ap_items": { "80002": "bombs" },
+  "ap_locations": { "tile2": 81001 }
+}

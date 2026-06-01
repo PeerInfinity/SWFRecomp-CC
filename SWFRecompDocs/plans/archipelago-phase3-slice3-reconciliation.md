@@ -414,9 +414,40 @@ deterministically:
   without WITH_AP don't even compile it); confirmed the non-AP path still compiles
   + passes.
 
-**Open / deferred:** (a) native connection ownership — does live native
-APCpp-as-client stay a target, or is native deterministic-stub-only with live play
-browser+host? (deferred; slice 1 uses the stub, works either way). (b) retire the
-native `Rando` builtin class + its WASM Phase-2 path (`rando_ap_wasm.c` /
-`window.__randoBridge`) once the EI path fully replaces them (kept compiling for
-now; nothing forces deletion yet). (c) the `storyComplete`/goal signal.
+**Slice 2 — LIVE native over APCpp — DONE 2026-06-01.** The native `__swfBridge`
+handler now drives **real APCpp against a live Archipelago server**, proven
+end-to-end:
+- **Block-until-connected** added to `sbn_load_config` (native has no wall-clock
+  frame pacing — the Slice-2b flat-out-frames issue — so a frame-based SWF can't
+  await an async connect). After `rando_ap_connect` it polls `rando_ap_is_connected`
+  (bounded, `SWF_BRIDGE_CONNECT_TIMEOUT_S`, default 20s) then a short settle window
+  (`SWF_BRIDGE_SETTLE_MS`) **only if it actually waited** — so the synchronous stub
+  (connected immediately, zero waits) is untouched and slice-1 stays fast +
+  deterministic; only a real async backend (APCpp) waits.
+- **`__swfLocationChecked(flash)`** read-back added to the handler (maps flash → AP
+  id → `rando_ap_location_is_checked`, bounded ~5s poll for the async ack). The
+  native-standalone analog of Rando's `locationIsChecked`; the browser substrate's
+  host observes checks instead, so it's native-only (the browser handler would
+  forward it to a `window` fn that doesn't exist → null).
+- Test `_rando/swfbridge_native_live` + `livetest/run_swfbridge_native_livetest.sh`:
+  starts a local ChecksFinder seed-1 server (Archipelago-CC venv), runs the test
+  under `WITH_AP=1 verify_output.py` (links APCpp), asserts the **outward
+  round-trip** — `__swfSendLocation("tile2")` → AP loc 81001 → server acks →
+  `__swfLocationChecked("tile2") == "true"` → DONE. **PASS** (headless — native
+  NO_GRAPHICS needs no DISPLAY). Not in CI (needs a live server).
+- **Finding — inward items aren't observable in a solo seed:** APCpp filters the
+  player's own-location item grants out of `received_items`, and the current
+  ChecksFinder seed delivers no starting inventory (confirmed: the existing
+  `rando_ap_livetest.c` also gets `received_items_size=0`), so `__swfPoll` has
+  nothing to apply natively in a solo seed. The live test therefore asserts the
+  outward (send → checked) round-trip, which does work. Observing inward items live
+  would need starting inventory or a multi-slot seed (cross-player items aren't
+  filtered) — orthogonal to this slice. In the real substrate the **host** observes
+  received items, so this isn't a gap for the substrate topology.
+
+**Open / deferred:** (a) native connection ownership — settled in practice as
+"live native APCpp-as-client works" (slice 2); deterministic stub remains for CI.
+(b) retire the native `Rando` builtin class + its WASM Phase-2 path
+(`rando_ap_wasm.c` / `window.__randoBridge`) once the EI path fully replaces them
+(kept compiling for now; nothing forces deletion yet). (c) the `storyComplete`/goal
+signal.
