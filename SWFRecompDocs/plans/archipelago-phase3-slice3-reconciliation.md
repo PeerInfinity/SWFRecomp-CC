@@ -368,3 +368,55 @@ transport.
    interaction anyway. (build_test.sh's NO_GRAPHICS-wasm path is independently
    broken — `ng_shared.c` lacks an `ng_find_textfield` declaration — so the graphics
    build is the path; the EI bridge itself is renderer-agnostic.)
+
+## Converging the native C Rando library onto `__swfBridge` (2026-06-01)
+
+**Decision (with the AP owner):** the native C Rando path adopts the **same
+`__swfBridge` cooperative EI interface** the browser + Ruffle use, rather than its
+bespoke `Rando` builtin class — so games speak one interface on every runtime and
+only the installed handler differs. Settled: use the **thin `__swfBridge`
+contract** (not the rich Rando API); **defer the goal/`storyComplete` signal**
+(additive on both ends — a `__swfBridge` method + an AP-side dispatch — not a
+blocker); **no migration** (no games use either system yet); expect interface churn.
+
+**Feature comparison (Rando API vs `__swfBridge`):** at the EI *mechanism* level
+there are no gaps. Against the thin 3-method *contract*, the differences are
+connection management (`connect`/`isConnected`/auth params) and the read-back
+queries (`hasItem`/`locationIsChecked`) — both **deliberately relocated to the
+host** (substrate topology = host owns the AP connection, not the game) — plus
+`storyComplete`, the one genuinely-absent capability (no AP-side event either),
+deferred. The thin contract is also all **≤1 string arg + string return**, so it
+needs **no marshaling changes** (the multi-arg/typed-return work would only have
+been for the rich Rando API).
+
+**Slice 1 — DONE 2026-06-01.** Native production `__swfBridge` EI handler, proven
+deterministically:
+- `swf_bridge_native_external_call` in `action.c` (guarded
+  `#if defined(WITH_AP) && !defined(__EMSCRIPTEN__)`, alongside
+  `swf_browser_external_call`) — a **C port of `swf_bridge.js`**: it holds the
+  `ap_items` (AP id → flash_name) + `ap_locations` (flash_name → AP id) maps +
+  connection params loaded from a **JSON config file** (minimal in-file C JSON
+  reader), and implements `__swfConfig` / `__swfPoll` (drains rando_ap received
+  items, maps ids → flash_names) / `__swfSendLocation` (maps flash_name → AP id →
+  `rando_ap_send_location`) over the existing `rando_ap.h` seam. The game's AS only
+  ever deals in flash_names — identical to the browser model.
+- Installed by an `ensureGlobalInit` gate keyed on the `SWF_BRIDGE_CONFIG` env var
+  (native analog of the browser's `window.__swfBridge` gate); native builds without
+  it keep the handler NULL / `available=false`, so the existing APCpp livetest
+  harnesses are unchanged. `verify_output.py` sets the env var when a test ships a
+  `swf_bridge_config.json`.
+- Test: `ruffle-tests/tests/swfs/_rando/swfbridge_native_stub` — the AS uses
+  `ExternalInterface.call("__swf…")` (not `new Rando()`), built with `RANDO_STUB=1`
+  (synthetic backend). Deterministic **PASS**: `available=true` → config loaded →
+  `__swfPoll` → Sword applied → `__swfSendLocation("chest")` → stub grants Key →
+  `__swfPoll` → Key applied → DONE. The EI-based sibling of `rando_item_application`.
+- Zero impact on the normal suite: all new code is `WITH_AP`-gated (CI builds
+  without WITH_AP don't even compile it); confirmed the non-AP path still compiles
+  + passes.
+
+**Open / deferred:** (a) native connection ownership — does live native
+APCpp-as-client stay a target, or is native deterministic-stub-only with live play
+browser+host? (deferred; slice 1 uses the stub, works either way). (b) retire the
+native `Rando` builtin class + its WASM Phase-2 path (`rando_ap_wasm.c` /
+`window.__randoBridge`) once the EI path fully replaces them (kept compiling for
+now; nothing forces deletion yet). (c) the `storyComplete`/goal signal.

@@ -1,0 +1,10 @@
+{
+  "gameId": "swfbridge_native_stub",
+  "host": "127.0.0.1",
+  "port": "38281",
+  "game": "APQuest",
+  "slot": "Player1",
+  "password": "",
+  "ap_items": { "2": "sword", "1": "key" },
+  "ap_locations": { "chest": 100, "enemy": 10 }
+}

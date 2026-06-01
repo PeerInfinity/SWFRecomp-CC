@@ -2975,6 +2975,12 @@ def main():
 
             # Set up capture triggers for image comparison tests
             run_env = {}
+            # Archipelago native __swfBridge: if the test ships a config, point the
+            # runtime's native EI handler at it (installs the handler + connects
+            # the rando_ap backend). Mirrors the browser's window.__swfBridge gate.
+            sbn_cfg = test_dir / "swf_bridge_config.json"
+            if sbn_cfg.exists():
+                run_env["SWF_BRIDGE_CONFIG"] = str(sbn_cfg)
             if has_image_cmps and args.uses_dawn:
                 triggers = []
                 for cmp_name, cmp_config in image_comparisons.items():

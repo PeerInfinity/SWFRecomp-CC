@@ -1,0 +1,6 @@
+EI available=true
+config nonempty=true
+apply: sword
+send chest
+apply: key
+DONE

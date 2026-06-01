@@ -5769,6 +5769,286 @@ static ActionVar swf_browser_external_call(SWFAppContext* app_context, const cha
 }
 #endif
 
+#if defined(WITH_AP) && !defined(__EMSCRIPTEN__)
+// --- Native __swfBridge ExternalInterface handler (Archipelago, native) ------
+//
+// The native production counterpart of swf_browser_external_call: it fulfills
+// the SAME cooperative __swfBridge contract the browser/Ruffle path uses, but in
+// C, backed by the rando_ap.h seam (APCpp or the deterministic stub) instead of
+// a JS host. It is effectively a C port of SWFRecomp/wasm_wrappers/swf_bridge.js:
+// it holds the ap_items (AP id -> flash_name) and ap_locations (flash_name -> AP
+// id) maps + connection params, loaded from a JSON config file, so the game's AS
+// only ever deals in flash_names — identical to the browser model.
+//
+// Game-facing EI calls (all string-in/string-out, no marshaling beyond the
+// browser handler's):
+//   __swfConfig()              -> the raw config JSON (inward pull, like browser)
+//   __swfPoll()                -> comma-separated flash_names received since the
+//                                 last poll, then drains (maps rando_ap item ids
+//                                 via ap_items)
+//   __swfSendLocation(flash)   -> maps flash -> AP location id via ap_locations,
+//                                 calls rando_ap_send_location (outward)
+//
+// Installed by ensureGlobalInit when the SWF_BRIDGE_CONFIG env var points at a
+// config file (the native analog of the browser's window.__swfBridge gate), so
+// native builds without it are unchanged (handler NULL, available=false).
+
+#include <actionmodern/rando_ap.h>
+
+#define SBN_MAX_ITEMS 256
+#define SBN_MAX_LOCS  256
+#define SBN_FLASH_MAX 64
+#define SBN_CONFIG_MAX 16384
+
+static struct { int64_t id; char flash[SBN_FLASH_MAX]; } g_sbn_items[SBN_MAX_ITEMS];
+static int g_sbn_item_count = 0;
+static struct { char flash[SBN_FLASH_MAX]; int64_t id; } g_sbn_locs[SBN_MAX_LOCS];
+static int g_sbn_loc_count = 0;
+static char g_sbn_config_raw[SBN_CONFIG_MAX];
+static u32 g_sbn_config_len = 0;
+static RandoAP* g_sbn_handle = NULL;
+static size_t g_sbn_poll_cursor = 0;
+
+// --- Minimal JSON reader (only the fixed config shape; plain C, no deps) ------
+// Handles: top-level string fields, and two flat objects (ap_items: stringified
+// id -> string; ap_locations: string -> number). Sufficient for the config; not
+// a general parser.
+
+static const char* sbn_skip_ws(const char* p) {
+	while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+	return p;
+}
+
+// Parse a JSON string literal at *p (which must point at the opening quote) into
+// buf. Advances *pp past the closing quote. Handles \" \\ \/ \n \t and \uXXXX
+// (BMP). Returns 1 on success.
+static int sbn_parse_string(const char** pp, char* buf, int buf_size) {
+	const char* p = *pp;
+	if (*p != '"') return 0;
+	p++;
+	int n = 0;
+	while (*p && *p != '"') {
+		char c = *p;
+		if (c == '\\') {
+			p++;
+			char e = *p;
+			if (e == 'n') c = '\n';
+			else if (e == 't') c = '\t';
+			else if (e == 'r') c = '\r';
+			else if (e == 'u') {
+				// \uXXXX -> UTF-8 (BMP only; enough for flash_names/notes)
+				char hex[5] = {0};
+				for (int k = 0; k < 4 && p[1+k]; k++) hex[k] = p[1+k];
+				unsigned int cp = (unsigned int)strtoul(hex, NULL, 16);
+				p += 4;
+				if (cp < 0x80) { if (n < buf_size-1) buf[n++] = (char)cp; }
+				else if (cp < 0x800) {
+					if (n < buf_size-2) { buf[n++] = (char)(0xC0 | (cp>>6)); buf[n++] = (char)(0x80 | (cp&0x3F)); }
+				} else {
+					if (n < buf_size-3) { buf[n++] = (char)(0xE0 | (cp>>12)); buf[n++] = (char)(0x80 | ((cp>>6)&0x3F)); buf[n++] = (char)(0x80 | (cp&0x3F)); }
+				}
+				p++;
+				continue;
+			}
+			else c = e;   // \" \\ \/ and any other -> literal
+		}
+		if (n < buf_size - 1) buf[n++] = c;
+		p++;
+	}
+	if (*p != '"') return 0;
+	p++;
+	buf[n] = '\0';
+	*pp = p;
+	return 1;
+}
+
+// Find the start of the value object for top-level key `key` (returns pointer at
+// the '{' after `"key" :`), or NULL.
+static const char* sbn_find_object(const char* json, const char* key) {
+	char needle[80];
+	int kn = snprintf(needle, sizeof(needle), "\"%s\"", key);
+	if (kn <= 0) return NULL;
+	const char* p = strstr(json, needle);
+	if (!p) return NULL;
+	p += kn;
+	p = sbn_skip_ws(p);
+	if (*p != ':') return NULL;
+	p++;
+	p = sbn_skip_ws(p);
+	if (*p != '{') return NULL;
+	return p;
+}
+
+// Extract a top-level string field "key":"value" into buf. Returns 1 if found.
+static int sbn_get_string_field(const char* json, const char* key, char* buf, int buf_size) {
+	char needle[80];
+	int kn = snprintf(needle, sizeof(needle), "\"%s\"", key);
+	if (kn <= 0) return 0;
+	const char* p = strstr(json, needle);
+	if (!p) { buf[0] = '\0'; return 0; }
+	p += kn;
+	p = sbn_skip_ws(p);
+	if (*p != ':') { buf[0] = '\0'; return 0; }
+	p++;
+	p = sbn_skip_ws(p);
+	if (*p != '"') { buf[0] = '\0'; return 0; }
+	return sbn_parse_string(&p, buf, buf_size);
+}
+
+// Parse the ap_items object { "<id>": "<flash>", ... } into g_sbn_items.
+static void sbn_parse_ap_items(const char* json) {
+	g_sbn_item_count = 0;
+	const char* p = sbn_find_object(json, "ap_items");
+	if (!p) return;
+	p++;  // past '{'
+	while (1) {
+		p = sbn_skip_ws(p);
+		if (*p == '}' || *p == '\0') break;
+		char keybuf[32];
+		if (!sbn_parse_string(&p, keybuf, sizeof(keybuf))) break;
+		p = sbn_skip_ws(p);
+		if (*p != ':') break;
+		p++;
+		p = sbn_skip_ws(p);
+		char valbuf[SBN_FLASH_MAX];
+		if (!sbn_parse_string(&p, valbuf, sizeof(valbuf))) break;
+		if (g_sbn_item_count < SBN_MAX_ITEMS) {
+			g_sbn_items[g_sbn_item_count].id = (int64_t)strtoll(keybuf, NULL, 10);
+			strncpy(g_sbn_items[g_sbn_item_count].flash, valbuf, SBN_FLASH_MAX - 1);
+			g_sbn_items[g_sbn_item_count].flash[SBN_FLASH_MAX - 1] = '\0';
+			g_sbn_item_count++;
+		}
+		p = sbn_skip_ws(p);
+		if (*p == ',') { p++; continue; }
+		break;
+	}
+}
+
+// Parse the ap_locations object { "<flash>": <id>, ... } into g_sbn_locs.
+static void sbn_parse_ap_locations(const char* json) {
+	g_sbn_loc_count = 0;
+	const char* p = sbn_find_object(json, "ap_locations");
+	if (!p) return;
+	p++;  // past '{'
+	while (1) {
+		p = sbn_skip_ws(p);
+		if (*p == '}' || *p == '\0') break;
+		char keybuf[SBN_FLASH_MAX];
+		if (!sbn_parse_string(&p, keybuf, sizeof(keybuf))) break;
+		p = sbn_skip_ws(p);
+		if (*p != ':') break;
+		p++;
+		p = sbn_skip_ws(p);
+		// numeric value (location id)
+		char* endp = NULL;
+		long long id = strtoll(p, &endp, 10);
+		if (endp == p) break;
+		p = endp;
+		if (g_sbn_loc_count < SBN_MAX_LOCS) {
+			strncpy(g_sbn_locs[g_sbn_loc_count].flash, keybuf, SBN_FLASH_MAX - 1);
+			g_sbn_locs[g_sbn_loc_count].flash[SBN_FLASH_MAX - 1] = '\0';
+			g_sbn_locs[g_sbn_loc_count].id = (int64_t)id;
+			g_sbn_loc_count++;
+		}
+		p = sbn_skip_ws(p);
+		if (*p == ',') { p++; continue; }
+		break;
+	}
+}
+
+// Load + parse the JSON config, then create + connect the AP backend. Returns 1
+// on success (config readable). The backend connect is synchronous for the stub;
+// for APCpp it begins async networking (the live-frame-pacing caveat is unchanged).
+static int sbn_load_config(const char* path) {
+	FILE* f = fopen(path, "rb");
+	if (!f) return 0;
+	size_t n = fread(g_sbn_config_raw, 1, SBN_CONFIG_MAX - 1, f);
+	fclose(f);
+	g_sbn_config_raw[n] = '\0';
+	g_sbn_config_len = (u32)n;
+
+	sbn_parse_ap_items(g_sbn_config_raw);
+	sbn_parse_ap_locations(g_sbn_config_raw);
+
+	char host[256], port[64], game[128], slot[128], password[128];
+	sbn_get_string_field(g_sbn_config_raw, "host", host, sizeof(host));
+	sbn_get_string_field(g_sbn_config_raw, "port", port, sizeof(port));
+	sbn_get_string_field(g_sbn_config_raw, "game", game, sizeof(game));
+	sbn_get_string_field(g_sbn_config_raw, "slot", slot, sizeof(slot));
+	sbn_get_string_field(g_sbn_config_raw, "password", password, sizeof(password));
+
+	g_sbn_handle = rando_ap_new(host, port, game, slot, password);
+	if (g_sbn_handle) rando_ap_connect(g_sbn_handle);
+	g_sbn_poll_cursor = 0;
+	return 1;
+}
+
+static const char* sbn_flash_for_item(int64_t id) {
+	for (int i = 0; i < g_sbn_item_count; i++)
+		if (g_sbn_items[i].id == id) return g_sbn_items[i].flash;
+	return NULL;
+}
+
+static int sbn_loc_for_flash(const char* flash, int64_t* out_id) {
+	for (int i = 0; i < g_sbn_loc_count; i++)
+		if (strcmp(g_sbn_locs[i].flash, flash) == 0) { *out_id = g_sbn_locs[i].id; return 1; }
+	return 0;
+}
+
+static ActionVar sbn_string_result(SWFAppContext* app_context, const char* s, u32 len) {
+	ActionVar result = {0};
+	u32 u16_len = 0;
+	uint16_t* u16 = utf8_to_u16(app_context, s, len, &u16_len);
+	result.type = ACTION_STACK_VALUE_STRING;
+	result.str_size = u16_len;
+	result.data.string_data.heap_ptr = u16;
+	result.data.string_data.owns_memory = true;
+	return result;
+}
+
+static ActionVar swf_bridge_native_external_call(SWFAppContext* app_context, const char* name,
+                                                 ActionVar* args, int arg_count)
+{
+	if (strcmp(name, "__swfConfig") == 0) {
+		return sbn_string_result(app_context, g_sbn_config_raw, g_sbn_config_len);
+	}
+
+	if (strcmp(name, "__swfPoll") == 0) {
+		// Drain new received items since the last poll, mapped to flash_names.
+		char buf[4096];
+		int len = 0;
+		size_t total = g_sbn_handle ? rando_ap_received_items_size(g_sbn_handle) : 0;
+		for (size_t i = g_sbn_poll_cursor; i < total; i++) {
+			int64_t id = rando_ap_received_item(g_sbn_handle, i);
+			const char* flash = sbn_flash_for_item(id);
+			if (!flash) continue;
+			int w = snprintf(buf + len, sizeof(buf) - len, "%s%s", (len > 0) ? "," : "", flash);
+			if (w > 0 && len + w < (int)sizeof(buf)) len += w; else break;
+		}
+		g_sbn_poll_cursor = total;
+		buf[len] = '\0';
+		return sbn_string_result(app_context, buf, (u32)len);
+	}
+
+	if (strcmp(name, "__swfSendLocation") == 0) {
+		ActionVar result = {0};
+		if (arg_count >= 1) {
+			char flash[SBN_FLASH_MAX];
+			int n = varToStringBuf(app_context, &args[0], flash, sizeof(flash) - 1);
+			flash[n] = '\0';
+			int64_t loc_id = 0;
+			if (g_sbn_handle && sbn_loc_for_flash(flash, &loc_id))
+				rando_ap_send_location(g_sbn_handle, loc_id);
+		}
+		return sbn_string_result(app_context, "", 0);
+	}
+
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_NULL;
+	return result;
+}
+#endif
+
 static ASFunction g_ei_available_func;
 static ASFunction g_ei_addCallback_func;
 static ASFunction g_ei_call_func;
@@ -36889,6 +37169,21 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		if (has_bridge)
 		{
 			g_external_call_handler = swf_browser_external_call;
+		}
+	}
+#elif defined(WITH_AP)
+	// Native opt-in: install the native __swfBridge EI handler (backed by
+	// rando_ap.h — APCpp or the stub) when SWF_BRIDGE_CONFIG points at a config
+	// file. The native analog of the browser's window.__swfBridge gate; native
+	// builds without the env var keep the handler NULL (available=false), so the
+	// existing APCpp livetest harnesses (no env var) are unchanged. Must run
+	// before initFlashPackage, which snapshots `available`.
+	if (g_external_call_handler == NULL)
+	{
+		const char* sbn_cfg = getenv("SWF_BRIDGE_CONFIG");
+		if (sbn_cfg != NULL && sbn_cfg[0] != '\0' && sbn_load_config(sbn_cfg))
+		{
+			g_external_call_handler = swf_bridge_native_external_call;
 		}
 	}
 #endif
