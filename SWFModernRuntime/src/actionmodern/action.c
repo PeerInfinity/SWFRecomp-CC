@@ -25008,10 +25008,15 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 static float mcReadAlpha(MovieClip* mc) {
 	if (mc == NULL) return 100.0f;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	if (!(mc->as_set_flags & 32) && mc->display_obj != NULL) {
+	// Only trust the entry's cx_aa when a placement CXFORM was actually applied
+	// (has_cxform): ng_init_cxform_from_data populates cx_aa from cxform_data
+	// only then, so a no-cxform entry's cx_aa is an uninitialized 0 that would
+	// wrongly read as _alpha=0 (regressed movieclip_library_state_values /
+	// MovieClip-v5..v8). Without a placement CXFORM, mc->alpha is authoritative.
+	DisplayObject* _obj = (DisplayObject*)mc->display_obj;
+	if (!(mc->as_set_flags & 32) && _obj != NULL && _obj->has_cxform) {
 		double _ra, _ga, _ba, _aa, _rb, _gb, _bb, _ab;
-		if (ng_getCTFromObj((DisplayObject*)mc->display_obj,
-		                    &_ra, &_ga, &_ba, &_aa, &_rb, &_gb, &_bb, &_ab))
+		if (ng_getCTFromObj(_obj, &_ra, &_ga, &_ba, &_aa, &_rb, &_gb, &_bb, &_ab))
 			return (float)_aa;
 	}
 #endif
