@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `aabce6a9c879` (2026-05-31T18:38:04.972445+00:00)
-**Current:** `0973204c3999` (2026-06-01T00:46:02.867174+00:00)
+**Previous:** `0973204c3999` (2026-06-01T00:46:02.867174+00:00)
+**Current:** `f9efc27405a3` (2026-06-01T01:35:48.778732+00:00)
 
 ## Summary
 
@@ -10,19 +10,19 @@
 | Passing | 132 | 132 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 54.3% | 54.3% | 0% |
-| Mismatched lines | 8952 | 8960 | +8 |
-|   Increased | | | +8 |
+| Mismatched lines | 8960 | 8952 | -8 |
+|   Decreased | | | -8 |
 
 ## Status Changed (1)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `MovieClip-v5` | ruffle_matched | output_mismatch | 339/363 | 337/363 |
+| `MovieClip-v5` | output_mismatch | ruffle_matched | 337/363 | 339/363 |
 
 ## Line Count Changed (3)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `MovieClip-v6` | output_mismatch | 880/936 | 878/936 | +2 |
-| `MovieClip-v7` | output_mismatch | 902/969 | 900/969 | +2 |
-| `MovieClip-v8` | output_mismatch | 988/1087 | 986/1087 | +2 |
+| `MovieClip-v6` | output_mismatch | 878/936 | 880/936 | -2 |
+| `MovieClip-v7` | output_mismatch | 900/969 | 902/969 | -2 |
+| `MovieClip-v8` | output_mismatch | 986/1087 | 988/1087 | -2 |
