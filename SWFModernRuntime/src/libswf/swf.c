@@ -349,7 +349,20 @@ void tagMain(SWFAppContext* app_context)
 		// next explicit goto.
 		{
 			extern MovieClip root_movieclip;
-			root_movieclip.currentframe = (int)current_frame + 1;
+			// Hold _currentframe at the last frame once the playhead runs
+			// past the timeline. A single-frame (or non-looping, quit_swf)
+			// root with no stop() keeps "playing" — the funcs gate
+			// (current_frame < g_frame_count) already stops frame scripts
+			// re-running, but current_frame itself keeps incrementing, so
+			// without this clamp _currentframe drifts (2,3,4,...) where Flash
+			// holds it at the last frame. Multi-frame looping movies never
+			// reach here: their last frame sets manual_next_frame (recompiler
+			// swf.cpp:733) and wraps current_frame, so this clamp is a no-op
+			// for them. Key game: Shopping Cart Hero (1-frame root, no stop();
+			// Ruffle holds _currentframe=1 while swfrecomp drifted 2,3,4,...).
+			size_t _disp_frame = (g_frame_count > 0 && current_frame >= g_frame_count)
+			                   ? g_frame_count - 1 : current_frame;
+			root_movieclip.currentframe = (int)_disp_frame + 1;
 		}
 
 		// Clear g_defer_sprite_init at tick boundary. ng_executeGotoCatchUp

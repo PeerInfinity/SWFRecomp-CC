@@ -1458,7 +1458,18 @@ void swfStart(SWFAppContext* app_context)
 		{
 			// Only advance naturally if we're still playing
 			current_frame++;
-			root_movieclip.currentframe = (int)current_frame + 1;  // Keep 1-indexed _currentframe in sync
+			// Hold _currentframe at the last frame once the playhead runs
+			// past the timeline (single-frame / non-looping root with no
+			// stop() that keeps ticking for child sprites). The funcs gate
+			// (current_frame < g_frame_count, above) already stops frame
+			// scripts re-running; without this clamp _currentframe would
+			// drift past the timeline. Multi-frame looping movies wrap via
+			// manual_next_frame (recompiler swf.cpp:733) so current_frame
+			// stays in range and this is a no-op. Mirrors swf.c. Key game:
+			// Shopping Cart Hero (1-frame root, no stop()).
+			size_t _disp_frame = (g_frame_count > 0 && current_frame >= g_frame_count)
+			                   ? g_frame_count - 1 : current_frame;
+			root_movieclip.currentframe = (int)_disp_frame + 1;  // Keep 1-indexed _currentframe in sync
 		}
 		else
 		{
