@@ -24996,6 +24996,28 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 // has changed since the last sync, but only for properties not explicitly set by ActionScript.
 // This handles PlaceObject2 updates (move/rotate/scale operations) without overwriting AS-set values.
 // as_set_flags bits: 1=_x, 2=_y, 4=_xscale, 8=_yscale, 16=_rotation
+// Effective _alpha for a MovieClip (Ruffle parity). ng_on_place_object2 decodes
+// the PlaceObject CXFORM into the display entry's cx_aa at placement, but the
+// lazily-created MovieClip wrapper's own mc->alpha stays at its 100 default — so
+// a clip placed with a CXFORM alpha would read 100. Read the clip's own entry
+// directly via display_obj (O(1); works for auto-named and nested clips a
+// by-name scan would miss). Once ActionScript sets _alpha (as_set_flags bit 32)
+// mc->alpha is authoritative — the script setter's write-through can miss a
+// nested display entry, so the entry is only trustworthy as the pre-script
+// value. Falls back to mc->alpha for dynamic clips with no display entry.
+static float mcReadAlpha(MovieClip* mc) {
+	if (mc == NULL) return 100.0f;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (!(mc->as_set_flags & 32) && mc->display_obj != NULL) {
+		double _ra, _ga, _ba, _aa, _rb, _gb, _bb, _ab;
+		if (ng_getCTFromObj((DisplayObject*)mc->display_obj,
+		                    &_ra, &_ga, &_ba, &_aa, &_rb, &_gb, &_bb, &_ab))
+			return (float)_aa;
+	}
+#endif
+	return mc->alpha;
+}
+
 static void syncTransformIfNeeded(MovieClip* mc) {
 	if (mc == NULL || mc->name[0] == '\0') return;
 	size_t depth = ng_findDisplayEntryByName(mc->name);
@@ -39941,7 +39963,7 @@ check_special_vars:
 			if (strcasecmp(var_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_alpha") == 0) { float v = mcReadAlpha(mc); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
 			if (strcasecmp(var_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
 			if (strcasecmp(var_name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_eh)); return; }
@@ -40393,6 +40415,7 @@ void actionSetVariable(SWFAppContext* app_context)
 			if (num_ok) {
 				// Quantize through 8.8 fixed-point like Flash's color transform
 				mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+				mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
 				mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Sync with display list cx_aa so Color.getTransform() reads the updated value
@@ -41438,7 +41461,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			value = mc ? (float)mc->totalframes : 1.0f;
 			break;
 		case 6:  // _alpha
-			value = mc ? mc->alpha : 100.0f;
+			value = mcReadAlpha(mc);
 			break;
 		case 7:  // _visible — returns boolean, not float
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, mc ? (mc->visible ? 1ULL : 0ULL) : 1ULL);
@@ -46066,6 +46089,7 @@ void actionSetMember(SWFAppContext* app_context)
 					if (dval_invalid) return;
 					// Quantize through 8.8 fixed-point like Flash's color transform
 					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+					mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
 					mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
 					// Sync with display list cx_aa so Color.getTransform() reads the updated value
 					{
@@ -49716,7 +49740,7 @@ void actionGetMember(SWFAppContext* app_context)
 				syncTransformIfNeeded(mc);
 #endif
 				float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_alpha") == 0) { float v = mc->alpha; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_alpha") == 0) { float v = mcReadAlpha(mc); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
 			if (strcasecmp(prop_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
 			if (strcasecmp(prop_name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_eh)); return; }
@@ -53280,6 +53304,7 @@ void actionSetProperty(SWFAppContext* app_context)
 		case 6:  // _alpha
 			// Quantize through 8.8 fixed-point like Flash's color transform
 			mc->alpha = (float)((double)(int16_t)roundf(num_value * 256.0f / 100.0f) * 100.0 / 256.0);
+			mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
 			break;
 		case 7: { // _visible
 			int new_vis = (num_value != 0.0f) ? 1 : 0;
@@ -54077,7 +54102,7 @@ static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 	if (strcasecmp(name, "_xscale") == 0) { float v = mc->xscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_yscale") == 0) { float v = mc->yscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_rotation") == 0) { float v = mc->rotation; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
-	if (strcasecmp(name, "_alpha") == 0) { float v = mc->alpha; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_alpha") == 0) { float v = mcReadAlpha(mc); result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_visible") == 0) { result->type = ACTION_STACK_VALUE_BOOLEAN; result->data.numeric_value = mc->visible ? 1 : 0; return 1; }
 	if (strcasecmp(name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &_ew, 8); return 1; }
 	if (strcasecmp(name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &_eh, 8); return 1; }
@@ -54137,6 +54162,7 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 	if (strcasecmp(name, "_alpha") == 0) {
 		// Quantize through 8.8 fixed-point like Flash's color transform
 		mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+		mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
 		return 1;
 	}
 	if (strcasecmp(name, "_visible") == 0) {
