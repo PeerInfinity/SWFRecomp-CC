@@ -213,3 +213,67 @@ Implications:
 
 The converged plan's §"Open question that decides the SWFRecomp-CC side" can be
 marked resolved (Yes) on the AP side — flagged here for that doc's owner.
+
+## Phase 1 / Mode 1 — PRODUCTION IMPLEMENTATION (2026-05-31) — DONE (deliverables 1–3), DELIVERABLE 4 coordination-gated
+
+The reverted probes are now the committed production version. SWFRecomp-CC-rooted
+deliverables 1–3 are implemented and **verified live end-to-end in headed Chrome**
+(8/8 assertions PASS); deliverable 4 (the cross-repo `SWF_IFRAME_SRC` swap) is
+surfaced for coordination (see below).
+
+**1. Production EI browser handler (`SWFModernRuntime/src/actionmodern/action.c`).**
+`swf_browser_external_call` (under `#ifdef __EMSCRIPTEN__`, ~after `actionEI_call`)
+forwards `ExternalInterface.call(name, arg0)` → `window[name](arg0)` and marshals a
+string return value back to AS (`stringToUTF8`/`lengthBytesUTF8` into a C buffer →
+`utf8_to_u16` → string ActionVar). It is installed in `ensureGlobalInit` **only when
+the page exposes `window.__swfBridge`** (the chosen opt-in gate — a page-set window
+flag, no `-D` flag, no separate build): an `EM_ASM_INT` check sets
+`g_external_call_handler` before `initFlashPackage` snapshots `available`. Browser
+demos that don't load the shim keep the handler NULL → `ExternalInterface.available`
+stays false → **zero behavior change** for every existing graphics-WASM demo. All of
+this is `__EMSCRIPTEN__`-only, so NO_GRAPHICS/OFFSCREEN_RENDER trace + graphics-native
+suites (and their CI) are unaffected.
+
+**2. The `__swfBridge` contract shim (`SWFRecomp/wasm_wrappers/swf_bridge.js`).**
+Installs `window.__swfBridge = { configure, pollItems, sendLocation }` (the AP-facing
+contract) plus three EI-facing top-level window fns the game's AS calls:
+`__swfConfig()` (returns config JSON — inward pull), `__swfPoll()` (returns
+comma-separated received flash_names then drains — inward pull), `__swfSendLocation(name)`
+(routes to `__swfBridge.sendLocation` — outward). `configure().ap_items` (AP item
+name → flash_name) is applied by the shim so the game only ever sees flash_names; the
+substrate owns the name maps. Staged into every wasm build by `build_test.sh` (inert
+unless the page's HTML loads it).
+
+**3. Mode-1 minigame (`SWFRecomp/tests/swfbridge_toy/`).** `Main.as` — the
+rando_browser_toy adapted to the EI/`__swfBridge` contract instead of the `Rando`
+builtin (no WITH_AP, no WebSocket, no AP server). Reads config once, reports two
+objectives (`chest`/`enemy`) outward, polls + applies received items (`sword`/`key`)
+each frame, traces `[toy] DONE`. Compiled with MTASC std8 (has
+`flash.external.ExternalInterface`); the class is referenced through an untyped
+`Object` so the variadic AVM1 `call` isn't rejected by the 1-arg intrinsic.
+
+**Live test (no AP server needed):**
+`ruffle-tests/tests/swfs/_swfbridge/livetest/toy_browser/` — `harness.html` loads the
+shim + graphics-WASM minigame and a **mock host** standing in for Archipelago-CC's
+`bridge.js` (overrides `__swfBridge.sendLocation` to record, calls `configure`,
+delivers items via `pollItems` ~1.2 s in). `toy_test.js` drives headed
+`/usr/bin/google-chrome` (WebGPU via WSLg/DISPLAY) and asserts the full round-trip;
+`run_toy_livetest.sh` builds + serves + drives. **RESULT: PASS** — `EI available=true`,
+configure reached the bridge, host recorded `sendLocation("chest")` + `("enemy")`,
+both items pulled + applied, `[toy] DONE`. (Requires interactive DISPLAY; not CI.)
+
+**4. Swap-in (`Archipelago-CC` `swfrecompSubstratePanel.js` `SWF_IFRAME_SRC`) —
+COORDINATION-GATED, not yet done.** Two real blockers make a naive hard-swap break the
+AP side, so it needs the AP-side owner's call:
+- The AP e2e Leg 2 (`frontend/modules/tests/testCases/swfrecompSubstrateTests.js`)
+  clicks a button **rendered by the placeholder page** and waits for "placeholder
+  rendered the objective button" — the real minigame has no such button (it auto-fires
+  via EI), so pointing `SWF_IFRAME_SRC` at it breaks that test as written.
+- The real page is a **graphics-WASM build needing WebGPU**; the AP in-app test harness
+  must run it in headed Chrome (WSLg/DISPLAY) for the chain to execute at all — the
+  placeholder runs anywhere because it's pure JS.
+Recommended shape (for the AP owner): keep the placeholder as the default test target,
+add the real recompiled-game page as an opt-in/parameterized `SWF_IFRAME_SRC` (or a
+separate "live" preset), and add a headed-Chrome e2e leg for it — rather than a global
+swap. The recompiled-game page itself is just `harness.html` minus the mock-host script
+(the page exposes `__swfBridge`; AP's injected `bridge.js` plays host).

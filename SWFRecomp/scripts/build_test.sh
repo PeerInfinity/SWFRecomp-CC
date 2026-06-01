@@ -269,6 +269,16 @@ if [ "${WITH_AP:-}" = "1" ] || [ "${WITH_AP:-}" = "true" ]; then
     fi
 fi
 
+# Stage the __swfBridge contract shim for wasm builds. It is inert unless the
+# page's HTML loads it AND thereby exposes window.__swfBridge (the C-side EI
+# bridge handler is gated on that), so staging it for every wasm build is safe
+# and changes nothing for demos that don't use it. The Mode-1 Archipelago
+# substrate (swfbridge_toy + the recompiled-game page) opts in by loading it.
+# See SWFRecomp/wasm_wrappers/swf_bridge.js.
+if [ "$TARGET" == "wasm" ] && [ -f "${SWFRECOMP_ROOT}/wasm_wrappers/swf_bridge.js" ]; then
+    cp "${SWFRECOMP_ROOT}/wasm_wrappers/swf_bridge.js" "${BUILD_DIR}/"
+fi
+
 # Copy display bridge if present in test dir or wasm_wrappers
 DISPLAY_BRIDGE=false
 if [ -f "${TEST_DIR}/display_bridge.c" ]; then

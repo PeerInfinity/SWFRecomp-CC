@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SWFRecomp __swfBridge Mode-1 substrate harness</title>
+</head>
+<body>
+<h1>__swfBridge Mode-1 substrate toy</h1>
+<!-- Headed-Chrome live test for the converged Archipelago "swfrecomp" substrate
+     (Mode 1). It loads the production bridge shim (swf_bridge.js -> installs
+     window.__swfBridge) and the graphics-WASM minigame (swfbridge_toy), then a
+     MOCK HOST stands in for Archipelago-CC's iframe bridge.js: it overrides
+     __swfBridge.sendLocation to record checks, calls __swfBridge.configure once,
+     and delivers items asynchronously via __swfBridge.pollItems (~1.2s after the
+     game starts) — exercising the full contract end-to-end without an AP server.
+
+     swf_bridge.js must load BEFORE the WASM module so the runtime's EI bridge
+     gate (ensureGlobalInit checks window.__swfBridge) installs the handler. -->
+<canvas id="canvas" width="200" height="150"></canvas>
+<button id="btn-run" disabled>Run SWF</button>
+
+<!-- 1) Production bridge shim — installs window.__swfBridge. Classic script so
+        it runs synchronously before the WASM glue below. -->
+<script src="swf_bridge.js"></script>
+
+<!-- 2) Mock host: the Archipelago-CC-side role, simulated for this test. -->
+<script>
+  window.__sentLocations = [];
+  // Override the contract's outward sink (as AP's bridge.js does — it routes to
+  // the dispatcher; here we just record + log).
+  window.__swfBridge.sendLocation = function (flashName) {
+    window.__sentLocations.push(flashName);
+    console.log('[host] location check:', flashName);
+  };
+  // Drive the host->game side once the game is running.
+  window.__hostDrive = function () {
+    // configure(payload): gameId + params + the AP item-name -> flash_name map.
+    window.__swfBridge.configure({
+      gameId: 'swfbridge_toy',
+      params: { difficulty: 'normal' },
+      ap_items: { Sword: 'sword', Key: 'key' },      // AP item name -> flash_name
+      ap_locations: { chest: 'Top Middle Chest', enemy: 'Right Room Enemy Drop' },
+      regionId: 'r1',
+    });
+    // Deliver received items asynchronously (~1.2s), simulating host item
+    // arrival. The game polls each frame and applies them.
+    setTimeout(function () {
+      console.log('[host] delivering items: Sword, Key');
+      window.__swfBridge.pollItems([{ name: 'Sword' }, { name: 'Key' }]);
+    }, 1200);
+  };
+</script>
+
+<!-- 3) WASM module setup (mirrors docs2/demo.html). -->
+<script>
+  window.__runtimeReady = false;
+  window.Module = {
+    locateFile: function (p) { return p; },
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.log('[err] ' + t); },
+    onRuntimeInitialized: function () { window.__runtimeReady = true; },
+  };
+  // Enable Run once BOTH the WASM runtime and the bridge exist.
+  (function waitReady(n) {
+    if (window.__runtimeReady && window.__swfBridge) {
+      document.getElementById('btn-run').disabled = false;
+      console.log('[harness] runtime + bridge ready');
+    } else if (n > 0) {
+      setTimeout(function () { waitReady(n - 1); }, 50);
+    } else {
+      console.log('[harness] ERROR: runtime/bridge not ready (runtime=' +
+        !!window.__runtimeReady + ' bridge=' + !!window.__swfBridge + ')');
+    }
+  })(400);
+  document.getElementById('btn-run').addEventListener('click', function () {
+    this.disabled = true;
+    console.log('[harness] running SWF');
+    window.__hostDrive();                 // configure + schedule item delivery
+    Module.ccall('runSWF', null, [], [], { async: true });
+  });
+</script>
+<script src="swfbridge_toy.js"></script>
+</body>
+</html>

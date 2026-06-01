@@ -5707,6 +5707,68 @@ static ActionVar actionEI_call(SWFAppContext* app_context, ActionVar* args, u32 
 	return g_external_call_handler(app_context, name_buf, call_args, call_arg_count);
 }
 
+#ifdef __EMSCRIPTEN__
+// --- ExternalInterface production browser bridge (Mode-1 substrate contract) ---
+//
+// Forwards ExternalInterface.call(name, arg0) from recompiled AS to the page's
+// window[name](arg0) and marshals a string return value back to AS. This is the
+// proven injected-AS seam (outward call + inward return-value pull) promoted to
+// a production handler. It is installed in ensureGlobalInit ONLY when the page
+// has opted in by exposing window.__swfBridge (see the gate there) — so browser
+// demos that don't load the bridge shim keep g_external_call_handler == NULL
+// (ExternalInterface.available stays false) and are entirely unaffected.
+//
+// The __swfBridge contract is string-based: the outward sendLocation(flashName)
+// passes one string; the inward pulls (__swfPoll / __swfConfig) take no args and
+// return a string. We coerce arg0 to UTF-8 and return any JS string result as an
+// AS string ActionVar (null when the result is not a string / the fn is absent).
+static ActionVar swf_browser_external_call(SWFAppContext* app_context, const char* name,
+                                           ActionVar* args, int arg_count)
+{
+	ActionVar result = {0};
+
+	char arg_buf[4096];
+	const char* arg0 = "";
+	int has_arg = 0;
+	if (arg_count >= 1)
+	{
+		int n = varToStringBuf(app_context, &args[0], arg_buf, sizeof(arg_buf) - 1);
+		arg_buf[n] = '\0';
+		arg0 = arg_buf;
+		has_arg = 1;
+	}
+
+	char ret_buf[8192];
+	ret_buf[0] = '\0';
+	int rlen = EM_ASM_INT({
+		var fname = UTF8ToString($0);
+		var fn = window[fname];
+		if (typeof fn !== 'function') return -1;
+		var r;
+		if ($1) { r = fn(UTF8ToString($2)); } else { r = fn(); }
+		if (r === undefined || r === null) return -1;
+		if (typeof r !== 'string') { r = String(r); }
+		stringToUTF8(r, $3, $4);
+		return lengthBytesUTF8(r);
+	}, name, has_arg, arg0, ret_buf, (int)sizeof(ret_buf));
+
+	if (rlen >= 0)
+	{
+		u32 u16_len = 0;
+		uint16_t* u16 = utf8_to_u16(app_context, ret_buf, (u32)strlen(ret_buf), &u16_len);
+		result.type = ACTION_STACK_VALUE_STRING;
+		result.str_size = u16_len;
+		result.data.string_data.heap_ptr = u16;
+		result.data.string_data.owns_memory = true;
+	}
+	else
+	{
+		result.type = ACTION_STACK_VALUE_NULL;
+	}
+	return result;
+}
+#endif
+
 static ASFunction g_ei_available_func;
 static ASFunction g_ei_addCallback_func;
 static ASFunction g_ei_call_func;
@@ -36810,6 +36872,26 @@ static void initFlashPackage(SWFAppContext* app_context)
 static void ensureGlobalInit(SWFAppContext* app_context)
 {
 	if (g_global_init_done) return;
+
+#ifdef __EMSCRIPTEN__
+	// Opt-in ExternalInterface browser bridge: install the production handler
+	// only when the page has exposed window.__swfBridge (the Mode-1 substrate
+	// contract shim — see SWFRecomp/wasm_wrappers/swf_bridge.js). Pages that do
+	// not load the shim keep g_external_call_handler == NULL, so
+	// ExternalInterface.available stays false and their behavior is unchanged.
+	// Must run before initFlashPackage (later in this function), which snapshots
+	// `available` into the ExternalInterface own_props.
+	if (g_external_call_handler == NULL)
+	{
+		int has_bridge = EM_ASM_INT({
+			return (typeof window !== 'undefined' && window.__swfBridge) ? 1 : 0;
+		});
+		if (has_bridge)
+		{
+			g_external_call_handler = swf_browser_external_call;
+		}
+	}
+#endif
 
 	// Initialize _level0 to root_movieclip
 	g_levels[0] = &root_movieclip;
