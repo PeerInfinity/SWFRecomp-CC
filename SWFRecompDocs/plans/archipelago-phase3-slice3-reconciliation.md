@@ -171,6 +171,33 @@ Findings:
   `SWFRecomp/tests/ei_outward_probe/`) was **reverted** after confirming; it was a
   capability probe, not the feature.
 
+### Inward read (PULL) experiment (2026-05-31) — the unproven half, now proven
+
+The converged plan flagged the **inward host→game read (`pollItems`)** as "the part
+still entirely unproven" and asked for a deliberate mechanism choice. Decision:
+**pull (EI return value)**, not push (`addCallback`) — it reuses the proven outward
+path, adds only return-value marshaling (a contained unknown), avoids JS→AS
+reentrancy mid-frame, and fits the frame-based game model (next-frame latency is a
+non-issue). Both satisfy the AP contract identically (the AP `bridge.js` calls
+`__swfBridge.pollItems(items)` regardless; how it routes to AS is SWFRecomp-CC's
+internal choice).
+
+**Probe (run then reverted):** extended the `#ifdef __EMSCRIPTEN__` handler so
+`ExternalInterface.call("__swfPoll")` returns the JS items-queue **string**
+(marshaled JS→AS as a UTF-16 `ActionVar` via `ascii_to_u16`). A probe SWF polled
+`__swfPoll` each frame via `onEnterFrame`; the harness delivered
+`'["sword","key"]'` to `window.__swfPoll`'s queue ~1.5s after start (simulating
+async item arrival). Result in headed google-chrome: `[ei] available=true`, then
+on a later frame `POLLED:["sword","key"]` — the inward read worked end-to-end in
+the live frame loop. Reverted after confirming (`action.c` + `tests/ei_pull_probe`).
+
+**Both halves of the `__swfBridge` contract are now proven on the AVM1 recompiled
+runtime via injected/cooperative AS:** outward `sendLocation` (EI `.call` → window)
+and inward `pollItems` (EI `.call` return value ← window). So **option 1
+(injected-AS via `ExternalInterface`, both directions) is fully de-risked** — the
+Phase-1 mechanism question is settled (injected-AS, pull for inward), and the
+`Rando` C builtin is not needed (stays a fallback).
+
 Implications:
 - **"Yes" branch is viable.** The AS→JS outward seam is architecturally present and
   natively tested; only a small EM_JS browser handler was missing. So injected /
