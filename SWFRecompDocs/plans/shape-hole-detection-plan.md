@@ -4,7 +4,32 @@
 
 **Created:** 2026-05-14
 
-**Status:** Planned; no implementation yet.
+**Status:** ✅ Implemented (Phases A–C), then **largely SUPERSEDED** for plain
+shapes by the libtess2 migration. See the status banner below.
+
+> **STATUS UPDATE 2026-06-02 — read this before using the plan below.**
+>
+> This plan's Phases A–C **landed 2026-05-14** (`992c37d68` containment
+> unification / `54053b79b` nesting-depth even-odd parity / `e2dc404e` drop
+> dead `Shape::outer_fill`) — the original "Planned; no implementation yet"
+> header was never updated.
+>
+> The spatial-containment hole classification those phases added has since been
+> **superseded for plain (non-font, non-morph) `DefineShape/2/3/4` fills** by the
+> **libtess2 tessellation migration** (`80c87edc0` even-odd prototype,
+> `a0e5d431d` DefineShape4 non-zero + device-font glyphs). libtess2's
+> even-odd / non-zero winding rules natively resolve multi-contour overlap,
+> self-intersection, and holes — i.e. they directly realize what §"Reference
+> behavior" below calls the *correct* approach (classify by spatial containment
+> under the active fill rule), without the fragile earcut pre-classification.
+> Plain-shape fills now route through `swf.cpp::tessellateContours()`; the old
+> earcut + johnson-cycle + containment machinery this plan describes is **kept
+> only for the `is_font` (embedded `DefineFont` glyphs) and `is_morph` paths**
+> (morph needs per-vertex `morph_index` correspondence libtess2 can't preserve).
+>
+> Canonical current state: `tools/divergence/PROGRESS.md` follow-up **#6** and
+> the `tessellation-libtess2-migration` auto-memory. The containment algorithm
+> documented below remains accurate for the font/morph paths that still use it.
 
 Driven by:
 

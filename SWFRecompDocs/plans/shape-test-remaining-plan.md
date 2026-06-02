@@ -4,7 +4,29 @@
 
 **Created:** 2026-05-14
 
-**Status:** Planned; no implementation yet.
+**Status:** Partially OBSOLETE — the tessellation issues (Phases 1–2) are now
+solved by the libtess2 migration. See the status banner below.
+
+> **STATUS UPDATE 2026-06-02 — read before using Phases 1–2.**
+>
+> **Phase 2 ("Split self-touching closed polygons before earcut") is
+> SUPERSEDED.** Plain-shape fills no longer use earcut — they route through
+> libtess2 with the SWF even-odd rule (`80c87edc0`, extended `a0e5d431d`), which
+> cuts self-touching / partially-overlapping sub-loops natively, so the manual
+> pre-split this phase proposes is no longer needed. **shape_test's C-shape
+> notches now render as white holes matching Ruffle** (confirmed in
+> `PROGRESS.md` #6). Phase 1 ("auto-close one-sided fill") similarly no longer
+> needs the earcut-specific handling.
+>
+> The **remaining** shape_test diff is the depth-4 Place-conflict for the 2nd
+> green clip (Phase 3 territory) plus the gnash-vs-Ruffle oracle disagreement —
+> NOT tessellation. (Phase 3 "Refuse PlaceObject Place on occupied depth" is
+> also affected by the later `b8ced0c60` PlaceObject occupied-depth *replace*
+> change — re-validate this phase's premise against current behavior before
+> acting on it.)
+>
+> Canonical current state: `tools/divergence/PROGRESS.md` follow-up **#6** and
+> the `tessellation-libtess2-migration` auto-memory.
 
 Follow-up to `shape-hole-detection-plan.md` (Phases A–C, landed
 `992c37d6`/`54053b79`/`e2dc404e`). The hole-detection plan named

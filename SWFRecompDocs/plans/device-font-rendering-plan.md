@@ -4,10 +4,33 @@
 
 **Created:** 2026-05-14
 
-**Status:** Plan only. Phases A → B → C; A unblocks the
-single image-comparison test that exercises this path
-(`from_shumway/avm1/text-bind`); C is the eventual goal
-(runtime TrueType rasterization with arbitrary Unicode).
+**Status:** ✅ Phase A implemented (compile-time glyph synthesis from a bundled
+NotoSans via stb_truetype). The driving `text-bind` diff is now an **accepted
+diff**, not a blocker. See the status banner below. Phases B/C (runtime glyph
+shapes / full Unicode rasterization) remain future work.
+
+> **STATUS UPDATE 2026-06-02 — read before treating this as open.**
+>
+> Phase A landed: `swf.cpp` synthesizes glyph outlines for zero-glyph
+> `_sans`/`_serif`/`_typewriter` fonts from the bundled
+> `SWFRecomp/assets/NotoSans.ttf` (`g_device_font` via `stb_truetype`), and
+> those glyphs now tessellate via libtess2 (`a0e5d431d`).
+>
+> **The original driver — `from_shumway/avm1/text-bind` rendering "blocked" /
+> "garbled" — is RESOLVED as an accepted device-font-fixture diff** (root-caused
+> 2026-06-02; `0d504cea5` updated `ACCEPTED_DIFFS.md` + `ignored_tests.txt`).
+> Our synthesized device-font layout **matches Ruffle's default fallback** (their
+> bundled `notosans.subset.ttf.gz` is byte-identical to our `assets/NotoSans.ttf`,
+> 1.069 em). `text-bind` diverges only because that test ships its OWN custom
+> NotoSans subset (0.7656 em) + a `fonts.conf` that Ruffle's oracle honors and we
+> don't resolve at recompile time → ~14px vertical offset. The
+> `textfield_glyph_render_cb` baseline math (`y = field_top + ascent*scale +
+> gutter`) is correct; **do not "fix the ascent"** (that was measuring against the
+> test's custom-font oracle, not Ruffle's default).
+>
+> Full root-cause: `tools/divergence/PROGRESS.md` follow-up **#12** and the
+> `tessellation-libtess2-migration` auto-memory. The Phase B/C design below is
+> still valid as future work (e.g. real Unicode coverage).
 
 Driven by `from_shumway/avm1/text-bind` investigation
 (`.claude/next-session-prompt.md` 2026-05-13 entry:
