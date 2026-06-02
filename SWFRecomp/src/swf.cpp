@@ -2468,6 +2468,15 @@ namespace SWFRecomp
 									polygon.push_back(contour);
 									contour.clear();
 								}
+								// Seed the new contour with the MoveTo point. Without
+								// this the contour's starting vertex is dropped — the
+								// tessellator implicitly closes P_last->P1, skipping
+								// P0 entirely and shaving a sliver off that corner
+								// (the device-font glyph garble in PROGRESS #6). It
+								// also gives curve-first contours a correct x0/y0
+								// instead of defaulting to (0,0).
+								contour.push_back({(Coord)(verts[v].x * ttf_scale),
+								                   (Coord)(-verts[v].y * ttf_scale)});
 								// Emit MoveTo for path data
 								emitGP(5.0f, verts[v].x * ttf_scale, -verts[v].y * ttf_scale);
 							} else if (verts[v].type == STBTT_vline) {
@@ -2551,30 +2560,48 @@ namespace SWFRecomp
 
 						if (polygon.empty() || polygon[0].size() < 3) continue;
 
-						std::vector<N> indices = mapbox::earcut<N>(polygon);
-						if (indices.size() < 3) continue;
+						// Tessellate the glyph outline with libtess2 under the
+						// non-zero winding rule (the TrueType fill convention).
+						// earcut treated polygon[0] as the outer ring and every
+						// other contour as a hole — wrong for any glyph whose
+						// contours aren't emitted outer-first (counters of
+						// 'B'/'8'/'%', accented glyphs), and intolerant of
+						// self-intersection. Non-zero respects the font's own
+						// contour directions regardless of order. See
+						// tessellation-libtess2-migration.
+						std::vector<std::vector<Vertex>> glyph_contours;
+						glyph_contours.reserve(polygon.size());
+						for (auto& ring : polygon) {
+							std::vector<Vertex> c;
+							c.reserve(ring.size());
+							for (auto& pt : ring) {
+								Vertex v; v.x = pt[0]; v.y = pt[1]; v.morph_index = -1;
+								c.push_back(v);
+							}
+							glyph_contours.push_back(std::move(c));
+						}
 
-						// Flatten polygon for index lookup
-						std::vector<std::array<Coord, 2>> all_pts;
-						for (auto& ring : polygon)
-							for (auto& pt : ring)
-								all_pts.push_back(pt);
+						std::vector<Tri> tris;
+						tessellateContours(glyph_contours, TESS_WINDING_NONZERO, tris);
+						if (tris.empty()) continue;
 
 						// Only emit triangles if the SWF didn't already provide glyph shapes
 						if (needs_triangles) {
 							font_glyph_entries[i].first = 3 * current_tri;
-							font_glyph_entries[i].second = indices.size();
+							font_glyph_entries[i].second = tris.size() * 3;
 
-							for (size_t idx = 0; idx < indices.size(); idx++) {
-								float x_f = (float)all_pts[indices[idx]][0];
-								float y_f = (float)all_pts[indices[idx]][1];
-								shape_data << "\t{ "
-									<< std::hex << std::uppercase
-									<< "0x" << VAL(u32, &x_f) << ", "
-									<< "0x" << VAL(u32, &y_f) << ", "
-									<< "0x00, 0x00 }," << std::dec << endl;
+							for (Tri& t : tris) {
+								for (int j = 0; j < 3; j++) {
+									float x_f = (float) t.verts[j].x;
+									float y_f = (float) t.verts[j].y;
+									shape_data << "\t{ "
+										<< std::hex << std::uppercase
+										<< "0x" << VAL(u32, &x_f) << ", "
+										<< "0x" << VAL(u32, &y_f) << ", "
+										<< "0x00, 0x00 }," << std::dec << endl;
+								}
 							}
-							current_tri += indices.size() / 3;
+							current_tri += tris.size();
 						}
 					}
 				}
@@ -7280,6 +7307,7 @@ namespace SWFRecomp
 		shape_has_alpha = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_3 || shape_tag.code == SWF_TAG_DEFINE_SHAPE_4 || is_morph);
 		shape_is_v4 = (shape_tag.code == SWF_TAG_DEFINE_SHAPE_4);
 		shape_is_morph2 = is_morph2;
+		shape_uses_nonzero_winding = false;
 
 		switch (shape_tag.code)
 		{
@@ -7364,6 +7392,7 @@ namespace SWFRecomp
 						int uses_fill_winding_rule = ((int)shape_tag.fields[0].value >> 2) & 1;
 						if (uses_fill_winding_rule)
 						{
+							shape_uses_nonzero_winding = true;
 							context.tag_main << "\t" << "ng_record_char_winding(" << to_string(shape_id) << ");" << endl;
 						}
 					}
@@ -8716,13 +8745,27 @@ namespace SWFRecomp
 				else
 				{
 					// Group fill contours by (fill_style_list, inner_fill) and
-					// tessellate each group together with libtess2 under the
-					// even-odd rule (SWF default for DefineShape/2/3). Even-odd
-					// natively cuts holes from self-touching / overlapping
-					// sub-loops — the case earcut + spatial containment can't
-					// handle (shape_test's C-shapes). Hole-marked shapes are
-					// included as ordinary contours; the fill rule resolves them.
-					// Insertion order is preserved for stable z-order.
+					// tessellate each group together with libtess2. The winding
+					// rule follows the SWF: even-odd by default (DefineShape/2/3
+					// and DefineShape4 without UsesFillWindingRule), non-zero when
+					// DefineShape4 sets that flag — matching Ruffle's lyon fill
+					// rule selection. Even-odd natively cuts holes from
+					// self-touching / overlapping sub-loops — the case earcut +
+					// spatial containment can't handle (shape_test's C-shapes).
+					// Hole-marked shapes are included as ordinary contours; the
+					// fill rule resolves them. Insertion order is preserved for
+					// stable z-order.
+					//
+					// Non-zero is orientation-sensitive (unlike even-odd), so
+					// when it's in effect we reverse contours whose inner_fill
+					// sits on the right (fill_right) to put the fill consistently
+					// on one side — outer boundaries then wind opposite their
+					// holes and the non-zero rule leaves the holes empty. For
+					// even-odd we keep the original vertex order untouched (it's
+					// orientation-agnostic, and preserving order keeps the
+					// triangulation byte-stable for the common path).
+					const int winding_rule = shape_uses_nonzero_winding ? TESS_WINDING_NONZERO : TESS_WINDING_ODD;
+
 					struct FillGroup
 					{
 						u32 fsl;
@@ -8759,14 +8802,19 @@ namespace SWFRecomp
 							gi = it->second;
 						}
 
-						groups[gi].contours.push_back(shapes[i].verts);
+						std::vector<Vertex> contour = shapes[i].verts;
+						if (shape_uses_nonzero_winding && shapes[i].fill_right)
+						{
+							std::reverse(contour.begin(), contour.end());
+						}
+						groups[gi].contours.push_back(std::move(contour));
 					}
 
 					for (FillGroup& g : groups)
 					{
 						std::vector<Tri> tris;
 
-						tessellateContours(g.contours, TESS_WINDING_ODD, tris);
+						tessellateContours(g.contours, winding_rule, tris);
 
 						tris_size += tris.size();
 

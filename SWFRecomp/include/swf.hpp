@@ -288,6 +288,7 @@ namespace SWFRecomp
 		bool shape_has_alpha;
 		bool shape_is_v4;
 		bool shape_is_morph2;
+		bool shape_uses_nonzero_winding;
 		bool use_network;
 
 		SWF();
