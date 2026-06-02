@@ -111,6 +111,109 @@ static u32 name_fold_hash(const char* name, u32 len)
 	return h;
 }
 
+// ---- Per-object property hash index ---------------------------------------
+// Large objects (mainly prototypes and _global) get an open-addressing index
+// mapping name_fold_hash -> slot in properties[], so lookups jump to the entry
+// instead of scanning. Small objects keep the hash-gated linear scan (index
+// stays NULL). The index stores slot indices into properties[]; since
+// deleteProperty compacts the array (shifting indices), the index is rebuilt
+// after a delete (deletes are rare). Array growth via realloc keeps slot
+// indices valid (logical positions don't move), so it needs no index update.
+#define PROP_HASH_EMPTY     0xFFFFFFFFu
+#define PROP_HASH_THRESHOLD 12   // build an index once an object has >= this many props
+
+static void prop_hash_insert(u32* table, u32 cap, u32 hash, u32 slot)
+{
+	u32 mask = cap - 1;
+	u32 probe = hash & mask;
+	while (table[probe] != PROP_HASH_EMPTY)
+		probe = (probe + 1) & mask;
+	table[probe] = slot;
+}
+
+// (Re)build the index sized for the current num_used. On allocation failure the
+// index is left NULL and callers transparently fall back to the linear scan.
+static void rebuildHashIndex(ASObject* obj)
+{
+	if (obj->hash_index)
+	{
+		free(obj->hash_index);
+		obj->hash_index = NULL;
+		obj->hash_capacity = 0;
+	}
+	u32 cap = 16;
+	while (cap < obj->num_used * 2) cap <<= 1;   // keep load factor <= 0.5
+	u32* table = (u32*) malloc(sizeof(u32) * cap);
+	if (table == NULL) return;                    // fall back to linear scan
+	for (u32 i = 0; i < cap; i++) table[i] = PROP_HASH_EMPTY;
+	for (u32 i = 0; i < obj->num_used; i++)
+	{
+		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
+			continue;
+		prop_hash_insert(table, cap, obj->properties[i].name_hash, i);
+	}
+	obj->hash_index = table;
+	obj->hash_capacity = cap;
+}
+
+// Maintain the index after a new property was appended at `slot`. Builds the
+// index when the object first crosses the size threshold, and grows it (rebuild)
+// when the load factor would be exceeded.
+static void hashIndexOnInsert(ASObject* obj, u32 slot)
+{
+	if (obj->hash_index != NULL)
+	{
+		if (obj->num_used * 2 > obj->hash_capacity)
+			rebuildHashIndex(obj);   // grow + reinsert all (incl. the new slot)
+		else
+			prop_hash_insert(obj->hash_index, obj->hash_capacity,
+			                 obj->properties[slot].name_hash, slot);
+	}
+	else if (obj->num_used >= PROP_HASH_THRESHOLD)
+	{
+		rebuildHashIndex(obj);
+	}
+}
+
+// Core property lookup. Returns the slot index of the matching property or
+// PROP_HASH_EMPTY. `qhash` must be name_fold_hash(name, name_length). Uses the
+// hash index when present, else a hash-gated linear scan.
+static u32 findPropertySlot(ASObject* obj, const char* name, u32 name_length, u32 qhash)
+{
+	if (obj->hash_index != NULL)
+	{
+		u32 mask = obj->hash_capacity - 1;
+		for (u32 probe = qhash & mask; ; probe = (probe + 1) & mask)
+		{
+			u32 slot = obj->hash_index[probe];
+			if (slot == PROP_HASH_EMPTY) return PROP_HASH_EMPTY;
+			ASProperty* p = &obj->properties[slot];
+			if (p->name_hash == qhash && p->name != NULL &&
+			    prop_name_match(p->name, p->name_length, name, name_length))
+				return slot;
+		}
+	}
+	for (u32 i = 0; i < obj->num_used; i++)
+	{
+		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
+			continue;
+		if (obj->properties[i].name_hash == qhash &&
+		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
+			return i;
+	}
+	return PROP_HASH_EMPTY;
+}
+
+// Public hook: rebuild the index after code outside object.c has directly
+// reordered/removed entries in properties[] (e.g. ensureBuiltinPrototypeProps).
+// No-op when the object has no index. Must be called before any subsequent
+// property lookup/insert on that object.
+void objectRehashIndex(ASObject* obj)
+{
+	if (obj != NULL && obj->hash_index != NULL)
+		rebuildHashIndex(obj);
+}
+
 // Null-terminated SWF version-aware name comparison (exposed for tag_stubs.c)
 // Returns 1 if names match, 0 if they don't
 int swf_name_match(const char* a, const char* b)
@@ -165,6 +268,8 @@ ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity)
 	obj->refcount = 1;  // Initial reference owned by caller
 	obj->num_properties = initial_capacity;
 	obj->num_used = 0;
+	obj->hash_index = NULL;
+	obj->hash_capacity = 0;
 
 	// Initialize interface fields
 	obj->interface_count = 0;
@@ -277,6 +382,12 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 			free(obj->properties);
 		}
 
+		// Free the property hash index
+		if (obj->hash_index != NULL)
+		{
+			free(obj->hash_index);
+		}
+
 		// Release interface objects
 		if (obj->interfaces != NULL)
 		{
@@ -303,18 +414,18 @@ ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL) return NULL;
 	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL)) return NULL;
-	u32 qhash = name_fold_hash(name, name_length);
-	for (u32 i = 0; i < obj->num_used; i++)
-	{
-		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
-			continue;
-		if (obj->properties[i].name_hash == qhash &&
-		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
-		{
-			return &obj->properties[i];
-		}
-	}
-	return NULL;
+	u32 s = findPropertySlot(obj, name, name_length, name_fold_hash(name, name_length));
+	return (s == PROP_HASH_EMPTY) ? NULL : &obj->properties[s];
+}
+
+// Like findPropertyRaw but takes a precomputed query hash, so prototype-chain
+// walkers can hash the name once per access instead of once per chain level.
+static ASProperty* findPropertyRawH(ASObject* obj, const char* name, u32 name_length, u32 qhash)
+{
+	if (obj == NULL || name == NULL) return NULL;
+	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL)) return NULL;
+	u32 s = findPropertySlot(obj, name, name_length, qhash);
+	return (s == PROP_HASH_EMPTY) ? NULL : &obj->properties[s];
 }
 
 bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length)
@@ -335,27 +446,13 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 		return NULL;
 	}
 
-	// Linear search through properties, gated by a precomputed name hash so the
-	// (relatively expensive) prop_name_match runs only on hash matches.
-	u32 qhash = name_fold_hash(name, name_length);
-	for (u32 i = 0; i < obj->num_used; i++)
-	{
-		// Safety: skip corrupt property entries (NULL or very low name pointer)
-		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
-			continue;
-		if (obj->properties[i].name_hash == qhash &&
-		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
-		{
-			// Check version-based hiding (ASSetPropFlags)
-			if (FLASH_HIDE_MASK && (obj->properties[i].flash_flags & FLASH_HIDE_MASK))
-			{
-				return NULL;  // Property hidden by version flags
-			}
-			return &obj->properties[i].value;
-		}
-	}
-
-	return NULL;  // Property not found
+	u32 s = findPropertySlot(obj, name, name_length, name_fold_hash(name, name_length));
+	if (s == PROP_HASH_EMPTY)
+		return NULL;  // Property not found
+	// Check version-based hiding (ASSetPropFlags)
+	if (FLASH_HIDE_MASK && (obj->properties[s].flash_flags & FLASH_HIDE_MASK))
+		return NULL;  // Property hidden by version flags
+	return &obj->properties[s].value;
 }
 
 /**
@@ -380,20 +477,30 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 	ASObject* current = obj;
 	int max_depth = 256;  // Prevent infinite loops in deep prototype chains
 	int depth = 0;
+	u32 qhash = name_fold_hash(name, name_length);   // hashed once for the whole walk
+	u32 proto_h = name_fold_hash("__proto__", 9);
 
 	while (current != NULL && depth < max_depth)
 	{
 		depth++;
 
-		// Search own properties first
-		ActionVar* prop = getProperty(current, name, name_length);
-		if (prop != NULL)
+		if (current->num_used > 16384 || (current->num_used > 0 && current->properties == NULL))
+			break;
+
+		// Search own properties first (mirrors getProperty, incl. version hiding)
+		u32 s = findPropertySlot(current, name, name_length, qhash);
+		if (s != PROP_HASH_EMPTY &&
+		    !(FLASH_HIDE_MASK && (current->properties[s].flash_flags & FLASH_HIDE_MASK)))
 		{
-			return prop;
+			return &current->properties[s].value;
 		}
 
 		// Property not found on this object - walk up to __proto__
-		ActionVar* proto_var = getProperty(current, "__proto__", 9);
+		u32 ps = findPropertySlot(current, "__proto__", 9, proto_h);
+		ActionVar* proto_var = NULL;
+		if (ps != PROP_HASH_EMPTY &&
+		    !(FLASH_HIDE_MASK && (current->properties[ps].flash_flags & FLASH_HIDE_MASK)))
+			proto_var = &current->properties[ps].value;
 		ASObject* next = resolveProtoVar(proto_var);
 		if (next == NULL)
 		{
@@ -434,15 +541,21 @@ ASProperty* findPropertyStructWithPrototype(ASObject* obj, const char* name, u32
 	ASObject* current = obj;
 	int max_depth = 256;
 	int depth = 0;
+	u32 qhash = name_fold_hash(name, name_length);   // hashed once for the whole walk
+	u32 proto_h = name_fold_hash("__proto__", 9);
 
 	while (current != NULL && depth < max_depth)
 	{
 		depth++;
 
+		if (current->num_used > 16384 || (current->num_used > 0 && current->properties == NULL))
+			break;
+
 		// Search own properties
-		ASProperty* prop = findPropertyRaw(current, name, name_length);
-		if (prop != NULL)
+		u32 s = findPropertySlot(current, name, name_length, qhash);
+		if (s != PROP_HASH_EMPTY)
 		{
+			ASProperty* prop = &current->properties[s];
 			// Check version-based hiding
 			if (FLASH_HIDE_MASK && (prop->flash_flags & FLASH_HIDE_MASK))
 				return NULL;
@@ -450,7 +563,11 @@ ASProperty* findPropertyStructWithPrototype(ASObject* obj, const char* name, u32
 		}
 
 		// Walk up __proto__
-		ActionVar* proto_var = getProperty(current, "__proto__", 9);
+		u32 ps = findPropertySlot(current, "__proto__", 9, proto_h);
+		ActionVar* proto_var = NULL;
+		if (ps != PROP_HASH_EMPTY &&
+		    !(FLASH_HIDE_MASK && (current->properties[ps].flash_flags & FLASH_HIDE_MASK)))
+			proto_var = &current->properties[ps].value;
 		ASObject* next = resolveProtoVar(proto_var);
 		if (next == NULL)
 			break;
@@ -481,47 +598,38 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 
 	// Check if property already exists
 	u32 qhash = name_fold_hash(name, name_length);
-	for (u32 i = 0; i < obj->num_used; i++)
+	u32 found = findPropertySlot(obj, name, name_length, qhash);
+	if (found != PROP_HASH_EMPTY)
 	{
-		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
-			continue;
-		if (obj->properties[i].name_hash == qhash &&
-		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
+		ASProperty* p = &obj->properties[found];
+		// Property exists - update value
+
+		// Release old value if it was an object
+		if (p->value.type == ACTION_STACK_VALUE_OBJECT)
 		{
-			// Property exists - update value
-
-			// Release old value if it was an object
-			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
-			{
-				ASObject* old_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
-				releaseObject(app_context, old_obj);
-			}
-			// Free old string if it owned memory
-			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
-			         obj->properties[i].value.data.string_data.owns_memory)
-			{
-				free(obj->properties[i].value.data.string_data.heap_ptr);
-			}
-
-			// Set new value and clear version-based hiding flags
-			// (In Flash, setting a property via SetMember clears ASSetPropFlags visibility)
-			obj->properties[i].value = *value;
-			obj->properties[i].flash_flags = 0;
-
-			// Retain new value if it's an object
-			if (value->type == ACTION_STACK_VALUE_OBJECT)
-			{
-				ASObject* new_obj = (ASObject*) value->data.numeric_value;
-				retainObject(new_obj);
-			}
-
-#ifdef DEBUG
-			printf("[DEBUG] setProperty: obj=%p, updated property '%.*s'\n",
-				(void*)obj, name_length, name);
-#endif
-
-			return;
+			ASObject* old_obj = (ASObject*) p->value.data.numeric_value;
+			releaseObject(app_context, old_obj);
 		}
+		// Free old string if it owned memory
+		else if (p->value.type == ACTION_STACK_VALUE_STRING &&
+		         p->value.data.string_data.owns_memory)
+		{
+			free(p->value.data.string_data.heap_ptr);
+		}
+
+		// Set new value and clear version-based hiding flags
+		// (In Flash, setting a property via SetMember clears ASSetPropFlags visibility)
+		p->value = *value;
+		p->flash_flags = 0;
+
+		// Retain new value if it's an object
+		if (value->type == ACTION_STACK_VALUE_OBJECT)
+		{
+			ASObject* new_obj = (ASObject*) value->data.numeric_value;
+			retainObject(new_obj);
+		}
+
+		return;
 	}
 
 	// Property doesn't exist - create new one
@@ -589,6 +697,9 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 		retainObject(new_obj);
 	}
 
+	// Maintain the lookup index (builds it once the object grows large enough)
+	hashIndexOnInsert(obj, index);
+
 #ifdef DEBUG
 	printf("[DEBUG] setProperty: obj=%p, created property '%.*s', num_used=%u\n",
 		(void*)obj, name_length, name, obj->num_used);
@@ -607,25 +718,23 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 
 	// If property already exists, just update the value
 	u32 qhash = name_fold_hash(name, name_length);
-	for (u32 i = 0; i < obj->num_used; i++)
+	u32 found = findPropertySlot(obj, name, name_length, qhash);
+	if (found != PROP_HASH_EMPTY)
 	{
-		if (obj->properties[i].name_hash == qhash &&
-		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
-		{
-			// Release old value
-			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
-				releaseObject(app_context, (ASObject*) obj->properties[i].value.data.numeric_value);
-			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
-			         obj->properties[i].value.data.string_data.owns_memory)
-				free(obj->properties[i].value.data.string_data.heap_ptr);
+		ASProperty* p = &obj->properties[found];
+		// Release old value
+		if (p->value.type == ACTION_STACK_VALUE_OBJECT)
+			releaseObject(app_context, (ASObject*) p->value.data.numeric_value);
+		else if (p->value.type == ACTION_STACK_VALUE_STRING &&
+		         p->value.data.string_data.owns_memory)
+			free(p->value.data.string_data.heap_ptr);
 
-			obj->properties[i].value = *value;
-			obj->properties[i].flash_flags = 0;
+		p->value = *value;
+		p->flash_flags = 0;
 
-			if (value->type == ACTION_STACK_VALUE_OBJECT)
-				retainObject((ASObject*) value->data.numeric_value);
-			return;
-		}
+		if (value->type == ACTION_STACK_VALUE_OBJECT)
+			retainObject((ASObject*) value->data.numeric_value);
+		return;
 	}
 
 	// Property doesn't exist — use setProperty to create it, then override flags
@@ -657,62 +766,58 @@ bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name,
 
 	// Find property by name
 	u32 qhash = name_fold_hash(name, name_length);
-	for (u32 i = 0; i < obj->num_used; i++)
+	u32 i = findPropertySlot(obj, name, name_length, qhash);
+	if (i != PROP_HASH_EMPTY)
 	{
-		if (obj->properties[i].name_hash == qhash &&
-		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
+		// Check if property is configurable (deletable)
+		if (!(obj->properties[i].flags & PROPERTY_FLAG_CONFIGURABLE))
 		{
-			// Check if property is configurable (deletable)
-			if (!(obj->properties[i].flags & PROPERTY_FLAG_CONFIGURABLE))
-			{
-				return false;  // Cannot delete non-configurable property
-			}
-
-			// Property found - delete it
-
-			// 1. Release the property value if it's an object/array
-			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
-			{
-				ASObject* child_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
-				releaseObject(app_context, child_obj);
-			}
-			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_ARRAY)
-			{
-				ASArray* child_arr = (ASArray*) obj->properties[i].value.data.numeric_value;
-				releaseArray(app_context, child_arr);
-			}
-			// Free string if it owns memory
-			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
-			         obj->properties[i].value.data.string_data.owns_memory)
-			{
-				free(obj->properties[i].value.data.string_data.heap_ptr);
-			}
-
-			// 2. Free the property name
-			if (obj->properties[i].name != NULL)
-			{
-				FREE(obj->properties[i].name);
-			}
-
-			// 3. Shift remaining properties down to fill the gap
-			for (u32 j = i; j < obj->num_used - 1; j++)
-			{
-				obj->properties[j] = obj->properties[j + 1];
-			}
-
-			// 4. Decrement the number of used slots
-			obj->num_used--;
-
-			// 5. Zero out the last slot
-			memset(&obj->properties[obj->num_used], 0, sizeof(ASProperty));
-
-#ifdef DEBUG
-			printf("[DEBUG] deleteProperty: obj=%p, deleted property '%.*s', num_used=%u\n",
-				(void*)obj, name_length, name, obj->num_used);
-#endif
-
-			return true;
+			return false;  // Cannot delete non-configurable property
 		}
+
+		// Property found - delete it
+
+		// 1. Release the property value if it's an object/array
+		if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
+		{
+			ASObject* child_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
+			releaseObject(app_context, child_obj);
+		}
+		else if (obj->properties[i].value.type == ACTION_STACK_VALUE_ARRAY)
+		{
+			ASArray* child_arr = (ASArray*) obj->properties[i].value.data.numeric_value;
+			releaseArray(app_context, child_arr);
+		}
+		// Free string if it owns memory
+		else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
+		         obj->properties[i].value.data.string_data.owns_memory)
+		{
+			free(obj->properties[i].value.data.string_data.heap_ptr);
+		}
+
+		// 2. Free the property name
+		if (obj->properties[i].name != NULL)
+		{
+			FREE(obj->properties[i].name);
+		}
+
+		// 3. Shift remaining properties down to fill the gap
+		for (u32 j = i; j < obj->num_used - 1; j++)
+		{
+			obj->properties[j] = obj->properties[j + 1];
+		}
+
+		// 4. Decrement the number of used slots
+		obj->num_used--;
+
+		// 5. Zero out the last slot
+		memset(&obj->properties[obj->num_used], 0, sizeof(ASProperty));
+
+		// 6. Compaction shifted slot indices — rebuild the lookup index.
+		if (obj->hash_index != NULL)
+			rebuildHashIndex(obj);
+
+		return true;
 	}
 
 	// Property not found - Flash AS2 returns false for non-existent properties

@@ -73,6 +73,12 @@ typedef struct ASObject
 	u32 num_used;           // Number of properties actually used
 	ASProperty* properties; // Dynamic array of properties
 
+	// Optional open-addressing name_hash->slot index, built lazily once an
+	// object grows large (see PROP_HASH_THRESHOLD in object.c). NULL/0 means
+	// "use the linear scan" (the common case for small objects).
+	u32* hash_index;        // table of slot indices, or NULL
+	u32 hash_capacity;      // power-of-2 capacity of hash_index, or 0
+
 	// Interface support (for ActionScript 2.0 implements keyword)
 	u32 interface_count;           // Number of interfaces this class implements
 	struct ASObject** interfaces;  // Array of interface constructors
@@ -157,6 +163,10 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 // Check if property exists ignoring flash_flags visibility (for hasOwnProperty)
 bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length);
 ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length);
+
+// Rebuild the property lookup index after directly reordering/removing entries
+// in obj->properties[] outside object.c (no-op if the object has no index).
+void objectRehashIndex(ASObject* obj);
 
 // Check if a property with given flash_flags is hidden at the current SWF version
 int isPropertyHiddenAtVersion(u16 flash_flags);

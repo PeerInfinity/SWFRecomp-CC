@@ -149,3 +149,52 @@ costs are now:
 
 Estimated combined headroom after step 2: roughly another 40% off the current
 total.
+
+### CI validation (step 1)
+Full suite, **both** no-graphics and graphics modes: **zero changes** across all 8
+suites (avm1, from_shumway, from_shumway/avm1, from_gnash/{actionscript,
+misc-ming, misc-swfc, misc-mtasc, misc-swfmill}.all). No pass→fail or fail→pass,
+identical mismatched-line counts. Confirms behavior-preserving. (commits
+`537951f4f` + result merges.)
+
+---
+
+## Optimization #2 — per-object hash index + hash-once-per-walk (2026-06-01)
+
+**Change** (`object.c`, `object.h`):
+1. Added a per-object open-addressing hash index (`hash_index`/`hash_capacity`
+   on `ASObject`) mapping `name_fold_hash` → slot in `properties[]`. Built lazily
+   once an object reaches `PROP_HASH_THRESHOLD` (12) properties — so small
+   objects (the majority) are untouched and keep the gated linear scan; large
+   objects (prototypes, `_global`) get O(1) lookup. All five property functions
+   now route through one primitive, `findPropertySlot(obj, name, len, qhash)`,
+   which probes the index when present and falls back to the gated scan
+   otherwise. The index stores slot indices; array growth keeps them valid, and
+   `deleteProperty`'s compaction rebuilds the index (deletes are rare). The one
+   external site that reorders `properties[]` directly
+   (`action.c:ensureBuiltinPrototypeProps`) calls the new `objectRehashIndex`.
+2. Thread a precomputed query hash through the prototype-chain walkers
+   (`getPropertyWithPrototype`, `findPropertyStructWithPrototype`) so the name is
+   hashed **once per access** instead of once per chain level (also caches the
+   `"__proto__"` hash per walk).
+
+**Result (Doodle Jump, 500 frames, NO_GRAPHICS), output byte-identical:**
+
+| Metric | Original | After #1 | After #2 | Δ total |
+|---|---:|---:|---:|---:|
+| Total instructions | 548.97M | 355.72M | **281.18M** | **−48.8%** |
+
+The O(n) property-iteration cost (`getProperty`+`findPropertyRaw`, ~33%) is gone
+— folded into `findPropertySlot` (14.5%, mostly the index probe + small-object
+fallback). The new top costs are `name_fold_hash` (17.6%, the query hashed once
+per lookup) and the UTF-8↔UTF-16 conversion on the stack↔property bridge
+(`utf8_to_u16` 5.8% + `u16_to_utf8` 4.4% + `utf8_decode_one` 2.4% ≈ 12.6%).
+
+### Next lever (step 3, larger change)
+The remaining big structural cost is **string handling at the AVM1 stack level**:
+member/variable opcodes pop a UTF-16 name off the stack, convert it to UTF-8 to
+call `getProperty`, which then hashes it. Full **string interning** — names
+travel as interned integer IDs on the stack with a precomputed hash — would
+remove most of the ~12.6% conversion cost *and* the 17.6% re-hashing. This is the
+big upstream-style change (their enum string IDs); it touches the stack value
+representation and many opcodes, so it warrants its own plan + CI cycle.

@@ -7809,6 +7809,9 @@ static void ensureBuiltinPrototypeProps(SWFAppContext* app_context, ASObject* pr
 					break;
 				}
 			}
+			// Direct array shift above can desync the property hash index — rebuild
+			// it before the setPropertyWithFlags lookups below.
+			objectRehashIndex(proto);
 			setPropertyWithFlags(app_context, proto, "constructor", 11, &ctor_val, PROPERTY_FLAG_WRITABLE);
 			if (proto_idx >= 0)
 				setPropertyWithFlags(app_context, proto, "__proto__", 9, &saved_proto, saved_flags);
