@@ -813,7 +813,7 @@ int ng_getTextFieldIdxByCharId(size_t char_id)
 // ---------------------------------------------------------------------------
 // Exported symbols registry (DoExportAssets → attachMovie linkage)
 // ---------------------------------------------------------------------------
-#define MAX_EXPORTED_SYMBOLS 128
+#define MAX_EXPORTED_SYMBOLS 1024
 static struct {
 	char name[128];
 	size_t char_id;
@@ -823,6 +823,38 @@ static struct {
 static size_t ng_exported_symbol_count = 0;
 
 u8 g_current_movie_id = 0;
+
+// Register (or update) one export entry, keyed by (name, movie_id). Flash's
+// export table is name-keyed within a movie, so re-exporting a name overwrites
+// the prior mapping ("last export wins") rather than appending a second entry.
+// Deduping is essential because some authoring tools emit a separate
+// ExportAssets tag for every USE of a symbol (e.g. N.swf emits ~1600
+// ExportAssets, almost all duplicate exports of one particle symbol -> chid
+// 135). Without dedup, the fixed table overflows and later, genuinely-distinct
+// exports (fpsBox, timeIndicator, ...) are silently dropped, so attachMovie
+// can't resolve them. The (name, movie_id) key keeps cross-movie imports
+// (tagImportCharacter re-registers a name under the importing movie's id)
+// distinct from the source movie's export of the same name.
+static void ng_register_export_entry(const char* name, size_t char_id,
+                                     u8 swf_version, u8 movie_id)
+{
+	for (size_t i = 0; i < ng_exported_symbol_count; i++) {
+		if (ng_exported_symbols[i].movie_id == movie_id
+		    && strcasecmp(ng_exported_symbols[i].name, name) == 0) {
+			ng_exported_symbols[i].char_id = char_id;
+			ng_exported_symbols[i].swf_version = swf_version;
+			return;
+		}
+	}
+	if (ng_exported_symbol_count < MAX_EXPORTED_SYMBOLS) {
+		strncpy(ng_exported_symbols[ng_exported_symbol_count].name, name, 127);
+		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
+		ng_exported_symbols[ng_exported_symbol_count].char_id = char_id;
+		ng_exported_symbols[ng_exported_symbol_count].swf_version = swf_version;
+		ng_exported_symbols[ng_exported_symbol_count].movie_id = movie_id;
+		ng_exported_symbol_count++;
+	}
+}
 
 size_t ng_lookupExport(const char* name)
 {
@@ -883,14 +915,7 @@ void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char
 {
 	(void)app_context;
 	extern int g_swf_version;
-	if (ng_exported_symbol_count < MAX_EXPORTED_SYMBOLS) {
-		strncpy(ng_exported_symbols[ng_exported_symbol_count].name, name, 127);
-		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
-		ng_exported_symbols[ng_exported_symbol_count].char_id = char_id;
-		ng_exported_symbols[ng_exported_symbol_count].swf_version = (u8)g_swf_version;
-		ng_exported_symbols[ng_exported_symbol_count].movie_id = g_current_movie_id;
-		ng_exported_symbol_count++;
-	}
+	ng_register_export_entry(name, char_id, (u8)g_swf_version, g_current_movie_id);
 }
 
 void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const char* export_name)
@@ -929,14 +954,7 @@ void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const 
 			break;
 		}
 	}
-	if (ng_exported_symbol_count < MAX_EXPORTED_SYMBOLS) {
-		strncpy(ng_exported_symbols[ng_exported_symbol_count].name, export_name, 127);
-		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
-		ng_exported_symbols[ng_exported_symbol_count].char_id = local_char_id;
-		ng_exported_symbols[ng_exported_symbol_count].swf_version = src_version;
-		ng_exported_symbols[ng_exported_symbol_count].movie_id = g_current_movie_id;
-		ng_exported_symbol_count++;
-	}
+	ng_register_export_entry(export_name, local_char_id, src_version, g_current_movie_id);
 }
 
 // ---------------------------------------------------------------------------
