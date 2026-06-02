@@ -122,17 +122,25 @@ AS2-prelude-stdlib pieces for perf reasons.
    ranked report. Determines whether cost is the AVM1 interpreter, rendering,
    allocation, or queue management — and grounds everything else.
 
-### Phase 2 — In-browser numbers (secondary)
+### Phase 2 — In-browser numbers (secondary) — DONE (HUD + uncapped)
 
-- Export the already-computed `elapsed` (`swf.c:1020`) to a small
-  frame-time/headroom HUD (current FPS, mean/p95 frame CPU-time, headroom %).
-- Add an uncapped (`sleep_ms=0`) fixed-N-frame benchmark mode for an
-  apples-to-apples max-FPS number vs Ruffle.
-- Optionally a `--profiling-funcs` named WASM build to confirm native findings
-  hold under ASYNCIFY/WASM and to catch WASM-specific overhead (ASYNCIFY,
-  memory growth).
-- The existing `docs/demo.html` already has an optional Ruffle player — extend
-  it with a benchmark toggle for side-by-side frame-time distributions.
+Implemented as a self-contained `EM_JS` hook in `swf.c` (`swf_perf_report`,
+browser-only, called once per rendered frame in both the main loop and the
+post-quit drain loop):
+- **Frame-time/headroom HUD overlay** — a fixed overlay (created by the hook
+  itself, no HTML-template change) showing per-frame CPU time mean / p95 / max,
+  headroom % of the FPS budget, and the **max sustainable FPS** (`1000/mean`).
+- **Uncapped benchmark mode** — skips the frame-pacing `emscripten_sleep` so the
+  loop runs flat-out, giving an apples-to-apples max-FPS number vs Ruffle.
+
+Usage (works on `docs/demo.html` and any page hosting a graphics WASM build):
+- Key **`P`** toggles the HUD; key **`U`** toggles uncapped mode.
+- URL **`?perfhud=1`** shows the HUD at load; **`?perfbench=1`** loads in uncapped
+  mode with the HUD on.
+
+Still optional / not done: a `--profiling-funcs` named WASM build to confirm
+native findings hold under ASYNCIFY/WASM; a side-by-side Ruffle benchmark toggle
+on `demo.html`.
 
 ### Phase 3 — Optimize (profiler-driven, ordered by impact)
 

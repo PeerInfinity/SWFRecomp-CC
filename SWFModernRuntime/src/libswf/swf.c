@@ -18,6 +18,68 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+
+// In-browser performance HUD + uncapped benchmark (Phase 2 of the WASM-game
+// performance plan). Called once per rendered frame with the frame's CPU time
+// (ms) and the per-frame budget (1000/fps). It records a rolling window, draws
+// a small overlay (toggle with 'P'), and returns whether "uncapped" mode is on
+// (toggle with 'U', or URL ?perfbench=1) so the loop skips the frame-pacing
+// sleep to measure max sustainable FPS. URL ?perfhud=1 shows the HUD at load.
+// Self-contained (creates its own overlay div); no HTML-template changes needed.
+EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
+	var S = globalThis.__swfPerf;
+	if (!S) {
+		S = globalThis.__swfPerf = { buf: [], cap: 120, i: 0, frames: 0,
+			uncapped: false, hud: false, div: null, last: 0 };
+		try {
+			var q = (typeof location !== 'undefined') ? location.search : '';
+			if (q.indexOf('perfhud=1') >= 0) S.hud = true;
+			if (q.indexOf('perfbench=1') >= 0) { S.uncapped = true; S.hud = true; }
+		} catch (e) {}
+		if (typeof document !== 'undefined' && document.addEventListener) {
+			document.addEventListener('keydown', function(ev) {
+				if (ev.key === 'p' || ev.key === 'P') S.hud = !S.hud;
+				if (ev.key === 'u' || ev.key === 'U') { S.uncapped = !S.uncapped; S.hud = true; }
+				if (S.div) S.div.style.display = S.hud ? 'block' : 'none';
+			});
+		}
+	}
+	if (S.buf.length < S.cap) S.buf.push(elapsed_ms);
+	else { S.buf[S.i] = elapsed_ms; S.i = (S.i + 1) % S.cap; }
+	S.frames++;
+
+	if (S.hud && typeof document !== 'undefined') {
+		var now = (typeof performance !== 'undefined') ? performance.now() : 0;
+		if (now - S.last >= 200) {            // throttle DOM updates to ~5 Hz
+			S.last = now;
+			if (!S.div) {
+				S.div = document.createElement('div');
+				S.div.style.cssText = 'position:fixed;top:6px;left:6px;z-index:99999;'
+					+ 'font:11px/1.35 monospace;color:#7CFC00;background:rgba(0,0,0,.72);'
+					+ 'padding:6px 8px;border-radius:4px;white-space:pre;pointer-events:none';
+				(document.body || document.documentElement).appendChild(S.div);
+			}
+			S.div.style.display = 'block';
+			var a = S.buf.slice().sort(function(x, y) { return x - y; });
+			var n = a.length, sum = 0;
+			for (var k = 0; k < n; k++) sum += a[k];
+			var mean = n ? sum / n : 0;
+			var p95 = n ? a[Math.min(n - 1, Math.floor(n * 0.95))] : 0;
+			var mx = n ? a[n - 1] : 0;
+			var head = budget_ms > 0 ? (mean / budget_ms * 100) : 0;
+			var susFps = mean > 0 ? (1000 / mean) : 0;
+			var capFps = budget_ms > 0 ? (1000 / budget_ms) : 0;
+			S.div.textContent =
+				'SWF perf  ' + (S.uncapped ? '[UNCAPPED]' : '[capped ' + capFps.toFixed(0) + 'fps]') + '\n'
+				+ 'frame CPU  mean ' + mean.toFixed(2) + ' ms  p95 ' + p95.toFixed(2) + '  max ' + mx.toFixed(2) + '\n'
+				+ 'headroom   ' + head.toFixed(0) + '% of ' + budget_ms.toFixed(1) + 'ms budget\n'
+				+ 'max sustainable ~' + susFps.toFixed(0) + ' fps   (P=hud  U=uncap)';
+		}
+	} else if (S.div) {
+		S.div.style.display = 'none';
+	}
+	return S.uncapped ? 1 : 0;
+});
 #endif
 
 int quit_swf;
@@ -1018,7 +1080,8 @@ void tagMain(SWFAppContext* app_context)
 
 #ifdef __EMSCRIPTEN__
 		double elapsed = emscripten_get_now() - frame_start;
-		u32 sleep_ms = (elapsed < (double)frame_ms) ? (u32)((double)frame_ms - elapsed) : 0;
+		int perf_uncapped = swf_perf_report(elapsed, (double)frame_ms);
+		u32 sleep_ms = (!perf_uncapped && elapsed < (double)frame_ms) ? (u32)((double)frame_ms - elapsed) : 0;
 		emscripten_sleep(sleep_ms);
 #endif
 		quit_swf |= bad_poll;
@@ -1068,9 +1131,9 @@ frame_loop_exit:
 		tagShowFrame(app_context);
 #ifdef __EMSCRIPTEN__
 		double elapsed2 = emscripten_get_now() - frame_start2;
-		u32 sleep_ms2 = (frame_ms > 0) ? frame_ms : 0;
-		if (elapsed2 < (double)sleep_ms2)
-			emscripten_sleep((u32)((double)sleep_ms2 - elapsed2));
+		int perf_uncapped2 = swf_perf_report(elapsed2, (double)frame_ms);
+		if (!perf_uncapped2 && elapsed2 < (double)frame_ms)
+			emscripten_sleep((u32)((double)frame_ms - elapsed2));
 		else
 			emscripten_sleep(0);
 #endif
