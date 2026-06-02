@@ -402,35 +402,56 @@ investigated but fixing this point introduced 2 regressions at other scribble bo
 
 ---
 
-### `from_shumway/avm1/text-bind` — Noto Sans synthesized glyph outlines (~1900 outlier pixels, max diff 158)
+### `from_shumway/avm1/text-bind` — device-font file mismatch: text ~14px too low (~1900 outlier pixels, max diff 158)
 
-**Test:** image-only comparison. Expected and actual both render "SUCCESS"
-in magenta (`#d662c6`) at the same position with the same font size (42).
-Diff is purely glyph outline precision at anti-aliased edges.
+**Test:** image-only comparison. Both render "SUCCESS" in magenta
+(`#d662c6`) at the same font size (42) with correctly-formed glyphs — but
+our text sits **~14px lower** than the expected image (ours text-top
+y≈86 vs expected y≈72; identical 31px glyph height = a pure vertical
+offset). An aligned single-glyph comparison shows the glyph shapes/AA
+match Ruffle; the outliers are the vertical misalignment, not glyph
+quality.
 
-The SWF declares font_id=1 as `_sans` device font with empty `<glyphs/>`
-(`DefineFont3` with no embedded glyphs). The recompiler's Phase A
-synthesis (device-font-rendering-plan.md, commit `1401e62c`) tessellates
-ASCII 32..126 from `NotoSans.ttf` via stb_truetype + earcut. Ruffle's
-test runner rasterizes via its own font engine (cosmic-text path). Both
-produce visually identical "SUCCESS" content, but the glyph outlines
-diverge sub-pixel at the curve edges, producing ~1900 pixels with diff
-130-158 along the anti-aliased glyph boundaries. The test's
-`tolerance = 128` ceiling rules these out as outliers (above 128 is
-"outlier"); 1918 outliers exceed the 100 limit.
+**Root cause (investigated end-to-end 2026-06-02): a device-font
+font-FILE mismatch, not a layout or tessellation bug.** The SWF declares
+font_id=1 as `_sans` device font with empty `<glyphs/>` (`DefineFont3`,
+no embedded glyphs). Which Noto Sans resolves `_sans` decides the
+baseline:
 
-Same root cause class as `movieclip_hittest_shapeflag`'s Noto-Sans-vs-
-Flash entry above — our synthesized Noto Sans outlines disagree at
-sub-pixel boundaries with Ruffle's font rasterizer. Fixable only by
-switching to runtime stb_truetype rasterization that matches Ruffle's
-output exactly (Phase C of `SWFRecompDocs/plans/device-font-rendering-plan.md`),
-or by relaxing the test's tolerance ceiling. Phase C is the eventual
-destination but a substantial scope; the test functionally renders
-correctly today.
+- **Our recompiler** synthesizes device-font glyphs/metrics from its
+  bundled `SWFRecomp/assets/NotoSans.ttf` — a full Noto, `unitsPerEm=1000`,
+  `hhea.ascent=1069` = **1.069 em**. The runtime places the first-line
+  baseline at `field_top + ascent·scale + gutter`
+  (`tag.c::textfield_glyph_render_cb`), so text lands lower.
+- **The `text-bind` test dir ships its OWN `NotoSans.ttf`** (25 KB subset,
+  `unitsPerEm=1024`, `hhea.ascent=784` = **0.7656 em**) plus a `fonts.conf`
+  mapping `sans-serif`→"Noto Sans". Ruffle's oracle resolves `_sans` to
+  *that* font via fontconfig → baseline ~14px higher.
 
-**Decision:** Accept; sub-pixel glyph rasterization differences between
-our compile-time stb_truetype + earcut tessellation and Ruffle's
-runtime font engine. Content matches at the semantic level.
+**Proof:** temporarily swapping the test's `NotoSans.ttf` into
+`SWFRecomp/assets/` moves our text-top from y=86 to **y=73, matching the
+expected y=72 within 1px** (outliers 1961→1462; the residual is sub-pixel
+AA). So our text layout is correct — only the font's vertical metrics
+differ.
+
+**Why we don't "fix" it:** Ruffle's *own* bundled fallback device font
+(`core/assets/notosans.subset.ttf.gz`) is **byte-identical to our
+`assets/NotoSans.ttf`** (both 243912 bytes, 1.069 em). So in the normal
+case — real games, and any SWF/test that doesn't ship a custom device
+font — our device-font text **matches Ruffle's default**. (A bare Ruffle
+exporter run on this SWF, ignoring the test's `fonts.conf`, renders at
+y=84 ≈ our y=86.) text-bind diverges only because it bundles a custom
+metrics font we don't resolve at recompile time. Replicating per-test
+fontconfig device-font resolution in the recompiler is high-effort /
+narrow value; switching our bundled font to the 0.7656 em subset would
+fix this one test but **diverge from Ruffle's default fallback and from
+real games** — a net regression. (Note: an earlier "shrink the
+synthesized ascent" idea was wrong — it measured against this test's
+custom-font oracle rather than Ruffle's default.)
+
+**Decision:** Accept; device-font vertical metrics depend on which font
+resolves `_sans`, and our choice matches Ruffle's default fallback font.
+The divergence is specific to this test's bundled custom font.
 
 ---
 
@@ -488,7 +509,7 @@ on-stage size. Trace test continues to pass.
 | `string_paths_reference_launder` | Ruffle known failure (stack_push) | 2 | Accept; Ruffle also fails this test |
 | `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 7 | Accept; proprietary Flash font metrics |
-| `from_shumway/avm1/text-bind` | Image: Noto Sans synthesized glyph outlines vs Ruffle font engine | ~1900 px | Accept; sub-pixel rasterization diff, content matches |
+| `from_shumway/avm1/text-bind` | Image: device-font file mismatch — text ~14px too low (test ships a 0.7656 em NotoSans + fonts.conf; we use our 1.069 em bundled Noto, which matches Ruffle's default fallback) | ~1900 px | Accept; device-font vertical metrics depend on which font resolves `_sans`; we match Ruffle's default |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |

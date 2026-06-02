@@ -2,8 +2,11 @@
 hitarea
 moviecliploader
 
-# Sub-pixel glyph rasterization diff (synthesized Noto Sans vs Ruffle font engine).
-# Content renders correctly — "SUCCESS" in magenta at the expected position; only
-# ~1900 anti-aliased boundary pixels exceed the tolerance ceiling. Documented in
+# Device-font file mismatch (NOT sub-pixel rasterization): "SUCCESS" renders with
+# correct glyphs but ~14px too low. The test ships its own NotoSans.ttf (0.7656 em
+# ascent) + fonts.conf, which Ruffle resolves for `_sans`; our recompiler synthesizes
+# from its bundled NotoSans.ttf (1.069 em) — byte-identical to Ruffle's OWN default
+# fallback font, so we match Ruffle's default in the general case (real games).
+# The ~1900 outliers are the vertical offset + AA. Documented in
 # avm1/_investigation/ACCEPTED_DIFFS.md::text-bind.
 text-bind
