@@ -1,11 +1,17 @@
 # Doodle Jump — flashSubstrate integration feasibility probe
 
-> **Status: PROBE BRIEF, 2026-06-01.** Written by the Archipelago-CC side
-> for the SWFRecomp-CC instance to execute. This is a **read/write +
+> **Status: PROBE BRIEF, 2026-06-01 — EXECUTED.** Written by the Archipelago-CC
+> side for the SWFRecomp-CC instance to execute. This is a **read/write +
 > control feasibility probe**, NOT an integration build. Find out what
 > Doodle Jump exposes to injected ActionScript *first*; we decide which
 > `flashSubstrate` features it can support *after*. Do not design the
 > integration up front.
+>
+> **RESULTS:** `SWFRecompDocs/status/2026-06-01-doodle-jump-flashsubstrate-feasibility.md`
+> (Q1–Q4 possible — read/write/placement byte-identical Ruffle vs recompiled,
+> Mode-2 authoring feasible; Q5 input/perception possible, reliable keypress
+> steering partial). Reusable probe harness:
+> `ruffle-tests/tests/swfs/_swfbridge/livetest/dj_probe/`.
 
 ## Context
 

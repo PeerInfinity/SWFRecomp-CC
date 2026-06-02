@@ -94,7 +94,7 @@ is easier to localize. Sizes (run `ls -laS ~/CC/flasharchive/*.swf` to refresh):
 
 ## 3. The toolset
 
-Five tools, ordered by how early in a session you reach for them. Each has a
+Six tools, ordered by how early in a session you reach for them. Each has a
 fuller doc — this table is the "which one and why."
 
 | Tool | What it does | Browser? | Doc |
@@ -102,6 +102,7 @@ fuller doc — this table is the "which one and why."
 | **Divergence harness** (`tools/divergence/`) | Runs a SWF through SWFRecomp (graphics-native, headless) **and** Ruffle; reports the first trace + image divergence | **No** — fully headless | `SWFRecompDocs/guides/divergence-harness-usage.md` |
 | **verify_output.py** (`ruffle-tests/`) | Single-test recompile+run, NO_GRAPHICS (trace) or `--mode=graphics` (headless PNGs) | No | `ruffle-tests/.../SESSION_START_GUIDE.md` |
 | **SWF analysis** (`tools/swf-analysis/`) | Static SWF inspection (DefineText flags, glyphs, tag bytes) — compare what the SWF *contains* vs what the runtime emits | No | `tools/swf-analysis/README.md` |
+| **Injected-AS probe** (`ruffle-tests/.../_swfbridge/livetest/dj_probe/`) | Splices a custom AS class into a game's SWF (before recompiling) to **read/write/control its live AS object graph** and report via `trace()`; runs the same injected SWF under Ruffle, native, and WASM | Native headless + Ruffle/WASM headed | `…/dj_probe/README.md` |
 | **WASM probe suite** (`SWFRecomp/tests/wasm_probes/`, `tools/wasm_probe_runner.py`) | Minimal hand-built SWFs, golden-image regression for isolated browser-WASM behaviors | Headed Chrome (automated) | `SWFRecompDocs/plans/wasm-probe-suite.md`, `wasm_probes/README.md` |
 | **Browser-WASM probe** (`tools/browser-test/probe.py`) | Drives a deployed demo in headed Chrome; captures console, display-list JSON, canvas PNG. Diagnostic only | Headed Chrome | `SWFRecompDocs/guides/browser-test-harness-usage.md` |
 
@@ -135,6 +136,42 @@ local_batch baseline at once, `tools/divergence/run_local_batch.sh`.
 - **`Image: first divergence at frame N`** — rendered pixels differ.
   `max_diff` near 255 with huge outlier counts = structural (background /
   preloader); `max_diff` ≤ ~8 = sub-pixel/AA, usually not worth chasing.
+
+### 3c. Injected-AS object-graph probe
+
+The divergence harness *diffs traces* — it can't tell you the live value of an
+arbitrary variable, walk a game's object graph, or drive the game to a specific
+state on demand. For that, **inject your own AS** into the game's SWF before
+recompiling, using the same splice pipeline as the tracer:
+
+```
+Probe.as --(MTASC)--> probe.swf --(tools/divergence/extract_bytecode.py)-->
+  probe_bytecode.bin --(tools/divergence/inject_tracer.py, --bytecode)--> game_probed.swf
+```
+
+The injected class hooks a dedicated high-depth clip's `onEnterFrame` (so it
+doesn't clobber the game's own `_root.onEnterFrame`) and reads/writes the live
+graph (`_root.foo`, `mc.bar`, `for..in` enumeration, `Key.isDown`), reporting via
+`trace()`. Because `trace()` reaches stdout natively and the console under
+Ruffle/WASM, **the same injected SWF runs on all three runtimes** — so you can
+read ground truth (Ruffle) and the recompiled value (native/WASM) side by side.
+The `dj_probe/` harness is the worked example (read/write/placement/steer modes,
+plus `run_native.py`/`run_ruffle.sh`/`run_wasm.sh` drivers).
+
+When to reach for it (vs the divergence harness):
+- "What is `_root.someVar` actually *set to*?" / "what's in this MC's object
+  graph?" — enumerate it live instead of inferring from a trace diff.
+- "This bug only happens in a state the harness can't reach." — the probe can
+  **drive the game to the state itself** (e.g. force gameplay with
+  `_root.gotoAndPlay(N)` instead of relying on a menu click; see §5 gotcha on
+  native hit-testing).
+- "Does Ruffle and SWFRecomp agree on this live value/behavior?" — run the same
+  injected SWF on both; for read/write of plain AS state they are typically
+  byte-identical (deterministic `MOCK_DATE_TIME` seeding).
+
+`run_native.py --input <input.json>` also drives **clicks/keypresses headlessly**
+under native (file-driven `EV_*` events → `keys.down[]` / mouse), so injected
+keys reach `Key.isDown` without a browser — useful for input-dependent logic.
 
 ---
 
@@ -192,6 +229,30 @@ From the local_batch run (see `tools/divergence/RESULTS.md`):
    sound (Checkers/Doodle Jump fire it on both sides).
 4. **Game `trace()` can contain non-UTF8 bytes** — `grep -c '^F'` on a trace
    file reports a blank/0 count (grep treats it as binary). Use `grep -a`.
+
+Cross-runtime gotchas found via the injected-AS probe (2026-06-01, Doodle Jump):
+
+5. **Native (OFFSCREEN_RENDER) does not hit-test menu buttons.** A file-driven
+   `MOUSE_DOWN_LEFT`/`UP` at a button's coords does **not** navigate under the
+   headless native build (the `targeted_sprite` / button-press dispatch that
+   makes menu clicks work is browser-WASM-only). Ruffle (real Flash) and
+   browser-WASM **do** hit-test. To reach a click-gated state headlessly, force
+   it from injected AS (e.g. `_root.gotoAndPlay(N)`) rather than synthesizing a
+   click. (Verify the target frame first — DJ's PLAY is `gotoAndPlay(2)`, and
+   frame 6 is the INFO screen.)
+6. **`_root._currentframe` reads `undefined` in browser-WASM** (native and Ruffle
+   report the real number). Don't use `_currentframe` as a state signal when
+   diagnosing under WASM; read a game variable instead.
+7. **DJ's `Math.random`-driven layout is not perfectly cross-runtime
+   deterministic** even under `MOCK_DATE_TIME`: initial platform positions/types
+   differed Ruffle vs native, though scalar `trace()`/score *progression* matched
+   byte-for-byte. So an *image* divergence can be a genuine RNG-layout difference,
+   not a renderer bug — confirm with the trace before chasing pixels.
+8. **Ruffle in headed Chrome with software WebGL pops a "hardware acceleration is
+   disabled" modal** that covers the canvas and **intercepts clicks**. Strip it
+   from the shadow DOM before driving input (see `dj_probe/run_browser.js`'s
+   `dismissRuffleOverlay`). SWFRecomp's own WASM/WebGPU runtime has no such
+   overlay.
 
 ---
 
