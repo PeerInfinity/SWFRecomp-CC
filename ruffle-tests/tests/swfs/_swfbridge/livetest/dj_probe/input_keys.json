@@ -1,0 +1,12 @@
+[
+  { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" },
+  { "type": "KeyDown", "key": "Right" },
+  { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" },
+  { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" },
+  { "type": "KeyUp", "key": "Right" },
+  { "type": "KeyDown", "key": "Left" },
+  { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" },
+  { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" },
+  { "type": "KeyUp", "key": "Left" },
+  { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" }, { "type": "Wait" }
+]

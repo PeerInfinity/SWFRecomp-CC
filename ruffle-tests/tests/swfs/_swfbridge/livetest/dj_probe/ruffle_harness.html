@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DJ flashSubstrate probe — Ruffle (ground truth)</title>
+</head>
+<body>
+<h1>DJ probe under Ruffle</h1>
+<!-- Tier 1 (ground truth) of the Doodle Jump flashSubstrate feasibility probe.
+     Loads the probe-injected DJ SWF (dj_probed.swf) under Ruffle web — the real
+     Flash player — so the injected AS's trace() output establishes what DJ
+     inherently exposes, independent of SWFRecomp runtime bugs. The probe is
+     self-driving (it forces gameplay via _root.gotoAndPlay(6)), so no host /
+     bridge is needed for the read experiments — Ruffle just autoplays it.
+
+     logLevel:'info' routes AVM trace() to the console (avm_trace channel). -->
+<div id="ruffle-container" style="width:240px;height:400px;background:#fff;"></div>
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  var rs = document.createElement('script');
+  rs.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+  rs.onload = function () {
+    window.RufflePlayer.config = {
+      allowScriptAccess: true,
+      autoplay: 'on',
+      unmuteOverlay: 'hidden',
+      splashScreen: false,
+      warnOnUnsupportedContent: false,
+      logLevel: 'info',
+    };
+    console.log('[harness] Ruffle ready');
+    var ruffle = window.RufflePlayer.newest();
+    var player = ruffle.createPlayer();
+    player.style.width = '240px';
+    player.style.height = '400px';
+    document.getElementById('ruffle-container').appendChild(player);
+    player.traceObserver = function (m) { console.log(m); };
+    fetch('dj_probed.swf').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      player.load({ data: buf, allowScriptAccess: true, autoplay: 'on' })
+        .then(function () { console.log('[harness] SWF loaded'); })
+        .catch(function (e) { console.log('[harness] ruffle load error: ' + e); });
+    }).catch(function (e) { console.log('[harness] fetch error: ' + e); });
+  };
+  rs.onerror = function () { console.log('[harness] ERROR: failed to load Ruffle CDN'); };
+  document.head.appendChild(rs);
+</script>
+</body>
+</html>

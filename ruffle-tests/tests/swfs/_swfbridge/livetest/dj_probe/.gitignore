@@ -1,0 +1,7 @@
+# Generated probe artifacts (rebuild via build_probe.sh / run_*.sh)
+probe.swf
+probe_bytecode.bin
+dj_probed.swf
+native_run/
+ruffle_run/
+wasm_run/

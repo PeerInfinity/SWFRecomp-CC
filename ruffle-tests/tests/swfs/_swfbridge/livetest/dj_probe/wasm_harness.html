@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DJ flashSubstrate probe — SWFRecomp graphics-WASM (browser, production runtime)</title>
+</head>
+<body>
+<h1>DJ probe under SWFRecomp WASM</h1>
+<!-- Tier 3 (production runtime) of the DJ flashSubstrate feasibility probe. Runs
+     the SAME probe-injected DJ SWF, recompiled to graphics-WASM, in real headed
+     Chrome (WebGPU via WSLg). Confirms browser parity with the Ruffle ground
+     truth + native recompilation, and exercises the browser DOM-keydown -> Key
+     input path (render_webgpu.c registers emscripten keydown on #canvas, mapping
+     evt.keyCode -> keys.down[], which Key.isDown reads).
+
+     The probe self-drives via _root.gotoAndPlay(2) and reports via trace()
+     (printf -> console). swf_bridge.js is loaded only to keep the EI gate happy;
+     this probe uses trace(), not the __swfBridge contract. -->
+<canvas id="canvas" width="240" height="400" tabindex="0"
+        style="border:1px solid #ccc;"></canvas>
+<button id="btn-run" disabled>Run</button>
+
+<script src="swf_bridge.js"></script>
+<script>
+  window.__runtimeReady = false;
+  window.Module = {
+    locateFile: function (p) { return p; },
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.log('[err] ' + t); },
+    onRuntimeInitialized: function () { window.__runtimeReady = true; },
+  };
+  (function waitReady(n) {
+    if (window.__runtimeReady) {
+      document.getElementById('btn-run').disabled = false;
+      console.log('[harness] runtime ready');
+      // Auto-run so the Playwright driver doesn't need to click Run.
+      window.__startSWF();
+    } else if (n > 0) {
+      setTimeout(function () { waitReady(n - 1); }, 50);
+    } else {
+      console.log('[harness] ERROR: runtime not ready');
+    }
+  })(600);
+  window.__startSWF = function () {
+    console.log('[harness] running SWF');
+    document.getElementById('canvas').focus();
+    Module.ccall('runSWF', null, [], [], { async: true });
+  };
+  document.getElementById('btn-run').addEventListener('click', window.__startSWF);
+</script>
+<script src="Doodle_Jump_probe.js"></script>
+</body>
+</html>
