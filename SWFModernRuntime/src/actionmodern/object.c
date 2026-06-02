@@ -72,6 +72,45 @@ static int prop_name_match(const char* a, u32 alen, const char* b, u32 blen)
 	return (pa >= ea && pb >= eb);
 }
 
+// Fast pre-filter hash for property-name lookups.
+//
+// Hashes the Unicode case-FOLDED codepoint sequence (the same fold used by
+// prop_name_match's SWF<=6 path) so it is consistent with prop_name_match in
+// BOTH version modes:
+//   - SWF>=7 (exact match): byte-identical names fold identically => equal hash,
+//     so a real match is never filtered out (no false negatives). Case-variant
+//     names may collide, but prop_name_match's strncmp then rejects them.
+//   - SWF<=6 (case-insensitive): names equal-under-fold hash equal, as required.
+// It is ONLY a filter: a hash match is always confirmed by prop_name_match.
+static u32 name_fold_hash(const char* name, u32 len)
+{
+	const unsigned char* p = (const unsigned char*)name;
+	const unsigned char* e = p + len;
+	u32 h = 2166136261u; // FNV-1a offset basis
+	while (p < e)
+	{
+		unsigned char b = *p;
+		if (b < 0x80)
+		{
+			// ASCII fast path (the overwhelmingly common case): lowercase
+			// A-Z and mix one byte. Avoids the per-codepoint UTF-8 decode.
+			uint32_t c = (b >= 'A' && b <= 'Z') ? (uint32_t)(b + 32) : (uint32_t)b;
+			h = (h ^ c) * 16777619u;
+			p++;
+			continue;
+		}
+		// Non-ASCII: full Unicode decode + case fold (matches prop_name_match's
+		// SWF<=6 path). Applied uniformly at insert and lookup, so equal-under-
+		// match names always hash equal regardless of which path each char takes.
+		uint32_t c = _obj_fold_lower(_obj_utf8_decode(&p));
+		h = (h ^ (c & 0xff)) * 16777619u;
+		h = (h ^ ((c >> 8) & 0xff)) * 16777619u;
+		h = (h ^ ((c >> 16) & 0xff)) * 16777619u;
+		h = (h ^ ((c >> 24) & 0xff)) * 16777619u;
+	}
+	return h;
+}
+
 // Null-terminated SWF version-aware name comparison (exposed for tag_stubs.c)
 // Returns 1 if names match, 0 if they don't
 int swf_name_match(const char* a, const char* b)
@@ -264,11 +303,13 @@ ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL) return NULL;
 	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL)) return NULL;
+	u32 qhash = name_fold_hash(name, name_length);
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
 		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
 			continue;
-		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
+		if (obj->properties[i].name_hash == qhash &&
+		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			return &obj->properties[i];
 		}
@@ -294,14 +335,16 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 		return NULL;
 	}
 
-	// Linear search through properties
-	// For production, consider hash table for large objects
+	// Linear search through properties, gated by a precomputed name hash so the
+	// (relatively expensive) prop_name_match runs only on hash matches.
+	u32 qhash = name_fold_hash(name, name_length);
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
 		// Safety: skip corrupt property entries (NULL or very low name pointer)
 		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
 			continue;
-		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
+		if (obj->properties[i].name_hash == qhash &&
+		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Check version-based hiding (ASSetPropFlags)
 			if (FLASH_HIDE_MASK && (obj->properties[i].flash_flags & FLASH_HIDE_MASK))
@@ -437,11 +480,13 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	}
 
 	// Check if property already exists
+	u32 qhash = name_fold_hash(name, name_length);
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
 		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
 			continue;
-		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
+		if (obj->properties[i].name_hash == qhash &&
+		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Property exists - update value
 
@@ -518,6 +563,7 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	memcpy(obj->properties[index].name, name, name_length);
 	obj->properties[index].name[name_length] = '\0';
 	obj->properties[index].name_length = name_length;
+	obj->properties[index].name_hash = name_fold_hash(name, name_length);
 
 	// Set default property flags (enumerable, writable, configurable)
 	obj->properties[index].flags = PROPERTY_FLAGS_DEFAULT;
@@ -560,9 +606,11 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 	if (obj == NULL || name == NULL || value == NULL || name_length == 0) return;
 
 	// If property already exists, just update the value
+	u32 qhash = name_fold_hash(name, name_length);
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
-		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
+		if (obj->properties[i].name_hash == qhash &&
+		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Release old value
 			if (obj->properties[i].value.type == ACTION_STACK_VALUE_OBJECT)
@@ -608,9 +656,11 @@ bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name,
 	}
 
 	// Find property by name
+	u32 qhash = name_fold_hash(name, name_length);
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
-		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
+		if (obj->properties[i].name_hash == qhash &&
+		    prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Check if property is configurable (deletable)
 			if (!(obj->properties[i].flags & PROPERTY_FLAG_CONFIGURABLE))
