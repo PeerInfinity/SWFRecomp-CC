@@ -190,6 +190,28 @@ fallback). The new top costs are `name_fold_hash` (17.6%, the query hashed once
 per lookup) and the UTF-8↔UTF-16 conversion on the stack↔property bridge
 (`utf8_to_u16` 5.8% + `u16_to_utf8` 4.4% + `utf8_decode_one` 2.4% ≈ 12.6%).
 
+### Graphics-mode (OFFSCREEN_RENDER) cross-check — methodology note
+
+Profiled Doodle Jump in `graphics` mode (real `swf.c` loop + offscreen Dawn).
+Total ballooned to **4.76B** instructions (17× the no-graphics 281M), but the top
+is entirely **`libLLVM` (shader JIT) + `libvulkan_lvp.so` (llvmpipe software
+rasterizer) + Dawn/tint/spirv shader translation** — i.e. the CPU *emulating a
+GPU*. **None of this exists in the browser**, where rendering runs on the real
+GPU. So graphics-native callgrind cannot represent browser CPU cost.
+
+Filtering to *our* code, the AVM1 functions show **near-identical absolute
+instruction counts in both modes** (`name_fold_hash` 49.1M graphics vs 49.6M
+no-graphics; `findPropertySlot` 40.3M vs 40.6M; `actionGetMember` 8.56M both).
+Conclusions:
+- The AVM1 interpreter cost is **mode-invariant**; graphics just adds GPU work on
+  top. The browser offloads that GPU work, so **no-graphics is the correct proxy
+  for browser CPU cost**, and our −48.8% applies in full regardless of mode.
+- Snake and Pong (which bail in no-graphics) **run the real loop correctly** in
+  graphics mode with the new property index — additional correctness validation
+  beyond the byte-identical DJ output and the all-clean CI.
+- Step 3 below targets the AVM1 interpreter, which *is* the browser-CPU
+  bottleneck, so it is the right next lever.
+
 ### Next lever (step 3, larger change)
 The remaining big structural cost is **string handling at the AVM1 stack level**:
 member/variable opcodes pop a UTF-16 name off the stack, convert it to UTF-8 to
