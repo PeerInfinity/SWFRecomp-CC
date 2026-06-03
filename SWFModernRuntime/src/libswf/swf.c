@@ -290,6 +290,17 @@ void tagMain(SWFAppContext* app_context)
 {
 	frame_func* frame_funcs = app_context->frame_funcs;
 	u32 frame_ms = app_context->fps > 0 ? 1000 / app_context->fps : 83;
+#ifdef __EMSCRIPTEN__
+	// Wall-clock frame pacing. Sleeping (budget - work) each frame lets the
+	// per-frame sleep/timer overhead accumulate, so the movie runs slightly slow
+	// and drifts out of sync with real time (and with Ruffle/Flash, which pace
+	// off the wall clock). Instead, track the absolute time each frame is *due*
+	// (anchor + N*budget) and sleep until then, so overhead never compounds and
+	// the long-run rate is exactly app_context->fps. Use a double budget so
+	// fractional rates (e.g. 30 -> 33.333 ms) don't round-drift either.
+	double frame_budget_ms = app_context->fps > 0 ? 1000.0 / (double)app_context->fps : 83.0;
+	double next_due_ms = 0.0;  // 0 = not yet anchored (set on the first frame)
+#endif
 
 #ifdef MAX_FRAMES
 	// Test-mode termination: bound the loop. Mirrors swf_core.c's max_ticks.
@@ -1092,10 +1103,25 @@ void tagMain(SWFAppContext* app_context)
 		}
 
 #ifdef __EMSCRIPTEN__
-		double elapsed = emscripten_get_now() - frame_start;
-		int perf_uncapped = swf_perf_report(elapsed, (double)frame_ms);
-		u32 sleep_ms = (!perf_uncapped && elapsed < (double)frame_ms) ? (u32)((double)frame_ms - elapsed) : 0;
-		emscripten_sleep(sleep_ms);
+		double now_ms = emscripten_get_now();
+		double elapsed = now_ms - frame_start;
+		int perf_uncapped = swf_perf_report(elapsed, frame_budget_ms);
+		if (next_due_ms == 0.0) next_due_ms = frame_start;  // anchor to first frame
+		next_due_ms += frame_budget_ms;                      // when this frame is due to end
+		if (perf_uncapped) {
+			emscripten_sleep(0);
+			next_due_ms = now_ms;                            // don't bank credit while uncapped
+		} else {
+			double remain_ms = next_due_ms - now_ms;
+			if (remain_ms > 0.0) {
+				emscripten_sleep((u32)(remain_ms + 0.5));   // round to nearest ms; deadline self-corrects
+			} else {
+				emscripten_sleep(0);
+				// More than a full frame behind (heavy frame / backgrounded tab):
+				// resync so we don't burst a catch-up storm.
+				if (remain_ms < -frame_budget_ms) next_due_ms = now_ms;
+			}
+		}
 #endif
 		quit_swf |= bad_poll;
 	}
@@ -1143,12 +1169,23 @@ frame_loop_exit:
 
 		tagShowFrame(app_context);
 #ifdef __EMSCRIPTEN__
-		double elapsed2 = emscripten_get_now() - frame_start2;
-		int perf_uncapped2 = swf_perf_report(elapsed2, (double)frame_ms);
-		if (!perf_uncapped2 && elapsed2 < (double)frame_ms)
-			emscripten_sleep((u32)((double)frame_ms - elapsed2));
-		else
+		double now2_ms = emscripten_get_now();
+		double elapsed2 = now2_ms - frame_start2;
+		int perf_uncapped2 = swf_perf_report(elapsed2, frame_budget_ms);
+		if (next_due_ms == 0.0) next_due_ms = frame_start2;  // continue the main-loop schedule
+		next_due_ms += frame_budget_ms;
+		if (perf_uncapped2) {
 			emscripten_sleep(0);
+			next_due_ms = now2_ms;
+		} else {
+			double remain2_ms = next_due_ms - now2_ms;
+			if (remain2_ms > 0.0) {
+				emscripten_sleep((u32)(remain2_ms + 0.5));
+			} else {
+				emscripten_sleep(0);
+				if (remain2_ms < -frame_budget_ms) next_due_ms = now2_ms;
+			}
+		}
 #endif
 	}
 #endif
