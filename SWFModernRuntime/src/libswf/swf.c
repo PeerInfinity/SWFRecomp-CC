@@ -29,8 +29,8 @@
 EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 	var S = globalThis.__swfPerf;
 	if (!S) {
-		S = globalThis.__swfPerf = { buf: [], cap: 120, i: 0, frames: 0,
-			uncapped: false, hud: false, div: null, last: 0 };
+		S = globalThis.__swfPerf = { cpu: [], iv: [], cap: 120, i: 0, frames: 0,
+			uncapped: false, hud: false, div: null, last: 0, lastT: 0 };
 		try {
 			var q = (typeof location !== 'undefined') ? location.search : '';
 			if (q.indexOf('perfhud=1') >= 0) S.hud = true;
@@ -44,14 +44,19 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 			});
 		}
 	}
-	if (S.buf.length < S.cap) S.buf.push(elapsed_ms);
-	else { S.buf[S.i] = elapsed_ms; S.i = (S.i + 1) % S.cap; }
+	var nowT = (typeof performance !== 'undefined') ? performance.now() : 0;
+	// Wall-clock gap since the previous frame's report = the delivered frame
+	// period (includes the pacing sleep + any browser scheduling/jank).
+	var interval = (S.lastT > 0) ? (nowT - S.lastT) : 0;
+	S.lastT = nowT;
+
+	if (S.cpu.length < S.cap) { S.cpu.push(elapsed_ms); if (interval > 0) S.iv.push(interval); }
+	else { S.cpu[S.i] = elapsed_ms; if (interval > 0) S.iv[S.i] = interval; S.i = (S.i + 1) % S.cap; }
 	S.frames++;
 
 	if (S.hud && typeof document !== 'undefined') {
-		var now = (typeof performance !== 'undefined') ? performance.now() : 0;
-		if (now - S.last >= 200) {            // throttle DOM updates to ~5 Hz
-			S.last = now;
+		if (nowT - S.last >= 200) {            // throttle DOM updates to ~5 Hz
+			S.last = nowT;
 			if (!S.div) {
 				S.div = document.createElement('div');
 				S.div.style.cssText = 'position:fixed;top:6px;left:6px;z-index:99999;'
@@ -60,19 +65,27 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 				(document.body || document.documentElement).appendChild(S.div);
 			}
 			S.div.style.display = 'block';
-			var a = S.buf.slice().sort(function(x, y) { return x - y; });
-			var n = a.length, sum = 0;
-			for (var k = 0; k < n; k++) sum += a[k];
-			var mean = n ? sum / n : 0;
-			var p95 = n ? a[Math.min(n - 1, Math.floor(n * 0.95))] : 0;
-			var mx = n ? a[n - 1] : 0;
-			var head = budget_ms > 0 ? (mean / budget_ms * 100) : 0;
-			var susFps = mean > 0 ? (1000 / mean) : 0;
+			var stat = function(arr) {
+				var b = arr.slice().sort(function(x, y) { return x - y; });
+				var n = b.length, s = 0;
+				for (var k = 0; k < n; k++) s += b[k];
+				return { n: n, mean: n ? s / n : 0,
+					p95: n ? b[Math.min(n - 1, Math.floor(n * 0.95))] : 0,
+					max: n ? b[n - 1] : 0 };
+			};
+			var c = stat(S.cpu), v = stat(S.iv);
+			var head = budget_ms > 0 ? (c.mean / budget_ms * 100) : 0;
+			var susFps = c.mean > 0 ? (1000 / c.mean) : 0;
 			var capFps = budget_ms > 0 ? (1000 / budget_ms) : 0;
+			// "late" = delivered interval overran the target by >50% (jank/drop).
+			var lateThresh = budget_ms * 1.5, late = 0;
+			for (var j = 0; j < S.iv.length; j++) if (S.iv[j] > lateThresh) late++;
+			var devMean = v.n ? (v.mean - budget_ms) : 0;       // avg drift from target
 			S.div.textContent =
 				'SWF perf  ' + (S.uncapped ? '[UNCAPPED]' : '[capped ' + capFps.toFixed(0) + 'fps]') + '\n'
-				+ 'frame CPU  mean ' + mean.toFixed(2) + ' ms  p95 ' + p95.toFixed(2) + '  max ' + mx.toFixed(2) + '\n'
-				+ 'headroom   ' + head.toFixed(0) + '% of ' + budget_ms.toFixed(1) + 'ms budget\n'
+				+ 'frame CPU   mean ' + c.mean.toFixed(2) + '  p95 ' + c.p95.toFixed(2) + '  max ' + c.max.toFixed(2) + ' ms  (' + head.toFixed(0) + '% budget)\n'
+				+ 'frame time  mean ' + v.mean.toFixed(1) + '  p95 ' + v.p95.toFixed(1) + '  max ' + v.max.toFixed(1) + ' ms  (target ' + budget_ms.toFixed(1) + ', ' + (devMean >= 0 ? '+' : '') + devMean.toFixed(1) + ')\n'
+				+ 'late >1.5x: ' + late + ' / ' + v.n + ' frames\n'
 				+ 'max sustainable ~' + susFps.toFixed(0) + ' fps   (P=hud  U=uncap)';
 		}
 	} else if (S.div) {
