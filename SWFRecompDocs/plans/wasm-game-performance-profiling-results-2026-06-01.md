@@ -212,7 +212,23 @@ Conclusions:
 - Step 3 below targets the AVM1 interpreter, which *is* the browser-CPU
   bottleneck, so it is the right next lever.
 
-### Next lever (step 3, larger change)
+### In-browser HUD measurement — Doodle Jump is NOT CPU-bound (2026-06-02)
+
+First real browser reading (HUD, post-#1/#2 build, Doodle Jump, capped 20 fps =
+50 ms budget): **frame CPU mean 1.38 ms, p95 2.0, max 5.0 — ~3% of budget; ~723
+fps uncapped.** This quantitatively confirms the Phase 0 premise: DJ finishes a
+frame in ~1.4 ms and sleeps ~48.6 ms to hold 20 fps. Ruffle is likewise
+cap-limited, so neither is faster in *observed* FPS — explaining the "no
+difference" observation. Our −48.8% interpreter win therefore shows up as lower
+CPU%/battery and heavy-frame margin, **not** higher FPS.
+
+**Implication for step 3:** interpreter optimization has ~zero user-visible
+payoff on a game running at 3% of budget. **Step 3 is only worth doing once we
+find a genuinely CPU-bound game** (HUD headroom near/over 100%, or visible
+stutter below target fps). Use the HUD across heavier titles / stress moments
+first; gate step 3 on finding one.
+
+### Next lever (step 3, larger change — gated on finding a CPU-bound game)
 The remaining big structural cost is **string handling at the AVM1 stack level**:
 member/variable opcodes pop a UTF-16 name off the stack, convert it to UTF-8 to
 call `getProperty`, which then hashes it. Full **string interning** — names
