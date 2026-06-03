@@ -790,6 +790,54 @@ static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject
 // Place tags' consume_pending_remove block) and NO_GRAPHICS/OFFSCREEN_RENDER.
 static void clear_display_entry(SWFAppContext* app_context, size_t depth);
 
+// Recurse into a non-advancing sprite's children WITHOUT advancing the parent's
+// own playhead or re-running its frame script. Flash advances a sprite's
+// children regardless of the parent's play state — a stopped or single-frame
+// holder clip still lets its playing children animate. The main advance loop
+// `continue`s past stopped / already-placed 1-frame sprites, which used to skip
+// their children entirely (a grandchild multi-frame sprite nested inside a
+// stopped holder froze at frame 1 — e.g. Bloons' introclip.instance5.instanceN).
+// Gated on !g_advance_defer_nested (the top-level deferred root call defers all
+// nested recursion to advance_nested_sprite_frames, which runs with defer=0).
+static void advance_sprite_children_only(SWFAppContext* app_context, DisplayObject* obj)
+{
+	if (g_advance_defer_nested) return;          // deferred pass handles recursion
+	if (obj->sprite_display_list == NULL) return;
+	if (obj->sprite_max_depth == 0) return;       // no children to advance
+
+	DisplayObject* saved_dl = display_list;
+	size_t saved_max = max_depth;
+	size_t saved_cap = display_list_capacity;
+
+	display_list = obj->sprite_display_list;
+	max_depth = obj->sprite_max_depth;
+	display_list_capacity = obj->sprite_dl_capacity;
+
+	MovieClip* sprite_mc = NULL;
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+	extern MovieClip root_movieclip;
+	MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+	if (obj->instance_name != NULL)
+		sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_recurse);
+#else
+	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+	if (obj->instance_name != NULL)
+		sprite_mc = actionFindMovieClipByName(obj->instance_name);
+#endif
+	MovieClip* saved_recurse_ctx = g_current_context;
+	if (sprite_mc) actionSetCurrentContext(sprite_mc);
+	advance_sprite_frames(app_context);
+	actionSetCurrentContext(saved_recurse_ctx);
+
+	obj->sprite_display_list = display_list;
+	obj->sprite_max_depth = max_depth;
+	obj->sprite_dl_capacity = display_list_capacity;
+
+	display_list = saved_dl;
+	max_depth = saved_max;
+	display_list_capacity = saved_cap;
+}
+
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
@@ -1016,13 +1064,16 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		if (obj->sprite_initialized >= 2)
 			obj->enterframe_eligible = 1;
 
-		// Only advance if playing
-		if (!obj->sprite_is_playing) continue;
+		// Only advance the parent if playing — but still recurse into its
+		// children so nested playing sprites animate (Flash advances children
+		// regardless of the parent's play state).
+		if (!obj->sprite_is_playing) { advance_sprite_children_only(app_context, obj); continue; }
 
 		// Skip 1-frame sprites — they don't advance.
 		// But on first encounter (just_allocated), still fall through to execute
 		// frame 0 so the child display list is populated for rendering.
-		if (ch->sprite_frame_count <= 1 && !just_allocated) continue;
+		// An already-placed 1-frame holder still advances its (multi-frame) children.
+		if (ch->sprite_frame_count <= 1 && !just_allocated) { advance_sprite_children_only(app_context, obj); continue; }
 
 		// Swap to sprite's display list context
 		DisplayObject* saved_dl = display_list;
