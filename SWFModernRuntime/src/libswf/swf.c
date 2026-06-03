@@ -21,29 +21,60 @@
 
 // In-browser performance HUD + uncapped benchmark (Phase 2 of the WASM-game
 // performance plan). Called once per rendered frame with the frame's CPU time
-// (ms) and the per-frame budget (1000/fps). It records a rolling window, draws
-// a small overlay (toggle with 'P'), and returns whether "uncapped" mode is on
-// (toggle with 'U', or URL ?perfbench=1) so the loop skips the frame-pacing
-// sleep to measure max sustainable FPS. URL ?perfhud=1 shows the HUD at load.
-// Self-contained (creates its own overlay div); no HTML-template changes needed.
+// (ms) and the per-frame budget (1000/fps). Records a rolling window and shows a
+// small overlay with two on-screen buttons: "Perf HUD" toggles the stats panel,
+// "Uncapped" toggles flat-out mode (skips the frame-pacing sleep to measure max
+// sustainable FPS). Returns whether uncapped is on. URL ?perfhud=1 shows the
+// stats at load; ?perfbench=1 also starts uncapped. Self-contained (creates its
+// own DOM, including the buttons); no HTML-template changes needed.
 EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 	var S = globalThis.__swfPerf;
 	if (!S) {
 		S = globalThis.__swfPerf = { cpu: [], iv: [], cap: 120, i: 0, frames: 0,
-			uncapped: false, hud: false, div: null, last: 0, lastT: 0 };
+			uncapped: false, hud: false, ui: null, pre: null, bH: null, bU: null,
+			last: 0, lastT: 0 };
 		try {
 			var q = (typeof location !== 'undefined') ? location.search : '';
 			if (q.indexOf('perfhud=1') >= 0) S.hud = true;
 			if (q.indexOf('perfbench=1') >= 0) { S.uncapped = true; S.hud = true; }
 		} catch (e) {}
-		if (typeof document !== 'undefined' && document.addEventListener) {
-			document.addEventListener('keydown', function(ev) {
-				if (ev.key === 'p' || ev.key === 'P') S.hud = !S.hud;
-				if (ev.key === 'u' || ev.key === 'U') { S.uncapped = !S.uncapped; S.hud = true; }
-				if (S.div) S.div.style.display = S.hud ? 'block' : 'none';
-			});
-		}
 	}
+	// Build the control UI once (on the first frame after the document is ready).
+	if (!S.ui && typeof document !== 'undefined' && document.createElement && document.body) {
+		var mkBtn = function(txt, cb) {
+			var b = document.createElement('button');
+			b.textContent = txt;
+			b.style.cssText = 'font:11px monospace;margin:0 4px 0 0;padding:2px 6px;'
+				+ 'cursor:pointer;border:1px solid #7CFC00;background:#111;color:#7CFC00;border-radius:3px';
+			b.onclick = cb;
+			return b;
+		};
+		var box = document.createElement('div');
+		box.style.cssText = 'position:fixed;top:6px;left:6px;z-index:99999;'
+			+ 'font:11px/1.35 monospace;color:#7CFC00;background:rgba(0,0,0,.72);'
+			+ 'padding:6px 8px;border-radius:4px;pointer-events:auto';
+		var bH = mkBtn('Perf HUD: ' + (S.hud ? 'ON' : 'OFF'), function() {
+			S.hud = !S.hud;
+			S.bH.textContent = 'Perf HUD: ' + (S.hud ? 'ON' : 'OFF');
+			S.pre.style.display = S.hud ? 'block' : 'none';
+		});
+		var bU = mkBtn('Uncapped: ' + (S.uncapped ? 'ON' : 'OFF'), function() {
+			S.uncapped = !S.uncapped;
+			S.bU.textContent = 'Uncapped: ' + (S.uncapped ? 'ON' : 'OFF');
+			S.hud = true;
+			S.bH.textContent = 'Perf HUD: ON';
+			S.pre.style.display = 'block';
+		});
+		var bar = document.createElement('div');
+		bar.appendChild(bH); bar.appendChild(bU);
+		var pre = document.createElement('pre');
+		pre.style.cssText = 'margin:6px 0 0;white-space:pre';
+		pre.style.display = S.hud ? 'block' : 'none';
+		box.appendChild(bar); box.appendChild(pre);
+		document.body.appendChild(box);
+		S.ui = box; S.pre = pre; S.bH = bH; S.bU = bU;
+	}
+
 	var nowT = (typeof performance !== 'undefined') ? performance.now() : 0;
 	// Wall-clock gap since the previous frame's report = the delivered frame
 	// period (includes the pacing sleep + any browser scheduling/jank).
@@ -54,42 +85,30 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 	else { S.cpu[S.i] = elapsed_ms; if (interval > 0) S.iv[S.i] = interval; S.i = (S.i + 1) % S.cap; }
 	S.frames++;
 
-	if (S.hud && typeof document !== 'undefined') {
-		if (nowT - S.last >= 200) {            // throttle DOM updates to ~5 Hz
-			S.last = nowT;
-			if (!S.div) {
-				S.div = document.createElement('div');
-				S.div.style.cssText = 'position:fixed;top:6px;left:6px;z-index:99999;'
-					+ 'font:11px/1.35 monospace;color:#7CFC00;background:rgba(0,0,0,.72);'
-					+ 'padding:6px 8px;border-radius:4px;white-space:pre;pointer-events:none';
-				(document.body || document.documentElement).appendChild(S.div);
-			}
-			S.div.style.display = 'block';
-			var stat = function(arr) {
-				var b = arr.slice().sort(function(x, y) { return x - y; });
-				var n = b.length, s = 0;
-				for (var k = 0; k < n; k++) s += b[k];
-				return { n: n, mean: n ? s / n : 0,
-					p95: n ? b[Math.min(n - 1, Math.floor(n * 0.95))] : 0,
-					max: n ? b[n - 1] : 0 };
-			};
-			var c = stat(S.cpu), v = stat(S.iv);
-			var head = budget_ms > 0 ? (c.mean / budget_ms * 100) : 0;
-			var susFps = c.mean > 0 ? (1000 / c.mean) : 0;
-			var capFps = budget_ms > 0 ? (1000 / budget_ms) : 0;
-			// "late" = delivered interval overran the target by >50% (jank/drop).
-			var lateThresh = budget_ms * 1.5, late = 0;
-			for (var j = 0; j < S.iv.length; j++) if (S.iv[j] > lateThresh) late++;
-			var devMean = v.n ? (v.mean - budget_ms) : 0;       // avg drift from target
-			S.div.textContent =
-				'SWF perf  ' + (S.uncapped ? '[UNCAPPED]' : '[capped ' + capFps.toFixed(0) + 'fps]') + '\n'
-				+ 'frame CPU   mean ' + c.mean.toFixed(2) + '  p95 ' + c.p95.toFixed(2) + '  max ' + c.max.toFixed(2) + ' ms  (' + head.toFixed(0) + '% budget)\n'
-				+ 'frame time  mean ' + v.mean.toFixed(1) + '  p95 ' + v.p95.toFixed(1) + '  max ' + v.max.toFixed(1) + ' ms  (target ' + budget_ms.toFixed(1) + ', ' + (devMean >= 0 ? '+' : '') + devMean.toFixed(1) + ')\n'
-				+ 'late >1.5x: ' + late + ' / ' + v.n + ' frames\n'
-				+ 'max sustainable ~' + susFps.toFixed(0) + ' fps   (P=hud  U=uncap)';
-		}
-	} else if (S.div) {
-		S.div.style.display = 'none';
+	if (S.hud && S.pre && nowT - S.last >= 200) {   // throttle DOM updates to ~5 Hz
+		S.last = nowT;
+		var stat = function(arr) {
+			var b = arr.slice().sort(function(x, y) { return x - y; });
+			var n = b.length, s = 0;
+			for (var k = 0; k < n; k++) s += b[k];
+			return { n: n, mean: n ? s / n : 0,
+				p95: n ? b[Math.min(n - 1, Math.floor(n * 0.95))] : 0,
+				max: n ? b[n - 1] : 0 };
+		};
+		var c = stat(S.cpu), v = stat(S.iv);
+		var head = budget_ms > 0 ? (c.mean / budget_ms * 100) : 0;
+		var susFps = c.mean > 0 ? (1000 / c.mean) : 0;
+		var capFps = budget_ms > 0 ? (1000 / budget_ms) : 0;
+		// "late" = delivered interval overran the target by >50% (jank/drop).
+		var lateThresh = budget_ms * 1.5, late = 0;
+		for (var j = 0; j < S.iv.length; j++) if (S.iv[j] > lateThresh) late++;
+		var devMean = v.n ? (v.mean - budget_ms) : 0;       // avg drift from target
+		S.pre.textContent =
+			'SWF perf  ' + (S.uncapped ? '[UNCAPPED]' : '[capped ' + capFps.toFixed(0) + 'fps]') + '\n'
+			+ 'frame CPU   mean ' + c.mean.toFixed(2) + '  p95 ' + c.p95.toFixed(2) + '  max ' + c.max.toFixed(2) + ' ms  (' + head.toFixed(0) + '% budget)\n'
+			+ 'frame time  mean ' + v.mean.toFixed(1) + '  p95 ' + v.p95.toFixed(1) + '  max ' + v.max.toFixed(1) + ' ms  (target ' + budget_ms.toFixed(1) + ', ' + (devMean >= 0 ? '+' : '') + devMean.toFixed(1) + ')\n'
+			+ 'late >1.5x: ' + late + ' / ' + v.n + ' frames\n'
+			+ 'max sustainable ~' + susFps.toFixed(0) + ' fps';
 	}
 	return S.uncapped ? 1 : 0;
 });

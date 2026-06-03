@@ -134,9 +134,12 @@ post-quit drain loop):
   loop runs flat-out, giving an apples-to-apples max-FPS number vs Ruffle.
 
 Usage (works on `docs/demo.html` and any page hosting a graphics WASM build):
-- Key **`P`** toggles the HUD; key **`U`** toggles uncapped mode.
-- URL **`?perfhud=1`** shows the HUD at load; **`?perfbench=1`** loads in uncapped
-  mode with the HUD on.
+- Two on-screen **buttons** (top-left, created by the hook itself): **"Perf HUD"**
+  toggles the stats panel; **"Uncapped"** toggles flat-out mode. Buttons are
+  always visible (reliable regardless of page focus, unlike the old keyboard
+  toggles).
+- URL **`?perfhud=1`** shows the stats at load; **`?perfbench=1`** loads in
+  uncapped mode with the stats on.
 
 Still optional / not done: a `--profiling-funcs` named WASM build to confirm
 native findings hold under ASYNCIFY/WASM; a side-by-side Ruffle benchmark toggle
