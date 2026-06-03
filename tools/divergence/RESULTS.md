@@ -102,9 +102,16 @@ SWFRecomp emits a spurious `_root instance3=undefined` global instead. Image:
 frame 1, `max_diff=255`, 51067 outliers.
 
 ### Bloons
-Trace diverges at line 0 — Ruffle's first line is `MochiServices Connecting…`
-(MochiAds network init), which SWFRecomp (no network layer) never emits. Image:
-frame 1, full-frame (`max_diff=255`, 1228800 outliers).
+**RE-RUN 2026-06-03 (cont. 18) with the fixed tracer; one fix landed (`2a090d60d`).**
+After the two accepted diffs (Ruffle's `MochiServices Connecting…` Mochi-stub line +
+`$version` LNX/WIN) the traces match byte-for-byte through F10. Two real divergences:
+(1) **FIXED** — `introclip.instance5.instance7-10` (multi-frame sprites nested in a
+1-frame holder) froze at `_cf=1` in swfrecomp vs Ruffle's 1→7; stopped/1-frame parent
+sprites now recurse into children (`advance_sprite_children_only`, tag.c). (2) **OPEN
+(deep, deferred — PROGRESS.md #14)** — the obfuscated root intro loop's `gotoAndStop("intro")`
+(in `script_118`) is a recompiler bytecode parse desync (emits invalid `0xfb`/`0x5e`),
+so swfrecomp advances linearly past the intro into the game where Ruffle loops it (the
+F11 line-jump). Image: frame 1, full-frame (`max_diff=255`).
 
 ### Bloons TD
 Trace diverges at line 5 — `_root.reserved` placement plus a frame-advance
