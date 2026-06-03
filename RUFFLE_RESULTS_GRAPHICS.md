@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `f0f555f76ce4`  
-**Date:** 2026-06-03 03:53 UTC  
-**Total duration:** 22m56s
+**Commit:** `257f96acd0f8`  
+**Date:** 2026-06-03 17:58 UTC  
+**Total duration:** 22m25s
 
 ## Results by Suite
 
@@ -78,30 +78,30 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 *No changes since last run.*
 
-*Comparing `367645c99d44` → `f0f555f76ce4`*
+*Comparing `f0f555f76ce4` → `257f96acd0f8`*
 
 ## Per-Suite Details
 
 ### avm1
 
 - **Pass:** 616/673 (91.5%)
-- **Duration:** 12m55s across 30 shards
+- **Duration:** 12m25s across 30 shards
 - **Lines:** 106,865/116,485 matching (91.7%)
-- **Avg test duration:** 1.1s — slowest: `native_double_construct` (10.0s)
+- **Avg test duration:** 1.0s — slowest: `stage_property_representation` (8.7s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 132/243 (54.3%)
-- **Duration:** 4m31s across 30 shards
+- **Duration:** 4m33s across 30 shards
 - **Lines:** 29,839/38,791 matching (76.9%)
-- **Avg test duration:** 1.1s — slowest: `MovieClip-v8` (2.8s)
+- **Avg test duration:** 1.1s — slowest: `MovieClip-v8` (2.5s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 65/110 (59.1%)
-- **Duration:** 2m22s across 30 shards
+- **Duration:** 2m19s across 30 shards
 - **Lines:** 4,014/5,239 matching (76.6%)
-- **Avg test duration:** 1.2s — slowest: `matrix_test` (5.8s)
+- **Avg test duration:** 1.2s — slowest: `matrix_test` (4.9s)
 
 ### from_gnash/misc-mtasc.all
 
@@ -115,25 +115,25 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 - **Pass:** 8/19 (42.1%)
 - **Duration:** 19s across 30 shards
 - **Lines:** 424/557 matching (76.1%)
-- **Avg test duration:** 0.9s — slowest: `action_execution_order_test10` (1.1s)
+- **Avg test duration:** 0.9s — slowest: `edittext_test1` (1.1s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 20s across 30 shards
+- **Duration:** 21s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 0.9s — slowest: `background` (1.3s)
+- **Avg test duration:** 1.0s — slowest: `missing_bitmap` (1.5s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 1m33s across 30 shards
+- **Duration:** 1m32s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 1.0s — slowest: `timeline/timeline_as2_5` (2.6s)
+- **Avg test duration:** 0.9s — slowest: `timeline/timeline_as2_5` (2.8s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
 - **Duration:** 46s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 0.9s — slowest: `levels` (1.4s)
+- **Avg test duration:** 0.9s — slowest: `scope` (1.2s)
