@@ -21,59 +21,29 @@
 
 // In-browser performance HUD + uncapped benchmark (Phase 2 of the WASM-game
 // performance plan). Called once per rendered frame with the frame's CPU time
-// (ms) and the per-frame budget (1000/fps). Records a rolling window and shows a
-// small overlay with two on-screen buttons: "Perf HUD" toggles the stats panel,
-// "Uncapped" toggles flat-out mode (skips the frame-pacing sleep to measure max
-// sustainable FPS). Returns whether uncapped is on. URL ?perfhud=1 shows the
-// stats at load; ?perfbench=1 also starts uncapped. Self-contained (creates its
-// own DOM, including the buttons); no HTML-template changes needed.
+// (ms) and the per-frame budget (1000/fps). Records a rolling window. Visibility
+// is OFF by default and driven externally by the host page's "Toggle HUD" button
+// via window.__swfHudOn; the URL ?perfhud=1 / ?perfbench=1 also enable it (a
+// standalone fallback for pages without that button). When shown it renders a
+// stats panel (frame CPU + delivered frame-time + late count + max FPS) plus an
+// "Uncapped" button that skips the frame-pacing sleep to measure max sustainable
+// FPS. Returns whether uncapped is on.
 EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 	var S = globalThis.__swfPerf;
 	if (!S) {
 		S = globalThis.__swfPerf = { cpu: [], iv: [], cap: 120, i: 0, frames: 0,
-			uncapped: false, hud: false, ui: null, pre: null, bH: null, bU: null,
-			last: 0, lastT: 0 };
+			uncapped: false, ui: null, pre: null, bU: null, last: 0, lastT: 0 };
+		try { if (location.search.indexOf('perfbench=1') >= 0) S.uncapped = true; } catch (e) {}
+	}
+	// Standalone fallback: if no host page set the visibility flag, derive the
+	// initial state from the URL so ?perfhud=1 / ?perfbench=1 still work.
+	if (typeof window !== 'undefined' && window.__swfHudOn === undefined) {
 		try {
-			var q = (typeof location !== 'undefined') ? location.search : '';
-			if (q.indexOf('perfhud=1') >= 0) S.hud = true;
-			if (q.indexOf('perfbench=1') >= 0) { S.uncapped = true; S.hud = true; }
-		} catch (e) {}
+			var q = location.search;
+			window.__swfHudOn = (q.indexOf('perfhud=1') >= 0 || q.indexOf('perfbench=1') >= 0);
+		} catch (e) { window.__swfHudOn = false; }
 	}
-	// Build the control UI once (on the first frame after the document is ready).
-	if (!S.ui && typeof document !== 'undefined' && document.createElement && document.body) {
-		var mkBtn = function(txt, cb) {
-			var b = document.createElement('button');
-			b.textContent = txt;
-			b.style.cssText = 'font:11px monospace;margin:0 4px 0 0;padding:2px 6px;'
-				+ 'cursor:pointer;border:1px solid #7CFC00;background:#111;color:#7CFC00;border-radius:3px';
-			b.onclick = cb;
-			return b;
-		};
-		var box = document.createElement('div');
-		box.style.cssText = 'position:fixed;top:6px;left:6px;z-index:99999;'
-			+ 'font:11px/1.35 monospace;color:#7CFC00;background:rgba(0,0,0,.72);'
-			+ 'padding:6px 8px;border-radius:4px;pointer-events:auto';
-		var bH = mkBtn('Perf HUD: ' + (S.hud ? 'ON' : 'OFF'), function() {
-			S.hud = !S.hud;
-			S.bH.textContent = 'Perf HUD: ' + (S.hud ? 'ON' : 'OFF');
-			S.pre.style.display = S.hud ? 'block' : 'none';
-		});
-		var bU = mkBtn('Uncapped: ' + (S.uncapped ? 'ON' : 'OFF'), function() {
-			S.uncapped = !S.uncapped;
-			S.bU.textContent = 'Uncapped: ' + (S.uncapped ? 'ON' : 'OFF');
-			S.hud = true;
-			S.bH.textContent = 'Perf HUD: ON';
-			S.pre.style.display = 'block';
-		});
-		var bar = document.createElement('div');
-		bar.appendChild(bH); bar.appendChild(bU);
-		var pre = document.createElement('pre');
-		pre.style.cssText = 'margin:6px 0 0;white-space:pre';
-		pre.style.display = S.hud ? 'block' : 'none';
-		box.appendChild(bar); box.appendChild(pre);
-		document.body.appendChild(box);
-		S.ui = box; S.pre = pre; S.bH = bH; S.bU = bU;
-	}
+	var on = (typeof window !== 'undefined' && window.__swfHudOn) ? true : false;
 
 	var nowT = (typeof performance !== 'undefined') ? performance.now() : 0;
 	// Wall-clock gap since the previous frame's report = the delivered frame
@@ -85,7 +55,29 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 	else { S.cpu[S.i] = elapsed_ms; if (interval > 0) S.iv[S.i] = interval; S.i = (S.i + 1) % S.cap; }
 	S.frames++;
 
-	if (S.hud && S.pre && nowT - S.last >= 200) {   // throttle DOM updates to ~5 Hz
+	// Build the panel lazily the first time it is shown (default: hidden).
+	if (on && !S.ui && typeof document !== 'undefined' && document.createElement && document.body) {
+		var box = document.createElement('div');
+		box.style.cssText = 'position:fixed;top:6px;left:6px;z-index:99999;'
+			+ 'font:11px/1.35 monospace;color:#7CFC00;background:rgba(0,0,0,.72);'
+			+ 'padding:6px 8px;border-radius:4px;pointer-events:auto';
+		var bU = document.createElement('button');
+		bU.textContent = 'Uncapped: ' + (S.uncapped ? 'ON' : 'OFF');
+		bU.style.cssText = 'font:11px monospace;margin:0 0 4px;padding:2px 6px;cursor:pointer;'
+			+ 'border:1px solid #7CFC00;background:#111;color:#7CFC00;border-radius:3px';
+		bU.onclick = function() {
+			S.uncapped = !S.uncapped;
+			S.bU.textContent = 'Uncapped: ' + (S.uncapped ? 'ON' : 'OFF');
+		};
+		var pre = document.createElement('pre');
+		pre.style.cssText = 'margin:0;white-space:pre';
+		box.appendChild(bU); box.appendChild(pre);
+		document.body.appendChild(box);
+		S.ui = box; S.pre = pre; S.bU = bU;
+	}
+	if (S.ui) S.ui.style.display = on ? 'block' : 'none';
+
+	if (on && S.pre && nowT - S.last >= 200) {   // throttle DOM updates to ~5 Hz
 		S.last = nowT;
 		var stat = function(arr) {
 			var b = arr.slice().sort(function(x, y) { return x - y; });

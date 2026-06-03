@@ -121,6 +121,9 @@
         .btn-compare { background: #1565C0; color: white; }
         .btn-compare:hover { background: #1256A0; }
         .btn-compare.active { background: #0D47A1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
+        .btn-hud { background: #2E7D32; color: white; }
+        .btn-hud:hover { background: #276A2B; }
+        .btn-hud.active { background: #1B5E20; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
 
         /* Status bar */
         .status {
@@ -304,6 +307,7 @@
                     <button class="btn-run" id="btn-run" disabled onclick="runSwf()">Run SWF</button>
                     <button class="btn-secondary" onclick="clearOutput()">Clear Output</button>
                     <button class="btn-compare" id="btn-compare" onclick="toggleComparison()">Toggle Comparison</button>
+                    <button class="btn-hud" id="btn-hud" onclick="toggleHud()">Toggle HUD</button>
                     <button class="btn-secondary" onclick="location.href='demo.html'">New SWF</button>
                 </div>
 
@@ -494,6 +498,10 @@
         if (isGraphics) {
             document.getElementById('canvas-wrap').style.display = 'block';
             document.getElementById('btn-run').classList.add('graphics');
+        } else {
+            // The perf HUD only updates from the graphics frame loop, so hide its
+            // toggle on trace (NO_GRAPHICS) tests where it would do nothing.
+            document.getElementById('btn-hud').style.display = 'none';
         }
 
         // --- Footer ---
@@ -752,6 +760,32 @@
             // Delay to let DOM settle
             setTimeout(function() { window.toggleComparison(); }, 100);
         }
+
+        // --- Performance HUD toggle (off by default) ---
+        // The HUD overlay itself is created by the WASM runtime (swf.c) when
+        // window.__swfHudOn is true; this button just flips that flag, like the
+        // comparison toggle flips its panel.
+        window.toggleHud = function() {
+            window.__swfHudOn = !window.__swfHudOn;
+            var btn = document.getElementById('btn-hud');
+            if (btn) btn.classList.toggle('active', !!window.__swfHudOn);
+            var np = new URLSearchParams(window.location.search);
+            if (window.__swfHudOn) {
+                np.set('perfhud', '1');
+            } else {
+                np.delete('perfhud');
+                np.delete('perfbench');
+            }
+            history.replaceState(null, '', '?' + np.toString());
+        };
+
+        // Initial state: off unless ?perfhud=1 / ?perfbench=1 is present.
+        var perfhudParam = params.get('perfhud') === '1' || params.get('perfbench') === '1';
+        window.__swfHudOn = perfhudParam;
+        (function() {
+            var b = document.getElementById('btn-hud');
+            if (b) b.classList.toggle('active', perfhudParam);
+        })();
 
         // Global error handler
         window.onerror = function(msg) {

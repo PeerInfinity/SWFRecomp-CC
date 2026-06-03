@@ -133,13 +133,16 @@ post-quit drain loop):
 - **Uncapped benchmark mode** — skips the frame-pacing `emscripten_sleep` so the
   loop runs flat-out, giving an apples-to-apples max-FPS number vs Ruffle.
 
-Usage (works on `docs/demo.html` and any page hosting a graphics WASM build):
-- Two on-screen **buttons** (top-left, created by the hook itself): **"Perf HUD"**
-  toggles the stats panel; **"Uncapped"** toggles flat-out mode. Buttons are
-  always visible (reliable regardless of page focus, unlike the old keyboard
-  toggles).
-- URL **`?perfhud=1`** shows the stats at load; **`?perfbench=1`** loads in
-  uncapped mode with the stats on.
+Usage:
+- **Off by default.** `docs2/demo.html` has a **"Toggle HUD"** button (next to
+  "Toggle Comparison") that flips `window.__swfHudOn`; the runtime hook reads that
+  flag and shows/hides the overlay. The button is hidden on trace (NO_GRAPHICS)
+  tests where the HUD never updates.
+- When shown, the overlay carries an in-panel **"Uncapped"** button (flat-out
+  mode, to read max sustainable FPS).
+- URL **`?perfhud=1`** shows the stats at load; **`?perfbench=1`** also starts
+  uncapped. These also work as a standalone fallback on pages without the
+  Toggle HUD button (the hook derives the initial flag from the URL).
 
 Still optional / not done: a `--profiling-funcs` named WASM build to confirm
 native findings hold under ASYNCIFY/WASM; a side-by-side Ruffle benchmark toggle
