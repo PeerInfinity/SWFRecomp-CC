@@ -211,28 +211,66 @@ explicit (see §7).
 
 ---
 
-## 5. Known harness limits (carry these into every session)
+## 5. Known harness limits & gotchas (carry these into every session)
 
-From the local_batch run (see `tools/divergence/RESULTS.md`):
+The single home for divergence-debugging gotchas (consolidated 2026-06-10;
+`tools/divergence/PROGRESS.md` used to hold a second list). **Add new ones
+here, not in PROGRESS.md.**
 
-1. **`MAX_CAPTURES 16` (`SWFModernRuntime/src/libswf/capture.c`)** — image
-   comparison only ever covers the **first 16 frames** regardless of `--frames`.
-   The tick loop runs the full count; only PNG capture is capped. Bump the
-   `#define` + rebuild to see later frames. (This is why Checkers reads
-   "identical" at 16 frames — its real divergence is at frame 19.)
-2. **30s recompile timeout (`ruffle-tests/verify_output.py::recompile_swf`)** —
-   large injected SWFs (Art of War 1.5MB, Castle Hero 14MB) time out. The docs2
-   WASM build path uses a longer timeout, so the *demo* still builds. Bump the
-   30s limit to diverge-test big games.
-3. **Tracer `_root.onEnterFrame` doesn't dispatch for Snake** (the only
-   originally-v5 SWF) — image-only comparison for it. The mechanism is otherwise
-   sound (Checkers/Doodle Jump fire it on both sides).
-4. **Game `trace()` can contain non-UTF8 bytes** — `grep -c '^F'` on a trace
+### Harness limits
+
+1. **Image comparison covers only the first 16 frames by default** — set the
+   `CAPTURE_MAX=<n>` env var (`ed198c7b7`; no rebuild needed). The tick loop
+   runs the full `--frames` count; only PNG capture is capped. (This is why
+   Checkers read "identical" at 16 frames — its real divergence is at
+   frame 19.)
+2. **Recompile timeout is 30s by default** — set
+   `SWFRECOMP_RECOMPILE_TIMEOUT=600` (env, `ed198c7b7`) for big games (>~2MB,
+   e.g. Art of War, Castle Hero; the docs2 WASM build path has its own longer
+   timeout). There is ALSO a hardcoded **300s per-file compile timeout** in
+   `verify_output.py`: a generated `script_defs.c` with one enormous function
+   (e.g. a 152k-line garbage `DefineFunction2`) blowing past it is a
+   *parse-desync symptom*, not a real game. A legit big game's `draws.c`
+   (Tron: 51MB) compiles fine — `script_defs.c` is the one to watch.
+3. **The harness compares against Ruffle's headless *exporter*, not the live
+   browser player.** They can differ (preloader/streaming/wall-clock timing).
+   "Trace: identical" does NOT prove a match with real Flash — both headless
+   tools can be equally stuck (e.g. a preloader that only advances under real
+   wall-clock).
+4. **The tracer must not clobber game handlers** — it hooks a dedicated
+   `__tracer__` clip's `onEnterFrame`, not `_root`'s (`6a08f06aa`). Any
+   divergence result produced *before* that commit for a
+   `_root.onEnterFrame`-driven game ran with the game's root loop disabled —
+   **invalid, re-run**.
+5. **v5 SWFs with PlaceObject2 clip-event handlers**: the injector's version
+   bump to ≥6 changes CLIPACTIONS flag width (UI16→UI32); the injector
+   rewrites them (`36fb13708`). If a v5 game still produces a giant garbage
+   `DefineFunction2` / "compilation timed out", suspect a *new*
+   version-dependent record the injector doesn't rewrite (CLIPACTIONS is the
+   only one in practice). The recompiler is CORRECT on native-version SWFs —
+   always compare a clean native recompile vs the injected one to tell an
+   injector bug from a recompiler bug.
+6. **Game `trace()` can contain non-UTF8 bytes** — `grep -c '^F'` on a trace
    file reports a blank/0 count (grep treats it as binary). Use `grep -a`.
+7. **Graphics-mode SIGABRT *after* correct output = a real heap UAF/OOB, not
+   a CI flake.** ASAN-pin it (`--asan`). See memory
+   `graphics-sigabrt-real-heap-bugs`.
+8. **Browser-probe canvas capture** of a live WebGPU canvas fails (Playwright
+   stability timeout); only the display-list JSON is reliable there. And
+   automated headed Chrome may throttle rAF (demo runs slowly / looks stuck).
 
-Cross-runtime gotchas found via the injected-AS probe (2026-06-01, Doodle Jump):
+### Runtime-behavior gotchas
 
-5. **Native (OFFSCREEN_RENDER) does not hit-test menu buttons.** A file-driven
+9. **`_alpha` reads the placement/timeline CXFORM alpha** (`mcReadAlpha`,
+   `0973204c3`/`f9efc2740`) — gated on `has_cxform` (placement CXFORM present)
+   AND `!(as_set_flags & 32)` (script hasn't set `_alpha`). The display
+   entry's `cx_aa` is only trustworthy when `has_cxform` (else uninitialized
+   0) and as the *pre-script* value (the `_alpha` setter's write-through can
+   miss a nested entry).
+
+### Cross-runtime gotchas (found via the injected-AS probe, 2026-06-01, Doodle Jump)
+
+10. **Native (OFFSCREEN_RENDER) does not hit-test menu buttons.** A file-driven
    `MOUSE_DOWN_LEFT`/`UP` at a button's coords does **not** navigate under the
    headless native build (the `targeted_sprite` / button-press dispatch that
    makes menu clicks work is browser-WASM-only). Ruffle (real Flash) and
@@ -240,15 +278,15 @@ Cross-runtime gotchas found via the injected-AS probe (2026-06-01, Doodle Jump):
    it from injected AS (e.g. `_root.gotoAndPlay(N)`) rather than synthesizing a
    click. (Verify the target frame first — DJ's PLAY is `gotoAndPlay(2)`, and
    frame 6 is the INFO screen.)
-6. **`_root._currentframe` reads `undefined` in browser-WASM** (native and Ruffle
+11. **`_root._currentframe` reads `undefined` in browser-WASM** (native and Ruffle
    report the real number). Don't use `_currentframe` as a state signal when
    diagnosing under WASM; read a game variable instead.
-7. **DJ's `Math.random`-driven layout is not perfectly cross-runtime
+12. **DJ's `Math.random`-driven layout is not perfectly cross-runtime
    deterministic** even under `MOCK_DATE_TIME`: initial platform positions/types
    differed Ruffle vs native, though scalar `trace()`/score *progression* matched
    byte-for-byte. So an *image* divergence can be a genuine RNG-layout difference,
    not a renderer bug — confirm with the trace before chasing pixels.
-8. **Ruffle in headed Chrome with software WebGL pops a "hardware acceleration is
+13. **Ruffle in headed Chrome with software WebGL pops a "hardware acceleration is
    disabled" modal** that covers the canvas and **intercepts clicks**. Strip it
    from the shadow DOM before driving input (see `dj_probe/run_browser.js`'s
    `dismissRuffleOverlay`). SWFRecomp's own WASM/WebGPU runtime has no such
@@ -278,7 +316,7 @@ GRAPHICS_BUILD_TIMEOUT=1800 SWFRecomp/scripts/build_swf_batch.sh <swf_dir> \
 
 `--clean` is **required** when runtime `.c` changed (the runtime is compiled into
 each demo's `.wasm`). Full build/deploy reference:
-`SWFRecompDocs/building-docs2-demos.md`.
+`SWFRecompDocs/guides/building-docs2-demos.md`.
 
 ### Two CI build modes — know which one your change touches
 
