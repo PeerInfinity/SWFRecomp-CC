@@ -201,3 +201,7 @@ tools/wasm_probe_runner_out/
 
 # APCpp datapackage cache (dropped in cwd by native WITH_AP livetests)
 APCpp_datapkg.cache
+
+# Untracked planning / working documents (session notes, cleanup plans).
+# Deliberately local-only: drafts live here before graduating to SWFRecompDocs.
+NewDocs/
