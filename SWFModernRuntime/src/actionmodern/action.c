@@ -30548,8 +30548,17 @@ void actionPlay(SWFAppContext* app_context)
 	// Modern arm: see comment in actionStop. Same widening applies.
 	{
 		extern int g_settarget_none;
+		extern int g_settarget_explicit_root;
 		if (g_settarget_none) return;
-		if (ng_isInsideSprite()) { ng_playCurrentSprite(); return; }
+		// SetTarget("_root") in effect: Play targets the ROOT, not the
+		// executing sprite. Mirrors actionGotoFrame's explicit-root branch;
+		// graphics-native stops the root for the inline goto catch-up and
+		// relies on the following Play to resume it (gotoAndPlay emits
+		// GotoFrame+Play). Key test: avm1/removed_base_clip_tell_target.
+		if (ng_isInsideSprite() && !g_settarget_explicit_root) {
+			ng_playCurrentSprite();
+			return;
+		}
 	}
 	is_playing = 1;
 }
@@ -30573,8 +30582,13 @@ void actionStop(SWFAppContext* app_context)
 	// (defined zero-init in graphics_stubs.c, never set).
 	{
 		extern int g_settarget_none;
+		extern int g_settarget_explicit_root;
 		if (g_settarget_none) return;
-		if (ng_isInsideSprite()) { ng_stopCurrentSprite(); return; }
+		// SetTarget("_root") in effect: Stop targets the ROOT (see actionPlay).
+		if (ng_isInsideSprite() && !g_settarget_explicit_root) {
+			ng_stopCurrentSprite();
+			return;
+		}
 	}
 	is_playing = 0;
 }
@@ -54356,6 +54370,26 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
 		}
+#ifndef NO_GRAPHICS
+		targeted_sprite = NULL;
+#endif
+		return;
+	}
+
+	// Removed base clip: ALL named-target resolution fails, even "_root".
+	// Ruffle activation.rs set_target() filters the resolved clip with
+	// `!self.base_clip.avm1_removed()` ("All properties invalid if base clip
+	// is removed") -> target_clip = None: GetVariable falls back to root,
+	// Play/Stop/Goto fail silently. Key test: avm1/removed_base_clip_tell_target.
+	if (base->avm1_removed || base->depth == INT_MIN) {
+		if (!g_settarget_context_changed) {
+			g_settarget_saved_context = g_current_context;
+		}
+		g_settarget_context_changed = 1;
+		setCurrentContext(&root_movieclip);
+		g_settarget_explicit_root = 0;
+		g_settarget_invalid = 1;
+		g_settarget_none = 1;
 #ifndef NO_GRAPHICS
 		targeted_sprite = NULL;
 #endif

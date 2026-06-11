@@ -41,22 +41,13 @@ Ruffle's `native_objects_swf6` test expects `new TextField(): non-object: undefi
 
 **Decision:** Keep Flash-correct behavior (`new TextField()` returns an object in SWF6). Accept the 1-line diff as a Ruffle implementation difference.
 
-## SetTarget Debug Trace on Removed Base Clip
+## ~~SetTarget Debug Trace on Removed Base Clip~~ (RESOLVED upstream 2026-06-11)
 
-**Test:** `removed_base_clip_tell_target`
+**Test:** `removed_base_clip_tell_target` — **now passing; removed from ignored_tests.txt.**
 
-The expected output contains `Target not found: Target="_root" Base="?"` — a debug trace message emitted when `SetTarget` fails to resolve a path because the base clip has been removed. Ruffle's own source code (in `core/src/avm1/activation.rs`) has a `// TODO: Emulate AVM1 trace error message.` comment above this trace, confirming it's speculative emulation — Ruffle is not certain Flash actually produces this trace.
+This entry predicted correctly: the expected `Target not found: Target="_root" Base="?"` line was Ruffle's speculative emulation (their source carried a `// TODO: Emulate AVM1 trace error message.` comment), and Flash Player actually prints nothing. Upstream Ruffle removed the trace in `71864d539` (2026-06-10, "avm1: Remove 'Target not found' trace" — "Flash Player does not trace anything in this case") and regenerated the expected outputs. We removed our matching emission the same week.
 
-Flash Player silently fails invalid SetTarget calls without emitting trace output. Our implementation correctly silently fails, matching Flash behavior.
-
-```diff
-- Target not found: Target="_root" Base="?"
-+ GOOD!
-```
-
-The test expects 2 lines: the debug trace + "GOOD!". Our output is just "GOOD!" (1 line). The "GOOD!" line confirms correct control flow (script continues after failed SetTarget).
-
-**Decision:** Accept as Ruffle-specific debug output. Add to ignored_tests.txt.
+With the trace gone from the expectation, the test exposed a real bug on our side (we printed `BAD`, not `GOOD!`): `actionSetTarget` did not fail named-target resolution (including `"_root"`) when the **base clip was removed** (Ruffle: `filter(|_| !self.base_clip.avm1_removed())` — "All properties invalid if base clip is removed"), and `actionPlay`/`actionStop`'s in-sprite arm ignored `g_settarget_explicit_root`, playing/stopping the executing sprite instead of the root. Both fixed 2026-06-11.
 
 ---
 

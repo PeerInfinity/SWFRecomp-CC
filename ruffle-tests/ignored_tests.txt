@@ -21,6 +21,7 @@ stylesheet_load
 xml_getbytes
 xml_socket
 xml_socket_close_in_handler
+xml_socket_connect_null
 xml_socket_on_data
 xml_socket_segmented
 
@@ -74,7 +75,9 @@ sandbox_type_remote
 # --- Ruffle behavior differs from Flash spec ---
 # These tests pass in Ruffle but expect behavior that doesn't match Flash Player.
 # We intentionally follow the Flash spec. See RUFFLE_VS_FLASH_DIFFERENCES.md for details.
-removed_base_clip_tell_target
+# (removed_base_clip_tell_target removed 2026-06-11 — upstream Ruffle 71864d539
+#  dropped the speculative "Target not found" trace, vindicating Flash's silent
+#  failure; the remaining GOOD!/BAD gap was a real SetTarget bug, now fixed.)
 string_paths_reference_launder
 string_relational_compare
 # globals_swf5: Ruffle exposes LocalConnection/NetConnection/Video in SWF5; Flash hides them.
