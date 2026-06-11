@@ -1,31 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-03T02:26:00.998418+00:00",
-    "old_git_sha": "2a090d60ddf3c4140483f0248273f067c05ff22d",
-    "new_timestamp": "2026-06-11T16:10:18.037035+00:00",
-    "new_git_sha": "eb280b751d6ba2b5705ed68711c2d33614c9caf0",
+    "old_timestamp": "2026-06-11T16:10:18.037035+00:00",
+    "old_git_sha": "eb280b751d6ba2b5705ed68711c2d33614c9caf0",
+    "new_timestamp": "2026-06-11T16:40:26.847269+00:00",
+    "new_git_sha": "db8c78080cb19a552094257983fc69fbbd045f27",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 66,
-    "old_ruffle_matched": 28,
-    "old_effective_pass": 94,
+    "old_ruffle_matched": 27,
+    "old_effective_pass": 93,
     "old_total": 110,
     "old_pass_rate": 60.0,
-    "new_pass": 66,
-    "new_ruffle_matched": 27,
-    "new_effective_pass": 93,
+    "new_pass": 67,
+    "new_ruffle_matched": 28,
+    "new_effective_pass": 95,
     "new_total": 110,
-    "new_pass_rate": 60.0,
+    "new_pass_rate": 60.9,
     "old_mismatched_lines": 1220,
-    "new_mismatched_lines": 1220,
+    "new_mismatched_lines": 1206,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
-    "newly_failing": 1,
-    "status_changed": 1,
-    "unchanged": 109,
+    "decreased_mismatches": 14,
+    "newly_passing": 2,
+    "newly_failing": 0,
+    "status_changed": 2,
+    "unchanged": 108,
     "added": 0,
     "removed": 0
   },
@@ -33,17 +33,33 @@
     {
       "test": "DragDropTest",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
       "old_lines": {
         "actual_lines": 45,
         "expected_lines": 44,
         "matching_lines": 33
       },
       "new_lines": {
-        "actual_lines": 45,
+        "actual_lines": 44,
         "expected_lines": 44,
-        "matching_lines": 33
+        "matching_lines": 40
+      }
+    },
+    {
+      "test": "opcode_guard_test",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 19,
+        "expected_lines": 18,
+        "matching_lines": 11
+      },
+      "new_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
       }
     }
   ]
