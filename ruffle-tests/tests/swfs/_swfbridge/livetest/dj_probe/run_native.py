@@ -41,6 +41,8 @@ def main():
     ap.add_argument("--input", type=Path, default=None,
                     help="input.json (Ruffle event schema) to drive clicks/keys")
     ap.add_argument("--recompile", action="store_true")
+    ap.add_argument("--asan", action="store_true",
+                    help="compile with AddressSanitizer (UAF/OOB pinning)")
     args = ap.parse_args()
 
     if not args.input_swf.exists():
@@ -68,7 +70,8 @@ def main():
 
     t0 = time.perf_counter()
     ok, err = vo.compile_native(test_dir, args.frames, build_dir, mode="graphics",
-                                has_image_comparisons=True, asan=False, use_ccache=True)
+                                has_image_comparisons=True, asan=args.asan,
+                                use_ccache=not args.asan)
     if not ok:
         sys.exit(f"compile_native failed:\n{err}")
     print(f"  compile:   {time.perf_counter()-t0:.2f}s", file=sys.stderr)

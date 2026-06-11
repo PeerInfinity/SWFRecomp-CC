@@ -1,0 +1,5 @@
+# Generated/run artifacts (dj_loader.swf & loader.swf are caught by the global *.swf)
+loader_bytecode.bin
+native_run*/
+ruffle_run/
+wasm_run/

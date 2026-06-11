@@ -263,8 +263,55 @@ def upgrade_clipactions_to_v6(fws: bytearray) -> int:
     return widened
 
 
-def inject(swf_bytes: bytes, bytecode: bytes, min_version: int = 8) -> bytes:
+def patch_stage_width(fws: bytearray, width_px: int) -> None:
+    """Re-pack the header FrameSize RECT with xmax = width_px.
+
+    Games like Doodle Jump read their playfield width via Stage.width at
+    runtime (the hero's wrap is `SW = Stage.width`), so widening the stage is
+    a header-only change. RECT fields are SIGNED bitfields sharing one nbits,
+    so growing xmax may grow the RECT by a byte — the header is re-packed and
+    the tail shifted (inject() rewrites the file length afterwards)."""
+    new_xmax = width_px * 20  # px -> twips
+
+    # Read the existing signed fields.
+    b0 = fws[8]
+    nbits = (b0 >> 3) & 0x1F
+
+    def read_sb(bitpos, n):
+        v = 0
+        for i in range(n):
+            p = bitpos + i
+            v = (v << 1) | ((fws[8 + p // 8] >> (7 - p % 8)) & 1)
+        if v & (1 << (n - 1)):
+            v -= 1 << n
+        return v
+
+    xmin = read_sb(5, nbits)
+    ymin = read_sb(5 + 2 * nbits, nbits)
+    ymax = read_sb(5 + 3 * nbits, nbits)
+    old_len = (5 + 4 * nbits + 7) // 8
+
+    vals = [xmin, new_xmax, ymin, ymax]
+    new_nbits = max(v.bit_length() for v in vals) + 1  # +1 sign bit
+    bits = []
+    bits += [(new_nbits >> (4 - i)) & 1 for i in range(5)]
+    for v in vals:
+        u = v & ((1 << new_nbits) - 1)
+        bits += [(u >> (new_nbits - 1 - i)) & 1 for i in range(new_nbits)]
+    while len(bits) % 8:
+        bits.append(0)
+    rect = bytearray(len(bits) // 8)
+    for i, bit in enumerate(bits):
+        if bit:
+            rect[i // 8] |= 1 << (7 - i % 8)
+    fws[8:8 + old_len] = rect
+
+
+def inject(swf_bytes: bytes, bytecode: bytes, min_version: int = 8,
+           stage_width: int = 0) -> bytes:
     fws = bytearray(decompress_swf(swf_bytes))
+    if stage_width:
+        patch_stage_width(fws, stage_width)
 
     orig_version = fws[3]
     target_version = max(orig_version, min_version)
@@ -302,6 +349,9 @@ def main():
                     default=HERE / "tracer_bytecode.bin",
                     help="Path to tracer_bytecode.bin (default: alongside script)")
     ap.add_argument("--min-version", type=int, default=8)
+    ap.add_argument("--stage-width", type=int, default=0,
+                    help="patch the header FrameSize RECT xmax to this many px "
+                         "(in-place bitfield rewrite; Stage.width follows)")
     args = ap.parse_args()
 
     if not args.bytecode.exists():
@@ -311,8 +361,11 @@ def main():
 
     swf_in = args.input.read_bytes()
     bytecode = args.bytecode.read_bytes()
-    result = inject(swf_in, bytecode, min_version=args.min_version)
+    result = inject(swf_in, bytecode, min_version=args.min_version,
+                    stage_width=args.stage_width)
     args.output.write_bytes(result)
+    if args.stage_width:
+        print(f"  stage width patched -> {args.stage_width}px", file=sys.stderr)
 
     print(f"Injected {len(bytecode)} bytes of tracer into {args.input.name}",
           file=sys.stderr)

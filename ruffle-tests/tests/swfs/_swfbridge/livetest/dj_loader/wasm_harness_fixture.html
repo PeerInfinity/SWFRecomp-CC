@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DJ level loader — SWFRecomp graphics-WASM</title>
+</head>
+<body>
+<h1>Recompiled-DJ level loader under SWFRecomp WASM (production runtime)</h1>
+<!-- The recompiled-DJ page, SWFRecomp flavor. dj_swf_bridge.js sets
+     window.__swfBridge BEFORE the Module loads — ensureGlobalInit installs the
+     EI handler (swf_browser_external_call) only when window.__swfBridge exists
+     at init. dj_host_mock.js plays host standalone. -->
+<canvas id="canvas" width="240" height="400" tabindex="0"
+        style="border:1px solid #ccc;"></canvas>
+<button id="btn-run" disabled>Run</button>
+
+
+
+
+<script>
+  window.__runtimeReady = false;
+  window.Module = {
+    locateFile: function (p) { return p; },
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.log('[err] ' + t); },
+    onRuntimeInitialized: function () { window.__runtimeReady = true; },
+  };
+  (function waitReady(n) {
+    if (window.__runtimeReady) {
+      document.getElementById('btn-run').disabled = false;
+      console.log('[harness] runtime ready');
+      window.__startSWF();
+    } else if (n > 0) {
+      setTimeout(function () { waitReady(n - 1); }, 50);
+    } else {
+      console.log('[harness] ERROR: runtime not ready');
+    }
+  })(600);
+  window.__startSWF = function () {
+    console.log('[harness] running SWF');
+    document.getElementById('canvas').focus();
+    Module.ccall('runSWF', null, [], [], { async: true });
+  };
+  document.getElementById('btn-run').addEventListener('click', window.__startSWF);
+</script>
+<script src="Doodle_Jump_loader.js"></script>
+</body>
+</html>
