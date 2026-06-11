@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-11 21:58 UTC
+**Date**: 2026-06-11 23:48 UTC
 
-**Git SHA**: `64cbe15ad6`
+**Git SHA**: `f75b58f7c0`
 
-**Run Duration**: 0m 6s
+**Run Duration**: 0m 4s
 
 ## Summary
 
@@ -33,15 +33,15 @@
 | 6 | `dict_override` | 2 | 0.2s |  |
 | 7 | `func_dict` | 3 | 0.1s |  |
 | 8 | `initaction_in_definesprite` | 2 | 0.2s |  |
-| 9 | `jump_after_end` | 3 | 0.7s |  |
-| 10 | `jump_to_prev_block` | 1 | 0.1s |  |
-| 11 | `missing_bitmap` | 0 | 0.4s |  |
+| 9 | `jump_after_end` | 3 | 0.2s |  |
+| 10 | `jump_to_prev_block` | 1 | 0.2s |  |
+| 11 | `missing_bitmap` | 0 | 0.1s |  |
 | 12 | `mixed-bytecode-as2` | 1 | 0.2s |  |
 | 13 | `registers` | 36 | 0.2s |  |
-| 14 | `tags_after_last_showframe` | 1 | 0.2s |  |
+| 14 | `tags_after_last_showframe` | 1 | 0.1s |  |
 | 15 | `trace-as2/arguments` | 8 | 0.2s |  |
-| 16 | `trace-as2/root_onload` | 4 | 0.2s |  |
-| 17 | `trace-as2/shortstack` | 2 | 0.5s |  |
+| 16 | `trace-as2/root_onload` | 4 | 0.1s |  |
+| 17 | `trace-as2/shortstack` | 2 | 0.2s |  |
 | 18 | `trace-as2/super` | 8 | 0.2s |  |
 | 19 | `trace-as2/this` | 8 | 0.2s |  |
 
