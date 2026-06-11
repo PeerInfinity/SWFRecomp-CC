@@ -1386,7 +1386,7 @@ static void initSoundTransformDefaults(SWFAppContext* app_context, ASObject* obj
 }
 
 // Forward decl — defined later in the file (around line 19614).
-static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element);
+static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element, int handle_this);
 
 // Helper: resolve the owner MovieClip for a Sound instance by looking up
 // the stored target path string. Returns NULL if (a) the Sound is set to
@@ -1414,7 +1414,7 @@ static MovieClip* resolveSoundOwner(SWFAppContext* app_context, ASObject* sound_
 	extern MovieClip* g_current_context;
 	MovieClip* start = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 
-	MovieClip* mc = resolveFlashPathToMC(app_context, path_buf, path_len, start, 1);
+	MovieClip* mc = resolveFlashPathToMC(app_context, path_buf, path_len, start, 1, 1);
 	if (mc == NULL) return NULL;
 	// _root is a valid owner (e.g. `new Sound(_root)` from sound_id3 test).
 	// Reject only fully-finalized removals (depth == INT_MIN). MCs in the
@@ -19825,9 +19825,14 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		if (g_settarget_none) return NULL;
 		return g_current_context ? g_current_context : &root_movieclip;
 	}
-	if (strcmp(target, "_root") == 0 || strcmp(target, "/") == 0 ||
-	    strcmp(target, "_level0") == 0) {
-		return &root_movieclip;
+	{
+		// "_root" is a SWF5+ keyword; "/" and "_level0" (parse_level) work in
+		// all versions.
+		extern int g_swf_version;
+		if ((g_swf_version >= 5 && strcmp(target, "_root") == 0) ||
+		    strcmp(target, "/") == 0 || strcmp(target, "_level0") == 0) {
+			return &root_movieclip;
+		}
 	}
 	// _levelN (N > 0) — check the levels array
 	const char* level_dot_rest = NULL;
@@ -20042,7 +20047,9 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 
 			// Special names — match case-insensitively in SWF<=6 via swf_name_match
 			// (e.g. gnash case-v6's `/_ROOT/MC0/` slash-path SetProperty target).
-			if (swf_name_match(seg_buf, "_root") || swf_name_match(seg_buf, "_level0")) {
+			// SWF4: _root/_level0 are not keywords (plain child names).
+			extern int g_swf_version;
+			if (g_swf_version >= 5 && (swf_name_match(seg_buf, "_root") || swf_name_match(seg_buf, "_level0"))) {
 				mc = &root_movieclip;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				cur_sprite_dl = display_list;
@@ -20266,6 +20273,8 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 static int isTargetPathStructurallyValid(const char* path, u32 len)
 {
 	if (len == 0) return 1; // Ruffle's `if path.is_empty() { return Some(start); }`
+	extern int g_swf_version;
+	int is_swf5 = (g_swf_version >= 5);
 	const char* p = path;
 	u32 remaining = len;
 	int is_slash_path = 0;
@@ -20274,14 +20283,14 @@ static int isTargetPathStructurallyValid(const char* path, u32 len)
 		if (remaining == 0) return 1;
 	}
 	while (remaining > 0) {
-		// Trim leading ':' (Ruffle's trim_start_matches(b':') at each iter).
-		while (remaining > 0 && p[0] == ':') { p++; remaining--; }
+		// Trim leading ':' (Ruffle's trim_start_matches(b':'), SWF5+ only).
+		while (is_swf5 && remaining > 0 && p[0] == ':') { p++; remaining--; }
 		if (remaining == 0) return 0; // empty-name lookup
-		// "..", "../", "..:" → parent nav.
+		// "..", "../", "..:"(SWF5+) → parent nav.
 		if (remaining >= 2 && p[0] == '.' && p[1] == '.') {
 			int is_parent = 0;
 			if (remaining == 2) { is_parent = 1; }
-			else if (p[2] == '/' || p[2] == ':') { is_parent = 1; }
+			else if (p[2] == '/' || (is_swf5 && p[2] == ':')) { is_parent = 1; }
 			if (is_parent) {
 				int third_is_slash = (remaining > 2 && p[2] == '/');
 				if (remaining <= 2) { remaining = 0; }
@@ -20290,12 +20299,12 @@ static int isTargetPathStructurallyValid(const char* path, u32 len)
 				continue;
 			}
 		}
-		// Scan to next delimiter.
+		// Scan to next delimiter (':' and '.' delimit only in SWF5+).
 		u32 seg_len = 0;
 		while (seg_len < remaining) {
 			char c = p[seg_len];
-			if (c == ':') break;
-			if (c == '.' && !is_slash_path) break;
+			if (c == ':' && is_swf5) break;
+			if (c == '.' && is_swf5 && !is_slash_path) break;
 			if (c == '/') { is_slash_path = 1; break; }
 			seg_len++;
 		}
@@ -20341,7 +20350,7 @@ static const char* sanitizeTargetPath(const char* path, u32 len,
 // - ".." (followed by '/', ':', or end-of-string) means parent navigation
 // - If first_element is true: "this" resolves to g_current_context, "_root" to root
 // - If first_element is false: all names go through child/property lookup
-static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element) {
+static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element, int handle_this) {
 	g_shape_alias_resolution = 0;
 	if (path_len == 0 || start_mc == NULL) return NULL;
 
@@ -20361,16 +20370,26 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 		extern MovieClip root_movieclip;
 		mc = (lev != NULL) ? lev : &root_movieclip;
 		is_slash_path = 1;
+		// A leading '/' consumes the "first element" slot: _root/this/_levelN
+		// keywords do NOT apply after it (Ruffle f95c2be5d: `first_element =
+		// false;` in the starts_with('/') branch). "/_level0" is a CHILD
+		// lookup of root (fails), not the level.
+		first_element = 0;
 		p++; remaining--;
 		if (remaining == 0) return mc;
 	}
 
+	// SWF4 is more restrictive: ':' and '.' are NOT path delimiters, and
+	// this/_root are not keywords — only '/' and ".." work (Ruffle 3cfcb8605).
+	extern int g_swf_version;
+	int is_swf5 = (g_swf_version >= 5);
+
 	int prev_delim_slash = (path_len > 0 && path[0] == '/') ? 1 : 0;  // Track if we arrived via '/' delimiter
 	int segments_resolved = 0;  // Track if we've resolved any segments
 	while (remaining > 0) {
-		// Skip leading colons
+		// Skip leading colons (SWF5+ only)
 		int colons_skipped = 0;
-		while (remaining > 0 && p[0] == ':') { p++; remaining--; prev_delim_slash = 0; colons_skipped++; }
+		while (is_swf5 && remaining > 0 && p[0] == ':') { p++; remaining--; prev_delim_slash = 0; colons_skipped++; }
 		if (remaining == 0) {
 			// Trailing colons after at least one segment create an empty final
 			// segment which fails (Ruffle: child_by_name("") → None).
@@ -20384,7 +20403,7 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 			int is_parent = 0;
 			if (remaining == 2) { is_parent = 1; }
 			else if (p[2] == '/') { is_parent = 1; is_slash_path = 1; }
-			else if (p[2] == ':') { is_parent = 1; }
+			else if (is_swf5 && p[2] == ':') { is_parent = 1; }
 
 			if (is_parent) {
 				if (mc->parent) mc = mc->parent;
@@ -20400,12 +20419,12 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 			}
 		}
 
-		// Scan for next delimiter
+		// Scan for next delimiter (':' and '.' delimit only in SWF5+)
 		u32 pos = 0;
 		while (pos < remaining) {
 			char c = p[pos];
-			if (c == ':') break;
-			if (c == '.' && !is_slash_path) break;
+			if (c == ':' && is_swf5) break;
+			if (c == '.' && is_swf5 && !is_slash_path) break;
 			if (c == '/') { is_slash_path = 1; break; }
 			pos++;
 		}
@@ -20434,11 +20453,11 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 		extern MovieClip root_movieclip;
 
 		// Resolve segment
-		// "_levelN" (N > 0) handler: resolve to g_levels[N]. Applies in both
-		// first_element and subsequent positions. Required for paths like
-		// `eval("_level50/target10")`.
+		// Non-first "_levelN" (N > 0) handler: resolve to g_levels[N]. SWF5+
+		// (magic path property). Required for paths like `eval("_level50/target10")`
+		// when not in first position; first position is parse_level below.
 		int _resolved_level = 0;
-		if (seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
+		if (is_swf5 && seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
 			const char* after = seg_buf + 6;
 			int all_digits = 1;
 			for (const char* c = after; *c != '\0'; c++) {
@@ -20455,10 +20474,36 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 		}
 		if (_resolved_level) {
 			first_element = 0;
-		} else if (first_element) {
-			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
+		} else if (first_element &&
+		           seg_len >= 6 &&
+		           ((g_swf_version <= 6) ? (strncasecmp(seg_buf, "_level", 6) == 0 || strncasecmp(seg_buf, "_flash", 6) == 0)
+		                                 : (strncmp(seg_buf, "_level", 6) == 0 || strncmp(seg_buf, "_flash", 6) == 0))) {
+			// Ruffle parse_level (stage_object.rs): "_level"/"_flash" prefix +
+			// leniently-parsed digits (stop at first non-digit; '-' allowed),
+			// FIRST element only, ALL SWF versions. A matching prefix consumes
+			// the segment: a nonexistent level FAILS resolution (no fall
+			// through to child lookup). Key test: avm1/target_paths/swf4
+			// ("_flash0" resolves, "/_flash0" does not).
+			const char* lp = seg_buf + 6;
+			int lneg = 0;
+			if (*lp == '-') { lneg = 1; lp++; }
+			int lid = 0;
+			while (*lp >= '0' && *lp <= '9') { lid = lid * 10 + (*lp - '0'); lp++; }
+			if (lneg) lid = -lid;
+			extern MovieClip* g_levels[MAX_LEVELS];
+			if (lid == 0) {
 				mc = &root_movieclip;
-			} else if (strcmp(seg_buf, "this") == 0) {
+			} else if (lid > 0 && lid < MAX_LEVELS && g_levels[lid] != NULL) {
+				mc = g_levels[lid];
+			} else {
+				return NULL;
+			}
+			first_element = 0;
+		} else if (first_element) {
+			// "_root"/"this" are SWF5+ keywords (first element only).
+			if (is_swf5 && strcmp(seg_buf, "_root") == 0) {
+				mc = &root_movieclip;
+			} else if (is_swf5 && handle_this && strcmp(seg_buf, "this") == 0) {
 				// "this" as first element resolves to current context
 				extern MovieClip* g_current_context;
 				mc = g_current_context ? g_current_context : &root_movieclip;
@@ -20481,7 +20526,8 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 				// resolveSlashPathToMC would otherwise treat `_level0` as root.
 				// `_levelN` (N>0) is handled above via _resolved_level.
 				return NULL;
-			} else if (strcmp(seg_buf, "_root") == 0) {
+			} else if (is_swf5 && strcmp(seg_buf, "_root") == 0) {
+				// Non-first _root = SWF5+ magic property
 				mc = &root_movieclip;
 			} else if (strcmp(seg_buf, "_parent") == 0) {
 				if (mc->parent) mc = mc->parent;
@@ -20531,6 +20577,14 @@ static MovieClip* resolveObjectPathToMC(SWFAppContext* app_context,
 {
 	if (path_len == 0 || start_mc == NULL) return NULL;
 
+	// SWF4: the per-segment object-property fallback is stage-object "magic"
+	// property machinery, which is SWF5+ (Ruffle 1660fffa1). SWF4 target
+	// resolution is display-list-only — resolveFlashPathToMC covers it.
+	{
+		extern int g_swf_version;
+		if (g_swf_version < 5) return NULL;
+	}
+
 	extern MovieClip root_movieclip;
 
 	const char* p = path;
@@ -20548,10 +20602,12 @@ static MovieClip* resolveObjectPathToMC(SWFAppContext* app_context,
 
 	PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)cur_start);
 	int walk_ok = 1;
+	extern int g_swf_version;
+	int is_swf5 = (g_swf_version >= 5);
 
 	while (remaining > 0 && walk_ok) {
-		// Skip leading colons (`:foo`, `:::foo` == `foo`)
-		while (remaining > 0 && *p == ':') { p++; remaining--; }
+		// Skip leading colons (`:foo`, `:::foo` == `foo`) — SWF5+ only
+		while (is_swf5 && remaining > 0 && *p == ':') { p++; remaining--; }
 		if (remaining == 0) break;
 
 		// ".." parent navigation
@@ -20559,7 +20615,7 @@ static MovieClip* resolveObjectPathToMC(SWFAppContext* app_context,
 			int is_parent = 0;
 			if (remaining == 2) is_parent = 1;
 			else if (p[2] == '/') { is_parent = 1; is_slash_path = 1; }
-			else if (p[2] == ':') is_parent = 1;
+			else if (is_swf5 && p[2] == ':') is_parent = 1;
 
 			if (is_parent) {
 				if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP) {
@@ -20580,26 +20636,34 @@ static MovieClip* resolveObjectPathToMC(SWFAppContext* app_context,
 			}
 		}
 
-		// Scan for delimiter
+		// Scan for delimiter (':' and '.' delimit only in SWF5+)
 		u32 seg_len = 0;
 		while (seg_len < remaining) {
 			char c = p[seg_len];
-			if (c == ':') break;
-			if (c == '.' && !is_slash_path) break;
+			if (c == ':' && is_swf5) break;
+			if (c == '.' && is_swf5 && !is_slash_path) break;
 			if (c == '/') { is_slash_path = 1; break; }
 			seg_len++;
 		}
 
-		if (seg_len == 0) { p++; remaining--; continue; }
+		if (seg_len == 0) {
+			// Empty segment name ("//", "/.", "a/.b" etc.): Ruffle resolves
+			// child_by_name("") / object.get("") -> undefined -> resolution
+			// FAILS. (A bare trailing delimiter never reaches here - it is
+			// consumed together with the preceding segment by the advance
+			// below.) Key test: avm1/target_paths ("//", "//a").
+			walk_ok = 0;
+			break;
+		}
 
 		if (first_element) {
-			if (seg_len == 5 && strncmp(p, "_root", 5) == 0) {
+			if (is_swf5 && seg_len == 5 && strncmp(p, "_root", 5) == 0) {
 				POP();
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 			} else if (seg_len == 7 && strncmp(p, "_level0", 7) == 0) {
 				POP();
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
-			} else if (seg_len == 4 && strncmp(p, "this", 4) == 0) {
+			} else if (is_swf5 && seg_len == 4 && strncmp(p, "this", 4) == 0) {
 				extern MovieClip* g_current_context;
 				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
 				POP();
@@ -38878,12 +38942,20 @@ void actionGetVariable(SWFAppContext* app_context)
 			// GetVariable slash-path: find RIGHTMOST ':' or '.' to split into
 			// target path (before) and property name (after).
 			// The left side is resolved using resolve_target_path (is_slash_path rules).
+			// SWF4: only ':' is the variable separator ('.' appeared in SWF5 —
+			// Ruffle get_variable's variable_separator).
 			char* last_sep = NULL;
 			for (int ci = var_name_len - 1; ci >= 0; ci--) {
-				if (var_name[ci] == ':' || var_name[ci] == '.') {
+				if (var_name[ci] == ':' || (g_swf_version >= 5 && var_name[ci] == '.')) {
 					last_sep = (char*)(var_name + ci);
 					break;
 				}
+			}
+			if (last_sep != NULL && last_sep == var_name) {
+				// Empty target before the separator (":var" / ":a/b") —
+				// Ruffle: `if path.is_empty() { return Undefined }`.
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+				return;
 			}
 			if (last_sep != NULL) {
 				u32 target_len = (u32)(last_sep - var_name);
@@ -38891,7 +38963,34 @@ void actionGetVariable(SWFAppContext* app_context)
 				u32 prop_len = var_name_len - target_len - 1;
 
 				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1);
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1, 1);
+				if (g_swf_version < 5) {
+					// SWF4 `target:var` reads actual timeline VARIABLES only —
+					// no children, no magic properties (Flash: eval("/a:root_var")
+					// is undefined even though root_var exists on root; key
+					// test avm1/target_paths/swf4). Unresolved target → undefined.
+					if (target_mc == &root_movieclip && prop_len > 0) {
+						extern hashmap* var_map;
+						ActionVar* gvar = NULL;
+						if (var_map != NULL &&
+						    hashmap_get(var_map, prop_name, prop_len, (uintptr_t*)&gvar) &&
+						    gvar != NULL &&
+						    !(gvar->type == ACTION_STACK_VALUE_STRING &&
+						      gvar->str_size == 0 &&
+						      gvar->data.string_data.heap_ptr == NULL)) {
+							pushVar(app_context, gvar);
+							return;
+						}
+					} else if (target_mc != NULL && target_mc->dynamic_props != NULL && prop_len > 0) {
+						ActionVar* dv = getProperty((ASObject*)target_mc->dynamic_props, prop_name, prop_len);
+						if (dv != NULL && dv->type != ACTION_STACK_VALUE_UNDEFINED) {
+							pushVar(app_context, dv);
+							return;
+						}
+					}
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					return;
+				}
 				if (target_mc != NULL && prop_len > 0) {
 					// Use GetMember semantics for the last segment
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
@@ -39047,18 +39146,22 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 			// Pure slash-path without colon or dot (e.g., "/clip1/clip2" resolves to MC)
 			// In Ruffle, this uses first_element=false and falls through to plain
-			// variable lookup if resolution fails.
-			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-			MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, var_name_len, ctx, 0);
-			if (target_mc != NULL) {
-				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
-				return;
+			// variable lookup if resolution fails. SWF5+ ONLY — "In SWF4 it has
+			// to have a trailing variable" (Ruffle get_variable), so SWF4 falls
+			// straight through to plain variable lookup (→ undefined).
+			if (g_swf_version >= 5) {
+				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, var_name_len, ctx, 0, 0);
+				if (target_mc != NULL) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
+					return;
+				}
 			}
 			// Fall through to plain variable lookup (scope chain / variable table)
 		}
 
 		// Also handle ".." paths (relative parent navigation without slashes)
-		if (var_name_len >= 2 && var_name[0] == '.' && var_name[1] == '.')
+		if (g_swf_version >= 5 && var_name_len >= 2 && var_name[0] == '.' && var_name[1] == '.')
 		{
 			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
 			MovieClip* target_mc = resolveSlashPathToMC(app_context, var_name, var_name_len, ctx);
@@ -39074,14 +39177,21 @@ void actionGetVariable(SWFAppContext* app_context)
 	// Handle dot/colon path resolution (e.g., "a.b.c", "_root.x.y", "a:b:c", "a:b.c")
 	// Algorithm: find RIGHTMOST ':' or '.', split into left (target path) and right (property).
 	// Resolve left with resolveFlashPathToMC, then GetMember for right.
+	// SWF4: only ':' separates (no '.'), and an empty target → undefined.
 	{
 		// Find rightmost dot or colon separator
 		const char* last_sep = NULL;
 		for (int ci = var_name_len - 1; ci >= 0; ci--) {
-			if (var_name[ci] == ':' || var_name[ci] == '.') {
+			if (var_name[ci] == ':' || (g_swf_version >= 5 && var_name[ci] == '.')) {
 				last_sep = var_name + ci;
 				break;
 			}
+		}
+		if (last_sep != NULL && last_sep == var_name)
+		{
+			// ":var" — empty target path: Ruffle returns Undefined.
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
 		}
 		if (last_sep != NULL)
 		{
@@ -39138,7 +39248,32 @@ void actionGetVariable(SWFAppContext* app_context)
 				}
 
 				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-				MovieClip* target_mc = resolveFlashPathToMC(app_context, target_ptr, target_len, ctx, 1);
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, target_ptr, target_len, ctx, 1, 1);
+				if (g_swf_version < 5) {
+					// SWF4 `target:var`: actual timeline variables only (see
+					// the slash-path branch above for rationale).
+					if (target_mc == &root_movieclip && prop_len > 0) {
+						extern hashmap* var_map;
+						ActionVar* gvar = NULL;
+						if (var_map != NULL &&
+						    hashmap_get(var_map, prop_name, prop_len, (uintptr_t*)&gvar) &&
+						    gvar != NULL &&
+						    !(gvar->type == ACTION_STACK_VALUE_STRING &&
+						      gvar->str_size == 0 &&
+						      gvar->data.string_data.heap_ptr == NULL)) {
+							pushVar(app_context, gvar);
+							return;
+						}
+					} else if (target_mc != NULL && target_mc->dynamic_props != NULL && prop_len > 0) {
+						ActionVar* dv = getProperty((ASObject*)target_mc->dynamic_props, prop_name, prop_len);
+						if (dv != NULL && dv->type != ACTION_STACK_VALUE_UNDEFINED) {
+							pushVar(app_context, dv);
+							return;
+						}
+					}
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					return;
+				}
 				if (target_mc != NULL && prop_len > 0) {
 					// Ruffle compatibility: own properties (variables set via SetVariable
 					// on root timeline) are checked BEFORE display list children.
@@ -40284,7 +40419,12 @@ check_special_vars:
 		} // end if (EFFECTIVE_SWF_VERSION() >= 5)
 
 		// Check display list children by instance name BEFORE _global
-		// (Flash resolution: target clip scope > _global)
+		// (Flash resolution: target clip scope > _global).
+		// SWF4: bare clip names are NOT variables — GetVariable("a") is
+		// undefined even when a child named "a" exists (Flash; confirmed by
+		// avm1/target_paths/swf4 preamble traces). SWF5 introduced
+		// stage-object variable resolution.
+		if (g_swf_version >= 5)
 		{
 			char name_buf[64];
 			if (var_name_len < 64)
@@ -40493,14 +40633,12 @@ check_special_vars:
 			}
 		}
 
-		// Variable not found
-		if (g_swf_version >= 5) {
-			// SWF5+: undefined variables return undefined
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-		} else {
-			// SWF4: undefined variables return empty string
-			PUSH_STR("", 0);
-		}
+		// Variable not found → undefined in ALL versions (Ruffle pushes
+		// Value::Undefined; SWF4's "" appearance comes from string COERCION
+		// of undefined in swf<7, which the use-site macros handle — while
+		// trace() prints "undefined" and typeof says "undefined" even in
+		// SWF4; key test: avm1/target_paths/swf4 preamble + eval rows).
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
 	}
 
@@ -40575,7 +40713,7 @@ void actionSetVariable(SWFAppContext* app_context)
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Resolve target path via resolveFlashPathToMC (first_element=1)
 			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-			MovieClip* target_mc = resolveFlashPathToMC(app_context, target_ptr, target_len, ctx, 1);
+			MovieClip* target_mc = resolveFlashPathToMC(app_context, target_ptr, target_len, ctx, 1, 1);
 			if (target_mc != NULL && prop_len > 0) {
 				// Use SetMember semantics (handles MC builtins, dynamic_props, etc.)
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
@@ -41210,7 +41348,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 			if (prop_len > 0) {
 				extern MovieClip root_movieclip;
 				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, path_len, ctx, 1);
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, path_len, ctx, 1, 1);
 				if (target_mc != NULL) {
 					ActionVar value_var;
 					peekVar(app_context, &value_var);
@@ -41559,7 +41697,7 @@ void actionDeclareLocal(SWFAppContext* app_context)
 			if (prop_len > 0) {
 				extern MovieClip root_movieclip;
 				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, path_len, ctx, 1);
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, path_len, ctx, 1, 1);
 				if (target_mc != NULL) {
 					// Only set to undefined if property doesn't already exist
 					if (target_mc->dynamic_props != NULL) {
@@ -41837,13 +41975,21 @@ void actionGetProperty(SWFAppContext* app_context)
 	const char* target = _gp_buf;
 	POP();
 
-	// Get the MovieClip object (try absolute first, then relative)
-	MovieClip* mc = getMovieClipByTarget(target);
-	if (!mc) mc = getMovieClipByRelativeName(target);
-	// SWF<=6 slash-path form (e.g. inline-asm GetProperty target "/_ROOT/MC0/")
-	// — `getMovieClipByTarget` only handles dot paths.
-	if (!mc && target[0] == '/' && target[1] != '\0') {
-		mc = resolveSlashPathToMC(app_context, target + 1, (u32)strlen(target + 1), &root_movieclip);
+	// Resolve the target like Ruffle's resolve_target_display_object
+	// (activation.rs): start = the SetTarget context (or base clip), then the
+	// resolve_target_path walk — display-list children first, then object
+	// properties. Key test: avm1/target_paths ("a/", "a/..", "a/../a", ...).
+	MovieClip* mc;
+	if (target[0] == '\0') {
+		// Empty target = current SetTarget context (or None after a failed
+		// SetTarget) — getMovieClipByTarget implements those semantics.
+		mc = getMovieClipByTarget(target);
+	} else {
+		extern MovieClip* g_current_context;
+		MovieClip* start = g_current_context ? g_current_context : &root_movieclip;
+		u32 tlen = (u32)strlen(target);
+		mc = resolveFlashPathToMC(app_context, target, tlen, start, 1, 0);
+		if (!mc) mc = resolveObjectPathToMC(app_context, target, tlen, start, 1);
 	}
 
 	// If target not found, push undefined (matches Flash/Ruffle)
@@ -50612,7 +50758,24 @@ void actionGetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
-			// Fall back to root-level name search
+			// Fall back to root-level name search — ONLY when mc's own child
+			// list could not be enumerated (no display linkage). When mc HAS
+			// a sprite_display_list, the direct lookup above was authoritative
+			// and a root-level hit must NOT leak in as a phantom child of mc:
+			// Flash resolves `a.a` (clip a, member a) to undefined even when
+			// root has a child named "a". The phantom (findOrCreateMovieClip
+			// with parent=mc) also corrupted ".." walks: `a/a/..` resolved to
+			// `a` via the phantom's parent. Key test: avm1/target_paths.
+			{
+				// (Root itself is exempt: for root the root-level search IS the
+				// authoritative child lookup.)
+				DisplayObject* _pdobj_known = (DisplayObject*)mc->display_obj;
+				if (mc != &root_movieclip &&
+				    _pdobj_known != NULL && _pdobj_known->sprite_display_list != NULL) {
+					child_depth = SIZE_MAX;
+					goto getmember_no_root_fallback;
+				}
+			}
 			child_depth = ng_findDisplayEntryByName(child_name_buf);
 			if (child_depth != SIZE_MAX) {
 				{
@@ -50650,6 +50813,7 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 			}
 
+			getmember_no_root_fallback:;
 			// Phase 1g: transient just-removed button-state children remain
 			// addressable for one tick after a state transition. Live display
 			// walks above will have missed them (the dl entry's char_id no
@@ -54396,8 +54560,9 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		return;
 	}
 
-	// Check for _root
-	if (strcmp(target_name, "_root") == 0 || strcmp(target_name, "/") == 0) {
+	// Check for _root ("_root" is a SWF5+ keyword; "/" works in all versions)
+	if ((g_swf_version >= 5 && strcmp(target_name, "_root") == 0) ||
+	    strcmp(target_name, "/") == 0) {
 		setCurrentContext(&root_movieclip);
 		g_settarget_explicit_root = 1;
 		g_settarget_invalid = 0;
@@ -54419,7 +54584,11 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	g_settarget_context_changed = 1;
 	{
 		u32 tn_len = (u32)strlen(target_name);
-		MovieClip* target_mc = resolveFlashPathToMC(app_context, target_name, tn_len, base, 0);
+		// first_element=1: Ruffle set_target → resolve_target_path(..., true,
+		// false) (f95c2be5d) — keywords/_levelN/_flashN apply to the first
+		// token of a SetTarget path. Key test: target_paths/swf4 tellTarget
+		// ("_flash0", "_level0:root_var").
+		MovieClip* target_mc = resolveFlashPathToMC(app_context, target_name, tn_len, base, 1, 0);
 		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
@@ -71114,7 +71283,7 @@ static void handle_asfunction(SWFAppContext* app_context, const char* href, Movi
 		if (method_len == 0) return;
 
 		// Resolve target path from container MC
-		MovieClip* target_mc = resolveFlashPathToMC(app_context, func_name, (u32)path_len, container, 0);
+		MovieClip* target_mc = resolveFlashPathToMC(app_context, func_name, (u32)path_len, container, 0, 0);
 		if (target_mc != NULL && target_mc->dynamic_props != NULL) {
 			ActionVar* mv = getPropertyWithPrototype((ASObject*)target_mc->dynamic_props, method_name, (u32)method_len);
 			if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION) {
