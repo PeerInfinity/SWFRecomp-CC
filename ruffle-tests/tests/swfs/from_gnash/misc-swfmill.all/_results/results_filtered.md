@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-06-03 02:26 UTC
+**Date**: 2026-06-11 16:10 UTC
 
-**Git SHA**: `2a090d60dd`
+**Git SHA**: `eb280b751d`
 
-**Run Duration**: 0m 25s
+**Run Duration**: 3m 39s
 
 **Filtered**: 0 tests ignored out of 20 available
 
@@ -29,22 +29,22 @@
 |---|------|-------|----------|-------|
 | 1 | `afunc_dict` | 2 | 0.2s |  |
 | 2 | `background` | 0 | 0.2s |  |
-| 3 | `dict_callframe` | 3 | 0.2s |  |
-| 4 | `dict_cross` | 3 | 0.2s |  |
+| 3 | `dict_callframe` | 3 | 19.0s |  |
+| 4 | `dict_cross` | 3 | 20.8s |  |
 | 5 | `dict_event` | 5 | 0.2s |  |
-| 6 | `dict_override` | 2 | 0.2s |  |
-| 7 | `func_dict` | 3 | 0.2s |  |
-| 8 | `initaction_in_definesprite` | 2 | 0.2s |  |
+| 6 | `dict_override` | 2 | 19.1s |  |
+| 7 | `func_dict` | 3 | 19.1s |  |
+| 8 | `initaction_in_definesprite` | 2 | 19.1s |  |
 | 9 | `jump_after_end` | 3 | 0.2s |  |
-| 10 | `jump_to_prev_block` | 1 | 0.6s |  |
-| 11 | `missing_bitmap` | 0 | 0.1s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 0.2s |  |
-| 13 | `registers` | 36 | 0.6s |  |
-| 14 | `tags_after_last_showframe` | 1 | 0.6s |  |
+| 10 | `jump_to_prev_block` | 1 | 19.2s |  |
+| 11 | `missing_bitmap` | 0 | 0.2s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 19.6s |  |
+| 13 | `registers` | 36 | 20.0s |  |
+| 14 | `tags_after_last_showframe` | 1 | 20.7s |  |
 | 15 | `trace-as2/arguments` | 8 | 0.2s |  |
-| 16 | `trace-as2/root_onload` | 4 | 0.2s |  |
-| 17 | `trace-as2/shortstack` | 2 | 0.2s |  |
-| 18 | `trace-as2/super` | 8 | 19.0s |  |
+| 16 | `trace-as2/root_onload` | 4 | 19.3s |  |
+| 17 | `trace-as2/shortstack` | 2 | 19.5s |  |
+| 18 | `trace-as2/super` | 8 | 1.3s |  |
 | 19 | `trace-as2/this` | 8 | 0.2s |  |
 
 ## Ruffle-Matched Tests
