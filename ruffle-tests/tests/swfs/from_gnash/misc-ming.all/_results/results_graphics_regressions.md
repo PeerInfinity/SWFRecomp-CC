@@ -1,14 +1,15 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 66/110 passing | Graphics: 65/110 passing
+Trace: 67/110 passing | Graphics: 65/110 passing
 
-## Graphics Regressions (1 tests)
+## Graphics Regressions (2 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
 | # | Test | Graphics Status | Detail |
 |---|------|-----------------|--------|
-| 1 | `place_and_remove_object_insane_test` | Output Mismatch | 17/22 lines match |
+| 1 | `opcode_guard_test` | Output Mismatch | 11/19 lines match |
+| 2 | `place_and_remove_object_insane_test` | Output Mismatch | 17/22 lines match |
 
 ## Graphics Improvements (0 tests)
 
