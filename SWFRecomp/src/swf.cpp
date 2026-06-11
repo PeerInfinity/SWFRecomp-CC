@@ -4314,15 +4314,12 @@ namespace SWFRecomp
 						// AllEventFlags is a dispatch FILTER (Flash behavior; Ruffle
 						// 8c5ca9d4d "Do not dispatch clip events not present in
 						// allEventFlags"): a record's effective events are
-						// event_flags & all_event_flags. Fully-masked records are
-						// dropped (payload skipped, no script emitted).
+						// event_flags & all_event_flags. Fully-masked records still
+						// get parsed below (parseActions is self-terminating and
+						// robust to lying ActionRecordSize values — key test
+						// avm1/bad_placeobject_clipaction) but are not registered.
 						// Key test: avm1/placeobject_all_event_flags.
 						u32 effective_flags = event_flags & all_event_flags;
-						if (effective_flags == 0)
-						{
-							cur_pos += action_size;
-							continue;
-						}
 
 						// Generate script function for this clip action
 						std::string func_name = "clip_action_" + to_string(next_script_i);
@@ -4341,7 +4338,8 @@ namespace SWFRecomp
 						action.parseActions(context, cur_pos, out_script);
 						out_script << "}";
 
-						clip_entries.push_back({ effective_flags, func_name });
+						if (effective_flags != 0)
+							clip_entries.push_back({ effective_flags, func_name });
 					}
 
 					if (!clip_entries.empty())
@@ -5635,12 +5633,9 @@ namespace SWFRecomp
 
 									// AllEventFlags dispatch filter — see the root-level
 									// PlaceObject2 CLIPACTIONS parse for rationale.
+									// (Parse even fully-masked records; only skip
+									// registration below.)
 									u32 effective_flags = event_flags & all_event_flags;
-									if (effective_flags == 0)
-									{
-										cur_pos += action_size;
-										continue;
-									}
 
 									std::string func_name = "clip_action_" + to_string(next_script_i);
 									context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
@@ -5657,7 +5652,8 @@ namespace SWFRecomp
 									action.parseActions(context, cur_pos, out_script);
 									out_script << "}";
 
-									clip_entries.push_back({ effective_flags, func_name });
+									if (effective_flags != 0)
+										clip_entries.push_back({ effective_flags, func_name });
 								}
 
 								if (!clip_entries.empty())
