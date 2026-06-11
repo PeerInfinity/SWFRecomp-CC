@@ -58,6 +58,23 @@ source ../../../../../../emsdk/emsdk_env.sh
 STEER_KEYS=1 ./run_wasm.sh 12     # STEER_KEYS=1 drives DOM ArrowRight/Left
 ```
 
+## Physics measurement probe (Measure.as)
+
+A second probe, `Measure.as`, measures DJ's physics constants/semantics for
+Archipelago-CC's bounceDemo `'dj'` profile (spec:
+`Archipelago-CC/NewDocs/plans/procedural-generation/dj-physics-measurement-spec.md`).
+`build_measure.sh <exp>` seds the experiment name in and builds
+`dj_measure_<exp>.swf`; experiments: `ff_rest ff_launch bounce spring keys
+catch blue brown jetpack`. Run natively via `run_native.py` (keys needs
+`--input input_measure_keys.json`), or on Ruffle by `cp dj_measure_<exp>.swf
+dj_probed.swf && ./run_ruffle.sh <secs>` (`STEER_KEYS=1` for keys).
+`parse_measure.py <trace> <exp> <tier> <run_id> <out.json>` converts a trace
+to the spec's JSON; `finalize_measurements.py` stamps setup/notes prose and
+writes `measurements/json/dj_constants_summary.json`. Results delivered
+2026-06-11; see `SWFRecompDocs/status/2026-06-11-dj-physics-measurements.md`.
+Caveat: blue/brown *animation children* don't run in graphics-native after a
+forced goto (nested-child enterFrame gap) — Ruffle runs are ground truth there.
+
 ## Files
 
 - `Probe.as` — the injected probe (MODE selects the experiment).

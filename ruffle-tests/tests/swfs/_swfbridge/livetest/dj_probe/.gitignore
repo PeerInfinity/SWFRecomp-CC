@@ -5,3 +5,5 @@ dj_probed.swf
 native_run/
 ruffle_run/
 wasm_run/
+dj_measure_*.swf
+measurements/

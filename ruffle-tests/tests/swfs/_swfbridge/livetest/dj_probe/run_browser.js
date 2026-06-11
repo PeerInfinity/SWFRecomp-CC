@@ -83,7 +83,11 @@ const CLICK_DELAY = parseInt(process.env.CLICK_DELAY || '3000', 10);
 		// + hero._x. STEER_KEYS=1 enables.
 		if (process.env.STEER_KEYS === '1') {
 			await page.waitForTimeout(3000);
-			try { await page.locator('#canvas').click(); } catch (e) {}
+			await dismissRuffleOverlay();
+			try { await page.locator('#canvas').click({ timeout: 1500 }); } catch (e) {
+				// Ruffle tier: no #canvas; click the player container for key focus
+				try { await page.locator(CLICK_TARGET).click({ timeout: 1500 }); } catch (e2) {}
+			}
 			await page.keyboard.down('ArrowRight');
 			console.log('[driver] ArrowRight DOWN');
 			await page.waitForTimeout(2500);
