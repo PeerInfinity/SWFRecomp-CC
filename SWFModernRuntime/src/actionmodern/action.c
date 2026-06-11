@@ -54330,22 +54330,6 @@ void actionRemoveSprite(SWFAppContext* app_context)
 	}
 }
 
-// Helper: convert a MovieClip's slash-path target to dot-notation base path
-// "/" → "_level0", "/clip1" → "_level0.clip1", "/clip1/clip2" → "_level0.clip1.clip2"
-static const char* mcToDotBasePath(MovieClip* mc) {
-	static char base_path_buf[256];
-	if (mc == NULL || mc == &root_movieclip) return "_level0";
-	if (mc->target[0] == '\0') return "_level0";
-	const char* tgt = mc->target;
-	if (tgt[0] == '/' && tgt[1] == '\0') return "_level0";
-	char tmp[200];
-	strncpy(tmp, tgt + 1, sizeof(tmp) - 1);
-	tmp[sizeof(tmp) - 1] = '\0';
-	for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
-	snprintf(base_path_buf, sizeof(base_path_buf), "_level0.%s", tmp);
-	return base_path_buf;
-}
-
 void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 {
 	extern int g_settarget_explicit_root;
@@ -54499,7 +54483,8 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #endif
 	}
 
-	// Target not found — set context to root and emit trace message.
+	// Target not found — set context to root, NO trace output (Flash Player
+	// prints nothing here; Ruffle removed its emulated trace in 71864d539).
 	// Ruffle: invalid target sets target_clip = None.
 	// GetVariable uses target_clip_or_root() → falls back to root.
 	// GotoFrame/Play/Stop use target_clip() → no-op when None.
@@ -54511,15 +54496,6 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #ifndef NO_GRAPHICS
 	targeted_sprite = NULL;
 #endif
-	// Base is always the base_clip (the clip whose timeline code is executing)
-	{
-		char msg_buf[512];
-		const char* base_path = mcToDotBasePath(base);
-		snprintf(msg_buf, sizeof(msg_buf),
-			"Target not found: Target=\"%s\" Base=\"%s\"\n",
-			target_name, base_path);
-		fputs(msg_buf, stdout);
-	}
 }
 
 // ==================================================================
