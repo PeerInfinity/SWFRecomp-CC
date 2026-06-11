@@ -17,9 +17,9 @@
 | Ruffle-matched | 6 (diffs ⊆ Ruffle's against Flash) |
 | Effective pass | **620** (97.3%) |
 | Failing | 17 |
-| Total expected lines | 99875 |
-| Matching lines | 97406 (97.5%) |
-| Mismatched lines | 2469 |
+| Total expected lines | 99864 |
+| Matching lines | 97405 (97.5%) |
+| Mismatched lines | 2459 |
 
 ### Failure Breakdown
 
@@ -704,12 +704,12 @@ No timeouts.
 | 8 | `load_cancel_via_removemovieclip` | 25.0% | 2/8 | 8 | 4 |  |
 | 9 | `target_paths/swf5` | 20.8% | 178/854 | 818 | 854 |  |
 | 10 | `target_paths/swf6` | 20.8% | 178/854 | 818 | 854 |  |
-| 11 | `xml_socket_connect_null` | 8.3% | 1/12 | 4 | 12 |  |
-| 12 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
-| 13 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
-| 14 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
-| 15 | `geturl_target_normalize` | 4.5% | 4/89 | 35 | 89 |  |
-| 16 | `geturl_opcode_target_normalize` | 0.0% | 0/45 | 0 | 45 |  |
+| 11 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
+| 12 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
+| 13 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
+| 14 | `geturl_target_normalize` | 4.5% | 4/89 | 35 | 89 |  |
+| 15 | `geturl_opcode_target_normalize` | 0.0% | 0/45 | 0 | 45 |  |
+| 16 | `removed_base_clip_tell_target` | 0.0% | 0/1 | 1 | 1 | [62](ruffle-tests/tests/swfs/avm1/_investigation/complete/MOVIECLIP_PLAN.md) [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
 | 17 | `swf4_vars` | 0.0% | 0/25 | 19 | 25 |  |
 
 ## Investigation Documents
@@ -777,7 +777,7 @@ No timeouts.
 | 59 | [MATH_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/MATH_PLAN.md) | 4 | 4 | 0 |
 | 60 | [MORPH_INTERPOLATION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/MORPH_INTERPOLATION_PLAN.md) | 1 | 1 | 0 |
 | 61 | [MOUSE_EVENTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/MOUSE_EVENTS_PLAN.md) | 5 | 5 | 0 |
-| 62 | [MOVIECLIP_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/MOVIECLIP_PLAN.md) | 55 | 55 | 0 |
+| 62 | [MOVIECLIP_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/MOVIECLIP_PLAN.md) | 56 | 55 | 1 |
 | 63 | [MOVIECLIPLOADER_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/MOVIECLIPLOADER_PLAN.md) | 14 | 14 | 0 |
 | 64 | [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NATIVE_INTROSPECTION_PLAN.md) | 15 | 15 | 0 |
 | 65 | [NATIVE_OBJECTS_UPDATED_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NATIVE_OBJECTS_UPDATED_PLAN.md) | 2 | 2 | 0 |
@@ -809,7 +809,7 @@ No timeouts.
 | 91 | [SWF_VERSION_SEMANTICS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/SWF_VERSION_SEMANTICS_PLAN.md) | 5 | 5 | 0 |
 | 92 | [TAB_ORDERING_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PLAN.md) | 16 | 16 | 0 |
 | 93 | [TAB_ORDERING_PROPERTIES_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PROPERTIES_PLAN.md) | 1 | 1 | 0 |
-| 94 | [TELLTARGET_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) | 17 | 17 | 0 |
+| 94 | [TELLTARGET_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) | 18 | 17 | 1 |
 | 95 | [TEXTFIELD_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) | 70 | 69 | 1 |
 | 96 | [TEXTSNAPSHOT_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTSNAPSHOT_PLAN.md) | 4 | 4 | 0 |
 | 97 | [THIS_BINDING_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/THIS_BINDING_PLAN.md) | 5 | 5 | 0 |
@@ -823,4 +823,4 @@ No timeouts.
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 5 | 5 | 0 |
 | 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 28 | 28 | 0 |
-| | *(tests not in any document)* | 178 | 159 | 19 |
+| | *(tests not in any document)* | 177 | 159 | 18 |

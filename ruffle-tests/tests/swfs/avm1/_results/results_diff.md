@@ -1,34 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `eb280b751d6b` (2026-06-11T16:10:17.999347+00:00)
-**Current:** `db8c78080cb1` (2026-06-11T16:40:26.811100+00:00)
+**Previous:** `db8c78080cb1` (2026-06-11T16:40:26.811100+00:00)
+**Current:** `198203cc9b06` (2026-06-11T18:15:16.480087+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 609 | 616 | +7 |
+| Passing | 616 | 617 | +1 |
 | Total | 678 | 678 | 0 |
-| Pass rate | 89.8% | 90.9% | +1.1% |
-| Mismatched lines | 11981 | 11125 | -856 |
-|   Decreased | | | -856 |
+| Pass rate | 90.9% | 91.0% | +0.1% |
+| Mismatched lines | 11125 | 11137 | +12 |
+|   Decreased | | | -1 |
+|   Increased | | | +13 |
 
-## Newly Passing (7)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `call` | output_mismatch | 42/62 | 62/62 |
-| `path_string` | output_mismatch | 56/301 | 301/301 |
-| `property_invalid_base_clip` | output_mismatch | 19/35 | 35/35 |
-| `swf4_actions_coercion_order` | output_mismatch | 106/157 | 157/157 |
-| `tell_target` | output_mismatch | 4/34 | 34/34 |
-| `tell_target_invalid` | output_mismatch | 0/5 | 5/5 |
-| `tell_target_invalid_swf6` | output_mismatch | 0/4 | 4/4 |
+| `removed_base_clip_tell_target` | output_mismatch | 0/1 | 1/1 |
 
-## Line Count Changed (3)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `target_paths/swf4` | output_mismatch | 171/818 | 642/818 | -471 |
-| `target_paths/swf5` | output_mismatch | 171/854 | 178/854 | -7 |
-| `target_paths/swf6` | output_mismatch | 171/854 | 178/854 | -7 |
+| `global_instance_decls` | output_mismatch | 26/758 | 13/758 | +13 |

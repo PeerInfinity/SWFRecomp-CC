@@ -7968,6 +7968,25 @@
       "status": "pass"
     },
     {
+      "test": "removed_base_clip_tell_target",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.579,
+        "run": 3.061
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 22.65,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=1, expected=1)",
+      "actual_output": "BAD",
+      "expected_output": "GOOD!"
+    },
+    {
       "test": "removed_clip_halts_script",
       "phases": {
         "recomp": 0.0,
@@ -10883,25 +10902,6 @@
       },
       "duration": 0.85,
       "status": "pass"
-    },
-    {
-      "test": "xml_socket_connect_null",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.696,
-        "run": 0.166
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 12,
-        "matching_lines": 1
-      },
-      "duration": 1.87,
-      "status": "output_mismatch",
-      "detail": "11 line(s) differ (actual=4, expected=12)",
-      "actual_output": "// connect() no args\n// connect(null)\n// connect(undefined)\n// connect(\"example.com\", 1234)",
-      "expected_output": "// connect() no args\nNavigator::connect_socket\n    Host: localhost; Port: 0\n// connect(null)\nNavigator::connect_socket\n    Host: localhost; Port: 0\n// connect(undefined)\nNavigator::connect_socket\n    Host: localhost; Port: 0\n// connect(\"example.com\", 1234)\nNavigator::connect_socket\n    Host: example.com; Port: 1234"
     },
     {
       "test": "xml_to_string",

@@ -27,7 +27,7 @@
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 97,406 | 99,875 | 97.5% |
+| avm1 | 97,405 | 99,864 | 97.5% |
 | from_gnash/actionscript.all | 29,630 | 31,918 | 92.8% |
 | from_gnash/misc-ming.all | 4,007 | 5,179 | 77.4% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -35,7 +35,7 @@
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
-| **Total** | **132,855** | **138,947** | **95.6%** |
+| **Total** | **132,854** | **138,936** | **95.6%** |
 
 ## Failure Breakdown
 
@@ -77,8 +77,8 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 - **Pass:** 614/637 (96.4%)
 - **Ignored:** 41 tests
 - **Duration:** 1h12m57s across 30 shards
-- **Lines:** 97,406/99,875 matching (97.5%)
-- **Avg test duration:** 6.4s — slowest: `tab_ordering_custom_m1` (46.6s)
+- **Lines:** 97,405/99,864 matching (97.5%)
+- **Avg test duration:** 6.5s — slowest: `tab_ordering_custom_m1` (46.6s)
 
 ### from_gnash/actionscript.all
 
