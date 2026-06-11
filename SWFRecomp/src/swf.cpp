@@ -4311,6 +4311,19 @@ namespace SWFRecomp
 							action_size -= 1;
 						}
 
+						// AllEventFlags is a dispatch FILTER (Flash behavior; Ruffle
+						// 8c5ca9d4d "Do not dispatch clip events not present in
+						// allEventFlags"): a record's effective events are
+						// event_flags & all_event_flags. Fully-masked records are
+						// dropped (payload skipped, no script emitted).
+						// Key test: avm1/placeobject_all_event_flags.
+						u32 effective_flags = event_flags & all_event_flags;
+						if (effective_flags == 0)
+						{
+							cur_pos += action_size;
+							continue;
+						}
+
 						// Generate script function for this clip action
 						std::string func_name = "clip_action_" + to_string(next_script_i);
 						context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
@@ -4328,7 +4341,7 @@ namespace SWFRecomp
 						action.parseActions(context, cur_pos, out_script);
 						out_script << "}";
 
-						clip_entries.push_back({ event_flags, func_name });
+						clip_entries.push_back({ effective_flags, func_name });
 					}
 
 					if (!clip_entries.empty())
@@ -5620,6 +5633,15 @@ namespace SWFRecomp
 										action_size -= 1;
 									}
 
+									// AllEventFlags dispatch filter — see the root-level
+									// PlaceObject2 CLIPACTIONS parse for rationale.
+									u32 effective_flags = event_flags & all_event_flags;
+									if (effective_flags == 0)
+									{
+										cur_pos += action_size;
+										continue;
+									}
+
 									std::string func_name = "clip_action_" + to_string(next_script_i);
 									context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
 
@@ -5635,7 +5657,7 @@ namespace SWFRecomp
 									action.parseActions(context, cur_pos, out_script);
 									out_script << "}";
 
-									clip_entries.push_back({ event_flags, func_name });
+									clip_entries.push_back({ effective_flags, func_name });
 								}
 
 								if (!clip_entries.empty())
