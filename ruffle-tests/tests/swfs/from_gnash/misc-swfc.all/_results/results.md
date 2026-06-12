@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-11 23:48 UTC
+**Date**: 2026-06-12 02:38 UTC
 
-**Git SHA**: `f75b58f7c0`
+**Git SHA**: `0b5f209663`
 
 **Run Duration**: 0m 5s
 
@@ -37,7 +37,7 @@
 | 4 | `hello` | 4 | 0.2s |  |
 | 5 | `mouse_drag_test` | 12 | 0.2s |  |
 | 6 | `movieclip_destruction_test2` | 56 | 0.2s |  |
-| 7 | `stackscope` | 11 | 0.2s |  |
+| 7 | `stackscope` | 11 | 0.1s |  |
 | 8 | `submoviegetvar` | 4 | 0.2s |  |
 | 9 | `swf4opcode` | 117 | 0.2s |  |
 
