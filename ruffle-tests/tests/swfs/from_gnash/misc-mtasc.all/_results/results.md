@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-12 20:26 UTC
+**Date**: 2026-06-12 22:01 UTC
 
-**Git SHA**: `79add5a10a`
+**Git SHA**: `3de56efba1`
 
 **Run Duration**: 0m 2s
 
@@ -27,7 +27,7 @@
 |---|------|-------|----------|-------|
 | 1 | `enum` | 19 | 0.2s |  |
 | 2 | `exception` | 35 | 0.2s |  |
-| 3 | `function_test` | 26 | 0.1s |  |
+| 3 | `function_test` | 26 | 0.2s |  |
 | 4 | `hello` | 8 | 0.2s |  |
 | 5 | `implementsOpTest` | 28 | 0.2s |  |
 | 6 | `inheritance` | 22 | 0.2s |  |
