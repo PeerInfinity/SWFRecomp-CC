@@ -144,7 +144,7 @@ class Loader {
 		regionTick++;
 		moverTick();
 		vizTick();
-		if (DBG && tick == 230) dumpClips();
+		if (DBG && tick == 330) dumpClips();
 		detectLanding();
 		if (DBG) trace("[dbg] t" + tick + " dl ok");
 		statusTrace();
@@ -203,18 +203,29 @@ class Loader {
 		if (nativeBlocks > n) n = nativeBlocks;
 		for (var b:Number = 0; b < n; b++) {
 			parkNamed(c, "block_" + b);
-			// Old region's goal/gate visuals don't survive a swap (the new
-			// region's idx set may be narrower, and doors are drawn per-side).
-			if (typeof(c["apviz_" + b]) == "movieclip") c["apviz_" + b].removeMovieClip();
-			if (typeof(_root["apdoor_" + b]) == "movieclip") _root["apdoor_" + b].removeMovieClip();
-			if (typeof(_root["apghost_" + b]) == "movieclip") _root["apghost_" + b].removeMovieClip();
 		}
+		// ALL visuals cleared via their reference registries on the SAME tick
+		// that re-authors the level — never by name lookup (by-name removal
+		// of dynamic clips is unreliable on the swfrecomp tier: stale doors
+		// AND a stale coin both survived swaps in hand-verify).
+		var k:String;
+		for (k in doors) {
+			if (typeof(doors[k]) == "movieclip") killViz(doors[k]);
+		}
+		for (k in ghosts) {
+			if (typeof(ghosts[k]) == "movieclip") killViz(ghosts[k]);
+		}
+		for (k in coins) {
+			if (typeof(coins[k]) == "movieclip") killViz(coins[k]);
+		}
+		doors = {};
+		ghosts = {};
+		coins = {};
 		c.attribute = new Array();
 		// Gated platforms stay parked until the next pollItemsTick re-applies
 		// the held set onto the NEW plats (forced via the itemsCsv sentinel).
 		held = {};
 		itemsCsv = "\x01";
-		updateBgFill();
 		placeAll();
 		resetHero();
 	}
@@ -313,7 +324,6 @@ class Loader {
 			var gateOk:Boolean = (p.gate == "" || held[p.gate] == true);
 			if (gateOk) positionPlat(p); else parkPlat(p);
 		} else {
-			updateBgFill();
 			resetHero();
 			inited = true;
 			trace("[loader] init done: spawner disabled, " + plats.length
@@ -322,31 +332,10 @@ class Loader {
 		initStep++;
 	}
 
-	// 3.3: cover the widened stage's empty strip (DJ's grid art is 240 wide
-	// and its timeline instance is UNNAMED — `_root.background` was never a
-	// real reference, so scaling it is impossible from AS). Instead: a flat
-	// paper-toned fill attached INSIDE the container at depth 1 — container
-	// children stack within the container (below our blocks at 6000+), and
-	// the container itself sits timeline-below the hero/header, so the fill
-	// can never cover gameplay. Tall enough to span the full level height
-	// plus bounce overshoot; redrawn per configure (worldH changes).
-	static function updateBgFill():Void {
-		if (Stage.width <= 240) return;
-		var c = _root.container;
-		var f = c["apbgfill"];
-		// Depth 50: above the native spawner's initial attaches (~0..18, all
-		// parked), below our claimed blocks (6000+).
-		if (typeof(f) != "movieclip") f = c.createEmptyMovieClip("apbgfill", 50);
-		f.clear();
-		var top:Number = -(worldH - 400) - 200;
-		f.beginFill(0xFAF2E8, 100);
-		f.moveTo(238, top);
-		f.lineTo(Stage.width + 2, top);
-		f.lineTo(Stage.width + 2, 460);
-		f.lineTo(238, 460);
-		f.lineTo(238, top);
-		f.endFill();
-	}
+	// (3.3 background fill REMOVED by user decision after hand-verify: in
+	// live z-order the fill composited ABOVE the authored blocks/coins/doors
+	// despite its low container depth — stage-extension cosmetics are
+	// deliberately not pursued for now; the empty strip stays.)
 
 	static function parkNamed(c, name:String):Void {
 		if (typeof(c[name]) != "movieclip") return;
@@ -409,21 +398,35 @@ class Loader {
 	//   (swept blues' ghosts ride the same x(t)); broken browns ghost NOTHING.
 	static function updateViz(p):Void {
 		if (!VIZ_GOALS) return;
+		if (coins == undefined) coins = {};
 		var c = _root.container;
-		var nm:String = "apviz_" + p.idx;
 		if (p.goalKind == "loc") {
-			var v = c[nm];
-			if (typeof(v) != "movieclip") v = c.attachMovie("coin", nm, 6500 + p.idx);
+			var v = coins[p.idx];
+			if (typeof(v) != "movieclip") {
+				v = c.attachMovie("coin", "apviz_" + p.idx, 6500 + p.idx);
+				coins[p.idx] = v;
+			}
 			v._x = p.x;
 			v._y = p.y - 28;
 			v._alpha = (checked[p.goalId] == true) ? 25 : 100;
-		} else if (typeof(c[nm]) == "movieclip") {
-			c[nm].removeMovieClip();
+		} else if (typeof(coins[p.idx]) == "movieclip") {
+			killViz(coins[p.idx]);
+			delete coins[p.idx];
 		}
 	}
 
 	static var DOOR_DEPTH:Number = 900000;
 	static var GHOST_DEPTH:Number = 901000;
+	// AS-side CLIP-REFERENCE registries for the _root drawing visuals. On the
+	// swfrecomp tier, name lookup of createEmptyMovieClip children on _root
+	// (`_root["apdoor_3"]`) resolves undefined even while the clip exists —
+	// which made removal-by-name a no-op (stale doors survived a region swap,
+	// frozen, until a LATER region reused the same idx and the same-depth
+	// createEmptyMovieClip replaced them: exactly the hand-verify symptom).
+	// Holding direct references sidesteps name lookup on every tier.
+	static var doors:Object;   // idx -> clip ref
+	static var ghosts:Object;  // idx -> clip ref
+	static var coins:Object;   // idx -> clip ref (container-attached "coin")
 
 	// Current host CENTER x in container space (live mover x when present,
 	// the sweep formula for gated-away movers so ghosts ride the same wave).
@@ -440,6 +443,8 @@ class Loader {
 
 	static function vizTick():Void {
 		if (!VIZ_GOALS || plats == undefined) return;
+		if (doors == undefined) doors = {};
+		if (ghosts == undefined) ghosts = {};
 		var c = _root.container;
 		var cy:Number = Number(c._y);
 		if (isNaN(cy)) cy = 0;
@@ -447,34 +452,45 @@ class Loader {
 			var p = plats[i];
 			var hx:Number = hostX(p);
 			if (p.goalKind == "exit") {
-				var d = _root["apdoor_" + p.idx];
+				var d = doors[p.idx];
 				if (typeof(d) != "movieclip") {
 					d = _root.createEmptyMovieClip("apdoor_" + p.idx, DOOR_DEPTH + p.idx);
 					drawDoor(d, p.goalSide);
+					doors[p.idx] = d;
 				}
 				d._x = hx;
 				d._y = p.y + cy;
 				d._alpha = p.present ? 80 : 22;
 			}
 			var wantGhost:Boolean = (!p.present && p.gate != "");
-			var g = _root["apghost_" + p.idx];
+			var g = ghosts[p.idx];
 			if (wantGhost) {
 				if (typeof(g) != "movieclip") {
 					g = _root.createEmptyMovieClip("apghost_" + p.idx, GHOST_DEPTH + p.idx);
 					drawGhost(g, p.type);
+					ghosts[p.idx] = g;
 				}
 				g._x = hx;
 				g._y = p.y + cy;
 			} else if (typeof(g) == "movieclip") {
-				g.removeMovieClip();
+				killViz(g);
+				delete ghosts[p.idx];
 			}
 			// Coins follow their host too (mover hosts; also self-heals any
 			// stale visual onto its true host).
-			if (p.goalKind == "loc") {
-				var v = c["apviz_" + p.idx];
+			if (p.goalKind == "loc" && coins != undefined) {
+				var v = coins[p.idx];
 				if (typeof(v) == "movieclip") { v._x = hx; v._y = p.y - 28; }
 			}
 		}
+	}
+
+	// Remove a _root drawing visual via its DIRECT reference, with an
+	// offscreen park as the belt to the suspenders (position-by-ref provably
+	// works on every tier — it's how vizTick moves these clips).
+	static function killViz(clip):Void {
+		clip._x = -3000;
+		clip.removeMovieClip();
 	}
 
 	// A translucent "door" around the clip origin (= the host's catch line):
@@ -599,9 +615,10 @@ class Loader {
 			if (p.idx != lb) continue;
 			if (p.goalKind == "loc" && checked[p.goalId] != true) {
 				checked[p.goalId] = true;
-				var c = _root.container;
 				// Collected pickups stay readable: dim, don't remove (3.1).
-				if (typeof(c["apviz_" + p.idx]) == "movieclip") c["apviz_" + p.idx]._alpha = 25;
+				if (coins != undefined && typeof(coins[p.idx]) == "movieclip") {
+					coins[p.idx]._alpha = 25;
+				}
 				trace("[loader] sendLocation " + p.goalId);
 				if (eiMode) EI.call("__swfSendLocation", p.goalId);
 			} else if (p.goalKind == "exit" && exitFired[p.goalId] != true) {
