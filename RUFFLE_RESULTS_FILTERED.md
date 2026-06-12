@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `0b5f209663a8`  
-**Date:** 2026-06-12 02:38 UTC  
-**Total duration:** 6m33s
+**Commit:** `3b477dec9296`  
+**Date:** 2026-06-12 03:59 UTC  
+**Total duration:** 6m09s
 
 ## Results by Suite
 
@@ -17,11 +17,16 @@
 | from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_filtered.md) |
 | from_gnash/misc-swfc.all | 9 | 17 | 52.9% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_filtered.md) |
 | from_gnash/misc-swfmill.all | 19 | 20 | 95.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_filtered.md) |
-| from_shumway | 73 | 76 | 96.1% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_filtered.md) |
-| from_shumway/avm1 | 44 | 44 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_filtered.md) |
-| **Total** | **967** | **1148** | **84.2%** | |
+| from_shumway | 72 | 75 | 96.0% ⚠️ | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_filtered.md) |
+| from_shumway/avm1 | 43 | 43 | 100% ⚠️ | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_filtered.md) |
+| **Total** | **965** | **1146** | **84.2%** | |
 
-*70 tests ignored.*
+*68 tests ignored.*
+
+### ⚠️ Incomplete Runs
+
+- **from_shumway**: 29/30 shards produced results (1 missing)
+- **from_shumway/avm1**: 29/30 shards produced results (1 missing)
 
 ## Line-Level Accuracy
 
@@ -33,9 +38,9 @@
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
 | from_gnash/misc-swfc.all | 411 | 532 | 77.3% |
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
-| from_shumway | 621 | 637 | 97.5% |
-| from_shumway/avm1 | 480 | 480 | 100% |
-| **Total** | **133,109** | **138,936** | **95.8%** |
+| from_shumway | 615 | 631 | 97.5% |
+| from_shumway/avm1 | 441 | 441 | 100% |
+| **Total** | **133,064** | **138,891** | **95.8%** |
 
 ## Failure Breakdown
 
@@ -84,7 +89,7 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 617/637 (96.9%)
 - **Ignored:** 41 tests
-- **Duration:** 3m22s across 30 shards
+- **Duration:** 3m04s across 30 shards
 - **Lines:** 97,651/99,864 matching (97.8%)
 - **Avg test duration:** 0.2s — slowest: `timeout` (5.2s)
 
@@ -92,7 +97,7 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 132/237 (55.7%)
 - **Ignored:** 6 tests
-- **Duration:** 1m41s across 30 shards
+- **Duration:** 1m38s across 30 shards
 - **Lines:** 29,630/31,918 matching (92.8%)
 - **Avg test duration:** 0.3s — slowest: `MovieClip-v8` (2.3s)
 
@@ -102,7 +107,7 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Ignored:** 2 tests
 - **Duration:** 41s across 30 shards
 - **Lines:** 4,012/5,179 matching (77.5%)
-- **Avg test duration:** 0.3s — slowest: `matrix_test` (3.3s)
+- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.8s)
 
 ### from_gnash/misc-mtasc.all
 
@@ -117,27 +122,27 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Ignored:** 2 tests
 - **Duration:** 5s across 30 shards
 - **Lines:** 411/532 matching (77.3%)
-- **Avg test duration:** 0.2s — slowest: `action_execution_order_test10` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `movieclip_destruction_test4` (0.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
 - **Duration:** 5s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 0.2s — slowest: `tags_after_last_showframe` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `registers` (0.6s)
 
 ### from_shumway
 
-- **Pass:** 73/76 (96.1%)
-- **Ignored:** 16 tests
-- **Duration:** 25s across 30 shards
-- **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 0.2s — slowest: `avm1/watch` (0.5s)
+- **Pass:** 72/75 (96.0%)
+- **Ignored:** 14 tests
+- **Duration:** 23s across 29 shards
+- **Lines:** 615/631 matching (97.5%)
+- **Avg test duration:** 0.2s — slowest: `fscommand1` (0.5s)
 
 ### from_shumway/avm1
 
-- **Pass:** 44/44 (100%)
+- **Pass:** 43/43 (100%)
 - **Ignored:** 3 tests
-- **Duration:** 12s across 30 shards
-- **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `super` (0.7s)
+- **Duration:** 11s across 29 shards
+- **Lines:** 441/441 matching (100%)
+- **Avg test duration:** 0.2s — slowest: `levels` (0.2s)
