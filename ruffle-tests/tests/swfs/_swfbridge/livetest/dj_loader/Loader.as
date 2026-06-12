@@ -143,6 +143,8 @@ class Loader {
 		if (DBG) trace("[dbg] t" + tick + " igo ok");
 		regionTick++;
 		moverTick();
+		vizTick();
+		if (DBG && tick == 230) dumpClips();
 		detectLanding();
 		if (DBG) trace("[dbg] t" + tick + " dl ok");
 		statusTrace();
@@ -164,12 +166,16 @@ class Loader {
 			var b = c["block_" + p.idx];
 			if (typeof(b) != "movieclip") continue;
 			if (typeof(b.aaa) == "movieclip") { b.aaa.ac = 0; b.aaa._x = 0; }
-			var span:Number = p.sweepMax - p.sweepMin;
-			var cyc:Number = 2 * span;
-			var ph:Number = (BLUE_SPEED * regionTick) % cyc;
-			if (ph < 0) ph += cyc;
-			b._x = p.sweepMin + ((ph <= span) ? ph : (cyc - ph));
+			b._x = sweepX(p);
 		}
+	}
+
+	static function sweepX(p):Number {
+		var span:Number = p.sweepMax - p.sweepMin;
+		var cyc:Number = 2 * span;
+		var ph:Number = (BLUE_SPEED * regionTick) % cyc;
+		if (ph < 0) ph += cyc;
+		return p.sweepMin + ((ph <= span) ? ph : (cyc - ph));
 	}
 
 	// ---- region swaps: host re-configures on every region move ------------
@@ -197,16 +203,18 @@ class Loader {
 		if (nativeBlocks > n) n = nativeBlocks;
 		for (var b:Number = 0; b < n; b++) {
 			parkNamed(c, "block_" + b);
-			// Old region's goal visuals don't survive a swap (the new region's
-			// idx set may be narrower).
+			// Old region's goal/gate visuals don't survive a swap (the new
+			// region's idx set may be narrower, and doors are drawn per-side).
 			if (typeof(c["apviz_" + b]) == "movieclip") c["apviz_" + b].removeMovieClip();
-			if (typeof(c["apdoor_" + b]) == "movieclip") c["apdoor_" + b].removeMovieClip();
+			if (typeof(_root["apdoor_" + b]) == "movieclip") _root["apdoor_" + b].removeMovieClip();
+			if (typeof(_root["apghost_" + b]) == "movieclip") _root["apghost_" + b].removeMovieClip();
 		}
 		c.attribute = new Array();
 		// Gated platforms stay parked until the next pollItemsTick re-applies
 		// the held set onto the NEW plats (forced via the itemsCsv sentinel).
 		held = {};
 		itemsCsv = "\x01";
+		updateBgFill();
 		placeAll();
 		resetHero();
 	}
@@ -305,12 +313,39 @@ class Loader {
 			var gateOk:Boolean = (p.gate == "" || held[p.gate] == true);
 			if (gateOk) positionPlat(p); else parkPlat(p);
 		} else {
+			updateBgFill();
 			resetHero();
 			inited = true;
 			trace("[loader] init done: spawner disabled, " + plats.length
 			      + " platforms authored over " + nativeBlocks + " native blocks");
 		}
 		initStep++;
+	}
+
+	// 3.3: cover the widened stage's empty strip (DJ's grid art is 240 wide
+	// and its timeline instance is UNNAMED — `_root.background` was never a
+	// real reference, so scaling it is impossible from AS). Instead: a flat
+	// paper-toned fill attached INSIDE the container at depth 1 — container
+	// children stack within the container (below our blocks at 6000+), and
+	// the container itself sits timeline-below the hero/header, so the fill
+	// can never cover gameplay. Tall enough to span the full level height
+	// plus bounce overshoot; redrawn per configure (worldH changes).
+	static function updateBgFill():Void {
+		if (Stage.width <= 240) return;
+		var c = _root.container;
+		var f = c["apbgfill"];
+		// Depth 50: above the native spawner's initial attaches (~0..18, all
+		// parked), below our claimed blocks (6000+).
+		if (typeof(f) != "movieclip") f = c.createEmptyMovieClip("apbgfill", 50);
+		f.clear();
+		var top:Number = -(worldH - 400) - 200;
+		f.beginFill(0xFAF2E8, 100);
+		f.moveTo(238, top);
+		f.lineTo(Stage.width + 2, top);
+		f.lineTo(Stage.width + 2, 460);
+		f.lineTo(238, 460);
+		f.lineTo(238, top);
+		f.endFill();
 	}
 
 	static function parkNamed(c, name:String):Void {
@@ -356,44 +391,128 @@ class Loader {
 		updateViz(p);
 	}
 
-	// Goal-host visuals, owned per platform: a coin above pickup hosts (until
-	// collected), a translucent "door" above portal hosts. Names are OUR
-	// namespace (apviz_/apdoor_) so DJ's native coin logic (attribute==7 +
-	// "coin_<i>") can never touch them; collection stays landing-triggered.
+	// ---- goal-host + gate visuals (increment 3) ----------------------------
+	// Coins (pickups) are container-attached native "coin" clips — attachMovie
+	// reliably parents into the container on every tier. Doors (portals) and
+	// gate GHOSTS are drawing-API clips on _ROOT, positioned EVERY tick from
+	// container-local coords + container._y by vizTick(): increment 2's
+	// container.createEmptyMovieClip door did not scroll with the level in
+	// real play (the AP 3.2 bug), so screen-space + per-tick positioning is
+	// the tier-agnostic fix. Names are OUR namespace (apviz_/apdoor_/apghost_)
+	// so DJ's native coin logic (attribute==7 + "coin_<i>") can't touch them.
+	//
+	// States (matching the JS renderer's visual language):
+	//   pickup uncollected -> full coin; collected/checked -> coin at _alpha
+	//   25 (stays readable, per the user); portal door rides its host with a
+	//   direction arrow, dimmed to 22 while the host is item-gated away;
+	//   gated-absent platforms show a translucent platform-colored ghost
+	//   (swept blues' ghosts ride the same x(t)); broken browns ghost NOTHING.
 	static function updateViz(p):Void {
 		if (!VIZ_GOALS) return;
 		var c = _root.container;
-		if (p.goalKind == "loc" && checked[p.goalId] != true) {
-			var v = c["apviz_" + p.idx];
-			if (typeof(v) != "movieclip") v = c.attachMovie("coin", "apviz_" + p.idx, 6500 + p.idx);
+		var nm:String = "apviz_" + p.idx;
+		if (p.goalKind == "loc") {
+			var v = c[nm];
+			if (typeof(v) != "movieclip") v = c.attachMovie("coin", nm, 6500 + p.idx);
 			v._x = p.x;
 			v._y = p.y - 28;
-		} else if (typeof(c["apviz_" + p.idx]) == "movieclip") {
-			c["apviz_" + p.idx].removeMovieClip();
+			v._alpha = (checked[p.goalId] == true) ? 25 : 100;
+		} else if (typeof(c[nm]) == "movieclip") {
+			c[nm].removeMovieClip();
 		}
-		if (p.goalKind == "exit") {
-			var m = c["apdoor_" + p.idx];
-			if (typeof(m) != "movieclip") m = c.createEmptyMovieClip("apdoor_" + p.idx, 6800 + p.idx);
-			m.clear();
-			m._x = 0;
-			m._y = 0;
-			m.beginFill(0x9933FF, 45);
-			m.moveTo(p.x - 12, p.y - 38);
-			m.lineTo(p.x + 12, p.y - 38);
-			m.lineTo(p.x + 12, p.y - 4);
-			m.lineTo(p.x - 12, p.y - 4);
-			m.lineTo(p.x - 12, p.y - 38);
-			m.endFill();
+	}
+
+	static var DOOR_DEPTH:Number = 900000;
+	static var GHOST_DEPTH:Number = 901000;
+
+	// Current host CENTER x in container space (live mover x when present,
+	// the sweep formula for gated-away movers so ghosts ride the same wave).
+	static function hostX(p):Number {
+		if (p.type == "m" && !isNaN(p.sweepMin)) {
+			if (p.present) {
+				var b = _root.container["block_" + p.idx];
+				if (typeof(b) == "movieclip") return b._x;
+			}
+			return sweepX(p);
 		}
+		return p.x;
+	}
+
+	static function vizTick():Void {
+		if (!VIZ_GOALS || plats == undefined) return;
+		var c = _root.container;
+		var cy:Number = Number(c._y);
+		if (isNaN(cy)) cy = 0;
+		for (var i:Number = 0; i < plats.length; i++) {
+			var p = plats[i];
+			var hx:Number = hostX(p);
+			if (p.goalKind == "exit") {
+				var d = _root["apdoor_" + p.idx];
+				if (typeof(d) != "movieclip") {
+					d = _root.createEmptyMovieClip("apdoor_" + p.idx, DOOR_DEPTH + p.idx);
+					drawDoor(d, p.goalSide);
+				}
+				d._x = hx;
+				d._y = p.y + cy;
+				d._alpha = p.present ? 80 : 22;
+			}
+			var wantGhost:Boolean = (!p.present && p.gate != "");
+			var g = _root["apghost_" + p.idx];
+			if (wantGhost) {
+				if (typeof(g) != "movieclip") {
+					g = _root.createEmptyMovieClip("apghost_" + p.idx, GHOST_DEPTH + p.idx);
+					drawGhost(g, p.type);
+				}
+				g._x = hx;
+				g._y = p.y + cy;
+			} else if (typeof(g) == "movieclip") {
+				g.removeMovieClip();
+			}
+			// Coins follow their host too (mover hosts; also self-heals any
+			// stale visual onto its true host).
+			if (p.goalKind == "loc") {
+				var v = c["apviz_" + p.idx];
+				if (typeof(v) == "movieclip") { v._x = hx; v._y = p.y - 28; }
+			}
+		}
+	}
+
+	// A translucent "door" around the clip origin (= the host's catch line):
+	// body (-12,-38)..(12,-4) + a white direction arrow per the exit side.
+	static function drawDoor(d, side:String):Void {
+		d.beginFill(0x9933FF, 55);
+		d.moveTo(-12, -38); d.lineTo(12, -38); d.lineTo(12, -4);
+		d.lineTo(-12, -4); d.lineTo(-12, -38);
+		d.endFill();
+		d.beginFill(0xFFFFFF, 90);
+		if (side == "N") {
+			d.moveTo(0, -30); d.lineTo(7, -16); d.lineTo(-7, -16); d.lineTo(0, -30);
+		} else if (side == "S") {
+			d.moveTo(0, -12); d.lineTo(7, -26); d.lineTo(-7, -26); d.lineTo(0, -12);
+		} else if (side == "W") {
+			d.moveTo(-8, -21); d.lineTo(6, -14); d.lineTo(6, -28); d.lineTo(-8, -21);
+		} else { // E
+			d.moveTo(8, -21); d.lineTo(-6, -14); d.lineTo(-6, -28); d.lineTo(8, -21);
+		}
+		d.endFill();
+	}
+
+	// Platform-shaped ghost around the origin (top edge at the catch line),
+	// tinted per type at low alpha — the metroidvania "what the item unlocks".
+	static function drawGhost(g, type:String):Void {
+		var col:Number = (type == "b") ? 0xA0784F : 0x5B9BD5;
+		g.beginFill(col, 24);
+		g.moveTo(-30, 0); g.lineTo(30, 0); g.lineTo(30, 13);
+		g.lineTo(-30, 13); g.lineTo(-30, 0);
+		g.endFill();
 	}
 
 	static function parkPlat(p):Void {
 		var c = _root.container;
 		if (typeof(c["block_" + p.idx]) == "movieclip") c["block_" + p.idx]._x = PARK_X;
-		if (typeof(c["apviz_" + p.idx]) == "movieclip") c["apviz_" + p.idx].removeMovieClip();
-		if (typeof(c["apdoor_" + p.idx]) == "movieclip") c["apdoor_" + p.idx].removeMovieClip();
 		c.attribute[p.idx] = 0;
 		p.present = false;
+		// Visuals stay: vizTick dims the door and shows the gate ghost.
 	}
 
 	static function resetHero():Void {
@@ -404,6 +523,19 @@ class Loader {
 		h.vy = 0;
 		h.jump = false;
 		h.lastblockhit = 0;
+		// Clear native POWERUP contamination from the pre-takeover window: the
+		// pinned hero can brush a random nail/inverse during the native game's
+		// staged-init ticks (Ruffle RNG is unseeded, so this is per-run luck).
+		// A live jetpack is poison: DJ's jetpack branch INCREMENTS
+		// lastblockhit every rising tick, which our landing detection would
+		// read as the hero landing on successive goal hosts — phantom
+		// sendLocation/sendExit storms (the AP 3.1 in-play weirdness).
+		h.jetpack = false;
+		h.jetcount = 0;
+		h.move_inversed = false;
+		h.counter = 0;
+		h.jumpspeed = 17;
+		h.maxjump = 22;
 		// Disable DJ's climb-recycle deletion (hero removes block_(lb-4) on
 		// each climb landing): authored levels keep ALL platforms alive — the
 		// bottom-fall respawn needs them back, and removeMovieClip of attached
@@ -451,6 +583,14 @@ class Loader {
 
 	// ---- landings -> goals (game -> host) ---------------------------------
 	static function detectLanding():Void {
+		// While a jetpack is live, DJ increments lastblockhit every rising
+		// tick (no landings happen) — never treat that march as landings.
+		// Authored levels can't grant jetpacks (attribute is only ever 0/2),
+		// but keep the guard in case one ever leaks in.
+		if (_root.hero.jetpack == true) {
+			lastLb = Number(_root.hero.lastblockhit);
+			return;
+		}
 		var lb:Number = Number(_root.hero.lastblockhit);
 		if (lb == lastLb) return;
 		lastLb = lb;
@@ -460,7 +600,8 @@ class Loader {
 			if (p.goalKind == "loc" && checked[p.goalId] != true) {
 				checked[p.goalId] = true;
 				var c = _root.container;
-				if (typeof(c["apviz_" + p.idx]) == "movieclip") c["apviz_" + p.idx].removeMovieClip();
+				// Collected pickups stay readable: dim, don't remove (3.1).
+				if (typeof(c["apviz_" + p.idx]) == "movieclip") c["apviz_" + p.idx]._alpha = 25;
 				trace("[loader] sendLocation " + p.goalId);
 				if (eiMode) EI.call("__swfSendLocation", p.goalId);
 			} else if (p.goalKind == "exit" && exitFired[p.goalId] != true) {
@@ -486,6 +627,19 @@ class Loader {
 	}
 
 	// ---- per-tick state trace (sustained-physics evidence + cross-tier diff)
+	static function dumpClips():Void {
+		var c = _root.container;
+		for (var n:String in c) {
+			if (typeof(c[n]) != "movieclip") continue;
+			trace("[dump] c." + n + " x=" + c[n]._x + " y=" + c[n]._y
+			      + " a=" + Math.round(c[n]._alpha) + " vis=" + c[n]._visible);
+		}
+		for (var m:String in _root) {
+			if (typeof(_root[m]) != "movieclip") continue;
+			trace("[dump] r." + m + " x=" + _root[m]._x + " y=" + _root[m]._y);
+		}
+	}
+
 	static function statusTrace():Void {
 		var h = _root.hero;
 		var line:String = "LT" + tick + " hx=" + h._x + " hy=" + h._y

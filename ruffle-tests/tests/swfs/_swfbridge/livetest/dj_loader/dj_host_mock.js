@@ -77,6 +77,12 @@
 				window.__swfBridge.pollItems(held);
 			}, g.at);
 		}
+		// Timed region tour (host-driven moves independent of portals), e.g.
+		// INJECT_JS='window.__DJ_TOUR=[{at:6000,region:"region_4_3"},...]' —
+		// the AP-suggested 3+ region walk for cross-region visual staleness.
+		for (const t of (window.__DJ_TOUR || [])) {
+			setTimeout(function () { configureRegion(t.region); }, t.at);
+		}
 	}
 
 	if (document.readyState === 'complete') start();
