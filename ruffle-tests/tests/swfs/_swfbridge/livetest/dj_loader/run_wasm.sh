@@ -18,7 +18,7 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${HERE}/../../../../../.." && pwd)"
 PROBE="${HERE}/../dj_probe"
-WASM_DIR="${ROOT}/SWFRecomp/tests/flasharchive/Doodle_Jump_loader/build/wasm"
+WASM_DIR="${WASM_DIR:-${ROOT}/SWFRecomp/tests/flasharchive/Doodle_Jump_loader/build/wasm}"
 AP_REPO="${AP_REPO:-$HOME/CC/Archipelago-CC}"
 PLAYWRIGHT_NODE_MODULES="${PLAYWRIGHT_NODE_MODULES:-${AP_REPO}/node_modules}"
 CHROME="${CHROME:-/usr/bin/google-chrome}"

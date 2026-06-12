@@ -86,16 +86,26 @@ runs); full results in the status doc.
 - **`build_test.sh` does NOT re-run the recompiler when only `test.swf`
   changed** — always pass `--clean` after replacing the SWF, and verify with
   `strings build/wasm/*.wasm | grep <new trace text>`.
-- **Browser-WASM hangs (main thread busy-loop) one-to-few ticks after
-  `removeMovieClip` of attachMovie'd container children**, and after a large
-  single-tick batch of MC ops from the injected clip's context. Hence (a) the
-  claim/park design instead of remove+reattach, (b) the STAGED init (one op
-  per tick), and (c) `hero.lastDeletedBlock = 999999` to disable the hero's
-  own climb-recycle deletion (also the right semantics for authored levels).
-  Runtime bug to fix separately — see the status doc.
+- **Browser-WASM hangs — ROOT-CAUSED AND FIXED 2026-06-11 (same day,
+  follow-up session): wasm stack overflow, NOT an MC-machinery bug.**
+  Emscripten's default `STACK_SIZE` is 64KB; recompiled AVM1 functions carry
+  multi-KB `ActionVar` frames, and the injected clip's nested enterFrame
+  dispatch overflowed it ~6 frames deep, silently writing below the stack
+  into dlmalloc-managed linear memory (wasm has no guard pages). The page
+  later busy-loops inside `$malloc` — the observed "removeMovieClip /
+  mass-MC-op hang" was just whichever call chain happened to be deepest.
+  Fix: `-sSTACK_SIZE=8MB` in `build_test.sh` (both wasm modes) and
+  `build_graphics_host.sh`, matching the native default. Hunt tooling kept
+  here: `build_wasm_memval.sh` (emmalloc-memvalidate + STACK_OVERFLOW_CHECK
+  oracle that pinned it), `build_native_browser_arm_asan.sh` + `alloc_guard.c`
+  (native compile of the browser arm with ASAN/HEAP_PASSTHROUGH — proved the
+  MC machinery itself clean), `build_wasm_asan.sh` (in-wasm ASAN; stalls in
+  renderer init, use memval instead). The loader's claim/park + staged-init +
+  `lastDeletedBlock = 999999` design is KEPT — it's the right semantics for
+  authored levels regardless (respawn needs all platforms alive).
 - The native `coin` sprite's frame-1 action is `gotoAndPlay(1)` (per-tick
-  self-goto): avoid attaching it from injected AS until the runtime hang is
-  understood (`VIZ_COIN = false`).
+  self-goto): was suspected in the hang (now exonerated — see above);
+  `VIZ_COIN = false` remains only because pickups have no approved visual yet.
 - The container's frame-1 DoAction is deferred in browser-WASM relative to
   the injected clip — init waits for `attachBlocks`/`lastBlockAttached` so
   the spawner can't be resurrected after the kill.

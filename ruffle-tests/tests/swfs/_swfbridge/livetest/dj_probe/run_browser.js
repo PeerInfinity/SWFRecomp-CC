@@ -27,8 +27,9 @@ const CLICK_DELAY = parseInt(process.env.CLICK_DELAY || '3000', 10);
 	});
 	try {
 		const page = await browser.newPage();
+		await page.addInitScript(() => { Error.stackTraceLimit = 80; });
 		page.on('console', (m) => console.log(m.text()));
-		page.on('pageerror', (e) => console.log('PAGEERROR: ' + e.message));
+		page.on('pageerror', (e) => console.log('PAGEERROR: ' + e.message + (e.stack ? '\n' + e.stack : '')));
 		await page.goto(URL, { waitUntil: 'load' });
 		if (CLICK) {
 			try {

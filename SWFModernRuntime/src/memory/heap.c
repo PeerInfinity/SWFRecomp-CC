@@ -37,6 +37,61 @@
 #define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB virtual space
 #endif
 
+#ifdef HEAP_PASSTHROUGH
+// Sanitizer mode: route HALLOC/HCALLOC/FREE straight to the system allocator
+// so ASAN/valgrind can see every runtime allocation individually. The o1heap
+// arena is one opaque block to sanitizers — UAF/double-free/OOB inside it are
+// invisible without this. Debug-only; never enable in production builds
+// (o1heap exists for per-frame latency, not correctness).
+bool heap_init(SWFAppContext* app_context, size_t initial_size)
+{
+	(void)initial_size;
+	if (app_context == NULL) return false;
+	app_context->heap_inited = 1;
+	fprintf(stderr, "[HEAP] PASSTHROUGH mode: HALLOC/FREE = system malloc/free (sanitizer hunt build)\n");
+	return true;
+}
+
+void* heap_alloc(SWFAppContext* app_context, size_t size)
+{
+	(void)app_context;
+	if (size == 0) return NULL;
+	void* ptr = malloc(size);
+	if (ptr == NULL)
+	{
+		fprintf(stderr, "ERROR: heap_alloc(%zu) failed - out of memory\n", size);
+		exit(1);
+	}
+	return ptr;
+}
+
+void* heap_calloc(SWFAppContext* app_context, size_t num, size_t size)
+{
+	(void)app_context;
+	if (num == 0 || size == 0) return NULL;
+	return calloc(num, size);
+}
+
+void heap_free(SWFAppContext* app_context, void* ptr)
+{
+	(void)app_context;
+	free(ptr);
+}
+
+void heap_stats(SWFAppContext* app_context)
+{
+	(void)app_context;
+	printf("[HEAP] PASSTHROUGH mode: no o1heap statistics\n");
+}
+
+void heap_shutdown(SWFAppContext* app_context)
+{
+	if (app_context != NULL)
+		app_context->heap_inited = 0;
+}
+
+#else  // !HEAP_PASSTHROUGH
+
 bool heap_init(SWFAppContext* app_context, size_t initial_size)
 {
 	if (app_context == NULL)
@@ -207,3 +262,5 @@ void heap_shutdown(SWFAppContext* app_context)
 	app_context->heap_current_size = 0;
 	app_context->heap_full_size = 0;
 }
+
+#endif  // !HEAP_PASSTHROUGH

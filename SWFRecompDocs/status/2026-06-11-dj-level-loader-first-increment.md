@@ -142,6 +142,34 @@ emscripten `-sASAN` (ASAN-in-wasm) on this scenario — until then, treat
 the real unmodified DJ exercises the recycle-deletion path on every climb in
 browser-WASM, so this bug likely affects long real-game sessions too.
 
+**ADDENDUM (2026-06-11, dedicated hunt session): ROOT-CAUSED AND FIXED.**
+The corruption is a **wasm stack overflow**, not an MC-machinery bug.
+Emscripten's default stack is 64KB (`STACK_SIZE`); recompiled AVM1 functions
+carry multi-KB `ActionVar` frames, and the injected clip's enterFrame
+dispatch chain (`tagMain → frame_N → tagFlushPendingEnterFrame → clip_action →
+actionCallMethod → …`) overflowed it only ~6 frames deep. Wasm linear memory
+has no guard pages, so the overflow silently writes below the stack into
+dlmalloc-managed memory — corrupted chunk metadata, and the page later
+busy-loops inside `$malloc` (the pinned spin stack). Evidence chain:
+(a) the browser arm compiled NATIVELY (render-stubbed, ASAN +
+`-DHEAP_PASSTHROUGH`, plus an o1heap/dlmalloc cross-free `--wrap=free` guard)
+runs the identical scenario clean for 27k ticks — 8MB native stack;
+(b) `-sMALLOC=emmalloc-memvalidate` in the browser detects metadata
+corruption on the loader's FIRST tick — even in runs that never hang, so the
+"green" soaks were corrupting too and hang timing (ticks 6/30/73) was just
+layout luck; (c) `-sSTACK_OVERFLOW_CHECK=2` converts it to an explicit
+`stack overflow (Attempt to set SP …)` abort at the same site; (d) with
+`-sSTACK_SIZE=8MB` both oracles run clean through the full scenario
+including the harsh repro (one-tick mass remove+reattach takeover + hero
+recycle-deletions + coin viz clips re-enabled). Fix landed in
+`build_test.sh` (both wasm modes) + `build_graphics_host.sh`. The
+removeMovieClip / mass-MC-op / coin-self-goto correlations were all just
+"deepest call chain that tick". Stock loader re-verified post-fix: 978-tick
+fixture soak and 1017-tick full-EI soak, contract events intact. The
+loader's claim/park + staged-init design is kept (correct semantics for
+authored levels). Previously deployed `docs/` / `docs2/` wasm demos were
+built with the 64KB stack and should be rebuilt to pick up the fix.
+
 ## THE key open question: 240px stage vs 600px worlds — RESOLVED (option 1, IMPLEMENTED)
 
 **Option 1 is implemented and verified on Ruffle + graphics-native** (the

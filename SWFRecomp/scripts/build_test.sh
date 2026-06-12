@@ -317,6 +317,15 @@ if [ "$TARGET" == "wasm" ]; then
         EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_getSpriteChildrenJSON","_setObjectTransform","_swf_ei_call_internal","_ng_ime_compose_set","_ng_ime_commit_set"]'
     fi
 
+    # STACK_SIZE=8MB on both wasm builds: emscripten's default stack is only
+    # 64KB and recompiled AVM1 functions carry multi-KB ActionVar frames — a
+    # ~6-deep enterFrame dispatch chain already overflows it. The overflow
+    # writes below the stack into dlmalloc-managed linear memory (no guard
+    # pages in wasm), corrupting chunk metadata; the page later hard-hangs
+    # busy-looping inside $malloc (ASYNCIFY allocateData). 8MB matches the
+    # native default ulimit, where the same code has always been fine.
+    # Root-caused 2026-06-11 via -sMALLOC=emmalloc-memvalidate +
+    # -sSTACK_OVERFLOW_CHECK=2 on the DJ level-loader repro.
     if [ "$GRAPHICS_FLAG" = true ]; then
         emcc \
             *.c \
@@ -338,6 +347,7 @@ if [ "$TARGET" == "wasm" ]; then
             -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=256MB \
+            -s STACK_SIZE=8MB \
             -sASYNCIFY \
             -sASYNCIFY_STACK_SIZE=65536 \
             -O2
@@ -357,7 +367,8 @@ if [ "$TARGET" == "wasm" ]; then
             -s EXPORTED_FUNCTIONS='["_main","_runSWF"]' \
             -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
-            -s INITIAL_MEMORY=16MB \
+            -s INITIAL_MEMORY=24MB \
+            -s STACK_SIZE=8MB \
             -O2
     fi
 
