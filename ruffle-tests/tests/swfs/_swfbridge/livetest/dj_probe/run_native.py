@@ -24,9 +24,10 @@ sys.path.insert(0, str(PROJECT_ROOT / "ruffle-tests"))
 import verify_output as vo  # noqa: E402
 
 
-def make_test_toml(num_frames: int) -> str:
+def make_test_toml(num_frames: int, capture_ticks=None) -> str:
     lines = [f"num_frames = {num_frames}", ""]
-    for i in range(1, min(num_frames, 16) + 1):
+    ticks = capture_ticks or range(1, min(num_frames, 16) + 1)
+    for i in ticks:
         lines.append(f"[image_comparisons.F{i:04d}]")
         lines.append(f"trigger = {i}")
         lines.append("")
@@ -43,6 +44,9 @@ def main():
     ap.add_argument("--recompile", action="store_true")
     ap.add_argument("--asan", action="store_true",
                     help="compile with AddressSanitizer (UAF/OOB pinning)")
+    ap.add_argument("--capture-ticks", default=None,
+                    help="comma-separated tick numbers for PNG capture "
+                         "(default: 1..16); deterministic visual probes")
     args = ap.parse_args()
 
     if not args.input_swf.exists():
@@ -54,7 +58,9 @@ def main():
     build_dir.mkdir(exist_ok=True)
 
     shutil.copy2(args.input_swf, test_dir / "test.swf")
-    (test_dir / "test.toml").write_text(make_test_toml(args.frames))
+    cap = ([int(t) for t in args.capture_ticks.split(",")]
+           if args.capture_ticks else None)
+    (test_dir / "test.toml").write_text(make_test_toml(args.frames, cap))
 
     event_file = None
     if args.input is not None:
@@ -76,7 +82,8 @@ def main():
         sys.exit(f"compile_native failed:\n{err}")
     print(f"  compile:   {time.perf_counter()-t0:.2f}s", file=sys.stderr)
 
-    triggers = ",".join(f"F{i:04d}:iteration:{i}" for i in range(1, min(args.frames, 16) + 1))
+    triggers = ",".join(f"F{i:04d}:iteration:{i}"
+                        for i in (cap or range(1, min(args.frames, 16) + 1)))
     extra_env = {
         "CAPTURE_TRIGGERS": triggers,
         "CAPTURE_OUTPUT_DIR": str(build_dir),

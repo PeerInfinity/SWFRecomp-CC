@@ -28,7 +28,24 @@ const CLICK_DELAY = parseInt(process.env.CLICK_DELAY || '3000', 10);
 	try {
 		const page = await browser.newPage();
 		await page.addInitScript(() => { Error.stackTraceLimit = 80; });
-		page.on('console', (m) => console.log(m.text()));
+		// SHOT_ON_REGEX: take SCREENSHOT_DIR/event.png ~EVENT_SHOT_DELAY ms after
+		// the first console line matching the regex (event-driven capture beats
+		// wall-clock guessing for fast game moments).
+		const SHOT_ON = process.env.SHOT_ON_REGEX || '';
+		let shotArmed = !!SHOT_ON && !!process.env.SCREENSHOT_DIR;
+		page.on('console', (m) => {
+			const t = m.text();
+			console.log(t);
+			if (shotArmed && new RegExp(SHOT_ON).test(t)) {
+				shotArmed = false;
+				setTimeout(async () => {
+					try {
+						await page.screenshot({ path: process.env.SCREENSHOT_DIR + '/event.png' });
+						console.log('[driver] event.png captured');
+					} catch (e) {}
+				}, parseInt(process.env.EVENT_SHOT_DELAY || '500', 10));
+			}
+		});
 		page.on('pageerror', (e) => console.log('PAGEERROR: ' + e.message + (e.stack ? '\n' + e.stack : '')));
 		await page.goto(URL, { waitUntil: 'load' });
 		if (CLICK) {

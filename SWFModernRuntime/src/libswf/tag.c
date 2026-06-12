@@ -1612,8 +1612,10 @@ static void build_cxform_from_obj(float out[20], const DisplayObject* obj)
 // Returns 1 if `obj` is an attached MC entry and `out` was populated with the
 // AS-state local matrix; 0 otherwise (caller should fall back to transforms[
 // obj->transform_id * 16]).
-static int build_attached_mc_local_xform(DisplayObject* obj, float out[16])
+static int build_attached_mc_local_xform(DisplayObject* obj, float out[16],
+	MovieClip** out_mc)
 {
+	if (out_mc) *out_mc = NULL;
 	if (obj == NULL || obj->instance_name == NULL) return 0;
 	extern MovieClip* child_mc_cache[];
 	extern int child_mc_count;
@@ -1637,6 +1639,7 @@ static int build_attached_mc_local_xform(DisplayObject* obj, float out[16])
 		out[8]  = 0.0f; out[9]  = 0.0f; out[10] = 1.0f; out[11] = 0.0f;
 		out[12] = 0.0f; out[13] = 0.0f; out[14] = 0.0f; out[15] = 1.0f;
 		apply_as_transform(out, mc, (u8)(1|2|4|8|16));
+		if (out_mc) *out_mc = mc;
 		return 1;
 	}
 	return 0;
@@ -1662,7 +1665,8 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		// transform_id at 0, so otherwise children render at the parent origin.
 		const float* local_xform;
 		float attached_xform[16];
-		if (build_attached_mc_local_xform(obj, attached_xform)) {
+		MovieClip* attached_mc = NULL;
+		if (build_attached_mc_local_xform(obj, attached_xform, &attached_mc)) {
 			local_xform = attached_xform;
 		} else if (obj->transform_id >= (u32)(app_context->transform_data_size / (16 * sizeof(float)))) {
 			// Dynamic GPU transform slot (transform_id >= the number of
@@ -1730,14 +1734,52 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			renderer_write_transform(context, obj->transform_id, composed);
 		}
 
-		// Propagate parent's cxform to children.
-		// When a parent sprite/button has a cxform (from timeline or runtime),
-		// children should inherit it.  For now, replace the child's cxform_id
-		// with the parent's (no composition — works when child has identity cxform).
-		// TODO: proper cxform composition (parent * child) for non-identity children.
-		if (parent_cx_override && obj->cxform_id != parent_cxform_id) {
+		// Color transform for this child and its subtree.
+		// A child entry's OWN runtime override (obj->cx_overridden — e.g. an
+		// AS `_alpha` write on an attachMovie'd clip, synced by
+		// mcSyncAlphaToDisplayObj) takes effect here: build a per-tick
+		// dynamic cxform slot from the entry's cx_* fields, multiplying the
+		// parent's alpha in when the parent also carries an override (the
+		// common nesting case; full channel-wise composition is still TODO).
+		// Otherwise inherit the parent's cxform as before (no composition —
+		// works when the child has an identity cxform).
+		int eff_cx_override = parent_cx_override;
+		u32 eff_cxform_id = parent_cxform_id;
+		int want_own_cx = 0;
+		float cx[20];
+		if (obj->cx_overridden) {
+			// Timeline-placed child whose entry carries a runtime cxform
+			// (mcSyncAlphaToDisplayObj writes through mc->display_obj, which
+			// IS this entry for timeline children).
+			build_cxform_from_obj(cx, obj);
+			want_own_cx = 1;
+		} else if (attached_mc != NULL && (attached_mc->as_set_flags & 32)) {
+			// attachMovie-placed child: its display_obj is a STANDALONE
+			// struct (see build_attached_mc_local_xform), so runtime state
+			// lives on the MC — mirror the spatial overlay and build an
+			// alpha-only cxform from mc->alpha.
+			memset(cx, 0, sizeof(cx));
+			cx[0] = cx[5] = cx[10] = 1.0f;
+			cx[15] = attached_mc->alpha / 100.0f;
+			if (cx[15] < 0.0f) cx[15] = 0.0f;
+			want_own_cx = 1;
+		}
+		if (want_own_cx) {
+			// (When the parent ALSO carries an override, the child's own
+			// slot wins un-composed — the parent slot lives GPU-side so its
+			// values can't be read back here. Channel-true parent*child
+			// composition stays with the cxform-composition TODO below.)
+			u32 cx_slot = g_next_dynamic_cxform_slot;
+			if (cx_slot < g_cxform_slot_capacity) {
+				g_next_dynamic_cxform_slot++;
+				renderer_write_cxform(context, cx_slot, cx);
+				eff_cx_override = 1;
+				eff_cxform_id = cx_slot;
+			}
+		}
+		if (eff_cx_override && obj->cxform_id != eff_cxform_id) {
 			cxform_overrides_push(obj, obj->cxform_id);
-			obj->cxform_id = parent_cxform_id;
+			obj->cxform_id = eff_cxform_id;
 		}
 
 		switch (ch->type)
@@ -1801,7 +1843,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				if (obj->sprite_display_list != NULL)
 					compose_children(app_context,
 						obj->sprite_display_list, obj->sprite_max_depth,
-						composed, parent_cx_override, parent_cxform_id);
+						composed, eff_cx_override, eff_cxform_id);
 				break;
 			}
 
@@ -1849,7 +1891,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
 					compose_children(app_context,
 						obj->sprite_display_list, obj->sprite_max_depth,
-						composed, parent_cx_override, parent_cxform_id);
+						composed, eff_cx_override, eff_cxform_id);
 				break;
 			}
 

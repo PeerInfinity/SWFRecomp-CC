@@ -25474,6 +25474,40 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 // mc->alpha is authoritative — the script setter's write-through can miss a
 // nested display entry, so the entry is only trustworthy as the pre-script
 // value. Falls back to mc->alpha for dynamic clips with no display entry.
+// Write-through: sync an AS-set _alpha onto the MC's DisplayObject so the
+// graphics render paths composite it (build_cxform_from_obj reads the entry's
+// cx_aa wherever cx_overridden is set; compose_children honors a child
+// entry's own override). Browser-WASM previously had NO consumer of
+// mc->alpha at all — the ng_setCTAlpha sync in the setters only covers the
+// NO_GRAPHICS/OFFSCREEN display lists — so runtime _alpha writes on
+// attachMovie'd / dynamic clips never rendered (found via the dj_loader:
+// coins didn't dim on live collection in-app while Ruffle dimmed them).
+static void mcSyncAlphaToDisplayObj(MovieClip* mc) {
+#ifndef NO_GRAPHICS
+	if (mc != NULL && mc->display_obj != NULL) {
+		DisplayObject* _dob = (DisplayObject*)mc->display_obj;
+		if (!_dob->cx_overridden &&
+		    _dob->cx_ra == 0.0 && _dob->cx_ga == 0.0 && _dob->cx_ba == 0.0 &&
+		    _dob->cx_rb == 0.0 && _dob->cx_gb == 0.0 && _dob->cx_bb == 0.0) {
+			// Entry whose cx channels were never populated (e.g. an
+			// ng_attachMovie sprite_display_list slot is zero-initialized,
+			// unlike root placements which run init_cx_fields): set the RGB
+			// multipliers to identity so build_cxform_from_obj doesn't read
+			// zeroed multipliers (rendering the clip black) once
+			// cx_overridden is flipped. A genuine all-zero-mult placement
+			// cxform (a deliberately black clip) is the one case this
+			// heuristic would lighten — acceptable vs. blackening every
+			// attached clip that sets _alpha.
+			_dob->cx_ra = _dob->cx_ga = _dob->cx_ba = 100.0;
+		}
+		_dob->cx_aa = (double)mc->alpha;
+		_dob->cx_overridden = 1;
+	}
+#else
+	(void)mc;
+#endif
+}
+
 static float mcReadAlpha(MovieClip* mc) {
 	if (mc == NULL) return 100.0f;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
@@ -27169,6 +27203,16 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 	// the AS source never called endFill (common with Gnash/Flash-style code
 	// that relies on each begin* implicitly closing the previous fill).
 	if (ds->cmd_count > 0) drawingFinalizePath(ds);
+	// Runtime `_alpha` on the drawing MC: fold into the flat fill/stroke
+	// alphas (equivalent to an alpha-only cxform for solid colors — dynamic
+	// MCs render with cxform_id 0, so this is the only channel the AS alpha
+	// can reach; gradient/bitmap drawing fills don't get the fold yet).
+	float as_alpha_mul = 1.0f;
+	if (mc->as_set_flags & 32) {
+		as_alpha_mul = mc->alpha / 100.0f;
+		if (as_alpha_mul < 0.0f) as_alpha_mul = 0.0f;
+		if (as_alpha_mul > 1.0f) as_alpha_mul = 1.0f;
+	}
 	int count = 0;
 	for (u32 p = 0; p < ds->path_count && count < max_out; p++) {
 		DrawPath* path = &ds->paths[p];
@@ -27178,7 +27222,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->fill_verts = path->fill_verts;
 		info->fill_count = path->has_fill ? path->fill_vert_count : 0;
 		info->fill_r = path->fill_r; info->fill_g = path->fill_g;
-		info->fill_b = path->fill_b; info->fill_a = path->fill_a;
+		info->fill_b = path->fill_b; info->fill_a = path->fill_a * as_alpha_mul;
 		info->has_gradient = path->has_gradient;
 		info->gradient_type = path->gradient_type;
 		info->spread_mode = path->spread_mode;
@@ -27209,7 +27253,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->line_verts = path->line_verts;
 		info->line_count = path->has_line ? path->line_vert_count : 0;
 		info->line_r = path->line_r; info->line_g = path->line_g;
-		info->line_b = path->line_b; info->line_a = path->line_a;
+		info->line_b = path->line_b; info->line_a = path->line_a * as_alpha_mul;
 		info->has_line_gradient = path->has_line_gradient;
 		info->line_gradient_type = path->line_gradient_type;
 		info->line_spread_mode = path->line_spread_mode;
@@ -41014,6 +41058,7 @@ void actionSetVariable(SWFAppContext* app_context)
 				mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
 				mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
 				mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
+				mcSyncAlphaToDisplayObj(mc);
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Sync with display list cx_aa so Color.getTransform() reads the updated value
 				{
@@ -46696,6 +46741,7 @@ void actionSetMember(SWFAppContext* app_context)
 					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
 					mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
 					mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
+					mcSyncAlphaToDisplayObj(mc);
 					// Sync with display list cx_aa so Color.getTransform() reads the updated value
 					{
 						extern size_t ng_findDisplayEntryByName(const char* name);

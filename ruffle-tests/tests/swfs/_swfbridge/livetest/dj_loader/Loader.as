@@ -144,6 +144,7 @@ class Loader {
 		regionTick++;
 		moverTick();
 		vizTick();
+		if (DBG && tick == 60) placeAlphaTestClips();
 		if (DBG && tick == 330) dumpClips();
 		detectLanding();
 		if (DBG) trace("[dbg] t" + tick + " dl ok");
@@ -644,6 +645,32 @@ class Loader {
 	}
 
 	// ---- per-tick state trace (sustained-physics evidence + cross-tier diff)
+	// DBG fixture for the runtime-_alpha bug: side-by-side full vs _alpha=25
+	// clips at fixed screen spots — container-attached coins (the cxform
+	// path) and root drawing squares (the drawing-fold path). Screenshot any
+	// time after tick 60; the dim one must render faint on every tier.
+	static function placeAlphaTestClips():Void {
+		var c = _root.container;
+		var ly:Number = 60 - Number(c._y);
+		var a1 = c.attachMovie("coin", "aptestA", 7771);
+		a1._x = 50; a1._y = ly;
+		var a2 = c.attachMovie("coin", "aptestB", 7772);
+		a2._x = 85; a2._y = ly;
+		a2._alpha = 25;
+		var d1 = _root.createEmptyMovieClip("aptestC", 903001);
+		d1.beginFill(0xCC2222, 100);
+		d1.moveTo(140, 140); d1.lineTo(160, 140); d1.lineTo(160, 160);
+		d1.lineTo(140, 160); d1.lineTo(140, 140);
+		d1.endFill();
+		var d2 = _root.createEmptyMovieClip("aptestD", 903002);
+		d2.beginFill(0xCC2222, 100);
+		d2.moveTo(170, 140); d2.lineTo(190, 140); d2.lineTo(190, 160);
+		d2.lineTo(170, 160); d2.lineTo(170, 140);
+		d2.endFill();
+		d2._alpha = 25;
+		trace("[dbg] aptest placed");
+	}
+
 	static function dumpClips():Void {
 		var c = _root.container;
 		for (var n:String in c) {
