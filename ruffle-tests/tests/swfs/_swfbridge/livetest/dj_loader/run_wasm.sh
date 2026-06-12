@@ -38,10 +38,14 @@ if [ -n "${FIXTURE:-}" ]; then
   cp "${HERE}/wasm_harness_fixture.html" "${TMP}/wasm_harness.html"
 else
   cp "${HERE}/wasm_harness.html" \
-     "${HERE}/region_4_4.js" "${HERE}/dj_swf_bridge.js" "${HERE}/dj_host_mock.js" "${TMP}/"
+     "${HERE}/regions.js" "${HERE}/dj_swf_bridge.js" "${HERE}/dj_host_mock.js" "${TMP}/"
 fi
-if [ -n "${GRANT_AT_MS:-}" ]; then
-  sed -i "s|<script src=\"dj_host_mock.js\">|<script>window.__DJ_GRANT_AT_MS=${GRANT_AT_MS};</script><script src=\"dj_host_mock.js\">|" "${TMP}/wasm_harness.html"
+# INJECT_JS: arbitrary pre-mock window config (grant schedules, start
+# region, etc.), e.g. INJECT_JS='window.__DJ_GRANTS=[{at:5000,item:"Left arrow"}]'
+INJECT="${INJECT_JS:-}"
+[ -n "${GRANT_AT_MS:-}" ] && INJECT="window.__DJ_GRANT_AT_MS=${GRANT_AT_MS};${INJECT}"
+if [ -n "$INJECT" ]; then
+  sed -i "s|<script src=\"dj_host_mock.js\">|<script>${INJECT}</script><script src=\"dj_host_mock.js\">|" "${TMP}/wasm_harness.html"
 fi
 if command -v fuser >/dev/null 2>&1; then fuser -k "${HTTP_PORT}/tcp" >/dev/null 2>&1 || true; sleep 0.3; fi
 ( cd "$TMP" && python3 -m http.server "$HTTP_PORT" >/dev/null 2>&1 ) & HTTP_PID=$!

@@ -43,9 +43,10 @@
 class Loader {
 	static var DEPTH:Number = 1048570;
 	static var GOTO_TICK:Number = 2;
-	// Pickup marker visual (native "coin" art above the host platform). NOTE
-	// the coin sprite's frame-1 action is gotoAndPlay(1) (a per-tick self-goto).
-	static var VIZ_COIN:Boolean = false;
+	// Goal visuals: native "coin" art above pickup hosts (exonerated from the
+	// 2026-06-11 hang — that was the 64KB wasm stack), drawing-API "door"
+	// above portal hosts. v1 is a human playing; they need to SEE goal hosts.
+	static var VIZ_GOALS:Boolean = true;
 	static var DBG:Boolean = false;
 	// Parked clips sit here: outside the wrap range [-23, 263], so the hero's
 	// feet point-tests (x +/- 23) can never reach their bbox.
@@ -72,6 +73,13 @@ class Loader {
 	static var itemsCsv:String = "\x01"; // sentinel: force first apply
 	static var held:Object;        // item name -> true
 	static var lastLb:Number = 0;
+	static var cfgGen:Number = 0;  // last seen __swfConfigGen (0 = no support)
+	static var genPoll:Boolean = false; // page exposes __swfConfigGen
+	static var maxIdxEver:Number = 0;   // widest block_<idx> set authored so far
+	// Mover clock: ticks since region entry/respawn (t=0 at the spawn state).
+	// Phases restart on respawn and on re-configure, per the AP sweep spec.
+	static var regionTick:Number = 0;
+	static var BLUE_SPEED:Number = 5;
 
 	static function main(mc:MovieClip):Void {
 		// Untyped so the variadic AVM1 ExternalInterface.call isn't rejected by
@@ -92,7 +100,16 @@ class Loader {
 			if (cfg != null && cfg != "" && cfg != "undefined" && cfg != "null") {
 				parseConfig(cfg);
 				configured = true;
-				trace("[loader] configured level=" + levelId + " platforms=" + plats.length);
+				if (eiMode) {
+					// Snapshot the configure generation counter (region swaps:
+					// the host re-configures on every region move; we poll one
+					// int per tick and re-pull the string only on change).
+					// Pages without __swfConfigGen -> NaN -> polling disabled.
+					var g0:Number = Number(EI.call("__swfConfigGen"));
+					if (!isNaN(g0)) { cfgGen = g0; genPoll = true; }
+				}
+				trace("[loader] configured level=" + levelId + " platforms="
+				      + plats.length + (genPoll ? (" gen=" + cfgGen) : ""));
 			}
 		}
 
@@ -119,13 +136,79 @@ class Loader {
 			if (!inited) return;
 		}
 
+		checkReconfigure();
 		pollItemsTick();
 		if (DBG) trace("[dbg] t" + tick + " poll ok");
 		interceptGameOver();
 		if (DBG) trace("[dbg] t" + tick + " igo ok");
+		regionTick++;
+		moverTick();
 		detectLanding();
 		if (DBG) trace("[dbg] t" + tick + " dl ok");
 		statusTrace();
+	}
+
+	// ---- blue movers: deterministic triangle wave (AP sweep spec) ----------
+	// x(t) = min + tri(BLUE_SPEED * t over a 2*span cycle), t = regionTick.
+	// This OVERRIDES DJ's native spawn-anchored mover: the inner child "aaa"
+	// (charId 32) is frozen at local 0 each tick (ac=0 kills its own
+	// `this._x += ac` clip action where it runs at all), making the mover
+	// geometrically identical to a green at the block origin (charId 35
+	// bounds x[-30,30] at aaa placement (0,0)) — so block._x IS the platform
+	// center and the same catch line applies.
+	static function moverTick():Void {
+		var c = _root.container;
+		for (var i:Number = 0; i < plats.length; i++) {
+			var p = plats[i];
+			if (p.type != "m" || !p.present || isNaN(p.sweepMin)) continue;
+			var b = c["block_" + p.idx];
+			if (typeof(b) != "movieclip") continue;
+			if (typeof(b.aaa) == "movieclip") { b.aaa.ac = 0; b.aaa._x = 0; }
+			var span:Number = p.sweepMax - p.sweepMin;
+			var cyc:Number = 2 * span;
+			var ph:Number = (BLUE_SPEED * regionTick) % cyc;
+			if (ph < 0) ph += cyc;
+			b._x = p.sweepMin + ((ph <= span) ? ph : (cyc - ph));
+		}
+	}
+
+	// ---- region swaps: host re-configures on every region move ------------
+	static function checkReconfigure():Void {
+		if (!genPoll) return;
+		var g:Number = Number(EI.call("__swfConfigGen"));
+		if (isNaN(g) || g == cfgGen) return;
+		cfgGen = g;
+		var cfg:String = String(EI.call("__swfConfig"));
+		if (cfg == null || cfg == "" || cfg == "undefined" || cfg == "null") return;
+		parseConfig(cfg);  // replaces plats/checked/exitFired (host owns the
+		                   // global collected set via the C| record)
+		reauthorLevel();
+		trace("[loader] reconfigured -> " + levelId + " (" + plats.length
+		      + " platforms, gen " + cfgGen + ")");
+	}
+
+	// Tear down the current region and author the new one. Claim/park makes
+	// this a re-position pass; batched MC ops are safe post stack-fix
+	// (0b5f20966), so unlike the initial takeover this runs in ONE tick — a
+	// region move should not show 15 ticks of the old level.
+	static function reauthorLevel():Void {
+		var c = _root.container;
+		var n:Number = maxIdxEver;
+		if (nativeBlocks > n) n = nativeBlocks;
+		for (var b:Number = 0; b < n; b++) {
+			parkNamed(c, "block_" + b);
+			// Old region's goal visuals don't survive a swap (the new region's
+			// idx set may be narrower).
+			if (typeof(c["apviz_" + b]) == "movieclip") c["apviz_" + b].removeMovieClip();
+			if (typeof(c["apdoor_" + b]) == "movieclip") c["apdoor_" + b].removeMovieClip();
+		}
+		c.attribute = new Array();
+		// Gated platforms stay parked until the next pollItemsTick re-applies
+		// the held set onto the NEW plats (forced via the itemsCsv sentinel).
+		held = {};
+		itemsCsv = "\x01";
+		placeAll();
+		resetHero();
 	}
 
 	// ---- config ----------------------------------------------------------
@@ -144,9 +227,13 @@ class Loader {
 				worldW = Number(f[2]); worldH = Number(f[3]);
 				spawnX = Number(f[4]); spawnY = Number(f[5]);
 			} else if (kind == "P") {
+				// P| v2 trailing fields: center-sweep bounds for blue movers
+				// (empty/missing -> NaN -> static).
 				plats.push({ idx: Number(f[1]), pid: f[2], type: f[3],
 				             x: Number(f[4]), y: Number(f[5]), gate: f[6],
 				             goalKind: f[7], goalId: f[8], goalSide: f[9],
+				             sweepMin: (f[10] == "" || f[10] == undefined) ? Number.NaN : Number(f[10]),
+				             sweepMax: (f[11] == "" || f[11] == undefined) ? Number.NaN : Number(f[11]),
 				             present: false });
 			} else if (kind == "C") {
 				var ids:Array = f[1].split(",");
@@ -232,6 +319,7 @@ class Loader {
 	}
 
 	static function placeAll():Void {
+		if (plats.length > maxIdxEver) maxIdxEver = plats.length;
 		for (var i:Number = 0; i < plats.length; i++) {
 			var p = plats[i];
 			var gateOk:Boolean = (p.gate == "" || held[p.gate] == true);
@@ -265,11 +353,45 @@ class Loader {
 			c.attribute[p.idx] = 0;
 		}
 		p.present = true;
+		updateViz(p);
+	}
+
+	// Goal-host visuals, owned per platform: a coin above pickup hosts (until
+	// collected), a translucent "door" above portal hosts. Names are OUR
+	// namespace (apviz_/apdoor_) so DJ's native coin logic (attribute==7 +
+	// "coin_<i>") can never touch them; collection stays landing-triggered.
+	static function updateViz(p):Void {
+		if (!VIZ_GOALS) return;
+		var c = _root.container;
+		if (p.goalKind == "loc" && checked[p.goalId] != true) {
+			var v = c["apviz_" + p.idx];
+			if (typeof(v) != "movieclip") v = c.attachMovie("coin", "apviz_" + p.idx, 6500 + p.idx);
+			v._x = p.x;
+			v._y = p.y - 28;
+		} else if (typeof(c["apviz_" + p.idx]) == "movieclip") {
+			c["apviz_" + p.idx].removeMovieClip();
+		}
+		if (p.goalKind == "exit") {
+			var m = c["apdoor_" + p.idx];
+			if (typeof(m) != "movieclip") m = c.createEmptyMovieClip("apdoor_" + p.idx, 6800 + p.idx);
+			m.clear();
+			m._x = 0;
+			m._y = 0;
+			m.beginFill(0x9933FF, 45);
+			m.moveTo(p.x - 12, p.y - 38);
+			m.lineTo(p.x + 12, p.y - 38);
+			m.lineTo(p.x + 12, p.y - 4);
+			m.lineTo(p.x - 12, p.y - 4);
+			m.lineTo(p.x - 12, p.y - 38);
+			m.endFill();
+		}
 	}
 
 	static function parkPlat(p):Void {
 		var c = _root.container;
 		if (typeof(c["block_" + p.idx]) == "movieclip") c["block_" + p.idx]._x = PARK_X;
+		if (typeof(c["apviz_" + p.idx]) == "movieclip") c["apviz_" + p.idx].removeMovieClip();
+		if (typeof(c["apdoor_" + p.idx]) == "movieclip") c["apdoor_" + p.idx].removeMovieClip();
 		c.attribute[p.idx] = 0;
 		p.present = false;
 	}
@@ -290,6 +412,8 @@ class Loader {
 		// means never.
 		h.lastDeletedBlock = 999999;
 		lastLb = 0;
+		regionTick = 0;
+		moverTick(); // movers take their t=0 position at the spawn state
 	}
 
 	// ---- items (host -> game), gated existence ----------------------------
@@ -364,7 +488,16 @@ class Loader {
 	// ---- per-tick state trace (sustained-physics evidence + cross-tier diff)
 	static function statusTrace():Void {
 		var h = _root.hero;
-		trace("LT" + tick + " hx=" + h._x + " hy=" + h._y + " vy=" + h.vy
-		      + " cy=" + _root.container._y + " lb=" + lastLb + " sc=" + h.score);
+		var line:String = "LT" + tick + " hx=" + h._x + " hy=" + h._y
+		      + " vy=" + h.vy + " cy=" + _root.container._y + " lb=" + lastLb
+		      + " sc=" + h.score + " rt=" + regionTick;
+		// Present movers append their current center x (table validation).
+		for (var i:Number = 0; i < plats.length; i++) {
+			var p = plats[i];
+			if (p.type == "m" && p.present && !isNaN(p.sweepMin)) {
+				line += " mx" + p.idx + "=" + _root.container["block_" + p.idx]._x;
+			}
+		}
+		trace(line);
 	}
 }

@@ -23,14 +23,18 @@ cleanup() { [ -n "$HTTP_PID" ] && kill "$HTTP_PID" 2>/dev/null || true; rm -rf "
 trap cleanup EXIT
 
 cp "${HERE}/dj_loader.swf" \
-   "${HERE}/region_4_4.js" "${HERE}/dj_swf_bridge.js" "${HERE}/dj_host_mock.js" "${TMP}/"
+   "${HERE}/regions.js" "${HERE}/dj_swf_bridge.js" "${HERE}/dj_host_mock.js" "${TMP}/"
 if [ -n "${WIDE:-}" ]; then
   cp "${HERE}/ruffle_harness_wide.html" "${TMP}/ruffle_harness.html"
 else
   cp "${HERE}/ruffle_harness.html" "${TMP}/"
 fi
-if [ -n "${GRANT_AT_MS:-}" ]; then
-  sed -i "s|<script src=\"dj_host_mock.js\">|<script>window.__DJ_GRANT_AT_MS=${GRANT_AT_MS};</script><script src=\"dj_host_mock.js\">|" "${TMP}/ruffle_harness.html"
+# INJECT_JS: arbitrary pre-mock window config (grant schedules, start
+# region, etc.), e.g. INJECT_JS='window.__DJ_GRANTS=[{at:5000,item:"Left arrow"}]'
+INJECT="${INJECT_JS:-}"
+[ -n "${GRANT_AT_MS:-}" ] && INJECT="window.__DJ_GRANT_AT_MS=${GRANT_AT_MS};${INJECT}"
+if [ -n "$INJECT" ]; then
+  sed -i "s|<script src=\"dj_host_mock.js\">|<script>${INJECT}</script><script src=\"dj_host_mock.js\">|" "${TMP}/ruffle_harness.html"
 fi
 if command -v fuser >/dev/null 2>&1; then fuser -k "${HTTP_PORT}/tcp" >/dev/null 2>&1 || true; sleep 0.3; fi
 ( cd "$TMP" && python3 -m http.server "$HTTP_PORT" >/dev/null 2>&1 ) & HTTP_PID=$!

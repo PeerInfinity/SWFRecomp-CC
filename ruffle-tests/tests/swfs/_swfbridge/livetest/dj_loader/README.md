@@ -39,10 +39,34 @@ DJ's hero physics are **untouched**. Platforms drive the hero's own engine:
 indices assigned bottom-to-top by the encoder because the catch loop scans
 `block_(lastblockhit-3) .. block_(lastblockhit+9)`.
 
+Increment 2 (status doc `2026-06-11-dj-loader-increment-2.md`) added:
+- **Region swaps**: the host re-configures on every region move; the loader
+  polls `__swfConfigGen()` (1 int/tick) and re-authors in one tick (claim/park
+  re-position + respawn; checked set comes from the new `C|` record).
+- **Arrow gating** (page-side, in `dj_swf_bridge.js`): ArrowLeft/Right reach
+  the game only while the items `Left arrow`/`Right arrow` are held.
+- **Blue movers**: `P|` FORMAT v2 trailing `|sweepMin|sweepMax` fields; the
+  loader drives sweeping blues per tick at the AP triangle wave
+  (BLUE_SPEED=5, t = ticks since region entry/respawn), freezing the native
+  "aaa" child at local 0 (block._x = platform center, offset 0 — charId 35
+  bounds are ±30 at placement 0).
+- **Goal visuals**: native `coin` above pickup hosts, drawing-API door above
+  portal hosts (parked/swept across gating/respawn/swaps).
+
 Page side: `dj_swf_bridge.js` (game side of `__swfBridge`; encodes the level
-JSON into the compact string — keep in sync with `gen_fixture.py`).
-`dj_host_mock.js` plays host standalone (configure + grant "Brown platforms"
-at `__DJ_GRANT_AT_MS`, default 15s).
+JSON into the compact string — keep in sync with `gen_fixture.py`; vendored
+verbatim by the AP embed, flag changes loudly).
+`dj_host_mock.js` plays host standalone: configure + item grants
+(`window.__DJ_GRANTS=[{at,item}]` or legacy `__DJ_GRANT_AT_MS`), and it
+FOLLOWS the preset exits on sendExit (multi-region swaps) carrying the
+global collected set. `regions.js` (generated) holds all five payloads;
+start region via `window.__DJ_START_REGION`. Harness pages take
+`INJECT_JS='window...;'` from the run scripts for any of these knobs.
+
+The canonical browser injector (`injectSwf()` ES module, what the AP embed
+vendors instead of its provisional swfPatch.js) lives at
+`tools/divergence/swf_inject.mjs`; byte-identity vs inject_tracer.py is
+pinned by `node tools/divergence/test_swf_inject.mjs`.
 
 ## Usage
 
@@ -113,3 +137,11 @@ runs); full results in the status doc.
   (container `_y` reads undefined afterwards; "Failed to place object at
   depth 1"). Pre-portal behavior and the whole contract sequence are clean;
   Ruffle is ground truth for the post-break tail.
+- Graphics-native catches MOVERS with a wider/shifted effective bbox (caught
+  with feet ~7px outside the true ±30 at rt=273 where Ruffle+WASM both catch
+  at rt=179 in exact agreement). Dev-tier divergence, chain still completes;
+  future runtime session.
+- An ASYNCIFY'd `runSWF` ccall'd re-entrantly from
+  `Module.onRuntimeInitialized` never ticks — defer to a fresh macrotask
+  (the harness's ready-flag polling does this; AP finding, kept here so new
+  pages don't regress it).

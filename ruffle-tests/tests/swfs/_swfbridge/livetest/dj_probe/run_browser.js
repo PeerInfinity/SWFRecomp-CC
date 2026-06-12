@@ -103,6 +103,9 @@ const CLICK_DELAY = parseInt(process.env.CLICK_DELAY || '3000', 10);
 		} else {
 			await page.waitForTimeout(SECONDS * 1000);
 		}
+		if (SHOT) {
+			try { await page.screenshot({ path: SHOT + '/final.png' }); } catch (e) {}
+		}
 	} finally {
 		await browser.close();
 	}
