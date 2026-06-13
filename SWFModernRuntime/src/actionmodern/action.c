@@ -64891,6 +64891,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					pushUndefined(app_context);
 					return;
 				}
+				// Attached clip (attachMovie/duplicateMovieClip): its
+				// display_obj is a standalone heap struct NOT in the global
+				// display_list, so ng_findDisplayEntryByName misses it. Act on
+				// the clip's own display object directly; without this an
+				// `attachedClip.play()` falls through to actionPlay and wrongly
+				// plays the ROOT timeline.
+				if (mc->display_obj != NULL) {
+					((DisplayObject*)mc->display_obj)->sprite_is_playing = 1;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
 			}
 #else
 			// Browser-WASM: same root-receiver short-circuit as the
@@ -64964,6 +64976,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (depth != SIZE_MAX) {
 					extern DisplayObject* display_list;
 					display_list[depth].sprite_is_playing = 0;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				// Attached clip (attachMovie/duplicateMovieClip): its
+				// display_obj is a standalone heap struct NOT in the global
+				// display_list, so ng_findDisplayEntryByName misses it. Act on
+				// the clip's own display object directly; without this an
+				// `attachedClip.stop()` falls through to actionStop and wrongly
+				// stops the ROOT timeline.
+				if (mc->display_obj != NULL) {
+					((DisplayObject*)mc->display_obj)->sprite_is_playing = 0;
 					if (args != NULL) FREE(args);
 					pushUndefined(app_context);
 					return;
