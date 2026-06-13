@@ -300,6 +300,8 @@ void ng_unbumpSpriteInitDepth(void);
 int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap);
 void ng_restoreFromRootDL(DisplayObject* saved_dl, size_t saved_max, size_t saved_cap);
 void ng_gotoFrameCurrentSprite(u16 frame);
+void ng_record_sprite_self_goto(DisplayObject* obj);
+void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);
 size_t ng_getSpriteFrameCount(void);
 size_t ng_findDisplayEntryByName(const char* name);
 // Find a display entry at the given SWF depth that is a direct child of root.

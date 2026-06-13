@@ -1308,6 +1308,140 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 }
 
 // ---------------------------------------------------------------------------
+// Same-tick application of a sprite's OWN frame-script gotoAndPlay (#10).
+//
+// Sprite frame scripts are QUEUED during advance_sprite_frames / advance_nested_
+// sprite_frames and only run when the AQ_KIND_SCRIPT queue is drained — which
+// happens AFTER both advance passes. So a sprite whose frame N script calls
+// gotoAndPlay(T) (ng_gotoFrameCurrentSprite) sets sprite_manual_next_frame too
+// late for THIS tick's advance: the top-of-loop manual-nav block only sees it
+// NEXT tick, costing an extra tick where the observer re-reads the issuing frame
+// (a "stutter") and then lands on — and re-observes — the target. Flash/Ruffle
+// apply the goto within the same tick: the issuing frame was already observed
+// (onEnterFrame ran before the frame action), the display rebuilds to the
+// target now, and a Play resumes at target+1 next tick. So a 5-frame sprite
+// whose frame 5 does gotoAndPlay(1) reads a clean period-4 loop (…,5,2,3,4,5,2,…)
+// instead of period-6 (…,5,5,1,2,3,4,…). ng_gotoFrameCurrentSprite records each
+// self-goto here; swf_core.c / swf.c call the apply pass right after draining
+// AQ_KIND_SCRIPT. gotoAndStop is left on the deferred path (is_playing==0 →
+// skipped) so its established behavior is unchanged.
+#define SELF_GOTO_CAP 256
+static DisplayObject* g_self_goto_objs[SELF_GOTO_CAP];
+static size_t g_self_goto_count = 0;
+
+void ng_record_sprite_self_goto(DisplayObject* obj)
+{
+	if (obj == NULL) return;
+	// Replays (catch_up_mode) suppress scripts, so a goto here is a real one; but
+	// guard anyway so a re-entrant apply/replay never records into its own list.
+	if (catch_up_mode) return;
+	for (size_t i = 0; i < g_self_goto_count; i++)
+		if (g_self_goto_objs[i] == obj) return;   // dedup: at most one apply per obj per tick
+	if (g_self_goto_count < SELF_GOTO_CAP)
+		g_self_goto_objs[g_self_goto_count++] = obj;
+}
+
+void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
+{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (catch_up_mode) { g_self_goto_count = 0; return; }
+#endif
+	size_t n = g_self_goto_count;
+	g_self_goto_count = 0;   // consume now so replays below don't re-enter the list
+	for (size_t i = 0; i < n; i++)
+	{
+		DisplayObject* obj = g_self_goto_objs[i];
+		if (obj == NULL || obj->char_id == 0) continue;
+		// Only a still-PLAYING pending nav is the gotoAndPlay self-loop. A
+		// gotoAndStop (is_playing==0) keeps its manual flag and the deferred
+		// top-of-loop path handles it next tick exactly as before.
+		if (!obj->sprite_manual_next_frame || !obj->sprite_is_playing) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count == 0) continue;
+
+		obj->sprite_manual_next_frame = 0;
+		size_t target = obj->sprite_next_frame;
+		if (target >= ch->sprite_frame_count) continue;
+
+		// Swap into this sprite's own display list and rebuild it as of `target`
+		// from a clean slate (replay frames 0..target, tags only). A full reset+
+		// replay reconstructs frame `target` exactly regardless of goto direction.
+		// The target frame's own DoAction is queued via ng_gotoFrameCurrentSprite's
+		// pending sprite-script queue (drained separately under
+		// actionUnifySpriteDrain), so it must NOT be re-queued here — hence
+		// catch_up_mode=1 throughout the replay.
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+
+		display_list = obj->sprite_display_list;
+		max_depth = obj->sprite_max_depth;
+		display_list_capacity = obj->sprite_dl_capacity;
+
+		for (size_t j = 1; j <= max_depth; ++j)
+		{
+			if (display_list[j].sprite_display_list != NULL)
+			{
+				FREE(display_list[j].sprite_display_list);
+				display_list[j].sprite_display_list = NULL;
+			}
+			display_list[j].char_id = 0;
+		}
+		max_depth = 0;
+
+		int saved_sg_cm = catch_up_mode;
+		catch_up_mode = 1;
+		for (size_t f = 0; f <= target; f++)
+			if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
+				CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[f]);
+		catch_up_mode = saved_sg_cm;
+
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+		// Initialize children placed by the rebuilt target frame.
+		{
+			int any_needs_init = 0;
+			for (size_t ci = 1; ci <= max_depth; ci++) {
+				if (display_list[ci].char_id != 0 && display_list[ci].sprite_needs_init) {
+					any_needs_init = 1;
+					break;
+				}
+			}
+			if (any_needs_init) {
+				extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+				extern MovieClip root_movieclip;
+				MovieClip* parent_for_init = (obj->instance_name != NULL)
+					? actionFindMovieClipByName(obj->instance_name) : NULL;
+				process_sprite_needs_init(app_context, parent_for_init ? parent_for_init : &root_movieclip);
+			}
+		}
+#endif
+
+		// NOTE: we do NOT recurse to advance this sprite's children here. The
+		// replay above (+ process_sprite_needs_init) re-places and initializes
+		// the target frame's children; like a real goto, they start at their own
+		// frame 1 and advance on subsequent ticks via the normal Phase 1/Phase 3
+		// passes — matching Flash/Ruffle. (The deferred top-of-loop block recurses
+		// because it runs with g_current_context set to the parent; this apply
+		// pass runs at the top of the tick with g_current_context = root, so an
+		// actionFindOrCreateMovieClip on a NESTED sprite's name would mint a root
+		// ghost instead of resolving the real child.)
+
+		// Play resumes from target+1 next tick (the target frame is shown this
+		// tick; the observer already read the issuing frame in the flush).
+		obj->sprite_current_frame = (target + 1) % ch->sprite_frame_count;
+		obj->enterframe_eligible = 1;
+
+		obj->sprite_display_list = display_list;
+		obj->sprite_max_depth = max_depth;
+		obj->sprite_dl_capacity = display_list_capacity;
+
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Pre-sync the AS-visible _currentframe of DEFERRED nested sprites (#10a).
 //
 // Nested sprites (depth >= 2) advance in Phase 3 (advance_nested_sprite_frames),

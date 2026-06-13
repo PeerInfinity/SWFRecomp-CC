@@ -1077,6 +1077,13 @@ void swfStart(SWFAppContext* app_context)
 			// queued AFTER funcs returned (advance_nested_sprite_frames
 			// runs after funcs).
 			actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
+
+			// Apply any sprite-frame-script gotoAndPlay that targeted its OWN
+			// sprite WITHIN this tick (#10). Sprite scripts only run in the drain
+			// above, so the manual flag is set too late for the advance passes;
+			// applying it here (rebuild to target, resume at target+1) avoids the
+			// one-tick-late goto + stutter the deferred top-of-loop path produces.
+			ng_apply_pending_sprite_self_gotos(app_context);
 		}
 		else
 		{
@@ -1131,6 +1138,9 @@ void swfStart(SWFAppContext* app_context)
 			// drain doesn't fire — same orphaned-script issue as the
 			// is_playing=0 branch above).
 			actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
+
+			// Same-tick self gotoAndPlay application (#10); see the playing branch.
+			ng_apply_pending_sprite_self_gotos(app_context);
 		}
 
 		// Mark dynamic MCs (createEmptyMovieClip) as eligible for next tick's enterFrame.

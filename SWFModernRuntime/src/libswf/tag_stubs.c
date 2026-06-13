@@ -908,6 +908,18 @@ void ng_gotoFrameCurrentSprite(u16 frame)
 	obj->sprite_manual_next_frame = 1;
 	obj->sprite_next_frame = frame;
 	obj->sprite_is_playing = 0;
+	// Record this self-goto (a sprite's OWN frame script navigating itself) so the
+	// post-script-drain pass can apply it WITHIN this tick (#10). Sprite frame
+	// scripts are queued and drained AFTER advance_sprite_frames, so the manual
+	// flag is set too late for that pass — left to the next tick it produces a
+	// one-tick-late goto + a stutter. See ng_apply_pending_sprite_self_gotos.
+	// Scoped to the two modes whose pump calls the apply pass (swf_core.c /
+	// swf.c-OFFSCREEN_RENDER); browser-WASM keeps the established deferred path so
+	// the recorder never accumulates stale entries no apply pass would clear.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	extern void ng_record_sprite_self_goto(DisplayObject* obj);
+	ng_record_sprite_self_goto(obj);
+#endif
 
 	// Phase B (GOTO_FIFO_UNIFICATION_INCREMENTAL): record the resolved
 	// target-frame script onto the deferred sprite-script queue. Nothing

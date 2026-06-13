@@ -865,6 +865,21 @@ void tagMain(SWFAppContext* app_context)
 		// that the recompiler-emitted in-frame drain didn't cover.
 		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
 
+		// Apply any sprite-frame-script gotoAndPlay that targeted its OWN sprite
+		// WITHIN this tick (#10). Sprite scripts only run in the drain above, so
+		// the manual flag is set too late for the advance passes; applying it here
+		// (rebuild to target, resume at target+1) avoids the one-tick-late goto +
+		// stutter the deferred top-of-loop path produces. Mirrors swf_core.c.
+		// OFFSCREEN_RENDER only (the graphics-native test mode); browser-WASM keeps
+		// the established deferred path — it is not covered by the CI suites and
+		// has its own delicate sprite-timing paths.
+#if defined(OFFSCREEN_RENDER)
+		{
+			extern void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);
+			ng_apply_pending_sprite_self_gotos(app_context);
+		}
+#endif
+
 		// Flush deferred rollOver/rollOut events from Selection.setFocus()
 		// calls that occurred during frame scripts. These fire
 		// asynchronously (after script completes) but before input events

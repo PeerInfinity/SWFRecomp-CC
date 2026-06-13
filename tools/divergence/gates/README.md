@@ -191,48 +191,70 @@ suite both modes; do not regress `nested_sprite_cf_lag` (this gate, becomes
 GREEN), Pacman `242==242` (its `Pac`/`CPac` lag should clear), and every
 nested-sprite / timeline / execution-order test.
 
-## nested_sprite_inframe_goto  — ⚠️ KNOWN-FAILING (desired-behavior gate, follow-up #10)
+## nested_sprite_inframe_goto  — ✅ FIXED (was follow-up #10; commit landing 2026-06-13)
 
-`nested_sprite_inframe_goto.swf` (from `nested_sprite_inframe_goto.swfml` via
-swfmill) — the minimal repro for the **sprite-frame `gotoAndPlay` overrun+stutter**
-(PROGRESS #10, the Pacman `Pac`/`CPac` playhead bug exposed once the #10a
-reporting lag was fixed). A 5-frame sprite whose **frame 5 does `gotoAndPlay(1)`**
-(a chomp loop, exactly like Pacman's `Pac` = `DefineSprite_40` frame_5) is placed
-two ways: nested one level (`_root.c.n`) and root-level (`_root.m`, control). Run
-through the full harness:
+**GREEN as of the #10 fix.** A sprite's OWN frame-script `gotoAndPlay(T)` is now
+applied WITHIN the same tick (no longer deferred a tick), eliminating the
+overrun+stutter. Verify:
 
 ```bash
 python3 tools/divergence/divergence_test.py tools/divergence/gates/nested_sprite_inframe_goto.swf --frames 12 --recompile
-cat tools/divergence/runs/nested_sprite_inframe_goto/divergence.txt
+cat tools/divergence/runs/nested_sprite_inframe_goto/divergence.txt   # → Trace: identical
 ```
 
-**FAILS on HEAD at filtered line 21.** Per-frame `_currentframe` (both `m` and
-`c.n` are IDENTICAL — the bug is NOT nested-specific):
+### Root cause + fix
+
+Sprite frame scripts are QUEUED during `advance_sprite_frames` /
+`advance_nested_sprite_frames` and only run when the `AQ_KIND_SCRIPT` queue is
+drained — which happens AFTER both advance passes. So a sprite whose frame-N
+script calls `gotoAndPlay(T)` (→ `ng_gotoFrameCurrentSprite`) sets
+`sprite_manual_next_frame` too late for that tick's advance; the deferred
+top-of-loop manual-nav block only processed it NEXT tick, burning an extra tick
+(the observer re-read the issuing frame — a "stutter") and then landing on, and
+re-observing, the target. Per-frame `_currentframe` (both `m` root-level and
+`c.n` nested were IDENTICAL — NOT nested-specific):
 
 ```
 frame:       F1 F2 F3 F4 F5 F6 F7 F8 F9 …
 Ruffle:       2  3  4  5  2  3  4  5  2     clean period-4 loop
-swfrecomp:    2  3  4  5  5  1  2  3  4     period-6: overruns to 5, STUTTERS (5,5), then 1
+swfrecomp (old): 2 3 4 5  5  1  2  3  4     period-6: overran to 5, STUTTERED (5,5), then 1
 ```
 
-swfrecomp's sequence is **byte-identical to Pacman's** `Pac` (`2,3,4,5,5,1`), so
-this gate faithfully reproduces the real bug in isolation.
+**Fix** (`tag.c` / `tag_stubs.c` / `swf_core.c` / `swf.c`):
+`ng_gotoFrameCurrentSprite` records each self-goto via
+`ng_record_sprite_self_goto`; the pump calls `ng_apply_pending_sprite_self_gotos`
+right after draining `AQ_KIND_SCRIPT` (swf_core.c NO_GRAPHICS + swf.c
+OFFSCREEN_RENDER). The apply pass rebuilds the sprite's display list to `T`
+(full reset + replay 0..T, tags only — the target's own DoAction is already
+queued) and sets `sprite_current_frame = (T+1)%count` so a Play resumes at T+1
+next tick. `gotoAndStop` (is_playing==0) is left on the deferred path unchanged.
+Scoped to the two test-pump modes; browser-WASM keeps the deferred path.
 
-**Diagnosis (pinned this session):** a sprite's own frame-N `gotoAndPlay(1)` is
-applied ~one tick LATE and leaves a stutter. Flash/Ruffle: the frame-5 goto
-resets the playhead within the tick, giving a clean period-4 loop; swfrecomp
-lets `_currentframe` reach 5, repeats 5 once, then lands on 1 (the target frame
-Ruffle's advance skips past). **The control `m` proves this is the GENERAL
-sprite frame-goto path, NOT the nested-advance path and NOT the #10a presync**
-(which only writes the reported `currentframe`, never the playhead). It is also
-NOT a recompiler frame-count bug — Pac is a 59-frame sprite whose attract-mode
-loop is frames 1–5 via `frame_5`'s `gotoAndPlay(1)`.
+### IMPORTANT — this gate does NOT capture Pacman's residual `Pac`/`CPac` diff
 
-**Where to look:** the sprite-local goto-from-own-frame-script path in
-`advance_sprite_frames` / `advance_nested_sprite_frames` (tag.c) —
-`sprite_manual_next_frame` / `sprite_next_frame` handling and
-`ng_gotoFrameCurrentSprite` / the sprite-script drain. The root TIMELINE goto is
-fine (`goto_frame`, `goto_frame2`, `tell_target` all pass); the bug is specific
-to a SPRITE looping via `gotoAndPlay` on a non-first frame. Do NOT regress those
-tests, the `nested_sprite_cf_lag` gate (#10a), or Pacman `242==242`; the fix
-should make Pacman `Pac`/`CPac` read Ruffle's `2,3,4,1` and this gate GREEN.
+The diagnosis assumed this gate is "byte-identical to Pacman's `Pac`." That is
+true of the *old swfrecomp bug output* (both were `2,3,4,5,5,1`) but NOT of
+**Ruffle's** output: Ruffle gives this gate `2,3,4,5` but Pacman `Pac` `2,3,4,1`
+— despite `Pac` frame_5 being the same `gotoAndPlay(1)`. The difference is the
+**injected tracer's instantiation order**, not the playhead. Ruffle runs ONE
+FIFO of `EnterFrame` events + frame `DoAction`s ordered by the clip exec-list
+(newest clip at the head, processed first). In this gate the looping sprites are
+placed by root-frame-1 `PlaceObject` tags, which run BEFORE the frame-1
+`DoAction` that `createEmptyMovieClip`s the tracer → the sprites are OLDER than
+the tracer → the tracer's `EnterFrame` runs BEFORE their goto `DoAction` → it
+reads the **pre-goto** frame (5). In Pacman, `Pac` is placed on a later `Demo`
+frame, AFTER the tracer → `Pac` is NEWER → its goto runs BEFORE the tracer's
+`EnterFrame` → the tracer reads the **post-goto** frame (1). Same playhead, the
+observer just samples it on opposite sides of the goto.
+
+So the #10 fix makes `Pac`'s playhead correct (the stutter is gone: old
+`2,3,4,5,5,1` → now `2,3,4,5`, a clean period-4 loop; frame 5 is the
+goto-trigger and is skipped in the RENDER, matching Flash). The remaining
+`Pac`/`CPac` `_cf` `5`-vs-`1` is a **reporting/observer-ordering artifact of the
+same class as #10a** (instantiation order of the observed clip relative to the
+harness tracer), not the #10 overrun/stutter — and it cannot be fixed by
+playhead mechanics: there is no single phase placement that yields pre-goto for
+clips older than the tracer AND post-goto for clips newer than it. Tracking it
+needs per-observer exec-order modeling (a #10a-style follow-up). The root
+TIMELINE goto path is unaffected (`goto_frame`, `goto_frame2`, `tell_target`,
+`execution_order1-4`, `goto_execution_order{,2}` all pass).
