@@ -115,3 +115,58 @@ fixed Achievement Unlocked (its real bug is `instance5` + a one-frame attach
 (`MenuMC3`, a non-root attach whose frame-1 stop still wasn't respected →
 4941/4941 → 4943). Backed out; this gate is the regression target for a future
 correct fix.
+
+## nested_sprite_cf_lag  — ⚠️ KNOWN-FAILING (desired-behavior gate, follow-up #10a)
+
+`nested_sprite_cf_lag.swf` (from `nested_sprite_cf_lag.swfml` via swfmill) — the
+minimal repro for the **nested-sprite `_currentframe` one-tick lag** (#10a).
+Structure: a 4-frame sprite `leaf` placed (as `n`) inside a 1-frame holder `mid`
+(placed as `c`) → `_root.c.n` is a multi-frame sprite nested one level; plus a
+ROOT-LEVEL 4-frame sprite `m` as a control. Root loops (2 frames, no stop) so
+everything keeps playing. Run through the **full** harness (the tracer auto-
+injects cleanly on this SWF):
+
+```bash
+python3 tools/divergence/divergence_test.py tools/divergence/gates/nested_sprite_cf_lag.swf --frames 10 --recompile
+cat tools/divergence/runs/nested_sprite_cf_lag/divergence.txt
+```
+
+**FAILS on HEAD at filtered line 3** (`_root.c.n _cf`). The control `m`
+(root-level) matches Ruffle exactly (`2,3,4,1,…` both sides); only the nested
+`c.n` lags one tick:
+
+```
+frame:        F1 F2 F3 F4 F5 …
+m   (root):    2  3  4  1  2     Ruffle == swfrecomp   (advances in Phase 1, pre-enterFrame)
+c.n (nested):  2  3  4  1  2     Ruffle
+c.n (nested):  1  2  3  4  1     swfrecomp  ← one tick behind
+```
+
+**Root cause (pinned this session):** Ruffle's `Avm1::run_frame`
+(`core/src/avm1/runtime.rs:519`) walks ONE flat `clip_exec_list` in
+*instantiation order*; each clip's `run_frame_avm1`
+(`core/src/display_object/movie_clip.rs:450`) does **enterFrame-event THEN
+playhead-advance**. The harness's `__tracer__` clip is `createEmptyMovieClip`'d
+at runtime → LAST in that list, so by the time its `onEnterFrame` fires every
+game clip (nested included) has already advanced this tick → the tracer reads
+post-advance `_currentframe`. SWFRecomp instead uses a *phased* model
+(`swf_core.c:994` Phase 1 advances root-level sprites with
+`g_advance_defer_nested=1`; `swf_core.c:1021`/`:1056` Phase 2 runs the root
+frame func + the `tagFlushPendingEnterFrame` where the tracer's `onEnterFrame`
+fires; `swf_core.c:1059` Phase 3 `advance_nested_sprite_frames` advances nested
+sprites). So nested sprites advance AFTER the enterFrame flush → the tracer
+reads them one tick stale. `swf.c` (OFFSCREEN_RENDER) mirrors this at
+`:735`/`:852`. Root-level sprites advance in Phase 1 (before enterFrame) →
+no lag, exactly as the `m` control shows.
+
+**Why it's high-risk (do NOT patch blind):** the Phase-3 deferral of nested
+advance exists to match nested-sprite *frame-script* execution ORDER relative to
+the root script (many MEMORY entries tuned this). Simply moving nested advance
+before the enterFrame flush would change script ordering and likely regress the
+trace suite. The likely correct shape is to advance the nested playhead COUNTER
+(`sprite_current_frame` / `_currentframe`) before enterFrame while keeping the
+nested frame SCRIPT in Phase 3 — OR adopt Ruffle's flat instantiation-ordered
+"enterFrame-then-advance per clip" exec list. Validate against the full trace
+suite both modes; do not regress `nested_sprite_cf_lag` (this gate, becomes
+GREEN), Pacman `242==242` (its `Pac`/`CPac` lag should clear), and every
+nested-sprite / timeline / execution-order test.
