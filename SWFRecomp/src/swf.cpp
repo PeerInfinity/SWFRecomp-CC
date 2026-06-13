@@ -8696,13 +8696,20 @@ namespace SWFRecomp
 				size_t tris_size = 0;
 				size_t morph_end_start_vertex = current_morph_end_vertex;
 
-				// Morph and font glyphs keep the earcut path: morph needs a
-				// per-vertex morph_index that libtess2 can't preserve (it invents
-				// vertices at intersections), and embedded font glyphs are
-				// tessellated separately. Plain DefineShape fills go through the
-				// libtess2 even-odd path below (prototype scope — see
-				// tessellation-libtess2-migration).
-				if (is_morph || is_font)
+				// Only morph shapes keep the earcut path: morph needs a per-vertex
+				// morph_index that libtess2 can't preserve (it invents vertices at
+				// intersections). Plain DefineShape fills AND embedded DefineFont
+				// glyphs go through the libtess2 path below. Embedded glyphs were
+				// migrated off earcut because the earcut + spatial-containment hole
+				// classification mis-cut fully-enclosed counters of stylized fonts
+				// (e.g. Tetris's "Wide awake Black" title — the "e"/"r" counters
+				// rendered filled, #6d/#18); libtess2 even-odd cuts enclosed
+				// counters regardless of contour winding/order. Embedded glyphs use
+				// even-odd (shape_uses_nonzero_winding is never set for DefineFont),
+				// matching the SWF default fill rule and Ruffle's glyph rasterizer.
+				// (The device-font synthesized-glyph fallback already uses libtess2,
+				// commit a0e5d431d; plain shapes since 80c87edc0.)
+				if (is_morph)
 				{
 					for (size_t i = 0; i < shapes.size(); ++i)
 					{
