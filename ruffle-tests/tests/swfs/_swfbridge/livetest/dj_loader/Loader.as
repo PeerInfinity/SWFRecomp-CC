@@ -553,6 +553,13 @@ class Loader {
 		h.counter = 0;
 		h.jumpspeed = 17;
 		h.maxjump = 22;
+		// ...and the jetpack ART: a nail pickup does hero.gotoAndStop(3/4)
+		// (jetpack frames) and nothing restores the frame once the variable
+		// is cleared (DJ only swaps frames on key input or jetpack expiry) —
+		// the hero would keep wearing the jetpack + flame after takeover
+		// (seen once on a Ruffle run). Frame 1 = the facing-right default;
+		// all hero frames are bare stop()s, so the goto is side-effect-free.
+		h.gotoAndStop(1);
 		// Disable DJ's climb-recycle deletion (hero removes block_(lb-4) on
 		// each climb landing): authored levels keep ALL platforms alive — the
 		// bottom-fall respawn needs them back, and removeMovieClip of attached
