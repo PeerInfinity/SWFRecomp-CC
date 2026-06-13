@@ -179,12 +179,10 @@ jobs:
 
       - name: Configure ccache
         run: |
-          # Cap each cache entry at 200 MiB. With ~30 shards each saving up
-          # to this much, total ccache usage stays under 6 GiB and leaves
-          # room for the Dawn cache (~few hundred MiB) under the 10 GiB
-          # per-repo limit. Larger values trigger eviction storms that drop
-          # the Dawn cache.
-          ccache --max-size=200M
+          # Single-runner path: one ccache entry per mode (key above is
+          # per-mode, not per-shard), so total stays small and leaves room for
+          # the Dawn cache under the 10 GiB per-repo limit.
+          ccache --max-size=300M
           ccache -z
 
       - name: Build SWFRecomp
@@ -513,11 +511,12 @@ jobs:
           git push -f origin ruffle-test-results
 
       - name: Prune old ccache entries
-        # Defense-in-depth against the per-repo 10 GiB cache cap. Each run
-        # produces ~30 ccache entries (~200 MiB each post-shrink), so caches
-        # accumulate fast. Without pruning, older runs' caches push out the
-        # Dawn cache (which is small and not refreshed every run). Keep the
-        # 2 most recent entries per cache-key prefix; delete the rest.
+        # Defense-in-depth against the per-repo 10 GiB cache cap. With the
+        # shared per-mode ccache key a run now produces ~1 entry per mode
+        # (was ~30 per shard per mode), but stale entries from prior runs and
+        # the old per-shard keys still accumulate. Keep the 2 most recent
+        # entries per cache-key prefix; delete the rest so the Dawn cache
+        # (small, refreshed only on graphics runs) is never LRU-evicted.
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -736,20 +735,29 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-ruffle-shard-${{ matrix.shard }}-${{ inputs.mode }}-${{ github.run_id }}
+          # SHARED key per mode (NOT per shard). Every shard compiles the same
+          # runtime (action.c etc. — the expensive part), so one ccache per
+          # mode accelerates them all. All shards in a run save this identical
+          # key; GitHub keeps the first writer (the rest get a harmless "cache
+          # already exists"), so a run produces ~1 ccache entry per mode, not
+          # ~30. Previously each shard saved its own key
+          # (ccache-ruffle-shard-<N>-<mode>-<run_id>): 30 shards × 2 modes ×
+          # keep-2 ≈ 19 GiB potential, which blew the 10 GiB per-repo cap and
+          # LRU-evicted the Dawn cache (forcing ~30-min rebuilds). The broad
+          # restore-keys fall back to any prior shard cache during the
+          # transition from the old per-shard keys.
+          key: ccache-ruffle-shard-${{ inputs.mode }}-${{ github.run_id }}
           restore-keys: |
-            ccache-ruffle-shard-${{ matrix.shard }}-${{ inputs.mode }}-
-            ccache-ruffle-shard-${{ matrix.shard }}-
+            ccache-ruffle-shard-${{ inputs.mode }}-
             ccache-ruffle-shard-
 
       - name: Configure ccache
         run: |
-          # Cap each cache entry at 200 MiB. With ~30 shards each saving up
-          # to this much, total ccache usage stays under 6 GiB and leaves
-          # room for the Dawn cache (~few hundred MiB) under the 10 GiB
-          # per-repo limit. Larger values trigger eviction storms that drop
-          # the Dawn cache.
-          ccache --max-size=200M
+          # Per-entry cap. Only ~1 entry per mode now survives (shared key
+          # above), so total ccache stays well under 1 GiB, leaving ample room
+          # for the Dawn cache (~few hundred MiB) under the 10 GiB per-repo
+          # limit. This headroom is what keeps Dawn from being LRU-evicted.
+          ccache --max-size=300M
           ccache -z
 
       - name: Download SWFRecomp binary
@@ -902,12 +910,9 @@ jobs:
 
       - name: Configure ccache
         run: |
-          # Cap each cache entry at 200 MiB. With ~30 shards each saving up
-          # to this much, total ccache usage stays under 6 GiB and leaves
-          # room for the Dawn cache (~few hundred MiB) under the 10 GiB
-          # per-repo limit. Larger values trigger eviction storms that drop
-          # the Dawn cache.
-          ccache --max-size=200M
+          # Combine job: one ccache entry per run; small, leaves room for the
+          # Dawn cache under the 10 GiB per-repo limit.
+          ccache --max-size=300M
           ccache -z
 
       - name: Download SWFRecomp binary
@@ -1318,11 +1323,12 @@ jobs:
           git push -f origin ruffle-test-results
 
       - name: Prune old ccache entries
-        # Defense-in-depth against the per-repo 10 GiB cache cap. Each run
-        # produces ~30 ccache entries (~200 MiB each post-shrink), so caches
-        # accumulate fast. Without pruning, older runs' caches push out the
-        # Dawn cache (which is small and not refreshed every run). Keep the
-        # 2 most recent entries per cache-key prefix; delete the rest.
+        # Defense-in-depth against the per-repo 10 GiB cache cap. With the
+        # shared per-mode ccache key a run now produces ~1 entry per mode
+        # (was ~30 per shard per mode), but stale entries from prior runs and
+        # the old per-shard keys still accumulate. Keep the 2 most recent
+        # entries per cache-key prefix; delete the rest so the Dawn cache
+        # (small, refreshed only on graphics runs) is never LRU-evicted.
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

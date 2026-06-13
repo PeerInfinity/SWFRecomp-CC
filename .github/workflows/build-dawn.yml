@@ -24,7 +24,13 @@ on:
         default: 'v1'
         type: string
   schedule:
-    - cron: '0 6 * * 0'  # Sunday 06:00 UTC
+    # Twice weekly (Sun + Wed) to keep a ~3-4 day margin against the 7-day
+    # no-access eviction TTL. A single weekly warm leaves zero margin: if the
+    # cron slips or access timing drifts, the cache can be evicted hours before
+    # the refresh. NOTE: the 7-day TTL is only one eviction cause — the 10 GiB
+    # per-repo cap (LRU) can evict Dawn much faster; see the prune step in
+    # ruffle-tests.yml and the Dawn-restore-on-every-mode comment there.
+    - cron: '0 6 * * 0,3'  # Sunday + Wednesday 06:00 UTC
 
 permissions:
   contents: read
