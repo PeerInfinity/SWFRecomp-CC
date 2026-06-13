@@ -1,14 +1,11 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-13T22:44:31.398485+00:00",
-    "old_git_sha": "2511a98544087e5b35d66796650a8b92c9566735",
-    "new_timestamp": "2026-06-13T23:44:02.472267+00:00",
+    "old_timestamp": "2026-06-13T23:44:02.472267+00:00",
+    "old_git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
+    "new_timestamp": "2026-06-13T23:50:22.982946+00:00",
     "new_git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": true
   },
   "summary": {
     "old_pass": 19,

@@ -1,22 +1,22 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-13 23:44 UTC
+**Date**: 2026-06-13 23:50 UTC
 
 **Git SHA**: `828b69b82d`
 
-**Run Duration**: 32m 54s
+**Run Duration**: 33m 16s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 107 |
-| Passing | **63** (58.9%) |
+| Total tests | 110 |
+| Passing | **66** (60.0%) |
 | Ruffle-matched | 28 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **91** (85.0%) |
+| Effective pass | **94** (85.5%) |
 | Failing | 16 |
-| Total expected lines | 5200 |
-| Matching lines | 3989 (76.7%) |
+| Total expected lines | 5239 |
+| Matching lines | 4028 (76.9%) |
 | Mismatched lines | 1211 |
 
 ### Failure Breakdown
@@ -27,7 +27,7 @@
 
 ## Passing Tests
 
-**63 tests passing**
+**66 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -88,12 +88,15 @@
 | 55 | `register_class/RegisterClassTest3` | 12 | 23.9s |  |
 | 56 | `register_class/registerClassTest` | 51 | 26.1s |  |
 | 57 | `replace_shapes1test` | 23 | 3.3s |  |
-| 58 | `runtime_vm_stack_test` | 9 | 23.3s |  |
-| 59 | `shape_test` | 21 | 25.0s |  |
-| 60 | `static_vs_dynamic1` | 17 | 2.8s |  |
-| 61 | `static_vs_dynamic2` | 18 | 21.2s |  |
-| 62 | `timeline_var_test` | 11 | 20.8s |  |
-| 63 | `unload_movieclip_test1` | 6 | 20.4s |  |
+| 58 | `replace_sprites1test` | 21 | 2.9s |  |
+| 59 | `reverse_execute_PlaceObject2_test1` | 8 | 2.3s |  |
+| 60 | `reverse_execute_PlaceObject2_test2` | 10 | 17.1s |  |
+| 61 | `runtime_vm_stack_test` | 9 | 23.3s |  |
+| 62 | `shape_test` | 21 | 25.0s |  |
+| 63 | `static_vs_dynamic1` | 17 | 2.8s |  |
+| 64 | `static_vs_dynamic2` | 18 | 21.2s |  |
+| 65 | `timeline_var_test` | 11 | 20.8s |  |
+| 66 | `unload_movieclip_test1` | 6 | 20.4s |  |
 
 ## Ruffle-Matched Tests
 

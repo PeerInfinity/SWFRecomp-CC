@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-06-13 23:44 UTC
+**Date**: 2026-06-13 23:50 UTC
 
 **Git SHA**: `828b69b82d`
 
-**Run Duration**: 33m 28s
+**Run Duration**: 34m 23s
 
 **Filtered**: 6 tests ignored out of 243 available
 
@@ -12,14 +12,14 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 229 |
-| Passing | **132** (57.6%) |
-| Ruffle-matched | 87 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **219** (95.6%) |
+| Total tests | 237 |
+| Passing | **132** (55.7%) |
+| Ruffle-matched | 95 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **227** (95.8%) |
 | Failing | 10 |
-| Total expected lines | 30666 |
-| Matching lines | 28602 (93.3%) |
-| Mismatched lines | 2064 |
+| Total expected lines | 31918 |
+| Matching lines | 29630 (92.8%) |
+| Mismatched lines | 2288 |
 
 ### Failure Breakdown
 
@@ -168,7 +168,7 @@
 
 ## Ruffle-Matched Tests
 
-**87 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**95 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
@@ -251,14 +251,22 @@
 | 77 | `XMLNode-v6` | 3 | 22 | 9.6s |  |
 | 78 | `XMLNode-v7` | 3 | 22 | 8.7s |  |
 | 79 | `XMLNode-v8` | 3 | 22 | 2.5s |  |
-| 80 | `toString_valueOf-v5` | 34 | 34 | 23.7s |  |
-| 81 | `toString_valueOf-v6` | 5 | 5 | 6.1s |  |
-| 82 | `toString_valueOf-v7` | 5 | 5 | 5.7s |  |
-| 83 | `toString_valueOf-v8` | 5 | 5 | 2.2s |  |
-| 84 | `with-v5` | 3 | 3 | 4.1s |  |
-| 85 | `with-v6` | 6 | 9 | 5.2s |  |
-| 86 | `with-v7` | 6 | 9 | 4.9s |  |
-| 87 | `with-v8` | 6 | 9 | 2.4s |  |
+| 80 | `ops-v5` | 7 | 9 | 23.8s |  |
+| 81 | `ops-v6` | 7 | 11 | 8.3s |  |
+| 82 | `ops-v7` | 7 | 11 | 9.0s |  |
+| 83 | `ops-v8` | 7 | 11 | 2.0s |  |
+| 84 | `setProperty-v5` | 49 | 49 | 3.1s |  |
+| 85 | `setProperty-v6` | 49 | 49 | 3.2s |  |
+| 86 | `setProperty-v7` | 49 | 49 | 2.8s |  |
+| 87 | `setProperty-v8` | 49 | 49 | 2.1s |  |
+| 88 | `toString_valueOf-v5` | 34 | 34 | 23.7s |  |
+| 89 | `toString_valueOf-v6` | 5 | 5 | 6.1s |  |
+| 90 | `toString_valueOf-v7` | 5 | 5 | 5.7s |  |
+| 91 | `toString_valueOf-v8` | 5 | 5 | 2.2s |  |
+| 92 | `with-v5` | 3 | 3 | 4.1s |  |
+| 93 | `with-v6` | 6 | 9 | 5.2s |  |
+| 94 | `with-v7` | 6 | 9 | 4.9s |  |
+| 95 | `with-v8` | 6 | 9 | 2.4s |  |
 
 ## Near-Passing Tests
 

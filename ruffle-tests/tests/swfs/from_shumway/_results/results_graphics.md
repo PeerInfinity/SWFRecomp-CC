@@ -1,22 +1,22 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-13 23:44 UTC
+**Date**: 2026-06-13 23:50 UTC
 
 **Git SHA**: `828b69b82d`
 
-**Run Duration**: 14m 29s
+**Run Duration**: 15m 4s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 89 |
-| Passing | **70** (78.7%) |
+| Total tests | 92 |
+| Passing | **73** (79.3%) |
 | Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **73** (82.0%) |
+| Effective pass | **76** (82.6%) |
 | Failing | 16 |
-| Total expected lines | 1273 |
-| Matching lines | 879 (69.0%) |
+| Total expected lines | 1276 |
+| Matching lines | 882 (69.1%) |
 | Mismatched lines | 394 |
 
 ### Failure Breakdown
@@ -27,7 +27,7 @@
 
 ## Passing Tests
 
-**70 tests passing**
+**73 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -95,12 +95,15 @@
 | 62 | `fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732` | 8 | 13.8s |  |
 | 63 | `fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca` | 5 | 21.1s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 | 64 | `fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69` | 6 | 22.4s |  |
-| 65 | `targetPath1` | 8 | 2.1s |  |
-| 66 | `timeline/timeline_as2_1` | 3 | 22.3s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
-| 67 | `timeline/timeline_as2_2` | 3 | 2.1s |  |
-| 68 | `timeline/timeline_as2_3` | 3 | 20.4s |  |
-| 69 | `timeline/timeline_as2_4` | 2 | 20.1s |  |
-| 70 | `timeline/timeline_as2_5` | 4 | 5.5s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 65 | `gradientTransform` | 0 | 16.5s |  |
+| 66 | `invalidClipDepth` | 0 | 16.7s |  |
+| 67 | `movieinfo1` | 3 | 1.8s |  |
+| 68 | `targetPath1` | 8 | 2.1s |  |
+| 69 | `timeline/timeline_as2_1` | 3 | 22.3s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 70 | `timeline/timeline_as2_2` | 3 | 2.1s |  |
+| 71 | `timeline/timeline_as2_3` | 3 | 20.4s |  |
+| 72 | `timeline/timeline_as2_4` | 2 | 20.1s |  |
+| 73 | `timeline/timeline_as2_5` | 4 | 5.5s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
 
 ## Ruffle-Matched Tests
 
@@ -169,4 +172,4 @@ No timeouts.
 | 2 | [SHUMWAY_AVM1_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) | 11 | 10 | 1 |
 | 3 | [SHUMWAY_AVM1_SUBTREES_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_SUBTREES_PLAN.md) | 1 | 1 | 0 |
 | 4 | [SHUMWAY_FUZZ_TIMELINE_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) | 20 | 2 | 18 |
-| | *(tests not in any document)* | 55 | 55 | 0 |
+| | *(tests not in any document)* | 58 | 58 | 0 |

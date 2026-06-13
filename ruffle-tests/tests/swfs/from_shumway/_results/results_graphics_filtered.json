@@ -1,22 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-06-13T23:44:02.467901+00:00",
+    "timestamp": "2026-06-13T23:50:22.978570+00:00",
     "git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
-    "duration_seconds": 868.76,
+    "duration_seconds": 903.89,
     "total_available": 92,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 16,
     "filtered": true
   },
-  "total": 73,
-  "pass": 70,
+  "total": 76,
+  "pass": 73,
   "ruffle_matched": 3,
   "fail": 0,
-  "pass_rate": 95.9,
-  "effective_pass": 73,
+  "pass_rate": 96.1,
+  "effective_pass": 76,
   "effective_pass_rate": 100.0,
   "breakdown": {
     "ruffle_matched": 3
@@ -1165,6 +1163,76 @@
         "matching_lines": 6
       },
       "duration": 22.42,
+      "status": "pass"
+    },
+    {
+      "test": "gradientTransform",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 16.349,
+        "run": 0.169
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.53,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1441 outliers exceed limit of 0, max difference 40",
+          "max_diff": 40,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": true
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "invalidClipDepth",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 16.518,
+        "run": 0.157
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.68,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "movieinfo1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.603,
+        "run": 0.155
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 1.76,
       "status": "pass"
     },
     {

@@ -1,27 +1,27 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-13 23:44 UTC
+**Date**: 2026-06-13 23:50 UTC
 
 **Git SHA**: `828b69b82d`
 
-**Run Duration**: 2m 46s
+**Run Duration**: 2m 48s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 46 |
-| Passing | **45** (97.8%) |
+| Total tests | 47 |
+| Passing | **46** (97.9%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **46** (100.0%) |
+| Effective pass | **47** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 490 |
-| Matching lines | 488 (99.6%) |
+| Total expected lines | 491 |
+| Matching lines | 489 (99.6%) |
 | Mismatched lines | 2 |
 
 ## Passing Tests
 
-**45 tests passing**
+**46 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -68,8 +68,9 @@
 | 41 | `undefined/undefined-swf6` | 39 | 2.0s |  |
 | 42 | `undefined/undefined-swf7` | 39 | 2.1s |  |
 | 43 | `watch` | 2 | 2.0s |  |
-| 44 | `xml/xmlload` | 4 | 2.3s |  |
-| 45 | `xml/xmlstring` | 9 | 1.8s |  |
+| 44 | `xml/xmlbuild` | 1 | 1.7s |  |
+| 45 | `xml/xmlload` | 4 | 2.3s |  |
+| 46 | `xml/xmlstring` | 9 | 1.8s |  |
 
 ## Ruffle-Matched Tests
 

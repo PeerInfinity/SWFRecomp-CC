@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-06-13 23:44 UTC
+**Date**: 2026-06-13 23:50 UTC
 
 **Git SHA**: `828b69b82d`
 
-**Run Duration**: 2m 46s
+**Run Duration**: 2m 48s
 
 **Filtered**: 3 tests ignored out of 47 available
 
@@ -12,16 +12,16 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 43 |
-| Passing | **43** (100.0%) |
+| Total tests | 44 |
+| Passing | **44** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 479 |
-| Matching lines | 479 (100.0%) |
+| Total expected lines | 480 |
+| Matching lines | 480 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**43 tests passing**
+**44 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -66,8 +66,9 @@
 | 39 | `undefined/undefined-swf6` | 39 | 2.0s |  |
 | 40 | `undefined/undefined-swf7` | 39 | 2.1s |  |
 | 41 | `watch` | 2 | 2.0s |  |
-| 42 | `xml/xmlload` | 4 | 2.3s |  |
-| 43 | `xml/xmlstring` | 9 | 1.8s |  |
+| 42 | `xml/xmlbuild` | 1 | 1.7s |  |
+| 43 | `xml/xmlload` | 4 | 2.3s |  |
+| 44 | `xml/xmlstring` | 9 | 1.8s |  |
 
 ## Near-Passing Tests
 

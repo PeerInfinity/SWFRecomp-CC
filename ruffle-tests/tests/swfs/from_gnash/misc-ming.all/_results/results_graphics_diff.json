@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-13T22:44:31.412925+00:00",
-    "old_git_sha": "2511a98544087e5b35d66796650a8b92c9566735",
-    "new_timestamp": "2026-06-13T23:44:02.486424+00:00",
+    "old_timestamp": "2026-06-13T23:44:02.486424+00:00",
+    "old_git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
+    "new_timestamp": "2026-06-13T23:50:22.997127+00:00",
     "new_git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 66,
+    "old_pass": 63,
     "old_ruffle_matched": 28,
-    "old_effective_pass": 94,
-    "old_total": 110,
-    "old_pass_rate": 60.0,
-    "new_pass": 63,
+    "old_effective_pass": 91,
+    "old_total": 107,
+    "old_pass_rate": 58.9,
+    "new_pass": 66,
     "new_ruffle_matched": 28,
-    "new_effective_pass": 91,
-    "new_total": 107,
-    "new_pass_rate": 58.9,
+    "new_effective_pass": 94,
+    "new_total": 110,
+    "new_pass_rate": 60.0,
     "old_mismatched_lines": 1211,
     "new_mismatched_lines": 1211,
     "increased_mismatches": 0,
@@ -29,46 +26,45 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 107,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 3
+    "added": 3,
+    "removed": 0
   },
   "changes": [
     {
       "test": "replace_sprites1test",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 21,
         "expected_lines": 21,
         "matching_lines": 21
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "reverse_execute_PlaceObject2_test1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 8,
         "expected_lines": 8,
         "matching_lines": 8
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "reverse_execute_PlaceObject2_test2",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 10,
         "expected_lines": 10,
         "matching_lines": 10
-      },
-      "new_lines": null
+      }
     }
   ]
 }

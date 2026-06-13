@@ -1,23 +1,21 @@
 {
   "metadata": {
-    "timestamp": "2026-06-13T23:44:02.486424+00:00",
+    "timestamp": "2026-06-13T23:50:22.997127+00:00",
     "git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
-    "duration_seconds": 1973.68,
+    "duration_seconds": 1996.16,
     "total_available": 110,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 2,
     "filtered": true
   },
-  "total": 105,
-  "pass": 62,
+  "total": 108,
+  "pass": 65,
   "ruffle_matched": 28,
   "fail": 15,
-  "pass_rate": 59.0,
-  "effective_pass": 90,
-  "effective_pass_rate": 85.7,
+  "pass_rate": 60.2,
+  "effective_pass": 93,
+  "effective_pass_rate": 86.1,
   "breakdown": {
     "output_mismatch": 15,
     "ruffle_matched": 28
@@ -1913,6 +1911,54 @@
         "matching_lines": 23
       },
       "duration": 3.33,
+      "status": "pass"
+    },
+    {
+      "test": "replace_sprites1test",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.611,
+        "run": 0.283
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      },
+      "duration": 2.9,
+      "status": "pass"
+    },
+    {
+      "test": "reverse_execute_PlaceObject2_test1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.038,
+        "run": 0.249
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 2.29,
+      "status": "pass"
+    },
+    {
+      "test": "reverse_execute_PlaceObject2_test2",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 16.869,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 17.14,
       "status": "pass"
     },
     {
