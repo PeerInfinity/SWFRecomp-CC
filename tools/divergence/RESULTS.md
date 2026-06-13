@@ -22,9 +22,15 @@ The prior board (2026-05-29) predated the tracer fix and was INVALID for every
    (`CAPTURE_MAX`, env-overridable). The tick loop runs the full `--frames`
    count; only PNG capture is capped.
 2. **Recompile timeout is 30s by default** (`SWFRECOMP_RECOMPILE_TIMEOUT`).
-   The two biggest games need it bumped: **Art of War** (1.5MB) recompiles fine
-   at the default; **Castle Hero** (14MB) needs `SWFRECOMP_RECOMPILE_TIMEOUT=900`
-   — its injected SWF (14MB) recompiled in ~49s with the bump.
+   **Art of War** (1.5MB) recompiles fine at the default. **Castle Hero** (14MB)
+   needs `SWFRECOMP_RECOMPILE_TIMEOUT=900` for the SWF→C step (recompiled in
+   ~49s with the bump) — but then hits a **SECOND, separate** limit: the
+   hardcoded **300s per-file gcc compile timeout** in `verify_output.py`
+   (`compile_native failed: compilation timed out`) on the resulting giant
+   generated C. So Castle Hero is **still blocked** even with the recompile
+   bump; bumping the gcc-compile cap (or sharding the generated C) is a separate
+   change. Castle Hero's SWF→C recompile is NOT the desync symptom (it produces
+   valid C, just a lot of it).
 3. **Trace numeric tolerance** (rel 1e-5 / abs 1e-4) absorbs f32-vs-f64
    precision noise by default; `--trace-exact` to see it.
 4. Game `trace()` can contain non-UTF8 bytes — use `grep -a`.
@@ -48,7 +54,7 @@ file tracks the broader **flasharchive corpus** the harness was re-swept across.
 | Doodle Jump | — | 211 / 196 | L6: `hero _y=247.55` vs `251.55` | RNG-driven initial platform layout (guide gotcha #12) |
 | Duck Life 1 | — | 482 / 482 | L26: `seed=5` / `skill=0` region | (line counts now MATCH; advanced from old L15) |
 | Duck Life 2 | — | 271 / 286 | L4: `loadcheat` region | preloader/value mismatch |
-| Castle Hero | 14MB | — | (recompile recovered w/ 900s timeout; see PROGRESS log) | big-SWF |
+| Castle Hero | 14MB | — | ⚠️ SWF→C recompiles (~49s w/ 900s timeout) but gcc compile times out (300s per-file cap) | big-SWF, blocked on gcc-compile cap |
 
 (Filtered trace-line counts. Every game's image diverges by frame 1–2 — mostly
 full-frame `max_diff=255` = background/preloader rendering, a few sub-pixel.)
