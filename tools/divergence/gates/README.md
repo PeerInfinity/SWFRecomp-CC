@@ -75,3 +75,43 @@ edit the XML (AVM1 actions are structured elements — `PushData`/`StackString`/
 `GetMember`/`CallMethod`/`CloneSprite`/`Trace`/…), then `swfmill xml2swf`. Note
 ActionCloneSprite's runtime stack is `[source-mc] [new-name] [depth]`, and the
 source must be a MovieClip ref (`GetVariable`), not a string path.
+
+## attached_clip_playhead  — ⚠️ KNOWN-FAILING (desired-behavior gate)
+
+`attached_clip_playhead.swf` (from `attached_clip_playhead.swfml` via swfmill):
+the root attaches a 4-frame `box` symbol twice — `b` left playing, `c` then
+`c.stop()`'d — and traces `b._currentframe` / `c._currentframe` each frame.
+Ruffle (`attached_clip_playhead.expected.txt`):
+
+```
+T1 b=1 c=1
+T2 b=2 c=1   <- b auto-advances each tick (attached clips PLAY in Flash); c frozen by stop()
+T3 b=3 c=1
+T4 b=4 c=1
+T5 b=1 c=1   <- b loops back to frame 1
+T6 b=2 c=1
+T7 b=3 c=1
+```
+
+**This gate FAILS on current HEAD** — it documents a real, confirmed gap:
+**attachMovie'd multi-frame clips do not auto-advance their playhead.**
+`advance_sprite_frames` only walks display-list arrays; a root-attached clip's
+`display_obj` is a standalone heap struct no list contains, so its timeline
+never ticks (`b` stays pinned at `_currentframe=1`). Run it:
+
+```bash
+rm -rf /tmp/acpg && \
+python3 tools/divergence/run_swfrecomp.py tools/divergence/gates/attached_clip_playhead.swf /tmp/acpg --frames 10 --recompile >/dev/null 2>&1 && \
+grep -a "^T" /tmp/acpg/trace.txt | diff - tools/divergence/gates/attached_clip_playhead.expected.txt && echo GATE-GREEN
+```
+
+See PROGRESS.md follow-up #15 for the full investigation: a naive
+playhead-advance pump (`ng_advance_attached_clip_playheads`) was prototyped and
+makes THIS gate green, but it must compose with (a) a creation-tick promotion
+(skip the attach tick) and (b) routing the attached clip's frame-1 `stop()`
+through the deferred attach-init script — and even with all three it neither
+fixed Achievement Unlocked (its real bug is `instance5` + a one-frame attach
+*pacing* lag, both upstream of the playhead) nor avoided regressing N
+(`MenuMC3`, a non-root attach whose frame-1 stop still wasn't respected →
+4941/4941 → 4943). Backed out; this gate is the regression target for a future
+correct fix.

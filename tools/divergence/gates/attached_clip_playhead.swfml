@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <Header framerate="12" frames="8">
+    <size><Rectangle left="0" right="4000" top="0" bottom="3000"/></size>
+    <tags>
+      <SetBackgroundColor><color><Color red="255" green="255" blue="255"/></color></SetBackgroundColor>
+
+      <!-- box: a plain 4-frame sprite (no content needed; only the playhead is observed) -->
+      <DefineSprite objectID="2" frames="4">
+        <tags>
+          <ShowFrame/>
+          <ShowFrame/>
+          <ShowFrame/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+      <Export><symbols><Symbol objectID="2" name="box"/></symbols></Export>
+
+      <!-- root frame 1: attach b (left playing) and c (stopped immediately) -->
+      <DoAction>
+        <actions>
+          <!-- _root.attachMovie("box","b",1) -->
+          <PushData><items>
+            <StackInteger value="1"/>
+            <StackString value="b"/>
+            <StackString value="box"/>
+            <StackInteger value="3"/>
+            <StackString value="_root"/>
+          </items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="attachMovie"/></items></PushData>
+          <CallMethod/>
+          <Pop/>
+
+          <!-- _root.attachMovie("box","c",2) -->
+          <PushData><items>
+            <StackInteger value="2"/>
+            <StackString value="c"/>
+            <StackString value="box"/>
+            <StackInteger value="3"/>
+            <StackString value="_root"/>
+          </items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="attachMovie"/></items></PushData>
+          <CallMethod/>
+          <Pop/>
+
+          <!-- c.stop() -->
+          <PushData><items>
+            <StackInteger value="0"/>
+            <StackString value="c"/>
+          </items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="stop"/></items></PushData>
+          <CallMethod/>
+          <Pop/>
+
+          <!-- trace("T1 b=" + b._currentframe + " c=" + c._currentframe) -->
+          <PushData><items><StackString value="T1 b="/></items></PushData>
+          <PushData><items><StackString value="b"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData><items><StackString value=" c="/></items></PushData>
+          <AddTyped/>
+          <PushData><items><StackString value="c"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+
+      <!-- root frame 2 -->
+      <DoAction>
+        <actions>
+          <PushData><items><StackString value="T2 b="/></items></PushData>
+          <PushData><items><StackString value="b"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData><items><StackString value=" c="/></items></PushData>
+          <AddTyped/>
+          <PushData><items><StackString value="c"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+
+      <!-- root frame 3 -->
+      <DoAction>
+        <actions>
+          <PushData><items><StackString value="T3 b="/></items></PushData>
+          <PushData><items><StackString value="b"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData><items><StackString value=" c="/></items></PushData>
+          <AddTyped/>
+          <PushData><items><StackString value="c"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+
+      <!-- root frame 4 -->
+      <DoAction>
+        <actions>
+          <PushData><items><StackString value="T4 b="/></items></PushData>
+          <PushData><items><StackString value="b"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData><items><StackString value=" c="/></items></PushData>
+          <AddTyped/>
+          <PushData><items><StackString value="c"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+
+      <!-- root frame 5 -->
+      <DoAction>
+        <actions>
+          <PushData><items><StackString value="T5 b="/></items></PushData>
+          <PushData><items><StackString value="b"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData><items><StackString value=" c="/></items></PushData>
+          <AddTyped/>
+          <PushData><items><StackString value="c"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+
+      <!-- root frame 6 -->
+      <DoAction>
+        <actions>
+          <PushData><items><StackString value="T6 b="/></items></PushData>
+          <PushData><items><StackString value="b"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData><items><StackString value=" c="/></items></PushData>
+          <AddTyped/>
+          <PushData><items><StackString value="c"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+
+      <!-- root frame 7: stop the root so the timeline doesn't wrap -->
+      <DoAction>
+        <actions>
+          <PushData><items><StackString value="T7 b="/></items></PushData>
+          <PushData><items><StackString value="b"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData><items><StackString value=" c="/></items></PushData>
+          <AddTyped/>
+          <PushData><items><StackString value="c"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <Stop/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+
+      <!-- root frame 8: sample once more while stopped -->
+      <DoAction>
+        <actions>
+          <PushData><items><StackString value="T8 b="/></items></PushData>
+          <PushData><items><StackString value="b"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData><items><StackString value=" c="/></items></PushData>
+          <AddTyped/>
+          <PushData><items><StackString value="c"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="_currentframe"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

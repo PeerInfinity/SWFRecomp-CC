@@ -1,156 +1,89 @@
-# Divergence Test Results — local_batch demos
+# Divergence Test Results — flasharchive games
 
-Each `docs2/examples/local_batch/` demo was (a) rebuilt as a docs2 WASM graphics
-demo from its `~/CC/flasharchive/` source SWF, and (b) run through the divergence
-harness (`tools/divergence/divergence_test.py`), which compares SWFRecomp
-(graphics-native) against Ruffle on both `trace()` output and per-frame rendered
-images.
+Each game's `~/CC/flasharchive/` source SWF is run through the divergence harness
+(`tools/divergence/divergence_test.py`), which compares SWFRecomp
+(graphics-native, headless) against Ruffle on both `trace()` output and per-frame
+rendered images.
 
 - **Source SWFs:** `~/CC/flasharchive/`
 - **Harness usage:** `SWFRecompDocs/guides/divergence-harness-usage.md`
-- **Run command per demo:** `python3 tools/divergence/divergence_test.py "<swf>" --frames 16`
-- **Frame count:** 16 (matches the image-capture cap, see note 1)
-- **Image comparison:** strict (tolerance 0, max-outliers 0)
-- **Per-run outputs:** `tools/divergence/runs/<stem>/` (gitignored)
+- **Run command per game:** `python3 tools/divergence/divergence_test.py "<swf>" --frames 16`
+- **Per-run outputs:** `tools/divergence/runs/<stem>/` (gitignored); co-located
+  ruffle/swfrecomp/difference PNGs in `runs/<stem>/compare/`.
 
-Date of run: 2026-05-29
+**Date of this run: 2026-06-12** (re-run of follow-up #4 with the fixed tracer
+`6a08f06aa` + all fixes landed through `c4630257e` on HEAD; both sides fresh).
+The prior board (2026-05-29) predated the tracer fix and was INVALID for every
+`_root.onEnterFrame`-driven game — superseded by this run.
 
 ## Investigation notes (read before interpreting results)
 
-1. **`MAX_CAPTURES 16` in `capture.c`** hard-caps PNG capture at the first 16
-   frames regardless of `--frames`. The tick loop still runs the full count (a
-   30-frame probe produced 16 PNGs but 29 tracer ticks), but **image comparison
-   only covers frames 1–16.** Trace comparison is unaffected (covers all ticks).
-   Concrete consequence: **Checkers** diverges at frame 19 (auto-instance name
-   `instance4` vs `instance6`) — visible at `--frames 20` but *not* caught here
-   at 16. To detect later divergences, bump that `#define` and rebuild.
+1. **Image comparison covers only the first 16 frames by default**
+   (`CAPTURE_MAX`, env-overridable). The tick loop runs the full `--frames`
+   count; only PNG capture is capped.
+2. **Recompile timeout is 30s by default** (`SWFRECOMP_RECOMPILE_TIMEOUT`).
+   The two biggest games need it bumped: **Art of War** (1.5MB) recompiles fine
+   at the default; **Castle Hero** (14MB) needs `SWFRECOMP_RECOMPILE_TIMEOUT=900`
+   — its injected SWF (14MB) recompiled in ~49s with the bump.
+3. **Trace numeric tolerance** (rel 1e-5 / abs 1e-4) absorbs f32-vs-f64
+   precision noise by default; `--trace-exact` to see it.
+4. Game `trace()` can contain non-UTF8 bytes — use `grep -a`.
 
-2. **Recompiler 30s timeout (`verify_output.py::recompile_swf`).** The divergence
-   harness recompiles the *injected* SWF with a hardcoded 30s limit. Two large
-   SWFs exceeded it: **Art of War** (1.5MB) and **Castle Hero** (14MB). Their
-   docs2 WASM demos built fine (that path recompiles the original with a longer
-   timeout); only the divergence-side recompile timed out. Bump the 30s limit to
-   recover them.
+## Summary (cross-suite re-run, smallest games covered by the status board)
 
-3. **Tracer (`_root.onEnterFrame`) fires on both sides for every game except
-   Snake.** Snake (the only SWF originally authored as v5) doesn't dispatch its
-   tracer `onEnterFrame` under SWFRecomp and emits no `trace()` of its own, so
-   its report is image-only. The tracer mechanism itself is sound (minimal
-   stopped/playing-root probes dispatch every tick).
+The per-game **status board** (Snake, Tetris, Minesweeper, Pacman, Tron, Storm
+the House, Shopping Cart Hero, N, Checkers, Bloons) lives in
+`tools/divergence/PROGRESS.md` — those are the games worked end-to-end. This
+file tracks the broader **flasharchive corpus** the harness was re-swept across.
 
-   > Tooling caveat: game `trace()` output can contain non-UTF8 bytes, so plain
-   > `grep -c '^F'` reports a blank/0 count on those files (grep treats them as
-   > binary). Use `grep -a` for accurate F-line counts.
-
-## Summary (14 demos)
-
-| Demo | WASM build | Trace (ruffle/swfrecomp) | Trace result | Image diff (≤f16) |
+| Game | Size | Trace (ruffle/swfrecomp) | First trace divergence | Bucket |
 |---|---|---|---|---|
-| Achievement Unlocked | ✅ | 250 / 278 | diverge L18: `k=1` vs spurious `instance1=undefined` | f1, 720550 px |
-| Age of War | ✅ | 61 / 61 | **identical** | f1, 308209 px |
-| Art of War | ✅ | — / — | ⚠️ harness recompile **timeout** | — |
-| Avalanche | ✅ | 76 / 91 | diverge L2: `instance1 _x=…` vs spurious `instance3=undefined` | f1, 51067 px |
-| Bloons | ✅ | 295 / 504 | diverge L0: Ruffle `MochiServices Connecting…` (no net in SWFRecomp) | f1, 1228800 px |
-| Bloons TD | ✅ | 166 / 198 | diverge L5: `_root.reserved` + frame-advance mismatch (`_cf` 1 vs 3) | f1, 1228800 px |
-| Bloons TD 2 | ✅ | 173 / 233 | diverge L6: same `reserved` + frame-advance pattern | f2, 7758 px |
-| Bloxorz | ✅ | 76 / 91 | diverge L2: `backser _x=…` vs `percentr="Preloading…"` | f1, 165000 px |
-| Castle Hero | ✅ | — / — | ⚠️ harness recompile **timeout** | — |
-| Checkers | ✅ | 16 / 16 | **identical** (real diverge at f19 is past the 16-frame window) | f2, 339 px |
-| Doodle Jump | ✅ | 211 / 211 | **identical** | f1, 15440 px |
-| Duck Life 1 | ✅ | 482 / 497 | diverge L15: `hat=0` vs spurious `game=undefined` | f1, 65236 px |
-| Duck Life 2 - World Champion | ✅ | 271 / 316 | diverge L4: `loadcheat=0` vs `loadcheat=0.5` | f1, 1176829 px |
-| Snake | ✅ | 87 / 0 | tracer not dispatched on SWFRecomp side (image-only) | f1, 2517 px (30f run) |
+| Age of War | — | 61 / 61 | **identical** | image-only |
+| Avalanche | 527KB | 76 / 76 | L2: `instance1 _cf=4` vs `2` | nested-sprite `_cf` lag (#10a) |
+| Achievement Unlocked | — | 289 / 303 | L11: `instance5 _cf=2` vs `100` | playhead/auto-name + attach pacing |
+| Art of War | 1.5MB | 224 / 226 | L2: `box="…wait until 50%"` vs `PercentLoaded=100` | preloader/network (no net layer) |
+| Bloons TD | — | 151 / 188 | L12: `prog=100` vs `loadbar` placement | preloader pacing + Mochi |
+| Bloons TD 2 | — | 173 / 233 | L6: `reserved` + `_cf` advance | preloader pacing + Mochi |
+| Bloxorz | — | 76 / 91 | L2: `backser` vs `percentr="Preloading…"` | preloader pacing |
+| Doodle Jump | — | 211 / 196 | L6: `hero _y=247.55` vs `251.55` | RNG-driven initial platform layout (guide gotcha #12) |
+| Duck Life 1 | — | 482 / 482 | L26: `seed=5` / `skill=0` region | (line counts now MATCH; advanced from old L15) |
+| Duck Life 2 | — | 271 / 286 | L4: `loadcheat` region | preloader/value mismatch |
+| Castle Hero | 14MB | — | (recompile recovered w/ 900s timeout; see PROGRESS log) | big-SWF |
 
-(Filtered trace-line counts. "px" = channels exceeding strict tolerance on the
-first diverging frame. Snake was run earlier at `--frames 30`; all others at 16.)
+(Filtered trace-line counts. Every game's image diverges by frame 1–2 — mostly
+full-frame `max_diff=255` = background/preloader rendering, a few sub-pixel.)
 
-## Cross-cutting patterns
+## Cross-cutting patterns (2026-06-12)
 
-- **Spurious `_root.instanceN=undefined` globals** appear on the SWFRecomp side
-  in several games (Achievement Unlocked → `instance1`, Avalanche → `instance3`,
-  Duck Life 1 → `game`). SWFRecomp enumerates `_root` properties that Ruffle does
-  not — a recurring, real AVM1 divergence worth a dedicated look.
-- **Frame-advance timing** differs in the Bloons family: at the same tick Ruffle
-  reports a lower `_currentframe`/`_cf` than SWFRecomp (e.g. Bloons TD `F2`:
-  Ruffle still at frame 1 state, SWFRecomp at frame 3). Preloader pacing.
-- **Network/MochiAds**: Bloons traces `MochiServices Connecting…` under Ruffle;
-  SWFRecomp has no network layer, so this diverges immediately (expected).
-- **Trace fully matches** for Age of War, Checkers, Doodle Jump within 16 frames.
-- **Every game's image diverges by frame 1–2.** Most are full-frame
-  (`max_diff=255`, huge outlier counts) → background/preloader rendering differs
-  fundamentally; a few are tiny (Checkers `max_diff=3`, Bloons TD 2 = 204) →
-  sub-pixel/AA only.
-
-## Per-demo detail
-
-### Achievement Unlocked
-Trace diverges at filtered line 18 — Ruffle has `F2 _root k=1`; SWFRecomp instead
-emits `F2 _root instance1=undefined` (a spurious enumerable global; `instance1`
-sorts before `k`). Image: frame 1, `max_diff=253`, 720550 outliers.
-
-### Age of War
-Trace **identical** (61 lines). Image: frame 1, `max_diff=255`, 308209 outliers.
-
-### Art of War  ⚠️
-WASM demo built OK. Divergence test failed: the recompiler **timed out** (30s
-limit) recompiling the 1.5MB injected SWF. Ruffle side produced 240 F-lines.
-Recoverable by bumping the recompile timeout.
-
-### Avalanche
-Trace diverges at filtered line 2 — Ruffle dumps `_root.instance1` display state;
-SWFRecomp emits a spurious `_root instance3=undefined` global instead. Image:
-frame 1, `max_diff=255`, 51067 outliers.
-
-### Bloons
-**RE-RUN 2026-06-03 (cont. 18) with the fixed tracer; one fix landed (`2a090d60d`).**
-After the two accepted diffs (Ruffle's `MochiServices Connecting…` Mochi-stub line +
-`$version` LNX/WIN) the traces match byte-for-byte through F10. Two real divergences:
-(1) **FIXED** — `introclip.instance5.instance7-10` (multi-frame sprites nested in a
-1-frame holder) froze at `_cf=1` in swfrecomp vs Ruffle's 1→7; stopped/1-frame parent
-sprites now recurse into children (`advance_sprite_children_only`, tag.c). (2) **OPEN
-(deep, deferred — PROGRESS.md #14)** — the obfuscated root intro loop's `gotoAndStop("intro")`
-(in `script_118`) is a recompiler bytecode parse desync (emits invalid `0xfb`/`0x5e`),
-so swfrecomp advances linearly past the intro into the game where Ruffle loops it (the
-F11 line-jump). Image: frame 1, full-frame (`max_diff=255`).
-
-### Bloons TD
-Trace diverges at line 5 — `_root.reserved` placement plus a frame-advance
-mismatch (`F2 _currentframe=3` on SWFRecomp vs Ruffle still showing frame-1
-state). Image: frame 1, full-frame (1228800 outliers).
-
-### Bloons TD 2
-Same pattern as Bloons TD (diverge at line 6: `reserved` + faster frame advance).
-Image: frame 2, `max_diff=204`, 7758 outliers.
-
-### Bloxorz
-Trace diverges at line 2 — Ruffle dumps `_root.backser` display state; SWFRecomp
-emits `_root percentr="Preloading Game ... 0 %"` (preloader var) first. Image:
-frame 1, `max_diff=255`, 165000 outliers.
-
-### Castle Hero  ⚠️
-WASM demo built OK. Divergence test failed: recompiler **timed out** (30s) on the
-14MB injected SWF. Ruffle side produced 1275 F-lines. Recoverable by bumping the
-recompile timeout (and likely needs more than a small bump given the size).
-
-### Checkers
-Trace **identical** within 16 frames. (At `--frames 20` it diverges at frame 19:
-`diff_picker.instance4` vs `instance6` — an auto-instance-counter difference now
-outside the window.) Image: frame 2, `max_diff=3`, 339 outliers (sub-pixel).
-
-### Doodle Jump
-Trace **identical** (211 lines). Image: frame 1, `max_diff=255`, 15440 outliers.
-
-### Duck Life 1
-Trace diverges at line 15 — Ruffle has `_root hat=0`; SWFRecomp emits a spurious
-`_root game=undefined` (sorts before `hat`). Image: frame 1, `max_diff=255`,
-65236 outliers.
-
-### Duck Life 2 - World Champion
-Trace diverges at line 4 — `_root loadcheat=0` (Ruffle) vs `loadcheat=0.5`
-(SWFRecomp): a real value mismatch in a game variable. Image: frame 1,
-`max_diff=255`, 1176829 outliers.
-
-### Snake
-SWFRecomp's tracer printed `TRACER: start` but dispatched `_root.onEnterFrame`
-0 times (Ruffle: 87 F-lines); Snake emits no `trace()` of its own, so this is an
-image-only comparison. Image: frame 1, `max_diff=204`, 2517 outliers. See note 3.
+- **Improvements since 2026-05-29** (landed fixes cleared earlier divergences):
+  - **Avalanche** old L2 `instance3=undefined` ghost → GONE (ghost-elimination
+    `5d27de9a7`); now 76/76 line counts, first divergence is the nested-sprite
+    `_cf` lag (#10a, `instance1 _cf=4` vs `2`).
+  - **Duck Life 1** old 482/497 diverge L15 (`game=undefined` spurious global) →
+    now **482/482**, divergence advanced to L26.
+  - **Achievement Unlocked** old 250/278 L18 (`instance1=undefined`) → now
+    289/303, first divergence advanced to L11 (a real `instance5` playhead bug).
+- **Nested / attached clip `_currentframe` divergences** are the dominant
+  remaining class across the corpus:
+  - **Nested timeline sprites lag one tick** (#10a): Avalanche `instance1`,
+    Pacman `Pac`/`CPac`, N `timeIndicator.bar`. swfrecomp advances nested
+    auto-playing playheads one tick later than Ruffle relative to the tracer's
+    `onEnterFrame` sample.
+  - **attachMovie'd multi-frame clips don't auto-advance at all** (NEW, #15):
+    a root/non-root attached clip's standalone `display_obj` is never walked by
+    `advance_sprite_frames`, so its timeline is pinned at `_currentframe=1`.
+    Minimal repro: `tools/divergence/gates/attached_clip_playhead.swf` (FAILS on
+    HEAD). Surfaces (gated behind other bugs) in Achievement Unlocked's
+    `ach80`/`shel`/`curAch` popups.
+  - **Auto-name playhead** (Achievement `instance5 _cf=100`): an auto-named clip
+    jumps to its last frame instead of advancing from 1 — distinct from the two
+    above; first divergence for Achievement.
+- **Preloader / network pacing** (Art of War, Bloons family, Bloxorz, Duck
+  Life 2): SWFRecomp has no network/Mochi layer, so `PercentLoaded`/byte
+  counters read 100/complete immediately while Ruffle's preloader holds.
+  Accepted/expected until a network stub exists (`MochiServices Connecting…` is
+  already harness-filterable).
+- **RNG-layout image divergences** (Doodle Jump): the 4px `hero._y` delta traces
+  to `Math.random`-seeded initial platform layout, not a renderer bug (guide
+  gotcha #12) — confirm via the trace before chasing pixels.
+- **Identical trace**: Age of War (logic matches; image-only divergence).
