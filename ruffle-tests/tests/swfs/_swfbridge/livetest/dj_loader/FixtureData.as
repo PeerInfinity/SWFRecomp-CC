@@ -2,5 +2,5 @@
 // record format. Used when ExternalInterface is unavailable
 // (graphics-native headless), with G|tick|items grant scheduling.
 class FixtureData {
-	static var DATA:String = "R|region_4_4|600|970|120|280;P|0|p0|g|120|300||||||;P|1|p1|g|120|210||||||;P|2|p2|g|120|120||||||;P|3|p10|g|5|120||exit|side_exit_N|N||;P|4|p3|g|120|30||||||;P|5|p4|g|120|-60||loc|loc_0|||;P|6|p5|g|120|-150||||||;P|7|p6|g|120|-240||||||;P|8|p7|g|120|-330||||||;P|9|p8|g|120|-420||||||;P|10|p9|b|120|-510|Brown platforms|exit|side_exit_W|W||;G|0|;G|300|Brown platforms";
+	static var DATA:String = "R|region_4_4|600|970|300|280;P|0|p0|g|300|300||||||;P|1|p1|g|300|210||||||;P|2|p2|g|300|120||||||;P|3|p10|g|185|120||exit|side_exit_N|N||;P|4|p3|g|300|30||||||;P|5|p4|g|300|-60||loc|loc_0|||;P|6|p5|g|300|-150||||||;P|7|p6|g|300|-240||||||;P|8|p7|g|300|-330||||||;P|9|p8|g|300|-420||||||;P|10|p9|b|300|-510|Brown platforms|exit|side_exit_W|W||;G|0|;G|300|Brown platforms";
 }
