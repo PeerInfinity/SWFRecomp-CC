@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-13T18:31:39.864038+00:00",
-    "old_git_sha": "c764b605aa9a8f0c1878a809025f7428ac5a44db",
-    "new_timestamp": "2026-06-13T20:07:05.055824+00:00",
-    "new_git_sha": "eb3bc573d2da00b8782153fa732fed67ec4ab7eb",
+    "old_timestamp": "2026-06-13T20:07:05.055824+00:00",
+    "old_git_sha": "eb3bc573d2da00b8782153fa732fed67ec4ab7eb",
+    "new_timestamp": "2026-06-13T22:05:08.345981+00:00",
+    "new_git_sha": "6fe66b90608ca4a6b7709bab51539e8992e81732",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 63,
+    "old_pass": 66,
     "old_ruffle_matched": 28,
-    "old_effective_pass": 91,
-    "old_total": 107,
-    "old_pass_rate": 58.9,
+    "old_effective_pass": 94,
+    "old_total": 110,
+    "old_pass_rate": 60.0,
     "new_pass": 66,
     "new_ruffle_matched": 28,
     "new_effective_pass": 94,
@@ -25,46 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 107,
-    "added": 3,
+    "unchanged": 110,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "replace_sprites1test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      }
-    },
-    {
-      "test": "reverse_execute_PlaceObject2_test1",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "reverse_execute_PlaceObject2_test2",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      }
-    }
-  ]
+  "changes": []
 }
