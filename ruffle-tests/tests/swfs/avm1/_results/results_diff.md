@@ -1,29 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `c764b605aa9a` (2026-06-13T18:26:06.916110+00:00)
-**Current:** `eb3bc573d2da` (2026-06-13T20:01:47.872655+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `eb3bc573d2da` (2026-06-13T20:01:47.872655+00:00)
+**Current:** `dcf781b6cf74` (2026-06-13T21:31:08.051651+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 620 | 600 | -20 |
-| Total | 687 | 664 | -23 |
-| Pass rate | 90.2% | 90.4% | +0.2% |
-| Mismatched lines | 12483 | 11172 | -1311 |
+| Passing | 600 | 620 | +20 |
+| Total | 664 | 687 | +23 |
+| Pass rate | 90.4% | 90.2% | -0.2% |
+| Mismatched lines | 11172 | 12483 | +1311 |
 
-## Missing Tests — Shard Failure (23)
+## Added Tests (23)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 20 were previously passing
-- 3 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `tab_ordering_custom_duplicate_index` | pass | 22/22 |
 | `tab_ordering_custom_i32_vs_u32` | pass | 12/12 |
 | `tab_ordering_custom_m1` | pass | 29/29 |
@@ -47,5 +39,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `text_blocks_clicks` | pass | 4/4 |
 | `text_format` | pass | 1146/1146 |
 | `text_format_display` | pass | 21/21 |
-
-</details>
