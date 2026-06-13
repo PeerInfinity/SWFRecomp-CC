@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-12T22:01:30.281528+00:00",
-    "old_git_sha": "3de56efba1cb82aad9a8b1a8ce8ca138ce0ce583",
-    "new_timestamp": "2026-06-12T23:10:23.231958+00:00",
-    "new_git_sha": "6dae4def39944144089fcbdfcfde1090d6cccc6d",
+    "old_timestamp": "2026-06-12T23:10:23.231958+00:00",
+    "old_git_sha": "6dae4def39944144089fcbdfcfde1090d6cccc6d",
+    "new_timestamp": "2026-06-13T03:16:50.460505+00:00",
+    "new_git_sha": "4b185445ed62fce5b484e14eed5eb31a0405cfbc",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,67 @@
     "new_pass": 619,
     "new_ruffle_matched": 14,
     "new_effective_pass": 633,
-    "new_total": 680,
-    "new_pass_rate": 91.0,
+    "new_total": 684,
+    "new_pass_rate": 90.5,
     "old_mismatched_lines": 10881,
-    "new_mismatched_lines": 10881,
+    "new_mismatched_lines": 12471,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 680,
-    "added": 0,
+    "added": 4,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "set_property_values/swf4",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1743,
+        "expected_lines": 1571,
+        "matching_lines": 350
+      }
+    },
+    {
+      "test": "set_property_values/swf5",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1743,
+        "expected_lines": 1743,
+        "matching_lines": 1620
+      }
+    },
+    {
+      "test": "set_property_values/swf6",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1743,
+        "expected_lines": 1743,
+        "matching_lines": 1620
+      }
+    },
+    {
+      "test": "set_property_values/swf7",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1743,
+        "expected_lines": 1743,
+        "matching_lines": 1620
+      }
+    }
+  ]
 }
