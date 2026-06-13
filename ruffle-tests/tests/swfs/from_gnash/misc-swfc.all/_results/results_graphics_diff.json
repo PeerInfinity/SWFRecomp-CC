@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-12T02:45:28.888236+00:00",
-    "old_git_sha": "0b5f209663a8928bfe4ae2c84ae7152f091b7391",
-    "new_timestamp": "2026-06-12T23:31:28.785673+00:00",
-    "new_git_sha": "6dae4def39944144089fcbdfcfde1090d6cccc6d",
+    "old_timestamp": "2026-06-12T23:31:28.785673+00:00",
+    "old_git_sha": "6dae4def39944144089fcbdfcfde1090d6cccc6d",
+    "new_timestamp": "2026-06-13T03:47:57.234036+00:00",
+    "new_git_sha": "716d0f7787b7f74cc9462b390445990192b2a29b",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 9,
-    "old_ruffle_matched": 6,
-    "old_effective_pass": 15,
+    "old_ruffle_matched": 5,
+    "old_effective_pass": 14,
     "old_total": 19,
     "old_pass_rate": 47.4,
     "new_pass": 9,
@@ -23,28 +23,11 @@
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 1,
-    "status_changed": 1,
-    "unchanged": 18,
+    "newly_failing": 0,
+    "status_changed": 0,
+    "unchanged": 19,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "opcode_guard_test2",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 24,
-        "expected_lines": 24,
-        "matching_lines": 19
-      },
-      "new_lines": {
-        "actual_lines": 24,
-        "expected_lines": 24,
-        "matching_lines": 19
-      }
-    }
-  ]
+  "changes": []
 }

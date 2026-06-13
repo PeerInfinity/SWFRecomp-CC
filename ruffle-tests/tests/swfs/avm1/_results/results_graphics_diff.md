@@ -1,20 +1,22 @@
 # Ruffle Test Results Diff
 
-**Previous:** `0b5f209663a8` (2026-06-12T02:45:28.853051+00:00)
-**Current:** `6dae4def3994` (2026-06-12T23:31:28.742367+00:00)
+**Previous:** `6dae4def3994` (2026-06-12T23:31:28.742367+00:00)
+**Current:** `716d0f7787b7` (2026-06-13T03:47:57.188292+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 619 | 619 | 0 |
-| Total | 678 | 680 | +2 |
-| Pass rate | 91.3% | 91.0% | -0.3% |
-| Mismatched lines | 10915 | 10917 | +2 |
+| Total | 680 | 684 | +4 |
+| Pass rate | 91.0% | 90.5% | -0.5% |
+| Mismatched lines | 10917 | 12507 | +1590 |
 
-## Added Tests (2)
+## Added Tests (4)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `set_target_2_swf6` | output_mismatch | 12/13 |
-| `set_target_2_swf7` | output_mismatch | 12/13 |
+| `set_property_values/swf4` | output_mismatch | 350/1571 |
+| `set_property_values/swf5` | output_mismatch | 1620/1743 |
+| `set_property_values/swf6` | output_mismatch | 1620/1743 |
+| `set_property_values/swf7` | output_mismatch | 1620/1743 |
