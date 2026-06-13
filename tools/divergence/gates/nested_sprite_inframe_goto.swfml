@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <Header framerate="12" frames="2">
+    <size><Rectangle left="0" right="4000" top="0" bottom="3000"/></size>
+    <tags>
+      <SetBackgroundColor><color><Color red="255" green="255" blue="255"/></color></SetBackgroundColor>
+
+      <!-- leaf: 5-frame sprite whose frame 5 does gotoAndPlay(1) (a chomp loop,
+           exactly like Pacman's Pac sprite 40 frame_5). In Flash the frame-5
+           goto resets the playhead to frame 1 within the SAME tick, so an
+           observer never sees _currentframe=5 — it reads 1,2,3,4,1,2,3,4. -->
+      <DefineSprite objectID="2" frames="5">
+        <tags>
+          <ShowFrame/>
+          <ShowFrame/>
+          <ShowFrame/>
+          <ShowFrame/>
+          <DoAction>
+            <actions>
+              <GotoFrame frame="0"/>
+              <Play/>
+              <EndAction/>
+            </actions>
+          </DoAction>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <!-- mid: 1-frame holder, places leaf as "n" -> _root.c.n is nested one level -->
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2" name="n"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <!-- m: ROOT-LEVEL copy of the same 5-frame+goto sprite (control). If the
+           bug is nested-specific, m matches Ruffle while c.n diverges. -->
+      <DefineSprite objectID="4" frames="5">
+        <tags>
+          <ShowFrame/>
+          <ShowFrame/>
+          <ShowFrame/>
+          <ShowFrame/>
+          <DoAction>
+            <actions>
+              <GotoFrame frame="0"/>
+              <Play/>
+              <EndAction/>
+            </actions>
+          </DoAction>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <!-- root: place mid as "c" (nested case) and m (root-level control);
+           2 frames, loops -->
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="c"/>
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="m"/>
+      <ShowFrame/>
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

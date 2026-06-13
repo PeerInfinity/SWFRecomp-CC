@@ -190,3 +190,49 @@ nested frame SCRIPT in Phase 3 — OR adopt Ruffle's flat instantiation-ordered
 suite both modes; do not regress `nested_sprite_cf_lag` (this gate, becomes
 GREEN), Pacman `242==242` (its `Pac`/`CPac` lag should clear), and every
 nested-sprite / timeline / execution-order test.
+
+## nested_sprite_inframe_goto  — ⚠️ KNOWN-FAILING (desired-behavior gate, follow-up #10)
+
+`nested_sprite_inframe_goto.swf` (from `nested_sprite_inframe_goto.swfml` via
+swfmill) — the minimal repro for the **sprite-frame `gotoAndPlay` overrun+stutter**
+(PROGRESS #10, the Pacman `Pac`/`CPac` playhead bug exposed once the #10a
+reporting lag was fixed). A 5-frame sprite whose **frame 5 does `gotoAndPlay(1)`**
+(a chomp loop, exactly like Pacman's `Pac` = `DefineSprite_40` frame_5) is placed
+two ways: nested one level (`_root.c.n`) and root-level (`_root.m`, control). Run
+through the full harness:
+
+```bash
+python3 tools/divergence/divergence_test.py tools/divergence/gates/nested_sprite_inframe_goto.swf --frames 12 --recompile
+cat tools/divergence/runs/nested_sprite_inframe_goto/divergence.txt
+```
+
+**FAILS on HEAD at filtered line 21.** Per-frame `_currentframe` (both `m` and
+`c.n` are IDENTICAL — the bug is NOT nested-specific):
+
+```
+frame:       F1 F2 F3 F4 F5 F6 F7 F8 F9 …
+Ruffle:       2  3  4  5  2  3  4  5  2     clean period-4 loop
+swfrecomp:    2  3  4  5  5  1  2  3  4     period-6: overruns to 5, STUTTERS (5,5), then 1
+```
+
+swfrecomp's sequence is **byte-identical to Pacman's** `Pac` (`2,3,4,5,5,1`), so
+this gate faithfully reproduces the real bug in isolation.
+
+**Diagnosis (pinned this session):** a sprite's own frame-N `gotoAndPlay(1)` is
+applied ~one tick LATE and leaves a stutter. Flash/Ruffle: the frame-5 goto
+resets the playhead within the tick, giving a clean period-4 loop; swfrecomp
+lets `_currentframe` reach 5, repeats 5 once, then lands on 1 (the target frame
+Ruffle's advance skips past). **The control `m` proves this is the GENERAL
+sprite frame-goto path, NOT the nested-advance path and NOT the #10a presync**
+(which only writes the reported `currentframe`, never the playhead). It is also
+NOT a recompiler frame-count bug — Pac is a 59-frame sprite whose attract-mode
+loop is frames 1–5 via `frame_5`'s `gotoAndPlay(1)`.
+
+**Where to look:** the sprite-local goto-from-own-frame-script path in
+`advance_sprite_frames` / `advance_nested_sprite_frames` (tag.c) —
+`sprite_manual_next_frame` / `sprite_next_frame` handling and
+`ng_gotoFrameCurrentSprite` / the sprite-script drain. The root TIMELINE goto is
+fine (`goto_frame`, `goto_frame2`, `tell_target` all pass); the bug is specific
+to a SPRITE looping via `gotoAndPlay` on a non-first frame. Do NOT regress those
+tests, the `nested_sprite_cf_lag` gate (#10a), or Pacman `242==242`; the fix
+should make Pacman `Pac`/`CPac` read Ruffle's `2,3,4,1` and this gate GREEN.

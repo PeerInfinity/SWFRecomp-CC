@@ -1,0 +1,61 @@
+TRACER: start _currentframe=1
+F1 _currentframe=2
+F1 _root $version="LNX 32,0,0,0"
+F1 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F1 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=2 _vis=true
+F1 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=2 _vis=true
+F2 _currentframe=1
+F2 _root $version="LNX 32,0,0,0"
+F2 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F2 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=3 _vis=true
+F2 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=3 _vis=true
+TRACER: start _currentframe=1
+F3 _currentframe=2
+F3 _root $version="LNX 32,0,0,0"
+F3 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F3 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=4 _vis=true
+F3 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=4 _vis=true
+F4 _currentframe=1
+F4 _root $version="LNX 32,0,0,0"
+F4 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F4 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=5 _vis=true
+F4 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=5 _vis=true
+TRACER: start _currentframe=1
+F5 _currentframe=2
+F5 _root $version="LNX 32,0,0,0"
+F5 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F5 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=2 _vis=true
+F5 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=2 _vis=true
+F6 _currentframe=1
+F6 _root $version="LNX 32,0,0,0"
+F6 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F6 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=3 _vis=true
+F6 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=3 _vis=true
+TRACER: start _currentframe=1
+F7 _currentframe=2
+F7 _root $version="LNX 32,0,0,0"
+F7 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F7 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=4 _vis=true
+F7 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=4 _vis=true
+F8 _currentframe=1
+F8 _root $version="LNX 32,0,0,0"
+F8 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F8 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=5 _vis=true
+F8 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=5 _vis=true
+TRACER: start _currentframe=1
+F9 _currentframe=2
+F9 _root $version="LNX 32,0,0,0"
+F9 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F9 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=2 _vis=true
+F9 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=2 _vis=true
+F10 _currentframe=1
+F10 _root $version="LNX 32,0,0,0"
+F10 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F10 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=3 _vis=true
+F10 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=3 _vis=true
+TRACER: start _currentframe=1
+F11 _currentframe=2
+F11 _root $version="LNX 32,0,0,0"
+F11 _root.c _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=1 _vis=true
+F11 _root.c.n _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=4 _vis=true
+F11 _root.m _x=0 _y=0 _xs=100 _ys=100 _rot=0 _a=100 _cf=4 _vis=true
