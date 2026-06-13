@@ -2742,6 +2742,18 @@ namespace SWFRecomp
 				u8 glyph_bits = (u8) tag.fields[0].value;
 				u8 advance_bits = (u8) tag.fields[1].value;
 
+				// The text "pen" position (translate_x/translate_y) PERSISTS
+				// across TEXTRECORDs. Per SWF spec §11.3, a record's XOffset/
+				// YOffset SET the pen (absolute, relative to the text origin);
+				// when a flag is absent the pen CONTINUES from where the previous
+				// record's last glyph advance left it. Declaring temp_matrix here
+				// (outside the record loop, not inside it) keeps that running pen
+				// alive — previously it was reset to `matrix` every record, so a
+				// record with neither offset (e.g. the "scores" run after "high "
+				// in Tetris's highScores_btn) snapped back to (0,0), drawing on
+				// top of earlier text instead of continuing the line.
+				MATRIX temp_matrix = matrix;
+
 				size_t text_record_count = 0;
 				while (true)
 				{
@@ -2820,8 +2832,6 @@ namespace SWFRecomp
 					tag.parseFields(cur_pos);
 
 					size_t current_field = 0;
-
-					MATRIX temp_matrix = matrix;
 
 					u16 font_id;
 					u8 r;
@@ -2902,13 +2912,17 @@ namespace SWFRecomp
 
 					u8 glyph_count = (u8) tag.fields[current_field++].value;
 
+					// XOffset/YOffset SET the pen absolutely relative to the text
+					// origin (the base matrix translation), replacing the running
+					// pen for this axis. When a flag is absent the pen continues
+					// unchanged from the previous record's accumulated advance.
 					if (has_x_offset)
 					{
-						temp_matrix.translate_x += x_offset;
+						temp_matrix.translate_x = matrix.translate_x + x_offset;
 					}
 					if (has_y_offset)
 					{
-						temp_matrix.translate_y += y_offset;
+						temp_matrix.translate_y = matrix.translate_y + y_offset;
 					}
 
 					size_t text_start = current_text;
