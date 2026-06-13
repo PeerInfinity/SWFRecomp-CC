@@ -735,6 +735,16 @@ void tagMain(SWFAppContext* app_context)
 			advance_sprite_frames(app_context);
 			g_advance_defer_nested = 0;
 		}
+
+		// Pre-sync the AS-visible _currentframe of deferred nested sprites
+		// (advanced in Phase 3 below) so a clip whose onEnterFrame fires in the
+		// flush reads their post-advance value, matching Ruffle's
+		// instantiation-ordered exec list (#10a). Writes only mc->currentframe;
+		// the playhead + frame scripts stay in Phase 3 (advance_nested_sprite_frames).
+		{
+			extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
+			presync_nested_sprite_currentframe(app_context);
+		}
 #endif
 
 		// Mark ENTER_FRAME dispatch pending. tagFlushPendingEnterFrame is

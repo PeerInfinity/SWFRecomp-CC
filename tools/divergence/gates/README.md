@@ -116,7 +116,27 @@ fixed Achievement Unlocked (its real bug is `instance5` + a one-frame attach
 4941/4941 → 4943). Backed out; this gate is the regression target for a future
 correct fix.
 
-## nested_sprite_cf_lag  — ⚠️ KNOWN-FAILING (desired-behavior gate, follow-up #10a)
+## nested_sprite_cf_lag  — ✅ FIXED (was follow-up #10a; commit landing 2026-06-12)
+
+**GREEN as of the #10a fix.** `presync_nested_sprite_currentframe` (tag.c) runs
+between Phase 1 and the enterFrame flush in both `swf_core.c` (NO_GRAPHICS) and
+`swf.c` (OFFSCREEN_RENDER); it writes ONLY the AS-visible `mc->currentframe` of
+deferred nested sprites to the value Phase 3 will set (`sprite_current_frame +
+1` for a normally-advancing sprite), leaving the playhead counter and all frame
+scripts in Phase 3. So a clip whose `onEnterFrame` fires in the flush (e.g. the
+tracer, always last-instantiated) reads the post-advance value — matching
+Ruffle's flat instantiation-ordered "enterFrame-event-THEN-advance per clip"
+exec list — without perturbing nested frame-script execution order (the reason
+the advance is deferred). This is option (a) below. Verify:
+
+```bash
+python3 tools/divergence/divergence_test.py tools/divergence/gates/nested_sprite_cf_lag.swf --frames 10 --recompile
+cat tools/divergence/runs/nested_sprite_cf_lag/divergence.txt   # → Trace: identical
+```
+
+The historical analysis (root cause / why it was high-risk) is preserved below.
+
+### Historical (pre-fix): ⚠️ KNOWN-FAILING (desired-behavior gate, follow-up #10a)
 
 `nested_sprite_cf_lag.swf` (from `nested_sprite_cf_lag.swfml` via swfmill) — the
 minimal repro for the **nested-sprite `_currentframe` one-tick lag** (#10a).

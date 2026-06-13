@@ -995,6 +995,16 @@ void swfStart(SWFAppContext* app_context)
 			advance_sprite_frames(app_context);
 			g_advance_defer_nested = 0;
 
+			// Pre-sync the AS-visible _currentframe of deferred nested sprites
+			// (advanced in Phase 3 below) so a clip created this/last tick whose
+			// onEnterFrame fires in the Phase-2 flush reads their post-advance
+			// value, matching Ruffle's instantiation-ordered exec list (#10a).
+			// Writes only mc->currentframe — playhead + scripts stay in Phase 3.
+			{
+				extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
+				presync_nested_sprite_currentframe(app_context);
+			}
+
 			// Mark ENTER_FRAME dispatch as pending. The actual dispatch happens in
 			// tagFlushPendingEnterFrame() which is called:
 			//   1. By the recompiler-emitted code right before each DoAction (after RemoveObject)
@@ -1093,6 +1103,12 @@ void swfStart(SWFAppContext* app_context)
 				g_advance_defer_nested = 1;
 				advance_sprite_frames(app_context);
 				g_advance_defer_nested = 0;
+			}
+			// Pre-sync deferred nested sprites' _currentframe before the enterFrame
+			// dispatch below (mirror of the playing branch; #10a).
+			{
+				extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
+				presync_nested_sprite_currentframe(app_context);
 			}
 			// Set enterframe_eligible for all initialized sprites (recursive into buttons)
 			{

@@ -1307,6 +1307,151 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Pre-sync the AS-visible _currentframe of DEFERRED nested sprites (#10a).
+//
+// Nested sprites (depth >= 2) advance in Phase 3 (advance_nested_sprite_frames),
+// AFTER the Phase-2 enterFrame flush where dynamically-created clips' onEnterFrame
+// handlers (e.g. the divergence tracer) sample state. Ruffle instead walks ONE
+// flat instantiation-ordered clip_exec_list doing enterFrame-event-THEN-advance
+// per clip (runtime.rs run_frame + movie_clip.rs run_frame_avm1), so a
+// last-instantiated clip's onEnterFrame reads every game clip's POST-advance
+// _currentframe. Our phased model left nested sprites one tick stale to that
+// observer (root-level sprites, advanced in Phase 1, were already correct).
+//
+// This pass writes ONLY the reporting field mc->currentframe (what _currentframe
+// reads) to the value Phase 3 will set — sprite_current_frame + 1 for a normally
+// advancing sprite — WITHOUT running any frame script, mutating the
+// sprite_current_frame playhead, or rebuilding any display list. So it cannot
+// perturb frame-script execution order (the reason nested advance is deferred):
+// Phase 3 still reads the unchanged playhead and runs scripts exactly as before,
+// re-writing currentframe to the same value. Mirrors the option-(a) design in
+// tools/divergence/gates/README.md "nested_sprite_cf_lag".
+//
+// Called between Phase 1 and the enterFrame flush in swf_core.c (NO_GRAPHICS)
+// and swf.c (OFFSCREEN_RENDER).
+static void presync_nested_cf_recurse(SWFAppContext* app_context)
+{
+	// Operates on the currently swapped-in display_list / max_depth.
+	extern size_t g_tick_count;
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		DisplayObject* obj = &display_list[d];
+		if (obj->char_id == 0) continue;
+		Character* ch = &dictionary[obj->char_id];
+
+		if (ch->type == CHAR_TYPE_BUTTON)
+		{
+			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+			{
+				DisplayObject* saved_dl = display_list;
+				size_t saved_max = max_depth;
+				size_t saved_cap = display_list_capacity;
+				display_list = obj->sprite_display_list;
+				max_depth = obj->sprite_max_depth;
+				display_list_capacity = obj->sprite_dl_capacity;
+				presync_nested_cf_recurse(app_context);
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+			}
+			continue;
+		}
+		if (ch->type != CHAR_TYPE_SPRITE) continue;
+		if (obj->sprite_display_list == NULL) continue;  // not yet built; Phase 3 establishes it
+
+		// Mirror advance_sprite_frames' "normal advance" guards: a sprite reaches
+		// the currentframe = frame + 1 write only when playing, not mid-goto,
+		// multi-frame, and not placed this very tick (advance_nested skips those).
+		MovieClip* smc = NULL;
+		if (obj->instance_name != NULL)
+		{
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+			extern MovieClip root_movieclip;
+			MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+			smc = actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc);
+#else
+			extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+			smc = actionFindMovieClipByName(obj->instance_name);
+#endif
+		}
+
+		int advances = obj->sprite_is_playing
+			&& !obj->sprite_manual_next_frame
+			&& ch->sprite_frame_count > 1
+			&& obj->placed_at_tick != g_tick_count;
+		if (advances && smc)
+			smc->currentframe = (int)obj->sprite_current_frame + 1;
+
+		// Recurse into children regardless of the parent's play state — a stopped
+		// or single-frame holder still has independently-advancing children.
+		if (obj->sprite_max_depth > 0)
+		{
+			DisplayObject* saved_dl = display_list;
+			size_t saved_max = max_depth;
+			size_t saved_cap = display_list_capacity;
+			MovieClip* saved_ctx = g_current_context;
+			display_list = obj->sprite_display_list;
+			max_depth = obj->sprite_max_depth;
+			display_list_capacity = obj->sprite_dl_capacity;
+			if (smc) actionSetCurrentContext(smc);
+			presync_nested_cf_recurse(app_context);
+			actionSetCurrentContext(saved_ctx);
+			display_list = saved_dl;
+			max_depth = saved_max;
+			display_list_capacity = saved_cap;
+		}
+	}
+}
+
+void presync_nested_sprite_currentframe(SWFAppContext* app_context)
+{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (catch_up_mode) return;
+#endif
+	// Iterate ROOT-level sprites and descend into each one's child display list,
+	// presyncing those nested sprites. Root-level sprites themselves were advanced
+	// in Phase 1 (before the flush) so their currentframe is already correct —
+	// do NOT touch it here. Root-level buttons likewise advance their children in
+	// Phase 1 (advance_sprite_frames' button recursion is not deferral-gated), so
+	// skip them too; only nested buttons (reached below) are deferred to Phase 3.
+	for (size_t d = 1; d <= max_depth; d++)
+	{
+		DisplayObject* obj = &display_list[d];
+		if (obj->char_id == 0) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE) continue;
+		if (obj->sprite_display_list == NULL || obj->sprite_max_depth == 0) continue;
+
+		MovieClip* smc = NULL;
+		if (obj->instance_name != NULL)
+		{
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+			extern MovieClip root_movieclip;
+			MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+			smc = actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc);
+#else
+			extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+			smc = actionFindMovieClipByName(obj->instance_name);
+#endif
+		}
+
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+		MovieClip* saved_ctx = g_current_context;
+		display_list = obj->sprite_display_list;
+		max_depth = obj->sprite_max_depth;
+		display_list_capacity = obj->sprite_dl_capacity;
+		if (smc) actionSetCurrentContext(smc);
+		presync_nested_cf_recurse(app_context);
+		actionSetCurrentContext(saved_ctx);
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+	}
+}
+
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
 // ---------------------------------------------------------------------------
 // Browser-WASM: apply DEFERRED gotoAndStop/Play navigation to attachMovie'd
