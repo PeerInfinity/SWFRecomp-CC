@@ -1,22 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6dae4def3994` (2026-06-12T23:10:23.231958+00:00)
-**Current:** `4b185445ed62` (2026-06-13T03:16:50.460505+00:00)
+**Previous:** `4b185445ed62` (2026-06-13T03:16:50.460505+00:00)
+**Current:** `c764b605aa9a` (2026-06-13T18:26:06.916110+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 619 | 619 | 0 |
-| Total | 680 | 684 | +4 |
-| Pass rate | 91.0% | 90.5% | -0.5% |
-| Mismatched lines | 10881 | 12471 | +1590 |
+| Passing | 619 | 620 | +1 |
+| Total | 684 | 687 | +3 |
+| Pass rate | 90.5% | 90.2% | -0.3% |
+| Mismatched lines | 12471 | 12483 | +12 |
 
-## Added Tests (4)
+## Added Tests (3)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `set_property_values/swf4` | output_mismatch | 350/1571 |
-| `set_property_values/swf5` | output_mismatch | 1620/1743 |
-| `set_property_values/swf6` | output_mismatch | 1620/1743 |
-| `set_property_values/swf7` | output_mismatch | 1620/1743 |
+| `amf_array_serialization` | output_mismatch | 3/10 |
+| `netconnection_serialize_arrays` | output_mismatch | 1/6 |
+| `set_target_2_swf5` | pass | 13/13 |
