@@ -93,11 +93,28 @@ T6 b=2 c=1
 T7 b=3 c=1
 ```
 
-**This gate FAILS on current HEAD** — it documents a real, confirmed gap:
-**attachMovie'd multi-frame clips do not auto-advance their playhead.**
-`advance_sprite_frames` only walks display-list arrays; a root-attached clip's
-`display_obj` is a standalone heap struct no list contains, so its timeline
-never ticks (`b` stays pinned at `_currentframe=1`). Run it:
+**This gate FAILS on current HEAD**, and the 2026-06-13 re-scoping found it has
+TWO distinct causes (the first masks the second):
+
+1. **Method-form `stop`/`play` on an attached clip mis-routes to the ROOT.**
+   The gate's `c.stop()` falls through the method-form handler
+   (`action.c` stop arm ~64961, play arm ~64884: both only stop/play a clip
+   found in the GLOBAL `display_list` via `ng_findDisplayEntryByName`; an
+   attached clip's `display_obj` is a standalone heap struct NOT in that list,
+   so it falls through to `actionStop` → `is_playing=0` → **stops the root**).
+   So the gate's root halts after frame 1 — swfrecomp emits only `T1` then
+   "Shutting down" (no `T2…`). This is a real, independently-wrong bug that hits
+   ANY game doing `attachedClip.stop()/.play()`. **It is also EXACTLY why the
+   earlier #15 prototype regressed N**: N's `menuMC` (objectID 410, a 13-frame
+   menu state-machine attached via `CreateSprite`) has `this.stop()` in its
+   frame 1 — the same method-form path — so the attached clip was never frozen
+   and the playhead pump over-advanced it.
+2. **attachMovie'd multi-frame clips don't auto-advance their playhead.**
+   `advance_sprite_frames` only walks display-list arrays; a root-attached
+   clip's `display_obj` is in no list, so its timeline never ticks (`b` would
+   stay at `_currentframe=1` even with the root advancing).
+
+Run it:
 
 ```bash
 rm -rf /tmp/acpg && \
@@ -105,16 +122,20 @@ python3 tools/divergence/run_swfrecomp.py tools/divergence/gates/attached_clip_p
 grep -a "^T" /tmp/acpg/trace.txt | diff - tools/divergence/gates/attached_clip_playhead.expected.txt && echo GATE-GREEN
 ```
 
-See PROGRESS.md follow-up #15 for the full investigation: a naive
-playhead-advance pump (`ng_advance_attached_clip_playheads`) was prototyped and
-makes THIS gate green, but it must compose with (a) a creation-tick promotion
-(skip the attach tick) and (b) routing the attached clip's frame-1 `stop()`
-through the deferred attach-init script — and even with all three it neither
-fixed Achievement Unlocked (its real bug is `instance5` + a one-frame attach
-*pacing* lag, both upstream of the playhead) nor avoided regressing N
-(`MenuMC3`, a non-root attach whose frame-1 stop still wasn't respected →
-4941/4941 → 4943). Backed out; this gate is the regression target for a future
-correct fix.
+**The correct fix is two ordered steps (see PROGRESS #15):**
+- **(1) attached-clip method-form `stop`/`play` routing** — add a
+  `mc->display_obj != NULL` branch to both arms so the call acts on the clip's
+  own display obj, never the root. Safe, high-value, independently shippable;
+  fixes the gate's root-advance AND freezes N's `menuMC` (un-regressing N).
+- **(2) attached-clip auto-advance pump** — only safe once (1) lands. The
+  earlier prototype (`ng_advance_attached_clip_playheads`) needs a creation-tick
+  promotion (skip the attach tick) ordered AFTER the deferred attach-init drain
+  so frame-1 `this.stop()` has applied before the clip is ever advanced (the
+  #10 `ng_record_*`/`ng_apply_*_after-drain` pattern is the model).
+Note: #15 does NOT fix Achievement Unlocked's first divergence — that's an
+`instance5` auto-name playhead bug + a one-frame attach-*pacing* lag, both
+UPSTREAM of the playhead. This gate is the regression target; N `4941==4941`
+must hold.
 
 ## nested_sprite_cf_lag  — ✅ FIXED (was follow-up #10a; commit landing 2026-06-12)
 
