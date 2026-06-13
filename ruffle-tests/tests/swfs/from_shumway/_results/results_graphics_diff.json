@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-13T03:47:57.207422+00:00",
-    "old_git_sha": "716d0f7787b7f74cc9462b390445990192b2a29b",
-    "new_timestamp": "2026-06-13T18:31:39.846227+00:00",
-    "new_git_sha": "c764b605aa9a8f0c1878a809025f7428ac5a44db",
+    "old_timestamp": "2026-06-13T18:31:39.846227+00:00",
+    "old_git_sha": "c764b605aa9a8f0c1878a809025f7428ac5a44db",
+    "new_timestamp": "2026-06-13T20:07:05.036877+00:00",
+    "new_git_sha": "eb3bc573d2da00b8782153fa732fed67ec4ab7eb",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 73,
+    "old_pass": 70,
     "old_ruffle_matched": 3,
-    "old_effective_pass": 76,
-    "old_total": 92,
-    "old_pass_rate": 79.3,
-    "new_pass": 70,
+    "old_effective_pass": 73,
+    "old_total": 89,
+    "old_pass_rate": 78.7,
+    "new_pass": 73,
     "new_ruffle_matched": 3,
-    "new_effective_pass": 73,
-    "new_total": 89,
-    "new_pass_rate": 78.7,
+    "new_effective_pass": 76,
+    "new_total": 92,
+    "new_pass_rate": 79.3,
     "old_mismatched_lines": 394,
     "new_mismatched_lines": 394,
     "increased_mismatches": 0,
@@ -29,46 +26,45 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 89,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 3
+    "added": 3,
+    "removed": 0
   },
   "changes": [
     {
       "test": "gradientTransform",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "invalidClipDepth",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "movieinfo1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 3
-      },
-      "new_lines": null
+      }
     }
   ]
 }

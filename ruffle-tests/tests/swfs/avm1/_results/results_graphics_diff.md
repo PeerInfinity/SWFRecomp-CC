@@ -1,37 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `716d0f7787b7` (2026-06-13T03:47:57.188292+00:00)
-**Current:** `c764b605aa9a` (2026-06-13T18:31:39.827638+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `c764b605aa9a` (2026-06-13T18:31:39.827638+00:00)
+**Current:** `eb3bc573d2da` (2026-06-13T20:07:05.017252+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 619 | 598 | -21 |
-| Total | 684 | 665 | -19 |
-| Pass rate | 90.5% | 89.9% | -0.6% |
-| Mismatched lines | 12507 | 12519 | +12 |
+| Passing | 598 | 620 | +22 |
+| Total | 665 | 687 | +22 |
+| Pass rate | 89.9% | 90.2% | +0.3% |
+| Mismatched lines | 12519 | 12519 | 0 |
 
-## Added Tests (3)
+## Added Tests (22)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `amf_array_serialization` | output_mismatch | 3/10 |
-| `netconnection_serialize_arrays` | output_mismatch | 1/6 |
-| `set_target_2_swf5` | pass | 13/13 |
-
-## Missing Tests — Shard Failure (22)
-
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 22 were previously passing
-- 0 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
 | `this_swf6` | pass | 41/41 |
 | `this_swf7` | pass | 41/41 |
 | `timeline_function_def` | pass | 7/7 |
@@ -54,5 +38,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `unloadmovie` | pass | 4/4 |
 | `unloadmovie_method` | pass | 3/3 |
 | `unloadmovienum` | pass | 13/13 |
-
-</details>
