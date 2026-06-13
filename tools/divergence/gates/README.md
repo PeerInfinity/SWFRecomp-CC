@@ -258,3 +258,13 @@ clips older than the tracer AND post-goto for clips newer than it. Tracking it
 needs per-observer exec-order modeling (a #10a-style follow-up). The root
 TIMELINE goto path is unaffected (`goto_frame`, `goto_frame2`, `tell_target`,
 `execution_order1-4`, `goto_execution_order{,2}` all pass).
+
+**Resolution (2026-06-13, #10b): tooling-only.** Rather than rearchitect the
+phased advance into Ruffle's flat exec-list (option A, deferred), the harness now
+has a per-game accepted-diff facility (`../accepted/`, `../accepted_diffs.py`,
+wired into `divergence_test.py`) that absorbs the documented Pacman `Pac`/`CPac`
+`_cf` `1`↔`5` artifact and reports Pacman converged-modulo-artifact. A rule only
+matches when EVERY field but `_cf` is identical and the values are the exact
+documented pair, so it cannot mask a real `_cf` bug. See `../accepted/README.md`
+and PROGRESS.md #10b. This gate is unaffected (it has no manifest and stays
+GREEN — it reads `2,3,4,5` on both sides).

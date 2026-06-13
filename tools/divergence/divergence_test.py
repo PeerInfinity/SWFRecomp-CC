@@ -42,6 +42,8 @@ HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "ruffle-tests"))
 import verify_output as vo  # for compare_images
+sys.path.insert(0, str(HERE))
+import accepted_diffs  # per-game accepted-divergence manifests
 
 RUFFLE_EXPORTER = Path.home() / "CC" / "ruffle" / "target" / "release" / "exporter"
 
@@ -110,15 +112,19 @@ def lines_equivalent(a: str, b: str, rel_tol: float, abs_tol: float) -> bool:
 
 
 def first_trace_divergence(a_lines: list[str], b_lines: list[str],
-                           rel_tol: float = 0.0, abs_tol: float = 0.0
-                           ) -> tuple[int, str, str, int]:
-    """Return (index, a_line, b_line, absorbed) of the first line that differs
-    beyond numeric tolerance. `absorbed` counts earlier lines that differed only
-    within tolerance (float-precision noise that was skipped). With
-    rel_tol=abs_tol=0 this is an exact line comparison. index=-1 = no divergence.
+                           rel_tol: float = 0.0, abs_tol: float = 0.0,
+                           accept_rules=None
+                           ) -> tuple[int, str, str, int, list]:
+    """Return (index, a_line, b_line, absorbed, accepted) of the first line that
+    differs beyond numeric tolerance and is not covered by an accepted-diff rule.
+    `absorbed` counts earlier lines that differed only within numeric tolerance
+    (float-precision noise). `accepted` is the list of (index, tag) for earlier
+    lines matched by a documented per-game accept rule. With rel_tol=abs_tol=0 and
+    no accept_rules this is an exact line comparison. index=-1 = no divergence.
     Skeletons match per-line so absorbing a line preserves positional alignment."""
     n = max(len(a_lines), len(b_lines))
     absorbed = 0
+    accepted = []
     for i in range(n):
         a = a_lines[i] if i < len(a_lines) else "<EOF>"
         b = b_lines[i] if i < len(b_lines) else "<EOF>"
@@ -128,8 +134,13 @@ def first_trace_divergence(a_lines: list[str], b_lines: list[str],
                 and lines_equivalent(a, b, rel_tol, abs_tol):
             absorbed += 1
             continue
-        return i, a, b, absorbed
-    return -1, "", "", absorbed
+        if accept_rules and a != "<EOF>" and b != "<EOF>":
+            tag = accepted_diffs.match_any(accept_rules, a, b)
+            if tag is not None:
+                accepted.append((i, tag))
+                continue
+        return i, a, b, absorbed, accepted
+    return -1, "", "", absorbed, accepted
 
 
 def ruffle_png_for_frame(ruffle_dir: Path, frame: int, total: int) -> Path:
@@ -213,6 +224,11 @@ def main():
     ap.add_argument("--trace-exact", action="store_true",
                     help="Byte-exact trace comparison (sets both trace tolerances "
                          "to 0). Use to inspect float-precision noise directly.")
+    ap.add_argument("--no-accept", action="store_true",
+                    help="Ignore the per-game accepted-diff manifest "
+                         "(tools/divergence/accepted/<stem>.txt), so documented "
+                         "observer/tooling artifacts are flagged like any other "
+                         "divergence. Use to inspect what a manifest is absorbing.")
     ap.add_argument("--skip-ruffle", action="store_true",
                     help="Skip Ruffle run (reuse existing outputs)")
     ap.add_argument("--skip-swfrecomp", action="store_true",
@@ -261,7 +277,9 @@ def main():
     b = filter_trace(swfrecomp_trace)
     rel_tol = 0.0 if args.trace_exact else args.trace_rel_tol
     abs_tol = 0.0 if args.trace_exact else args.trace_abs_tol
-    idx, a_line, b_line, absorbed = first_trace_divergence(a, b, rel_tol, abs_tol)
+    accept_rules = [] if args.no_accept else accepted_diffs.load_manifest(stem)
+    idx, a_line, b_line, absorbed, accepted = first_trace_divergence(
+        a, b, rel_tol, abs_tol, accept_rules)
 
     report = []
     report.append(f"=== Divergence report: {stem} ===")
@@ -271,9 +289,21 @@ def main():
         report.append(f"Trace: {absorbed} line(s) differed only within numeric "
                       f"tolerance (rel={rel_tol:g}, abs={abs_tol:g}) — float-precision "
                       f"noise, not flagged. Use --trace-exact to see them.")
+    if accepted:
+        tags = ", ".join(sorted(set(t for _, t in accepted)))
+        mname = accepted_diffs.manifest_path(stem).name
+        report.append(f"Trace: {len(accepted)} line(s) matched documented "
+                      f"accepted-diff rule(s) in accepted/{mname} ({tags}) — "
+                      f"known observer/tooling artifact, not flagged. Use "
+                      f"--no-accept to see them.")
     if idx < 0:
-        report.append("Trace: identical" if not absorbed
-                      else "Trace: equivalent within tolerance")
+        if accepted:
+            report.append(f"Trace: converged (modulo {len(accepted)} documented "
+                          f"accepted-diff line(s))")
+        elif absorbed:
+            report.append("Trace: equivalent within tolerance")
+        else:
+            report.append("Trace: identical")
     else:
         report.append(f"Trace: first divergence at filtered line {idx}")
         report.append(f"  ruffle:    {a_line}")

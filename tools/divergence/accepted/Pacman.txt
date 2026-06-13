@@ -1,0 +1,26 @@
+# Pacman — accepted divergence manifest (divergence harness)
+#
+# Format (see ../accepted_diffs.py): one rule per line
+#   <path_regex> | <field> | <ruffle_value> | <swfrecomp_value> | <tag>
+# A rule absorbs a diverging (ruffle, swfrecomp) trace-line PAIR only when the
+# path matches, the two lines are identical in every field EXCEPT the named one,
+# and that field's values are the exact documented pair. So it cannot mask a real
+# _cf bug (different values, a second differing field, or another clip all fall
+# through and are flagged normally).
+#
+# #10b — observer / instantiation-order REPORTING artifact (NOT a runtime bug).
+# Pac (placed on a later Demo frame) and CPac (inside PacLogo) are NEWER than the
+# injected __tracer__ clip, so Ruffle's single instantiation-ordered FIFO runs
+# their frame_5 gotoAndPlay(1) DoAction BEFORE the tracer's onEnterFrame and the
+# tracer reads the POST-goto frame (_cf=1). SWFRecomp's phased model reports the
+# goto-SOURCE frame (_cf=5). The playhead is correct on both sides (Pac/CPac loop
+# 2,3,4,5 then wrap); only the harness tracer's sample side differs, and only on
+# the goto-boundary frames F5/F9/F13 (where the values are 1 vs 5). Everything
+# else — x/y/scale/rot/alpha/vis, line counts (242==242), children — matches.
+# See PROGRESS.md #10b, gates/README.md "nested_sprite_inframe_goto", and
+# auto-memory divergence-tracer-exec-order. The faithful fix is a per-observer
+# exec-order model (option A, a major rearchitecture, deliberately deferred); this
+# manifest lets the harness report Pacman as converged-modulo-documented-artifact.
+
+^_root\..*\.Pac$  | _cf | 1 | 5 | #10b-observer-exec-order
+^_root\..*\.CPac$ | _cf | 1 | 5 | #10b-observer-exec-order
