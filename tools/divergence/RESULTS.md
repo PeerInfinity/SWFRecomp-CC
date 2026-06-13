@@ -11,10 +11,31 @@ rendered images.
 - **Per-run outputs:** `tools/divergence/runs/<stem>/` (gitignored); co-located
   ruffle/swfrecomp/difference PNGs in `runs/<stem>/compare/`.
 
-**Date of this run: 2026-06-12** (re-run of follow-up #4 with the fixed tracer
-`6a08f06aa` + all fixes landed through `c4630257e` on HEAD; both sides fresh).
-The prior board (2026-05-29) predated the tracer fix and was INVALID for every
-`_root.onEnterFrame`-driven game — superseded by this run.
+**Date of latest run: 2026-06-13** (smallest-first re-sweep on HEAD; Duck Life 1
++ Avalanche re-run both sides fresh). Prior full sweep: **2026-06-12** (follow-up
+#4, fixed tracer `6a08f06aa` + fixes through `c4630257e`). The 2026-05-29 board
+predated the tracer fix and was INVALID for every `_root.onEnterFrame`-driven
+game — superseded.
+
+**Changes vs the 2026-06-12 board (2026-06-13 re-sweep):**
+- **Duck Life 1 → CONVERGED.** The L26 `spinamount` divergence the board
+  flagged as "smells like (A)" is **class (B)**, not a real bug. `spinamount` is
+  a frame-1 `DefineEditText (vn:"spinamount")` whose binding seeds `_root.spinamount
+  = "0"` (string); the preloader's `setInterval(Lbar,10)` then computes
+  `getBytesLoaded()/getBytesTotal()*100` = `100` on a fully-loaded local SWF.
+  SWFRecomp fires the interval (Flash-correct → `100`); Ruffle's headless exporter
+  never fires it, so the binding's `"0"` persists every frame. The `web=_url` line
+  is a file:// path artifact. With the new `file://*.swf` NOISE_PATTERN + the
+  `accepted/Duck Life 1.txt` spinamount rule, **0 residual divergent lines** (482).
+- **Avalanche → first divergence FIXED (L2→L3).** `instance1 _cf` was FROZEN at 2
+  (Ruffle advances 4→18) — NOT the #10a 1-tick lag the board guessed, but a
+  complete failure to escape a 2-frame preloader. Root cause: `actionGoToLabel`
+  (GoToLabel / `gotoAndStop("loaded")`) was not sprite-aware — it resolved the
+  label against the ROOT timeline only, so a sprite-local label silently no-op'd.
+  Fixed in `action.c` (sprite-local label lookup via `ng_findSpriteLabelFrame` +
+  `ng_gotoFrameCurrentSprite`). `instance1` now advances 4→18 matching Ruffle;
+  new first divergence L3 = the **#13 auto-instance-counter** offset
+  (`instance4` vs `instance2`, cosmetic/deferred).
 
 ## Investigation notes (read before interpreting results)
 
@@ -45,14 +66,14 @@ file tracks the broader **flasharchive corpus** the harness was re-swept across.
 | Game | Size | Trace (ruffle/swfrecomp) | First trace divergence | Bucket |
 |---|---|---|---|---|
 | Age of War | — | 61 / 61 | **identical** | image-only |
-| Avalanche | 527KB | 76 / 76 | L2: `instance1 _cf=4` vs `2` | nested-sprite `_cf` lag (#10a) |
+| Avalanche | 527KB | 76 / 76 | **L3** (was L2): `instance1.instance4` vs `instance2` | **L2 frozen-preloader FIXED 2026-06-13** (sprite-local GoToLabel); residual = #13 auto-instance counter |
 | Achievement Unlocked | — | 289 / 303 | L11: `instance5 _cf=2` vs `100` | playhead/auto-name + attach pacing |
 | Art of War | 1.5MB | 224 / 226 | L2: `box="…wait until 50%"` vs `PercentLoaded=100` | preloader/network (no net layer) |
 | Bloons TD | — | 151 / 188 | L12: `prog=100` vs `loadbar` placement | preloader pacing + Mochi |
 | Bloons TD 2 | — | 173 / 233 | L6: `reserved` + `_cf` advance | preloader pacing + Mochi |
 | Bloxorz | — | 76 / 91 | L2: `backser` vs `percentr="Preloading…"` | preloader pacing |
 | Doodle Jump | — | 211 / 196 | L6: `hero _y=247.55` vs `251.55` | RNG-driven initial platform layout (guide gotcha #12) |
-| Duck Life 1 | — | 482 / 482 | L26: `seed=5` / `skill=0` region | (line counts now MATCH; advanced from old L15) |
+| Duck Life 1 | 1.28MB | 482 / 482 | **none (CONVERGED 2026-06-13)** | `spinamount` = (B) preloader byte-counter; `web` = `_url` path artifact; both absorbed (rule + noise) |
 | Duck Life 2 | — | 271 / 286 | L4: `loadcheat` region | preloader/value mismatch |
 | Castle Hero | 14MB | — | ⚠️ SWF→C recompiles (~49s w/ 900s timeout) but gcc compile times out (300s per-file cap) | big-SWF, blocked on gcc-compile cap |
 

@@ -1,0 +1,24 @@
+# Duck Life 1 — accepted divergence manifest (divergence harness)
+#
+# Format (see ../accepted_diffs.py): one rule per line
+#   <path_regex> | <field> | <ruffle_value> | <swfrecomp_value> | <tag>
+# A rule absorbs a diverging (ruffle, swfrecomp) trace-line PAIR only when the
+# path matches, the two lines are identical in every field EXCEPT the named one,
+# and that field's values are the exact documented pair.
+#
+# spinamount — class (B), preloader byte-counter / no-net-layer (NOT a runtime
+# bug; SWFRecomp matches Flash). The frame-1 preloader has a DefineEditText
+# (chid 9, vn:"spinamount") with initial text "0", so the textfield-variable
+# binding sets _root.spinamount = "0" (string) on both sides. The preloader's
+# `setInterval(Lbar, 10)` (frame_1/DoAction_2) then does
+#   _root.spinamount = getBytesLoaded() / getBytesTotal() * 100;
+# which on a fully-loaded local SWF is 100. Real Flash fires the interval, so
+# spinamount becomes the number 100 — SWFRecomp matches that. Ruffle's HEADLESS
+# exporter never fires the setInterval, so the binding's initial string "0"
+# persists unchanged across every frame (F1..F10 all "0"). The string-vs-number
+# and 0-vs-100 are both that one Ruffle-exporter-vs-Flash difference; nothing
+# else in the 482-line trace diverges. See PROGRESS.md (Duck Life 1) and
+# RESULTS.md. (The `web=_url` path line is absorbed by the harness's general
+# file://*.swf NOISE_PATTERN, not here.)
+
+^_root$ | spinamount | "0" | 100 | preloader-byte-counter-no-net-layer

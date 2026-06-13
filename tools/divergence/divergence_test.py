@@ -54,6 +54,12 @@ NOISE_PATTERNS = [
     re.compile(r"^SWF Runtime Loaded"),
     re.compile(r"^\[HEAP\]"),
     re.compile(r" \$version="),    # Capabilities.version differs LNX vs WIN
+    # _url / _root.<name>=_url properties echo the loaded movie's file:// path,
+    # which is inherently environment-specific: Ruffle loads the injected SWF by
+    # its absolute path, SWFRecomp stages it as test.swf. Same class as $version
+    # (a path/host artifact, not a runtime divergence). Drops the line on both
+    # sides so they cancel.
+    re.compile(r'="file://[^"]*\.swf"'),
 ]
 
 

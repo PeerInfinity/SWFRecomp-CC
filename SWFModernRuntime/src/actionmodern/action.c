@@ -31315,6 +31315,37 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 		return;
 	}
 
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Sprite-local label resolution. GoToLabel (0x8C, gotoAndStop("name"))
+	// emitted inside a sprite's OWN frame script resolves the label against the
+	// CURRENT sprite's timeline, not the root. findFrameByLabel below only knows
+	// the root timeline's labels, so a sprite-local label (e.g. a preloader's
+	// `gotoAndStop("loaded")`) silently no-ops there and the sprite never
+	// navigates. Surfaced via Avalanche: DefineSprite_45 is a 2-frame preloader
+	// (frame_1 = "if loaded gotoAndStop('loaded')", frame_2 = gotoAndPlay(1));
+	// since "loaded" lives in the sprite, the escape no-op'd and the sprite froze
+	// looping frames 1<->2 while Ruffle escaped to the "loaded" label and played
+	// on. Mirrors actionGotoFrame2's target-path branch (ng_findSpriteLabelFrame
+	// + sprite-aware navigation). gotoAndStop semantics: ng_gotoFrameCurrentSprite
+	// sets manual nav + stops + records the self-goto so the post-script-drain
+	// apply pass lands it this tick; a following Play (gotoAndStop+play) resumes.
+	// On a sprite-local MISS we fall through to the existing root lookup so this
+	// only changes behavior when the label genuinely exists in the sprite.
+	if (ng_isInsideSprite())
+	{
+		extern DisplayObject* g_current_sprite_obj;
+		if (g_current_sprite_obj != NULL && g_current_sprite_obj->char_id != 0)
+		{
+			int sprite_frame = ng_findSpriteLabelFrame(g_current_sprite_obj->char_id, label);
+			if (sprite_frame >= 0)
+			{
+				ng_gotoFrameCurrentSprite((u16)sprite_frame);
+				return;
+			}
+		}
+	}
+#endif
+
 	// Look up frame by label
 	int frame_index = findFrameByLabel(label);
 
