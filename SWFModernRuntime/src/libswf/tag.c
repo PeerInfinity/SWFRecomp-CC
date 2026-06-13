@@ -1308,6 +1308,99 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 }
 
 // ---------------------------------------------------------------------------
+// attachMovie'd multi-frame clip playhead auto-advance pump (PROGRESS #15).
+//
+// Flash/Ruffle auto-play an attachMovie'd clip: it shows frame 1 on the attach
+// tick and each later tick advances (looping at the end) unless its frame-1
+// script stop()s it. advance_sprite_frames / advance_nested_sprite_frames only
+// walk display-list arrays; a root/non-root attached clip's display_obj is a
+// STANDALONE heap struct in NO list, so its timeline never ticks. This pump
+// walks child_mc_cache and advances the AS-visible playhead of each attached
+// clip flagged `attached_playable == 2` (active) whose display_obj is playing.
+//
+// Scope (PROGRESS #15): this advances the playhead COUNTER only — it does not
+// re-execute the clip's per-frame tags/scripts. The gate's `box` has no frame
+// content and N's menuMC is stop()'d (skipped), so the counter is the entire
+// observable behaviour for the #15 regression target. Executing attached-clip
+// frame scripts here (Phase 1, before the root frame func) would reintroduce
+// the cross-clip script-ordering hazards tracked in #10a/#10b; that is left as
+// a documented follow-up. The method-form stop()/play() fix (step 1) and
+// ng_gotoFrameByMC already rebuild the clip's display list when navigation
+// actually occurs.
+//
+// Ordering: the pump runs in Phase 1 (before the root frame func reads
+// _currentframe), so the observed value matches a timeline sprite advanced in
+// Phase 1. The attach tick is skipped via the flag — ng_record_attached_playable
+// sets it to 1 (pending) at attach; ng_promote_attached_playheads promotes 1->2
+// only AFTER the deferred attach-init drain has run that tick, so a clip's
+// frame-1 this.stop() (routed to its own display_obj by step 1) has applied
+// before it is ever advanced (the #10 record / apply-after-drain pattern).
+// ---------------------------------------------------------------------------
+void ng_record_attached_playable(MovieClip* mc)
+{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (mc == NULL || mc->display_obj == NULL) return;
+	DisplayObject* obj = (DisplayObject*)mc->display_obj;
+	if (obj->char_id == 0) return;
+	Character* ch = &dictionary[obj->char_id];
+	if (ch->type != CHAR_TYPE_SPRITE) return;
+	if (ch->sprite_frame_count <= 1) return;   // 1-frame clips never advance
+	// Flash auto-plays an (re)attached clip from frame 1. A frame-1 stop() /
+	// gotoAndStop in the attach-init drain overrides this to 0 before the first
+	// pump tick (drain runs this tick; pump runs next tick).
+	obj->sprite_is_playing = 1;
+	// Re-attach of an already-active clip stays active (keeps advancing without
+	// burning another promotion tick); a fresh attach is pending so its creation
+	// tick is skipped.
+	if (mc->attached_playable != 2)
+		mc->attached_playable = 1;
+#else
+	(void)mc;
+#endif
+}
+
+void ng_promote_attached_playheads(void)
+{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc != NULL && mc->attached_playable == 1)
+			mc->attached_playable = 2;
+	}
+#endif
+}
+
+void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
+{
+	(void)app_context;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (catch_up_mode) return;
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL) continue;
+		if (mc->attached_playable != 2) continue;        // only promoted (post-attach-tick) clips
+		if (mc->avm1_removed) continue;
+		DisplayObject* obj = (DisplayObject*)mc->display_obj;
+		if (obj == NULL) continue;
+		if (!obj->sprite_is_playing) continue;           // stop()'d / gotoAndStop'd -> frozen
+		if (obj->sprite_manual_next_frame) continue;     // a pending goto handles its own nav
+		if (obj->char_id == 0) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE) continue;
+		size_t fc = ch->sprite_frame_count;
+		if (fc <= 1) continue;
+		size_t new_frame = (obj->sprite_current_frame + 1) % fc;
+		obj->sprite_current_frame = new_frame;
+		mc->currentframe = (int)new_frame + 1;
+	}
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // Same-tick application of a sprite's OWN frame-script gotoAndPlay (#10).
 //
 // Sprite frame scripts are QUEUED during advance_sprite_frames / advance_nested_

@@ -241,7 +241,23 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
 	g_settarget_explicit_root = 0;
 	g_settarget_invalid = 0;
 	g_settarget_none = 0;
+	// PROGRESS #15: route a bare stop()/play()/gotoAndStop in the attached clip's
+	// OWN frame-1 script to the clip's display_obj. These compile to
+	// actionStop/actionPlay/actionGotoFrame which act on g_current_sprite_obj via
+	// ng_stopCurrentSprite/ng_playCurrentSprite — with this NULL the bare stop()
+	// fell through and never froze the clip, so the auto-advance pump over-advanced
+	// it (e.g. Pacman's ghosts _root.Demo.G.0, frozen at _cf=1 in Ruffle via a bare
+	// frame-1 stop()). The method-form `this.stop()` (gate's c, N's menuMC) is
+	// handled separately by the step-1 method-form fix. Scoped to the two test-pump
+	// modes that auto-advance attached clips; browser-WASM keeps the established
+	// NULL path (its attached clips don't auto-advance, and its attach timing is
+	// not covered by the CI suites). NULL fallback for clips with no display_obj.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	g_current_sprite_obj = (mc != NULL && mc->display_obj != NULL)
+	                       ? (DisplayObject*)mc->display_obj : NULL;
+#else
 	g_current_sprite_obj = NULL;
+#endif
 
 	// Run the frame function in script-only mode: placement tags already ran during
 	// ng_attachMovie with catch_up_mode=1, so only scripts need to execute now.
@@ -619,6 +635,15 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	new_mc->totalframes = (int)frame_count;
 	new_mc->framesloaded = (int)frame_count;
 	new_mc->currentframe = 1;
+
+	// PROGRESS #15: flag a multi-frame attached clip for playhead auto-advance.
+	// The clip starts playing (set inside); the pump (ng_advance_attached_clip_
+	// playheads) advances it each tick once promoted, unless its frame-1 script
+	// stop()s it (routed to its own display_obj by the step-1 method-form fix).
+	{
+		extern void ng_record_attached_playable(MovieClip* mc);
+		ng_record_attached_playable(new_mc);
+	}
 
 	return new_mc;
 }

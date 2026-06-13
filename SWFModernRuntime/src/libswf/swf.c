@@ -736,6 +736,14 @@ void tagMain(SWFAppContext* app_context)
 			g_advance_defer_nested = 0;
 		}
 
+		// Auto-advance attachMovie'd multi-frame clips (PROGRESS #15). Phase 1,
+		// before the root frame func reads _currentframe. Skips clips attached
+		// this tick (not yet promoted) and stopped clips. Mirrors swf_core.c.
+		{
+			extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
+			ng_advance_attached_clip_playheads(app_context);
+		}
+
 		// Pre-sync the AS-visible _currentframe of deferred nested sprites
 		// (advanced in Phase 3 below) so a clip whose onEnterFrame fires in the
 		// flush reads their post-advance value, matching Ruffle's
@@ -853,6 +861,15 @@ void tagMain(SWFAppContext* app_context)
 		{
 			extern void actionMarkDynamicMCsEnterFrameEligible(void);
 			actionMarkDynamicMCsEnterFrameEligible();
+		}
+
+		// Promote this tick's freshly-attached multi-frame clips to active so the
+		// pump advances them STARTING NEXT tick (PROGRESS #15). After the deferred
+		// attach-init drain (inside frame_func) so a clip's frame-1 this.stop()
+		// has applied before it is ever advanced. Mirrors swf_core.c.
+		{
+			extern void ng_promote_attached_playheads(void);
+			ng_promote_attached_playheads();
 		}
 
 		// Phase 3: advance nested sprite children (deferred from Phase 1

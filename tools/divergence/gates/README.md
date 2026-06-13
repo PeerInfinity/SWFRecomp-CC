@@ -76,7 +76,7 @@ edit the XML (AVM1 actions are structured elements — `PushData`/`StackString`/
 ActionCloneSprite's runtime stack is `[source-mc] [new-name] [depth]`, and the
 source must be a MovieClip ref (`GetVariable`), not a string path.
 
-## attached_clip_playhead  — ⚠️ KNOWN-FAILING (desired-behavior gate)
+## attached_clip_playhead  — ✅ FIXED (#15, 2026-06-13)
 
 `attached_clip_playhead.swf` (from `attached_clip_playhead.swfml` via swfmill):
 the root attaches a 4-frame `box` symbol twice — `b` left playing, `c` then
@@ -93,28 +93,7 @@ T6 b=2 c=1
 T7 b=3 c=1
 ```
 
-**This gate FAILS on current HEAD**, and the 2026-06-13 re-scoping found it has
-TWO distinct causes (the first masks the second):
-
-1. **Method-form `stop`/`play` on an attached clip mis-routes to the ROOT.**
-   The gate's `c.stop()` falls through the method-form handler
-   (`action.c` stop arm ~64961, play arm ~64884: both only stop/play a clip
-   found in the GLOBAL `display_list` via `ng_findDisplayEntryByName`; an
-   attached clip's `display_obj` is a standalone heap struct NOT in that list,
-   so it falls through to `actionStop` → `is_playing=0` → **stops the root**).
-   So the gate's root halts after frame 1 — swfrecomp emits only `T1` then
-   "Shutting down" (no `T2…`). This is a real, independently-wrong bug that hits
-   ANY game doing `attachedClip.stop()/.play()`. **It is also EXACTLY why the
-   earlier #15 prototype regressed N**: N's `menuMC` (objectID 410, a 13-frame
-   menu state-machine attached via `CreateSprite`) has `this.stop()` in its
-   frame 1 — the same method-form path — so the attached clip was never frozen
-   and the playhead pump over-advanced it.
-2. **attachMovie'd multi-frame clips don't auto-advance their playhead.**
-   `advance_sprite_frames` only walks display-list arrays; a root-attached
-   clip's `display_obj` is in no list, so its timeline never ticks (`b` would
-   stay at `_currentframe=1` even with the root advancing).
-
-Run it:
+**GREEN as of the #15 fix.** Run it:
 
 ```bash
 rm -rf /tmp/acpg && \
@@ -122,20 +101,51 @@ python3 tools/divergence/run_swfrecomp.py tools/divergence/gates/attached_clip_p
 grep -a "^T" /tmp/acpg/trace.txt | diff - tools/divergence/gates/attached_clip_playhead.expected.txt && echo GATE-GREEN
 ```
 
-**The correct fix is two ordered steps (see PROGRESS #15):**
-- **(1) attached-clip method-form `stop`/`play` routing** — add a
-  `mc->display_obj != NULL` branch to both arms so the call acts on the clip's
-  own display obj, never the root. Safe, high-value, independently shippable;
-  fixes the gate's root-advance AND freezes N's `menuMC` (un-regressing N).
-- **(2) attached-clip auto-advance pump** — only safe once (1) lands. The
-  earlier prototype (`ng_advance_attached_clip_playheads`) needs a creation-tick
-  promotion (skip the attach tick) ordered AFTER the deferred attach-init drain
-  so frame-1 `this.stop()` has applied before the clip is ever advanced (the
-  #10 `ng_record_*`/`ng_apply_*_after-drain` pattern is the model).
+### Root cause + fix (two ordered commits)
+
+The gate had TWO distinct causes (the first masked the second):
+
+1. **Method-form `stop`/`play` on an attached clip mis-routed to the ROOT.**
+   `c.stop()` fell through the method-form handler (`action.c` stop arm / play
+   arm: both only acted on a clip found in the GLOBAL `display_list` via
+   `ng_findDisplayEntryByName`; an attached clip's `display_obj` is a standalone
+   heap struct NOT in that list) → `actionStop` → `is_playing=0` → **stopped the
+   root**, halting the gate after `T1`. Same bug regressed the earlier prototype's
+   N run: `menuMC` has `this.stop()` (method-form) in frame 1.
+2. **attachMovie'd multi-frame clips didn't auto-advance their playhead.**
+   `advance_sprite_frames` only walks display-list arrays; a root/non-root
+   attached clip's `display_obj` is in no list, so its timeline never ticked.
+
+**Step 1** (`runtime(avm1): route attached-clip method-form stop()/play()…`):
+added a `mc->display_obj != NULL` branch to both method-form arms (act on the
+clip's own display obj, never the root). Mirrors the browser-WASM `#else` arms.
+`ng_gotoFrameByMC` already resolved attached clips for gotoAndStop/gotoAndPlay.
+
+**Step 2** (`runtime(timeline): auto-advance attachMovie'd multi-frame clips…`):
+`ng_advance_attached_clip_playheads` (tag.c) walks `child_mc_cache` each Phase 1
+and advances the playhead COUNTER of clips flagged `attached_playable == 2`
+whose `display_obj` is playing. `ng_record_attached_playable` (end of
+`ng_attachMovie`) sets the flag to 1 (pending) + defaults the clip playing;
+`ng_promote_attached_playheads` promotes 1→2 at end of tick, AFTER the deferred
+attach-init drain — so a frame-1 stop has applied before the first advance (the
+#10 record/apply-after-drain pattern). The pump advances the counter only (no
+per-frame script re-exec — Phase-1 cross-clip script ordering is left to a
+#10a/#10b-style follow-up); `box` has no frame content and N's `menuMC` is
+stopped, so the counter is the entire observable behaviour here.
+
+A bare `stop()`/`play()` in an attached clip's OWN frame-1 script (Pacman's
+ghosts `_root.Demo.G.0`) compiles to `actionStop`/`actionPlay` acting on
+`g_current_sprite_obj`, which `aq_dispatch_pending_attach_init` set to NULL — so
+the bare stop never froze the clip and the pump over-advanced it. Step 2 also
+sets `g_current_sprite_obj = mc->display_obj` during the attach-init drain
+(NO_GRAPHICS/OFFSCREEN_RENDER only) so the bare stop routes to the clip.
+
 Note: #15 does NOT fix Achievement Unlocked's first divergence — that's an
 `instance5` auto-name playhead bug + a one-frame attach-*pacing* lag, both
-UPSTREAM of the playhead. This gate is the regression target; N `4941==4941`
-must hold.
+UPSTREAM of the playhead. Regression set held: N `4941==4941`, Pacman `242==242`,
+avm1 `attach_movie*`/`default_names`/`create_empty_movie_clip`, gnash
+`attachMovie*`/`attachImported`/`attachExtImported`, both clone gates,
+`nested_sprite_inframe_goto`/`nested_sprite_cf_lag`.
 
 ## nested_sprite_cf_lag  — ✅ FIXED (was follow-up #10a; commit landing 2026-06-12)
 

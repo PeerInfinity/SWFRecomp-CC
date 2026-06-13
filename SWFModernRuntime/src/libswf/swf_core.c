@@ -995,6 +995,15 @@ void swfStart(SWFAppContext* app_context)
 			advance_sprite_frames(app_context);
 			g_advance_defer_nested = 0;
 
+			// Auto-advance attachMovie'd multi-frame clips (PROGRESS #15). Runs in
+			// Phase 1 like a timeline sprite, before the root frame func reads
+			// _currentframe. Skips clips attached this tick (not yet promoted) and
+			// stopped clips.
+			{
+				extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
+				ng_advance_attached_clip_playheads(app_context);
+			}
+
 			// Pre-sync the AS-visible _currentframe of deferred nested sprites
 			// (advanced in Phase 3 below) so a clip created this/last tick whose
 			// onEnterFrame fires in the Phase-2 flush reads their post-advance
@@ -1111,6 +1120,12 @@ void swfStart(SWFAppContext* app_context)
 				advance_sprite_frames(app_context);
 				g_advance_defer_nested = 0;
 			}
+			// Auto-advance attachMovie'd multi-frame clips past the last root frame
+			// too (Flash keeps attached clips playing). PROGRESS #15.
+			{
+				extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
+				ng_advance_attached_clip_playheads(app_context);
+			}
 			// Pre-sync deferred nested sprites' _currentframe before the enterFrame
 			// dispatch below (mirror of the playing branch; #10a).
 			{
@@ -1141,6 +1156,15 @@ void swfStart(SWFAppContext* app_context)
 
 			// Same-tick self gotoAndPlay application (#10); see the playing branch.
 			ng_apply_pending_sprite_self_gotos(app_context);
+		}
+
+		// Promote this tick's freshly-attached multi-frame clips to active so the
+		// pump advances them STARTING NEXT tick (PROGRESS #15). Runs after the
+		// deferred attach-init drain (inside the root frame func) so a clip's
+		// frame-1 this.stop() has applied before it is ever advanced.
+		{
+			extern void ng_promote_attached_playheads(void);
+			ng_promote_attached_playheads();
 		}
 
 		// Mark dynamic MCs (createEmptyMovieClip) as eligible for next tick's enterFrame.

@@ -98,6 +98,7 @@ struct MovieClip {
 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
 	u8 ts_stale_source;    // 1 if this MC was used as the source of a duplicateMovieClip call, or inherited the flag from such a source. Ruffle rejects `new TextSnapshot(mc)` for these in AVM1 (as_movie_clip() returns None), so we skip setting NATIVE_TEXTSNAPSHOT and getText returns undefined.
 	u8 mc_enterframe_eligible; // 0 on creation tick, set to 1 on next tick so onEnterFrame doesn't fire on creation frame
+	u8 attached_playable;      // attachMovie'd multi-frame clip playhead auto-advance state: 0=not applicable, 1=pending (attached this tick, not yet eligible), 2=active (promoted after attach-init drain; advanced by ng_advance_attached_clip_playheads). See PROGRESS #15.
 	u8 movie_id;               // Which SWF movie defined this MC (0=main, 1+=child). Used for per-movie export table isolation in attachMovie.
 	// Color transform for dynamic MCs (createEmptyMovieClip, etc.) not in the display list.
 	// Default: multipliers=100, offsets=0. Used by Color.getTransform/setTransform when
