@@ -2988,12 +2988,18 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		// the baked on(...) actions handled above (which need
 		// ch->button_action_count > 0), these live on the button's MovieClip
 		// dynamic_props (e.g. Tetris `play_btn.onRelease = function(){play();}`,
-		// whose DefineButton2 has ActionOffset=0 / no baked actions). In
-		// browser-WASM the per-MC AABB dispatch (actionDispatchMCRelease) can't
-		// reach buttons — their MC has no display_obj, so the bounds come back
-		// empty — so the precise button hit-test here is the dispatch point.
-		// Inert under OFFSCREEN_RENDER / headless: no mouse input is processed,
-		// so the button never changes state.
+		// whose DefineButton2 has ActionOffset=0 / no baked actions).
+		//
+		// BROWSER-WASM ONLY. In NO_GRAPHICS / OFFSCREEN_RENDER /
+		// HEADLESS_GRAPHICS, process_sprite_needs_init runs and sets
+		// button_mc->display_obj, so the per-MC AABB dispatch
+		// (actionDispatchMCPress/Release/MouseMove) already fires these
+		// handlers from swf_core.c / input_events — doing it here too would
+		// double-fire them (regressed focus_mouse / tab_ordering_events_mouse).
+		// Browser-WASM is the one build where process_sprite_needs_init is
+		// gated out, so button MCs have display_obj==NULL, the AABB dispatch
+		// skips them, and this precise-hit-test dispatch is the only path.
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
 		if (old_state != new_state && mc_enabled && obj->instance_name != NULL)
 		{
 			int as_allow = mc_visible;
@@ -3039,6 +3045,7 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				}
 			}
 		}
+#endif // browser-WASM only (other modes fire via the AABB dispatch path)
 
 		obj->button_prev_state = old_state;
 	}
