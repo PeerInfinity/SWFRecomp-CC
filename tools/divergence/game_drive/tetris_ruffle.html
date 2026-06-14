@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tetris — Ruffle ground truth</title>
+<style>html,body{margin:0;background:#fff;} #ruffle-container{width:382px;height:380px;}</style>
+</head>
+<body>
+<!-- Ground-truth tier for the Tetris browser comparison: loads the unmodified
+     Tetris.swf under Ruffle web (real Flash) at the SWF's native 382x380 stage,
+     so a headed-Chrome driver can click Play / arrows / OK at the same stage
+     coordinates as the SWFRecomp browser-WASM demo and screenshot the result. -->
+<div id="ruffle-container"></div>
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  var rs = document.createElement('script');
+  rs.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+  rs.onload = function () {
+    window.RufflePlayer.config = {
+      allowScriptAccess: true, autoplay: 'on', unmuteOverlay: 'hidden',
+      splashScreen: false, warnOnUnsupportedContent: false, logLevel: 'info',
+      // Deterministic, matching SWFRecomp's MOCK_DATE_TIME seeding intent.
+      // (Ruffle's exporter uses --deterministic; the web player has no flag,
+      // but Tetris's menu/level-select are not RNG-driven so it's irrelevant
+      // until a piece spawns.)
+      contextMenu: 'off', preferredRenderer: 'webgl',
+    };
+    var ruffle = window.RufflePlayer.newest();
+    var player = ruffle.createPlayer();
+    player.style.width = '382px';
+    player.style.height = '380px';
+    document.getElementById('ruffle-container').appendChild(player);
+    player.traceObserver = function (m) { console.log(m); };
+    fetch('Tetris.swf').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      player.load({ data: buf, allowScriptAccess: true, autoplay: 'on' })
+        .then(function () { console.log('[harness] Tetris loaded under Ruffle'); })
+        .catch(function (e) { console.log('[harness] ruffle load error: ' + e); });
+    }).catch(function (e) { console.log('[harness] fetch error: ' + e); });
+  };
+  rs.onerror = function () { console.log('[harness] ERROR: failed to load Ruffle CDN'); };
+  document.head.appendChild(rs);
+</script>
+</body>
+</html>
