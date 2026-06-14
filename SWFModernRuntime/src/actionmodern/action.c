@@ -21485,11 +21485,26 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 				tfRebuildFromHtml(app_context, tf_mc, u16, existing_val.str_size);
 			}
 		} else {
-			setProperty(app_context, props, "text", 4, &existing_val);
+			// Coerce the bound value to a string for display. The render path
+			// reads `text` as a UTF-16 string, and AVM1 TextField.text is always
+			// a string — so a numeric bound variable (e.g. Tetris's
+			// `startLevel` = 1, an F64) must be stringified or the field renders
+			// blank. Mirrors ng_syncVarToTextFields' coercion (the later-write
+			// path already does this); this is the initial-bind counterpart.
+			ActionVar text_val = existing_val;
+			if (existing_val.type != ACTION_STACK_VALUE_STRING) {
+				char _sv_buf[512];
+				int _n = varToStringBuf(app_context, &existing_val, _sv_buf, sizeof(_sv_buf));
+				u32 _u16_len = 0;
+				uint16_t* _u16 = utf8_to_u16(app_context, _sv_buf, _n > 0 ? (u32)_n : 0, &_u16_len);
+				text_val.type = ACTION_STACK_VALUE_STRING;
+				text_val.str_size = _u16_len;
+				VAL(u64, &text_val.data.numeric_value) = (u64)_u16;
+			}
+			setProperty(app_context, props, "text", 4, &text_val);
 			ActionVar len_val = {0};
 			len_val.type = ACTION_STACK_VALUE_F64;
-			u32 elen = (existing_val.type == ACTION_STACK_VALUE_STRING) ? existing_val.str_size : 0;
-			VAL(double, &len_val.data.numeric_value) = (double)elen;
+			VAL(double, &len_val.data.numeric_value) = (double)text_val.str_size;
 			setProperty(app_context, props, "length", 6, &len_val);
 		}
 	} else {
