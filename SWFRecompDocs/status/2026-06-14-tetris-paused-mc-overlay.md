@@ -46,11 +46,25 @@ every call** (a different pointer each frame), never the MC that got `visible=0`
 ### Follow-up (OPEN, separate bug — anticipated by the original "behind-the-overlay" note)
 
 With the overlay gone, the game still doesn't fully render: the **board** (190
-`b_mc.attachMovie("block")` clips), the **next-piece preview**, the **level/lines/score
-labels**, and the **quit/pause buttons** don't appear on the SWFRecomp side (Ruffle
-renders them all). These were always masked by the overlay and have their own render
-gap — likely in how attached children of a non-root sprite (`b_mc`) are rendered in
-browser-WASM. The dynamic-number italic SLANT is still a separate, user-deprioritized bug.
+`b_mc.attachMovie("block")` clips), the **next-piece preview** (`next_mc`, also
+attachMovie-built), the **level/lines/score labels**, and the **quit/pause buttons**
+don't appear on the SWFRecomp side (Ruffle renders them all). These were always masked
+by the overlay.
+
+**Confirmed mechanism for the board/preview (next session's starting point):** the
+blocks are `attachMovie("block", ...)`'d onto **`b_mc`**, which is a **timeline sprite
+at root depth** (frame_3: `instance 198 = "b_mc"`, char 40 = `sprite_40`), so each block
+MC has `parent == b_mc`, **not** `&root_movieclip`. The browser-WASM render only draws
+attached MCs in the root `child_mc_cache` pass (`tag.c` ~4869), which filters
+`if (mc->parent != &root_movieclip) continue;` — so **attached children of a non-root
+sprite render nowhere**. `render_single_object`/`render_display_list` for a
+`CHAR_TYPE_SPRITE` only walk that sprite's own `sprite_display_list`, which does not
+contain `child_mc_cache` attachments. The fix is a render-architecture change: when
+rendering a sprite, also render the `child_mc_cache` MCs parented to that sprite's MC
+(recursively), composing under the sprite's world transform. This is a separate, sizable
+change — not part of the overlay fix.
+
+The dynamic-number italic SLANT is still a separate, user-deprioritized bug.
 
 ---
 
