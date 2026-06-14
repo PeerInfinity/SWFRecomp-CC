@@ -51,18 +51,41 @@ attachMovie-built), the **level/lines/score labels**, and the **quit/pause butto
 don't appear on the SWFRecomp side (Ruffle renders them all). These were always masked
 by the overlay.
 
-**Confirmed mechanism for the board/preview (next session's starting point):** the
-blocks are `attachMovie("block", ...)`'d onto **`b_mc`**, which is a **timeline sprite
-at root depth** (frame_3: `instance 198 = "b_mc"`, char 40 = `sprite_40`), so each block
-MC has `parent == b_mc`, **not** `&root_movieclip`. The browser-WASM render only draws
-attached MCs in the root `child_mc_cache` pass (`tag.c` ~4869), which filters
-`if (mc->parent != &root_movieclip) continue;` — so **attached children of a non-root
-sprite render nowhere**. `render_single_object`/`render_display_list` for a
-`CHAR_TYPE_SPRITE` only walk that sprite's own `sprite_display_list`, which does not
-contain `child_mc_cache` attachments. The fix is a render-architecture change: when
-rendering a sprite, also render the `child_mc_cache` MCs parented to that sprite's MC
-(recursively), composing under the sprite's world transform. This is a separate, sizable
-change — not part of the overlay fix.
+**Confirmed mechanism for the board/preview (cont. 28 — partly addressed):** the blocks
+are `attachMovie("block", ...)`'d onto **`b_mc`**, a **timeline sprite at root depth**
+(frame_3: `instance 198 = "b_mc"`, char 40 = `sprite_40`), so each block MC has
+`parent == b_mc`, **not** `&root_movieclip`. The board is ~128 block MCs (`char 10`,
+`sprite_10` — an **8-frame** sprite, one frame per colour) on a 20px grid.
+
+**Two distinct bugs, only the first fixed (cont. 28):**
+
+1. **Render-architecture gap — FIXED (cont. 28, committed).** The browser-WASM render
+   only drew attached MCs in the root `child_mc_cache` pass (`tag.c` ~4869), filtered
+   `if (mc->parent != &root_movieclip) continue;` — so attached children of a non-root
+   sprite rendered nowhere; and even with that lifted, the dynamic transform-slot pool
+   (`render_webgpu.c` `extra_slots`, was **512**) exhausted mid-board, so the overflow
+   overwrote the *shared* `char 10` child transform_id in place and every block collapsed
+   onto the last one's matrix (single visible cell). Fixes: new `compute_mc_world_xform`
+   walks the parent chain so the root-attached pass composes each block under `b_mc`'s
+   world transform (verified: block 180 → stage (10px, 370px), etc.); `extra_slots`
+   512 → 4096; `MAX_XFORM_OVERRIDES` 4096 → 8192 to match. Gated browser-WASM-only
+   (OFFSCREEN/HEADLESS keep the root-only path, byte-identical). Verified via diagnostics
+   that the blocks now reach `render_display_list` at correct transforms with no
+   exhaustion.
+
+2. **Block content empty — OPEN (next session).** Despite (1), the board is still blank:
+   each block's `sprite_display_list` is **empty at render** (all `char_id == 0`) even
+   though `ng_attachMovie` runs `sprite_10_frame_0` (which places `char 2 "bang_mc"` at
+   depth 3) at attach. So the frame-0 content is populated at attach but **cleared before
+   render**. Dump (game frame): blocks are `curframe=0 playing=0 manual=0`, `smax=3`,
+   `sprite_display_list` non-NULL but zeroed. `advance_sprite_frames` doesn't iterate
+   `child_mc_cache`, and `advance_attached_clip_frames` skips them (`manual_next_frame==0`),
+   so nothing *should* clear them post-attach — suspects: the re-attach `memset`
+   (`tag_stubs.c` ~451-455 — if the board-build loop re-attaches each frame) or a
+   `clear_display_entry`/rewind path. **Next step:** instrument where a block's
+   `sprite_display_list[*].char_id` goes 2→0 between attach and render (add a one-shot
+   trace in `ng_attachMovie` right after frame_0, and in the re-attach `memset` /
+   `clear_display_entry`). Once content persists, (1) will make the board visible.
 
 The dynamic-number italic SLANT is still a separate, user-deprioritized bug.
 

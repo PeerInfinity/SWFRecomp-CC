@@ -817,7 +817,15 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 	// sprite instances share the same child transform_id.
 	{
 		u32 orig_slots = (u32)(ctx->transform_data_size / (16 * sizeof(float)));
-		u32 extra_slots = 512;
+		// Dynamic composed-transform slots, allocated fresh each frame by
+		// compose_children() (one per nested/attached child instance). Games
+		// that build a large grid of attachMovie'd clips need many: Tetris's
+		// board alone is up to ~180 cells x 3 child shapes. 512 exhausted
+		// mid-board, so the overflow fell back to overwriting the shared child
+		// transform_id in place — every block collapsed onto the last one's
+		// matrix (only one cell rendered). 4096 covers a full board + falling
+		// piece + preview with headroom.
+		u32 extra_slots = 4096;
 		u32 total_slots = orig_slots + extra_slots;
 		size_t total_size = (size_t)total_slots * 16 * sizeof(float);
 		ctx->xform_buffer = create_buffer(ctx->device, ctx->queue,

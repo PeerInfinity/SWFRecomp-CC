@@ -1785,8 +1785,12 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 static u32 g_next_dynamic_xform_slot;   // next available slot in xform_buffer
 static u32 g_xform_slot_capacity;       // total slots available
 
-// Save/restore stack for transform_id overrides during compose+render
-#define MAX_XFORM_OVERRIDES 4096
+// Save/restore stack for transform_id overrides during compose+render.
+// Must exceed the dynamic xform-slot pool (render_webgpu.c extra_slots) so a
+// frame that fills the whole pool still records every override and restores it;
+// dropping overrides would leave transform_ids pointing at dynamic slots,
+// corrupting the next frame's compose.
+#define MAX_XFORM_OVERRIDES 8192
 typedef struct { DisplayObject* obj; u32 original_id; } XformOverride;
 static XformOverride g_xform_overrides[MAX_XFORM_OVERRIDES];
 static int g_xform_override_count;
@@ -4204,6 +4208,51 @@ static void finalize_pending_removes_recursive(SWFAppContext* app_context)
 }
 #endif
 
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+// Compute an MC's local-to-world (stage-space) transform by walking its parent
+// chain. Used by the root-attached render pass to place attachMovie children of
+// a non-root sprite (e.g. Tetris's block cells parented to b_mc). _root itself
+// returns identity — the root's own transform is applied globally via the
+// uploaded stage transform, so folding it in here would double-apply it.
+static void compute_mc_world_xform(SWFAppContext* app_context, MovieClip* mc, float out[16])
+{
+	static const float identity[16] = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	if (mc == NULL || mc == &root_movieclip) {
+		memcpy(out, identity, sizeof(identity));
+		return;
+	}
+	DisplayObject* d = (DisplayObject*)mc->display_obj;
+	uintptr_t lo = (uintptr_t)display_list;
+	uintptr_t hi = lo + display_list_capacity * sizeof(DisplayObject);
+	int in_root_dl = (d != NULL) && (uintptr_t)d >= lo && (uintptr_t)d < hi;
+	if (d != NULL && (in_root_dl || d->transform_id != 0)) {
+		// Timeline-placed (root or nested): its transform_data slot holds the
+		// stage-space matrix — for root entries the raw placement, for nested
+		// entries the matrix compose_children already composed to world this
+		// frame. Overlay any AS-set transform, then we're done (no recursion:
+		// the slot is already world-space).
+		memcpy(out, (const float*)app_context->transform_data + (size_t)d->transform_id * 16,
+			16 * sizeof(float));
+		if (mc->as_set_flags != 0)
+			apply_as_transform(out, mc, mc->as_set_flags);
+		return;
+	}
+	// Standalone attachMovie entry (transform_id left at 0): build the local
+	// matrix from AS state and compose under the parent's world.
+	float parent_world[16];
+	compute_mc_world_xform(app_context, mc->parent, parent_world);
+	float local[16];
+	memcpy(local, identity, sizeof(identity));
+	apply_as_transform(local, mc, (u8)(1|2|4|8|16));
+	hit_test_mat4_multiply(out, parent_world, local);
+}
+#endif
+
 void tagShowFrame(SWFAppContext* app_context)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
@@ -4850,7 +4899,13 @@ void tagShowFrame(SWFAppContext* app_context)
 			MovieClip* mc = child_mc_cache[i];
 			if (mc == NULL) continue;
 			if (mc->depth == INT_MIN) continue;            // removed
-			if (mc->parent != &root_movieclip) continue;   // non-root attach
+#if defined(OFFSCREEN_RENDER) || defined(HEADLESS_GRAPHICS)
+			// Graphics-native / headless keep the original root-only behavior
+			// (trace-based suites; rendering non-root attaches here is a
+			// browser-WASM-only feature, kept out of these modes to stay
+			// byte-identical). Browser-WASM falls through to the general path.
+			if (mc->parent != &root_movieclip) continue;
+#endif
 			if (mc->display_obj == NULL) continue;         // no sprite content
 			if (!mc->visible) continue;                    // AS-set _visible=false
 			// Skip timeline-placed root children: their display_obj points
@@ -4865,27 +4920,40 @@ void tagShowFrame(SWFAppContext* app_context)
 			DisplayObject* d = (DisplayObject*)mc->display_obj;
 			if (d->sprite_display_list == NULL || d->sprite_max_depth == 0)
 				continue;
-			// Build the MC's own transform (composing AS-set _x/_y/scale on
-			// identity), allocate a fresh slot, and use it as parent_composed
-			// for compose_children + the inner render pass.
-			float mc_xform[16] = {
+			// Skip clips whose parent chain is hidden: a clip attached to a
+			// non-root sprite whose ancestor set _visible=false must not render.
+			{
+				int _anc_hidden = 0;
+				for (MovieClip* _a = mc->parent; _a != NULL && _a != &root_movieclip; _a = _a->parent)
+					if (!_a->visible) { _anc_hidden = 1; break; }
+				if (_anc_hidden) continue;
+			}
+			// Build the MC's WORLD transform: parent's world (walk the parent
+			// chain) composed with this MC's own AS-set _x/_y/scale/rotation.
+			// For a clip attached directly to root the parent world is identity,
+			// recovering the original behaviour; for one attached to a non-root
+			// sprite (e.g. Tetris's 190 block cells parented to b_mc) this places
+			// it under the parent sprite's placement instead of at the stage
+			// origin. Without it, attachMovie children of any non-root sprite
+			// render nowhere (the old `parent != root` skip dropped them).
+			float parent_world[16];
+			compute_mc_world_xform(app_context, mc->parent, parent_world);
+			float mc_local[16] = {
 				1.0f, 0.0f, 0.0f, 0.0f,
 				0.0f, 1.0f, 0.0f, 0.0f,
 				0.0f, 0.0f, 1.0f, 0.0f,
 				0.0f, 0.0f, 0.0f, 1.0f,
 			};
-			// Always overlay mc->x/y/xscale/yscale/rotation. Even when
-			// as_set_flags is 0, mc->x/y hold valid values (defaulting to 0/
-			// scales 100). This matters for duplicateMovieClip clones whose
-			// _x/_y were set via opcode SetProperty (action.c:~52883) — in
-			// browser-WASM that opcode writes mc->x but doesn't set the
-			// as_set_flags bit, so without forcing here clones render at the
-			// composed identity (origin) instead of their AS-set position.
-			// attachMovie / SetMember already set as_set_flags so they're
-			// unaffected. For Snake's gameplay where script_14 uses opcode
-			// SetProperty to place every snake segment, this is the path that
-			// makes the segments visible at their grid cells.
-			apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
+			// Unconditionally overlay mc->x/y/xscale/yscale/rotation onto the
+			// local matrix. Even when as_set_flags is 0, mc->x/y hold valid
+			// values (defaulting to 0 / scales 100). This matters for
+			// duplicateMovieClip clones whose _x/_y were set via opcode
+			// SetProperty (action.c:~52883) — browser-WASM writes mc->x but not
+			// the as_set_flags bit, so without forcing here clones render at the
+			// origin. (Snake's gameplay places every snake segment this way.)
+			apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
+			float mc_xform[16];
+			hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
 			compose_children(app_context, d->sprite_display_list,
 				d->sprite_max_depth, mc_xform, 0, 0);
 			render_display_list(app_context, d->sprite_display_list,
