@@ -8783,26 +8783,27 @@ namespace SWFRecomp
 				}
 				else
 				{
-					// Group fill contours by (fill_style_list, inner_fill) and
-					// tessellate each group together with libtess2. The winding
-					// rule follows the SWF: even-odd by default (DefineShape/2/3
-					// and DefineShape4 without UsesFillWindingRule), non-zero when
-					// DefineShape4 sets that flag — matching Ruffle's lyon fill
-					// rule selection. Even-odd natively cuts holes from
-					// self-touching / overlapping sub-loops — the case earcut +
-					// spatial containment can't handle (shape_test's C-shapes).
-					// Hole-marked shapes are included as ordinary contours; the
-					// fill rule resolves them. Insertion order is preserved for
-					// stable z-order.
+					// Ruffle directed-edge fill model (replaces the johnson-cycle /
+					// spatial-containment grouping for plain shapes + embedded glyphs;
+					// `shapes` above is still built and used by the morph path). See
+					// ~/CC/ruffle render/src/shape_utils.rs ShapeConverter.
 					//
-					// Non-zero is orientation-sensitive (unlike even-odd), so
-					// when it's in effect we reverse contours whose inner_fill
-					// sits on the right (fill_right) to put the fill consistently
-					// on one side — outer boundaries then wind opposite their
-					// holes and the non-zero rule leaves the holes empty. For
-					// even-odd we keep the original vertex order untouched (it's
-					// orientation-agnostic, and preserving order keeps the
-					// triangulation byte-stable for the common path).
+					// Each fill style collects the edge runs that bound it. SWF fill
+					// paths are dual-sided: fill_style_1 is the positive side,
+					// fill_style_0 the negative. We add fill_style_1-side runs as-is and
+					// fill_style_0-side runs reversed (Path::flip), so every edge
+					// bounding a given fill is directed consistently (fill always on the
+					// same side). Runs sharing endpoints are then linked into closed
+					// loops (PendingPath::add_segment) and tessellated even-odd by
+					// default (DefineShape/2/3, and Shape4 without UsesFillWindingRule)
+					// or non-zero when Shape4 sets that flag — matching Ruffle's lyon
+					// fill-rule selection.
+					//
+					// This is what keeps a fill island whose boundary carries the fill
+					// on its fill_style_0 side (the Tetris title "e"/"r" nubs, #18b) as a
+					// positive fill: johnson's undirected cycle finder instead synthesizes
+					// a spurious enclosing contour in the same even-odd group, and the
+					// island's two same-fill crossings cancel it to empty.
 					const int winding_rule = shape_uses_nonzero_winding ? TESS_WINDING_NONZERO : TESS_WINDING_ODD;
 
 					struct FillGroup
@@ -8814,40 +8815,116 @@ namespace SWFRecomp
 					std::vector<FillGroup> groups;
 					std::unordered_map<u64, size_t> group_index;
 
-					for (size_t i = 0; i < shapes.size(); ++i)
+					auto link_same_pt = [](const Vertex& a, const Vertex& b)
 					{
-						if (shapes[i].invalid || !shapes[i].closed || shapes[i].inner_fill == 0)
+						return a.x == b.x && a.y == b.y;
+					};
+					// PendingPath::add_segment — greedily link `seg` onto an existing
+					// segment of `lp` at a shared endpoint (either end may link).
+					auto link_add_segment = [&](std::vector<std::vector<Vertex>>& lp,
+					                            std::vector<Vertex> seg)
+					{
+						if (seg.size() <= 1)
 						{
-							continue;
+							return;
 						}
-						// Bounds check: ensure fill_style_list and inner_fill index are valid
-						if (shapes[i].fill_style_list >= all_fill_styles.size() ||
-							shapes[i].inner_fill > all_fill_style_counts[shapes[i].fill_style_list])
+						bool start_open = true;
+						bool end_open = true;
+						size_t i = 0;
+						while ((start_open || end_open) && i < lp.size())
 						{
-							continue;
+							std::vector<Vertex>& other = lp[i];
+							if (start_open && link_same_pt(other.back(), seg.front()))
+							{
+								other.insert(other.end(), seg.begin() + 1, seg.end());
+								seg = std::move(other);
+								lp[i] = std::move(lp.back());
+								lp.pop_back();
+								start_open = false;
+							}
+							else if (end_open && link_same_pt(seg.back(), other.front()))
+							{
+								std::swap(other, seg);
+								other.insert(other.end(), seg.begin() + 1, seg.end());
+								seg = std::move(other);
+								lp[i] = std::move(lp.back());
+								lp.pop_back();
+								end_open = false;
+							}
+							else
+							{
+								++i;
+							}
 						}
+						lp.push_back(std::move(seg));
+					};
 
-						u64 key = ((u64) shapes[i].fill_style_list << 32) | (u64) shapes[i].inner_fill;
+					// Returns the contour list for (fill_style_list, fill_id), creating
+					// the group on first use; nullptr if the fill index is out of range.
+					// The returned pointer is used immediately by the caller before any
+					// further get_group call, so a groups reallocation can't dangle it.
+					auto link_get_group = [&](u32 fsl, u32 fill_id) -> std::vector<std::vector<Vertex>>*
+					{
+						if (fsl >= all_fill_styles.size() || fill_id == 0 ||
+							fill_id > all_fill_style_counts[fsl])
+						{
+							return nullptr;
+						}
+						u64 key = ((u64) fsl << 32) | (u64) fill_id;
 						auto it = group_index.find(key);
 						size_t gi;
 						if (it == group_index.end())
 						{
 							gi = groups.size();
 							group_index[key] = gi;
-							groups.push_back({ shapes[i].fill_style_list, shapes[i].inner_fill, {} });
+							groups.push_back({ fsl, fill_id, {} });
 						}
 						else
 						{
 							gi = it->second;
 						}
+						return &groups[gi].contours;
+					};
 
-						std::vector<Vertex> contour = shapes[i].verts;
-						if (shape_uses_nonzero_winding && shapes[i].fill_right)
+					for (size_t i = 0; i < paths.size(); ++i)
+					{
+						Path& p = paths[i];
+						if (p.verts.size() < 2)
 						{
-							std::reverse(contour.begin(), contour.end());
+							continue;
 						}
-						groups[gi].contours.push_back(std::move(contour));
+
+						if (p.fill_styles[1] != 0)
+						{
+							std::vector<std::vector<Vertex>>* lp =
+								link_get_group(p.fill_style_list, p.fill_styles[1]);
+							if (lp)
+							{
+								link_add_segment(*lp, p.verts);
+							}
+						}
+
+						if (p.fill_styles[0] != 0)
+						{
+							std::vector<std::vector<Vertex>>* lp =
+								link_get_group(p.fill_style_list, p.fill_styles[0]);
+							if (lp)
+							{
+								std::vector<Vertex> rev(p.verts.rbegin(), p.verts.rend());
+								link_add_segment(*lp, std::move(rev));
+							}
+						}
 					}
+
+					// Draw fills by ascending (fill_style_list, fill id): Ruffle draws
+					// fills in style-id order within a layer, layers in order. group_index
+					// is stale after this sort, but it is unused past population.
+					std::sort(groups.begin(), groups.end(),
+						[](const FillGroup& a, const FillGroup& b)
+						{
+							if (a.fsl != b.fsl) return a.fsl < b.fsl;
+							return a.inner_fill < b.inner_fill;
+						});
 
 					for (FillGroup& g : groups)
 					{
