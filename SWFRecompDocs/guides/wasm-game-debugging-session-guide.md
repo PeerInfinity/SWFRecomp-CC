@@ -255,9 +255,19 @@ here, not in PROGRESS.md.**
 7. **Graphics-mode SIGABRT *after* correct output = a real heap UAF/OOB, not
    a CI flake.** ASAN-pin it (`--asan`). See memory
    `graphics-sigabrt-real-heap-bugs`.
-8. **Browser-probe canvas capture** of a live WebGPU canvas fails (Playwright
-   stability timeout); only the display-list JSON is reliable there. And
-   automated headed Chrome may throttle rAF (demo runs slowly / looks stuck).
+8. **Browser-WASM WebGPU canvas capture WORKS — but only with
+   `--ignore-gpu-blocklist`.** Launch headed Chrome with
+   `--enable-unsafe-webgpu --ignore-gpu-blocklist --no-sandbox`; then BOTH
+   `page.screenshot()` and `locator('#canvas').screenshot()` capture the live
+   WebGPU canvas. WITHOUT `--ignore-gpu-blocklist` the canvas comes back **black**
+   (GPU compositing disabled) — that flag was the missing piece behind the old
+   "WebGPU capture always fails" belief. The ready-made browser-faithful
+   Ruffle-vs-SWFRecomp image harness is `tools/divergence/game_drive/`
+   (`tetris_compare.py`; drives both runtimes through input-gated states and
+   writes side-by-side `compare_<stage>.png`). Caveat unchanged: a continuously
+   redrawing canvas can still trip `locator.screenshot`'s stability timeout —
+   take the shot during a settled moment, or use `page.screenshot()`. Automated
+   headed Chrome may also throttle rAF (demo runs slowly / looks stuck).
 
 ### Runtime-behavior gotchas
 
