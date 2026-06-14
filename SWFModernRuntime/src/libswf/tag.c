@@ -7967,6 +7967,7 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	display_list[depth].transformed_by_script = 0;
 	display_list[depth].cx_overridden = 0;
 	display_list[depth].clone_replaced = 0;
+	display_list[depth].as_hidden = 0;  // fresh placement at this depth defaults visible
 	// Reset enterFrame-eligibility so a subsequent fresh placement at this depth
 	// re-runs the init cycle (sprite_initialized 0→1 on place, 1→2 next tick) and
 	// therefore does NOT fire its clip-event enterFrame on the placement tick —
