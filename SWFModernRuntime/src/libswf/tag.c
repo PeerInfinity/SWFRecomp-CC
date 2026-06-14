@@ -2983,6 +2983,63 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 			}
 		}
 
+		// Fire AS-level (dynamically-assigned) button handlers — onPress,
+		// onRelease, onRollOver, etc. — on the same state transition. Unlike
+		// the baked on(...) actions handled above (which need
+		// ch->button_action_count > 0), these live on the button's MovieClip
+		// dynamic_props (e.g. Tetris `play_btn.onRelease = function(){play();}`,
+		// whose DefineButton2 has ActionOffset=0 / no baked actions). In
+		// browser-WASM the per-MC AABB dispatch (actionDispatchMCRelease) can't
+		// reach buttons — their MC has no display_obj, so the bounds come back
+		// empty — so the precise button hit-test here is the dispatch point.
+		// Inert under OFFSCREEN_RENDER / headless: no mouse input is processed,
+		// so the button never changes state.
+		if (old_state != new_state && mc_enabled && obj->instance_name != NULL)
+		{
+			int as_allow = mc_visible;
+			if (!mc_visible)
+			{
+				if ((old_state == 1 && new_state == 0) ||
+				    (old_state == 3 && new_state == 0) ||
+				    (old_state == 2 && new_state == 0) ||
+				    (old_state == 2 && new_state == 3))
+					as_allow = 1;
+			}
+			if (as_allow)
+			{
+				u16 as_transition = 0;
+				if      (old_state == 0 && new_state == 1) as_transition = 0x0001;
+				else if (old_state == 1 && new_state == 0) as_transition = 0x0002;
+				else if (old_state == 1 && new_state == 2) as_transition = 0x0004;
+				else if (old_state == 2 && new_state == 1) as_transition = 0x0008;
+				else if (old_state == 2 && new_state == 3) as_transition = 0x0010;
+				else if (old_state == 3 && new_state == 2) as_transition = 0x0020;
+				else if (old_state == 3 && new_state == 0) as_transition = 0x0040;
+				else if (old_state == 0 && new_state == 2) as_transition = 0x0080;
+				else if (old_state == 2 && new_state == 0) as_transition = 0x0100;
+				if (as_transition != 0)
+				{
+					MovieClip* as_btn_mc = actionFindOrCreateMovieClip(
+						app_context, obj->instance_name, parent_mc);
+					// AVM1 button handlers run with the parent timeline as the
+					// current context, so a bare gotoAndStop/play inside the
+					// handler targets the timeline that DEFINED it (via the
+					// function's captured base clip), not the button itself.
+					MovieClip* as_saved_ctx = g_current_context;
+					DisplayObject* as_saved_sprite = g_current_sprite_obj;
+					actionSetCurrentContext(parent_mc);
+					if (parent_mc && parent_mc->is_button_mc && parent_mc->display_obj)
+						g_current_sprite_obj = (DisplayObject*)parent_mc->display_obj;
+					else
+						g_current_sprite_obj = enclosing_sprite_obj;
+					extern void actionFireButtonAS2Event(SWFAppContext*, MovieClip*, u16);
+					actionFireButtonAS2Event(app_context, as_btn_mc, as_transition);
+					g_current_sprite_obj = as_saved_sprite;
+					actionSetCurrentContext(as_saved_ctx);
+				}
+			}
+		}
+
 		obj->button_prev_state = old_state;
 	}
 }

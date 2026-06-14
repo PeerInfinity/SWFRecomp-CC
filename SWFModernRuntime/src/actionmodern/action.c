@@ -69796,6 +69796,41 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 	}
 }
 
+// Fire an AVM1 button's dynamically-assigned AS2 event handler (onPress,
+// onRelease, onRollOver, ...) for a button-state transition. Called from
+// ng_update_button_states_in_dl (tag.c) so AS-assigned handlers on a
+// DefineButton (e.g. Tetris `play_btn.onRelease = function(){ play(); }`)
+// fire on the SAME precise hit-test transitions that drive the button's
+// baked on(...) actions — regardless of whether the button has any baked
+// actions. Mirrors Ruffle's avm1_button event dispatch, which runs both the
+// button's compiled actions and the script-assigned handler methods.
+//
+// `mc` is the button's MovieClip (from actionFindOrCreateMovieClip on the
+// button's instance_name); `transition` uses the same SWFBUTTON_* condition
+// bit that tag.c computes for the state change. No-op for transitions with no
+// associated handler, or when mc/dynamic_props is NULL.
+void actionFireButtonAS2Event(SWFAppContext* app_context, MovieClip* mc, u16 transition)
+{
+	if (mc == NULL || mc->dynamic_props == NULL || g_execution_halted) return;
+
+	const char* name = NULL;
+	u32 name_len = 0;
+	switch (transition)
+	{
+		case 0x0001: name = "onRollOver";       name_len = 10; break; // idle->overUp
+		case 0x0002: name = "onRollOut";        name_len = 9;  break; // overUp->idle
+		case 0x0004: name = "onPress";          name_len = 7;  break; // overUp->overDown
+		case 0x0008: name = "onRelease";        name_len = 9;  break; // overDown->overUp
+		case 0x0010: name = "onDragOut";        name_len = 9;  break; // overDown->outDown
+		case 0x0020: name = "onDragOver";       name_len = 10; break; // outDown->overDown
+		case 0x0040: name = "onReleaseOutside"; name_len = 16; break; // outDown->idle
+		case 0x0080: name = "onPress";          name_len = 7;  break; // idle->overDown
+		case 0x0100: name = "onRelease";        name_len = 9;  break; // overDown->idle
+		default: return;
+	}
+	mc_call_as2_handler_ng(app_context, mc, name, name_len, NULL, 0);
+}
+
 // (was: #endif — see above)
 
 // Whether this MC has any of Ruffle's BUTTON_EVENT_METHODS as own dynamic
