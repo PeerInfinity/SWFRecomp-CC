@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-13T23:39:03.132423+00:00",
-    "old_git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
-    "new_timestamp": "2026-06-14T03:03:00.438270+00:00",
-    "new_git_sha": "b58adf8ff59ef5adb904cbbe0b8943e414b11091",
+    "old_timestamp": "2026-06-14T03:03:00.438270+00:00",
+    "old_git_sha": "b58adf8ff59ef5adb904cbbe0b8943e414b11091",
+    "new_timestamp": "2026-06-14T04:05:35.151962+00:00",
+    "new_git_sha": "eb85f9fc9f918983990dfe2265cd01493cab12e0",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,54 @@
     "old_effective_pass": 76,
     "old_total": 92,
     "old_pass_rate": 79.3,
-    "new_pass": 73,
+    "new_pass": 71,
     "new_ruffle_matched": 3,
-    "new_effective_pass": 76,
+    "new_effective_pass": 74,
     "new_total": 92,
-    "new_pass_rate": 79.3,
+    "new_pass_rate": 77.2,
     "old_mismatched_lines": 394,
     "new_mismatched_lines": 394,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 92,
+    "newly_failing": 2,
+    "status_changed": 2,
+    "unchanged": 90,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1/mouse-transparency",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "button3",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    }
+  ]
 }
