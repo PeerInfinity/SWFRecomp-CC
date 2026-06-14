@@ -1,12 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 46/47 passing | Graphics: 46/47 passing
+Trace: 46/47 passing | Graphics: 45/47 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (1 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `mouse-transparency` | Output Mismatch | 1/2 lines match |
 
 ## Graphics Improvements (0 tests)
 
