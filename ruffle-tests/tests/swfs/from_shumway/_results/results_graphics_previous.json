@@ -1,21 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-06-13T23:44:02.467901+00:00",
+    "timestamp": "2026-06-13T23:50:22.978570+00:00",
     "git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
-    "duration_seconds": 868.76,
+    "duration_seconds": 903.89,
     "total_available": 92,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 89,
-  "pass": 70,
+  "total": 92,
+  "pass": 73,
   "ruffle_matched": 3,
   "fail": 16,
-  "pass_rate": 78.7,
-  "effective_pass": 73,
-  "effective_pass_rate": 82.0,
+  "pass_rate": 79.3,
+  "effective_pass": 76,
+  "effective_pass_rate": 82.6,
   "breakdown": {
     "output_mismatch": 16
   },
@@ -1468,6 +1466,76 @@
       "detail": "16 line(s) differ (actual=26, expected=24)",
       "actual_output": "... (2 lines before) ...\n1\n1\n1\n5\n5\n7\n5\n8\n3\n5\n7\n10\n2\n8\n7\n1\n1\n3\n7\n8\n12\n6\n8\n1",
       "expected_output": "... (2 lines before) ...\n1\n1\n1\n5\n5\n5\n7\n3\n5\n7\n8\n10\n2\n7\n8\n1\n3\n7\n8\n12\n6\n8"
+    },
+    {
+      "test": "gradientTransform",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 16.349,
+        "run": 0.169
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.53,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1441 outliers exceed limit of 0, max difference 40",
+          "max_diff": 40,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": true
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "invalidClipDepth",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 16.518,
+        "run": 0.157
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.68,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "movieinfo1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.603,
+        "run": 0.155
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 1.76,
+      "status": "pass"
     },
     {
       "test": "targetPath1",

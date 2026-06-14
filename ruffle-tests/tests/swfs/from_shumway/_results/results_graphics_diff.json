@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-13T23:44:02.467901+00:00",
+    "old_timestamp": "2026-06-13T23:50:22.978570+00:00",
     "old_git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
-    "new_timestamp": "2026-06-13T23:50:22.978570+00:00",
-    "new_git_sha": "828b69b82dfb5df03cd33eb7684de79414bbdda9",
+    "new_timestamp": "2026-06-14T02:51:34.395136+00:00",
+    "new_git_sha": "b58adf8ff59ef5adb904cbbe0b8943e414b11091",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 70,
+    "old_pass": 73,
     "old_ruffle_matched": 3,
-    "old_effective_pass": 73,
-    "old_total": 89,
-    "old_pass_rate": 78.7,
+    "old_effective_pass": 76,
+    "old_total": 92,
+    "old_pass_rate": 79.3,
     "new_pass": 73,
     "new_ruffle_matched": 3,
     "new_effective_pass": 76,
@@ -25,46 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 89,
-    "added": 3,
+    "unchanged": 92,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "gradientTransform",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "invalidClipDepth",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "movieinfo1",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    }
-  ]
+  "changes": []
 }
