@@ -4707,6 +4707,18 @@ void tagShowFrame(SWFAppContext* app_context)
 			continue;
 		}
 
+		// Honor AS-set _visible=false on a timeline-placed object: skip rendering
+		// it (and its whole subtree). actionSetProperty syncs the MC's _visible
+		// onto this entry's as_hidden via mc->display_obj — a name lookup from
+		// root can't find a timeline sprite's MC. A mask's _visible is irrelevant
+		// to its clipping role, so only skip non-mask entries. Without this, a
+		// sprite whose frame-script sets `_visible = false` (e.g. Tetris's
+		// paused_mc / quitGame_mc overlay) keeps painting over the game.
+		if (obj->clip_depth == 0 && obj->as_hidden)
+		{
+			continue;
+		}
+
 		// Check if this object is a clip mask
 		if (obj->clip_depth > 0)
 		{
@@ -4840,6 +4852,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			if (mc->depth == INT_MIN) continue;            // removed
 			if (mc->parent != &root_movieclip) continue;   // non-root attach
 			if (mc->display_obj == NULL) continue;         // no sprite content
+			if (!mc->visible) continue;                    // AS-set _visible=false
 			// Skip timeline-placed root children: their display_obj points
 			// into the global display_list array, so the main render loop
 			// already drew them. Root attaches have a separately HCALLOC'd

@@ -198,6 +198,11 @@ typedef struct DisplayObject
 	                        // tagPlaceObject2/Ratio (reclaim path) or finalized by
 	                        // tagShowFrame fallback. See browser_wasm_frame_func_rerun
 	                        // auto-memory.
+	u8 as_hidden;           // 1 if AS set _visible=false on the MC linked to this entry
+	                        // (synced from actionSetProperty via mc->display_obj). Zero-init
+	                        // = visible. The render loop skips drawing entries with this set;
+	                        // a name lookup from root can't find a timeline sprite's MC, but
+	                        // mc->display_obj points straight back at the display_list entry.
 	// Cached transform values (populated at placement time for correct bounds on child SWFs)
 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
 	// Child movie transform data override (set during placement when g_active_transform_data != NULL)

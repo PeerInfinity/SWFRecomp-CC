@@ -91,12 +91,31 @@ async def drive(page, locator_sel, label, settle, click_run_sel=None):
         p = OUT / f"{label}_{stage}.png"
         try:
             await el.screenshot(path=str(p), timeout=6000)
+            shots[stage] = p
+            return
         except Exception as e:
-            # Fall back to a full-page shot cropped to the element box.
             print(f"    {label}/{stage}: element shot failed ({str(e)[:50]}), full-page",
                   file=sys.stderr)
-            await page.screenshot(path=str(p))
-        shots[stage] = p
+        # Fall back to a full-page shot (also non-fatal — WSLg/WebGPU capture is flaky).
+        try:
+            await page.screenshot(path=str(p), timeout=8000, animations="disabled")
+            shots[stage] = p
+            return
+        except Exception as e:
+            print(f"    {label}/{stage}: full-page shot also failed ({str(e)[:50]})",
+                  file=sys.stderr)
+        # Last resort: CDP Page.captureScreenshot — bypasses Playwright's
+        # "waiting for fonts to load" gate that hangs on this page.
+        try:
+            import base64
+            cdp = await page.context.new_cdp_session(page)
+            data = await cdp.send("Page.captureScreenshot", {"format": "png",
+                                                              "captureBeyondViewport": False})
+            p.write_bytes(base64.b64decode(data["data"]))
+            shots[stage] = p
+        except Exception as e:
+            print(f"    {label}/{stage}: CDP shot also failed ({str(e)[:60]})",
+                  file=sys.stderr)
 
     await shot("menu")
     ax, ay = at(FRAC["play"]); await held_click(page, ax, ay); await shot("play")
@@ -175,14 +194,24 @@ async def main():
         print("=== Ruffle ===", file=sys.stderr)
         rpage = await browser.new_page(viewport={"width": 900, "height": 700})
         rpage.on("console", lambda m: None)
-        await rpage.goto("http://127.0.0.1:8411/tetris_ruffle.html", wait_until="load",
-                         timeout=20000)
-        ruffle_shots = await drive(rpage, "#ruffle-container", "ruffle", settle=4.0)
+        ruffle_shots = {}
+        try:
+            await rpage.goto("http://127.0.0.1:8411/tetris_ruffle.html", wait_until="load",
+                             timeout=20000)
+            ruffle_shots = await drive(rpage, "#ruffle-container", "ruffle", settle=4.0)
+        except Exception as e:
+            print(f"  ruffle drive failed (non-fatal): {str(e)[:120]}", file=sys.stderr)
         await rpage.close()
 
         # SWFRecomp browser-WASM
         print("=== SWFRecomp ===", file=sys.stderr)
         spage = await browser.new_page(viewport={"width": 900, "height": 700})
+        _pmlog = open(OUT / "pmdiag.log", "w")
+        def _on_console(m):
+            t = m.text
+            if "PMDIAG" in t:
+                _pmlog.write(t + "\n"); _pmlog.flush()
+        spage.on("console", _on_console)
         await spage.goto("http://127.0.0.1:8410/demo.html?test=flasharchive/Tetris",
                          wait_until="load", timeout=20000)
         swf_shots = await drive(spage, "#canvas", "swfrecomp", settle=3.0,

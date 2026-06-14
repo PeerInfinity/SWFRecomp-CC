@@ -54026,6 +54026,12 @@ void actionSetProperty(SWFAppContext* app_context)
 			if (mc->visible && !new_vis && g_focused_mc == mc)
 				selection_do_focus_change(app_context, mc, NULL);
 			mc->visible = new_vis;
+			// Sync to the linked display-list entry so the renderer can honor
+			// _visible on a timeline-placed sprite (whose MC is not findable by
+			// name from the root render loop). mc->display_obj points straight
+			// at the DisplayObject. See DisplayObject::as_hidden.
+			if (mc->display_obj != NULL)
+				((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1;
 			markTransformedByScript(mc);
 			break;
 		}

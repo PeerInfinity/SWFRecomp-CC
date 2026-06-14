@@ -1,8 +1,60 @@
 # Tetris game frame: `paused_mc` overlay covers the whole game (browser-WASM)
 
 **Date:** 2026-06-14
-**Status:** ROOT-CAUSED, no fix landed yet. Next focused session implements the fix.
-**Bucket:** browser-WASM only (not CI-observable; verify with the harness below).
+**Status:** ✅ **FIXED** (cont. 27). The overlay no longer covers the game — verified
+with `tetris_compare.py`. A separate, newly-unmasked board-render gap remains (see
+"Follow-up" below).
+**Bucket:** browser-WASM only (not CI-observable; verified with the harness below).
+
+---
+
+## RESOLUTION (cont. 27) — read this first; the original root cause below was WRONG
+
+The cont. 26 root cause ("`frame_1`'s `_visible=false` never runs; `VISDIAG count: 0`")
+was **stale/incorrect**. Fresh instrumentation (`advance_sprite_frames` + sprite-script
+dispatch + `actionSetProperty` case 7) showed the opposite:
+
+- `paused_mc`'s `frame_0` **does** run, once, on the game frame with `catch_up_mode=0`
+  (`ASF callframe char=68 frame=0 cm=0`).
+- `script_15` **is** queued and dispatched **in paused_mc's context**
+  (`SPRITESCRIPT dispatch char=68 ... name='paused_mc'`).
+- `""._visible=false` **is** applied to the right MC
+  (`SETVIS ... mcname='paused_mc' new_vis=0`), so `mc->visible == 0`.
+
+**The real bug was in the renderer**, not the script: the browser-WASM render path
+**never honored `_visible` for a timeline-placed sprite**. The root render loop tried
+no visibility check at all, and a name-based check doesn't work either — from the root
+render loop, `actionFindMovieClipByName("paused_mc")` returns NULL and
+`actionFindOrCreateMovieClip("paused_mc", root)` **mints a brand-new `visible=1` MC on
+every call** (a different pointer each frame), never the MC that got `visible=0`.
+
+### The fix (commit: see git log near this date)
+
+- `DisplayObject::as_hidden` — new `u8`, zero-init = visible (`SWFModernRuntime/include/libswf/swf.h`).
+- `actionSetProperty` case 7 (`_visible`) syncs it onto the linked entry via
+  `mc->display_obj` (set by `exec_sprite_frame`: `mc->display_obj = &display_list[depth]`),
+  so the flag rides on the exact `DisplayObject` the render loop iterates
+  (`SWFModernRuntime/src/actionmodern/action.c`).
+- Browser-WASM root render loop (`tagShowFrame`, `tag.c`) skips non-mask entries with
+  `obj->as_hidden` set; the root-attached (`child_mc_cache`) pass skips `!mc->visible`.
+  A mask's `_visible` is irrelevant to clipping, so mask entries are not skipped.
+- The render-loop edit sits in the `#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)`
+  block, so it also compiles for OFFSCREEN/HEADLESS → run CI both modes as a
+  no-regression check (the suites are trace-based, so honoring `_visible` in rendering
+  is inert there).
+
+### Follow-up (OPEN, separate bug — anticipated by the original "behind-the-overlay" note)
+
+With the overlay gone, the game still doesn't fully render: the **board** (190
+`b_mc.attachMovie("block")` clips), the **next-piece preview**, the **level/lines/score
+labels**, and the **quit/pause buttons** don't appear on the SWFRecomp side (Ruffle
+renders them all). These were always masked by the overlay and have their own render
+gap — likely in how attached children of a non-root sprite (`b_mc`) are rendered in
+browser-WASM. The dynamic-number italic SLANT is still a separate, user-deprioritized bug.
+
+---
+
+## Original (cont. 26) writeup — KEPT FOR HISTORY; root cause superseded above
 
 ## Symptom (what the user sees)
 
