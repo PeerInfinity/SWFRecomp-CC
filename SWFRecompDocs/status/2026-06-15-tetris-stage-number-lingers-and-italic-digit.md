@@ -95,33 +95,47 @@ depth. Cannot affect NO_GRAPHICS / OFFSCREEN (not compiled there) → no CI.
 
 ---
 
-## (A) The slanted/italic "1" — faithful render of a real italic font glyph
+## (A) The slanted/italic "1" — our geometry is correct; the gap is anti-aliasing
 
-Root-caused, **not a bug in our rendering**:
+**Root-caused and confirmed against ground truth (real Flash + Ruffle). NOT a glyph,
+parse, or tessellation bug — it is an anti-aliasing fidelity difference.**
 
-- The level number uses **font 12 "Wide awake Black"** (the same decorative title
-  font as the "tetris" logo), glyph index **5**, which is **correctly** code `'1'`
-  (`font_12_codes[5] == 49`).
-- The recompiler tessellates this glyph to **exactly 2 triangles forming a
-  parallelogram**: top edge `x[177,331] @ y=-829`, bottom edge `x[42,196] @ y=-61`
-  — a ~10° rightward (top-shifted) shear. earcut never moves vertices, so those 4
-  corners are the SWF outline's **actual** points: the embedded font's "1" is a
-  genuinely **italic/slanted** glyph.
-- The glyph render callback (`textfield_glyph_render_cb`) applies **only uniform
-  scale + translation** (`vx*scale + x_pos`, same `scale` for x and y); the field
-  placement matrix's scale/rotation is explicitly deferred. So our rendered slant
-  **equals** the font glyph's true slant — we do **not** introduce a skew or
-  mis-tessellate.
+What I verified:
 
-Per the handoff's own criterion ("if it's a real italic font glyph, it may be an
-accepted Ruffle/Flash-matching diff"), this is the accepted case: our render is
-faithful to the embedded `DefineFont2` outline (what Flash Player would draw).
-Ruffle appears to render the "1" more upright — most likely Ruffle substituting a
-device/fallback glyph for this field — which would make it a Ruffle-vs-Flash
-difference, with our embedded-glyph render the more Flash-correct one. This is the
-same embedded-font-glyph family tracked under #18 (`Wide awake Black`, the title
-counters). **No render change made** — changing it would make the glyph *less*
-faithful to the font. Left for user confirmation in-game / the #18 effort.
+- **The level number uses font 12 "Wide awake Black"** (the decorative title font),
+  glyph index **5** = correctly code `'1'` (`font_12_codes[5] == 49`). `FontID=12`
+  with the `UseOutlines`/embedFonts flag set (`flags=0x98`), so the field genuinely
+  renders with the embedded outlines, not a device font.
+- **Font 12 is a uniformly OBLIQUE font.** I dumped all 42 glyphs from the recompiler
+  and measured each glyph's top-vs-bottom horizontal shift: **almost every glyph —
+  digits and letters alike — leans by the same ~135-unit shear (~10°)** (`0`/`2`/`3`/
+  `5`/`6`/`8`/`9`/`e`/`o`/`r`/… all = 135; `i`/`l` = 152). The "1" is **not** specially
+  slanted; it leans the same ~10° as the whole font.
+- **Our parse is correct.** The raw SWF edge records for the "1" encode the two side
+  strokes as **general lines with `dx=±135`** (verified by logging the recompiler's
+  edge reader: `DBGEDGE general dx=135 dy=-768` / `dx=-135 dy=768`), i.e. a genuine
+  parallelogram — not vertical lines we sheared. Ruffle's own `swf` crate
+  (`read.rs::read_shape_record`) reads the same general-line deltas, so **Ruffle ends
+  up with identical geometry.**
+- **Why ours looks like a harsh `/`:** the "1" is a thin bar (~154 wide) and the lean
+  (135) is nearly the bar's full width, so the top sits almost entirely to the right
+  of the bottom. The same 10° that's invisible on a wide letter is stark on a thin
+  bar. Our glyph render is uniform scale+translate (no skew added), so the rendered
+  slant **equals** the font's true slant.
+
+**Ground-truth confirmation (user test):** in both Ruffle and the Basilisk official
+Flash player, zooming in shows the "1" **does** have the slight slant — it is just
+**mostly hidden by anti-aliasing**. So Flash/Ruffle render the same oblique geometry
+we do; their rasterizer softens the thin slanted bar into a near-vertical stroke,
+while our hard-edged WebGPU triangle fill shows the slant crisply.
+
+**Conclusion:** our render is geometrically faithful to the embedded font. The visible
+difference is an instance of the **known "our glyph anti-aliasing differs from Ruffle"**
+gap (other AA differences were noted previously and deprioritized). **No render change
+made** — the geometry is correct; closing this would require glyph-edge anti-aliasing
+in the renderer, a broader change. **Low priority** (user-confirmed). Not a
+device-font-substitution issue (an earlier draft of this doc speculated that; the
+user's zoom test disproved it).
 
 ## Reproduce
 ```bash
