@@ -20832,8 +20832,21 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 }
 
 // MovieClip cache: ensures same instance name always returns same pointer
-// so properties (dynamic_props) persist across lookups
-#define MAX_CHILD_MOVIECLIPS 128
+// so properties (dynamic_props) persist across lookups. When this cache is
+// FULL, findOrCreateMovieClip can no longer cache a freshly-created MC, so
+// every subsequent name lookup (GetVariable/GetMember) mints a *brand-new*
+// MovieClip with empty dynamic_props — breaking `parent[childName]` resolution
+// for attachMovie'd children (whose binding lives on the attach-time instance's
+// dynamic_props). 128 was too small for games that attach many clips: Tetris
+// builds a ~118-cell board via b_mc.attachMovie("block",...), then colors cells
+// with b_mc[pos].gotoAndStop(c) every tick — with a 128 cap the board cells fill
+// the cache, b_mc/next_mc become uncacheable, their dynamic_props never persist,
+// and every gotoAndStop hit an undefined receiver (blank board + falling piece).
+// 512 comfortably holds the board + next-piece preview + UI clips. The cap is a
+// leak backstop only (per-tick MC leaks are prevented at their source, e.g. the
+// browser-WASM frame-func re-run guard in tag.c), so raising it does not change
+// correctness for churny games — it only adds headroom.
+#define MAX_CHILD_MOVIECLIPS 512
 MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
 int child_mc_count = 0;
 // MCs at index >= this threshold were just placed in the current frame's
@@ -64565,8 +64578,29 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ASObject* _mcp_modern = (g_mc_ctor_modern != NULL) ? g_mc_ctor_modern->prototype_obj : NULL;
 				ASObject* _mcp_default = g_movieclip_constructor.prototype_obj;
 				ASObject* _mcm_cur = (ASObject*)(uintptr_t)_mcm_dp_proto->data.numeric_value;
+				// A vanilla MovieClip that merely acquired a generic dynamic_props
+				// bag (e.g. via SetMember `mc.foo = x`, or a runtime that allocates
+				// the bag with the builtin Object.prototype as its __proto__) has
+				// dynamic_props.__proto__ pointing DIRECTLY at the builtin
+				// Object.prototype. That is NOT a registerClass'd chain — MC
+				// builtins (gotoAndStop, getDepth, ...) must still apply. Only a
+				// genuine Object.registerClass replaces __proto__ with a *user*
+				// prototype object (e.g. `theClass.prototype = {}`), which is a
+				// distinct object whose own __proto__ is Object.prototype. So:
+				// bypass only when the immediate __proto__ is a user object that
+				// fails to reach MovieClip.prototype — never when it IS the builtin
+				// Object.prototype. Without this guard, Tetris's attachMovie'd
+				// "block" cells (which gain an Object.prototype-based dynamic_props)
+				// had their b_mc[pos].gotoAndStop(color) routed to a no-op, leaving
+				// the whole board + falling piece blank in browser-WASM.
+				ASObject* _mcm_objproto = getObjectPrototype(app_context);
 				int _mcm_found = 0;
-				for (int _mcm_hops = 0; _mcm_hops < 16 && _mcm_cur != NULL; _mcm_hops++) {
+				if (_mcm_cur != NULL && _mcm_cur == _mcm_objproto) {
+					// Directly the builtin Object.prototype → vanilla MC, not a
+					// registered class. Treat MC builtins as available.
+					_mcm_found = 1;
+				}
+				for (int _mcm_hops = 0; !_mcm_found && _mcm_hops < 16 && _mcm_cur != NULL; _mcm_hops++) {
 					if (_mcm_cur == _mcp_legacy || _mcm_cur == _mcp_modern || _mcm_cur == _mcp_default) {
 						_mcm_found = 1; break;
 					}
@@ -64823,11 +64857,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								// (charId 37) at _y=0, restarting its fall animation
 								// and pinning the platform's collision bounds at the
 								// hero forever. Skip when already settled on frame N.
-								if (!is_play
-								    && dobj->sprite_current_frame == (size_t)frame0
-								    && !dobj->sprite_manual_next_frame) {
+								// (Guard on the 1-indexed currentframe, which
+								// ng_gotoFrameByMC keeps in sync — sprite_current_frame
+								// is the *next* frame to run, not the displayed one.)
+								if (!is_play && mc->currentframe == (int)frame0 + 1) {
 									// already stopped on this frame — no-op
-								} else {
+								}
+								// Tetris board cells (b_mc.attachMovie("block",...)
+								// then b_mc[pos].gotoAndStop(color+1)) need the
+								// attached clip's display list REBUILT to the target
+								// frame's content — the old flag-only path left every
+								// cell on frame 0 (the empty "bang_mc"), so the board
+								// and falling piece rendered blank. ng_gotoFrameByMC
+								// runs the frame funcs synchronously into the MC's
+								// standalone sprite_display_list (and, unlike
+								// actionGotoFrame, never touches the root timeline, so
+								// the Doodle Jump concern above is moot).
+								else if (!ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
+									// Fallback for clips ng_gotoFrameByMC can't handle
+									// (no name, or no display content): record the
+									// target so a later pump can pick it up.
 									dobj->sprite_next_frame = (size_t)frame0;
 									dobj->sprite_manual_next_frame = 1;
 									dobj->sprite_is_playing = is_play ? 1 : 0;
