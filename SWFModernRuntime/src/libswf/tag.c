@@ -8107,7 +8107,38 @@ static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject
 		if (mc->display_obj != (void*)obj) continue;
 		invalidate_descendants_of_mc(app_context, mc);
 		actionInvalidateCachedMovieClipDirect(app_context, mc);
-		break;
+		return;
+	}
+	// Fallback for root-placed text fields. A DefineEditText placed directly on
+	// the root display list gets its child_mc_cache wrapper created lazily by
+	// name lookup (actionFindOrCreateMovieClip), which sets ng_textfield_idx and
+	// depth (= SWF depth - 16384) but never links display_obj. The display_obj
+	// scan above therefore can't find it, so when the entry is removed/reclaimed
+	// (Tetris's level-select "startLevel" number at depth 193 replaced by
+	// sound_mc at the menu->game transition) the wrapper survives in the cache
+	// and actionIterateTextFieldGlyphs keeps drawing its bound value on every
+	// later frame. Match the orphaned wrapper by the AS-depth that corresponds
+	// to this SWF depth plus the text-field index, and invalidate it.
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern int ng_find_textfield(size_t);
+	int tf_idx = ng_find_textfield(obj->char_id);
+	if (tf_idx < 0) return;
+	uintptr_t base = (uintptr_t)display_list;
+	uintptr_t op = (uintptr_t)obj;
+	if (display_list == NULL || op < base) return;
+	size_t d = (size_t)(op - base) / sizeof(DisplayObject);
+	if (d > max_depth || &display_list[d] != obj) return;  // not a root DL entry
+	int as_depth = (int)d - 16384;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (mc->display_obj != NULL) continue;
+		if (mc->ng_textfield_idx != tf_idx) continue;
+		if (mc->depth != as_depth) continue;
+		invalidate_descendants_of_mc(app_context, mc);
+		actionInvalidateCachedMovieClipDirect(app_context, mc);
+		return;
 	}
 }
 #endif
