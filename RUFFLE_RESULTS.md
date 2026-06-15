@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `419dc1efba21`  
-**Date:** 2026-06-15 01:07 UTC  
-**Total duration:** 2h58m59s
+**Commit:** `3f8c0c1ec7c8`  
+**Date:** 2026-06-15 03:41 UTC  
+**Total duration:** 2h07m05s
 
 ## Results by Suite
 
@@ -24,7 +24,7 @@
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 113,362 | 125,858 | 90.1% |
+| avm1 | 113,375 | 125,858 | 90.1% |
 | from_gnash/actionscript.all | 29,983 | 38,791 | 77.3% |
 | from_gnash/misc-ming.all | 4,033 | 5,239 | 77.0% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -32,7 +32,7 @@
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
 | from_shumway | 882 | 1,276 | 69.1% |
 | from_shumway/avm1 | 489 | 491 | 99.6% |
-| **Total** | **149,481** | **172,538** | **86.6%** |
+| **Total** | **149,494** | **172,538** | **86.6%** |
 
 ## Failure Breakdown
 
@@ -83,9 +83,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | - | - | - | 13 |
+| avm1 | - | - | 13 | - |
 
-*Comparing `22a981318bb5` → `419dc1efba21`*
+*Comparing `419dc1efba21` → `3f8c0c1ec7c8`*
 
 ## Flash-Spec Results
 
@@ -100,55 +100,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 620/687 (90.2%)
-- **Duration:** 1h15m13s across 30 shards
-- **Lines:** 113,362/125,858 matching (90.1%)
-- **Avg test duration:** 6.5s — slowest: `netstream_play_flv_screen` (36.9s)
+- **Duration:** 48m23s across 30 shards
+- **Lines:** 113,375/125,858 matching (90.1%)
+- **Avg test duration:** 4.2s — slowest: `netstream_play_flv_screen` (36.3s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 135/243 (55.6%)
-- **Duration:** 36m05s across 30 shards
+- **Duration:** 25m25s across 30 shards
 - **Lines:** 29,983/38,791 matching (77.3%)
-- **Avg test duration:** 8.9s — slowest: `MovieClip-v8` (63.9s)
+- **Avg test duration:** 6.2s — slowest: `array-v6` (51.6s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 67/110 (60.9%)
-- **Duration:** 35m09s across 30 shards
+- **Duration:** 28m15s across 30 shards
 - **Lines:** 4,033/5,239 matching (77.0%)
-- **Avg test duration:** 19.1s — slowest: `matrix_test` (103.4s)
+- **Avg test duration:** 15.4s — slowest: `matrix_test` (91.6s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
 - **Duration:** 2m27s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 16.4s — slowest: `enum` (20.5s)
+- **Avg test duration:** 16.4s — slowest: `exception` (20.9s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 9/19 (47.4%)
-- **Duration:** 5m21s across 30 shards
+- **Duration:** 4m12s across 30 shards
 - **Lines:** 428/557 matching (76.8%)
-- **Avg test duration:** 16.9s — slowest: `registerclass_test3` (22.2s)
+- **Avg test duration:** 13.2s — slowest: `movieclip_destruction_test3` (21.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 6m43s across 30 shards
+- **Duration:** 3m04s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 20.1s — slowest: `tags_after_last_showframe` (21.3s)
+- **Avg test duration:** 9.1s — slowest: `missing_bitmap` (20.5s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 15m47s across 30 shards
+- **Duration:** 13m28s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 10.2s — slowest: `fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd` (23.9s)
+- **Avg test duration:** 8.7s — slowest: `fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732` (23.1s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 2m10s across 30 shards
+- **Duration:** 1m47s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 2.7s — slowest: `hitarea` (21.1s)
+- **Avg test duration:** 2.2s — slowest: `hitarea` (19.9s)
