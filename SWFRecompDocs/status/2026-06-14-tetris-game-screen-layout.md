@@ -1,130 +1,112 @@
-# Tetris game screen: object placement is broken (board frame, score panel, buttons missing; ~2× stage inflation)
+# Tetris game-screen layout FIXED — no-matrix PlaceObject2 "modify" reset objects to the origin
 
-**Date:** 2026-06-14 (cont. 30 follow-up — investigation handoff)
-**Status:** 🔴 **OPEN** — new investigation. The board cells now *colour* (cont. 30
-`shape_array` fix + cont. 29 cell-resolution fixes), but the **game-frame layout is
-wrong**: the board outline, the level/lines/score panel labels, and the quit/pause
-buttons don't render, the "tetris" logo is mis-placed, blocks are scattered/wrong, and
-the stage is inflated to ~2× by a stray element. **Browser-WASM only** — verify with
-`tetris_compare.py`, not CI.
+**Date:** 2026-06-14 (cont. 31)
+**Status:** ✅ **FIXED** — the board outline, the level/lines/score panel labels +
+values, the quit/pause buttons, and the "tetris" logo now render in their correct
+positions on the SWFRecomp browser-WASM game screen, matching Ruffle. Verified with
+`tools/divergence/game_drive/tetris_compare.py` (all four stages — menu / play / up /
+ok — now match; no regression on the three that were already good).
+**Bucket:** **shared runtime** (`tag.c` `tagPlaceObject2` compiles into
+trace / NO_GRAPHICS / OFFSCREEN as well as browser-WASM) → run CI both modes as a
+no-regression check.
 
 ---
 
-## What the visual comparison established (tetris_compare.py, cont. 30)
+## The handoff's theory was wrong (twice over)
 
-The renderer/text/scale engine is **proven good** — the divergence is specific to the
-**game screen** ("ok" stage):
+The cont. 30 handoff hypothesized the game frame's **static/timeline content was being
+skipped by the renderer** while only attached/dynamic content drew. Instrumentation
+disproved both layers:
 
-| Stage | Result |
-|-------|--------|
-| **menu** | ✅ near-perfect match — "tetris" logo, ■ play / ■ high scores, `www.neave.com/games`, same scale |
-| **play** (level select) | ✅ match — *except* the digit **"1" renders as a slanted "/"** (known, deprioritized italic-glyph bug; "2" renders fine on the next stage) |
-| **up** (level→2) | ✅ match |
-| **ok** (game) | ❌ **broken layout — this is the bug** |
+1. **The "hang" was an instrumentation artifact.** Early diagnostic builds dumped the
+   full root display list + `child_mc_cache` (~400 console lines) on *every* frame
+   change. That console flood froze the page mid-tick, so the timeline appeared to
+   "stop" at a wall-clock-variable frame (10/13/14/15 depending on how much I logged).
+   With a **lean** heartbeat (one line per main-loop iteration, no array dumps), the
+   heartbeats continue indefinitely: the timeline plays cleanly to **frame 23 and
+   stops** (`play=0`). **No hang.** Lesson: a per-frame full-DL dump is heavy enough to
+   self-induce a "freeze" — keep render-loop diagnostics to O(1) per frame.
 
-Compare images live in `tools/divergence/game_drive/compare_out/`:
-`compare_{menu,play,up,ok}.png` (side-by-side), `ruffle_ok.png` (correct game screen),
-`swfrecomp_ok.png` (our broken game screen).
+2. **The content is NOT skipped by the renderer — it was placed at the wrong
+   coordinates.** A one-shot dump at the stopped frame showed every element present in
+   the display list (`char 55`/`69` board outline, `char 41–50` labels/values,
+   `quit_btn`/`pause_btn`, `char 26` logo) — but the labels, values, buttons, and logo
+   were all at **tx=0, ty=0** (piled in the top-left = the garbled cluster in the broken
+   screenshot). At an earlier frame (cf=14) those same objects had **correct** coords
+   (`quit_btn` was tx=247, ty=280); a later frame reset them.
 
-### Ruffle's correct game screen (`ruffle_ok.png`)
-- Tall board rectangle on the **left**, blue falling piece upper-left.
-- Next-piece preview box **top-right** (blue piece).
-- Right column: **level 2 / lines 0 / score 0** (label + value rows).
-- **quit / pause** buttons.
-- **"tetris" logo bottom-right.**
-- Everything fits in a **382×380** box.
+## Root cause
 
-### SWFRecomp's broken game screen (`swfrecomp_ok.png`)
-- **"tetris" logo at TOP-LEFT** (should be bottom-right) — mis-positioned.
-- A stray **red** 2×2 block top-center (Ruffle has no red here).
-- A blue piece top-right (plausibly the next-piece preview, roughly right position).
-- A bare floating **"2"** mid-screen (the level *value*, but with **no `level`/`lines`/
-  `score` labels** around it).
-- A small stray cell at the **far bottom-right**.
-- **No board outline, no panel labels, no quit/pause buttons.**
-- Harness measured the SWFRecomp content box at **781×777 @ (52,0)** — ~**2×** Ruffle's
-  382×380. The stray bottom-right cell is almost certainly what inflates the bbox; the
-  harness then scales the capture by that box, cramming the real content into the
-  top-left quadrant (so some of the "mis-position" is capture-scaling, but the logo
-  being top-left and the missing frame/labels/buttons are real).
+`tagPlaceObject2`'s **modify path** (`char_id == 0`, a PlaceObject2 with the Move flag
+but no new CharacterId) updated the object's `transform_id` **unconditionally**:
 
-## Hypotheses / where to look (unverified — for the next session)
-
-This is a **placement / frame-content** bug class, distinct from the cell-colouring one:
-
-1. **Stray element at ~(781,777) inflating the stage to 2×.** Find which display entry
-   / attached MC lands there. Could be a board cell placed at doubled coordinates, or
-   an element whose transform is composed twice (`compute_mc_world_xform` from cont. 28
-   double-applying a parent transform?). Fixing this likely also un-cramps the capture.
-2. **Board outline (the tall rectangle) not rendering.** Is it a static DefineShape on
-   the game frame, or part of `b_mc`? Check whether the game-frame's static/timeline
-   content renders at all, or only the attached `block` cells do.
-3. **Score panel labels (`level`/`lines`/`score`) + quit/pause buttons missing.** These
-   are static text + buttons on the game frame. The bare "2" rendering (a bound dynamic
-   textfield value) but not its label suggests the static/timeline content of the game
-   frame is being skipped while only dynamic/attached content renders. Compare to how
-   the menu frame (which renders fully) differs from the game frame.
-4. **"tetris" logo mis-position.** Same static-content-placement question.
-
-**Strong working theory:** on the game frame, only *dynamically-created / attached*
-content (bound textfields, attached `block` cells) is rendering; the frame's *static /
-timeline-placed* content (board frame shape, panel labels, buttons, logo) is being
-skipped or mis-placed. The menu/level-select frames render their static content fine,
-so contrast those frames' placement path against the game frame's. Start by
-instrumenting the game-frame render to dump every display entry (static + attached):
-char_id, instance name, world (x,y), and whether it rendered — then diff against the
-expected Ruffle layout.
-
-## Reproduce / verify (the loop)
-
-```bash
-source emsdk/emsdk_env.sh
-SWFRecomp/scripts/build_test.sh flasharchive/Tetris wasm --graphics --clean
-# confirm your diagnostic landed BEFORE deploying:
-strings SWFRecomp/tests/flasharchive/Tetris/build/wasm/Tetris.wasm | grep -c <your-PMDIAG-marker>
-SWFRecomp/scripts/deploy_example.sh flasharchive/Tetris "$(pwd)/docs2/examples" --no-index --graphics
-# run the harness STANDALONE (see process gotchas):
-/tmp/browser-test-venv/bin/python3 tools/divergence/game_drive/tetris_compare.py
-# view compare_out/swfrecomp_ok.png vs ruffle_ok.png; diagnostics in compare_out/pmdiag.log
+```c
+if (!display_list[depth].transformed_by_script) {
+    display_list[depth].transform_id = transform_id;   // even when transform_id == 0
+}
 ```
 
-## Process gotchas (cost real time in cont. 30 — heed)
+The recompiler emits `transform_id = 0` when a PlaceObject2 tag has **no matrix**
+(`HasMatrix == 0`, `swf.cpp:3611`: `if (has_matrix) … else transform_id = 0;`). Slot 0
+of `transform_data` is the identity matrix. So a move tag that changes *only* the color
+transform / ratio / clip depth (no matrix) snapped the object to the **origin** instead
+of keeping its position — the opposite of Flash, where a move tag only updates the
+matrix when it actually carries one.
 
-- **The handoff's cleanup `pkill -9 -f browser-test-venv` / `pkill -f chrome`
-  SELF-MATCH the launching shell** (its command line literally contains
-  `/tmp/browser-test-venv/bin/python3 …` and the word `chrome`), so pkill kills the bash
-  command before it runs → exit 1, no output, stale `pmdiag.log` left behind. **Run
-  cleanup in a SEPARATE bash call from the harness launch, and use the bracket trick:**
-  `pkill -9 -f 'tetris_compar[e]'`, `pkill -9 -f 'chrom[e]'`, or name-based
-  `pkill -9 chrome` / `pkill -9 chromium`. See memory
-  `tetris-compare-harness-pkill-selfmatch.md`.
-- The harness needs **Chrome + WebGPU + Ruffle CDN network + DISPLAY** → run it with the
-  **Bash sandbox disabled** (`dangerouslyDisableSandbox: true`), `timeout 600`.
-- After building, `strings <wasm> | grep <marker>` to confirm the diagnostic actually
-  compiled in before deploying (a couple of builds raced on stale wasm in cont. 30).
-- Gate temp diagnostics on `#ifdef __EMSCRIPTEN__`; `printf("PMDIAG …")` is captured to
-  `compare_out/pmdiag.log` by the harness console hook. **Strip before committing.**
-- The SWFRecomp side is slow; allow `timeout 600`.
+Concrete Tetris victims:
+- **"tetris" logo** (`char 26`): placed at frame 3 with a real matrix (bottom-right),
+  then frames 6–10 issue **cxform-only** modifies (the fade-in animation) → reset to
+  (0,0) = top-left.
+- **score-panel labels + values + quit/pause buttons** (`char 41–54`): placed at frame
+  14 with real matrices, then frame 15 issues **cxform** modifies → reset to (0,0).
 
-## Constraints
+## The fix
 
-- Browser-WASM-only behavior → verify with the harness, NOT CI
-  (`ci-only-when-observable`). If a fix touches shared/OFFSCREEN-compiled code, also run
-  CI both modes as a no-regression check (`.claude/pipeline-handoff.md`); autonomous
-  commit/push/CI is authorized. Commit to master (trunk-based). Update PROGRESS.md
-  (cont. 31) + a new status doc when something lands.
-- Also still pending (deprioritized): the italic-digit "1"→"/" glyph slant; and a manual
-  re-check of DJ/Snake/Pong for cont. 29's fix #3 (`gotoAndStop`→`ng_gotoFrameByMC`,
-  not CI-observable).
+Guard the transform update in the modify path with `transform_id != 0` so a no-matrix
+modify **keeps the existing matrix** (Flash semantics). `tag.c` only, three sites in
+`tagPlaceObject2`:
+- the main `char_id == 0` modify branch (all modes),
+- its `ng_cache_transform` companion (NO_GRAPHICS/OFFSCREEN cached x/y),
+- the browser-WASM same-tick `pending_remove` reclaim-modify branch.
 
-## Read first (next session)
+**This is exactly what the sibling `tagPlaceObject2Ratio` modify path already does**
+(`if (transform_id != 0) { … }`) — the plain variant was the buggy outlier; the fix
+brings it into line, which strongly de-risks the change.
 
-1. This doc.
-2. `SWFRecompDocs/status/2026-06-14-tetris-shape-array-newobject.md` (cont. 30 — the
-   colouring fix that got us here).
-3. `SWFRecompDocs/status/2026-06-14-tetris-board-gotoandstop.md` (cont. 29 — cell
-   resolution + gotoAndStop fixes #1–#3).
-4. `tools/divergence/game_drive/README.md` (harness).
-5. Memory: `browser-wasm-visible-and-nonroot-attach-render.md`,
-   `child-mc-cache-cap-resolution.md`, `tetris-compare-harness-pkill-selfmatch.md`,
-   `getbounds-as-created-clips.md`.
+Known minor ambiguity (documented in-code): an *explicit* identity move-matrix also
+dedups to slot 0, so a deliberate "move to origin" via PlaceObject2 is now not applied.
+This is rare (you'd place at origin with the default transform, not re-move there) and
+is the trade-off for correct no-matrix-modify behavior.
+
+## Verification
+
+`tetris_compare.py` → `compare_out/compare_ok.png`: SWFRecomp now shows the tall board
+outline, the next-piece preview box, the **level / lines / score** rows (values in the
+right column), the **quit / pause** buttons, and the **"tetris" logo bottom-right** —
+all matching Ruffle's reference. `compare_menu.png` / `compare_up.png` unchanged
+(still pixel-match). Shared code → CI both modes.
+
+## Still open (separate issues, out of scope for this fix)
+
+- **Per-frame game ActionScript doesn't drive the timeline in browser-WASM.** During the
+  full 3→23 playthrough only ~6 `func_anonymous` (init-time) calls fire; no per-tick
+  `onEnterFrame` game-loop runs, and `setInterval` callbacks never fire (the
+  `processTimers` call site in `swf.c` is inside `#ifdef OFFSCREEN_RENDER`, so
+  browser-WASM never pumps timers). Consequences: the falling piece doesn't animate in
+  the board, and the timeline free-plays to frame 23 instead of being held at the game
+  frame by the running game. This is the next real blocker for *playable* Tetris.
+- The deprioritized italic-digit "1"→"/" glyph slant.
+- Manual re-check of DJ/Snake/Pong for cont. 29 fix #3 (`gotoAndStop`→`ng_gotoFrameByMC`).
+
+## Process notes (heed)
+
+- **Don't dump the full display list / child_mc_cache every frame** in browser-WASM
+  diagnostics — the console flood freezes the page and masquerades as a runtime hang.
+  Use a one-line-per-tick heartbeat to measure frame progression, and gate any heavy
+  per-entry dump to a single one-shot (`if (cf == TARGET && !done)`).
+- Runtime `.c` changes **do** recompile without `--clean` (BUILD_DIR is wiped every
+  build); the earlier "timer.c marker absent" was dead-code elimination of an
+  OFFSCREEN-only function, not a stale build. `--clean` additionally regenerates
+  `RecompiledScripts`/`RecompiledTags` (wiping any edits to generated files).
+- Harness cleanup still self-matches the launching shell — see
+  `tetris-compare-harness-pkill-selfmatch.md`; run cleanup in a separate bash call.

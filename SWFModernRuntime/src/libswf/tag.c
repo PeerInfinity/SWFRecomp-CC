@@ -6210,7 +6210,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		if (display_list[depth].char_id != 0
 		    && display_list[depth].char_id == char_id)
 		{
-			if (!display_list[depth].transformed_by_script) {
+			// transform_id==0 = no matrix in this move tag (recompiler sentinel,
+			// swf.cpp:3611) → keep the existing matrix (Flash semantics).
+			if (transform_id != 0 && !display_list[depth].transformed_by_script) {
 				display_list[depth].transform_id = transform_id;
 				ng_cache_transform(&display_list[depth], transform_id);
 			}
@@ -6380,7 +6382,17 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		//   timeline modify.
 		if (display_list[depth].cx_overridden) return;
 		// Modify operation (HasCharacter=0): update transform/cxform only, preserve identity.
-		if (!display_list[depth].transformed_by_script) {
+		// A move-PlaceObject2 with NO matrix (HasMatrix=0) is emitted by the
+		// recompiler as transform_id=0 (swf.cpp:3611). Per Flash, a move tag only
+		// updates the object's matrix when it carries one — a no-matrix modify
+		// (e.g. a cxform-only fade, or a ratio/clip-only change) must KEEP the
+		// existing matrix. Without the `transform_id != 0` guard such a modify
+		// snaps the object to the origin (slot 0 = identity). Concrete victims:
+		// Tetris's "tetris" logo (frames 6-10 cxform fade-in modifies) and its
+		// score-panel labels + quit/pause buttons (frame 15 cxform modifies) all
+		// jumped to (0,0). (Rare ambiguity: an explicit identity move-matrix also
+		// dedups to slot 0; such a deliberate move-to-origin is not preserved.)
+		if (transform_id != 0 && !display_list[depth].transformed_by_script) {
 			display_list[depth].transform_id = transform_id;
 		}
 		display_list[depth].cxform_id = cxform_id;
@@ -6394,8 +6406,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Skip caching the new transform when it was rejected above so the
 		// cached x/y/xscale/yscale on the DisplayObject continue to reflect the
-		// AS-set values.
-		if (!display_list[depth].transformed_by_script) {
+		// AS-set values (or the preserved matrix for a no-matrix modify).
+		if (transform_id != 0 && !display_list[depth].transformed_by_script) {
 			ng_cache_transform(&display_list[depth], transform_id);
 		}
 		// Re-init cxform via ng_on_place_object2 (handles ng_init_cxform_from_data internally).
