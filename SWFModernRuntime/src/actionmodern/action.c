@@ -51567,18 +51567,60 @@ void actionNewObject(SWFAppContext* app_context)
 	popVar(app_context, &num_args_var);
 	u32 num_args = (u32) varToInt32(&num_args_var);
 
-	// 3. Pop arguments from stack (store them temporarily)
-	// Limit to 16 arguments for simplicity
-	ActionVar args[16];
+	// 3. Pop arguments from stack (store them temporarily).
+	// We MUST pop ALL num_args operands to keep the stack balanced for the
+	// following opcode — clamping the pop count (the old behavior) strands the
+	// extra args (and, below them, the SetVariable name) on the stack, so a
+	// following `SetVariable` reads a leftover element as the variable name.
+	// That silently dropped Tetris's 112-element `shape_array` literal.
+	// Only the `new Array(e1,…,eN)` element-list path actually consumes more
+	// than 16 args; every other constructor reads at most args[0..few]. So we
+	// spill to a heap buffer for large counts (freed in the Array path) and copy
+	// the first 16 into the fixed buffer for the generic ctor paths.
+	ActionVar args_fixed[16];
+	ActionVar* args = args_fixed;
+	ActionVar* args_heap = NULL;
 	if (num_args > 16)
 	{
-		num_args = 16;
+		args_heap = (ActionVar*) malloc(sizeof(ActionVar) * num_args);
 	}
-
-	// Pop arguments: SWF pushes last arg first, so first arg is on top of stack
-	for (u32 i = 0; i < num_args; i++)
+	if (args_heap != NULL)
 	{
-		popVar(app_context, &args[i]);
+		// Pop arguments: SWF pushes last arg first, so first arg is on top of stack
+		for (u32 i = 0; i < num_args; i++)
+		{
+			popVar(app_context, &args_heap[i]);
+		}
+		if (strcmp(ctor_name, "Array") == 0)
+		{
+			// Array element list needs all args — use (and free) the heap buffer.
+			args = args_heap;
+		}
+		else
+		{
+			// Non-Array ctor: stack is now balanced; only the first 16 args are
+			// ever consumed below, so keep those and drop the heap buffer.
+			for (u32 i = 0; i < 16; i++)
+			{
+				args_fixed[i] = args_heap[i];
+			}
+			free(args_heap);
+			args_heap = NULL;
+			num_args = 16;
+		}
+	}
+	else
+	{
+		// Small arg count (or malloc failure — fall back to the old clamp).
+		if (num_args > 16)
+		{
+			num_args = 16;
+		}
+		// Pop arguments: SWF pushes last arg first, so first arg is on top of stack
+		for (u32 i = 0; i < num_args; i++)
+		{
+			popVar(app_context, &args[i]);
+		}
 	}
 
 	// 4. Create new object based on constructor name
@@ -51637,6 +51679,11 @@ void actionNewObject(SWFAppContext* app_context)
 		initArrayProto(app_context, arr);
 		new_obj = arr;
 		obj_type = ACTION_STACK_VALUE_ARRAY;
+		if (args_heap != NULL)
+		{
+			free(args_heap);
+			args_heap = NULL;
+		}
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) new_obj);
 		return;
 	}
