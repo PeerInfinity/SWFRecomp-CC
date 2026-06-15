@@ -1044,7 +1044,22 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		// (script_4's `play()` after mc_red.gotoAndStop(3) must set mc_red playing
 		// so the sprite advances to frame 3 and fires script_5 → "7+" trace).
 		extern void exec_sprite_frame(SWFAppContext*, DisplayObject*, frame_func);
-		size_t current = obj->sprite_current_frame;
+		// sprite_current_frame holds the NEXT frame to execute ((shown+1) % fc,
+		// see the post-loop assignment below), but the forward/backward/same
+		// branch logic needs the currently-DISPLAYED frame. Un-wrap it. Without
+		// this the comparison was off by one and, crucially, WRAPPED at fc: a
+		// clip stopped on the last frame had sprite_current_frame == 0, so a
+		// gotoAndStop back to frame 0 read as "same frame" and skipped the
+		// clear+replay — leaving the old frame's shapes on screen. That is the
+		// Tetris board-cell erase bug: the `block` sprite colours live at
+		// depth 1/2 (frames 1-7) while the "empty" frame 0 only places bang_mc
+		// at depth 3 and clears nothing, so erasing a cell (drawBlock(0,pos) ->
+		// gotoAndStop(1)) REQUIRES the backward-jump rewind. The off-by-one also
+		// made forward colour jumps start at the wrong frame (skipping the
+		// depth-1 establishing place). Deriving `current` from the displayed
+		// frame fixes both. (mc->currentframe-1 is the same value, un-wrapped,
+		// and the caller's no-op guard already trusts it.)
+		size_t current = (fc > 0) ? ((obj->sprite_current_frame + fc - 1) % fc) : 0;
 		if (frame > current)
 		{
 			// Forward jump: execute frames current+1..frame
