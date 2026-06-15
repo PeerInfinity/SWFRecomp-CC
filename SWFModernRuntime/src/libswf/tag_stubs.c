@@ -1103,6 +1103,35 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 				exec_sprite_frame(app_context, obj, ch->sprite_frame_funcs[frame]);
 		}
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Finalize deferred removes from the synchronous replay. In browser-WASM /
+		// HEADLESS_GRAPHICS, tagRemoveObject2 only marks pending_remove=1 (it does
+		// NOT clear char_id) and relies on tagShowFrame's later pending-remove walk
+		// to finalize. This replay has no such pass, so a frame's RemoveObject2 left
+		// the old entry live: e.g. the Tetris `block` sprite swaps its colour shape
+		// between depth 1 and depth 2 (frames 3/5/6/7 remove one depth and place the
+		// other), so without finalizing, a goto landed with BOTH colour depths
+		// occupied and the higher depth rendered on top — the wrong-colour squares
+		// (purple on the orange I-piece). A re-place at the same depth already
+		// consumed its own pending_remove (tagPlaceObject2's consume path), so only
+		// genuinely-removed depths remain flagged here. Clear them to reflect the
+		// target frame's true state. (NO_GRAPHICS/OFFSCREEN clear inline in
+		// tagRemoveObject2, so they never hit this.)
+		for (size_t j = 1; j <= max_depth; ++j)
+		{
+			if (display_list[j].pending_remove)
+			{
+				if (display_list[j].sprite_display_list != NULL)
+				{
+					FREE(display_list[j].sprite_display_list);
+					display_list[j].sprite_display_list = NULL;
+				}
+				display_list[j].char_id = 0;
+				display_list[j].pending_remove = 0;
+			}
+		}
+#endif
+
 		obj->sprite_display_list = display_list;
 		obj->sprite_max_depth = max_depth;
 		obj->sprite_dl_capacity = display_list_capacity;
