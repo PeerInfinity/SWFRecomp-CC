@@ -1066,6 +1066,28 @@ void tagMain(SWFAppContext* app_context)
 		// swf_headless.c line ~1267.
 		capture_tick_post_frame();
 #endif
+
+#if !defined(OFFSCREEN_RENDER) && defined(__EMSCRIPTEN__)
+		// Browser-WASM per-tick timer pump. The OFFSCREEN_RENDER block above
+		// runs processTimers inside its #ifdef; browser-WASM never did, so
+		// AS2 setInterval / setTimeout callbacks never fired here — e.g.
+		// Tetris's `timeout = setInterval(down, speed)` falling-piece driver,
+		// which is the game's entire fall mechanic (without it the board never
+		// animates and the game is unplayable). Sprite advance, enterFrame
+		// dispatch (tagFlushPendingEnterFrame), and LOAD drains already run per
+		// tick inside tagShowFrame (called from each frame_func), so we add ONLY
+		// the timer-side pumps that have no browser-WASM equivalent. Bracketed
+		// by actionFlushPendingOnLoads like the OFFSCREEN cluster so onLoad
+		// chains queued by a timer callback drain the same tick.
+		{
+			extern void processTimers(SWFAppContext*, double);
+			extern void actionFlushPendingOnLoads(SWFAppContext*);
+			double timer_dur_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;
+			actionFlushPendingOnLoads(app_context);
+			processTimers(app_context, timer_dur_ms);
+			actionFlushPendingOnLoads(app_context);
+		}
+#endif
 		if (manual_next_frame)
 		{
 			// Natural backward wrap (recompiler-emitted at end of last frame
