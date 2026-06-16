@@ -85,8 +85,48 @@ appearing as a `char_id` confirmed a reused/freed buffer.)
 Not CI-dispatched: browser-WASM-only behavior, not CI-observable
 ([[ci-only-when-observable]]).
 
+## Remaining browser-WASM gaps (radios still not visually correct)
+
+The user manual-tested after the fix above: the radios still don't show and the
+"extra rectangles" (vs Ruffle) persist. Firing the constructor was necessary but
+not sufficient — it exposed a cascade of further browser-WASM-only gaps in the
+FUIComponent instance pipeline that had been fully masked while the constructor
+never ran. Pinned with fresh browser instrumentation:
+
+1. **`this.<timelineChild>` resolves to undefined in browser-WASM.**
+   `FRadioButton.init()` runs `this.boundingBox_mc.unloadMovie()` (Ruffle empties
+   the boundingBox so no rectangle shows). In browser-WASM the `unloadMovie`
+   method handler is **never reached** — `actionCallMethod`'s MC-method chain is
+   gated on `obj_var.type == ACTION_STACK_VALUE_MOVIECLIP`, and `this.boundingBox_mc`
+   (a GetMember for a timeline-placed child of the component MC) resolves to a
+   non-MOVIECLIP (undefined). So `boundingBox_mc` is never emptied → its
+   `boundingBox` shape (charid 32, `_alpha`=100) keeps rendering as an opaque
+   rectangle. This same GetMember gap almost certainly also blocks the label text
+   (`FLabel.setLabel` writes `this.labelField.text`). The attached children
+   (`frb_states_mc`/`fLabel_mc`/`frb_hitArea_mc`) DO render via
+   `render_attached_child` (verified: `frb_states_mc` smd=9, `frb_hitArea_mc`
+   correctly skipped `!visible`), but they're covered by / interleaved with the
+   un-emptied opaque boundingBox, and the label glyphs never got their text.
+
+   OFFSCREEN resolves `this.boundingBox_mc` correctly (it renders the radios
+   fine), so this is a browser-WASM-specific child-resolution path — `actionGetMember`
+   / the MC-child name lookup for a timeline child of a registerClass'd component
+   instance. Fixing it is the next blocker for the visible result. NOTE:
+   `actionGetMember` is shared across all build modes, so any change there is
+   CI-observable and must be gated/verified accordingly.
+
+2. **`render_attached_child` does not propagate cxform** (`compose_children(..., 0, 0)`)
+   and renders the `child_mc_cache` candidates in cache order, not depth order —
+   latent z-order / alpha-fidelity gaps that may matter once (1) is fixed.
+
+These are tracked as the continuation of the browser-WASM component work; the
+committed change here is the necessary foundation (construction + crash fix), not
+the complete visual fix.
+
 ## Process lesson (again)
 
 Same lesson as the cont.26 handoff: re-confirm a handoff's root cause with fresh
 instrumentation before coding. The "missing render pass" framing was already
-fixed; the real bug was one layer up (construction) plus a latent attach UAF.
+fixed; the real bug was one layer up (construction) plus a latent attach UAF —
+and that in turn sits on top of further browser-WASM component-pipeline gaps
+(child resolution, unloadMovie, label text).
