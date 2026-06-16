@@ -4251,6 +4251,67 @@ static void compute_mc_world_xform(SWFAppContext* app_context, MovieClip* mc, fl
 	apply_as_transform(local, mc, (u8)(1|2|4|8|16));
 	hit_test_mat4_multiply(out, parent_world, local);
 }
+
+#if !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+// Root display_list index of an attached MC's parent, or -1 if the parent is
+// _root or is not a timeline-placed object (i.e. itself an attached/dynamic MC
+// whose DisplayObject lives outside the global display_list array). Used to
+// layer attached (child_mc_cache) clips at their parent's depth rather than
+// above all timeline content. See the interleave in tagShowFrame.
+static int attached_parent_dl_index(MovieClip* mc)
+{
+	extern MovieClip root_movieclip;
+	if (mc == NULL || mc->parent == NULL || mc->parent == &root_movieclip)
+		return -1;
+	DisplayObject* pd = (DisplayObject*)mc->parent->display_obj;
+	if (pd == NULL) return -1;
+	uintptr_t lo = (uintptr_t)display_list;
+	uintptr_t hi = lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
+	uintptr_t p = (uintptr_t)pd;
+	if (p < lo || p >= hi) return -1;
+	return (int)(pd - display_list);
+}
+#endif
+
+// Render one attached (child_mc_cache) MovieClip's sprite content under its
+// parent's world transform. Shared by the depth-interleaved pass and the
+// post-loop root-attached pass in tagShowFrame. No-op when the clip has no
+// sprite content, is hidden, has a hidden ancestor, or is a timeline-placed
+// root child already drawn by the main display loop.
+static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
+{
+	extern MovieClip root_movieclip;
+	if (mc->display_obj == NULL) return;            // no sprite content
+	if (!mc->visible) return;                       // AS-set _visible=false
+	// Timeline-placed root children point into the global display_list and were
+	// already drawn by the main render loop.
+	uintptr_t dl_lo = (uintptr_t)display_list;
+	uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
+	uintptr_t dobj = (uintptr_t)mc->display_obj;
+	if (dobj >= dl_lo && dobj < dl_hi) return;
+
+	DisplayObject* d = (DisplayObject*)mc->display_obj;
+	if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) return;
+	// Skip clips whose parent chain is hidden.
+	for (MovieClip* _a = mc->parent; _a != NULL && _a != &root_movieclip; _a = _a->parent)
+		if (!_a->visible) return;
+
+	float parent_world[16];
+	compute_mc_world_xform(app_context, mc->parent, parent_world);
+	float mc_local[16] = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
+	float mc_xform[16];
+	hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
+	compose_children(app_context, d->sprite_display_list,
+		d->sprite_max_depth, mc_xform, 0, 0);
+	render_display_list(app_context, d->sprite_display_list,
+		d->sprite_max_depth);
+}
 #endif
 
 void tagShowFrame(SWFAppContext* app_context)
@@ -4879,6 +4940,29 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Restore default blend mode
 		if (obj->blend_mode > 1)
 			renderer_set_blend_mode(context, 0);
+
+#if !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+		// Interleave attached (child_mc_cache) clips parented to THIS timeline
+		// object right after it, so they layer at the parent's depth instead of
+		// above all timeline content. Without this, a clip attached to a sprite
+		// that sits below a later timeline object — Tetris's board cells are
+		// parented to b_mc (depth 198), below the game-over quitGame_mc overlay
+		// (depth 219) — paints OVER that object. Root-attached clips (parent ==
+		// _root, AS depth 16384+) keep going through the post-loop pass below so
+		// they stay above all timeline content, matching Flash. OFFSCREEN /
+		// HEADLESS skip non-root attaches entirely (see the post-loop pass), so
+		// this interleave is browser-WASM-only.
+		{
+			extern MovieClip* child_mc_cache[];
+			extern int child_mc_count;
+			for (int ci = 0; ci < child_mc_count; ci++) {
+				MovieClip* cm = child_mc_cache[ci];
+				if (cm == NULL || cm->depth == INT_MIN) continue;
+				if (attached_parent_dl_index(cm) == (int)i)
+					render_attached_child(app_context, cm);
+			}
+		}
+#endif
 	}
 
 	if (active_clip_depth > 0)
@@ -4905,59 +4989,15 @@ void tagShowFrame(SWFAppContext* app_context)
 			// browser-WASM-only feature, kept out of these modes to stay
 			// byte-identical). Browser-WASM falls through to the general path.
 			if (mc->parent != &root_movieclip) continue;
+#else
+			// Clips parented to a timeline object were already drawn at their
+			// parent's depth by the interleave in the main render loop above.
+			// Only root-attached clips (AS depth 16384+) and nested-attached
+			// clips whose parent isn't a timeline object reach here — both
+			// correctly layer above all timeline content.
+			if (attached_parent_dl_index(mc) >= 0) continue;
 #endif
-			if (mc->display_obj == NULL) continue;         // no sprite content
-			if (!mc->visible) continue;                    // AS-set _visible=false
-			// Skip timeline-placed root children: their display_obj points
-			// into the global display_list array, so the main render loop
-			// already drew them. Root attaches have a separately HCALLOC'd
-			// DisplayObject (ng_attachMovie:414-420).
-			uintptr_t dl_lo = (uintptr_t)display_list;
-			uintptr_t dl_hi = dl_lo + display_list_capacity * sizeof(DisplayObject);
-			uintptr_t dobj = (uintptr_t)mc->display_obj;
-			if (dobj >= dl_lo && dobj < dl_hi) continue;
-
-			DisplayObject* d = (DisplayObject*)mc->display_obj;
-			if (d->sprite_display_list == NULL || d->sprite_max_depth == 0)
-				continue;
-			// Skip clips whose parent chain is hidden: a clip attached to a
-			// non-root sprite whose ancestor set _visible=false must not render.
-			{
-				int _anc_hidden = 0;
-				for (MovieClip* _a = mc->parent; _a != NULL && _a != &root_movieclip; _a = _a->parent)
-					if (!_a->visible) { _anc_hidden = 1; break; }
-				if (_anc_hidden) continue;
-			}
-			// Build the MC's WORLD transform: parent's world (walk the parent
-			// chain) composed with this MC's own AS-set _x/_y/scale/rotation.
-			// For a clip attached directly to root the parent world is identity,
-			// recovering the original behaviour; for one attached to a non-root
-			// sprite (e.g. Tetris's 190 block cells parented to b_mc) this places
-			// it under the parent sprite's placement instead of at the stage
-			// origin. Without it, attachMovie children of any non-root sprite
-			// render nowhere (the old `parent != root` skip dropped them).
-			float parent_world[16];
-			compute_mc_world_xform(app_context, mc->parent, parent_world);
-			float mc_local[16] = {
-				1.0f, 0.0f, 0.0f, 0.0f,
-				0.0f, 1.0f, 0.0f, 0.0f,
-				0.0f, 0.0f, 1.0f, 0.0f,
-				0.0f, 0.0f, 0.0f, 1.0f,
-			};
-			// Unconditionally overlay mc->x/y/xscale/yscale/rotation onto the
-			// local matrix. Even when as_set_flags is 0, mc->x/y hold valid
-			// values (defaulting to 0 / scales 100). This matters for
-			// duplicateMovieClip clones whose _x/_y were set via opcode
-			// SetProperty (action.c:~52883) — browser-WASM writes mc->x but not
-			// the as_set_flags bit, so without forcing here clones render at the
-			// origin. (Snake's gameplay places every snake segment this way.)
-			apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
-			float mc_xform[16];
-			hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
-			compose_children(app_context, d->sprite_display_list,
-				d->sprite_max_depth, mc_xform, 0, 0);
-			render_display_list(app_context, d->sprite_display_list,
-				d->sprite_max_depth);
+			render_attached_child(app_context, mc);
 		}
 	}
 
