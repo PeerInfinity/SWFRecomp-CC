@@ -335,6 +335,12 @@ const char* ng_getTextFieldRawHtml(int tf_idx);
 const char* ng_getTextFieldInitialTextByIdx(int tf_idx);
 const char* ng_getFontName(u16 font_id);
 const char* ng_getFontNameSWFDefined(u16 font_id);
+// Returns the font_id of a synthesized device-font ("_sans"/"_serif"/
+// "_typewriter") that carries real glyph outlines (Phase-A compile-time
+// synthesis fills these for zero-glyph named fonts), or -1 if none exists.
+// Used as the render fallback for device-font EditTexts whose referenced
+// embedded font only carries a partial glyph subset.
+int ng_find_device_fallback_font(void);
 int ng_getFontBold(u16 font_id);
 int ng_getFontItalic(u16 font_id);
 int ng_getTransformId(size_t depth, u32* out_id);

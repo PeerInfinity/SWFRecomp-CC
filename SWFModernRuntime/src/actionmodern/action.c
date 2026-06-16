@@ -25974,6 +25974,29 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			else if (mc->ng_textfield_idx >= 0) font_id = ng_getTextFieldFontId(mc->ng_textfield_idx);
 			if (fh_prop) font_height = (u16)varToDoubleSimple(fh_prop);
 			else if (mc->ng_textfield_idx >= 0) font_height = ng_getTextFieldFontHeight(mc->ng_textfield_idx);
+
+			// Device-font fields (embedFonts/UseOutlines = false) render with a
+			// host system font, not the SWF's embedded outlines. When such a
+			// field references a real embedded font that only carries a partial
+			// glyph subset (e.g. Minesweeper's "Arial" font 57, which embeds
+			// just the glyphs used by its static title), the missing glyphs are
+			// silently dropped and the label renders garbled. Re-point the field
+			// at a synthesized device-font alias ("_sans" etc., full ASCII via
+			// the recompiler's Phase-A synthesis) so the whole label renders.
+			// Fonts already named with a "_" device alias point at the
+			// synthesized set, so they're left untouched.
+			{
+				ActionVar* ef = getProperty(props, "embedFonts", 10);
+				int embed = (ef && ef->type == ACTION_STACK_VALUE_BOOLEAN &&
+				             ef->data.numeric_value != 0);
+				if (!embed) {
+					const char* fname = ng_getFontName(font_id);
+					if (fname == NULL || fname[0] != '_') {
+						int dev = ng_find_device_fallback_font();
+						if (dev >= 0) font_id = (u16)dev;
+					}
+				}
+			}
 		}
 
 		// Get text color (fallback when no run table or run color missing)

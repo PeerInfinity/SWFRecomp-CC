@@ -580,6 +580,29 @@ u16 ng_findFontIdByName(const char* name)
 	return 0;
 }
 
+// A device-font EditText (UseOutlines/embedFonts = false) renders with a host
+// system font, never with the SWF's embedded outlines. Many SWFs embed a font
+// (e.g. "Arial") with only the glyph subset used by their static text, then
+// point device-font fields at the same font expecting the player to supply the
+// rest from a system font. We approximate that by re-pointing such fields at a
+// reserved device-font alias ("_sans"/"_serif"/"_typewriter"), which the
+// recompiler's Phase-A synthesis has populated with a full ASCII glyph set from
+// the bundled NotoSans. Returns the alias font's id (preferring "_sans"), or -1
+// when the SWF declares no such synthesized device font.
+int ng_find_device_fallback_font(void)
+{
+	static const char* prefs[3] = { "_sans", "_serif", "_typewriter" };
+	for (int pi = 0; pi < 3; pi++) {
+		for (size_t i = 0; i < ng_font_count; i++) {
+			if (!ng_fonts[i].is_builtin && ng_fonts[i].has_metrics &&
+			    ng_fonts[i].glyph_count > 0 &&
+			    strcasecmp(ng_fonts[i].name, prefs[pi]) == 0)
+				return (int)ng_fonts[i].font_id;
+		}
+	}
+	return -1;
+}
+
 int ng_getFontBold(u16 font_id)
 {
 	for (size_t i = 0; i < ng_font_count; i++)
