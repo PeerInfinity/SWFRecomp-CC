@@ -4,13 +4,16 @@
 **Status:** ✅ **FIXED** — topping out now shows the "game over" / "enter your
 name:" name-entry screen (`quitGame_mc` frame 2) instead of a frozen board.
 Verified with `tools/divergence/game_drive/tetris_gameover_probe.py`.
-**Bucket:** **browser-WASM only.** The fix writes `DisplayObject::as_hidden`,
-which is **read only** at `tag.c:4766` inside the `#else` of
-`#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)` — compiled only when
-`!NO_GRAPHICS && !OFFSCREEN_RENDER` (HEADLESS_GRAPHICS defines NO_GRAPHICS,
-native graphics is OFFSCREEN). In NO_GRAPHICS / OFFSCREEN / HEADLESS the field
-is never read, so the change is **inert** there → **not CI-observable** (per
-`ci-only-when-observable`). No CI dispatch.
+**Bucket / CI:** the fix writes `DisplayObject::as_hidden`, which is **read** at
+`tag.c:4766`. That render walk is inside `#if !defined(NO_GRAPHICS) ||
+defined(HEADLESS_GRAPHICS)` — NOT the `#else` of `NO_GRAPHICS||OFFSCREEN_RENDER`
+(that `#endif` closes earlier, at the button-hit-test boundary ~line 4469). So
+the read is compiled in **OFFSCREEN_RENDER (graphics-native) and
+HEADLESS_GRAPHICS** as well as browser-WASM → the SetMember `_visible` change
+**IS CI-observable** in the `--mode=graphics` suite. (An earlier draft of this
+doc wrongly called it browser-WASM-only; corrected after re-reading the
+preprocessor nesting.) Pure NO_GRAPHICS/trace never reads `as_hidden`, so traces
+are unaffected. **Graphics CI dispatched** as a no-regression check.
 
 ---
 
@@ -88,6 +91,46 @@ game to a no-input single-column top-out (~110 s). After the fix the render dump
 shows `hidden=0` with the frame-2 DL, and `go_final.png` (clean build, no
 diagnostics) shows the **"game over" / "enter your name:" / "ok"** screen over
 the board — previously completely absent.
+
+## Follow-up 1 — game-over screen rendered BEHIND the blocks — FIXED
+
+User-reported after the screen started showing: the game-over form drew *behind*
+the board blocks. The board cells are `attachMovie`'d into `b_mc` (timeline
+depth 198), but the browser-WASM attached-MC pass (`tag.c`) drew **all**
+`child_mc_cache` clips *after* the entire timeline walk, assuming attached clips
+sit above all timeline content. That holds only for clips attached to `_root`
+(AS depth 16384+). `quitGame_mc` is a timeline object at depth **219 > 198**, so
+the cells (parented to b_mc@198) painted over it.
+
+**Fix (`tag.c`):** interleave attached clips at their parent's timeline depth.
+After rendering `display_list[i]` in the main loop, render the `child_mc_cache`
+clips whose parent's `display_obj == &display_list[i]`; the post-loop pass now
+renders only root-attached clips (and nested-attached clips whose parent isn't a
+timeline object), which correctly stay above all timeline content. Extracted the
+per-clip render into `render_attached_child()`; added `attached_parent_dl_index()`.
+Gated `!OFFSCREEN_RENDER && !HEADLESS_GRAPHICS` (those modes skip non-root
+attaches), so browser-WASM-only; the refactored post-loop pass is
+behavior-equivalent for root-parent clips in all modes. Verified: form now in
+front of the blocks; board cells during play unchanged; DJ menu smoke clean.
+
+## Follow-up 2/3 — still open (game-over screen interactivity)
+
+Both reported by the user, both deeper than the render fixes above:
+
+- **(2) `ok` button hover doesn't darken the "ok" text.** The cursor DOES change
+  to a pointer on hover, so the nested-button hit-test fires
+  (`ng_update_button_states_in_dl` recurses into `quitGame_mc`'s sprite DL and
+  composes the placement transform). The gap is the OVER-state **visual** not
+  rendering for this nested button — needs browser instrumentation to localize
+  (state rebuild vs. render of the rebuilt state DL). Bounded but not yet done.
+- **(3) Can't type into the `name_txt` field.** `name_txt` (char 64) is an INPUT
+  TextField inside `quitGame_mc`; `Selection.setFocus(name_txt)` is called on
+  game-over. Editing requires routing keydown to the focused input field +
+  mutating/re-rendering its text + caret — a substantial input-text-editing
+  feature, not a small fix.
+
+Both need a repro that reaches game-over (~110 s no-input top-out) then drives a
+hover / keystrokes; left for a focused follow-up session.
 
 ## Still open — the line-clear freeze (separate bug)
 
