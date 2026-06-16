@@ -26124,8 +26124,30 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		float world_x = mc->x;
 		float world_y = mc->y;
 		for (MovieClip* p = mc->parent; p != NULL; p = p->parent) {
-			world_x += p->x;
-			world_y += p->y;
+			float px = p->x, py = p->y;
+			// A timeline-placed sprite holds its placement in the root
+			// display-list transform, not mc->x (which stays 0 unless AS moved
+			// it). Without adding it, a textfield nested in such a sprite — e.g.
+			// Tetris's game-over name_txt inside quitGame_mc@219 — renders at its
+			// parent-local position near the stage origin instead of inside the
+			// placed form. Only fires for parents whose display_obj points INTO
+			// the global display_list (timeline-placed); attached/dynamic clips
+			// have mc->x set and a display_obj outside it, so they're unchanged.
+			// Use the placement only when AS hasn't overridden _x/_y.
+			if (p->display_obj != NULL) {
+				extern DisplayObject* display_list;
+				extern size_t max_depth;
+				extern float transform_data[][16];
+				ptrdiff_t _pidx = (DisplayObject*)p->display_obj - display_list;
+				if (_pidx >= 0 && (size_t)_pidx <= max_depth &&
+				    &display_list[_pidx] == (DisplayObject*)p->display_obj) {
+					u32 _ptid = ((DisplayObject*)p->display_obj)->transform_id;
+					if (!(p->as_set_flags & 1)) px = transform_data[_ptid][12] / 20.0f;
+					if (!(p->as_set_flags & 2)) py = transform_data[_ptid][13] / 20.0f;
+				}
+			}
+			world_x += px;
+			world_y += py;
 		}
 
 		TextFieldGlyphInfo info;
