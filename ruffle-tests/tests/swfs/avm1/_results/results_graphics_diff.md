@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `efddd2eaf784` (2026-06-15T20:04:14.214680+00:00)
-**Current:** `0ca6e0abddf1` (2026-06-16T01:49:04.991392+00:00)
+**Previous:** `0ca6e0abddf1` (2026-06-16T01:49:04.991392+00:00)
+**Current:** `9b74cb424ac8` (2026-06-16T03:44:26.798170+00:00)
 
 ## Summary
 
