@@ -20982,6 +20982,33 @@ static size_t findDisplayEntryInParent(const char* instance_name, MovieClip* par
 	extern MovieClip root_movieclip;
 	if (parent == &root_movieclip) return SIZE_MAX; // parent IS root, already searched
 
+	// Attached / dynamic clips (attachMovie / createEmptyMovieClip) hold their
+	// children in their OWN display_obj->sprite_display_list, not the global
+	// display_list. ng_findDisplayEntryByName(parent->name) below can't locate
+	// such a parent when it is itself nested inside another attached clip
+	// (e.g. Minesweeper's fLabel_mc, attached inside the attached radio button
+	// level_eazy), so its placed children — like the EditText `labelField` — are
+	// invisible to the global-list search and `this.labelField` resolves to
+	// undefined during the component's on(initialize). That makes FLabel.setLabel
+	// write `labelField.text` onto undefined, so the radio labels never render.
+	// Search the parent's own sprite display list directly first.
+	if (parent->display_obj != NULL) {
+		DisplayObject* pdobj = (DisplayObject*)parent->display_obj;
+		if (pdobj->sprite_display_list != NULL) {
+			for (size_t d = 1; d <= pdobj->sprite_max_depth; d++) {
+				DisplayObject* child = &pdobj->sprite_display_list[d];
+				if (child->char_id == 0 || child->instance_name == NULL) continue;
+				if (swf_name_match(child->instance_name, instance_name)) {
+					if (out_char_id) *out_char_id = child->char_id;
+					// Parent isn't in the global display_list, so there's no
+					// root parent_depth to encode; return a small non-SIZE_MAX
+					// sentinel (the caller only checks != SIZE_MAX + out_char_id).
+					return d;
+				}
+			}
+		}
+	}
+
 	// Find parent's root depth
 	size_t parent_depth = ng_findDisplayEntryByName(parent->name);
 	if (parent_depth == SIZE_MAX || parent_depth > max_depth) return SIZE_MAX;
@@ -21000,6 +21027,30 @@ static size_t findDisplayEntryInParent(const char* instance_name, MovieClip* par
 		}
 	}
 	return SIZE_MAX;
+}
+
+// An attachMovie'd / createEmptyMovieClip'd child's mc->display_obj is the clip's
+// OWN child-holder DisplayObject, which is a SEPARATE object from the entry that
+// ng_attachMovie registered in the parent's sprite_display_list (they share the
+// same children array but have independent as_hidden flags — see ng_attachMovie's
+// registration block). The _visible setters write as_hidden onto mc->display_obj,
+// so the registration entry that render_display_list actually iterates never gets
+// the flag and keeps drawing a clip the script set invisible (Minesweeper's
+// FRadioButton frb_hitArea_mc — a wide hit-test shape set `_visible=false` — paints
+// a grey bar over its label). Propagate as_hidden onto the registration entry too.
+// No-op for timeline-placed children (mc->display_obj already IS the entry; this
+// just re-sets the same flag) and for root attaches (parent has no sprite list).
+static void sync_attached_entry_hidden(MovieClip* mc, int new_vis) {
+	if (mc == NULL || mc->parent == NULL || mc->name[0] == '\0') return;
+	if (mc->parent->display_obj == NULL) return;
+	DisplayObject* pdobj = (DisplayObject*)mc->parent->display_obj;
+	if (pdobj->sprite_display_list == NULL) return;
+	for (size_t d = 1; d <= pdobj->sprite_max_depth; d++) {
+		DisplayObject* e = &pdobj->sprite_display_list[d];
+		if (e->char_id != 0 && e->instance_name != NULL &&
+		    swf_name_match(e->instance_name, mc->name))
+			e->as_hidden = new_vis ? 0 : 1;
+	}
 }
 
 // Returns 1 if `mc` represents a non-scriptable display character (shape,
@@ -41189,7 +41240,7 @@ void actionSetVariable(SWFAppContext* app_context)
 				// can never be re-shown by an explicit `mc._visible = true`
 				// (Tetris game-over quitGame_mc screen).
 				if (mc->display_obj != NULL)
-					((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1;
+					{ ((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1; sync_attached_entry_hidden(mc, new_vis); }
 			}
 			handled = 1;
 		}
@@ -46923,7 +46974,7 @@ void actionSetMember(SWFAppContext* app_context)
 						// SetMember `mc._visible = true` can't re-show a sprite that a
 						// frame-script `_visible=false` (SetProperty opcode) hid.
 						if (mc->display_obj != NULL)
-							((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1;
+							{ ((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1; sync_attached_entry_hidden(mc, new_vis); }
 						markTransformedByScript(mc);
 					}
 					return;
@@ -54150,7 +54201,7 @@ void actionSetProperty(SWFAppContext* app_context)
 			// name from the root render loop). mc->display_obj points straight
 			// at the DisplayObject. See DisplayObject::as_hidden.
 			if (mc->display_obj != NULL)
-				((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1;
+				{ ((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1; sync_attached_entry_hidden(mc, new_vis); }
 			markTransformedByScript(mc);
 			break;
 		}
@@ -55016,7 +55067,7 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 		// re-show a sprite that a frame-script `_visible=false` (SetProperty
 		// opcode) hid.
 		if (mc->display_obj != NULL)
-			((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1;
+			{ ((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1; sync_attached_entry_hidden(mc, new_vis); }
 		markTransformedByScript(mc);
 		return 1;
 	}
@@ -69017,6 +69068,24 @@ _mc_user_dispatch: ;
 							// stale operands on the caller's eval stack (gnash
 							// Function.as case2bis: clip1.stack_test2(7,8,9) on a
 							// 0-param method).
+							//
+							// Bind `this` = receiver MC on g_this_stack too, not just
+							// the local scope object. GetVariable("this") consults
+							// g_this_stack BEFORE the scope chain (it mirrors Flash's
+							// Activation.this, which is not a scope property), so
+							// without this push a simple DefineFunction method body
+							// reads the CALLER's `this` off the stack. Minesweeper's
+							// FLabel.setLabel (type-1) ran with this=the radio button
+							// instead of fLabel_mc, so `this.labelField.text = ...`
+							// wrote to undefined and the radio labels never rendered.
+							// The type-2 path below binds via g_event_this_mc, which
+							// preload_this consumes; type-1 bodies don't preload, so
+							// they need the explicit g_this_stack entry.
+							u32 _mcm_saved_this_depth = g_this_depth;
+							if (g_this_depth < MAX_THIS_DEPTH) {
+								g_this_stack[g_this_depth] = this_var;
+								g_this_depth++;
+							}
 							for (u32 i = 0; i < num_args && i < func->param_count; i++)
 								pushVar(app_context, &args[i]);
 							for (u32 i = num_args; i < func->param_count; i++) {
@@ -69024,6 +69093,7 @@ _mc_user_dispatch: ;
 							}
 							if (args != NULL) FREE(args);
 							result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+							g_this_depth = _mcm_saved_this_depth;
 						} else if (func->advanced_func != NULL) {
 							// Type 2: pass args array
 							// Use g_event_this_mc so generated preload_this code picks up MC type correctly

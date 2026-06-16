@@ -2392,6 +2392,16 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
 
+		// Honor AS-set _visible=false on a nested entry (and its whole subtree).
+		// SetProperty/SetMember _visible syncs the MC's _visible onto this entry's
+		// as_hidden via mc->display_obj. Mirrors the same skip in the main display
+		// loop (~line 4895). A mask's _visible is irrelevant to its clipping role,
+		// so only skip non-mask entries. Without this, an invisible nested clip —
+		// e.g. Minesweeper's FRadioButton frb_hitArea_mc (a wide hit-test shape set
+		// `_visible=false`) — paints a grey bar over its label. The setter syncs
+		// as_hidden onto this (registration) entry via sync_attached_entry_hidden.
+		if (obj->clip_depth == 0 && obj->as_hidden) continue;
+
 #if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary.
 		// Check for video BEFORE the switch to avoid rendering as empty shape.
