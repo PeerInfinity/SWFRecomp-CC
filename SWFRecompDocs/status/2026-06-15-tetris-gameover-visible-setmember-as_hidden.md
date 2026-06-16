@@ -113,24 +113,51 @@ attaches), so browser-WASM-only; the refactored post-loop pass is
 behavior-equivalent for root-parent clips in all modes. Verified: form now in
 front of the blocks; board cells during play unchanged; DJ menu smoke clean.
 
-## Follow-up 2/3 — still open (game-over screen interactivity)
+## Follow-up 3 — name-field input — Selection API wired (browser-WASM), input now works
 
-Both reported by the user, both deeper than the render fixes above:
+User-reported: can't type into the name field. Instrumented the whole chain
+(reaching game-over via `tetris_gameover_interact_probe.py`, ~118 s):
 
-- **(2) `ok` button hover doesn't darken the "ok" text.** The cursor DOES change
-  to a pointer on hover, so the nested-button hit-test fires
-  (`ng_update_button_states_in_dl` recurses into `quitGame_mc`'s sprite DL and
-  composes the placement transform). The gap is the OVER-state **visual** not
-  rendering for this nested button — needs browser instrumentation to localize
-  (state rebuild vs. render of the rebuilt state DL). Bounded but not yet done.
-- **(3) Can't type into the `name_txt` field.** `name_txt` (char 64) is an INPUT
-  TextField inside `quitGame_mc`; `Selection.setFocus(name_txt)` is called on
-  game-over. Editing requires routing keydown to the focused input field +
-  mutating/re-rendering its text + caret — a substantial input-text-editing
-  feature, not a small fix.
+1. **`Selection.setFocus(name_txt)` was a no-op in browser-WASM.** The entire
+   Selection API (`setFocus`/`getFocus`/`setSelection`/`getBeginIndex`/…) was
+   wired only under `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`
+   (`action.c` ~37655 + the forward decls ~34716). The impls are ungated.
+   Browser-WASM had the `Selection` object but no methods, so
+   `Selection.setFocus(name_txt)` resolved to **undefined**. Calling undefined
+   also aborted the rest of `quitGame_mc` frame 2's DoAction (`script_14`),
+   which is why `_root.pause_btn._visible = _root.quit_btn._visible = false`
+   never ran (quit/pause stayed visible). **Fix:** remove both gates so the API
+   is wired in all modes. NO_GRAPHICS/OFFSCREEN already had it → browser-WASM-only,
+   not CI-observable. After the fix, SETFOCUS reports `name_txt` focused
+   (`focusable=1 istf=1`).
+2. **Keystroke routing already works.** `on_keypress` (`render_webgpu.c`,
+   registered on the focusable `#canvas`) → `g_text_input_ring` → `swf.c` drain →
+   `actionTextFieldInput` with `g_focused_mc == name_txt`. Confirmed end-to-end:
+   chars A/B/C are inserted into `name_txt`.
+   - **Harness gotchas** (documented in the probe): Playwright's
+     `keyboard.type`/`press` does **not** emit the `keypress` event emscripten
+     listens for (KEYDOWN fires, KEYPRESS doesn't) — dispatch a synthetic
+     `KeyboardEvent('keypress', …)` instead. And a mouse **click** on the canvas
+     clears the AS field focus, so don't click before typing.
 
-Both need a repro that reaches game-over (~110 s no-input top-out) then drives a
-hover / keystrokes; left for a focused follow-up session.
+**Residual (separate, pre-existing nested-field bug):** the focused input field
+renders its typed text at the **wrong world position** (top-left of the stage)
+instead of inside the form — `name_txt` is nested in `quitGame_mc`@219 and its
+glyph-render world position isn't composed under the parent's placement.
+Newly visible now that input works; tracked as a follow-up. Also the
+`_root.pause_btn/quit_btn._visible=false` still doesn't hide them (name-resolved
+button MC has no linked `display_obj`, so the as_hidden sync no-ops) — minor.
+
+## Follow-up 2 — `ok` button hover doesn't darken its text (open, narrowed)
+
+The cursor changes on hover, and instrumentation confirmed the nested `ok_btn`
+(char 62) **does** reach the OVER state (`old=1 new=1 hover=1`) —
+`ng_update_button_states_in_dl` recurses into `quitGame_mc`'s sprite DL, composes
+the placement transform, hit-tests, and rebuilds the state DL. So the state
+machine works; the gap is that the rendered OVER-state visual doesn't change the
+text colour. Remaining work: compare the over-state shape/cxform against Ruffle
+(is our over-state DL content/colour wrong, or does this button's over-state
+genuinely differ only subtly?). Render-fidelity item, left for follow-up.
 
 ## Still open — the line-clear freeze (separate bug)
 
