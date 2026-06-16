@@ -64852,8 +64852,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (endptr != frame_part && *endptr == '\0') {
 						frame_num = (s32)parsed;
 					} else {
-						// Try label lookup (sprite-specific first, then root)
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+						// Try label lookup (sprite-specific first, then root).
+						// Available in all build modes: ng_getCharIdByMC is in
+						// tag_stubs.c (compiled everywhere), ng_findSpriteLabelFrame is
+						// in tag.c (every graphics variant incl. browser-WASM), and
+						// findFrameByLabel is in action.c. The browser-WASM gotoAndStop
+						// arm below consumes frame_num just like the NO_GRAPHICS/OFFSCREEN
+						// arm — without resolving the label here, a `mc.gotoAndStop("lbl")`
+						// in browser-WASM left frame_num=0 and no-op'd (Minesweeper's
+						// FRadioButton frb_states.gotoAndStop("selectedEnabled") → the
+						// selected-radio dot never appeared in the deployed demo).
 						if (!force_root) {
 							size_t cid = ng_getCharIdByMC(mc);
 							if (cid > 0) {
@@ -64865,7 +64873,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							int rf = findFrameByLabel(frame_part);
 							if (rf >= 0) frame_num = rf + 1;
 						}
-#endif
 					}
 				}
 				if (frame_num > 0) {
