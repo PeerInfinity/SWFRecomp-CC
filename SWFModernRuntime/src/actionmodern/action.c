@@ -34713,15 +34713,16 @@ static ASFunction g_selection_getBeginIndex_func;
 static ASFunction g_selection_getCaretIndex_func;
 static ASFunction g_selection_getEndIndex_func;
 static ASFunction g_selection_setSelection_func;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-// Forward declarations — implementations are in the NO_GRAPHICS block at end of file
+// Forward declarations — implementations are ungated at the end of file. The
+// Selection API is wired in ALL modes (browser-WASM included) so AS2 input
+// forms work there too — e.g. Tetris's game-over name-entry calls
+// Selection.setFocus(name_txt). (Previously gated to NO_GRAPHICS/OFFSCREEN.)
 static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_getBeginIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_getCaretIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_getEndIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_setSelection(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
-#endif
 
 static int g_global_init_done = 0;
 
@@ -37651,8 +37652,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	}
 	installAsBroadcaster(app_context, g_selection_obj);
 
-	// Install Selection methods
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Install Selection methods (all modes — browser-WASM needs these for AS2
+	// input forms; the impls are ungated. Was gated to NO_GRAPHICS/OFFSCREEN.)
 	{
 		static int sel_funcs_init = 0;
 		if (!sel_funcs_init) {
@@ -37703,7 +37704,6 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		fv.data.numeric_value = (u64)&g_selection_setSelection_func;
 		setProperty(app_context, g_selection_obj, "setSelection", 12, &fv);
 	}
-#endif
 
 	// AsBroadcaster own_props and MovieClipLoader prototype
 	initAsBroadcasterFuncs(app_context);
