@@ -79,8 +79,38 @@ kept painting.
   `as2_super_and_this_v6`, `call_method_empty_name` all pass.
 - Shared runtime + OFFSCREEN render path → CI dispatched both modes.
 
-## Remaining (minor, out of scope)
+## Follow-up — selected-radio filled dot — ALSO FIXED
 
-Medium is the initially-selected radio; Ruffle draws a filled center dot. Ours
-draws an empty circle (the `frb_states` selected-frame indicator isn't shown).
-Separate, cosmetic; not pursued this session.
+Medium is the initially-selected radio; Ruffle draws a filled center dot, ours
+drew an empty circle. `FRadioButton.setState(true)` →
+`frb_states_mc.gotoAndStop("selectedEnabled")` (a **frame-label gotoAndStop on the
+attachMovie'd `frb_states` 5-frame clip**; "selectedEnabled" = frame 5, which
+places the dot char 28 at depth 11). Three bugs in the attached-clip goto path
+(`tag_stubs.c`, all headless-reproducible — trace `frb_states_mc _cf` went 1→5
+matching Ruffle):
+
+1. **`ng_getCharIdByMC` returned 0 for the attached clip** (it only did a global
+   display_list name lookup; nested attached clips aren't there). So gotoAndStop
+   couldn't resolve the sprite frame label and stayed on frame 1. Fix: read
+   `mc->display_obj->char_id` first (ng_attachMovie sets it).
+2. **`ng_gotoFrameByMC` ran the frame funcs in the caller's context** —
+   `exec_sprite_frame` only sets the sprite context when the display_obj has an
+   `instance_name`, which an attachMovie'd holder lacks. The frame-5 placement of
+   `frb_frame_mc` leaked onto `_root` (`_root.frb_frame_mc=undefined`). Fix: set
+   `g_current_context = mc` explicitly around the frame execution.
+3. **The dot didn't render** even with the playhead on frame 5: the parent's
+   registration entry (what `render_display_list` iterates) carries a stale copy
+   of `sprite_max_depth` (9) from attach time, clipping the iteration short of the
+   dot at depth 11. Fix: re-copy the live `sprite_display_list` / `sprite_max_depth`
+   / `sprite_dl_capacity` onto the registration entry after the goto.
+
+These are NO_GRAPHICS / OFFSCREEN_RENDER paths (the divergence harness + both CI
+modes). The deployed **browser-WASM** demo uses a different gotoAndStop arm
+(`!NO_GRAPHICS && !OFFSCREEN_RENDER`, the `targeted_sprite` path), so the dot in
+the live demo would need that path verified separately (browser-test bucket); the
+label fixes (action.c) are shared and already apply there.
+
+Local regression checks: goto_frame / goto_advance1 / goto_both_ways1 /
+goto_execution_order / button_goto pass; Tetris trace identical; Pacman converged;
+Doodle Jump unchanged (its L6 hero `_y` diff is the documented RNG-layout one,
+RESULTS.md L75).

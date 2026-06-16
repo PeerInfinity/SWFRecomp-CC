@@ -1036,6 +1036,25 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			display_list_capacity = obj->sprite_dl_capacity;
 		}
 
+		// Run the frame funcs with g_current_context = this MC so named child
+		// placements (e.g. frb_frame_mc) parent to THIS sprite, not the caller's
+		// context. exec_sprite_frame sets the context from obj->instance_name, but
+		// an attachMovie'd clip's holder DisplayObject has a NULL instance_name
+		// (ng_attachMovie never sets it), so the context wouldn't change and the
+		// frame's placements would bind to whatever was current — leaking the
+		// sprite's named children onto _root (Minesweeper frb_states
+		// gotoAndStop("selectedEnabled") leaked _root.frb_frame_mc=undefined). We
+		// already hold the exact MC, so set it directly (no name-ambiguity: three
+		// radios share the name "frb_states_mc").
+		extern MovieClip* g_current_context;
+		extern void actionSetCurrentContext(MovieClip*);
+		extern MovieClip* actionGetBaseClip(void);
+		extern void actionSetBaseClip(MovieClip*);
+		MovieClip* _gfbmc_saved_ctx = g_current_context;
+		MovieClip* _gfbmc_saved_base = actionGetBaseClip();
+		actionSetCurrentContext(mc);
+		actionSetBaseClip(mc);
+
 		// Execute sprite frame funcs via exec_sprite_frame so g_current_sprite_obj /
 		// g_current_context / base_clip are set correctly. Without this, sprite
 		// scripts queued by these frames (e.g. via actionQueueSpriteScript) capture
@@ -1132,6 +1151,9 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		}
 #endif
 
+		actionSetCurrentContext(_gfbmc_saved_ctx);
+		actionSetBaseClip(_gfbmc_saved_base);
+
 		obj->sprite_display_list = display_list;
 		obj->sprite_max_depth = max_depth;
 		obj->sprite_dl_capacity = display_list_capacity;
@@ -1155,6 +1177,33 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 	obj->sprite_manual_next_frame = 0;
 	obj->sprite_is_playing = play ? 1 : 0;
 	mc->currentframe = (int)frame + 1;  // 1-indexed
+
+	// Propagate the updated display list to the parent's registration entry.
+	// An attachMovie'd clip's mc->display_obj (== obj) is a SEPARATE holder from
+	// the entry render_display_list iterates in the parent's sprite_display_list
+	// (ng_attachMovie copies the holder's list pointer + sprite_max_depth into
+	// that entry at attach time). The goto above advanced the holder to the
+	// target frame's content — e.g. Minesweeper's frb_states "selectedEnabled"
+	// frame places the filled radio dot (chid 28) at a NEW depth (11) beyond the
+	// attach-time max_depth — but the registration entry's stale sprite_max_depth
+	// would clip the iteration short and the dot would never render. Re-copy the
+	// live fields. (No-op for timeline-placed clips whose mc->display_obj already
+	// IS the iterated entry — they aren't found in the parent's sprite list.)
+	if (mc->parent != NULL && mc->parent->display_obj != NULL && mc->name[0] != '\0') {
+		DisplayObject* pdobj = (DisplayObject*)mc->parent->display_obj;
+		if (pdobj->sprite_display_list != NULL) {
+			for (size_t d = 1; d <= pdobj->sprite_max_depth; d++) {
+				DisplayObject* e = &pdobj->sprite_display_list[d];
+				if (e != obj && e->instance_name != NULL &&
+				    swf_name_match(e->instance_name, mc->name)) {
+					e->sprite_display_list = obj->sprite_display_list;
+					e->sprite_max_depth = obj->sprite_max_depth;
+					e->sprite_dl_capacity = obj->sprite_dl_capacity;
+					break;
+				}
+			}
+		}
+	}
 	return 1;
 }
 
@@ -1164,6 +1213,19 @@ size_t ng_getCharIdByMC(MovieClip* mc)
 {
 	extern MovieClip root_movieclip;
 	if (!mc || mc == &root_movieclip) return 0;
+	// Attached / dynamic clips (attachMovie / createEmptyMovieClip), and clips
+	// nested inside them, are NOT in the global display_list, so the name lookup
+	// below can't find them. Read the char_id straight off the clip's own display
+	// object (ng_attachMovie sets dobj->char_id). Timeline-placed clips' display_obj
+	// points into the global display_list and carries the same char_id, so this is
+	// authoritative for both. Without it, gotoAndStop("label") on an attachMovie'd
+	// multi-frame clip couldn't resolve its sprite frame labels (Minesweeper's
+	// FRadioButton frb_states_mc never reached the "selectedEnabled" frame, so the
+	// selected radio showed no filled dot).
+	if (mc->display_obj != NULL) {
+		size_t cid = ((DisplayObject*)mc->display_obj)->char_id;
+		if (cid != 0) return cid;
+	}
 	if (!mc->name || mc->name[0] == '\0') return 0;
 	size_t depth = ng_findDisplayEntryByName(mc->name);
 	if (depth == SIZE_MAX) return 0;
