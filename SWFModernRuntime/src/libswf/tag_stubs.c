@@ -599,6 +599,25 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// reach the renderer via a separate child_mc_cache walk in tag.c's
 	// render path — see render_root_attached_mcs(). resolveSlashPathToMC's
 	// name lookup already covers them via setVariableByName above.
+	//
+	// Browser-WASM (USE_WEBGPU without OFFSCREEN_RENDER/HEADLESS_GRAPHICS) ALSO
+	// skips this for non-root attaches: there the child reaches the renderer via
+	// the child_mc_cache pass (render_attached_child), not the parent's
+	// sprite_display_list recursion, and is resolvable via child_mc_cache /
+	// parent->dynamic_props — so the registration is rendering-inert. Worse, it
+	// is actively harmful: `target_d = swf_depth` (= as_depth + 16384, e.g. 16386
+	// for a clip attached at AS depth 2) grows the parent MC's display_obj
+	// sprite_display_list to a ~16400-entry buffer and FREEs the old one — which
+	// a timeline-placed parent shares with its ROOT display_list registration
+	// entry (a distinct DisplayObject struct holding the same buffer pointer),
+	// leaving that entry dangling. finalize_pending_removes_recursive / the
+	// render recursion then walk the freed buffer → "memory access out of
+	// bounds". Surfaced once registered-class constructors began running in
+	// browser-WASM (Minesweeper FRadioButton init attaches frb_states_mc /
+	// fLabel_mc / frb_hitArea_mc onto each level_* radio). The CI modes
+	// (NO_GRAPHICS / OFFSCREEN_RENDER / HEADLESS_GRAPHICS) keep the registration
+	// unchanged.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) || defined(HEADLESS_GRAPHICS)
 	if (parent != &root_movieclip && parent->display_obj != NULL) {
 		DisplayObject* pdobj = (DisplayObject*)parent->display_obj;
 		if (pdobj->sprite_display_list != NULL) {
@@ -631,6 +650,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 				pdobj->sprite_max_depth = target_d;
 		}
 	}
+#endif // CI modes only; browser-WASM renders non-root attaches via child_mc_cache
 
 	new_mc->totalframes = (int)frame_count;
 	new_mc->framesloaded = (int)frame_count;

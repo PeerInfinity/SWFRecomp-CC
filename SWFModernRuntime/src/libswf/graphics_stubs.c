@@ -186,6 +186,7 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
     MovieClip* saved_ctx = g_current_context;
     MovieClip* saved_base = actionGetBaseClip();
     int did_swap = 0;
+    MovieClip* swapped_mc = NULL;
     if (obj != NULL && obj->instance_name != NULL && obj->clip_action_count == 0) {
         extern MovieClip* actionFindOrCreateMovieClip(SWFAppContext*, const char*, MovieClip*);
         extern MovieClip root_movieclip;
@@ -195,11 +196,65 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
             mc->display_obj = (void*)obj;
             actionSetCurrentContext(mc);
             actionSetBaseClip(mc);
+            swapped_mc = mc;
             did_swap = 1;
         }
     }
 
     if (f) f(app_context);
+
+    // Fire the registered-class constructor for a timeline-placed sprite the
+    // first time its frame script runs, mirroring process_sprite_needs_init's
+    // post-frame-0 constructor dispatch (tag.c, gated to NO_GRAPHICS/OFFSCREEN).
+    // Browser-WASM skips process_sprite_needs_init entirely, so without this a
+    // sprite bound to a class via Object.registerClass never runs its
+    // constructor — e.g. Minesweeper's FRadioButton instances (level_eazy/
+    // medium/tough) whose constructor calls this.init() to attachMovie the
+    // radio circle/dot (frb_states_mc) and label (fLabel_mc). The component
+    // sub-clips are only created by that init(); without it the radio shows
+    // just the timeline-placed boundingBox.
+    // actionInvokeRegisteredClassConstructor self-guards: it no-ops when no
+    // class is registered for the symbol, so ordinary exported sprites (Tetris
+    // board cells, DJ platforms, etc.) are unaffected. The constructor_invoked
+    // flag (on the persistent display_list entry) makes it fire once per
+    // instance even though exec_sprite_frame runs every tick. Attached clips
+    // get their constructor from attachMovie's own ng_fire_child_constructors
+    // path and don't reach here.
+    if (obj != NULL && obj->instance_name != NULL && !obj->constructor_invoked) {
+        extern void* lookupRegisteredClassByCharId(size_t, int, const char**);
+        extern int g_swf_version;
+        // Gate on a class actually being registered for this character (via
+        // Object.registerClass). Without this gate, the find-or-create below
+        // would mint an MC for every exported clip-action sprite — risking a
+        // duplicate "shadow" MC for sprites whose MC is normally created by the
+        // clip-event LOAD path (breaks button hit-test, per the did_swap skip
+        // above). lookupRegisteredClassByCharId is side-effect-free.
+        if (lookupRegisteredClassByCharId(obj->char_id, g_swf_version, NULL) != NULL) {
+            extern const char* ng_lookupExportName(size_t char_id);
+            extern void actionInvokeRegisteredClassConstructor(SWFAppContext*, const char*, MovieClip*);
+            extern MovieClip* actionFindOrCreateMovieClip(SWFAppContext*, const char*, MovieClip*);
+            extern MovieClip root_movieclip;
+            const char* _rc_export = ng_lookupExportName(obj->char_id);
+            if (_rc_export != NULL) {
+                // did_swap sprites already have their MC; clip-action sprites
+                // (did_swap==0) don't, and the clip-event LOAD path that
+                // normally creates it may not have run yet on this first
+                // frame-execution. Find-or-create with the caller's context as
+                // parent resolves the canonical MC (the LOAD path
+                // find-or-creates the same one by name+parent, so no duplicate).
+                MovieClip* cmc = swapped_mc;
+                if (cmc == NULL) {
+                    MovieClip* _p = g_current_context ? g_current_context : &root_movieclip;
+                    cmc = actionFindOrCreateMovieClip(app_context, obj->instance_name, _p);
+                    if (cmc != NULL) cmc->display_obj = (void*)obj;
+                }
+                if (cmc != NULL) {
+                    obj->constructor_invoked = 1;
+                    actionInvokeRegisteredClassConstructor(app_context, _rc_export, cmc);
+                }
+            }
+        }
+    }
 
     if (did_swap) {
         actionSetCurrentContext(saved_ctx);
