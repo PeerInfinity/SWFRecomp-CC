@@ -2364,6 +2364,27 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 	}
 }
 
+// Compose two 20-float cxforms (5 vec4: column-major mat4 `mult` + vec4 `add`,
+// applied as out = mult*color + add — see apply_cxform in render_webgpu.c) so
+// that `out = outer(inner(color))`. mult = outer.mult * inner.mult;
+// add = outer.mult * inner.add + outer.add.
+static void compose_cxform20(float out[20], const float* outer, const float* inner)
+{
+	for (int j = 0; j < 4; j++)        // result column
+		for (int i = 0; i < 4; i++) {  // result row
+			float s = 0.0f;
+			for (int k = 0; k < 4; k++)
+				s += outer[k*4 + i] * inner[j*4 + k];
+			out[j*4 + i] = s;
+		}
+	for (int i = 0; i < 4; i++) {       // add = outer.mult * inner.add + outer.add
+		float s = 0.0f;
+		for (int k = 0; k < 4; k++)
+			s += outer[k*4 + i] * inner[16 + k];
+		out[16 + i] = s + outer[16 + i];
+	}
+}
+
 static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max_depth)
 {
 	for (size_t i = 1; i <= dl_max_depth; ++i)
@@ -2414,14 +2435,41 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				// they render dynamically via actionIterateTextFieldGlyphs.
 				if (ng_getCharTextfieldIdx(obj->char_id) >= 0) break;
 #endif
+			{
+				// Compose the placement cxform (obj->cxform_id) over the text's
+				// baked cxform (ch->cxform_id). Static text glyphs are tinted only
+				// by ch->cxform_id, so a DefineText placed with a color transform
+				// — e.g. a button's OVER/DOWN state that darkens its label by
+				// placing the text with a darkening cxform — was rendered with the
+				// up-state color (Tetris game-over "ok" stayed white on hover).
+				// Only when the placement is a NON-identity BAKED slot (slot 0 is
+				// identity; dynamic/composed slots live GPU-side and can't be read
+				// back here) and a dynamic slot is free; otherwise fall back to the
+				// baked cxform (unchanged behavior).
+				u32 text_cx = ch->cxform_id;
+				extern float cxform_data[];
+				u32 baked_cx = (app_context->cxform_data_size > 0)
+					? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
+				if (obj->cxform_id != 0 && obj->cxform_id != ch->cxform_id &&
+				    obj->cxform_id < baked_cx && ch->cxform_id < baked_cx &&
+				    g_next_dynamic_cxform_slot < g_cxform_slot_capacity)
+				{
+					float comp[20];
+					compose_cxform20(comp, &cxform_data[obj->cxform_id * 20],
+						&cxform_data[ch->cxform_id * 20]);
+					u32 slot = g_next_dynamic_cxform_slot++;
+					renderer_write_cxform(context, slot, comp);
+					text_cx = slot;
+				}
 				for (size_t j = 0; j < ch->text_size; ++j)
 				{
 					size_t glyph_index = 4*app_context->text_data[ch->text_start + j];
 					renderer_draw_shape(context,
 						app_context->glyph_data[glyph_index],
 						app_context->glyph_data[glyph_index + 1],
-						ch->transform_start + j, ch->cxform_id);
+						ch->transform_start + j, text_cx);
 				}
+			}
 				break;
 
 			case CHAR_TYPE_SPRITE:
