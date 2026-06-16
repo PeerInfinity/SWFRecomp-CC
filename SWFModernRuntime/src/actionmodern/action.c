@@ -41137,6 +41137,14 @@ void actionSetVariable(SWFAppContext* app_context)
 				if (mc->visible && !new_vis && g_focused_mc == mc)
 					selection_do_focus_change(app_context, mc, NULL);
 				mc->visible = new_vis;
+				// Sync the render-skip flag on the linked display-list entry, same
+				// as actionSetProperty case 7. SetMember-form `mc._visible = ...`
+				// must update as_hidden too, else a timeline sprite set hidden via
+				// the SetProperty opcode (frame-script implicit-this `_visible=false`)
+				// can never be re-shown by an explicit `mc._visible = true`
+				// (Tetris game-over quitGame_mc screen).
+				if (mc->display_obj != NULL)
+					((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1;
 			}
 			handled = 1;
 		}
@@ -46865,6 +46873,12 @@ void actionSetMember(SWFAppContext* app_context)
 						if (mc->visible && !new_vis && g_focused_mc == mc)
 							selection_do_focus_change(app_context, mc, NULL);
 						mc->visible = new_vis;
+						// Sync the render-skip flag, same as actionSetProperty case 7
+						// (see the _visible note there). Without this, an explicit
+						// SetMember `mc._visible = true` can't re-show a sprite that a
+						// frame-script `_visible=false` (SetProperty opcode) hid.
+						if (mc->display_obj != NULL)
+							((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1;
 						markTransformedByScript(mc);
 					}
 					return;
@@ -54952,6 +54966,12 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 		if (mc->visible && !new_vis && g_focused_mc == mc)
 			selection_do_focus_change(app_context, mc, NULL);
 		mc->visible = new_vis;
+		// Sync the render-skip flag, same as actionSetProperty case 7 (see the
+		// _visible note there) so an explicit SetMember `mc._visible = true` can
+		// re-show a sprite that a frame-script `_visible=false` (SetProperty
+		// opcode) hid.
+		if (mc->display_obj != NULL)
+			((DisplayObject*)mc->display_obj)->as_hidden = new_vis ? 0 : 1;
 		markTransformedByScript(mc);
 		return 1;
 	}
