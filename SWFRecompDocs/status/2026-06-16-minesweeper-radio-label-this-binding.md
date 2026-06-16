@@ -105,10 +105,35 @@ matching Ruffle):
    / `sprite_dl_capacity` onto the registration entry after the goto.
 
 These are NO_GRAPHICS / OFFSCREEN_RENDER paths (the divergence harness + both CI
-modes). The deployed **browser-WASM** demo uses a different gotoAndStop arm
-(`!NO_GRAPHICS && !OFFSCREEN_RENDER`, the `targeted_sprite` path), so the dot in
-the live demo would need that path verified separately (browser-test bucket); the
-label fixes (action.c) are shared and already apply there.
+modes).
+
+### browser-WASM (deployed demo) — gotoAndStop-label fix landed, but rendering
+is blocked by a known open bug
+
+The gotoAndStop label lookup was gated `#if NO_GRAPHICS || OFFSCREEN_RENDER`, so
+in browser-WASM `frb_states_mc.gotoAndStop("selectedEnabled")` left frame_num=0
+and no-op'd. **Fixed** (`ffb87e027`) by un-gating it — all three helpers
+(`ng_getCharIdByMC` in tag_stubs.c, `ng_findSpriteLabelFrame` in tag.c,
+`findFrameByLabel` in action.c) are available in every build mode, and the
+browser-WASM goto arm consumes `frame_num` identically. `ng_getCharIdByMC` /
+`ng_gotoFrameByMC` (with this session's context + registration-entry fixes) are
+in tag_stubs.c — compiled in **all** modes — so they already apply to browser-WASM.
+
+**However**, the deployed demo still does NOT show the radio circles/dots/labels:
+they render as mis-positioned white-bordered boxes. Root cause is a **separate,
+known, open render-architecture bug** ([[browser-wasm-visible-and-nonroot-attach-render]]
+§2): *attached children of a NON-root sprite render nowhere in browser-WASM.* The
+radio (`level_eazy`) is a root child, but its circle/dot live in `frb_states`,
+which is attachMovie'd onto `level_eazy` (a non-root sprite); `tag.c`'s
+root-attached render pass filters `if (mc->parent != &root_movieclip) continue;`,
+and the sprite display-list walk doesn't include `child_mc_cache` attachments. So
+nothing inside `frb_states` / `fLabel_mc` draws (the white boxes are the EditText
+fields that DO render via the separate textfield pass). This is the documented
+"Tetris board follow-up" — it needs the render-architecture change (when rendering
+a sprite, also render `child_mc_cache` MCs parented to that sprite's MC, composed
+under its world transform), verified across DJ / Snake / Pong. It is browser-WASM
+only (OFFSCREEN renders the whole screen correctly) and out of scope for the
+gotoAndStop work here.
 
 Local regression checks: goto_frame / goto_advance1 / goto_both_ways1 /
 goto_execution_order / button_goto pass; Tetris trace identical; Pacman converged;
