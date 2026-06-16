@@ -140,24 +140,37 @@ User-reported: can't type into the name field. Instrumented the whole chain
      `KeyboardEvent('keypress', …)` instead. And a mouse **click** on the canvas
      clears the AS field focus, so don't click before typing.
 
-**Residual (separate, pre-existing nested-field bug):** the focused input field
-renders its typed text at the **wrong world position** (top-left of the stage)
-instead of inside the form — `name_txt` is nested in `quitGame_mc`@219 and its
-glyph-render world position isn't composed under the parent's placement.
-Newly visible now that input works; tracked as a follow-up. Also the
-`_root.pause_btn/quit_btn._visible=false` still doesn't hide them (name-resolved
-button MC has no linked `display_obj`, so the as_hidden sync no-ops) — minor.
+**Residual — FIXED.** The focused input field rendered its typed text at the
+wrong world position (top-left). `actionIterateTextFieldGlyphs` computed world
+position as `mc->x + Σ(parent->x)`, but a TIMELINE-placed parent (quitGame_mc)
+holds its placement in the root display-list transform, not `mc->x` (which stays
+0). Instrumented: `name_txt mc=(-102.7,28), quitGame_mc x=0` → `world=(-102.7,28)`.
+**Fix:** in the parent-chain walk, when a parent's `display_obj` points INTO the
+global display_list (timeline-placed) and AS hasn't overridden `_x/_y`, add that
+entry's placement-transform translation instead of `mc->x`. Now `world=(7.3,203)`
+and the typed text renders inside the form. CI-observable (graphics text) — ran
+graphics CI, **0 regressions** (all suites delta=0). Still minor:
+`_root.pause_btn/quit_btn._visible=false` doesn't hide them (name-resolved button
+MC has no linked `display_obj`, so the as_hidden sync no-ops).
 
-## Follow-up 2 — `ok` button hover doesn't darken its text (open, narrowed)
+## Follow-up 2 — `ok` button hover doesn't darken its text — FIXED
 
-The cursor changes on hover, and instrumentation confirmed the nested `ok_btn`
-(char 62) **does** reach the OVER state (`old=1 new=1 hover=1`) —
-`ng_update_button_states_in_dl` recurses into `quitGame_mc`'s sprite DL, composes
-the placement transform, hit-tests, and rebuilds the state DL. So the state
-machine works; the gap is that the rendered OVER-state visual doesn't change the
-text colour. Remaining work: compare the over-state shape/cxform against Ruffle
-(is our over-state DL content/colour wrong, or does this button's over-state
-genuinely differ only subtly?). Render-fidelity item, left for follow-up.
+The state machine was fine: instrumentation confirmed `ok_btn` (char 62) reaches
+the OVER state on hover, runs `button_62_frame_over`, and places its "ok" text
+(char 31) with **cxform 97**, which the renderer received (`OKTEXT char31
+cxform=97`). cxform 97 zeros RGB → black. But the **`CHAR_TYPE_TEXT` render path
+used `ch->cxform_id`** (the DefineText's baked cxform), **ignoring
+`obj->cxform_id`** (the placement = 97). So the placement darkening was dropped
+and "ok" kept its up-state white. (Shapes already use `obj->cxform_id`; only text
+glyphs had this gap.)
+
+**Fix (`tag.c`):** in the TEXT path, compose the placement cxform over the baked
+text cxform (`out = placement(baked(color))`) into a dynamic cxform slot via a new
+`compose_cxform20()` (column-major mat4 mult + add, matching the shader's
+`apply_cxform`). Guarded to fire only for a NON-identity BAKED placement slot
+(slot 0 is identity; dynamic/composed slots are GPU-side) with a free dynamic
+slot; otherwise unchanged (identity placement → baked cxform). Verified: "ok"
+turns black on hover. CI-observable (graphics static text) — graphics CI run.
 
 ## Still open — the line-clear freeze (separate bug)
 
