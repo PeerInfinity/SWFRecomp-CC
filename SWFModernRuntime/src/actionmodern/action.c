@@ -63071,11 +63071,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							this_var.data.numeric_value = (u64)obj;
 							setVariableByName("this", &this_var);
 
-							// NOTE: reverse order here (unlike the super paths / TYPE1_ARG_ORDER).
-							// Forward order regressed coerce_to_primitive_resolve — the
-							// __resolve and array-element dispatch paths build/consume args
-							// differently; left as-is pending a dedicated investigation.
-							for (int i = (int)num_args - 1; i >= 0; i--)
+							for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
 								pushVar(app_context, &args[i]);
 
 							ASObject* local_scope = allocObject(app_context, 8);
@@ -63347,11 +63343,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 						else if (func->function_type == 1 && func->simple_func != NULL)
 						{
-							// NOTE: reverse order here (unlike the super paths / TYPE1_ARG_ORDER).
-							// Forward order regressed coerce_to_primitive_resolve — the
-							// __resolve and array-element dispatch paths build/consume args
-							// differently; left as-is pending a dedicated investigation.
-							for (int i = (int)num_args - 1; i >= 0; i--)
+							for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
 								pushVar(app_context, &args[i]);
 
 							u32 captured_count = func->captured_scope_count;
