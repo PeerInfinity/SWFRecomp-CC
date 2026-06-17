@@ -1,3 +1,12 @@
+> ⚠️ **SUPERSEDED (2026-06-17).** The diagnosis below is WRONG for the browser.
+> A real in-browser CPU profile showed the bottleneck is the WebGPU renderer's
+> per-shape `writeBuffer` calls (~88% of frame CPU), not the AVM1 walks (<2% in
+> the browser). The native NO_GRAPHICS profile this plan is based on has rendering
+> stubbed, so the walks dominate *there* by construction only. The real fix
+> (batch dynamic buffer writes) landed in `079c0fefe`; see
+> `SWFRecompDocs/status/2026-06-17-minesweeper-perf-writeBuffer-batching.md`.
+> The pruning below was implemented + shelved (`~/avm1_subtree_pruning_shelved.patch`).
+
 # Minesweeper perf — static-subtree per-frame-walk pruning (PLAN / HANDOFF)
 
 **Date:** 2026-06-17
