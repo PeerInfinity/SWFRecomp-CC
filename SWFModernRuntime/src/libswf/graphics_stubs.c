@@ -272,6 +272,32 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
                         obj->sprite_max_depth = max_depth;
                         obj->sprite_dl_capacity = display_list_capacity;
                     }
+                    // Run the sprite's INITIALIZE (0x200) clip events before the
+                    // registerClass constructor, matching AVM1's
+                    // Initialize → Construct order. The IDE emits component
+                    // parameters (e.g. the radio's `label = " Easy (40 mines)"`)
+                    // as an Initialize clip handler; the constructor's init()
+                    // reads `this.label` and pushes it to the label field. In
+                    // browser-WASM only CLIP_EVENT_LOAD is dispatched
+                    // (tag_stubs.c pending-load queue) — Initialize never ran, so
+                    // `this.label` was empty and the radios rendered blank. Run
+                    // it here in the clip's own context so its SetVariable lands
+                    // on this MC. Once-only (gated by constructor_invoked above).
+                    {
+                        MovieClip* _init_saved_ctx = g_current_context;
+                        actionSetCurrentContext(cmc);
+                        for (size_t _ca = 0; _ca < obj->clip_action_count; _ca++) {
+                            if ((obj->clip_actions[_ca].event_flags & CLIP_EVENT_INITIALIZE)
+                                && obj->clip_actions[_ca].action != NULL)
+                                obj->clip_actions[_ca].action(app_context);
+                        }
+                        for (size_t _ca = 0; _ca < obj->accumulated_clip_action_count; _ca++) {
+                            if ((obj->accumulated_clip_actions[_ca].event_flags & CLIP_EVENT_INITIALIZE)
+                                && obj->accumulated_clip_actions[_ca].action != NULL)
+                                obj->accumulated_clip_actions[_ca].action(app_context);
+                        }
+                        actionSetCurrentContext(_init_saved_ctx);
+                    }
                     actionInvokeRegisteredClassConstructor(app_context, _rc_export, cmc);
                 }
             }

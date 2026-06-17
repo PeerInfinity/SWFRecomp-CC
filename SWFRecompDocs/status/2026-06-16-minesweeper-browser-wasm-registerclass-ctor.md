@@ -133,25 +133,55 @@ not compiled in CI). Fix 2 is entirely inside the `!NO_GRAPHICS &&
 divergence trace unchanged at 634 lines, clean). Not CI-observable
 ([[ci-only-when-observable]]).
 
-### Still open after cont. 40 — radio circle/dot + label TEXT not visible
+### cont. 40b — INITIALIZE clip event now runs → label TEXT renders
 
-With the rectangles removed, the radio area is empty (circle ring + label text
-absent). Instrumenting `render_attached_child` showed the attached children DO
-reach the renderer every frame, visible, at correct world positions:
-`frb_states_mc` (circle/dot, `smd=9`) and `fLabel_mc` (label, `smd=1`, one child
-= `labelField` DefineEditText) for all three radios (e.g. level_eazy circle at
-tx≈5300/ty≈2690 twips, parent=level_eazy). So the missing piece is their
-**content**, not the clip render:
-- **Label text:** dynamic-textfield glyphs render via the GLOBAL
-  `actionIterateTextFieldGlyphs` pass (tag.c:4193/5081), NOT via
-  `render_display_list` of `fLabel_mc`'s sub-list. So the next blocker is whether
-  `labelField` (a nested attached-clip textfield) is registered + its text set
-  (`FLabel.setLabel` → `this.labelField.text`) + rendered at the nested attached
-  world position by that global pass. Verify text-set vs text-render separately.
-- **Circle ring** may also be faint/white on the light background — confirm
-  against Ruffle once the label text lands.
-- `render_attached_child` still passes `compose_children(..., 0, 0)` (no cxform)
-  and renders cache-order, not depth-order — latent alpha/z-order fidelity.
+`render_attached_child` instrumentation confirmed the attached children DO reach
+the renderer every frame, visible, at correct positions: `frb_states_mc`
+(circle, `smd=9`) and `fLabel_mc` (label, `smd=1`, child = `labelField`
+DefineEditText). So the gap was their CONTENT. The label text renders via the
+GLOBAL `actionIterateTextFieldGlyphs` pass (child_mc_cache walk). `labelField`
+WAS found there (is_tf=1, vis=1, tf_idx=0) but its `text` was just `' '`.
+
+Root cause: the radio's label string is a **component parameter** the IDE emits
+as a `{ 0x200, clip_action_24 }` handler — **0x200 = ClipEventInitialize** —
+which does `label = " Easy (40 mines)"` (per radio). Per AVM1, Initialize runs
+before Construct. But browser-WASM only dispatches `CLIP_EVENT_LOAD` (tag_stubs.c
+pending-load queue) — Initialize never ran, so `this.label` was empty and
+`FLabel.setLabel` wrote `this.labelField.text = label` = "".
+
+**Fix 3 (`graphics_stubs.c` `exec_sprite_frame`, browser-WASM-only):** before
+firing the registerClass constructor, run the sprite's INITIALIZE (0x200) clip
+events (from `obj->clip_actions` + `accumulated_clip_actions`) in the clip's own
+context. Once-only (constructor_invoked gate). Confirmed: labelField text now =
+" Easy (40 mines)" / " Medium (70 mines)" / " Tough (100 mines)", and the labels
+RENDER. (Not CI-observable; OFFSCREEN trace still 634 lines.)
+
+### Still open after cont. 40b — label TEXT is width-CLIPPED (~2 chars)
+
+The labels render but clip to ~18–20px ("Ea"/"M"/"To"). Traced precisely:
+- `actionIterateTextFieldGlyphs` uses `info.w = mc->width` as the field layout
+  width. labelField is created with the correct width (85px, from its
+  DefineEditText bounds, via `findOrCreateMovieClip`'s nested-TF init), but
+  `setSize` then overrides it: `FRadioButton.init()` calls
+  `this.setSize(this._width, this._height)`, which cascades to
+  `fLabel_mc.setWidth(...)` → `labelField._width = ~18.55` then `20`.
+- Those tiny values come from **the radio's own `_width` reading ~18–20px** (just
+  the circle) instead of ~120px. In Flash the component's width is defined by
+  `boundingBox_mc` (the editor bounding rectangle, cid 32). But its shape isn't
+  placed yet when `init()` reads `this._width`: boundingBox_mc is a nested 1-frame
+  sprite whose own frame-0 runs in the DEFERRED nested-sprite advance (AFTER the
+  constructor). So `this._width` excludes it. **Same nested-sprite-frame0-before-
+  constructor ordering gap as cont.40, one level deeper** (radio bounds depend on
+  boundingBox_mc's content, which isn't built until after construct).
+- Proper fix is to eager-init the constructed sprite's nested timeline children
+  (run their frame-0) BEFORE firing its registerClass constructor — mirroring
+  OFFSCREEN's `process_sprite_needs_init` ordering — so `this._width` and any
+  `this.<child>` access during `init()` see fully-built content. This is a
+  broader/ordering change (touches the browser-WASM advance recursion) and is
+  deferred to its own session; my cont.40/40b fixes are the contained foundation.
+- Also still latent once width lands: `render_attached_child`'s
+  `compose_children(..., 0, 0)` (no cxform) + cache-order (not depth-order)
+  z-order; and the faint circle ring vs Ruffle.
 
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
