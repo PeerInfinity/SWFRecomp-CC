@@ -761,6 +761,17 @@ void ng_set_script_only_mode(int mode)
 // performed by advance_nested_sprite_frames() after the root frame script.
 int g_advance_defer_nested = 0;
 
+// When 1, advance_sprite_frames BUILDS just-allocated nested sprites (runs their
+// frame-0) but does NOT advance the playhead of already-built sprites — it only
+// recurses into them to build their own unbuilt children. Used after
+// ng_gotoFrameByMC's synchronous frame replay (browser-WASM) to build the nested
+// content the target frame placed (e.g. Minesweeper's dot cid 28→27→shape)
+// WITHOUT advancing pre-existing playing siblings (e.g. Tetris's bang_mc, a
+// 7-frame explosion clip placed at the block's frame 0 — a full advance would
+// step it every board-cell gotoAndStop and paint stray bang frames over the
+// piece colours).
+int g_build_only = 0;
+
 // Browser-WASM eager-build (status doc 2026-06-16 cont.40c/40d): graphics_stubs.c
 // exec_sprite_frame builds a registerClass'd sprite's nested timeline children
 // (runs their frame-0) BEFORE firing the class constructor, so init()'s
@@ -939,6 +950,16 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			just_allocated = 1;
 			// Don't override sprite_is_playing — tagPlaceObject2 already set it to 1,
 			// and a script may have already set it to 0 (e.g. gotoAndStop before first ShowFrame)
+		}
+
+		// Build-only mode (post-ng_gotoFrameByMC replay): for an already-built
+		// sprite, recurse to build its unbuilt children but do NOT advance its
+		// own playhead (see g_build_only). just-allocated sprites still build
+		// their frame-0 via the normal flow below.
+		if (g_build_only && !just_allocated)
+		{
+			advance_sprite_children_only(app_context, obj);
+			continue;
 		}
 
 		// Check for manual frame navigation (gotoAndPlay/gotoAndStop)

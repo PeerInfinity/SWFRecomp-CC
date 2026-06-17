@@ -1214,18 +1214,24 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		// NOT build their content — e.g. Minesweeper's frb_states
 		// "selectedEnabled" frame places cid 28 (the radio dot), itself a sprite
 		// wrapping the dot shape (cid 27). Left unbuilt, the dot holder renders
-		// empty (the selected radio showed a hollow ring). Mirrors
-		// advance_attached_clip_frames' post-replay advance_sprite_frames (the
-		// pending-nav path), and clears g_advance_defer_nested so the FULL
-		// subtree builds (cont.40f deep-build) — g_current_context is still this
-		// clip, so the children parent correctly. 1-frame already-built siblings
-		// (the ring cid 14/17) are no-ops on the re-advance.
+		// empty (the selected radio showed a hollow ring). g_advance_defer_nested
+		// is cleared so the FULL subtree builds (cont.40f deep-build) and
+		// g_build_only is set so we BUILD just-allocated children but do NOT
+		// advance pre-existing playing siblings — without that, a clip whose base
+		// frame holds a playing multi-frame effect clip (Tetris's bang_mc, placed
+		// at the block's frame 0) would have it stepped on every board-cell
+		// gotoAndStop, painting stray explosion frames over the piece colours.
+		// g_current_context is still this clip, so children parent correctly.
 		{
 			extern void advance_sprite_frames(SWFAppContext*);
 			extern int g_advance_defer_nested;
+			extern int g_build_only;
 			int _gfbmc_saved_defer = g_advance_defer_nested;
-			g_advance_defer_nested = 0;
+			int _gfbmc_saved_bo = g_build_only;
+			g_advance_defer_nested = 0;  // recurse the full subtree (cont.40f)
+			g_build_only = 1;            // build unbuilt children, don't advance siblings
 			advance_sprite_frames(app_context);
+			g_build_only = _gfbmc_saved_bo;
 			g_advance_defer_nested = _gfbmc_saved_defer;
 		}
 #endif
