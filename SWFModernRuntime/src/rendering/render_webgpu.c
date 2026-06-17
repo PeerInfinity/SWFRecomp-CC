@@ -853,6 +853,11 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		ctx->dynamic_color_base = orig_colors;
 	}
 
+	// CPU staging mirrors for the dynamic vertex/color regions (batched upload —
+	// see the comment on dyn_vtx_staging in render_webgpu.h).
+	ctx->dyn_vtx_staging = (u32*)malloc((size_t)MAX_DYNAMIC_VERTICES * 4 * sizeof(u32));
+	ctx->dyn_color_staging = (float*)malloc((size_t)MAX_DYNAMIC_RECTS * 4 * sizeof(float));
+
 	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient + bitmap matrices
 	#define MAX_DYNAMIC_GRADIENTS 64
 	#define MAX_DYNAMIC_BITMAPS 64
@@ -1726,6 +1731,35 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic vertex/color staging — accumulate into a CPU mirror of the dynamic
+// region, flushed by render_webgpu_close_pass as one writeBuffer per buffer
+// (instead of one tiny writeBuffer per shape). See dyn_vtx_staging in the header.
+// ---------------------------------------------------------------------------
+static inline void stage_dyn_verts(WebGPURenderContext* ctx, u32 vert_base,
+	const void* verts, u32 vcount)
+{
+	if (ctx->dyn_vtx_staging == NULL) {   // staging unavailable — fall back to direct upload
+		wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
+			(uint64_t)vert_base * 4 * sizeof(u32), verts, (size_t)vcount * 4 * sizeof(u32));
+		return;
+	}
+	memcpy(&ctx->dyn_vtx_staging[(size_t)(vert_base - ctx->dynamic_vertex_base) * 4],
+		verts, (size_t)vcount * 4 * sizeof(u32));
+}
+
+static inline void stage_dyn_color(WebGPURenderContext* ctx, u32 color_idx,
+	const float color[4])
+{
+	if (ctx->dyn_color_staging == NULL) {
+		wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer,
+			(uint64_t)color_idx * 4 * sizeof(float), color, 4 * sizeof(float));
+		return;
+	}
+	float* dst = &ctx->dyn_color_staging[(size_t)(color_idx - ctx->dynamic_color_base) * 4];
+	dst[0] = color[0]; dst[1] = color[1]; dst[2] = color[2]; dst[3] = color[3];
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_draw_rect — dynamic filled rectangle (for text field bg/border)
 // ---------------------------------------------------------------------------
 void render_webgpu_draw_rect(WebGPURenderContext* ctx,
@@ -1742,10 +1776,9 @@ void render_webgpu_draw_rect(WebGPURenderContext* ctx,
 	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
 	ctx->dynamic_vertex_used += 6;
 
-	// Write color to the dynamic color slot
+	// Stage color into the dynamic color slot (flushed once in close_pass)
 	float color[4] = { r, g, b, a };
-	wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer,
-		(uint64_t)color_idx * 4 * sizeof(float), color, sizeof(color));
+	stage_dyn_color(ctx, color_idx, color);
 
 	// Generate 6 vertices (2 triangles) for the quad
 	// Vertex format: { float x, float y, u32 style_x, u32 style_y }
@@ -1766,10 +1799,8 @@ void render_webgpu_draw_rect(WebGPURenderContext* ctx,
 		{ x0.u, y1.u, sx, sy },  // bottom-left
 	};
 
-	// Write vertices to the dynamic area
-	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
-	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
-		byte_offset, verts, sizeof(verts));
+	// Stage vertices into the dynamic area (flushed once in close_pass)
+	stage_dyn_verts(ctx, vert_base, verts, 6);
 
 	// Issue draw call
 	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
@@ -1792,10 +1823,9 @@ void render_webgpu_draw_tris(WebGPURenderContext* ctx,
 	u32 idx = ctx->dynamic_rect_count++;
 	u32 color_idx = ctx->dynamic_color_base + idx;
 
-	// Write color to the dynamic color slot
+	// Stage color into the dynamic color slot (flushed once in close_pass)
 	float color[4] = { r, g, b, a };
-	wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer,
-		(uint64_t)color_idx * 4 * sizeof(float), color, sizeof(color));
+	stage_dyn_color(ctx, color_idx, color);
 
 	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
 	ctx->dynamic_vertex_used += vertex_count;
@@ -1815,9 +1845,7 @@ void render_webgpu_draw_tris(WebGPURenderContext* ctx,
 	}
 
 	// Write vertices to the dynamic area
-	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
-	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
-		byte_offset, verts, vertex_count * 4 * sizeof(u32));
+	stage_dyn_verts(ctx, vert_base, verts, vertex_count);
 	free(verts);
 
 	// Issue draw call
@@ -1930,9 +1958,7 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 		verts[i * 4 + 3] = sy;
 	}
 
-	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
-	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
-		byte_offset, verts, vertex_count * 4 * sizeof(u32));
+	stage_dyn_verts(ctx, vert_base, verts, vertex_count);
 	free(verts);
 
 	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
@@ -2055,9 +2081,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 		{ x0.u, y1.u, sx, sy },  // bottom-left
 	};
 
-	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
-	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
-		byte_offset, verts, sizeof(verts));
+	stage_dyn_verts(ctx, vert_base, verts, 6);
 
 	// Switch to premultiplied alpha blending for bitmap rendering
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->blend_premul_pipeline);
@@ -2203,9 +2227,7 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 		verts[i * 4 + 2] = sx_word;
 		verts[i * 4 + 3] = sy_word;
 	}
-	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
-	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
-		byte_offset, verts, (size_t)vertex_count * 4 * sizeof(u32));
+	stage_dyn_verts(ctx, vert_base, verts, vertex_count);
 	free(verts);
 
 	// Premultiplied blend (bitmap data is pre-multiplied via fillRect).
@@ -2261,6 +2283,22 @@ void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
 void render_webgpu_close_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
+
+	// Flush this frame's batched dynamic vertex/color staging — ONE writeBuffer per
+	// buffer instead of one tiny writeBuffer per shape (the per-call overhead
+	// dominated browser frame CPU). queue.writeBuffer is ordered before the submit
+	// below, so the dynamic regions hold their final data before any recorded draw
+	// executes. The used ranges are fully populated (each draw writes its slice
+	// contiguously from offset 0), so flushing [0, used) is exact.
+	if (ctx->dyn_vtx_staging != NULL && ctx->dynamic_vertex_used > 0)
+		wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
+			(uint64_t)ctx->dynamic_vertex_base * 4 * sizeof(u32),
+			ctx->dyn_vtx_staging, (size_t)ctx->dynamic_vertex_used * 4 * sizeof(u32));
+	if (ctx->dyn_color_staging != NULL && ctx->dynamic_rect_count > 0)
+		wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer,
+			(uint64_t)ctx->dynamic_color_base * 4 * sizeof(float),
+			ctx->dyn_color_staging, (size_t)ctx->dynamic_rect_count * 4 * sizeof(float));
+
 	wgpuRenderPassEncoderEnd(ctx->render_pass);
 
 #ifdef OFFSCREEN_RENDER

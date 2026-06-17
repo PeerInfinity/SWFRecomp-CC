@@ -166,6 +166,16 @@ typedef struct WebGPURenderContext
 	u32 dynamic_rect_count;     // number of dynamic color slots used this frame
 	u32 dynamic_vertex_used;    // total dynamic vertices used this frame
 
+	// Per-frame CPU staging for the dynamic vertex/color regions. Each dynamic
+	// draw (text glyph, drawing-API shape, bitmap quad) used to issue its OWN tiny
+	// wgpuQueueWriteBuffer per shape — hundreds per frame, and the per-call
+	// marshalling overhead dominated browser frame CPU (writeBuffer was ~88% on the
+	// Minesweeper difficulty screen). Instead, draws now memcpy into these CPU
+	// arrays and render_webgpu_close_pass flushes each as a SINGLE writeBuffer of
+	// the used range. Same bytes, same offsets → pixel-identical output.
+	u32* dyn_vtx_staging;       // [MAX_DYNAMIC_VERTICES * 4] u32 (mirror of dynamic vertex region)
+	float* dyn_color_staging;   // [MAX_DYNAMIC_RECTS * 4] float (mirror of dynamic color region)
+
 	// Dynamic gradient rendering (Drawing API beginGradientFill/lineGradientStyle)
 	u32 static_gradient_count;   // number of gradients from recompiler (static)
 	u32 dynamic_gradient_used;   // number of dynamic gradient layers used this frame
