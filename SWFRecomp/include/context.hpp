@@ -51,6 +51,15 @@ namespace SWFRecomp
 		// and the button stops responding to hover/press transitions).
 		std::set<uint16_t> shape_char_ids;
 
+		// Subset of shape_char_ids whose SHAPE has at least one fill style.
+		// DefineButton2 prefers a FILLED hit shape over a stroke-only one: a
+		// button's StateHitTest region is the union of all HitTest records, and
+		// the invisible filled rectangle (no line styles) is the real clickable
+		// area. A stroke-only shape only hit-tests on its edges (interior misses
+		// in both our hit test and Ruffle's shape_hit_test), so picking it as
+		// the single hit char leaves the button face un-clickable.
+		std::set<uint16_t> filled_shape_char_ids;
+
 		Context() : inside_function2(false), function2_register_count(0), in_function_body(false), swf_version(0) {}
 	};
 };

@@ -29955,7 +29955,9 @@ static void freeEnumeratedNames(EnumeratedName* head)
 // property (e.g. an attachMovie'd clip bound on parent->dynamic_props by the #8 fix) is
 // enumerated exactly once. user_data is an EnumChildState*; head may be NULL (no dedup).
 struct EnumChildState { SWFAppContext* ctx; EnumeratedName** head; };
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Ungated to browser-WASM (was NO_GRAPHICS||OFFSCREEN only) so for..in over a
+// MovieClip enumerates its timeline children in graphics builds too — see the
+// call sites in actionEnumerate / actionEnumerate2.
 static void enum_child_callback(const char* name, u32 name_len, void* user_data)
 {
 	struct EnumChildState* st = (struct EnumChildState*)user_data;
@@ -29967,7 +29969,6 @@ static void enum_child_callback(const char* name, u32 name_len, void* user_data)
 	}
 	PUSH_STR(name, name_len);
 }
-#endif
 
 // Callback for hashmap_iterate on var_map — pushes variable names onto the ActionScript stack
 struct EnumVarMapState { SWFAppContext* ctx; EnumeratedName** head; };
@@ -30306,7 +30307,16 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 	// Dedup against the prototype-chain names recorded above so an attachMovie'd child that
 	// is also an enumerable dynamic property isn't enumerated twice (enumerated_head is freed
 	// after this walk, not before it).
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	//
+	// Ungated to browser-WASM (was NO_GRAPHICS||OFFSCREEN only): without child
+	// enumeration here, `for(var i in someMovieClip)` in browser-WASM yields only
+	// the clip's dynamic props, never its timeline child instances. Minesweeper's
+	// FRadioButton.setState deselects sibling radios via
+	// `for(var i in this._parent) this._parent[i].setState(false)` — over _root,
+	// which must enumerate level_eazy/level_medium/level_tough. Without it the
+	// loop is empty and clicking a radio never clears the previously-selected
+	// dot (two dots showing). CI modes (NO_GRAPHICS/OFFSCREEN) already compiled
+	// this, so adding browser-WASM leaves CI output byte-identical.
 	if (mc != NULL)
 	{
 		struct EnumChildState _ecs = { app_context, &enumerated_head };
@@ -30330,7 +30340,6 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 			ng_enumerateChildren(mc->name, enum_child_callback, &_ecs);
 		}
 	}
-#endif
 	freeEnumeratedNames(enumerated_head);
 }
 
@@ -43622,8 +43631,13 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			// than after it.
 			EnumeratedName* enumerated_head = NULL;
 
-			// Enumerate child MovieClip instance names first (pushed early = popped late)
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Enumerate child MovieClip instance names first (pushed early = popped late).
+			// Ungated to browser-WASM (was NO_GRAPHICS||OFFSCREEN only): for..in over a
+			// MovieClip must yield its timeline child instances in browser-WASM too, or
+			// `for(var i in this._parent) this._parent[i].setState(false)`
+			// (FRadioButton sibling-deselect over _root) finds no radios and the
+			// previously-selected dot never clears. CI modes already compiled this →
+			// CI output stays byte-identical.
 			{
 				struct EnumChildState _ecs = { app_context, &enumerated_head };
 				// Phase 1e: push transient (just-removed previous-state) button
@@ -43678,7 +43692,6 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					enum_child_callback(_cc->name, (u32)strlen(_cc->name), &_ecs);
 				}
 			}
-#endif
 
 			// Enumerate var_map variables for root movieclip
 			if (mc == &root_movieclip) {
@@ -68779,6 +68792,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					_ul_dobj->char_id = 0;
 					_ul_dobj->instance_name = NULL;
 				}
+				// Mark the emptied clip unloaded so the hit-test AABB union
+				// (mc_get_pixel_aabb_ng) skips it AND its lingering child
+				// shape-wrapper MCs (which keep stale large bounds in
+				// child_mc_cache even after the DL clear above). Without this,
+				// FUIComponent's unloadMovie'd boundingBox_mc (the editor
+				// bounding rectangle, ~100x103) inflates the radio's clickable
+				// box so stacked radios overlap. The immediate-unload path here
+				// (browser-WASM nested-clip case) doesn't go through the
+				// deferred queue that normally sets this flag a tick later.
+				mc->unloaded = 1;
 #endif
 				mc->currentframe = 0;
 				mc->totalframes = 0;
@@ -69788,6 +69811,15 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 {
 	if (mc == NULL) return 0;
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM: an unloadMovie'd clip has no clickable area (Flash empties
+	// it). Its lingering child shape-wrapper MCs keep stale bounds in
+	// child_mc_cache, so without this an unloaded clip (e.g. FUIComponent's
+	// boundingBox_mc editor box) still hit-tests and steals clicks. CI modes
+	// keep the original behavior (this fallback isn't compiled there).
+	if (mc->unloaded) return 0;
+#endif
+
 	float bxmin = 0, bxmax = 0, bymin = 0, bymax = 0;
 	int has_bounds = mc->draw_has_bounds;
 
@@ -69888,7 +69920,57 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 		}
 	}
 
-	if (!has_bounds) return 0;
+	if (!has_bounds) {
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser-WASM: a "container" MC with no graphics of its own (e.g. an
+		// FUIComponent registerClass instance like Minesweeper's radios) gets
+		// its clickable region from its attached children (frb_states_mc circle,
+		// fLabel_mc label, deadPreview). Those live in child_mc_cache parented to
+		// this MC and render via render_attached_child using display-list
+		// transforms — they are NOT in this MC's sprite_display_list and have no
+		// draw_has_bounds, so the loops above miss them and the MC's AABB is
+		// empty → un-clickable. Union the children's STAGE AABBs (recursive;
+		// each child now carries a correct _x/_y from its placement so the
+		// parent-chain walk yields stage coords). Depth-guarded against cycles.
+		// CI modes (NO_GRAPHICS/OFFSCREEN) keep the original empty-return: there
+		// process_sprite_needs_init populates the MC's own sprite_display_list,
+		// so this fallback isn't needed and output stays byte-identical.
+		static int s_hit_aabb_depth = 0;
+		if (s_hit_aabb_depth < 8) {
+			s_hit_aabb_depth++;
+			float ux1 = 0, uy1 = 0, ux2 = 0, uy2 = 0;
+			int any = 0;
+			for (int ci = 0; ci < child_mc_count; ci++) {
+				MovieClip* child = child_mc_cache[ci];
+				if (child == NULL || child->parent != mc) continue;
+				// Skip children that are no longer present: an unloadMovie'd
+				// child (e.g. FUIComponent's boundingBox_mc, which init()
+				// empties) keeps a lingering child_mc_cache wrapper whose own
+				// child shape still has large bounds — including it would
+				// inflate the hit box far beyond the visible component (and
+				// make stacked radios overlap). Removed/pending-removal too.
+				if (child->unloaded || child->avm1_removed || child->pending_removal)
+					continue;
+				float cx1, cy1, cx2, cy2;
+				if (!mc_get_pixel_aabb_ng(child, &cx1, &cy1, &cx2, &cy2)) continue;
+				if (!any) {
+					ux1 = cx1; uy1 = cy1; ux2 = cx2; uy2 = cy2; any = 1;
+				} else {
+					if (cx1 < ux1) ux1 = cx1;
+					if (cy1 < uy1) uy1 = cy1;
+					if (cx2 > ux2) ux2 = cx2;
+					if (cy2 > uy2) uy2 = cy2;
+				}
+			}
+			s_hit_aabb_depth--;
+			if (any) {
+				*x1 = ux1; *y1 = uy1; *x2 = ux2; *y2 = uy2;
+				return 1;
+			}
+		}
+#endif
+		return 0;
+	}
 
 	float sx = mc->xscale / 100.0f;
 	float sy = mc->yscale / 100.0f;
@@ -70051,6 +70133,7 @@ void actionDispatchMCPress(SWFAppContext* app_context)
 {
 	float mx = app_context->mouse.stage_x / 20.0f;  // stage_x is in twips; convert to pixels
 	float my = app_context->mouse.stage_y / 20.0f;
+
 
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
@@ -71386,6 +71469,50 @@ static void queue_hover_rollout_on_focus_change(void)
 		queue_one_deferred_roll(mc, 1);
 		mc->mc_mouse_inside = 0;
 	}
+}
+
+// Whether the mouse (current stage position) is over a focusable (selectable or
+// editable) text field. Drives the browser-WASM I-beam cursor over text boxes
+// (e.g. Minesweeper's "Enter your name" field). Mirrors actionMouseClickFocus's
+// hit-test: frontmost child_mc_cache MC first, then SWF-defined display-list
+// text fields not yet promoted to an MC. Browser-WASM only (graphics cursor).
+int actionMouseOverFocusableTextField(SWFAppContext* app_context)
+{
+	float mx = app_context->mouse.stage_x / 20.0f;
+	float my = app_context->mouse.stage_y / 20.0f;
+
+	for (int i = child_mc_count - 1; i >= 0; i--) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL) continue;
+		float x1, y1, x2, y2;
+		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
+		// Frontmost hit: report whether IT is a focusable text field. (Don't
+		// keep scanning under it — a field covered by an opaque MC isn't hovered.)
+		return mc_is_focusable_by_click(mc);
+	}
+
+	// Fallback: SWF-defined text fields still on the display list (not yet
+	// promoted into child_mc_cache by script access).
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	for (size_t di = 1; di <= max_depth; di++) {
+		if (display_list[di].char_id == 0) continue;
+		int tf_idx = ng_getTextFieldIdx(di);
+		if (tf_idx < 0) continue;
+		u16 flags = ng_getTextFieldFlags(tf_idx);
+		if (flags & 0x0004) continue;  // noSelect → not focusable
+		s32 bxmin, bxmax, bymin, bymax;
+		ng_getTextFieldBounds(tf_idx, &bxmin, &bxmax, &bymin, &bymax);
+		float tx = display_list[di].place_tx, ty = display_list[di].place_ty;
+		float fx1 = tx / 20.0f + (float)bxmin / 20.0f;
+		float fy1 = ty / 20.0f + (float)bymin / 20.0f;
+		float fx2 = tx / 20.0f + (float)bxmax / 20.0f;
+		float fy2 = ty / 20.0f + (float)bymax / 20.0f;
+		if (mx < fx1 || mx > fx2 || my < fy1 || my > fy2) continue;
+		return 1;
+	}
+	return 0;
 }
 
 // On mouse click, determine which MC was clicked and set focus if appropriate.

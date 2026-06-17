@@ -310,6 +310,22 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
                                 if (_sy > 0.0f) cmc->yscale = _sy * 100.0f;
                             }
                         }
+                        // Reflect the PLACEMENT matrix translation onto _x/_y too
+                        // (the natural completion of the _xscale/_yscale fix above).
+                        // A timeline-placed clip's _x/_y equal its placement origin
+                        // in Flash; browser-WASM left registerClass MCs at (0,0), so
+                        // their stage position lived only in display_obj's transform.
+                        // Without _x/_y the AABB / hit-test path (which walks mc->x +
+                        // parent chain) computes a near-origin box, and the component
+                        // is un-clickable (Minesweeper's radios). Gate on _x/_y not
+                        // being AS-overridden yet. Rendering uses the display-list
+                        // transform (not mc->x), so this is hit-test/_x metadata only.
+                        {
+                            const float* _pt = (const float*)app_context->transform_data
+                                + (size_t)obj->transform_id * 16;
+                            if (!(cmc->as_set_flags & 1)) cmc->x = _pt[12] / 20.0f;
+                            if (!(cmc->as_set_flags & 2)) cmc->y = _pt[13] / 20.0f;
+                        }
                     }
                     // Eager-build this sprite's NESTED timeline children (run their
                     // frame-0) before the constructor. The frame func `f` above

@@ -6385,13 +6385,30 @@ namespace SWFRecomp
 					if (flags & 0x02) over_records.push_back(rec);
 					if (flags & 0x04) down_records.push_back(rec);
 					if (flags & 0x08) {
-						// Prefer SHAPE/MORPH_SHAPE hit records over sprite/button
-						// records — only update hit_char_id if this char is a
-						// known shape, OR if we haven't seen any shape yet.
-						bool is_shape = context.shape_char_ids.count(char_id) > 0;
-						bool prev_is_shape = (hit_char_id >= 0 &&
-							context.shape_char_ids.count((u16)hit_char_id) > 0);
-						if (is_shape || !prev_is_shape) {
+						// A button's StateHitTest region is the union of ALL
+						// HitTest records; we approximate it with a single shape.
+						// Rank candidates so we keep the one that best represents
+						// the clickable face:
+						//   2 = filled shape (the invisible hit rectangle — the
+						//       real clickable area; its interior hit-tests)
+						//   1 = stroke-only shape (only its edges hit-test, so
+						//       the interior of the button face misses)
+						//   0 = non-shape (sprite/button: no graphics, resolves
+						//       to NULL hit shape)
+						// Prefer a strictly higher rank; on a tie keep the LAST
+						// (matches the prior "last shape wins" behavior so
+						// single-hit-shape buttons are unchanged). This fixes
+						// buttons (e.g. Minesweeper's Start, cid 53) whose last
+						// HitTest record is a stroke-only border (cid 52) placed
+						// after the filled hit rectangle (cid 48).
+						auto rank_of = [&](u16 cid) -> int {
+							if (context.filled_shape_char_ids.count(cid) > 0) return 2;
+							if (context.shape_char_ids.count(cid) > 0) return 1;
+							return 0;
+						};
+						int new_rank = rank_of(char_id);
+						int prev_rank = (hit_char_id < 0) ? -1 : rank_of((u16)hit_char_id);
+						if (new_rank >= prev_rank) {
 							hit_char_id = char_id;
 							hit_matrix = matrix;
 						}
@@ -7521,6 +7538,12 @@ namespace SWFRecomp
 						all_fill_styles.push_back(parseFillStyles(fill_style_count));
 					}
 					all_fill_style_counts.push_back(fill_style_count);
+
+					// Track shapes that carry at least one fill style so
+					// DefineButton2 can prefer a filled hit shape (the real
+					// clickable area) over a stroke-only one.
+					if (fill_style_count > 0)
+						context.filled_shape_char_ids.insert(shape_id);
 
 					// LINESTYLEARRAY
 					shape_tag.clearFields();

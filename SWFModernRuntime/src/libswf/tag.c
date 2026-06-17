@@ -4726,9 +4726,18 @@ void tagShowFrame(SWFAppContext* app_context)
 	{
 		int any_hover = ng_update_button_states(app_context);
 #ifdef __EMSCRIPTEN__
+		// Cursor: hand/pointer over interactive buttons (any_hover), I-beam
+		// (text) over a focusable text field (e.g. an editable name box), else
+		// default. Buttons take precedence (a button over a field is still a
+		// click target). text-field check is skipped when a button is hovered.
+		int over_text = 0;
+		if (!any_hover) {
+			extern int actionMouseOverFocusableTextField(SWFAppContext*);
+			over_text = actionMouseOverFocusableTextField(app_context);
+		}
 		EM_ASM({
-			document.getElementById('canvas').style.cursor = $0 ? 'pointer' : 'default';
-		}, any_hover);
+			document.getElementById('canvas').style.cursor = $0 ? 'pointer' : ($1 ? 'text' : 'default');
+		}, any_hover, over_text);
 #endif
 	}
 #endif
