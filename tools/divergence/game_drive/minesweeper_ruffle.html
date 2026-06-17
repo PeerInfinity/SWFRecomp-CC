@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Minesweeper — Ruffle ground truth</title>
+<style>html,body{margin:0;background:#fff;} #ruffle-container{width:500px;height:335px;}</style>
+</head>
+<body>
+<!-- Ground-truth tier for the Minesweeper browser comparison: loads the
+     unmodified Minesweeper.swf under Ruffle web (real Flash) at the SWF's native
+     500x335 stage, so a headed-Chrome driver can screenshot the difficulty
+     screen (FRadioButton radios) at the same stage coordinates as the SWFRecomp
+     browser-WASM demo. -->
+<div id="ruffle-container"></div>
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  var rs = document.createElement('script');
+  rs.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+  rs.onload = function () {
+    window.RufflePlayer.config = {
+      allowScriptAccess: true, autoplay: 'on', unmuteOverlay: 'hidden',
+      splashScreen: false, warnOnUnsupportedContent: false, logLevel: 'info',
+      contextMenu: 'off', preferredRenderer: 'webgl',
+    };
+    var ruffle = window.RufflePlayer.newest();
+    var player = ruffle.createPlayer();
+    player.style.width = '500px';
+    player.style.height = '335px';
+    document.getElementById('ruffle-container').appendChild(player);
+    player.traceObserver = function (m) { console.log(m); };
+    fetch('Minesweeper.swf').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      player.load({ data: buf, allowScriptAccess: true, autoplay: 'on' })
+        .then(function () { console.log('[harness] Minesweeper loaded under Ruffle'); })
+        .catch(function (e) { console.log('[harness] ruffle load error: ' + e); });
+    }).catch(function (e) { console.log('[harness] fetch error: ' + e); });
+  };
+  rs.onerror = function () { console.log('[harness] ERROR: failed to load Ruffle CDN'); };
+  document.head.appendChild(rs);
+</script>
+</body>
+</html>
