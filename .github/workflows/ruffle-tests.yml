@@ -156,9 +156,25 @@ jobs:
           # (SWFRecompDocs/plans/video-codec-support-plan.md). verify_output.py
           # probes pkg-config in graphics modes and defines SWF_HAVE_LIBAVCODEC
           # when found; absent, only ScreenVideo (FLV codec 3) decodes.
-          sudo apt-get install -y \
-            mesa-vulkan-drivers vulkan-tools libvulkan1 \
-            libavcodec-dev libavutil-dev libswscale-dev
+          # Hardened against the intermittent runner hang where apt blocks
+          # forever on a dpkg lock held by unattended-upgrades (froze random
+          # shards in graphics runs): noninteractive frontend + bounded dpkg
+          # lock wait + hard outer timeout + retry, so a stuck lock fails fast
+          # and retries instead of hanging the whole shard.
+          export DEBIAN_FRONTEND=noninteractive
+          for attempt in 1 2 3; do
+            if sudo timeout 300 apt-get -o DPkg::Lock::Timeout=180 install -y \
+                 mesa-vulkan-drivers vulkan-tools libvulkan1 \
+                 libavcodec-dev libavutil-dev libswscale-dev; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "::error::apt-get install failed/timed out after 3 attempts"
+              exit 1
+            fi
+            echo "apt-get install attempt $attempt failed/timed out; retrying in 15s..."
+            sleep 15
+          done
           {
             echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
             echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
@@ -719,9 +735,23 @@ jobs:
           fi
           # libav* are needed by SWFModernRuntime's video codec backend
           # (see SWFRecompDocs/plans/video-codec-support-plan.md).
-          sudo apt-get install -y \
-            mesa-vulkan-drivers vulkan-tools libvulkan1 \
-            libavcodec-dev libavutil-dev libswscale-dev
+          # Hardened against the intermittent apt/dpkg-lock hang that froze
+          # random shards (see the matching step in the setup job): noninteractive
+          # frontend + bounded dpkg lock wait + hard outer timeout + retry.
+          export DEBIAN_FRONTEND=noninteractive
+          for attempt in 1 2 3; do
+            if sudo timeout 300 apt-get -o DPkg::Lock::Timeout=180 install -y \
+                 mesa-vulkan-drivers vulkan-tools libvulkan1 \
+                 libavcodec-dev libavutil-dev libswscale-dev; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "::error::apt-get install failed/timed out after 3 attempts"
+              exit 1
+            fi
+            echo "apt-get install attempt $attempt failed/timed out; retrying in 15s..."
+            sleep 15
+          done
           {
             echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
             echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
