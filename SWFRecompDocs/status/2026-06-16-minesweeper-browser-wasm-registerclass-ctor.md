@@ -487,9 +487,32 @@ after the replay in `ng_gotoFrameByMC` with `g_advance_defer_nested` cleared
 Both gated `!NO_GRAPHICS && !OFFSCREEN_RENDER` → CI byte-identical (OFFSCREEN
 Minesweeper divergence unchanged at 634 lines; not CI-dispatched). Verified
 in the deployed demo: **Medium ◉, Easy/Tough ○** (matches Ruffle/OFFSCREEN
-F0014.png). Regression: Tetris title + GAMEPLAY (board cells via
-`ng_gotoFrameByMC` — correct colors, no stale trail) and Doodle Jump menu clean.
-The ring-SHADING gap (#2 from cont.40g, glossy bead vs flat) remains DEFERRED.
+F0014.png). The ring-SHADING gap (#2 from cont.40g, glossy bead vs flat) remains
+DEFERRED.
+
+**Build-only follow-up (`d4ac7ae25`).** Gap-2's post-replay `advance_sprite_frames`
+initially used a FULL advance, which also stepped the playhead of already-built
+playing multi-frame nested sprites on every synchronous goto. Tetris's `bang_mc`
+(a 7-frame line-clear explosion at the block's frame 0, depth 3, above the colour
+shape at depth 1) got advanced on every board-cell `gotoAndStop(colour)` →
+explosion frames painted over the piece colours (a white square + missing colour).
+Fix: `g_build_only` flag — `advance_sprite_frames` builds just-allocated nested
+sprites but, for already-built ones, only recurses to build THEIR unbuilt children
+(no playhead advance). A synchronous goto navigates a clip + builds its target
+content without advancing its children's playheads. Defaults 0, set only in the
+browser-WASM `ng_gotoFrameByMC` block → CI byte-identical. (The user initially
+reported the Tetris regression, then found it was a stale build — but build-only is
+the correct semantics regardless and the current build is confirmed clean.)
+
+**Still open (LOW priority, user-deprioritized):** the Medium dot renders slightly
+**up-and-to-the-left** of centre vs Ruffle/OFFSCREEN (which centre it). The ring
+(cid 14/17, built at attach) is centred; the dot (cid 28→27, built at goto-time
+via `ng_gotoFrameByMC`) is offset toward the frb_states origin — suspect the
+dot-holder's `transform_id` isn't the placed value (99) at compose time, possibly
+because frame 4 (selectedEnabled) places cid 28 at depth 11 over a pending-remove
+(not-yet-cleared) old entry during the browser-WASM replay, so the place takes a
+modify path that doesn't update `transform_id`. `compose_children` then uses
+identity/stale → origin. Not yet confirmed (deep-dive deprioritized).
 
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
