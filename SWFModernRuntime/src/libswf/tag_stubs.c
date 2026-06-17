@@ -1208,6 +1208,28 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		}
 #endif
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Build the nested sprites the replayed target frame just placed (run
+		// their frame-0). The frame replay above places child sprites but does
+		// NOT build their content — e.g. Minesweeper's frb_states
+		// "selectedEnabled" frame places cid 28 (the radio dot), itself a sprite
+		// wrapping the dot shape (cid 27). Left unbuilt, the dot holder renders
+		// empty (the selected radio showed a hollow ring). Mirrors
+		// advance_attached_clip_frames' post-replay advance_sprite_frames (the
+		// pending-nav path), and clears g_advance_defer_nested so the FULL
+		// subtree builds (cont.40f deep-build) — g_current_context is still this
+		// clip, so the children parent correctly. 1-frame already-built siblings
+		// (the ring cid 14/17) are no-ops on the re-advance.
+		{
+			extern void advance_sprite_frames(SWFAppContext*);
+			extern int g_advance_defer_nested;
+			int _gfbmc_saved_defer = g_advance_defer_nested;
+			g_advance_defer_nested = 0;
+			advance_sprite_frames(app_context);
+			g_advance_defer_nested = _gfbmc_saved_defer;
+		}
+#endif
+
 		actionSetCurrentContext(_gfbmc_saved_ctx);
 		actionSetBaseClip(_gfbmc_saved_base);
 

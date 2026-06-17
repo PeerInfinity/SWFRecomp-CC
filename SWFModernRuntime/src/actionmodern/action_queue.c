@@ -232,6 +232,18 @@ static int aq_drain_one_onload_or_script(SWFAppContext* app_context);
 void actionDrainAllInPriorityOrder(SWFAppContext* app_context)
 {
 	if (g_drain_suppress_depth > 0) return;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM: construct just-placed registerClass timeline sprites (e.g.
+	// Minesweeper's FRadioButton components) before this frame's queued root
+	// DoAction runs, so a same-frame `group.setValue(...)` sees the constructed
+	// component group. NO_GRAPHICS/OFFSCREEN build these at placement time
+	// (process_sprite_needs_init); browser-WASM otherwise builds them later in
+	// tagShowFrame's advance, after this drain. Idempotent + re-entrancy-guarded.
+	{
+		extern void ng_construct_pending_registerclass_sprites(SWFAppContext*);
+		ng_construct_pending_registerclass_sprites(app_context);
+	}
+#endif
 	// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK): preserved from the
 	// original actionDrainOnloadAndScript path. Run unsurvivor cleanup
 	// before scripts run on natural-wrap catch-up.

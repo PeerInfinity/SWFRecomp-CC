@@ -1217,6 +1217,101 @@ void advance_sprite_frames(SWFAppContext* app_context)
 	}
 }
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+// Browser-WASM: construct just-placed registerClass timeline sprites BEFORE the
+// current frame's queued root DoAction drains.
+//
+// NO_GRAPHICS/OFFSCREEN construct timeline-placed registerClass sprites at
+// PLACEMENT time (process_sprite_needs_init, during tagPlaceObject2 / the frame
+// func), so they exist before the frame's DoAction runs — matching Flash's
+// construct_frame-before-frame_scripts order. Browser-WASM has no
+// process_sprite_needs_init; it fires the registerClass constructor inside
+// exec_sprite_frame, which only runs in tagShowFrame's advance_sprite_frames —
+// i.e. AFTER the recompiler-emitted actionDrainAllInPriorityOrder that runs the
+// frame's queued root DoAction. For Minesweeper that left the FRadioButtonGroup
+// `diff_level` un-built when frame 5's `diff_level.setValue(70)` ran: the call
+// hit `undefined` (a no-op) and the default radio selection (Medium ◉) never
+// applied. (Confirmed by instrumentation: setValue fired on undefined before any
+// radio constructor; OFFSCREEN fires it on the real group after all 3 construct.)
+//
+// This pass runs the just_allocated branch of advance_sprite_frames for each
+// freshly-placed (sprite_display_list==NULL) registerClass sprite in the CURRENT
+// display list, so its constructor (→ this.init() → addToRadioGroup) runs before
+// the DoAction drain. Idempotent: a sprite is skipped once allocated, so the
+// later advance_sprite_frames sees it non-just_allocated (1-frame → skipped, no
+// double-run; multi-frame → resumes from frame 1 as normal). Re-entrancy-guarded
+// (the constructor's AS may itself trigger a drain).
+void ng_construct_pending_registerclass_sprites(SWFAppContext* app_context)
+{
+	extern int catch_up_mode;
+	if (catch_up_mode) return;
+	static int s_in_pass = 0;
+	if (s_in_pass) return;
+	extern void* lookupRegisteredClassByCharId(size_t, int, const char**);
+	extern int g_swf_version;
+	extern MovieClip root_movieclip;
+
+	// Cheap pre-scan: skip the whole pass unless something actually needs it.
+	int any = 0;
+	for (size_t d = 1; d <= max_depth; d++) {
+		DisplayObject* obj = &display_list[d];
+		if (obj->char_id == 0 || obj->sprite_display_list != NULL) continue;
+		if (dictionary[obj->char_id].type != CHAR_TYPE_SPRITE) continue;
+		if (lookupRegisteredClassByCharId(obj->char_id, g_swf_version, NULL) != NULL) { any = 1; break; }
+	}
+	if (!any) return;
+
+	s_in_pass = 1;
+	for (size_t d = 1; d <= max_depth; d++) {
+		DisplayObject* obj = &display_list[d];
+		if (obj->char_id == 0 || obj->sprite_display_list != NULL) continue;
+		Character* ch = &dictionary[obj->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE) continue;
+		if (lookupRegisteredClassByCharId(obj->char_id, g_swf_version, NULL) == NULL) continue;
+
+		// Allocate the sprite's persistent display list (just_allocated path).
+		obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+		obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
+		obj->sprite_max_depth = 0;
+		obj->sprite_current_frame = 0;
+
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth;
+		size_t saved_cap = display_list_capacity;
+		display_list = obj->sprite_display_list;
+		max_depth = obj->sprite_max_depth;
+		display_list_capacity = obj->sprite_dl_capacity;
+
+		if (obj->instance_name != NULL) {
+			MovieClip* smc = actionFindOrCreateMovieClip(app_context, obj->instance_name,
+				g_current_context ? g_current_context : &root_movieclip);
+			if (smc) smc->currentframe = 1;
+		}
+
+		// exec_sprite_frame fires the registerClass constructor (once-only) and
+		// eager-builds the sprite's nested children (setting g_exec_eager_built_obj).
+		if (ch->sprite_frame_funcs[0] != NULL)
+			CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[0]);
+
+		// Nested children already eager-built inside exec_sprite_frame — consume
+		// the flag so the later advance_sprite_frames recursion doesn't double-step.
+		if (g_exec_eager_built_obj == obj)
+			g_exec_eager_built_obj = NULL;
+
+		obj->sprite_display_list = display_list;
+		obj->sprite_max_depth = max_depth;
+		obj->sprite_dl_capacity = display_list_capacity;
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
+
+		if (ch->sprite_frame_count > 0)
+			obj->sprite_current_frame = 1 % ch->sprite_frame_count;
+	}
+	s_in_pass = 0;
+}
+#endif
+
 // Deferred recursion pass: for each root-level sprite, swap into its display
 // list and call advance_sprite_frames (which will now recurse normally since
 // g_advance_defer_nested is 0).
