@@ -410,9 +410,41 @@ TWO confirmed browser-WASM-only gaps, BOTH non-trivial:
    the grandchildren's cxform_id vs OFFSCREEN.
 
 Both are follow-ups beyond the original two complaints (circles-visible + labels-clipped),
-which are fixed and committed (40f/40g). Recommend tackling #1 (selected dot) first — it's
-the clearer correctness gap. Ruffle ground-truth + side-by-side:
+which are fixed and committed (40f/40g). Ruffle ground-truth + side-by-side:
 `DISPLAY=:0 …/minesweeper_ruffle_capture.py` then crop vs `smoke_Minesweeper.png`.
+
+## cont. 40h (2026-06-17) — selected-dot investigation: NOT the gotoAndStop wiring
+
+Investigated the selected-dot (#1). The `gotoAndStop` machinery is NOT the problem — it
+WORKS in browser-WASM: instrumented the MOVIECLIP `gotoAndStop` handler (action.c ~64808)
+and `ng_gotoFrameByMC` — `frb_states_mc.gotoAndStop(label)` IS reached, the label resolves
+(`ng_findSpriteLabelFrame`, ungated, in tag.c), the browser-WASM `#else` arm calls
+`ng_gotoFrameByMC` for the attached non-root clip, and `advance_attached_clip_frames`
+rebuilds its display list. All wired up (much was already done in a prior session — see the
+frb_states comment at action.c ~64877 / tag_stubs.c ~1102).
+
+**The real break is UPSTREAM in the radio-group selection chain.** Probe result: every
+`gotoAndStop` call on frb_states_mc is `frame_num=1` (**unselectedEnabled**) — `selectedEnabled`
+(frame 21) is NEVER requested. So no radio's `setState(true)` ever fires. The default
+selection flows: `frame_4: _root.bombs_amount=70` → `frame_5: diff_level.setValue(70)` →
+`FRadioButtonGroupClass.setValue` iterates `radioInstances`, finds `data==70` (Medium) →
+`Medium.setValue(true)` → `setState(true)` → `gotoAndStop("selectedEnabled")`. That chain
+never reaches Medium in browser-WASM. (All radios' `initialState=false`, confirmed in their
+`on(initialize)` params — so the default is set ONLY by the group's `setValue`, not per-radio.)
+
+Two red flags from the probe, both pointing at the registerClass/frame-execution model:
+- Every gotoAndStop fires at `root_frame=1` (not frame 5 where the radios/`diff_level.setValue`
+  live) — root frame counter / frame-5-DoAction execution timing is suspect.
+- Each radio's `setState(false)` fires **11×** (re-initialization across frames, not once) —
+  the registerClass ctor / init `setValue(false)` appears to re-run, which would also RESET
+  any selection applied by the group.
+
+**Conclusion:** the selected-dot needs work in the browser-WASM registerClass-component
+group-selection + re-init / frame-execution model (does `frame_5`'s `diff_level.setValue(70)`
+run? is the group `radioInstances` array populated when it does? why do radios re-init 11×?),
+NOT the goto path. This is a deeper, separate investigation than the goto wiring — deferred.
+The ring-shading (#2) remains deferred too. Both primary complaints (40f/40g) stay fixed.
+No code changed in 40h (investigation only; all DBG stripped, demo redeployed clean).
 
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
