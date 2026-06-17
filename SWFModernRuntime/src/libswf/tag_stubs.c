@@ -523,6 +523,26 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		catch_up_mode = saved_catch_up;
 		g_tag_skip_mode = _am_saved_tag_skip;
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Build the nested sprite content placed by frame-0 (browser-WASM). funcs[0]
+		// above placed this clip's children, but a NESTED sprite child is left as a
+		// just-allocated holder with a NULL sprite_display_list. render_display_list
+		// recurses into nested sprite entries, so an unbuilt nested sprite draws
+		// nothing — e.g. Minesweeper's frb_states_mc circle ring is two nested
+		// sprites (cid 14/17) whose 3D-shading layers never rendered, so no radio
+		// circle appeared. NO_GRAPHICS/OFFSCREEN build these via
+		// process_sprite_needs_init (tagShowFrame); browser-WASM has no such pass.
+		// The globals are still swapped to this clip's list and g_current_context is
+		// the attached MC, so advance_sprite_frames runs each child's just_allocated
+		// frame-0. Done before the content-bounds computation below so nested
+		// content is included in _width/_height. (Only builds unbuilt 1-frame-style
+		// holders; already-built/playing clips are advanced as usual.)
+		{
+			extern void advance_sprite_frames(SWFAppContext*);
+			advance_sprite_frames(app_context);
+		}
+#endif
+
 		// Restore context
 		actionSetCurrentContext(saved_ctx);
 		g_current_sprite_obj = saved_sprite_obj;
