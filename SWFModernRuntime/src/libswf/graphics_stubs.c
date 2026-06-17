@@ -18,6 +18,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <math.h>
 #include <swf.h>
 #include <tag.h>
 #include <action.h>  // full struct MovieClip needed by exec_sprite_frame body
@@ -287,6 +288,28 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
                         obj->sprite_display_list = display_list;
                         obj->sprite_max_depth = max_depth;
                         obj->sprite_dl_capacity = display_list_capacity;
+                    }
+                    // Reflect the sprite's PLACEMENT matrix scale onto its MC's
+                    // _xscale/_yscale before the constructor runs. In Flash a
+                    // timeline-placed clip's _xscale/_yscale equal its placement
+                    // matrix scale (e.g. Minesweeper's radios are placed at 108%/125%
+                    // to fit their labels). The constructor's init() reads
+                    // `this._width` = local-bounds × _xscale to size the component;
+                    // without this, _xscale stays 100 so every radio reads the same
+                    // unscaled width and the labels clip to a single fixed width.
+                    // Browser-WASM's exec_sprite_frame never set this (NO_GRAPHICS/
+                    // OFFSCREEN do it in their placement/init path). Gate on the
+                    // scale not being AS-overridden yet (init later sets _xscale=100,
+                    // which sets the flags, so subsequent frames won't re-apply).
+                    {
+                        if (!(cmc->as_set_flags & (4|8))) {
+                            if (obj->place_a != 0.0f || obj->place_b != 0.0f) {
+                                float _sx = sqrtf(obj->place_a*obj->place_a + obj->place_b*obj->place_b);
+                                float _sy = sqrtf(obj->place_c*obj->place_c + obj->place_d*obj->place_d);
+                                if (_sx > 0.0f) cmc->xscale = _sx * 100.0f;
+                                if (_sy > 0.0f) cmc->yscale = _sy * 100.0f;
+                            }
+                        }
                     }
                     // Eager-build this sprite's NESTED timeline children (run their
                     // frame-0) before the constructor. The frame func `f` above
