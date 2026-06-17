@@ -89,12 +89,28 @@ int g_ime_commit_pending = 0;
 int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
                                 float* xmin_out, float* xmax_out,
                                 float* ymin_out, float* ymax_out) {
-    (void)dl; (void)dl_max;
-    if (xmin_out) *xmin_out = 0;
-    if (xmax_out) *xmax_out = 0;
-    if (ymin_out) *ymin_out = 0;
-    if (ymax_out) *ymax_out = 0;
-    return 0;
+    // Real bounds (twips) of a display list, recursing into nested sprites, via
+    // the shared bounds engine (tag_stubs.c, linked in browser-WASM). This was a
+    // 0-returning stub, so ng_attachMovie set every attached clip's mc->width/
+    // height to 0 — e.g. Minesweeper's FRadioButton circle frb_states_mc._width
+    // read 0, so FRadioButton.setLabelPlacement put fLabel_mc._x = radioWidth = 0
+    // and the label drew on top of the circle (circle invisible), and the
+    // component width math fell short (clipped labels). NO_GRAPHICS/OFFSCREEN have
+    // the real impl in tag.c. Output order matches the callers: (xmin, xmax, ymin,
+    // ymax).
+    extern int ng_computeBoundsFromDL_matrix(DisplayObject*, size_t,
+        double, double, double, double, double, double,
+        int*, double*, double*, double*, double*);
+    int has = 0;
+    double xmin = 0, ymin = 0, xmax = 0, ymax = 0;
+    if (dl != NULL)
+        ng_computeBoundsFromDL_matrix(dl, dl_max, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+            &has, &xmin, &ymin, &xmax, &ymax);
+    if (xmin_out) *xmin_out = (float)xmin;
+    if (xmax_out) *xmax_out = (float)xmax;
+    if (ymin_out) *ymin_out = (float)ymin;
+    if (ymax_out) *ymax_out = (float)ymax;
+    return has;
 }
 
 void ng_queue_placement_clip_events(SWFAppContext* app_context, size_t depth) {
