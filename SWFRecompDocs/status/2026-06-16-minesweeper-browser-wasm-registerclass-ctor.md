@@ -277,9 +277,43 @@ modes render full labels ("Easy (40 mines)" / "Medium (70 mines)" / "Tough (100 
 no-graphics + graphics. Minesweeper NO_GRAPHICS trace unchanged (634 lines) — the fix
 alters rendered component layout, not `trace()` output. Eager-build CI-inert.
 
-**Still open (cont.40e):** the radio circle ring / dot (`frb_states_mc`) renders faint;
-`render_attached_child` cxform + cache-order-not-depth-order (handoff step 4). The label
-goal is DONE.
+## cont. 40e (2026-06-16) — radio circle: nested-build + bounds-stub fixed; deep nested-bounds still open
+
+User re-tested in a real browser after the super-arg fix: labels render but are still
+clipped a bit at the right, and the radio circles are not visible. Both turned out to
+share one browser-WASM root — **attached/nested clip `_width` reads short or 0** — chased
+through several layers (each fix is committed, browser-WASM-only, CI byte-identical):
+
+1. **Nested-sprite content wasn't built (`8494da83d`).** `frb_states_mc` (the circle) is
+   built from two nested sprites (cid 14/17, the ring's 3D layers). `ng_attachMovie` placed
+   them but left them as just-allocated holders with NULL `sprite_display_list`;
+   `render_display_list`/`compose_children` recurse into nested sprites, so they drew
+   nothing. NO_GRAPHICS/OFFSCREEN build them via `process_sprite_needs_init` (no such pass
+   in browser-WASM). Fix: run `advance_sprite_frames` over the clip's list right after
+   `funcs[0]` in `ng_attachMovie`. Confirmed nested lists now populate (nsmd 7/1).
+
+2. **`sprite_content_bounds_twips` was a 0-returning stub (`e9c2a1e14`).** In
+   `graphics_stubs.c` it returned 0 unconditionally, so `ng_attachMovie` set every attached
+   clip's `mc->width/height = 0`. Implemented it via `ng_computeBoundsFromDL_matrix`.
+   Corrects attached clips with direct/shallow content; regression-smoked Tetris + DJ clean.
+
+3. **STILL OPEN — deep nested-bounds recursion zeroes out.** Even after (1)+(2),
+   `frb_states_mc._width` is still **0**. Instrumented `mcGetEffectiveSize` /
+   `ng_computeBoundsFromDL_matrix`: `frb_states`'s children cid 14/17 are identity-placed
+   (`place_a/d=1`, tx/ty=0) with built nested lists, but the recursion into their children
+   (cid 14 has 7 grandchildren) yields no bounds, so the whole clip computes 0. Net effect:
+   `radioWidth = frb_states._width = 0` → `FRadioButton.setLabelPlacement` sets
+   `fLabel_mc._x = 0` → the label draws **on top of** the circle (circle hidden), and the
+   component width math still falls a bit short (labels clipped). The circle content almost
+   certainly renders now (transforms come from `transform_id`, not `place_*`) but is covered.
+   **Next step:** find why `ng_computeBoundsFromDL_matrix`'s recursion into cid 14's
+   grandchildren returns 0 — likely their cached `place_*` weren't set when built via the
+   attach-context `advance_sprite_frames` (vs the `funcs[0]` placement that cached cid
+   14/17 correctly). Fixing that should make `frb_states._width` correct → `fLabel_mc._x`
+   offsets the label right → circle becomes visible, and tighten the label width.
+
+`render_attached_child` cxform (`compose_children(...,0,0)`) + cache-order z-order remain a
+possible secondary follow-up once the bounds/overlap is fixed.
 
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
