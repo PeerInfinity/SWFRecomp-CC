@@ -345,14 +345,43 @@ lines, unchanged). Regression-smoked Tetris + Doodle Jump clean. Not CI-dispatch
 
 **Still possibly open (needs the human's real-browser eyeball — smoke is unreliable):**
 the labels may still clip a few px at the right (`radio._width` reads 100 vs OFFSCREEN
-108). I could NOT measure this in automation: `mcGetEffectiveSize` is never called for
-the radio (registerClass `this` reads `_width` via its object path) or for attached
-clips (they read the cached `mc->width` directly), and headed-Chrome rAF throttling
-freezes the smoke at a mid-init frame (gotcha #8) so the screenshot can't judge final
-label width. The PRIMARY goal (circles visible, label offset by radioWidth) is done;
-the residual ~8px label-width gap, if real, is the next follow-up — likely a
-boundingBox_mc width detail (the radio's component width), and the
-`render_attached_child` cxform/z-order item also remains.
+108). [RESOLVED in cont.40g below.]
+
+## cont. 40g (2026-06-16) — labels fully un-clip: placement scale → MC _xscale (`8df7ff325`)
+
+User re-tested: circles visible (cont.40f win) but labels still clipped at the right —
+and tellingly **all three clipped at the SAME x** despite differing lengths. That's
+fixed-field-width clipping, not text overflow. Traced (browser-vs-OFFSCREEN DBG on the
+exact render path `actionIterateTextFieldGlyphs` `info.w = mc->width`):
+- browser-WASM labelField width = **90** for all three; OFFSCREEN = **98 / 115 / 115**
+  (per-label). So OFFSCREEN sizes each field to its text; browser used one fixed width.
+- The field is `autoSize=none` in BOTH modes (tf_flags 0x0048 = HTML+ReadOnly, no
+  WordWrap/AutoSize) — so autoSize was a red herring. The width comes from
+  `FRadioButton.setLabelPlacement`: `labelField._width = this.width - frb_states._width`.
+- `this.width` is set at init by `super.setSize(this._width, …)` — read BEFORE init's
+  `this._xscale = 100` (line 30). So `this._width` = local-bounds × placement-xscale.
+  **The three radios are placed at different xscale — `place_a` = 1.08 / 1.25 / 1.25 —
+  to fit their labels.** OFFSCREEN reflects that on the MC (`_width` = 100×1.08 = 108 …),
+  but browser-WASM created the registerClass MC with `_xscale = 100` (placement scale
+  never transferred) → every radio read width 100 → label 90 → clip.
+
+**Fix (`8df7ff325`, `graphics_stubs.c` exec_sprite_frame, browser-WASM-only):** before
+firing the constructor, set the MC's `_xscale`/`_yscale` from the placement-matrix
+magnitude (`sqrt(a²+b²)`, `sqrt(c²+d²)`) when scale isn't AS-overridden yet (init's later
+`_xscale=100` sets the as_set_flags, so later frames don't re-apply). Matches Flash
+(a clip's `_xscale` reflects its placement matrix). Confirmed: browser-WASM labelField
+widths now **98/115/115** = OFFSCREEN exactly; all three labels render fully
+("Easy (40 mines)" / "Medium (70 mines)" / "Tough (100 mines)"). Browser-WASM-only
+(exec_sprite_frame `#ifndef OFFSCREEN_RENDER`) → CI byte-identical (OFFSCREEN 634 lines).
+Tetris + Doodle Jump smokes clean.
+
+**Still open — circle APPEARANCE differs from Ruffle (user report).** The circle ring
+now renders and is correctly positioned, but the user notes it "looks different from
+Ruffle." Not yet pinned (no Ruffle screenshot to diff against). Candidates from the
+handoff: `render_attached_child`'s `compose_children(..., 0, 0)` drops the cxform
+(alpha/tint) and composites `child_mc_cache` in cache order rather than depth order —
+either could change the ring's shading/z-order. Needs a Ruffle reference capture to
+diff before fixing.
 
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
