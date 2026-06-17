@@ -761,6 +761,16 @@ void ng_set_script_only_mode(int mode)
 // performed by advance_nested_sprite_frames() after the root frame script.
 int g_advance_defer_nested = 0;
 
+// Browser-WASM eager-build (status doc 2026-06-16 cont.40c/40d): graphics_stubs.c
+// exec_sprite_frame builds a registerClass'd sprite's nested timeline children
+// (runs their frame-0) BEFORE firing the class constructor, so init()'s
+// this._width / this.<child> reads see fully-built content (FRadioButton's
+// boundingBox_mc — nested 2 levels — defines the component width). When it does
+// so it sets g_exec_eager_built_obj to that sprite so the post-CALL_FRAME
+// recursion below skips the redundant re-advance (a double-advance corrupts
+// nested frame counters). NULL in CI modes (exec_sprite_frame not compiled there).
+DisplayObject* g_exec_eager_built_obj = NULL;
+
 // Monotonic tick counter, incremented at the top of every tick by swf.c
 // (OFFSCREEN_RENDER) and swf_core.c (NO_GRAPHICS). Used in conjunction with
 // DisplayObject.placed_at_tick so advance_nested_sprite_frames can skip
@@ -1166,7 +1176,13 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// When g_advance_defer_nested is set (top-level call from swf_core.c),
 		// skip recursion here — it will be done by advance_nested_sprite_frames()
 		// after the root frame script, matching Ruffle's execution order.
-		if (!g_advance_defer_nested)
+		// Also skip when exec_sprite_frame already eager-built this sprite's
+		// nested children before its registerClass constructor (browser-WASM,
+		// g_exec_eager_built_obj) — re-advancing would double-step the children.
+		if (g_exec_eager_built_obj == obj) {
+			g_exec_eager_built_obj = NULL;  // consume (one-shot)
+		}
+		else if (!g_advance_defer_nested)
 		{
 			MovieClip* sprite_mc = NULL;
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)

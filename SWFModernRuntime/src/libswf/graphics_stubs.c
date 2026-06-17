@@ -272,6 +272,40 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
                         obj->sprite_max_depth = max_depth;
                         obj->sprite_dl_capacity = display_list_capacity;
                     }
+                    // Eager-build this sprite's NESTED timeline children (run their
+                    // frame-0) before the constructor. The frame func `f` above
+                    // placed this sprite's direct children (e.g. FRadioButton's
+                    // boundingBox_mc at depth 1), but their own sub-content (the
+                    // boundingBox shape, nested one level deeper) is only built by
+                    // the deferred nested-sprite advance that the caller runs AFTER
+                    // we return — i.e. after the constructor. init() then reads
+                    // this._width (the component width, defined by boundingBox_mc)
+                    // and gets 0, collapsing the radio label to ~2 chars. The
+                    // caller already swapped the globals to this sprite's list, so
+                    // advance_sprite_frames here iterates this sprite's children and
+                    // runs their just_allocated frame-0. Mark g_exec_eager_built_obj
+                    // so the caller's post-CALL_FRAME recursion skips the redundant
+                    // re-advance (double-stepping corrupts nested frame counters).
+                    // catch_up_mode is suppressed-script replay — skip eager-build
+                    // there to match the caller's own catch-up behavior.
+                    {
+                        extern int catch_up_mode;
+                        extern void advance_sprite_frames(SWFAppContext*);
+                        extern DisplayObject* g_exec_eager_built_obj;
+                        if (!catch_up_mode) {
+                            MovieClip* _eb_saved = g_current_context;
+                            actionSetCurrentContext(cmc);
+                            advance_sprite_frames(app_context);
+                            actionSetCurrentContext(_eb_saved);
+                            extern DisplayObject* display_list;
+                            extern size_t max_depth;
+                            extern size_t display_list_capacity;
+                            obj->sprite_display_list = display_list;
+                            obj->sprite_max_depth = max_depth;
+                            obj->sprite_dl_capacity = display_list_capacity;
+                            g_exec_eager_built_obj = obj;
+                        }
+                    }
                     // Run the sprite's INITIALIZE (0x200) clip events before the
                     // registerClass constructor, matching AVM1's
                     // Initialize → Construct order. The IDE emits component

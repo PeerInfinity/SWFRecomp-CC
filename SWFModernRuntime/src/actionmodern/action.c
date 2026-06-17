@@ -53429,7 +53429,13 @@ void actionNewMethod(SWFAppContext* app_context)
 				else
 				{
 					// Simple DefineFunction (type 1)
-					// Push arguments onto stack for the function
+					// TYPE1_ARG_ORDER: push arguments in forward order — args[0]
+					// pushed first (deepest), the last arg ends on top. The generated
+					// type-1 function prologue pops its parameters expecting this
+					// layout. Every type-1 simple_func call site must use this order
+					// (super/__resolve/array-element dispatchers previously reversed it,
+					// swapping multi-arg params — e.g. Minesweeper's FUIComponent
+					// .setSize(w,h) via super.setSize bound w↔h).
 					for (u32 i = 0; i < num_args; i++)
 					{
 						pushVar(app_context, &args[i]);
@@ -61833,7 +61839,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				this_var.type = ACTION_STACK_VALUE_OBJECT;
 				this_var.data.numeric_value = (u64)this_obj;
 				setVariableByName("this", &this_var);
-				for (int i = (int)num_args - 1; i >= 0; i--)
+				// Forward order (args[0] deepest, last arg on top) to match the
+				// canonical type-1 simple_func convention (non-super dispatch ~53488);
+				// the old reverse order swapped multi-arg params of type-1 functions
+				// reached via super/__resolve/array-element calls (see TYPE1_ARG_ORDER).
+				for (u32 i = 0; i < num_args; i++)
 					pushVar(app_context, &args[i]);
 				g_call_depth++;
 				((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
@@ -61948,7 +61958,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_this_stack[g_this_depth] = this_var;
 					g_this_depth++;
 				}
-				for (int i = (int)num_args - 1; i >= 0; i--)
+				// Forward order (args[0] deepest, last arg on top) to match the
+				// canonical type-1 simple_func convention (non-super dispatch ~53488);
+				// the old reverse order swapped multi-arg params of type-1 functions
+				// reached via super/__resolve/array-element calls (see TYPE1_ARG_ORDER).
+				for (u32 i = 0; i < num_args; i++)
 					pushVar(app_context, &args[i]);
 				g_call_depth++;
 				result = ((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
@@ -62033,7 +62047,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						this_var.data.numeric_value = (u64)super_this;
 					}
 					setVariableByName("this", &this_var);
-					for (int i = (int)num_args - 1; i >= 0; i--)
+					for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
 						pushVar(app_context, &args[i]);
 					g_call_depth++;
 					ctor_result = ((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
@@ -62150,7 +62164,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_this_stack[g_this_depth] = this_var;
 						g_this_depth++;
 					}
-					for (int i = (int)num_args - 1; i >= 0; i--)
+					for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
 						pushVar(app_context, &args[i]);
 					g_call_depth++;
 					result = ((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
@@ -63057,7 +63071,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							this_var.data.numeric_value = (u64)obj;
 							setVariableByName("this", &this_var);
 
-							for (int i = (int)num_args - 1; i >= 0; i--)
+							for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
 								pushVar(app_context, &args[i]);
 
 							ASObject* local_scope = allocObject(app_context, 8);
@@ -63329,7 +63343,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 						else if (func->function_type == 1 && func->simple_func != NULL)
 						{
-							for (int i = (int)num_args - 1; i >= 0; i--)
+							for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
 								pushVar(app_context, &args[i]);
 
 							u32 captured_count = func->captured_scope_count;
