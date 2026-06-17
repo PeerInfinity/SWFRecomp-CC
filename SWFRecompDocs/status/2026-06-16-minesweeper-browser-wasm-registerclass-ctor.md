@@ -446,6 +446,51 @@ NOT the goto path. This is a deeper, separate investigation than the goto wiring
 The ring-shading (#2) remains deferred too. Both primary complaints (40f/40g) stay fixed.
 No code changed in 40h (investigation only; all DBG stripped, demo redeployed clean).
 
+## cont. 40i (2026-06-17) — selected-dot FIXED (`f437520b0`)
+
+The selected dot (Medium ◉) now renders in browser-WASM. Re-confirmed cont.40h's
+root cause with fresh instrumentation (CTOR / CALLM setValue,setState /
+GOTOSTOP-frame DBG in shared code → stderr, diffed browser-WASM vs the working
+OFFSCREEN reference). cont.40h's "frame map" was wrong: frb_states (cid 29) has
+**5 frames** (selectedEnabled = frame **5**, not 21 — that was a tag index). Two
+browser-WASM-only gaps, both fixed:
+
+**Gap 1 — selection chain never fired (registerClass construction ORDERING).**
+DBG delta: browser-WASM `setValue f64=70` fired at seq=3 on **objtype=3
+(undefined)** BEFORE any radio constructor (seq 4/45/86); OFFSCREEN fires it at
+seq=129 on **objtype=11 (the real group)** AFTER all 3 radios construct +
+`addToRadioGroup`. The radios are placed in (recompiler) `frame_4`; the DoAction
+`diff_level.setValue(70)` is `actionQueueScript(script_22)` drained at that frame's
+`actionDrainAllInPriorityOrder` (tagMain.c:108) — which runs BEFORE `tagShowFrame`
+(:109), where browser-WASM constructs the radios (exec_sprite_frame). So the group
+`diff_level` was un-built (undefined) when setValue ran → no-op → nobody selected.
+NO_GRAPHICS/OFFSCREEN construct at PLACEMENT (process_sprite_needs_init), before
+the DoAction. (cont.40h red flag #2 "11× re-init" was a MISREAD — that's the
+normal init cascade, identical count in both modes; constructors fire once each.
+Red flag #1 "root_frame=1" was the never-updated browser-WASM root counter, a
+red herring.) **Fix:** `ng_construct_pending_registerclass_sprites` (tag.c) runs
+the just_allocated construction for freshly-placed registerClass timeline sprites
+at the top of `actionDrainAllInPriorityOrder` — so the group exists before the
+DoAction. Idempotent (skips allocated) + re-entrancy-guarded.
+
+**Gap 2 — the dot didn't render even after the chain fired.** Render DBG
+(`render_attached_child`) showed Medium's frb_states at cf=5, smd=11, with cid 28
+present at depth 11 — yet no visible dot. cid 28 (the dot) is itself a 1-frame
+SPRITE wrapping the dot shape (cid 27). `ng_gotoFrameByMC`'s synchronous frame
+replay places cid 28 but — unlike `advance_attached_clip_frames`' post-replay
+`advance_sprite_frames` (tag.c:1873) — never built its nested content, so the
+holder rendered empty (the ring, cid 14/17, was deep-built during initial
+construction so it showed; the dot was not). **Fix:** `advance_sprite_frames`
+after the replay in `ng_gotoFrameByMC` with `g_advance_defer_nested` cleared
+(cont.40f deep-build), g_current_context still the clip.
+
+Both gated `!NO_GRAPHICS && !OFFSCREEN_RENDER` → CI byte-identical (OFFSCREEN
+Minesweeper divergence unchanged at 634 lines; not CI-dispatched). Verified
+in the deployed demo: **Medium ◉, Easy/Tough ○** (matches Ruffle/OFFSCREEN
+F0014.png). Regression: Tetris title + GAMEPLAY (board cells via
+`ng_gotoFrameByMC` — correct colors, no stale trail) and Doodle Jump menu clean.
+The ring-SHADING gap (#2 from cont.40g, glossy bead vs flat) remains DEFERRED.
+
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
 The user manual-tested after the fix above: the radios still don't show and the
