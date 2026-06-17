@@ -315,6 +315,45 @@ through several layers (each fix is committed, browser-WASM-only, CI byte-identi
 `render_attached_child` cxform (`compose_children(...,0,0)`) + cache-order z-order remain a
 possible secondary follow-up once the bounds/overlap is fixed.
 
+## cont. 40f (2026-06-16) — DEEP nested build → radio circles VISIBLE (`327ef4378`)
+
+Re-confirmed the cont.40e "place_* unset" hypothesis with fresh instrumentation
+(a recursive DL dump in `ng_attachMovie` + the bounds engine) — and it was **wrong
+again** (process lesson, yet again). The grandchildren's `place_*` WERE correctly
+cached (a=1, d=1, proper tx/ty). The real cause: the grandchildren (cid 7/9/11/13/16)
+are themselves **nested sprites** that were *placed but never built* — `nDL=NULL
+nsmd=0`. `frb_states`'s circle is cid 14/17 (built, nsmd 7/1), each holding nested
+sprites cid 7/9/11/13/16, which wrap the actual ring shapes cid 6/8/10/12/15. The
+bounds engine can't recurse into empty holders → the clip computed `_width=0`.
+
+**Why only one level built:** `advance_sprite_frames` gates its
+recurse-into-nested-children step on `!g_advance_defer_nested` (tag.c:1185). Both
+the attach-time nested build (`ng_attachMovie`, `8494da83d`) and the registerClass
+eager build (`exec_sprite_frame`) run INSIDE the root frame advance, where the flag
+is 1 — so they built each clip's DIRECT children and stopped, leaving the next level
+as unbuilt holders.
+
+**Fix (`327ef4378`):** clear `g_advance_defer_nested` (save/restore) around the
+`advance_sprite_frames` call in BOTH `ng_attachMovie` (tag_stubs.c) and
+`exec_sprite_frame`'s eager build (graphics_stubs.c), so the full subtree builds.
+Confirmed: `frb_states_mc._width` 0 → **10** (matches the OFFSCREEN reference
+exactly), every leaf shape now has `charBounds=yes`, and the deployed-demo
+**circles render** (gray rings left of each label). Both sites are browser-WASM-only
+(ng_attachMovie block gated `!NO_GRAPHICS && !OFFSCREEN_RENDER`; exec_sprite_frame
+under `#ifndef OFFSCREEN_RENDER`) → CI byte-identical (OFFSCREEN divergence 634
+lines, unchanged). Regression-smoked Tetris + Doodle Jump clean. Not CI-dispatched.
+
+**Still possibly open (needs the human's real-browser eyeball — smoke is unreliable):**
+the labels may still clip a few px at the right (`radio._width` reads 100 vs OFFSCREEN
+108). I could NOT measure this in automation: `mcGetEffectiveSize` is never called for
+the radio (registerClass `this` reads `_width` via its object path) or for attached
+clips (they read the cached `mc->width` directly), and headed-Chrome rAF throttling
+freezes the smoke at a mid-init frame (gotcha #8) so the screenshot can't judge final
+label width. The PRIMARY goal (circles visible, label offset by radioWidth) is done;
+the residual ~8px label-width gap, if real, is the next follow-up — likely a
+boundingBox_mc width detail (the radio's component width), and the
+`render_attached_child` cxform/z-order item also remains.
+
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
 The user manual-tested after the fix above: the radios still don't show and the
