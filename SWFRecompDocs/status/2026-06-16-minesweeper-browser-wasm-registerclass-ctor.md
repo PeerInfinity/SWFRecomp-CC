@@ -176,12 +176,60 @@ The labels render but clip to ~18–20px ("Ea"/"M"/"To"). Traced precisely:
 - Proper fix is to eager-init the constructed sprite's nested timeline children
   (run their frame-0) BEFORE firing its registerClass constructor — mirroring
   OFFSCREEN's `process_sprite_needs_init` ordering — so `this._width` and any
-  `this.<child>` access during `init()` see fully-built content. This is a
-  broader/ordering change (touches the browser-WASM advance recursion) and is
-  deferred to its own session; my cont.40/40b fixes are the contained foundation.
+  `this.<child>` access during `init()` see fully-built content.
 - Also still latent once width lands: `render_attached_child`'s
   `compose_children(..., 0, 0)` (no cxform) + cache-order (not depth-order)
   z-order; and the faint circle ring vs Ruffle.
+
+### cont. 40c (2026-06-16) — eager-build PROTOTYPED & validated, but the width
+### chain has a 5th layer; eager-build REVERTED (not committed)
+
+Implemented the eager-init-before-constructor fix above and validated it works:
+- New shared flag `g_exec_eager_built_obj` (tag.c). In `exec_sprite_frame`
+  (browser-WASM), before firing the ctor and when `!catch_up_mode`, call
+  `advance_sprite_frames()` on the sprite's own list (the caller already swapped
+  the globals to it) to build the nested children's frame-0, then set the flag so
+  the caller's post-CALL_FRAME recursion (tag.c ~1169) skips the redundant rebuild
+  (`g_exec_eager_built_obj != obj` guard + consume). NULL in CI modes → output-
+  identical there.
+- **Confirmed working:** boundingBox_mc now has content (`child_smd=3`) before the
+  ctor, and the radio's first `setSize` read becomes correct: `setWidth(v=100)`
+  (was 18.55). So the eager-build genuinely fixes the FIRST `_width` read.
+
+**But it's invisible — a 5th layer dominates.** Instrumenting `mcSetEffectiveWidth`
+showed `labelField._width` is set **twice** per radio, both in the radio's context:
+`setWidth(100)` (radio `_width`=100, boundingBox present) THEN `setWidth(20)`
+(radio `_width`=20, AFTER `boundingBox_mc.unloadMovie()`). The second call wins →
+still clipped. The `20` is the radio's post-unload `_width`: with boundingBox
+removed (cont.40 fix), the radio's `sprite_display_list` bounds = just `deadPreview`
+(~20px). The attached children that SHOULD make it ~100px — `fLabel_mc` (label,
+already 100px wide) and `frb_states_mc` (circle) — are in `child_mc_cache`
+(attachMovie'd), NOT in the radio's `sprite_display_list`, so the browser-WASM
+bounds engine (`mcGetEffectiveSize` / `ng_computeBoundsFromDL_*`) excludes them.
+In Flash a clip's `_width` includes its attached children, so the post-unload
+`_width` stays ~100 and the second `setSize` is a no-op. **5th gap: attached
+(child_mc_cache) children parented to a clip are not counted in that clip's
+`_width`/`_height`/bounds in browser-WASM.** (Not yet pinned: the exact source of
+the SECOND setSize call — it runs once, in the radio's context, after unload;
+likely a component `size()`/relayout. Worth confirming before fixing.)
+
+Because eager-build (40c) is invisible until the 5th gap is also fixed AND it
+touches the shared advance hot path (other games use `registerClass`), it was
+**reverted** rather than committed half-finished — land it together with the
+attached-children-bounds fix, tested as a unit (smokes + OFFSCREEN divergence).
+The 40c patch is fully described here and was validated, so re-deriving it is
+cheap. Committed state remains cont.40 + 40b (rectangles gone + labels render
+with correct text, width-clipped).
+
+**Next-session plan (the width chain, in order):**
+1. Pin the source of the SECOND `setSize`/`setWidth(20)` call (instrument the
+   radio's `setSize`/`size` method entry; confirm it reads live `this._width`).
+2. Make the browser-WASM bounds engine count attached `child_mc_cache` children
+   (parented to the clip) in `_width`/`_height`/getBounds — so post-unload
+   `_width` ≈ 100 and the second `setSize` stops shrinking the label. (Broad
+   surface — gate browser-WASM, regression-test bounds-sensitive games.)
+3. Re-apply the 40c eager-build (first-read correctness) and land both together.
+4. Then revisit the faint circle ring + `render_attached_child` cxform/z-order.
 
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
