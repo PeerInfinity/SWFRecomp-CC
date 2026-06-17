@@ -376,12 +376,43 @@ widths now **98/115/115** = OFFSCREEN exactly; all three labels render fully
 Tetris + Doodle Jump smokes clean.
 
 **Still open — circle APPEARANCE differs from Ruffle (user report).** The circle ring
-now renders and is correctly positioned, but the user notes it "looks different from
-Ruffle." Not yet pinned (no Ruffle screenshot to diff against). Candidates from the
-handoff: `render_attached_child`'s `compose_children(..., 0, 0)` drops the cxform
-(alpha/tint) and composites `child_mc_cache` in cache order rather than depth order —
-either could change the ring's shading/z-order. Needs a Ruffle reference capture to
-diff before fixing.
+now renders and is correctly positioned, but looks different from Ruffle — diagnosed
+precisely with the new Ruffle harness (`tools/divergence/game_drive/minesweeper_ruffle*`,
+committed `d962010e0`) + DBG on `render_attached_child` and the frb_states structure.
+
+**frb_states (cid 29) is a 5-STATE multi-frame clip** (FrameLabels): `unselectedEnabled`
+(f1: place cid14 frb_frame_mc @d1 + cid17 @d9), `press` (f6: +cid20), `unselectedDisabled`
+(f11: cid22), `selectedDisabled` (f15: +cid25), `selectedEnabled` (f21: +cid28 = the dot).
+FRadioButton.setState does `frb_states_mc.gotoAndStop("selectedEnabled"/"unselectedEnabled")`.
+
+TWO confirmed browser-WASM-only gaps, BOTH non-trivial:
+
+1. **Selected-dot missing (Medium should be ◉).** DBG on `render_attached_child`: ALL
+   three frb_states render at `cur_frame=0` (unselectedEnabled), `playing=0`, children
+   cid14+cid17 only — **no radio ever reaches `selectedEnabled` (cid28 dot)**. Root: the
+   attached-clip `gotoAndStop("selectedEnabled")` is never applied in browser-WASM. The
+   whole goto-by-label + attached-clip frame-navigation machinery is `#if NO_GRAPHICS ||
+   OFFSCREEN_RENDER`-gated (action.c ~45036 `ng_findSpriteLabelFrame`, ~58192 the
+   `gotoAndStop` apply has no browser-WASM `#else` arm, and the bare-call path at 58189
+   uses `varToDouble(args[0])` which can't resolve a string label anyway). Fixing this
+   means giving browser-WASM a real attached-clip goto-to-label: resolve the label →
+   frame, navigate the attached clip's `sprite_display_list` to that frame (run/build
+   frames 0..target like advance_sprite_frames' manual-nav branch), and stop. Substantial.
+
+2. **Ring shading: glossy 3D "bead" vs Ruffle's flat circle.** Both show the SAME content
+   (unselectedEnabled = cid14 frb_frame_mc + cid17), so it's NOT a wrong frame — it's how
+   cid14's nested 3D shading sub-layers (grandchildren cid6/8/10/12/15 shapes) render.
+   `compose_children` DOES preserve each child's baked `cxform_id` for direct children, so
+   the cxform isn't trivially dropped; the suspect is whether the DEEP-BUILT grandchildren
+   (built via the cont.40f `advance_sprite_frames` path) got their `cxform_id` cached at
+   placement (transform_id was cached correctly; cxform_id may not be) — if they're left at
+   identity, the alpha/tint that flattens the ring is lost → opaque bead. Needs a DBG on
+   the grandchildren's cxform_id vs OFFSCREEN.
+
+Both are follow-ups beyond the original two complaints (circles-visible + labels-clipped),
+which are fixed and committed (40f/40g). Recommend tackling #1 (selected dot) first — it's
+the clearer correctness gap. Ruffle ground-truth + side-by-side:
+`DISPLAY=:0 …/minesweeper_ruffle_capture.py` then crop vs `smoke_Minesweeper.png`.
 
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
