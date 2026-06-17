@@ -308,10 +308,24 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
                         extern int catch_up_mode;
                         extern void advance_sprite_frames(SWFAppContext*);
                         extern DisplayObject* g_exec_eager_built_obj;
+                        extern int g_advance_defer_nested;
                         if (!catch_up_mode) {
                             MovieClip* _eb_saved = g_current_context;
                             actionSetCurrentContext(cmc);
+                            // Force the FULL nested build: advance_sprite_frames
+                            // gates its recurse-into-nested-children step on
+                            // !g_advance_defer_nested (tag.c:1185), and this eager
+                            // build runs inside the root advance where the flag is
+                            // 1. Without clearing it, the constructed sprite's
+                            // DIRECT children build but their own nested-sprite
+                            // children stay unbuilt — so init()'s `this._width`
+                            // (e.g. FRadioButton reading boundingBox_mc, a nested
+                            // sprite containing a shape) reads short. Clear locally
+                            // and restore.
+                            int _eb_saved_defer = g_advance_defer_nested;
+                            g_advance_defer_nested = 0;
                             advance_sprite_frames(app_context);
+                            g_advance_defer_nested = _eb_saved_defer;
                             actionSetCurrentContext(_eb_saved);
                             extern DisplayObject* display_list;
                             extern size_t max_depth;

@@ -539,7 +539,24 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		// holders; already-built/playing clips are advanced as usual.)
 		{
 			extern void advance_sprite_frames(SWFAppContext*);
+			extern int g_advance_defer_nested;
+			// Force the FULL nested build (all levels deep). advance_sprite_frames
+			// gates its recurse-into-nested-children step on !g_advance_defer_nested
+			// (tag.c:1185). When attachMovie runs inside the root frame advance —
+			// e.g. a registerClass constructor's init() calling attachMovie — that
+			// flag is still 1, so the advance below builds only this clip's DIRECT
+			// children and leaves their own nested-sprite children as unbuilt
+			// holders (NULL sprite_display_list). The bounds engine then can't
+			// recurse into them and the clip's _width/_height compute 0 — e.g.
+			// Minesweeper's frb_states_mc circle (cid 14/17 built, but their
+			// nested-sprite children cid 7/9/11/13/16 left empty → frb_states._width
+			// = 0 → FRadioButton.setLabelPlacement puts the label on top of the
+			// circle). Clear the flag locally so the recursion fully builds the
+			// subtree, then restore.
+			int _am_saved_defer = g_advance_defer_nested;
+			g_advance_defer_nested = 0;
 			advance_sprite_frames(app_context);
+			g_advance_defer_nested = _am_saved_defer;
 		}
 #endif
 
