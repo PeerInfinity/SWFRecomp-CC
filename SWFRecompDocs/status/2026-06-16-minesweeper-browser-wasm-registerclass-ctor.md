@@ -231,6 +231,56 @@ with correct text, width-clipped).
 3. Re-apply the 40c eager-build (first-read correctness) and land both together.
 4. Then revisit the faint circle ring + `render_attached_child` cxform/z-order.
 
+## cont. 40d (2026-06-16) — ROOT CAUSE was SHARED, not the width chain — FIXED (`bcacc3f70`)
+
+The cont.40c "width chain" / "5th gap" premise was **wrong**, caught by re-confirming
+with fresh instrumentation (process lesson, yet again). The plan above (esp. step 2,
+"count attached children in the bounds engine") would have been **useless and risky**:
+
+- Instrumented `mcGetEffectiveSize` + the `this.width`/`this.height` setMember writes
+  in BOTH browser-WASM and OFFSCREEN. The radio's `_width` is read **once** at init
+  (`super.setSize(this._width, this._height)`) and **never re-read** with attached
+  children present — so making the bounds engine count attached children changes
+  nothing observable. The "20 = radio post-unload `_width` = deadPreview" story was
+  fiction: `deadPreview._width` is set to **1**, and the radio reads **0** (no eager-
+  build) / **100** (eager-build), never 20.
+- **OFFSCREEN clips the labels identically** (rendered `F0014.png`: "○ E / ◉ r / ○ -").
+  So it was never a browser-WASM-only bug. The handoff's "OFFSCREEN renders the radios
+  fine" was inferred from the NO_GRAPHICS *trace* (text), which is unaffected — not
+  from a render.
+
+**Real root cause (shared, all build modes):** decompiled the SWF with JPEXS
+(`~/CC/jpexs/ffdec-cli.jar -export script`). `FUIComponentClass.setSize = function(w,h){
+this.width=w; this.height=h; ... }` is a type-1 (simple `DefineFunction`); FRadioButton
+reaches it via `super.setSize(this._width, this._height)`. Six type-1 dispatchers in
+`actionCallMethod` (the SWF6 + SWF7+ super-ctor/super-method paths, the `__resolve` hook,
+and array-element `arr[N](args)` calls) pushed args onto the stack in **reverse** order,
+while the canonical non-super dispatcher (`action.c:~53488`) and the generated type-1
+prologue both expect **forward** order (the prologue pops params last-declared-first).
+Net: `super.setSize(108, 13)` bound `this.width=13, this.height=108` — confirmed by
+instrumentation. That collapsed the component width, so `setLabelPlacement`'s
+`w = this.width - frb_states._width` shrank each `labelField._width` to ~10px and the
+single-line non-wordWrap labels clipped to ~2 chars.
+
+**Fix:** make all 6 type-1 dispatchers push forward (`for i=0..num_args`), matching the
+canonical path. Tagged `TYPE1_ARG_ORDER`. After the fix: `super.setSize(108,13)` →
+`width=108, height=13`; `labelField._width` → 115 (OFFSCREEN) / 100 (browser-WASM); both
+modes render full labels ("Easy (40 mines)" / "Medium (70 mines)" / "Tough (100 mines)").
+
+**Eager-build (40c) kept, browser-WASM only:** still needed there so the radio's
+`this._width` reads the (2-levels-deep) `boundingBox_mc` width at construct time (0 → 100)
+— without it the swap fix has nothing but 0 to bind. Gated via `g_exec_eager_built_obj`
+(NULL + inert in CI: `graphics_stubs.c` `exec_sprite_frame` isn't compiled there).
+
+**CI:** the arg-order fix is shared/CI-observable (affects every `super.method(2+ args)` /
+`super(2+ args)` / `__resolve` / array-element type-1 call suite-wide). Dispatched
+no-graphics + graphics. Minesweeper NO_GRAPHICS trace unchanged (634 lines) — the fix
+alters rendered component layout, not `trace()` output. Eager-build CI-inert.
+
+**Still open (cont.40e):** the radio circle ring / dot (`frb_states_mc`) renders faint;
+`render_attached_child` cxform + cache-order-not-depth-order (handoff step 4). The label
+goal is DONE.
+
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
 The user manual-tested after the fix above: the radios still don't show and the
