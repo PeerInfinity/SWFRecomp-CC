@@ -68728,6 +68728,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// a tick, leaving _cf=1 + a stale child.
 			if (mc != NULL && mc != &root_movieclip) {
 				DisplayObject* _ul_dobj = (DisplayObject*) mc->display_obj;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+				// Capture (before the clear below zeroes sprite_max_depth) whether
+				// this clip's own content was never placed — see the entry-clear
+				// note after the clear loop.
+				int _ul_content_unplaced = (_ul_dobj == NULL) ? 0
+					: (_ul_dobj->sprite_display_list == NULL || _ul_dobj->sprite_max_depth == 0);
+#endif
 				if (_ul_dobj != NULL && _ul_dobj->sprite_display_list != NULL) {
 					for (size_t _ud = 0; _ud <= _ul_dobj->sprite_max_depth; _ud++) {
 						_ul_dobj->sprite_display_list[_ud].char_id = 0;
@@ -68737,6 +68744,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					_ul_dobj->sprite_current_frame = 0;
 					_ul_dobj->sprite_is_playing = 0;
 				}
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+				// Browser-WASM: a NESTED timeline clip's own frame-0 is NOT run
+				// at placement (the eager-init in tagPlaceObject2 is gated to
+				// NO_GRAPHICS/OFFSCREEN). So when init() unloads such a clip
+				// BEFORE its content was ever placed, the child-list clear above
+				// is a no-op AND the deferred nested-sprite advance would re-run
+				// the clip's frame-0 (just_allocated path, tag.c:1076) AFTER this
+				// call, re-placing the content we just "unloaded". In that case
+				// only, neutralize the clip's OWN display entry so the deferred
+				// advance + the renderer skip it (char_id==0), making the empty
+				// state stick — matching Ruffle's emptied-clip result and the
+				// OFFSCREEN/NO_GRAPHICS behavior (where the at-placement frame-0
+				// made the clear stick). Scoped to the unplaced case so a normal
+				// unloadMovie on an already-populated clip keeps its entry (a
+				// later loadMovie can repopulate it). Minesweeper
+				// FRadioButton.init: this.boundingBox_mc.unloadMovie() removes the
+				// opaque editor bounding rectangle behind each radio.
+				if (_ul_dobj != NULL && _ul_content_unplaced) {
+					_ul_dobj->char_id = 0;
+					_ul_dobj->instance_name = NULL;
+				}
+#endif
 				mc->currentframe = 0;
 				mc->totalframes = 0;
 				mc->framesloaded = 0;

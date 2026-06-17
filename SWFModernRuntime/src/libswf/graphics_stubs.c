@@ -250,6 +250,28 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
                 }
                 if (cmc != NULL) {
                     obj->constructor_invoked = 1;
+                    // The sprite's frame func (`f`, run above) placed this
+                    // sprite's timeline children into the GLOBAL display_list/
+                    // max_depth (the caller — advance_sprite_frames / the goto
+                    // replay paths — swapped the globals to this sprite's list
+                    // before calling us, and only writes obj->sprite_* back
+                    // AFTER we return). So obj->sprite_max_depth is still stale
+                    // (0 on the first run) right now. Sync it from the globals
+                    // before invoking the constructor, so init()'s
+                    // `this.<timelineChild>` GetMember (which scans
+                    // mc->display_obj->sprite_display_list, i.e. obj's) finds
+                    // the children (e.g. FRadioButton.init's
+                    // this.boundingBox_mc.unloadMovie()). Also repoints
+                    // obj->sprite_display_list at the (possibly realloc'd)
+                    // global buffer, avoiding a stale/freed pointer read.
+                    {
+                        extern DisplayObject* display_list;
+                        extern size_t max_depth;
+                        extern size_t display_list_capacity;
+                        obj->sprite_display_list = display_list;
+                        obj->sprite_max_depth = max_depth;
+                        obj->sprite_dl_capacity = display_list_capacity;
+                    }
                     actionInvokeRegisteredClassConstructor(app_context, _rc_export, cmc);
                 }
             }

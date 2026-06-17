@@ -85,6 +85,74 @@ appearing as a `char_id` confirmed a reused/freed buffer.)
 Not CI-dispatched: browser-WASM-only behavior, not CI-observable
 ([[ci-only-when-observable]]).
 
+## Continuation (cont. 40, 2026-06-16) — child resolution + opaque rectangles FIXED
+
+Re-confirmed gap #1's root cause with fresh instrumentation (and it was, again,
+not quite the handoff's premise): `actionGetMember`'s child-resolution logic was
+fine — the **data it read was empty**. At constructor time the radio sprite's
+`sprite_display_list` was allocated but `sprite_max_depth == 0`, so the scan for
+`boundingBox_mc` (cid 34) found nothing → undefined.
+
+**Why `smd==0` at ctor time (browser-WASM only):** a timeline-placed sprite's
+frame-0 placement tags run via `exec_sprite_frame` (caller =
+`advance_sprite_frames` / the goto-replay paths in `tag.c`). Those callers swap
+the GLOBAL `display_list`/`max_depth` to the sprite's list before the call and
+only write `obj->sprite_max_depth` back AFTER `exec_sprite_frame` returns
+(tag.c:1190 etc.). The constructor fires INSIDE `exec_sprite_frame` (right after
+the frame func), so `obj->sprite_max_depth` is still the stale pre-frame value
+(0 on first run) while the children actually live in the global `display_list`.
+(The eager-init path in `tagPlaceObject2` that would otherwise populate this
+earlier is gated to NO_GRAPHICS/OFFSCREEN — its browser-WASM `#else` is a no-op.)
+
+**Fix 1 (`graphics_stubs.c` `exec_sprite_frame`, browser-WASM-only):** right
+before firing the registered-class constructor, sync
+`obj->sprite_display_list`/`sprite_max_depth`/`sprite_dl_capacity` from the
+globals (which the caller already swapped to this sprite's populated list). Now
+`this.boundingBox_mc` resolves to a MovieClip and `unloadMovie()` reaches its
+handler. (Also repoints `obj->sprite_display_list` at the possibly-realloc'd
+global buffer, avoiding a stale-pointer read.) Confirmed: `smd` 0 → 5,
+`boundingBox_mc` (cid 34) found at d=1.
+
+**Fix 2 (`action.c` `unloadMovie`, gated `!NO_GRAPHICS && !OFFSCREEN_RENDER`):**
+firing `unloadMovie` exposed an ORDERING problem. In OFFSCREEN the nested clip's
+frame-0 runs at placement (before the constructor), so unloadMovie's child-list
+clear sticks. In browser-WASM that eager-init is gated out, so at unload time
+`boundingBox_mc`'s own content isn't placed yet (`sdl==NULL/smd==0`) — the clear
+is a no-op, and the deferred nested-sprite advance then runs the clip's frame-0
+ONCE (`just_allocated` path, tag.c:1076), re-placing the shape. Fix: when (and
+only when) the clip's content is still unplaced at unload, also zero the clip's
+OWN display entry (`char_id=0`) so the deferred advance + renderer skip it —
+making the empty state stick, matching Ruffle. Scoped to the unplaced case so a
+normal unloadMovie on a populated clip keeps its entry (later loadMovie can
+repopulate). **Result: the three opaque editor-bounding rectangles are GONE**
+(confirmed in the deployed demo).
+
+**Not CI-dispatched:** Fix 1 is in `exec_sprite_frame` (browser-WASM-only TU,
+not compiled in CI). Fix 2 is entirely inside the `!NO_GRAPHICS &&
+!OFFSCREEN_RENDER` gate → both CI modes are byte-identical (verified: OFFSCREEN
+divergence trace unchanged at 634 lines, clean). Not CI-observable
+([[ci-only-when-observable]]).
+
+### Still open after cont. 40 — radio circle/dot + label TEXT not visible
+
+With the rectangles removed, the radio area is empty (circle ring + label text
+absent). Instrumenting `render_attached_child` showed the attached children DO
+reach the renderer every frame, visible, at correct world positions:
+`frb_states_mc` (circle/dot, `smd=9`) and `fLabel_mc` (label, `smd=1`, one child
+= `labelField` DefineEditText) for all three radios (e.g. level_eazy circle at
+tx≈5300/ty≈2690 twips, parent=level_eazy). So the missing piece is their
+**content**, not the clip render:
+- **Label text:** dynamic-textfield glyphs render via the GLOBAL
+  `actionIterateTextFieldGlyphs` pass (tag.c:4193/5081), NOT via
+  `render_display_list` of `fLabel_mc`'s sub-list. So the next blocker is whether
+  `labelField` (a nested attached-clip textfield) is registered + its text set
+  (`FLabel.setLabel` → `this.labelField.text`) + rendered at the nested attached
+  world position by that global pass. Verify text-set vs text-render separately.
+- **Circle ring** may also be faint/white on the light background — confirm
+  against Ruffle once the label text lands.
+- `render_attached_child` still passes `compose_children(..., 0, 0)` (no cxform)
+  and renders cache-order, not depth-order — latent alpha/z-order fidelity.
+
 ## Remaining browser-WASM gaps (radios still not visually correct)
 
 The user manual-tested after the fix above: the radios still don't show and the
