@@ -42089,6 +42089,23 @@ void actionSetTarget2(SWFAppContext* app_context)
 		POP();
 		MovieClip* picked;
 		if (mc != NULL && mc->depth != INT_MIN) {
+			// Flash coerces a MovieClip passed to tellTarget/SetTarget2 into its
+			// (name-based) target path and re-resolves it. When the clip's name
+			// is shadowed by a lower-depth same-named sibling, that path resolves
+			// to the FIRST such clip, not the one referenced (set_target_2 test:
+			// two clips both named "clip5" at depths 6/7 — tellTarget(b) targets
+			// the depth-6 clip). Detect that case and route through the unified
+			// string path so resolution + bookkeeping match tellTarget("path");
+			// otherwise keep the direct pointer (robust for dynamic / attached
+			// clips whose path may not resolve cleanly).
+			if (mc != &root_movieclip && mc->target[0]) {
+				MovieClip* bypath = resolveFlashPathToMC(app_context, mc->target,
+					(u32) strlen(mc->target), &root_movieclip, 1, 0);
+				if (bypath != NULL && bypath != mc && bypath->depth != INT_MIN) {
+					actionSetTarget(app_context, mc->target);
+					return;
+				}
+			}
 			setCurrentContext(mc);
 			picked = mc;
 		} else {
