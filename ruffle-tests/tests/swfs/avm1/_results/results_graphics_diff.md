@@ -1,29 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `485cab11544b` (2026-06-18T02:01:16.324714+00:00)
-**Current:** `6308c4a03e34` (2026-06-18T03:34:16.123030+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `6308c4a03e34` (2026-06-18T03:34:16.123030+00:00)
+**Current:** `5bd16324c89f` (2026-06-18T03:47:17.750663+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 622 | 600 | -22 |
-| Total | 701 | 678 | -23 |
-| Pass rate | 88.7% | 88.5% | -0.2% |
-| Mismatched lines | 16460 | 16458 | -2 |
+| Passing | 600 | 622 | +22 |
+| Total | 678 | 701 | +23 |
+| Pass rate | 88.5% | 88.7% | +0.2% |
+| Mismatched lines | 16458 | 16460 | +2 |
 
-## Missing Tests — Shard Failure (23)
+## Added Tests (23)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 22 were previously passing
-- 1 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `textfield_maxchars` | pass | 3/3 |
 | `textfield_properties` | pass | 44/44 |
 | `textfield_props_swf5` | ruffle_matched | 173/175 |
@@ -47,5 +39,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `timer_run_actions` | pass | 18/18 |
 | `trace` | pass | 8/8 |
 | `transform` | pass | 70/70 |
-
-</details>
