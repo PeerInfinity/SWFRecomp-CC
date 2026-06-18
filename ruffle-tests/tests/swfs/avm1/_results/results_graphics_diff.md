@@ -1,29 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `2c74f64fc3bb` (2026-06-17T21:43:52.764883+00:00)
-**Current:** `079c0fefecc6` (2026-06-18T00:01:46.697658+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `079c0fefecc6` (2026-06-18T00:01:46.697658+00:00)
+**Current:** `ed44b710b7c3` (2026-06-18T00:22:40.281349+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 622 | 602 | -20 |
-| Total | 701 | 678 | -23 |
-| Pass rate | 88.7% | 88.8% | +0.1% |
-| Mismatched lines | 16460 | 15149 | -1311 |
+| Passing | 602 | 622 | +20 |
+| Total | 678 | 701 | +23 |
+| Pass rate | 88.8% | 88.7% | -0.1% |
+| Mismatched lines | 15149 | 16460 | +1311 |
 
-## Missing Tests — Shard Failure (23)
+## Added Tests (23)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 20 were previously passing
-- 3 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `tab_ordering_properties_tab_index_edge_case` | ruffle_matched | 1/4 |
 | `tab_ordering_reverse` | pass | 51/51 |
 | `tab_ordering_tabbable` | pass | 47/47 |
@@ -47,5 +39,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `textfield_background_color` | pass | 11/11 |
 | `textfield_border_color` | pass | 11/11 |
 | `textfield_cache_as_bitmap` | pass | 1/1 |
-
-</details>
