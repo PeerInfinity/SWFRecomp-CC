@@ -1,70 +1,86 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T03:34:16.160276+00:00",
-    "old_git_sha": "6308c4a03e3473d9bd1895efae7cc181b4dc2d6b",
-    "new_timestamp": "2026-06-18T03:47:17.787356+00:00",
-    "new_git_sha": "5bd16324c89fea6ac05c02c92eb61fbfcacc044d",
+    "old_timestamp": "2026-06-18T03:47:17.787356+00:00",
+    "old_git_sha": "5bd16324c89fea6ac05c02c92eb61fbfcacc044d",
+    "new_timestamp": "2026-06-18T05:42:14.428765+00:00",
+    "new_git_sha": "5f25304460d4b94cfbd5c1d7b281e19267129eac",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
-    "old_pass": 65,
-    "old_ruffle_matched": 26,
-    "old_effective_pass": 91,
-    "old_total": 107,
-    "old_pass_rate": 60.7,
-    "new_pass": 66,
-    "new_ruffle_matched": 28,
-    "new_effective_pass": 94,
-    "new_total": 110,
-    "new_pass_rate": 60.0,
-    "old_mismatched_lines": 1200,
-    "new_mismatched_lines": 1211,
+    "old_pass": 66,
+    "old_ruffle_matched": 28,
+    "old_effective_pass": 94,
+    "old_total": 110,
+    "old_pass_rate": 60.0,
+    "new_pass": 65,
+    "new_ruffle_matched": 25,
+    "new_effective_pass": 90,
+    "new_total": 106,
+    "new_pass_rate": 61.3,
+    "old_mismatched_lines": 1211,
+    "new_mismatched_lines": 1176,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 107,
-    "added": 3,
-    "removed": 0
+    "unchanged": 106,
+    "added": 0,
+    "removed": 0,
+    "missing_from_incomplete_run": 4
   },
   "changes": [
     {
-      "test": "register_class/registerClassTest2",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 44,
-        "expected_lines": 44,
-        "matching_lines": 36
-      }
+      "test": "init_action/InitActionTest",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "ruffle_matched",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 11
+      },
+      "new_lines": null
     },
     {
-      "test": "replace_buttons1test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 15
-      }
+      "test": "init_action/InitActionTest2",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "ruffle_matched",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 29,
+        "expected_lines": 29,
+        "matching_lines": 5
+      },
+      "new_lines": null
     },
     {
-      "test": "replace_shapes1test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 23,
-        "expected_lines": 23,
-        "matching_lines": 23
-      }
+      "test": "instanceNameTest",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "key_event_test",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "ruffle_matched",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 66,
+        "expected_lines": 66,
+        "matching_lines": 61
+      },
+      "new_lines": null
     }
   ]
 }
