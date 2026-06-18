@@ -13,8 +13,8 @@ against its committed `_results/results.json`.
 | avm1 | `shared_object` | **No** (no `output.txt`/`test.toml`) | not run | SharedObject persistence + two-run harness — see below |
 | avm1 | `shared_object_self_ref` | **No** | not run | same infra gap |
 | from_gnash/misc-ming.all | `gotoFrame2Test` | Yes | **PASS** (fixed this session) | self-goto loop fix |
-| from_gnash/misc-swfc.all | `gotoFrameFromInterval` | Yes | timeout (`known_failure`) | cross-frame gotoAndPlay-from-callback |
-| from_gnash/misc-swfc.all | `gotoFrameFromInterval2` | Yes | output_mismatch (`known_failure`) | cross-frame gotoAndPlay-from-callback |
+| from_gnash/misc-swfc.all | `gotoFrameFromInterval` | Yes | timeout (`known_failure`) | Ruffle is wrong (runaway) — not pursued |
+| from_gnash/misc-swfc.all | `gotoFrameFromInterval2` | Yes | **ruffle_matched** (fixed) | timer-callback gotoAndPlay over-advance fixed |
 
 ## CI does not yet grade the three new Gnash tests (pre-existing enumeration gap)
 
@@ -68,20 +68,49 @@ Regression check: AVM1 goto battery (`goto_frame_number`, `goto_methods`,
 failure and is **byte-identical** with/without this change). `loop_test6` and
 `loop_test10` both ruffle_matched.
 
-## gotoFrameFromInterval / gotoFrameFromInterval2 — remaining `known_failure`
+## gotoFrameFromInterval2 — FIXED (ruffle_matched)
 
-Both are `known_failure` (Ruffle itself fails them; they ship `output.ruffle.txt`).
-Distinct mechanism from gotoFrame2Test: a **cross-frame** `gotoAndPlay(6)` issued
-from a setInterval/onEnterFrame callback (when `_currentframe==2`). We land on
-frame 6 correctly ("Entering frame 6"), but then **over-advance to frame 7**
-("Entering unreachable frame 7"), so `_root._currentframe` reads 7 instead of 6.
+Both interval tests are `known_failure` (Ruffle itself fails them; they ship
+`output.ruffle.txt`). Mechanism: a **cross-frame** `gotoAndPlay(6)` issued from a
+`setInterval` callback (`func_16`, fired in `processTimers`) when `_currentframe==2`.
 
-For `gotoFrameFromInterval2`, this over-advance is the *only* diff vs Ruffle
-beyond the shared `asOrder` FAILED line (which both Ruffle and we emit). Fixing
-the over-advance — making the target frame's `Stop()` win after a callback-driven
-`gotoAndPlay` — would promote it to `ruffle_matched`. The fix lives in the
-deferred-goto-from-callback path (the most fragile area of the runtime); deferred
-to a follow-up with full-suite CI verification.
+We were landing on frame 6 ("Entering frame 6") but then **over-advancing to
+frame 7** ("Entering unreachable frame 7"), so `_root._currentframe` read 7
+instead of 6 — the *only* diff vs Ruffle beyond the shared `asOrder` FAILED line.
+
+Root cause (confirmed by instrumentation): the bare `gotoAndPlay(6)` dispatches
+through the MovieClip-nav path (`action.c` `_is_mc_nav` arm, root target):
+`actionGotoFrame(5)` runs `ng_executeGotoCatchUp`, which **drain-suppresses** the
+target frame's queued DoAction (`script_3`, which calls `Stop()`), then
+`is_playing = 1` (play flag). When the goto comes from a *frame script*, the
+caller's SHOW_FRAME drain runs `script_3` same-tick and its `Stop()` wins. But
+from a *timer callback* there is no enclosing drain, so `script_3` stays queued;
+the main loop's natural advance then sees `is_playing == 1` and moves cf 5→6
+**before** `Stop()` ever runs (it drains a tick late, when cf is already 6).
+
+Fix (`swf_core.c`, after `processTimers`/onLoad/MCL drains, before the advance):
+drain any orphaned pending ONLOAD/SCRIPT queue entries
+(`actionActionQueuePending() > 0` → `actionDrainAllInPriorityOrder`). `g_aq_count`
+is normally 0 here (frame funcs drain at SHOW_FRAME), so it is a no-op on the
+common path; it only fires for scripts a timer/event-callback goto orphaned.
+`script_3`'s `Stop()` now settles `is_playing=0` before the advance → no
+over-advance, `_root._currentframe == 6`. Promotes the test to `ruffle_matched`
+(remaining diff = the shared `asOrder` FAILED line, ⊆ Ruffle's diff).
+
+## gotoFrameFromInterval — Ruffle is wrong (not pursued)
+
+`gotoFrameFromInterval` (no "2") is a different test that *legitimately* reaches
+"frame7". Flash (`output.txt`) cleanly terminates: 3 tests, `#passed: 3`. **Ruffle
+itself is buggy here** — its `output.ruffle.txt` is a runaway: `_root.asOrder`
+grows unboundedly (`x0xx1xx2…x89…`), it reports 10 tests instead of 3, and output
+continues *past* `__END_OF_TEST__`. We currently time out (infinite loop, a
+distinct pre-existing issue). Per the working rule "reach ruffle_matched unless
+Ruffle is doing something wrong" — Ruffle is doing something wrong here (does not
+match Flash, doesn't cleanly terminate), so matching its buggy runaway is not a
+worthwhile target. Left as `known_failure`. (The timeout itself — making our
+runtime terminate the runaway like a frame-capped player rather than hang — is a
+separate, lower-priority follow-up; it would not change the pass rate since the
+test is a `known_failure` Ruffle also fails.)
 
 ## shared_object / shared_object_self_ref — SharedObject persistence (infra gap)
 

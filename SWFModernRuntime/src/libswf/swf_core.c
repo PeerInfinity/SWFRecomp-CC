@@ -1450,6 +1450,23 @@ void swfStart(SWFAppContext* app_context)
 				actionFirePendingLoadInits(app_context);
 		}
 
+		// A goto issued from a timer/event callback (setInterval, etc.) queues the
+		// target frame's DoAction via ng_executeGotoCatchUp's drain-suppressed
+		// funcs[target] call. Unlike a goto from a frame script — where the
+		// caller's SHOW_FRAME drain runs the target script this tick — a
+		// timer-callback goto leaves it orphaned in the queue. A gotoAndPlay's
+		// is_playing=1 then survives into the natural advance below before the
+		// target frame's own stop() runs, over-advancing one frame. Drain any
+		// orphaned ONLOAD/SCRIPT entries now so the target frame's actions
+		// (e.g. stop()) settle is_playing before the advance. g_aq_count is
+		// normally 0 here (frame funcs drain at SHOW_FRAME), so this is a no-op
+		// on the common path. Key test: from_gnash/misc-swfc.all/gotoFrameFromInterval2.
+		{
+			extern size_t actionActionQueuePending(void);
+			if (actionActionQueuePending() > 0)
+				actionDrainAllInPriorityOrder(app_context);
+		}
+
 		// After-tick hook (for test harness / external interface injection)
 		{
 			typedef void (*AfterTickHandler)(SWFAppContext*, int);
