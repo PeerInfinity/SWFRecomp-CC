@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-17T03:16:45.573497+00:00",
-    "old_git_sha": "aaed7fde5735057844d647ac5d4d687352410975",
-    "new_timestamp": "2026-06-17T20:12:27.576862+00:00",
-    "new_git_sha": "e86241173c4e9370942a911f5355746c59345007",
+    "old_timestamp": "2026-06-17T20:12:27.576862+00:00",
+    "old_git_sha": "e86241173c4e9370942a911f5355746c59345007",
+    "new_timestamp": "2026-06-18T04:00:12.137332+00:00",
+    "new_git_sha": "878b6fd81b85364949360ddc57f48f4903755674",
     "partial": false,
     "same_commit": false
   },
@@ -11,49 +11,37 @@
     "old_pass": 622,
     "old_ruffle_matched": 15,
     "old_effective_pass": 637,
-    "old_total": 700,
-    "old_pass_rate": 88.9,
+    "old_total": 701,
+    "old_pass_rate": 88.7,
     "new_pass": 622,
     "new_ruffle_matched": 15,
     "new_effective_pass": 637,
     "new_total": 701,
     "new_pass_rate": 88.7,
-    "old_mismatched_lines": 16419,
+    "old_mismatched_lines": 16424,
     "new_mismatched_lines": 16424,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 699,
-    "added": 1,
+    "unchanged": 700,
+    "added": 0,
     "removed": 0
   },
   "changes": [
-    {
-      "test": "amf_serialize_typed_objects",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 6,
-        "matching_lines": 1
-      }
-    },
     {
       "test": "watch_special_recursion_double_swf7",
       "change_type": "changed",
       "old_status": "segfault",
       "new_status": "segfault",
       "old_lines": {
-        "actual_lines": 660,
+        "actual_lines": 657,
         "expected_lines": 3118,
         "matching_lines": 521
       },
       "new_lines": {
-        "actual_lines": 657,
+        "actual_lines": 660,
         "expected_lines": 3118,
         "matching_lines": 521
       }
