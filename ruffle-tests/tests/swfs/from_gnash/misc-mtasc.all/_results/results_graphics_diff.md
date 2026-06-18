@@ -1,15 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `5f25304460d4` (2026-06-18T05:42:14.425450+00:00)
-**Current:** `f9f0700382a1` (2026-06-18T05:55:10.487002+00:00)
+**Previous:** `fe0030e4fc7d` (2026-06-18T21:40:01.272848+00:00)
+**Current:** `fe0030e4fc7d` (2026-06-18T22:05:01.968094+00:00)
+*Re-run on same commit — no comparison available.*
+**⚠️ Incomplete run: 22/30 shards produced results (8 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 7 | 7 | 0 |
-| Total | 9 | 9 | 0 |
-| Pass rate | 77.8% | 77.8% | 0% |
+| Passing | 6 | 4 | -2 |
+| Total | 8 | 6 | -2 |
+| Pass rate | 75.0% | 66.7% | -8.3% |
 | Mismatched lines | 20 | 20 | 0 |
-
-No changes detected.

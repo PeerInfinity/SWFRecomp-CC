@@ -1,25 +1,25 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-06-18 05:55 UTC
+**Date**: 2026-06-18 22:05 UTC
 
-**Git SHA**: `f9f0700382`
+**Git SHA**: `fe0030e4fc`
 
-**Run Duration**: 5m 14s
+**Run Duration**: 4m 15s
 
-**Filtered**: 2 tests ignored out of 19 available
+**Filtered**: 2 tests ignored out of 20 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 17 |
-| Passing | **9** (52.9%) |
-| Ruffle-matched | 5 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **14** (82.4%) |
+| Total tests | 13 |
+| Passing | **6** (46.2%) |
+| Ruffle-matched | 4 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **10** (76.9%) |
 | Failing | 3 |
-| Total expected lines | 532 |
-| Matching lines | 411 (77.3%) |
-| Mismatched lines | 121 |
+| Total expected lines | 483 |
+| Matching lines | 374 (77.4%) |
+| Mismatched lines | 109 |
 
 ### Failure Breakdown
 
@@ -29,31 +29,27 @@
 
 ## Passing Tests
 
-**9 tests passing**
+**6 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.5s |  |
-| 2 | `edittext_test1` | 47 | 22.4s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 21.4s |  |
-| 4 | `hello` | 4 | 21.5s |  |
-| 5 | `mouse_drag_test` | 12 | 21.2s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 2.8s |  |
-| 7 | `stackscope` | 11 | 2.4s |  |
-| 8 | `submoviegetvar` | 4 | 21.6s |  |
-| 9 | `swf4opcode` | 117 | 3.7s |  |
+| 1 | `button_test1` | 31 | 2.8s |  |
+| 2 | `edittext_test1` | 47 | 21.6s |  |
+| 3 | `hello` | 4 | 21.2s |  |
+| 4 | `movieclip_destruction_test2` | 56 | 21.4s |  |
+| 5 | `stackscope` | 11 | 20.8s |  |
+| 6 | `swf4opcode` | 117 | 3.5s |  |
 
 ## Ruffle-Matched Tests
 
-**5 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**4 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `action_execution_order_test10` | 11 | 14 | 21.6s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 21.8s |  |
-| 3 | `movieclip_destruction_test1` | 43 | 52 | 23.0s |  |
-| 4 | `registerclass_test3` | 12 | 20 | 2.8s |  |
-| 5 | `soft_reference_test1` | 3 | 4 | 21.4s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 17.2s |  |
+| 3 | `movieclip_destruction_test1` | 43 | 52 | 24.4s |  |
+| 4 | `soft_reference_test1` | 3 | 4 | 22.9s |  |
 
 ## Near-Passing Tests
 
