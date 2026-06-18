@@ -883,14 +883,22 @@ jobs:
             --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_MING_DIR" \
             --json=ruffle-tests/results-shard-gnash_ming-${{ matrix.shard }}.json \
-            --shard="$SHARD" \
-            --exclude=gotoFrame2Test || true
+            --shard="$SHARD" || true
+          # gotoFrame2Test (misc-ming) and gotoFrameFromInterval2 (misc-swfc)
+          # were excluded as "hanging" in 4b79110d6; both are now fixed and
+          # grade PASS / ruffle_matched, so they are no longer excluded.
+          # gotoFrameFromInterval (no "2") stays excluded: it is a
+          # known_failure runaway where both we AND Ruffle diverge from Flash
+          # (Ruffle's own output.ruffle.txt is an unbounded runaway). It hangs
+          # to the 30s per-test timeout with no pass-rate upside, so grading it
+          # would only burn ~30s of CI per run. See
+          # ruffle-tests/tests/swfs/_investigation/NEW_UPSTREAM_TESTS_TRIAGE.md.
           python3 ruffle-tests/verify_output.py -v \
             --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_SWFC_DIR" \
             --json=ruffle-tests/results-shard-gnash_swfc-${{ matrix.shard }}.json \
             --shard="$SHARD" \
-            --exclude=gotoFrameFromInterval --exclude=gotoFrameFromInterval2 || true
+            --exclude=gotoFrameFromInterval || true
 
       - name: Upload Gnash results
         if: always()

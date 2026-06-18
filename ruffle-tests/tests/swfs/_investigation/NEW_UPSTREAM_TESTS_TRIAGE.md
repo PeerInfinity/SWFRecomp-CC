@@ -16,26 +16,43 @@ against its committed `_results/results.json`.
 | from_gnash/misc-swfc.all | `gotoFrameFromInterval` | Yes | timeout (`known_failure`) | Ruffle is wrong (runaway) — not pursued |
 | from_gnash/misc-swfc.all | `gotoFrameFromInterval2` | Yes | **ruffle_matched** (fixed) | timer-callback gotoAndPlay over-advance fixed |
 
-## CI does not yet grade the three new Gnash tests (pre-existing enumeration gap)
+## CI enumeration gap — ROOT CAUSE FOUND & FIXED (2026-06-18, follow-up session)
 
-CI run `27767514089` (no-graphics, my fix) confirmed **zero regressions** across
-all 8 suites, but its graded counts still show `misc-ming.all` total **110** and
-`misc-swfc.all` total **19** — i.e. `gotoFrame2Test`, `gotoFrameFromInterval`, and
-`gotoFrameFromInterval2` are **absent from CI results entirely**, before *and*
-after my change. These tests have been in upstream master since 2026-05-16
-(commit `8e2852107`), so several past CI runs never graded them either.
+The earlier hypothesis in this doc (an "artifact flow" mystery in how the
+sharded run enumerates the uploaded recompiled-test-data) was **wrong**. The
+real cause was much simpler: the Gnash shard step in
+`.github/workflows/ruffle-tests.yml` carried explicit **`--exclude`** flags that
+dropped exactly these three tests:
 
-This is NOT caused by my change and NOT a recompiler failure: CI's "Download
-Ruffle test SWFs" installs all 404 gnash tests, CI's "Run recompiler" step
-reports 0 failures, `run_tests.py` recompiles all 111 misc-ming tests locally
-(111/111), and `verify_output.discover_tests` finds 111 locally (incl.
-gotoFrame2Test). The gap is in how the **sharded run** enumerates/consumes the
-uploaded recompiled-test-data artifact — the shards' graded set omits these
-dirs. Diagnosing the artifact flow (Setup upload → shard download →
-`verify_output --shard`) is a separate CI-infrastructure follow-up; it must not
-destabilize the working pipeline. **Consequence:** `gotoFrame2Test`'s
-timeout→PASS fix is verified locally and produces no CI regression, but is not
-yet reflected in CI pass counts until the enumeration gap is closed.
+```
+--tests-dir="$GNASH_MING_DIR"  ... --exclude=gotoFrame2Test
+--tests-dir="$GNASH_SWFC_DIR"  ... --exclude=gotoFrameFromInterval --exclude=gotoFrameFromInterval2
+```
+
+These were added in commit `4b79110d6` ("Add --exclude flag and skip hanging
+Gnash tests in CI", 2026-04-03) as a stopgap because all three were **hanging**
+(infinite loops / runaway) before the timeline-control fixes. `verify_output.py`
+applies `--exclude` after `discover_tests`, so the shards simply never graded
+them — which is why CI's `misc-ming.all` total read 110 and `misc-swfc.all` read
+19 even though local discovery finds 111 / 20.
+
+**Fix:** removed the excludes for the two now-fixed tests so CI grades them:
+
+- `gotoFrame2Test` → **PASS** (un-excluded)
+- `gotoFrameFromInterval2` → **ruffle_matched** (un-excluded)
+- `gotoFrameFromInterval` → **stays excluded** (see below)
+
+`gotoFrameFromInterval` (no "2") remains excluded on purpose. It is a
+`known_failure` runaway: both we *and* Ruffle diverge from Flash
+(Flash's `output.txt` cleanly terminates with 3 tests + `__END_OF_TEST__`;
+Ruffle's `output.ruffle.txt` is an unbounded runaway). Locally it hangs ~35s
+(9 GB RSS — within-tick timer/goto catch-up looping with O(n²) `asOrder` string
+growth, bounded only by `timer.c`'s `iteration_limit=10000`) until the 30s
+per-test runner timeout kills it. Grading it would only add a `timeout` failure
+and burn ~30s of CI per run with zero pass-rate upside. Making the runtime cap
+the runaway like a frame-capped player is the OPTIONAL follow-up below; it is
+deferred because it touches the core "keep ticking past num_frames for
+onEnterFrame" main-loop policy that many tests rely on.
 
 `__framework__` (in `avm1/`) is the AVM1 test framework helper
 (`ClassDefinition.as` / `ArgumentDefinition.as` / `Utils.as`), not a runnable
@@ -148,3 +165,37 @@ Passing them requires, beyond our current stub `SharedObject.getLocal`
 This is a sizeable feature with low ROI (2 tests). Left untracked-but-documented;
 not added to `ignored_tests.txt` because they are not discovered (adding them
 would have no effect and could mislead).
+
+### Scoping decision (2026-06-18 follow-up session): DEFER
+
+Re-scoped against the actual test source (`shared_object/test.as`,
+`output1.txt`/`output2.txt`) — confirms the analysis above. The full effort is:
+
+- **AMF0 codec (serializer + deserializer)** covering Number, Boolean, String,
+  Null, Undefined, anonymous Object, ECMA Array, Strict Array, Date, XML
+  (typed-object), and references. This is the bulk of the work (~several hundred
+  lines of fiddly format code).
+- **Byte-exact `getSize()`** — `output1.txt` asserts `size: 279` *exactly*. The
+  serializer must reproduce Flash/Ruffle's AMF0 byte layout precisely (including
+  property key ordering, ECMA-array `length` framing, the `09` object-end
+  marker, etc.). Byte-exactness is brittle: any ordering or framing mismatch
+  fails the assertion, and there is no partial credit.
+- **`.sol` container format** — 6-byte header, `TCSO` magic, padding, the
+  shared-object name, AMF version byte, then the AMF0 body.
+- **`verify_output.py` two-run harness** — run with no `.sol` (compare
+  `output1.txt`, persist the flushed `.sol`), then re-run with it present
+  (compare `output2.txt`). Plus discovery support so the `output1.txt`/
+  `output2.txt` pair is recognized (currently `resolve_expected_filename`
+  returns `None` → the tests are skipped entirely).
+- **AVM1 edge semantics** the read-back branch exercises: array holes →
+  `elem0,undefined,undefined,undefined,elem4`, `length == 5`,
+  `hasOwnProperty('0')==true` / `('1')==false`, string property `array['prop']`,
+  negative index `array[-1]`, nested object, `Date.getTime()`, `XML` typeof, and
+  `delete obj.data` returning **false** (SharedObject `data` is non-deletable).
+
+**Decision: do NOT implement now.** Two tests do not justify a from-scratch
+byte-exact AMF0 codec plus a new two-run harness, and the byte-exact `getSize`
+gate makes it a long debugging tail. Revisit only if (a) more SharedObject/AMF0
+tests appear upstream, or (b) a shipped game actually needs LSO persistence —
+at which point the codec earns its keep beyond the test suite. Until then these
+two stay undiscovered (zero pass-rate impact) and documented here.
