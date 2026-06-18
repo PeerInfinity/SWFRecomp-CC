@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T03:47:17.769487+00:00",
-    "old_git_sha": "5bd16324c89fea6ac05c02c92eb61fbfcacc044d",
-    "new_timestamp": "2026-06-18T05:42:14.410617+00:00",
-    "new_git_sha": "5f25304460d4b94cfbd5c1d7b281e19267129eac",
+    "old_timestamp": "2026-06-18T05:42:14.410617+00:00",
+    "old_git_sha": "5f25304460d4b94cfbd5c1d7b281e19267129eac",
+    "new_timestamp": "2026-06-18T05:55:10.471183+00:00",
+    "new_git_sha": "f9f0700382a13284ee863a0b8977bf917e915f85",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 73,
+    "old_pass": 70,
     "old_ruffle_matched": 3,
-    "old_effective_pass": 76,
-    "old_total": 92,
-    "old_pass_rate": 79.3,
-    "new_pass": 70,
+    "old_effective_pass": 73,
+    "old_total": 89,
+    "old_pass_rate": 78.7,
+    "new_pass": 73,
     "new_ruffle_matched": 3,
-    "new_effective_pass": 73,
-    "new_total": 89,
-    "new_pass_rate": 78.7,
+    "new_effective_pass": 76,
+    "new_total": 92,
+    "new_pass_rate": 79.3,
     "old_mismatched_lines": 394,
     "new_mismatched_lines": 394,
     "increased_mismatches": 0,
@@ -29,46 +26,45 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 89,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 3
+    "added": 3,
+    "removed": 0
   },
   "changes": [
     {
       "test": "button3",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "doubleAndRegister",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "fscommand1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     }
   ]
 }
