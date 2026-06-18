@@ -70,7 +70,15 @@ no `onEnterFrame` and no clip-`ENTER_FRAME`, so both prune fully).
 - Local NO_GRAPHICS trace tests pass (directly exercise both walks):
   `clip_events`, `clip_event_propagation_order`, `unload_clip_event`,
   `execution_order1`–`4`.
-- CI both modes: _(filled in after dispatch)_.
+- CI both modes **green, 0 regressions** (commit `5f2530446`):
+  - graphics (run 27739365781): avm1 622/701 = baseline; 0 graphics regressions.
+  - no-graphics (run 27739836100): avm1 622, from_shumway 73, from_gnash
+    135/67/7/9/19 — all 0 delta, no incomplete shards. The trace suites directly
+    exercise `onEnterFrame` + clip-`ENTER_FRAME` dispatch (what both pruned walks
+    drive), so this is the load-bearing correctness signal.
+  - (Two earlier graphics runs each lost a *different* random shard — 29, then 17
+    — to the recurring HTTP 401 runner-auth flake; a code bug would fail the same
+    deterministic tests, and the clean re-run restored them.)
 
 ## Next levers (still open)
 
