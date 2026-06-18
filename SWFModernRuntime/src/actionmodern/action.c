@@ -20929,7 +20929,7 @@ static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 	char* utf8_buf, u16* out_font_id, u16* out_font_height, s16* out_leading,
 	int* out_word_wrap, int* out_field_width_twips,
 	int* out_left_margin_twips, int* out_right_margin_twips, int* out_indent_twips);
-static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc);
+static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc, int skip_if_empty);
 
 // Forward declarations for HTML text format run system
 typedef struct TFRun_s {
@@ -27797,7 +27797,7 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
 		mc->width = (float)(floor(fabs(v) * 20.0) / 20.0);
-		applyAutoSize(app_context, mc);
+		applyAutoSize(app_context, mc, 0);
 		return;
 	}
 	double nat_w = 0, nat_h = 0;
@@ -27852,7 +27852,7 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
 		mc->height = (float)(floor(fabs(v) * 20.0) / 20.0);
-		applyAutoSize(app_context, mc);
+		applyAutoSize(app_context, mc, 0);
 		return;
 	}
 	double nat_w = 0, nat_h = 0;
@@ -48441,13 +48441,18 @@ void actionSetMember(SWFAppContext* app_context)
 				retainObject((ASObject*) mc->dynamic_props);
 			}
 			setProperty(app_context, (ASObject*) mc->dynamic_props, prop_name, prop_name_len, &value_var);
-			// Trigger autoSize recalculation when autoSize, text, or htmlText changes
-			if (MC_IS_TEXTFIELD(mc) && (
-				(prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0) ||
-				(prop_name_len == 4 && strncmp(prop_name, "text", 4) == 0) ||
-				(prop_name_len == 8 && strncmp(prop_name, "htmlText", 8) == 0)))
+			// Trigger autoSize recalculation when autoSize, text, or htmlText changes.
+			// The autoSize-property change skips empty fields (Flash keeps authored
+			// dimensions); text/htmlText changes always resize (even text=="").
 			{
-				applyAutoSize(app_context, mc);
+				int _is_autosize_prop = (prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0);
+				if (MC_IS_TEXTFIELD(mc) && (
+					_is_autosize_prop ||
+					(prop_name_len == 4 && strncmp(prop_name, "text", 4) == 0) ||
+					(prop_name_len == 8 && strncmp(prop_name, "htmlText", 8) == 0)))
+				{
+					applyAutoSize(app_context, mc, _is_autosize_prop);
+				}
 			}
 			// Only propagate to global variable table for root movieclip
 			// (timeline variables on root are also accessible as globals)
@@ -49264,7 +49269,15 @@ static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 
 // Apply autoSize: recalculate field width/height/x based on text content.
 // Called when text, textFormat, or autoSize property changes.
-static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc)
+// skip_if_empty: when set, an empty (zero-length) text leaves the field's
+// authored width/height/x untouched. Passed by the autoSize *property* setter
+// only — Flash does not resize a field when you merely toggle autoSize while the
+// text is empty (gnash TextField-vN: createTextField(..,500,500) then the
+// autoSize=left/center/right/none round-trip must keep _width/_height == 500).
+// The text/htmlText/setTextFormat triggers pass 0, so assigning text (even "")
+// still resizes to the gutter-only extent (avm1 edittext_align_trailing_spaces:
+// t.text = "" on an autoSize field → 4x4).
+static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc, int skip_if_empty)
 {
 	if (mc == NULL || !MC_IS_TEXTFIELD(mc) || mc->dynamic_props == NULL) return;
 
@@ -49289,6 +49302,9 @@ static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc)
 	int _as_ww, _as_fwt, _as_lm, _as_rm, _as_ind;
 	size_t _as_len = extractTextFieldParams(app_context, mc, _as_utf8,
 		&_as_fid, &_as_fh, &_as_ld, &_as_ww, &_as_fwt, &_as_lm, &_as_rm, &_as_ind);
+
+	// See header comment: only the autoSize-property setter skips empty fields.
+	if (skip_if_empty && _as_len == 0) return;
 
 	// When embedFonts=true and font is not actually embedded in the SWF (font_id=0
 	// for dynamic textfields), Flash renders nothing and text has zero dimensions.
@@ -66324,7 +66340,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 			stf_done:
-			applyAutoSize(app_context, mc);
+			applyAutoSize(app_context, mc, 0);
 #endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -66427,7 +66443,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					setProperty(app_context, (ASObject*)mc->dynamic_props, "align", 5, al_prop);
 				}
 			}
-			applyAutoSize(app_context, mc);
+			applyAutoSize(app_context, mc, 0);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 #else

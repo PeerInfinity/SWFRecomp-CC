@@ -1,6 +1,31 @@
 # TextField-vN Investigation Plan
 <!-- TESTS: TextField-v6, TextField-v7, TextField-v8 -->
 
+Last updated: 2026-06-18 (Phase 10 landed — `tf._width`/`tf._height` initial
+value. Root cause was NOT in the getter: `createTextField("tf",..,500,500)`
+correctly stored `mc->width=500`, but the autoSize sub-test
+(`tf.autoSize = true/'center'/'right'/'none'`, TextField.as:215-236, *before* any
+text is assigned) ran `applyAutoSize` on the empty field and collapsed it to the
+gutter-only 4px; setting autoSize back to `'none'` never restored it, so
+`tf._height==500` (line 323) and `tf._width==500` (lines 578/844) read 4.
+Flash/Ruffle keep the authored size: an autoSize-*property* change does not
+resize an empty field. Fix in `SWFModernRuntime/src/actionmodern/action.c`:
+`applyAutoSize` gained a `skip_if_empty` param; the autoSize-property setter
+passes 1 (skip resize when text length 0), while the text/htmlText/setTextFormat
+triggers pass 0 (still resize, even for `text==""` → gutter 4×4). Line-match:
+v6 ~456→**462/545** (83 mismatch), v7 ~447→**471/570** (99 mismatch), v8 ~449→
+**473/571** (98 mismatch). All three still output_mismatch — more phases needed
+for promotion. No AVM1 regressions: `edittext_align_trailing_spaces_swf7/swf8`
+(which DO expect `t.text=""` to resize an embedFonts field to 4×4) still PASS —
+the first attempt's blanket empty-text guard regressed them, fixed by the
+trigger-aware `skip_if_empty` split; `edittext_autosize`,
+`edittext_autosize_setter`, `edittext_width_height`, `movieclip_create_text_field`,
+`textfield_props_swf6/7/8`, `clone_sprite_edittext{,_dynamic}`,
+`edittext_html_swf6/7`, `edittext_html_roundtrip`, `edittext_scroll`,
+`edittext_hscroll`, `edittext_newlines`, `edittext_bullet`, `edittext_input`,
+`edittext_default_format`, `edittext_align`, `edittext_margins`,
+`edittext_text_height_leading` all PASS.)
+
 Last updated: 2026-05-24 (Phase 3 landed — `TextField.getFontList`
 static method registered on `g_textfield_constructor.own_props` as a
 `function_type=2` builtin returning an empty `ASArray`. Marked
@@ -99,7 +124,7 @@ phases:
     status: pending
   - id: 10
     name: "tf._width / _height initial value (4 vs 500)"
-    status: pending
+    status: done
   - id: 11
     name: "tf._parent setter (silent no-op vs apparent mutation)"
     status: pending
