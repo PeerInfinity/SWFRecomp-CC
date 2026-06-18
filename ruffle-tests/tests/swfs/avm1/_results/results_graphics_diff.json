@@ -1,314 +1,310 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-17T21:43:52.764883+00:00",
-    "old_git_sha": "2c74f64fc3bb667c48e59988e7033c6c87583806",
-    "new_timestamp": "2026-06-18T00:01:46.697658+00:00",
-    "new_git_sha": "079c0fefecc6408fe30b978c1c509042a8f1272f",
+    "old_timestamp": "2026-06-18T00:01:46.697658+00:00",
+    "old_git_sha": "079c0fefecc6408fe30b978c1c509042a8f1272f",
+    "new_timestamp": "2026-06-18T00:22:40.281349+00:00",
+    "new_git_sha": "ed44b710b7c3534cbe34a8b7f26676022e29efae",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 622,
-    "old_ruffle_matched": 15,
-    "old_effective_pass": 637,
-    "old_total": 701,
-    "old_pass_rate": 88.7,
-    "new_pass": 602,
-    "new_ruffle_matched": 12,
-    "new_effective_pass": 614,
-    "new_total": 678,
-    "new_pass_rate": 88.8,
-    "old_mismatched_lines": 16460,
-    "new_mismatched_lines": 15149,
+    "old_pass": 602,
+    "old_ruffle_matched": 12,
+    "old_effective_pass": 614,
+    "old_total": 678,
+    "old_pass_rate": 88.8,
+    "new_pass": 622,
+    "new_ruffle_matched": 15,
+    "new_effective_pass": 637,
+    "new_total": 701,
+    "new_pass_rate": 88.7,
+    "old_mismatched_lines": 15149,
+    "new_mismatched_lines": 16460,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 678,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 23
+    "added": 23,
+    "removed": 0
   },
   "changes": [
     {
       "test": "tab_ordering_properties_tab_index_edge_case",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "tab_ordering_reverse",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 51,
         "expected_lines": 51,
         "matching_lines": 51
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "tab_ordering_tabbable",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 47,
         "expected_lines": 47,
         "matching_lines": 47
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "target_clip_removed",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 5,
         "expected_lines": 5,
         "matching_lines": 5
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "target_clip_swf5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "target_clip_swf6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "target_path",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 14,
         "expected_lines": 14,
         "matching_lines": 14
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "target_paths/swf4",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 818,
         "expected_lines": 818,
         "matching_lines": 818
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "target_paths/swf5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 818,
         "expected_lines": 854,
         "matching_lines": 200
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "target_paths/swf6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 818,
         "expected_lines": 854,
         "matching_lines": 200
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "tell_target",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 34,
         "expected_lines": 34,
         "matching_lines": 34
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "tell_target_invalid",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 5,
         "expected_lines": 5,
         "matching_lines": 5
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "tell_target_invalid_swf6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 4
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "text_blocks_clicks",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 4
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "text_format",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1146,
         "expected_lines": 1146,
         "matching_lines": 1146
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "text_format_display",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 21,
         "expected_lines": 21,
         "matching_lines": 21
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "text_format_font_max_length",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "text_format_get_text_extent_undefined_width",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 10,
         "expected_lines": 10,
         "matching_lines": 10
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "text_format_rounding_swf7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 840,
         "expected_lines": 840,
         "matching_lines": 840
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "text_format_rounding_swf8",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 840,
         "expected_lines": 840,
         "matching_lines": 840
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "textfield_background_color",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 11,
         "expected_lines": 11,
         "matching_lines": 11
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "textfield_border_color",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 11,
         "expected_lines": 11,
         "matching_lines": 11
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "textfield_cache_as_bitmap",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     }
   ]
 }
