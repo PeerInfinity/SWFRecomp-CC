@@ -28,6 +28,50 @@ extern RenderContext* context;
 extern int catch_up_mode;
 extern int g_tag_skip_mode;
 
+#include <limits.h>  // INT_MIN (freed-MC sentinel depth)
+
+// --- Per-frame-walk MovieClip resolution cache -----------------------------
+// The hot per-frame tree walks (advance_sprite_children_only,
+// presync_nested_cf_recurse, ...) resolve each sprite node's MovieClip* by
+// string name every frame. The resolvers (actionFindOrCreateMovieClip /
+// actionFindMovieClipByName) do an O(child_mc_count) scan with swf_name_match
+// per call. We memoize the result on the DisplayObject (obj->resolved_mc) and
+// revalidate the SAME predicate the resolver keys on, so a hit is a single
+// swf_name_match + a few pointer checks instead of a full scan. On a miss the
+// caller runs the real resolver and calls tag_store_walk_mc to (re)cache.
+//
+//   name_only=1  mirrors actionFindMovieClipByName (global first-match by name:
+//                depth!=INT_MIN && swf_name_match).
+//   name_only=0  mirrors findOrCreateMovieClip (live + same parent + same name,
+//                honoring name_displaced and the g_skip_pending_removal_mc gate).
+//
+// Correctness: same-name live MCs are appended to child_mc_cache (a fresh
+// placement never shadows an earlier *live* match — it lands at a higher index),
+// so the cached first-match stays the resolver's answer while it remains live
+// and name-matching. Otherwise revalidation fails (freed → depth==INT_MIN,
+// renamed/re-parented → predicate mismatch) and the caller re-resolves.
+extern int g_skip_pending_removal_mc;
+extern int swf_name_match(const char* a, const char* b);
+
+static inline MovieClip* tag_cached_walk_mc(DisplayObject* obj, MovieClip* parent, int name_only)
+{
+	MovieClip* c = (MovieClip*)obj->resolved_mc;
+	if (c == NULL || obj->instance_name == NULL) return NULL;
+	if (c->depth == INT_MIN) return NULL;
+	if (!name_only) {
+		if (c->name_displaced) return NULL;
+		if (c->parent != parent) return NULL;
+		if (g_skip_pending_removal_mc && c->pending_removal) return NULL;
+	}
+	if (!swf_name_match(c->name, obj->instance_name)) return NULL;
+	return c;
+}
+
+static inline void tag_store_walk_mc(DisplayObject* obj, MovieClip* mc)
+{
+	obj->resolved_mc = (void*)mc;
+}
+
 // Per-movie transform data mapping (indexed by movie_id, 0 = main SWF).
 // Set during actionImportAssets/actionFirePendingLoadInits so that sprites from
 // child movies can reference the correct transform array during frame execution.
@@ -838,12 +882,22 @@ static void advance_sprite_children_only(SWFAppContext* app_context, DisplayObje
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 	extern MovieClip root_movieclip;
 	MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
-	if (obj->instance_name != NULL)
-		sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_recurse);
+	if (obj->instance_name != NULL) {
+		sprite_mc = tag_cached_walk_mc(obj, parent_for_recurse, 0);
+		if (sprite_mc == NULL) {
+			sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_recurse);
+			tag_store_walk_mc(obj, sprite_mc);
+		}
+	}
 #else
 	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
-	if (obj->instance_name != NULL)
-		sprite_mc = actionFindMovieClipByName(obj->instance_name);
+	if (obj->instance_name != NULL) {
+		sprite_mc = tag_cached_walk_mc(obj, NULL, 1);
+		if (sprite_mc == NULL) {
+			sprite_mc = actionFindMovieClipByName(obj->instance_name);
+			tag_store_walk_mc(obj, sprite_mc);
+		}
+	}
 #endif
 	MovieClip* saved_recurse_ctx = g_current_context;
 	if (sprite_mc) actionSetCurrentContext(sprite_mc);
@@ -1728,10 +1782,18 @@ static void presync_nested_cf_recurse(SWFAppContext* app_context)
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 			extern MovieClip root_movieclip;
 			MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
-			smc = actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc);
+			smc = tag_cached_walk_mc(obj, pmc, 0);
+			if (smc == NULL) {
+				smc = actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc);
+				tag_store_walk_mc(obj, smc);
+			}
 #else
 			extern MovieClip* actionFindMovieClipByName(const char* instance_name);
-			smc = actionFindMovieClipByName(obj->instance_name);
+			smc = tag_cached_walk_mc(obj, NULL, 1);
+			if (smc == NULL) {
+				smc = actionFindMovieClipByName(obj->instance_name);
+				tag_store_walk_mc(obj, smc);
+			}
 #endif
 		}
 
@@ -2714,8 +2776,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				hit_test_mat4_multiply(child_parent_xf, parent_xf, place_xf);
 
 				MovieClip* sprite_mc = NULL;
-				if (obj->instance_name != NULL)
-					sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (obj->instance_name != NULL) {
+					sprite_mc = tag_cached_walk_mc(obj, parent_mc, 0);
+					if (sprite_mc == NULL) {
+						sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+						tag_store_walk_mc(obj, sprite_mc);
+					}
+				}
 
 				// In browser-WASM (USE_WEBGPU, no OFFSCREEN_RENDER), process_sprite_needs_init
 				// isn't called from tagShowFrame, so sprite-named MCs created lazily by
@@ -2796,8 +2863,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 
 			// Find the MC for this button to use as context for children
 			MovieClip* btn_mc = NULL;
-			if (obj->instance_name != NULL)
-				btn_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			if (obj->instance_name != NULL) {
+				btn_mc = tag_cached_walk_mc(obj, parent_mc, 0);
+				if (btn_mc == NULL) {
+					btn_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+					tag_store_walk_mc(obj, btn_mc);
+				}
+			}
 
 			// A button is not a timeline; keep the same enclosing sprite for
 			// any buttons nested in this button's state display list.

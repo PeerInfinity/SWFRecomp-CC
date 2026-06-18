@@ -203,6 +203,15 @@ typedef struct DisplayObject
 	                        // = visible. The render loop skips drawing entries with this set;
 	                        // a name lookup from root can't find a timeline sprite's MC, but
 	                        // mc->display_obj points straight back at the display_list entry.
+	// Per-frame-walk resolution cache: memoizes the MovieClip* that the hot
+	// per-frame tree walks (advance/presync/button) resolve this display entry
+	// to by string name. The underlying resolvers do an O(child_mc_count) scan
+	// with swf_name_match per call; this collapses a hit to a single
+	// swf_name_match + liveness check. Validated against the SAME predicate each
+	// resolver keys on (see tag.c tag_cached_walk_mc); a stale entry falls
+	// through to the real resolver and is re-cached. void* to avoid pulling the
+	// MovieClip definition into this header.
+	void* resolved_mc;
 	// Cached transform values (populated at placement time for correct bounds on child SWFs)
 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
 	// Child movie transform data override (set during placement when g_active_transform_data != NULL)
