@@ -67,7 +67,14 @@ tick-bound on exactly these walks ([[minesweeper-radio-click-lag-is-avm1-burst]]
   `goto_execution_order`, `goto_both_ways1`, `clone_sprite_types`,
   `empty_movieclip_can_attach_movies`, `goto_advance1`, `button_goto`,
   `attach_movie_stop`.
-- CI both modes: _(filled in after dispatch)_.
+- CI both modes **green, 0 regressions** (commit `6308c4a03`):
+  - graphics (run 27734993529): avm1 622/701 — identical to pre-change baseline
+    `485cab11`; `results_graphics_regressions.md` = 0 graphics regressions.
+  - no-graphics (run 27735390001): avm1 622/701, from_shumway 73, from_gnash
+    135/67/7/9/19 — all 0 delta.
+  - (The first graphics run 27734196347 reported a spurious −22 from a single
+    failed shard 29 — an HTTP 401 infra error that dropped the same shard across
+    all 6 suites; the clean re-run restored exactly those 22 tests.)
 
 ## Next levers (documented, not done)
 
