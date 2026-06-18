@@ -1,310 +1,314 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T03:34:16.123030+00:00",
-    "old_git_sha": "6308c4a03e3473d9bd1895efae7cc181b4dc2d6b",
-    "new_timestamp": "2026-06-18T03:47:17.750663+00:00",
-    "new_git_sha": "5bd16324c89fea6ac05c02c92eb61fbfcacc044d",
+    "old_timestamp": "2026-06-18T03:47:17.750663+00:00",
+    "old_git_sha": "5bd16324c89fea6ac05c02c92eb61fbfcacc044d",
+    "new_timestamp": "2026-06-18T05:42:14.391714+00:00",
+    "new_git_sha": "5f25304460d4b94cfbd5c1d7b281e19267129eac",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
-    "old_pass": 600,
-    "old_ruffle_matched": 14,
-    "old_effective_pass": 614,
-    "old_total": 678,
-    "old_pass_rate": 88.5,
-    "new_pass": 622,
-    "new_ruffle_matched": 15,
-    "new_effective_pass": 637,
-    "new_total": 701,
-    "new_pass_rate": 88.7,
-    "old_mismatched_lines": 16458,
-    "new_mismatched_lines": 16460,
+    "old_pass": 622,
+    "old_ruffle_matched": 15,
+    "old_effective_pass": 637,
+    "old_total": 701,
+    "old_pass_rate": 88.7,
+    "new_pass": 601,
+    "new_ruffle_matched": 13,
+    "new_effective_pass": 614,
+    "new_total": 678,
+    "new_pass_rate": 88.6,
+    "old_mismatched_lines": 16460,
+    "new_mismatched_lines": 16458,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 678,
-    "added": 23,
-    "removed": 0
+    "added": 0,
+    "removed": 0,
+    "missing_from_incomplete_run": 23
   },
   "changes": [
     {
-      "test": "textfield_maxchars",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
+      "test": "math_swf8",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 530,
+        "expected_lines": 530,
+        "matching_lines": 530
+      },
+      "new_lines": null
     },
     {
-      "test": "textfield_properties",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 44,
-        "expected_lines": 44,
-        "matching_lines": 44
-      }
+      "test": "matrix",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 171,
+        "expected_lines": 171,
+        "matching_lines": 171
+      },
+      "new_lines": null
     },
     {
-      "test": "textfield_props_swf5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 175,
-        "expected_lines": 175,
-        "matching_lines": 173
-      }
+      "test": "mcl_as_broadcaster",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "new_lines": null
     },
     {
-      "test": "textfield_props_swf6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 210,
-        "expected_lines": 210,
-        "matching_lines": 210
-      }
+      "test": "mcl_events_swf_version",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 232,
+        "expected_lines": 232,
+        "matching_lines": 232
+      },
+      "new_lines": null
     },
     {
-      "test": "textfield_props_swf7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 210,
-        "expected_lines": 210,
-        "matching_lines": 210
-      }
+      "test": "mcl_getprogress",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "new_lines": null
     },
     {
-      "test": "textfield_props_swf8",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 210,
-        "expected_lines": 210,
-        "matching_lines": 210
-      }
+      "test": "mcl_loadclip",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 149,
+        "expected_lines": 149,
+        "matching_lines": 149
+      },
+      "new_lines": null
     },
     {
-      "test": "textfield_text",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
+      "test": "mcl_loadclip_properties",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
     },
     {
-      "test": "textfield_variable",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 81,
-        "expected_lines": 81,
-        "matching_lines": 81
-      }
-    },
-    {
-      "test": "textsnapshot_available_text",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      }
-    },
-    {
-      "test": "textsnapshot_findtext",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 44,
-        "expected_lines": 44,
-        "matching_lines": 44
-      }
-    },
-    {
-      "test": "textsnapshot_gettext",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 55,
-        "expected_lines": 55,
-        "matching_lines": 55
-      }
-    },
-    {
-      "test": "textsnapshot_props_swf5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 56,
-        "expected_lines": 56,
-        "matching_lines": 56
-      }
-    },
-    {
-      "test": "textsnapshot_props_swf6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 56,
-        "expected_lines": 56,
-        "matching_lines": 56
-      }
-    },
-    {
-      "test": "textsnapshot_text_order",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
+      "test": "mcl_loadclip_replace_root",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      }
+      },
+      "new_lines": null
     },
     {
-      "test": "this_scoping",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
-      }
+      "test": "mcl_mislabeled_target",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
     },
     {
-      "test": "this_swf5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 41
-      }
+      "test": "mcl_replace_root_swf7_to_swf5",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "ruffle_matched",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 56
+      },
+      "new_lines": null
     },
     {
-      "test": "this_swf6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 41
-      }
+      "test": "mcl_replace_root_swf7_to_swf6",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "ruffle_matched",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 56
+      },
+      "new_lines": null
     },
     {
-      "test": "this_swf7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 41
-      }
+      "test": "mcl_target_gif87a",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
     },
     {
-      "test": "timeline_function_def",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
+      "test": "mcl_target_gif89a",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
     },
     {
-      "test": "timeout",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
+      "test": "mcl_target_jpg",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
     },
     {
-      "test": "timer_run_actions",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 18
-      }
+      "test": "mcl_target_png",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
     },
     {
-      "test": "trace",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
+      "test": "mcl_unloadclip",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse_events",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
         "actual_lines": 8,
         "expected_lines": 8,
         "matching_lines": 8
-      }
+      },
+      "new_lines": null
     },
     {
-      "test": "transform",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 70,
-        "expected_lines": 70,
-        "matching_lines": 70
-      }
+      "test": "mouse_events_visible_enabled",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse_hover_events_while_dragging",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse_listeners",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 67
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse_pos",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 665,
+        "expected_lines": 665,
+        "matching_lines": 665
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse_pos_with_scale_factor",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 260,
+        "expected_lines": 260,
+        "matching_lines": 260
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse_wheel_enabled",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
     }
   ]
 }
