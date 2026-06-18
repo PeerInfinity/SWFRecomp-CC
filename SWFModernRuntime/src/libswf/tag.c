@@ -20,6 +20,7 @@ extern RenderContext* context;
 
 // action.h is needed in all modes (g_current_context, actionFindOrCreateMovieClip, etc.)
 #include <action.h>
+#include <actionmodern/object.h>  // getPropertyWithPrototype, ASObject (enterFrame pruning)
 
 // ActionQueue API for clip-event migration (Phase 4+ of ACTION_QUEUE_PLAN).
 #include <actionmodern/action_queue.h>
@@ -70,6 +71,73 @@ static inline MovieClip* tag_cached_walk_mc(DisplayObject* obj, MovieClip* paren
 static inline void tag_store_walk_mc(DisplayObject* obj, MovieClip* mc)
 {
 	obj->resolved_mc = (void*)mc;
+}
+
+// --- Event-driven enterFrame-walk pruning ----------------------------------
+// Two per-frame walks over the whole display tree exist purely to drive
+// enterFrame dispatch, and on a deep static tree (e.g. Minesweeper's stopped
+// FUIComponent radios) they are wasted work:
+//
+//   set_enterframe_eligible_recursive — sets enterframe_eligible=1, consumed
+//     ONLY by actionDispatchEnterFrameHandlers (mc.onEnterFrame).
+//   gather_clip_ef_entries (via dispatch_enterframe_clip_actions) — gathers
+//     entries, used ONLY to fire CLIP_EVENT_ENTER_FRAME clip actions.
+//
+// Walk 1 — stamp the ancestry of every onEnterFrame handler each tick and prune
+// subtrees with no stamped descendant. SOURCE-COMPLETE: an onEnterFrame handler
+// lives on mc->dynamic_props, which only exists on cached MovieClips, so every
+// dispatchable handler is reachable from child_mc_cache. g_ef_prune_safe drops
+// to the full walk for the tick if any handler MC's display_obj ancestry is
+// broken (NULL link before root), so a linkage gap can never drop a handler.
+// Recomputed each tick (self-healing: a handler added mid-tick fires next tick,
+// matching the existing dispatch which skips newly-added MCs anyway).
+//
+// Walk 2 — skip gather entirely while no CLIP_EVENT_ENTER_FRAME clip action has
+// ever been placed (g_any_clip_ef_placed, sticky). When one exists we keep the
+// full walk (conservative — avoids any per-subtree gap for anonymous clips).
+static int g_ef_prune_safe = 0;
+static size_t g_ef_stamp_tick = (size_t)-1;
+int g_any_clip_ef_placed = 0;
+
+// Sticky-flag a clip-action list that contains CLIP_EVENT_ENTER_FRAME. Called at
+// every site that assigns clip_actions to a live display entry.
+static inline void note_clip_actions_for_ef(const ClipAction* acts, size_t count)
+{
+	if (g_any_clip_ef_placed || acts == NULL) return;
+	for (size_t a = 0; a < count; a++)
+		if (acts[a].event_flags & CLIP_EVENT_ENTER_FRAME) { g_any_clip_ef_placed = 1; return; }
+}
+
+// Stamp subtree_ef_gen along the display-tree ancestry of every cached MovieClip
+// that has an onEnterFrame handler. Idempotent per tick.
+static void stamp_onenterframe_paths(void)
+{
+	extern size_t g_tick_count;
+	if (g_ef_stamp_tick == g_tick_count) return;   // once per tick
+	g_ef_stamp_tick = g_tick_count;
+	g_ef_prune_safe = 1;
+
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	extern MovieClip root_movieclip;
+	for (int i = 0; i < child_mc_count; i++)
+	{
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		if (mc->is_button_mc) continue;                  // buttons don't fire onEnterFrame
+		ASObject* props = (ASObject*)mc->dynamic_props;
+		ActionVar* ef = getPropertyWithPrototype(props, "onEnterFrame", 12);
+		if (ef == NULL || ef->type != ACTION_STACK_VALUE_FUNCTION) continue;
+		// Dynamic MCs without a display entry use mc_enterframe_eligible, a
+		// separate path not gated by set_enterframe_eligible_recursive.
+		if (mc->display_obj == NULL) continue;
+		for (MovieClip* p = mc; p != NULL && p != &root_movieclip; p = p->parent)
+		{
+			DisplayObject* d = (DisplayObject*)p->display_obj;
+			if (d == NULL) { g_ef_prune_safe = 0; break; }  // broken ancestry → full walk
+			d->subtree_ef_gen = g_tick_count;
+		}
+	}
 }
 
 // Per-movie transform data mapping (indexed by movie_id, 0 = main SWF).
@@ -3481,6 +3549,9 @@ static void dispatch_enterframe_clip_actions_recursive(SWFAppContext* app_contex
 void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
+	// No CLIP_EVENT_ENTER_FRAME clip action has ever been placed → the gather
+	// walk would find nothing to dispatch. Skip the whole tree traversal.
+	if (!g_any_clip_ef_placed) return;
 	#define CLIP_EF_FLAT_CAP 2048
 	ClipEFEntry entries[CLIP_EF_FLAT_CAP];
 	size_t n = 0;
@@ -3596,9 +3667,18 @@ void dispatch_attached_clip_enterframe(SWFAppContext* app_context)
 // When a parent is removed (char_id=0), the walk skips it → children don't get the flag.
 void set_enterframe_eligible_recursive(DisplayObject* dl, size_t dl_max)
 {
+	// Refresh the onEnterFrame ancestry stamp once per tick (no-op on the
+	// recursive calls and on additional top-level callers within the same tick).
+	extern size_t g_tick_count;
+	stamp_onenterframe_paths();
 	for (size_t i = 0; i <= dl_max; i++)
 	{
 		if (dl[i].char_id == 0) continue;
+		// Static-subtree prune: no onEnterFrame handler anywhere below here this
+		// tick, so the eligible flag would never be read in this subtree. Skipped
+		// only when the stamp is provably complete (g_ef_prune_safe).
+		if (g_ef_prune_safe && dl[i].subtree_ef_gen != g_tick_count)
+			continue;
 		if (dl[i].sprite_initialized >= 2)
 			dl[i].enterframe_eligible = 1;
 		if (dl[i].sprite_display_list != NULL && dl[i].sprite_max_depth > 0)
@@ -7226,6 +7306,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	if (g_pending_clip_actions != NULL) {
 		display_list[depth].clip_actions = g_pending_clip_actions;
 		display_list[depth].clip_action_count = g_pending_clip_action_count;
+		note_clip_actions_for_ef(display_list[depth].clip_actions, display_list[depth].clip_action_count);
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
 	}
@@ -7448,6 +7529,7 @@ void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* cli
 	{
 		display_list[depth].clip_actions = clip_actions;
 		display_list[depth].clip_action_count = clip_action_count;
+		note_clip_actions_for_ef(clip_actions, clip_action_count);
 	}
 }
 
@@ -7787,6 +7869,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	if (g_pending_clip_actions != NULL) {
 		display_list[depth].clip_actions = g_pending_clip_actions;
 		display_list[depth].clip_action_count = g_pending_clip_action_count;
+		note_clip_actions_for_ef(display_list[depth].clip_actions, display_list[depth].clip_action_count);
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
 	}
@@ -8084,6 +8167,7 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 	// Set new clip actions
 	display_list[depth].clip_actions = new_clip_actions;
 	display_list[depth].clip_action_count = new_clip_action_count;
+	note_clip_actions_for_ef(new_clip_actions, new_clip_action_count);
 	// Accumulate old clip actions to fire before new_clip_actions on next removal
 	display_list[depth].accumulated_clip_actions = old_clip_actions;
 	display_list[depth].accumulated_clip_action_count = old_clip_action_count;
