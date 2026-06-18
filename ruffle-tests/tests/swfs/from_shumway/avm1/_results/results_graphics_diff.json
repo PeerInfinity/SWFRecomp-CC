@@ -1,23 +1,26 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T05:42:14.406818+00:00",
-    "old_git_sha": "5f25304460d4b94cfbd5c1d7b281e19267129eac",
-    "new_timestamp": "2026-06-18T05:55:10.467168+00:00",
-    "new_git_sha": "f9f0700382a13284ee863a0b8977bf917e915f85",
+    "old_timestamp": "2026-06-18T05:55:10.467168+00:00",
+    "old_git_sha": "f9f0700382a13284ee863a0b8977bf917e915f85",
+    "new_timestamp": "2026-06-18T21:40:01.222882+00:00",
+    "new_git_sha": "fe0030e4fc7dc5e760a8fc572f7294ae410ac33b",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 4,
+    "expected_shards": 30
   },
   "summary": {
-    "old_pass": 44,
+    "old_pass": 46,
     "old_ruffle_matched": 1,
-    "old_effective_pass": 45,
-    "old_total": 45,
-    "old_pass_rate": 97.8,
-    "new_pass": 46,
+    "old_effective_pass": 47,
+    "old_total": 47,
+    "old_pass_rate": 97.9,
+    "new_pass": 40,
     "new_ruffle_matched": 1,
-    "new_effective_pass": 47,
-    "new_total": 47,
-    "new_pass_rate": 97.9,
+    "new_effective_pass": 41,
+    "new_total": 41,
+    "new_pass_rate": 97.6,
     "old_mismatched_lines": 2,
     "new_mismatched_lines": 2,
     "increased_mismatches": 0,
@@ -25,34 +28,83 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 45,
-    "added": 2,
-    "removed": 0
+    "unchanged": 41,
+    "added": 0,
+    "removed": 0,
+    "missing_from_incomplete_run": 6
   },
   "changes": [
     {
-      "test": "rollover",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
+      "test": "duplicateMovieClip/duplicateMovieClip",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 4
-      }
+      },
+      "new_lines": null
     },
     {
-      "test": "scope",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
-      }
+      "test": "duplicateMovieClip/name-coercion",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "nativeinheritance",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "nested-button",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "settimeout",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      },
+      "new_lines": null
+    },
+    {
+      "test": "undefined/undefined-swf6",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 39,
+        "expected_lines": 39,
+        "matching_lines": 39
+      },
+      "new_lines": null
     }
   ]
 }
