@@ -1,5 +1,18 @@
 # Gnash Test Suite Status
 
+Last updated: 2026-06-18 (pending CI — newly-synced upstream tests triaged; see
+`_investigation/NEW_UPSTREAM_TESTS_TRIAGE.md`. `misc-ming.all/gotoFrame2Test`
+(new, NOT known_failure): timeout → **PASS** via a self-goto guard in
+`swf_core.c::ng_executeGotoCatchUp` — a `GotoFrame2 play=1` whose target is the
+frame whose own script is executing (`gotoAndPlay(_currentframe)` + `Stop()`) no
+longer replays/re-queues that frame's script (it was re-issuing the goto →
+unbounded loop). `misc-swfc.all/gotoFrameFromInterval` (timeout) and
+`gotoFrameFromInterval2` (output_mismatch) are new `known_failure`s with a
+distinct cross-frame gotoAndPlay-from-callback over-advance bug — still open,
+see the triage doc. No regressions: AVM1 goto battery 7/7, misc-ming goto/loop
+battery 8/9 effective (lone mismatch `action_execution_order_test5` byte-identical
+with/without the change).)
+
 Last updated: 2026-05-29 (pending CI — `getvariable-v5/v6/v7/v8` (actionscript.all)
 output_mismatch/ruffle_matched → PASS (+4, v6 was already RM). The fix makes a
 `_level0` segment resolve to `undefined` ONLY when it appears as an INTERMEDIATE

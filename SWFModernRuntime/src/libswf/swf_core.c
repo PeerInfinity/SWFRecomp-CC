@@ -139,6 +139,25 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	size_t original_frame = current_frame;
 	size_t target = next_frame;
 
+	// Self-goto guard: a goto targeting the frame whose own script is currently
+	// executing (e.g. GotoFrame2 play=1 / gotoAndPlay(_currentframe) issued from
+	// the running frame) must NOT replay tags or re-run funcs[target]. The
+	// playhead is already on `target`; re-running funcs[target] here re-queues
+	// that same script, which re-issues the goto → unbounded loop (the script
+	// FIFO never drains). Flash does not re-execute the current frame's actions
+	// on a same-frame goto within the tick — it just confirms the playhead and
+	// lets is_playing (set by any trailing Stop/Play in the same script) decide
+	// whether the NEXT tick advances. Consume the goto request and return so the
+	// main loop's natural advance (current_frame++ when is_playing) still applies.
+	// Key test: from_gnash/misc-ming.all/gotoFrame2Test (GotoFrame2 play=1 to the
+	// current frame, then Stop()).
+	if (target == original_frame) {
+		goto_from_action = 0;
+		manual_next_frame = 0;
+		current_frame = target;
+		return;
+	}
+
 	ng_display_clear_after(app_context, target);
 
 	// Process ALL frames (intermediate + target) with catch_up_mode=1
