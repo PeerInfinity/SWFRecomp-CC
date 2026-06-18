@@ -16,6 +16,27 @@ against its committed `_results/results.json`.
 | from_gnash/misc-swfc.all | `gotoFrameFromInterval` | Yes | timeout (`known_failure`) | cross-frame gotoAndPlay-from-callback |
 | from_gnash/misc-swfc.all | `gotoFrameFromInterval2` | Yes | output_mismatch (`known_failure`) | cross-frame gotoAndPlay-from-callback |
 
+## CI does not yet grade the three new Gnash tests (pre-existing enumeration gap)
+
+CI run `27767514089` (no-graphics, my fix) confirmed **zero regressions** across
+all 8 suites, but its graded counts still show `misc-ming.all` total **110** and
+`misc-swfc.all` total **19** — i.e. `gotoFrame2Test`, `gotoFrameFromInterval`, and
+`gotoFrameFromInterval2` are **absent from CI results entirely**, before *and*
+after my change. These tests have been in upstream master since 2026-05-16
+(commit `8e2852107`), so several past CI runs never graded them either.
+
+This is NOT caused by my change and NOT a recompiler failure: CI's "Download
+Ruffle test SWFs" installs all 404 gnash tests, CI's "Run recompiler" step
+reports 0 failures, `run_tests.py` recompiles all 111 misc-ming tests locally
+(111/111), and `verify_output.discover_tests` finds 111 locally (incl.
+gotoFrame2Test). The gap is in how the **sharded run** enumerates/consumes the
+uploaded recompiled-test-data artifact — the shards' graded set omits these
+dirs. Diagnosing the artifact flow (Setup upload → shard download →
+`verify_output --shard`) is a separate CI-infrastructure follow-up; it must not
+destabilize the working pipeline. **Consequence:** `gotoFrame2Test`'s
+timeout→PASS fix is verified locally and produces no CI regression, but is not
+yet reflected in CI pass counts until the enumeration gap is closed.
+
 `__framework__` (in `avm1/`) is the AVM1 test framework helper
 (`ClassDefinition.as` / `ArgumentDefinition.as` / `Utils.as`), not a runnable
 test — correctly absent from results.
