@@ -97,6 +97,14 @@ common path; it only fires for scripts a timer/event-callback goto orphaned.
 over-advance, `_root._currentframe == 6`. Promotes the test to `ruffle_matched`
 (remaining diff = the shared `asOrder` FAILED line, ⊆ Ruffle's diff).
 
+CI side-effect (benign, no pass-rate impact): three pre-existing
+`output_mismatch` *runaway* tests in misc-ming.all (`ActionOrderTest3`,
+`ActionOrderTest4`, `RegisterClassTest4`) emit +11 `actual_lines` each — the
+drain runs their timer-queued scripts one extra round per tick, so each loops
+slightly further before terminating. `matching_lines` is **unchanged** (4/62,
+9/64, 3/42), status stays `output_mismatch`, effective pass unchanged, no new
+timeouts. CI run `27773253214`: zero pass→fail regressions across all 8 suites.
+
 ## gotoFrameFromInterval — Ruffle is wrong (not pursued)
 
 `gotoFrameFromInterval` (no "2") is a different test that *legitimately* reaches
