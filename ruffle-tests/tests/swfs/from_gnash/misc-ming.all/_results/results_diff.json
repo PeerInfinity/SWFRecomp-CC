@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T06:08:27.767970+00:00",
-    "old_git_sha": "1a1b1196703224692282a369775e73f59fbb654f",
-    "new_timestamp": "2026-06-18T14:56:43.565835+00:00",
-    "new_git_sha": "eea0b53a20979ce489da51df35e8eb5902d1a868",
+    "old_timestamp": "2026-06-18T14:56:43.565835+00:00",
+    "old_git_sha": "eea0b53a20979ce489da51df35e8eb5902d1a868",
+    "new_timestamp": "2026-06-18T16:28:58.315248+00:00",
+    "new_git_sha": "de99b3a9b02563533d615b40d7253b9115734ce6",
     "partial": false,
     "same_commit": false
   },
@@ -25,9 +25,58 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 110,
+    "unchanged": 107,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "action_order/ActionOrderTest3",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 78,
+        "expected_lines": 62,
+        "matching_lines": 4
+      },
+      "new_lines": {
+        "actual_lines": 89,
+        "expected_lines": 62,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "action_order/ActionOrderTest4",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 118,
+        "expected_lines": 64,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 129,
+        "expected_lines": 64,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "register_class/RegisterClassTest4",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 64,
+        "expected_lines": 42,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 75,
+        "expected_lines": 42,
+        "matching_lines": 3
+      }
+    }
+  ]
 }
