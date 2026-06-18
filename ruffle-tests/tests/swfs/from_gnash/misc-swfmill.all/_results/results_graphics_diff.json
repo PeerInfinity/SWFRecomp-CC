@@ -1,26 +1,26 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T05:55:10.475641+00:00",
-    "old_git_sha": "f9f0700382a13284ee863a0b8977bf917e915f85",
-    "new_timestamp": "2026-06-18T21:40:01.236604+00:00",
+    "old_timestamp": "2026-06-18T21:40:01.236604+00:00",
+    "old_git_sha": "fe0030e4fc7dc5e760a8fc572f7294ae410ac33b",
+    "new_timestamp": "2026-06-18T22:05:01.959713+00:00",
     "new_git_sha": "fe0030e4fc7dc5e760a8fc572f7294ae410ac33b",
     "partial": false,
-    "same_commit": false,
+    "same_commit": true,
     "incomplete": true,
-    "missing_shards": 5,
+    "missing_shards": 8,
     "expected_shards": 30
   },
   "summary": {
-    "old_pass": 19,
+    "old_pass": 15,
     "old_ruffle_matched": 1,
-    "old_effective_pass": 20,
-    "old_total": 20,
-    "old_pass_rate": 95.0,
-    "new_pass": 15,
+    "old_effective_pass": 16,
+    "old_total": 16,
+    "old_pass_rate": 93.8,
+    "new_pass": 14,
     "new_ruffle_matched": 1,
-    "new_effective_pass": 16,
-    "new_total": 16,
-    "new_pass_rate": 93.8,
+    "new_effective_pass": 15,
+    "new_total": 15,
+    "new_pass_rate": 93.3,
     "old_mismatched_lines": 2,
     "new_mismatched_lines": 2,
     "increased_mismatches": 0,
@@ -28,50 +28,50 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 16,
-    "added": 0,
+    "unchanged": 13,
+    "added": 2,
     "removed": 0,
-    "missing_from_incomplete_run": 4
+    "missing_from_incomplete_run": 3
   },
   "changes": [
     {
-      "test": "dict_event",
+      "test": "dict_override",
       "change_type": "missing_from_incomplete_run",
       "old_status": "pass",
       "new_status": null,
       "old_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "jump_after_end",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
       },
       "new_lines": null
     },
     {
       "test": "registers",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 36,
         "expected_lines": 36,
         "matching_lines": 36
-      },
-      "new_lines": null
+      }
     },
     {
-      "test": "trace-as2/root_onload",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "new_lines": null
-    },
-    {
-      "test": "trace-as2/this",
+      "test": "trace-as2/arguments",
       "change_type": "missing_from_incomplete_run",
       "old_status": "pass",
       "new_status": null,
@@ -81,6 +81,18 @@
         "matching_lines": 8
       },
       "new_lines": null
+    },
+    {
+      "test": "trace-as2/root_onload",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
     }
   ]
 }

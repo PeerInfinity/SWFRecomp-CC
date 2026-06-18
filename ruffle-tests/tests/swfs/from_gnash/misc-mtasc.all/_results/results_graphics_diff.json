@@ -1,26 +1,26 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T05:55:10.487002+00:00",
-    "old_git_sha": "f9f0700382a13284ee863a0b8977bf917e915f85",
-    "new_timestamp": "2026-06-18T21:40:01.272848+00:00",
+    "old_timestamp": "2026-06-18T21:40:01.272848+00:00",
+    "old_git_sha": "fe0030e4fc7dc5e760a8fc572f7294ae410ac33b",
+    "new_timestamp": "2026-06-18T22:05:01.968094+00:00",
     "new_git_sha": "fe0030e4fc7dc5e760a8fc572f7294ae410ac33b",
     "partial": false,
-    "same_commit": false,
+    "same_commit": true,
     "incomplete": true,
-    "missing_shards": 5,
+    "missing_shards": 8,
     "expected_shards": 30
   },
   "summary": {
-    "old_pass": 7,
+    "old_pass": 6,
     "old_ruffle_matched": 2,
-    "old_effective_pass": 9,
-    "old_total": 9,
-    "old_pass_rate": 77.8,
-    "new_pass": 6,
+    "old_effective_pass": 8,
+    "old_total": 8,
+    "old_pass_rate": 75.0,
+    "new_pass": 4,
     "new_ruffle_matched": 2,
-    "new_effective_pass": 8,
-    "new_total": 8,
-    "new_pass_rate": 75.0,
+    "new_effective_pass": 6,
+    "new_total": 6,
+    "new_pass_rate": 66.7,
     "old_mismatched_lines": 20,
     "new_mismatched_lines": 20,
     "increased_mismatches": 0,
@@ -28,21 +28,33 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 8,
+    "unchanged": 6,
     "added": 0,
     "removed": 0,
-    "missing_from_incomplete_run": 1
+    "missing_from_incomplete_run": 2
   },
   "changes": [
     {
-      "test": "hello",
+      "test": "implementsOpTest",
       "change_type": "missing_from_incomplete_run",
       "old_status": "pass",
       "new_status": null,
       "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
+        "actual_lines": 28,
+        "expected_lines": 28,
+        "matching_lines": 28
+      },
+      "new_lines": null
+    },
+    {
+      "test": "super_test1",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
       },
       "new_lines": null
     }
