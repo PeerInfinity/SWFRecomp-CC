@@ -176,6 +176,16 @@ typedef struct WebGPURenderContext
 	u32* dyn_vtx_staging;       // [MAX_DYNAMIC_VERTICES * 4] u32 (mirror of dynamic vertex region)
 	float* dyn_color_staging;   // [MAX_DYNAMIC_RECTS * 4] float (mirror of dynamic color region)
 
+	// Retained-mode upload skip (browser only). Exact CPU copy of the LAST data
+	// uploaded to the dynamic vertex/color regions; render_webgpu_close_pass skips
+	// the writeBuffer when this frame's staging is byte-identical (the GPU buffer
+	// still holds the retained data → pixel-identical, zero re-upload). NULL in
+	// native/OFFSCREEN builds, where the skip is disabled (always upload).
+	u32* prev_dyn_vtx;          // [MAX_DYNAMIC_VERTICES * 4] u32, or NULL
+	float* prev_dyn_color;      // [MAX_DYNAMIC_RECTS * 4] float, or NULL
+	u32 prev_dyn_vtx_used;      // vertex count of the last upload (0 = none/invalid)
+	u32 prev_dyn_rect_count;    // color slot count of the last upload (0 = none/invalid)
+
 	// Dynamic gradient rendering (Drawing API beginGradientFill/lineGradientStyle)
 	u32 static_gradient_count;   // number of gradients from recompiler (static)
 	u32 dynamic_gradient_used;   // number of dynamic gradient layers used this frame

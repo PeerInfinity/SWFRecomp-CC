@@ -858,6 +858,16 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 	ctx->dyn_vtx_staging = (u32*)malloc((size_t)MAX_DYNAMIC_VERTICES * 4 * sizeof(u32));
 	ctx->dyn_color_staging = (float*)malloc((size_t)MAX_DYNAMIC_RECTS * 4 * sizeof(float));
 
+	// Retained-upload-skip mirrors (browser only — see prev_dyn_vtx in the header).
+	// Native/OFFSCREEN leave these NULL so the skip is disabled and every frame
+	// uploads as before (keeps the graphics-native test suite bit-for-bit).
+#ifdef __EMSCRIPTEN__
+	ctx->prev_dyn_vtx = (u32*)malloc((size_t)MAX_DYNAMIC_VERTICES * 4 * sizeof(u32));
+	ctx->prev_dyn_color = (float*)malloc((size_t)MAX_DYNAMIC_RECTS * 4 * sizeof(float));
+#endif
+	ctx->prev_dyn_vtx_used = 0;
+	ctx->prev_dyn_rect_count = 0;
+
 	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient + bitmap matrices
 	#define MAX_DYNAMIC_GRADIENTS 64
 	#define MAX_DYNAMIC_BITMAPS 64
@@ -2290,14 +2300,57 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	// below, so the dynamic regions hold their final data before any recorded draw
 	// executes. The used ranges are fully populated (each draw writes its slice
 	// contiguously from offset 0), so flushing [0, used) is exact.
+	// Retained-mode upload skip: a fully static screen (e.g. the Minesweeper
+	// difficulty screen) re-tessellates and re-stages byte-identical dynamic
+	// geometry every frame — ~281 KB/frame of vertices that never change. The
+	// vertex/color buffers still hold the previous frame's bytes (we never clear
+	// them), and the per-frame draw calls reference the same offsets, so when this
+	// frame's staged content matches what was last uploaded we can skip the
+	// writeBuffer entirely and the GPU reads the identical retained data →
+	// pixel-identical output, zero re-upload. We compare against an exact CPU copy
+	// of the last upload (memcmp, not a hash) so correctness is provable, and skip
+	// the vertex and color regions independently. writeBuffer bytes were the only
+	// frame-CPU cost that survives on a real GPU (the SwiftShader createView cost
+	// is a software-present artifact), so cutting them is the lever toward 30fps.
 	if (ctx->dyn_vtx_staging != NULL && ctx->dynamic_vertex_used > 0)
-		wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
-			(uint64_t)ctx->dynamic_vertex_base * 4 * sizeof(u32),
-			ctx->dyn_vtx_staging, (size_t)ctx->dynamic_vertex_used * 4 * sizeof(u32));
+	{
+		size_t vbytes = (size_t)ctx->dynamic_vertex_used * 4 * sizeof(u32);
+		int unchanged = (ctx->prev_dyn_vtx != NULL &&
+			ctx->prev_dyn_vtx_used == ctx->dynamic_vertex_used &&
+			memcmp(ctx->prev_dyn_vtx, ctx->dyn_vtx_staging, vbytes) == 0);
+		if (!unchanged)
+		{
+			wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
+				(uint64_t)ctx->dynamic_vertex_base * 4 * sizeof(u32),
+				ctx->dyn_vtx_staging, vbytes);
+			if (ctx->prev_dyn_vtx != NULL)
+			{
+				memcpy(ctx->prev_dyn_vtx, ctx->dyn_vtx_staging, vbytes);
+				ctx->prev_dyn_vtx_used = ctx->dynamic_vertex_used;
+			}
+		}
+	}
+	else { ctx->prev_dyn_vtx_used = 0; }  // empty frame: invalidate retained copy
+
 	if (ctx->dyn_color_staging != NULL && ctx->dynamic_rect_count > 0)
-		wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer,
-			(uint64_t)ctx->dynamic_color_base * 4 * sizeof(float),
-			ctx->dyn_color_staging, (size_t)ctx->dynamic_rect_count * 4 * sizeof(float));
+	{
+		size_t cbytes = (size_t)ctx->dynamic_rect_count * 4 * sizeof(float);
+		int unchanged = (ctx->prev_dyn_color != NULL &&
+			ctx->prev_dyn_rect_count == ctx->dynamic_rect_count &&
+			memcmp(ctx->prev_dyn_color, ctx->dyn_color_staging, cbytes) == 0);
+		if (!unchanged)
+		{
+			wgpuQueueWriteBuffer(ctx->queue, ctx->color_buffer,
+				(uint64_t)ctx->dynamic_color_base * 4 * sizeof(float),
+				ctx->dyn_color_staging, cbytes);
+			if (ctx->prev_dyn_color != NULL)
+			{
+				memcpy(ctx->prev_dyn_color, ctx->dyn_color_staging, cbytes);
+				ctx->prev_dyn_rect_count = ctx->dynamic_rect_count;
+			}
+		}
+	}
+	else { ctx->prev_dyn_rect_count = 0; }  // empty frame: invalidate retained copy
 
 	wgpuRenderPassEncoderEnd(ctx->render_pass);
 

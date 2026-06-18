@@ -40,19 +40,54 @@ Verified pixel-identical in **browser-WASM** and **OFFSCREEN graphics-native**
 (Minesweeper + Tetris render correctly; Minesweeper OFFSCREEN trace unchanged at
 634 lines).
 
-## Remaining gap to 30fps (future work)
+## Remaining gap to 30fps — CLOSED (retained-mode upload skip, 2026-06-17)
 
-Frame CPU is now bimodal: most frames ~12 ms, but a tail (~p90 110 ms) keeps the
-*mean* high and caps delivered fps at ~24. The remaining top profile entries are
-GPU-driver ops (`writeBuffer` bytes + `createView`), i.e. the cost is now
-**GPU-upload / present-bound**, not CPU-call-overhead-bound. Next levers, in order:
+Follow-up commit: **retained-mode dynamic-upload skip** (`render_webgpu.c`).
 
-1. **Retained-mode glyph/shape caching** — the static difficulty-screen text is
-   re-tessellated + re-uploaded into the dynamic region every frame. Caching
-   tessellated glyph geometry (upload once, redraw from a persistent region) would
-   cut the per-frame *bytes*, which batching does not.
-2. The one-time **construction spike** (~2.5 s `max` frame) is the deep-build of
-   the FUIComponent tree; separate from steady-state.
+### Re-profile findings (the diagnosis the prior session's "next lever" guessed at)
+- This WSL2 Chrome runs **SwiftShader** (`isFallbackAdapter: true`) — a pure CPU
+  software rasterizer, no GPU. So the post-batching profile's top two costs split as:
+  - **`writeBuffer` ~36%** — real per-frame byte movement; **costs on ANY backend**
+    (real GPU too).
+  - **`createView` ~47%** — SwiftShader's synchronous software present/swapchain
+    sync; **negligible on a real GPU**, an artifact of this environment. Not chased.
+- Per-frame instrumentation proved the static difficulty screen re-stages
+  **287,664 bytes (17,979 verts) every frame** with a **byte-identical content hash
+  across all frames** (1 distinct hash, 66/66 frames identical to previous). So the
+  whole `writeBuffer` cost was re-uploading geometry that never changed →
+  **hypothesis (a) confirmed**, hypothesis (b) (present/vsync) ruled out as the
+  real-GPU-relevant cost.
+
+### The fix
+`render_webgpu_close_pass` keeps an exact CPU copy of the last data uploaded to the
+dynamic vertex/color regions and **skips the `writeBuffer` when this frame's staging
+is byte-identical** (`memcmp`, not a hash — provable correctness). The GPU buffers
+still hold the retained data and the per-frame draws reference the same offsets, so
+output is pixel-identical with zero re-upload. Vertex and color regions skip
+independently. Browser-only (`prev_dyn_vtx`/`prev_dyn_color` malloc'd under
+`__EMSCRIPTEN__`); native/OFFSCREEN leave them NULL → always upload, so the
+graphics-native test suite is bit-for-bit unchanged.
+
+### Results (difficulty screen, steady-state, buffer reset after construction spike)
+| metric | batching only | + retained skip |
+|---|---|---|
+| frame CPU **median** | ~57 ms | **~3 ms** |
+| frame CPU **p90** | ~110–120 ms | **~7 ms** |
+| frame CPU **max (tail)** | 150–290 ms | **12–18 ms** |
+| delivered interval median | ~63–90 ms (~12–16 fps) | **33.4 ms (~30 fps)** |
+
+The heavy tail is gone; CPU is ~9% of the 33 ms frame budget. **30 fps reached.**
+Verified pixel-identical (browser fixed vs no-skip baseline: 0 diff px; OFFSCREEN
+trace 634 lines; Tetris title + gameplay correct with moving content NOT frozen).
+
+> NOTE on the prior "median ~12 ms after batching" claim: at that session's end the
+> deployed `docs2` wasm (16:34) actually **predated** the batching commit (16:41),
+> so it was the stale pre-batching binary. The honest batching-only steady-state
+> median is ~57 ms (re-measured here on a correctly-deployed build).
+
+### Still open (minor, not blocking 30fps)
+The one-time **construction spike** (~2.5 s `max` frame) is the deep-build of the
+FUIComponent tree; separate from steady-state, only affects first paint.
 
 ## On the static-subtree pruning (shelved, NOT landed)
 
