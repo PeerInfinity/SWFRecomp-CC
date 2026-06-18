@@ -217,3 +217,39 @@ That's exactly what our renderer now does after the 2026-05-13 Phase 1 landing o
 5. Pre-Phase-1 our renderer happened to match the asset stamp by coincidence (128×128 source, identity transform, 128×128 stage), not by following the Flash spec.
 
 **Decision:** Match Flash. The Phase 1 render-at-declared-bounds rule is correct; we accept the divergence from this Ruffle-specific test fixture. Test added to `ignored_tests.txt`.
+
+## `gotoFrameFromInterval`: Ruffle's Expected Output Is an Unbounded Runaway
+
+**Test:** `from_gnash/misc-swfc.all/gotoFrameFromInterval` (`known_failure = true`)
+
+A `setInterval`/`onEnterFrame`-driven `gotoAndPlay` test. Flash Player
+(`output.txt`) cleanly terminates: 3 tests run, `#passed: 3`, ending with a
+single `frame7` trace and `__END_OF_TEST__`.
+
+Ruffle's `output.ruffle.txt` does **not** match Flash — it is a runaway:
+`_root.asOrder` grows without bound (`x0xx1xx2…x89…`, far past Flash's
+`x0xx1x234`), it reports **10** tests instead of 3, and the trace output
+continues *past* `__END_OF_TEST__` (the file's last line is another growing
+`asOrder` FAILED at ~90 iterations). The test is marked `known_failure = true`
+in its own `test.toml`, confirming Ruffle knows its expectation is wrong.
+
+```diff
+- frame7
+- PASSED: _root.asOrder == x0xx1x234   (Flash: clean stop, 3 tests)
++ FAILED: _root.asOrder: ... obtained: "x0xx1xx2xx3...x89..."  (Ruffle: runaway, 10 tests, never cleanly ends)
+```
+
+**Caveat — this is not the usual "we match Flash" case.** Our runtime does **not**
+match Flash here either: we currently **time out** (a distinct pre-existing
+infinite-loop issue in the runaway path). So the entry is recorded as "Ruffle's
+expectation is wrong" rather than "we're right and Ruffle's wrong."
+
+**Decision:** Do not pursue `ruffle_matched` — matching Ruffle's buggy,
+non-terminating output is not a worthwhile target (working rule: reach
+`ruffle_matched` *unless Ruffle is doing something wrong*, and here it is). Leave
+as `known_failure`. The runtime timeout (making us terminate the runaway like a
+frame-capped player instead of hanging) is a separate, lower-priority follow-up
+that would not change the pass rate (the test fails against Flash regardless).
+See `_investigation/NEW_UPSTREAM_TESTS_TRIAGE.md` for the discovery context and
+the sibling `gotoFrameFromInterval2` fix (timer-callback `gotoAndPlay` over-advance
+→ `ruffle_matched`).
