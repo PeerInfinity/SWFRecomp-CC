@@ -239,6 +239,10 @@ void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, Action
 
 // Track key insertion order for Flash-compatible for-in enumeration
 void arrayTrackKey(ASArray* arr, const char* key, u32 key_len);
+// Remove a key from the enumeration order (compacts the list).
+void arrayUntrackKey(ASArray* arr, const char* key, u32 key_len);
+// Move a key to the end of the enumeration order (Flash re-insert on assign).
+void arrayReinsertKey(ASArray* arr, const char* key, u32 key_len);
 
 /**
  * Debug/Testing Functions

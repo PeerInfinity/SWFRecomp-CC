@@ -1110,6 +1110,34 @@ void arrayTrackKey(ASArray* arr, const char* key, u32 key_len)
 	arr->enum_keys[arr->enum_count++] = key_copy;
 }
 
+// Remove a key from the array's enumeration order (freeing its copy) and
+// compact the list. No-op if the key isn't tracked.
+void arrayUntrackKey(ASArray* arr, const char* key, u32 key_len)
+{
+	if (arr->enum_keys == NULL) return;
+	for (u32 i = 0; i < arr->enum_count; i++)
+	{
+		if (strlen(arr->enum_keys[i]) == key_len &&
+		    memcmp(arr->enum_keys[i], key, key_len) == 0)
+		{
+			free(arr->enum_keys[i]);
+			for (u32 j = i + 1; j < arr->enum_count; j++)
+				arr->enum_keys[j - 1] = arr->enum_keys[j];
+			arr->enum_count--;
+			return;
+		}
+	}
+}
+
+// Move a key to the END of the array's enumeration order (Flash re-inserts a
+// key when it is (re)assigned; for-in then yields it in reverse-insertion
+// order). Removes any existing entry first, then appends.
+void arrayReinsertKey(ASArray* arr, const char* key, u32 key_len)
+{
+	arrayUntrackKey(arr, key, key_len);
+	arrayTrackKey(arr, key, key_len);
+}
+
 ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 {
 	ASArray* arr = (ASArray*) malloc(sizeof(ASArray));

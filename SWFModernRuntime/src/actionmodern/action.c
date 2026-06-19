@@ -43581,7 +43581,19 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 						    idx_val < arr->length && idx_val < arr->capacity &&
 						    arr->elements[(u32)idx_val].type != ACTION_STACK_VALUE_HOLE)
 						{
-							PUSH_STR((char*)key, key_len);
+							// Honor DontEnum set via ASSetPropFlags on the index
+							// (ENUMERABLE cleared in arr->props): skip from for-in.
+							int dont_enum = 0;
+							if (arr->props != NULL)
+							{
+								ASProperty* ps = findPropertyRaw(arr->props, key, key_len);
+								if (ps != NULL && !(ps->flags & PROPERTY_FLAG_ENUMERABLE))
+									dont_enum = 1;
+							}
+							if (!dont_enum)
+							{
+								PUSH_STR((char*)key, key_len);
+							}
 							found = 1;
 						}
 					}
@@ -43589,10 +43601,12 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					// Fall back to named properties (handles large indices, strings, etc.)
 					if (!found && arr->props != NULL)
 					{
-						ActionVar* pv = getProperty(arr->props, key, key_len);
-						if (pv != NULL)
+						ASProperty* ps = findPropertyRaw(arr->props, key, key_len);
+						if (ps != NULL)
 						{
-							PUSH_STR((char*)key, key_len);
+							// Honor DontEnum (ENUMERABLE cleared via ASSetPropFlags).
+							if (ps->flags & PROPERTY_FLAG_ENUMERABLE)
+								PUSH_STR((char*)key, key_len);
 							found = 1;
 						}
 					}
@@ -43611,12 +43625,22 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
 						continue;
 					char idx_buf[16];
-					snprintf(idx_buf, sizeof(idx_buf), "%u", i);
+					int idx_len = snprintf(idx_buf, sizeof(idx_buf), "%u", i);
 					u32 len = (u32)strlen(idx_buf);
+					// Honor DontEnum set via ASSetPropFlags on this index.
+					if (arr->props != NULL && idx_len > 0)
+					{
+						ASProperty* ps = findPropertyRaw(arr->props, idx_buf, (u32)idx_len);
+						if (ps != NULL && !(ps->flags & PROPERTY_FLAG_ENUMERABLE))
+							continue;
+					}
 					PUSH_STR(idx_buf, len);
 				}
 
-				// Push non-index properties
+				// Push non-index properties. Numeric in-range indices are
+				// already emitted by the element loop above (ASSetPropFlags
+				// creates an arr->props entry for them); skip those here to
+				// avoid duplicates.
 				if (arr->props != NULL && arr->props->num_used > 0)
 				{
 					for (u32 i = 0; i < arr->props->num_used; i++)
@@ -43626,6 +43650,16 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 						if (pn_len == 9 && strncmp(pn, "__proto__", 9) == 0)
 							continue;
 						if (!(arr->props->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
+							continue;
+						// Skip purely-numeric in-range index keys (handled above).
+						int is_index = (pn_len > 0 && pn_len <= 10);
+						u64 idx_val = 0;
+						for (u32 j = 0; is_index && j < pn_len; j++)
+						{
+							if (pn[j] < '0' || pn[j] > '9') { is_index = 0; break; }
+							idx_val = idx_val * 10 + (pn[j] - '0');
+						}
+						if (is_index && (int32_t)arr->length > 0 && idx_val < arr->length)
 							continue;
 						PUSH_STR(pn, pn_len);
 					}
@@ -59698,75 +59732,98 @@ static int callArrayMethod(SWFAppContext* app_context,
 		{
 			ActionVar first = arr->elements[0];
 			u32 old_len = arr->length;
-			// Flash shift skips the move when the TARGET index is
-			// DontDelete-protected (CONFIGURABLE cleared). ReadOnly /
-			// WRITABLE is NOT honored here — see array-v5 cases at
-			// array.as:1411 (DontDelete+ReadOnly: keep) vs 1444 (ReadOnly
-			// only: overwrite).
-			char _idx_buf_skip[16];
-			for (u32 i = 0; i < old_len - 1; i++)
+			// Flash's Array.shift moves each element down one slot via an
+			// element-by-element assignment (a[i] = a[i+1]). Each such
+			// assignment (re)creates a real own property at index i — even
+			// where the source was a hole — so the array is DENSIFIED. A
+			// CONFIGURABLE index that is reassigned has its ASSetPropFlags
+			// reset ("flag lost") and is moved to the END of the enumeration
+			// order (for-in yields keys in reverse-insertion order). A
+			// DontDelete index (CONFIGURABLE cleared) gets its VALUE
+			// overwritten but keeps its flags AND its enumeration position. A
+			// move is BLOCKED entirely only when the index is both DontDelete
+			// AND ReadOnly (WRITABLE cleared); DontDelete-alone or ReadOnly-
+			// alone still overwrites (array_shift ASSetPropFlags cases). The
+			// last index is deleted unless DontDelete-protected (value then
+			// preserved into arr->props). See the array_shift test.
+			char _idx_buf[16];
+			// Seed the enumeration order with the current live indices so a
+			// literal array (no prior SetMember → no enum_keys) keeps its
+			// implicit ascending order for indices that are NOT reinserted
+			// below (DontDelete-protected ones).
+			for (u32 i = 0; i < old_len; i++)
 			{
-				int target_dont_delete = 0;
-				if (arr->props != NULL)
+				if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
+					continue;
+				int _sl = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+				if (_sl > 0)
+					arrayTrackKey(arr, _idx_buf, (u32)_sl);
+			}
+			for (u32 i = 0; i + 1 < old_len; i++)
+			{
+				int blocked = 0;
+				int dont_delete = 0;
+				ASProperty* ps = NULL;
+				int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+				if (arr->props != NULL && _idx_len > 0)
 				{
-					int _idx_len = snprintf(_idx_buf_skip, sizeof(_idx_buf_skip), "%u", i);
-					if (_idx_len > 0)
+					ps = findPropertyRaw(arr->props, _idx_buf, (u32)_idx_len);
+					if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
 					{
-						ASProperty* ps = findPropertyRaw(arr->props, _idx_buf_skip, (u32)_idx_len);
-						if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
-							target_dont_delete = 1;
+						dont_delete = 1;
+						if (!(ps->flags & PROPERTY_FLAG_WRITABLE))
+							blocked = 1;
 					}
 				}
-				if (!target_dont_delete)
-					arr->elements[i] = arr->elements[i + 1];
-			}
-			// Indices overwritten by the shift have their ASSetPropFlags
-			// metadata reset (Flash semantics: "flag was lost"). Skip
-			// indices we did NOT actually overwrite (DontDelete-protected),
-			// since those should keep their flags.
-			if (arr->props != NULL)
-			{
-				char _idx_buf[16];
-				for (u32 i = 0; i < old_len - 1; i++)
+				if (blocked)
+					continue;  // keep element, flags, and enum position
+
+				arr->elements[i] = arr->elements[i + 1];
+				// Materialize a moved-in hole to undefined — Flash creates a
+				// real property even when the source slot was unset.
+				if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
 				{
-					int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
-					if (_idx_len <= 0) continue;
-					ASProperty* ps = findPropertyRaw(arr->props, _idx_buf, (u32)_idx_len);
-					if (ps != NULL && (ps->flags & PROPERTY_FLAG_CONFIGURABLE))
+					arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+					arr->elements[i].data.numeric_value = 0;
+					arr->elements[i].str_size = 0;
+				}
+				// A DontDelete index keeps its flags and enum position even
+				// when its value is overwritten; a CONFIGURABLE index loses
+				// its ASSetPropFlags and is re-inserted at the end.
+				if (!dont_delete && _idx_len > 0)
+				{
+					if (ps != NULL)
 					{
 						ps->flags = PROPERTY_FLAGS_DEFAULT;
 						ps->flash_flags = 0;
 					}
+					arrayReinsertKey(arr, _idx_buf, (u32)_idx_len);
 				}
 			}
 			// "Delete" the last element. If arr->props marks index (old_len-1)
 			// with DontDelete (CONFIGURABLE cleared), preserve the original
 			// element value into arr->props so the props fallback in
-			// actionGetMember returns it after length truncation. Mirrors the
-			// length-truncation path in actionSetMember.
+			// actionGetMember returns it after length truncation, and keep its
+			// enum key. Otherwise drop the slot and its enum key.
 			u32 last_idx = old_len - 1;
 			int preserved = 0;
-			if (arr->props != NULL)
+			int last_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", last_idx);
+			if (arr->props != NULL && last_len > 0)
 			{
-				char _idx_buf[16];
-				int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", last_idx);
-				if (_idx_len > 0)
+				ASProperty* ps = findPropertyRaw(arr->props, _idx_buf, (u32)last_len);
+				if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
 				{
-					ASProperty* ps = findPropertyRaw(arr->props, _idx_buf, (u32)_idx_len);
-					if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
+					if (ps->value.type == ACTION_STACK_VALUE_UNDEFINED &&
+					    arr->elements[last_idx].type != ACTION_STACK_VALUE_HOLE)
 					{
-						if (ps->value.type == ACTION_STACK_VALUE_UNDEFINED &&
-						    arr->elements[last_idx].type != ACTION_STACK_VALUE_HOLE)
-						{
-							ps->value = arr->elements[last_idx];
-							if (ps->value.type == ACTION_STACK_VALUE_OBJECT)
-								retainObject((ASObject*)ps->value.data.numeric_value);
-							if (ps->value.type == ACTION_STACK_VALUE_STRING &&
-							    arr->elements[last_idx].data.string_data.owns_memory)
-								arr->elements[last_idx].data.string_data.owns_memory = 0;
-						}
-						preserved = 1;
+						ps->value = arr->elements[last_idx];
+						if (ps->value.type == ACTION_STACK_VALUE_OBJECT)
+							retainObject((ASObject*)ps->value.data.numeric_value);
+						if (ps->value.type == ACTION_STACK_VALUE_STRING &&
+						    arr->elements[last_idx].data.string_data.owns_memory)
+							arr->elements[last_idx].data.string_data.owns_memory = 0;
 					}
+					preserved = 1;
 				}
 			}
 			if (!preserved)
@@ -59774,9 +59831,14 @@ static int callArrayMethod(SWFAppContext* app_context,
 				arr->elements[last_idx].type = ACTION_STACK_VALUE_HOLE;
 				arr->elements[last_idx].data.numeric_value = 0;
 				arr->elements[last_idx].str_size = 0;
+				if (last_len > 0)
+					arrayUntrackKey(arr, _idx_buf, (u32)last_len);
 			}
 			arr->length--;
-			pushVar(app_context, &first);
+			if (first.type == ACTION_STACK_VALUE_HOLE)
+				pushUndefined(app_context);
+			else
+				pushVar(app_context, &first);
 		}
 		return 1;
 	}
