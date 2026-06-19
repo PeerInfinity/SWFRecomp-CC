@@ -6,27 +6,27 @@
 
 **Run Duration**: 43m 18s
 
-**Filtered**: 32 tests ignored out of 701 available
+**Filtered**: 34 tests ignored out of 701 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 482 |
-| Passing | **450** (93.4%) |
+| Total tests | 480 |
+| Passing | **450** (93.8%) |
 | Ruffle-matched | 6 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **456** (94.6%) |
-| Failing | 26 |
-| Total expected lines | 94354 |
-| Matching lines | 86643 (91.8%) |
-| Mismatched lines | 7711 |
+| Effective pass | **456** (95.0%) |
+| Failing | 24 |
+| Total expected lines | 90194 |
+| Matching lines | 85927 (95.3%) |
+| Mismatched lines | 4267 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 22 | 84.6% |
-| Segfault | 4 | 15.4% |
+| Output Mismatch | 22 | 91.7% |
+| Segfault | 2 | 8.3% |
 
 ## Passing Tests
 
@@ -519,14 +519,12 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 ## Segfaults
 
-**4 tests** crash with SIGSEGV
+**2 tests** crash with SIGSEGV
 
 | # | Test | Duration | Notes |
 |---|------|----------|-------|
 | 1 | `watch_special_recursion_double_swf6` | 3.2s |  |
-| 2 | `watch_special_recursion_double_swf7` | 3.2s |  |
-| 3 | `watch_special_recursion_swf6` | 3.7s |  |
-| 4 | `watch_special_recursion_swf7` | 3.6s |  |
+| 2 | `watch_special_recursion_swf6` | 3.7s |  |
 
 ## Runtime Errors
 
@@ -676,4 +674,4 @@ No timeouts.
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 2 | 2 | 0 |
 | 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 28 | 28 | 0 |
-| | *(tests not in any document)* | 143 | 114 | 29 |
+| | *(tests not in any document)* | 141 | 114 | 27 |
