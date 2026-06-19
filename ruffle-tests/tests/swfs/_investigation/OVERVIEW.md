@@ -10,6 +10,16 @@ Last updated: 2026-05-15 (CI `eb8206f8` no-graphics, run `25896064893` — first
 
 "Effective pass" = raw pass + `ruffle_matched` (diffs ⊆ Ruffle's diffs against Flash; auto-promoted when upstream has `known_failure=true` + `output.ruffle.txt`).
 
+> **Policy — match Flash, not Ruffle.** `ruffle_matched` recognizes tests whose
+> residual diffs are Flash limitations Ruffle *also* has; it is NOT a goal to
+> chase by deliberately changing behavior to match Ruffle. When Ruffle and Flash
+> genuinely **conflict** (both behave, they disagree), match **Flash**, document
+> the difference in the suite's accepted-diffs / Ruffle-vs-Flash doc, and add the
+> test to that suite's `ignored_tests.txt`. Do not adopt a Ruffle-matching
+> implementation that regresses a line we already get Flash-correct. (Example:
+> `from_gnash/actionscript.all/array-v5` sort-mutating-comparator UB — see
+> `from_gnash/_investigation/ACCEPTED_DIFFS.md` Category 1.)
+
 Numbers below are from CI `eb8206f8` (no-graphics, 2026-05-15). The four Gnash sub-suites grew this run because SUBTESTS_HARNESS now discovers tests that ship only `[subtests]`/`output.fpN.txt` — previous totals (190 / 102 / 16 / 18) silently omitted those.
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |

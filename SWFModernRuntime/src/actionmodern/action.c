@@ -60639,22 +60639,22 @@ static int callArrayMethod(SWFAppContext* app_context,
 
 		// --- Standard sort: Flash QuickSort (iterative, leftmost pivot) ---
 		//
-		// Sort a SNAPSHOT of the elements, not the live array. A comparator is
-		// allowed to mutate the array mid-sort (gnash array.as testCmpBogus6:
-		// `function(x,y){ trysortarray.pop(); return 1; }`); Flash/avmplus — and
-		// Ruffle's sort_internal — work on a copy collected up front, qsort that,
-		// then write the sorted copy back, RESTORING the length the comparator
-		// shrank. Without the snapshot, the pops corrupt the working set and the
-		// array ends up empty (we'd report length 0 where Flash/Ruffle report 4
-		// for "2,3,4,1"). pop()/shift() only decrement arr->length without freeing
-		// element storage, so the snapshot's value pointers stay valid through the
-		// comparator's mutations. If the snapshot allocation fails, fall back to
-		// sorting the live array in place (previous behaviour).
+		// Sorts the LIVE array in place. A comparator that mutates the array
+		// mid-sort (gnash array.as testCmpBogus5/6: `trysortarray.pop(); return ±1`)
+		// is documented Flash sort UB — Flash's in-place avmplus sort produces
+		// DIFFERENT results per return value (length 0 for `return -1`, length 4 /
+		// "2,3,4,1" for `return +1`), which depends on Flash's exact comparison/swap
+		// interleaving with the pops. We replicate the `return -1` → length 0 case
+		// (array.as:317) by sorting in place; the `return +1` → length 4 case
+		// (array.as:324/325) we do NOT replicate (would need a Flash-exact in-place
+		// quicksort). Do NOT switch to a snapshot-and-write-back sort to "fix"
+		// 324/325: that matches Ruffle but DIVERGES from Flash on 317 (Ruffle gets
+		// 317 wrong too). Project policy is to match Flash over Ruffle on conflicts;
+		// array-v5's residual sort-UB diff is documented in
+		// from_gnash/_investigation/ACCEPTED_DIFFS.md and the test is on the
+		// actionscript.all ignored list.
 		{
-			ActionVar* _qsnap = (ActionVar*) HALLOC(n * sizeof(ActionVar));
-			ActionVar* _qbuf  = (_qsnap != NULL) ? _qsnap : arr->elements;
-			if (_qsnap != NULL)
-				for (u32 _si = 0; _si < n; _si++) _qsnap[_si] = arr->elements[_si];
+			ActionVar* _qbuf = arr->elements;
 
 			typedef struct { u32 low; u32 high; } _QS_Range;
 			_QS_Range* _qs_stack = (_QS_Range*) HALLOC(n * sizeof(_QS_Range));
@@ -60761,17 +60761,6 @@ static int callArrayMethod(SWFAppContext* app_context,
 					_qbuf[_qhi] = _qtmp;
 					_qlo++; _qhi--;
 				}
-			}
-
-			// Commit the sorted snapshot back to the array, restoring the length
-			// a mutating comparator may have shrunk. capacity >= n holds (it only
-			// ever grows in this runtime), but clamp defensively just in case.
-			if (_qsnap != NULL)
-			{
-				u32 _wn = (n <= arr->capacity) ? n : arr->capacity;
-				for (u32 _si = 0; _si < _wn; _si++) arr->elements[_si] = _qsnap[_si];
-				arr->length = _wn;
-				FREE(_qsnap);
 			}
 		}
 

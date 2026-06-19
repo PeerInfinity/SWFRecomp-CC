@@ -497,6 +497,51 @@ realistic position values to AS over time). Test has no `output.ruffle.txt`
 or `known_failure = true`, so it cannot promote to `ruffle_matched`. Added
 to `from_gnash/misc-swfc.all/ignored_tests.txt`.
 
+### array-v5 (actionscript.all) — sort-mutating-comparator UB; we match Flash, Ruffle does not (Ruffle-vs-Flash conflict)
+
+**Example diff (against Flash `output.txt`):**
+```
+- 113  PASSED: trysortarray.length == 4 [./array.as:324]
++ 113  FAILED: expected: 4 obtained: 0 [./array.as:324]
+- 114  PASSED: trysortarray.toString() == "2,3,4,1" [./array.as:325]
++ 114  FAILED: expected: "2,3,4,1" obtained:  [./array.as:325]
+```
+
+**Root cause.** `array.as` sorts with comparators that MUTATE the array
+mid-sort (`testCmpBogus5`: `trysortarray.pop(); return -1`; `testCmpBogus6`:
+`trysortarray.pop(); return 1`). This is documented Flash sort UB: Flash's
+in-place avmplus sort produces *different* results depending on the
+comparator's return value —
+
+| Comparator | Flash | Ruffle | Us |
+|------------|-------|--------|-----|
+| `pop(); return -1` (array.as:317) | length **0** | length 4 (FAIL) | length **0** (match Flash) |
+| `pop(); return +1` (array.as:324/325) | length **4**, `"2,3,4,1"` | length 4 (PASS) | length 0 (FAIL) |
+
+The 0-vs-4 split for `-1` vs `+1` falls out of Flash's exact comparison/swap
+interleaving with the pops. We sort the **live** array in place, which
+reproduces Flash on line 317 but not 324/325. Ruffle uses a
+**snapshot-and-write-back** sort (`sort_internal`: collect to a Vec, qsort,
+`set_element` back) that restores the length unconditionally — so Ruffle gets
+324/325 right but 317 WRONG (length 4 where Flash is 0).
+
+**Decision.** Match Flash, not Ruffle. We keep the in-place sort (Flash-correct
+on 317). We deliberately do NOT adopt Ruffle's snapshot sort, because that would
+trade a Flash-correct line (317) for two Ruffle-correct ones — net Flash-drift on
+a *genuine Ruffle-vs-Flash conflict*, which project policy resolves in Flash's
+favour. Reproducing Flash on BOTH 317 and 324/325 would require a Flash-exact
+in-place AVM1 quicksort (high effort, the residual sort-UB nobody fully nails);
+not pursued. Because we pass 317 (Ruffle fails it) our diff is NOT a subset of
+Ruffle's, so array-v5 cannot promote to `ruffle_matched`; added to
+`from_gnash/actionscript.all/ignored_tests.txt`. The remaining array-v5 diffs
+(260/263/1630/1636) are separate clusters both engines also miss vs Flash.
+
+> **Policy note:** `ruffle_matched` (diff ⊆ Ruffle's diff vs Flash) is an
+> *automatic-promotion convenience* for tests where our remaining diffs are
+> Flash limitations Ruffle shares — it is NOT a license to deliberately diverge
+> from Flash to win the subset match. When Ruffle and Flash genuinely conflict,
+> match Flash, document the difference here, and add the test to the ignore list.
+
 ---
 
 ## Category 3: Native-Object Enumeration Divergence

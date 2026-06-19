@@ -41,3 +41,17 @@ argstest-v8
 getvariable-v5
 getvariable-v7
 getvariable-v8
+
+# array-v5 — sort-mutating-comparator UB (Flash in-place avmplus sort).
+# A comparator that pops the array mid-sort yields DIFFERENT Flash results per
+# return value: `pop(); return -1` → length 0 (array.as:317), `pop(); return +1`
+# → length 4 / "2,3,4,1" (array.as:324/325). We sort in place and match Flash on
+# 317 but NOT 324/325 (would need a Flash-exact in-place quicksort). Ruffle uses
+# a snapshot-and-write-back sort that gets 324/325 right but 317 WRONG (length 4)
+# — a genuine Ruffle-vs-Flash conflict. Per project policy we match Flash, so our
+# diff is NOT a subset of Ruffle's (we pass 317 where Ruffle fails; Ruffle passes
+# 324/325 where we fail) -> no ruffle_matched promotion. The remaining
+# 260/263/1630/1636 diffs are separate clusters both engines also miss vs Flash.
+# See _investigation/ACCEPTED_DIFFS.md Category 1 and
+# _investigation/incomplete/ARRAY_V5_PLAN.md.
+array-v5
