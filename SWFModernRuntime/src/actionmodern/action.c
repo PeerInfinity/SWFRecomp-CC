@@ -60695,6 +60695,23 @@ static int callArrayMethod(SWFAppContext* app_context,
 		memset(_so_fields, 0, sizeof(_so_fields));
 		memset(_so_flags, 0, sizeof(_so_flags));
 
+		// Coerce a single field-name argument into a UTF-8 C string in _dst.
+		// Field names may be strings OR objects overriding toString (gnash
+		// array.as: `id = {}; id.toString = function(){ return "Name"; }`),
+		// which Flash coerces via toString before using as the property name.
+		#define SORTON_FIELD_NAME(_fe, _dst) do { \
+			if ((_fe)->type == ACTION_STACK_VALUE_STRING) { \
+				const uint16_t* _u16 = varGetU16Ptr(_fe); \
+				if (_u16) u16_to_utf8(_u16, (_fe)->str_size, (_dst), 128); \
+			} else if ((_fe)->type == ACTION_STACK_VALUE_OBJECT) { \
+				int _tf = 0; ActionVar _tsv = objectCallToString(app_context, (_fe), &_tf); \
+				if (_tsv.type == ACTION_STACK_VALUE_STRING) { \
+					const uint16_t* _u16 = varGetU16Ptr(&_tsv); \
+					if (_u16) u16_to_utf8(_u16, _tsv.str_size, (_dst), 128); \
+				} \
+			} \
+		} while(0)
+
 		ActionVar* field_arg = &args[0];
 		if (field_arg->type == ACTION_STACK_VALUE_ARRAY)
 		{
@@ -60705,19 +60722,13 @@ static int callArrayMethod(SWFAppContext* app_context,
 				if (_so_nkeys > SORTON_MAX_KEYS) _so_nkeys = SORTON_MAX_KEYS;
 				for (int _ki = 0; _ki < _so_nkeys; _ki++)
 				{
-					ActionVar* _fe = &_fnarr->elements[_ki];
-					if (_fe->type == ACTION_STACK_VALUE_STRING)
-					{
-						const uint16_t* _fu16 = varGetU16Ptr(_fe);
-						if (_fu16) u16_to_utf8(_fu16, _fe->str_size, _so_fields[_ki], 128);
-					}
+					SORTON_FIELD_NAME(&_fnarr->elements[_ki], _so_fields[_ki]);
 				}
 			}
 		}
 		else if (field_arg->type == ACTION_STACK_VALUE_STRING)
 		{
-			const uint16_t* _fu16 = varGetU16Ptr(field_arg);
-			if (_fu16) u16_to_utf8(_fu16, field_arg->str_size, _so_fields[0], 128);
+			SORTON_FIELD_NAME(field_arg, _so_fields[0]);
 			_so_nkeys = 1;
 		}
 		else if (field_arg->type == ACTION_STACK_VALUE_UNDEFINED)
@@ -60728,7 +60739,11 @@ static int callArrayMethod(SWFAppContext* app_context,
 		}
 		else
 		{
-			// null, boolean, etc. — use empty field name
+			// Scalar non-string field name (object, null, boolean, …): Flash does
+			// NOT coerce a scalar object via toString here (it only does so for
+			// array elements — see gnash array.as `a.sortOn(id)` vs
+			// `a.sortOn([id], 0)`). Treat as a single empty field → no effective
+			// reorder (all elements compare equal), leaving the array unchanged.
 			_so_nkeys = 1;
 		}
 
@@ -60780,10 +60795,14 @@ static int callArrayMethod(SWFAppContext* app_context,
 			u32 _fnl = (u32)strlen(_fn); \
 			if ((_elem)->type == ACTION_STACK_VALUE_OBJECT && (_elem)->data.numeric_value != 0) { \
 				ASObject* _o = (ASObject*)(_elem)->data.numeric_value; \
-				/* Only own properties (no prototype chain), no getter invocation */ \
+				/* Only own properties (no prototype chain), no getter invocation. */ \
+				/* SWF<=6 resolves property names case-insensitively, so */ \
+				/* `sortOn("name")` matches a "Name" field (gnash array.as). */ \
 				for (u32 _sopi = 0; _sopi < _o->num_used; _sopi++) { \
 					if (_o->properties[_sopi].name_length == _fnl && \
-					    strncmp(_o->properties[_sopi].name, _fn, _fnl) == 0) { \
+					    (g_swf_version <= 6 \
+					        ? strncasecmp(_o->properties[_sopi].name, _fn, _fnl) \
+					        : strncmp(_o->properties[_sopi].name, _fn, _fnl)) == 0) { \
 						if (_o->properties[_sopi].getter == NULL) \
 							(_out_var) = _o->properties[_sopi].value; \
 						break; \

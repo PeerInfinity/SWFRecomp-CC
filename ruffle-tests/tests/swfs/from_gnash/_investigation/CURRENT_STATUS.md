@@ -1,6 +1,29 @@
 # Gnash Test Suite Status
 
 Last updated: 2026-06-18 (pending CI — `array-v5/v6/v7/v8` (actionscript.all)
+sortOn fixes: v5/v6 +5 lines, v7/v8 +3 lines, zero regressions. Two changes in
+`SWFModernRuntime/src/actionmodern/action.c` sortOn handler: (1) field names
+given as an ARRAY element that is an OBJECT overriding toString (gnash array.as
+`id={}; id.toString=function(){return "Name";}`) are now coerced via
+`objectCallToString` (new `SORTON_FIELD_NAME` macro) — fixes
+`a.sortOn([yr,id],[NUMERIC,DESCENDING])` multi-key. A SCALAR object first arg is
+deliberately NOT coerced (Flash only does so for array elements: `a.sortOn(id)`
+leaves the array unchanged, while `a.sortOn([id],0)` sorts by "Name"). (2)
+`SORTON_GET_FIELD` property-name match is case-insensitive (`strncasecmp`) when
+`g_swf_version <= 6`, so `a.sortOn("name")` matches a `Name` field (SWF<=6
+case-insensitive member resolution). array-v5 is now 2 lines from
+`ruffle_matched` — the only residual is the bogus-comparator pair (see next
+entry). No regressions: avm1 array battery 8/8 PASS, no array-vN line regressed.
+NOTE: the bogus-comparator residual (array.as:324/325, `sort` with a comparator
+that mutates the array via `pop()`) is a CONFIRMED RABBIT HOLE — Flash's two
+side-effecting cases (`testCmpBogus5` `pop;return -1` → length 0 vs
+`testCmpBogus6` `pop;return 1` → length 4) have different final lengths from the
+exact interleaving of pops with the quicksort's comparison sequence. A
+snapshot-based sort matches Bogus6 but regresses Bogus5; in-place matches Bogus5
+but fails Bogus6. Matching both needs bit-exact replication of Flash's quicksort
+with live-array side effects — not worth it; do not re-attempt.
+
+Last updated: 2026-06-18 (pending CI — `array-v5/v6/v7/v8` (actionscript.all)
 line-match +6 each via Array.sort UNIQUESORT/RETURNINDEXEDARRAY fix. Single
 change in `SWFModernRuntime/src/actionmodern/action.c` sort handler: the
 UNIQUESORT uniqueness check is now done AFTER the sort, on ADJACENT elements of
