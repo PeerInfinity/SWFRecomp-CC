@@ -11,7 +11,7 @@
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
-| avm1 | 450 | 482 | 93.4% ⚠️ | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics_filtered.md) |
+| avm1 | 450 | 480 | 93.8% ⚠️ | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics_filtered.md) |
 | from_gnash/actionscript.all | 101 | 178 | 56.7% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_graphics_filtered.md) |
 | from_gnash/misc-ming.all | 49 | 81 | 60.5% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_graphics_filtered.md) |
 | from_gnash/misc-mtasc.all | 4 | 6 | 66.7% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_graphics_filtered.md) |
@@ -19,9 +19,9 @@
 | from_gnash/misc-swfmill.all | 14 | 15 | 93.3% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_graphics_filtered.md) |
 | from_shumway | 56 | 57 | 98.2% ⚠️ | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_graphics_filtered.md) |
 | from_shumway/avm1 | 32 | 32 | 100% ⚠️ | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_graphics_filtered.md) |
-| **Total** | **712** | **864** | **82.4%** | |
+| **Total** | **712** | **862** | **82.6%** | |
 
-*50 tests ignored.*
+*52 tests ignored.*
 
 ### ⚠️ Incomplete Runs
 
@@ -38,7 +38,7 @@
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 86,643 | 94,354 | 91.8% |
+| avm1 | 85,927 | 90,194 | 95.3% |
 | from_gnash/actionscript.all | 19,859 | 21,686 | 91.6% |
 | from_gnash/misc-ming.all | 3,591 | 4,483 | 80.1% |
 | from_gnash/misc-mtasc.all | 158 | 178 | 88.8% |
@@ -46,13 +46,13 @@
 | from_gnash/misc-swfmill.all | 67 | 69 | 97.1% |
 | from_shumway | 529 | 530 | 99.8% |
 | from_shumway/avm1 | 405 | 405 | 100% |
-| **Total** | **111,626** | **122,188** | **91.4%** |
+| **Total** | **110,910** | **118,028** | **94.0%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch | ruffle_matched | segfault | timeout |
 |-------|-----------------:|----------------:|----------:|---------:|
-| avm1 | 22 | 6 | 4 | - |
+| avm1 | 22 | 6 | 2 | - |
 | from_gnash/actionscript.all | 6 | 71 | - | - |
 | from_gnash/misc-ming.all | 10 | 21 | - | 1 |
 | from_gnash/misc-mtasc.all | - | 2 | - | - |
@@ -60,7 +60,7 @@
 | from_gnash/misc-swfmill.all | - | 1 | - | - |
 | from_shumway | - | 1 | - | - |
 | from_shumway/avm1 | - | - | - | - |
-| **Total** | **41** | **106** | **4** | **1** |
+| **Total** | **41** | **106** | **2** | **1** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -86,10 +86,10 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ### avm1
 
-- **Pass:** 450/482 (93.4%)
-- **Ignored:** 32 tests
+- **Pass:** 450/480 (93.8%)
+- **Ignored:** 34 tests
 - **Duration:** 43m18s across 22 shards
-- **Lines:** 86,643/94,354 matching (91.8%)
+- **Lines:** 85,927/90,194 matching (95.3%)
 - **Avg test duration:** 5.0s — slowest: `target_paths/swf4` (29.3s)
 
 ### from_gnash/actionscript.all
