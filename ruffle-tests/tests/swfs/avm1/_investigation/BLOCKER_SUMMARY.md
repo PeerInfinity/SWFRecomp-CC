@@ -165,6 +165,49 @@ Tests requiring HTTP requests, file dialogs, audio/video streaming, or browser J
 
 ---
 
+### Blocker 10: Display-list child name vs `var x=` timeline variable are conflated
+
+**Impact**: 1 test (`sound_setters`), and any test that renames a clip held in a
+same-named local variable.
+
+**Root cause (diagnosed 2026-06-19).** In Flash there are *two independent*
+bindings for a created clip:
+1. the **display-list child** (looked up by current instance name) — it *moves*
+   when you set `mc._name`;
+2. the **timeline variable** created by an explicit `var mc = ...` assignment —
+   it holds a reference and is *untouched* by a rename.
+
+`sound_setters` does `var mc = createEmptyMovieClip("mc", 1); new Sound(mc)`. The
+Sound captures the path `_level0.mc`. The test then renames the clip to
+`"changed"`, mutates volume/pan/transform, renames back to `"mc"`, and expects the
+mutations to have taken effect (the Sound stays bound to the clip via the
+surviving `var mc`). A control case in the same test uses
+`var mcr = createEmptyMovieClip("mc2", 2)` (var name ≠ instance name) and expects
+the rename-period mutations *not* to persist — because there is no variable
+`mc2`, only the display-list child that moved away.
+
+Our runtime conflates the two: `createEmptyMovieClip` registers the clip in
+**both** `parent->dynamic_props[name]` *and* `var_map[name]`
+(`action.c` ~66450-66516), and the `_name` setter clobbers **both** old-name
+entries to `undefined` on rename (`action.c` ~47346-47393). That clobber destroys
+the user's `var mc`, so the later `mc._name = "mc"` is a no-op on `undefined` and
+the clip is never restored → `getVolume()` returns `undefined` for the rest of the
+test.
+
+**Why it's not a quick fix.** The clobber is load-bearing for
+`from_gnash/misc-swfc.all/soft_reference_test1` (expects `typeof(oldname) ==
+'undefined'` after a rename), gnash `case-v6` (case-insensitive name table), and
+the gnash `MovieClip-vN` soft-reference suite — all currently `ruffle_matched`.
+The correct fix is to stop `createEmptyMovieClip` from registering a *variable*
+(it should only create a display-list-child binding, resolved via `dynamic_props`
+with a GetVariable fallback) and to stop the rename from clobbering `var_map`.
+That is an architectural change to instance-vs-variable binding that touches many
+tests and cannot be validated locally (full-suite, multi-suite). Deferred until it
+can be done behind a full CI run. Single test, no `output.ruffle.txt`, so only a
+full Flash PASS counts.
+
+---
+
 ## Resolved Blockers
 
 | Blocker | When | Key Result |
