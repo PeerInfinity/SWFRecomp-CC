@@ -59802,6 +59802,65 @@ static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVa
 	return result;
 }
 
+// Assign `value` into array slot `dest` with the Flash element-(re)assignment
+// semantics shared by Array.shift/unshift/reverse: a HOLE source is DENSIFIED
+// to `undefined`; ASSetPropFlags on the destination index is honored — a write
+// to a DontDelete+ReadOnly slot is BLOCKED (the slot keeps its old value,
+// flags and enumeration position), a DontDelete slot keeps its flags and
+// enumeration position (value still overwritten), and a CONFIGURABLE slot
+// loses its ASSetPropFlags and is moved to the END of the for-in enumeration
+// order. `may_dup` must be non-zero when `value` is still referenced by
+// another live slot (blocked-slot duplication) so owned resources are retained
+// to avoid a double free. Returns 1 if the slot was written, 0 if blocked.
+static int arrayAssignSlotReorder(ASArray* arr, u32 dest, ActionVar* value, int may_dup)
+{
+	char idx_buf[16];
+	int ilen = snprintf(idx_buf, sizeof(idx_buf), "%u", dest);
+	if (ilen <= 0) return 0;
+	int dont_delete = 0, blocked = 0;
+	ASProperty* ps = NULL;
+	if (arr->props != NULL)
+	{
+		ps = findPropertyRaw(arr->props, idx_buf, (u32)ilen);
+		if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
+		{
+			dont_delete = 1;
+			if (!(ps->flags & PROPERTY_FLAG_WRITABLE))
+				blocked = 1;
+		}
+	}
+	if (blocked)
+		return 0;  // keep the slot's old value, flags, and enum position
+
+	ActionVar nv = *value;
+	if (nv.type == ACTION_STACK_VALUE_HOLE)
+	{
+		nv.type = ACTION_STACK_VALUE_UNDEFINED;
+		nv.data.numeric_value = 0;
+		nv.str_size = 0;
+	}
+	else if (may_dup)
+	{
+		if (nv.type == ACTION_STACK_VALUE_OBJECT ||
+		    nv.type == ACTION_STACK_VALUE_ARRAY ||
+		    nv.type == ACTION_STACK_VALUE_FUNCTION)
+			retainObject((ASObject*) nv.data.numeric_value);
+		else if (nv.type == ACTION_STACK_VALUE_STRING)
+			nv.data.string_data.owns_memory = 0;
+	}
+	arr->elements[dest] = nv;
+	if (!dont_delete)
+	{
+		if (ps != NULL)
+		{
+			ps->flags = PROPERTY_FLAGS_DEFAULT;
+			ps->flash_flags = 0;
+		}
+		arrayReinsertKey(arr, idx_buf, (u32)ilen);
+	}
+	return 1;
+}
+
 // Helper function to call built-in array methods
 // Returns 1 if method was handled, 0 if not found
 static int callArrayMethod(SWFAppContext* app_context,
@@ -60010,7 +60069,8 @@ static int callArrayMethod(SWFAppContext* app_context,
 		if (num_args > 0)
 		{
 			// Ensure capacity
-			u32 new_length = arr->length + num_args;
+			u32 old_len = arr->length;
+			u32 new_length = old_len + num_args;
 			while (new_length > arr->capacity)
 			{
 				u32 new_cap = arr->capacity * 2;
@@ -60018,15 +60078,52 @@ static int callArrayMethod(SWFAppContext* app_context,
 				arr->elements = (ActionVar*) realloc(arr->elements, sizeof(ActionVar) * new_cap);
 				arr->capacity = new_cap;
 			}
-			// Shift existing elements right
-			for (int i = (int)arr->length - 1; i >= 0; i--)
+			// Flash's Array.unshift moves each existing element up by num_args
+			// (a[i+n] = a[i]) and then writes the new elements into the freed
+			// front slots. Every such write is an element (re)assignment with
+			// the same per-index semantics as Array.shift (densify holes,
+			// ASSetPropFlags-aware flags/enum-order; see arrayAssignSlotReorder
+			// and the array_unshift test incl. its ASSetPropFlags matrix).
+			char _idx_buf[16];
+			// Seed the enumeration order with the current live indices in
+			// ascending order so a DontDelete front slot keeps its implicit
+			// position (literal arrays have no enum_keys until first SetMember).
+			for (u32 i = 0; i < old_len; i++)
 			{
-				arr->elements[i + num_args] = arr->elements[i];
+				if (i < arr->capacity &&
+				    arr->elements[i].type != ACTION_STACK_VALUE_HOLE)
+				{
+					int sl = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+					if (sl > 0)
+						arrayTrackKey(arr, _idx_buf, (u32)sl);
+				}
 			}
-			// Insert new elements at front
+			// Move existing elements right (high-to-low so each source is read
+			// before being overwritten). A source slot survives only if it is a
+			// front slot whose write is later BLOCKED (DontDelete+ReadOnly),
+			// which duplicates the value into both slots — flag may_dup so the
+			// moved copy doesn't double-free an owned resource.
+			for (int i = (int)old_len - 1; i >= 0; i--)
+			{
+				int src_blocked = 0;
+				if ((u32)i < num_args)
+				{
+					int il = snprintf(_idx_buf, sizeof(_idx_buf), "%u", (u32)i);
+					if (arr->props != NULL && il > 0)
+					{
+						ASProperty* sp = findPropertyRaw(arr->props, _idx_buf, (u32)il);
+						if (sp != NULL && !(sp->flags & PROPERTY_FLAG_CONFIGURABLE) &&
+						    !(sp->flags & PROPERTY_FLAG_WRITABLE))
+							src_blocked = 1;
+					}
+				}
+				ActionVar src = arr->elements[i];
+				arrayAssignSlotReorder(arr, (u32)i + num_args, &src, src_blocked);
+			}
+			// Write the new elements into the front slots.
 			for (u32 i = 0; i < num_args; i++)
 			{
-				arr->elements[i] = args[i];
+				arrayAssignSlotReorder(arr, i, &args[i], 0);
 			}
 			arr->length = new_length;
 		}
@@ -60038,24 +60135,148 @@ static int callArrayMethod(SWFAppContext* app_context,
 	// reverse() - reverse in place, return array ref
 	if (method_name_len == 7 && strncmp(method_name, "reverse", 7) == 0)
 	{
-		for (u32 i = 0; i < arr->length / 2; i++)
+		// Flash's Array.reverse swaps elements pairwise (index i <-> n-1-i).
+		// Each swap (re)assigns the two slots via element-by-element writes,
+		// with the SAME per-index semantics as Array.shift (see the shift
+		// case above): the array is DENSIFIED (a hole written into a slot
+		// becomes a real `undefined` property); a CONFIGURABLE index that is
+		// reassigned loses its ASSetPropFlags and is moved to the END of the
+		// for-in enumeration order; a DontDelete index keeps its flags AND its
+		// enumeration position (value still overwritten); and a write is
+		// BLOCKED entirely only when the index is both DontDelete AND ReadOnly
+		// (it keeps its old value, flags, and position). For odd lengths the
+		// middle index is never touched and keeps its original position. The
+		// swapped slots are re-inserted in the order i0,j0,i1,j1,... See the
+		// array_reverse test (incl. its ASSetPropFlags matrix).
+		u32 _n = arr->length;
+		char _idx_buf[16];
+		// Seed the enumeration order with the current live indices in
+		// ascending order so a literal array (no prior SetMember -> no
+		// enum_keys) keeps an implicit position for the untouched middle
+		// index; reassigned indices are re-inserted at the end below.
+		for (u32 i = 0; i < _n; i++)
 		{
-			ActionVar tmp = arr->elements[i];
-			arr->elements[i] = arr->elements[arr->length - 1 - i];
-			arr->elements[arr->length - 1 - i] = tmp;
-		}
-		// Flash: reverse densifies the array — convert HOLEs to UNDEFINED
-		// so for-in enumerates all indices (matches Flash, not Ruffle).
-		for (u32 i = 0; i < arr->length; i++)
-		{
-			if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
+			if (i < arr->capacity &&
+			    arr->elements[i].type != ACTION_STACK_VALUE_HOLE)
 			{
-				arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
-				arr->elements[i].data.numeric_value = 0;
-				arr->elements[i].str_size = 0;
-				char _idx_buf[12];
-				int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
-				arrayTrackKey(arr, _idx_buf, (u32)_idx_len);
+				int _sl = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+				if (_sl > 0)
+					arrayTrackKey(arr, _idx_buf, (u32)_sl);
+			}
+		}
+		for (u32 i = 0; i < _n / 2; i++)
+		{
+			u32 j = _n - 1 - i;
+			// Snapshot both source values (shallow) before writing.
+			ActionVar old_i = arr->elements[i];
+			ActionVar old_j = arr->elements[j];
+
+			// Resolve each index's flag-derived behaviour from arr->props.
+			int dont_delete_i = 0, blocked_i = 0;
+			int dont_delete_j = 0, blocked_j = 0;
+			ASProperty* ps_i = NULL;
+			ASProperty* ps_j = NULL;
+			int ilen = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+			if (arr->props != NULL && ilen > 0)
+			{
+				ps_i = findPropertyRaw(arr->props, _idx_buf, (u32)ilen);
+				if (ps_i != NULL && !(ps_i->flags & PROPERTY_FLAG_CONFIGURABLE))
+				{
+					dont_delete_i = 1;
+					if (!(ps_i->flags & PROPERTY_FLAG_WRITABLE))
+						blocked_i = 1;
+				}
+			}
+			int jlen = snprintf(_idx_buf, sizeof(_idx_buf), "%u", j);
+			if (arr->props != NULL && jlen > 0)
+			{
+				ps_j = findPropertyRaw(arr->props, _idx_buf, (u32)jlen);
+				if (ps_j != NULL && !(ps_j->flags & PROPERTY_FLAG_CONFIGURABLE))
+				{
+					dont_delete_j = 1;
+					if (!(ps_j->flags & PROPERTY_FLAG_WRITABLE))
+						blocked_j = 1;
+				}
+			}
+
+			// Final values: a blocked slot keeps its old value; otherwise it
+			// receives the partner's old value (densifying a hole source to
+			// undefined). When a blocked slot keeps a value that the partner
+			// also receives, the value is duplicated; retain owned resources
+			// so the two slots don't double-free (rare: needs DontDelete+
+			// ReadOnly on one side with object/owned-string elements).
+			if (!blocked_i)
+			{
+				ActionVar nv = old_j;
+				if (nv.type == ACTION_STACK_VALUE_HOLE)
+				{
+					nv.type = ACTION_STACK_VALUE_UNDEFINED;
+					nv.data.numeric_value = 0;
+					nv.str_size = 0;
+				}
+				else if (blocked_j)
+				{
+					// old_j stays in slot j too -> duplicated; own one copy.
+					if (nv.type == ACTION_STACK_VALUE_OBJECT ||
+					    nv.type == ACTION_STACK_VALUE_ARRAY ||
+					    nv.type == ACTION_STACK_VALUE_FUNCTION)
+						retainObject((ASObject*) nv.data.numeric_value);
+					else if (nv.type == ACTION_STACK_VALUE_STRING)
+						nv.data.string_data.owns_memory = 0;
+				}
+				arr->elements[i] = nv;
+			}
+			if (!blocked_j)
+			{
+				ActionVar nv = old_i;
+				if (nv.type == ACTION_STACK_VALUE_HOLE)
+				{
+					nv.type = ACTION_STACK_VALUE_UNDEFINED;
+					nv.data.numeric_value = 0;
+					nv.str_size = 0;
+				}
+				else if (blocked_i)
+				{
+					if (nv.type == ACTION_STACK_VALUE_OBJECT ||
+					    nv.type == ACTION_STACK_VALUE_ARRAY ||
+					    nv.type == ACTION_STACK_VALUE_FUNCTION)
+						retainObject((ASObject*) nv.data.numeric_value);
+					else if (nv.type == ACTION_STACK_VALUE_STRING)
+						nv.data.string_data.owns_memory = 0;
+				}
+				arr->elements[j] = nv;
+			}
+
+			// Update flags / enumeration order for each reassigned index.
+			// CONFIGURABLE: reset flags + move key to end. DontDelete: keep
+			// flags and position. Blocked: untouched.
+			if (!blocked_i)
+			{
+				int sl = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+				if (!dont_delete_i)
+				{
+					if (ps_i != NULL)
+					{
+						ps_i->flags = PROPERTY_FLAGS_DEFAULT;
+						ps_i->flash_flags = 0;
+					}
+					if (sl > 0)
+						arrayReinsertKey(arr, _idx_buf, (u32)sl);
+				}
+			}
+			if (!blocked_j)
+			{
+				int sl = snprintf(_idx_buf, sizeof(_idx_buf), "%u", j);
+				if (!dont_delete_j)
+				{
+					if (ps_j != NULL)
+					{
+						ps_j->flags = PROPERTY_FLAGS_DEFAULT;
+						ps_j->flash_flags = 0;
+					}
+					if (sl > 0)
+						arrayReinsertKey(arr, _idx_buf, (u32)sl);
+				}
 			}
 		}
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
