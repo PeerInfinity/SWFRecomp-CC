@@ -1,5 +1,24 @@
 # Gnash Test Suite Status
 
+Last updated: 2026-06-18 (pending CI — `array-v5/v6/v7/v8` (actionscript.all)
+line-match +6 each via Array.sort UNIQUESORT/RETURNINDEXEDARRAY fix. Single
+change in `SWFModernRuntime/src/actionmodern/action.c` sort handler: the
+UNIQUESORT uniqueness check is now done AFTER the sort, on ADJACENT elements of
+the sorted order, using the DEFAULT string/numeric comparison — never the custom
+comparator (mirrors Ruffle `core/src/avm1/globals/array.rs::sort_internal`, which
+boxes `sort_compare` for the non-sortOn uniqueness pass). Previously it ran a
+before-sort all-pairs check using the comparator, so `a.sort(cmp_fn, UNIQUESORT)`
+where `cmp_fn` collapses distinct values (comparing by string length) was wrongly
+rejected with scalar 0, and `sort(cmp_fn, …|RETURNINDEXEDARRAY)` returned 0
+instead of the index array. The sort now always runs via index-permutation when
+either flag is set, leaving the array unmodified when a duplicate is found
+(Flash returns 0 + keeps original order). Fixes array.as:950/1030/1031/1033/1035
+clusters. Tests stay `output_mismatch` (residual ours-only: sparse
+hasOwnProperty, bogus-comparator quicksort order array.as:324/325, sortOn
+stability, `__proto__`=number). No regressions: 0 regressed lines in array-v6;
+avm1 `array_sort`/`array_sort_random` still PASS; array_reverse/array_unshift
+were already failing pre-change.)
+
 Last updated: 2026-06-18 (pending CI — newly-synced upstream tests triaged; see
 `_investigation/NEW_UPSTREAM_TESTS_TRIAGE.md`. `misc-ming.all/gotoFrame2Test`
 (new, NOT known_failure): timeout → **PASS** via a self-goto guard in

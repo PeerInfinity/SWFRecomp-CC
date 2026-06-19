@@ -60381,39 +60381,22 @@ static int callArrayMethod(SWFAppContext* app_context,
 			return 1;
 		}
 
-		// --- UNIQUESORT: check for duplicates before sorting ---
-		if (flags & 4)
-		{
-			for (u32 _ui = 0; _ui < n && !(flags & 4); _ui++) {}
-			// Run the duplicate check using the same comparison method
-			for (u32 _ui = 0; _ui < n; _ui++)
-			{
-				for (u32 _uj = _ui + 1; _uj < n; _uj++)
-				{
-					int _ucmp = 0;
-					if (comparator != NULL)
-					{
-						ActionVar _ures = _invoke_sort_comparator(app_context, comparator,
-						                                          &arr->elements[_ui], &arr->elements[_uj]);
-						double _ud = varToDoubleSWF(app_context, &_ures, g_swf_version);
-						_ucmp = (_ud < 0) ? -1 : (_ud > 0) ? 1 : 0;
-					}
-					else
-					{
-						_ucmp = _sort_compare_vars(app_context, &arr->elements[_ui], &arr->elements[_uj], flags & ~2);
-					}
-					if (_ucmp == 0)
-					{
-						double _zero = 0.0;
-						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_zero));
-						return 1;
-					}
-				}
-			}
-		}
-
-		// --- RETURNINDEXEDARRAY: sort a copy of indices, return index array ---
-		if (flags & 8)
+		// --- UNIQUESORT / RETURNINDEXEDARRAY: index-based sort ---
+		// When either flag is set we sort a copy of the indices (so the
+		// original array stays untouched until we decide to commit it) and
+		// then run the post-sort work. This mirrors Ruffle's sort_internal:
+		//  * UNIQUESORT's uniqueness check runs AFTER the sort, on ADJACENT
+		//    elements of the sorted order, and (for Array.sort, not sortOn)
+		//    uses the DEFAULT string/numeric comparison — never the custom
+		//    comparator. So `a.sort(cmp_fn, UNIQUESORT)` is rejected only when
+		//    two values that the custom sort left adjacent are also equal
+		//    under the default comparison. If a duplicate is found, the
+		//    original array is left unmodified and 0 is returned.
+		//  * RETURNINDEXEDARRAY returns the sorted index list without touching
+		//    the original array.
+		//  * UNIQUESORT without RETURNINDEXEDARRAY commits the sorted values
+		//    back to the array once the uniqueness check passes.
+		if ((flags & 8) || (flags & 4))
 		{
 			u32* _idx = (u32*) HALLOC(n * sizeof(u32));
 			if (_idx == NULL) { PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
@@ -60528,18 +60511,55 @@ static int callArrayMethod(SWFAppContext* app_context,
 				}
 			}
 
-			// Build index result array
-			ASArray* _ridx_arr = allocArray(app_context, n);
-			if (_ridx_arr == NULL) { FREE(_idx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
-			_ridx_arr->length = n;
-			for (u32 _ii = 0; _ii < n; _ii++)
+			// --- UNIQUESORT: adjacent-pair uniqueness check on the sorted order ---
+			// Uses the DEFAULT comparison (flags sans DESCENDING), never the
+			// custom comparator. On a duplicate, leave the array unmodified
+			// and return scalar 0.
+			if (flags & 4)
 			{
-				_ridx_arr->elements[_ii].type = ACTION_STACK_VALUE_F64;
-				double _dv = (double) _idx[_ii];
-				VAL(double, &_ridx_arr->elements[_ii].data.numeric_value) = _dv;
+				for (u32 _ii = 0; _ii + 1 < n; _ii++)
+				{
+					int _ucmp = _sort_compare_vars(app_context,
+						&arr->elements[_idx[_ii]], &arr->elements[_idx[_ii + 1]], flags & ~2);
+					if (_ucmp == 0)
+					{
+						FREE(_idx);
+						double _zero = 0.0;
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_zero));
+						return 1;
+					}
+				}
+			}
+
+			// --- RETURNINDEXEDARRAY: return the sorted index list (array unchanged) ---
+			if (flags & 8)
+			{
+				ASArray* _ridx_arr = allocArray(app_context, n);
+				if (_ridx_arr == NULL) { FREE(_idx); PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
+				_ridx_arr->length = n;
+				for (u32 _ii = 0; _ii < n; _ii++)
+				{
+					_ridx_arr->elements[_ii].type = ACTION_STACK_VALUE_F64;
+					double _dv = (double) _idx[_ii];
+					VAL(double, &_ridx_arr->elements[_ii].data.numeric_value) = _dv;
+				}
+				FREE(_idx);
+				PUSH(ACTION_STACK_VALUE_ARRAY, (u64) _ridx_arr);
+				return 1;
+			}
+
+			// --- UNIQUESORT without RETURNINDEXEDARRAY: commit the sorted values ---
+			{
+				ActionVar* _sorted = (ActionVar*) HALLOC(n * sizeof(ActionVar));
+				if (_sorted != NULL)
+				{
+					for (u32 _ii = 0; _ii < n; _ii++) _sorted[_ii] = arr->elements[_idx[_ii]];
+					for (u32 _ii = 0; _ii < n; _ii++) arr->elements[_ii] = _sorted[_ii];
+					FREE(_sorted);
+				}
 			}
 			FREE(_idx);
-			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) _ridx_arr);
+			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 			return 1;
 		}
 
