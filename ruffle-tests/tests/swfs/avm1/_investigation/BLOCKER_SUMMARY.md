@@ -206,6 +206,11 @@ tests and cannot be validated locally (full-suite, multi-suite). Deferred until 
 can be done behind a full CI run. Single test, no `output.ruffle.txt`, so only a
 full Flash PASS counts.
 
+**Plan**: `blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md` (3 phases: stop
+instance-name auto-registration in `var_map`; fix the `_name` setter to not
+clobber `var_map` and delete-not-undef the moved `dynamic_props` key; validate via
+full CI).
+
 ---
 
 ## Resolved Blockers
