@@ -488,6 +488,44 @@ on-stage size. Trace test continues to pass.
 
 ---
 
+## Category 10: Watch Handler Deep Re-entrancy (SWF7 Recursion Depth)
+
+New upstream tests (`watch_special_recursion_*`, `known_failure = true`). When a
+watched property is set from *inside* its own `watch` handler, Flash re-fires the
+handler a version-specific number of times before bottoming out: **SWF6 fires it
+once** (then commits the value without re-firing); **SWF7+ recurses 65 levels**
+(single property) or **130 levels** (two mutually-recursive properties). Ruffle
+recurses unboundedly here (hence the tests are `known_failure`); our previous
+behavior was an unbounded C-stack recursion → **SEGFAULT**.
+
+We now bound this with a per-`(object, property)` firing stack capped at
+`accessorReentryLimit()` (1 for SWF6, 65 for SWF7+ — the same depth Flash uses
+for `addProperty` getter/setter re-entry), plus a combined `MAX_SPECIAL_DEPTH`
+total-nesting safety cap so the mutually-recursive "double" case cannot overflow
+the C stack (`action.c`, `g_watch_firing` / `watch_firing_depth`).
+
+| Test | Result | Why not full match |
+|------|--------|--------------------|
+| `watch_special_recursion_swf6` | **ruffle_matched** | o1 matches Flash exactly; o2 residual ⊆ Ruffle's diff |
+| `watch_special_recursion_double_swf6` | **ruffle_matched** | same |
+| `watch_special_recursion_swf7` | accepted diff | ships **no** `output.ruffle.txt` (no RM target); o1 matches Flash (65 fires) but the o2 `addProperty`+`watch` interplay is a separate deep semantic gap |
+| `watch_special_recursion_double_swf7` | accepted diff | has `output.ruffle.txt`, but ~63 RM-blocker lines remain in the o2 section, and Flash's 130-deep mutual recursion would overflow our C stack regardless |
+
+### `watch_special_recursion_swf7` / `watch_special_recursion_double_swf7` — deep recursion + o2 interplay
+
+The single-property `o1` section now matches Flash's bounded recursion exactly
+(65 `o1.prop changed` lines). The unmatched lines are entirely in the `o2`
+section, where a property has **both** an `addProperty` getter/setter **and** a
+`watch`: the exact ordering of getter/setter/handler invocations and the
+`undefined,undefined` argument values diverge. Matching it would require
+replicating Flash's combined accessor+watch dispatch ordering and a non-recursive
+130-deep evaluation; not worth it for two `known_failure` SWF7 variants.
+
+**Decision:** Accept; segfault eliminated (the real bug). swf6 variants pass
+(ruffle_matched); swf7 variants added to `ignored_tests.txt`.
+
+---
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
@@ -514,3 +552,5 @@ on-stage size. Trace test continues to pass.
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
 | `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision | ~52k image outliers, max diff 64 | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render, residual diff is decoder fixed-point arithmetic |
+| `watch_special_recursion_swf7` | Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay; no `output.ruffle.txt` | ~part of test | Accept; segfault fixed, o1 matches Flash (65 fires); see Category 10 |
+| `watch_special_recursion_double_swf7` | Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay | ~63 | Accept; segfault fixed; see Category 10 |

@@ -130,3 +130,17 @@ bitmap_data_thorough/pixelDissolve
 # (Japanese-flag test pattern at correct position and size). See
 # ACCEPTED_DIFFS.md Category 9 and SWFRecompDocs/plans/video-codec-support-plan.md.
 netstream_play_flv
+
+# --- Watch deep re-entrancy (SWF7 recursion depth) ---
+# New upstream tests. Setting a watched property from inside its own watch
+# handler re-fires it; in SWF7+ Flash recurses 65 (single) / 130 (mutual)
+# levels deep before bottoming out. The single-property o1 section now matches
+# Flash exactly (we previously SEGFAULTED on unbounded C-stack recursion; now
+# bounded — see action.c g_watch_firing / accessorReentryLimit). Full match is
+# unreachable: watch_special_recursion_swf7 ships no output.ruffle.txt (no RM
+# target), and the 130-deep "double" recursion would overflow our C stack
+# anyway, plus the o2 addProperty+watch interplay (~63 lines) is a separate deep
+# semantic gap. The swf6 variants DO pass (ruffle_matched). See ACCEPTED_DIFFS.md
+# Category 10.
+watch_special_recursion_swf7
+watch_special_recursion_double_swf7

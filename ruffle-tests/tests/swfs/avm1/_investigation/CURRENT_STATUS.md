@@ -1,5 +1,28 @@
 # Current Ruffle Test Status
 
+Last updated: 2026-06-19 (pending CI — **watch deep-recursion SEGFAULTS fixed**.
+Upstream added ~47 new avm1 tests since the last doc snapshot (suite is now 701,
+not 654); among them four `watch_special_recursion_*` `known_failure` tests that
+**segfaulted** (unbounded C-stack recursion). Root cause: setting a watched
+property from inside its own `watch` handler re-fired the handler with no bound.
+Flash re-fires version-specifically — SWF6 once, SWF7+ 65 (single) / 130 (mutual)
+levels — then commits without re-firing. Fix in
+`SWFModernRuntime/src/actionmodern/action.c`: a per-`(object, property)` firing
+stack (`g_watch_firing` / `watch_firing_depth`) capped at `accessorReentryLimit()`
+(1 for SWF6, 65 for SWF7+ — the same limit the `addProperty` getter/setter
+re-entry already uses), plus a combined `MAX_SPECIAL_DEPTH` safety cap so the
+mutually-recursive "double" case cannot overflow the stack. Results:
+`watch_special_recursion_swf6` + `watch_special_recursion_double_swf6` →
+**ruffle_matched** (o1 matches Flash exactly); `watch_special_recursion_swf7` +
+`watch_special_recursion_double_swf7` → segfault eliminated, now clean
+output_mismatch (o1 matches Flash; residual is the o2 addProperty+watch interplay
+and Flash's 130-deep recursion that overflows recursively — both unreachable).
+The two swf7 variants added to `ignored_tests.txt` + ACCEPTED_DIFFS.md Category 10.
+No regressions across a 14-test setMember/property/watch battery (the lone fail,
+`global_proto_decls`, is pre-existing + ignored). NOTE: other new upstream avm1
+tests remain non-passing (coerce_to_primitive_resolve, shared_stack, array_reverse,
+amf_*, geturl_*_normalize, set_property_values, etc.) — not yet triaged.)
+
 Last updated: 2026-05-29 (pending CI — `with` output_mismatch → PASS. Upstream
 added `with(undefined)` / `with(null)` cases to the test; we were tracing
 `Error: A 'with' action failed because the specified object did not exist.`

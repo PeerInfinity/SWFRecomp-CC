@@ -816,6 +816,45 @@ typedef struct {
 static WatchEntry g_watch_table[MAX_WATCH_ENTRIES];
 static int g_watch_count = 0;
 
+// Re-entrancy guard for watch handlers. Setting a watched property from inside
+// its own watch handler re-fires the handler a Flash-version-specific number of
+// times: SWF6 invokes it once then commits the value without re-firing; SWF7+
+// recurses 65 levels before bottoming out — the same quirky depth Flash uses
+// for addProperty getter/setter re-entry (see accessorReentryLimit()). Ruffle
+// recurses unboundedly (its watch_special_recursion tests are known_failure);
+// without this bound we recurse on the C stack and segfault. A LIFO stack of
+// the currently-firing (obj/mc, prop) pairs (counting nested matches) mirrors
+// the g_active_accessors model and is robust to the watch table being reordered
+// by unwatch() inside a handler.
+// Sized above the deepest legal nesting (one entry per re-fire; the double
+// tests reach accessorReentryLimit()==65 on each of two distinct props → 130).
+// If this fills, pushes silently drop and the depth guard would stop counting
+// (→ runaway recursion), so it must comfortably exceed the worst case.
+#define MAX_WATCH_FIRING 256
+static struct { ASObject* obj; MovieClip* mc; char prop[64]; u32 len; } g_watch_firing[MAX_WATCH_FIRING];
+static int g_watch_firing_count = 0;
+static int watch_firing_depth(ASObject* obj, MovieClip* mc, const char* prop, u32 len) {
+	int c = 0;
+	for (int i = 0; i < g_watch_firing_count; i++)
+		if (g_watch_firing[i].obj == obj && g_watch_firing[i].mc == mc &&
+		    g_watch_firing[i].len == len && strncmp(g_watch_firing[i].prop, prop, len) == 0)
+			c++;
+	return c;
+}
+static void watch_firing_push(ASObject* obj, MovieClip* mc, const char* prop, u32 len) {
+	if (g_watch_firing_count >= MAX_WATCH_FIRING) return;
+	u32 c = len < (u32)(sizeof(g_watch_firing[0].prop) - 1) ? len : (u32)(sizeof(g_watch_firing[0].prop) - 1);
+	g_watch_firing[g_watch_firing_count].obj = obj;
+	g_watch_firing[g_watch_firing_count].mc = mc;
+	memcpy(g_watch_firing[g_watch_firing_count].prop, prop, c);
+	g_watch_firing[g_watch_firing_count].prop[c] = '\0';
+	g_watch_firing[g_watch_firing_count].len = len;
+	g_watch_firing_count++;
+}
+static void watch_firing_pop(void) {
+	if (g_watch_firing_count > 0) g_watch_firing_count--;
+}
+
 // Object.registerClass(symbolName, constructorFunc)
 // Returns true on success, false on invalid args.
 static ActionVar actionObjectRegisterClass(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -46444,6 +46483,21 @@ void actionSetMember(SWFAppContext* app_context)
 						ASFunction* _wf = g_watch_table[_wi].watcher_func;
 						if (_wf != NULL)
 						{
+							// Re-entrancy guard: a write to this same property from
+							// inside its own handler re-fires it only up to Flash's
+							// version-specific depth (1 for SWF6, 65 for SWF7+); past
+							// that the value is committed without re-firing. Avoids
+							// the unbounded C-stack recursion (→ segfault) Ruffle has
+							// on these known_failure properties. The second clause is
+							// a hard total-nesting safety cap for the mutually-
+							// recursive "double" case (prop1↔prop2): Flash's true
+							// depth there (130 each) would overflow our C stack, so we
+							// bound combined nesting at MAX_SPECIAL_DEPTH like the
+							// accessor recursion does (no crash; output diverges but
+							// these SWF7 variants are unmatchable recursively anyway).
+							if (watch_firing_depth(obj, NULL, prop_name, prop_name_len) >= accessorReentryLimit()
+							    || g_watch_firing_count >= MAX_SPECIAL_DEPTH)
+								break;
 							// Build prop_name string arg (shared by both type paths)
 							u32 _pname_u16_len;
 							uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
@@ -46480,6 +46534,7 @@ void actionSetMember(SWFAppContext* app_context)
 							_wargs[3] = g_watch_table[_wi].user_data;
 							if (_wargs[3].type == ACTION_STACK_VALUE_STRING)
 								_wargs[3].data.string_data.owns_memory = false;
+							watch_firing_push(obj, NULL, prop_name, prop_name_len);
 							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
 							{
 								// The type-2 watcher's prologue binds args into its
@@ -46579,6 +46634,7 @@ void actionSetMember(SWFAppContext* app_context)
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
+							watch_firing_pop();
 						}
 						break;
 					}
