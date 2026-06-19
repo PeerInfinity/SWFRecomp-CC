@@ -23493,6 +23493,71 @@ static void queueChildOnUnloads(MovieClip* parent_mc)
 	}
 }
 
+// Returns 1 if `mc` itself OR any descendant (recursively) has an AS-set
+// onUnload handler. Flash keeps a removed clip alive at a shifted depth if it
+// or any of its children defines onUnload — see gnash MovieClip.as hardref3:
+// "still accessible due to onUnload defined for its child" (line 712-715).
+static int mcOrDescendantHasOnUnload(MovieClip* mc)
+{
+	if (mc == NULL) return 0;
+	if (mc->dynamic_props != NULL) {
+		ActionVar* handler = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
+		if (handler != NULL && handler->type == ACTION_STACK_VALUE_FUNCTION
+		    && handler->data.numeric_value != 0)
+			return 1;
+	}
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* child = child_mc_cache[i];
+		if (child == NULL || child == mc || child->depth == INT_MIN) continue;
+		if (child->parent != mc) continue;
+		if (mcOrDescendantHasOnUnload(child)) return 1;
+	}
+	return 0;
+}
+
+// Strip non-surviving direct children of a clip that was deferred-removed ONLY
+// because a descendant defines onUnload (the clip itself has none). Flash keeps
+// the subtree at and above the lowest-depth onUnload-bearing direct child;
+// lower-depth direct children are content-stripped (kept as empty movieclips,
+// but their parent name-binding and own properties are removed). See gnash
+// MovieClip.as ul4 section (lines 755-805): hul7 (depth 3) has onUnload, so
+// hul5/hul6 (depths 1/2) lose their `ul4.hulN` binding and their `.a` property,
+// while hul7/hul8/hul9 (depths >= 3) keep both.
+static void stripNonSurvivingDeferredChildren(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL) return;
+	// D = lowest depth among direct children whose subtree defines onUnload.
+	int surviving_depth = INT_MAX;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* child = child_mc_cache[i];
+		if (child == NULL || child == mc || child->depth == INT_MIN) continue;
+		if (child->parent != mc) continue;
+		if (mcOrDescendantHasOnUnload(child) && child->depth < surviving_depth)
+			surviving_depth = child->depth;
+	}
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* child = child_mc_cache[i];
+		if (child == NULL || child == mc || child->depth == INT_MIN) continue;
+		if (child->parent != mc) continue;
+		if (child->depth >= surviving_depth) continue;  // survives — keep intact
+		// Non-surviving: remove the parent's name-binding to this child.
+		if (mc->dynamic_props != NULL && child->name[0]) {
+			ActionVar* pv = getProperty((ASObject*)mc->dynamic_props, child->name,
+			                            strlen(child->name));
+			if (pv != NULL && pv->type == ACTION_STACK_VALUE_MOVIECLIP
+			    && (MovieClip*)(uintptr_t)pv->data.numeric_value == child) {
+				deleteProperty(app_context, (ASObject*)mc->dynamic_props,
+				               child->name, strlen(child->name));
+			}
+		}
+		// Strip the child's own properties (it stays a live, empty movieclip).
+		if (child->dynamic_props != NULL) {
+			releaseObject(app_context, (ASObject*)child->dynamic_props);
+			child->dynamic_props = NULL;
+		}
+	}
+}
+
 // Fire all queued onUnload handlers (called from tagShowFrame in tag.c).
 // Phase 2 of ACTION_QUEUE_PLAN: drains only is_unload=1 entries so unload
 // dispatch remains ordered BEFORE onloads/loads/attach_inits (whose drain
@@ -54759,6 +54824,13 @@ void actionRemoveSprite(SWFAppContext* app_context)
 			// Recursively queue onUnload handlers for children
 			queueChildOnUnloads(_rs_mc);
 
+			// Defer removal when this clip OR a descendant defines onUnload.
+			// When deferred ONLY because of a descendant (clip itself has no
+			// onUnload), strip the non-surviving lower-depth children.
+			int _rs_self_unload = _rs_has_unload;
+			if (!_rs_has_unload)
+				_rs_has_unload = mcOrDescendantHasOnUnload(_rs_mc);
+
 			if (_rs_has_unload) {
 				// Deferred removal: shift depth into the removed-depth zone and
 				// keep dynamic_props / var_map bindings intact. The MC will be
@@ -54785,6 +54857,8 @@ void actionRemoveSprite(SWFAppContext* app_context)
 				// the active SetTarget context. Flash keeps the target valid for
 				// same-frame reads of the MC's properties (testVar lookup) — the
 				// MC's depth is shifted but dynamic_props are still reachable.
+				if (!_rs_self_unload)
+					stripNonSurvivingDeferredChildren(app_context, _rs_mc);
 			} else {
 				// Immediate removal: clear bindings and mark depth INT_MIN.
 				// Clear from parent's dynamic_props
@@ -68814,6 +68888,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					queueOnUnload(_rmc_unload_func, mc);
 				// Recursively queue onUnload handlers for children
 				queueChildOnUnloads(mc);
+
+				// Defer removal when this clip OR a descendant defines onUnload.
+				// When deferred ONLY because of a descendant (clip itself has no
+				// onUnload), strip the non-surviving lower-depth children.
+				int _rmc_self_unload = _rmc_has_unload;
+				if (!_rmc_has_unload)
+					_rmc_has_unload = mcOrDescendantHasOnUnload(mc);
+
 				// CLONE_CLIP_EVENT_DISPATCH Phase 5: queue clip-action UNLOAD
 				// for the clone's display_list slot, then clear the slot so
 				// dispatch_enterframe doesn't keep firing on the removed
@@ -68838,6 +68920,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					mc->pending_removal = 1;
 					mc->depth = -(int)_rmc_swf_depth - 1 - 16384;
 					mc->display_obj = NULL;
+					if (!_rmc_self_unload)
+						stripNonSurvivingDeferredChildren(app_context, mc);
 				} else {
 					// Clear the variable from parent's dynamic_props
 					MovieClip* _rmc_parent = mc->parent ? mc->parent : &root_movieclip;
