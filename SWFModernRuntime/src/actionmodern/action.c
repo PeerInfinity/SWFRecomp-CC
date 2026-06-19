@@ -8113,6 +8113,20 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 		if (g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = (MovieClip*)func->base_clip;
 
+		// A virtual-property getter receives NO arguments in Flash
+		// (p1=p2=undefined; verified by the SWF7 variant of
+		// virtual_property_special_recursion, whose getter traces
+		// "undefined,undefined"). The type-1 prologue pops EXACTLY
+		// param_count values, so push that many undefineds first; otherwise
+		// the prologue pops stale eval-stack slots belonging to the caller's
+		// in-progress expression (e.g. it swallowed the "Done: " literal of
+		// `trace("Done: " + obj.prop)`, corrupting the trace).
+		// (TYPE1_ARG_ORDER: forward order, args[0] deepest.)
+		for (u32 pi = 0; pi < func->param_count; pi++)
+		{
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+		}
+
 		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 
 		g_current_context = saved_context;
@@ -8515,8 +8529,25 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 		if (g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = (MovieClip*)func->base_clip;
 
-		// Type 1 (DefineFunction): push value onto stack, call function
-		if (value != NULL) pushVar(app_context, value);
+		// Type 1 (DefineFunction): the prologue pops EXACTLY param_count values
+		// (last declared param from the top of the stack). Push the assigned
+		// value as the first parameter and pad the remaining declared params
+		// with undefined so the setter reads p1=value, p2..=undefined rather
+		// than stale stack slots. Without the padding the lone value landed in
+		// the LAST popped param (e.g. p2 for a 2-arg setter), swapping the
+		// setter's arguments. (TYPE1_ARG_ORDER: forward order, args[0] deepest.)
+		{
+			u32 _pc = func->param_count;
+			for (u32 pi = 0; pi < _pc; pi++)
+			{
+				if (pi == 0 && value != NULL)
+					pushVar(app_context, value);
+				else
+				{
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+				}
+			}
+		}
 		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 
 		g_current_context = saved_context;
