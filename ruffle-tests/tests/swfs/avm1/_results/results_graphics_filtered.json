@@ -8,18 +8,18 @@
     "expected_shards": 30,
     "missing_shards": 8,
     "incomplete": true,
-    "ignored_count": 34,
+    "ignored_count": 36,
     "filtered": true
   },
-  "total": 480,
+  "total": 478,
   "pass": 450,
   "ruffle_matched": 6,
-  "fail": 24,
-  "pass_rate": 93.8,
+  "fail": 22,
+  "pass_rate": 94.1,
   "effective_pass": 456,
-  "effective_pass_rate": 95.0,
+  "effective_pass_rate": 95.4,
   "breakdown": {
-    "output_mismatch": 22,
+    "output_mismatch": 20,
     "segfault": 2,
     "ruffle_matched": 6
   },
@@ -3535,44 +3535,6 @@
       },
       "duration": 1.84,
       "status": "pass"
-    },
-    {
-      "test": "geturl_opcode_target_normalize",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 16.334,
-        "run": 0.14
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 45,
-        "matching_lines": 0
-      },
-      "duration": 16.48,
-      "status": "output_mismatch",
-      "detail": "45 line(s) differ (actual=0, expected=45)",
-      "actual_output": "",
-      "expected_output": "Navigator::navigate_to_url:\n  URL: https://example.com/0\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/1\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/2\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/3\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/4\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/5\n  Target: _self\nNavigator::navigate_to_url:\n  URL: https://example.com/6\n  Target: self\nNavigator::navigate_to_url:\n  URL: https://example.com/7\n  Target: myWindow\nNavigator::navigate_to_url:\n  URL: https://example.com/8\n  Target: \nNavigator::navigate_to_url:\n  URL: https://example.com/10\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/11\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/12\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/13\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/14\n  Target: _self\nNavigator::navigate_to_url:\n  URL: https://example.com/15\n  Target: myWindow"
-    },
-    {
-      "test": "geturl_target_normalize",
-      "phases": {
-        "recomp": 0.004,
-        "compile": 16.331,
-        "run": 0.146
-      },
-      "num_frames": 5,
-      "lines": {
-        "actual_lines": 35,
-        "expected_lines": 89,
-        "matching_lines": 4
-      },
-      "duration": 16.49,
-      "status": "output_mismatch",
-      "detail": "85 line(s) differ (actual=35, expected=89)",
-      "actual_output": "// target: [_blank]\n\n// target: [blank]\n\n// target: [BLANK]\n\n// target: [_Blank]\n\n// target: [_BLANK]\n\n// target: [bLaNk]\n\n// target: [_BlAnK]\n\n// target: [_self]\n\n// target: [self]\n\n// target: [_parent]\n\n// target: [parent]\n\n// target: [_top]\n\n// target: [top]\n\n// target: [myWindow]\n\n// target: []\n\n// target: [_custom]\n\n// target: [blanket]\n\n// target: [_blanker]",
-      "expected_output": "// target: [_blank]\nNavigator::navigate_to_url:\n  URL: https://example.com/0\n  Target: _blank\n\n// target: [blank]\nNavigator::navigate_to_url:\n  URL: https://example.com/1\n  Target: _blank\n\n// target: [BLANK]\nNavigator::navigate_to_url:\n  URL: https://example.com/2\n  Target: _blank\n\n// target: [_Blank]\nNavigator::navigate_to_url:\n  URL: https://example.com/3\n  Target: _blank\n\n// target: [_BLANK]\nNavigator::navigate_to_url:\n  URL: https://example.com/4\n  Target: _blank\n\n// target: [bLaNk]\nNavigator::navigate_to_url:\n  URL: https://example.com/5\n  Target: _blank\n\n// target: [_BlAnK]\nNavigator::navigate_to_url:\n  URL: https://example.com/6\n  Target: _blank\n\n// target: [_self]\nNavigator::navigate_to_url:\n  URL: https://example.com/7\n  Target: _self\n\n// target: [self]\nNavigator::navigate_to_url:\n  URL: https://example.com/8\n  Target: self\n\n// target: [_parent]\nNavigator::navigate_to_url:\n  URL: https://example.com/9\n  Target: _parent\n\n... (39 lines after) ..."
     },
     {
       "test": "global_array",

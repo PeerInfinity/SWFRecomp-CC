@@ -6,27 +6,27 @@
 
 **Run Duration**: 43m 18s
 
-**Filtered**: 34 tests ignored out of 701 available
+**Filtered**: 36 tests ignored out of 701 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 480 |
-| Passing | **450** (93.8%) |
+| Total tests | 478 |
+| Passing | **450** (94.1%) |
 | Ruffle-matched | 6 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **456** (95.0%) |
-| Failing | 24 |
-| Total expected lines | 90194 |
-| Matching lines | 85927 (95.3%) |
-| Mismatched lines | 4267 |
+| Effective pass | **456** (95.4%) |
+| Failing | 22 |
+| Total expected lines | 90060 |
+| Matching lines | 85923 (95.4%) |
+| Mismatched lines | 4137 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 22 | 91.7% |
-| Segfault | 2 | 8.3% |
+| Output Mismatch | 20 | 90.9% |
+| Segfault | 2 | 9.1% |
 
 ## Passing Tests
 
@@ -536,7 +536,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**22 tests** with output mismatch, sorted by match rate (best first)
+**20 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -560,8 +560,6 @@ No timeouts.
 | 18 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
 | 19 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
 | 20 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
-| 21 | `geturl_target_normalize` | 4.5% | 4/89 | 35 | 89 |  |
-| 22 | `geturl_opcode_target_normalize` | 0.0% | 0/45 | 0 | 45 |  |
 
 ## Investigation Documents
 
@@ -674,4 +672,4 @@ No timeouts.
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 2 | 2 | 0 |
 | 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 28 | 28 | 0 |
-| | *(tests not in any document)* | 141 | 114 | 27 |
+| | *(tests not in any document)* | 139 | 114 | 25 |
