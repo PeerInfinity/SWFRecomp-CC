@@ -250,7 +250,19 @@ body are dropped, but pops are not undone. The asymmetry is load-bearing
 
 No crashes or segfaults remain. All previous crashes have been fixed.
 
-## Remaining Filtered Failures: 0
+## Remaining Filtered Failures
+
+> **SUPERSEDED (2026-06-19).** The "0 filtered failures" below reflected the
+> 648/654-test snapshot (CI `035950cf`). Upstream has since grown the suite to
+> **701 tests**, adding real failures. Current state (CI `1bef9e7b1`): **21
+> non-ignored filtered failures**, fully triaged in
+> `NEW_UPSTREAM_AVM1_TRIAGE.md` (infra-blocked AMF/FileReference/multi-SWF
+> clusters + a handful of tractable candidates: `coerce_to_primitive_resolve`,
+> `virtual_property_special_recursion_swf6/double_swf6`, `set_property_values/*`,
+> `array_unshift`/`array_reverse`). The four `watch_special_recursion_*`
+> segfaults were fixed this session. The text below is retained for history.
+
+### (historical, CI `035950cf`) Remaining Filtered Failures: 0
 
 The 34 raw fails not in the filtered set are in `ignored_tests.txt` (accepted diffs documented in `ACCEPTED_DIFFS.md` / `RUFFLE_VS_FLASH_DIFFERENCES.md` / `RUFFLE_COMPAT_TWEAKS.md` / `FLASH_BUGS_REPLICATED.md`).
 

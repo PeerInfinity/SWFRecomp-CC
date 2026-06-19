@@ -4,8 +4,12 @@
 # One test name per line. Lines starting with # are comments. Blank lines ignored.
 
 # --- Navigator/getURL (Ruffle-internal tracing) ---
-# These tests trace Ruffle's internal navigator dispatch output, not Flash trace output.
+# These tests trace Ruffle's internal navigator dispatch output
+# (`Navigator::navigate_to_url:` + URL/Target lines), not Flash trace output.
+# We don't emit Ruffle's navigator log, so these can never match line-for-line.
 geturl
+geturl_target_normalize
+geturl_opcode_target_normalize
 
 # --- Network/form loading (no multi-SWF infrastructure needed) ---
 # These tests require network connections, HTTP POST, or browser-level form submission.

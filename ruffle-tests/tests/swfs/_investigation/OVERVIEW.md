@@ -2,6 +2,16 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
+Last updated: 2026-06-19 — **the `avm1` suite has grown to 701 tests** (was 654
+in the snapshots below) as `download_tests.sh` syncs fresh from upstream master.
+The new tests added real failures the per-suite tables below do **not** yet
+reflect; the "100% filtered" claim for avm1 is stale. As of CI `1bef9e7b1`, avm1
+is **635/656 (96.8%) effective filtered** with 21 non-ignored filtered failures,
+all triaged in `avm1/_investigation/NEW_UPSTREAM_AVM1_TRIAGE.md`. This session
+fixed the four `watch_special_recursion_*` SEGFAULTS (2 → ruffle_matched, 2 →
+clean mismatch) and ignored the two `geturl_*_normalize` Ruffle-navigator-tracing
+tests. The other suites' totals below are still current.
+
 Last updated: 2026-05-19 — planning sweep. Every non-ignored filtered failure across the four Gnash sub-suites is now either passing/RM or covered by a dedicated `*_PLAN.md` in `from_gnash/_investigation/incomplete/`. 27 new plans landed this session; `SUBTESTS_NEWLY_VISIBLE_TRIAGE` graduated to `complete/`; six entries in `REMAINING_TAIL_TRIAGE` replaced with one-line cross-links per its own promotion convention. See `from_gnash/_investigation/CURRENT_STATUS.md` § "Missing dedicated plans" for the full per-test table.
 
 Last updated: 2026-05-15 (CI `eb8206f8` no-graphics, run `25896064893` — first run after SUBTESTS_HARNESS shipped. 66 previously-undiscoverable tests with `[subtests]`/no `output.txt` are now visible (53 in actionscript.all, 8 in misc-ming.all, 3 in misc-swfc.all, 2 in misc-swfmill.all). Newly-added: 2 raw pass (`Global-v5`, `misc-swfmill.all/trace-as2/arguments`), 8 ruffle_matched (`ops-v5/v6/v7`, `setProperty-v5/v6/v7/v8`, `BitmapDataDraw`), 45 output_mismatch. Three regressions: `avm1/placeobject_occupied_depth` (pass → output_mismatch), `misc-ming.all/loop/loop_test10` (RM 5/28 → mismatch 1/28), `misc-ming.all/register_class/RegisterClassTest4` (17/42 → 7/42 lines). Triage of the new output_mismatch tests in `from_gnash/_investigation/incomplete/SUBTESTS_NEWLY_VISIBLE_TRIAGE.md` (now closed, moved to `complete/`).)
