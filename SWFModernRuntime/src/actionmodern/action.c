@@ -60919,7 +60919,10 @@ static ASArray* objectToTempArray(SWFAppContext* app_context, ASObject* obj, u32
 // Helper: sync a temporary ASArray back to an array-like ASObject.
 // When update_length is 0, leaves obj.length untouched (Ruffle's shift/pop/
 // unshift only set_length if `this` is a real Array).
-static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject* obj, u32 old_length, int update_length)
+// When delete_excess is 0, trailing slots beyond the new length are left in
+// place (Flash splice shifts values down in-place and does NOT delete the
+// orphaned trailing index — it only lowers length).
+static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject* obj, u32 old_length, int update_length, int delete_excess)
 {
 	// Write new elements. Skip HOLE — those represent indices the temp
 	// array doesn't really have (typically because the source plain Object
@@ -60933,9 +60936,11 @@ static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject
 		setProperty(app_context, obj, idx, (u32)strlen(idx), &arr->elements[i]);
 	}
 	// Delete excess elements if array shrunk
-	for (u32 i = arr->length; i < old_length; i++) {
-		char idx[16]; snprintf(idx, sizeof(idx), "%u", i);
-		deleteProperty(app_context, obj, idx, (u32)strlen(idx));
+	if (delete_excess) {
+		for (u32 i = arr->length; i < old_length; i++) {
+			char idx[16]; snprintf(idx, sizeof(idx), "%u", i);
+			deleteProperty(app_context, obj, idx, (u32)strlen(idx));
+		}
 	}
 	if (update_length) {
 		ActionVar lv = {0};
@@ -60944,6 +60949,48 @@ static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject
 		VAL(u64, &lv.data.numeric_value) = VAL(u64, &dl);
 		setProperty(app_context, obj, "length", 6, &lv);
 	}
+}
+
+// Flash plain-Object Array.prototype semantics for shift/unshift/reverse:
+// each index slot the method *assigns to* is delete+re-added, so for-in
+// (reverse insertion order) moves those keys to the end while untouched keys
+// keep their position. We replay the exact per-method index-touch order
+// instead of the generic in-place writeback (syncArrayToObject keeps existing
+// keys in their original slot, which mismatches Flash's enumeration order).
+// Values come from the post-method temp array; length is left untouched
+// (these methods do not set length on a plain Object — see syncArrayToObject).
+static void syncArrayMethodReorder(SWFAppContext* app_context, ASArray* temp,
+                                   ASObject* obj, u32 old_length,
+                                   const char* method, u32 mlen)
+{
+	#define TOUCH_IDX(IDX) do { \
+		u32 _i = (u32)(IDX); \
+		char _k[16]; u32 _kl = (u32)snprintf(_k, sizeof(_k), "%u", _i); \
+		deleteProperty(app_context, obj, _k, _kl); \
+		ActionVar _v; \
+		if (_i < temp->length && temp->elements[_i].type != ACTION_STACK_VALUE_HOLE) { \
+			_v = temp->elements[_i]; \
+		} else { \
+			memset(&_v, 0, sizeof(_v)); _v.type = ACTION_STACK_VALUE_UNDEFINED; \
+		} \
+		setProperty(app_context, obj, _k, _kl, &_v); \
+	} while (0)
+
+	if (mlen == 5 && strncmp(method, "shift", 5) == 0) {
+		// shift assigns o[i] = o[i+1] for i in 0..length-2 (ascending);
+		// the last slot (length-1) is left in place, length unchanged.
+		for (u32 i = 0; old_length >= 1 && i + 1 < old_length; i++) TOUCH_IDX(i);
+	} else if (mlen == 7 && strncmp(method, "unshift", 7) == 0) {
+		// unshift shifts every slot up then fills the front: it assigns
+		// indices new_length-1 .. 0 (descending).
+		for (u32 i = temp->length; i-- > 0; ) TOUCH_IDX(i);
+	} else if (mlen == 7 && strncmp(method, "reverse", 7) == 0) {
+		// reverse swaps the outer pairs inward: for i in 0..len/2-1 it
+		// assigns o[i] then o[len-1-i]; an odd middle slot is left alone.
+		u32 n = temp->length;
+		for (u32 i = 0; i < n / 2; i++) { TOUCH_IDX(i); TOUCH_IDX(n - 1 - i); }
+	}
+	#undef TOUCH_IDX
 }
 
 static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -60995,13 +61042,23 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 			                  (method_name_len == 4 && strncmp(method_name, "sort", 4) == 0) ||
 			                  (method_name_len == 6 && strncmp(method_name, "sortOn", 6) == 0);
 			if (is_mutating) {
-				// shift/pop/unshift only update length on real Array `this`
-				// (Ruffle: gated on `if let NativeObject::Array(_)`). On a
-				// plain Object, length stays at its user-set value.
-				int skip_length = (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0) ||
-				                  (method_name_len == 3 && strncmp(method_name, "pop", 3) == 0) ||
-				                  (method_name_len == 7 && strncmp(method_name, "unshift", 7) == 0);
-				syncArrayToObject(app_context, temp, obj, old_length, skip_length ? 0 : 1);
+				// shift/unshift/reverse reorder for-in by delete+re-adding
+				// the slots they assign to (Flash plain-Object semantics).
+				int is_reorder = (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0) ||
+				                 (method_name_len == 7 && strncmp(method_name, "unshift", 7) == 0) ||
+				                 (method_name_len == 7 && strncmp(method_name, "reverse", 7) == 0);
+				if (is_reorder) {
+					syncArrayMethodReorder(app_context, temp, obj, old_length, method_name, method_name_len);
+				} else {
+					// pop only updates length on real Array `this`
+					// (Ruffle: gated on `if let NativeObject::Array(_)`). On a
+					// plain Object, length stays at its user-set value.
+					int skip_length = (method_name_len == 3 && strncmp(method_name, "pop", 3) == 0);
+					// splice writes in-place and leaves the orphaned trailing
+					// index alone (only lowers length); other methods delete it.
+					int delete_excess = !(method_name_len == 6 && strncmp(method_name, "splice", 6) == 0);
+					syncArrayToObject(app_context, temp, obj, old_length, skip_length ? 0 : 1, delete_excess);
+				}
 			}
 			ActionVar result;
 			popVar(app_context, &result);
