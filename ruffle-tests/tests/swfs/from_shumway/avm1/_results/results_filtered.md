@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-06-19 17:40 UTC
+**Date**: 2026-06-19 18:14 UTC
 
-**Git SHA**: `d8f7848032`
+**Git SHA**: `5f4d902549`
 
-**Run Duration**: 2m 45s
+**Run Duration**: 2m 42s
 
 **Filtered**: 3 tests ignored out of 47 available
 
@@ -29,44 +29,44 @@
 | 2 | `bitmapdata/getPixel` | 2 | 0.6s |  |
 | 3 | `bitmapdata/loadBitmap` | 3 | 0.7s |  |
 | 4 | `callee` | 2 | 1.1s |  |
-| 5 | `depth` | 6 | 1.3s |  |
-| 6 | `doactionorder/doactionorder` | 7 | 1.5s |  |
-| 7 | `doactionorder/symbolclass` | 4 | 1.3s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 20.2s |  |
+| 5 | `depth` | 6 | 1.2s |  |
+| 6 | `doactionorder/doactionorder` | 7 | 1.4s |  |
+| 7 | `doactionorder/symbolclass` | 4 | 1.2s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 19.8s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 1.2s |  |
 | 10 | `duplicateMovieClip/name-coercion` | 3 | 1.1s |  |
-| 11 | `duplicateMovieClip/samedepth` | 6 | 1.3s |  |
+| 11 | `duplicateMovieClip/samedepth` | 6 | 1.2s |  |
 | 12 | `externalinterface` | 4 | 1.1s |  |
 | 13 | `filters` | 149 | 1.5s |  |
-| 14 | `haxe/flocons1` | 2 | 1.1s |  |
-| 15 | `haxe/flocons2` | 3 | 1.0s |  |
-| 16 | `label` | 4 | 19.5s |  |
-| 17 | `levels` | 9 | 1.1s |  |
-| 18 | `loadevent` | 9 | 0.8s |  |
-| 19 | `loadvariables/loadvariables` | 7 | 0.6s |  |
-| 20 | `loadvariables/loadvars` | 2 | 1.2s |  |
-| 21 | `lookup` | 3 | 1.3s |  |
+| 14 | `haxe/flocons1` | 2 | 1.2s |  |
+| 15 | `haxe/flocons2` | 3 | 1.1s |  |
+| 16 | `label` | 4 | 20.2s |  |
+| 17 | `levels` | 9 | 1.2s |  |
+| 18 | `loadevent` | 9 | 0.9s |  |
+| 19 | `loadvariables/loadvariables` | 7 | 0.7s |  |
+| 20 | `loadvariables/loadvars` | 2 | 0.9s |  |
+| 21 | `lookup` | 3 | 1.0s |  |
 | 22 | `mouse-transparency` | 1 | 1.3s |  |
-| 23 | `nativeinheritance` | 6 | 1.3s |  |
-| 24 | `nested-button` | 1 | 1.3s |  |
-| 25 | `operations` | 13 | 1.2s |  |
-| 26 | `property-paths/property-paths-6` | 6 | 0.7s |  |
+| 23 | `nativeinheritance` | 6 | 1.1s |  |
+| 24 | `nested-button` | 1 | 1.2s |  |
+| 25 | `operations` | 13 | 1.1s |  |
+| 26 | `property-paths/property-paths-6` | 6 | 0.6s |  |
 | 27 | `property-paths/property-paths-7` | 7 | 0.7s |  |
 | 28 | `propertycase/propertycase` | 7 | 0.6s |  |
 | 29 | `propertycase/propertycase-preserving-6` | 2 | 0.6s |  |
 | 30 | `propertycase/propertycase-preserving-7` | 5 | 0.3s |  |
-| 31 | `rollover` | 4 | 19.9s |  |
+| 31 | `rollover` | 4 | 19.5s |  |
 | 32 | `scope` | 14 | 1.2s |  |
-| 33 | `setinterval` | 20 | 1.4s |  |
+| 33 | `setinterval` | 20 | 1.2s |  |
 | 34 | `settimeout` | 17 | 1.2s |  |
-| 35 | `super` | 11 | 0.9s |  |
-| 36 | `target` | 18 | 1.1s |  |
+| 35 | `super` | 11 | 1.1s |  |
+| 36 | `target` | 18 | 1.2s |  |
 | 37 | `textfield/textfield-html` | 4 | 1.3s |  |
 | 38 | `textfield/textfield-text-setters` | 8 | 1.3s |  |
-| 39 | `undefined/undefined-swf6` | 39 | 0.3s |  |
+| 39 | `undefined/undefined-swf6` | 39 | 0.4s |  |
 | 40 | `undefined/undefined-swf7` | 39 | 0.3s |  |
-| 41 | `watch` | 2 | 1.4s |  |
-| 42 | `xml/xmlbuild` | 1 | 1.1s |  |
+| 41 | `watch` | 2 | 1.2s |  |
+| 42 | `xml/xmlbuild` | 1 | 1.2s |  |
 | 43 | `xml/xmlload` | 4 | 0.3s |  |
 | 44 | `xml/xmlstring` | 9 | 0.9s |  |
 

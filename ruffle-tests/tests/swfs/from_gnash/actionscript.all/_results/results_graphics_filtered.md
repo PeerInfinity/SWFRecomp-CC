@@ -6,26 +6,26 @@
 
 **Run Duration**: 20m 1s
 
-**Filtered**: 0 tests ignored out of 243 available
+**Filtered**: 1 tests ignored out of 243 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 179 |
-| Passing | **101** (56.4%) |
+| Total tests | 178 |
+| Passing | **101** (56.7%) |
 | Ruffle-matched | 71 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **172** (96.1%) |
-| Failing | 7 |
-| Total expected lines | 22246 |
-| Matching lines | 20395 (91.7%) |
-| Mismatched lines | 1851 |
+| Effective pass | **172** (96.6%) |
+| Failing | 6 |
+| Total expected lines | 21686 |
+| Matching lines | 19859 (91.6%) |
+| Mismatched lines | 1827 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 7 | 100.0% |
+| Output Mismatch | 6 | 100.0% |
 
 ## Passing Tests
 
@@ -217,17 +217,16 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**7 tests** within reach
+**6 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `array-v5` | 95.7% | 536 | 560 | 24 |  |
-| 2 | `array-v6` | 94.4% | 608 | 644 | 36 |  |
-| 3 | `MovieClip-v6` | 94.0% | 880 | 936 | 56 |  |
-| 4 | `MovieClip-v7` | 93.1% | 902 | 969 | 67 |  |
-| 5 | `MovieClip-v8` | 90.9% | 988 | 1087 | 99 |  |
-| 6 | `array-v7` | 90.1% | 589 | 654 | 65 |  |
-| 7 | `array-v8` | 90.1% | 589 | 654 | 65 |  |
+| 1 | `array-v6` | 94.4% | 608 | 644 | 36 |  |
+| 2 | `MovieClip-v6` | 94.0% | 880 | 936 | 56 |  |
+| 3 | `MovieClip-v7` | 93.1% | 902 | 969 | 67 |  |
+| 4 | `MovieClip-v8` | 90.9% | 988 | 1087 | 99 |  |
+| 5 | `array-v7` | 90.1% | 589 | 654 | 65 |  |
+| 6 | `array-v8` | 90.1% | 589 | 654 | 65 |  |
 
 ## Segfaults
 
@@ -243,14 +242,13 @@ No timeouts.
 
 ## All Output Mismatches
 
-**7 tests** with output mismatch, sorted by match rate (best first)
+**6 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `array-v5` | 95.7% | 536/560 | 560 | 560 |  |
-| 2 | `array-v6` | 94.4% | 608/644 | 644 | 644 |  |
-| 3 | `MovieClip-v6` | 94.0% | 880/936 | 921 | 936 |  |
-| 4 | `MovieClip-v7` | 93.1% | 902/969 | 956 | 969 |  |
-| 5 | `MovieClip-v8` | 90.9% | 988/1087 | 1074 | 1087 |  |
-| 6 | `array-v7` | 90.1% | 589/654 | 654 | 654 |  |
-| 7 | `array-v8` | 90.1% | 589/654 | 654 | 654 |  |
+| 1 | `array-v6` | 94.4% | 608/644 | 644 | 644 |  |
+| 2 | `MovieClip-v6` | 94.0% | 880/936 | 921 | 936 |  |
+| 3 | `MovieClip-v7` | 93.1% | 902/969 | 956 | 969 |  |
+| 4 | `MovieClip-v8` | 90.9% | 988/1087 | 1074 | 1087 |  |
+| 5 | `array-v7` | 90.1% | 589/654 | 654 | 654 |  |
+| 6 | `array-v8` | 90.1% | 589/654 | 654 | 654 |  |
