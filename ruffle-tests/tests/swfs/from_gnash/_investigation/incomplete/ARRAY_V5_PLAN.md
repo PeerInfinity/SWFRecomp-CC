@@ -1,9 +1,46 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-05-08 (pending CI: shift DontDelete + sync HOLE skip + ARRAY __resolve + ARRAY-typed __proto__ chain follow)
+Last updated: 2026-06-19 (pending CI: sort-mutating-comparator snapshot → **array-v5 PROMOTED to ruffle_matched**)
 
-## Status: IN PROGRESS — 536/560 lines match locally (~95.7%), 24 remaining failures (CI baseline `068b46d8` was 528/560; previous local 535/560)
+## Status: RUFFLE_MATCHED (2026-06-19) — diff now a strict subset of Ruffle's diff against Flash
+
+### Promotion fix (2026-06-19) — `Array.sort` snapshots elements (sort-mutating-comparator UB)
+
+**`array-v5` → ruffle_matched.** The last ours-only diff lines were
+`array.as:324`/`325` (testCmpBogus6): a comparator that mutates the array
+mid-sort —
+`function testCmpBogus6(x,y){ trysortarray.pop(); return 1; }` on
+`[1,2,3,4]` — must end with `length == 4` and `toString() == "2,3,4,1"`.
+Our standard-sort path sorted the live `arr->elements` in place, so the
+comparator's `pop()`s shrank the array to empty (we reported `length 0`,
+`""`). Ruffle's `sort_internal` collects the elements into a Vec up front,
+qsorts that copy, then writes it back (restoring length); the comparator's
+mutations never touch the working set.
+
+Fix in `SWFModernRuntime/src/actionmodern/action.c` (standard `sort` path in
+`callArrayMethod`): snapshot `arr->elements[0..n]` into a `HALLOC` buffer
+before qsort, run the existing iterative Flash-quicksort on the snapshot
+(`_qbuf`), then commit it back to `arr->elements` and set `arr->length = n`.
+`pop()`/`shift()` only decrement `length` without freeing element storage, so
+the snapshot's value pointers stay valid through the comparator. Falls back to
+in-place sorting if the snapshot allocation fails.
+
+This deliberately makes us match **Ruffle**, not Flash, on `array.as:317`
+(testCmpBogus5: `pop(); return -1` — Flash ends `length 0`, Ruffle/we now end
+`length 4`). That line moves INTO our diff but is already in Ruffle's diff, so
+the net effect is: our diff cluster becomes `{260, 263, 317, 1630, 1636}` =
+Ruffle's diff exactly → ruffle_matched. Faithfully replicating Flash's
+in-place avmplus result for BOTH return values (0 for `-1`, 4 for `+1`) is the
+documented sort-UB that Ruffle itself doesn't replicate; not pursued (full PASS
+needs the unrelated 260/263/1630/1636 clusters anyway).
+
+Side effect: `array-v6/v7/v8` (no Ruffle sidecar, stay output_mismatch) each
+gain +1 net matching line (324/325 pass, 317 regresses). No regressions across
+AVM1 `array_sort`, `array_sort_random`, `array_constructor`, `array_properties`,
+`array_shift`, `global_array` (all PASS).
+
+### Prior status (superseded): IN PROGRESS — 536/560 lines match locally (~95.7%), 24 remaining failures (CI baseline `068b46d8` was 528/560; previous local 535/560)
 
 ### Latest fix (2026-05-08, pending CI) — +1 line
 

@@ -60638,7 +60638,24 @@ static int callArrayMethod(SWFAppContext* app_context,
 		}
 
 		// --- Standard sort: Flash QuickSort (iterative, leftmost pivot) ---
+		//
+		// Sort a SNAPSHOT of the elements, not the live array. A comparator is
+		// allowed to mutate the array mid-sort (gnash array.as testCmpBogus6:
+		// `function(x,y){ trysortarray.pop(); return 1; }`); Flash/avmplus — and
+		// Ruffle's sort_internal — work on a copy collected up front, qsort that,
+		// then write the sorted copy back, RESTORING the length the comparator
+		// shrank. Without the snapshot, the pops corrupt the working set and the
+		// array ends up empty (we'd report length 0 where Flash/Ruffle report 4
+		// for "2,3,4,1"). pop()/shift() only decrement arr->length without freeing
+		// element storage, so the snapshot's value pointers stay valid through the
+		// comparator's mutations. If the snapshot allocation fails, fall back to
+		// sorting the live array in place (previous behaviour).
 		{
+			ActionVar* _qsnap = (ActionVar*) HALLOC(n * sizeof(ActionVar));
+			ActionVar* _qbuf  = (_qsnap != NULL) ? _qsnap : arr->elements;
+			if (_qsnap != NULL)
+				for (u32 _si = 0; _si < n; _si++) _qsnap[_si] = arr->elements[_si];
+
 			typedef struct { u32 low; u32 high; } _QS_Range;
 			_QS_Range* _qs_stack = (_QS_Range*) HALLOC(n * sizeof(_QS_Range));
 			if (_qs_stack != NULL)
@@ -60656,7 +60673,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 					u32 _qh = _qs_stack[_qs_top].high;
 					if (_ql >= _qh) continue;
 
-					ActionVar _qpivot = arr->elements[_ql];
+					ActionVar _qpivot = _qbuf[_ql];
 					u32 _qleft = _ql + 1;
 					u32 _qright = _qh;
 
@@ -60672,14 +60689,14 @@ static int callArrayMethod(SWFAppContext* app_context,
 							if (comparator != NULL)
 							{
 								ActionVar _qres = _invoke_sort_comparator(app_context, comparator,
-								                                          &_qpivot, &arr->elements[_qleft]);
+								                                          &_qpivot, &_qbuf[_qleft]);
 								if (g_execution_halted) break;
 								double _qd = varToDoubleSWF(app_context, &_qres, g_swf_version);
 								_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
 							}
 							else
 							{
-								_qcmp = _sort_compare_vars(app_context, &_qpivot, &arr->elements[_qleft], _qs_flags);
+								_qcmp = _sort_compare_vars(app_context, &_qpivot, &_qbuf[_qleft], _qs_flags);
 							}
 							if (_qcmp <= 0) break;
 							_qleft++;
@@ -60692,29 +60709,29 @@ static int callArrayMethod(SWFAppContext* app_context,
 							if (comparator != NULL)
 							{
 								ActionVar _qres = _invoke_sort_comparator(app_context, comparator,
-								                                          &_qpivot, &arr->elements[_qright]);
+								                                          &_qpivot, &_qbuf[_qright]);
 								if (g_execution_halted) break;
 								double _qd = varToDoubleSWF(app_context, &_qres, g_swf_version);
 								_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
 							}
 							else
 							{
-								_qcmp = _sort_compare_vars(app_context, &_qpivot, &arr->elements[_qright], _qs_flags);
+								_qcmp = _sort_compare_vars(app_context, &_qpivot, &_qbuf[_qright], _qs_flags);
 							}
 							if (_qcmp > 0) break;
 							_qright--;
 						}
 						if (g_execution_halted) break;
 						if (_qleft >= _qright) break;
-						// Swap elements[_qleft] and elements[_qright]
-						ActionVar _qtmp = arr->elements[_qleft];
-						arr->elements[_qleft] = arr->elements[_qright];
-						arr->elements[_qright] = _qtmp;
+						// Swap _qbuf[_qleft] and _qbuf[_qright]
+						ActionVar _qtmp = _qbuf[_qleft];
+						_qbuf[_qleft] = _qbuf[_qright];
+						_qbuf[_qright] = _qtmp;
 					}
 
 					// Place pivot at its final position
-					arr->elements[_ql] = arr->elements[_qright];
-					arr->elements[_qright] = _qpivot;
+					_qbuf[_ql] = _qbuf[_qright];
+					_qbuf[_qright] = _qpivot;
 
 					// Push right subarray first (LIFO -> left processed first)
 					if (_qright + 1 <= _qh && _qs_top < (int)n)
@@ -60739,11 +60756,22 @@ static int callArrayMethod(SWFAppContext* app_context,
 				u32 _qlo = 0, _qhi = n - 1;
 				while (_qlo < _qhi)
 				{
-					ActionVar _qtmp = arr->elements[_qlo];
-					arr->elements[_qlo] = arr->elements[_qhi];
-					arr->elements[_qhi] = _qtmp;
+					ActionVar _qtmp = _qbuf[_qlo];
+					_qbuf[_qlo] = _qbuf[_qhi];
+					_qbuf[_qhi] = _qtmp;
 					_qlo++; _qhi--;
 				}
+			}
+
+			// Commit the sorted snapshot back to the array, restoring the length
+			// a mutating comparator may have shrunk. capacity >= n holds (it only
+			// ever grows in this runtime), but clamp defensively just in case.
+			if (_qsnap != NULL)
+			{
+				u32 _wn = (n <= arr->capacity) ? n : arr->capacity;
+				for (u32 _si = 0; _si < _wn; _si++) arr->elements[_si] = _qsnap[_si];
+				arr->length = _wn;
+				FREE(_qsnap);
 			}
 		}
 
