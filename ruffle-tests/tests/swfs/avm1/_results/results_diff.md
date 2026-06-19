@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `db12e096cbeb` (2026-06-19T04:17:28.335758+00:00)
-**Current:** `d8f784803243` (2026-06-19T17:40:07.451990+00:00)
+**Previous:** `d8f784803243` (2026-06-19T17:40:07.451990+00:00)
+**Current:** `5f4d902549c1` (2026-06-19T18:14:23.126530+00:00)
 
 ## Summary
 
@@ -16,4 +16,4 @@
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `watch_special_recursion_double_swf7` | segfault | 521/3118 | 521/3118 | 0 |
+| `watch_special_recursion_swf7` | segfault | 195/1042 | 195/1042 | 0 |
