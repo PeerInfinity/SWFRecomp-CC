@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `c6258d18e954` (2026-06-19T03:19:46.868308+00:00)
-**Current:** `db12e096cbeb` (2026-06-19T04:17:28.362069+00:00)
+**Previous:** `db12e096cbeb` (2026-06-19T04:17:28.362069+00:00)
+**Current:** `d8f784803243` (2026-06-19T17:40:07.478771+00:00)
 
 ## Summary
 
@@ -10,13 +10,19 @@
 | Passing | 135 | 135 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 55.6% | 55.6% | 0% |
-| Mismatched lines | 8727 | 8690 | -37 |
-|   Decreased | | | -37 |
+| Mismatched lines | 8690 | 8686 | -4 |
+|   Decreased | | | -4 |
+
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `array-v5` | output_mismatch | ruffle_matched | 552/560 | 553/560 |
 
 ## Line Count Changed (3)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `MovieClip-v7` | output_mismatch | 902/969 | 918/969 | -16 |
-| `MovieClip-v8` | output_mismatch | 988/1087 | 1004/1087 | -16 |
-| `MovieClip-v6` | output_mismatch | 880/936 | 885/936 | -5 |
+| `array-v6` | output_mismatch | 624/644 | 625/644 | -1 |
+| `array-v7` | output_mismatch | 603/654 | 604/654 | -1 |
+| `array-v8` | output_mismatch | 603/654 | 604/654 | -1 |
