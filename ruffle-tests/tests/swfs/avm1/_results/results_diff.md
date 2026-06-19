@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `c00efd4d8f0b` (2026-06-19T00:55:52.211120+00:00)
-**Current:** `d5e320f78aa9` (2026-06-19T01:40:50.092246+00:00)
+**Previous:** `d5e320f78aa9` (2026-06-19T01:40:50.092246+00:00)
+**Current:** `8889d42798ef` (2026-06-19T02:30:30.227575+00:00)
 
 ## Summary
 
@@ -12,4 +12,8 @@
 | Pass rate | 89.2% | 89.2% | 0% |
 | Mismatched lines | 16306 | 16306 | 0 |
 
-No changes detected.
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `watch_special_recursion_double_swf7` | segfault | 521/3118 | 521/3118 | 0 |
