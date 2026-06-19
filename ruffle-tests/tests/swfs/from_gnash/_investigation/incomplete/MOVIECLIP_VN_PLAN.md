@@ -448,35 +448,70 @@ not cached at child-construction time.
 
 ### F. Soft-reference / hard-reference semantics (Phase 6)
 
-Lines: 388, 390, 391, 401, 402, 416, 421-435, 445, 447.
+This cluster has TWO independent sub-parts. Sub-part F1 (descendant-onUnload
+deferral) is **DONE**; sub-part F2 (soft-reference rebinding) is the remaining
+blocker and is a large architectural change.
+
+#### F1. Descendant-onUnload removal deferral — DONE (`db12e096c`, 2026-06-18)
+
+Lines fixed: 388, 390, 391, 401, 402 (v6); the equivalent + the `ul4` section
+(776/782/785/787/789/...) on v7/v8.
 
 ```
-- PASSED: typeof(hardref3) == 'movieclip' [./MovieClip.as:712]
-+ FAILED: expected: 'movieclip' obtained: undefined
-- PASSED: typeof(sr62.member) == 'undefined' [./MovieClip.as:846]
-+ FAILED: expected: 'undefined' obtained: string
+- PASSED: typeof(hardref3) == 'movieclip' [./MovieClip.as:712]   <- now PASS
+```
+
+Flash keeps a `removeMovieClip`'d clip alive at a shifted depth
+(`-(swf_depth)-1-16384`) if the clip **OR any descendant** defines `onUnload`,
+not just the clip itself (hardref3 has no own onUnload, but its child
+hardref3child does). Fixed in `SWFModernRuntime/src/actionmodern/action.c`:
+`mcOrDescendantHasOnUnload()` drives the deferral in both removal paths
+(function-form `actionRemoveSprite` + method-form `mc.removeMovieClip()`);
+`stripNonSurvivingDeferredChildren()` handles the `ul4` per-child rule (direct
+children below the lowest-depth onUnload-bearing child lose their parent
+name-binding + own props; at/above-depth children keep both). v6 +5, v7 +16,
+v8 +16 matching lines, zero regressions. See memory
+`removemovieclip-descendant-onunload-defer`.
+
+#### F2. Soft-reference rebinding — REMAINING BLOCKER (large, architectural)
+
+Lines: 416, 421-435, 445, 447 (the sr62/sr63/hardref4 section, MovieClip.as
+~808-911).
+
+```
 - PASSED: sr62.member == "hardref4_63" [./MovieClip.as:861]
 + FAILED: expected: "hardref4_63" obtained: hardref4_original
+- PASSED: hardref.member == 60 [./MovieClip.as:812]
++ FAILED: expected: 60 obtained: 6
 ```
 
-Complex multi-line cluster exercising Flash's distinction between:
-- **Hard references** — variables that hold a MovieClip value
-  directly (typeof "movieclip"). When the underlying MC is removed,
-  the variable should become undefined.
-- **Soft references** — variables that re-resolve to the MC by name
-  on each read. When the MC is replaced at the same depth, the
-  variable transparently follows.
+A variable holding a MovieClip (e.g. `sr62 = createEmptyMovieClip("hardref4",62)`)
+behaves as a **soft reference** that re-resolves by the original target NAME/PATH
+on each read, not by the raw pointer. Flash rebinding rules (from gnash comments):
+1. lowest-depth same-named clip wins on name lookup (`hardref.member==60` after a
+   new "hardref" is created at depth 60 < the existing 61);
+2. no rebind until the originally-bound sprite is *destroyed* (not merely unloaded);
+3. once destroyed, rebinding is *always* attempted;
+4. renaming a clip into the bound name (`sr60._name="hardref4"`) triggers rebind.
 
-Our implementation appears to confuse the two; soft references
-keep stale values (`sr62.member == "hardref4_original"` when it
-should be `"hardref4_63"` because the slot now holds a different MC
-with member `_63`), and hard references aren't being cleared on
-unload (`typeof(hardref3) == undefined` expected, we return
-`movieclip`).
+Our runtime stores MC references as **raw pointers**, so it never re-resolves —
+soft refs keep stale values (`sr62.member=="hardref4_original"` when the slot now
+holds a different MC with member `_63`).
 
-This is the single largest cluster by line count. Verify against the
-AVM1 `target_clip_removed`, `string_paths_eval2`, and
-`removed_clip_halts_script` tests before committing fixes.
+**Promotion gate.** This is the ONLY thing keeping MovieClip-v6/v7/v8 from
+`ruffle_matched`: **Ruffle PASSES lines 416-434** (it implements rebinding); our
+diff is a strict subset of Ruffle's *except* these lines. So F2 is necessary AND
+(modulo a couple of singletons — Phase 7 unloadMovie binding, Phase 8 getBounds)
+sufficient for promotion.
+
+**Scope / cost.** Large — touches the fundamental MC-reference representation
+(pointer → path-resolved). Related existing infra: memory
+`settarget2-movieclip-reresolve-by-path`, gnash misc-swfc `soft_reference_test1`
+(already RM), and `MovieClip::set_name` propagation. **ROI is modest**: 3 tests,
+and the array-vN siblings remain blocked by a *separate* avmplus sort-UB. Do not
+prioritize over cheaper wins. Before committing, verify against AVM1
+`target_clip_removed`, `string_paths_eval2`, `removed_clip_halts_script`,
+`removed_target_clip_scope`, and gnash `soft_reference_test1`.
 
 ### G. unloadMovie binding clearance (Phase 7)
 
