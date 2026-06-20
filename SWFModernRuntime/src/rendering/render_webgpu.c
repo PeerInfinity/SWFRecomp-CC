@@ -341,6 +341,14 @@ static void request_adapter_sync(WebGPURenderContext* ctx,
 #endif
 }
 
+static void on_uncaptured_error(const WGPUDevice* device, WGPUErrorType type,
+                                struct WGPUStringView message, void* u1, void* u2)
+{
+	(void)device;(void)u1;(void)u2;
+	fprintf(stderr, "WebGPU error (type %d): %.*s\n", (int)type,
+		(int)message.length, message.data ? message.data : "");
+}
+
 static void on_device_ready(WGPURequestDeviceStatus status,
                             WGPUDevice device,
                             struct WGPUStringView message,
@@ -689,8 +697,26 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	{
 		WGPUDeviceDescriptor dev_desc = {0};
 		dev_desc.label = WGPU_LABEL("swf_device");
-		// Request defaults — no special limits or features needed
 		dev_desc.defaultQueue.label = WGPU_LABEL("swf_queue");
+		dev_desc.uncapturedErrorCallbackInfo.callback = on_uncaptured_error;
+
+		// Request the adapter's full limits rather than the WebGPU defaults.
+		// The default maxTextureArrayLayers is 256, but the gradient (and bitmap)
+		// texture arrays use one layer per distinct gradient/bitmap — content-heavy
+		// SWFs (e.g. Meteor Storm: 519 gradients) blow past 256, which makes the
+		// array-texture creation fail. An invalid texture poisons the bind group
+		// and silently drops EVERY command buffer that references it (including the
+		// clear + MSAA resolve), so the offscreen target reads back as fully
+		// transparent black. Requesting the adapter maximum (often 2048 layers,
+		// larger buffer sizes) lets these games render. Limits queried from the
+		// adapter are by definition grantable.
+		WGPULimits adapter_limits = WGPU_LIMITS_INIT;
+		WGPULimits required_limits = WGPU_LIMITS_INIT;
+		if (wgpuAdapterGetLimits(ctx->adapter, &adapter_limits) == WGPUStatus_Success) {
+			required_limits = adapter_limits;
+			required_limits.nextInChain = NULL;
+			dev_desc.requiredLimits = &required_limits;
+		}
 
 		request_device_sync(ctx, &dev_desc);
 		assert(ctx->device != NULL);
