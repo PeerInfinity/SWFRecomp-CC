@@ -163,6 +163,22 @@ static const char* fragment_wgsl =
 "  return clamp(mult * color + add, vec4f(0.0), vec4f(1.0));\n"
 "}\n"
 "\n"
+"// Sample a gradient ramp (256x1) stored as `row` of the packed 256xN gradient\n"
+"// texture. textureLoad selects the row with EXACT integer coords (no V\n"
+"// filtering, so no bleed into adjacent ramps even on adapters whose linear\n"
+"// filtering doesn't land precisely on the texel center — e.g. SwiftShader),\n"
+"// and we lerp along U by hand to keep the smooth ramp. `t` is already in [0,1]\n"
+"// (spread/clamp applied by the *_t helpers).\n"
+"fn sample_gradient(t: f32, row: i32) -> vec4f {\n"
+"  let u = clamp(t, 0.0, 1.0) * 255.0;\n"
+"  let u0 = i32(floor(u));\n"
+"  let u1 = min(u0 + 1, 255);\n"
+"  let f = u - f32(u0);\n"
+"  let c0 = textureLoad(gradient_tex, vec2i(u0, row), 0);\n"
+"  let c1 = textureLoad(gradient_tex, vec2i(u1, row), 0);\n"
+"  return mix(c0, c1, f);\n"
+"}\n"
+"\n"
 "@fragment\n"
 "fn fs_main(in: FragmentInput) -> @location(0) vec4f {\n"
 "  // Sample all textures unconditionally (uniform control flow required by Chrome/Dawn).\n"
@@ -173,14 +189,12 @@ static const char* fragment_wgsl =
 "  let is_bitmap = (in.v_style_type & 0xF0u) == 0x40u;\n"
 "  let grad_layer = select(0, i32(in.v_style_id), is_gradient);\n"
 "  let bmp_layer = select(0, i32(in.v_style_id), is_bitmap);\n"
-"  // Gradients are packed as rows of a 256xN 2D texture (one ramp per row),\n"
-"  // not array layers — this avoids the 256 maxTextureArrayLayers cap that\n"
-"  // some adapters (e.g. SwiftShader) enforce. Sample at the row center so\n"
-"  // bilinear V-filtering lands fully on the selected ramp (no row bleed).\n"
-"  let grad_v = (f32(grad_layer) + 0.5) / f32(textureDimensions(gradient_tex).y);\n"
-"  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), grad_v));\n"
-"  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), grad_v));\n"
-"  let focal_sample = textureSample(gradient_tex, gradient_samp, vec2f(focal_radial_t(in.v_args), grad_v));\n"
+"  // Gradients are packed one ramp per ROW of a 256xN 2D texture (not array\n"
+"  // layers — avoids the 256 maxTextureArrayLayers cap on some adapters). Row\n"
+"  // is selected with textureLoad (exact, no V-filter bleed); see sample_gradient.\n"
+"  let linear_sample = sample_gradient(linear_t(in.v_args), grad_layer);\n"
+"  let radial_sample = sample_gradient(radial_t(in.v_args), grad_layer);\n"
+"  let focal_sample = sample_gradient(focal_radial_t(in.v_args), grad_layer);\n"
 "  let bitmap_sample = textureSample(bitmap_tex, bitmap_samp, in.v_args.xy, bmp_layer);\n"
 "  let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
 "  let bitmap_repeat_sample = textureSample(bitmap_tex, bitmap_samp, fract(in.v_args.xy / bm_ratio) * bm_ratio, bmp_layer);\n"
@@ -455,6 +469,7 @@ static void create_textures(WebGPURenderContext* ctx);
 static void create_pipelines(WebGPURenderContext* ctx);
 static void create_bind_groups(WebGPURenderContext* ctx);
 static void run_compute_pass(WebGPURenderContext* ctx);
+static int invert_4x4_matrix(const float m[16], float inv[16]);
 
 // ---------------------------------------------------------------------------
 // WASM mouse input callbacks (registered in render_webgpu_init)
@@ -1575,37 +1590,38 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 }
 
 // ---------------------------------------------------------------------------
-// run_compute_pass: invert gradient matrices on the GPU
+// run_compute_pass: invert the static gradient matrices (CPU).
+//
+// These were inverted in a GPU compute shader (mat4_inverse over the gradient
+// matrix array). That works on real GPUs and lavapipe, but SwiftShader (the
+// software WebGPU backend in WSL2 browsers) miscomputes it, leaving garbage in
+// inv_mat_buffer → every static gradient's coordinate transform is wrong and
+// the ramp smears across the whole stage (giant gray gradient over the menu).
+// The matrices are simple 2D affines, the count is small (hundreds), and this
+// runs once at init, so inverting them on the CPU — with the SAME
+// invert_4x4_matrix the dynamic-gradient path already uses — is both correct on
+// every adapter and negligibly cheap. The compute pipeline is left allocated
+// but unused.
 // ---------------------------------------------------------------------------
 static void run_compute_pass(WebGPURenderContext* ctx)
 {
 	size_t num_gradients = ctx->uninv_mat_data_size / (16 * sizeof(float));
 	if (num_gradients == 0) return;
 
-	// Upload uninverted matrix data
-	wgpuQueueWriteBuffer(ctx->queue, ctx->uninv_mat_buffer, 0,
-	                     ctx->uninv_mat_data, ctx->uninv_mat_data_size);
-
-	WGPUCommandEncoderDescriptor enc_desc = {0};
-	enc_desc.label = WGPU_LABEL("compute_encoder");
-	WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(ctx->device, &enc_desc);
-
-	WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
-	wgpuComputePassEncoderSetPipeline(pass, ctx->compute_pipeline);
-	wgpuComputePassEncoderSetBindGroup(pass, 0, ctx->compute_read_bg, 0, NULL);
-	wgpuComputePassEncoderSetBindGroup(pass, 1, ctx->compute_write_bg, 0, NULL);
-
-	u32 workgroups = (u32)((num_gradients + 63) / 64);
-	wgpuComputePassEncoderDispatchWorkgroups(pass, workgroups, 1, 1);
-	wgpuComputePassEncoderEnd(pass);
-
-	WGPUCommandBufferDescriptor cmd_desc = {0};
-	WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, &cmd_desc);
-	wgpuQueueSubmit(ctx->queue, 1, &cmd);
-
-	wgpuCommandBufferRelease(cmd);
-	wgpuComputePassEncoderRelease(pass);
-	wgpuCommandEncoderRelease(encoder);
+	const float* src = (const float*)ctx->uninv_mat_data;
+	float* inv = (float*)malloc(num_gradients * 16 * sizeof(float));
+	if (!inv) return;
+	for (size_t i = 0; i < num_gradients; i++)
+	{
+		if (!invert_4x4_matrix(src + i * 16, inv + i * 16))
+		{
+			// Singular — fall back to identity so the gradient is inert, not garbage.
+			for (int j = 0; j < 16; j++) inv[i * 16 + j] = (j % 5 == 0) ? 1.0f : 0.0f;
+		}
+	}
+	wgpuQueueWriteBuffer(ctx->queue, ctx->inv_mat_buffer, 0,
+	                     inv, num_gradients * 16 * sizeof(float));
+	free(inv);
 }
 
 // ---------------------------------------------------------------------------

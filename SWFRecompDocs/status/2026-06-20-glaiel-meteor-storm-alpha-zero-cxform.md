@@ -87,9 +87,43 @@ canvas. After: **0 WebGPU errors**, the canvas renders real game content. Gradie
 rendering verified unchanged on native: Meteor diff steady at ~1.7k (text-AA only),
 Reaction image-identical to Ruffle (tol 0/0).
 
-## Residual / follow-ups
+## Additional browser hardening (gradient path)
+
+While verifying in-browser, two more gradient-path changes were made — both
+native byte-identical (Reaction tol 0/0), so they don't change real-GPU output,
+but they remove fragile software-WebGPU dependencies:
+
+- **Gradient sampling via `textureLoad`** (exact integer row + manual U-lerp)
+  instead of `textureSample` with a computed V. Eliminates any chance of
+  bilinear V-filter bleed between row-packed ramps on adapters whose linear
+  filtering doesn't land exactly on the texel center.
+- **Static gradient-matrix inversion on the CPU** (the same `invert_4x4_matrix`
+  the dynamic path uses) instead of a GPU compute shader. SwiftShader's compute
+  backend is unreliable; the matrices are simple 2D affines inverted once at
+  init, so CPU inversion is both correct everywhere and trivially cheap. The
+  compute pipeline is left allocated but unused.
+
+## KNOWN REMAINING ISSUE — SwiftShader (WSL2 software WebGPU) renders solids gray
+
+On a real GPU (and native lavapipe) the demo renders correctly. On **SwiftShader**
+— Chrome's software WebGPU fallback, which is what WSL2 Chrome uses — the menu
+renders with all **solid fills shifted to gray** (black background → ~0.6 gray,
+colored text desaturated), so the page shows a mostly-gray screen with ghosted
+content.
+
+Root-caused (via in-browser fragment-shader probes — solid/gradient/bitmap color
+keying, cxform-add readout, raw-color readout) to the **`colors` storage buffer
+read**: the vertex shader's `out.v_args = colors[v_style_id]` returns the correct
+black (0,0,0) under native lavapipe but ~gray under SwiftShader, for the **same
+uploaded bytes** (`array<vec4f>`, 14328 entries / 224 KB — well under any limit).
+It is NOT a gradient, cxform-add, color-data, or buffer-size problem; it is a
+SwiftShader-specific storage-buffer read discrepancy. Pinning the exact trigger
+needs rasterizer-level debugging. Real-GPU browsers should be unaffected (they
+match native). Candidate workarounds if pursued: deliver vertex colors as a
+vertex attribute instead of a storage-buffer lookup, or split/repack the colors
+buffer. Distinct from the original alpha-zero bug, which is fully fixed.
 
 - **Bitmap** textures still use array layers — a game with > adapter-max distinct
-  bitmaps would hit the same wall on a 256-capped adapter (requiredLimits covers
+  bitmaps would hit the 256 cap on a 256-capped adapter (requiredLimits covers
   real GPUs but not SwiftShader). Same row/atlas treatment could be applied if a
   game surfaces it; none in the current corpus does.
