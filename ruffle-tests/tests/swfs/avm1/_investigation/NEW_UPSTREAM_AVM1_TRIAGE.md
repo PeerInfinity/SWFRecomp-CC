@@ -54,7 +54,7 @@ How the list was found: glob `**/test.swf` on disk minus the `test` names in
 | `set_property_values/swf6` | 92.9% | **BLOCKED** | Same source/blocker, SWF6 gates. See `blocked/SET_PROPERTY_VALUES_PLAN.md`. |
 | `set_property_values/swf7` | 92.9% | **BLOCKED** | Same source/blocker, SWF7 gates. See `blocked/SET_PROPERTY_VALUES_PLAN.md`. |
 | `set_property_values/swf4` | 22.3% | Large | Same source; `output.ruffle.txt` **present** so `ruffle_matched` reachable, but a much bigger, *separate* SWF4 gap (likely SWF4 property-number addressing) — not addressed by the swf5-7 quirk fixes. |
-| `coerce_to_primitive_resolve` | 72.7% | Small-medium | `__resolve`-through-`toString`/`valueOf` coercion ordering; a `[type Object]` line emitted out of order + one trailing line short. No ruffle file → full match. |
+| `coerce_to_primitive_resolve` | 72.7% | **BLOCKED** | Whole diff = **1 missing `[type Object]`** from `trace(obj3)` (throwing `addProperty` toString getter). Verified vs current Ruffle master: Ruffle's `coerce_to_string` **propagates** the getter throw → emits only "caught toString" = **our exact output**. `output.txt` is real-Flash (no `known_failure`, no ruffle file) capturing a Player quirk Ruffle doesn't reproduce → no oracle to validate against. See `blocked/COERCE_TO_PRIMITIVE_RESOLVE_PLAN.md`. |
 | `array_unshift` | 79.5% | Medium | Array `unshift` sparse/own-property + length semantics (gnash array-vN territory; see `[[array-shift-densify-enum]]`). No ruffle file. |
 | `array_reverse` | 66.4% | Medium | Array `reverse` sparse/own-property semantics. No ruffle file. |
 | `virtual_property_special_recursion_swf6` | 16.7% | Medium | `addProperty` getter/setter deep re-entry (the accessor analog of the watch fix). Two issues: setter arg order is swapped (`setter: ,b` vs expected `setter: b,`) and the recursion-fallback value/ordering differs. Uses the existing `g_active_accessors` machinery. |
@@ -62,7 +62,7 @@ How the list was found: glob `**/test.swf` on disk minus the `test` names in
 
 ## Recommended next targets
 
-1. **`coerce_to_primitive_resolve`** — smallest tractable gap (~1 effective line: a missing `[type Object]` from `trace(obj3)` when `toString` is a throwing `addProperty` getter, which then shifts the tail by one). Self-contained `__resolve`/coercion ordering, has `Test.as`. No RM shortcut. Needs the AVM1 object→string trace-coercion semantics nailed down (why Flash emits `[type Object]` *and* throws the toString error).
+1. ~~`coerce_to_primitive_resolve`~~ — **BLOCKED** (investigated 2026-06-19). 1 missing `[type Object]` line, but it's a real-Flash quirk Ruffle's own source doesn't reproduce (Ruffle output == ours), so no oracle to validate a fix. `blocked/COERCE_TO_PRIMITIVE_RESOLVE_PLAN.md`.
 2. **`virtual_property_special_recursion_swf6/double_swf6`** — adjacent to the just-landed watch fix; the setter-arg-order bug looks like a contained dispatch fix that may also help the `set`/`addProperty` family broadly.
 3. ~~`set_property_values/swf5-7`~~ — **BLOCKED/unpromotable** (float precision on `_x`/`_y`←Inf; no RM file). See `blocked/SET_PROPERTY_VALUES_PLAN.md`. Don't re-investigate.
 
