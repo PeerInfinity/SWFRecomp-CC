@@ -80,7 +80,8 @@ typedef struct WebGPURenderContext
 	WGPUSampler bitmap_sampler;
 
 	WGPUTexture dummy_tex;            // 1x1 fallback for empty gradient/bitmap
-	WGPUTextureView dummy_tex_view;
+	WGPUTextureView dummy_tex_view;  // 2D-array view (bitmap fallback)
+	WGPUTextureView dummy_tex_2d_view; // 2D view (gradient fallback)
 	WGPUSampler dummy_sampler;
 
 	WGPUTexture msaa_texture;

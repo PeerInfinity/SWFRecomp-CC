@@ -103,7 +103,7 @@ static const char* vertex_wgsl =
 static const char* fragment_wgsl =
 "@group(0) @binding(4) var<storage, read> cxforms: array<vec4f>;\n"
 "\n"
-"@group(2) @binding(0) var gradient_tex: texture_2d_array<f32>;\n"
+"@group(2) @binding(0) var gradient_tex: texture_2d<f32>;\n"
 "@group(2) @binding(1) var gradient_samp: sampler;\n"
 "@group(2) @binding(2) var bitmap_tex: texture_2d_array<f32>;\n"
 "@group(2) @binding(3) var bitmap_samp: sampler;\n"
@@ -173,9 +173,14 @@ static const char* fragment_wgsl =
 "  let is_bitmap = (in.v_style_type & 0xF0u) == 0x40u;\n"
 "  let grad_layer = select(0, i32(in.v_style_id), is_gradient);\n"
 "  let bmp_layer = select(0, i32(in.v_style_id), is_bitmap);\n"
-"  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), 0.5), grad_layer);\n"
-"  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), 0.5), grad_layer);\n"
-"  let focal_sample = textureSample(gradient_tex, gradient_samp, vec2f(focal_radial_t(in.v_args), 0.5), grad_layer);\n"
+"  // Gradients are packed as rows of a 256xN 2D texture (one ramp per row),\n"
+"  // not array layers — this avoids the 256 maxTextureArrayLayers cap that\n"
+"  // some adapters (e.g. SwiftShader) enforce. Sample at the row center so\n"
+"  // bilinear V-filtering lands fully on the selected ramp (no row bleed).\n"
+"  let grad_v = (f32(grad_layer) + 0.5) / f32(textureDimensions(gradient_tex).y);\n"
+"  let linear_sample = textureSample(gradient_tex, gradient_samp, vec2f(linear_t(in.v_args), grad_v));\n"
+"  let radial_sample = textureSample(gradient_tex, gradient_samp, vec2f(radial_t(in.v_args), grad_v));\n"
+"  let focal_sample = textureSample(gradient_tex, gradient_samp, vec2f(focal_radial_t(in.v_args), grad_v));\n"
 "  let bitmap_sample = textureSample(bitmap_tex, bitmap_samp, in.v_args.xy, bmp_layer);\n"
 "  let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
 "  let bitmap_repeat_sample = textureSample(bitmap_tex, bitmap_samp, fract(in.v_args.xy / bm_ratio) * bm_ratio, bmp_layer);\n"
@@ -414,6 +419,13 @@ static void create_dummy_texture(WebGPURenderContext* ctx)
 	view_desc.arrayLayerCount = 1;
 	view_desc.mipLevelCount = 1;
 	ctx->dummy_tex_view = wgpuTextureCreateView(ctx->dummy_tex, &view_desc);
+
+	// A plain 2D view of the same dummy, for the gradient binding (now texture_2d).
+	WGPUTextureViewDescriptor view2d_desc = {0};
+	view2d_desc.dimension = WGPUTextureViewDimension_2D;
+	view2d_desc.arrayLayerCount = 1;
+	view2d_desc.mipLevelCount = 1;
+	ctx->dummy_tex_2d_view = wgpuTextureCreateView(ctx->dummy_tex, &view2d_desc);
 
 	WGPUSamplerDescriptor samp_desc = {0};
 	samp_desc.label = WGPU_LABEL("dummy_sampler");
@@ -989,12 +1001,18 @@ static void create_textures(WebGPURenderContext* ctx)
 	if (total_gradient_layers == 0) total_gradient_layers = 1; // minimum 1 layer
 	ctx->static_gradient_count = (u32)num_gradients;
 
-	// --- Gradient texture array (always created, over-allocated for dynamic gradients) ---
+	// --- Gradient texture (always created, over-allocated for dynamic gradients) ---
+	// Each gradient ramp is 256x1 RGBA8. We pack one ramp per ROW of a single
+	// 256 x total_gradient_layers 2D texture rather than using array layers,
+	// because maxTextureArrayLayers is only 256 on some adapters (notably
+	// SwiftShader / WSL2 browsers) and content-heavy SWFs have far more
+	// gradients than that (e.g. Meteor Storm: 519). maxTextureDimension2D is
+	// 8192+, so the row-packed layout scales to thousands of gradients.
 	{
 		WGPUTextureDescriptor tex_desc = {0};
 		tex_desc.label = WGPU_LABEL("gradient_tex");
 		tex_desc.dimension = WGPUTextureDimension_2D;
-		tex_desc.size = (WGPUExtent3D){256, 1, total_gradient_layers};
+		tex_desc.size = (WGPUExtent3D){256, total_gradient_layers, 1};
 		tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
 		tex_desc.mipLevelCount = 1;
 		tex_desc.sampleCount = 1;
@@ -1002,20 +1020,21 @@ static void create_textures(WebGPURenderContext* ctx)
 		ctx->gradient_tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
 
 		WGPUTextureViewDescriptor view_desc = {0};
-		view_desc.dimension = WGPUTextureViewDimension_2DArray;
-		view_desc.arrayLayerCount = total_gradient_layers;
+		view_desc.dimension = WGPUTextureViewDimension_2D;
+		view_desc.arrayLayerCount = 1;
 		view_desc.mipLevelCount = 1;
 		ctx->gradient_tex_view = wgpuTextureCreateView(ctx->gradient_tex, &view_desc);
 
-		// Upload static gradient data
+		// Upload static gradient data — consecutive 256-texel ramps map to
+		// consecutive rows (bytesPerRow = one ramp, rowsPerImage = ramp count).
 		if (num_gradients > 0)
 		{
 			WGPUTexelCopyTextureInfo dest = {0};
 			dest.texture = ctx->gradient_tex;
 			WGPUTexelCopyBufferLayout layout = {0};
 			layout.bytesPerRow = 256 * 4;
-			layout.rowsPerImage = 1;
-			WGPUExtent3D extent = {256, 1, (u32)num_gradients};
+			layout.rowsPerImage = (u32)num_gradients;
+			WGPUExtent3D extent = {256, (u32)num_gradients, 1};
 			wgpuQueueWriteTexture(ctx->queue, &dest, ctx->gradient_data,
 			                      num_gradients * 256 * 4, &layout, &extent);
 		}
@@ -1155,7 +1174,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	bg2_entries[0].binding = 0;
 	bg2_entries[0].visibility = WGPUShaderStage_Fragment;
 	bg2_entries[0].texture.sampleType = WGPUTextureSampleType_Float;
-	bg2_entries[0].texture.viewDimension = WGPUTextureViewDimension_2DArray;
+	bg2_entries[0].texture.viewDimension = WGPUTextureViewDimension_2D;  // gradient_tex: 256xN rows
 	bg2_entries[1].binding = 1;
 	bg2_entries[1].visibility = WGPUShaderStage_Fragment;
 	bg2_entries[1].sampler.type = WGPUSamplerBindingType_Filtering;
@@ -1503,7 +1522,7 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 
 	// --- Group 2: fragment textures + samplers ---
 	// Use dummy textures as fallback when gradients/bitmaps are absent
-	WGPUTextureView grad_view = ctx->gradient_tex_view ? ctx->gradient_tex_view : ctx->dummy_tex_view;
+	WGPUTextureView grad_view = ctx->gradient_tex_view ? ctx->gradient_tex_view : ctx->dummy_tex_2d_view;
 	WGPUSampler grad_samp = ctx->gradient_sampler ? ctx->gradient_sampler : ctx->dummy_sampler;
 	WGPUTextureView bmp_view = ctx->bitmap_tex_view ? ctx->bitmap_tex_view : ctx->dummy_tex_view;
 	WGPUSampler bmp_samp = ctx->bitmap_sampler ? ctx->bitmap_sampler : ctx->dummy_sampler;
@@ -1928,15 +1947,15 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 		vertex_count = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
 	if (vertex_count == 0) return;
 
-	// Allocate a gradient layer (after all static gradients)
+	// Allocate a gradient row (after all static gradients)
 	u32 grad_id = ctx->static_gradient_count + ctx->dynamic_gradient_used;
 	ctx->dynamic_gradient_used++;
 
-	// Upload gradient ramp to this texture layer
+	// Upload gradient ramp to this texture row
 	{
 		WGPUTexelCopyTextureInfo dest = {0};
 		dest.texture = ctx->gradient_tex;
-		dest.origin = (WGPUOrigin3D){0, 0, grad_id};
+		dest.origin = (WGPUOrigin3D){0, grad_id, 0};
 		WGPUTexelCopyBufferLayout layout = {0};
 		layout.bytesPerRow = 256 * 4;
 		layout.rowsPerImage = 1;
@@ -3218,6 +3237,7 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->bitmap_tex) wgpuTextureRelease(ctx->bitmap_tex);
 	if (ctx->bitmap_sampler) wgpuSamplerRelease(ctx->bitmap_sampler);
 	if (ctx->dummy_tex_view) wgpuTextureViewRelease(ctx->dummy_tex_view);
+	if (ctx->dummy_tex_2d_view) wgpuTextureViewRelease(ctx->dummy_tex_2d_view);
 	if (ctx->dummy_tex) wgpuTextureRelease(ctx->dummy_tex);
 	if (ctx->dummy_sampler) wgpuSamplerRelease(ctx->dummy_sampler);
 	if (ctx->msaa_view) wgpuTextureViewRelease(ctx->msaa_view);
