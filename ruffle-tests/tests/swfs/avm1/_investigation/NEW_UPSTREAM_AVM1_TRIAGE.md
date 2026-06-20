@@ -50,10 +50,10 @@ How the list was found: glob `**/test.swf` on disk minus the `test` names in
 
 | Test | % | Effort | Notes |
 |------|---|--------|-------|
-| `set_property_values/swf5` | 92.9% | Medium-large | Per-property value coercion/clamping. e.g. extreme sets should read back `-107374182.4` (= INT_MIN twips ÷ 20) but we return 0; some sets should reject (read 0/1) but we keep 10. **No `output.ruffle.txt` → needs full match** (123 lines). |
-| `set_property_values/swf6` | 92.9% | Medium-large | Same source, SWF6 gates. |
-| `set_property_values/swf7` | 92.9% | Medium-large | Same source, SWF7 gates. |
-| `set_property_values/swf4` | 22.3% | Large | Same source but a much bigger SWF4 gap (likely SWF4 property-number addressing). |
+| `set_property_values/swf5` | 92.9% | **BLOCKED** | **Unpromotable** — full PASS needs `_x`/`_y`←Inf to read back `-107374182.4` (INT_MIN/20, 9 sig figs) but `mc->x/.y` are `float` → `-107374184`. No `output.ruffle.txt`. ~111 other lines are fixable coercion quirks on the shared setProperty hot path. Full quirk map + plan: `blocked/SET_PROPERTY_VALUES_PLAN.md` (2026-06-19). |
+| `set_property_values/swf6` | 92.9% | **BLOCKED** | Same source/blocker, SWF6 gates. See `blocked/SET_PROPERTY_VALUES_PLAN.md`. |
+| `set_property_values/swf7` | 92.9% | **BLOCKED** | Same source/blocker, SWF7 gates. See `blocked/SET_PROPERTY_VALUES_PLAN.md`. |
+| `set_property_values/swf4` | 22.3% | Large | Same source; `output.ruffle.txt` **present** so `ruffle_matched` reachable, but a much bigger, *separate* SWF4 gap (likely SWF4 property-number addressing) — not addressed by the swf5-7 quirk fixes. |
 | `coerce_to_primitive_resolve` | 72.7% | Small-medium | `__resolve`-through-`toString`/`valueOf` coercion ordering; a `[type Object]` line emitted out of order + one trailing line short. No ruffle file → full match. |
 | `array_unshift` | 79.5% | Medium | Array `unshift` sparse/own-property + length semantics (gnash array-vN territory; see `[[array-shift-densify-enum]]`). No ruffle file. |
 | `array_reverse` | 66.4% | Medium | Array `reverse` sparse/own-property semantics. No ruffle file. |
@@ -62,8 +62,8 @@ How the list was found: glob `**/test.swf` on disk minus the `test` names in
 
 ## Recommended next targets
 
-1. **`coerce_to_primitive_resolve`** — smallest tractable gap (~6 lines), self-contained `__resolve`/coercion ordering.
+1. **`coerce_to_primitive_resolve`** — smallest tractable gap (~1 effective line: a missing `[type Object]` from `trace(obj3)` when `toString` is a throwing `addProperty` getter, which then shifts the tail by one). Self-contained `__resolve`/coercion ordering, has `Test.as`. No RM shortcut. Needs the AVM1 object→string trace-coercion semantics nailed down (why Flash emits `[type Object]` *and* throws the toString error).
 2. **`virtual_property_special_recursion_swf6/double_swf6`** — adjacent to the just-landed watch fix; the setter-arg-order bug looks like a contained dispatch fix that may also help the `set`/`addProperty` family broadly.
-3. **`set_property_values/swf5-7`** — 93% and self-contained, but a full-match line grind (twips overflow + per-property reject rules) with no RM shortcut.
+3. ~~`set_property_values/swf5-7`~~ — **BLOCKED/unpromotable** (float precision on `_x`/`_y`←Inf; no RM file). See `blocked/SET_PROPERTY_VALUES_PLAN.md`. Don't re-investigate.
 
 Bucket A is genuinely blocked on infrastructure (AMF codec, file-dialog input, multi-SWF child frames) — low ROI until a shipped game or a larger test cohort needs those subsystems.

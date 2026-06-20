@@ -8,6 +8,19 @@ This document catalogs the root-cause blockers preventing further progress on th
 
 ## Active Blockers
 
+### Blocker 10: `setProperty` value coercion grind — swf5/6/7 unpromotable (float precision)
+
+`set_property_values/swf{5,6,7}` (1620/1743 ≈ 93%, no `output.ruffle.txt`) can
+**never** reach full PASS: `_x`/`_y` ← `±Infinity` must read back `-107374182.4`
+(= INT_MIN/20), but `MovieClip.x/.y` are `float` (~7 sig figs) so it reads back
+`-107374184`. Widening to `double` = out-of-scope cross-runtime change. The other
+~111 lines/variant are real, fixable coercion quirks (string strict-parse,
+`_alpha` truncation, `_name` toString, per-property ±Inf routing) but sit on the
+shared `actionSetProperty`/`actionGetProperty` hot path (CI-gated, multi-cycle)
+and yield **zero swf5-7 promotions** because of the float blocker. swf4 (22%) has
+a *separate, larger* SWF4 property-addressing gap. Full decoded quirk map +
+fix plan: `blocked/SET_PROPERTY_VALUES_PLAN.md`. Diagnosed 2026-06-19.
+
 ### ~~Blocker 1: Font Metrics / Text Layout Accuracy~~ — RESOLVED
 
 **Resolved 2026-03-14.** All font metrics tests now pass (TEXTFIELD_PLAN complete, 62/62). Key fixes:
@@ -254,3 +267,4 @@ full CI).
 | IGNORED_INFRASTRUCTURE_TESTS | 23 | 0/23 | Network/external infra (Blocker 7) |
 | TELLTARGET_PLAN | 22 | 19/22 | Duplicate onPress (Blocker 9), 2 accepted/ignored |
 | UNCOVERED_SMALL_TESTS_PLAN | 19 | 13/19 | 0 actionable; 6 blocked on external features |
+| SET_PROPERTY_VALUES_PLAN | 4 | 0/4 promotable | swf5-7 float-precision blocker (Blocker 10); swf4 separate SWF4 gap |
