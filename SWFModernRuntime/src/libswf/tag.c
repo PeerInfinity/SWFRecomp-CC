@@ -4634,6 +4634,26 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 
 	DisplayObject* d = (DisplayObject*)mc->display_obj;
 	if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) return;
+	// Skip timeline-placed NESTED children. The global-display_list guard above
+	// only catches ROOT timeline children; a sprite nested inside another sprite
+	// has its display_obj inside an ANCESTOR's sprite_display_list (not the
+	// global one), yet it is ALREADY composed and drawn by that ancestor's
+	// recursive render from the main display loop. Re-processing it here composes
+	// its subtree a SECOND time — and because the first compose already rewrote
+	// each entry's transform_id to a dynamic GPU slot, this second compose reads
+	// those dynamic slots as CPU-side transform_data indices (out of bounds) and
+	// produces garbage matrices, drawing the subtree again as exploded geometry
+	// on top of the correct render. (Meteor Storm's menu: char 23 nested in 24,
+	// char 19/22 nested in 23.) Genuine attachMovie children are exempt:
+	// ng_attachMovie gives them a STANDALONE display_obj that lives in no
+	// sprite_display_list, so this never matches them (e.g. Tetris board cells).
+	for (MovieClip* anc = mc->parent; anc != NULL && anc != &root_movieclip; anc = anc->parent) {
+		DisplayObject* ad = (DisplayObject*)anc->display_obj;
+		if (ad == NULL || ad->sprite_display_list == NULL) continue;
+		uintptr_t alo = (uintptr_t)ad->sprite_display_list;
+		uintptr_t ahi = alo + (uintptr_t)ad->sprite_dl_capacity * sizeof(DisplayObject);
+		if (dobj >= alo && dobj < ahi) return;
+	}
 	// Skip clips whose parent chain is hidden.
 	for (MovieClip* _a = mc->parent; _a != NULL && _a != &root_movieclip; _a = _a->parent)
 		if (!_a->visible) return;

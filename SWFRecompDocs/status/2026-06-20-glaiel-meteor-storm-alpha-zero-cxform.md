@@ -103,14 +103,70 @@ but they remove fragile software-WebGPU dependencies:
   init, so CPU inversion is both correct everywhere and trivially cheap. The
   compute pipeline is left allocated but unused.
 
-## KNOWN REMAINING ISSUE — browser-WASM menu renders corrupt (all browsers)
+## FIXED — browser-WASM menu rendered corrupt (nested timeline sprite re-composed by render_attached_child)
 
-After the alpha-zero fix the demo renders, but the **menu** screen (after the
-loading screen) renders as a mostly-gray mess with exploded geometry. The user
-confirmed this on **Windows Firefox AND Chrome** (real GPUs) — so it is NOT a
-SwiftShader/WSL2 software-rasterizer issue (an earlier draft of this section
-wrongly concluded that). It is a deterministic browser-WASM rendering bug. The
-**loading screen renders correctly** in the browser; only the later menu is wrong.
+**Status: FIXED** (`tag.c` `render_attached_child`, browser-WASM-only, CI byte-identical).
+
+### Symptom (now resolved)
+After the alpha-zero fix the demo rendered, but the **menu** screen (after the
+loading screen) rendered as a mostly-gray mess with exploded geometry over the
+real (faint) content. Reproduced on Windows Firefox AND Chrome (real GPUs) — a
+deterministic browser-WASM rendering bug, not a SwiftShader artifact.
+
+### Root cause
+`render_attached_child` (browser-WASM render path) is meant to draw
+`child_mc_cache` clips attached via `attachMovie` to a non-root parent. Its only
+"already-drawn, skip me" guard checked whether the clip's `display_obj` points
+into the **global** display_list (i.e. a ROOT timeline child). But the menu has
+sprites nested inside sprites (`char 23` inside `char 24` inside _root; `char 19`/
+`char 22` inside `char 23`). Those timeline-placed NESTED sprites had also landed
+in `child_mc_cache`, and their `display_obj` points into an **ancestor sprite's**
+`sprite_display_list`, not the global one — so the guard didn't skip them.
+
+Consequence per menu tick:
+1. The main compose loop composed `char 24`'s subtree, assigning each entry a
+   fresh dynamic GPU transform slot (562–578) and rewriting `obj->transform_id`
+   to it. The main render loop's recursive `render_display_list(char 24)` then
+   drew the subtree **correctly** (the faint content behind).
+2. `render_attached_child` then fired for `char 23`/`19`/`22` and called
+   `compose_children` on the **same** entries a second time. This pass read
+   `obj->transform_id` — now the dynamic slot from step 1 (564, 565, …) — and,
+   since those are `>= orig_transform_count`, took the "dynamic GPU slot →
+   build-from-AS-state / identity" branch, producing garbage matrices written to
+   slots 583–601, then `render_display_list` drew the subtree again as exploded
+   geometry on top.
+
+Captured via a temporary `tag.c` draw-stream dump (stripped before commit),
+comparing the live `tagShowFrame` (browser) path against the capture
+`tagRerenderFrame` (native) path in the OFFSCREEN build, then confirmed in-browser
+(headless SwiftShader console capture) where the live path showed 19 bogus
+non-root composes/tick reading already-dynamic transform_ids.
+
+### Fix
+In `render_attached_child`, after the global-display_list guard, walk the MC's
+ancestor chain and `return` if its `display_obj` falls within any ancestor's
+`sprite_display_list` range — i.e. it's a timeline-placed nested child already
+composed+drawn by the ancestor's recursive render. Genuine `attachMovie` children
+are unaffected: `ng_attachMovie` gives them a STANDALONE `display_obj` that lives
+in no `sprite_display_list` (e.g. Tetris board cells still render).
+
+### Verification (deterministic, GPU-independent)
+In-browser console counters (headless SwiftShader, menu ticks):
+- bogus non-root `render_attached_child` composes: **19/tick → 0**
+- composes reading an already-dynamic transform_id (garbage): **~19/tick → 0**
+- nested timeline sprites now correctly skipped by the new guard: 5/tick.
+
+OFFSCREEN/HEADLESS are byte-identical: those modes only ever call
+`render_attached_child` for root-parented clips (the post-loop pass guards
+`mc->parent != &root_movieclip`), so the new ancestor loop never executes there.
+NO_GRAPHICS doesn't compile `render_attached_child`. Native Meteor harness re-run:
+rc=0, loading screen unchanged. Not CI-dispatched (browser-WASM-only,
+non-observable).
+
+Pixel capture note: an animating WebGPU canvas can't be screenshotted in this
+WSL2 headless setup (`locator.screenshot`/full-page both hang on the stability
+wait; `drawImage`→`toDataURL` returns blank-white under software WebGPU). Console
+draw-stream capture is the reliable, GPU-independent verification path here.
 
 Characterized via end-of-shader fragment probes (the only valid placement — an
 early `return` before the unconditional `textureSample` calls is a WGSL
