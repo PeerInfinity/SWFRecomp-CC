@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T22:05:01.953201+00:00",
-    "old_git_sha": "fe0030e4fc7dc5e760a8fc572f7294ae410ac33b",
-    "new_timestamp": "2026-06-20T19:39:30.156959+00:00",
-    "new_git_sha": "6e0b2fc8f8b0a2de02e9726d93806e664e3324bb",
+    "old_timestamp": "2026-06-20T20:13:58.751976+00:00",
+    "old_git_sha": "6dcffb0b490f158773897a10341b5252ae88c3e6",
+    "new_timestamp": "2026-06-20T21:16:02.974862+00:00",
+    "new_git_sha": "6dcffb0b490f158773897a10341b5252ae88c3e6",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 34,
+    "old_pass": 46,
     "old_ruffle_matched": 1,
-    "old_effective_pass": 35,
-    "old_total": 35,
-    "old_pass_rate": 97.1,
+    "old_effective_pass": 47,
+    "old_total": 47,
+    "old_pass_rate": 97.9,
     "new_pass": 46,
     "new_ruffle_matched": 1,
     "new_effective_pass": 47,
@@ -25,154 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 35,
-    "added": 12,
+    "unchanged": 47,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "duplicateMovieClip/duplicateMovieClip",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "duplicateMovieClip/name-coercion",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "duplicateMovieClip/samedepth",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "externalinterface",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "label",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "levels",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "property-paths/property-paths-7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "propertycase/propertycase",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "settimeout",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "textfield/textfield-html",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "textfield/textfield-text-setters",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "watch",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    }
-  ]
+  "changes": []
 }
