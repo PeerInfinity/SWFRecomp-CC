@@ -103,25 +103,48 @@ but they remove fragile software-WebGPU dependencies:
   init, so CPU inversion is both correct everywhere and trivially cheap. The
   compute pipeline is left allocated but unused.
 
-## KNOWN REMAINING ISSUE — SwiftShader (WSL2 software WebGPU) renders solids gray
+## KNOWN REMAINING ISSUE — browser-WASM menu renders corrupt (all browsers)
 
-On a real GPU (and native lavapipe) the demo renders correctly. On **SwiftShader**
-— Chrome's software WebGPU fallback, which is what WSL2 Chrome uses — the menu
-renders with all **solid fills shifted to gray** (black background → ~0.6 gray,
-colored text desaturated), so the page shows a mostly-gray screen with ghosted
-content.
+After the alpha-zero fix the demo renders, but the **menu** screen (after the
+loading screen) renders as a mostly-gray mess with exploded geometry. The user
+confirmed this on **Windows Firefox AND Chrome** (real GPUs) — so it is NOT a
+SwiftShader/WSL2 software-rasterizer issue (an earlier draft of this section
+wrongly concluded that). It is a deterministic browser-WASM rendering bug. The
+**loading screen renders correctly** in the browser; only the later menu is wrong.
 
-Root-caused (via in-browser fragment-shader probes — solid/gradient/bitmap color
-keying, cxform-add readout, raw-color readout) to the **`colors` storage buffer
-read**: the vertex shader's `out.v_args = colors[v_style_id]` returns the correct
-black (0,0,0) under native lavapipe but ~gray under SwiftShader, for the **same
-uploaded bytes** (`array<vec4f>`, 14328 entries / 224 KB — well under any limit).
-It is NOT a gradient, cxform-add, color-data, or buffer-size problem; it is a
-SwiftShader-specific storage-buffer read discrepancy. Pinning the exact trigger
-needs rasterizer-level debugging. Real-GPU browsers should be unaffected (they
-match native). Candidate workarounds if pursued: deliver vertex colors as a
-vertex attribute instead of a storage-buffer lookup, or split/repack the colors
-buffer. Distinct from the original alpha-zero bug, which is fully fixed.
+Characterized via end-of-shader fragment probes (the only valid placement — an
+early `return` before the unconditional `textureSample` calls is a WGSL
+"uniform control flow" compile error, which silently rendered (0,0,0,0) and
+produced several **bogus "everything reads 0"** intermediate results before this
+was caught). Comparing native (lavapipe, OFFSCREEN capture) vs browser on the
+**same original SWF** (injected-vs-original confound eliminated) at the static
+menu:
+
+| signal (solid fills) | native | browser |
+|---|---|---|
+| vertex `style_id` (color index) | 246 / 20 / 469 (varied) | **487 / 486** dominant + OOB 14348 |
+| `transform_id` (from `instance_index`) | **22** (static slot, ~75% coverage) | **600 / 601** (dynamic slots) |
+
+So in the browser the menu's shapes are routed through **high/dynamic transform
+slots holding bad matrices** (→ giant exploded triangles) and read **different
+style indices**. Both are wrong, consistently.
+
+**Leading hypothesis:** the native test harness captures via `tagRerenderFrame`
+(an OFFSCREEN/capture-only path that re-composes transforms into dynamic slots its
+own way), while the **browser's live render loop uses a different
+transform-composition path** (`tagShowFrame` / per-frame compose). The harness
+therefore never exercises the path the browser actually runs — a classic
+browser-WASM-only bug that CI/divergence cannot see (cf. the browser-WASM notes in
+project memory). The loading screen working but the menu not is consistent with a
+defect that surfaces once dynamic transform composition / deeper display lists
+kick in.
+
+**Next step (needs C-side instrumentation, not shader probes):** dump the live
+draw stream (per-shape `transform_id`, `cxform_id`, vertex offset, and the
+composed matrix at `transforms[transform_id]`) from the browser path and diff
+against the capture path for the menu frame; find where a menu shape's
+`transform_id` diverges and which composition step writes the bad dynamic-slot
+matrix. Distinct from the original alpha-zero bug, which is fully fixed.
 
 - **Bitmap** textures still use array layers — a game with > adapter-max distinct
   bitmaps would hit the 256 cap on a 256-capped adapter (requiredLimits covers
