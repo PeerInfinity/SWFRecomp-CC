@@ -1,322 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-18T22:05:01.956315+00:00",
-    "old_git_sha": "fe0030e4fc7dc5e760a8fc572f7294ae410ac33b",
-    "new_timestamp": "2026-06-20T19:39:30.161162+00:00",
-    "new_git_sha": "6e0b2fc8f8b0a2de02e9726d93806e664e3324bb",
+    "old_timestamp": "2026-06-20T19:39:30.161162+00:00",
+    "old_git_sha": "6e0b2fc8f8b0a2de02e9726d93806e664e3324bb",
+    "new_timestamp": "2026-06-20T20:13:58.754292+00:00",
+    "new_git_sha": "6dcffb0b490f158773897a10341b5252ae88c3e6",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 56,
-    "old_ruffle_matched": 1,
-    "old_effective_pass": 57,
-    "old_total": 68,
-    "old_pass_rate": 82.4,
+    "old_pass": 73,
+    "old_ruffle_matched": 3,
+    "old_effective_pass": 76,
+    "old_total": 92,
+    "old_pass_rate": 79.3,
     "new_pass": 73,
     "new_ruffle_matched": 3,
     "new_effective_pass": 76,
     "new_total": 92,
     "new_pass_rate": 79.3,
-    "old_mismatched_lines": 302,
+    "old_mismatched_lines": 394,
     "new_mismatched_lines": 394,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 68,
-    "added": 24,
+    "unchanged": 92,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm1/haxe/flocons1",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm1/haxe/flocons2",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "avm1/hitarea",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 4,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm1/label",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "avm1/levels",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "avm1/loadevent",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "avm1/nested-button",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "avm1/operations",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      }
-    },
-    {
-      "test": "avm1/property-paths/property-paths-6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "avm1/watch",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm1/xml/xmlbuild",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "avm1/xml/xmlload",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "fuzz/2f4f46bf21d6cd33a751b090ad97552e8cdd8f7a606e7f0796deba04abb2e229",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 96,
-        "expected_lines": 70,
-        "matching_lines": 29
-      }
-    },
-    {
-      "test": "fuzz/81004241e3a9278ee3c26c5d7d04a3677e7a28618dd0dd2ad041a98374a280f0",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 38,
-        "expected_lines": 31,
-        "matching_lines": 18
-      }
-    },
-    {
-      "test": "fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "fuzz/a86fee6d68f77c63cd83f33d136be2c48f0ab7ab0414a93a0b711ec2a19c6883",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "fuzz/ac649dcf28572cc8250759cc0f8571a4111361fb6923db34ff02901095cdc580",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 28,
-        "expected_lines": 25,
-        "matching_lines": 14
-      }
-    },
-    {
-      "test": "fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 32,
-        "expected_lines": 22,
-        "matching_lines": 16
-      }
-    },
-    {
-      "test": "fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 14
-      }
-    },
-    {
-      "test": "fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 26,
-        "expected_lines": 24,
-        "matching_lines": 10
-      }
-    }
-  ]
+  "changes": []
 }
