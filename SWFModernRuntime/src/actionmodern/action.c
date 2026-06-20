@@ -25740,10 +25740,48 @@ static float mcReadAlpha(MovieClip* mc) {
 	return mc->alpha;
 }
 
+// Sync a nested clip's cached _x/_y/_xscale/_yscale/_rotation/_skew from its
+// linked display entry (mc->display_obj). Used when the root-only
+// ng_findDisplayEntryByName can't locate a clip nested in a parent sprite's
+// sub-display-list — without this a motion-tweened nested clip reads a frozen
+// _xscale/_x while its _alpha (read via mcReadAlpha straight off mc->display_obj)
+// tracks. ng_cache_transform populates place_a..place_ty on the entry at
+// placement/modify time using the correct g_active_transform_data table, so the
+// per-frame tween matrix is available here even though the root scan misses it.
+static void syncTransformFromDisplayObj(MovieClip* mc) {
+	DisplayObject* obj = (mc != NULL) ? (DisplayObject*)mc->display_obj : NULL;
+	if (obj == NULL) return;
+	float a = obj->place_a, b = obj->place_b, c = obj->place_c, d = obj->place_d;
+	// All-zero = the entry's transform was never cached (zero-initialized slot):
+	// don't clobber the MC's existing values with a degenerate scale-0 matrix.
+	if (a == 0.0f && b == 0.0f && c == 0.0f && d == 0.0f) return;
+	if (obj->transform_id == mc->last_transform_id) return;
+	if (!(mc->as_set_flags & 1)) mc->x = obj->place_tx / 20.0f;
+	if (!(mc->as_set_flags & 2)) mc->y = obj->place_ty / 20.0f;
+	float rot_x = atan2f(b, a);
+	float rot_y = atan2f(-c, d);
+	if (!(mc->as_set_flags & 4))  mc->xscale = sqrtf(a*a + b*b) * 100.0f;
+	if (!(mc->as_set_flags & 8))  mc->yscale = sqrtf(c*c + d*d) * 100.0f;
+	if (!(mc->as_set_flags & 16)) mc->rotation = normalizeRotation(rot_x * 180.0f / 3.14159265358979323846f);
+	if (!(mc->as_set_flags & (4|8|16))) mc->skew = rot_y - rot_x;
+	mc->last_transform_id = obj->transform_id;
+}
+
 static void syncTransformIfNeeded(MovieClip* mc) {
 	if (mc == NULL || mc->name[0] == '\0') return;
 	size_t depth = ng_findDisplayEntryByName(mc->name);
-	if (depth == SIZE_MAX) return;
+	if (depth == SIZE_MAX) {
+		// Nested clip: ng_findDisplayEntryByName only scans the ROOT display
+		// list, so a clip living in a parent sprite's sub-display-list is never
+		// found and its timeline-tweened matrix never reaches mc->xscale etc.
+		// (e.g. a motion-tweened nested sprite reads a frozen _xscale while its
+		// _alpha — read via mcReadAlpha straight off mc->display_obj — tracks).
+		// Fall back to the linked display entry: ng_cache_transform populates
+		// its place_a/b/c/d/tx/ty with the per-frame modify matrix (using the
+		// correct g_active_transform_data table), so decompose those directly.
+		syncTransformFromDisplayObj(mc);
+		return;
+	}
 	u32 tid;
 	if (!ng_getTransformId(depth, &tid)) return;
 	if (tid == mc->last_transform_id) return;
