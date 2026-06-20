@@ -31225,7 +31225,46 @@ void actionTrace(SWFAppContext* app_context)
 				break;
 			}
 			int ts_found = 0;
-			ActionVar ts = objectCallToString(app_context, &obj_var, &ts_found);
+			ActionVar ts = {0};
+			// Flash/Ruffle: trace() coerces the object via toString; if that
+			// coercion THROWS (e.g. a throwing addProperty getter), trace still
+			// prints the fallback "[type Object]" AND re-propagates the exception
+			// (Ruffle `action_trace`, activation.rs: on `coerce_to_string` Err it
+			// emits "[type Object]" then returns the error). Our coercion throws
+			// via setjmp/longjmp, which would otherwise unwind straight past this
+			// frame to the AS catch and skip the printed fallback — so install a
+			// local handler to mirror the print-then-propagate behavior.
+			{
+				u32 _tr_sp0 = SP; u32 _tr_sc0 = scope_depth;
+				int _tr_ed = g_exception_state.depth;
+				if (_tr_ed < MAX_EXCEPTION_DEPTH)
+				{
+					g_exception_state.frames[_tr_ed].saved_scope_depth = scope_depth;
+					g_exception_state.frames[_tr_ed].has_jmp_buf = 1;
+					if (setjmp(g_exception_state.frames[_tr_ed].handler) == 0)
+					{
+						g_exception_state.depth = _tr_ed + 1;
+						ts = objectCallToString(app_context, &obj_var, &ts_found);
+						g_exception_state.depth = _tr_ed;
+					}
+					else
+					{
+						ActionVar _tr_exc = g_exception_state.exception_value;
+						g_exception_state.depth = _tr_ed;
+						g_exception_state.exception_thrown = false;
+						scope_depth = _tr_sc0; SP = _tr_sp0;
+						printf("[type Object]\n");
+						// Re-propagate to the next outer handler (or uncaught).
+						pushVar(app_context, &_tr_exc);
+						actionThrow(app_context);
+						break; // not reached — actionThrow longjmps / aborts
+					}
+				}
+				else
+				{
+					ts = objectCallToString(app_context, &obj_var, &ts_found);
+				}
+			}
 			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
 			{
 				const uint16_t* u16 = varGetU16Ptr(&ts);

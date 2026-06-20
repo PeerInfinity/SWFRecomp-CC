@@ -1,6 +1,36 @@
-# coerce_to_primitive_resolve — blocked (Flash-only quirk Ruffle doesn't reproduce)
+# coerce_to_primitive_resolve — RESOLVED ✅
 
-**Status:** BLOCKED — needs unverifiable Flash-Player-specific behavior.
+**Status:** FIXED 2026-06-19 — now passes (22/22). The initial "blocked"
+diagnosis was wrong: it was based on a **stale `~/CC/ruffle` checkout** and a
+WebFetch that only inspected `coerce_to_string`/`search_prototype`. After updating
+the local Ruffle checkout, the real mechanism turned up in `action_trace` itself.
+
+## The fix
+
+Ruffle `activation.rs::action_trace`: when `coerce_to_string` returns `Err`, it
+prints the fallback `"[type Object]"` to the trace log **and** propagates the
+error:
+
+```rust
+match val.coerce_to_string(self) {
+    Ok(s) => ...,
+    Err(err) => { ctrl = Err(err); "[type Object]".into() } // print AND propagate
+}
+```
+
+Our `actionTrace` OBJECT case coerced via `objectCallToString`, whose throwing
+addProperty getter longjmps straight past `actionTrace` to the AS `catch` — so we
+never printed the fallback (missing line 17). Fix: wrap the coercion in a local
+`setjmp` frame (the established `g_exception_state` intercept idiom); on throw,
+`printf("[type Object]\n")` then re-propagate via `pushVar` + `actionThrow`.
+`action.c` OBJECT case in `actionTrace`. Verified: target 22/22; no regressions
+across trace/toString/try-catch/addProperty/native-object spot-checks.
+
+---
+
+_Original (incorrect) blocked diagnosis kept below for the record:_
+
+**Status:** ~~BLOCKED — needs unverifiable Flash-Player-specific behavior.~~
 **Diagnosed:** 2026-06-19 (verified against current Ruffle master source via web).
 
 ## The gap is exactly one line

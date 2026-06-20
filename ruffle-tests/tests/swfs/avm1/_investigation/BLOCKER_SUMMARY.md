@@ -21,17 +21,16 @@ and yield **zero swf5-7 promotions** because of the float blocker. swf4 (22%) ha
 a *separate, larger* SWF4 property-addressing gap. Full decoded quirk map +
 fix plan: `blocked/SET_PROPERTY_VALUES_PLAN.md`. Diagnosed 2026-06-19.
 
-### Blocker 11: `coerce_to_primitive_resolve` — Flash-only trace/toString quirk, no oracle
+### ~~Blocker 11: `coerce_to_primitive_resolve`~~ — RESOLVED 2026-06-19
 
-Whole 6-line diff = **one missing `[type Object]`** from `trace(obj3)` where
-`toString` is a throwing `addProperty` getter. Verified against current Ruffle
-master: `search_prototype` + `coerce_to_string` **propagate** the getter throw, so
-Ruffle emits only "caught toString" — **byte-identical to ours**. `output.txt` is
-real Flash (no `known_failure`, no `output.ruffle.txt`) capturing a Player quirk
-(emit default `[type Object]` *and* propagate the throw) that Ruffle doesn't
-reproduce. No reference to validate a fix against; risky on the shared
-`ActionTrace`/coercion path. Revisit only if upstream Ruffle implements it.
-`blocked/COERCE_TO_PRIMITIVE_RESOLVE_PLAN.md`. Diagnosed 2026-06-19.
+Whole 6-line diff was **one missing `[type Object]`** from `trace(obj3)` where
+`toString` is a throwing `addProperty` getter. The initial "no oracle" diagnosis
+was wrong — it relied on a **stale `~/CC/ruffle` checkout** and only inspected
+`coerce_to_string`/`search_prototype`. The real mechanism is in Ruffle's
+`action_trace`: on a `coerce_to_string` `Err` it prints fallback `[type Object]`
+**and** propagates the throw. FIXED by wrapping `actionTrace`'s object-coercion in
+a local `setjmp` frame that prints `[type Object]` then re-throws. Test 22/22,
+no regressions. `complete/COERCE_TO_PRIMITIVE_RESOLVE_PLAN.md`.
 
 ### ~~Blocker 1: Font Metrics / Text Layout Accuracy~~ — RESOLVED
 
@@ -280,4 +279,4 @@ full CI).
 | TELLTARGET_PLAN | 22 | 19/22 | Duplicate onPress (Blocker 9), 2 accepted/ignored |
 | UNCOVERED_SMALL_TESTS_PLAN | 19 | 13/19 | 0 actionable; 6 blocked on external features |
 | SET_PROPERTY_VALUES_PLAN | 4 | 0/4 promotable | swf5-7 float-precision blocker (Blocker 10); swf4 separate SWF4 gap |
-| COERCE_TO_PRIMITIVE_RESOLVE_PLAN | 1 | 0/1 | Flash-only trace/toString-throw quirk Ruffle doesn't reproduce (Blocker 11); no oracle |
+
