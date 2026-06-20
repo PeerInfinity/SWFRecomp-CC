@@ -1,88 +1,73 @@
-# Glaiel Meteor Storm — whole-stage alpha=0 (malformed placement cxform) — DEFERRED
+# Glaiel Meteor Storm — whole-stage alpha=0 (runtime cxform-alpha render bug) — DEFERRED
 
-**Date:** 2026-06-20
+**Date:** 2026-06-20 (root cause corrected same day)
 **Game:** glaiel `Meteor Storm` (177KB, AVM1/AS2)
-**Bucket:** headless-diagnosable (image), but root cause is recompiler cxform emission.
-**Status:** NOT fixed — logged as a follow-up.
+**Bucket:** render bug (browser-visible — user confirmed plain white canvas).
+**Status:** NOT fixed — root-caused to the runtime render cxform path; deferred.
 
 ## Symptom
 
 `divergence_test.py "Meteor Storm.swf" --frames 16` → **Trace identical
-(199/199)** (logic perfect). Image F1 diverges with 256966 outliers / max_diff 255
-across the *whole* frame.
+(199/199)** (logic perfect). Image: the whole offscreen frame is **alpha=0
+(transparent)** with correct RGB (black bg + white "Loading"/bar/"GlaielGames.com"
+text). In the **browser** the canvas composites with alpha, so the page shows
+through → **plain white canvas** (confirmed by the user). Reaction/Pong (no root
+cxform) render alpha=255.
 
-The RGB content is **correct** (black background + white "Loading" / loading bar /
-"GlaielGames.com" logo, matching Ruffle). The divergence is purely the **alpha
-channel**: SWFRecomp's offscreen framebuffer is **alpha=0 (fully transparent)
-everywhere**, while Ruffle's is alpha=255 (opaque). Composited on the white PNG
-viewer background, transparent → white, so it *looks* blank. Confirmed:
-Reaction/Pong output alpha=255; Meteor Storm alpha min=max=0 across all 16 frames.
+## Root cause — it is NOT the recompiler (earlier note was wrong)
 
-## Lead (root cause, unconfirmed end-to-end)
-
-The loading screen is one sprite `char 8` (`sprite_44`) placed at root depth 1
-**with a color transform**: `tagPlaceObject2(app_context, 1, 8, 21, 2, 0, 0)` →
-`cxform_id=2`. (Reaction, which renders opaque, places its root content with
-`cxform_id=0` = none.)
-
-`cxform_data` entry 2 is **malformed**. Layout is 20 floats per entry, diagonal
-multipliers at cx[0]/cx[5]/cx[10]/cx[15] and adds at cx[16..19]
-(`ng_init_cxform_from_data`, tag_stubs.c:764). Entry 0 (identity) is clean
-(`1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1, 0,0,0,0`). Entry 2 is
-`0,255,0,0, 256,0,0,0, 0,0,256,0, 0,0,0,0, 256,0,0,0` — i.e. **alpha-mult cx[15]=0**
-(→ whole sprite alpha 0) and **out-of-range mults** (cx[10]=256, cx[16]=256 where
-≤1.0 is expected; `roundf(256*256)` overflows the int16 cast). Entry 1 is likewise
-off. So the recompiler's cxform emission is wrong for this SWF — the values look
-mis-scaled / mis-strided (some entries use ×256, identity uses ×1).
-
-Curiously the **RGB stays correct** even though cx[0]=cx[5]=0 for entry 2 (which
-would black-out RGB if applied) — so the malformed cxform's alpha component
-reaches the framebuffer alpha but its RGB component does not, suggesting only the
-alpha path consumes the bad value (or the visible white text is a sub-element not
-under this cxform). Needs render-pipeline tracing to pin which.
-
-## Why deferred
-
-- Trace identical + RGB correct → low functional impact headless; the open question
-  is whether it makes the game invisible **in-browser** (canvas alphaMode), which
-  needs a browser check.
-- Root cause is in the **recompiler's CXFORMWITHALPHA decode/emit** for this SWF's
-  format — a focused recompiler investigation, not a one-liner, and SWF-specific
-  (Reaction/Pong/most games use cxform_id=0 on their root and are unaffected).
-
-## SWF ground truth (ffdec dump)
-
-The placement IS a CXFORMWITHALPHA (confirmed via `ffdec.jar -dumpSWF`):
+The loading screen is sprite `char 8` (`sprite_44`) placed at root depth 1 with a
+**CXFORMWITHALPHA**:
 ```
 PlaceObject2 (chid: 8, dpt: 1) len=21
-  0e 01 00 08 00  1c a2 81 dc 80 e8  00 00 00 04 00 ff 3f cf f0 00
+  0e 01 00 08 00  1c a2 81 dc 80 e8 00 00 00 04 00 ff 3f cf f0 00
 ```
-flags `0e` = HasCharacter(2)+HasMatrix(4)+HasColorTransform(8). depth=1, char=8.
-The matrix (`1c a2 81 dc 80 e8 …`) is bit-packed **translate-only** (HasScale=0,
-HasRotate=0, NTranslateBits=14, tx=5200/ty=3812 twips). **The matrix decode is
-CORRECT** — the recompiler emitted `transform[21] = [1,0,0,0, 0,1,0,0, 0,0,1,0,
-5200,3812,0,1]`, matching a hand bit-decode exactly. So the CXFORM read starts at
-the right bit offset (just past the 35-bit matrix). The garbage is therefore in
-the **CXFORMWITHALPHA decode itself**, not matrix misalignment. The cxform spans
-the remaining ~11 bytes (`80(part) e8 00 00 00 04 00 ff 3f cf f0 00`) — a
-substantial transform (HasMult+HasAdd with a wide NBits), NOT identity — and the
-recompiler turned it into entry 2 with mults of 256 (over-range) + alpha-mult 0.
-**Bit-trace `swf.cpp`'s CXFORMWITHALPHA reader** (NBits width, signed-field
-extraction, and the float scaling it writes into `cxform_data` — identity uses
-1.0 but entry 2 uses 256, so the scale convention is inconsistent between code
-paths). Likely a sign/width bug in the recompiler's cxform field reader for
-wide-NBits records.
+Hand-decoding per spec (the cxform is **byte-aligned after the 35-bit
+translate-only matrix** — this is what fills the 21-byte tag) gives:
+**mult = [0, 0, 0, 256], add = [255, 255, 255, 0]** — i.e. RGB forced to white
+(×0 +255), **alpha ×1.0 +0 = fully opaque**.
 
-## Next steps when resumed
+The recompiler decodes this **correctly**: `cxform_data` entry 2 reads, in order,
+`mult_r=0, mult_g=0, mult_b=0, mult_a=256/256=1.0` (diagonal at indices
+0/5/10/**15**) and `add=[255,255,255,0]` (indices 16–19). (An earlier draft of
+this doc wrongly called entry 2 "garbage with alpha-mult 0" — that was a parsing
+artifact: the array literals are `VALUE/256.0f`, and a naive number-scan captured
+the `256`/`255` denominators plus an off-by-one, fabricating bogus values. Reading
+the raw lines shows the entry is correct.)
 
-1. Confirm transform_id 21 decodes to the right translate (matrix decode OK?), then
-   bit-trace where the CXFORMWITHALPHA read starts in `swf.cpp` for this tag — a
-   misaligned start is the prime suspect for the garbage entry 2.
-2. If the SWF cxform is benign (e.g. identity/opaque) and the recompiler garbled
-   it → fix the recompiler cxform reader (likely a bit-alignment / scale bug in
-   `swf.cpp`'s CXFORM emit). If the SWF genuinely sets alpha-mult 0 → check how
-   Ruffle keeps the stage opaque (stage backing is opaque regardless of a
-   full-cover child's alpha).
+So: matrix decode correct (transform 21 = translate 5200/3812), cxform decode
+correct (white-opaque). **The bug is in the runtime render.**
+
+## Where the bug is (runtime render)
+
+The WGSL `apply_cxform` (render_webgpu.c:159) is a diagonal `mult*color + add`
+clamp and is correct in isolation: for an opaque white-tinted shape it returns
+`[1,1,1,a]`. Yet the rendered alpha is 0 **everywhere** — including the white text
+pixels (whose shape alpha should be 1) and the black background (the clear, which
+is hard-set to alpha **1.0** at render_webgpu.c:1668). For the clear's alpha to
+read 0, the white-tint cxform must be reaching the whole framebuffer and zeroing
+alpha — a defect in how `char 8`'s placement cxform is **composed onto its nested
+children / propagated down the sprite hierarchy**, and/or how that interacts with
+the **premultiplied-alpha** pipeline (the renderer blends premultiplied; the
+shader returns straight-alpha `[1,1,1,a]`; a white RGB with add_rgb=255 over a
+premultiplied pipeline is exactly the kind of case that can drop alpha).
+
+Note: the sprite-child draw path (tag.c ~2694) draws shape children with their
+**own** `obj->cxform_id` and does not visibly compose the parent sprite's cxform
+onto shape children (only the TEXT path composes, and only with the char's baked
+cxform) — so how `char 8`'s cxform 2 reaches the children (it clearly does — RGB
+is white) and why it zeros alpha is the thread to pull.
+
+## Next steps when resumed (runtime render session)
+
+1. Empirically confirm the cxform is the cause: force `cxform_id=0` for the root
+   `char 8` placement in the runtime and re-render — expect opaque output.
+2. Trace how a **root sprite's placement cxform** propagates to its shape/text
+   children in the OFFSCREEN render, and how alpha flows through the
+   premultiplied blend + MSAA resolve + readback. The white text pixels reading
+   alpha 0 (not 1) is the precise anomaly to instrument (dump the fragment
+   `color.a` going into `apply_cxform` and the resolved texture alpha).
 3. Regression gate: `divergence_test.py "$HOME/CC/glaiel/swfs/Meteor Storm.swf"
-   --frames 16` → image alpha should become 255 (opaque) matching Ruffle.
-</content>
+   --frames 16` → image alpha should become 255 (opaque) matching Ruffle; the
+   deployed `docs2/examples/glaiel/Meteor_Storm` demo should show the loading
+   screen instead of a white canvas.
