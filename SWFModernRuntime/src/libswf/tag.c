@@ -1206,6 +1206,27 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					display_list_capacity = saved_cap;
 				}
 				obj->sprite_current_frame = target;
+
+				// Sync the AS-visible _currentframe to the navigated frame. The
+				// normal-advance path below does this (smc->currentframe = frame+1),
+				// but the manual-nav branch skips it via the `continue`. For a
+				// gotoAndStop'd nested sprite that omission is permanent: once
+				// stopped (is_playing==0) the sprite takes the advance_sprite_
+				// children_only branch every later tick and never re-syncs, so its
+				// MovieClip reports the pre-nav frame forever even though the
+				// display list (and sprite_current_frame) navigated correctly.
+				// Surfaced via Riddle School: the preloader DefineSprite_35
+				// (instance65, nested 2 levels deep in loadingthing) does
+				// gotoAndStop("loaded") at 100% loaded; the DL rebuilt to the
+				// "loaded" frame (child instance69) but _currentframe stuck at 1
+				// vs Ruffle's 3. Mirrors the normal-advance sync at the non-manual
+				// branch.
+				if (obj->instance_name != NULL)
+				{
+					extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+					MovieClip* smc = actionFindMovieClipByName(obj->instance_name);
+					if (smc) smc->currentframe = (int)target + 1;
+				}
 			}
 			obj->enterframe_eligible = 1;
 			continue; // Manual nav done, skip normal advancement
