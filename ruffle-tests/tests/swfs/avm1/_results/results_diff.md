@@ -1,15 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b9fac15a1ba6` (2026-06-21T00:19:02.438467+00:00)
-**Current:** `370dc2c7d695` (2026-06-21T03:59:44.584884+00:00)
+**Previous:** `370dc2c7d695` (2026-06-21T03:59:44.584884+00:00)
+**Current:** `b7d832163ca5` (2026-06-21T16:52:06.527104+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 629 | 629 | 0 |
-| Total | 702 | 702 | 0 |
-| Pass rate | 89.6% | 89.6% | 0% |
-| Mismatched lines | 15440 | 15440 | 0 |
+| Passing | 629 | 628 | -1 |
+| Total | 702 | 703 | +1 |
+| Pass rate | 89.6% | 89.3% | -0.3% |
+| Mismatched lines | 15440 | 15446 | +6 |
+|   Increased | | | +5 |
 
-No changes detected.
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `execution_order4` | output_mismatch | 12/12 | 7/12 |
+
+## Added Tests (1)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `bitmapdata_hittest_threshold` | output_mismatch | 5/6 |
