@@ -824,7 +824,23 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 		const char* var_name  = ng_getTextFieldVariableName(tf_idx);
 		const char* init_text = ng_getTextFieldInitialTextByIdx(tf_idx);
 		if (var_name[0] != '\0')
-			actionInitTextFieldVariable(app_context, var_name, init_text);
+		{
+			// The legacy seeding for a SIMPLE (unqualified) variable name writes
+			// it into the global var_map, which exposes it as an enumerable
+			// _root.<var>. That is only correct for a textfield whose parent IS
+			// _root; for a field nested in a child sprite the variable binds to
+			// the parent MC's scope (handled by the Phase B bind below, which
+			// resolves the parent from g_current_context), and seeding the global
+			// var_map wrongly leaks _root.<var> (Ruffle binds parent-scope only;
+			// e.g. glaiel krazykar2's preloader "perc" field inside instance1).
+			// Path-variable names ("_root.mc.var") name their own container and
+			// are parent-independent, so always seed those.
+			extern MovieClip root_movieclip;
+			int is_path_var = (strchr(var_name, '.') != NULL);
+			MovieClip* tf_parent = g_current_context ? g_current_context : &root_movieclip;
+			if (is_path_var || tf_parent == &root_movieclip)
+				actionInitTextFieldVariable(app_context, var_name, init_text);
+		}
 	}
 
 	// Phase B: eagerly create the AVM1 wrapper for placed text fields, so
