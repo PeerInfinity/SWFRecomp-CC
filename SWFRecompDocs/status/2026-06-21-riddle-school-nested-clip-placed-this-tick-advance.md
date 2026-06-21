@@ -67,25 +67,33 @@ So `instance69` advanced past frame 1 **on its placement tick**, before its
 
 ## Fix
 
-Add the established placed-this-tick skip to the recursive `advance_sprite_frames`
-per-sprite loop, scoped to:
-- **non-deferred contexts** (`!g_advance_defer_nested`) — the Phase-1 root pass runs
-  with the defer flag set and defers nested advance to Phase 3 (which already
-  guards); the manual-nav / `advance_sprite_children_only` / `advance_nested`
-  per-root recursions run with it clear, and those are exactly where a deeply-nested
-  clip placed this tick is reached.
-- **already-built clips** (`!just_allocated`) — a genuinely new clip still builds its
-  frame 0 normally; only a clip whose DL already exists (e.g. built by the catch-up
-  eager-init) is prevented from advancing on its placement tick.
+Add the placed-this-tick skip to the recursive `advance_sprite_frames` per-sprite
+loop, scoped narrowly to the **manual-nav (gotoAndStop/Play) catch-up recursion**
+via a new counter `g_in_manual_nav_catchup_recurse` (incremented around the two
+manual-nav recursion call sites in the same function), and to already-built clips
+(`!just_allocated`, so a genuinely new clip still builds its frame 0):
 
 ```c
-if (!g_advance_defer_nested && !just_allocated)
+if (g_in_manual_nav_catchup_recurse && !just_allocated)
 {
     extern size_t g_tick_count;
     if (obj->placed_at_tick == g_tick_count)
         continue;
 }
 ```
+
+**Why NOT the broader `!g_advance_defer_nested` scope** (the first attempt,
+shipped in `b7d832163` and caught by CI): the general Phase-3 nested advance
+(`advance_nested_sprite_frames` → recurse) **intentionally advances a nested clip
+on the tick a parent's frame script placed it** — `execution_order4`'s
+`clip1.child` is placed by `clip1`'s frame-2 script and must run/advance that same
+tick. Skipping placed-this-tick clips in *all* non-deferred recursion regressed
+`execution_order4` (12/12 → 7/12: `clip1.child` lagged a tick and dropped its last
+frame). The Riddle School case is specifically the **goto catch-up** path, where
+the child's frame-1 `stop()` is suppressed under `catch_up_mode` and the catch-up
+eager-init has already parked its playhead at frame 1 — so only that path needs
+the skip. Restricting the guard to `g_in_manual_nav_catchup_recurse` fixes
+instance69 and leaves `execution_order4` at 12/12.
 
 Shared runtime code (`tag.c` `advance_sprite_frames` compiles in
 NO_GRAPHICS / OFFSCREEN / graphics) → CI both modes.

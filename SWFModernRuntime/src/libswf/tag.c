@@ -873,6 +873,18 @@ void ng_set_script_only_mode(int mode)
 // performed by advance_nested_sprite_frames() after the root frame script.
 int g_advance_defer_nested = 0;
 
+// When > 0, advance_sprite_frames is recursing into a parent's display list as
+// part of a manual-nav (gotoAndStop/gotoAndPlay) catch-up rebuild. A child
+// freshly placed by the replayed frames must NOT advance its own playhead on
+// this (its placement) tick — its frame-1 script (incl. a frame-1 stop()) is
+// applied at construction and it should only advance on subsequent ticks. This
+// is narrower than the general nested recursion: normal Phase-3 nested advance
+// (advance_nested_sprite_frames) intentionally DOES advance a nested clip on the
+// tick it was placed by a parent's frame script (execution_order4's clip1.child),
+// so the placed-this-tick skip is restricted to the goto catch-up path. See
+// SWFRecompDocs/status/2026-06-21-riddle-school-nested-clip-placed-this-tick-advance.md.
+int g_in_manual_nav_catchup_recurse = 0;
+
 // When 1, advance_sprite_frames BUILDS just-allocated nested sprites (runs their
 // frame-0) but does NOT advance the playhead of already-built sprites — it only
 // recurses into them to build their own unbuilt children. Used after
@@ -1084,24 +1096,23 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			continue;
 		}
 
-		// A sprite placed THIS tick must not advance its own playhead on its
-		// placement tick: Flash constructs it (frame-1 script — incl. a frame-1
-		// stop() — runs at construction) and shows frame 1, advancing only on
-		// subsequent ticks. advance_nested_sprite_frames already skips
-		// placed-this-tick ROOT-level entries (its plain `continue` at the
-		// `placed_at_tick == g_tick_count` guard), matching Ruffle's
-		// clip_exec_list "captures next before processing" semantics. But the
-		// recursive advance path used by a parent's manual-nav (gotoAndStop/Play)
-		// catch-up — advance_sprite_frames recursing into the rebuilt parent DL —
-		// had no such skip, so a freshly-placed nested clip advanced past frame 1
-		// before its (deferred) frame-1 stop() drained. Concrete case: Riddle
-		// School's preloader hover button instance69 (DefineSprite_34, 16 frames,
-		// frame-1 stop()), placed during instance65's gotoAndStop("loaded")
-		// catch-up, auto-advanced 1->2 and reported _cf=2 vs Ruffle's _cf=1.
-		// Scoped to non-deferred contexts (the Phase-1 root pass runs with
-		// g_advance_defer_nested=1 and defers nested advance to Phase 3) and to
-		// already-built clips (just_allocated clips still build their frame 0).
-		if (!g_advance_defer_nested && !just_allocated)
+		// During a parent's manual-nav (gotoAndStop/Play) catch-up rebuild, a
+		// child freshly placed by the replayed frames must NOT advance its own
+		// playhead on its placement tick: Flash constructs it (frame-1 script —
+		// incl. a frame-1 stop() — runs at construction) and shows frame 1,
+		// advancing only on subsequent ticks. The catch-up eager-init builds the
+		// child's frame 0 under catch_up_mode (its frame-1 stop() suppressed) and
+		// parks sprite_current_frame=1; the manual-nav recursion would then
+		// advance it 1->2 before the deferred stop() drains. Concrete case:
+		// Riddle School's preloader hover button instance69 (DefineSprite_34, 16
+		// frames, frame-1 stop()), placed during instance65's
+		// gotoAndStop("loaded") catch-up, auto-advanced 1->2 and reported _cf=2
+		// vs Ruffle's _cf=1. Scoped to the catch-up recursion (g_in_manual_nav_
+		// catchup_recurse) — NOT the general Phase-3 nested advance, which
+		// intentionally advances a nested clip on the tick a parent frame script
+		// placed it (execution_order4's clip1.child) — and to already-built clips
+		// (just_allocated clips still build their frame 0).
+		if (g_in_manual_nav_catchup_recurse && !just_allocated)
 		{
 			extern size_t g_tick_count;
 			if (obj->placed_at_tick == g_tick_count)
@@ -1165,7 +1176,9 @@ void advance_sprite_frames(SWFAppContext* app_context)
 #endif
 						MovieClip* sctx = g_current_context;
 						if (smc) actionSetCurrentContext(smc);
+						g_in_manual_nav_catchup_recurse++;
 						advance_sprite_frames(app_context);
+						g_in_manual_nav_catchup_recurse--;
 						actionSetCurrentContext(sctx);
 					}
 
@@ -1217,7 +1230,9 @@ void advance_sprite_frames(SWFAppContext* app_context)
 #endif
 						MovieClip* sctx = g_current_context;
 						if (smc) actionSetCurrentContext(smc);
+						g_in_manual_nav_catchup_recurse++;
 						advance_sprite_frames(app_context);
+						g_in_manual_nav_catchup_recurse--;
 						actionSetCurrentContext(sctx);
 					}
 
