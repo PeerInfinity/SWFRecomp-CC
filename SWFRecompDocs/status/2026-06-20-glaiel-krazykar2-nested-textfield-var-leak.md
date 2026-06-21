@@ -69,30 +69,37 @@ sprite (common in preloaders).
 - Shared runtime code (compiled in NO_GRAPHICS + OFFSCREEN/graphics) → CI both
   modes.
 
-## STILL OPEN — krazykar2 next divergence (B): `_root.l1`/`_root.l2` removed before F1
+## RESOLVED (not a bug) — krazykar2 divergence B: l1/l2 = accepted preloader-pacing
 
-New first divergence (filtered L3): Ruffle has `_root.l1`/`_root.l2` at F1
-(`_cf=0`, gone by F2); swfrecomp never enumerates them. They are created by
-`instance1`'s `onClipEvent(load)` (`clip_action_1`):
-`_root.createEmptyMovieClip("l1",1)` / `("l2",2)`, plus `perc="0%"` (unqualified
-→ instance1 scope), `p1=0`, `_root.stop()`.
+Ruffle has `_root.l1`/`_root.l2` at F1 (`_cf=0`, gone by F2); swfrecomp never
+enumerates them. **Root-caused as the accepted preloader-pacing class — SWFRecomp
+is Flash-plausible, NOT a bug** (same class as Duck Life 1's `spinamount`).
 
-**Characterized via instrumentation (NOT a creation or load-timing bug):**
-- `createEmptyMovieClip` DOES fire for both, with the receiver `mc == _root`
-  (`mc_is_root=1`), and **before** the first tracer dump (interleaved stdout
-  order: `l1`,`l2` created → `TRACER: start` → `__tracer__` → `F1`). So the load
-  handler runs at the right time and on the right target.
-- BUT a one-shot dump at the **first `_root` for..in** shows
-  `root.dynamic_props` = `{$version, __tracer__}` and `child_mc_cache(parent=root)`
-  = `{instance1 (depth=-16383), __tracer__ (depth 1048575)}` — **l1/l2 are absent
-  from BOTH** by F1. So they are created and then **removed** between the load
-  handler and the first enumeration.
+**Mechanism (fully traced):**
+- `instance1`'s `onClipEvent(load)` (`clip_action_1`) creates the two loading-bar
+  clips: `_root.createEmptyMovieClip("l1",1)` / `("l2",2)` (receiver `mc==_root`,
+  confirmed `mc_is_root=1`), plus `p1=0`, `_root.stop()`.
+- The preloader logic `script_2` computes `p1 = (getBytesLoaded/getBytesTotal)*100`
+  and, **once `p1 >= 100`**, runs `_root.l1.removeMovieClip()` /
+  `_root.l2.removeMovieClip()` (verified: the removals fire via `actionRemoveSprite`
+  at action.c:55043/55047, gated by `if (p1 < 100) goto skip`).
+- On a **local, fully-loaded SWF**, `getBytesLoaded == getBytesTotal` immediately,
+  so swfrecomp's `p1 = 100` at frame 1 → the bar clips are removed **before** F1's
+  tracer dump. Ruffle's **headless exporter** reports partial bytes at F1, so
+  `p1 < 100` there and l1/l2 survive that one frame (gone by F2).
 
-**Lead:** l1 is created at **depth 1**, the same depth as the timeline clip
-`instance1` (char 4, root depth 1; stored in cache as `1 - 16384 = -16383`). The
-collision/removal between the AS-depth space (raw `1`) and the timeline-depth
-encoding (`-16383`) is the prime suspect — either the createEmptyMovieClip
-depth-conflict loop, a frame-advance display-list rebuild, or a catch-up cleanup
-pass strips the freshly-created AS clips. Next: instrument what sets l1/l2's
-`depth=INT_MIN` / clears their `child_mc_cache` slot / removes the
-`root.dynamic_props` entry between creation and F1. Distinct from the `perc` leak.
+So the divergence is purely the preloader's load-pacing, where SWFRecomp matches
+real-Flash "local SWF already loaded" behavior and Ruffle's exporter holds. This
+is the documented preloader/network-pacing accepted class (cf. Art of War, Bloons,
+Duck Life 2 in RESULTS.md; Duck Life 1 `spinamount`).
+
+**Decision:** documented as accepted, NOT suppressed in the harness. The
+accepted-diff facility absorbs field-value PAIRS, not Ruffle-only lines; a
+ruffle-only-line rule (or a generic `_root.l[12]` NOISE_PATTERN) would weaken the
+facility's bug-masking safety for a cosmetic 2-line, frame-1-only artifact. krazykar2
+is therefore **converged modulo this accepted preloader-pacing divergence** (the
+only other trace diffs are f32-vs-f64 precision, already harness-absorbed).
+
+**Earlier (disproven) lead:** the AS-depth-1 vs timeline-depth-(-16383) collision
+was a red herring — the removal is an explicit, load-gated `removeMovieClip`, not a
+depth collision.
