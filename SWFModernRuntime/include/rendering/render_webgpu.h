@@ -187,6 +187,17 @@ typedef struct WebGPURenderContext
 	u32 prev_dyn_vtx_used;      // vertex count of the last upload (0 = none/invalid)
 	u32 prev_dyn_rect_count;    // color slot count of the last upload (0 = none/invalid)
 
+	// Retained-mode transform-upload skip (browser only). compose_children
+	// recomputes and re-uploads EVERY transform slot via render_webgpu_write_transform
+	// each frame; a static screen re-uploads ~hundreds of byte-identical 64-byte
+	// matrices (each a separate wgpuQueueWriteBuffer that serializes against present
+	// on a software backend). xform_mirror holds the last bytes written to each
+	// xform_buffer slot; write_transform skips the upload when the slot is unchanged.
+	// Invariant: xform_mirror_valid[i] != 0  =>  GPU xform_buffer slot i == xform_mirror[i].
+	// NULL in native/OFFSCREEN (skip disabled → graphics-native suite bit-for-bit).
+	float* xform_mirror;        // [xform_slot_count * 16] float, or NULL
+	u8* xform_mirror_valid;     // [xform_slot_count] u8 (0 = unknown/never written), or NULL
+
 	// Dynamic gradient rendering (Drawing API beginGradientFill/lineGradientStyle)
 	u32 static_gradient_count;   // number of gradients from recompiler (static)
 	u32 dynamic_gradient_used;   // number of dynamic gradient layers used this frame

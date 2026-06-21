@@ -917,6 +917,10 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 #ifdef __EMSCRIPTEN__
 	ctx->prev_dyn_vtx = (u32*)malloc((size_t)MAX_DYNAMIC_VERTICES * 4 * sizeof(u32));
 	ctx->prev_dyn_color = (float*)malloc((size_t)MAX_DYNAMIC_RECTS * 4 * sizeof(float));
+	// Transform-slot retained-skip mirror (zeroed → all slots start "invalid", so the
+	// first write_transform per slot always uploads and syncs the mirror to the GPU).
+	ctx->xform_mirror = (float*)calloc((size_t)ctx->xform_slot_count * 16, sizeof(float));
+	ctx->xform_mirror_valid = (u8*)calloc((size_t)ctx->xform_slot_count, 1);
 #endif
 	ctx->prev_dyn_vtx_used = 0;
 	ctx->prev_dyn_rect_count = 0;
@@ -2578,6 +2582,29 @@ static void mat4_multiply(float* out, const float* A, const float* B)
 }
 
 // ---------------------------------------------------------------------------
+// xform_slot_write: write one composed 16-float matrix to GPU xform_buffer at
+// `transform_id`, with the retained-skip described on xform_mirror in the header.
+// Single choke point for ALL per-frame xform_buffer writers so the mirror stays
+// consistent (compose_text/sprite/write_transform). Mirror NULL → always upload.
+// ---------------------------------------------------------------------------
+static inline void xform_slot_write(WebGPURenderContext* ctx, u32 transform_id,
+                                    const float composed[16])
+{
+	if (ctx->xform_mirror != NULL && transform_id < ctx->xform_slot_count)
+	{
+		float* slot = &ctx->xform_mirror[(size_t)transform_id * 16];
+		if (ctx->xform_mirror_valid[transform_id] &&
+			memcmp(slot, composed, 16 * sizeof(float)) == 0)
+			return;  // unchanged — GPU still holds identical bytes
+		memcpy(slot, composed, 16 * sizeof(float));
+		ctx->xform_mirror_valid[transform_id] = 1;
+	}
+	uint64_t offset = (uint64_t)transform_id * 16 * sizeof(float);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
+	                     composed, 16 * sizeof(float));
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_compose_text_transforms: compose PlaceObject2 transform with
 // each glyph transform and write composed results to GPU xform_buffer.
 // Called before renderer_open_pass so all writes happen before the render pass.
@@ -2602,9 +2629,7 @@ void render_webgpu_compose_text_transforms(WebGPURenderContext* ctx,
 		mat4_multiply(composed, place_xform, glyph_xform);
 
 		// Write composed transform to the GPU buffer at the glyph's slot
-		uint64_t offset = (uint64_t)glyph_xform_id * 16 * sizeof(float);
-		wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
-		                     composed, 16 * sizeof(float));
+		xform_slot_write(ctx, glyph_xform_id, composed);
 	}
 }
 
@@ -2626,9 +2651,7 @@ void render_webgpu_compose_sprite_transform(WebGPURenderContext* ctx,
 	float composed[16];
 	mat4_multiply(composed, parent_xform, child_xform);
 
-	uint64_t offset = (uint64_t)child_transform_id * 16 * sizeof(float);
-	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
-	                     composed, 16 * sizeof(float));
+	xform_slot_write(ctx, child_transform_id, composed);
 }
 
 // ---------------------------------------------------------------------------
@@ -2639,9 +2662,7 @@ void render_webgpu_write_transform(WebGPURenderContext* ctx,
                                    u32 transform_id, const float composed[16])
 {
 	if (!ctx->renderer_ok) return;
-	uint64_t offset = (uint64_t)transform_id * 16 * sizeof(float);
-	wgpuQueueWriteBuffer(ctx->queue, ctx->xform_buffer, offset,
-	                     composed, 16 * sizeof(float));
+	xform_slot_write(ctx, transform_id, composed);
 }
 
 // ---------------------------------------------------------------------------
