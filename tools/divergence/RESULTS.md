@@ -68,10 +68,10 @@ file tracks the broader **flasharchive corpus** the harness was re-swept across.
 | Age of War | — | 61 / 61 | **identical** | image-only |
 | Avalanche | 527KB | 76 / 76 | **L3** (was L2): `instance1.instance4` vs `instance2` | **L2 frozen-preloader FIXED 2026-06-13** (sprite-local GoToLabel); residual = #13 auto-instance counter |
 | Achievement Unlocked | — | 289 / 303 | L11: `instance5 _cf=2` vs `100` | playhead/auto-name + attach pacing |
-| Art of War | 1.5MB | 224 / 226 | L2: `box="…wait until 50%"` vs `PercentLoaded=100` | preloader/network (no net layer) |
-| Bloons TD | — | 151 / 188 | L12: `prog=100` vs `loadbar` placement | preloader pacing + Mochi |
-| Bloons TD 2 | — | 173 / 233 | L6: `reserved` + `_cf` advance | preloader pacing + Mochi |
-| Bloxorz | — | 76 / 91 | L2: `backser` vs `percentr="Preloading…"` | preloader pacing |
+| Art of War | 1.3MB | 207 / 209 (re-run 2026-06-21) | F1: `PercentLoaded=100` vs `box="…wait until 50%"` (207 matched, 2 swf-only) | **accepted preloader pacing** — byte-counter, no net layer (confirmed #11) |
+| Bloons TD | 531KB | 151 / 188 (re-run 2026-06-21) | F3: `prog=100` (ruffle-only); swf advances ahead | **accepted preloader pacing** — byte-counter drives the multi-frame root ahead, NOT a frame-ordering bug (confirmed #11) + Mochi |
+| Bloons TD 2 | 787KB | ✗ **gcc-fail** (re-run 2026-06-21) | #14 desync: garbage ConstantPool strings (`char* str_…="<binary>"`) | **#14 obfuscated-AS recompiler parse desync** (confirmed recompiler-side via clean non-injected recompile; prior 173/233 was built on a desynced parse) |
+| Bloxorz | 2.25MB | ✗ **gcc-fail** (re-run 2026-06-21) | #14 desync: garbage ConstantPool strings | **#14 obfuscated-AS recompiler parse desync** (prior 76/91 invalid — desynced parse) |
 | Doodle Jump | — | 211 / 196 | L6: `hero _y=247.55` vs `251.55` | RNG-driven initial platform layout (guide gotcha #12) |
 | Duck Life 1 | 1.28MB | 482 / 482 | **none (CONVERGED 2026-06-13)** | `spinamount` = (B) preloader byte-counter; `web` = `_url` path artifact; both absorbed (rule + noise) |
 | Duck Life 2 | — | 271 / 286 | L4: `loadcheat` region | preloader/value mismatch |
@@ -108,6 +108,30 @@ full-frame `max_diff=255` = background/preloader rendering, a few sub-pixel.)
 - **Preloader / network pacing** (Art of War, Bloons family, Bloxorz, Duck
   Life 2): SWFRecomp has no network/Mochi layer, so `PercentLoaded`/byte
   counters read 100/complete immediately while Ruffle's preloader holds.
+
+### Bloons-family cluster re-run (#11 closed, 2026-06-21)
+
+Re-ran the preloader-pacing cluster to settle #11's open question — *is any
+multi-frame root advancing ahead of Ruffle for a real frame-ordering reason
+(high-risk swf.c timing), rather than the byte-counter?* **Answer: no.**
+
+- **All five roots are MULTI-frame** (Bloons 59, Bloons TD 11, Bloons TD 2 12,
+  Bloxorz 99, Art of War 23) — so the single-frame `_currentframe` clamp
+  (`6e7cf24ea`) never applied to them; #11's "maybe they're single-frame too"
+  hypothesis is **false**.
+- The two that compile (**Bloons TD**, **Art of War**) **do** advance ahead of
+  Ruffle, but in both the harness auto-confirms it is the
+  `getBytesLoaded/getBytesTotal` byte-counter (local SWF reads 100%-loaded
+  immediately, so the preloader gate/loop exits while Ruffle's exporter streams
+  bytes). Art of War: 207/209 lines match. This is the **accepted no-net-layer
+  pacing class** (same mechanism as Duck Life 1 / Shopping Cart Hero), **not** an
+  independent frame-ordering bug. No high-risk swf.c timing fix is warranted.
+- The three that don't converge (**Bloons**, **Bloons TD 2**, **Bloxorz**) are
+  all blocked by **#14** (obfuscated-AS recompiler parse desync), confirmed
+  recompiler-side via a clean non-injected recompile. Bloons TD 2 + Bloxorz are
+  NEW additions to #14's affected-games list; their prior 2026-06-12 traces were
+  built on an already-desynced parse (the garbage has since shifted onto bytes
+  that break a C string literal → gcc-fail). See PROGRESS.md #14.
   Accepted/expected until a network stub exists (`MochiServices Connecting…` is
   already harness-filterable).
 - **RNG-layout image divergences** (Doodle Jump): the 4px `hero._y` delta traces
