@@ -69,12 +69,30 @@ sprite (common in preloaders).
 - Shared runtime code (compiled in NO_GRAPHICS + OFFSCREEN/graphics) → CI both
   modes.
 
-## STILL OPEN — krazykar2 next divergence (B): `_root.l1`/`_root.l2` not created
+## STILL OPEN — krazykar2 next divergence (B): `_root.l1`/`_root.l2` removed before F1
 
 New first divergence (filtered L3): Ruffle has `_root.l1`/`_root.l2` at F1
-(`_cf=0`); swfrecomp does not. They are created by `instance1`'s
-`onClipEvent(load)` (`clip_action_1`): `_root.createEmptyMovieClip("l1",1)` /
-`("l2",2)`, plus `perc="0%"` (unqualified → instance1 scope), `p1=0`,
-`_root.stop()`. swfrecomp either doesn't run that load handler or
-`_root.createEmptyMovieClip` from a clip-event context doesn't register/enumerate
-the new root children. Distinct from the `perc` leak; next target for krazykar2.
+(`_cf=0`, gone by F2); swfrecomp never enumerates them. They are created by
+`instance1`'s `onClipEvent(load)` (`clip_action_1`):
+`_root.createEmptyMovieClip("l1",1)` / `("l2",2)`, plus `perc="0%"` (unqualified
+→ instance1 scope), `p1=0`, `_root.stop()`.
+
+**Characterized via instrumentation (NOT a creation or load-timing bug):**
+- `createEmptyMovieClip` DOES fire for both, with the receiver `mc == _root`
+  (`mc_is_root=1`), and **before** the first tracer dump (interleaved stdout
+  order: `l1`,`l2` created → `TRACER: start` → `__tracer__` → `F1`). So the load
+  handler runs at the right time and on the right target.
+- BUT a one-shot dump at the **first `_root` for..in** shows
+  `root.dynamic_props` = `{$version, __tracer__}` and `child_mc_cache(parent=root)`
+  = `{instance1 (depth=-16383), __tracer__ (depth 1048575)}` — **l1/l2 are absent
+  from BOTH** by F1. So they are created and then **removed** between the load
+  handler and the first enumeration.
+
+**Lead:** l1 is created at **depth 1**, the same depth as the timeline clip
+`instance1` (char 4, root depth 1; stored in cache as `1 - 16384 = -16383`). The
+collision/removal between the AS-depth space (raw `1`) and the timeline-depth
+encoding (`-16383`) is the prime suspect — either the createEmptyMovieClip
+depth-conflict loop, a frame-advance display-list rebuild, or a catch-up cleanup
+pass strips the freshly-created AS clips. Next: instrument what sets l1/l2's
+`depth=INT_MIN` / clears their `child_mc_cache` slot / removes the
+`root.dynamic_props` entry between creation and F1. Distinct from the `perc` leak.
