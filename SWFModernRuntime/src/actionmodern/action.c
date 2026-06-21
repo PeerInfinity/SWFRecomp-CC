@@ -20916,7 +20916,11 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 // leak backstop only (per-tick MC leaks are prevented at their source, e.g. the
 // browser-WASM frame-func re-run guard in tag.c), so raising it does not change
 // correctness for churny games — it only adds headroom.
-#define MAX_CHILD_MOVIECLIPS 512
+// 1024: a single Minesweeper board is 30*16=480 duplicateMovieClip cells, which
+// alongside the game/menu chrome MCs exceeds the old 512 cap (the last ~22 cells
+// were dropped → a partly-blank board). The add path below also reuses NULL
+// (removed) slots so deleteCells+rebuild on Restart doesn't grow the table.
+#define MAX_CHILD_MOVIECLIPS 1024
 MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
 int child_mc_count = 0;
 // MCs at index >= this threshold were just placed in the current frame's
@@ -22383,13 +22387,23 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 		}
 	}
 	if (is_new && mc != NULL) {
-		// Only add to cache if it's a brand new MC (not a re-init of cached one)
-		int already_cached = 0;
+		// Only add to cache if it's a brand new MC (not a re-init of cached one).
+		// Reuse a freed (NULL) slot before appending so a remove+recreate churn
+		// (e.g. Minesweeper Restart: deleteCells removeMovieClip's all 480 cells,
+		// which NULL their slots, then the board is rebuilt) doesn't grow
+		// child_mc_count without bound. Mirrors the free-slot pattern used by the
+		// attachMovie add paths.
+		int already_cached = 0, free_slot = -1;
 		for (int i = 0; i < child_mc_count; i++) {
 			if (child_mc_cache[i] == mc) { already_cached = 1; break; }
+			if (free_slot < 0 && child_mc_cache[i] == NULL) free_slot = i;
 		}
-		if (!already_cached && child_mc_count < MAX_CHILD_MOVIECLIPS) {
-			child_mc_cache[child_mc_count++] = mc;
+		if (!already_cached) {
+			if (free_slot >= 0) {
+				child_mc_cache[free_slot] = mc;
+			} else if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
+				child_mc_cache[child_mc_count++] = mc;
+			}
 		}
 	}
 	return mc;

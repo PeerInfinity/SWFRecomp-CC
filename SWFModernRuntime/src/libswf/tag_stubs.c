@@ -2254,7 +2254,12 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		clone_mc->yscale  = src_mc->yscale;
 		clone_mc->rotation = src_mc->rotation;
 		clone_mc->alpha   = src_mc->alpha;
-		clone_mc->visible = src_mc->visible;
+		// Clones are born visible. Ruffle's clone_sprite copies only the matrix
+		// and color transform, never _visible — a duplicate of a clip the script
+		// hid with _visible=false is still shown. Inheriting src visibility left
+		// Minesweeper's 480 board-cell clones invisible (the game sets
+		// cell._visible=false before the duplicateMovieClip loop) → blank board.
+		clone_mc->visible = 1;
 		clone_mc->totalframes   = src_mc->totalframes;
 		clone_mc->framesloaded  = src_mc->framesloaded;
 		clone_mc->as_set_flags  = src_mc->as_set_flags;
@@ -2495,7 +2500,9 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	clone_mc->yscale  = src_mc->yscale;
 	clone_mc->rotation = src_mc->rotation;
 	clone_mc->alpha   = src_mc->alpha;
-	clone_mc->visible = src_mc->visible;
+	// Clones are born visible (see ng_cloneSprite) — Ruffle's clone_sprite never
+	// copies _visible, so a duplicate of a hidden clip is still shown.
+	clone_mc->visible = 1;
 	clone_mc->totalframes   = src_mc->totalframes;
 	clone_mc->framesloaded  = src_mc->framesloaded;
 	clone_mc->as_set_flags  = src_mc->as_set_flags;
@@ -2555,7 +2562,8 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 		}
 	}
 
-	// Textfield clones reset _visible to true (unlike sprite clones which preserve it)
+	// Both sprite and textfield clones are born visible now (see the visible=1
+	// above); this is left as a defensive no-op for the textfield path.
 	if (clone_mc->ng_textfield_idx >= 0 || clone_mc->ng_textfield_idx == -2) {
 		clone_mc->visible = 1;
 	}
@@ -2579,6 +2587,68 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 			display_list[src_depth].clip_actions,
 			display_list[src_depth].clip_action_count);
 	}
+
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	// Browser-WASM render path: a sprite clone needs its OWN standalone display_obj
+	// (sprite content holder) populated by frame 0, because the child_mc_cache
+	// render pass (render_attached_child) draws nothing when mc->display_obj == NULL.
+	// ng_cloneSprite and ng_duplicateMovieClip already do this; ng_cloneSpriteFromMC
+	// did not, so old-form duplicateMovieClip of a timeline clip routed here left the
+	// clone with no renderable content. Minesweeper builds its 480-cell board with
+	// duplicateMovieClip(cell, ...) → blank (pink) board. The global display_list
+	// write above is skipped in browser-WASM, so display_obj is the only content path.
+	{
+		size_t src_cid = 0;
+		if (src_depth != SIZE_MAX)
+			src_cid = display_list[src_depth].char_id;
+		else if (src_mc->display_obj != NULL)
+			src_cid = ((DisplayObject*)src_mc->display_obj)->char_id;
+		if (src_cid != 0 && dictionary[src_cid].type == CHAR_TYPE_SPRITE &&
+		    clone_mc->display_obj == NULL)
+		{
+			frame_func* funcs = dictionary[src_cid].sprite_frame_funcs;
+			size_t frame_count = dictionary[src_cid].sprite_frame_count;
+			if (funcs != NULL && frame_count > 0 && funcs[0] != NULL)
+			{
+				DisplayObject* saved_dl  = display_list;
+				size_t         saved_max = max_depth;
+				size_t         saved_cap = display_list_capacity;
+				DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+				int            saved_catch_up = catch_up_mode;
+
+				DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
+				dobj->char_id = src_cid;
+				dobj->sprite_dl_capacity = 64;
+				dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+				dobj->sprite_max_depth = 0;
+				clone_mc->display_obj = dobj;
+
+				display_list = dobj->sprite_display_list;
+				max_depth = dobj->sprite_max_depth;
+				display_list_capacity = dobj->sprite_dl_capacity;
+
+				MovieClip* saved_ctx = g_current_context;
+				actionSetCurrentContext(clone_mc);
+				g_current_sprite_obj = NULL;
+
+				catch_up_mode = 1;
+				funcs[0](app_context);
+				catch_up_mode = saved_catch_up;
+
+				actionSetCurrentContext(saved_ctx);
+				g_current_sprite_obj = saved_sprite_obj;
+
+				dobj->sprite_display_list = display_list;
+				dobj->sprite_max_depth = max_depth;
+				dobj->sprite_dl_capacity = display_list_capacity;
+
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+			}
+		}
+	}
+#endif
 
 	// Register under the clone's real parent (root → depth table + var_map;
 	// non-root → parent->dynamic_props only).
@@ -2619,7 +2689,12 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 		clone_mc->yscale  = src_mc->yscale;
 		clone_mc->rotation = src_mc->rotation;
 		clone_mc->alpha   = src_mc->alpha;
-		clone_mc->visible = src_mc->visible;
+		// Clones are born visible. Ruffle's clone_sprite copies only the matrix
+		// and color transform, never _visible — a duplicate of a clip the script
+		// hid with _visible=false is still shown. Inheriting src visibility left
+		// Minesweeper's 480 board-cell clones invisible (the game sets
+		// cell._visible=false before the duplicateMovieClip loop) → blank board.
+		clone_mc->visible = 1;
 		clone_mc->totalframes   = src_mc->totalframes;
 		clone_mc->framesloaded  = src_mc->framesloaded;
 		clone_mc->as_set_flags  = src_mc->as_set_flags;
