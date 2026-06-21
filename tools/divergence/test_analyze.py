@@ -108,6 +108,46 @@ with tempfile.TemporaryDirectory() as td:
     (d / "RecompiledScripts" / "script_defs.c").write_text('char* str_0 = "hi";\n')
     check("preloader detect: negative", dt.detect_byte_preloader(d) is False)
 
+# 9. Per-clip self-healing: a NAMED clip diverges ONLY on its first frame then
+#    re-converges, WHILE another clip diverges persistently (Riddle School #17:
+#    instance68 cursor self-heals, instance65 nested sprite persists). The
+#    self-healing clip is absorbed (clip_transient); the persistent clip is the
+#    real first divergence and is NOT masked.
+ruffle = ["F1 _root.cursor _x=-155 _y=94", "F1 _root.box _cf=3",
+          "F2 _root.cursor _x=0 _y=0",     "F2 _root.box _cf=3",
+          "F3 _root.cursor _x=0 _y=0",     "F3 _root.box _cf=3"]
+swf =    ["F1 _root.cursor _x=0 _y=0",     "F1 _root.box _cf=1",
+          "F2 _root.cursor _x=0 _y=0",     "F2 _root.box _cf=1",
+          "F3 _root.cursor _x=0 _y=0",     "F3 _root.box _cf=1"]
+r = an(ruffle, swf)
+check("per-clip transient: cursor absorbed", len(r["clip_transient"]) == 1,
+      str(r["clip_transient"]))
+check("per-clip transient: cursor path",
+      r["clip_transient"] and r["clip_transient"][0]["path"] == "_root.cursor")
+check("per-clip transient: persistent box still flagged as first divergence",
+      r["first"] is not None and "_root.box" in r["first"]["a"], str(r["first"]))
+
+# 10. A NAMED self-healing clip with NO other divergence -> fully converged modulo
+#     the self-healing clip (first is None, clip_transient populated).
+r = an(["F1 _root.cursor _x=-155", "F2 _root.cursor _x=0", "F3 _root.cursor _x=0"],
+       ["F1 _root.cursor _x=0",    "F2 _root.cursor _x=0", "F3 _root.cursor _x=0"])
+check("self-healing only: first is None", r["first"] is None, str(r["first"]))
+check("self-healing only: one clip_transient", len(r["clip_transient"]) == 1)
+
+# 11. A NAMED clip diverging on TWO frames (not just its first) is NOT self-healing
+#     — a real lag must still be flagged.
+r = an(["F1 _root.c _x=1", "F2 _root.c _x=1", "F3 _root.c _x=9"],
+       ["F1 _root.c _x=0", "F2 _root.c _x=0", "F3 _root.c _x=9"])
+check("multi-frame divergence: not clip_transient", len(r["clip_transient"]) == 0)
+check("multi-frame divergence: still flagged", r["first"] is not None)
+
+# 12. A PATHLESS first-frame blip (e.g. root _currentframe) is NOT absorbed by the
+#     per-clip recognizer (guard: non-empty clip path) — stays whole-trace transient.
+r = an(["F1 v=0", "F2 v=100", "F3 v=100"],
+       ["F1 v=5", "F2 v=100", "F3 v=100"])
+check("pathless blip: not clip_transient", len(r["clip_transient"]) == 0)
+check("pathless blip: whole-trace transient", r["transient"] is not None)
+
 print()
 if _fails:
     print(f"{len(_fails)} FAILED: {_fails}")

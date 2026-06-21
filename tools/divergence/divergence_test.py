@@ -157,7 +157,7 @@ def analyze_trace_divergence(a_lines: list[str], b_lines: list[str],
     """
     res = {"first": None, "absorbed": 0, "accepted": [], "ruffle_only": 0,
            "swf_only": 0, "matched": 0, "diverge_frames": set(),
-           "max_frame": None, "transient": None}
+           "max_frame": None, "transient": None, "clip_transient": []}
 
     def note_frame(line):
         f = _frame_of(line)
@@ -165,16 +165,26 @@ def analyze_trace_divergence(a_lines: list[str], b_lines: list[str],
             res["max_frame"] = f if res["max_frame"] is None else max(res["max_frame"], f)
         return f
 
-    def real_divergence(kind, a, b):
-        if res["first"] is None:
-            res["first"] = {"kind": kind, "a": a, "b": b,
-                            "a_frame": _frame_of(a) if a != "<absent>" else None,
-                            "b_frame": _frame_of(b) if b != "<absent>" else None}
-        for ln in (a, b):
-            if ln != "<absent>":
-                f = _frame_of(ln)
-                if f is not None:
-                    res["diverge_frames"].add(f)
+    def _clip_path(line):
+        """The clip path of a tracer line: the whitespace tokens with no '='
+        after the leading frame token ("F1 _root.instance68 _x=0" ->
+        "_root.instance68"). Empty for pathless lines (e.g. "F1 _currentframe=1")."""
+        toks = [t for t in line.split() if "=" not in t]
+        return " ".join(toks[1:]) if len(toks) > 1 else ""
+
+    # Per-clip-path frame bookkeeping for the self-healing-clip recognizer below.
+    clip_obs = {}   # path -> set of frames where the clip appears (any outcome)
+    clip_div = {}   # path -> set of frames where the clip has a real replace divergence
+
+    def _obs(line):
+        p, f = _clip_path(line), _frame_of(line)
+        if p and f is not None:
+            clip_obs.setdefault(p, set()).add(f)
+
+    # Real divergences are collected in trace order and resolved AFTER the walk,
+    # so the per-clip self-healing classification (which needs the whole run) can
+    # absorb a clip's first-frame blip before the first divergence is chosen.
+    events = []   # ordered: {kind, a, b, path, frame}
 
     sm = difflib.SequenceMatcher(None, a_lines, b_lines, autojunk=False)
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
@@ -182,11 +192,14 @@ def analyze_trace_divergence(a_lines: list[str], b_lines: list[str],
             note_frame(ln)
         if tag == "equal":
             res["matched"] += (i2 - i1)
+            for ln in a_lines[i1:i2]:
+                _obs(ln)
         elif tag == "replace":
             ra, rb = a_lines[i1:i2], b_lines[j1:j2]
             m = min(len(ra), len(rb))
             for k in range(m):
                 pa, pb = ra[k], rb[k]
+                _obs(pa)   # the clip appears this frame regardless of outcome
                 if (rel_tol > 0 or abs_tol > 0) and lines_equivalent(pa, pb, rel_tol, abs_tol):
                     res["absorbed"] += 1
                     continue
@@ -195,26 +208,76 @@ def analyze_trace_divergence(a_lines: list[str], b_lines: list[str],
                     if t is not None:
                         res["accepted"].append(t)
                         continue
-                real_divergence("replace", pa, pb)
+                p, f = _clip_path(pa), _frame_of(pa)
+                if p and f is not None:
+                    clip_div.setdefault(p, set()).add(f)
+                events.append({"kind": "replace", "a": pa, "b": pb, "path": p, "frame": f})
             # Unpaired remainder of a longer side = ruffle-only / swfrecomp-only.
             for pa in ra[m:]:
                 res["ruffle_only"] += 1
-                real_divergence("ruffle_only", pa, "<absent>")
+                events.append({"kind": "ruffle_only", "a": pa, "b": "<absent>",
+                               "path": _clip_path(pa), "frame": _frame_of(pa)})
             for pb in rb[m:]:
                 res["swf_only"] += 1
-                real_divergence("swfrecomp_only", "<absent>", pb)
+                events.append({"kind": "swfrecomp_only", "a": "<absent>", "b": pb,
+                               "path": _clip_path(pb), "frame": _frame_of(pb)})
         elif tag == "delete":   # lines only in a (Ruffle)
             for pa in a_lines[i1:i2]:
                 res["ruffle_only"] += 1
-                real_divergence("ruffle_only", pa, "<absent>")
+                events.append({"kind": "ruffle_only", "a": pa, "b": "<absent>",
+                               "path": _clip_path(pa), "frame": _frame_of(pa)})
         elif tag == "insert":   # lines only in b (SWFRecomp)
             for pb in b_lines[j1:j2]:
                 res["swf_only"] += 1
-                real_divergence("swfrecomp_only", "<absent>", pb)
+                events.append({"kind": "swfrecomp_only", "a": "<absent>", "b": pb,
+                               "path": _clip_path(pb), "frame": _frame_of(pb)})
 
-    # Re-convergence: real divergences confined to early frames, with at least
-    # one fully-matched later frame (the hallmark of a transient preloader/pacing
-    # blip that self-heals, vs a bug that cascades for the rest of the run).
+    # Self-healing-clip (per-clip transient) recognizer: a NAMED clip whose only
+    # real divergences land on its FIRST observed frame, after which it re-converges
+    # and matches on every later frame it appears in. This is the signature of an
+    # observer / enterFrame-ordering artifact — e.g. Riddle School's custom mouse
+    # cursor `instance68`, whose `onClipEvent(enterFrame){this._x=_root._xmouse;...}`
+    # fires on the opposite side of the injected tracer's own onEnterFrame at the
+    # same tick (headless `_xmouse=0`), so the FIRST sample reads the placement and
+    # every later sample matches. SWFRecomp's two-phase enterFrame dispatch
+    # (clip-action EF then AS onEnterFrame) can't match Ruffle's single
+    # instantiation-ordered exec list (#10b), so the newest clip (the tracer) and an
+    # older clip-action clip swap order for exactly one observation. This absorbs
+    # that one-frame blip the same way #10b/Pacman is absorbed — but automatically
+    # and per-clip, rather than via a hand-written accepted/<game>.txt manifest.
+    # Guards: requires a non-empty clip path (a pathless root `_currentframe` blip is
+    # NEVER silently absorbed — that stays a whole-trace divergence) and at least one
+    # later matched frame (genuine re-convergence, not a one-frame run); and the
+    # divergence must be confined to the clip's first appearance (a multi-frame or
+    # recurring divergence — e.g. a real nested-sprite frame lag — is still flagged).
+    transient_clips = set()
+    for p, dfr in clip_div.items():
+        obs = clip_obs.get(p, set())
+        if not obs:
+            continue
+        first_obs = min(obs)
+        if dfr == {first_obs} and max(obs) > first_obs:
+            transient_clips.add(p)
+
+    for ev in events:
+        if ev["kind"] == "replace" and ev["path"] in transient_clips:
+            res["clip_transient"].append(
+                {"path": ev["path"], "frame": ev["frame"], "a": ev["a"], "b": ev["b"]})
+            continue
+        if res["first"] is None:
+            res["first"] = {"kind": ev["kind"], "a": ev["a"], "b": ev["b"],
+                            "a_frame": ev["frame"] if ev["a"] != "<absent>" else None,
+                            "b_frame": ev["frame"] if ev["b"] != "<absent>" else None}
+        for ln in (ev["a"], ev["b"]):
+            if ln != "<absent>":
+                f = _frame_of(ln)
+                if f is not None:
+                    res["diverge_frames"].add(f)
+
+    # Whole-trace re-convergence: real divergences (after per-clip absorption above)
+    # confined to early frames, with at least one fully-matched later frame (the
+    # hallmark of a transient preloader/pacing blip that self-heals, vs a bug that
+    # cascades for the rest of the run).
     df = res["diverge_frames"]
     if df and res["max_frame"] is not None and max(df) < res["max_frame"]:
         res["transient"] = {"reconverge_frame": max(df) + 1,
@@ -398,8 +461,22 @@ def main():
                       f"accepted-diff rule(s) in accepted/{mname} ({tags}) — "
                       f"known observer/tooling artifact, not flagged. Use "
                       f"--no-accept to see them.")
+    clip_transient = an["clip_transient"]
+    if clip_transient:
+        ct_clips = sorted(set(e["path"] for e in clip_transient))
+        ct_frames = ",".join(f"F{x}" for x in sorted(set(e["frame"] for e in clip_transient)))
+        report.append(f"Trace: {len(clip_transient)} self-healing per-clip "
+                      f"divergence(s) on {', '.join(ct_clips)} confined to "
+                      f"{ct_frames}, re-converging and matching through "
+                      f"F{an['max_frame']} — observer / enterFrame-ordering artifact "
+                      f"(custom-cursor-style onClipEvent(enterFrame) sampled opposite "
+                      f"the tracer; #10b class), not flagged.")
     if first is None:
-        if accepted:
+        if clip_transient:
+            n = len(clip_transient) + len(accepted)
+            report.append(f"Trace: converged (modulo {n} self-healing / documented "
+                          f"observer-artifact line(s))")
+        elif accepted:
             report.append(f"Trace: converged (modulo {len(accepted)} documented "
                           f"accepted-diff line(s))")
         elif absorbed:

@@ -23,13 +23,18 @@ Then pick the highest-priority unblocked item from PROGRESS.md's "Open follow-up
 - Diagnose with: python3 tools/divergence/divergence_test.py "<swf>" --frames 16
   Triage trace-first / headless-first; localize; fix; lock with a regression-gate
   divergence_test command. Co-located frames + per-frame diffs land in runs/<stem>/compare/.
-- The report auto-flags TRANSIENT (divergences confined to early frames that
-  re-converge) and PRELOADER (getBytesLoaded/getBytesTotal-driven) divergences:
-  these are usually the accepted preloader-pacing class — SWFRecomp reports a
-  local SWF fully loaded immediately while Ruffle's exporter streams bytes — so
-  VERIFY, then document via tools/divergence/accepted/ rather than chasing as a
-  bug. The first divergence's kind (replace / ruffle_only / swfrecomp_only) + the
-  line-count summary tell you whether it's a value diff or an added/removed line.
+- The report auto-flags three benign classes — VERIFY before treating any as a
+  bug: TRANSIENT (whole-trace divergences confined to early frames that
+  re-converge); PRELOADER (getBytesLoaded/getBytesTotal-driven — SWFRecomp reports
+  a local SWF fully loaded immediately while Ruffle's exporter streams bytes, the
+  accepted preloader-pacing class, document via tools/divergence/accepted/); and
+  CLIP_TRANSIENT / "self-healing per-clip divergence" (a NAMED clip diverging only
+  on its FIRST observed frame then re-converging = the enterFrame-vs-tracer
+  observer-ordering artifact, #10b class — e.g. a custom mouse cursor whose
+  onClipEvent(enterFrame) fires opposite the injected tracer's onEnterFrame; auto-
+  recognized, not flagged, no manifest needed). The first divergence's kind
+  (replace / ruffle_only / swfrecomp_only) + the line-count summary tell you
+  whether it's a value diff or an added/removed line.
 - For any graphics-mode SIGABRT-after-correct-output, use --asan: it's a real heap
   bug (UAF/OOB), NOT a CI flake.
 - Deploy demos into the per-corpus namespace (flasharchive / glaiel), not local_batch.
