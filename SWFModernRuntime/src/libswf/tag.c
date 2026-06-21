@@ -1084,6 +1084,30 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			continue;
 		}
 
+		// A sprite placed THIS tick must not advance its own playhead on its
+		// placement tick: Flash constructs it (frame-1 script — incl. a frame-1
+		// stop() — runs at construction) and shows frame 1, advancing only on
+		// subsequent ticks. advance_nested_sprite_frames already skips
+		// placed-this-tick ROOT-level entries (its plain `continue` at the
+		// `placed_at_tick == g_tick_count` guard), matching Ruffle's
+		// clip_exec_list "captures next before processing" semantics. But the
+		// recursive advance path used by a parent's manual-nav (gotoAndStop/Play)
+		// catch-up — advance_sprite_frames recursing into the rebuilt parent DL —
+		// had no such skip, so a freshly-placed nested clip advanced past frame 1
+		// before its (deferred) frame-1 stop() drained. Concrete case: Riddle
+		// School's preloader hover button instance69 (DefineSprite_34, 16 frames,
+		// frame-1 stop()), placed during instance65's gotoAndStop("loaded")
+		// catch-up, auto-advanced 1->2 and reported _cf=2 vs Ruffle's _cf=1.
+		// Scoped to non-deferred contexts (the Phase-1 root pass runs with
+		// g_advance_defer_nested=1 and defers nested advance to Phase 3) and to
+		// already-built clips (just_allocated clips still build their frame 0).
+		if (!g_advance_defer_nested && !just_allocated)
+		{
+			extern size_t g_tick_count;
+			if (obj->placed_at_tick == g_tick_count)
+				continue;
+		}
+
 		// Check for manual frame navigation (gotoAndPlay/gotoAndStop)
 		size_t frame = obj->sprite_current_frame;
 		if (obj->sprite_manual_next_frame)
