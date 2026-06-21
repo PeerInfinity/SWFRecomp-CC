@@ -31,6 +31,7 @@ Default output: tools/divergence/runs/<swf_stem>/
   divergence.txt              first divergence report
 """
 import argparse
+import difflib
 import os
 import re
 import shutil
@@ -117,36 +118,128 @@ def lines_equivalent(a: str, b: str, rel_tol: float, abs_tol: float) -> bool:
     return all(_nums_close(x, y, rel_tol, abs_tol) for x, y in zip(na, nb))
 
 
-def first_trace_divergence(a_lines: list[str], b_lines: list[str],
-                           rel_tol: float = 0.0, abs_tol: float = 0.0,
-                           accept_rules=None
-                           ) -> tuple[int, str, str, int, list]:
-    """Return (index, a_line, b_line, absorbed, accepted) of the first line that
-    differs beyond numeric tolerance and is not covered by an accepted-diff rule.
-    `absorbed` counts earlier lines that differed only within numeric tolerance
-    (float-precision noise). `accepted` is the list of (index, tag) for earlier
-    lines matched by a documented per-game accept rule. With rel_tol=abs_tol=0 and
-    no accept_rules this is an exact line comparison. index=-1 = no divergence.
-    Skeletons match per-line so absorbing a line preserves positional alignment."""
-    n = max(len(a_lines), len(b_lines))
-    absorbed = 0
-    accepted = []
-    for i in range(n):
-        a = a_lines[i] if i < len(a_lines) else "<EOF>"
-        b = b_lines[i] if i < len(b_lines) else "<EOF>"
-        if a == b:
+_FRAME_RE = re.compile(r"^F(\d+)\b")
+
+
+def _frame_of(line: str):
+    """Parse the leading frame number from a tracer line ("F12 ..." -> 12).
+    Returns None for non-frame lines (e.g. "TRACER: start ...")."""
+    m = _FRAME_RE.match(line)
+    return int(m.group(1)) if m else None
+
+
+def analyze_trace_divergence(a_lines: list[str], b_lines: list[str],
+                             rel_tol: float = 0.0, abs_tol: float = 0.0,
+                             accept_rules=None) -> dict:
+    """Align the two filtered traces with difflib (exact-line keys) and classify
+    every difference. Unlike a positional index compare, this correctly handles
+    INSERTED / DELETED lines (e.g. a preloader clip Ruffle keeps but SWFRecomp
+    removed) — they show up as ruffle-only / swfrecomp-only lines instead of
+    shifting every subsequent line into a false divergence.
+
+    Identical lines (frame headers, matched clips) anchor the alignment; float
+    precision and structural diffs land in `replace` blocks where the existing
+    numeric tolerance + accepted-diff rules are applied per pair.
+
+    Returns a dict:
+      first        None, or {kind, a, b, a_frame, b_frame} for the first real
+                   divergence (kind: 'replace'|'ruffle_only'|'swfrecomp_only').
+      absorbed     count of lines that differed only within numeric tolerance.
+      accepted     [(tag), ...] lines matched by a documented per-game rule.
+      ruffle_only  count of lines present in Ruffle but not SWFRecomp.
+      swf_only     count of lines present in SWFRecomp but not Ruffle.
+      matched      count of exactly-equal aligned lines.
+      diverge_frames  sorted list of frame numbers carrying a real divergence.
+      max_frame    highest frame number seen on either side (None if none).
+      transient    None, or {reconverge_frame, diverge_frames} when all real
+                   divergences are confined to early frames and the traces
+                   re-converge (match) for at least one later frame.
+    """
+    res = {"first": None, "absorbed": 0, "accepted": [], "ruffle_only": 0,
+           "swf_only": 0, "matched": 0, "diverge_frames": set(),
+           "max_frame": None, "transient": None}
+
+    def note_frame(line):
+        f = _frame_of(line)
+        if f is not None:
+            res["max_frame"] = f if res["max_frame"] is None else max(res["max_frame"], f)
+        return f
+
+    def real_divergence(kind, a, b):
+        if res["first"] is None:
+            res["first"] = {"kind": kind, "a": a, "b": b,
+                            "a_frame": _frame_of(a) if a != "<absent>" else None,
+                            "b_frame": _frame_of(b) if b != "<absent>" else None}
+        for ln in (a, b):
+            if ln != "<absent>":
+                f = _frame_of(ln)
+                if f is not None:
+                    res["diverge_frames"].add(f)
+
+    sm = difflib.SequenceMatcher(None, a_lines, b_lines, autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        for ln in a_lines[i1:i2] + b_lines[j1:j2]:
+            note_frame(ln)
+        if tag == "equal":
+            res["matched"] += (i2 - i1)
+        elif tag == "replace":
+            ra, rb = a_lines[i1:i2], b_lines[j1:j2]
+            m = min(len(ra), len(rb))
+            for k in range(m):
+                pa, pb = ra[k], rb[k]
+                if (rel_tol > 0 or abs_tol > 0) and lines_equivalent(pa, pb, rel_tol, abs_tol):
+                    res["absorbed"] += 1
+                    continue
+                if accept_rules:
+                    t = accepted_diffs.match_any(accept_rules, pa, pb)
+                    if t is not None:
+                        res["accepted"].append(t)
+                        continue
+                real_divergence("replace", pa, pb)
+            # Unpaired remainder of a longer side = ruffle-only / swfrecomp-only.
+            for pa in ra[m:]:
+                res["ruffle_only"] += 1
+                real_divergence("ruffle_only", pa, "<absent>")
+            for pb in rb[m:]:
+                res["swf_only"] += 1
+                real_divergence("swfrecomp_only", "<absent>", pb)
+        elif tag == "delete":   # lines only in a (Ruffle)
+            for pa in a_lines[i1:i2]:
+                res["ruffle_only"] += 1
+                real_divergence("ruffle_only", pa, "<absent>")
+        elif tag == "insert":   # lines only in b (SWFRecomp)
+            for pb in b_lines[j1:j2]:
+                res["swf_only"] += 1
+                real_divergence("swfrecomp_only", "<absent>", pb)
+
+    # Re-convergence: real divergences confined to early frames, with at least
+    # one fully-matched later frame (the hallmark of a transient preloader/pacing
+    # blip that self-heals, vs a bug that cascades for the rest of the run).
+    df = res["diverge_frames"]
+    if df and res["max_frame"] is not None and max(df) < res["max_frame"]:
+        res["transient"] = {"reconverge_frame": max(df) + 1,
+                            "diverge_frames": sorted(df)}
+    res["diverge_frames"] = sorted(df)
+    return res
+
+
+def detect_byte_preloader(swfrecomp_dir: Path) -> bool:
+    """True if the recompiled scripts reference getBytesLoaded/getBytesTotal —
+    i.e. the SWF has a byte-loading preloader. Such SWFs report fully-loaded
+    immediately under SWFRecomp (local file) while Ruffle's headless exporter
+    streams bytes progressively, so early-frame divergences are often
+    exporter-pacing artifacts rather than runtime bugs."""
+    scripts = swfrecomp_dir / "RecompiledScripts"
+    if not scripts.is_dir():
+        return False
+    for f in scripts.glob("*.c"):
+        try:
+            txt = f.read_text(errors="ignore")
+        except OSError:
             continue
-        if (rel_tol > 0 or abs_tol > 0) and a != "<EOF>" and b != "<EOF>" \
-                and lines_equivalent(a, b, rel_tol, abs_tol):
-            absorbed += 1
-            continue
-        if accept_rules and a != "<EOF>" and b != "<EOF>":
-            tag = accepted_diffs.match_any(accept_rules, a, b)
-            if tag is not None:
-                accepted.append((i, tag))
-                continue
-        return i, a, b, absorbed, accepted
-    return -1, "", "", absorbed, accepted
+        if "getBytesLoaded" in txt or "getBytesTotal" in txt:
+            return True
+    return False
 
 
 def ruffle_png_for_frame(ruffle_dir: Path, frame: int, total: int) -> Path:
@@ -284,8 +377,11 @@ def main():
     rel_tol = 0.0 if args.trace_exact else args.trace_rel_tol
     abs_tol = 0.0 if args.trace_exact else args.trace_abs_tol
     accept_rules = [] if args.no_accept else accepted_diffs.load_manifest(stem)
-    idx, a_line, b_line, absorbed, accepted = first_trace_divergence(
-        a, b, rel_tol, abs_tol, accept_rules)
+    an = analyze_trace_divergence(a, b, rel_tol, abs_tol, accept_rules)
+    absorbed = an["absorbed"]
+    accepted = an["accepted"]
+    first = an["first"]
+    byte_preloader = detect_byte_preloader(swfrecomp_dir)
 
     report = []
     report.append(f"=== Divergence report: {stem} ===")
@@ -296,13 +392,13 @@ def main():
                       f"tolerance (rel={rel_tol:g}, abs={abs_tol:g}) — float-precision "
                       f"noise, not flagged. Use --trace-exact to see them.")
     if accepted:
-        tags = ", ".join(sorted(set(t for _, t in accepted)))
+        tags = ", ".join(sorted(set(accepted)))
         mname = accepted_diffs.manifest_path(stem).name
         report.append(f"Trace: {len(accepted)} line(s) matched documented "
                       f"accepted-diff rule(s) in accepted/{mname} ({tags}) — "
                       f"known observer/tooling artifact, not flagged. Use "
                       f"--no-accept to see them.")
-    if idx < 0:
+    if first is None:
         if accepted:
             report.append(f"Trace: converged (modulo {len(accepted)} documented "
                           f"accepted-diff line(s))")
@@ -311,13 +407,35 @@ def main():
         else:
             report.append("Trace: identical")
     else:
-        report.append(f"Trace: first divergence at filtered line {idx}")
-        report.append(f"  ruffle:    {a_line}")
-        report.append(f"  swfrecomp: {b_line}")
-        ctx_start = max(0, idx - 3)
-        report.append(f"  context (filtered lines {ctx_start}-{idx-1}):")
-        for j in range(ctx_start, idx):
-            report.append(f"    {j:>4}: {a[j]}")
+        kind = first["kind"]
+        report.append(f"Trace: first divergence ({kind})"
+                      + (f" at frame F{first['a_frame'] or first['b_frame']}"
+                         if (first['a_frame'] or first['b_frame']) is not None else ""))
+        report.append(f"  ruffle:    {first['a']}")
+        report.append(f"  swfrecomp: {first['b']}")
+        if an["ruffle_only"] or an["swf_only"]:
+            report.append(f"  line counts: {an['ruffle_only']} ruffle-only, "
+                          f"{an['swf_only']} swfrecomp-only, "
+                          f"{an['matched']} matched")
+        # B: transient (re-convergence) classification.
+        if an["transient"]:
+            t = an["transient"]
+            fr = ",".join(f"F{x}" for x in t["diverge_frames"])
+            report.append(f"  TRANSIENT: divergences confined to {fr}; traces "
+                          f"re-converge at F{t['reconverge_frame']} and match "
+                          f"through F{an['max_frame']}.")
+        # C: byte-loading-preloader context. Gate on the actual pacing
+        # signatures — a transient (self-healing) divergence or a clip
+        # add/remove line-count mismatch — not merely "early frame", so a real
+        # early value-replace bug (e.g. an auto-instance-counter off-by-N) in a
+        # SWF that happens to have a preloader is not mislabeled.
+        if byte_preloader and (an["transient"] or an["ruffle_only"] or an["swf_only"]):
+            report.append("  PRELOADER: SWF uses getBytesLoaded/getBytesTotal — "
+                          "SWFRecomp reports fully-loaded immediately (local file) "
+                          "while Ruffle's exporter streams progressively, so an "
+                          "early-frame divergence here is likely an exporter-pacing "
+                          "artifact (accepted preloader-pacing class), not a runtime "
+                          "bug. Verify before treating as a bug.")
 
     # 5. Diff images (also builds the side-by-side compare/ set for all frames)
     img_frame, img_msg = build_comparison(

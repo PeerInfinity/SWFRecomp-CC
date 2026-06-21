@@ -128,10 +128,20 @@ local_batch baseline at once, `tools/divergence/run_local_batch.sh`.
 
 ### 3b. Reading a divergence report
 
-- **`Trace: first divergence at filtered line N`** — the first place AVM1 state
-  diverges. This is almost always the most actionable signal and is **fully
+- **`Trace: first divergence (kind) at frame FN`** — the first place AVM1 state
+  diverges (traces are difflib-aligned, so `kind` is `replace` / `ruffle_only` /
+  `swfrecomp_only` and inserted/deleted lines don't cascade into false
+  divergences). This is almost always the most actionable signal and is **fully
   headless**. Example finding from RESULTS.md: SWFRecomp emits spurious
   `_root.instanceN=undefined` enumerable globals that Ruffle doesn't.
+- **`TRANSIENT` / `PRELOADER` annotations** — the harness auto-recognizes the
+  preloader-pacing class: `TRANSIENT` = divergences confined to early frames that
+  re-converge (self-healing blip, not a cascading bug); `PRELOADER` = the SWF uses
+  `getBytesLoaded`/`getBytesTotal` and the divergence has a pacing signature, so
+  it's **likely an accepted exporter-pacing artifact** (SWFRecomp reports a local
+  file as fully loaded immediately; Ruffle's exporter streams progressively).
+  A *hint to verify*, not a verdict — confirm, then document via
+  `tools/divergence/accepted/`. (cf. krazykar2 `l1`/`l2`, Duck Life 1 `spinamount`.)
 - **`Trace: identical`** — logic matches; any remaining diff is rendering.
 - **`Image: first divergence at frame N`** — rendered pixels differ.
   `max_diff` near 255 with huge outlier counts = structural (background /

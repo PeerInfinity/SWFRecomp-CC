@@ -101,13 +101,9 @@ after frame N has run":
 === Divergence report: Pong ===
 Frames compared: 20
 Trace lines: ruffle=76, swfrecomp=96
-Trace: first divergence at filtered line 6
+Trace: first divergence (replace) at frame F2
   ruffle:    F2 _currentframe=2
   swfrecomp: F2 _currentframe=1
-  context (filtered lines 3-5):
-       3: F1 _root.instance2 _x=260 _y=190.6 _cf=1 _vis=true
-       4: F1 _root.instance2.instance3 _x=-13.65 _y=-58.1 _cf=2 _vis=true
-       5: F1 _root.instance2.instance3.progbar _x=-49.9 _y=0 _cf=1 _vis=true
 Image: first divergence at frame 1: max_diff=255 (50459 outliers exceed limit of 0, max difference 255)
 ```
 
@@ -115,15 +111,36 @@ Image: first divergence at frame 1: max_diff=255 (50459 outliers exceed limit of
   each side. A big gap usually means one side exited the tick loop early —
   not always a bug (`fscommand("quit")` from the tracer), but worth checking
   the last few lines of each `trace.txt`.
-- **Trace: first divergence**: line index into the filtered traces. Context
-  shows the 3 preceding identical lines for orientation. Numbers are compared
-  with tolerance (see `--trace-rel-tol`), so this is the first *meaningful*
-  divergence, skipping float-precision noise.
+- **Trace: first divergence (`kind`) at frame F`N`**: the traces are aligned
+  with `difflib` (not a positional index compare), so the `kind` is one of:
+  - `replace` — a line present on both sides whose structure or beyond-tolerance
+    numbers differ (the classic divergence).
+  - `ruffle_only` — a line in Ruffle's trace with no SWFRecomp counterpart
+    (e.g. a preloader clip Ruffle keeps but SWFRecomp already removed).
+  - `swfrecomp_only` — a line SWFRecomp emits that Ruffle doesn't.
+  Because alignment is diff-based, an inserted/deleted line no longer shifts
+  every later line into a false divergence; a `line counts:` summary
+  (`R ruffle-only, S swfrecomp-only, M matched`) is printed when lines were
+  added/removed. Numbers are compared with tolerance (see `--trace-rel-tol`).
 - **Trace: N line(s) differed only within numeric tolerance**: appears when
   float-precision noise was absorbed (e.g. f32 scale storage). It is NOT a bug;
   re-run with `--trace-exact` if you want to see those lines. Without this, the
   harness used to get permanently stuck on the first computed scale/position in
   component-heavy games.
+- **`TRANSIENT: ...`**: all real divergences are confined to early frames and the
+  traces **re-converge** (match for at least one later frame). The hallmark of a
+  self-healing pacing blip — a bug almost always cascades, a transient self-heals.
+  Reports the diverging frame(s) and the re-convergence frame.
+- **`PRELOADER: ...`**: the SWF's recompiled scripts reference
+  `getBytesLoaded`/`getBytesTotal` AND the divergence has a preloader-pacing
+  signature (transient, or a clip add/remove line-count mismatch). SWFRecomp
+  reports a local file as fully loaded immediately while Ruffle's headless
+  exporter streams bytes progressively, so such a divergence is **likely an
+  accepted exporter-pacing artifact, not a runtime bug** (cf. Duck Life 1
+  `spinamount`, krazykar2 `l1`/`l2`). It is a *hint to verify*, not a verdict —
+  nothing is suppressed; confirm before treating as a bug, then document it as
+  accepted (see `tools/divergence/accepted/README.md`). The
+  `TRANSIENT`+`PRELOADER` combination is the strongest signal of this class.
 - **Image: first divergence**: lowest 1-based frame number whose PNG pair
   fails the tolerance check. `max_diff` is the largest single-channel
   absolute difference (0-255); `outliers` is the number of channels (R, G,
