@@ -1,16 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `34641bc76d68` (2026-06-22T00:11:58.897747+00:00)
-**Current:** `b5e9f3e9caf0` (2026-06-22T02:27:05.860022+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `b5e9f3e9caf0` (2026-06-22T02:27:05.860022+00:00)
+**Current:** `96e9660aefe6` (2026-06-22T03:27:53.472288+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 18 | 18 | 0 |
-| Total | 19 | 19 | 0 |
-| Pass rate | 94.7% | 94.7% | 0% |
+| Passing | 18 | 19 | +1 |
+| Total | 19 | 20 | +1 |
+| Pass rate | 94.7% | 95.0% | +0.3% |
 | Mismatched lines | 2 | 2 | 0 |
 
-No changes detected.
+## Added Tests (1)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `trace-as2/root_onload` | pass | 4/4 |
