@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `3c5a3c75e1cf`  
-**Date:** 2026-06-22 18:02 UTC  
-**Total duration:** 3h12m23s
+**Commit:** `242276006a46`  
+**Date:** 2026-06-22 19:13 UTC  
+**Total duration:** 2h44m30s
 
 ## Results by Suite
 
@@ -32,7 +32,7 @@
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 115,471 | 130,961 | 88.2% |
+| avm1 | 115,484 | 130,961 | 88.2% |
 | from_gnash/actionscript.all | 29,815 | 38,484 | 77.5% |
 | from_gnash/misc-ming.all | 3,972 | 5,183 | 76.6% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -40,7 +40,7 @@
 | from_gnash/misc-swfmill.all | 89 | 91 | 97.8% |
 | from_shumway | 882 | 1,276 | 69.1% |
 | from_shumway/avm1 | 489 | 491 | 99.6% |
-| **Total** | **151,322** | **177,252** | **85.4%** |
+| **Total** | **151,335** | **177,252** | **85.4%** |
 
 ## Failure Breakdown
 
@@ -91,64 +91,64 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | - | - | - | 13 |
+| avm1 | - | - | 13 | - |
 
-*Comparing `96e9660aefe6` → `3c5a3c75e1cf`*
+*Comparing `3c5a3c75e1cf` → `242276006a46`*
 
 ## Per-Suite Details
 
 ### avm1
 
 - **Pass:** 629/703 (89.5%)
-- **Duration:** 1h27m37s across 30 shards
-- **Lines:** 115,471/130,961 matching (88.2%)
-- **Avg test duration:** 7.4s — slowest: `edittext_html_align_swf7` (39.5s)
+- **Duration:** 1h09m45s across 30 shards
+- **Lines:** 115,484/130,961 matching (88.2%)
+- **Avg test duration:** 5.9s — slowest: `netstream_play_flv_screen` (37.9s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 128/235 (54.5%)
-- **Duration:** 37m07s across 29 shards
+- **Duration:** 29m55s across 29 shards
 - **Lines:** 29,815/38,484 matching (77.5%)
-- **Avg test duration:** 9.4s — slowest: `MovieClip-v8` (56.5s)
+- **Avg test duration:** 7.6s — slowest: `MovieClip-v8` (69.5s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 63/107 (58.9%)
-- **Duration:** 34m18s across 29 shards
+- **Duration:** 31m51s across 29 shards
 - **Lines:** 3,972/5,183 matching (76.6%)
-- **Avg test duration:** 19.2s — slowest: `matrix_test` (108.5s)
+- **Avg test duration:** 17.8s — slowest: `matrix_test` (104.7s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m48s across 29 shards
+- **Duration:** 2m16s across 29 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 12.1s — slowest: `implementsOpTest` (23.1s)
+- **Avg test duration:** 15.1s — slowest: `exception` (22.4s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 10/19 (52.6%)
-- **Duration:** 5m30s across 29 shards
+- **Duration:** 5m03s across 29 shards
 - **Lines:** 393/535 matching (73.5%)
-- **Avg test duration:** 17.4s — slowest: `gotoFrameLabelAsFunction` (23.6s)
+- **Avg test duration:** 15.9s — slowest: `movieclip_destruction_test1` (24.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 18/19 (94.7%)
-- **Duration:** 6m13s across 29 shards
+- **Duration:** 6m28s across 29 shards
 - **Lines:** 89/91 matching (97.8%)
-- **Avg test duration:** 19.6s — slowest: `background` (23.4s)
+- **Avg test duration:** 20.4s — slowest: `dict_event` (22.6s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 16m28s across 30 shards
+- **Duration:** 15m47s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 10.7s — slowest: `fuzz/65f0c0a49528b4350e0521d10c632e475a5670010f817d406246b9771a1c2121` (24.1s)
+- **Avg test duration:** 10.2s — slowest: `fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3` (23.3s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 3m19s across 30 shards
+- **Duration:** 3m20s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 4.2s — slowest: `text-bind` (24.6s)
+- **Avg test duration:** 4.2s — slowest: `text-bind` (22.5s)
