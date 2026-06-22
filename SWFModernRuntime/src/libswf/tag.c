@@ -4048,6 +4048,56 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	// Draw pass: same walk as measure, but pull per-paragraph x_offset at
 	// paragraph start (right after newline / on first byte).
 	float base_x = info->x * 20.0f + gutter_twips;
+
+	// Horizontal scroll: shift the whole layout left so the caret stays inside
+	// the field when the text is wider than the field. Single-line + focused
+	// only; the field clip mask hides the scrolled-out glyphs. Browser-WASM only
+	// (in OFFSCREEN/headless nothing is focused → caret_char<0 → no shift → CI
+	// render byte-identical).
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	if (info->caret_char >= 0 && info->mc != NULL) {
+		int multiline = 0;
+		for (size_t i = 0; i < text_len; i++) {
+			unsigned char c = (unsigned char)text[i];
+			if (c == '\n' || c == '\r' || c == 0xFE || c == 0xFF) { multiline = 1; break; }
+		}
+		if (!multiline) {
+			// Caret pixel offset from the text origin (paragraph offset + the
+			// glyph advances up to the caret).
+			float caret_off = (par_count > 0 ? par_x_offset[0] : 0.0f);
+			size_t p = 0; int cc = 0;
+			while (p < text_len && cc < info->caret_char) {
+				unsigned char c0 = (unsigned char)text[p];
+				u16 cp;
+				if (c0 >= 0xC0 && c0 < 0xE0 && p + 1 < text_len) {
+					cp = ((c0 & 0x1F) << 6) | ((unsigned char)text[p+1] & 0x3F); p += 2;
+				} else if (c0 >= 0xE0 && c0 < 0xF0 && p + 2 < text_len) {
+					cp = ((c0 & 0x0F) << 12) | (((unsigned char)text[p+1] & 0x3F) << 6) |
+					     ((unsigned char)text[p+2] & 0x3F); p += 3;
+				} else { cp = c0; p += 1; }
+				int gi = ng_font_find_glyph(font_idx, cp);
+				if (gi >= 0) {
+					s16 a = ng_font_glyph_advance_by_idx(font_idx, gi);
+					if (a >= 0)
+						caret_off += (float)a * ((float)info->font_height / (float)em_square);
+				}
+				cc++;
+			}
+			float visible_w = info->w * 20.0f - 2.0f * gutter_twips;
+			float old_scroll = ng_get_textfield_scroll_x(info->mc);
+			float scroll = old_scroll;
+			if (caret_off - scroll < 0.0f) scroll = caret_off;
+			else if (caret_off - scroll > visible_w) scroll = caret_off - visible_w;
+			if (scroll < 0.0f) scroll = 0.0f;
+			if (scroll != old_scroll)
+				ng_set_textfield_scroll_x(_gd_ctx, info->mc, scroll);
+			base_x -= scroll;
+		} else if (ng_get_textfield_scroll_x(info->mc) != 0.0f) {
+			ng_set_textfield_scroll_x(_gd_ctx, info->mc, 0.0f);
+		}
+	}
+#endif
+
 	int par_idx = 0;
 	float x_pos = base_x + (par_count > 0 ? par_x_offset[0] : 0.0f);
 	int at_par_start = 1;

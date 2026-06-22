@@ -26451,6 +26451,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		// offscreen runs, where nothing is focused → CI render output unchanged).
 		info.caret_char = (mc == g_focused_mc && g_selection_caret >= 0)
 			? g_selection_caret : -1;
+		info.mc = (void*)mc;
 
 		cb(&info, user_data);
 		count++;
@@ -26676,6 +26677,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.right_margin_twips = (s32) ng_getTextFieldRightMargin(tf_idx);
 	info.indent_twips = (s32) ng_getTextFieldIndent(tf_idx);
 	info.caret_char = -1;  // orphan/static path: never the focused editable field
+	info.mc = NULL;
 	glyph_cb(&info, user_data);
 }
 
@@ -71932,6 +71934,32 @@ int ng_is_textfield_focused(void)
 	return (g_focused_mc != NULL && MC_IS_TEXTFIELD(g_focused_mc)) ? 1 : 0;
 }
 
+// Horizontal scroll offset (twips) for a single-line editable field, cached on
+// the field's dynamic props as `_tf_scroll_x`. The glyph renderer adjusts it
+// each frame to keep the caret inside the field and shifts the layout left by
+// it; click hit-testing adds it back so clicks map to the right character.
+float ng_get_textfield_scroll_x(void* mc_v)
+{
+	MovieClip* mc = (MovieClip*) mc_v;
+	if (mc == NULL || mc->dynamic_props == NULL) return 0.0f;
+	ActionVar* p = getProperty((ASObject*)mc->dynamic_props, "_tf_scroll_x", 12);
+	if (p != NULL && p->type == ACTION_STACK_VALUE_F64) {
+		double d; memcpy(&d, &p->data.numeric_value, sizeof(double));
+		return (float)d;
+	}
+	return 0.0f;
+}
+
+void ng_set_textfield_scroll_x(SWFAppContext* app_context, void* mc_v, float twips)
+{
+	MovieClip* mc = (MovieClip*) mc_v;
+	if (mc == NULL || mc->dynamic_props == NULL) return;
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &v.data.numeric_value) = (double)twips;
+	setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_scroll_x", 12, &v);
+}
+
 // ---------------------------------------------------------------------------
 // Focus highlight state
 // ---------------------------------------------------------------------------
@@ -72315,7 +72343,9 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 	if (g_focused_mc != NULL && g_focused_mc->ng_textfield_idx >= 0) {
 		float x1, y1, x2, y2;
 		if (mc_get_pixel_aabb_ng(g_focused_mc, &x1, &y1, &x2, &y2)) {
-			float local_x = mx - x1;
+			// Add the field's horizontal scroll (twips→px) so a click maps to the
+			// right character when the text is scrolled. 0 in non-browser builds.
+			float local_x = mx - x1 + ng_get_textfield_scroll_x(g_focused_mc) / 20.0f;
 			float local_y = my - y1;
 			// Get current text from MC properties
 			const char* text_utf8 = NULL;
@@ -72366,7 +72396,7 @@ static int tf_char_index_at_mouse(SWFAppContext* app_context)
 	float my = app_context->mouse.stage_y / 20.0f;
 	float x1, y1, x2, y2;
 	if (!mc_get_pixel_aabb_ng(g_focused_mc, &x1, &y1, &x2, &y2)) return -1;
-	float local_x = mx - x1;
+	float local_x = mx - x1 + ng_get_textfield_scroll_x(g_focused_mc) / 20.0f;
 	float local_y = my - y1;
 
 	// Get current text
@@ -72659,7 +72689,7 @@ void actionTextFieldDragEnd(SWFAppContext* app_context)
 		// Mouse hit this text field — check for href
 		TFRunTable* table = tf_find_table(mc);
 		if (table == NULL) continue;
-		float local_x = mx - x1;
+		float local_x = mx - x1 + ng_get_textfield_scroll_x(mc) / 20.0f;
 		float local_y = my - y1;
 		// Get text for char index calculation
 		const char* text_utf8 = NULL;

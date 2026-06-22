@@ -705,6 +705,10 @@ typedef struct TextFieldGlyphInfo {
     // or -1 when it isn't (the common case — nothing is focused in headless /
     // offscreen runs, so the caret is never drawn there and CI is unaffected).
     int caret_char;
+    // The field's MovieClip (only set for the child_mc_cache path; NULL for
+    // orphan/static fields). Lets the renderer read/write the cached horizontal
+    // scroll offset to keep the caret visible.
+    void* mc;
 } TextFieldGlyphInfo;
 
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);
@@ -779,3 +783,5 @@ void actionTextControlBackspace(SWFAppContext* app_context);
 void actionTextControlDelete(SWFAppContext* app_context);
 void actionTextFieldInput(SWFAppContext* app_context, int codepoint);
 int  ng_is_textfield_focused(void);
+float ng_get_textfield_scroll_x(void* mc);
+void  ng_set_textfield_scroll_x(SWFAppContext* app_context, void* mc, float twips);
