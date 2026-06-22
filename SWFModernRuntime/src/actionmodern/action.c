@@ -20310,13 +20310,38 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 							}
 						}
 					}
-					if (child_depth == SIZE_MAX) return NULL;
-
-					MovieClip* child_mc = findOrCreateMovieClip(app_context, seg_buf,
-						mc == &root_movieclip ? &root_movieclip : mc);
-					if (child_mc == NULL) return NULL;
-					child_mc->parent = mc;
-					mc = child_mc;
+					if (child_depth == SIZE_MAX) {
+						// Dynamic clips (duplicateMovieClip / attachMovie /
+						// createEmptyMovieClip) live in child_mc_cache, NOT the
+						// display list, so the display-list scans above miss them.
+						// Find the clip there by name+parent (find-only, no
+						// creation) so tellTarget / SetTarget can redirect to it.
+						// Without this, a bare-name SetTarget to a duplicated clip
+						// returns NULL and the redirect falls back to root — e.g.
+						// Minesweeper's board build
+						// `tellTarget("cell"+i+"_"+j){gotoAndStop("Unknown")}`
+						// no-op'd, freezing all 480 cells on frame 1. The
+						// NO_GRAPHICS branch already resolves these via its
+						// dynamic_props / findOrCreateMovieClip fallbacks.
+						MovieClip* want_parent = (mc == &root_movieclip) ? &root_movieclip : mc;
+						MovieClip* dyn = NULL;
+						for (int _i = 0; _i < child_mc_count; _i++) {
+							MovieClip* _c = child_mc_cache[_i];
+							if (_c == NULL || _c->depth == INT_MIN) continue;
+							if (_c->parent != want_parent) continue;
+							if (!swf_name_match(_c->name, seg_buf)) continue;
+							dyn = _c;
+							break;
+						}
+						if (dyn == NULL) return NULL;
+						mc = dyn;
+					} else {
+						MovieClip* child_mc = findOrCreateMovieClip(app_context, seg_buf,
+							mc == &root_movieclip ? &root_movieclip : mc);
+						if (child_mc == NULL) return NULL;
+						child_mc->parent = mc;
+						mc = child_mc;
+					}
 				}
 #endif
 			}
@@ -31722,6 +31747,50 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 	if (!label)
 	{
 		return;
+	}
+
+	// tellTarget / SetTarget redirected the target to a non-root MC (e.g. a
+	// duplicateMovieClip'd clip): resolve the label against THAT clip's OWN
+	// timeline and navigate it. Mirrors actionGotoFrame's targeted_sprite /
+	// g_current_context branches. Without this, gotoAndStop("Unknown") inside
+	// `tellTarget("cell"+i+"_"+j)` misses (the root label table has no
+	// "Unknown") and silently no-ops, freezing every Minesweeper board cell on
+	// frame 1 (the "1"/digit tile) instead of the raised "Unknown" tile.
+	// gotoAndStop semantics ⇒ stop (play=0). The branch only fires while a
+	// SetTarget redirect is active (g_settarget_context_changed) or a graphics
+	// targeted_sprite is set, so normal in-sprite / root gotos are unaffected.
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	if (targeted_sprite != NULL && targeted_sprite->char_id != 0)
+	{
+		extern int ng_findSpriteLabelFrame(size_t char_id, const char* label);
+		int sf = ng_findSpriteLabelFrame(targeted_sprite->char_id, label);
+		if (sf >= 0)
+		{
+			targeted_sprite->sprite_next_frame = (size_t)sf;
+			targeted_sprite->sprite_manual_next_frame = 1;
+			targeted_sprite->sprite_is_playing = 0;
+		}
+		return;
+	}
+#endif
+	{
+		extern int g_settarget_context_changed;
+		if (g_settarget_context_changed && g_current_context != NULL &&
+		    g_current_context != &root_movieclip)
+		{
+			extern size_t ng_getCharIdByMC(MovieClip* mc);
+			extern int ng_findSpriteLabelFrame(size_t char_id, const char* label);
+			size_t cid = ng_getCharIdByMC(g_current_context);
+			if (cid > 0)
+			{
+				int sf = ng_findSpriteLabelFrame(cid, label);
+				if (sf >= 0)
+				{
+					ng_gotoFrameByMC(app_context, g_current_context, (u16)sf, 0);
+					return;
+				}
+			}
+		}
 	}
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)

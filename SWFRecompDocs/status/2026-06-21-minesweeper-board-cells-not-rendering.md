@@ -75,9 +75,17 @@ Full 30×16 grey grid renders, matching Ruffle. Verified in headed Chrome via
   still the pre-existing F4 float32-scale component diff).
 - CI: shared `action.c`/`tag_stubs.c` → dispatched both modes.
 
-## Known residual (minor, follow-up)
-The bottom-right cell (`cell29_15`, the last clone) shows a stray blue "1" instead
-of the grey "Unknown" tile — its `gotoAndStop("Unknown"); play()` advanced one
-frame where the other 479 stayed put (the duplicated-clip playhead-advance edge
-case; cf. `goto-catchup-placed-clip-no-advance`). Cosmetic, one cell; the board is
-fully playable. Not chased this session.
+## Known residual (minor, follow-up) — FIXED 2026-06-22
+~~The bottom-right cell (`cell29_15`, the last clone) shows a stray blue "1"
+instead of the grey "Unknown" tile.~~
+
+**Correction / resolution:** this undercounted — *all 480* cells were frozen on
+frame 1 (the digit tile), not just the bottom-right; the board only *looked*
+plausible because frame 1 isn't visually far off at a glance. Root cause was NOT a
+playhead-advance edge case: the board build's `tellTarget("cellX_Y")
+{ gotoAndStop("Unknown") }` never navigated the cells at all, because (1)
+browser-WASM `actionSetTarget` couldn't resolve a `child_mc_cache` dynamic clip
+(its `resolveSlashPathToMC` graphics branch only searched the display list), and
+(2) `actionGoToLabel` ignored the `tellTarget` target. Fixed in `action.c`; all
+480 cells now rest on frame 12 ("Unknown"), matching Ruffle. See
+`2026-06-22-minesweeper-board-cells-frozen-frame1-telltarget-gotolabel.md`.
