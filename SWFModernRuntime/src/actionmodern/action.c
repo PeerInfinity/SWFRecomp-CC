@@ -23997,6 +23997,23 @@ static TFRunTable* tf_find_table(MovieClip* mc) {
 	return NULL;
 }
 
+// Drop any existing TFRunTable for an MC so the glyph renderer falls back to
+// the field's live `text` property. The editable-text mutation paths
+// (keyboard input, backspace/delete/cut, IME commit) write `text` directly via
+// setProperty(), bypassing the SetMember "text" handler that normally
+// invalidates the stale run table. Without this the renderer keeps drawing the
+// table's initial static text (e.g. Minesweeper's "anonymous" name field never
+// reflected typed characters). Mirrors the SetMember non-HTML invalidate branch.
+static void tf_invalidate_run_table(MovieClip* mc) {
+	TFRunTable* t = tf_find_table(mc);
+	if (t != NULL) {
+		t->mc = NULL;
+		t->run_count = 0;
+		t->text_len = 0;
+		t->from_html_text = 0;
+	}
+}
+
 // Find the TFRun whose character range covers char_idx, or NULL
 static TFRun* tf_find_run_at_index(TFRunTable* table, u32 char_idx) {
 	for (u32 i = 0; i < table->run_count; i++) {
@@ -67403,6 +67420,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			VAL(double, &len_val.data.numeric_value) = (double)result_len;
 			setProperty(app_context, rs_props, "length", 6, &len_val);
 
+			// Drop the stale run table so the renderer reads the updated `text`.
+			tf_invalidate_run_table(mc);
+
 			// Update selection: caret moves to end of inserted text, begin=end=caret
 			int new_caret = sel_begin + (int)new_u16_len;
 			if (mc == g_focused_mc) {
@@ -72753,6 +72773,7 @@ void actionTextControlCut(SWFAppContext* app_context)
 	setProperty(app_context, props, "length", 6, &len_val);
 
 	ng_syncTextToVar(app_context, g_focused_mc, &empty_text);
+	tf_invalidate_run_table(g_focused_mc);
 	g_tf_select_all = 0;
 }
 
@@ -72857,6 +72878,7 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 		VAL(double, &len_val.data.numeric_value) = 0.0;
 		setProperty(app_context, props, "length", 6, &len_val);
 		ng_syncTextToVar(app_context, g_focused_mc, &empty_text);
+		tf_invalidate_run_table(g_focused_mc);
 		g_tf_select_all = 0;
 		g_selection_begin = 0;
 		g_selection_end = 0;
@@ -72917,6 +72939,7 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 	g_selection_caret = del_start;
 
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+	tf_invalidate_run_table(g_focused_mc);
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 }
 
@@ -73308,6 +73331,7 @@ void actionTextFieldImeCompose(SWFAppContext* app_context, const char* text,
 
 	// Sync to variable binding
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+	tf_invalidate_run_table(g_focused_mc);
 
 	// Update selection/caret to end of composition
 	int new_caret = (int)(g_ime_data.ime_start + g_ime_data.ime_len);
@@ -73435,6 +73459,9 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 	// Sync to variable binding
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
 	g_tf_select_all = 0;
+
+	// Drop the stale run table so the renderer reads the updated `text`.
+	tf_invalidate_run_table(g_focused_mc);
 
 	// Fire onChanged callback
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
