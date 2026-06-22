@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-06-22T20:17:58.862290+00:00",
-    "git_sha": "242276006a46afc42e03b87b36d7d48ab927c910",
-    "duration_seconds": 2197.64,
+    "timestamp": "2026-06-22T22:18:23.193650+00:00",
+    "git_sha": "faeccbf1137168112737e14f1467f47ff528ea0b",
+    "duration_seconds": 2197.41,
     "total_available": 243,
     "shards": 30,
     "expected_shards": 30,
@@ -24,8 +24,8 @@
     {
       "test": "ASnative-v5",
       "phases": {
-        "recomp": 0.039,
-        "compile": 24.428,
+        "recomp": 0.043,
+        "compile": 24.398,
         "run": 0.005
       },
       "num_frames": 30,
@@ -34,7 +34,7 @@
         "expected_lines": 107,
         "matching_lines": 72
       },
-      "duration": 24.48,
+      "duration": 24.45,
       "ruffle_diff_count": 35,
       "ours_diff_count": 35,
       "status": "ruffle_matched",
@@ -43,8 +43,8 @@
     {
       "test": "ASnative-v6",
       "phases": {
-        "recomp": 0.04,
-        "compile": 5.513,
+        "recomp": 0.045,
+        "compile": 5.488,
         "run": 0.005
       },
       "num_frames": 30,
@@ -53,7 +53,7 @@
         "expected_lines": 110,
         "matching_lines": 70
       },
-      "duration": 5.56,
+      "duration": 5.54,
       "ruffle_diff_count": 40,
       "ours_diff_count": 40,
       "status": "ruffle_matched",
@@ -62,8 +62,8 @@
     {
       "test": "ASnative-v7",
       "phases": {
-        "recomp": 0.04,
-        "compile": 5.156,
+        "recomp": 0.045,
+        "compile": 5.186,
         "run": 0.005
       },
       "num_frames": 30,
@@ -72,7 +72,7 @@
         "expected_lines": 110,
         "matching_lines": 70
       },
-      "duration": 5.21,
+      "duration": 5.24,
       "ruffle_diff_count": 40,
       "ours_diff_count": 40,
       "status": "ruffle_matched",
@@ -81,8 +81,8 @@
     {
       "test": "ASnative-v8",
       "phases": {
-        "recomp": 0.04,
-        "compile": 1.323,
+        "recomp": 0.045,
+        "compile": 1.335,
         "run": 0.005
       },
       "num_frames": 30,
@@ -91,7 +91,7 @@
         "expected_lines": 110,
         "matching_lines": 70
       },
-      "duration": 1.37,
+      "duration": 1.39,
       "ruffle_diff_count": 40,
       "ours_diff_count": 40,
       "status": "ruffle_matched",
@@ -100,8 +100,8 @@
     {
       "test": "Accessibility-v5",
       "phases": {
-        "recomp": 0.007,
-        "compile": 1.92,
+        "recomp": 0.008,
+        "compile": 1.93,
         "run": 0.003
       },
       "num_frames": 30,
@@ -110,14 +110,14 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 1.93,
+      "duration": 1.94,
       "status": "pass"
     },
     {
       "test": "Accessibility-v6",
       "phases": {
         "recomp": 0.008,
-        "compile": 1.981,
+        "compile": 1.99,
         "run": 0.003
       },
       "num_frames": 30,
@@ -126,14 +126,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 2.0,
+      "duration": 2.01,
       "status": "pass"
     },
     {
       "test": "Accessibility-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.623,
+        "recomp": 0.008,
+        "compile": 1.634,
         "run": 0.003
       },
       "num_frames": 30,
@@ -142,14 +142,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 1.63,
+      "duration": 1.65,
       "status": "pass"
     },
     {
       "test": "Accessibility-v8",
       "phases": {
-        "recomp": 0.009,
-        "compile": 1.216,
+        "recomp": 0.0,
+        "compile": 1.23,
         "run": 0.003
       },
       "num_frames": 30,
@@ -158,14 +158,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 1.23,
+      "duration": 1.24,
       "status": "pass"
     },
     {
       "test": "AsBroadcaster-v5",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.818,
+        "recomp": 0.007,
+        "compile": 1.823,
         "run": 0.003
       },
       "num_frames": 30,
@@ -174,15 +174,15 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 1.83,
+      "duration": 1.84,
       "status": "pass"
     },
     {
       "test": "AsBroadcaster-v6",
       "phases": {
-        "recomp": 0.032,
-        "compile": 23.625,
-        "run": 0.005
+        "recomp": 0.043,
+        "compile": 23.658,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -190,7 +190,7 @@
         "expected_lines": 121,
         "matching_lines": 114
       },
-      "duration": 23.67,
+      "duration": 23.71,
       "ruffle_diff_count": 13,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -199,8 +199,8 @@
     {
       "test": "AsBroadcaster-v7",
       "phases": {
-        "recomp": 0.031,
-        "compile": 4.483,
+        "recomp": 0.043,
+        "compile": 4.668,
         "run": 0.005
       },
       "num_frames": 30,
@@ -209,7 +209,7 @@
         "expected_lines": 121,
         "matching_lines": 114
       },
-      "duration": 4.52,
+      "duration": 4.72,
       "ruffle_diff_count": 13,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -218,9 +218,9 @@
     {
       "test": "AsBroadcaster-v8",
       "phases": {
-        "recomp": 0.031,
-        "compile": 1.445,
-        "run": 0.005
+        "recomp": 0.043,
+        "compile": 1.564,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -228,7 +228,7 @@
         "expected_lines": 121,
         "matching_lines": 114
       },
-      "duration": 1.48,
+      "duration": 1.61,
       "ruffle_diff_count": 13,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -237,8 +237,8 @@
     {
       "test": "BitmapData-v5",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.866,
+        "recomp": 0.006,
+        "compile": 1.965,
         "run": 0.003
       },
       "num_frames": 30,
@@ -247,30 +247,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.88,
+      "duration": 1.98,
       "status": "pass"
     },
     {
       "test": "BitmapData-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 0.547,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.55,
-      "status": "pass"
-    },
-    {
-      "test": "BitmapData-v7",
-      "phases": {
-        "recomp": 0.004,
-        "compile": 1.429,
+        "recomp": 0.006,
+        "compile": 0.594,
         "run": 0.003
       },
       "num_frames": 30,
@@ -279,15 +263,31 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.44,
+      "duration": 0.61,
+      "status": "pass"
+    },
+    {
+      "test": "BitmapData-v7",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.564,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.58,
       "status": "pass"
     },
     {
       "test": "BitmapData-v8",
       "phases": {
-        "recomp": 0.236,
-        "compile": 21.218,
-        "run": 0.128
+        "recomp": 0.282,
+        "compile": 23.12,
+        "run": 0.13
       },
       "num_frames": 30,
       "lines": {
@@ -295,7 +295,7 @@
         "expected_lines": 417,
         "matching_lines": 409
       },
-      "duration": 21.59,
+      "duration": 23.54,
       "ruffle_diff_count": 13,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -304,9 +304,9 @@
     {
       "test": "Boolean-v5",
       "phases": {
-        "recomp": 0.008,
-        "compile": 2.341,
-        "run": 0.004
+        "recomp": 0.011,
+        "compile": 2.453,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -314,15 +314,15 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 2.36,
+      "duration": 2.47,
       "status": "pass"
     },
     {
       "test": "Boolean-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.783,
-        "run": 0.004
+        "recomp": 0.011,
+        "compile": 1.909,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -330,15 +330,15 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 1.79,
+      "duration": 1.93,
       "status": "pass"
     },
     {
       "test": "Boolean-v7",
       "phases": {
         "recomp": 0.011,
-        "compile": 21.183,
-        "run": 0.003
+        "compile": 20.914,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -346,14 +346,14 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 21.2,
+      "duration": 20.93,
       "status": "pass"
     },
     {
       "test": "Boolean-v8",
       "phases": {
         "recomp": 0.011,
-        "compile": 1.446,
+        "compile": 1.414,
         "run": 0.003
       },
       "num_frames": 30,
@@ -362,14 +362,14 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 1.46,
+      "duration": 1.43,
       "status": "pass"
     },
     {
       "test": "Camera-v5",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.806,
+        "recomp": 0.006,
+        "compile": 1.759,
         "run": 0.003
       },
       "num_frames": 30,
@@ -378,14 +378,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.82,
+      "duration": 1.77,
       "status": "pass"
     },
     {
       "test": "Camera-v6",
       "phases": {
-        "recomp": 0.032,
-        "compile": 4.048,
+        "recomp": 0.029,
+        "compile": 3.912,
         "run": 0.004
       },
       "num_frames": 30,
@@ -394,7 +394,7 @@
         "expected_lines": 90,
         "matching_lines": 33
       },
-      "duration": 4.09,
+      "duration": 3.95,
       "ruffle_diff_count": 57,
       "ours_diff_count": 57,
       "status": "ruffle_matched",
@@ -403,8 +403,8 @@
     {
       "test": "Camera-v7",
       "phases": {
-        "recomp": 0.03,
-        "compile": 3.685,
+        "recomp": 0.029,
+        "compile": 3.521,
         "run": 0.004
       },
       "num_frames": 30,
@@ -413,7 +413,7 @@
         "expected_lines": 90,
         "matching_lines": 33
       },
-      "duration": 3.72,
+      "duration": 3.56,
       "ruffle_diff_count": 57,
       "ours_diff_count": 57,
       "status": "ruffle_matched",
@@ -422,8 +422,8 @@
     {
       "test": "Camera-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.449,
+        "recomp": 0.03,
+        "compile": 1.407,
         "run": 0.004
       },
       "num_frames": 30,
@@ -432,7 +432,7 @@
         "expected_lines": 90,
         "matching_lines": 33
       },
-      "duration": 1.46,
+      "duration": 1.44,
       "ruffle_diff_count": 57,
       "ours_diff_count": 57,
       "status": "ruffle_matched",
@@ -441,8 +441,8 @@
     {
       "test": "Color-v5",
       "phases": {
-        "recomp": 0.05,
-        "compile": 5.55,
+        "recomp": 0.049,
+        "compile": 5.223,
         "run": 0.004
       },
       "num_frames": 30,
@@ -451,14 +451,14 @@
         "expected_lines": 140,
         "matching_lines": 140
       },
-      "duration": 5.61,
+      "duration": 5.28,
       "status": "pass"
     },
     {
       "test": "Color-v6",
       "phases": {
-        "recomp": 0.067,
-        "compile": 6.407,
+        "recomp": 0.066,
+        "compile": 6.236,
         "run": 0.005
       },
       "num_frames": 30,
@@ -467,14 +467,14 @@
         "expected_lines": 171,
         "matching_lines": 171
       },
-      "duration": 6.48,
+      "duration": 6.31,
       "status": "pass"
     },
     {
       "test": "Color-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 6.355,
+        "recomp": 0.06,
+        "compile": 5.997,
         "run": 0.005
       },
       "num_frames": 30,
@@ -483,15 +483,15 @@
         "expected_lines": 161,
         "matching_lines": 161
       },
-      "duration": 6.36,
+      "duration": 6.07,
       "status": "pass"
     },
     {
       "test": "Color-v8",
       "phases": {
-        "recomp": 0.046,
-        "compile": 24.302,
-        "run": 0.006
+        "recomp": 0.069,
+        "compile": 25.434,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -499,14 +499,14 @@
         "expected_lines": 161,
         "matching_lines": 161
       },
-      "duration": 24.36,
+      "duration": 25.51,
       "status": "pass"
     },
     {
       "test": "ColorTransform-v5",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.777,
+        "recomp": 0.006,
+        "compile": 2.072,
         "run": 0.003
       },
       "num_frames": 30,
@@ -515,14 +515,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.79,
+      "duration": 2.09,
       "status": "pass"
     },
     {
       "test": "ColorTransform-v6",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.552,
+        "recomp": 0.006,
+        "compile": 0.659,
         "run": 0.003
       },
       "num_frames": 30,
@@ -531,15 +531,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 0.56,
+      "duration": 0.67,
       "status": "pass"
     },
     {
       "test": "ColorTransform-v7",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.44,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 1.687,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -547,14 +547,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.45,
+      "duration": 1.7,
       "status": "pass"
     },
     {
       "test": "ColorTransform-v8",
       "phases": {
-        "recomp": 0.012,
-        "compile": 2.977,
+        "recomp": 0.019,
+        "compile": 3.356,
         "run": 0.004
       },
       "num_frames": 30,
@@ -563,14 +563,14 @@
         "expected_lines": 55,
         "matching_lines": 55
       },
-      "duration": 3.0,
+      "duration": 3.38,
       "status": "pass"
     },
     {
       "test": "ContextMenu-v5",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.753,
+        "recomp": 0.0,
+        "compile": 2.028,
         "run": 0.003
       },
       "num_frames": 30,
@@ -579,14 +579,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.76,
+      "duration": 2.03,
       "status": "pass"
     },
     {
       "test": "ContextMenu-v6",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.521,
+        "recomp": 0.006,
+        "compile": 0.63,
         "run": 0.003
       },
       "num_frames": 30,
@@ -595,14 +595,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 0.53,
+      "duration": 0.64,
       "status": "pass"
     },
     {
       "test": "ContextMenu-v7",
       "phases": {
-        "recomp": 0.028,
-        "compile": 4.477,
+        "recomp": 0.044,
+        "compile": 4.985,
         "run": 0.005
       },
       "num_frames": 30,
@@ -611,15 +611,15 @@
         "expected_lines": 131,
         "matching_lines": 131
       },
-      "duration": 4.51,
+      "duration": 5.04,
       "status": "pass"
     },
     {
       "test": "ContextMenu-v8",
       "phases": {
-        "recomp": 0.03,
-        "compile": 25.064,
-        "run": 0.005
+        "recomp": 0.034,
+        "compile": 18.777,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -627,15 +627,15 @@
         "expected_lines": 131,
         "matching_lines": 131
       },
-      "duration": 25.1,
+      "duration": 18.82,
       "status": "pass"
     },
     {
       "test": "Date-v5",
       "phases": {
-        "recomp": 0.127,
-        "compile": 32.564,
-        "run": 0.008
+        "recomp": 0.139,
+        "compile": 26.302,
+        "run": 0.006
       },
       "num_frames": 30,
       "lines": {
@@ -643,7 +643,7 @@
         "expected_lines": 315,
         "matching_lines": 308
       },
-      "duration": 32.7,
+      "duration": 26.45,
       "ruffle_diff_count": 7,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -652,9 +652,9 @@
     {
       "test": "Date-v6",
       "phases": {
-        "recomp": 0.156,
-        "compile": 13.967,
-        "run": 0.008
+        "recomp": 0.169,
+        "compile": 13.068,
+        "run": 0.006
       },
       "num_frames": 30,
       "lines": {
@@ -662,7 +662,7 @@
         "expected_lines": 357,
         "matching_lines": 351
       },
-      "duration": 14.13,
+      "duration": 13.25,
       "ruffle_diff_count": 6,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -671,9 +671,9 @@
     {
       "test": "Date-v7",
       "phases": {
-        "recomp": 0.161,
-        "compile": 14.185,
-        "run": 0.008
+        "recomp": 0.174,
+        "compile": 12.911,
+        "run": 0.006
       },
       "num_frames": 30,
       "lines": {
@@ -681,7 +681,7 @@
         "expected_lines": 357,
         "matching_lines": 351
       },
-      "duration": 14.36,
+      "duration": 13.1,
       "ruffle_diff_count": 6,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -690,9 +690,9 @@
     {
       "test": "Date-v8",
       "phases": {
-        "recomp": 0.161,
-        "compile": 1.559,
-        "run": 0.008
+        "recomp": 0.175,
+        "compile": 1.339,
+        "run": 0.006
       },
       "num_frames": 30,
       "lines": {
@@ -700,7 +700,7 @@
         "expected_lines": 357,
         "matching_lines": 351
       },
-      "duration": 1.73,
+      "duration": 1.52,
       "ruffle_diff_count": 6,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -709,9 +709,9 @@
     {
       "test": "Error-v5",
       "phases": {
-        "recomp": 0.007,
-        "compile": 2.277,
-        "run": 0.004
+        "recomp": 0.009,
+        "compile": 1.865,
+        "run": 0.002
       },
       "num_frames": 30,
       "lines": {
@@ -719,46 +719,14 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 2.29,
+      "duration": 1.88,
       "status": "pass"
     },
     {
       "test": "Error-v6",
       "phases": {
-        "recomp": 0.007,
-        "compile": 2.328,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      },
-      "duration": 2.34,
-      "status": "pass"
-    },
-    {
-      "test": "Error-v7",
-      "phases": {
-        "recomp": 0.007,
-        "compile": 1.941,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      },
-      "duration": 1.95,
-      "status": "pass"
-    },
-    {
-      "test": "Error-v8",
-      "phases": {
-        "recomp": 0.012,
-        "compile": 22.184,
+        "recomp": 0.0,
+        "compile": 1.919,
         "run": 0.003
       },
       "num_frames": 30,
@@ -767,14 +735,46 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 22.2,
+      "duration": 1.92,
+      "status": "pass"
+    },
+    {
+      "test": "Error-v7",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 1.628,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 1.64,
+      "status": "pass"
+    },
+    {
+      "test": "Error-v8",
+      "phases": {
+        "recomp": 0.011,
+        "compile": 21.467,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 21.48,
       "status": "pass"
     },
     {
       "test": "ExternalInterface-v5",
       "phases": {
         "recomp": 0.006,
-        "compile": 2.11,
+        "compile": 2.004,
         "run": 0.003
       },
       "num_frames": 30,
@@ -783,15 +783,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 2.12,
+      "duration": 2.02,
       "status": "pass"
     },
     {
       "test": "ExternalInterface-v6",
       "phases": {
-        "recomp": 0.018,
-        "compile": 3.111,
-        "run": 0.004
+        "recomp": 0.016,
+        "compile": 2.901,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -799,15 +799,15 @@
         "expected_lines": 55,
         "matching_lines": 55
       },
-      "duration": 3.14,
+      "duration": 2.92,
       "status": "pass"
     },
     {
       "test": "ExternalInterface-v7",
       "phases": {
-        "recomp": 0.018,
-        "compile": 2.702,
-        "run": 0.004
+        "recomp": 0.016,
+        "compile": 2.504,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -815,14 +815,14 @@
         "expected_lines": 55,
         "matching_lines": 55
       },
-      "duration": 2.73,
+      "duration": 2.53,
       "status": "pass"
     },
     {
       "test": "ExternalInterface-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 5.294,
+        "recomp": 0.04,
+        "compile": 4.911,
         "run": 0.005
       },
       "num_frames": 30,
@@ -831,7 +831,7 @@
         "expected_lines": 118,
         "matching_lines": 114
       },
-      "duration": 5.3,
+      "duration": 4.96,
       "ruffle_diff_count": 4,
       "ours_diff_count": 4,
       "status": "ruffle_matched",
@@ -840,8 +840,8 @@
     {
       "test": "Function-v5",
       "phases": {
-        "recomp": 0.044,
-        "compile": 25.857,
+        "recomp": 0.039,
+        "compile": 25.234,
         "run": 0.005
       },
       "num_frames": 30,
@@ -850,7 +850,7 @@
         "expected_lines": 158,
         "matching_lines": 144
       },
-      "duration": 25.91,
+      "duration": 25.28,
       "ruffle_diff_count": 24,
       "ours_diff_count": 14,
       "status": "ruffle_matched",
@@ -859,8 +859,8 @@
     {
       "test": "Function-v6",
       "phases": {
-        "recomp": 0.11,
-        "compile": 10.073,
+        "recomp": 0.097,
+        "compile": 9.617,
         "run": 0.007
       },
       "num_frames": 30,
@@ -869,7 +869,7 @@
         "expected_lines": 271,
         "matching_lines": 263
       },
-      "duration": 10.2,
+      "duration": 9.73,
       "ruffle_diff_count": 33,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -878,8 +878,8 @@
     {
       "test": "Function-v7",
       "phases": {
-        "recomp": 0.111,
-        "compile": 10.189,
+        "recomp": 0.098,
+        "compile": 9.802,
         "run": 0.007
       },
       "num_frames": 30,
@@ -888,7 +888,7 @@
         "expected_lines": 272,
         "matching_lines": 264
       },
-      "duration": 10.31,
+      "duration": 9.91,
       "ruffle_diff_count": 33,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -898,7 +898,7 @@
       "test": "Function-v8",
       "phases": {
         "recomp": 0.097,
-        "compile": 27.828,
+        "compile": 28.217,
         "run": 0.007
       },
       "num_frames": 30,
@@ -907,7 +907,7 @@
         "expected_lines": 272,
         "matching_lines": 264
       },
-      "duration": 27.94,
+      "duration": 28.33,
       "ruffle_diff_count": 33,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -916,8 +916,8 @@
     {
       "test": "Global-v5",
       "phases": {
-        "recomp": 0.0,
-        "compile": 6.699,
+        "recomp": 0.068,
+        "compile": 6.755,
         "run": 0.005
       },
       "num_frames": 30,
@@ -926,14 +926,14 @@
         "expected_lines": 172,
         "matching_lines": 172
       },
-      "duration": 6.71,
+      "duration": 6.83,
       "status": "pass"
     },
     {
       "test": "Global-v6",
       "phases": {
         "recomp": 0.091,
-        "compile": 26.193,
+        "compile": 26.58,
         "run": 0.006
       },
       "num_frames": 30,
@@ -942,7 +942,7 @@
         "expected_lines": 210,
         "matching_lines": 201
       },
-      "duration": 26.29,
+      "duration": 26.68,
       "ruffle_diff_count": 10,
       "ours_diff_count": 9,
       "status": "ruffle_matched",
@@ -951,8 +951,8 @@
     {
       "test": "Global-v7",
       "phases": {
-        "recomp": 0.073,
-        "compile": 7.02,
+        "recomp": 0.0,
+        "compile": 7.239,
         "run": 0.005
       },
       "num_frames": 30,
@@ -961,14 +961,14 @@
         "expected_lines": 182,
         "matching_lines": 182
       },
-      "duration": 7.1,
+      "duration": 7.25,
       "status": "pass"
     },
     {
       "test": "Global-v8",
       "phases": {
-        "recomp": 0.065,
-        "compile": 6.461,
+        "recomp": 0.0,
+        "compile": 6.633,
         "run": 0.005
       },
       "num_frames": 30,
@@ -977,14 +977,14 @@
         "expected_lines": 169,
         "matching_lines": 169
       },
-      "duration": 6.53,
+      "duration": 6.64,
       "status": "pass"
     },
     {
       "test": "HitTest-v6",
       "phases": {
-        "recomp": 0.029,
-        "compile": 4.771,
+        "recomp": 0.0,
+        "compile": 4.807,
         "run": 0.004
       },
       "num_frames": 30,
@@ -993,7 +993,7 @@
         "expected_lines": 88,
         "matching_lines": 80
       },
-      "duration": 4.81,
+      "duration": 4.82,
       "ruffle_diff_count": 8,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -1002,8 +1002,8 @@
     {
       "test": "HitTest-v7",
       "phases": {
-        "recomp": 0.031,
-        "compile": 4.444,
+        "recomp": 0.0,
+        "compile": 4.497,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1012,7 +1012,7 @@
         "expected_lines": 88,
         "matching_lines": 80
       },
-      "duration": 4.48,
+      "duration": 4.51,
       "ruffle_diff_count": 8,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -1021,8 +1021,8 @@
     {
       "test": "HitTest-v8",
       "phases": {
-        "recomp": 0.029,
-        "compile": 4.291,
+        "recomp": 0.0,
+        "compile": 4.333,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1031,7 +1031,7 @@
         "expected_lines": 88,
         "matching_lines": 79
       },
-      "duration": 4.33,
+      "duration": 4.34,
       "ruffle_diff_count": 9,
       "ours_diff_count": 9,
       "status": "ruffle_matched",
@@ -1040,8 +1040,8 @@
     {
       "test": "Inheritance-v5",
       "phases": {
-        "recomp": 0.0,
-        "compile": 23.843,
+        "recomp": 0.038,
+        "compile": 25.567,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1050,7 +1050,7 @@
         "expected_lines": 114,
         "matching_lines": 114
       },
-      "duration": 23.85,
+      "duration": 25.61,
       "ruffle_diff_count": 17,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -1060,7 +1060,7 @@
       "test": "Inheritance-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.772,
+        "compile": 7.086,
         "run": 0.006
       },
       "num_frames": 30,
@@ -1069,7 +1069,7 @@
         "expected_lines": 181,
         "matching_lines": 173
       },
-      "duration": 6.78,
+      "duration": 7.1,
       "ruffle_diff_count": 16,
       "ours_diff_count": 9,
       "status": "ruffle_matched",
@@ -1078,8 +1078,8 @@
     {
       "test": "Inheritance-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 6.926,
+        "recomp": 0.065,
+        "compile": 7.253,
         "run": 0.006
       },
       "num_frames": 30,
@@ -1088,7 +1088,7 @@
         "expected_lines": 181,
         "matching_lines": 177
       },
-      "duration": 6.94,
+      "duration": 7.33,
       "ruffle_diff_count": 10,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -1097,8 +1097,8 @@
     {
       "test": "Inheritance-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 2.003,
+        "recomp": 0.065,
+        "compile": 2.032,
         "run": 0.006
       },
       "num_frames": 30,
@@ -1107,7 +1107,7 @@
         "expected_lines": 181,
         "matching_lines": 177
       },
-      "duration": 2.01,
+      "duration": 2.11,
       "ruffle_diff_count": 10,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -1116,8 +1116,40 @@
     {
       "test": "Instance-v5",
       "phases": {
+        "recomp": 0.015,
+        "compile": 3.065,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 52,
+        "expected_lines": 52,
+        "matching_lines": 52
+      },
+      "duration": 3.09,
+      "status": "pass"
+    },
+    {
+      "test": "Instance-v6",
+      "phases": {
+        "recomp": 0.016,
+        "compile": 1.745,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 52,
+        "expected_lines": 52,
+        "matching_lines": 52
+      },
+      "duration": 1.77,
+      "status": "pass"
+    },
+    {
+      "test": "Instance-v7",
+      "phases": {
         "recomp": 0.0,
-        "compile": 2.981,
+        "compile": 2.684,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1126,47 +1158,15 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 2.99,
-      "status": "pass"
-    },
-    {
-      "test": "Instance-v6",
-      "phases": {
-        "recomp": 0.016,
-        "compile": 1.733,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
-      },
-      "duration": 1.76,
-      "status": "pass"
-    },
-    {
-      "test": "Instance-v7",
-      "phases": {
-        "recomp": 0.016,
-        "compile": 2.688,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
-      },
-      "duration": 2.71,
+      "duration": 2.69,
       "status": "pass"
     },
     {
       "test": "Instance-v8",
       "phases": {
-        "recomp": 0.016,
-        "compile": 1.469,
-        "run": 0.004
+        "recomp": 0.015,
+        "compile": 1.478,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1174,14 +1174,14 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 1.49,
+      "duration": 1.5,
       "status": "pass"
     },
     {
       "test": "Key-v5",
       "phases": {
-        "recomp": 0.014,
-        "compile": 17.459,
+        "recomp": 0.0,
+        "compile": 21.576,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1190,14 +1190,14 @@
         "expected_lines": 51,
         "matching_lines": 51
       },
-      "duration": 17.48,
+      "duration": 21.58,
       "status": "pass"
     },
     {
       "test": "Key-v6",
       "phases": {
-        "recomp": 0.015,
-        "compile": 2.303,
+        "recomp": 0.019,
+        "compile": 2.904,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1206,14 +1206,14 @@
         "expected_lines": 55,
         "matching_lines": 55
       },
-      "duration": 2.32,
+      "duration": 2.93,
       "status": "pass"
     },
     {
       "test": "Key-v7",
       "phases": {
-        "recomp": 0.014,
-        "compile": 2.135,
+        "recomp": 0.0,
+        "compile": 2.527,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1222,14 +1222,14 @@
         "expected_lines": 55,
         "matching_lines": 55
       },
-      "duration": 2.16,
+      "duration": 2.53,
       "status": "pass"
     },
     {
       "test": "Key-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.179,
+        "recomp": 0.018,
+        "compile": 1.49,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1238,15 +1238,15 @@
         "expected_lines": 55,
         "matching_lines": 55
       },
-      "duration": 1.18,
+      "duration": 1.52,
       "status": "pass"
     },
     {
       "test": "LoadVars-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 16.836,
-        "run": 0.002
+        "compile": 20.93,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1254,15 +1254,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.84,
+      "duration": 20.94,
       "status": "pass"
     },
     {
       "test": "LoadVars-v6",
       "phases": {
-        "recomp": 0.037,
-        "compile": 4.745,
-        "run": 0.004
+        "recomp": 0.047,
+        "compile": 5.508,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -1270,7 +1270,7 @@
         "expected_lines": 152,
         "matching_lines": 146
       },
-      "duration": 4.79,
+      "duration": 5.56,
       "ruffle_diff_count": 8,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -1279,9 +1279,9 @@
     {
       "test": "LoadVars-v7",
       "phases": {
-        "recomp": 0.036,
-        "compile": 4.305,
-        "run": 0.004
+        "recomp": 0.0,
+        "compile": 5.211,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -1289,7 +1289,7 @@
         "expected_lines": 152,
         "matching_lines": 146
       },
-      "duration": 4.35,
+      "duration": 5.22,
       "ruffle_diff_count": 8,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -1298,9 +1298,9 @@
     {
       "test": "LoadVars-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.777,
-        "run": 0.004
+        "recomp": 0.046,
+        "compile": 2.233,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -1308,7 +1308,7 @@
         "expected_lines": 152,
         "matching_lines": 146
       },
-      "duration": 1.78,
+      "duration": 2.29,
       "ruffle_diff_count": 8,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -1318,7 +1318,7 @@
       "test": "LocalConnection-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.888,
+        "compile": 20.169,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1327,15 +1327,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 20.9,
+      "duration": 20.18,
       "status": "pass"
     },
     {
       "test": "LocalConnection-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 2.986,
-        "run": 0.004
+        "recomp": 0.017,
+        "compile": 2.85,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1343,15 +1343,15 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 2.99,
+      "duration": 2.87,
       "status": "pass"
     },
     {
       "test": "LocalConnection-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 2.634,
-        "run": 0.004
+        "recomp": 0.018,
+        "compile": 2.437,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1359,15 +1359,15 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 2.64,
+      "duration": 2.46,
       "status": "pass"
     },
     {
       "test": "LocalConnection-v8",
       "phases": {
-        "recomp": 0.018,
-        "compile": 1.275,
-        "run": 0.004
+        "recomp": 0.0,
+        "compile": 1.223,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1375,15 +1375,15 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 1.3,
+      "duration": 1.23,
       "status": "pass"
     },
     {
       "test": "Math-v5",
       "phases": {
-        "recomp": 0.16,
-        "compile": 13.29,
-        "run": 0.007
+        "recomp": 0.159,
+        "compile": 12.726,
+        "run": 0.006
       },
       "num_frames": 30,
       "lines": {
@@ -1391,7 +1391,7 @@
         "expected_lines": 278,
         "matching_lines": 273
       },
-      "duration": 13.46,
+      "duration": 12.9,
       "ruffle_diff_count": 5,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -1401,7 +1401,7 @@
       "test": "Math-v6",
       "phases": {
         "recomp": 0.159,
-        "compile": 0.659,
+        "compile": 0.641,
         "run": 0.007
       },
       "num_frames": 30,
@@ -1410,7 +1410,7 @@
         "expected_lines": 278,
         "matching_lines": 273
       },
-      "duration": 0.83,
+      "duration": 0.81,
       "ruffle_diff_count": 5,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -1419,8 +1419,8 @@
     {
       "test": "Math-v7",
       "phases": {
-        "recomp": 0.168,
-        "compile": 13.66,
+        "recomp": 0.167,
+        "compile": 13.205,
         "run": 0.007
       },
       "num_frames": 30,
@@ -1429,7 +1429,7 @@
         "expected_lines": 287,
         "matching_lines": 282
       },
-      "duration": 13.84,
+      "duration": 13.38,
       "ruffle_diff_count": 5,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -1438,8 +1438,8 @@
     {
       "test": "Math-v8",
       "phases": {
-        "recomp": 0.168,
-        "compile": 1.387,
+        "recomp": 0.167,
+        "compile": 1.316,
         "run": 0.007
       },
       "num_frames": 30,
@@ -1448,7 +1448,7 @@
         "expected_lines": 287,
         "matching_lines": 282
       },
-      "duration": 1.57,
+      "duration": 1.49,
       "ruffle_diff_count": 5,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -1457,8 +1457,8 @@
     {
       "test": "Matrix-v5",
       "phases": {
-        "recomp": 0.0,
-        "compile": 20.501,
+        "recomp": 0.006,
+        "compile": 22.234,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1467,14 +1467,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 20.51,
+      "duration": 22.25,
       "status": "pass"
     },
     {
       "test": "Matrix-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 7.144,
+        "recomp": 0.077,
+        "compile": 7.965,
         "run": 0.006
       },
       "num_frames": 30,
@@ -1483,7 +1483,7 @@
         "expected_lines": 168,
         "matching_lines": 139
       },
-      "duration": 7.15,
+      "duration": 8.05,
       "ruffle_diff_count": 71,
       "ours_diff_count": 29,
       "status": "ruffle_matched",
@@ -1492,27 +1492,8 @@
     {
       "test": "Matrix-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 7.143,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 168,
-        "expected_lines": 168,
-        "matching_lines": 140
-      },
-      "duration": 7.15,
-      "ruffle_diff_count": 70,
-      "ours_diff_count": 28,
-      "status": "ruffle_matched",
-      "detail": "diffs 28 \u2286 ruffle 70"
-    },
-    {
-      "test": "Matrix-v8",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.517,
+        "recomp": 0.077,
+        "compile": 7.961,
         "run": 0.006
       },
       "num_frames": 30,
@@ -1521,7 +1502,26 @@
         "expected_lines": 168,
         "matching_lines": 140
       },
-      "duration": 1.53,
+      "duration": 8.05,
+      "ruffle_diff_count": 70,
+      "ours_diff_count": 28,
+      "status": "ruffle_matched",
+      "detail": "diffs 28 \u2286 ruffle 70"
+    },
+    {
+      "test": "Matrix-v8",
+      "phases": {
+        "recomp": 0.077,
+        "compile": 1.581,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 168,
+        "expected_lines": 168,
+        "matching_lines": 140
+      },
+      "duration": 1.67,
       "ruffle_diff_count": 70,
       "ours_diff_count": 28,
       "status": "ruffle_matched",
@@ -1530,8 +1530,8 @@
     {
       "test": "Microphone-v5",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.903,
+        "recomp": 0.006,
+        "compile": 1.978,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1540,14 +1540,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.91,
+      "duration": 1.99,
       "status": "pass"
     },
     {
       "test": "Microphone-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 3.361,
+        "recomp": 0.025,
+        "compile": 3.474,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1556,7 +1556,7 @@
         "expected_lines": 79,
         "matching_lines": 48
       },
-      "duration": 3.37,
+      "duration": 3.51,
       "ruffle_diff_count": 31,
       "ours_diff_count": 31,
       "status": "ruffle_matched",
@@ -1565,8 +1565,8 @@
     {
       "test": "Microphone-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 3.009,
+        "recomp": 0.025,
+        "compile": 3.266,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1575,7 +1575,7 @@
         "expected_lines": 79,
         "matching_lines": 48
       },
-      "duration": 3.02,
+      "duration": 3.3,
       "ruffle_diff_count": 31,
       "ours_diff_count": 31,
       "status": "ruffle_matched",
@@ -1584,8 +1584,8 @@
     {
       "test": "Microphone-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.404,
+        "recomp": 0.025,
+        "compile": 1.508,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1594,7 +1594,7 @@
         "expected_lines": 79,
         "matching_lines": 48
       },
-      "duration": 1.41,
+      "duration": 1.54,
       "ruffle_diff_count": 31,
       "ours_diff_count": 31,
       "status": "ruffle_matched",
@@ -1604,8 +1604,8 @@
       "test": "Mouse-v5",
       "phases": {
         "recomp": 0.007,
-        "compile": 24.415,
-        "run": 0.004
+        "compile": 20.821,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1613,15 +1613,15 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 24.43,
+      "duration": 20.83,
       "status": "pass"
     },
     {
       "test": "Mouse-v6",
       "phases": {
-        "recomp": 0.009,
-        "compile": 2.458,
-        "run": 0.004
+        "recomp": 0.008,
+        "compile": 2.24,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1629,15 +1629,15 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 2.47,
+      "duration": 2.26,
       "status": "pass"
     },
     {
       "test": "Mouse-v7",
       "phases": {
-        "recomp": 0.009,
-        "compile": 2.057,
-        "run": 0.004
+        "recomp": 0.008,
+        "compile": 1.843,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1645,15 +1645,15 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 2.07,
+      "duration": 1.86,
       "status": "pass"
     },
     {
       "test": "Mouse-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.595,
-        "run": 0.004
+        "recomp": 0.008,
+        "compile": 1.424,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1661,14 +1661,14 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 1.6,
+      "duration": 1.44,
       "status": "pass"
     },
     {
       "test": "MovieClip-v5",
       "phases": {
-        "recomp": 0.206,
-        "compile": 35.381,
+        "recomp": 0.207,
+        "compile": 31.359,
         "run": 0.008
       },
       "num_frames": 30,
@@ -1677,7 +1677,7 @@
         "expected_lines": 363,
         "matching_lines": 339
       },
-      "duration": 35.6,
+      "duration": 31.58,
       "ruffle_diff_count": 226,
       "ours_diff_count": 24,
       "status": "ruffle_matched",
@@ -1686,9 +1686,9 @@
     {
       "test": "MovieClip-v6",
       "phases": {
-        "recomp": 1.171,
-        "compile": 49.901,
-        "run": 0.026
+        "recomp": 1.162,
+        "compile": 46.138,
+        "run": 0.017
       },
       "num_frames": 30,
       "lines": {
@@ -1696,7 +1696,7 @@
         "expected_lines": 936,
         "matching_lines": 885
       },
-      "duration": 51.11,
+      "duration": 47.33,
       "status": "output_mismatch",
       "detail": "51 line(s) differ (actual=921, expected=936)",
       "actual_output": "... (410 lines before) ...\nPASSED: sr61.member == 6 [./MovieClip.as:747]\nPASSED: typeof(sr62.member) == 'undefined' [./MovieClip.as:748]\nPASSED: sr61._name == \"hardref\" [./MovieClip.as:749]\nPASSED: sr62._name == \"hardref\" [./MovieClip.as:750]\nPASSED: hardref.member == 6 [./MovieClip.as:809]\nFAILED: expected: 60 obtained: 6 [./MovieClip.as:812]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:828]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:836]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:838]\nPASSED: typeof(hardref4) == 'undefined' [./MovieClip.as:845]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:846]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:853]\nFAILED: expected: \"hardref4_63\" obtained: hardref4_original [./MovieClip.as:861]\nPASSED: hardref4.member == 'hardref4_60' [./MovieClip.as:874]\nFAILED: expected: \"hardref4_60\" obtained: hardref4_original [./MovieClip.as:875]\nPASSED: sr63.member == \"hardref4_63\" [./MovieClip.as:876]\nPASSED: sr62.member == \"hardref4_63\" [./MovieClip.as:881]\nFAILED: expected: sr63 obtained:  [./MovieClip.as:884]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:886]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:887]\nPASSED: sr62.member == \"hardref4_64\" [./MovieClip.as:899]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:900]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:908]\nFAILED: expected: 'hardref4_64' obtained: hardref4_63 [./MovieClip.as:909]\nFAILED: expected: 'hardref4_64' obtained: hardref4_63 [./MovieClip.as:910]\nPASSED: sr64.member == 'hardref4_64' [./MovieClip.as:911]\nPASSED: sr59.getDepth() == 59 [./MovieClip.as:921]\nPASSED: sr60.getDepth() == 60 [./MovieClip.as:922]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:923]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:924]\nPASSED: sr59.getDepth() == 59 [./MovieClip.as:926]\nPASSED: sr60.getDepth() == -32829 [./MovieClip.as:927]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:928]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:929]\nFAILED: expected: -32829 obtained: -32828 [./MovieClip.as:935]\nPASSED: hardref5._target == \"/hardref5\" [./MovieClip.as:936]\nFAILED: expected: \"hardref5@60\" obtained: hardref5@59 [./MovieClip.as:937]\nPASSED: sr59.getDepth() == -32828 [./MovieClip.as:940]\nPASSED: sr59.member == \"hardref5@59\" [./MovieClip.as:941]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:942]\nPASSED: sr60.getDepth() == -32829 [./MovieClip.as:943]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:944]\nPASSED: sr60.member == \"hardref5@60\" [./MovieClip.as:945]\nPASSED: typeof(umc) == 'movieclip' [./MovieClip.as:954]\nPASSED: umc.getBounds().xMax == 6710886.35 [./MovieClip.as:956]\nPASSED: umc.getBounds().xMax == 102 [./MovieClip.as:972]\nPASSED: umc.getBounds().xMax == 102 [./MovieClip.as:984]\nPASSED: umc.a == 7 [./MovieClip.as:987]\nPASSED: umc.b == \"string\" [./MovieClip.as:988]\nPASSED: typeof(umc.onRollOut) == \"undefined\" [./MovieClip.as:989]\n... (461 lines after) ...",
@@ -1705,9 +1705,9 @@
     {
       "test": "MovieClip-v7",
       "phases": {
-        "recomp": 1.249,
-        "compile": 54.639,
-        "run": 0.018
+        "recomp": 1.25,
+        "compile": 49.101,
+        "run": 0.025
       },
       "num_frames": 30,
       "lines": {
@@ -1715,7 +1715,7 @@
         "expected_lines": 969,
         "matching_lines": 918
       },
-      "duration": 55.91,
+      "duration": 50.38,
       "status": "output_mismatch",
       "detail": "51 line(s) differ (actual=954, expected=969)",
       "actual_output": "... (440 lines before) ...\nPASSED: ul8.a == 7 [./MovieClip.as:798]\nPASSED: typeof(ul4.hul9) == \"movieclip\" [./MovieClip.as:801]\nPASSED: typeof(ul9) == \"movieclip\" [./MovieClip.as:802]\nPASSED: ul9.a == 7 [./MovieClip.as:803]\nPASSED: hardref.member == 6 [./MovieClip.as:809]\nFAILED: expected: 60 obtained: 6 [./MovieClip.as:812]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:828]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:836]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:838]\nPASSED: typeof(hardref4) == 'undefined' [./MovieClip.as:845]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:846]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:853]\nFAILED: expected: \"hardref4_63\" obtained: hardref4_original [./MovieClip.as:861]\nPASSED: hardref4.member == 'hardref4_60' [./MovieClip.as:874]\nFAILED: expected: \"hardref4_60\" obtained: hardref4_original [./MovieClip.as:875]\nPASSED: sr63.member == \"hardref4_63\" [./MovieClip.as:876]\nPASSED: sr62.member == \"hardref4_63\" [./MovieClip.as:881]\nFAILED: expected: sr63 obtained: undefined [./MovieClip.as:884]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:886]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:887]\nPASSED: sr62.member == \"hardref4_64\" [./MovieClip.as:899]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:900]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:908]\nFAILED: expected: 'hardref4_64' obtained: hardref4_63 [./MovieClip.as:909]\nFAILED: expected: 'hardref4_64' obtained: hardref4_63 [./MovieClip.as:910]\nPASSED: sr64.member == 'hardref4_64' [./MovieClip.as:911]\nPASSED: sr59.getDepth() == 59 [./MovieClip.as:921]\nPASSED: sr60.getDepth() == 60 [./MovieClip.as:922]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:923]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:924]\nPASSED: sr59.getDepth() == 59 [./MovieClip.as:926]\nPASSED: sr60.getDepth() == -32829 [./MovieClip.as:927]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:928]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:929]\nFAILED: expected: -32829 obtained: -32828 [./MovieClip.as:935]\nPASSED: hardref5._target == \"/hardref5\" [./MovieClip.as:936]\nFAILED: expected: \"hardref5@60\" obtained: hardref5@59 [./MovieClip.as:937]\nPASSED: sr59.getDepth() == -32828 [./MovieClip.as:940]\nPASSED: sr59.member == \"hardref5@59\" [./MovieClip.as:941]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:942]\nPASSED: sr60.getDepth() == -32829 [./MovieClip.as:943]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:944]\nPASSED: sr60.member == \"hardref5@60\" [./MovieClip.as:945]\nPASSED: typeof(umc) == 'movieclip' [./MovieClip.as:954]\nPASSED: umc.getBounds().xMax == 6710886.35 [./MovieClip.as:956]\nPASSED: umc.getBounds().xMax == 102 [./MovieClip.as:972]\nPASSED: umc.getBounds().xMax == 102 [./MovieClip.as:984]\nPASSED: umc.a == 7 [./MovieClip.as:987]\nPASSED: umc.b == \"string\" [./MovieClip.as:988]\nPASSED: typeof(umc.onRollOut) == \"undefined\" [./MovieClip.as:989]\n... (464 lines after) ...",
@@ -1724,9 +1724,9 @@
     {
       "test": "MovieClip-v8",
       "phases": {
-        "recomp": 1.582,
-        "compile": 67.914,
-        "run": 0.021
+        "recomp": 1.574,
+        "compile": 66.338,
+        "run": 0.019
       },
       "num_frames": 30,
       "lines": {
@@ -1734,7 +1734,7 @@
         "expected_lines": 1087,
         "matching_lines": 1004
       },
-      "duration": 69.53,
+      "duration": 67.94,
       "status": "output_mismatch",
       "detail": "83 line(s) differ (actual=1072, expected=1087)",
       "actual_output": "... (440 lines before) ...\nPASSED: ul8.a == 7 [./MovieClip.as:798]\nPASSED: typeof(ul4.hul9) == \"movieclip\" [./MovieClip.as:801]\nPASSED: typeof(ul9) == \"movieclip\" [./MovieClip.as:802]\nPASSED: ul9.a == 7 [./MovieClip.as:803]\nPASSED: hardref.member == 6 [./MovieClip.as:809]\nFAILED: expected: 60 obtained: 6 [./MovieClip.as:812]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:828]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:836]\nPASSED: sr62.member == \"hardref4_original\" [./MovieClip.as:838]\nPASSED: typeof(hardref4) == 'undefined' [./MovieClip.as:845]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:846]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:853]\nFAILED: expected: \"hardref4_63\" obtained: hardref4_original [./MovieClip.as:861]\nPASSED: hardref4.member == 'hardref4_60' [./MovieClip.as:874]\nFAILED: expected: \"hardref4_60\" obtained: hardref4_original [./MovieClip.as:875]\nPASSED: sr63.member == \"hardref4_63\" [./MovieClip.as:876]\nPASSED: sr62.member == \"hardref4_63\" [./MovieClip.as:881]\nFAILED: expected: sr63 obtained: undefined [./MovieClip.as:884]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:886]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:887]\nPASSED: sr62.member == \"hardref4_64\" [./MovieClip.as:899]\nFAILED: expected: 'undefined' obtained: string [./MovieClip.as:900]\nFAILED: expected: \"undefined\" obtained: string [./MovieClip.as:908]\nFAILED: expected: 'hardref4_64' obtained: hardref4_63 [./MovieClip.as:909]\nFAILED: expected: 'hardref4_64' obtained: hardref4_63 [./MovieClip.as:910]\nPASSED: sr64.member == 'hardref4_64' [./MovieClip.as:911]\nPASSED: sr59.getDepth() == 59 [./MovieClip.as:921]\nPASSED: sr60.getDepth() == 60 [./MovieClip.as:922]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:923]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:924]\nPASSED: sr59.getDepth() == 59 [./MovieClip.as:926]\nPASSED: sr60.getDepth() == -32829 [./MovieClip.as:927]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:928]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:929]\nFAILED: expected: -32829 obtained: -32828 [./MovieClip.as:935]\nPASSED: hardref5._target == \"/hardref5\" [./MovieClip.as:936]\nFAILED: expected: \"hardref5@60\" obtained: hardref5@59 [./MovieClip.as:937]\nPASSED: sr59.getDepth() == -32828 [./MovieClip.as:940]\nPASSED: sr59.member == \"hardref5@59\" [./MovieClip.as:941]\nPASSED: sr59._target == \"/hardref5\" [./MovieClip.as:942]\nPASSED: sr60.getDepth() == -32829 [./MovieClip.as:943]\nPASSED: sr60._target == \"/hardref5\" [./MovieClip.as:944]\nPASSED: sr60.member == \"hardref5@60\" [./MovieClip.as:945]\nPASSED: typeof(umc) == 'movieclip' [./MovieClip.as:954]\nPASSED: umc.getBounds().xMax == 6710886.35 [./MovieClip.as:956]\nFAILED: expected: 101 obtained: 102 [./MovieClip.as:970]\nFAILED: expected: 101 obtained: 102 [./MovieClip.as:982]\nPASSED: umc.a == 7 [./MovieClip.as:987]\nPASSED: umc.b == \"string\" [./MovieClip.as:988]\nPASSED: typeof(umc.onRollOut) == \"undefined\" [./MovieClip.as:989]\n... (582 lines after) ...",
@@ -1743,8 +1743,8 @@
     {
       "test": "MovieClipLoader-v5",
       "phases": {
-        "recomp": 0.005,
-        "compile": 20.481,
+        "recomp": 0.006,
+        "compile": 22.331,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1753,14 +1753,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 20.49,
+      "duration": 22.34,
       "status": "pass"
     },
     {
       "test": "MovieClipLoader-v6",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.624,
+        "recomp": 0.006,
+        "compile": 0.674,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1769,15 +1769,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 0.64,
+      "duration": 0.69,
       "status": "pass"
     },
     {
       "test": "MovieClipLoader-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 3.877,
-        "run": 0.003
+        "recomp": 0.021,
+        "compile": 4.23,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -1785,7 +1785,7 @@
         "expected_lines": 165,
         "matching_lines": 47
       },
-      "duration": 3.88,
+      "duration": 4.26,
       "ruffle_diff_count": 118,
       "ours_diff_count": 118,
       "status": "ruffle_matched",
@@ -1794,9 +1794,9 @@
     {
       "test": "MovieClipLoader-v8",
       "phases": {
-        "recomp": 0.018,
-        "compile": 2.505,
-        "run": 0.003
+        "recomp": 0.021,
+        "compile": 2.659,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -1804,7 +1804,7 @@
         "expected_lines": 165,
         "matching_lines": 47
       },
-      "duration": 2.53,
+      "duration": 2.69,
       "ruffle_diff_count": 118,
       "ours_diff_count": 118,
       "status": "ruffle_matched",
@@ -1813,8 +1813,8 @@
     {
       "test": "NetConnection-v5",
       "phases": {
-        "recomp": 0.005,
-        "compile": 20.146,
+        "recomp": 0.006,
+        "compile": 22.536,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1823,15 +1823,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 20.16,
+      "duration": 22.55,
       "status": "pass"
     },
     {
       "test": "NetConnection-v6",
       "phases": {
-        "recomp": 0.042,
-        "compile": 4.815,
-        "run": 0.004
+        "recomp": 0.0,
+        "compile": 5.385,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -1839,7 +1839,7 @@
         "expected_lines": 126,
         "matching_lines": 122
       },
-      "duration": 4.87,
+      "duration": 5.39,
       "ruffle_diff_count": 49,
       "ours_diff_count": 4,
       "status": "ruffle_matched",
@@ -1848,9 +1848,9 @@
     {
       "test": "NetConnection-v7",
       "phases": {
-        "recomp": 0.042,
-        "compile": 4.822,
-        "run": 0.004
+        "recomp": 0.051,
+        "compile": 5.416,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -1858,7 +1858,7 @@
         "expected_lines": 126,
         "matching_lines": 122
       },
-      "duration": 4.87,
+      "duration": 5.48,
       "ruffle_diff_count": 45,
       "ours_diff_count": 4,
       "status": "ruffle_matched",
@@ -1867,8 +1867,8 @@
     {
       "test": "NetConnection-v8",
       "phases": {
-        "recomp": 0.042,
-        "compile": 1.525,
+        "recomp": 0.051,
+        "compile": 1.667,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1877,7 +1877,7 @@
         "expected_lines": 126,
         "matching_lines": 122
       },
-      "duration": 1.58,
+      "duration": 1.73,
       "ruffle_diff_count": 45,
       "ours_diff_count": 4,
       "status": "ruffle_matched",
@@ -1886,8 +1886,8 @@
     {
       "test": "NetStream-v5",
       "phases": {
-        "recomp": 0.006,
-        "compile": 21.107,
+        "recomp": 0.0,
+        "compile": 20.613,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1896,14 +1896,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 21.12,
+      "duration": 20.62,
       "status": "pass"
     },
     {
       "test": "NetStream-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 3.509,
+        "recomp": 0.027,
+        "compile": 3.409,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1912,14 +1912,14 @@
         "expected_lines": 80,
         "matching_lines": 80
       },
-      "duration": 3.52,
+      "duration": 3.44,
       "status": "pass"
     },
     {
       "test": "NetStream-v7",
       "phases": {
-        "recomp": 0.024,
-        "compile": 3.15,
+        "recomp": 0.0,
+        "compile": 3.08,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1928,14 +1928,14 @@
         "expected_lines": 80,
         "matching_lines": 80
       },
-      "duration": 3.18,
+      "duration": 3.09,
       "status": "pass"
     },
     {
       "test": "NetStream-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.293,
+        "recomp": 0.027,
+        "compile": 1.284,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1944,14 +1944,14 @@
         "expected_lines": 80,
         "matching_lines": 80
       },
-      "duration": 1.3,
+      "duration": 1.32,
       "status": "pass"
     },
     {
       "test": "Number-v5",
       "phases": {
-        "recomp": 0.107,
-        "compile": 8.978,
+        "recomp": 0.122,
+        "compile": 9.215,
         "run": 0.006
       },
       "num_frames": 30,
@@ -1960,7 +1960,7 @@
         "expected_lines": 244,
         "matching_lines": 236
       },
-      "duration": 9.1,
+      "duration": 9.35,
       "ruffle_diff_count": 12,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -1969,8 +1969,8 @@
     {
       "test": "Number-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 8.793,
+        "recomp": 0.12,
+        "compile": 8.792,
         "run": 0.006
       },
       "num_frames": 30,
@@ -1979,14 +1979,14 @@
         "expected_lines": 239,
         "matching_lines": 239
       },
-      "duration": 8.8,
+      "duration": 8.92,
       "status": "pass"
     },
     {
       "test": "Number-v7",
       "phases": {
-        "recomp": 0.102,
-        "compile": 8.808,
+        "recomp": 0.117,
+        "compile": 8.847,
         "run": 0.006
       },
       "num_frames": 30,
@@ -1995,14 +1995,14 @@
         "expected_lines": 237,
         "matching_lines": 237
       },
-      "duration": 8.92,
+      "duration": 8.98,
       "status": "pass"
     },
     {
       "test": "Number-v8",
       "phases": {
-        "recomp": 0.102,
-        "compile": 1.347,
+        "recomp": 0.0,
+        "compile": 1.384,
         "run": 0.006
       },
       "num_frames": 30,
@@ -2011,14 +2011,14 @@
         "expected_lines": 237,
         "matching_lines": 237
       },
-      "duration": 1.46,
+      "duration": 1.4,
       "status": "pass"
     },
     {
       "test": "Object-v5",
       "phases": {
-        "recomp": 0.051,
-        "compile": 24.014,
+        "recomp": 0.052,
+        "compile": 23.984,
         "run": 0.005
       },
       "num_frames": 30,
@@ -2027,7 +2027,7 @@
         "expected_lines": 145,
         "matching_lines": 142
       },
-      "duration": 24.07,
+      "duration": 24.05,
       "ruffle_diff_count": 6,
       "ours_diff_count": 3,
       "status": "ruffle_matched",
@@ -2036,8 +2036,8 @@
     {
       "test": "Object-v6",
       "phases": {
-        "recomp": 0.184,
-        "compile": 12.167,
+        "recomp": 0.186,
+        "compile": 12.23,
         "run": 0.008
       },
       "num_frames": 30,
@@ -2046,7 +2046,7 @@
         "expected_lines": 333,
         "matching_lines": 324
       },
-      "duration": 12.36,
+      "duration": 12.43,
       "ruffle_diff_count": 24,
       "ours_diff_count": 9,
       "status": "ruffle_matched",
@@ -2055,8 +2055,8 @@
     {
       "test": "Object-v7",
       "phases": {
-        "recomp": 0.184,
-        "compile": 12.295,
+        "recomp": 0.186,
+        "compile": 12.489,
         "run": 0.02
       },
       "num_frames": 30,
@@ -2065,7 +2065,7 @@
         "expected_lines": 333,
         "matching_lines": 325
       },
-      "duration": 12.5,
+      "duration": 12.7,
       "ruffle_diff_count": 15,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -2074,9 +2074,9 @@
     {
       "test": "Object-v8",
       "phases": {
-        "recomp": 0.184,
-        "compile": 2.008,
-        "run": 0.02
+        "recomp": 0.185,
+        "compile": 2.024,
+        "run": 0.021
       },
       "num_frames": 30,
       "lines": {
@@ -2084,7 +2084,7 @@
         "expected_lines": 333,
         "matching_lines": 325
       },
-      "duration": 2.22,
+      "duration": 2.24,
       "ruffle_diff_count": 15,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -2094,7 +2094,7 @@
       "test": "Point-v5",
       "phases": {
         "recomp": 0.006,
-        "compile": 20.042,
+        "compile": 20.297,
         "run": 0.003
       },
       "num_frames": 30,
@@ -2103,14 +2103,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 20.05,
+      "duration": 20.31,
       "status": "pass"
     },
     {
       "test": "Point-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 0.586,
+        "recomp": 0.005,
+        "compile": 0.589,
         "run": 0.003
       },
       "num_frames": 30,
@@ -2119,14 +2119,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 0.59,
+      "duration": 0.6,
       "status": "pass"
     },
     {
       "test": "Point-v7",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.546,
+        "recomp": 0.0,
+        "compile": 1.552,
         "run": 0.003
       },
       "num_frames": 30,
@@ -2141,8 +2141,8 @@
     {
       "test": "Point-v8",
       "phases": {
-        "recomp": 0.079,
-        "compile": 7.592,
+        "recomp": 0.08,
+        "compile": 7.829,
         "run": 0.006
       },
       "num_frames": 30,
@@ -2151,14 +2151,14 @@
         "expected_lines": 193,
         "matching_lines": 193
       },
-      "duration": 7.68,
+      "duration": 7.92,
       "status": "pass"
     },
     {
       "test": "Random-v5",
       "phases": {
-        "recomp": 0.012,
-        "compile": 21.54,
+        "recomp": 0.01,
+        "compile": 20.576,
         "run": 0.014
       },
       "num_frames": 30,
@@ -2167,15 +2167,15 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 21.57,
+      "duration": 20.6,
       "status": "pass"
     },
     {
       "test": "Random-v6",
       "phases": {
-        "recomp": 0.012,
-        "compile": 0.699,
-        "run": 0.014
+        "recomp": 0.011,
+        "compile": 0.622,
+        "run": 0.013
       },
       "num_frames": 30,
       "lines": {
@@ -2183,14 +2183,14 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 0.73,
+      "duration": 0.65,
       "status": "pass"
     },
     {
       "test": "Random-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.159,
+        "compile": 2.04,
         "run": 0.013
       },
       "num_frames": 30,
@@ -2199,14 +2199,14 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 2.18,
+      "duration": 2.06,
       "status": "pass"
     },
     {
       "test": "Random-v8",
       "phases": {
-        "recomp": 0.011,
-        "compile": 1.485,
+        "recomp": 0.01,
+        "compile": 1.409,
         "run": 0.013
       },
       "num_frames": 30,
@@ -2215,14 +2215,14 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 1.51,
+      "duration": 1.44,
       "status": "pass"
     },
     {
       "test": "Rectangle-v5",
       "phases": {
-        "recomp": 0.0,
-        "compile": 2.018,
+        "recomp": 0.005,
+        "compile": 1.921,
         "run": 0.003
       },
       "num_frames": 30,
@@ -2231,14 +2231,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 2.03,
+      "duration": 1.93,
       "status": "pass"
     },
     {
       "test": "Rectangle-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.622,
+        "compile": 0.591,
         "run": 0.003
       },
       "num_frames": 30,
@@ -2247,717 +2247,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 0.63,
+      "duration": 0.6,
       "status": "pass"
     },
     {
       "test": "Rectangle-v7",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.652,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.66,
-      "status": "pass"
-    },
-    {
-      "test": "Rectangle-v8",
-      "phases": {
-        "recomp": 0.068,
-        "compile": 7.05,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 166,
-        "expected_lines": 166,
-        "matching_lines": 145
-      },
-      "duration": 7.13,
-      "ruffle_diff_count": 21,
-      "ours_diff_count": 21,
-      "status": "ruffle_matched",
-      "detail": "diffs 21 \u2286 ruffle 21"
-    },
-    {
-      "test": "Selection-v5",
-      "phases": {
-        "recomp": 0.009,
-        "compile": 22.546,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      },
-      "duration": 22.56,
-      "status": "pass"
-    },
-    {
-      "test": "Selection-v6",
-      "phases": {
-        "recomp": 0.049,
-        "compile": 5.928,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 125,
-        "expected_lines": 125,
-        "matching_lines": 118
-      },
-      "duration": 5.99,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
-    },
-    {
-      "test": "Selection-v7",
-      "phases": {
-        "recomp": 0.049,
-        "compile": 5.485,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 125,
-        "expected_lines": 125,
-        "matching_lines": 118
-      },
-      "duration": 5.54,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
-    },
-    {
-      "test": "Selection-v8",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.629,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 125,
-        "expected_lines": 125,
-        "matching_lines": 118
-      },
-      "duration": 1.64,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
-    },
-    {
-      "test": "Sound-v5",
-      "phases": {
-        "recomp": 0.038,
-        "compile": 26.197,
-        "run": 0.004
-      },
-      "num_frames": 50,
-      "lines": {
-        "actual_lines": 100,
-        "expected_lines": 100,
-        "matching_lines": 84
-      },
-      "duration": 26.25,
-      "ruffle_diff_count": 16,
-      "ours_diff_count": 16,
-      "status": "ruffle_matched",
-      "detail": "diffs 16 \u2286 ruffle 16"
-    },
-    {
-      "test": "Sound-v6",
-      "phases": {
-        "recomp": 0.044,
-        "compile": 5.766,
-        "run": 0.005
-      },
-      "num_frames": 50,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 113
-      },
-      "duration": 5.82,
-      "ruffle_diff_count": 37,
-      "ours_diff_count": 8,
-      "status": "ruffle_matched",
-      "detail": "diffs 8 \u2286 ruffle 37"
-    },
-    {
-      "test": "Sound-v7",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 5.394,
-        "run": 0.005
-      },
-      "num_frames": 50,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 113
-      },
-      "duration": 5.4,
-      "ruffle_diff_count": 37,
-      "ours_diff_count": 8,
-      "status": "ruffle_matched",
-      "detail": "diffs 8 \u2286 ruffle 37"
-    },
-    {
-      "test": "Sound-v8",
-      "phases": {
-        "recomp": 0.044,
-        "compile": 2.038,
-        "run": 0.005
-      },
-      "num_frames": 50,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 113
-      },
-      "duration": 2.09,
-      "ruffle_diff_count": 37,
-      "ours_diff_count": 8,
-      "status": "ruffle_matched",
-      "detail": "diffs 8 \u2286 ruffle 37"
-    },
-    {
-      "test": "Stage-v5",
-      "phases": {
-        "recomp": 0.009,
-        "compile": 20.989,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 38,
-        "expected_lines": 38,
-        "matching_lines": 38
-      },
-      "duration": 21.01,
-      "status": "pass"
-    },
-    {
-      "test": "Stage-v6",
-      "phases": {
-        "recomp": 0.012,
-        "compile": 21.981,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 64,
-        "matching_lines": 50
-      },
-      "duration": 22.0,
-      "ruffle_diff_count": 14,
-      "ours_diff_count": 14,
-      "status": "ruffle_matched",
-      "detail": "diffs 14 \u2286 ruffle 14"
-    },
-    {
-      "test": "Stage-v7",
-      "phases": {
-        "recomp": 0.012,
-        "compile": 2.556,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 64,
-        "matching_lines": 50
-      },
-      "duration": 2.58,
-      "ruffle_diff_count": 14,
-      "ours_diff_count": 14,
-      "status": "ruffle_matched",
-      "detail": "diffs 14 \u2286 ruffle 14"
-    },
-    {
-      "test": "Stage-v8",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.384,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 64,
-        "matching_lines": 50
-      },
-      "duration": 1.39,
-      "ruffle_diff_count": 14,
-      "ours_diff_count": 14,
-      "status": "ruffle_matched",
-      "detail": "diffs 14 \u2286 ruffle 14"
-    },
-    {
-      "test": "String-v5",
-      "phases": {
-        "recomp": 0.191,
-        "compile": 14.267,
-        "run": 0.009
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 358,
-        "expected_lines": 358,
-        "matching_lines": 339
-      },
-      "duration": 14.47,
-      "ruffle_diff_count": 21,
-      "ours_diff_count": 19,
-      "status": "ruffle_matched",
-      "detail": "diffs 19 \u2286 ruffle 21"
-    },
-    {
-      "test": "String-v6",
-      "phases": {
-        "recomp": 0.206,
-        "compile": 15.015,
-        "run": 0.009
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 377,
-        "expected_lines": 377,
-        "matching_lines": 367
-      },
-      "duration": 15.23,
-      "ruffle_diff_count": 10,
-      "ours_diff_count": 10,
-      "status": "ruffle_matched",
-      "detail": "diffs 10 \u2286 ruffle 10"
-    },
-    {
-      "test": "String-v7",
-      "phases": {
-        "recomp": 0.206,
-        "compile": 14.728,
-        "run": 0.009
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 377,
-        "expected_lines": 377,
-        "matching_lines": 367
-      },
-      "duration": 14.95,
-      "ruffle_diff_count": 10,
-      "ours_diff_count": 10,
-      "status": "ruffle_matched",
-      "detail": "diffs 10 \u2286 ruffle 10"
-    },
-    {
-      "test": "String-v8",
-      "phases": {
-        "recomp": 0.206,
-        "compile": 1.468,
-        "run": 0.009
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 377,
-        "expected_lines": 377,
-        "matching_lines": 367
-      },
-      "duration": 1.69,
-      "ruffle_diff_count": 10,
-      "ours_diff_count": 10,
-      "status": "ruffle_matched",
-      "detail": "diffs 10 \u2286 ruffle 10"
-    },
-    {
-      "test": "System-v5",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 22.821,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 67,
-        "expected_lines": 67,
-        "matching_lines": 67
-      },
-      "duration": 22.83,
-      "status": "pass"
-    },
-    {
-      "test": "System-v6",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 4.215,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 100,
-        "expected_lines": 100,
-        "matching_lines": 100
-      },
-      "duration": 4.22,
-      "status": "pass"
-    },
-    {
-      "test": "System-v7",
-      "phases": {
-        "recomp": 0.031,
-        "compile": 4.323,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 101,
-        "expected_lines": 101,
-        "matching_lines": 101
-      },
-      "duration": 4.36,
-      "status": "pass"
-    },
-    {
-      "test": "System-v8",
-      "phases": {
-        "recomp": 0.031,
-        "compile": 1.517,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 101,
-        "expected_lines": 101,
-        "matching_lines": 101
-      },
-      "duration": 1.56,
-      "status": "pass"
-    },
-    {
-      "test": "TextField-v5",
-      "phases": {
-        "recomp": 0.007,
-        "compile": 2.121,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 9
-      },
-      "duration": 2.13,
-      "ruffle_diff_count": 3,
-      "ours_diff_count": 3,
-      "status": "ruffle_matched",
-      "detail": "diffs 3 \u2286 ruffle 3"
-    },
-    {
-      "test": "TextField-v6",
-      "phases": {
-        "recomp": 0.41,
-        "compile": 42.153,
-        "run": 0.012
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 463
-      },
-      "duration": 42.58,
-      "status": "output_mismatch",
-      "detail": "82 line(s) differ (actual=545, expected=545)",
-      "actual_output": "... (16 lines before) ...\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nFAILED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nFAILED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nFAILED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nFAILED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nFAILED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nFAILED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nFAILED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nFAILED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nFAILED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nFAILED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nFAILED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nFAILED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nFAILED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nFAILED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nFAILED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nFAILED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nFAILED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nFAILED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nFAILED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nFAILED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nFAILED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nFAILED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nFAILED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nFAILED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nFAILED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\nFAILED: !TextField.prototype.hasOwnProperty('wordWrap') [./TextField.as:112]\nPASSED: typeof(TextField.getFontList) == 'function' [./TextField.as:115]\nPASSED: typeof(TextField.prototype.getFontList) == 'undefined' [./TextField.as:116]\nPASSED: TextField.getFontList() instanceof Array == true [./TextField.as:121]\nPASSED: tfGetFontList() instanceof Array == true [./TextField.as:122]\nPASSED: tfGetFontListObj.f() instanceof Array == true [./TextField.as:123]\nPASSED: tfGetFontList.call(null) instanceof Array == true [./TextField.as:124]\nPASSED: tfGetFontList.call(undefined) instanceof Array == true [./TextField.as:125]\nPASSED: TextField.prototype.hasOwnProperty('replaceText') [./TextField.as:127]\nPASSED: typeof(TextField.prototype.replaceText) == 'undefined' [./TextField.as:131]\nPASSED: typeof(tfObj) == 'object' [./TextField.as:136]\nPASSED: tfObj instanceof TextField [./TextField.as:137]\nPASSED: typeof(tfObj.setTextFormat) == 'function' [./TextField.as:139]\nPASSED: typeof(tfObj.getTextFormat) == 'function' [./TextField.as:140]\nPASSED: typeof(tfObj.setNewTextFormat) == 'function' [./TextField.as:141]\nPASSED: typeof(tfObj.getNewTextFormat) == 'function' [./TextField.as:142]\nPASSED: typeof(tfObj.addListener) == 'function' [./TextField.as:143]\nPASSED: typeof(tfObj.removeListener) == 'function' [./TextField.as:144]\nPASSED: typeof(tfObj.getDepth) == 'function' [./TextField.as:145]\nPASSED: typeof(tfObj.removeTextField) == 'function' [./TextField.as:146]\n... (479 lines after) ...",
-      "expected_output": "... (16 lines before) ...\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nPASSED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nPASSED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nPASSED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nPASSED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nPASSED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nPASSED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nPASSED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nPASSED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nPASSED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nPASSED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nPASSED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nPASSED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nPASSED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nPASSED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nPASSED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nPASSED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nPASSED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nPASSED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nPASSED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nPASSED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nPASSED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nPASSED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nPASSED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nPASSED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nPASSED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\nPASSED: !TextField.prototype.hasOwnProperty('wordWrap') [./TextField.as:112]\nPASSED: typeof(TextField.getFontList) == 'function' [./TextField.as:115]\nPASSED: typeof(TextField.prototype.getFontList) == 'undefined' [./TextField.as:116]\nPASSED: TextField.getFontList() instanceof Array == true [./TextField.as:121]\nPASSED: tfGetFontList() instanceof Array == true [./TextField.as:122]\nPASSED: tfGetFontListObj.f() instanceof Array == true [./TextField.as:123]\nPASSED: tfGetFontList.call(null) instanceof Array == true [./TextField.as:124]\nPASSED: tfGetFontList.call(undefined) instanceof Array == true [./TextField.as:125]\nPASSED: TextField.prototype.hasOwnProperty('replaceText') [./TextField.as:127]\nPASSED: typeof(TextField.prototype.replaceText) == 'undefined' [./TextField.as:131]\nPASSED: typeof(tfObj) == 'object' [./TextField.as:136]\nPASSED: tfObj instanceof TextField [./TextField.as:137]\nPASSED: typeof(tfObj.setTextFormat) == 'function' [./TextField.as:139]\nPASSED: typeof(tfObj.getTextFormat) == 'function' [./TextField.as:140]\nPASSED: typeof(tfObj.setNewTextFormat) == 'function' [./TextField.as:141]\nPASSED: typeof(tfObj.getNewTextFormat) == 'function' [./TextField.as:142]\nPASSED: typeof(tfObj.addListener) == 'function' [./TextField.as:143]\nPASSED: typeof(tfObj.removeListener) == 'function' [./TextField.as:144]\nPASSED: typeof(tfObj.getDepth) == 'function' [./TextField.as:145]\nPASSED: typeof(tfObj.removeTextField) == 'function' [./TextField.as:146]\n... (479 lines after) ..."
-    },
-    {
-      "test": "TextField-v7",
-      "phases": {
-        "recomp": 0.445,
-        "compile": 24.088,
-        "run": 0.012
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 570,
-        "expected_lines": 570,
-        "matching_lines": 472
-      },
-      "duration": 24.55,
-      "status": "output_mismatch",
-      "detail": "98 line(s) differ (actual=570, expected=570)",
-      "actual_output": "SWF7\n\n[TextField.as debug-22405-0e18b8076]\nPASSED: _root.getInstanceAtDepth(-16383) == _level0.__shared_assets [./TextField.as:42]\nFAILED: !_level0.__shared_assets.instance1._xtrace_win instanceof TextField [./TextField.as:43]\nFAILED: expected: \"movieclip\" obtained: object [./TextField.as:45]\n[object Object]\nPASSED: typeof(TextField) == 'function' [./TextField.as:64]\nPASSED: typeof(TextField.prototype) == 'object' [./TextField.as:65]\nPASSED: typeof(TextField.prototype.__proto__) == 'object' [./TextField.as:66]\nPASSED: TextField.prototype.__proto__ == Object.prototype [./TextField.as:67]\nPASSED: typeof(TextField.prototype.setTextFormat) == 'function' [./TextField.as:68]\nPASSED: typeof(TextField.prototype.getTextFormat) == 'function' [./TextField.as:69]\nPASSED: typeof(TextField.prototype.setNewTextFormat) == 'function' [./TextField.as:70]\nPASSED: typeof(TextField.prototype.getNewTextFormat) == 'function' [./TextField.as:71]\nPASSED: typeof(TextField.prototype.getDepth) == 'function' [./TextField.as:72]\nPASSED: typeof(TextField.prototype.removeTextField) == 'function' [./TextField.as:73]\nPASSED: typeof(TextField.prototype.replaceSel) == 'function' [./TextField.as:74]\nPASSED: typeof(TextField.prototype.addListener) == 'function' [./TextField.as:78]\nPASSED: typeof(TextField.prototype.removeListener) == 'function' [./TextField.as:79]\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nFAILED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nFAILED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nFAILED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nFAILED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nFAILED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nFAILED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nFAILED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nFAILED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nFAILED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nFAILED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nFAILED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nFAILED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nFAILED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nFAILED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nFAILED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nFAILED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nFAILED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nFAILED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nFAILED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nFAILED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nFAILED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nFAILED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nFAILED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nFAILED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nFAILED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\n... (520 lines after) ...",
-      "expected_output": "SWF7\n\n[TextField.as debug-22405-0e18b8076]\nPASSED: _root.getInstanceAtDepth(-16383) == _level0.__shared_assets [./TextField.as:42]\nPASSED: !_level0.__shared_assets.instance1._xtrace_win instanceof TextField [./TextField.as:43]\nPASSED: typeof(_level0.__shared_assets.instance1._xtrace_win) == \"movieclip\" [./TextField.as:45]\n[object Object]\nPASSED: typeof(TextField) == 'function' [./TextField.as:64]\nPASSED: typeof(TextField.prototype) == 'object' [./TextField.as:65]\nPASSED: typeof(TextField.prototype.__proto__) == 'object' [./TextField.as:66]\nPASSED: TextField.prototype.__proto__ == Object.prototype [./TextField.as:67]\nPASSED: typeof(TextField.prototype.setTextFormat) == 'function' [./TextField.as:68]\nPASSED: typeof(TextField.prototype.getTextFormat) == 'function' [./TextField.as:69]\nPASSED: typeof(TextField.prototype.setNewTextFormat) == 'function' [./TextField.as:70]\nPASSED: typeof(TextField.prototype.getNewTextFormat) == 'function' [./TextField.as:71]\nPASSED: typeof(TextField.prototype.getDepth) == 'function' [./TextField.as:72]\nPASSED: typeof(TextField.prototype.removeTextField) == 'function' [./TextField.as:73]\nPASSED: typeof(TextField.prototype.replaceSel) == 'function' [./TextField.as:74]\nPASSED: typeof(TextField.prototype.addListener) == 'function' [./TextField.as:78]\nPASSED: typeof(TextField.prototype.removeListener) == 'function' [./TextField.as:79]\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nPASSED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nPASSED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nPASSED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nPASSED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nPASSED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nPASSED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nPASSED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nPASSED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nPASSED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nPASSED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nPASSED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nPASSED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nPASSED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nPASSED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nPASSED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nPASSED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nPASSED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nPASSED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nPASSED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nPASSED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nPASSED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nPASSED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nPASSED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nPASSED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nPASSED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\n... (520 lines after) ..."
-    },
-    {
-      "test": "TextField-v8",
-      "phases": {
-        "recomp": 0.446,
-        "compile": 24.063,
-        "run": 0.012
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 474
-      },
-      "duration": 24.53,
-      "status": "output_mismatch",
-      "detail": "97 line(s) differ (actual=571, expected=571)",
-      "actual_output": "SWF8\n\n[TextField.as debug-22405-0e18b8076]\nPASSED: _root.getInstanceAtDepth(-16383) == _level0.__shared_assets [./TextField.as:42]\nFAILED: !_level0.__shared_assets.instance1._xtrace_win instanceof TextField [./TextField.as:43]\nFAILED: expected: \"movieclip\" obtained: object [./TextField.as:45]\n[object Object]\nPASSED: typeof(TextField) == 'function' [./TextField.as:64]\nPASSED: typeof(TextField.prototype) == 'object' [./TextField.as:65]\nPASSED: typeof(TextField.prototype.__proto__) == 'object' [./TextField.as:66]\nPASSED: TextField.prototype.__proto__ == Object.prototype [./TextField.as:67]\nPASSED: typeof(TextField.prototype.setTextFormat) == 'function' [./TextField.as:68]\nPASSED: typeof(TextField.prototype.getTextFormat) == 'function' [./TextField.as:69]\nPASSED: typeof(TextField.prototype.setNewTextFormat) == 'function' [./TextField.as:70]\nPASSED: typeof(TextField.prototype.getNewTextFormat) == 'function' [./TextField.as:71]\nPASSED: typeof(TextField.prototype.getDepth) == 'function' [./TextField.as:72]\nPASSED: typeof(TextField.prototype.removeTextField) == 'function' [./TextField.as:73]\nPASSED: typeof(TextField.prototype.replaceSel) == 'function' [./TextField.as:74]\nPASSED: typeof(TextField.prototype.addListener) == 'function' [./TextField.as:78]\nPASSED: typeof(TextField.prototype.removeListener) == 'function' [./TextField.as:79]\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nFAILED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nFAILED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nFAILED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nFAILED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nFAILED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nFAILED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nFAILED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nFAILED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nFAILED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nFAILED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nFAILED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nFAILED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nFAILED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nFAILED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nFAILED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nFAILED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nFAILED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nFAILED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nFAILED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nFAILED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nFAILED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nFAILED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nFAILED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nFAILED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nFAILED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\n... (521 lines after) ...",
-      "expected_output": "SWF8\n\n[TextField.as debug-22405-0e18b8076]\nPASSED: _root.getInstanceAtDepth(-16383) == _level0.__shared_assets [./TextField.as:42]\nPASSED: !_level0.__shared_assets.instance1._xtrace_win instanceof TextField [./TextField.as:43]\nPASSED: typeof(_level0.__shared_assets.instance1._xtrace_win) == \"movieclip\" [./TextField.as:45]\n[object Object]\nPASSED: typeof(TextField) == 'function' [./TextField.as:64]\nPASSED: typeof(TextField.prototype) == 'object' [./TextField.as:65]\nPASSED: typeof(TextField.prototype.__proto__) == 'object' [./TextField.as:66]\nPASSED: TextField.prototype.__proto__ == Object.prototype [./TextField.as:67]\nPASSED: typeof(TextField.prototype.setTextFormat) == 'function' [./TextField.as:68]\nPASSED: typeof(TextField.prototype.getTextFormat) == 'function' [./TextField.as:69]\nPASSED: typeof(TextField.prototype.setNewTextFormat) == 'function' [./TextField.as:70]\nPASSED: typeof(TextField.prototype.getNewTextFormat) == 'function' [./TextField.as:71]\nPASSED: typeof(TextField.prototype.getDepth) == 'function' [./TextField.as:72]\nPASSED: typeof(TextField.prototype.removeTextField) == 'function' [./TextField.as:73]\nPASSED: typeof(TextField.prototype.replaceSel) == 'function' [./TextField.as:74]\nPASSED: typeof(TextField.prototype.addListener) == 'function' [./TextField.as:78]\nPASSED: typeof(TextField.prototype.removeListener) == 'function' [./TextField.as:79]\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nPASSED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nPASSED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nPASSED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nPASSED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nPASSED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nPASSED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nPASSED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nPASSED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nPASSED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nPASSED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nPASSED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nPASSED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nPASSED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nPASSED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nPASSED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nPASSED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nPASSED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nPASSED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nPASSED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nPASSED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nPASSED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nPASSED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nPASSED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nPASSED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nPASSED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\n... (521 lines after) ..."
-    },
-    {
-      "test": "TextFieldHTML-v5",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 20.4,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 20.41,
-      "status": "pass"
-    },
-    {
-      "test": "TextFieldHTML-v6",
-      "phases": {
-        "recomp": 0.012,
-        "compile": 2.589,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 37,
-        "expected_lines": 37,
-        "matching_lines": 37
-      },
-      "duration": 2.61,
-      "status": "pass"
-    },
-    {
-      "test": "TextFieldHTML-v7",
-      "phases": {
-        "recomp": 0.013,
-        "compile": 2.301,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 37,
-        "expected_lines": 37,
-        "matching_lines": 37
-      },
-      "duration": 2.32,
-      "status": "pass"
-    },
-    {
-      "test": "TextFieldHTML-v8",
-      "phases": {
-        "recomp": 0.012,
-        "compile": 1.436,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 37,
-        "expected_lines": 37,
-        "matching_lines": 37
-      },
-      "duration": 1.46,
-      "status": "pass"
-    },
-    {
-      "test": "TextFormat-v5",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 4.833,
-        "run": 0.004
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 128,
-        "expected_lines": 128,
-        "matching_lines": 128
-      },
-      "duration": 4.84,
-      "status": "pass"
-    },
-    {
-      "test": "TextFormat-v6",
-      "phases": {
-        "recomp": 0.044,
-        "compile": 0.615,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 128,
-        "expected_lines": 128,
-        "matching_lines": 128
-      },
-      "duration": 0.67,
-      "status": "pass"
-    },
-    {
-      "test": "TextFormat-v7",
-      "phases": {
-        "recomp": 0.068,
-        "compile": 6.523,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 174,
-        "expected_lines": 174,
-        "matching_lines": 136
-      },
-      "duration": 6.6,
-      "ruffle_diff_count": 40,
-      "ours_diff_count": 38,
-      "status": "ruffle_matched",
-      "detail": "diffs 38 \u2286 ruffle 40"
-    },
-    {
-      "test": "TextFormat-v8",
-      "phases": {
-        "recomp": 0.067,
-        "compile": 24.888,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 172,
-        "expected_lines": 172,
-        "matching_lines": 136
-      },
-      "duration": 24.97,
-      "ruffle_diff_count": 38,
-      "ours_diff_count": 36,
-      "status": "ruffle_matched",
-      "detail": "diffs 36 \u2286 ruffle 38"
-    },
-    {
-      "test": "TextSnapshot-v5",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 20.369,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 20.38,
-      "status": "pass"
-    },
-    {
-      "test": "TextSnapshot-v6",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 7.463,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 173,
-        "expected_lines": 173,
-        "matching_lines": 173
-      },
-      "duration": 7.47,
-      "status": "pass"
-    },
-    {
-      "test": "TextSnapshot-v7",
-      "phases": {
-        "recomp": 0.069,
-        "compile": 7.1,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 173,
-        "expected_lines": 173,
-        "matching_lines": 173
-      },
-      "duration": 7.18,
-      "status": "pass"
-    },
-    {
-      "test": "TextSnapshot-v8",
-      "phases": {
-        "recomp": 0.069,
-        "compile": 1.499,
-        "run": 0.005
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 173,
-        "expected_lines": 173,
-        "matching_lines": 173
-      },
-      "duration": 1.58,
-      "status": "pass"
-    },
-    {
-      "test": "Transform-v5",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 1.934,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.95,
-      "status": "pass"
-    },
-    {
-      "test": "Transform-v6",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 1.39,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.4,
-      "status": "pass"
-    },
-    {
-      "test": "Transform-v7",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 1.562,
+        "compile": 1.556,
         "run": 0.003
       },
       "num_frames": 30,
@@ -2970,10 +2267,713 @@
       "status": "pass"
     },
     {
-      "test": "Transform-v8",
+      "test": "Rectangle-v8",
+      "phases": {
+        "recomp": 0.062,
+        "compile": 6.332,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 166,
+        "expected_lines": 166,
+        "matching_lines": 145
+      },
+      "duration": 6.4,
+      "ruffle_diff_count": 21,
+      "ours_diff_count": 21,
+      "status": "ruffle_matched",
+      "detail": "diffs 21 \u2286 ruffle 21"
+    },
+    {
+      "test": "Selection-v5",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 20.926,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      },
+      "duration": 20.94,
+      "status": "pass"
+    },
+    {
+      "test": "Selection-v6",
+      "phases": {
+        "recomp": 0.043,
+        "compile": 5.274,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 118
+      },
+      "duration": 5.33,
+      "ruffle_diff_count": 13,
+      "ours_diff_count": 7,
+      "status": "ruffle_matched",
+      "detail": "diffs 7 \u2286 ruffle 13"
+    },
+    {
+      "test": "Selection-v7",
+      "phases": {
+        "recomp": 0.043,
+        "compile": 4.884,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 118
+      },
+      "duration": 4.94,
+      "ruffle_diff_count": 13,
+      "ours_diff_count": 7,
+      "status": "ruffle_matched",
+      "detail": "diffs 7 \u2286 ruffle 13"
+    },
+    {
+      "test": "Selection-v8",
+      "phases": {
+        "recomp": 0.043,
+        "compile": 1.476,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 118
+      },
+      "duration": 1.53,
+      "ruffle_diff_count": 13,
+      "ours_diff_count": 7,
+      "status": "ruffle_matched",
+      "detail": "diffs 7 \u2286 ruffle 13"
+    },
+    {
+      "test": "Sound-v5",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.193,
+        "run": 0.004
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 100,
+        "expected_lines": 100,
+        "matching_lines": 84
+      },
+      "duration": 24.2,
+      "ruffle_diff_count": 16,
+      "ours_diff_count": 16,
+      "status": "ruffle_matched",
+      "detail": "diffs 16 \u2286 ruffle 16"
+    },
+    {
+      "test": "Sound-v6",
+      "phases": {
+        "recomp": 0.039,
+        "compile": 5.208,
+        "run": 0.005
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 121,
+        "expected_lines": 121,
+        "matching_lines": 113
+      },
+      "duration": 5.26,
+      "ruffle_diff_count": 37,
+      "ours_diff_count": 8,
+      "status": "ruffle_matched",
+      "detail": "diffs 8 \u2286 ruffle 37"
+    },
+    {
+      "test": "Sound-v7",
+      "phases": {
+        "recomp": 0.039,
+        "compile": 4.913,
+        "run": 0.005
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 121,
+        "expected_lines": 121,
+        "matching_lines": 113
+      },
+      "duration": 4.96,
+      "ruffle_diff_count": 37,
+      "ours_diff_count": 8,
+      "status": "ruffle_matched",
+      "detail": "diffs 8 \u2286 ruffle 37"
+    },
+    {
+      "test": "Sound-v8",
+      "phases": {
+        "recomp": 0.039,
+        "compile": 1.887,
+        "run": 0.005
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 121,
+        "expected_lines": 121,
+        "matching_lines": 113
+      },
+      "duration": 1.94,
+      "ruffle_diff_count": 37,
+      "ours_diff_count": 8,
+      "status": "ruffle_matched",
+      "detail": "diffs 8 \u2286 ruffle 37"
+    },
+    {
+      "test": "Stage-v5",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 20.564,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 38,
+        "expected_lines": 38,
+        "matching_lines": 38
+      },
+      "duration": 20.58,
+      "status": "pass"
+    },
+    {
+      "test": "Stage-v6",
+      "phases": {
+        "recomp": 0.017,
+        "compile": 21.268,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 60,
+        "expected_lines": 64,
+        "matching_lines": 50
+      },
+      "duration": 21.29,
+      "ruffle_diff_count": 14,
+      "ours_diff_count": 14,
+      "status": "ruffle_matched",
+      "detail": "diffs 14 \u2286 ruffle 14"
+    },
+    {
+      "test": "Stage-v7",
+      "phases": {
+        "recomp": 0.017,
+        "compile": 2.607,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 60,
+        "expected_lines": 64,
+        "matching_lines": 50
+      },
+      "duration": 2.63,
+      "ruffle_diff_count": 14,
+      "ours_diff_count": 14,
+      "status": "ruffle_matched",
+      "detail": "diffs 14 \u2286 ruffle 14"
+    },
+    {
+      "test": "Stage-v8",
+      "phases": {
+        "recomp": 0.018,
+        "compile": 1.515,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 60,
+        "expected_lines": 64,
+        "matching_lines": 50
+      },
+      "duration": 1.54,
+      "ruffle_diff_count": 14,
+      "ours_diff_count": 14,
+      "status": "ruffle_matched",
+      "detail": "diffs 14 \u2286 ruffle 14"
+    },
+    {
+      "test": "String-v5",
+      "phases": {
+        "recomp": 0.23,
+        "compile": 14.762,
+        "run": 0.008
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 358,
+        "expected_lines": 358,
+        "matching_lines": 339
+      },
+      "duration": 15.01,
+      "ruffle_diff_count": 21,
+      "ours_diff_count": 19,
+      "status": "ruffle_matched",
+      "detail": "diffs 19 \u2286 ruffle 21"
+    },
+    {
+      "test": "String-v6",
+      "phases": {
+        "recomp": 0.247,
+        "compile": 15.497,
+        "run": 0.009
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 367
+      },
+      "duration": 15.76,
+      "ruffle_diff_count": 10,
+      "ours_diff_count": 10,
+      "status": "ruffle_matched",
+      "detail": "diffs 10 \u2286 ruffle 10"
+    },
+    {
+      "test": "String-v7",
+      "phases": {
+        "recomp": 0.246,
+        "compile": 15.238,
+        "run": 0.009
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 367
+      },
+      "duration": 15.5,
+      "ruffle_diff_count": 10,
+      "ours_diff_count": 10,
+      "status": "ruffle_matched",
+      "detail": "diffs 10 \u2286 ruffle 10"
+    },
+    {
+      "test": "String-v8",
+      "phases": {
+        "recomp": 0.248,
+        "compile": 1.604,
+        "run": 0.008
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 367
+      },
+      "duration": 1.86,
+      "ruffle_diff_count": 10,
+      "ours_diff_count": 10,
+      "status": "ruffle_matched",
+      "detail": "diffs 10 \u2286 ruffle 10"
+    },
+    {
+      "test": "System-v5",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.67,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 67
+      },
+      "duration": 23.68,
+      "status": "pass"
+    },
+    {
+      "test": "System-v6",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.603,
+        "run": 0.008
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 100,
+        "expected_lines": 100,
+        "matching_lines": 100
+      },
+      "duration": 4.62,
+      "status": "pass"
+    },
+    {
+      "test": "System-v7",
       "phases": {
         "recomp": 0.035,
-        "compile": 23.306,
+        "compile": 4.624,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 101,
+        "expected_lines": 101,
+        "matching_lines": 101
+      },
+      "duration": 4.67,
+      "status": "pass"
+    },
+    {
+      "test": "System-v8",
+      "phases": {
+        "recomp": 0.035,
+        "compile": 1.583,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 101,
+        "expected_lines": 101,
+        "matching_lines": 101
+      },
+      "duration": 1.63,
+      "status": "pass"
+    },
+    {
+      "test": "TextField-v5",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.202,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 9
+      },
+      "duration": 2.21,
+      "ruffle_diff_count": 3,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 3"
+    },
+    {
+      "test": "TextField-v6",
+      "phases": {
+        "recomp": 0.475,
+        "compile": 44.659,
+        "run": 0.012
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 545,
+        "expected_lines": 545,
+        "matching_lines": 463
+      },
+      "duration": 45.15,
+      "status": "output_mismatch",
+      "detail": "82 line(s) differ (actual=545, expected=545)",
+      "actual_output": "... (16 lines before) ...\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nFAILED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nFAILED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nFAILED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nFAILED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nFAILED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nFAILED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nFAILED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nFAILED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nFAILED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nFAILED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nFAILED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nFAILED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nFAILED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nFAILED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nFAILED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nFAILED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nFAILED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nFAILED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nFAILED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nFAILED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nFAILED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nFAILED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nFAILED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nFAILED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nFAILED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\nFAILED: !TextField.prototype.hasOwnProperty('wordWrap') [./TextField.as:112]\nPASSED: typeof(TextField.getFontList) == 'function' [./TextField.as:115]\nPASSED: typeof(TextField.prototype.getFontList) == 'undefined' [./TextField.as:116]\nPASSED: TextField.getFontList() instanceof Array == true [./TextField.as:121]\nPASSED: tfGetFontList() instanceof Array == true [./TextField.as:122]\nPASSED: tfGetFontListObj.f() instanceof Array == true [./TextField.as:123]\nPASSED: tfGetFontList.call(null) instanceof Array == true [./TextField.as:124]\nPASSED: tfGetFontList.call(undefined) instanceof Array == true [./TextField.as:125]\nPASSED: TextField.prototype.hasOwnProperty('replaceText') [./TextField.as:127]\nPASSED: typeof(TextField.prototype.replaceText) == 'undefined' [./TextField.as:131]\nPASSED: typeof(tfObj) == 'object' [./TextField.as:136]\nPASSED: tfObj instanceof TextField [./TextField.as:137]\nPASSED: typeof(tfObj.setTextFormat) == 'function' [./TextField.as:139]\nPASSED: typeof(tfObj.getTextFormat) == 'function' [./TextField.as:140]\nPASSED: typeof(tfObj.setNewTextFormat) == 'function' [./TextField.as:141]\nPASSED: typeof(tfObj.getNewTextFormat) == 'function' [./TextField.as:142]\nPASSED: typeof(tfObj.addListener) == 'function' [./TextField.as:143]\nPASSED: typeof(tfObj.removeListener) == 'function' [./TextField.as:144]\nPASSED: typeof(tfObj.getDepth) == 'function' [./TextField.as:145]\nPASSED: typeof(tfObj.removeTextField) == 'function' [./TextField.as:146]\n... (479 lines after) ...",
+      "expected_output": "... (16 lines before) ...\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nPASSED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nPASSED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nPASSED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nPASSED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nPASSED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nPASSED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nPASSED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nPASSED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nPASSED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nPASSED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nPASSED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nPASSED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nPASSED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nPASSED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nPASSED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nPASSED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nPASSED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nPASSED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nPASSED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nPASSED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nPASSED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nPASSED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nPASSED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nPASSED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nPASSED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\nPASSED: !TextField.prototype.hasOwnProperty('wordWrap') [./TextField.as:112]\nPASSED: typeof(TextField.getFontList) == 'function' [./TextField.as:115]\nPASSED: typeof(TextField.prototype.getFontList) == 'undefined' [./TextField.as:116]\nPASSED: TextField.getFontList() instanceof Array == true [./TextField.as:121]\nPASSED: tfGetFontList() instanceof Array == true [./TextField.as:122]\nPASSED: tfGetFontListObj.f() instanceof Array == true [./TextField.as:123]\nPASSED: tfGetFontList.call(null) instanceof Array == true [./TextField.as:124]\nPASSED: tfGetFontList.call(undefined) instanceof Array == true [./TextField.as:125]\nPASSED: TextField.prototype.hasOwnProperty('replaceText') [./TextField.as:127]\nPASSED: typeof(TextField.prototype.replaceText) == 'undefined' [./TextField.as:131]\nPASSED: typeof(tfObj) == 'object' [./TextField.as:136]\nPASSED: tfObj instanceof TextField [./TextField.as:137]\nPASSED: typeof(tfObj.setTextFormat) == 'function' [./TextField.as:139]\nPASSED: typeof(tfObj.getTextFormat) == 'function' [./TextField.as:140]\nPASSED: typeof(tfObj.setNewTextFormat) == 'function' [./TextField.as:141]\nPASSED: typeof(tfObj.getNewTextFormat) == 'function' [./TextField.as:142]\nPASSED: typeof(tfObj.addListener) == 'function' [./TextField.as:143]\nPASSED: typeof(tfObj.removeListener) == 'function' [./TextField.as:144]\nPASSED: typeof(tfObj.getDepth) == 'function' [./TextField.as:145]\nPASSED: typeof(tfObj.removeTextField) == 'function' [./TextField.as:146]\n... (479 lines after) ..."
+    },
+    {
+      "test": "TextField-v7",
+      "phases": {
+        "recomp": 0.514,
+        "compile": 25.369,
+        "run": 0.012
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 570,
+        "expected_lines": 570,
+        "matching_lines": 472
+      },
+      "duration": 25.9,
+      "status": "output_mismatch",
+      "detail": "98 line(s) differ (actual=570, expected=570)",
+      "actual_output": "SWF7\n\n[TextField.as debug-22405-0e18b8076]\nPASSED: _root.getInstanceAtDepth(-16383) == _level0.__shared_assets [./TextField.as:42]\nFAILED: !_level0.__shared_assets.instance1._xtrace_win instanceof TextField [./TextField.as:43]\nFAILED: expected: \"movieclip\" obtained: object [./TextField.as:45]\n[object Object]\nPASSED: typeof(TextField) == 'function' [./TextField.as:64]\nPASSED: typeof(TextField.prototype) == 'object' [./TextField.as:65]\nPASSED: typeof(TextField.prototype.__proto__) == 'object' [./TextField.as:66]\nPASSED: TextField.prototype.__proto__ == Object.prototype [./TextField.as:67]\nPASSED: typeof(TextField.prototype.setTextFormat) == 'function' [./TextField.as:68]\nPASSED: typeof(TextField.prototype.getTextFormat) == 'function' [./TextField.as:69]\nPASSED: typeof(TextField.prototype.setNewTextFormat) == 'function' [./TextField.as:70]\nPASSED: typeof(TextField.prototype.getNewTextFormat) == 'function' [./TextField.as:71]\nPASSED: typeof(TextField.prototype.getDepth) == 'function' [./TextField.as:72]\nPASSED: typeof(TextField.prototype.removeTextField) == 'function' [./TextField.as:73]\nPASSED: typeof(TextField.prototype.replaceSel) == 'function' [./TextField.as:74]\nPASSED: typeof(TextField.prototype.addListener) == 'function' [./TextField.as:78]\nPASSED: typeof(TextField.prototype.removeListener) == 'function' [./TextField.as:79]\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nFAILED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nFAILED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nFAILED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nFAILED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nFAILED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nFAILED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nFAILED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nFAILED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nFAILED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nFAILED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nFAILED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nFAILED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nFAILED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nFAILED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nFAILED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nFAILED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nFAILED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nFAILED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nFAILED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nFAILED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nFAILED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nFAILED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nFAILED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nFAILED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nFAILED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\n... (520 lines after) ...",
+      "expected_output": "SWF7\n\n[TextField.as debug-22405-0e18b8076]\nPASSED: _root.getInstanceAtDepth(-16383) == _level0.__shared_assets [./TextField.as:42]\nPASSED: !_level0.__shared_assets.instance1._xtrace_win instanceof TextField [./TextField.as:43]\nPASSED: typeof(_level0.__shared_assets.instance1._xtrace_win) == \"movieclip\" [./TextField.as:45]\n[object Object]\nPASSED: typeof(TextField) == 'function' [./TextField.as:64]\nPASSED: typeof(TextField.prototype) == 'object' [./TextField.as:65]\nPASSED: typeof(TextField.prototype.__proto__) == 'object' [./TextField.as:66]\nPASSED: TextField.prototype.__proto__ == Object.prototype [./TextField.as:67]\nPASSED: typeof(TextField.prototype.setTextFormat) == 'function' [./TextField.as:68]\nPASSED: typeof(TextField.prototype.getTextFormat) == 'function' [./TextField.as:69]\nPASSED: typeof(TextField.prototype.setNewTextFormat) == 'function' [./TextField.as:70]\nPASSED: typeof(TextField.prototype.getNewTextFormat) == 'function' [./TextField.as:71]\nPASSED: typeof(TextField.prototype.getDepth) == 'function' [./TextField.as:72]\nPASSED: typeof(TextField.prototype.removeTextField) == 'function' [./TextField.as:73]\nPASSED: typeof(TextField.prototype.replaceSel) == 'function' [./TextField.as:74]\nPASSED: typeof(TextField.prototype.addListener) == 'function' [./TextField.as:78]\nPASSED: typeof(TextField.prototype.removeListener) == 'function' [./TextField.as:79]\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nPASSED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nPASSED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nPASSED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nPASSED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nPASSED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nPASSED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nPASSED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nPASSED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nPASSED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nPASSED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nPASSED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nPASSED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nPASSED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nPASSED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nPASSED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nPASSED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nPASSED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nPASSED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nPASSED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nPASSED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nPASSED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nPASSED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nPASSED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nPASSED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nPASSED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\n... (520 lines after) ..."
+    },
+    {
+      "test": "TextField-v8",
+      "phases": {
+        "recomp": 0.507,
+        "compile": 25.578,
+        "run": 0.013
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 571,
+        "expected_lines": 571,
+        "matching_lines": 474
+      },
+      "duration": 26.1,
+      "status": "output_mismatch",
+      "detail": "97 line(s) differ (actual=571, expected=571)",
+      "actual_output": "SWF8\n\n[TextField.as debug-22405-0e18b8076]\nPASSED: _root.getInstanceAtDepth(-16383) == _level0.__shared_assets [./TextField.as:42]\nFAILED: !_level0.__shared_assets.instance1._xtrace_win instanceof TextField [./TextField.as:43]\nFAILED: expected: \"movieclip\" obtained: object [./TextField.as:45]\n[object Object]\nPASSED: typeof(TextField) == 'function' [./TextField.as:64]\nPASSED: typeof(TextField.prototype) == 'object' [./TextField.as:65]\nPASSED: typeof(TextField.prototype.__proto__) == 'object' [./TextField.as:66]\nPASSED: TextField.prototype.__proto__ == Object.prototype [./TextField.as:67]\nPASSED: typeof(TextField.prototype.setTextFormat) == 'function' [./TextField.as:68]\nPASSED: typeof(TextField.prototype.getTextFormat) == 'function' [./TextField.as:69]\nPASSED: typeof(TextField.prototype.setNewTextFormat) == 'function' [./TextField.as:70]\nPASSED: typeof(TextField.prototype.getNewTextFormat) == 'function' [./TextField.as:71]\nPASSED: typeof(TextField.prototype.getDepth) == 'function' [./TextField.as:72]\nPASSED: typeof(TextField.prototype.removeTextField) == 'function' [./TextField.as:73]\nPASSED: typeof(TextField.prototype.replaceSel) == 'function' [./TextField.as:74]\nPASSED: typeof(TextField.prototype.addListener) == 'function' [./TextField.as:78]\nPASSED: typeof(TextField.prototype.removeListener) == 'function' [./TextField.as:79]\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nFAILED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nFAILED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nFAILED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nFAILED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nFAILED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nFAILED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nFAILED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nFAILED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nFAILED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nFAILED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nFAILED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nFAILED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nFAILED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nFAILED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nFAILED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nFAILED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nFAILED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nFAILED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nFAILED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nFAILED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nFAILED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nFAILED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nFAILED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nFAILED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nFAILED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\n... (521 lines after) ...",
+      "expected_output": "SWF8\n\n[TextField.as debug-22405-0e18b8076]\nPASSED: _root.getInstanceAtDepth(-16383) == _level0.__shared_assets [./TextField.as:42]\nPASSED: !_level0.__shared_assets.instance1._xtrace_win instanceof TextField [./TextField.as:43]\nPASSED: typeof(_level0.__shared_assets.instance1._xtrace_win) == \"movieclip\" [./TextField.as:45]\n[object Object]\nPASSED: typeof(TextField) == 'function' [./TextField.as:64]\nPASSED: typeof(TextField.prototype) == 'object' [./TextField.as:65]\nPASSED: typeof(TextField.prototype.__proto__) == 'object' [./TextField.as:66]\nPASSED: TextField.prototype.__proto__ == Object.prototype [./TextField.as:67]\nPASSED: typeof(TextField.prototype.setTextFormat) == 'function' [./TextField.as:68]\nPASSED: typeof(TextField.prototype.getTextFormat) == 'function' [./TextField.as:69]\nPASSED: typeof(TextField.prototype.setNewTextFormat) == 'function' [./TextField.as:70]\nPASSED: typeof(TextField.prototype.getNewTextFormat) == 'function' [./TextField.as:71]\nPASSED: typeof(TextField.prototype.getDepth) == 'function' [./TextField.as:72]\nPASSED: typeof(TextField.prototype.removeTextField) == 'function' [./TextField.as:73]\nPASSED: typeof(TextField.prototype.replaceSel) == 'function' [./TextField.as:74]\nPASSED: typeof(TextField.prototype.addListener) == 'function' [./TextField.as:78]\nPASSED: typeof(TextField.prototype.removeListener) == 'function' [./TextField.as:79]\nPASSED: typeof(TextField.prototype.broadcastMessage) == 'function' [./TextField.as:80]\nPASSED: TextField.prototype.hasOwnProperty(\"_listeners\") [./TextField.as:81]\nPASSED: typeof(TextField.prototype._listeners) == 'object' [./TextField.as:82]\nPASSED: TextField.prototype._listeners instanceof Array [./TextField.as:83]\nPASSED: TextField.prototype._listeners.length == 0 [./TextField.as:84]\nPASSED: !TextField.prototype.hasOwnProperty('background') [./TextField.as:87]\nPASSED: !TextField.prototype.hasOwnProperty('backgroundColor') [./TextField.as:88]\nPASSED: !TextField.prototype.hasOwnProperty('autoSize') [./TextField.as:89]\nPASSED: !TextField.prototype.hasOwnProperty('border') [./TextField.as:90]\nPASSED: !TextField.prototype.hasOwnProperty('borderColor') [./TextField.as:91]\nPASSED: !TextField.prototype.hasOwnProperty('bottomScroll') [./TextField.as:92]\nPASSED: !TextField.prototype.hasOwnProperty('embedFonts') [./TextField.as:93]\nPASSED: !TextField.prototype.hasOwnProperty('hscroll') [./TextField.as:94]\nPASSED: !TextField.prototype.hasOwnProperty('html') [./TextField.as:95]\nPASSED: !TextField.prototype.hasOwnProperty('htmlText') [./TextField.as:96]\nPASSED: !TextField.prototype.hasOwnProperty('length') [./TextField.as:97]\nPASSED: !TextField.prototype.hasOwnProperty('maxChars') [./TextField.as:98]\nPASSED: !TextField.prototype.hasOwnProperty('maxhscroll') [./TextField.as:99]\nPASSED: !TextField.prototype.hasOwnProperty('maxscroll') [./TextField.as:100]\nPASSED: !TextField.prototype.hasOwnProperty('multiline') [./TextField.as:101]\nPASSED: !TextField.prototype.hasOwnProperty('password') [./TextField.as:102]\nPASSED: !TextField.prototype.hasOwnProperty('restrict') [./TextField.as:103]\nPASSED: !TextField.prototype.hasOwnProperty('scroll') [./TextField.as:104]\nPASSED: !TextField.prototype.hasOwnProperty('selectable') [./TextField.as:105]\nPASSED: !TextField.prototype.hasOwnProperty('text') [./TextField.as:106]\nPASSED: !TextField.prototype.hasOwnProperty('textColor') [./TextField.as:107]\nPASSED: !TextField.prototype.hasOwnProperty('textHeight') [./TextField.as:108]\nPASSED: !TextField.prototype.hasOwnProperty('textWidth') [./TextField.as:109]\nPASSED: !TextField.prototype.hasOwnProperty('type') [./TextField.as:110]\nPASSED: !TextField.prototype.hasOwnProperty('variable') [./TextField.as:111]\n... (521 lines after) ..."
+    },
+    {
+      "test": "TextFieldHTML-v5",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 21.874,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 21.89,
+      "status": "pass"
+    },
+    {
+      "test": "TextFieldHTML-v6",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 2.781,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      },
+      "duration": 2.8,
+      "status": "pass"
+    },
+    {
+      "test": "TextFieldHTML-v7",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 2.351,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      },
+      "duration": 2.37,
+      "status": "pass"
+    },
+    {
+      "test": "TextFieldHTML-v8",
+      "phases": {
+        "recomp": 0.012,
+        "compile": 1.461,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      },
+      "duration": 1.48,
+      "status": "pass"
+    },
+    {
+      "test": "TextFormat-v5",
+      "phases": {
+        "recomp": 0.044,
+        "compile": 5.168,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 128,
+        "expected_lines": 128,
+        "matching_lines": 128
+      },
+      "duration": 5.22,
+      "status": "pass"
+    },
+    {
+      "test": "TextFormat-v6",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.631,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 128,
+        "expected_lines": 128,
+        "matching_lines": 128
+      },
+      "duration": 0.64,
+      "status": "pass"
+    },
+    {
+      "test": "TextFormat-v7",
+      "phases": {
+        "recomp": 0.068,
+        "compile": 6.821,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 174,
+        "expected_lines": 174,
+        "matching_lines": 136
+      },
+      "duration": 6.9,
+      "ruffle_diff_count": 40,
+      "ours_diff_count": 38,
+      "status": "ruffle_matched",
+      "detail": "diffs 38 \u2286 ruffle 40"
+    },
+    {
+      "test": "TextFormat-v8",
+      "phases": {
+        "recomp": 0.067,
+        "compile": 26.133,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 172,
+        "expected_lines": 172,
+        "matching_lines": 136
+      },
+      "duration": 26.21,
+      "ruffle_diff_count": 38,
+      "ours_diff_count": 36,
+      "status": "ruffle_matched",
+      "detail": "diffs 36 \u2286 ruffle 38"
+    },
+    {
+      "test": "TextSnapshot-v5",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.925,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 20.93,
+      "status": "pass"
+    },
+    {
+      "test": "TextSnapshot-v6",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 8.008,
+        "run": 0.006
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 173,
+        "expected_lines": 173,
+        "matching_lines": 173
+      },
+      "duration": 8.02,
+      "status": "pass"
+    },
+    {
+      "test": "TextSnapshot-v7",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.616,
+        "run": 0.006
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 173,
+        "expected_lines": 173,
+        "matching_lines": 173
+      },
+      "duration": 7.63,
+      "status": "pass"
+    },
+    {
+      "test": "TextSnapshot-v8",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.51,
+        "run": 0.005
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 173,
+        "expected_lines": 173,
+        "matching_lines": 173
+      },
+      "duration": 1.52,
+      "status": "pass"
+    },
+    {
+      "test": "Transform-v5",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.023,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 2.03,
+      "status": "pass"
+    },
+    {
+      "test": "Transform-v6",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.467,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.47,
+      "status": "pass"
+    },
+    {
+      "test": "Transform-v7",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.621,
+        "run": 0.003
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.63,
+      "status": "pass"
+    },
+    {
+      "test": "Transform-v8",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.486,
         "run": 0.005
       },
       "num_frames": 30,
@@ -2982,7 +2982,7 @@
         "expected_lines": 101,
         "matching_lines": 94
       },
-      "duration": 23.35,
+      "duration": 24.5,
       "ruffle_diff_count": 11,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -2991,8 +2991,8 @@
     {
       "test": "Try-v5",
       "phases": {
-        "recomp": 0.01,
-        "compile": 21.419,
+        "recomp": 0.011,
+        "compile": 22.315,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3001,14 +3001,14 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 21.44,
+      "duration": 22.33,
       "status": "pass"
     },
     {
       "test": "Try-v6",
       "phases": {
-        "recomp": 0.01,
-        "compile": 0.639,
+        "recomp": 0.0,
+        "compile": 0.651,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3024,7 +3024,7 @@
       "test": "Try-v7",
       "phases": {
         "recomp": 0.01,
-        "compile": 2.631,
+        "compile": 2.703,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3033,14 +3033,14 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 2.65,
+      "duration": 2.72,
       "status": "pass"
     },
     {
       "test": "Try-v8",
       "phases": {
-        "recomp": 0.01,
-        "compile": 1.438,
+        "recomp": 0.0,
+        "compile": 1.476,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3049,14 +3049,14 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 1.45,
+      "duration": 1.48,
       "status": "pass"
     },
     {
       "test": "Video-v5",
       "phases": {
         "recomp": 0.006,
-        "compile": 20.992,
+        "compile": 21.007,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3065,14 +3065,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 21.0,
+      "duration": 21.02,
       "status": "pass"
     },
     {
       "test": "Video-v6",
       "phases": {
-        "recomp": 0.023,
-        "compile": 3.545,
+        "recomp": 0.0,
+        "compile": 3.678,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3081,14 +3081,14 @@
         "expected_lines": 85,
         "matching_lines": 85
       },
-      "duration": 3.58,
+      "duration": 3.69,
       "status": "pass"
     },
     {
       "test": "Video-v7",
       "phases": {
-        "recomp": 0.023,
-        "compile": 3.229,
+        "recomp": 0.0,
+        "compile": 3.447,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3097,14 +3097,14 @@
         "expected_lines": 85,
         "matching_lines": 85
       },
-      "duration": 3.26,
+      "duration": 3.46,
       "status": "pass"
     },
     {
       "test": "Video-v8",
       "phases": {
         "recomp": 0.023,
-        "compile": 1.451,
+        "compile": 1.459,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3113,15 +3113,15 @@
         "expected_lines": 85,
         "matching_lines": 85
       },
-      "duration": 1.48,
+      "duration": 1.49,
       "status": "pass"
     },
     {
       "test": "XML-v5",
       "phases": {
-        "recomp": 0.201,
-        "compile": 35.621,
-        "run": 0.01
+        "recomp": 0.177,
+        "compile": 32.586,
+        "run": 0.009
       },
       "num_frames": 30,
       "lines": {
@@ -3129,7 +3129,7 @@
         "expected_lines": 449,
         "matching_lines": 439
       },
-      "duration": 35.84,
+      "duration": 32.78,
       "ruffle_diff_count": 79,
       "ours_diff_count": 10,
       "status": "ruffle_matched",
@@ -3138,9 +3138,9 @@
     {
       "test": "XML-v6",
       "phases": {
-        "recomp": 0.239,
-        "compile": 17.554,
-        "run": 0.011
+        "recomp": 0.208,
+        "compile": 15.33,
+        "run": 0.01
       },
       "num_frames": 30,
       "lines": {
@@ -3148,7 +3148,7 @@
         "expected_lines": 486,
         "matching_lines": 483
       },
-      "duration": 17.81,
+      "duration": 15.55,
       "ruffle_diff_count": 98,
       "ours_diff_count": 3,
       "status": "ruffle_matched",
@@ -3157,9 +3157,9 @@
     {
       "test": "XML-v7",
       "phases": {
-        "recomp": 0.24,
-        "compile": 16.953,
-        "run": 0.012
+        "recomp": 0.208,
+        "compile": 15.046,
+        "run": 0.01
       },
       "num_frames": 30,
       "lines": {
@@ -3167,7 +3167,7 @@
         "expected_lines": 486,
         "matching_lines": 483
       },
-      "duration": 17.21,
+      "duration": 15.27,
       "ruffle_diff_count": 98,
       "ours_diff_count": 3,
       "status": "ruffle_matched",
@@ -3176,8 +3176,8 @@
     {
       "test": "XML-v8",
       "phases": {
-        "recomp": 0.236,
-        "compile": 4.868,
+        "recomp": 0.21,
+        "compile": 4.351,
         "run": 0.01
       },
       "num_frames": 30,
@@ -3186,7 +3186,7 @@
         "expected_lines": 465,
         "matching_lines": 462
       },
-      "duration": 5.12,
+      "duration": 4.58,
       "ruffle_diff_count": 116,
       "ours_diff_count": 24,
       "status": "ruffle_matched",
@@ -3195,46 +3195,8 @@
     {
       "test": "XMLNode-v5",
       "phases": {
-        "recomp": 0.104,
-        "compile": 9.523,
-        "run": 0.007
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 207,
-        "expected_lines": 207,
-        "matching_lines": 204
-      },
-      "duration": 9.64,
-      "ruffle_diff_count": 22,
-      "ours_diff_count": 3,
-      "status": "ruffle_matched",
-      "detail": "diffs 3 \u2286 ruffle 22"
-    },
-    {
-      "test": "XMLNode-v6",
-      "phases": {
         "recomp": 0.0,
-        "compile": 9.294,
-        "run": 0.007
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 207,
-        "expected_lines": 207,
-        "matching_lines": 204
-      },
-      "duration": 9.31,
-      "ruffle_diff_count": 22,
-      "ours_diff_count": 3,
-      "status": "ruffle_matched",
-      "detail": "diffs 3 \u2286 ruffle 22"
-    },
-    {
-      "test": "XMLNode-v7",
-      "phases": {
-        "recomp": 0.104,
-        "compile": 8.234,
+        "compile": 8.344,
         "run": 0.006
       },
       "num_frames": 30,
@@ -3250,10 +3212,10 @@
       "detail": "diffs 3 \u2286 ruffle 22"
     },
     {
-      "test": "XMLNode-v8",
+      "test": "XMLNode-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.657,
+        "recomp": 0.093,
+        "compile": 8.306,
         "run": 0.006
       },
       "num_frames": 30,
@@ -3262,7 +3224,45 @@
         "expected_lines": 207,
         "matching_lines": 204
       },
-      "duration": 1.67,
+      "duration": 8.41,
+      "ruffle_diff_count": 22,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 22"
+    },
+    {
+      "test": "XMLNode-v7",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.308,
+        "run": 0.006
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 204
+      },
+      "duration": 7.32,
+      "ruffle_diff_count": 22,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 22"
+    },
+    {
+      "test": "XMLNode-v8",
+      "phases": {
+        "recomp": 0.092,
+        "compile": 1.586,
+        "run": 0.006
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 207,
+        "expected_lines": 207,
+        "matching_lines": 204
+      },
+      "duration": 1.69,
       "ruffle_diff_count": 22,
       "ours_diff_count": 3,
       "status": "ruffle_matched",
@@ -3272,7 +3272,7 @@
       "test": "XMLSocket-v5",
       "phases": {
         "recomp": 0.012,
-        "compile": 22.074,
+        "compile": 21.224,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3281,14 +3281,14 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 22.09,
+      "duration": 21.24,
       "status": "pass"
     },
     {
       "test": "XMLSocket-v6",
       "phases": {
-        "recomp": 0.012,
-        "compile": 2.607,
+        "recomp": 0.011,
+        "compile": 2.616,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3303,8 +3303,8 @@
     {
       "test": "XMLSocket-v7",
       "phases": {
-        "recomp": 0.012,
-        "compile": 2.277,
+        "recomp": 0.011,
+        "compile": 2.245,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3313,14 +3313,14 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 2.3,
+      "duration": 2.26,
       "status": "pass"
     },
     {
       "test": "XMLSocket-v8",
       "phases": {
         "recomp": 0.012,
-        "compile": 1.589,
+        "compile": 1.572,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3329,14 +3329,14 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 1.61,
+      "duration": 1.59,
       "status": "pass"
     },
     {
       "test": "argstest-v5",
       "phases": {
         "recomp": 0.006,
-        "compile": 2.12,
+        "compile": 2.132,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3345,14 +3345,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 2.13,
+      "duration": 2.15,
       "status": "pass"
     },
     {
       "test": "array-v6",
       "phases": {
-        "recomp": 0.643,
-        "compile": 50.702,
+        "recomp": 0.734,
+        "compile": 54.051,
         "run": 0.015
       },
       "num_frames": 30,
@@ -3361,7 +3361,7 @@
         "expected_lines": 644,
         "matching_lines": 624
       },
-      "duration": 51.37,
+      "duration": 54.81,
       "status": "output_mismatch",
       "detail": "20 line(s) differ (actual=644, expected=644)",
       "actual_output": "... (120 lines before) ...\nPASSED: gaparray[14] == undefined [./array.as:233]\nPASSED: gaparray[15] == '16' [./array.as:235]\nPASSED: gaparray[16] == '4' [./array.as:236]\nPASSED: gaparray.hasOwnProperty('15') [./array.as:244]\nPASSED: gaparray.hasOwnProperty('16') [./array.as:245]\nFAILED: gaparray.hasOwnProperty('4') [./array.as:246]\nPASSED: !gaparray.hasOwnProperty('0') [./array.as:247]\nFAILED: expected: '3' obtained: 2 [./array.as:260]\nPASSED: tmp[0] == '15' [./array.as:261]\nPASSED: tmp[1] == '16' [./array.as:262]\nFAILED: expected: '4' obtained:  [./array.as:263]\nPASSED: trysortarray.toString() == \"But,Different,alphabet,capitalization\" [./array.as:293]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:295]\nPASSED: typeof(testCmpThis) == 'undefined' [./array.as:296]\nPASSED: testCmpCalls == 7 [./array.as:297]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:301]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:305]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:309]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:313]\nPASSED: trysortarray.length == 0 [./array.as:317]\nPASSED: trysortarray.toString() == \"1,2,3,4\" [./array.as:321]\nPASSED: trysortarray.length == 4 [./array.as:322]\nFAILED: expected: 4 obtained: 0 [./array.as:324]\nFAILED: expected: \"2,3,4,1\" obtained:  [./array.as:325]\nPASSED: indexedarray.length == 7 [./array.as:336]\nPASSED: firstRandom != secondRandom [./array.as:344]\nPASSED: typeof(c) == \"object\" [./array.as:351]\nPASSED: c[0] == \"zero\" [./array.as:356]\nPASSED: c[1] == \"one\" [./array.as:357]\nPASSED: c[1.1] == \"one point one\" [./array.as:358]\nPASSED: c[1.9] == undefined [./array.as:359]\nPASSED: c[-3] == \"minus three\" [./array.as:360]\nPASSED: c[-3.7] == undefined [./array.as:361]\nPASSED: c[0] == \"zero\" [./array.as:364]\nPASSED: c[1] == \"one\" [./array.as:365]\nPASSED: c[0] == undefined [./array.as:370]\nPASSED: c[1] == undefined [./array.as:371]\nPASSED: c[2] == undefined [./array.as:372]\nPASSED: c[3] == undefined [./array.as:373]\nPASSED: c[1.1] == \"one point one\" [./array.as:374]\nPASSED: c[-2147483649] == \"too low\" [./array.as:375]\nPASSED: c[int(-2147483649)] == undefined [./array.as:377]\nPASSED: c[-2147483649] == \"too low\" [./array.as:380]\nPASSED: c[2147483649] == \"too high\" [./array.as:381]\nPASSED: c[1] == undefined [./array.as:382]\nPASSED: c[2] == undefined [./array.as:383]\nPASSED: c[3] == undefined [./array.as:384]\nPASSED: c.length == -2147483646 [./array.as:386]\nPASSED: str == \"2147483649: too high; -2147483649: too low; -2147483648: lowest int; -3: minus three; 1.1: one point one; \" [./array.as:394]\nPASSED: c[0] == \"zero\" [./array.as:400]\n... (474 lines after) ...",
@@ -3370,8 +3370,8 @@
     {
       "test": "array-v7",
       "phases": {
-        "recomp": 0.662,
-        "compile": 33.773,
+        "recomp": 0.762,
+        "compile": 35.2,
         "run": 0.015
       },
       "num_frames": 30,
@@ -3380,7 +3380,7 @@
         "expected_lines": 654,
         "matching_lines": 603
       },
-      "duration": 34.46,
+      "duration": 35.98,
       "status": "output_mismatch",
       "detail": "51 line(s) differ (actual=654, expected=654)",
       "actual_output": "... (118 lines before) ...\nPASSED: gaparray[12] == undefined [./array.as:231]\nPASSED: gaparray[13] == undefined [./array.as:232]\nPASSED: gaparray[14] == undefined [./array.as:233]\nPASSED: gaparray[15] == undefined [./array.as:238]\nPASSED: gaparray[16] == undefined [./array.as:239]\nFAILED: gaparray.hasOwnProperty('16') [./array.as:249]\nFAILED: gaparray.hasOwnProperty('4') [./array.as:250]\nPASSED: gaparray.hasOwnProperty('1') [./array.as:251]\nPASSED: gaparray.hasOwnProperty('0') [./array.as:252]\nFAILED: gaparray.hasOwnProperty('2') [./array.as:253]\nFAILED: expected: '5' obtained: 2 [./array.as:265]\nPASSED: tmp[0] == '0' [./array.as:266]\nPASSED: tmp[1] == '1' [./array.as:267]\nFAILED: expected: '16' obtained: undefined [./array.as:268]\nFAILED: expected: '2' obtained: undefined [./array.as:269]\nFAILED: expected: '4' obtained: undefined [./array.as:270]\nPASSED: trysortarray.toString() == \"But,Different,alphabet,capitalization\" [./array.as:293]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:295]\nFAILED: expected: 'undefined' obtained: movieclip [./array.as:296]\nPASSED: testCmpCalls == 7 [./array.as:297]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:301]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:305]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:309]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:313]\nPASSED: trysortarray.length == 0 [./array.as:317]\nPASSED: trysortarray.toString() == \"1,2,3,4\" [./array.as:321]\nPASSED: trysortarray.length == 4 [./array.as:322]\nFAILED: expected: 4 obtained: 0 [./array.as:324]\nFAILED: expected: \"2,3,4,1\" obtained:  [./array.as:325]\nPASSED: indexedarray.length == 7 [./array.as:336]\nPASSED: firstRandom != secondRandom [./array.as:344]\nPASSED: typeof(c) == \"object\" [./array.as:351]\nPASSED: c[0] == \"zero\" [./array.as:356]\nPASSED: c[1] == \"one\" [./array.as:357]\nPASSED: c[1.1] == \"one point one\" [./array.as:358]\nPASSED: c[1.9] == undefined [./array.as:359]\nPASSED: c[-3] == \"minus three\" [./array.as:360]\nPASSED: c[-3.7] == undefined [./array.as:361]\nPASSED: c[0] == \"zero\" [./array.as:364]\nPASSED: c[1] == \"one\" [./array.as:365]\nPASSED: c[0] == undefined [./array.as:370]\nPASSED: c[1] == undefined [./array.as:371]\nPASSED: c[2] == undefined [./array.as:372]\nPASSED: c[3] == undefined [./array.as:373]\nPASSED: c[1.1] == \"one point one\" [./array.as:374]\nPASSED: c[-2147483649] == \"too low\" [./array.as:375]\nPASSED: c[int(-2147483649)] == undefined [./array.as:377]\nPASSED: c[-2147483649] == \"too low\" [./array.as:380]\nPASSED: c[2147483649] == \"too high\" [./array.as:381]\nPASSED: c[1] == undefined [./array.as:382]\n... (486 lines after) ...",
@@ -3389,9 +3389,9 @@
     {
       "test": "array-v8",
       "phases": {
-        "recomp": 0.663,
-        "compile": 2.589,
-        "run": 0.015
+        "recomp": 0.751,
+        "compile": 2.826,
+        "run": 0.016
       },
       "num_frames": 30,
       "lines": {
@@ -3399,7 +3399,7 @@
         "expected_lines": 654,
         "matching_lines": 603
       },
-      "duration": 3.27,
+      "duration": 3.6,
       "status": "output_mismatch",
       "detail": "51 line(s) differ (actual=654, expected=654)",
       "actual_output": "... (118 lines before) ...\nPASSED: gaparray[12] == undefined [./array.as:231]\nPASSED: gaparray[13] == undefined [./array.as:232]\nPASSED: gaparray[14] == undefined [./array.as:233]\nPASSED: gaparray[15] == undefined [./array.as:238]\nPASSED: gaparray[16] == undefined [./array.as:239]\nFAILED: gaparray.hasOwnProperty('16') [./array.as:249]\nFAILED: gaparray.hasOwnProperty('4') [./array.as:250]\nPASSED: gaparray.hasOwnProperty('1') [./array.as:251]\nPASSED: gaparray.hasOwnProperty('0') [./array.as:252]\nFAILED: gaparray.hasOwnProperty('2') [./array.as:253]\nFAILED: expected: '5' obtained: 2 [./array.as:265]\nPASSED: tmp[0] == '0' [./array.as:266]\nPASSED: tmp[1] == '1' [./array.as:267]\nFAILED: expected: '16' obtained: undefined [./array.as:268]\nFAILED: expected: '2' obtained: undefined [./array.as:269]\nFAILED: expected: '4' obtained: undefined [./array.as:270]\nPASSED: trysortarray.toString() == \"But,Different,alphabet,capitalization\" [./array.as:293]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:295]\nFAILED: expected: 'undefined' obtained: movieclip [./array.as:296]\nPASSED: testCmpCalls == 7 [./array.as:297]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:301]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:305]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:309]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:313]\nPASSED: trysortarray.length == 0 [./array.as:317]\nPASSED: trysortarray.toString() == \"1,2,3,4\" [./array.as:321]\nPASSED: trysortarray.length == 4 [./array.as:322]\nFAILED: expected: 4 obtained: 0 [./array.as:324]\nFAILED: expected: \"2,3,4,1\" obtained:  [./array.as:325]\nPASSED: indexedarray.length == 7 [./array.as:336]\nPASSED: firstRandom != secondRandom [./array.as:344]\nPASSED: typeof(c) == \"object\" [./array.as:351]\nPASSED: c[0] == \"zero\" [./array.as:356]\nPASSED: c[1] == \"one\" [./array.as:357]\nPASSED: c[1.1] == \"one point one\" [./array.as:358]\nPASSED: c[1.9] == undefined [./array.as:359]\nPASSED: c[-3] == \"minus three\" [./array.as:360]\nPASSED: c[-3.7] == undefined [./array.as:361]\nPASSED: c[0] == \"zero\" [./array.as:364]\nPASSED: c[1] == \"one\" [./array.as:365]\nPASSED: c[0] == undefined [./array.as:370]\nPASSED: c[1] == undefined [./array.as:371]\nPASSED: c[2] == undefined [./array.as:372]\nPASSED: c[3] == undefined [./array.as:373]\nPASSED: c[1.1] == \"one point one\" [./array.as:374]\nPASSED: c[-2147483649] == \"too low\" [./array.as:375]\nPASSED: c[int(-2147483649)] == undefined [./array.as:377]\nPASSED: c[-2147483649] == \"too low\" [./array.as:380]\nPASSED: c[2147483649] == \"too high\" [./array.as:381]\nPASSED: c[1] == undefined [./array.as:382]\n... (486 lines after) ...",
@@ -3408,9 +3408,9 @@
     {
       "test": "case-v5",
       "phases": {
-        "recomp": 0.0,
-        "compile": 2.593,
-        "run": 0.003
+        "recomp": 0.014,
+        "compile": 2.975,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -3418,14 +3418,14 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 2.6,
+      "duration": 3.0,
       "status": "pass"
     },
     {
       "test": "case-v6",
       "phases": {
-        "recomp": 0.021,
-        "compile": 3.468,
+        "recomp": 0.024,
+        "compile": 4.023,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3434,14 +3434,14 @@
         "expected_lines": 73,
         "matching_lines": 73
       },
-      "duration": 3.5,
+      "duration": 4.06,
       "status": "pass"
     },
     {
       "test": "case-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 3.337,
+        "recomp": 0.022,
+        "compile": 3.956,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3450,14 +3450,14 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 3.34,
+      "duration": 3.99,
       "status": "pass"
     },
     {
       "test": "case-v8",
       "phases": {
-        "recomp": 0.02,
-        "compile": 1.454,
+        "recomp": 0.023,
+        "compile": 1.702,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3466,15 +3466,15 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 1.48,
+      "duration": 1.73,
       "status": "pass"
     },
     {
       "test": "delete-v5",
       "phases": {
-        "recomp": 0.0,
-        "compile": 21.806,
-        "run": 0.004
+        "recomp": 0.016,
+        "compile": 21.398,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -3482,14 +3482,14 @@
         "expected_lines": 61,
         "matching_lines": 61
       },
-      "duration": 21.81,
+      "duration": 21.42,
       "status": "pass"
     },
     {
       "test": "delete-v6",
       "phases": {
         "recomp": 0.016,
-        "compile": 2.25,
+        "compile": 2.244,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3505,8 +3505,8 @@
       "test": "delete-v7",
       "phases": {
         "recomp": 0.016,
-        "compile": 2.441,
-        "run": 0.004
+        "compile": 2.449,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -3514,15 +3514,15 @@
         "expected_lines": 61,
         "matching_lines": 61
       },
-      "duration": 2.46,
+      "duration": 2.47,
       "status": "pass"
     },
     {
       "test": "delete-v8",
       "phases": {
         "recomp": 0.016,
-        "compile": 1.434,
-        "run": 0.004
+        "compile": 1.408,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -3530,14 +3530,14 @@
         "expected_lines": 61,
         "matching_lines": 61
       },
-      "duration": 1.46,
+      "duration": 1.43,
       "status": "pass"
     },
     {
       "test": "enumerate-v5",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.768,
+        "recomp": 0.0,
+        "compile": 1.721,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3546,14 +3546,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.78,
+      "duration": 1.73,
       "status": "pass"
     },
     {
       "test": "enumerate-v6",
       "phases": {
         "recomp": 0.016,
-        "compile": 2.82,
+        "compile": 2.742,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3562,14 +3562,14 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 2.84,
+      "duration": 2.77,
       "status": "pass"
     },
     {
       "test": "enumerate-v7",
       "phases": {
-        "recomp": 0.017,
-        "compile": 2.425,
+        "recomp": 0.016,
+        "compile": 2.385,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3578,14 +3578,14 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 2.45,
+      "duration": 2.41,
       "status": "pass"
     },
     {
       "test": "enumerate-v8",
       "phases": {
         "recomp": 0.016,
-        "compile": 1.232,
+        "compile": 1.223,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3594,14 +3594,14 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 1.26,
+      "duration": 1.25,
       "status": "pass"
     },
     {
       "test": "flash-v5",
       "phases": {
         "recomp": 0.006,
-        "compile": 21.096,
+        "compile": 20.297,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3610,14 +3610,14 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 21.11,
+      "duration": 20.31,
       "status": "pass"
     },
     {
       "test": "flash-v6",
       "phases": {
         "recomp": 0.006,
-        "compile": 2.048,
+        "compile": 1.998,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3626,14 +3626,14 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 2.06,
+      "duration": 2.01,
       "status": "pass"
     },
     {
       "test": "flash-v7",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.644,
+        "compile": 1.634,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3642,14 +3642,14 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 1.66,
+      "duration": 1.65,
       "status": "pass"
     },
     {
       "test": "flash-v8",
       "phases": {
-        "recomp": 0.014,
-        "compile": 21.84,
+        "recomp": 0.0,
+        "compile": 21.297,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3658,14 +3658,14 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 21.86,
+      "duration": 21.3,
       "status": "pass"
     },
     {
       "test": "getvariable-v6",
       "phases": {
-        "recomp": 0.0,
-        "compile": 3.308,
+        "recomp": 0.02,
+        "compile": 3.242,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3674,14 +3674,14 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 3.32,
+      "duration": 3.27,
       "status": "pass"
     },
     {
       "test": "ops-v5",
       "phases": {
-        "recomp": 0.12,
-        "compile": 28.933,
+        "recomp": 0.0,
+        "compile": 28.706,
         "run": 0.006
       },
       "num_frames": 30,
@@ -3690,7 +3690,7 @@
         "expected_lines": 260,
         "matching_lines": 253
       },
-      "duration": 29.07,
+      "duration": 28.72,
       "ruffle_diff_count": 9,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -3699,8 +3699,8 @@
     {
       "test": "ops-v6",
       "phases": {
-        "recomp": 0.121,
-        "compile": 8.859,
+        "recomp": 0.0,
+        "compile": 9.129,
         "run": 0.006
       },
       "num_frames": 30,
@@ -3709,7 +3709,7 @@
         "expected_lines": 260,
         "matching_lines": 253
       },
-      "duration": 8.99,
+      "duration": 9.14,
       "ruffle_diff_count": 11,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -3718,8 +3718,8 @@
     {
       "test": "ops-v7",
       "phases": {
-        "recomp": 0.121,
-        "compile": 9.329,
+        "recomp": 0.0,
+        "compile": 9.757,
         "run": 0.006
       },
       "num_frames": 30,
@@ -3728,7 +3728,7 @@
         "expected_lines": 262,
         "matching_lines": 255
       },
-      "duration": 9.46,
+      "duration": 9.77,
       "ruffle_diff_count": 11,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -3737,8 +3737,8 @@
     {
       "test": "ops-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 20.224,
+        "recomp": 0.139,
+        "compile": 20.324,
         "run": 0.006
       },
       "num_frames": 30,
@@ -3747,7 +3747,7 @@
         "expected_lines": 262,
         "matching_lines": 255
       },
-      "duration": 20.23,
+      "duration": 20.47,
       "ruffle_diff_count": 11,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -3757,7 +3757,7 @@
       "test": "setProperty-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 3.023,
+        "compile": 3.067,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3766,7 +3766,7 @@
         "expected_lines": 52,
         "matching_lines": 3
       },
-      "duration": 3.03,
+      "duration": 3.07,
       "ruffle_diff_count": 49,
       "ours_diff_count": 49,
       "status": "ruffle_matched",
@@ -3776,8 +3776,8 @@
       "test": "setProperty-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 3.137,
-        "run": 0.004
+        "compile": 3.079,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -3785,7 +3785,7 @@
         "expected_lines": 52,
         "matching_lines": 3
       },
-      "duration": 3.14,
+      "duration": 3.09,
       "ruffle_diff_count": 49,
       "ours_diff_count": 49,
       "status": "ruffle_matched",
@@ -3794,8 +3794,8 @@
     {
       "test": "setProperty-v7",
       "phases": {
-        "recomp": 0.0,
-        "compile": 2.791,
+        "recomp": 0.016,
+        "compile": 2.714,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3804,7 +3804,7 @@
         "expected_lines": 52,
         "matching_lines": 3
       },
-      "duration": 2.8,
+      "duration": 2.74,
       "ruffle_diff_count": 49,
       "ours_diff_count": 49,
       "status": "ruffle_matched",
@@ -3813,8 +3813,8 @@
     {
       "test": "setProperty-v8",
       "phases": {
-        "recomp": 0.014,
-        "compile": 1.715,
+        "recomp": 0.016,
+        "compile": 1.797,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3823,7 +3823,7 @@
         "expected_lines": 52,
         "matching_lines": 3
       },
-      "duration": 1.74,
+      "duration": 1.82,
       "ruffle_diff_count": 49,
       "ours_diff_count": 49,
       "status": "ruffle_matched",
@@ -3833,7 +3833,7 @@
       "test": "swap-v5",
       "phases": {
         "recomp": 0.006,
-        "compile": 21.105,
+        "compile": 21.656,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3842,14 +3842,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 21.12,
+      "duration": 21.67,
       "status": "pass"
     },
     {
       "test": "swap-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.648,
+        "compile": 0.659,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3858,14 +3858,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 0.66,
+      "duration": 0.67,
       "status": "pass"
     },
     {
       "test": "swap-v7",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.486,
+        "compile": 1.52,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3874,14 +3874,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.5,
+      "duration": 1.53,
       "status": "pass"
     },
     {
       "test": "swap-v8",
       "phases": {
-        "recomp": 0.007,
-        "compile": 1.28,
+        "recomp": 0.006,
+        "compile": 1.34,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3890,14 +3890,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.29,
+      "duration": 1.35,
       "status": "pass"
     },
     {
       "test": "targetPath-v5",
       "phases": {
-        "recomp": 0.007,
-        "compile": 1.884,
+        "recomp": 0.008,
+        "compile": 2.016,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3906,14 +3906,14 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 1.9,
+      "duration": 2.03,
       "status": "pass"
     },
     {
       "test": "targetPath-v6",
       "phases": {
         "recomp": 0.01,
-        "compile": 2.11,
+        "compile": 2.2,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3922,14 +3922,14 @@
         "expected_lines": 23,
         "matching_lines": 23
       },
-      "duration": 2.13,
+      "duration": 2.22,
       "status": "pass"
     },
     {
       "test": "targetPath-v7",
       "phases": {
-        "recomp": 0.01,
-        "compile": 1.746,
+        "recomp": 0.0,
+        "compile": 1.866,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3938,14 +3938,14 @@
         "expected_lines": 23,
         "matching_lines": 23
       },
-      "duration": 1.76,
+      "duration": 1.87,
       "status": "pass"
     },
     {
       "test": "targetPath-v8",
       "phases": {
         "recomp": 0.01,
-        "compile": 1.249,
+        "compile": 1.353,
         "run": 0.003
       },
       "num_frames": 30,
@@ -3954,14 +3954,14 @@
         "expected_lines": 23,
         "matching_lines": 23
       },
-      "duration": 1.27,
+      "duration": 1.37,
       "status": "pass"
     },
     {
       "test": "toString_valueOf-v5",
       "phases": {
         "recomp": 0.045,
-        "compile": 23.706,
+        "compile": 24.685,
         "run": 0.005
       },
       "num_frames": 30,
@@ -3970,7 +3970,7 @@
         "expected_lines": 137,
         "matching_lines": 103
       },
-      "duration": 23.76,
+      "duration": 24.74,
       "ruffle_diff_count": 34,
       "ours_diff_count": 34,
       "status": "ruffle_matched",
@@ -3979,8 +3979,8 @@
     {
       "test": "toString_valueOf-v6",
       "phases": {
-        "recomp": 0.052,
-        "compile": 5.315,
+        "recomp": 0.0,
+        "compile": 5.763,
         "run": 0.005
       },
       "num_frames": 30,
@@ -3989,7 +3989,7 @@
         "expected_lines": 155,
         "matching_lines": 150
       },
-      "duration": 5.38,
+      "duration": 5.77,
       "ruffle_diff_count": 5,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -3998,8 +3998,8 @@
     {
       "test": "toString_valueOf-v7",
       "phases": {
-        "recomp": 0.052,
-        "compile": 4.862,
+        "recomp": 0.053,
+        "compile": 5.435,
         "run": 0.005
       },
       "num_frames": 30,
@@ -4008,7 +4008,7 @@
         "expected_lines": 155,
         "matching_lines": 150
       },
-      "duration": 4.92,
+      "duration": 5.5,
       "ruffle_diff_count": 5,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -4017,8 +4017,8 @@
     {
       "test": "toString_valueOf-v8",
       "phases": {
-        "recomp": 0.053,
-        "compile": 1.327,
+        "recomp": 0.057,
+        "compile": 1.38,
         "run": 0.005
       },
       "num_frames": 30,
@@ -4027,7 +4027,7 @@
         "expected_lines": 155,
         "matching_lines": 150
       },
-      "duration": 1.39,
+      "duration": 1.45,
       "ruffle_diff_count": 5,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -4037,8 +4037,8 @@
       "test": "with-v5",
       "phases": {
         "recomp": 0.019,
-        "compile": 3.261,
-        "run": 0.003
+        "compile": 3.532,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -4046,7 +4046,7 @@
         "expected_lines": 49,
         "matching_lines": 46
       },
-      "duration": 3.29,
+      "duration": 3.56,
       "ruffle_diff_count": 3,
       "ours_diff_count": 3,
       "status": "ruffle_matched",
@@ -4055,9 +4055,9 @@
     {
       "test": "with-v6",
       "phases": {
-        "recomp": 0.031,
-        "compile": 4.397,
-        "run": 0.004
+        "recomp": 0.032,
+        "compile": 4.822,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -4065,7 +4065,7 @@
         "expected_lines": 107,
         "matching_lines": 101
       },
-      "duration": 4.44,
+      "duration": 4.86,
       "ruffle_diff_count": 9,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -4074,9 +4074,9 @@
     {
       "test": "with-v7",
       "phases": {
-        "recomp": 0.031,
-        "compile": 4.07,
-        "run": 0.004
+        "recomp": 0.032,
+        "compile": 4.475,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -4084,7 +4084,7 @@
         "expected_lines": 107,
         "matching_lines": 101
       },
-      "duration": 4.11,
+      "duration": 4.52,
       "ruffle_diff_count": 9,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -4093,9 +4093,9 @@
     {
       "test": "with-v8",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.505,
-        "run": 0.004
+        "recomp": 0.031,
+        "compile": 1.553,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -4103,7 +4103,7 @@
         "expected_lines": 107,
         "matching_lines": 101
       },
-      "duration": 1.51,
+      "duration": 1.59,
       "ruffle_diff_count": 9,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
