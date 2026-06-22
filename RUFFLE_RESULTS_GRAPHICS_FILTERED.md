@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS_GRAPHICS.md](RUFFLE_RESULTS_GRAPHICS.md) for unfiltered results.*
 
-**Commit:** `895ada87ff24`  
-**Date:** 2026-06-21 20:54 UTC  
-**Total duration:** 3h17m20s
+**Commit:** `34641bc76d68`  
+**Date:** 2026-06-22 00:11 UTC  
+**Total duration:** 2h32m38s
 
 ## Results by Suite
 
@@ -88,60 +88,60 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 - **Pass:** 627/660 (95.0%)
 - **Ignored:** 43 tests
-- **Duration:** 1h27m57s across 30 shards
+- **Duration:** 1h03m48s across 30 shards
 - **Lines:** 105,043/111,688 matching (94.1%)
-- **Avg test duration:** 7.5s — slowest: `bitmap_data_thorough/fillRect` (32.3s)
+- **Avg test duration:** 5.3s — slowest: `movieclip_methods_with_loaded_image` (30.5s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 125/228 (54.8%)
 - **Ignored:** 7 tests
-- **Duration:** 38m17s across 29 shards
+- **Duration:** 28m49s across 29 shards
 - **Lines:** 28,910/31,051 matching (93.1%)
-- **Avg test duration:** 9.6s — slowest: `MovieClip-v8` (64.5s)
+- **Avg test duration:** 7.2s — slowest: `MovieClip-v8` (65.0s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 62/105 (59.0%)
 - **Ignored:** 2 tests
-- **Duration:** 36m12s across 29 shards
+- **Duration:** 27m00s across 29 shards
 - **Lines:** 3,951/5,123 matching (77.1%)
-- **Avg test duration:** 20.2s — slowest: `matrix_test` (111.7s)
+- **Avg test duration:** 15.1s — slowest: `matrix_test` (107.7s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m23s across 29 shards
+- **Duration:** 2m21s across 29 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 15.9s — slowest: `enum` (23.5s)
+- **Avg test duration:** 15.6s — slowest: `enum` (22.5s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 10/17 (58.8%)
 - **Ignored:** 2 tests
-- **Duration:** 5m56s across 29 shards
+- **Duration:** 5m16s across 29 shards
 - **Lines:** 376/510 matching (73.7%)
-- **Avg test duration:** 19.6s — slowest: `stackscope` (24.7s)
+- **Avg test duration:** 17.1s — slowest: `movieclip_destruction_test1` (23.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 18/19 (94.7%)
-- **Duration:** 6m38s across 29 shards
+- **Duration:** 6m42s across 29 shards
 - **Lines:** 89/91 matching (97.8%)
-- **Avg test duration:** 20.9s — slowest: `trace-as2/super` (24.1s)
+- **Avg test duration:** 21.1s — slowest: `background` (23.4s)
 
 ### from_shumway
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 16m33s across 30 shards
+- **Duration:** 15m21s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 8.4s — slowest: `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` (24.8s)
+- **Avg test duration:** 7.4s — slowest: `avm1/text-bind` (23.2s)
 
 ### from_shumway/avm1
 
 - **Pass:** 44/44 (100%)
 - **Ignored:** 3 tests
-- **Duration:** 3m20s across 30 shards
+- **Duration:** 3m17s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 3.0s — slowest: `label` (21.6s)
+- **Avg test duration:** 3.0s — slowest: `rollover` (21.0s)
