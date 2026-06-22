@@ -41147,20 +41147,19 @@ check_special_vars:
 				return;
 			}
 			if (strcasecmp(var_name, "_xmouse") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+				// Compute the clip-local mouse position on demand in ALL modes.
+				// Browser-WASM previously returned the cached mc->xmouse, which is
+				// only ever updated on root_movieclip — so a non-root clip (e.g.
+				// Minesweeper's board `sensor`, a translated timeline clip whose
+				// on(press) reads `_xmouse`) always saw 0 (its local origin) and
+				// every click mapped to the board center. mc_get_local_mouse uses
+				// app_context->mouse (populated in browser-WASM input_events.c too).
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx)); return;
-#else
-				float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
-#endif
 			}
 			if (strcasecmp(var_name, "_ymouse") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly)); return;
-#else
-				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
-#endif
 			}
 		}
 
@@ -42716,27 +42715,18 @@ void actionGetProperty(SWFAppContext* app_context)
 			is_string = 1;
 			break;
 		case 20: // _xmouse (SWF 5+)
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// On-demand clip-local mouse in all modes (see GetVariable note).
 			if (mc) {
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx));
 			} else { PUSH(ACTION_STACK_VALUE_F64, 0); }
 			return;
-#else
-			value = mc ? mc->xmouse : 0.0f;
-#endif
-			break;
 		case 21: // _ymouse (SWF 5+)
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) {
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly));
 			} else { PUSH(ACTION_STACK_VALUE_F64, 0); }
 			return;
-#else
-			value = mc ? mc->ymouse : 0.0f;
-#endif
-			break;
 		default:
 			// Unknown/out-of-range property index - push undefined (Flash behavior)
 			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
@@ -51021,20 +51011,13 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(g_stage_quality, strlen(g_stage_quality)); return; }
 			if (strcasecmp(prop_name, "_xmouse") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+				// On-demand clip-local mouse in all modes (see GetVariable note).
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx)); return;
-#else
-				float v = mc->xmouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
-#endif
 			}
 			if (strcasecmp(prop_name, "_ymouse") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly)); return;
-#else
-				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
-#endif
 			}
 			if (strcasecmp(prop_name, "_highquality") == 0) { float v = (float)stageQualityToHighqualityInt(); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_focusrect") == 0) {
