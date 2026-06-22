@@ -645,6 +645,7 @@ void tagMain(SWFAppContext* app_context)
 						switch (code) {
 							case 8:  actionTextControlBackspace(app_context); break; // Backspace
 							case 13: actionTextControlEnter(app_context);     break; // Enter
+							case 46: actionTextControlDelete(app_context);    break; // Delete (forward)
 							case 35: actionTextControlMoveEnd(app_context);   break; // End
 							case 36: actionTextControlMoveHome(app_context);  break; // Home
 							case 37: actionTextControlMoveLeft(app_context);  break; // Left arrow

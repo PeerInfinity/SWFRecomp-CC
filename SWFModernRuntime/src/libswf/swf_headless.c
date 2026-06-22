@@ -604,6 +604,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             actionTextControlEnter(app_context);
         else if (strcmp(ev->ctrl, "Backspace") == 0)
             actionTextControlBackspace(app_context);
+        else if (strcmp(ev->ctrl, "Delete") == 0)
+            actionTextControlDelete(app_context);
         break;
     case EV_SET_CLIPBOARD_TEXT:
         actionSetClipboardText(ev->text);

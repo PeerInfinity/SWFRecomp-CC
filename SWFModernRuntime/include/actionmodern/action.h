@@ -776,4 +776,6 @@ void actionTextControlMoveHome(SWFAppContext* app_context);
 void actionTextControlMoveEnd(SWFAppContext* app_context);
 void actionTextControlEnter(SWFAppContext* app_context);
 void actionTextControlBackspace(SWFAppContext* app_context);
+void actionTextControlDelete(SWFAppContext* app_context);
 void actionTextFieldInput(SWFAppContext* app_context, int codepoint);
+int  ng_is_textfield_focused(void);

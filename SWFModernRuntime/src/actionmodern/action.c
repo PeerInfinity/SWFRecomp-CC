@@ -71923,6 +71923,15 @@ void actionAdvanceTabFocus(SWFAppContext* app_context, int reversed)
 // Accessor for g_focused_mc — used by tag.c for button keyPress focus gating.
 void* actionGetFocusedMC(void) { return (void*)g_focused_mc; }
 
+// 1 when a text field currently holds keyboard focus. render_webgpu.c's keydown
+// callback uses this to decide whether to preventDefault: when a field is
+// focused it must NOT preventDefault printable keys, or the browser never emits
+// the `keypress` event that drives text input.
+int ng_is_textfield_focused(void)
+{
+	return (g_focused_mc != NULL && MC_IS_TEXTFIELD(g_focused_mc)) ? 1 : 0;
+}
+
 // ---------------------------------------------------------------------------
 // Focus highlight state
 // ---------------------------------------------------------------------------
@@ -73000,6 +73009,90 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 	VAL(double, &len_val.data.numeric_value) = (double)result_len;
 	setProperty(app_context, props, "length", 6, &len_val);
 
+	g_selection_begin = del_start;
+	g_selection_end = del_start;
+	g_selection_caret = del_start;
+
+	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+	tf_invalidate_run_table(g_focused_mc);
+	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+}
+
+// Forward delete (Delete key): like Backspace but removes the character AFTER
+// the caret (or the selection), leaving the caret in place.
+void actionTextControlDelete(SWFAppContext* app_context)
+{
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+	if (props == NULL) return;
+
+	if (g_tf_select_all) {
+		// Delete all text (same as Backspace's select-all path).
+		static const uint16_t empty_u16[] = {0};
+		ActionVar empty_text = {0};
+		empty_text.type = ACTION_STACK_VALUE_STRING;
+		empty_text.data.numeric_value = (u64)(uintptr_t)empty_u16;
+		empty_text.str_size = 0;
+		setProperty(app_context, props, "text", 4, &empty_text);
+		ActionVar len_val = {0};
+		len_val.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &len_val.data.numeric_value) = 0.0;
+		setProperty(app_context, props, "length", 6, &len_val);
+		ng_syncTextToVar(app_context, g_focused_mc, &empty_text);
+		tf_invalidate_run_table(g_focused_mc);
+		g_tf_select_all = 0;
+		g_selection_begin = 0;
+		g_selection_end = 0;
+		g_selection_caret = 0;
+		mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+		return;
+	}
+
+	ActionVar* text_prop = getProperty(props, "text", 4);
+	if (text_prop == NULL || text_prop->type != ACTION_STACK_VALUE_STRING) return;
+	const uint16_t* old_u16 = varGetU16Ptr(text_prop);
+	u32 old_len = text_prop->str_size;
+	if (old_len == 0) return;
+
+	int sel_begin = g_selection_begin >= 0 ? g_selection_begin : 0;
+	int sel_end = g_selection_end >= 0 ? g_selection_end : 0;
+	if (sel_begin > (int)old_len) sel_begin = (int)old_len;
+	if (sel_end > (int)old_len) sel_end = (int)old_len;
+
+	int del_start, del_end;
+	if (sel_begin != sel_end) {
+		// Range selection: delete the selection.
+		del_start = sel_begin < sel_end ? sel_begin : sel_end;
+		del_end = sel_begin > sel_end ? sel_begin : sel_end;
+	} else {
+		// No selection: delete the character AFTER the caret.
+		if (sel_begin >= (int)old_len) return; // caret at end — nothing to delete
+		del_start = sel_begin;
+		del_end = sel_begin + 1;
+	}
+
+	u32 prefix_len = (u32)del_start;
+	u32 suffix_len = old_len - (u32)del_end;
+	u32 result_len = prefix_len + suffix_len;
+	uint16_t* result_u16 = (uint16_t*) malloc( (result_len + 1) * sizeof(uint16_t));
+	if (prefix_len > 0 && old_u16 != NULL)
+		memcpy(result_u16, old_u16, prefix_len * sizeof(uint16_t));
+	if (suffix_len > 0 && old_u16 != NULL)
+		memcpy(result_u16 + prefix_len, old_u16 + del_end, suffix_len * sizeof(uint16_t));
+	result_u16[result_len] = 0;
+
+	ActionVar new_text = {0};
+	new_text.type = ACTION_STACK_VALUE_STRING;
+	new_text.data.numeric_value = (u64)(uintptr_t)result_u16;
+	new_text.str_size = result_len;
+	setProperty(app_context, props, "text", 4, &new_text);
+
+	ActionVar len_val = {0};
+	len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = (double)result_len;
+	setProperty(app_context, props, "length", 6, &len_val);
+
+	// Caret stays at del_start for a forward delete.
 	g_selection_begin = del_start;
 	g_selection_end = del_start;
 	g_selection_caret = del_start;

@@ -551,6 +551,29 @@ static EM_BOOL on_key_down(int type, const EmscriptenKeyboardEvent* evt, void* u
 		g_mouse_app_context->keys.last_key_down = code;
 		g_mouse_app_context->keys.last_key_ascii = evt->which;
 	}
+	// When a text field is focused, the browser must still emit the `keypress`
+	// event that drives text input — and preventDefault() on keydown cancels it.
+	// So for a focused field, only preventDefault the non-character navigation /
+	// editing keys (which never produce a keypress anyway, and whose browser
+	// defaults — scroll, back-navigation, tab-out — we don't want); let printable
+	// keys (incl. space) through so keypress fires. With no field focused, keep
+	// the original behavior (preventDefault everything) so game canvases don't
+	// scroll the page on arrows/space.
+	extern int ng_is_textfield_focused(void);
+	if (ng_is_textfield_focused()) {
+		int code = evt->keyCode;
+		switch (code) {
+			case 8:  // Backspace (browser back-nav)
+			case 9:  // Tab (focus-out)
+			case 33: case 34:            // PageUp / PageDown
+			case 35: case 36:            // End / Home
+			case 37: case 38: case 39: case 40: // arrows
+			case 46:                     // Delete
+				return EM_TRUE;          // preventDefault — no keypress lost
+			default:
+				return EM_FALSE;         // printable keys: let keypress fire
+		}
+	}
 	// Prevent default for arrow keys / space to stop page scrolling
 	return EM_TRUE;
 }
