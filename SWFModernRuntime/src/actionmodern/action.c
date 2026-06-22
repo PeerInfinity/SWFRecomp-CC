@@ -19863,10 +19863,13 @@ extern int child_mc_count;
 
 // Forward declarations for focus tracking (defined in Selection section)
 static MovieClip* g_focused_mc;
-// Forward tentative declaration (real definition + init at the Selection block
-// below). Needed by actionIterateTextFieldGlyphs to draw the caret on the
-// focused field.
+// Forward tentative declarations (real definitions + init at the Selection block
+// below). Needed by actionIterateTextFieldGlyphs to draw the caret + selection
+// highlight on the focused field.
 static int g_selection_caret;
+static int g_selection_begin;
+static int g_selection_end;
+static int g_tf_select_all;
 static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc);
 
 // Forward declaration for _level management (defined after child_mc_cache)
@@ -26452,6 +26455,23 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		info.caret_char = (mc == g_focused_mc && g_selection_caret >= 0)
 			? g_selection_caret : -1;
 		info.mc = (void*)mc;
+		// Selection range for the focused field (browser-only highlight). A
+		// select-all maps to [0, text length]; a normal non-empty range maps
+		// directly. Collapsed / unfocused → no selection.
+		info.sel_begin = -1;
+		info.sel_end = -1;
+		if (mc == g_focused_mc) {
+			if (g_tf_select_all) {
+				ActionVar* _sel_tp = getProperty(props, "text", 4);
+				int _sel_tl = (_sel_tp != NULL && _sel_tp->type == ACTION_STACK_VALUE_STRING)
+					? (int)_sel_tp->str_size : 0;
+				if (_sel_tl > 0) { info.sel_begin = 0; info.sel_end = _sel_tl; }
+			} else if (g_selection_begin >= 0 && g_selection_end >= 0
+			           && g_selection_begin != g_selection_end) {
+				info.sel_begin = g_selection_begin;
+				info.sel_end = g_selection_end;
+			}
+		}
 
 		cb(&info, user_data);
 		count++;
@@ -26678,6 +26698,8 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.indent_twips = (s32) ng_getTextFieldIndent(tf_idx);
 	info.caret_char = -1;  // orphan/static path: never the focused editable field
 	info.mc = NULL;
+	info.sel_begin = -1;
+	info.sel_end = -1;
 	glyph_cb(&info, user_data);
 }
 
@@ -72837,57 +72859,86 @@ static int tf_get_text_length(MovieClip* mc)
 	return 0;
 }
 
+// 1 when Shift is held (browser sets keys.down[16] on keydown), so the text-
+// control move keys extend the selection instead of collapsing it.
+static int tf_shift_held(SWFAppContext* app_context)
+{
+	return (app_context != NULL && app_context->keys.down[16] != 0) ? 1 : 0;
+}
+
+// The current caret (active end of the selection). A prior select-all normalizes
+// to the end of the text.
+static int tf_active_caret(int text_len)
+{
+	if (g_tf_select_all) return text_len;
+	return g_selection_caret >= 0 ? g_selection_caret : 0;
+}
+
+// The fixed end of the selection (the end that is NOT the caret), used when
+// extending with Shift. Falls back to the caret when there's no active range;
+// a prior select-all anchors at the start.
+static int tf_selection_anchor(int caret)
+{
+	if (g_tf_select_all) return 0;
+	if (g_selection_begin >= 0 && g_selection_end >= 0
+	    && g_selection_begin != g_selection_end)
+		return (g_selection_caret == g_selection_end)
+			? g_selection_begin : g_selection_end;
+	return caret;
+}
+
+// Apply a new caret position: extend the selection from its anchor when shift is
+// held, otherwise collapse to the caret.
+static void tf_set_caret(int new_caret, int text_len, int shift)
+{
+	if (new_caret < 0) new_caret = 0;
+	if (new_caret > text_len) new_caret = text_len;
+	if (shift) {
+		int anchor = tf_selection_anchor(tf_active_caret(text_len));
+		g_selection_begin = anchor;
+		g_selection_end = new_caret;
+		g_selection_caret = new_caret;
+	} else {
+		g_selection_begin = new_caret;
+		g_selection_end = new_caret;
+		g_selection_caret = new_caret;
+	}
+	g_tf_select_all = 0;
+}
+
 void actionTextControlMoveRight(SWFAppContext* app_context)
 {
-	(void)app_context;
 	if (g_focused_mc == NULL) return;
+	int shift = tf_shift_held(app_context);
 	int text_len = tf_get_text_length(g_focused_mc);
-	if (g_tf_select_all) {
-		// Collapse selection to end of text
-		g_selection_begin = text_len;
-		g_selection_end = text_len;
-		g_selection_caret = text_len;
-		g_tf_select_all = 0;
-	} else if (g_selection_begin >= 0 && g_selection_end >= 0 && g_selection_begin != g_selection_end) {
-		// Collapse range selection to right edge
-		int right = g_selection_end > g_selection_begin ? g_selection_end : g_selection_begin;
-		g_selection_begin = right;
-		g_selection_end = right;
-		g_selection_caret = right;
+	int caret = tf_active_caret(text_len);
+	int has_sel = (!g_tf_select_all && g_selection_begin >= 0 && g_selection_end >= 0
+	               && g_selection_begin != g_selection_end);
+	if (!shift && (has_sel || g_tf_select_all)) {
+		// Non-shift over a selection collapses to its right edge (no extra move).
+		int right = g_tf_select_all ? text_len
+			: (g_selection_end > g_selection_begin ? g_selection_end : g_selection_begin);
+		tf_set_caret(right, text_len, 0);
 	} else {
-		// Move caret right by one
-		int pos = g_selection_caret >= 0 ? g_selection_caret : 0;
-		if (pos < text_len) pos++;
-		g_selection_begin = pos;
-		g_selection_end = pos;
-		g_selection_caret = pos;
+		tf_set_caret(caret < text_len ? caret + 1 : caret, text_len, shift);
 	}
 }
 
 void actionTextControlMoveLeft(SWFAppContext* app_context)
 {
-	(void)app_context;
 	if (g_focused_mc == NULL) return;
+	int shift = tf_shift_held(app_context);
 	int text_len = tf_get_text_length(g_focused_mc);
-	if (g_tf_select_all) {
-		// Collapse selection to beginning of text
-		g_selection_begin = 0;
-		g_selection_end = 0;
-		g_selection_caret = 0;
-		g_tf_select_all = 0;
-	} else if (g_selection_begin >= 0 && g_selection_end >= 0 && g_selection_begin != g_selection_end) {
-		// Collapse range selection to left edge
-		int left = g_selection_begin < g_selection_end ? g_selection_begin : g_selection_end;
-		g_selection_begin = left;
-		g_selection_end = left;
-		g_selection_caret = left;
+	int caret = tf_active_caret(text_len);
+	int has_sel = (!g_tf_select_all && g_selection_begin >= 0 && g_selection_end >= 0
+	               && g_selection_begin != g_selection_end);
+	if (!shift && (has_sel || g_tf_select_all)) {
+		// Non-shift over a selection collapses to its left edge.
+		int left = g_tf_select_all ? 0
+			: (g_selection_begin < g_selection_end ? g_selection_begin : g_selection_end);
+		tf_set_caret(left, text_len, 0);
 	} else {
-		// Move caret left by one
-		int pos = g_selection_caret >= 0 ? g_selection_caret : text_len;
-		if (pos > 0) pos--;
-		g_selection_begin = pos;
-		g_selection_end = pos;
-		g_selection_caret = pos;
+		tf_set_caret(caret > 0 ? caret - 1 : caret, text_len, shift);
 	}
 }
 
@@ -72908,11 +72959,11 @@ static const uint16_t* tf_get_text_u16(MovieClip* mc, u32* out_len)
 
 void actionTextControlMoveHome(SWFAppContext* app_context)
 {
-	(void)app_context;
 	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	int shift = tf_shift_held(app_context);
 	u32 len = 0;
 	const uint16_t* t = tf_get_text_u16(g_focused_mc, &len);
-	int pos = g_selection_caret >= 0 ? g_selection_caret : 0;
+	int pos = tf_active_caret((int)len);
 	if (pos > (int)len) pos = (int)len;
 	// Walk back to the start of the current line (after the previous newline).
 	int home = pos;
@@ -72921,19 +72972,16 @@ void actionTextControlMoveHome(SWFAppContext* app_context)
 	} else {
 		home = 0;
 	}
-	g_selection_begin = home;
-	g_selection_end = home;
-	g_selection_caret = home;
-	g_tf_select_all = 0;
+	tf_set_caret(home, (int)len, shift);
 }
 
 void actionTextControlMoveEnd(SWFAppContext* app_context)
 {
-	(void)app_context;
 	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	int shift = tf_shift_held(app_context);
 	u32 len = 0;
 	const uint16_t* t = tf_get_text_u16(g_focused_mc, &len);
-	int pos = g_selection_caret >= 0 ? g_selection_caret : (int)len;
+	int pos = tf_active_caret((int)len);
 	if (pos > (int)len) pos = (int)len;
 	// Walk forward to the end of the current line (before the next newline).
 	int end = pos;
@@ -72942,10 +72990,7 @@ void actionTextControlMoveEnd(SWFAppContext* app_context)
 	} else {
 		end = (int)len;
 	}
-	g_selection_begin = end;
-	g_selection_end = end;
-	g_selection_caret = end;
-	g_tf_select_all = 0;
+	tf_set_caret(end, (int)len, shift);
 }
 
 void actionTextControlEnter(SWFAppContext* app_context)
@@ -73606,22 +73651,36 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 		}
 	}
 
-	// Insert at the caret position (NOT at the end) so click-then-type and
-	// mid-string edits land where the user expects. Clamp to the text length.
-	u32 caret = g_tf_select_all ? 0
-		: (g_selection_caret >= 0 ? (u32)g_selection_caret : old_len);
-	if (caret > old_len) caret = old_len;
+	// Determine the range the input replaces. A non-empty selection is replaced
+	// (so typing over a selection overwrites it); otherwise the input is inserted
+	// at the caret (a zero-width range). Clamp everything to the text length.
+	u32 del_lo, del_hi;
+	if (g_tf_select_all) {
+		del_lo = 0; del_hi = old_len;  // old_len==0 here (whole field replaced)
+	} else if (g_selection_begin >= 0 && g_selection_end >= 0
+	           && g_selection_begin != g_selection_end) {
+		u32 a = (u32)(g_selection_begin < g_selection_end ? g_selection_begin : g_selection_end);
+		u32 b = (u32)(g_selection_begin > g_selection_end ? g_selection_begin : g_selection_end);
+		if (a > old_len) a = old_len;
+		if (b > old_len) b = old_len;
+		del_lo = a; del_hi = b;
+	} else {
+		u32 caret = (g_selection_caret >= 0) ? (u32)g_selection_caret : old_len;
+		if (caret > old_len) caret = old_len;
+		del_lo = caret; del_hi = caret;
+	}
 
-	// Build new text = old[0..caret] + ch + old[caret..]
-	u32 u16_len = old_len + ch_u16_len;
+	// Build new text = old[0..del_lo] + ch + old[del_hi..]
+	u32 tail_len = (old_len > del_hi) ? (old_len - del_hi) : 0;
+	u32 u16_len = del_lo + ch_u16_len + tail_len;
 	uint16_t* u16_result = (uint16_t*) malloc((u16_len + 1) * sizeof(uint16_t));
-	if (old_u16 != NULL && caret > 0)
-		memcpy(u16_result, old_u16, caret * sizeof(uint16_t));
+	if (old_u16 != NULL && del_lo > 0)
+		memcpy(u16_result, old_u16, del_lo * sizeof(uint16_t));
 	if (ch_u16 != NULL && ch_u16_len > 0)
-		memcpy(u16_result + caret, ch_u16, ch_u16_len * sizeof(uint16_t));
-	if (old_u16 != NULL && old_len > caret)
-		memcpy(u16_result + caret + ch_u16_len, old_u16 + caret,
-		       (old_len - caret) * sizeof(uint16_t));
+		memcpy(u16_result + del_lo, ch_u16, ch_u16_len * sizeof(uint16_t));
+	if (old_u16 != NULL && tail_len > 0)
+		memcpy(u16_result + del_lo + ch_u16_len, old_u16 + del_hi,
+		       tail_len * sizeof(uint16_t));
 	u16_result[u16_len] = 0;
 
 	// Apply maxChars truncation
@@ -73637,7 +73696,7 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 	}
 
 	// Advance the caret past the inserted text (clamped to the final length).
-	u32 new_caret = caret + ch_u16_len;
+	u32 new_caret = del_lo + ch_u16_len;
 	if (new_caret > u16_len) new_caret = u16_len;
 
 	// Set text property

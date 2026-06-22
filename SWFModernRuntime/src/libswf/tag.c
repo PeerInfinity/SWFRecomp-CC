@@ -4103,6 +4103,54 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	int at_par_start = 1;
 	(void)at_par_start;
 
+	// Selection highlight: draw a box behind the selected glyphs (single-line,
+	// focused field). Browser-WASM only, same rationale as the caret — nothing is
+	// selected in headless/OFFSCREEN, so CI render output is unchanged.
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	if (info->sel_begin >= 0 && info->sel_end >= 0 && info->sel_begin != info->sel_end) {
+		int sel_lo = info->sel_begin < info->sel_end ? info->sel_begin : info->sel_end;
+		int sel_hi = info->sel_begin > info->sel_end ? info->sel_begin : info->sel_end;
+		int sel_multiline = 0;
+		for (size_t i = 0; i < text_len; i++) {
+			unsigned char c = (unsigned char)text[i];
+			if (c == '\n' || c == '\r' || c == 0xFE || c == 0xFF) { sel_multiline = 1; break; }
+		}
+		if (!sel_multiline) {
+			float sscale = (float)info->font_height / (float)em_square;
+			float xx = base_x + (par_count > 0 ? par_x_offset[0] : 0.0f);
+			float x_lo = -1.0f, x_hi = -1.0f;
+			int cc = 0; size_t p = 0;
+			while (1) {
+				if (cc == sel_lo && x_lo < 0.0f) x_lo = xx;
+				if (cc == sel_hi) { x_hi = xx; break; }
+				if (p >= text_len) break;
+				unsigned char c0 = (unsigned char)text[p];
+				u16 cp;
+				if (c0 >= 0xC0 && c0 < 0xE0 && p + 1 < text_len) {
+					cp = ((c0 & 0x1F) << 6) | ((unsigned char)text[p+1] & 0x3F); p += 2;
+				} else if (c0 >= 0xE0 && c0 < 0xF0 && p + 2 < text_len) {
+					cp = ((c0 & 0x0F) << 12) | (((unsigned char)text[p+1] & 0x3F) << 6) |
+					     ((unsigned char)text[p+2] & 0x3F); p += 3;
+				} else { cp = c0; p += 1; }
+				int gi = ng_font_find_glyph(font_idx, cp);
+				if (gi >= 0) {
+					s16 a = ng_font_glyph_advance_by_idx(font_idx, gi);
+					if (a >= 0) xx += (float)a * sscale;
+				}
+				cc++;
+			}
+			if (x_lo >= 0.0f && x_hi > x_lo) {
+				float sb_scale = (float)baseline_fh / (float)em_square;
+				float sel_top = y_pos - (float)ascent * sb_scale;
+				float sel_h = (float)baseline_fh;
+				// Light-blue highlight; the (usually black) text draws on top.
+				renderer_draw_rect(context, x_lo, sel_top, x_hi - x_lo, sel_h,
+					0.45f, 0.62f, 0.95f, 1.0f, 0, 0);
+			}
+		}
+	}
+#endif
+
 	size_t pos = 0;
 	int run_idx = 0;
 

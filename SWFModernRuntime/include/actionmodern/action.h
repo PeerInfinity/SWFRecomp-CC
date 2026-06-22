@@ -709,6 +709,11 @@ typedef struct TextFieldGlyphInfo {
     // orphan/static fields). Lets the renderer read/write the cached horizontal
     // scroll offset to keep the caret visible.
     void* mc;
+    // Selection range in UTF-16 code units for the focused field (sel_begin..
+    // sel_end, unordered), or -1/-1 when there's no selection or the field isn't
+    // focused — so the highlight, like the caret, is browser-only / never in CI.
+    int sel_begin;
+    int sel_end;
 } TextFieldGlyphInfo;
 
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);
