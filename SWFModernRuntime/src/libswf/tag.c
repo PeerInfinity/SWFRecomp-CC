@@ -4056,6 +4056,19 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	size_t pos = 0;
 	int run_idx = 0;
 
+	// Caret tracking: when this field is focused (info->caret_char >= 0), record
+	// the pen position at the caret's character index so we can draw a caret bar
+	// after the glyph pass. char_count counts decoded codepoints (== UTF-16 units
+	// for the BMP); caret_x stays <0 until the caret index is reached.
+	// Browser-WASM only: the caret is an interactive element; OFFSCREEN / headless
+	// CI captures must stay caret-free (a test's Selection.setFocus would otherwise
+	// add a caret bar and diverge from Ruffle's baseline).
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	size_t caret_count = 0;
+	float caret_x = -1.0f;
+	float caret_baseline = y_pos;
+#endif
+
 	while (pos < text_len) {
 		// Resolve run covering this byte position (runs are in order, monotonic).
 		u32 cur_color = info->text_color;
@@ -4089,6 +4102,17 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			cp = c0;
 			pos += 1;
 		}
+
+		// Record the caret x at its character index (pen position before this
+		// char is laid out, on the current line's baseline).
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+		if (info->caret_char >= 0 && caret_x < 0.0f &&
+		    caret_count == (size_t)info->caret_char) {
+			caret_x = x_pos;
+			caret_baseline = y_pos;
+		}
+		caret_count++;
+#endif
 
 		// Newline: advance y, reset x and consume next paragraph's offset.
 		if (cp == '\n' || cp == '\r') {
@@ -4139,6 +4163,28 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		}
 	}
 	#undef MAX_TF_PARAGRAPHS
+
+	// Caret at (or past) the end of the text — pen is at its final position.
+	// Draw a thin vertical bar at the insertion point, in the text color,
+	// spanning the line's em height. Browser-WASM only (see tracking note above).
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	if (info->caret_char >= 0 && caret_x < 0.0f &&
+	    (size_t)info->caret_char >= caret_count) {
+		caret_x = x_pos;
+		caret_baseline = y_pos;
+	}
+	if (info->caret_char >= 0 && caret_x >= 0.0f) {
+		float scale_b = (float)baseline_fh / (float)em_square;
+		float caret_top = caret_baseline - (float)ascent * scale_b;
+		float caret_h = (float)baseline_fh;
+		float caret_w = 20.0f; // ~1px
+		float cr = ((info->text_color >> 16) & 0xFF) / 255.0f;
+		float cg = ((info->text_color >> 8) & 0xFF) / 255.0f;
+		float cb = (info->text_color & 0xFF) / 255.0f;
+		renderer_draw_rect(context, caret_x, caret_top, caret_w, caret_h,
+			cr, cg, cb, 1.0f, 0, 0);
+	}
+#endif
 
 	if (has_clip) {
 		renderer_end_clip(context);

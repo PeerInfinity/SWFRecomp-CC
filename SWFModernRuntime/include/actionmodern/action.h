@@ -701,6 +701,10 @@ typedef struct TextFieldGlyphInfo {
     s32 left_margin_twips;
     s32 right_margin_twips;
     s32 indent_twips;
+    // Caret position in UTF-16 code units when this field is keyboard-focused,
+    // or -1 when it isn't (the common case — nothing is focused in headless /
+    // offscreen runs, so the caret is never drawn there and CI is unaffected).
+    int caret_char;
 } TextFieldGlyphInfo;
 
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);
@@ -768,6 +772,8 @@ void actionTextControlCut(SWFAppContext* app_context);
 void actionTextControlSelectAll(SWFAppContext* app_context);
 void actionTextControlMoveRight(SWFAppContext* app_context);
 void actionTextControlMoveLeft(SWFAppContext* app_context);
+void actionTextControlMoveHome(SWFAppContext* app_context);
+void actionTextControlMoveEnd(SWFAppContext* app_context);
 void actionTextControlEnter(SWFAppContext* app_context);
 void actionTextControlBackspace(SWFAppContext* app_context);
 void actionTextFieldInput(SWFAppContext* app_context, int codepoint);

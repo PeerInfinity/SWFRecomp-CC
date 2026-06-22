@@ -744,6 +744,10 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             actionTextControlMoveRight(app_context);
         else if (strcmp(ev->ctrl, "MoveLeft") == 0)
             actionTextControlMoveLeft(app_context);
+        else if (strcmp(ev->ctrl, "MoveHome") == 0)
+            actionTextControlMoveHome(app_context);
+        else if (strcmp(ev->ctrl, "MoveEnd") == 0)
+            actionTextControlMoveEnd(app_context);
         else if (strcmp(ev->ctrl, "Enter") == 0)
             actionTextControlEnter(app_context);
         else if (strcmp(ev->ctrl, "Backspace") == 0)

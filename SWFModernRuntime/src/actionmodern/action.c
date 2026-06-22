@@ -19863,6 +19863,10 @@ extern int child_mc_count;
 
 // Forward declarations for focus tracking (defined in Selection section)
 static MovieClip* g_focused_mc;
+// Forward tentative declaration (real definition + init at the Selection block
+// below). Needed by actionIterateTextFieldGlyphs to draw the caret on the
+// focused field.
+static int g_selection_caret;
 static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc);
 
 // Forward declaration for _level management (defined after child_mc_cache)
@@ -26443,6 +26447,10 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		info.left_margin_twips = left_margin_twips;
 		info.right_margin_twips = right_margin_twips;
 		info.indent_twips = indent_twips;
+		// Draw the caret only on the keyboard-focused field (never in headless /
+		// offscreen runs, where nothing is focused → CI render output unchanged).
+		info.caret_char = (mc == g_focused_mc && g_selection_caret >= 0)
+			? g_selection_caret : -1;
 
 		cb(&info, user_data);
 		count++;
@@ -26667,6 +26675,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.left_margin_twips = (s32) ng_getTextFieldLeftMargin(tf_idx);
 	info.right_margin_twips = (s32) ng_getTextFieldRightMargin(tf_idx);
 	info.indent_twips = (s32) ng_getTextFieldIndent(tf_idx);
+	info.caret_char = -1;  // orphan/static path: never the focused editable field
 	glyph_cb(&info, user_data);
 }
 
@@ -72843,6 +72852,63 @@ void actionTextControlMoveLeft(SWFAppContext* app_context)
 	}
 }
 
+// Home / End keys. Line-aware: move the caret to the start / end of the line
+// containing it (delimited by \r or \n), which for a single-line field is the
+// whole text. Mirrors Flash's caret behavior.
+static const uint16_t* tf_get_text_u16(MovieClip* mc, u32* out_len)
+{
+	*out_len = 0;
+	if (mc == NULL) return NULL;
+	ASObject* props = (ASObject*) mc->dynamic_props;
+	if (props == NULL) return NULL;
+	ActionVar* text_prop = getProperty(props, "text", 4);
+	if (text_prop == NULL || text_prop->type != ACTION_STACK_VALUE_STRING) return NULL;
+	*out_len = text_prop->str_size;
+	return varGetU16Ptr(text_prop);
+}
+
+void actionTextControlMoveHome(SWFAppContext* app_context)
+{
+	(void)app_context;
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	u32 len = 0;
+	const uint16_t* t = tf_get_text_u16(g_focused_mc, &len);
+	int pos = g_selection_caret >= 0 ? g_selection_caret : 0;
+	if (pos > (int)len) pos = (int)len;
+	// Walk back to the start of the current line (after the previous newline).
+	int home = pos;
+	if (t != NULL) {
+		while (home > 0 && t[home - 1] != '\r' && t[home - 1] != '\n') home--;
+	} else {
+		home = 0;
+	}
+	g_selection_begin = home;
+	g_selection_end = home;
+	g_selection_caret = home;
+	g_tf_select_all = 0;
+}
+
+void actionTextControlMoveEnd(SWFAppContext* app_context)
+{
+	(void)app_context;
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	u32 len = 0;
+	const uint16_t* t = tf_get_text_u16(g_focused_mc, &len);
+	int pos = g_selection_caret >= 0 ? g_selection_caret : (int)len;
+	if (pos > (int)len) pos = (int)len;
+	// Walk forward to the end of the current line (before the next newline).
+	int end = pos;
+	if (t != NULL) {
+		while (end < (int)len && t[end] != '\r' && t[end] != '\n') end++;
+	} else {
+		end = (int)len;
+	}
+	g_selection_begin = end;
+	g_selection_end = end;
+	g_selection_caret = end;
+	g_tf_select_all = 0;
+}
+
 void actionTextControlEnter(SWFAppContext* app_context)
 {
 	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
@@ -73401,30 +73467,39 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 		}
 	}
 
-	// Get existing text
-	char existing[2048] = {0};
-	size_t existing_len = 0;
+	// Convert the (restricted) input char to UTF-16.
+	u32 ch_u16_len = 0;
+	uint16_t* ch_u16 = utf8_to_u16(app_context, ch_utf8, (u32)ch_len, &ch_u16_len);
+
+	// Existing text (UTF-16). When the whole field is selected, the input
+	// replaces it entirely (treat existing as empty, insert at 0).
+	const uint16_t* old_u16 = NULL;
+	u32 old_len = 0;
 	if (!g_tf_select_all) {
 		ActionVar* text_prop = getProperty(props, "text", 4);
 		if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING && text_prop->str_size > 0) {
-			const uint16_t* t_u16 = varGetU16Ptr(text_prop);
-			if (t_u16 != NULL)
-				existing_len = (size_t)u16_to_utf8(t_u16, text_prop->str_size, existing, (int)sizeof(existing));
+			old_u16 = varGetU16Ptr(text_prop);
+			old_len = text_prop->str_size;
 		}
 	}
 
-	// Build result: existing + new char
-	char result[2048];
-	size_t result_len = 0;
-	if (existing_len > 0) {
-		memcpy(result, existing, existing_len);
-		result_len = existing_len;
-	}
-	if (result_len + ch_len < sizeof(result)) {
-		memcpy(result + result_len, ch_utf8, ch_len);
-		result_len += ch_len;
-	}
-	result[result_len] = '\0';
+	// Insert at the caret position (NOT at the end) so click-then-type and
+	// mid-string edits land where the user expects. Clamp to the text length.
+	u32 caret = g_tf_select_all ? 0
+		: (g_selection_caret >= 0 ? (u32)g_selection_caret : old_len);
+	if (caret > old_len) caret = old_len;
+
+	// Build new text = old[0..caret] + ch + old[caret..]
+	u32 u16_len = old_len + ch_u16_len;
+	uint16_t* u16_result = (uint16_t*) malloc((u16_len + 1) * sizeof(uint16_t));
+	if (old_u16 != NULL && caret > 0)
+		memcpy(u16_result, old_u16, caret * sizeof(uint16_t));
+	if (ch_u16 != NULL && ch_u16_len > 0)
+		memcpy(u16_result + caret, ch_u16, ch_u16_len * sizeof(uint16_t));
+	if (old_u16 != NULL && old_len > caret)
+		memcpy(u16_result + caret + ch_u16_len, old_u16 + caret,
+		       (old_len - caret) * sizeof(uint16_t));
+	u16_result[u16_len] = 0;
 
 	// Apply maxChars truncation
 	ActionVar* maxc_prop = getProperty(props, "maxChars", 8);
@@ -73433,15 +73508,14 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 		double d; memcpy(&d, &maxc_prop->data.numeric_value, 8);
 		if (d > 0 && d == d) max_chars = (int)d;
 	}
-
-	// Convert to UTF-16
-	u32 u16_len = 0;
-	uint16_t* u16_result = utf8_to_u16(app_context, result, (u32)result_len, &u16_len);
-
 	if (max_chars > 0 && (int)u16_len > max_chars) {
 		u16_len = (u32)max_chars;
 		u16_result[u16_len] = 0;
 	}
+
+	// Advance the caret past the inserted text (clamped to the final length).
+	u32 new_caret = caret + ch_u16_len;
+	if (new_caret > u16_len) new_caret = u16_len;
 
 	// Set text property
 	ActionVar new_text = {0};
@@ -73459,6 +73533,11 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 	// Sync to variable binding
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
 	g_tf_select_all = 0;
+
+	// Move the caret past the just-inserted text.
+	g_selection_begin = (int)new_caret;
+	g_selection_end = (int)new_caret;
+	g_selection_caret = (int)new_caret;
 
 	// Drop the stale run table so the renderer reads the updated `text`.
 	tf_invalidate_run_table(g_focused_mc);
