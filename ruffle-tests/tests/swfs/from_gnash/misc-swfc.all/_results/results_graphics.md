@@ -1,23 +1,23 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-22 22:33 UTC
+**Date**: 2026-06-23 03:07 UTC
 
-**Git SHA**: `faeccbf113`
+**Git SHA**: `1365c9f714`
 
-**Run Duration**: 5m 56s
+**Run Duration**: 6m 23s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 19 |
-| Passing | **10** (52.6%) |
-| Ruffle-matched | 4 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **14** (73.7%) |
+| Total tests | 20 |
+| Passing | **10** (50.0%) |
+| Ruffle-matched | 5 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **15** (75.0%) |
 | Failing | 5 |
-| Total expected lines | 535 |
-| Matching lines | 393 (73.5%) |
-| Mismatched lines | 142 |
+| Total expected lines | 580 |
+| Matching lines | 435 (75.0%) |
+| Mismatched lines | 145 |
 
 ### Failure Breakdown
 
@@ -31,27 +31,28 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.6s |  |
-| 2 | `edittext_test1` | 47 | 22.6s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 21.2s |  |
-| 4 | `hello` | 4 | 20.6s |  |
-| 5 | `mouse_drag_test` | 12 | 21.8s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 21.6s |  |
-| 7 | `opcode_guard_test2` | 24 | 21.7s |  |
-| 8 | `stackscope` | 11 | 20.5s |  |
-| 9 | `submoviegetvar` | 4 | 21.9s |  |
-| 10 | `swf4opcode` | 117 | 22.8s |  |
+| 1 | `button_test1` | 31 | 2.9s |  |
+| 2 | `edittext_test1` | 47 | 24.6s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 20.4s |  |
+| 4 | `hello` | 4 | 20.7s |  |
+| 5 | `mouse_drag_test` | 12 | 22.4s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 22.8s |  |
+| 7 | `opcode_guard_test2` | 24 | 22.4s |  |
+| 8 | `stackscope` | 11 | 22.1s |  |
+| 9 | `submoviegetvar` | 4 | 21.3s |  |
+| 10 | `swf4opcode` | 117 | 23.4s |  |
 
 ## Ruffle-Matched Tests
 
-**4 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**5 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 21.7s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 23.4s |  |
-| 3 | `movieclip_destruction_test1` | 43 | 52 | 21.8s |  |
-| 4 | `registerclass_test3` | 12 | 20 | 21.7s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 21.6s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 22.2s |  |
+| 3 | `movieclip_destruction_test1` | 43 | 52 | 22.0s |  |
+| 4 | `registerclass_test3` | 12 | 20 | 21.3s |  |
+| 5 | `soft_reference_test1` | 3 | 4 | 20.7s |  |
 
 ## Near-Passing Tests
 
