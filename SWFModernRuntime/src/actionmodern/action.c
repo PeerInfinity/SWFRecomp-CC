@@ -70663,9 +70663,19 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 	// This handles shapes placed by tagPlaceObject2 (not the Drawing API).
 	extern int ng_getCharBoundsForRatio(size_t char_id, u16 ratio, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
 	DisplayObject* dobj = (DisplayObject*)mc->display_obj;
-	if (dobj != NULL && dobj->sprite_display_list != NULL) {
+	// Only walk the sprite display list when its metadata is self-consistent.
+	// An attached/cloned clip whose standalone display_obj was freed (or never
+	// fully built) can leave sprite_max_depth / sprite_dl_capacity garbage; the
+	// old unconditional `d <= sprite_max_depth` then read past the allocation
+	// (or off a stale pointer) → intermittent heap segfault during hit-AABB
+	// (mc_get_pixel_aabb_ng, e.g. FUIComponent radio children at frame_9, and
+	// board cells during a large reveal that calls this for many clips). Require
+	// a sane, bounded capacity and clamp the scan to it.
+	if (dobj != NULL && dobj->sprite_display_list != NULL &&
+	    dobj->sprite_dl_capacity > 0 && dobj->sprite_dl_capacity <= 65536) {
 		DisplayObject* sdl = dobj->sprite_display_list;
 		size_t sdl_max = dobj->sprite_max_depth;
+		if (sdl_max >= dobj->sprite_dl_capacity) sdl_max = dobj->sprite_dl_capacity - 1;
 		extern size_t ng_getButtonHitCharId(size_t char_id);
 		for (size_t d = 1; d <= sdl_max; d++) {
 			if (sdl[d].char_id == 0) continue;

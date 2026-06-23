@@ -2139,6 +2139,26 @@ static void xform_overrides_restore(void)
 	g_xform_override_count = 0;
 }
 
+// Save/restore stack for per-instance static-text glyph transform bases.
+// compose_children sets obj->text_glyph_xform_base to a freshly-allocated dynamic
+// slot run; this clears it back to 0 at frame end so the next frame's compose
+// re-allocates (the dynamic pool is reset each frame).
+#define MAX_TEXT_GLYPH_OVERRIDES 8192
+static DisplayObject* g_text_glyph_overrides[MAX_TEXT_GLYPH_OVERRIDES];
+static int g_text_glyph_override_count;
+static void text_glyph_overrides_reset(void) { g_text_glyph_override_count = 0; }
+static void text_glyph_overrides_push(DisplayObject* obj)
+{
+	if (g_text_glyph_override_count < MAX_TEXT_GLYPH_OVERRIDES)
+		g_text_glyph_overrides[g_text_glyph_override_count++] = obj;
+}
+static void text_glyph_overrides_restore(void)
+{
+	for (int i = g_text_glyph_override_count - 1; i >= 0; --i)
+		g_text_glyph_overrides[i]->text_glyph_xform_base = 0;
+	g_text_glyph_override_count = 0;
+}
+
 // Recover the original (pre-compose_children) transform_id for a display
 // object. compose_children rewrites obj->transform_id to point at a
 // dynamically-allocated GPU slot; CPU-side `transform_data` has no entry
@@ -2483,14 +2503,31 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		switch (ch->type)
 		{
 			case CHAR_TYPE_TEXT:
-				// Compose each glyph transform with the composed text transform
-				for (size_t j = 0; j < ch->text_size; j++)
+				// Compose each glyph transform with the composed text transform.
+				// The glyph slots ch->transform_start+j are CHARACTER-shared, so
+				// composing two instances of the same DefineText in one frame would
+				// overwrite each other and the batched GPU draw would render BOTH at
+				// the last writer's position (Minesweeper: every "1"/"2"/"3" board
+				// cell collapsed onto the last-revealed tile). Allocate a per-INSTANCE
+				// run of dynamic slots (mirrors the shape path above) and record the
+				// base on obj so render_single_object/render_display_list draw from it.
 				{
-					u32 glyph_xform_id = ch->transform_start + (u32)j;
-					const float* glyph_local = &transforms[glyph_xform_id * 16];
-					float glyph_composed[16];
-					hit_test_mat4_multiply(glyph_composed, composed, glyph_local);
-					renderer_write_transform(context, glyph_xform_id, glyph_composed);
+					u32 tgbase = g_next_dynamic_xform_slot;
+					int tg_dyn = (ch->text_size > 0 &&
+						tgbase + (u32)ch->text_size <= g_xform_slot_capacity);
+					if (tg_dyn) {
+						g_next_dynamic_xform_slot += (u32)ch->text_size;
+						text_glyph_overrides_push(obj);
+						obj->text_glyph_xform_base = tgbase;
+					}
+					for (size_t j = 0; j < ch->text_size; j++)
+					{
+						const float* glyph_local = &transforms[(ch->transform_start + (u32)j) * 16];
+						float glyph_composed[16];
+						hit_test_mat4_multiply(glyph_composed, composed, glyph_local);
+						u32 dst = tg_dyn ? (tgbase + (u32)j) : (ch->transform_start + (u32)j);
+						renderer_write_transform(context, dst, glyph_composed);
+					}
 				}
 				break;
 
@@ -2666,13 +2703,17 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 			// browser-WASM graphics (USE_WEBGPU without OFFSCREEN_RENDER).
 			if (ng_getCharTextfieldIdx(obj->char_id) >= 0) break;
 #endif
+			{
+			u32 _tg_base = obj->text_glyph_xform_base ? obj->text_glyph_xform_base
+			                                           : (u32)ch->transform_start;
 			for (size_t j = 0; j < ch->text_size; ++j)
 			{
 				size_t glyph_index = 4*app_context->text_data[ch->text_start + j];
 				renderer_draw_shape(context,
 					app_context->glyph_data[glyph_index],
 					app_context->glyph_data[glyph_index + 1],
-					ch->transform_start + j, ch->cxform_id);
+					_tg_base + (u32)j, ch->cxform_id);
+			}
 			}
 			break;
 		case CHAR_TYPE_SPRITE:
@@ -2793,13 +2834,15 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 					renderer_write_cxform(context, slot, comp);
 					text_cx = slot;
 				}
+				u32 _tg_base = obj->text_glyph_xform_base ? obj->text_glyph_xform_base
+				                                          : (u32)ch->transform_start;
 				for (size_t j = 0; j < ch->text_size; ++j)
 				{
 					size_t glyph_index = 4*app_context->text_data[ch->text_start + j];
 					renderer_draw_shape(context,
 						app_context->glyph_data[glyph_index],
 						app_context->glyph_data[glyph_index + 1],
-						ch->transform_start + j, text_cx);
+						_tg_base + (u32)j, text_cx);
 				}
 			}
 				break;
@@ -4383,6 +4426,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		g_next_dynamic_xform_slot = orig_xform_count;
 		g_xform_slot_capacity = context->xform_slot_count;
 		xform_overrides_reset();
+		text_glyph_overrides_reset();
 
 		u32 orig_cxform_count = app_context->cxform_data_size > 0
 			? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 1;
@@ -4702,6 +4746,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 
 	renderer_close_pass(context);
 	xform_overrides_restore();
+	text_glyph_overrides_restore();
 	cxform_overrides_restore();
 }
 #endif
@@ -5132,6 +5177,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		g_next_dynamic_xform_slot = orig_xform_count;
 		g_xform_slot_capacity = context->xform_slot_count;
 		xform_overrides_reset();
+		text_glyph_overrides_reset();
 
 		u32 orig_cxform_count = app_context->cxform_data_size > 0
 			? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 1;
@@ -5606,6 +5652,7 @@ void tagShowFrame(SWFAppContext* app_context)
 
 	// Restore original transform_ids and cxform_ids that were overridden
 	xform_overrides_restore();
+	text_glyph_overrides_restore();
 	cxform_overrides_restore();
 #endif // NO_GRAPHICS
 
@@ -5955,6 +6002,12 @@ static void dispatch_clip_event_press_dl(SWFAppContext* app_context,
 	{
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
+		// Invisible clips (and their whole subtree) receive no mouse events in
+		// Flash. Without this, Minesweeper's board `sensor` kept firing on(press)/
+		// on(release) after a mine set `_root.sensor._visible=false`, so the player
+		// could still reveal tiles after losing. as_hidden is synced from
+		// _visible=false (SetProperty / SetMember).
+		if (obj->as_hidden) continue;
 
 		// Compose parent transform with this entry's transform.
 		// If this entry is the current drag target, use the virtual drag position

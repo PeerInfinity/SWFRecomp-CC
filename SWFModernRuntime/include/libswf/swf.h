@@ -167,6 +167,12 @@ typedef struct DisplayObject
 	double cx_ra, cx_ga, cx_ba, cx_aa;  // multipliers (percentage: 100.0 = normal)
 	double cx_rb, cx_gb, cx_bb, cx_ab;  // addends (0..255 range, 0 = normal)
 	int cx_overridden;                   // 1 if cx_* fields override cxform_data[]
+	// Per-INSTANCE base GPU transform slot for this entry's composed static-text
+	// glyphs (CHAR_TYPE_TEXT). 0 = none → the draw uses the CHARACTER-shared
+	// ch->transform_start. compose_children allocates ch->text_size dynamic slots
+	// per text instance so multiple instances of the same DefineText (e.g. all
+	// Minesweeper "1" cells) don't overwrite each other's glyph transforms.
+	u32 text_glyph_xform_base;
 	// Timeline tracking
 	u8 sprite_needs_init;   // 1 if frame_0 needs to run this tick (NO_GRAPHICS)
 	u8 depth_swapped;       // 1 if moved here by swapDepths (skip timeline modifies)
