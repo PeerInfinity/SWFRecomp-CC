@@ -69373,7 +69373,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 15 && strncasecmp(method_name, "removeMovieClip", 15) == 0)
 		{
 			if (args != NULL) FREE(args);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Runs in ALL modes: this was gated to NO_GRAPHICS/OFFSCREEN, so in
+			// browser-WASM `mc.removeMovieClip()` was a complete no-op — Minesweeper's
+			// Splash (`deleteCells()` → 480× removeMovieClip) left every board cell
+			// alive over the menu ("Splash partly loads the title screen"). The
+			// removal only touches dynamic clips (depth >= 0, never timeline-placed),
+			// which aren't in the global display_list, so the display_list-slot code
+			// below is a no-op for them; the render loop skips depth==INT_MIN /
+			// NULL child_mc_cache slots. CI byte-identical (CI modes already ran this).
 			// Only dynamically-created clips at removable AS depths [0, 2130690032) can be removed.
 			// Timeline-placed clips (negative depth) and reserved-range clips are immune.
 			#define AVM_MAX_REMOVE_DEPTH 2130690032
@@ -69467,7 +69474,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
-#endif
 			pushUndefined(app_context);
 			return;
 		}
