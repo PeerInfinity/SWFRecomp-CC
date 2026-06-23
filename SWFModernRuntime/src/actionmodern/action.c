@@ -26667,10 +26667,12 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	const char* initial_text = ng_getTextFieldInitialTextByIdx(tf_idx);
 	const char* text_utf8 = initial_text ? initial_text : "";
 	size_t text_len = strlen(text_utf8);
+	int used_variable = 0;
 
 	if (var_name && var_name[0] != '\0') {
 		ActionVar resolved = {0};
 		if (otf_resolve_var_path(app_context, var_name, &resolved)) {
+			used_variable = 1;
 			if (resolved.type == ACTION_STACK_VALUE_STRING) {
 				if (resolved.str_size > 0) {
 					const uint16_t* u16 = varGetU16Ptr(&resolved);
@@ -26704,6 +26706,51 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 		}
 	}
 
+	// HTML orphan fields: ng_getTextFieldInitialTextByIdx returns the plain,
+	// markup-stripped text, so paragraph structure (<P>…</P>, <BR>) is lost and
+	// every paragraph collapses onto one overflowing line. Parse the tag's raw
+	// HTML into format runs (carrying SENTINEL paragraph breaks + per-run
+	// align/color/size) so the static render matches Flash. Only when the text
+	// still comes from the tag (not a bound variable). This mirrors the
+	// findOrCreateMovieClip / actionIterateTextFieldGlyphs run-table path that a
+	// field gets once it acquires an MC wrapper — without it, a render-only HTML
+	// field (Minesweeper's bottom instruction field) renders single-line until a
+	// gotoAndPlay re-entry happens to trigger the name lookup.
+	static TFRunTable otf_html_table;
+	static TextFieldGlyphRun otf_html_runs[TF_MAX_RUNS];
+	const TextFieldGlyphRun* emit_runs = NULL;
+	int emit_run_count = 0;
+	if (!used_variable && (tf_flags & 0x0040)) {  // HTML field, tag-sourced text
+		const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
+		if (raw_html != NULL && raw_html[0] != '\0') {
+			TFRun def;
+			memset(&def, 0, sizeof(def));
+			def.color = text_color & 0x00FFFFFF;
+			def.font_height = (s16)font_height;
+			def.align = ng_getTextFieldAlign(tf_idx);
+			int is_ml = (tf_flags & 0x0002) != 0;
+			tf_parse_html(&otf_html_table, raw_html, (u32)strlen(raw_html),
+				&def, 0, g_swf_version, is_ml);
+			if (otf_html_table.run_count > 0 && otf_html_table.text_len > 0) {
+				int rc = (int)otf_html_table.run_count;
+				if (rc > TF_MAX_RUNS) rc = TF_MAX_RUNS;
+				for (int ri = 0; ri < rc; ri++) {
+					TFRun* r = &otf_html_table.runs[ri];
+					otf_html_runs[ri].byte_start = r->start;
+					otf_html_runs[ri].byte_length = r->length;
+					otf_html_runs[ri].color = r->color & 0x00FFFFFF;
+					otf_html_runs[ri].font_height = (u16)r->font_height;
+					otf_html_runs[ri].align = r->align;
+					otf_html_runs[ri].bullet = 0;
+				}
+				emit_runs = otf_html_runs;
+				emit_run_count = rc;
+				text_utf8 = otf_html_table.text;
+				text_len = otf_html_table.text_len;
+			}
+		}
+	}
+
 	if (text_len == 0) return;
 
 	TextFieldGlyphInfo info = {0};
@@ -26716,8 +26763,8 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.h = field_h_px;
 	info.text_utf8 = text_utf8;
 	info.text_len = text_len;
-	info.runs = NULL;
-	info.run_count = 0;
+	info.runs = emit_runs;
+	info.run_count = emit_run_count;
 	info.left_margin_twips = (s32) ng_getTextFieldLeftMargin(tf_idx);
 	info.right_margin_twips = (s32) ng_getTextFieldRightMargin(tf_idx);
 	info.indent_twips = (s32) ng_getTextFieldIndent(tf_idx);
