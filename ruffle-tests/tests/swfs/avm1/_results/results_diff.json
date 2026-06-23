@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-22T20:17:58.835424+00:00",
-    "old_git_sha": "242276006a46afc42e03b87b36d7d48ab927c910",
-    "new_timestamp": "2026-06-22T22:18:23.166482+00:00",
-    "new_git_sha": "faeccbf1137168112737e14f1467f47ff528ea0b",
+    "old_timestamp": "2026-06-22T22:18:23.166482+00:00",
+    "old_git_sha": "faeccbf1137168112737e14f1467f47ff528ea0b",
+    "new_timestamp": "2026-06-23T02:51:07.999339+00:00",
+    "new_git_sha": "f433bb69ab78aef8b32e1b40280e807abe36d085",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,31 @@
     "new_pass": 629,
     "new_ruffle_matched": 17,
     "new_effective_pass": 646,
-    "new_total": 703,
-    "new_pass_rate": 89.5,
+    "new_total": 704,
+    "new_pass_rate": 89.3,
     "old_mismatched_lines": 15441,
-    "new_mismatched_lines": 15441,
+    "new_mismatched_lines": 15447,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 703,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "amf_strict_array_serialization",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 7,
+        "matching_lines": 1
+      }
+    }
+  ]
 }
