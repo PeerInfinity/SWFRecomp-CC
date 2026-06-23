@@ -701,6 +701,13 @@ typedef struct TextFieldGlyphInfo {
     s32 left_margin_twips;
     s32 right_margin_twips;
     s32 indent_twips;
+    // The field's local bounds-RECT min (twips). Flash/Ruffle lay text out at
+    // matrix.translate(bounds.x_min + GUTTER, ...) (edit_text.rs), i.e. the text
+    // origin is offset from the placement matrix by the bounds-RECT min. info.x/y
+    // carry only the placement translation, so the renderer adds this. 0 for
+    // dynamic/createTextField fields (no static DefineEditText bounds).
+    s32 bounds_xmin_twips;
+    s32 bounds_ymin_twips;
     // Caret position in UTF-16 code units when this field is keyboard-focused,
     // or -1 when it isn't (the common case — nothing is focused in headless /
     // offscreen runs, so the caret is never drawn there and CI is unaffected).

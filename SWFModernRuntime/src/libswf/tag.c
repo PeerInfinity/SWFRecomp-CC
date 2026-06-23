@@ -3920,8 +3920,13 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 	// Field clipping mask (stencil): gutter-inset horizontally, full height
 	// vertically. Matches Ruffle EditText::render_self mask.
-	float mask_x = info->x * 20.0f + gutter_twips;
-	float mask_y = info->y * 20.0f;
+	// The text origin (and mask) is offset from the placement matrix by the
+	// field's bounds-RECT min (Ruffle edit_text.rs: translate(bounds.x_min+GUTTER)).
+	// info->x/y carry only the placement translation, so add bounds_min here.
+	float bxmin_off = (float)info->bounds_xmin_twips;
+	float bymin_off = (float)info->bounds_ymin_twips;
+	float mask_x = info->x * 20.0f + bxmin_off + gutter_twips;
+	float mask_y = info->y * 20.0f + bymin_off;
 	float mask_w = info->w * 20.0f - 2.0f * gutter_twips;
 	float mask_h = info->h * 20.0f;
 	int has_clip = (mask_w > 0.0f && mask_h > 0.0f);
@@ -3946,7 +3951,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		if (max_fh > 0) baseline_fh = max_fh;
 	}
 	float baseline_scale = (float)baseline_fh / (float)em_square;
-	float y_pos = info->y * 20.0f + (float)ascent * baseline_scale + gutter_twips;
+	float y_pos = info->y * 20.0f + bymin_off + (float)ascent * baseline_scale + gutter_twips;
 
 	// Per-glyph vertex buffer. SWF glyphs are stored as triangulated fills in
 	// shape_data, and complex glyphs can hold many vertices (e.g. Bitstream
@@ -4090,7 +4095,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 	// Draw pass: same walk as measure, but pull per-paragraph x_offset at
 	// paragraph start (right after newline / on first byte).
-	float base_x = info->x * 20.0f + gutter_twips;
+	float base_x = info->x * 20.0f + bxmin_off + gutter_twips;
 
 	// Horizontal scroll: shift the whole layout left so the caret stays inside
 	// the field when the text is wider than the field. Single-line + focused

@@ -105,6 +105,42 @@ verification is via the rendered run/paragraph layout data + the menu screenshot
   and that no rendered-text test regresses.
 - Browser-WASM is not CI-observable; the user-visible win is verified in headed Chrome.
 
+## Follow-up (same day): the text was also ~34px too far LEFT + a stale-align glitch
+
+After the paragraph-break fix shipped, the user reported the instruction text still
+sat too far left, and that after Restart the **top line** jumped right while the rest
+stayed left. Captured a Ruffle reference (`exporter --force-play`, frame 11) and
+measured: Ruffle draws the text at **x≈232**; we drew it at **x≈197.5**. Two more
+bugs, both pre-existing:
+
+### Bug A — text origin ignored the field's bounds-RECT min (the ~34px left shift)
+Ruffle lays text out at `Matrix::translate(bounds.x_min + GUTTER, bounds.y_min + GUTTER)`
+(`core/src/display_object/edit_text.rs:776`). Our renderer used only the placement
+translation + gutter, ignoring `bounds.x_min`. The instruction field (chid 82) has
+`bounds.x_min = 672 twips (33.6px)`, so its text landed 33.6px too far left
+(`195.5 + 2 = 197.5` instead of `195.5 + 33.6 + 2 = 231`). Both emit paths
+(`otf_emit_textfield` and `actionIterateTextFieldGlyphs`) only carried the placement
+translation in `info.x`. **Fix:** new `TextFieldGlyphInfo.bounds_xmin_twips/ymin_twips`
+(0 for dynamic/createTextField fields), populated from `ng_getTextFieldBounds` in both
+emit paths and added to `base_x`/`mask_x`/`y_pos`/`mask_y` in `textfield_glyph_render_cb`.
+Now text at x=231 = Ruffle's 232. Other fields shift toward Ruffle too: standard
+fields (`bounds.x_min=-40`) by -2px, the counters (chid 65/83, `+86`) by +4.3px.
+
+### Bug B — stale run alignment after the field acquired an MC wrapper (top-line center)
+After Restart the field renders via the wrapper path (`actionIterateTextFieldGlyphs`),
+whose `TFRun → TextFieldGlyphRun` conversion copied `byte_start/length/color/font_height`
+but **not `align`/`bullet`**. `_tfg_runs` is a shared static buffer, so the instruction
+field's first run inherited `align=2` (center) left over from the previously-rendered
+center-aligned "Bombs Left" field (chid 65), shifting only its top line right. The
+orphan path (the paragraph-break fix) set align correctly, which is why first-load was
+fine but post-Restart wasn't. **Fix:** copy `align` (and zero `bullet`) in that
+conversion. Verified: first-load and after-Restart now both render all 5 paragraphs
+left-aligned at x=231.1, run aligns all 0.
+
+These three fixes (paragraph breaks + bounds-min offset + stale align) together make
+the instruction text match Ruffle. The board cells were never actually shifted
+(composed world matrix exactly `(18,18)`, same as Ruffle's top-left cell).
+
 ## Decompile / repro
 - AS: `java -jar ~/CC/jpexs/ffdec.jar -export script /tmp/ms_cell ~/CC/flasharchive/Minesweeper.swf`
   (board build = `scripts/frame_10/DoAction.as`; Restart = `scripts/DefineButton2_72/`).

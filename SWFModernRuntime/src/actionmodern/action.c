@@ -26359,6 +26359,14 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				_tfg_runs[ri].byte_length = r->length;
 				_tfg_runs[ri].color = r->color & 0x00FFFFFF;
 				_tfg_runs[ri].font_height = (u16)r->font_height;
+				// align/bullet drive the renderer's per-paragraph x layout. _tfg_runs
+				// is a shared static buffer reused across fields, so failing to set
+				// these leaves STALE values from a previously-rendered field — e.g.
+				// Minesweeper's instruction field inherited align=2 (center) in its
+				// first run from the center-aligned "Bombs Left" field, shifting only
+				// its top line right after the field acquired an MC wrapper.
+				_tfg_runs[ri].align = r->align;
+				_tfg_runs[ri].bullet = 0;
 			}
 			runs_out = _tfg_runs;
 			run_count_out = rc;
@@ -26475,6 +26483,18 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		info.left_margin_twips = left_margin_twips;
 		info.right_margin_twips = right_margin_twips;
 		info.indent_twips = indent_twips;
+		// Text origin offset from the placement matrix by the static DefineEditText
+		// bounds-RECT min (Ruffle edit_text.rs translate(bounds.x_min+GUTTER,...)).
+		// Dynamic/createTextField fields (ng_textfield_idx==-2) have no static
+		// bounds — leave at 0 (their mc->x already encodes the visual origin).
+		info.bounds_xmin_twips = 0;
+		info.bounds_ymin_twips = 0;
+		if (mc->ng_textfield_idx >= 0) {
+			s32 _bxmin, _bxmax, _bymin, _bymax;
+			ng_getTextFieldBounds(mc->ng_textfield_idx, &_bxmin, &_bxmax, &_bymin, &_bymax);
+			info.bounds_xmin_twips = _bxmin;
+			info.bounds_ymin_twips = _bymin;
+		}
 		// Draw the caret only on the keyboard-focused field (never in headless /
 		// offscreen runs, where nothing is focused → CI render output unchanged).
 		info.caret_char = (mc == g_focused_mc && g_selection_caret >= 0)
@@ -26768,6 +26788,10 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.left_margin_twips = (s32) ng_getTextFieldLeftMargin(tf_idx);
 	info.right_margin_twips = (s32) ng_getTextFieldRightMargin(tf_idx);
 	info.indent_twips = (s32) ng_getTextFieldIndent(tf_idx);
+	// Text origin is offset from the placement matrix by the bounds-RECT min
+	// (matches Ruffle edit_text.rs: translate(bounds.x_min + GUTTER, ...)).
+	info.bounds_xmin_twips = (s32) bxmin;
+	info.bounds_ymin_twips = (s32) bymin;
 	info.caret_char = -1;  // orphan/static path: never the focused editable field
 	info.mc = NULL;
 	info.sel_begin = -1;
