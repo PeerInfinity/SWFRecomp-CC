@@ -1,21 +1,29 @@
 # Ruffle Test Results Diff
 
-**Previous:** `faeccbf11371` (2026-06-22T22:33:56.735508+00:00)
-**Current:** `1365c9f714ae` (2026-06-23T03:07:13.063937+00:00)
+**Previous:** `1365c9f714ae` (2026-06-23T03:07:13.063937+00:00)
+**Current:** `f69fb84f1e02` (2026-06-23T18:29:36.060811+00:00)
+**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 128 | 135 | +7 |
-| Total | 235 | 243 | +8 |
-| Pass rate | 54.5% | 55.6% | +1.1% |
-| Mismatched lines | 8669 | 8690 | +21 |
+| Passing | 135 | 128 | -7 |
+| Total | 243 | 235 | -8 |
+| Pass rate | 55.6% | 54.5% | -1.1% |
+| Mismatched lines | 8690 | 8669 | -21 |
 
-## Added Tests (8)
+## Missing Tests — Shard Failure (8)
 
-| Test | Status | Lines |
-|------|--------|-------|
+These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
+
+- 7 were previously passing
+- 1 were previously failing
+
+<details><summary>Show all missing tests</summary>
+
+| Test | Previous Status | Lines |
+|------|----------------|-------|
 | `Random-v5` | pass | 30/30 |
 | `Random-v6` | pass | 30/30 |
 | `Random-v7` | pass | 30/30 |
@@ -24,3 +32,5 @@
 | `Rectangle-v6` | pass | 7/7 |
 | `Rectangle-v7` | pass | 7/7 |
 | `Rectangle-v8` | ruffle_matched | 145/166 |
+
+</details>
