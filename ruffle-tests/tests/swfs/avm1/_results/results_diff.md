@@ -1,19 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `faeccbf11371` (2026-06-22T22:18:23.166482+00:00)
-**Current:** `f433bb69ab78` (2026-06-23T02:51:07.999339+00:00)
+**Previous:** `f433bb69ab78` (2026-06-23T02:51:07.999339+00:00)
+**Current:** `97b752c5eea0` (2026-06-24T03:17:06.536255+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 629 | 629 | 0 |
-| Total | 703 | 704 | +1 |
-| Pass rate | 89.5% | 89.3% | -0.2% |
-| Mismatched lines | 15441 | 15447 | +6 |
+| Total | 704 | 704 | 0 |
+| Pass rate | 89.3% | 89.3% | 0% |
+| Mismatched lines | 15447 | 15447 | 0 |
 
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `amf_strict_array_serialization` | output_mismatch | 1/7 |
+No changes detected.
