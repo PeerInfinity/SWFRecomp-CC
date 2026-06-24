@@ -2672,9 +2672,31 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 // Forward declaration for mutual recursion
 static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max_depth);
 
+// Returns 1 if a baked (static placement) color transform forces the output
+// alpha to 0 — i.e. the object is authored fully transparent (a common idiom
+// for invisible hit-test areas, e.g. Pacman's "Hit" sprite placed alpha=0).
+// Such an object (and its subtree) is invisible in Flash, so the renderer skips
+// it. Identity (cxform_id==0) and dynamic/composed slots (>= baked count, which
+// hold runtime _alpha/Color overrides handled elsewhere) are never treated as
+// invisible here. Note: this is the placement cxform's OWN alpha; it does NOT
+// compose a parent cxform (an alpha-0 ancestor is handled at the ancestor).
+static int cxform_forces_invisible(SWFAppContext* app_context, u32 cxform_id)
+{
+	if (cxform_id == 0) return 0;
+	extern float cxform_data[];
+	u32 baked = (app_context->cxform_data_size > 0)
+		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
+	if (cxform_id >= baked) return 0;
+	const float* cx = &cxform_data[cxform_id * 20];
+	// 20-float layout: 4x4 column-major mult (alpha mult at [15]) + vec4 add
+	// (alpha add at [19]); see apply_cxform in render_webgpu.c.
+	return (cx[15] <= 0.0001f && cx[19] <= 0.0001f);
+}
+
 // Helper: render a single object into the current render pass
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
+	if (cxform_forces_invisible(app_context, obj->cxform_id)) return;
 #if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary because
 	// tagDefineVideoStream doesn't set a type. Check for video BEFORE the switch.
@@ -2779,11 +2801,23 @@ static void compose_cxform20(float out[20], const float* outer, const float* inn
 
 static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max_depth)
 {
+	// Clip masks nested inside a sprite (e.g. Pacman's CPac: a box-with-wedge
+	// mask shape clips a circle into a pacman). The two root-level render loops
+	// (tagShowFrame / tagRerenderFrame) already do this, but this recursive
+	// nested renderer did not — so a sprite's mask shape was drawn as ordinary
+	// visible geometry (Pacman's title "C" showed the white wedge mask box
+	// instead of clipping the yellow pacman). Mirror the root loops' handling.
+	u32 active_clip_depth = 0;
 	for (size_t i = 1; i <= dl_max_depth; ++i)
 	{
+		if (active_clip_depth > 0 && i > active_clip_depth)
+		{
+			renderer_end_clip(context);
+			active_clip_depth = 0;
+		}
+
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
-
 		// Honor AS-set _visible=false on a nested entry (and its whole subtree).
 		// SetProperty/SetMember _visible syncs the MC's _visible onto this entry's
 		// as_hidden via mc->display_obj. Mirrors the same skip in the main display
@@ -2793,6 +2827,45 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		// `_visible=false`) — paints a grey bar over its label. The setter syncs
 		// as_hidden onto this (registration) entry via sync_attached_entry_hidden.
 		if (obj->clip_depth == 0 && obj->as_hidden) continue;
+
+		// Authored fully transparent (alpha-0 placement cxform): invisible in
+		// Flash. Skip non-mask entries (a mask still clips even at alpha 0).
+		// Fixes Pacman's "Hit" sprite (alpha=0) painting white through the
+		// pacman's masked-out mouth.
+		if (obj->clip_depth == 0 && cxform_forces_invisible(app_context, obj->cxform_id))
+			continue;
+
+		// This entry is a clip mask: render it into the stencil buffer (not the
+		// color target) and clip subsequent depths up to clip_depth to it.
+		if (obj->clip_depth > 0)
+		{
+			Character* mch = &dictionary[obj->char_id];
+			if (mch->type == CHAR_TYPE_SHAPE)
+			{
+				renderer_begin_clip_mask(context);
+				renderer_draw_shape(context, mch->shape_offset, mch->size,
+					obj->transform_id, obj->cxform_id);
+				renderer_end_clip_mask(context);
+				active_clip_depth = obj->clip_depth;
+			}
+			else if (mch->type == CHAR_TYPE_MORPH_SHAPE)
+			{
+				renderer_begin_clip_mask(context);
+				renderer_draw_shape(context, mch->morph_start_offset, mch->morph_start_size,
+					obj->transform_id, obj->cxform_id);
+				renderer_end_clip_mask(context);
+				active_clip_depth = obj->clip_depth;
+			}
+			else if (mch->type == CHAR_TYPE_SPRITE)
+			{
+				renderer_begin_clip_mask(context);
+				if (obj->sprite_display_list != NULL)
+					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
+				renderer_end_clip_mask(context);
+				active_clip_depth = obj->clip_depth;
+			}
+			continue;
+		}
 
 #if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary.
@@ -2895,6 +2968,8 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				break;
 		}
 	}
+	if (active_clip_depth > 0)
+		renderer_end_clip(context);
 }
 #endif // NO_GRAPHICS
 
@@ -7126,8 +7201,20 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		if (transform_id != 0 && !display_list[depth].transformed_by_script) {
 			display_list[depth].transform_id = transform_id;
 		}
-		display_list[depth].cxform_id = cxform_id;
-		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+		// A move-PlaceObject2 with NO HasColorTransform is emitted by the
+		// recompiler as cxform_id=0 (swf.cpp:3614). Per Flash, such a move keeps
+		// the object's EXISTING color transform — only a move that actually
+		// carries a CXFORM updates it. Unlike the matrix sentinel, this is
+		// unambiguous: an explicit (even identity) CXFORM always gets a non-zero
+		// slot, so cxform_id==0 only ever means "no color transform here". Without
+		// this guard, an animated clip that moves a tinted child each frame (e.g.
+		// Pacman's title "CPac": frame 0 places the white pac shape with a
+		// white→yellow cxform, frames 1-4 move it with no cxform) loses the tint
+		// on the first move and renders white.
+		if (cxform_id != 0) {
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = 1;
+		}
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
 		// Don't update placed_at_frame on modify — the object was originally placed
 		// at the earlier frame. Updating here would cause ng_display_clear_after to

@@ -6780,6 +6780,26 @@ namespace SWFRecomp
 						GradientRecord& last_grad = fill_styles[i].gradient.records[j - 1];
 						GradientRecord& grad = fill_styles[i].gradient.records[j];
 
+						// Pad the ramp head [0, first stop ratio) with the first stop
+						// color. SWF gradient ramps are pad-extended below the first
+						// stop; without this the head rows are never written AND every
+						// later gradient's 256-row texture boundary shifts, so a stop
+						// list whose first ratio > 0 (e.g. Pacman's title pac, first
+						// stop at ratio 45) sampled stale data and rendered white.
+						if (j == 1)
+						{
+							GradientRecord& first_grad = fill_styles[i].gradient.records[0];
+							for (int head = 0; head < (int) first_grad.ratio; ++head)
+							{
+								gradient_data << "\t" << "{ "
+											  << to_string(first_grad.r) << ", "
+											  << to_string(first_grad.g) << ", "
+											  << to_string(first_grad.b) << ", "
+											  << to_string(first_grad.a) << " },"
+											  << endl;
+							}
+						}
+
 						for (u8 ratio = last_grad.ratio; ratio < grad.ratio; ++ratio)
 						{
 							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
@@ -6813,6 +6833,40 @@ namespace SWFRecomp
 										  << to_string(g) << ", "
 										  << to_string(b) << ", "
 										  << to_string(a) << " },"
+										  << endl;
+						}
+
+						// Pad the ramp tail (last stop ratio, 255] with the last stop
+						// color when the final stop is below 255 (the ratio==255 branch
+						// above already emits row 255 when the gradient ends exactly at
+						// 255). Together with the head pad this keeps every gradient
+						// exactly 256 rows so gradient N lands on texture row N.
+						if (j == fill_styles[i].gradient.num_grads - 1 && grad.ratio < 255)
+						{
+							for (int tail = (int) grad.ratio; tail < 256; ++tail)
+							{
+								gradient_data << "\t" << "{ "
+											  << to_string(grad.r) << ", "
+											  << to_string(grad.g) << ", "
+											  << to_string(grad.b) << ", "
+											  << to_string(grad.a) << " },"
+											  << endl;
+							}
+						}
+					}
+
+					// Degenerate single-stop gradient: the loop above never runs a
+					// segment, so fill the whole 256-row ramp with that one color.
+					if (fill_styles[i].gradient.num_grads == 1)
+					{
+						GradientRecord& only_grad = fill_styles[i].gradient.records[0];
+						for (int u = 0; u < 256; ++u)
+						{
+							gradient_data << "\t" << "{ "
+										  << to_string(only_grad.r) << ", "
+										  << to_string(only_grad.g) << ", "
+										  << to_string(only_grad.b) << ", "
+										  << to_string(only_grad.a) << " },"
 										  << endl;
 						}
 					}
@@ -7121,6 +7175,24 @@ namespace SWFRecomp
 						GradientRecord& last_grad = fill_styles[i].gradient.records[j - 1];
 						GradientRecord& grad = fill_styles[i].gradient.records[j];
 
+						// Pad the ramp head [0, first stop ratio) with the first stop
+						// color so every gradient emits exactly 256 rows and lands on
+						// its own texture row (see the non-morph path for the full
+						// rationale — an unpadded head misaligned later gradients).
+						if (j == 1)
+						{
+							GradientRecord& first_grad = fill_styles[i].gradient.records[0];
+							for (int head = 0; head < (int) first_grad.ratio; ++head)
+							{
+								gradient_data << "\t" << "{ "
+											  << to_string(first_grad.r) << ", "
+											  << to_string(first_grad.g) << ", "
+											  << to_string(first_grad.b) << ", "
+											  << to_string(first_grad.a) << " },"
+											  << endl;
+							}
+						}
+
 						for (u8 ratio = last_grad.ratio; ratio < grad.ratio; ++ratio)
 						{
 							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
@@ -7154,6 +7226,36 @@ namespace SWFRecomp
 										  << to_string(g) << ", "
 										  << to_string(b) << ", "
 										  << to_string(a) << " },"
+										  << endl;
+						}
+
+						// Pad the ramp tail [last stop ratio, 255] with the last stop
+						// color when the final stop is below 255.
+						if (j == fill_styles[i].gradient.num_grads - 1 && grad.ratio < 255)
+						{
+							for (int tail = (int) grad.ratio; tail < 256; ++tail)
+							{
+								gradient_data << "\t" << "{ "
+											  << to_string(grad.r) << ", "
+											  << to_string(grad.g) << ", "
+											  << to_string(grad.b) << ", "
+											  << to_string(grad.a) << " },"
+											  << endl;
+							}
+						}
+					}
+
+					// Degenerate single-stop gradient: fill the whole 256-row ramp.
+					if (fill_styles[i].gradient.num_grads == 1)
+					{
+						GradientRecord& only_grad = fill_styles[i].gradient.records[0];
+						for (int u = 0; u < 256; ++u)
+						{
+							gradient_data << "\t" << "{ "
+										  << to_string(only_grad.r) << ", "
+										  << to_string(only_grad.g) << ", "
+										  << to_string(only_grad.b) << ", "
+										  << to_string(only_grad.a) << " },"
 										  << endl;
 						}
 					}
