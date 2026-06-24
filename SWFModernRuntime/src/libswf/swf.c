@@ -129,6 +129,15 @@ char g_drag_target_name[256] = "";
 int catch_up_mode = 0;
 int g_tag_skip_mode = 0;
 
+// Debug: minimum per-frame wall-clock budget in ms (0 = off). When set (via the
+// display-bridge dbgSetFrameCapMs from JS), the browser render loop sleeps to at
+// least this long per frame, throttling the frame rate. On a software-WebGPU
+// backend (WSL2) an uncapped busy board floods the present queue faster than it
+// drains; the backlog makes screenshots and the debug framebuffer readback stall
+// for many seconds. Capping to ~6-10fps keeps the queue drained so captures
+// (and Playwright input) stay responsive. No effect on native/headless builds.
+int g_debug_frame_floor_ms = 0;
+
 // Goto-catch-up state and executors — ported from swf_core.c. Phase 3
 // retires this duplication along with HEADLESS_GRAPHICS.
 int goto_from_action = 0;
@@ -1183,9 +1192,11 @@ void tagMain(SWFAppContext* app_context)
 #ifdef __EMSCRIPTEN__
 		double now_ms = emscripten_get_now();
 		double elapsed = now_ms - frame_start;
-		int perf_uncapped = swf_perf_report(elapsed, frame_budget_ms);
+		double eff_budget_ms = frame_budget_ms;
+		if (g_debug_frame_floor_ms > eff_budget_ms) eff_budget_ms = g_debug_frame_floor_ms;
+		int perf_uncapped = swf_perf_report(elapsed, eff_budget_ms);
 		if (next_due_ms == 0.0) next_due_ms = frame_start;  // anchor to first frame
-		next_due_ms += frame_budget_ms;                      // when this frame is due to end
+		next_due_ms += eff_budget_ms;                        // when this frame is due to end
 		if (perf_uncapped) {
 			emscripten_sleep(0);
 			next_due_ms = now_ms;                            // don't bank credit while uncapped
@@ -1197,7 +1208,7 @@ void tagMain(SWFAppContext* app_context)
 				emscripten_sleep(0);
 				// More than a full frame behind (heavy frame / backgrounded tab):
 				// resync so we don't burst a catch-up storm.
-				if (remain_ms < -frame_budget_ms) next_due_ms = now_ms;
+				if (remain_ms < -eff_budget_ms) next_due_ms = now_ms;
 			}
 		}
 #endif
@@ -1249,9 +1260,11 @@ frame_loop_exit:
 #ifdef __EMSCRIPTEN__
 		double now2_ms = emscripten_get_now();
 		double elapsed2 = now2_ms - frame_start2;
-		int perf_uncapped2 = swf_perf_report(elapsed2, frame_budget_ms);
+		double eff_budget2_ms = frame_budget_ms;
+		if (g_debug_frame_floor_ms > eff_budget2_ms) eff_budget2_ms = g_debug_frame_floor_ms;
+		int perf_uncapped2 = swf_perf_report(elapsed2, eff_budget2_ms);
 		if (next_due_ms == 0.0) next_due_ms = frame_start2;  // continue the main-loop schedule
-		next_due_ms += frame_budget_ms;
+		next_due_ms += eff_budget2_ms;
 		if (perf_uncapped2) {
 			emscripten_sleep(0);
 			next_due_ms = now2_ms;
@@ -1261,7 +1274,7 @@ frame_loop_exit:
 				emscripten_sleep((u32)(remain2_ms + 0.5));
 			} else {
 				emscripten_sleep(0);
-				if (remain2_ms < -frame_budget_ms) next_due_ms = now2_ms;
+				if (remain2_ms < -eff_budget2_ms) next_due_ms = now2_ms;
 			}
 		}
 #endif

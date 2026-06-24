@@ -156,6 +156,23 @@ typedef struct WebGPURenderContext
 	int capture_requested;           // 1 if next close_pass should copy to readback buffer
 #endif
 
+	// --- Browser on-demand framebuffer capture (debug; HAS_DISPLAY_BRIDGE) ---
+	// Lets JS read back the rendered frame via copyTextureToBuffer (a DIRECT GPU
+	// copy, NOT a present), bypassing the saturated software present queue that
+	// makes Playwright/CDP page screenshots hang on a busy board in WSL2 (no dzn
+	// Vulkan driver → Chrome WebGPU runs on software). Driven entirely from the
+	// render loop so dbgCapturePNG never has to re-enter ASYNCIFY (the main loop
+	// already owns the suspended stack). State machine: 0 idle → 1 requested →
+	// 2 mapping → 3 ready. See render_webgpu_capture_browser_* and
+	// SWFRecomp/wasm_wrappers/display_bridge.c (dbgCapturePNG).
+	int browser_capture_state;             // 0=idle 1=requested 2=mapping 3=ready
+	int browser_capture_active;            // this frame is resolving into the capture texture
+	WGPUTexture browser_capture_texture;   // RenderAttachment|CopySrc resolve target
+	WGPUTextureView browser_capture_view;
+	WGPUBuffer browser_capture_readback;   // CopyDst|MapRead staging buffer
+	size_t browser_capture_row_stride;     // 256-aligned bytes per row
+	unsigned char* browser_capture_rgba;   // CPU RGBA result (width*height*4), tightly packed
+
 	// Window background color
 	u8 red;
 	u8 green;
@@ -262,4 +279,13 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context
 // Headless rendering: framebuffer capture and PNG output
 void render_webgpu_request_capture(WebGPURenderContext* context);
 int render_webgpu_save_png(WebGPURenderContext* context, const char* path);
+#endif
+
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+// Browser on-demand framebuffer capture (debug). Request a capture, poll for
+// readiness, then read the tightly-packed RGBA result. Driven by the render
+// loop (see the browser_capture_* fields). Used by display_bridge.c.
+void render_webgpu_request_browser_capture(WebGPURenderContext* context);
+int  render_webgpu_browser_capture_ready(WebGPURenderContext* context);   // 1 when RGBA ready
+unsigned char* render_webgpu_browser_capture_data(WebGPURenderContext* context); // RGBA ptr or NULL
 #endif

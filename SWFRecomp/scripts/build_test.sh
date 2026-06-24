@@ -315,6 +315,12 @@ if [ "$TARGET" == "wasm" ]; then
     EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_swf_ei_call_internal","_ng_ime_compose_set","_ng_ime_commit_set"]'
     if [ "$DISPLAY_BRIDGE" = true ]; then
         EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_getSpriteChildrenJSON","_setObjectTransform","_swf_ei_call_internal","_ng_ime_compose_set","_ng_ime_commit_set"]'
+        # The dbgCapture* framebuffer-readback debug exports only exist in graphics
+        # WASM builds (USE_WEBGPU); exporting them in a NO_GRAPHICS build would fail
+        # with "undefined exported symbol".
+        if [ "$GRAPHICS_FLAG" = true ]; then
+            EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_getSpriteChildrenJSON","_setObjectTransform","_dbgCapturePNG","_dbgCaptureReady","_dbgCaptureData","_dbgCaptureWidth","_dbgCaptureHeight","_dbgSetFrameCapMs","_swf_ei_call_internal","_ng_ime_compose_set","_ng_ime_commit_set"]'
+        fi
     fi
 
     # STACK_SIZE=8MB on both wasm builds: emscripten's default stack is only
@@ -344,7 +350,7 @@ if [ "$TARGET" == "wasm" ]; then
             -o "${OUTPUT_NAME}.js" \
             -s WASM=1 \
             -s EXPORTED_FUNCTIONS="${EXPORTED_FUNCS}" \
-            -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32"]' \
+            -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","HEAPU8"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=256MB \
             -s STACK_SIZE=8MB \

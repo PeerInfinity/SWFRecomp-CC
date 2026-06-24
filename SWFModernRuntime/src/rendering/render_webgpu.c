@@ -470,6 +470,10 @@ static void create_pipelines(WebGPURenderContext* ctx);
 static void create_bind_groups(WebGPURenderContext* ctx);
 static void run_compute_pass(WebGPURenderContext* ctx);
 static int invert_4x4_matrix(const float m[16], float inv[16]);
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+static int ensure_browser_capture_resources(WebGPURenderContext* ctx);
+static void browser_capture_finish(WebGPURenderContext* ctx);
+#endif
 
 // ---------------------------------------------------------------------------
 // WASM mouse input callbacks (registered in render_webgpu_init)
@@ -1727,17 +1731,32 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	// Headless: use the persistent offscreen texture as resolve target
 	ctx->surface_view = ctx->offscreen_view;
 #else
-	// Get the current surface texture
-	WGPUSurfaceTexture surf_tex;
-	wgpuSurfaceGetCurrentTexture(ctx->surface, &surf_tex);
-	if (surf_tex.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal &&
-	    surf_tex.status != WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal)
+	ctx->browser_capture_active = 0;
+#if defined(__EMSCRIPTEN__)
+	if (ctx->browser_capture_state == 1 && ensure_browser_capture_resources(ctx))
 	{
-		fprintf(stderr, "Failed to get surface texture\n");
-		return;
+		// Capture frame: resolve into our own CopySrc texture instead of the
+		// swapchain. We skip getCurrentTexture/present for this single frame
+		// (the canvas simply doesn't update for one tick) so the readback is a
+		// direct GPU copy that never touches the saturated present queue.
+		ctx->surface_view = ctx->browser_capture_view;
+		ctx->browser_capture_active = 1;
 	}
+	else
+#endif
+	{
+		// Get the current surface texture
+		WGPUSurfaceTexture surf_tex;
+		wgpuSurfaceGetCurrentTexture(ctx->surface, &surf_tex);
+		if (surf_tex.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal &&
+		    surf_tex.status != WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal)
+		{
+			fprintf(stderr, "Failed to get surface texture\n");
+			return;
+		}
 
-	ctx->surface_view = wgpuTextureCreateView(surf_tex.texture, NULL);
+		ctx->surface_view = wgpuTextureCreateView(surf_tex.texture, NULL);
+	}
 #endif
 
 	// Create command encoder
@@ -2463,6 +2482,29 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	}
 #endif
 
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	// Browser debug capture: this frame resolved into browser_capture_texture
+	// instead of the swapchain; copy it into the readback staging buffer in the
+	// same command buffer (a direct GPU copy, no present involved).
+	if (ctx->browser_capture_active)
+	{
+		WGPUTexelCopyTextureInfo src = {0};
+		src.texture = ctx->browser_capture_texture;
+		src.mipLevel = 0;
+		src.origin = (WGPUOrigin3D){0, 0, 0};
+		src.aspect = WGPUTextureAspect_All;
+
+		WGPUTexelCopyBufferInfo dst = {0};
+		dst.buffer = ctx->browser_capture_readback;
+		dst.layout.offset = 0;
+		dst.layout.bytesPerRow = (uint32_t)ctx->browser_capture_row_stride;
+		dst.layout.rowsPerImage = ctx->height;
+
+		WGPUExtent3D copy_size = {(uint32_t)ctx->width, (uint32_t)ctx->height, 1};
+		wgpuCommandEncoderCopyTextureToBuffer(ctx->encoder, &src, &dst, &copy_size);
+	}
+#endif
+
 	WGPUCommandBufferDescriptor cmd_desc = {0};
 	WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(ctx->encoder, &cmd_desc);
 	wgpuQueueSubmit(ctx->queue, 1, &cmd);
@@ -2473,12 +2515,32 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	wgpuSurfacePresent(ctx->surface);
 #endif
 
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	// This frame resolved into the capture texture and submitted the readback
+	// copy. Finish the capture HERE, inside the render loop's ASYNCIFY context:
+	// map the buffer and spin on emscripten_sleep until it completes. Parking
+	// here pauses the main loop, so NO new frames are submitted while we wait —
+	// the GPU backlog drains and our copy executes promptly (otherwise, on a
+	// busy board, a steady stream of present/writeBuffer work starves the copy
+	// and the map never fires; that is exactly why naive screenshots hang). This
+	// is NOT re-entrant: close_pass runs from the single main-loop stack, and
+	// dbgCapturePNG (the JS entry) only sets a flag and returns without sleeping.
+	if (ctx->browser_capture_active)
+	{
+		ctx->browser_capture_active = 0;
+		browser_capture_finish(ctx);   // state 1 -> 3 (or 0 on failure)
+	}
+#endif
+
 	// Release per-frame objects
 	wgpuCommandBufferRelease(cmd);
 	wgpuRenderPassEncoderRelease(ctx->render_pass);
 	wgpuCommandEncoderRelease(ctx->encoder);
 #ifndef OFFSCREEN_RENDER
-	wgpuTextureViewRelease(ctx->surface_view);
+	// The capture view is persistent (reused across captures) — only the
+	// per-frame swapchain view is created/released each frame.
+	if (ctx->surface_view && ctx->surface_view != ctx->browser_capture_view)
+		wgpuTextureViewRelease(ctx->surface_view);
 #endif
 
 	ctx->render_pass = NULL;
@@ -3347,6 +3409,13 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->readback_buffer) wgpuBufferRelease(ctx->readback_buffer);
 #endif
 
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	if (ctx->browser_capture_view) wgpuTextureViewRelease(ctx->browser_capture_view);
+	if (ctx->browser_capture_texture) wgpuTextureRelease(ctx->browser_capture_texture);
+	if (ctx->browser_capture_readback) wgpuBufferRelease(ctx->browser_capture_readback);
+	if (ctx->browser_capture_rgba) free(ctx->browser_capture_rgba);
+#endif
+
 	free(ctx);
 }
 
@@ -3436,3 +3505,140 @@ int render_webgpu_save_png(WebGPURenderContext* ctx, const char* path)
 }
 
 #endif // OFFSCREEN_RENDER
+
+// ---------------------------------------------------------------------------
+// Browser on-demand framebuffer capture (debug; HAS_DISPLAY_BRIDGE)
+//
+// copyTextureToBuffer on the rendered color target → mapAsync → CPU RGBA,
+// returned to JS. This is a DIRECT GPU copy, not a present, so it bypasses the
+// browser compositor and the software present queue that makes a busy board's
+// page/CDP screenshot hang in WSL2 (Chrome WebGPU has no GPU path there). The
+// whole thing is driven from render_webgpu_close_pass across frames so this
+// code never calls emscripten_sleep — the render loop already owns the single
+// ASYNCIFY suspended stack, and a second suspension from dbgCapturePNG would
+// corrupt it. JS polls render_webgpu_browser_capture_ready() instead.
+// ---------------------------------------------------------------------------
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+
+static volatile int g_browser_map_done = 0;
+static volatile WGPUMapAsyncStatus g_browser_map_status;
+
+static void on_browser_map_callback(WGPUMapAsyncStatus status,
+                                    WGPUStringView message,
+                                    void* userdata1, void* userdata2)
+{
+	(void)message; (void)userdata1; (void)userdata2;
+	g_browser_map_status = status;
+	g_browser_map_done = 1;
+}
+
+// Lazily create the capture render target + readback staging buffer (once).
+static int ensure_browser_capture_resources(WebGPURenderContext* ctx)
+{
+	if (!ctx->device || ctx->width <= 0 || ctx->height <= 0) return 0;
+	if (ctx->browser_capture_texture && ctx->browser_capture_readback) return 1;
+
+	WGPUTextureDescriptor tex_desc = {0};
+	tex_desc.label = WGPU_LABEL("browser_capture_target");
+	tex_desc.dimension = WGPUTextureDimension_2D;
+	tex_desc.size = (WGPUExtent3D){(uint32_t)ctx->width, (uint32_t)ctx->height, 1};
+	tex_desc.format = ctx->surface_format;   // BGRA8Unorm — matches the MSAA target
+	tex_desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
+	tex_desc.mipLevelCount = 1;
+	tex_desc.sampleCount = 1;                 // resolve target for the 4x MSAA pass
+	ctx->browser_capture_texture = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
+	if (!ctx->browser_capture_texture) return 0;
+	ctx->browser_capture_view = wgpuTextureCreateView(ctx->browser_capture_texture, NULL);
+
+	size_t row_bytes = (size_t)ctx->width * 4;
+	size_t aligned_row = (row_bytes + 255) & ~(size_t)255;   // WebGPU 256-align
+	ctx->browser_capture_row_stride = aligned_row;
+
+	WGPUBufferDescriptor buf_desc = {0};
+	buf_desc.label = WGPU_LABEL("browser_capture_readback");
+	buf_desc.size = aligned_row * (size_t)ctx->height;
+	buf_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
+	buf_desc.mappedAtCreation = false;
+	ctx->browser_capture_readback = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
+	if (!ctx->browser_capture_readback) return 0;
+
+	if (!ctx->browser_capture_rgba)
+		ctx->browser_capture_rgba = malloc((size_t)ctx->width * ctx->height * 4);
+
+	return ctx->browser_capture_rgba != NULL;
+}
+
+// Map the readback buffer and block (via emscripten_sleep) until it completes,
+// then harvest BGRA→RGBA into the CPU buffer (state → 3). Called from close_pass,
+// i.e. from the main loop's ASYNCIFY stack, so the sleep pauses frame submission
+// and lets the GPU backlog drain — without that pause the copy is perpetually
+// queued behind present work on a busy board and the map never fires.
+static void browser_capture_finish(WebGPURenderContext* ctx)
+{
+	ctx->browser_capture_state = 2;   // mapping
+	g_browser_map_done = 0;
+	WGPUBufferMapCallbackInfo map_info = {0};
+	// AllowSpontaneous so the callback fires during emscripten_sleep event-loop
+	// turns — the browser never calls wgpuInstanceProcessEvents, so
+	// AllowProcessEvents would never fire. Matches the adapter/device requests.
+	map_info.mode = WGPUCallbackMode_AllowSpontaneous;
+	map_info.callback = on_browser_map_callback;
+	wgpuBufferMapAsync(ctx->browser_capture_readback, WGPUMapMode_Read, 0,
+	                   ctx->browser_capture_row_stride * (size_t)ctx->height, map_info);
+
+	int guard = 0;
+	while (!g_browser_map_done && guard++ < 2500)   // up to ~20s, then give up
+		emscripten_sleep(8);
+
+	if (!g_browser_map_done || g_browser_map_status != WGPUMapAsyncStatus_Success)
+	{
+		fprintf(stderr, "browser capture: map failed (done=%d status %d)\n",
+		        g_browser_map_done, (int)g_browser_map_status);
+		ctx->browser_capture_state = 0;   // give up; JS poll will time out
+		return;
+	}
+
+	size_t map_size = ctx->browser_capture_row_stride * (size_t)ctx->height;
+	const void* mapped = wgpuBufferGetConstMappedRange(ctx->browser_capture_readback, 0, map_size);
+	if (mapped && ctx->browser_capture_rgba)
+	{
+		int w = ctx->width, h = ctx->height;
+		for (int y = 0; y < h; y++)
+		{
+			const unsigned char* src_row = (const unsigned char*)mapped + (size_t)y * ctx->browser_capture_row_stride;
+			unsigned char* dst_row = ctx->browser_capture_rgba + (size_t)y * w * 4;
+			for (int x = 0; x < w; x++)
+			{
+				dst_row[x * 4 + 0] = src_row[x * 4 + 2]; // R <- B
+				dst_row[x * 4 + 1] = src_row[x * 4 + 1]; // G <- G
+				dst_row[x * 4 + 2] = src_row[x * 4 + 0]; // B <- R
+				dst_row[x * 4 + 3] = 255;                // opaque stage screenshot
+			}
+		}
+		ctx->browser_capture_state = 3;   // ready
+	}
+	else
+	{
+		ctx->browser_capture_state = 0;
+	}
+	wgpuBufferUnmap(ctx->browser_capture_readback);
+}
+
+void render_webgpu_request_browser_capture(WebGPURenderContext* ctx)
+{
+	if (!ctx || !ctx->renderer_ok) return;
+	ctx->browser_capture_state = 1;   // requested — open_pass picks it up next frame
+}
+
+int render_webgpu_browser_capture_ready(WebGPURenderContext* ctx)
+{
+	return (ctx && ctx->browser_capture_state == 3) ? 1 : 0;
+}
+
+unsigned char* render_webgpu_browser_capture_data(WebGPURenderContext* ctx)
+{
+	if (!ctx || ctx->browser_capture_state != 3) return NULL;
+	return ctx->browser_capture_rgba;
+}
+
+#endif // __EMSCRIPTEN__ && !OFFSCREEN_RENDER

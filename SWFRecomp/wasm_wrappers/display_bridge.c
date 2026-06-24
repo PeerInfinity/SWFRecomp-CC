@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
 #ifndef M_PI
@@ -203,5 +204,84 @@ void setObjectTransform(int depth, float x, float y,
     }
 #endif
 }
+
+// ---------------------------------------------------------------------------
+// Browser framebuffer capture (debug)
+//
+// Reads the rendered frame back via a direct GPU copyTextureToBuffer (see
+// render_webgpu.c), bypassing the software present queue that makes a busy
+// board's Playwright/CDP screenshot hang in this WSL2. Async by design — JS
+// requests, polls dbgCaptureReady, then reads the RGBA bytes at dbgCaptureData.
+// A reusable async helper window.dbgCaptureBoard() (returns a PNG data URL) is
+// installed on first request for console / harness use.
+// ---------------------------------------------------------------------------
+#if defined(USE_WEBGPU) && defined(__EMSCRIPTEN__)
+
+EMSCRIPTEN_KEEPALIVE
+void dbgCapturePNG(void)
+{
+    if (context) render_webgpu_request_browser_capture(context);
+    // Install the JS convenience helper once (no-op on subsequent calls).
+    static int helper_installed = 0;
+    if (!helper_installed) {
+        helper_installed = 1;
+        EM_ASM({
+            window.dbgCaptureBoard = async function() {
+                Module.ccall('dbgCapturePNG', null, [], []);
+                var ready = 0;
+                for (var i = 0; i < 300; i++) {           // up to ~10s
+                    ready = Module.ccall('dbgCaptureReady', 'number', [], []);
+                    if (ready) break;
+                    await new Promise(function(r){ setTimeout(r, 33); });
+                }
+                if (!ready) return null;
+                var ptr = Module.ccall('dbgCaptureData', 'number', [], []);
+                var w = Module.ccall('dbgCaptureWidth', 'number', [], []);
+                var h = Module.ccall('dbgCaptureHeight', 'number', [], []);
+                if (!ptr || !w || !h) return null;
+                var bytes = Module.HEAPU8.subarray(ptr, ptr + w * h * 4);
+                var cnv = document.createElement('canvas');
+                cnv.width = w; cnv.height = h;
+                var cx = cnv.getContext('2d');
+                var img = cx.createImageData(w, h);
+                img.data.set(bytes);
+                cx.putImageData(img, 0, 0);
+                return cnv.toDataURL('image/png');
+            };
+        });
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE
+int dbgCaptureReady(void)
+{
+    return context ? render_webgpu_browser_capture_ready(context) : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int dbgCaptureData(void)
+{
+    if (!context) return 0;
+    return (int)(intptr_t)render_webgpu_browser_capture_data(context);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int dbgCaptureWidth(void)  { return context ? context->width : 0; }
+
+EMSCRIPTEN_KEEPALIVE
+int dbgCaptureHeight(void) { return context ? context->height : 0; }
+
+// Throttle the render loop to at most ~(1000/ms) fps (0 = off). On WSL2 software
+// WebGPU an uncapped busy board floods the present queue faster than it drains;
+// the backlog makes the framebuffer readback (and Playwright input) stall for
+// many seconds. Cap to ~6-10fps while capturing/driving the board.
+EMSCRIPTEN_KEEPALIVE
+void dbgSetFrameCapMs(int ms)
+{
+    extern int g_debug_frame_floor_ms;
+    g_debug_frame_floor_ms = ms < 0 ? 0 : ms;
+}
+
+#endif /* USE_WEBGPU && __EMSCRIPTEN__ */
 
 #endif /* HAS_DISPLAY_BRIDGE */
