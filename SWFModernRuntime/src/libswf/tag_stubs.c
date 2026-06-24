@@ -2370,17 +2370,42 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 				DisplayObject* saved_sprite_obj = g_current_sprite_obj;
 				int            saved_catch_up = catch_up_mode;
 
-				// Create display_obj for clone to hold its children
-				if (clone_mc->display_obj == NULL) {
-					DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
-					dobj->char_id = cid;
+				// Create (or reset) display_obj for clone to hold its children.
+				// Re-cloning into a clip that ALREADY exists (e.g. Minesweeper's
+				// Restart re-runs the board-build duplicateMovieClip loop over the
+				// still-live 480 cells) must start from a clean, frame-0 state — the
+				// same state a fresh allocation gives. Without the reset, funcs[0]
+				// below merges frame-0 place tags ON TOP of the previous frame's
+				// content, and the stale sprite_current_frame makes the subsequent
+				// gotoAndStop seek (ng_gotoFrameByMC) take its same-frame no-rebuild
+				// branch — leaving the clip frozen on the polluted frame-0 geometry
+				// while currentframe reports the requested frame. (The cell0_0-
+				// after-Restart misplacement: the FIRST re-clone re-ran the template's
+				// frame_0 onto the stale frame-12 "Unknown" list; later cells were
+				// spared only because cloning nulls the template's display_obj, so
+				// their funcs[0] was skipped.)
+				DisplayObject* dobj = (DisplayObject*)clone_mc->display_obj;
+				if (dobj == NULL) {
+					dobj = calloc(1, sizeof(DisplayObject));
 					dobj->sprite_dl_capacity = 64;
 					dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
-					dobj->sprite_max_depth = 0;
 					clone_mc->display_obj = dobj;
+				} else if (dobj->sprite_display_list != NULL) {
+					// Free nested child sprite lists, then zero the entries (mirrors
+					// the backward-jump rewind in ng_gotoFrameByMC). memset (not free)
+					// keeps the top-level buffer regardless of which allocator owns it.
+					for (size_t _rj = 0; _rj < dobj->sprite_dl_capacity; _rj++) {
+						if (dobj->sprite_display_list[_rj].sprite_display_list != NULL) {
+							FREE(dobj->sprite_display_list[_rj].sprite_display_list);
+							dobj->sprite_display_list[_rj].sprite_display_list = NULL;
+						}
+					}
+					memset(dobj->sprite_display_list, 0,
+					       dobj->sprite_dl_capacity * sizeof(DisplayObject));
 				}
-
-				DisplayObject* dobj = (DisplayObject*)clone_mc->display_obj;
+				dobj->char_id = cid;
+				dobj->sprite_max_depth = 0;
+				dobj->sprite_current_frame = 0;
 				display_list = dobj->sprite_display_list;
 				max_depth = dobj->sprite_max_depth;
 				display_list_capacity = dobj->sprite_dl_capacity;
