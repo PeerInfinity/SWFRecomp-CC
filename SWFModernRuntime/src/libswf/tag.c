@@ -2096,6 +2096,35 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 		display_list_capacity = saved_cap;
 	}
 }
+
+// Browser-WASM: promote sprite_initialized 1→2 inside attachMovie'd clips'
+// standalone display lists. upgrade_sprite_initialized (called from tagShowFrame)
+// only walks the global display_list, so nested sprites placed inside an attached
+// clip (e.g. Doodle Jump's blue platform charId 32 "aaa", placed by
+// advance_attached_clip_frames into the cloud's STANDALONE list) never reach 2 and
+// gather_clip_ef_entries (which requires >=2) skips them — so their
+// onClipEvent(enterFrame) clip actions never fire. Run the same recursive
+// promotion over each attached clip's standalone list once per tick.
+void upgrade_attached_clip_initialized(SWFAppContext* app_context)
+{
+	(void)app_context;
+	void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max);
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	uintptr_t dl_lo = (uintptr_t)display_list;
+	uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
+	for (int i = 0; i < child_mc_count; i++)
+	{
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN || mc->display_obj == NULL) continue;
+		DisplayObject* d = (DisplayObject*)mc->display_obj;
+		// Only standalone attachMovie'd clips (timeline-placed clips live in the
+		// global display_list and are already covered by the root walk).
+		if ((uintptr_t)d >= dl_lo && (uintptr_t)d < dl_hi) continue;
+		if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) continue;
+		upgrade_sprite_initialized(d->sprite_display_list, d->sprite_max_depth);
+	}
+}
 #endif
 
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
@@ -3760,6 +3789,23 @@ void dispatch_attached_clip_enterframe(SWFAppContext* app_context)
 		dispatch_enterframe_clip_actions(app_context, d->sprite_display_list,
 			d->sprite_max_depth, mc);
 		actionSetCurrentContext(saved_ctx);
+
+		// Link each named nested clip's MovieClip to its display entry. The clip
+		// action above mutates the MC's spatial props (e.g. blue platform "aaa"
+		// `this._x += ac`), but the MC is created lazily by NAME during dispatch
+		// with display_obj == NULL, so compose_children's per-tick overlay (which
+		// matches the moving MC to its entry by display_obj == obj) can't find it
+		// and the motion never renders. Resolve the per-cloud MC (keyed by name +
+		// this cloud as parent) and point its display_obj at the entry so the
+		// overlay applies the AS transform. Only set when NULL — never clobber an
+		// existing linkage.
+		for (size_t dd = 1; dd <= d->sprite_max_depth; dd++) {
+			DisplayObject* co = &d->sprite_display_list[dd];
+			if (co->char_id == 0 || co->instance_name == NULL) continue;
+			MovieClip* cmc = actionFindOrCreateMovieClip(app_context, co->instance_name, mc);
+			if (cmc != NULL && cmc->display_obj == NULL)
+				cmc->display_obj = co;
+		}
 	}
 }
 #endif
@@ -5052,6 +5098,12 @@ void tagShowFrame(SWFAppContext* app_context)
 			void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max);
 			upgrade_sprite_initialized(display_list, max_depth);
 		}
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+		{
+			void upgrade_attached_clip_initialized(SWFAppContext* app_context);
+			upgrade_attached_clip_initialized(app_context);
+		}
+#endif
 
 		// After the first tagShowFrame, root's enterFrame becomes eligible.
 		// On the first frame, root fires LOAD (its frame script), not enterFrame.
@@ -5113,6 +5165,12 @@ void tagShowFrame(SWFAppContext* app_context)
 		void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max);
 		upgrade_sprite_initialized(display_list, max_depth);
 	}
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	{
+		void upgrade_attached_clip_initialized(SWFAppContext* app_context);
+		upgrade_attached_clip_initialized(app_context);
+	}
+#endif
 #if !defined(HEADLESS_GRAPHICS)
 	// Browser-WASM: finalize any tagRemoveObject(2)'d entries that weren't
 	// reclaimed by a same-tick tagPlaceObject2(Ratio) BEFORE the AQ_KIND_LOAD
