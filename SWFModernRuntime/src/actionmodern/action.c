@@ -58769,6 +58769,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		int _bm_match = 0;
 		if (func_name_len == 9 && strncmp(func_name, "getBounds", 9) == 0) _bm_match = 1;
 		else if (func_name_len == 7 && strncmp(func_name, "getRect", 7) == 0) _bm_match = 1;
+		// Bare `hitTest(x,y[,shape])` / `hitTest(target)` inside a clip event handler
+		// resolves to `this.hitTest(...)` in AVM1 (clip is the scope target;
+		// MovieClip.prototype.hitTest wins). Without this it fell through to the
+		// user-function lookup, returned undefined, and the caller's
+		// `if (hitTest(...))` was always false — Minesweeper spacebar-flag keyUp.
+		else if (func_name_len == 7 && strncmp(func_name, "hitTest", 7) == 0) _bm_match = 1;
 		if (_bm_match)
 		{
 			// Re-push args (in reverse-of-popped order) so actionCallMethod's
@@ -69182,7 +69188,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ASObject* _ltg_pt = (ASObject*) args[0].data.numeric_value;
 			if (args != NULL) FREE(args);
 			if (_ltg_pt == NULL) { pushUndefined(app_context); return; }
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Compiled in ALL modes: browser-WASM graphics needs the point
+			// transform too. getLocalMatrixForMC_render / getConcatMatrixForMC are
+			// available in every build (the hitTest builtin already uses them).
+			// Without this, localToGlobal was a no-op in browser-WASM, so games
+			// that map a mouse point to stage space before hitTest silently broke
+			// (Minesweeper spacebar-flag: keyUp localToGlobal(point)+hitTest never
+			// reached mark() → no flag placed).
 			{
 				ActionVar* _ltg_xv = getProperty(_ltg_pt, "x", 1);
 				ActionVar* _ltg_yv = getProperty(_ltg_pt, "y", 1);
@@ -69229,7 +69241,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					setProperty(app_context, _ltg_pt, "y", 1, &_ltg_rv);
 				}
 			}
-#endif
 			pushUndefined(app_context);
 			return;
 		}
@@ -69244,7 +69255,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ASObject* _gtl_pt = (ASObject*) args[0].data.numeric_value;
 			if (args != NULL) FREE(args);
 			if (_gtl_pt == NULL) { pushUndefined(app_context); return; }
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Compiled in ALL modes (see localToGlobal above) — browser-WASM
+			// needs the inverse transform too; was a no-op there.
 			{
 				ActionVar* _gtl_xv = getProperty(_gtl_pt, "x", 1);
 				ActionVar* _gtl_yv = getProperty(_gtl_pt, "y", 1);
@@ -69302,7 +69314,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
-#endif
 			pushUndefined(app_context);
 			return;
 		}
