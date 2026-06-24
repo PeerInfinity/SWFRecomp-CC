@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-24T03:30:09.570055+00:00",
-    "old_git_sha": "b436318402fe0ee0c41c85ee20150b060c3629b8",
-    "new_timestamp": "2026-06-24T18:51:25.396210+00:00",
-    "new_git_sha": "f5b1fefe77d251a3dca81c8276a95dd735f9a8e9",
+    "old_timestamp": "2026-06-24T18:51:25.396210+00:00",
+    "old_git_sha": "f5b1fefe77d251a3dca81c8276a95dd735f9a8e9",
+    "new_timestamp": "2026-06-24T19:07:03.492339+00:00",
+    "new_git_sha": "79e0ad3cebbcb238762ff29d56a989c084d361bf",
     "partial": false,
     "same_commit": false,
     "incomplete": true,
@@ -11,11 +11,11 @@
     "expected_shards": 30
   },
   "summary": {
-    "old_pass": 19,
+    "old_pass": 18,
     "old_ruffle_matched": 1,
-    "old_effective_pass": 20,
-    "old_total": 20,
-    "old_pass_rate": 95.0,
+    "old_effective_pass": 19,
+    "old_total": 19,
+    "old_pass_rate": 94.7,
     "new_pass": 18,
     "new_ruffle_matched": 1,
     "new_effective_pass": 19,
@@ -30,21 +30,7 @@
     "status_changed": 0,
     "unchanged": 19,
     "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 1
+    "removed": 0
   },
-  "changes": [
-    {
-      "test": "trace-as2/root_onload",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "new_lines": null
-    }
-  ]
+  "changes": []
 }
