@@ -26773,6 +26773,26 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 
 	if (text_len == 0) return;
 
+	// Variable-bound / plain text builds no per-run HTML formatting above, so
+	// emit_runs is NULL and the glyph renderer would default to left alignment.
+	// But the field's DefineEditText layout alignment still applies to its text.
+	// Synthesize a single default run carrying the field align so this no-wrapper
+	// (orphan) path matches the MC-wrapper path, which sets
+	// _tfg_runs[0].align = ng_getTextFieldAlign(...). Without this, Minesweeper's
+	// center-aligned "Bombs Left" / "Elapsed Time" counters (chid 65/83) rendered
+	// left-aligned on the first board and snapped right (to center) once they
+	// acquired an MC wrapper on a gotoAndPlay re-entry (Restart).
+	if (emit_runs == NULL) {
+		otf_html_runs[0].byte_start = 0;
+		otf_html_runs[0].byte_length = (u32)text_len;
+		otf_html_runs[0].color = text_color & 0x00FFFFFF;
+		otf_html_runs[0].font_height = font_height;
+		otf_html_runs[0].align = (u8)ng_getTextFieldAlign(tf_idx);
+		otf_html_runs[0].bullet = 0;
+		emit_runs = otf_html_runs;
+		emit_run_count = 1;
+	}
+
 	TextFieldGlyphInfo info = {0};
 	info.font_id = font_id;
 	info.font_height = font_height;
