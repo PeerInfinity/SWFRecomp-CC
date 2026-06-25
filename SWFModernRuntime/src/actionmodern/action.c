@@ -40219,6 +40219,27 @@ void actionGetVariable(SWFAppContext* app_context)
 					}
 				}
 			}
+				// Child clips of a with-scope MovieClip resolve as bare identifiers.
+				// Flash exposes a clip's named child instances as properties of the
+				// parent, so `with(ghost){ Shape._visible }` must see the ghost's
+				// nested Shape child. Without this, the name falls through to the
+				// g_current_context (root) fallback and resolves to undefined —
+				// e.g. Pacman's ghost-house-exit cheat (gated on Shape._visible)
+				// never fires, trapping the ghosts. Only for genuine with-scopes;
+				// skip _-prefixed names (_root/_level/_parent etc handled elsewhere).
+				if (scope_is_with[i] && var_name_len > 0 && var_name[0] != '_')
+				{
+					MovieClip* wchild = resolveSlashPathToMC(app_context, var_name, var_name_len, scope_mc[i]);
+					if (wchild != NULL && wchild != scope_mc[i])
+					{
+						g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+						g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
+						g_last_callable_this_set = 1;
+						g_last_callable_this_is_with = 1;
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)wchild);
+						return;
+					}
+				}
 		}
 	}
 
