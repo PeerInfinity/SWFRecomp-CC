@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `a049390fec8c`  
-**Date:** 2026-06-24 23:04 UTC  
-**Total duration:** 3h01m39s
+**Commit:** `4193a5bf6f8b`  
+**Date:** 2026-06-25 17:19 UTC  
+**Total duration:** 2h33m36s
 
 ## Results by Suite
 
@@ -24,7 +24,7 @@
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 115,521 | 130,968 | 88.2% |
+| avm1 | 115,508 | 130,968 | 88.2% |
 | from_gnash/actionscript.all | 30,101 | 38,791 | 77.6% |
 | from_gnash/misc-ming.all | 4,042 | 5,248 | 77.0% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -32,7 +32,7 @@
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
 | from_shumway | 882 | 1,276 | 69.1% |
 | from_shumway/avm1 | 489 | 491 | 99.6% |
-| **Total** | **151,777** | **177,680** | **85.4%** |
+| **Total** | **151,764** | **177,680** | **85.4%** |
 
 ## Failure Breakdown
 
@@ -81,9 +81,11 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-*No changes since last run.*
+| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
+|-------|-------------:|-------------:|--------------:|----------------:|
+| avm1 | - | - | - | 13 |
 
-*Comparing `363b7a57dd08` → `a049390fec8c`*
+*Comparing `a049390fec8c` → `4193a5bf6f8b`*
 
 ## Flash-Spec Results
 
@@ -98,55 +100,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 629/704 (89.3%)
-- **Duration:** 1h17m25s across 30 shards
-- **Lines:** 115,521/130,968 matching (88.2%)
-- **Avg test duration:** 6.5s — slowest: `netstream_play_flv_screen` (35.3s)
+- **Duration:** 56m11s across 30 shards
+- **Lines:** 115,508/130,968 matching (88.2%)
+- **Avg test duration:** 4.7s — slowest: `netstream_play_flv_screen` (37.3s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 135/243 (55.6%)
-- **Duration:** 36m15s across 30 shards
+- **Duration:** 31m14s across 30 shards
 - **Lines:** 30,101/38,791 matching (77.6%)
-- **Avg test duration:** 8.9s — slowest: `MovieClip-v8` (66.7s)
+- **Avg test duration:** 7.7s — slowest: `MovieClip-v8` (63.5s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 68/111 (61.3%)
-- **Duration:** 35m05s across 30 shards
+- **Duration:** 34m12s across 30 shards
 - **Lines:** 4,042/5,248 matching (77.0%)
-- **Avg test duration:** 18.9s — slowest: `matrix_test` (98.6s)
+- **Avg test duration:** 18.4s — slowest: `matrix_test` (107.2s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m12s across 30 shards
+- **Duration:** 1m34s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 14.7s — slowest: `enum` (22.1s)
+- **Avg test duration:** 10.5s — slowest: `exception` (21.8s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 10/20 (50.0%)
-- **Duration:** 6m04s across 30 shards
+- **Duration:** 6m03s across 30 shards
 - **Lines:** 438/580 matching (75.5%)
-- **Avg test duration:** 18.1s — slowest: `swf4opcode` (24.4s)
+- **Avg test duration:** 18.1s — slowest: `action_execution_order_test12` (22.7s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 6m39s across 30 shards
+- **Duration:** 6m46s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 19.9s — slowest: `zeroframe_definesprite` (21.3s)
+- **Avg test duration:** 20.3s — slowest: `background` (21.7s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 15m09s across 30 shards
+- **Duration:** 15m04s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 9.8s — slowest: `fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b` (23.1s)
+- **Avg test duration:** 9.8s — slowest: `fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b` (24.2s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 2m47s across 30 shards
+- **Duration:** 2m28s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 3.5s — slowest: `rollover` (20.5s)
+- **Avg test duration:** 3.1s — slowest: `hitarea` (21.2s)
