@@ -11286,6 +11286,26 @@ static int colorGetMCName(SWFAppContext* app_context, ASObject* obj, char* out_b
 	return 0;
 }
 
+// Resolve a Color object's bound target MovieClip directly (the raw "target"
+// own property stores the MOVIECLIP arg from `new Color(mc)`). Preferred over a
+// name lookup for browser-WASM color sync because the name can be ambiguous
+// (Pacman's four ghosts each have a child named "Shape").
+static MovieClip* colorGetTargetMC(SWFAppContext* app_context, ASObject* obj) {
+	if (!obj) return NULL;
+	ActionVar* target = getProperty(obj, "target", 6);
+	if (target && target->type == ACTION_STACK_VALUE_MOVIECLIP) {
+		MovieClip* mc = (MovieClip*)(uintptr_t)target->data.numeric_value;
+		if (mc != NULL && mc->depth != INT_MIN) return mc;
+	}
+	char name[256] = {0};
+	if (colorGetMCName(app_context, obj, name, sizeof(name))) {
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+		return actionFindMovieClipByName(name);
+	}
+	return NULL;
+}
+static void mcSyncColorToDisplayObj(MovieClip* mc);  // fwd decl (defined later)
+
 // Color.getTransform() -> Object{ra,ga,ba,aa,rb,gb,bb,ab}
 // Returns undefined if the target MC is invalid (same as getRGB).
 static ActionVar colorGetTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -11390,6 +11410,27 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 		_mc->cx_rb = (float)rb; _mc->cx_gb = (float)gb;
 		_mc->cx_bb = (float)bb; _mc->cx_ab = (float)ab;
 	}
+#else
+	// Browser-WASM: apply the transform to the bound clip + sync to the renderer
+	// (mirrors colorSetRGB's #else). Without this Color.setTransform was a no-op.
+	MovieClip* _mc = colorGetTargetMC(app_context, self);
+	if (_mc) {
+		double ra=100,ga=100,ba=100,aa=100,rb=0,gb=0,bb=0,ab=0;
+		ActionVar* pv;
+		pv = getProperty(param, "ra", 2); if (pv) ra = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
+		pv = getProperty(param, "ga", 2); if (pv) ga = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
+		pv = getProperty(param, "ba", 2); if (pv) ba = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
+		pv = getProperty(param, "aa", 2); if (pv) aa = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
+		pv = getProperty(param, "rb", 2); if (pv) rb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
+		pv = getProperty(param, "gb", 2); if (pv) gb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
+		pv = getProperty(param, "bb", 2); if (pv) bb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
+		pv = getProperty(param, "ab", 2); if (pv) ab = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
+		_mc->alpha = (float)aa;
+		_mc->cx_ra = (float)ra; _mc->cx_ga = (float)ga; _mc->cx_ba = (float)ba; _mc->cx_aa = (float)aa;
+		_mc->cx_rb = (float)rb; _mc->cx_gb = (float)gb; _mc->cx_bb = (float)bb; _mc->cx_ab = (float)ab;
+		mcSyncColorToDisplayObj(_mc);
+	}
+	(void)name;
 #endif
 	return undef;
 }
@@ -11462,6 +11503,22 @@ static ActionVar colorSetRGB(SWFAppContext* app_context, ActionVar* args, u32 ar
 		_mc->cx_rb = (float)new_rb; _mc->cx_gb = (float)new_gb; _mc->cx_bb = (float)new_bb;
 		// aa and ab unchanged
 	}
+#else
+	// Browser-WASM: the NG/OFFSCREEN path above is gated out, so Color.setRGB was
+	// a no-op (Pacman ghosts stayed white, the power-pellet blue/blink/revert
+	// never showed). Set the bound clip's RGB cxform (zero multipliers + offset =
+	// solid color, per Flash setRGB) and sync it to the render DisplayObject.
+	MovieClip* _mc = colorGetTargetMC(app_context, obj);
+	if (_mc) {
+		int32_t n = ecmaToInt32Color(varToDoubleSWF(app_context, &args[0], g_swf_version));
+		_mc->cx_ra = 0.0f; _mc->cx_ga = 0.0f; _mc->cx_ba = 0.0f;
+		_mc->cx_rb = (float)((n >> 16) & 0xFF);
+		_mc->cx_gb = (float)((n >> 8) & 0xFF);
+		_mc->cx_bb = (float)(n & 0xFF);
+		// aa/ab unchanged (alpha preserved); mcSyncColorToDisplayObj uses mc->alpha.
+		mcSyncColorToDisplayObj(_mc);
+	}
+	(void)name;
 #endif
 	return undef;
 }
@@ -25780,6 +25837,41 @@ static void mcSyncAlphaToDisplayObj(MovieClip* mc) {
 		_dob->cx_aa = (double)mc->alpha;
 		_dob->cx_overridden = 1;
 	}
+#else
+	(void)mc;
+#endif
+}
+
+// Sync a MovieClip's full color transform (cx_ra..cx_bb RGB + alpha) to its
+// render DisplayObject, so a runtime Color.setRGB/setTransform tints the clip in
+// graphics mode. Mirrors mcSyncAlphaToDisplayObj but for all channels. For a
+// NESTED clip inside an attachMovie'd parent (e.g. a Pacman ghost's "Shape"),
+// mc->display_obj may be NULL (the browser-WASM child resolver doesn't link it),
+// so fall back to finding the clip's entry in the PARENT's sprite_display_list by
+// instance name — that entry is what compose_children reads (its cx_overridden
+// path allocates a dynamic cxform slot). Without this, Color.setRGB on an
+// attached clip's nested shape was a no-op and the ghosts rendered white.
+static void mcSyncColorToDisplayObj(MovieClip* mc) {
+#ifndef NO_GRAPHICS
+	if (mc == NULL) return;
+	DisplayObject* dob = (DisplayObject*)mc->display_obj;
+	if (dob == NULL && mc->parent != NULL && mc->parent->display_obj != NULL && mc->name[0] != '\0') {
+		DisplayObject* pdob = (DisplayObject*)mc->parent->display_obj;
+		if (pdob->sprite_display_list != NULL) {
+			for (size_t d = 1; d <= pdob->sprite_max_depth; d++) {
+				DisplayObject* e = &pdob->sprite_display_list[d];
+				if (e->char_id != 0 && e->instance_name != NULL && swf_name_match(e->instance_name, mc->name)) {
+					dob = e; break;
+				}
+			}
+		}
+	}
+	if (dob == NULL) return;
+	dob->cx_ra = (double)mc->cx_ra; dob->cx_ga = (double)mc->cx_ga; dob->cx_ba = (double)mc->cx_ba;
+	dob->cx_rb = (double)mc->cx_rb; dob->cx_gb = (double)mc->cx_gb; dob->cx_bb = (double)mc->cx_bb;
+	dob->cx_aa = (double)mc->alpha;  // alpha multiplier (percent) from _alpha
+	dob->cx_ab = (double)mc->cx_ab;
+	dob->cx_overridden = 1;
 #else
 	(void)mc;
 #endif
