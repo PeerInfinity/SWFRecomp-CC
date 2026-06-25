@@ -41656,21 +41656,41 @@ void actionSetVariable(SWFAppContext* app_context)
 				if (num_ok) fval = (float) dval; \
 			} \
 		} while (0)
-		if (strcasecmp(var_name, "_x") == 0) { RESOLVE_NUM_PROP(); if (num_ok) mc->x = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_y") == 0) { RESOLVE_NUM_PROP(); if (num_ok) mc->y = fval; handled = 1; }
+		// Browser-WASM: SetMember `_x`/`_y`/`_xscale`/`_yscale`/`_rotation` must mark
+		// the field as script-set (as_set_flags + transformed_by_script) so
+		// tagShowFrame's apply_as_transform overlay renders the new value — the
+		// SetProperty opcode path already does this in all modes; SetMember
+		// (e.g. Pacman's `with(Pacman){ _x -= pacStep }`, the ghosts' `_x`/`_y`)
+		// updated mc->x/y but left as_set_flags clear, so the renderer's
+		// flag-gated overlay skipped the entry and the clip rendered frozen at
+		// its timeline placement. NG/OFFSCREEN behavior is unchanged (those modes
+		// already set the scale/rotation bits; _x/_y stay as before there).
+		if (strcasecmp(var_name, "_x") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->x = fval;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+			mc->as_set_flags |= 1; markTransformedByScript(mc);
+#endif
+			} handled = 1; }
+		else if (strcasecmp(var_name, "_y") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->y = fval;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+			mc->as_set_flags |= 2; markTransformedByScript(mc);
+#endif
+			} handled = 1; }
 		else if (strcasecmp(var_name, "_xscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->xscale = fval;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 4;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+			markTransformedByScript(mc);
 #endif
 			} handled = 1; }
 		else if (strcasecmp(var_name, "_yscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->yscale = fval;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 8;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+			markTransformedByScript(mc);
 #endif
 			} handled = 1; }
 		else if (strcasecmp(var_name, "_rotation") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->rotation = normalizeRotation(fval);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 16;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+			markTransformedByScript(mc);
 #endif
 			} handled = 1; }
 		else if (strcasecmp(var_name, "_alpha") == 0) {
@@ -55570,38 +55590,34 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 	double dval = varToDoubleSimple(value);
 	float fval = (float)dval;
 
+	// as_set_flags must be set in ALL modes (was NG/OFFSCREEN-only): browser-WASM's
+	// tagShowFrame renders a script-moved timeline clip via a flag-gated
+	// apply_as_transform overlay, so a clear flag left the clip frozen at its
+	// placement. setMCBuiltinProperty is the with-scope / SetVariable setter, i.e.
+	// `with(Pacman){ _x -= pacStep }` and the ghosts' `_x`/`_y` writes — the actual
+	// Pacman/ghost movement path. NG/OFFSCREEN already set these bits → unchanged.
 	if (strcasecmp(name, "_x") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 1;
-#endif
 		markTransformedByScript(mc);
 		mc->x = fval; return 1;
 	}
 	if (strcasecmp(name, "_y") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 2;
-#endif
 		markTransformedByScript(mc);
 		mc->y = fval; return 1;
 	}
 	if (strcasecmp(name, "_xscale") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 4;
-#endif
 		markTransformedByScript(mc);
 		mc->xscale = fval; return 1;
 	}
 	if (strcasecmp(name, "_yscale") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 8;
-#endif
 		markTransformedByScript(mc);
 		mc->yscale = fval; return 1;
 	}
 	if (strcasecmp(name, "_rotation") == 0) {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 16;
-#endif
 		markTransformedByScript(mc);
 		mc->rotation = normalizeRotation(fval); return 1;
 	}

@@ -61,6 +61,35 @@ int dbgIsPlaying(void)
     return is_playing;
 }
 
+/* DEBUG: read a clip's AS-state (x,y,as_set_flags) via the SAME lookup the
+ * renderer uses (actionFindMovieClipByName). Format: "x,y,flags,hasDisplayObj".
+ * Pacman gameplay diagnosis. */
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+const char* dbgClipInfo(const char* name)
+{
+    static char buf[128];
+    extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+    MovieClip* mc = actionFindMovieClipByName(name);
+    if (!mc) { snprintf(buf, sizeof(buf), "NOT_FOUND"); return buf; }
+    snprintf(buf, sizeof(buf), "x=%.1f y=%.1f flags=%u dobj=%d",
+             mc->x, mc->y, (unsigned)mc->as_set_flags, mc->display_obj ? 1 : 0);
+    return buf;
+}
+
+/* DEBUG: read a _root global variable as a number (Pacman gameplay diagnosis). */
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+double dbgRootVarNum(const char* name)
+{
+    extern double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version);
+    ActionVar* v = getVariable((char*)name, strlen(name));
+    if (!v) return -999999.0;
+    return varToDoubleSWF(&app_context, v, 6);
+}
+
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 #endif
