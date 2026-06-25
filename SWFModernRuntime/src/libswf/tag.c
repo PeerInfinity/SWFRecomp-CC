@@ -1414,8 +1414,20 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
 
-		// Advance frame (loop back to 0); guard against 0-frame sprites
-		if (ch->sprite_frame_count > 0)
+		// Advance frame (loop back to 0); guard against 0-frame sprites.
+		// BUT only if sprite_current_frame is still the value we read at the top
+		// of this iteration: a method-form gotoAndStop/Play on THIS sprite issued
+		// by a root script that runs mid-advance (e.g. `clip.gotoAndPlay("label")`)
+		// calls ng_gotoFrameByMC, which sets sprite_current_frame directly. The
+		// stale `frame + 1` here would clobber that nav. Pacman's death path
+		// (`Pacman.gotoAndPlay("Die")` from the root game loop) hit exactly this:
+		// the goto set scf=6 (the Die frame) between this iteration's frame read
+		// and write, but the auto-advance overwrote it back into the 1-5 chomp
+		// loop, so Pacman never played its death animation and the game froze.
+		// A sprite's OWN frame-script goto uses sprite_manual_next_frame (handled
+		// at the top of the loop), NOT a direct scf write, so this guard is inert
+		// for the normal advance + self-loop cases.
+		if (ch->sprite_frame_count > 0 && obj->sprite_current_frame == frame)
 			obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
 	}
 }
