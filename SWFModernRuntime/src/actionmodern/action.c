@@ -31715,6 +31715,17 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 			ng_gotoFrameCurrentSprite(frame);
 			return;
 		}
+		// A tellTarget/with-targeted non-root clip (e.g. `tellTarget(Ghost[g])
+		// { gotoAndStop(1) }`) navigates THAT clip, not the root timeline.
+		// Mirrors the NG/OFFSCREEN g_current_context branch above. Without
+		// this, the bare goto fell through to the root-goto path below and
+		// hijacked the root playhead — Pacman's initVars runs
+		// `tellTarget(Ghost[g]){ gotoAndStop(1) }` for each ghost, which bounced
+		// the whole game off the Ready frame back to the title screen.
+		if (g_current_context != NULL && g_current_context != &root_movieclip) {
+			ng_gotoFrameByMC(app_context, g_current_context, frame, 0);
+			return;
+		}
 	}
 #endif
 
@@ -32216,6 +32227,18 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 		else if (ng_isInsideSprite()) { ng_playCurrentSprite(); }
 		else if (g_current_context != NULL && g_current_context != &root_movieclip) {
 			// base_clip context: set play on the MC's sprite display entry
+			size_t _pd = ng_findDisplayEntryByName(g_current_context->name);
+			if (_pd != SIZE_MAX)
+				display_list[_pd].sprite_is_playing = 1;
+		}
+		else
+#else
+		// browser-WASM: a tellTarget/with-targeted non-root clip was already
+		// navigated by actionGotoFrame's g_current_context branch — set play on
+		// the clip's sprite entry rather than resuming the ROOT timeline.
+		// Mirrors the NG/OFFSCREEN base_clip branch above.
+		if (!ng_isInsideSprite() && g_current_context != NULL &&
+		    g_current_context != &root_movieclip) {
 			size_t _pd = ng_findDisplayEntryByName(g_current_context->name);
 			if (_pd != SIZE_MAX)
 				display_list[_pd].sprite_is_playing = 1;

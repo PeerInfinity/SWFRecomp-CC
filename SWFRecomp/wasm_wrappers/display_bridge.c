@@ -42,6 +42,25 @@ extern RenderContext* context;
 
 static char json_buf[8192];
 
+/* DEBUG: report root timeline state (Pacman play-button-bounce diagnosis). */
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+int dbgRootFrame(void)
+{
+    extern size_t current_frame;   /* the true root playhead (swf.c) */
+    return (int)current_frame;
+}
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+int dbgIsPlaying(void)
+{
+    extern int is_playing;
+    return is_playing;
+}
+
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 #endif
