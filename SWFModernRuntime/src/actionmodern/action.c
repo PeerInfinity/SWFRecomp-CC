@@ -41510,6 +41510,22 @@ void actionSetVariable(SWFAppContext* app_context)
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser-WASM only: a `with(_root)` scope must NOT capture the write on
+		// the root wrapper's property store (root_movieclip.dynamic_props). In
+		// browser-WASM `_root` resolves to a heap wrapper whose dynamic_props is
+		// synced one-way from the global var_map, where root timeline variables
+		// actually live — so capturing here diverges the two stores and the game's
+		// bare-name reads (var_map) never see the written value. Skip it so the
+		// write falls through to the canonical global var_map write below (which
+		// also syncs back to root dynamic_props). NG/OFFSCREEN resolve `_root`
+		// consistently and must keep the existing path (set_variable_scope).
+		// Pacman's keyDown handler runs `with(_root){ nextPacDir = N }`; without
+		// this, arrow-key steering was written to dynamic_props only and the game
+		// kept reading the stale var_map value, so the keys did nothing.
+		if (scope_is_with[i] && scope_mc[i] == &root_movieclip)
+			continue;
+#endif
 		if (scope_chain[i] != NULL)
 		{
 			// Check for addProperty setter in scope chain
@@ -41597,15 +41613,32 @@ void actionSetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Inside tellTarget (non-root context): set on target clip's properties
-	if (g_current_context != NULL && g_current_context != &root_movieclip)
+	// Browser-WASM only: AVM1 `with(MovieClip)` retargets unqualified variable
+	// access to that clip's timeline, so an active innermost with-scope MovieClip
+	// takes precedence over the raw execution context as the write target.
+	// Without this, a clip-event handler's `with(_root){ nextPacDir = 0 }` fell
+	// through to g_current_context (the handler's own clip) and created the
+	// variable there instead of on _root, where the game reads it — Pacman's
+	// keyDown steering never took effect. NG/OFFSCREEN keep the existing context
+	// target (set_variable_scope).
+	MovieClip* _uq_target = g_current_context;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	for (int _wi = scope_depth - 1; _wi >= 0; _wi--) {
+		if (scope_is_with[_wi] && scope_mc[_wi] != NULL) { _uq_target = scope_mc[_wi]; break; }
+	}
+#endif
+
+	// Inside tellTarget / with(non-root clip): set on target clip's properties.
+	// (_uq_target == &root_movieclip falls through to the global var_map write
+	// below — root timeline variables live there, not in a wrapper object.)
+	if (_uq_target != NULL && _uq_target != &root_movieclip)
 	{
 		// Ensure target clip has dynamic_props
-		if (g_current_context->dynamic_props == NULL)
+		if (_uq_target->dynamic_props == NULL)
 		{
-			g_current_context->dynamic_props = (void*) allocObject(app_context, 8);
+			_uq_target->dynamic_props = (void*) allocObject(app_context, 8);
 		}
-		ASObject* clip_props = (ASObject*) g_current_context->dynamic_props;
+		ASObject* clip_props = (ASObject*) _uq_target->dynamic_props;
 		ActionVar value_var;
 		peekVar(app_context, &value_var);
 		// Check for addProperty setter on dynamic_props prototype chain
@@ -41617,14 +41650,14 @@ void actionSetVariable(SWFAppContext* app_context)
 			// the CONSTRUCT-time setter call may still store shadow state that the
 			// registered-class constructor reads. Replay re-fires the setter after
 			// the constructor has built _vp / _ncMgr / etc.
-			actionCaptureConstructSetVar(g_current_context, var_name, var_name_len, &value_var);
+			actionCaptureConstructSetVar(_uq_target, var_name, var_name_len, &value_var);
 			POP_2();
 			// Use g_event_this_mc so the setter's preload_this gets MOVIECLIP type
 			// (passing mc directly as this_obj would make it ACTION_STACK_VALUE_OBJECT
 			// in the generated function's preload code, but MovieClip* != ASObject*)
 			extern MovieClip* g_event_this_mc;
 			MovieClip* saved_event_this = g_event_this_mc;
-			g_event_this_mc = g_current_context;
+			g_event_this_mc = _uq_target;
 			invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, NULL, &value_var);
 			g_event_this_mc = saved_event_this;
 			return;

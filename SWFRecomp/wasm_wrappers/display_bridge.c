@@ -61,6 +61,15 @@ int dbgIsPlaying(void)
     return is_playing;
 }
 
+/* DEBUG: last key code seen by the runtime (keyboard-input diagnosis). */
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+int dbgLastKey(void)
+{
+    return app_context.keys.last_key_down;
+}
+
 /* DEBUG: read a clip's AS-state (x,y,as_set_flags) via the SAME lookup the
  * renderer uses (actionFindMovieClipByName). Format: "x,y,flags,hasDisplayObj".
  * Pacman gameplay diagnosis. */
