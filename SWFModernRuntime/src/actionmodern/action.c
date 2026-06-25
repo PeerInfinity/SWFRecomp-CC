@@ -41613,18 +41613,26 @@ void actionSetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Browser-WASM only: AVM1 `with(MovieClip)` retargets unqualified variable
-	// access to that clip's timeline, so an active innermost with-scope MovieClip
-	// takes precedence over the raw execution context as the write target.
-	// Without this, a clip-event handler's `with(_root){ nextPacDir = 0 }` fell
-	// through to g_current_context (the handler's own clip) and created the
-	// variable there instead of on _root, where the game reads it — Pacman's
-	// keyDown steering never took effect. NG/OFFSCREEN keep the existing context
-	// target (set_variable_scope).
+	// Browser-WASM only: if the INNERMOST with-scope is `_root`, force the
+	// unqualified write target to root (its var_map) even from a non-root
+	// execution context — e.g. a clip-event handler's `with(_root){ nextPacDir =
+	// 0 }`, whose g_current_context is the handler's own clip, must write to
+	// _root where the game reads it (Pacman keyDown steering).
+	//
+	// Do NOT retarget to a NON-root with-MC: an unqualified name not found on it
+	// resolves to the outer scope (root), per AVM1 `with` semantics. Retargeting
+	// broke `with(Pacman){ pacPos--; pacX = nextX }` — pacPos/pacX/pacY are _root
+	// variables, and writing them onto the Pacman clip froze the grid logic (no
+	// dot-eating / wall collision / vertical turns) while _x (a builtin, handled
+	// in the scope loop) still moved the sprite. NG/OFFSCREEN keep the existing
+	// context target (set_variable_scope).
 	MovieClip* _uq_target = g_current_context;
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	for (int _wi = scope_depth - 1; _wi >= 0; _wi--) {
-		if (scope_is_with[_wi] && scope_mc[_wi] != NULL) { _uq_target = scope_mc[_wi]; break; }
+		if (scope_is_with[_wi] && scope_mc[_wi] != NULL) {
+			if (scope_mc[_wi] == &root_movieclip) _uq_target = &root_movieclip;
+			break;  // innermost with-scope decides; outer scopes don't override
+		}
 	}
 #endif
 
