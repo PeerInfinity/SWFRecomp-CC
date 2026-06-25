@@ -58903,11 +58903,20 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			if (_mc_target != NULL) {
 				if (_is_mc_nav == 1 && num_args >= 1) {
-					// gotoAndStop / gotoAndPlay
+					// gotoAndStop / gotoAndPlay — all modes. Was
+					// #if NO_GRAPHICS||OFFSCREEN-gated, so in browser-WASM an
+					// unqualified gotoAndStop/Play inside `with(mc){ ... }` (which
+					// compiles to CallFunction("gotoAndStop", ...) with no explicit
+					// receiver) resolved the with-scope target MC above but then
+					// NEVER navigated it. That left Pacman's ghost blue-revert
+					// `with(Ghost[g]){ gotoAndStop(1) }` a no-op: after the power
+					// pellet wore off the ghosts stayed on frame 2 (scared face),
+					// stayed edible, and kept fleeing (chase-vs-flee and the
+					// die-vs-eat collision are gated on `_currentframe == 1`).
+					// ng_gotoFrameByMC / actionGotoFrame both work in browser-WASM.
 					s32 _gf = (s32)varToDouble(&args[0]);
 					if (_gf > 0) {
 						u16 _gf0 = (u16)(_gf - 1);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						extern MovieClip root_movieclip;
 						if (_mc_target == &root_movieclip) {
 							actionGotoFrame(app_context, _gf0);
@@ -58915,7 +58924,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						} else {
 							ng_gotoFrameByMC(app_context, _mc_target, _gf0, _mc_nav_play);
 						}
-#endif
 					}
 				} else if (_is_mc_nav == 2) {
 					// stop — no-op for dynamic clips (they don't advance)
