@@ -87,6 +87,43 @@ const char* dbgClipInfo(const char* name)
     return buf;
 }
 
+/* DEBUG: dump an attached/child clip's state by instance name (ghost diagnosis):
+ * "x,y parent=NAME ghX=.. ghY=.. ghDir=.. ghPos=..". Searches child_mc_cache. */
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+const char* dbgChildState(const char* name)
+{
+    static char buf[256];
+    extern MovieClip* child_mc_cache[];
+    extern int child_mc_count;
+    MovieClip* mc = NULL;
+    /* Prefer a match whose parent is the game "Ghost" container (the attract
+     * demo's "G" container also holds clips named 1..4). */
+    for (int i = 0; i < child_mc_count; i++) {
+        MovieClip* c = child_mc_cache[i];
+        if (c != NULL && c->name[0] != '\0' && strcmp(c->name, name) == 0) {
+            if (c->parent != NULL && strcmp(c->parent->name, "Ghost") == 0) { mc = c; break; }
+            if (mc == NULL) mc = c;  /* fallback */
+        }
+    }
+    if (!mc) { snprintf(buf, sizeof(buf), "NOT_FOUND"); return buf; }
+    double v[5] = {-9, -9, -9, -9, -9};
+    const char* names[5] = {"ghX", "ghY", "ghDir", "ghPos", "gNum"};
+    extern ActionVar* getProperty(void* obj, const char* name, unsigned name_length);
+    extern double varToDoubleSWF(SWFAppContext*, ActionVar*, int);
+    if (mc->dynamic_props != NULL) {
+        for (int k = 0; k < 5; k++) {
+            ActionVar* p = getProperty(mc->dynamic_props, names[k], (unsigned)strlen(names[k]));
+            if (p) v[k] = varToDoubleSWF(&app_context, p, 6);
+        }
+    }
+    const char* pn = (mc->parent && mc->parent->name[0]) ? mc->parent->name : "(root/none)";
+    snprintf(buf, sizeof(buf), "x=%.1f y=%.1f parent=%s ghX=%.0f ghY=%.0f ghDir=%.0f ghPos=%.0f gNum=%.0f",
+             mc->x, mc->y, pn, v[0], v[1], v[2], v[3], v[4]);
+    return buf;
+}
+
 /* DEBUG: read a _root global variable as a number (Pacman gameplay diagnosis). */
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
