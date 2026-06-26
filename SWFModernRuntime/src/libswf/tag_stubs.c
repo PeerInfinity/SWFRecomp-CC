@@ -1151,15 +1151,31 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		// depth-1 establishing place). Deriving `current` from the displayed
 		// frame fixes both. (mc->currentframe-1 is the same value, un-wrapped,
 		// and the caller's no-op guard already trusts it.)
+		// Intermediate frames of a goto build display state but must NOT run their
+		// DoActions (Flash semantics — only the target frame's script runs). Sprite
+		// frame functions queue their script under the recompiler-emitted
+		// `!catch_up_mode` gate, so running the in-between frames with catch_up_mode=1
+		// suppresses that queuing; the target frame runs with the saved mode so its
+		// script queues normally. Without this, the intermediate scripts queue and
+		// drain AFTER this goto set sprite_is_playing — e.g. a backward
+		// gotoAndPlay re-runs frame 1's stop() (Pacman BGSnd "NewLife" resume never
+		// reached frame 87, freezing the game at "Get Ready"), and a forward goto
+		// re-runs an in-between self-loop gotoAndPlay (Pacman's frame-5
+		// gotoAndPlay(1) bounced the Die animation). Mirrors advance_sprite_frames'
+		// manual-nav backward replay, which already forces catch_up_mode=1.
+		extern int catch_up_mode;
+		int _gfbmc_saved_cm = catch_up_mode;
 		size_t current = (fc > 0) ? ((obj->sprite_current_frame + fc - 1) % fc) : 0;
 		if (frame > current)
 		{
 			// Forward jump: execute frames current+1..frame
 			for (size_t f = current + 1; f <= frame; f++)
 			{
+				catch_up_mode = (f < frame) ? 1 : _gfbmc_saved_cm;
 				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
 					exec_sprite_frame(app_context, obj, ch->sprite_frame_funcs[f]);
 			}
+			catch_up_mode = _gfbmc_saved_cm;
 		}
 		else if (frame < current)
 		{
@@ -1177,9 +1193,11 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 
 			for (size_t f = 0; f <= frame; f++)
 			{
+				catch_up_mode = (f < frame) ? 1 : _gfbmc_saved_cm;
 				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
 					exec_sprite_frame(app_context, obj, ch->sprite_frame_funcs[f]);
 			}
+			catch_up_mode = _gfbmc_saved_cm;
 		}
 		else
 		{
