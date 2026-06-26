@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-06-26T02:12:55.157444+00:00",
-    "git_sha": "a9a13cf7522bd17be973c5cf740122a57906c202",
-    "duration_seconds": 400.45,
+    "timestamp": "2026-06-26T18:47:43.156142+00:00",
+    "git_sha": "1af043d3e7c74ac53fc5b13237b97af4d5f6a361",
+    "duration_seconds": 391.79,
     "total_available": 20,
     "shards": 30,
     "expected_shards": 30
@@ -20,7 +20,7 @@
       "test": "afunc_dict",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.88,
+        "compile": 20.937,
         "run": 0.002
       },
       "num_frames": 30,
@@ -29,14 +29,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.89,
+      "duration": 20.94,
       "status": "pass"
     },
     {
       "test": "background",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.353,
+        "compile": 21.393,
         "run": 0.002
       },
       "num_frames": 30,
@@ -45,14 +45,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.36,
+      "duration": 21.4,
       "status": "pass"
     },
     {
       "test": "dict_callframe",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.499,
+        "compile": 21.537,
         "run": 0.002
       },
       "num_frames": 30,
@@ -61,14 +61,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 20.5,
+      "duration": 21.54,
       "status": "pass"
     },
     {
       "test": "dict_cross",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.367,
+        "compile": 19.351,
         "run": 0.002
       },
       "num_frames": 30,
@@ -77,14 +77,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 21.37,
+      "duration": 19.36,
       "status": "pass"
     },
     {
       "test": "dict_event",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.187,
+        "compile": 20.087,
         "run": 0.002
       },
       "num_frames": 30,
@@ -93,46 +93,14 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 22.19,
+      "duration": 20.09,
       "status": "pass"
     },
     {
       "test": "dict_override",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.197,
-        "run": 0.001
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 19.2,
-      "status": "pass"
-    },
-    {
-      "test": "func_dict",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 19.144,
-        "run": 0.001
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 19.15,
-      "status": "pass"
-    },
-    {
-      "test": "initaction_in_definesprite",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 19.756,
+        "compile": 19.596,
         "run": 0.002
       },
       "num_frames": 30,
@@ -141,14 +109,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.76,
+      "duration": 19.6,
       "status": "pass"
     },
     {
-      "test": "jump_after_end",
+      "test": "func_dict",
       "phases": {
         "recomp": 0.0,
-        "compile": 18.875,
+        "compile": 15.803,
         "run": 0.001
       },
       "num_frames": 30,
@@ -157,14 +125,46 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 18.88,
+      "duration": 15.81,
+      "status": "pass"
+    },
+    {
+      "test": "initaction_in_definesprite",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.813,
+        "run": 0.002
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 19.82,
+      "status": "pass"
+    },
+    {
+      "test": "jump_after_end",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.913,
+        "run": 0.001
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 19.92,
       "status": "pass"
     },
     {
       "test": "jump_to_prev_block",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.142,
+        "compile": 20.255,
         "run": 0.002
       },
       "num_frames": 30,
@@ -173,14 +173,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 20.15,
+      "duration": 20.26,
       "status": "pass"
     },
     {
       "test": "missing_bitmap",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.662,
+        "compile": 20.658,
         "run": 0.002
       },
       "num_frames": 30,
@@ -189,15 +189,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.67,
+      "duration": 20.66,
       "status": "pass"
     },
     {
       "test": "mixed-bytecode-as2",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.655,
-        "run": 0.001
+        "compile": 19.627,
+        "run": 0.002
       },
       "num_frames": 30,
       "lines": {
@@ -205,14 +205,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 19.66,
+      "duration": 19.63,
       "status": "pass"
     },
     {
       "test": "registers",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.471,
+        "compile": 21.664,
         "run": 0.002
       },
       "num_frames": 30,
@@ -221,14 +221,14 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 20.48,
+      "duration": 21.67,
       "status": "pass"
     },
     {
       "test": "tags_after_last_showframe",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.044,
+        "compile": 19.584,
         "run": 0.002
       },
       "num_frames": 30,
@@ -237,14 +237,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 20.05,
+      "duration": 19.59,
       "status": "pass"
     },
     {
       "test": "trace-as2/arguments",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.36,
+        "compile": 20.505,
         "run": 0.002
       },
       "num_frames": 30,
@@ -253,15 +253,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 19.37,
+      "duration": 20.51,
       "status": "pass"
     },
     {
       "test": "trace-as2/root_onload",
       "phases": {
         "recomp": 0.005,
-        "compile": 19.531,
-        "run": 0.002
+        "compile": 18.927,
+        "run": 0.001
       },
       "num_frames": 30,
       "lines": {
@@ -269,14 +269,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 19.54,
+      "duration": 18.94,
       "status": "pass"
     },
     {
       "test": "trace-as2/shortstack",
       "phases": {
         "recomp": 0.004,
-        "compile": 19.329,
+        "compile": 19.38,
         "run": 0.001
       },
       "num_frames": 30,
@@ -285,14 +285,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.34,
+      "duration": 19.39,
       "status": "pass"
     },
     {
       "test": "trace-as2/super",
       "phases": {
         "recomp": 0.005,
-        "compile": 19.575,
+        "compile": 19.403,
         "run": 0.002
       },
       "num_frames": 30,
@@ -301,14 +301,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 19.58,
+      "duration": 19.41,
       "status": "pass"
     },
     {
       "test": "trace-as2/this",
       "phases": {
         "recomp": 0.005,
-        "compile": 19.646,
+        "compile": 19.795,
         "run": 0.002
       },
       "num_frames": 30,
@@ -317,14 +317,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 19.66,
+      "duration": 19.81,
       "status": "pass"
     },
     {
       "test": "zeroframe_definesprite",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.467,
+        "compile": 12.292,
         "run": 0.002
       },
       "num_frames": 30,
@@ -333,7 +333,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 19.47,
+      "duration": 12.3,
       "ruffle_diff_count": 2,
       "ours_diff_count": 2,
       "status": "ruffle_matched",
