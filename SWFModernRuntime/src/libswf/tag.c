@@ -10195,10 +10195,14 @@ void tagVideoFrame(SWFAppContext* app_context, u16 char_id, u16 frame_num,
 #endif
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Returns 1 if any multi-frame sprite at root level is playing or has pending navigation.
 // A sprite with sprite_manual_next_frame=1 has a pending gotoAndStop/gotoAndPlay that
 // advance_sprite_frames must process, even if sprite_is_playing is false.
+//
+// Compiled for ALL graphics modes (browser-WASM included), not just headless:
+// swf.c's frame-loop keep-alive gate calls it in every build so a non-looping
+// root that set quit_swf keeps ticking while a sprite still plays. Reads only
+// display_list/max_depth/dictionary, all present in the graphics build.
 int hasPlayingSprites(void)
 {
 	for (size_t i = 1; i <= max_depth; i++)
@@ -10237,6 +10241,7 @@ int hasClipEnterFrameHandlers(void)
 	return hasClipEnterFrameHandlers_impl(display_list, max_depth);
 }
 
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Run deferred sprite-init with optional frame filter.
 // filter_mode: 0=all, 1=only placed_at_frame < target, 2=only placed_at_frame >= target
 static void ng_run_deferred_sprite_init_impl(SWFAppContext* app_context, int filter_mode, size_t target_frame)

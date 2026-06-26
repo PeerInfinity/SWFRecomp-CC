@@ -359,7 +359,6 @@ void tagMain(SWFAppContext* app_context)
 		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
 		{ extern size_t g_tick_count; g_tick_count++; }
 
-#ifdef OFFSCREEN_RENDER
 		// Mirror swf_core.c's exit condition (around line 1056). The
 		// recompiler-emits `quit_swf = 1` at the end of the last root
 		// frame, but multi-frame sprites placed by that frame still need
@@ -374,6 +373,16 @@ void tagMain(SWFAppContext* app_context)
 		// to fire the child's init+frame0 (drops the "Child movie loaded!"
 		// trace line in avm1/loadmovie and the loadmovie/loadmovienum
 		// cluster). Mirrors swf_core.c (line ~1064).
+		//
+		// This applies to BOTH the headless graphics-native (OFFSCREEN_RENDER)
+		// build AND the browser-WASM build. Browser-WASM previously used a bare
+		// `if (quit_swf) break;`, which terminated the whole game loop the tick
+		// after a non-looping (e.g. single-frame) root set quit_swf — killing
+		// `_root.onEnterFrame`-driven games (Metanet's "N": frame_1 sets
+		// `_root.onEnterFrame = RunApp` then quit_swf, so the demo + all menu
+		// input died after ~2 ticks). Keeping the loop alive while a handler,
+		// sprite, timer, sound, or pending load is still live is exactly the
+		// headless behavior, so the two paths are now unified.
 		{
 			extern int hasPlayingSounds(void);
 			extern int hasActiveNetStreams(void);
@@ -388,10 +397,20 @@ void tagMain(SWFAppContext* app_context)
 			// before input_events_pump_tick gets to deliver the queued
 			// events. Key test: avm1/hittest_morph_input — onRollOver
 			// queued for MouseMove (180,160) never fired.
+			//
+			// The preloaded-event queue (g_event_count/g_event_pos) only exists
+			// in the headless graphics-native build; browser-WASM delivers mouse/
+			// key events live via the render_webgpu.c emscripten callbacks, so
+			// there is no queue to drain (treat as already drained).
+#ifdef OFFSCREEN_RENDER
 			extern size_t g_event_count;
 			extern size_t g_event_pos;
+			int events_drained = (g_event_pos >= g_event_count);
+#else
+			int events_drained = 1;
+#endif
 			if (quit_swf
-			    && g_event_pos >= g_event_count
+			    && events_drained
 			    && !actionHasEnterFrameHandlers()
 			    && !hasPlayingSprites()
 			    && !hasActiveTimers()
@@ -417,7 +436,7 @@ void tagMain(SWFAppContext* app_context)
 			{
 				extern int g_force_quit;
 				if (g_force_quit
-				    && g_event_pos >= g_event_count
+				    && events_drained
 				    && !actionHasEnterFrameHandlers()
 				    && !hasActiveTimers()
 				    && !hasPlayingSounds()
@@ -425,9 +444,6 @@ void tagMain(SWFAppContext* app_context)
 				    && !hasClipEnterFrameHandlers()) break;
 			}
 		}
-#else
-		if (quit_swf) break;
-#endif
 
 #ifdef __EMSCRIPTEN__
 		double frame_start = emscripten_get_now();

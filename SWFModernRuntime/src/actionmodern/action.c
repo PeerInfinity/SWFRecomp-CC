@@ -21009,7 +21009,17 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 // alongside the game/menu chrome MCs exceeds the old 512 cap (the last ~22 cells
 // were dropped → a partly-blank board). The add path below also reuses NULL
 // (removed) slots so deleteCells+rebuild on Restart doesn't grow the table.
-#define MAX_CHILD_MOVIECLIPS 1024
+// 4096 (was 1024): tile-heavy games saturate the cache with their own live
+// clips, after which later-created clips can't register — so their AS2 button
+// handlers (onPress/onRelease/onRollOver) are never hit-tested and parent[child]
+// / dynamic-prop lookups return undefined. Metanet's "N" places a 31×23 = 713-
+// cell tilemap plus a ~30-part demo ninja and particle effects that run behind
+// the main menu, filling all 1024 slots before the menu's button clips are
+// placed — so the menu was completely unclickable. The dispatch/enumeration
+// loops iterate `child_mc_count` (the live high-water mark), not this cap, so a
+// larger ceiling costs nothing for the vast majority of content that stays well
+// under it. See memory `child-mc-cache-cap-resolution` (prior 128→512→1024 raises).
+#define MAX_CHILD_MOVIECLIPS 4096
 MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
 int child_mc_count = 0;
 // MCs at index >= this threshold were just placed in the current frame's
@@ -71248,7 +71258,6 @@ void actionDispatchMCPress(SWFAppContext* app_context)
 {
 	float mx = app_context->mouse.stage_x / 20.0f;  // stage_x is in twips; convert to pixels
 	float my = app_context->mouse.stage_y / 20.0f;
-
 
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
