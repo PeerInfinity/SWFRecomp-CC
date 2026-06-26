@@ -71019,6 +71019,36 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 				if (child_ymax > bymax) bymax = child_ymax;
 			}
 		}
+
+		// The per-child scan above skips SPRITE children (ng_getCharBoundsForRatio
+		// has no intrinsic bounds for a sprite), so a clip whose visible body is a
+		// nested sprite gets a hit area covering only its shape/textfield children.
+		// Metanet "N" level buttons (DefineSprite_295) are exactly this: a small
+		// `num` EditText (≈16×15px) plus a `gfx` border SPRITE that IS the visible
+		// button — so the AABB was just the number and most clicks missed it. Union
+		// the renderer's recursive content bounds, which DOES descend into child
+		// sprites and applies their placement transforms, so the hit area matches
+		// what's drawn. (Union, not replace: only ever grows the area, so existing
+		// button clips keep their current hit region.)
+		{
+			extern int sprite_content_bounds_twips(DisplayObject*, size_t, float*, float*, float*, float*);
+			float scx0, scx1, scy0, scy1;
+			if (sprite_content_bounds_twips(sdl, sdl_max, &scx0, &scx1, &scy0, &scy1)) {
+				float lx0 = scx0 / 20.0f, lx1 = scx1 / 20.0f;
+				float ly0 = scy0 / 20.0f, ly1 = scy1 / 20.0f;
+				if (lx0 > lx1) { float t = lx0; lx0 = lx1; lx1 = t; }
+				if (ly0 > ly1) { float t = ly0; ly0 = ly1; ly1 = t; }
+				if (!has_bounds) {
+					bxmin = lx0; bxmax = lx1; bymin = ly0; bymax = ly1;
+					has_bounds = 1;
+				} else {
+					if (lx0 < bxmin) bxmin = lx0;
+					if (lx1 > bxmax) bxmax = lx1;
+					if (ly0 < bymin) bymin = ly0;
+					if (ly1 > bymax) bymax = ly1;
+				}
+			}
+		}
 	}
 
 	// Include bounds of dynamically-created child MCs (from child_mc_cache).
