@@ -72626,8 +72626,11 @@ static int mc_is_focusable_by_click(MovieClip* mc)
 	if (mc->ng_textfield_idx >= 0) {
 		// SWF-defined text field: focusable if selectable (or editable)
 		u16 flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
-		// Bit 0x0004 = noSelect (inverse of selectable)
-		if (flags & 0x0004) return 0;
+		// Bit 0x0010 = NoSelect (inverse of selectable); see swf.cpp packed_flags
+		// (0x0004 is Password). A NoSelect field is not focusable/selectable, so
+		// the I-beam cursor must not appear over it (N's read-only `num` label
+		// inside each level button is NoSelect+ReadOnly).
+		if (flags & 0x0010) return 0;
 		return 1;
 	}
 	if (mc->ng_textfield_idx == -2) {
@@ -72690,7 +72693,7 @@ int actionMouseOverFocusableTextField(SWFAppContext* app_context)
 		int tf_idx = ng_getTextFieldIdx(di);
 		if (tf_idx < 0) continue;
 		u16 flags = ng_getTextFieldFlags(tf_idx);
-		if (flags & 0x0004) continue;  // noSelect → not focusable
+		if (flags & 0x0010) continue;  // NoSelect → not focusable (0x0004 is Password)
 		s32 bxmin, bxmax, bymin, bymax;
 		ng_getTextFieldBounds(tf_idx, &bxmin, &bxmax, &bymin, &bymax);
 		float tx = display_list[di].place_tx, ty = display_list[di].place_ty;

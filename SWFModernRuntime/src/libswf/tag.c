@@ -3026,6 +3026,15 @@ static Character* resolve_hit_shape(size_t hit_char_id, u32* out_hit_transform_i
 	return NULL;
 }
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+// Browser-WASM only: also update DefineButton2 states inside attachMovie'd /
+// createEmptyMovieClip'd clips (child_mc_cache), which live outside the root
+// display_list. Defined below, after compute_mc_world_xform/render_attached_child.
+// Gated like the AS2-button-fire block below — NO_GRAPHICS / OFFSCREEN / HEADLESS
+// dispatch attached-clip buttons via their own per-event / process_sprite path.
+static void ng_update_button_states_attached(SWFAppContext* app_context, int* found_hover);
+#endif
+
 // Button hit testing + state machine + action dispatch.
 // Runs on every mouse event (in NO_GRAPHICS mode) so that transitions fire
 // on the correct per-event boundary (e.g. MOUSE_MOVE → OverUp, then
@@ -3619,6 +3628,12 @@ int ng_update_button_states(SWFAppContext* app_context)
 		identity, &root_movieclip,
 		NULL,
 		&found_hover);
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	// Browser-WASM: the root display_list above misses DefineButton2 buttons
+	// that live inside attachMovie'd / createEmptyMovieClip'd clips (e.g. N's
+	// entire menuMC UI). Walk those too.
+	ng_update_button_states_attached(app_context, &found_hover);
+#endif
 	return found_hover;
 }
 
@@ -5061,6 +5076,60 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	render_display_list(app_context, d->sprite_display_list,
 		d->sprite_max_depth);
 }
+
+#if !defined(NO_GRAPHICS)
+// Update DefineButton2 hover/press/release state for buttons that live inside
+// attachMovie'd / createEmptyMovieClip'd clips (child_mc_cache), which are NOT
+// in the root display_list and so are missed by ng_update_button_states' root
+// walk. Mirrors render_attached_child's per-clip eligibility (skip
+// root-timeline-placed and timeline-NESTED clips — those are already covered by
+// the root walk / their ancestor's recursion — and hidden subtrees) and world
+// transform, then runs the same recursive button state machine on each
+// attached clip's sprite_display_list. Threads found_hover so the cursor +
+// topmost-button semantics stay consistent. (N's main menu — menuMC built via
+// gfx.CreateSprite = buffer.attachMovie — was entirely unreachable before this,
+// so its H/S/Q/N menu clicks were dead while keyboard worked.)
+static void ng_update_button_states_attached(SWFAppContext* app_context, int* found_hover)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->display_obj == NULL || !mc->visible) continue;
+		DisplayObject* d = (DisplayObject*)mc->display_obj;
+		if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) continue;
+		uintptr_t dobj = (uintptr_t)d;
+		// Skip root-timeline-placed clips (covered by the root walk).
+		uintptr_t dl_lo = (uintptr_t)display_list;
+		uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
+		if (dobj >= dl_lo && dobj < dl_hi) continue;
+		// Skip timeline-NESTED clips (already reached via an ancestor's recursion).
+		int nested = 0;
+		for (MovieClip* anc = mc->parent; anc != NULL && anc != &root_movieclip; anc = anc->parent) {
+			DisplayObject* ad = (DisplayObject*)anc->display_obj;
+			if (ad == NULL || ad->sprite_display_list == NULL) continue;
+			uintptr_t alo = (uintptr_t)ad->sprite_display_list;
+			uintptr_t ahi = alo + (uintptr_t)ad->sprite_dl_capacity * sizeof(DisplayObject);
+			if (dobj >= alo && dobj < ahi) { nested = 1; break; }
+		}
+		if (nested) continue;
+		// Skip clips whose parent chain is hidden.
+		int hidden_anc = 0;
+		for (MovieClip* a = mc->parent; a != NULL && a != &root_movieclip; a = a->parent)
+			if (!a->visible) { hidden_anc = 1; break; }
+		if (hidden_anc) continue;
+		// World transform of this attached clip (mirror render_attached_child).
+		float parent_world[16];
+		compute_mc_world_xform(app_context, mc->parent, parent_world);
+		float mc_local[16] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
+		apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
+		float mc_xform[16];
+		hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
+		ng_update_button_states_in_dl(app_context, d->sprite_display_list,
+			d->sprite_max_depth, mc_xform, mc, d, found_hover);
+	}
+}
+#endif // !NO_GRAPHICS
 #endif
 
 void tagShowFrame(SWFAppContext* app_context)
