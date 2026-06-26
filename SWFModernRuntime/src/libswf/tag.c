@@ -347,6 +347,21 @@ static size_t         g_btn_state_old_sprite_cf[BTN_STATE_SNAP_MAX];
 static u8             g_btn_state_old_sprite_playing[BTN_STATE_SNAP_MAX];
 static int    g_btn_state_active = 0;
 
+// Set while ng_update_button_states_attached walks DefineButton2 buttons that
+// live inside attachMovie'd / createEmptyMovieClip'd clips (child_mc_cache, e.g.
+// N's menu). For those, the per-state-change display-list REPOPULATION (running
+// button_state_funcs to swap UP/OVER/DOWN child graphics) corrupts the render —
+// the button's children are timeline-placed inside a nested sprite inside an
+// attached clip, and re-placing them every state change collides with
+// render_attached_child's compose pass (already-dynamic transform_ids get read
+// as CPU indices → garbage → the button renders blank, so hover makes N's menu
+// items vanish and an invisible button never completes its release transition,
+// killing the click). While this is set we KEEP the state transitions + action
+// dispatch (clicks fire) but SKIP the visual repopulation (button stays in its
+// initially-placed UP graphics). Trade-off: no hover color-shift animation for
+// attached-clip buttons — a separate deeper render fix would be needed for that.
+static int    g_btn_attached_walk = 0;
+
 // Phase 1e: transient enumeration of removed button-state children.
 // After a state transition, depths that had a child in the OLD state but
 // no longer match in the NEW state remain enumerable for one tick (mirrors
@@ -3266,8 +3281,10 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		obj->sticky_button_state = new_state;
 
 		// On state change, re-populate the button's persistent display list
-		// with the new state's children (shapes, sprites, etc.)
-		if (old_state != new_state)
+		// with the new state's children (shapes, sprites, etc.). Skipped for
+		// attached-clip buttons (see g_btn_attached_walk) where this corrupts the
+		// render; their state var + action dispatch below still run.
+		if (old_state != new_state && !g_btn_attached_walk)
 		{
 			// Allocate display list if needed
 			if (obj->sprite_display_list == NULL)
@@ -5125,8 +5142,10 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
 		apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
 		float mc_xform[16];
 		hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
+		g_btn_attached_walk = 1;
 		ng_update_button_states_in_dl(app_context, d->sprite_display_list,
 			d->sprite_max_depth, mc_xform, mc, d, found_hover);
+		g_btn_attached_walk = 0;
 	}
 }
 #endif // !NO_GRAPHICS
