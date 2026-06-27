@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-26T19:50:24.836754+00:00",
-    "old_git_sha": "2c07e01a5a02df3f9559a1cb2db1eea2f8f662bf",
-    "new_timestamp": "2026-06-26T21:31:09.666352+00:00",
-    "new_git_sha": "769d0a02274f2f578cb9ee422837bb329f471930",
+    "old_timestamp": "2026-06-26T21:31:09.666352+00:00",
+    "old_git_sha": "769d0a02274f2f578cb9ee422837bb329f471930",
+    "new_timestamp": "2026-06-27T21:52:43.343855+00:00",
+    "new_git_sha": "ca31201a1991d39a133e5515d36f214a0001ac20",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 63,
+    "old_pass": 66,
     "old_ruffle_matched": 28,
-    "old_effective_pass": 91,
-    "old_total": 107,
-    "old_pass_rate": 58.9,
+    "old_effective_pass": 94,
+    "old_total": 111,
+    "old_pass_rate": 59.5,
     "new_pass": 66,
     "new_ruffle_matched": 28,
     "new_effective_pass": 94,
@@ -25,54 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 107,
-    "added": 4,
+    "unchanged": 111,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "frame_label_test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "getTimer_test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "get_frame_number_test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      }
-    },
-    {
-      "test": "gotoFrame2Test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "timeout",
-      "old_lines": null,
-      "new_lines": null
-    }
-  ]
+  "changes": []
 }

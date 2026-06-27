@@ -1,130 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-26T19:50:24.826448+00:00",
-    "old_git_sha": "2c07e01a5a02df3f9559a1cb2db1eea2f8f662bf",
-    "new_timestamp": "2026-06-26T21:31:09.656062+00:00",
-    "new_git_sha": "769d0a02274f2f578cb9ee422837bb329f471930",
+    "old_timestamp": "2026-06-26T21:31:09.656062+00:00",
+    "old_git_sha": "769d0a02274f2f578cb9ee422837bb329f471930",
+    "new_timestamp": "2026-06-27T21:52:43.333345+00:00",
+    "new_git_sha": "ca31201a1991d39a133e5515d36f214a0001ac20",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 128,
-    "old_ruffle_matched": 94,
-    "old_effective_pass": 222,
-    "old_total": 235,
-    "old_pass_rate": 54.5,
+    "old_pass": 135,
+    "old_ruffle_matched": 95,
+    "old_effective_pass": 230,
+    "old_total": 243,
+    "old_pass_rate": 55.6,
     "new_pass": 135,
     "new_ruffle_matched": 95,
     "new_effective_pass": 230,
     "new_total": 243,
     "new_pass_rate": 55.6,
-    "old_mismatched_lines": 8669,
+    "old_mismatched_lines": 8690,
     "new_mismatched_lines": 8690,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 235,
-    "added": 8,
+    "unchanged": 243,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "Random-v5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      }
-    },
-    {
-      "test": "Random-v6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      }
-    },
-    {
-      "test": "Random-v7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      }
-    },
-    {
-      "test": "Random-v8",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      }
-    },
-    {
-      "test": "Rectangle-v5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "Rectangle-v6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "Rectangle-v7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "Rectangle-v8",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 166,
-        "expected_lines": 166,
-        "matching_lines": 145
-      }
-    }
-  ]
+  "changes": []
 }
