@@ -533,6 +533,24 @@ void tagMain(SWFAppContext* app_context)
 		}
 #endif
 
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+		// Browser-WASM: run the same pending-removal finalize + dead-child cascade
+		// the OFFSCREEN block above runs. Without it, nested timeline-placed
+		// children (auto-named "instanceN") of clips removed via removeMovieClip
+		// are never invalidated — they orphan in child_mc_cache (parent depth =
+		// INT_MIN but the child still live) and accumulate every frame. Metanet
+		// "N"'s title demo continuously spawns + removes objects/particles whose
+		// sub-clips leaked this way: the "instance" clip count climbed unbounded,
+		// ratcheting per-frame render/scan cost until the game froze. The cascade
+		// keys off parent->depth == INT_MIN, which removeMovieClip already sets, so
+		// it reaches every orphan + grandchild. (Mirrors swf_core.c / the OFFSCREEN
+		// path, which already call this each tick.)
+		{
+			extern void actionFinalizePendingRemovals(SWFAppContext* app_context);
+			actionFinalizePendingRemovals(app_context);
+		}
+#endif
+
 #ifndef OFFSCREEN_RENDER
 		// Per-frame AS2 input dispatch.
 		// In NO_GRAPHICS mode swf_core.c dispatches these per event; here we

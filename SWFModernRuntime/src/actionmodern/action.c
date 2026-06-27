@@ -65502,7 +65502,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					// Built-in MC method (e.g., removeMovieClip) applied to a target
 					if (apply_args != NULL) FREE(apply_args);
 					if (args != NULL) FREE(args);
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+					// Un-gated for browser-WASM (__EMSCRIPTEN__): this "built-in method
+					// applied to a target" dispatch is how `mc.removeMovieClip()` routes
+					// when `mc` is a function parameter (e.g. N's
+					// `gfx.DestroyMC(mc){ mc.swapDepths(..); mc.removeMovieClip(); }`
+					// during level teardown). It was NO_GRAPHICS/OFFSCREEN-only, so in
+					// the browser it was a complete no-op → level-object clips were never
+					// removed and accumulated across the title-demo's loops (Metanet "N":
+					// live clip count climbs unbounded → per-frame cost ratchets up → the
+					// game eventually freezes). The removal body below is mode-agnostic
+					// (MovieClip + child_mc_cache + display_list, all present in browser
+					// graphics) and identical to what the CI modes already run, so this is
+					// browser-only-additive and byte-identical in NO_GRAPHICS/OFFSCREEN.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) || defined(__EMSCRIPTEN__)
 					if (strcmp(func->name, "removeMovieClip") == 0) {
 						MovieClip* _apply_mc = apply_this_mc ? apply_this_mc : (MovieClip*)this_obj;
 						#ifndef AVM_MAX_REMOVE_DEPTH
