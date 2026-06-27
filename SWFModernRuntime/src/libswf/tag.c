@@ -5400,20 +5400,46 @@ void tagShowFrame(SWFAppContext* app_context)
 	// (after event delivery), and per-mouse-event from input_events_deliver().
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 	{
-		int any_hover = ng_update_button_states(app_context);
 #ifdef __EMSCRIPTEN__
-		// Cursor: hand/pointer over interactive buttons (any_hover), I-beam
-		// (text) over a focusable text field (e.g. an editable name box), else
-		// default. Buttons take precedence (a button over a field is still a
-		// click target). text-field check is skipped when a button is hovered.
-		int over_text = 0;
-		if (!any_hover) {
-			extern int actionMouseOverFocusableTextField(SWFAppContext*);
-			over_text = actionMouseOverFocusableTextField(app_context);
+		// Browser-WASM perf gate. The button-state hover walk
+		// (ng_update_button_states + _attached) recursively hit-tests interactive
+		// clips via mc_get_pixel_aabb_ng, which does an O(child_mc_count) scan per
+		// call — on Metanet "N" (1614+ clips) this was ~43% of frame CPU EVERY
+		// frame, even during keyboard gameplay with a stationary mouse. Button
+		// hover/press state only changes when the mouse moves or a button
+		// transitions (Flash updates hover on mouse move), so skip the walk on
+		// frames where neither the pointer position nor the button state changed,
+		// and keep the previous cursor. Non-browser graphics (OFFSCREEN/HEADLESS,
+		// the CI path) keep the unconditional walk below → byte-identical results,
+		// so this is NOT CI-observable and can't regress the trace suites. Known
+		// tradeoff (accepted): a button that moves under a perfectly stationary
+		// pointer won't re-evaluate rollover until the next pointer move/click.
+		static int s_pm_init = 0;
+		static float s_pm_x = 0.0f, s_pm_y = 0.0f;
+		static int s_pm_btn = 0;
+		float _cmx = app_context->mouse.stage_x, _cmy = app_context->mouse.stage_y;
+		int _cbtn = app_context->mouse.button_down;
+		int _mouse_changed = !s_pm_init || _cmx != s_pm_x || _cmy != s_pm_y ||
+		                     _cbtn != s_pm_btn || app_context->mouse.clicked ||
+		                     app_context->mouse.released;
+		s_pm_init = 1; s_pm_x = _cmx; s_pm_y = _cmy; s_pm_btn = _cbtn;
+		if (_mouse_changed) {
+			int any_hover = ng_update_button_states(app_context);
+			// Cursor: hand/pointer over interactive buttons (any_hover), I-beam
+			// (text) over a focusable text field (e.g. an editable name box), else
+			// default. Buttons take precedence (a button over a field is still a
+			// click target). text-field check is skipped when a button is hovered.
+			int over_text = 0;
+			if (!any_hover) {
+				extern int actionMouseOverFocusableTextField(SWFAppContext*);
+				over_text = actionMouseOverFocusableTextField(app_context);
+			}
+			EM_ASM({
+				document.getElementById('canvas').style.cursor = $0 ? 'pointer' : ($1 ? 'text' : 'default');
+			}, any_hover, over_text);
 		}
-		EM_ASM({
-			document.getElementById('canvas').style.cursor = $0 ? 'pointer' : ($1 ? 'text' : 'default');
-		}, any_hover, over_text);
+#else
+		ng_update_button_states(app_context);
 #endif
 	}
 #endif
