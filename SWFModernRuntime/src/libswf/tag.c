@@ -3534,7 +3534,24 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 					// AVM1 buttons run actions relative to their parent, not themselves.
 					MovieClip* saved_ctx = g_current_context;
 					DisplayObject* saved_sprite_obj = g_current_sprite_obj;
-					actionSetCurrentContext(parent_mc);
+					MovieClip* _btn_action_ctx = parent_mc;
+					// Attached-clip buttons (browser-WASM, e.g. N's menuMC, deeply
+					// nested under root via createEmptyMovieClip+attachMovie): resolve
+					// the action's unqualified variables/functions against ROOT, where
+					// AVM1 game globals live. Our function-call dispatch inherits the
+					// caller's g_current_context instead of switching to each callee's
+					// home timeline, so a `_root.foo()` chain run with parent_mc =
+					// instance31 (chid112) resolves `gui`/`userdata` on instance31 →
+					// undefined → no navigation. Root-placed DefineButton2 buttons
+					// already get root context (their parent IS root); this makes the
+					// nested ones behave the same. g_current_sprite_obj stays the
+					// enclosing sprite below, so bare Play/Stop/GotoFrame still target
+					// the button's own timeline. (g_btn_attached_walk is only ever set
+					// inside the browser-WASM attached-button walk → no effect in
+					// OFFSCREEN/NO_GRAPHICS.)
+					if (g_btn_attached_walk)
+						_btn_action_ctx = &root_movieclip;
+					actionSetCurrentContext(_btn_action_ctx);
 					// Establish the "current sprite" so a bare Play/Stop/GotoFrame
 					// in the button's action targets the timeline CONTAINING the
 					// button (AVM1 runs button actions relative to the parent
