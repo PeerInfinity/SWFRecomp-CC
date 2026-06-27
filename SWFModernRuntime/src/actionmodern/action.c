@@ -21610,9 +21610,16 @@ int actionNotifyPropertyChange(SWFAppContext* app_context, MovieClip* container,
 //
 // Idempotent: calling repeatedly is safe — the "variable" / "text" properties
 // on the TF are just overwritten with current values.
+// Bumped whenever a textfield's "variable" binding is (re)established. Invalidates
+// ng_syncVarToTextFields' bound-name fast-reject cache (see there). Bumping on
+// ADDITION is what matters for correctness; stale names left after a binding is
+// removed only cause a rare wasted full scan, never a missed sync.
+size_t g_tf_bound_gen = 0;
+
 int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc, int set_initial_value)
 {
 	if (tf_mc == NULL || tf_mc->ng_textfield_idx < 0) return 1;
+	g_tf_bound_gen++;   // a binding may be (re)established below — invalidate the fast-reject cache
 	ASObject* props = (ASObject*) tf_mc->dynamic_props;
 	if (props == NULL) return 1;
 
@@ -25539,6 +25546,52 @@ static void tf_condense_white(TFRunTable* table, int swf_version) {
 
 // Sync variable → all text fields bound to var_name
 // Called when a variable is set via SetVariable/DefineLocal/etc.
+// Fast-reject cache for ng_syncVarToTextFields. The sync below scans ALL
+// child_mc_cache clips (O(child_mc_count)) with a per-textfield "variable"
+// getProperty + u16_to_utf8 — on EVERY variable write. A heavy game's per-tick
+// scripts (Metanet "N"'s RunApp) do hundreds of writes, almost none to a
+// var-bound textfield, so this was ~11% of frame CPU (plus the string-conversion
+// cost it drove). Cache the set of "variable" binding strings of all bound
+// textfields; a write whose name isn't in the set skips the scan entirely.
+// Rebuilt only when g_tf_bound_gen changes (bumped at the two binding-add points
+// — actionTryBindTextFieldVariable + the runtime setMember "variable" path), so
+// the set never misses a live binding (additions bump; removals are harmless).
+#define TFBN_MAX 64
+#define TFBN_NAMELEN 64
+static char g_tfbn_names[TFBN_MAX][TFBN_NAMELEN];
+static int  g_tfbn_count = 0;
+static size_t g_tfbn_seen_gen = (size_t)-1;
+static int  g_tfbn_disabled = 0;   // too many / too-long names -> always scan (safe)
+static void tf_bound_names_rebuild(void)
+{
+	extern size_t g_tf_bound_gen;
+	g_tfbn_count = 0;
+	g_tfbn_disabled = 0;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN || mc->ng_textfield_idx < 0) continue;
+		ASObject* props = (ASObject*) mc->dynamic_props;
+		if (props == NULL) continue;
+		ActionVar* var_prop = getProperty(props, "variable", 8);
+		if (var_prop == NULL || var_prop->type != ACTION_STACK_VALUE_STRING) continue;
+		const uint16_t* u = varGetU16Ptr(var_prop);
+		if (!u || var_prop->str_size == 0) continue;
+		char buf[256];
+		u16_to_utf8(u, var_prop->str_size, buf, sizeof(buf));
+		if (buf[0] == '\0') continue;
+		if (strlen(buf) >= TFBN_NAMELEN || g_tfbn_count >= TFBN_MAX) { g_tfbn_disabled = 1; break; }
+		// Dedup (case-insensitively for swf<7, the same rule the scan matches with).
+		int dup = 0;
+		for (int k = 0; k < g_tfbn_count; k++) {
+			int m = (g_swf_version < 7) ? (strcasecmp(g_tfbn_names[k], buf) == 0)
+			                            : (strcmp(g_tfbn_names[k], buf) == 0);
+			if (m) { dup = 1; break; }
+		}
+		if (!dup) { strncpy(g_tfbn_names[g_tfbn_count], buf, TFBN_NAMELEN - 1); g_tfbn_names[g_tfbn_count][TFBN_NAMELEN-1] = '\0'; g_tfbn_count++; }
+	}
+	g_tfbn_seen_gen = g_tf_bound_gen;
+}
+
 static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_name, u32 var_name_len, ActionVar* value)
 {
 	(void)app_context;
@@ -25547,6 +25600,22 @@ static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_n
 	if (value->type == ACTION_STACK_VALUE_UNDEFINED ||
 	    value->type == ACTION_STACK_VALUE_HOLE)
 		return;
+
+	// Fast reject: if no bound textfield's "variable" matches var_name, skip the
+	// O(child_mc_count) scan below. Rebuilt lazily when a binding was added.
+	{
+		extern size_t g_tf_bound_gen;
+		if (g_tfbn_seen_gen != g_tf_bound_gen) tf_bound_names_rebuild();
+		if (!g_tfbn_disabled) {
+			int hit = 0;
+			for (int k = 0; k < g_tfbn_count; k++) {
+				int m = (g_swf_version < 7) ? (strcasecmp(g_tfbn_names[k], var_name) == 0)
+				                            : (strcmp(g_tfbn_names[k], var_name) == 0);
+				if (m) { hit = 1; break; }
+			}
+			if (!hit) return;
+		}
+	}
 
 	// Convert value to UTF-16 string for setting text. For non-STRING types
 	// that require a coercion with potential side effects (OBJECT invokes
@@ -48555,6 +48624,8 @@ void actionSetMember(SWFAppContext* app_context)
 			// TextField variable: changing binding breaks old, creates new
 			if (strcmp(prop_name, "variable") == 0 && mc->ng_textfield_idx >= 0 && mc->dynamic_props != NULL)
 			{
+				extern size_t g_tf_bound_gen;
+				g_tf_bound_gen++;   // runtime rebind — invalidate ng_syncVarToTextFields' fast-reject cache
 				// When variable binding changes: read new variable (or use initial text)
 				// and reset the text field, then create the variable if needed.
 				if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size > 0) {
