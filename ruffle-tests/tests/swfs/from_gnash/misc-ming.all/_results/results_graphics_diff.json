@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-26T21:31:09.666352+00:00",
-    "old_git_sha": "769d0a02274f2f578cb9ee422837bb329f471930",
-    "new_timestamp": "2026-06-27T21:52:43.343855+00:00",
-    "new_git_sha": "ca31201a1991d39a133e5515d36f214a0001ac20",
+    "old_timestamp": "2026-06-27T21:52:43.343855+00:00",
+    "old_git_sha": "ca31201a1991d39a133e5515d36f214a0001ac20",
+    "new_timestamp": "2026-06-27T22:54:37.983146+00:00",
+    "new_git_sha": "b7f1a17597345c97a18c8f624ed378415170ad4f",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 66,
@@ -13,11 +16,11 @@
     "old_effective_pass": 94,
     "old_total": 111,
     "old_pass_rate": 59.5,
-    "new_pass": 66,
+    "new_pass": 63,
     "new_ruffle_matched": 28,
-    "new_effective_pass": 94,
-    "new_total": 111,
-    "new_pass_rate": 59.5,
+    "new_effective_pass": 91,
+    "new_total": 107,
+    "new_pass_rate": 58.9,
     "old_mismatched_lines": 1211,
     "new_mismatched_lines": 1211,
     "increased_mismatches": 0,
@@ -25,9 +28,55 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 111,
+    "unchanged": 107,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 4
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "frame_label_test",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      },
+      "new_lines": null
+    },
+    {
+      "test": "getTimer_test",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "get_frame_number_test",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "new_lines": null
+    },
+    {
+      "test": "gotoFrame2Test",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "timeout",
+      "new_status": null,
+      "old_lines": null,
+      "new_lines": null
+    }
+  ]
 }
