@@ -1315,6 +1315,12 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 	obj->sprite_current_frame = (fc > 0) ? ((frame + 1) % fc) : 0;
 	obj->sprite_manual_next_frame = 0;
 	obj->sprite_is_playing = play ? 1 : 0;
+	// Browser-WASM: mark an explicit gotoAndPlay so advance_attached_clip_natural
+	// will play this STANDALONE attached clip forward (coins' "COLLECTED" disappear,
+	// drones' "prefire"). gotoAndStop (play=0) clears it. Harmless on timeline-placed
+	// clips — the pump only processes standalone attached clips (display_obj outside
+	// the global display_list), which advance_sprite_frames doesn't reach.
+	obj->goto_play_active = play ? 1 : 0;
 	mc->currentframe = (int)frame + 1;  // 1-indexed
 
 	// Propagate the updated display list to the parent's registration entry.

@@ -2155,6 +2155,109 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 		display_list = saved_dl;
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
+		// See advance_attached_clip_natural: a manual nav this tick must not also be
+		// auto-stepped this tick (gotoAndPlay(T) shows T now, plays T+1 next tick).
+		{ extern size_t g_tick_count; d->placed_at_tick = g_tick_count; }
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Browser-WASM per-tick forward play of EXPLICITLY gotoAndPlay'd attached clips.
+//
+// Browser-WASM has no auto-advance for standalone attachMovie'd clips' own
+// timelines (advance_attached_clip_frames only services pending MANUAL navs; the
+// OFFSCREEN ng_advance_attached_clip_playheads counter pump is gated out). So a
+// coin's mc.gotoAndPlay("COLLECTED") (GoldObject.Dissapear) or a drone's
+// gotoAndPlay("...prefire") jumps once via ng_gotoFrameByMC and then FREEZES — the
+// disappear/transition animation never plays, leaving the clip on screen forever
+// (visual bug + needless overdraw).
+//
+// SAFETY (this is v2 — v1 advanced ALL is_playing clips and ran their frame
+// scripts, which let timeIndicator-class GUI clips re-create child clips every
+// tick and exploded `bar` to the 4096 cap):
+//   * Only clips with goto_play_active (set ONLY by ng_gotoFrameByMC(play=1)) are
+//     touched — never default-is_playing GUI/HUD clips.
+//   * Frames run with catch_up_mode=1 → PLACEMENT TAGS ONLY, NO DoAction. Nothing
+//     can attachMovie/createEmptyMovieClip from a frame script, so no chain
+//     reaction. (Trade-off: an animation whose end-frame *script* does the next
+//     transition won't transition — it just animates to its last frame.)
+//   * child_mc_count is snapshotted before the loop, so any clip created this tick
+//     can't be swept into the same pass.
+//   * One-shot: when the playhead wraps to frame 0 the clip stops (no loop), so a
+//     gotoAndPlay to a label plays forward once and parks on its last frame
+//     (matches a disappear/transition ending in stop()).
+// Browser-WASM only (OFFSCREEN/HEADLESS keep their counter pump; NO_GRAPHICS not
+// built here) → CI byte-identical, not CI-observable.
+void advance_attached_clip_natural(SWFAppContext* app_context)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	extern size_t g_tick_count;
+	if (catch_up_mode) return;
+	uintptr_t dl_lo = (uintptr_t)display_list;
+	uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
+	int n = child_mc_count;   // snapshot: clips created this pass must not cascade in
+	for (int i = 0; i < n; i++)
+	{
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN || mc->avm1_removed) continue;
+		if (mc->display_obj == NULL) continue;
+		DisplayObject* d = (DisplayObject*)mc->display_obj;
+		if (!d->goto_play_active) continue;             // only explicit gotoAndPlay'd clips
+		// Standalone attached clips only — timeline-placed clips advance via
+		// advance_sprite_frames (the flag is inert on them).
+		if ((uintptr_t)d >= dl_lo && (uintptr_t)d < dl_hi) continue;
+		if (!d->sprite_is_playing) { d->goto_play_active = 0; continue; }
+		if (d->sprite_manual_next_frame) continue;
+		if (d->placed_at_tick == g_tick_count) continue; // gotoAndPlay'd this tick -> show target first
+		if (d->char_id == 0) { d->goto_play_active = 0; continue; }
+		Character* ch = &dictionary[d->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count <= 1) { d->goto_play_active = 0; continue; }
+		size_t fc = ch->sprite_frame_count;
+
+		// sprite_current_frame is the NEXT frame to execute (ng_gotoFrameByMC left
+		// it at (target+1)%fc). If it wrapped to 0 the one-shot animation has played
+		// its last frame — stop here (no loop, no replay of frame 0 / NOT_COLLECTED).
+		size_t frame = d->sprite_current_frame;
+		if (frame == 0)
+		{
+			d->sprite_is_playing = 0;
+			d->goto_play_active = 0;
+			continue;
+		}
+
+		DisplayObject* saved_dl  = display_list;
+		size_t         saved_max = max_depth;
+		size_t         saved_cap = display_list_capacity;
+		MovieClip*     saved_ctx = g_current_context;
+		int            saved_cm  = catch_up_mode;
+
+		display_list = d->sprite_display_list;
+		max_depth = d->sprite_max_depth;
+		display_list_capacity = d->sprite_dl_capacity;
+		actionSetCurrentContext(mc);
+
+		// Placement tags only — catch_up_mode=1 suppresses every frame's DoAction
+		// (the recompiler gates script queueing on !catch_up_mode), so no clip can
+		// be spawned from here.
+		catch_up_mode = 1;
+		if (frame < fc && ch->sprite_frame_funcs[frame] != NULL)
+			exec_sprite_frame(app_context, d, ch->sprite_frame_funcs[frame]);
+		catch_up_mode = saved_cm;
+
+		actionSetCurrentContext(saved_ctx);
+
+		d->sprite_display_list = display_list;
+		d->sprite_max_depth = max_depth;
+		d->sprite_dl_capacity = display_list_capacity;
+		// Advance; wrap-to-0 next tick is caught above and stops the clip.
+		if (d->sprite_current_frame == frame)
+			d->sprite_current_frame = (frame + 1) % fc;
+		mc->currentframe = (int)frame + 1;
+
+		display_list = saved_dl;
+		max_depth = saved_max;
+		display_list_capacity = saved_cap;
 	}
 }
 
@@ -5381,6 +5484,13 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Apply deferred gotoAndStop/Play navs on attachMovie'd clips (e.g.
 		// Doodle Jump platforms) and build their nested sprite sub-lists.
 		advance_attached_clip_frames(app_context);
+		// Play EXPLICITLY gotoAndPlay'd standalone attached clips forward one frame
+		// (coins' COLLECTED disappear, drones' prefire). Placement-tags-only +
+		// flag-gated + count-snapshot → safe (see advance_attached_clip_natural).
+		{
+			extern void advance_attached_clip_natural(SWFAppContext* app_context);
+			advance_attached_clip_natural(app_context);
+		}
 	}
 	// Upgrade sprite_initialized 1→2 so dispatch_enterframe_clip_actions
 	// fires from the next tick. tagPlaceObject2 in browser-WASM marks

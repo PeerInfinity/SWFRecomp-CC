@@ -134,6 +134,7 @@ typedef struct DisplayObject
 	size_t sprite_dl_capacity;
 	size_t sprite_current_frame;
 	u8 sprite_is_playing;         // 0=stopped, 1=playing (default 1)
+	u8 goto_play_active;          // browser-WASM: set by ng_gotoFrameByMC(play=1); gates advance_attached_clip_natural so ONLY explicitly gotoAndPlay'd standalone attached clips auto-advance (coins' COLLECTED, drones' prefire). Cleared by gotoAndStop / one-shot completion.
 	int sprite_manual_next_frame;  // pending manual frame nav
 	size_t sprite_next_frame;      // target frame
 	char* instance_name;           // from PlaceObject2 HasName (or NULL)
