@@ -450,6 +450,26 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 			// Re-attach: clear existing children
 			DisplayObject* dobj = (DisplayObject*)new_mc->display_obj;
 			if (dobj->sprite_display_list) {
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+				// Browser-WASM: re-attaching a reused parent MC memsets away its
+				// child display list, but the cached child MovieClips (auto-named
+				// "instanceN" nested placements) keep parent==new_mc, which is
+				// still alive — so the dead-parent cascade never reaches them and
+				// they orphan in child_mc_cache every re-attach. Metanet "N"'s
+				// particle ring buffer re-attaches the same "pfx*" names cyclically,
+				// leaking their nested instance children unbounded until the game
+				// freezes. Mark all of new_mc's current children dead here; the
+				// per-frame cascade reaches grandchildren (their parent is now
+				// INT_MIN), and frame 0 below re-materializes the fresh placements.
+				extern MovieClip* child_mc_cache[];
+				extern int child_mc_count;
+				extern void actionInvalidateCachedMovieClipDirect(SWFAppContext*, MovieClip*);
+				for (int _rai = 0; _rai < child_mc_count; _rai++) {
+					MovieClip* _rac = child_mc_cache[_rai];
+					if (_rac != NULL && _rac->depth != INT_MIN && _rac->parent == new_mc)
+						actionInvalidateCachedMovieClipDirect(app_context, _rac);
+				}
+#endif
 				memset(dobj->sprite_display_list, 0, dobj->sprite_dl_capacity * sizeof(DisplayObject));
 				dobj->sprite_max_depth = 0;
 			}

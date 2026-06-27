@@ -1336,6 +1336,30 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					_lb_mc != NULL ? _lb_mc : &root_movieclip);
 			}
 #endif
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+			// Browser-WASM: the NO_GRAPHICS/OFFSCREEN path above invalidates the
+			// cached child MovieClips for these soon-to-be-freed entries via
+			// fire_recursive_child_unloads; mirror just the invalidation here.
+			// Without it, a looping nested/attached sprite re-places its children
+			// with fresh auto-instance numbers each loop while the OLD materialized
+			// MCs ("instanceN") linger in child_mc_cache — the parent (this sprite)
+			// is still alive, so actionFinalizePendingRemovals' dead-parent cascade
+			// never reaches them. They accumulate every loop, ratcheting live-clip
+			// count + per-frame scan/render cost until the game freezes (Metanet
+			// "N"'s title-demo / gameplay particle + drone clips). invalidate_mc_
+			// for_dl_entry marks each matched MC (and its descendants, by parent
+			// walk) depth=INT_MIN. Gated on !catch_up_mode to match the NO_GRAPHICS
+			// unload path — a rebuild-in-progress must not tear down children it is
+			// about to re-materialize this same pass.
+			if (!catch_up_mode)
+			{
+				for (size_t j = 1; j <= max_depth; ++j)
+				{
+					if (display_list[j].char_id != 0)
+						invalidate_mc_for_dl_entry(app_context, &display_list[j]);
+				}
+			}
+#endif
 			for (size_t j = 1; j <= max_depth; ++j)
 			{
 				if (display_list[j].sprite_display_list != NULL)
@@ -2085,6 +2109,16 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 
 		// Full rebuild from frame 0 (gotoAndStop is a jump). Free nested
 		// sub-lists and clear so a backward jump doesn't leave stale entries.
+		// First invalidate the cached child MovieClips for the entries we're
+		// about to free, so a manual nav (gotoAndStop/Play) on an attached clip
+		// doesn't orphan its old auto-instance children in child_mc_cache (same
+		// leak as the natural loop-back in advance_sprite_frames). The rebuild
+		// below re-materializes the target frame's placements.
+		for (size_t j = 1; j <= max_depth; ++j)
+		{
+			if (display_list[j].char_id != 0)
+				invalidate_mc_for_dl_entry(app_context, &display_list[j]);
+		}
 		for (size_t j = 1; j <= max_depth; ++j)
 		{
 			if (display_list[j].sprite_display_list != NULL)

@@ -549,6 +549,31 @@ void tagMain(SWFAppContext* app_context)
 			extern void actionFinalizePendingRemovals(SWFAppContext* app_context);
 			actionFinalizePendingRemovals(app_context);
 		}
+
+		// Browser-WASM dead-slot reclaim. The cascade above (and the loop-back /
+		// re-attach invalidation in tag.c / tag_stubs.c) mark fully-dead clips
+		// depth=INT_MIN but leave them in child_mc_cache, so child_mc_count — the
+		// high-water bound every per-frame O(N) walk scans to (button hover,
+		// attached-clip advance, glyph iterate) — only ever grows as looping
+		// sprites churn instanceN children. NULL the dead slots so
+		// findOrCreateMovieClip / attachMovie reuse them instead of appending,
+		// then trim trailing NULLs to actually shrink the scan bound. The MC
+		// structs are deliberately NOT freed (they are calloc'd and never freed
+		// elsewhere; AS variables may still hold dead MOVIECLIP refs, which read
+		// as INT_MIN-dead — freeing would dangle them). After the cascade no LIVE
+		// clip has a dead parent, so NULLing dead slots cannot orphan a live
+		// subtree. Without this the live-clip leak fixes still let child_mc_count
+		// ratchet up, slowing every scan over a long session.
+		{
+			extern MovieClip* child_mc_cache[];
+			extern int child_mc_count;
+			for (int _ri = 0; _ri < child_mc_count; _ri++) {
+				if (child_mc_cache[_ri] != NULL && child_mc_cache[_ri]->depth == INT_MIN)
+					child_mc_cache[_ri] = NULL;
+			}
+			while (child_mc_count > 0 && child_mc_cache[child_mc_count - 1] == NULL)
+				child_mc_count--;
+		}
 #endif
 
 #ifndef OFFSCREEN_RENDER
