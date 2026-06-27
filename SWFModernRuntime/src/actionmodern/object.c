@@ -65,6 +65,21 @@ static int prop_name_match(const char* a, u32 alen, const char* b, u32 blen)
 	const unsigned char* pb = (const unsigned char*)b;
 	const unsigned char* eb = pb + blen;
 	while (pa < ea && pb < eb) {
+		// ASCII fast path (property names are almost always pure ASCII): when
+		// BOTH current bytes are ASCII, fold + compare at byte level without the
+		// per-codepoint UTF-8 decode. For a <0x80 byte, _obj_utf8_decode returns
+		// the byte unchanged and _obj_fold_lower only lowercases A-Z, so this is
+		// bit-for-bit identical to the decode path below — just far cheaper.
+		// Falls through to the full Unicode decode the moment either side is
+		// non-ASCII, so multi-byte sequences still align correctly.
+		unsigned char ba = *pa, bb = *pb;
+		if (ba < 0x80 && bb < 0x80) {
+			uint32_t ca = (ba >= 'A' && ba <= 'Z') ? (uint32_t)(ba + 32) : (uint32_t)ba;
+			uint32_t cb = (bb >= 'A' && bb <= 'Z') ? (uint32_t)(bb + 32) : (uint32_t)bb;
+			if (ca != cb) return 0;
+			pa++; pb++;
+			continue;
+		}
 		uint32_t ca = _obj_fold_lower(_obj_utf8_decode(&pa));
 		uint32_t cb = _obj_fold_lower(_obj_utf8_decode(&pb));
 		if (ca != cb) return 0;
@@ -225,6 +240,16 @@ int swf_name_match(const char* a, const char* b)
 	const unsigned char* pa = (const unsigned char*)a;
 	const unsigned char* pb = (const unsigned char*)b;
 	while (*pa && *pb) {
+		// ASCII fast path (see prop_name_match): byte-level fold when both sides
+		// are ASCII — bit-identical to the decode path, far cheaper.
+		unsigned char ba = *pa, bb = *pb;
+		if (ba < 0x80 && bb < 0x80) {
+			uint32_t ca = (ba >= 'A' && ba <= 'Z') ? (uint32_t)(ba + 32) : (uint32_t)ba;
+			uint32_t cb = (bb >= 'A' && bb <= 'Z') ? (uint32_t)(bb + 32) : (uint32_t)bb;
+			if (ca != cb) return 0;
+			pa++; pb++;
+			continue;
+		}
 		uint32_t ca = _obj_fold_lower(_obj_utf8_decode(&pa));
 		uint32_t cb = _obj_fold_lower(_obj_utf8_decode(&pb));
 		if (ca != cb) return 0;
