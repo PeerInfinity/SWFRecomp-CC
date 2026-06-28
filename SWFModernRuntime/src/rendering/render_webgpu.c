@@ -1717,12 +1717,56 @@ void render_webgpu_upload_stage_transform(WebGPURenderContext* ctx, const float 
 	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0, matrix, 16 * sizeof(float));
 }
 
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+// ---------------------------------------------------------------------------
+// GPU frames-in-flight backpressure (browser-WASM).
+// ---------------------------------------------------------------------------
+// The browser render loop paces via emscripten_sleep (a wall-clock timer), NOT
+// requestAnimationFrame, so it has no present/GPU backpressure. Under sustained
+// GPU load (e.g. N's 825-tile level + particle overdraw) the loop submits one
+// command buffer per iteration FASTER than the GPU drains them; the queue backs
+// up without bound and display latency climbs until the screen updates <1fps
+// while the CPU loop still spins at ~80fps (frame-CPU stays ~7ms — the cost is
+// off-CPU, in the never-drained backlog). The screenshot path already documents
+// and works around this same "GPU backlog" by parking the loop (browser_capture_
+// finish). Bound it generally: register an OnSubmittedWorkDone callback per
+// submit, and park at the start of the next frame until the GPU has caught up to
+// within MAX_FRAMES_IN_FLIGHT. This caps display latency to ~2 frames and
+// throttles the loop to the GPU's real sustainable rate (smooth N fps instead of
+// a frozen <1fps). When the GPU keeps up (the common case / light scenes) the
+// callback fires immediately and the park is a no-op, so no throughput penalty.
+// AllowSpontaneous so the callback fires during the park's emscripten_sleep
+// event-loop turns (the browser never calls wgpuInstanceProcessEvents — matches
+// browser_capture_finish + the adapter/device requests).
+#define MAX_FRAMES_IN_FLIGHT 2
+static volatile int g_frames_in_flight = 0;
+static void on_frame_work_done(WGPUQueueWorkDoneStatus status, WGPUStringView message,
+                               void* u1, void* u2)
+{
+	(void)status; (void)message; (void)u1; (void)u2;
+	if (g_frames_in_flight > 0) g_frames_in_flight--;
+}
+#endif
+
 // ---------------------------------------------------------------------------
 // render_webgpu_open_pass
 // ---------------------------------------------------------------------------
 void render_webgpu_open_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	// Wait for the GPU to drain to within MAX_FRAMES_IN_FLIGHT before building a
+	// new frame (see the backpressure note above). guard caps the wait so a
+	// stalled/lost callback degrades gracefully to the old no-backpressure
+	// behavior rather than hanging.
+	{
+		int guard = 0;
+		while (g_frames_in_flight >= MAX_FRAMES_IN_FLIGHT) {
+			if (guard++ >= 1000) { g_frames_in_flight = 0; break; }
+			emscripten_sleep(1);
+		}
+	}
+#endif
 	ctx->dynamic_rect_count = 0;
 	ctx->dynamic_vertex_used = 0;
 	ctx->dynamic_gradient_used = 0;
@@ -2508,6 +2552,20 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	WGPUCommandBufferDescriptor cmd_desc = {0};
 	WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(ctx->encoder, &cmd_desc);
 	wgpuQueueSubmit(ctx->queue, 1, &cmd);
+
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	// Track this frame as in-flight; on_frame_work_done decrements when the GPU
+	// finishes it, and render_webgpu_open_pass parks until we're within
+	// MAX_FRAMES_IN_FLIGHT (see the backpressure note above). Without this the
+	// timer-paced loop outruns the GPU and the present queue backs up unbounded.
+	{
+		WGPUQueueWorkDoneCallbackInfo wd_info = {0};
+		wd_info.mode = WGPUCallbackMode_AllowSpontaneous;
+		wd_info.callback = on_frame_work_done;
+		wgpuQueueOnSubmittedWorkDone(ctx->queue, wd_info);
+		g_frames_in_flight++;
+	}
+#endif
 
 #ifdef OFFSCREEN_RENDER
 	// Headless: no surface to present
