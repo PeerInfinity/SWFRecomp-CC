@@ -53,10 +53,47 @@ regressions.
 `display_object_properties` (~192 px), `from_gnash …/simple_loop_test` (121–724
 px/frame, hairline pixel-snapping). We == Ruffle; both differ from Flash.
 
-**Still-open *fixable* gap (NOT accepted — next target):** gradient color-ramp
-**banding** on `movieclip_begin_gradient_fill` (1266 px) and
-`movieclip_line_gradient_style` (1052 px). Ruffle ≈ Flash (180/151 px) but we're far
-off — a real SWFRecomp gradient-rendering gap (diagonal-stripe/arc banding in the diff).
+**Still-open *fixable* gap (NOT accepted — next target):** the gradient-draw tests
+`movieclip_begin_gradient_fill` (1266 px) and `movieclip_line_gradient_style`
+(1052 px). Ruffle ≈ Flash (180/151 px) but we're far off — a real SWFRecomp
+drawing-API gradient-rendering gap. `from_shumway/gradientTransform` (467 px) is a
+DefineShape gradient whose *interior ramp already matches Flash exactly* (flat 153);
+its residual is the accepted MSAA edge-AA gap (Category 11), not gradient banding.
+
+**2026-06-28 root-cause update — it is NOT a ramp color-ramp/quantization bug.**
+A full investigation (compute our 256-ramp, compare byte-for-byte to Ruffle's
+`CommonGradient::new` in `render/wgpu/src/mesh.rs`, and trace the full
+sample→linear_to_srgb→cxform pipeline) showed:
+
+- **The ramp itself is essentially correct** for these tests. (Both stops here share
+  `G=20`, so even the one genuine ramp imprecision below is ≤1 px here.) A faithful
+  Ruffle ramp port — float-precision linearRGB convert + truncate-once instead of
+  pre-quantizing each endpoint to u8-linear — was tried and **reverted**: it moved
+  the metric by only ±1 px noise (net slightly *worse*: 1266→1304, 1052→1059) because
+  these gradients have no black→colour dark-channel interpolation. (That endpoint-
+  quantization fix would matter for a black→colour linearRGB *drawing-API* gradient;
+  no current test exercises one. `from_gnash …/GradientFillTest` has such stops but
+  uses the **DefineShape/recompiler** ramp path (`swf.cpp`), not this runtime path.)
+- **The real error is a ~0.25 px sub-pixel gradient-*sampling phase* offset**: our
+  per-fragment `t` lands ~2–3 ramp indices *high* (consistently too blue / too little
+  red) vs Ruffle. It is **our bug** — a fresh 4× Ruffle render is **byte-identical to
+  Flash** on the worst cell (Ruffle-vs-Flash = 0; us-vs-Ruffle ≈ us-vs-Flash ≈ 1076).
+  The offset is invisible on slow pad/linear gradients (3–12 px) but **explodes where
+  focal/repeat/reflect compresses cycles** (the `radial, repeat, linearRGB, focal 0.8`
+  cell alone is ~1090 of the 1266): a tiny constant `t` error × the large
+  `d(t)/d(uv)` gain in the focal-dense region. The diff pixels (channel-sum > 30) sit
+  on the *steep* parts of each cycle / the repeat-wrap edges; the smooth ramp is < 30.
+- Ruled out: ramp values, ramp texture format (`RGBA8Unorm`, not sRGB — no double
+  convert), surface format (`BGRA8Unorm`, linear), the focal WGSL formula (identical
+  to Ruffle's `gradient.wgsl`), focal encode/decode (`(u16)(f*16384+32768)` ↔
+  `(x-32768)/16384`, consistent), spread/`fract`, and uv being vertex-interpolated
+  (affine ⇒ exact). f32 matrix-inversion precision is ~5e-7, too small alone.
+- **Next step requires GPU-level instrumentation** (dump per-fragment `uv`/`t` for one
+  focal-repeat pixel, ours vs a Ruffle wgpu capture) to localise the ~0.25 px
+  position/convention difference — likely a pixel-center / sample-position or
+  gradient-matrix-origin convention mismatch in the drawing-API GPU path
+  (`render_webgpu_draw_gradient_tris` + vertex shader uv), not the ramp builder.
+  Static source analysis could not pin it.
 
 **Verification gotchas** (cost hours): editing runtime `.c` then re-rendering can
 read a stale `action.o` (ccache) AND a stale `output.actual.png`. Always:
