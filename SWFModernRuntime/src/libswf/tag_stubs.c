@@ -1200,6 +1200,33 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		else if (frame < current)
 		{
 			// Backward jump: clear display list and re-execute from frame 0
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+			// Browser-WASM: this clear frees the sprite's child display-list
+			// entries but leaves their materialized child MovieClips (auto-named
+			// "instanceN" nested placements) live in child_mc_cache with
+			// parent==mc (mc is still alive), so the dead-parent cascade never
+			// reaches them and they orphan every backward goto. Metanet "N"'s
+			// drones re-fire each shot via gotoAndPlay("laserdrone_prefire") —
+			// a BACKWARD jump from the later postfire frame — and (since the
+			// d701257e4 forward-advance now actually plays prefire/fire forward,
+			// placing nested effect clips) those instanceN children accumulate
+			// unbounded here, ratcheting child_mc_count + every per-frame O(N)
+			// scan until the title demo collapses to <1fps. Mark all of mc's
+			// current children dead before the clear; frame 0..target below
+			// re-materializes the fresh placements, and swf.c's dead-slot reclaim
+			// NULLs the old slots. Mirrors the ng_attachMovie re-attach fix above
+			// and advance_sprite_frames' loop-back invalidation.
+			{
+				extern MovieClip* child_mc_cache[];
+				extern int child_mc_count;
+				extern void actionInvalidateCachedMovieClipDirect(SWFAppContext*, MovieClip*);
+				for (int _bji = 0; _bji < child_mc_count; _bji++) {
+					MovieClip* _bjc = child_mc_cache[_bji];
+					if (_bjc != NULL && _bjc->depth != INT_MIN && _bjc->parent == mc)
+						actionInvalidateCachedMovieClipDirect(app_context, _bjc);
+				}
+			}
+#endif
 			for (size_t j = 1; j <= max_depth; ++j)
 			{
 				if (display_list[j].sprite_display_list != NULL)
