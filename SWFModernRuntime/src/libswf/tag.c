@@ -2227,10 +2227,11 @@ void advance_attached_clip_natural(SWFAppContext* app_context)
 		{
 			if (is_oneshot)
 			{
-				// Particle finished its animation: the SWF's final frame would call
-				// this.removeMovieClip() (suppressed here since we run placement tags
-				// only) — do the removal directly so the clip stops rendering and the
-				// child_mc_cache slot can be reclaimed (no leftover line, no overdraw).
+				// Particle reached the end of its authored lifetime: the SWF's final
+				// frame would call this.removeMovieClip() (never executed — we don't run
+				// the particle's frame scripts) — do the removal directly so the clip
+				// stops rendering and its child_mc_cache slot can be reclaimed (no
+				// leftover line, no overdraw).
 				extern void actionInvalidateCachedMovieClipDirect(SWFAppContext*, MovieClip*);
 				d->sprite_is_playing = 0;
 				d->natural_oneshot = 0;
@@ -2239,6 +2240,28 @@ void advance_attached_clip_natural(SWFAppContext* app_context)
 			}
 			d->sprite_is_playing = 0;
 			d->goto_play_active = 0;
+			continue;
+		}
+
+		if (is_oneshot)
+		{
+			// Attached morph-shape particles ("pfx*" — DefineLaserCharge/Spark etc.
+			// are DefineMorphShapes animated by per-frame RATIO) CANNOT be ratio-
+			// interpolated per-instance in this renderer: morph interpolation runs as
+			// a per-character pre-pass into a SHARED vertex buffer over the ROOT
+			// display_list only (tag.c ~5802), and render_display_list draws attached
+			// morphs at morph_start_offset (ratio 0). Re-running each frame's placement
+			// tags would apply that frame's MATRIX (authored for the ratio-N morphed
+			// geometry) to the ratio-0 geometry actually drawn → corrupt scale/position
+			// (the user's "data looks corrupt"). So DON'T re-run placement tags: keep
+			// the particle at its consistent attach-time frame-0 appearance and just
+			// count its authored lifetime down, then remove on wrap (above). This keeps
+			// the leftover-line + overdraw fix (the particle still self-removes) without
+			// the morph mismatch. Trade-off: the particle doesn't play its grow/fade
+			// in-between frames (a faithful version needs per-instance morph vertex
+			// buffers — a separate renderer change).
+			d->sprite_current_frame = (frame + 1) % fc;
+			mc->currentframe = (int)frame + 1;
 			continue;
 		}
 
