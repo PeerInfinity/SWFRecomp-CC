@@ -653,10 +653,64 @@ boundaries that no real-world SWF exercises. Added to
 
 ---
 
+## Category 5: Graphics — MSAA-vs-Flash Rasterizer Differences (image comparisons)
+
+These are **image** comparison diffs (`<cmp>.actual.png` vs `<cmp>.expected.png`),
+not trace diffs. The expected PNG is the **real Flash Player** render (the Flash
+oracle); `<cmp>.ruffle.png`, when present, is Ruffle's *own* render and is only
+checked in for `known_failure` image tests (often captured at `quality="low"` =
+1× MSAA, so it is **not** a fidelity oracle — always measure against
+`expected.png`).
+
+The defining property of this category: **we are byte-identical to a fresh 4×
+Ruffle render (`us-vs-Ruffle = 0`), and both differ from Flash by the same
+amount.** When the reference Flash emulator matches us and not Flash, the gap is
+the rendering *architecture*, not a defect. Confirm with
+`ruffle-tests/triage_image_tests.py <test>` (renders Ruffle at 4× and reports
+us-vs-Flash / us-vs-Ruffle / Ruffle-vs-Flash).
+
+### `simple_loop_test` (misc-ming.all/loop) — hairline-stroke pixel-snapping (121–724 image px/frame)
+
+Draws three 60×60px bars (red/green/blue) placed abutting at integer pixel
+boundaries (x=0/60/120), each with a `lineStyle width="1"` (1-twip ≈ 0.05px
+**hairline**) stroke the same color as its fill.
+
+**Example diff (frame3, red|green seam at x=60, row 30):**
+```
+         col 58   col 59                      col 60
+ours:    red      (128,128,0) [½red+½green]   green
+flash:   red      (0,255,0)   [solid green]   green
+```
+Same on the bars' outer bottom edge (y=60): ours `(255,128,128)` = ½red+½white,
+Flash `(255,255,255)` clean.
+
+**Why it can't be fixed (within our renderer):** the hairline stroke is centered
+exactly on the pixel boundary, so it spans ≈`[59.5, 60.5]` and covers ~half of the
+neighbouring pixel. We (and Ruffle) render the stroke at its true geometric
+position and let 4× MSAA antialias it → ~50% coverage → it blends with whatever is
+underneath. **Flash snaps thin (≤1px) strokes to the pixel grid** ("hairline" /
+pixel-hinting) and draws a crisp 1px line aligned to one whole column/row. Matching
+Flash would require reimplementing hairline pixel-snapping — a global special-case
+for thin strokes that **Ruffle itself does not implement** (these are
+`known_failure` upstream), is ill-defined for rotated/curved strokes, and carries
+high regression risk for a 1px cosmetic seam.
+
+**Contrast — NOT the same as the `movieclip_setmask` corner residual, which WAS
+fixed** (`feat(graphics): miter joins for drawing-API stroke corners`). That was
+*missing* stroke-corner geometry we could add; this is geometry we draw correctly
+and Flash snaps. "Missing geometry" is fixable; "Flash-snaps-our-correct-geometry"
+is architectural.
+
+**Decision:** Accept. We match Ruffle (`us-vs-Ruffle = 0`); closing the last 1px
+means reimplementing Flash hairline hinting at disproportionate risk.
+
+---
+
 ## Summary Table
 
 | Test | Diff Lines | Root Cause | Our Behavior | Spec |
 |------|-----------|------------|-------------|------|
+| simple_loop_test (misc-ming/loop) | 121–724 img px/frame | Flash hairline (≤1px stroke) pixel-snapping; MSAA antialiases the sub-pixel-straddling hairline instead | Matches Ruffle (us-vs-Ruffle=0); both differ from Flash | Flash pixel-hinting for hairlines (Ruffle doesn't implement it either) |
 | Math-v5 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
 | Math-v6 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
 | Math-v7 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |

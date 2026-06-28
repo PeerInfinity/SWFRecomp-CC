@@ -253,3 +253,32 @@ that would not change the pass rate (the test fails against Flash regardless).
 See `_investigation/NEW_UPSTREAM_TESTS_TRIAGE.md` for the discovery context and
 the sibling `gotoFrameFromInterval2` fix (timer-callback `gotoAndPlay` over-advance
 → `ruffle_matched`).
+
+## Image tests: reference semantics, and the inverse case (we match Ruffle, not Flash)
+
+This doc's usual pattern is "we match **Flash**, the test's expected (which reflects
+**Ruffle**) differs." **Image** comparisons invert which file is which, so be
+careful:
+
+- **`output.expected.png` = the real Flash Player render** (the Flash oracle) — for
+  image tests this IS the authoritative target, *not* a Ruffle artifact.
+- **`output.ruffle.png` = Ruffle's *own* render**, present only for `known_failure`
+  image tests, often at `quality="low"` (1× MSAA). Comparing our 4× render against a
+  1× `ruffle.png` shows spurious 1px "row/column off-by-one" lines that are **pure
+  sample-count mismatch, not real divergence** — always evaluate against
+  `expected.png`, and render a fresh 4× Ruffle reference (via
+  `ruffle-tests/triage_image_tests.py`) if you want an apples-to-apples Ruffle compare.
+
+**The inverse-of-this-doc category exists for rendering:** a class of image tests
+where **we match Ruffle's renderer but neither matches Flash's** — Flash's analytic
+coverage rasterizer + thin-stroke pixel-hinting yields crisp edges/seams that any 4×
+MSAA renderer (ours and Ruffle's) antialiases into a sub-pixel blend. Because we ==
+Ruffle here, these are inherent, not Ruffle-design-choice diffs, so they live in
+`ACCEPTED_DIFFS.md` (avm1 Category 11; `from_gnash` Category 5 —
+`simple_loop_test`, `display_object_properties`), **not** here.
+
+Conversely, when Ruffle ≈ Flash on an image test but **we** don't, that's a real
+SWFRecomp rendering bug (not a Ruffle-vs-Flash spec difference): e.g.
+`movieclip_setmask` (now fixed: drawing-API stroke closing + mask-fill-only + miter
+joins → 0px, beating Ruffle), and the still-open **gradient color-ramp/banding** gap
+on `movieclip_begin_gradient_fill` / `movieclip_line_gradient_style`.

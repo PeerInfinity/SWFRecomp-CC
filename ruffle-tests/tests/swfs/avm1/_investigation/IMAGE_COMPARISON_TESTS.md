@@ -11,6 +11,60 @@
 Expected PNGs are now copied into each test directory as `output.expected.png` (from `~/CC/ruffle/tests/tests/swfs/avm1/`).
 Actual PNGs are saved to the test directory as `output.actual.png` when `--verbose` is passed.
 
+> **Much of the "Known Bugs / Missing Features" section below is now STALE** —
+> Drawing API and `setMask` rendering work; see the 2026-06-28 update next.
+
+---
+
+## Session update (2026-06-28): reference semantics, triage tool, stroke fixes, taxonomy
+
+**Two image references — don't confuse them:**
+- **`output.expected.png` = the real Flash Player render** = the authoritative oracle.
+- **`output.ruffle.png` = Ruffle's *own* render**, present only for `known_failure`
+  tests, often at `quality="low"` (1× MSAA, no AA). It is **not** a fidelity oracle:
+  comparing our 4× render to a 1× `ruffle.png` produces spurious 1px "off-by-one"
+  edge lines. Always measure against `expected.png`.
+
+**Triage tool — `ruffle-tests/triage_image_tests.py [test]`** (sweep with no arg).
+Renders a fresh **4× Ruffle** reference (apples-to-apples) and classifies each
+comparison:
+- **CLEAN** — we already match Flash.
+- **B-FIXABLE** — Ruffle ≈ Flash but we don't → a real SWFRecomp bug; correct output
+  is demonstrably achievable.
+- **A-INHERENT** — we == Ruffle (`us-vs-Ruffle = 0`), both differ from Flash → the
+  MSAA-vs-Flash-analytic-rasterizer gap (hairline pixel-snapping, abutting-edge
+  seams, sharp-corner coverage). Not fixable without reimplementing Flash hinting,
+  which Ruffle doesn't do either → accept.
+
+**Drawing-API stroke fixes landed (runtime `action.c` + graphics `tag.c`):**
+1. `fix(runtime)`: close the **stroke** on filled open paths (Flash auto-closes the
+   outline of a filled shape; the `moveTo;lineTo*3;endFill` idiom dropped one side).
+2. `fix(graphics)`: **mask stencils use fill geometry only** — Flash masks ignore the
+   mask clip's stroke; we were inflating the mask by the stroke width.
+3. `feat(graphics)`: **per-vertex miter joins** for stroke corners (outer side,
+   winding-independent, miter-limit 4, bevel fallback; ASAN-clean & deterministic —
+   a prior prototype overran `line_verts` → non-deterministic heap corruption, fixed).
+
+Result: **`avm1/movieclip_setmask` 3594 px → 0 px (pixel-perfect, PASSES, beats
+Ruffle's 16px residual).** `mask_with_drawing` stayed clean. CI both modes, no
+regressions.
+
+**Inherent (accepted) — see `ACCEPTED_DIFFS.md` Category 11 / `from_gnash` Cat 5:**
+`display_object_properties` (~192 px), `from_gnash …/simple_loop_test` (121–724
+px/frame, hairline pixel-snapping). We == Ruffle; both differ from Flash.
+
+**Still-open *fixable* gap (NOT accepted — next target):** gradient color-ramp
+**banding** on `movieclip_begin_gradient_fill` (1266 px) and
+`movieclip_line_gradient_style` (1052 px). Ruffle ≈ Flash (180/151 px) but we're far
+off — a real SWFRecomp gradient-rendering gap (diagonal-stripe/arc banding in the diff).
+
+**Verification gotchas** (cost hours): editing runtime `.c` then re-rendering can
+read a stale `action.o` (ccache) AND a stale `output.actual.png`. Always:
+`touch test.swf; rm -rf RecompiledScripts RecompiledTags build output.actual.png;
+CCACHE_DISABLE=1 … verify_output.py … --mode=graphics --verbose` and confirm the PNG
+mtime advanced. `--verbose` is required to save `output.actual.png` (else triage
+reports NOIMG). `--asan` auto-disables ccache.
+
 ---
 
 ## Current Rendering Status

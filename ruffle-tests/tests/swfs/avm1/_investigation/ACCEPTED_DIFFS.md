@@ -526,10 +526,56 @@ replicating Flash's combined accessor+watch dispatch ordering and a non-recursiv
 
 ---
 
+## Category 11: Graphics — MSAA-vs-Flash Rasterizer Differences (image comparisons)
+
+These are **image** diffs (`output.actual.png` vs `output.expected.png`). Key
+references for interpreting them (see `IMAGE_COMPARISON_TESTS.md` and
+`RUFFLE_VS_FLASH_DIFFERENCES.md`):
+
+- **`output.expected.png` = the real Flash Player render** (the Flash oracle). This
+  is the authoritative target.
+- **`output.ruffle.png` = Ruffle's *own* render**, checked in only for
+  `known_failure` image tests, frequently at `quality="low"` (1× MSAA, no AA). It
+  is **not** a fidelity oracle — never treat it as ground truth (a 4× render of
+  ours vs a 1× `ruffle.png` shows spurious 1px edge "shifts" that are not bugs).
+- Triage with `ruffle-tests/triage_image_tests.py <test>`: it renders Ruffle at 4×
+  (apples-to-apples) and classifies each diff as **fixable** (we differ from
+  Ruffle, Ruffle ≈ Flash) vs **inherent** (we == Ruffle, both differ from Flash).
+
+The cases below are **inherent**: we are byte-identical to a 4× Ruffle render and
+both differ from Flash. This is the MSAA-vs-Flash-analytic-rasterizer gap — Flash's
+coverage rasterizer + thin-stroke pixel-hinting produces crisp edges/seams that a
+4× MSAA renderer (ours and Ruffle's alike) antialiases into a sub-pixel blend.
+
+### `display_object_properties` — MSAA edge/stroke antialiasing (~192 image px)
+
+`us-vs-Flash = 192`, `us-vs-Ruffle = 0`, `Ruffle-vs-Flash = 192`. Thin 1px diff
+lines along shape edges where our (and Ruffle's) MSAA antialiasing differs from
+Flash's analytic coverage. Same class as `from_gnash …/simple_loop_test` (hairline
+pixel-snapping; see that file's Category 5 for the detailed mechanism).
+**Decision:** Accept; we match Ruffle, no fix without reimplementing Flash hinting.
+
+**FIXED (not accepted), for the record:** `movieclip_setmask` was in this bucket at
+3594 px, but its residual turned out to be *missing* drawing-API stroke geometry,
+not the MSAA gap. Three fixes took it to **0 px (pixel-perfect, beats Ruffle's
+16px)**: close the stroke on filled open paths, mask stencils use fill-only, and
+per-vertex miter joins (`fix(runtime)…`, `fix(graphics)…`, `feat(graphics): miter
+joins…`). Rule of thumb: if Ruffle ≈ Flash but we don't, it's a *fixable* geometry
+gap; if we == Ruffle, it's inherent.
+
+**Known *fixable* gap (NOT accepted — tracked for follow-up):** the gradient-draw
+tests `movieclip_begin_gradient_fill` (1266 px) and `movieclip_line_gradient_style`
+(1052 px) still fail, but **Ruffle ≈ Flash there (180/151 px) while we are far off**
+→ a real SWFRecomp **gradient color-ramp/banding** gap (the diagonal-stripe/arc
+banding in the diff), a distinct next target. Do not file these as accepted.
+
+---
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
 |------|----------|-----------|----------|
+| `display_object_properties` | Graphics: MSAA edge AA vs Flash analytic/hairline | ~192 img px | Accept; we==Ruffle, both differ from Flash |
 | `date` | Platform UB (NaN/Infinity year cast) | ~9 | Accept; no portable fix |
 | `date` | Float precision (TimezoneOffset extreme dates) | ~1 | Accept; edge case |
 | `date` | Inconsistent expected output (UTCHours at −8.64e15) | ~18 | Accept; Ruffle test bug |
