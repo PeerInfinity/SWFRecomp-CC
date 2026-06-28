@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `b7f1a1759734`  
-**Date:** 2026-06-27 22:54 UTC  
-**Total duration:** 2h22m49s
+**Commit:** `d579ca99ba21`  
+**Date:** 2026-06-28 18:16 UTC  
+**Total duration:** 2h48m55s
 
 ## Results by Suite
 
@@ -32,7 +32,7 @@
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 115,485 | 130,968 | 88.2% |
+| avm1 | 115,486 | 130,968 | 88.2% |
 | from_gnash/actionscript.all | 29,815 | 38,484 | 77.5% |
 | from_gnash/misc-ming.all | 3,972 | 5,183 | 76.6% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -40,7 +40,7 @@
 | from_gnash/misc-swfmill.all | 89 | 91 | 97.8% |
 | from_shumway | 882 | 1,276 | 69.1% |
 | from_shumway/avm1 | 489 | 491 | 99.6% |
-| **Total** | **151,336** | **177,259** | **85.4%** |
+| **Total** | **151,337** | **177,259** | **85.4%** |
 
 ## Failure Breakdown
 
@@ -89,64 +89,66 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-*No changes since last run.*
+| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
+|-------|-------------:|-------------:|--------------:|----------------:|
+| avm1 | - | - | 1 | - |
 
-*Comparing `ca31201a1991` → `b7f1a1759734`*
+*Comparing `b7f1a1759734` → `d579ca99ba21`*
 
 ## Per-Suite Details
 
 ### avm1
 
 - **Pass:** 629/704 (89.3%)
-- **Duration:** 55m25s across 30 shards
-- **Lines:** 115,485/130,968 matching (88.2%)
-- **Avg test duration:** 4.7s — slowest: `netstream_play_flv_screen` (35.5s)
+- **Duration:** 1h14m23s across 30 shards
+- **Lines:** 115,486/130,968 matching (88.2%)
+- **Avg test duration:** 6.3s — slowest: `netstream_play_flv_screen` (36.6s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 128/235 (54.5%)
-- **Duration:** 28m58s across 29 shards
+- **Duration:** 32m05s across 29 shards
 - **Lines:** 29,815/38,484 matching (77.5%)
-- **Avg test duration:** 7.3s — slowest: `MovieClip-v8` (70.3s)
+- **Avg test duration:** 8.1s — slowest: `MovieClip-v8` (57.3s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 63/107 (58.9%)
-- **Duration:** 28m08s across 29 shards
+- **Duration:** 31m30s across 29 shards
 - **Lines:** 3,972/5,183 matching (76.6%)
-- **Avg test duration:** 15.7s — slowest: `matrix_test` (107.3s)
+- **Avg test duration:** 17.6s — slowest: `matrix_test` (108.2s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m11s across 29 shards
+- **Duration:** 2m16s across 29 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 14.5s — slowest: `exception` (22.6s)
+- **Avg test duration:** 15.1s — slowest: `implementsOpTest` (24.0s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 10/19 (52.6%)
-- **Duration:** 4m29s across 29 shards
+- **Duration:** 5m22s across 29 shards
 - **Lines:** 393/535 matching (73.5%)
-- **Avg test duration:** 14.1s — slowest: `movieclip_destruction_test1` (22.5s)
+- **Avg test duration:** 16.9s — slowest: `edittext_test1` (23.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 18/19 (94.7%)
-- **Duration:** 6m30s across 29 shards
+- **Duration:** 5m02s across 29 shards
 - **Lines:** 89/91 matching (97.8%)
-- **Avg test duration:** 20.5s — slowest: `zeroframe_definesprite` (22.6s)
+- **Avg test duration:** 15.9s — slowest: `background` (23.0s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 14m40s across 30 shards
+- **Duration:** 15m10s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 9.5s — slowest: `fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77` (25.2s)
+- **Avg test duration:** 9.8s — slowest: `fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b` (24.4s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 2m24s across 30 shards
+- **Duration:** 3m03s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 3.0s — slowest: `text-bind` (22.0s)
+- **Avg test duration:** 3.8s — slowest: `text-bind` (24.1s)
