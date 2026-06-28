@@ -722,6 +722,35 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		ng_record_attached_playable(new_mc);
 	}
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+	// Browser-WASM one-shot particle auto-advance (Metanet "N"). N's
+	// ParticleManager attachMovie's every effect (dust, blood, laser spark/charge,
+	// ...) as "pfx"+depth into a cyclic ring buffer and relies on each clip's OWN
+	// timeline playing forward to a final-frame this.removeMovieClip() to clean
+	// itself up. Browser-WASM has no auto-advance for attachMovie'd clips' own
+	// timelines (the OFFSCREEN ng_advance_attached_clip_playheads pump is gated
+	// out; advance_attached_clip_natural only services EXPLICITLY gotoAndPlay'd
+	// clips), so a particle FREEZES on frame 1 forever — leaving the "leftover
+	// laser/death lines" the user sees AND a permanent pile of full-opacity
+	// particle sprites whose overdraw is N's dominant GPU cost (user A/B-confirmed:
+	// skipping particle draws recovers fps far more than skipping the tile grid).
+	// Flag genuine auto-play particles (attached during normal play, not catch-up;
+	// multi-frame) so advance_attached_clip_natural plays them forward (placement
+	// tags) and removes them on wrap. NAME-gated to "pfx*" to stay surgical: it
+	// cannot touch GUI/HUD clips (the v1 broad auto-advance exploded timeIndicator
+	// `bar`), and it matches exactly the clips the user's SkipParticles A/B hid.
+	if (!catch_up_mode && new_mc->display_obj != NULL && new_name != NULL
+	    && strncmp(new_name, "pfx", 3) == 0
+	    && dictionary[char_id].sprite_frame_count > 1) {
+		extern size_t g_tick_count;
+		DisplayObject* pdo = (DisplayObject*)new_mc->display_obj;
+		pdo->natural_oneshot = 1;
+		pdo->sprite_is_playing = 1;
+		pdo->sprite_current_frame = 1;        // frame 0 shown at attach; frame 1 next
+		pdo->placed_at_tick = g_tick_count;   // show frame 1 this tick, advance next
+	}
+#endif
+
 	return new_mc;
 }
 

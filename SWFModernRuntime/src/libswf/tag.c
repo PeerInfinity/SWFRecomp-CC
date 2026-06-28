@@ -2203,24 +2203,40 @@ void advance_attached_clip_natural(SWFAppContext* app_context)
 		if (mc == NULL || mc->depth == INT_MIN || mc->avm1_removed) continue;
 		if (mc->display_obj == NULL) continue;
 		DisplayObject* d = (DisplayObject*)mc->display_obj;
-		if (!d->goto_play_active) continue;             // only explicit gotoAndPlay'd clips
+		// Two entry conditions: explicit gotoAndPlay'd clips (coins/drones, parked
+		// on wrap) and auto-play one-shot particles ("pfx*", REMOVED on wrap to
+		// mimic their final-frame removeMovieClip — see ng_attachMovie flagging).
+		int is_oneshot = d->natural_oneshot;
+		if (!d->goto_play_active && !is_oneshot) continue;
 		// Standalone attached clips only — timeline-placed clips advance via
 		// advance_sprite_frames (the flag is inert on them).
 		if ((uintptr_t)d >= dl_lo && (uintptr_t)d < dl_hi) continue;
-		if (!d->sprite_is_playing) { d->goto_play_active = 0; continue; }
+		if (!d->sprite_is_playing) { d->goto_play_active = 0; d->natural_oneshot = 0; continue; }
 		if (d->sprite_manual_next_frame) continue;
-		if (d->placed_at_tick == g_tick_count) continue; // gotoAndPlay'd this tick -> show target first
-		if (d->char_id == 0) { d->goto_play_active = 0; continue; }
+		if (d->placed_at_tick == g_tick_count) continue; // placed this tick -> show frame 1 first
+		if (d->char_id == 0) { d->goto_play_active = 0; d->natural_oneshot = 0; continue; }
 		Character* ch = &dictionary[d->char_id];
-		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count <= 1) { d->goto_play_active = 0; continue; }
+		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count <= 1) { d->goto_play_active = 0; d->natural_oneshot = 0; continue; }
 		size_t fc = ch->sprite_frame_count;
 
 		// sprite_current_frame is the NEXT frame to execute (ng_gotoFrameByMC left
-		// it at (target+1)%fc). If it wrapped to 0 the one-shot animation has played
-		// its last frame — stop here (no loop, no replay of frame 0 / NOT_COLLECTED).
+		// it at (target+1)%fc; a fresh attach leaves it at 1). If it wrapped to 0 the
+		// one-shot animation has played its last frame.
 		size_t frame = d->sprite_current_frame;
 		if (frame == 0)
 		{
+			if (is_oneshot)
+			{
+				// Particle finished its animation: the SWF's final frame would call
+				// this.removeMovieClip() (suppressed here since we run placement tags
+				// only) — do the removal directly so the clip stops rendering and the
+				// child_mc_cache slot can be reclaimed (no leftover line, no overdraw).
+				extern void actionInvalidateCachedMovieClipDirect(SWFAppContext*, MovieClip*);
+				d->sprite_is_playing = 0;
+				d->natural_oneshot = 0;
+				actionInvalidateCachedMovieClipDirect(app_context, mc);
+				continue;
+			}
 			d->sprite_is_playing = 0;
 			d->goto_play_active = 0;
 			continue;
