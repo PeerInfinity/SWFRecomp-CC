@@ -27583,6 +27583,68 @@ static void applyLineGradientStyleToMC(SWFAppContext* app_context, MovieClip* mc
 	ds->line_gradient_focal = focal;
 }
 
+// Emit an outer-side stroke join wedge at vertex V, between the incoming
+// segment A->V and the outgoing segment V->B. Coordinates are passed in pixels
+// and converted to twips internally (matching the stroke-quad emission, which
+// also scales by 20). Writes triangle-list vertices (x,y float pairs) into
+// `out` and returns the number of vertices written: 0 (no join), 3 (bevel) or
+// 6 (miter, two triangles).
+//
+// The outer (convex) side of the turn is the side with a coverage gap between
+// the two independent segment quads; the inner side already overlaps. The
+// outer side is selected from the sign of the cross product of the segment
+// directions, so the join is winding-independent (works for both CW and CCW
+// contours). Miter point uses the unit-normal-sum bisector (numerically stable:
+// near-collinear vertices yield a small wedge near V, not a blow-up); sharp
+// angles past the miter limit fall back to a bevel triangle.
+static u32 drawing_emit_stroke_join(float* out,
+                                    float ax, float ay,
+                                    float vx, float vy,
+                                    float bx, float by,
+                                    float half_w)
+{
+	ax *= 20.0f; ay *= 20.0f;
+	vx *= 20.0f; vy *= 20.0f;
+	bx *= 20.0f; by *= 20.0f;
+	float d0x = vx - ax, d0y = vy - ay;
+	float d1x = bx - vx, d1y = by - vy;
+	float l0 = sqrtf(d0x*d0x + d0y*d0y);
+	float l1 = sqrtf(d1x*d1x + d1y*d1y);
+	if (l0 < 0.001f || l1 < 0.001f) return 0;   // degenerate segment
+	d0x /= l0; d0y /= l0;
+	d1x /= l1; d1y /= l1;
+	float cross = d0x*d1y - d0y*d1x;
+	if (fabsf(cross) < 1e-6f) return 0;          // collinear: no visible corner
+	// Outer side: left turn (cross>0) bends toward +normal, so the gap is on
+	// the -normal (right) side, and vice versa. Segment quad normal is
+	// n = (-dy, dx) (the "+n" side), matching _DR_EMIT_STROKE_SEG below.
+	float sign = (cross > 0.0f) ? -1.0f : 1.0f;
+	float o0x = sign * -d0y, o0y = sign * d0x;   // outer unit normal of incoming
+	float o1x = sign * -d1y, o1y = sign * d1x;   // outer unit normal of outgoing
+	float p0x = vx + o0x*half_w, p0y = vy + o0y*half_w;  // incoming outer corner
+	float p1x = vx + o1x*half_w, p1y = vy + o1y*half_w;  // outgoing outer corner
+	float mx = o0x + o1x, my = o0y + o1y;
+	float mlen = sqrtf(mx*mx + my*my);
+	if (mlen > 1e-4f) {
+		float mhx = mx/mlen, mhy = my/mlen;
+		float cos_half = mhx*o0x + mhy*o0y;      // cos(half the corner angle)
+		// Miter ratio = 1/cos_half (miter length over stroke half-width).
+		// Limit 4 (cos_half >= 0.25) — beyond this the spike is clipped to a
+		// bevel, matching Flash's miter-limit behavior.
+		if (cos_half > 0.25f) {
+			float miter_len = half_w / cos_half;
+			float Mx = vx + mhx*miter_len;
+			float My = vy + mhy*miter_len;
+			out[0]=vx;  out[1]=vy;   out[2]=p0x; out[3]=p0y;  out[4]=Mx;  out[5]=My;
+			out[6]=vx;  out[7]=vy;   out[8]=Mx;  out[9]=My;   out[10]=p1x; out[11]=p1y;
+			return 6;
+		}
+	}
+	// Bevel fallback (sharp angle or near-degenerate bisector).
+	out[0]=vx; out[1]=vy;  out[2]=p0x; out[3]=p0y;  out[4]=p1x; out[5]=p1y;
+	return 3;
+}
+
 // Finalize the active path: tessellate to triangles and add to paths array.
 // Each MOVE_TO starts a new contour; tessellation unions all contours under
 // the current fill style (Flash's "all sub-paths share the active fill" rule).
@@ -27780,6 +27842,14 @@ static void drawingFinalizePath(DrawingState* ds)
 			path->has_fill && ((ce) - (cs)) >= 3 && ( \
 				fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   > 0.01f || \
 				fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) > 0.01f))
+		// A contour explicitly closed by the AS code repeats its first point as
+		// its last (last ≈ first); such a contour forms a loop without an added
+		// closing segment, but its seam vertex is still a real corner needing a
+		// join.
+		#define _DR_CONTOUR_EXPLICIT_CLOSED(cs, ce) ( \
+			((ce) - (cs)) >= 3 && \
+				fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   <= 0.01f && \
+				fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) <= 0.01f)
 		// First pass: count total stroke segments across all contours
 		u32 total_segs = 0;
 		for (u32 ci = 0; ci < contour_count; ci++) {
@@ -27789,10 +27859,14 @@ static void drawingFinalizePath(DrawingState* ds)
 			if (_DR_CONTOUR_NEEDS_CLOSE(cstart, cend)) total_segs += 1;
 		}
 		if (total_segs > 0) {
-			path->line_vert_count = total_segs * 6;
-			path->line_verts = (float*)malloc(path->line_vert_count * 2 * sizeof(float));
 			float half_w = path->line_width * 0.5f * 20.0f;
-			u32 out_seg = 0;
+			// Allocate the stroke quads plus headroom for one join per vertex
+			// (a join is at most 2 triangles = 6 verts). poly_count is a safe
+			// upper bound on the number of joins, so this never overflows; the
+			// actual vertex count is tracked in `wv` and stored afterwards.
+			u32 alloc_verts = total_segs * 6 + poly_count * 6;
+			path->line_verts = (float*)malloc(alloc_verts * 2 * sizeof(float));
+			u32 wv = 0;  // verts written so far (each vert = 2 floats)
 			#define _DR_EMIT_STROKE_SEG(_x0, _y0, _x1, _y1) do { \
 				float x0 = (_x0) * 20.0f, y0 = (_y0) * 20.0f; \
 				float x1 = (_x1) * 20.0f, y1 = (_y1) * 20.0f; \
@@ -27800,25 +27874,53 @@ static void drawingFinalizePath(DrawingState* ds)
 				float len = sqrtf(dx*dx + dy*dy); \
 				if (len < 0.001f) len = 0.001f; \
 				float nx = -dy / len * half_w, ny = dx / len * half_w; \
-				float* out = &path->line_verts[out_seg * 12]; \
+				float* out = &path->line_verts[wv * 2]; \
 				out[0]=x0+nx; out[1]=y0+ny;  out[2]=x0-nx; out[3]=y0-ny;  out[4]=x1+nx; out[5]=y1+ny; \
 				out[6]=x0-nx; out[7]=y0-ny;  out[8]=x1-nx; out[9]=y1-ny;  out[10]=x1+nx; out[11]=y1+ny; \
-				out_seg++; \
+				wv += 6; \
+			} while (0)
+			#define _DR_EMIT_JOIN(_kp, _kv, _kn) do { \
+				wv += drawing_emit_stroke_join(&path->line_verts[wv * 2], \
+					poly[(_kp)*2], poly[(_kp)*2+1], \
+					poly[(_kv)*2], poly[(_kv)*2+1], \
+					poly[(_kn)*2], poly[(_kn)*2+1], half_w); \
 			} while (0)
 			for (u32 ci = 0; ci < contour_count; ci++) {
 				u32 cstart = contour_starts[ci];
 				u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
+				int needs_close = _DR_CONTOUR_NEEDS_CLOSE(cstart, cend);
+				int expl_closed = _DR_CONTOUR_EXPLICIT_CLOSED(cstart, cend);
+				// Stroke quads for each consecutive segment.
 				for (u32 i = cstart; i + 1 < cend; i++) {
 					_DR_EMIT_STROKE_SEG(poly[i*2], poly[i*2+1],
 					                    poly[(i+1)*2], poly[(i+1)*2+1]);
 				}
-				if (_DR_CONTOUR_NEEDS_CLOSE(cstart, cend)) {
+				if (needs_close) {
 					_DR_EMIT_STROKE_SEG(poly[(cend-1)*2], poly[(cend-1)*2+1],
 					                    poly[cstart*2], poly[cstart*2+1]);
 				}
+				// Joins at interior vertices (each shared by two segments).
+				for (u32 k = cstart + 1; k + 1 < cend; k++) {
+					_DR_EMIT_JOIN(k - 1, k, k + 1);
+				}
+				// Closure joins where the contour forms a loop.
+				if (needs_close && (cend - cstart) >= 2) {
+					// Seam at cstart: closing segment (cend-1 -> cstart) meets
+					// the first segment (cstart -> cstart+1).
+					_DR_EMIT_JOIN(cend - 1, cstart, cstart + 1);
+					// Corner at cend-1: last segment meets the closing segment.
+					_DR_EMIT_JOIN(cend - 2, cend - 1, cstart);
+				} else if (expl_closed) {
+					// Seam where last point coincides with first: last segment
+					// (cend-2 -> cend-1≈cstart) meets first (cstart -> cstart+1).
+					_DR_EMIT_JOIN(cend - 2, cstart, cstart + 1);
+				}
 			}
+			#undef _DR_EMIT_JOIN
 			#undef _DR_EMIT_STROKE_SEG
+			path->line_vert_count = wv;
 		}
+		#undef _DR_CONTOUR_EXPLICIT_CLOSED
 		#undef _DR_CONTOUR_NEEDS_CLOSE
 	}
 
