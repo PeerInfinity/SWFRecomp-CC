@@ -27769,35 +27769,57 @@ static void drawingFinalizePath(DrawingState* ds)
 
 	// Line stroke expansion: emit quads per contour (skip MOVE_TO seams).
 	if (path->has_line && contour_count > 0) {
+		// A FILLED contour the AS code left open (e.g. the common
+		// `moveTo; lineTo*3; endFill` idiom that omits the 4th side) is
+		// auto-closed by Flash for BOTH fill and stroke: the closing edge
+		// (last point → contour start) is stroked too. libtess2 already
+		// closes the fill; close the stroke to match. Only for filled paths
+		// (an open stroked polyline with no fill stays open in Flash), and
+		// skip contours already explicitly closed (last point ≈ first).
+		#define _DR_CONTOUR_NEEDS_CLOSE(cs, ce) ( \
+			path->has_fill && ((ce) - (cs)) >= 3 && ( \
+				fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   > 0.01f || \
+				fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) > 0.01f))
 		// First pass: count total stroke segments across all contours
 		u32 total_segs = 0;
 		for (u32 ci = 0; ci < contour_count; ci++) {
 			u32 cstart = contour_starts[ci];
 			u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
 			if (cend > cstart + 1) total_segs += (cend - cstart - 1);
+			if (_DR_CONTOUR_NEEDS_CLOSE(cstart, cend)) total_segs += 1;
 		}
 		if (total_segs > 0) {
 			path->line_vert_count = total_segs * 6;
 			path->line_verts = (float*)malloc(path->line_vert_count * 2 * sizeof(float));
 			float half_w = path->line_width * 0.5f * 20.0f;
 			u32 out_seg = 0;
+			#define _DR_EMIT_STROKE_SEG(_x0, _y0, _x1, _y1) do { \
+				float x0 = (_x0) * 20.0f, y0 = (_y0) * 20.0f; \
+				float x1 = (_x1) * 20.0f, y1 = (_y1) * 20.0f; \
+				float dx = x1 - x0, dy = y1 - y0; \
+				float len = sqrtf(dx*dx + dy*dy); \
+				if (len < 0.001f) len = 0.001f; \
+				float nx = -dy / len * half_w, ny = dx / len * half_w; \
+				float* out = &path->line_verts[out_seg * 12]; \
+				out[0]=x0+nx; out[1]=y0+ny;  out[2]=x0-nx; out[3]=y0-ny;  out[4]=x1+nx; out[5]=y1+ny; \
+				out[6]=x0-nx; out[7]=y0-ny;  out[8]=x1-nx; out[9]=y1-ny;  out[10]=x1+nx; out[11]=y1+ny; \
+				out_seg++; \
+			} while (0)
 			for (u32 ci = 0; ci < contour_count; ci++) {
 				u32 cstart = contour_starts[ci];
 				u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
 				for (u32 i = cstart; i + 1 < cend; i++) {
-					float x0 = poly[i*2] * 20.0f, y0 = poly[i*2+1] * 20.0f;
-					float x1 = poly[(i+1)*2] * 20.0f, y1 = poly[(i+1)*2+1] * 20.0f;
-					float dx = x1 - x0, dy = y1 - y0;
-					float len = sqrtf(dx*dx + dy*dy);
-					if (len < 0.001f) len = 0.001f;
-					float nx = -dy / len * half_w, ny = dx / len * half_w;
-					float* out = &path->line_verts[out_seg * 12];
-					out[0]=x0+nx; out[1]=y0+ny;  out[2]=x0-nx; out[3]=y0-ny;  out[4]=x1+nx; out[5]=y1+ny;
-					out[6]=x0-nx; out[7]=y0-ny;  out[8]=x1-nx; out[9]=y1-ny;  out[10]=x1+nx; out[11]=y1+ny;
-					out_seg++;
+					_DR_EMIT_STROKE_SEG(poly[i*2], poly[i*2+1],
+					                    poly[(i+1)*2], poly[(i+1)*2+1]);
+				}
+				if (_DR_CONTOUR_NEEDS_CLOSE(cstart, cend)) {
+					_DR_EMIT_STROKE_SEG(poly[(cend-1)*2], poly[(cend-1)*2+1],
+					                    poly[cstart*2], poly[cstart*2+1]);
 				}
 			}
+			#undef _DR_EMIT_STROKE_SEG
 		}
+		#undef _DR_CONTOUR_NEEDS_CLOSE
 	}
 
 	free(poly);
