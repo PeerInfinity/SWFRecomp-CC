@@ -36,6 +36,28 @@ first).
   diagnosing `avm1/netstream_seek_flv` (2026-05-11) — see playbook
   gotcha #15 for the symptom signature.
 
+## Browser-WASM — rendering
+
+- **Attached-clip morph shapes can't ratio-interpolate per-instance.**
+  Morph interpolation is a per-CHARACTER pre-pass into a SHARED vertex
+  buffer run over the ROOT display_list only (`tag.c` ~5802);
+  `render_display_list` / `render_single_object` draw attached/nested
+  morph shapes at `morph_start_offset` (ratio 0). So a morph clip
+  reached via `render_attached_child` (attachMovie'd) can't show its
+  animated in-between frames, and two on-screen instances of the same
+  morph character would collide on the shared buffer. Surfaced by
+  Metanet "N"'s particles (DefineMorphShapes animated by per-frame
+  ratio): the current N fix (`c9d729168`) sidesteps it —
+  `natural_oneshot` "pfx*" particles keep their frame-0 appearance and
+  just self-remove on lifetime end (no animation, but no corruption +
+  the fps/leftover-line wins). **Proper fix:** per-instance morph
+  interpolation — interpolate verts at each instance's `obj->ratio` into
+  a dynamic vertex region per draw (like the drawing-API
+  `dyn_vtx_staging` path) instead of the shared per-character buffer.
+  USER-CONFIRMED current behavior is "good enough for N"; do the proper
+  fix when a game needs faithful nested/attached morph animation.
+  (2026-06-27)
+
 ## Deferred test failures
 
 - ~~**`from_gnash/actionscript.all/case-v6` CI-only flake.**~~ FIXED
