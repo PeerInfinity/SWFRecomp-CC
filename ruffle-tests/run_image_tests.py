@@ -40,6 +40,11 @@ RESULTS_HTML = SCRIPT_DIR.parent / "ruffle-image-results.html"
 _DISCOVERY_SKIP_DIRS = {
     "__framework__", "_investigation", "_image-test-output", "_results",
     "RecompiledScripts", "RecompiledTags",
+    # _swfbridge holds the dj_loader/dj_probe livetest harnesses (native game
+    # runs, not Ruffle render-comparison tests). They acquired
+    # [image_comparisons] test.toml sections later and would otherwise be
+    # swept into the image suite where they NO_RENDER and take minutes each.
+    "_swfbridge",
 }
 
 
