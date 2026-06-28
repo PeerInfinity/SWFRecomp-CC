@@ -4744,14 +4744,32 @@ static void render_drawing_mc_paths(const DrawingMCInfo* mc_info)
 	}
 }
 
+// Render only the FILL triangles of a drawing MC's paths (strokes skipped).
+// Used when rasterizing a clip into the stencil buffer: Flash masks are
+// defined by fill geometry only — a mask clip's line style never contributes
+// to the mask region. (The stencil-write pipeline ignores color, so the fill
+// triangles alone give correct coverage regardless of fill type.)
+static void render_drawing_mc_paths_fill_only(const DrawingMCInfo* mc_info)
+{
+	for (int i = 0; i < mc_info->path_count; i++) {
+		const DrawingRenderInfo* info = &mc_info->paths[i];
+		if (info->fill_count > 0) {
+			renderer_draw_tris(context, info->fill_verts, info->fill_count,
+				info->fill_r, info->fill_g, info->fill_b, info->fill_a,
+				info->transform_id, info->cxform_id);
+		}
+	}
+}
+
 // Callback for actionIterateMaskedDrawings: stencil-masked rendering.
 static void masked_drawing_render_cb(const DrawingMCInfo* masked, const DrawingMCInfo* mask, void* user_data)
 {
 	(void)user_data;
 
-	// 1. Write mask shape into stencil buffer
+	// 1. Write mask shape into stencil buffer — fill geometry only (Flash
+	//    masks ignore the mask clip's stroke).
 	renderer_begin_clip_mask(context);
-	render_drawing_mc_paths(mask);
+	render_drawing_mc_paths_fill_only(mask);
 	renderer_end_clip_mask(context);
 
 	// 2. Render masked MC content with stencil test
