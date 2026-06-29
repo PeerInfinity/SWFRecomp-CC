@@ -27415,6 +27415,15 @@ static void applyGradientFillToMC(SWFAppContext* app_context, MovieClip* mc,
 		focal = (float)varToDoubleSimple(&args[7]);
 		if (isnan(focal) || isinf(focal)) focal = 0.0f;
 		if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;  // focal radial
+		// Flash/Ruffle store the focal point as Fixed8 — `Fixed8::from_f64` is
+		// `(n * 256.0) as i16`, i.e. TRUNCATION toward zero (NOT rounding). So
+		// AS focal 0.8 → 0.8*256 = 204.8 → 204 → 0.796875, not 0.80078. Then the
+		// wgpu renderer clamps to [-0.98, 0.98]. Our previous ~0.79998 encoding
+		// was off by ~0.003 — invisible on pad/reflect, but with a `repeat`
+		// spread it shifted the infinitely compressed cycles around the focal
+		// singularity, producing the bulk of this test's gradient diff.
+		focal = truncf(focal * 256.0f) / 256.0f;
+		if (focal > 0.98f) focal = 0.98f; else if (focal < -0.98f) focal = -0.98f;
 	}
 
 	// Build gradient matrix
@@ -27542,6 +27551,9 @@ static void applyLineGradientStyleToMC(SWFAppContext* app_context, MovieClip* mc
 		focal = (float)varToDoubleSimple(&args[7]);
 		if (isnan(focal) || isinf(focal)) focal = 0.0f;
 		if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;
+		// Fixed8 truncation + renderer clamp; see beginGradientFill above.
+		focal = truncf(focal * 256.0f) / 256.0f;
+		if (focal > 0.98f) focal = 0.98f; else if (focal < -0.98f) focal = -0.98f;
 	}
 
 	DrawingState* ds = getOrCreateDrawingState(mc);

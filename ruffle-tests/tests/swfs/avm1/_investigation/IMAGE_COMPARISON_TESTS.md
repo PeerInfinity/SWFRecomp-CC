@@ -60,6 +60,46 @@ drawing-API gradient-rendering gap. `from_shumway/gradientTransform` (467 px) is
 DefineShape gradient whose *interior ramp already matches Flash exactly* (flat 153);
 its residual is the accepted MSAA edge-AA gap (Category 11), not gradient banding.
 
+## Session update (2026-06-29): gradient phase offset ROOT-CAUSED AND FIXED
+
+The 2026-06-28 "sub-pixel sampling phase" hypothesis was correct in *symptom* but
+the cause was concrete and fixable, not a GPU convention mismatch:
+
+**1. Focal-point Fixed8 truncation (the dominant bug — ~1000 of 1266 px).**
+Per-cell analysis showed the *entire* `movieclip_begin_gradient_fill` error lived
+in one cell — `radial, repeat, linearRGB, focal 0.8` (all other cells, including
+radial-pad and radial-reflect, were 0 px in the interior). Flash/Ruffle store the
+focal point as **Fixed8**, and `swf::Fixed8::from_f64(n)` is `(n * 256.0) as i16`
+— Rust `as i16` **truncates toward zero**, NOT rounds. So AS focal `0.8` →
+`0.8*256 = 204.8` → `204` → `204/256 = 0.796875` (then the wgpu renderer clamps to
+`[-0.98, 0.98]`). Our code fed `~0.79998` to the shader (a near-exact 0.8). With a
+`repeat` spread the cycles around the focal singularity are infinitely compressed,
+so a `0.003` focal error shifts the whole high-frequency region → the bulk of the
+diff. An empirical `FOCAL_OVERRIDE` sweep (persistent build, no rebuild per value)
+found the optimum at exactly the shader value `0.796875`, confirming Fixed8
+truncation. **Fix:** `action.c` `applyGradientFillToMC` / `applyLineGradientStyleToMC`
+now `focal = truncf(focal*256)/256` then clamp `[-0.98, 0.98]`.
+Result: `movieclip_begin_gradient_fill` **1266 → 202** (focal cell 1040 → 8;
+Ruffle-vs-Flash floor is 180 — we now match Flash about as well as Ruffle does).
+
+**2. Ramp-sample index convention (minor — ~40 px).** Ruffle samples its 256-texel
+ramp with a HARDWARE linear sampler (clamp-to-edge): effective index `t*256 - 0.5`.
+Our `sample_gradient` used `t*255`, a `(0.5 - t)`-index phase error. Changed to
+`clamp(t*256-0.5, 0, 255)` (kept `textureLoad` for exact ROW selection — no
+V-filter bleed across ramps on SwiftShader). `render_webgpu.c`.
+
+**No regressions:** `movieclip_setmask` = 0, `mask_with_drawing` = 0,
+`from_shumway/gradientTransform` = 467 (unchanged — the accepted Cat-11 edge gap;
+the ramp-convention change is byte-neutral on its flat interior).
+
+**Still open (separate, NOT gradient phase):** `movieclip_line_gradient_style`
+**1052 → 535** — the gradient *phase* is fixed (its focal-repeat cell, 54, now
+matches its other stroke cells, 32–64), but its residual is stroke-edge AA
+distributed across every `lineGradientStyle` cell. Ruffle-vs-Flash is 151 here, so
+our strokes are genuinely ~3.5× less faithful to Flash than Ruffle's — a
+stroke-rasterization gap (per-vertex miter joins vs Flash's analytic rasterizer),
+not a gradient issue. Future stroke-fidelity work, out of scope for the phase fix.
+
 **2026-06-28 root-cause update — it is NOT a ramp color-ramp/quantization bug.**
 A full investigation (compute our 256-ramp, compare byte-for-byte to Ruffle's
 `CommonGradient::new` in `render/wgpu/src/mesh.rs`, and trace the full
