@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import tomllib
 from datetime import datetime, timezone
@@ -2284,10 +2285,23 @@ function startDemo() {{
     return True
 
 
+# Hard cap on a single test binary's captured output. Legit trace tests emit at
+# most a few hundred KB; a runaway (e.g. a gotoFrame2 frame-replay loop that
+# never terminates) emits unbounded PASSED/FAILED lines. Without a cap,
+# subprocess.communicate() buffers it ALL in RAM and OOMs the (memory-limited) CI
+# runner — which surfaces as "runner received a shutdown signal" / exit 143 and
+# kills the whole shard. Capping here turns a runaway into a clean per-test
+# TIMEOUT instead. 32 MB is orders of magnitude above any real test.
+MAX_OUTPUT_BYTES = 32 * 1024 * 1024
+
+
 def run_binary(build_dir, event_file=None, extra_env=None):
     """Run the compiled binary and capture output.
 
-    Returns (stdout, returncode, stderr).
+    Returns (stdout, returncode, stderr), or (None, -1, "") on wall-clock
+    timeout OR output-size runaway (both graded as a timeout by the caller).
+    Output is drained on background threads (so the child never blocks on a
+    full pipe) and bounded to MAX_OUTPUT_BYTES (so a runaway can't OOM us).
     """
     cmd = [str(build_dir / "test_run")]
     if event_file is not None:
@@ -2298,21 +2312,55 @@ def run_binary(build_dir, event_file=None, extra_env=None):
     env.setdefault("TZ", "NPT-5:45")
     if extra_env:
         env.update(extra_env)
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    runaway = threading.Event()
+
+    def _drain(stream, chunks, bound):
+        # Read until EOF, appending chunks. If `bound` and the accumulated size
+        # exceeds the cap, flag a runaway and kill the child (which closes the
+        # pipe and ends this loop).
+        total = 0
+        try:
+            while True:
+                b = stream.read(65536)
+                if not b:
+                    break
+                chunks.append(b)
+                if bound:
+                    total += len(b)
+                    if total > MAX_OUTPUT_BYTES:
+                        runaway.set()
+                        proc.kill()
+                        break
+        except Exception:
+            pass
+
+    out_chunks, err_chunks = [], []
+    t_out = threading.Thread(target=_drain, args=(proc.stdout, out_chunks, True))
+    t_err = threading.Thread(target=_drain, args=(proc.stderr, err_chunks, True))
+    t_out.start()
+    t_err.start()
+
     try:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=env,
-        )
-        stdout, stderr = proc.communicate(timeout=30)
-        return (stdout.decode("utf-8", errors="replace"),
-                proc.returncode,
-                stderr.decode("utf-8", errors="replace"))
+        proc.wait(timeout=30)
     except subprocess.TimeoutExpired:
         proc.kill()
-        proc.wait()
+        t_out.join(2)
+        t_err.join(2)
         return None, -1, ""
+    t_out.join(2)
+    t_err.join(2)
+    if runaway.is_set():
+        return None, -1, ""
+    return (b"".join(out_chunks).decode("utf-8", errors="replace"),
+            proc.returncode,
+            b"".join(err_chunks).decode("utf-8", errors="replace"))
 
 
 def _diff_indices(actual, expected, epsilon=0.0, number_patterns=None):
