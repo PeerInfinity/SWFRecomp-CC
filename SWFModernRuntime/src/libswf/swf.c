@@ -181,6 +181,32 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	size_t original_frame = current_frame;
 	size_t target = next_frame;
 
+	// Self-goto guard (ported from swf_core.c): a goto targeting the frame whose
+	// own script is currently executing (e.g. GotoFrame2 play=1 /
+	// gotoAndPlay(_currentframe) issued from the running frame) must NOT replay
+	// tags or re-run funcs[target]. The playhead is already on `target`; the
+	// inline funcs[target] call at the end of this function re-queues that same
+	// script (via the recompiler-emitted actionQueueScript under g_tag_skip_mode),
+	// whose drain re-issues the goto → unbounded inline frame replay within a
+	// single tick (the script FIFO never drains, MAX_FRAMES can't bound it). The
+	// NO_GRAPHICS path has had this guard; the OFFSCREEN_RENDER (graphics) path
+	// lacked it, so it spun forever where no-graphics terminates and passes.
+	// Flash does not re-execute the current frame's actions on a same-frame goto
+	// within the tick — it just confirms the playhead and lets is_playing (set by
+	// any trailing Stop/Play in the same script) decide whether the NEXT tick
+	// advances. Consume the goto request and return so the main loop's natural
+	// advance (current_frame++ when is_playing) still applies. Key test:
+	// from_gnash/misc-ming.all/gotoFrame2Test (GotoFrame2 play=1 to the current
+	// frame, then Stop()).
+	if (target == original_frame) {
+		if (swapped)
+			ng_restoreFromRootDL(saved_sprite_dl, saved_sprite_max, saved_sprite_cap);
+		goto_from_action = 0;
+		manual_next_frame = 0;
+		current_frame = target;
+		return;
+	}
+
 	ng_display_clear_after(app_context, target);
 
 	int saved_tag_skip = g_tag_skip_mode;
