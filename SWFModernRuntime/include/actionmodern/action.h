@@ -533,6 +533,15 @@ typedef struct {
 	u32 fill_vert_count;   // number of vertices (multiple of 3)
 	float* line_verts;     // x,y pairs in twips (line quad triangles)
 	u32 line_vert_count;
+	// Retained stroke source polyline for scale-aware re-expansion to Flash's
+	// minimum 1px on-screen stroke width (rebuilt by drawingBuildStroke when the
+	// MC's render scale changes). NULL when the path carries no stroke.
+	float* stroke_poly;        // x,y pairs in PIXELS (contour vertices)
+	u32 stroke_poly_count;
+	u32* stroke_contours;      // per-contour start indices into stroke_poly
+	u32 stroke_contour_count;
+	int stroke_filled;         // path had a fill (controls stroke auto-close)
+	float stroke_built_half_w; // half-width (twips) line_verts were built at; <0 = unbuilt
 } DrawPath;
 
 typedef struct {

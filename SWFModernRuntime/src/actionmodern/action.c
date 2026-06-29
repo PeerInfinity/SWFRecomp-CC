@@ -27657,6 +27657,116 @@ static u32 drawing_emit_stroke_join(float* out,
 	return 3;
 }
 
+// (Re)build the stroke triangle geometry for `path` at the given half-width
+// (twips) from the retained contour polyline (path->stroke_poly, in pixels).
+// Called once at finalize with the nominal half-width and again at render time
+// whenever the MC's on-screen scale changes enough to alter Flash's minimum-1px
+// stroke width. Frees and reallocates path->line_verts.
+static void drawingBuildStroke(DrawPath* path, float half_w)
+{
+	float* poly = path->stroke_poly;
+	u32 poly_count = path->stroke_poly_count;
+	u32* contour_starts = path->stroke_contours;
+	u32 contour_count = path->stroke_contour_count;
+
+	free(path->line_verts);
+	path->line_verts = NULL;
+	path->line_vert_count = 0;
+	path->stroke_built_half_w = half_w;
+	if (poly == NULL || contour_count == 0) return;
+
+	// A FILLED contour the AS code left open (e.g. the common
+	// `moveTo; lineTo*3; endFill` idiom that omits the 4th side) is
+	// auto-closed by Flash for BOTH fill and stroke: the closing edge
+	// (last point → contour start) is stroked too. libtess2 already
+	// closes the fill; close the stroke to match. Only for filled paths
+	// (an open stroked polyline with no fill stays open in Flash), and
+	// skip contours already explicitly closed (last point ≈ first).
+	#define _DR_CONTOUR_NEEDS_CLOSE(cs, ce) ( \
+		path->stroke_filled && ((ce) - (cs)) >= 3 && ( \
+			fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   > 0.01f || \
+			fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) > 0.01f))
+	// A contour explicitly closed by the AS code repeats its first point as
+	// its last (last ≈ first); such a contour forms a loop without an added
+	// closing segment, but its seam vertex is still a real corner needing a
+	// join.
+	#define _DR_CONTOUR_EXPLICIT_CLOSED(cs, ce) ( \
+		((ce) - (cs)) >= 3 && \
+			fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   <= 0.01f && \
+			fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) <= 0.01f)
+	// First pass: count total stroke segments across all contours
+	u32 total_segs = 0;
+	for (u32 ci = 0; ci < contour_count; ci++) {
+		u32 cstart = contour_starts[ci];
+		u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
+		if (cend > cstart + 1) total_segs += (cend - cstart - 1);
+		if (_DR_CONTOUR_NEEDS_CLOSE(cstart, cend)) total_segs += 1;
+	}
+	if (total_segs > 0) {
+		// Allocate the stroke quads plus headroom for one join per vertex
+		// (a join is at most 2 triangles = 6 verts). poly_count is a safe
+		// upper bound on the number of joins, so this never overflows; the
+		// actual vertex count is tracked in `wv` and stored afterwards.
+		u32 alloc_verts = total_segs * 6 + poly_count * 6;
+		path->line_verts = (float*)malloc(alloc_verts * 2 * sizeof(float));
+		u32 wv = 0;  // verts written so far (each vert = 2 floats)
+		#define _DR_EMIT_STROKE_SEG(_x0, _y0, _x1, _y1) do { \
+			float x0 = (_x0) * 20.0f, y0 = (_y0) * 20.0f; \
+			float x1 = (_x1) * 20.0f, y1 = (_y1) * 20.0f; \
+			float dx = x1 - x0, dy = y1 - y0; \
+			float len = sqrtf(dx*dx + dy*dy); \
+			if (len < 0.001f) len = 0.001f; \
+			float nx = -dy / len * half_w, ny = dx / len * half_w; \
+			float* out = &path->line_verts[wv * 2]; \
+			out[0]=x0+nx; out[1]=y0+ny;  out[2]=x0-nx; out[3]=y0-ny;  out[4]=x1+nx; out[5]=y1+ny; \
+			out[6]=x0-nx; out[7]=y0-ny;  out[8]=x1-nx; out[9]=y1-ny;  out[10]=x1+nx; out[11]=y1+ny; \
+			wv += 6; \
+		} while (0)
+		#define _DR_EMIT_JOIN(_kp, _kv, _kn) do { \
+			wv += drawing_emit_stroke_join(&path->line_verts[wv * 2], \
+				poly[(_kp)*2], poly[(_kp)*2+1], \
+				poly[(_kv)*2], poly[(_kv)*2+1], \
+				poly[(_kn)*2], poly[(_kn)*2+1], half_w); \
+		} while (0)
+		for (u32 ci = 0; ci < contour_count; ci++) {
+			u32 cstart = contour_starts[ci];
+			u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
+			int needs_close = _DR_CONTOUR_NEEDS_CLOSE(cstart, cend);
+			int expl_closed = _DR_CONTOUR_EXPLICIT_CLOSED(cstart, cend);
+			// Stroke quads for each consecutive segment.
+			for (u32 i = cstart; i + 1 < cend; i++) {
+				_DR_EMIT_STROKE_SEG(poly[i*2], poly[i*2+1],
+				                    poly[(i+1)*2], poly[(i+1)*2+1]);
+			}
+			if (needs_close) {
+				_DR_EMIT_STROKE_SEG(poly[(cend-1)*2], poly[(cend-1)*2+1],
+				                    poly[cstart*2], poly[cstart*2+1]);
+			}
+			// Joins at interior vertices (each shared by two segments).
+			for (u32 k = cstart + 1; k + 1 < cend; k++) {
+				_DR_EMIT_JOIN(k - 1, k, k + 1);
+			}
+			// Closure joins where the contour forms a loop.
+			if (needs_close && (cend - cstart) >= 2) {
+				// Seam at cstart: closing segment (cend-1 -> cstart) meets
+				// the first segment (cstart -> cstart+1).
+				_DR_EMIT_JOIN(cend - 1, cstart, cstart + 1);
+				// Corner at cend-1: last segment meets the closing segment.
+				_DR_EMIT_JOIN(cend - 2, cend - 1, cstart);
+			} else if (expl_closed) {
+				// Seam where last point coincides with first: last segment
+				// (cend-2 -> cend-1≈cstart) meets first (cstart -> cstart+1).
+				_DR_EMIT_JOIN(cend - 2, cstart, cstart + 1);
+			}
+		}
+		#undef _DR_EMIT_JOIN
+		#undef _DR_EMIT_STROKE_SEG
+		path->line_vert_count = wv;
+	}
+	#undef _DR_CONTOUR_EXPLICIT_CLOSED
+	#undef _DR_CONTOUR_NEEDS_CLOSE
+}
+
 // Finalize the active path: tessellate to triangles and add to paths array.
 // Each MOVE_TO starts a new contour; tessellation unions all contours under
 // the current fill style (Flash's "all sub-paths share the active fill" rule).
@@ -27841,99 +27951,19 @@ static void drawingFinalizePath(DrawingState* ds)
 		free(twips_poly);
 	}
 
-	// Line stroke expansion: emit quads per contour (skip MOVE_TO seams).
+	// Line stroke: retain the contour polyline so the stroke can be (re)built
+	// at render time honoring Flash's minimum 1px on-screen stroke width (the
+	// effective width depends on the MC's render scale, unknown here). The
+	// nominal-width build below is refined per-frame in fillDrawingInfos.
 	if (path->has_line && contour_count > 0) {
-		// A FILLED contour the AS code left open (e.g. the common
-		// `moveTo; lineTo*3; endFill` idiom that omits the 4th side) is
-		// auto-closed by Flash for BOTH fill and stroke: the closing edge
-		// (last point → contour start) is stroked too. libtess2 already
-		// closes the fill; close the stroke to match. Only for filled paths
-		// (an open stroked polyline with no fill stays open in Flash), and
-		// skip contours already explicitly closed (last point ≈ first).
-		#define _DR_CONTOUR_NEEDS_CLOSE(cs, ce) ( \
-			path->has_fill && ((ce) - (cs)) >= 3 && ( \
-				fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   > 0.01f || \
-				fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) > 0.01f))
-		// A contour explicitly closed by the AS code repeats its first point as
-		// its last (last ≈ first); such a contour forms a loop without an added
-		// closing segment, but its seam vertex is still a real corner needing a
-		// join.
-		#define _DR_CONTOUR_EXPLICIT_CLOSED(cs, ce) ( \
-			((ce) - (cs)) >= 3 && \
-				fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   <= 0.01f && \
-				fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) <= 0.01f)
-		// First pass: count total stroke segments across all contours
-		u32 total_segs = 0;
-		for (u32 ci = 0; ci < contour_count; ci++) {
-			u32 cstart = contour_starts[ci];
-			u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
-			if (cend > cstart + 1) total_segs += (cend - cstart - 1);
-			if (_DR_CONTOUR_NEEDS_CLOSE(cstart, cend)) total_segs += 1;
-		}
-		if (total_segs > 0) {
-			float half_w = path->line_width * 0.5f * 20.0f;
-			// Allocate the stroke quads plus headroom for one join per vertex
-			// (a join is at most 2 triangles = 6 verts). poly_count is a safe
-			// upper bound on the number of joins, so this never overflows; the
-			// actual vertex count is tracked in `wv` and stored afterwards.
-			u32 alloc_verts = total_segs * 6 + poly_count * 6;
-			path->line_verts = (float*)malloc(alloc_verts * 2 * sizeof(float));
-			u32 wv = 0;  // verts written so far (each vert = 2 floats)
-			#define _DR_EMIT_STROKE_SEG(_x0, _y0, _x1, _y1) do { \
-				float x0 = (_x0) * 20.0f, y0 = (_y0) * 20.0f; \
-				float x1 = (_x1) * 20.0f, y1 = (_y1) * 20.0f; \
-				float dx = x1 - x0, dy = y1 - y0; \
-				float len = sqrtf(dx*dx + dy*dy); \
-				if (len < 0.001f) len = 0.001f; \
-				float nx = -dy / len * half_w, ny = dx / len * half_w; \
-				float* out = &path->line_verts[wv * 2]; \
-				out[0]=x0+nx; out[1]=y0+ny;  out[2]=x0-nx; out[3]=y0-ny;  out[4]=x1+nx; out[5]=y1+ny; \
-				out[6]=x0-nx; out[7]=y0-ny;  out[8]=x1-nx; out[9]=y1-ny;  out[10]=x1+nx; out[11]=y1+ny; \
-				wv += 6; \
-			} while (0)
-			#define _DR_EMIT_JOIN(_kp, _kv, _kn) do { \
-				wv += drawing_emit_stroke_join(&path->line_verts[wv * 2], \
-					poly[(_kp)*2], poly[(_kp)*2+1], \
-					poly[(_kv)*2], poly[(_kv)*2+1], \
-					poly[(_kn)*2], poly[(_kn)*2+1], half_w); \
-			} while (0)
-			for (u32 ci = 0; ci < contour_count; ci++) {
-				u32 cstart = contour_starts[ci];
-				u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
-				int needs_close = _DR_CONTOUR_NEEDS_CLOSE(cstart, cend);
-				int expl_closed = _DR_CONTOUR_EXPLICIT_CLOSED(cstart, cend);
-				// Stroke quads for each consecutive segment.
-				for (u32 i = cstart; i + 1 < cend; i++) {
-					_DR_EMIT_STROKE_SEG(poly[i*2], poly[i*2+1],
-					                    poly[(i+1)*2], poly[(i+1)*2+1]);
-				}
-				if (needs_close) {
-					_DR_EMIT_STROKE_SEG(poly[(cend-1)*2], poly[(cend-1)*2+1],
-					                    poly[cstart*2], poly[cstart*2+1]);
-				}
-				// Joins at interior vertices (each shared by two segments).
-				for (u32 k = cstart + 1; k + 1 < cend; k++) {
-					_DR_EMIT_JOIN(k - 1, k, k + 1);
-				}
-				// Closure joins where the contour forms a loop.
-				if (needs_close && (cend - cstart) >= 2) {
-					// Seam at cstart: closing segment (cend-1 -> cstart) meets
-					// the first segment (cstart -> cstart+1).
-					_DR_EMIT_JOIN(cend - 1, cstart, cstart + 1);
-					// Corner at cend-1: last segment meets the closing segment.
-					_DR_EMIT_JOIN(cend - 2, cend - 1, cstart);
-				} else if (expl_closed) {
-					// Seam where last point coincides with first: last segment
-					// (cend-2 -> cend-1≈cstart) meets first (cstart -> cstart+1).
-					_DR_EMIT_JOIN(cend - 2, cstart, cstart + 1);
-				}
-			}
-			#undef _DR_EMIT_JOIN
-			#undef _DR_EMIT_STROKE_SEG
-			path->line_vert_count = wv;
-		}
-		#undef _DR_CONTOUR_EXPLICIT_CLOSED
-		#undef _DR_CONTOUR_NEEDS_CLOSE
+		path->stroke_poly = poly;
+		path->stroke_poly_count = poly_count;
+		path->stroke_contours = contour_starts;
+		path->stroke_contour_count = contour_count;
+		path->stroke_filled = path->has_fill;
+		path->stroke_built_half_w = -1.0f;
+		drawingBuildStroke(path, path->line_width * 0.5f * 20.0f);
+		poly = NULL; contour_starts = NULL;  // ownership transferred to path
 	}
 
 	free(poly);
@@ -27962,6 +27992,8 @@ static void drawingClear(MovieClip* mc)
 	for (u32 i = 0; i < ds->path_count; i++) {
 		free(ds->paths[i].fill_verts);
 		free(ds->paths[i].line_verts);
+		free(ds->paths[i].stroke_poly);
+		free(ds->paths[i].stroke_contours);
 	}
 	free(ds->paths); ds->paths = NULL;
 	ds->path_count = ds->path_capacity = 0;
@@ -28053,6 +28085,31 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 			? mc->dynamic_xform_slot
 			: mc->last_transform_id;
 		info->cxform_id = 0;
+
+		// Flash renders every stroke at a minimum of 1 on-screen pixel. Our
+		// stroke geometry is baked in local twips, so re-expand it whenever the
+		// MC's on-screen scale would otherwise drop the nominal width below 1px
+		// (matches Ruffle's tessellator: width.max(1.0/scale)). This is what
+		// makes hairline lineStyle(0) lines render as 1px instead of vanishing,
+		// and keeps strokes on scaled-down clips from thinning away.
+		if (path->has_line && path->stroke_poly != NULL) {
+			extern float transform_data[][16];
+			float a = transform_data[info->transform_id][0];
+			float b = transform_data[info->transform_id][1];
+			float c = transform_data[info->transform_id][4];
+			float d = transform_data[info->transform_id][5];
+			float sx = sqrtf(a*a + b*b);
+			float sy = sqrtf(c*c + d*d);
+			float s = (sx > sy) ? sx : sy;                  // max-axis on-screen scale
+			float min_w_px = (s > 1e-6f) ? (1.0f / s) : 1.0f;
+			float eff_w_px = (path->line_width > min_w_px) ? path->line_width : min_w_px;
+			float want_half_w = eff_w_px * 0.5f * 20.0f;
+			if (fabsf(want_half_w - path->stroke_built_half_w) > 0.01f) {
+				drawingBuildStroke(path, want_half_w);
+			}
+			info->line_verts = path->line_verts;
+			info->line_count = path->has_line ? path->line_vert_count : 0;
+		}
 	}
 	return count;
 }

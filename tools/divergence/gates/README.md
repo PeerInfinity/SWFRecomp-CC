@@ -299,3 +299,36 @@ matches when EVERY field but `_cf` is identical and the values are the exact
 documented pair, so it cannot mask a real `_cf` bug. See `../accepted/README.md`
 and PROGRESS.md #10b. This gate is unaffected (it has no manifest and stays
 GREEN — it reads `2,3,4,5` on both sides).
+
+## stroke_min_width (image gate)
+
+`stroke_min_width.swf` (from `stroke_min_width.as`, MTASC `-version 8`): four
+drawing-API horizontal strokes on a 200×150 stage —
+
+1. `lineStyle(0)` black hairline @ 100% scale,
+2. `lineStyle(2)` red @ 100% scale,
+3. `lineStyle(4)` blue on a clip scaled to `_xscale=_yscale=25` (→ 1px on screen),
+4. `lineStyle(2)` green on a clip scaled to 25% (→ 0.5px on screen).
+
+Locks Flash's **minimum 1px on-screen stroke width**. Ruffle floors every stroke
+to ≥1 screen pixel (`render/src/tessellator.rs`: `width.max(1.0/scale)`).
+SWFRecomp baked the stroke half-width in local twips at `lineTo` time, scale-blind,
+so row 1 vanished entirely (half-width 0) and rows 3-4 thinned below 1px. This was
+the root cause of game **N**'s "shapes are much thinner than Ruffle" — N draws
+everything with the drawing API into clips it then scales down. Fixed by retaining
+the stroke contour polyline (`DrawPath::stroke_poly`) and re-expanding it per-frame
+in `fillDrawingInfos` (`action.c`) against the MC's render scale derived from
+`transform_data[transform_id]`, mirroring Ruffle.
+
+Unlike the trace gates, this is an **image** gate. The checker renders via
+`run_swfrecomp.py` and asserts all four stroke rows are present (counts horizontal
+"inked" bands, robust to anti-aliasing). `stroke_min_width.ruffle.png` is the
+Ruffle exporter reference for eyeballing.
+
+Gate (must print `GATE-GREEN`):
+
+```bash
+CCACHE_DISABLE=1 python3 tools/divergence/gates/check_stroke_min_width.py
+```
+
+Regressed before the min-stroke-width fix: row 1 (hairline) absent → 3 bands → FAIL.
