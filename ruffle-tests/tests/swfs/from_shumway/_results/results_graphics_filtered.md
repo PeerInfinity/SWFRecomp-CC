@@ -1,6 +1,6 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-06-29 19:57 UTC
+**Date**: 2026-06-29 20:06 UTC
 
 **Git SHA**: `b980ca79e3`
 
@@ -73,7 +73,7 @@
 | 44 | `avm1/watch` | 2 | 1.9s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 45 | `avm1/xml/xmlbuild` | 1 | 1.8s |  |
 | 46 | `avm1/xml/xmlload` | 4 | 2.1s |  |
-| 47 | `avm1/xml/xmlstring` | 9 | 1.7s |  |
+| 47 | `avm1/xml/xmlstring` | 9 | 1.6s |  |
 | 48 | `avm1timeline1` | 3 | 1.9s |  |
 | 49 | `avm1timeline2` | 6 | 1.9s |  |
 | 50 | `button3` | 1 | 21.8s |  |

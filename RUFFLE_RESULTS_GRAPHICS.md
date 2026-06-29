@@ -3,8 +3,8 @@
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
 **Commit:** `b980ca79e3e6`  
-**Date:** 2026-06-29 19:57 UTC  
-**Total duration:** 3h19m18s
+**Date:** 2026-06-29 20:06 UTC  
+**Total duration:** 3h18m08s
 
 ## Results by Suite
 
@@ -91,16 +91,14 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 *No changes since last run.*
 
-*Comparing `a0db68a54d9c` → `b980ca79e3e6`*
-
 ## Per-Suite Details
 
 ### avm1
 
 - **Pass:** 629/704 (89.3%)
-- **Duration:** 1h30m14s across 30 shards
+- **Duration:** 1h29m04s across 30 shards
 - **Lines:** 115,486/130,968 matching (88.2%)
-- **Avg test duration:** 7.6s — slowest: `matrix` (34.3s)
+- **Avg test duration:** 7.5s — slowest: `matrix` (34.3s)
 
 ### from_gnash/actionscript.all
 
@@ -140,7 +138,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 16m31s across 30 shards
+- **Duration:** 16m30s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
 - **Avg test duration:** 10.7s — slowest: `avm1/text-bind` (23.7s)
 

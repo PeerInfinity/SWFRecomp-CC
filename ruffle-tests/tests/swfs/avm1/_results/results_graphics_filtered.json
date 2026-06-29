@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-06-29T19:57:46.172207+00:00",
+    "timestamp": "2026-06-29T20:06:11.915640+00:00",
     "git_sha": "b980ca79e3e6b4d7be6ddbf435e0b371a1ba6a57",
-    "duration_seconds": 5414.71,
+    "duration_seconds": 5344.92,
     "total_available": 704,
     "shards": 30,
     "expected_shards": 30,
@@ -6024,8 +6024,8 @@
       "test": "loadvariablesnum",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.835,
-        "run": 0.192
+        "compile": 1.683,
+        "run": 0.187
       },
       "num_frames": 3,
       "lines": {
@@ -6033,15 +6033,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 2.03,
+      "duration": 1.88,
       "status": "pass"
     },
     {
       "test": "loadvars_tostring",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.976,
-        "run": 0.189
+        "compile": 1.662,
+        "run": 0.209
       },
       "num_frames": 1,
       "lines": {
@@ -6049,15 +6049,15 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 21.17,
+      "duration": 1.88,
       "status": "pass"
     },
     {
       "test": "local_to_global",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.825,
-        "run": 0.187
+        "compile": 1.767,
+        "run": 0.185
       },
       "num_frames": 1,
       "lines": {
@@ -6065,14 +6065,14 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 2.02,
+      "duration": 1.96,
       "status": "pass"
     },
     {
       "test": "localconnection_properties",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.701,
+        "compile": 1.859,
         "run": 0.19
       },
       "num_frames": 1,
@@ -6081,15 +6081,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 1.9,
+      "duration": 2.05,
       "status": "pass"
     },
     {
       "test": "lock_root",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.786,
-        "run": 0.19
+        "compile": 1.752,
+        "run": 0.192
       },
       "num_frames": 2,
       "lines": {
@@ -6097,15 +6097,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.98,
+      "duration": 1.95,
       "status": "pass"
     },
     {
       "test": "logical_ops_swf4",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.666,
-        "run": 0.189
+        "compile": 1.843,
+        "run": 0.187
       },
       "num_frames": 1,
       "lines": {
@@ -6113,15 +6113,15 @@
         "expected_lines": 90,
         "matching_lines": 90
       },
-      "duration": 1.86,
+      "duration": 2.04,
       "status": "pass"
     },
     {
       "test": "logical_ops_swf8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.704,
-        "run": 0.186
+        "compile": 1.709,
+        "run": 0.185
       },
       "num_frames": 1,
       "lines": {
@@ -6136,8 +6136,8 @@
       "test": "looping",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.142,
-        "run": 0.197
+        "compile": 20.84,
+        "run": 0.194
       },
       "num_frames": 6,
       "lines": {
@@ -6145,15 +6145,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 21.35,
+      "duration": 21.04,
       "status": "pass"
     },
     {
       "test": "looping_child_swf32",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.067,
-        "run": 0.203
+        "compile": 22.766,
+        "run": 0.2
       },
       "num_frames": 36,
       "lines": {
@@ -6161,7 +6161,7 @@
         "expected_lines": 141,
         "matching_lines": 29
       },
-      "duration": 23.28,
+      "duration": 22.97,
       "status": "output_mismatch",
       "detail": "346 line(s) differ (actual=375, expected=141)",
       "actual_output": "... (21 lines before) ...\nsprite 22, frame 1\nsprite 23, frame 1\nsprite 24, frame 1\nsprite 24, frame 2\nsprite 23, frame 2\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 18, frame 2\nsprite 17, frame 2\nsprite 14, frame 2\nsprite 13, frame 2\nsprite 9, frame 1\nsprite 6, frame 1\nsprite 23, frame 1\nsprite 23, frame 1\nsprite 20, frame 1\nsprite 20, frame 1\nsprite 17, frame 1\nsprite 17, frame 1\nsprite 13, frame 1\nsprite 13, frame 1\nsprite 10, frame 1\nsprite 7, frame 1\nsprite 24, frame 1\nsprite 23, frame 2\nsprite 21, frame 1\nsprite 20, frame 2\nsprite 18, frame 1\nsprite 17, frame 2\nsprite 14, frame 1\nsprite 13, frame 2\nsprite 9, frame 1\nsprite 6, frame 1\nsprite 24, frame 2\nsprite 23, frame 1\nsprite 21, frame 2\nsprite 20, frame 1\nsprite 18, frame 2\nsprite 17, frame 1\nsprite 14, frame 2\nsprite 13, frame 1\nsprite 10, frame 1\nsprite 7, frame 1\nsprite 23, frame 1\nsprite 23, frame 2\nsprite 20, frame 1\nsprite 20, frame 2\nsprite 17, frame 1\nsprite 17, frame 2\nsprite 13, frame 1\n... (304 lines after) ...",
@@ -6171,7 +6171,26 @@
       "test": "looping_child_swf5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.899,
+        "compile": 0.88,
+        "run": 0.201
+      },
+      "num_frames": 36,
+      "lines": {
+        "actual_lines": 375,
+        "expected_lines": 141,
+        "matching_lines": 29
+      },
+      "duration": 1.09,
+      "status": "output_mismatch",
+      "detail": "346 line(s) differ (actual=375, expected=141)",
+      "actual_output": "... (21 lines before) ...\nsprite 22, frame 1\nsprite 23, frame 1\nsprite 24, frame 1\nsprite 24, frame 2\nsprite 23, frame 2\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 18, frame 2\nsprite 17, frame 2\nsprite 14, frame 2\nsprite 13, frame 2\nsprite 9, frame 1\nsprite 6, frame 1\nsprite 23, frame 1\nsprite 23, frame 1\nsprite 20, frame 1\nsprite 20, frame 1\nsprite 17, frame 1\nsprite 17, frame 1\nsprite 13, frame 1\nsprite 13, frame 1\nsprite 10, frame 1\nsprite 7, frame 1\nsprite 24, frame 1\nsprite 23, frame 2\nsprite 21, frame 1\nsprite 20, frame 2\nsprite 18, frame 1\nsprite 17, frame 2\nsprite 14, frame 1\nsprite 13, frame 2\nsprite 9, frame 1\nsprite 6, frame 1\nsprite 24, frame 2\nsprite 23, frame 1\nsprite 21, frame 2\nsprite 20, frame 1\nsprite 18, frame 2\nsprite 17, frame 1\nsprite 14, frame 2\nsprite 13, frame 1\nsprite 10, frame 1\nsprite 7, frame 1\nsprite 23, frame 1\nsprite 23, frame 2\nsprite 20, frame 1\nsprite 20, frame 2\nsprite 17, frame 1\nsprite 17, frame 2\nsprite 13, frame 1\n... (304 lines after) ...",
+      "expected_output": "... (21 lines before) ...\nsprite 22, frame 1\nsprite 23, frame 1\nsprite 24, frame 1\nsprite 24, frame 2\nsprite 23, frame 2\nsprite 22, frame 2\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 18, frame 2\nsprite 17, frame 2\nsprite 16, frame 2\nsprite 15, frame 2\nsprite 14, frame 2\nsprite 13, frame 2\nsprite 12, frame 2\nsprite 11, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nstop\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\n... (70 lines after) ..."
+    },
+    {
+      "test": "looping_child_swf9",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.898,
         "run": 0.204
       },
       "num_frames": 36,
@@ -6187,30 +6206,11 @@
       "expected_output": "... (21 lines before) ...\nsprite 22, frame 1\nsprite 23, frame 1\nsprite 24, frame 1\nsprite 24, frame 2\nsprite 23, frame 2\nsprite 22, frame 2\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 18, frame 2\nsprite 17, frame 2\nsprite 16, frame 2\nsprite 15, frame 2\nsprite 14, frame 2\nsprite 13, frame 2\nsprite 12, frame 2\nsprite 11, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nstop\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\n... (70 lines after) ..."
     },
     {
-      "test": "looping_child_swf9",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.912,
-        "run": 0.202
-      },
-      "num_frames": 36,
-      "lines": {
-        "actual_lines": 375,
-        "expected_lines": 141,
-        "matching_lines": 29
-      },
-      "duration": 1.12,
-      "status": "output_mismatch",
-      "detail": "346 line(s) differ (actual=375, expected=141)",
-      "actual_output": "... (21 lines before) ...\nsprite 22, frame 1\nsprite 23, frame 1\nsprite 24, frame 1\nsprite 24, frame 2\nsprite 23, frame 2\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 18, frame 2\nsprite 17, frame 2\nsprite 14, frame 2\nsprite 13, frame 2\nsprite 9, frame 1\nsprite 6, frame 1\nsprite 23, frame 1\nsprite 23, frame 1\nsprite 20, frame 1\nsprite 20, frame 1\nsprite 17, frame 1\nsprite 17, frame 1\nsprite 13, frame 1\nsprite 13, frame 1\nsprite 10, frame 1\nsprite 7, frame 1\nsprite 24, frame 1\nsprite 23, frame 2\nsprite 21, frame 1\nsprite 20, frame 2\nsprite 18, frame 1\nsprite 17, frame 2\nsprite 14, frame 1\nsprite 13, frame 2\nsprite 9, frame 1\nsprite 6, frame 1\nsprite 24, frame 2\nsprite 23, frame 1\nsprite 21, frame 2\nsprite 20, frame 1\nsprite 18, frame 2\nsprite 17, frame 1\nsprite 14, frame 2\nsprite 13, frame 1\nsprite 10, frame 1\nsprite 7, frame 1\nsprite 23, frame 1\nsprite 23, frame 2\nsprite 20, frame 1\nsprite 20, frame 2\nsprite 17, frame 1\nsprite 17, frame 2\nsprite 13, frame 1\n... (304 lines after) ...",
-      "expected_output": "... (21 lines before) ...\nsprite 22, frame 1\nsprite 23, frame 1\nsprite 24, frame 1\nsprite 24, frame 2\nsprite 23, frame 2\nsprite 22, frame 2\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 18, frame 2\nsprite 17, frame 2\nsprite 16, frame 2\nsprite 15, frame 2\nsprite 14, frame 2\nsprite 13, frame 2\nsprite 12, frame 2\nsprite 11, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nstop\nsprite 21, frame 1\nsprite 20, frame 1\nsprite 19, frame 1\nsprite 21, frame 2\nsprite 20, frame 2\nsprite 19, frame 2\nsprite 21, frame 1\nsprite 20, frame 1\n... (70 lines after) ..."
-    },
-    {
       "test": "looping_real_1_declared_1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.627,
-        "run": 0.189
+        "compile": 1.635,
+        "run": 0.185
       },
       "num_frames": 5,
       "lines": {
@@ -6218,14 +6218,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.82,
+      "duration": 1.83,
       "status": "pass"
     },
     {
       "test": "looping_real_1_declared_2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.723,
+        "compile": 0.71,
         "run": 0.187
       },
       "num_frames": 5,
@@ -6234,15 +6234,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 0.92,
+      "duration": 0.9,
       "status": "pass"
     },
     {
       "test": "looping_real_2_declared_1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.656,
-        "run": 0.194
+        "compile": 1.605,
+        "run": 0.188
       },
       "num_frames": 5,
       "lines": {
@@ -6250,15 +6250,15 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 1.86,
+      "duration": 1.8,
       "status": "pass"
     },
     {
       "test": "looping_real_2_declared_2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.707,
-        "run": 0.192
+        "compile": 0.7,
+        "run": 0.189
       },
       "num_frames": 5,
       "lines": {
@@ -6266,15 +6266,15 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 0.91,
+      "duration": 0.9,
       "status": "pass"
     },
     {
       "test": "mask_reapply",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.853,
-        "run": 0.361
+        "compile": 21.182,
+        "run": 0.353
       },
       "num_frames": 1,
       "lines": {
@@ -6282,7 +6282,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 23.25,
+      "duration": 21.57,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -6300,7 +6300,7 @@
       "test": "mask_with_drawing",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.245,
+        "compile": 21.002,
         "run": 0.186
       },
       "num_frames": 1,
@@ -6309,7 +6309,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.46,
+      "duration": 21.22,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -6327,8 +6327,8 @@
       "test": "math_min_max",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.757,
-        "run": 0.189
+        "compile": 1.742,
+        "run": 0.184
       },
       "num_frames": 1,
       "lines": {
@@ -6336,15 +6336,15 @@
         "expected_lines": 101,
         "matching_lines": 101
       },
-      "duration": 1.95,
+      "duration": 1.93,
       "status": "pass"
     },
     {
       "test": "math_swf6",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.518,
-        "run": 0.178
+        "compile": 2.124,
+        "run": 0.173
       },
       "num_frames": 1,
       "lines": {
@@ -6352,30 +6352,14 @@
         "expected_lines": 530,
         "matching_lines": 530
       },
-      "duration": 21.7,
+      "duration": 2.3,
       "status": "pass"
     },
     {
       "test": "math_swf7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.806,
-        "run": 0.174
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 530,
-        "expected_lines": 530,
-        "matching_lines": 530
-      },
-      "duration": 0.99,
-      "status": "pass"
-    },
-    {
-      "test": "math_swf8",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.844,
+        "compile": 0.754,
         "run": 0.175
       },
       "num_frames": 1,
@@ -6384,7 +6368,23 @@
         "expected_lines": 530,
         "matching_lines": 530
       },
-      "duration": 1.03,
+      "duration": 0.94,
+      "status": "pass"
+    },
+    {
+      "test": "math_swf8",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.79,
+        "run": 0.177
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 530,
+        "expected_lines": 530,
+        "matching_lines": 530
+      },
+      "duration": 0.97,
       "status": "pass"
     },
     {

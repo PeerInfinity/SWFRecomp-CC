@@ -1,6 +1,6 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-29 19:57 UTC
+**Date**: 2026-06-29 20:06 UTC
 
 **Git SHA**: `b980ca79e3`
 
@@ -54,7 +54,7 @@
 | 27 | `property-paths/property-paths-6` | 6 | 1.4s |  |
 | 28 | `property-paths/property-paths-7` | 7 | 1.5s |  |
 | 29 | `propertycase/propertycase` | 7 | 1.4s |  |
-| 30 | `propertycase/propertycase-preserving-6` | 2 | 1.6s |  |
+| 30 | `propertycase/propertycase-preserving-6` | 2 | 1.5s |  |
 | 31 | `propertycase/propertycase-preserving-7` | 5 | 0.9s |  |
 | 32 | `rollover` | 4 | 20.4s |  |
 | 33 | `scope` | 14 | 1.9s |  |

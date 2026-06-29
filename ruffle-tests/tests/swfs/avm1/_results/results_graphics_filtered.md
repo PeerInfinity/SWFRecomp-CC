@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-06-29 19:57 UTC
+**Date**: 2026-06-29 20:06 UTC
 
 **Git SHA**: `b980ca79e3`
 
-**Run Duration**: 90m 15s
+**Run Duration**: 89m 5s
 
 **Filtered**: 43 tests ignored out of 704 available
 
@@ -358,23 +358,23 @@
 | 323 | `loadmovienum_cross_version_prototype` | 9 | 2.1s | [54](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) [55](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_REMAINING_PLAN.md) |
 | 324 | `loadvariables` | 2 | 20.8s | [54](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) [56](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADVARIABLES_PLAN.md) |
 | 325 | `loadvariables2` | 8 | 20.8s | [54](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) [56](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADVARIABLES_PLAN.md) |
-| 326 | `loadvariablesnum` | 2 | 2.0s | [54](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) [56](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADVARIABLES_PLAN.md) |
-| 327 | `loadvars_tostring` | 5 | 21.2s |  |
+| 326 | `loadvariablesnum` | 2 | 1.9s | [54](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) [56](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADVARIABLES_PLAN.md) |
+| 327 | `loadvars_tostring` | 5 | 1.9s |  |
 | 328 | `local_to_global` | 49 | 2.0s | [47](ruffle-tests/tests/swfs/avm1/_investigation/blocked/HIT_TESTING_PLAN.md) [62](ruffle-tests/tests/swfs/avm1/_investigation/complete/MOVIECLIP_PLAN.md) |
-| 329 | `localconnection_properties` | 8 | 1.9s | [46](ruffle-tests/tests/swfs/avm1/_investigation/complete/GLOBALS_PLAN.md) |
-| 330 | `lock_root` | 1 | 2.0s |  |
-| 331 | `logical_ops_swf4` | 90 | 1.9s |  |
+| 329 | `localconnection_properties` | 8 | 2.0s | [46](ruffle-tests/tests/swfs/avm1/_investigation/complete/GLOBALS_PLAN.md) |
+| 330 | `lock_root` | 1 | 1.9s |  |
+| 331 | `logical_ops_swf4` | 90 | 2.0s |  |
 | 332 | `logical_ops_swf8` | 108 | 1.9s |  |
-| 333 | `looping` | 6 | 21.4s |  |
+| 333 | `looping` | 6 | 21.0s |  |
 | 334 | `looping_real_1_declared_1` | 1 | 1.8s |  |
 | 335 | `looping_real_1_declared_2` | 1 | 0.9s |  |
-| 336 | `looping_real_2_declared_1` | 5 | 1.9s |  |
+| 336 | `looping_real_2_declared_1` | 5 | 1.8s |  |
 | 337 | `looping_real_2_declared_2` | 5 | 0.9s |  |
-| 338 | `mask_reapply` | 0 | 23.2s | [77](ruffle-tests/tests/swfs/avm1/_investigation/complete/RUNTIME_SETMASK_PLAN.md) |
-| 339 | `mask_with_drawing` | 0 | 21.5s | [31](ruffle-tests/tests/swfs/avm1/_investigation/blocked/DRAWING_API_RENDERING_PLAN.md) [77](ruffle-tests/tests/swfs/avm1/_investigation/complete/RUNTIME_SETMASK_PLAN.md) |
+| 338 | `mask_reapply` | 0 | 21.6s | [77](ruffle-tests/tests/swfs/avm1/_investigation/complete/RUNTIME_SETMASK_PLAN.md) |
+| 339 | `mask_with_drawing` | 0 | 21.2s | [31](ruffle-tests/tests/swfs/avm1/_investigation/blocked/DRAWING_API_RENDERING_PLAN.md) [77](ruffle-tests/tests/swfs/avm1/_investigation/complete/RUNTIME_SETMASK_PLAN.md) |
 | 340 | `math_min_max` | 101 | 1.9s | [46](ruffle-tests/tests/swfs/avm1/_investigation/complete/GLOBALS_PLAN.md) [59](ruffle-tests/tests/swfs/avm1/_investigation/complete/MATH_PLAN.md) |
-| 341 | `math_swf6` | 530 | 21.7s | [59](ruffle-tests/tests/swfs/avm1/_investigation/complete/MATH_PLAN.md) |
-| 342 | `math_swf7` | 530 | 1.0s | [59](ruffle-tests/tests/swfs/avm1/_investigation/complete/MATH_PLAN.md) |
+| 341 | `math_swf6` | 530 | 2.3s | [59](ruffle-tests/tests/swfs/avm1/_investigation/complete/MATH_PLAN.md) |
+| 342 | `math_swf7` | 530 | 0.9s | [59](ruffle-tests/tests/swfs/avm1/_investigation/complete/MATH_PLAN.md) |
 | 343 | `math_swf8` | 530 | 1.0s | [59](ruffle-tests/tests/swfs/avm1/_investigation/complete/MATH_PLAN.md) |
 | 344 | `matrix` | 171 | 34.3s | [19](ruffle-tests/tests/swfs/avm1/_investigation/complete/COLOR_OBJECT_PLAN.md) [44](ruffle-tests/tests/swfs/avm1/_investigation/complete/GEOMETRY_CLASSES_PLAN.md) |
 | 345 | `mcl_as_broadcaster` | 12 | 1.8s | [54](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) [63](ruffle-tests/tests/swfs/avm1/_investigation/complete/MOVIECLIPLOADER_PLAN.md) |

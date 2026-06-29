@@ -4,8 +4,8 @@
 *See [RUFFLE_RESULTS_GRAPHICS.md](RUFFLE_RESULTS_GRAPHICS.md) for unfiltered results.*
 
 **Commit:** `b980ca79e3e6`  
-**Date:** 2026-06-29 19:57 UTC  
-**Total duration:** 3h19m18s
+**Date:** 2026-06-29 20:06 UTC  
+**Total duration:** 3h18m08s
 
 ## Results by Suite
 
@@ -88,9 +88,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 - **Pass:** 627/661 (94.9%)
 - **Ignored:** 43 tests
-- **Duration:** 1h30m14s across 30 shards
+- **Duration:** 1h29m04s across 30 shards
 - **Lines:** 105,044/111,695 matching (94.0%)
-- **Avg test duration:** 7.7s — slowest: `matrix` (34.3s)
+- **Avg test duration:** 7.6s — slowest: `matrix` (34.3s)
 
 ### from_gnash/actionscript.all
 
@@ -134,7 +134,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 16m31s across 30 shards
+- **Duration:** 16m30s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
 - **Avg test duration:** 8.4s — slowest: `avm1/text-bind` (23.7s)
 
