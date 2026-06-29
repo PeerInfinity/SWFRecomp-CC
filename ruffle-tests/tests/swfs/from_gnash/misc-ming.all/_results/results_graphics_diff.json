@@ -1,78 +1,46 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-29T20:06:11.952922+00:00",
-    "old_git_sha": "b980ca79e3e6b4d7be6ddbf435e0b371a1ba6a57",
-    "new_timestamp": "2026-06-29T20:58:46.727835+00:00",
-    "new_git_sha": "ddf6a589f7e39596bb6ba24df8b277e69872f3e0",
+    "old_timestamp": "2026-06-29T20:58:46.727835+00:00",
+    "old_git_sha": "ddf6a589f7e39596bb6ba24df8b277e69872f3e0",
+    "new_timestamp": "2026-06-29T21:43:15.315057+00:00",
+    "new_git_sha": "49c54cd204b4f2cfbc454c32f288eaf8d4b97727",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 63,
+    "old_pass": 66,
     "old_ruffle_matched": 28,
-    "old_effective_pass": 91,
-    "old_total": 107,
-    "old_pass_rate": 58.9,
-    "new_pass": 66,
+    "old_effective_pass": 94,
+    "old_total": 111,
+    "old_pass_rate": 59.5,
+    "new_pass": 67,
     "new_ruffle_matched": 28,
-    "new_effective_pass": 94,
+    "new_effective_pass": 95,
     "new_total": 111,
-    "new_pass_rate": 59.5,
+    "new_pass_rate": 60.4,
     "old_mismatched_lines": 1211,
     "new_mismatched_lines": 1211,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 107,
-    "added": 4,
+    "status_changed": 1,
+    "unchanged": 110,
+    "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "frame_label_test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "getTimer_test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "get_frame_number_test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      }
-    },
-    {
       "test": "gotoFrame2Test",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "timeout",
+      "change_type": "changed",
+      "old_status": "timeout",
+      "new_status": "pass",
       "old_lines": null,
-      "new_lines": null
+      "new_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      }
     }
   ]
 }
