@@ -1,14 +1,11 @@
 {
   "metadata": {
-    "old_timestamp": "2026-06-29T19:57:46.210009+00:00",
+    "old_timestamp": "2026-06-29T20:06:11.952922+00:00",
     "old_git_sha": "b980ca79e3e6b4d7be6ddbf435e0b371a1ba6a57",
-    "new_timestamp": "2026-06-29T20:06:11.952922+00:00",
-    "new_git_sha": "b980ca79e3e6b4d7be6ddbf435e0b371a1ba6a57",
+    "new_timestamp": "2026-06-29T20:58:46.727835+00:00",
+    "new_git_sha": "ddf6a589f7e39596bb6ba24df8b277e69872f3e0",
     "partial": false,
-    "same_commit": true,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
     "old_pass": 63,
@@ -16,11 +13,11 @@
     "old_effective_pass": 91,
     "old_total": 107,
     "old_pass_rate": 58.9,
-    "new_pass": 63,
+    "new_pass": 66,
     "new_ruffle_matched": 28,
-    "new_effective_pass": 91,
-    "new_total": 107,
-    "new_pass_rate": 58.9,
+    "new_effective_pass": 94,
+    "new_total": 111,
+    "new_pass_rate": 59.5,
     "old_mismatched_lines": 1211,
     "new_mismatched_lines": 1211,
     "increased_mismatches": 0,
@@ -29,8 +26,53 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 107,
-    "added": 0,
+    "added": 4,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "frame_label_test",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      }
+    },
+    {
+      "test": "getTimer_test",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "get_frame_number_test",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      }
+    },
+    {
+      "test": "gotoFrame2Test",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "timeout",
+      "old_lines": null,
+      "new_lines": null
+    }
+  ]
 }

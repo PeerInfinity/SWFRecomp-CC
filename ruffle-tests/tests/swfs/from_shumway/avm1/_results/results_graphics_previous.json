@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-06-29T19:57:46.187600+00:00",
+    "timestamp": "2026-06-29T20:06:11.930947+00:00",
     "git_sha": "b980ca79e3e6b4d7be6ddbf435e0b371a1ba6a57",
-    "duration_seconds": 203.49,
+    "duration_seconds": 203.33,
     "total_available": 47,
     "shards": 30,
     "expected_shards": 30
@@ -502,9 +502,9 @@
     {
       "test": "propertycase/propertycase-preserving-6",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.402,
-        "run": 0.19
+        "recomp": 0.004,
+        "compile": 1.262,
+        "run": 0.187
       },
       "num_frames": 1,
       "lines": {
@@ -512,15 +512,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.6,
+      "duration": 1.46,
       "status": "pass"
     },
     {
       "test": "propertycase/propertycase-preserving-7",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.717,
-        "run": 0.186
+        "compile": 0.698,
+        "run": 0.195
       },
       "num_frames": 1,
       "lines": {
@@ -528,7 +528,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 0.91,
+      "duration": 0.9,
       "status": "pass"
     },
     {
