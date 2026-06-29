@@ -27,6 +27,37 @@ noted. All script paths are under `SWFRecomp/scripts/`.
 > behavior you want to reflect the change (the runtime is compiled into each
 > demo's `.wasm`).
 
+## Refreshing the game demos after a fix (the common case)
+
+To rebuild **and** redeploy every `flasharchive/` + `glaiel/` game demo with the
+current recompiler + runtime in one command:
+
+```bash
+# Picks up recompiler (swf.cpp) AND runtime changes. Rebuilds the SWFRecomp
+# binary, re-runs it per demo (--clean), recompiles + redeploys each WASM, and
+# regenerates flasharchive_catalog.json + glaiel_catalog.json.
+SWFRecomp/scripts/rebuild_docs2_demos.sh
+
+# Runtime-only change (e.g. you edited SWFModernRuntime/src/.../render_webgpu.c
+# or action.c): skip the recompiler rebuild + re-recompile — much faster, and
+# the WASM runtime is recompiled from source either way.
+SWFRecomp/scripts/rebuild_docs2_demos.sh --fast
+
+# Narrow it: one namespace and/or specific demos
+SWFRecomp/scripts/rebuild_docs2_demos.sh glaiel --fast --only Pong,Reaction
+SWFRecomp/scripts/rebuild_docs2_demos.sh flasharchive
+```
+
+The script auto-sources `emsdk/emsdk_env.sh` if `emcc` isn't on PATH, discovers
+the demo list from what's actually deployed under `docs2/examples/<ns>/`, skips
+the non-deployed probe/loader test-dir variants, and always sets each catalog's
+`type` to the namespace (NOT `graphics` — see the warning under "Catalogs"). It
+prints a per-demo OK/FAIL summary; `GRAPHICS_BUILD_TIMEOUT` (default 900s) caps
+each build. `--help` documents all flags.
+
+The sections below explain the underlying two-step `build_test.sh` →
+`deploy_example.sh` model the wrapper drives, for one-off or trace demos.
+
 ## The two-step model: build → deploy
 
 Every demo is produced by two scripts:
@@ -118,13 +149,22 @@ catalog JSONs and `demo.html`/`index.html` are tracked.
 regardless of local batches — namespaced catalogs are managed separately by
 `generate_local_catalog.py`.
 
-To regenerate just a namespace catalog after a manual single-demo deploy:
+> **Catalog `type` must equal the namespace.** `generate_local_catalog.py`'s
+> `--type` sets each entry's `type`, which the index uses to place demos in the
+> `flasharchive`/`glaiel` section. If it's left as `graphics` (e.g. by passing
+> `--demo-type graphics` to `build_swf_batch.sh`) that section renders empty.
+> Always pass `--type flasharchive` / `--type glaiel` (the wrapper script does
+> this for you). The per-demo `.demo_type` file written by `deploy_example.sh`
+> is unrelated and unused by the catalog generator.
+
+To regenerate just a namespace catalog after a manual single-demo deploy
+(`docs_dir` is the first POSITIONAL arg — there is no `--docs-dir` flag):
 ```bash
-python3 SWFRecomp/scripts/generate_local_catalog.py \
-    --docs-dir "$(pwd)/docs2" --namespace glaiel --catalog-name glaiel_catalog.json
+python3 SWFRecomp/scripts/generate_local_catalog.py "$(pwd)/docs2" \
+    --namespace glaiel --catalog-name glaiel_catalog.json --type glaiel
 ```
 (See the script's `--help`; defaults are namespace=`local_batch`,
-catalog_name=`local_catalog.json`.)
+catalog_name=`local_catalog.json`, type=namespace.)
 
 ## Viewing locally
 
