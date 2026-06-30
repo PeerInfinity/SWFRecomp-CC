@@ -32,10 +32,30 @@ Format facts: `SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`.
 - **`nDemo.js`** — N demo (input replay) (de)serialization. `holdRight(ticks)` /
   `holdLeft(ticks)` / `encodeDemo(perTickMasks)` / `decodeDemo(str)`. Per tick =
   4 bits L/R/J/JTRIG; 7 ticks/entry; `holdRight(7) === "7:35791394"`.
-- **`make_queue_testcases.mjs`** — generates a small batch of flat walk-right
+- **`make_queue_testcases.mjs`** — writes a small fixed batch of flat walk-right
   levels (authored, not N's data) into `../n_queue_testcases.js` for the Ruffle
   `QUEUE=1` batch-verify run (see the parent README). The queue proved the
   SWF-side re-arm: N re-loads a fresh level after each completion in one session.
+- **`queueFile.js`** — shared writer for `../n_queue_testcases.js`
+  (`window.__N_QUEUE`).
+
+## Phase 1 (done): flat generator + Ruffle acceptance gate
+
+- **`nGenerate.js`** — seeded, deterministic flat-level generator.
+  `generateFlatLevel(seed, opts)` / `generateFlatBatch(count, baseSeed, opts)`
+  emit `{levelId, level, demo, meta}`: a solid floor row with spawn → switch →
+  door laid left-to-right, solvable by a hold-right demo (the demo IS the proof).
+  Knobs: `floorRow`, `spawnX`, walk distance, gold count. `makeRng` = mulberry32.
+- **`nVerify.js`** — the authoritative gate. Generates a batch, writes the queue
+  payload, runs one Ruffle session, and asserts every level reported
+  `N_COMPLETE` (pass/fail read from `N_COMPLETE` / `N_FAIL` traces). A level is
+  "good" only if real N completes it.
+  ```bash
+  node gen/nVerify.js [count] [baseSeed] [captureSecs]   # exit 0 iff all pass
+  ```
+  Verified: `node gen/nVerify.js 6 1` → 6/6 flat levels complete on real N in one
+  session. The SWF advances the queue on `N_FAIL` too (per-level `LEVEL_MAX`
+  frame budget), so one unsolvable level never stalls a batch.
 
 This is injected-AS / JS tooling under `_swfbridge/livetest/` — **not
 CI-observable**; do not dispatch ruffle-tests CI for it.

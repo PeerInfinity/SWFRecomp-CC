@@ -7,7 +7,7 @@
 //  comments - "zlib_deflate_end". Detail goes in the README, not here.)
 class NLoader {
 	static var DEPTH:Number = 1048570;
-	static var MAX:Number = 1500;    // hard frame cap (quit even if stuck); queue needs headroom
+	static var MAX:Number = 8000;    // session frame backstop; per-level LEVEL_MAX bounds each level
 	static var EI_WAIT:Number = 12;  // ticks to poll __swfConfig before fixture fallback
 	static var MODE:String = "walk"; // fixture used when no EI host: "walk" | "fall"
 	static var DONE:String = "__N_DONE__"; // __swfConfig sentinel: queue exhausted -> quit
@@ -47,7 +47,9 @@ class NLoader {
 	static var demoStr:String = "";        // "" => keyboard input (no demo playback)
 	static var rawCfg:String = "";         // last __swfConfig string seen (queue dedup key)
 	static var lastConfig:String = "";     // rawCfg of the level currently/last loaded
-	static var levelsDone:Number = 0;      // count of completed levels this session
+	static var levelsDone:Number = 0;      // count of levels finished this session
+	static var runStartTick:Number = 0;    // tick when the current level entered "run"
+	static var LEVEL_MAX:Number = 400;     // per-level frame budget (fail+advance if exceeded)
 
 	static function main(mc:MovieClip):Void {
 		r = _root;
@@ -177,22 +179,9 @@ class NLoader {
 			r.game.Tick();   // one deterministic sim step
 			recordFrame();   // structured per-frame telemetry (NF line)
 			var p:Object = r.player;
-			if (completed) {
-				levelsDone++;
-				// In EI mode the host may have a NEXT level queued: re-arm and
-				// poll __swfConfig instead of quitting. Otherwise quit.
-				if (eiMode) {
-					trace("[nloader] level complete (" + levelsDone
-					      + ") -> polling for next");
-					rearm(); return;
-				}
-				trace("[nloader] level complete -> quitting");
-				phase = "done"; fscommand("quit", ""); return;
-			}
-			if (p.isDead) {
-				trace("[nloader] PLAYER DIED before exit -> quitting");
-				phase = "done"; fscommand("quit", ""); return;
-			}
+			if (completed)         { finishLevel(true, "complete"); return; }
+			if (p.isDead)          { finishLevel(false, "died"); return; }
+			if (tick - runStartTick > LEVEL_MAX) { finishLevel(false, "timeout"); return; }
 		} else if (phase == "poll") {
 			// Re-armed after a completion: wait for the host to serve the NEXT
 			// level (a config string different from the one we just ran), or the
@@ -227,8 +216,28 @@ class NLoader {
 		r.App_LoadLevel_Raw(levelStr, NLoader.onLoaded);
 	}
 
-	// Reset per-level state after a completion and re-enter the poll phase so the
-	// host can serve the next queued level (App_LoadLevel_Raw again, same session).
+	// Finish the current level (success or failure), advance the host queue, and
+	// either re-arm for the next level (EI mode) or quit (fixture/native). Routing
+	// all three end conditions (complete / died / timeout) through here keeps the
+	// queue advancing even on a bad level, so a batch never stalls. Pass/fail is
+	// carried by the N_COMPLETE vs N_FAIL trace, not by the host callback.
+	static function finishLevel(success:Boolean, reason:String):Void {
+		levelsDone++;
+		if (success) {
+			trace("N_COMPLETE id=" + levelId + " tick=" + tick);
+		} else {
+			trace("N_FAIL id=" + levelId + " reason=" + reason + " tick=" + tick);
+		}
+		if (eiMode) {
+			EI.call("__swfSendExit", levelId);   // advance the host queue either way
+			rearm();
+		} else {
+			phase = "done"; fscommand("quit", "");
+		}
+	}
+
+	// Reset per-level state and re-enter the poll phase so the host can serve the
+	// next queued level (App_LoadLevel_Raw again, same session).
 	static function rearm():Void {
 		completed = false;
 		goldCount = 0;
@@ -246,11 +255,11 @@ class NLoader {
 		r.game.InitRetryLevel();
 		installHooks();   // gold/switch -> NEV events + counters
 		r.App_PlayerDeathEvent = r.App_PlayerDeathEvent_Normal;
+		// Hook only flags completion (+ telemetry) and chains N's handler; the
+		// trace + queue-advance happen in finishLevel from the run phase.
 		r.App_LevelPassedEvent = function():Void {
 			NLoader.completed = true;
 			trace("NEV exit tick=" + NLoader.tick + " id=" + NLoader.levelId);
-			trace("N_COMPLETE id=" + NLoader.levelId + " tick=" + NLoader.tick);
-			if (NLoader.eiMode) NLoader.EI.call("__swfSendExit", NLoader.levelId);
 			NLoader.r.App_LevelPassedEvent_Normal();
 		};
 		if (demoStr != "") {
@@ -258,6 +267,7 @@ class NLoader {
 			r.game.StartDemoPlayback();
 		}
 		r.SetActiveProcess(NLoader.noop);
+		runStartTick = tick;   // per-level deadline baseline
 		phase = "run";
 	}
 }
