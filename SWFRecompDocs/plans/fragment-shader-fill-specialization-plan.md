@@ -1,9 +1,12 @@
 # Plan: skip wasted per-fragment texture sampling in the WebGPU fragment shader
 
-**Status:** EXECUTED 2026-06-29 (commit `3d2ea1b5c`, Option 1). Pixel-identity proven +
-graphics CI green (0 regressions). Perf win UNCONFIRMED on WSL2 SwiftShader (no measurable
-drop — likely SwiftShader already DCEs the dead samples); real-GPU (Windows) run is now the
-decisive measurement. See §8 for the execution record.
+**Status:** EXECUTED 2026-06-29 (commit `3d2ea1b5c`, Option 1) but **REFUTED as the perf
+lever.** Pixel-identity proven + graphics CI green (0 regressions) — the change is a correct,
+zero-regression cleanup and stays. But it produced **no measurable win on WSL2 SwiftShader NOR
+on the user's real-GPU Windows machine** (user-confirmed 2026-06-29: N still ~100–200% of frame
+budget, "about the same as before"). So the per-fragment texture-sampling cost was **NOT** the
+Ruffle-vs-SWFRecomp gap. The real bottleneck is elsewhere — re-localize (see §8). See §8 for the
+execution record and the refutation.
 
 **Goal:** make solid-colour (and single-fill) shapes stop paying for gradient + bitmap
 texture sampling they don't use, closing most of the Ruffle-vs-SWFRecomp WASM render gap
@@ -180,3 +183,20 @@ SwiftShader win" outcome.) The change is still correct and expected to help on r
 that don't DCE the uber-shader as aggressively and on HW where each texture op is a real cost.
 **A real-GPU run on the user's Windows machine is the decisive next measurement** (§5 always
 flagged this). If it too shows no win, the lever is overdraw reduction (§7), not the shader.
+
+**REAL-GPU RESULT (2026-06-29, user-confirmed): NO WIN.** On Windows (real GPU) N is still
+~100–200% of frame budget, "about the same as before." So the uber-fragment-shader per-fragment
+texture cost was **not** the gap on real hardware either. The hypothesis is **refuted**; the
+shader change stays as a correct cleanup but is not the perf lever. **Re-localize from scratch
+on real GPU** — the WSL2 SwiftShader profile (~82% idle, GPU-wait-dominated) was an environment
+artifact and cannot point at the real-GPU bottleneck. Candidate levers to disambiguate with a
+real-GPU CPU profile (Chrome DevTools Performance on Windows, or `cdp_profile.py` run there):
+(1) **AVM/CPU** — Ruffle is interpreter-bound on N (21 ms tick ≫ 6 ms render); our AVM has known
+hot spots (property-name/string lookup → interning per `wasm-game-performance-profiling`; the
+per-frame button-hover walk per `n-button-hover-walk-perf`). (2) **per-frame command building /
+writeBuffer** — N issues ~480 UNBATCHED draws/frame with occasional multi-MB writeBuffer spikes;
+per-draw CPU encoder + bind-group + upload overhead in the emscripten/Dawn path may dominate on
+real GPU where the GPU itself is cheap. (3) **overdraw** (§7) — prior user A/B said particle
+overdraw dominates, but that was SwiftShader fill-rate; re-check on real GPU. Next step: get the
+**AVM-vs-render-submit split** and a **self-time-by-function CPU profile on Windows** before
+touching code — don't guess the lever again.
