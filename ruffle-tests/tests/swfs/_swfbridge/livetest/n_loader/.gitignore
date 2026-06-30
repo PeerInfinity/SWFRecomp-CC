@@ -7,3 +7,7 @@ ruffle_run/
 record_run/
 wasm_run/
 run.log
+
+# N is not open source: its extracted built-in level strings stay local only.
+# Regenerate with gen/extract_builtin_levels.mjs (see gen/README.md).
+gen/builtin_levels.json
