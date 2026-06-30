@@ -21804,6 +21804,24 @@ int actionRetryUnboundTextFields(SWFAppContext* app_context)
 	return resolved;
 }
 
+// Cheap first-byte pre-reject for the child_mc_cache scan below. swf_name_match
+// is an extern call (object.c — not inlinable here) invoked up to child_mc_count
+// times per findOrCreateMovieClip call, and findOrCreateMovieClip is the single
+// hottest function on fill-heavy games (e.g. flasharchive/N: ~11.7% self-time,
+// 4096-slot cache). This is a CONSERVATIVE reject — it only returns 0 when the
+// first byte can't possibly match (so swf_name_match stays authoritative); it
+// folds A-Z for SWF<=6 exactly as swf_name_match's ASCII fast path does, and
+// defers (returns 1) on any non-ASCII lead byte. Bit-identical results, fewer calls.
+static inline int swf_name_first_byte_maybe(const char* a, const char* b) {
+	unsigned char x = (unsigned char)a[0], y = (unsigned char)b[0];
+	if (x >= 0x80 || y >= 0x80) return 1;  // non-ASCII lead: defer to full match
+	if (g_swf_version <= 6) {
+		if (x >= 'A' && x <= 'Z') x += 32;
+		if (y >= 'A' && y <= 'Z') y += 32;
+	}
+	return x == y;
+}
+
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	(void)app_context;  // used only in NO_GRAPHICS for TextField init
 	MovieClip* mc = NULL;
@@ -21817,12 +21835,16 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 	// placement during a backward goto; AS name lookups must get the fresh MC.
 	extern int g_skip_pending_removal_mc;
 	for (int i = 0; i < child_mc_count; i++) {
+		// Condition order is a pure speedup (the conjunction is unchanged): the
+		// cheap pointer/field checks gate first, then the cheap first-byte reject,
+		// so the expensive extern swf_name_match only runs on real candidates.
 		if (child_mc_cache[i] != NULL &&
 		    child_mc_cache[i]->depth != INT_MIN &&
 		    !child_mc_cache[i]->name_displaced &&
 		    !(g_skip_pending_removal_mc && child_mc_cache[i]->pending_removal) &&
-		    swf_name_match(child_mc_cache[i]->name, instance_name) &&
-		    child_mc_cache[i]->parent == parent) {
+		    child_mc_cache[i]->parent == parent &&
+		    swf_name_first_byte_maybe(child_mc_cache[i]->name, instance_name) &&
+		    swf_name_match(child_mc_cache[i]->name, instance_name)) {
 			mc = child_mc_cache[i];
 			break;
 		}
