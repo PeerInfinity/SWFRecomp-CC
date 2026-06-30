@@ -28,13 +28,16 @@
 // stats panel (frame CPU + delivered frame-time + late count + max FPS) plus an
 // "Uncapped" button that skips the frame-pacing sleep to measure max sustainable
 // FPS. Returns whether uncapped is on.
-EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
+EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present_ms), {
 	var S = globalThis.__swfPerf;
 	if (!S) {
-		S = globalThis.__swfPerf = { cpu: [], iv: [], cap: 120, i: 0, frames: 0,
+		S = globalThis.__swfPerf = { cpu: [], iv: [], rp: [], cap: 120, i: 0, frames: 0,
 			uncapped: false, ui: null, pre: null, bU: null, last: 0, lastT: 0 };
 		try { if (location.search.indexOf('perfbench=1') >= 0) S.uncapped = true; } catch (e) {}
 	}
+	// `present_ms` = time spent in renderer_poll (swap/present + async-GPU yield);
+	// `elapsed_ms - present_ms` ≈ AVM + render-submit (mostly CPU). Lets us tell a
+	// CPU-bound frame from one that's parked on the SwiftShader/GPU present.
 	// Standalone fallback: if no host page set the visibility flag, derive the
 	// initial state from the URL so ?perfhud=1 / ?perfbench=1 still work.
 	if (typeof window !== 'undefined' && window.__swfHudOn === undefined) {
@@ -51,8 +54,8 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 	var interval = (S.lastT > 0) ? (nowT - S.lastT) : 0;
 	S.lastT = nowT;
 
-	if (S.cpu.length < S.cap) { S.cpu.push(elapsed_ms); if (interval > 0) S.iv.push(interval); }
-	else { S.cpu[S.i] = elapsed_ms; if (interval > 0) S.iv[S.i] = interval; S.i = (S.i + 1) % S.cap; }
+	if (S.cpu.length < S.cap) { S.cpu.push(elapsed_ms); S.rp.push(present_ms); if (interval > 0) S.iv.push(interval); }
+	else { S.cpu[S.i] = elapsed_ms; S.rp[S.i] = present_ms; if (interval > 0) S.iv[S.i] = interval; S.i = (S.i + 1) % S.cap; }
 	S.frames++;
 
 	// Build the panel lazily the first time it is shown (default: hidden).
@@ -87,7 +90,8 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 				p95: n ? b[Math.min(n - 1, Math.floor(n * 0.95))] : 0,
 				max: n ? b[n - 1] : 0 };
 		};
-		var c = stat(S.cpu), v = stat(S.iv);
+		var c = stat(S.cpu), v = stat(S.iv), rp = stat(S.rp);
+		var cpuOnly = Math.max(0, c.mean - rp.mean);   // AVM + render-submit
 		var head = budget_ms > 0 ? (c.mean / budget_ms * 100) : 0;
 		var susFps = c.mean > 0 ? (1000 / c.mean) : 0;
 		var capFps = budget_ms > 0 ? (1000 / budget_ms) : 0;
@@ -98,6 +102,7 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms), {
 		S.pre.textContent =
 			'SWF perf  ' + (S.uncapped ? '[UNCAPPED]' : '[capped ' + capFps.toFixed(0) + 'fps]') + '\n'
 			+ 'frame CPU   mean ' + c.mean.toFixed(2) + '  p95 ' + c.p95.toFixed(2) + '  max ' + c.max.toFixed(2) + ' ms  (' + head.toFixed(0) + '% budget)\n'
+			+ '  avm+submit ' + cpuOnly.toFixed(2) + '   present ' + rp.mean.toFixed(2) + '  p95 ' + rp.p95.toFixed(2) + ' ms\n'
 			+ 'frame time  mean ' + v.mean.toFixed(1) + '  p95 ' + v.p95.toFixed(1) + '  max ' + v.max.toFixed(1) + ' ms  (target ' + budget_ms.toFixed(1) + ', ' + (devMean >= 0 ? '+' : '') + devMean.toFixed(1) + ')\n'
 			+ 'late >1.5x: ' + late + ' / ' + v.n + ' frames\n'
 			+ 'max sustainable ~' + susFps.toFixed(0) + ' fps';
@@ -1262,7 +1267,13 @@ void tagMain(SWFAppContext* app_context)
 #endif
 		}
 		// else: stopped — stay on current frame
+#ifdef __EMSCRIPTEN__
+		double render_poll_start = emscripten_get_now();
+#endif
 		bad_poll |= renderer_poll(app_context);
+#ifdef __EMSCRIPTEN__
+		double render_poll_ms = emscripten_get_now() - render_poll_start;
+#endif
 
 		// After-tick hook (for test harness / display bridge)
 		{
@@ -1279,7 +1290,7 @@ void tagMain(SWFAppContext* app_context)
 		double elapsed = now_ms - frame_start;
 		double eff_budget_ms = frame_budget_ms;
 		if (g_debug_frame_floor_ms > eff_budget_ms) eff_budget_ms = g_debug_frame_floor_ms;
-		int perf_uncapped = swf_perf_report(elapsed, eff_budget_ms);
+		int perf_uncapped = swf_perf_report(elapsed, eff_budget_ms, render_poll_ms);
 		if (next_due_ms == 0.0) next_due_ms = frame_start;  // anchor to first frame
 		next_due_ms += eff_budget_ms;                        // when this frame is due to end
 		if (perf_uncapped) {
@@ -1347,7 +1358,7 @@ frame_loop_exit:
 		double elapsed2 = now2_ms - frame_start2;
 		double eff_budget2_ms = frame_budget_ms;
 		if (g_debug_frame_floor_ms > eff_budget2_ms) eff_budget2_ms = g_debug_frame_floor_ms;
-		int perf_uncapped2 = swf_perf_report(elapsed2, eff_budget2_ms);
+		int perf_uncapped2 = swf_perf_report(elapsed2, eff_budget2_ms, 0.0);  // drain loop: present folded into renderer_poll gate
 		if (next_due_ms == 0.0) next_due_ms = frame_start2;  // continue the main-loop schedule
 		next_due_ms += eff_budget2_ms;
 		if (perf_uncapped2) {

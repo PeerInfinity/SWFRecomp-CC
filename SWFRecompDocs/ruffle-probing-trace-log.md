@@ -5,10 +5,19 @@ captures AVM `trace()` / warning output to a file while rendering a SWF. This is
 how we generate Ruffle reference *trace* output (alongside the screenshot the
 exporter normally produces) for the SWFRecomp test suites.
 
-**Status:** re-applied onto the updated Ruffle checkout 2026-05-29 (the checkout
-was a shallow clone ~3 months stale; updated to `origin/master`). The full patch
-is kept at `~/CC/ruffle/probing-trace-log.patch` for re-application after future
-updates.
+**Status:** verified still applied 2026-06-29 against Ruffle checkout HEAD
+`7ea7c888` (2026-06-19, "avm2: Clean up TextLine"). The working-tree diff is
+byte-identical to the saved patch (49 insertions, +3 deletions). Originally
+re-applied 2026-05-29 (the checkout had been a shallow clone ~3 months stale;
+updated to `origin/master`). The full patch is kept both at
+`~/CC/ruffle/probing-trace-log.patch` and vendored in this repo at
+`SWFRecompDocs/probing-trace-log.patch` for re-application after future updates.
+
+> **Note:** the patch lives only in the working tree of the external
+> `~/CC/ruffle` clone (uncommitted there). The built binary at
+> `~/CC/ruffle/target/release/exporter` may lag the source — rebuild with
+> `cargo +nightly build --release -p exporter` before generating fresh
+> reference output if upstream has moved.
 
 ## What it adds
 
@@ -68,4 +77,5 @@ ruffle_exporter <movie.swf> <out.png> --trace-log <out.txt>
 The `LogBackend` trait (`ruffle_core::backend::log`) and
 `PlayerBuilder::with_log` are stable upstream APIs; the patch applied cleanly
 onto the updated checkout. If a future update breaks it, re-derive from the three
-edits above or `git apply ~/CC/ruffle/probing-trace-log.patch`.
+edits above or `git apply` the patch (either `~/CC/ruffle/probing-trace-log.patch`
+or the in-repo copy `SWFRecompDocs/probing-trace-log.patch`).

@@ -1,0 +1,126 @@
+diff --git a/exporter/src/cli.rs b/exporter/src/cli.rs
+index bbc9ed0fc..008637c9b 100644
+--- a/exporter/src/cli.rs
++++ b/exporter/src/cli.rs
+@@ -99,6 +99,11 @@ pub struct Opt {
+     #[clap(long)]
+     pub force_play: bool,
+ 
++    /// Capture AVM trace() output to this file (one message per line).
++    /// Only meaningful when exporting a single SWF.
++    #[clap(long = "trace-log")]
++    pub trace_log: Option<PathBuf>,
++
+     /// Type of graphics backend to use. Not all options may be supported by your current system.
+     /// Default will attempt to pick the most supported graphics backend.
+     #[clap(long, short, default_value = "default")]
+diff --git a/exporter/src/exporter.rs b/exporter/src/exporter.rs
+index cfb7d0b90..9f31f20fa 100644
+--- a/exporter/src/exporter.rs
++++ b/exporter/src/exporter.rs
+@@ -6,6 +6,7 @@ use std::sync::Mutex;
+ use image::RgbaImage;
+ use ruffle_core::Player;
+ use ruffle_core::PlayerBuilder;
++use ruffle_core::backend::log::LogBackend;
+ use ruffle_core::limits::ExecutionLimit;
+ use ruffle_core::tag_utils::movie_from_path;
+ use ruffle_render_wgpu::backend::{
+@@ -23,12 +24,38 @@ use crate::cli::Opt;
+ use crate::cli::SizeOpt;
+ use crate::player_ext::PlayerExporterExt;
+ 
++#[derive(Clone, Default)]
++pub struct TraceLogBackend {
++    output: Arc<Mutex<String>>,
++}
++
++impl TraceLogBackend {
++    pub fn take(&self) -> String {
++        std::mem::take(&mut *self.output.lock().unwrap())
++    }
++}
++
++impl LogBackend for TraceLogBackend {
++    fn avm_trace(&self, message: &str) {
++        let mut o = self.output.lock().unwrap();
++        o.push_str(message);
++        o.push('\n');
++    }
++    fn avm_warning(&self, message: &str) {
++        let mut o = self.output.lock().unwrap();
++        o.push_str("Warning: ");
++        o.push_str(message);
++        o.push('\n');
++    }
++}
++
+ pub struct Exporter {
+     descriptors: Arc<Descriptors>,
+     size: SizeOpt,
+     skipframes: u32,
+     frames: FrameSelection,
+     force_play: bool,
++    trace_log: Option<TraceLogBackend>,
+ }
+ 
+ impl Exporter {
+@@ -44,15 +71,22 @@ impl Exporter {
+ 
+         let descriptors = Arc::new(Descriptors::new(instance, adapter, device, queue));
+ 
++        let trace_log = opt.trace_log.as_ref().map(|_| TraceLogBackend::default());
++
+         Ok(Self {
+             descriptors,
+             size: opt.size,
+             skipframes: opt.skipframes,
+             frames: opt.frames,
+             force_play: opt.force_play,
++            trace_log,
+         })
+     }
+ 
++    pub fn trace_log(&self) -> Option<&TraceLogBackend> {
++        self.trace_log.as_ref()
++    }
++
+     pub fn start_exporting_movie(&self, swf_path: &Path) -> Result<MovieExport> {
+         let movie = movie_from_path(swf_path, None).map_err(|e| anyhow!(e.to_string()))?;
+ 
+@@ -72,14 +106,17 @@ impl Exporter {
+ 
+         let target = TextureTarget::new(&self.descriptors.device, (width, height))
+             .map_err(|e| anyhow!(e.to_string()))?;
+-        let player = PlayerBuilder::new()
++        let mut builder = PlayerBuilder::new()
+             .with_renderer(
+                 WgpuRenderBackend::new(self.descriptors.clone(), target)
+                     .map_err(|e| anyhow!(e.to_string()))?,
+             )
+             .with_movie(movie)
+-            .with_viewport_dimensions(width, height, self.size.scale)
+-            .build();
++            .with_viewport_dimensions(width, height, self.size.scale);
++        if let Some(log) = &self.trace_log {
++            builder = builder.with_log(log.clone());
++        }
++        let player = builder.build();
+ 
+         Ok(MovieExport {
+             player,
+diff --git a/exporter/src/lib.rs b/exporter/src/lib.rs
+index 30f7f90c0..bf4c5e461 100644
+--- a/exporter/src/lib.rs
++++ b/exporter/src/lib.rs
+@@ -132,6 +132,10 @@ fn capture_single_swf(exporter: &Exporter, opt: &Opt) -> Result<()> {
+         }
+     }
+ 
++    if let (Some(path), Some(log)) = (opt.trace_log.as_ref(), exporter.trace_log()) {
++        std::fs::write(path, log.take())?;
++    }
++
+     let message = if frames.len() == 1 {
+         if !opt.silent {
+             Some(format!(

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>N — Ruffle (profiling build)</title>
+<style>html,body{margin:0;background:#000;} #c{width:792px;height:600px;}</style>
+</head>
+<body>
+<!-- Loads N.swf under the LOCALLY-BUILT Ruffle web bundle compiled with the
+     `profiling` feature, which exposes per-frame CPU on window.__rufflePerfTick
+     (AVM/sim ms) and window.__rufflePerfRender (cmd-build+GPU ms). A Playwright
+     probe reads those, mirroring how minesweeper_perf_probe2.py reads SWFRecomp's
+     __swfPerf HUD. Self-hosted (not CDN) because only this build has the shim. -->
+<div id="c"></div>
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  var rs = document.createElement('script');
+  rs.src = 'ruffle.js';
+  rs.onload = function () {
+    window.RufflePlayer.config = {
+      allowScriptAccess: true, autoplay: 'on', unmuteOverlay: 'hidden',
+      splashScreen: false, warnOnUnsupportedContent: false, logLevel: 'info',
+      contextMenu: 'off', preferredRenderer: 'webgpu',
+    };
+    var ruffle = window.RufflePlayer.newest();
+    var player = ruffle.createPlayer();
+    player.style.width = '792px';
+    player.style.height = '600px';
+    document.getElementById('c').appendChild(player);
+    player.traceObserver = function (m) { console.log('[trace] ' + m); };
+    fetch('N.swf').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      player.load({ data: buf, allowScriptAccess: true, autoplay: 'on' })
+        .then(function () { console.log('[harness] N loaded under Ruffle'); window.__nLoaded = true; })
+        .catch(function (e) { console.log('[harness] ruffle load error: ' + e); });
+    }).catch(function (e) { console.log('[harness] fetch error: ' + e); });
+  };
+  rs.onerror = function () { console.log('[harness] ERROR: failed to load local ruffle.js'); };
+  document.head.appendChild(rs);
+</script>
+</body>
+</html>
