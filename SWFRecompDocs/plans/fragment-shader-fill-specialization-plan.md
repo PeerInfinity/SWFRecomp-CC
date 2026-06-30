@@ -1,7 +1,9 @@
 # Plan: skip wasted per-fragment texture sampling in the WebGPU fragment shader
 
-**Status:** not started (written 2026-06-29). Self-contained follow-up; intended to be
-executed in a fresh session.
+**Status:** EXECUTED 2026-06-29 (commit `3d2ea1b5c`, Option 1). Pixel-identity proven +
+graphics CI green (0 regressions). Perf win UNCONFIRMED on WSL2 SwiftShader (no measurable
+drop — likely SwiftShader already DCEs the dead samples); real-GPU (Windows) run is now the
+decisive measurement. See §8 for the execution record.
 
 **Goal:** make solid-colour (and single-fill) shapes stop paying for gradient + bitmap
 texture sampling they don't use, closing most of the Ruffle-vs-SWFRecomp WASM render gap
@@ -141,3 +143,40 @@ SwiftShader exaggerates the absolute numbers but the relative drop should hold).
   see `n-laser-is-frozen-particle-sprite-not-drawing-api` / `wasm-game-performance-profiling`.
 - GPU timestamp queries for direct GPU-time measurement.
 - Pipeline specialisation (Option 2) unless Option 1 underdelivers.
+
+## 8. Execution record (2026-06-29, commit `3d2ea1b5c`)
+
+**Done — Option 1, single-file `render_webgpu.c fragment_wgsl` edit.** `fs_main` now computes
+only the texture sample the fill type needs: `sample_gradient` (textureLoad — no uniformity
+requirement) moved into the gradient branches; both bitmap `textureSample`s swapped for
+`textureSampleLevel(..., 0.0)` (explicit LOD ⇒ no derivatives ⇒ legal in non-uniform flow) and
+moved into the bitmap branch. Solid fills now do zero texture ops. The old `select(0, v_style_id,
+is_*)` OOB layer guard was dropped (each texture is sampled only inside its own branch, where
+`v_style_id` is valid); `is_bitmap` removed (now unused); ramp exactness, repeat-vs-clamp,
+linearRGB→sRGB, unconditional cxform tail, and unknown-fill default all preserved.
+
+**Pixel-identity: PROVEN.** Native offscreen Dawn (`--mode=graphics`):
+- Oracle pass on the NEW shader for every fill path: `movieclip_begin_gradient_fill`,
+  `movieclip_line_gradient_style`, `color`, `color_transform`, `mcl_target_jpg`,
+  `bitmap_data_copypixels`, `from_gnash/.../morph_test1` — all PASS.
+- **Byte-identical old-vs-new `output.actual.png`** (`--verbose`, then `cmp`) for the two
+  highest-risk paths: gradient fill (6 moved textureLoads) and JPEG bitmap (textureSample →
+  textureSampleLevel). `md5` matched exactly. (Note: `difference.png` is only retained with
+  `--verbose`; without it you compare stale artifacts — use `output.actual.png`.)
+
+**Graphics CI: GREEN, 0 regressions.** `ruffle-tests.yml mode=graphics` run `28415138546`:
+every suite "No changes detected" — avm1 629/704, shumway 73/92 + avm1 46/47, all 5 gnash
+sub-suites unchanged. Confirms pixel-identity at full-suite scale.
+
+**Perf on WSL2 SwiftShader: NO measurable win (as the harness can see it).** Two runs of
+`n_swfrecomp_perf.py 8 15` on the freshly-redeployed N (verified new shader is in the wasm:
+`grep -a textureSampleLevel docs2/examples/flasharchive/N/N.wasm` → present): frame CPU median
+**139.7 / 142.5 ms**, draws **480/481** — statistically unchanged from the ~147–177 ms baseline.
+Most likely cause: **SwiftShader's LLVM-based shader compiler already dead-code-eliminates the
+uber-shader's unused samples** (their results never reach `@location(0)`), so hand-specializing
+is a no-op *on SwiftShader*. (The alternative — the bottleneck is overdraw / fragment *count*,
+not per-fragment texture ops — points to the same out-of-scope §7 lever and the same "no
+SwiftShader win" outcome.) The change is still correct and expected to help on real GPU drivers
+that don't DCE the uber-shader as aggressively and on HW where each texture op is a real cost.
+**A real-GPU run on the user's Windows machine is the decisive next measurement** (§5 always
+flagged this). If it too shows no win, the lever is overdraw reduction (§7), not the shader.
