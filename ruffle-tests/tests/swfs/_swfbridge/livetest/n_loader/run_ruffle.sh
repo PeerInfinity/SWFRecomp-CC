@@ -27,7 +27,14 @@ cleanup() { [ -n "$HTTP_PID" ] && kill "$HTTP_PID" 2>/dev/null || true; rm -rf "
 trap cleanup EXIT
 
 cp "${HERE}/n_loader.swf" "${TMP}/"
-cp "${HERE}/n_ruffle_harness.html" "${TMP}/ruffle_harness.html"
+if [ -n "${EI:-}" ]; then
+  # EI tier: feed the level via ExternalInterface (__swfBridge) + host mock.
+  cp "${HERE}/n_swf_bridge.js" "${HERE}/n_host_mock.js" "${TMP}/"
+  cp "${HERE}/n_ruffle_ei_harness.html" "${TMP}/ruffle_harness.html"
+  echo "(EI mode: level fed via __swfConfig, completion via __swfSendExit)"
+else
+  cp "${HERE}/n_ruffle_harness.html" "${TMP}/ruffle_harness.html"
+fi
 if command -v fuser >/dev/null 2>&1; then fuser -k "${HTTP_PORT}/tcp" >/dev/null 2>&1 || true; sleep 0.3; fi
 ( cd "$TMP" && python3 -m http.server "$HTTP_PORT" >/dev/null 2>&1 ) & HTTP_PID=$!
 for _ in $(seq 1 40); do (exec 3<>"/dev/tcp/127.0.0.1/${HTTP_PORT}") 2>/dev/null && { exec 3>&- 3<&- 2>/dev/null; break; }; sleep 0.25; done
@@ -39,8 +46,8 @@ HARNESS_URL="http://127.0.0.1:${HTTP_PORT}/ruffle_harness.html" \
   NODE_PATH="$PLAYWRIGHT_NODE_MODULES" \
   node "${PROBE}/run_browser.js" | tee "${OUT}/console.txt"
 echo "--- captured $(wc -l < "${OUT}/console.txt") lines -> ${OUT}/console.txt ---"
-echo "=== NLoader trace (Ruffle console formatting stripped) ==="
+echo "=== NLoader + bridge trace (Ruffle console formatting stripped) ==="
 # Ruffle wraps AVM trace() as "%cINFO%c web/src/log_adapter.rs:18%c <msg> color:..."
-grep -E 'nloader|N_COMPLETE|NT[0-9]+ ' "${OUT}/console.txt" \
+grep -E 'nloader|N_COMPLETE|NT[0-9]+ |\[bridge\]|\[host\]' "${OUT}/console.txt" \
   | sed -E 's/.*log_adapter\.rs:[0-9]+%c //; s/ color: whitesmoke.*$//' \
   || echo "(no loader trace captured)"

@@ -16,7 +16,24 @@ NLoader.as --(MTASC)--> nloader.swf --(extract_bytecode.py)--> nloader_bytecode.
            --(SWFRecomp recompile)--> native (headless) / wasm
 ```
 
-`NLoader` has a `MODE` switch:
+### `__swfBridge` (ExternalInterface) contract
+The loader pulls its level from a JS host and reports completion outward, so a
+host (e.g. an Archipelago embed) drives it - the baked fixture is only the
+fallback. Mirrors DJ's `__swfBridge`.
+- **Inward:** `ExternalInterface.call("__swfConfig")` returns
+  `"levelId\nlevStr\ndemoStr"` (newline is the only separator safe vs N's level
+  chars). The loader polls each tick; if no host answers within `EI_WAIT` ticks
+  (or EI is unavailable, e.g. native headless), it falls back to the baked
+  `MODE` fixture.
+- **Outward:** on completion, `ExternalInterface.call("__swfSendExit", levelId)`.
+- Page side: `n_swf_bridge.js` installs `window.__swfConfig` / `__swfSendExit`
+  and the host API `window.__swfBridge.configure({levelId,level,demo})` /
+  `.onExit(cb)`. `n_host_mock.js` plays a standalone host for testing.
+- Verified on Ruffle (`EI=1 ./run_ruffle.sh`): host feeds the level in, player
+  completes, `__swfSendExit` reaches the host. Same plumbing applies to
+  SWFRecomp-WASM in the browser (interactive keyboard when `demoStr` is empty).
+
+`NLoader` has a `MODE` switch (the fixture used when no EI host is present):
 - **`walk`** (default): a grounded level (solid floor row) where the player
   WALKS RIGHT into the exit's switch then door, driven by a hand-authored demo
   (N's bit-packed input replay). Faithful navigation. PASSES headless.
@@ -65,7 +82,8 @@ Two tiers run the SAME injected `n_loader.swf`:
 ./build_nloader.sh          # -> n_loader.swf  (MTASC + inject; needs ~/CC/mtasc)
 
 # Ruffle (ground truth, FAST: no recompile, ~15s) - needs DISPLAY + chrome + playwright
-./run_ruffle.sh 15          # -> ruffle_run/console.txt ; prints N_COMPLETE
+./run_ruffle.sh 15          # baked fixture -> ruffle_run/console.txt ; prints N_COMPLETE
+EI=1 ./run_ruffle.sh 15     # __swfBridge tier: host feeds level, gets __swfSendExit
 
 # SWFRecomp native (headless) - first build ~4 min (action.c -O2), ccache after
 ./run_nloader.sh 400        # recompile native + run headless -> native_run/trace.txt

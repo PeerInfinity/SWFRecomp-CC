@@ -1,15 +1,15 @@
 // NLoader.as - injected level loader for recompiled "N" (Metanet ninja).
-// Loads a SPECIFIC level and DETECTS completion, headless. Pipeline like
-// ../dj_probe: MTASC -> extract_bytecode.py -> inject_tracer.py -> recompile.
-// Full design + decoded level/demo formats: README.md and
-// SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md.
+// Loads a SPECIFIC level and DETECTS completion. Pipeline like ../dj_probe:
+// MTASC -> extract_bytecode.py -> inject_tracer.py -> recompile.
+// Full design + decoded level/demo formats + the __swfBridge contract: README.md
+// and SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md.
 // (Keep this header short: MTASC v8's SWF writer overflows zlib on long
 //  comments - "zlib_deflate_end". Detail goes in the README, not here.)
 class NLoader {
 	static var DEPTH:Number = 1048570;
 	static var MAX:Number = 400;     // hard frame cap (quit even if stuck)
-	static var SETTLE:Number = 6;    // ticks to wait after boot before loading
-	static var MODE:String = "walk"; // "walk" | "fall"
+	static var EI_WAIT:Number = 12;  // ticks to poll __swfConfig before fixture fallback
+	static var MODE:String = "walk"; // fixture used when no EI host: "walk" | "fall"
 
 	// --- "fall" fixture: empty map, switch+door stacked just below spawn ----
 	static var FALL_SPAWN:String = "5^372,100";
@@ -32,15 +32,26 @@ class NLoader {
 	static var completed:Boolean = false;
 	static var r:Object;
 
+	// __swfBridge / ExternalInterface state. Inward config (level), outward exit.
+	static var EI:Object;
+	static var eiMode:Boolean = false;
+	static var resolved:Boolean = false;   // config (EI or fixture) decided
+	static var levelId:String = "fixture";
+	static var levelStr:String = "";
+	static var demoStr:String = "";        // "" => keyboard input (no demo playback)
+
 	static function main(mc:MovieClip):Void {
 		r = _root;
-		trace("[nloader] start mode=" + MODE);
+		EI = flash.external.ExternalInterface;       // untyped: variadic call ok
+		eiMode = (EI.available == true);
+		trace("[nloader] start mode=" + MODE + " ei=" + eiMode);
 		var clip:MovieClip = _root.createEmptyMovieClip("__nloader__", DEPTH);
 		clip.onEnterFrame = function():Void { NLoader.tickFn(); };
 	}
 
 	static function noop():Void {}   // parks N's active process while we drive ticks
 
+	// Build the baked fixture level string from MODE (no-EI fallback).
 	static function buildLevel():String {
 		if (MODE == "fall") {
 			var empty:String = "";
@@ -63,18 +74,52 @@ class NLoader {
 		return map + "|" + WALK_SPAWN + "!" + WALK_EXIT;
 	}
 
+	// Host config string (from __swfConfig): "levelId\nlevStr\ndemoStr". Newline
+	// is the only separator safe vs N's level chars ('0'..'Q', | ! ^ , :).
+	static function parseConfig(cfg:String):Void {
+		var parts:Array = cfg.split("\n");
+		levelId  = (parts[0] != undefined) ? String(parts[0]) : "host";
+		levelStr = (parts[1] != undefined) ? String(parts[1]) : "";
+		demoStr  = (parts[2] != undefined) ? String(parts[2]) : "";
+	}
+
+	static function useFixture():Void {
+		levelId = "fixture-" + MODE;
+		levelStr = buildLevel();
+		demoStr = (MODE == "walk") ? WALK_DEMO : "";
+	}
+
 	static function tickFn():Void {
 		tick++;
 
 		if (phase == "wait") {
-			if (r.gamedata != null && r.game != null
-			    && r.App_LoadLevel_Raw != undefined) {
-				if (bootTick == 0) {
-					bootTick = tick;
-					trace("[nloader] boot-ready at tick " + tick + ", settling");
-				}
-				if (tick - bootTick >= SETTLE) startLoad();
+			// Wait for N to finish booting (gamedata is the last module built).
+			if (r.gamedata == null || r.game == null
+			    || r.App_LoadLevel_Raw == undefined) return;
+			if (bootTick == 0) {
+				bootTick = tick;
+				trace("[nloader] boot-ready at tick " + tick);
 			}
+			if (!resolved) {
+				if (eiMode) {
+					var cfg:String = String(EI.call("__swfConfig"));
+					if (cfg != null && cfg != "" && cfg != "undefined"
+					    && cfg != "null") {
+						parseConfig(cfg);
+						resolved = true;
+						trace("[nloader] EI configured id=" + levelId
+						      + " levchars=" + levelStr.length
+						      + " demo=" + (demoStr != ""));
+					} else if (tick - bootTick >= EI_WAIT) {
+						useFixture(); resolved = true;
+						trace("[nloader] EI host silent -> fixture " + levelId);
+					}
+				} else if (tick - bootTick >= EI_WAIT) {
+					useFixture(); resolved = true;
+					trace("[nloader] no EI -> fixture " + levelId);
+				}
+			}
+			if (resolved) startLoad();
 		} else if (phase == "run") {
 			r.game.Tick();   // one deterministic sim step
 			var p:Object = r.player;
@@ -100,27 +145,27 @@ class NLoader {
 
 	static function startLoad():Void {
 		phase = "load";
-		var lev:String = buildLevel();
-		trace("[nloader] loading raw level (" + lev.length + " chars)");
+		trace("[nloader] loading level " + levelId + " (" + levelStr.length + " chars)");
 		r.game.InitNewGame();
-		r.App_LoadLevel_Raw(lev, NLoader.onLoaded);
+		r.App_LoadLevel_Raw(levelStr, NLoader.onLoaded);
 	}
 
 	static function onLoaded():Void {
 		trace("[nloader] level loaded -> entering running state");
 		// Set up the running state by hand (App_PlayGame's wall-clock loop would
-		// starve game.Tick()), install the completion hook, optionally start the
-		// walk demo, then park N's process and drive ticks from tickFn().
+		// starve game.Tick()), install the completion hook -> __swfSendExit, start
+		// the demo if provided, park N's process, drive ticks from tickFn().
 		r.gui.HideAll();
 		r.game.InitRetryLevel();
 		r.App_PlayerDeathEvent = r.App_PlayerDeathEvent_Normal;
 		r.App_LevelPassedEvent = function():Void {
 			NLoader.completed = true;
-			trace("N_COMPLETE tick=" + NLoader.tick);
+			trace("N_COMPLETE id=" + NLoader.levelId + " tick=" + NLoader.tick);
+			if (NLoader.eiMode) NLoader.EI.call("__swfSendExit", NLoader.levelId);
 			NLoader.r.App_LevelPassedEvent_Normal();
 		};
-		if (MODE == "walk") {
-			r.game.LoadDemo(WALK_DEMO);
+		if (demoStr != "") {
+			r.game.LoadDemo(demoStr);
 			r.game.StartDemoPlayback();
 		}
 		r.SetActiveProcess(NLoader.noop);

@@ -4,6 +4,27 @@ Date: 2026-06-30. Goal (user): load a *specific level* into recompiled N and
 *detect when the level is completed*. Scope chosen: **arbitrary raw levels**,
 **native/headless fixture tier first** (mirrors the DJ loader's first increment).
 
+## STATUS: __swfBridge (EI) contract works on Ruffle (2026-06-30)
+The loader now pulls its level from a JS host via ExternalInterface and reports
+completion outward, with the baked fixture as fallback. Verified end-to-end on
+Ruffle (`EI=1 ./run_ruffle.sh`):
+```
+[bridge] configured id=mock-walk levchars=742 demo=true   (host feeds level IN)
+[nloader] EI configured id=mock-walk                       (loader pulls __swfConfig)
+N_COMPLETE id=mock-walk tick=74
+[bridge] __swfSendExit mock-walk                           (loader reports OUT)
+[host] LEVEL COMPLETE: mock-walk                           (host receives it)
+```
+- Inward: `EI.call("__swfConfig")` -> `"levelId\nlevStr\ndemoStr"` (newline = only
+  separator safe vs N level chars '0'..'Q', | ! ^ , :). Polled each tick; falls
+  back to baked `MODE` fixture after `EI_WAIT` ticks or when EI is unavailable
+  (native headless). Both fallback paths verified.
+- Outward: `EI.call("__swfSendExit", levelId)` on completion.
+- Page side: `n_swf_bridge.js` (window.__swfConfig/__swfSendExit + host API
+  `window.__swfBridge.configure/onExit`), `n_host_mock.js` (standalone host),
+  `n_ruffle_ei_harness.html`. Same plumbing targets SWFRecomp-WASM in-browser
+  (interactive keyboard when demoStr is empty).
+
 ## STATUS: increments 1 & 2 PASS on BOTH Ruffle and SWFRecomp (2026-06-30)
 
 ### Cross-runtime: BYTE-IDENTICAL on Ruffle and SWFRecomp native
