@@ -1,0 +1,8 @@
+# Generated/run artifacts (rebuild via build_nloader.sh / run_nloader.sh)
+nloader.swf
+n_loader.swf
+nloader_bytecode.bin
+native_run/
+ruffle_run/
+wasm_run/
+run.log
