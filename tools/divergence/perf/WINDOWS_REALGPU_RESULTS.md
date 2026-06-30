@@ -147,3 +147,37 @@ gitignored, so the rebuild step above picks up the new runtime), and re-profile:
    ~11.7% self-time should drop (how much depends on the cache's parent/name distribution).
    If it doesn't move materially, the next lever is hash-indexing the cache or interning
    clip/property names — deferred as higher-risk. (User pre-approved "ok if no improvement.")
+
+## RE-VERIFIED on Windows (2026-06-29, HEAD 244000ab8 — both fixes confirmed)
+
+Rebuilt N symbolicated (`EMCC_CFLAGS=--profiling-funcs`) from current master and re-ran
+both checks on the same Intel Gen9 / real Chrome v149 setup. **Both fixes work.**
+
+**Fix #2 — `findOrCreateMovieClip` cache-scan (CONFIRMED, ~halved):**
+Fresh symbolicated CDP self-time profile (intro, 23.2k samples):
+- `findOrCreateMovieClip`: **11.7% → 6.3% self-time** (no longer the dominant outlier).
+- Steady-state frame CPU (harness, kept hot): **~6.0 → ~4.3–4.9 ms** mean.
+- Rest of the cluster ~unchanged (compose_children 3.7, tagShowFrame 3.5, prop_name_match
+  3.3, memcmp 2.1, findPropertySlot 1.6, name_fold_hash 1.6, getPropertyWithPrototype 1.4).
+  render_webgpu_draw_tris still ~1.3%. So the hot path is now flatter; next lever (hash-index
+  / interning) is where the remaining property-name cost lives, as you predicted.
+
+**Fix #1 — HUD steady-state reporting (CONFIRMED, both paths):**
+The extension drives a **hidden** tab (`document.visibilityState === "hidden"`), so it always
+RAF-throttles — that was the artifact source. New HUD behaves correctly in both states:
+
+- Hidden/throttled tab (extension): headline still raw (388–778% budget) BUT now prints
+  `[THROTTLED]` and `steady-state: 77/77 frames (excl 77 warmup/throttle; raw max 805.8)` —
+  i.e. it flags the reading as unreliable and shows everything was excluded.
+- Visible/hot tab (Playwright harness, `document.hidden===false`): **no `[THROTTLED]`**, and the
+  headline tracks the true steady state:
+  `frame CPU mean 4.31 / p95 6.40 / max 7.40 ms (52% budget)` ·
+  `steady-state: 120/120 frames (excl 0 warmup/throttle; raw max 7.4)` · `max sustainable ~232 fps`.
+
+So the misleading 100–200%/370% headline is gone for normal foreground use; under throttle the
+viewer is now explicitly warned. Net of both fixes: N intro on this iGPU is **~52% of the 120 fps
+budget (~4.3 ms/frame)**, GPU never the gate (present≈0, submit≈0.06 ms, ~42% idle).
+
+**Disk state:** `build_test.sh` pristine (EMCC_CFLAGS env, no edit). `docs2/.../N.{js,wasm}`
+restored to the pre-task build (13,101,213 bytes) — note this is the *old* runtime; regenerate
+docs2 via `rebuild_docs2_demos.sh --only N` if you want the deployed demo to reflect the fixes.
