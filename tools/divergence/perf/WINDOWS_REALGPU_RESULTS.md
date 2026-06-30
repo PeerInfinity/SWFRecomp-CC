@@ -125,3 +125,25 @@ Windows Chrome.exe, serving docs2 over the WSL UNC share via
 `SimpleHTTPRequestHandler(directory=...)` (Windows can't chdir to a UNC path), a printed
 WebGPU adapter check, and a settled-counters dump.
 ```
+
+## FOLLOW-UP — two fixes landed from these results (re-verify on Windows)
+
+Acting on this report, two changes shipped to `master` (no-graphics CI green, 0 regressions,
+byte-identical trace suite). To re-verify, **pull master, rebuild N** (the docs2 N build is
+gitignored, so the rebuild step above picks up the new runtime), and re-profile:
+
+1. **HUD now reports steady-state** (`fix(perf-hud)` `56970ac27`, `swf.c::swf_perf_report`).
+   It excludes warmup (<30 frames), throttled frames (delivered interval >250ms or
+   `document.hidden`), and frame 0 from the headline, and prints
+   `steady-state: N/total (excl K warmup/throttle; raw max X)` + a `[THROTTLED]` flag.
+   **Expected:** the misleading "100–200% budget / 370%" reading is gone even on a
+   non-foreground tab — the headline tracks the ~6 ms steady state, and the throttle spikes
+   show only in the "excl"/"raw max" fields. (This is the real fix for the artifact this
+   report identified.)
+2. **`findOrCreateMovieClip` scan sped up** (`perf(avm)` `65b09ad64`, `action.c`). The
+   child_mc_cache scan now does the cheap parent-pointer check + an inline first-byte
+   fast-reject before the extern `swf_name_match`. Provably identical results (CI byte-clean).
+   **Expected:** in a fresh symbolicated CDP self-time profile, `findOrCreateMovieClip`'s
+   ~11.7% self-time should drop (how much depends on the cache's parent/name distribution).
+   If it doesn't move materially, the next lever is hash-indexing the cache or interning
+   clip/property names — deferred as higher-risk. (User pre-approved "ok if no improvement.")
