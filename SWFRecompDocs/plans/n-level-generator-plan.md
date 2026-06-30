@@ -187,13 +187,20 @@ When wrapping the core as an Archipelago-CC Mode-2 substrate (template: copy
 
 ## 7. Phasing (each phase verified before the next)
 
-- **P0 — encoder + golden round-trip.** `nLevel.js` + extract N's built-in
-  `LevelData` strings (from the JPEXS decompile) into a committed fixture; assert
-  decode→encode is byte-identical for every shipped level. Locks format
-  correctness. *Autonomous, fast, no build.*
-- **P1 — flat/trivial generator end-to-end.** Parameterize the walk fixture
-  (floor + spawn + switch + door + gold + walk-right demo); generate a batch;
-  verify all complete on Ruffle via the queue. Proves the whole pipeline.
+- **P0 — encoder + golden round-trip. ✅ DONE (2026-06-30).** `gen/nLevel.js`
+  (Level model + encode/decode + cell↔pixel) + `gen/extract_builtin_levels.mjs`
+  → `gen/builtin_levels.json` (all 150 built-in levels; **gitignored — N is not
+  open source**, regenerate locally). `gen/golden_roundtrip.test.mjs`:
+  encode(decode(s)) byte-identical for all 150.
+- **P1 — flat/trivial generator end-to-end. ✅ DONE (2026-06-30).** First proved
+  the **batch-verify queue** on Ruffle: SWF re-loads a fresh level after each
+  completion in one page session (NLoader.as re-arm; `n_swf_bridge.js`
+  `configureQueue`; `__N_DONE__` sentinel). Then `gen/nGenerate.js` (seeded flat
+  walk-right levels: floor + spawn→switch→door + gold + hold-right demo) +
+  `gen/nVerify.js` (the authoritative gate). `node gen/nVerify.js 6 1` → **6/6
+  complete on real N**. NLoader `finishLevel()` advances the queue on
+  `N_COMPLETE`/`N_FAIL` (per-level `LEVEL_MAX` budget) so a bad level never
+  stalls a batch (verified good→timeout→good).
 - **P2 — jumps & gaps.** `nMotion` envelopes + `nReach`; generate levels with
   height changes and reachable gaps; construction emits the jump demo; Ruffle
   gates. This is where the coarse model + real-N verifier earn their keep.
