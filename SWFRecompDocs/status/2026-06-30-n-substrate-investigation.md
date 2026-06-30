@@ -4,7 +4,16 @@ Date: 2026-06-30. Goal (user): load a *specific level* into recompiled N and
 *detect when the level is completed*. Scope chosen: **arbitrary raw levels**,
 **native/headless fixture tier first** (mirrors the DJ loader's first increment).
 
-## STATUS: increments 1 & 2 PASS (2026-06-30)
+## STATUS: increments 1 & 2 PASS on BOTH Ruffle and SWFRecomp (2026-06-30)
+
+### Cross-runtime: BYTE-IDENTICAL on Ruffle and SWFRecomp native
+The same injected `n_loader.swf` runs under Ruffle (web, via `run_ruffle.sh`:
+headed Chrome + Playwright, `traceObserver`->console) AND SWFRecomp native. Walk
+mode trace matches to the last digit on both (NT79 x=287.168719153465,
+N_COMPLETE tick=80, NT80 x=288.98753196193). So Ruffle is the FAST iteration loop
+(no recompile, ~15s) and SWFRecomp native is the headless oracle (~4 min first
+build); any divergence is a SWFRecomp bug. Both tiers run the identical SWF.
+Harness: `n_ruffle_harness.html` + `run_ruffle.sh` (needs DISPLAY+chrome+playwright).
 
 ### Increment 2 (walk-right, grounded, demo-driven) PASS
 `NLoader.as` now has a `MODE` switch ("walk" | "fall"). Walk mode: solid floor

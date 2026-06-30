@@ -59,14 +59,24 @@ through a switch+door stacked just below the spawn completes deterministically.
 
 ## Usage
 
+Two tiers run the SAME injected `n_loader.swf`:
+
 ```bash
 ./build_nloader.sh          # -> n_loader.swf  (MTASC + inject; needs ~/CC/mtasc)
-./run_nloader.sh 300        # recompile native + run headless -> native_run/trace.txt
-grep N_COMPLETE native_run/trace.txt   # the completion signal
+
+# Ruffle (ground truth, FAST: no recompile, ~15s) - needs DISPLAY + chrome + playwright
+./run_ruffle.sh 15          # -> ruffle_run/console.txt ; prints N_COMPLETE
+
+# SWFRecomp native (headless) - first build ~4 min (action.c -O2), ccache after
+./run_nloader.sh 400        # recompile native + run headless -> native_run/trace.txt
+grep N_COMPLETE native_run/trace.txt
 ```
 
-First native recompile is slow (N's `action.c` is ~3 MB at -O2); ccache makes
-reruns fast. The runner is the game-agnostic `../dj_probe/run_native.py`.
+**Both runtimes produce byte-identical trace** (player x, completion tick), so
+Ruffle is the fast iteration loop and SWFRecomp native is the headless oracle;
+any divergence between them is a SWFRecomp bug. Ruffle runs the SWF directly (no
+recompile), so fixture authoring iterates in seconds. The native runner is the
+game-agnostic `../dj_probe/run_native.py`.
 
 ### Demo / input format (decoded)
 Per tick = 4 bits `L=1, R=2, J=4, JTRIG=8` (jump rising-edge); 7 ticks packed per

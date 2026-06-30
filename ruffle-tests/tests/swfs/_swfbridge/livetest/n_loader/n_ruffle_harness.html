@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>N level loader - Ruffle (ground truth)</title>
+</head>
+<body>
+<h1>N loader under Ruffle</h1>
+<!-- Runs the loader-injected N SWF (n_loader.swf) under Ruffle web - the real
+     Flash player - so NLoader's trace() output (N_COMPLETE) establishes that the
+     load+detect logic works on Ruffle too, independent of SWFRecomp. The loader
+     is self-driving in fixture mode (forces level load + demo playback), so no
+     host/bridge is needed - Ruffle just autoplays it.
+     logLevel:'info' + traceObserver route AVM trace() to the console. -->
+<div id="ruffle-container" style="width:640px;height:480px;background:#000;"></div>
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  var rs = document.createElement('script');
+  rs.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+  rs.onload = function () {
+    window.RufflePlayer.config = {
+      allowScriptAccess: true,
+      autoplay: 'on',
+      unmuteOverlay: 'hidden',
+      splashScreen: false,
+      warnOnUnsupportedContent: false,
+      logLevel: 'info',
+    };
+    console.log('[harness] Ruffle ready');
+    var ruffle = window.RufflePlayer.newest();
+    var player = ruffle.createPlayer();
+    player.style.width = '640px';
+    player.style.height = '480px';
+    document.getElementById('ruffle-container').appendChild(player);
+    player.traceObserver = function (m) { console.log(m); };
+    fetch('n_loader.swf').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      player.load({ data: buf, allowScriptAccess: true, autoplay: 'on' })
+        .then(function () { console.log('[harness] SWF loaded'); })
+        .catch(function (e) { console.log('[harness] ruffle load error: ' + e); });
+    }).catch(function (e) { console.log('[harness] fetch error: ' + e); });
+  };
+  rs.onerror = function () { console.log('[harness] ERROR: failed to load Ruffle CDN'); };
+  document.head.appendChild(rs);
+</script>
+</body>
+</html>
