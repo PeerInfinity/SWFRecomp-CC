@@ -27,5 +27,15 @@ Format facts: `SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`.
   node golden_roundtrip.test.mjs   # -> 150/150 byte-identical, exit 0
   ```
 
+## Batch-verify queue tooling
+
+- **`nDemo.js`** — N demo (input replay) (de)serialization. `holdRight(ticks)` /
+  `holdLeft(ticks)` / `encodeDemo(perTickMasks)` / `decodeDemo(str)`. Per tick =
+  4 bits L/R/J/JTRIG; 7 ticks/entry; `holdRight(7) === "7:35791394"`.
+- **`make_queue_testcases.mjs`** — generates a small batch of flat walk-right
+  levels (authored, not N's data) into `../n_queue_testcases.js` for the Ruffle
+  `QUEUE=1` batch-verify run (see the parent README). The queue proved the
+  SWF-side re-arm: N re-loads a fresh level after each completion in one session.
+
 This is injected-AS / JS tooling under `_swfbridge/livetest/` — **not
 CI-observable**; do not dispatch ruffle-tests CI for it.

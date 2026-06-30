@@ -27,7 +27,13 @@ cleanup() { [ -n "$HTTP_PID" ] && kill "$HTTP_PID" 2>/dev/null || true; rm -rf "
 trap cleanup EXIT
 
 cp "${HERE}/n_loader.swf" "${TMP}/"
-if [ -n "${EI:-}" ]; then
+if [ -n "${QUEUE:-}" ]; then
+  # QUEUE tier: host serves a BATCH of levels; SWF re-loads each after the prior
+  # one completes (batch-verify throughput). __N_QUEUE from n_queue_testcases.js.
+  cp "${HERE}/n_swf_bridge.js" "${HERE}/n_queue_host.js" "${HERE}/n_queue_testcases.js" "${TMP}/"
+  cp "${HERE}/n_ruffle_queue_harness.html" "${TMP}/ruffle_harness.html"
+  echo "(QUEUE mode: batch of levels fed via __swfConfig; re-load on each __swfSendExit)"
+elif [ -n "${EI:-}" ]; then
   # EI tier: feed the level via ExternalInterface (__swfBridge) + host mock.
   cp "${HERE}/n_swf_bridge.js" "${HERE}/n_host_mock.js" "${TMP}/"
   cp "${HERE}/n_ruffle_ei_harness.html" "${TMP}/ruffle_harness.html"

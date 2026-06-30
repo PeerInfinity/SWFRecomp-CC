@@ -84,6 +84,7 @@ Two tiers run the SAME injected `n_loader.swf`:
 # Ruffle (ground truth, FAST: no recompile, ~15s) - needs DISPLAY + chrome + playwright
 ./run_ruffle.sh 15          # baked fixture -> ruffle_run/console.txt ; prints N_COMPLETE
 EI=1 ./run_ruffle.sh 15     # __swfBridge tier: host feeds level, gets __swfSendExit
+QUEUE=1 ./run_ruffle.sh 30  # batch-verify: host serves many levels, SWF re-loads each
 
 # SWFRecomp native (headless) - first build ~4 min (action.c -O2), ccache after
 ./run_nloader.sh 400        # recompile native + run headless -> native_run/trace.txt
@@ -125,6 +126,22 @@ shows N's run model `vx[n+1] = vx[n]*0.99 + 0.15` (groundAccel + drag).
 Per tick = 4 bits `L=1, R=2, J=4, JTRIG=8` (jump rising-edge); 7 ticks packed per
 entry at shifts 0,4,…,24; serialized `"<tickCount>:<e0>|<e1>|…"`. "Hold right" =
 R every tick → each full 7-tick entry = `35791394`.
+
+## Batch-verify queue (`QUEUE=1`)
+
+For verifying many generated levels cheaply, the host serves a **queue** of
+levels in ONE page session: the SWF completes a level, reports `__swfSendExit`,
+the host advances `__swfConfig` to the next level, and the SWF re-loads it
+(`game.InitNewGame()` + `App_LoadLevel_Raw()` again, same session) — proven on
+Ruffle to re-load and re-replay demos across levels without state desync. When
+the queue is exhausted, `__swfConfig` returns the `__N_DONE__` sentinel and the
+SWF quits. This turns ~15s/level (page reload per level) into one boot + ~80
+sim-frames per level.
+
+- `gen/make_queue_testcases.mjs` → `n_queue_testcases.js` (`window.__N_QUEUE`,
+  authored flat walk levels — not N's built-in data).
+- `n_queue_host.js` calls `__swfBridge.configureQueue([...])` and logs each exit.
+- `n_ruffle_queue_harness.html` is the page; `QUEUE=1 ./run_ruffle.sh` drives it.
 
 ## Next steps (see the status doc)
 - Arbitrary procgen levels: the full object-param and tile-state tables are in

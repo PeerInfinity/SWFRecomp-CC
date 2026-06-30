@@ -7,9 +7,10 @@
 //  comments - "zlib_deflate_end". Detail goes in the README, not here.)
 class NLoader {
 	static var DEPTH:Number = 1048570;
-	static var MAX:Number = 400;     // hard frame cap (quit even if stuck)
+	static var MAX:Number = 1500;    // hard frame cap (quit even if stuck); queue needs headroom
 	static var EI_WAIT:Number = 12;  // ticks to poll __swfConfig before fixture fallback
 	static var MODE:String = "walk"; // fixture used when no EI host: "walk" | "fall"
+	static var DONE:String = "__N_DONE__"; // __swfConfig sentinel: queue exhausted -> quit
 
 	// --- "fall" fixture: empty map, switch+door stacked just below spawn ----
 	static var FALL_SPAWN:String = "5^372,100";
@@ -44,6 +45,9 @@ class NLoader {
 	static var levelId:String = "fixture";
 	static var levelStr:String = "";
 	static var demoStr:String = "";        // "" => keyboard input (no demo playback)
+	static var rawCfg:String = "";         // last __swfConfig string seen (queue dedup key)
+	static var lastConfig:String = "";     // rawCfg of the level currently/last loaded
+	static var levelsDone:Number = 0;      // count of completed levels this session
 
 	static function main(mc:MovieClip):Void {
 		r = _root;
@@ -152,8 +156,9 @@ class NLoader {
 				if (eiMode) {
 					var cfg:String = String(EI.call("__swfConfig"));
 					if (cfg != null && cfg != "" && cfg != "undefined"
-					    && cfg != "null") {
+					    && cfg != "null" && cfg != DONE) {
 						parseConfig(cfg);
+						rawCfg = cfg;
 						resolved = true;
 						trace("[nloader] EI configured id=" + levelId
 						      + " levchars=" + levelStr.length
@@ -173,12 +178,37 @@ class NLoader {
 			recordFrame();   // structured per-frame telemetry (NF line)
 			var p:Object = r.player;
 			if (completed) {
+				levelsDone++;
+				// In EI mode the host may have a NEXT level queued: re-arm and
+				// poll __swfConfig instead of quitting. Otherwise quit.
+				if (eiMode) {
+					trace("[nloader] level complete (" + levelsDone
+					      + ") -> polling for next");
+					rearm(); return;
+				}
 				trace("[nloader] level complete -> quitting");
 				phase = "done"; fscommand("quit", ""); return;
 			}
 			if (p.isDead) {
 				trace("[nloader] PLAYER DIED before exit -> quitting");
 				phase = "done"; fscommand("quit", ""); return;
+			}
+		} else if (phase == "poll") {
+			// Re-armed after a completion: wait for the host to serve the NEXT
+			// level (a config string different from the one we just ran), or the
+			// DONE sentinel meaning the queue is exhausted.
+			var ncfg:String = String(EI.call("__swfConfig"));
+			if (ncfg == DONE) {
+				trace("[nloader] queue done (" + levelsDone + " levels) -> quitting");
+				phase = "done"; fscommand("quit", ""); return;
+			}
+			if (ncfg != null && ncfg != "" && ncfg != "undefined"
+			    && ncfg != "null" && ncfg != lastConfig) {
+				parseConfig(ncfg);
+				rawCfg = ncfg;
+				trace("[nloader] next level id=" + levelId
+				      + " levchars=" + levelStr.length + " demo=" + (demoStr != ""));
+				startLoad();
 			}
 		}
 
@@ -191,9 +221,20 @@ class NLoader {
 
 	static function startLoad():Void {
 		phase = "load";
+		lastConfig = rawCfg;   // remember which config this load corresponds to
 		trace("[nloader] loading level " + levelId + " (" + levelStr.length + " chars)");
 		r.game.InitNewGame();
 		r.App_LoadLevel_Raw(levelStr, NLoader.onLoaded);
+	}
+
+	// Reset per-level state after a completion and re-enter the poll phase so the
+	// host can serve the next queued level (App_LoadLevel_Raw again, same session).
+	static function rearm():Void {
+		completed = false;
+		goldCount = 0;
+		switchOpen = false;
+		demoStr = "";
+		phase = "poll";
 	}
 
 	static function onLoaded():Void {

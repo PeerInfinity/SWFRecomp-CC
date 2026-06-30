@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>N level loader - Ruffle + __swfBridge batch QUEUE</title>
+</head>
+<body>
+<h1>N loader under Ruffle (batch-verify QUEUE)</h1>
+<!-- QUEUE tier: the host (n_queue_host.js) serves a LIST of levels
+     (n_queue_testcases.js -> window.__N_QUEUE) via __swfConfig; the SWF re-loads
+     each one after completing the previous (App_LoadLevel_Raw again, same
+     session). Proves the batch-verify throughput path before any generator
+     depends on it. -->
+<div id="ruffle-container" style="width:640px;height:480px;background:#000;"></div>
+<script src="n_swf_bridge.js"></script>
+<script src="n_queue_testcases.js"></script>
+<script src="n_queue_host.js"></script>
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  var rs = document.createElement('script');
+  rs.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+  rs.onload = function () {
+    window.RufflePlayer.config = {
+      allowScriptAccess: true,
+      autoplay: 'on',
+      unmuteOverlay: 'hidden',
+      splashScreen: false,
+      warnOnUnsupportedContent: false,
+      logLevel: 'info',
+    };
+    console.log('[harness] Ruffle ready');
+    var ruffle = window.RufflePlayer.newest();
+    var player = ruffle.createPlayer();
+    player.style.width = '640px';
+    player.style.height = '480px';
+    document.getElementById('ruffle-container').appendChild(player);
+    player.traceObserver = function (m) { console.log(m); };
+    fetch('n_loader.swf').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      player.load({ data: buf, allowScriptAccess: true, autoplay: 'on' })
+        .then(function () { console.log('[harness] SWF loaded'); })
+        .catch(function (e) { console.log('[harness] ruffle load error: ' + e); });
+    }).catch(function (e) { console.log('[harness] fetch error: ' + e); });
+  };
+  rs.onerror = function () { console.log('[harness] ERROR: failed to load Ruffle CDN'); };
+  document.head.appendChild(rs);
+</script>
+</body>
+</html>
