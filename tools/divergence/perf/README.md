@@ -117,3 +117,6 @@ cost is the most likely explanation for the ~20× render gap.
    fills do zero texture ops. Smaller, lower-risk than (2).
 2. Specialise pipelines per fill type like Ruffle (color / gradient / bitmap). Bigger change.
 Then re-measure `draws`/frame-time and confirm with GPU timestamp queries + a real-GPU run.
+
+Full execution plan (approach, WGSL invariants to preserve, pixel-identity verification,
+rollback): `SWFRecompDocs/plans/fragment-shader-fill-specialization-plan.md`.
