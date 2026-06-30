@@ -96,6 +96,31 @@ any divergence between them is a SWFRecomp bug. Ruffle runs the SWF directly (no
 recompile), so fixture authoring iterates in seconds. The native runner is the
 game-agnostic `../dj_probe/run_native.py`.
 
+## Per-frame telemetry recorder
+
+For motion-model calibration and debugging (richer than pass/fail), the loader
+emits one structured `NF ...` line per simulated frame plus `NEV <type> ...`
+events. `record_demo.sh` runs a test level + demo and parses the capture into a
+JSON record:
+
+```bash
+./record_demo.sh testcases/walk.json 15   # -> record_run/record.json
+```
+
+A test case is `{levelId, level, demo}` (see `testcases/walk.json`); it is fed to
+the SWF via `__swfBridge` (injected as `window.__N_CONFIG`). `record.json`:
+```jsonc
+{ "meta": { "levelId", "frames", "completed", "completedTick", "result" },
+  "events": [ {"type":"gold"|"switch"|"exit", "tick":N, ...} ],
+  "frames": [ { "t":tick, "gt":gameTick, "x","y", "vx","vy",   // Verlet velocity
+                "st":0-7, "stName":"run"|"jump"|..., "air","wall", "jt":jumpTimer,
+                "face", "L","R","J","JT",                       // input applied
+                "gold":count, "swon":switchOpen, "dead" } ] }
+```
+`n_record.mjs` is the parser (handles both Ruffle `console.txt` and SWFRecomp
+native `trace.txt` - same `NF` lines). Example: the walk demo's velocity ramp
+shows N's run model `vx[n+1] = vx[n]*0.99 + 0.15` (groundAccel + drag).
+
 ### Demo / input format (decoded)
 Per tick = 4 bits `L=1, R=2, J=4, JTRIG=8` (jump rising-edge); 7 ticks packed per
 entry at shifts 0,4,…,24; serialized `"<tickCount>:<e0>|<e1>|…"`. "Hold right" =

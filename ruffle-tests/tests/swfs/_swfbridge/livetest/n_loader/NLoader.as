@@ -32,6 +32,11 @@ class NLoader {
 	static var completed:Boolean = false;
 	static var r:Object;
 
+	// Per-frame telemetry / event recording state.
+	static var goldCount:Number = 0;
+	static var switchOpen:Boolean = false;
+	static var hooksInstalled:Boolean = false;
+
 	// __swfBridge / ExternalInterface state. Inward config (level), outward exit.
 	static var EI:Object;
 	static var eiMode:Boolean = false;
@@ -89,6 +94,49 @@ class NLoader {
 		demoStr = (MODE == "walk") ? WALK_DEMO : "";
 	}
 
+	// One structured telemetry line per simulated frame. Parsed by n_record.mjs
+	// into a JSON record. Velocity is Verlet (pos-oldpos = last step's motion);
+	// st = curState (0 stand,1 run,2 skid,3 jump,4 fall,5 wallslide,6 ragdoll,
+	// 7 celebrate); L/R/J/JT = input applied this tick (PINPUT_L/R/J/JTRIG).
+	static function recordFrame():Void {
+		var p:Object = r.player;
+		var inp:Object = p.inputList;
+		trace("NF t=" + tick + " gt=" + r.game.GetTime()
+		      + " x=" + p.pos.x + " y=" + p.pos.y
+		      + " vx=" + (p.pos.x - p.oldpos.x) + " vy=" + (p.pos.y - p.oldpos.y)
+		      + " st=" + p.curState
+		      + " air=" + (p.IN_AIR ? 1 : 0) + " wall=" + (p.NEAR_WALL ? 1 : 0)
+		      + " jt=" + p.jumptimer + " face=" + p.facingDir
+		      + " L=" + (inp[0] ? 1 : 0) + " R=" + (inp[1] ? 1 : 0)
+		      + " J=" + (inp[2] ? 1 : 0) + " JT=" + (inp[3] ? 1 : 0)
+		      + " gold=" + goldCount + " swon=" + (switchOpen ? 1 : 0)
+		      + " dead=" + (p.isDead ? 1 : 0));
+	}
+
+	// Wrap N's gold-collect and exit-switch so they emit NEV events + counters,
+	// chaining to the originals (via an untyped `self` to dodge MTASC's typed
+	// `this` dispatch). Installed once, after the level is loaded.
+	static function installHooks():Void {
+		if (hooksInstalled) return;
+		hooksInstalled = true;
+		var GO:Object = r.GoldObject;
+		GO.prototype.__nOrigDis = GO.prototype.Dissapear;
+		GO.prototype.Dissapear = function():Void {
+			var self:Object = this;
+			NLoader.goldCount++;
+			trace("NEV gold tick=" + NLoader.tick);
+			self.__nOrigDis();
+		};
+		var EO:Object = r.ExitObject;
+		EO.prototype.__nOrigTrig = EO.prototype.PlayerHitTrigger;
+		EO.prototype.PlayerHitTrigger = function():Void {
+			var self:Object = this;
+			NLoader.switchOpen = true;
+			trace("NEV switch tick=" + NLoader.tick);
+			self.__nOrigTrig();
+		};
+	}
+
 	static function tickFn():Void {
 		tick++;
 
@@ -122,10 +170,8 @@ class NLoader {
 			if (resolved) startLoad();
 		} else if (phase == "run") {
 			r.game.Tick();   // one deterministic sim step
+			recordFrame();   // structured per-frame telemetry (NF line)
 			var p:Object = r.player;
-			trace("NT" + tick + " gt=" + r.game.GetTime()
-			      + " x=" + p.pos.x + " y=" + p.pos.y
-			      + " dead=" + p.isDead + " done=" + completed);
 			if (completed) {
 				trace("[nloader] level complete -> quitting");
 				phase = "done"; fscommand("quit", ""); return;
@@ -157,9 +203,11 @@ class NLoader {
 		// the demo if provided, park N's process, drive ticks from tickFn().
 		r.gui.HideAll();
 		r.game.InitRetryLevel();
+		installHooks();   // gold/switch -> NEV events + counters
 		r.App_PlayerDeathEvent = r.App_PlayerDeathEvent_Normal;
 		r.App_LevelPassedEvent = function():Void {
 			NLoader.completed = true;
+			trace("NEV exit tick=" + NLoader.tick + " id=" + NLoader.levelId);
 			trace("N_COMPLETE id=" + NLoader.levelId + " tick=" + NLoader.tick);
 			if (NLoader.eiMode) NLoader.EI.call("__swfSendExit", NLoader.levelId);
 			NLoader.r.App_LevelPassedEvent_Normal();
