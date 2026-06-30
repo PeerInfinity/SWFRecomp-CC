@@ -31,8 +31,16 @@
 EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present_ms), {
 	var S = globalThis.__swfPerf;
 	if (!S) {
-		S = globalThis.__swfPerf = { cpu: [], iv: [], rp: [], cap: 120, i: 0, frames: 0,
-			uncapped: false, ui: null, pre: null, bU: null, last: 0, lastT: 0 };
+		S = globalThis.__swfPerf = { cpu: [], iv: [], rp: [], bad: [], cap: 120, i: 0, frames: 0,
+			uncapped: false, ui: null, pre: null, bU: null, last: 0, lastT: 0,
+			// Steady-state filtering: drop the first `warmup` frames (one-time
+			// startup work — shader/pipeline compile, the ~4MB initial texture
+			// upload) and any frame whose delivered interval exceeds `throttleMs`
+			// (Chrome RAF-throttles a non-foreground tab to ~1Hz; the catch-up
+			// frame then does huge-dt work). Folding those into the rolling mean is
+			// what made the HUD read 100-200%+ when steady state is well under
+			// budget — see tools/divergence/perf/WINDOWS_REALGPU_RESULTS.md.
+			warmup: 30, throttleMs: 250 };
 		try { if (location.search.indexOf('perfbench=1') >= 0) S.uncapped = true; } catch (e) {}
 	}
 	// `present_ms` = time spent in renderer_poll (swap/present + async-GPU yield);
@@ -54,8 +62,15 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present
 	var interval = (S.lastT > 0) ? (nowT - S.lastT) : 0;
 	S.lastT = nowT;
 
-	if (S.cpu.length < S.cap) { S.cpu.push(elapsed_ms); S.rp.push(present_ms); if (interval > 0) S.iv.push(interval); }
-	else { S.cpu[S.i] = elapsed_ms; S.rp[S.i] = present_ms; if (interval > 0) S.iv[S.i] = interval; S.i = (S.i + 1) % S.cap; }
+	// Mark a frame "tainted" (excluded from the steady-state stats below) if it's
+	// in the warmup window, was delivered after a throttle/stall gap, the tab was
+	// hidden, or it's the first frame (no valid delivered period yet). Kept in a
+	// `bad` ring buffer aligned 1:1 with cpu/iv/rp so the stats can filter it out.
+	var tainted = (S.frames < S.warmup
+		|| interval <= 0 || interval > S.throttleMs
+		|| (typeof document !== 'undefined' && document.hidden)) ? 1 : 0;
+	if (S.cpu.length < S.cap) { S.cpu.push(elapsed_ms); S.rp.push(present_ms); S.iv.push(interval); S.bad.push(tainted); }
+	else { S.cpu[S.i] = elapsed_ms; S.rp[S.i] = present_ms; S.iv[S.i] = interval; S.bad[S.i] = tainted; S.i = (S.i + 1) % S.cap; }
 	S.frames++;
 
 	// Build the panel lazily the first time it is shown (default: hidden).
@@ -82,29 +97,38 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present
 
 	if (on && S.pre && nowT - S.last >= 200) {   // throttle DOM updates to ~5 Hz
 		S.last = nowT;
-		var stat = function(arr) {
-			var b = arr.slice().sort(function(x, y) { return x - y; });
+		// stat over the window; when clean=true, include only untainted frames
+		// (steady state) using the index-aligned S.bad flags.
+		var stat = function(arr, clean) {
+			var b = [];
+			for (var k = 0; k < arr.length; k++) if (!clean || !S.bad[k]) b.push(arr[k]);
+			b.sort(function(x, y) { return x - y; });
 			var n = b.length, s = 0;
-			for (var k = 0; k < n; k++) s += b[k];
+			for (var k2 = 0; k2 < n; k2++) s += b[k2];
 			return { n: n, mean: n ? s / n : 0,
 				p95: n ? b[Math.min(n - 1, Math.floor(n * 0.95))] : 0,
 				max: n ? b[n - 1] : 0 };
 		};
-		var c = stat(S.cpu), v = stat(S.iv), rp = stat(S.rp);
+		var total = S.cpu.length, nbad = 0;
+		for (var jb = 0; jb < total; jb++) if (S.bad[jb]) nbad++;
+		// Headline = steady-state (clean) stats. If EVERY frame is tainted (e.g.
+		// the tab is persistently throttled/hidden), fall back to raw so the panel
+		// still shows something, flagged THROTTLED so the number isn't trusted.
+		var throttled = (total > 0 && nbad === total);
+		var c = stat(S.cpu, !throttled), v = stat(S.iv, !throttled), rp = stat(S.rp, !throttled);
+		var cRaw = stat(S.cpu, false);
 		var cpuOnly = Math.max(0, c.mean - rp.mean);   // AVM + render-submit
 		var head = budget_ms > 0 ? (c.mean / budget_ms * 100) : 0;
 		var susFps = c.mean > 0 ? (1000 / c.mean) : 0;
 		var capFps = budget_ms > 0 ? (1000 / budget_ms) : 0;
-		// "late" = delivered interval overran the target by >50% (jank/drop).
-		var lateThresh = budget_ms * 1.5, late = 0;
-		for (var j = 0; j < S.iv.length; j++) if (S.iv[j] > lateThresh) late++;
 		var devMean = v.n ? (v.mean - budget_ms) : 0;       // avg drift from target
 		S.pre.textContent =
-			'SWF perf  ' + (S.uncapped ? '[UNCAPPED]' : '[capped ' + capFps.toFixed(0) + 'fps]') + '\n'
+			'SWF perf  ' + (S.uncapped ? '[UNCAPPED]' : '[capped ' + capFps.toFixed(0) + 'fps]')
+				+ (throttled ? '  [THROTTLED]' : '') + '\n'
 			+ 'frame CPU   mean ' + c.mean.toFixed(2) + '  p95 ' + c.p95.toFixed(2) + '  max ' + c.max.toFixed(2) + ' ms  (' + head.toFixed(0) + '% budget)\n'
 			+ '  avm+submit ' + cpuOnly.toFixed(2) + '   present ' + rp.mean.toFixed(2) + '  p95 ' + rp.p95.toFixed(2) + ' ms\n'
 			+ 'frame time  mean ' + v.mean.toFixed(1) + '  p95 ' + v.p95.toFixed(1) + '  max ' + v.max.toFixed(1) + ' ms  (target ' + budget_ms.toFixed(1) + ', ' + (devMean >= 0 ? '+' : '') + devMean.toFixed(1) + ')\n'
-			+ 'late >1.5x: ' + late + ' / ' + v.n + ' frames\n'
+			+ 'steady-state: ' + c.n + ' / ' + total + ' frames  (excl ' + nbad + ' warmup/throttle; raw max ' + cRaw.max.toFixed(1) + ')\n'
 			+ 'max sustainable ~' + susFps.toFixed(0) + ' fps';
 	}
 	return S.uncapped ? 1 : 0;
