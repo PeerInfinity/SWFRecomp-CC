@@ -83,7 +83,15 @@ GPU cost is interleaved in `tagShowFrame`, not the swap.
 N on the intro screen issues **~400–530 draw calls per pass** (median 467), with
 writeBuffer ~40–185 calls/pass (~2.5 KB median, occasional multi-MB spikes) and
 `queue-submit` only ~0.3 ms. So the submit is cheap; the cost is the GPU asynchronously
-rasterizing **hundreds of unbatched draws per frame** (one per shape). Ruffle's entire
-render is ~6 ms because it batches — **draw-call count / batching is the lever**, the
-same class of win as the Minesweeper writeBuffer batching (`079c0fefe` / `485cab115`).
-`__swfRender` fields: `wb`, `bytes`, `draws`, `submit` (240-sample ring buffers).
+rasterizing the per-frame workload. `__swfRender` fields: `wb`, `bytes`, `draws`,
+`submit` (240-sample ring buffers).
+
+**A/B with Ruffle's draw count (`__rufflePerfDraws`, via the wgpu `draw_counter`
+feature) — DRAW COUNT IS *NOT* THE LEVER:** Ruffle issues **mean 738 / median 385 /
+p90 1204** shape draws per frame on N — *similar-or-more* than ours (median 467) — yet
+renders in ~7 ms vs our ~150 ms wall. So the gap is **per-draw GPU cost**, not draw
+*count*: fill-rate / **overdraw**, MSAA sample count, or fragment-shader cost. This
+matches the prior user-confirmed finding that N's particle **overdraw** dominates (not
+tile/draw count). Batching draw calls would *not* close the gap; reducing
+overdraw/fill (and checking MSAA + shader cost) is the real lever. Confirm with GPU
+timestamp queries or an overdraw visualisation, and re-measure on a real GPU.

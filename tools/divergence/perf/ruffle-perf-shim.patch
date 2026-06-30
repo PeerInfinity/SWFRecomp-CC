@@ -1,7 +1,69 @@
+diff --git a/render/wgpu/Cargo.toml b/render/wgpu/Cargo.toml
+index 3cef4bc95..a7097c50c 100644
+--- a/render/wgpu/Cargo.toml
++++ b/render/wgpu/Cargo.toml
+@@ -41,6 +41,10 @@ features = ["HtmlCanvasElement"]
+ render_debug_labels = []
+ webgl = ["wgpu/webgl"]
+ profile-with-tracy = ["profiling", "profiling/profile-with-tracy"]
++# Local perf instrumentation: count per-frame shape draw_indexed calls into a
++# global atomic, read+reset via take_draw_calls(). Off by default; enabled by the
++# web crate's `profiling` feature for the Ruffle-vs-SWFRecomp perf harness.
++draw_counter = []
+ 
+ [package.metadata.cargo-machete]
+ ignored = [
+diff --git a/render/wgpu/src/lib.rs b/render/wgpu/src/lib.rs
+index bcc8d5dbd..2b4165aa8 100644
+--- a/render/wgpu/src/lib.rs
++++ b/render/wgpu/src/lib.rs
+@@ -1,6 +1,19 @@
+ // Remove this when we decide on how to handle multithreaded rendering (especially on wasm)
+ #![allow(clippy::arc_with_non_send_sync)]
+ 
++// Local perf instrumentation (feature `draw_counter`): a global count of shape
++// draw_indexed calls, incremented in surface::commands and read+reset per frame
++// by the web crate's profiling shim. Relaxed ordering — an approximate per-frame
++// tally, not a synchronisation point.
++#[cfg(feature = "draw_counter")]
++pub static DRAW_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
++
++/// Read and reset the accumulated shape draw-call count (feature `draw_counter`).
++#[cfg(feature = "draw_counter")]
++pub fn take_draw_calls() -> u64 {
++    DRAW_CALLS.swap(0, std::sync::atomic::Ordering::Relaxed)
++}
++
+ use crate::backend::ActiveFrame;
+ use crate::bitmaps::BitmapSamplers;
+ use crate::buffer_pool::{BufferPool, PoolEntry};
+diff --git a/render/wgpu/src/surface/commands.rs b/render/wgpu/src/surface/commands.rs
+index 18706ef44..20632b87e 100644
+--- a/render/wgpu/src/surface/commands.rs
++++ b/render/wgpu/src/surface/commands.rs
+@@ -194,6 +194,9 @@ impl<'pass, 'frame: 'pass, 'global: 'frame> CommandRenderer<'pass, 'frame, 'glob
+         self.render_pass
+             .set_index_buffer(indices, wgpu::IndexFormat::Uint32);
+ 
++        #[cfg(feature = "draw_counter")]
++        crate::DRAW_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++
+         self.render_pass.draw_indexed(0..num_indices, 0, 0..1);
+     }
+ 
 diff --git a/web/Cargo.toml b/web/Cargo.toml
-index 2d2b18592..7758d6eee 100644
+index 2d2b18592..1bdd4bf4c 100644
 --- a/web/Cargo.toml
 +++ b/web/Cargo.toml
+@@ -28,7 +28,7 @@ canvas = ["ruffle_render_canvas"]
+ webgl = ["ruffle_render_webgl"]
+ webgpu = ["ruffle_render_wgpu"]
+ wgpu-webgl = ["ruffle_render_wgpu", "ruffle_render_wgpu/webgl"]
+-profiling = []
++profiling = ["ruffle_render_wgpu?/draw_counter"]
+ 
+ [dependencies]
+ console_error_panic_hook = { version = "0.1.7", optional = true }
 @@ -74,7 +74,7 @@ features = [
      "HtmlInputElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "PageTransitionEvent", "PointerEvent",
      "Request", "RequestInit", "Response", "Storage", "WheelEvent", "Window", "ReadableStream", "RequestCredentials",
@@ -12,10 +74,10 @@ index 2d2b18592..7758d6eee 100644
  
  [target.'cfg(target_family = "wasm")'.dependencies.getrandom]
 diff --git a/web/src/lib.rs b/web/src/lib.rs
-index 9e8f051a2..7e3d2c843 100644
+index 9e8f051a2..17fe684a4 100644
 --- a/web/src/lib.rs
 +++ b/web/src/lib.rs
-@@ -1243,12 +1243,30 @@ impl RuffleHandle {
+@@ -1243,12 +1243,34 @@ impl RuffleHandle {
                  });
              }
  
@@ -41,12 +103,16 @@ index 9e8f051a2..7e3d2c843 100644
 +            #[cfg(feature = "profiling")]
 +            if let (Some(p), Some(t0), Some(t1)) = (_perf.as_ref(), _t0, _t1) {
 +                let t2 = p.now();
-+                crate::record_frame_ms(t1 - t0, t2 - t1);
++                #[cfg(feature = "webgpu")]
++                let draws = ruffle_render_wgpu::take_draw_calls() as f64;
++                #[cfg(not(feature = "webgpu"))]
++                let draws = 0.0_f64;
++                crate::record_frame_ms(t1 - t0, t2 - t1, draws);
 +            }
          });
      }
  
-@@ -1276,6 +1294,41 @@ impl RuffleHandle {
+@@ -1276,6 +1298,42 @@ impl RuffleHandle {
      }
  }
  
@@ -56,7 +122,7 @@ index 9e8f051a2..7e3d2c843 100644
 +/// An external harness reads these to compute mean/p95/max, the same way it reads
 +/// SWFRecomp's perf HUD. Only compiled with the `profiling` feature.
 +#[cfg(feature = "profiling")]
-+fn record_frame_ms(tick_ms: f64, render_ms: f64) {
++fn record_frame_ms(tick_ms: f64, render_ms: f64, draws: f64) {
 +    use wasm_bindgen::{JsCast, JsValue};
 +    const CAP: u32 = 600;
 +    let Some(window) = web_sys::window() else {
@@ -83,6 +149,7 @@ index 9e8f051a2..7e3d2c843 100644
 +    };
 +    push("__rufflePerfTick", "__rufflePerfLastTick", tick_ms);
 +    push("__rufflePerfRender", "__rufflePerfLastRender", render_ms);
++    push("__rufflePerfDraws", "__rufflePerfLastDraws", draws);
 +}
 +
  impl RuffleInstance {

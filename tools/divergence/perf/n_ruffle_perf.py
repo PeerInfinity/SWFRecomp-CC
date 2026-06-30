@@ -70,14 +70,16 @@ async def main():
         print(f"captured {end_idx - start_idx} frames (index {start_idx}->{end_idx})")
         data = await pg.evaluate(
             f"() => ({{tick: (window.__rufflePerfTick||[]).slice({start_idx}), "
-            f"render: (window.__rufflePerfRender||[]).slice({start_idx})}})")
+            f"render: (window.__rufflePerfRender||[]).slice({start_idx}), "
+            f"draws: (window.__rufflePerfDraws||[]).slice({start_idx})}})")
         await pg.close(); await b.close()
-    tick, render = data["tick"], data["render"]
+    tick, render, draws = data["tick"], data["render"], data["draws"]
     total = [t + r for t, r in zip(tick, render)]
     eff_fps = len(tick) / CAPTURE if CAPTURE else 0
     print(f"\n=== Ruffle N per-frame WASM CPU (SwiftShader; ~{eff_fps:.1f} eff fps) ===")
     rep("tick   (AVM/sim)  ms", tick)
     rep("render (cmd+GPU)  ms", render)
     rep("TOTAL  frame      ms", total)
+    rep("draw calls (shape)  ", draws)
 
 asyncio.run(main())

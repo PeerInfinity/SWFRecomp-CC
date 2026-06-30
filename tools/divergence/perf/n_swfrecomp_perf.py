@@ -64,15 +64,26 @@ async def main():
         end_idx = await poll_active(pg, CAPTURE)
         print(f"captured {end_idx - start_idx} frames (index {start_idx}->{end_idx})")
         data = await pg.evaluate(
-            f"() => {{const S=globalThis.__swfPerf; return S?{{cpu:S.cpu.slice({start_idx}), "
-            f"iv:S.iv.slice({start_idx}), frames:S.frames}}:null;}}")
+            f"() => {{const S=globalThis.__swfPerf, R=globalThis.__swfRender; return {{"
+            f"cpu:S?S.cpu.slice({start_idx}):[], iv:S?S.iv.slice({start_idx}):[], "
+            f"rp:S&&S.rp?S.rp.slice({start_idx}):[], "
+            f"wb:R?R.wb.slice():[], bytes:R?R.bytes.slice():[], draws:R?R.draws.slice():[], "
+            f"submit:R?R.submit.slice():[]}};}}")
         await pg.close(); await b.close()
-    if not data:
+    cpu = data["cpu"]; rp = data["rp"]
+    if not cpu:
         print("!! __swfPerf missing — HUD not enabled in this build."); return
-    cpu = data["cpu"]
+    avm = [c - r for c, r in zip(cpu, rp)]
     eff_fps = len(cpu) / CAPTURE if CAPTURE else 0
     print(f"\n=== SWFRecomp N per-frame WASM CPU (SwiftShader; ~{eff_fps:.1f} eff fps) ===")
-    rep("frame CPU (total) ms", cpu)
+    rep("frame  (total)    ms", cpu)
+    rep("avm+submit        ms", avm)
+    rep("present(rndr_poll)ms", rp)
     rep("interval          ms", data["iv"])
+    print("--- render workload (__swfRender, per close_pass) ---")
+    rep("writeBuffer calls   ", data["wb"])
+    rep("writeBuffer KB      ", [b / 1024.0 for b in data["bytes"]])
+    rep("draw calls          ", data["draws"])
+    rep("queue-submit      ms", data["submit"])
 
 asyncio.run(main())
