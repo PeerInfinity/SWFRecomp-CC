@@ -16,6 +16,19 @@ NLoader.as --(MTASC)--> nloader.swf --(extract_bytecode.py)--> nloader_bytecode.
            --(SWFRecomp recompile)--> native (headless) / wasm
 ```
 
+`NLoader` has a `MODE` switch:
+- **`walk`** (default): a grounded level (solid floor row) where the player
+  WALKS RIGHT into the exit's switch then door, driven by a hand-authored demo
+  (N's bit-packed input replay). Faithful navigation. PASSES headless.
+- **`fall`**: an empty level where the player AUTO-FALLS through a switch+door
+  stacked just below the spawn — no input (increment 1). PASSES headless.
+
+To keep headless runs DETERMINISTIC, the loader does NOT use `App_PlayGame`
+(whose `App_UpdateGame` gates `game.Tick()` on wall-clock elapsed time, which
+starves near-instant headless frames to ~5 game-ticks per 200 frames). Instead
+it parks N's process (`SetActiveProcess(noop)`) and drives `game.Tick()` itself
+once per injected frame — one game-tick per frame.
+
 `NLoader` is a high-depth `onEnterFrame` clip injected alongside N. It reaches
 N's own top-level (`_root`) API through an untyped `Object` and:
 
@@ -55,8 +68,13 @@ grep N_COMPLETE native_run/trace.txt   # the completion signal
 First native recompile is slow (N's `action.c` is ~3 MB at -O2); ccache makes
 reruns fast. The runner is the game-agnostic `../dj_probe/run_native.py`.
 
+### Demo / input format (decoded)
+Per tick = 4 bits `L=1, R=2, J=4, JTRIG=8` (jump rising-edge); 7 ticks packed per
+entry at shifts 0,4,…,24; serialized `"<tickCount>:<e0>|<e1>|…"`. "Hold right" =
+R every tick → each full 7-tick entry = `35791394`.
+
 ## Next steps (see the status doc)
-- "Walk right on the ground" fixture + a hand-authored "hold right" demo (needs
-  the demo format) for a faithful grounded run.
-- Arbitrary procgen levels (decode the remaining object/tile type codes).
-- Browser-WASM tier via the `__swfBridge` ExternalInterface plumbing.
+- Arbitrary procgen levels: the full object-param and tile-state tables are in
+  the status doc (`2026-06-30-n-substrate-investigation.md`).
+- Browser-WASM tier via the `__swfBridge` ExternalInterface plumbing (interactive
+  keyboard input instead of a demo).

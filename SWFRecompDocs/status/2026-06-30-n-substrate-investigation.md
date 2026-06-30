@@ -4,6 +4,50 @@ Date: 2026-06-30. Goal (user): load a *specific level* into recompiled N and
 *detect when the level is completed*. Scope chosen: **arbitrary raw levels**,
 **native/headless fixture tier first** (mirrors the DJ loader's first increment).
 
+## STATUS: increments 1 & 2 PASS (2026-06-30)
+
+### Increment 2 (walk-right, grounded, demo-driven) PASS
+`NLoader.as` now has a `MODE` switch ("walk" | "fall"). Walk mode: solid floor
+row, player WALKS RIGHT into the exit switch then door, driven by a hand-authored
+demo. Trace:
+```
+NT67 gt=1  x=276    y=350   (spawned on floor - grounded, y constant)
+NT79 gt=13 x=287.17 y=350   (reaches switch at 294 -> exit opens)
+NT80       x=288.99 done=true -> N_COMPLETE tick=80
+```
+Validated: grounded level authoring (floor tiles + pixel mapping), the demo
+format decode, and DETERMINISTIC ticking. KEY FIX: instead of App_PlayGame (whose
+App_UpdateGame gates game.Tick() on wall-clock elapsed, starving headless runs to
+~5 ticks/200 frames), the loader parks N's process (`SetActiveProcess(noop)`) and
+drives `game.Tick()` itself once per injected frame -> `gt` counts 1,2,3,...
+
+### Demo / input format (decoded, DoAction_91)
+Per tick = 4 bits `L=1, R=2, J=4, JTRIG=8` (jump rising-edge). 7 ticks packed per
+`demoList` entry at shifts 0,4,8,12,16,20,24. Serialized `"<tickCount>:<e0>|<e1>|..."`
+(`:` then `|`). "Hold right" = R every tick -> each full 7-tick entry = 35791394.
+Bound to `_Complex` variants in NinjaGame ctor (DoAction_89). Player reads input
+via `game.GetInputState(inList)` (DoAction_86:12); `game.GetTime()`=tickCounter.
+
+### Object type + Init params (for procgen authoring)
+GOLD=0 [x,y]; BOUNCEBLOCK=1 [x,y]; LAUNCHPAD=2 [x,y,nx,ny]; TURRET=3 [x,y];
+FLOORGUARD=4 [x,y,dir]; PLAYER=5 [x,y]; DRONE=6 [x,y,movetype,isChaser,weaptype,dir];
+ONEWAYPLATFORM=7 [x,y,dir]; THWOMP=8 [x,y,dir]; TESTDOOR=9 [x,y,vert,isTrap,doorI,
+doorJ,isLocked,dI,dJ]; HOMINGLAUNCHER=10 [x,y]; EXIT=11 [doorX,doorY,switchX,switchY];
+MINE=12 [x,y]. (Classes in DoAction_70..84.)
+
+### Tile state codes (charCode-48)
+0 empty, 1 full; 2-5 = 45deg slopes (pn/nn/np/pp); 6-9 concave; 10-13 convex;
+14-21 = 22deg (steep S / broad B); 22-29 = 67deg (S/B); 30-33 = half-tiles (d/r/u/l).
+Solid floor = '1'. Grid `TileMap(rows=31,cols=23,xw=12,yw=12)`, tw=th=24; cell
+(i,j) center=(i*24+12,j*24+12); 1-tile solid border; SetTileState(i,j)->grid[i+1][j+1];
+map char index = mapX*23+mapY (X-outer/Y-inner); map cell (mapX,mapY) pixel center
+= (mapX*24+36, mapY*24+36).
+
+### MTASC gotcha
+MTASC v8's SWF writer overflows zlib ("zlib_deflate_end", truncated 8-byte output)
+on a LONG leading comment OR any non-ASCII (em-dash) in comments. Keep injected-AS
+headers short + ASCII; detail goes in README/status docs.
+
 ## STATUS: increment 1 PASSES (2026-06-30)
 Harness: `ruffle-tests/tests/swfs/_swfbridge/livetest/n_loader/` (`NLoader.as`,
 `build_nloader.sh`, `run_nloader.sh`, README). Native headless run trace:
