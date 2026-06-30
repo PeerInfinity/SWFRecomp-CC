@@ -93,5 +93,27 @@ renders in ~7 ms vs our ~150 ms wall. So the gap is **per-draw GPU cost**, not d
 *count*: fill-rate / **overdraw**, MSAA sample count, or fragment-shader cost. This
 matches the prior user-confirmed finding that N's particle **overdraw** dominates (not
 tile/draw count). Batching draw calls would *not* close the gap; reducing
-overdraw/fill (and checking MSAA + shader cost) is the real lever. Confirm with GPU
-timestamp queries or an overdraw visualisation, and re-measure on a real GPU.
+overdraw/fill (and checking MSAA + shader cost) is the real lever.
+
+**Ruled out (read-only comparison): MSAA / resolution.** Ruffle's web default is
+`StageQuality::High` → 4× MSAA (builder.rs), identical to our hardcoded `sampleCount=4`;
+N never changes `_quality`. Both DPR-scale the render target and use ~1 main pass. So
+MSAA, resolution, and pass-count are equal — not the gap.
+
+**ROOT-CAUSE CANDIDATE: our uber fragment shader samples every texture per fragment.**
+`render_webgpu.c fs_main` computes **3 gradient ramp samples (6 `textureLoad`s) + 2 bitmap
+`textureSample`s for EVERY fragment**, then an `if`-chain on `v_style_type` discards the
+unused ones (the code comment: "Sample all textures unconditionally (uniform control flow
+required by Chrome/Dawn)"). So a **solid-colour** shape (`v_style_type == 0x00`, the common
+case for N's particles) still pays ~8 texture ops/pixel. Ruffle uses **specialised
+pipelines** (`color.wgsl` = trivial, `gradient.wgsl`, `bitmap.wgsl`), so its solid fills do
+~0 texture ops. On SwiftShader (no HW texture units) × N's heavy overdraw, that per-fragment
+cost is the most likely explanation for the ~20× render gap.
+
+**Fix directions (next session — renderer change, needs graphics-CI + pixel-identity check):**
+1. Move the gradient `textureLoad`s inside their branches (textureLoad has no uniformity
+   requirement — can already be conditional) and replace the bitmap `textureSample` with
+   `textureSampleLevel(..., 0.0)` so it too can live inside the bitmap branch. Then solid
+   fills do zero texture ops. Smaller, lower-risk than (2).
+2. Specialise pipelines per fill type like Ruffle (color / gradient / bitmap). Bigger change.
+Then re-measure `draws`/frame-time and confirm with GPU timestamp queries + a real-GPU run.
