@@ -38,6 +38,36 @@
 #define WGPU_LABEL(s) ((WGPUStringView){.data = (s), .length = WGPU_STRLEN})
 
 // ---------------------------------------------------------------------------
+// Browser-WASM render perf counters (per close_pass): writeBuffer call/byte
+// count + draw-call count + queue-submit time, published to JS via
+// swf_render_stats(...) on window.__swfRender for the Ruffle-vs-SWFRecomp
+// comparison harness (tools/divergence/perf/). These are the cross-backend-real
+// levers (unlike wall-clock frame time, which on SwiftShader is GPU-emulation
+// bound). Gated to __EMSCRIPTEN__ && !OFFSCREEN_RENDER so native / offscreen
+// (the CI suites) compile byte-identically — not CI-observable.
+// ---------------------------------------------------------------------------
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+static unsigned long g_perf_wb_calls = 0;
+static unsigned long g_perf_wb_bytes = 0;
+static unsigned long g_perf_draw_calls = 0;
+// Count + forward to the real API. The parenthesised callee name is NOT a
+// macro invocation (not followed by '('), so this does not recurse.
+#define wgpuQueueWriteBuffer(q, b, o, d, s) \
+	do { g_perf_wb_calls++; g_perf_wb_bytes += (unsigned long)(s); \
+	     (wgpuQueueWriteBuffer)(q, b, o, d, s); } while (0)
+#define wgpuRenderPassEncoderDraw(p, vc, ic, fv, fi) \
+	do { g_perf_draw_calls++; (wgpuRenderPassEncoderDraw)(p, vc, ic, fv, fi); } while (0)
+
+EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, double submit_ms), {
+	var R = globalThis.__swfRender;
+	if (!R) R = globalThis.__swfRender = { wb: [], bytes: [], draws: [], submit: [], cap: 240, i: 0 };
+	var push = function(k, v) { if (R[k].length < R.cap) R[k].push(v); else R[k][R.i] = v; };
+	push('wb', wb_calls); push('bytes', wb_bytes); push('draws', draws); push('submit', submit_ms);
+	if (R.wb.length >= R.cap) R.i = (R.i + 1) % R.cap;
+});
+#endif
+
+// ---------------------------------------------------------------------------
 // Embedded WGSL shader sources
 // ---------------------------------------------------------------------------
 
@@ -2560,7 +2590,17 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 
 	WGPUCommandBufferDescriptor cmd_desc = {0};
 	WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(ctx->encoder, &cmd_desc);
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	double _submit_t0 = emscripten_get_now();
+#endif
 	wgpuQueueSubmit(ctx->queue, 1, &cmd);
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	// Publish this frame's render workload (writeBuffer calls/bytes, draw calls,
+	// queue-submit time) and reset the per-frame counters for the next pass.
+	swf_render_stats((double)g_perf_wb_calls, (double)g_perf_wb_bytes,
+	                 (double)g_perf_draw_calls, emscripten_get_now() - _submit_t0);
+	g_perf_wb_calls = 0; g_perf_wb_bytes = 0; g_perf_draw_calls = 0;
+#endif
 
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
 	// Track this frame as in-flight; on_frame_work_done decrements when the GPU

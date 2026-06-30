@@ -78,3 +78,12 @@ WSL2 can't separate true CPU from GPU-wait. **Real levers:** instrument
 `render_webgpu.c` (writeBuffer bytes, draw-call count, queue-submit time — cross-backend
 real), and re-measure on a real GPU. `renderer_poll` was the wrong split boundary; the
 GPU cost is interleaved in `tagShowFrame`, not the swap.
+
+**Render-workload counters (`render_webgpu.c` → `window.__swfRender`, per close_pass):**
+N on the intro screen issues **~400–530 draw calls per pass** (median 467), with
+writeBuffer ~40–185 calls/pass (~2.5 KB median, occasional multi-MB spikes) and
+`queue-submit` only ~0.3 ms. So the submit is cheap; the cost is the GPU asynchronously
+rasterizing **hundreds of unbatched draws per frame** (one per shape). Ruffle's entire
+render is ~6 ms because it batches — **draw-call count / batching is the lever**, the
+same class of win as the Minesweeper writeBuffer batching (`079c0fefe` / `485cab115`).
+`__swfRender` fields: `wb`, `bytes`, `draws`, `submit` (240-sample ring buffers).
