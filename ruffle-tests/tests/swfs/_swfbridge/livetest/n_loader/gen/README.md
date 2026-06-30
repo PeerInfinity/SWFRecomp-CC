@@ -57,5 +57,30 @@ Format facts: `SWFRecompDocs/status/2026-06-30-n-substrate-investigation.md`.
   session. The SWF advances the queue on `N_FAIL` too (per-level `LEVEL_MAX`
   frame budget), so one unsolvable level never stalls a batch.
 
+## P2 (in progress): motion model MEASURED on real N
+
+Telemetry-calibrated, momentum-aware. Before generating jumps/gaps we measured
+N's actual motion (not derived from constants):
+
+- **`nProbe.js`** — calibration probe matrix: flat floor, exit far right, demos
+  that run `R` ticks (entry speed) then jump-hold `K` ticks, self-terminating.
+- **`nTelemetry.js`** — splits a QUEUE console into per-level arcs and extracts
+  features (entry vx, apex, airtime, air distance). Also a CLI dumper.
+- **`calibrate.mjs`** — runs the matrix through one Ruffle session →
+  **`nMotion_calib.json`** (measured table).
+  ```bash
+  node gen/calibrate.mjs            # -> nMotion_calib.json
+  ```
+- **`nMotion.js`** — the queryable model over the measured table: `runStep`,
+  `runUpTicksForSpeed`/`runUpDistForSpeed`, `apexHeight(K)`, `airtime(K)`,
+  `airDist(vx,K)`, and conservative envelopes `maxGap(vx)`, `maxStepUp()`,
+  `maxRunningGap()`. `node gen/nMotion.js` self-reports.
+
+Measured (real N): ground speed clamps at ~5 px/tick (`vx[n+1]=min(5,vx*0.99+0.15)`,
+full ~tick 38); jump launch impulse constant (vy=−3); apex height + airtime depend
+ONLY on hold `K` (vertical/horizontal decoupled); air distance depends on entry
+speed AND `K` (air-control ramps vx back to ~5 mid-flight). Conservative envelopes:
+step-up ≈ 2.6 tiles, same-level gap ≈ 12 tiles at full run.
+
 This is injected-AS / JS tooling under `_swfbridge/livetest/` — **not
 CI-observable**; do not dispatch ruffle-tests CI for it.
