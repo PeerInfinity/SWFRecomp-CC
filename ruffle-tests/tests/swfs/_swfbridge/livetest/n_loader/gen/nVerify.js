@@ -7,30 +7,43 @@
 // trace lines (the SWF advances the queue on either, so a bad level never stalls
 // the batch).
 //
-//   node gen/nVerify.js [count] [baseSeed] [captureSecs]
+//   node gen/nVerify.js [flat|gap] [count] [baseSeed] [captureSecs]
 //
-// Defaults: count=6, baseSeed=1, captureSecs auto (12 + 4*count). Exit 0 iff all
+// Args are order-flexible: 'flat'/'gap' picks the generator (default flat), the
+// numeric args fill count, baseSeed, captureSecs in order. Exit 0 iff all
 // generated levels completed. Needs DISPLAY + chrome + playwright (run_ruffle.sh).
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { generateFlatBatch } from "./nGenerate.js";
+import { generateFlatBatch, generateGapBatch } from "./nGenerate.js";
 import { writeQueueFile } from "./queueFile.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const loaderDir = join(here, "..");
 
-const count = Number(process.argv[2] || 6);
-const baseSeed = Number(process.argv[3] || 1);
-const captureSecs = Number(process.argv[4] || 12 + 4 * count);
+let kind = "flat";
+const nums = [];
+for (const a of process.argv.slice(2)) {
+	if (a === "flat" || a === "gap") kind = a;
+	else if (a !== "" && !Number.isNaN(Number(a))) nums.push(Number(a));
+}
+const count = nums[0] || 6;
+const baseSeed = nums[1] || 1;
+const captureSecs = nums[2] || 12 + 5 * count;
 
-console.log(`[nVerify] generating ${count} flat levels (baseSeed=${baseSeed})`);
-const batch = generateFlatBatch(count, baseSeed);
+console.log(`[nVerify] generating ${count} ${kind} levels (baseSeed=${baseSeed})`);
+const batch = kind === "gap" ? generateGapBatch(count, baseSeed) : generateFlatBatch(count, baseSeed);
 for (const b of batch) {
-	console.log(`  ${b.levelId}: floorRow ${b.meta.floorRow} spawn ${b.meta.spawnX}` +
-		` -> switch ${b.meta.switchX} -> door ${b.meta.doorX} (${b.meta.walk}px,` +
-		` ${b.meta.gold.length} gold, demo ${b.meta.ticks} ticks)`);
+	if (kind === "gap") {
+		console.log(`  ${b.levelId}: floorRow ${b.meta.floorRow} gap ${b.meta.gapTiles} tiles` +
+			` (${b.meta.gapPx}px) entryVx ${b.meta.entryVx} K=${b.meta.K} reach ${b.meta.reach}px` +
+			` planOk=${b.meta.planOk}`);
+	} else {
+		console.log(`  ${b.levelId}: floorRow ${b.meta.floorRow} spawn ${b.meta.spawnX}` +
+			` -> switch ${b.meta.switchX} -> door ${b.meta.doorX} (${b.meta.walk}px,` +
+			` ${b.meta.gold.length} gold, demo ${b.meta.ticks} ticks)`);
+	}
 }
 
 writeQueueFile(join(loaderDir, "n_queue_testcases.js"), batch);
@@ -65,14 +78,17 @@ for (const b of batch) {
 		pass++;
 		console.log(`  PASS ${b.levelId} (tick ${completed.get(b.levelId)})`);
 	} else if (failed.has(b.levelId)) {
-		console.log(`  FAIL ${b.levelId} (${failed.get(b.levelId)}) walk=${b.meta.walk}px`);
+		console.log(`  FAIL ${b.levelId} (${failed.get(b.levelId)}) ${describe(b)}`);
 		missing.push(b);
 	} else {
-		console.log(`  MISS ${b.levelId} (no trace - never ran or capture too short) walk=${b.meta.walk}px`);
+		console.log(`  MISS ${b.levelId} (no trace - never ran or capture too short) ${describe(b)}`);
 		missing.push(b);
 	}
 }
 
+function describe(b) {
+	return kind === "gap" ? `gap=${b.meta.gapTiles}t K=${b.meta.K}` : `walk=${b.meta.walk}px`;
+}
 console.log(`\n[nVerify] ${pass}/${batch.length} levels verified on real N (Ruffle)`);
 if (pass !== batch.length) {
 	console.error(`[nVerify] FAILED: ${missing.map((b) => b.levelId).join(", ")}`);

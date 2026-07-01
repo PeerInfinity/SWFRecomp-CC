@@ -8,6 +8,8 @@
 // a batch to nVerify.js to confirm every one completes on real N via Ruffle.
 import { Level, OBJ, TILE_FULL, cellToPixel, pixelToCell, COLS } from "./nLevel.js";
 import { holdRight } from "./nDemo.js";
+import { maxRunningGap } from "./nMotion.js";
+import { planRunJump } from "./nReach.js";
 
 // N geometry (status doc): player radius 10; floor map-row `fr` has its top
 // surface at pixel (fr+1)*24, so a grounded body rests at center y = top - r.
@@ -80,5 +82,58 @@ export function generateFlatLevel(seed, opts = {}) {
 export function generateFlatBatch(count, baseSeed = 1, opts = {}) {
 	const out = [];
 	for (let i = 0; i < count; i++) out.push(generateFlatLevel((baseSeed + i) >>> 0, opts));
+	return out;
+}
+
+// ---- P2 #1: same-level gap (run -> jump over a pit -> land, exit on landing) --
+
+const TAKEOFF_COL = 8; // right edge of the takeoff platform (~150px run-up from spawn)
+const LAND_TILES = 10; // landing platform width (tiles) - long enough to catch overshoot
+
+/**
+ * Generate one same-level gap level: a takeoff platform, a pit of `gapTiles`, and
+ * a landing platform carrying the exit. The demo (from nReach) runs up and clears
+ * the pit with one timed jump. Gap width is capped to the measured envelope so the
+ * jump is physically possible; Ruffle is the final judge.
+ */
+export function generateGapLevel(seed, opts = {}) {
+	const rng = makeRng(seed);
+	const floorRow = opts.floorRow != null ? opts.floorRow : randint(rng, 12, 16);
+	const ry = restY(floorRow);
+	const envTiles = Math.floor(maxRunningGap() / TILE); // conservative reachable tiles (~11)
+	const minGap = opts.minGapTiles != null ? opts.minGapTiles : 3;
+	const maxGap = Math.min(opts.maxGapTiles != null ? opts.maxGapTiles : 9, envTiles);
+	const gapTiles = opts.gapTiles != null ? opts.gapTiles : randint(rng, minGap, maxGap);
+
+	const spawnCol = 2;
+	const tCol = TAKEOFF_COL;
+	const landStart = tCol + 1 + gapTiles;
+	const landEnd = Math.min(COLS - 1, landStart + LAND_TILES);
+
+	const lvl = new Level();
+	lvl.fillRect(1, floorRow, tCol, floorRow, TILE_FULL);          // takeoff platform
+	lvl.fillRect(landStart, floorRow, landEnd, floorRow, TILE_FULL); // landing platform
+
+	const spawnX = cellToPixel(spawnCol, floorRow).x;
+	lvl.addObject(OBJ.PLAYER, [spawnX, ry]);
+	const doorCol = landEnd - 1, switchCol = landEnd - 2;
+	lvl.addObject(OBJ.EXIT, [cellToPixel(doorCol, floorRow).x, ry, cellToPixel(switchCol, floorRow).x, ry]);
+
+	// Takeoff edge = right edge of the takeoff floor; gap to clear = gapTiles wide.
+	const launchX = tCol * TILE + 48; // cell tCol center (tCol*24+36) + half tile
+	const plan = planRunJump(spawnX, launchX, gapTiles * TILE, { margin: opts.margin });
+
+	return {
+		levelId: `gap-s${seed >>> 0}`,
+		level: lvl.encode(),
+		demo: plan.demo,
+		meta: { seed: seed >>> 0, floorRow, gapTiles, gapPx: gapTiles * TILE, entryVx: Math.round(plan.entryVx * 100) / 100, K: plan.K, reach: Math.round(plan.reach), planOk: plan.ok },
+	};
+}
+
+/** Generate `count` distinct gap levels from consecutive seeds. */
+export function generateGapBatch(count, baseSeed = 1, opts = {}) {
+	const out = [];
+	for (let i = 0; i < count; i++) out.push(generateGapLevel((baseSeed + i) >>> 0, opts));
 	return out;
 }

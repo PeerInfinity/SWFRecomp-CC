@@ -82,5 +82,25 @@ ONLY on hold `K` (vertical/horizontal decoupled); air distance depends on entry
 speed AND `K` (air-control ramps vx back to ~5 mid-flight). Conservative envelopes:
 step-up ≈ 2.6 tiles, same-level gap ≈ 12 tiles at full run.
 
+> Known conservatism: the highest-speed/longest-hold probe (R45/K30) was truncated
+> in capture, so max air distance is UNDER-stated (a 14-tile gap the model rejects
+> actually clears on N). Safe direction (accepted levels pass); re-calibrate that
+> cell later to reclaim range.
+
+## P2 #1 (done): same-level gap generator, Ruffle-verified
+
+- **`nReach.js`** — reachability by construction-by-simulation: `planRunJump(spawnX,
+  launchX, gapPx)` simulates the run-up with the real ramp, reads the entry speed
+  at the takeoff edge, picks the smallest measured hold whose `airDist` clears the
+  gap, and emits the exact solving demo.
+- **`nGenerate.js`** — `generateGapLevel` / `generateGapBatch`: takeoff platform →
+  pit (`gapTiles`, capped to the envelope) → landing platform carrying the exit;
+  the demo runs up and clears the pit with one timed jump.
+- **`nVerify.js`** — now takes `flat|gap`: `node gen/nVerify.js gap 6 1`.
+
+Verified: 6/6 random gap levels complete on real N in one session; an over-wide
+(480px) gap correctly `N_FAIL`s (the physics gate is meaningful) while the batch
+continues. Uses momentum: full-speed run-up + a timed variable-height jump.
+
 This is injected-AS / JS tooling under `_swfbridge/livetest/` — **not
 CI-observable**; do not dispatch ruffle-tests CI for it.
