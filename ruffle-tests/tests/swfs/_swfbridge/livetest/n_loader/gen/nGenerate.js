@@ -8,8 +8,8 @@
 // a batch to nVerify.js to confirm every one completes on real N via Ruffle.
 import { Level, OBJ, TILE_FULL, cellToPixel, pixelToCell, COLS } from "./nLevel.js";
 import { holdRight } from "./nDemo.js";
-import { maxRunningGap } from "./nMotion.js";
-import { planRunJump } from "./nReach.js";
+import { maxRunningGap, apexHeight, MODEL } from "./nMotion.js";
+import { planRunJump, planStepUp, planStepDown } from "./nReach.js";
 
 // N geometry (status doc): player radius 10; floor map-row `fr` has its top
 // surface at pixel (fr+1)*24, so a grounded body rests at center y = top - r.
@@ -135,5 +135,79 @@ export function generateGapLevel(seed, opts = {}) {
 export function generateGapBatch(count, baseSeed = 1, opts = {}) {
 	const out = [];
 	for (let i = 0; i < count; i++) out.push(generateGapLevel((baseSeed + i) >>> 0, opts));
+	return out;
+}
+
+// ---- P2 #1 (step): land on a platform at a DIFFERENT height across a gap -------
+
+// Cell whose LEFT edge is at/after pixel x (left edge of cell c = c*24+24).
+function colAtOrAfter(x) { return Math.ceil((x - 24) / TILE); }
+// Cell whose center is nearest pixel x.
+function colNearest(x) { return Math.round((x - 36) / TILE); }
+// Max upward step (tiles) the best jump clears with clearance+margin.
+function maxStepUpTiles() {
+	const apex = apexHeight(MODEL.holds[MODEL.holds.length - 1]);
+	return Math.max(1, Math.floor((apex - 22) / TILE)); // -22 ~ clearance+margin
+}
+
+/**
+ * Generate one step level: takeoff platform, a gap, then a landing platform a few
+ * tiles HIGHER (dir "up") or LOWER (dir "down"), carrying the exit. Uses the
+ * measured jump arc to place the landing platform where the ninja actually lands.
+ */
+export function generateStepLevel(seed, opts = {}) {
+	const rng = makeRng(seed);
+	const floorRow = opts.floorRow != null ? opts.floorRow : randint(rng, 12, 15);
+	const ry = restY(floorRow);
+	const dir = opts.dir || (rng() < 0.5 ? "up" : "down");
+
+	const spawnCol = 2;
+	const tCol = TAKEOFF_COL;
+	const launchX = tCol * TILE + 48;
+	const spawnX = cellToPixel(spawnCol, floorRow).x;
+
+	const lvl = new Level();
+	lvl.fillRect(1, floorRow, tCol, floorRow, TILE_FULL); // takeoff platform
+
+	let stepTiles, floorRow2, plan, nearCol, landCol;
+	if (dir === "up") {
+		const maxUp = Math.min(opts.maxStepTiles != null ? opts.maxStepTiles : 2, maxStepUpTiles());
+		stepTiles = opts.stepTiles != null ? opts.stepTiles : randint(rng, 1, maxUp);
+		floorRow2 = floorRow - stepTiles;
+		plan = planStepUp(spawnX, launchX, stepTiles * TILE, { margin: opts.margin });
+		nearCol = Math.max(tCol + 2, colAtOrAfter(launchX + (plan.nearEdgeDx ?? 60)));
+		landCol = colNearest(launchX + plan.landDx);
+	} else {
+		const maxDown = opts.maxStepTiles != null ? opts.maxStepTiles : 3;
+		stepTiles = opts.stepTiles != null ? opts.stepTiles : randint(rng, 1, maxDown);
+		floorRow2 = floorRow + stepTiles;
+		plan = planStepDown(spawnX, launchX, stepTiles * TILE, { K: opts.K });
+		landCol = colNearest(launchX + plan.landDx);
+		nearCol = Math.max(tCol + 2, landCol - 1); // small gap; land a tile onto the ledge
+	}
+
+	const landEnd = Math.min(COLS - 1, nearCol + LAND_TILES);
+	lvl.fillRect(nearCol, floorRow2, landEnd, floorRow2, TILE_FULL); // landing platform
+
+	const ry2 = restY(floorRow2);
+	lvl.addObject(OBJ.PLAYER, [spawnX, ry]);
+	const doorCol = landEnd - 1, switchCol = landEnd - 2;
+	lvl.addObject(OBJ.EXIT, [cellToPixel(doorCol, floorRow2).x, ry2, cellToPixel(switchCol, floorRow2).x, ry2]);
+
+	return {
+		levelId: `step-${dir}-s${seed >>> 0}`,
+		level: lvl.encode(),
+		demo: plan.demo,
+		meta: { seed: seed >>> 0, dir, stepTiles, floorRow, floorRow2, K: plan.K, entryVx: Math.round(plan.entryVx * 100) / 100, nearCol, landCol, landEnd, planOk: plan.ok, apexH: Math.round(plan.apexH) },
+	};
+}
+
+/** Generate `count` distinct step levels (alternating up/down) from consecutive seeds. */
+export function generateStepBatch(count, baseSeed = 1, opts = {}) {
+	const out = [];
+	for (let i = 0; i < count; i++) {
+		const dir = opts.dir || (i % 2 === 0 ? "up" : "down");
+		out.push(generateStepLevel((baseSeed + i) >>> 0, { ...opts, dir }));
+	}
 	return out;
 }

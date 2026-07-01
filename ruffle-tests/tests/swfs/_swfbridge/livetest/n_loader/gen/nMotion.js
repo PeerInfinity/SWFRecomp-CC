@@ -54,7 +54,6 @@ function bracket(arr, x) {
 
 /** Apex height (px above takeoff) for a jump-hold of K ticks. Depends only on K. */
 export function apexHeight(K) {
-	const rows = VS.map((v) => cell.get(`${v}|${closest(KS, K)}`)).filter(Boolean);
 	const [i0, i1, t] = bracket(KS, K);
 	const at = (kk) => avg(VS.map((v) => cell.get(`${v}|${kk}`)?.apexHeight).filter((x) => x != null));
 	return lerp(at(KS[i0]), at(KS[i1]), t);
@@ -65,6 +64,14 @@ export function airtime(K) {
 	const at = (kk) => avg(VS.map((v) => cell.get(`${v}|${kk}`)?.airtime).filter((x) => x != null));
 	return lerp(at(KS[i0]), at(KS[i1]), t);
 }
+/** The measured jump trajectory ([dx,dy] per air tick, dy<0=above takeoff) for the
+ *  grid cell closest to (entry speed, hold). Arcs are only measured at grid points;
+ *  the generator uses full-speed entry so the closest cell is faithful. */
+export function arcFor(entryVx, K) {
+	const v = closest(VS, entryVx), k = closest(KS, K);
+	return cell.get(`${v}|${k}`)?.arc ?? [];
+}
+
 /** Horizontal air distance for entry speed `vx` and jump-hold `K` (bilinear). */
 export function airDist(vx, K) {
 	const [vi0, vi1, vt] = bracket(VS, vx);

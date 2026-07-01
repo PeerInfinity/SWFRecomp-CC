@@ -102,5 +102,22 @@ Verified: 6/6 random gap levels complete on real N in one session; an over-wide
 (480px) gap correctly `N_FAIL`s (the physics gate is meaningful) while the batch
 continues. Uses momentum: full-speed run-up + a timed variable-height jump.
 
+## P2 #1 step-ups/downs (done): land on a platform at a different height
+
+Built on the captured jump **arcs** (calibrate.mjs stores per-tick [dx,dy]; nMotion
+`arcFor`):
+- **`nReach.js`** — `planStepUp(spawnX, launchX, upPx)` picks the smallest hold
+  whose apex clears the ledge, then reads from the arc where the ninja is safely
+  above the ledge (near-edge placement) and where it descends back to the surface
+  (landing). `planStepDown(...)` hops onto a lower ledge.
+- **`nGenerate.js`** — `generateStepLevel` / `generateStepBatch`: takeoff platform
+  → gap → landing platform a few tiles higher/lower carrying the exit, placed where
+  the ninja actually lands. Up-step capped to the apex envelope (~2 tiles).
+- **`nVerify.js`** — `node gen/nVerify.js step 6 1`.
+
+Verified: 6/6 up+down step levels complete on real N; a 4-tile (96px) up-step
+correctly `N_FAIL`s (died — above the ~74px apex), gate is meaningful. Model is
+conservative on height too (a 72px ledge it rejects actually clears, apex 73.6px).
+
 This is injected-AS / JS tooling under `_swfbridge/livetest/` — **not
 CI-observable**; do not dispatch ruffle-tests CI for it.

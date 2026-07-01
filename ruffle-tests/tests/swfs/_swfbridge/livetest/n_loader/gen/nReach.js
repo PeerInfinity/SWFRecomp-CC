@@ -4,7 +4,7 @@
 // run-up with the real ramp, read the entry speed at the takeoff edge, pick the
 // smallest measured jump-hold whose air distance clears the gap, and emit the
 // exact demo that does it (the demo IS the solving proof; Ruffle is the judge).
-import { runStep, airDist, MODEL } from "./nMotion.js";
+import { runStep, airDist, apexHeight, arcFor, MODEL } from "./nMotion.js";
 import { encodeDemo, IN } from "./nDemo.js";
 
 /**
@@ -41,6 +41,71 @@ export function planRunJump(spawnX, launchX, gapPx, opts = {}) {
 	for (let i = 0; i < tail; i++) seq.push(IN.R); // walk into the exit after landing
 
 	return { demo: encodeDemo(seq), entryVx, K, ok, jumpTick: t, need, reach: airDist(entryVx, K) };
+}
+
+// ---- step-up / step-down (land on a platform at a different height) ----------
+
+function apexIdx(arc) { let a = 0; for (let i = 1; i < arc.length; i++) if (arc[i][1] < arc[a][1]) a = i; return a; }
+// First dx where the (rising) arc reaches height dyTarget (dy<=dyTarget). null if never.
+function ascendCrossDx(arc, dyTarget) { for (const [dx, dy] of arc) if (dy <= dyTarget) return dx; return null; }
+// After apex, first dx where the (falling) arc returns to dyTarget (dy>=dyTarget).
+function descendCrossDx(arc, dyTarget) {
+	const a = apexIdx(arc);
+	for (let i = a; i < arc.length; i++) if (arc[i][1] >= dyTarget) return arc[i][0];
+	return arc[arc.length - 1][0];
+}
+
+/** Simulate a run-up (hold right) to just before `launchX`; return {ticks, entryVx}. */
+function runUpTo(spawnX, launchX, lead) {
+	let x = spawnX, vx = 0, t = 0;
+	while (x < launchX - lead && t < 800) { vx = runStep(vx); x += vx; t++; }
+	return { ticks: t, entryVx: vx };
+}
+function buildDemo(runTicks, K, tail) {
+	const seq = new Array(runTicks).fill(IN.R);
+	seq.push(IN.R | IN.J | IN.JTRIG);
+	for (let i = 1; i < K; i++) seq.push(IN.R | IN.J);
+	for (let i = 0; i < tail; i++) seq.push(IN.R);
+	return encodeDemo(seq);
+}
+
+/**
+ * Plan a run-and-jump onto a platform `upPx` ABOVE takeoff. Picks the smallest
+ * hold whose apex clears the ledge (+clearance), then reads from the measured arc
+ * where the ninja is `clearance` above the ledge (near-edge placement) and where
+ * it descends back to the ledge surface (landing). Returns geometry in px
+ * relative to the takeoff edge. ok=false if no hold reaches the height.
+ */
+export function planStepUp(spawnX, launchX, upPx, opts = {}) {
+	const clearance = opts.clearance != null ? opts.clearance : 12;
+	const margin = opts.margin != null ? opts.margin : 10;
+	const lead = opts.lead != null ? opts.lead : 8;
+	const tail = opts.tail != null ? opts.tail : 160;
+	const { ticks, entryVx } = runUpTo(spawnX, launchX, lead);
+
+	let K = null;
+	for (const k of MODEL.holds) { if (apexHeight(k) >= upPx + clearance + margin) { K = k; break; } }
+	const ok = K != null;
+	if (!ok) K = MODEL.holds[MODEL.holds.length - 1];
+	const arc = arcFor(entryVx, K);
+	const nearEdgeDx = ascendCrossDx(arc, -(upPx + clearance)); // clear the near edge this far out
+	const landDx = descendCrossDx(arc, -upPx);                  // land on the ledge surface here
+	return { demo: buildDemo(ticks, K, tail), entryVx, K, ok, nearEdgeDx, landDx, apexH: apexHeight(K) };
+}
+
+/**
+ * Plan a run-and-hop onto a platform `downPx` BELOW takeoff (across a gap). A
+ * small hop carries horizontal distance while the ninja falls to the lower ledge;
+ * always reachable (gravity), the only question is horizontal reach (Ruffle gates).
+ */
+export function planStepDown(spawnX, launchX, downPx, opts = {}) {
+	const lead = opts.lead != null ? opts.lead : 8;
+	const tail = opts.tail != null ? opts.tail : 160;
+	const K = opts.K != null ? opts.K : MODEL.holds[1]; // modest hop
+	const { ticks, entryVx } = runUpTo(spawnX, launchX, lead);
+	const arc = arcFor(entryVx, K);
+	const landDx = descendCrossDx(arc, downPx); // descends to +downPx below takeoff
+	return { demo: buildDemo(ticks, K, tail), entryVx, K, ok: true, landDx, apexH: apexHeight(K) };
 }
 
 /** Distance covered while ramping to (near) full speed - min run-up before a gap. */
