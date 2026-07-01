@@ -242,8 +242,8 @@ export function generateCourseLevel(seed, opts = {}) {
 	// full-speed arc), and keep a little platform margin (INTER) for residual drift.
 	const LEAD = 8;
 	const RIGHT_LIMIT = opts.rightLimit != null ? opts.rightLimit : 30;
-	const START_PLAT = 7, INTER = 2, EXIT_RESERVE = 2, CLEAR = 12;
-	const GAP_MARGIN = opts.margin != null ? opts.margin : 36;
+	const START_PLAT = 7, INTER = 2, EXIT_RESERVE = 2, CLEAR = 8;
+	const GAP_MARGIN = opts.margin != null ? opts.margin : 14;
 
 	let row = clampRow(opts.floorRow != null ? opts.floorRow : randint(rng, 12, 15));
 	const lvl = new Level();
@@ -296,7 +296,7 @@ export function generateCourseLevel(seed, opts = {}) {
 			features.push({ type: "gap", W, K });
 		} else if (type === "up") {
 			const upTiles = rng() < 0.4 && row - 2 >= 6 ? 2 : 1;
-			K = smallestApexK(upTiles * TILE + CLEAR + 10);
+			K = smallestApexK(upTiles * TILE + CLEAR + 2);
 			const pl = stepUpPlacement(entryVx, K, upTiles * TILE, CLEAR);
 			landX = launchX + pl.landDx;
 			nextRow = row - upTiles;
@@ -320,6 +320,11 @@ export function generateCourseLevel(seed, opts = {}) {
 		row = nextRow;
 		platEnd = platRight;
 		x = landX; vx = MAX_SPEED; // cruise speed carried out of the jump
+		// Chaining AFTER a height change (step) is not yet reliable open-loop —
+		// the landing estimate off a stepped platform drifts enough to mistrigger
+		// the next jump. Gaps (same-level) chain fine. So a step terminates the
+		// chain; multi-step vertical courses are the vertical/serpentine work.
+		if (type !== "gap") break;
 	}
 
 	// Exit on the final platform (extend it if there's room).

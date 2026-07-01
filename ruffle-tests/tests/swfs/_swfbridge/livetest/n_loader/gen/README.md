@@ -130,9 +130,23 @@ full-speed arc. `node gen/nVerify.js course 12 1` → 12/12 complete on real N.
 Grid reality: the demo is OPEN-LOOP, so landing estimates must be accurate or the
 next jump mistriggers — hence the full run-up (all jumps full-speed) and a small
 platform margin. And a full-speed jump covers ~8 tiles, so on the 31-wide grid a
-feature is only placed if its horizontal reach + the exit still fits (steps reach
-~11-13 tiles → they appear as the first/only feature; 2-feature courses are gap
-chains). Taller/serpentine courses that chain steps need vertical layout (future).
+feature is only placed if its horizontal reach + the exit still fits. Chaining
+after a same-level GAP is reliable; chaining after a height change (STEP) is not
+yet (the stepped-platform landing estimate drifts enough to mistrigger the next
+jump — verified: step→gap courses fail), so **a step terminates the chain**. Result:
+gap-chains + single/first steps. Multi-step vertical/serpentine courses are future
+work (own session; needs turn/wall-jump calibration).
+
+## Margins tightened from the dense calibration (2026-06-30)
+
+The dense K=1..30 sweep (`sweep_kdense.json`) confirmed the model is accurate to
+~1-3px, so the guessed safety margins were far too wide. `nMotion` now loads the
+dense curve and exposes the **full hold range (K=1..30)** (`MODEL.holds`) with exact
+`apexHeight`/`airtime`/full-speed `airDist`/`arc` per integer hold, so the generator
+picks the minimal hold (e.g. a 1-tile step-up is now K5, not K15; 2-tile K19, not
+K30 — shorter, tighter jumps). Margins dropped: gap clearance 36→14px, step
+clearance 12→8px + apex safety 22→10px. Re-verified on real N: steps 8/8, gaps 8/8,
+courses 10/10. (Non-full-speed entry still falls back to the 4x4 `nMotion_calib.json`.)
 
 This is injected-AS / JS tooling under `_swfbridge/livetest/` — **not
 CI-observable**; do not dispatch ruffle-tests CI for it.

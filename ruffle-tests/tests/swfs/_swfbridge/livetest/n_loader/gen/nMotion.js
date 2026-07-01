@@ -16,6 +16,12 @@ import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const calib = JSON.parse(readFileSync(join(here, "nMotion_calib.json"), "utf8"));
+// Dense full-speed hold sweep (K=1..30) — measured (sweep.mjs). Apex/airtime depend
+// only on K, and the generator's jumps are all ~full speed, so this dense curve is
+// the primary source for apex/airtime and full-speed airDist/arc; the 4x4 calib
+// remains the fallback for non-full-speed entry.
+let denseSweep = null;
+try { denseSweep = JSON.parse(readFileSync(join(here, "sweep_kdense.json"), "utf8")); } catch { /* optional */ }
 
 export const MAX_SPEED = calib.speed.maxSpeed; // ~5 px/tick
 export const TILE = 24;
@@ -38,11 +44,30 @@ export function runUpDistForSpeed(v) {
 	return d;
 }
 
-// ---- jump envelope (interpolated over the measured grid) ---------------------
+// ---- jump envelope ----------------------------------------------------------
+// 4x4 grid (entry speed x hold) — fallback for non-full-speed entry.
 const J = calib.jumps.filter((j) => !j.error);
 const KS = [...new Set(J.map((j) => j.K))].sort((a, b) => a - b);
 const VS = [...new Set(J.map((j) => j.entryVx))].sort((a, b) => a - b);
 const cell = new Map(J.map((j) => [`${j.entryVx}|${j.K}`, j]));
+
+// Dense full-speed curve: K -> {apexHeight, airtime, airDist, arc} for K=1..30.
+// From the sweep (K=1..29); K30 spliced from the 4x4 full-speed cell (sweep's last
+// probe truncates on capture cutoff).
+const DK = new Map();
+if (denseSweep) for (const r of denseSweep.rows) {
+	if (!r.error && r.apexHeight != null) DK.set(r.K, { apexHeight: r.apexHeight, airtime: r.airtime, airDist: r.airDist, arc: r.arc });
+}
+{
+	const fullV = Math.max(...VS);
+	for (const k of KS) {
+		if (DK.has(k)) continue;
+		const c = cell.get(`${fullV}|${k}`);
+		if (c) DK.set(k, { apexHeight: c.apexHeight, airtime: c.airtime, airDist: c.airDist, arc: c.arc });
+	}
+}
+const DKS = [...DK.keys()].sort((a, b) => a - b);
+const FULL = 0.9 * MAX_SPEED; // "full speed" threshold for using the dense curve
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 function bracket(arr, x) {
@@ -51,23 +76,21 @@ function bracket(arr, x) {
 	let i = 0; while (arr[i + 1] < x) i++;
 	return [i, i + 1, (x - arr[i]) / (arr[i + 1] - arr[i])];
 }
+// Interpolate a field of the dense full-speed curve over hold K.
+function denseField(K, field) {
+	const [i0, i1, t] = bracket(DKS, K);
+	return lerp(DK.get(DKS[i0])[field], DK.get(DKS[i1])[field], t);
+}
 
 /** Apex height (px above takeoff) for a jump-hold of K ticks. Depends only on K. */
-export function apexHeight(K) {
-	const [i0, i1, t] = bracket(KS, K);
-	const at = (kk) => avg(VS.map((v) => cell.get(`${v}|${kk}`)?.apexHeight).filter((x) => x != null));
-	return lerp(at(KS[i0]), at(KS[i1]), t);
-}
+export function apexHeight(K) { return denseField(K, "apexHeight"); }
 /** Airtime (ticks aloft) for a jump-hold of K. Depends only on K. */
-export function airtime(K) {
-	const [i0, i1, t] = bracket(KS, K);
-	const at = (kk) => avg(VS.map((v) => cell.get(`${v}|${kk}`)?.airtime).filter((x) => x != null));
-	return lerp(at(KS[i0]), at(KS[i1]), t);
-}
-/** The measured jump trajectory ([dx,dy] per air tick, dy<0=above takeoff) for the
- *  grid cell closest to (entry speed, hold). Arcs are only measured at grid points;
- *  the generator uses full-speed entry so the closest cell is faithful. */
+export function airtime(K) { return denseField(K, "airtime"); }
+/** The measured jump trajectory ([dx,dy] per air tick, dy<0=above takeoff). Uses the
+ *  dense full-speed arc for full-speed entry (the generator's case); else the closest
+ *  4x4 grid cell. */
 export function arcFor(entryVx, K) {
+	if (entryVx >= FULL) return DK.get(closest(DKS, K))?.arc ?? [];
 	const v = closest(VS, entryVx), k = closest(KS, K);
 	return cell.get(`${v}|${k}`)?.arc ?? [];
 }
@@ -95,8 +118,10 @@ export function stepUpPlacement(entryVx, K, upPx, clearance = 12) {
 /** Landing dx for a hop onto a ledge `downPx` below takeoff. */
 export function stepDownLandingDx(entryVx, K, downPx) { return descendCrossDx(arcFor(entryVx, K), downPx); }
 
-/** Horizontal air distance for entry speed `vx` and jump-hold `K` (bilinear). */
+/** Horizontal air distance for entry speed `vx` and jump-hold `K`. Full-speed uses
+ *  the dense K curve (exact per hold); else bilinear over the 4x4 grid. */
 export function airDist(vx, K) {
+	if (vx >= FULL) return denseField(K, "airDist");
 	const [vi0, vi1, vt] = bracket(VS, vx);
 	const [ki0, ki1, kt] = bracket(KS, K);
 	const g = (vi, ki) => cell.get(`${VS[vi]}|${KS[ki]}`)?.airDist ?? 0;
@@ -108,21 +133,22 @@ export function airDist(vx, K) {
 /** Max same-level horizontal gap clearable from entry speed `vx` (best hold),
  *  shrunk by `margin` so the real-N gate almost always agrees. In pixels. */
 export function maxGap(vx, margin = 0.12) {
-	const best = Math.max(...KS.map((K) => airDist(vx, K)));
+	const best = Math.max(...DKS.map((K) => airDist(vx, K)));
 	return best * (1 - margin);
 }
 /** Max upward ledge height reachable (best hold), shrunk by `margin`. In pixels. */
 export function maxStepUp(margin = 0.15) {
-	return Math.max(...KS.map((K) => apexHeight(K))) * (1 - margin);
+	return Math.max(...DKS.map((K) => apexHeight(K))) * (1 - margin);
 }
 /** Best-case max gap from full running speed. */
 export function maxRunningGap(margin = 0.12) { return maxGap(MAX_SPEED, margin); }
 
-function avg(a) { return a.reduce((s, x) => s + x, 0) / a.length; }
 function closest(arr, x) { return arr.reduce((b, v) => (Math.abs(v - x) < Math.abs(b - x) ? v : b), arr[0]); }
 
 export const MODEL = {
-	maxSpeed: MAX_SPEED, restY: GROUND_REST_Y, holds: KS, entrySpeeds: VS,
+	// holds = the full measured hold range (dense K=1..30), so the generator can
+	// pick any hold, not just the 4x4 grid points.
+	maxSpeed: MAX_SPEED, restY: GROUND_REST_Y, holds: DKS, entrySpeeds: VS,
 	rampToFullTicks: runUpTicksForSpeed(MAX_SPEED * 0.99),
 };
 

@@ -12,14 +12,15 @@ import { encodeDemo, IN } from "./nDemo.js";
  *   spawnX  : player start x (px)
  *   launchX : x of the takeoff edge (right edge of the takeoff platform, px)
  *   gapPx   : horizontal distance that must be cleared (px)
- * opts: margin (clearance safety px, default 36), lead (jump this many px before
- *   the edge so takeoff is grounded, default 8), tail (hold-right ticks after the
- *   jump to walk into the exit, default 160).
+ * opts: margin (clearance safety px, default 14 — landing this far past the pit's
+ *   far edge, > player radius 10; the measured model is accurate to ~2px so the old
+ *   36px pad is unnecessary), lead (jump this many px before the edge so takeoff is
+ *   grounded, default 8), tail (hold-right ticks after the jump, default 160).
  * Returns { demo, entryVx, K, ok, jumpTick, need, reach }. ok=false means no
  * measured hold clears it (still returns a best-effort demo for the Ruffle gate).
  */
 export function planRunJump(spawnX, launchX, gapPx, opts = {}) {
-	const margin = opts.margin != null ? opts.margin : 36;
+	const margin = opts.margin != null ? opts.margin : 14;
 	const lead = opts.lead != null ? opts.lead : 8;
 	const tail = opts.tail != null ? opts.tail : 160;
 
@@ -67,8 +68,8 @@ function buildDemo(runTicks, K, tail) {
  * relative to the takeoff edge. ok=false if no hold reaches the height.
  */
 export function planStepUp(spawnX, launchX, upPx, opts = {}) {
-	const clearance = opts.clearance != null ? opts.clearance : 12;
-	const margin = opts.margin != null ? opts.margin : 10;
+	const clearance = opts.clearance != null ? opts.clearance : 8;  // corner-clear above the ledge surface
+	const margin = opts.margin != null ? opts.margin : 2;           // small extra apex safety (was 10)
 	const lead = opts.lead != null ? opts.lead : 8;
 	const tail = opts.tail != null ? opts.tail : 160;
 	const { ticks, entryVx } = runUpTo(spawnX, launchX, lead);
