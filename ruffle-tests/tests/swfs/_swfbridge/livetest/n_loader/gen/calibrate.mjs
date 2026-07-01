@@ -57,6 +57,7 @@ for (const p of probes) {
 		R: p.meta.R, K: p.meta.K, result: lv.result,
 		entryVx: round(f.entryVx), initVy: round(f.initVy), apexHeight: round(f.apexHeight),
 		airtime: f.airtime, airDist: round(f.airDist), exitVx: round(f.exitVx), maxVx: round(f.maxVx),
+		arc: f.arc, // [dx,dy] per air tick relative to takeoff (for step-up/down placement)
 	});
 }
 

@@ -79,6 +79,9 @@ export function extractJumpFeatures(frames) {
 		if (f.vy < initVy) initVy = f.vy; // most-negative = launch impulse
 	}
 	const last = air[air.length - 1] || frames[ji];
+	// Trajectory relative to takeoff: [dx, dy] per air tick (dy<0 = above takeoff).
+	// This is what step-up/down placement needs (height at a given horizontal reach).
+	const arc = air.map((f) => [round1(f.x - startX), round1(f.y - startY)]);
 	return {
 		jump: true,
 		ground,
@@ -91,8 +94,11 @@ export function extractJumpFeatures(frames) {
 		exitVx: last.vx,
 		maxVx,
 		startX,
+		arc,
 	};
 }
+
+function round1(x) { return Math.round(x * 10) / 10; }
 
 // CLI: node nTelemetry.js <console.txt>  -> dump per-level summary
 if (process.argv[1] && process.argv[1].endsWith("nTelemetry.js")) {
