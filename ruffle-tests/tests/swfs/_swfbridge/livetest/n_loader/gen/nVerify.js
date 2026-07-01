@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { generateFlatBatch, generateGapBatch, generateStepBatch } from "./nGenerate.js";
+import { generateFlatBatch, generateGapBatch, generateStepBatch, generateCourseBatch } from "./nGenerate.js";
 import { writeQueueFile } from "./queueFile.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -25,7 +25,7 @@ const loaderDir = join(here, "..");
 let kind = "flat";
 const nums = [];
 for (const a of process.argv.slice(2)) {
-	if (a === "flat" || a === "gap" || a === "step") kind = a;
+	if (a === "flat" || a === "gap" || a === "step" || a === "course") kind = a;
 	else if (a !== "" && !Number.isNaN(Number(a))) nums.push(Number(a));
 }
 const count = nums[0] || 6;
@@ -35,9 +35,13 @@ const captureSecs = nums[2] || 12 + 5 * count;
 console.log(`[nVerify] generating ${count} ${kind} levels (baseSeed=${baseSeed})`);
 const batch = kind === "gap" ? generateGapBatch(count, baseSeed)
 	: kind === "step" ? generateStepBatch(count, baseSeed)
+	: kind === "course" ? generateCourseBatch(count, baseSeed)
 	: generateFlatBatch(count, baseSeed);
 for (const b of batch) {
-	if (kind === "step") {
+	if (kind === "course") {
+		console.log(`  ${b.levelId}: ${b.meta.nFeatures} features [${b.meta.features.join(", ")}]` +
+			` endRow ${b.meta.endRow} endCol ${b.meta.endCol} demoTicks ${b.meta.ticks}`);
+	} else if (kind === "step") {
 		console.log(`  ${b.levelId}: ${b.meta.dir} ${b.meta.stepTiles} tiles` +
 			` (row ${b.meta.floorRow}->${b.meta.floorRow2}) K=${b.meta.K} entryVx ${b.meta.entryVx}` +
 			` land@col${b.meta.landCol} plat[${b.meta.nearCol}..${b.meta.landEnd}] planOk=${b.meta.planOk}`);
@@ -95,6 +99,7 @@ for (const b of batch) {
 function describe(b) {
 	if (kind === "gap") return `gap=${b.meta.gapTiles}t K=${b.meta.K}`;
 	if (kind === "step") return `${b.meta.dir}=${b.meta.stepTiles}t K=${b.meta.K} land@${b.meta.landCol}`;
+	if (kind === "course") return `[${b.meta.features.join(",")}] endCol${b.meta.endCol}`;
 	return `walk=${b.meta.walk}px`;
 }
 console.log(`\n[nVerify] ${pass}/${batch.length} levels verified on real N (Ruffle)`);

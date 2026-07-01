@@ -72,6 +72,29 @@ export function arcFor(entryVx, K) {
 	return cell.get(`${v}|${k}`)?.arc ?? [];
 }
 
+// --- arc crossing helpers (trajectory queries the generator needs) -----------
+function apexIdx(arc) { let a = 0; for (let i = 1; i < arc.length; i++) if (arc[i][1] < arc[a][1]) a = i; return a; }
+// First dx where the rising arc reaches height dyTarget (dy<=dyTarget); null if never.
+function ascendCrossDx(arc, dyTarget) { for (const [dx, dy] of arc) if (dy <= dyTarget) return dx; return null; }
+// After apex, first dx where the falling arc returns to dyTarget (dy>=dyTarget).
+function descendCrossDx(arc, dyTarget) {
+	if (!arc.length) return 0;
+	const a = apexIdx(arc);
+	for (let i = a; i < arc.length; i++) if (arc[i][1] >= dyTarget) return arc[i][0];
+	return arc[arc.length - 1][0];
+}
+
+/** Landing dx for a same-level jump (arc returns to takeoff height). */
+export function gapLandingDx(entryVx, K) { return descendCrossDx(arcFor(entryVx, K), 0); }
+/** For a jump onto a ledge `upPx` above takeoff: where the ninja is `clearance`
+ *  above the ledge (near-edge placement) and where it descends to the surface. */
+export function stepUpPlacement(entryVx, K, upPx, clearance = 12) {
+	const arc = arcFor(entryVx, K);
+	return { nearEdgeDx: ascendCrossDx(arc, -(upPx + clearance)), landDx: descendCrossDx(arc, -upPx) };
+}
+/** Landing dx for a hop onto a ledge `downPx` below takeoff. */
+export function stepDownLandingDx(entryVx, K, downPx) { return descendCrossDx(arcFor(entryVx, K), downPx); }
+
 /** Horizontal air distance for entry speed `vx` and jump-hold `K` (bilinear). */
 export function airDist(vx, K) {
 	const [vi0, vi1, vt] = bracket(VS, vx);

@@ -119,5 +119,20 @@ Verified: 6/6 up+down step levels complete on real N; a 4-tile (96px) up-step
 correctly `N_FAIL`s (died — above the ~74px apex), gate is meaningful. Model is
 conservative on height too (a 72px ledge it rejects actually clears, apex 73.6px).
 
+## P2 #2 multi-segment courses (done): chain features, one demo through all
+
+`nGenerate.generateCourseLevel` / `generateCourseBatch` lay spawn → a chain of
+features (gap / step-up / step-down) → exit, threaded by a SINGLE demo via
+construction-by-simulation: a full run-up brings the ninja to ~max speed once,
+then it cruises at ~5 px/tick between features, so every jump uses the measured
+full-speed arc. `node gen/nVerify.js course 12 1` → 12/12 complete on real N.
+
+Grid reality: the demo is OPEN-LOOP, so landing estimates must be accurate or the
+next jump mistriggers — hence the full run-up (all jumps full-speed) and a small
+platform margin. And a full-speed jump covers ~8 tiles, so on the 31-wide grid a
+feature is only placed if its horizontal reach + the exit still fits (steps reach
+~11-13 tiles → they appear as the first/only feature; 2-feature courses are gap
+chains). Taller/serpentine courses that chain steps need vertical layout (future).
+
 This is injected-AS / JS tooling under `_swfbridge/livetest/` — **not
 CI-observable**; do not dispatch ruffle-tests CI for it.

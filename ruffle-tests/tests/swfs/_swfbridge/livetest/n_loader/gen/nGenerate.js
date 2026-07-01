@@ -8,8 +8,9 @@
 // a batch to nVerify.js to confirm every one completes on real N via Ruffle.
 import { Level, OBJ, TILE_FULL, cellToPixel, pixelToCell, COLS } from "./nLevel.js";
 import { holdRight } from "./nDemo.js";
-import { maxRunningGap, apexHeight, MODEL } from "./nMotion.js";
+import { maxRunningGap, maxGap, apexHeight, airtime, airDist, runStep, stepUpPlacement, stepDownLandingDx, MAX_SPEED, MODEL } from "./nMotion.js";
 import { planRunJump, planStepUp, planStepDown } from "./nReach.js";
+import { encodeDemo, IN } from "./nDemo.js";
 
 // N geometry (status doc): player radius 10; floor map-row `fr` has its top
 // surface at pixel (fr+1)*24, so a grounded body rests at center y = top - r.
@@ -209,5 +210,138 @@ export function generateStepBatch(count, baseSeed = 1, opts = {}) {
 		const dir = opts.dir || (i % 2 === 0 ? "up" : "down");
 		out.push(generateStepLevel((baseSeed + i) >>> 0, { ...opts, dir }));
 	}
+	return out;
+}
+
+// ---- P2 #2: multi-segment course (chain features, one demo through all) --------
+
+function smallestGapK(entryVx, needPx) {
+	for (const k of MODEL.holds) if (airDist(entryVx, k) >= needPx) return k;
+	return MODEL.holds[MODEL.holds.length - 1];
+}
+function smallestApexK(needPx) {
+	for (const k of MODEL.holds) if (apexHeight(k) >= needPx) return k;
+	return MODEL.holds[MODEL.holds.length - 1];
+}
+const clampRow = (r) => Math.max(6, Math.min(19, r));
+
+/**
+ * Generate one multi-segment course: spawn -> a chain of 2-3 features (gap /
+ * step-up / step-down) -> exit, threaded by a SINGLE demo. Construction-by-
+ * simulation: the ninja runs up to full speed once, then cruises at ~maxSpeed
+ * between features, so each feature is a full-speed jump placed by the measured
+ * arc. Laid strictly left-to-right (monotonic columns) to fit the 31-wide grid,
+ * so courses are short (2-3 features / one screen). Ruffle is the final judge.
+ */
+export function generateCourseLevel(seed, opts = {}) {
+	const rng = makeRng(seed);
+	// A full-speed jump already covers ~8 tiles (air-control ramps vx to ~5 mid-
+	// flight), so on a 31-wide grid only ~2 features fit. The demo is open-loop, so
+	// landing estimates MUST be accurate or the next jump mistriggers: give a full
+	// run-up (START_PLAT) so EVERY jump is at ~full speed (matching the measured
+	// full-speed arc), and keep a little platform margin (INTER) for residual drift.
+	const LEAD = 8;
+	const RIGHT_LIMIT = opts.rightLimit != null ? opts.rightLimit : 30;
+	const START_PLAT = 7, INTER = 2, EXIT_RESERVE = 2, CLEAR = 12;
+	const GAP_MARGIN = opts.margin != null ? opts.margin : 36;
+
+	let row = clampRow(opts.floorRow != null ? opts.floorRow : randint(rng, 12, 15));
+	const lvl = new Level();
+	let platEnd = 1 + START_PLAT;
+	lvl.fillRect(1, row, platEnd, row, TILE_FULL);
+	const spawnX = cellToPixel(2, row).x;
+	lvl.addObject(OBJ.PLAYER, [spawnX, restY(row)]);
+
+	const seq = [];
+	let x = spawnX, vx = 0;
+	const features = [];
+	const runTo = (targetX) => { let n = 0; while (x < targetX - LEAD && n < 400) { vx = runStep(vx); x += vx; seq.push(IN.R); n++; } };
+	const doJump = (K, at) => {
+		seq.push(IN.R | IN.J | IN.JTRIG);
+		for (let i = 1; i < K; i++) seq.push(IN.R | IN.J);
+		for (let i = K; i < at; i++) seq.push(IN.R); // finish the flight
+	};
+
+	const nWant = opts.features != null ? opts.features : randint(rng, 2, 3);
+	while (features.length < nWant) {
+		const launchCol = platEnd;
+		const launchX = launchCol * TILE + 48;
+		const budget = RIGHT_LIMIT - launchCol;
+
+		// A feature is only allowed if its full-speed horizontal reach + the exit
+		// still fits — else it overshoots into the right wall past the exit. Steps
+		// reach ~11-13 tiles (long, high-air jumps), gaps ~9 (min-hold K3), so on a
+		// 31-wide grid steps fit mainly as the first/only feature; 2-feature courses
+		// are gap chains. (Reaches are conservative over-estimates.)
+		const REACH = { gap: 9, up: 13, down: 12 };
+		const fits = (t) => launchCol + REACH[t] + EXIT_RESERVE <= RIGHT_LIMIT;
+		const types = [];
+		if (fits("gap")) types.push("gap");
+		if (row - 2 >= 6 && fits("up")) types.push("up");
+		if (row + 2 <= 19 && fits("down")) types.push("down");
+		if (types.length === 0) break; // no feature fits -> finish with the exit
+		const type = types[Math.floor(rng() * types.length)];
+
+		runTo(launchX);
+		const entryVx = vx;
+
+		let K, at, landX, nextRow, nearCol;
+		if (type === "gap") {
+			const maxW = Math.min(6, Math.floor(maxGap(entryVx) / TILE), budget - EXIT_RESERVE - 2);
+			const W = Math.max(3, Math.min(maxW, randint(rng, 3, 5)));
+			K = smallestGapK(entryVx, W * TILE + GAP_MARGIN);
+			landX = launchX + airDist(entryVx, K);
+			nextRow = row;
+			nearCol = launchCol + 1 + W;
+			features.push({ type: "gap", W, K });
+		} else if (type === "up") {
+			const upTiles = rng() < 0.4 && row - 2 >= 6 ? 2 : 1;
+			K = smallestApexK(upTiles * TILE + CLEAR + 10);
+			const pl = stepUpPlacement(entryVx, K, upTiles * TILE, CLEAR);
+			landX = launchX + pl.landDx;
+			nextRow = row - upTiles;
+			nearCol = Math.max(launchCol + 2, colAtOrAfter(launchX + (pl.nearEdgeDx ?? 60)));
+			features.push({ type: "up", upTiles, K });
+		} else {
+			const downTiles = randint(rng, 1, 2);
+			K = MODEL.holds[1];
+			landX = launchX + stepDownLandingDx(entryVx, K, downTiles * TILE);
+			nextRow = row + downTiles;
+			nearCol = Math.max(launchCol + 2, colNearest(landX) - 1);
+			features.push({ type: "down", downTiles, K });
+		}
+		at = Math.round(airtime(K));
+		doJump(K, at);
+
+		const landCol = colNearest(landX);
+		const platRight = Math.min(RIGHT_LIMIT, Math.max(landCol, nearCol) + INTER);
+		nextRow = clampRow(nextRow);
+		lvl.fillRect(nearCol, nextRow, platRight, nextRow, TILE_FULL);
+		row = nextRow;
+		platEnd = platRight;
+		x = landX; vx = MAX_SPEED; // cruise speed carried out of the jump
+	}
+
+	// Exit on the final platform (extend it if there's room).
+	const exitEnd = Math.min(COLS - 1, platEnd + EXIT_RESERVE);
+	if (exitEnd > platEnd) lvl.fillRect(platEnd + 1, row, exitEnd, row, TILE_FULL);
+	platEnd = exitEnd;
+	const doorCol = platEnd - 1, switchCol = platEnd - 2;
+	lvl.addObject(OBJ.EXIT, [cellToPixel(doorCol, row).x, restY(row), cellToPixel(switchCol, row).x, restY(row)]);
+	runTo(cellToPixel(doorCol, row).x + 30);
+	for (let i = 0; i < 20; i++) seq.push(IN.R);
+
+	return {
+		levelId: `course-s${seed >>> 0}`,
+		level: lvl.encode(),
+		demo: encodeDemo(seq),
+		meta: { seed: seed >>> 0, nFeatures: features.length, features: features.map((f) => f.type + (f.W || f.upTiles || f.downTiles)), endRow: row, endCol: platEnd, ticks: seq.length },
+	};
+}
+
+/** Generate `count` distinct courses from consecutive seeds. */
+export function generateCourseBatch(count, baseSeed = 1, opts = {}) {
+	const out = [];
+	for (let i = 0; i < count; i++) out.push(generateCourseLevel((baseSeed + i) >>> 0, opts));
 	return out;
 }

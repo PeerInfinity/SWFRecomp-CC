@@ -4,7 +4,7 @@
 // run-up with the real ramp, read the entry speed at the takeoff edge, pick the
 // smallest measured jump-hold whose air distance clears the gap, and emit the
 // exact demo that does it (the demo IS the solving proof; Ruffle is the judge).
-import { runStep, airDist, apexHeight, arcFor, MODEL } from "./nMotion.js";
+import { runStep, airDist, apexHeight, stepUpPlacement, stepDownLandingDx, MODEL } from "./nMotion.js";
 import { encodeDemo, IN } from "./nDemo.js";
 
 /**
@@ -45,16 +45,6 @@ export function planRunJump(spawnX, launchX, gapPx, opts = {}) {
 
 // ---- step-up / step-down (land on a platform at a different height) ----------
 
-function apexIdx(arc) { let a = 0; for (let i = 1; i < arc.length; i++) if (arc[i][1] < arc[a][1]) a = i; return a; }
-// First dx where the (rising) arc reaches height dyTarget (dy<=dyTarget). null if never.
-function ascendCrossDx(arc, dyTarget) { for (const [dx, dy] of arc) if (dy <= dyTarget) return dx; return null; }
-// After apex, first dx where the (falling) arc returns to dyTarget (dy>=dyTarget).
-function descendCrossDx(arc, dyTarget) {
-	const a = apexIdx(arc);
-	for (let i = a; i < arc.length; i++) if (arc[i][1] >= dyTarget) return arc[i][0];
-	return arc[arc.length - 1][0];
-}
-
 /** Simulate a run-up (hold right) to just before `launchX`; return {ticks, entryVx}. */
 function runUpTo(spawnX, launchX, lead) {
 	let x = spawnX, vx = 0, t = 0;
@@ -87,9 +77,7 @@ export function planStepUp(spawnX, launchX, upPx, opts = {}) {
 	for (const k of MODEL.holds) { if (apexHeight(k) >= upPx + clearance + margin) { K = k; break; } }
 	const ok = K != null;
 	if (!ok) K = MODEL.holds[MODEL.holds.length - 1];
-	const arc = arcFor(entryVx, K);
-	const nearEdgeDx = ascendCrossDx(arc, -(upPx + clearance)); // clear the near edge this far out
-	const landDx = descendCrossDx(arc, -upPx);                  // land on the ledge surface here
+	const { nearEdgeDx, landDx } = stepUpPlacement(entryVx, K, upPx, clearance);
 	return { demo: buildDemo(ticks, K, tail), entryVx, K, ok, nearEdgeDx, landDx, apexH: apexHeight(K) };
 }
 
@@ -103,8 +91,7 @@ export function planStepDown(spawnX, launchX, downPx, opts = {}) {
 	const tail = opts.tail != null ? opts.tail : 160;
 	const K = opts.K != null ? opts.K : MODEL.holds[1]; // modest hop
 	const { ticks, entryVx } = runUpTo(spawnX, launchX, lead);
-	const arc = arcFor(entryVx, K);
-	const landDx = descendCrossDx(arc, downPx); // descends to +downPx below takeoff
+	const landDx = stepDownLandingDx(entryVx, K, downPx); // descends to +downPx below takeoff
 	return { demo: buildDemo(ticks, K, tail), entryVx, K, ok: true, landDx, apexH: apexHeight(K) };
 }
 
