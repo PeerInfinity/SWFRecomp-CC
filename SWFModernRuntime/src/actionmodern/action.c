@@ -22860,6 +22860,29 @@ MovieClip* actionFindMovieClipByName(const char* instance_name) {
 	return NULL;
 }
 
+// Drop the instance-name binding for `mc` from its parent's dynamic_props
+// (root included) when the entry references exactly this MC. Instance names
+// live there — not in var_map — since the instance-name/variable
+// de-conflation, so every invalidation path must clear the binding or name
+// reads keep resolving the dead struct (gnash misc-ming static_vs_dynamic2:
+// typeof(dup) after RemoveObject2-after-swapDepths must be 'undefined').
+// The pointer guard keeps user properties and re-placed same-name entries
+// untouched.
+static void mcDropParentInstanceBinding(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL || mc->name[0] == '\0') return;
+	extern MovieClip root_movieclip;
+	MovieClip* parent = mc->parent ? mc->parent : &root_movieclip;
+	if (parent->dynamic_props == NULL) return;
+	u32 _dib_nl = (u32)strlen(mc->name);
+	ActionVar* pv = getProperty((ASObject*)parent->dynamic_props, mc->name, _dib_nl);
+	if (pv != NULL && pv->type == ACTION_STACK_VALUE_MOVIECLIP &&
+	    (MovieClip*)(uintptr_t)pv->data.numeric_value == mc)
+	{
+		deleteProperty(app_context, (ASObject*)parent->dynamic_props, mc->name, _dib_nl);
+	}
+}
+
 // Invalidate cached MovieClip when a display entry is removed (e.g., tagRemoveObject2).
 // Clears dynamic_props so the MC starts fresh if re-placed with the same name.
 // swf_depth disambiguates when multiple MCs share the same name.
@@ -22925,6 +22948,8 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 					}
 				}
 			}
+			// Instance-name binding lives on the parent's dynamic_props now.
+			mcDropParentInstanceBinding(app_context, child_mc_cache[i]);
 			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead
 			// Cascade invalidation to descendant MCs whose parent chain
 			// includes this MC. Without this, child MCs (e.g. button_txt
@@ -22995,18 +23020,31 @@ void actionInvalidateMCAtASDepth(SWFAppContext* app_context, int as_depth)
 		actionUnregisterTextFieldBindings(ch);
 		actionUnboundTextFieldsDrop(ch);
 		ch->avm1_removed = 1;
+		// Drop the instance-name binding on the parent's dynamic_props (must
+		// run BEFORE dynamic_props/depth are cleared). Clones register there
+		// — not in var_map — since the instance-name/variable de-conflation;
+		// without this `typeof(dup)` after RemoveObject2 reads the stale MC.
+		mcDropParentInstanceBinding(app_context, ch);
 		ch->dynamic_props = NULL;
 		ch->ng_textfield_idx = -1;
-		// Clear the global variable entry that setVariableByName created at
-		// clone time. Without this, `_root.dup` still resolves to the stale
-		// MC pointer via var_map and typeof() returns 'movieclip' instead
-		// of 'undefined'. (PlaceObject2-placed MCs are looked up via
-		// display_list/child_mc_cache and don't need this; only
-		// duplicateMovieClip/CloneSprite clones are stored in var_map.)
+		// Clear a stale global variable entry only when it references THIS
+		// MC (a user var pointing at the removed clone reads as undefined —
+		// matches the historical behavior for `typeof(dup)`).
 		if (ch->name[0] != '\0') {
-			ActionVar undef = {0};
-			undef.type = ACTION_STACK_VALUE_UNDEFINED;
-			setVariableByName(ch->name, &undef);
+			extern bool hasVariable(char* var_name, size_t key_size);
+			extern ActionVar* getVariable(char* var_name, size_t key_size);
+			size_t _iad_nl = strlen(ch->name);
+			if (hasVariable(ch->name, _iad_nl)) {
+				ActionVar* _iad_v = getVariable(ch->name, _iad_nl);
+				if (_iad_v != NULL
+				    && _iad_v->type == ACTION_STACK_VALUE_MOVIECLIP
+				    && (MovieClip*)(uintptr_t)_iad_v->data.numeric_value == ch)
+				{
+					ActionVar undef = {0};
+					undef.type = ACTION_STACK_VALUE_UNDEFINED;
+					setVariableByName(ch->name, &undef);
+				}
+			}
 		}
 		ch->depth = INT_MIN;
 		break;
@@ -23047,6 +23085,8 @@ void actionInvalidateCachedMovieClipDirect(SWFAppContext* app_context, MovieClip
 	actionUnregisterTextFieldBindings(mc);
 	actionUnboundTextFieldsDrop(mc);
 	mc->avm1_removed = 1;
+	// Drop the parent-dprops instance binding before clearing state.
+	mcDropParentInstanceBinding(app_context, mc);
 	mc->dynamic_props = NULL;
 	mc->ng_textfield_idx = -1;
 	mc->depth = INT_MIN;
@@ -58906,14 +58946,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 				mc_var.data.numeric_value = (u64)child;
 				setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
-				// Also set on global scope for GetVariable access
-				size_t klen = strlen(inst_name);
-				ActionVar* gvar = getVariable((char*)inst_name, klen);
-				if (gvar != NULL) {
-					gvar->type = mc_var.type;
-					gvar->str_size = mc_var.str_size;
-					gvar->data = mc_var.data;
-				}
+				// No var_map registration — instance names are display-list
+				// child bindings, not variables (see createEmptyMovieClip
+				// note). Keeping one here made `tf._name = 'changed'` leave a
+				// stale var_map entry so typeof(tf) stayed non-undefined
+				// (gnash TextField.as:435).
 			}
 
 			// Add to child_mc_cache so it persists across lookups
@@ -66977,10 +67014,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					break;
 				}
 			}
-			// Set variable to undefined (so GetVariable returns undefined)
-			ActionVar undef_var = {0};
-			undef_var.type = ACTION_STACK_VALUE_UNDEFINED;
-			setVariableByName(mc->name, &undef_var);
+			// Drop the parent-dprops instance binding and mark the wrapper
+			// dead so name reads fall through to "not found" and a later
+			// create at the same name rebinds (gnash TextField.as:805-817:
+			// typeof(hardref) == 'undefined' after removeTextField, then
+			// createEmptyMovieClip("hardref", 24) must resolve). A user
+			// variable still holding the field becomes a dangling ref that
+			// the soft-ref machinery re-resolves by original target.
+			mcDropParentInstanceBinding(app_context, mc);
+			mc->avm1_removed = 1;
+			mc->depth = INT_MIN;
 #endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -67169,14 +67212,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 					mc_var.data.numeric_value = (u64)child;
 					setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
-					// Also set on global scope for GetVariable access
-					size_t klen = strlen(inst_name);
-					ActionVar* gvar = getVariable((char*)inst_name, klen);
-					if (gvar != NULL) {
-						gvar->type = mc_var.type;
-						gvar->str_size = mc_var.str_size;
-						gvar->data = mc_var.data;
-					}
+					// No var_map registration — instance names are display-list
+					// child bindings, not variables (see createEmptyMovieClip
+					// note). Keeping one here made `tf._name = 'changed'` leave a
+					// stale var_map entry so typeof(tf) stayed non-undefined
+					// (gnash TextField.as:435).
 				}
 
 				// Add to child_mc_cache so it persists across lookups
@@ -67525,12 +67565,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, _mcemc_inst_len, &mc_var);
 				}
 				// NOTE: the instance name is deliberately NOT registered in the
-				// global var_map (nor as a local variable for non-root
-				// receivers). The display-list child binding lives in
+				// global var_map. The display-list child binding lives in
 				// dynamic_props / the as_created child-name scans; var_map holds
 				// only genuine user variables so a `mc._name = ...` rename can't
 				// destroy a same-named user var (avm1/sound_setters). See
 				// avm1/_investigation/blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
+				//
+				// Exception: inside a function/handler invocation, still expose
+				// the instance name as a variable — local when an activation
+				// scope exists, else global. When the receiver differs from
+				// g_current_context (e.g. `t = this.createEmptyMovieClip('tc',
+				// 8)` in an onMouseDown handler defined on the receiver's
+				// timeline), a bare-name read can't reach the receiver's
+				// dynamic_props here, but Flash resolves it via the handler's
+				// closure scope (the defining clip) — gnash misc-ming
+				// loading/loadMovieTest (`tc instanceof MovieClip`). Timeline-
+				// level creates (depth 0, no this-binding) skip this entirely,
+				// so rename semantics stay clean for the soft-reference tests.
+				if (g_call_depth > 0 || g_this_depth > 0) {
+					extern bool setVariableOnLocalScope(const char* var_name, ActionVar* value);
+					if (!setVariableOnLocalScope(inst_name, &mc_var))
+						setGlobalVariableByName(inst_name, &mc_var);
+				}
 
 				// Find free slot or append in child_mc_cache
 				{
