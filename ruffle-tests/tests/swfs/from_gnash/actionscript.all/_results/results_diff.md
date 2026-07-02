@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `8d1e3adef576` (2026-07-02T19:28:39.938542+00:00)
-**Current:** `855c63864032` (2026-07-02T20:42:12.824382+00:00)
+**Previous:** `855c63864032` (2026-07-02T20:42:12.824382+00:00)
+**Current:** `98fb875b6b88` (2026-07-02T21:53:52.089936+00:00)
 
 ## Summary
 
@@ -10,20 +10,17 @@
 | Passing | 135 | 135 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 55.6% | 55.6% | 0% |
-| Mismatched lines | 8649 | 8651 | +2 |
-|   Decreased | | | -1 |
-|   Increased | | | +3 |
+| Mismatched lines | 8651 | 8654 | +3 |
+|   Decreased | | | -3 |
+|   Increased | | | +6 |
 
-## Status Changed (1)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `Transform-v8` | output_mismatch | ruffle_matched | 93/101 | 94/101 |
-
-## Line Count Changed (3)
+## Line Count Changed (6)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `MovieClip-v6` | output_mismatch | 899/936 | 898/936 | +1 |
-| `MovieClip-v7` | output_mismatch | 932/969 | 931/969 | +1 |
-| `MovieClip-v8` | output_mismatch | 1018/1087 | 1017/1087 | +1 |
+| `MovieClip-v6` | output_mismatch | 898/936 | 899/936 | -1 |
+| `MovieClip-v7` | output_mismatch | 931/969 | 932/969 | -1 |
+| `MovieClip-v8` | output_mismatch | 1017/1087 | 1018/1087 | -1 |
+| `TextField-v6` | output_mismatch | 463/545 | 461/545 | +2 |
+| `TextField-v7` | output_mismatch | 472/570 | 470/570 | +2 |
+| `TextField-v8` | output_mismatch | 474/571 | 472/571 | +2 |
