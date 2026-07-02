@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-02 19:28 UTC
+**Date**: 2026-07-02 20:42 UTC
 
-**Git SHA**: `8d1e3adef5`
+**Git SHA**: `855c638640`
 
-**Run Duration**: 6m 3s
+**Run Duration**: 5m 25s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -33,17 +33,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 1.7s |  |
-| 2 | `edittext_test1` | 47 | 21.4s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 20.8s |  |
-| 4 | `hello` | 4 | 21.5s |  |
-| 5 | `mouse_drag_test` | 12 | 21.6s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 21.2s |  |
+| 1 | `button_test1` | 31 | 1.8s |  |
+| 2 | `edittext_test1` | 47 | 21.0s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 1.4s |  |
+| 4 | `hello` | 4 | 20.3s |  |
+| 5 | `mouse_drag_test` | 12 | 20.2s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 20.5s |  |
 | 7 | `opcode_guard_test2` | 24 | 20.7s |  |
-| 8 | `soft_reference_test1` | 45 | 20.5s |  |
-| 9 | `stackscope` | 11 | 20.5s |  |
-| 10 | `submoviegetvar` | 4 | 20.9s |  |
-| 11 | `swf4opcode` | 117 | 22.4s |  |
+| 8 | `soft_reference_test1` | 45 | 22.2s |  |
+| 9 | `stackscope` | 11 | 20.1s |  |
+| 10 | `submoviegetvar` | 4 | 19.8s |  |
+| 11 | `swf4opcode` | 117 | 21.9s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +51,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 16.8s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 21.0s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.8s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 21.0s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 21.5s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 21.1s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 21.9s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.7s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 22.2s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 2.1s |  |
 
 ## Near-Passing Tests
 
