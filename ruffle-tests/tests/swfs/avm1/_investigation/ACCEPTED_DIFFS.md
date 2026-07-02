@@ -490,6 +490,14 @@ on-stage size. Trace test continues to pass.
 
 ## Category 10: Watch Handler Deep Re-entrancy (SWF7 Recursion Depth)
 
+> **Rename note (2026-07-02):** upstream renamed this family
+> `watch_special_recursion_*` → `watch_recursion_*` (and the sibling
+> `virtual_property_special_recursion_*` → `virtual_property_recursion_*`);
+> `test.swf` is byte-identical, statuses carry over. `ignored_tests.txt` was
+> updated to the new swf7 names. Old-name directories may linger locally
+> because `download_tests.sh` doesn't `--clean`. Names below are the
+> original ones.
+
 New upstream tests (`watch_special_recursion_*`, `known_failure = true`). When a
 watched property is set from *inside* its own `watch` handler, Flash re-fires the
 handler a version-specific number of times before bottoming out: **SWF6 fires it

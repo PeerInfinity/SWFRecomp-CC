@@ -78,7 +78,9 @@ first).
   now 10/10 in graphics, both still pass NO_GRAPHICS, ASAN clean
   (only pre-existing `u16_concat` Dejagnu leaks). (2026-05-30)
 - **`from_gnash/misc-ming.all/place_and_remove_object_insane_test`
-  15/19 in graphics-native vs 19/19 NO_GRAPHICS.** Same diff appears
-  in `--mode=graphics-headless-legacy`, so the bug is in shared code
+  17/22 in graphics-native vs 22/22 NO_GRAPHICS** (was 15/19 vs 19/19;
+  upstream line totals grew, gap persists — re-checked against merged
+  CI of 2026-06-30, SHA `56970ac27`). Same diff appears in
+  `--mode=graphics-headless-legacy`, so the bug is in shared code
   (tag.c or `#ifdef NO_GRAPHICS`-gated tag handling), not swf.c.
-  Defer to a tag.c-focused session. (2026-05-11)
+  Defer to a tag.c-focused session. (2026-05-11, updated 2026-07-02)

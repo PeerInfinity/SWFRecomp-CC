@@ -11,6 +11,39 @@ How the list was found: glob `**/test.swf` on disk minus the `test` names in
 `_results/results.json`, then filter `results.json` for status ∉
 {pass, ruffle_matched} and not in `ignored_tests.txt`.
 
+## Update 2026-07-02 (CI 2026-06-30, SHA `56970ac27`)
+
+Suite is now **704 tests**; filtered **639/661 effective (96.7%)** — 627 pass +
+12 RM; **20 non-ignored filtered failures** after the ignore-list rename below.
+
+Changes vs the 2026-06-19 state of this doc:
+
+- **Fixed since:** `array_unshift` → **PASS**, `array_reverse` → **PASS**
+  (Bucket C, fixed without a doc update at the time);
+  `coerce_to_primitive_resolve` already marked fixed below.
+- **`virtual_property_special_recursion_*` → fixed by `63f7af229`** (type-1
+  virtual getter/setter params padded/ordered): `double_swf6` → **PASS**,
+  `swf6` → **ruffle_matched**.
+- **Upstream renamed both recursion families:**
+  `watch_special_recursion_*` → `watch_recursion_*` and
+  `virtual_property_special_recursion_*` → `virtual_property_recursion_*`
+  (`test.swf` byte-identical; old-name dirs linger locally since
+  `download_tests.sh` doesn't `--clean`). The two ignored swf7 watch variants
+  reappeared as "new" failures under the new names until `ignored_tests.txt`
+  was re-pointed (2026-07-02) — they remain accepted diffs
+  (`ACCEPTED_DIFFS.md` Category 10), not regressions.
+- **New non-ignored failures, untriaged:**
+  - `virtual_property_recursion_double_swf7` (129/523) — the swf7 mutual
+    variant of the fixed swf6 family (`virtual_property_recursion_swf7`
+    single **passes**); likely the 65-deep re-entry analog of the watch swf7
+    accepted diffs — verify before assuming fixable.
+  - `virtual_property_recursion_scope` (6/11) — new scope variant.
+  - `bitmapdata_hittest_threshold` (5/6) — 1 line off.
+  - `amf_strict_array_serialization` (1/7) — joins Bucket A's AMF codec group.
+- **Unchanged:** Bucket A (AMF, FileReference, multi-SWF child frames), Bucket
+  B (`sound_setters` 14/43), `set_property_values/*` (still blocked at 92.9% /
+  swf4 22.3%).
+
 ## Already resolved this session
 
 - **`watch_special_recursion_{swf6,double_swf6}` → ruffle_matched**;
@@ -55,15 +88,15 @@ How the list was found: glob `**/test.swf` on disk minus the `test` names in
 | `set_property_values/swf7` | 92.9% | **BLOCKED** | Same source/blocker, SWF7 gates. See `blocked/SET_PROPERTY_VALUES_PLAN.md`. |
 | `set_property_values/swf4` | 22.3% | Large | Same source; `output.ruffle.txt` **present** so `ruffle_matched` reachable, but a much bigger, *separate* SWF4 gap (likely SWF4 property-number addressing) — not addressed by the swf5-7 quirk fixes. |
 | `coerce_to_primitive_resolve` | **100% ✅** | **FIXED 2026-06-19** | Whole diff was **1 missing `[type Object]`** from `trace(obj3)`. Real mechanism is Ruffle `action_trace`: on `coerce_to_string` Err it prints fallback `[type Object]` **and** propagates. Fixed by wrapping `actionTrace` object-coercion in a local `setjmp` frame (print + re-throw). `complete/COERCE_TO_PRIMITIVE_RESOLVE_PLAN.md`. |
-| `array_unshift` | 79.5% | Medium | Array `unshift` sparse/own-property + length semantics (gnash array-vN territory; see `[[array-shift-densify-enum]]`). No ruffle file. |
-| `array_reverse` | 66.4% | Medium | Array `reverse` sparse/own-property semantics. No ruffle file. |
-| `virtual_property_special_recursion_swf6` | 16.7% | Medium | `addProperty` getter/setter deep re-entry (the accessor analog of the watch fix). Two issues: setter arg order is swapped (`setter: ,b` vs expected `setter: b,`) and the recursion-fallback value/ordering differs. Uses the existing `g_active_accessors` machinery. |
-| `virtual_property_special_recursion_double_swf6` | 27.3% | Medium | Same as above, mutual prop1↔prop2. |
+| ~~`array_unshift`~~ | — | **FIXED** | → PASS (see 2026-07-02 update). Was: sparse/own-property + length semantics. |
+| ~~`array_reverse`~~ | — | **FIXED** | → PASS (see 2026-07-02 update). |
+| ~~`virtual_property_special_recursion_swf6`~~ | — | **FIXED `63f7af229`** | → ruffle_matched (renamed upstream to `virtual_property_recursion_swf6`). Type-1 getter/setter param pad/order fix. |
+| ~~`virtual_property_special_recursion_double_swf6`~~ | — | **FIXED `63f7af229`** | → PASS (renamed to `virtual_property_recursion_double_swf6`). |
 
 ## Recommended next targets
 
 1. ~~`coerce_to_primitive_resolve`~~ — **FIXED 2026-06-19** (100%). Was a real Ruffle behavior after all (in `action_trace`, not `coerce_to_string`); the "no oracle" call was an artifact of a stale `~/CC/ruffle` checkout. `complete/COERCE_TO_PRIMITIVE_RESOLVE_PLAN.md`.
-2. **`virtual_property_special_recursion_swf6/double_swf6`** — adjacent to the just-landed watch fix; the setter-arg-order bug looks like a contained dispatch fix that may also help the `set`/`addProperty` family broadly.
+2. ~~`virtual_property_special_recursion_swf6/double_swf6`~~ — **FIXED `63f7af229`** (type-1 getter/setter param pad; the predicted broad `set`/`addProperty` dispatch fix). Remaining family members: `virtual_property_recursion_double_swf7` + `virtual_property_recursion_scope` (see 2026-07-02 update).
 3. ~~`set_property_values/swf5-7`~~ — **BLOCKED/unpromotable** (float precision on `_x`/`_y`←Inf; no RM file). See `blocked/SET_PROPERTY_VALUES_PLAN.md`. Don't re-investigate.
 
 Bucket A is genuinely blocked on infrastructure (AMF codec, file-dialog input, multi-SWF child frames) — low ROI until a shipped game or a larger test cohort needs those subsystems.

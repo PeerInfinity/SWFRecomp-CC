@@ -2,6 +2,19 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
+Last updated: 2026-07-02 — doc sync against merged CI of 2026-06-30 (SHA
+`56970ac27`); no new fixes this entry. Fresh effective-pass numbers (the Suite
+Summary table below still shows the 2026-05-15 snapshot and understates several
+suites): **avm1 704 tests, filtered 639/661 (96.7%), 20 non-ignored failures**
+(all triaged in `avm1/_investigation/NEW_UPSTREAM_AVM1_TRIAGE.md` §2026-07-02 —
+note upstream RENAMED `watch_special_recursion_*` → `watch_recursion_*` and
+`virtual_property_special_recursion_*` → `virtual_property_recursion_*`, which
+briefly made two long-ignored accepted diffs look like new failures;
+`ignored_tests.txt` re-pointed); **actionscript.all 230/243 (94.7%)**;
+**misc-ming.all 96/111 (86.5%)**; **misc-mtasc.all 9/9**; **misc-swfc.all
+16/20 (80.0%)**; **misc-swfmill.all 20/20 (100%)**; **from_shumway flat
+76/92 (82.6% raw, 100% filtered)**; **from_shumway/avm1 47/47**.
+
 Last updated: 2026-06-19 — **the `avm1` suite has grown to 701 tests** (was 654
 in the snapshots below) as `download_tests.sh` syncs fresh from upstream master.
 The new tests added real failures the per-suite tables below do **not** yet

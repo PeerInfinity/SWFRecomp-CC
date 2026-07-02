@@ -1,5 +1,22 @@
 # Current Ruffle Test Status
 
+Last updated: 2026-07-02 (doc sync against merged CI of 2026-06-30, SHA
+`56970ac27` — no new fixes this entry). Suite is now **704 tests** (upstream
+sync keeps growing it); filtered **639/661 effective (96.7%)** = 627 pass +
+12 ruffle_matched, **20 non-ignored filtered failures**. All 20 are triaged in
+`NEW_UPSTREAM_AVM1_TRIAGE.md` (see its 2026-07-02 update): the bulk are
+infrastructure-blocked (AMF codec ×4, FileReference dialogs ×3, multi-SWF
+child-frame execution ×5), plus blocked `set_property_values/*` ×4,
+`sound_setters` (soft-ref rebinding), and three new untriaged tests
+(`virtual_property_recursion_double_swf7`, `virtual_property_recursion_scope`,
+`bitmapdata_hittest_threshold`). Notable since the 2026-06-19 entry below:
+`array_unshift`, `array_reverse`, `coerce_to_primitive_resolve` → PASS;
+`virtual_property_special_recursion_{swf6,double_swf6}` → RM/PASS
+(`63f7af229`); upstream **renamed** `watch_special_recursion_*` →
+`watch_recursion_*` and `virtual_property_special_recursion_*` →
+`virtual_property_recursion_*` (byte-identical SWFs; `ignored_tests.txt`
+re-pointed to the new swf7 watch names on 2026-07-02).
+
 Last updated: 2026-06-19 (pending CI — **watch deep-recursion SEGFAULTS fixed**.
 Upstream added ~47 new avm1 tests since the last doc snapshot (suite is now 701,
 not 654); among them four `watch_special_recursion_*` `known_failure` tests that
