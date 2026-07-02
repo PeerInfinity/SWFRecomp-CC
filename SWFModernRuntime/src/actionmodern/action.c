@@ -59068,7 +59068,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// independent; conflating them destroyed user variables on rename
 			// (avm1/sound_setters). Name reads reach the clip via dynamic_props
 			// and the as_created child-name scans in GetVariable/GetMember.
-			// See avm1/_investigation/blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
+			// See avm1/_investigation/complete/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
 
 			// Find a free slot or append
 			int _slot = -1;
@@ -67569,7 +67569,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// dynamic_props / the as_created child-name scans; var_map holds
 				// only genuine user variables so a `mc._name = ...` rename can't
 				// destroy a same-named user var (avm1/sound_setters). See
-				// avm1/_investigation/blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
+				// avm1/_investigation/complete/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
 				//
 				// Exception: inside a function/handler invocation, still expose
 				// the instance name as a variable — local when an activation

@@ -1,7 +1,17 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
-Last updated: 2026-07-02b (**F2 follow-up after first CI round.** CI at
+Last updated: 2026-07-02c (**MovieClip.as:812 FIXED** by the instance-name
+vs variable binding de-conflation, `98fb875b6` + `5de7f35b7`, CI green both
+modes: instance names no longer auto-register in var_map, and the root
+dynamic_props read applies lowest-depth-wins to LIVE duplicates
+(`mcNameBindingOverrideEx` allow_live=1 — safe at root because explicit user
+vars hit var_map first, so Transform-v8 stays ruffle_matched). MovieClip-vN
+each −1 more mismatched line (v6 899/936, v7 932/969, v8 1018/1087). See
+avm1/_investigation/complete/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md. The
+"COST: MovieClip.as:812" note in the 2026-07-02b entry below is superseded.)
+
+Previous update: 2026-07-02b (**F2 follow-up after first CI round.** CI at
 `8d1e3adef` (both modes, identical) confirmed the wins but surfaced 3
 regressions, all fixed in the follow-up commit: (1) avm1 `global_swf6_7_8` —
 `mcResolveSoftRef`'s cache fallback required `as_created`, but the
@@ -22,7 +32,7 @@ keeps the hardref5 lines (MovieClip.as:935/937) and cannot hijack live
 bindings. COST: MovieClip.as:812 (`hardref.member == 60`, live duplicate
 pair) regresses back to failing — that line needs instance names to stop
 being auto-registered as variables, i.e.
-blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md. Net per MovieClip-vN test:
+complete/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md. Net per MovieClip-vN test:
 −13 mismatched lines vs pre-F2 baseline (was −14 in the first round). Also
 note: Transform.as:175-177 fail LOCALLY at any commit including pre-F2 parent
 (local-vs-CI environment divergence; CI passes them) — don't chase locally.)

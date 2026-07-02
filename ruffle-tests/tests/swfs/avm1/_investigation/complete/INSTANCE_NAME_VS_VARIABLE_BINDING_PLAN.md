@@ -2,30 +2,83 @@
 
 <!-- PLAN_META
 id: INSTANCE_NAME_VS_VARIABLE_BINDING
-status: blocked
+status: complete
 phases:
   - id: 1
     name: "Stop createEmptyMovieClip/attachMovie/duplicateMovieClip from auto-registering instance names in var_map"
-    status: planned
+    status: complete
   - id: 2
     name: "Stop the _name setter from clobbering var_map; delete (not undef) the moved dynamic_props key"
-    status: in_progress
-    note: "dprops delete-not-undef + var_map sentinel-not-undef landed 2026-07-02 with the soft-ref work (8d1e3adef); the remaining piece is removing the var_map clobber entirely, which depends on Phase 1"
+    status: complete
   - id: 3
     name: "Full-suite CI validation across avm1 + gnash + shumway"
-    status: planned
+    status: complete
 dependencies: []
-blockers:
-  - blocker: 10
-    reason: "Architectural change to instance-name vs variable binding; cannot be validated locally (multi-suite, full-suite). Must run behind full CI."
+blockers: []
 -->
 
 # Instance-Name vs `var x=` Variable Binding Plan
 
-## Status: BLOCKED — needs full-suite CI to land safely
+## Status: COMPLETE — landed 2026-07-02 (`98fb875b6` + follow-up `5de7f35b7`), CI green both modes
 
-Resolves **Blocker 10** (`BLOCKER_SUMMARY.md`). Diagnosed 2026-06-19 while
+Resolved **Blocker 10** (`BLOCKER_SUMMARY.md`). Diagnosed 2026-06-19 while
 working `avm1/sound_setters`.
+
+## Landed 2026-07-02 — implementation summary and results
+
+Approach 1 as planned, in two commits:
+
+**`98fb875b6` (core de-conflation):**
+- var_map auto-registration removed from `createEmptyMovieClip` (function +
+  method forms), function-form `attachMovie`, `ng_attachMovie` (root branch),
+  and `ng_register_clone_under_parent` (root branch). Root instance bindings
+  now go to `root_movieclip.dynamic_props` via a new guarded helper
+  (`ng_register_instance_on_parent_dprops`, tag_stubs.c) — don't overwrite an
+  existing own property unless it's a dead/renamed-away MC.
+- `_name` setter: var_map move/clobber block removed entirely (dprops
+  delete-not-undef move stays). A user `var mc = ...` survives renames.
+- `resolveSoundOwner`: `resolveObjectPathToMC` fallback (the plan's Sound
+  owner re-resolution) — resolves `_level0.mc` through the surviving user
+  variable, mirroring Ruffle's `resolve_target_path` object.get fallback.
+- `mcNameBindingOverrideEx(..., allow_live)`: at the ROOT dprops read in
+  `actionGetVariable`, live same-named duplicates rebind lowest-depth-first
+  (safe there: explicit root vars hit var_map first). The `avm1_removed` gate
+  stays at the var_map / non-root dprops sites (Transform-v8 protection).
+- `mcResolveSoftRef`: lowest-depth-wins applied to the rebound clip
+  (`string_paths_reference_launder` stays a full PASS).
+- `clone_depth_evict`: no longer poisons var_map with typed UNDEFINED
+  (destroyed user vars + shadowed re-attached names — `avm1/attach_movie`);
+  deletes the root dprops instance binding instead.
+
+**`5de7f35b7` (round-2 fixes for the 3 first-CI regressions):**
+- New `mcDropParentInstanceBinding` helper called from
+  `actionInvalidateCachedMovieClip` / `actionInvalidateMCAtASDepth` /
+  `actionInvalidateCachedMovieClipDirect` / `removeTextField` — every
+  invalidation path must clear the parent-dprops binding now that instance
+  names don't live in var_map (gnash misc-ming `static_vs_dynamic2`).
+- Method-form `createEmptyMovieClip` inside a function/handler restores the
+  old variable side effect (local scope first, else global) — Flash resolves
+  the bare name via the handler's closure scope, which our handler execution
+  doesn't model (gnash misc-ming `loading/loadMovieTest`). Timeline-level
+  creates stay clean.
+- `createTextField` (both forms) no longer registers var_map;
+  `removeTextField` drops the parent-dprops binding and marks the wrapper
+  dead (gnash `TextField.as:435` + `:814`; bonus `:812/:817/:822`).
+
+**CI (both modes agree exactly; runs 28625453052/28625455601 at `5de7f35b7`):**
+- avm1: 630 → 631 passing — `sound_setters` full PASS (43/43). 0 regressions.
+- gnash `MovieClip-v6/v7/v8`: −1 mismatched line each (`MovieClip.as:812`,
+  `hardref.member == 60`, now passes — part of the ruffle_matched promotion
+  gate in `MOVIECLIP_VN_PLAN.md`).
+- gnash `TextField-v6/v7/v8`: −3 mismatched lines each net vs pre-work
+  baseline.
+- `soft_reference_test1` full PASS, `case-v6` PASS, `Transform-v8`
+  ruffle_matched (byte-identical diff) — all sentinels held.
+- misc-ming `static_vs_dynamic2` 18/18 and `loading/loadMovieTest`
+  ruffle_matched 71/80 — both back at their pre-work baseline after round 2.
+- shumway (flat + avm1) and all other gnash sub-suites: no changes.
+
+The rest of this document is the original plan, kept for reference.
 
 ## Update 2026-07-02 — soft-reference rebinding landed; this plan is now UNBLOCKED-ADJACENT
 
