@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-06-30 02:11 UTC
+**Date**: 2026-07-02 19:32 UTC
 
-**Git SHA**: `3d2ea1b5cf`
+**Git SHA**: `8d1e3adef5`
 
-**Run Duration**: 3m 20s
+**Run Duration**: 3m 22s
 
 ## Summary
 
@@ -26,51 +26,51 @@
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `array` | 7 | 1.9s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 1.7s |  |
-| 3 | `bitmapdata/loadBitmap` | 3 | 1.7s |  |
-| 4 | `callee` | 2 | 1.8s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 1.8s |  |
+| 3 | `bitmapdata/loadBitmap` | 3 | 1.9s |  |
+| 4 | `callee` | 2 | 2.0s |  |
 | 5 | `depth` | 6 | 1.9s |  |
-| 6 | `doactionorder/doactionorder` | 7 | 2.3s |  |
-| 7 | `doactionorder/symbolclass` | 4 | 2.0s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 21.3s |  |
+| 6 | `doactionorder/doactionorder` | 7 | 2.4s |  |
+| 7 | `doactionorder/symbolclass` | 4 | 1.5s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 16.4s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 2.0s |  |
-| 10 | `duplicateMovieClip/name-coercion` | 3 | 1.8s |  |
+| 10 | `duplicateMovieClip/name-coercion` | 3 | 1.9s |  |
 | 11 | `duplicateMovieClip/samedepth` | 6 | 1.9s |  |
-| 12 | `externalinterface` | 4 | 1.8s |  |
-| 13 | `filters` | 149 | 2.4s |  |
-| 14 | `haxe/flocons1` | 2 | 2.0s |  |
+| 12 | `externalinterface` | 4 | 1.7s |  |
+| 13 | `filters` | 149 | 2.2s |  |
+| 14 | `haxe/flocons1` | 2 | 1.8s |  |
 | 15 | `haxe/flocons2` | 3 | 1.9s |  |
-| 16 | `label` | 4 | 20.7s |  |
-| 17 | `levels` | 9 | 1.9s |  |
-| 18 | `loadevent` | 9 | 1.8s |  |
-| 19 | `loadvariables/loadvariables` | 7 | 1.5s |  |
-| 20 | `loadvariables/loadvars` | 2 | 2.0s |  |
-| 21 | `lookup` | 3 | 2.2s |  |
-| 22 | `mouse-transparency` | 1 | 1.7s |  |
-| 23 | `moviecliploader` | 7 | 16.8s |  |
+| 16 | `label` | 4 | 22.4s |  |
+| 17 | `levels` | 9 | 2.2s |  |
+| 18 | `loadevent` | 9 | 1.9s |  |
+| 19 | `loadvariables/loadvariables` | 7 | 1.6s |  |
+| 20 | `loadvariables/loadvars` | 2 | 1.8s |  |
+| 21 | `lookup` | 3 | 2.0s |  |
+| 22 | `mouse-transparency` | 1 | 2.0s |  |
+| 23 | `moviecliploader` | 7 | 20.4s |  |
 | 24 | `nativeinheritance` | 6 | 1.9s |  |
 | 25 | `nested-button` | 1 | 1.9s |  |
-| 26 | `operations` | 13 | 1.7s |  |
-| 27 | `property-paths/property-paths-6` | 6 | 1.5s |  |
-| 28 | `property-paths/property-paths-7` | 7 | 1.3s |  |
-| 29 | `propertycase/propertycase` | 7 | 1.3s |  |
-| 30 | `propertycase/propertycase-preserving-6` | 2 | 1.5s |  |
-| 31 | `propertycase/propertycase-preserving-7` | 5 | 0.9s |  |
-| 32 | `rollover` | 4 | 20.4s |  |
-| 33 | `scope` | 14 | 1.9s |  |
-| 34 | `setinterval` | 20 | 1.6s |  |
-| 35 | `settimeout` | 17 | 1.9s |  |
-| 36 | `super` | 11 | 1.9s |  |
-| 37 | `target` | 18 | 2.0s |  |
-| 38 | `text-bind` | 0 | 22.9s |  |
-| 39 | `textfield/textfield-html` | 4 | 2.3s |  |
+| 26 | `operations` | 13 | 1.8s |  |
+| 27 | `property-paths/property-paths-6` | 6 | 1.6s |  |
+| 28 | `property-paths/property-paths-7` | 7 | 1.5s |  |
+| 29 | `propertycase/propertycase` | 7 | 1.5s |  |
+| 30 | `propertycase/propertycase-preserving-6` | 2 | 0.8s |  |
+| 31 | `propertycase/propertycase-preserving-7` | 5 | 1.0s |  |
+| 32 | `rollover` | 4 | 21.3s |  |
+| 33 | `scope` | 14 | 2.0s |  |
+| 34 | `setinterval` | 20 | 1.9s |  |
+| 35 | `settimeout` | 17 | 1.6s |  |
+| 36 | `super` | 11 | 1.6s |  |
+| 37 | `target` | 18 | 1.9s |  |
+| 38 | `text-bind` | 0 | 23.1s |  |
+| 39 | `textfield/textfield-html` | 4 | 2.2s |  |
 | 40 | `textfield/textfield-text-setters` | 8 | 2.0s |  |
-| 41 | `undefined/undefined-swf6` | 39 | 1.7s |  |
-| 42 | `undefined/undefined-swf7` | 39 | 1.7s |  |
-| 43 | `watch` | 2 | 1.8s |  |
-| 44 | `xml/xmlbuild` | 1 | 1.9s |  |
-| 45 | `xml/xmlload` | 4 | 1.0s |  |
-| 46 | `xml/xmlstring` | 9 | 1.8s |  |
+| 41 | `undefined/undefined-swf6` | 39 | 1.9s |  |
+| 42 | `undefined/undefined-swf7` | 39 | 1.5s |  |
+| 43 | `watch` | 2 | 1.6s |  |
+| 44 | `xml/xmlbuild` | 1 | 2.0s |  |
+| 45 | `xml/xmlload` | 4 | 1.7s |  |
+| 46 | `xml/xmlstring` | 9 | 1.7s |  |
 
 ## Ruffle-Matched Tests
 
@@ -78,7 +78,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `hitarea` | 2 | 2 | 20.8s |  |
+| 1 | `hitarea` | 2 | 2 | 22.1s |  |
 
 ## Near-Passing Tests
 
