@@ -4,7 +4,20 @@
 
 **Created:** 2026-05-14
 
-**Status:** Planned; no implementation yet.
+**Status:** RESOLVED (noted 2026-07-02) — the fix landed, though not verbatim
+from this plan. The refuse-place gate in `tagPlaceObject2` /
+`tagPlaceObject2Ratio` (`SWFModernRuntime/src/libswf/tag.c` ~7500) is now
+layered with `!ng_depth_has_pending_finalize(depth) && !g_loopback_replay &&
+!catch_up_backward` (commits `879a8566b` "treat timeline Place during a loop
+wrap as a rewind-modify" and `2d64da674` "gate refuse-place on
+catch_up_backward"). Merged CI of 2026-06-30 (SHA `56970ac27`) confirms every
+regression in the "Affected tests" table below is recovered: `loop_test`
+21/21 PASS, `loop_test2` 15/15 PASS, `loop_test3` 16/16 PASS, `loop_test10`
+ruffle_matched (5/28), while `shape_test`'s occupied-depth win holds
+(`place_and_remove_object_insane_test` 22/22 NO_GRAPHICS).
+`RegisterClassTest4` sits at 3/42 but was separately moved to the gnash
+ACCEPTED_DIFFS (Ruffle itself diverges there). Kept for the pattern analysis
+below; no remaining work.
 
 Phase 3 (commit `12fa91a3`, "refuse Place on occupied depth") fixed
 `shape_test`'s missing-`sh2` driver but broke several tests that rely on
