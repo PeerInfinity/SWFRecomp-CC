@@ -6,26 +6,26 @@
 
 **Run Duration**: 64m 7s
 
-**Filtered**: 43 tests ignored out of 704 available
+**Filtered**: 45 tests ignored out of 704 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 661 |
-| Passing | **627** (94.9%) |
+| Total tests | 659 |
+| Passing | **627** (95.1%) |
 | Ruffle-matched | 12 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **639** (96.7%) |
-| Failing | 22 |
-| Total expected lines | 111695 |
-| Matching lines | 105044 (94.0%) |
-| Mismatched lines | 6651 |
+| Effective pass | **639** (97.0%) |
+| Failing | 20 |
+| Total expected lines | 107535 |
+| Matching lines | 103599 (96.3%) |
+| Mismatched lines | 3936 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 22 | 100.0% |
+| Output Mismatch | 20 | 100.0% |
 
 ## Passing Tests
 
@@ -684,17 +684,16 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**7 tests** within reach
+**6 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `watch_recursion_swf7` | 98.9% | 1036 | 1048 | 12 |  |
-| 2 | `set_property_values/swf5` | 92.9% | 1620 | 1743 | 123 |  |
-| 3 | `set_property_values/swf6` | 92.9% | 1620 | 1743 | 123 |  |
-| 4 | `set_property_values/swf7` | 92.9% | 1620 | 1743 | 123 |  |
-| 5 | `bitmapdata_hittest_threshold` | 83.3% | 5 | 6 | 1 |  |
-| 6 | `shared_stack` | 68.8% | 11 | 16 | 5 |  |
-| 7 | `file_reference_list_browse_invalid_filters` | 50.0% | 18 | 36 | 18 |  |
+| 1 | `set_property_values/swf5` | 92.9% | 1620 | 1743 | 123 |  |
+| 2 | `set_property_values/swf6` | 92.9% | 1620 | 1743 | 123 |  |
+| 3 | `set_property_values/swf7` | 92.9% | 1620 | 1743 | 123 |  |
+| 4 | `bitmapdata_hittest_threshold` | 83.3% | 5 | 6 | 1 |  |
+| 5 | `shared_stack` | 68.8% | 11 | 16 | 5 |  |
+| 6 | `file_reference_list_browse_invalid_filters` | 50.0% | 18 | 36 | 18 |  |
 
 ## Segfaults
 
@@ -710,32 +709,30 @@ No timeouts.
 
 ## All Output Mismatches
 
-**22 tests** with output mismatch, sorted by match rate (best first)
+**20 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `watch_recursion_swf7` | 98.9% | 1036/1048 | 1048 | 1042 |  |
-| 2 | `set_property_values/swf5` | 92.9% | 1620/1743 | 1743 | 1743 |  |
-| 3 | `set_property_values/swf6` | 92.9% | 1620/1743 | 1743 | 1743 |  |
-| 4 | `set_property_values/swf7` | 92.9% | 1620/1743 | 1743 | 1743 |  |
-| 5 | `bitmapdata_hittest_threshold` | 83.3% | 5/6 | 6 | 6 |  |
-| 6 | `shared_stack` | 68.8% | 11/16 | 12 | 16 |  |
-| 7 | `file_reference_list_browse_invalid_filters` | 50.0% | 18/36 | 36 | 36 |  |
-| 8 | `virtual_property_recursion_scope` | 42.9% | 6/14 | 14 | 11 |  |
-| 9 | `sound_setters` | 32.6% | 14/43 | 39 | 43 |  |
-| 10 | `amf_array_serialization` | 30.0% | 3/10 | 5 | 10 |  |
-| 11 | `file_reference_list_browse_cancel` | 25.0% | 1/4 | 2 | 4 |  |
-| 12 | `load_cancel_via_removemovieclip` | 25.0% | 2/8 | 8 | 4 |  |
-| 13 | `virtual_property_recursion_double_swf7` | 24.7% | 129/523 | 263 | 523 |  |
-| 14 | `set_property_values/swf4` | 20.1% | 350/1743 | 1743 | 1571 |  |
-| 15 | `amf_serialize_typed_objects` | 16.7% | 1/6 | 1 | 6 |  |
-| 16 | `netconnection_serialize_arrays` | 16.7% | 1/6 | 1 | 6 |  |
-| 17 | `amf_strict_array_serialization` | 14.3% | 1/7 | 2 | 7 |  |
-| 18 | `file_reference_list_browse_select` | 14.3% | 1/7 | 2 | 7 |  |
-| 19 | `watch_recursion_double_swf7` | 13.1% | 409/3118 | 1596 | 3118 |  |
-| 20 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
-| 21 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
-| 22 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
+| 1 | `set_property_values/swf5` | 92.9% | 1620/1743 | 1743 | 1743 |  |
+| 2 | `set_property_values/swf6` | 92.9% | 1620/1743 | 1743 | 1743 |  |
+| 3 | `set_property_values/swf7` | 92.9% | 1620/1743 | 1743 | 1743 |  |
+| 4 | `bitmapdata_hittest_threshold` | 83.3% | 5/6 | 6 | 6 |  |
+| 5 | `shared_stack` | 68.8% | 11/16 | 12 | 16 |  |
+| 6 | `file_reference_list_browse_invalid_filters` | 50.0% | 18/36 | 36 | 36 |  |
+| 7 | `virtual_property_recursion_scope` | 42.9% | 6/14 | 14 | 11 |  |
+| 8 | `sound_setters` | 32.6% | 14/43 | 39 | 43 |  |
+| 9 | `amf_array_serialization` | 30.0% | 3/10 | 5 | 10 |  |
+| 10 | `file_reference_list_browse_cancel` | 25.0% | 1/4 | 2 | 4 |  |
+| 11 | `load_cancel_via_removemovieclip` | 25.0% | 2/8 | 8 | 4 |  |
+| 12 | `virtual_property_recursion_double_swf7` | 24.7% | 129/523 | 263 | 523 |  |
+| 13 | `set_property_values/swf4` | 20.1% | 350/1743 | 1743 | 1571 |  |
+| 14 | `amf_serialize_typed_objects` | 16.7% | 1/6 | 1 | 6 |  |
+| 15 | `netconnection_serialize_arrays` | 16.7% | 1/6 | 1 | 6 |  |
+| 16 | `amf_strict_array_serialization` | 14.3% | 1/7 | 2 | 7 |  |
+| 17 | `file_reference_list_browse_select` | 14.3% | 1/7 | 2 | 7 |  |
+| 18 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
+| 19 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
+| 20 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
 
 ## Investigation Documents
 
@@ -848,4 +845,4 @@ No timeouts.
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 5 | 5 | 0 |
 | 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 28 | 28 | 0 |
-| | *(tests not in any document)* | 201 | 171 | 30 |
+| | *(tests not in any document)* | 199 | 171 | 28 |
