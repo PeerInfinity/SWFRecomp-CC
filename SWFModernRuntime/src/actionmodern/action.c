@@ -1424,8 +1424,9 @@ static void initSoundTransformDefaults(SWFAppContext* app_context, ASObject* obj
 	setPropertyWithFlags(app_context, obj, "__rr__", 6, &v, PROPERTY_FLAGS_DONTENUM);
 }
 
-// Forward decl — defined later in the file (around line 19614).
+// Forward decls — defined later in the file (around line 19614).
 static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element, int handle_this);
+static MovieClip* resolveObjectPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element);
 
 // Helper: resolve the owner MovieClip for a Sound instance by looking up
 // the stored target path string. Returns NULL if (a) the Sound is set to
@@ -1454,6 +1455,16 @@ static MovieClip* resolveSoundOwner(SWFAppContext* app_context, ASObject* sound_
 	MovieClip* start = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 
 	MovieClip* mc = resolveFlashPathToMC(app_context, path_buf, path_len, start, 1, 1);
+	if (mc == NULL) {
+		// Display-list child lookup failed — fall back to per-segment object/
+		// variable property resolution (Ruffle's resolve_target_path falls back
+		// to object.get(), which at root reaches timeline variables). This is
+		// what lets a Sound owner path like "_level0.mc" keep resolving through
+		// a surviving user `var mc` while the clip is renamed away — but NOT
+		// through a bare instance name with no same-named variable
+		// (avm1/sound_setters: mutations persist for mc, are lost for mc2).
+		mc = resolveObjectPathToMC(app_context, path_buf, path_len, start, 1);
+	}
 	if (mc == NULL) return NULL;
 	// _root is a valid owner (e.g. `new Sound(_root)` from sound_id3 test).
 	// Reject only fully-finalized removals (depth == INT_MIN). MCs in the
@@ -20116,12 +20127,27 @@ static MovieClip* mcLowestDepthSameName(MovieClip* mc)
 	return best;
 }
 
-// If `v` holds a live MovieClip instance binding for exactly the name being
+// If `v` holds a MovieClip instance binding for exactly the name being
 // looked up, apply the lowest-depth-wins rule across same-named siblings.
 // Stored bindings (var_map / parent dynamic_props) hold the pointer that was
 // registered at creation, which with duplicates present may be a higher-depth
 // sibling. Returns the replacement clip, or NULL when the binding stands.
-static MovieClip* mcNameBindingOverride(ActionVar* v, const char* var_name, u32 var_name_len)
+//
+// allow_live: whether a LIVE bound clip may be rebound too. At the var_map
+// and non-root dynamic_props read sites this must be 0 — those stores hold
+// explicit user assignments (`mc = createEmptyMovieClip("mc", d)` after a
+// same-named sibling exists) which must stay authoritative: gnash
+// Transform.as:205-207 reads the NEWLY assigned clip's identity matrix, not
+// the lower-depth sibling. With allow_live == 0, only clips in the
+// removed-deferred zone (removeMovieClip deferred by onUnload) rebind —
+// gnash MovieClip.as:935/937, two unloaded-deferred "hardref5" clips, lowest
+// shifted depth wins. At the ROOT dynamic_props read site allow_live == 1 is
+// safe: instance names are no longer auto-registered in var_map, so any
+// explicit root user variable is found by the var_map lookup BEFORE the
+// dprops fallback runs — a root dprops MC entry reached there is an
+// instance-name binding, and Flash resolves live same-named duplicates
+// lowest-depth-first (gnash MovieClip.as:812, hardref.member == 60).
+static MovieClip* mcNameBindingOverrideEx(ActionVar* v, const char* var_name, u32 var_name_len, int allow_live)
 {
 	if (!g_mc_dup_names_seen) return NULL;
 	if (v == NULL || v->type != ACTION_STACK_VALUE_MOVIECLIP || v->data.numeric_value == 0) return NULL;
@@ -20134,23 +20160,14 @@ static MovieClip* mcNameBindingOverride(ActionVar* v, const char* var_name, u32 
 	// Not an instance binding (a user var that happens to hold an MC) — the
 	// stored value is authoritative.
 	if (!swf_name_match(mc->name, nbuf)) return NULL;
-	// Only rebind when the bound clip is in the removed-deferred zone
-	// (removeMovieClip deferred by onUnload): a LIVE bound clip may be an
-	// explicit user assignment (`mc = createEmptyMovieClip("mc", d)` after a
-	// same-named sibling exists) which must stay authoritative — gnash
-	// Transform.as:205-207 reads the NEWLY assigned clip's identity matrix,
-	// not the lower-depth sibling. We can't distinguish auto-registration
-	// from explicit assignment (SetVariable at root mirrors into root
-	// dynamic_props, so both stores always agree); the removed-zone gate
-	// covers the observable Flash divergence (gnash MovieClip.as:935/937 —
-	// two unloaded-deferred "hardref5" clips, lowest shifted depth wins)
-	// without hijacking live bindings. The live-duplicate case
-	// (MovieClip.as:812, hardref.member == 60) remains unfixable until
-	// instance names stop being auto-registered as variables — see
-	// blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
-	if (!mc->avm1_removed) return NULL;
+	if (!allow_live && !mc->avm1_removed) return NULL;
 	MovieClip* best = mcLowestDepthSameName(mc);
 	return (best != mc) ? best : NULL;
+}
+
+static MovieClip* mcNameBindingOverride(ActionVar* v, const char* var_name, u32 var_name_len)
+{
+	return mcNameBindingOverrideEx(v, var_name, var_name_len, 0);
 }
 
 // Resolve a (possibly destroyed) MovieClip pointer the way Flash resolves a
@@ -20169,7 +20186,19 @@ static MovieClip* mcResolveSoftRef(SWFAppContext* app_context, MovieClip* mc)
 	extern MovieClip root_movieclip;
 	MovieClip* live = resolveSlashPathToMC(app_context, tgt + 1, (u32)strlen(tgt + 1), &root_movieclip);
 	if (live != NULL && live != mc && live != &root_movieclip && live->depth != INT_MIN)
+	{
+		// Rebinding resolves by name, so with same-named live siblings the
+		// LOWEST depth wins — the stored parent-dprops binding the path
+		// resolver returns may be a higher-depth sibling
+		// (avm1/string_paths_reference_launder: the re-laundered reference
+		// must follow `clip` to the newer depth-0 clip, matching Flash's 50).
+		if (g_mc_dup_names_seen)
+		{
+			MovieClip* best = mcLowestDepthSameName(live);
+			if (best != NULL) live = best;
+		}
 		return live;
+	}
 	// Dynamic clips may have no display-list entry; resolve root-level
 	// single-segment targets against the clip cache by CURRENT name, lowest
 	// depth first. Deliberately NOT filtered on as_created: this path only
@@ -40914,6 +40943,20 @@ void actionGetVariable(SWFAppContext* app_context)
 					pushVar(app_context, &result);
 					return;
 				}
+				// Same-named siblings: lowest depth wins, LIVE duplicates
+				// included (gnash MovieClip.as:806-812). Safe with allow_live
+				// only at root: an explicit root user variable was already
+				// found by the var_map lookup above, so an MC entry reached
+				// here is an instance-name binding.
+				if (ctx_mc == &root_movieclip)
+				{
+					MovieClip* _dup_mc = mcNameBindingOverrideEx(&own_prop->value, var_name, var_name_len, 1);
+					if (_dup_mc != NULL)
+					{
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_dup_mc);
+						return;
+					}
+				}
 					pushVar(app_context, &own_prop->value);
 				return;
 			}
@@ -48310,50 +48353,15 @@ void actionSetMember(SWFAppContext* app_context)
 									deleteProperty(app_context, dprops, old_name, old_len);
 								}
 							}
-							// Update var_map (root MCs only — root timeline vars live here)
-							if (mc->parent == &root_movieclip)
-							{
-								extern hashmap* var_map;
-								if (var_map != NULL)
-								{
-									ActionVar* old_gvar = NULL;
-									char old_lookup[256];
-									char new_lookup[256];
-									const char* old_key = old_name;
-									const char* new_key = new_name;
-									if (g_swf_version <= 6 && old_len < sizeof(old_lookup) && new_len < sizeof(new_lookup))
-									{
-										for (u32 _fi = 0; _fi < old_len; _fi++) {
-											char _fc = old_name[_fi];
-											old_lookup[_fi] = (_fc >= 'A' && _fc <= 'Z') ? (_fc + 32) : _fc;
-										}
-										old_lookup[old_len] = '\0';
-										old_key = old_lookup;
-										for (u32 _fi = 0; _fi < new_len; _fi++) {
-											char _fc = new_name[_fi];
-											new_lookup[_fi] = (_fc >= 'A' && _fc <= 'Z') ? (_fc + 32) : _fc;
-										}
-										new_lookup[new_len] = '\0';
-										new_key = new_lookup;
-									}
-									if (hashmap_get(var_map, old_key, old_len, (uintptr_t*)&old_gvar) &&
-									    old_gvar != NULL &&
-									    old_gvar->type == ACTION_STACK_VALUE_MOVIECLIP &&
-									    (MovieClip*)(uintptr_t)old_gvar->data.numeric_value == mc)
-									{
-										setGlobalVariableByName(new_key, &mc_var);
-										// Clear with the not-found sentinel (type 0/size 0/
-										// heap NULL) rather than a typed undefined: a typed
-										// undefined entry is treated as a PRESENT variable and
-										// shadows child-name resolution (`_level0.mc1` after a
-										// rename round-trip while a same-named sibling stays
-										// alive — soft_reference_test1 sc:164). Matches what
-										// removeMovieClip's immediate path writes.
-										ActionVar _rn_sentinel = {0};
-										setGlobalVariableByName(old_key, &_rn_sentinel);
-									}
-								}
-							}
+							// var_map is deliberately NOT touched: instance names
+							// are no longer auto-registered there (see the
+							// createEmptyMovieClip registration note), so a
+							// var_map entry holding this MC is a genuine user
+							// variable (`var mc = createEmptyMovieClip(...)`)
+							// which in Flash SURVIVES the rename untouched —
+							// that asymmetry is exactly avm1/sound_setters'
+							// mc (var == instance name, sets persist) vs mc2
+							// (var name differs, rename window sets are lost).
 							// A rename can create a same-name sibling pair (`sr60._name =
 							// "hardref4"` while hardref4 is alive) — enable the
 							// lowest-depth-wins rescan path (gnash MovieClip.as:806-812).
@@ -59017,22 +59025,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (!_cemc_has_existing) {
 				setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, _cemc_inst_len, &mc_var);
 			}
-			// Root-level global var_map shadow only when no existing variable
-			if (mc == &root_movieclip) {
-				extern hashmap* var_map;
-				ActionVar* _cemc_gvar = NULL;
-				int _cemc_has_gvar = 0;
-				if (var_map != NULL && hashmap_get(var_map, inst_name, _cemc_inst_len, (uintptr_t*)&_cemc_gvar)) {
-					_cemc_has_gvar = (_cemc_gvar != NULL &&
-						!(_cemc_gvar->type == ACTION_STACK_VALUE_STRING &&
-						  _cemc_gvar->str_size == 0 &&
-						  _cemc_gvar->data.string_data.heap_ptr == NULL) &&
-						_cemc_gvar->type != ACTION_STACK_VALUE_UNDEFINED);
-				}
-				if (!_cemc_has_gvar) {
-					setVariableByName(inst_name, &mc_var);
-				}
-			}
+			// NOTE: the instance name is deliberately NOT registered in the
+			// global var_map. In Flash the display-list child binding (moves on
+			// `_name` rename) and a user `var mc = ...` timeline variable are
+			// independent; conflating them destroyed user variables on rename
+			// (avm1/sound_setters). Name reads reach the clip via dynamic_props
+			// and the as_created child-name scans in GetVariable/GetMember.
+			// See avm1/_investigation/blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
 
 			// Find a free slot or append
 			int _slot = -1;
@@ -59178,7 +59177,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					mc_var.data.numeric_value = (u64) attached;
 					setProperty(app_context, (ASObject*) mc->dynamic_props,
 						_am_buf2, (u32)strlen(_am_buf2), &mc_var);
-					setVariableByName(_am_buf2, &mc_var);
+					// No var_map registration — instance names are display-list
+					// child bindings, not variables (see createEmptyMovieClip note).
 					// Fire registered class constructor synchronously during attachMovie
 					// (Flash fires it before returning to caller script)
 					// Button symbols skip constructor (Flash doesn't fire registerClass for buttons)
@@ -67524,46 +67524,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (!_mcemc_has_existing) {
 					setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, _mcemc_inst_len, &mc_var);
 				}
-				// Also set on global scope for GetVariable access. Skip only at root
-				// when the global var_map already holds a LIVE MC under a
-				// case-insensitively-matching key (case-v6 protection); for
-				// non-root receivers and dead-MC entries, always rebind so
-				// repeated `this.createEmptyMovieClip(name, depth)` still
-				// updates the global slot.
-				if (mc == &root_movieclip) {
-					extern hashmap* var_map;
-					ActionVar* _mcemc_gvar = NULL;
-					int _mcemc_has_gvar = 0;
-					char _mcemc_folded[512];
-					const char* _mcemc_lookup_key = inst_name;
-					if (g_swf_version <= 6 && _mcemc_inst_len < sizeof(_mcemc_folded)) {
-						for (u32 _fi = 0; _fi < _mcemc_inst_len; _fi++) {
-							char _fc = inst_name[_fi];
-							_mcemc_folded[_fi] = (_fc >= 'A' && _fc <= 'Z') ? (_fc + 32) : _fc;
-						}
-						_mcemc_folded[_mcemc_inst_len] = '\0';
-						_mcemc_lookup_key = _mcemc_folded;
-					}
-					if (var_map != NULL && hashmap_get(var_map, _mcemc_lookup_key, _mcemc_inst_len, (uintptr_t*)&_mcemc_gvar)) {
-						if (_mcemc_gvar != NULL && _mcemc_gvar->type == ACTION_STACK_VALUE_MOVIECLIP) {
-							MovieClip* _mcemc_gmc = (MovieClip*)(uintptr_t)_mcemc_gvar->data.numeric_value;
-							// Same authoritative check as dynamic_props: only treat
-							// as collision when the MC's name still matches the
-							// hashmap key (case-insensitively in SWF<=6 via
-							// swf_name_match). Renamed MCs (`mc._name = "other"`)
-							// leave a stale var_map entry that must not block
-							// rebinds.
-							if (_mcemc_gmc != NULL && _mcemc_gmc->depth != INT_MIN &&
-							    swf_name_match(_mcemc_gmc->name, _mcemc_lookup_key))
-								_mcemc_has_gvar = 1;
-						}
-					}
-					if (!_mcemc_has_gvar) {
-						setVariableByName(inst_name, &mc_var);
-					}
-				} else {
-					setVariableByName(inst_name, &mc_var);
-				}
+				// NOTE: the instance name is deliberately NOT registered in the
+				// global var_map (nor as a local variable for non-root
+				// receivers). The display-list child binding lives in
+				// dynamic_props / the as_created child-name scans; var_map holds
+				// only genuine user variables so a `mc._name = ...` rename can't
+				// destroy a same-named user var (avm1/sound_setters). See
+				// avm1/_investigation/blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
 
 				// Find free slot or append in child_mc_cache
 				{

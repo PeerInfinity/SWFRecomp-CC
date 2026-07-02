@@ -63,7 +63,18 @@ typedef struct { int swf_depth; char name[64]; } CloneDepthEntry;
 static CloneDepthEntry g_clone_depth_table[MAX_CLONE_DEPTH_ENTRIES];
 static size_t g_clone_depth_count = 0;
 
-// Evict any clone registered at swf_depth: clear its global variable to undefined.
+extern MovieClip root_movieclip;
+
+// Evict any clone registered at swf_depth: kill the old MC and remove its
+// instance-name binding from root's dynamic_props so GetVariable(old_name)
+// falls through to "not found" (undefined) after the replacement. The global
+// var_map is deliberately NOT touched: with instance names no longer
+// auto-registered there, any var_map entry holding the old clone is a genuine
+// user variable, which in Flash becomes a dangling soft reference (re-resolved
+// by original_target on use) — not a destroyed variable. Previously this wrote
+// a typed UNDEFINED into var_map, which both destroyed user vars and shadowed
+// the fresh clone's name resolution (avm1/attach_movie re-attach at the same
+// depth read `clip` as undefined).
 // `keep` is the freshly-created MC about to be re-registered at this depth; it
 // must NOT be matched/nuked by the name walk. After game-over → restart in
 // SWFs that re-clone the same names at the same SWF depths (e.g. Snake's
@@ -72,7 +83,7 @@ static size_t g_clone_depth_count = 0;
 // stamp depth=INT_MIN on it, hiding the clone forever — even though the OLD
 // MC of the same name was long gone (NULL'd in child_mc_cache by an earlier
 // actionRemoveSprite or alive but no longer needing eviction).
-static void clone_depth_evict(int swf_depth, MovieClip* keep)
+static void clone_depth_evict(SWFAppContext* app_context, int swf_depth, MovieClip* keep)
 {
 	for (size_t i = 0; i < g_clone_depth_count; i++)
 	{
@@ -81,6 +92,7 @@ static void clone_depth_evict(int swf_depth, MovieClip* keep)
 			// Mark old MC as removed (depth = INT_MIN) and clear from child_mc_cache
 			const char* old_name = g_clone_depth_table[i].name;
 			size_t name_len = strlen(old_name);
+			MovieClip* evicted = NULL;
 			{
 				extern MovieClip* child_mc_cache[];
 				extern int child_mc_count;
@@ -88,27 +100,30 @@ static void clone_depth_evict(int swf_depth, MovieClip* keep)
 					if (child_mc_cache[ci] != NULL &&
 					    child_mc_cache[ci] != keep &&
 					    strcmp(child_mc_cache[ci]->name, old_name) == 0) {
-						child_mc_cache[ci]->avm1_removed = 1;
-						child_mc_cache[ci]->depth = INT_MIN;
+						evicted = child_mc_cache[ci];
+						evicted->avm1_removed = 1;
+						evicted->depth = INT_MIN;
 						child_mc_cache[ci] = NULL;
 						break;
 					}
 				}
 			}
-			// Set global variable to undefined so GetVariable returns undefined
-			ActionVar* old_var = getVariable((char*)old_name, name_len);
-			if (old_var != NULL)
+			// Drop the instance-name binding — only when it references the
+			// evicted MC (or a dead leftover), never a user property.
+			if (root_movieclip.dynamic_props != NULL)
 			{
-				if (old_var->type == ACTION_STACK_VALUE_STRING &&
-				    old_var->data.string_data.owns_memory &&
-				    old_var->data.string_data.heap_ptr != NULL)
+				ActionVar* dp = getProperty((ASObject*)root_movieclip.dynamic_props,
+				                            old_name, (u32)name_len);
+				if (dp != NULL && dp->type == ACTION_STACK_VALUE_MOVIECLIP)
 				{
-					free(old_var->data.string_data.heap_ptr);
-					old_var->data.string_data.heap_ptr = NULL;
-					old_var->data.string_data.owns_memory = false;
+					MovieClip* dp_mc = (MovieClip*)(uintptr_t)dp->data.numeric_value;
+					if (dp_mc != NULL && dp_mc != keep &&
+					    (dp_mc == evicted || dp_mc->depth == INT_MIN))
+					{
+						deleteProperty(app_context, (ASObject*)root_movieclip.dynamic_props,
+						               old_name, (u32)name_len);
+					}
 				}
-				old_var->type = ACTION_STACK_VALUE_UNDEFINED;
-				old_var->data.numeric_value = 0;
 			}
 			// Remove entry by swapping with last
 			g_clone_depth_table[i] = g_clone_depth_table[--g_clone_depth_count];
@@ -120,9 +135,9 @@ static void clone_depth_evict(int swf_depth, MovieClip* keep)
 // Register a clone variable name at a SWF depth (evicts old entry first).
 // `keep` is the freshly-created MC being registered; eviction must not match
 // it by name even if a stale entry from a prior session shares the name.
-static void clone_depth_register(int swf_depth, const char* name, MovieClip* keep)
+static void clone_depth_register(SWFAppContext* app_context, int swf_depth, const char* name, MovieClip* keep)
 {
-	clone_depth_evict(swf_depth, keep);
+	clone_depth_evict(app_context, swf_depth, keep);
 	if (g_clone_depth_count < MAX_CLONE_DEPTH_ENTRIES)
 	{
 		g_clone_depth_table[g_clone_depth_count].swf_depth = swf_depth;
@@ -347,6 +362,48 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 }
 
 // ---------------------------------------------------------------------------
+// Instance-name binding on a parent's dynamic_props (root included).
+// Instance names are deliberately NOT registered in the global var_map —
+// that store holds only genuine user variables, so a `_name` rename can't
+// destroy a same-named user var (see avm1/_investigation/blocked/
+// INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md). The binding is skipped when an
+// existing entry is "authoritative": a pre-existing own property (root
+// timeline vars shadow display children, mirroring Ruffle's no-slot model)
+// or a LIVE MC whose current name still matches the key. Dead MCs
+// (depth == INT_MIN), renamed-away MCs and UNDEFINED leftovers rebind.
+// ---------------------------------------------------------------------------
+static void ng_register_instance_on_parent_dprops(SWFAppContext* app_context,
+                                                  MovieClip* parent,
+                                                  const char* name,
+                                                  MovieClip* child)
+{
+	if (parent == NULL || name == NULL || name[0] == '\0') return;
+	if (parent->dynamic_props == NULL) {
+		parent->dynamic_props = (void*) allocObject(app_context, 8);
+		retainObject((ASObject*) parent->dynamic_props);
+	}
+	u32 name_len = (u32)strlen(name);
+	ActionVar* existing = getProperty((ASObject*) parent->dynamic_props, name, name_len);
+	int blocked = 0;
+	if (existing != NULL && existing->type != ACTION_STACK_VALUE_UNDEFINED) {
+		blocked = 1;
+		if (existing->type == ACTION_STACK_VALUE_MOVIECLIP) {
+			MovieClip* old_mc = (MovieClip*)(uintptr_t)existing->data.numeric_value;
+			if (old_mc == NULL || old_mc->depth == INT_MIN ||
+			    !swf_name_match(old_mc->name, name))
+				blocked = 0;
+		}
+	}
+	if (!blocked) {
+		ActionVar v = {0};
+		v.type = ACTION_STACK_VALUE_MOVIECLIP;
+		v.data.numeric_value = (u64)(uintptr_t)child;
+		setProperty(app_context, (ASObject*) parent->dynamic_props,
+		            name, name_len, &v);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // ng_attachMovie — instantiate an exported library symbol at runtime
 // ---------------------------------------------------------------------------
 
@@ -374,7 +431,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// children have independent depth spaces and must not collide.
 	int swf_depth = as_depth + 16384;
 	if (parent == &root_movieclip)
-		clone_depth_register(swf_depth, new_name, new_mc);
+		clone_depth_register(app_context, swf_depth, new_name, new_mc);
 
 	new_mc->depth = as_depth;
 	new_mc->x = 0.0f;
@@ -392,33 +449,14 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	new_mc->as_set_flags = 0;
 #endif
 
-	// Register the attached clip so name resolution finds it.
-	ActionVar mc_var = {0};
-	mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-	mc_var.data.numeric_value = (u64)(uintptr_t)new_mc;
-	if (parent == &root_movieclip) {
-		// Root attach: _root[name] = clip. _root's named properties live in
-		// var_map, so the global setter is the correct binding here.
-		setVariableByName(new_name, &mc_var);
-	} else if (new_name != NULL && new_name[0] != '\0') {
-		// Non-root attach: in AVM1, mc.attachMovie(id, name, depth) binds the
-		// clip only as a property of `mc` — it must NOT create a global/_root
-		// variable. Routing through setVariableByName lands in the global
-		// var_map whenever no function activation is on the scope stack (the
-		// common case for deferred component init), leaking an enumerable
-		// _root.<name> set to undefined once the clip is later invalidated —
-		// e.g. Minesweeper's Flash v2 UI-component children (fLabel_mc,
-		// frb_hitArea_mc, frb_states_mc) which Ruffle never exposes on _root.
-		// child_mc_cache already makes parent.<name> resolvable; mirror
-		// createEmptyMovieClip by also binding on parent->dynamic_props for
-		// GetMember parity.
-		if (parent->dynamic_props == NULL) {
-			parent->dynamic_props = (void*) allocObject(app_context, 8);
-			retainObject((ASObject*) parent->dynamic_props);
-		}
-		setProperty(app_context, (ASObject*) parent->dynamic_props,
-			new_name, (u32)strlen(new_name), &mc_var);
-	}
+	// Register the attached clip so name resolution finds it. In AVM1,
+	// mc.attachMovie(id, name, depth) binds the clip only as a display-list
+	// child of `mc` (root included) — never as a global/_root VARIABLE.
+	// The binding lives on parent->dynamic_props for GetMember/path parity;
+	// child_mc_cache scans cover bare-name reads. Root attaches previously
+	// went to var_map, which conflated instance names with user variables
+	// (see ng_register_instance_on_parent_dprops above).
+	ng_register_instance_on_parent_dprops(app_context, parent, new_name, new_mc);
 
 	// Execute the sprite's frame 0 placement tags (scripts deferred to end of frame)
 	frame_func* funcs = dictionary[char_id].sprite_frame_funcs;
@@ -656,7 +694,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// finally let Flash's single-tree depth model fit cleanly), root attaches
 	// reach the renderer via a separate child_mc_cache walk in tag.c's
 	// render path — see render_root_attached_mcs(). resolveSlashPathToMC's
-	// name lookup already covers them via setVariableByName above.
+	// name lookup already covers them via the parent dynamic_props binding above.
 	//
 	// Browser-WASM (USE_WEBGPU without OFFSCREEN_RENDER/HEADLESS_GRAPHICS) ALSO
 	// skips this for non-root attaches: there the child reaches the renderer via
@@ -2177,31 +2215,22 @@ int ng_getTextFieldIdx(size_t depth)
 // ---------------------------------------------------------------------------
 
 // Register a freshly-created clone under its real parent. AVM1 clone semantics:
-// duplicate/clone binds the new clip as a property of its parent (the source's
-// parent), NOT as a global _root variable. Root clones keep the historical
-// behavior (global clone-depth table + _root var_map, the only mode that makes
-// the global depth table meaningful); non-root clones bind only on the parent's
-// dynamic_props — mirrors ng_attachMovie's #8 fix. Without this, a nested
+// duplicate/clone binds the new clip as a display-list child of its parent
+// (the source's parent), NOT as a global _root variable. Root clones keep the
+// global clone-depth table (the only mode that makes it meaningful); the name
+// binding goes to the parent's dynamic_props in ALL cases via
+// ng_register_instance_on_parent_dprops — instance names never enter var_map
+// (user-variable store). Without the non-root binding, a nested
 // `child.duplicateMovieClip("dup", n)` minted the clone as a _root ghost and
 // `parent.dup` never resolved (Ruffle: parent.dup is a movieclip).
 static void ng_register_clone_under_parent(SWFAppContext* app_context,
                                            MovieClip* parent, const char* name,
                                            MovieClip* clone_mc, int swf_depth_for_table)
 {
-	ActionVar v = {0};
-	v.type = ACTION_STACK_VALUE_MOVIECLIP;
-	v.data.numeric_value = (u64)(uintptr_t)clone_mc;
-	if (parent == NULL || parent == &root_movieclip) {
-		clone_depth_register(swf_depth_for_table, name, clone_mc);
-		setVariableByName(name, &v);
-	} else if (name != NULL && name[0] != '\0') {
-		if (parent->dynamic_props == NULL) {
-			parent->dynamic_props = (void*) allocObject(app_context, 8);
-			retainObject((ASObject*) parent->dynamic_props);
-		}
-		setProperty(app_context, (ASObject*) parent->dynamic_props,
-		            name, (u32)strlen(name), &v);
-	}
+	if (parent == NULL) parent = &root_movieclip;
+	if (parent == &root_movieclip)
+		clone_depth_register(app_context, swf_depth_for_table, name, clone_mc);
+	ng_register_instance_on_parent_dprops(app_context, parent, name, clone_mc);
 }
 
 MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
