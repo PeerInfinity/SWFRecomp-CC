@@ -1,26 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `855c63864032` (2026-07-02T20:38:12.205453+00:00)
-**Current:** `98fb875b6b88` (2026-07-02T21:58:36.485046+00:00)
+**Previous:** `98fb875b6b88` (2026-07-02T21:58:36.485046+00:00)
+**Current:** `5de7f35b75a0` (2026-07-02T22:42:52.703851+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 67 | 66 | -1 |
+| Passing | 66 | 67 | +1 |
 | Total | 111 | 111 | 0 |
-| Pass rate | 60.4% | 59.5% | -0.9% |
-| Mismatched lines | 1211 | 1225 | +14 |
-|   Increased | | | +14 |
+| Pass rate | 59.5% | 60.4% | +0.9% |
+| Mismatched lines | 1225 | 1211 | -14 |
+|   Decreased | | | -14 |
 
-## Newly Failing (1)
+## Newly Passing (1)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `static_vs_dynamic2` | output_mismatch | 18/18 | 15/18 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `static_vs_dynamic2` | output_mismatch | 15/18 | 18/18 |
 
 ## Status Changed (1)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `loading/loadMovieTest` | ruffle_matched | output_mismatch | 71/80 | 60/80 |
+| `loading/loadMovieTest` | output_mismatch | ruffle_matched | 60/80 | 71/80 |
