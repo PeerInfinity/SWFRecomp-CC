@@ -20134,6 +20134,21 @@ static MovieClip* mcNameBindingOverride(ActionVar* v, const char* var_name, u32 
 	// Not an instance binding (a user var that happens to hold an MC) — the
 	// stored value is authoritative.
 	if (!swf_name_match(mc->name, nbuf)) return NULL;
+	// Only rebind when the bound clip is in the removed-deferred zone
+	// (removeMovieClip deferred by onUnload): a LIVE bound clip may be an
+	// explicit user assignment (`mc = createEmptyMovieClip("mc", d)` after a
+	// same-named sibling exists) which must stay authoritative — gnash
+	// Transform.as:205-207 reads the NEWLY assigned clip's identity matrix,
+	// not the lower-depth sibling. We can't distinguish auto-registration
+	// from explicit assignment (SetVariable at root mirrors into root
+	// dynamic_props, so both stores always agree); the removed-zone gate
+	// covers the observable Flash divergence (gnash MovieClip.as:935/937 —
+	// two unloaded-deferred "hardref5" clips, lowest shifted depth wins)
+	// without hijacking live bindings. The live-duplicate case
+	// (MovieClip.as:812, hardref.member == 60) remains unfixable until
+	// instance names stop being auto-registered as variables — see
+	// blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md.
+	if (!mc->avm1_removed) return NULL;
 	MovieClip* best = mcLowestDepthSameName(mc);
 	return (best != mc) ? best : NULL;
 }
@@ -20155,15 +20170,18 @@ static MovieClip* mcResolveSoftRef(SWFAppContext* app_context, MovieClip* mc)
 	MovieClip* live = resolveSlashPathToMC(app_context, tgt + 1, (u32)strlen(tgt + 1), &root_movieclip);
 	if (live != NULL && live != mc && live != &root_movieclip && live->depth != INT_MIN)
 		return live;
-	// AS-created clips (createEmptyMovieClip/attachMovie/duplicateMovieClip)
-	// may have no display-list entry; resolve root-level single-segment
-	// targets against the clip cache by CURRENT name, lowest depth first.
+	// Dynamic clips may have no display-list entry; resolve root-level
+	// single-segment targets against the clip cache by CURRENT name, lowest
+	// depth first. Deliberately NOT filtered on as_created: this path only
+	// fires for a DEAD receiver, and replacement structs minted by other
+	// machinery (e.g. MovieClipLoader loadClip re-creating the target) must
+	// stay reachable — avm1/global_swf6_7_8 (`swf6.global` after loadClip).
 	if (strchr(tgt + 1, '/') == NULL) {
 		MovieClip* best = NULL;
 		for (int i = 0; i < child_mc_count; i++) {
 			MovieClip* c = child_mc_cache[i];
 			if (c == NULL || c == mc || c->depth == INT_MIN) continue;
-			if (!c->as_created || c->name_displaced) continue;
+			if (c->name_displaced) continue;
 			if (c->parent != &root_movieclip) continue;
 			if (best != NULL && c->depth >= best->depth) continue;
 			if (!swf_name_match(c->name, tgt + 1)) continue;
@@ -41697,14 +41715,21 @@ check_special_vars:
 			// CURRENT name, lowest depth first — gnash MovieClip.as:843-845
 			// (`hardref4.removeMovieClip()` must reach the depth-62 clip after
 			// the renamed depth-60 clip stole and then dropped the binding).
+			// Scoped to the CURRENT context's children: a bare name inside a
+			// child clip must NOT resolve a root-level clip (bbb1's
+			// `trace(foo)` reads undefined even though _level0.foo exists —
+			// avm1/string_paths_other lines 29-30).
 			{
 				extern MovieClip root_movieclip;
+				MovieClip* _asf_scope =
+					(g_current_context != NULL && g_current_context->depth != INT_MIN)
+						? g_current_context : &root_movieclip;
 				MovieClip* _asf_best = NULL;
 				for (int _asf_i = 0; _asf_i < child_mc_count; _asf_i++) {
 					MovieClip* _asf_c = child_mc_cache[_asf_i];
 					if (_asf_c == NULL || _asf_c->depth == INT_MIN) continue;
 					if (!_asf_c->as_created || _asf_c->name_displaced) continue;
-					if (_asf_c->parent != &root_movieclip) continue;
+					if (_asf_c->parent != _asf_scope) continue;
 					if (_asf_best != NULL && _asf_c->depth >= _asf_best->depth) continue;
 					if (!swf_name_match(_asf_c->name, name_buf)) continue;
 					_asf_best = _asf_c;

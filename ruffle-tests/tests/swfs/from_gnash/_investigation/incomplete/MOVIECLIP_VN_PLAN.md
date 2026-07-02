@@ -1,6 +1,32 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
+Last updated: 2026-07-02b (**F2 follow-up after first CI round.** CI at
+`8d1e3adef` (both modes, identical) confirmed the wins but surfaced 3
+regressions, all fixed in the follow-up commit: (1) avm1 `global_swf6_7_8` —
+`mcResolveSoftRef`'s cache fallback required `as_created`, but the
+MovieClipLoader loadClip replacement struct is minted by
+findOrCreateMovieClip (as_created=0), so stale vars stopped rebinding after
+loadClip; fallback relaxed to any live root child (matches the pre-existing
+GetMember pre-block behavior — the deref only fires on dead receivers, so no
+phantom risk). (2) avm1 `string_paths_other` — the new GetVariable bare-name
+cache fallback hardcoded parent==root, so a bare name inside a CHILD clip
+(bbb1's `trace(foo)`) wrongly resolved a root-level clip; now scoped to the
+current context's children. (3) gnash `Transform-v8` (RM→mismatch, line 207)
+— the lowest-depth-wins override redirected an EXPLICIT `mc =
+createEmptyMovieClip("mc", d)` variable read to a lower-depth same-named
+sibling. No origin discriminator exists (SetVariable at root mirrors into
+root dynamic_props, so var_map/dprops always agree); the override is now
+gated on the bound clip being avm1_removed (removed-deferred zone), which
+keeps the hardref5 lines (MovieClip.as:935/937) and cannot hijack live
+bindings. COST: MovieClip.as:812 (`hardref.member == 60`, live duplicate
+pair) regresses back to failing — that line needs instance names to stop
+being auto-registered as variables, i.e.
+blocked/INSTANCE_NAME_VS_VARIABLE_BINDING_PLAN.md. Net per MovieClip-vN test:
+−13 mismatched lines vs pre-F2 baseline (was −14 in the first round). Also
+note: Transform.as:175-177 fail LOCALLY at any commit including pre-F2 parent
+(local-vs-CI environment divergence; CI passes them) — don't chase locally.)
+
 Last updated: 2026-07-02 (**Phase 6 / F2 soft-reference rebinding LANDED,
 pending CI.** The whole sr62/sr63/hardref4/hardref5 cluster collapses to 0
 ours-only lines on v6 (52→38 total diff, −14; v7 cluster also clean); gnash
