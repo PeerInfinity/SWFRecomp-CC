@@ -20082,6 +20082,98 @@ static MovieClip* reResolveDeadBaseClip(SWFAppContext* app_context, MovieClip* m
 	return mc;
 }
 
+// ---------------------------------------------------------------------------
+// Flash "soft references" (gnash MovieClip.as:806-941, misc-swfc
+// soft_reference_test1). A MovieClip value held in a variable re-resolves by
+// the ORIGINAL (creation-time) target path once the sprite it was bound to is
+// DESTROYED (depth == INT_MIN) — not merely unloaded: a removeMovieClip
+// deferred by onUnload keeps a shifted depth and never rebinds. The live-clip
+// fast path is a single depth comparison at each use site.
+
+extern int child_mc_count;
+// Set once a second live clip is created into (or renamed into) a name+parent
+// that already has a live owner. Name lookups only pay the lowest-depth
+// rescan after that point; content that never duplicates names keeps the
+// existing O(1)/first-match paths bit-identically.
+int g_mc_dup_names_seen = 0;
+
+// Among same-named live siblings, Flash resolves a name to the clip with the
+// LOWEST depth (MovieClip.as:806-812; the removed-deferred hardref5 pair at
+// 916-941 participates with its shifted depth, so only INT_MIN is excluded).
+static MovieClip* mcLowestDepthSameName(MovieClip* mc)
+{
+	if (mc == NULL || mc->parent == NULL) return mc;
+	MovieClip* best = mc;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* c = child_mc_cache[i];
+		if (c == NULL || c == best || c->depth == INT_MIN) continue;
+		if (c->name_displaced) continue;
+		if (c->parent != mc->parent) continue;
+		if (c->depth >= best->depth) continue;
+		if (!swf_name_match(c->name, mc->name)) continue;
+		best = c;
+	}
+	return best;
+}
+
+// If `v` holds a live MovieClip instance binding for exactly the name being
+// looked up, apply the lowest-depth-wins rule across same-named siblings.
+// Stored bindings (var_map / parent dynamic_props) hold the pointer that was
+// registered at creation, which with duplicates present may be a higher-depth
+// sibling. Returns the replacement clip, or NULL when the binding stands.
+static MovieClip* mcNameBindingOverride(ActionVar* v, const char* var_name, u32 var_name_len)
+{
+	if (!g_mc_dup_names_seen) return NULL;
+	if (v == NULL || v->type != ACTION_STACK_VALUE_MOVIECLIP || v->data.numeric_value == 0) return NULL;
+	MovieClip* mc = (MovieClip*)(uintptr_t)v->data.numeric_value;
+	if (mc->depth == INT_MIN || mc->parent == NULL) return NULL;
+	char nbuf[64];
+	if (var_name_len >= sizeof(nbuf)) return NULL;
+	memcpy(nbuf, var_name, var_name_len);
+	nbuf[var_name_len] = '\0';
+	// Not an instance binding (a user var that happens to hold an MC) — the
+	// stored value is authoritative.
+	if (!swf_name_match(mc->name, nbuf)) return NULL;
+	MovieClip* best = mcLowestDepthSameName(mc);
+	return (best != mc) ? best : NULL;
+}
+
+// Resolve a (possibly destroyed) MovieClip pointer the way Flash resolves a
+// soft reference: live → itself; destroyed → the live clip now at the
+// reference's creation-time path (lowest depth wins), or NULL when nothing is
+// there (dangling — callers keep the dead struct so the existing dead-MC
+// behavior applies). Rebinding always uses original_target: renames applied
+// to the bound sprite before it died do NOT re-point the reference
+// (soft_reference_test1 frames 5/9/11; Ruffle instead stores the capture-time
+// path and fails sc:126/sc:164-adjacent gnash lines we can pass).
+static MovieClip* mcResolveSoftRef(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL || mc->depth != INT_MIN) return mc;
+	const char* tgt = mc->original_target;
+	if (tgt[0] != '/' || tgt[1] == '\0') return NULL;
+	extern MovieClip root_movieclip;
+	MovieClip* live = resolveSlashPathToMC(app_context, tgt + 1, (u32)strlen(tgt + 1), &root_movieclip);
+	if (live != NULL && live != mc && live != &root_movieclip && live->depth != INT_MIN)
+		return live;
+	// AS-created clips (createEmptyMovieClip/attachMovie/duplicateMovieClip)
+	// may have no display-list entry; resolve root-level single-segment
+	// targets against the clip cache by CURRENT name, lowest depth first.
+	if (strchr(tgt + 1, '/') == NULL) {
+		MovieClip* best = NULL;
+		for (int i = 0; i < child_mc_count; i++) {
+			MovieClip* c = child_mc_cache[i];
+			if (c == NULL || c == mc || c->depth == INT_MIN) continue;
+			if (!c->as_created || c->name_displaced) continue;
+			if (c->parent != &root_movieclip) continue;
+			if (best != NULL && c->depth >= best->depth) continue;
+			if (!swf_name_match(c->name, tgt + 1)) continue;
+			best = c;
+		}
+		if (best != NULL) return best;
+	}
+	return NULL;
+}
+
 // Set to 1 by the path resolvers (resolveSlashPathToMC / resolveFlashPathToMC)
 // when they return a parent MC as a stand-in for a shape / morph / static-text
 // child placed with an instance name — Flash's "sh1.var = 10" actually sets
@@ -40659,6 +40751,15 @@ void actionGetVariable(SWFAppContext* app_context)
 			ActionVar* prop = getPropertyWithPrototype(clip_props, var_name, var_name_len);
 			if (prop != NULL)
 			{
+				// Same-named live siblings: lowest depth wins (gnash
+				// MovieClip.as:806-812). No-op unless a duplicate name has
+				// ever been created (g_mc_dup_names_seen).
+				MovieClip* _dup_mc = mcNameBindingOverride(prop, var_name, var_name_len);
+				if (_dup_mc != NULL)
+				{
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_dup_mc);
+					return;
+				}
 				PUSH_VAR(prop);
 				return;
 			}
@@ -41587,6 +41688,32 @@ check_special_vars:
 			}
 			}
 #endif
+
+			// AS-created clips (createEmptyMovieClip / attachMovie /
+			// duplicateMovieClip) have no display-list entry, so the searches
+			// above miss them once their var_map/dynamic_props binding was
+			// deleted or stolen (rename shuffles, removal of a same-named
+			// clip). Flash resolves child names against the live children by
+			// CURRENT name, lowest depth first — gnash MovieClip.as:843-845
+			// (`hardref4.removeMovieClip()` must reach the depth-62 clip after
+			// the renamed depth-60 clip stole and then dropped the binding).
+			{
+				extern MovieClip root_movieclip;
+				MovieClip* _asf_best = NULL;
+				for (int _asf_i = 0; _asf_i < child_mc_count; _asf_i++) {
+					MovieClip* _asf_c = child_mc_cache[_asf_i];
+					if (_asf_c == NULL || _asf_c->depth == INT_MIN) continue;
+					if (!_asf_c->as_created || _asf_c->name_displaced) continue;
+					if (_asf_c->parent != &root_movieclip) continue;
+					if (_asf_best != NULL && _asf_c->depth >= _asf_best->depth) continue;
+					if (!swf_name_match(_asf_c->name, name_buf)) continue;
+					_asf_best = _asf_c;
+				}
+				if (_asf_best != NULL) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_asf_best);
+					return;
+				}
+			}
 		}
 
 		// Check _global object properties as fallback. Primary `global_object`
@@ -41713,6 +41840,19 @@ check_special_vars:
 		// SWF4; key test: avm1/target_paths/swf4 preamble + eval rows).
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
+	}
+
+	// Same-named live siblings: lowest depth wins (gnash MovieClip.as:806-812
+	// and the removed-deferred hardref5 pair at 916-941). The var_map binding
+	// registered by createEmptyMovieClip may point at a higher-depth sibling.
+	// No-op unless a duplicate name has ever been created.
+	{
+		MovieClip* _dup_mc = mcNameBindingOverride(var, var_name, var_name_len);
+		if (_dup_mc != NULL)
+		{
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_dup_mc);
+			return;
+		}
 	}
 
 	// Push variable value to stack
@@ -46535,6 +46675,22 @@ void actionSetMember(SWFAppContext* app_context)
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
 
+	// MovieClip soft-reference rebinding on writes — mirrors the GetMember
+	// pre-block: a destroyed receiver re-resolves to the live clip at its
+	// creation-time path (gnash MovieClip.as:846-911). Dangling refs keep the
+	// dead struct (writes land invisibly, as before).
+	if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP &&
+	    obj_var.data.numeric_value != 0)
+	{
+		MovieClip* _sm_mc = (MovieClip*)(uintptr_t)obj_var.data.numeric_value;
+		if (_sm_mc->depth == INT_MIN)
+		{
+			MovieClip* _sm_live = mcResolveSoftRef(app_context, _sm_mc);
+			if (_sm_live != NULL)
+				obj_var.data.numeric_value = (u64)_sm_live;
+		}
+	}
+
 	// Check if the object is actually an object type
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
@@ -48111,9 +48267,12 @@ void actionSetMember(SWFAppContext* app_context)
 							ActionVar mc_var = {0};
 							mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 							mc_var.data.numeric_value = (u64)mc;
-							ActionVar undef = {0};
-							undef.type = ACTION_STACK_VALUE_UNDEFINED;
-							// Update parent.dynamic_props
+							// Update parent.dynamic_props. DELETE the old-name key rather
+							// than setting it to undefined: a typed-undefined entry
+							// SHADOWS child-name resolution (GetVariable/GetMember treat
+							// it as a present property), so a same-named sibling that
+							// stays alive would become unreachable after this clip's
+							// rename round-trip (soft_reference_test1 sc:143-164).
 							if (mc->parent != NULL && mc->parent->dynamic_props != NULL)
 							{
 								ASObject* dprops = (ASObject*)mc->parent->dynamic_props;
@@ -48123,7 +48282,7 @@ void actionSetMember(SWFAppContext* app_context)
 								    (MovieClip*)(uintptr_t)old_prop->value.data.numeric_value == mc)
 								{
 									setProperty(app_context, dprops, new_name, new_len, &mc_var);
-									setProperty(app_context, dprops, old_name, old_len, &undef);
+									deleteProperty(app_context, dprops, old_name, old_len);
 								}
 							}
 							// Update var_map (root MCs only — root timeline vars live here)
@@ -48158,8 +48317,31 @@ void actionSetMember(SWFAppContext* app_context)
 									    (MovieClip*)(uintptr_t)old_gvar->data.numeric_value == mc)
 									{
 										setGlobalVariableByName(new_key, &mc_var);
-										setGlobalVariableByName(old_key, &undef);
+										// Clear with the not-found sentinel (type 0/size 0/
+										// heap NULL) rather than a typed undefined: a typed
+										// undefined entry is treated as a PRESENT variable and
+										// shadows child-name resolution (`_level0.mc1` after a
+										// rename round-trip while a same-named sibling stays
+										// alive — soft_reference_test1 sc:164). Matches what
+										// removeMovieClip's immediate path writes.
+										ActionVar _rn_sentinel = {0};
+										setGlobalVariableByName(old_key, &_rn_sentinel);
 									}
+								}
+							}
+							// A rename can create a same-name sibling pair (`sr60._name =
+							// "hardref4"` while hardref4 is alive) — enable the
+							// lowest-depth-wins rescan path (gnash MovieClip.as:806-812).
+							if (!g_mc_dup_names_seen && mc->parent != NULL)
+							{
+								for (int _rn_i = 0; _rn_i < child_mc_count; _rn_i++) {
+									MovieClip* _rn_c = child_mc_cache[_rn_i];
+									if (_rn_c == NULL || _rn_c == mc || _rn_c->depth == INT_MIN) continue;
+									if (_rn_c->name_displaced) continue;
+									if (_rn_c->parent != mc->parent) continue;
+									if (!swf_name_match(_rn_c->name, mc->name)) continue;
+									g_mc_dup_names_seen = 1;
+									break;
 								}
 							}
 						}
@@ -50519,40 +50701,21 @@ void actionGetMember(SWFAppContext* app_context)
 	// 2a. MovieClip "soft reference" rebinding: if the receiver is a dead
 	// MovieClip (removeMovieClip was called) but a live clip now exists at
 	// the same original path (e.g. a subsequent createEmptyMovieClip with the
-	// same name at a different depth), redirect property access to the live
-	// clip. Mirrors Flash semantics where MovieClip references are treated
-	// as soft references resolved by path on each access. Test:
-	// AsBroadcaster.as:173 — dang.addListener after recreate.
+	// same name, or a rename into that name), redirect property access to the
+	// live clip. Mirrors Flash semantics where MovieClip references are
+	// treated as soft references resolved by path on each access. Tests:
+	// AsBroadcaster.as:173 — dang.addListener after recreate; gnash
+	// MovieClip.as:846-911 (sr62/sr63 rebinding). Dangling (unresolvable)
+	// refs keep the dead struct so the dead-MC undefined path below applies.
 	if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP &&
 	    obj_var.data.numeric_value != 0)
 	{
 		MovieClip* _gm_mc = (MovieClip*)(uintptr_t)obj_var.data.numeric_value;
-		if (_gm_mc->depth == INT_MIN && _gm_mc->original_target[0] == '/' &&
-		    _gm_mc->original_target[1] != '\0')
+		if (_gm_mc->depth == INT_MIN)
 		{
-			extern MovieClip root_movieclip;
-			const char* _gm_path = _gm_mc->original_target + 1;
-			u32 _gm_path_len = (u32)strlen(_gm_path);
-			MovieClip* _gm_live = resolveSlashPathToMC(app_context, _gm_path, _gm_path_len, &root_movieclip);
-			if (_gm_live == NULL || _gm_live == &root_movieclip || _gm_live->depth == INT_MIN) {
-				// Fall back to child_mc_cache by name (createEmptyMovieClip
-				// children may not appear in display lists).
-				if (memchr(_gm_path, '/', _gm_path_len) == NULL) {
-					for (int _gm_i = 0; _gm_i < child_mc_count; _gm_i++) {
-						MovieClip* _c = child_mc_cache[_gm_i];
-						if (_c == NULL || _c == _gm_mc || _c->depth == INT_MIN) continue;
-						if (_c->parent == &root_movieclip &&
-						    strncmp(_c->name, _gm_path, _gm_path_len) == 0 &&
-						    _c->name[_gm_path_len] == '\0') {
-							_gm_live = _c;
-							break;
-						}
-					}
-				}
-			}
-			if (_gm_live != NULL && _gm_live != _gm_mc && _gm_live->depth != INT_MIN) {
+			MovieClip* _gm_live = mcResolveSoftRef(app_context, _gm_mc);
+			if (_gm_live != NULL)
 				obj_var.data.numeric_value = (u64)_gm_live;
-			}
 		}
 	}
 
@@ -52063,6 +52226,33 @@ void actionGetMember(SWFAppContext* app_context)
 					if (_tc->depth == INT_MIN) continue; // already finalized — gone
 					if (!swf_name_match(_tc->name, _tn_buf)) continue;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_tc);
+					return;
+				}
+			}
+
+			// AS-created children have no display-list entry; once their
+			// parent-dynamic_props binding is gone (rename shuffles, removal
+			// of a same-named sibling) the display walks above miss them.
+			// Resolve by scanning live cache children by CURRENT name, lowest
+			// depth first (gnash soft_reference_test1 sc:164 — `_level0.mc1`
+			// must reach the surviving depth-51 clip after its binding was
+			// stolen by the depth-50 clip's rename round-trip). Gated on a
+			// live receiver: a removeMovieClip-deferred parent must NOT
+			// resurrect stripped children this way (MovieClip.as ul4/hul5).
+			if (!mc->avm1_removed)
+			{
+				MovieClip* _asf_best = NULL;
+				for (int _asf_i = 0; _asf_i < child_mc_count; _asf_i++) {
+					MovieClip* _asf_c = child_mc_cache[_asf_i];
+					if (_asf_c == NULL || _asf_c == mc || _asf_c->depth == INT_MIN) continue;
+					if (!_asf_c->as_created || _asf_c->name_displaced) continue;
+					if (_asf_c->parent != mc) continue;
+					if (_asf_best != NULL && _asf_c->depth >= _asf_best->depth) continue;
+					if (!swf_name_match(_asf_c->name, child_name_buf)) continue;
+					_asf_best = _asf_c;
+				}
+				if (_asf_best != NULL) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_asf_best);
 					return;
 				}
 			}
@@ -58764,8 +58954,24 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			child->totalframes = 1;
 			child->framesloaded = 1;
 			child->depth = depth_val;
+			child->as_created = 1;
 			strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
 			child->url[sizeof(child->url) - 1] = '\0';
+
+			// Duplicate-name detection: a second live clip created into an
+			// already-owned name enables the lowest-depth-wins lookup rule
+			// (gnash MovieClip.as:806-812). The new child is not yet cached,
+			// so any live match is a distinct sibling.
+			if (!g_mc_dup_names_seen) {
+				for (int _dn_i = 0; _dn_i < child_mc_count; _dn_i++) {
+					MovieClip* _dn_c = child_mc_cache[_dn_i];
+					if (_dn_c == NULL || _dn_c->depth == INT_MIN || _dn_c->name_displaced) continue;
+					if (_dn_c->parent != mc) continue;
+					if (!swf_name_match(_dn_c->name, child->name)) continue;
+					g_mc_dup_names_seen = 1;
+					break;
+				}
+			}
 
 			// Register child on parent MC's dynamic_props — but don't overwrite
 			// an existing own property with the same name. In Ruffle, createEmptyMovieClip
@@ -66132,6 +66338,22 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	{
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
 
+		// MovieClip soft-reference rebinding for method dispatch — a destroyed
+		// receiver re-resolves to the live clip at its creation-time path, so
+		// e.g. `sr62.removeMovieClip()` removes the clip the reference now
+		// binds to (gnash MovieClip.as:879-881) and `mcRef.getDepth()` reads
+		// the rebound clip. Dangling refs keep the dead struct so existing
+		// dead-MC method behavior (valueOf → null, etc.) applies.
+		if (mc != NULL && mc->depth == INT_MIN)
+		{
+			MovieClip* _cm_live = mcResolveSoftRef(app_context, mc);
+			if (_cm_live != NULL)
+			{
+				mc = _cm_live;
+				obj_var.data.numeric_value = (u64)mc;
+			}
+		}
+
 		// If mc has been Object.registerClass'd to a class whose prototype
 		// chain bypasses MovieClip.prototype, MC-specific builtins (getDepth,
 		// gotoAndStop, etc.) are not reachable via inheritance and should
@@ -67211,10 +67433,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				child->totalframes = 1;
 				child->framesloaded = 1;
 				child->depth = depth_val;
+				child->as_created = 1;
 
 				// Copy URL from parent
 				strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
-				child->url[sizeof(child->url) - 1] = 0;   
+				child->url[sizeof(child->url) - 1] = 0;
+
+				// Duplicate-name detection: a second live clip created into an
+				// already-owned name enables the lowest-depth-wins lookup rule
+				// (gnash MovieClip.as:806-812). The new child is not yet cached,
+				// so any live match is a distinct sibling.
+				if (!g_mc_dup_names_seen) {
+					for (int _dn_i = 0; _dn_i < child_mc_count; _dn_i++) {
+						MovieClip* _dn_c = child_mc_cache[_dn_i];
+						if (_dn_c == NULL || _dn_c->depth == INT_MIN || _dn_c->name_displaced) continue;
+						if (_dn_c->parent != mc) continue;
+						if (!swf_name_match(_dn_c->name, child->name)) continue;
+						g_mc_dup_names_seen = 1;
+						break;
+					}
+				}
 
 				// Register child on parent MC's dynamic_props so mc.childName works via GetMember.
 				// Mirrors the function-form path above: don't overwrite an existing

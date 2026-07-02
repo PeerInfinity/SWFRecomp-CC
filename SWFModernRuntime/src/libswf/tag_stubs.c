@@ -363,6 +363,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// Create MC for the attached clip (reset position/scale to defaults for re-attach)
 	MovieClip* new_mc = actionFindOrCreateMovieClip(app_context, new_name, parent);
 	if (new_mc == NULL) return NULL;
+	new_mc->as_created = 1;  /* AS-created: name-resolvable via cache scan (soft refs) */
 	new_mc->is_button_mc = _am_is_button ? 1 : 0;
 	new_mc->movie_id = parent->movie_id;  // Attached clips belong to same movie as parent
 
@@ -2345,6 +2346,7 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	if (src_mc == NULL || src_mc == &root_movieclip) return NULL; // cannot clone root
 	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, clone_parent);
 	if (clone_mc == NULL) return NULL;
+	clone_mc->as_created = 1;  /* AS-created: name-resolvable via cache scan (soft refs) */
 
 	if (src_mc != NULL)
 	{
@@ -2618,6 +2620,7 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	MovieClip* clone_parent = src_mc->parent;
 	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, clone_parent);
 	if (clone_mc == NULL) return NULL;
+	clone_mc->as_created = 1;  /* AS-created: name-resolvable via cache scan (soft refs) */
 
 	clone_mc->x       = src_mc->x;
 	clone_mc->y       = src_mc->y;
@@ -2805,6 +2808,7 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 	MovieClip* src_mc = actionFindOrCreateMovieClip(app_context, source_name, clone_parent);
 	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, clone_parent);
 	if (clone_mc == NULL) return NULL;
+	clone_mc->as_created = 1;  /* AS-created: name-resolvable via cache scan (soft refs) */
 
 	if (src_mc != NULL)
 	{

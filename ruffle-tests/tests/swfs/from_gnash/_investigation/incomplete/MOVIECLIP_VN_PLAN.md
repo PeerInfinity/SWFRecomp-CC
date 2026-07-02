@@ -1,6 +1,51 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
+Last updated: 2026-07-02 (**Phase 6 / F2 soft-reference rebinding LANDED,
+pending CI.** The whole sr62/sr63/hardref4/hardref5 cluster collapses to 0
+ours-only lines on v6 (52→38 total diff, −14; v7 cluster also clean); gnash
+misc-swfc `soft_reference_test1` promotes ruffle_matched → **full PASS 38/38**
+(we now pass the 2 lines Ruffle fails — sc:126/sc:164 — because rebinding uses
+the clip's creation-time `original_target`, which is Flash's rule, while
+Ruffle stores the capture-time path). Implementation in
+`SWFModernRuntime/src/actionmodern/action.c` (+`action.h`, `tag_stubs.c`):
+(1) central `mcResolveSoftRef()` — a MOVIECLIP ActionVar pointing at a
+DESTROYED struct (`depth == INT_MIN`; unloaded/deferred clips never rebind)
+re-resolves by `original_target` via `resolveSlashPathToMC` + an
+`as_created`-filtered child_mc_cache scan (lowest depth wins); inserted at the
+GetMember pre-block (refactored), SetMember, and actionCallMethod receiver
+extraction — dangling refs keep the dead struct so existing dead-MC behavior
+(valueOf → null etc.) is preserved; (2) new `MovieClip.as_created` flag set by
+createEmptyMovieClip/attachMovie/duplicateMovieClip so cache-scan name
+resolution can find dynamic clips without ever resolving lookup-minted
+phantoms; (3) bare-name (GetVariable) and member (GetMember) child lookups get
+an as_created cache-scan fallback by CURRENT name — fixes
+`hardref4.removeMovieClip()` no-op'ing after a rename stole and dropped the
+binding; the GetMember fallback is gated on `!mc->avm1_removed` to protect the
+F1 ul4/hul5 stripped-children semantics; (4) lowest-depth-wins for same-named
+siblings (`hardref.member == 60`, hardref5 deferred pair) via
+`mcNameBindingOverride` applied at GetVariable's var_map/dynamic_props
+MOVIECLIP binding hits, gated behind a sticky `g_mc_dup_names_seen` flag (set
+by createEmptyMovieClip/rename collision detection) so content without
+duplicate names keeps the O(1) path; (5) the `_name` setter now DELETES the
+old dynamic_props key (was: set-to-undefined, which shadowed same-named
+survivors) and clears the old var_map key with the not-found sentinel `{0}`
+(was: typed undefined, which shadowed `_level0.mc1` child re-resolution —
+soft_reference_test1 sc:164). Local battery: soft_reference_test1 PASS;
+case-v6 PASS; MovieClip-v5 RM; AsBroadcaster-v6 improved to RM; 12-test AVM1
+removal/duplication battery all PASS (target_clip_removed, string_paths_eval2,
+removed_clip_halts_script, removed_target_clip_scope, unload_nested_child,
+movieclip_state_values/default_state, clone_sprite_edittext, tell_target,
+execution_order4, duplicate_movie_clip, remove_movie_clip, goto_rewind3,
+function_base_clip_removed, removed_base_clip_tell_target,
+movieclip_in_removed_button); ming loop/register battery effective-pass;
+movieclip_destruction_test3/4 byte-identical A/B (pre-existing failures).
+Remaining ours-only v6 lines (996 Phase 7 unloadMovie binding; 2097/2100
+Phase 1 residuals; 2191 Phase 14; 2542 getSWFVersion-TextField; 2590/2596
+toString singletons; plus the missing loadVariables/onData tail) still block
+ruffle_matched promotion — F2 is done but the "couple of singletons" in the
+promotion gate turned out to be ~7 lines + the Phase 15 tail.)
+
 Last updated: 2026-05-29 (Phases 9 + 10 + 12 landed, pending CI —
 getBounds for AS-created (createEmptyMovieClip) clips. MovieClip-v6
 dropped 91 → 57 mismatched lines (−34). Three changes in
@@ -117,7 +162,7 @@ phases:
     status: completed
   - id: 6
     name: "Soft-reference / hard-reference depth and replacement semantics"
-    status: pending
+    status: completed
   - id: 7
     name: "unloadMovie binding deletion timing (umc undefined too early)"
     status: pending
