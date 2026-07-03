@@ -1,15 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `98fb875b6b88` (2026-07-02T21:53:52.062790+00:00)
-**Current:** `5de7f35b75a0` (2026-07-02T22:38:04.905065+00:00)
+**Previous:** `5de7f35b75a0` (2026-07-02T22:38:04.905065+00:00)
+**Current:** `2ecb89e9fec9` (2026-07-03T02:28:58.035689+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 631 | 631 | 0 |
+| Passing | 631 | 634 | +3 |
 | Total | 705 | 705 | 0 |
-| Pass rate | 89.5% | 89.5% | 0% |
-| Mismatched lines | 15419 | 15419 | 0 |
+| Pass rate | 89.5% | 89.9% | +0.4% |
+| Mismatched lines | 15419 | 15017 | -402 |
+|   Decreased | | | -402 |
 
-No changes detected.
+## Newly Passing (3)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `bitmapdata_hittest_threshold` | output_mismatch | 5/6 | 6/6 |
+| `virtual_property_recursion_double_swf7` | output_mismatch | 129/523 | 523/523 |
+| `virtual_property_recursion_scope` | output_mismatch | 6/11 | 11/11 |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `load_cancel_via_removemovieclip` | output_mismatch | 2/4 | 4/4 | -2 |
