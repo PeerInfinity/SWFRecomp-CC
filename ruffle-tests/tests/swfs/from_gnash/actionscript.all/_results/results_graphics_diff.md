@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `98fb875b6b88` (2026-07-02T21:58:36.474432+00:00)
-**Current:** `5de7f35b75a0` (2026-07-02T22:42:52.693737+00:00)
+**Previous:** `5de7f35b75a0` (2026-07-02T22:42:52.693737+00:00)
+**Current:** `2ecb89e9fec9` (2026-07-03T02:24:36.411977+00:00)
 
 ## Summary
 
@@ -10,13 +10,13 @@
 | Passing | 135 | 135 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 55.6% | 55.6% | 0% |
-| Mismatched lines | 8654 | 8639 | -15 |
-|   Decreased | | | -15 |
+| Mismatched lines | 8639 | 8633 | -6 |
+|   Decreased | | | -6 |
 
 ## Line Count Changed (3)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `TextField-v6` | output_mismatch | 461/545 | 466/545 | -5 |
-| `TextField-v7` | output_mismatch | 470/570 | 475/570 | -5 |
-| `TextField-v8` | output_mismatch | 472/571 | 477/571 | -5 |
+| `MovieClip-v6` | output_mismatch | 899/936 | 901/936 | -2 |
+| `MovieClip-v7` | output_mismatch | 932/969 | 934/969 | -2 |
+| `MovieClip-v8` | output_mismatch | 1018/1087 | 1020/1087 | -2 |
