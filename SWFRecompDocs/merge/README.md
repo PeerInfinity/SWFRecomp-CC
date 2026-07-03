@@ -6,7 +6,14 @@ This directory contains merge analysis and planning documents for synchronizing 
 
 ### Active
 
-- **[upstream-downstream-merge-plan-2024-12.md](upstream-downstream-merge-plan-2024-12.md)** - Comprehensive plan for syncing with upstream SWFRecomp repositories (December 2025)
+- **[upstream-relationship-2026-07.md](upstream-relationship-2026-07.md)** - Relationship reassessment after upstream merged the objects-and-functions PRs to master (July 2, 2026)
+  - Verdict: no code-level merge in either direction; permanent friendly fork with knowledge exchange
+  - What we offer upstream: investigation docs, AVM1 edge-case maps, tests, targeted PRs
+  - Written to be shareable — starting point for a conversation with LittleCube
+
+### Historical
+
+- **[upstream-downstream-merge-plan-2024-12.md](upstream-downstream-merge-plan-2024-12.md)** - Comprehensive plan for syncing with upstream SWFRecomp repositories (December 2025; superseded July 2026)
   - Upstream merges: object system, extended action.c, 100+ tests
   - Downstream merges: recent memory leak and Linux fixes
 

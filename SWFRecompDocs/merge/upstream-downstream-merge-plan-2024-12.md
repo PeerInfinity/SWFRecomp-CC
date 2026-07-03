@@ -1,5 +1,13 @@
 # SWFRecomp-CC Upstream/Downstream Merge Plan
 
+> **SUPERSEDED (July 2, 2026):** The upstream objects-and-functions PRs merged to
+> master on July 2, 2026, and this plan was reassessed item by item. Every planned
+> code-level merge is now obsolete (independently built, superseded, or
+> architecturally impossible). The replacement strategy — permanent friendly fork
+> with knowledge/test exchange — is documented in
+> [`upstream-relationship-2026-07.md`](upstream-relationship-2026-07.md).
+> This document is retained as a historical record.
+
 **Date:** December 4, 2025
 **Last Updated:** March 9, 2026
 
