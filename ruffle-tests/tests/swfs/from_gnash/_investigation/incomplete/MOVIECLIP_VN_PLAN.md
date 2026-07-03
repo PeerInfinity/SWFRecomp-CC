@@ -82,6 +82,58 @@ toString singletons; plus the missing loadVariables/onData tail) still block
 ruffle_matched promotion — F2 is done but the "couple of singletons" in the
 promotion gate turned out to be ~7 lines + the Phase 15 tail.)
 
+## Update 2026-07-02 (session 2) — singletons 996 + 2542 FIXED; 2097/2100/2191/2590/2596 diagnosed
+
+**FIXED (local MovieClip-v6 −2 ours-only lines, full removal battery clean):**
+
+- **:996 (Phase 7, `typeof(umc)` after removeMovieClip) — FIXED.** Root cause
+  was NOT a binding-clearance gap but four removal paths actively destroying
+  the USER variable: `actionInvalidateCachedMovieClip` /
+  `actionInvalidateMCAtASDepth` / the RemoveObject2 cascade wrote typed
+  UNDEFINED, and the two `removeMovieClip` dispatch copies (actionRemoveSprite
+  + the actionCallMethod MOVIECLIP arm) wrote the `{0}` sentinel into var_map
+  for the clip's name. Post-de-conflation nothing auto-registers clones in
+  var_map, so any MOVIECLIP entry there is a user variable — and Flash keeps
+  those across removal (Ruffle `Value::MovieClip` `type_of` is unconditionally
+  "movieclip"; member access on a dangling ref yields undefined). All five
+  clear sites removed. Follow-up nuance: `umc.getBounds()` (:998) then reached
+  the dead struct and returned stale drawing bounds — getBounds/getRect now
+  return undefined for a dangling receiver (dead + no mcResolveSoftRef
+  replacement), matching Ruffle's dead-reference coercion.
+- **:2542 (getSWFVersion on default TextField) — FIXED.** The MOVIECLIP-arm
+  `getSWFVersion` case now returns undefined for SWF6+ TextField receivers
+  with no OWN `getSWFVersion` on dynamic_props (TextField.prototype doesn't
+  inherit it); the explicit assignment at :2549 lands on dynamic_props and
+  takes the normal version path. MovieClip-v5 stays RM; TextField.as never
+  calls getSWFVersion.
+
+**Diagnosed, deferred (risk exceeds 1-line payoff; re-approach deliberately):**
+
+- **:2191 (Phase 14 residual, `propinspect == 0`).** New root cause: ming
+  compiles `mc._x = 1` as dotted `SetVariable("mc._x")`. Our dotted-path
+  target resolution (`actionSetVariable` → `resolveFlashPathToMC`) walks
+  display-list children FIRST, so it writes the fresh child clip `mc`'s raw
+  `_x`; Flash resolves the SCRIPT VARIABLE `mc` (still `_root` from :2143)
+  first, so the child's raw `_x` stays 0 and the trailing
+  `GetProperty('mc',0)` (which correctly resolves the CHILD path-first) reads
+  0. The fix is a variables-before-children precedence swap for DOT-separated
+  SetVariable/GetVariable targets — high regression risk against the
+  avm1/target_paths Ruffle-parity architecture; don't attempt casually.
+- **:2097/:2100 (Phase 1 residuals)** — unchanged diagnosis (arguments.caller
+  through the `meth` builtin frame; user-override dispatch for primitive
+  Number receivers mirroring the ~200-line String-arm inline machinery at
+  actionCallMethod's STRING case). Prefer refactoring the String-arm dispatch
+  into a shared helper first.
+- **:2590/:2596 (toString singletons)** — requires the full chain: native
+  `Boolean.prototype.toString` identity surviving `mc.toString = ...`
+  assignment, dprops-first dispatch for `toString` on MOVIECLIP receivers
+  (currently routed to the generic object-method path), and a Boolean "relay"
+  emulation (`super()` running the Boolean ctor with a MovieClip `this` must
+  mark the MC so the native toString returns "false" instead of undefined).
+  Note the Flash-captured expected output shows Date does NOT relay onto MCs
+  (:2581 FAILED in expected) but Boolean does (:2596 PASSED) — any relay
+  emulation must be per-class.
+
 Last updated: 2026-05-29 (Phases 9 + 10 + 12 landed, pending CI —
 getBounds for AS-created (createEmptyMovieClip) clips. MovieClip-v6
 dropped 91 → 57 mismatched lines (−34). Three changes in

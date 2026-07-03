@@ -23043,31 +23043,13 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 			child_mc_cache[i]->avm1_removed = 1;
 			child_mc_cache[i]->dynamic_props = NULL;
 			child_mc_cache[i]->ng_textfield_idx = -1;
-			// Phase 2c (CLONESPRITE_DEPTH_BIAS): if the MC was a CloneSprite/
-			// duplicateMovieClip clone, its name has an explicit MOVIECLIP entry
-			// in the global var_map (set by setVariableByName at clone time).
-			// Without clearing it, `typeof(name)` after RemoveObject2 still
-			// returns 'movieclip' from the stale var_map entry instead of
-			// 'undefined'. Mirrors what actionInvalidateMCAtASDepth does for
-			// the empty-DL-slot path. Only clears when the var_map currently
-			// resolves to THIS MC pointer — timeline MCs lazy-init to empty
-			// strings, not MOVIECLIP, so this is a no-op for them.
-			if (child_mc_cache[i]->name[0] != '\0') {
-				extern bool hasVariable(char* var_name, size_t key_size);
-				extern ActionVar* getVariable(char* var_name, size_t key_size);
-				size_t _nl = strlen(child_mc_cache[i]->name);
-				if (hasVariable(child_mc_cache[i]->name, _nl)) {
-					ActionVar* existing = getVariable(child_mc_cache[i]->name, _nl);
-					if (existing != NULL
-					    && existing->type == ACTION_STACK_VALUE_MOVIECLIP
-					    && (MovieClip*)(uintptr_t)existing->data.numeric_value == child_mc_cache[i])
-					{
-						ActionVar undef = {0};
-						undef.type = ACTION_STACK_VALUE_UNDEFINED;
-						setVariableByName(child_mc_cache[i]->name, &undef);
-					}
-				}
-			}
+			// Do NOT clear a same-named var_map entry: post de-conflation,
+			// clones/creates never auto-register in var_map, so a MOVIECLIP
+			// entry there is a USER variable holding this clip — and Flash
+			// keeps such variables alive across removal (typeof stays
+			// 'movieclip', member reads yield undefined; Ruffle
+			// Value::MovieClip type_of is unconditional). Writing typed
+			// UNDEFINED here destroyed the user var (MovieClip.as:996 umc).
 			// Instance-name binding lives on the parent's dynamic_props now.
 			mcDropParentInstanceBinding(app_context, child_mc_cache[i]);
 			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead
@@ -23147,25 +23129,9 @@ void actionInvalidateMCAtASDepth(SWFAppContext* app_context, int as_depth)
 		mcDropParentInstanceBinding(app_context, ch);
 		ch->dynamic_props = NULL;
 		ch->ng_textfield_idx = -1;
-		// Clear a stale global variable entry only when it references THIS
-		// MC (a user var pointing at the removed clone reads as undefined —
-		// matches the historical behavior for `typeof(dup)`).
-		if (ch->name[0] != '\0') {
-			extern bool hasVariable(char* var_name, size_t key_size);
-			extern ActionVar* getVariable(char* var_name, size_t key_size);
-			size_t _iad_nl = strlen(ch->name);
-			if (hasVariable(ch->name, _iad_nl)) {
-				ActionVar* _iad_v = getVariable(ch->name, _iad_nl);
-				if (_iad_v != NULL
-				    && _iad_v->type == ACTION_STACK_VALUE_MOVIECLIP
-				    && (MovieClip*)(uintptr_t)_iad_v->data.numeric_value == ch)
-				{
-					ActionVar undef = {0};
-					undef.type = ACTION_STACK_VALUE_UNDEFINED;
-					setVariableByName(ch->name, &undef);
-				}
-			}
-		}
+		// Do NOT clear a same-named var_map entry — a MOVIECLIP entry there
+		// is a user variable and survives removal (typeof stays 'movieclip';
+		// see actionInvalidateCachedMovieClip).
 		ch->depth = INT_MIN;
 		break;
 	}
@@ -23304,20 +23270,10 @@ void actionFinalizePendingRemovals(SWFAppContext* app_context)
 						               _fpr_mc->name, strlen(_fpr_mc->name));
 					}
 				}
-				if (_fpr_parent == &root_movieclip) {
-					extern bool hasVariable(char* var_name, size_t key_size);
-					extern ActionVar* getVariable(char* var_name, size_t key_size);
-					size_t _fpr_nl = strlen(_fpr_mc->name);
-					if (hasVariable(_fpr_mc->name, _fpr_nl)) {
-						ActionVar* _fpr_vv = getVariable(_fpr_mc->name, _fpr_nl);
-						if (_fpr_vv != NULL
-						    && _fpr_vv->type == ACTION_STACK_VALUE_MOVIECLIP
-						    && (MovieClip*)(uintptr_t)_fpr_vv->data.numeric_value == _fpr_mc) {
-							ActionVar _fpr_sentinel = {0};
-							setVariableByName(_fpr_mc->name, &_fpr_sentinel);
-						}
-					}
-				}
+				// A same-named var_map entry is a USER variable (creation no
+				// longer auto-registers there) — Flash keeps it across
+				// removal (typeof stays 'movieclip'; see the removeMovieClip
+				// immediate branch), so do not sentinel-clear it here either.
 			}
 			// Phase C: drain TF binding registry on container unload.
 			actionUnregisterTextFieldBindings(_fpr_mc);
@@ -24187,33 +24143,9 @@ void actionRewindCleanup(SWFAppContext* app_context)
 						ch->name, strlen(ch->name), &undef);
 				}
 			}
-			// Also clear from global variable table — BUT ONLY if the name
-			// currently resolves to THIS MC pointer. CloneSprite/
-			// duplicateMovieClip register their clones as explicit
-			// MOVIECLIP var_map entries; timeline-placed MCs do not. Any
-			// entry that is a lazy-created empty-string placeholder (from
-			// prior `typeof(name)` / GetVariable("name") calls) must be
-			// left alone — overwriting it with UNDEFINED would shadow
-			// display-list lookups for a re-placed timeline MC of the same
-			// name (VAR_NOT_FOUND in actionGetVariable treats explicit
-			// UNDEFINED as "found", skipping the display-list fallback).
-			{
-				extern bool hasVariable(char* var_name, size_t key_size);
-				extern ActionVar* getVariable(char* var_name, size_t key_size);
-				size_t _nl = strlen(ch->name);
-				if (hasVariable(ch->name, _nl)) {
-					ActionVar* existing = getVariable(ch->name, _nl);
-					int is_self_clone_entry = (existing != NULL
-					    && existing->type == ACTION_STACK_VALUE_MOVIECLIP
-					    && (MovieClip*)(uintptr_t)existing->data.numeric_value == ch);
-					if (is_self_clone_entry) {
-						ActionVar undef = {0};
-						undef.type = ACTION_STACK_VALUE_UNDEFINED;
-						extern void setVariableByName(const char* var_name, ActionVar* value);
-						setVariableByName(ch->name, &undef);
-					}
-				}
-			}
+			// Do NOT clear a same-named var_map entry — a MOVIECLIP entry
+			// there is a user variable and survives removal (typeof stays
+			// 'movieclip'; see actionInvalidateCachedMovieClip).
 			ch->depth = INT_MIN;
 			child_mc_cache[i] = NULL;
 		}
@@ -56081,13 +56013,12 @@ void actionRemoveSprite(SWFAppContext* app_context)
 					deleteProperty(app_context, (ASObject*)_rs_parent->dynamic_props,
 					               _rs_mc->name, strlen(_rs_mc->name));
 				}
-				// Also clear from root-level variable table (set by createEmptyMovieClip)
-				// Use uninitialized sentinel (type=0/str_size=0/heap_ptr=NULL) so
-				// VAR_NOT_FOUND falls through to display list lookup for new MCs.
-				if (_rs_mc->name[0]) {
-					ActionVar _rs_sentinel = {0};
-					setVariableByName(_rs_mc->name, &_rs_sentinel);
-				}
+				// Do NOT clear a same-named var_map entry: creation no longer
+				// auto-registers there (de-conflation), so any MOVIECLIP entry
+				// is a USER variable — Flash keeps it across removal (typeof
+				// stays 'movieclip', MovieClip.as:996 umc; member access
+				// soft-ref rebinds via mcResolveSoftRef when a same-named
+				// clip reappears).
 				// Mark as removed — keep dynamic_props intact until pending unload fires
 				_rs_mc->avm1_removed = 1;
 				_rs_mc->depth = INT_MIN;
@@ -68511,6 +68442,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 13 && strncasecmp(method_name, "getSWFVersion", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
+			// SWF6+ TextFields don't inherit getSWFVersion — TextField.prototype's
+			// chain doesn't include MovieClip.prototype, so the default call is
+			// `undefined()` → undefined (gnash MovieClip.as:2542). An explicitly
+			// assigned method (`t1.getSWFVersion = MovieClip.prototype.getSWFVersion`,
+			// :2549) lands on dynamic_props and takes the normal version path.
+			if (MC_IS_TEXTFIELD(mc) && g_swf_version >= 6)
+			{
+				ActionVar* _gsv_own = (mc->dynamic_props != NULL)
+					? getProperty((ASObject*)mc->dynamic_props, "getSWFVersion", 13) : NULL;
+				if (_gsv_own == NULL || _gsv_own->type != ACTION_STACK_VALUE_FUNCTION)
+				{
+					pushUndefined(app_context);
+					return;
+				}
+			}
 			double v = mc->load_failed ? -1.0 : mc->loaded_image_width > 0 ? -1.0 : (mc->swf_version ? (double)mc->swf_version : (double)g_swf_version);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
@@ -68992,6 +68938,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// getBounds(targetCoordSpace) / getRect(targetCoordSpace)
 			// Returns {xMin, yMin, xMax, yMax} in the target's coordinate space.
 			// Empty clips return sentinel values.
+			// A dangling reference (destroyed clip; mcResolveSoftRef already
+			// found no live replacement at dispatch entry) yields undefined —
+			// Ruffle's dead MovieClipReference coerces to no receiver, so the
+			// whole call is undefined (MovieClip.as:998 umc after removal).
+			if (mc == NULL || mc->depth == INT_MIN) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
 			// Ruffle gates getRect with VERSION_8 — in SWF<8, calling getRect
 			// returns undefined (the prototype property stays visible to
 			// hasOwnProperty but the function isn't callable as a method).
@@ -70441,11 +70396,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						deleteProperty(app_context, (ASObject*)_rmc_parent->dynamic_props,
 						               mc->name, strlen(mc->name));
 					}
-					// Also clear from root-level variable table (set by createEmptyMovieClip)
-					if (mc->name[0]) {
-						ActionVar _rmc_sentinel = {0};
-						setVariableByName(mc->name, &_rmc_sentinel);
-					}
+					// Do NOT clear a same-named var_map entry: creation no longer
+					// auto-registers there (de-conflation), so any MOVIECLIP
+					// entry is a USER variable — Flash keeps it across removal
+					// (typeof stays 'movieclip', MovieClip.as:996 umc).
 					// Mark as removed — keep dynamic_props intact until pending unload fires
 					mc->avm1_removed = 1;
 					mc->depth = INT_MIN;
