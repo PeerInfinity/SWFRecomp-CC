@@ -669,14 +669,41 @@ static int g_use_new_invalid_bounds = 0;  // Ruffle: one-way flag, flips to 1 wh
 // so subsystem files carved out of action.c can use it too.
 
 // ==================================================================
-// Special Recursion Counter (for getter/setter/valueOf/toString)
+// Special Recursion Counter (LocalConnection/NetStream dispatch etc.)
 // ==================================================================
-// Flash/Ruffle tracks a separate "special" recursion counter for
-// getter/setter invocations. Hard limit of 66 — non-fatal (returns
-// undefined instead of halting execution).
+// Non-fatal recursion bound for internal callback dispatch (drops the call
+// instead of halting execution). NOTE: addProperty getter/setter invocations
+// no longer use this — they count toward g_call_depth/g_max_call_depth (the
+// ScriptLimits bound; exceeding it halts the script like Flash) and are
+// re-entry-limited per addProperty entry (see invokeVirtualGetter/Setter).
 
 #define MAX_SPECIAL_DEPTH 66
 static u32 g_special_depth = 0;
+
+// Flash-parity accessor/function recursion (up to g_max_call_depth = 256
+// nested invocations before script death) can stack ~64KB interpreter frames
+// (actionGetMember/actionSetMember are huge), overflowing the default 8MB
+// main-thread stack around ~130 deep. Raise the soft RLIMIT_STACK at program
+// start — the Linux kernel consults the current limit on each stack-growth
+// fault, so the already-running main thread gains the headroom.
+// (WASM builds instead use -sSTACK_SIZE in build scripts.)
+#if !defined(__EMSCRIPTEN__) && (defined(__linux__) || defined(__APPLE__))
+#include <sys/resource.h>
+__attribute__((constructor))
+static void raiseStackLimitForScriptRecursion(void)
+{
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_STACK, &rl) == 0)
+	{
+		rlim_t want = (rlim_t)64 * 1024 * 1024;
+		if (rl.rlim_cur != RLIM_INFINITY && rl.rlim_cur < want)
+		{
+			rl.rlim_cur = (rl.rlim_max == RLIM_INFINITY || rl.rlim_max > want) ? want : rl.rlim_max;
+			setrlimit(RLIMIT_STACK, &rl);
+		}
+	}
+}
+#endif
 
 // ------------------------------------------------------------------
 // addProperty getter/setter re-entrancy guard.
@@ -689,24 +716,43 @@ static u32 g_special_depth = 0;
 // underlying value (a documented Flash quirk — Gnash's Object.as marks
 // the SWF7+ count `xcheck_equals(..., 65) // urgh!`).
 //
-// We model this with a per-(object, property-name) re-entrancy stack:
-// the getter/setter is invoked while the re-entry count is below the
-// version-specific limit (1 for SWF6, 65 for SWF7+); once the limit is
-// reached the access falls back to the property's underlying value.
-#define MAX_ACTIVE_ACCESSORS 96
+// The re-entrancy key is version-specific (both counted on one LIFO stack):
+//   SWF6:  per (receiver object, property name, getter-vs-setter) — one
+//          invocation per chain, then the underlying value.
+//   SWF7+: per addProperty ENTRY (the registration slot, keyed by
+//          ASProperty::vprop_id), getter and setter invocations COMBINED,
+//          65 per chain. Two receivers delegating to the same proto entry
+//          share one counter (virtual_property_recursion_scope o1/o2 via p:
+//          65 total); two entries recursing into each other get 65 each
+//          (double_swf7: 130); delete + re-addProperty creates a fresh slot
+//          and therefore a fresh counter (scope o6: unbounded, bottoms out
+//          at the g_max_call_depth script-death backstop in the invokers).
+// Sized above the deepest legal nesting: g_max_call_depth (256) accessor
+// frames can be live before the invoker backstop halts the script.
+#define MAX_ACTIVE_ACCESSORS 320
 typedef struct {
 	void* this_obj;
 	u32 name_len;
+	u32 entry_id;
 	u8 is_setter;
 	char name[64];
 } ActiveAccessor;
 static ActiveAccessor g_active_accessors[MAX_ACTIVE_ACCESSORS];
 static u32 g_active_accessor_count = 0;
 
+// Monotonic id source for ASProperty::vprop_id (0 = unassigned).
+static u32 g_vprop_id_seq = 0;
+static u32 vpropEntryId(ASProperty* prop)
+{
+	if (prop->vprop_id == 0) prop->vprop_id = ++g_vprop_id_seq;
+	return prop->vprop_id;
+}
+
 static int countActiveAccessor(void* this_obj, const char* name, u32 name_len, u8 is_setter)
 {
 	int c = 0;
-	for (u32 i = 0; i < g_active_accessor_count; i++)
+	u32 n = g_active_accessor_count < MAX_ACTIVE_ACCESSORS ? g_active_accessor_count : MAX_ACTIVE_ACCESSORS;
+	for (u32 i = 0; i < n; i++)
 	{
 		ActiveAccessor* a = &g_active_accessors[i];
 		if (a->this_obj == this_obj && a->is_setter == is_setter &&
@@ -716,12 +762,26 @@ static int countActiveAccessor(void* this_obj, const char* name, u32 name_len, u
 	return c;
 }
 
-static void pushActiveAccessor(void* this_obj, const char* name, u32 name_len, u8 is_setter)
+static int countActiveAccessorEntry(u32 entry_id)
 {
-	if (g_active_accessor_count >= MAX_ACTIVE_ACCESSORS) return;
-	ActiveAccessor* a = &g_active_accessors[g_active_accessor_count++];
+	int c = 0;
+	u32 n = g_active_accessor_count < MAX_ACTIVE_ACCESSORS ? g_active_accessor_count : MAX_ACTIVE_ACCESSORS;
+	for (u32 i = 0; i < n; i++)
+		if (g_active_accessors[i].entry_id == entry_id)
+			c++;
+	return c;
+}
+
+static void pushActiveAccessor(void* this_obj, const char* name, u32 name_len, u8 is_setter, u32 entry_id)
+{
+	// Count past capacity (records beyond MAX are dropped but the depth stays
+	// balanced with popActiveAccessor — an unbalanced silent drop would make
+	// pops eat other frames' records and the counters lose track entirely).
+	if (g_active_accessor_count++ >= MAX_ACTIVE_ACCESSORS) return;
+	ActiveAccessor* a = &g_active_accessors[g_active_accessor_count - 1];
 	a->this_obj = this_obj;
 	a->is_setter = is_setter;
+	a->entry_id = entry_id;
 	a->name_len = name_len < 63 ? name_len : 63;
 	memcpy(a->name, name, a->name_len);
 	a->name[a->name_len] = 0;
@@ -739,6 +799,13 @@ static int accessorReentryLimit(void)
 {
 	return (g_swf_version <= 6) ? 1 : 65;
 }
+
+// Centralized addProperty accessor dispatch (guard + invoke + fallback).
+// All virtual-property getter/setter invocations should go through these so
+// the re-entrancy rules above apply uniformly on every dispatch path
+// (GetMember/SetMember, GetVariable/SetVariable scope walks, MC dprops, ...).
+static ActionVar invokeVirtualGetter(SWFAppContext* app_context, ASProperty* prop, void* this_obj);
+static void invokeVirtualSetter(SWFAppContext* app_context, ASProperty* prop, void* this_obj, ActionVar* value);
 
 // ==================================================================
 // Function Storage and Management
@@ -8027,10 +8094,17 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 	undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (func == NULL || g_execution_halted) return undef;
 
-	g_special_depth++;
-	if (g_special_depth >= MAX_SPECIAL_DEPTH)
+	// An accessor invocation is a function call: it counts toward Flash's
+	// ScriptLimits recursion bound, and blowing it kills the whole script
+	// (silently), exactly like runaway user-function recursion. This is the
+	// backstop for accessor recursion the per-entry counters never bound
+	// (e.g. a getter that delete+re-addProperty's itself each pass gets a
+	// fresh counter every cycle — virtual_property_recursion_scope o6).
+	g_call_depth++;
+	if (g_call_depth > g_max_call_depth)
 	{
-		g_special_depth--;
+		g_call_depth--;
+		g_execution_halted = 1;
 		return undef;
 	}
 
@@ -8149,7 +8223,7 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 	}
 
 	g_this_depth = saved_this_depth;
-	g_special_depth--;
+	g_call_depth--;
 	return result;
 }
 
@@ -8182,7 +8256,7 @@ static int tryAutoBoxPrimitive(SWFAppContext* app_context, ActionVar* obj_var, A
 		if (gp != NULL) {
 			ActionVar ctor_val;
 			if (gp->getter != NULL) {
-				ctor_val = invokePropertyGetter(app_context, (ASFunction*)gp->getter, (void*)active_global);
+				ctor_val = invokeVirtualGetter(app_context, gp, (void*)active_global);
 			} else {
 				ctor_val = gp->value;
 			}
@@ -8435,10 +8509,13 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 {
 	if (func == NULL || g_execution_halted) return;
 
-	g_special_depth++;
-	if (g_special_depth >= MAX_SPECIAL_DEPTH)
+	// See invokePropertyGetter: accessor calls count toward the ScriptLimits
+	// recursion bound; exceeding it halts the script like Flash.
+	g_call_depth++;
+	if (g_call_depth > g_max_call_depth)
 	{
-		g_special_depth--;
+		g_call_depth--;
+		g_execution_halted = 1;
 		return;
 	}
 
@@ -8570,7 +8647,48 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 	}
 
 	g_this_depth = saved_this_depth;
-	g_special_depth--;
+	g_call_depth--;
+}
+
+// Centralized addProperty accessor dispatch. Applies the version-specific
+// re-entrancy rule (see the ActiveAccessor block comment), invoking the
+// accessor while under the limit and falling back to the property's
+// underlying stored value once it's reached.
+static int virtualAccessorBlocked(ASProperty* prop, void* this_obj, u8 is_setter)
+{
+	if (g_swf_version <= 6)
+		return countActiveAccessor(this_obj, prop->name, prop->name_length, is_setter) >= accessorReentryLimit();
+	return countActiveAccessorEntry(vpropEntryId(prop)) >= accessorReentryLimit();
+}
+
+static ActionVar invokeVirtualGetter(SWFAppContext* app_context, ASProperty* prop, void* this_obj)
+{
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (prop == NULL || prop->getter == NULL) return undef;
+	if (virtualAccessorBlocked(prop, this_obj, 0))
+	{
+		// Re-entrant read past the limit — resolve to the underlying value.
+		return prop->value;
+	}
+	pushActiveAccessor(this_obj, prop->name, prop->name_length, 0, vpropEntryId(prop));
+	ActionVar result = invokePropertyGetter(app_context, (ASFunction*)prop->getter, this_obj);
+	popActiveAccessor();
+	return result;
+}
+
+static void invokeVirtualSetter(SWFAppContext* app_context, ASProperty* prop, void* this_obj, ActionVar* value)
+{
+	if (prop == NULL || prop->setter == NULL) return;
+	if (virtualAccessorBlocked(prop, this_obj, 1))
+	{
+		// Re-entrant write past the limit — store to the underlying value.
+		prop->value = *value;
+		return;
+	}
+	pushActiveAccessor(this_obj, prop->name, prop->name_length, 1, vpropEntryId(prop));
+	invokePropertySetter(app_context, (ASFunction*)prop->setter, this_obj, value);
+	popActiveAccessor();
 }
 
 // ============================================================================
@@ -8661,8 +8779,7 @@ void actionReplayConstructParams(SWFAppContext* app_context, MovieClip* mc)
 				g_event_this_mc = mc;
 				MovieClip* saved_ctx = g_current_context;
 				actionSetCurrentContext(mc);
-				invokePropertySetter(app_context, (ASFunction*) prop_struct->setter,
-				                     NULL, &p->value);
+				invokeVirtualSetter(app_context, prop_struct, NULL, &p->value);
 				actionSetCurrentContext(saved_ctx);
 				g_event_this_mc = saved_event_this;
 			}
@@ -12854,10 +12971,13 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
     int py = sy ? (int)tsArgToDouble_ctx(app_context, sy) : 0;
     int bx = px - fx;
     int by = py - fy;
+    // Point hit test: threshold 0 acts as 1 (fully transparent pixels never
+    // hit) — Flash behavior, matches Ruffle's hit_test_point (f15d278f1).
+    int point_alpha = first_alpha < 1 ? 1 : first_alpha;
     if (bx >= 0 && bx < bmp->width && by >= 0 && by < bmp->height) {
         uint32_t p = bmp->pixels[by * bmp->width + bx];
         int a = (p >> 24) & 0xFF;
-        if (a >= first_alpha) {
+        if (a >= point_alpha) {
             r.type = ACTION_STACK_VALUE_BOOLEAN;
             r.data.numeric_value = 1;
             return r;
@@ -14621,7 +14741,7 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 		ASProperty* vof_struct = findPropertyStructWithPrototype(obj, "valueOf", 7);
 		if (vof_struct != NULL && vof_struct->getter != NULL)
 		{
-			ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)vof_struct->getter, (void*)obj);
+			ActionVar getter_result = invokeVirtualGetter(app_context, vof_struct, (void*)obj);
 			ASFunction* vof_func = NULL;
 			if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
 				vof_func = lookupFunctionFromVar(&getter_result);
@@ -14926,7 +15046,7 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 		ASProperty* ts_struct = findPropertyStructWithPrototype(obj, "toString", 8);
 		if (ts_struct != NULL && ts_struct->getter != NULL)
 		{
-			ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ts_struct->getter, (void*)obj);
+			ActionVar getter_result = invokeVirtualGetter(app_context, ts_struct, (void*)obj);
 			ASFunction* ts_func = NULL;
 			if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
 				ts_func = lookupFunctionFromVar(&getter_result);
@@ -19580,7 +19700,7 @@ static ActionVar builtin_xml_sendAndLoad(SWFAppContext* app_context, ActionVar* 
 	ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
 	ASProperty* loaded_prop = findPropertyStructWithPrototype(target, "loaded", 6);
 	if (loaded_prop != NULL && loaded_prop->setter != NULL) {
-		invokePropertySetter(app_context, (ASFunction*) loaded_prop->setter, (void*) target, &lf);
+		invokeVirtualSetter(app_context, loaded_prop, (void*) target, &lf);
 	} else {
 		setProperty(app_context, target, "loaded", 6, &lf);
 	}
@@ -29748,7 +29868,7 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 				ASProperty* vof_struct = findPropertyStructWithPrototype(obj, "valueOf", 7);
 				if (vof_struct != NULL && vof_struct->getter != NULL)
 				{
-					ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)vof_struct->getter, (void*)obj);
+					ActionVar getter_result = invokeVirtualGetter(app_context, vof_struct, (void*)obj);
 					ASFunction* vof_func = NULL;
 					if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
 						vof_func = lookupFunctionFromVar(&getter_result);
@@ -36792,8 +36912,7 @@ static ActionVar builtin_loadvars_toString(SWFAppContext* app_context, ActionVar
 		// to clean up out_buf locally; HALLOC entries are tracked).
 		ActionVar value_var;
 		if (p->getter != NULL) {
-			value_var = invokePropertyGetter(app_context,
-				(ASFunction*) p->getter, (void*) lv);
+			value_var = invokeVirtualGetter(app_context, p, (void*) lv);
 		} else {
 			value_var = p->value;
 		}
@@ -40709,7 +40828,7 @@ void actionGetVariable(SWFAppContext* app_context)
 				}
 				else if (prop_struct->getter != NULL)
 				{
-					ActionVar result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)scope_chain[i]);
+					ActionVar result = invokeVirtualGetter(app_context, prop_struct, (void*)scope_chain[i]);
 					// Track scope callable this for CallFunction
 					// Ruffle: scope.resolve() returns Callable(scope_obj, value) for ALL scope levels
 					if (scope_mc[i] != NULL) {
@@ -40933,7 +41052,7 @@ void actionGetVariable(SWFAppContext* app_context)
 				ASProperty* gp = findPropertyStructWithPrototype(global_object, var_name, var_name_len);
 				if (gp != NULL && gp->getter != NULL)
 				{
-					ActionVar result = invokePropertyGetter(app_context, (ASFunction*)gp->getter, (void*)global_object);
+					ActionVar result = invokeVirtualGetter(app_context, gp, (void*)global_object);
 					pushVar(app_context, &result);
 					return;
 				}
@@ -40977,8 +41096,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			{
 				if (own_prop->getter != NULL)
 				{
-					ActionVar result = invokePropertyGetter(app_context,
-						(ASFunction*)own_prop->getter,
+					ActionVar result = invokeVirtualGetter(app_context, own_prop,
 						(void*)ctx_mc->dynamic_props);
 					pushVar(app_context, &result);
 					return;
@@ -41006,8 +41124,7 @@ void actionGetVariable(SWFAppContext* app_context)
 				(ASObject*)ctx_mc->dynamic_props, var_name, var_name_len);
 			if (ctx_prop_struct != NULL && ctx_prop_struct->getter != NULL)
 			{
-				ActionVar result = invokePropertyGetter(app_context,
-					(ASFunction*)ctx_prop_struct->getter,
+				ActionVar result = invokeVirtualGetter(app_context, ctx_prop_struct,
 					(void*)ctx_mc->dynamic_props);
 				pushVar(app_context, &result);
 				return;
@@ -41022,8 +41139,7 @@ void actionGetVariable(SWFAppContext* app_context)
 				g_movieclip_constructor.prototype_obj, var_name, var_name_len);
 			if (proto_prop != NULL && proto_prop->getter != NULL)
 			{
-				ActionVar result = invokePropertyGetter(app_context,
-					(ASFunction*)proto_prop->getter,
+				ActionVar result = invokeVirtualGetter(app_context, proto_prop,
 					(void*)g_movieclip_constructor.prototype_obj);
 				pushVar(app_context, &result);
 				return;
@@ -42199,7 +42315,7 @@ void actionSetVariable(SWFAppContext* app_context)
 					ActionVar value_var;
 					peekVar(app_context, &value_var);
 					POP_2();
-					invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, (void*)scope_chain[i], &value_var);
+					invokeVirtualSetter(app_context, prop_struct, (void*)scope_chain[i], &value_var);
 					return;
 				}
 				// Non-writable (ReadOnly) property — silently drop the assignment.
@@ -42321,7 +42437,7 @@ void actionSetVariable(SWFAppContext* app_context)
 			extern MovieClip* g_event_this_mc;
 			MovieClip* saved_event_this = g_event_this_mc;
 			g_event_this_mc = _uq_target;
-			invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, NULL, &value_var);
+			invokeVirtualSetter(app_context, prop_struct, NULL, &value_var);
 			g_event_this_mc = saved_event_this;
 			return;
 		}
@@ -42490,7 +42606,7 @@ void actionSetVariable(SWFAppContext* app_context)
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
 				POP_2();
-				invokePropertySetter(app_context, (ASFunction*)gp->setter, (void*)global_object, &value_var);
+				invokeVirtualSetter(app_context, gp, (void*)global_object, &value_var);
 				return;
 			}
 		}
@@ -42896,7 +43012,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
 				POP_2();
-				invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, (void*)scope_chain[i], &value_var);
+				invokeVirtualSetter(app_context, prop_struct, (void*)scope_chain[i], &value_var);
 				return;
 			}
 			// Property not directly on with object — continue to next scope
@@ -42943,7 +43059,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 					ActionVar value_var;
 					peekVar(app_context, &value_var);
 					POP_2();
-					invokePropertySetter(app_context, (ASFunction*)prop_struct->setter,
+					invokeVirtualSetter(app_context, prop_struct,
 						(void*)ctx_mc->dynamic_props, &value_var);
 					return;
 				}
@@ -42956,7 +43072,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 					ActionVar value_var;
 					peekVar(app_context, &value_var);
 					POP_2();
-					invokePropertySetter(app_context, (ASFunction*)proto_prop->setter,
+					invokeVirtualSetter(app_context, proto_prop,
 						(void*)g_movieclip_constructor.prototype_obj, &value_var);
 					return;
 				}
@@ -47769,18 +47885,16 @@ void actionSetMember(SWFAppContext* app_context)
 					{
 						// Invoke setter with this = original obj
 						// Push super context so setter can access super
-						if (countActiveAccessor((void*)obj, prop_name, prop_name_len, 1) >= accessorReentryLimit())
+						if (virtualAccessorBlocked(setter_prop, (void*)obj, 1))
 						{
-							// Re-entrant write of a property whose setter is
-							// already running — store to the underlying value.
+							// Re-entrant write past the limit — store to the
+							// underlying value.
 							setter_prop->value = value_var;
 						}
 						else
 						{
 							pushSuperContext((void*)obj, setter_search_depth);
-							pushActiveAccessor((void*)obj, prop_name, prop_name_len, 1);
-							invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
-							popActiveAccessor();
+							invokeVirtualSetter(app_context, setter_prop, (void*)obj, &value_var);
 							popSuperContext();
 							// Flash stores the assigned value into the property's
 							// underlying cache after the setter returns — the
@@ -47855,7 +47969,7 @@ void actionSetMember(SWFAppContext* app_context)
 				if (_ap != NULL && (_ap->getter != NULL || _ap->setter != NULL)) {
 					// Has addProperty — invoke setter or no-op if setter is null
 					if (_ap->setter != NULL) {
-						invokePropertySetter(app_context, (ASFunction*)_ap->setter, (void*)arr, &value_var);
+						invokeVirtualSetter(app_context, _ap, (void*)arr, &value_var);
 					}
 					return;
 				}
@@ -51021,20 +51135,9 @@ void actionGetMember(SWFAppContext* app_context)
 				// Virtual property (addProperty) — invoke getter with this = original obj
 				// Push super context so getter can access super (Ruffle behavior)
 				ActionVar result;
-				if (countActiveAccessor((void*)obj, prop_name, prop_name_len, 0) >= accessorReentryLimit())
-				{
-					// Re-entrant read of a property whose getter is already
-					// running on this object — resolve to the underlying value.
-					result = prop_struct->value;
-				}
-				else
-				{
-					pushSuperContext((void*)obj, prop_search_depth);
-					pushActiveAccessor((void*)obj, prop_name, prop_name_len, 0);
-					result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)obj);
-					popActiveAccessor();
-					popSuperContext();
-				}
+				pushSuperContext((void*)obj, prop_search_depth);
+				result = invokeVirtualGetter(app_context, prop_struct, (void*)obj);
+				popSuperContext();
 				pushVar(app_context, &result);
 			}
 			else
@@ -51278,7 +51381,7 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 			if (_ap != NULL && _ap->getter != NULL) {
 				// Invoke addProperty getter with the array as 'this' (pass as obj_var)
-				ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)_ap->getter, (void*)arr);
+				ActionVar getter_result = invokeVirtualGetter(app_context, _ap, (void*)arr);
 				pushVar(app_context, &getter_result);
 				return;
 			}
@@ -51410,7 +51513,7 @@ void actionGetMember(SWFAppContext* app_context)
 					ASProperty* ps = findPropertyRaw(func->own_props, "prototype", 9);
 					if (ps != NULL && ps->getter != NULL)
 					{
-						ActionVar result = invokePropertyGetter(app_context, (ASFunction*)ps->getter, (void*)func->own_props);
+						ActionVar result = invokeVirtualGetter(app_context, ps, (void*)func->own_props);
 						pushVar(app_context, &result);
 						_handled = 1;
 					}
@@ -51628,18 +51731,10 @@ void actionGetMember(SWFAppContext* app_context)
 			if (_mc_ap != NULL && (_mc_ap->getter != NULL || _mc_ap->setter != NULL))
 			{
 				ActionVar _mc_ap_result;
-				void* _mc_ap_key = (void*)mc->dynamic_props;
-				if (_mc_ap->getter == NULL ||
-				    countActiveAccessor(_mc_ap_key, prop_name, prop_name_len, 0) >= accessorReentryLimit())
-				{
+				if (_mc_ap->getter == NULL)
 					_mc_ap_result = _mc_ap->value;
-				}
 				else
-				{
-					pushActiveAccessor(_mc_ap_key, prop_name, prop_name_len, 0);
-					_mc_ap_result = invokePropertyGetter(app_context, (ASFunction*)_mc_ap->getter, (void*)mc->dynamic_props);
-					popActiveAccessor();
-				}
+					_mc_ap_result = invokeVirtualGetter(app_context, _mc_ap, (void*)mc->dynamic_props);
 				pushVar(app_context, &_mc_ap_result);
 				return;
 			}
@@ -51660,18 +51755,10 @@ void actionGetMember(SWFAppContext* app_context)
 				if (_pp_prop != NULL && (_pp_prop->getter != NULL || _pp_prop->setter != NULL))
 				{
 					ActionVar _pp_result;
-					void* _pp_key = (void*)mc->dynamic_props;
-					if (_pp_prop->getter == NULL ||
-					    countActiveAccessor(_pp_key, prop_name, prop_name_len, 0) >= accessorReentryLimit())
-					{
+					if (_pp_prop->getter == NULL)
 						_pp_result = _pp_prop->value;
-					}
 					else
-					{
-						pushActiveAccessor(_pp_key, prop_name, prop_name_len, 0);
-						_pp_result = invokePropertyGetter(app_context, (ASFunction*)_pp_prop->getter, (void*)mc->dynamic_props);
-						popActiveAccessor();
-					}
+						_pp_result = invokeVirtualGetter(app_context, _pp_prop, (void*)mc->dynamic_props);
 					pushVar(app_context, &_pp_result);
 					return;
 				}
@@ -57778,7 +57865,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				ASProperty* ctor_prop = findPropertyStructWithPrototype(base_proto, "__constructor__", 15);
 				if (ctor_prop != NULL) {
 					if (ctor_prop->getter != NULL) {
-						ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ctor_prop->getter, (void*)base_proto);
+						ActionVar getter_result = invokeVirtualGetter(app_context, ctor_prop, (void*)base_proto);
 						if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
 							parent_ctor = (ASFunction*) getter_result.data.numeric_value;
 					} else if (ctor_prop->value.type == ACTION_STACK_VALUE_FUNCTION) {
@@ -63445,7 +63532,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ASProperty* ctor_prop = findPropertyStructWithPrototype(base_proto, "__constructor__", 15);
 			if (ctor_prop != NULL) {
 				if (ctor_prop->getter != NULL) {
-					ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ctor_prop->getter, (void*)base_proto);
+					ActionVar getter_result = invokeVirtualGetter(app_context, ctor_prop, (void*)base_proto);
 					if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
 						parent_ctor = (ASFunction*) getter_result.data.numeric_value;
 				} else if (ctor_prop->value.type == ACTION_STACK_VALUE_FUNCTION) {
@@ -63456,7 +63543,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ASProperty* ctor_prop2 = findPropertyStructWithPrototype(base_proto, "constructor", 11);
 				if (ctor_prop2 != NULL) {
 					if (ctor_prop2->getter != NULL) {
-						ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ctor_prop2->getter, (void*)base_proto);
+						ActionVar getter_result = invokeVirtualGetter(app_context, ctor_prop2, (void*)base_proto);
 						if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
 							parent_ctor = (ASFunction*) getter_result.data.numeric_value;
 					} else if (ctor_prop2->value.type == ACTION_STACK_VALUE_FUNCTION) {
@@ -63664,7 +63751,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ASProperty* ctor_prop = findPropertyStructWithPrototype(base_proto, "__constructor__", 15);
 				if (ctor_prop != NULL) {
 					if (ctor_prop->getter != NULL) {
-						ActionVar getter_result = invokePropertyGetter(app_context, (ASFunction*)ctor_prop->getter, (void*)base_proto);
+						ActionVar getter_result = invokeVirtualGetter(app_context, ctor_prop, (void*)base_proto);
 						if (getter_result.type == ACTION_STACK_VALUE_FUNCTION)
 							parent_ctor = (ASFunction*) getter_result.data.numeric_value;
 					} else if (ctor_prop->value.type == ACTION_STACK_VALUE_FUNCTION) {

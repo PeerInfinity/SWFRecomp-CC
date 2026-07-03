@@ -33,12 +33,28 @@ Changes vs the 2026-06-19 state of this doc:
   was re-pointed (2026-07-02) — they remain accepted diffs
   (`ACCEPTED_DIFFS.md` Category 10), not regressions.
 - **New non-ignored failures, untriaged:**
-  - `virtual_property_recursion_double_swf7` (129/523) — the swf7 mutual
-    variant of the fixed swf6 family (`virtual_property_recursion_swf7`
-    single **passes**); likely the 65-deep re-entry analog of the watch swf7
-    accepted diffs — verify before assuming fixable.
-  - `virtual_property_recursion_scope` (6/11) — new scope variant.
-  - `bitmapdata_hittest_threshold` (5/6) — 1 line off.
+  - ~~`virtual_property_recursion_double_swf7`~~ — **FIXED 2026-07-02 → PASS**
+    (came free with the `_scope` fix below: per-entry combined re-entry
+    counters allow the two-entry 130-call chains).
+  - ~~`virtual_property_recursion_scope`~~ — **FIXED 2026-07-02 → PASS.**
+    Flash's SWF7+ accessor re-entry limit is 65 **per addProperty ENTRY**
+    (registration slot), getter+setter invocations combined — NOT per
+    receiver, NOT per kind, NOT a global depth cap. Two receivers delegating
+    to one proto entry share a counter (65); two entries recursing into each
+    other get 65 each (130); delete+re-addProperty mints a fresh counter, so
+    the o6 self-re-registering getter recurses until Flash's 256-call
+    ScriptLimits bound **kills the script** (expected output just ends).
+    Implemented in `action.c`: `ASProperty::vprop_id` +
+    `invokeVirtualGetter/Setter` centralized dispatch on ALL accessor paths;
+    the invokers' old silent depth-66 cap became a `g_call_depth`/
+    `g_max_call_depth` script-halt; startup `RLIMIT_STACK` raise so 130-256
+    deep interpreter recursion doesn't overflow the 8MB C stack.
+    SWF6 semantics (one invocation per receiver+kind, then underlying value)
+    unchanged.
+  - ~~`bitmapdata_hittest_threshold`~~ — **FIXED 2026-07-02 → PASS.** Point
+    hit-test treats `alphaThreshold=0` as 1 (fully transparent pixels never
+    hit) — upstream Ruffle fix `f15d278f1`; point path only, the rectangle
+    and bitmap-vs-bitmap paths keep plain `>=`.
   - `amf_strict_array_serialization` (1/7) — joins Bucket A's AMF codec group.
 - **Unchanged:** Bucket A (AMF, FileReference, multi-SWF child frames), Bucket
   B (`sound_setters` 14/43), `set_property_values/*` (still blocked at 92.9% /

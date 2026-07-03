@@ -97,6 +97,10 @@ struct ASProperty
 	ActionVar value;        // Property value (can be any type)
 	void* getter;           // ASFunction* or NULL (for addProperty virtual properties)
 	void* setter;           // ASFunction* or NULL (for addProperty virtual properties)
+	u32 vprop_id;           // Unique id of this addProperty registration (0 = unassigned;
+	                        // lazily assigned on first accessor dispatch). Keys the SWF7+
+	                        // getter/setter re-entry counter: delete + re-addProperty
+	                        // creates a new zeroed slot and therefore a fresh counter.
 };
 
 /**
