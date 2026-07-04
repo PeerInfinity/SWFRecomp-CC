@@ -7,8 +7,8 @@ from §5.2 of [`../merge/upstream-relationship-2026-07.md`](../merge/upstream-re
 > **This is the deliverable LittleCube asked for** (July 2026): *"whatever
 > information you have about flash features that games will expect to behave in a
 > particular way, that are not obvious to implement/normally undefined behavior."*
-> Sections 1–6 and 9 are the non-obvious behaviors; section 8 covers the
-> normally-undefined / Flash-bug territory.
+> Sections 1–8 and 11 are the non-obvious behaviors; section 10 covers the
+> normally-undefined / Flash-bug territory; section 9 is test methodology.
 
 SWFRecomp-CC has spent nine months making the Ruffle/Gnash/Shumway AVM1 test suites
 and several complete games pass. Most of that time went to behaviors that are
@@ -116,7 +116,48 @@ Trace tests barely touch this; games live in it.
   only register-based DefineFunction2 ones. Simple-function methods silently
   reading the *caller's* `this` works surprisingly often — until it doesn't.
 
-## 7. Determinism for testing (adopt early — cheap now, expensive later)
+## 7. Case sensitivity is a *runtime mode*, not a constant (SWF ≤ 6)
+
+Property, variable, function, and instance-name lookup is **case-insensitive in
+SWF6-and-below movies** and case-sensitive in SWF7+. Three consequences that are
+easy to miss:
+
+- It's decided by the *movie's* version at runtime, per comparison — not a
+  compile-time choice. Our matchers branch on the SWF version inside the compare
+  function itself.
+- Folding must be **Unicode-aware**, not `strcasecmp` — AVM1 folds non-ASCII
+  codepoints too (we use a codepoint case-fold with an ASCII fast path, and the
+  property hash is computed with the same fold so hash and compare agree).
+- **This interacts directly with string-ID interning** (relevant to your merged
+  architecture, which we surveyed in July 2026: property lookup is exact `u32`
+  id equality and the interner keys the hashmap by exact bytes). Under that
+  scheme, `foo` and `Foo` intern to different ids and become *different
+  properties* — correct for SWF7+, wrong for ≤6, where they must alias. The fix
+  shape: fold names before interning when the movie version is <7 (or intern a
+  folded id alongside the exact one). Lots of SWF5/6 games rely on sloppy
+  casing; this surfaces as "handler never fires" / "variable is undefined" bugs
+  that look unrelated to string handling.
+
+## 8. `for..in` enumeration order is load-bearing
+
+AVM1 enumerates object properties in **insertion order** (delivered in reverse,
+because Enumerate pushes them and the loop pops LIFO). Real content and emulator
+test suites both depend on it. Two traps:
+
+- **An id- or hash-ordered store breaks it.** An rbtree keyed by string id
+  iterates in id order (= interning order), not insertion order. If your
+  property store doesn't preserve insertion order natively, keep a side list or
+  ordered index for enumeration. (Your `ActionEnumerate` is currently
+  unimplemented, so this hasn't bitten yet — cheaper to design for now than to
+  retrofit.)
+- **Hidden-property masks are SWF-version-dependent.** `ASSetPropFlags` hiding
+  bits mean different things per movie version; enumeration must apply the
+  right mask. And mutations have quirky order effects — e.g. `Array.shift()`
+  densifies holes and moves a reassigned index to the *end* of enumeration
+  order. When you implement Enumerate, the Ruffle/Gnash enumeration tests are
+  the oracle to run early.
+
+## 9. Determinism for testing (adopt early — cheap now, expensive later)
 
 Seed `Math.random` and the clock **per test**: we compile every test with a
 `MOCK_DATE_TIME` macro (default matching Ruffle's `--deterministic` mode) and seed
@@ -126,7 +167,7 @@ after tests exist means re-blessing every expected output. Related: replicating
 **avmplus's exact RNG** and `%.15g`-style number formatting is required to match
 Ruffle's expected outputs at all.
 
-## 8. Flash is buggy on purpose — know when to stop "fixing"
+## 10. Flash is buggy on purpose — know when to stop "fixing"
 
 A class of behaviors are Flash Player *bugs* that both Ruffle and real content
 depend on. Implementing the "correct" version fails tests and games. We keep four
@@ -151,7 +192,7 @@ Also in this category: text-field bounds wanting a +1px fudge to match (see
 RUFFLE_COMPAT_TWEAKS above), and `setProperty(_x, Infinity)`-class quirks where
 Flash's internal numeric representation (float vs twips int) leaks into results.
 
-## 9. Miscellaneous sharp edges
+## 11. Miscellaneous sharp edges
 
 - **`tellTarget` + label goto on dynamically created clips** — target resolution
   must consult dynamically attached clips, not just the authored display list.

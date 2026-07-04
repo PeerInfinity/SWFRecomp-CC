@@ -43,13 +43,21 @@ CPU-bound titles.
 
 **Their design:** rbtree keyed by string ID — O(log n) lookup/insert/delete.
 
-**Our deficiency:** Linear `properties` array — O(n) scan per access, O(n²)-ish
-patterns for property-heavy objects (arrays used as dictionaries, large config
-objects, per-tile game state). Compounds with #1: we pay a string compare *per
-scanned entry*.
+**Our deficiency (largely mitigated June 2026):** Linear `properties` array. The
+raw O(n) strcmp scan is gone — properties now carry a precomputed case-folded
+`name_hash`, scans are hash-gated, and objects with ≥12 properties get a lazy
+open-addressing hash index (`findPropertySlot`, `object.c:196`). What remains is
+the per-lookup query hashing and UTF conversion (see #1).
 
-**Actionable:** Yes, and only worth doing together with #1 (integer keys make the
-tree cheap). Same caveat on priority.
+**Caveat found in the July 2026 survey:** rbtree iteration is *id order*, but AVM1
+`for..in` must enumerate in insertion order (reverse, via LIFO push) — our tests
+and real content depend on it. Upstream hasn't hit this only because their
+`ActionEnumerate` is currently unimplemented (body commented out). Our adoption
+path (see `plans/string-id-interning-plan.md`) therefore keys *comparison* by id
+but keeps the insertion-ordered array as storage.
+
+**Actionable:** Comparison-by-id yes (Stage 3 of the interning plan); the tree
+itself no.
 
 ## 3. All state in `app_context` — instantiability and re-entrancy
 

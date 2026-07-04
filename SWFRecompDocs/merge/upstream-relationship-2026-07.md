@@ -104,12 +104,17 @@ superseded, or architecturally impossible.**
 
 ### The one upstream idea we may adopt — as an idea, not code
 
-**String-ID interning + rbtree properties.** Our native profiling found ~67% of
-instruction count in property-name lookup (string hashing/comparison); interning was
-independently identified as our top AVM1-side performance lever. Upstream master is now
-a working reference implementation of exactly that design. If/when we do this work we
+**String-ID interning + rbtree properties.** Our native profiling initially found ~67%
+of instruction count in property-name lookup; hash-gating/indexing work landed in June
+2026 cut that roughly in half, and the residual name-handling complex (~40% on N's
+headless profile) is what full interning would eliminate. Upstream master is now a
+working reference implementation of the interning design. If/when we do this work we
 would implement it inside our own architecture rather than port code — but it is a
 genuine case of upstream having already solved a problem we will eventually face.
+(Full staged plan: `SWFRecompDocs/plans/string-id-interning-plan.md`, July 2026. The
+survey behind it also found two gaps in upstream's implementation worth flagging back:
+no SWF<7 case-insensitive lookup, and id-ordered rbtree iteration vs AVM1's
+insertion-ordered for-in — see the warnings doc.)
 
 (Worth noting the reverse also happened: both projects independently chose libtess2 to
 replace their original tessellation — upstream at runtime, we at recompile time. When
