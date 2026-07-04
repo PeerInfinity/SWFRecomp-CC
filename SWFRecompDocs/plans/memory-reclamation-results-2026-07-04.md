@@ -2,7 +2,9 @@
 
 **Date:** 2026-07-04 (updated same-session as fixes landed)
 **Plan:** [memory-reclamation-plan.md](memory-reclamation-plan.md)
-**Commits:** Stage 0 instrumentation `700e02a3a`, Stage 1a `<sha>`, Stage 1b `<sha>`
+**Commits:** Stage 0 instrumentation `700e02a3a`, Stage 1a `a38bbe7ea`,
+init_text UAF fix `09c353f58`, virtual-setter UAF fix `c8d52316f`,
+Stage 1b `9b2aa048b`
 
 ## Methodology
 
