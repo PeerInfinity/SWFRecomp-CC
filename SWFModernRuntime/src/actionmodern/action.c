@@ -1591,7 +1591,7 @@ static ASObject* resolveSoundTransformTarget(SWFAppContext* app_context, void* t
 	// Ensure dynamic_props exists on the MC, and that sound-transform
 	// defaults are initialized once on first use.
 	if (mc->dynamic_props == NULL) {
-		mc->dynamic_props = (void*) allocObject(app_context, 8);
+		mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 		retainObject((ASObject*) mc->dynamic_props);
 	}
 	ActionVar* existing = getProperty((ASObject*)mc->dynamic_props, "__volume__", 10);
@@ -4991,7 +4991,7 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 		MovieClip* mc = (MovieClip*)(u64)args[0].data.numeric_value;
 		if (mc != NULL) {
 			if (mc->dynamic_props == NULL)
-				mc->dynamic_props = (void*) allocObject(app_context, 8);
+				mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 			obj = (ASObject*) mc->dynamic_props;
 		}
 	}
@@ -21950,7 +21950,7 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 			MovieClip* container_mc = (MovieClip*) VAL(u64, &cvar.data.numeric_value);
 			if (container_mc == NULL) return 0;  // unresolvable
 			if (container_mc->dynamic_props == NULL) {
-				container_mc->dynamic_props = (void*) allocObject(app_context, 4);
+				container_mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
 				retainObject((ASObject*) container_mc->dynamic_props);
 			}
 			container = (ASObject*) container_mc->dynamic_props;
@@ -21961,7 +21961,7 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 	} else {
 		simple_binding_mc = (tf_mc->parent != NULL) ? tf_mc->parent : &root_movieclip;
 		if (simple_binding_mc->dynamic_props == NULL) {
-			simple_binding_mc->dynamic_props = (void*) allocObject(app_context, 4);
+			simple_binding_mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
 			retainObject((ASObject*) simple_binding_mc->dynamic_props);
 		}
 		container = (ASObject*) simple_binding_mc->dynamic_props;
@@ -22183,7 +22183,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			int tf_idx = ng_getTextFieldIdxByCharId(nested_char_id);
 			if (tf_idx >= 0) {
 				if (mc->dynamic_props == NULL) {
-					mc->dynamic_props = (void*) allocObject(app_context, 32);
+					mc->dynamic_props = (void*) allocDynamicProps(app_context, 32);
 					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ASObject* props = (ASObject*) mc->dynamic_props;
@@ -22431,7 +22431,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			// Pre-populate TextField default properties
 			if (ng_isTextFieldAtDepth(depth)) {
 				if (mc->dynamic_props == NULL) {
-					mc->dynamic_props = (void*) allocObject(app_context, 32);
+					mc->dynamic_props = (void*) allocDynamicProps(app_context, 32);
 					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ASObject* props = (ASObject*) mc->dynamic_props;
@@ -22859,7 +22859,7 @@ void actionInitDynTextFieldClone(SWFAppContext* app_context, MovieClip* mc) {
 	mc->ng_textfield_idx = -2;
 
 	if (mc->dynamic_props == NULL) {
-		mc->dynamic_props = (void*) allocObject(app_context, 32);
+		mc->dynamic_props = (void*) allocDynamicProps(app_context, 32);
 		retainObject((ASObject*) mc->dynamic_props);
 	}
 	ASObject* props = (ASObject*) mc->dynamic_props;
@@ -24291,7 +24291,7 @@ void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_nam
 						return;  // Already set, don't overwrite
 				}
 				if (target_props == NULL) {
-					target_mc->dynamic_props = (void*) allocObject(app_context, 8);
+					target_mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 					target_props = (ASObject*) target_mc->dynamic_props;
 				}
 				ActionVar init_val = {0};
@@ -26029,7 +26029,7 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 			if (target_mc != NULL) {
 				ASObject* target_props = (ASObject*) target_mc->dynamic_props;
 				if (target_props == NULL) {
-					target_mc->dynamic_props = (void*) allocObject(app_context, 8);
+					target_mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 					target_props = (ASObject*) target_mc->dynamic_props;
 				}
 				setProperty(app_context, target_props, final_prop, final_prop_len, text_value);
@@ -26088,7 +26088,7 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 	MovieClip* binding_mc = (mc->parent != NULL) ? mc->parent : &root_movieclip;
 	u32 var_name_simple_len = (u32)strlen(var_name);
 	if (binding_mc->dynamic_props == NULL) {
-		binding_mc->dynamic_props = (void*) allocObject(app_context, 4);
+		binding_mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
 		retainObject((ASObject*) binding_mc->dynamic_props);
 	}
 	// Honor ASSetPropFlags read-only locks on the bound variable: if the
@@ -33139,7 +33139,7 @@ static void parseURLEncodedVars(SWFAppContext* app_context, char* content, Movie
 
 	// Ensure target has dynamic_props
 	if (target_mc->dynamic_props == NULL) {
-		target_mc->dynamic_props = allocObject(app_context, 8);
+		target_mc->dynamic_props = allocDynamicProps(app_context, 8);
 	}
 
 	// Parse key=value&key=value... pairs
@@ -34089,7 +34089,7 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
 
     // Store file size on target MC for getProgress
     if (target_mc->dynamic_props == NULL) {
-        target_mc->dynamic_props = allocObject(app_context, 4);
+        target_mc->dynamic_props = allocDynamicProps(app_context, 4);
     }
     {
         ActionVar sz = {0};
@@ -35799,7 +35799,7 @@ static ActionVar builtin_asbroadcaster_initialize(SWFAppContext* app_context, Ac
             mc = reResolveDeadBaseClip(app_context, mc);
         }
         if (mc != NULL && mc->dynamic_props == NULL && mc->depth != INT_MIN) {
-            mc->dynamic_props = allocObject(app_context, 4);
+            mc->dynamic_props = allocDynamicProps(app_context, 4);
         }
         if (mc && mc->dynamic_props) target = (ASObject*) mc->dynamic_props;
     }
@@ -39233,7 +39233,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// Ruffle defines this on root object1 at SWF load — see context.rs:417.
 	{
 		if (root_movieclip.dynamic_props == NULL) {
-			root_movieclip.dynamic_props = (void*) allocObject(app_context, 8);
+			root_movieclip.dynamic_props = (void*) allocDynamicProps(app_context, 8);
 			retainObject((ASObject*) root_movieclip.dynamic_props);
 		}
 		ActionVar ver_val = {0}; ver_val.type = ACTION_STACK_VALUE_STRING;
@@ -42375,7 +42375,7 @@ void actionSetVariable(SWFAppContext* app_context)
 		// Ensure target clip has dynamic_props
 		if (_uq_target->dynamic_props == NULL)
 		{
-			_uq_target->dynamic_props = (void*) allocObject(app_context, 8);
+			_uq_target->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 		}
 		ASObject* clip_props = (ASObject*) _uq_target->dynamic_props;
 		ActionVar value_var;
@@ -42826,7 +42826,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 					// Also store the literal slash-path key on the MC, so that
 					// this['/:pqr'] (GetMember with literal key) can find it.
 					if (target_mc->dynamic_props == NULL) {
-						target_mc->dynamic_props = (void*)allocObject(app_context, 8);
+						target_mc->dynamic_props = (void*)allocDynamicProps(app_context, 8);
 					}
 					setProperty(app_context, (ASObject*)target_mc->dynamic_props,
 						var_name, var_name_len, &value_var);
@@ -42996,7 +42996,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 	if (g_current_context != NULL && g_current_context != &root_movieclip) {
 		MovieClip* mc = g_current_context;
 		if (mc->dynamic_props == NULL) {
-			mc->dynamic_props = (void*)allocObject(app_context, 8);
+			mc->dynamic_props = (void*)allocDynamicProps(app_context, 8);
 		}
 		ActionVar value_var;
 		peekVar(app_context, &value_var);
@@ -43316,7 +43316,7 @@ void actionDeclareLocal(SWFAppContext* app_context)
 
 			// Not found — create as own property on MC's dynamic_props
 			if (ctx_mc->dynamic_props == NULL)
-				ctx_mc->dynamic_props = (void*)allocObject(app_context, 8);
+				ctx_mc->dynamic_props = (void*)allocDynamicProps(app_context, 8);
 			ActionVar undefined_var = {0};
 			undefined_var.type = ACTION_STACK_VALUE_UNDEFINED;
 			setProperty(app_context, (ASObject*)ctx_mc->dynamic_props,
@@ -48503,7 +48503,7 @@ void actionSetMember(SWFAppContext* app_context)
 				if (strcasecmp(prop_name, "_parent") == 0 && MC_IS_TEXTFIELD(mc))
 				{
 					if (mc->dynamic_props == NULL) {
-						mc->dynamic_props = (void*) allocObject(app_context, 4);
+						mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
 						retainObject((ASObject*) mc->dynamic_props);
 					}
 					setProperty(app_context, (ASObject*) mc->dynamic_props, "_parent", 7, &value_var);
@@ -48556,7 +48556,7 @@ void actionSetMember(SWFAppContext* app_context)
 			if (prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0) {
 				if (value_var.type == ACTION_STACK_VALUE_ARRAY) {
 					if (mc->dynamic_props == NULL) {
-						mc->dynamic_props = allocObject(app_context, 4);
+						mc->dynamic_props = allocDynamicProps(app_context, 4);
 					}
 					setProperty(app_context, (ASObject*)mc->dynamic_props, "filters", 7, &value_var);
 				}
@@ -49214,7 +49214,7 @@ void actionSetMember(SWFAppContext* app_context)
 							if (strchr(new_var, '.') == NULL) {
 								extern MovieClip root_movieclip;
 								if (root_movieclip.dynamic_props == NULL) {
-									root_movieclip.dynamic_props = (void*) allocObject(app_context, 4);
+									root_movieclip.dynamic_props = (void*) allocDynamicProps(app_context, 4);
 									retainObject((ASObject*) root_movieclip.dynamic_props);
 								}
 								setProperty(app_context, (ASObject*) root_movieclip.dynamic_props,
@@ -49739,7 +49739,7 @@ void actionSetMember(SWFAppContext* app_context)
 				if (!MC_IS_TEXTFIELD(mc) && !mc->is_button_mc)
 				{
 					if (mc->dynamic_props == NULL) {
-						mc->dynamic_props = (void*) allocObject(app_context, 4);
+						mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
 						retainObject((ASObject*) mc->dynamic_props);
 					}
 					setPropertyWithFlags(app_context, (ASObject*) mc->dynamic_props,
@@ -49753,7 +49753,7 @@ void actionSetMember(SWFAppContext* app_context)
 			// Store in dynamic_props
 			if (mc->dynamic_props == NULL)
 			{
-				mc->dynamic_props = (void*) allocObject(app_context, 4);
+				mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
 				retainObject((ASObject*) mc->dynamic_props);
 			}
 			setProperty(app_context, (ASObject*) mc->dynamic_props, prop_name, prop_name_len, &value_var);
@@ -55864,7 +55864,7 @@ void actionCloneSprite(SWFAppContext* app_context)
 		// For root callers the var_map registration alone already works.
 		if (clone_mc != NULL && caller_ctx != &root_movieclip) {
 			if (caller_ctx->dynamic_props == NULL) {
-				caller_ctx->dynamic_props = (void*) allocObject(app_context, 32);
+				caller_ctx->dynamic_props = (void*) allocDynamicProps(app_context, 32);
 				retainObject((ASObject*) caller_ctx->dynamic_props);
 			}
 			ASObject* dp = (ASObject*) caller_ctx->dynamic_props;
@@ -56416,7 +56416,7 @@ static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc,
 
 	// Ensure dynamic_props exists
 	if (mc->dynamic_props == NULL) {
-		mc->dynamic_props = (void*) allocObject(app_context, 8);
+		mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 		retainObject((ASObject*) mc->dynamic_props);
 	}
 
@@ -56550,7 +56550,7 @@ int actionWithStart(SWFAppContext* app_context)
 			// Ensure mc has dynamic_props allocated
 			if (mc->dynamic_props == NULL)
 			{
-				mc->dynamic_props = (void*) allocObject(app_context, 8);
+				mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 			}
 			scope_is_with[scope_depth] = 1;
 			scope_mc[scope_depth] = mc;
@@ -56974,7 +56974,7 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 			// Child SWF context: store on MC's dynamic_props only
 			MovieClip* ctx = g_current_context;
 			if (ctx->dynamic_props == NULL) {
-				ctx->dynamic_props = (void*)allocObject(app_context, 8);
+				ctx->dynamic_props = (void*)allocDynamicProps(app_context, 8);
 			}
 			setProperty(app_context, (ASObject*)ctx->dynamic_props, resolved_name, strlen(resolved_name), &func_var);
 		} else {
@@ -56988,7 +56988,7 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 			if (g_current_context != NULL && g_current_context != &root_movieclip) {
 				MovieClip* ctx = g_current_context;
 				if (ctx->dynamic_props == NULL) {
-					ctx->dynamic_props = (void*)allocObject(app_context, 8);
+					ctx->dynamic_props = (void*)allocDynamicProps(app_context, 8);
 				}
 				setProperty(app_context, (ASObject*)ctx->dynamic_props, name, strlen(name), &func_var);
 			}
@@ -57106,7 +57106,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 			// Child SWF context: store on MC's dynamic_props only
 			MovieClip* ctx = g_current_context;
 			if (ctx->dynamic_props == NULL) {
-				ctx->dynamic_props = (void*)allocObject(app_context, 8);
+				ctx->dynamic_props = (void*)allocDynamicProps(app_context, 8);
 			}
 			setProperty(app_context, (ASObject*)ctx->dynamic_props, resolved_name, strlen(resolved_name), &func_var);
 		} else {
@@ -57120,7 +57120,7 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 			if (g_current_context != NULL && g_current_context != &root_movieclip) {
 				MovieClip* ctx = g_current_context;
 				if (ctx->dynamic_props == NULL) {
-					ctx->dynamic_props = (void*)allocObject(app_context, 8);
+					ctx->dynamic_props = (void*)allocDynamicProps(app_context, 8);
 				}
 				setProperty(app_context, (ASObject*)ctx->dynamic_props, name, strlen(name), &func_var);
 			}
@@ -58840,7 +58840,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			child->ng_textfield_idx = -2; // dynamically created textfield
 
 			if (child->dynamic_props == NULL) {
-				child->dynamic_props = (void*) allocObject(app_context, 32);
+				child->dynamic_props = (void*) allocDynamicProps(app_context, 32);
 				retainObject((ASObject*) child->dynamic_props);
 			}
 			ASObject* props = (ASObject*) child->dynamic_props;
@@ -58985,7 +58985,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// Register child on parent MC's dynamic_props so mc.childName works via GetMember
 			{
 				if (mc->dynamic_props == NULL) {
-					mc->dynamic_props = (void*) allocObject(app_context, 8);
+					mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ActionVar mc_var = {0};
@@ -59095,7 +59095,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// ScriptObject slot. Pre-existing own properties (and root timeline vars)
 			// shadow the child on name resolution.
 			if (mc->dynamic_props == NULL) {
-				mc->dynamic_props = (void*) allocObject(app_context, 8);
+				mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 				retainObject((ASObject*) mc->dynamic_props);
 			}
 			ActionVar mc_var = {0};
@@ -59184,7 +59184,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Set __proto__ BEFORE initObject
 					{
 						if (attached->dynamic_props == NULL) {
-							attached->dynamic_props = (void*) allocObject(app_context, 8);
+							attached->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 							retainObject((ASObject*) attached->dynamic_props);
 						}
 						if (attached->is_button_mc) {
@@ -59252,7 +59252,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					}
 					// Register on parent's dynamic_props
 					if (mc->dynamic_props == NULL) {
-						mc->dynamic_props = (void*) allocObject(app_context, 8);
+						mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 						retainObject((ASObject*) mc->dynamic_props);
 					}
 					ActionVar mc_var = {0};
@@ -67111,7 +67111,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				// Set up dynamic_props with TextField defaults
 				if (child->dynamic_props == NULL) {
-					child->dynamic_props = (void*) allocObject(app_context, 32);
+					child->dynamic_props = (void*) allocDynamicProps(app_context, 32);
 					retainObject((ASObject*) child->dynamic_props);
 				}
 				ASObject* props = (ASObject*) child->dynamic_props;
@@ -67251,7 +67251,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Register child on parent MC's dynamic_props so mc.childName works via GetMember
 				{
 					if (mc->dynamic_props == NULL) {
-						mc->dynamic_props = (void*) allocObject(app_context, 8);
+						mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 						retainObject((ASObject*) mc->dynamic_props);
 					}
 					ActionVar mc_var = {0};
@@ -67348,7 +67348,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Set __proto__ BEFORE initObject
 						{
 							if (attached->dynamic_props == NULL) {
-								attached->dynamic_props = (void*) allocObject(app_context, 8);
+								attached->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 								retainObject((ASObject*) attached->dynamic_props);
 							}
 							if (attached->is_button_mc) {
@@ -67417,7 +67417,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 						// Register on parent's dynamic_props
 						if (mc->dynamic_props == NULL) {
-							mc->dynamic_props = (void*) allocObject(app_context, 8);
+							mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 							retainObject((ASObject*) mc->dynamic_props);
 						}
 						ActionVar am_var = {0};
@@ -67584,7 +67584,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// 8)` at the same depth) and dead-MC pointers
 				// (`depth == INT_MIN`) both fall through and overwrite normally.
 				if (mc->dynamic_props == NULL) {
-					mc->dynamic_props = (void*) allocObject(app_context, 8);
+					mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ActionVar mc_var = {0};
@@ -68428,7 +68428,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 			// Set text property
 			if (rs_props == NULL) {
-				mc->dynamic_props = (void*) allocObject(app_context, 8);
+				mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 				rs_props = (ASObject*) mc->dynamic_props;
 			}
 			ActionVar new_text = {0};
@@ -70745,7 +70745,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				// Ensure dynamic_props exists
 				if (mc->dynamic_props == NULL) {
-					mc->dynamic_props = (void*) allocObject(app_context, 8);
+					mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
 					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ASObject* _ap_obj = (ASObject*) mc->dynamic_props;

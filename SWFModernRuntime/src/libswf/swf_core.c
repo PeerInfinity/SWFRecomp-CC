@@ -20,6 +20,7 @@
 #include <action_queue.h>
 #include <sprite_frame_scripts.h>
 #include <variables.h>
+#include <object.h>
 #include <utils.h>
 #include <heap.h>
 
@@ -1593,6 +1594,10 @@ frame_loop_exit:
 	actionSetTimeoutJmp(NULL);
 
 	printf("\n=== SWF Execution Completed ===\n");
+
+	// Env-gated (SWF_MEM_REPORT) leak-tracking summary; must precede
+	// heap_shutdown, which unmaps the pool the MC registry lives in.
+	swfMemReportAtExitIfEnabled();
 
 	// Cleanup (dictionary/display_list freed by heap_shutdown; stack uses system malloc)
 	heap_shutdown(app_context);

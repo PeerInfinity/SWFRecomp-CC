@@ -276,6 +276,148 @@ int isPropertyHiddenAtVersion(u16 flash_flags) {
 }
 
 /**
+ * Memory-reclamation instrumentation (Stage 0 of
+ * SWFRecompDocs/plans/memory-reclamation-plan.md)
+ *
+ * Always-on: total alloc/free counters plus an intrusive doubly-linked list
+ * of every live ASObject/ASArray (two pointers per object, O(1) link/unlink).
+ * The list doubles as the sweep infrastructure for the measurement-gated
+ * Stage 3 collector. Reporting is opt-in via the SWF_MEM_REPORT env var
+ * (stderr at exit, native builds), so default builds and CI output are
+ * byte-identical.
+ */
+static u64 g_mt_obj_allocs = 0;
+static u64 g_mt_obj_frees  = 0;
+static u64 g_mt_arr_allocs = 0;
+static u64 g_mt_arr_frees  = 0;
+static ASObject* g_mt_obj_head = NULL;
+static ASArray*  g_mt_arr_head = NULL;
+
+u32 swfMemLiveObjects(void) { return (u32)(g_mt_obj_allocs - g_mt_obj_frees); }
+u32 swfMemLiveArrays(void)  { return (u32)(g_mt_arr_allocs - g_mt_arr_frees); }
+
+static void mtLinkObject(ASObject* obj)
+{
+	obj->mt_prev = NULL;
+	obj->mt_next = g_mt_obj_head;
+	if (g_mt_obj_head != NULL) g_mt_obj_head->mt_prev = obj;
+	g_mt_obj_head = obj;
+	g_mt_obj_allocs++;
+}
+
+static void mtUnlinkObject(ASObject* obj)
+{
+	if (obj->mt_prev != NULL) obj->mt_prev->mt_next = obj->mt_next;
+	else g_mt_obj_head = obj->mt_next;
+	if (obj->mt_next != NULL) obj->mt_next->mt_prev = obj->mt_prev;
+	g_mt_obj_frees++;
+}
+
+static void mtLinkArray(ASArray* arr)
+{
+	arr->mt_prev = NULL;
+	arr->mt_next = g_mt_arr_head;
+	if (g_mt_arr_head != NULL) g_mt_arr_head->mt_prev = arr;
+	g_mt_arr_head = arr;
+	g_mt_arr_allocs++;
+}
+
+static void mtUnlinkArray(ASArray* arr)
+{
+	if (arr->mt_prev != NULL) arr->mt_prev->mt_next = arr->mt_next;
+	else g_mt_arr_head = arr->mt_next;
+	if (arr->mt_next != NULL) arr->mt_next->mt_prev = arr->mt_prev;
+	g_mt_arr_frees++;
+}
+
+/**
+ * Classified live-set report (stderr).
+ *
+ * Crude attribution — it only needs to rank the three leak classes from the
+ * plan: (a) detached dynamic_props, (b) arrays held only by object property
+ * values (the borrowed-edge asymmetry), (c) everything else (cycle
+ * candidates). "Attached" is computed against the MC registries at call time.
+ */
+void swfMemReport(void)
+{
+	// Mark pass: which live arrays are referenced by a live object's property
+	// values, and which live objects are referenced by live object properties
+	// / array elements (both directions only used for the summary).
+	for (ASArray* a = g_mt_arr_head; a != NULL; a = a->mt_next) a->mt_mark = 0;
+	for (ASObject* o = g_mt_obj_head; o != NULL; o = o->mt_next) o->mt_mark = 0;
+	for (ASObject* o = g_mt_obj_head; o != NULL; o = o->mt_next)
+	{
+		for (u32 i = 0; i < o->num_used; i++)
+		{
+			if (o->properties == NULL) break;
+			if (o->properties[i].value.type == ACTION_STACK_VALUE_ARRAY)
+			{
+				ASArray* a = (ASArray*) o->properties[i].value.data.numeric_value;
+				if (a != NULL) a->mt_mark = 1;
+			}
+		}
+	}
+
+	// Attached dynamic_props set: root + levels + child MC registry.
+	// (Uses mt_mark bit 2 on the object so we don't need a side table.)
+	{
+		extern MovieClip root_movieclip;
+		extern MovieClip* child_mc_cache[];
+		extern int child_mc_count;
+		if (root_movieclip.dynamic_props != NULL)
+			((ASObject*)root_movieclip.dynamic_props)->mt_mark |= 2;
+		for (int i = 0; i < child_mc_count; i++)
+		{
+			if (child_mc_cache[i] != NULL && child_mc_cache[i]->dynamic_props != NULL)
+				((ASObject*)child_mc_cache[i]->dynamic_props)->mt_mark |= 2;
+		}
+	}
+
+	u32 live_obj = 0, dprops_attached = 0, dprops_detached = 0, plain_obj = 0;
+	for (ASObject* o = g_mt_obj_head; o != NULL; o = o->mt_next)
+	{
+		live_obj++;
+		if (o->mt_kind == MT_KIND_DPROPS)
+		{
+			if (o->mt_mark & 2) dprops_attached++;
+			else dprops_detached++;
+		}
+		else plain_obj++;
+	}
+
+	u32 live_arr = 0, arr_as_obj_prop = 0, arr_other = 0;
+	for (ASArray* a = g_mt_arr_head; a != NULL; a = a->mt_next)
+	{
+		live_arr++;
+		if (a->mt_mark & 1) arr_as_obj_prop++;
+		else arr_other++;
+	}
+
+	fprintf(stderr,
+		"[swf-mem] objects: alloc=%llu free=%llu live=%u"
+		" (dprops attached=%u detached=%u, plain=%u)\n",
+		(unsigned long long)g_mt_obj_allocs, (unsigned long long)g_mt_obj_frees,
+		live_obj, dprops_attached, dprops_detached, plain_obj);
+	fprintf(stderr,
+		"[swf-mem] arrays:  alloc=%llu free=%llu live=%u"
+		" (held-as-obj-prop=%u other=%u)\n",
+		(unsigned long long)g_mt_arr_allocs, (unsigned long long)g_mt_arr_frees,
+		live_arr, arr_as_obj_prop, arr_other);
+}
+
+// Env-gated wrapper for the end-of-run report. Must be called BEFORE
+// heap_shutdown (both frame loops do), NOT from atexit: MovieClips live in
+// the o1heap pool, which heap_shutdown unmaps — an atexit walk of
+// child_mc_cache would read unmapped memory.
+void swfMemReportAtExitIfEnabled(void)
+{
+#ifndef __EMSCRIPTEN__
+	if (getenv("SWF_MEM_REPORT") != NULL)
+		swfMemReport();
+#endif
+}
+
+/**
  * Object Allocation
  *
  * Allocates a new ASObject with the specified initial capacity.
@@ -322,11 +464,23 @@ ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity)
 		obj->properties = NULL;
 	}
 
+	obj->mt_kind = MT_KIND_PLAIN;
+	obj->mt_mark = 0;
+	mtLinkObject(obj);
+
 #ifdef DEBUG
 	printf("[DEBUG] allocObject: obj=%p, refcount=%u, capacity=%u\n",
 		(void*)obj, obj->refcount, obj->num_properties);
 #endif
 
+	return obj;
+}
+
+// allocObject tagged as a MovieClip dynamic_props allocation (leak attribution).
+ASObject* allocDynamicProps(SWFAppContext* app_context, u32 initial_capacity)
+{
+	ASObject* obj = allocObject(app_context, initial_capacity);
+	if (obj != NULL) obj->mt_kind = MT_KIND_DPROPS;
 	return obj;
 }
 
@@ -424,6 +578,7 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 		}
 
 		// Free object itself
+		mtUnlinkObject(obj);
 		free(obj);
 	}
 }
@@ -1198,6 +1353,9 @@ ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 	arr->enum_count = 0;
 	arr->enum_capacity = 0;
 
+	arr->mt_mark = 0;
+	mtLinkArray(arr);
+
 #ifdef DEBUG
 	printf("[DEBUG] allocArray: arr=%p, refcount=%u, capacity=%u\n",
 		(void*)arr, arr->refcount, arr->capacity);
@@ -1285,6 +1443,7 @@ void releaseArray(SWFAppContext* app_context, ASArray* arr)
 		}
 
 		// Free array itself
+		mtUnlinkArray(arr);
 		free(arr);
 	}
 }

@@ -28,7 +28,7 @@
 // stats panel (frame CPU + delivered frame-time + late count + max FPS) plus an
 // "Uncapped" button that skips the frame-pacing sleep to measure max sustainable
 // FPS. Returns whether uncapped is on.
-EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present_ms), {
+EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present_ms, int live_obj, int live_arr), {
 	var S = globalThis.__swfPerf;
 	if (!S) {
 		S = globalThis.__swfPerf = { cpu: [], iv: [], rp: [], bad: [], cap: 120, i: 0, frames: 0,
@@ -129,7 +129,10 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present
 			+ '  avm+submit ' + cpuOnly.toFixed(2) + '   present ' + rp.mean.toFixed(2) + '  p95 ' + rp.p95.toFixed(2) + ' ms\n'
 			+ 'frame time  mean ' + v.mean.toFixed(1) + '  p95 ' + v.p95.toFixed(1) + '  max ' + v.max.toFixed(1) + ' ms  (target ' + budget_ms.toFixed(1) + ', ' + (devMean >= 0 ? '+' : '') + devMean.toFixed(1) + ')\n'
 			+ 'steady-state: ' + c.n + ' / ' + total + ' frames  (excl ' + nbad + ' warmup/throttle; raw max ' + cRaw.max.toFixed(1) + ')\n'
-			+ 'max sustainable ~' + susFps.toFixed(0) + ' fps';
+			+ 'max sustainable ~' + susFps.toFixed(0) + ' fps\n'
+			// Live AS heap objects (memory-reclamation plan Stage 0): a count
+			// that climbs without bound on clip-churn gameplay = a leak.
+			+ 'live AS objs ' + live_obj + '  arrays ' + live_arr;
 	}
 	return S.uncapped ? 1 : 0;
 });
@@ -1314,7 +1317,8 @@ void tagMain(SWFAppContext* app_context)
 		double elapsed = now_ms - frame_start;
 		double eff_budget_ms = frame_budget_ms;
 		if (g_debug_frame_floor_ms > eff_budget_ms) eff_budget_ms = g_debug_frame_floor_ms;
-		int perf_uncapped = swf_perf_report(elapsed, eff_budget_ms, render_poll_ms);
+		int perf_uncapped = swf_perf_report(elapsed, eff_budget_ms, render_poll_ms,
+		                                    (int)swfMemLiveObjects(), (int)swfMemLiveArrays());
 		if (next_due_ms == 0.0) next_due_ms = frame_start;  // anchor to first frame
 		next_due_ms += eff_budget_ms;                        // when this frame is due to end
 		if (perf_uncapped) {
@@ -1382,7 +1386,8 @@ frame_loop_exit:
 		double elapsed2 = now2_ms - frame_start2;
 		double eff_budget2_ms = frame_budget_ms;
 		if (g_debug_frame_floor_ms > eff_budget2_ms) eff_budget2_ms = g_debug_frame_floor_ms;
-		int perf_uncapped2 = swf_perf_report(elapsed2, eff_budget2_ms, 0.0);  // drain loop: present folded into renderer_poll gate
+		int perf_uncapped2 = swf_perf_report(elapsed2, eff_budget2_ms, 0.0,  // drain loop: present folded into renderer_poll gate
+		                                     (int)swfMemLiveObjects(), (int)swfMemLiveArrays());
 		if (next_due_ms == 0.0) next_due_ms = frame_start2;  // continue the main-loop schedule
 		next_due_ms += eff_budget2_ms;
 		if (perf_uncapped2) {
@@ -1570,6 +1575,10 @@ void swfStart(SWFAppContext* app_context)
 	audio_shutdown(app_context);
 
 	renderer_free(app_context, context);
+
+	// Env-gated (SWF_MEM_REPORT) leak-tracking summary; must precede
+	// heap_shutdown, which unmaps the pool the MC registry lives in.
+	swfMemReportAtExitIfEnabled();
 
 	heap_shutdown(app_context);
 	freeMap();

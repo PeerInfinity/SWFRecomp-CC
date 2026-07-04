@@ -85,7 +85,19 @@ typedef struct ASObject
 
 	// Native backing type (0 = pure ActionScript object, >0 = native-backed)
 	u8 native_type;
+
+	// --- Memory-reclamation instrumentation (Stage 0 of
+	// SWFRecompDocs/plans/memory-reclamation-plan.md). Also the sweep
+	// infrastructure for the (measurement-gated) Stage 3 collector. ---
+	u8 mt_kind;             // MT_KIND_* allocation-site tag (leak attribution)
+	u8 mt_mark;             // scratch mark bit (report classifier / future sweep)
+	struct ASObject* mt_prev;  // intrusive all-objects list (O(1) link/unlink)
+	struct ASObject* mt_next;
 } ASObject;
+
+// Allocation-site tags for leak attribution (mt_kind)
+#define MT_KIND_PLAIN  0   // ordinary script object
+#define MT_KIND_DPROPS 1   // allocated as a MovieClip's dynamic_props
 
 struct ASProperty
 {
@@ -122,6 +134,32 @@ extern ASObject* global_object;
 // Allocate new object with initial capacity
 // Returns object with refcount = 1
 ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity);
+
+// allocObject + tags the object MT_KIND_DPROPS for leak attribution.
+// Use for every `mc->dynamic_props = ...` attach site (behavior-identical to
+// allocObject otherwise).
+ASObject* allocDynamicProps(SWFAppContext* app_context, u32 initial_capacity);
+
+/**
+ * Memory-reclamation instrumentation (Stage 0)
+ *
+ * Cheap always-on counters + intrusive live lists, maintained by
+ * allocObject/allocArray and the two release-at-zero blocks. The report is
+ * emitted at exit only when the SWF_MEM_REPORT env var is set (native), so
+ * default builds/CI output is byte-identical.
+ */
+
+// Live counts (total allocs minus frees) — cheap enough for a per-frame HUD.
+u32 swfMemLiveObjects(void);
+u32 swfMemLiveArrays(void);
+
+// Classified live-set summary to stderr (native; also callable manually).
+void swfMemReport(void);
+
+// swfMemReport if SWF_MEM_REPORT is set (native builds; no-op otherwise).
+// Called by the frame loops just before heap_shutdown — must NOT run from
+// atexit, because heap_shutdown unmaps the pool that MovieClips live in.
+void swfMemReportAtExitIfEnabled(void);
 
 // Increment reference count
 // Should be called when:
@@ -219,6 +257,11 @@ typedef struct ASArray
 	char** enum_keys;       // Insertion-ordered key names for enumeration (NULL until first set)
 	u32 enum_count;         // Number of entries in enum_keys
 	u32 enum_capacity;      // Allocated capacity of enum_keys
+
+	// Memory-reclamation instrumentation (see ASObject counterparts)
+	u8 mt_mark;             // scratch mark bit (report classifier / future sweep)
+	struct ASArray* mt_prev;   // intrusive all-arrays list (O(1) link/unlink)
+	struct ASArray* mt_next;
 } ASArray;
 
 /**
