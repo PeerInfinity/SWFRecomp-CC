@@ -343,6 +343,13 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 
 		if (method_func == NULL) return; // method not found, skip silently
 
+		// Run the callback under its defining movie's SWF version (and the
+		// matching version-group _global) — timers fire from the host movie's
+		// frame loop, so a callback defined in a loaded child SWF of a
+		// different version would otherwise get the host's semantics.
+		int _tm_saved_ver; ASObject* _tm_saved_global; int _tm_saved_midx;
+		actionSwitchToFunctionVersion(method_func, &_tm_saved_ver, &_tm_saved_global, &_tm_saved_midx);
+
 		// Call the method with this = obj or mc
 		void* this_obj = NULL;
 		if (obj != NULL) this_obj = obj;
@@ -393,12 +400,18 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 
 			g_event_this_mc = old_event_this;
 		}
+
+		actionRestoreFunctionVersion(_tm_saved_ver, _tm_saved_global, _tm_saved_midx);
 	}
 	else
 	{
 		// Function-form: call the function directly
 		ASFunction* func = (ASFunction*)(uintptr_t)t->func.data.numeric_value;
 		if (func == NULL) return;
+
+		// Defining-movie SWF-version semantics (see method-form above).
+		int _tf_saved_ver; ASObject* _tf_saved_global; int _tf_saved_midx;
+		actionSwitchToFunctionVersion(func, &_tf_saved_ver, &_tf_saved_global, &_tf_saved_midx);
 
 		if (func->function_type == 2)
 		{
@@ -451,6 +464,8 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 
 			g_current_context = old_context;
 		}
+
+		actionRestoreFunctionVersion(_tf_saved_ver, _tf_saved_global, _tf_saved_midx);
 	}
 }
 

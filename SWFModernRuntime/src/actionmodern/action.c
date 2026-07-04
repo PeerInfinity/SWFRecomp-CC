@@ -15592,6 +15592,17 @@ static inline void restoreFunctionVersion(int saved_ver, ASObject* saved_global,
 	(void)saved_movie_idx; // reserved for future use
 }
 
+// Exported wrappers so subsystem files carved out of action.c (timer.c)
+// can apply per-function SWF-version semantics on their dispatch paths.
+void actionSwitchToFunctionVersion(ASFunction* func, int* saved_ver, ASObject** saved_global, int* saved_movie_idx)
+{
+	switchToFunctionVersion(func, saved_ver, saved_global, saved_movie_idx);
+}
+void actionRestoreFunctionVersion(int saved_ver, ASObject* saved_global, int saved_movie_idx)
+{
+	restoreFunctionVersion(saved_ver, saved_global, saved_movie_idx);
+}
+
 // MovieClip constructor function (for MovieClip.prototype access)
 ASFunction g_movieclip_constructor;
 int g_movieclip_constructor_init = 0;

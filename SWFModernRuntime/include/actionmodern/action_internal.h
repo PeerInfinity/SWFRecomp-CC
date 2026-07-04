@@ -185,6 +185,13 @@ extern u8 g_call_this_type;
 void pushSuperContextWithMC(void* this_obj, u8 depth, void* mc);
 void popSuperContext(void);
 
+// Per-function SWF-version switch (see ASFunction::swf_version). Swaps
+// g_swf_version and the active version-group global (_global legacy vs
+// modern) to the function's defining-movie values; restore reverses it.
+// Wrappers around action.c's static-inline helpers.
+void actionSwitchToFunctionVersion(ASFunction* func, int* saved_ver, ASObject** saved_global, int* saved_movie_idx);
+void actionRestoreFunctionVersion(int saved_ver, ASObject* saved_global, int saved_movie_idx);
+
 // Constructor context stack — marks whether the active call is a
 // constructor invocation (changes return-value semantics).
 void pushCtorContext(u8 is_constructor);
