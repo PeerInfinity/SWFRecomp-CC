@@ -1,14 +1,19 @@
 # Memory Reclamation — Leak Fixes + Cycle Collector Plan
 
 **Created:** July 4, 2026
-**Status:** Stages 0–2 DONE (2026-07-04). Stage 0 instrumentation `700e02a3a`;
+**Status:** ALL STAGES DONE (2026-07-04). Stage 0 instrumentation `700e02a3a`;
 Stage 1a dprops release `a38bbe7ea` (Minesweeper churn: −41% live objects,
 1,348 detached dprops → 0); Stage 1b ARRAY balancing landed as a
 correctness/consistency fix — measured reclamation ≈0 because the allocating
-reference floats (see results doc). **Stage 2 verdict: residual growth is NOT
-≈0 (N leaks ~12 obj + 12 arr per frame, linear) → Stage 3 collector stays
-live and is the only fix for the dominant class (unreachable-but-refcounted
-temporaries).** Numbers, gates, and ownership facts:
+reference floats (see results doc). Stage 2 verdict: residual growth NOT ≈0
+(N leaked ~12 obj + 12 arr per frame, linear) → Stage 3 executed.
+**Stage 3 collector landed `bac8b31e8` + `427f0abb1` (MCL/LV/XML root fix,
+found by the CI rollout): root-traced mark-sweep. Acceptance met — N title
+3000 ticks: 59,736 obj + 55,483 arr live → 3,709 + 254 FLAT, byte-identical
+stdout on all four soak games, ASAN clean (pre-existing errors only),
+quarantine poison traps silent, CI green both modes at cadence 1.
+DEFAULT-ON (real free, cadence 60; `SWF_GC=0` disables).** CI runs + final
+flag state: see results doc §Stage 3. Numbers, gates, and ownership facts:
 [memory-reclamation-results-2026-07-04.md](memory-reclamation-results-2026-07-04.md).
 **Origin:** upstream-comparison advantage #4 ("our refcounting leaks cycles").
 Scoped as "cycle collector" going in; the July 4 ownership survey of

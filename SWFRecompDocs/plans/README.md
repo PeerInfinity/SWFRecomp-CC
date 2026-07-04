@@ -27,11 +27,12 @@ Grounded in the [upstream comparison analyses](../upstream-comparison/):
 - [memory-reclamation-plan.md](memory-reclamation-plan.md) — deterministic leak
   fixes (detached `dynamic_props`, unreleased array-valued properties) + a
   measurement-gated root-traced cycle collector.
-  **Stages 0–2 done 2026-07-04**: instrumentation + both fixes landed
+  **ALL STAGES done 2026-07-04**: instrumentation + both fixes landed
   (dprops: −41% live objects on Minesweeper churn; array balancing =
-  correctness only). **Verdict: Stage 3 collector needed** — dominant leak is
-  unreachable-but-refcounted temporaries (N: ~12 obj + 12 arr per frame),
-  which only reachability-based collection covers. Measurements:
+  correctness only); **Stage 3 mark-sweep collector landed `bac8b31e8`**
+  (env-gated `SWF_GC=count|quarantine|1`, default off; CI `swf_gc` input).
+  Acceptance met: N title 3000 ticks 59,736 obj + 55,483 arr live →
+  3,709 + 254 flat, byte-identical output, ASAN clean. Measurements:
   [memory-reclamation-results-2026-07-04.md](memory-reclamation-results-2026-07-04.md).
 
 ## Active — feature/game threads

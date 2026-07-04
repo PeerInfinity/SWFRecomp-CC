@@ -1982,13 +1982,21 @@ static void gcParseConfig(void)
 {
 	g_gc_config_parsed = 1;
 	const char* mode = getenv("SWF_GC");
-	if (mode == NULL || mode[0] == '\0' || strcmp(mode, "0") == 0) return;
-	if      (strcmp(mode, "count") == 0)      g_gc_mode = SWF_GC_MODE_COUNT;
+	if (mode != NULL && strcmp(mode, "0") == 0) return;  // explicit opt-out
+	if (mode == NULL || mode[0] == '\0') {
+		// DEFAULT-ON (real free, default cadence) as of 2026-07-04: gated
+		// rollout complete — count/quarantine/free all byte-identical on the
+		// game soak set, ASAN clean, and full CI green in both modes with
+		// the collector forced to cadence 1 (see memory-reclamation results
+		// doc §Stage 3). SWF_GC=0 disables.
+		g_gc_mode = SWF_GC_MODE_FREE;
+	}
+	else if (strcmp(mode, "count") == 0)      g_gc_mode = SWF_GC_MODE_COUNT;
 	else if (strcmp(mode, "quarantine") == 0) g_gc_mode = SWF_GC_MODE_QUARANTINE;
 	else if (strcmp(mode, "1") == 0 || strcmp(mode, "free") == 0 || strcmp(mode, "on") == 0)
 		g_gc_mode = SWF_GC_MODE_FREE;
 	else {
-		fprintf(stderr, "[swf-gc] unknown SWF_GC mode '%s' (want count|quarantine|1) — collector off\n", mode);
+		fprintf(stderr, "[swf-gc] unknown SWF_GC mode '%s' (want 0|count|quarantine|1) — collector off\n", mode);
 		return;
 	}
 	const char* cad = getenv("SWF_GC_CADENCE");

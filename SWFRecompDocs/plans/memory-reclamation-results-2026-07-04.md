@@ -184,3 +184,151 @@ follow-up material, same family as making prototype ownership explicit).
   entry/buffer pointers on grow) or ownership refactor — needs its own
   session. Repro: `ms_input.txt` board workload under the scratchpad
   `asan_build_run.sh` (HEAP_PASSTHROUGH) build.
+
+---
+
+# Stage 3 — Root-traced mark-sweep collector (2026-07-04, second session)
+
+**Commit:** `bac8b31e8` (collector, default-off, env-gated). CI validation
+runs recorded below.
+
+## Design as landed
+
+- **Liveness = reachability only** (refcounts advisory, ignored for the
+  collection decision). Collector core in `object.c` (mark primitives,
+  worklist trace, two-pass teardown, quarantine); root markers exported per
+  owning TU (`actionGcMarkRoots`, `variablesGcMarkRoots`, `timerGcMarkRoots`,
+  `registeredClassGcMarkRoots`, `mathGcMarkRoots`, `dateGcMarkRoots`).
+- **Runs between frames only**: hooked after the dprops drain + eval-stack
+  reset in all three frame loops (`swf_core.c` native; `swf.c` timeline +
+  renderer_poll loops). Quiescence asserted at entry (`actionGcVmQuiescent`:
+  eval stack at INITIAL_SP, scope/this/super/watch-firing stacks empty) —
+  bails to the next tick otherwise.
+- **Modes** (`SWF_GC` env; default OFF = zero behavior change):
+  `count` (census only) → `quarantine` (poison + park, free
+  `SWF_GC_QUARANTINE_LAG`=3 collections later; ANY access to a poisoned
+  object aborts via `swfGcPoisonTrap` — checks in the object.c hot entry
+  points) → `1|free|on` (real free). `SWF_GC_CADENCE` (default 60 ticks),
+  `SWF_GC_VERBOSE` per-collection stderr line.
+- **Root set** (full inventory in `actionGcMarkRoots` + per-TU markers):
+  `_global` for all version groups + every prototype/singleton C static
+  (geom/filter/system/broadcaster/StyleSheet/Sound-transform/…); all MC
+  `dynamic_props` (root + entire `child_mc_cache`, tombstones included) +
+  the deferred-dprops queue; `var_map`/`var_array`; **all functions** —
+  `function_registry` + a new all-heap-functions intrusive list
+  (`ASFunction.gc_next`, linked at all 9 heap alloc sites incl. anonymous
+  DefineFunction/2, secondary-version-group ctor copies, native toString) +
+  graph-reached FUNCTION values and property getters/setters, traced via an
+  epoch stamp (`gc_epoch`) through `prototype_obj`/`own_props`/
+  `captured_scope[]`; timer entries; watch table; LC channels/messages;
+  NetStream/NetConnection/BitmapData/Sound identity-keyed side tables;
+  global registers; pending exception/return values; call-dispatch stashes.
+- **Never dereferenced:** MOVIECLIP-typed values (non-owning, may dangle).
+  A **live-list enrollment bit** (mt_mark bit 1, stamped in the clear pass)
+  gates all marking, so dangling OBJECT/ARRAY edges at freed memory are
+  ignored rather than traced (first hit: N tick 60, a property whose bytes
+  were recycled heap garbage).
+- **Two-pass teardown:** pass 1 releases each doomed object's retained
+  edges into MARKED targets only (balances live refcounts; a live target
+  reaching 0 is left for a future sweep, never freed mid-collection);
+  pass 2 frees innards + struct (or poisons + parks in quarantine).
+- **Scrub-on-free:** when refcounting frees an object/array (collector on
+  only), matching borrowed stash entries are cleared (registers, timers,
+  watch, LC/NS/NC/BMD/Sound tables) so the next mark phase cannot read
+  freed memory. ASAN-verified; also fixes the pointer-reuse false-match
+  hazard in the identity-keyed side tables.
+- **Self-disable guard:** if `child_mc_cache` ever fills (uncacheable MCs =
+  invisible roots), the collector logs once and turns itself off for the
+  run (`actionGcRootsEnumerable`).
+
+## Acceptance measurements (native no-graphics, deterministic inputs)
+
+Same methodology as Stages 0–2. Byte-identity = stdout diff vs the same
+binary with GC off. All runs also byte-identical between quarantine and
+free modes, and deterministic across repeats.
+
+| Workload (3000 ticks) | live obj GC-off | live obj GC-on | live arr GC-off | live arr GC-on | swept | stdout |
+|---|---|---|---|---|---|---|
+| **N title demo** | 59,736 | **3,709 (flat)** | 55,483 | **254 (flat)** | 56,027 obj + 55,229 arr over 50 collections | identical |
+| Minesweeper menu→Start→15 cell clicks† | 1,996 | **448** | 2,569 | **24** | 1,548 obj + 2,545 arr | identical |
+| Doodle Jump menu clicks + arrow bursts | 1,220 | **438** | 63 | **12** | 782 obj + 51 arr | identical |
+| Tetris menu + gameplay keys | 462 | 457 | 45 | 37 | 5 obj + 8 arr (barely leaks) | identical |
+
+† Run ends early at the **pre-existing** `heap_alloc(442368)` OOM
+(attachMovie sprite_display_list churn — documented in the Stage 0–2
+section); identical deterministic endpoint in all modes.
+
+**Acceptance metric met:** N's +11.8 obj + 11.8 arr per frame linear growth
+is gone — steady-state live count oscillates around ~4.3k obj / ~900 arr
+between collections (each collection sweeps ~700+700, exactly the per-60-tick
+leak), with the reachable set flat at ~3.7k. The would-sweep census also
+showed ~20k of N's 23k startup allocations are level-parse temporaries —
+unreachable from the first collection.
+
+## Soak / safety gates
+
+- **Quarantine mode, all four games:** zero poison-trap aborts; stdout
+  byte-identical. (Quarantine = every swept object stays allocated-but-
+  poisoned for 3 collections; any access would abort with the pointer +
+  entry point.)
+- **ASAN soak** (HEAP_PASSTHROUGH sanitizer builds, 3000-tick runs,
+  `halt_on_error=0`, baseline vs quarantine vs free): Doodle Jump + Tetris
+  clean everywhere; N and Minesweeper show exactly ONE error each,
+  **identical in GC-off baseline** — the documented pre-existing
+  `aq_dispatch_register_ctor` sprite_display_list UAF (tag.c:7131). No
+  collector-caused reports.
+- ASAN found one collector bug during development, fixed before landing:
+  marking borrowed stash roots (e.g. `g_last_callable_this`, global
+  registers) could read an object legitimately freed by refcounting → the
+  scrub-on-free mechanism above.
+- **Local test smoke at cadence 1** (collect every tick): 17 avm1 tests +
+  `set_interval` (no-graphics) + `array_trivial`/`remove_movie_clip`
+  (graphics mode, local Dawn) all pass with `SWF_GC=1 SWF_GC_CADENCE=1`.
+  (`date` fails identically with and without GC — pre-existing, in
+  ignored_tests.txt.)
+- **Emscripten compile check:** object.c/action.c/timer.c/variables.c/
+  registered_class.c/math.c syntax-clean under emcc (browser-WASM builds
+  compile the collector; with the final default-on flag state it is active
+  there too — see Flag state below).
+
+## CI validation
+
+`ruffle-tests.yml` gained a `swf_gc` input: when set, every test binary in
+the run executes with `SWF_GC=<value>` at `SWF_GC_CADENCE=1` (collect every
+tick — far more aggressive than the default 60).
+
+**Round 1** (`bac8b31e8`, swf_gc=1 both modes):
+- no-graphics (run 28722397912): **zero changes**, 638/710, "No changes
+  detected" in every suite.
+- graphics (run 28722407576): **one regression** —
+  `depth_replacement_audio_unloading` → segfault. Root cause: a genuinely
+  missed root, the pending **MovieClipLoader two-bucket queue** (`.mcl`
+  borrowed between `loadClip()` and the deferred onLoadInit — the sweep
+  freed the loader object, `fireMCLEvent` read freed memory). This is
+  precisely what the count → quarantine → CI rollout was designed to catch.
+
+**Fix `427f0abb1`:** rooted (and scrub-on-free'd) the MCL two-bucket queue,
+the deferred LoadVars queue (its C-queue retain is invisible to the trace),
+and deferred XML-load payloads riding the ActionQueue (new
+`actionQueueGcForEach`; all other queue kinds audited — MovieClip*/fn-ptr
+payloads only).
+
+**Round 2** (`427f0abb1`, swf_gc=1 both modes, runs 28723251802 /
+28723252214): **both green, zero pass→fail in every suite**; graphics back
+to 638/710 (the regressed test returned to pass). Collector exercised at
+cadence 1 across all ~1,205 tests × 2 modes.
+
+## Flag state (final)
+
+**DEFAULT-ON** as of the close-out commit: `SWF_GC` unset → real-free mode
+at cadence 60 (collect every ~2s at 30fps). `SWF_GC=0` disables;
+`count`/`quarantine`/`1` select modes explicitly as before. The default-on
+bar from the rollout plan was met in full: both CI modes green at cadence 1,
+soak set clean (quarantine traps silent + ASAN), stdout byte-identical
+everywhere. A round-3 CI dispatch without the `swf_gc` input validates the
+default-on path itself (results recorded in the pipeline log).
+
+Note for browser-WASM: deployed demos pick the collector up on their next
+rebuild/redeploy (emscripten has no env → default-on applies there too);
+the perf HUD's live obj/arr line is the quick sanity check — N attract mode
+should hover ~4k objects instead of growing without bound.
