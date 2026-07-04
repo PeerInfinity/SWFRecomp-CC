@@ -1,7 +1,15 @@
 # Memory Reclamation — Leak Fixes + Cycle Collector Plan
 
 **Created:** July 4, 2026
-**Status:** Planned, not started.
+**Status:** Stages 0–2 DONE (2026-07-04). Stage 0 instrumentation `700e02a3a`;
+Stage 1a dprops release `a38bbe7ea` (Minesweeper churn: −41% live objects,
+1,348 detached dprops → 0); Stage 1b ARRAY balancing landed as a
+correctness/consistency fix — measured reclamation ≈0 because the allocating
+reference floats (see results doc). **Stage 2 verdict: residual growth is NOT
+≈0 (N leaks ~12 obj + 12 arr per frame, linear) → Stage 3 collector stays
+live and is the only fix for the dominant class (unreachable-but-refcounted
+temporaries).** Numbers, gates, and ownership facts:
+[memory-reclamation-results-2026-07-04.md](memory-reclamation-results-2026-07-04.md).
 **Origin:** upstream-comparison advantage #4 ("our refcounting leaks cycles").
 Scoped as "cycle collector" going in; the July 4 ownership survey of
 `object.c`/`action.c` broadened it — two *deterministic* leak classes were found

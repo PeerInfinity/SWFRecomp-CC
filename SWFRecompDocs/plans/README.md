@@ -27,6 +27,12 @@ Grounded in the [upstream comparison analyses](../upstream-comparison/):
 - [memory-reclamation-plan.md](memory-reclamation-plan.md) — deterministic leak
   fixes (detached `dynamic_props`, unreleased array-valued properties) + a
   measurement-gated root-traced cycle collector.
+  **Stages 0–2 done 2026-07-04**: instrumentation + both fixes landed
+  (dprops: −41% live objects on Minesweeper churn; array balancing =
+  correctness only). **Verdict: Stage 3 collector needed** — dominant leak is
+  unreachable-but-refcounted temporaries (N: ~12 obj + 12 arr per frame),
+  which only reachability-based collection covers. Measurements:
+  [memory-reclamation-results-2026-07-04.md](memory-reclamation-results-2026-07-04.md).
 
 ## Active — feature/game threads
 
