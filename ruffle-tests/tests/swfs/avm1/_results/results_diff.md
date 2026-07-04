@@ -1,23 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `2ecb89e9fec9` (2026-07-03T02:28:58.035689+00:00)
-**Current:** `3c806aac0987` (2026-07-04T18:49:53.395133+00:00)
+**Previous:** `3c806aac0987` (2026-07-04T18:49:53.395133+00:00)
+**Current:** `a38bbe7ea6b9` (2026-07-04T20:20:20.438462+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 634 | 638 | +4 |
-| Total | 705 | 710 | +5 |
+| Passing | 638 | 638 | 0 |
+| Total | 710 | 710 | 0 |
 | Pass rate | 89.9% | 89.9% | 0% |
-| Mismatched lines | 15017 | 15018 | +1 |
+| Mismatched lines | 15018 | 15176 | +158 |
+|   Increased | | | +158 |
 
-## Added Tests (5)
+## Status Changed (1)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `ei_type1_args` | pass | 7/7 |
-| `mc_event_type1_args` | pass | 3/3 |
-| `nc_onstatus_closure` | pass | 2/2 |
-| `remove_different_level` | output_mismatch | 2/3 |
-| `timer_cross_swf_version` | pass | 3/3 |
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `global_proto_decls` | output_mismatch | segfault | 898/4497 | 740/4497 |
