@@ -19,16 +19,25 @@ The flip side is [`downstream-architecture-advantages.md`](downstream-architectu
 (`initial_strings`, per-SWF string tables) with runtime support for dynamic string
 IDs (`d30e783`, `c6a9e71`). Property lookup compares integers.
 
-**Our deficiency:** We look up properties by raw string with `strcmp`/hashing.
-Native callgrind profiling (2026, `scripts/profile_game_native.sh`) measured **~67%
-of instruction count in property-name lookup**. This was independently identified as
-our top AVM1-side performance lever before we ever saw their implementation.
+**Our deficiency:** We look up properties by raw string. The initial callgrind
+profile (June 2026, Doodle Jump) measured **~67% of instruction count in
+property-name lookup** — independently identifying interning as our top AVM1-side
+lever before we ever saw their implementation. Two mitigations have since landed
+*inside* our architecture (property fold-hash gate `537951f4f`, per-object hash
+index `e13388a18`; −49% instructions on DJ, both CI-clean) plus resolution caches
+and ASCII fast-paths, so the live residual is the **query-hashing + UTF-8↔UTF-16
+conversion complex, ~40% of N's no-graphics profile** (name_fold_hash ~13%,
+findPropertySlot ~8%, conversions/malloc ~15%). Full interning eliminates that
+residual class.
 
 **Actionable:** Yes — the highest-value idea to port (as a design, not code). Their
 master is now a working reference: compile-time ID assignment in the recompiler,
-runtime intern table for dynamic names, IDs as rbtree keys. Currently deprioritized
-because our user-facing bottleneck is GPU upload, not AVM1 — but if native/headless
-throughput ever matters (batch procgen validation, server-side use), this is the fix.
+runtime intern table for dynamic names, IDs as rbtree keys. A contained first stage
+was already planned (`SWFRecompDocs/plans/wasm-game-performance-step3-string-interning.md`);
+the full plan is `SWFRecompDocs/plans/string-id-interning-plan.md`. Caveat on
+user-visible payoff: the profiled games are currently GPU-bound or frame-capped,
+so this buys CPU%/battery and headless throughput first, wall-clock FPS only on
+CPU-bound titles.
 
 ## 2. Ordered property storage (red-black tree) vs linear array
 
@@ -182,7 +191,7 @@ better starting point. Structural.
 
 | # | Advantage | Solves a problem we measurably have? | Actionable for us? |
 |---|-----------|--------------------------------------|--------------------|
-| 1 | String-ID interning | **Yes** — ~67% native instr. in name lookup | Yes (top candidate) |
+| 1 | String-ID interning | **Yes** — name-lookup complex was 67%, still ~40% after landed mitigations | Yes (top candidate) |
 | 2 | rbtree properties | Yes — O(n) scans | Yes (with #1) |
 | 3 | app_context instantiability | Barely (see thread-safety analysis) | Deliberately declined |
 | 4 | GC + stack-integrated refcounts | Yes — cycle leaks, recurring manual-refcount bugs | Partially (single-threaded cycle collector) |

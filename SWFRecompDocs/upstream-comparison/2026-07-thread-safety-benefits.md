@@ -35,9 +35,10 @@ These have very different value for this repo and should be evaluated separately
   2026) rests on preserving that exact ordering. There is no VM-level parallelism to
   extract.
 - **Our measured bottlenecks are not CPU-thread-limited.** Browser performance is
-  GPU `writeBuffer`-bound (see `browser-perf-is-writebuffer-not-avm1-walks` memory /
-  commits `079c0fefe`, `485cab115`); native performance is property-name-lookup-bound
-  (~67% of instruction count, callgrind). Threads fix neither.
+  GPU-bound (writeBuffer/present backpressure on the profiled titles; see
+  `browser-perf-is-writebuffer-not-avm1-walks`, commits `079c0fefe`, `485cab115`,
+  `fee8f23f7`); native/headless is property-name-lookup-bound (67% initially,
+  ~40% residual after the June 2026 hash-gate/hash-index work). Threads fix neither.
 - **Threads are a liability on our primary target.** Browser-WASM pthreads require
   SharedArrayBuffer + COOP/COEP headers, heavier builds, and complicate audio and
   rendering. Upstream's GC free thread would be a cost for us in the browser, not a

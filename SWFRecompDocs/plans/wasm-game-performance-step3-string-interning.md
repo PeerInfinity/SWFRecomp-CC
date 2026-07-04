@@ -3,6 +3,11 @@
 **Created:** 2026-06-02
 **Status:** Planned, not started. Follows optimizations #1/#2 (see
 [results doc](wasm-game-performance-profiling-results-2026-06-01.md)).
+**Note (2026-07-04):** now **Stage 2** of the umbrella
+[string-id-interning-plan.md](string-id-interning-plan.md), which adds a cheaper
+Stage 1 (MC-builtin dispatch by id — the strcasecmp ladders) before this and
+gates the "bigger alternative" below (full key interning) behind measurements
+as Stage 3.
 **Prereq context:** property-lookup machinery already optimized (−48.8% on DJ);
 the AVM1 interpreter is the browser-CPU bottleneck (graphics-mode cross-check
 confirmed rendering is GPU work the browser offloads).
