@@ -22267,7 +22267,6 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					text_val.str_size = _it_u16_len;
 					VAL(u64, &text_val.data.numeric_value) = (u64)_it_u16;
 				}
-				if (init_text_ml) free(init_text_ml);
 				setProperty(app_context, props, "text", 4, &text_val);
 				// htmlText
 				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
@@ -22315,6 +22314,10 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				setProperty(app_context, props, "type", 4, &type_val);
 				ActionVar len_val = {0}; len_val.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &len_val.data.numeric_value) = (double)strlen(init_text);
+				// Last use of init_text — safe to drop the multiline copy now (was
+				// freed right after the `text` property, leaving init_text dangling
+				// for this strlen: ASAN-confirmed UAF).
+				if (init_text_ml) { free(init_text_ml); init_text_ml = NULL; }
 				setProperty(app_context, props, "length", 6, &len_val);
 				setProperty(app_context, props, "multiline", 9, (tf_flags & 0x0002) ? &true_val : &false_val);
 				setProperty(app_context, props, "wordWrap", 8, (tf_flags & 0x0001) ? &true_val : &false_val);
@@ -22483,7 +22486,6 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					text_val.str_size = _it_u16_len;
 					VAL(u64, &text_val.data.numeric_value) = (u64)_it_u16;
 				}
-				if (init_text_ml) free(init_text_ml);
 				setProperty(app_context, props, "text", 4, &text_val);
 				// htmlText — parse HTML and build format runs for proper serialization
 				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
@@ -22557,6 +22559,10 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				ActionVar len_val = {0};
 				len_val.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &len_val.data.numeric_value) = (double)strlen(init_text);
+				// Last use of init_text — safe to drop the multiline copy now (was
+				// freed right after the `text` property, leaving init_text dangling
+				// for this strlen: ASAN-confirmed UAF).
+				if (init_text_ml) { free(init_text_ml); init_text_ml = NULL; }
 				setProperty(app_context, props, "length", 6, &len_val);
 				// multiline (from DefineEditText Multiline flag)
 				setProperty(app_context, props, "multiline", 9, (tf_flags & 0x0002) ? &true_val : &false_val);
