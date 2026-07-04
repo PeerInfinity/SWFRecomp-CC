@@ -91,11 +91,19 @@ incrementally.
   (case-v5/v6, fixed 2026-05-30 via ASAN), assorted leak fixes throughout the log.
   Every new code path re-exposes the risk; theirs centralizes it.
 
-**Actionable:** Partially. The *cycle collector* could be adopted single-threaded
-(between frames) without any locking. The *stack-integrated refcounting* idea could
-be retrofitted into our PUSH/POP macros, though auditing 75K lines of existing
-pop-then-use patterns makes it a major project. The concurrent/locked form is
-structural (and undesirable in browser WASM).
+**Actionable:** Partially. A cycle collector can be adopted single-threaded
+(between frames) without any locking — but the July 2026 ownership survey found
+our refcounts are *advisory* (ARRAY/FUNCTION property values, timers, and
+this/scope stacks are borrowed by design), so refcount-trusting detectors
+(Bacon-Rajan trial deletion, upstream's neighbor-walking design) are unsafe for
+us; the safe shape is a root-traced mark-sweep backstop. The same survey found
+two deterministic non-cycle leaks that likely dominate (detached
+`mc->dynamic_props`, unreleased array-valued properties). **Planned:**
+`plans/memory-reclamation-plan.md` — leak fixes first, collector
+measurement-gated. The *stack-integrated refcounting* idea could be retrofitted
+into our PUSH/POP macros, though auditing 75K lines of existing pop-then-use
+patterns makes it a major project. The concurrent/locked form is structural
+(and undesirable in browser WASM).
 
 ## 5. Standard library in ActionScript (AS2Runtime prelude)
 
