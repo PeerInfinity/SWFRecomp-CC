@@ -28,8 +28,8 @@ Step-by-step implementation guides for various components:
 
 High-level project planning documents:
 
-- **[wasm-project-plan.md](plans/wasm-project-plan.md)** - Overall WebAssembly project architecture and roadmap
-- **[streamline-test-builds.md](plans/streamline-test-builds.md)** - Proposal for streamlining the test build process to reduce duplication and leverage SWFModernRuntime
+- **[wasm-project-plan.md](plans/completed/wasm-project-plan.md)** - Overall WebAssembly project architecture and roadmap
+- **[streamline-test-builds.md](plans/completed/streamline-test-builds.md)** - Proposal for streamlining the test build process to reduce duplication and leverage SWFModernRuntime
 
 ### Status
 

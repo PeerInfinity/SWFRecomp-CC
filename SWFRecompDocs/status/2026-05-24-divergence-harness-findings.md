@@ -126,7 +126,7 @@ branch requires the nightly toolchain (uses `as_array_of_cells`); build with
 
 ### Why bytecode injection (not prelude SWF)
 
-`SWFRecompDocs/plans/runtime-swf-injection-demos.md` documents three
+`SWFRecompDocs/plans/completed/runtime-swf-injection-demos.md` documents three
 ways to instrument a running SWF: ActionScript `loadMovie` inspection, C-side
 `test_harness.c` hooks, and "prelude SWF" (LittleCube's pattern). For runtime
 *API* implementation, prelude SWF is the winner.

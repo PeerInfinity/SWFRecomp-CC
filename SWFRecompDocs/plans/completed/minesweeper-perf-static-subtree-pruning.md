@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Landed via `6308c4a03` (MC resolution cache, -38.4%) + `5f2530446` (event-driven walk pruning, -14.4%); riskier structural advance/presync prune deferred.
+
 > ⚠️ **SUPERSEDED (2026-06-17).** The diagnosis below is WRONG for the browser.
 > A real in-browser CPU profile showed the bottleneck is the WebGPU renderer's
 > per-shape `writeBuffer` calls (~88% of frame CPU), not the AVM1 walks (<2% in

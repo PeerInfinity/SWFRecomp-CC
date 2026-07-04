@@ -1,7 +1,7 @@
 # Doodle Jump — flashSubstrate feasibility probe: capability report
 
 **Date:** 2026-06-01. **Probe brief:**
-`SWFRecompDocs/plans/archipelago-doodle-jump-feasibility.md`. **Harness (kept
+`SWFRecompDocs/plans/completed/archipelago-doodle-jump-feasibility.md`. **Harness (kept
 for reuse):** `ruffle-tests/tests/swfs/_swfbridge/livetest/dj_probe/`.
 
 This is the capability report for the read/write + control feasibility probe of

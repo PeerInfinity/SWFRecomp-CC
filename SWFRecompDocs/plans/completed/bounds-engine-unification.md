@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Landed `808f578c0` 2026-05-28 — single bounds engine ng_computeBoundsFromDL_matrix; legacy helpers deleted.
+
 # Bounds engine unification — Flash-accurate `_width`/`_height`/getBounds/hitTest
 
 Status: **DONE** (P1–P3 landed & CI-green in both modes; legacy engine + entry_idx encoding deleted). Created 2026-05-28.

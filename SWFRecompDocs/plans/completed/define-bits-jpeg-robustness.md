@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Implemented in SWFRecomp/src/swf.cpp (self-contained JPEG fallback, JPEGTables supersede/duplicate handling, EOI/SOI).
+
 ## DefineBits JPEG Robustness (mid-stream EOI+SOI, empty JPEGTables, PNG/GIF, trailing EOI)
 
 **Status:** Planning — 2026-05-16

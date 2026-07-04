@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-17
 **Commit:** `079c0fefe` (perf(render): batch per-frame dynamic GPU buffer writes)
-**Supersedes the diagnosis in:** `SWFRecompDocs/plans/minesweeper-perf-static-subtree-pruning.md`
+**Supersedes the diagnosis in:** `SWFRecompDocs/plans/completed/minesweeper-perf-static-subtree-pruning.md`
 
 ## TL;DR
 

@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Shipped — WASM builds + WebGPU graphics are the production browser path.
+
 # SWFRecomp WASM Port - Project Plan
 
 **Document Version:** 1.2

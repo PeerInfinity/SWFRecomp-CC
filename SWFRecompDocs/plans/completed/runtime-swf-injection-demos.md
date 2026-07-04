@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Built — demos/runtime-swf/ (display_editor and injection demos).
+
 # Runtime SWF / Code Injection Demos
 
 ## Background

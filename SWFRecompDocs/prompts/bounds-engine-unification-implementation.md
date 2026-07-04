@@ -14,7 +14,7 @@ permanent shim.
 
 ## Read first
 
-1. **`SWFRecompDocs/plans/bounds-engine-unification.md`** — the full plan: engine
+1. **`SWFRecompDocs/plans/completed/bounds-engine-unification.md`** — the full plan: engine
    inventory table, the 5 legacy call sites with their contracts, the `entry_idx`
    encoding and its limits, open decisions D1–D3, the phased migration, the
    validation strategy, and the **pre-refactor CI baseline** (the pass counts you

@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Audio implemented (src/audio/, minimp3, native + web output paths).
+
 # SWFRecomp Audio Support - Implementation Plan
 
 **Document Version:** 1.0

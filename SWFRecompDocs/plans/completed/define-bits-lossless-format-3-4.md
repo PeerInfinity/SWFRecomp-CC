@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Implemented — DefineBitsLossless/Lossless2 format 3 color-table parsing in swf.cpp.
+
 # DefineBitsLossless Format 3 / 4 Decoders
 
 **Status:** Planning — 2026-05-15

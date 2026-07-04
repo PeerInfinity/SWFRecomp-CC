@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Executed — profile_game_native.sh harness built; optimizations #1/#2 + walk caches landed; see results doc + string-id-interning-plan.md for the continuation.
+
 # WASM Game Performance Profiling & Optimization Plan
 
 **Created:** 2026-06-01

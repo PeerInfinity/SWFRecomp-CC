@@ -749,7 +749,7 @@ cd SWFRecomp/tests/trace_swf_4
   ./validate.py
 ```
 
-**For detailed information about the test system design**, see `SWFRecompDocs/plans/test-system-redesign-plan.md`
+**For detailed information about the test system design**, see `SWFRecompDocs/plans/completed/test-system-redesign-plan.md`
 
 ## Opcode Categories and Complexity
 

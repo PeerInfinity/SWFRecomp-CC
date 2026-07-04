@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Executed 2026-06-29 (`3d2ea1b5c`) but refuted as the perf lever — kept for the negative result.
+
 # Plan: skip wasted per-fragment texture sampling in the WebGPU fragment shader
 
 **Status:** EXECUTED 2026-06-29 (commit `3d2ea1b5c`, Option 1) but **REFUTED as the perf

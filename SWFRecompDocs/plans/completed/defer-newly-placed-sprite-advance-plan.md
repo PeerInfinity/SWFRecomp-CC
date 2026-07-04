@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Fixed `dd97a719f` — placement-tick no-advance scoped to g_in_manual_nav_catchup_recurse (Riddle School convergence).
+
 # Defer Newly-Placed Sprites by One Tick — Plan
 
 **Document Version:** 1.0

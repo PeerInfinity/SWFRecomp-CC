@@ -297,6 +297,6 @@ See the following tests for reference implementations:
 
 ## Getting Help
 
-- Review the project plan: `SWFRecompDocs/plans/test-system-redesign-plan.md`
+- Review the project plan: `SWFRecompDocs/plans/completed/test-system-redesign-plan.md`
 - Look at existing test implementations in `tests/*/validate.py`
 - Check the test utilities: `tests/test_utils.py`

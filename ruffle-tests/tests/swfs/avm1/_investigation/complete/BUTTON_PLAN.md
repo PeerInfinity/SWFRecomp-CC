@@ -268,7 +268,7 @@ python3 ruffle-tests/verify_output.py --test=movieclip_in_removed_button --diff 
 ## Phase 2: Input Event Simulation Infrastructure
 
 > **SUPERSEDED AND COMPLETE** — This phase is fully implemented via
-> `SWFRecompDocs/plans/input-event-injection.md` (all phases done). The infrastructure includes:
+> `SWFRecompDocs/plans/completed/input-event-injection.md` (all phases done). The infrastructure includes:
 >
 > - `verify_output.py` preprocesses `input.json` → line-based event file, passed as `argv[1]`
 > - C event pump in `swf_core.c` (`input_events_load`/`pump_tick`/`deliver`) at tick boundaries
@@ -527,7 +527,7 @@ Phase 2 ──→ Phase 3 ──→ Phase 4 ──→ Phase 5
 
 ### Prerequisite (input-event-injection.md Phases 0–4)
 
-See `SWFRecompDocs/plans/input-event-injection.md` for full details. Summary:
+See `SWFRecompDocs/plans/completed/input-event-injection.md` for full details. Summary:
 
 | File | Change |
 |------|--------|
@@ -546,7 +546,7 @@ See `SWFRecompDocs/plans/input-event-injection.md` for full details. Summary:
 
 ### Phase 2 (infrastructure)
 
-> Superseded. See `SWFRecompDocs/plans/input-event-injection.md`.
+> Superseded. See `SWFRecompDocs/plans/completed/input-event-injection.md`.
 
 ### Phase 3 (mouse events)
 

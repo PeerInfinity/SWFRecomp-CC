@@ -2,7 +2,7 @@
 
 Injected-AS feasibility probe for Doodle Jump (DJ), driving the
 `flashSubstrate` capability questions in
-`SWFRecompDocs/plans/archipelago-doodle-jump-feasibility.md`. The findings are
+`SWFRecompDocs/plans/completed/archipelago-doodle-jump-feasibility.md`. The findings are
 written up in
 `SWFRecompDocs/status/2026-06-01-doodle-jump-flashsubstrate-feasibility.md`.
 

@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Shipped — render_webgpu.c is the production renderer.
+
 # Phase 2 WebGPU Implementation — Concrete Next Steps
 
 **Created:** February 6, 2026

@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Implemented (Phases A-C), then largely superseded by the libtess2 tessellation migration.
+
 # SWFRecomp Shape Hole-Detection Unification — Plan
 
 **Document Version:** 1.0

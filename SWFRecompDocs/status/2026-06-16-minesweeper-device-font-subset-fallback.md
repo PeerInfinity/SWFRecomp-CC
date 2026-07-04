@@ -41,7 +41,7 @@ Projecting the strings through font 57's code table reproduces the exact garble:
 ```
 
 The recompiler's **Phase-A device-font synthesis** (see
-`plans/device-font-rendering-plan.md`) already fills a full ASCII glyph set from
+`plans/completed/device-font-rendering-plan.md`) already fills a full ASCII glyph set from
 the bundled NotoSans for **zero-glyph** named fonts — and this SWF *has* one:
 font 3 `_sans` got 95 synthesized glyphs at glyph_base 0. But Phase A is gated on
 `num_entries == 0`; font 57 has 23 glyphs, so it was skipped. Nothing routed the

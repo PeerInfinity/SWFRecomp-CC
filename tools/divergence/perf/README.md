@@ -119,4 +119,4 @@ cost is the most likely explanation for the ~20× render gap.
 Then re-measure `draws`/frame-time and confirm with GPU timestamp queries + a real-GPU run.
 
 Full execution plan (approach, WGSL invariants to preserve, pixel-identity verification,
-rollback): `SWFRecompDocs/plans/fragment-shader-fill-specialization-plan.md`.
+rollback): `SWFRecompDocs/plans/completed/fragment-shader-fill-specialization-plan.md`.

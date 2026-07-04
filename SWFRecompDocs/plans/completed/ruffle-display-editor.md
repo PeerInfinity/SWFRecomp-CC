@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Built — demos/ruffle-editor + docs/injector/ruffle_editor.html.
+
 # Ruffle Display Editor — ExternalInterface-based display list editing
 
 ## Goal

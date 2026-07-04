@@ -8,7 +8,7 @@ harness. The next step is to add exported C functions that JavaScript can call t
 read and modify the display list in real time.
 
 **Key docs to read:**
-- `SWFRecompDocs/plans/live-display-editor.md` — full plan with milestones and technical details
+- `SWFRecompDocs/plans/completed/live-display-editor.md` — full plan with milestones and technical details
 - `demos/runtime-swf/display_editor/test_harness.c` — existing C code that reads the display list
 - `SWFRecomp/wasm_wrappers/main.c` — WASM entry point with `runSWF()` export
 - `SWFModernRuntime/include/libswf/swf.h` — `DisplayObject` struct, `SWFAppContext`

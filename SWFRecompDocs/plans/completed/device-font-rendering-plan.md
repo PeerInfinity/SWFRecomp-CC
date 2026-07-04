@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Phase A implemented (compile-time glyph synthesis); residual garble = accepted font-file-mismatch diff.
+
 # Device-Font Rendering — `_sans` / `_serif` / `_typewriter`
 
 **Document Version:** 0.1

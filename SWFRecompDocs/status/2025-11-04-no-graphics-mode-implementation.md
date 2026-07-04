@@ -704,7 +704,7 @@ These are **intentional** and used for fatal error handling. The warnings are ha
 
 **Plans (implemented):**
 - `plans/swfmodernruntime-no-graphics-mode.md` - Original design
-- `plans/streamline-test-builds.md` - Build system plan
+- `plans/completed/streamline-test-builds.md` - Build system plan
 - `plans/swfmodernruntime-test-compatibility.md` - Test migration plan
 
 **Reference:**

@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Shipped — demo.html + catalog.json manifest system is the live docs/docs2 demo infrastructure.
+
 # Demo System Redesign Plan
 
 ## Overview

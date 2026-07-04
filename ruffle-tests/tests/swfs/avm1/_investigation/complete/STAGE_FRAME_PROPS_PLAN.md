@@ -568,7 +568,7 @@ python3 ruffle-tests/verify_output.py --test=stage_object_children --diff --verb
 **Effort**: Large (infrastructure) — **Done**
 **Impact**: `frame_size_translated_*` line 21 ("Pressed shape1") — **Now passing**
 
-Input event injection is fully implemented (see `SWFRecompDocs/plans/input-event-injection.md`):
+Input event injection is fully implemented (see `SWFRecompDocs/plans/completed/input-event-injection.md`):
 1. `verify_output.py` preprocesses `input.json` → line-based event file, passed as `argv[1]`
 2. C event pump in `swf_core.c` delivers events at tick boundaries
 3. Full button state machine with shape hit-testing fires `onPress`/`onRelease` callbacks

@@ -108,4 +108,4 @@ The following placeholders are automatically replaced by the build script:
 
 - `SWFRecomp/scripts/build_test.sh` - Main build script
 - `SWFModernRuntime/` - Runtime library
-- `SWFRecompDocs/plans/streamline-test-builds.md` - Architecture documentation
+- `SWFRecompDocs/plans/completed/streamline-test-builds.md` - Architecture documentation

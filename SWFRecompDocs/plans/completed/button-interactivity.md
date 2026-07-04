@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Buttons implemented (state funcs, hit-shape handling, browser + CI modes).
+
 # Button Interactivity - Implementation Plan
 
 **Created:** February 8, 2026

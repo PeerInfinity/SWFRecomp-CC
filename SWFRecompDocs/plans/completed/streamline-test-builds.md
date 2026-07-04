@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Obsolete — superseded by the shared verify_output.py runner and SWFRecomp/scripts/ build scripts.
+
 # Streamlining SWFRecomp Test Build Process
 
 ## Executive Summary

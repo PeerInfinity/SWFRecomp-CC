@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Implemented + verified 2026-05-31 (browser archipelago.js bridge, docs2 demo panel, Playwright round-trip).
+
 # Archipelago Phase 2 — WASM transport bridge (`Rando` in the browser)
 
 **Status:** **Implemented + verified** 2026-05-31 (build + link + run + deploy +

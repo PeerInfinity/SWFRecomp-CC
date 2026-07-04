@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Implemented (Option A) 2026-05-16; johnson grouping later replaced entirely by directed-edge model + libtess2.
+
 # DefineShape4: Johnson Cycle Memory Explosion
 
 **Status:** Implemented (Option A) — 2026-05-16

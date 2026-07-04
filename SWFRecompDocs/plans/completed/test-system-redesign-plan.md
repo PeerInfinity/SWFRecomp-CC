@@ -1,3 +1,5 @@
+> **AUDIT OUTCOME (2026-07-04):** Executed — per-test validate.py + test_results.json are the live old-suite test system.
+
 # Test System Redesign - Project Plan
 
 ## Overview
