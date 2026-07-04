@@ -1,7 +1,7 @@
 # Function-Dispatch Consolidation — Plan
 
 **Created:** July 4, 2026
-**Status:** Planned, not started.
+**Status:** Stage 0 COMPLETE (July 4, 2026) — see §4 Stage 0 results. Stages 1–5 not started.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
 lines) + `timer.c` performed July 4, 2026; figures below are from that survey.
@@ -111,6 +111,65 @@ a timer callback). Outcome per case: *real bug* → fix inline now (small,
 independent of consolidation, CI both modes) and keep the test; *unreachable*
 → document why at the site. This pays for the survey even if consolidation
 stalls.
+
+#### Stage 0 results (July 4, 2026) — 3 real bugs fixed, 1 suspect stale
+
+Repro method: MTASC emits DefineFunction2 for SWF6+, so all four repros are
+hand-assembled SWF bytecode (`create_test_swf.py` per test dir) that provably
+contains plain `DefineFunction`. All four live as permanent, fully git-tracked
+custom tests in `ruffle-tests/tests/swfs/avm1/` (they survive
+`download_tests.sh` because the sync restores git-tracked content).
+
+1. **`actionEI_callInternalInterface` type-1 arm — REAL BUG, fixed
+   `d8abc5c0a`.** Pushed args in REVERSE (missed by the bcacc3f70 sweep) and
+   didn't pad/clamp to `param_count`. Repro output before fix: `a=two b=one`
+   (swapped) and a 1-arg call bound the arg to the wrong param. Reachability:
+   **native, not just browser** — the `external_interface` ruffle test harness
+   (`test_harness.c`) and the browser EI glue both call it. Fix: forward
+   order, clamp extras, pad missing with undefined (exactly `param_count`
+   values pushed). Test: `ei_type1_args`.
+2. **`mc_call_as2_handler_ng` type-1 arm — REAL BUG, fixed `9a8c6dce3`.**
+   Pushed NO args ("event handlers are always type 2" was false) — a type-1
+   handler with declared params lost the event's real argument and the
+   prologue popped stale eval-stack slots. Repro: `onSetFocus(oldFocus)` via
+   `Selection.setFocus` traced `old=undefined` instead of `old=null` /
+   `old=_level0.t1`. Oracle: Ruffle `call_focus_handler`
+   (`core/src/display_object/interactive.rs:640`) passes `[otherFocus]`,
+   Null when none. Same forward+clamp+pad fix. Test: `mc_event_type1_args`.
+3. **Missing `switchToFunctionVersion` — REAL BUG on the timer path, fixed
+   `60070d96a`; other paths deferred to Stage 4.** Repro: v7 host
+   `loadMovie`s a v6 child whose `setInterval` callback traces
+   `"" + undefined` → printed `undefined` (v7 semantics) instead of `` (v6).
+   Bonus symptom: the callback read `_global` from the wrong version-group
+   global (legacy vs modern), so its `clearInterval(_global.iid)` no-op'd and
+   the timer re-fired ~41×/tick forever. Fix: exported
+   `actionSwitchToFunctionVersion`/`actionRestoreFunctionVersion` wrappers
+   (action_internal.h) + both `fireTimerCallback` branches switch/restore.
+   The event (`mc_call_as2_handler_ng`), EI, and coercion paths still skip
+   the version switch — that normalization is Stage 4 work, now with a proven
+   failure mode. Test: `timer_cross_swf_version`.
+4. **LC/NS/NC captured-scope push — NOT A BUG (survey claim stale).**
+   `lc_dispatch_onStatus` / `ns_dispatch_onStatus` / `nc_dispatch_onStatus`
+   all restore the handler's captured scope chain in BOTH type-1 and type-2
+   arms (verified by reading and behaviorally). A closure over a
+   DefineFunction local used as `nc.onStatus` resolves its captured variable
+   through `connect(null)`'s Connect.Success dispatch. Behavior-lock test:
+   `nc_onstatus_closure` (guards Stage 4 migration of these dispatchers).
+
+**New findings for Stage 4** (same bug class, discovered while verifying):
+- The type-1 arms of `fireTimerCallback` (both forms) and of
+  `lc/ns/nc_dispatch_onStatus` push args in forward order (correct) but do
+  NOT clamp/pad to `param_count` — a type-1 timer callback declaring more
+  params than the `setInterval` extra args pops stale eval-stack slots, and
+  an onStatus handler declaring 0 params strands the event arg. Fix these
+  during Stage 4 migration (or earlier if a game hits them).
+- `actionEI_callInternalInterface` pushes the local scope BEFORE the captured
+  scopes (every other dispatcher pushes captured first, local on top), so its
+  `setVariableByName("this", ...)` lands in the topmost captured WITH scope
+  when one exists. Normalize the ordering when migrating to the core helper.
+- The `PUSH()` macro in action.h is a naked multi-statement macro (not
+  do/while(0)) — an unbraced `else PUSH(...)` compiles but corrupts the
+  stack. Worth wrapping when convenient; the new dispatch code braces it.
 
 ### Stage 1 — extract the core: `invokeFunctionValue()`
 

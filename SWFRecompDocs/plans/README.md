@@ -20,8 +20,10 @@ Grounded in the [upstream comparison analyses](../upstream-comparison/):
   (MC-builtin id-memo dispatch → per-id name cache → full key interning, gated).
   - [wasm-game-performance-step3-string-interning.md](wasm-game-performance-step3-string-interning.md) — its Stage 2 (pre-existing plan).
 - [function-dispatch-consolidation-plan.md](function-dispatch-consolidation-plan.md) —
-  one `invokeFunctionValue()` core for ~129 invocation points / ~38 dispatchers;
-  Stage 0 verifies two suspected live arg-marshalling bugs.
+  one `invokeFunctionValue()` core for ~129 invocation points / ~38 dispatchers.
+  **Stage 0 done 2026-07-04**: 3 real bugs fixed (EI type-1 arg reversal, MC
+  event type-1 args dropped, timer version switch), 1 suspect stale
+  (LC/NS/NC captured scope was fine); 4 permanent tests added.
 - [memory-reclamation-plan.md](memory-reclamation-plan.md) — deterministic leak
   fixes (detached `dynamic_props`, unreleased array-valued properties) + a
   measurement-gated root-traced cycle collector.
