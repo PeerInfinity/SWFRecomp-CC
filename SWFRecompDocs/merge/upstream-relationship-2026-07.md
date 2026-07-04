@@ -207,22 +207,33 @@ app_context) — semantics ported by rewriting, never by copying incompatible co
 
 ---
 
-## 6. Open questions for LittleCube
+## 6. Open questions for LittleCube — ANSWERED (July 2026)
 
-1. **Does the friendly-fork framing match your view?** If you'd rather the projects
-   re-converge eventually, that changes our calculus (we'd want to discuss what a
-   multi-year porting path would even look like) — but our read is that both projects
-   are healthier specializing.
+LittleCube replied shortly after this document was shared. Answers recorded inline:
+
+1. **Does the friendly-fork framing match your view?**
+   > *"yeah that's fine, whatever you guys think will be most productive"*
+   — **Confirmed.** The friendly-fork + knowledge-exchange model in §4 is now the
+   working arrangement.
 2. **What's most useful to you first** — the investigation docs (§5.1), the edge-case
-   maps (§5.2), tests (§5.3)? We'd rather send what you'll actually use than dump
-   everything.
-3. **Test infrastructure**: interested in the Ruffle-suite harness for upstream CI now,
-   or later once opcode coverage grows?
-4. **Reporting channel**: when we find behavioral bugs in upstream (e.g., while
-   tracking new commits), do you prefer issues, PRs, or Discord?
-5. **RhythmPlanets**: as you get into full-game recompilation, our game-debugging
-   experience (divergence harnesses, headless-vs-browser triage, execution-order
-   forensics) is available — happy to compare notes.
+   maps (§5.2), tests (§5.3)?
+   > *"whatever information you have about flash features that games will expect to
+   > behave in a particular way, that are not obvious to implement/normally undefined
+   > behavior"*
+   — That is the §5.2 edge-case category. **Deliverable:**
+   [`../upstream-comparison/warnings-for-upstream.md`](../upstream-comparison/warnings-for-upstream.md)
+   (the trap map: super, removeMovieClip lifecycle, addProperty re-entry budget,
+   goto catch-up ordering, Flash-bugs-on-purpose, etc.), backed by the four
+   classification docs in `ruffle-tests/tests/swfs/avm1/_investigation/`. It grows
+   as upstream tracking shows new territory being entered.
+3. **Test infrastructure**: *"it's not urgent, up to you"* — deferred; revisit when
+   upstream opcode coverage makes suite runs meaningful.
+4. **Reporting channel**: *"probably issues, and then discussion follows in discord"*
+   (GitHub issues tracked by a Discord bot). — **Policy:** behavioral findings about
+   upstream get filed as GitHub issues on the relevant SWFRecomp org repo;
+   follow-up discussion happens on Discord.
+5. **RhythmPlanets** (game-debugging notes offer): no specific response; standing
+   offer remains open.
 
 ---
 

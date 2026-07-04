@@ -4,6 +4,12 @@
 **Audience:** LittleCube / upstream contributors — written to be shared. Expanded
 from §5.2 of [`../merge/upstream-relationship-2026-07.md`](../merge/upstream-relationship-2026-07.md).
 
+> **This is the deliverable LittleCube asked for** (July 2026): *"whatever
+> information you have about flash features that games will expect to behave in a
+> particular way, that are not obvious to implement/normally undefined behavior."*
+> Sections 1–6 and 9 are the non-obvious behaviors; section 8 covers the
+> normally-undefined / Flash-bug territory.
+
 SWFRecomp-CC has spent nine months making the Ruffle/Gnash/Shumway AVM1 test suites
 and several complete games pass. Most of that time went to behaviors that are
 undocumented, counter-intuitive, or outright Flash Player bugs that content depends
@@ -123,20 +129,26 @@ Ruffle's expected outputs at all.
 ## 8. Flash is buggy on purpose — know when to stop "fixing"
 
 A class of behaviors are Flash Player *bugs* that both Ruffle and real content
-depend on. Implementing the "correct" version fails tests and games. We keep three
-classification documents that are directly reusable:
+depend on. Implementing the "correct" version fails tests and games. We keep four
+classification documents that are directly reusable (links are to this repo on
+GitHub so they work standalone):
 
-- `ruffle-tests/tests/swfs/avm1/_investigation/FLASH_BUGS_REPLICATED.md` — bugs to
-  replicate deliberately (e.g. ColorTransform alpha-multiplier-only assignment
-  being a no-op).
-- `.../RUFFLE_VS_FLASH_DIFFERENCES.md` — where Ruffle's expected output reflects
-  Ruffle, not Flash; decide which oracle you serve *before* chasing these.
-- `.../ACCEPTED_DIFFS.md` — expected outputs that are platform UB or internally
-  inconsistent; provably unfixable, maintain an ignore list instead of burning
-  weeks (we burned the weeks).
+- [FLASH_BUGS_REPLICATED.md](https://github.com/PeerInfinity/SWFRecomp-CC/blob/master/ruffle-tests/tests/swfs/avm1/_investigation/FLASH_BUGS_REPLICATED.md)
+  — bugs to replicate deliberately (e.g. ColorTransform alpha-multiplier-only
+  assignment being a no-op).
+- [RUFFLE_VS_FLASH_DIFFERENCES.md](https://github.com/PeerInfinity/SWFRecomp-CC/blob/master/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md)
+  — where Ruffle's expected output reflects Ruffle, not Flash; decide which oracle
+  you serve *before* chasing these.
+- [ACCEPTED_DIFFS.md](https://github.com/PeerInfinity/SWFRecomp-CC/blob/master/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md)
+  — expected outputs that are platform UB or internally inconsistent; provably
+  unfixable, maintain an ignore list instead of burning weeks (we burned the
+  weeks).
+- [RUFFLE_COMPAT_TWEAKS.md](https://github.com/PeerInfinity/SWFRecomp-CC/blob/master/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md)
+  — underspecified behaviors and the pragmatic choices that match real-world
+  expectations.
 
-Also in this category: text-field bounds wanting a +1px fudge to match
-(`RUFFLE_COMPAT_TWEAKS.md`), and `setProperty(_x, Infinity)`-class quirks where
+Also in this category: text-field bounds wanting a +1px fudge to match (see
+RUFFLE_COMPAT_TWEAKS above), and `setProperty(_x, Infinity)`-class quirks where
 Flash's internal numeric representation (float vs twips int) leaks into results.
 
 ## 9. Miscellaneous sharp edges
@@ -161,6 +173,7 @@ Flash's internal numeric representation (float vs twips int) leaks into results.
 
 For any subsystem above we can supply: the specific Ruffle/Gnash/Shumway test names
 that act as oracles, our investigation notes, and (where useful) targeted PRs
-written against upstream's architecture. Ask in whatever channel is convenient —
-see the open questions in
-[`../merge/upstream-relationship-2026-07.md`](../merge/upstream-relationship-2026-07.md).
+written against upstream's architecture.
+
+**Agreed channel (July 2026):** behavioral findings get filed as GitHub issues on
+the relevant SWFRecomp org repo, with follow-up discussion on Discord.
