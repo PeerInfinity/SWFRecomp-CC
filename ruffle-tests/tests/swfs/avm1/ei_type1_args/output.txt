@@ -1,0 +1,7 @@
+registered
+a=one
+b=two
+result=ok
+a=solo
+b=undefined
+result=ok

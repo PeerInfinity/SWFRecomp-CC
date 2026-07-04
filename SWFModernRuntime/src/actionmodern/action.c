@@ -6309,9 +6309,26 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 	}
 	else if (func->function_type == 1 && func->simple_func != NULL)
 	{
-		// Type 1: push args onto stack in reverse, set "this"
-		for (int i = arg_count - 1; i >= 0; i--)
-			pushVar(app_context, &args[i]);
+		// Type 1: marshal args onto the eval stack, set "this".
+		// TYPE1_ARG_ORDER: forward order — args[0] pushed first (deepest); the
+		// generated prologue pops params last-first. The prologue pops EXACTLY
+		// param_count values, so push exactly that many: clamp extra args
+		// (they'd be stranded on the stack) and pad missing ones with
+		// undefined (otherwise the prologue swallows unrelated eval-stack
+		// slots). This site previously pushed in REVERSE, swapping multi-arg
+		// callback params (missed by the bcacc3f70 sweep).
+		u32 t1_param_count = func->param_count;
+		for (u32 i = 0; i < t1_param_count; i++)
+		{
+			if (i < (u32)arg_count)
+			{
+				pushVar(app_context, &args[i]);
+			}
+			else
+			{
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			}
+		}
 
 		ASObject* local_scope = allocObject(app_context, 8);
 		if (scope_depth < MAX_SCOPE_DEPTH)
