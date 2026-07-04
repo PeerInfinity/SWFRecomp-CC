@@ -9,6 +9,7 @@
 #include <common.h>
 #include <variables.h>
 #include <actionmodern/action.h>
+#include <actionmodern/object.h>  // swfGcMarkVar (Stage 3 collector root marker)
 #include <ctype.h>
 
 #define VAL(type, x) *((type*) x)
@@ -312,4 +313,24 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 		var->str_size = VAL(u32, &stack[sp + 8]);
 		var->data.numeric_value = VAL(u64, &stack[sp + 16]);
 	}
+}
+// Stage 3 collector root marker: every timeline variable (global var_map +
+// the SWF<=6 case-fold var_array) is a borrowed ActionVar that can hold
+// OBJECT/ARRAY/FUNCTION values across frames.
+static int gc_mark_variable_callback(const void* key, size_t ksize, uintptr_t value, void* usr)
+{
+	(void)key; (void)ksize; (void)usr;
+	ActionVar* var = (ActionVar*)value;
+	if (var != NULL)
+		swfGcMarkVar(var);
+	return 0;
+}
+
+void variablesGcMarkRoots(void)
+{
+	if (var_map != NULL)
+		hashmap_iterate(var_map, gc_mark_variable_callback, NULL);
+	for (size_t i = 0; i < var_array_size; i++)
+		if (var_array[i] != NULL)
+			swfGcMarkVar(var_array[i]);
 }

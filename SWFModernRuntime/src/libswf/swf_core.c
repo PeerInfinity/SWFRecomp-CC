@@ -937,6 +937,11 @@ void swfStart(SWFAppContext* app_context)
 		app_context->sp = INITIAL_SP;
 		app_context->oldSP = 0;
 
+		// Stage 3 mark-sweep collector (env-gated, default off) — must run
+		// right here: after the dprops drain and the stack reset, where the
+		// VM is quiescent. See memory-reclamation plan §Stage 3.
+		swfGcMaybeCollect(app_context);
+
 		// Check execution timeout — if halted, stop all further processing
 		{
 			extern u8 g_execution_halted;

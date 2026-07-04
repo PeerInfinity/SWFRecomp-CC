@@ -831,6 +831,22 @@ void registerNativeFunction(ASFunction* fn)
 		function_registry[function_count++] = fn;
 }
 
+// ---- Stage 3 collector: all-heap-functions intrusive list ----
+// function_registry deliberately excludes anonymous functions (they can never
+// satisfy lookupFunctionByName), but the collector must trace EVERY function's
+// prototype_obj/own_props/captured_scope as roots. Every heap ASFunction
+// allocation links here (functions are immortal, so entries never unlink).
+// Static/BSS builtins are reached via function_registry plus FUNCTION-typed
+// values in the object graph.
+static ASFunction* g_gc_fn_head = NULL;
+
+void actionGcLinkFunction(ASFunction* fn)
+{
+	if (fn == NULL) return;
+	fn->gc_next = g_gc_fn_head;
+	g_gc_fn_head = fn;
+}
+
 // Global Object.prototype with built-in toString and valueOf
 static ASObject* g_object_prototype = NULL;
 
@@ -6996,6 +7012,7 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 	if (class_id == 1) {
 		ASFunction* fn = (ASFunction*)calloc(1, sizeof(ASFunction));
 		if (fn == NULL) return undef;
+		actionGcLinkFunction(fn);
 		fn->function_type = 2;
 		fn->advanced_func = (Function2Ptr)builtin_noop_func;
 		fn->no_lazy_prototype = 1;
@@ -8907,6 +8924,7 @@ static ActionVar rectangleToString(SWFAppContext* app_context, ActionVar* args, 
 static void setNativeToString(SWFAppContext* app_context, ASObject* obj, Function2Ptr func)
 {
 	ASFunction* f = (ASFunction*) calloc(1, sizeof(ASFunction));
+	actionGcLinkFunction(f);
 	strncpy(f->name, "toString", 255);
 	f->function_type = 2;
 	f->advanced_func = func;
@@ -39809,6 +39827,10 @@ static ASFunction* createConstructorCopy(SWFAppContext* app_context, ASFunction*
 	ASFunction* copy = (ASFunction*) malloc(sizeof(ASFunction));
 	if (!copy) return NULL;
 	memcpy(copy, src, sizeof(ASFunction));
+	// memcpy copied src's GC list linkage — reset before linking the copy.
+	copy->gc_next = NULL;
+	copy->gc_epoch = 0;
+	actionGcLinkFunction(copy);
 	// Clear prototype_obj — it will be lazily created as a new instance
 	// (with __proto__ pointing to the secondary Object.prototype)
 	copy->prototype_obj = NULL;
@@ -39930,6 +39952,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	// Object constructor — needs prototype_obj set to sec_obj_proto
 	ASFunction* sec_obj_ctor = (ASFunction*) malloc(sizeof(ASFunction));
 	memset(sec_obj_ctor, 0, sizeof(ASFunction));
+	actionGcLinkFunction(sec_obj_ctor);
 	strncpy(sec_obj_ctor->name, "Object", 255);
 	sec_obj_ctor->function_type = 1;
 	sec_obj_ctor->prototype_obj = sec_obj_proto;
@@ -39967,6 +39990,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	// Array constructor — needs prototype_obj set to sec_arr_proto
 	ASFunction* sec_arr_ctor = (ASFunction*) malloc(sizeof(ASFunction));
 	memset(sec_arr_ctor, 0, sizeof(ASFunction));
+	actionGcLinkFunction(sec_arr_ctor);
 	strncpy(sec_arr_ctor->name, "Array", 255);
 	sec_arr_ctor->function_type = 1;
 	sec_arr_ctor->prototype_obj = sec_arr_proto;
@@ -39987,6 +40011,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	for (int i = 0; i < num_extra; i++) {
 		sec_extra_ctors[i] = (ASFunction*) malloc(sizeof(ASFunction));
 		memset(sec_extra_ctors[i], 0, sizeof(ASFunction));
+		actionGcLinkFunction(sec_extra_ctors[i]);
 		strncpy(sec_extra_ctors[i]->name, ctor_names[i], 255);
 		sec_extra_ctors[i]->function_type = 1;
 		// Set own_props with __proto__ to secondary Function.prototype
@@ -40089,6 +40114,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	// Error, ASSetPropFlags, ASnative — fresh instances
 	ASFunction* sec_error_ctor = (ASFunction*) malloc(sizeof(ASFunction));
 	memset(sec_error_ctor, 0, sizeof(ASFunction));
+	actionGcLinkFunction(sec_error_ctor);
 	strncpy(sec_error_ctor->name, "Error", 255);
 	sec_error_ctor->function_type = 1;
 	if (sec_fn_proto) {
@@ -56970,6 +56996,10 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 		}
 	}
 
+	// GC: enroll in the all-heap-functions list (after the registry-full
+	// early-return above, which is the only path that frees an ASFunction).
+	actionGcLinkFunction(as_func);
+
 	// If named, store in variable
 	if (strlen(name) > 0) {
 		ActionVar func_var;
@@ -57101,6 +57131,10 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
 			}
 		}
 	}
+
+	// GC: enroll in the all-heap-functions list (after the registry-full
+	// early-return above, which is the only path that frees an ASFunction).
+	actionGcLinkFunction(as_func);
 
 	// If named, store in variable
 	if (strlen(name) > 0) {
@@ -75038,4 +75072,239 @@ void processSoundPlayback(SWFAppContext* app_context, double frame_duration_ms)
 int hasPlayingSounds(void)
 {
 	return g_has_playing_sounds;
+}
+
+// ===========================================================================
+// Stage 3 mark-sweep collector — action.c-owned roots + quiescence checks
+// (memory-reclamation plan §Stage 3; the collector core lives in object.c).
+//
+// A missed root here = the collector frees a live object = UAF. The root set
+// below follows the plan §Stage 3 inventory: every C-static that can hold an
+// ASObject*/ASArray*/ActionVar reference invisible to the object graph.
+// ===========================================================================
+
+// VM quiescence: collections run only at tick boundaries where the eval
+// stack, WITH/function scope chain, `this` stack, super-context stack, and
+// watch-handler re-entry stack are all empty. Any of these non-empty means
+// script state is live outside the object graph — bail, collect next tick.
+int actionGcVmQuiescent(SWFAppContext* app_context)
+{
+	if (app_context->sp != INITIAL_SP) return 0;
+	if (scope_depth != 0) return 0;
+	if (g_this_depth != 0) return 0;
+	if (g_super_stack_pos != 0) return 0;
+	if (g_watch_firing_count != 0) return 0;
+	return 1;
+}
+
+// child_mc_cache overflow mints fresh uncacheable MovieClips on every name
+// lookup (see child-mc-cache-cap-resolution); their dynamic_props would be
+// invisible to the root walk below, so collecting past that point could sweep
+// live objects. The caller disables the collector permanently when this
+// returns 0.
+int actionGcRootsEnumerable(void)
+{
+	return child_mc_count < MAX_CHILD_MOVIECLIPS;
+}
+
+void actionGcMarkRoots(void)
+{
+	// --- All functions (immortal; their prototype_obj / own_props /
+	// captured_scope pin objects). Registry covers named user functions and
+	// registerNativeFunction'd builtins; the heap list covers anonymous
+	// functions and the secondary-version-group constructor copies; the
+	// explicit singletons below cover static builtins that may not be
+	// registered. Functions reached only through the object graph are traced
+	// by swfGcMarkVar's FUNCTION arm and property getter/setter fields.
+	for (u32 i = 0; i < function_count; i++)
+		swfGcMarkFunctionPtr(function_registry[i]);
+	for (ASFunction* f = g_gc_fn_head; f != NULL; f = f->gc_next)
+		swfGcMarkFunctionPtr(f);
+	for (int i = 0; i < NUM_STUB_CTORS; i++)
+		swfGcMarkFunctionPtr(&g_stub_ctors[i]);
+	swfGcMarkFunctionPtr(&g_object_constructor_static);
+	swfGcMarkFunctionPtr(&g_array_constructor_static);
+	swfGcMarkFunctionPtr(&g_movieclip_constructor);
+	swfGcMarkFunctionPtr(&g_textfield_constructor);
+	swfGcMarkFunctionPtr(&g_stylesheet_constructor_global);
+	swfGcMarkFunctionPtr(&g_textformat_constructor);
+	swfGcMarkFunctionPtr(&g_xml_constructor);
+	swfGcMarkFunctionPtr(&g_xmlnode_constructor);
+	swfGcMarkFunctionPtr(g_function_constructor);
+	swfGcMarkFunctionPtr(g_number_ctor_ref);
+	swfGcMarkFunctionPtr(g_boolean_ctor_ref);
+	swfGcMarkFunctionPtr(g_mc_ctor_legacy);
+	swfGcMarkFunctionPtr(g_mc_ctor_modern);
+	swfGcMarkFunctionPtr(g_getmember_call_target);
+
+	// --- _global (all version groups) + prototype / singleton objects.
+	swfGcMarkObject(global_object);
+	swfGcMarkObject(g_global_legacy);
+	swfGcMarkObject(g_global_modern);
+	swfGcMarkObject(g_object_prototype);
+	swfGcMarkObject(g_array_prototype);
+	swfGcMarkObject(g_object_proto_legacy);
+	swfGcMarkObject(g_object_proto_modern);
+	swfGcMarkObject(g_array_proto_legacy);
+	swfGcMarkObject(g_array_proto_modern);
+	swfGcMarkObject(g_function_proto_legacy);
+	swfGcMarkObject(g_function_proto_modern);
+	swfGcMarkObject(g_point_prototype);
+	swfGcMarkObject(g_matrix_prototype);
+	swfGcMarkObject(g_rect_prototype);
+	swfGcMarkObject(g_color_prototype);
+	swfGcMarkObject(g_transform_prototype);
+	swfGcMarkObject(g_color_transform_prototype);
+	swfGcMarkObject(g_bitmapdata_prototype);
+	swfGcMarkObject(g_bitmapdata_ctor_own_props);
+	swfGcMarkObject(g_system_object);
+	swfGcMarkObject(g_flash_object);
+	swfGcMarkObject(g_soundcodec_obj);
+	swfGcMarkObject(g_textrenderer_obj);
+	swfGcMarkObject(g_stylesheet_prototype);
+	swfGcMarkObject(g_stage_obj);
+	swfGcMarkObject(g_key_obj);
+	swfGcMarkObject(g_mouse_obj);
+	swfGcMarkObject(g_accessibility_obj);
+	swfGcMarkObject(g_selection_obj);
+	swfGcMarkObject(g_sound_global_transform);
+	swfGcMarkObject(g_c_function_this_obj);
+	for (int i = 0; i < 9; i++) {
+		swfGcMarkObject(g_filter_protos_by_type[i]);
+		swfGcMarkObject(g_filter_subclass_protos[i]);
+	}
+
+	// --- MovieClip registry: every cached MC's dynamic_props (conservative:
+	// tombstoned entries included — a non-NULL dprops is still owned by the
+	// MC field until detached through actionDeferDpropsRelease).
+	if (root_movieclip.dynamic_props != NULL)
+		swfGcMarkObject((ASObject*)root_movieclip.dynamic_props);
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL && child_mc_cache[i]->dynamic_props != NULL)
+			swfGcMarkObject((ASObject*)child_mc_cache[i]->dynamic_props);
+	}
+
+	// --- Detached dprops awaiting the tick-boundary drain (normally empty
+	// at collection time; kept for safety if hook placement ever changes).
+	for (int i = 0; i < g_dprops_release_count; i++)
+		swfGcMarkObject(g_dprops_release_queue[i]);
+
+	// --- Object.watch table.
+	for (int i = 0; i < g_watch_count; i++) {
+		swfGcMarkObject(g_watch_table[i].obj);
+		swfGcMarkFunctionPtr(g_watch_table[i].watcher_func);
+		swfGcMarkVar(&g_watch_table[i].user_data);
+	}
+
+	// --- LocalConnection channels + queued messages.
+	for (int i = 0; i < g_lc_channel_count; i++)
+		swfGcMarkObject(g_lc_channels[i].receiver);
+	for (int i = 0; i < g_lc_message_count; i++) {
+		swfGcMarkObject(g_lc_messages[i].sender);
+		for (int j = 0; j < g_lc_messages[i].num_args && j < MAX_LC_MSG_ARGS; j++)
+			swfGcMarkVar(&g_lc_messages[i].args[j]);
+	}
+
+	// --- NetStream / NetConnection side tables (keyed by object pointer —
+	// rooting keeps pointer-identity lookups valid; entries are never
+	// reclaimed today, so this preserves the existing lifetime).
+	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++)
+		if (g_active_netstreams[i].active)
+			swfGcMarkObject(g_active_netstreams[i].ns_obj);
+	for (int i = 0; i < g_nc_state_count; i++)
+		swfGcMarkObject(g_nc_states[i].nc);
+
+	// --- BitmapData native side table (pointer-keyed weak-map shape; rooted
+	// for the same identity-safety reason — matches today's "entries are
+	// never reclaimed" lifetime).
+	for (int i = 0; i < g_bitmap_native_count; i++)
+		swfGcMarkObject(g_bitmap_natives[i].obj);
+
+	// --- Simulated sound playback (onSoundComplete receivers).
+	for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
+		if (g_playing_sounds[i].active)
+			swfGcMarkObject(g_playing_sounds[i].sound_obj);
+
+	// --- Global registers (persist across frames; r0..r3 are the AVM1
+	// globals, the rest defensively — the array is written only through the
+	// guarded store but costs nothing to scan).
+	for (int i = 0; i < MAX_REGISTERS; i++)
+		swfGcMarkVar(&g_registers[i]);
+
+	// --- Pending exception / return values + call-dispatch stashes.
+	swfGcMarkVar(&g_exception_state.exception_value);
+	swfGcMarkVar(&g_exception_state.return_value);
+	swfGcMarkVar(&g_last_callable_this);
+	swfGcMarkVar(&g_override_this);
+
+	// --- Scope / this / super stacks: empty at quiescence (asserted by the
+	// caller); scanned anyway so a future hook-placement change cannot turn
+	// them into silent root holes.
+	for (u32 i = 0; i < scope_depth && i < MAX_SCOPE_DEPTH; i++)
+		swfGcMarkObject(scope_chain[i]);
+	for (u32 i = 0; i < g_this_depth && i < MAX_THIS_DEPTH; i++)
+		swfGcMarkVar(&g_this_stack[i]);
+	for (u32 i = 0; i < g_super_stack_pos && i < MAX_SUPER_DEPTH; i++)
+		swfGcMarkObject((ASObject*)g_super_this_stack[i]);
+}
+
+// Compare-and-clear one borrowed ActionVar stash slot against a freed pointer.
+static void gcScrubVar(ActionVar* v, const void* p)
+{
+	if ((v->type == ACTION_STACK_VALUE_OBJECT || v->type == ACTION_STACK_VALUE_ARRAY) &&
+	    (void*)(uintptr_t)v->data.numeric_value == p)
+	{
+		v->type = ACTION_STACK_VALUE_UNDEFINED;
+		v->data.numeric_value = 0;
+		v->str_size = 0;
+	}
+}
+
+// Scrub-on-free (collector on only — see gcNotifyRefcountFree in object.c):
+// clear every borrowed action.c stash that still points at the freed object.
+// The identity-keyed side tables (NC/BMD/NetStream/Sound) get their entry
+// neutralized too, which also prevents a later pointer-reuse false match.
+void actionGcScrubStashes(const void* p)
+{
+	for (int i = 0; i < MAX_REGISTERS; i++)
+		gcScrubVar(&g_registers[i], p);
+	gcScrubVar(&g_exception_state.exception_value, p);
+	gcScrubVar(&g_exception_state.return_value, p);
+	gcScrubVar(&g_last_callable_this, p);
+	gcScrubVar(&g_override_this, p);
+	if ((const void*)g_c_function_this_obj == p) g_c_function_this_obj = NULL;
+
+	// Watch table: entries watching the freed object are dead — remove them
+	// (swap-with-last compaction, mirroring unwatch); scrub user_data on the
+	// survivors.
+	for (int i = 0; i < g_watch_count; ) {
+		if ((const void*)g_watch_table[i].obj == p) {
+			g_watch_table[i] = g_watch_table[g_watch_count - 1];
+			g_watch_count--;
+			continue;
+		}
+		gcScrubVar(&g_watch_table[i].user_data, p);
+		i++;
+	}
+
+	for (int i = 0; i < g_lc_channel_count; i++)
+		if ((const void*)g_lc_channels[i].receiver == p) g_lc_channels[i].receiver = NULL;
+	for (int i = 0; i < g_lc_message_count; i++) {
+		if ((const void*)g_lc_messages[i].sender == p) g_lc_messages[i].sender = NULL;
+		for (int j = 0; j < g_lc_messages[i].num_args && j < MAX_LC_MSG_ARGS; j++)
+			gcScrubVar(&g_lc_messages[i].args[j], p);
+	}
+
+	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++) {
+		if ((const void*)g_active_netstreams[i].ns_obj == p) {
+			g_active_netstreams[i].ns_obj = NULL;
+			g_active_netstreams[i].active = 0;
+		}
+	}
+	for (int i = 0; i < g_nc_state_count; i++)
+		if ((const void*)g_nc_states[i].nc == p) g_nc_states[i].nc = NULL;
+	for (int i = 0; i < g_bitmap_native_count; i++)
+		if ((const void*)g_bitmap_natives[i].obj == p) g_bitmap_natives[i].obj = NULL;
+	for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
+		if ((const void*)g_playing_sounds[i].sound_obj == p) g_playing_sounds[i].sound_obj = NULL;
 }

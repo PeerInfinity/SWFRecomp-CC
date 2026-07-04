@@ -43,6 +43,11 @@ on:
         required: false
         default: ''
         type: string
+      swf_gc:
+        description: 'Stage 3 mark-sweep collector mode for test binaries (empty = off; 1/quarantine/count; runs at cadence 1)'
+        required: false
+        default: ''
+        type: string
   workflow_call:
     inputs:
       categories:
@@ -70,6 +75,11 @@ on:
         required: false
         default: ''
         type: string
+      swf_gc:
+        description: 'Stage 3 mark-sweep collector mode for test binaries (empty = off)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -79,6 +89,11 @@ permissions:
 # When adding a new category, add it here, to the DIRS lists below, and to
 # the shard combine script's categories dict.
 env:
+  # Stage 3 mark-sweep collector (memory-reclamation plan): when the swf_gc
+  # input is set, every test binary runs with the collector enabled at
+  # cadence 1 (collect every tick) for maximum coverage. Empty = off.
+  SWF_GC: ${{ inputs.swf_gc }}
+  SWF_GC_CADENCE: ${{ inputs.swf_gc != '' && '1' || '' }}
   AVM1_DIR: ruffle-tests/tests/swfs/avm1
   SHUMWAY_AVM1_DIR: ruffle-tests/tests/swfs/from_shumway/avm1
   SHUMWAY_FLAT_DIR: ruffle-tests/tests/swfs/from_shumway

@@ -72,7 +72,26 @@ typedef struct ASFunction {
 	// If set, this function does not get a lazily-created .prototype object.
 	// Used for native/built-in functions that don't have prototypes in Flash.
 	u8 no_lazy_prototype;
+
+	// --- Stage 3 mark-sweep collector (memory-reclamation plan §Stage 3) ---
+	// Intrusive all-heap-functions list: function_registry deliberately
+	// excludes anonymous functions, so the collector traces prototype_obj/
+	// own_props/captured_scope from this list instead. Heap alloc sites link
+	// via actionGcLinkFunction; static/BSS builtins are reached through
+	// function_registry + FUNCTION-typed values in the object graph.
+	// Functions themselves stay immortal (never swept).
+	struct ASFunction* gc_next;
+	// Mark epoch (== current collection's epoch → already traced). Epoch-based
+	// so unlisted static functions reached via graph FUNCTION values need no
+	// clear pass.
+	u32 gc_epoch;
 } ASFunction;
+
+// Link a heap-allocated ASFunction into the collector's all-functions list.
+// Call exactly once per heap allocation, after zeroing gc_next/gc_epoch
+// (calloc does; malloc+memcpy copies like createConstructorCopy must reset
+// them first). Defined in action.c.
+void actionGcLinkFunction(ASFunction* fn);
 
 // ------------------------------------------------------------------
 // Stack / coercion helpers (defined in action.c)

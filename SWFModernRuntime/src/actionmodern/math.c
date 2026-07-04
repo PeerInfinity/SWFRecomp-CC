@@ -471,3 +471,10 @@ int32_t actionRNGGenerateRange(int32_t range)
 {
 	return Random(range, &global_random_state);
 }
+
+// Stage 3 collector root marker: the Math singleton is read through this
+// C static even if script deletes _global.Math.
+void mathGcMarkRoots(void)
+{
+	swfGcMarkObject(g_math_object);
+}

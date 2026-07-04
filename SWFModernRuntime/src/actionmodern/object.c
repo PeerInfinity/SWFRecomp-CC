@@ -5,6 +5,7 @@
 
 #include <actionmodern/object.h>
 #include <actionmodern/action.h>
+#include <actionmodern/action_internal.h>  // ASFunction (Stage 3 collector traces prototype_obj/own_props/captured_scope)
 #include <heap.h>
 #include "unicode_case_tables.h"
 
@@ -331,6 +332,44 @@ static void mtUnlinkArray(ASArray* arr)
 }
 
 /**
+ * Stage 3 collector: quarantine poison gate (SWF_GC=quarantine).
+ *
+ * Swept objects are poisoned (mt_kind = MT_KIND_GC_POISONED) and parked for a
+ * few collections before the real free. Any runtime access to a poisoned
+ * object means the collector swept something reachable — a missed GC root —
+ * so the trap aborts loudly with the pointer and access site. The gate int
+ * keeps the checks free when quarantine mode is off (one predictable branch).
+ * Collector core is at the end of this file.
+ */
+int g_swf_gc_poison_active = 0;
+
+void swfGcPoisonTrap(const void* p, const char* where)
+{
+	fprintf(stderr,
+		"[swf-gc] FATAL: access to quarantined (swept) object %p via %s"
+		" — missed GC root (memory-reclamation plan Stage 3 rollout)\n",
+		p, where);
+	fflush(stderr);
+	abort();
+}
+
+#define GC_POISON_OBJ(o, where) \
+	do { if (g_swf_gc_poison_active && (o) != NULL && (o)->mt_kind == MT_KIND_GC_POISONED) \
+		swfGcPoisonTrap((o), (where)); } while (0)
+#define GC_POISON_ARR(a, where) \
+	do { if (g_swf_gc_poison_active && (a) != NULL && (a)->mt_kind == MT_KIND_GC_POISONED) \
+		swfGcPoisonTrap((a), (where)); } while (0)
+
+// Forward decl — GC stats line appended to swfMemReport (defined with the
+// collector core at the end of this file).
+static void gcReportLine(void);
+
+// Forward decl — scrub borrowed C stashes (registers, timers, side tables)
+// when refcounting frees an object, so the collector's root walk never reads
+// freed memory through a dangling stash. No-op unless the collector is on.
+static void gcNotifyRefcountFree(void* p);
+
+/**
  * Classified live-set report (stderr).
  *
  * Crude attribution — it only needs to rank the three leak classes from the
@@ -403,6 +442,7 @@ void swfMemReport(void)
 		" (held-as-obj-prop=%u other=%u)\n",
 		(unsigned long long)g_mt_arr_allocs, (unsigned long long)g_mt_arr_frees,
 		live_arr, arr_as_obj_prop, arr_other);
+	gcReportLine();
 }
 
 // Env-gated wrapper for the end-of-run report. Called by the frame loops
@@ -527,6 +567,7 @@ void retainObject(ASObject* obj)
 	{
 		return;
 	}
+	GC_POISON_OBJ(obj, "retainObject");
 
 	obj->refcount++;
 
@@ -549,6 +590,7 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 	{
 		return;
 	}
+	GC_POISON_OBJ(obj, "releaseObject");
 
 #ifdef DEBUG
 	printf("[DEBUG] releaseObject: obj=%p, refcount=%u -> %u\n",
@@ -616,6 +658,7 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 		}
 
 		// Free object itself
+		gcNotifyRefcountFree(obj);
 		mtUnlinkObject(obj);
 		free(obj);
 	}
@@ -631,6 +674,7 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL) return NULL;
+	GC_POISON_OBJ(obj, "findPropertyRaw");
 	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL)) return NULL;
 	u32 s = findPropertySlot(obj, name, name_length, name_fold_hash(name, name_length));
 	return (s == PROP_HASH_EMPTY) ? NULL : &obj->properties[s];
@@ -657,6 +701,7 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 	{
 		return NULL;
 	}
+	GC_POISON_OBJ(obj, "getProperty");
 
 	// Safety: reject obviously corrupt objects (garbage num_used or NULL properties with nonzero count)
 	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL))
@@ -687,6 +732,7 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 	{
 		return NULL;
 	}
+	GC_POISON_OBJ(obj, "getPropertyWithPrototype");
 
 	// Safety: reject obviously corrupt objects
 	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL))
@@ -755,6 +801,7 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 ASProperty* findPropertyStructWithPrototype(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL) return NULL;
+	GC_POISON_OBJ(obj, "findPropertyStructWithPrototype");
 
 	ASObject* current = obj;
 	int max_depth = 256;
@@ -813,6 +860,7 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	{
 		return;
 	}
+	GC_POISON_OBJ(obj, "setProperty");
 
 	// Check if property already exists
 	u32 qhash = name_fold_hash(name, name_length);
@@ -950,6 +998,7 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length, ActionVar* value, u8 flags)
 {
 	if (obj == NULL || name == NULL || value == NULL || name_length == 0) return;
+	GC_POISON_OBJ(obj, "setPropertyWithFlags");
 
 	// If property already exists, just update the value
 	u32 qhash = name_fold_hash(name, name_length);
@@ -1003,6 +1052,7 @@ bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name,
 	{
 		return true;  // Flash behavior: delete on null returns true
 	}
+	GC_POISON_OBJ(obj, "deleteProperty");
 
 	// Find property by name
 	u32 qhash = name_fold_hash(name, name_length);
@@ -1414,6 +1464,7 @@ ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 	arr->enum_capacity = 0;
 
 	arr->mt_mark = 0;
+	arr->mt_kind = MT_KIND_PLAIN;
 	mtLinkArray(arr);
 
 #ifdef DEBUG
@@ -1430,6 +1481,7 @@ void retainArray(ASArray* arr)
 	{
 		return;
 	}
+	GC_POISON_ARR(arr, "retainArray");
 
 	arr->refcount++;
 
@@ -1445,6 +1497,7 @@ void releaseArray(SWFAppContext* app_context, ASArray* arr)
 	{
 		return;
 	}
+	GC_POISON_ARR(arr, "releaseArray");
 
 #ifdef DEBUG
 	printf("[DEBUG] releaseArray: arr=%p, refcount=%u -> %u\n",
@@ -1503,6 +1556,7 @@ void releaseArray(SWFAppContext* app_context, ASArray* arr)
 		}
 
 		// Free array itself
+		gcNotifyRefcountFree(arr);
 		mtUnlinkArray(arr);
 		free(arr);
 	}
@@ -1514,6 +1568,7 @@ ActionVar* getArrayElement(ASArray* arr, u32 index)
 	{
 		return NULL;
 	}
+	GC_POISON_ARR(arr, "getArrayElement");
 	// Flash: negative signed length (e.g., arr.length = -1) makes all elements inaccessible
 	if ((int32_t)arr->length < 0)
 	{
@@ -1525,6 +1580,7 @@ ActionVar* getArrayElement(ASArray* arr, u32 index)
 
 void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, ActionVar* value)
 {
+	GC_POISON_ARR(arr, "setArrayElement");
 	if (arr == NULL || value == NULL)
 	{
 		return;
@@ -1624,4 +1680,472 @@ void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, Action
 	printf("[DEBUG] setArrayElement: arr=%p, index=%u, length=%u\n",
 		(void*)arr, index, arr->length);
 #endif
+}
+
+/**
+ * ===========================================================================
+ * Stage 3 root-traced mark-sweep collector core
+ * (SWFRecompDocs/plans/memory-reclamation-plan.md §Stage 3)
+ * ===========================================================================
+ *
+ * Liveness = reachability ONLY. Refcounts are advisory here (stack ops,
+ * var_map stores, scope captures, timers are all borrowed edges, and the
+ * allocating +1 of script-created values floats forever), so the sweep frees
+ * unmarked objects regardless of refcount — that floating +1 is exactly why
+ * they leak. Conversely the two-pass teardown releases a doomed object's
+ * retained edges into MARKED targets so live refcounts stay balanced.
+ *
+ * Runs only between frames (caller checks actionGcVmQuiescent) at a tick
+ * cadence. Rollout modes (SWF_GC env var): count → quarantine → free.
+ * Tracing rules (plan §Stage 3): follow OBJECT/ARRAY ActionVars in
+ * properties/elements/arr->props/interfaces; FUNCTION values are traced via
+ * their prototype_obj/own_props/captured_scope (functions are immortal);
+ * MOVIECLIP values are non-owning and never dereferenced.
+ */
+
+// --- configuration + stats ---
+#define SWF_GC_MODE_OFF        0
+#define SWF_GC_MODE_COUNT      1
+#define SWF_GC_MODE_QUARANTINE 2
+#define SWF_GC_MODE_FREE       3
+static u8  g_gc_mode = SWF_GC_MODE_OFF;
+static int g_gc_verbose = 0;
+static u32 g_gc_cadence = 60;          // ticks between collections
+static u32 g_gc_quarantine_lag = 3;    // collections an object stays parked
+static u64 g_gc_tick = 0;
+static u32 g_gc_collections = 0;
+static u64 g_gc_swept_obj_total = 0;
+static u64 g_gc_swept_arr_total = 0;
+static int g_gc_config_parsed = 0;
+
+// --- mark worklist (explicit stack — the graph can be deep) ---
+typedef struct { void* p; u8 is_array; } GcWorkItem;
+static GcWorkItem* g_gc_wl = NULL;
+static u32 g_gc_wl_count = 0;
+static u32 g_gc_wl_cap = 0;
+static int g_gc_mark_failed = 0;   // worklist OOM → abort collection, sweep nothing
+
+// Function-mark epoch: a function is "already traced this collection" when
+// gc_epoch == g_gc_fn_epoch. Epochs start at 1 so zero-initialized statics
+// (BSS) read as unmarked without any clear pass.
+static u32 g_gc_fn_epoch = 0;
+
+static void gcPush(void* p, u8 is_array)
+{
+	if (g_gc_mark_failed) return;
+	if (g_gc_wl_count >= g_gc_wl_cap) {
+		u32 ncap = g_gc_wl_cap ? g_gc_wl_cap * 2 : 4096;
+		GcWorkItem* nw = (GcWorkItem*) realloc(g_gc_wl, (size_t)ncap * sizeof(GcWorkItem));
+		if (nw == NULL) { g_gc_mark_failed = 1; return; }
+		g_gc_wl = nw;
+		g_gc_wl_cap = ncap;
+	}
+	g_gc_wl[g_gc_wl_count].p = p;
+	g_gc_wl[g_gc_wl_count].is_array = is_array;
+	g_gc_wl_count++;
+}
+
+// Enrollment filter: the clear pass stamps bit 1 ("member of the live list
+// this cycle") on every listed object/array; marking requires it. OBJECT/
+// ARRAY-typed edges can dangle at freed memory (the runtime's own
+// num_used>16384 corruption guards exist for the same reason), and a garbage
+// pointer that merely LOOKS like an object must be neither traced nor swept
+// (first observed: N title tick 60, a property whose ASProperty bytes were
+// recycled heap garbage — tracing its "getter" segfaulted).
+void swfGcMarkObject(ASObject* obj)
+{
+	if (obj == NULL || (obj->mt_mark & 2) == 0 || (obj->mt_mark & 1)) return;
+	obj->mt_mark |= 1;
+	gcPush(obj, 0);
+}
+
+void swfGcMarkArray(ASArray* arr)
+{
+	if (arr == NULL || (arr->mt_mark & 2) == 0 || (arr->mt_mark & 1)) return;
+	arr->mt_mark |= 1;
+	gcPush(arr, 1);
+}
+
+void swfGcMarkFunctionPtr(void* fp)
+{
+	ASFunction* f = (ASFunction*) fp;
+	if (f == NULL || f->gc_epoch == g_gc_fn_epoch) return;
+	f->gc_epoch = g_gc_fn_epoch;
+	swfGcMarkObject(f->prototype_obj);
+	swfGcMarkObject(f->own_props);
+	u32 n = f->captured_scope_count;
+	if (n > 8) n = 8;
+	for (u32 i = 0; i < n; i++)
+		swfGcMarkObject(f->captured_scope[i]);
+}
+
+void swfGcMarkVar(ActionVar* v)
+{
+	if (v == NULL) return;
+	switch (v->type) {
+		case ACTION_STACK_VALUE_OBJECT:
+			swfGcMarkObject((ASObject*)(uintptr_t)v->data.numeric_value);
+			break;
+		case ACTION_STACK_VALUE_ARRAY:
+			swfGcMarkArray((ASArray*)(uintptr_t)v->data.numeric_value);
+			break;
+		case ACTION_STACK_VALUE_FUNCTION:
+			swfGcMarkFunctionPtr((void*)(uintptr_t)v->data.numeric_value);
+			break;
+		default:
+			break;  // MOVIECLIP is non-owning (may dangle) — never traced
+	}
+}
+
+// Trace one object's outgoing edges (same corruption guards as getProperty).
+static void gcTraceObject(ASObject* o)
+{
+	if (o->num_used <= 16384 && o->properties != NULL) {
+		for (u32 i = 0; i < o->num_used; i++) {
+			swfGcMarkVar(&o->properties[i].value);
+			if (o->properties[i].getter != NULL)
+				swfGcMarkFunctionPtr(o->properties[i].getter);
+			if (o->properties[i].setter != NULL)
+				swfGcMarkFunctionPtr(o->properties[i].setter);
+		}
+	}
+	if (o->interfaces != NULL) {
+		for (u32 i = 0; i < o->interface_count; i++)
+			swfGcMarkObject(o->interfaces[i]);
+	}
+}
+
+// Trace one array's outgoing edges. Bounded by min(length, capacity): length
+// can exceed capacity via script `arr.length = N`, and entries past a
+// shrunken length may hold already-released values — [0, min) is the live
+// window (enum_keys are name strings, not references).
+static void gcTraceArray(ASArray* a)
+{
+	u32 n = a->length;
+	if (n > a->capacity) n = a->capacity;
+	if (a->elements != NULL) {
+		for (u32 i = 0; i < n; i++)
+			swfGcMarkVar(&a->elements[i]);
+	}
+	swfGcMarkObject(a->props);
+}
+
+static void gcDrainWorklist(void)
+{
+	while (g_gc_wl_count > 0 && !g_gc_mark_failed) {
+		GcWorkItem it = g_gc_wl[--g_gc_wl_count];
+		if (it.is_array) gcTraceArray((ASArray*)it.p);
+		else             gcTraceObject((ASObject*)it.p);
+	}
+}
+
+// --- two-pass teardown -----------------------------------------------------
+// Pass 1 (neutralize): release each doomed object's retained edges into
+// MARKED (live) targets, balancing the retain the doomed object held. Edges
+// into other doomed objects are skipped — those are freed wholesale. If a
+// live target's count hits 0 it is NOT freed here (borrowed roots may still
+// reach it); it simply becomes collectable by a future sweep.
+static void gcReleaseIfLiveObject(ASObject* o)
+{
+	if (o != NULL && (o->mt_mark & 1) && o->refcount > 0)
+		o->refcount--;
+}
+
+static void gcReleaseIfLiveArray(ASArray* a)
+{
+	if (a != NULL && (a->mt_mark & 1) && a->refcount > 0)
+		a->refcount--;
+}
+
+static void gcNeutralizeObject(ASObject* o)
+{
+	if (o->num_used <= 16384 && o->properties != NULL) {
+		for (u32 i = 0; i < o->num_used; i++) {
+			ActionVar* v = &o->properties[i].value;
+			if (v->type == ACTION_STACK_VALUE_OBJECT)
+				gcReleaseIfLiveObject((ASObject*)(uintptr_t)v->data.numeric_value);
+			else if (v->type == ACTION_STACK_VALUE_ARRAY)
+				gcReleaseIfLiveArray((ASArray*)(uintptr_t)v->data.numeric_value);
+		}
+	}
+	if (o->interfaces != NULL) {
+		for (u32 i = 0; i < o->interface_count; i++)
+			gcReleaseIfLiveObject(o->interfaces[i]);
+	}
+}
+
+static void gcNeutralizeArray(ASArray* a)
+{
+	u32 n = a->length;
+	if (n > a->capacity) n = a->capacity;
+	if (a->elements != NULL) {
+		for (u32 i = 0; i < n; i++) {
+			ActionVar* v = &a->elements[i];
+			if (v->type == ACTION_STACK_VALUE_OBJECT)
+				gcReleaseIfLiveObject((ASObject*)(uintptr_t)v->data.numeric_value);
+			else if (v->type == ACTION_STACK_VALUE_ARRAY)
+				gcReleaseIfLiveArray((ASArray*)(uintptr_t)v->data.numeric_value);
+		}
+	}
+	gcReleaseIfLiveObject(a->props);
+}
+
+// Pass 2 (free innards): mirrors the release-at-zero teardown in
+// releaseObject/releaseArray minus the recursive releases (pass 1 handled
+// live edges; doomed edges are freed as their own sweep entries). Leaves the
+// struct itself for the caller (free now, or poison + park in quarantine).
+static void gcFreeObjectInnards(SWFAppContext* app_context, ASObject* o)
+{
+	if (o->num_used <= 16384 && o->properties != NULL) {
+		for (u32 i = 0; i < o->num_used; i++) {
+			if (o->properties[i].name != NULL)
+				FREE(o->properties[i].name);
+			if (o->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
+			    o->properties[i].value.data.string_data.owns_memory)
+				free(o->properties[i].value.data.string_data.heap_ptr);
+		}
+	}
+	if (o->properties != NULL) free(o->properties);
+	if (o->hash_index != NULL) free(o->hash_index);
+	if (o->interfaces != NULL) free(o->interfaces);
+	o->properties = NULL;
+	o->hash_index = NULL;
+	o->interfaces = NULL;
+	o->interface_count = 0;
+	o->num_used = 0;
+	o->num_properties = 0;
+}
+
+static void gcFreeArrayInnards(SWFAppContext* app_context, ASArray* a)
+{
+	(void)app_context;
+	u32 n = a->length;
+	if (n > a->capacity) n = a->capacity;
+	if (a->elements != NULL) {
+		for (u32 i = 0; i < n; i++) {
+			if (a->elements[i].type == ACTION_STACK_VALUE_STRING &&
+			    a->elements[i].data.string_data.owns_memory)
+				free(a->elements[i].data.string_data.heap_ptr);
+		}
+		free(a->elements);
+	}
+	if (a->enum_keys != NULL) {
+		for (u32 i = 0; i < a->enum_count; i++)
+			free(a->enum_keys[i]);
+		free(a->enum_keys);
+	}
+	a->elements = NULL;
+	a->props = NULL;
+	a->enum_keys = NULL;
+	a->enum_count = 0;
+	a->enum_capacity = 0;
+	a->length = 0;
+	a->capacity = 0;
+}
+
+// --- quarantine ------------------------------------------------------------
+typedef struct { void* p; u8 is_array; u32 seq; } GcQuarantined;
+static GcQuarantined* g_gc_q = NULL;
+static u32 g_gc_q_count = 0;
+static u32 g_gc_q_cap = 0;
+
+static void gcQuarantinePark(void* p, u8 is_array)
+{
+	if (g_gc_q_count >= g_gc_q_cap) {
+		u32 ncap = g_gc_q_cap ? g_gc_q_cap * 2 : 1024;
+		GcQuarantined* nq = (GcQuarantined*) realloc(g_gc_q, (size_t)ncap * sizeof(GcQuarantined));
+		if (nq == NULL) { free(p); return; }  // OOM: skip quarantine, free now
+		g_gc_q = nq;
+		g_gc_q_cap = ncap;
+	}
+	g_gc_q[g_gc_q_count].p = p;
+	g_gc_q[g_gc_q_count].is_array = is_array;
+	g_gc_q[g_gc_q_count].seq = g_gc_collections;
+	g_gc_q_count++;
+}
+
+// Free entries that have aged out (or everything, when flush_all).
+static void gcQuarantineFlush(int flush_all)
+{
+	u32 kept = 0;
+	for (u32 i = 0; i < g_gc_q_count; i++) {
+		if (flush_all || g_gc_collections - g_gc_q[i].seq >= g_gc_quarantine_lag)
+			free(g_gc_q[i].p);
+		else
+			g_gc_q[kept++] = g_gc_q[i];
+	}
+	g_gc_q_count = kept;
+}
+
+// --- collection ------------------------------------------------------------
+static void gcParseConfig(void)
+{
+	g_gc_config_parsed = 1;
+	const char* mode = getenv("SWF_GC");
+	if (mode == NULL || mode[0] == '\0' || strcmp(mode, "0") == 0) return;
+	if      (strcmp(mode, "count") == 0)      g_gc_mode = SWF_GC_MODE_COUNT;
+	else if (strcmp(mode, "quarantine") == 0) g_gc_mode = SWF_GC_MODE_QUARANTINE;
+	else if (strcmp(mode, "1") == 0 || strcmp(mode, "free") == 0 || strcmp(mode, "on") == 0)
+		g_gc_mode = SWF_GC_MODE_FREE;
+	else {
+		fprintf(stderr, "[swf-gc] unknown SWF_GC mode '%s' (want count|quarantine|1) — collector off\n", mode);
+		return;
+	}
+	const char* cad = getenv("SWF_GC_CADENCE");
+	if (cad != NULL && atoi(cad) > 0) g_gc_cadence = (u32)atoi(cad);
+	const char* lag = getenv("SWF_GC_QUARANTINE_LAG");
+	if (lag != NULL && atoi(lag) > 0) g_gc_quarantine_lag = (u32)atoi(lag);
+	if (getenv("SWF_GC_VERBOSE") != NULL) g_gc_verbose = 1;
+	if (g_gc_mode == SWF_GC_MODE_QUARANTINE) g_swf_gc_poison_active = 1;
+	if (g_gc_verbose)
+		fprintf(stderr, "[swf-gc] mode=%s cadence=%u\n", mode, g_gc_cadence);
+}
+
+static void gcCollect(SWFAppContext* app_context)
+{
+	g_gc_collections++;
+	gcQuarantineFlush(0);
+
+	// Clear marks + stamp the enrollment bit (bit 1) on the live sets; bump
+	// the function epoch (skipping 0, which means "never marked" for
+	// zero-initialized statics). Marking requires the enrollment bit, so
+	// dangling edges at freed memory are ignored (see swfGcMarkObject).
+	for (ASObject* o = g_mt_obj_head; o != NULL; o = o->mt_next) o->mt_mark = 2;
+	for (ASArray* a = g_mt_arr_head; a != NULL; a = a->mt_next) a->mt_mark = 2;
+	g_gc_fn_epoch++;
+	if (g_gc_fn_epoch == 0) g_gc_fn_epoch = 1;
+	g_gc_mark_failed = 0;
+	g_gc_wl_count = 0;
+
+	// Root set (see actionGcMarkRoots for the inventory), then trace.
+	actionGcMarkRoots();
+	variablesGcMarkRoots();
+	timerGcMarkRoots();
+	registeredClassGcMarkRoots();
+	mathGcMarkRoots();
+	dateGcMarkRoots();
+	gcDrainWorklist();
+	if (g_gc_mark_failed) {
+		fprintf(stderr, "[swf-gc] mark worklist OOM — collection #%u aborted (nothing swept)\n",
+			g_gc_collections);
+		return;
+	}
+
+	// Doomed census (also the entire "count" mode).
+	u32 doom_obj = 0, doom_dprops = 0, doom_arr = 0;
+	for (ASObject* o = g_mt_obj_head; o != NULL; o = o->mt_next) {
+		if (o->mt_mark & 1) continue;
+		if (o->mt_kind == MT_KIND_DPROPS) doom_dprops++;
+		doom_obj++;
+	}
+	for (ASArray* a = g_mt_arr_head; a != NULL; a = a->mt_next) {
+		if (!(a->mt_mark & 1)) doom_arr++;
+	}
+	if (g_gc_verbose) {
+		fprintf(stderr,
+			"[swf-gc] #%u tick=%llu live=%u obj/%u arr — %s %u obj (%u dprops) + %u arr\n",
+			g_gc_collections, (unsigned long long)g_gc_tick,
+			swfMemLiveObjects(), swfMemLiveArrays(),
+			g_gc_mode == SWF_GC_MODE_COUNT ? "would sweep" : "sweeping",
+			doom_obj, doom_dprops, doom_arr);
+	}
+	if (g_gc_mode == SWF_GC_MODE_COUNT) return;
+	if (doom_obj == 0 && doom_arr == 0) return;
+
+	// Pass 1: neutralize every doomed object's retained edges into live
+	// targets (must complete for the WHOLE doomed set before anything is
+	// freed — releases must never touch freed memory).
+	for (ASObject* o = g_mt_obj_head; o != NULL; o = o->mt_next)
+		if (!(o->mt_mark & 1)) gcNeutralizeObject(o);
+	for (ASArray* a = g_mt_arr_head; a != NULL; a = a->mt_next)
+		if (!(a->mt_mark & 1)) gcNeutralizeArray(a);
+
+	// Pass 2: free innards + free/park the structs.
+	int park = (g_gc_mode == SWF_GC_MODE_QUARANTINE);
+	for (ASObject* o = g_mt_obj_head; o != NULL; ) {
+		ASObject* next = o->mt_next;
+		if (!(o->mt_mark & 1)) {
+			gcFreeObjectInnards(app_context, o);
+			mtUnlinkObject(o);
+			if (park) {
+				o->mt_kind = MT_KIND_GC_POISONED;
+				o->refcount = 0xDDDDDDDDu;
+				o->mt_prev = NULL;
+				o->mt_next = NULL;
+				gcQuarantinePark(o, 0);
+			} else {
+				free(o);
+			}
+			g_gc_swept_obj_total++;
+		}
+		o = next;
+	}
+	for (ASArray* a = g_mt_arr_head; a != NULL; ) {
+		ASArray* next = a->mt_next;
+		if (!(a->mt_mark & 1)) {
+			gcFreeArrayInnards(app_context, a);
+			mtUnlinkArray(a);
+			if (park) {
+				a->mt_kind = MT_KIND_GC_POISONED;
+				a->refcount = 0xDDDDDDDDu;
+				a->mt_prev = NULL;
+				a->mt_next = NULL;
+				gcQuarantinePark(a, 1);
+			} else {
+				free(a);
+			}
+			g_gc_swept_arr_total++;
+		}
+		a = next;
+	}
+}
+
+void swfGcMaybeCollect(SWFAppContext* app_context)
+{
+	if (!g_gc_config_parsed) gcParseConfig();
+	if (g_gc_mode == SWF_GC_MODE_OFF) return;
+	g_gc_tick++;
+	if (g_gc_tick % g_gc_cadence != 0) return;
+	if (!actionGcRootsEnumerable()) {
+		fprintf(stderr, "[swf-gc] child_mc_cache overflowed — uncacheable MovieClips"
+			" would be invisible roots; collector disabled for this run\n");
+		g_gc_mode = SWF_GC_MODE_OFF;
+		return;
+	}
+	if (!actionGcVmQuiescent(app_context)) {
+		if (g_gc_verbose)
+			fprintf(stderr, "[swf-gc] tick=%llu VM not quiescent — skipping\n",
+				(unsigned long long)g_gc_tick);
+		return;
+	}
+	gcCollect(app_context);
+}
+
+// GC stats line for swfMemReport (only when the collector ever ran).
+static void gcReportLine(void)
+{
+	if (g_gc_collections == 0) return;
+	fprintf(stderr,
+		"[swf-mem] gc:      collections=%u swept=%llu obj + %llu arr (mode=%u cadence=%u quarantined=%u)\n",
+		g_gc_collections,
+		(unsigned long long)g_gc_swept_obj_total,
+		(unsigned long long)g_gc_swept_arr_total,
+		(unsigned)g_gc_mode, g_gc_cadence, g_gc_q_count);
+}
+
+// Scrub-on-free: when refcounting frees an object/array, clear any borrowed
+// C stash still pointing at it (global registers, timer entries, watch table,
+// LC/NetStream/Sound side tables). Those stashes are GC roots, and a stale
+// entry would make the mark phase read freed memory. Pre-GC these stale
+// entries were latent UAFs at their eventual use sites; scrubbing also fixes
+// the pointer-reuse false-match hazard in the identity-keyed side tables.
+// Gated on collector mode so default builds keep the exact old behavior.
+static void gcNotifyRefcountFree(void* p)
+{
+	// Parse env config on the first free too — frees during init would
+	// otherwise predate the first tick's parse and skip scrubbing.
+	if (!g_gc_config_parsed) gcParseConfig();
+	if (g_gc_mode == SWF_GC_MODE_OFF) return;
+	actionGcScrubStashes(p);
+	timerGcScrubStashes(p);
 }

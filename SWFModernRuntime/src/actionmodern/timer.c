@@ -604,3 +604,50 @@ ASFunction* actionTimerGetSetInterval(void)   { initTimerFunctions(); return &g_
 ASFunction* actionTimerGetClearInterval(void) { initTimerFunctions(); return &g_clearInterval_func; }
 ASFunction* actionTimerGetSetTimeout(void)    { initTimerFunctions(); return &g_setTimeout_func; }
 ASFunction* actionTimerGetClearTimeout(void)  { initTimerFunctions(); return &g_clearTimeout_func; }
+
+// Stage 3 collector root marker: active timer entries hold borrowed
+// func/object/extra_args references invisible to the object graph.
+// The 4 timer builtin ASFunctions' own_props are marked too (they are
+// static but not necessarily in function_registry).
+void timerGcMarkRoots(void)
+{
+	for (int i = 0; i < MAX_TIMERS; i++) {
+		if (!g_timers[i].active) continue;
+		swfGcMarkVar(&g_timers[i].func);
+		swfGcMarkVar(&g_timers[i].object);
+		for (int j = 0; j < g_timers[i].extra_arg_count && j < 8; j++)
+			swfGcMarkVar(&g_timers[i].extra_args[j]);
+	}
+	if (g_timer_funcs_init) {
+		swfGcMarkFunctionPtr(&g_setInterval_func);
+		swfGcMarkFunctionPtr(&g_clearInterval_func);
+		swfGcMarkFunctionPtr(&g_setTimeout_func);
+		swfGcMarkFunctionPtr(&g_clearTimeout_func);
+	}
+}
+
+// Scrub-on-free (collector on only): clear timer-held borrowed refs to the
+// freed object. A timer whose callback object died was a latent UAF at fire
+// time before; firing with UNDEFINED is a deterministic no-op instead.
+void timerGcScrubStashes(const void* p)
+{
+	for (int i = 0; i < MAX_TIMERS; i++) {
+		if (!g_timers[i].active) continue;
+		ActionVar* vars[10];
+		int n = 0;
+		vars[n++] = &g_timers[i].func;
+		vars[n++] = &g_timers[i].object;
+		for (int j = 0; j < g_timers[i].extra_arg_count && j < 8; j++)
+			vars[n++] = &g_timers[i].extra_args[j];
+		for (int k = 0; k < n; k++) {
+			ActionVar* v = vars[k];
+			if ((v->type == ACTION_STACK_VALUE_OBJECT || v->type == ACTION_STACK_VALUE_ARRAY) &&
+			    (void*)(uintptr_t)v->data.numeric_value == p)
+			{
+				v->type = ACTION_STACK_VALUE_UNDEFINED;
+				v->data.numeric_value = 0;
+				v->str_size = 0;
+			}
+		}
+	}
+}

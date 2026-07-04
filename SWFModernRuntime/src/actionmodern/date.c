@@ -1004,3 +1004,11 @@ ASFunction* actionDateGetASnativeMethod(SWFAppContext* app_context, u16 index) {
 		default:  return NULL;
 	}
 }
+
+// Stage 3 collector root marker: Date.prototype + the static constructor's
+// lazily-created own_props/prototype_obj.
+void dateGcMarkRoots(void)
+{
+	swfGcMarkObject(g_date_prototype);
+	swfGcMarkFunctionPtr(&g_date_constructor);
+}

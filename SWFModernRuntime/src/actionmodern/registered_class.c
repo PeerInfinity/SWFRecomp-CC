@@ -393,3 +393,13 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 	// invokes _vp[_activeVP].play(url) when _vp now exists).
 	actionReplayConstructParams(app_context, mc);
 }
+
+// Stage 3 collector root marker: Object.registerClass bindings hold borrowed
+// ASFunction* constructors whose prototype_obj must stay live.
+void registeredClassGcMarkRoots(void)
+{
+	for (size_t i = 0; i < g_registered_class_count_cs; i++)
+		swfGcMarkFunctionPtr(g_registered_classes_cs[i].constructor);
+	for (size_t i = 0; i < g_registered_class_count_ci; i++)
+		swfGcMarkFunctionPtr(g_registered_classes_ci[i].constructor);
+}

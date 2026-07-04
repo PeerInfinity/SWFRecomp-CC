@@ -515,6 +515,10 @@ void tagMain(SWFAppContext* app_context)
 		app_context->sp = INITIAL_SP;
 		app_context->oldSP = 0;
 
+		// Stage 3 mark-sweep collector (env-gated, default off) — after the
+		// dprops drain + stack reset, where the VM is quiescent.
+		swfGcMaybeCollect(app_context);
+
 		current_frame = next_frame;
 #ifdef OFFSCREEN_RENDER
 		// Capture scheduling: request a readback before this tick's frame
@@ -1374,6 +1378,11 @@ frame_loop_exit:
 #endif
 		// Tick boundary = VM quiescent (see main loop).
 		actionDrainDpropsReleases(app_context);
+
+		// Stage 3 mark-sweep collector (env-gated, default off). The
+		// quiescence check inside bails if this loop ever runs with leftover
+		// eval-stack state.
+		swfGcMaybeCollect(app_context);
 
 		// Set enterframe_eligible on all initialized sprites so
 		// actionDispatchEnterFrameHandlers doesn't skip them.

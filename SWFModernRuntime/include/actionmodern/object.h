@@ -98,6 +98,10 @@ typedef struct ASObject
 // Allocation-site tags for leak attribution (mt_kind)
 #define MT_KIND_PLAIN  0   // ordinary script object
 #define MT_KIND_DPROPS 1   // allocated as a MovieClip's dynamic_props
+// Poison tag stamped on swept-but-quarantined objects/arrays by the Stage 3
+// collector (SWF_GC=quarantine). Any runtime access to a poisoned object is a
+// missed GC root — swfGcPoisonTrap aborts loudly so soak runs surface it.
+#define MT_KIND_GC_POISONED 0xDD
 
 struct ASProperty
 {
@@ -265,7 +269,8 @@ typedef struct ASArray
 	u32 enum_capacity;      // Allocated capacity of enum_keys
 
 	// Memory-reclamation instrumentation (see ASObject counterparts)
-	u8 mt_mark;             // scratch mark bit (report classifier / future sweep)
+	u8 mt_mark;             // scratch mark bit (report classifier / GC sweep)
+	u8 mt_kind;             // MT_KIND_* tag (poison marker for the GC quarantine)
 	struct ASArray* mt_prev;   // intrusive all-arrays list (O(1) link/unlink)
 	struct ASArray* mt_next;
 } ASArray;
@@ -311,3 +316,51 @@ void printObject(ASObject* obj);
 // Print array state for debugging
 void printArray(ASArray* arr);
 #endif
+
+/**
+ * Stage 3 root-traced mark-sweep collector (memory-reclamation plan §Stage 3).
+ *
+ * Liveness = reachability from the root set; refcounts are advisory (borrowed
+ * edges everywhere) and are IGNORED for the collection decision. Runs only
+ * between frames (VM quiescent), at a tunable tick cadence. Default-off;
+ * enabled via env vars on native builds:
+ *   SWF_GC=count       mark + report would-sweep set, free nothing
+ *   SWF_GC=quarantine  poison + park swept objects, free K collections later;
+ *                      any access to a poisoned object aborts (missed root!)
+ *   SWF_GC=1|free|on   real free
+ *   SWF_GC_CADENCE=N   collect every N ticks (default 60)
+ *   SWF_GC_VERBOSE=1   per-collection stderr line
+ */
+
+// Mark primitives (idempotent; safe on NULL). MarkVar handles OBJECT/ARRAY/
+// FUNCTION-typed values and ignores everything else (MOVIECLIP values are
+// non-owning and may dangle — never traced). MarkFunctionPtr takes an
+// ASFunction* as void* and traces its prototype_obj/own_props/captured_scope.
+void swfGcMarkObject(ASObject* obj);
+void swfGcMarkArray(ASArray* arr);
+void swfGcMarkVar(ActionVar* v);
+void swfGcMarkFunctionPtr(void* fn);
+
+// Per-tick entry point — env config on first call, cadence + quiescence gate,
+// then a full collection. Call at tick boundaries only (after the eval-stack
+// reset). No-op unless SWF_GC is set.
+void swfGcMaybeCollect(SWFAppContext* app_context);
+
+// Loud abort on access to a quarantined (swept) object — a missed GC root.
+void swfGcPoisonTrap(const void* p, const char* where);
+
+// Root markers implemented by the owning translation units (called by the
+// collector in object.c). Each marks its file-scope object references.
+void actionGcMarkRoots(void);            // action.c: registries, singletons, MC dprops, stacks
+int  actionGcVmQuiescent(SWFAppContext* app_context);  // action.c: eval/scope/this/super stacks empty
+int  actionGcRootsEnumerable(void);      // action.c: 0 if child_mc_cache overflowed (uncacheable MCs exist)
+void variablesGcMarkRoots(void);         // variables.c: var_map + var_array
+void timerGcMarkRoots(void);             // timer.c: active TimerEntry func/object/extra_args
+void registeredClassGcMarkRoots(void);   // registered_class.c: registered constructors
+void mathGcMarkRoots(void);              // math.c: g_math_object singleton
+void dateGcMarkRoots(void);              // date.c: g_date_prototype + constructor
+
+// Scrub-on-free (collector on only): clear borrowed C stashes pointing at a
+// just-freed object/array so the next mark phase cannot read freed memory.
+void actionGcScrubStashes(const void* p);  // action.c: registers, watch, LC, NS, sounds, BMD
+void timerGcScrubStashes(const void* p);   // timer.c: active timer func/object/extra_args
