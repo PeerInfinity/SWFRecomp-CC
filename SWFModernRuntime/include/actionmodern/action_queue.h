@@ -267,3 +267,7 @@ void actionAttachInitLeave(void);
 void actionDrainSuppressEnter(void);
 void actionDrainSuppressLeave(void);
 int actionDrainSuppressed(void);
+
+// Stage 3 collector root helper — iterate queued (fn, user) pairs so the
+// root walk can mark object refs inside heap payloads (see actionGcMarkRoots).
+void actionQueueGcForEach(void (*cb)(void* fn, void* user));

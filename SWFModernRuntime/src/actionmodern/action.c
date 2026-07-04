@@ -75107,6 +75107,14 @@ int actionGcRootsEnumerable(void)
 	return child_mc_count < MAX_CHILD_MOVIECLIPS;
 }
 
+// actionQueueGcForEach callback: deferred XML loads carry a heap
+// XmlLoadDeferred whose doc is a borrowed ASObject* — mark it.
+static void gcMarkXmlLoadPayload(void* fn, void* user)
+{
+	if (fn == (void*)aq_dispatch_xml_load && user != NULL)
+		swfGcMarkObject(((XmlLoadDeferred*)user)->doc);
+}
+
 void actionGcMarkRoots(void)
 {
 	// --- All functions (immortal; their prototype_obj / own_props /
@@ -75225,6 +75233,22 @@ void actionGcMarkRoots(void)
 		if (g_playing_sounds[i].active)
 			swfGcMarkObject(g_playing_sounds[i].sound_obj);
 
+	// --- Pending async loads holding borrowed callback objects.
+	// MovieClipLoader two-bucket queue (found the hard way: CI graphics
+	// depth_replacement_audio_unloading segfault — the loader MCL object was
+	// swept between load() and the deferred onLoadInit).
+	for (int i = 0; i < g_pending_mcl_load_count_this_tick && i < MAX_PENDING_MCL_LOADS; i++)
+		swfGcMarkObject(g_pending_mcl_loads_this_tick[i].mcl);
+	for (int i = 0; i < g_pending_mcl_load_count_next_tick && i < MAX_PENDING_MCL_LOADS; i++)
+		swfGcMarkObject(g_pending_mcl_loads_next_tick[i].mcl);
+	// Deferred LoadVars loads (queue holds a retain, but retained-by-C-queue
+	// is still invisible to the trace — must be an explicit root).
+	for (int i = 0; i < g_pending_lv_load_count && i < MAX_PENDING_LV_LOADS; i++)
+		swfGcMarkObject(g_pending_lv_loads[i].lv);
+	// Deferred XML loads ride the ActionQueue as heap payloads — walk the
+	// queue and mark the doc of every aq_dispatch_xml_load entry.
+	actionQueueGcForEach(gcMarkXmlLoadPayload);
+
 	// --- Global registers (persist across frames; r0..r3 are the AVM1
 	// globals, the rest defensively — the array is written only through the
 	// guarded store but costs nothing to scan).
@@ -75307,4 +75331,13 @@ void actionGcScrubStashes(const void* p)
 		if ((const void*)g_bitmap_natives[i].obj == p) g_bitmap_natives[i].obj = NULL;
 	for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
 		if ((const void*)g_playing_sounds[i].sound_obj == p) g_playing_sounds[i].sound_obj = NULL;
+	for (int i = 0; i < g_pending_mcl_load_count_this_tick && i < MAX_PENDING_MCL_LOADS; i++)
+		if ((const void*)g_pending_mcl_loads_this_tick[i].mcl == p)
+			g_pending_mcl_loads_this_tick[i].mcl = NULL;
+	for (int i = 0; i < g_pending_mcl_load_count_next_tick && i < MAX_PENDING_MCL_LOADS; i++)
+		if ((const void*)g_pending_mcl_loads_next_tick[i].mcl == p)
+			g_pending_mcl_loads_next_tick[i].mcl = NULL;
+	for (int i = 0; i < g_pending_lv_load_count && i < MAX_PENDING_LV_LOADS; i++)
+		if ((const void*)g_pending_lv_loads[i].lv == p)
+			g_pending_lv_loads[i].lv = NULL;
 }

@@ -714,3 +714,13 @@ void actionQueueSpriteScript(SWFAppContext* app_context,
 	                                 (void*)actionGetBaseClip(),
 	                                 (void*)g_current_sprite_obj);
 }
+
+// Stage 3 collector root helper: expose every queued entry's (fn, user) so
+// action.c can mark object references held inside heap payloads (e.g. the
+// deferred XML-load payload's doc pointer). Entries are opaque here — the
+// callback owner knows which dispatch fns carry object-bearing payloads.
+void actionQueueGcForEach(void (*cb)(void* fn, void* user))
+{
+	for (size_t i = 0; i < g_aq_count; i++)
+		cb((void*)g_aq[i].fn, g_aq[i].user);
+}
