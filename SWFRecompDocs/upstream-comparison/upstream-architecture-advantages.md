@@ -91,19 +91,25 @@ incrementally.
   (case-v5/v6, fixed 2026-05-30 via ASAN), assorted leak fixes throughout the log.
   Every new code path re-exposes the risk; theirs centralizes it.
 
-**Actionable:** Partially. A cycle collector can be adopted single-threaded
-(between frames) without any locking — but the July 2026 ownership survey found
-our refcounts are *advisory* (ARRAY/FUNCTION property values, timers, and
+**Actionable:** Partially, and now measured. The July 2026 ownership survey
+found our refcounts are *advisory* (ARRAY/FUNCTION property values, timers, and
 this/scope stacks are borrowed by design), so refcount-trusting detectors
 (Bacon-Rajan trial deletion, upstream's neighbor-walking design) are unsafe for
-us; the safe shape is a root-traced mark-sweep backstop. The same survey found
-two deterministic non-cycle leaks that likely dominate (detached
-`mc->dynamic_props`, unreleased array-valued properties). **Planned:**
-`plans/memory-reclamation-plan.md` — leak fixes first, collector
-measurement-gated. The *stack-integrated refcounting* idea could be retrofitted
-into our PUSH/POP macros, though auditing 75K lines of existing pop-then-use
-patterns makes it a major project. The concurrent/locked form is structural
-(and undesirable in browser WASM).
+us; the safe shape is a root-traced mark-sweep backstop. The plan's Stages 0–2
+executed 2026-07-04 (`700e02a3a`, `a38bbe7ea`, `9b2aa048b`): the two
+deterministic leaks are fixed (Minesweeper clip-churn −41% live objects; 1,348
+detached `dynamic_props` → 0), and the measurements produced the decisive
+diagnosis — **the dominant residual leak is acyclic script temporaries whose
+allocating +1 is never consumed** (stack, var_map, and scopes are all borrowed,
+so release chains stop at refcount 1; N leaks ~12 objects + 12 arrays per
+frame, linear). That is exactly the problem upstream's *stack-integrated
+refcounting* (`PUSH_OBJ` retains / `POP` releases) solves by construction — a
+genuine validation of their design. Our chosen fix is the Stage 3 root-traced
+collector instead (retrofitting consuming semantics into 75K lines of
+pop-then-use code is the larger, riskier project); the floating refs are
+load-bearing safety padding until then and must not be "fixed" site-locally.
+**Plan:** `plans/memory-reclamation-plan.md` (+ results doc). The
+concurrent/locked form remains structural (and undesirable in browser WASM).
 
 ## 5. Standard library in ActionScript (AS2Runtime prelude)
 
