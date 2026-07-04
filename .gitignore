@@ -130,6 +130,10 @@ ruffle-tests/tests/swfs/avm1/timer_cross_swf_version/RecompiledScripts/
 ruffle-tests/tests/swfs/avm1/timer_cross_swf_version/RecompiledTags/
 !ruffle-tests/tests/swfs/avm1/timer_cross_swf_version/test.swf
 !ruffle-tests/tests/swfs/avm1/timer_cross_swf_version/child.swf
+!ruffle-tests/tests/swfs/avm1/nc_onstatus_closure/
+ruffle-tests/tests/swfs/avm1/nc_onstatus_closure/RecompiledScripts/
+ruffle-tests/tests/swfs/avm1/nc_onstatus_closure/RecompiledTags/
+!ruffle-tests/tests/swfs/avm1/nc_onstatus_closure/test.swf
 
 # Shumway tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_shumway/*/
