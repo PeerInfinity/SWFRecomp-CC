@@ -71907,8 +71907,27 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 			}
 		}
 
-		// Type 1 functions (recompiler-generated) don't support handler_args
-		// (event handlers are always type 2 DefineFunction2)
+		// Marshal event args for the type-1 prologue. TYPE1_ARG_ORDER: forward
+		// order — args[0] pushed first (deepest); the generated prologue pops
+		// params last-first. It pops EXACTLY param_count values, so push
+		// exactly that many: clamp extra event args and pad missing ones with
+		// undefined (Flash: a handler param beyond the event's arguments reads
+		// undefined). This arm previously pushed NOTHING, so a type-1 handler
+		// with declared params (e.g. onSetFocus(oldFocus)) both lost the event
+		// argument and swallowed unrelated eval-stack slots.
+		u32 t1_param_count = func->param_count;
+		for (u32 i = 0; i < t1_param_count; i++)
+		{
+			if (i < (u32)handler_arg_count)
+			{
+				pushVar(app_context, &handler_args[i]);
+			}
+			else
+			{
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			}
+		}
+
 		g_call_depth++;
 		ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 		(void)result;

@@ -121,6 +121,10 @@ ruffle-tests/tests/swfs/avm1/external_interface/RecompiledTags/
 ruffle-tests/tests/swfs/avm1/ei_type1_args/RecompiledScripts/
 ruffle-tests/tests/swfs/avm1/ei_type1_args/RecompiledTags/
 !ruffle-tests/tests/swfs/avm1/ei_type1_args/test.swf
+!ruffle-tests/tests/swfs/avm1/mc_event_type1_args/
+ruffle-tests/tests/swfs/avm1/mc_event_type1_args/RecompiledScripts/
+ruffle-tests/tests/swfs/avm1/mc_event_type1_args/RecompiledTags/
+!ruffle-tests/tests/swfs/avm1/mc_event_type1_args/test.swf
 
 # Shumway tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_shumway/*/
