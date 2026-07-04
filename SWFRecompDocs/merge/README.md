@@ -29,5 +29,7 @@ Older merge documents from the initial fork creation (Oct-Nov 2025) have been mo
 
 ## Related Documentation
 
+- **[../upstream-comparison/](../upstream-comparison/)** - Ongoing comparison analyses (upstream vs downstream architecture advantages, "what would X buy us?" evaluations, warnings for upstream)
+
 - **[../status/](../status/)** - Implementation status and summaries
 - **[../../branch-merge-history.md](../../branch-merge-history.md)** - History of Claude-created branches merged into this repo
