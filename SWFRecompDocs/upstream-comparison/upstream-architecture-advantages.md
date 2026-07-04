@@ -146,7 +146,11 @@ Each fix was small; the class of bug exists because the convention isn't singula
 
 **Actionable:** Yes, as internal consolidation — funnel all our dispatch paths
 through one arg-marshalling helper. No upstream code needed; their design just
-demonstrates the invariant worth enforcing.
+demonstrates the invariant worth enforcing. **Planned:**
+`plans/function-dispatch-consolidation-plan.md` (July 2026). The survey behind it
+counted ~129 raw invocation points across ~38 dispatchers and found two further
+suspected live instances of this bug class (ExternalInterface reverse arg order;
+event-handler type-1 args never pushed).
 
 ## 7. Runtime-side tessellation (libtess2)
 
