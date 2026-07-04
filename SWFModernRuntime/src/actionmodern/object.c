@@ -578,6 +578,13 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 				ASObject* child_obj = (ASObject*) obj->properties[i].value.data.numeric_value;
 				releaseObject(app_context, child_obj);
 			}
+			// If property value is an array, release it recursively (Stage 1b:
+			// property stores retain arrays, so destruction must balance)
+			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_ARRAY)
+			{
+				ASArray* child_arr = (ASArray*) obj->properties[i].value.data.numeric_value;
+				releaseArray(app_context, child_arr);
+			}
 			// If property value is a string that owns memory, free it
 			else if (obj->properties[i].value.type == ACTION_STACK_VALUE_STRING &&
 			         obj->properties[i].value.data.string_data.owns_memory)
@@ -815,11 +822,30 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 		ASProperty* p = &obj->properties[found];
 		// Property exists - update value
 
-		// Release old value if it was an object
+		// Retain the new value BEFORE releasing the old one: self-assignment
+		// (obj.a = obj.a with an array/object value) must not drop the count
+		// to zero in between.
+		if (value->type == ACTION_STACK_VALUE_OBJECT)
+		{
+			ASObject* new_obj = (ASObject*) value->data.numeric_value;
+			retainObject(new_obj);
+		}
+		else if (value->type == ACTION_STACK_VALUE_ARRAY)
+		{
+			ASArray* new_arr = (ASArray*) value->data.numeric_value;
+			retainArray(new_arr);
+		}
+
+		// Release old value if it was an object or array
 		if (p->value.type == ACTION_STACK_VALUE_OBJECT)
 		{
 			ASObject* old_obj = (ASObject*) p->value.data.numeric_value;
 			releaseObject(app_context, old_obj);
+		}
+		else if (p->value.type == ACTION_STACK_VALUE_ARRAY)
+		{
+			ASArray* old_arr = (ASArray*) p->value.data.numeric_value;
+			releaseArray(app_context, old_arr);
 		}
 		// Free old string if it owned memory
 		else if (p->value.type == ACTION_STACK_VALUE_STRING &&
@@ -832,13 +858,6 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 		// (In Flash, setting a property via SetMember clears ASSetPropFlags visibility)
 		p->value = *value;
 		p->flash_flags = 0;
-
-		// Retain new value if it's an object
-		if (value->type == ACTION_STACK_VALUE_OBJECT)
-		{
-			ASObject* new_obj = (ASObject*) value->data.numeric_value;
-			retainObject(new_obj);
-		}
 
 		return;
 	}
@@ -901,11 +920,16 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	// Set value
 	obj->properties[index].value = *value;
 
-	// Retain if value is an object
+	// Retain if value is an object or array
 	if (value->type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* new_obj = (ASObject*) value->data.numeric_value;
 		retainObject(new_obj);
+	}
+	else if (value->type == ACTION_STACK_VALUE_ARRAY)
+	{
+		ASArray* new_arr = (ASArray*) value->data.numeric_value;
+		retainArray(new_arr);
 	}
 
 	// Maintain the lookup index (builds it once the object grows large enough)
@@ -933,18 +957,23 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 	if (found != PROP_HASH_EMPTY)
 	{
 		ASProperty* p = &obj->properties[found];
-		// Release old value
+		// Retain new before releasing old (self-assignment safety), then
+		// release the old object/array value.
+		if (value->type == ACTION_STACK_VALUE_OBJECT)
+			retainObject((ASObject*) value->data.numeric_value);
+		else if (value->type == ACTION_STACK_VALUE_ARRAY)
+			retainArray((ASArray*) value->data.numeric_value);
+
 		if (p->value.type == ACTION_STACK_VALUE_OBJECT)
 			releaseObject(app_context, (ASObject*) p->value.data.numeric_value);
+		else if (p->value.type == ACTION_STACK_VALUE_ARRAY)
+			releaseArray(app_context, (ASArray*) p->value.data.numeric_value);
 		else if (p->value.type == ACTION_STACK_VALUE_STRING &&
 		         p->value.data.string_data.owns_memory)
 			free(p->value.data.string_data.heap_ptr);
 
 		p->value = *value;
 		p->flash_flags = 0;
-
-		if (value->type == ACTION_STACK_VALUE_OBJECT)
-			retainObject((ASObject*) value->data.numeric_value);
 		return;
 	}
 
