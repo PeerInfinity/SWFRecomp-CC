@@ -1592,7 +1592,6 @@ static ASObject* resolveSoundTransformTarget(SWFAppContext* app_context, void* t
 	// defaults are initialized once on first use.
 	if (mc->dynamic_props == NULL) {
 		mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-		retainObject((ASObject*) mc->dynamic_props);
 	}
 	ActionVar* existing = getProperty((ASObject*)mc->dynamic_props, "__volume__", 10);
 	if (existing == NULL) {
@@ -21951,7 +21950,6 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 			if (container_mc == NULL) return 0;  // unresolvable
 			if (container_mc->dynamic_props == NULL) {
 				container_mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
-				retainObject((ASObject*) container_mc->dynamic_props);
 			}
 			container = (ASObject*) container_mc->dynamic_props;
 			binding_container_mc = container_mc;
@@ -21962,7 +21960,6 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 		simple_binding_mc = (tf_mc->parent != NULL) ? tf_mc->parent : &root_movieclip;
 		if (simple_binding_mc->dynamic_props == NULL) {
 			simple_binding_mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
-			retainObject((ASObject*) simple_binding_mc->dynamic_props);
 		}
 		container = (ASObject*) simple_binding_mc->dynamic_props;
 		prop_name = var_name;
@@ -22184,7 +22181,6 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			if (tf_idx >= 0) {
 				if (mc->dynamic_props == NULL) {
 					mc->dynamic_props = (void*) allocDynamicProps(app_context, 32);
-					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ASObject* props = (ASObject*) mc->dynamic_props;
 				props->native_type = NATIVE_TEXTFIELD;
@@ -22432,7 +22428,6 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			if (ng_isTextFieldAtDepth(depth)) {
 				if (mc->dynamic_props == NULL) {
 					mc->dynamic_props = (void*) allocDynamicProps(app_context, 32);
-					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ASObject* props = (ASObject*) mc->dynamic_props;
 				props->native_type = NATIVE_TEXTFIELD;
@@ -22860,7 +22855,6 @@ void actionInitDynTextFieldClone(SWFAppContext* app_context, MovieClip* mc) {
 
 	if (mc->dynamic_props == NULL) {
 		mc->dynamic_props = (void*) allocDynamicProps(app_context, 32);
-		retainObject((ASObject*) mc->dynamic_props);
 	}
 	ASObject* props = (ASObject*) mc->dynamic_props;
 	props->native_type = NATIVE_TEXTFIELD;
@@ -23008,6 +23002,43 @@ MovieClip* actionFindMovieClipByName(const char* instance_name) {
 	return NULL;
 }
 
+// ---- Deferred dynamic_props release (memory-reclamation plan Stage 1) ----
+// Detach sites must not free a clip's dynamic_props inline: script may still
+// be mid-execution holding borrowed references to it — `this` for SWF6+
+// type-1 method calls, WITH-scope chain entries — and unload/load paths can
+// detach mid-handler (e.g. loadMovie(url, this)). Queue the object and
+// release at the tick boundary, where the VM is quiescent (eval stack,
+// scope_chain, g_this_stack all empty). Destruction is pure reclamation, so
+// deferring is script-invisible. The MC's pointer field is the sole owner of
+// the allocating reference (attach sites do NOT retain); anyone else with a
+// genuine retain keeps the object alive past the drain.
+static ASObject** g_dprops_release_queue = NULL;
+static int g_dprops_release_count = 0;
+static int g_dprops_release_capacity = 0;
+
+void actionDeferDpropsRelease(SWFAppContext* app_context, MovieClip* mc)
+{
+	(void)app_context;
+	if (mc == NULL || mc->dynamic_props == NULL) return;
+	if (g_dprops_release_count >= g_dprops_release_capacity) {
+		int ncap = g_dprops_release_capacity ? g_dprops_release_capacity * 2 : 64;
+		ASObject** nq = (ASObject**) realloc(g_dprops_release_queue,
+		                                     (size_t)ncap * sizeof(ASObject*));
+		if (nq == NULL) { mc->dynamic_props = NULL; return; }  // OOM: fall back to the old leak
+		g_dprops_release_queue = nq;
+		g_dprops_release_capacity = ncap;
+	}
+	g_dprops_release_queue[g_dprops_release_count++] = (ASObject*) mc->dynamic_props;
+	mc->dynamic_props = NULL;
+}
+
+void actionDrainDpropsReleases(SWFAppContext* app_context)
+{
+	for (int i = 0; i < g_dprops_release_count; i++)
+		releaseObject(app_context, g_dprops_release_queue[i]);
+	g_dprops_release_count = 0;
+}
+
 // Drop the instance-name binding for `mc` from its parent's dynamic_props
 // (root included) when the entry references exactly this MC. Instance names
 // live there — not in var_map — since the instance-name/variable
@@ -23069,7 +23100,7 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 			actionUnregisterTextFieldBindings(child_mc_cache[i]);
 			actionUnboundTextFieldsDrop(child_mc_cache[i]);
 			child_mc_cache[i]->avm1_removed = 1;
-			child_mc_cache[i]->dynamic_props = NULL;
+			actionDeferDpropsRelease(app_context, child_mc_cache[i]);
 			child_mc_cache[i]->ng_textfield_idx = -1;
 			// Do NOT clear a same-named var_map entry: post de-conflation,
 			// clones/creates never auto-register in var_map, so a MOVIECLIP
@@ -23101,7 +23132,7 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 				while (p != NULL && hops < 64) {
 					if (p == dead_parent) {
 						dch->avm1_removed = 1;
-						dch->dynamic_props = NULL;
+						actionDeferDpropsRelease(app_context, dch);
 						dch->ng_textfield_idx = -1;
 						dch->depth = INT_MIN;
 						break;
@@ -23155,7 +23186,7 @@ void actionInvalidateMCAtASDepth(SWFAppContext* app_context, int as_depth)
 		// — not in var_map — since the instance-name/variable de-conflation;
 		// without this `typeof(dup)` after RemoveObject2 reads the stale MC.
 		mcDropParentInstanceBinding(app_context, ch);
-		ch->dynamic_props = NULL;
+		actionDeferDpropsRelease(app_context, ch);
 		ch->ng_textfield_idx = -1;
 		// Do NOT clear a same-named var_map entry — a MOVIECLIP entry there
 		// is a user variable and survives removal (typeof stays 'movieclip';
@@ -23201,7 +23232,7 @@ void actionInvalidateCachedMovieClipDirect(SWFAppContext* app_context, MovieClip
 	mc->avm1_removed = 1;
 	// Drop the parent-dprops instance binding before clearing state.
 	mcDropParentInstanceBinding(app_context, mc);
-	mc->dynamic_props = NULL;
+	actionDeferDpropsRelease(app_context, mc);
 	mc->ng_textfield_idx = -1;
 	mc->depth = INT_MIN;
 }
@@ -23306,7 +23337,7 @@ void actionFinalizePendingRemovals(SWFAppContext* app_context)
 			// Phase C: drain TF binding registry on container unload.
 			actionUnregisterTextFieldBindings(_fpr_mc);
 			actionUnboundTextFieldsDrop(_fpr_mc);
-			_fpr_mc->dynamic_props = NULL;
+			actionDeferDpropsRelease(app_context, _fpr_mc);
 			_fpr_mc->ng_textfield_idx = -1;
 			_fpr_mc->pending_removal = 0;
 			_fpr_mc->depth = INT_MIN;  // Mark as dead so name lookups skip it
@@ -23327,7 +23358,7 @@ void actionFinalizePendingRemovals(SWFAppContext* app_context)
 			actionUnregisterTextFieldBindings(ch);
 			actionUnboundTextFieldsDrop(ch);
 			ch->avm1_removed = 1;
-			ch->dynamic_props = NULL;
+			actionDeferDpropsRelease(app_context, ch);
 			ch->ng_textfield_idx = -1;
 			ch->depth = INT_MIN;
 			changed = 1;
@@ -24046,10 +24077,7 @@ static void stripNonSurvivingDeferredChildren(SWFAppContext* app_context, MovieC
 			}
 		}
 		// Strip the child's own properties (it stays a live, empty movieclip).
-		if (child->dynamic_props != NULL) {
-			releaseObject(app_context, (ASObject*)child->dynamic_props);
-			child->dynamic_props = NULL;
-		}
+		actionDeferDpropsRelease(app_context, child);
 	}
 }
 
@@ -26089,7 +26117,6 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 	u32 var_name_simple_len = (u32)strlen(var_name);
 	if (binding_mc->dynamic_props == NULL) {
 		binding_mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
-		retainObject((ASObject*) binding_mc->dynamic_props);
 	}
 	// Honor ASSetPropFlags read-only locks on the bound variable: if the
 	// existing entry has WRITABLE cleared, skip the write so a textfield
@@ -33284,10 +33311,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		url_mut[sizeof(url_mut) - 1] = '\0';
 		MovieClip* mc = getOrCreateLevel(app_context, level_num);
 		// Clear dynamic_props when loading new content (Phase 6: variable clearing)
-		if (mc != NULL && mc->dynamic_props != NULL) {
-			releaseObject(app_context, (ASObject*)mc->dynamic_props);
-			mc->dynamic_props = NULL;
-		}
+		if (mc != NULL) actionDeferDpropsRelease(app_context, mc);
 		if (mc != NULL) mc->unloaded = 0;
 		parseAndSetFlashVars(app_context, url_mut, mc);
 		MovieEntry* entry = findMovieEntry(url_mut);
@@ -33358,10 +33382,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		strncpy(url_mut2, url, sizeof(url_mut2) - 1);
 		url_mut2[sizeof(url_mut2) - 1] = '\0';
 		// Clear dynamic_props when loading new content (Phase 6: variable clearing)
-		if (mc != NULL && mc->dynamic_props != NULL) {
-			releaseObject(app_context, (ASObject*)mc->dynamic_props);
-			mc->dynamic_props = NULL;
-		}
+		if (mc != NULL) actionDeferDpropsRelease(app_context, mc);
 		if (mc != NULL) mc->unloaded = 0;
 		parseAndSetFlashVars(app_context, url_mut2, mc);
 		MovieEntry* entry = findMovieEntry(url_mut2);
@@ -34070,10 +34091,7 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
     VAL(u64, &result.data.numeric_value) = 1;
 
     // Clear target MC's dynamic properties (loading replaces the clip's content)
-    if (target_mc->dynamic_props != NULL) {
-        releaseObject(app_context, (ASObject*)target_mc->dynamic_props);
-        target_mc->dynamic_props = NULL;
-    }
+    actionDeferDpropsRelease(app_context, target_mc);
 
     // Strip query string (FlashVars) and set on target MC before child init
     parseAndSetFlashVars(app_context, url_utf8, target_mc);
@@ -39234,7 +39252,6 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	{
 		if (root_movieclip.dynamic_props == NULL) {
 			root_movieclip.dynamic_props = (void*) allocDynamicProps(app_context, 8);
-			retainObject((ASObject*) root_movieclip.dynamic_props);
 		}
 		ActionVar ver_val = {0}; ver_val.type = ACTION_STACK_VALUE_STRING;
 		ver_val.str_size = 13; VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
@@ -46520,10 +46537,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 		MovieEntry* entry = findMovieEntry(url_utf8);
 		if (entry != NULL) {
 			// Clear dynamic_props when loading new content (Phase 6: variable clearing)
-			if (_gu2_mc != NULL && _gu2_mc->dynamic_props != NULL) {
-				releaseObject(app_context, (ASObject*)_gu2_mc->dynamic_props);
-				_gu2_mc->dynamic_props = NULL;
-			}
+			if (_gu2_mc != NULL) actionDeferDpropsRelease(app_context, _gu2_mc);
 			if (_gu2_mc != NULL) {
 				_gu2_mc->unloaded = 0;
 				_gu2_mc->load_failed = 0;
@@ -48504,7 +48518,6 @@ void actionSetMember(SWFAppContext* app_context)
 				{
 					if (mc->dynamic_props == NULL) {
 						mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
-						retainObject((ASObject*) mc->dynamic_props);
 					}
 					setProperty(app_context, (ASObject*) mc->dynamic_props, "_parent", 7, &value_var);
 					return;
@@ -49215,7 +49228,6 @@ void actionSetMember(SWFAppContext* app_context)
 								extern MovieClip root_movieclip;
 								if (root_movieclip.dynamic_props == NULL) {
 									root_movieclip.dynamic_props = (void*) allocDynamicProps(app_context, 4);
-									retainObject((ASObject*) root_movieclip.dynamic_props);
 								}
 								setProperty(app_context, (ASObject*) root_movieclip.dynamic_props,
 									new_var, (u32)nvlen, &init_val);
@@ -49740,7 +49752,6 @@ void actionSetMember(SWFAppContext* app_context)
 				{
 					if (mc->dynamic_props == NULL) {
 						mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
-						retainObject((ASObject*) mc->dynamic_props);
 					}
 					setPropertyWithFlags(app_context, (ASObject*) mc->dynamic_props,
 						"tabIndex", 8, &value_var, PROPERTY_FLAGS_DONTENUM);
@@ -49754,7 +49765,6 @@ void actionSetMember(SWFAppContext* app_context)
 			if (mc->dynamic_props == NULL)
 			{
 				mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
-				retainObject((ASObject*) mc->dynamic_props);
 			}
 			setProperty(app_context, (ASObject*) mc->dynamic_props, prop_name, prop_name_len, &value_var);
 			// Trigger autoSize recalculation when autoSize, text, or htmlText changes.
@@ -55865,7 +55875,6 @@ void actionCloneSprite(SWFAppContext* app_context)
 		if (clone_mc != NULL && caller_ctx != &root_movieclip) {
 			if (caller_ctx->dynamic_props == NULL) {
 				caller_ctx->dynamic_props = (void*) allocDynamicProps(app_context, 32);
-				retainObject((ASObject*) caller_ctx->dynamic_props);
 			}
 			ASObject* dp = (ASObject*) caller_ctx->dynamic_props;
 			ActionVar mc_var = {0};
@@ -56417,7 +56426,6 @@ static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc,
 	// Ensure dynamic_props exists
 	if (mc->dynamic_props == NULL) {
 		mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-		retainObject((ASObject*) mc->dynamic_props);
 	}
 
 	// Check prototype chain for addProperty setter
@@ -58841,7 +58849,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			if (child->dynamic_props == NULL) {
 				child->dynamic_props = (void*) allocDynamicProps(app_context, 32);
-				retainObject((ASObject*) child->dynamic_props);
 			}
 			ASObject* props = (ASObject*) child->dynamic_props;
 			props->native_type = NATIVE_TEXTFIELD;
@@ -58986,7 +58993,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			{
 				if (mc->dynamic_props == NULL) {
 					mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ActionVar mc_var = {0};
 				mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -59096,7 +59102,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// shadow the child on name resolution.
 			if (mc->dynamic_props == NULL) {
 				mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-				retainObject((ASObject*) mc->dynamic_props);
 			}
 			ActionVar mc_var = {0};
 			mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -59185,7 +59190,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					{
 						if (attached->dynamic_props == NULL) {
 							attached->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-							retainObject((ASObject*) attached->dynamic_props);
 						}
 						if (attached->is_button_mc) {
 							// Button symbols: __proto__ = Button.prototype (ignore registered class)
@@ -59253,7 +59257,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Register on parent's dynamic_props
 					if (mc->dynamic_props == NULL) {
 						mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-						retainObject((ASObject*) mc->dynamic_props);
 					}
 					ActionVar mc_var = {0};
 					mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -67112,7 +67115,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Set up dynamic_props with TextField defaults
 				if (child->dynamic_props == NULL) {
 					child->dynamic_props = (void*) allocDynamicProps(app_context, 32);
-					retainObject((ASObject*) child->dynamic_props);
 				}
 				ASObject* props = (ASObject*) child->dynamic_props;
 
@@ -67252,7 +67254,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				{
 					if (mc->dynamic_props == NULL) {
 						mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-						retainObject((ASObject*) mc->dynamic_props);
 					}
 					ActionVar mc_var = {0};
 					mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -67349,7 +67350,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						{
 							if (attached->dynamic_props == NULL) {
 								attached->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-								retainObject((ASObject*) attached->dynamic_props);
 							}
 							if (attached->is_button_mc) {
 								// Button symbols: __proto__ = Button.prototype (ignore registered class)
@@ -67418,7 +67418,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Register on parent's dynamic_props
 						if (mc->dynamic_props == NULL) {
 							mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-							retainObject((ASObject*) mc->dynamic_props);
 						}
 						ActionVar am_var = {0};
 						am_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -67585,7 +67584,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// (`depth == INT_MIN`) both fall through and overwrite normally.
 				if (mc->dynamic_props == NULL) {
 					mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ActionVar mc_var = {0};
 				mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -70466,10 +70464,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				} else {
 					// Clear dynamic_props when loading new content (Phase 6: variable clearing)
-					if (mc != NULL && mc->dynamic_props != NULL) {
-						releaseObject(app_context, (ASObject*)mc->dynamic_props);
-						mc->dynamic_props = NULL;
-					}
+					if (mc != NULL) actionDeferDpropsRelease(app_context, mc);
 					if (mc != NULL) mc->unloaded = 0;
 					// Strip query string (FlashVars) and set on target MC
 					parseAndSetFlashVars(app_context, _lm_url, mc);
@@ -70746,7 +70741,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Ensure dynamic_props exists
 				if (mc->dynamic_props == NULL) {
 					mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-					retainObject((ASObject*) mc->dynamic_props);
 				}
 				ASObject* _ap_obj = (ASObject*) mc->dynamic_props;
 				ASProperty* _ap_prop = NULL;

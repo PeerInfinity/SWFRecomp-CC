@@ -417,6 +417,10 @@ void tagMain(SWFAppContext* app_context)
 		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
 		{ extern size_t g_tick_count; g_tick_count++; }
 
+		// Tick boundary = VM quiescent: release dynamic_props detached last
+		// tick (memory-reclamation plan Stage 1; see actionDeferDpropsRelease).
+		actionDrainDpropsReleases(app_context);
+
 		// Mirror swf_core.c's exit condition (around line 1056). The
 		// recompiler-emits `quit_swf = 1` at the end of the last root
 		// frame, but multi-frame sprites placed by that frame still need
@@ -1368,6 +1372,9 @@ frame_loop_exit:
 #ifdef __EMSCRIPTEN__
 		double frame_start2 = emscripten_get_now();
 #endif
+		// Tick boundary = VM quiescent (see main loop).
+		actionDrainDpropsReleases(app_context);
+
 		// Set enterframe_eligible on all initialized sprites so
 		// actionDispatchEnterFrameHandlers doesn't skip them.
 		{
@@ -1576,8 +1583,10 @@ void swfStart(SWFAppContext* app_context)
 
 	renderer_free(app_context, context);
 
-	// Env-gated (SWF_MEM_REPORT) leak-tracking summary; must precede
+	// Release any dynamic_props detached in the final tick, then the
+	// env-gated (SWF_MEM_REPORT) leak-tracking summary; both must precede
 	// heap_shutdown, which unmaps the pool the MC registry lives in.
+	actionDrainDpropsReleases(app_context);
 	swfMemReportAtExitIfEnabled();
 
 	heap_shutdown(app_context);

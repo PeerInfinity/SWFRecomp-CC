@@ -159,7 +159,13 @@ void swfMemReport(void);
 // swfMemReport if SWF_MEM_REPORT is set (native builds; no-op otherwise).
 // Called by the frame loops just before heap_shutdown — must NOT run from
 // atexit, because heap_shutdown unmaps the pool that MovieClips live in.
+// (An env-gated atexit fallback covers abnormal exits while the pool is
+// still mapped, e.g. heap_alloc OOM exit(1).)
 void swfMemReportAtExitIfEnabled(void);
+
+// Called by heap_shutdown: the MC pool is about to be unmapped, so the
+// report's registry walk is no longer safe (disables the atexit fallback).
+void swfMemMarkUnsafeToWalk(void);
 
 // Increment reference count
 // Should be called when:

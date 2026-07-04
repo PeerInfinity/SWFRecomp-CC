@@ -405,15 +405,34 @@ void swfMemReport(void)
 		live_arr, arr_as_obj_prop, arr_other);
 }
 
-// Env-gated wrapper for the end-of-run report. Must be called BEFORE
-// heap_shutdown (both frame loops do), NOT from atexit: MovieClips live in
-// the o1heap pool, which heap_shutdown unmaps — an atexit walk of
-// child_mc_cache would read unmapped memory.
+// Env-gated wrapper for the end-of-run report. Called by the frame loops
+// BEFORE heap_shutdown — the classifier walks the MC registry, and MovieClips
+// live in the o1heap pool that heap_shutdown unmaps. An atexit FALLBACK
+// covers abnormal exits (e.g. heap_alloc OOM calls exit(1) mid-run): it fires
+// only if the loop-end report didn't run AND the pool is still mapped
+// (heap_shutdown flips g_mt_walk_unsafe via swfMemMarkUnsafeToWalk).
+static int g_mt_reported = 0;
+static int g_mt_walk_unsafe = 0;
+
+void swfMemMarkUnsafeToWalk(void)
+{
+	g_mt_walk_unsafe = 1;
+}
+
+#ifndef __EMSCRIPTEN__
+static void mtAtexitFallbackReport(void)
+{
+	if (!g_mt_reported && !g_mt_walk_unsafe)
+		swfMemReport();
+}
+#endif
+
 void swfMemReportAtExitIfEnabled(void)
 {
 #ifndef __EMSCRIPTEN__
 	if (getenv("SWF_MEM_REPORT") != NULL)
 		swfMemReport();
+	g_mt_reported = 1;
 #endif
 }
 
@@ -467,6 +486,18 @@ ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity)
 	obj->mt_kind = MT_KIND_PLAIN;
 	obj->mt_mark = 0;
 	mtLinkObject(obj);
+
+#ifndef __EMSCRIPTEN__
+	// Register the abnormal-exit report fallback once (env-gated; see above).
+	{
+		static int mt_exit_checked = 0;
+		if (!mt_exit_checked) {
+			mt_exit_checked = 1;
+			if (getenv("SWF_MEM_REPORT") != NULL)
+				atexit(mtAtexitFallbackReport);
+		}
+	}
+#endif
 
 #ifdef DEBUG
 	printf("[DEBUG] allocObject: obj=%p, refcount=%u, capacity=%u\n",

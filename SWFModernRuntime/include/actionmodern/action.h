@@ -178,6 +178,14 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, int swf_depth);
 // Finalize pending removals: invalidate MCs marked for removal in a previous frame
 void actionFinalizePendingRemovals(SWFAppContext* app_context);
+// Detach mc->dynamic_props (NULLs the field) and queue the object for release
+// at the next tick-boundary drain. Detach sites must not release inline —
+// script may still hold borrowed refs (`this` in SWF6+ type-1 calls, WITH
+// scopes). No-op if mc or its dynamic_props is NULL.
+void actionDeferDpropsRelease(SWFAppContext* app_context, MovieClip* mc);
+// Release everything queued by actionDeferDpropsRelease. Call only at a
+// quiescent point (tick boundary in the frame loops / end of run).
+void actionDrainDpropsReleases(SWFAppContext* app_context);
 // Check if a named MC at given depth has an AS-level onUnload property
 int actionMCHasOnUnloadProperty(const char* name, int swf_depth);
 // Enqueue the AS-set onUnload handler on a MovieClip being removed (deferred — fires at next ShowFrame drain).

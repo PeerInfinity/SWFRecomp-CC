@@ -204,7 +204,6 @@ void actionSetupRegisteredClassPrototype(SWFAppContext* app_context, const char*
 	if (mc->dynamic_props == NULL)
 	{
 		mc->dynamic_props = allocDynamicProps(app_context, 8);
-		retainObject((ASObject*)mc->dynamic_props);
 	}
 	ASObject* obj = (ASObject*)mc->dynamic_props;
 

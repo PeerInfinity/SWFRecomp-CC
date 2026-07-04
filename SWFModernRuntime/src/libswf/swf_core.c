@@ -924,6 +924,10 @@ void swfStart(SWFAppContext* app_context)
 		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
 		{ extern size_t g_tick_count; g_tick_count++; }
 
+		// Tick boundary = VM quiescent: release dynamic_props detached last
+		// tick (memory-reclamation plan Stage 1; see actionDeferDpropsRelease).
+		actionDrainDpropsReleases(app_context);
+
 		// Flash clears the action stack at each frame boundary: DoAction blocks
 		// within a frame share stack (later blocks see earlier pushes), but the
 		// stack resets between frames so leftover pushes don't leak to the next
@@ -1595,8 +1599,10 @@ frame_loop_exit:
 
 	printf("\n=== SWF Execution Completed ===\n");
 
-	// Env-gated (SWF_MEM_REPORT) leak-tracking summary; must precede
+	// Release any dynamic_props detached in the final tick, then the
+	// env-gated (SWF_MEM_REPORT) leak-tracking summary; both must precede
 	// heap_shutdown, which unmaps the pool the MC registry lives in.
+	actionDrainDpropsReleases(app_context);
 	swfMemReportAtExitIfEnabled();
 
 	// Cleanup (dictionary/display_list freed by heap_shutdown; stack uses system malloc)

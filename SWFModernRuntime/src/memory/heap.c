@@ -86,6 +86,9 @@ void heap_stats(SWFAppContext* app_context)
 
 void heap_shutdown(SWFAppContext* app_context)
 {
+	// MC registry memory is going away — disable the mem-report atexit fallback.
+	extern void swfMemMarkUnsafeToWalk(void);
+	swfMemMarkUnsafeToWalk();
 	if (app_context != NULL)
 		app_context->heap_inited = 0;
 }
@@ -246,6 +249,10 @@ void heap_stats(SWFAppContext* app_context)
 
 void heap_shutdown(SWFAppContext* app_context)
 {
+	// MC registry memory is going away — disable the mem-report atexit fallback.
+	extern void swfMemMarkUnsafeToWalk(void);
+	swfMemMarkUnsafeToWalk();
+
 	if (app_context == NULL || !app_context->heap_inited)
 	{
 		return;

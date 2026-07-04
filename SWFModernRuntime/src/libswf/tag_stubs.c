@@ -380,7 +380,6 @@ static void ng_register_instance_on_parent_dprops(SWFAppContext* app_context,
 	if (parent == NULL || name == NULL || name[0] == '\0') return;
 	if (parent->dynamic_props == NULL) {
 		parent->dynamic_props = (void*) allocDynamicProps(app_context, 8);
-		retainObject((ASObject*) parent->dynamic_props);
 	}
 	u32 name_len = (u32)strlen(name);
 	ActionVar* existing = getProperty((ASObject*) parent->dynamic_props, name, name_len);
