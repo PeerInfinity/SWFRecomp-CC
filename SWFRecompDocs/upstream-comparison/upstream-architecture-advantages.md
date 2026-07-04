@@ -156,9 +156,13 @@ Each fix was small; the class of bug exists because the convention isn't singula
 through one arg-marshalling helper. No upstream code needed; their design just
 demonstrates the invariant worth enforcing. **Planned:**
 `plans/function-dispatch-consolidation-plan.md` (July 2026). The survey behind it
-counted ~129 raw invocation points across ~38 dispatchers and found two further
-suspected live instances of this bug class (ExternalInterface reverse arg order;
-event-handler type-1 args never pushed).
+counted ~129 raw invocation points across ~38 dispatchers, and its Stage 0
+(completed 2026-07-04) **confirmed and fixed three more live instances** of the
+bug class: ExternalInterface type-1 args pushed in reverse (`d8abc5c0a`),
+event-handler type-1 args never pushed — `onSetFocus(oldFocus)` lost its
+argument (`9a8c6dce3`), and setInterval callbacks running under the caller's SWF
+version instead of their own (`60070d96a`). Seven shipped bugs from one
+structural cause and counting.
 
 ## 7. Runtime-side tessellation (libtess2)
 

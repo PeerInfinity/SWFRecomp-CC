@@ -194,6 +194,18 @@ Flash's internal numeric representation (float vs twips int) leaks into results.
 
 ## 11. Miscellaneous sharp edges
 
+- **Functions carry their *defining* SWF's version.** Version-sensitive
+  semantics (string→bool coercion, case rules, version-partitioned `_global`
+  views) must follow the SWF version of the movie that *defined* the executing
+  function, not the caller's — and that includes asynchronous re-entry: timers,
+  event handlers, loaded-child-SWF callbacks. We shipped and fixed exactly this
+  (July 2026): a v6 child SWF's `setInterval` callback ran under the v7 host's
+  semantics, resolved the wrong version-view of `_global`, so its own
+  `clearInterval` silently no-op'd and the timer re-fired ~41×/tick forever.
+  Relevant to your prelude-SWF architecture whenever the prelude's compiled
+  version differs from the user movie's — the version switch has to happen at
+  *every* dispatch site (timers, events, coercions), not just the main
+  CallFunction path; the async paths are the ones everyone forgets.
 - **`tellTarget` + label goto on dynamically created clips** — target resolution
   must consult dynamically attached clips, not just the authored display list.
 - **`_xmouse`/`_ymouse` are per-clip local coordinates** — compute on demand per
