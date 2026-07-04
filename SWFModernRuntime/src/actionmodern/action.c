@@ -47880,7 +47880,15 @@ void actionSetMember(SWFAppContext* app_context)
 							// underlying cache after the setter returns — the
 							// setter's own re-entrant writes to the same property
 							// do not survive past it ("did still set the cache").
-							if (_own_vprop) setter_prop->value = value_var;
+							// Re-resolve the slot first: the setter body may have added
+							// properties to obj, and setProperty's realloc moves
+							// properties[] — writing through the pre-call pointer is a
+							// UAF (ASAN-confirmed on global_proto_decls' Rectangle.top
+							// setter).
+							if (_own_vprop) {
+								ASProperty* _sp2 = findPropertyRaw(obj, prop_name, prop_name_len);
+								if (_sp2 != NULL) _sp2->value = value_var;
+							}
 						}
 					}
 					else if (_own_vprop)
