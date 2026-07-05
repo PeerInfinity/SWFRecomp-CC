@@ -339,6 +339,11 @@ u8 ng_getVideoCodec(size_t char_id)
 // Scriptable character queries
 // ---------------------------------------------------------------------------
 
+// Defined in the textfield registry section below. Must be declared before
+// use: the trace-WASM emcc build has no -Wno-error=implicit-function-declaration
+// (unlike the graphics build), so an implicit declaration fails that build.
+int ng_find_textfield(size_t char_id);
+
 int ng_isScriptableChar(size_t char_id)
 {
 	return (dictionary[char_id].type == CHAR_TYPE_SPRITE) ||

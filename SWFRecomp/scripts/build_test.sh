@@ -192,6 +192,8 @@ fi
 
 if [ "$HEADLESS_FLAG" = true ]; then
     echo "Using HEADLESS_GRAPHICS mode (offscreen WebGPU + trace) for ${TARGET} build..."
+    cp "${SWFMODERN_SRC}/actionmodern/action_queue.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/actionmodern/sprite_frame_scripts.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/swf_headless.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
@@ -215,6 +217,12 @@ elif [ "$GRAPHICS_FLAG" = true ]; then
     cp "${SWFMODERN_SRC}/audio/audio_output_web.c" "${BUILD_DIR}/"
 else
     echo "Using NO_GRAPHICS mode for ${TARGET} build..."
+    cp "${SWFMODERN_SRC}/actionmodern/action_queue.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/actionmodern/sprite_frame_scripts.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/actionmodern/image_decode.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/actionmodern/video_codec.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/stb_image_impl.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/swf_core.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
