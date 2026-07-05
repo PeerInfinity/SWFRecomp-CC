@@ -229,6 +229,30 @@ follow-up material, same family as making prototype ownership explicit).
   during App_LoadingMenuDemo; some alias of the freed child list survives the
   scrub. Repro: scratchpad `asan_build_run.sh N` after a
   `profile_game_native.sh flasharchive/N 500 no-graphics --build-only` stage.
+  **FIXED 2026-07-05 (own session, prompt
+  `SWFRecompDocs/prompts/n-goto-backward-clear-uaf.md`).** Root cause: the
+  surviving alias was the attached clip's own STANDALONE `display_obj` (the
+  calloc'd DisplayObject ng_attachMovie creates outside any DL) — the
+  CI-mode registration entry in the parent's list holds a COPY of the same
+  `sprite_display_list` base, the backward-jump clear freed the buffer
+  through the registration copy and NULLed only that copy, and
+  actionGetMember's `_`-prefixed child-name walk then read the freed buffer
+  through `mc->display_obj->sprite_display_list` (a drone's
+  `gotoAndPlay("laserdrone_prefire")` backward jump, then member access in
+  the same handler). Two-part fix: (1) the backward-jump clear now applies
+  Ruffle's `survives_rewind` AVM1 rule — dynamic-range children
+  (swf_depth >= 16384, i.e. attachMovie/duplicateMovieClip) are not removal
+  candidates and survive explicit backward gotos with identity intact, the
+  same rule the natural loop-back (`9030c61d9`) and root
+  `ng_display_clear_after` already apply; (2) funnel completeness —
+  `scrub_mc_display_obj_in_range` (ng_freeSpriteDL) now also NULLs
+  base-pointer FIELD copies in standalone attachMovie/clone display_objs
+  (the free-side twin of `dlr_rebase_copies_recurse`'s Class B), so freeing
+  through either alias of the pair scrubs the other. Verified: N 3000-frame
+  ASAN clean (collector off AND `SWF_GC=1`, stdout identical both ways);
+  goto-cluster local smoke (12 tests incl. goto_rewind1-3, goto_both_ways,
+  rewind_depth, goto_execution_order) all pass; soak A/B + CI results in the
+  session log / pipeline state.
   ASAN (post-1b run, board workload): `aq_dispatch_register_ctor`
   (tag.c:7131) reads `prc->display_obj->constructor_invoked` inside a
   442,368-byte block (= 512 × 864B DisplayObject sprite list) that

@@ -145,6 +145,13 @@ typedef struct DisplayObject
 	// the next grow. C-stack locals held across a call that can grow a list
 	// (scripts, attachMovie, placement replays) must be re-read after the
 	// call instead.
+	// FREE-SIDE: ng_freeSpriteDL is the ONLY way to free this buffer; it
+	// NULLs the same holder classes (scrub_mc_display_obj_in_range also
+	// clears base-pointer copies of the field in standalone attachMovie /
+	// clone display_objs). Every free site must NULL the entry field it
+	// freed through — the buffer is aliased by the CI-mode attachMovie
+	// registration entry AND the attached clip's own standalone display_obj,
+	// and freeing through one alias must not leave the other dangling.
 	struct DisplayObject* sprite_display_list;
 	size_t sprite_max_depth;
 	size_t sprite_dl_capacity;

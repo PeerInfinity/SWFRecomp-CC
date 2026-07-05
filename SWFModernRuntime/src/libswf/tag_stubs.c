@@ -1294,8 +1294,25 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 				}
 			}
 #endif
+			// Ruffle run_goto survives_rewind (AVM1): only depth < AVM_DEPTH_BIAS
+			// (16384) is a removal candidate — dynamic-range children (attachMovie /
+			// duplicateMovieClip, swf_depth >= 16384) survive an explicit backward
+			// goto with their identity intact, same rule the natural loop-back
+			// (advance_sprite_frames) and the root timeline (ng_display_clear_after)
+			// already apply. Freeing them here was also a UAF: the CI-mode
+			// attachMovie registration entry at [swf_depth] holds a COPY of the
+			// attached clip's own DL base, so this clear freed the child's list
+			// while the clip's standalone display_obj kept the pointer — N's
+			// drone gotoAndPlay("laserdrone_prefire") then read it via
+			// actionGetMember's child-name walk.
+			size_t bj_surviving_max = 0;
 			for (size_t j = 1; j <= max_depth; ++j)
 			{
+				if (j >= 16384)
+				{
+					if (display_list[j].char_id != 0) bj_surviving_max = j;
+					continue;
+				}
 				if (display_list[j].sprite_display_list != NULL)
 				{
 					ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
@@ -1304,7 +1321,7 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 				}
 				display_list[j].char_id = 0;
 			}
-			max_depth = 0;
+			max_depth = bj_surviving_max;
 
 			for (size_t f = 0; f <= frame; f++)
 			{

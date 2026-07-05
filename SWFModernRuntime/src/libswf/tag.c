@@ -9344,18 +9344,46 @@ void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
 // whose dangling display_obj is still reachable through hit-test walks
 // (actionMouseClickFocus → mc_get_pixel_aabb_ng read a tombstoned
 // disabled_mc's entry inside a buffer clear_display_entry had freed).
+//
+// Also the free-side twin of dlr_rebase_copies_recurse's Class B for
+// standalone display_objs: an attachMovie/clone MC's display_obj is a
+// calloc'd DisplayObject OUTSIDE any DL whose sprite_display_list FIELD
+// holds the same base pointer as the CI-mode registration entry in the
+// parent's list. Freeing the buffer through either alias must NULL the
+// other, or the survivor dangles (N's backward-goto actionGetMember UAF
+// read an attached drone's own DL through its standalone display_obj after
+// ng_gotoFrameByMC freed it through the parent's registration copy).
+// Registration-entry copies themselves are cleared by the free sites (the
+// funnel contract: every caller NULLs the entry field it freed through).
 static void scrub_mc_display_obj_in_range(DisplayObject* base, size_t cap)
 {
 	extern MovieClip* child_mc_cache[];
 	extern int child_mc_count;
+	extern MovieClip root_movieclip;
 	uintptr_t lo = (uintptr_t)base;
 	uintptr_t hi = lo + cap * sizeof(DisplayObject);
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* m = child_mc_cache[i];
 		if (m == NULL || m->display_obj == NULL) continue;
 		uintptr_t p = (uintptr_t)m->display_obj;
-		if (p >= lo && p < hi)
+		if (p >= lo && p < hi) {
 			m->display_obj = NULL;
+			continue;
+		}
+		DisplayObject* dobj = (DisplayObject*)m->display_obj;
+		if (dobj->sprite_display_list == base) {
+			dobj->sprite_display_list = NULL;
+			dobj->sprite_dl_capacity = 0;
+			dobj->sprite_max_depth = 0;
+		}
+	}
+	if (root_movieclip.display_obj != NULL) {
+		DisplayObject* rdobj = (DisplayObject*)root_movieclip.display_obj;
+		if (rdobj->sprite_display_list == base) {
+			rdobj->sprite_display_list = NULL;
+			rdobj->sprite_dl_capacity = 0;
+			rdobj->sprite_max_depth = 0;
+		}
 	}
 }
 
