@@ -90,6 +90,19 @@ Trace tests barely touch this; games live in it.
   engine stores the upcoming frame (common), every comparison against a
   script-requested frame needs unwrapping — the off-by-one hides until a goto
   targets frame 0 from the last frame and reads as "same frame, skip work."
+- **Loop-back must preserve child identity (`survives_rewind`).** When a
+  sprite's timeline wraps to frame 1 (or any backward goto lands on a frame
+  that re-places the same character at the same depth), the existing child
+  **survives** — same instance name, same variables, same playhead, same
+  button state — and the re-place applies as a *modify*. The naive
+  clear-everything-then-replay mints a fresh instance every loop, which both
+  breaks scripts (state stored on children evaporates; `instanceN` names
+  drift) and leaks unboundedly (we measured ~4 clips/tick on a looping UI
+  sprite until caches overflowed). Dynamically created children (attachMovie/
+  duplicateMovieClip depth range) always survive a rewind. Ruffle's `run_goto`
+  is the reference; fixing this outright repaired a Gnash execution-order test
+  for us (July 2026). Decide survivorship against per-frame placement data,
+  not by diffing live state.
 - **Execution ordering** (init actions → place → frame scripts → clip events →
   `onEnterFrame`, with goto-deferral queues) is the single biggest source of
   divergence between AVM1 implementations. Build ordering tests early; Ruffle's
