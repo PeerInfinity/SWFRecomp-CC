@@ -251,8 +251,11 @@ follow-up material, same family as making prototype ownership explicit).
   through either alias of the pair scrubs the other. Verified: N 3000-frame
   ASAN clean (collector off AND `SWF_GC=1`, stdout identical both ways);
   goto-cluster local smoke (12 tests incl. goto_rewind1-3, goto_both_ways,
-  rewind_depth, goto_execution_order) all pass; soak A/B + CI results in the
-  session log / pipeline state.
+  rewind_depth, goto_execution_order) all pass; Minesweeper/DJ/Tetris
+  3000-frame ASAN soaks clean with stdout byte-identical vs HEAD-source
+  controls. Landed as `ae9a841a3`; CI both modes at that commit: zero
+  changes across all suites (runs 28736338846 no-graphics / 28736339255
+  graphics).
   ASAN (post-1b run, board workload): `aq_dispatch_register_ctor`
   (tag.c:7131) reads `prc->display_obj->constructor_invoked` inside a
   442,368-byte block (= 512 × 864B DisplayObject sprite list) that
