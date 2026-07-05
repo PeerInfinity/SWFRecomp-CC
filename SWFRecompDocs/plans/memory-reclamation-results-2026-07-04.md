@@ -165,8 +165,10 @@ follow-up material, same family as making prototype ownership explicit).
   on the profile-no-graphics build.
 - **attachMovie sprite_display_list growth invalidates aliased
   DisplayObject pointers (CI modes) — UAF + the OOM, one root cause.**
-  **FIXED 2026-07-04 (realloc-aliasing session — commit hash in git log:
-  "fix(runtime): sprite display-list realloc aliasing + occupancy sizing").**
+  **FIXED 2026-07-04, commit `2f20b1c59` ("fix(runtime): sprite display-list
+  realloc aliasing + occupancy sizing"). CI both modes at that commit: green,
+  zero changes in every suite (runs 28731611828 no-graphics / 28731612389
+  graphics).**
   Post-fix diagnosis CORRECTED the OOM attribution below: the arena was NOT
   exhausted by grow/free churn (only 3 grows × ~7 MB occur in the repro; the
   doc's ~14 MB figure was also off — sizeof(DisplayObject)=432, a 16,401-entry
