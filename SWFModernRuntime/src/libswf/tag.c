@@ -9149,7 +9149,14 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 //   - typeof / _root.mc lookups via display_list iteration still find the MC
 //     by name (instance_name stays populated until finalize).
 // For MCs WITHOUT unload handlers, both run inline (no handler to wait for).
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+//
+// The pending-finalize QUEUE functions below are NO_GRAPHICS/OFFSCREEN_RENDER
+// only (browser-WASM gets no-op stubs in the #else), but the state table and
+// the realloc/free funnel that scrubs it (ng_spriteDLRealloc / ng_freeSpriteDL
+// / ng_ensureDisplayListSize) compile in ALL modes: the funnel call sites in
+// tag.c/tag_stubs.c are shared with the browser build, which otherwise fails
+// to link (undefined ng_freeSpriteDL). In browser mode the table just stays
+// empty, so its scrub loops are no-ops.
 #define NG_PENDING_FINALIZE_CAP 256
 typedef struct {
 	MovieClip* mc;
@@ -9462,6 +9469,7 @@ void ng_ensureDisplayListSize(SWFAppContext* app_context, size_t depth)
 	                   new_cap);
 }
 
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 extern void actionMarkMCPendingRemovalDirect(MovieClip* mc, int swf_depth);
 static void clear_display_entry(SWFAppContext* app_context, size_t depth);
 
