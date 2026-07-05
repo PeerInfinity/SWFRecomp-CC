@@ -207,12 +207,28 @@ follow-up material, same family as making prototype ownership explicit).
   (board builds and play continues past the old deterministic death point);
   N / Doodle Jump / Minesweeper stdout byte-identical vs HEAD-source control
   builds; avm1 smoke tests green both modes.
-  **Residual (distinct, still open):** the same workload still exits early
-  around tick ~2500+ from a *separate pre-existing* per-tick churn leak —
-  looping sprites re-place nameless buttons with fresh auto-instance
-  identities every wrap (~4 lists + 4 cached MCs per tick, unbounded), which
-  eventually overflows any child_mc_cache cap and resumes leaking. Root cause
-  and fix plan: `SWFRecompDocs/prompts/looping-sprite-child-identity-churn.md`.
+  **Residual (distinct): FIXED 2026-07-05, commit `9030c61d9` ("fix(runtime):
+  preserve child identity across nested-sprite loop-back + reclaim dead MC
+  cache slots"). CI both modes at that commit: zero regressions; misc-ming
+  `action_order/action_execution_order_test5` newly passing (26/35 → 35/35);
+  runs 28733917621 no-graphics / 28733918237 graphics.** The leak was the
+  per-tick churn described below: looping sprites re-placed nameless buttons
+  with fresh auto-instance identities every wrap (~4 lists + 4 cached MCs per
+  tick, unbounded) until child_mc_cache overflowed and resumed leaking. Fix =
+  Ruffle-style survives_rewind on the nested-sprite frame-0 rewind (decided
+  against the recompiler-emitted FramePlacement tables, which existed for this
+  purpose but had no consumer) + dynamic-range (>=16384) children survive the
+  wrap + the browser-WASM dead-slot reclaim pass now runs in CI modes
+  (`actionReclaimDeadChildMCSlots`). The 3000-tick board workload now runs to
+  MAX_FRAMES with flat memory and no overflow message. Session prompt (now
+  executed): `SWFRecompDocs/prompts/looping-sprite-child-identity-churn.md`.
+  Discovered during verification, PRE-EXISTING (reproduced identically at
+  HEAD `a18e181b9`, out of scope): N under ASAN (no input, 3000 frames)
+  aborts on a heap-UAF — `actionGetMember` reads a 27,648-byte sprite child
+  DL freed by `ng_gotoFrameByMC`'s backward-jump clear (tag_stubs.c:1301)
+  during App_LoadingMenuDemo; some alias of the freed child list survives the
+  scrub. Repro: scratchpad `asan_build_run.sh N` after a
+  `profile_game_native.sh flasharchive/N 500 no-graphics --build-only` stage.
   ASAN (post-1b run, board workload): `aq_dispatch_register_ctor`
   (tag.c:7131) reads `prc->display_obj->constructor_invoked` inside a
   442,368-byte block (= 512 × 864B DisplayObject sprite list) that

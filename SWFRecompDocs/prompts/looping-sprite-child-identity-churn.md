@@ -1,5 +1,14 @@
 # Session prompt: looping-sprite child identity churn (per-tick DL/MC leak)
 
+> **STATUS: DONE 2026-07-05, commit `9030c61d9`.** Nested-sprite frame-0 rewind
+> now preserves child identity via survives_rewind against the recompiler's
+> FramePlacement tables; dynamic-range children survive the wrap; the
+> browser-WASM dead-slot reclaim runs in CI modes. Minesweeper's 3000-tick
+> board workload runs to MAX_FRAMES, flat memory, no cache overflow. CI both
+> modes zero regressions, +1 newly passing (misc-ming
+> action_execution_order_test5). Verdict details in
+> `SWFRecompDocs/plans/memory-reclamation-results-2026-07-04.md` §residual.
+
 Fix the pre-existing per-tick churn leak discovered (and quantified) during the
 sprite-display-list realloc-aliasing session — see
 `SWFRecompDocs/plans/memory-reclamation-results-2026-07-04.md` §pre-existing
