@@ -325,8 +325,9 @@ at cadence 60 (collect every ~2s at 30fps). `SWF_GC=0` disables;
 `count`/`quarantine`/`1` select modes explicitly as before. The default-on
 bar from the rollout plan was met in full: both CI modes green at cadence 1,
 soak set clean (quarantine traps silent + ASAN), stdout byte-identical
-everywhere. A round-3 CI dispatch without the `swf_gc` input validates the
-default-on path itself (results recorded in the pipeline log).
+everywhere. **Round 3** (`ee0805363`, no `swf_gc` input — every test binary
+running the default-on collector at cadence 60, runs 28723727564 /
+28723727978): both modes green, "No changes detected" in every suite.
 
 Note for browser-WASM: deployed demos pick the collector up on their next
 rebuild/redeploy (emscripten has no env → default-on applies there too);
