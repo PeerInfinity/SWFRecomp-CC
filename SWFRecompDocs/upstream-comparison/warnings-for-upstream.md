@@ -99,10 +99,13 @@ Trace tests barely touch this; games live in it.
   breaks scripts (state stored on children evaporates; `instanceN` names
   drift) and leaks unboundedly (we measured ~4 clips/tick on a looping UI
   sprite until caches overflowed). Dynamically created children (attachMovie/
-  duplicateMovieClip depth range) always survive a rewind. Ruffle's `run_goto`
-  is the reference; fixing this outright repaired a Gnash execution-order test
-  for us (July 2026). Decide survivorship against per-frame placement data,
-  not by diffing live state.
+  duplicateMovieClip depth range, ≥16384) survive **every** backward goto, not
+  just natural loops — Ruffle's removal logic only considers depths below the
+  dynamic bias at all. Ruffle's `run_goto` is the reference; fixing this
+  outright repaired a Gnash execution-order test for us, and a second bug in
+  the same family (explicit backward gotos destroying attached children) was
+  the root cause of a use-after-free (July 2026). Decide survivorship against
+  per-frame placement data, not by diffing live state.
 - **Execution ordering** (init actions → place → frame scripts → clip events →
   `onEnterFrame`, with goto-deferral queues) is the single biggest source of
   divergence between AVM1 implementations. Build ordering tests early; Ruffle's
