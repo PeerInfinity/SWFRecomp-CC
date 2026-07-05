@@ -81,6 +81,11 @@ these modes are the whole game.
 - **WASM-friendly by default:** no SharedArrayBuffer / COOP-COEP requirements, no
   pthread builds. Upstream's free-thread GC and locks are a porting liability for
   any future browser target; our model drops in.
+- **Proof point (July 2026):** we shipped GC-grade memory reclamation *within*
+  this model — a single-threaded, between-frames, root-traced mark-sweep
+  collector (default-on, `bac8b31e8`) that flattened N's unbounded leak with
+  byte-identical output and zero test regressions. Concurrency was never the
+  missing ingredient.
 
 ## 6. Everything-in-C stdlib: control where Flash is weird
 

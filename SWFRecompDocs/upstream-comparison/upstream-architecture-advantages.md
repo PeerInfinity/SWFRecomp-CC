@@ -104,12 +104,19 @@ allocating +1 is never consumed** (stack, var_map, and scopes are all borrowed,
 so release chains stop at refcount 1; N leaks ~12 objects + 12 arrays per
 frame, linear). That is exactly the problem upstream's *stack-integrated
 refcounting* (`PUSH_OBJ` retains / `POP` releases) solves by construction — a
-genuine validation of their design. Our chosen fix is the Stage 3 root-traced
-collector instead (retrofitting consuming semantics into 75K lines of
-pop-then-use code is the larger, riskier project); the floating refs are
-load-bearing safety padding until then and must not be "fixed" site-locally.
-**Plan:** `plans/memory-reclamation-plan.md` (+ results doc). The
-concurrent/locked form remains structural (and undesirable in browser WASM).
+genuine validation of their design. Our answer — the Stage 3 **root-traced
+mark-sweep collector — shipped default-on 2026-07-04** (`bac8b31e8` +
+`427f0abb1`): single-threaded, between-frames, reachability-only liveness,
+real free at cadence 60, `SWF_GC=0` opt-out. Acceptance met: N title demo over
+3000 ticks went from 59,736 objects + 55,483 arrays (linear growth) to ~3,709 +
+254 flat, byte-identical output, both CI modes green. The floating refs remain
+load-bearing for the refcount fast path and must not be "fixed" site-locally;
+any new C-side object stash must be rooted or scrubbed (see the root-set rules
+memory). **This advantage is now substantially neutralized** — we have
+GC-grade reclamation without threads, locks, or WASM costs; what remains
+upstream-only is the promptness of stack-integrated refcounting (they reclaim
+at pop; we reclaim within ~60 ticks). **Plan + results:**
+`plans/memory-reclamation-plan.md`, `plans/memory-reclamation-results-2026-07-04.md`.
 
 ## 5. Standard library in ActionScript (AS2Runtime prelude)
 
@@ -224,7 +231,7 @@ better starting point. Structural.
 | 1 | String-ID interning | **Yes** — name-lookup complex was 67%, still ~40% after landed mitigations | Yes (top candidate) |
 | 2 | rbtree properties | Yes — O(n) scans | Yes (with #1) |
 | 3 | app_context instantiability | Barely (see thread-safety analysis) | Deliberately declined |
-| 4 | GC + stack-integrated refcounts | Yes — cycle leaks, recurring manual-refcount bugs | Partially (single-threaded cycle collector) |
+| 4 | GC + stack-integrated refcounts | **Neutralized 2026-07-04** — our root-traced collector shipped default-on; residual gap = reclamation promptness only | Done (differently) |
 | 5 | AS2 prelude stdlib | Partly — semantics-by-construction | Pattern only, for net-new surface |
 | 6 | Single calling convention | **Yes** — recurring arg-marshalling bug class | Yes (internal consolidation) |
 | 7 | Uniform runtime tessellation | Partly — our morph/glyph paths still earcut | Trade-off |
