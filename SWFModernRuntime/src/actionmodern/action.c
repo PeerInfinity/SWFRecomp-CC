@@ -21323,7 +21323,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 // loops iterate `child_mc_count` (the live high-water mark), not this cap, so a
 // larger ceiling costs nothing for the vast majority of content that stays well
 // under it. See memory `child-mc-cache-cap-resolution` (prior 128→512→1024 raises).
-#define MAX_CHILD_MOVIECLIPS 4096
+#define MAX_CHILD_MOVIECLIPS 16384
 MovieClip* child_mc_cache[MAX_CHILD_MOVIECLIPS];
 int child_mc_count = 0;
 // MCs at index >= this threshold were just placed in the current frame's
@@ -23820,12 +23820,12 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 			// "Failed to place object" warning.
 			if (dobj == NULL) {
 				dobj = (DisplayObject*)HCALLOC(1, sizeof(DisplayObject));
-				dobj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				dobj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 				dobj->sprite_display_list = (DisplayObject*)HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
 				dobj->sprite_max_depth = 0;
 				mc->display_obj = dobj;
 			} else if (dobj->sprite_display_list == NULL) {
-				dobj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				dobj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 				dobj->sprite_display_list = (DisplayObject*)HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
 				dobj->sprite_max_depth = 0;
 			}

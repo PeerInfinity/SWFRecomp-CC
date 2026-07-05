@@ -2,6 +2,8 @@
 #include <actionmodern/action_queue.h>
 #include <libswf/swf.h>
 
+#include <stdint.h>
+
 // Sprite context globals captured at push time. Defined elsewhere; we
 // only read them here.
 extern MovieClip* g_current_context;
@@ -63,6 +65,21 @@ const PendingSpriteScriptEntry* actionPendingSpriteScriptAt(size_t i)
 }
 
 void actionResetPendingSpriteScriptQueue(void) { g_pending_count = 0; }
+
+void actionPendingSpriteScriptsRebaseSpriteObj(void* old_base,
+                                               size_t old_bytes,
+                                               void* new_base)
+{
+	uintptr_t lo = (uintptr_t)old_base;
+	uintptr_t hi = lo + old_bytes;
+	for (size_t i = 0; i < g_pending_count; i++) {
+		uintptr_t v = (uintptr_t)g_pending[i].ctx_sprite_obj;
+		if (v >= lo && v < hi)
+			g_pending[i].ctx_sprite_obj = new_base
+				? (char*)new_base + (v - lo)
+				: NULL;  // new_base==NULL: buffer being FREED, not moved
+	}
+}
 
 size_t actionFlushPendingSpriteScriptsToScriptQueue(SWFAppContext* app_context)
 {

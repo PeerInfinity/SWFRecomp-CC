@@ -39,6 +39,13 @@ typedef enum
 
 #define INITIAL_DICTIONARY_CAPACITY 8192  // Increased to support per-movie char_id offsetting (1000 per child SWF)
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
+// Per-sprite child display lists are sized by occupancy, not by the depth
+// range: they start small and are grown on demand via ng_spriteDLRealloc /
+// ng_ensureDisplayListSize (tag.c), which rebase every aliased DisplayObject*
+// after the buffer moves. Sizing every sprite at INITIAL_DISPLAYLIST_CAPACITY
+// (1024 entries x ~432 B = ~440 KB each) exhausted the 1 GB o1heap arena on
+// sprite-heavy games (Minesweeper board play held ~2000 live lists = ~1 GB).
+#define INITIAL_SPRITE_DL_CAPACITY 64
 // AVM1 SWF-depth bias: AS depth + AVM_DEPTH_BIAS = SWF depth (display_list slot index).
 // Clones live in slots [AVM_DEPTH_BIAS, AVM_CLONE_SLOT_CAP); the cap is the upper
 // bound on display_list slots reachable by CloneSprite/duplicateMovieClip. Beyond
@@ -128,7 +135,16 @@ typedef struct DisplayObject
 	u8 sticky_button_state; // preserved state across remove+re-place (same char)
 	size_t sticky_char_id;  // char_id that sticky_button_state belongs to
 	u8 blend_mode;         // 0=normal (default), see SWF spec blend modes
-	// Per-sprite persistent display list (for multi-frame sprites)
+	// Per-sprite persistent display list (for multi-frame sprites).
+	// ALIASING RULE: this buffer can MOVE (ng_spriteDLRealloc /
+	// ng_ensureDisplayListSize grow it on demand and FREE the old buffer).
+	// Any persistent holder of a pointer INTO the buffer (&dl[i], e.g.
+	// MovieClip.display_obj, queued ctor/script payloads) or of the buffer
+	// BASE itself (copies of this field in other entries or globals) must be
+	// registered in tag.c ng_spriteDLRealloc's rebase walk, or it dangles on
+	// the next grow. C-stack locals held across a call that can grow a list
+	// (scripts, attachMovie, placement replays) must be re-read after the
+	// call instead.
 	struct DisplayObject* sprite_display_list;
 	size_t sprite_max_depth;
 	size_t sprite_dl_capacity;

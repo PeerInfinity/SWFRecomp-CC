@@ -717,19 +717,18 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		DisplayObject* pdobj = (DisplayObject*)parent->display_obj;
 		if (pdobj->sprite_display_list != NULL) {
 			size_t target_d = (size_t)swf_depth;
-			// Grow if needed — use HCALLOC/FREE (heap allocator) because the parent's
-			// sprite_display_list may have been allocated by HCALLOC (timeline sprites).
-			// Standard realloc cannot operate on custom-heap pointers.
-			if (target_d >= pdobj->sprite_dl_capacity) {
-				size_t new_cap = target_d + 16;
-				DisplayObject* new_dl = HCALLOC(new_cap, sizeof(DisplayObject));
-				if (new_dl) {
-					memcpy(new_dl, pdobj->sprite_display_list, pdobj->sprite_dl_capacity * sizeof(DisplayObject));
-					FREE(pdobj->sprite_display_list);
-					pdobj->sprite_display_list = new_dl;
-					pdobj->sprite_dl_capacity = new_cap;
-				}
-			}
+			// Grow if needed — ng_spriteDLRealloc reallocates on the custom heap
+			// AND rebases every aliased pointer into the old buffer (queued
+			// register-ctor payloads, child_mc_cache display_obj, base-pointer
+			// copies; see swf.h ALIASING RULE). The old raw HCALLOC/memcpy/FREE
+			// here was the root cause of the aq_dispatch_register_ctor
+			// use-after-free: growing a radio component's list mid-ctor-drain
+			// freed the buffer that later queued ctor entries still pointed at.
+			if (target_d >= pdobj->sprite_dl_capacity)
+				ng_spriteDLRealloc(app_context, &pdobj->sprite_display_list,
+				                   &pdobj->sprite_dl_capacity, target_d + 16);
+			if (target_d >= pdobj->sprite_dl_capacity)
+				goto skip_parent_dl_registration;
 			pdobj->sprite_display_list[target_d].char_id = char_id;
 			if (pdobj->sprite_display_list[target_d].instance_name)
 				free(pdobj->sprite_display_list[target_d].instance_name);
@@ -743,6 +742,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 			}
 			if (target_d > pdobj->sprite_max_depth)
 				pdobj->sprite_max_depth = target_d;
+		skip_parent_dl_registration: ;
 		}
 	}
 #endif // CI modes only; browser-WASM renders non-root attaches via child_mc_cache
@@ -965,7 +965,7 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 		{
 			if (obj->sprite_display_list == NULL)
 			{
-				obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				obj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 				obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 				obj->sprite_max_depth = 0;
 			}
@@ -979,7 +979,7 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 	{
 		if (obj->sprite_display_list == NULL)
 		{
-			obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+			obj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 			obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 			obj->sprite_max_depth = 0;
 		}
@@ -1298,7 +1298,8 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			{
 				if (display_list[j].sprite_display_list != NULL)
 				{
-					FREE(display_list[j].sprite_display_list);
+					ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
+				                display_list[j].sprite_dl_capacity);
 					display_list[j].sprite_display_list = NULL;
 				}
 				display_list[j].char_id = 0;
@@ -1347,7 +1348,8 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			{
 				if (display_list[j].sprite_display_list != NULL)
 				{
-					FREE(display_list[j].sprite_display_list);
+					ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
+				                display_list[j].sprite_dl_capacity);
 					display_list[j].sprite_display_list = NULL;
 				}
 				display_list[j].char_id = 0;
@@ -2306,19 +2308,13 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (target_swf_depth < AVM_CLONE_SLOT_CAP)
 		{
-			// Ensure capacity — use HCALLOC/FREE because display_list may be
-			// from the custom heap allocator (timeline sprites use HCALLOC).
+			// Ensure capacity — realloc with aliased-pointer rebase (the old
+			// HCALLOC/memcpy/FREE here stranded every mc->display_obj pointing
+			// into the root display_list; see swf.h ALIASING RULE).
 			if (target_swf_depth >= display_list_capacity)
-			{
-				size_t new_cap = target_swf_depth + 64;
-				DisplayObject* new_dl = HCALLOC(new_cap, sizeof(DisplayObject));
-				if (new_dl) {
-					memcpy(new_dl, display_list, display_list_capacity * sizeof(DisplayObject));
-					FREE(display_list);
-					display_list = new_dl;
-					display_list_capacity = new_cap;
-				}
-			}
+				ng_spriteDLRealloc(app_context, &display_list,
+				                   &display_list_capacity,
+				                   target_swf_depth + 64);
 			display_list[target_swf_depth] = display_list[src_depth];
 			// Give clone its own strdup'd name
 			display_list[target_swf_depth].instance_name = strdup(target_name);
@@ -2518,7 +2514,10 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 				if (dobj == NULL) {
 					dobj = calloc(1, sizeof(DisplayObject));
 					dobj->sprite_dl_capacity = 64;
-					dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+					// HCALLOC (not calloc): growth paths realloc/FREE this buffer on
+					// the custom heap (ng_spriteDLRealloc); a calloc'd buffer would
+					// SIGABRT heap_free's ownership check.
+					dobj->sprite_display_list = HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
 					clone_mc->display_obj = dobj;
 				} else if (dobj->sprite_display_list != NULL) {
 					// Free nested child sprite lists, then zero the entries (mirrors
@@ -2526,7 +2525,8 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 					// keeps the top-level buffer regardless of which allocator owns it.
 					for (size_t _rj = 0; _rj < dobj->sprite_dl_capacity; _rj++) {
 						if (dobj->sprite_display_list[_rj].sprite_display_list != NULL) {
-							FREE(dobj->sprite_display_list[_rj].sprite_display_list);
+							ng_freeSpriteDL(app_context, dobj->sprite_display_list[_rj].sprite_display_list,
+						                dobj->sprite_display_list[_rj].sprite_dl_capacity);
 							dobj->sprite_display_list[_rj].sprite_display_list = NULL;
 						}
 					}
@@ -2612,19 +2612,13 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 				display_list[target_swf_depth].instance_name = NULL;
 			}
 		}
-		// Ensure capacity — use HCALLOC/FREE because display_list may be
-		// from the custom heap allocator (timeline sprites use HCALLOC).
+		// Ensure capacity — realloc with aliased-pointer rebase (the old
+		// HCALLOC/memcpy/FREE here stranded every mc->display_obj pointing
+		// into the root display_list; see swf.h ALIASING RULE).
 		if (target_swf_depth >= display_list_capacity)
-		{
-			size_t new_cap = target_swf_depth + 64;
-			DisplayObject* new_dl = HCALLOC(new_cap, sizeof(DisplayObject));
-			if (new_dl) {
-				memcpy(new_dl, display_list, display_list_capacity * sizeof(DisplayObject));
-				FREE(display_list);
-				display_list = new_dl;
-			}
-			display_list_capacity = new_cap;
-		}
+			ng_spriteDLRealloc(app_context, &display_list,
+			                   &display_list_capacity,
+			                   target_swf_depth + 64);
 		display_list[target_swf_depth] = display_list[src_depth];
 		display_list[target_swf_depth].instance_name = strdup(target_name);
 		display_list[target_swf_depth].instance_name_owned = 1;
@@ -2775,7 +2769,8 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 				DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
 				dobj->char_id = src_cid;
 				dobj->sprite_dl_capacity = 64;
-				dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+				// HCALLOC (not calloc): see ng_cloneSprite re-clone note above.
+				dobj->sprite_display_list = HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
 				dobj->sprite_max_depth = 0;
 				clone_mc->display_obj = dobj;
 
@@ -2917,7 +2912,10 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 					DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
 					dobj->char_id = cid;
 					dobj->sprite_dl_capacity = 64;
-					dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+					// HCALLOC (not calloc): growth paths realloc/FREE this buffer on
+					// the custom heap (ng_spriteDLRealloc); a calloc'd buffer would
+					// SIGABRT heap_free's ownership check.
+					dobj->sprite_display_list = HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
 					dobj->sprite_max_depth = 0;
 					clone_mc->display_obj = dobj;
 				}

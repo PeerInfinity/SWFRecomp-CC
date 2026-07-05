@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <stdint.h>
 
 // Single dynamic-growth array. Drain scans for highest-priority non-empty
 // bucket. For tens-of-entries scale (typical frame queue is <20 entries)
@@ -723,4 +724,27 @@ void actionQueueGcForEach(void (*cb)(void* fn, void* user))
 {
 	for (size_t i = 0; i < g_aq_count; i++)
 		cb((void*)g_aq[i].fn, g_aq[i].user);
+}
+
+// Sprite display-list realloc rebase (see swf.h ALIASING RULE): queued
+// sprite-script payloads capture ctx_sprite_obj = a DisplayObject* into a
+// sprite display list. When that list's buffer moves, still-queued payloads
+// must be repointed or the dispatch dereferences freed memory. Safe to call
+// mid-drain: aq_drain pops an entry before dispatching it, so every entry
+// still in g_aq[] holds a live payload.
+void actionQueueRebaseSpriteObjPayloads(void* old_base, size_t old_bytes,
+                                        void* new_base)
+{
+	uintptr_t lo = (uintptr_t)old_base;
+	uintptr_t hi = lo + old_bytes;
+	for (size_t i = 0; i < g_aq_count; i++) {
+		if (g_aq[i].fn != aq_dispatch_sprite_script || g_aq[i].user == NULL)
+			continue;
+		PendingSpriteScript* p = (PendingSpriteScript*)g_aq[i].user;
+		uintptr_t v = (uintptr_t)p->ctx_sprite_obj;
+		if (v >= lo && v < hi)
+			p->ctx_sprite_obj = new_base
+				? (DisplayObject*)((char*)new_base + (v - lo))
+				: NULL;  // new_base==NULL: buffer being FREED, not moved
+	}
 }

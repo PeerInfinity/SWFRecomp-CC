@@ -7,6 +7,8 @@
 #include <math.h>
 #include <utils.h>
 #include <heap.h>
+#include <stdint.h>
+#include <sprite_frame_scripts.h>
 #include <hit_test.h>
 
 #ifdef __EMSCRIPTEN__
@@ -937,11 +939,17 @@ static void fire_recursive_child_unloads(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc);
 #endif
 
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-// Forward decls — defined alongside tagRemoveObject2 below. Browser-WASM only:
-// invalidate cached descendant MCs of a removed/replaced sprite, so iteration
-// walks (e.g. actionIterateTextFieldGlyphs) stop drawing their glyphs.
+// Forward decl — freed-buffer display_obj scrub (defined near the DL-realloc
+// rebase machinery below); used by the frame-0 loop-back free above it.
+static void scrub_mc_display_obj_in_range(DisplayObject* base, size_t cap);
+
+// Forward decls — defined alongside tagRemoveObject2 below. Invalidate cached
+// descendant MCs of a removed/replaced sprite, so iteration walks (e.g.
+// actionIterateTextFieldGlyphs) stop drawing their glyphs.
+// invalidate_descendants_of_mc is all-modes (clear_display_entry's freed-DL
+// walk needs it); invalidate_mc_for_dl_entry stays browser-WASM-only.
 static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* parent);
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject* obj);
 #endif
 
@@ -1092,7 +1100,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		int just_allocated = 0;
 		if (obj->sprite_display_list == NULL)
 		{
-			obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+			obj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 			obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 			obj->sprite_max_depth = 0;
 			obj->sprite_current_frame = 0;
@@ -1158,7 +1166,8 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					{
 						if (display_list[j].sprite_display_list != NULL)
 						{
-							FREE(display_list[j].sprite_display_list);
+							ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
+			                display_list[j].sprite_dl_capacity);
 							display_list[j].sprite_display_list = NULL;
 						}
 						display_list[j].char_id = 0;
@@ -1364,7 +1373,8 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			{
 				if (display_list[j].sprite_display_list != NULL)
 				{
-					FREE(display_list[j].sprite_display_list);
+					ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
+					                display_list[j].sprite_dl_capacity);
 					display_list[j].sprite_display_list = NULL;
 				}
 				display_list[j].char_id = 0;
@@ -1524,7 +1534,7 @@ void ng_construct_pending_registerclass_sprites(SWFAppContext* app_context)
 		if (lookupRegisteredClassByCharId(obj->char_id, g_swf_version, NULL) == NULL) continue;
 
 		// Allocate the sprite's persistent display list (just_allocated path).
-		obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+		obj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 		obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 		obj->sprite_max_depth = 0;
 		obj->sprite_current_frame = 0;
@@ -1840,7 +1850,8 @@ void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context)
 		{
 			if (display_list[j].sprite_display_list != NULL)
 			{
-				FREE(display_list[j].sprite_display_list);
+				ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
+			                display_list[j].sprite_dl_capacity);
 				display_list[j].sprite_display_list = NULL;
 			}
 			display_list[j].char_id = 0;
@@ -2123,7 +2134,8 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 		{
 			if (display_list[j].sprite_display_list != NULL)
 			{
-				FREE(display_list[j].sprite_display_list);
+				ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
+			                display_list[j].sprite_dl_capacity);
 				display_list[j].sprite_display_list = NULL;
 			}
 			display_list[j].char_id = 0;
@@ -2829,7 +2841,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				// (buttons 19/20 inside sprite_26) appeared in the top-left corner.
 				if (obj->sprite_display_list == NULL && ch->button_state_funcs != NULL)
 				{
-					obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+					obj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 					obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 					obj->sprite_max_depth = 0;
 
@@ -3465,7 +3477,7 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 			// Allocate display list if needed
 			if (obj->sprite_display_list == NULL)
 			{
-				obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				obj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 				obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 				obj->sprite_max_depth = 0;
 			}
@@ -3870,6 +3882,18 @@ typedef struct {
 	size_t place_seq;
 } ClipEFEntry;
 
+// The flat dispatch loop below holds gathered DisplayObject* on the C stack
+// while running EF handlers that can grow a sprite display list (attachMovie
+// etc.), which moves the buffer the pointers alias (swf.h ALIASING RULE).
+// Each active dispatch registers its entries array on this chain so
+// ng_spriteDLRealloc's rebase can repoint the not-yet-dispatched entries.
+typedef struct ClipEFRebaseFrame {
+	ClipEFEntry* entries;
+	size_t n;
+	struct ClipEFRebaseFrame* prev;
+} ClipEFRebaseFrame;
+static ClipEFRebaseFrame* g_clip_ef_rebase_head = NULL;
+
 static int gather_clip_ef_entries(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc,
 	ClipEFEntry* out, size_t* n, size_t cap)
@@ -4018,9 +4042,15 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 		entries[b+1] = key;
 	}
 
+	// Register the gathered array for pointer rebase while handlers run
+	// (see ClipEFRebaseFrame above).
+	ClipEFRebaseFrame _ef_frame = { entries, n, g_clip_ef_rebase_head };
+	g_clip_ef_rebase_head = &_ef_frame;
+
 	for (size_t e = 0; e < n; e++) {
 		DisplayObject* obj = entries[e].obj;
 		MovieClip* entry_parent = entries[e].parent_mc;
+		if (obj == NULL) continue;        // entry's DL freed mid-dispatch (scrubbed)
 		if (obj->char_id == 0) continue;  // entry may have been removed mid-dispatch
 		if (obj->sprite_initialized < 2) continue;
 		if (obj->clip_action_count == 0) continue;
@@ -4059,11 +4089,19 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 		{
 			if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME) {
 				obj->clip_actions[a].action(app_context);
+				// The handler may have grown (moved) or freed the display list
+				// holding this entry; entries[] is rebased by ng_spriteDLRealloc
+				// (or NULLed by ng_freeSpriteDL), so re-read the entry pointer
+				// before touching obj again.
+				obj = entries[e].obj;
+				if (obj == NULL) break;
 			}
 		}
 		actionSetCurrentContext(saved_ctx);
 		actionSetBaseClip(saved_base);
 	}
+
+	g_clip_ef_rebase_head = _ef_frame.prev;
 }
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
@@ -5783,7 +5821,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			// Initialize button display list on first encounter (graphics mode)
 			if (obj->sprite_display_list == NULL && ch->button_state_funcs != NULL)
 			{
-				obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				obj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
 				obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 				obj->sprite_max_depth = 0;
 
@@ -7139,7 +7177,17 @@ static void aq_dispatch_register_ctor(SWFAppContext* app_context, void* user)
 		prc->mc->display_obj = (void*)prc->display_obj;
 		actionSetupRegisteredClassPrototype(app_context, prc->export_name, prc->mc);
 		actionInvokeRegisteredClassConstructor(app_context, prc->export_name, prc->mc);
-		prc->display_obj->constructor_invoked = 1;
+		// The ctor can grow (move) the display list holding this entry.
+		// This entry was already popped from the queue, so the realloc
+		// rebase can't fix prc->display_obj — but it DOES keep
+		// prc->mc->display_obj fresh (assigned equal above, rebased via the
+		// child_mc_cache walk). Re-read through the MC instead of the stale
+		// payload pointer.
+		{
+			DisplayObject* live_obj = (DisplayObject*)prc->mc->display_obj;
+			if (live_obj != NULL)
+				live_obj->constructor_invoked = 1;
+		}
 	}
 	free(prc->export_name);
 	free(prc);
@@ -7339,7 +7387,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 #endif
-	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
+	ng_ensureDisplayListSize(app_context, depth);
 
 #if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: consume any deferred pending_remove from a same-tick
@@ -7763,7 +7811,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 					}
 					if (display_list[depth].sprite_display_list != NULL)
 					{
-						FREE(display_list[depth].sprite_display_list);
+						ng_freeSpriteDL(app_context, display_list[depth].sprite_display_list,
+			                display_list[depth].sprite_dl_capacity);
 						display_list[depth].sprite_display_list = NULL;
 					}
 					display_list[depth].char_id = 0;
@@ -8310,7 +8359,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 #endif
-	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
+	ng_ensureDisplayListSize(app_context, depth);
 
 #if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: consume any deferred pending_remove from a same-tick
@@ -8507,7 +8556,8 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 					}
 					if (display_list[depth].sprite_display_list != NULL)
 					{
-						FREE(display_list[depth].sprite_display_list);
+						ng_freeSpriteDL(app_context, display_list[depth].sprite_display_list,
+			                display_list[depth].sprite_dl_capacity);
 						display_list[depth].sprite_display_list = NULL;
 					}
 					display_list[depth].char_id = 0;
@@ -8981,6 +9031,264 @@ typedef struct {
 static PendingFinalizeEntry ng_pending_finalize_entries[NG_PENDING_FINALIZE_CAP];
 static int ng_pending_finalize_count = 0;
 
+// ===========================================================================
+// Sprite display-list reallocation with aliased-pointer rebase
+//
+// A sprite's sprite_display_list buffer can move when it grows (attachMovie
+// registration at swf_depth >= 16384, or a placement depth exceeding the
+// occupancy-sized capacity). Persistent holders alias the old buffer two
+// ways (see the ALIASING RULE at DisplayObject.sprite_display_list, swf.h):
+//
+//   A) entry pointers (&dl[i]): MovieClip.display_obj on every cached MC,
+//      g_current_sprite_obj, queued PendingRegisterCtor / PendingClipLoad /
+//      PendingSpriteScript payloads, pending sprite-frame-script captures,
+//      and the active clip-EF flat dispatch array (g_clip_ef_rebase_head).
+//   B) base-pointer copies: the global display_list while swapped to the
+//      grown list, g_root_dl_backup, the button-state snapshot arrays,
+//      PendingFinalizeEntry.queued_dl_array, and nested-sprite entries in
+//      OTHER lists that hold a copy of this list's base (the attachMovie
+//      registration copies child list pointers into the parent's entry).
+//
+// ng_spriteDLRealloc reallocates and repoints ALL of the above before
+// freeing the old buffer. What it cannot fix are C-stack locals (saved_dl /
+// saved DisplayObject* held across a call that can grow a list) — those
+// callers must re-read after the call; new holders must be added to this
+// walk. Known residual: the recursive clip-EF overflow fallback and the
+// xform/cxform override stacks (render-phase only, no script runs while
+// they are live).
+// ===========================================================================
+
+static DisplayObject* g_dlr_old_base;
+static DisplayObject* g_dlr_new_base;
+static size_t g_dlr_old_cap;
+static size_t g_dlr_new_cap;
+
+// Repoint p if it points into the old buffer [old_base, old_base+old_cap).
+static void* dlr_rebase_ptr(void* p)
+{
+	uintptr_t v = (uintptr_t)p;
+	uintptr_t lo = (uintptr_t)g_dlr_old_base;
+	uintptr_t hi = lo + g_dlr_old_cap * sizeof(DisplayObject);
+	if (v >= lo && v < hi)
+		return (char*)g_dlr_new_base + (v - lo);
+	return p;
+}
+
+// Action-queue payload rebase (entries are popped before dispatch, so every
+// entry still queued holds a live payload — safe mid-drain).
+static void dlr_rebase_queue_cb(void* fn, void* user)
+{
+	if (user == NULL) return;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (fn == (void*)aq_dispatch_register_ctor) {
+		PendingRegisterCtor* prc = (PendingRegisterCtor*)user;
+		prc->display_obj = (DisplayObject*)dlr_rebase_ptr((void*)prc->display_obj);
+		return;
+	}
+#endif
+	if (fn == (void*)aq_dispatch_clip_load) {
+		PendingClipLoad* pcl = (PendingClipLoad*)user;
+		pcl->obj = (DisplayObject*)dlr_rebase_ptr((void*)pcl->obj);
+	}
+}
+
+// Fix base-pointer copies of the old buffer held in nested-sprite entries of
+// other display lists (attachMovie registration copies). Walks the holder
+// tree; lists form a parent->child DAG (a child list can be reachable both
+// via its owning entry and via a registration copy), so bound the depth.
+static void dlr_rebase_copies_recurse(DisplayObject* dobj, int guard)
+{
+	if (dobj == NULL || guard > 64) return;
+	if (dobj->sprite_display_list == g_dlr_old_base) {
+		dobj->sprite_display_list = g_dlr_new_base;
+		dobj->sprite_dl_capacity = g_dlr_new_cap;
+	}
+	DisplayObject* dl = dobj->sprite_display_list;
+	if (dl == NULL || dobj->sprite_dl_capacity == 0) return;
+	size_t maxd = dobj->sprite_max_depth;
+	if (maxd >= dobj->sprite_dl_capacity) maxd = dobj->sprite_dl_capacity - 1;
+	for (size_t d = 0; d <= maxd; d++)
+		if (dl[d].sprite_display_list != NULL)
+			dlr_rebase_copies_recurse(&dl[d], guard + 1);
+}
+
+void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
+                        size_t* cap_io, size_t new_cap)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	extern MovieClip root_movieclip;
+	extern DisplayObject* g_current_sprite_obj;
+	extern void* ng_get_root_display_obj(void);
+
+	DisplayObject* old_base = *base_io;
+	size_t old_cap = *cap_io;
+	if (old_base != NULL && new_cap <= old_cap) return;
+
+	DisplayObject* new_base = HCALLOC(new_cap, sizeof(DisplayObject));
+	if (new_base == NULL) return;  // OOM: keep the old buffer (HALLOC exits on
+	                               // o1heap OOM, so this only fires in
+	                               // passthrough/sanitizer builds)
+	if (old_base != NULL)
+		memcpy(new_base, old_base, old_cap * sizeof(DisplayObject));
+	*base_io = new_base;
+	*cap_io = new_cap;
+	if (old_base == NULL) return;  // fresh allocation, nothing to rebase
+
+	g_dlr_old_base = old_base;
+	g_dlr_old_cap = old_cap;
+	g_dlr_new_base = new_base;
+	g_dlr_new_cap = new_cap;
+	size_t old_bytes = old_cap * sizeof(DisplayObject);
+
+	// --- Class A: pointers to entries inside the moved buffer ---
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* m = child_mc_cache[i];
+		if (m != NULL && m->display_obj != NULL)
+			m->display_obj = dlr_rebase_ptr(m->display_obj);
+	}
+	if (root_movieclip.display_obj != NULL)
+		root_movieclip.display_obj = dlr_rebase_ptr(root_movieclip.display_obj);
+	g_current_sprite_obj =
+		(DisplayObject*)dlr_rebase_ptr((void*)g_current_sprite_obj);
+	actionQueueGcForEach(dlr_rebase_queue_cb);
+	actionQueueRebaseSpriteObjPayloads((void*)old_base, old_bytes,
+	                                   (void*)new_base);
+	actionPendingSpriteScriptsRebaseSpriteObj((void*)old_base, old_bytes,
+	                                          (void*)new_base);
+	for (ClipEFRebaseFrame* fr = g_clip_ef_rebase_head; fr != NULL;
+	     fr = fr->prev)
+		for (size_t e = 0; e < fr->n; e++)
+			fr->entries[e].obj =
+				(DisplayObject*)dlr_rebase_ptr((void*)fr->entries[e].obj);
+
+	// --- Class B: copies of the old buffer's base pointer ---
+	if (display_list == old_base) {
+		display_list = new_base;
+		display_list_capacity = new_cap;
+	}
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (g_root_dl_backup == old_base) {
+		g_root_dl_backup = new_base;
+		g_root_dl_cap_backup = new_cap;
+	}
+#endif
+	for (size_t j = 0; j < BTN_STATE_SNAP_MAX; j++) {
+		if (g_btn_state_old_sprite_dl[j] == old_base) {
+			g_btn_state_old_sprite_dl[j] = new_base;
+			g_btn_state_old_sprite_cap[j] = new_cap;
+		}
+	}
+	for (int i = 0; i < ng_pending_finalize_count; i++) {
+		if (ng_pending_finalize_entries[i].queued_dl_array == (void*)old_base)
+			ng_pending_finalize_entries[i].queued_dl_array = (void*)new_base;
+	}
+	dlr_rebase_copies_recurse((DisplayObject*)ng_get_root_display_obj(), 0);
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* m = child_mc_cache[i];
+		if (m != NULL && m->display_obj != NULL)
+			dlr_rebase_copies_recurse((DisplayObject*)m->display_obj, 0);
+	}
+
+	FREE(old_base);
+}
+
+// Freed-buffer scrub: NULL every cached MC display_obj pointing into a
+// sprite display list that is about to be freed — INCLUDING tombstoned
+// (depth==INT_MIN) MCs, which the invalidation walks deliberately skip but
+// whose dangling display_obj is still reachable through hit-test walks
+// (actionMouseClickFocus → mc_get_pixel_aabb_ng read a tombstoned
+// disabled_mc's entry inside a buffer clear_display_entry had freed).
+static void scrub_mc_display_obj_in_range(DisplayObject* base, size_t cap)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	uintptr_t lo = (uintptr_t)base;
+	uintptr_t hi = lo + cap * sizeof(DisplayObject);
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* m = child_mc_cache[i];
+		if (m == NULL || m->display_obj == NULL) continue;
+		uintptr_t p = (uintptr_t)m->display_obj;
+		if (p >= lo && p < hi)
+			m->display_obj = NULL;
+	}
+}
+
+// Free-side queue-payload scrub: NULL queued PendingRegisterCtor /
+// PendingClipLoad payload pointers into the buffer being freed. Dispatchers
+// already guard on NULL (the entry's clip is being torn down, so skipping is
+// the correct semantic — previously they read freed memory: ASAN hit
+// aq_dispatch_register_ctor's guard read when a root goto catch-up removed a
+// sprite whose child ctors were still queued).
+static void dlr_scrub_queue_cb(void* fn, void* user)
+{
+	if (user == NULL) return;
+	uintptr_t lo = (uintptr_t)g_dlr_old_base;
+	uintptr_t hi = lo + g_dlr_old_cap * sizeof(DisplayObject);
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (fn == (void*)aq_dispatch_register_ctor) {
+		PendingRegisterCtor* prc = (PendingRegisterCtor*)user;
+		uintptr_t v = (uintptr_t)prc->display_obj;
+		if (v >= lo && v < hi)
+			prc->display_obj = NULL;
+		return;
+	}
+#endif
+	if (fn == (void*)aq_dispatch_clip_load) {
+		PendingClipLoad* pcl = (PendingClipLoad*)user;
+		uintptr_t v = (uintptr_t)pcl->obj;
+		if (v >= lo && v < hi)
+			pcl->obj = NULL;
+	}
+}
+
+// The ONLY way to free a sprite_display_list buffer. Scrubs every registered
+// holder class (see ng_spriteDLRealloc's rebase walk — this is its free-side
+// twin: pointers are NULLed instead of rebased), then FREEs. Freeing a DL
+// with a raw FREE() strands whichever holder the workload exercises next.
+void ng_freeSpriteDL(SWFAppContext* app_context, DisplayObject* base, size_t cap)
+{
+	(void)app_context;
+	if (base == NULL) return;
+	uintptr_t lo = (uintptr_t)base;
+	uintptr_t hi = lo + cap * sizeof(DisplayObject);
+	scrub_mc_display_obj_in_range(base, cap);
+	g_dlr_old_base = base;
+	g_dlr_old_cap = cap;
+	actionQueueGcForEach(dlr_scrub_queue_cb);
+	actionQueueRebaseSpriteObjPayloads((void*)base, cap * sizeof(DisplayObject), NULL);
+	actionPendingSpriteScriptsRebaseSpriteObj((void*)base, cap * sizeof(DisplayObject), NULL);
+	{
+		extern DisplayObject* g_current_sprite_obj;
+		uintptr_t v = (uintptr_t)g_current_sprite_obj;
+		if (v >= lo && v < hi) g_current_sprite_obj = NULL;
+	}
+	for (ClipEFRebaseFrame* fr = g_clip_ef_rebase_head; fr != NULL; fr = fr->prev) {
+		for (size_t e = 0; e < fr->n; e++) {
+			uintptr_t v = (uintptr_t)fr->entries[e].obj;
+			if (v >= lo && v < hi) fr->entries[e].obj = NULL;
+		}
+	}
+	for (int i = 0; i < ng_pending_finalize_count; i++) {
+		if (ng_pending_finalize_entries[i].queued_dl_array == (void*)base)
+			ng_pending_finalize_entries[i].queued_dl_array = NULL;
+	}
+	FREE(base);
+}
+
+// ENSURE_SIZE-style doubling wrapper for the global display_list (root, or a
+// sprite's list while swapped in). Replaces the raw ENSURE_SIZE/grow_ptr at
+// the placement sites, which freed the old buffer WITHOUT repointing aliases.
+void ng_ensureDisplayListSize(SWFAppContext* app_context, size_t depth)
+{
+	if (depth < display_list_capacity) return;
+	size_t new_cap = display_list_capacity > 0 ? display_list_capacity
+	                                           : INITIAL_SPRITE_DL_CAPACITY;
+	while (depth >= new_cap) new_cap <<= 1;
+	ng_spriteDLRealloc(app_context, &display_list, &display_list_capacity,
+	                   new_cap);
+}
+
 extern void actionMarkMCPendingRemovalDirect(MovieClip* mc, int swf_depth);
 static void clear_display_entry(SWFAppContext* app_context, size_t depth);
 
@@ -9139,12 +9447,10 @@ void run_pending_finalize(SWFAppContext* app_context) { (void)app_context; }
 int ng_depth_has_pending_finalize(size_t depth) { (void)depth; return 0; }
 #endif
 
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-// Forward decls — defined later (~line 7074). Needed in clear_display_entry's
-// freed-DL invalidation walk below.
+// Forward decls — defined later in this file. Needed in clear_display_entry's
+// freed-DL invalidation walk below (all modes).
 static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* parent);
 extern void actionInvalidateCachedMovieClipDirect(SWFAppContext* app_context, MovieClip* mc);
-#endif
 
 static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 {
@@ -9154,9 +9460,12 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	}
 	if (display_list[depth].sprite_display_list != NULL)
 	{
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-		// Browser-WASM: before freeing the persistent sprite_display_list,
-		// invalidate any cached MovieClips whose display_obj points into it.
+		// Before freeing the persistent sprite_display_list, invalidate any
+		// cached MovieClips whose display_obj points into it (all modes; this
+		// walk was browser-WASM-only until the CI modes hit the same class:
+		// a mouse-click hit-walk (mc_get_pixel_aabb_ng) read a cached MC's
+		// display_obj inside a buffer this FREE released — Minesweeper board
+		// workload, sprite_29 goto RemoveObject2. See swf.h ALIASING RULE.)
 		// Button state-change handlers (line ~2275) write state-func placements
 		// into this DL; sprite children placed there (e.g. SLUG button's
 		// down-state → sprite_11) get MCs registered in child_mc_cache via
@@ -9184,8 +9493,8 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 				actionInvalidateCachedMovieClipDirect(app_context, leaked);
 			}
 		}
-#endif
-		FREE(display_list[depth].sprite_display_list);  // heap free: HCALLOC'd buffer
+		ng_freeSpriteDL(app_context, display_list[depth].sprite_display_list,
+		                display_list[depth].sprite_dl_capacity);
 		display_list[depth].sprite_display_list = NULL;
 	}
 	// Preserve button state so it can be restored if the same char is re-placed
@@ -9241,8 +9550,10 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 // can't tell them apart and would invalidate the wrong instance's child.
 // Without this, when the 4 menu buttons are removed, 3 children get
 // invalidated and 1 keeps rendering after menu→gameplay.
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 extern void actionInvalidateCachedMovieClipDirect(SWFAppContext* app_context, MovieClip* mc);
+// All modes (was browser-WASM-only): clear_display_entry's freed-buffer
+// invalidation walk needs it in the CI modes too (see the ALIASING RULE note
+// there).
 static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* parent)
 {
 	extern MovieClip* child_mc_cache[];
@@ -9259,6 +9570,7 @@ static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* 
 	}
 }
 
+#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 // Find the cached MC whose display_obj == `obj`, then invalidate it and all
 // its descendants. NULL display_obj match is skipped because many cached MCs
 // (e.g. dynamically-created clones) have display_obj=NULL legitimately.
@@ -10728,7 +11040,8 @@ void ng_display_cleanup_unplaced_after(SWFAppContext* app_context, size_t target
 			}
 			if (display_list[i].sprite_display_list != NULL)
 			{
-				FREE(display_list[i].sprite_display_list);
+				ng_freeSpriteDL(app_context, display_list[i].sprite_display_list,
+			                display_list[i].sprite_dl_capacity);
 				display_list[i].sprite_display_list = NULL;
 			}
 			display_list[i].char_id = 0;

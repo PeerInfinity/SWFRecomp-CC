@@ -165,6 +165,52 @@ follow-up material, same family as making prototype ownership explicit).
   on the profile-no-graphics build.
 - **attachMovie sprite_display_list growth invalidates aliased
   DisplayObject pointers (CI modes) — UAF + the OOM, one root cause.**
+  **FIXED 2026-07-04 (realloc-aliasing session — commit hash in git log:
+  "fix(runtime): sprite display-list realloc aliasing + occupancy sizing").**
+  Post-fix diagnosis CORRECTED the OOM attribution below: the arena was NOT
+  exhausted by grow/free churn (only 3 grows × ~7 MB occur in the repro; the
+  doc's ~14 MB figure was also off — sizeof(DisplayObject)=432, a 16,401-entry
+  span is ~7 MB). The real driver was **initial sizing**: every placed
+  sprite/button got a 1024-entry (442,368 B → 512 KB o1heap) child list
+  regardless of occupancy, and the board workload held ~2,014 of them live
+  (measured) = ~1 GB → `heap_alloc(442368)` failed at tick ~422 during board
+  construction. Fixes landed:
+  1. `ng_spriteDLRealloc` + rebase walk (tag.c): every sprite-DL realloc now
+     repoints all registered holders — child_mc_cache `display_obj`,
+     `g_current_sprite_obj`, root MC, queued `PendingRegisterCtor` /
+     `PendingClipLoad` / `PendingSpriteScript` payloads, pending
+     sprite-frame-script captures, active clip-EF dispatch arrays,
+     `PendingFinalizeEntry.queued_dl_array`, button-state snapshots,
+     `g_root_dl_backup`, the swapped-in global `display_list`, and
+     nested-entry base copies (recursive walk) — before FREEing the old
+     buffer. Used by the attachMovie grow, both clone-path root grows, and
+     the two `tagPlaceObject2*` ENSURE_SIZE sites. The ALIASING RULE comment
+     at `DisplayObject.sprite_display_list` (swf.h) names the contract for
+     future holders. `aq_dispatch_register_ctor` re-reads the entry through
+     the rebased `prc->mc->display_obj` after the ctor (its own payload is
+     popped before dispatch, so the queue rebase can't fix it).
+  2. Occupancy sizing: `INITIAL_SPRITE_DL_CAPACITY` = 64 entries (~32 KB
+     o1heap) for per-sprite lists, geometric growth on demand via the
+     rebase-aware path (root display_list stays at 1024). Clone-path lists
+     switched calloc → HCALLOC (heap_free on a calloc'd list = assert abort).
+  3. Free-site hardening (same aliasing class, next-in-line ASAN hits):
+     `clear_display_entry`'s freed-buffer invalidation walk un-gated for CI
+     modes (was browser-only), plus `scrub_mc_display_obj_in_range` NULLs
+     every cached MC `display_obj` (tombstones included — the walks skip
+     depth==INT_MIN but hit-test walks still read them) pointing into a
+     buffer being freed, at clear_display_entry and the loop-back rewind.
+  4. `MAX_CHILD_MOVIECLIPS` 4096 → 16384 (the expert board legitimately needs
+     >4096 live MCs; overflow breaks MC reuse and disables the GC).
+  Verified: ASAN register-ctor UAF repro clean; `heap_alloc(442368)` OOM gone
+  (board builds and play continues past the old deterministic death point);
+  N / Doodle Jump / Minesweeper stdout byte-identical vs HEAD-source control
+  builds; avm1 smoke tests green both modes.
+  **Residual (distinct, still open):** the same workload still exits early
+  around tick ~2500+ from a *separate pre-existing* per-tick churn leak —
+  looping sprites re-place nameless buttons with fresh auto-instance
+  identities every wrap (~4 lists + 4 cached MCs per tick, unbounded), which
+  eventually overflows any child_mc_cache cap and resumes leaking. Root cause
+  and fix plan: `SWFRecompDocs/prompts/looping-sprite-child-identity-churn.md`.
   ASAN (post-1b run, board workload): `aq_dispatch_register_ctor`
   (tag.c:7131) reads `prc->display_obj->constructor_invoked` inside a
   442,368-byte block (= 512 × 864B DisplayObject sprite list) that

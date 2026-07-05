@@ -76,4 +76,11 @@ void actionResetPendingSpriteScriptQueue(void);
 // g_unify_sprite_drain — actionDrainOnloadAndScript does.
 size_t actionFlushPendingSpriteScriptsToScriptQueue(struct SWFAppContext* app_context);
 
+// Sprite display-list realloc rebase (see swf.h ALIASING RULE): repoint
+// pending entries whose captured ctx_sprite_obj falls inside the moved
+// buffer [old_base, old_base+old_bytes).
+void actionPendingSpriteScriptsRebaseSpriteObj(void* old_base,
+                                               size_t old_bytes,
+                                               void* new_base);
+
 #endif

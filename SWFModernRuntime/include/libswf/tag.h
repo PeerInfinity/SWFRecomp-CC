@@ -299,6 +299,20 @@ void ng_bumpSpriteInitDepth(void);
 void ng_unbumpSpriteInitDepth(void);
 int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap);
 void ng_restoreFromRootDL(DisplayObject* saved_dl, size_t saved_max, size_t saved_cap);
+
+// Sprite display-list reallocation with aliased-pointer rebase (see the
+// ALIASING RULE comment at DisplayObject.sprite_display_list in swf.h).
+// ng_spriteDLRealloc: grow *base_io to new_cap entries, rebase every
+// registered holder of the old buffer (entry pointers and base copies),
+// then FREE the old buffer. ng_ensureDisplayListSize: ENSURE_SIZE-style
+// doubling wrapper for the global display_list (root or a swapped-in
+// sprite list).
+void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
+                        size_t* cap_io, size_t new_cap);
+void ng_ensureDisplayListSize(SWFAppContext* app_context, size_t depth);
+// The ONLY way to free a sprite_display_list buffer: scrubs (NULLs) every
+// registered holder of pointers into it, then FREEs. Raw FREE() strands them.
+void ng_freeSpriteDL(SWFAppContext* app_context, DisplayObject* base, size_t cap);
 void ng_gotoFrameCurrentSprite(u16 frame);
 void ng_record_sprite_self_goto(DisplayObject* obj);
 void ng_apply_pending_sprite_self_gotos(SWFAppContext* app_context);

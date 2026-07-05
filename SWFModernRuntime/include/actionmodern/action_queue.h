@@ -271,3 +271,9 @@ int actionDrainSuppressed(void);
 // Stage 3 collector root helper — iterate queued (fn, user) pairs so the
 // root walk can mark object refs inside heap payloads (see actionGcMarkRoots).
 void actionQueueGcForEach(void (*cb)(void* fn, void* user));
+
+// Sprite display-list realloc rebase (see swf.h ALIASING RULE): repoint
+// queued sprite-script payloads whose captured ctx_sprite_obj falls inside
+// the moved buffer [old_base, old_base+old_bytes).
+void actionQueueRebaseSpriteObjPayloads(void* old_base, size_t old_bytes,
+                                        void* new_base);
