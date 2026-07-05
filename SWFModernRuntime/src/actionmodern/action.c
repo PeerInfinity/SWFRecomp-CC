@@ -23402,6 +23402,52 @@ void actionQueueDynamicChildUnloads(MovieClip* parent_mc)
 	queueChildOnUnloads(parent_mc);
 }
 
+// Dead-slot reclaim for child_mc_cache. Invalidation paths (loop-back rewind,
+// re-attach, removeMovieClip cascade) mark clips depth=INT_MIN but leave them
+// in the cache, so child_mc_count — the high-water bound every per-frame O(N)
+// walk scans to — only ever grows, and a long session ratchets the cache to
+// MAX_CHILD_MOVIECLIPS even with bounded live clips (overflow breaks MC reuse
+// and disables the GC). NULL the dead slots so findOrCreateMovieClip /
+// attachMovie reuse them instead of appending, then trim trailing NULLs to
+// shrink the scan bound. MC structs are deliberately NOT freed (AS variables
+// may still hold dead MOVIECLIP refs, which read as INT_MIN-dead — freeing
+// would dangle them; their dynamic_props were already released via
+// actionDeferDpropsRelease at invalidation time). Call only AFTER
+// actionFinalizePendingRemovals' dead-parent cascade in the per-tick flow —
+// the cascade guarantees no LIVE clip has a dead parent, so NULLing dead
+// slots cannot orphan a live subtree. (Extracted from the browser-WASM
+// inline pass in swf.c; now shared by all build modes.)
+void actionReclaimDeadChildMCSlots(void)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		if (child_mc_cache[i] != NULL && child_mc_cache[i]->depth == INT_MIN)
+			child_mc_cache[i] = NULL;
+	}
+	while (child_mc_count > 0 && child_mc_cache[child_mc_count - 1] == NULL)
+		child_mc_count--;
+}
+
+// Loop-back variant of actionQueueDynamicChildUnloads (tag.c's nested-sprite
+// frame-0 rewind): queue AS-level onUnload only for direct children the caller
+// does NOT preserve across the wrap. skip_child(child, ud) returns nonzero for
+// survivors — their whole subtree stays alive, so neither they nor their
+// descendants fire onUnload. Non-survivors get the full recursive treatment
+// (own handler + queueChildOnUnloads subtree), matching the unfiltered path.
+static void queueOwnOnUnload(MovieClip* child);
+void actionQueueChildUnloadsFiltered(MovieClip* parent_mc,
+	int (*skip_child)(MovieClip*, void*), void* ud)
+{
+	if (parent_mc == NULL) return;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* child = child_mc_cache[i];
+		if (child == NULL || child->depth == INT_MIN) continue;
+		if (child->parent != parent_mc) continue;
+		if (skip_child != NULL && skip_child(child, ud)) continue;
+		queueOwnOnUnload(child);
+		queueChildOnUnloads(child);
+	}
+}
+
 // --- Deferred AS-level onUnload for timeline-removed clips ---
 // Captures (func, mc, swf_depth) at queue time. At drain time, shifts the MC's
 // depth to the removed-depth zone and sets avm1_removed=1 BEFORE invoking, so
@@ -24016,6 +24062,18 @@ void actionQueueClipActionUnloadDeferred(void (*fn)(SWFAppContext*), MovieClip* 
 	                      AQ_KIND_SCRIPT);
 }
 
+// Queue `child`'s own AS-set onUnload handler, if any.
+static void queueOwnOnUnload(MovieClip* child)
+{
+	if (child == NULL || child->dynamic_props == NULL) return;
+	ActionVar* handler = getProperty((ASObject*)child->dynamic_props, "onUnload", 8);
+	if (handler != NULL && handler->type == ACTION_STACK_VALUE_FUNCTION) {
+		ASFunction* func = (ASFunction*) handler->data.numeric_value;
+		if (func != NULL)
+			queueOnUnload(func, child);
+	}
+}
+
 // Recursively queue onUnload handlers for children of a removed MovieClip.
 // When a parent MC is removed, all its children are also removed and their
 // onUnload handlers should fire. Children are NOT marked as removed here
@@ -24029,14 +24087,7 @@ static void queueChildOnUnloads(MovieClip* parent_mc)
 		if (child->parent != parent_mc) continue;
 
 		// Check for onUnload handler on this child
-		if (child->dynamic_props != NULL) {
-			ActionVar* handler = getProperty((ASObject*)child->dynamic_props, "onUnload", 8);
-			if (handler != NULL && handler->type == ACTION_STACK_VALUE_FUNCTION) {
-				ASFunction* func = (ASFunction*) handler->data.numeric_value;
-				if (func != NULL)
-					queueOnUnload(func, child);
-			}
-		}
+		queueOwnOnUnload(child);
 
 		// Recursively process grandchildren
 		queueChildOnUnloads(child);

@@ -958,6 +958,107 @@ static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject
 // Place tags' consume_pending_remove block) and NO_GRAPHICS/OFFSCREEN_RENDER.
 static void clear_display_entry(SWFAppContext* app_context, size_t depth);
 
+// ---------------------------------------------------------------------------
+// LOOPBACK IDENTITY PRESERVATION (nested-sprite natural wrap → frame 0).
+//
+// Flash/Ruffle rewind a looping timeline via run_goto: children that the
+// target frame re-places with the same character at the same depth SURVIVE
+// with their full identity (instance name, cached MovieClip, child display
+// list, playhead, button state), and dynamic-range children (attachMovie /
+// duplicateMovieClip / createEmptyMovieClip, swf_depth >= 16384) always
+// survive — run_goto only considers depth < AVM_DEPTH_BIAS for removal (the
+// root timeline applies the same rule in ng_display_clear_after). Only
+// children absent from the target frame are removed (firing UNLOAD).
+//
+// Survival is decided against the recompiler-emitted per-frame placement
+// table (tagSetSpritePlacements / ng_sprite_frame_placements): an entry at a
+// static depth survives iff frame 0 contains a PlaceObject for that depth
+// whose ratio matches and whose char id matches (id may differ for sprite
+// children — Ruffle's survives_rewind MovieClip rule). No table registered →
+// no static survivors (degrades to the old clear-everything behavior).
+// ---------------------------------------------------------------------------
+static int ng_loopback_entry_survives(const DisplayObject* e, size_t swf_depth,
+                                      const FramePlacement* f0, u16 f0_count)
+{
+	if (e->char_id == 0) return 0;
+	if (swf_depth >= 16384) return 1;  // dynamic-range child: always survives
+	if (e->clone_replaced) return 0;   // AVM1 clones never survive rewind
+	if (e->depth_swapped) return 0;    // conservative: swapped entries re-churn
+	{
+		// A same-frame deferred Remove (UNLOAD handler) logically vacated this
+		// depth — the entry must not be resurrected by preservation.
+		extern int ng_depth_has_pending_finalize(size_t);
+		if (ng_depth_has_pending_finalize(swf_depth)) return 0;
+	}
+	int existing_is_mc = (e->sprite_display_list != NULL);
+	for (u16 k = 0; k < f0_count; k++)
+	{
+		if (f0[k].is_remove) continue;
+		if (f0[k].char_id == 0) continue;  // Modify tag — not an instantiation
+		if (f0[k].depth != (u16)swf_depth) continue;
+		if (f0[k].ratio != e->ratio) continue;
+		if (!existing_is_mc && f0[k].char_id != (u16)e->char_id) continue;
+		return 1;
+	}
+	return 0;
+}
+
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Forward decl — single-entry body of fire_recursive_child_unloads (defined
+// alongside it below); the loop-back path fires it per non-surviving entry.
+static void fire_entry_unloads(SWFAppContext* app_context,
+	DisplayObject* dl, size_t i, MovieClip* parent_mc);
+
+// Skip-callback for actionQueueChildUnloadsFiltered: maps a cached child MC of
+// the wrapping sprite back to its display-list entry and reports whether that
+// entry survives the frame-0 rewind (survivors keep their whole subtree — no
+// AS-level onUnload must fire for them).
+typedef struct {
+	DisplayObject* dl;
+	size_t dl_max;
+	const FramePlacement* f0;
+	u16 f0_count;
+} LoopbackSkipCtx;
+
+static int lb_skip_surviving_child(MovieClip* child, void* ud)
+{
+	LoopbackSkipCtx* c = (LoopbackSkipCtx*)ud;
+	// Primary key: display_obj points at &dl[i].
+	size_t idx = 0;
+	uintptr_t base = (uintptr_t)c->dl;
+	uintptr_t p = (uintptr_t)child->display_obj;
+	if (child->display_obj != NULL && p > base)
+	{
+		size_t off = (size_t)(p - base);
+		if (off % sizeof(DisplayObject) == 0)
+		{
+			size_t i = off / sizeof(DisplayObject);
+			if (i >= 1 && i <= c->dl_max) idx = i;
+		}
+	}
+	// Fallback: AS depth → swf depth index, with a name check so a stale
+	// same-depth entry for a different child doesn't match.
+	if (idx == 0)
+	{
+		long swf_d = (long)child->depth + 16384;
+		if (swf_d >= 1 && (size_t)swf_d <= c->dl_max)
+		{
+			DisplayObject* e = &c->dl[swf_d];
+			if (e->char_id != 0 && e->instance_name != NULL
+			    && strcmp(e->instance_name, child->name) == 0)
+				idx = (size_t)swf_d;
+		}
+	}
+	if (idx == 0)
+	{
+		// Unmappable: dynamically-created MC with no display_obj link (e.g. a
+		// duplicateMovieClip clone). Dynamic children survive the rewind.
+		return child->depth >= 0;
+	}
+	return ng_loopback_entry_survives(&c->dl[idx], idx, c->f0, c->f0_count);
+}
+#endif
+
 // Recurse into a non-advancing sprite's children WITHOUT advancing the parent's
 // own playhead or re-running its frame script. Flash advances a sprite's
 // children regardless of the parent's play state — a stopped or single-frame
@@ -1321,56 +1422,87 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		max_depth = obj->sprite_max_depth;
 		display_list_capacity = obj->sprite_dl_capacity;
 
-		// When looping back to frame 0, reset the display list (Flash behavior)
+		// When looping back to frame 0, rewind the display list. NOT a full
+		// clear: entries frame 0 re-places (same char/depth/ratio) and
+		// dynamic-range children survive with their identity — see
+		// ng_loopback_entry_survives above. Previously this path cleared and
+		// re-placed EVERYTHING each wrap, minting fresh auto-instance names +
+		// fresh cached MovieClips + fresh 64-entry child display lists every
+		// loop iteration (~4/tick on Minesweeper's menu, forever): unbounded
+		// child_mc_cache growth → cache overflow → uncacheable-MC minting per
+		// lookup → arena OOM on long sessions. It also reset button state and
+		// restarted child playheads every wrap, diverging from Flash/Ruffle.
+		int lb_wrapped = 0;
 		if (frame == 0 && max_depth > 0)
 		{
+			lb_wrapped = 1;
+			u16 lb_f0_count = 0;
+			const FramePlacement* lb_f0 =
+				ng_sprite_frame_placements((u16)obj->char_id, 0, &lb_f0_count);
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Flash rewinds a looping sprite to frame 0 via run_goto, which
 			// removes every object not present in frame 0 and fires their
-			// UNLOAD events. The old code freed the child entries silently —
-			// children placed on inner frames (mc11/mc12/mc21 in
-			// action_execution_order_test12) never got onUnload. Queue the
-			// clip-action UNLOADs + AS-level onUnload handlers here, then let
-			// the free loop below clear the slots. AS-level handlers are
-			// queued FIRST (before fire_recursive_child_unloads invalidates
-			// the cached MCs — invalidation sets depth=INT_MIN, which would
-			// make queueChildOnUnloads skip them).
+			// UNLOAD events. Queue the clip-action UNLOADs + AS-level onUnload
+			// handlers for NON-SURVIVORS here, then let the free loop below
+			// clear their slots (survivors fire nothing — their subtree stays
+			// alive). AS-level handlers are queued FIRST (before
+			// fire_entry_unloads invalidates the cached MCs — invalidation
+			// sets depth=INT_MIN, which would make queueChildOnUnloads skip
+			// them). Inner-frame children (mc11/mc12/mc21 in
+			// action_execution_order_test12) are never in frame 0's placement
+			// table, so they keep firing onUnload each wrap as before.
 			if (!catch_up_mode && obj->instance_name != NULL)
 			{
 				extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+				extern void actionQueueChildUnloadsFiltered(MovieClip*,
+					int (*)(MovieClip*, void*), void*);
 				MovieClip* _lb_mc = actionFindMovieClipByName(obj->instance_name);
+				LoopbackSkipCtx _lb_ctx = { display_list, max_depth, lb_f0, lb_f0_count };
 				if (_lb_mc != NULL)
-					actionQueueDynamicChildUnloads(_lb_mc);
-				fire_recursive_child_unloads(app_context, display_list, max_depth,
-					_lb_mc != NULL ? _lb_mc : &root_movieclip);
+					actionQueueChildUnloadsFiltered(_lb_mc, lb_skip_surviving_child, &_lb_ctx);
+				for (size_t j = 1; j <= max_depth; ++j)
+				{
+					if (display_list[j].char_id == 0) continue;
+					if (ng_loopback_entry_survives(&display_list[j], j, lb_f0, lb_f0_count))
+						continue;
+					fire_entry_unloads(app_context, display_list, j,
+						_lb_mc != NULL ? _lb_mc : &root_movieclip);
+				}
 			}
 #endif
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
 			// Browser-WASM: the NO_GRAPHICS/OFFSCREEN path above invalidates the
-			// cached child MovieClips for these soon-to-be-freed entries via
-			// fire_recursive_child_unloads; mirror just the invalidation here.
-			// Without it, a looping nested/attached sprite re-places its children
-			// with fresh auto-instance numbers each loop while the OLD materialized
-			// MCs ("instanceN") linger in child_mc_cache — the parent (this sprite)
-			// is still alive, so actionFinalizePendingRemovals' dead-parent cascade
-			// never reaches them. They accumulate every loop, ratcheting live-clip
-			// count + per-frame scan/render cost until the game freezes (Metanet
-			// "N"'s title-demo / gameplay particle + drone clips). invalidate_mc_
-			// for_dl_entry marks each matched MC (and its descendants, by parent
-			// walk) depth=INT_MIN. Gated on !catch_up_mode to match the NO_GRAPHICS
-			// unload path — a rebuild-in-progress must not tear down children it is
-			// about to re-materialize this same pass.
+			// cached child MovieClips for the soon-to-be-freed entries via
+			// fire_entry_unloads; mirror just the invalidation here (survivors
+			// keep their MCs — that IS the churn fix: the same "instanceN" MC is
+			// reused every loop instead of a fresh one lingering per wrap, which
+			// used to ratchet live-clip count + per-frame scan/render cost until
+			// the game froze — Metanet "N"'s title-demo / gameplay particle +
+			// drone clips). invalidate_mc_for_dl_entry marks each matched MC
+			// (and its descendants, by parent walk) depth=INT_MIN. Gated on
+			// !catch_up_mode to match the NO_GRAPHICS unload path — a
+			// rebuild-in-progress must not tear down children it is about to
+			// re-materialize this same pass.
 			if (!catch_up_mode)
 			{
 				for (size_t j = 1; j <= max_depth; ++j)
 				{
-					if (display_list[j].char_id != 0)
-						invalidate_mc_for_dl_entry(app_context, &display_list[j]);
+					if (display_list[j].char_id == 0) continue;
+					if (ng_loopback_entry_survives(&display_list[j], j, lb_f0, lb_f0_count))
+						continue;
+					invalidate_mc_for_dl_entry(app_context, &display_list[j]);
 				}
 			}
 #endif
+			size_t lb_new_max = 0;
 			for (size_t j = 1; j <= max_depth; ++j)
 			{
+				if (display_list[j].char_id != 0
+				    && ng_loopback_entry_survives(&display_list[j], j, lb_f0, lb_f0_count))
+				{
+					lb_new_max = j;
+					continue;
+				}
 				if (display_list[j].sprite_display_list != NULL)
 				{
 					ng_freeSpriteDL(app_context, display_list[j].sprite_display_list,
@@ -1379,7 +1511,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 				}
 				display_list[j].char_id = 0;
 			}
-			max_depth = 0;
+			max_depth = lb_new_max;
 		}
 
 		// Sync 1-indexed _currentframe on the sprite's MC so scripts running
@@ -1392,11 +1524,24 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			if (smc) smc->currentframe = (int)frame + 1;
 		}
 
-		// Execute current frame function
+		// Execute current frame function. On a natural wrap replay of frame 0,
+		// raise g_loopback_replay so tagPlaceObject2's survives_rewind branch
+		// treats same-char re-places of preserved entries as modifies (matrix/
+		// cxform update gated on transformed_by_script, no re-instantiation) —
+		// mirroring the root timeline's natural-wrap replay semantics.
 		if (frame < ch->sprite_frame_count && ch->sprite_frame_funcs[frame] != NULL)
 		{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			extern int g_loopback_replay;
+			int _lb_saved_replay = g_loopback_replay;
+			if (lb_wrapped) g_loopback_replay = 1;
+#endif
 			CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[frame]);
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			g_loopback_replay = _lb_saved_replay;
+#endif
 		}
+		(void)lb_wrapped;
 
 		// Mark eligible for AS2 onEnterFrame dispatch (sprite actually advanced)
 		obj->enterframe_eligible = 1;
@@ -9626,46 +9771,53 @@ static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject
 // recursing into nested sprites before firing the child's own unload.
 // Also invalidates child MCs so they don't fire onEnterFrame after parent removal.
 static void fire_recursive_child_unloads(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc);
+
+static void fire_entry_unloads(SWFAppContext* app_context,
+	DisplayObject* dl, size_t i, MovieClip* parent_mc)
+{
+	DisplayObject* obj = &dl[i];
+	if (obj->char_id == 0) return;
+
+	// Recurse into nested sprite's children first (even if this obj has no clip actions)
+	if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+	{
+		MovieClip* child_mc = NULL;
+		if (obj->instance_name != NULL)
+			child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+		fire_recursive_child_unloads(app_context,
+			obj->sprite_display_list, obj->sprite_max_depth,
+			child_mc ? child_mc : parent_mc);
+	}
+
+	// Queue this child's CLIP_EVENT_UNLOAD (deferred — fires at next ShowFrame
+	// drain in actionFirePendingUnloads, alongside AS-level onUnload handlers).
+	// Resolves the MC at queue time so g_current_context can be restored at
+	// dispatch time.
+	if (obj->clip_action_count > 0)
+	{
+		MovieClip* child_mc = NULL;
+		if (obj->instance_name != NULL)
+			child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+		for (size_t a = 0; a < obj->clip_action_count; a++)
+		{
+			if (obj->clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+				actionQueueClipActionUnload(obj->clip_actions[a].action, child_mc);
+		}
+	}
+
+	// Invalidate child MC so it won't fire onEnterFrame after parent removal.
+	// The parent's sprite_display_list will be freed by clear_display_entry,
+	// making child MC's display_obj a dangling pointer.
+	if (obj->instance_name != NULL)
+		actionInvalidateCachedMovieClip(app_context, obj->instance_name, (int)i);
+}
+
+static void fire_recursive_child_unloads(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
 	for (size_t i = 1; i <= dl_max; i++)
-	{
-		DisplayObject* obj = &dl[i];
-		if (obj->char_id == 0) continue;
-
-		// Recurse into nested sprite's children first (even if this obj has no clip actions)
-		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
-		{
-			MovieClip* child_mc = NULL;
-			if (obj->instance_name != NULL)
-				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-			fire_recursive_child_unloads(app_context,
-				obj->sprite_display_list, obj->sprite_max_depth,
-				child_mc ? child_mc : parent_mc);
-		}
-
-		// Queue this child's CLIP_EVENT_UNLOAD (deferred — fires at next ShowFrame
-		// drain in actionFirePendingUnloads, alongside AS-level onUnload handlers).
-		// Resolves the MC at queue time so g_current_context can be restored at
-		// dispatch time.
-		if (obj->clip_action_count > 0)
-		{
-			MovieClip* child_mc = NULL;
-			if (obj->instance_name != NULL)
-				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-			for (size_t a = 0; a < obj->clip_action_count; a++)
-			{
-				if (obj->clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-					actionQueueClipActionUnload(obj->clip_actions[a].action, child_mc);
-			}
-		}
-
-		// Invalidate child MC so it won't fire onEnterFrame after parent removal.
-		// The parent's sprite_display_list will be freed by clear_display_entry,
-		// making child MC's display_obj a dangling pointer.
-		if (obj->instance_name != NULL)
-			actionInvalidateCachedMovieClip(app_context, obj->instance_name, (int)i);
-	}
+		fire_entry_unloads(app_context, dl, i, parent_mc);
 }
 
 void tagRemoveObject(SWFAppContext* app_context, size_t depth)
@@ -10090,7 +10242,9 @@ int ng_findSpriteLabelFrame(size_t char_id, const char* label)
 }
 
 // Per-sprite per-frame placement table storage (for survives_rewind).
-#define MAX_SPRITE_PLACEMENT_ENTRIES 256
+// 1024: real games exceed 256 sprites (the loop-back survives_rewind check
+// degrades to clear-everything churn for any sprite past the cap).
+#define MAX_SPRITE_PLACEMENT_ENTRIES 1024
 static struct {
 	u16 sprite_id;
 	FramePlacement* placements;

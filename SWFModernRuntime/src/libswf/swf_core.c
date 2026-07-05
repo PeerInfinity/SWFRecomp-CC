@@ -1010,6 +1010,17 @@ void swfStart(SWFAppContext* app_context)
 		// They persisted for one frame (scripts could still access them); now invalidate.
 		actionFinalizePendingRemovals(app_context);
 
+		// Reclaim dead child_mc_cache slots so long sessions can't ratchet the
+		// cache to MAX_CHILD_MOVIECLIPS (overflow breaks MC reuse and disables
+		// the GC). Must run after the finalize cascade above — see the comment
+		// on actionReclaimDeadChildMCSlots. (Browser-WASM swf.c has run this
+		// pass per tick since the Metanet "N" instanceN-leak fix; CI modes
+		// lacked it.)
+		{
+			extern void actionReclaimDeadChildMCSlots(void);
+			actionReclaimDeadChildMCSlots();
+		}
+
 		// Promote pending MCL loads queued during the previous tick into the
 		// "fire this tick" bucket, so events drain AFTER the loader's
 		// next-frame DoAction has run (matches Flash semantics — see
