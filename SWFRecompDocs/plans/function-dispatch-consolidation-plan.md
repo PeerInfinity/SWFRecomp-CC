@@ -1,7 +1,10 @@
 # Function-Dispatch Consolidation — Plan
 
 **Created:** July 4, 2026
-**Status:** Stage 0 COMPLETE (July 4, 2026) — see §4 Stage 0 results. Stages 1–5 not started.
+**Status:** Stage 0 COMPLETE (July 4, 2026) — see §4 Stage 0 results.
+Stage 1 COMPLETE (July 8, 2026) — `invokeFunctionValue()` core + `InvokeOpts`
+flags added and `invokeResolveFunction` wired to it (behavior-preserving); see the
+Stage 1 landing note in §4. Stages 2–5 not started.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
 lines) + `timer.c` performed July 4, 2026; figures below are from that survey.
@@ -197,6 +200,30 @@ ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* func,
 - Unit-level validation: temporarily wire ONE low-risk site (e.g.
   `invokeResolveFunction`) and run full CI both modes before any further
   migration.
+
+#### Stage 1 landing note (July 8, 2026)
+
+`invokeFunctionValue(app_context, func, this_var, args, num_args, opts)` added to
+`action.c` — forward-declared beside the accessor family (`invokePropertyGetter`),
+defined after the version-switch primitives (where `switchToFunctionVersion` /
+`pushSuperContext` / `allocObject` / `pushVar` are in scope). It performs the
+whole ritual gated by `InvokeOpts.flags`:
+`INV_DEPTH_GUARD / THIS_STACK / SUPER_CTX / CAPTURED_SCOPE / LOCAL_SCOPE /
+BIND_THIS / BASE_CLIP / VERSION_SWITCH / EVENT_THIS_MC / EXEC_FUNC`, plus two
+opt-in legacy-quirk flags (`INV_FORCE_CAPTURED_WITH`, `INV_MC_THIS_NULL_PTR`).
+It holds the **single** type-1 cast, the **single** forward-order + pad-to-
+`param_count` type-1 marshalling loop, the type-2 register setup, and symmetric
+teardown. `opts==NULL` defaults to the "everything reasonable on" superset.
+
+First (and only, this stage) migrated site: `invokeResolveFunction`, now a thin
+adapter passing `INV_DEPTH_GUARD | INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+INV_LOCAL_SCOPE | INV_BIND_THIS | INV_BASE_CLIP`. The core normalizes two inert
+details vs. the old hand-rolled body (captured-before-local scope order; type-1
+arg pad to `param_count`) — neither can affect a `__resolve` body, whose local
+scope only ever holds `"this"` and whose one declared param is the name string.
+Local: `object_resolve`, `resolve_different_root`, `coerce_to_primitive_resolve`
+pass in NO_GRAPHICS; `object_resolve` passes in `--mode=graphics`. Both-mode CI
+run: see commit trailer.
 
 ### Stage 2 — migrate the accessor family
 

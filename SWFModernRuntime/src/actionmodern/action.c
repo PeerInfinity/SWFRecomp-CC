@@ -8120,6 +8120,48 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 	return result;
 }
 
+// ---------------------------------------------------------------------------
+// Unified function-invocation core (Function-Dispatch Consolidation plan, Stage 1).
+//
+// One place that performs the ~11-step invocation ritual (depth guard, this-stack
+// push, super context, captured/local scope setup, base_clip/version switch,
+// event-this-mc, forward-order + pad type-1 marshalling, the single type-1 cast,
+// type-2 register setup, and symmetric teardown). Each of ~38 hand-rolled
+// dispatchers currently performs a different subset of these steps; that variance
+// is the structural cause of a four-times-shipped arg-marshalling bug class.
+//
+// Migration is behavior-preserving: a caller passes the flag subset that mirrors
+// its current ritual. Turning a skipped step on ("normalization") is a separate,
+// per-site, CI-gated decision — see the plan's Stage 4. Stage 1 wires exactly one
+// low-risk site (invokeResolveFunction) to shake the core out against full CI.
+#define INV_DEPTH_GUARD          0x0001u  // g_call_depth++ guard at entry (accessor style)
+#define INV_THIS_STACK           0x0002u  // push this_var onto g_this_stack for the call
+#define INV_SUPER_CTX            0x0004u  // pushSuperContext(this_ptr, opts->super_depth)
+#define INV_CAPTURED_SCOPE       0x0008u  // restore func's captured scope chain
+#define INV_LOCAL_SCOPE          0x0010u  // alloc + push a fresh local scope frame
+#define INV_BIND_THIS            0x0020u  // bind "this" on the local scope (needs INV_LOCAL_SCOPE)
+#define INV_BASE_CLIP            0x0040u  // SWF6+: switch g_current_context to func->base_clip
+#define INV_VERSION_SWITCH       0x0080u  // switch/restore per-function SWF version + _global group
+#define INV_EVENT_THIS_MC        0x0100u  // set g_event_this_mc when the receiver is a MovieClip
+#define INV_EXEC_FUNC            0x0200u  // save/restore g_current_executing_func / g_prev_executing_func
+#define INV_FORCE_CAPTURED_WITH  0x0400u  // force is_with=1 on captured scopes (legacy resolve/EI quirk)
+#define INV_MC_THIS_NULL_PTR     0x0800u  // pass NULL (not this_ptr) to advanced_func so preload_this uses g_event_this_mc
+
+typedef struct InvokeOpts {
+	u16 flags;
+	u16 super_depth;   // super chain depth, applied when INV_SUPER_CTX is set
+} InvokeOpts;
+
+// Invoke `func` with `this_var` as the receiver and `args`/`num_args` as the
+// arguments, performing the ritual steps selected by `opts->flags`. Returns the
+// function's return value (undefined for type-1 functions that return nothing,
+// or when func is NULL / execution is halted / the depth guard trips). Defined
+// after the version-switch primitives; declared here so the accessor family can
+// delegate to it.
+static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* func,
+                                     ActionVar* this_var, ActionVar* args, u32 num_args,
+                                     const InvokeOpts* opts);
+
 // Invoke an addProperty getter with a specific this_obj
 static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* func, void* this_obj)
 {
@@ -8423,6 +8465,16 @@ static ASFunction* findResolveMethod(SWFAppContext* app_context, ASObject* obj)
 
 // Invoke a __resolve function with one string argument (the property name).
 // Returns the resolve function's return value, or undefined if invocation fails.
+//
+// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+// Consolidation, Stage 1). Behavior-preserving: the flag subset reproduces this
+// site's historical ritual — depth guard, captured scopes kept as WITH scopes
+// (a long-standing quirk here), a local scope binding "this", and the SWF6+
+// base_clip switch; no this-stack push, super context, version switch, or
+// event-this-mc were ever done on the __resolve path. The core normalizes two
+// inert details (captured-before-local scope order; type-1 arg padding to
+// param_count) that cannot affect a __resolve body, whose local scope only ever
+// holds "this" and whose one declared param is the name string.
 static ActionVar invokeResolveFunction(SWFAppContext* app_context, ASFunction* func, void* this_obj,
                                         const char* prop_name, u32 prop_name_len)
 {
@@ -8430,111 +8482,27 @@ static ActionVar invokeResolveFunction(SWFAppContext* app_context, ASFunction* f
 	undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (func == NULL || g_execution_halted) return undef;
 
-	g_call_depth++;
-	if (g_call_depth > g_max_call_depth)
-	{
-		g_execution_halted = 1;
-		g_call_depth--;
-		return undef;
-	}
+	// Property name as a UTF-16 STRING ActionVar — one representation for both
+	// branches: the type-2 arm receives it in the args array, the type-1 arm
+	// marshals it via pushVar (emitting the same UTF-16 push the old PUSH_STR
+	// path did). owns_memory stays 0, so pushVar reads the pointer from
+	// numeric_value (matching the historical type-2 name_arg construction).
+	ActionVar name_arg = {0};
+	u32 u16_len = 0;
+	uint16_t* u16_str = utf8_to_u16(app_context, prop_name, prop_name_len, &u16_len);
+	name_arg.type = ACTION_STACK_VALUE_STRING;
+	name_arg.str_size = u16_len;
+	name_arg.data.numeric_value = (u64)(uintptr_t)u16_str;
 
-	ActionVar result;
-	if (func->function_type == 2 && func->advanced_func != NULL)
-	{
-		// Type 2 (DefineFunction2): pass args array directly
-		ActionVar name_arg = {0};
-		u32 u16_len = 0;
-		uint16_t* u16_str = utf8_to_u16(app_context, prop_name, prop_name_len, &u16_len);
-		name_arg.type = ACTION_STACK_VALUE_STRING;
-		name_arg.str_size = u16_len;
-		name_arg.data.numeric_value = (u64)(uintptr_t)u16_str;
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
 
-		ActionVar* registers = NULL;
-		if (func->register_count > 0)
-			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-
-		// Push local scope
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		// Restore captured WITH scopes if any
-		u32 captured_count = func->captured_scope_count;
-		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
-		{
-			scope_is_with[scope_depth] = 1;
-			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
-			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
-		}
-
-		// Switch base_clip context if SWF6+
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		result = func->advanced_func(app_context, &name_arg, 1, registers, this_obj);
-
-		g_current_context = saved_context;
-		// Pop captured scopes + local scope
-		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
-			scope_depth--;
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (registers != NULL) FREE(registers);
-	}
-	else if (func->function_type == 1 && func->simple_func != NULL)
-	{
-		// Type 1 (DefineFunction): push args onto stack, set "this"
-		PUSH_STR(prop_name, prop_name_len);  // Push property name as string arg
-
-		// Push local scope
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		// Restore captured WITH scopes
-		u32 captured_count = func->captured_scope_count;
-		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
-		{
-			scope_is_with[scope_depth] = 1;
-			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
-			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
-		}
-
-		// Switch base_clip context if SWF6+
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		// Set "this"
-		ActionVar this_var = {0};
-		this_var.type = ACTION_STACK_VALUE_OBJECT;
-		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
-		setVariableByName("this", &this_var);
-
-		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-
-		g_current_context = saved_context;
-		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
-			scope_depth--;
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-	}
-	else
-	{
-		result = undef;
-	}
-
-	g_call_depth--;
-	return result;
+	InvokeOpts opts = { .flags = (u16)(INV_DEPTH_GUARD | INV_CAPTURED_SCOPE |
+	                                   INV_FORCE_CAPTURED_WITH | INV_LOCAL_SCOPE |
+	                                   INV_BIND_THIS | INV_BASE_CLIP),
+	                    .super_depth = 0 };
+	return invokeFunctionValue(app_context, func, &this_var, &name_arg, 1, &opts);
 }
 
 // Invoke an addProperty setter with a specific this_obj and value argument
@@ -15618,6 +15586,179 @@ void actionSwitchToFunctionVersion(ASFunction* func, int* saved_ver, ASObject** 
 void actionRestoreFunctionVersion(int saved_ver, ASObject* saved_global, int saved_movie_idx)
 {
 	restoreFunctionVersion(saved_ver, saved_global, saved_movie_idx);
+}
+
+// Unified function-invocation core — see the forward declaration + flag docs near
+// invokePropertyGetter. Defined here so switchToFunctionVersion / pushSuperContext
+// / allocObject / setProperty / pushVar are all in scope.
+static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* func,
+                                     ActionVar* this_var, ActionVar* args, u32 num_args,
+                                     const InvokeOpts* opts)
+{
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (func == NULL || g_execution_halted) return undef;
+
+	// Default (opts==NULL): the "everything reasonable on" superset, minus the
+	// two opt-in quirks (forced-with, MC-null-ptr). Explicit callers pass a
+	// reduced subset mirroring their current behavior.
+	u16 flags = opts ? opts->flags
+	                 : (u16)(INV_DEPTH_GUARD | INV_THIS_STACK | INV_SUPER_CTX |
+	                         INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BIND_THIS |
+	                         INV_BASE_CLIP | INV_VERSION_SWITCH | INV_EVENT_THIS_MC |
+	                         INV_EXEC_FUNC);
+
+	if (flags & INV_DEPTH_GUARD)
+	{
+		g_call_depth++;
+		if (g_call_depth > g_max_call_depth)
+		{
+			g_call_depth--;
+			g_execution_halted = 1;
+			return undef;
+		}
+	}
+
+	// Receiver pointer + MC-ness derived from the this_var tag.
+	int this_is_mc = (this_var != NULL && this_var->type == ACTION_STACK_VALUE_MOVIECLIP);
+	void* this_ptr = (this_var != NULL &&
+	                  (this_var->type == ACTION_STACK_VALUE_OBJECT ||
+	                   this_var->type == ACTION_STACK_VALUE_MOVIECLIP ||
+	                   this_var->type == ACTION_STACK_VALUE_ARRAY ||
+	                   this_var->type == ACTION_STACK_VALUE_FUNCTION))
+	                     ? (void*)(uintptr_t)this_var->data.numeric_value : NULL;
+
+	u32 saved_this_depth = g_this_depth;
+	if ((flags & INV_THIS_STACK) && this_var != NULL && g_this_depth < MAX_THIS_DEPTH)
+	{
+		g_this_stack[g_this_depth] = *this_var;
+		g_this_depth++;
+	}
+
+	if (flags & INV_SUPER_CTX)
+		pushSuperContext(this_ptr, opts ? (u8)opts->super_depth : 0);
+
+	MovieClip* saved_event_this = g_event_this_mc;
+	if ((flags & INV_EVENT_THIS_MC) && this_is_mc)
+		g_event_this_mc = (MovieClip*)this_ptr;
+
+	int _iv_saved_ver = 0; ASObject* _iv_saved_global = NULL; int _iv_saved_midx = 0;
+	if (flags & INV_VERSION_SWITCH)
+		switchToFunctionVersion(func, &_iv_saved_ver, &_iv_saved_global, &_iv_saved_midx);
+
+	ASFunction* prev_exec = g_current_executing_func;
+	if (flags & INV_EXEC_FUNC)
+	{
+		g_prev_executing_func = prev_exec;
+		g_current_executing_func = func;
+	}
+
+	ActionVar result = undef;
+	u8 captured_count = (flags & INV_CAPTURED_SCOPE) ? func->captured_scope_count : 0;
+
+	if (func->function_type == 2 && func->advanced_func != NULL)
+	{
+		ActionVar* registers = NULL;
+		if (func->register_count > 0)
+			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		for (u8 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
+		{
+			scope_is_with[scope_depth] = (flags & INV_FORCE_CAPTURED_WITH) ? 1 : func->captured_scope_is_with[ci];
+			scope_mc[scope_depth] = func->captured_scope_mc[ci];
+			scope_chain[scope_depth++] = func->captured_scope[ci];
+		}
+
+		ASObject* local_scope = NULL;
+		int pushed_local = 0;
+		if (flags & INV_LOCAL_SCOPE)
+		{
+			local_scope = allocObject(app_context, 8);
+			if ((flags & INV_BIND_THIS) && this_var != NULL)
+				setProperty(app_context, local_scope, "this", 4, this_var);
+			if (scope_depth < MAX_SCOPE_DEPTH)
+			{
+				scope_is_with[scope_depth] = 0;
+				scope_mc[scope_depth] = this_is_mc ? (MovieClip*)this_ptr : NULL;
+				scope_chain[scope_depth++] = local_scope;
+				pushed_local = 1;
+			}
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if ((flags & INV_BASE_CLIP) && g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		void* pass_this = ((flags & INV_MC_THIS_NULL_PTR) && this_is_mc) ? NULL : this_ptr;
+		result = func->advanced_func(app_context, args, num_args, registers, pass_this);
+
+		g_current_context = saved_context;
+		if (pushed_local && scope_depth > 0) scope_depth--;
+		for (u8 ci = 0; ci < captured_count && scope_depth > 0; ci++) scope_depth--;
+		if (local_scope != NULL) releaseObject(app_context, local_scope);
+		if (registers != NULL) FREE(registers);
+	}
+	else if (func->function_type == 1 && func->simple_func != NULL)
+	{
+		for (u8 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
+		{
+			scope_is_with[scope_depth] = (flags & INV_FORCE_CAPTURED_WITH) ? 1 : func->captured_scope_is_with[ci];
+			scope_mc[scope_depth] = func->captured_scope_mc[ci];
+			scope_chain[scope_depth++] = func->captured_scope[ci];
+		}
+
+		ASObject* local_scope = NULL;
+		int pushed_local = 0;
+		if (flags & INV_LOCAL_SCOPE)
+		{
+			local_scope = allocObject(app_context, 8);
+			if ((flags & INV_BIND_THIS) && this_var != NULL)
+				setProperty(app_context, local_scope, "this", 4, this_var);
+			if (scope_depth < MAX_SCOPE_DEPTH)
+			{
+				scope_is_with[scope_depth] = 0;
+				scope_mc[scope_depth] = this_is_mc ? (MovieClip*)this_ptr : NULL;
+				scope_chain[scope_depth++] = local_scope;
+				pushed_local = 1;
+			}
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if ((flags & INV_BASE_CLIP) && g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		// Type-1 marshalling: the DefineFunction prologue pops EXACTLY param_count
+		// values (last declared param from the top of stack). Push exactly that
+		// many, forward order (args[0] deepest), real args where present and
+		// undefined for the rest — clamping extras and padding shortfalls. This is
+		// the single canonical copy of the TYPE1_ARG_ORDER + pad fix that was
+		// hand-duplicated across ~32 sites.
+		u32 pc = func->param_count;
+		for (u32 pi = 0; pi < pc; pi++)
+		{
+			if (pi < num_args)
+				pushVar(app_context, &args[pi]);
+			else
+			{
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			}
+		}
+
+		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+
+		g_current_context = saved_context;
+		if (pushed_local && scope_depth > 0) scope_depth--;
+		for (u8 ci = 0; ci < captured_count && scope_depth > 0; ci++) scope_depth--;
+		if (local_scope != NULL) releaseObject(app_context, local_scope);
+	}
+
+	if (flags & INV_EXEC_FUNC) g_current_executing_func = prev_exec;
+	if (flags & INV_VERSION_SWITCH) restoreFunctionVersion(_iv_saved_ver, _iv_saved_global, _iv_saved_midx);
+	if (flags & INV_EVENT_THIS_MC) g_event_this_mc = saved_event_this;
+	if (flags & INV_SUPER_CTX) popSuperContext();
+	g_this_depth = saved_this_depth;
+	if (flags & INV_DEPTH_GUARD) g_call_depth--;
+	return result;
 }
 
 // MovieClip constructor function (for MovieClip.prototype access)
