@@ -8146,6 +8146,8 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 #define INV_EXEC_FUNC            0x0200u  // save/restore g_current_executing_func / g_prev_executing_func
 #define INV_FORCE_CAPTURED_WITH  0x0400u  // force is_with=1 on captured scopes (legacy resolve/EI quirk)
 #define INV_MC_THIS_NULL_PTR     0x0800u  // pass NULL (not this_ptr) to advanced_func so preload_this uses g_event_this_mc
+#define INV_LOCAL_SCOPE_MC       0x1000u  // associate the receiver MC with the local scope frame (scope_mc)
+#define INV_RESET_THIS_DEPTH     0x2000u  // zero g_this_depth for the call (accessor-setter isolation)
 
 typedef struct InvokeOpts {
 	u16 flags;
@@ -8169,137 +8171,38 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 	undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (func == NULL || g_execution_halted) return undef;
 
-	// An accessor invocation is a function call: it counts toward Flash's
-	// ScriptLimits recursion bound, and blowing it kills the whole script
-	// (silently), exactly like runaway user-function recursion. This is the
-	// backstop for accessor recursion the per-entry counters never bound
-	// (e.g. a getter that delete+re-addProperty's itself each pass gets a
-	// fresh counter every cycle — virtual_property_recursion_scope o6).
-	g_call_depth++;
-	if (g_call_depth > g_max_call_depth)
-	{
-		g_call_depth--;
-		g_execution_halted = 1;
-		return undef;
-	}
-
 	// Build the "this" var passed to getter: receiver object as ActionVar.
-	// Pushed onto g_this_stack so getVariable("this") inside the getter body
-	// returns the receiver (matches Ruffle's [Getter] execution: this = receiver).
+	// INV_THIS_STACK pushes it on g_this_stack so getVariable("this") inside the
+	// getter body returns the receiver (matches Ruffle's [Getter] execution:
+	// this = receiver); INV_BIND_THIS also binds it by name on the local scope so
+	// type-1 bodies like `function () { return this.x; }` resolve through the
+	// scope chain.
 	ActionVar this_var = {0};
 	this_var.type = ACTION_STACK_VALUE_OBJECT;
 	this_var.data.numeric_value = (u64) this_obj;
-	u32 saved_this_depth = g_this_depth;
-	if (g_this_depth < MAX_THIS_DEPTH)
-	{
-		g_this_stack[g_this_depth] = this_var;
-		g_this_depth++;
-	}
 
-	ActionVar result;
-	if (func->function_type == 2)
-	{
-		ActionVar* registers = NULL;
-		if (func->register_count > 0)
-			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+	// INV_DEPTH_GUARD: an accessor invocation is a function call — it counts
+	// toward Flash's ScriptLimits recursion bound, and blowing it kills the whole
+	// script (silently), exactly like runaway user-function recursion. This is the
+	// backstop for accessor recursion the per-entry counters never bound (e.g. a
+	// getter that delete+re-addProperty's itself each pass gets a fresh counter
+	// every cycle — virtual_property_recursion_scope o6).
+	//
+	// No local-scope MC association, super context, version switch, event-this-mc
+	// or exec-func tracking: none were ever done on the getter path.
+	InvokeOpts opts = { .flags = (u16)(INV_DEPTH_GUARD | INV_THIS_STACK |
+	                                   INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+	                                   INV_BIND_THIS | INV_BASE_CLIP),
+	                    .super_depth = 0 };
 
-		// Restore captured scopes (closure context)
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH)
-			{
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		// Bind "this" by name on the local scope so getVariableByName("this")
-		// resolves to the receiver inside the getter body (matches the
-		// actionCallFunction type-2 setup).
-		setProperty(app_context, local_scope, "this", 4, &this_var);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		// Switch base_clip context for SWF6+
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		result = func->advanced_func(app_context, NULL, 0, registers, this_obj);
-
-		g_current_context = saved_context;
-		// Pop local scope + captured scopes
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-		{
-			if (scope_depth > 0) scope_depth--;
-		}
-		releaseObject(app_context, local_scope);
-		if (registers != NULL) FREE(registers);
-	}
-	else
-	{
-		// Restore captured scopes for type-1 functions too
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH)
-			{
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		// Push a local scope and bind "this" — type-1 getter bodies that
-		// reference "this" by name (e.g. `function () { return this.x; }`)
-		// resolve through the scope chain.
-		ASObject* local_scope = allocObject(app_context, 8);
-		setProperty(app_context, local_scope, "this", 4, &this_var);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		// A virtual-property getter receives NO arguments in Flash
-		// (p1=p2=undefined; verified by the SWF7 variant of
-		// virtual_property_special_recursion, whose getter traces
-		// "undefined,undefined"). The type-1 prologue pops EXACTLY
-		// param_count values, so push that many undefineds first; otherwise
-		// the prologue pops stale eval-stack slots belonging to the caller's
-		// in-progress expression (e.g. it swallowed the "Done: " literal of
-		// `trace("Done: " + obj.prop)`, corrupting the trace).
-		// (TYPE1_ARG_ORDER: forward order, args[0] deepest.)
-		for (u32 pi = 0; pi < func->param_count; pi++)
-		{
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-		}
-
-		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-		{
-			if (scope_depth > 0) scope_depth--;
-		}
-		releaseObject(app_context, local_scope);
-	}
-
-	g_this_depth = saved_this_depth;
-	g_call_depth--;
-	return result;
+	// A virtual-property getter receives NO arguments in Flash (p1=p2=undefined;
+	// verified by the SWF7 variant of virtual_property_special_recursion, whose
+	// getter traces "undefined,undefined"). Passing num_args=0 makes the core's
+	// type-1 loop push exactly param_count undefineds — which is precisely what
+	// the prologue pops. Without that padding the prologue would pop stale
+	// eval-stack slots belonging to the caller's in-progress expression (e.g. it
+	// swallowed the "Done: " literal of `trace("Done: " + obj.prop)`).
+	return invokeFunctionValue(app_context, func, &this_var, NULL, 0, &opts);
 }
 
 // Find __resolve method by walking prototype chain (raw lookup, no addProperty getters).
@@ -8510,22 +8413,14 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 {
 	if (func == NULL || g_execution_halted) return;
 
-	// See invokePropertyGetter: accessor calls count toward the ScriptLimits
-	// recursion bound; exceeding it halts the script like Flash.
-	g_call_depth++;
-	if (g_call_depth > g_max_call_depth)
-	{
-		g_call_depth--;
-		g_execution_halted = 1;
-		return;
-	}
-
-	// Build the "this" var bound to the setter via its local scope (below).
+	// Build the "this" var bound to the setter via its local scope (INV_BIND_THIS).
 	// When this_obj is NULL but g_event_this_mc is set (the MC-setter dispatch
 	// pattern used by SetVariable/SetMember on MovieClip receivers and by
 	// actionReplayConstructParams), the receiver is the MovieClip — emit a
 	// MOVIECLIP-typed binding rather than OBJECT(NULL) so the setter body's
-	// `this` reads land on the MC's dynamic_props.
+	// `this` reads land on the MC's dynamic_props. INV_MC_THIS_NULL_PTR then
+	// keeps the type-2 advanced_func receiving NULL (as this_obj was) on that
+	// path, so preload_this resolves the MC via g_event_this_mc.
 	ActionVar this_var = {0};
 	if (this_obj != NULL) {
 		this_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -8536,119 +8431,36 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 	} else {
 		this_var.type = ACTION_STACK_VALUE_UNDEFINED;
 	}
-	// Save g_this_depth and reset to 0 for the duration of the setter call so
-	// nested method calls (which don't push g_this_stack themselves) don't
+
+	// INV_DEPTH_GUARD: see invokePropertyGetter — accessor calls count toward the
+	// ScriptLimits recursion bound; exceeding it halts the script like Flash.
+	//
+	// INV_RESET_THIS_DEPTH zeroes g_this_depth for the duration of the setter call
+	// so nested method calls (which don't push g_this_stack themselves) don't
 	// inherit the outer caller's `this` via the early-this fast path in
 	// actionGetVariable. The setter body and its nested calls each get their
-	// `this` from their own scope-chain binding (setProperty(local_scope,
-	// "this", &this_var) below for the setter; actionCallMethod's MC
-	// user-method dispatch sets the same for nested receiver MCs).
-	// Without this, FLVPlayback's contentPath setter → createINCManager
-	// resolved `this` to the outer setter's receiver (or OBJECT(NULL) on the
-	// older NULL-this_obj path), causing `this.ncMgrClassName = ...` to write
-	// to the wrong object and the read-back to return undefined.
-	u32 saved_this_depth = g_this_depth;
-	g_this_depth = 0;
+	// `this` from their own scope-chain binding. Without this, FLVPlayback's
+	// contentPath setter -> createINCManager resolved `this` to the outer setter's
+	// receiver (or OBJECT(NULL) on the older NULL-this_obj path), causing
+	// `this.ncMgrClassName = ...` to write to the wrong object.
+	//
+	// No local-scope MC association, super context, version switch, event-this-mc
+	// or exec-func tracking: none were ever done on the setter path.
+	InvokeOpts opts = { .flags = (u16)(INV_DEPTH_GUARD | INV_RESET_THIS_DEPTH |
+	                                   INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+	                                   INV_BIND_THIS | INV_BASE_CLIP |
+	                                   INV_MC_THIS_NULL_PTR),
+	                    .super_depth = 0 };
 
-	if (func->function_type == 2)
-	{
-		ActionVar* registers = NULL;
-		if (func->register_count > 0)
-			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-
-		// Restore captured scopes (closure context)
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH)
-			{
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		setProperty(app_context, local_scope, "this", 4, &this_var);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		func->advanced_func(app_context, value, 1, registers, this_obj);
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-		{
-			if (scope_depth > 0) scope_depth--;
-		}
-		releaseObject(app_context, local_scope);
-		if (registers != NULL) FREE(registers);
-	}
-	else if (func->function_type == 1 && func->simple_func != NULL)
-	{
-		// Restore captured scopes
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH)
-			{
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		setProperty(app_context, local_scope, "this", 4, &this_var);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		// Type 1 (DefineFunction): the prologue pops EXACTLY param_count values
-		// (last declared param from the top of the stack). Push the assigned
-		// value as the first parameter and pad the remaining declared params
-		// with undefined so the setter reads p1=value, p2..=undefined rather
-		// than stale stack slots. Without the padding the lone value landed in
-		// the LAST popped param (e.g. p2 for a 2-arg setter), swapping the
-		// setter's arguments. (TYPE1_ARG_ORDER: forward order, args[0] deepest.)
-		{
-			u32 _pc = func->param_count;
-			for (u32 pi = 0; pi < _pc; pi++)
-			{
-				if (pi == 0 && value != NULL)
-					pushVar(app_context, value);
-				else
-				{
-					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-				}
-			}
-		}
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-		{
-			if (scope_depth > 0) scope_depth--;
-		}
-		releaseObject(app_context, local_scope);
-	}
-
-	g_this_depth = saved_this_depth;
-	g_call_depth--;
+	// The assigned value is the sole argument. The core's type-1 loop pushes it as
+	// the first declared param and pads the rest with undefined, so the setter
+	// reads p1=value, p2..=undefined rather than stale stack slots (without the
+	// padding the lone value landed in the LAST popped param, swapping a 2-arg
+	// setter's arguments). A NULL value (defensive; invokeVirtualSetter already
+	// dereferences it) becomes zero args, so every declared param pads to
+	// undefined instead of dereferencing NULL.
+	(void) invokeFunctionValue(app_context, func, &this_var, value,
+	                           value != NULL ? 1u : 0u, &opts);
 }
 
 // Centralized addProperty accessor dispatch. Applies the version-specific
@@ -15606,7 +15418,7 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 	                 : (u16)(INV_DEPTH_GUARD | INV_THIS_STACK | INV_SUPER_CTX |
 	                         INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BIND_THIS |
 	                         INV_BASE_CLIP | INV_VERSION_SWITCH | INV_EVENT_THIS_MC |
-	                         INV_EXEC_FUNC);
+	                         INV_EXEC_FUNC | INV_LOCAL_SCOPE_MC);
 
 	if (flags & INV_DEPTH_GUARD)
 	{
@@ -15634,6 +15446,11 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 		g_this_stack[g_this_depth] = *this_var;
 		g_this_depth++;
 	}
+	// Accessor setters isolate the callee: nested method calls (which don't push
+	// g_this_stack themselves) must not inherit the outer caller's `this` via the
+	// early-this fast path in actionGetVariable. The callee and its nested calls
+	// each take `this` from their own scope-chain binding instead.
+	if (flags & INV_RESET_THIS_DEPTH) g_this_depth = 0;
 
 	if (flags & INV_SUPER_CTX)
 		pushSuperContext(this_ptr, opts ? (u8)opts->super_depth : 0);
@@ -15679,7 +15496,8 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 			if (scope_depth < MAX_SCOPE_DEPTH)
 			{
 				scope_is_with[scope_depth] = 0;
-				scope_mc[scope_depth] = this_is_mc ? (MovieClip*)this_ptr : NULL;
+				scope_mc[scope_depth] = ((flags & INV_LOCAL_SCOPE_MC) && this_is_mc)
+				                            ? (MovieClip*)this_ptr : NULL;
 				scope_chain[scope_depth++] = local_scope;
 				pushed_local = 1;
 			}
@@ -15717,7 +15535,8 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 			if (scope_depth < MAX_SCOPE_DEPTH)
 			{
 				scope_is_with[scope_depth] = 0;
-				scope_mc[scope_depth] = this_is_mc ? (MovieClip*)this_ptr : NULL;
+				scope_mc[scope_depth] = ((flags & INV_LOCAL_SCOPE_MC) && this_is_mc)
+				                            ? (MovieClip*)this_ptr : NULL;
 				scope_chain[scope_depth++] = local_scope;
 				pushed_local = 1;
 			}

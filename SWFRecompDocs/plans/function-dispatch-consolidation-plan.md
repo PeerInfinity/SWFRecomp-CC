@@ -4,7 +4,11 @@
 **Status:** Stage 0 COMPLETE (July 4, 2026) — see §4 Stage 0 results.
 Stage 1 COMPLETE (July 8, 2026) — `invokeFunctionValue()` core + `InvokeOpts`
 flags added and `invokeResolveFunction` wired to it (behavior-preserving); see the
-Stage 1 landing note in §4. Stages 2–5 not started.
+Stage 1 landing note in §4.
+Stage 2 COMPLETE (July 8, 2026) — the whole accessor family
+(`invokePropertyGetter` / `invokePropertySetter` / `invokeResolveFunction`) are now
+thin adapters over the core; see the Stage 2 landing note in §4. Stages 3–5 not
+started.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
 lines) + `timer.c` performed July 4, 2026; figures below are from that survey.
@@ -233,6 +237,47 @@ current ritual). These are already funnels with ~30+ callers, so three
 rewrites cover a large call population. Key regression suites: the
 virtual-property tests (`virtual_property_special_recursion_*`), addProperty
 setters (`init_object_order`), `object_resolve`.
+
+#### Stage 2 landing note (July 8, 2026)
+
+All three accessors are now thin adapters (**−181 lines net**). Two new core
+flags were required, both discovered by diffing each site's ritual against the
+core rather than assuming:
+
+- `INV_RESET_THIS_DEPTH` — the setter *zeroes* `g_this_depth` for the call
+  (it does not push `g_this_stack`), isolating nested method calls from the
+  outer caller's `this` (the FLVPlayback `contentPath` → `createINCManager` fix).
+- `INV_LOCAL_SCOPE_MC` — getter/setter set the local frame's `scope_mc = NULL`
+  unconditionally; only `call_function_with_this` associates the receiver MC.
+  Now opt-in (and in the `opts==NULL` superset).
+
+The setter's MC-receiver path (`this_obj == NULL && g_event_this_mc != NULL`)
+maps exactly onto the existing `INV_MC_THIS_NULL_PTR`: `this_var` carries the
+MOVIECLIP tag for the scope binding while `advanced_func` still receives NULL,
+so `preload_this` resolves the MC via `g_event_this_mc` — identical to passing
+the old NULL `this_obj`.
+
+Arg shapes: getter passes `num_args=0` (a Flash virtual getter takes no
+arguments), so the core's type-1 loop pushes exactly `param_count` undefineds —
+reproducing the old hand-rolled pad. Setter passes the value with
+`num_args = value ? 1 : 0`, so a defensive NULL value pads every declared param
+instead of dereferencing NULL.
+
+Verified: `function_type` is always 1 or 2 with the matching pointer non-NULL for
+every registered accessor (`addProperty` type-checks its args; builtin transform
+accessors use `INIT_TRANSFORM_FUNC` → type 2 + `advanced_func`; every
+`simple_func` assignment pairs with `function_type = 1`). So the core's strict
+dispatch (which returns undefined instead of calling a NULL pointer) is safe
+here, and it adds the NULL-stub handling the getter's old unconditional
+`else`-branch lacked.
+
+Local (NO_GRAPHICS): the full virtual-property/watch/resolve cluster + the four
+Stage-0 permanent tests + `add_property`, `transform`, `color_transform`,
+`matrix`, `color`, `bitmap_filters`, `as_transformed_flag` all hold baseline.
+`watch_virtual_property` is `output_mismatch` **in the pre-existing CI baseline at
+`c23831e4ba`**, not a Stage-2 regression. Graphics: `transform`,
+`color_transform`, `matrix`, `bitmap_filters`, `init_object_order`,
+`object_resolve`, `virtual_property_special_recursion_swf7` pass.
 
 ### Stage 3 — the mega-dispatchers, one arm at a time
 
