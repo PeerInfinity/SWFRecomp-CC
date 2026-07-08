@@ -12,6 +12,10 @@ The `ruffle-tests.yml` workflow accepts a `mode` input. Match the mode to whatev
 
 All modes push results to the same branch (`ruffle-test-results`) — only the filenames differ. Default to no-graphics unless the user's changes touch graphics code (renderer, video, tag-render paths, etc.) or the user asks otherwise.
 
+### WASM link is now CI-observable
+
+Every `ruffle-tests.yml` dispatch (any mode / any `parallel` / with or without `single_test`) also runs a **`wasm-link-smoke`** job that compiles+links one trace-WASM demo (`swf_core.c` path) and one browser-WASM graphics demo (`swf.c` path). A runtime change that breaks either WASM link turns the run red as its own named job. So the old manual smoke ritual (from the `wasm-build-modes-rot-without-ci` memory) is **no longer needed to catch link/compile breakage** — CI catches it. Still run a manual browser smoke for **behavioural** checks (rendering, interactivity), which this job deliberately does NOT do (compile+link only, no execution).
+
 ## State file
 
 Path: `.pipeline-state` (gitignored). Compact JSON, one line:

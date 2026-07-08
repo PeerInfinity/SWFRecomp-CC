@@ -1406,3 +1406,114 @@ jobs:
             echo "Pruning ccache id=$id"
             gh cache delete "$id" || true
           done
+
+  # --- WASM link-smoke (compile+link only) ---
+  # Neither WASM build mode has behavioural CI, and both silently rotted while
+  # the Ruffle suite stayed green: the browser-WASM graphics link broke at
+  # 2f20b1c59 (fixed 367c9b1e5) and the trace-WASM build rotted from ~mid-June
+  # (fixed 903b88c8a). This job compiles AND links one small git-tracked demo in
+  # each mode on every dispatch, so a runtime change that breaks either WASM
+  # link turns the run red. It is COMPILE+LINK ONLY — no browser, no execution
+  # (headless browser testing is a separate, rejected-for-now project; see
+  # SWFRecompDocs/plans/browser-wasm-testing-plan.md). Mode-independent: runs
+  # regardless of the mode / parallel / single_test inputs, as its own named
+  # job so a smoke failure is visible on its own, not buried in a shard.
+  wasm-link-smoke:
+    name: WASM link-smoke
+    runs-on: ubuntu-latest
+
+    env:
+      # Pin emsdk to the version used locally so the emdawnwebgpu port (pulled
+      # by the graphics build via --use-port=emdawnwebgpu) is always available.
+      EMSDK_VERSION: '5.0.0'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Install system dependencies
+        # swfmill: the graphics smoke's test.swf is gitignored and regenerated
+        # from its tracked create_test_swf.py, which shells out to swfmill.
+        # (The trace smoke's SWF generator is pure-Python, no swfmill needed.)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake swfmill
+
+      # Cache the whole emsdk tree (SDK + toolchain + the emscripten ports/cache
+      # dir under emsdk/upstream/emscripten/cache, which is where the
+      # emdawnwebgpu port lands on first graphics build). One stable entry keyed
+      # on the pinned version — it never churns, so it won't LRU-evict the Dawn
+      # cache. On a miss the clone+install+activate + first port download runs
+      # inline (~few min, cold); on a hit the job is warm (< ~5 min target).
+      - name: Restore emsdk cache
+        id: emsdk_cache
+        uses: actions/cache@v4
+        with:
+          path: emsdk
+          key: emsdk-wasm-smoke-${{ runner.os }}-${{ env.EMSDK_VERSION }}
+
+      - name: Set up emsdk (cache miss)
+        if: steps.emsdk_cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git emsdk
+          cd emsdk
+          ./emsdk install "${EMSDK_VERSION}"
+          ./emsdk activate "${EMSDK_VERSION}"
+
+      - name: Build SWFRecomp
+        run: |
+          mkdir -p SWFRecomp/build
+          cd SWFRecomp/build
+          cmake ..
+          make -j$(nproc)
+
+      - name: Trace-WASM link smoke (swf_core.c / NO_GRAPHICS)
+        # build_test.sh auto-generates test.swf, runs the recompiler, and
+        # compiles+links with emcc; set -e makes an emcc link failure exit
+        # non-zero (which fails this step).
+        run: |
+          source emsdk/emsdk_env.sh
+          bash SWFRecomp/scripts/build_test.sh trace_swf_4 wasm
+
+      - name: Browser-WASM graphics link smoke (swf.c / USE_WEBGPU)
+        # First graphics build downloads the emdawnwebgpu port into the emsdk
+        # cache dir (captured by the emsdk cache above on a cold run).
+        run: |
+          source emsdk/emsdk_env.sh
+          bash SWFRecomp/scripts/build_test.sh graphics/three_boxes wasm --graphics
+
+      - name: Verify link artifacts exist
+        run: |
+          set -eu
+          fail=0
+          check() {
+            local label="$1" f="$2"
+            if [ -s "$f" ]; then
+              echo "  ✅ ${label}: $f ($(wc -c < "$f") bytes)"
+            else
+              echo "::error::${label} link artifact missing or empty: $f"
+              fail=1
+            fi
+          }
+          echo "## WASM link-smoke" >> "$GITHUB_STEP_SUMMARY"
+          T_JS=SWFRecomp/tests/trace_swf_4/build/wasm/trace_swf_4.js
+          T_WASM=SWFRecomp/tests/trace_swf_4/build/wasm/trace_swf_4.wasm
+          G_JS=SWFRecomp/tests/graphics/three_boxes/build/wasm/three_boxes.js
+          G_WASM=SWFRecomp/tests/graphics/three_boxes/build/wasm/three_boxes.wasm
+          echo "### Trace-WASM (swf_core.c)"
+          check "trace .js" "$T_JS"
+          check "trace .wasm" "$T_WASM"
+          echo "### Browser-WASM graphics (swf.c)"
+          check "graphics .js" "$G_JS"
+          check "graphics .wasm" "$G_WASM"
+          if [ "$fail" = 0 ]; then
+            echo "Both WASM build modes linked cleanly. ✅" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ One or more WASM link artifacts were missing — see job log." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
