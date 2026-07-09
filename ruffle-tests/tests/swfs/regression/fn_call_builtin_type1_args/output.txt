@@ -1,0 +1,10 @@
+a=one
+b=two
+X
+a=one
+b=two
+Y
+a=only
+b=undefined
+Z
+done

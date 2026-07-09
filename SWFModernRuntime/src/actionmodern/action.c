@@ -65405,122 +65405,74 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				else if (func->function_type == 2)
 				{
-					ActionVar* registers = NULL;
-					if (func->register_count > 0)
-						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-					else if (g_override_this_set)
-						g_override_this_set = 0; // C functions don't consume the flag; clear to prevent leaking
+					// Stays outside the core: a C-implemented callee has no preload-this
+					// prologue to consume the flag, so this arm clears it BEFORE the call
+					// when the callee has no registers. INV_OVERRIDE_THIS clears only
+					// AFTER — the same divergence the empty-method-name arm documents.
+					if (func->register_count == 0 && g_override_this_set)
+						g_override_this_set = 0;
 
-					ASFunction* prev_executing_func_call = g_current_executing_func;
-					g_call_depth++;
-					g_prev_executing_func = prev_executing_func_call;
-					g_current_executing_func = func;
-
-					// Restore captured scope chain if any
-					u32 captured_count = func->captured_scope_count;
-					for (u32 ci = 0; ci < captured_count; ci++) {
-						if (scope_depth < MAX_SCOPE_DEPTH) {
-							scope_is_with[scope_depth] = 1;
-							scope_mc[scope_depth] = func->captured_scope_mc[ci];
-							scope_chain[scope_depth++] = func->captured_scope[ci];
-						}
+					// Two distinct receivers. `this_obj` is the ABI pointer handed to
+					// advanced_func (dynamic_props for a MOVIECLIP thisArg, own_props for a
+					// FUNCTION one, global_object for null/undefined/no thisArg), while
+					// g_this_stack takes the *scriptable* thisArg so a MOVIECLIP receiver
+					// keeps its type tag inside the callee.
+					ActionVar t2_this_var_ca = {0};
+					if (num_args >= 1
+					    && args[0].type != ACTION_STACK_VALUE_UNDEFINED
+					    && args[0].type != ACTION_STACK_VALUE_NULL) {
+						t2_this_var_ca = args[0];
+					} else {
+						t2_this_var_ca.type = ACTION_STACK_VALUE_OBJECT;
+						t2_this_var_ca.data.numeric_value = (u64)(uintptr_t) global_object;
 					}
 
-					// Push a fresh local scope so the body's setVariableByName
-					// param-bind writes don't leak into global var_map across
-					// repeated call()/apply() invocations.
-					ASObject* local_scope_ca2 = allocObject(app_context, 8);
-					int local_scope_pushed_ca2 = 0;
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 0;
-						scope_mc[scope_depth] = NULL;
-						scope_chain[scope_depth++] = local_scope_ca2;
-						local_scope_pushed_ca2 = 1;
-					}
+					// Mirrors actionCallFunction's type-2 "neither preload nor suppress"
+					// branch. act_flags stays 0: this arm has never built an `arguments`
+					// object for a type-2 callee, nor bound "this"/"super" on the local
+					// scope. Preserved, not normalized (plan §3).
+					u16 f2flags_ca2 = func->flags;
+					u32 _ca2_flags = INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+					                 INV_LOCAL_SCOPE | INV_BASE_CLIP | INV_EXEC_FUNC |
+					                 INV_OVERRIDE_THIS;
+					if (!(f2flags_ca2 & 0x0001) && !(f2flags_ca2 & 0x0002))
+						_ca2_flags |= INV_THIS_STACK;
 
-					// Switch context to base_clip for SWF6+
-					MovieClip* prev_ctx_call = g_current_context;
-					if (g_swf_version >= 6 && func->base_clip != NULL)
-						g_current_context = func->base_clip;
+					InvokeOpts opts = {
+						.flags = _ca2_flags,
+						.has_this_ptr = 1,
+						.this_ptr = this_obj,
+					};
 
-					// Push super context so super keyword works inside .call()
+					// Outside the core: it sources pushSuperContext's receiver from
+					// `this_var`, and this arm has always pushed `this_obj` — the two
+					// differ whenever the thisArg is a MovieClip or a Function.
 					if (this_obj != NULL)
 						pushSuperContext(this_obj, 1);
 
-					// Bind `this` for the type-2 callee via g_this_stack so the
-					// body's actionGetVariable("this") resolves to the call
-					// thisArg. Mirrors actionCallFunction's type-2
-					// "neither preload nor suppress" branch.
-					u32 saved_this_depth_ca2 = g_this_depth;
-					int t2_this_pushed_ca2 = 0;
-					{
-						u16 f2flags_ca2 = func->flags;
-						int f2_preload_this_ca2  = (f2flags_ca2 & 0x0001);
-						int f2_suppress_this_ca2 = (f2flags_ca2 & 0x0002);
-						if (!f2_preload_this_ca2 && !f2_suppress_this_ca2
-						    && g_this_depth < MAX_THIS_DEPTH) {
-							ActionVar t2_this_var_ca = {0};
-							if (num_args >= 1
-							    && args[0].type != ACTION_STACK_VALUE_UNDEFINED
-							    && args[0].type != ACTION_STACK_VALUE_NULL) {
-								t2_this_var_ca = args[0];
-							} else {
-								t2_this_var_ca.type = ACTION_STACK_VALUE_OBJECT;
-								t2_this_var_ca.data.numeric_value = (u64)(uintptr_t) global_object;
-							}
-							g_this_stack[g_this_depth++] = t2_this_var_ca;
-							t2_this_pushed_ca2 = 1;
-						}
-					}
-
-					// Pass this-type so builtin wrappers can distinguish ASArray from ASObject
+					// Read only from inside builtin bodies, never by a ritual step, so
+					// bracketing the core call is equivalent to doing it inside (precedent:
+					// 3b's .call arm and the object-method arm).
 					g_call_this_type = (num_args >= 1) ? args[0].type : 0;
-					ActionVar result = func->advanced_func(app_context, call_args, call_arg_count, registers, this_obj);
-					g_call_this_type = 0;
-					g_override_this_set = 0; // clear in case function didn't consume it
 
-					if (t2_this_pushed_ca2)
-						g_this_depth = saved_this_depth_ca2;
+					g_call_depth++;
+					ActionVar result = invokeFunctionValue(app_context, func, &t2_this_var_ca,
+					                                       call_args, call_arg_count, &opts);
+					g_call_depth--;
+					g_call_this_type = 0;
 
 					if (this_obj != NULL)
 						popSuperContext();
 
-					g_current_context = prev_ctx_call;
-					if (local_scope_pushed_ca2 && scope_depth > 0) scope_depth--;
-					for (u32 ci = 0; ci < captured_count; ci++) {
-						if (scope_depth > 0) scope_depth--;
-					}
-					releaseObject(app_context, local_scope_ca2);
-
-					g_current_executing_func = prev_executing_func_call;
-					g_call_depth--;
-
-					if (registers != NULL) FREE(registers);
 					if (call_args != NULL) FREE(call_args);
 					if (args != NULL) FREE(args);
 					pushVar(app_context, &result);
 				}
 				else if (func->function_type == 1 && func->simple_func != NULL)
 				{
-					// User-defined simple function — set up local scope + arguments
-					ASFunction* prev_executing_func_call = g_current_executing_func;
-					ASObject* local_scope_call = allocObject(app_context, 8);
-					ASArray* arguments_arr_call = allocArray(app_context, call_arg_count > 0 ? call_arg_count : 1);
-					for (u32 i = 0; i < call_arg_count; i++)
-					{
-						setArrayElement(app_context, arguments_arr_call, i, &call_args[i]);
-						pushVar(app_context, &call_args[i]);
-					}
-					// Pad with undefined up to param_count — a type-1 simple
-					// function body unconditionally pops param_count values
-					// from the stack to bind its named parameters.
-					for (u32 i = call_arg_count; i < func->param_count; i++)
-					{
-						PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-					}
-					// Bind 'this' for the callee via g_this_stack — a type-1
-					// body resolves `this` through GetVariable("this") which
-					// reads g_this_stack, not the this_obj pointer arg.
+					// A type-1 body resolves `this` through GetVariable("this"), which reads
+					// g_this_stack rather than the this_obj pointer. INV_ACT_THIS binds
+					// exactly that for a type-1 callee, and nothing on the scope chain.
 					ActionVar t1_this_call = {0};
 					if (g_override_this_set && g_override_this.type == ACTION_STACK_VALUE_MOVIECLIP) {
 						t1_this_call = g_override_this;
@@ -65532,53 +65484,29 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					} else {
 						t1_this_call.type = ACTION_STACK_VALUE_UNDEFINED;
 					}
-					u32 saved_this_depth_t1c = g_this_depth;
-					if (g_this_depth < MAX_THIS_DEPTH)
-						g_this_stack[g_this_depth++] = t1_this_call;
-					setupArgumentsProps(app_context, arguments_arr_call, func, prev_executing_func_call);
-					ActionVar args_var_call = {0};
-					args_var_call.type = ACTION_STACK_VALUE_ARRAY;
-					args_var_call.data.numeric_value = (u64)arguments_arr_call;
-					setProperty(app_context, local_scope_call, "arguments", 9, &args_var_call);
 
-					// Restore captured scope chain
-					u32 captured_count = func->captured_scope_count;
-					for (u32 ci = 0; ci < captured_count; ci++) {
-						if (scope_depth < MAX_SCOPE_DEPTH) {
-							scope_is_with[scope_depth] = 1;
-							scope_mc[scope_depth] = func->captured_scope_mc[ci];
-							scope_chain[scope_depth++] = func->captured_scope[ci];
-						}
-					}
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 0;
-						scope_mc[scope_depth] = NULL;
-						scope_chain[scope_depth++] = local_scope_call;
-					}
+					// The core pushes EXACTLY param_count operands. The loop this replaces
+					// padded a short call but never clamped a long one, so the extra
+					// arguments were stranded on the caller's eval stack —
+					// regression/fn_call_builtin_type1_args.
+					//
+					// INV_EXEC_FUNC must be the CORE's: setupArgumentsProps takes the
+					// pre-swap g_current_executing_func, so an arm that swapped it itself
+					// would make `arguments.caller` the callee.
+					InvokeOpts opts = {
+						.flags = (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+						          INV_LOCAL_SCOPE | INV_BASE_CLIP | INV_EXEC_FUNC |
+						          INV_OVERRIDE_THIS),
+						.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS),
+					};
+
+					g_call_depth++;
+					ActionVar result = invokeFunctionValue(app_context, func, &t1_this_call,
+					                                       call_args, call_arg_count, &opts);
+					g_call_depth--;
 
 					if (call_args != NULL) FREE(call_args);
 					if (args != NULL) FREE(args);
-
-					MovieClip* prev_ctx_call = g_current_context;
-					if (g_swf_version >= 6 && func->base_clip != NULL)
-						g_current_context = func->base_clip;
-
-					g_call_depth++;
-					g_prev_executing_func = prev_executing_func_call;
-					g_current_executing_func = func;
-					ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-					g_current_executing_func = prev_executing_func_call;
-					g_call_depth--;
-					g_override_this_set = 0; // clear in case function didn't consume it
-					g_this_depth = saved_this_depth_t1c;
-
-					g_current_context = prev_ctx_call;
-					for (u32 ci = 0; ci < captured_count; ci++) {
-						if (scope_depth > 0) scope_depth--;
-					}
-					if (scope_depth > 0) scope_depth--;
-					releaseObject(app_context, local_scope_call);
-
 					pushVar(app_context, &result);
 				}
 				else if (func->name[0] != '\0' &&
@@ -65809,127 +65737,64 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				else if (func->function_type == 2)
 				{
-					ActionVar* registers = NULL;
-					if (func->register_count > 0)
-						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-					else if (g_override_this_set)
-						g_override_this_set = 0; // C functions don't consume the flag; clear to prevent leaking
+					// Mirror of the .call type-2 arm above; see it for why the
+					// override-this pre-clear, the super push, and g_call_this_type all
+					// stay outside the core, and why `this_obj` and the g_this_stack
+					// receiver are two different values.
+					if (func->register_count == 0 && g_override_this_set)
+						g_override_this_set = 0;
 
-					ASFunction* prev_executing_func_ap2 = g_current_executing_func;
-					g_call_depth++;
-					g_prev_executing_func = prev_executing_func_ap2;
-					g_current_executing_func = func;
-
-					// Restore captured scope chain if any
-					u32 captured_count_ap2 = func->captured_scope_count;
-					for (u32 ci = 0; ci < captured_count_ap2; ci++) {
-						if (scope_depth < MAX_SCOPE_DEPTH) {
-							scope_is_with[scope_depth] = 1;
-							scope_mc[scope_depth] = func->captured_scope_mc[ci];
-							scope_chain[scope_depth++] = func->captured_scope[ci];
-						}
+					ActionVar t2_this_var_ap = {0};
+					if (num_args >= 1
+					    && args[0].type != ACTION_STACK_VALUE_UNDEFINED
+					    && args[0].type != ACTION_STACK_VALUE_NULL) {
+						t2_this_var_ap = args[0];
+					} else {
+						t2_this_var_ap.type = ACTION_STACK_VALUE_OBJECT;
+						t2_this_var_ap.data.numeric_value = (u64)(uintptr_t) global_object;
 					}
 
-					// Push a fresh local scope so the body's setVariableByName
-					// param-bind writes don't leak into global var_map across
-					// repeated apply()/call() invocations.
-					ASObject* local_scope_ap2 = allocObject(app_context, 8);
-					int local_scope_pushed_ap2 = 0;
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 0;
-						scope_mc[scope_depth] = NULL;
-						scope_chain[scope_depth++] = local_scope_ap2;
-						local_scope_pushed_ap2 = 1;
-					}
+					u16 f2flags_ap2 = func->flags;
+					u32 _ap2_flags = INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+					                 INV_LOCAL_SCOPE | INV_BASE_CLIP | INV_EXEC_FUNC |
+					                 INV_OVERRIDE_THIS;
+					if (!(f2flags_ap2 & 0x0001) && !(f2flags_ap2 & 0x0002))
+						_ap2_flags |= INV_THIS_STACK;
 
-					// Switch context to base_clip for SWF6+
-					MovieClip* prev_ctx_ap2 = g_current_context;
-					if (g_swf_version >= 6 && func->base_clip != NULL)
-						g_current_context = func->base_clip;
+					InvokeOpts opts = {
+						.flags = _ap2_flags,
+						.has_this_ptr = 1,
+						.this_ptr = this_obj,
+					};
 
-					// Push super context so super keyword works inside .apply()
 					if (this_obj != NULL)
 						pushSuperContext(this_obj, 1);
 
-					// Bind `this` for the type-2 callee via g_this_stack so the
-					// body's actionGetVariable("this") resolves to the apply
-					// thisArg. Mirrors actionCallFunction's type-2
-					// "neither preload nor suppress" branch.
-					u32 saved_this_depth_ap2 = g_this_depth;
-					int t2_this_pushed_ap2 = 0;
-					{
-						u16 f2flags_ap2 = func->flags;
-						int f2_preload_this_ap2  = (f2flags_ap2 & 0x0001);
-						int f2_suppress_this_ap2 = (f2flags_ap2 & 0x0002);
-						if (!f2_preload_this_ap2 && !f2_suppress_this_ap2
-						    && g_this_depth < MAX_THIS_DEPTH) {
-							ActionVar t2_this_var = {0};
-							if (num_args >= 1
-							    && args[0].type != ACTION_STACK_VALUE_UNDEFINED
-							    && args[0].type != ACTION_STACK_VALUE_NULL) {
-								t2_this_var = args[0];
-							} else {
-								t2_this_var.type = ACTION_STACK_VALUE_OBJECT;
-								t2_this_var.data.numeric_value = (u64)(uintptr_t) global_object;
-							}
-							g_this_stack[g_this_depth++] = t2_this_var;
-							t2_this_pushed_ap2 = 1;
-						}
-					}
-
-					// Pass this-type so builtin wrappers can distinguish ASArray
-					// from ASObject — mirrors the .call path above. SWF5 gate:
-					// Flash's SWF5 apply on Array.prototype methods returns
-					// undefined ("up to SWF5 we couldn't do this" per array.as
-					// line 159); only set the type-tag for SWF6+.
+					// SWF5 gate: Flash's SWF5 apply on Array.prototype methods returns
+					// undefined ("up to SWF5 we couldn't do this" per array.as line 159);
+					// only set the type-tag for SWF6+. g_swf_version is still the caller's
+					// here — this arm performs no version switch.
 					if (g_swf_version >= 6)
 						g_call_this_type = (num_args >= 1) ? args[0].type : 0;
-					ActionVar result = func->advanced_func(app_context, apply_args, apply_arg_count, registers, this_obj);
-					g_call_this_type = 0;
-					g_override_this_set = 0; // clear in case function didn't consume it
 
-					if (t2_this_pushed_ap2)
-						g_this_depth = saved_this_depth_ap2;
+					g_call_depth++;
+					ActionVar result = invokeFunctionValue(app_context, func, &t2_this_var_ap,
+					                                       apply_args, apply_arg_count, &opts);
+					g_call_depth--;
+					g_call_this_type = 0;
 
 					if (this_obj != NULL)
 						popSuperContext();
 
-					g_current_context = prev_ctx_ap2;
-					if (local_scope_pushed_ap2 && scope_depth > 0) scope_depth--;
-					for (u32 ci = 0; ci < captured_count_ap2; ci++) {
-						if (scope_depth > 0) scope_depth--;
-					}
-					releaseObject(app_context, local_scope_ap2);
-
-					g_current_executing_func = prev_executing_func_ap2;
-					g_call_depth--;
-
-					if (registers != NULL) FREE(registers);
 					if (apply_args != NULL) FREE(apply_args);
 					if (args != NULL) FREE(args);
 					pushVar(app_context, &result);
 				}
 				else if (func->function_type == 1 && func->simple_func != NULL)
 				{
-					// Create local scope + arguments object for apply() on simple functions
-					ASFunction* prev_executing_func_ap = g_current_executing_func;
-					ASObject* local_scope_ap = allocObject(app_context, 8);
-					ASArray* arguments_arr_ap = allocArray(app_context, apply_arg_count > 0 ? apply_arg_count : 1);
-					for (u32 i = 0; i < apply_arg_count; i++)
-					{
-						setArrayElement(app_context, arguments_arr_ap, i, &apply_args[i]);
-						pushVar(app_context, &apply_args[i]);
-					}
-					// Pad with undefined up to param_count — a type-1 simple
-					// function body unconditionally pops param_count values
-					// from the stack to bind its named parameters.
-					for (u32 i = apply_arg_count; i < func->param_count; i++)
-					{
-						PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-					}
-					// Bind 'this' for the callee via g_this_stack — a type-1
-					// body resolves `this` through GetVariable("this") which
-					// reads g_this_stack, not the this_obj pointer arg.
+					// Mirror of the .call type-1 arm above, with the arguments taken from
+					// the array operand. Same clamp bug, same fix — see
+					// regression/fn_call_builtin_type1_args.
 					ActionVar t1_this_ap = {0};
 					if (g_override_this_set && g_override_this.type == ACTION_STACK_VALUE_MOVIECLIP) {
 						t1_this_ap = g_override_this;
@@ -65941,53 +65806,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					} else {
 						t1_this_ap.type = ACTION_STACK_VALUE_UNDEFINED;
 					}
-					u32 saved_this_depth_t1a = g_this_depth;
-					if (g_this_depth < MAX_THIS_DEPTH)
-						g_this_stack[g_this_depth++] = t1_this_ap;
-					setupArgumentsProps(app_context, arguments_arr_ap, func, prev_executing_func_ap);
-					ActionVar args_var_ap = {0};
-					args_var_ap.type = ACTION_STACK_VALUE_ARRAY;
-					args_var_ap.data.numeric_value = (u64)arguments_arr_ap;
-					setProperty(app_context, local_scope_ap, "arguments", 9, &args_var_ap);
 
-					// Restore captured scope chain
-					u32 captured_count_ap1 = func->captured_scope_count;
-					for (u32 ci = 0; ci < captured_count_ap1; ci++) {
-						if (scope_depth < MAX_SCOPE_DEPTH) {
-							scope_is_with[scope_depth] = 1;
-							scope_mc[scope_depth] = func->captured_scope_mc[ci];
-							scope_chain[scope_depth++] = func->captured_scope[ci];
-						}
-					}
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 0;
-						scope_mc[scope_depth] = NULL;
-						scope_chain[scope_depth++] = local_scope_ap;
-					}
+					InvokeOpts opts = {
+						.flags = (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+						          INV_LOCAL_SCOPE | INV_BASE_CLIP | INV_EXEC_FUNC |
+						          INV_OVERRIDE_THIS),
+						.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS),
+					};
+
+					g_call_depth++;
+					ActionVar result = invokeFunctionValue(app_context, func, &t1_this_ap,
+					                                       apply_args, apply_arg_count, &opts);
+					g_call_depth--;
 
 					if (apply_args != NULL) FREE(apply_args);
 					if (args != NULL) FREE(args);
-
-					MovieClip* prev_ctx_ap1 = g_current_context;
-					if (g_swf_version >= 6 && func->base_clip != NULL)
-						g_current_context = func->base_clip;
-
-					g_call_depth++;
-					g_prev_executing_func = prev_executing_func_ap;
-					g_current_executing_func = func;
-					ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-					g_current_executing_func = prev_executing_func_ap;
-					g_call_depth--;
-					g_override_this_set = 0; // clear in case function didn't consume it
-					g_this_depth = saved_this_depth_t1a;
-
-					g_current_context = prev_ctx_ap1;
-					for (u32 ci = 0; ci < captured_count_ap1; ci++) {
-						if (scope_depth > 0) scope_depth--;
-					}
-					if (scope_depth > 0) scope_depth--;
-					releaseObject(app_context, local_scope_ap);
-
 					pushVar(app_context, &result);
 				}
 				else if (func->function_type == 1 && func->simple_func == NULL && (this_obj != NULL || apply_this_mc != NULL))
