@@ -8174,6 +8174,15 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 //
 // Read off actionCallFunction's two branches and the object-method arm. The
 // capacity split is preserved, not normalized — Stage 3 is behavior-preserving.
+//
+// The type-1 column's two "no scope binding" cells are not an approximation: a
+// type-1 body cannot observe either binding. GetVariable("this") resolves from the
+// this-cell before any scope walk, and GetVariable("super") falls back to the live
+// super context when the chain misses — so a name binding of either is dead
+// whenever INV_ACT_THIS / INV_SUPER_CTX are in force. The string-primitive arm
+// used to write both anyway (it read the callee's flags word without branching on
+// function_type, and a DefineFunction's flags is always 0), which is why that arm
+// needs no extra flag. See regression/string_prim_method_type1_args.
 #define INV_ACT_THIS             0x01u
 #define INV_ACT_ARGUMENTS        0x02u
 #define INV_ACT_SUPER            0x04u
@@ -64990,118 +64999,66 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							return;
 						}
 
-						// Inline the OBJECT/type-2 dispatch machinery so the
-						// user function runs with `this`/`arguments`/`super`
-						// accessible via scope chain (same as a normal method
-						// call with an auto-boxed wrapper).
-						pushSuperContext((void*)_sp_wrap, 1);
+						// Dispatch the user function with `this` / `arguments` / `super`
+						// reachable from its scope chain, on an auto-boxed String wrapper.
+						int _sp_is_t2 = (_sp_fn->function_type == 2);
+						int _sp_caller_ver = g_swf_version;
 
-						int _sp_saved_ver = 0;
-						ASObject* _sp_saved_global = NULL;
-						int _sp_saved_midx = 0;
-						switchToFunctionVersion(_sp_fn, &_sp_saved_ver, &_sp_saved_global, &_sp_saved_midx);
-						int _sp_caller_ver = _sp_saved_ver;
+						// CF_VERSION installs the callee's version; CF_CTX_LIVE re-resolves
+						// base_clip afterwards (it reads g_swf_version) but takes its gate on
+						// the CALLER's version, computed here. Setting INV_BASE_CLIP alongside
+						// INV_VERSION_SWITCH instead would gate on the callee's version.
+						ClosureFrame cf;
+						enterClosureFrame(app_context, &cf, _sp_fn,
+						                  (u8)(CF_VERSION | (_sp_caller_ver >= 6 ? CF_CTX_LIVE : 0)));
 
-						MovieClip* _sp_saved_ctx = g_current_context;
-						if (_sp_caller_ver >= 6 && _sp_fn->base_clip != NULL) {
-							MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)_sp_fn->base_clip);
-							if (_bc->depth != INT_MIN)
-								g_current_context = _bc;
-						}
+						ActionVar _sp_this = {0};
+						_sp_this.type = ACTION_STACK_VALUE_OBJECT;
+						_sp_this.data.numeric_value = (u64) _sp_wrap;
 
-						ASObject* _sp_local_scope = allocObject(app_context, 8);
-						retainObject(_sp_local_scope);
-						int _sp_pushed_scope = 0;
-						if (scope_depth < MAX_SCOPE_DEPTH) {
-							scope_is_with[scope_depth] = 0;
-							scope_mc[scope_depth] = NULL;
-							scope_chain[scope_depth++] = _sp_local_scope;
-							_sp_pushed_scope = 1;
-						}
+						// The core's marshalling loop pushes EXACTLY param_count values. The
+						// type-1 loop this replaces pushed num_args of them, neither clamping
+						// nor padding — see regression/string_prim_method_type1_args.
+						//
+						// This arm used to read _sp_fn->flags without branching on
+						// function_type, so a type-1 body also got "this" and "super" bound by
+						// name on its local frame. Both writes were dead: GetVariable("this")
+						// resolves from the this-cell before any scope walk, and
+						// GetVariable("super") falls back to the live super context, which
+						// INV_SUPER_CTX holds for the whole body. Verified by dropping them and
+						// re-running the test's `t=` / `ts=` lines unchanged. So the core's
+						// per-type rule table needs no extra flag here.
+						//
+						// INV_SUPER_CTX is safe here where .call/.apply and the array arms had to
+						// keep the super push outside: the receiver the core derives from
+						// this_var IS the one this arm pushes, since this_var = OBJECT(_sp_wrap).
+						InvokeOpts opts = {
+							.flags = (INV_SUPER_CTX | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
+							.super_depth = 1,
+							.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS |
+							                  INV_ACT_SUPER),
+						};
 
-						u32 _sp_saved_this_depth = g_this_depth;
-						u16 _sp_flags = _sp_fn->flags;
-						int _sp_preload_this = (_sp_flags & 0x0001);
-						int _sp_suppress_this = (_sp_flags & 0x0002);
-						int _sp_preload_args = (_sp_flags & 0x0004);
-						int _sp_suppress_args = (_sp_flags & 0x0008);
-						int _sp_preload_super = (_sp_flags & 0x0010);
-						int _sp_suppress_super = (_sp_flags & 0x0020);
-
-						if (!_sp_preload_this && !_sp_suppress_this) {
-							ActionVar _sp_tv = {0};
-							_sp_tv.type = ACTION_STACK_VALUE_OBJECT;
-							_sp_tv.data.numeric_value = (u64) _sp_wrap;
-							setProperty(app_context, _sp_local_scope, "this", 4, &_sp_tv);
-							if (g_this_depth < MAX_THIS_DEPTH) {
-								g_this_stack[g_this_depth] = _sp_tv;
-								g_this_depth++;
-							}
-						}
-
-						ASFunction* _sp_prev_exec = g_current_executing_func;
-						if (!_sp_preload_args && !_sp_suppress_args) {
-							ASArray* _sp_args_arr = allocArray(app_context, num_args > 0 ? num_args : 1);
-							for (u32 i = 0; i < num_args; i++)
-								setArrayElement(app_context, _sp_args_arr, i, &args[i]);
-							setupArgumentsProps(app_context, _sp_args_arr, _sp_fn, _sp_prev_exec);
-							ActionVar _sp_av = {0};
-							_sp_av.type = ACTION_STACK_VALUE_ARRAY;
-							_sp_av.data.numeric_value = (u64) _sp_args_arr;
-							setProperty(app_context, _sp_local_scope, "arguments", 9, &_sp_av);
-						}
-						{
-							ActionVar _sp_sv = {0};
-							_sp_sv.type = ACTION_STACK_VALUE_UNDEFINED;
-							if (!_sp_preload_super && !_sp_suppress_super && hasSuperContext()) {
-								_sp_sv.type = ACTION_STACK_VALUE_SUPER;
-								_sp_sv.data.numeric_value = (u64) getSuperThis();
-								_sp_sv.str_size = (u32) getSuperDepth();
-							}
-							setProperty(app_context, _sp_local_scope, "super", 5, &_sp_sv);
-						}
-
-						ActionVar _sp_result = {0};
-						_sp_result.type = ACTION_STACK_VALUE_UNDEFINED;
-
-						if (_sp_fn->function_type == 2 && _sp_fn->advanced_func != NULL) {
-							ActionVar* _sp_registers = NULL;
-							if (_sp_fn->register_count > 0)
-								_sp_registers = (ActionVar*) HCALLOC(_sp_fn->register_count, sizeof(ActionVar));
-
-							g_call_depth++;
-							g_prev_executing_func = _sp_prev_exec;
-							g_current_executing_func = _sp_fn;
+						// Both stay outside the core: they are read only from inside builtin
+						// bodies, never by a ritual step, and neither has any meaning on the
+						// type-1 path.
+						u8 _sp_saved_call_this_type = g_call_this_type;
+						if (_sp_is_t2) {
 							g_c_function_this_obj = _sp_wrap;
-							u8 _sp_saved_call_this_type = g_call_this_type;
 							g_call_this_type = ACTION_STACK_VALUE_OBJECT;
-							_sp_result = _sp_fn->advanced_func(app_context, args, num_args, _sp_registers, (void*) _sp_wrap);
+						}
+
+						g_call_depth++;
+						ActionVar _sp_result = invokeFunctionValue(app_context, _sp_fn, &_sp_this,
+						                                           args, num_args, &opts);
+						g_call_depth--;
+
+						if (_sp_is_t2) {
 							g_call_this_type = _sp_saved_call_this_type;
 							g_c_function_this_obj = NULL;
-							g_current_executing_func = _sp_prev_exec;
-							g_call_depth--;
-
-							if (_sp_registers != NULL) FREE(_sp_registers);
-						} else if (_sp_fn->function_type == 1 && _sp_fn->simple_func != NULL) {
-							// Type 1 uses stack-based calling convention: push args
-							// onto the AS stack; simple_func pops them.
-							for (u32 i = 0; i < num_args; i++)
-								pushVar(app_context, &args[i]);
-
-							g_call_depth++;
-							g_prev_executing_func = _sp_prev_exec;
-							g_current_executing_func = _sp_fn;
-							_sp_result = ((ActionVar(*)(SWFAppContext*))_sp_fn->simple_func)(app_context);
-							g_current_executing_func = _sp_prev_exec;
-							g_call_depth--;
 						}
 
-						g_current_context = _sp_saved_ctx;
-						if (_sp_pushed_scope && scope_depth > 0) scope_depth--;
-						releaseObject(app_context, _sp_local_scope);
-						g_this_depth = _sp_saved_this_depth;
-						popSuperContext();
-						restoreFunctionVersion(_sp_saved_ver, _sp_saved_global, _sp_saved_midx);
+						leaveClosureFrame(app_context, &cf);
 
 						if (args != NULL) FREE(args);
 						pushVar(app_context, &_sp_result);

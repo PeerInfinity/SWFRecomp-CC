@@ -8,15 +8,18 @@ Stage 1 landing note in §4.
 Stage 2 COMPLETE (July 8, 2026) — the whole accessor family
 (`invokePropertyGetter` / `invokePropertySetter` / `invokeResolveFunction`) are now
 thin adapters over the core; see the Stage 2 landing note in §4.
-Stage 3 IN PROGRESS (July 9, 2026) — **12 of `actionCallMethod`'s ~19 arms
+Stage 3 IN PROGRESS (July 9, 2026) — **14 of `actionCallMethod`'s ~19 arms
 migrated**, plus all of `actionCallFunction` (`e4082f224`, `65d442f09`,
-`ee9132778`, `e31237992`, `a2cd5228b`, `d3e5747bc`, `812bc54f7`). **Six real
-TYPE1_ARG_ORDER clamp/pad bugs found and fixed**, each with a permanent
-hand-assembled test in `regression/`. Read the Stage 3 progress note in §4, then
-the **Stage 3c design note** for the shape (arm-owned `ClosureFrame` + in-core
-`act_flags` activation), then the **Stage 3c landing notes** — the last of which
-surveys the two remaining arms (`__resolve`, string-primitive), **neither of
-which is a drop-in**. Stages 4–5 not started.
+`ee9132778`, `e31237992`, `a2cd5228b`, `d3e5747bc`, `812bc54f7`, + steps 5b/5c).
+Only the **MC arm** remains. **Eight real TYPE1_ARG_ORDER clamp/pad bugs found
+and fixed**, each with a permanent hand-assembled test in `regression/` (now
+12/12). Read the Stage 3 progress note in §4, then the **Stage 3c design note**
+for the shape (arm-owned `ClosureFrame` + in-core `act_flags` activation), then
+the **Stage 3c landing notes**. The two arms that were "not drop-ins" are landed:
+`__resolve` needed a new `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit (its scope
+inversion is real and observable); the string-primitive arm needed **no** new
+flag (its type-1 `this`/`super` name bindings are provably dead). Stages 4–5 not
+started.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
 lines) + `timer.c` performed July 4, 2026; figures below are from that survey.
@@ -758,6 +761,53 @@ The core's two duplicated scope-push blocks (one per `function_type`) are now on
 already a plain depth decrement of `pushed_local + captured_count` and so is
 order-independent and unchanged.
 
+**Step 5c — the string-primitive arm.** A user-overridden `String.prototype`
+method on a primitive receiver. Both halves collapse to one call site. A
+`CF_VERSION | CF_CTX_LIVE`-shaped `ClosureFrame` (the latter gated on the
+caller's version), then `INV_SUPER_CTX` at depth 1 — safe here, unlike
+`.call`/`.apply` and the array arms, because `this_var = OBJECT(_sp_wrap)` is
+exactly the receiver the arm pushes — plus `INV_LOCAL_SCOPE | INV_EXEC_FUNC` and
+`act_flags = THIS | ARGUMENTS | SUPER`. `g_c_function_this_obj` /
+`g_call_this_type` stay outside on the type-2 path only; the depth pre-check and
+the bare `g_call_depth++/--` stay outside as well.
+
+**Decision: no new flag. The type-1 divergence the survey found is unobservable.**
+The survey was right that this arm reads `_sp_fn->flags` without branching on
+`function_type`, so it applied the type-2 activation to type-1 bodies — binding
+`"this"` and `"super"` by name on a plain `DefineFunction`'s local frame, which
+the core's rule table does not do. But **both writes are dead**, for two separate
+reasons found by reading the resolver rather than assuming:
+
+- `GetVariable("this")` takes an early this-cell path *before* any scope walk
+  (`action.c:41062`, mirroring Ruffle's `Activation.resolve()`), and
+  `INV_ACT_THIS` pushes `g_this_stack` for a type-1 callee. The name binding is
+  never consulted.
+- `GetVariable("super")` has a fallback (`action.c:41227`) that rebuilds the
+  `SUPER` value from the **live** super context when the scope chain misses.
+  `INV_SUPER_CTX` holds that context for the whole body, so the fallback yields
+  the identical value the arm's snapshot held.
+
+Verified, not just argued: the arm was migrated with a new
+`INV_ACT_T1_NAMED_LOCALS` bit, then the bit was **removed** and
+`regression/string_prim_method_type1_args` re-run — its `t=abc` and `ts=object`
+lines are unchanged. So the bit was deleted rather than shipped. This is the one
+place so far where "diff the arm against the core" found a divergence that is real
+in the code and inert in behavior; the core's per-type rule table already covers it.
+
+**The type-1 clamp/pad bug is REAL here too — instance eight** (predicted at the
+old `65102`), and the eighth of the class overall. Verified before the fix:
+`"abc".m("only")` on a 2-param type-1 callee bound `a="SENTINEL2", b="only"`, and
+`"abc".m("one","two","three")` bound `a="two", b="three"` while stranding `"one"`.
+Test `regression/string_prim_method_type1_args` covers both directions and, via
+`t=` / `ts=` / `n=`, pins `this` / `super` / `arguments.length` for a type-1 body.
+
+Incidental leak fixed: the arm did `allocObject` + `retainObject` on its local
+scope and released it once, so the frame was never freed. The core allocs and
+releases (closures already `retainObject` non-with scopes at capture —
+`actionDefineFunction`), so the frame now frees when nothing captured it.
+
+**Stage 3 is complete for `actionCallMethod`'s invocation arms** except the MC arm.
+
 ##### Survey of the two arms that are NOT drop-ins (read before attempting them)
 
 Both remaining `actionCallMethod` arms diverge from the core in a way no existing
@@ -768,20 +818,10 @@ decision first.
    `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit, inversion preserved and pinned by a test.
    Instance seven of the clamp/pad bug confirmed real and fixed. The survey's
    mechanism for the inversion was wrong — see the landing note.)*
-2. **The string-primitive arm** (`action.c:64959`, type-1 loop at `65102`, a user-overridden
-   `String.prototype` method on a primitive receiver). It reads `_sp_fn->flags`
-   and applies the **type-2 activation ritual to type-1 bodies too** — binding
-   `"this"`, `"arguments"` *and* `"super"` on the local scope even for a plain
-   `DefineFunction`, whose `flags` is always 0 (`actionDefineFunction`,
-   `action.c:57175`). The core's `INV_ACT_*` rule table deliberately gives a
-   type-1 callee no `"this"`/`"super"` scope binding, so `act_flags = THIS |
-   ARGUMENTS | SUPER` would **drop** two bindings on the type-1 path. Its type-1
-   half also pushes `num_args` unclamped/unpadded — instance eight, unverified.
-   Its type-2 half, by contrast, maps cleanly (`INV_SUPER_CTX` depth 1 with
-   `this_var = OBJECT(_sp_wrap)`, so the core's derived receiver is correct here;
-   `INV_LOCAL_SCOPE | INV_EXEC_FUNC`, `act_flags = THIS | ARGUMENTS | SUPER`,
-   and a `CF_VERSION | CF_CTX_LIVE`-shaped frame). Splitting the commit by
-   function_type is a legitimate option.
+2. **The string-primitive arm** — *(Landed: step 5c above. Decision: NO new flag —
+   the type-1 `this`/`super` name bindings the arm performed are provably dead, so
+   `act_flags = THIS|ARGUMENTS|SUPER` reproduces it exactly. Instance eight of the
+   clamp/pad bug confirmed real and fixed.)*
 
 **The clamp/pad fix is visible in the wild, and `results_diff.md` mis-reports it
 as a regression.** Gnash's `makeswf`/Ming emits plain `DefineFunction`, so every
