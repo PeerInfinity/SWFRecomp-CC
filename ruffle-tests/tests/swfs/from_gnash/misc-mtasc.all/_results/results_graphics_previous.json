@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-09T04:39:30.738143+00:00",
-    "git_sha": "132d88e0981a551d154f13fc0fd87f51e3836a2e",
-    "duration_seconds": 135.79,
+    "timestamp": "2026-07-09T05:10:44.799519+00:00",
+    "git_sha": "aa707f4c9a352aeb247cee611a3998959290e088",
+    "duration_seconds": 140.86,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30
@@ -20,8 +20,8 @@
       "test": "TextFieldTest",
       "phases": {
         "recomp": 0.006,
-        "compile": 20.578,
-        "run": 0.365
+        "compile": 21.026,
+        "run": 0.416
       },
       "num_frames": 30,
       "lines": {
@@ -29,7 +29,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 20.96,
+      "duration": 21.46,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -39,7 +39,7 @@
       "test": "enum",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.715,
+        "compile": 21.213,
         "run": 0.215
       },
       "num_frames": 30,
@@ -48,14 +48,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 20.94,
+      "duration": 21.43,
       "status": "pass"
     },
     {
       "test": "exception",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.078,
+        "compile": 21.885,
         "run": 0.215
       },
       "num_frames": 30,
@@ -64,14 +64,14 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 23.3,
+      "duration": 22.11,
       "status": "pass"
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.177,
+        "compile": 22.603,
         "run": 0.215
       },
       "num_frames": 30,
@@ -80,14 +80,14 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 20.4,
+      "duration": 22.83,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.353,
+        "compile": 20.757,
         "run": 0.215
       },
       "num_frames": 30,
@@ -96,14 +96,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 21.57,
+      "duration": 20.98,
       "status": "pass"
     },
     {
       "test": "implementsOpTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 18.053,
+        "compile": 21.589,
         "run": 0.215
       },
       "num_frames": 30,
@@ -112,15 +112,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 18.27,
+      "duration": 21.81,
       "status": "pass"
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.392,
-        "run": 0.265
+        "compile": 2.298,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -128,15 +128,15 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 2.66,
+      "duration": 2.52,
       "status": "pass"
     },
     {
       "test": "levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.129,
-        "run": 0.266
+        "compile": 4.113,
+        "run": 0.265
       },
       "num_frames": 30,
       "lines": {
@@ -144,7 +144,7 @@
         "expected_lines": 68,
         "matching_lines": 49
       },
-      "duration": 4.4,
+      "duration": 4.39,
       "ruffle_diff_count": 21,
       "ours_diff_count": 19,
       "status": "ruffle_matched",
@@ -154,7 +154,7 @@
       "test": "super_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.54,
+        "compile": 2.564,
         "run": 0.215
       },
       "num_frames": 30,
@@ -163,7 +163,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 2.76,
+      "duration": 2.79,
       "status": "pass"
     }
   ]
