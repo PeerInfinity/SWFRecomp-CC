@@ -7,7 +7,11 @@ flags added and `invokeResolveFunction` wired to it (behavior-preserving); see t
 Stage 1 landing note in §4.
 Stage 2 COMPLETE (July 8, 2026) — the whole accessor family
 (`invokePropertyGetter` / `invokePropertySetter` / `invokeResolveFunction`) are now
-thin adapters over the core; see the Stage 2 landing note in §4. Stages 3–5 not
+thin adapters over the core; see the Stage 2 landing note in §4.
+Stage 3 IN PROGRESS (July 9, 2026) — 5 of `actionCallMethod`'s ~19 arms migrated
+(`e4082f224`, `65d442f09`), one real TYPE1_ARG_ORDER bug found and fixed; the
+remaining arms need new core capability (`arguments` object, closure-context
+scope reset, ctor context). See the Stage 3 progress note in §4. Stages 4–5 not
 started.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
@@ -294,6 +298,84 @@ Stage-0 permanent tests + `add_property`, `transform`, `color_transform`,
 - Key suites: `as2_super_and_this_*`, `super_edge_cases`, `extends_chain`,
   `register_and_init_order`, `swf5_no_closure`, `swf5_to_6_cross_call`.
 
+#### Stage 3 progress note (July 9, 2026) — 5 of ~19 arms migrated
+
+Landed, each CI-green in **both** modes with every suite's delta at 0:
+
+| Commit | Arms |
+|---|---|
+| `e4082f224` (3a) | `actionCallMethod`'s four **super** arms: the `arguments`-array `super()` proxy, the `arguments`-array `super.method()` proxy, and the two arms under the `SUPER`-typed receiver |
+| `65d442f09` (3b) | the `.call`/`.apply`-via-`GetMember` arm (`g_getmember_call_target`) — **plus a real bug**, below |
+
+**No new core flags were needed.** The existing set covered every arm, but only
+because three ritual steps were deliberately left *outside* the core:
+
+- `setVariableByName("this", ...)` — these arms bind `this` into the **enclosing**
+  scope, not a fresh local frame, so `INV_LOCAL_SCOPE | INV_BIND_THIS` would not
+  reproduce them.
+- the bare `g_call_depth++/--` — `INV_DEPTH_GUARD` also adds a
+  `g_max_call_depth` halt check that these arms never had.
+- `g_current_executing_func` / `g_call_this_type` in the `.call` arm —
+  `INV_EXEC_FUNC` additionally writes `g_prev_executing_func`, which that arm
+  never did.
+
+The arms' flag sets genuinely differ from one another and that asymmetry is
+load-bearing (§3): e.g. the `arguments`-array `super()` proxy's type-1 branch
+binds `this` to the super **object** even when a registerClass companion MC
+exists, while the `SUPER`-receiver arms bind it to the **MC**. Reproduced, not
+normalized. Type-2 arms with a companion MC map exactly onto
+`INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR`.
+
+**Bug found and fixed (3b):** the `.call`/`.apply`-via-`GetMember` arm's type-1
+branch pushed args in **reverse** order and never padded to `param_count`.
+`f.call(null,"one","two")` on a plain `DefineFunction` bound `a="two", b="one"`;
+the 1-arg form bound `a=undefined, b="only"` while the callee's prologue popped a
+value off the **caller's** eval stack. A seventh instance of the class
+`bcacc3f70` fixed in six dispatchers and Stage 0 fixed in
+`actionEI_callInternalInterface` — it survived both sweeps. The core's single
+forward+clamp+pad loop fixes it for free. Regression test:
+`regression/fn_call_type1_args`.
+
+Safety audit that made the pad/clamp adoption safe here: `param_count` is
+accurate for **every** type-1 function reachable from these arms — recompiled
+`DefineFunction` bodies pop exactly `param_count` (`action.c:56928`), and the
+only five natives with a real `simple_func` are `toString`-shaped with
+`param_count = 0` and no args. Separately, the `registers` parameter of a
+recompiled `DefineFunction2` is **never read** (the generated body declares its
+own local `regs[]`), so the core's `HCALLOC(register_count)`-or-NULL is safe
+where arms previously passed a zeroed `ActionVar registers[256]` stack array.
+
+**Perf gate: passed, but not via N.** `invokeFunctionValue` is *never executed*
+in N — N's 691 script functions are 100% type-1 `DefineFunction`, it has zero
+`DefineFunction2`, and it reaches none of the migrated arms (0 mentions in
+`callgrind.out`). N is therefore a vacuous oracle for this stage. Worse, the
+harness has **~13% run-to-run Ir variance on N with the identical binary**
+(5,755,417,982 vs 6,506,572,041 on two `--run-only` invocations), so it cannot
+resolve a small delta anyway — do not trust a single-run before/after on N.
+Measured on **Minesweeper** instead, which does reach the `super.method()` arm:
+`invokeFunctionValue` self cost is **12,117 Ir of 641,978,548 = 0.0019%**. No
+`static inline` needed.
+
+**Remaining ~14 arms need new core capability, not just new flags.** The object
+/ MC / array / `__resolve` / `.call`-handler arms each perform steps the core has
+no notion of. Design these before continuing:
+- **`arguments` object construction** + `setupArgumentsProps` (respecting the
+  DefineFunction2 preload/suppress flags) — the `.call`/`.apply` handlers and the
+  object-method arm.
+- **Closure-context switch**: save/clear/restore the *whole* scope chain
+  (`scope_depth = 0`), `reResolveDeadBaseClip` + `actionSetCurrentContext` +
+  `g_current_sprite_obj`, gated on `caller_ver >= 6`. This is the
+  `actionCallFunction` shape; the empty-method-name arm shares it verbatim.
+- **`pushCtorContext` / `popCtorContext`**, `g_override_this` /
+  `g_override_this_set`, `g_c_function_this_obj`, and binding `"super"` as a
+  named local.
+
+**New Stage-4 leads (same bug class, outside Stage 3's scope):** two reverse-order
+type-1 arg pushes remain — `lc_dispatch_method` (`action.c:2908`, LocalConnection
+method dispatch) and `bdRectangleGetter` (`action.c:14365`, which pushes four
+fixed `Rectangle` ctor args in reverse). Both also skip the `param_count`
+clamp/pad.
+
 ### Stage 4 — event/callback dispatchers + deliberate normalization
 
 `mc_call_as2_handler_ng`, `fireTimerCallback`, `builtin_broadcaster_broadcastMessage`,
@@ -320,10 +402,15 @@ and 4 get properly fixed rather than patched).
   behavior lock; zero pass→fail is the bar for behavior-preserving stages.
 - Stage-0 tests become permanent regression tests.
 - Watch the known-sensitive clusters per stage (listed inline above).
-- Perf sanity: the helper adds one call frame + flag checks on hot call paths
-  — run `profile_game_native.sh` on N before/after Stage 3 to confirm no
-  measurable regression (expect noise-level; if not, inline the core with
-  `static inline` + always_inline).
+- Perf sanity: the helper adds one call frame + flag checks on hot call paths.
+  **Do not use N for this** — it never executes `invokeFunctionValue` (100%
+  type-1 functions, no `DefineFunction2`, reaches none of the migrated arms),
+  and `profile_game_native.sh` shows ~13% run-to-run Ir variance on N with the
+  *identical binary*, so a single before/after pair there is meaningless. Use
+  **Minesweeper** (reaches the `super.method()` arm) and read the core's own
+  `Ir` line out of `callgrind_annotate --threshold=100`, rather than comparing
+  PROGRAM TOTALS across builds. Measured July 9, 2026: 0.0019% of total. Inline
+  the core (`static inline` + always_inline) only if that share becomes material.
 
 ## 6. Risks
 
