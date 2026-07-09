@@ -529,7 +529,9 @@ migration and gets a `regression/` test at that point:
 - **object-method type-1 arm** (`64719`): pushes `num_args` values, no clamp, no
   pad. **CONFIRMED REAL and fixed** in step 3 — see the landing note below.
 - **`.call`/`.apply` type-1 handler** (`65659`): pads to `param_count` but never
-  **clamps** — extra args leak onto the caller's eval stack.
+  **clamps** — extra args leak onto the caller's eval stack. **CONFIRMED REAL and
+  fixed** in step 4 — see the landing note below. Four for four: every arm this
+  survey flagged had the bug.
 
 #### Stage 3c landing notes
 
@@ -616,6 +618,60 @@ two modes as step 2: `o.m("only")` bound `a="SENTINEL2", b="only"`, and
 That is the third arm of this class, after `.call`/`.apply`-via-`GetMember` (3b)
 and the empty-method-name arm (step 2). One hand-rolled marshalling loop's worth
 of bug in each; all three now served by the core's single forward+clamp+pad loop.
+
+**Step 4 — the `.call`/`.apply` builtin handlers (`d3e5747bc`, −167 lines).** All
+four invocation branches of `actionCallMethod`'s builtin
+`Function.prototype.call` (`65282`) and `Function.prototype.apply` (`65555`)
+handlers are now thin adapters. Distinct from 3b's arm, which serves the
+`GetMember("call")` + `CallMethod(undefined)` bytecode shape.
+
+Flags: `INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH | INV_LOCAL_SCOPE |
+INV_BASE_CLIP | INV_EXEC_FUNC | INV_OVERRIDE_THIS` on all four. The type-2
+branches add `INV_THIS_STACK`, gated *by the arm* on the callee's
+preload/suppress-`this` bits, and carry `act_flags = 0` — they have never built
+an `arguments` object nor bound `this`/`super` on the local scope. The type-1
+branches carry `act_flags = INV_ACT_THIS | INV_ACT_ARGUMENTS`, which the rule
+table renders as "push `g_this_stack` only" + "`allocArray(max(n,1))`". No
+`INV_VERSION_SWITCH`, so `INV_BASE_CLIP`'s `g_swf_version` test still reads the
+**caller's** version — the hazard stays disarmed without a `ClosureFrame`.
+
+Three steps stay outside, and the first is a new *kind* of reason:
+
+- **`pushSuperContext` takes a different receiver than the core would.** The core
+  sources its super receiver from `this_var`; this arm has always pushed
+  `this_obj`, which is `mc->dynamic_props` for a MOVIECLIP thisArg and
+  `own_props` for a FUNCTION one. Those genuinely differ, and so does the value
+  that belongs on `g_this_stack` (the *scriptable* thisArg, which must keep its
+  MOVIECLIP tag inside the callee). So: `this_var` carries the scriptable
+  receiver, `opts->this_ptr` (`has_this_ptr`) carries the ABI receiver, and the
+  super push brackets the core call. It is a pure state push
+  (`action.c:432`) that reads no other global, so hoisting it above the scope
+  setup is exactly equivalent. **Do not "fix" the core to source super from
+  `pass_this`** — the object-method arm relies on the current behavior, passing
+  `this_ptr = obj` while its `this_var` falls back to `root_movieclip`.
+- The **override-`this` pre-clear**: the arm clears `g_override_this_set` *before*
+  the call when `register_count == 0`; `INV_OVERRIDE_THIS` clears only after.
+  Same divergence as step 2's empty-method-name arm.
+- `g_call_this_type` — read only from inside builtin bodies (precedent: 3b).
+
+**The predicted type-1 clamp bug is REAL** (predicted at `65659`), the fourth of
+its class and the last one the 3c survey called. Both branches padded a short
+call up to `param_count` but never clamped a long one, so the prologue bound the
+**last** `param_count` operands and the leading arguments were stranded on the
+caller's eval stack: `f.call(null,"one","two","three")` on a 2-param type-1 `f`
+bound `a="two", b="three"` and leaked `"one"`. Regression test
+`regression/fn_call_builtin_type1_args` — hand-assembled bytecode; each over-long
+call is followed by `POP` + `TRACE` of a sentinel pushed beneath it, so a leak
+traces the stranded argument instead of the sentinel. Verified to fail before and
+pass after, for both `.call` and `.apply`.
+
+CI green in **both** modes, every suite's pass delta 0, regression 7/7 → 8/8.
+**And this time the line metrics moved the right way**, unlike step 3: gnash
+`actionscript.all` dropped 219 mismatched lines, with `argstest-v8` 54 → 175
+matching, `argstest-v7` 50 → 110, `argstest-v6` 42 → 80. Same fix class, same
+already-failing tests — the direction of the metric simply depends on whether the
+shortened output happens to re-align positionally. Neither direction is evidence
+on its own; read the output.
 
 **The clamp/pad fix is visible in the wild, and `results_diff.md` mis-reports it
 as a regression.** Gnash's `makeswf`/Ming emits plain `DefineFunction`, so every
