@@ -63583,36 +63583,36 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			else
 				pushSuperContext(this_obj, depth + 1);
 
-			if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL)
-			{
-				ActionVar registers[256] = {0};
-				// If registerClass context has a companion MC, pass it via
-				// g_event_this_mc so preload_this gets MOVIECLIP type.
-				MovieClip* _saved_etm = g_event_this_mc;
-				void* _ctor_this = this_obj;
-				if (super_mc != NULL) {
-					g_event_this_mc = (MovieClip*)super_mc;
-					_ctor_this = NULL;  // let preload-this use g_event_this_mc
-				}
-				g_call_depth++;
-				parent_ctor->advanced_func(app_context, args, num_args, registers, _ctor_this);
-				g_call_depth--;
-				if (super_mc != NULL) g_event_this_mc = _saved_etm;
-			}
-			else if (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL)
+			int _sc_is_t2 = (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL);
+			int _sc_is_t1 = (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL);
+
+			if (_sc_is_t2 || _sc_is_t1)
 			{
 				ActionVar this_var = {0};
-				this_var.type = ACTION_STACK_VALUE_OBJECT;
-				this_var.data.numeric_value = (u64)this_obj;
-				setVariableByName("this", &this_var);
-				// Forward order (args[0] deepest, last arg on top) to match the
-				// canonical type-1 simple_func convention (non-super dispatch ~53488);
-				// the old reverse order swapped multi-arg params of type-1 functions
-				// reached via super/__resolve/array-element calls (see TYPE1_ARG_ORDER).
-				for (u32 i = 0; i < num_args; i++)
-					pushVar(app_context, &args[i]);
+				u16 _sc_flags = 0;
+				if (_sc_is_t2 && super_mc != NULL)
+				{
+					// registerClass companion MC: hand it over as the MOVIECLIP
+					// receiver so INV_EVENT_THIS_MC publishes it and
+					// INV_MC_THIS_NULL_PTR still passes NULL to advanced_func,
+					// letting preload_this pick it up as a MOVIECLIP.
+					this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					this_var.data.numeric_value = (u64)(uintptr_t) super_mc;
+					_sc_flags = INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR;
+				}
+				else
+				{
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.data.numeric_value = (u64)(uintptr_t) this_obj;
+				}
+
+				// A type-1 ctor body reads `this` from the enclosing scope, not
+				// from a local frame — bind it by name, as this arm always has.
+				if (_sc_is_t1) setVariableByName("this", &this_var);
+
+				InvokeOpts opts = { .flags = _sc_flags, .super_depth = 0 };
 				g_call_depth++;
-				((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
+				(void) invokeFunctionValue(app_context, parent_ctor, &this_var, args, num_args, &opts);
 				g_call_depth--;
 			}
 			else if (parent_ctor->simple_func == NULL && parent_ctor->advanced_func == NULL) {
@@ -63704,36 +63704,27 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ActionVar result = {0};
 			result.type = ACTION_STACK_VALUE_UNDEFINED;
 
-			if (method_func->function_type == 2 && method_func->advanced_func != NULL)
-			{
-				ActionVar registers[256] = {0};
-				g_call_depth++;
-				result = method_func->advanced_func(app_context, args, num_args, registers, this_obj);
-				g_call_depth--;
-			}
-			else if (method_func->function_type == 1 && method_func->simple_func != NULL)
+			int _sm_is_t1 = (method_func->function_type == 1 && method_func->simple_func != NULL);
+			if ((method_func->function_type == 2 && method_func->advanced_func != NULL) || _sm_is_t1)
 			{
 				ActionVar this_var = {0};
 				this_var.type = ACTION_STACK_VALUE_OBJECT;
-				this_var.data.numeric_value = (u64)this_obj;
-				setVariableByName("this", &this_var);
-				// Push to g_this_stack so the early "this" resolution in
-				// actionGetVariable finds the correct object
-				u32 _saved_this_depth = g_this_depth;
-				if (g_this_depth < MAX_THIS_DEPTH) {
-					g_this_stack[g_this_depth] = this_var;
-					g_this_depth++;
+				this_var.data.numeric_value = (u64)(uintptr_t) this_obj;
+
+				// A type-1 body reads `this` from the enclosing scope, and needs it on
+				// g_this_stack for actionGetVariable's early `this` resolution. A type-2
+				// body gets it as the receiver pointer instead.
+				u16 _sm_flags = 0;
+				if (_sm_is_t1)
+				{
+					setVariableByName("this", &this_var);
+					_sm_flags = INV_THIS_STACK;
 				}
-				// Forward order (args[0] deepest, last arg on top) to match the
-				// canonical type-1 simple_func convention (non-super dispatch ~53488);
-				// the old reverse order swapped multi-arg params of type-1 functions
-				// reached via super/__resolve/array-element calls (see TYPE1_ARG_ORDER).
-				for (u32 i = 0; i < num_args; i++)
-					pushVar(app_context, &args[i]);
+
+				InvokeOpts opts = { .flags = _sm_flags, .super_depth = 0 };
 				g_call_depth++;
-				result = ((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
+				result = invokeFunctionValue(app_context, method_func, &this_var, args, num_args, &opts);
 				g_call_depth--;
-				g_this_depth = _saved_this_depth;
 			}
 
 			popSuperContext();
@@ -63789,34 +63780,30 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					pushSuperContextWithMC(super_this, super_depth + 1, super_mc);
 				else
 					pushSuperContext(super_this, super_depth + 1);
-				if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL) {
-					ActionVar registers[256] = {0};
-					// If registerClass context has a companion MC, pass it via
-					// g_event_this_mc so preload_this gets MOVIECLIP type.
-					MovieClip* _saved_etm = g_event_this_mc;
-					void* _ctor_this = super_this;
-					if (super_mc != NULL) {
-						g_event_this_mc = (MovieClip*)super_mc;
-						_ctor_this = NULL;
-					}
-					g_call_depth++;
-					ctor_result = parent_ctor->advanced_func(app_context, args, num_args, registers, _ctor_this);
-					g_call_depth--;
-					if (super_mc != NULL) g_event_this_mc = _saved_etm;
-				} else if (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL) {
+				int _su_is_t2 = (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL);
+				int _su_is_t1 = (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL);
+				if (_su_is_t2 || _su_is_t1) {
+					// A registerClass companion MC becomes the MOVIECLIP receiver. For a
+					// type-2 ctor that means INV_EVENT_THIS_MC publishes it while
+					// INV_MC_THIS_NULL_PTR keeps advanced_func's `this` NULL, so
+					// preload_this picks the MC up. A type-1 ctor ignores the receiver
+					// pointer and reads `this` from the enclosing scope instead.
 					ActionVar this_var = {0};
 					if (super_mc != NULL) {
 						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-						this_var.data.numeric_value = (u64)super_mc;
+						this_var.data.numeric_value = (u64)(uintptr_t) super_mc;
 					} else {
 						this_var.type = ACTION_STACK_VALUE_OBJECT;
-						this_var.data.numeric_value = (u64)super_this;
+						this_var.data.numeric_value = (u64)(uintptr_t) super_this;
 					}
-					setVariableByName("this", &this_var);
-					for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
-						pushVar(app_context, &args[i]);
+
+					u16 _su_flags = 0;
+					if (_su_is_t1) setVariableByName("this", &this_var);
+					else if (super_mc != NULL) _su_flags = INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR;
+
+					InvokeOpts opts = { .flags = _su_flags, .super_depth = 0 };
 					g_call_depth++;
-					ctor_result = ((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
+					ctor_result = invokeFunctionValue(app_context, parent_ctor, &this_var, args, num_args, &opts);
 					g_call_depth--;
 				} else if (parent_ctor->simple_func == NULL && parent_ctor->advanced_func == NULL) {
 					invokeNativeSuperConstructor(app_context, parent_ctor, super_this, args, num_args, &ctor_result);
@@ -63901,41 +63888,34 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar result = {0};
 				result.type = ACTION_STACK_VALUE_UNDEFINED;
 
-				if (method_func->function_type == 2 && method_func->advanced_func != NULL) {
-					ActionVar registers[256] = {0};
-					// registerClass instance: pass the MC via g_event_this_mc so
-					// preload_this binds `this` as MOVIECLIP (mirrors super() ctor path).
-					MovieClip* _saved_etm = g_event_this_mc;
-					void* _meth_this = super_this;
-					if (super_mc != NULL) {
-						g_event_this_mc = (MovieClip*)super_mc;
-						_meth_this = NULL;
-					}
-					g_call_depth++;
-					result = method_func->advanced_func(app_context, args, num_args, registers, _meth_this);
-					g_call_depth--;
-					if (super_mc != NULL) g_event_this_mc = _saved_etm;
-				} else if (method_func->function_type == 1 && method_func->simple_func != NULL) {
+				int _sd_is_t2 = (method_func->function_type == 2 && method_func->advanced_func != NULL);
+				int _sd_is_t1 = (method_func->function_type == 1 && method_func->simple_func != NULL);
+				if (_sd_is_t2 || _sd_is_t1) {
+					// registerClass instance: the companion MC is the receiver, so
+					// preload_this binds `this` as MOVIECLIP (mirrors the super() ctor
+					// path above). A type-1 body takes `this` from the enclosing scope
+					// plus g_this_stack, and ignores the receiver pointer.
 					ActionVar this_var = {0};
 					if (super_mc != NULL) {
 						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-						this_var.data.numeric_value = (u64)super_mc;
+						this_var.data.numeric_value = (u64)(uintptr_t) super_mc;
 					} else {
 						this_var.type = ACTION_STACK_VALUE_OBJECT;
-						this_var.data.numeric_value = (u64)super_this;
+						this_var.data.numeric_value = (u64)(uintptr_t) super_this;
 					}
-					setVariableByName("this", &this_var);
-					u32 _saved_this_depth2 = g_this_depth;
-					if (g_this_depth < MAX_THIS_DEPTH) {
-						g_this_stack[g_this_depth] = this_var;
-						g_this_depth++;
+
+					u16 _sd_flags = 0;
+					if (_sd_is_t1) {
+						setVariableByName("this", &this_var);
+						_sd_flags = INV_THIS_STACK;
+					} else if (super_mc != NULL) {
+						_sd_flags = INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR;
 					}
-					for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
-						pushVar(app_context, &args[i]);
+
+					InvokeOpts opts = { .flags = _sd_flags, .super_depth = 0 };
 					g_call_depth++;
-					result = ((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
+					result = invokeFunctionValue(app_context, method_func, &this_var, args, num_args, &opts);
 					g_call_depth--;
-					g_this_depth = _saved_this_depth2;
 				}
 
 				// Restore original super value on scope chain
