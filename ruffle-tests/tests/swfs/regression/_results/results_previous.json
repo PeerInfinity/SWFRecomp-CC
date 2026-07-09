@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-09T02:21:35.483765+00:00",
-    "git_sha": "c8447e0246f403a830a363e1a52ba129a5cb02b0",
-    "duration_seconds": 94.65,
+    "timestamp": "2026-07-09T04:24:55.662001+00:00",
+    "git_sha": "ee913277877cd3eb447ef7e52c9165d86568b5f7",
+    "duration_seconds": 100.2,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -20,8 +20,8 @@
       "test": "ei_type1_args",
       "phases": {
         "recomp": 0.004,
-        "compile": 19.386,
-        "run": 0.002
+        "compile": 20.063,
+        "run": 0.004
       },
       "num_frames": 2,
       "lines": {
@@ -29,15 +29,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 19.4,
+      "duration": 20.08,
       "status": "pass"
     },
     {
       "test": "fn_call_type1_args",
       "phases": {
         "recomp": 0.005,
-        "compile": 19.641,
-        "run": 0.002
+        "compile": 19.876,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -45,15 +45,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 19.65,
+      "duration": 19.89,
       "status": "pass"
     },
     {
       "test": "mc_event_type1_args",
       "phases": {
         "recomp": 0.004,
-        "compile": 15.64,
-        "run": 0.002
+        "compile": 19.962,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -61,14 +61,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.65,
+      "duration": 19.97,
       "status": "pass"
     },
     {
       "test": "nc_onstatus_closure",
       "phases": {
-        "recomp": 0.004,
-        "compile": 19.526,
+        "recomp": 0.005,
+        "compile": 20.17,
         "run": 0.004
       },
       "num_frames": 2,
@@ -77,14 +77,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.54,
+      "duration": 20.18,
       "status": "pass"
     },
     {
       "test": "timer_cross_swf_version",
       "phases": {
         "recomp": 0.004,
-        "compile": 20.391,
+        "compile": 19.782,
         "run": 0.004
       },
       "num_frames": 5,
@@ -93,7 +93,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 20.4,
+      "duration": 19.79,
       "status": "pass"
     }
   ]
