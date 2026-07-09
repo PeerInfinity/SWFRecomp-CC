@@ -1,0 +1,100 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-09T02:37:02.430376+00:00",
+    "git_sha": "aa651d161b96e4f87e22eec728c11addcc85b268",
+    "duration_seconds": 103.61,
+    "total_available": 5,
+    "shards": 30,
+    "expected_shards": 30
+  },
+  "total": 5,
+  "pass": 5,
+  "ruffle_matched": 0,
+  "fail": 0,
+  "pass_rate": 100.0,
+  "effective_pass": 5,
+  "effective_pass_rate": 100.0,
+  "breakdown": {},
+  "tests": [
+    {
+      "test": "ei_type1_args",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 19.069,
+        "run": 0.165
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 19.24,
+      "status": "pass"
+    },
+    {
+      "test": "fn_call_type1_args",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 21.538,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 21.72,
+      "status": "pass"
+    },
+    {
+      "test": "mc_event_type1_args",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 21.231,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 21.41,
+      "status": "pass"
+    },
+    {
+      "test": "nc_onstatus_closure",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 19.674,
+        "run": 0.165
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 19.85,
+      "status": "pass"
+    },
+    {
+      "test": "timer_cross_swf_version",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 20.917,
+        "run": 0.165
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 21.09,
+      "status": "pass"
+    }
+  ]
+}
