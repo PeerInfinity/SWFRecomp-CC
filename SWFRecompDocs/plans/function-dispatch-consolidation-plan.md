@@ -8,12 +8,15 @@ Stage 1 landing note in §4.
 Stage 2 COMPLETE (July 8, 2026) — the whole accessor family
 (`invokePropertyGetter` / `invokePropertySetter` / `invokeResolveFunction`) are now
 thin adapters over the core; see the Stage 2 landing note in §4.
-Stage 3 IN PROGRESS (July 9, 2026) — 5 of `actionCallMethod`'s ~19 arms migrated
-(`e4082f224`, `65d442f09`), one real TYPE1_ARG_ORDER bug found and fixed; the
-remaining arms need new core capability (`arguments` object, closure-context
-scope reset, ctor context). See the Stage 3 progress note in §4, then the
-**Stage 3c design note** for the chosen shape (arm-owned `ClosureFrame` +
-in-core `act_flags` activation) and the migration order. Stages 4–5 not started.
+Stage 3 IN PROGRESS (July 9, 2026) — **12 of `actionCallMethod`'s ~19 arms
+migrated**, plus all of `actionCallFunction` (`e4082f224`, `65d442f09`,
+`ee9132778`, `e31237992`, `a2cd5228b`, `d3e5747bc`, `812bc54f7`). **Six real
+TYPE1_ARG_ORDER clamp/pad bugs found and fixed**, each with a permanent
+hand-assembled test in `regression/`. Read the Stage 3 progress note in §4, then
+the **Stage 3c design note** for the shape (arm-owned `ClosureFrame` + in-core
+`act_flags` activation), then the **Stage 3c landing notes** — the last of which
+surveys the two remaining arms (`__resolve`, string-primitive), **neither of
+which is a drop-in**. Stages 4–5 not started.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
 lines) + `timer.c` performed July 4, 2026; figures below are from that survey.
@@ -515,8 +518,11 @@ Extending 3a/3b's judgement, with a reason for each rather than an assumption:
    `INV_SUPER_CTX` with `method_search_depth`, `INV_VERSION_SWITCH`.
 4. **The `.call`/`.apply` builtin handlers**: `INV_FORCE_CAPTURED_WITH` (they
    force `is_with = 1` on captured scopes), `INV_ACT_ARGUMENTS` on the type-1
-   branch only — the type-2 branch builds no `arguments` object today.
-5. `__resolve` arm, array arm, string-primitive arm, MC arm.
+   branch only — the type-2 branch builds no `arguments` object today. *(Landed:
+   `d3e5747bc`.)*
+5. `__resolve` arm, array arm, string-primitive arm, MC arm. *(Array arms landed:
+   `812bc54f7`. The `__resolve` and string-primitive arms are **not** drop-ins —
+   see the survey below before attempting them.)*
 
 ##### Latent bugs this design will fix for free (same class)
 
@@ -672,6 +678,73 @@ matching, `argstest-v7` 50 → 110, `argstest-v6` 42 → 80. Same fix class, sam
 already-failing tests — the direction of the metric simply depends on whether the
 shortened output happens to re-align positionally. Neither direction is evidence
 on its own; read the output.
+
+**Step 5a — the two array arms (`812bc54f7`, −79 lines).** Both invocation arms
+of `actionCallMethod`'s ARRAY receiver, each collapsing its type-1 and type-2
+halves into one call site: the **user-method** arm (`arr.m = f; arr.m(...)`, via
+`getPropertyWithPrototype(arr->props, …)`) and the **numeric-index element** arm
+(`arr = [f]; arr[0](...)`).
+
+Flags — user-method: `INV_THIS_STACK` on both halves, `+ INV_LOCAL_SCOPE |
+INV_BIND_THIS` on type-2 only. Element: `INV_CAPTURED_SCOPE` on both (**unforced**
+`is_with`, unlike `.call`/`.apply`), `+ INV_LOCAL_SCOPE | INV_BASE_CLIP` on type-2
+only. `act_flags = 0` on both arms — neither has ever built an `arguments` object.
+
+Preserved asymmetries: the user-method type-1 half has **no local frame at all**,
+so it binds `this` into the *enclosing* scope via `setVariableByName` (outside the
+core, as in 3a/3b) while its type-2 half gets a fresh frame with `"this"` on it;
+the element arm binds **no receiver whatsoever** (`advanced_func` gets NULL,
+nothing reaches `g_this_stack`). And `pushSuperContext` again takes a different
+receiver than the core would derive — `arr->props`, not `arr`, because
+`walkProtoChain` casts `super_this` to `ASObject*` and a raw `ASArray` is not one.
+Second site to need that treatment after `.call`/`.apply`.
+
+**Instances five and six of the clamp/pad bug** — and the first two found *outside*
+the survey's predicted set. Both arms pushed `num_args` operands with neither a
+clamp nor a pad, so a type-1 array method mis-bound in **both** directions:
+
+    arr.m("one","two","three")  ->  a="two", b="three", and "one" leaked
+    arr.m("only")               ->  a=<caller's stack top>, b="only"
+
+The short-call direction is the more damaging one: the prologue popped a value
+belonging to the caller's in-progress expression. Tests
+`regression/array_method_type1_args` and `regression/array_element_type1_args`,
+each pushing a sentinel beneath the call and `TRACE`ing it afterwards. Both
+verified to fail before and pass after. CI green in **both** modes, all pass
+deltas 0, regression 8/8 → 10/10.
+
+##### Survey of the two arms that are NOT drop-ins (read before attempting them)
+
+Both remaining `actionCallMethod` arms diverge from the core in a way no existing
+flag expresses. Neither is a bug to fix in passing — each needs a deliberate
+decision first.
+
+1. **The OBJECT `__resolve` arm** (`action.c:64613`, type-1 loop at `64671`, the call of the function
+   `__resolve` *returned*; the hook itself is already `invokeResolveFunction`).
+   It pushes the **local scope FIRST and the captured scopes on top of it** —
+   the exact inversion of the core, which pushes captured first and local last.
+   With `captured_scope_count > 0` the topmost frame is therefore a captured
+   `is_with` scope, so the callee's parameter binds land in the *closure's*
+   captured object instead of a fresh frame. `actionEI_callInternalInterface`
+   has the same inversion (Stage 0 note). Migrating as-is would silently
+   normalize it. Either add an `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit (two sites
+   would use it) or make the normalization a deliberate Stage-4 change with a
+   test. Its type-1 half also pushes `num_args` unclamped/unpadded — instance
+   seven, unverified.
+2. **The string-primitive arm** (`action.c:64959`, type-1 loop at `65102`, a user-overridden
+   `String.prototype` method on a primitive receiver). It reads `_sp_fn->flags`
+   and applies the **type-2 activation ritual to type-1 bodies too** — binding
+   `"this"`, `"arguments"` *and* `"super"` on the local scope even for a plain
+   `DefineFunction`, whose `flags` is always 0 (`actionDefineFunction`,
+   `action.c:57175`). The core's `INV_ACT_*` rule table deliberately gives a
+   type-1 callee no `"this"`/`"super"` scope binding, so `act_flags = THIS |
+   ARGUMENTS | SUPER` would **drop** two bindings on the type-1 path. Its type-1
+   half also pushes `num_args` unclamped/unpadded — instance eight, unverified.
+   Its type-2 half, by contrast, maps cleanly (`INV_SUPER_CTX` depth 1 with
+   `this_var = OBJECT(_sp_wrap)`, so the core's derived receiver is correct here;
+   `INV_LOCAL_SCOPE | INV_EXEC_FUNC`, `act_flags = THIS | ARGUMENTS | SUPER`,
+   and a `CF_VERSION | CF_CTX_LIVE`-shaped frame). Splitting the commit by
+   function_type is a legitimate option.
 
 **The clamp/pad fix is visible in the wild, and `results_diff.md` mis-reports it
 as a regression.** Gnash's `makeswf`/Ming emits plain `DefineFunction`, so every

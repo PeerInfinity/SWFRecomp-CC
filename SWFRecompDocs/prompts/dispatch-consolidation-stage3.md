@@ -2,7 +2,7 @@
 
 ## Where things stand
 
-Stages 0–2 landed earlier. **Stage 3 is well past half: 8 of `actionCallMethod`'s
+Stages 0–2 landed earlier. **Stage 3 is nearly done: 12 of `actionCallMethod`'s
 ~19 arms are migrated, plus the whole of `actionCallFunction`.** Every step below
 was CI-green in **both** modes with zero pass→fail.
 
@@ -16,6 +16,8 @@ was CI-green in **both** modes with zero pass→fail.
 | **3c/1** | `ee9132778` | **design** + `actionCallFunction`, both branches |
 | **3c/2** | `e31237992` | the **empty-method-name** arm **+ 2 real bugs** |
 | **3c/3** | `a2cd5228b` | the **two object-method arms, merged into one** (−99 lines) **+ a real bug** |
+| **3c/4** | `d3e5747bc` | the **`.call`/`.apply` builtin handlers**, all four branches (−167 lines) **+ the last predicted bug** |
+| **3c/5a** | `812bc54f7` | the **two array arms**, each merged into one (−79 lines) **+ 2 real bugs** |
 | — | `7ff10e157` | why step 3's `argstest` line-count drop is the fix, not a regression |
 
 ## Read first
@@ -63,20 +65,41 @@ Two hazards the design routes around, both live traps for a new arm:
 
 ## What's next
 
-4. **The `.call`/`.apply` builtin handlers** (`~65550`–`65740`). They force
-   `is_with = 1` on captured scopes → `INV_FORCE_CAPTURED_WITH`. `INV_ACT_ARGUMENTS`
-   on the **type-1 branch only** — the type-2 branch builds no `arguments` object
-   today. Note 3b already migrated the *GetMember* shortcut arm; these are the
-   builtin `Function.prototype.call`/`apply` bodies, a different site.
-5. Then the `__resolve` arm, the array arm, the string-primitive arm, the MC arm.
-6. Then Stage 4 (event/callback dispatchers + the deliberate normalization pass)
-   and Stage 5 (`gates/check_dispatch_funnel.py`).
+Every arm the 3c survey predicted a bug in had one — **four for four**, and the
+two array arms made it **six instances** of the TYPE1_ARG_ORDER clamp/pad class.
+Assume the remaining arms have it too, and verify with a repro before fixing
+(Stage 0's method).
 
-**One predicted bug left in Stage 3's scope**, unverified: the `.call`/`.apply`
-type-1 handler (`~65659`) pads to `param_count` but never **clamps**, so extra
-args leak onto the caller's eval stack. Three sibling predictions from the same
-survey all turned out real (3b, step 2, step 3) — but verify with a repro before
-fixing, per Stage 0's method.
+**The two remaining `actionCallMethod` arms are NOT drop-ins.** Each diverges from
+the core in a way no existing flag expresses. Read the plan's §4 survey
+("Survey of the two arms that are NOT drop-ins") before touching either — the
+decision is the work, not the edit.
+
+5. **The OBJECT `__resolve` arm** (`action.c:64613`, type-1 loop at `64671` — the call of the function
+   `__resolve` *returned*; the hook itself is already `invokeResolveFunction`).
+   It pushes the **local scope FIRST, captured scopes on top** — the exact
+   inversion of the core. With `captured_scope_count > 0` the callee's param
+   binds then land in the closure's captured `is_with` object, not a fresh
+   frame. `actionEI_callInternalInterface` has the same inversion. Either add an
+   `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit (two sites would use it), or make the
+   normalization a deliberate Stage-4 change **with a test**. Its type-1 half is
+   also unclamped/unpadded (instance seven, unverified).
+6. **The string-primitive arm** (`action.c:64959`, type-1 loop at `65102` — a user-overridden
+   `String.prototype` method on a primitive receiver). It reads `_sp_fn->flags`
+   and applies the **type-2 activation ritual to type-1 bodies**, binding
+   `"this"`, `"arguments"` AND `"super"` on the local scope even for a plain
+   `DefineFunction` (whose `flags` is always 0 — `actionDefineFunction`,
+   `action.c:57175`). `act_flags = THIS|ARGUMENTS|SUPER` would silently **drop**
+   two of those on the type-1 path. Its **type-2 half maps cleanly** though
+   (`INV_SUPER_CTX` depth 1 — here the core's this_var-derived receiver *is*
+   right, since `this_var = OBJECT(_sp_wrap)`; plus `INV_LOCAL_SCOPE |
+   INV_EXEC_FUNC`, `act_flags = THIS|ARGUMENTS|SUPER`, and a
+   `CF_VERSION | CF_CTX_LIVE`-shaped frame). Splitting the commit by
+   `function_type` is a legitimate option. Type-1 half unclamped (instance
+   eight, unverified).
+7. Then the MC arm.
+8. Then Stage 4 (event/callback dispatchers + the deliberate normalization pass)
+   and Stage 5 (`gates/check_dispatch_funnel.py`).
 
 ## Rules (guardrails, not suggestions)
 
@@ -91,6 +114,18 @@ fixing, per Stage 0's method.
   `setVariableByName("this",...)`, the bare `g_call_depth++/--`,
   `g_c_function_this_obj`, `g_call_this_type`, and dispatch decisions like
   `actionCallFunction`'s `simple_func == NULL` converter branch.
+- **`pushSuperContext`'s receiver is not always `this_var`'s.** The core derives it
+  from `this_var`; `.call`/`.apply` push `this_obj` (`mc->dynamic_props`, or a
+  Function's `own_props`) and the array arms push `arr->props`. When they differ,
+  keep the super push **outside**, bracketing the core call — it is a pure state
+  push (`action.c:432`) that reads nothing else, so hoisting it is exact. **Do
+  NOT "fix" the core to source super from `pass_this`**: the object-method arm
+  relies on today's behavior, passing `this_ptr = obj` while its `this_var` falls
+  back to `root_movieclip`.
+- **`INV_ACT_THIS` needs `INV_LOCAL_SCOPE`.** `buildActivationLocals` returns early
+  when `local_scope == NULL`, so an arm that wants only the `g_this_stack` push
+  and no local frame (the array user-method type-1 half) must use
+  `INV_THIS_STACK`, which is the identical operation for a type-1 callee.
 - **Preserve pointer-identity thunk checks before the core** (`builtin_stub_method`,
   `builtin_noop_func`, `builtin_array_method`) — dispatch decisions, not steps.
 - Two audited facts, reuse them: `param_count` is accurate for every type-1
@@ -107,6 +142,7 @@ fixing, per Stage 0's method.
 - Sensitive clusters: `as2_super_and_this_*`, `super_edge_cases`, `extends_chain`,
   `register_and_init_order`, `swf5_no_closure`, `swf5_to_6_cross_call`, `call`,
   `funky_function_calls`, `arguments`, `register_class`, `extends_native_type`.
+  For the array/string arms add `array_*` (14 of them) and `string_methods*`.
   Standing guards in `regression/` (findable by bare name): `ei_type1_args`,
   `mc_event_type1_args`, `timer_cross_swf_version`, `nc_onstatus_closure`,
   `fn_call_type1_args`, `fn_empty_method_type1_args`, `method_type1_args`.
@@ -132,12 +168,12 @@ fixing, per Stage 0's method.
   everywhere), no `static inline` warranted. Don't re-litigate without a workload
   that actually stresses the migrated branch.
 
-## CI baseline to hold (both modes, 2026-07-09 @ `7ff10e157`)
+## CI baseline to hold (both modes, 2026-07-09 @ `812bc54f7`)
 
 | Suite | no-graphics | graphics |
 |---|---|---|
 | avm1 | 634/706 | 634/706 |
-| **regression** | **7/7** | **7/7** |
+| **regression** | **10/10** | **10/10** |
 | from_shumway | 73/92 | 73/92 |
 | from_shumway/avm1 | 46/47 | 46/47 |
 | from_gnash/actionscript.all | 135/243 | 135/243 |
@@ -151,8 +187,12 @@ fixing, per Stage 0's method.
 - `watch_virtual_property` (avm1) — pre-existing `output_mismatch`.
 - `delete-v5..v8` / `delete2` — upstream fixture drift (a missing
   primitive-coercion warning line from an updated `delete.as`).
-- `argstest-v6/v7/v8` (gnash) — `output_mismatch` long before this work; step 3
-  made them *less* wrong while lowering their positional `matching_lines`.
+- `argstest-v6/v7/v8` (gnash) — `output_mismatch` long before this work. Step 3
+  made them less wrong while *lowering* their positional `matching_lines`; step 4
+  made them less wrong while *raising* it (−219 mismatched lines; v8 54 → 175).
+  Same fix class both times. The metric's direction only tracks whether the
+  shortened output happens to re-align positionally — it is not evidence either
+  way. Read the actual output.
 
 ## Also open (Stage-4 scope; independent)
 
