@@ -26,6 +26,8 @@ sup*.swf
 !tools/divergence/gates/*.swf
 # Allow demo SWFs for in-browser recompiler
 !docs/recompiler/*.swf
+# Allow the regression suite's hand-built SWFs (tracked; see that suite's README)
+!ruffle-tests/tests/swfs/regression/*/test.swf
 # Allow demo SWFs for runtime-swf experiments
 !demos/**/*.swf
 # Allow deployed wrapper SWFs for injector demos

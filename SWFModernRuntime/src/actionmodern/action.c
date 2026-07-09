@@ -64059,159 +64059,91 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				return;
 			}
 
-			// Closure context: SWF6+ callers switch to function's context
+			// Closure context: an SWF6+ caller runs the callee in its definition
+			// world. This arm gates the ENTIRE frame — captured scopes and local
+			// scope included — on the caller's version, so an SWF5 caller gets no
+			// local frame at all here. (actionCallFunction, by contrast, resets the
+			// scope chain for both versions.)
 			int _cme_caller_ver = g_swf_version;
-			MovieClip* _cme_saved_ctx = g_current_context;
-			DisplayObject* _cme_saved_sprite = g_current_sprite_obj;
-			int _cme_saved_ver = 0; ASObject* _cme_saved_global = NULL; int _cme_saved_midx = 0;
-			u32 _cme_saved_scope = scope_depth;
-			ASObject* _cme_saved_sc[MAX_SCOPE_DEPTH];
-			u8 _cme_saved_sw[MAX_SCOPE_DEPTH];
-			MovieClip* _cme_saved_sm[MAX_SCOPE_DEPTH];
-			ASObject* _cme_local_scope = NULL;
-			if (_cme_caller_ver >= 6 && func != NULL) {
-				switchToFunctionVersion(func, &_cme_saved_ver, &_cme_saved_global, &_cme_saved_midx);
-				for (u32 si = 0; si < scope_depth; si++) {
-					_cme_saved_sc[si] = scope_chain[si];
-					_cme_saved_sw[si] = scope_is_with[si];
-					_cme_saved_sm[si] = scope_mc[si];
-				}
-				scope_depth = 0;
-				if (func->base_clip != NULL) {
-					MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
-					actionSetCurrentContext(_bc);
-					g_current_sprite_obj = NULL;
-				}
-				// Push captured scopes from function definition, then a fresh local scope.
-				// Without this, nested functions cannot resolve variables from their enclosing
-				// scope (e.g. `var` locals of an outer function), which cascades into every
-				// reference in the callee appearing undefined.
-				u8 cap_count = func->captured_scope_count;
-				for (u8 ci = 0; ci < cap_count; ci++) {
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-						scope_mc[scope_depth] = func->captured_scope_mc[ci];
-						scope_chain[scope_depth++] = func->captured_scope[ci];
-					}
-				}
-				_cme_local_scope = allocObject(app_context, 8);
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = 0;
-					scope_mc[scope_depth] = NULL;
-					scope_chain[scope_depth++] = _cme_local_scope;
-				}
-			}
+			int _cme_closure = (_cme_caller_ver >= 6 && func != NULL);
+			ClosureFrame cf;
+			enterClosureFrame(app_context, &cf, func,
+			                  (u8)(_cme_closure ? (CF_RESET_SCOPE | CF_VERSION | CF_CTX) : 0));
+			// Without the captured scopes, a nested function cannot resolve variables
+			// from its enclosing scope (e.g. an outer function's `var` locals), which
+			// cascades into every reference in the callee reading undefined.
+			u32 _cme_scope_flags = _cme_closure ? (INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE) : 0;
 
 			if (func != NULL && func->function_type == 2)
 			{
-				// Invoke DefineFunction2
-				ActionVar* registers = NULL;
-				if (func->register_count > 0) {
-					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-				}
-
-				// No 'this' binding for empty-method-name call: this = undefined
+				// No `this` binding for an empty-method-name call: this = undefined.
+				// The set-then-conditionally-unset protocol stays OUTSIDE the core:
+				// INV_OVERRIDE_THIS installs the value unconditionally and clears the
+				// flag only afterwards, whereas a native callee here must never see it
+				// set (it has no generated preload-this prologue to consume it, and a
+				// stale flag leaks into nested calls).
 				g_override_this.type = ACTION_STACK_VALUE_UNDEFINED;
 				g_override_this.data.numeric_value = 0;
 				g_override_this.str_size = 0;
 				g_override_this_set = 1;
+				if (func->register_count == 0) g_override_this_set = 0;
 
-				int _cm_is_bytecode = (func->register_count > 0);
-				if (!_cm_is_bytecode) g_override_this_set = 0; // C functions don't consume the flag; clear to prevent leaking to nested calls
+				InvokeOpts opts = {
+					.flags = _cme_scope_flags | INV_CTOR_CTX,
+					.has_this_ptr = 1,
+					.this_ptr = NULL,
+				};
 				g_call_depth++;
-				if (_cm_is_bytecode) pushCtorContext(0);
-				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
-				if (_cm_is_bytecode) popCtorContext();
+				ActionVar result = invokeFunctionValue(app_context, func, NULL,
+				                                       args, num_args, &opts);
 				g_call_depth--;
 				g_override_this_set = 0;
 
-				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
-
-				// Restore closure context
-				if (_cme_caller_ver >= 6) {
-					if (_cme_local_scope != NULL) releaseObject(app_context, _cme_local_scope);
-					scope_depth = _cme_saved_scope;
-					for (u32 si = 0; si < _cme_saved_scope; si++) {
-						scope_chain[si] = _cme_saved_sc[si];
-						scope_is_with[si] = _cme_saved_sw[si];
-						scope_mc[si] = _cme_saved_sm[si];
-					}
-					actionSetCurrentContext(_cme_saved_ctx);
-					g_current_sprite_obj = _cme_saved_sprite;
-					restoreFunctionVersion(_cme_saved_ver, _cme_saved_global, _cme_saved_midx);
-				}
-
+				leaveClosureFrame(app_context, &cf);
 				pushVar(app_context, &result);
 				return;
 			}
 			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
 			{
-				// Invoke simple function (DefineFunction type 1)
-				// Push 'this' binding
-				u32 _cme_saved_this = g_this_depth;
-				if (g_this_depth < MAX_THIS_DEPTH) {
-					if (_cme_caller_ver >= 6) {
-						MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)_ctx->dynamic_props;
-					} else {
-						MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)_ctx;
-					}
-					g_this_depth++;
-				}
-
-				// Push arguments onto stack for parameter binding
-				for (u32 i = 0; i < num_args; i++)
-				{
-					pushVar(app_context, &args[i]);
-				}
-				if (args != NULL) FREE(args);
-
-				g_call_depth++;
-				pushCtorContext(0);
-				ActionVar result;
-				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-				popCtorContext();
-				g_call_depth--;
-				g_this_depth = _cme_saved_this;
-
-				// Restore closure context
+				// `this` is the context's property bag for an SWF6+ caller, the clip
+				// itself for SWF5. Read after the frame so it is the callee's context.
+				ActionVar this_var = {0};
+				MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
 				if (_cme_caller_ver >= 6) {
-					if (_cme_local_scope != NULL) releaseObject(app_context, _cme_local_scope);
-					scope_depth = _cme_saved_scope;
-					for (u32 si = 0; si < _cme_saved_scope; si++) {
-						scope_chain[si] = _cme_saved_sc[si];
-						scope_is_with[si] = _cme_saved_sw[si];
-						scope_mc[si] = _cme_saved_sm[si];
-					}
-					actionSetCurrentContext(_cme_saved_ctx);
-					g_current_sprite_obj = _cme_saved_sprite;
-					restoreFunctionVersion(_cme_saved_ver, _cme_saved_global, _cme_saved_midx);
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.data.numeric_value = (u64)_ctx->dynamic_props;
+				} else {
+					this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					this_var.data.numeric_value = (u64)_ctx;
 				}
 
+				// The core's marshalling loop pushes EXACTLY param_count values. The
+				// hand-rolled loop this replaces pushed num_args of them, so a callee
+				// declaring more params than the call supplied popped stale operands
+				// off the caller's eval stack, and extra args were stranded on it.
+				InvokeOpts opts = {
+					.flags = _cme_scope_flags | INV_THIS_STACK | INV_CTOR_CTX,
+				};
+				g_call_depth++;
+				ActionVar result = invokeFunctionValue(app_context, func, &this_var,
+				                                       args, num_args, &opts);
+				g_call_depth--;
+
+				if (args != NULL) FREE(args);
+				leaveClosureFrame(app_context, &cf);
 				pushVar(app_context, &result);
 				return;
 			}
 			else
 			{
-				// Unknown function type or NULL - push undefined
+				// Unknown function type or NULL. The old restore block here ran
+				// whenever caller_ver >= 6 — including the func == NULL case, where
+				// the frame was never entered and it copied uninitialized stack
+				// garbage back over scope_chain[]. leaveClosureFrame keys off the
+				// frame's own flags, so it is a no-op when nothing was entered.
 				if (args != NULL) FREE(args);
-				// Restore closure context
-				if (_cme_caller_ver >= 6) {
-					if (_cme_local_scope != NULL) releaseObject(app_context, _cme_local_scope);
-					scope_depth = _cme_saved_scope;
-					for (u32 si = 0; si < _cme_saved_scope; si++) {
-						scope_chain[si] = _cme_saved_sc[si];
-						scope_is_with[si] = _cme_saved_sw[si];
-						scope_mc[si] = _cme_saved_sm[si];
-					}
-					actionSetCurrentContext(_cme_saved_ctx);
-					g_current_sprite_obj = _cme_saved_sprite;
-					restoreFunctionVersion(_cme_saved_ver, _cme_saved_global, _cme_saved_midx);
-				}
+				leaveClosureFrame(app_context, &cf);
 				pushUndefined(app_context);
 				return;
 			}

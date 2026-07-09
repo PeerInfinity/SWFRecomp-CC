@@ -518,16 +518,70 @@ Extending 3a/3b's judgement, with a reason for each rather than an assumption:
    branch only — the type-2 branch builds no `arguments` object today.
 5. `__resolve` arm, array arm, string-primitive arm, MC arm.
 
-##### Latent bugs this design will fix for free (same class, all unverified)
+##### Latent bugs this design will fix for free (same class)
 
 Found by diffing each arm's type-1 marshalling against the core's single
 forward+clamp+pad loop. None is fixed speculatively; each falls out of its arm's
-migration and wants a `regression/` test at that point:
+migration and gets a `regression/` test at that point:
 
-- **empty-method-name arm** (`64150`): pushes `num_args` values, no clamp, no pad.
+- **empty-method-name arm** (`64150`): pushes `num_args` values, no clamp, no
+  pad. **CONFIRMED REAL and fixed** in step 2 — see the landing note below.
 - **object-method type-1 arm** (`64719`): pushes `num_args` values, no clamp, no pad.
 - **`.call`/`.apply` type-1 handler** (`65659`): pads to `param_count` but never
   **clamps** — extra args leak onto the caller's eval stack.
+
+#### Stage 3c landing notes
+
+**Step 1 — `actionCallFunction` (`ee9132778`).** Both invocation branches are now
+thin adapters over the core. CI green in **both** modes, all nine suites at delta
+0 (even the mismatched-line totals are byte-identical). The
+`simple_func == NULL` converter path (`Number` / `Boolean` / `String` called
+without `new`) is hoisted out as a dispatch decision — it previously built the
+entire activation (this binding, `arguments` array, scope frame, param pad) and
+tore it back down unused before reaching the converters.
+
+Perf gate: **passed, but no game is a strong oracle for this arm.** Minesweeper
+never executes `actionCallFunction` at all (absent from `callgrind.out`), so it
+measures only the 3a/3b super arm: `invokeFunctionValue` self = 13,497 Ir of
+989,736,679 (0.0014%). Doodle Jump *does* reach `actionCallFunction` (616,472 Ir,
+0.23% of 273,213,327) but the core's self cost under it is 239 Ir and
+`buildActivationLocals` is 98 Ir — most of that 0.23% is name resolution that
+returns early on builtins before any invocation. Both say the core is free;
+neither stresses the migrated branch. Structurally the migration adds a few
+branch tests and one call frame to a path that already does `allocObject` +
+`allocArray` + `setupArgumentsProps` per call. No `static inline` warranted.
+
+**Step 2 — the empty-method-name arm.** Falls out of step 1 as predicted:
+`CF_RESET_SCOPE | CF_VERSION | CF_CTX` gated on `caller_ver >= 6` (this arm gates
+the *whole* frame, local scope included, unlike `actionCallFunction`), plus
+`INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE` under the same gate, `INV_CTOR_CTX`, and
+`INV_THIS_STACK` on the type-1 branch. `act_flags = 0` — this arm binds no named
+locals at all.
+
+Its override-`this` protocol stays **outside** the core, and this is the case
+that proves "diff each arm, don't assume it matches": the arm writes
+`g_override_this_set = 1` and then clears it again *before* the call when
+`register_count == 0`. `INV_OVERRIDE_THIS` sets unconditionally and clears only
+*after*, so the flag would have left a native callee seeing the flag set. Same
+judgement as 3b's `g_call_this_type`.
+
+Two bugs fixed, both predicted by the design survey:
+
+1. **The type-1 clamp/pad bug is REAL** (predicted above at `64150`). Regression
+   test `regression/fn_empty_method_type1_args` — hand-assembled bytecode, since
+   the arm needs a plain `DefineFunction` receiver with an undefined method name
+   (`push args; push num_args; push f; push undefined; CallMethod`). Verified to
+   fail before the fix and pass after, in both predicted modes: a short call
+   `f("only")` on a 2-param callee bound `a="SENTINEL2", b="only"` — the
+   prologue popped a value belonging to the caller's in-progress expression — and
+   a long call `f("one","two","three")` bound `a="two", b="three"` and stranded
+   `"one"` on the caller's eval stack.
+2. **An uninitialized scope-chain restore.** The old teardown ran whenever
+   `caller_ver >= 6`, but the *setup* was gated on `caller_ver >= 6 && func !=
+   NULL`. With a FUNCTION-typed `ActionVar` carrying a NULL pointer, the restore
+   copied uninitialized C stack garbage back over `scope_chain[]` and called
+   `restoreFunctionVersion(0, NULL, 0)`. `leaveClosureFrame` keys off the frame's
+   own recorded flags, so it is a no-op when nothing was entered.
 
 ### Stage 4 — event/callback dispatchers + deliberate normalization
 
