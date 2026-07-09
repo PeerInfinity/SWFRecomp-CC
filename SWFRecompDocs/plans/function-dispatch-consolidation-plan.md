@@ -617,6 +617,32 @@ That is the third arm of this class, after `.call`/`.apply`-via-`GetMember` (3b)
 and the empty-method-name arm (step 2). One hand-rolled marshalling loop's worth
 of bug in each; all three now served by the core's single forward+clamp+pad loop.
 
+**The clamp/pad fix is visible in the wild, and `results_diff.md` mis-reports it
+as a regression.** Gnash's `makeswf`/Ming emits plain `DefineFunction`, so every
+function in `from_gnash/actionscript.all` is type-1 and every `obj.method(...)`
+there went through the buggy loop. Step 3's no-graphics CI shows zero pass→fail
+but flags `argstest-v7` at 67→50 matching lines and `argstest-v8` at 58→54.
+That is **not** a regression:
+
+| | `argstest-v7` actual output | spurious `Testing <digit>()` lines |
+|---|---|---|
+| before step 3 | 7,285 lines | 4,640 |
+| after step 3 | 5,655 lines | 3,010 |
+| expected (`output.fp32.txt`) | 2,061 lines | **0** |
+| Ruffle (`output.fp32.ruffle.txt`) | — | **0** |
+
+Those `Testing 4()` / `Testing 3()` / … lines are the *symptom* of the bug: a
+type-1 method called with fewer args than it declares made the callee's prologue
+pop values off the caller's in-progress `for..in` enumeration stack, duplicating
+and corrupting the walk. Neither Flash nor Ruffle emits a single such line. The
+fix deleted 1,630 of them. `matching_lines` fell only because the runner compares
+positionally and the output shrank underneath it. The test remains
+`output_mismatch` (it was already), but strictly less wrong.
+
+Lesson for the remaining arms: **when this fix lands on an already-failing test,
+`results_diff.md`'s line metrics can move the wrong way.** Read the actual output,
+not just the delta table.
+
 ### Stage 4 — event/callback dispatchers + deliberate normalization
 
 `mc_call_as2_handler_ng`, `fireTimerCallback`, `builtin_broadcaster_broadcastMessage`,
