@@ -1,42 +1,43 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-09 21:13 UTC
+**Date**: 2026-07-09 21:41 UTC
 
-**Git SHA**: `fee25fd79c`
+**Git SHA**: `c7d755871e`
 
-**Run Duration**: 4m 7s
+**Run Duration**: 2m 53s
 
-**Filtered**: 0 tests ignored out of 12 available
+**Filtered**: 0 tests ignored out of 13 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 12 |
-| Passing | **12** (100.0%) |
+| Total tests | 13 |
+| Passing | **13** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 98 |
-| Matching lines | 98 (100.0%) |
+| Total expected lines | 104 |
+| Matching lines | 104 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**12 tests passing**
+**13 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array_element_type1_args` | 7 | 21.2s |  |
-| 2 | `array_method_type1_args` | 7 | 15.8s |  |
-| 3 | `ei_type1_args` | 7 | 20.3s |  |
-| 4 | `fn_call_builtin_type1_args` | 10 | 20.8s |  |
-| 5 | `fn_call_type1_args` | 7 | 17.5s |  |
-| 6 | `fn_empty_method_type1_args` | 10 | 21.3s |  |
-| 7 | `mc_event_type1_args` | 3 | 22.8s |  |
-| 8 | `method_type1_args` | 10 | 22.3s |  |
-| 9 | `nc_onstatus_closure` | 2 | 20.2s |  |
-| 10 | `resolve_type1_args` | 13 | 21.9s |  |
-| 11 | `string_prim_method_type1_args` | 19 | 21.9s |  |
-| 12 | `timer_cross_swf_version` | 3 | 20.5s |  |
+| 1 | `array_element_type1_args` | 7 | 18.6s |  |
+| 2 | `array_method_type1_args` | 7 | 1.0s |  |
+| 3 | `ei_type1_args` | 7 | 20.1s |  |
+| 4 | `fn_call_builtin_type1_args` | 10 | 1.8s |  |
+| 5 | `fn_call_type1_args` | 7 | 1.9s |  |
+| 6 | `fn_empty_method_type1_args` | 10 | 1.9s |  |
+| 7 | `mc_event_type1_args` | 3 | 20.6s |  |
+| 8 | `mc_resolve_type1_args` | 6 | 21.6s |  |
+| 9 | `method_type1_args` | 10 | 20.3s |  |
+| 10 | `nc_onstatus_closure` | 2 | 20.9s |  |
+| 11 | `resolve_type1_args` | 13 | 1.7s |  |
+| 12 | `string_prim_method_type1_args` | 19 | 21.1s |  |
+| 13 | `timer_cross_swf_version` | 3 | 20.7s |  |
 
 ## Near-Passing Tests
 
