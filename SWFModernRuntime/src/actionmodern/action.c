@@ -8150,6 +8150,15 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 #define INV_RESET_THIS_DEPTH     0x2000u  // zero g_this_depth for the call (accessor-setter isolation)
 #define INV_CTOR_CTX             0x4000u  // pushCtorContext(0)/popCtorContext around the callee body
 #define INV_OVERRIDE_THIS        0x8000u  // manage g_override_this{,_set} for the call (see opts->override_this)
+// Push the fresh local frame BENEATH the captured scopes instead of on top of
+// them. Parameter binds are unaffected either way (getCurrentLocalScope skips
+// is_with frames), but actionGetVariable walks the whole chain top-down, so a
+// captured scope then shadows the callee's own parameters and locals. Only the
+// __resolve arm does this today; actionEI_callInternalInterface has the same
+// inversion and will use this bit when Stage 4 migrates it. Almost certainly
+// wrong — normalizing it is a deliberate Stage-4 change, guarded by
+// regression/resolve_type1_args.
+#define INV_LOCAL_SCOPE_UNDER_CAPTURED 0x10000u
 
 // Callee activation (opts->act_flags): how the callee's *named* locals are bound
 // on the fresh local-scope frame. A type-1 body has no DefineFunction2 flags word,
@@ -15435,6 +15444,60 @@ void actionRestoreFunctionVersion(int saved_ver, ASObject* saved_global, int sav
 	restoreFunctionVersion(saved_ver, saved_global, saved_movie_idx);
 }
 
+// Push the callee's captured closure scopes onto the scope chain.
+static void pushCapturedScopes(ASFunction* func, u32 flags, u8 captured_count)
+{
+	for (u8 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
+	{
+		scope_is_with[scope_depth] = (flags & INV_FORCE_CAPTURED_WITH) ? 1 : func->captured_scope_is_with[ci];
+		scope_mc[scope_depth] = func->captured_scope_mc[ci];
+		scope_chain[scope_depth++] = func->captured_scope[ci];
+	}
+}
+
+// Alloc + push the callee's fresh local-scope frame. Returns it (NULL when
+// INV_LOCAL_SCOPE is clear) and reports whether it made it onto the chain.
+static ASObject* pushLocalScopeFrame(SWFAppContext* app_context, u32 flags,
+                                     ActionVar* this_var, int this_is_mc,
+                                     void* this_ptr, int* out_pushed)
+{
+	*out_pushed = 0;
+	if (!(flags & INV_LOCAL_SCOPE)) return NULL;
+
+	ASObject* local_scope = allocObject(app_context, 8);
+	if ((flags & INV_BIND_THIS) && this_var != NULL)
+		setProperty(app_context, local_scope, "this", 4, this_var);
+	if (scope_depth < MAX_SCOPE_DEPTH)
+	{
+		scope_is_with[scope_depth] = 0;
+		scope_mc[scope_depth] = ((flags & INV_LOCAL_SCOPE_MC) && this_is_mc)
+		                            ? (MovieClip*)this_ptr : NULL;
+		scope_chain[scope_depth++] = local_scope;
+		*out_pushed = 1;
+	}
+	return local_scope;
+}
+
+// Both frames, in the order INV_LOCAL_SCOPE_UNDER_CAPTURED selects. Teardown is
+// a plain depth decrement of (pushed_local + captured_count), so it is
+// order-independent and stays inline at the call site.
+static ASObject* pushInvokeScopes(SWFAppContext* app_context, ASFunction* func, u32 flags,
+                                  u8 captured_count, ActionVar* this_var, int this_is_mc,
+                                  void* this_ptr, int* out_pushed_local)
+{
+	if (flags & INV_LOCAL_SCOPE_UNDER_CAPTURED)
+	{
+		ASObject* local_scope = pushLocalScopeFrame(app_context, flags, this_var,
+		                                            this_is_mc, this_ptr, out_pushed_local);
+		pushCapturedScopes(func, flags, captured_count);
+		return local_scope;
+	}
+
+	pushCapturedScopes(func, flags, captured_count);
+	return pushLocalScopeFrame(app_context, flags, this_var, this_is_mc, this_ptr,
+	                           out_pushed_local);
+}
+
 // Bind the callee's named locals ("this" / "arguments" / "super") on its fresh
 // local-scope frame, per opts->act_flags and the callee's own DefineFunction2
 // preload/suppress bits. See the INV_ACT_* rule table near InvokeOpts.
@@ -15576,29 +15639,9 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 		if (func->register_count > 0)
 			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 
-		for (u8 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
-		{
-			scope_is_with[scope_depth] = (flags & INV_FORCE_CAPTURED_WITH) ? 1 : func->captured_scope_is_with[ci];
-			scope_mc[scope_depth] = func->captured_scope_mc[ci];
-			scope_chain[scope_depth++] = func->captured_scope[ci];
-		}
-
-		ASObject* local_scope = NULL;
 		int pushed_local = 0;
-		if (flags & INV_LOCAL_SCOPE)
-		{
-			local_scope = allocObject(app_context, 8);
-			if ((flags & INV_BIND_THIS) && this_var != NULL)
-				setProperty(app_context, local_scope, "this", 4, this_var);
-			if (scope_depth < MAX_SCOPE_DEPTH)
-			{
-				scope_is_with[scope_depth] = 0;
-				scope_mc[scope_depth] = ((flags & INV_LOCAL_SCOPE_MC) && this_is_mc)
-				                            ? (MovieClip*)this_ptr : NULL;
-				scope_chain[scope_depth++] = local_scope;
-				pushed_local = 1;
-			}
-		}
+		ASObject* local_scope = pushInvokeScopes(app_context, func, flags, captured_count,
+		                                         this_var, this_is_mc, this_ptr, &pushed_local);
 
 		buildActivationLocals(app_context, local_scope, func, this_var,
 		                      args, num_args, prev_exec, act_flags);
@@ -15637,29 +15680,9 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 	}
 	else if (func->function_type == 1 && func->simple_func != NULL)
 	{
-		for (u8 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
-		{
-			scope_is_with[scope_depth] = (flags & INV_FORCE_CAPTURED_WITH) ? 1 : func->captured_scope_is_with[ci];
-			scope_mc[scope_depth] = func->captured_scope_mc[ci];
-			scope_chain[scope_depth++] = func->captured_scope[ci];
-		}
-
-		ASObject* local_scope = NULL;
 		int pushed_local = 0;
-		if (flags & INV_LOCAL_SCOPE)
-		{
-			local_scope = allocObject(app_context, 8);
-			if ((flags & INV_BIND_THIS) && this_var != NULL)
-				setProperty(app_context, local_scope, "this", 4, this_var);
-			if (scope_depth < MAX_SCOPE_DEPTH)
-			{
-				scope_is_with[scope_depth] = 0;
-				scope_mc[scope_depth] = ((flags & INV_LOCAL_SCOPE_MC) && this_is_mc)
-				                            ? (MovieClip*)this_ptr : NULL;
-				scope_chain[scope_depth++] = local_scope;
-				pushed_local = 1;
-			}
-		}
+		ASObject* local_scope = pushInvokeScopes(app_context, func, flags, captured_count,
+		                                         this_var, this_is_mc, this_ptr, &pushed_local);
 
 		buildActivationLocals(app_context, local_scope, func, this_var,
 		                      args, num_args, prev_exec, act_flags);
@@ -64621,84 +64644,45 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ASFunction* func = lookupFunctionFromVar(&resolved);
 					if (func != NULL)
 					{
+						// Stays outside the core: the type-2 half has no this_var
+						// for the core to derive a receiver from, and this is a
+						// pure state push that reads nothing else, so bracketing
+						// the call is exactly equivalent.
 						pushSuperContext((void*)obj, 1);
 
-						ActionVar result = {0};
-						result.type = ACTION_STACK_VALUE_UNDEFINED;
+						// The core's marshalling loop pushes EXACTLY param_count
+						// values. The type-1 loop this replaces pushed num_args of
+						// them, neither clamping nor padding — see
+						// regression/resolve_type1_args.
+						//
+						// INV_LOCAL_SCOPE_UNDER_CAPTURED reproduces this arm's
+						// inverted scope order (local frame beneath the captured
+						// scopes). Preserved, not normalized — same test pins it.
+						InvokeOpts opts = {
+							.flags = (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+							          INV_LOCAL_SCOPE | INV_LOCAL_SCOPE_UNDER_CAPTURED |
+							          INV_BASE_CLIP),
+							// advanced_func receives the receiver; nothing binds it
+							// as `this` on the callee's frame, so this_var is NULL.
+							.has_this_ptr = 1,
+							.this_ptr = (void*)obj,
+						};
 
-						if (func->function_type == 2 && func->advanced_func != NULL)
-						{
-							ActionVar* registers = NULL;
-							if (func->register_count > 0)
-								registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-
-							ASObject* local_scope = allocObject(app_context, 8);
-							if (scope_depth < MAX_SCOPE_DEPTH) {
-								scope_is_with[scope_depth] = 0;
-								scope_mc[scope_depth] = NULL;
-								scope_chain[scope_depth++] = local_scope;
-							}
-
-							u32 captured_count = func->captured_scope_count;
-							for (u32 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++) {
-								scope_is_with[scope_depth] = 1;
-								scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-								scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-							}
-
-							MovieClip* saved_ctx = g_current_context;
-							if (g_swf_version >= 6 && func->base_clip != NULL)
-								g_current_context = (MovieClip*)func->base_clip;
-
-							g_call_depth++;
-							result = func->advanced_func(app_context, args, num_args, NULL, (void*)obj);
-							g_call_depth--;
-
-							g_current_context = saved_ctx;
-							for (u32 ci = 0; ci < captured_count && scope_depth > 0; ci++)
-								scope_depth--;
-							if (scope_depth > 0) scope_depth--;
-							releaseObject(app_context, local_scope);
-							if (registers != NULL) FREE(registers);
-						}
-						else if (func->function_type == 1 && func->simple_func != NULL)
+						// Type-1 only, and it must land in the CALLER's scope: the
+						// arm binds `this` before the callee's frame exists, so
+						// INV_LOCAL_SCOPE | INV_BIND_THIS would not reproduce it.
+						if (func->function_type == 1 && func->simple_func != NULL)
 						{
 							ActionVar this_var = {0};
 							this_var.type = ACTION_STACK_VALUE_OBJECT;
 							this_var.data.numeric_value = (u64)obj;
 							setVariableByName("this", &this_var);
-
-							for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
-								pushVar(app_context, &args[i]);
-
-							ASObject* local_scope = allocObject(app_context, 8);
-							if (scope_depth < MAX_SCOPE_DEPTH) {
-								scope_is_with[scope_depth] = 0;
-								scope_mc[scope_depth] = NULL;
-								scope_chain[scope_depth++] = local_scope;
-							}
-
-							u32 captured_count = func->captured_scope_count;
-							for (u32 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++) {
-								scope_is_with[scope_depth] = 1;
-								scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-								scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-							}
-
-							MovieClip* saved_ctx = g_current_context;
-							if (g_swf_version >= 6 && func->base_clip != NULL)
-								g_current_context = (MovieClip*)func->base_clip;
-
-							g_call_depth++;
-							result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-							g_call_depth--;
-
-							g_current_context = saved_ctx;
-							for (u32 ci = 0; ci < captured_count && scope_depth > 0; ci++)
-								scope_depth--;
-							if (scope_depth > 0) scope_depth--;
-							releaseObject(app_context, local_scope);
 						}
+
+						g_call_depth++;
+						ActionVar result = invokeFunctionValue(app_context, func, NULL,
+						                                       args, num_args, &opts);
+						g_call_depth--;
 
 						popSuperContext();
 						if (args != NULL) FREE(args);

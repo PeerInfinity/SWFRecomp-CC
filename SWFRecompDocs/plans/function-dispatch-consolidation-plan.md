@@ -713,24 +713,61 @@ each pushing a sentinel beneath the call and `TRACE`ing it afterwards. Both
 verified to fail before and pass after. CI green in **both** modes, all pass
 deltas 0, regression 8/8 → 10/10.
 
+**Step 5b — the OBJECT `__resolve` arm.** The call of the function `__resolve`
+*returned* (the hook itself was already `invokeResolveFunction`). Both halves
+collapse to one call site. Flags: `INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+INV_LOCAL_SCOPE | INV_BASE_CLIP`, plus the new
+**`INV_LOCAL_SCOPE_UNDER_CAPTURED`**. `act_flags = 0`; `this_var = NULL` with
+`has_this_ptr / this_ptr = obj`, since nothing binds a receiver on the callee's
+frame but `advanced_func` still takes one. `pushSuperContext(obj, 1)` brackets
+the core call from outside — the type-2 half has no `this_var` for the core to
+derive a receiver from — as does the type-1 half's `setVariableByName("this")`,
+which must land in the **caller's** scope (the arm binds it before the callee's
+frame exists). The bare `g_call_depth++/--` also stays outside.
+
+**Decision: reproduce the scope inversion, don't normalize it.** This arm pushes
+the callee's fresh local frame **first** and its captured scopes **on top**, the
+inverse of the core. Per §3 that is preserved via a new flag rather than silently
+normalized, and `actionEI_callInternalInterface` (Stage 4) will be its second
+user. The normalization is a good Stage-4 candidate — the inversion is almost
+certainly wrong — but it is now a *deliberate* change, because
+`regression/resolve_type1_args` pins it.
+
+**The survey's stated mechanism for that inversion was wrong; its conclusion was
+right.** The claim was that a captured `is_with` frame on top makes the callee's
+parameter *binds* land in the closure's captured object. It does not:
+`setVariableByName` → `setVariableOnLocalScope` → `getCurrentLocalScope`
+(`action.c:545`) walks down past every `is_with` frame, so binds reach the local
+frame under either ordering — the test's `w.a=W_A` line proves it. What actually
+inverts is **lookup**: `actionGetVariable` (`action.c:41065`) walks the whole
+chain top-down over `is_with` and plain frames alike, so a captured scope
+**shadows the callee's own parameters and locals**. In the test, `h(a)` is defined
+inside `with (w)` where `w.a = "W_A"`, and it reads `W_A` instead of its own
+argument. Behaviour-preserving migration keeps that; the same line is what a
+Stage-4 normalization must consciously flip.
+
+**The type-1 clamp/pad bug is REAL here too — instance seven** (predicted at the
+old `64671`). Verified before the fix: `o.missing("only")` on a 2-param type-1
+callee bound `a="SENTINEL2", b="only"` and then traced `undefined` where the
+sentinel should have been, while `o.missing("one","two","three")` bound
+`a="two", b="three"` and stranded `"one"` on the caller's eval stack. Test
+`regression/resolve_type1_args` covers both directions plus the scope-order pin.
+
+The core's two duplicated scope-push blocks (one per `function_type`) are now one
+`pushInvokeScopes()` helper that takes the ordering from the flag; teardown was
+already a plain depth decrement of `pushed_local + captured_count` and so is
+order-independent and unchanged.
+
 ##### Survey of the two arms that are NOT drop-ins (read before attempting them)
 
 Both remaining `actionCallMethod` arms diverge from the core in a way no existing
 flag expresses. Neither is a bug to fix in passing — each needs a deliberate
 decision first.
 
-1. **The OBJECT `__resolve` arm** (`action.c:64613`, type-1 loop at `64671`, the call of the function
-   `__resolve` *returned*; the hook itself is already `invokeResolveFunction`).
-   It pushes the **local scope FIRST and the captured scopes on top of it** —
-   the exact inversion of the core, which pushes captured first and local last.
-   With `captured_scope_count > 0` the topmost frame is therefore a captured
-   `is_with` scope, so the callee's parameter binds land in the *closure's*
-   captured object instead of a fresh frame. `actionEI_callInternalInterface`
-   has the same inversion (Stage 0 note). Migrating as-is would silently
-   normalize it. Either add an `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit (two sites
-   would use it) or make the normalization a deliberate Stage-4 change with a
-   test. Its type-1 half also pushes `num_args` unclamped/unpadded — instance
-   seven, unverified.
+1. **The OBJECT `__resolve` arm** — *(Landed: step 5b above. Decision: new
+   `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit, inversion preserved and pinned by a test.
+   Instance seven of the clamp/pad bug confirmed real and fixed. The survey's
+   mechanism for the inversion was wrong — see the landing note.)*
 2. **The string-primitive arm** (`action.c:64959`, type-1 loop at `65102`, a user-overridden
    `String.prototype` method on a primitive receiver). It reads `_sp_fn->flags`
    and applies the **type-2 activation ritual to type-1 bodies too** — binding

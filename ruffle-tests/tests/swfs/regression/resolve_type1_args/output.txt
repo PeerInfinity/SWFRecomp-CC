@@ -1,0 +1,13 @@
+a=one
+b=two
+SENTINEL1
+a=only
+b=undefined
+SENTINEL2
+a=one
+b=two
+SENTINEL3
+h a=W_A
+SENTINEL4
+w.a=W_A
+done
