@@ -1,14 +1,14 @@
 # Ruffle Test Results Diff
 
-**Previous:** `e31237992e4f` (2026-07-09T04:55:00.662716+00:00)
-**Current:** `a2cd5228b00a` (2026-07-09T05:27:44.333221+00:00)
+**Previous:** `a2cd5228b00a` (2026-07-09T05:27:44.333221+00:00)
+**Current:** `d3e5747bc594` (2026-07-09T19:02:47.226448+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 6 | 7 | +1 |
-| Total | 6 | 7 | +1 |
+| Passing | 7 | 8 | +1 |
+| Total | 7 | 8 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
@@ -16,4 +16,4 @@
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `method_type1_args` | pass | 10/10 |
+| `fn_call_builtin_type1_args` | pass | 10/10 |

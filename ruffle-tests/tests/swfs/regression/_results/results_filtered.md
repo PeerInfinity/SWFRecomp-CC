@@ -1,37 +1,38 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-09 05:27 UTC
+**Date**: 2026-07-09 19:02 UTC
 
-**Git SHA**: `a2cd5228b0`
+**Git SHA**: `d3e5747bc5`
 
-**Run Duration**: 2m 22s
+**Run Duration**: 2m 36s
 
-**Filtered**: 0 tests ignored out of 7 available
+**Filtered**: 0 tests ignored out of 8 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 7 |
-| Passing | **7** (100.0%) |
+| Total tests | 8 |
+| Passing | **8** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 42 |
-| Matching lines | 42 (100.0%) |
+| Total expected lines | 52 |
+| Matching lines | 52 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**7 tests passing**
+**8 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `ei_type1_args` | 7 | 19.3s |  |
-| 2 | `fn_call_type1_args` | 7 | 19.9s |  |
-| 3 | `fn_empty_method_type1_args` | 10 | 19.9s |  |
-| 4 | `mc_event_type1_args` | 3 | 19.8s |  |
-| 5 | `method_type1_args` | 10 | 17.9s |  |
-| 6 | `nc_onstatus_closure` | 2 | 23.6s |  |
-| 7 | `timer_cross_swf_version` | 3 | 21.0s |  |
+| 1 | `ei_type1_args` | 7 | 19.7s |  |
+| 2 | `fn_call_builtin_type1_args` | 10 | 19.9s |  |
+| 3 | `fn_call_type1_args` | 7 | 20.3s |  |
+| 4 | `fn_empty_method_type1_args` | 10 | 19.6s |  |
+| 5 | `mc_event_type1_args` | 3 | 19.2s |  |
+| 6 | `method_type1_args` | 10 | 19.5s |  |
+| 7 | `nc_onstatus_closure` | 2 | 19.9s |  |
+| 8 | `timer_cross_swf_version` | 3 | 17.2s |  |
 
 ## Near-Passing Tests
 
