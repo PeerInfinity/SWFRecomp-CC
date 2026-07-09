@@ -29179,6 +29179,16 @@ void actionSetCurrentContext(MovieClip* mc) {
 #define CF_RESET_SCOPE  0x01u  // save the whole chain, then scope_depth = 0
 #define CF_VERSION      0x02u  // switchToFunctionVersion / restoreFunctionVersion
 #define CF_CTX          0x04u  // re-resolve base_clip into g_current_context; clear sprite
+#define CF_CTX_LIVE     0x08u  // as CF_CTX, but skip a DESTROYED clip and keep the sprite
+
+// CF_CTX vs CF_CTX_LIVE: the method arms refuse to enter a destroyed base clip
+// (depth == INT_MIN) and leave g_current_sprite_obj alone; actionCallFunction and
+// the empty-method-name arm enter it unconditionally and clear the sprite. That
+// asymmetry is load-bearing (plan §3) — reproduced, not normalized.
+//
+// Both re-resolve AFTER CF_VERSION has installed the callee's version, because
+// reResolveDeadBaseClip -> resolveSlashPathToMC reads g_swf_version/global_object.
+// The *gate* on caller_ver stays with the caller, in the flags the arm computes.
 
 typedef struct ClosureFrame {
 	u32 saved_scope_depth;
@@ -29219,11 +29229,18 @@ static void enterClosureFrame(SWFAppContext* app_context, ClosureFrame* cf,
 
 	cf->saved_ctx = g_current_context;
 	cf->saved_sprite = g_current_sprite_obj;
-	if ((cf_flags & CF_CTX) && func != NULL && func->base_clip != NULL)
+	if ((cf_flags & (CF_CTX | CF_CTX_LIVE)) && func != NULL && func->base_clip != NULL)
 	{
 		MovieClip* bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
-		actionSetCurrentContext(bc);
-		g_current_sprite_obj = NULL;
+		if (cf_flags & CF_CTX)
+		{
+			actionSetCurrentContext(bc);
+			g_current_sprite_obj = NULL;
+		}
+		else if (bc->depth != INT_MIN)
+		{
+			actionSetCurrentContext(bc);
+		}
 	}
 }
 
@@ -64511,192 +64528,76 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				g_execution_halted = 1;
 				pushUndefined(app_context);
 			}
-			else if (func != NULL && func->function_type == 2)
+			else if (func != NULL &&
+			         ((func->function_type == 2 && func->advanced_func != NULL) ||
+			          (func->function_type == 1 && func->simple_func != NULL)))
 			{
-				// Invoke DefineFunction2 with 'this' binding.
-				// Push super context for SWF6+: depth = max(search_depth, 1)
-				// This allows GetVariable("super") inside the function to resolve correctly.
-				pushSuperContext((void*)obj, method_search_depth);
+				// Object-method dispatch, both function types. The core branches on
+				// function_type, so the two arms this replaces collapse into one call
+				// site: everything that differed between them is exactly what the
+				// INV_ACT_* rule table already encodes per type (a type-1 method gets
+				// no "this"/"super" scope binding and no preload/suppress gate, and its
+				// `arguments` array is allocated with capacity max(num_args, 1)).
+				int _om_is_t2 = (func->function_type == 2);
+				int _om_caller_ver = g_swf_version;
 
-				// Phase 3: switch to function's SWF version
-				int _om2_saved_ver = 0; ASObject* _om2_saved_global = NULL; int _om2_saved_midx = 0;
-				switchToFunctionVersion(func, &_om2_saved_ver, &_om2_saved_global, &_om2_saved_midx);
-				int _om2_caller_ver = _om2_saved_ver; // caller's version for closure decision
+				// Unlike actionCallFunction, a method call does NOT reset the scope
+				// chain and does NOT restore the callee's captured scopes — it stacks a
+				// bare local frame on top of the caller's chain. Load-bearing asymmetry
+				// (plan §3): reproduced, not normalized. CF_CTX_LIVE also refuses to
+				// enter a DESTROYED base clip and leaves g_current_sprite_obj alone,
+				// where actionCallFunction's CF_CTX does neither.
+				ClosureFrame cf;
+				enterClosureFrame(app_context, &cf, func,
+				                  (u8)(CF_VERSION | (_om_caller_ver >= 6 ? CF_CTX_LIVE : 0)));
 
-				// Switch base_clip context for SWF6+ closures (uses caller's version)
-				MovieClip* saved_ctx_om2 = g_current_context;
-				if (_om2_caller_ver >= 6 && func->base_clip != NULL) {
-					MovieClip* bc_raw = (MovieClip*)func->base_clip;
-					MovieClip* bc = reResolveDeadBaseClip(app_context, bc_raw);
-					if (bc->depth != INT_MIN)
-						g_current_context = bc;
+				// `this` is the receiver, or _root when the method was reached with no
+				// receiver object at all.
+				ActionVar this_var = {0};
+				if (obj != NULL) {
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.data.numeric_value = (u64)obj;
+				} else {
+					extern MovieClip root_movieclip;
+					this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					this_var.data.numeric_value = (u64)&root_movieclip;
 				}
 
-				// Push a local scope so GetVariable("this"/"super"/"arguments") can
-				// resolve them when neither preload nor suppress is set (flags == 0 bits).
-				ASObject* local_scope = allocObject(app_context, 8);
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = 0;
-					scope_mc[scope_depth] = NULL;
-					scope_chain[scope_depth++] = local_scope;
-				}
+				// The core's marshalling loop pushes EXACTLY param_count values. The
+				// type-1 loop this replaces pushed num_args of them, neither clamping
+				// nor padding — see regression/method_type1_args.
+				InvokeOpts opts = {
+					.flags = (INV_SUPER_CTX | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
+					.super_depth = (u16)method_search_depth,
+					.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS | INV_ACT_SUPER),
+					// advanced_func receives the raw receiver, NULL included; this_var
+					// above only drives the scope / this-stack binding.
+					.has_this_ptr = 1,
+					.this_ptr = obj,
+				};
 
-				u32 saved_this_depth_am2 = g_this_depth;
-
-				u16 f2flags = func->flags;
-				int f2_preload_this  = (f2flags & 0x0001);
-				int f2_suppress_this = (f2flags & 0x0002);
-				int f2_preload_args  = (f2flags & 0x0004);
-				int f2_suppress_args = (f2flags & 0x0008);
-				int f2_preload_super = (f2flags & 0x0010);
-				int f2_suppress_super= (f2flags & 0x0020);
-
-				// When neither preload nor suppress is set, the variable is accessible
-				// by name inside the function body (scope-chain lookup).
-				// Push to g_this_stack AND set on scope chain.
-				// When preloaded/suppressed, inherit parent's this (Ruffle behavior).
-				if (!f2_preload_this && !f2_suppress_this) {
-					ActionVar this_var = {0};
-					if (obj != NULL) {
-						this_var.type = ACTION_STACK_VALUE_OBJECT;
-						this_var.data.numeric_value = (u64)obj;
-					} else {
-						extern MovieClip root_movieclip;
-						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-						this_var.data.numeric_value = (u64)&root_movieclip;
-					}
-					setProperty(app_context, local_scope, "this", 4, &this_var);
-					if (g_this_depth < MAX_THIS_DEPTH) {
-						g_this_stack[g_this_depth] = this_var;
-						g_this_depth++;
-					}
-				}
-				// Track calling function for arguments.caller
-				ASFunction* prev_executing_func_am2 = g_current_executing_func;
-
-				if (!f2_preload_args && !f2_suppress_args) {
-					ASArray* arguments_arr = allocArray(app_context, num_args);
-					for (u32 i = 0; i < num_args; i++)
-						setArrayElement(app_context, arguments_arr, i, &args[i]);
-					setupArgumentsProps(app_context, arguments_arr, func, prev_executing_func_am2);
-					ActionVar args_var = {0};
-					args_var.type = ACTION_STACK_VALUE_ARRAY;
-					args_var.data.numeric_value = (u64)arguments_arr;
-					setProperty(app_context, local_scope, "arguments", 9, &args_var);
-				}
-				{
-					// Base case (no preload/suppress + super context): expose super as named variable.
-					// Suppress/preload: super variable not accessible by name — set to undefined.
-					ActionVar super_var;
-					super_var.type = ACTION_STACK_VALUE_UNDEFINED;
-					super_var.data.numeric_value = 0;
-					super_var.str_size = 0;
-					if (!f2_preload_super && !f2_suppress_super && hasSuperContext()) {
-						super_var.type = ACTION_STACK_VALUE_SUPER;
-						super_var.data.numeric_value = (u64)getSuperThis();
-						super_var.str_size = (u32)getSuperDepth();
-					}
-					setProperty(app_context, local_scope, "super", 5, &super_var);
-				}
-
-				ActionVar* registers = NULL;
-				if (func->register_count > 0) {
-					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+				// Both stay outside the core: they are read only from inside builtin
+				// bodies (g_c_function_this_obj at 33494/33560/33602/34089), never by a
+				// ritual step, so bracketing the core call is equivalent — and neither
+				// has any meaning on the type-1 path.
+				u8 _saved_call_this_type_om = g_call_this_type;
+				if (_om_is_t2) {
+					g_c_function_this_obj = (ASObject*)obj;
+					g_call_this_type = ACTION_STACK_VALUE_OBJECT;
 				}
 
 				g_call_depth++;
-				g_prev_executing_func = prev_executing_func_am2;
-				g_current_executing_func = func;
-				g_c_function_this_obj = (ASObject*)obj;
-				u8 _saved_call_this_type_om2 = g_call_this_type;
-				g_call_this_type = ACTION_STACK_VALUE_OBJECT;
-				ActionVar result = func->advanced_func(app_context, args, num_args, registers, obj);
-				g_call_this_type = _saved_call_this_type_om2;
-				g_c_function_this_obj = NULL;
-				g_current_executing_func = prev_executing_func_am2;
+				ActionVar result = invokeFunctionValue(app_context, func, &this_var,
+				                                       args, num_args, &opts);
 				g_call_depth--;
 
-				g_current_context = saved_ctx_om2;
-				if (scope_depth > 0) scope_depth--;
-				releaseObject(app_context, local_scope);
-				g_this_depth = saved_this_depth_am2;
-				popSuperContext();
-				restoreFunctionVersion(_om2_saved_ver, _om2_saved_global, _om2_saved_midx);
-				if (registers != NULL) FREE(registers);
+				if (_om_is_t2) {
+					g_call_this_type = _saved_call_this_type_om;
+					g_c_function_this_obj = NULL;
+				}
+
 				if (args != NULL) FREE(args);
-
-				pushVar(app_context, &result);
-			}
-			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
-			{
-				// Invoke simple function (DefineFunction type 1) as method
-				// Push super context for SWF6+
-				pushSuperContext((void*)obj, method_search_depth);
-
-				// Phase 3: switch to function's SWF version
-				int _om1_saved_ver = 0; ASObject* _om1_saved_global = NULL; int _om1_saved_midx = 0;
-				switchToFunctionVersion(func, &_om1_saved_ver, &_om1_saved_global, &_om1_saved_midx);
-				int _om1_caller_ver = _om1_saved_ver; // caller's version for closure decision
-
-				// Switch base_clip context for SWF6+ closures (uses caller's version)
-				MovieClip* saved_ctx_om1 = g_current_context;
-				if (_om1_caller_ver >= 6 && func->base_clip != NULL) {
-					MovieClip* bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
-					if (bc->depth != INT_MIN)
-						g_current_context = bc;
-				}
-
-				// Create local scope with arguments object for proper arguments.callee/caller
-				ASFunction* prev_executing_func_am1 = g_current_executing_func;
-				ASObject* local_scope_am1 = allocObject(app_context, 8);
-
-				// Push 'this' to receiver for type 1 method calls
-				u32 saved_this_depth_am1 = g_this_depth;
-				if (g_this_depth < MAX_THIS_DEPTH) {
-					if (obj != NULL) {
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
-					} else {
-						extern MovieClip root_movieclip;
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)&root_movieclip;
-					}
-					g_this_depth++;
-				}
-
-				ASArray* arguments_arr_am1 = allocArray(app_context, num_args > 0 ? num_args : 1);
-				for (u32 i = 0; i < num_args; i++)
-				{
-					setArrayElement(app_context, arguments_arr_am1, i, &args[i]);
-					pushVar(app_context, &args[i]);
-				}
-				setupArgumentsProps(app_context, arguments_arr_am1, func, prev_executing_func_am1);
-				ActionVar args_var_am1 = {0};
-				args_var_am1.type = ACTION_STACK_VALUE_ARRAY;
-				args_var_am1.data.numeric_value = (u64)arguments_arr_am1;
-				setProperty(app_context, local_scope_am1, "arguments", 9, &args_var_am1);
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = 0;
-					scope_mc[scope_depth] = NULL;
-					scope_chain[scope_depth++] = local_scope_am1;
-				}
-				if (args != NULL) FREE(args);
-
-				g_call_depth++;
-				g_prev_executing_func = prev_executing_func_am1;
-				g_current_executing_func = func;
-				ActionVar result;
-				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-				g_current_executing_func = prev_executing_func_am1;
-				g_call_depth--;
-
-				g_current_context = saved_ctx_om1;
-				if (scope_depth > 0) scope_depth--;
-				releaseObject(app_context, local_scope_am1);
-				g_this_depth = saved_this_depth_am1;
-				popSuperContext();
-				restoreFunctionVersion(_om1_saved_ver, _om1_saved_global, _om1_saved_midx);
-
+				leaveClosureFrame(app_context, &cf);
 				pushVar(app_context, &result);
 			}
 			else

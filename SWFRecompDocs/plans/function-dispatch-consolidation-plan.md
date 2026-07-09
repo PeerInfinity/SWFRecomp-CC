@@ -526,7 +526,8 @@ migration and gets a `regression/` test at that point:
 
 - **empty-method-name arm** (`64150`): pushes `num_args` values, no clamp, no
   pad. **CONFIRMED REAL and fixed** in step 2 — see the landing note below.
-- **object-method type-1 arm** (`64719`): pushes `num_args` values, no clamp, no pad.
+- **object-method type-1 arm** (`64719`): pushes `num_args` values, no clamp, no
+  pad. **CONFIRMED REAL and fixed** in step 3 — see the landing note below.
 - **`.call`/`.apply` type-1 handler** (`65659`): pads to `param_count` but never
   **clamps** — extra args leak onto the caller's eval stack.
 
@@ -582,6 +583,39 @@ Two bugs fixed, both predicted by the design survey:
    copied uninitialized C stack garbage back over `scope_chain[]` and called
    `restoreFunctionVersion(0, NULL, 0)`. `leaveClosureFrame` keys off the frame's
    own recorded flags, so it is a no-op when nothing was entered.
+
+**Step 3 — the object-method arms (`om2` + `om1`), merged into one.** The core
+already branches on `function_type`, and everything that differed between the two
+arms is exactly what the `INV_ACT_*` rule table encodes per type. So they collapse
+to a single call site (**−99 lines**): `CF_VERSION` always, `CF_CTX_LIVE` gated on
+`caller_ver >= 6`, `INV_SUPER_CTX` with `method_search_depth`, `INV_LOCAL_SCOPE`,
+`INV_EXEC_FUNC`, `act_flags = THIS | ARGUMENTS | SUPER`.
+
+Three asymmetries preserved rather than normalized:
+- A method call **does not reset the scope chain** and **does not restore the
+  callee's captured scopes** — it stacks a bare local frame on the caller's chain.
+  (`actionCallFunction` does both.) So no `CF_RESET_SCOPE`, no `INV_CAPTURED_SCOPE`.
+- New `CF_CTX_LIVE`: the method arms refuse to enter a **destroyed** base clip
+  (`depth == INT_MIN`) and leave `g_current_sprite_obj` alone, where `CF_CTX`
+  enters unconditionally and clears the sprite.
+- `g_c_function_this_obj` / `g_call_this_type` stay outside the core and are set
+  only on the type-2 path (they have no meaning for a type-1 method).
+
+Both `CF_CTX` variants re-resolve **after** `CF_VERSION` has installed the
+callee's version, because `reResolveDeadBaseClip` → `resolveSlashPathToMC` reads
+`g_swf_version` / `global_object`. The *gate* stays on the caller's version, in
+the flags the arm computes before entering. That ordering is what the frame exists
+to make explicit.
+
+**The type-1 clamp/pad bug is REAL here too** (predicted above at `64719`).
+Regression test `regression/method_type1_args` — `o = {}; o.m = m; o.m(...)` with
+a hand-assembled type-1 `m`. Verified to fail before and pass after, in the same
+two modes as step 2: `o.m("only")` bound `a="SENTINEL2", b="only"`, and
+`o.m("one","two","three")` bound `a="two", b="three"` while stranding `"one"`.
+
+That is the third arm of this class, after `.call`/`.apply`-via-`GetMember` (3b)
+and the empty-method-name arm (step 2). One hand-rolled marshalling loop's worth
+of bug in each; all three now served by the core's single forward+clamp+pad loop.
 
 ### Stage 4 — event/callback dispatchers + deliberate normalization
 
