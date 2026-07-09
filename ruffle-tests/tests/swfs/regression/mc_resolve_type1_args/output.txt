@@ -1,0 +1,6 @@
+r2 a=zzzMissingA
+r2 b=undefined
+SENTINEL1
+r0 ran
+SENTINEL2
+done

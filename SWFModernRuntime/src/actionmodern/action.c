@@ -70654,7 +70654,18 @@ _mc_user_dispatch: ;
 					ActionVar resolve_result = {0};
 					resolve_result.type = ACTION_STACK_VALUE_UNDEFINED;
 					if (func->function_type == 1 && func->simple_func != NULL) {
-						pushVar(app_context, &name_arg);
+						// The prologue pops EXACTLY param_count values. Push that many:
+						// the name where it fits, undefined for the rest. A bare
+						// pushVar(&name_arg) let a 2-param __resolve bind a caller
+						// operand, and a 0-param one strand the name on the caller's
+						// eval stack. The OBJECT __resolve hook has always clamped and
+						// padded (invokeResolveFunction); this is the MOVIECLIP one.
+						// See regression/mc_resolve_type1_args.
+						if (func->param_count > 0)
+							pushVar(app_context, &name_arg);
+						for (u32 _rp = 1; _rp < func->param_count; _rp++) {
+							PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+						}
 						resolve_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 					} else if (func->advanced_func != NULL) {
 						MovieClip* saved_event_this_cm = g_event_this_mc;

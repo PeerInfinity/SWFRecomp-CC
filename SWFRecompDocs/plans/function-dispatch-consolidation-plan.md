@@ -849,6 +849,47 @@ Lesson for the remaining arms: **when this fix lands on an already-failing test,
 `results_diff.md`'s line metrics can move the wrong way.** Read the actual output,
 not just the delta table.
 
+#### Stage 3d — the MC arm (surveyed July 9, 2026; NOT yet migrated)
+
+All user-defined MOVIECLIP-receiver dispatch sits behind `_mc_user_dispatch:`,
+after the builtin-method wall. Name resolution is unified (dynamic_props →
+`__proto__` chain → MovieClip.prototype → root var_map → `lookupFunctionByName`),
+so **registerClass methods are not a separate arm**. There are three invocation
+arms:
+
+| | A: user method | B: `__resolve` hook | C: callable `__resolve` returned |
+|---|---|---|---|
+| `retainObject` on local frame | no | yes | yes |
+| `g_this_stack` push | type-1 only | no | no |
+| `g_current_executing_func` | save/set/restore | save/set/restore | **untracked** |
+| args | caller's | synthetic name, 1 | caller's |
+| type-1 marshalling | fwd + clamp + pad | **bare single push** | fwd + clamp + pad |
+
+None of the three uses super context, ctor context, override-`this`,
+`g_call_this_type`, `g_c_function_this_obj`, `arguments`/`super` binding, the
+DefineFunction2 flags gate, or a `g_max_call_depth` pre-check. All three pass
+`NULL` as `advanced_func`'s receiver and bind the MC via `g_event_this_mc`
+(= `INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR`), bind `"this"` on the local frame
+with `scope_mc = NULL` (so `INV_BIND_THIS` **without** `INV_LOCAL_SCOPE_MC`), and
+restore captured scopes with `is_with` **copied**, not forced.
+
+**They need a new `ClosureFrame` context mode.** The base-clip switch is neither
+`CF_CTX` nor `CF_CTX_LIVE`: it re-resolves, and on a **destroyed** clip
+(`depth == INT_MIN`) — or under SWF < 6 — it falls back to
+`actionSetCurrentContext(mc)`, the *receiver*, rather than entering the base clip
+(`CF_CTX`) or leaving the context alone (`CF_CTX_LIVE`). It also forces
+`g_current_sprite_obj = NULL` like `CF_CTX`. Call it `CF_CTX_MC_FALLBACK`; the arm
+must pass the receiver. That is the decision to make before editing.
+
+**Instance nine of the clamp/pad class — VERIFIED REAL and fixed ahead of the
+migration**, since it is independent of the above decision. Arm B pushed the
+synthesized name argument unconditionally. A type-1 `__resolve` declaring two
+params bound `a = <caller operand>, b = <name>`; one declaring zero params
+stranded the name on the caller's eval stack. The OBJECT `__resolve` hook has
+always clamped and padded (it goes through `invokeResolveFunction`), so the two
+hooks disagreed. Test `regression/mc_resolve_type1_args`. Arms A and C already
+clamp and pad, so they are clean.
+
 ### Stage 4 — event/callback dispatchers + deliberate normalization
 
 `mc_call_as2_handler_ng`, `fireTimerCallback`, `builtin_broadcaster_broadcastMessage`,
