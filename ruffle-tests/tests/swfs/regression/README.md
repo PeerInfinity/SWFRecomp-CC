@@ -14,16 +14,16 @@ script. Tests that live here need none of that.
 
 ## Running
 
-The suite is not the runner's default `--tests-dir`, so name it explicitly:
-
 ```bash
+# one test — `--test` finds the suite that owns the name, no --tests-dir needed
+python3 ruffle-tests/verify_output.py --test=fn_call_type1_args --diff --verbose
+
 # whole suite (5 tests, a few seconds)
 python3 ruffle-tests/verify_output.py -v --tests-dir=ruffle-tests/tests/swfs/regression
-
-# one test
-python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/regression \
-  --test=fn_call_type1_args --diff --verbose
 ```
+
+A bare `--test=NAME` searches every suite in `verify_output.py`'s `SUITE_DIRS`.
+Names must all resolve to one suite; pass `--tests-dir` to disambiguate.
 
 CI runs it as its own suite alongside `avm1` (gated on the same `RUN_AVM1`
 condition), with results in `_results/` and the usual per-mode diff reports.

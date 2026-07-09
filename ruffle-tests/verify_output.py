@@ -512,6 +512,20 @@ STB_DIR = PROJECT_ROOT / "SWFRecomp" / "lib" / "stb"
 # Ruffle upstream test assets (expected PNGs live here)
 RUFFLE_UPSTREAM = Path.home() / "CC" / "ruffle" / "tests" / "tests" / "swfs" / "avm1"
 
+# Every suite root, in the order `--test` searches them. Mirrors the *_DIR env
+# vars in .github/workflows/ruffle-tests.yml — keep the two in sync.
+SUITE_DIRS = [
+    "avm1",
+    "regression",
+    "from_shumway",
+    "from_shumway/avm1",
+    "from_gnash/actionscript.all",
+    "from_gnash/misc-ming.all",
+    "from_gnash/misc-mtasc.all",
+    "from_gnash/misc-swfc.all",
+    "from_gnash/misc-swfmill.all",
+]
+
 # JSON result files (re-derived from TESTS_DIR in main() when --tests-dir is used)
 RESULTS_DIR = TESTS_DIR / "_results"
 RESULTS_FINAL = RESULTS_DIR / "results.json"
@@ -2762,6 +2776,40 @@ def main():
         if not TESTS_DIR.is_dir():
             print(f"Error: tests directory not found: {TESTS_DIR}")
             sys.exit(1)
+    elif args.test:
+        # `--test=NAME` without `--tests-dir`: find NAME in whichever suite owns
+        # it, so callers need not know that (say) fn_call_type1_args lives in
+        # regression/ rather than the default avm1/. Only exact names are
+        # resolved; glob patterns stay scoped to the default suite. All named
+        # tests must land in one suite, since results paths and the child-SWF
+        # conventions are per-suite.
+        swfs_root = SCRIPT_DIR / "tests" / "swfs"
+        literals = [t for t in args.test if "*" not in t and "?" not in t]
+        if literals and not all((TESTS_DIR / t).is_dir() for t in literals):
+            suites = [swfs_root / s for s in SUITE_DIRS]
+            homes = {}
+            for t in literals:
+                if (TESTS_DIR / t).is_dir():
+                    homes[t] = TESTS_DIR
+                    continue
+                hits = [d for d in suites if (d / t).is_dir()]
+                if len(hits) == 1:
+                    homes[t] = hits[0]
+                elif len(hits) > 1:
+                    names = ", ".join(str(d.relative_to(swfs_root)) for d in hits)
+                    print(f"Error: test '{t}' exists in several suites ({names}); "
+                          f"pass --tests-dir to choose one")
+                    sys.exit(1)
+                # No hit: leave it unresolved. The per-test check below reports
+                # it against whichever suite we settle on.
+            chosen = set(homes.values())
+            if len(chosen) > 1:
+                names = ", ".join(sorted(str(d.relative_to(swfs_root)) for d in chosen))
+                print(f"Error: named tests span multiple suites ({names}); "
+                      f"run one suite at a time or pass --tests-dir")
+                sys.exit(1)
+            if chosen:
+                TESTS_DIR = chosen.pop()
 
     # Re-derive results paths from TESTS_DIR
     RESULTS_DIR = TESTS_DIR / "_results"
