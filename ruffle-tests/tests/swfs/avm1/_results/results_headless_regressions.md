@@ -1,6 +1,6 @@
 # Headless vs Trace Mode Differences
 
-Trace: 638/710 passing | Headless: 6/6 passing
+Trace: 634/706 passing | Headless: 6/6 passing
 
 ## Headless Regressions (0 tests)
 
