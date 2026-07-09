@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 7/7 passing | Graphics: 7/7 passing
+Trace: 8/8 passing | Graphics: 7/7 passing
 
 ## Graphics Regressions (0 tests)
 
