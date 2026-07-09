@@ -64837,47 +64837,39 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// `for (var i in this)` iterates the array's indices (Array.prototype.realLength).
 			// arr->props is the addProperty/named-prop store, not the array's identity.
 			ASFunction* func = lookupFunctionFromVar(user_method_prop);
-			if (func != NULL && func->function_type == 2 && func->advanced_func != NULL) {
-				pushSuperContext((void*)arr->props, 1);  /* super_this must be the property bag, not the raw ASArray (walkProtoChain casts to ASObject*) */
-				ASObject* local_scope = allocObject(app_context, 8);
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = 0;
-					scope_mc[scope_depth] = NULL;
-					scope_chain[scope_depth++] = local_scope;
-				}
+			int _am_t2 = (func != NULL && func->function_type == 2 && func->advanced_func != NULL);
+			int _am_t1 = (func != NULL && func->function_type == 1 && func->simple_func != NULL);
+			if (_am_t2 || _am_t1) {
 				ActionVar this_var = {0};
 				this_var.type = ACTION_STACK_VALUE_ARRAY;
 				this_var.data.numeric_value = (u64)arr;
-				if (g_this_depth < MAX_THIS_DEPTH) {
-					g_this_stack[g_this_depth++] = this_var;
-				}
-				setProperty(app_context, local_scope, "this", 4, &this_var);
+
+				/* super_this must be the property bag, not the raw ASArray
+				   (walkProtoChain casts to ASObject*). Stays outside the core, which
+				   would derive its super receiver from this_var — i.e. `arr` itself. */
+				pushSuperContext((void*)arr->props, 1);
+
+				// The type-1 half has no local frame on this path, so it binds `this` into
+				// the ENCLOSING scope — something INV_BIND_THIS cannot express. The type-2
+				// half gets a fresh frame with "this" on it. Asymmetry preserved, not
+				// normalized (plan §3).
+				if (_am_t1) setVariableByName("this", &this_var);
+
+				// The core pushes EXACTLY param_count operands. The type-1 loop this
+				// replaces pushed num_args of them, neither clamping a long call nor
+				// padding a short one — see regression/array_method_type1_args.
+				InvokeOpts opts = {
+					.flags = (u32)(INV_THIS_STACK |
+					               (_am_t2 ? (INV_LOCAL_SCOPE | INV_BIND_THIS) : 0)),
+				};
+
 				g_call_depth++;
-				ActionVar result = func->advanced_func(app_context, args, num_args, NULL, (void*)arr);
+				ActionVar result = invokeFunctionValue(app_context, func, &this_var,
+				                                       args, num_args, &opts);
 				g_call_depth--;
-				if (g_this_depth > 0) g_this_depth--;
-				if (scope_depth > 0) scope_depth--;
-				releaseObject(app_context, local_scope);
+
 				popSuperContext();
 				if (args != NULL) FREE(args);
-				pushVar(app_context, &result);
-			} else if (func != NULL && func->function_type == 1 && func->simple_func != NULL) {
-				pushSuperContext((void*)arr->props, 1);  /* super_this must be the property bag, not the raw ASArray (walkProtoChain casts to ASObject*) */
-				ActionVar this_var = {0};
-				this_var.type = ACTION_STACK_VALUE_ARRAY;
-				this_var.data.numeric_value = (u64)arr;
-				setVariableByName("this", &this_var);
-				if (g_this_depth < MAX_THIS_DEPTH) {
-					g_this_stack[g_this_depth++] = this_var;
-				}
-				for (u32 i = 0; i < num_args; i++)
-					pushVar(app_context, &args[i]);
-				if (args != NULL) FREE(args);
-				g_call_depth++;
-				ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-				g_call_depth--;
-				if (g_this_depth > 0) g_this_depth--;
-				popSuperContext();
 				pushVar(app_context, &result);
 			} else {
 				if (args != NULL) FREE(args);
@@ -64899,65 +64891,27 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ASFunction* func = (ASFunction*)(uintptr_t)elem->data.numeric_value;
 					if (func != NULL)
 					{
-						if (func->function_type == 2 && func->advanced_func != NULL)
+						int _ae_t2 = (func->function_type == 2 && func->advanced_func != NULL);
+						int _ae_t1 = (func->function_type == 1 && func->simple_func != NULL);
+						if (_ae_t2 || _ae_t1)
 						{
-							ActionVar* registers = NULL;
-							if (func->register_count > 0)
-								registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-
-							u32 captured_count = func->captured_scope_count;
-							for (u32 ci = 0; ci < captured_count; ci++) {
-								if (scope_depth < MAX_SCOPE_DEPTH) {
-									scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-									scope_mc[scope_depth] = func->captured_scope_mc[ci];
-									scope_chain[scope_depth++] = func->captured_scope[ci];
-								}
-							}
-
-							ASObject* local_scope = allocObject(app_context, 8);
-							if (scope_depth < MAX_SCOPE_DEPTH) {
-								scope_is_with[scope_depth] = 0;
-								scope_mc[scope_depth] = NULL;
-								scope_chain[scope_depth++] = local_scope;
-							}
-
-							MovieClip* saved_ctx = g_current_context;
-							if (g_swf_version >= 6 && func->base_clip != NULL)
-								g_current_context = func->base_clip;
+							// arr[N](...) binds no receiver: advanced_func gets NULL and nothing
+							// reaches g_this_stack. Only the type-2 half ever had a local frame
+							// or a base_clip switch, and neither half forces is_with on the
+							// captured scopes. Asymmetry preserved, not normalized (plan §3).
+							//
+							// The core pushes EXACTLY param_count operands; the type-1 loop this
+							// replaces pushed num_args — see regression/array_element_type1_args.
+							InvokeOpts opts = {
+								.flags = (u32)(INV_CAPTURED_SCOPE |
+								               (_ae_t2 ? (INV_LOCAL_SCOPE | INV_BASE_CLIP) : 0)),
+							};
 
 							g_call_depth++;
-							ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
+							ActionVar result = invokeFunctionValue(app_context, func, NULL,
+							                                       args, num_args, &opts);
 							g_call_depth--;
 
-							g_current_context = saved_ctx;
-							for (u32 ci = 0; ci < captured_count + 1; ci++)
-								if (scope_depth > 0) scope_depth--;
-							releaseObject(app_context, local_scope);
-							if (registers != NULL) FREE(registers);
-							if (args != NULL) FREE(args);
-							pushVar(app_context, &result);
-							return;
-						}
-						else if (func->function_type == 1 && func->simple_func != NULL)
-						{
-							for (u32 i = 0; i < num_args; i++)  // TYPE1_ARG_ORDER: forward
-								pushVar(app_context, &args[i]);
-
-							u32 captured_count = func->captured_scope_count;
-							for (u32 ci = 0; ci < captured_count; ci++) {
-								if (scope_depth < MAX_SCOPE_DEPTH) {
-									scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-									scope_mc[scope_depth] = func->captured_scope_mc[ci];
-									scope_chain[scope_depth++] = func->captured_scope[ci];
-								}
-							}
-
-							g_call_depth++;
-							ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-							g_call_depth--;
-
-							for (u32 ci = 0; ci < captured_count; ci++)
-								if (scope_depth > 0) scope_depth--;
 							if (args != NULL) FREE(args);
 							pushVar(app_context, &result);
 							return;
