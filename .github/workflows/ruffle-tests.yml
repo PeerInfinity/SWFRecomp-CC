@@ -95,6 +95,9 @@ env:
   SWF_GC: ${{ inputs.swf_gc }}
   SWF_GC_CADENCE: ${{ inputs.swf_gc != '' && '1' || '' }}
   AVM1_DIR: ruffle-tests/tests/swfs/avm1
+  # Hand-written regression tests. Not downloaded — download_tests.sh never
+  # touches this tree, so it takes no `CATS` entry, only a DIRS entry.
+  REGRESSION_DIR: ruffle-tests/tests/swfs/regression
   SHUMWAY_AVM1_DIR: ruffle-tests/tests/swfs/from_shumway/avm1
   SHUMWAY_FLAT_DIR: ruffle-tests/tests/swfs/from_shumway
   GNASH_SWFMILL_DIR: ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all
@@ -234,7 +237,7 @@ jobs:
       - name: Run recompiler on test SWFs
         run: |
           DIRS=""
-          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR"
+          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -246,7 +249,7 @@ jobs:
       - name: Fetch previous results
         run: |
           DIRS=""
-          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR"
+          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -284,7 +287,7 @@ jobs:
           TZ: NPT-5:45
         run: |
           DIRS=""
-          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR"
+          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -670,7 +673,7 @@ jobs:
       - name: Run recompiler on test SWFs
         run: |
           DIRS=""
-          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR"
+          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -845,6 +848,28 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Verify regression (shard ${{ matrix.shard }})
+        if: "!cancelled() && env.RUN_AVM1 == 'true'"
+        timeout-minutes: 10
+        env:
+          TZ: NPT-5:45
+        run: |
+          SHARD="${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
+            --tests-dir="$REGRESSION_DIR" \
+            --json=ruffle-tests/results-shard-regression-${{ matrix.shard }}.json \
+            --shard="$SHARD" || true
+
+      - name: Upload regression results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-shard-${{ matrix.shard }}-regression
+          path: ruffle-tests/results-shard-regression-${{ matrix.shard }}.json
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Verify Shumway (shard ${{ matrix.shard }})
         if: "!cancelled() && env.RUN_SHUMWAY == 'true'"
         timeout-minutes: 10
@@ -988,7 +1013,7 @@ jobs:
         # stale _results/ files from the master checkout, which would overwrite
         # the fetched previous results if we fetched first.
         run: |
-          DIRS="$AVM1_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
+          DIRS="$AVM1_DIR $REGRESSION_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
           # Per-mode previous baseline (graphics diffs against graphics, etc.).
           case "${{ inputs.mode }}" in
             graphics) PREV_STEM="results_graphics" ;;
@@ -1034,6 +1059,7 @@ jobs:
           # Map of shard tag -> output results dir
           categories = {
               "avm1": "ruffle-tests/tests/swfs/avm1/_results",
+              "regression": "ruffle-tests/tests/swfs/regression/_results",
               "shumway_avm1": "ruffle-tests/tests/swfs/from_shumway/avm1/_results",
               "shumway_flat": "ruffle-tests/tests/swfs/from_shumway/_results",
               "gnash_swfmill": "ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results",

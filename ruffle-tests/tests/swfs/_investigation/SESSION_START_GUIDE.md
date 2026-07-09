@@ -54,6 +54,7 @@ Each suite stores results in its own `_results/` directory:
 | Gnash misc-swfmill.all | `ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/` |
 | Shumway (flat) | `ruffle-tests/tests/swfs/from_shumway/_results/` |
 | Shumway (avm1 subdir) | `ruffle-tests/tests/swfs/from_shumway/avm1/_results/` |
+| Regression (ours, not downloaded) | `ruffle-tests/tests/swfs/regression/_results/` |
 
 Each `_results/` directory contains: `results.json`, `results.md`, `results_filtered.json` (if ignore list exists), `results_filtered.md`, `results_diff.json`, `results_diff.md`.
 
@@ -112,6 +113,9 @@ python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/from_g
 
 # Shumway
 python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/from_shumway --test=TEST_NAME --diff --verbose
+
+# Regression (hand-written by this project; see that suite's README.md)
+python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/regression --test=TEST_NAME --diff --verbose
 ```
 
 ### Run multiple tests

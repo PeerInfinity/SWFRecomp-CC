@@ -124,8 +124,11 @@ stalls.
 Repro method: MTASC emits DefineFunction2 for SWF6+, so all four repros are
 hand-assembled SWF bytecode (`create_test_swf.py` per test dir) that provably
 contains plain `DefineFunction`. All four live as permanent, fully git-tracked
-custom tests in `ruffle-tests/tests/swfs/avm1/` (they survive
-`download_tests.sh` because the sync restores git-tracked content).
+custom tests in **`ruffle-tests/tests/swfs/regression/`** — a suite
+`download_tests.sh` never touches. (They originally sat in
+`ruffle-tests/tests/swfs/avm1/` behind per-test `.gitignore` negations; Stage 3
+moved them out, since that directory is a wipe-and-re-download mirror of
+upstream. See the suite's `README.md`.)
 
 1. **`actionEI_callInternalInterface` type-1 arm — REAL BUG, fixed
    `d8abc5c0a`.** Pushed args in REVERSE (missed by the bcacc3f70 sweep) and

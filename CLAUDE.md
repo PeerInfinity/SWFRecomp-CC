@@ -62,6 +62,7 @@ gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f single_test=TE
   - `tests/swfs/avm1/` — 641 AVM1 tests from Ruffle (100% filtered pass rate)
   - `tests/swfs/from_gnash/` — 335 tests from Gnash (147 effective pass across 5 sub-suites)
   - `tests/swfs/from_shumway/` — 92 flat + 47 avm1 tests from Shumway (61 + 45 effective)
+  - `tests/swfs/regression/` — hand-written by this project, never downloaded; fully git-tracked. Run with `--tests-dir=ruffle-tests/tests/swfs/regression`. New custom tests go here, NOT in the upstream mirrors above (see that suite's `README.md`).
 - `SWFRecomp/tests/` — Old hand-written test suite (158 trace tests + 59 graphics tests, all passing)
 - `SWFRecomp/scripts/` — Build scripts (build_test.sh, deploy_example.sh, etc.)
 - `scripts/` — Test result processing scripts (diff, markdown generation)
