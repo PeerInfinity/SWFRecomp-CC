@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `fee25fd79cf7`  
-**Date:** 2026-07-09 21:07 UTC  
-**Total duration:** 2h58m51s
+**Commit:** `c7d755871e0f`  
+**Date:** 2026-07-09 21:36 UTC  
+**Total duration:** 3h03m23s
 
 ## Results by Suite
 
@@ -19,8 +19,8 @@
 | from_gnash/misc-swfmill.all | 19 | 20 | 95.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_filtered.md) |
 | from_shumway | 73 | 76 | 96.1% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_filtered.md) |
 | from_shumway/avm1 | 44 | 44 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_filtered.md) |
-| regression | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results_filtered.md) |
-| **Total** | **997** | **1185** | **84.1%** | |
+| regression | 13 | 13 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results_filtered.md) |
+| **Total** | **998** | **1186** | **84.1%** | |
 
 *75 tests ignored.*
 
@@ -36,8 +36,8 @@
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
-| regression | 98 | 98 | 100% |
-| **Total** | **139,245** | **146,187** | **95.3%** |
+| regression | 104 | 104 | 100% |
+| **Total** | **139,251** | **146,193** | **95.3%** |
 
 ## Failure Breakdown
 
@@ -90,67 +90,67 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 631/661 (95.5%)
 - **Ignored:** 45 tests
-- **Duration:** 1h14m24s across 30 shards
+- **Duration:** 1h16m52s across 30 shards
 - **Lines:** 104,036/107,545 matching (96.7%)
-- **Avg test duration:** 6.3s — slowest: `movieclip_invalid_get_bounds_6` (26.9s)
+- **Avg test duration:** 6.6s — slowest: `bitxor` (26.5s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 132/236 (55.9%)
 - **Ignored:** 7 tests
-- **Duration:** 35m01s across 30 shards
+- **Duration:** 35m13s across 30 shards
 - **Lines:** 29,253/31,358 matching (93.3%)
-- **Avg test duration:** 8.5s — slowest: `MovieClip-v8` (67.2s)
+- **Avg test duration:** 8.6s — slowest: `MovieClip-v8` (57.0s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 68/109 (62.4%)
 - **Ignored:** 2 tests
-- **Duration:** 34m05s across 30 shards
+- **Duration:** 34m49s across 30 shards
 - **Lines:** 4,029/5,188 matching (77.7%)
-- **Avg test duration:** 18.3s — slowest: `matrix_test` (103.3s)
+- **Avg test duration:** 18.7s — slowest: `matrix_test` (100.3s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
 - **Duration:** 2m10s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 14.5s — slowest: `TextFieldTest` (23.3s)
+- **Avg test duration:** 14.5s — slowest: `exception` (21.4s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 11/18 (61.1%)
 - **Ignored:** 2 tests
-- **Duration:** 5m46s across 30 shards
+- **Duration:** 5m50s across 30 shards
 - **Lines:** 424/555 matching (76.4%)
-- **Avg test duration:** 18.0s — slowest: `swf4opcode` (22.4s)
+- **Avg test duration:** 18.2s — slowest: `registerclass_test3` (21.5s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 6m24s across 30 shards
+- **Duration:** 6m30s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 19.2s — slowest: `afunc_dict` (20.9s)
+- **Avg test duration:** 19.5s — slowest: `dict_event` (20.8s)
 
 ### from_shumway
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 14m41s across 30 shards
+- **Duration:** 14m56s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 7.2s — slowest: `invalidClipDepth` (22.2s)
+- **Avg test duration:** 7.3s — slowest: `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` (21.7s)
 
 ### from_shumway/avm1
 
 - **Pass:** 44/44 (100%)
 - **Ignored:** 3 tests
-- **Duration:** 2m35s across 30 shards
+- **Duration:** 2m47s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 2.1s — slowest: `duplicateMovieClip/dontremove` (19.4s)
+- **Avg test duration:** 2.4s — slowest: `duplicateMovieClip/dontremove` (21.1s)
 
 ### regression
 
-- **Pass:** 12/12 (100%)
-- **Duration:** 3m41s across 30 shards
-- **Lines:** 98/98 matching (100%)
-- **Avg test duration:** 18.4s — slowest: `array_element_type1_args` (20.5s)
+- **Pass:** 13/13 (100%)
+- **Duration:** 4m12s across 30 shards
+- **Lines:** 104/104 matching (100%)
+- **Avg test duration:** 19.3s — slowest: `fn_empty_method_type1_args` (20.8s)
