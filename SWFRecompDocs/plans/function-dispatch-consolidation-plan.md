@@ -8,17 +8,20 @@ Stage 1 landing note in §4.
 Stage 2 COMPLETE (July 8, 2026) — the whole accessor family
 (`invokePropertyGetter` / `invokePropertySetter` / `invokeResolveFunction`) are now
 thin adapters over the core; see the Stage 2 landing note in §4.
-Stage 3 IN PROGRESS (July 9, 2026) — **14 of `actionCallMethod`'s ~19 arms
-migrated**, plus all of `actionCallFunction` (`e4082f224`, `65d442f09`,
-`ee9132778`, `e31237992`, `a2cd5228b`, `d3e5747bc`, `812bc54f7`, + steps 5b/5c).
-Only the **MC arm** remains. **Eight real TYPE1_ARG_ORDER clamp/pad bugs found
-and fixed**, each with a permanent hand-assembled test in `regression/` (now
-12/12). Read the Stage 3 progress note in §4, then the **Stage 3c design note**
-for the shape (arm-owned `ClosureFrame` + in-core `act_flags` activation), then
-the **Stage 3c landing notes**. The two arms that were "not drop-ins" are landed:
-`__resolve` needed a new `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit (its scope
-inversion is real and observable); the string-primitive arm needed **no** new
-flag (its type-1 `this`/`super` name bindings are provably dead). Stages 4–5 not
+Stage 3 COMPLETE (July 9, 2026) — **all of `actionCallMethod`'s ~19 invocation
+arms migrated**, plus all of `actionCallFunction` (`e4082f224`, `65d442f09`,
+`ee9132778`, `e31237992`, `a2cd5228b`, `d3e5747bc`, `812bc54f7`, + steps 5b/5c
+and the Stage-3d MC arm). **Nine real TYPE1_ARG_ORDER clamp/pad bugs found and
+fixed**, each with a permanent hand-assembled test in `regression/` (now 13/13).
+Read the Stage 3 progress note in §4, then the **Stage 3c design note** for the
+shape (arm-owned `ClosureFrame` + in-core `act_flags` activation), then the
+**Stage 3c landing notes** and the **Stage 3d landing note**. The three arms that
+were "not drop-ins" are landed, and each went a different way: `__resolve` needed
+a new `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit (its scope inversion is real and
+observable); the string-primitive arm needed **no** new flag (its type-1
+`this`/`super` name bindings are provably dead); the MC arm needed **no** new
+`InvokeOpts` flag but two new `ClosureFrame` context modes, and exposed the
+`INV_BASE_CLIP | INV_VERSION_SWITCH` hazard as *live*, not latent. Stages 4–5 not
 started.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
@@ -457,6 +460,11 @@ callee's version — i.e. it gates on the **callee's** version, while every real
 arm gates on the **caller's**. No migrated site sets both flags (verified: all
 eight `invokeFunctionValue` call sites pass explicit opts; the `opts==NULL`
 superset that combines them is dead code), so this is latent, not live.
+*(Corrected by Stage 3d: it is latent only among the arms surveyed here. The
+three MOVIECLIP arms have always gated on the callee's version, because they read
+`g_swf_version` after their own `switchToFunctionVersion` call. That is the live
+instance, and Stage 3d preserves it by computing `eff_ver` in the arm rather than
+letting the frame or the core read the global. See the Stage 3d landing note.)*
 `enterClosureFrame` takes `caller_ver` explicitly and owns the context switch, so
 the closure arms never touch `INV_BASE_CLIP`. Leave the flag's gate alone;
 `gates/check_dispatch_funnel.py` (Stage 5) should reject any site that sets both.
@@ -806,7 +814,8 @@ scope and released it once, so the frame was never freed. The core allocs and
 releases (closures already `retainObject` non-with scopes at capture —
 `actionDefineFunction`), so the frame now frees when nothing captured it.
 
-**Stage 3 is complete for `actionCallMethod`'s invocation arms** except the MC arm.
+**Stage 3 is complete for `actionCallMethod`'s invocation arms** except the MC arm
+(landed separately — see the Stage 3d landing note below).
 
 ##### Survey of the two arms that are NOT drop-ins (read before attempting them)
 
@@ -849,7 +858,7 @@ Lesson for the remaining arms: **when this fix lands on an already-failing test,
 `results_diff.md`'s line metrics can move the wrong way.** Read the actual output,
 not just the delta table.
 
-#### Stage 3d — the MC arm (surveyed July 9, 2026; NOT yet migrated)
+#### Stage 3d — the MC arm (surveyed July 9, 2026; LANDED July 9, 2026)
 
 All user-defined MOVIECLIP-receiver dispatch sits behind `_mc_user_dispatch:`,
 after the builtin-method wall. Name resolution is unified (dynamic_props →
@@ -873,22 +882,96 @@ DefineFunction2 flags gate, or a `g_max_call_depth` pre-check. All three pass
 with `scope_mc = NULL` (so `INV_BIND_THIS` **without** `INV_LOCAL_SCOPE_MC`), and
 restore captured scopes with `is_with` **copied**, not forced.
 
-**They need a new `ClosureFrame` context mode.** The base-clip switch is neither
-`CF_CTX` nor `CF_CTX_LIVE`: it re-resolves, and on a **destroyed** clip
-(`depth == INT_MIN`) — or under SWF < 6 — it falls back to
-`actionSetCurrentContext(mc)`, the *receiver*, rather than entering the base clip
-(`CF_CTX`) or leaving the context alone (`CF_CTX_LIVE`). It also forces
-`g_current_sprite_obj = NULL` like `CF_CTX`. Call it `CF_CTX_MC_FALLBACK`; the arm
-must pass the receiver. That is the decision to make before editing.
-
 **Instance nine of the clamp/pad class — VERIFIED REAL and fixed ahead of the
-migration**, since it is independent of the above decision. Arm B pushed the
-synthesized name argument unconditionally. A type-1 `__resolve` declaring two
-params bound `a = <caller operand>, b = <name>`; one declaring zero params
-stranded the name on the caller's eval stack. The OBJECT `__resolve` hook has
-always clamped and padded (it goes through `invokeResolveFunction`), so the two
-hooks disagreed. Test `regression/mc_resolve_type1_args`. Arms A and C already
-clamp and pad, so they are clean.
+migration** (`c7d755871`), since it is independent of the design decision below.
+Arm B pushed the synthesized name argument unconditionally. A type-1 `__resolve`
+declaring two params bound `a = <caller operand>, b = <name>`; one declaring zero
+params stranded the name on the caller's eval stack. The OBJECT `__resolve` hook
+has always clamped and padded (it goes through `invokeResolveFunction`), so the
+two hooks disagreed. Test `regression/mc_resolve_type1_args`. Arms A and C
+already clamp and pad, so they are clean.
+
+##### Stage 3d landing note — two context modes, and the callee-version gate
+
+All three arms are now thin adapters (**−103 lines**). No new `InvokeOpts` flag
+was needed; the frame grew two modes and a `ctx_receiver` parameter.
+
+**The survey said "add a `CF_CTX_MC_FALLBACK` mode taking the receiver." That is
+necessary but not sufficient, and it is not the interesting divergence.** Diffing
+the arms turned up four differences, not one:
+
+1. A **destroyed** base clip (`depth == INT_MIN`) → enter the **receiver**.
+   `CF_CTX` enters it anyway; `CF_CTX_LIVE` leaves the context alone.
+2. `base_clip == NULL` under SWF6+ → switch **nothing**. Same as both existing
+   modes — but it must survive: `mc.valueOf()` / `mc.toString()` reach arm A
+   through the `MovieClip.prototype` walk as natives with a NULL `base_clip`.
+3. **SWF < 6 → enter the receiver, ignoring `base_clip` outright.** No existing
+   mode does this, and a SWF5 `DefineFunction` *does* carry a `base_clip`
+   (`actionDefineFunction` sets it unconditionally), so folding this into rule 1
+   would enter the defining clip where today we enter the receiver. **This is why
+   one mode cannot cover the arm.**
+4. **The gate reads the CALLEE's SWF version, not the caller's.** All four
+   migrated frame arms compute `g_swf_version` *before* `enterClosureFrame`
+   (`_cf_caller_ver`, `_cme_caller_ver`, `_om_caller_ver`, `_sp_caller_ver`); all
+   three MC arms read it *after* `switchToFunctionVersion` installed the callee's.
+   This is the one **live** instance of the `INV_BASE_CLIP | INV_VERSION_SWITCH`
+   hazard that §4's Stage-3c design note calls "latent, not live."
+
+Difference 4 got no mode and no flag. The arm computes
+`eff_ver = func->swf_version ? func->swf_version : g_swf_version` — provably the
+value `switchToFunctionVersion` is about to install — and gates its own flags on
+it. The frame stays version-agnostic, the invariant "the gate lives with the arm"
+holds, and a callee-version gate that previously existed only as an accident of
+statement ordering becomes a named, documented local. **Arguably this arm is the
+correct one and the other four are wrong** — "a SWF5 function has no closures" is
+a property of the function, not of who calls it — but flipping either way is a
+Stage-4 normalization with a test, not a Stage-3 migration.
+
+So: `CF_CTX_MC_FALLBACK` (rules 1+2) and `CF_CTX_RECEIVER` (rule 3), plus a
+`ctx_receiver` parameter on `enterClosureFrame` (NULL at the four existing sites).
+
+Three further findings, none needing a flag:
+
+- **`INV_EXEC_FUNC` stays off; the swap stays outside** (arms A and B; arm C does
+  not track it at all). The core also writes `g_prev_executing_func`, which these
+  arms never did — and that global is read by `swf_setup_arguments_props`
+  (`action.c:8031`) from a generated `preload_arguments` prologue, so the flag
+  would silently change `arguments.caller` for a type-2 MC method. Same judgement,
+  and the same global, as 3b's `.call`/`.apply`-via-`GetMember` arm.
+- **`INV_EVENT_THIS_MC` is gated to the type-2 branch by the arm.** The core sets
+  it for both types; the arms have always set it only inside their type-2 branch,
+  and natives read it when `this_obj == NULL` (`Object.prototype.valueOf` at
+  `action.c:4354`, the Sound-owner fallback at `1484`, the accessor setter at
+  `8481`). The arm already branches on `function_type` to pick flags — the same
+  shape as step 4's `.call` handler gating `INV_THIS_STACK` on preload bits.
+- **Arms B and C leaked their local scope frame.** Both did `allocObject` (which
+  starts at `refcount = 1`, `object.c:494`) + `retainObject` and released once.
+  The core allocs and releases, so both leaks are fixed for free — exactly as in
+  step 5c. Not a UAF: `actionDefineFunction` retains non-`with` captured scopes at
+  capture time (`action.c:57263`), so a frame a returned closure captured survives.
+
+**Safety audit that made the core's strict dispatch safe here.** The arms all end
+in `... else if (advanced_func != NULL)`, which would call a `function_type != 2`
+function with a live `advanced_func`; the core requires `function_type == 2`.
+Checked both directions across the whole runtime: no `ASFunction` pairs
+`function_type == 1` with a non-NULL `advanced_func` (all 31 type-1 assignment
+sites), and every non-NULL `advanced_func` assignment pairs with
+`function_type = 2` (all 121). The `else if` was dead code. The type-1 natives with
+**both** pointers NULL — `g_mc_method_funcs` name-dispatched stubs, `g_stub_ctors` —
+are reachable through arm A's `MovieClip.prototype` walk and return undefined under
+both old and new dispatch.
+
+**No new regression test, and that is a considered decision.** This migration was
+not expected to fix a tenth bug and did not: arms A and C already clamped and
+padded, and arm B was fixed ahead of it. A lock test would pass before and after —
+worthless by the project's own rule. Instead the two new modes were checked for
+*coverage* by instrumenting `enterClosureFrame` and attributing each branch to a
+test: `function_base_clip_removed` exercises `CF_CTX_MC_FALLBACK`'s dead-clip →
+receiver fallback, and `swf5_no_closure` exercises `CF_CTX_RECEIVER`. Both already
+pass. (`MC_FALLBACK_LIVE` fires 14× across the sensitive cluster.)
+
+**Stage 3 is COMPLETE.** All of `actionCallMethod`'s invocation arms and all of
+`actionCallFunction` now funnel through `invokeFunctionValue`.
 
 ### Stage 4 — event/callback dispatchers + deliberate normalization
 
