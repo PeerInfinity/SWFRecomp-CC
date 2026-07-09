@@ -11,8 +11,9 @@ thin adapters over the core; see the Stage 2 landing note in §4.
 Stage 3 IN PROGRESS (July 9, 2026) — 5 of `actionCallMethod`'s ~19 arms migrated
 (`e4082f224`, `65d442f09`), one real TYPE1_ARG_ORDER bug found and fixed; the
 remaining arms need new core capability (`arguments` object, closure-context
-scope reset, ctor context). See the Stage 3 progress note in §4. Stages 4–5 not
-started.
+scope reset, ctor context). See the Stage 3 progress note in §4, then the
+**Stage 3c design note** for the chosen shape (arm-owned `ClosureFrame` +
+in-core `act_flags` activation) and the migration order. Stages 4–5 not started.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
 lines) + `timer.c` performed July 4, 2026; figures below are from that survey.
@@ -375,6 +376,158 @@ type-1 arg pushes remain — `lc_dispatch_method` (`action.c:2908`, LocalConnect
 method dispatch) and `bdRectangleGetter` (`action.c:14365`, which pushes four
 fixed `Rectangle` ctor args in reverse). Both also skip the `param_count`
 clamp/pad.
+
+#### Stage 3c design note (July 9, 2026) — the shape for the remaining ~14 arms
+
+Written before any Stage-3c edit, per the "design first, don't calcify the wrong
+abstraction into 14 call sites" rule. Survey basis: `actionCallFunction`
+(`57832`–`60234`), the empty-method-name arm (`64044`–`64200`), the object-method
+arms (`64565`–`64752`), the `__resolve` arm (`64764`+), the `.call`/`.apply`
+builtin handlers (`65549`–`65733`), the array and string-primitive arms.
+
+##### What actually varies (and what doesn't)
+
+Three ritual steps recur with *genuinely different structure*, not different
+booleans:
+
+1. **The callee's named locals** — `this`, `arguments`, `super` bound on the
+   fresh local-scope object, each gated by the callee's DefineFunction2
+   preload/suppress bits. Needs `local_scope`, which only the core has.
+2. **The closure frame** — save the *whole* scope chain, `scope_depth = 0`,
+   `reResolveDeadBaseClip` + `actionSetCurrentContext` + `g_current_sprite_obj`,
+   all gated on the **caller's** SWF version. Needs ~544 B of `MAX_SCOPE_DEPTH`
+   save arrays.
+3. **Constructor context** — `pushCtorContext(0)` / `popCtorContext` and
+   `g_override_this` / `g_override_this_set` around the callee body.
+
+##### The shape: one new core capability, one new *primitive beside* the core
+
+Capability 1 goes **into** the core (it needs `local_scope`). Capability 2 goes
+**beside** it as an arm-owned enter/leave pair. Capability 3 splits: the parts
+that must straddle the callee body go into the core; the parts that are merely
+*set immediately around it* stay outside.
+
+```c
+// (A) The caller-side frame a callee runs in. Storage is owned by the dispatch
+//     ARM (its own stack), entered before invokeFunctionValue and left after.
+typedef enum { CF_CTX_ONLY, CF_FULL } ClosureFrameMode;
+typedef struct ClosureFrame {
+    u32 saved_scope_depth;
+    ASObject*  saved_chain[MAX_SCOPE_DEPTH];
+    u8         saved_is_with[MAX_SCOPE_DEPTH];
+    MovieClip* saved_mc[MAX_SCOPE_DEPTH];
+    MovieClip* saved_ctx;
+    DisplayObject* saved_sprite;
+    u8 mode, active;
+} ClosureFrame;
+static void enterClosureFrame(SWFAppContext*, ClosureFrame*, ASFunction*,
+                              ClosureFrameMode, int caller_ver);
+static void leaveClosureFrame(SWFAppContext*, ClosureFrame*);
+
+// (B) InvokeOpts grows: `flags` widened u16 -> u32, plus four fields. All new
+//     fields are zero-default, so the five migrated sites are untouched.
+typedef struct InvokeOpts {
+    u32 flags;                 // + INV_CTOR_CTX
+    u16 super_depth;
+    u8  act_flags;             // INV_ACT_THIS | INV_ACT_ARGUMENTS | INV_ACT_SUPER
+    u8  has_this_ptr;
+    ActionVar* override_this;  // non-NULL -> g_override_this{,_set} for the call
+    void* this_ptr;            // ABI receiver override (decoupled from this_var)
+} InvokeOpts;
+```
+
+**Why `ClosureFrame` is arm-owned and not a core flag.** `MAX_SCOPE_DEPTH` is 32,
+so the frame is 32×(8+1+8) + 16 ≈ 544 B. `g_max_call_depth` is 256. If the core
+declared it unconditionally, every accessor invocation would carry it — up to
+139 KB of C stack on a deep getter recursion, against a 64 KB emscripten stack
+(memory `wasm-stack-overflow-64kb`), and the `virtual_property_recursion_*` tests
+go deep on purpose. Only the two closure-shaped arms need it, and
+`actionCallFunction` already pays exactly this cost on its own frame today — so
+arm-owned storage is byte-for-byte neutral there and free everywhere else.
+
+**Why the frame also fixes a latent gate bug.** The core's `INV_BASE_CLIP` reads
+`g_swf_version >= 6` *after* `INV_VERSION_SWITCH` has already installed the
+callee's version — i.e. it gates on the **callee's** version, while every real
+arm gates on the **caller's**. No migrated site sets both flags (verified: all
+eight `invokeFunctionValue` call sites pass explicit opts; the `opts==NULL`
+superset that combines them is dead code), so this is latent, not live.
+`enterClosureFrame` takes `caller_ver` explicitly and owns the context switch, so
+the closure arms never touch `INV_BASE_CLIP`. Leave the flag's gate alone;
+`gates/check_dispatch_funnel.py` (Stage 5) should reject any site that sets both.
+
+##### Per-type rule table for `act_flags` (encoded inside the core)
+
+`arguments` and `super` have no meaning for a type-1 body's flags word (type-1
+has none), so the core interprets `act_flags` per `function_type`:
+
+| `act_flags` bit | type 2 (DefineFunction2) | type 1 (DefineFunction) |
+|---|---|---|
+| `INV_ACT_THIS` | if `!preload_this && !suppress_this`: `setProperty(local,"this")` **and** push `g_this_stack` | push `g_this_stack` only (no scope binding) |
+| `INV_ACT_ARGUMENTS` | if `!preload_args && !suppress_args`: `allocArray(n)` + `setupArgumentsProps` + `setProperty(local,"arguments")` | unconditional; `allocArray(max(n,1))` |
+| `INV_ACT_SUPER` | always `setProperty(local,"super", …)`; value is `SUPER` when `!preload_super && !suppress_super && hasSuperContext()`, else undefined | no-op |
+
+That table is read directly off `actionCallFunction` type-2 (`59924`–`59979`) and
+type-1 (`60044`–`60071`), and off the object-method arm (`64597`–`64651`). The
+`allocArray(n)` vs `allocArray(max(n,1))` split is preserved rather than
+normalized — capacity only, but Stage 3 is behavior-preserving.
+
+**Ordering hazard the core must own.** `setupArgumentsProps(…, caller_func)`
+supplies `arguments.caller`. The core already captures
+`prev_exec = g_current_executing_func` *before* `INV_EXEC_FUNC` overwrites it; the
+activation builder must take that value as a parameter, never re-read the global.
+Corollary: **an arm that wants `INV_ACT_ARGUMENTS` must let the core own the
+exec-func swap** (`INV_EXEC_FUNC`) rather than doing it outside as 3b's `.call`
+arm does — otherwise `arguments.caller` silently becomes the callee itself.
+
+##### What deliberately stays OUTSIDE the core
+
+Extending 3a/3b's judgement, with a reason for each rather than an assumption:
+
+- **`g_c_function_this_obj`** (object-method type-2 arm, string-primitive arm).
+  Read *only* from inside builtin bodies (`33494`, `33560`, `33602`, `34089`),
+  never by a ritual step — so setting and restoring it around the core call is
+  exactly equivalent to doing it inside, and it would cost a flag plus a value
+  field for two sites.
+- **`g_call_this_type`** — same argument; precedent set by 3b.
+- **`g_call_depth++/--` bare** — `actionCallFunction` pre-checks
+  `>= g_max_call_depth - 1`, halts, and pushes undefined itself.
+  `INV_DEPTH_GUARD` would double-increment and uses a different bound.
+- **`setVariableByName("this", …)`** — the 3a/3b arms bind into the *enclosing*
+  scope, not a fresh local frame.
+- **The `simple_func == NULL` converter branch** of `actionCallFunction` type-1
+  (`Number` / `Boolean` / `String` called without `new`, `60109`–`60186`). That
+  is a *dispatch decision*, like the `builtin_stub_method` /
+  `builtin_noop_func` / `builtin_array_method` pointer-identity checks: it must
+  be taken before the core is entered.
+
+##### Migration order (one commit per step, full CI both modes per step)
+
+1. **`actionCallFunction`, both branches.** Biggest single win; exercises all
+   three capabilities at once and is the shape everything else reduces to.
+2. **`actionCallMethod`'s empty-method-name arm.** Falls out of step 1: same
+   `CF_FULL` frame, `act_flags = 0`, `override_this = undefined`,
+   `INV_CTOR_CTX`. Note it gates the *entire* frame — captured scopes and local
+   scope included — on `caller_ver >= 6`, so its SWF5 path passes neither
+   `INV_CAPTURED_SCOPE` nor `INV_LOCAL_SCOPE`. The arm picks its flag set after
+   reading `func->function_type`; the core stays version-agnostic.
+3. **The object-method arms** (`om2`/`om1`): `CF_CTX_ONLY` frame,
+   `act_flags = THIS|ARGUMENTS|SUPER` (type 2) / `ARGUMENTS` (type 1),
+   `INV_SUPER_CTX` with `method_search_depth`, `INV_VERSION_SWITCH`.
+4. **The `.call`/`.apply` builtin handlers**: `INV_FORCE_CAPTURED_WITH` (they
+   force `is_with = 1` on captured scopes), `INV_ACT_ARGUMENTS` on the type-1
+   branch only — the type-2 branch builds no `arguments` object today.
+5. `__resolve` arm, array arm, string-primitive arm, MC arm.
+
+##### Latent bugs this design will fix for free (same class, all unverified)
+
+Found by diffing each arm's type-1 marshalling against the core's single
+forward+clamp+pad loop. None is fixed speculatively; each falls out of its arm's
+migration and wants a `regression/` test at that point:
+
+- **empty-method-name arm** (`64150`): pushes `num_args` values, no clamp, no pad.
+- **object-method type-1 arm** (`64719`): pushes `num_args` values, no clamp, no pad.
+- **`.call`/`.apply` type-1 handler** (`65659`): pads to `param_count` but never
+  **clamps** — extra args leak onto the caller's eval stack.
 
 ### Stage 4 — event/callback dispatchers + deliberate normalization
 

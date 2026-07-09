@@ -8148,10 +8148,45 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 #define INV_MC_THIS_NULL_PTR     0x0800u  // pass NULL (not this_ptr) to advanced_func so preload_this uses g_event_this_mc
 #define INV_LOCAL_SCOPE_MC       0x1000u  // associate the receiver MC with the local scope frame (scope_mc)
 #define INV_RESET_THIS_DEPTH     0x2000u  // zero g_this_depth for the call (accessor-setter isolation)
+#define INV_CTOR_CTX             0x4000u  // pushCtorContext(0)/popCtorContext around the callee body
+#define INV_OVERRIDE_THIS        0x8000u  // manage g_override_this{,_set} for the call (see opts->override_this)
+
+// Callee activation (opts->act_flags): how the callee's *named* locals are bound
+// on the fresh local-scope frame. A type-1 body has no DefineFunction2 flags word,
+// so each bit means something slightly different per function_type:
+//
+//   bit             type 2 (DefineFunction2)                 type 1 (DefineFunction)
+//   INV_ACT_THIS    !preload && !suppress: bind "this" on     push g_this_stack only
+//                   the local scope AND push g_this_stack     (no scope binding)
+//   INV_ACT_ARGS    !preload && !suppress: build `arguments`  unconditional; capacity
+//                   with capacity num_args                    max(num_args, 1)
+//   INV_ACT_SUPER   always bind "super" (SUPER value only     no-op
+//                   when !preload && !suppress && in ctx)
+//
+// Read off actionCallFunction's two branches and the object-method arm. The
+// capacity split is preserved, not normalized — Stage 3 is behavior-preserving.
+#define INV_ACT_THIS             0x01u
+#define INV_ACT_ARGUMENTS        0x02u
+#define INV_ACT_SUPER            0x04u
 
 typedef struct InvokeOpts {
-	u16 flags;
+	u32 flags;
 	u16 super_depth;   // super chain depth, applied when INV_SUPER_CTX is set
+	u8  act_flags;     // INV_ACT_* — callee named-local bindings (needs INV_LOCAL_SCOPE)
+	u8  has_this_ptr;  // 1: pass opts->this_ptr to advanced_func instead of deriving it
+
+	// The ABI receiver handed to advanced_func, decoupled from `this_var` (the
+	// *scriptable* receiver that `this` resolves to in the callee's scope chain).
+	// actionCallFunction needs both to differ: `this` binds to the current-context
+	// MovieClip while advanced_func receives NULL (or global_object when a SWF6+
+	// function is called from SWF5 bytecode).
+	void* this_ptr;
+
+	// With INV_OVERRIDE_THIS: non-NULL installs *override_this into g_override_this
+	// (+ g_override_this_set) for the call. The flag alone still clears
+	// g_override_this_set afterwards — the safety net for C-implemented callees
+	// that lack the generated preload-this code which normally consumes it.
+	ActionVar* override_this;
 } InvokeOpts;
 
 // Invoke `func` with `this_var` as the receiver and `args`/`num_args` as the
@@ -15400,6 +15435,67 @@ void actionRestoreFunctionVersion(int saved_ver, ASObject* saved_global, int sav
 	restoreFunctionVersion(saved_ver, saved_global, saved_movie_idx);
 }
 
+// Bind the callee's named locals ("this" / "arguments" / "super") on its fresh
+// local-scope frame, per opts->act_flags and the callee's own DefineFunction2
+// preload/suppress bits. See the INV_ACT_* rule table near InvokeOpts.
+//
+// `caller_func` MUST be the g_current_executing_func value captured *before* the
+// core swapped in `func` — arguments.caller is the caller, and re-reading the
+// global here would make every function its own caller.
+static void buildActivationLocals(SWFAppContext* app_context, ASObject* local_scope,
+                                  ASFunction* func, ActionVar* this_var,
+                                  ActionVar* args, u32 num_args,
+                                  ASFunction* caller_func, u8 act_flags)
+{
+	if (local_scope == NULL || act_flags == 0) return;
+
+	int is_t2 = (func->function_type == 2);
+	u16 f2 = is_t2 ? func->flags : 0;
+	int suppress_this  = is_t2 && (f2 & 0x0003);   // preload (0x1) or suppress (0x2)
+	int suppress_args  = is_t2 && (f2 & 0x000C);
+	int suppress_super = is_t2 && (f2 & 0x0030);
+
+	if ((act_flags & INV_ACT_THIS) && this_var != NULL && !suppress_this)
+	{
+		// Type-1 bodies read `this` out of g_this_stack via GetVariable("this");
+		// only a type-2 body resolves it through the scope chain by name.
+		if (is_t2) setProperty(app_context, local_scope, "this", 4, this_var);
+		if (g_this_depth < MAX_THIS_DEPTH)
+		{
+			g_this_stack[g_this_depth] = *this_var;
+			g_this_depth++;
+		}
+	}
+
+	if ((act_flags & INV_ACT_ARGUMENTS) && !suppress_args)
+	{
+		u32 cap = is_t2 ? num_args : (num_args > 0 ? num_args : 1);
+		ASArray* arguments_arr = allocArray(app_context, cap);
+		for (u32 i = 0; i < num_args; i++)
+			setArrayElement(app_context, arguments_arr, i, &args[i]);
+		setupArgumentsProps(app_context, arguments_arr, func, caller_func);
+		ActionVar args_var = {0};
+		args_var.type = ACTION_STACK_VALUE_ARRAY;
+		args_var.data.numeric_value = (u64) arguments_arr;
+		setProperty(app_context, local_scope, "arguments", 9, &args_var);
+	}
+
+	// `super` is bound even when it resolves to undefined — a suppressed/preloaded
+	// `super` must shadow an outer scope's binding, not fall through to it.
+	if ((act_flags & INV_ACT_SUPER) && is_t2)
+	{
+		ActionVar super_var = {0};
+		super_var.type = ACTION_STACK_VALUE_UNDEFINED;
+		if (!suppress_super && hasSuperContext())
+		{
+			super_var.type = ACTION_STACK_VALUE_SUPER;
+			super_var.data.numeric_value = (u64) getSuperThis();
+			super_var.str_size = (u32) getSuperDepth();
+		}
+		setProperty(app_context, local_scope, "super", 5, &super_var);
+	}
+}
+
 // Unified function-invocation core — see the forward declaration + flag docs near
 // invokePropertyGetter. Defined here so switchToFunctionVersion / pushSuperContext
 // / allocObject / setProperty / pushVar are all in scope.
@@ -15414,11 +15510,12 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 	// Default (opts==NULL): the "everything reasonable on" superset, minus the
 	// two opt-in quirks (forced-with, MC-null-ptr). Explicit callers pass a
 	// reduced subset mirroring their current behavior.
-	u16 flags = opts ? opts->flags
-	                 : (u16)(INV_DEPTH_GUARD | INV_THIS_STACK | INV_SUPER_CTX |
+	u32 flags = opts ? opts->flags
+	                 : (u32)(INV_DEPTH_GUARD | INV_THIS_STACK | INV_SUPER_CTX |
 	                         INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BIND_THIS |
 	                         INV_BASE_CLIP | INV_VERSION_SWITCH | INV_EVENT_THIS_MC |
 	                         INV_EXEC_FUNC | INV_LOCAL_SCOPE_MC);
+	u8 act_flags = opts ? opts->act_flags : 0;
 
 	if (flags & INV_DEPTH_GUARD)
 	{
@@ -15503,12 +15600,34 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 			}
 		}
 
+		buildActivationLocals(app_context, local_scope, func, this_var,
+		                      args, num_args, prev_exec, act_flags);
+
 		MovieClip* saved_context = g_current_context;
 		if ((flags & INV_BASE_CLIP) && g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = (MovieClip*)func->base_clip;
 
-		void* pass_this = ((flags & INV_MC_THIS_NULL_PTR) && this_is_mc) ? NULL : this_ptr;
+		if ((flags & INV_OVERRIDE_THIS) && opts != NULL && opts->override_this != NULL)
+		{
+			g_override_this = *opts->override_this;
+			g_override_this_set = 1;
+		}
+
+		void* pass_this = (opts != NULL && opts->has_this_ptr) ? opts->this_ptr
+		                : ((flags & INV_MC_THIS_NULL_PTR) && this_is_mc) ? NULL
+		                : this_ptr;
+
+		// Only bytecode functions run the generated prologue that consumes the ctor
+		// context; a native Function2Ptr wrapper must see through to the enclosing
+		// bytecode frame's context instead.
+		int ctor_pushed = (flags & INV_CTOR_CTX) && func->register_count > 0;
+		if (ctor_pushed) pushCtorContext(0);
 		result = func->advanced_func(app_context, args, num_args, registers, pass_this);
+		if (ctor_pushed) popCtorContext();
+
+		// Clear even if we never set it: a C-implemented callee has no preload-this
+		// prologue to consume the flag, and leaking it corrupts the next call.
+		if (flags & INV_OVERRIDE_THIS) g_override_this_set = 0;
 
 		g_current_context = saved_context;
 		if (pushed_local && scope_depth > 0) scope_depth--;
@@ -15542,9 +15661,18 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 			}
 		}
 
+		buildActivationLocals(app_context, local_scope, func, this_var,
+		                      args, num_args, prev_exec, act_flags);
+
 		MovieClip* saved_context = g_current_context;
 		if ((flags & INV_BASE_CLIP) && g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = (MovieClip*)func->base_clip;
+
+		if ((flags & INV_OVERRIDE_THIS) && opts != NULL && opts->override_this != NULL)
+		{
+			g_override_this = *opts->override_this;
+			g_override_this_set = 1;
+		}
 
 		// Type-1 marshalling: the DefineFunction prologue pops EXACTLY param_count
 		// values (last declared param from the top of stack). Push exactly that
@@ -15563,7 +15691,14 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 			}
 		}
 
+		// Unlike a type-2 callee, a type-1 body always runs the generated prologue,
+		// so the ctor context is pushed without the register_count test.
+		int ctor_pushed_t1 = (flags & INV_CTOR_CTX) != 0;
+		if (ctor_pushed_t1) pushCtorContext(0);
 		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		if (ctor_pushed_t1) popCtorContext();
+
+		if (flags & INV_OVERRIDE_THIS) g_override_this_set = 0;
 
 		g_current_context = saved_context;
 		if (pushed_local && scope_depth > 0) scope_depth--;
@@ -29019,6 +29154,97 @@ MovieClip* actionGetBaseClip(void) {
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
+}
+
+// ---------------------------------------------------------------------------
+// ClosureFrame — the caller-side world a callee executes in: its SWF version,
+// its scope chain, and its base clip. Paired with invokeFunctionValue (which owns
+// the *callee-side* ritual: this-stack, super context, local scope, arg
+// marshalling) but deliberately NOT folded into it.
+//
+// Storage lives on the dispatching arm's C stack, not the core's, because it is
+// MAX_SCOPE_DEPTH-sized (~544 B). g_max_call_depth is 256, so a core that carried
+// it unconditionally would add up to ~139 KB of C stack to every accessor
+// invocation — against a 64 KB emscripten stack, with the
+// virtual_property_recursion_* tests recursing on purpose. Only the two
+// closure-shaped arms (actionCallFunction, actionCallMethod's empty-method-name
+// arm) need a frame; each already paid exactly this cost on its own stack.
+//
+// Entering also switches the SWF version, so an arm using a frame must NOT also
+// pass INV_VERSION_SWITCH / INV_BASE_CLIP. That is not just redundancy: the core's
+// INV_BASE_CLIP gate reads g_swf_version *after* INV_VERSION_SWITCH has installed
+// the callee's version, so the two flags together would gate the base-clip switch
+// on the callee's version where every dispatcher gates it on the caller's. No site
+// combines them today; the frame takes caller_ver explicitly instead.
+#define CF_RESET_SCOPE  0x01u  // save the whole chain, then scope_depth = 0
+#define CF_VERSION      0x02u  // switchToFunctionVersion / restoreFunctionVersion
+#define CF_CTX          0x04u  // re-resolve base_clip into g_current_context; clear sprite
+
+typedef struct ClosureFrame {
+	u32 saved_scope_depth;
+	ASObject*  saved_chain[MAX_SCOPE_DEPTH];
+	u8         saved_is_with[MAX_SCOPE_DEPTH];
+	MovieClip* saved_mc[MAX_SCOPE_DEPTH];
+	MovieClip* saved_ctx;
+	DisplayObject* saved_sprite;
+	int saved_ver;
+	ASObject* saved_global;
+	int saved_movie_idx;
+	u8 flags;
+} ClosureFrame;
+
+static void enterClosureFrame(SWFAppContext* app_context, ClosureFrame* cf,
+                              ASFunction* func, u8 cf_flags)
+{
+	cf->flags = cf_flags;
+	cf->saved_ver = 0; cf->saved_global = NULL; cf->saved_movie_idx = 0;
+
+	if (cf_flags & CF_VERSION)
+		switchToFunctionVersion(func, &cf->saved_ver, &cf->saved_global, &cf->saved_movie_idx);
+
+	cf->saved_scope_depth = scope_depth;
+	if (cf_flags & CF_RESET_SCOPE)
+	{
+		// Every function call starts with a fresh chain: SWF6+ closures then
+		// restore their captured scopes, SWF5 non-closures get only a local frame
+		// and inherit nothing from the caller (Ruffle avm1/function.rs:298-330).
+		for (u32 si = 0; si < scope_depth; si++)
+		{
+			cf->saved_chain[si] = scope_chain[si];
+			cf->saved_is_with[si] = scope_is_with[si];
+			cf->saved_mc[si] = scope_mc[si];
+		}
+		scope_depth = 0;
+	}
+
+	cf->saved_ctx = g_current_context;
+	cf->saved_sprite = g_current_sprite_obj;
+	if ((cf_flags & CF_CTX) && func != NULL && func->base_clip != NULL)
+	{
+		MovieClip* bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
+		actionSetCurrentContext(bc);
+		g_current_sprite_obj = NULL;
+	}
+}
+
+static void leaveClosureFrame(SWFAppContext* app_context, ClosureFrame* cf)
+{
+	(void) app_context;
+	if (cf->flags & CF_RESET_SCOPE)
+	{
+		for (u32 si = 0; si < cf->saved_scope_depth; si++)
+		{
+			scope_chain[si] = cf->saved_chain[si];
+			scope_is_with[si] = cf->saved_is_with[si];
+			scope_mc[si] = cf->saved_mc[si];
+		}
+		scope_depth = cf->saved_scope_depth;
+	}
+	// Unconditional: a no-op assignment when CF_CTX never fired.
+	actionSetCurrentContext(cf->saved_ctx);
+	g_current_sprite_obj = cf->saved_sprite;
+	if (cf->flags & CF_VERSION)
+		restoreFunctionVersion(cf->saved_ver, cf->saved_global, cf->saved_movie_idx);
 }
 // Flag set by actionCallMethod/actionNewMethod when target object is undefined/null.
 // In Flash/Ruffle, CallMethod/NewMethod on undefined/null skip the halt check.
@@ -59850,275 +60076,72 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		{
 			g_call_depth++;
 
-			// SWF6+ closure semantics: the function executes in its
-			// definition context (base_clip), not the caller's context.
-			// SWF5 does NOT have closures — functions execute in the caller's context.
-			MovieClip* saved_cf_context = g_current_context;
-			DisplayObject* saved_cf_sprite = g_current_sprite_obj;
-			// Use CALLER's version for closure decision (not function's version).
-			// In Ruffle, is_closure = activation.swf_version() >= 6 (caller's version).
+			// SWF6+ closure semantics: the function executes in its definition
+			// context (base_clip), not the caller's. SWF5 has no closures — the
+			// function executes in the caller's context and at the caller's version.
+			// The scope chain is reset for BOTH, though: a SWF5 non-closure starts
+			// with just its local frame and inherits nothing from the caller
+			// (Ruffle avm1/function.rs:298-330; Function-v5 line 413 —
+			// `result1 == undefined`, an inner_func defined and called inside
+			// outer_func must NOT see outer_func's local `a`).
 			int _cf_caller_ver = g_swf_version;
-			// Phase 3: switch to function's SWF version for correct version-dependent behavior
-			// Only for SWF6+ closure calls — SWF5 non-closures execute in caller's version
-			int _cf_saved_ver = 0; ASObject* _cf_saved_global = NULL; int _cf_saved_midx = 0;
-			if (_cf_caller_ver >= 6)
-				switchToFunctionVersion(func, &_cf_saved_ver, &_cf_saved_global, &_cf_saved_midx);
-			// Save scope chain: every function call starts with a fresh scope
-			// chain. SWF6+ closures then restore captured scopes from definition
-			// time; SWF5 non-closures start with just the local scope (no
-			// inheritance from the caller). Mirrors Ruffle (avm1/function.rs:298-330)
-			// which creates a fresh [Global, Target(base_clip)] parent for SWF5
-			// instead of inheriting the caller's scope. Required by Function-v5
-			// line 413 (`result1 == undefined` — inner_func defined and called
-			// inside outer_func must NOT see outer_func's local `a`).
-			u32 saved_scope_depth_cf = scope_depth;
-			ASObject* saved_scope_chain_cf[MAX_SCOPE_DEPTH];
-			u8 saved_scope_is_with_cf[MAX_SCOPE_DEPTH];
-			MovieClip* saved_scope_mc_cf[MAX_SCOPE_DEPTH];
-			for (u32 si = 0; si < scope_depth; si++) {
-				saved_scope_chain_cf[si] = scope_chain[si];
-				saved_scope_is_with_cf[si] = scope_is_with[si];
-				saved_scope_mc_cf[si] = scope_mc[si];
-			}
-			scope_depth = 0;
-			if (_cf_caller_ver >= 6 && func->base_clip != NULL)
-			{
-				MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
-				actionSetCurrentContext(_bc);
-				g_current_sprite_obj = NULL;
-			}
+			ClosureFrame cf;
+			enterClosureFrame(app_context, &cf, func,
+			                  (u8)(CF_RESET_SCOPE |
+			                       (_cf_caller_ver >= 6 ? (CF_VERSION | CF_CTX) : 0)));
 
 			if (func->function_type == 2)
 			{
-				// DefineFunction2 with registers and this context
-				ActionVar* registers = NULL;
-				if (func->register_count > 0) {
-					registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-				}
-
-				// Create local scope object for function-local variables
-				// Start with capacity for a few local variables
-				ASObject* local_scope = allocObject(app_context, 8);
-
-				// Restore captured scope chain entries from definition time
-				u8 captured_count = func->captured_scope_count;
-				for (u8 ci = 0; ci < captured_count; ci++)
-				{
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-						scope_mc[scope_depth] = func->captured_scope_mc[ci];
-						scope_chain[scope_depth++] = func->captured_scope[ci];
-					}
-				}
-
-				// Push local scope onto scope chain
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = 0;
-					scope_mc[scope_depth] = NULL;
-					scope_chain[scope_depth++] = local_scope;
-				}
-
-				// Track calling function for arguments.caller
-				ASFunction* prev_executing_func = g_current_executing_func;
-
-				// Populate scope with this/super/arguments when neither preload nor suppress is set
-				u32 saved_this_depth_t2 = g_this_depth;
-				{
-					u16 f2flags = func->flags;
-					int f2_preload_this  = (f2flags & 0x0001);
-					int f2_suppress_this = (f2flags & 0x0002);
-					int f2_preload_args  = (f2flags & 0x0004);
-					int f2_suppress_args = (f2flags & 0x0008);
-					int f2_preload_super = (f2flags & 0x0010);
-					int f2_suppress_super= (f2flags & 0x0020);
-					if (!f2_preload_this && !f2_suppress_this) {
-						// When 'this' is accessible by name (not preloaded/suppressed),
-						// push to g_this_stack AND set on scope chain.
-						// When preloaded/suppressed, inherit parent's this (Ruffle behavior).
-						ActionVar this_var = {0};
-						if (has_callable_this) {
-							// Function found on WITH scope — use scope object as this
-							this_var = callable_this;
-						} else {
-							// Default this = current context MC (not root_movieclip)
-							// For child SWF contexts, g_current_context is the loaded clip
-							MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
-							this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-							this_var.data.numeric_value = (u64)_ctx;
-						}
-						setProperty(app_context, local_scope, "this", 4, &this_var);
-						if (g_this_depth < MAX_THIS_DEPTH) {
-							g_this_stack[g_this_depth] = this_var;
-							g_this_depth++;
-						}
-					}
-					if (!f2_preload_args && !f2_suppress_args) {
-						ASArray* arguments_arr = allocArray(app_context, num_args);
-						for (u32 i = 0; i < num_args; i++)
-							setArrayElement(app_context, arguments_arr, i, &args[i]);
-						setupArgumentsProps(app_context, arguments_arr, func, prev_executing_func);
-						ActionVar args_var = {0};
-						args_var.type = ACTION_STACK_VALUE_ARRAY;
-						args_var.data.numeric_value = (u64)arguments_arr;
-						setProperty(app_context, local_scope, "arguments", 9, &args_var);
-					}
-					{
-						// Base case (no preload/suppress + super context): expose super as named variable.
-						// Suppress/preload: super variable not accessible by name — set to undefined.
-						ActionVar super_var;
-						super_var.type = ACTION_STACK_VALUE_UNDEFINED;
-						super_var.data.numeric_value = 0;
-						super_var.str_size = 0;
-						if (!f2_preload_super && !f2_suppress_super && hasSuperContext()) {
-							super_var.type = ACTION_STACK_VALUE_SUPER;
-							super_var.data.numeric_value = (u64)getSuperThis();
-							super_var.str_size = (u32)getSuperDepth();
-						}
-						setProperty(app_context, local_scope, "super", 5, &super_var);
-					}
-				}
-
-				g_prev_executing_func = prev_executing_func;
-				g_current_executing_func = func;
-				// SWF5 non-closure standalone call: 'this' should be OBJECT type (not MOVIECLIP).
-				// In Ruffle, SWF5 non-closure calls pass target_clip_or_root() as a Value::Object,
-				// yielding typeof="object". Pass global_object as this_obj so generated preload_this
-				// stores as OBJECT type instead of falling back to MOVIECLIP.
-				void* _cf_this_obj = NULL;
+				// `this` binds to the callable's scope object when the function was
+				// resolved off the scope chain, else to the (post-frame) context MC.
+				ActionVar this_var = {0};
 				if (has_callable_this) {
-					// Function found on a scope chain entry — pass the scope object as 'this'
-					// via g_override_this (preserves correct OBJECT/MOVIECLIP type).
-					// In Ruffle, load_this() sets the register to the passed 'this' value
-					// (the scope object), while the activation's this_cell() inherits from parent.
-					g_override_this = callable_this;
-					g_override_this_set = 1;
+					this_var = callable_this;
+				} else {
+					// For child SWF contexts, g_current_context is the loaded clip
+					MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
+					this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					this_var.data.numeric_value = (u64)_ctx;
+				}
+
+				// The ABI receiver differs from the scriptable one. Normally NULL;
+				// for a SWF5 non-closure standalone call it is global_object, so the
+				// generated preload_this stores OBJECT (typeof=="object") rather than
+				// falling back to MOVIECLIP — Ruffle passes target_clip_or_root() as a
+				// Value::Object there. When the function came off the scope chain,
+				// g_override_this carries the scope object with its real type instead
+				// (Ruffle's load_this() sets the register to the passed `this` while
+				// the activation's this_cell() inherits from the parent).
+				void* _cf_this_obj = NULL;
+				ActionVar* _cf_override = NULL;
+				if (has_callable_this) {
+					_cf_override = &callable_this;
 				} else if (_cf_caller_ver < 6 && func->swf_version >= 6) {
 					_cf_this_obj = (void*)global_object;
 				}
-				// Only push constructor context for bytecode functions (register_count > 0).
-				// Native Function2Ptr wrappers (register_count == 0) should see through
-				// to the enclosing bytecode frame's constructor context.
-				int is_bytecode_func = (func->register_count > 0);
-				if (is_bytecode_func) pushCtorContext(0);
-				ActionVar result = func->advanced_func(app_context, args, num_args, registers, _cf_this_obj);
-				if (is_bytecode_func) popCtorContext();
-				// Clear g_override_this_set in case the function didn't consume it
-				// (C-implemented stubs like builtin_setTimeout_impl don't have the
-				// generated preload-this code that normally clears this flag)
-				if (g_override_this_set) g_override_this_set = 0;
-				g_current_executing_func = prev_executing_func;
 
-				// Pop local scope + captured scopes from scope chain
-				for (u8 ci = 0; ci < captured_count + 1; ci++)
-				{
-					if (scope_depth > 0) scope_depth--;
-				}
-
-				// Clean up local scope object
-				// Release decrements refcount and frees if refcount reaches 0
-				releaseObject(app_context, local_scope);
-
-				g_this_depth = saved_this_depth_t2;
-				if (registers != NULL) FREE(registers);
+				InvokeOpts opts = {
+					.flags = (INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_EXEC_FUNC |
+					          INV_CTOR_CTX | INV_OVERRIDE_THIS),
+					.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS | INV_ACT_SUPER),
+					.has_this_ptr = 1,
+					.this_ptr = _cf_this_obj,
+					.override_this = _cf_override,
+				};
+				ActionVar result = invokeFunctionValue(app_context, func, &this_var,
+				                                       args, num_args, &opts);
 				if (args != NULL) FREE(args);
-
 				pushVar(app_context, &result);
 			}
-			else
+			else if (func->simple_func == NULL)
 			{
-				// Simple DefineFunction (type 1)
-				// Simple functions expect arguments on the stack, not in an array
-				// We need to push arguments back onto stack in correct order
-
-				// Create local scope object for function-local variables
-				ASObject* local_scope = allocObject(app_context, 8);
-
-				// Push 'this' binding for type 1 functions (DefineFunction)
-				// In Flash, 'this' defaults to current context MC for plain calls,
-				// unless the function was found on a WITH scope object (then this = that object).
-				// A function resolved from a plain (non-MC) local scope object also
-				// binds `this` to that scope object — Ruffle's scope.resolve() returns
-				// Callable(locals_obj, fn) for every scope level, so a bare call to a
-				// local-variable function sees the activation's locals object as `this`
-				// (Function.as:797 `localGetThis()` → typeof(this)=='object').
-				u32 saved_this_depth_t1 = g_this_depth;
-				if (g_this_depth < MAX_THIS_DEPTH) {
-					if (has_callable_this && (callable_this_is_with || callable_this_from_path ||
-					    callable_this.type == ACTION_STACK_VALUE_OBJECT)) {
-						g_this_stack[g_this_depth] = callable_this;
-					} else {
-						// Default this = current context MC (not root_movieclip)
-						MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)_ctx;
-					}
-					g_this_depth++;
-				}
-
-				// Track calling function for arguments.caller
-				ASFunction* prev_executing_func_t1 = g_current_executing_func;
-
-				// Create arguments array and set on local scope
-				ASArray* arguments_arr = allocArray(app_context, num_args > 0 ? num_args : 1);
-				for (u32 i = 0; i < num_args; i++)
+				// Built-in constructor called as a plain function (no implementation).
+				// This is a DISPATCH decision, not an invocation — taken before the
+				// core, like the builtin_stub_method / builtin_noop_func pointer
+				// identity checks. The old code built the full activation (this
+				// binding, arguments array, scope frame, param pad) and then tore it
+				// all back down unused before reaching the converters below.
 				{
-					setArrayElement(app_context, arguments_arr, i, &args[i]);
-				}
-				setupArgumentsProps(app_context, arguments_arr, func, prev_executing_func_t1);
-				ActionVar args_var = {0};
-				args_var.type = ACTION_STACK_VALUE_ARRAY;
-				args_var.data.numeric_value = (u64) arguments_arr;
-				setProperty(app_context, local_scope, "arguments", 9, &args_var);
-
-				// Restore captured scope chain entries from definition time
-				u8 captured_count_t1 = func->captured_scope_count;
-				for (u8 ci = 0; ci < captured_count_t1; ci++)
-				{
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-						scope_mc[scope_depth] = func->captured_scope_mc[ci];
-						scope_chain[scope_depth++] = func->captured_scope[ci];
-					}
-				}
-
-				// Push local scope onto scope chain
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = 0;
-					scope_mc[scope_depth] = NULL;
-					scope_chain[scope_depth++] = local_scope;
-				}
-
-				// Push EXACTLY param_count values onto the stack: a generated
-				// DefineFunction (type-1) body unconditionally pops param_count
-				// values to bind its named parameters. Push args[0..min(num_args,
-				// param_count)) forward, pad short calls with undefined, and DROP
-				// any extra args (num_args > param_count). Pushing the extras
-				// would leave them on the caller's eval stack after the body
-				// returns — gnash actionscript.all/Function.as case1bis
-				// (`stack_test1(4,5,6)` on a 0-param function) had its 6
-				// pre-pushed asm values consumed by the stray 4/5/6.
-				for (u32 i = 0; i < num_args && i < func->param_count; i++)
-				{
-					pushVar(app_context, &args[i]);
-				}
-				for (u32 i = num_args; i < func->param_count; i++)
-				{
-					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-				}
-
-				if (func->simple_func == NULL)
-				{
-					// Built-in constructor called as plain function (no implementation)
-					// Pop the param_count values we pushed above.
-					u32 total_pushed = func->param_count;
-					for (u32 i = 0; i < total_pushed; i++) { POP(); }
-					// Pop local scope + captured scopes + this binding
-					for (u8 ci = 0; ci < captured_count_t1 + 1; ci++) {
-						if (scope_depth > 0) scope_depth--;
-					}
-					releaseObject(app_context, local_scope);
-					g_this_depth = saved_this_depth_t1;
-
 					// Check if this is a built-in converter function (called without new)
 					const char* fname = func->name;
 					if (strcmp(fname, "Number") == 0)
@@ -60184,45 +60207,39 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						pushUndefined(app_context);
 					}
 				}
-				else
-				{
-					// Free args array (already pushed to stack, no longer needed)
-					if (args != NULL) FREE(args);
-
-					// Call the simple function (cast to correct return type — generated functions return ActionVar)
-					g_prev_executing_func = prev_executing_func_t1;
-					g_current_executing_func = func;
-					pushCtorContext(0);
-					ActionVar func_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-					popCtorContext();
-					g_current_executing_func = prev_executing_func_t1;
-
-					// Pop local scope + captured scopes + this binding from scope chain
-					for (u8 ci = 0; ci < captured_count_t1 + 1; ci++) {
-						if (scope_depth > 0) scope_depth--;
-					}
-					releaseObject(app_context, local_scope);
-					g_this_depth = saved_this_depth_t1;
-
-					pushVar(app_context, &func_result);
+			}
+			else
+			{
+				// Simple DefineFunction (type 1). `this` defaults to the (post-frame)
+				// context MC, unless the function was found on a WITH scope object or
+				// a dotted path, or on a plain (non-MC) local scope object — Ruffle's
+				// scope.resolve() returns Callable(locals_obj, fn) for every scope
+				// level, so a bare call to a local-variable function sees the
+				// activation's locals object as `this` (Function.as:797
+				// `localGetThis()` → typeof(this)=='object').
+				ActionVar this_var = {0};
+				if (has_callable_this && (callable_this_is_with || callable_this_from_path ||
+				    callable_this.type == ACTION_STACK_VALUE_OBJECT)) {
+					this_var = callable_this;
+				} else {
+					MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
+					this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					this_var.data.numeric_value = (u64)_ctx;
 				}
+
+				InvokeOpts opts = {
+					.flags = (INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_EXEC_FUNC |
+					          INV_CTOR_CTX),
+					.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS),
+				};
+				ActionVar func_result = invokeFunctionValue(app_context, func, &this_var,
+				                                            args, num_args, &opts);
+				if (args != NULL) FREE(args);
+				pushVar(app_context, &func_result);
 			}
 
 			g_call_depth--;
-
-			// Restore caller's scope chain and context (we reset to 0 on entry
-			// for both SWF5 and SWF6+, so restore unconditionally).
-			for (u32 si = 0; si < saved_scope_depth_cf; si++) {
-				scope_chain[si] = saved_scope_chain_cf[si];
-				scope_is_with[si] = saved_scope_is_with_cf[si];
-				scope_mc[si] = saved_scope_mc_cf[si];
-			}
-			scope_depth = saved_scope_depth_cf;
-			actionSetCurrentContext(saved_cf_context);
-			g_current_sprite_obj = saved_cf_sprite;
-			// Phase 3: restore caller's SWF version (only if we switched)
-			if (_cf_caller_ver >= 6)
-				restoreFunctionVersion(_cf_saved_ver, _cf_saved_global, _cf_saved_midx);
+			leaveClosureFrame(app_context, &cf);
 		}
 		else
 		{
