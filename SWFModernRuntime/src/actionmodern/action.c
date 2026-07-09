@@ -63995,34 +63995,35 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Invoke the target function
 				ActionVar result = {0};
 				result.type = ACTION_STACK_VALUE_UNDEFINED;
-				if (target_func->function_type == 2 && target_func->advanced_func != NULL) {
-					ActionVar* registers = NULL;
-					if (target_func->register_count > 0)
-						registers = (ActionVar*) HCALLOC(target_func->register_count, sizeof(ActionVar));
-					ASFunction* prev_ef = g_current_executing_func;
-					g_current_executing_func = target_func;
-					if (this_obj != NULL) pushSuperContext(this_obj, 1);
-					g_call_this_type = this_type;
-					g_call_depth++;
-					result = target_func->advanced_func(app_context, call_args, call_arg_count, registers, this_obj);
-					g_call_depth--;
-					g_call_this_type = 0;
-					if (this_obj != NULL) popSuperContext();
-					g_current_executing_func = prev_ef;
-					if (registers != NULL) FREE(registers);
-				} else if (target_func->function_type == 1 && target_func->simple_func != NULL) {
-					// Type 1: push args onto stack, set this
-					for (int i = (int)call_arg_count - 1; i >= 0; i--)
-						pushVar(app_context, &call_args[i]);
+				int _ca_is_t2 = (target_func->function_type == 2 && target_func->advanced_func != NULL);
+				int _ca_is_t1 = (target_func->function_type == 1 && target_func->simple_func != NULL);
+				if (_ca_is_t2 || _ca_is_t1) {
 					ActionVar this_var = {0};
 					this_var.type = ACTION_STACK_VALUE_OBJECT;
-					this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
-					setVariableByName("this", &this_var);
-					if (this_obj != NULL) pushSuperContext(this_obj, 1);
+					this_var.data.numeric_value = (u64)(uintptr_t) this_obj;
+
+					// A type-2 body takes `this` as the receiver pointer and lets
+					// builtin wrappers read the original arg type off g_call_this_type;
+					// a type-1 body reads `this` from the enclosing scope.
+					ASFunction* prev_ef = g_current_executing_func;
+					if (_ca_is_t2) {
+						g_current_executing_func = target_func;
+						g_call_this_type = this_type;
+					} else {
+						setVariableByName("this", &this_var);
+					}
+
+					InvokeOpts opts = { .flags = (u16)(this_obj != NULL ? INV_SUPER_CTX : 0),
+					                    .super_depth = 1 };
 					g_call_depth++;
-					result = ((ActionVar(*)(SWFAppContext*))target_func->simple_func)(app_context);
+					result = invokeFunctionValue(app_context, target_func, &this_var,
+					                             call_args, call_arg_count, &opts);
 					g_call_depth--;
-					if (this_obj != NULL) popSuperContext();
+
+					if (_ca_is_t2) {
+						g_call_this_type = 0;
+						g_current_executing_func = prev_ef;
+					}
 				}
 
 				if (call_args != NULL) FREE(call_args);
