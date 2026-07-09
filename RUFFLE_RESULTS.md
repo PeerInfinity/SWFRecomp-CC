@@ -86,8 +86,6 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 *No changes since last run.*
 
-*Comparing `e4082f224aa0` → `c8447e0246f4`*
-
 ## Flash-Spec Results
 
 Tests verified against Flash's actual output (`output.flash.txt`).
