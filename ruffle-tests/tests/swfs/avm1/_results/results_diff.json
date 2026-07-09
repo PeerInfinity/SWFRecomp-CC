@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-08T23:54:22.331767+00:00",
-    "old_git_sha": "7b47771ae254cfd13f8b7ac7abcaa05084ea9ac1",
-    "new_timestamp": "2026-07-09T01:46:16.233981+00:00",
-    "new_git_sha": "e4082f224aa06593ed528e8d3107cbd8eeb4e2f6",
+    "old_timestamp": "2026-07-09T01:46:16.233981+00:00",
+    "old_git_sha": "e4082f224aa06593ed528e8d3107cbd8eeb4e2f6",
+    "new_timestamp": "2026-07-09T02:21:35.468902+00:00",
+    "new_git_sha": "c8447e0246f403a830a363e1a52ba129a5cb02b0",
     "partial": false,
     "same_commit": false
   },
@@ -13,11 +13,11 @@
     "old_effective_pass": 655,
     "old_total": 710,
     "old_pass_rate": 89.9,
-    "new_pass": 638,
+    "new_pass": 634,
     "new_ruffle_matched": 17,
-    "new_effective_pass": 655,
-    "new_total": 710,
-    "new_pass_rate": 89.9,
+    "new_effective_pass": 651,
+    "new_total": 706,
+    "new_pass_rate": 89.8,
     "old_mismatched_lines": 15176,
     "new_mismatched_lines": 15176,
     "increased_mismatches": 0,
@@ -25,9 +25,58 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 710,
+    "unchanged": 706,
     "added": 0,
-    "removed": 0
+    "removed": 4
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "ei_type1_args",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mc_event_type1_args",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "nc_onstatus_closure",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timer_cross_swf_version",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    }
+  ]
 }
