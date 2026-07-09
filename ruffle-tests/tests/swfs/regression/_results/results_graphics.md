@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-09 02:37 UTC
+**Date**: 2026-07-09 04:39 UTC
 
-**Git SHA**: `aa651d161b`
+**Git SHA**: `132d88e098`
 
-**Run Duration**: 1m 44s
+**Run Duration**: 1m 46s
 
 ## Summary
 
@@ -23,11 +23,11 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `ei_type1_args` | 7 | 19.2s |  |
-| 2 | `fn_call_type1_args` | 7 | 21.7s |  |
-| 3 | `mc_event_type1_args` | 3 | 21.4s |  |
-| 4 | `nc_onstatus_closure` | 2 | 19.9s |  |
-| 5 | `timer_cross_swf_version` | 3 | 21.1s |  |
+| 1 | `ei_type1_args` | 7 | 22.2s |  |
+| 2 | `fn_call_type1_args` | 7 | 20.2s |  |
+| 3 | `mc_event_type1_args` | 3 | 21.5s |  |
+| 4 | `nc_onstatus_closure` | 2 | 20.0s |  |
+| 5 | `timer_cross_swf_version` | 3 | 21.5s |  |
 
 ## Near-Passing Tests
 
