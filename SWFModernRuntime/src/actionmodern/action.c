@@ -42459,19 +42459,27 @@ void actionSetVariable(SWFAppContext* app_context)
 					var->str_size = 0;
 					// Bare local frame, no this bind, ABI this = NULL (this_var
 					// = NULL) — this arm never gave the watcher a `this` channel.
-					// Preserved as-is: pname handed OWNING and freed
-					// unconditionally after (the latent double-free with a
-					// named-param type-2 watcher — probe pending, D13), and
-					// string newVal/userData keep their owns flags (this arm
+					// String newVal/userData keep their owns flags (this arm
 					// never cleared them, unlike B/C). The type-2-only gate
 					// above stays: a type-1 timeline watcher silently commits
 					// without firing (D2 — normalization candidate, not this
 					// migration). The fold lands in _new_val (undefined return
 					// keeps the intended value).
+					//
+					// pname is handed NON-owning and never freed — the OBJECT
+					// arm's leak-over-dangle discipline. This arm used to pass
+					// it owning AND free it unconditionally, which double-freed
+					// with a NAMED-param (non-register-preloaded) type-2
+					// watcher: its prologue pointer-shares each arg into the
+					// local frame via setVariableByName, and the frame release
+					// freed the string before the arm's free() hit it again
+					// (regression/watch_timeline_named_params — glibc abort).
+					// Freeing instead of leaking would dangle any watcher-
+					// stored copy of the name (the same reason B leaks).
 					invokeWatchCallback(app_context, _wf, &_we->user_data, NULL,
 						var_name, var_name_len, &_old_val, &_new_val,
 						INV_LOCAL_SCOPE,
-						4, /*pname_owns*/1, /*free_pname*/1, /*clear_owns*/0);
+						4, /*pname_owns*/0, /*free_pname*/0, /*clear_owns*/0);
 					*var = _new_val;
 					// Sync to hashmap if string_id path was used
 					if (string_id != 0) {
