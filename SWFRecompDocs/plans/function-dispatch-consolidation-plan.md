@@ -1016,6 +1016,58 @@ review** — should this path get version-switch / captured-scope / this-stack?
 Each "yes" is its own commit with a targeted test (this is where §1's items 3
 and 4 get properly fixed rather than patched).
 
+#### Stage 4 landing notes
+
+**Prep — relocated the `InvokeOpts` machinery.** Five of Stage 4's dispatchers
+(`lc_dispatch_method`, `lc/ns/nc_dispatch_onStatus`, `actionEI_callInternalInterface`)
+are *defined earlier in `action.c`* than the core's flag/struct block was
+(the block sat just above `invokePropertyGetter`). A dispatcher can't call the
+core from above its declaration, so the flag macros + `INV_ACT_*` + the
+`InvokeOpts` struct + the `invokeFunctionValue` forward decl were moved verbatim
+to just above the LocalConnection section — one pure relocation (no token
+changed; the struct still precedes every user, the forward decl still precedes
+`invokePropertyGetter`). This unblocks every early Stage-4 dispatcher in place,
+rather than moving each one's body down past line 15574.
+
+**`lc_dispatch_method` (LocalConnection method delivery) migrated — instance
+ten.** Now a thin adapter: `INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE`, plus
+`INV_BASE_CLIP` **gated to the type-2 branch** (the old type-1 arm never switched
+`g_current_context`, so the flag is computed off `func->function_type` before the
+call — the same per-branch-flag shape as the MC arm's `INV_EVENT_THIS_MC`). The
+receiver rides in as `this_var` (OBJECT tag) so `advanced_func` gets it as its ABI
+`this`; no this-stack push, super, version switch, event-this-mc, or exec-func —
+none were ever done here. The bare `g_call_depth++/--` stays outside (the arm
+never had `INV_DEPTH_GUARD`'s `g_max_call_depth` halt check).
+
+Two bugs fixed for free by the migration:
+- **The type-1 arm pushed args in REVERSE with no clamp/pad** — the tenth
+  instance of the TYPE1_ARG_ORDER class, and the one the Stage-3 reachability
+  probe called *latent on a live path* (the avm1 `localconnection` test hits the
+  arm, but only with `num_args = 0, param_count = 0`). Confirmed real:
+  `regression/lc_method_type1_args` — hand-assembled SWF6 bytecode building a
+  plain `DefineFunction` receiver method of two params and `send`ing it 2/1/3
+  args. Verified to fail before the fix and pass after, in all three directions:
+  `send("one","two")` bound `a="two", b="one"` (swapped); `send("solo")` bound
+  `a=<popped from an empty end-of-frame stack>, b="solo"` instead of `a="solo",
+  b=undefined`; `send("x1","x2","x3")` bound `a="x2", b="x1"` instead of clamping
+  to `a="x1", b="x2"`. (`b=undefined` traces as `b=` — SWF6 concatenates
+  undefined to the empty string, per `timer_cross_swf_version`'s v6 semantics.)
+- **The `else` branch called `func->simple_func` with no NULL check**, so a
+  type-1 both-pointers-NULL native (a `g_mc_method_funcs` stub such as
+  `MovieClip.prototype.getDepth`, or a `g_stub_ctors` entry) assigned as an LC
+  receiver method was a NULL call. The core's strict dispatch
+  (`function_type == 1 && simple_func != NULL`) returns undefined instead.
+
+Behavior-preserving verified: the avm1 `localconnection` test's full trace is
+**byte-identical** across the old and new `action.c` builds (the type-2 arm is
+unchanged, and the one live type-1 call has 0 args / 0 params so the marshalling
+fix is a no-op on it). Regression suite 13/13 → **14/14**.
+
+*Normalization pass (b) still owed for this dispatcher:* the type-1 arm skips the
+base-clip switch that type-2 performs, and the whole dispatcher skips
+`switchToFunctionVersion`, captured-scope-force, and the this-stack push. Each is
+a separate commit with a test, per §1 items 3/4.
+
 ### Stage 5 — lock it in
 
 - Delete the then-dead 32 marshalling loops and per-site casts.

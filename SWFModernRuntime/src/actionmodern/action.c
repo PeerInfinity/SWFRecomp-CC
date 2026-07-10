@@ -2618,6 +2618,103 @@ typedef struct {
 static ActiveNetStream g_active_netstreams[MAX_ACTIVE_NETSTREAMS];
 static int g_has_active_netstreams = 0;
 
+// ---------------------------------------------------------------------------
+// Unified function-invocation core (Function-Dispatch Consolidation plan, Stage 1).
+//
+// One place that performs the ~11-step invocation ritual (depth guard, this-stack
+// push, super context, captured/local scope setup, base_clip/version switch,
+// event-this-mc, forward-order + pad type-1 marshalling, the single type-1 cast,
+// type-2 register setup, and symmetric teardown). Each of ~38 hand-rolled
+// dispatchers currently performs a different subset of these steps; that variance
+// is the structural cause of a four-times-shipped arg-marshalling bug class.
+//
+// Migration is behavior-preserving: a caller passes the flag subset that mirrors
+// its current ritual. Turning a skipped step on ("normalization") is a separate,
+// per-site, CI-gated decision — see the plan's Stage 4. Stage 1 wires exactly one
+// low-risk site (invokeResolveFunction) to shake the core out against full CI.
+#define INV_DEPTH_GUARD          0x0001u  // g_call_depth++ guard at entry (accessor style)
+#define INV_THIS_STACK           0x0002u  // push this_var onto g_this_stack for the call
+#define INV_SUPER_CTX            0x0004u  // pushSuperContext(this_ptr, opts->super_depth)
+#define INV_CAPTURED_SCOPE       0x0008u  // restore func's captured scope chain
+#define INV_LOCAL_SCOPE          0x0010u  // alloc + push a fresh local scope frame
+#define INV_BIND_THIS            0x0020u  // bind "this" on the local scope (needs INV_LOCAL_SCOPE)
+#define INV_BASE_CLIP            0x0040u  // SWF6+: switch g_current_context to func->base_clip
+#define INV_VERSION_SWITCH       0x0080u  // switch/restore per-function SWF version + _global group
+#define INV_EVENT_THIS_MC        0x0100u  // set g_event_this_mc when the receiver is a MovieClip
+#define INV_EXEC_FUNC            0x0200u  // save/restore g_current_executing_func / g_prev_executing_func
+#define INV_FORCE_CAPTURED_WITH  0x0400u  // force is_with=1 on captured scopes (legacy resolve/EI quirk)
+#define INV_MC_THIS_NULL_PTR     0x0800u  // pass NULL (not this_ptr) to advanced_func so preload_this uses g_event_this_mc
+#define INV_LOCAL_SCOPE_MC       0x1000u  // associate the receiver MC with the local scope frame (scope_mc)
+#define INV_RESET_THIS_DEPTH     0x2000u  // zero g_this_depth for the call (accessor-setter isolation)
+#define INV_CTOR_CTX             0x4000u  // pushCtorContext(0)/popCtorContext around the callee body
+#define INV_OVERRIDE_THIS        0x8000u  // manage g_override_this{,_set} for the call (see opts->override_this)
+// Push the fresh local frame BENEATH the captured scopes instead of on top of
+// them. Parameter binds are unaffected either way (getCurrentLocalScope skips
+// is_with frames), but actionGetVariable walks the whole chain top-down, so a
+// captured scope then shadows the callee's own parameters and locals. Only the
+// __resolve arm does this today; actionEI_callInternalInterface has the same
+// inversion and will use this bit when Stage 4 migrates it. Almost certainly
+// wrong — normalizing it is a deliberate Stage-4 change, guarded by
+// regression/resolve_type1_args.
+#define INV_LOCAL_SCOPE_UNDER_CAPTURED 0x10000u
+
+// Callee activation (opts->act_flags): how the callee's *named* locals are bound
+// on the fresh local-scope frame. A type-1 body has no DefineFunction2 flags word,
+// so each bit means something slightly different per function_type:
+//
+//   bit             type 2 (DefineFunction2)                 type 1 (DefineFunction)
+//   INV_ACT_THIS    !preload && !suppress: bind "this" on     push g_this_stack only
+//                   the local scope AND push g_this_stack     (no scope binding)
+//   INV_ACT_ARGS    !preload && !suppress: build `arguments`  unconditional; capacity
+//                   with capacity num_args                    max(num_args, 1)
+//   INV_ACT_SUPER   always bind "super" (SUPER value only     no-op
+//                   when !preload && !suppress && in ctx)
+//
+// Read off actionCallFunction's two branches and the object-method arm. The
+// capacity split is preserved, not normalized — Stage 3 is behavior-preserving.
+//
+// The type-1 column's two "no scope binding" cells are not an approximation: a
+// type-1 body cannot observe either binding. GetVariable("this") resolves from the
+// this-cell before any scope walk, and GetVariable("super") falls back to the live
+// super context when the chain misses — so a name binding of either is dead
+// whenever INV_ACT_THIS / INV_SUPER_CTX are in force. The string-primitive arm
+// used to write both anyway (it read the callee's flags word without branching on
+// function_type, and a DefineFunction's flags is always 0), which is why that arm
+// needs no extra flag. See regression/string_prim_method_type1_args.
+#define INV_ACT_THIS             0x01u
+#define INV_ACT_ARGUMENTS        0x02u
+#define INV_ACT_SUPER            0x04u
+
+typedef struct InvokeOpts {
+	u32 flags;
+	u16 super_depth;   // super chain depth, applied when INV_SUPER_CTX is set
+	u8  act_flags;     // INV_ACT_* — callee named-local bindings (needs INV_LOCAL_SCOPE)
+	u8  has_this_ptr;  // 1: pass opts->this_ptr to advanced_func instead of deriving it
+
+	// The ABI receiver handed to advanced_func, decoupled from `this_var` (the
+	// *scriptable* receiver that `this` resolves to in the callee's scope chain).
+	// actionCallFunction needs both to differ: `this` binds to the current-context
+	// MovieClip while advanced_func receives NULL (or global_object when a SWF6+
+	// function is called from SWF5 bytecode).
+	void* this_ptr;
+
+	// With INV_OVERRIDE_THIS: non-NULL installs *override_this into g_override_this
+	// (+ g_override_this_set) for the call. The flag alone still clears
+	// g_override_this_set afterwards — the safety net for C-implemented callees
+	// that lack the generated preload-this code which normally consumes it.
+	ActionVar* override_this;
+} InvokeOpts;
+
+// Invoke `func` with `this_var` as the receiver and `args`/`num_args` as the
+// arguments, performing the ritual steps selected by `opts->flags`. Returns the
+// function's return value (undefined for type-1 functions that return nothing,
+// or when func is NULL / execution is halted / the depth guard trips). Defined
+// after the version-switch primitives; declared here so the accessor family can
+// delegate to it.
+static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* func,
+                                     ActionVar* this_var, ActionVar* args, u32 num_args,
+                                     const InvokeOpts* opts);
+
 // --- LocalConnection implementation ---
 
 static ASFunction g_lc_connect_func;
@@ -2856,7 +2953,6 @@ static ActionVar builtin_lc_domain(SWFAppContext* app_context, ActionVar* args, 
 static void lc_dispatch_method(SWFAppContext* app_context, ASObject* receiver,
                                const char* method_name, ActionVar* args, int num_args)
 {
-	extern MovieClip* g_current_context;
 	ActionVar* mv = getPropertyWithPrototype(receiver, method_name, strlen(method_name));
 	if (mv == NULL || mv->type != ACTION_STACK_VALUE_FUNCTION) return;
 	ASFunction* func = (ASFunction*)(uintptr_t)mv->data.numeric_value;
@@ -2865,74 +2961,38 @@ static void lc_dispatch_method(SWFAppContext* app_context, ASObject* receiver,
 	g_special_depth++;
 	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
 
-	if (func->function_type == 2)
-	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). Behavior-preserving: the old body restored the
+	// captured scope chain (is_with copied) and pushed a bare local frame with
+	// scope_mc = NULL and no "this" binding, in BOTH type arms
+	// (INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE). Only the type-2 arm switched
+	// g_current_context to the callee's base_clip under SWF6+, so INV_BASE_CLIP
+	// is gated to type-2 here. The receiver is passed as the ABI `this` to
+	// advanced_func (this_var carries it; no this-stack push, no event-this-mc,
+	// no super/version/exec-func — none were ever done here). The bare
+	// g_call_depth++/-- stays outside the core (INV_DEPTH_GUARD adds a
+	// g_max_call_depth halt check this path never had).
+	//
+	// Two bugs the migration fixes for free: (1) the old type-1 arm pushed args
+	// in REVERSE with no clamp/pad — the core's single forward+clamp+pad loop
+	// binds a type-1 receiver method's declared params correctly (instance ten
+	// of the TYPE1_ARG_ORDER class; regression/lc_method_type1_args). (2) the
+	// old `else` branch called func->simple_func with no NULL check, so a
+	// type-1 both-pointers-NULL native (a g_mc_method_funcs stub / g_stub_ctors
+	// entry) assigned as an LC receiver method was a NULL call; the core's
+	// strict dispatch returns undefined instead.
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t)receiver;
 
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
+	InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE };
+	if (func->function_type == 2) opts.flags |= INV_BASE_CLIP;
 
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		g_call_depth++;
-		func->advanced_func(app_context, args, num_args, regs, (void*)receiver);
-		g_call_depth--;
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
-	}
-	else
-	{
-		// Type 1: push args on stack (reverse order)
-		for (int i = num_args - 1; i >= 0; i--)
-			pushVar(app_context, &args[i]);
-
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-	}
+	u32 n = (num_args > 0) ? (u32)num_args : 0;
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var,
+	                           n > 0 ? args : NULL, n, &opts);
+	g_call_depth--;
 
 	g_special_depth--;
 }
@@ -8120,102 +8180,6 @@ static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* f
 	return result;
 }
 
-// ---------------------------------------------------------------------------
-// Unified function-invocation core (Function-Dispatch Consolidation plan, Stage 1).
-//
-// One place that performs the ~11-step invocation ritual (depth guard, this-stack
-// push, super context, captured/local scope setup, base_clip/version switch,
-// event-this-mc, forward-order + pad type-1 marshalling, the single type-1 cast,
-// type-2 register setup, and symmetric teardown). Each of ~38 hand-rolled
-// dispatchers currently performs a different subset of these steps; that variance
-// is the structural cause of a four-times-shipped arg-marshalling bug class.
-//
-// Migration is behavior-preserving: a caller passes the flag subset that mirrors
-// its current ritual. Turning a skipped step on ("normalization") is a separate,
-// per-site, CI-gated decision — see the plan's Stage 4. Stage 1 wires exactly one
-// low-risk site (invokeResolveFunction) to shake the core out against full CI.
-#define INV_DEPTH_GUARD          0x0001u  // g_call_depth++ guard at entry (accessor style)
-#define INV_THIS_STACK           0x0002u  // push this_var onto g_this_stack for the call
-#define INV_SUPER_CTX            0x0004u  // pushSuperContext(this_ptr, opts->super_depth)
-#define INV_CAPTURED_SCOPE       0x0008u  // restore func's captured scope chain
-#define INV_LOCAL_SCOPE          0x0010u  // alloc + push a fresh local scope frame
-#define INV_BIND_THIS            0x0020u  // bind "this" on the local scope (needs INV_LOCAL_SCOPE)
-#define INV_BASE_CLIP            0x0040u  // SWF6+: switch g_current_context to func->base_clip
-#define INV_VERSION_SWITCH       0x0080u  // switch/restore per-function SWF version + _global group
-#define INV_EVENT_THIS_MC        0x0100u  // set g_event_this_mc when the receiver is a MovieClip
-#define INV_EXEC_FUNC            0x0200u  // save/restore g_current_executing_func / g_prev_executing_func
-#define INV_FORCE_CAPTURED_WITH  0x0400u  // force is_with=1 on captured scopes (legacy resolve/EI quirk)
-#define INV_MC_THIS_NULL_PTR     0x0800u  // pass NULL (not this_ptr) to advanced_func so preload_this uses g_event_this_mc
-#define INV_LOCAL_SCOPE_MC       0x1000u  // associate the receiver MC with the local scope frame (scope_mc)
-#define INV_RESET_THIS_DEPTH     0x2000u  // zero g_this_depth for the call (accessor-setter isolation)
-#define INV_CTOR_CTX             0x4000u  // pushCtorContext(0)/popCtorContext around the callee body
-#define INV_OVERRIDE_THIS        0x8000u  // manage g_override_this{,_set} for the call (see opts->override_this)
-// Push the fresh local frame BENEATH the captured scopes instead of on top of
-// them. Parameter binds are unaffected either way (getCurrentLocalScope skips
-// is_with frames), but actionGetVariable walks the whole chain top-down, so a
-// captured scope then shadows the callee's own parameters and locals. Only the
-// __resolve arm does this today; actionEI_callInternalInterface has the same
-// inversion and will use this bit when Stage 4 migrates it. Almost certainly
-// wrong — normalizing it is a deliberate Stage-4 change, guarded by
-// regression/resolve_type1_args.
-#define INV_LOCAL_SCOPE_UNDER_CAPTURED 0x10000u
-
-// Callee activation (opts->act_flags): how the callee's *named* locals are bound
-// on the fresh local-scope frame. A type-1 body has no DefineFunction2 flags word,
-// so each bit means something slightly different per function_type:
-//
-//   bit             type 2 (DefineFunction2)                 type 1 (DefineFunction)
-//   INV_ACT_THIS    !preload && !suppress: bind "this" on     push g_this_stack only
-//                   the local scope AND push g_this_stack     (no scope binding)
-//   INV_ACT_ARGS    !preload && !suppress: build `arguments`  unconditional; capacity
-//                   with capacity num_args                    max(num_args, 1)
-//   INV_ACT_SUPER   always bind "super" (SUPER value only     no-op
-//                   when !preload && !suppress && in ctx)
-//
-// Read off actionCallFunction's two branches and the object-method arm. The
-// capacity split is preserved, not normalized — Stage 3 is behavior-preserving.
-//
-// The type-1 column's two "no scope binding" cells are not an approximation: a
-// type-1 body cannot observe either binding. GetVariable("this") resolves from the
-// this-cell before any scope walk, and GetVariable("super") falls back to the live
-// super context when the chain misses — so a name binding of either is dead
-// whenever INV_ACT_THIS / INV_SUPER_CTX are in force. The string-primitive arm
-// used to write both anyway (it read the callee's flags word without branching on
-// function_type, and a DefineFunction's flags is always 0), which is why that arm
-// needs no extra flag. See regression/string_prim_method_type1_args.
-#define INV_ACT_THIS             0x01u
-#define INV_ACT_ARGUMENTS        0x02u
-#define INV_ACT_SUPER            0x04u
-
-typedef struct InvokeOpts {
-	u32 flags;
-	u16 super_depth;   // super chain depth, applied when INV_SUPER_CTX is set
-	u8  act_flags;     // INV_ACT_* — callee named-local bindings (needs INV_LOCAL_SCOPE)
-	u8  has_this_ptr;  // 1: pass opts->this_ptr to advanced_func instead of deriving it
-
-	// The ABI receiver handed to advanced_func, decoupled from `this_var` (the
-	// *scriptable* receiver that `this` resolves to in the callee's scope chain).
-	// actionCallFunction needs both to differ: `this` binds to the current-context
-	// MovieClip while advanced_func receives NULL (or global_object when a SWF6+
-	// function is called from SWF5 bytecode).
-	void* this_ptr;
-
-	// With INV_OVERRIDE_THIS: non-NULL installs *override_this into g_override_this
-	// (+ g_override_this_set) for the call. The flag alone still clears
-	// g_override_this_set afterwards — the safety net for C-implemented callees
-	// that lack the generated preload-this code which normally consumes it.
-	ActionVar* override_this;
-} InvokeOpts;
-
-// Invoke `func` with `this_var` as the receiver and `args`/`num_args` as the
-// arguments, performing the ritual steps selected by `opts->flags`. Returns the
-// function's return value (undefined for type-1 functions that return nothing,
-// or when func is NULL / execution is halted / the depth guard trips). Defined
-// after the version-switch primitives; declared here so the accessor family can
-// delegate to it.
-static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* func,
-                                     ActionVar* this_var, ActionVar* args, u32 num_args,
-                                     const InvokeOpts* opts);
 
 // Invoke an addProperty getter with a specific this_obj
 static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* func, void* this_obj)
