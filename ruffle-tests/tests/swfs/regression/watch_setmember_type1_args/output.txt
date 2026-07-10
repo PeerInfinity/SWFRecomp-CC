@@ -1,0 +1,7 @@
+w: p||x
+SENTINEL1
+stored: x!
+w5: q||y|UD|
+SENTINEL2
+stored2: y
+end

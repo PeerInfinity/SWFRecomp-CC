@@ -2636,6 +2636,65 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
                                      ActionVar* this_var, ActionVar* args, u32 num_args,
                                      const InvokeOpts* opts);
 
+// Shared adapter for the three watch-firing sites (dispatch Stage 4):
+// actionSetVariable's timeline arm (Site A), actionSetMember's OBJECT arm
+// (Site B), and its MOVIECLIP arm (Site C). Owns the prop-name arg
+// construction with the per-site ownership discipline, the (up to) 4-arg
+// payload {name, oldVal, newVal, userData}, the bare g_call_depth bracket
+// (no site ever had the depth guard's halt check), the core call, and the
+// non-undefined return fold into *value. Everything site-specific stays at
+// the site: Site B's re-entry guard push/pop, Site C's receiver-context
+// bracket, Site A's type-2-only gate + clear-first + hashmap re-sync, and
+// each site's old-value source (A: real previous value, B: proto-inherited,
+// C: hardcoded undefined). The three flag sets stay distinct — collapsing
+// them is the normalization pass, not this migration.
+//
+//   pname_owns  — args[0].owns_memory as handed to the callee. Site B type-1
+//                 transfers ownership to the callee's param bind (and now
+//                 LEAKS instead when the core clamps a 0-param watcher —
+//                 leak-over-dangle, the documented site discipline); B
+//                 type-2 hands it non-owning and never frees (deliberate
+//                 documented leak); A hands it owning AND frees (latent
+//                 double-free with a named-param type-2 watcher — probe
+//                 pending, preserved as-is).
+//   free_pname  — unconditionally free the buffer after the call (A, C).
+//   clear_owns  — mark string newVal/userData non-owning in the payload
+//                 (B, C discipline; A never did — preserved).
+//   num_args    — 4 everywhere except Site C type-1's 3 (userData dropped,
+//                 a preserved divergence; the core pads the 4th param with
+//                 undefined instead of popping a stale caller slot).
+static void invokeWatchCallback(SWFAppContext* app_context, ASFunction* wf,
+                                ActionVar* user_data, ActionVar* this_var,
+                                const char* prop_name, u32 prop_name_len,
+                                ActionVar* old_val, ActionVar* value,
+                                u32 flags, u32 num_args,
+                                int pname_owns, int free_pname, int clear_owns)
+{
+	u32 _pname_u16_len;
+	uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
+	ActionVar _wargs[4];
+	memset(&_wargs[0], 0, sizeof(_wargs[0]));
+	_wargs[0].type = ACTION_STACK_VALUE_STRING;
+	_wargs[0].str_size = _pname_u16_len;
+	_wargs[0].data.string_data.heap_ptr = _pname_u16;
+	_wargs[0].data.string_data.owns_memory = pname_owns ? true : false;
+	_wargs[1] = *old_val;
+	_wargs[2] = *value;
+	if (clear_owns && _wargs[2].type == ACTION_STACK_VALUE_STRING)
+		_wargs[2].data.string_data.owns_memory = false;
+	_wargs[3] = *user_data;
+	if (clear_owns && _wargs[3].type == ACTION_STACK_VALUE_STRING)
+		_wargs[3].data.string_data.owns_memory = false;
+
+	InvokeOpts opts = { .flags = flags };
+	g_call_depth++;
+	ActionVar _wret = invokeFunctionValue(app_context, wf, this_var, _wargs, num_args, &opts);
+	g_call_depth--;
+	if (free_pname) free(_pname_u16);
+	if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
+		*value = _wret;
+}
+
 // --- LocalConnection implementation ---
 
 static ASFunction g_lc_connect_func;
@@ -42398,35 +42457,22 @@ void actionSetVariable(SWFAppContext* app_context)
 					var->type = ACTION_STACK_VALUE_UNDEFINED;
 					var->data.numeric_value = 0;
 					var->str_size = 0;
-					// Build prop name as string ActionVar
-					u32 _pname_u16_len;
-					uint16_t* _pname_u16 = ascii_to_u16(app_context, var_name, (int)var_name_len, &_pname_u16_len);
-					ActionVar _pname_arg = {0};
-					_pname_arg.type = ACTION_STACK_VALUE_STRING;
-					_pname_arg.str_size = _pname_u16_len;
-					_pname_arg.data.string_data.heap_ptr = _pname_u16;
-					_pname_arg.data.string_data.owns_memory = true;
-					// Call watcher(propName, oldVal, newVal, userData)
-					ActionVar _wargs[4] = { _pname_arg, _old_val, _new_val, _we->user_data };
-					ActionVar* _wregs = NULL;
-					if (_wf->register_count > 0)
-						_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
-					ASObject* _wscope = allocObject(app_context, 4);
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 0;
-						scope_mc[scope_depth] = NULL;
-						scope_chain[scope_depth++] = _wscope;
-					}
-					g_call_depth++;
-					ActionVar _wret = _wf->advanced_func(app_context, _wargs, 4, _wregs, NULL);
-					g_call_depth--;
-					if (scope_depth > 0) scope_depth--;
-					releaseObject(app_context, _wscope);
-					if (_wregs != NULL) FREE(_wregs);
-					free(_pname_u16);  // allocated via ascii_to_u16 which uses malloc
-					// If watcher returned non-undefined, use it; else use the intended new value
-					ActionVar _actual_new = (_wret.type != ACTION_STACK_VALUE_UNDEFINED) ? _wret : _new_val;
-					*var = _actual_new;
+					// Bare local frame, no this bind, ABI this = NULL (this_var
+					// = NULL) — this arm never gave the watcher a `this` channel.
+					// Preserved as-is: pname handed OWNING and freed
+					// unconditionally after (the latent double-free with a
+					// named-param type-2 watcher — probe pending, D13), and
+					// string newVal/userData keep their owns flags (this arm
+					// never cleared them, unlike B/C). The type-2-only gate
+					// above stays: a type-1 timeline watcher silently commits
+					// without firing (D2 — normalization candidate, not this
+					// migration). The fold lands in _new_val (undefined return
+					// keeps the intended value).
+					invokeWatchCallback(app_context, _wf, &_we->user_data, NULL,
+						var_name, var_name_len, &_old_val, &_new_val,
+						INV_LOCAL_SCOPE,
+						4, /*pname_owns*/1, /*free_pname*/1, /*clear_owns*/0);
+					*var = _new_val;
 					// Sync to hashmap if string_id path was used
 					if (string_id != 0) {
 						extern hashmap* var_map;
@@ -47420,14 +47466,6 @@ void actionSetMember(SWFAppContext* app_context)
 							if (watch_firing_depth(obj, NULL, prop_name, prop_name_len) >= accessorReentryLimit()
 							    || g_watch_firing_count >= MAX_SPECIAL_DEPTH)
 								break;
-							// Build prop_name string arg (shared by both type paths)
-							u32 _pname_u16_len;
-							uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
-							ActionVar _pname_arg = {0};
-							_pname_arg.type = ACTION_STACK_VALUE_STRING;
-							_pname_arg.str_size = _pname_u16_len;
-							_pname_arg.data.string_data.heap_ptr = _pname_u16;
-							_pname_arg.data.string_data.owns_memory = true;
 							// Get old value via prototype chain (Flash includes inherited values)
 							// IMPORTANT: copy old value before invoking callback, because
 							// the callback or stack operations might free the original string.
@@ -47440,121 +47478,46 @@ void actionSetMember(SWFAppContext* app_context)
 								if (_old_val.type == ACTION_STACK_VALUE_STRING)
 									_old_val.data.string_data.owns_memory = false;
 							}
-							// Pass 4 args: (propName, oldVal, newVal, userData).
-							// _wargs[0] (the freshly-allocated property name) keeps
-							// owns_memory = true so ownership transfers to the
-							// watcher — whatever stores it (e.g. `_root.info.nam`)
-							// frees it later. Freeing it here would dangle that
-							// reference. old/new/userData stay non-owning (owned by
-							// the property / watch table, both outlive the call).
-							ActionVar _wargs[4];
-							_wargs[0] = _pname_arg;
-							_wargs[1] = _old_val;
-							_wargs[2] = value_var;
-							if (_wargs[2].type == ACTION_STACK_VALUE_STRING)
-								_wargs[2].data.string_data.owns_memory = false;
-							_wargs[3] = g_watch_table[_wi].user_data;
-							if (_wargs[3].type == ACTION_STACK_VALUE_STRING)
-								_wargs[3].data.string_data.owns_memory = false;
+							// this = watched object for both branches: the core pushes it
+							// on g_this_stack (INV_THIS_STACK) so the watcher body's
+							// GetVariable("this") resolves to the object (not the root MC
+							// → "_level0"); the type-2 branch additionally binds it on the
+							// fresh local frame (INV_BIND_THIS), mirroring
+							// invokePropertyGetter. The type-1 branch has no local frame
+							// (the nc_onstatus shape) — its old setVariableByName("this")
+							// side-write into the ENCLOSING scope is dropped, not
+							// preserved: the bind was dead for lookup (the this-cell wins
+							// with INV_THIS_STACK in force) and its only residue was
+							// minting a stray `this` variable in the caller's frame or
+							// the timeline vars (string-primitive precedent — a flag
+							// preserving a dead write is worse than the divergence).
+							ActionVar _wthis = {0};
+							_wthis.type = ACTION_STACK_VALUE_OBJECT;
+							_wthis.data.numeric_value = (u64) obj;
 							watch_firing_push(obj, NULL, prop_name, prop_name_len);
 							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
 							{
-								// The type-2 watcher's prologue binds args into its
-								// local scope via setProperty (pointer-sharing, no
-								// string copy). When that scope is released after the
-								// call its string properties would be freed — leaving
-								// the watcher-stored copy (e.g. `_root.info.nam`)
-								// dangling. Mark the freshly-allocated property-name
-								// arg non-owning so the scope release can't free it;
-								// the watcher-stored copy then stays valid.
-								_wargs[0].data.string_data.owns_memory = false;
-								ActionVar* _wregs = NULL;
-								if (_wf->register_count > 0)
-									_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
-								// Bind `this` → watched object: push g_this_stack so
-								// the watcher body's GetVariable("this") resolves to
-								// the object (not the root MC → "_level0"), and bind
-								// it on the local scope too. Mirrors invokePropertyGetter.
-								ActionVar _wthis = {0};
-								_wthis.type = ACTION_STACK_VALUE_OBJECT;
-								_wthis.data.numeric_value = (u64) obj;
-								u32 _wsaved_this_depth = g_this_depth;
-								if (g_this_depth < MAX_THIS_DEPTH) {
-									g_this_stack[g_this_depth] = _wthis;
-									g_this_depth++;
-								}
-								// Restore the watcher's captured closure scopes.
-								u32 _wcap = _wf->captured_scope_count;
-								for (u32 _wci = 0; _wci < _wcap; _wci++) {
-									if (scope_depth < MAX_SCOPE_DEPTH) {
-										scope_is_with[scope_depth] = _wf->captured_scope_is_with[_wci];
-										scope_mc[scope_depth] = (MovieClip*)_wf->captured_scope_mc[_wci];
-										scope_chain[scope_depth++] = (ASObject*)_wf->captured_scope[_wci];
-									}
-								}
-								ASObject* _wscope = allocObject(app_context, 8);
-								setProperty(app_context, _wscope, "this", 4, &_wthis);
-								if (scope_depth < MAX_SCOPE_DEPTH) {
-									scope_is_with[scope_depth] = 0;
-									scope_mc[scope_depth] = NULL;
-									scope_chain[scope_depth++] = _wscope;
-								}
-								MovieClip* _wsaved_ctx = g_current_context;
-								if (g_swf_version >= 6 && _wf->base_clip != NULL)
-									g_current_context = (MovieClip*)_wf->base_clip;
-								g_call_depth++;
-								// Pass watched object as this_obj for correct this binding
-								ActionVar _wret = _wf->advanced_func(app_context, _wargs, 4, _wregs, (void*)obj);
-								g_call_depth--;
-								g_current_context = _wsaved_ctx;
-								if (scope_depth > 0) scope_depth--;
-								for (u32 _wci = 0; _wci < _wcap; _wci++)
-									if (scope_depth > 0) scope_depth--;
-								g_this_depth = _wsaved_this_depth;
-								releaseObject(app_context, _wscope);
-								if (_wregs != NULL) FREE(_wregs);
-								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
-									value_var = _wret;
+								// pname handed non-owning and never freed (deliberate
+								// leak-over-dangle: the type-2 prologue pointer-shares
+								// args into its local scope, and the scope release
+								// would free the watcher-stored copy).
+								invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
+									&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
+									INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+									INV_BIND_THIS | INV_BASE_CLIP,
+									4, /*pname_owns*/0, /*free_pname*/0, /*clear_owns*/1);
 							}
 							else if (_wf->function_type == 1 && _wf->simple_func != NULL)
 							{
-								// Type 1: bind `this` → watched object and push the
-								// 4 watcher args (name, oldVal, newVal, userData)
-								// onto the value stack in order — the type-1
-								// prologue pops the last parameter first, so the
-								// first arg must be pushed first. Without this the
-								// watcher body saw unbound params and this==_level0.
-								ActionVar _wthis = {0};
-								_wthis.type = ACTION_STACK_VALUE_OBJECT;
-								_wthis.data.numeric_value = (u64) obj;
-								u32 _wcap = _wf->captured_scope_count;
-								for (u32 _wci = 0; _wci < _wcap; _wci++) {
-									if (scope_depth < MAX_SCOPE_DEPTH) {
-										scope_is_with[scope_depth] = _wf->captured_scope_is_with[_wci];
-										scope_mc[scope_depth] = (MovieClip*)_wf->captured_scope_mc[_wci];
-										scope_chain[scope_depth++] = (ASObject*)_wf->captured_scope[_wci];
-									}
-								}
-								setVariableByName("this", &_wthis);
-								u32 _wsaved_this_depth = g_this_depth;
-								if (g_this_depth < MAX_THIS_DEPTH) {
-									g_this_stack[g_this_depth] = _wthis;
-									g_this_depth++;
-								}
-								MovieClip* _wsaved_ctx = g_current_context;
-								if (g_swf_version >= 6 && _wf->base_clip != NULL)
-									g_current_context = (MovieClip*)_wf->base_clip;
-								for (int _wai = 0; _wai < 4; _wai++)
-									pushVar(app_context, &_wargs[_wai]);
-								g_call_depth++;
-								ActionVar _wret = ((ActionVar(*)(SWFAppContext*))_wf->simple_func)(app_context);
-								g_call_depth--;
-								g_current_context = _wsaved_ctx;
-								g_this_depth = _wsaved_this_depth;
-								for (u32 _wci = 0; _wci < _wcap; _wci++)
-									if (scope_depth > 0) scope_depth--;
-								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
-									value_var = _wret;
+								// pname ownership transfers to the callee's param bind
+								// (owns=1, no free). The core clamps/pads to param_count —
+								// the canonical 3-param watcher no longer binds every arg
+								// off by one with the name string stranded on the caller's
+								// eval stack (regression/watch_setmember_type1_args).
+								invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
+									&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
+									INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_BASE_CLIP,
+									4, /*pname_owns*/1, /*free_pname*/0, /*clear_owns*/1);
 							}
 							watch_firing_pop();
 						}
@@ -49391,101 +49354,45 @@ void actionSetMember(SWFAppContext* app_context)
 						ASFunction* _wf = g_watch_table[_wi].watcher_func;
 						if (_wf != NULL)
 						{
-							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
+							int _wf_t2 = (_wf->function_type == 2 && _wf->advanced_func != NULL);
+							int _wf_t1 = (_wf->function_type == 1 && _wf->simple_func != NULL);
+							if (_wf_t2 || _wf_t1)
 							{
-								u32 _pname_u16_len;
-								uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
-								ActionVar _pname_arg = {0};
-								_pname_arg.type = ACTION_STACK_VALUE_STRING;
-								_pname_arg.str_size = _pname_u16_len;
-								_pname_arg.data.string_data.heap_ptr = _pname_u16;
-								_pname_arg.data.string_data.owns_memory = true;
 								// Old value: use undefined (MC virtual properties like "text"
 								// are stored in dynamic_props by init, but Flash/Ruffle
 								// treats them as virtual getter/setter — old value is
 								// undefined until explicitly set by ActionScript)
 								ActionVar _old_val = {0};
 								_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
-								// Mark all string args as non-owning to prevent double-free:
-								// the explicit free below owns _pname_arg; user_data is owned
-								// by the watch table; value_var may be owned by caller.
-								ActionVar _wargs[4];
-								_wargs[0] = _pname_arg;
-								_wargs[0].data.string_data.owns_memory = false;  // freed below
-								_wargs[1] = _old_val;
-								_wargs[2] = value_var;
-								if (_wargs[2].type == ACTION_STACK_VALUE_STRING)
-									_wargs[2].data.string_data.owns_memory = false;
-								_wargs[3] = g_watch_table[_wi].user_data;
-								if (_wargs[3].type == ACTION_STACK_VALUE_STRING)
-									_wargs[3].data.string_data.owns_memory = false;
-								ActionVar* _wregs = NULL;
-								if (_wf->register_count > 0)
-									_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
-								ASObject* _wscope = allocObject(app_context, 4);
-								// Set this = mc on the watcher scope
+								// this = receiver MC, bound on the fresh local frame
+								// (INV_BIND_THIS + INV_LOCAL_SCOPE). LIVE, not dead-by-
+								// rule: no this-stack push here, so at timeline level
+								// GetVariable("this") falls to the scope walk and finds
+								// it. No captured scopes, no this-stack — preserved by
+								// omission.
 								ActionVar _wthis = {0};
 								_wthis.type = ACTION_STACK_VALUE_MOVIECLIP;
 								_wthis.data.numeric_value = (u64)mc;
-								setProperty(app_context, _wscope, "this", 4, &_wthis);
-								if (scope_depth < MAX_SCOPE_DEPTH) {
-									scope_is_with[scope_depth] = 0;
-									scope_mc[scope_depth] = NULL;
-									scope_chain[scope_depth++] = _wscope;
-								}
-								g_call_depth++;
+								// Receiver-context bracket stays in the arm: this site
+								// switches g_current_context to the RECEIVER, not the
+								// callee's base_clip — no InvokeOpts flag expresses
+								// that, deliberately (kin to Stage 3d's CF_CTX_RECEIVER).
 								MovieClip* _wsaved = g_current_context;
 								actionSetCurrentContext(mc);
-								ActionVar _wret = _wf->advanced_func(app_context, _wargs, 4, _wregs, (void*)mc);
+								// Type-1 stays 3 args (userData DROPPED — a preserved
+								// divergence, D6; delivering it is a normalization
+								// commit with Ruffle as oracle). The core pads the
+								// callee's 4th param with undefined instead of popping
+								// a stale caller slot (regression/watch_mc_type1_args).
+								// pname handed non-owning + freed here for BOTH types
+								// now — the old type-1 arm pushed it owning AND freed
+								// it, a latent double-free when the param bind's scope
+								// release also freed it.
+								invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
+									&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
+									INV_LOCAL_SCOPE | INV_BIND_THIS,
+									_wf_t2 ? 4 : 3, /*pname_owns*/0, /*free_pname*/1, /*clear_owns*/1);
 								actionSetCurrentContext(_wsaved);
-								g_call_depth--;
-								if (scope_depth > 0) scope_depth--;
-								releaseObject(app_context, _wscope);
-								if (_wregs != NULL) FREE(_wregs);
-								if (_pname_arg.data.string_data.owns_memory)
-									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
-								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
-									value_var = _wret;
-							}
-							else if (_wf->function_type == 1 && _wf->simple_func != NULL)
-							{
-								// Type 1 watcher: push args on stack, call, use return value
-								u32 _pname_u16_len;
-								uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
-								ActionVar _pname_arg = {0};
-								_pname_arg.type = ACTION_STACK_VALUE_STRING;
-								_pname_arg.str_size = _pname_u16_len;
-								_pname_arg.data.string_data.heap_ptr = _pname_u16;
-								_pname_arg.data.string_data.owns_memory = true;
-								ActionVar _old_val = {0};
-								_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
-								// Push 3 params: prop (bottom), oldVal, newVal (top)
-								pushVar(app_context, &_pname_arg);
-								pushVar(app_context, &_old_val);
-								pushVar(app_context, &value_var);
-								// Create local scope with this = mc
-								ASObject* _wscope = allocObject(app_context, 4);
-								ActionVar _wthis = {0};
-								_wthis.type = ACTION_STACK_VALUE_MOVIECLIP;
-								_wthis.data.numeric_value = (u64)mc;
-								setProperty(app_context, _wscope, "this", 4, &_wthis);
-								if (scope_depth < MAX_SCOPE_DEPTH) {
-									scope_is_with[scope_depth] = 0;
-									scope_mc[scope_depth] = NULL;
-									scope_chain[scope_depth++] = _wscope;
-								}
-								g_call_depth++;
-								MovieClip* _wsaved = g_current_context;
-								actionSetCurrentContext(mc);
-								ActionVar _wret = ((ActionVar(*)(SWFAppContext*))_wf->simple_func)(app_context);
-								actionSetCurrentContext(_wsaved);
-								g_call_depth--;
-								if (scope_depth > 0) scope_depth--;
-								releaseObject(app_context, _wscope);
-								if (_pname_arg.data.string_data.owns_memory)
-									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
-								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
-									value_var = _wret;
 							}
 						}
 						break;
