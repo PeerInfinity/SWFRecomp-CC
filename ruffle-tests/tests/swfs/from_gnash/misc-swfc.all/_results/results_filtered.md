@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-10 21:39 UTC
+**Date**: 2026-07-10 22:53 UTC
 
-**Git SHA**: `1f68e0043c`
+**Git SHA**: `8a8ff17c73`
 
-**Run Duration**: 5m 8s
+**Run Duration**: 5m 34s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -34,16 +34,16 @@
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `button_test1` | 31 | 1.9s |  |
-| 2 | `edittext_test1` | 47 | 22.6s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 19.4s |  |
-| 4 | `hello` | 4 | 19.6s |  |
-| 5 | `mouse_drag_test` | 12 | 16.0s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 21.2s |  |
-| 7 | `opcode_guard_test2` | 24 | 15.8s |  |
-| 8 | `soft_reference_test1` | 45 | 19.8s |  |
-| 9 | `stackscope` | 11 | 22.6s |  |
-| 10 | `submoviegetvar` | 4 | 20.0s |  |
-| 11 | `swf4opcode` | 117 | 2.8s |  |
+| 2 | `edittext_test1` | 47 | 20.7s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 19.3s |  |
+| 4 | `hello` | 4 | 19.7s |  |
+| 5 | `mouse_drag_test` | 12 | 19.7s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 19.7s |  |
+| 7 | `opcode_guard_test2` | 24 | 19.6s |  |
+| 8 | `soft_reference_test1` | 45 | 19.6s |  |
+| 9 | `stackscope` | 11 | 1.7s |  |
+| 10 | `submoviegetvar` | 4 | 21.5s |  |
+| 11 | `swf4opcode` | 117 | 20.9s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +51,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 20.5s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 19.9s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.8s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 16.4s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 2.1s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 20.2s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 20.1s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.5s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 21.4s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 20.8s |  |
 
 ## Near-Passing Tests
 
