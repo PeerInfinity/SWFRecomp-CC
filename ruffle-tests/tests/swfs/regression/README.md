@@ -18,7 +18,7 @@ script. Tests that live here need none of that.
 # one test — `--test` finds the suite that owns the name, no --tests-dir needed
 python3 ruffle-tests/verify_output.py --test=fn_call_type1_args --diff --verbose
 
-# whole suite (5 tests, a few seconds)
+# whole suite (a few seconds)
 python3 ruffle-tests/verify_output.py -v --tests-dir=ruffle-tests/tests/swfs/regression
 ```
 
@@ -54,4 +54,5 @@ arms cannot be reached any other way.
 | `lv_ondata_type1_args` | `fireLoadVarsCallback`'s type-1 arm: forward arg order + clamp/pad (instance thirteen; fixed migrating it onto `invokeFunctionValue` in dispatch Stage 4) |
 | `xml_onload_type1_args` | `soundFireCallback`'s type-1 arm (the shared Sound/XML event dispatcher): forward arg order + clamp/pad (instance fourteen; fixed in the same migration batch) |
 | `sort_comparator_type1_args` | `_invoke_sort_comparator`'s type-1 arm: clamp/pad to `param_count` (instance fifteen — a 1-param comparator misbound `b` and leaked a stack slot per comparison into the NEXT sort's comparator; fixed migrating it onto `invokeFunctionValue` in dispatch Stage 4) |
+| `timer_type1_args` | `fireTimerCallback`'s two type-1 arms (function-form `setTimeout(f, …)` AND method-form `setTimeout(o, "m", …)` are separate paths): clamp/pad to `param_count` (instance seventeen — the arms pushed forward but a clamped row stranded an operand on the AVM1 stack that corrupted the NEXT callback's pad pop; fixed migrating `fireTimerCallback` onto `invokeFunctionValue` via the exported `actionInvokeFunctionValue` in dispatch Stage 4). The 2-arg rows are deliberate order locks (passed before the fix) |
 | `coerce_type1_args` | the coercion paths' (`objectCallValueOf` / `objectToPrimitive` / `convertFloat` / `objectCallToString`) type-1 arms: pad to `param_count` (instance sixteen, one instance for the family — all four sites pushed nothing, so a 2-param valueOf's prologue popped the caller's live stack, including the operand under conversion in `convertFloat`; fixed migrating the family onto `invokeFunctionValue` in dispatch Stage 4) |

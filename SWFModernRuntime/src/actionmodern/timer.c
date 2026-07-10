@@ -343,65 +343,34 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 
 		if (method_func == NULL) return; // method not found, skip silently
 
-		// Run the callback under its defining movie's SWF version (and the
-		// matching version-group _global) — timers fire from the host movie's
-		// frame loop, so a callback defined in a loaded child SWF of a
-		// different version would otherwise get the host's semantics.
-		int _tm_saved_ver; ASObject* _tm_saved_global; int _tm_saved_midx;
-		actionSwitchToFunctionVersion(method_func, &_tm_saved_ver, &_tm_saved_global, &_tm_saved_midx);
-
-		// Call the method with this = obj or mc
-		void* this_obj = NULL;
-		if (obj != NULL) this_obj = obj;
-		else if (mc != NULL) this_obj = mc;
-
-		if (method_func->function_type == 2)
-		{
-			// Type 2 (DefineFunction2) — allocate registers, call with args
-			ActionVar* registers = NULL;
-			if (method_func->register_count > 0)
-				registers = (ActionVar*) HCALLOC(method_func->register_count, sizeof(ActionVar));
-
-			// Restore captured scopes
-			int captured_count = method_func->captured_scope_count;
-			for (int s = 0; s < captured_count; s++)
-			{
-				scope_chain[scope_depth] = method_func->captured_scope[s];
-				scope_is_with[scope_depth] = 1;
-				scope_depth++;
-			}
-
-			g_call_depth++;
-			ActionVar result = method_func->advanced_func(app_context,
-				t->extra_arg_count > 0 ? t->extra_args : NULL,
-				t->extra_arg_count, registers, this_obj);
-			(void)result;
-			g_call_depth--;
-
-			// Pop captured scopes
-			scope_depth -= captured_count;
-
-			if (registers) FREE(registers);
-			// Discard return value
-		}
-		else
-		{
-			// Type 1 (DefineFunction) — push args on stack
-			for (int i = 0; i < t->extra_arg_count; i++)
-				pushVar(app_context, &t->extra_args[i]);
-
-			// Save and set event this
-			MovieClip* old_event_this = g_event_this_mc;
-			if (mc != NULL) g_event_this_mc = mc;
-
-			g_call_depth++;
-			((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
-			g_call_depth--;
-
-			g_event_this_mc = old_event_this;
-		}
-
-		actionRestoreFunctionVersion(_tm_saved_ver, _tm_saved_global, _tm_saved_midx);
+		// INV_VERSION_SWITCH: run the callback under its defining movie's SWF
+		// version (and the matching version-group _global) — timers fire from
+		// the host movie's frame loop, so a callback defined in a loaded child
+		// SWF of a different version would otherwise get the host's semantics.
+		// Safe inside the core for this form: neither arm ever switches base
+		// clip, so there is no gate to compute against the switched version.
+		//
+		// this_var = &t->object: the core derives the same obj/mc ABI receiver
+		// the arm used to compute by hand. INV_EVENT_THIS_MC on type-1 only —
+		// the core's "set when the receiver is an MC" is exactly the old
+		// `if (mc != NULL)`, and the type-2 arm never set it. No local scope
+		// frame, no this-stack, no exec-func swap in either arm (preserved by
+		// leaving those flags clear); depth bracket stays out here because the
+		// path never had the g_max_call_depth halt check. The core additionally
+		// clamps/pads type-1 args to param_count (the TYPE1_ARG_ORDER fix,
+		// regression/timer_type1_args), bounds + copies scope_mc on the
+		// captured-scope push (was stale), and NULL-checks the function
+		// pointers (MovieClip.prototype stubs are type-1 with NULL pointers).
+		u32 _tm_flags = (method_func->function_type == 2)
+			? (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH | INV_VERSION_SWITCH)
+			: (INV_EVENT_THIS_MC | INV_VERSION_SWITCH);
+		InvokeOpts _tm_opts = { .flags = _tm_flags };
+		g_call_depth++;
+		actionInvokeFunctionValue(app_context, method_func, &t->object,
+			t->extra_arg_count > 0 ? t->extra_args : NULL,
+			t->extra_arg_count, &_tm_opts);
+		g_call_depth--;
+		// Return value discarded.
 	}
 	else
 	{
@@ -409,63 +378,37 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 		ASFunction* func = (ASFunction*)(uintptr_t)t->func.data.numeric_value;
 		if (func == NULL) return;
 
-		// Defining-movie SWF-version semantics (see method-form above).
-		int _tf_saved_ver; ASObject* _tf_saved_global; int _tf_saved_midx;
-		actionSwitchToFunctionVersion(func, &_tf_saved_ver, &_tf_saved_global, &_tf_saved_midx);
+		// Base clip stays in the arm (never pair INV_BASE_CLIP with
+		// INV_VERSION_SWITCH): this form has always gated the base-clip switch
+		// on the CALLEE's SWF version, because it read g_swf_version after its
+		// own version switch. eff_ver is provably the value
+		// switchToFunctionVersion is about to install — the gate is now a named
+		// local instead of an accident of statement ordering. The context
+		// switch now precedes the core's version switch (they used to be the
+		// other way around); the two brackets write disjoint globals and
+		// nothing between them reads the other.
+		int eff_ver = (func->swf_version != 0) ? func->swf_version : g_swf_version;
+		MovieClip* old_context = g_current_context;
+		if (eff_ver >= 6 && func->base_clip != NULL)
+			g_current_context = func->base_clip;
 
-		if (func->function_type == 2)
-		{
-			ActionVar* registers = NULL;
-			if (func->register_count > 0)
-				registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+		// this_var = NULL: the core passes NULL as the ABI receiver, as both
+		// arms always did. Type-1 keeps no captured scopes (a type-1 closure
+		// loses its defining chain here — a normalization candidate, not a
+		// migration change). Same silent fixes as the method-form above
+		// (clamp/pad, bounded scope push, scope_mc, NULL-checked dispatch).
+		u32 _tf_flags = (func->function_type == 2)
+			? (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH | INV_VERSION_SWITCH)
+			: INV_VERSION_SWITCH;
+		InvokeOpts _tf_opts = { .flags = _tf_flags };
+		g_call_depth++;
+		actionInvokeFunctionValue(app_context, func, NULL,
+			t->extra_arg_count > 0 ? t->extra_args : NULL,
+			t->extra_arg_count, &_tf_opts);
+		g_call_depth--;
 
-			// Restore captured scopes
-			int captured_count = func->captured_scope_count;
-			for (int s = 0; s < captured_count; s++)
-			{
-				scope_chain[scope_depth] = func->captured_scope[s];
-				scope_is_with[scope_depth] = 1;
-				scope_depth++;
-			}
-
-			// Restore base_clip context for SWF6+
-			MovieClip* old_context = g_current_context;
-			if (g_swf_version >= 6 && func->base_clip != NULL)
-				g_current_context = func->base_clip;
-
-			g_call_depth++;
-			ActionVar result = func->advanced_func(app_context,
-				t->extra_arg_count > 0 ? t->extra_args : NULL,
-				t->extra_arg_count, registers, NULL);
-			(void)result;
-			g_call_depth--;
-
-			g_current_context = old_context;
-
-			// Pop captured scopes
-			scope_depth -= captured_count;
-
-			if (registers) FREE(registers);
-		}
-		else
-		{
-			// Type 1 — push args on stack
-			for (int i = 0; i < t->extra_arg_count; i++)
-				pushVar(app_context, &t->extra_args[i]);
-
-			// Restore base_clip context for SWF6+
-			MovieClip* old_context = g_current_context;
-			if (g_swf_version >= 6 && func->base_clip != NULL)
-				g_current_context = func->base_clip;
-
-			g_call_depth++;
-			((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-			g_call_depth--;
-
-			g_current_context = old_context;
-		}
-
-		actionRestoreFunctionVersion(_tf_saved_ver, _tf_saved_global, _tf_saved_midx);
+		g_current_context = old_context;
+		// Return value discarded.
 	}
 }
 

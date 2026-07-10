@@ -1,0 +1,14 @@
+start
+f:a=one
+f:b=two
+f:a=solo
+f:b=
+f:a=x1
+f:b=x2
+m:a=one
+m:b=two
+m:a=solo
+m:b=
+m:a=x1
+m:b=x2
+done
