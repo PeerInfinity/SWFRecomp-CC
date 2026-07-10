@@ -1,29 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1f68e0043c1b` (2026-07-10T21:35:27.200984+00:00)
-**Current:** `8a8ff17c73a3` (2026-07-10T22:53:59.472776+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `8a8ff17c73a3` (2026-07-10T22:53:59.472776+00:00)
+**Current:** `2ab5d2685cab` (2026-07-10T23:34:28.833716+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 634 | 610 | -24 |
-| Total | 706 | 682 | -24 |
-| Pass rate | 89.8% | 89.4% | -0.4% |
+| Passing | 610 | 634 | +24 |
+| Total | 682 | 706 | +24 |
+| Pass rate | 89.4% | 89.8% | +0.4% |
 | Mismatched lines | 15176 | 15176 | 0 |
 
-## Missing Tests — Shard Failure (24)
+## Added Tests (24)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 24 were previously passing
-- 0 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `init_object_invalid` | pass | 4/4 |
 | `init_object_order` | pass | 15/15 |
 | `input_dead_keys_windows` | pass | 15/15 |
@@ -48,5 +40,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `issue_768` | pass | 3/3 |
 | `issue_9327` | pass | 2/2 |
 | `issue_9885` | pass | 2/2 |
-
-</details>
