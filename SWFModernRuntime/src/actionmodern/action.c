@@ -34878,81 +34878,49 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 
 		MovieClip* saved_ctx = g_current_context;
 		actionSetCurrentContext(mc);
-		g_event_this_mc = mc;
 
-		// Switch to the function's SWF version context
-		int _ef_saved_ver = 0; ASObject* _ef_saved_global = NULL; int _ef_saved_midx = 0;
-		switchToFunctionVersion(func, &_ef_saved_ver, &_ef_saved_global, &_ef_saved_midx);
+		// this_var = MOVIECLIP(mc): INV_EVENT_THIS_MC reproduces the arm's
+		// g_event_this_mc = mc (the core's save/restore equals the arm's
+		// set/clear-to-NULL — this dispatcher only ever runs from the frame
+		// loop, where the saved value IS NULL), and INV_MC_THIS_NULL_PTR
+		// keeps the ABI this NULL so the generated preload_this reads the
+		// MOVIECLIP off g_event_this_mc, exactly as the arm passed NULL.
+		ActionVar _ef_this = {0};
+		_ef_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+		_ef_this.data.numeric_value = (u64)(uintptr_t)mc;
 
-		// Pass NULL as this_obj; the generated code's else branch uses
-		// g_event_this_mc to preload 'this' as MOVIECLIP.
+		// Base clip stays in the arm (never INV_BASE_CLIP|INV_VERSION_SWITCH):
+		// this arm has always gated the base-clip switch on the CALLEE's SWF
+		// version (it read g_swf_version after its own switchToFunctionVersion)
+		// — same accident as the MC arms and fireTimerCallback's function form.
+		// eff_ver is provably the value the core's version switch installs.
+		int _ef_eff_ver = (func->swf_version != 0) ? func->swf_version : g_swf_version;
+		MovieClip* ef_saved_base = g_current_context;
+		if (_ef_eff_ver >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		// Type-1 keeps its fresh local activation (absorbs plain assignments
+		// and `var` declarations that would otherwise leak onto the receiver)
+		// pushed UNDER the captured scopes — this arm is another instance of
+		// the local-under-captured inversion, with captured is_with COPIED
+		// (not forced): a third variant of the family. Type-2 has no local
+		// frame. Both push no this-stack and no exec-func. The core
+		// additionally pads a type-1 handler's declared params with undefined
+		// instead of letting the prologue pop the empty between-frames stack —
+		// inert HERE (the guarded empty-stack pop already synthesized
+		// undefined; A/B-verified identical), locked rather than repro'd by
+		// regression/enterframe_type1_args.
+		u32 _ef_flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
+		if (func->function_type == 2)
+			_ef_flags |= INV_MC_THIS_NULL_PTR;
+		else
+			_ef_flags |= INV_LOCAL_SCOPE | INV_LOCAL_SCOPE_UNDER_CAPTURED;
+		InvokeOpts _ef_opts = { .flags = _ef_flags };
 		g_call_depth++;
-		if (func->function_type == 2 && func->advanced_func != NULL)
-		{
-			// Restore captured scopes (closure context)
-			u8 ef_captured = func->captured_scope_count;
-			for (u8 ci = 0; ci < ef_captured; ci++) {
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-					scope_mc[scope_depth] = func->captured_scope_mc[ci];
-					scope_chain[scope_depth++] = func->captured_scope[ci];
-				}
-			}
-			// Switch base_clip context if SWF6+
-			MovieClip* ef_saved_base = g_current_context;
-			if (g_swf_version >= 6 && func->base_clip != NULL)
-				g_current_context = (MovieClip*)func->base_clip;
-			ActionVar* regs = NULL;
-			if (func->register_count > 0)
-				regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-			func->advanced_func(app_context, NULL, 0, regs, NULL);
-			if (regs != NULL) FREE(regs);
-			g_current_context = ef_saved_base;
-			for (u8 ci = 0; ci < ef_captured; ci++) {
-				if (scope_depth > 0) scope_depth--;
-			}
-		}
-		else if (func->function_type == 1 && func->simple_func != NULL)
-		{
-			// Type 1 (DefineFunction) lacks the per-call register file that
-			// DefineFunction2 uses for hoisted locals, so the dispatch must push
-			// a fresh local activation and switch g_current_context to base_clip
-			// itself. Otherwise plain assignments and `var` declarations inside
-			// e.g. `mc.onEnterFrame = function(){ x = 3; var y = 4; }` leak onto
-			// the receiver `mc` (since g_current_context still pointed at the
-			// receiver and there was no activation to absorb DefineLocal).
-			// Type 2 already manages its locals via the registers array, so we
-			// leave its dispatch unchanged to avoid disturbing existing scope
-			// resolution paths.
-			ASObject* ef_local_scope = allocObject(app_context, 8);
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = 0;
-				scope_mc[scope_depth] = NULL;
-				scope_chain[scope_depth++] = ef_local_scope;
-			}
-			u8 ef_captured_t1 = func->captured_scope_count;
-			for (u8 ci = 0; ci < ef_captured_t1; ci++) {
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-					scope_mc[scope_depth] = func->captured_scope_mc[ci];
-					scope_chain[scope_depth++] = func->captured_scope[ci];
-				}
-			}
-			MovieClip* ef_saved_base_t1 = g_current_context;
-			if (g_swf_version >= 6 && func->base_clip != NULL)
-				g_current_context = (MovieClip*)func->base_clip;
-			((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-			g_current_context = ef_saved_base_t1;
-			for (u8 ci = 0; ci < ef_captured_t1; ci++) {
-				if (scope_depth > 0) scope_depth--;
-			}
-			if (scope_depth > 0) scope_depth--;
-			releaseObject(app_context, ef_local_scope);
-		}
+		invokeFunctionValue(app_context, func, &_ef_this, NULL, 0, &_ef_opts);
 		g_call_depth--;
-		g_event_this_mc = NULL;
 
-		restoreFunctionVersion(_ef_saved_ver, _ef_saved_global, _ef_saved_midx);
+		g_current_context = ef_saved_base;
 		actionSetCurrentContext(saved_ctx);
 	}
 
@@ -34970,45 +34938,24 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 				if (func != NULL) {
 					MovieClip* saved_ctx = g_current_context;
 					actionSetCurrentContext(&root_movieclip);
-					g_event_this_mc = &root_movieclip;
+					// Unlike the children arm above, this arm has NEVER
+					// version-switched (normalization candidate, not this
+					// migration), so INV_BASE_CLIP reads the caller's live
+					// g_swf_version — exactly what the arm read — and the
+					// forbidden pairing doesn't arise. Type-1 keeps no local
+					// frame AND no base clip here (both preserved-by-omission;
+					// another asymmetry vs the children arm). The core's
+					// clamp/pad covers a param'd type-1 handler as above.
+					ActionVar _ref_this = {0};
+					_ref_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+					_ref_this.data.numeric_value = (u64)(uintptr_t)&root_movieclip;
+					u32 _ref_flags = INV_CAPTURED_SCOPE | INV_EVENT_THIS_MC;
+					if (func->function_type == 2)
+						_ref_flags |= INV_MC_THIS_NULL_PTR | INV_BASE_CLIP;
+					InvokeOpts _ref_opts = { .flags = _ref_flags };
 					g_call_depth++;
-					if (func->function_type == 2 && func->advanced_func != NULL) {
-						u8 ref_captured = func->captured_scope_count;
-						for (u8 ci = 0; ci < ref_captured; ci++) {
-							if (scope_depth < MAX_SCOPE_DEPTH) {
-								scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-								scope_mc[scope_depth] = func->captured_scope_mc[ci];
-								scope_chain[scope_depth++] = func->captured_scope[ci];
-							}
-						}
-						MovieClip* ref_saved_base = g_current_context;
-						if (g_swf_version >= 6 && func->base_clip != NULL)
-							g_current_context = (MovieClip*)func->base_clip;
-						ActionVar* regs = NULL;
-						if (func->register_count > 0)
-							regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-						func->advanced_func(app_context, NULL, 0, regs, NULL);
-						if (regs != NULL) FREE(regs);
-						g_current_context = ref_saved_base;
-						for (u8 ci = 0; ci < ref_captured; ci++) {
-							if (scope_depth > 0) scope_depth--;
-						}
-					} else if (func->function_type == 1 && func->simple_func != NULL) {
-						u8 ref_captured_t1 = func->captured_scope_count;
-						for (u8 ci = 0; ci < ref_captured_t1; ci++) {
-							if (scope_depth < MAX_SCOPE_DEPTH) {
-								scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-								scope_mc[scope_depth] = func->captured_scope_mc[ci];
-								scope_chain[scope_depth++] = func->captured_scope[ci];
-							}
-						}
-						((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-						for (u8 ci = 0; ci < ref_captured_t1; ci++) {
-							if (scope_depth > 0) scope_depth--;
-						}
-					}
+					invokeFunctionValue(app_context, func, &_ref_this, NULL, 0, &_ref_opts);
 					g_call_depth--;
-					g_event_this_mc = NULL;
 					actionSetCurrentContext(saved_ctx);
 				}
 			}
@@ -35062,20 +35009,21 @@ void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context)
 
 	MovieClip* saved_ctx = g_current_context;
 	actionSetCurrentContext(&root_movieclip);
-	g_event_this_mc = &root_movieclip;
-	if (func->function_type == 2 && func->advanced_func != NULL)
-	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-		func->advanced_func(app_context, NULL, 0, regs, NULL);
-		if (regs != NULL) FREE(regs);
-	}
-	else if (func->function_type == 1 && func->simple_func != NULL)
-	{
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-	}
-	g_event_this_mc = NULL;
+	// The barest arm of the family: no captured scopes, no local frame, no
+	// base clip, no version switch, and no g_call_depth bracket — all
+	// preserved by omission (this arm never had them; adding any is a
+	// normalization commit). INV_EVENT_THIS_MC reproduces the set/clear (the
+	// frame loop's saved value is NULL); INV_MC_THIS_NULL_PTR keeps the
+	// type-2 ABI this NULL for the g_event_this_mc preload. The core pads a
+	// param'd type-1 handler instead of under-popping the eval stack.
+	ActionVar _rvm_this = {0};
+	_rvm_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_rvm_this.data.numeric_value = (u64)(uintptr_t)&root_movieclip;
+	u32 _rvm_flags = INV_EVENT_THIS_MC;
+	if (func->function_type == 2)
+		_rvm_flags |= INV_MC_THIS_NULL_PTR;
+	InvokeOpts _rvm_opts = { .flags = _rvm_flags };
+	invokeFunctionValue(app_context, func, &_rvm_this, NULL, 0, &_rvm_opts);
 	actionSetCurrentContext(saved_ctx);
 }
 
