@@ -1,44 +1,46 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-10 18:15 UTC
+**Date**: 2026-07-10 20:34 UTC
 
-**Git SHA**: `ddbe4f878b`
+**Git SHA**: `ea3647e8d1`
 
-**Run Duration**: 3m 21s
+**Run Duration**: 4m 32s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 16 |
-| Passing | **16** (100.0%) |
+| Total tests | 18 |
+| Passing | **18** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 117 |
-| Matching lines | 117 (100.0%) |
+| Total expected lines | 123 |
+| Matching lines | 123 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**16 tests passing**
+**18 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array_element_type1_args` | 7 | 18.6s |  |
-| 2 | `array_method_type1_args` | 7 | 1.0s |  |
-| 3 | `ei_type1_args` | 7 | 20.4s |  |
-| 4 | `fn_call_builtin_type1_args` | 10 | 1.8s |  |
-| 5 | `fn_call_type1_args` | 7 | 1.6s |  |
-| 6 | `fn_empty_method_type1_args` | 10 | 1.9s |  |
-| 7 | `lc_method_type1_args` | 7 | 1.8s |  |
-| 8 | `lc_onstatus_type1_args` | 3 | 2.0s |  |
-| 9 | `mc_event_type1_args` | 3 | 20.8s |  |
-| 10 | `mc_resolve_type1_args` | 6 | 22.2s |  |
-| 11 | `method_type1_args` | 10 | 19.5s |  |
-| 12 | `nc_onstatus_closure` | 2 | 21.1s |  |
-| 13 | `nc_onstatus_type1_args` | 3 | 21.5s |  |
-| 14 | `resolve_type1_args` | 13 | 1.9s |  |
-| 15 | `string_prim_method_type1_args` | 19 | 22.4s |  |
-| 16 | `timer_cross_swf_version` | 3 | 21.3s |  |
+| 1 | `array_element_type1_args` | 7 | 17.3s |  |
+| 2 | `array_method_type1_args` | 7 | 19.4s |  |
+| 3 | `ei_type1_args` | 7 | 20.5s |  |
+| 4 | `fn_call_builtin_type1_args` | 10 | 20.3s |  |
+| 5 | `fn_call_type1_args` | 7 | 1.8s |  |
+| 6 | `fn_empty_method_type1_args` | 10 | 19.7s |  |
+| 7 | `lc_method_type1_args` | 7 | 21.1s |  |
+| 8 | `lc_onstatus_type1_args` | 3 | 20.4s |  |
+| 9 | `lv_ondata_type1_args` | 3 | 21.7s |  |
+| 10 | `mc_event_type1_args` | 3 | 20.8s |  |
+| 11 | `mc_resolve_type1_args` | 6 | 0.9s |  |
+| 12 | `method_type1_args` | 10 | 0.8s |  |
+| 13 | `nc_onstatus_closure` | 2 | 21.6s |  |
+| 14 | `nc_onstatus_type1_args` | 3 | 1.9s |  |
+| 15 | `resolve_type1_args` | 13 | 20.1s |  |
+| 16 | `string_prim_method_type1_args` | 19 | 1.8s |  |
+| 17 | `timer_cross_swf_version` | 3 | 20.3s |  |
+| 18 | `xml_onload_type1_args` | 3 | 20.6s |  |
 
 ## Near-Passing Tests
 
