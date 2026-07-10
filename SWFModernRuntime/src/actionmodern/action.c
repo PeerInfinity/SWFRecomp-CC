@@ -37117,85 +37117,46 @@ static void fireLoadVarsCallback(SWFAppContext* app_context, ASObject* obj,
 	g_special_depth++;
 	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
 
-	// Push `this` so callbacks using `getVariable("this")` see the target obj.
-	u32 saved_this_depth = g_this_depth;
-	if (g_this_depth < MAX_THIS_DEPTH) {
-		g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-		g_this_stack[g_this_depth].str_size = 0;
-		g_this_stack[g_this_depth].data.numeric_value = (u64)(uintptr_t) obj;
-		g_this_depth++;
-	}
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). Behavior-preserving: the old ritual pushed the
+	// receiver onto g_this_stack (no name bind — INV_THIS_STACK, not
+	// INV_ACT_THIS), swapped both executing-func globals (INV_EXEC_FUNC),
+	// restored the captured scopes + a fresh local frame in normal order,
+	// built an `arguments` array on the local frame for BOTH function types
+	// (INV_ACT_ARGUMENTS — which requires core-owned INV_EXEC_FUNC), and
+	// switched to the callee's base_clip under the ambient SWF6+ gate, in
+	// both arms. The bare g_call_depth++/-- bracket and the g_special_depth
+	// guard stay outside the core.
+	//
+	// Three accepted deltas, each inert in practice: (1) the old code handed
+	// setupArgumentsProps the GRANDPARENT executing func (prev_prev), so
+	// arguments.caller was the caller's caller — the core passes the true
+	// caller; both are typically NULL here (fired from the frame-loop drain).
+	// (2) the old code built `arguments` even for a type-2 callee whose
+	// preload/suppress flags say not to — the core honors the flags (the
+	// Flash-correct behavior). (3) the old teardown also restored
+	// g_prev_executing_func; the core restores current-only — g_prev is only
+	// ever read inside a callee prologue, which follows its own swap.
+	//
+	// Two bugs the migration fixes for free: (1) the old type-1 arm pushed
+	// args in REVERSE with no clamp/pad — instance thirteen of the
+	// TYPE1_ARG_ORDER class, latent at the live 1-arg call sites;
+	// regression/lv_ondata_type1_args pins it via a 2-param DefineFunction
+	// LoadVars.onData. (2) neither arm NULL-checked its function pointer
+	// (the else was a catch-all); the core's strict dispatch returns
+	// undefined instead.
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t) obj;
 
-	// Set g_current_executing_func so swf_setup_arguments_props finds the
-	// callee when the recompiler-emitted body populates `arguments`.
-	ASFunction* prev_cur = g_current_executing_func;
-	ASFunction* prev_prev = g_prev_executing_func;
-	g_prev_executing_func = g_current_executing_func;
-	g_current_executing_func = func;
+	InvokeOpts opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+	                             INV_BASE_CLIP | INV_EXEC_FUNC,
+	                    .act_flags = INV_ACT_ARGUMENTS };
 
-	// Restore captured scope chain (closure support).
-	u32 captured_count = func->captured_scope_count;
-	for (u32 ci = 0; ci < captured_count; ci++) {
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-			scope_mc[scope_depth] = (MovieClip*) func->captured_scope_mc[ci];
-			scope_chain[scope_depth++] = (ASObject*) func->captured_scope[ci];
-		}
-	}
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, cb_args, cb_arg_count, &opts);
+	g_call_depth--;
 
-	// Local scope for function-local variables.
-	ASObject* local_scope = allocObject(app_context, 8);
-	if (scope_depth < MAX_SCOPE_DEPTH) {
-		scope_is_with[scope_depth] = 0;
-		scope_mc[scope_depth] = NULL;
-		scope_chain[scope_depth++] = local_scope;
-	}
-
-	// Build `arguments` array on local_scope so the callback body can read
-	// `arguments.length` and `arguments[i]`. Mirrors actionCallFunction's
-	// type-1 path at action.c ~47538.
-	{
-		ASArray* arguments_arr = allocArray(app_context, cb_arg_count > 0 ? cb_arg_count : 1);
-		for (u32 i = 0; i < cb_arg_count; i++)
-			setArrayElement(app_context, arguments_arr, i, &cb_args[i]);
-		setupArgumentsProps(app_context, arguments_arr, func, prev_prev);
-		ActionVar args_var = {0};
-		args_var.type = ACTION_STACK_VALUE_ARRAY;
-		args_var.data.numeric_value = (u64)(uintptr_t) arguments_arr;
-		setProperty(app_context, local_scope, "arguments", 9, &args_var);
-	}
-
-	// Switch to function's base_clip (SWF6+ closure semantics).
-	MovieClip* saved_context = g_current_context;
-	if (g_swf_version >= 6 && func->base_clip != NULL)
-		g_current_context = (MovieClip*) func->base_clip;
-
-	if (func->function_type == 2) {
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-		g_call_depth++;
-		func->advanced_func(app_context, cb_args, cb_arg_count, regs, (void*) obj);
-		g_call_depth--;
-		if (regs != NULL) FREE(regs);
-	} else {
-		// Type 1: push args on stack (reverse order so first-popped == args[0]).
-		for (int i = (int)cb_arg_count - 1; i >= 0; i--)
-			pushVar(app_context, &cb_args[i]);
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*)) func->simple_func)(app_context);
-		g_call_depth--;
-	}
-
-	g_current_context = saved_context;
-	// Pop local scope + captured scopes
-	for (u32 ci = 0; ci < captured_count + 1; ci++)
-		if (scope_depth > 0) scope_depth--;
-	releaseObject(app_context, local_scope);
-
-	g_current_executing_func = prev_cur;
-	g_prev_executing_func = prev_prev;
-	g_this_depth = saved_this_depth;
 	g_special_depth--;
 }
 
@@ -74127,10 +74088,11 @@ static double soundGetElapsedForObject(ASObject* sound_obj)
 	return 0;
 }
 
-// Generic callback dispatcher for Sound events (onID3, onLoad, etc.)
+// Generic callback dispatcher for Sound events (onID3, onLoad, etc.) — and,
+// despite the name, for XML.onLoad/onData (see aq_dispatch_xml_load and
+// builtin_xml_onData).
 static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 name_len, ActionVar* cb_args, u32 cb_arg_count)
 {
-	extern MovieClip* g_current_context;
 	ActionVar* handler = getPropertyWithPrototype(sound_obj, name, name_len);
 	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
 	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
@@ -74139,99 +74101,41 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 	g_special_depth++;
 	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
 
-	if (func->function_type == 2)
-	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). Behavior-preserving: both arms restored the
+	// captured scope chain (is_with copied), pushed a fresh local frame,
+	// bound "this" by name (so a non-preload DefineFunction2 handler reading
+	// `this` via actionGetVariable sees the receiver — XML.as:903
+	// `++this.onLoadCalls`), and switched g_current_context to the callee's
+	// base_clip under the caller's SWF6+ gate. The old type-1 arm pushed its
+	// local frame FIRST with the captured scopes on top — the same inversion
+	// as the __resolve arm — preserved per-branch via
+	// INV_LOCAL_SCOPE_UNDER_CAPTURED. One deliberate delta inside that
+	// inversion: the old code's setVariableByName("this") landed on the
+	// topmost non-with frame (possibly a captured outer frame — scope
+	// pollution); INV_BIND_THIS writes the fresh local frame instead.
+	// Lookup-identical, A/B'd across the sound/xml clusters. No this-stack,
+	// no version switch, no exec-func — never done here. The bare
+	// g_call_depth++/-- bracket stays outside the core.
+	//
+	// Two bugs the migration fixes for free: (1) the old type-1 arm pushed
+	// args in REVERSE with no clamp/pad — instance fourteen of the
+	// TYPE1_ARG_ORDER class, latent at the live 1-arg call sites;
+	// regression/xml_onload_type1_args pins it via a 2-param DefineFunction
+	// XML.onLoad. (2) the old arms called advanced_func/simple_func with no
+	// NULL check (the else was a catch-all); the core's strict dispatch
+	// returns undefined instead.
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t)sound_obj;
 
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
+	InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+	                             INV_BIND_THIS | INV_BASE_CLIP };
+	if (func->function_type != 2) opts.flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED;
 
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		// Make `this` resolvable by name. A DefineFunction2 handler that
-		// references `this` without a preload-this register reads it via
-		// actionGetVariable("this") — without this the handler's `this` is
-		// undefined (XML.as:903 `++this.onLoadCalls`, v7+ where the handler
-		// compiles to DefineFunction2). Harmless when a preload register is
-		// used (the register wins; the variable is just never read).
-		ActionVar this_var = {0};
-		this_var.type = ACTION_STACK_VALUE_OBJECT;
-		this_var.data.numeric_value = (u64)(uintptr_t)sound_obj;
-		setVariableByName("this", &this_var);
-
-		g_call_depth++;
-		func->advanced_func(app_context, cb_args, cb_arg_count, regs, (void*)sound_obj);
-		g_call_depth--;
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
-	}
-	else
-	{
-		// Type 1 (DefineFunction): the function body reads its parameters
-		// off the stack. Push the callback args in reverse, set up a local
-		// scope + captured scopes + `this`, and switch base_clip — mirrors
-		// the type-1 path in actionEI_callInternalInterface. Without the
-		// arg push, a handler declared `function(success){...}` (e.g. an
-		// XML/Sound `onLoad`) would see no `success`.
-		for (int ai = (int)cb_arg_count - 1; ai >= 0; ai--)
-			pushVar(app_context, &cb_args[ai]);
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
-		{
-			scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		ActionVar this_var = {0};
-		this_var.type = ACTION_STACK_VALUE_OBJECT;
-		this_var.data.numeric_value = (u64)(uintptr_t)sound_obj;
-		setVariableByName("this", &this_var);
-
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count && scope_depth > 0; ci++)
-			scope_depth--;
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-	}
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, cb_args, cb_arg_count, &opts);
+	g_call_depth--;
 
 	g_special_depth--;
 }

@@ -51,3 +51,5 @@ arms cannot be reached any other way.
 | `lc_method_type1_args` | `lc_dispatch_method`'s type-1 arm: forward arg order + clamp/pad (instance ten; fixed migrating it onto `invokeFunctionValue` in dispatch Stage 4) |
 | `lc_onstatus_type1_args` | `lc_dispatch_onStatus`'s type-1 arm: clamp/pad the event-object arg to `param_count` (instance eleven; fixed migrating the onStatus family onto `invokeFunctionValue` in dispatch Stage 4) |
 | `nc_onstatus_type1_args` | `nc_dispatch_onStatus`'s type-1 arm: clamp/pad the info-object arg to `param_count` (instance twelve; fixed in the same onStatus-family migration) |
+| `lv_ondata_type1_args` | `fireLoadVarsCallback`'s type-1 arm: forward arg order + clamp/pad (instance thirteen; fixed migrating it onto `invokeFunctionValue` in dispatch Stage 4) |
+| `xml_onload_type1_args` | `soundFireCallback`'s type-1 arm (the shared Sound/XML event dispatcher): forward arg order + clamp/pad (instance fourteen; fixed in the same migration batch) |
