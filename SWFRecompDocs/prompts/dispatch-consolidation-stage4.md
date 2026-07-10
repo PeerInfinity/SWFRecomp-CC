@@ -221,12 +221,12 @@ Standing guards in `regression/` (findable by bare name, 13 of them): `ei_type1_
 Note `string_relational_compare` (avm1) is `output_mismatch` and on
 `ignored_tests.txt` — it will show up in a local cluster run. Not yours.
 
-## CI baseline to hold (raw `pass`, both modes, @ `3593ca852`)
+## CI baseline to hold (raw `pass`, both modes, @ `ddbe4f878`)
 
 | Suite | no-graphics | graphics |
 |---|---|---|
 | avm1 | 634/706 | 634/706 |
-| **regression** | **13/13** | **13/13** |
+| **regression** | **16/16** | **16/16** |
 | from_shumway | 73/92 | 73/92 |
 | from_shumway/avm1 | 46/47 | 46/47 |
 | from_gnash/actionscript.all | 135/243 | 135/243 |
