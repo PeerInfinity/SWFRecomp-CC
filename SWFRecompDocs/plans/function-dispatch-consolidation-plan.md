@@ -1107,6 +1107,57 @@ to the CI baseline.
 family-specific question — whether NC's type-1 no-local-frame divergence (param
 binds leak into the enclosing scope) should be normalized to the LC/NS ritual.
 
+**2026-07-10 session — five more dispatchers, instances thirteen–sixteen**
+(per-dispatcher analysis in `dispatch-stage4-dossiers.md`; each commit's message
+carries the full flag mapping + verification record):
+
+- **`fireMCLEvent`** (`66e15789a`) — flags = 0, the family's simplest adapter
+  (both arms were bare). GC constraint honored: `aq_dispatch_xml_load`
+  untouched. Type-1 clamp/pad fixed but uncredited (no suite coverage of a
+  scripted `broadcastMessage` override).
+- **`soundFireCallback` + `fireLoadVarsCallback`** (`ea3647e8d`) — **instances
+  thirteen and fourteen** (both type-1 arms pushed REVERSE with no clamp/pad +
+  unchecked calls; `regression/lv_ondata_type1_args`,
+  `regression/xml_onload_type1_args`, both offline via embedded data files).
+  Sound/XML preserves its type-1 scope inversion per-branch via
+  `INV_LOCAL_SCOPE_UNDER_CAPTURED` (the flag's second user); LV takes
+  `INV_EXEC_FUNC` + `INV_ACT_ARGUMENTS` (core-owned pair) with three documented
+  near-inert deltas (grandparent `arguments.caller` → true caller; type-2
+  suppress flags honored; `g_prev_executing_func` no longer restored).
+- **`mc_call_as2_handler_ng`** (`ab3b7a77f`) — the 34-call-site input-event
+  dispatcher. Type-2 is the first event-family user of `INV_LOCAL_SCOPE_MC` and
+  the counterexample to "the exec-func swap always stays outside" (its swap is
+  exactly `INV_EXEC_FUNC`, and `preload_arguments` depends on it). Entry
+  halt-at-max-1 pre-check and the `g_inside_event_handler` bracket stay
+  outside. A/B'd across the input-driven cluster (19/19) + ButtonEventsTest
+  byte-identical.
+- **`_invoke_sort_comparator`** (`8c576d3e5`) — **instance fifteen**
+  (`regression/sort_comparator_type1_args`: a 1-param comparator misbound `b`
+  and the leaked slot popped into the NEXT sort's comparator). Type-2 flags = 0
+  with one accepted delta: the core now HCALLOCs registers per comparison where
+  the old arm passed NULL — behaviorally inert, perf-flagged; candidate
+  core-level fix (skip registers for generated bodies) is its own commit.
+  gnash array-v5..v8 byte-identical.
+- **Coercion paths + `call_function_with_this`** (`1f68e0043`) — **instance
+  sixteen, one instance for the family** (all four sites' type-1 arms pushed
+  NOTHING; `regression/coerce_type1_args` pins the stale pop — convertFloat's
+  leg popped the previous valueOf's return into param `b` and
+  double-dispatched). oCVO/oCTS main branches keep the version switch + ungated
+  `actionSetCurrentContext` bracket + current-only exec-func swap in the arm;
+  the getter branches' bare-vs-captured asymmetry is preserved; objectToPrimitive
+  keeps its type-1-only this-stack gate; convertFloat keeps no this-cell (the
+  un-propagated 14799 fix = separate normalization commit). c_f_w_t stays a thin
+  wrapper; its type-1 clamp/pad fixed-not-credited (asfunction unreachable by
+  the suite). gnash toString_valueOf/Number/String/Boolean v5–v8 and avm1
+  set_property_values/swf4–7 byte-identical old-vs-new.
+
+Running total: **sixteen** confirmed TYPE1_ARG_ORDER instances, regression suite
+**20/20** in both modes. Remaining Stage-4 dispatchers: `fireTimerCallback`
+(blocked on the TU-boundary export decision), `actionEI_callInternalInterface`,
+the watch arms, `builtin_broadcaster_broadcastMessage` (blocked on the
+`super_bind` core extension — LAST), and the enterFrame/onLoad/onConstruct
+sibling family. Then normalization pass (b) per the dossier master list.
+
 ### Stage 5 — lock it in
 
 - Delete the then-dead 32 marshalling loops and per-site casts.

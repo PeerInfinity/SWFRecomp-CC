@@ -32,10 +32,15 @@ Session start, in order:
 | `3593ca852` | **the MC arm** — no new `InvokeOpts` flag; two new `ClosureFrame` modes; two leaks fixed |
 | `704a9cbbf` | **Stage 4 opens**: `lc_dispatch_method` — instance ten + a NULL-call fix; `InvokeOpts` block relocated above the LC section |
 | `ddbe4f878` | **the onStatus/onMetaData family** (5 dispatchers) — instances eleven+twelve; three distinct type-1 rituals preserved per-branch |
+| `66e15789a` | `fireMCLEvent` — flags=0, the simplest adapter; clamp/pad fixed-not-credited |
+| `ea3647e8d` | **`soundFireCallback` + `fireLoadVarsCallback`** — instances thirteen+fourteen; INV_LOCAL_SCOPE_UNDER_CAPTURED's second user; LV's INV_EXEC_FUNC+INV_ACT_ARGUMENTS pair |
+| `ab3b7a77f` | **`mc_call_as2_handler_ng`** — first event-family INV_LOCAL_SCOPE_MC user; exec-func swap moved INTO the core (exact match) |
+| `8c576d3e5` | `_invoke_sort_comparator` — instance fifteen; per-comparison registers HCALLOC perf delta flagged |
+| `1f68e0043` | **the coercion paths + `call_function_with_this`** (5 sites, 8 branches) — instance sixteen (one for the family); version-switch/base-clip brackets kept in the oCVO/oCTS arms |
 
-Each CI-green in **both** modes with zero pass→fail. **Twelve** confirmed instances of
+Each CI-green in **both** modes with zero pass→fail. **Sixteen** confirmed instances of
 the TYPE1_ARG_ORDER clamp/pad class; each has a permanent hand-assembled test in
-`regression/`, **16/16** in both modes.
+`regression/`, **20/20** in both modes.
 
 Four results worth internalizing before you touch anything:
 
@@ -82,13 +87,15 @@ Per the plan: **(a)** behavior-preserving migration, then **(b)** a normalizatio
 review — "should this path get version-switch / captured-scope / this-stack?" Each
 "yes" is its own commit with a targeted test.
 
-Dispatchers in scope: `mc_call_as2_handler_ng`, `fireTimerCallback`,
-`builtin_broadcaster_broadcastMessage`, `fireMCLEvent`, `fireLoadVarsCallback`,
-`soundFireCallback` (also the XML onData/onLoad dispatcher), ~~the LC/NS/NC
-dispatchers~~ (DONE — `704a9cbbf` + `ddbe4f878`), `actionEI_callInternalInterface`,
-`call_function_with_this`, the watch arms in `actionSetVariable`/`actionSetMember`,
-`_invoke_sort_comparator`, and the coercion paths (`objectCallValueOf`/`ToString`/
-`objectToPrimitive`, `convertFloat`). **Plus a family the original list missed**
+Dispatchers in scope: ~~`mc_call_as2_handler_ng`~~ (DONE — `ab3b7a77f`),
+`fireTimerCallback`, `builtin_broadcaster_broadcastMessage`, ~~`fireMCLEvent`,
+`fireLoadVarsCallback`, `soundFireCallback`~~ (DONE — `66e15789a` +
+`ea3647e8d`), ~~the LC/NS/NC dispatchers~~ (DONE — `704a9cbbf` + `ddbe4f878`),
+`actionEI_callInternalInterface`, ~~`call_function_with_this`~~,
+the watch arms in `actionSetVariable`/`actionSetMember`,
+~~`_invoke_sort_comparator`~~ (DONE — `8c576d3e5`), ~~and the coercion paths
+(`objectCallValueOf`/`ToString`/`objectToPrimitive`, `convertFloat`)~~ (DONE
+with c_f_w_t — `1f68e0043`). **Plus a family the original list missed**
 (dossier discovery): `actionDispatchEnterFrameHandlers` + `actionDispatchMCOnLoad`/
 `RootOnLoad`/`MCOnConstruct` + the inline `onUnload` lookups — near-clones of
 `mc_call_as2_handler_ng`'s ritual that additionally version-switch and base-clip
@@ -121,10 +128,10 @@ pinning test:**
 
 - **`lc_dispatch_method` — DONE** (`704a9cbbf`, instance ten + the NULL-call fix;
   see the plan's Stage-4 landing notes).
-- **Two more reverse pushes found by the dossiers, both still live in the code:**
-  `fireLoadVarsCallback`'s and `soundFireCallback`'s type-1 arms (both also have the
-  unchecked-NULL-call hazard; both inert-at-1-arg today). Repro designs are in their
-  dossiers (`lv_ondata_type1_args`, `xml_onload_type1_args`).
+- **`fireLoadVarsCallback` + `soundFireCallback` — DONE** (`ea3647e8d`, instances
+  thirteen+fourteen; `regression/lv_ondata_type1_args`,
+  `regression/xml_onload_type1_args`, both fail-before verified). No reverse
+  pushes remain in the code.
 - **`bdRectangleGetter` — type-1 branch is NOT reached by the suite.** Probed across
   gnash `BitmapData-v6/v7/v8` and the avm1 `bitmap_data*` cluster: zero hits. The only
   `flash.geom.Rectangle` override in the suite (gnash `BitmapData.as`, before tests
@@ -143,6 +150,14 @@ Also queued: the type-1 arms of `fireTimerCallback` (both forms) push forward
 and twelve, `regression/{lc,nc}_onstatus_type1_args`; note NC's type-1 arms
 push no local frame and `nc_dispatch_onStatus_undefined`'s pushes nothing —
 preserved via per-branch flags.)
+
+**Remaining Stage-4 migrations** (dossier order): `fireTimerCallback` (needs
+the TU-boundary export decision first — recommended: export a non-static
+`actionInvokeFunctionValue` wrapper via `action_internal.h`), EI (write the
+`ei_closure_scope_order` lock test first), the watch arms B → C → A,
+`broadcastMessage` (LAST — needs the `super_bind` core extension), and the
+enterFrame/onLoad/onConstruct sibling family. Then normalization pass (b) per
+the dossier master list.
 
 After Stage 4: **Stage 5** (delete the dead marshalling loops; add
 `gates/check_dispatch_funnel.py`, which should also reject any site setting
@@ -226,21 +241,24 @@ Sensitive clusters: `as2_super_and_this_v6`/`_v8` (NOT `_swf6`), `super_edge_cas
 `coerce_to_object_monkeypatch`, `string_methods*`, `string_coercion`, `closure_scope`,
 `with`, `function_base_clip{,_removed,_readded}`, `this_swf5`/`_swf6`/`_swf7`.
 
-Standing guards in `regression/` (findable by bare name, 13 of them): `ei_type1_args`,
+Standing guards in `regression/` (findable by bare name, 20 of them): `ei_type1_args`,
 `mc_event_type1_args`, `timer_cross_swf_version`, `nc_onstatus_closure`,
 `fn_call_type1_args`, `fn_empty_method_type1_args`, `method_type1_args`,
 `fn_call_builtin_type1_args`, `array_method_type1_args`, `array_element_type1_args`,
-`resolve_type1_args`, `string_prim_method_type1_args`, `mc_resolve_type1_args`.
+`resolve_type1_args`, `string_prim_method_type1_args`, `mc_resolve_type1_args`,
+`lc_method_type1_args`, `lc_onstatus_type1_args`, `nc_onstatus_type1_args`,
+`lv_ondata_type1_args`, `xml_onload_type1_args`, `sort_comparator_type1_args`,
+`coerce_type1_args`.
 
 Note `string_relational_compare` (avm1) is `output_mismatch` and on
 `ignored_tests.txt` — it will show up in a local cluster run. Not yours.
 
-## CI baseline to hold (raw `pass`, both modes, @ `ddbe4f878`)
+## CI baseline to hold (raw `pass`, both modes, @ `1f68e0043`)
 
 | Suite | no-graphics | graphics |
 |---|---|---|
 | avm1 | 634/706 | 634/706 |
-| **regression** | **16/16** | **16/16** |
+| **regression** | **20/20** | **20/20** |
 | from_shumway | 73/92 | 73/92 |
 | from_shumway/avm1 | 46/47 | 46/47 |
 | from_gnash/actionscript.all | 135/243 | 135/243 |
