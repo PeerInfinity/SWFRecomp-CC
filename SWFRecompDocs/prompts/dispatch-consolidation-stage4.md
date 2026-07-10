@@ -30,10 +30,12 @@ Session start, in order:
 | `fee25fd79` | the string-primitive arm — **no new flag**; instance 8; a local-scope leak fixed |
 | `c7d755871` | the MOVIECLIP `__resolve` hook's clamp/pad — instance 9 |
 | `3593ca852` | **the MC arm** — no new `InvokeOpts` flag; two new `ClosureFrame` modes; two leaks fixed |
+| `704a9cbbf` | **Stage 4 opens**: `lc_dispatch_method` — instance ten + a NULL-call fix; `InvokeOpts` block relocated above the LC section |
+| `ddbe4f878` | **the onStatus/onMetaData family** (5 dispatchers) — instances eleven+twelve; three distinct type-1 rituals preserved per-branch |
 
-Each CI-green in **both** modes with zero pass→fail. **Nine** confirmed instances of
+Each CI-green in **both** modes with zero pass→fail. **Twelve** confirmed instances of
 the TYPE1_ARG_ORDER clamp/pad class; each has a permanent hand-assembled test in
-`regression/`, **13/13** in both modes.
+`regression/`, **16/16** in both modes.
 
 Four results worth internalizing before you touch anything:
 
@@ -82,10 +84,16 @@ review — "should this path get version-switch / captured-scope / this-stack?" 
 
 Dispatchers in scope: `mc_call_as2_handler_ng`, `fireTimerCallback`,
 `builtin_broadcaster_broadcastMessage`, `fireMCLEvent`, `fireLoadVarsCallback`,
-`soundFireCallback`, the LC/NS/NC dispatchers, `actionEI_callInternalInterface`,
+`soundFireCallback` (also the XML onData/onLoad dispatcher), ~~the LC/NS/NC
+dispatchers~~ (DONE — `704a9cbbf` + `ddbe4f878`), `actionEI_callInternalInterface`,
 `call_function_with_this`, the watch arms in `actionSetVariable`/`actionSetMember`,
 `_invoke_sort_comparator`, and the coercion paths (`objectCallValueOf`/`ToString`/
-`toPrimitive`, `convertFloat`).
+`objectToPrimitive`, `convertFloat`). **Plus a family the original list missed**
+(dossier discovery): `actionDispatchEnterFrameHandlers` + `actionDispatchMCOnLoad`/
+`RootOnLoad`/`MCOnConstruct` + the inline `onUnload` lookups — near-clones of
+`mc_call_as2_handler_ng`'s ritual that additionally version-switch and base-clip
+switch with the **callee-version gate accident** (they read `g_swf_version` after
+their own switch). Scope them like the MC arms.
 
 **Known normalizations waiting for this stage, each with a proven failure mode or a
 pinning test:**
@@ -100,28 +108,23 @@ pinning test:**
   closures" is a property of the function, not of who calls it — so the MC arms may be
   the *correct* ones. Normalizing means picking one and writing a cross-version test;
   `regression/timer_cross_swf_version` is the model.
-- `mc_call_as2_handler_ng`, EI, and the coercion paths still **skip
-  `switchToFunctionVersion`** entirely (Stage 0 proved this was a real bug on the timer
-  path, `60070d96a`).
+- `mc_call_as2_handler_ng`, EI, `objectToPrimitive`, `convertFloat`, and
+  `call_function_with_this` still **skip `switchToFunctionVersion`** (Stage 0 proved
+  this was a real bug on the timer path, `60070d96a`). NOTE (dossier correction): the
+  `objectCallValueOf`/`objectCallToString` **main branches DO switch** — the earlier
+  "coercion paths skip it entirely" claim was half-wrong. MCL deliberately does NOT
+  get a version switch — its drain stages the ambient version itself.
 - The MC arms set `g_event_this_mc` only on their type-2 branch; the core would set it
   for both. Consider whether a type-1 MC method body should see it.
 
-**The two remaining reverse-order type-1 pushes — reachability now MEASURED (don't
-redo the experiment), and they are NOT the same case:**
+**Reverse-order type-1 pushes — status:**
 
-- **`lc_dispatch_method` (LocalConnection method dispatch) — type-1 arm is LIVE.** The
-  existing avm1 `localconnection` test reaches it with a real `simple_func`. The one
-  observed call had `num_args = 0, param_count = 0`, so it does not itself misbind: the
-  reverse order and the missing clamp/pad are **latent on a live path**. Write the repro
-  with `num_args >= 1` or `param_count >= 1` (SWF6 + a plain `DefineFunction` receiver
-  method — LocalConnection is Flash 6+ and Flash MX-era SWF6 emits `DefineFunction`).
-  Expect **instance ten**.
-- **`lc_dispatch_method` also has a NULL-call hazard, and it is the better reason to
-  migrate it first.** Its `else` branch catches *everything* that is not
-  `function_type == 2` and calls `func->simple_func` with **no NULL check**. A type-1
-  both-pointers-NULL native — a `g_mc_method_funcs` stub (`MovieClip.prototype.getDepth`)
-  or a `g_stub_ctors` entry — assigned as an LC receiver method is a NULL call. The
-  core's strict dispatch fixes it for free. **Migrate; don't patch the push loop.**
+- **`lc_dispatch_method` — DONE** (`704a9cbbf`, instance ten + the NULL-call fix;
+  see the plan's Stage-4 landing notes).
+- **Two more reverse pushes found by the dossiers, both still live in the code:**
+  `fireLoadVarsCallback`'s and `soundFireCallback`'s type-1 arms (both also have the
+  unchecked-NULL-call hazard; both inert-at-1-arg today). Repro designs are in their
+  dossiers (`lv_ondata_type1_args`, `xml_onload_type1_args`).
 - **`bdRectangleGetter` — type-1 branch is NOT reached by the suite.** Probed across
   gnash `BitmapData-v6/v7/v8` and the avm1 `bitmap_data*` cluster: zero hits. The only
   `flash.geom.Rectangle` override in the suite (gnash `BitmapData.as`, before tests
