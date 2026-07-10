@@ -1,43 +1,44 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-09 23:49 UTC
+**Date**: 2026-07-10 17:22 UTC
 
-**Git SHA**: `3593ca8524`
+**Git SHA**: `704a9cbbf2`
 
-**Run Duration**: 4m 9s
+**Run Duration**: 4m 23s
 
-**Filtered**: 0 tests ignored out of 13 available
+**Filtered**: 0 tests ignored out of 14 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 13 |
-| Passing | **13** (100.0%) |
+| Total tests | 14 |
+| Passing | **14** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 104 |
-| Matching lines | 104 (100.0%) |
+| Total expected lines | 111 |
+| Matching lines | 111 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**13 tests passing**
+**14 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array_element_type1_args` | 7 | 15.7s |  |
-| 2 | `array_method_type1_args` | 7 | 19.2s |  |
-| 3 | `ei_type1_args` | 7 | 22.0s |  |
-| 4 | `fn_call_builtin_type1_args` | 10 | 19.6s |  |
+| 1 | `array_element_type1_args` | 7 | 19.6s |  |
+| 2 | `array_method_type1_args` | 7 | 19.0s |  |
+| 3 | `ei_type1_args` | 7 | 17.1s |  |
+| 4 | `fn_call_builtin_type1_args` | 10 | 21.2s |  |
 | 5 | `fn_call_type1_args` | 7 | 19.8s |  |
-| 6 | `fn_empty_method_type1_args` | 10 | 21.0s |  |
-| 7 | `mc_event_type1_args` | 3 | 19.6s |  |
-| 8 | `mc_resolve_type1_args` | 6 | 15.3s |  |
-| 9 | `method_type1_args` | 10 | 19.1s |  |
-| 10 | `nc_onstatus_closure` | 2 | 16.7s |  |
-| 11 | `resolve_type1_args` | 13 | 19.0s |  |
-| 12 | `string_prim_method_type1_args` | 19 | 20.6s |  |
-| 13 | `timer_cross_swf_version` | 3 | 20.4s |  |
+| 6 | `fn_empty_method_type1_args` | 10 | 18.6s |  |
+| 7 | `lc_method_type1_args` | 7 | 20.6s |  |
+| 8 | `mc_event_type1_args` | 3 | 15.2s |  |
+| 9 | `mc_resolve_type1_args` | 6 | 20.1s |  |
+| 10 | `method_type1_args` | 10 | 19.7s |  |
+| 11 | `nc_onstatus_closure` | 2 | 19.6s |  |
+| 12 | `resolve_type1_args` | 13 | 12.7s |  |
+| 13 | `string_prim_method_type1_args` | 19 | 19.2s |  |
+| 14 | `timer_cross_swf_version` | 3 | 19.7s |  |
 
 ## Near-Passing Tests
 
