@@ -1,19 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `fee25fd79cf7` (2026-07-09T21:13:28.485325+00:00)
-**Current:** `c7d755871e0f` (2026-07-09T21:41:58.711597+00:00)
+**Previous:** `c7d755871e0f` (2026-07-09T21:41:58.711597+00:00)
+**Current:** `ff7641ed26a8` (2026-07-10T00:05:17.218856+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 12 | 13 | +1 |
-| Total | 12 | 13 | +1 |
+| Passing | 13 | 13 | 0 |
+| Total | 13 | 13 | 0 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `mc_resolve_type1_args` | pass | 6/6 |
+No changes detected.
