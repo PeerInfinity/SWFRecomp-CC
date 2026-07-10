@@ -2,39 +2,51 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `1f68e0043c1b`  
-**Date:** 2026-07-10 21:35 UTC  
-**Total duration:** 3h16m47s
+**Commit:** `8a8ff17c73a3`  
+**Date:** 2026-07-10 22:53 UTC  
+**Total duration:** 3h14m55s
 
 ## Results by Suite
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
-| avm1 | 634 | 706 | 89.8% | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics.md) |
-| from_gnash/actionscript.all | 135 | 243 | 55.6% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_graphics.md) |
-| from_gnash/misc-ming.all | 68 | 111 | 61.3% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_graphics.md) |
-| from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_graphics.md) |
-| from_gnash/misc-swfc.all | 11 | 20 | 55.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_graphics.md) |
-| from_gnash/misc-swfmill.all | 19 | 20 | 95.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_graphics.md) |
-| from_shumway | 73 | 92 | 79.3% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_graphics.md) |
-| from_shumway/avm1 | 46 | 47 | 97.9% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_graphics.md) |
-| regression | 20 | 20 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results_graphics.md) |
-| **Total** | **1013** | **1268** | **79.9%** | |
+| avm1 | 610 | 682 | 89.4% ⚠️ | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics.md) |
+| from_gnash/actionscript.all | 128 | 235 | 54.5% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_graphics.md) |
+| from_gnash/misc-ming.all | 64 | 107 | 59.8% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_graphics.md) |
+| from_gnash/misc-mtasc.all | 7 | 9 | 77.8% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_graphics.md) |
+| from_gnash/misc-swfc.all | 10 | 19 | 52.6% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_graphics.md) |
+| from_gnash/misc-swfmill.all | 18 | 19 | 94.7% ⚠️ | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_graphics.md) |
+| from_shumway | 70 | 89 | 78.7% ⚠️ | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_graphics.md) |
+| from_shumway/avm1 | 44 | 45 | 97.8% ⚠️ | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_graphics.md) |
+| regression | 20 | 20 | 100% ⚠️ | [details](ruffle-tests/tests/swfs/regression/_results/results_graphics.md) |
+| **Total** | **971** | **1225** | **79.3%** | |
+
+### ⚠️ Incomplete Runs
+
+- **avm1**: 29/30 shards produced results (1 missing)
+- **from_gnash/actionscript.all**: 29/30 shards produced results (1 missing)
+- **from_gnash/misc-ming.all**: 29/30 shards produced results (1 missing)
+- **from_gnash/misc-mtasc.all**: 29/30 shards produced results (1 missing)
+- **from_gnash/misc-swfc.all**: 29/30 shards produced results (1 missing)
+- **from_gnash/misc-swfmill.all**: 29/30 shards produced results (1 missing)
+- **from_shumway**: 29/30 shards produced results (1 missing)
+- **from_shumway/avm1**: 29/30 shards produced results (1 missing)
+- **regression**: 29/30 shards produced results (1 missing)
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 115,802 | 130,978 | 88.4% |
-| from_gnash/actionscript.all | 30,356 | 38,791 | 78.3% |
-| from_gnash/misc-ming.all | 4,048 | 5,248 | 77.1% |
+| avm1 | 115,389 | 130,565 | 88.4% |
+| from_gnash/actionscript.all | 29,161 | 37,588 | 77.6% |
+| from_gnash/misc-ming.all | 3,981 | 5,181 | 76.8% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
-| from_gnash/misc-swfc.all | 438 | 580 | 75.5% |
-| from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
-| from_shumway | 882 | 1,276 | 69.1% |
-| from_shumway/avm1 | 489 | 491 | 99.6% |
-| regression | 137 | 137 | 100% |
-| **Total** | **152,456** | **177,827** | **85.7%** |
+| from_gnash/misc-swfc.all | 414 | 556 | 74.5% |
+| from_gnash/misc-swfmill.all | 92 | 94 | 97.9% |
+| from_shumway | 796 | 1,190 | 66.9% |
+| from_shumway/avm1 | 470 | 472 | 99.6% |
+| regression | 149 | 149 | 100% |
+| **Total** | **150,663** | **176,026** | **85.6%** |
 
 ## Failure Breakdown
 
@@ -86,69 +98,69 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 *No changes since last run.*
 
-*Comparing `8c576d3e5451` → `1f68e0043c1b`*
+*Comparing `1f68e0043c1b` → `8a8ff17c73a3`*
 
 ## Per-Suite Details
 
 ### avm1
 
-- **Pass:** 634/706 (89.8%)
-- **Duration:** 1h24m09s across 30 shards
-- **Lines:** 115,802/130,978 matching (88.4%)
-- **Avg test duration:** 7.1s — slowest: `netstream_play_flv_screen` (36.5s)
+- **Pass:** 610/682 (89.4%)
+- **Duration:** 1h23m14s across 29 shards
+- **Lines:** 115,389/130,565 matching (88.4%)
+- **Avg test duration:** 7.3s — slowest: `netstream_play_flv_screen` (36.7s)
 
 ### from_gnash/actionscript.all
 
-- **Pass:** 135/243 (55.6%)
-- **Duration:** 36m40s across 30 shards
-- **Lines:** 30,356/38,791 matching (78.3%)
-- **Avg test duration:** 9.0s — slowest: `MovieClip-v8` (64.6s)
+- **Pass:** 128/235 (54.5%)
+- **Duration:** 36m18s across 29 shards
+- **Lines:** 29,161/37,588 matching (77.6%)
+- **Avg test duration:** 9.2s — slowest: `MovieClip-v8` (70.5s)
 
 ### from_gnash/misc-ming.all
 
-- **Pass:** 68/111 (61.3%)
-- **Duration:** 35m35s across 30 shards
-- **Lines:** 4,048/5,248 matching (77.1%)
-- **Avg test duration:** 19.2s — slowest: `matrix_test` (105.2s)
+- **Pass:** 64/107 (59.8%)
+- **Duration:** 35m34s across 29 shards
+- **Lines:** 3,981/5,181 matching (76.8%)
+- **Avg test duration:** 19.9s — slowest: `matrix_test` (104.3s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m10s across 30 shards
+- **Duration:** 2m14s across 29 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 14.4s — slowest: `function_test` (21.1s)
+- **Avg test duration:** 14.8s — slowest: `exception` (22.1s)
 
 ### from_gnash/misc-swfc.all
 
-- **Pass:** 11/20 (55.0%)
-- **Duration:** 6m05s across 30 shards
-- **Lines:** 438/580 matching (75.5%)
-- **Avg test duration:** 18.2s — slowest: `opcode_guard_test2` (23.7s)
+- **Pass:** 10/19 (52.6%)
+- **Duration:** 5m42s across 29 shards
+- **Lines:** 414/556 matching (74.5%)
+- **Avg test duration:** 18.0s — slowest: `movieclip_destruction_test3` (23.5s)
 
 ### from_gnash/misc-swfmill.all
 
-- **Pass:** 19/20 (95.0%)
-- **Duration:** 6m42s across 30 shards
-- **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 20.1s — slowest: `registers` (22.4s)
+- **Pass:** 18/19 (94.7%)
+- **Duration:** 6m24s across 29 shards
+- **Lines:** 92/94 matching (97.9%)
+- **Avg test duration:** 20.2s — slowest: `missing_bitmap` (23.0s)
 
 ### from_shumway
 
-- **Pass:** 73/92 (79.3%)
-- **Duration:** 15m37s across 30 shards
-- **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 10.1s — slowest: `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` (23.0s)
+- **Pass:** 70/89 (78.7%)
+- **Duration:** 15m35s across 29 shards
+- **Lines:** 796/1,190 matching (66.9%)
+- **Avg test duration:** 10.5s — slowest: `fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b` (23.5s)
 
 ### from_shumway/avm1
 
-- **Pass:** 46/47 (97.9%)
-- **Duration:** 3m08s across 30 shards
-- **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 3.9s — slowest: `rollover` (21.6s)
+- **Pass:** 44/45 (97.8%)
+- **Duration:** 3m09s across 29 shards
+- **Lines:** 470/472 matching (99.6%)
+- **Avg test duration:** 4.2s — slowest: `text-bind` (21.0s)
 
 ### regression
 
 - **Pass:** 20/20 (100%)
-- **Duration:** 6m36s across 30 shards
-- **Lines:** 137/137 matching (100%)
-- **Avg test duration:** 19.8s — slowest: `sort_comparator_type1_args` (21.2s)
+- **Duration:** 6m40s across 29 shards
+- **Lines:** 149/149 matching (100%)
+- **Avg test duration:** 20.0s — slowest: `fn_empty_method_type1_args` (21.8s)

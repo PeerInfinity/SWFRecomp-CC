@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-10T21:14:26.219072+00:00",
-    "old_git_sha": "8c576d3e54511ec17099cfa6f81e3137d26e87c5",
-    "new_timestamp": "2026-07-10T21:35:27.233685+00:00",
-    "new_git_sha": "1f68e0043c1b972e95f0d245109a19695c56b213",
+    "old_timestamp": "2026-07-10T21:35:27.233685+00:00",
+    "old_git_sha": "1f68e0043c1b972e95f0d245109a19695c56b213",
+    "new_timestamp": "2026-07-10T22:53:59.499148+00:00",
+    "new_git_sha": "8a8ff17c73a3ea75a044eafc5f191be3308413a0",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 135,
@@ -13,21 +16,119 @@
     "old_effective_pass": 230,
     "old_total": 243,
     "old_pass_rate": 55.6,
-    "new_pass": 135,
-    "new_ruffle_matched": 95,
-    "new_effective_pass": 230,
-    "new_total": 243,
-    "new_pass_rate": 55.6,
+    "new_pass": 128,
+    "new_ruffle_matched": 94,
+    "new_effective_pass": 222,
+    "new_total": 235,
+    "new_pass_rate": 54.5,
     "old_mismatched_lines": 8435,
-    "new_mismatched_lines": 8435,
+    "new_mismatched_lines": 8427,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 243,
+    "unchanged": 235,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 8
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "NetStream-v5",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "NetStream-v6",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 80
+      },
+      "new_lines": null
+    },
+    {
+      "test": "NetStream-v7",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 80
+      },
+      "new_lines": null
+    },
+    {
+      "test": "NetStream-v8",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 80
+      },
+      "new_lines": null
+    },
+    {
+      "test": "Number-v5",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "ruffle_matched",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 244,
+        "expected_lines": 244,
+        "matching_lines": 236
+      },
+      "new_lines": null
+    },
+    {
+      "test": "Number-v6",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 239,
+        "expected_lines": 239,
+        "matching_lines": 239
+      },
+      "new_lines": null
+    },
+    {
+      "test": "Number-v7",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 237,
+        "expected_lines": 237,
+        "matching_lines": 237
+      },
+      "new_lines": null
+    },
+    {
+      "test": "Number-v8",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 237,
+        "expected_lines": 237,
+        "matching_lines": 237
+      },
+      "new_lines": null
+    }
+  ]
 }
