@@ -34036,17 +34036,24 @@ static void fireMCLEvent(SWFAppContext* app_context, ASObject* mcl,
     if (bm_prop && bm_prop->type == ACTION_STACK_VALUE_FUNCTION) {
         ASFunction* bm_func = lookupFunctionFromVar(bm_prop);
         if (bm_func) {
-            if (bm_func->function_type == 2 && bm_func->advanced_func != NULL) {
-                ActionVar* regs = NULL;
-                if (bm_func->register_count > 0)
-                    regs = (ActionVar*) HCALLOC(bm_func->register_count, sizeof(ActionVar));
-                bm_func->advanced_func(app_context, args, 1 + extra_count, regs, mcl);
-                if (regs) FREE(regs);
-            } else if (bm_func->function_type == 1 && bm_func->simple_func != NULL) {
-                for (int j = 0; j < 1 + extra_count; j++)
-                    pushVar(app_context, &args[j]);
-                ((ActionVar(*)(SWFAppContext*))bm_func->simple_func)(app_context);
-            }
+            // Migrated to the unified invokeFunctionValue core (Function-Dispatch
+            // Consolidation, Stage 4). Behavior-preserving with flags = 0: the old
+            // arms were completely bare — no depth guard, no scopes, no this-stack,
+            // no base-clip/version/exec-func — and passed the MCL object as the ABI
+            // `this`, which the core derives from the OBJECT this_var. Only a
+            // user-scripted override of broadcastMessage reaches these arms; the
+            // normal path resolves the type-2 native and the miss falls through to
+            // the direct builtin call below. The old type-1 arm pushed all
+            // 1+extra_count args forward (order correct) but with no clamp/pad;
+            // the core's canonical loop fixes that. Fix-only — no suite coverage
+            // of a scripted override, so not credited as a TYPE1_ARG_ORDER
+            // instance (see the Stage-4 dossier).
+            ActionVar this_var = {0};
+            this_var.type = ACTION_STACK_VALUE_OBJECT;
+            this_var.data.numeric_value = (u64)(uintptr_t)mcl;
+            InvokeOpts opts = { .flags = 0 };
+            (void) invokeFunctionValue(app_context, bm_func, &this_var,
+                                       args, (u32)(1 + extra_count), &opts);
             return;
         }
     }
