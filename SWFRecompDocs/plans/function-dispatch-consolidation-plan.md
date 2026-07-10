@@ -381,10 +381,41 @@ no notion of. Design these before continuing:
   named local.
 
 **New Stage-4 leads (same bug class, outside Stage 3's scope):** two reverse-order
-type-1 arg pushes remain — `lc_dispatch_method` (`action.c:2908`, LocalConnection
-method dispatch) and `bdRectangleGetter` (`action.c:14365`, which pushes four
-fixed `Rectangle` ctor args in reverse). Both also skip the `param_count`
-clamp/pad.
+type-1 arg pushes remain — `lc_dispatch_method` (LocalConnection method dispatch)
+and `bdRectangleGetter` (which pushes four fixed `Rectangle` ctor args in reverse).
+Both also skip the `param_count` clamp/pad. **Reachability measured 2026-07-09 —
+see below; they are not the same case.**
+
+##### Reachability of the two remaining leads (measured, July 9, 2026)
+
+Both type-1 branches were instrumented with a file-writing probe and the candidate
+tests run. Result: **the two leads are in different states, and neither should be
+"fixed" the way the other is.**
+
+- **`lc_dispatch_method`'s type-1 arm is LIVE.** The existing avm1 `localconnection`
+  test reaches it with a real `simple_func`. The single observed call had
+  `num_args = 0, param_count = 0`, so it does not itself trigger the misbinding —
+  the reverse order and the missing clamp/pad are **latent on a live path**. A repro
+  with `num_args >= 1` or `param_count >= 1` will confirm the bug; a SWF6 file with a
+  plain `DefineFunction` receiver method is the shape (LocalConnection is Flash 6+, and
+  Flash MX-era SWF6 files do emit `DefineFunction`). Expect instance ten.
+
+- **`bdRectangleGetter`'s type-1 branch never fires** across gnash `BitmapData-v6/v7/v8`
+  and the avm1 `bitmap_data*` cluster. The only `flash.geom.Rectangle` override in the
+  suite (gnash `BitmapData.as`, before tests 324/329/334) compiles to a
+  **DefineFunction2**, so it takes the type-2 branch. The reverse push is real code and
+  currently unreachable *by the suite*; a hand-assembled type-1 override would reach it.
+  Fix it during migration, but do not credit it as a found-in-the-wild instance.
+
+- **A third, worse bug at the same site.** `lc_dispatch_method`'s `else` branch catches
+  *everything* that is not `function_type == 2` and calls `func->simple_func`
+  **without a NULL check**. A type-1 both-pointers-NULL native — a `g_mc_method_funcs`
+  stub (`MovieClip.prototype.getDepth`, …) or a `g_stub_ctors` entry — assigned as an LC
+  receiver method is a **NULL call**. The core's strict dispatch (`function_type == 1 &&
+  simple_func != NULL`) fixes this for free on migration; it is a reason to migrate this
+  dispatcher early in Stage 4 rather than patch its push loop in place. (The type-2
+  branch's unguarded `advanced_func` call is safe — every `function_type = 2` site pairs
+  with a non-NULL pointer, audited in Stage 3d.)
 
 #### Stage 3c design note (July 9, 2026) — the shape for the remaining ~14 arms
 

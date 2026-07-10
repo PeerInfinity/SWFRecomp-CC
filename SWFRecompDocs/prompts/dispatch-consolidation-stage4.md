@@ -95,13 +95,33 @@ pinning test:**
 - The MC arms set `g_event_this_mc` only on their type-2 branch; the core would set it
   for both. Consider whether a type-1 MC method body should see it.
 
-**Two unverified reverse-order type-1 pushes of the same bug class**, both in Stage-4
-scope and independent: `lc_dispatch_method` (LocalConnection method dispatch,
-~`action.c:2908`) and `bdRectangleGetter` (~`action.c:14365`, pushes four fixed
-`Rectangle` ctor args in reverse; check whether that constructor is ever type-1 before
-assuming it's live). Both also skip the `param_count` clamp/pad. **Verify reachability
-with a repro before fixing either** — nine for nine is a reason to expect them, not a
-reason to skip the repro.
+**The two remaining reverse-order type-1 pushes — reachability now MEASURED (don't
+redo the experiment), and they are NOT the same case:**
+
+- **`lc_dispatch_method` (LocalConnection method dispatch) — type-1 arm is LIVE.** The
+  existing avm1 `localconnection` test reaches it with a real `simple_func`. The one
+  observed call had `num_args = 0, param_count = 0`, so it does not itself misbind: the
+  reverse order and the missing clamp/pad are **latent on a live path**. Write the repro
+  with `num_args >= 1` or `param_count >= 1` (SWF6 + a plain `DefineFunction` receiver
+  method — LocalConnection is Flash 6+ and Flash MX-era SWF6 emits `DefineFunction`).
+  Expect **instance ten**.
+- **`lc_dispatch_method` also has a NULL-call hazard, and it is the better reason to
+  migrate it first.** Its `else` branch catches *everything* that is not
+  `function_type == 2` and calls `func->simple_func` with **no NULL check**. A type-1
+  both-pointers-NULL native — a `g_mc_method_funcs` stub (`MovieClip.prototype.getDepth`)
+  or a `g_stub_ctors` entry — assigned as an LC receiver method is a NULL call. The
+  core's strict dispatch fixes it for free. **Migrate; don't patch the push loop.**
+- **`bdRectangleGetter` — type-1 branch is NOT reached by the suite.** Probed across
+  gnash `BitmapData-v6/v7/v8` and the avm1 `bitmap_data*` cluster: zero hits. The only
+  `flash.geom.Rectangle` override in the suite (gnash `BitmapData.as`, before tests
+  324/329/334) compiles to a **DefineFunction2** and takes the type-2 branch. Fix the
+  reverse push during migration, but **do not credit it as a found-in-the-wild
+  instance** and don't spend a session hunting a natural repro.
+
+Method note: both were settled by instrumenting the type-1 branch with a probe that
+writes to a **file** (the runner swallows the test binary's stderr) and running the
+candidate tests. Cheap, decisive, and it is the same technique that proved the Stage-3d
+`ClosureFrame` modes were already covered.
 
 Also queued: the type-1 arms of `fireTimerCallback` (both forms) and of
 `lc/ns/nc_dispatch_onStatus` push forward (correct) but do **not** clamp/pad.
