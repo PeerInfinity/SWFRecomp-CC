@@ -6022,134 +6022,59 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 	}
 	if (cb == NULL || cb->func == NULL) return undef;
 
-	g_call_depth++;
-	if (g_call_depth > g_max_call_depth)
-	{
-		g_execution_halted = 1;
-		g_call_depth--;
-		return undef;
-	}
-
 	ASFunction* func = cb->func;
+
+	// this_obj extraction + this_var construction stay in the arm: cb->this_obj
+	// is the verbatim addCallback arg and may carry any tag, but this dispatcher
+	// has always collapsed it to a raw pointer for OBJECT/MOVIECLIP only (ARRAY/
+	// FUNCTION thisObj → NULL), and the type-1 "this" bind has always carried an
+	// OBJECT tag even for a MOVIECLIP pointer. Passing cb->this_obj through as
+	// this_var would change the derived this_is_mc and the bind's observable tag
+	// (typeof this) — preserve the collapse exactly. The OBJECT-tag-on-MC-pointer
+	// is a latent type-confusion quirk; normalization-review candidate.
 	void* this_obj = NULL;
-
-	// Determine this_obj from the stored thisObj ActionVar
-	if (cb->this_obj.type == ACTION_STACK_VALUE_OBJECT)
-		this_obj = (void*)(uintptr_t)cb->this_obj.data.numeric_value;
-	else if (cb->this_obj.type == ACTION_STACK_VALUE_MOVIECLIP)
+	if (cb->this_obj.type == ACTION_STACK_VALUE_OBJECT ||
+	    cb->this_obj.type == ACTION_STACK_VALUE_MOVIECLIP)
 		this_obj = (void*)(uintptr_t)cb->this_obj.data.numeric_value;
 
-	ActionVar result;
-
-	if (func->function_type == 2 && func->advanced_func != NULL)
+	ActionVar this_var = {0};
+	if (this_obj != NULL)
 	{
-		ActionVar* registers = NULL;
-		if (func->register_count > 0)
-			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-
-		// Push local scope
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		// Restore captured WITH scopes
-		u32 captured_count = func->captured_scope_count;
-		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
-		{
-			scope_is_with[scope_depth] = 1;
-			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
-			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
-		}
-
-		// Switch base_clip context if SWF6+
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		result = func->advanced_func(app_context, args, (u32)arg_count, registers, this_obj);
-
-		g_current_context = saved_context;
-		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
-			scope_depth--;
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (registers != NULL) FREE(registers);
-	}
-	else if (func->function_type == 1 && func->simple_func != NULL)
-	{
-		// Type 1: marshal args onto the eval stack, set "this".
-		// TYPE1_ARG_ORDER: forward order — args[0] pushed first (deepest); the
-		// generated prologue pops params last-first. The prologue pops EXACTLY
-		// param_count values, so push exactly that many: clamp extra args
-		// (they'd be stranded on the stack) and pad missing ones with
-		// undefined (otherwise the prologue swallows unrelated eval-stack
-		// slots). This site previously pushed in REVERSE, swapping multi-arg
-		// callback params (missed by the bcacc3f70 sweep).
-		u32 t1_param_count = func->param_count;
-		for (u32 i = 0; i < t1_param_count; i++)
-		{
-			if (i < (u32)arg_count)
-			{
-				pushVar(app_context, &args[i]);
-			}
-			else
-			{
-				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-			}
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		u32 captured_count = func->captured_scope_count;
-		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
-		{
-			scope_is_with[scope_depth] = 1;
-			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[i];
-			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[i];
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		// Set "this"
-		ActionVar this_var = {0};
-		if (this_obj != NULL)
-		{
-			this_var.type = ACTION_STACK_VALUE_OBJECT;
-			this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
-		}
-		else
-		{
-			this_var.type = ACTION_STACK_VALUE_UNDEFINED;
-		}
-		setVariableByName("this", &this_var);
-
-		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-
-		g_current_context = saved_context;
-		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
-			scope_depth--;
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
+		this_var.type = ACTION_STACK_VALUE_OBJECT;
+		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
 	}
 	else
 	{
-		result = undef;
+		this_var.type = ACTION_STACK_VALUE_UNDEFINED;
 	}
 
-	g_call_depth--;
-	return result;
+	// INV_DEPTH_GUARD: EI's old guard was byte-equivalent to the core's
+	// (increment, max-check, halt, decrement, undefined) — unlike the LC
+	// family's bare bracket, the guard moves INTO the core here.
+	// INV_LOCAL_SCOPE_UNDER_CAPTURED + INV_FORCE_CAPTURED_WITH: both arms
+	// pushed the local frame FIRST with captured scopes forced-with ON TOP —
+	// the same double quirk as the __resolve arm (this is the flag's second
+	// user). regression/ei_closure_scope_order locks both on this path.
+	// INV_BASE_CLIP without INV_VERSION_SWITCH: no version switch has ever
+	// existed here (normalization candidate), so the core's gate reads the
+	// caller's live g_swf_version — exactly what the arms read.
+	// INV_BIND_THIS, type-1 ONLY, and it is LIVE here (not dead-by-rule): EI
+	// pushes no g_this_stack entry and host-driven calls run at
+	// g_this_depth == 0, where GetVariable("this") falls through the early
+	// this-cell path into the scope walk and finds this bind on the local
+	// frame (ei_closure_scope_order's this.tag=T line). The old
+	// setVariableByName("this") landed on the same frame because forced-with
+	// makes getCurrentLocalScope skip every captured frame. Type-2 never
+	// bound "this" by name — do not add it there.
+	// Preserved-by-omission: no this-stack, no super, no version switch, no
+	// event-this, no exec-func (a preload_arguments callee keeps reading the
+	// stale g_prev_executing_func — current behavior), no ctor context.
+	u32 ei_flags = INV_DEPTH_GUARD | INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+	               INV_LOCAL_SCOPE | INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_BASE_CLIP;
+	if (func->function_type == 1)
+		ei_flags |= INV_BIND_THIS;
+	InvokeOpts ei_opts = { .flags = ei_flags };
+	return invokeFunctionValue(app_context, func, &this_var, args, (u32)arg_count, &ei_opts);
 }
 
 // Public: Convert an ActionVar STRING to a UTF-8 C string.

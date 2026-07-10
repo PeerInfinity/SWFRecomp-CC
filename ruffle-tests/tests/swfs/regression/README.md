@@ -44,6 +44,7 @@ arms cannot be reached any other way.
 | Test | Guards |
 |---|---|
 | `ei_type1_args` | `actionEI_callInternalInterface`'s type-1 arm: forward arg order + pad to `param_count` (fixed `d8abc5c0a`) |
+| `ei_closure_scope_order` | `actionEI_callInternalInterface`'s three dispatch quirks — a behavior lock, not a bug repro: local-scope-under-captured (a captured `with(w)` scope shadows the callee's same-named param on lookup), forced `is_with=1` on captured scopes (a `var` in the callee never lands on a captured local frame — the discriminating row; note a plain SetVariable writes THROUGH a with-frame where the property exists, so that row locks write-through, not the force), and the LIVE type-1 `this` bind (`thisObj` readable as `this` at `g_this_depth==0`; `typeof this` is `undefined` when registered with null). Normalizing any of these must flip this test deliberately |
 | `mc_event_type1_args` | `mc_call_as2_handler_ng`'s type-1 arm passes the event's arguments at all (fixed `9a8c6dce3`) |
 | `timer_cross_swf_version` | `fireTimerCallback` switches to the callback's own SWF version and `_global` group (fixed `60070d96a`) |
 | `nc_onstatus_closure` | `nc_dispatch_onStatus` restores the handler's captured scope chain — a behavior lock, not a bug fix |
