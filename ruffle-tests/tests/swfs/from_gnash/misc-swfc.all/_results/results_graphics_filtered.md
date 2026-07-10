@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-10 22:53 UTC
+**Date**: 2026-07-10 23:34 UTC
 
-**Git SHA**: `8a8ff17c73`
+**Git SHA**: `2ab5d2685c`
 
-**Run Duration**: 5m 43s
+**Run Duration**: 5m 42s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -12,13 +12,13 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 17 |
-| Passing | **10** (58.8%) |
+| Total tests | 18 |
+| Passing | **11** (61.1%) |
 | Ruffle-matched | 4 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **14** (82.4%) |
+| Effective pass | **15** (83.3%) |
 | Failing | 3 |
-| Total expected lines | 531 |
-| Matching lines | 397 (74.8%) |
+| Total expected lines | 555 |
+| Matching lines | 421 (75.9%) |
 | Mismatched lines | 134 |
 
 ### Failure Breakdown
@@ -29,20 +29,21 @@
 
 ## Passing Tests
 
-**10 tests passing**
+**11 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.6s |  |
-| 2 | `edittext_test1` | 47 | 20.9s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 20.1s |  |
-| 4 | `hello` | 4 | 22.2s |  |
-| 5 | `mouse_drag_test` | 12 | 21.0s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 22.5s |  |
-| 7 | `soft_reference_test1` | 45 | 21.4s |  |
-| 8 | `stackscope` | 11 | 20.5s |  |
-| 9 | `submoviegetvar` | 4 | 20.9s |  |
-| 10 | `swf4opcode` | 117 | 21.7s |  |
+| 1 | `button_test1` | 31 | 2.7s |  |
+| 2 | `edittext_test1` | 47 | 22.6s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 20.5s |  |
+| 4 | `hello` | 4 | 19.7s |  |
+| 5 | `mouse_drag_test` | 12 | 21.1s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 21.1s |  |
+| 7 | `opcode_guard_test2` | 24 | 20.7s |  |
+| 8 | `soft_reference_test1` | 45 | 20.9s |  |
+| 9 | `stackscope` | 11 | 20.9s |  |
+| 10 | `submoviegetvar` | 4 | 20.3s |  |
+| 11 | `swf4opcode` | 117 | 3.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,10 +51,10 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 18.8s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 21.7s |  |
-| 3 | `movieclip_destruction_test1` | 43 | 52 | 19.8s |  |
-| 4 | `registerclass_test3` | 12 | 20 | 17.6s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 19.0s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 21.4s |  |
+| 3 | `movieclip_destruction_test1` | 43 | 52 | 19.3s |  |
+| 4 | `registerclass_test3` | 12 | 20 | 20.6s |  |
 
 ## Near-Passing Tests
 

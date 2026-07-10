@@ -1,50 +1,54 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-10 22:53 UTC
+**Date**: 2026-07-10 23:34 UTC
 
-**Git SHA**: `8a8ff17c73`
+**Git SHA**: `2ab5d2685c`
 
-**Run Duration**: 6m 40s
+**Run Duration**: 8m 1s
 
-**Filtered**: 0 tests ignored out of 21 available
+**Filtered**: 0 tests ignored out of 24 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 20 |
-| Passing | **20** (100.0%) |
+| Total tests | 24 |
+| Passing | **24** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 149 |
-| Matching lines | 149 (100.0%) |
+| Total expected lines | 172 |
+| Matching lines | 172 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**20 tests passing**
+**24 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array_element_type1_args` | 7 | 18.5s |  |
-| 2 | `array_method_type1_args` | 7 | 19.1s |  |
-| 3 | `coerce_type1_args` | 9 | 20.1s |  |
-| 4 | `ei_type1_args` | 7 | 19.4s |  |
-| 5 | `fn_call_builtin_type1_args` | 10 | 20.3s |  |
-| 6 | `fn_call_type1_args` | 7 | 20.6s |  |
-| 7 | `fn_empty_method_type1_args` | 10 | 21.8s |  |
-| 8 | `lc_method_type1_args` | 7 | 20.0s |  |
-| 9 | `lc_onstatus_type1_args` | 3 | 20.3s |  |
-| 10 | `lv_ondata_type1_args` | 3 | 21.1s |  |
-| 11 | `mc_event_type1_args` | 3 | 20.8s |  |
-| 12 | `mc_resolve_type1_args` | 6 | 19.4s |  |
-| 13 | `method_type1_args` | 10 | 18.8s |  |
-| 14 | `nc_onstatus_type1_args` | 3 | 16.7s |  |
-| 15 | `resolve_type1_args` | 13 | 20.5s |  |
-| 16 | `sort_comparator_type1_args` | 5 | 20.2s |  |
-| 17 | `string_prim_method_type1_args` | 19 | 20.7s |  |
-| 18 | `timer_cross_swf_version` | 3 | 20.6s |  |
-| 19 | `timer_type1_args` | 14 | 19.7s |  |
-| 20 | `xml_onload_type1_args` | 3 | 20.8s |  |
+| 1 | `array_element_type1_args` | 7 | 19.0s |  |
+| 2 | `array_method_type1_args` | 7 | 19.3s |  |
+| 3 | `coerce_type1_args` | 9 | 20.2s |  |
+| 4 | `ei_closure_scope_order` | 7 | 22.4s |  |
+| 5 | `ei_type1_args` | 7 | 22.3s |  |
+| 6 | `fn_call_builtin_type1_args` | 10 | 19.9s |  |
+| 7 | `fn_call_type1_args` | 7 | 19.4s |  |
+| 8 | `fn_empty_method_type1_args` | 10 | 19.6s |  |
+| 9 | `lc_method_type1_args` | 7 | 20.4s |  |
+| 10 | `lc_onstatus_type1_args` | 3 | 20.0s |  |
+| 11 | `lv_ondata_type1_args` | 3 | 19.9s |  |
+| 12 | `mc_event_type1_args` | 3 | 19.4s |  |
+| 13 | `mc_resolve_type1_args` | 6 | 16.2s |  |
+| 14 | `method_type1_args` | 10 | 19.5s |  |
+| 15 | `nc_onstatus_closure` | 2 | 19.8s |  |
+| 16 | `nc_onstatus_type1_args` | 3 | 19.9s |  |
+| 17 | `resolve_type1_args` | 13 | 20.0s |  |
+| 18 | `sort_comparator_type1_args` | 5 | 20.8s |  |
+| 19 | `string_prim_method_type1_args` | 19 | 19.9s |  |
+| 20 | `timer_cross_swf_version` | 3 | 20.6s |  |
+| 21 | `timer_type1_args` | 14 | 19.8s |  |
+| 22 | `watch_mc_type1_args` | 7 | 20.0s |  |
+| 23 | `watch_setmember_type1_args` | 7 | 20.9s |  |
+| 24 | `xml_onload_type1_args` | 3 | 20.8s |  |
 
 ## Near-Passing Tests
 

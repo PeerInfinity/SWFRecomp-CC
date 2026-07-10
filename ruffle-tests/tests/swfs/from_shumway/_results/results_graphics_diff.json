@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-10T21:35:27.224492+00:00",
-    "old_git_sha": "1f68e0043c1b972e95f0d245109a19695c56b213",
-    "new_timestamp": "2026-07-10T22:53:59.492280+00:00",
-    "new_git_sha": "8a8ff17c73a3ea75a044eafc5f191be3308413a0",
+    "old_timestamp": "2026-07-10T22:53:59.492280+00:00",
+    "old_git_sha": "8a8ff17c73a3ea75a044eafc5f191be3308413a0",
+    "new_timestamp": "2026-07-10T23:34:28.856842+00:00",
+    "new_git_sha": "2ab5d2685cab208f84e77f3b7ae0856621879d75",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 73,
+    "old_pass": 70,
     "old_ruffle_matched": 3,
-    "old_effective_pass": 76,
-    "old_total": 92,
-    "old_pass_rate": 79.3,
-    "new_pass": 70,
+    "old_effective_pass": 73,
+    "old_total": 89,
+    "old_pass_rate": 78.7,
+    "new_pass": 73,
     "new_ruffle_matched": 3,
-    "new_effective_pass": 73,
-    "new_total": 89,
-    "new_pass_rate": 78.7,
+    "new_effective_pass": 76,
+    "new_total": 92,
+    "new_pass_rate": 79.3,
     "old_mismatched_lines": 394,
     "new_mismatched_lines": 394,
     "increased_mismatches": 0,
@@ -29,46 +26,45 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 89,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 3
+    "added": 3,
+    "removed": 0
   },
   "changes": [
     {
       "test": "avm1/textfield/textfield-text-setters",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 8,
         "expected_lines": 8,
         "matching_lines": 8
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/undefined/undefined-swf6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 39,
         "expected_lines": 39,
         "matching_lines": 39
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/undefined/undefined-swf7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 39,
         "expected_lines": 39,
         "matching_lines": 39
-      },
-      "new_lines": null
+      }
     }
   ]
 }
