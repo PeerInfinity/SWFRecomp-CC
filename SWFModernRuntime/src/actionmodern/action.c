@@ -71075,111 +71075,49 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 	this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 	this_var.data.numeric_value = (u64)(uintptr_t)mc;
 
-	// Push MC as 'this' on the per-call-frame stack
-	u32 saved_this_depth_mc = g_this_depth;
-	if (g_this_depth < MAX_THIS_DEPTH) {
-		g_this_stack[g_this_depth] = this_var;
-		g_this_depth++;
-	}
-
 	// Mark "inside AS2 MC event handler" so a bare actionNextFrame /
 	// actionGotoFrame opcode inside the handler runs inline catch-up
-	// (Ruffle synchronous-goto semantics).
+	// (Ruffle synchronous-goto semantics). Must enclose the core call, and this
+	// dispatcher must continue NOT setting g_current_sprite_obj (the core never
+	// touches it) — actionNextFrame's inline catch-up depends on both.
 	g_inside_event_handler++;
 
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). Behavior-preserving: the shared preamble pushed
+	// the MOVIECLIP receiver onto g_this_stack for BOTH arms (INV_THIS_STACK —
+	// unlike the MC method arms, which gate it to type-1) and both arms
+	// restored the captured scopes (is_with copied). The type-2 arm
+	// additionally pushed a local frame with "this" bound and scope_mc = mc
+	// (INV_LOCAL_SCOPE | INV_BIND_THIS | INV_LOCAL_SCOPE_MC), swapped both
+	// executing-func globals with a current-only restore (INV_EXEC_FUNC —
+	// exact here, and load-bearing: generated preload_arguments prologues read
+	// g_prev_executing_func for arguments.caller), set g_event_this_mc
+	// (INV_EVENT_THIS_MC), and called advanced_func with a NULL ABI this so
+	// the generated preload_this consumes g_event_this_mc
+	// (INV_MC_THIS_NULL_PTR). The type-1 arm pushed no local frame (handler
+	// params/locals deliberately land in the enclosing chain — same preserved
+	// shape as nc_dispatch_onStatus) and its forward+clamp+pad marshalling was
+	// already the canonical loop (Stage-0 fix; regression/mc_event_type1_args).
+	// No version switch, no context switch, no scope reset — never done here
+	// (the comment above is load-bearing); the sibling enterFrame dispatcher
+	// differs on all three, a Stage-4 normalization question.
+	//
+	// Stays outside the core: the entry depth pre-check (halt at max-1 WITHOUT
+	// incrementing — not INV_DEPTH_GUARD), the bare g_call_depth++/-- bracket,
+	// and the g_inside_event_handler bracket. Fixed for free: the old type-2
+	// arm called advanced_func with no NULL check; the core's strict dispatch
+	// returns undefined instead.
+	InvokeOpts opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE };
 	if (func->function_type == 2)
-	{
-		ActionVar* registers = NULL;
-		if (func->register_count > 0)
-			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+		opts.flags |= INV_LOCAL_SCOPE | INV_BIND_THIS | INV_LOCAL_SCOPE_MC |
+		              INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR | INV_EXEC_FUNC;
 
-		// Restore captured scope chain entries from definition time (closure support)
-		u8 captured_count = func->captured_scope_count;
-		for (u8 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = func->captured_scope[ci];
-			}
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		// Expose "this" = mc on local scope for direct scope property access
-		setProperty(app_context, local_scope, "this", 4, &this_var);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = mc;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		ASFunction* prev_func = g_current_executing_func;
-		g_call_depth++;
-		g_prev_executing_func = prev_func;
-		g_current_executing_func = func;
-		// Use g_event_this_mc so generated preload_this code picks up MC type correctly
-		MovieClip* saved_event_this_handler = g_event_this_mc;
-		g_event_this_mc = mc;
-		ActionVar result = func->advanced_func(app_context, handler_args, handler_arg_count, registers, NULL);
-		g_event_this_mc = saved_event_this_handler;
-		(void)result;
-		g_current_executing_func = prev_func;
-		g_call_depth--;
-
-		// Pop local scope + captured scopes
-		for (u8 ci = 0; ci < captured_count + 1; ci++) {
-			if (scope_depth > 0) scope_depth--;
-		}
-		releaseObject(app_context, local_scope);
-		if (registers != NULL) FREE(registers);
-	}
-	else if (func->function_type == 1 && func->simple_func != NULL)
-	{
-		// Restore captured scope chain entries from definition time (closure support)
-		u8 captured_count_t1 = func->captured_scope_count;
-		for (u8 ci = 0; ci < captured_count_t1; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = func->captured_scope[ci];
-			}
-		}
-
-		// Marshal event args for the type-1 prologue. TYPE1_ARG_ORDER: forward
-		// order — args[0] pushed first (deepest); the generated prologue pops
-		// params last-first. It pops EXACTLY param_count values, so push
-		// exactly that many: clamp extra event args and pad missing ones with
-		// undefined (Flash: a handler param beyond the event's arguments reads
-		// undefined). This arm previously pushed NOTHING, so a type-1 handler
-		// with declared params (e.g. onSetFocus(oldFocus)) both lost the event
-		// argument and swallowed unrelated eval-stack slots.
-		u32 t1_param_count = func->param_count;
-		for (u32 i = 0; i < t1_param_count; i++)
-		{
-			if (i < (u32)handler_arg_count)
-			{
-				pushVar(app_context, &handler_args[i]);
-			}
-			else
-			{
-				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-			}
-		}
-
-		g_call_depth++;
-		ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		(void)result;
-		g_call_depth--;
-
-		// Pop captured scopes
-		for (u8 ci = 0; ci < captured_count_t1; ci++) {
-			if (scope_depth > 0) scope_depth--;
-		}
-	}
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, handler_args,
+	                           (u32)handler_arg_count, &opts);
+	g_call_depth--;
 
 	g_inside_event_handler--;
-	g_this_depth = saved_this_depth_mc;
 }
 
 // Dispatch AS2 onPress to all dynamic MCs whose hit area contains the mouse.
