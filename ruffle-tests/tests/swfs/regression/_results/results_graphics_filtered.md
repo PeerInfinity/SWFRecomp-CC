@@ -1,43 +1,44 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-10 00:05 UTC
+**Date**: 2026-07-10 17:29 UTC
 
-**Git SHA**: `ff7641ed26`
+**Git SHA**: `704a9cbbf2`
 
-**Run Duration**: 4m 25s
+**Run Duration**: 2m 35s
 
-**Filtered**: 0 tests ignored out of 13 available
+**Filtered**: 0 tests ignored out of 14 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 13 |
-| Passing | **13** (100.0%) |
+| Total tests | 14 |
+| Passing | **14** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 104 |
-| Matching lines | 104 (100.0%) |
+| Total expected lines | 111 |
+| Matching lines | 111 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**13 tests passing**
+**14 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array_element_type1_args` | 7 | 19.4s |  |
-| 2 | `array_method_type1_args` | 7 | 19.7s |  |
-| 3 | `ei_type1_args` | 7 | 20.5s |  |
-| 4 | `fn_call_builtin_type1_args` | 10 | 19.8s |  |
-| 5 | `fn_call_type1_args` | 7 | 21.1s |  |
-| 6 | `fn_empty_method_type1_args` | 10 | 21.9s |  |
-| 7 | `mc_event_type1_args` | 3 | 16.7s |  |
-| 8 | `mc_resolve_type1_args` | 6 | 20.1s |  |
-| 9 | `method_type1_args` | 10 | 20.8s |  |
-| 10 | `nc_onstatus_closure` | 2 | 20.8s |  |
-| 11 | `resolve_type1_args` | 13 | 21.8s |  |
-| 12 | `string_prim_method_type1_args` | 19 | 20.8s |  |
-| 13 | `timer_cross_swf_version` | 3 | 20.7s |  |
+| 1 | `array_element_type1_args` | 7 | 0.8s |  |
+| 2 | `array_method_type1_args` | 7 | 1.1s |  |
+| 3 | `ei_type1_args` | 7 | 20.6s |  |
+| 4 | `fn_call_builtin_type1_args` | 10 | 1.3s |  |
+| 5 | `fn_call_type1_args` | 7 | 1.6s |  |
+| 6 | `fn_empty_method_type1_args` | 10 | 21.4s |  |
+| 7 | `lc_method_type1_args` | 7 | 20.4s |  |
+| 8 | `mc_event_type1_args` | 3 | 2.0s |  |
+| 9 | `mc_resolve_type1_args` | 6 | 20.5s |  |
+| 10 | `method_type1_args` | 10 | 20.2s |  |
+| 11 | `nc_onstatus_closure` | 2 | 21.1s |  |
+| 12 | `resolve_type1_args` | 13 | 1.4s |  |
+| 13 | `string_prim_method_type1_args` | 19 | 1.8s |  |
+| 14 | `timer_cross_swf_version` | 3 | 20.3s |  |
 
 ## Near-Passing Tests
 
