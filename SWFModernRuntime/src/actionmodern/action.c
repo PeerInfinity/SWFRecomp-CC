@@ -14355,25 +14355,19 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 			if (vof_func != NULL)
 			{
 				*found = 1;
-				ActionVar result;
-				if (vof_func->function_type == 2 && vof_func->advanced_func != NULL)
-				{
-					ActionVar* regs = NULL;
-					if (vof_func->register_count > 0)
-						regs = (ActionVar*) HCALLOC(vof_func->register_count, sizeof(ActionVar));
-					result = vof_func->advanced_func(app_context, NULL, 0, regs, obj);
-					if (regs != NULL) FREE(regs);
-				}
-				else if (vof_func->function_type == 1 && vof_func->simple_func != NULL)
-				{
-					result = ((ActionVar(*)(SWFAppContext*))vof_func->simple_func)(app_context);
-				}
-				else
-				{
-					result.type = ACTION_STACK_VALUE_UNDEFINED;
-					result.data.numeric_value = 0;
-				}
-				return result;
+				// Migrated to invokeFunctionValue (dispatch Stage 4). The
+				// getter-returned function was invoked with literally no ritual
+				// (no scopes, no this-stack, no version — deliberately barer
+				// than oCTS's twin, which pushes captured scopes; do not
+				// equalize): flags = 0, receiver as ABI this via this_var. The
+				// core adds the canonical type-1 pad to param_count (the old
+				// arm pushed nothing — TYPE1_ARG_ORDER family instance,
+				// regression/coerce_type1_args).
+				ActionVar gv_this = {0};
+				gv_this.type = ACTION_STACK_VALUE_OBJECT;
+				gv_this.data.numeric_value = (u64)(uintptr_t)obj;
+				InvokeOpts gv_opts = { .flags = 0 };
+				return invokeFunctionValue(app_context, vof_func, &gv_this, NULL, 0, &gv_opts);
 			}
 		}
 	}
@@ -14386,62 +14380,33 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 			if (func != NULL)
 			{
 				*found = 1;
-				ActionVar result;
-				// Switch to function's base_clip and SWF version (closure context),
-				// set up captured scopes and this-stack for type 1 functions.
+				// Migrated to invokeFunctionValue (dispatch Stage 4). Kept in
+				// the arm, deliberately: the version switch + the UNGATED
+				// actionSetCurrentContext(func->base_clip) bracket (no SWF6
+				// gate, and actionSetCurrentContext is not the raw
+				// g_current_context assignment INV_BASE_CLIP performs), and
+				// the exec-func swap (current-only — the core's INV_EXEC_FUNC
+				// also writes g_prev_executing_func, observable via
+				// arguments.caller). The core takes the this-stack push (both
+				// arms pushed OBJECT(obj)) and the captured scopes, and adds
+				// the canonical type-1 pad to param_count (the old arm pushed
+				// nothing — regression/coerce_type1_args).
 				MovieClip* _vof_saved_ctx = g_current_context;
 				int _vof_saved_ver; ASObject* _vof_saved_global; int _vof_saved_midx;
 				switchToFunctionVersion(func, &_vof_saved_ver, &_vof_saved_global, &_vof_saved_midx);
 				if (func->base_clip != NULL)
 					actionSetCurrentContext(func->base_clip);
-				u32 _vof_saved_scope_depth = scope_depth;
-				u8 _vof_captured = func->captured_scope_count;
-				for (u8 ci = 0; ci < _vof_captured; ci++) {
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-						scope_mc[scope_depth] = func->captured_scope_mc[ci];
-						scope_chain[scope_depth++] = func->captured_scope[ci];
-					}
-				}
 				ASFunction* _vof_prev_exec_func = g_current_executing_func;
 				g_current_executing_func = func;
-				if (func->function_type == 2 && func->advanced_func != NULL)
-				{
-					ActionVar* regs = NULL;
-					if (func->register_count > 0)
-						regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-					// Push this=obj so the function body's `this` lookups resolve
-					// to obj regardless of whether the compiler emitted
-					// register-preload or GetVariable("this") for `this`.
-					u32 _vof_saved_this_depth = g_this_depth;
-					if (g_this_depth < MAX_THIS_DEPTH) {
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
-						g_this_depth++;
-					}
-					result = func->advanced_func(app_context, NULL, 0, regs, obj);
-					g_this_depth = _vof_saved_this_depth;
-					if (regs != NULL) FREE(regs);
-				}
-				else if (func->function_type == 1 && func->simple_func != NULL)
-				{
-					// Push this=obj for type 1 functions (they access this via getVariable("this"))
-					u32 _vof_saved_this_depth = g_this_depth;
-					if (g_this_depth < MAX_THIS_DEPTH) {
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
-						g_this_depth++;
-					}
-					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-					g_this_depth = _vof_saved_this_depth;
-				}
-				else
-				{
-					result.type = ACTION_STACK_VALUE_UNDEFINED;
-					result.data.numeric_value = 0;
-				}
+
+				ActionVar vof_this = {0};
+				vof_this.type = ACTION_STACK_VALUE_OBJECT;
+				vof_this.data.numeric_value = (u64)(uintptr_t)obj;
+				InvokeOpts vof_opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE };
+				ActionVar result = invokeFunctionValue(app_context, func, &vof_this,
+				                                       NULL, 0, &vof_opts);
+
 				g_current_executing_func = _vof_prev_exec_func;
-				scope_depth = _vof_saved_scope_depth;
 				actionSetCurrentContext(_vof_saved_ctx);
 				restoreFunctionVersion(_vof_saved_ver, _vof_saved_global, _vof_saved_midx);
 				return result;
@@ -14573,64 +14538,29 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 		if (func != NULL)
 		{
 			if (found) *found = 1;
-			ActionVar result;
-			// Switch to function's base_clip and SWF version (closure context)
-			// toString is an internal call — always use function's base_clip
+			// Migrated to invokeFunctionValue (dispatch Stage 4) — same shape
+			// as objectCallValueOf's main branch: version switch + ungated
+			// actionSetCurrentContext bracket + current-only exec-func swap
+			// stay in the arm; the core takes the this-stack push + captured
+			// scopes and adds the canonical type-1 pad. The
+			// builtin_array_method result fixup below runs after the core
+			// returns, as before.
 			MovieClip* _ts_saved_ctx = g_current_context;
 			int _ts_saved_ver; ASObject* _ts_saved_global; int _ts_saved_midx;
 			switchToFunctionVersion(func, &_ts_saved_ver, &_ts_saved_global, &_ts_saved_midx);
 			if (func->base_clip != NULL)
 				actionSetCurrentContext(func->base_clip);
-			// Save and restore captured scopes for proper closure support
-			u32 saved_scope_depth = scope_depth;
-			u8 captured = func->captured_scope_count;
-			for (u8 ci = 0; ci < captured; ci++) {
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-					scope_mc[scope_depth] = func->captured_scope_mc[ci];
-					scope_chain[scope_depth++] = func->captured_scope[ci];
-				}
-			}
-			// Save and set g_current_executing_func so builtin methods can identify themselves
 			ASFunction* _ts_prev_exec_func = g_current_executing_func;
 			g_current_executing_func = func;
-			if (func->function_type == 2 && func->advanced_func != NULL)
-			{
-				ActionVar* regs = NULL;
-				if (func->register_count > 0)
-					regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-				// Push this=obj so the function body's `this` lookups resolve
-				// to obj regardless of whether the compiler emitted
-				// register-preload or GetVariable("this") for `this`.
-				u32 _ts_saved_this_depth = g_this_depth;
-				if (g_this_depth < MAX_THIS_DEPTH) {
-					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-					g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
-					g_this_depth++;
-				}
-				result = func->advanced_func(app_context, NULL, 0, regs, obj);
-				g_this_depth = _ts_saved_this_depth;
-				if (regs != NULL) FREE(regs);
-			}
-			else if (func->function_type == 1 && func->simple_func != NULL)
-			{
-				// Push this=obj for type 1 functions (they access this via getVariable("this"))
-				u32 _ts_saved_this_depth = g_this_depth;
-				if (g_this_depth < MAX_THIS_DEPTH) {
-					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-					g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
-					g_this_depth++;
-				}
-				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-				g_this_depth = _ts_saved_this_depth;
-			}
-			else
-			{
-				result.type = ACTION_STACK_VALUE_UNDEFINED;
-				result.data.numeric_value = 0;
-			}
+
+			ActionVar ts_this = {0};
+			ts_this.type = ACTION_STACK_VALUE_OBJECT;
+			ts_this.data.numeric_value = (u64)(uintptr_t)obj;
+			InvokeOpts ts_opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE };
+			ActionVar result = invokeFunctionValue(app_context, func, &ts_this,
+			                                       NULL, 0, &ts_opts);
+
 			g_current_executing_func = _ts_prev_exec_func;
-			scope_depth = saved_scope_depth;
 			actionSetCurrentContext(_ts_saved_ctx);
 			restoreFunctionVersion(_ts_saved_ver, _ts_saved_global, _ts_saved_midx);
 			// If the toString was a builtin_array_method stub that returned undefined,
@@ -14660,35 +14590,15 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 			if (ts_func != NULL)
 			{
 				if (found) *found = 1;
-				ActionVar result;
-				u32 saved_scope_depth = scope_depth;
-				u8 captured = ts_func->captured_scope_count;
-				for (u8 ci = 0; ci < captured; ci++) {
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = ts_func->captured_scope_is_with[ci];
-						scope_mc[scope_depth] = ts_func->captured_scope_mc[ci];
-						scope_chain[scope_depth++] = ts_func->captured_scope[ci];
-					}
-				}
-				if (ts_func->function_type == 2 && ts_func->advanced_func != NULL)
-				{
-					ActionVar* regs = NULL;
-					if (ts_func->register_count > 0)
-						regs = (ActionVar*) HCALLOC(ts_func->register_count, sizeof(ActionVar));
-					result = ts_func->advanced_func(app_context, NULL, 0, regs, obj);
-					if (regs != NULL) FREE(regs);
-				}
-				else if (ts_func->function_type == 1 && ts_func->simple_func != NULL)
-				{
-					result = ((ActionVar(*)(SWFAppContext*))ts_func->simple_func)(app_context);
-				}
-				else
-				{
-					result.type = ACTION_STACK_VALUE_UNDEFINED;
-					result.data.numeric_value = 0;
-				}
-				scope_depth = saved_scope_depth;
-				return result;
+				// Migrated to invokeFunctionValue (dispatch Stage 4). This
+				// getter branch pushed captured scopes only (unlike oCVO's
+				// bare twin — deliberate asymmetry, do not equalize):
+				// INV_CAPTURED_SCOPE, receiver as ABI this via this_var.
+				ActionVar tsg_this = {0};
+				tsg_this.type = ACTION_STACK_VALUE_OBJECT;
+				tsg_this.data.numeric_value = (u64)(uintptr_t)obj;
+				InvokeOpts tsg_opts = { .flags = INV_CAPTURED_SCOPE };
+				return invokeFunctionValue(app_context, ts_func, &tsg_this, NULL, 0, &tsg_opts);
 			}
 		}
 	}
@@ -14785,36 +14695,19 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 			ASFunction* func = lookupFunctionFromVar(valueOf_prop);
 			if (func != NULL)
 			{
-				ActionVar result;
-				if (func->function_type == 2 && func->advanced_func != NULL)
-				{
-					ActionVar* regs = NULL;
-					if (func->register_count > 0)
-						regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-					result = func->advanced_func(app_context, NULL, 0, regs, obj);
-					if (regs != NULL) FREE(regs);
-				}
-				else if (func->function_type == 1 && func->simple_func != NULL)
-				{
-					// Push this=obj so a type-1 valueOf body resolves `this`
-					// (via GetVariable("this")) to the object being converted.
-					// Without this the body reads the caller's `this` (typically
-					// root) — objectCallValueOf already does this; objectToPrimitive
-					// must too.
-					u32 _otp_saved_this = g_this_depth;
-					if (g_this_depth < MAX_THIS_DEPTH) {
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
-						g_this_depth++;
-					}
-					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-					g_this_depth = _otp_saved_this;
-				}
-				else
-				{
-					result.type = ACTION_STACK_VALUE_UNDEFINED;
-					result.data.numeric_value = 0;
-				}
+				// Migrated to invokeFunctionValue (dispatch Stage 4). This
+				// path pushed the this-stack for type-1 ONLY (the 14799 fix);
+				// a type-2 callee never saw a this-cell here — gate the flag
+				// per-branch rather than normalize (a new this-cell is
+				// observable to nested calls via actionGetVariable's early
+				// path). No scopes, no version, no exec-func — never done.
+				ActionVar otp_this = {0};
+				otp_this.type = ACTION_STACK_VALUE_OBJECT;
+				otp_this.data.numeric_value = (u64)(uintptr_t)obj;
+				InvokeOpts otp_opts = { .flags = (func->function_type == 1)
+				                                     ? INV_THIS_STACK : 0u };
+				ActionVar result = invokeFunctionValue(app_context, func, &otp_this,
+				                                       NULL, 0, &otp_opts);
 
 				// If result is a primitive (not an object), use it
 				if (result.type != ACTION_STACK_VALUE_OBJECT &&
@@ -14852,32 +14745,15 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 			ASFunction* func = lookupFunctionFromVar(toString_prop);
 			if (func != NULL)
 			{
-				ActionVar result;
-				if (func->function_type == 2 && func->advanced_func != NULL)
-				{
-					ActionVar* regs = NULL;
-					if (func->register_count > 0)
-						regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-					result = func->advanced_func(app_context, NULL, 0, regs, obj);
-					if (regs != NULL) FREE(regs);
-				}
-				else if (func->function_type == 1 && func->simple_func != NULL)
-				{
-					// Push this=obj so a type-1 toString body resolves `this`.
-					u32 _otp_saved_this = g_this_depth;
-					if (g_this_depth < MAX_THIS_DEPTH) {
-						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
-						g_this_depth++;
-					}
-					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-					g_this_depth = _otp_saved_this;
-				}
-				else
-				{
-					result.type = ACTION_STACK_VALUE_UNDEFINED;
-					result.data.numeric_value = 0;
-				}
+				// Migrated to invokeFunctionValue (dispatch Stage 4) — same
+				// per-branch this-stack gate as the valueOf leg above.
+				ActionVar otp_ts_this = {0};
+				otp_ts_this.type = ACTION_STACK_VALUE_OBJECT;
+				otp_ts_this.data.numeric_value = (u64)(uintptr_t)obj;
+				InvokeOpts otp_ts_opts = { .flags = (func->function_type == 1)
+				                                        ? INV_THIS_STACK : 0u };
+				ActionVar result = invokeFunctionValue(app_context, func, &otp_ts_this,
+				                                       NULL, 0, &otp_ts_opts);
 
 				if (result.type != ACTION_STACK_VALUE_OBJECT &&
 				    result.type != ACTION_STACK_VALUE_ARRAY &&
@@ -29876,35 +29752,22 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 						ASFunction* func = lookupFunctionFromVar(valueOf_prop);
 						if (func != NULL)
 						{
-							ActionVar result;
-							// Save and restore captured scopes for proper closure support
-							u32 saved_scope_depth = scope_depth;
-							u8 captured = func->captured_scope_count;
-							for (u8 ci = 0; ci < captured; ci++) {
-								if (scope_depth < MAX_SCOPE_DEPTH) {
-									scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-									scope_mc[scope_depth] = func->captured_scope_mc[ci];
-									scope_chain[scope_depth++] = func->captured_scope[ci];
-								}
-							}
-							if (func->function_type == 2 && func->advanced_func != NULL)
-							{
-								ActionVar* regs = NULL;
-								if (func->register_count > 0)
-									regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-								result = func->advanced_func(app_context, NULL, 0, regs, obj);
-								if (regs != NULL) FREE(regs);
-							}
-							else if (func->function_type == 1 && func->simple_func != NULL)
-							{
-								result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-							}
-							else
-							{
-								result.type = ACTION_STACK_VALUE_UNDEFINED;
-								result.data.numeric_value = 0;
-							}
-							scope_depth = saved_scope_depth;
+							// Migrated to invokeFunctionValue (dispatch
+							// Stage 4). Captured scopes only — this path has
+							// NEVER pushed a this-cell for either type (the
+							// un-propagated 14799 fix; normalizing it is a
+							// separate commit), no version switch, no
+							// exec-func. The core adds the canonical type-1
+							// pad (the old arm pushed nothing, and the
+							// operand under conversion sat on the stack top —
+							// regression/coerce_type1_args pins the stale
+							// pop).
+							ActionVar cf_this = {0};
+							cf_this.type = ACTION_STACK_VALUE_OBJECT;
+							cf_this.data.numeric_value = (u64)(uintptr_t)obj;
+							InvokeOpts cf_opts = { .flags = INV_CAPTURED_SCOPE };
+							ActionVar result = invokeFunctionValue(app_context, func, &cf_this,
+							                                       NULL, 0, &cf_opts);
 
 							// If valueOf returned a primitive, use it
 							if (result.type != ACTION_STACK_VALUE_OBJECT &&
@@ -29940,34 +29803,14 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 						vof_func = lookupFunctionFromVar(&getter_result);
 					if (vof_func != NULL)
 					{
-						ActionVar result;
-						u32 saved_scope_depth = scope_depth;
-						u8 captured = vof_func->captured_scope_count;
-						for (u8 ci = 0; ci < captured; ci++) {
-							if (scope_depth < MAX_SCOPE_DEPTH) {
-								scope_is_with[scope_depth] = vof_func->captured_scope_is_with[ci];
-								scope_mc[scope_depth] = vof_func->captured_scope_mc[ci];
-								scope_chain[scope_depth++] = vof_func->captured_scope[ci];
-							}
-						}
-						if (vof_func->function_type == 2 && vof_func->advanced_func != NULL)
-						{
-							ActionVar* regs = NULL;
-							if (vof_func->register_count > 0)
-								regs = (ActionVar*) HCALLOC(vof_func->register_count, sizeof(ActionVar));
-							result = vof_func->advanced_func(app_context, NULL, 0, regs, obj);
-							if (regs != NULL) FREE(regs);
-						}
-						else if (vof_func->function_type == 1 && vof_func->simple_func != NULL)
-						{
-							result = ((ActionVar(*)(SWFAppContext*))vof_func->simple_func)(app_context);
-						}
-						else
-						{
-							result.type = ACTION_STACK_VALUE_UNDEFINED;
-							result.data.numeric_value = 0;
-						}
-						scope_depth = saved_scope_depth;
+						// Migrated to invokeFunctionValue (dispatch Stage 4):
+						// captured scopes only, same as the plain branch above.
+						ActionVar cfg_this = {0};
+						cfg_this.type = ACTION_STACK_VALUE_OBJECT;
+						cfg_this.data.numeric_value = (u64)(uintptr_t)obj;
+						InvokeOpts cfg_opts = { .flags = INV_CAPTURED_SCOPE };
+						ActionVar result = invokeFunctionValue(app_context, vof_func, &cfg_this,
+						                                       NULL, 0, &cfg_opts);
 						if (result.type != ACTION_STACK_VALUE_OBJECT &&
 						    result.type != ACTION_STACK_VALUE_ARRAY &&
 						    result.type != ACTION_STACK_VALUE_FUNCTION)
@@ -72724,98 +72567,41 @@ static void call_function_with_this(SWFAppContext* app_context, ASFunction* func
 		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
 	}
 
-	// Push this on the per-call-frame stack
-	u32 saved_this_depth = g_this_depth;
-	if (g_this_depth < MAX_THIS_DEPTH) {
-		g_this_stack[g_this_depth] = this_var;
-		g_this_depth++;
-	}
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). Kept as a thin wrapper (the name documents the
+	// asfunction contract; the entry halt-check and this_var construction are
+	// genuinely caller-side). Behavior-preserving, per-branch:
+	//
+	// - Type-2: this-stack push, captured scopes, local frame with "this"
+	//   bound and scope_mc = receiver MC (INV_LOCAL_SCOPE_MC — the core gates
+	//   it on this_is_mc, matching the old this_is_mc ? MC : NULL), base-clip
+	//   switch under the caller's SWF6+ gate, g_event_this_mc (gated on MC by
+	//   the core, as before), both executing-func globals with current-only
+	//   restore (INV_EXEC_FUNC — exact: this arm wrote g_prev), and NULL ABI
+	//   this for MC receivers (INV_MC_THIS_NULL_PTR).
+	// - Type-1: this-stack + captured scopes + event-this-mc only (no local
+	//   frame, no base clip — the old arm's shape). The old arm pushed args
+	//   forward with NO clamp/pad — TYPE1_ARG_ORDER class, fixed by the core;
+	//   measured unreachable by the suite (asfunction needs a rendered
+	//   hyperlink click), so fixed-not-credited per the bdRectangleGetter
+	//   precedent.
+	//
+	// The entry halt-at-max-1 check (not INV_DEPTH_GUARD) and the bare
+	// g_call_depth++/-- bracket stay outside. Return value stays discarded.
+	InvokeOpts opts;
+	if (func->function_type == 2)
+		opts = (InvokeOpts){ .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE |
+		                              INV_LOCAL_SCOPE | INV_BIND_THIS |
+		                              INV_LOCAL_SCOPE_MC | INV_BASE_CLIP |
+		                              INV_EVENT_THIS_MC | INV_EXEC_FUNC |
+		                              INV_MC_THIS_NULL_PTR };
+	else
+		opts = (InvokeOpts){ .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE |
+		                              INV_EVENT_THIS_MC };
 
-	if (func->function_type == 2 && func->advanced_func != NULL)
-	{
-		ActionVar* registers = NULL;
-		if (func->register_count > 0)
-			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-
-		// Restore captured scope chain
-		u8 captured_count = func->captured_scope_count;
-		for (u8 ci = 0; ci < captured_count; ci++) {
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = func->captured_scope[ci];
-			}
-		}
-
-		// Push local scope with "this"
-		ASObject* local_scope = allocObject(app_context, 8);
-		setProperty(app_context, local_scope, "this", 4, &this_var);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = this_is_mc ? (MovieClip*)this_obj : NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		// Switch base_clip context for SWF6+
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		MovieClip* saved_event_this = g_event_this_mc;
-		if (this_is_mc) g_event_this_mc = (MovieClip*)this_obj;
-
-		ASFunction* prev_func = g_current_executing_func;
-		g_call_depth++;
-		g_prev_executing_func = prev_func;
-		g_current_executing_func = func;
-
-		// For MC targets, pass NULL as this_obj so preload_this uses g_event_this_mc
-		// (which produces MOVIECLIP type). For ASObject targets, pass the object directly.
-		func->advanced_func(app_context, args, arg_count, registers,
-		                    this_is_mc ? NULL : this_obj);
-
-		g_current_executing_func = prev_func;
-		g_call_depth--;
-		g_event_this_mc = saved_event_this;
-		g_current_context = saved_context;
-
-		// Pop local scope + captured scopes
-		for (u8 ci = 0; ci < captured_count + 1; ci++) {
-			if (scope_depth > 0) scope_depth--;
-		}
-		releaseObject(app_context, local_scope);
-		if (registers != NULL) FREE(registers);
-	}
-	else if (func->function_type == 1 && func->simple_func != NULL)
-	{
-		// Type 1: push args on stack
-		for (int i = 0; i < arg_count; i++)
-			pushVar(app_context, &args[i]);
-
-		u8 captured_count = func->captured_scope_count;
-		for (u8 ci = 0; ci < captured_count; ci++) {
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = func->captured_scope[ci];
-			}
-		}
-
-		MovieClip* saved_event_this = g_event_this_mc;
-		if (this_is_mc) g_event_this_mc = (MovieClip*)this_obj;
-
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-
-		g_event_this_mc = saved_event_this;
-
-		for (u8 ci = 0; ci < captured_count; ci++) {
-			if (scope_depth > 0) scope_depth--;
-		}
-	}
-
-	g_this_depth = saved_this_depth;
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, args, (u32)arg_count, &opts);
+	g_call_depth--;
 }
 
 // Handle asfunction: URL from a hyperlink click in a text field.
