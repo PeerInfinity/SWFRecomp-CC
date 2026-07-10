@@ -12,6 +12,13 @@ Index established by the 2026-07-04 audit. Conventions:
 - When adding a plan, add it to this index; when finishing one, banner it and
   move it.
 
+## Active — AVM2 (July 2026)
+
+- [avm2-support-plan.md](avm2-support-plan.md) — umbrella plan for ActionScript 3
+  support. Phase-1 metric: Ruffle avm2 trace-test parity (694-test realistic
+  ceiling, ~90-test first tranche). Draft v1 2026-07-10; architecture sketch
+  (§4) is the LittleCube coordination attachment.
+
 ## Active — current planning thread (July 2026, post-upstream-merge)
 
 Grounded in the [upstream comparison analyses](../upstream-comparison/):
