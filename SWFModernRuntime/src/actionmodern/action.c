@@ -60654,63 +60654,47 @@ static ActionVar _invoke_sort_comparator(SWFAppContext* app_context,
 	ActionVar args[2] = { *a, *b };
 	g_call_depth++;
 
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). Behavior-preserving, per-branch flags:
+	//
+	// - Type-2 was a completely bare call (no scopes, no this, no base clip):
+	//   flags = 0 with this_var = NULL reproduces it — with one accepted
+	//   delta: the old arm passed registers = NULL where the core HCALLOCs
+	//   register_count slots. Behaviorally inert (generated func2 bodies
+	//   ignore the parameter and declare their own regs[]), but it is a
+	//   per-comparison alloc/free on the hot sort path — flagged in the
+	//   Stage-4 dossier; the candidate fix is core-level and separate.
+	// - Type-1 pushed its local frame FIRST with the captured scopes on top
+	//   (the __resolve-arm inversion — INV_LOCAL_SCOPE_UNDER_CAPTURED),
+	//   switched to the callee's base_clip under the caller's SWF6+ gate,
+	//   and bound "this" = undefined by name (INV_BIND_THIS on the fresh
+	//   local frame; the old setVariableByName could land on a captured
+	//   outer frame — same lookup-identical bind-frame delta as
+	//   soundFireCallback, A/B'd clean).
+	//
+	// The bare g_call_depth++/-- bracket, the args[2] copy, and all sort
+	// machinery (in-place live-array policy, convergence guard, sign fold)
+	// stay outside the core. Bug fixed by the migration: the type-1 arm
+	// pushed exactly 2 args with no clamp/pad to param_count — instance
+	// fifteen of the TYPE1_ARG_ORDER class: a 1-param comparator bound `b`
+	// into its only param and leaked a stack slot per comparison (the leak
+	// then popped into the NEXT sort's comparator params); a 3-param
+	// comparator popped the caller's stack. regression/
+	// sort_comparator_type1_args pins both shapes.
 	ActionVar result;
-	if (comparator->function_type == 2 && comparator->advanced_func != NULL)
+	if (comparator->function_type == 2)
 	{
-		result = comparator->advanced_func(app_context, args, 2, NULL, NULL);
-	}
-	else if (comparator->function_type == 1 && comparator->simple_func != NULL)
-	{
-		// Push a fresh local scope so param/"this" bindings don't leak to global.
-		ASObject* local_scope = allocObject(app_context, 8);
-		int pushed_local = 0;
-		if (local_scope != NULL && scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-			pushed_local = 1;
-		}
-
-		// Restore captured scopes (closure context from definition site).
-		u32 captured_count = comparator->captured_scope_count;
-		u32 captured_pushed = 0;
-		for (u32 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
-		{
-			scope_is_with[scope_depth] = comparator->captured_scope_is_with[ci];
-			scope_mc[scope_depth] = (MovieClip*)comparator->captured_scope_mc[ci];
-			scope_chain[scope_depth++] = (ASObject*)comparator->captured_scope[ci];
-			captured_pushed++;
-		}
-
-		// Switch base_clip for SWF6+ closures.
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && comparator->base_clip != NULL)
-			g_current_context = (MovieClip*)comparator->base_clip;
-
-		// this=undefined for sort comparator (Flash behavior).
-		ActionVar undef_this = {0};
-		undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
-		setVariableByName("this", &undef_this);
-
-		// Forward-push: args[0] (bottom), args[1] (top) so the generated
-		// `pop→param_last; ...; pop→param_0` prelude binds params in order.
-		pushVar(app_context, &args[0]);
-		pushVar(app_context, &args[1]);
-
-		result = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_pushed && scope_depth > 0; ci++)
-			scope_depth--;
-		if (pushed_local && scope_depth > 0)
-			scope_depth--;
-		if (local_scope != NULL)
-			releaseObject(app_context, local_scope);
+		InvokeOpts opts = { .flags = 0 };
+		result = invokeFunctionValue(app_context, comparator, NULL, args, 2, &opts);
 	}
 	else
 	{
-		result = undef;
+		ActionVar undef_this = {0};
+		undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
+		InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+		                             INV_LOCAL_SCOPE_UNDER_CAPTURED |
+		                             INV_BASE_CLIP | INV_BIND_THIS };
+		result = invokeFunctionValue(app_context, comparator, &undef_this, args, 2, &opts);
 	}
 
 	g_call_depth--;

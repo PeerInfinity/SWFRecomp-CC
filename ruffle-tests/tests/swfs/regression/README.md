@@ -53,3 +53,4 @@ arms cannot be reached any other way.
 | `nc_onstatus_type1_args` | `nc_dispatch_onStatus`'s type-1 arm: clamp/pad the info-object arg to `param_count` (instance twelve; fixed in the same onStatus-family migration) |
 | `lv_ondata_type1_args` | `fireLoadVarsCallback`'s type-1 arm: forward arg order + clamp/pad (instance thirteen; fixed migrating it onto `invokeFunctionValue` in dispatch Stage 4) |
 | `xml_onload_type1_args` | `soundFireCallback`'s type-1 arm (the shared Sound/XML event dispatcher): forward arg order + clamp/pad (instance fourteen; fixed in the same migration batch) |
+| `sort_comparator_type1_args` | `_invoke_sort_comparator`'s type-1 arm: clamp/pad to `param_count` (instance fifteen — a 1-param comparator misbound `b` and leaked a stack slot per comparison into the NEXT sort's comparator; fixed migrating it onto `invokeFunctionValue` in dispatch Stage 4) |
