@@ -123,8 +123,12 @@ writes to a **file** (the runner swallows the test binary's stderr) and running 
 candidate tests. Cheap, decisive, and it is the same technique that proved the Stage-3d
 `ClosureFrame` modes were already covered.
 
-Also queued: the type-1 arms of `fireTimerCallback` (both forms) and of
-`lc/ns/nc_dispatch_onStatus` push forward (correct) but do **not** clamp/pad.
+Also queued: the type-1 arms of `fireTimerCallback` (both forms) push forward
+(correct) but do **not** clamp/pad. (The `lc/ns/nc_dispatch_onStatus` +
+`ns_dispatch_onMetaData` family is DONE — five dispatchers, instances eleven
+and twelve, `regression/{lc,nc}_onstatus_type1_args`; note NC's type-1 arms
+push no local frame and `nc_dispatch_onStatus_undefined`'s pushes nothing —
+preserved via per-branch flags.)
 
 After Stage 4: **Stage 5** (delete the dead marshalling loops; add
 `gates/check_dispatch_funnel.py`, which should also reject any site setting

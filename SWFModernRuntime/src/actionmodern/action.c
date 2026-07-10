@@ -3001,7 +3001,6 @@ static void lc_dispatch_method(SWFAppContext* app_context, ASObject* receiver,
 // Creates {level: "status"} or {level: "error"} event object.
 static void lc_dispatch_onStatus(SWFAppContext* app_context, ASObject* sender, const char* level)
 {
-	extern MovieClip* g_current_context;
 	ActionVar* handler = getPropertyWithPrototype(sender, "onStatus", 8);
 	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
 	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
@@ -3020,72 +3019,24 @@ static void lc_dispatch_onStatus(SWFAppContext* app_context, ASObject* sender, c
 	g_special_depth++;
 	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
 
-	if (func->function_type == 2)
-	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4) — same ritual as lc_dispatch_method: captured
+	// scopes + a bare local frame in BOTH arms, base-clip switch only in the
+	// type-2 arm, receiver as the ABI `this` via this_var, bare g_call_depth
+	// bracket outside the core. The old type-1 arm pushed the event object
+	// with no clamp/pad (instance eleven of TYPE1_ARG_ORDER;
+	// regression/lc_onstatus_type1_args) and called simple_func with no NULL
+	// check; the core fixes both.
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t)sender;
 
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
+	InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE };
+	if (func->function_type == 2) opts.flags |= INV_BASE_CLIP;
 
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		g_call_depth++;
-		func->advanced_func(app_context, &event_arg, 1, regs, (void*)sender);
-		g_call_depth--;
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
-	}
-	else
-	{
-		pushVar(app_context, &event_arg);
-
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-	}
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, &event_arg, 1, &opts);
+	g_call_depth--;
 
 	g_special_depth--;
 }
@@ -3554,7 +3505,6 @@ int actionGetEmbeddedVideoFramePixels(size_t char_id, u16 frame_num,
 static void ns_dispatch_onStatus(SWFAppContext* app_context, ASObject* ns,
                                   const char* code, const char* level)
 {
-	extern MovieClip* g_current_context;
 	ActionVar* handler = getPropertyWithPrototype(ns, "onStatus", 8);
 	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
 	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
@@ -3576,73 +3526,21 @@ static void ns_dispatch_onStatus(SWFAppContext* app_context, ASObject* ns,
 	g_special_depth++;
 	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
 
-	if (func->function_type == 2)
-	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4) — identical ritual to lc_dispatch_onStatus.
+	// The old type-1 arm's missing clamp/pad and unchecked simple_func call
+	// are fixed by the core (the arm is only reachable with an active stream,
+	// i.e. under HAS_DATA_FILES).
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t)ns;
 
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
+	InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE };
+	if (func->function_type == 2) opts.flags |= INV_BASE_CLIP;
 
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		g_call_depth++;
-		func->advanced_func(app_context, &event_arg, 1, regs, (void*)ns);
-		g_call_depth--;
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
-	}
-	else
-	{
-		pushVar(app_context, &event_arg);
-
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		// Push local scope so type-1 function parameter binding works
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-	}
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, &event_arg, 1, &opts);
+	g_call_depth--;
 
 	g_special_depth--;
 }
@@ -3650,7 +3548,6 @@ static void ns_dispatch_onStatus(SWFAppContext* app_context, ASObject* ns,
 static void ns_dispatch_onMetaData(SWFAppContext* app_context, ASObject* ns,
                                     double duration, double width, double height, double framerate)
 {
-	extern MovieClip* g_current_context;
 	ActionVar* handler = getPropertyWithPrototype(ns, "onMetaData", 10);
 	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
 	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
@@ -3675,73 +3572,20 @@ static void ns_dispatch_onMetaData(SWFAppContext* app_context, ASObject* ns,
 	g_special_depth++;
 	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
 
-	if (func->function_type == 2)
-	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4) — identical ritual to lc_dispatch_onStatus.
+	// (Note the meta object deliberately has no Object.prototype — pre-existing
+	// divergence from the onStatus event objects, preserved.)
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t)ns;
 
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
+	InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE };
+	if (func->function_type == 2) opts.flags |= INV_BASE_CLIP;
 
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		g_call_depth++;
-		func->advanced_func(app_context, &meta_arg, 1, regs, (void*)ns);
-		g_call_depth--;
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
-	}
-	else
-	{
-		pushVar(app_context, &meta_arg);
-
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		// Push local scope so type-1 function parameter binding works
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-	}
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, &meta_arg, 1, &opts);
+	g_call_depth--;
 
 	g_special_depth--;
 }
@@ -3943,7 +3787,6 @@ int hasActiveNetStreams(void)
 static void nc_dispatch_onStatus(SWFAppContext* app_context, ASObject* nc,
                                   const char* code, const char* level)
 {
-	extern MovieClip* g_current_context;
 	ActionVar* handler = getPropertyWithPrototype(nc, "onStatus", 8);
 	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
 	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
@@ -3967,65 +3810,25 @@ static void nc_dispatch_onStatus(SWFAppContext* app_context, ASObject* nc,
 	g_special_depth++;
 	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
 
-	if (func->function_type == 2)
-	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). Unlike the LC/NS dispatchers, the old type-1
+	// arm here pushed NO local frame (captured scopes only) — a type-1
+	// handler's param binds land wherever getCurrentLocalScope resolves in
+	// the enclosing chain, and regression/nc_onstatus_closure pins the
+	// captured-scope restore — so INV_LOCAL_SCOPE is gated to type-2 along
+	// with INV_BASE_CLIP. The old type-1 arm's missing clamp/pad (instance
+	// twelve of TYPE1_ARG_ORDER; regression/nc_onstatus_type1_args) and
+	// unchecked simple_func call are fixed by the core.
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t)nc;
 
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
+	InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE };
+	if (func->function_type == 2) opts.flags |= INV_LOCAL_SCOPE | INV_BASE_CLIP;
 
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		g_call_depth++;
-		func->advanced_func(app_context, &event_arg, 1, regs, (void*)nc);
-		g_call_depth--;
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
-	}
-	else
-	{
-		// Type 1 function: push event arg on stack
-		pushVar(app_context, &event_arg);
-
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-
-		for (u32 ci = 0; ci < captured_count; ci++)
-			if (scope_depth > 0) scope_depth--;
-	}
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, &event_arg, 1, &opts);
+	g_call_depth--;
 
 	g_special_depth--;
 }
@@ -4113,7 +3916,6 @@ static ActionVar builtin_nc_connect(SWFAppContext* app_context, ActionVar* args,
 
 static void nc_dispatch_onStatus_undefined(SWFAppContext* app_context, ASObject* nc)
 {
-	extern MovieClip* g_current_context;
 	ActionVar* handler = getPropertyWithPrototype(nc, "onStatus", 8);
 	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
 	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
@@ -4125,50 +3927,24 @@ static void nc_dispatch_onStatus_undefined(SWFAppContext* app_context, ASObject*
 	g_special_depth++;
 	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
 
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). The old type-1 arm here pushed NOTHING around
+	// the call — no captured scopes, no local frame — so every scope flag is
+	// gated to type-2. The old type-1 arm's missing clamp/pad and unchecked
+	// simple_func call are fixed by the core (same class as
+	// nc_dispatch_onStatus; not separately counted — the delivered arg is
+	// undefined, so a misbind was invisible on an empty stack).
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64)(uintptr_t)nc;
+
+	InvokeOpts opts = { .flags = 0 };
 	if (func->function_type == 2)
-	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+		opts.flags |= INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BASE_CLIP;
 
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH) {
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		MovieClip* saved_context = g_current_context;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
-
-		g_call_depth++;
-		func->advanced_func(app_context, &undef_arg, 1, regs, (void*)nc);
-		g_call_depth--;
-
-		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count + 1; ci++)
-			if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
-	}
-	else
-	{
-		pushVar(app_context, &undef_arg);
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-	}
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &this_var, &undef_arg, 1, &opts);
+	g_call_depth--;
 
 	g_special_depth--;
 }

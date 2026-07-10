@@ -1068,6 +1068,45 @@ base-clip switch that type-2 performs, and the whole dispatcher skips
 `switchToFunctionVersion`, captured-scope-force, and the this-stack push. Each is
 a separate commit with a test, per §1 items 3/4.
 
+**The onStatus/onMetaData family migrated — instances eleven and twelve.** Five
+dispatchers in one commit (structural siblings, all newly able to call the core
+after the `InvokeOpts` relocation): `lc_dispatch_onStatus`, `ns_dispatch_onStatus`,
+`ns_dispatch_onMetaData`, `nc_dispatch_onStatus`, `nc_dispatch_onStatus_undefined`.
+All five shared the same type-2 ritual (captured scopes + bare local frame +
+caller-version-gated base-clip switch, receiver as ABI `this`, bare
+`g_call_depth++/--`, `g_special_depth` guard outside) but had **three distinct
+type-1 rituals**, preserved via per-branch flags:
+
+- LC/NS (three dispatchers): captured + local in both arms →
+  `INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE`, `INV_BASE_CLIP` gated to type-2.
+- `nc_dispatch_onStatus`: type-1 pushed **no local frame** (param binds land in
+  the enclosing chain; `regression/nc_onstatus_closure` pins the captured-scope
+  restore) → type-1 gets `INV_CAPTURED_SCOPE` only.
+- `nc_dispatch_onStatus_undefined`: type-1 pushed **nothing** → type-1 gets no
+  scope flags at all.
+
+Every old type-1 arm pushed its single delivered arg with no clamp/pad, and every
+old `else` branch called `simple_func` with no NULL check — the same two bug
+classes as `lc_dispatch_method`, fixed by the core at all five sites. Two sites
+confirmed live with fail-before repros: `regression/lc_onstatus_type1_args`
+(send to a dead channel → `{level:"error"}` on the sender; **instance eleven**)
+and `regression/nc_onstatus_type1_args` (`connect(null)` → Connect.Success info
+object; **instance twelve**). Both showed the 2-param handler binding the event
+object into its LAST param and the first param popping the empty stack. The NS
+sites are only reachable with an active stream (`HAS_DATA_FILES`), so their fix
+is uncredited, per the `bdRectangleGetter` precedent.
+
+Verification: regression 14/14 → **16/16**; avm1 LC/NC/NS cluster (8 tests) all
+statuses + line metrics equal to the CI baseline, and the 4 already-failing
+tests' actual outputs **byte-identical** old-vs-new build; gnash
+`NetConnection-v5..v8` / `NetStream-v5..v8` / `LocalConnection-v5..v8` all equal
+to the CI baseline.
+
+*Normalization pass (b) owed for the family:* same items as `lc_dispatch_method`
+(type-1 base-clip switch, `switchToFunctionVersion`, this-stack), plus one
+family-specific question — whether NC's type-1 no-local-frame divergence (param
+binds leak into the enclosing scope) should be normalized to the LC/NS ritual.
+
 ### Stage 5 — lock it in
 
 - Delete the then-dead 32 marshalling loops and per-site casts.

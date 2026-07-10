@@ -49,3 +49,5 @@ arms cannot be reached any other way.
 | `nc_onstatus_closure` | `nc_dispatch_onStatus` restores the handler's captured scope chain — a behavior lock, not a bug fix |
 | `fn_call_type1_args` | `actionCallMethod`'s `.call`/`.apply`-via-GetMember arm: forward arg order + pad (fixed in dispatch Stage 3b) |
 | `lc_method_type1_args` | `lc_dispatch_method`'s type-1 arm: forward arg order + clamp/pad (instance ten; fixed migrating it onto `invokeFunctionValue` in dispatch Stage 4) |
+| `lc_onstatus_type1_args` | `lc_dispatch_onStatus`'s type-1 arm: clamp/pad the event-object arg to `param_count` (instance eleven; fixed migrating the onStatus family onto `invokeFunctionValue` in dispatch Stage 4) |
+| `nc_onstatus_type1_args` | `nc_dispatch_onStatus`'s type-1 arm: clamp/pad the info-object arg to `param_count` (instance twelve; fixed in the same onStatus-family migration) |
