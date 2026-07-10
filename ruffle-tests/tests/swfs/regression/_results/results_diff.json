@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-10T21:39:09.639797+00:00",
-    "old_git_sha": "1f68e0043c1b972e95f0d245109a19695c56b213",
-    "new_timestamp": "2026-07-10T22:53:01.047512+00:00",
-    "new_git_sha": "8a8ff17c73a3ea75a044eafc5f191be3308413a0",
+    "old_timestamp": "2026-07-10T22:53:01.047512+00:00",
+    "old_git_sha": "8a8ff17c73a3ea75a044eafc5f191be3308413a0",
+    "new_timestamp": "2026-07-10T23:27:19.946404+00:00",
+    "new_git_sha": "2ab5d2685cab208f84e77f3b7ae0856621879d75",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 20,
+    "old_pass": 21,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 20,
-    "old_total": 20,
+    "old_effective_pass": 21,
+    "old_total": 21,
     "old_pass_rate": 100.0,
-    "new_pass": 21,
+    "new_pass": 24,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 21,
-    "new_total": 21,
+    "new_effective_pass": 24,
+    "new_total": 24,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,21 +25,45 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 20,
-    "added": 1,
+    "unchanged": 21,
+    "added": 3,
     "removed": 0
   },
   "changes": [
     {
-      "test": "timer_type1_args",
+      "test": "ei_closure_scope_order",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "watch_mc_type1_args",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "watch_setmember_type1_args",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
       }
     }
   ]

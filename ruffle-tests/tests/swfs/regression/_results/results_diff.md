@@ -1,19 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1f68e0043c1b` (2026-07-10T21:39:09.639797+00:00)
-**Current:** `8a8ff17c73a3` (2026-07-10T22:53:01.047512+00:00)
+**Previous:** `8a8ff17c73a3` (2026-07-10T22:53:01.047512+00:00)
+**Current:** `2ab5d2685cab` (2026-07-10T23:27:19.946404+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 20 | 21 | +1 |
-| Total | 20 | 21 | +1 |
+| Passing | 21 | 24 | +3 |
+| Total | 21 | 24 | +3 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (1)
+## Added Tests (3)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `timer_type1_args` | pass | 14/14 |
+| `ei_closure_scope_order` | pass | 7/7 |
+| `watch_mc_type1_args` | pass | 7/7 |
+| `watch_setmember_type1_args` | pass | 7/7 |
