@@ -62,6 +62,17 @@ Four results worth internalizing before you touch anything:
 
 The design is DONE — extend it, don't re-litigate it.
 
+## Per-dispatcher analysis dossiers — READ FIRST
+
+`SWFRecompDocs/plans/dispatch-stage4-dossiers.md` (2026-07-10) has a full
+analysis dossier for every remaining Stage-4 dispatcher: exact ritual per arm,
+proposed flag mapping, divergences, clamp/pad + NULL-call status, reachability,
+repro designs, and a cross-cutting synthesis with a suggested migration order
+and the two known blockers (fireTimerCallback's TU boundary; broadcastMessage's
+type-1 super shadow needing a `super_bind` core extension). The dossiers are
+advisory — re-verify the flag mapping against live code before each commit —
+but they replace the first hour of every migration session.
+
 ## Your task: Stage 4, and it is two passes per dispatcher
 
 Stage 4 is the event/callback dispatchers **plus** the deliberate normalization pass.
