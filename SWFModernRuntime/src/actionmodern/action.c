@@ -49341,7 +49341,17 @@ void actionSetMember(SWFAppContext* app_context)
 					return;  // Read-only virtual property
 				}
 			}
-			// Check watch table for MC property watchers
+			// Check watch table for MC property watchers.
+			// IMPORTANT: prop_name points to actionSetMember's static _sm_buf,
+			// which any SetMember performed inside the watcher clobbers — and
+			// this arm reads prop_name again AFTER the call (tabIndex check,
+			// the dynamic_props setProperty that stores the assignment, the
+			// autoSize and TF-binding notifications), so the assignment would
+			// land under the wrong name (regression/watch_mc_reentrant_
+			// setmember). Copy it to this arm-level buffer before invoking —
+			// done inside the match so the non-watched fast path pays nothing.
+			// Same hazard the OBJECT arm fixed with its unconditional copy.
+			char _prop_copy_mc[256];
 			if (g_watch_count > 0 && !g_execution_halted)
 			{
 				for (int _wi = 0; _wi < g_watch_count; _wi++)
@@ -49358,6 +49368,14 @@ void actionSetMember(SWFAppContext* app_context)
 							int _wf_t1 = (_wf->function_type == 1 && _wf->simple_func != NULL);
 							if (_wf_t2 || _wf_t1)
 							{
+								// Move the name off the clobber-prone static buffer
+								// (see the _prop_copy_mc comment above).
+								u32 _pcl = prop_name_len < (u32)(sizeof(_prop_copy_mc)-1)
+								               ? prop_name_len : (u32)(sizeof(_prop_copy_mc)-1);
+								memcpy(_prop_copy_mc, prop_name, _pcl);
+								_prop_copy_mc[_pcl] = '\0';
+								prop_name = _prop_copy_mc;
+								prop_name_len = _pcl;
 								// Old value: use undefined (MC virtual properties like "text"
 								// are stored in dynamic_props by init, but Flash/Ruffle
 								// treats them as virtual getter/setter — old value is
