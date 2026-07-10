@@ -1158,6 +1158,76 @@ the watch arms, `builtin_broadcaster_broadcastMessage` (blocked on the
 `super_bind` core extension — LAST), and the enterFrame/onLoad/onConstruct
 sibling family. Then normalization pass (b) per the dossier master list.
 
+**2026-07-10 second session — timer, EI, the watch arms, the enterFrame trio,
+two real-bug fixes, instances seventeen–eighteen** (flag mappings + full
+verification records in each commit message):
+
+- **TU boundary resolved as option (a)** (`8a8ff17c7`): the `INV_*` flag block +
+  `InvokeOpts` moved verbatim into `action_internal.h`, with a non-static
+  `actionInvokeFunctionValue` wrapper exported next to
+  `actionSwitchToFunctionVersion`. Any subsystem carved out of action.c can now
+  drive the core; timer.c is clean of raw `simple_func`/`advanced_func` calls
+  for Stage 5's funnel gate.
+- **`fireTimerCallback`** (`8a8ff17c7`) — **instance seventeen**
+  (`regression/timer_type1_args`: BOTH type-1 arms are separate paths; the
+  fail-before run demonstrated cross-callback corruption live — the
+  function-form clamp row's stranded operand popped into the method-form pad
+  row). Method-form: `INV_VERSION_SWITCH` safe in-core (no base clip on that
+  form, no gate to compute); `INV_EVENT_THIS_MC` type-1-only (mirror of the MC
+  arms). Function-form: callee-version base-clip gate preserved as an `eff_ver`
+  named local in the arm (the Stage-3d pattern).
+- **`actionEI_callInternalInterface`** (`23b8ab41a`) — the depth guard moves
+  INTO the core (EI's was byte-equivalent, unlike LC's bare bracket); second
+  user of `INV_LOCAL_SCOPE_UNDER_CAPTURED` + `INV_FORCE_CAPTURED_WITH`;
+  type-1-only `INV_BIND_THIS`, **live not dead-by-rule** (no this-stack here,
+  host calls run at `g_this_depth == 0`). `regression/ei_closure_scope_order`
+  (behavior lock) pins all three quirks BEFORE the migration — including the
+  empirical correction that a plain SetVariable writes THROUGH a forced-with
+  captured frame (the dossier's write-back observable doesn't discriminate; a
+  `var`/DefineLocal row does).
+- **The watch arms B → C → A** (`73a50cf5f`) — **instance eighteen** (both
+  SetMember arms' type-1 branches, zero suite coverage before;
+  `regression/watch_setmember_type1_args` + `regression/watch_mc_type1_args`,
+  the latter locking C's preserved userData DROP). New shared
+  `invokeWatchCallback()` adapter owns pname construction/ownership, the 4-arg
+  payload, the bare depth bracket, core call, and return fold; B's re-entry
+  guard, C's receiver-context bracket (context = RECEIVER, deliberately not a
+  flag), and A's type-2-only gate + clear-first stay sited. B-t1's
+  enclosing-scope `setVariableByName("this")` DROPPED (dead for lookup under
+  INV_THIS_STACK; residue = minting a stray `this` var — string-primitive
+  precedent). ruffle_matched watch-recursion pair byte-identical old-vs-new.
+- **Two watch real-bug fixes, separate commits** (probes confirmed both):
+  `3d7788391` — Site C read `prop_name` off the static `_sm_buf` AFTER the
+  watcher call, so a SetMember inside the watcher made the assignment store
+  under the wrong name (`regression/watch_mc_reentrant_setmember`); copy-on-
+  match, fast path unchanged. `ecb5aeedb` — Site A's owning-pname +
+  unconditional free double-freed with a NAMED-param type-2 watcher (glibc
+  abort; `regression/watch_timeline_named_params`, the suite's first
+  hand-emitted DefineFunction2); fixed with B's leak-over-dangle discipline.
+- **The enterFrame trio** (`a2ded85b7`) — children arm (version switch +
+  callee-version base-clip gate via `eff_ver`; type-1 = local-under-captured
+  with is_with COPIED, a third variant of the inversion family), root arm (no
+  version switch; type-1 = no local frame, no base clip), var-map arm (barest:
+  `INV_EVENT_THIS_MC` only, no depth bracket). All pass
+  `MOVIECLIP(receiver)` + `INV_MC_THIS_NULL_PTR` (the MC-arm preload pattern).
+  The type-1 pad is INERT on this family (frame-loop dispatch, empty stack,
+  guarded pop already synthesized undefined — A/B-verified) so
+  `regression/enterframe_type1_args` is a **lock, not a credited instance**;
+  its first draft found that a type-1 handler's `this` falls back through
+  base_clip to `_root` (documented in the test). onLoad/onConstruct/onUnload
+  still unmigrated.
+
+Running total: **eighteen** confirmed TYPE1_ARG_ORDER instances, regression
+suite **27/27** locally (24/24 in the mid-session CI baseline; 3 tests newer).
+CI both modes green with **zero pass→fail** at `8a8ff17c7` (no-graphics) and
+`2ab5d2685` (both modes — the timer+EI+watch batch); the final batch at
+`a2ded85b7` covers the two watch fixes + enterFrame trio. One graphics run
+(`29128133910`) died to the known flaky apt-get shard — re-covered by the next
+batch, not a code failure. Remaining Stage-4: `actionDispatchMCOnLoad` /
+`RootOnLoad` / `MCOnConstruct` + inline onUnload sites, then
+`broadcastMessage` (after the `super_bind` core extension). Then normalization
+pass (b).
+
 ### Stage 5 — lock it in
 
 - Delete the then-dead 32 marshalling loops and per-site casts.

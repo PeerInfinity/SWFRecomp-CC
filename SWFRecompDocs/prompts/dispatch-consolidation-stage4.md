@@ -37,10 +37,15 @@ Session start, in order:
 | `ab3b7a77f` | **`mc_call_as2_handler_ng`** — first event-family INV_LOCAL_SCOPE_MC user; exec-func swap moved INTO the core (exact match) |
 | `8c576d3e5` | `_invoke_sort_comparator` — instance fifteen; per-comparison registers HCALLOC perf delta flagged |
 | `1f68e0043` | **the coercion paths + `call_function_with_this`** (5 sites, 8 branches) — instance sixteen (one for the family); version-switch/base-clip brackets kept in the oCVO/oCTS arms |
+| `8a8ff17c7` | **`fireTimerCallback`** — instance seventeen; TU boundary resolved: `INV_*` flags + `InvokeOpts` now in `action_internal.h`, exported `actionInvokeFunctionValue` wrapper |
+| `23b8ab41a` | **`actionEI_callInternalInterface`** — depth guard moves INTO the core; `INV_LOCAL_SCOPE_UNDER_CAPTURED`'s second user; type-1 `INV_BIND_THIS` is LIVE there; `regression/ei_closure_scope_order` lock landed first |
+| `73a50cf5f` | **the watch arms B → C → A** — instance eighteen; shared `invokeWatchCallback()` adapter; B-t1's enclosing-scope this-write dropped (string-primitive precedent) |
+| `3d7788391` + `ecb5aeedb` | **two watch real-bug fixes** (probes confirmed): Site C's `_sm_buf` clobber across the watcher call; Site A's pname double-free with named-param watchers (suite's first hand-emitted DefineFunction2) |
+| `a2ded85b7` | **the enterFrame trio** (children/root/var-map arms) — no credited instance (pad inert at frame-loop level, A/B-proved); `regression/enterframe_type1_args` is a lock; children arm = third variant of the local-under-captured inversion (is_with COPIED) |
 
-Each CI-green in **both** modes with zero pass→fail. **Sixteen** confirmed instances of
+Each CI-green in **both** modes with zero pass→fail. **Eighteen** confirmed instances of
 the TYPE1_ARG_ORDER clamp/pad class; each has a permanent hand-assembled test in
-`regression/`, **20/20** in both modes.
+`regression/`, **27/27** locally.
 
 Four results worth internalizing before you touch anything:
 
@@ -151,13 +156,27 @@ and twelve, `regression/{lc,nc}_onstatus_type1_args`; note NC's type-1 arms
 push no local frame and `nc_dispatch_onStatus_undefined`'s pushes nothing —
 preserved via per-branch flags.)
 
-**Remaining Stage-4 migrations** (dossier order): `fireTimerCallback` (needs
-the TU-boundary export decision first — recommended: export a non-static
-`actionInvokeFunctionValue` wrapper via `action_internal.h`), EI (write the
-`ei_closure_scope_order` lock test first), the watch arms B → C → A,
-`broadcastMessage` (LAST — needs the `super_bind` core extension), and the
-enterFrame/onLoad/onConstruct sibling family. Then normalization pass (b) per
-the dossier master list.
+**Remaining Stage-4 migrations**: ~~`fireTimerCallback`~~, ~~EI~~, ~~the watch
+arms~~, ~~the enterFrame trio~~ (all DONE 2026-07-10, second session — see the
+table above). Left: **`actionDispatchMCOnLoad` / `RootOnLoad` /
+`MCOnConstruct` + the inline onUnload firing sites** (the rest of the
+enterFrame sibling family — onLoad/onConstruct have this-stack pushes,
+manual preload/suppress gating, and OPPOSITE scope orders between their own
+t1/t2 arms; onConstruct adds a setjmp exception bracket; scope them
+arm-by-arm from live code, there is no dossier), and **`broadcastMessage`**
+(LAST — needs the `super_bind` core extension, its own commit first). Then
+normalization pass (b) per the dossier master list.
+
+Session-learned notes not yet in the dossiers: (1) EI's forced-with is NOT
+observable via SetVariable write-back (it writes THROUGH a with-frame where
+the property exists) — the discriminator is a `var`/DefineLocal in the callee
+(`ei_closure_scope_order`'s `lv=undefined` row). (2) The enterFrame family's
+missing type-1 pad is inert at frame-loop level (empty stack; the guarded pop
+already synthesizes undefined, typeof included) — locks, not repros, for any
+dispatcher that only ever runs between frames; expect the same for
+onLoad/onConstruct. (3) A type-1 handler on the enterFrame children arm has
+NO `this` channel — `this` falls back through base_clip to `_root`; a repro
+that self-disables via `this.onEnterFrame` kills the ROOT handler instead.
 
 After Stage 4: **Stage 5** (delete the dead marshalling loops; add
 `gates/check_dispatch_funnel.py`, which should also reject any site setting
@@ -241,24 +260,27 @@ Sensitive clusters: `as2_super_and_this_v6`/`_v8` (NOT `_swf6`), `super_edge_cas
 `coerce_to_object_monkeypatch`, `string_methods*`, `string_coercion`, `closure_scope`,
 `with`, `function_base_clip{,_removed,_readded}`, `this_swf5`/`_swf6`/`_swf7`.
 
-Standing guards in `regression/` (findable by bare name, 20 of them): `ei_type1_args`,
+Standing guards in `regression/` (findable by bare name, 27 of them): `ei_type1_args`,
 `mc_event_type1_args`, `timer_cross_swf_version`, `nc_onstatus_closure`,
 `fn_call_type1_args`, `fn_empty_method_type1_args`, `method_type1_args`,
 `fn_call_builtin_type1_args`, `array_method_type1_args`, `array_element_type1_args`,
 `resolve_type1_args`, `string_prim_method_type1_args`, `mc_resolve_type1_args`,
 `lc_method_type1_args`, `lc_onstatus_type1_args`, `nc_onstatus_type1_args`,
 `lv_ondata_type1_args`, `xml_onload_type1_args`, `sort_comparator_type1_args`,
-`coerce_type1_args`.
+`coerce_type1_args`, `timer_type1_args`, `ei_closure_scope_order`,
+`watch_setmember_type1_args`, `watch_mc_type1_args`,
+`watch_mc_reentrant_setmember`, `watch_timeline_named_params`,
+`enterframe_type1_args`.
 
 Note `string_relational_compare` (avm1) is `output_mismatch` and on
 `ignored_tests.txt` — it will show up in a local cluster run. Not yours.
 
-## CI baseline to hold (raw `pass`, both modes, @ `1f68e0043`)
+## CI baseline to hold (raw `pass`, both modes, @ `2ab5d2685`; regression grows with each landed guard — 24 at that SHA, 27 after `a2ded85b7`)
 
 | Suite | no-graphics | graphics |
 |---|---|---|
 | avm1 | 634/706 | 634/706 |
-| **regression** | **20/20** | **20/20** |
+| **regression** | **24/24** | **24/24** |
 | from_shumway | 73/92 | 73/92 |
 | from_shumway/avm1 | 46/47 | 46/47 |
 | from_gnash/actionscript.all | 135/243 | 135/243 |
