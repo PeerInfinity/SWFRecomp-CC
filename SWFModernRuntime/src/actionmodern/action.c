@@ -15187,6 +15187,12 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 		buildActivationLocals(app_context, local_scope, func, this_var,
 		                      args, num_args, prev_exec, act_flags);
 
+		// super_bind: arm-computed "super" name-shadow on the local frame (see
+		// the InvokeOpts doc). After buildActivationLocals so it wins over
+		// INV_ACT_SUPER.
+		if (opts != NULL && opts->super_bind != NULL && local_scope != NULL)
+			setProperty(app_context, local_scope, "super", 5, opts->super_bind);
+
 		MovieClip* saved_context = g_current_context;
 		if ((flags & INV_BASE_CLIP) && g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = (MovieClip*)func->base_clip;
@@ -15227,6 +15233,13 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 
 		buildActivationLocals(app_context, local_scope, func, this_var,
 		                      args, num_args, prev_exec, act_flags);
+
+		// super_bind: the type-1 side is the reason this field exists — a
+		// type-1 body's GetVariable("super") walks the chain, and a dispatcher
+		// whose own frame binds `super` (e.g. bytecode-invoked broadcastMessage)
+		// stays on that chain for the whole call, so the callee needs a shadow.
+		if (opts != NULL && opts->super_bind != NULL && local_scope != NULL)
+			setProperty(app_context, local_scope, "super", 5, opts->super_bind);
 
 		MovieClip* saved_context = g_current_context;
 		if ((flags & INV_BASE_CLIP) && g_swf_version >= 6 && func->base_clip != NULL)

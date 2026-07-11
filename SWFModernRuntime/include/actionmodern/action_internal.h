@@ -300,6 +300,20 @@ typedef struct InvokeOpts {
 	// g_override_this_set afterwards — the safety net for C-implemented callees
 	// that lack the generated preload-this code which normally consumes it.
 	ActionVar* override_this;
+
+	// When non-NULL (and INV_LOCAL_SCOPE is set), the core binds *super_bind as
+	// "super" on the callee's fresh local frame for BOTH function types. This is
+	// the type-1 super NAME-SHADOW a dispatcher needs when its own invocation
+	// frame's `super` is still live on the scope chain: unlike the dead type-1
+	// this/super binds (which the chain MISSES, falling to the this-cell / live
+	// super context), here the chain HITS the outer frame's binding, so a type-1
+	// callee's GetVariable("super") reads the DISPATCHER's super unless shadowed.
+	// broadcastMessage is the canonical user (gnash AsBroadcaster.as:312 —
+	// a listener's `super.add(o)` must see the LISTENER's super, not the
+	// broadcaster's). The arm computes the value, including any preload/suppress
+	// gate for type-2 callees. Bound AFTER buildActivationLocals, so it wins
+	// over INV_ACT_SUPER — do not set both unless shadowing is the intent.
+	ActionVar* super_bind;
 } InvokeOpts;
 
 // Exported wrapper over action.c's static invokeFunctionValue — the unified
