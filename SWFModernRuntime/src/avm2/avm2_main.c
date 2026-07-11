@@ -40,7 +40,9 @@ Avm2Context* avm2_get_context(void)
 
 void* avm2_alloc(Avm2Context* ctx, uint32_t size)
 {
-	void* p = heap_alloc(ctx->app, size);
+	// o1heap refuses zero-size requests; empty tables (an ABC with no
+	// classes) are legal and want a unique non-NULL pointer.
+	void* p = heap_alloc(ctx->app, size > 0 ? size : 1);
 	if (p == NULL)
 	{
 		avm2_fatal("out of memory allocating %u bytes", size);

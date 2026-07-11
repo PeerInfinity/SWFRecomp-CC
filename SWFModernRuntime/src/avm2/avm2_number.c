@@ -389,6 +389,7 @@ void avm2_register_number(Avm2Context* ctx)
 	Avm2Builtins* b = &ctx->builtins;
 
 	b->number_class = avm2_builtin_class(ctx, "", "Number", b->object_class);
+	b->number_class->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	b->number_class->native_construct = number_construct;
 	b->number_class->native_call = number_construct;
 	add_number_methods(ctx, b->number_class);
@@ -403,6 +404,7 @@ void avm2_register_number(Avm2Context* ctx)
 	                              avm2_number(-INFINITY));
 
 	b->int_class = avm2_builtin_class(ctx, "", "int", b->object_class);
+	b->int_class->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	b->int_class->native_construct = int_construct;
 	b->int_class->native_call = int_construct;
 	add_number_methods(ctx, b->int_class);
@@ -412,6 +414,7 @@ void avm2_register_number(Avm2Context* ctx)
 	                              avm2_integer((int32_t) -2147483648LL));
 
 	b->uint_class = avm2_builtin_class(ctx, "", "uint", b->object_class);
+	b->uint_class->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	b->uint_class->native_construct = uint_construct;
 	b->uint_class->native_call = uint_construct;
 	add_number_methods(ctx, b->uint_class);
@@ -420,6 +423,7 @@ void avm2_register_number(Avm2Context* ctx)
 	avm2_builtin_add_static_const(ctx, b->uint_class, "MIN_VALUE", avm2_integer(0));
 
 	b->boolean_class = avm2_builtin_class(ctx, "", "Boolean", b->object_class);
+	b->boolean_class->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	b->boolean_class->native_construct = boolean_construct;
 	b->boolean_class->native_call = boolean_construct;
 	avm2_builtin_add_method(ctx, b->boolean_class, "toString", boolean_to_string);

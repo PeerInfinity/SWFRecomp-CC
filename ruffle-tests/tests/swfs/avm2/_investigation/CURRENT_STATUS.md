@@ -1,13 +1,63 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-11 — Stage 4 tranche 3 (Namespace/QName, Proxy,
-Dictionary, ByteArray, AMF) landed; Stage 4 COMPLETE.
+Last updated: 2026-07-11 — the E4X/XML engine landed (the §5 deferred
+plan); Stage 4 COMPLETE before it.
 
 **Plan:** `SWFRecompDocs/plans/avm2-support-plan.md` (umbrella; stages,
 architecture sketch, tranche definitions). Phase-1 metric: pass rate on this
 suite's trace tests.
 
 ## State
+
+- **E4X/XML engine (2026-07-11): 53 / 55 E4X candidates pass locally**
+  (`_investigation/E4X_CANDIDATES.txt`; exit criterion >=40 met). The 2
+  misses are triaged infrastructure gaps, not E4X gaps:
+  xml_socket (needs flash.net.XMLSocket + the Ruffle test-framework
+  socket.json mock) and xml_appendchild_swf_v21 (its first 7 lines pass;
+  the rest needs flash.display.Loader loading loadable.swf).
+  What landed:
+  - `SWFModernRuntime/src/avm2/avm2_e4x.c` — E4XNode tree, hand-written
+    parser for the E4X subset (entities + char refs with Ruffle's
+    "&[^;]*;-or-verbatim" rule, CDATA/comments/PIs, DOCTYPE/decl skip,
+    lenient end tags, dup-attr 1104, errors 1083-1097), namespace
+    resolution (xmlns decls, dxns), ECMA-357 ToXMLString with
+    prettyPrinting/prettyIndent, toString simple-content rules,
+    matches_name/handle_input_multiname (incl. the original-set+public
+    rebuild — xml_explicit_use_namespace), deep equals/copy, mutation.
+  - `SWFModernRuntime/src/avm2/avm2_xml.c` — XML/XMLList classes: full
+    method surface (namespace ops incl. the ECMA 9.1.1.13 prefix strip,
+    appendChild/insertChild*/replace/setChildren with maybe_escape_child
+    SWF gates, normalize, setName 1117 + namespace clearing), class-call
+    conversions (XML(x) identity, 1088), settings statics, the
+    [[TargetObject]]/resolve_value append machinery, list numeric-index
+    [[Put]], the notification API (attributeAdded/attributeChanged/
+    nameSet with ancestor bubbling — xml_notification_bubbling), and the
+    legacy flash.xml.XMLNode/XMLDocument/XMLNodeType family (ported from
+    Ruffle's AS3 impls; xmldocument/xmlnode/xml_ignore_white).
+  - Property engine: XML/XMLList receivers intercept get/set/delete in
+    every path of avm2_ops.c (static/dyn/QName/RTQName), with the
+    avmplus Toplevel.cpp quirk (public method-trait hits reroute to E4X
+    access; explicit AS3::name binds the method), numeric-index rules
+    (xml[0] === xml; node->obj wrapper caching for ===), call fallback
+    (simple-content string delegation, 1-element list delegation), `in`/
+    hasOwnProperty, enumeration hooks, with-scope resolution for filter
+    loops, abstract_eq XML/XMLList/QName arms, and the XML+XML → XMLList
+    add operator.
+  - Ops: GetDescendants (static/lazy/RTQName forms), CheckFilter (1123),
+    Dxns/DxnsLate (ctx->dxns, dynamically scoped via avm2_call_method_ref
+    save/restore + SET_DXNS reset; feeds handle_input + parser).
+  - Integration: AMF3 writer XML arm (0x0B XmlString, pretty-sensitive —
+    amf_xml), QName is_attribute flag (honored by lazy names and
+    flash_proxy::isAttribute — qname_as_lazy_name_attribute_multiname),
+    real describeType (E4X tree: attrs, extendsClass chain, constructor
+    signatures, Object's AS3 method trio; atom-int class rule —
+    function_proto_created, number_autoconv), avmplus flag constants,
+    primitive builtin classes now SEALED|FINAL, avm2_alloc(0) fixed
+    (empty-table ABCs — xml_explicit_use_namespace).
+  **Census ceiling 1155 -> 1163/1164** with 128 ops
+  (`_investigation/E4X_OPS.txt` = TRANCHE3_OPS + GetDescendants/
+  CheckFilter/Dxns/DxnsLate); the only op-blocked test left is the
+  alchemy (Li8/Sf64/...) one.
 
 - **CI baseline (run 29158224391, 2026-07-11): 411 / 1,200 passing
   (34.2%)** — up from tranche 2's 354/1200 (+57), zero pass->fail

@@ -617,9 +617,19 @@ Avm2Value avm2_call_method_ref(Avm2Context* ctx, const Avm2MethodRef* m,
 	act.args = args;
 	act.argc = argc;
 	act.callee = NULL;
+	// Default XML namespace propagation (Ruffle activation.rs): callees
+	// inherit the caller's dxns; SET_DXNS methods start fresh. Restored on
+	// return (exception unwinds restore via the try-frame snapshot).
+	const Avm2String* saved_dxns = ctx->dxns;
+	if (m->file != NULL
+	    && (m->file->data->methods[m->method_index].flags & (1u << 6)) != 0)
+	{
+		ctx->dxns = NULL;
+	}
 	avm2_callstack_push(ctx, m, bound_class);
 	Avm2Value result = m->fn(&act);
 	avm2_callstack_pop(ctx);
+	ctx->dxns = saved_dxns;
 	return result;
 }
 

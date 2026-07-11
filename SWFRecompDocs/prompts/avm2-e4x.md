@@ -1,4 +1,18 @@
-# Session prompt — AVM2: the E4X/XML engine
+# Session prompt — AVM2: the E4X/XML engine — COMPLETE 2026-07-11
+
+**Status: COMPLETE.** 53/55 candidates pass locally (exit ≥40 met; the 2
+misses are xml_socket = XMLSocket networking + socket.json mock, and
+xml_appendchild_swf_v21 = flash.display.Loader — both infrastructure, not
+E4X). New modules `avm2_e4x.c`/`avm2_xml.c` (incl. legacy flash.xml family
++ the notification API), all four ops, describeType, AMF XML arm. Census
+ceiling 1163/1164 (`E4X_OPS.txt`). See
+`avm2/_investigation/CURRENT_STATUS.md` for the landing summary and the
+`avm2-e4x-engine` memory for gotchas. Next: Stage 5 (frame lifecycle +
+display basics — unlocks the movieclip_*/displayobject_* families).
+
+---
+
+(Original prompt below, for reference.)
 
 You are implementing the **E4X/XML engine** for the AVM2 runtime — the
 deferred plan named in `SWFRecompDocs/plans/avm2-support-plan.md` §5

@@ -12,11 +12,75 @@
 #include <string.h>
 
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_e4x.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+
+// E4XName from a lazy QName value (uri NULL = any namespace).
+static E4XName e4x_name_from_qext(const Avm2QNameExt* q, int force_attr)
+{
+	E4XName n;
+	memset(&n, 0, sizeof(n));
+	n.local = q->local;
+	n.is_attribute = (uint8_t) (q->is_attribute || force_attr);
+	if (q->uri == NULL)
+	{
+		n.any_ns = 1;
+	}
+	else
+	{
+		n.is_qname = 1;
+		n.single_uri = q->uri;
+		n.single_is_real = 1;
+	}
+	return n;
+}
+
+// E4XName from a popped RTQName namespace + a name string. An empty-URI
+// (public) namespace rebuilds via string_to_multiname (dxns handling).
+static E4XName e4x_name_from_rtns(Avm2Context* ctx, Avm2Value ns_val,
+                                  const Avm2String* local, int attr)
+{
+	Avm2NamespaceExt* n = avm2_namespace_ext_of(ns_val);
+	if (n != NULL && n->uri != NULL && n->uri->len > 0)
+	{
+		E4XName name;
+		memset(&name, 0, sizeof(name));
+		name.local = local;
+		name.is_attribute = (uint8_t) attr;
+		name.is_qname = 1;
+		name.single_uri = n->uri;
+		name.single_is_real = 1;
+		return name;
+	}
+	return avm2_e4x_name_from_string(ctx, local, attr);
+}
+
+static int mn_is_attribute_kind(const Avm2AbcFileData* data, uint32_t mn_idx)
+{
+	uint8_t k = data->multinames[mn_idx].kind;
+	return k == 0x0d || k == 0x10 || k == 0x12 || k == 0x0e || k == 0x1c;
+}
+
+// Lazy-name fill keeps the multiname's static ns set (handle_input then
+// adds public): a plain rebuilt name gains the compiler set so
+// use-namespace lookups still match (xml_explicit_use_namespace).
+static void e4x_name_attach_mn_set(Avm2Activation* act, uint32_t mn_idx, E4XName* n)
+{
+	const Avm2AbcFileData* data = act->file->data;
+	uint8_t k = data->multinames[mn_idx].kind;
+	if (k != 0x09 && k != 0x0e && k != 0x1b && k != 0x1c) return;
+	if (n->is_qname || n->any_ns || n->is_attribute || n->local == NULL) return;
+	if (avm2_dxns_uri(act->ctx) != NULL) return;
+	n->single_uri = NULL;
+	n->single_is_real = 0;
+	n->data = data;
+	n->ns_set = data->multinames[mn_idx].ns_set;
+	n->also_public = 1;
+}
 
 _Noreturn void avm2_fatal(const char* fmt, ...)
 {
@@ -438,6 +502,14 @@ Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32
 	{
 		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
 	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		Avm2Value out;
+		if (avm2_xml_get_mn(act->ctx, recv, act->file->data, mn_idx, &out))
+		{
+			return out;
+		}
+	}
 	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
 	    && avm2_mn_has_public_ns(act->file->data, mn_idx))
 	{
@@ -479,6 +551,14 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 		// key (Ruffle fill_with_runtime_params — qname_indexing).
 		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 		if (q != NULL) return getproperty_qname(act, recv, q);
+	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		int attr = mn_is_attribute_kind(act->file->data, mn_idx);
+		E4XName n = avm2_e4x_name_from_value(ctx, name_val, attr);
+		e4x_name_attach_mn_set(act, mn_idx, &n);
+		Avm2Value out;
+		if (avm2_xml_get_name(ctx, recv, &n, &out)) return out;
 	}
 	if (value_is_null_like(recv))
 	{
@@ -651,6 +731,11 @@ static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	{
 		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
 	}
+	if (avm2_value_is_xmlish(recv)
+	    && avm2_xml_set_mn(act->ctx, recv, act->file->data, mn_idx, value))
+	{
+		return;
+	}
 	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
 	    && avm2_mn_has_public_ns(act->file->data, mn_idx)
 	    && avm2_vector_name_access(act->ctx, recv.u.obj, name, name_len,
@@ -713,6 +798,13 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 			setproperty_qname(act, recv, q, value);
 			return;
 		}
+	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		int attr = mn_is_attribute_kind(act->file->data, mn_idx);
+		E4XName n = avm2_e4x_name_from_value(ctx, name_val, attr);
+		e4x_name_attach_mn_set(act, mn_idx, &n);
+		if (avm2_xml_set_name(ctx, recv, &n, value)) return;
 	}
 	if (value_is_null_like(recv))
 	{
@@ -834,6 +926,14 @@ Avm2Value avm2_op_deleteproperty(Avm2Activation* act, Avm2Value recv, uint32_t m
 	const char* name;
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (avm2_value_is_xmlish(recv))
+	{
+		Avm2Value out;
+		if (avm2_xml_delete_mn(ctx, recv, act->file->data, mn_idx, &out))
+		{
+			return out;
+		}
+	}
 	if (recv.kind == AVM2_VALUE_OBJECT && avm2_is_proxy(recv.u.obj))
 	{
 		// Declared traits (in ANY ns of the multiname) can't be deleted;
@@ -870,6 +970,15 @@ Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32
 		}
 		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 		if (q != NULL) return deleteproperty_qname(act, recv, q);
+	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		Avm2Context* xctx = act->ctx;
+		int attr = mn_is_attribute_kind(act->file->data, mn_idx);
+		E4XName n = avm2_e4x_name_from_value(xctx, name_val, attr);
+		e4x_name_attach_mn_set(act, mn_idx, &n);
+		Avm2Value out;
+		if (avm2_xml_delete_name(xctx, recv, &n, &out)) return out;
 	}
 	if (recv.kind == AVM2_VALUE_OBJECT && avm2_is_proxy(recv.u.obj))
 	{
@@ -970,6 +1079,12 @@ static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
                                    const Avm2QNameExt* q)
 {
 	Avm2Context* ctx = act->ctx;
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = e4x_name_from_qext(q, 0);
+		Avm2Value out;
+		if (avm2_xml_get_name(ctx, recv, &n, &out)) return out;
+	}
 	Avm2PropKey key;
 	int any_ns;
 	int pub = key_from_qname_ext(q, &key, &any_ns);
@@ -996,6 +1111,11 @@ static void setproperty_qname(Avm2Activation* act, Avm2Value recv,
                               const Avm2QNameExt* q, Avm2Value value)
 {
 	Avm2Context* ctx = act->ctx;
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = e4x_name_from_qext(q, 0);
+		if (avm2_xml_set_name(ctx, recv, &n, value)) return;
+	}
 	Avm2PropKey key;
 	int any_ns;
 	int pub = key_from_qname_ext(q, &key, &any_ns);
@@ -1020,6 +1140,12 @@ static Avm2Value deleteproperty_qname(Avm2Activation* act, Avm2Value recv,
                                       const Avm2QNameExt* q)
 {
 	Avm2Context* ctx = act->ctx;
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = e4x_name_from_qext(q, 0);
+		Avm2Value out;
+		if (avm2_xml_delete_name(ctx, recv, &n, &out)) return out;
+	}
 	Avm2PropKey key;
 	int any_ns;
 	int pub = key_from_qname_ext(q, &key, &any_ns);
@@ -1065,6 +1191,14 @@ Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t
 	{
 		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
 	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = e4x_name_from_rtns(ctx, ns_val,
+		                               avm2_string_new(ctx, name, name_len),
+		                               mn_is_attribute_kind(act->file->data, mn_idx));
+		Avm2Value out;
+		if (avm2_xml_get_name(ctx, recv, &n, &out)) return out;
+	}
 	Avm2PropKey key;
 	int pub = key_from_ns_value(ns_val, name, name_len, &key);
 	Resolved r;
@@ -1075,7 +1209,6 @@ Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t
 Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                      Avm2Value ns_val, Avm2Value name_val)
 {
-	(void) mn_idx;
 	Avm2Context* ctx = act->ctx;
 	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 	if (q != NULL)
@@ -1087,6 +1220,13 @@ Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32
 	if (value_is_null_like(recv))
 	{
 		avm2_throw_null_or_undefined(ctx, recv, s->utf8, s->len);
+	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = e4x_name_from_rtns(ctx, ns_val, s,
+		                               mn_is_attribute_kind(act->file->data, mn_idx));
+		Avm2Value out;
+		if (avm2_xml_get_name(ctx, recv, &n, &out)) return out;
 	}
 	Avm2PropKey key;
 	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
@@ -1103,6 +1243,12 @@ static void setproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 	if (value_is_null_like(recv))
 	{
 		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = e4x_name_from_rtns(ctx, ns_val,
+		                               avm2_string_new(ctx, name, name_len), 0);
+		if (avm2_xml_set_name(ctx, recv, &n, value)) return;
 	}
 	Avm2PropKey key;
 	int pub = key_from_ns_value(ns_val, name, name_len, &key);
@@ -1150,6 +1296,13 @@ static Avm2Value deleteproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 	if (value_is_null_like(recv))
 	{
 		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = e4x_name_from_rtns(ctx, ns_val,
+		                               avm2_string_new(ctx, name, name_len), 0);
+		Avm2Value out;
+		if (avm2_xml_delete_name(ctx, recv, &n, &out)) return out;
 	}
 	if (recv.kind != AVM2_VALUE_OBJECT) return avm2_bool(false);
 	Avm2PropKey key;
@@ -1310,8 +1463,14 @@ static int scope_defines_mn(Avm2Activation* act, const Avm2ScopeEntry* se, uint3
 	{
 		return avm2_vtable_find_mn(se->obj->vtable, act->file->data, mn_idx) != NULL;
 	}
+	Avm2Value sv = avm2_object_value(se->obj);
+	if (avm2_value_is_xmlish(sv))
+	{
+		// E4X filter loops (with-scope per item): has_property semantics.
+		return avm2_xml_has_property_mn(act->ctx, sv, act->file->data, mn_idx);
+	}
 	Resolved r;
-	return resolve_mn(act, avm2_object_value(se->obj), mn_idx, &r);
+	return resolve_mn(act, sv, mn_idx, &r);
 }
 
 static Avm2Object* findproperty_impl(Avm2Activation* act, const Avm2ScopeEntry* lscope,
@@ -1425,7 +1584,19 @@ static Avm2Object* findproperty_key(Avm2Activation* act, const Avm2ScopeEntry* l
 		Resolved r;
 		if (lscope[i - 1].is_with)
 		{
-			if (resolve_key(ctx, avm2_object_value(so), key, public_ok, &r)) return so;
+			Avm2Value sv = avm2_object_value(so);
+			if (avm2_value_is_xmlish(sv))
+			{
+				if (avm2_xml_has_property_via_in(ctx, sv,
+				        avm2_string_new(ctx, key->name, key->name_len)))
+				{
+					return so;
+				}
+			}
+			else if (resolve_key(ctx, sv, key, public_ok, &r))
+			{
+				return so;
+			}
 		}
 		else if (avm2_vtable_find(so->vtable, key) != NULL)
 		{
@@ -1624,6 +1795,10 @@ Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_
 	}
 	Resolved r;
 	int ok = resolve_mn(act, recv, mn_idx, &r);
+	if (!ok && avm2_value_is_xmlish(recv))
+	{
+		return avm2_xml_call_fallback(act->ctx, recv, name, name_len, args, argc);
+	}
 	return callproperty_common(act->ctx, recv, name, name_len, ok, &r, args, argc, recv);
 }
 
@@ -1666,6 +1841,10 @@ Avm2Value avm2_op_callproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, 1, &r);
+	if (!ok && avm2_value_is_xmlish(recv))
+	{
+		return avm2_xml_call_fallback(ctx, recv, ns->utf8, ns->len, args, argc);
+	}
 	return callproperty_common(act->ctx, recv, ns->utf8, ns->len, ok, &r, args, argc, recv);
 }
 
@@ -1683,6 +1862,10 @@ static Avm2Value callproperty_qname(Avm2Activation* act, Avm2Value recv,
 	}
 	Resolved r;
 	int ok = resolve_generic_key(ctx, recv, &key, pub, any_ns, &r);
+	if (!ok && avm2_value_is_xmlish(recv))
+	{
+		return avm2_xml_call_fallback(ctx, recv, key.name, key.name_len, args, argc);
+	}
 	return callproperty_common(ctx, recv, key.name, key.name_len, ok, &r, args, argc, recv);
 }
 
@@ -1701,6 +1884,10 @@ Avm2Value avm2_op_callproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_
 	int pub = key_from_ns_value(ns_val, name, name_len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
+	if (!ok && avm2_value_is_xmlish(recv))
+	{
+		return avm2_xml_call_fallback(ctx, recv, name, name_len, args, argc);
+	}
 	return callproperty_common(ctx, recv, name, name_len, ok, &r, args, argc, recv);
 }
 
@@ -1724,6 +1911,10 @@ Avm2Value avm2_op_callproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint3
 	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
+	if (!ok && avm2_value_is_xmlish(recv))
+	{
+		return avm2_xml_call_fallback(ctx, recv, s->utf8, s->len, args, argc);
+	}
 	return callproperty_common(ctx, recv, s->utf8, s->len, ok, &r, args, argc, recv);
 }
 
@@ -2279,6 +2470,10 @@ Avm2Value avm2_op_in(Avm2Activation* act, Avm2Value name, Avm2Value obj)
 		return avm2_bool(avm2_coerce_to_boolean(v));
 	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name);
+	if (avm2_value_is_xmlish(obj))
+	{
+		return avm2_bool(avm2_xml_has_property_via_in(ctx, obj, ns) != 0);
+	}
 	return avm2_bool(avm2_has_public_property(ctx, obj, ns->utf8, ns->len) != 0);
 }
 
@@ -2556,6 +2751,17 @@ Avm2Value avm2_get_public_property(Avm2Context* ctx, Avm2Value recv,
 	{
 		return avm2_undefined();
 	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = avm2_e4x_name_from_string(
+			ctx, avm2_string_new(ctx, name, name_len), 0);
+		Avm2Value out;
+		if (avm2_xml_get_name(ctx, recv, &n, &out))
+		{
+			if (found != NULL) *found = 1;
+			return out;
+		}
+	}
 	Avm2PropKey key = avm2_public_key(name, name_len);
 	Resolved r;
 	if (!resolve_key(ctx, recv, &key, 1, &r))
@@ -2577,6 +2783,10 @@ Avm2Value avm2_call_public_property(Avm2Context* ctx, Avm2Value recv,
 	Avm2PropKey key = avm2_public_key(name, name_len);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, 1, &r);
+	if (!ok && avm2_value_is_xmlish(recv))
+	{
+		return avm2_xml_call_fallback(ctx, recv, name, name_len, args, argc);
+	}
 	return callproperty_common(ctx, recv, name, name_len, ok, &r, args, argc, recv);
 }
 
@@ -2588,6 +2798,12 @@ void avm2_set_public_property(Avm2Context* ctx, Avm2Value recv,
 	if (value_is_null_like(recv))
 	{
 		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	if (avm2_value_is_xmlish(recv))
+	{
+		E4XName n = avm2_e4x_name_from_string(
+			ctx, avm2_string_new(ctx, name, name_len), 0);
+		if (avm2_xml_set_name(ctx, recv, &n, value)) return;
 	}
 	uint32_t idx;
 	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
@@ -2610,6 +2826,11 @@ int avm2_has_public_property(Avm2Context* ctx, Avm2Value recv,
                              const char* name, uint32_t name_len)
 {
 	if (value_is_null_like(recv)) return 0;
+	if (avm2_value_is_xmlish(recv))
+	{
+		return avm2_xml_has_property_via_in(
+			ctx, recv, avm2_string_new(ctx, name, name_len));
+	}
 	Avm2PropKey key = avm2_public_key(name, name_len);
 	Resolved r;
 	return resolve_key(ctx, recv, &key, 1, &r);
@@ -2619,6 +2840,10 @@ int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
                                  const char* name, uint32_t name_len)
 {
 	if (value_is_null_like(recv)) return 0;
+	if (avm2_value_is_xmlish(recv))
+	{
+		return avm2_xml_has_own(ctx, recv, name, name_len);
+	}
 	// STRICT publicness: hasOwnProperty must not see AS3-namespace traits
 	// (hasownproperty_namespaces).
 	const Avm2VTable* vt = avm2_value_vtable(ctx, recv);
@@ -2636,4 +2861,131 @@ int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
 		return idx < avm2_vector_ext(obj)->length;
 	}
 	return avm2_object_find_dynamic(obj, name, name_len) != NULL;
+}
+
+// ---------------------------------------------------------------------------
+// E4X ops: GetDescendants / CheckFilter / Dxns / DxnsLate
+// ---------------------------------------------------------------------------
+
+// Static-multiname has_property for with-scope finds (filter expressions).
+int avm2_xml_has_property_mn(Avm2Context* ctx, Avm2Value recv,
+                             const Avm2AbcFileData* data, uint32_t mn_idx)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(data, mn_idx, &name, &name_len);
+	E4XName n = avm2_e4x_name_from_mn(ctx, data, mn_idx);
+	Avm2XmlExt* xe = avm2_xml_ext_of(recv);
+	Avm2XmlListExt* le = avm2_xmllist_ext_of(recv);
+	// Any-name / attribute forms have no string equivalent; probe directly.
+	if (xe != NULL)
+	{
+		E4XNode* node = xe->node;
+		if (node->kind != E4X_ELEMENT) return 0;
+		E4XNode** arr = n.is_attribute ? node->attributes : node->children;
+		uint32_t cnt = n.is_attribute ? node->attr_count : node->child_count;
+		for (uint32_t i = 0; i < cnt; i++)
+		{
+			if (avm2_e4x_matches_name(arr[i], &n)) return 1;
+		}
+		return 0;
+	}
+	if (le != NULL)
+	{
+		for (uint32_t i = 0; i < le->count; i++)
+		{
+			Avm2Value item = avm2_object_value(
+				avm2_xml_object_for_node(ctx, le->items[i]));
+			if (avm2_xml_has_property_mn(ctx, item, data, mn_idx)) return 1;
+		}
+		return 0;
+	}
+	return 0;
+}
+
+Avm2Value avm2_op_getdescendants(Avm2Activation* act, Avm2Value v, uint32_t mn_idx)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(v))
+	{
+		avm2_throw_null_or_undefined(ctx, v, NULL, 0);
+	}
+	E4XName name = avm2_e4x_name_from_mn(ctx, act->file->data, mn_idx);
+	return avm2_xml_descendants_value(ctx, v, &name);
+}
+
+Avm2Value avm2_op_getdescendants_dyn(Avm2Activation* act, Avm2Value v, uint32_t mn_idx,
+                                     Avm2Value name_val)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(v))
+	{
+		avm2_throw_null_or_undefined(ctx, v, NULL, 0);
+	}
+	int attr = mn_is_attribute_kind(act->file->data, mn_idx);
+	E4XName name = avm2_e4x_name_from_value(ctx, name_val, attr);
+	return avm2_xml_descendants_value(ctx, v, &name);
+}
+
+Avm2Value avm2_op_getdescendants_rtns(Avm2Activation* act, Avm2Value v, uint32_t mn_idx,
+                                       Avm2Value ns_val)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(v))
+	{
+		avm2_throw_null_or_undefined(ctx, v, NULL, 0);
+	}
+	const char* nm;
+	uint32_t nm_len;
+	avm2_mn_name(act->file->data, mn_idx, &nm, &nm_len);
+	E4XName name = e4x_name_from_rtns(ctx, ns_val, avm2_string_new(ctx, nm, nm_len),
+	                                  mn_is_attribute_kind(act->file->data, mn_idx));
+	return avm2_xml_descendants_value(ctx, v, &name);
+}
+
+Avm2Value avm2_op_getdescendants_rtns_l(Avm2Activation* act, Avm2Value v, uint32_t mn_idx,
+                                        Avm2Value ns_val, Avm2Value name_val)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(v))
+	{
+		avm2_throw_null_or_undefined(ctx, v, NULL, 0);
+	}
+	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+	if (q != NULL)
+	{
+		E4XName name = e4x_name_from_qext(
+			q, mn_is_attribute_kind(act->file->data, mn_idx));
+		return avm2_xml_descendants_value(ctx, v, &name);
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, name_val);
+	E4XName name = e4x_name_from_rtns(ctx, ns_val, s,
+	                                  mn_is_attribute_kind(act->file->data, mn_idx));
+	return avm2_xml_descendants_value(ctx, v, &name);
+}
+
+Avm2Value avm2_op_checkfilter(Avm2Activation* act, Avm2Value v)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(v))
+	{
+		avm2_throw_null_or_undefined(ctx, v, NULL, 0);
+	}
+	if (avm2_value_is_xmlish(v)) return v;
+	char cn[160];
+	class_name_of(ctx, v, cn, sizeof(cn));
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #1123: Filter operator not supported on type %s.", cn);
+}
+
+void avm2_op_dxns(Avm2Activation* act, uint32_t str_idx)
+{
+	act->ctx->dxns = &act->file->data->strings[str_idx];
+}
+
+void avm2_op_dxnslate(Avm2Activation* act, Avm2Value v)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2NamespaceExt* n = avm2_namespace_ext_of(v);
+	ctx->dxns = (n != NULL) ? n->uri : avm2_coerce_to_string(ctx, v);
 }

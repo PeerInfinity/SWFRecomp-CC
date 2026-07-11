@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include <avm2/avm2_value.h>
+#include <avm2/avm2_e4x.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
@@ -679,6 +680,37 @@ Avm2Value avm2_op_add_values(Avm2Context* ctx, Avm2Value a, Avm2Value b)
 	{
 		return avm2_number(a.u.d + b.u.d);
 	}
+	if (avm2_value_is_xmlish(a) && avm2_value_is_xmlish(b))
+	{
+		// E4X: XML/XMLList + XML/XMLList concatenates into a new XMLList
+		// (Ruffle activation.rs op_add; xml_list_concat).
+		Avm2Object* out = avm2_xmllist_new(ctx, NULL, NULL);
+		Avm2XmlListExt* oe = (Avm2XmlListExt*) out->native_ext;
+		Avm2Value halves[2] = { a, b };
+		for (int h = 0; h < 2; h++)
+		{
+			Avm2XmlListExt* le = avm2_xmllist_ext_of(halves[h]);
+			if (le != NULL)
+			{
+				// append(list): copy target linkage, clear dirty.
+				oe->target_dirty = 0;
+				oe->target_object = le->target_object;
+				oe->has_target_prop = le->has_target_prop;
+				oe->target_prop = le->target_prop;
+				for (uint32_t i = 0; i < le->count; i++)
+				{
+					avm2_xmllist_push(ctx, oe, le->items[i]);
+				}
+			}
+			else
+			{
+				Avm2XmlExt* xe = avm2_xml_ext_of(halves[h]);
+				oe->target_dirty = 1;
+				avm2_xmllist_push(ctx, oe, xe->node);
+			}
+		}
+		return avm2_object_value(out);
+	}
 	if (a.kind == AVM2_VALUE_STRING)
 	{
 		return avm2_string(avm2_string_concat(ctx, a.u.str, avm2_coerce_to_string(ctx, b)));
@@ -729,7 +761,27 @@ bool avm2_strict_eq(Avm2Value a, Avm2Value b)
 
 bool avm2_abstract_eq(Avm2Context* ctx, Avm2Value a, Avm2Value b)
 {
-	// ECMA-262 3rd ed. 11.9.3 (value.rs abstract_eq; no XML/QName here).
+	// E4X arms come first (Ruffle value.rs: XML/XMLList/QName before the
+	// ECMA algorithm — an empty XMLList == undefined).
+	{
+		int eq;
+		if (avm2_xml_abstract_eq(ctx, a, b, &eq)) return eq != 0;
+		if (avm2_xml_abstract_eq(ctx, b, a, &eq)) return eq != 0;
+		Avm2QNameExt* qa = avm2_qname_ext_of(a);
+		Avm2QNameExt* qb = avm2_qname_ext_of(b);
+		if (qa != NULL && qb != NULL)
+		{
+			int uri_eq = (qa->uri == NULL && qb->uri == NULL)
+			             || (qa->uri != NULL && qb->uri != NULL
+			                 && avm2_string_equals(qa->uri, qb->uri));
+			int local_eq = (qa->local == NULL && qb->local == NULL)
+			               || (qa->local != NULL && qb->local != NULL
+			                   && avm2_string_equals(qa->local, qb->local));
+			return uri_eq && local_eq;
+		}
+	}
+
+	// ECMA-262 3rd ed. 11.9.3 (value.rs abstract_eq).
 	bool a_num = avm2_value_is_number(a);
 	bool b_num = avm2_value_is_number(b);
 

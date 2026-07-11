@@ -140,10 +140,10 @@ static Avm2Value proxy_default_next_value(Avm2Activation* act)
 
 static Avm2Value proxy_is_attribute(Avm2Activation* act)
 {
-	// Attribute multinames are E4X territory (GetDescendants) — the QNames
-	// our engine builds are never attributes yet.
-	(void) act;
-	return avm2_bool(false);
+	// Honors the QName ATTRIBUTE flag (set by E4X name() on attribute
+	// nodes and by attribute multinames routed through the proxy hooks).
+	Avm2QNameExt* q = (act->argc >= 1) ? avm2_qname_ext_of(act->args[0]) : NULL;
+	return avm2_bool(q != NULL && q->is_attribute != 0);
 }
 
 // ---------------------------------------------------------------------------

@@ -574,6 +574,7 @@ void avm2_register_string(Avm2Context* ctx)
 	Avm2Builtins* b = &ctx->builtins;
 	Avm2Class* cls = avm2_builtin_class(ctx, "", "String", b->object_class);
 	b->string_class = cls;
+	cls->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	cls->native_construct = string_construct;
 	cls->native_call = string_construct;
 

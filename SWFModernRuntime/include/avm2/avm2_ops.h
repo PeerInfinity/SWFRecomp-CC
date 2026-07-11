@@ -179,6 +179,17 @@ Avm2Value avm2_op_coerce_s(Avm2Activation* act, Avm2Value v);   // null/undef â†
 Avm2Value avm2_op_convert_s(Avm2Activation* act, Avm2Value v);  // always string
 Avm2Value avm2_op_coerce_o(Avm2Activation* act, Avm2Value v);   // undef â†’ null
 Avm2Value avm2_op_convert_o(Avm2Activation* act, Avm2Value v);  // null check
+// E4X ops (GetDescendants / CheckFilter / Dxns / DxnsLate).
+Avm2Value avm2_op_getdescendants(Avm2Activation* act, Avm2Value v, uint32_t mn_idx);
+Avm2Value avm2_op_getdescendants_dyn(Avm2Activation* act, Avm2Value v, uint32_t mn_idx,
+                                     Avm2Value name_val);
+Avm2Value avm2_op_getdescendants_rtns(Avm2Activation* act, Avm2Value v, uint32_t mn_idx,
+                                       Avm2Value ns_val);
+Avm2Value avm2_op_getdescendants_rtns_l(Avm2Activation* act, Avm2Value v, uint32_t mn_idx,
+                                        Avm2Value ns_val, Avm2Value name_val);
+Avm2Value avm2_op_checkfilter(Avm2Activation* act, Avm2Value v);
+void avm2_op_dxns(Avm2Activation* act, uint32_t str_idx);
+void avm2_op_dxnslate(Avm2Activation* act, Avm2Value v);
 Avm2Value avm2_op_esc_xattr(Avm2Activation* act, Avm2Value v);  // XML attr escape
 Avm2Value avm2_op_esc_xelem(Avm2Activation* act, Avm2Value v);  // XML elem escape
 

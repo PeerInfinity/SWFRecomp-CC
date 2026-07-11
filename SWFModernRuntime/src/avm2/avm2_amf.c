@@ -38,6 +38,7 @@
 #include <string.h>
 
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_e4x.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
@@ -760,6 +761,19 @@ static void w3_value(Amf3Wr* w, Avm2Value v)
 	{
 		w3_dictionary(w, obj);
 		return;
+	}
+	{
+		// XML (not XMLList) writes as XmlString: toXMLString() bytes,
+		// prettyPrinting-sensitive (Ruffle amf.rs as_xml_object arm).
+		Avm2XmlExt* xe = avm2_xml_ext_of(v);
+		if (xe != NULL)
+		{
+			const Avm2String* xs = avm2_e4x_to_xml_string(w->ctx, xe->node);
+			buf_u8(&w->out, M3_XMLSTR);
+			w3_u29(w, (int32_t) ((xs->len << 1) | 1));
+			buf_put(&w->out, (const uint8_t*) xs->utf8, xs->len);
+			return;
+		}
 	}
 	w3_object(w, obj);
 }

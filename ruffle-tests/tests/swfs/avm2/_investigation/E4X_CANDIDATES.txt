@@ -3,9 +3,13 @@
 # leftovers that need E4X (amf_xml, qname_as_lazy_name_attribute_multiname
 # = GetDescendants, function_proto_created + number_autoconv =
 # describeType XML output). Statuses at b355ae701; all failing.
-# Likely triage members: xml_socket (needs XMLSocket networking),
-# xmldocument/xmlnode (legacy flash.xml API), xml_notification_bubbling
-# (undocumented XML notification API).
+#
+# RESULT (E4X engine landed 2026-07-11): 53/55 pass locally. The 2
+# misses are NOT E4X gaps: xml_socket needs flash.net.XMLSocket + the
+# Ruffle test-framework socket.json mock; xml_appendchild_swf_v21 needs
+# flash.display.Loader (its E4X half passes). xmldocument/xmlnode/
+# xml_ignore_white pass via the legacy flash.xml family;
+# xml_notification_bubbling passes via the notification API.
 amf_xml
 function_proto_created
 number_autoconv

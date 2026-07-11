@@ -71,6 +71,9 @@ void avm2_builtin_add_static_method(Avm2Context* ctx, Avm2Class* cls, const char
                                     Avm2MethodFn fn);
 void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char* name,
                                    Avm2Value value);
+// Static accessor pair on the class object (setter may be NULL).
+void avm2_builtin_add_static_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                    Avm2MethodFn getter, Avm2MethodFn setter);
 // Install a native function on a prototype object (dont_enum).
 void avm2_proto_add_function(Avm2Context* ctx, Avm2Object* proto, const char* name,
                              Avm2MethodFn fn);
@@ -147,6 +150,10 @@ typedef struct Avm2QNameExt
 {
 	const Avm2String* uri;
 	const Avm2String* local;
+	// The Ruffle Multiname ATTRIBUTE flag: set when the QName names an
+	// attribute (e.g. xml.attributes()[0].name()); honored by E4X lazy
+	// names and Proxy's flash_proxy::isAttribute.
+	uint8_t is_attribute;
 } Avm2QNameExt;
 
 // NULL when the value is not a Namespace / QName instance.

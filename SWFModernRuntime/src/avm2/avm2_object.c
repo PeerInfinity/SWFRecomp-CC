@@ -395,6 +395,7 @@ uint32_t avm2_object_next_enumerant(Avm2Object* obj, uint32_t cur)
 		uint32_t next;
 		if (avm2_nsqname_next_enumerant(obj, cur, &next)) return next;
 		if (avm2_proxy_next_enumerant(obj, cur, &next)) return next;
+		if (avm2_xml_next_enumerant(obj, cur, &next)) return next;
 	}
 	uint32_t arr_n = array_enum_count(obj);
 	if (cur < arr_n) return cur + 1;
@@ -455,6 +456,7 @@ Avm2Value avm2_object_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t
 		Avm2Value v;
 		if (avm2_nsqname_enumerant_name(ctx, obj, idx, &v)) return v;
 		if (avm2_proxy_enumerant_name(ctx, obj, idx, &v)) return v;
+		if (avm2_xml_enumerant_name(ctx, obj, idx, &v)) return v;
 	}
 	uint32_t arr_n = array_enum_count(obj);
 	if (idx >= 1 && idx <= arr_n)
@@ -502,6 +504,7 @@ Avm2Value avm2_object_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_
 		Avm2Value v;
 		if (avm2_nsqname_enumerant_value(ctx, obj, idx, &v)) return v;
 		if (avm2_proxy_enumerant_value(ctx, obj, idx, &v)) return v;
+		if (avm2_xml_enumerant_value(ctx, obj, idx, &v)) return v;
 	}
 	uint32_t arr_n = array_enum_count(obj);
 	if (idx >= 1 && idx <= arr_n)

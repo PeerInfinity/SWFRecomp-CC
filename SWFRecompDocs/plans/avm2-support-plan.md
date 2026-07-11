@@ -351,11 +351,30 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
     124 ops; remaining: GetDescendants/CheckFilter/DxnsLate — all E4X or
     alchemy). **Stage 4 complete**; next = Stage 5 frame lifecycle or the
     E4X/XML plan.
+- **E4X/XML engine — DONE 2026-07-11** (was a §"Later" deferred plan):
+  full ECMA-357 implementation in two new runtime modules —
+  `avm2_e4x.c` (E4XNode tree, hand-written parser for the E4X subset
+  with the numbered FP parse errors, namespace resolution, ToXMLString
+  with prettyPrinting, matches_name/handle_input_multiname, deep
+  equals/copy, mutation) and `avm2_xml.c` (XML/XMLList method surface,
+  class-call conversions, settings statics, [[TargetObject]]/
+  resolve_value append machinery, the notification API, and the legacy
+  flash.xml.XMLNode/XMLDocument/XMLNodeType family ported from Ruffle's
+  AS3). XML/XMLList receivers hook every property path in avm2_ops.c
+  (incl. the avmplus Toplevel.cpp public-method-trait reroute and
+  with-scope resolution for filter loops); the four remaining ops
+  landed (GetDescendants incl. lazy/RTQName forms, CheckFilter,
+  Dxns/DxnsLate with dynamically-scoped ctx->dxns); AMF writer XML arm;
+  QName is_attribute; real describeType. Exit met: **53/55 E4X
+  candidates locally** (misses: xml_socket = XMLSocket networking,
+  xml_appendchild_swf_v21 = flash.display.Loader). Census ceiling
+  1155 → **1163/1164** (E4X_OPS.txt, 128 ops; only the alchemy-ops test
+  remains op-blocked).
 - **Stage 5 — frame lifecycle + display basics**: broadcast events, 3-phase
   dispatch, `addFrameScript`, DisplayObject hierarchy bridged onto the existing
   display list. Unlocks the timeline-dependent minority + starts the path
   toward renderer-touching tests.
-- **Later / separate plans**: playerglobal recompilation, E4X/XML engine,
+- **Later / separate plans**: playerglobal recompilation,
   graphics-mode avm2 tests, AVM1↔AVM2 interop, AS3 games.
 
 Custom AVM2 regression tests go in `ruffle-tests/tests/swfs/regression/`

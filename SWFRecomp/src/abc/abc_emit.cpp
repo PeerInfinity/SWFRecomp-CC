@@ -669,6 +669,46 @@ namespace abc
 				    << op.arg1 << ");" << endl;
 				return true;
 
+			// --- E4X ---
+			case IrOpcode::GetDescendants:
+				if (mnLazyNs(abc, op.arg1))
+				{
+					if (mnLazyName(abc, op.arg1))
+					{
+						// RTQNameL: [obj, ns, name]
+						out << "\tsp -= 2; stk[sp - 1] = avm2_op_getdescendants_rtns_l("
+						    << "act, stk[sp - 1], " << op.arg1
+						    << ", stk[sp], stk[sp + 1]);" << endl;
+					}
+					else
+					{
+						// RTQName: [obj, ns]
+						out << "\tsp--; stk[sp - 1] = avm2_op_getdescendants_rtns(act, "
+						    << "stk[sp - 1], " << op.arg1 << ", stk[sp]);" << endl;
+					}
+					return true;
+				}
+				if (mnLazyName(abc, op.arg1))
+				{
+					out << "\tsp--; stk[sp - 1] = avm2_op_getdescendants_dyn(act, "
+					    << "stk[sp - 1], " << op.arg1 << ", stk[sp]);" << endl;
+				}
+				else
+				{
+					out << "\tstk[sp - 1] = avm2_op_getdescendants(act, stk[sp - 1], "
+					    << op.arg1 << ");" << endl;
+				}
+				return true;
+			case IrOpcode::CheckFilter:
+				out << "\tstk[sp - 1] = avm2_op_checkfilter(act, stk[sp - 1]);" << endl;
+				return true;
+			case IrOpcode::Dxns:
+				out << "\tavm2_op_dxns(act, " << op.arg1 << ");" << endl;
+				return true;
+			case IrOpcode::DxnsLate:
+				out << "\tavm2_op_dxnslate(act, stk[--sp]);" << endl;
+				return true;
+
 			// --- enumeration ---
 			case IrOpcode::HasNext2:
 				out << "\tstk[sp++] = avm2_op_hasnext2(act, &loc[" << op.arg1

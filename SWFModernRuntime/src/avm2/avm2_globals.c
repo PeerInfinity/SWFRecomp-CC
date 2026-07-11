@@ -18,6 +18,7 @@
 
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_e4x.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
@@ -242,6 +243,22 @@ void avm2_builtin_add_static_method(Avm2Context* ctx, Avm2Class* cls, const char
 	e.kind = AVM2_PROP_METHOD;
 	e.method.fn = fn;
 	e.method.debug_name = name;
+	e.defining_class = cls;
+	avm2_vtable_append(ctx, vt, &e);
+}
+
+void avm2_builtin_add_static_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                    Avm2MethodFn getter, Avm2MethodFn setter)
+{
+	Avm2VTable* vt = class_static_vtable(ctx, cls);
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key = builtin_key("", name);
+	e.kind = (setter != NULL) ? AVM2_PROP_GETSET : AVM2_PROP_GETTER;
+	e.method.fn = getter;
+	e.method.debug_name = name;
+	e.setter.fn = setter;
+	e.setter.debug_name = name;
 	e.defining_class = cls;
 	avm2_vtable_append(ctx, vt, &e);
 }
@@ -921,21 +938,74 @@ static Avm2Value global_get_definition_by_name(Avm2Activation* act)
 	throw_1065_for_definition(ctx, s->utf8, s->len);
 }
 
-// Minimal flash.utils.describeType: a plain dynamic object carrying the
-// attribute values simple tests read (@name/@base/@isDynamic/@isFinal/
-// @isStatic). Real describeType returns E4X XML — that's the deferred
-// XML plan; attribute GetProperty on this object resolves the same way.
+// flash.utils.describeType: builds a real E4X <type> tree (Ruffle
+// avmplus.as describeType over describeTypeJSON). Scope: attributes,
+// the extendsClass chain, the constructor (signature from emitted class
+// data when available; builtins report the avmplus 1-optional-* form),
+// and Object's three AS3 instance methods (declaredBy Object). Trait
+// enumeration for arbitrary classes is not modeled yet.
+static void dt_set_attr(Avm2Context* ctx, E4XNode* elem, const char* name,
+                        const char* value)
+{
+	E4XNode* a = avm2_e4x_attribute(ctx, NULL,
+	                                avm2_string_from_literal(ctx, name),
+	                                avm2_string_from_literal(ctx, value), elem);
+	avm2_e4x_append_attribute(ctx, elem, a);
+}
+
+static E4XNode* dt_child(Avm2Context* ctx, E4XNode* parent, const char* name)
+{
+	E4XNode* e = avm2_e4x_element(ctx, NULL, avm2_string_from_literal(ctx, name),
+	                              parent);
+	avm2_e4x_insert_at(ctx, parent, parent->child_count, e);
+	return e;
+}
+
+static void dt_param(Avm2Context* ctx, E4XNode* parent, int index,
+                     const char* type, int optional)
+{
+	E4XNode* pe = dt_child(ctx, parent, "parameter");
+	char ib[16];
+	snprintf(ib, sizeof(ib), "%d", index);
+	dt_set_attr(ctx, pe, "index", ib);
+	dt_set_attr(ctx, pe, "type", type);
+	dt_set_attr(ctx, pe, "optional", optional ? "true" : "false");
+}
+
 static Avm2Value global_describe_type(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2Object* out = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
-	out->cls = ctx->builtins.object_class;
-	out->proto = ctx->builtins.object_class->prototype_obj;
-	if (act->argc == 0) return avm2_object_value(out);
+	E4XNode* type = avm2_e4x_element(ctx, NULL,
+	                                 avm2_string_from_literal(ctx, "type"), NULL);
+	if (act->argc == 0)
+	{
+		return avm2_object_value(avm2_xml_object_for_node(ctx, type));
+	}
 	Avm2Value v = act->args[0];
 	int is_static = v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
 	                && v.u.obj->kind == AVM2_OBJ_CLASS;
-	Avm2Class* cls = is_static ? v.u.obj->class_ref : avm2_value_class(ctx, v);
+	Avm2Class* cls;
+	if (is_static)
+	{
+		cls = v.u.obj->class_ref;
+	}
+	else if (v.kind == AVM2_VALUE_INTEGER
+	         && v.u.i < (1 << 28) && v.u.i >= -(1 << 28))
+	{
+		// avmplus atom-int range (same rule as getQualifiedClassName).
+		cls = ctx->builtins.int_class;
+	}
+	else if (v.kind == AVM2_VALUE_NUMBER)
+	{
+		int32_t i = (int32_t) v.u.d;
+		cls = (v.u.d == (double) i && !(v.u.d == 0.0 && signbit(v.u.d))
+		       && i < (1 << 28) && i >= -(1 << 28))
+			? ctx->builtins.int_class : ctx->builtins.number_class;
+	}
+	else
+	{
+		cls = avm2_value_class(ctx, v);
+	}
 	char nb[256];
 	if (cls->name.ns_len > 0)
 	{
@@ -948,21 +1018,89 @@ static Avm2Value global_describe_type(Avm2Activation* act)
 		snprintf(nb, sizeof(nb), "%.*s",
 		         (int) cls->name.name_len, cls->name.name);
 	}
-	avm2_object_set_dynamic(ctx, out, "name", 4,
-	                        avm2_string(avm2_string_from_literal(ctx, nb)));
+	dt_set_attr(ctx, type, "name", nb);
 	if (cls->super_class != NULL)
 	{
 		char bb[256];
 		avm2_class_qname_buf(cls->super_class, bb, sizeof(bb));
-		avm2_object_set_dynamic(ctx, out, "base", 4,
-		                        avm2_string(avm2_string_from_literal(ctx, bb)));
+		dt_set_attr(ctx, type, "base", bb);
 	}
-	avm2_object_set_dynamic(ctx, out, "isDynamic", 9,
-	                        avm2_bool((cls->flags & AVM2_CLASS_FLAG_SEALED) == 0));
-	avm2_object_set_dynamic(ctx, out, "isFinal", 7,
-	                        avm2_bool((cls->flags & AVM2_CLASS_FLAG_FINAL) != 0));
-	avm2_object_set_dynamic(ctx, out, "isStatic", 8, avm2_bool(is_static != 0));
-	return avm2_object_value(out);
+	dt_set_attr(ctx, type, "isDynamic",
+	            (cls->flags & AVM2_CLASS_FLAG_SEALED) == 0 ? "true" : "false");
+	dt_set_attr(ctx, type, "isFinal",
+	            (cls->flags & AVM2_CLASS_FLAG_FINAL) != 0 ? "true" : "false");
+	dt_set_attr(ctx, type, "isStatic", is_static ? "true" : "false");
+
+	for (Avm2Class* b = cls->super_class; b != NULL; b = b->super_class)
+	{
+		char bb[256];
+		avm2_class_qname_buf(b, bb, sizeof(bb));
+		E4XNode* ec = dt_child(ctx, type, "extendsClass");
+		dt_set_attr(ctx, ec, "type", bb);
+	}
+
+	if (cls != ctx->builtins.object_class)
+	{
+		E4XNode* ctor = dt_child(ctx, type, "constructor");
+		const Avm2MethodRef* init = &cls->instance_init;
+		if (init->file != NULL)
+		{
+			const Avm2AbcMethodData* m =
+				&init->file->data->methods[init->method_index];
+			for (uint32_t i = 0; i < m->param_count; i++)
+			{
+				char tb[256] = "*";
+				uint32_t tmn = m->param_types[i];
+				if (tmn != 0)
+				{
+					Avm2PropKey k;
+					if (avm2_propkey_from_qname(init->file->data, tmn, &k))
+					{
+						if (k.ns_len > 0)
+						{
+							snprintf(tb, sizeof(tb), "%.*s::%.*s",
+							         (int) k.ns_len, k.ns_uri,
+							         (int) k.name_len, k.name);
+						}
+						else
+						{
+							snprintf(tb, sizeof(tb), "%.*s",
+							         (int) k.name_len, k.name);
+						}
+					}
+				}
+				int opt = m->optionals != NULL && m->optionals[i].has_value;
+				dt_param(ctx, ctor, (int) i + 1, tb, opt);
+			}
+		}
+		else
+		{
+			// Builtin natives: the avmplus shell reports one optional-any
+			// parameter (int/uint/Number/Boolean/String/Object family).
+			dt_param(ctx, ctor, 1, "*", 1);
+		}
+		if (ctor->child_count == 0)
+		{
+			avm2_e4x_delete_by_index(type, (uint32_t) avm2_e4x_child_index(ctor));
+		}
+	}
+
+	if (cls == ctx->builtins.object_class && !is_static)
+	{
+		static const char* const trio[3] = {
+			"hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable"
+		};
+		for (int i = 0; i < 3; i++)
+		{
+			E4XNode* me = dt_child(ctx, type, "method");
+			dt_set_attr(ctx, me, "name", trio[i]);
+			dt_set_attr(ctx, me, "declaredBy", "Object");
+			dt_set_attr(ctx, me, "returnType", "Boolean");
+			dt_param(ctx, me, 1, "*", 1);
+			dt_set_attr(ctx, me, "uri", "http://adobe.com/AS3/2006/builtin");
+		}
+	}
+	return avm2_object_value(avm2_xml_object_for_node(ctx, type));
 }
 
 // --- flash.system.ApplicationDomain (minimal: currentDomain +
@@ -1060,6 +1198,22 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	                         global_describe_type);
 	builtin_add_global_fn_ns(ctx, "avmplus", "describeType",
 	                         global_describe_type);
+	// The avmplus describeTypeJSON flag constants (avmplus.as).
+	{
+		static const struct { const char* name; int32_t v; } dtflags[] = {
+			{ "HIDE_NSURI_METHODS", 0x0001 }, { "INCLUDE_BASES", 0x0002 },
+			{ "INCLUDE_INTERFACES", 0x0004 }, { "INCLUDE_VARIABLES", 0x0008 },
+			{ "INCLUDE_ACCESSORS", 0x0010 }, { "INCLUDE_METHODS", 0x0020 },
+			{ "INCLUDE_METADATA", 0x0040 }, { "INCLUDE_CONSTRUCTOR", 0x0080 },
+			{ "INCLUDE_TRAITS", 0x0100 }, { "USE_ITRAITS", 0x0200 },
+			{ "HIDE_OBJECT", 0x0400 }, { "FLASH10_FLAGS", 0x05FF },
+		};
+		for (size_t i = 0; i < sizeof(dtflags) / sizeof(dtflags[0]); i++)
+		{
+			avm2_builtin_define_alias(ctx, builtin_key("avmplus", dtflags[i].name),
+			                          avm2_integer(dtflags[i].v));
+		}
+	}
 
 	// Global constants.
 	static const char* const_names[3] = { "NaN", "Infinity", "undefined" };
@@ -1136,11 +1290,10 @@ void avm2_globals_init(Avm2Context* ctx)
 	                        class_proto_to_string);
 	avm2_builtin_add_getter(ctx, b->class_class, "prototype", class_get_prototype);
 
-	// XML/XMLList stubs (constructible; only typeof/is behavior — E4X is a
-	// separate later plan). Date is a stub too (real impl = tranche 2):
-	// it exists so `x as Date` / `is Date` type checks resolve.
-	b->xml_class = avm2_builtin_class(ctx, "", "XML", b->object_class);
-	b->xml_list_class = avm2_builtin_class(ctx, "", "XMLList", b->object_class);
+	// XML/XMLList: the E4X engine (avm2_xml.c / avm2_e4x.c).
+	avm2_register_xml(ctx);
+	// Date is a stub (upgraded by avm2_register_amf): exists so
+	// `x as Date` / `is Date` type checks resolve.
 	b->date_class = avm2_builtin_class(ctx, "", "Date", b->object_class);
 	// flash.geom.Point minimal stub: constructible, x/y as expando props
 	// (slots_force_autoassigned only needs the definition to exist).

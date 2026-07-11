@@ -36,6 +36,11 @@ struct Avm2Context
 	struct Avm2TryFrame* try_top;  // innermost exception frame (avm2_error.h)
 	uint8_t swf_version;  // for string_to_f64 bug compatibility
 	uint8_t bytearray_default_encoding;  // ByteArray.defaultObjectEncoding
+	// The default XML namespace URI (Dxns/DxnsLate), or NULL. Dynamically
+	// scoped: avm2_call_method_ref saves/restores it around every call and
+	// resets it for methods with the SET_DXNS flag (Ruffle activation.rs
+	// default_xml_namespace propagation).
+	const Avm2String* dxns;
 	// Debug call stack (FP debug-player getStackTrace).
 	Avm2CallFrame* call_frames;
 	uint32_t call_depth;
