@@ -12,7 +12,7 @@
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | avm1 | 631 | 661 | 95.5% | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics_filtered.md) |
-| avm2 | 8 | 973 | 0.8% | [details](ruffle-tests/tests/swfs/avm2/_results/results_graphics_filtered.md) |
+| avm2 | 8 | 971 | 0.8% | [details](ruffle-tests/tests/swfs/avm2/_results/results_graphics_filtered.md) |
 | from_gnash/actionscript.all | 132 | 236 | 55.9% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_graphics_filtered.md) |
 | from_gnash/misc-ming.all | 67 | 109 | 61.5% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_graphics_filtered.md) |
 | from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_graphics_filtered.md) |
@@ -21,16 +21,16 @@
 | from_shumway | 73 | 76 | 96.1% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_graphics_filtered.md) |
 | from_shumway/avm1 | 44 | 44 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_graphics_filtered.md) |
 | regression | 41 | 41 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results_graphics_filtered.md) |
-| **Total** | **1033** | **2187** | **47.2%** | |
+| **Total** | **1033** | **2185** | **47.3%** | |
 
-*300 tests ignored.*
+*302 tests ignored.*
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 104,035 | 107,545 | 96.7% |
-| avm2 | 272 | 125,429 | 0.2% |
+| avm2 | 272 | 124,376 | 0.2% |
 | from_gnash/actionscript.all | 29,253 | 31,358 | 93.3% |
 | from_gnash/misc-ming.all | 4,024 | 5,188 | 77.6% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -39,14 +39,14 @@
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
 | regression | 260 | 260 | 100% |
-| **Total** | **139,670** | **271,778** | **51.4%** |
+| **Total** | **139,670** | **270,725** | **51.6%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch | ruffle_matched | runtime_error |
 |-------|-----------------:|----------------:|---------------:|
 | avm1 | 18 | 12 | - |
-| avm2 | 23 | - | 942 |
+| avm2 | 23 | - | 940 |
 | from_gnash/actionscript.all | 9 | 95 | - |
 | from_gnash/misc-ming.all | 14 | 28 | - |
 | from_gnash/misc-mtasc.all | - | 2 | - |
@@ -55,7 +55,7 @@
 | from_shumway | - | 3 | - |
 | from_shumway/avm1 | - | - | - |
 | regression | - | - | - |
-| **Total** | **67** | **145** | **942** |
+| **Total** | **67** | **145** | **940** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -91,10 +91,10 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ### avm2
 
-- **Pass:** 8/973 (0.8%)
-- **Ignored:** 225 tests
+- **Pass:** 8/971 (0.8%)
+- **Ignored:** 227 tests
 - **Duration:** 1h26m08s across 30 shards
-- **Lines:** 272/125,429 matching (0.2%)
+- **Lines:** 272/124,376 matching (0.2%)
 - **Avg test duration:** 3.6s — slowest: `textblock_createline_fte` (22.3s)
 
 ### from_gnash/actionscript.all
