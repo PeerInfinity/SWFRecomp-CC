@@ -1,9 +1,9 @@
-# Next-session prompt: Function-Dispatch Consolidation, Stage 4 → 5
+# Next-session prompt: Function-Dispatch Consolidation, Stage 4 pass (b) → Stage 5
 
 `SWFRecompDocs/prompts/dispatch-consolidation-stage4.md` — read it and follow it
 end-to-end; the plan it references
 (`SWFRecompDocs/plans/function-dispatch-consolidation-plan.md`) is the source of
-truth for the survey, the staged design, the Stage 1/2/3a/3b/3c/3d landing notes,
+truth for the survey, the staged design, the Stage 1/2/3a/3b/3c/3d/4 landing notes,
 the verification protocol, and the risks.
 
 Session start, in order:
@@ -12,17 +12,20 @@ Session start, in order:
    autonomous git/CI authorization, the accepted-diffs doc policy).
 2. Read `ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md` and
    `ruffle-tests/tests/swfs/avm1/_investigation/CURRENT_STATUS.md`.
-3. Read the plan. In it, read §3 ("today's inconsistencies are load-bearing"),
-   §4's Stage 3c design note, and ALL the Stage 3c/3d landing notes — especially
-   **step 5b** (`__resolve`), **step 5c** (string-primitive), and the **Stage 3d
-   landing note**, whose "two modes, and the callee-version gate" finding is the
-   most recent correction to the design.
-4. Run: `bash ruffle-tests/download_tests.sh avm1 from_shumway from_gnash`
+3. Read the plan. In it, read §3 ("today's inconsistencies are load-bearing" —
+   NOW BEING DELIBERATELY REVISITED, which is exactly why each flip needs its
+   own commit + test) and ALL the Stage 3c/3d/4 landing notes — the three
+   Stage-4 third-session notes (instances 19/20/21) are the most recent
+   corrections to the design.
+4. Read the normalization master list in
+   `SWFRecompDocs/plans/dispatch-stage4-dossiers.md` (grep "Normalization
+   pass (b) master list") and the per-item dossier bullets it references.
+5. Run: `bash ruffle-tests/download_tests.sh avm1 from_shumway from_gnash`
 
 ## Where things stand
 
-**Stage 3 is COMPLETE.** All ~19 of `actionCallMethod`'s invocation arms and all of
-`actionCallFunction` funnel through `invokeFunctionValue()`. Recent landings:
+**Stages 0–3 and Stage 4's migration pass (a) are COMPLETE.** Every surveyed
+dispatcher funnels through `invokeFunctionValue()`. Stage-4 landings:
 
 | Commit | What |
 |---|---|
@@ -88,105 +91,86 @@ type-1 super shadow needing a `super_bind` core extension). The dossiers are
 advisory — re-verify the flag mapping against live code before each commit —
 but they replace the first hour of every migration session.
 
-## Your task: Stage 4, and it is two passes per dispatcher
+## Your task: normalization pass (b), then Stage 5
 
-Stage 4 is the event/callback dispatchers **plus** the deliberate normalization pass.
-Per the plan: **(a)** behavior-preserving migration, then **(b)** a normalization
-review — "should this path get version-switch / captured-scope / this-stack?" Each
-"yes" is its own commit with a targeted test.
+**Migration pass (a) is COMPLETE** (2026-07-10, third session — see the
+table above; 21 credited TYPE1_ARG_ORDER instances, 31 regression guards).
+Every surveyed dispatcher funnels through `invokeFunctionValue`;
+`invokeSpecialFunction` is down to one caller (`lv_url_encode`'s
+`_global.escape` override). What remains of Stage 4 is the deliberate
+**normalization pass (b)**: for each preserved divergence, decide "should
+this path get version-switch / captured-scope / this-stack / depth-guard?"
+— each "yes" is its **own commit with a targeted test that flips** (a new
+repro, or a deliberate edit to an existing lock — flipping a lock is a
+feature here, it proves the change is observable). Each "no" is a
+documented decision, not silence.
 
-Dispatchers in scope: ~~`mc_call_as2_handler_ng`~~ (DONE — `ab3b7a77f`),
-`fireTimerCallback`, `builtin_broadcaster_broadcastMessage`, ~~`fireMCLEvent`,
-`fireLoadVarsCallback`, `soundFireCallback`~~ (DONE — `66e15789a` +
-`ea3647e8d`), ~~the LC/NS/NC dispatchers~~ (DONE — `704a9cbbf` + `ddbe4f878`),
-`actionEI_callInternalInterface`, ~~`call_function_with_this`~~,
-the watch arms in `actionSetVariable`/`actionSetMember`,
-~~`_invoke_sort_comparator`~~ (DONE — `8c576d3e5`), ~~and the coercion paths
-(`objectCallValueOf`/`ToString`/`objectToPrimitive`, `convertFloat`)~~ (DONE
-with c_f_w_t — `1f68e0043`). **Plus a family the original list missed**
-(dossier discovery): `actionDispatchEnterFrameHandlers` + `actionDispatchMCOnLoad`/
-`RootOnLoad`/`MCOnConstruct` + the inline `onUnload` lookups — near-clones of
-`mc_call_as2_handler_ng`'s ritual that additionally version-switch and base-clip
-switch with the **callee-version gate accident** (they read `g_swf_version` after
-their own switch). Scope them like the MC arms.
+**The master list** (dossiers doc, "Normalization pass (b) master list"
+near the end — grep it; plus session-3 additions). In rough
+value-over-effort order:
 
-**Known normalizations waiting for this stage, each with a proven failure mode or a
-pinning test:**
+1. **`switchToFunctionVersion` adds** — the proven-bug class (Stage 0's
+   timer bug `60070d96a`; `regression/timer_cross_swf_version` is the model
+   and the test template). Missing on: `mc_call_as2_handler_ng` (**test
+   design READY** — `mc_event_cross_swf_version`, spelled out in the
+   mc_call_as2_handler_ng dossier's "Normalization (a)" bullet: SWF7 host
+   loadMovies a SWF6 child whose v6 handler must see v6 undefined-coercion;
+   requires a host+child two-SWF regression test — check how
+   `HAS_CHILD_MOVIES` tests are laid out before building), EI, the
+   broadcaster, the watch arms, `objectToPrimitive`/`convertFloat`/
+   `call_function_with_this`, LV/XML/sound, and (session-3 discovery)
+   **onLoad/onConstruct**. NOT MCL (its drain stages the ambient version
+   itself — adding the flag would double-switch); NOT the
+   `objectCallValueOf`/`objectCallToString` main branches (they already
+   switch).
+2. **The `INV_LOCAL_SCOPE_UNDER_CAPTURED` flip** — the inversion is almost
+   certainly wrong. Now FOUR variants share it: `__resolve`, EI (forced
+   with), the enterFrame children arm (copied with), onLoad/onConstruct
+   (forced with). One commit flipping all users together, deliberately
+   flipping the lock tests (`resolve_type1_args`, `ei_closure_scope_order`)
+   — a captured scope shadowing the callee's own params is the observable.
+3. **The callee-vs-caller version gate unification.** Callee-gate
+   instances: the MC arms, fireTimerCallback's function form, the
+   enterFrame children arm. "A SWF5 function has no closures" is a property
+   of the function → the callee gate is probably the correct one. Pick,
+   write the cross-version test, convert the others.
+4. **Missing depth guards**: coercion recursion, broadcaster re-broadcast,
+   watch A/C re-fire. Each needs a recursion repro that today segfaults or
+   silently wedges — check what Flash/Ruffle actually do (Ruffle's 66-deep
+   special limit vs ScriptLimits) before picking the guard type.
+5. **The onUnload t1 local frame** (session-3): the path pushes NO local
+   frame, so a param'd handler's prologue binds leak ambiently
+   (`onunload_type1_args`'s docstring documents it). Adding
+   `INV_LOCAL_SCOPE` for t1 is the normalization; the test is an
+   onUnload handler whose param name collides with a global.
+6. **soundFireCallback family**: exec-func + arguments for t2 (XML
+   handlers' `arguments` are broken today — dossier claim, verify with a
+   probe first), this-stack, and its scope-order (rides item 2).
+7. Smaller queue: watch D1 (return fold) / D6 (userData) / D8 (old-value
+   source); `convertFloat`'s missing t1 this push; sort-comparator captured
+   scopes for t2; LV grandparent-caller; `g_event_this_mc` for the MC arms'
+   t1 branch.
 
-- `actionEI_callInternalInterface`'s scope inversion → use
-  `INV_LOCAL_SCOPE_UNDER_CAPTURED`, then consider flipping it (guarded by
-  `regression/resolve_type1_args` for the `__resolve` twin).
-- The **`INV_LOCAL_SCOPE_UNDER_CAPTURED` flip itself**, with a test. The inversion is
-  almost certainly wrong.
-- The **callee-vs-caller version gate**. Stage 3d showed the MC arms gate on the
-  callee's version and the other four on the caller's. "A SWF5 function has no
-  closures" is a property of the function, not of who calls it — so the MC arms may be
-  the *correct* ones. Normalizing means picking one and writing a cross-version test;
-  `regression/timer_cross_swf_version` is the model.
-- `mc_call_as2_handler_ng`, EI, `objectToPrimitive`, `convertFloat`, and
-  `call_function_with_this` still **skip `switchToFunctionVersion`** (Stage 0 proved
-  this was a real bug on the timer path, `60070d96a`). NOTE (dossier correction): the
-  `objectCallValueOf`/`objectCallToString` **main branches DO switch** — the earlier
-  "coercion paths skip it entirely" claim was half-wrong. MCL deliberately does NOT
-  get a version switch — its drain stages the ambient version itself.
-- The MC arms set `g_event_this_mc` only on their type-2 branch; the core would set it
-  for both. Consider whether a type-1 MC method body should see it.
+Method notes that carry over: settle reachability questions with a
+**file-writing probe** (the runner swallows stderr), never by argument. EI's
+forced-with is NOT observable via SetVariable write-back — the discriminator
+is a `var`/DefineLocal in the callee. A dispatcher that only runs between
+frames (empty stack) yields **locks, not repros**, for marshalling changes —
+mid-script dispatchers (coercion, watch, onConstruct, onUnload,
+broadcastMessage) are where repros live.
 
-**Reverse-order type-1 pushes — status:**
-
-- **`lc_dispatch_method` — DONE** (`704a9cbbf`, instance ten + the NULL-call fix;
-  see the plan's Stage-4 landing notes).
-- **`fireLoadVarsCallback` + `soundFireCallback` — DONE** (`ea3647e8d`, instances
-  thirteen+fourteen; `regression/lv_ondata_type1_args`,
-  `regression/xml_onload_type1_args`, both fail-before verified). No reverse
-  pushes remain in the code.
-- **`bdRectangleGetter` — type-1 branch is NOT reached by the suite.** Probed across
-  gnash `BitmapData-v6/v7/v8` and the avm1 `bitmap_data*` cluster: zero hits. The only
-  `flash.geom.Rectangle` override in the suite (gnash `BitmapData.as`, before tests
-  324/329/334) compiles to a **DefineFunction2** and takes the type-2 branch. Fix the
-  reverse push during migration, but **do not credit it as a found-in-the-wild
-  instance** and don't spend a session hunting a natural repro.
-
-Method note: both were settled by instrumenting the type-1 branch with a probe that
-writes to a **file** (the runner swallows the test binary's stderr) and running the
-candidate tests. Cheap, decisive, and it is the same technique that proved the Stage-3d
-`ClosureFrame` modes were already covered.
-
-Also queued: the type-1 arms of `fireTimerCallback` (both forms) push forward
-(correct) but do **not** clamp/pad. (The `lc/ns/nc_dispatch_onStatus` +
-`ns_dispatch_onMetaData` family is DONE — five dispatchers, instances eleven
-and twelve, `regression/{lc,nc}_onstatus_type1_args`; note NC's type-1 arms
-push no local frame and `nc_dispatch_onStatus_undefined`'s pushes nothing —
-preserved via per-branch flags.)
-
-**Remaining Stage-4 migrations**: ~~`fireTimerCallback`~~, ~~EI~~, ~~the watch
-arms~~, ~~the enterFrame trio~~ (all DONE 2026-07-10, second session),
-~~onLoad/onConstruct~~ (instance nineteen), ~~the EIGHT onUnload firing
-sites~~ (instance twenty), ~~`super_bind` + `broadcastMessage`~~ (instance
-twenty-one) — all DONE 2026-07-10, third session, see the table above.
-**Stage 4's migration pass (a) is COMPLETE** — every surveyed dispatcher
-funnels through `invokeFunctionValue`; `invokeSpecialFunction` is down to
-one caller (`lv_url_encode`). Left: **normalization pass (b)** per the
-dossier master list (add three found this session: onLoad/onConstruct skip
-`switchToFunctionVersion` — confirmed from live code, the prompt's earlier
-"they version-switch" claim was wrong; the onUnload t1 path pushes no
-local frame, so a param'd handler's prologue binds leak ambiently; the
-broadcaster family has no depth guard of any kind). Then **Stage 5**.
-
-Session-learned notes not yet in the dossiers: (1) EI's forced-with is NOT
-observable via SetVariable write-back (it writes THROUGH a with-frame where
-the property exists) — the discriminator is a `var`/DefineLocal in the callee
-(`ei_closure_scope_order`'s `lv=undefined` row). (2) The enterFrame family's
-missing type-1 pad is inert at frame-loop level (empty stack; the guarded pop
-already synthesizes undefined, typeof included) — locks, not repros, for any
-dispatcher that only ever runs between frames; expect the same for
-onLoad/onConstruct. (3) A type-1 handler on the enterFrame children arm has
-NO `this` channel — `this` falls back through base_clip to `_root`; a repro
-that self-disables via `this.onEnterFrame` kills the ROOT handler instead.
-
-After Stage 4: **Stage 5** (delete the dead marshalling loops; add
-`gates/check_dispatch_funnel.py`, which should also reject any site setting
-`INV_BASE_CLIP | INV_VERSION_SWITCH` together).
+**Then Stage 5** (can start same session once (b)'s high-value items land):
+- Audit for now-dead marshalling helpers (most raw loops were replaced
+  in-place by the migrations; what's left is whatever became unreachable).
+- Add `gates/check_dispatch_funnel.py` (follow the existing `gates/`
+  pattern): grep for raw `simple_func`/`advanced_func` calls outside
+  `invokeFunctionValue` + an allowlist (generated-code callers,
+  `lv_url_encode` until someone migrates it), and reject any site setting
+  `INV_BASE_CLIP | INV_VERSION_SWITCH` together.
+- The perf note below: Stage 4's dispatchers run every frame in real games —
+  if a fresh measurement is ever warranted it is now, on Minesweeper or DJ
+  (callgrind harness per `wasm-game-performance-profiling` memory; N is
+  noisy, never A/B on it).
 
 ## Guardrails
 
