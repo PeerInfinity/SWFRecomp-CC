@@ -1,7 +1,7 @@
 # avm2 Suite — Current Status
 
 Last updated: 2026-07-11 — Stage 4 tranche 2 (Vector/RegExp/JSON/proto
-edge cases) landed; CI baseline pending the tranche-2 run (see git log).
+edge cases) landed.
 
 **Plan:** `SWFRecompDocs/plans/avm2-support-plan.md` (umbrella; stages,
 architecture sketch, tranche definitions). Phase-1 metric: pass rate on this
@@ -9,10 +9,20 @@ suite's trace tests.
 
 ## State
 
+- **CI baseline (run 29154109023, 2026-07-11): 354 / 1,200 passing
+  (29.5%)** — up from Stage 3's 296/1198 (+58), zero pass→fail
+  regressions in avm2 or ANY AVM1 suite (avm1 634/706, gnash suites,
+  shumway 73/92 + 46/47, regression 41/41 all unchanged),
+  wasm-link-smoke green. Remaining avm2 statuses: 764 output_mismatch,
+  71 runtime_error, 11 ruffle_matched. Beyond the candidate list, the
+  tranche unlocked application_domain, event_* (bubbles/cancelable/
+  type), eventdispatcher_dispatchevent_this/haseventlistener,
+  primitive_edge_cases, resolve_order, rng, symbol_class_root_not_zero,
+  negative_volume_panned.
 - **Stage 4 tranche 2 (2026-07-11): 50 / 55 tranche-2 candidates pass
-  locally** (`_investigation/TRANCHE2_CANDIDATES.txt`; was 2 at the
-  Stage-3 baseline — the ≥45-of-55 exit criterion is met). The 5 misses
-  are all triaged to later work: class_call +
+  in CI and locally** (`_investigation/TRANCHE2_CANDIDATES.txt`; was 2
+  at the Stage-3 baseline — the ≥45-of-55 exit criterion is met). The 5
+  misses are all triaged to later work: class_call +
   amf_nondynamic_function_prop (ByteArray/AMF, tranche 3),
   coerce_to_primitive_side_effects (Proxy, tranche 3),
   function_proto_created (avmplus-shell describeType XML / E4X, deferred),
