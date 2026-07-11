@@ -1228,6 +1228,46 @@ batch, not a code failure. Remaining Stage-4: `actionDispatchMCOnLoad` /
 `broadcastMessage` (after the `super_bind` core extension). Then normalization
 pass (b).
 
+**2026-07-10 third session — onLoad + onConstruct, instance nineteen:**
+
+- **`actionDispatchMCOnLoad` + `actionDispatchMCOnConstruct`** — byte-identical
+  ritual clones, migrated together in one commit
+  (`actionDispatchRootOnLoad` is a thin wrapper and needed no change).
+  Scoped from live code (no dossier): contrary to the session prompt's
+  partial read, these arms have **NO version switch at all**, so
+  `INV_BASE_CLIP`'s ambient `g_swf_version` gate is exactly the gate the arms
+  read — the MC arms' callee-version accident does not arise and no
+  `ClosureFrame`/`eff_ver` is needed. (The missing `switchToFunctionVersion`
+  joins the normalization-pass-(b) list, same class as the timer bug.)
+- Flag mapping, both dispatchers: base
+  `INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BASE_CLIP | INV_EVENT_THIS_MC`;
+  type-1 adds `INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_FORCE_CAPTURED_WITH`
+  (**fourth member of the local-under-captured family** — this variant
+  FORCES is_with, like `__resolve`/EI, unlike the enterFrame children arm
+  which copies) `| INV_THIS_STACK | INV_BIND_THIS` (the arm's
+  `setVariableByName("this")` lands on the same local frame — dead for reads
+  via the this-cell path, preserved at zero cost by the existing flag);
+  type-2 instead sets `act_flags = INV_ACT_THIS` (the arm's manual
+  `!preload_this && !suppress_this` gate is exactly buildActivationLocals'
+  type-2 shape) `+ INV_MC_THIS_NULL_PTR`. Unlike the enterFrame family, the
+  arms set `g_event_this_mc` for BOTH branches (core matches). Bare
+  `g_call_depth++` bracket kept in the arms; onConstruct's setjmp exception
+  bracket and its `depth == INT_MIN` guard stay outside the core.
+- **Instance nineteen** (`regression/onconstruct_type1_args`, fail-before
+  verified): onConstruct fires **mid-script** from `createEmptyMovieClip`,
+  so the missing type-1 pad popped the caller's in-flight expression
+  operands — `trace("X: " + createEmptyMovieClip("m", 1))` with a 2-param
+  type-1 `MovieClip.prototype.onConstruct` swallowed `"X: "` into param `b`
+  (`typeof "string"`) and corrupted the outer concat to `NaN`. onLoad has no
+  such window (queue-drain/after-first-frame only, empty stack) —
+  `regression/onload_type1_args` is a **lock**, additionally pinning that a
+  type-1 onLoad handler HAS a `this` channel (`this=_level0`), unlike the
+  enterFrame arms.
+- Verified: regression 29/29 (both new tests + all 27 standing), the 29-test
+  avm1 sensitive cluster, gnash `case-v6/v7/v8` (onConstruct-powered),
+  misc-mtasc.all 7+2rm/9 (mtasc onLoad closures), graphics-mode smoke of the
+  repro. onUnload sites + `broadcastMessage` still unmigrated.
+
 ### Stage 5 — lock it in
 
 - Delete the then-dead 32 marshalling loops and per-site casts.

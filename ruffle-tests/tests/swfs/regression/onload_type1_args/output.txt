@@ -1,0 +1,7 @@
+setup
+l:a=
+l:ta=undefined
+l:b=
+l:tb=undefined
+l:this=_level0
+done

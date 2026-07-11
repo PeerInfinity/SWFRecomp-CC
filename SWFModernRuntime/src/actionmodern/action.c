@@ -35073,125 +35073,55 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 
 	MovieClip* saved_ctx = g_current_context;
 	actionSetCurrentContext(mc);
-	MovieClip* saved_event_this = g_event_this_mc;
-	g_event_this_mc = mc;
 
-	if (func->function_type == 1 && func->simple_func != NULL)
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). this_var = MOVIECLIP(mc); INV_EVENT_THIS_MC
+	// reproduces the arm's g_event_this_mc save/set/restore around both
+	// branches. No version switch has EVER existed on this path (a
+	// normalization candidate, not this migration), so INV_BASE_CLIP's
+	// ambient g_swf_version gate is exactly the gate the arm read — the MC
+	// arms' callee-version accident does not arise here and no ClosureFrame
+	// is needed.
+	//
+	// Type 1 (kept from actionInvokeRegisteredClassConstructor's setup so
+	// closure-captured free variables of mtasc-compiled bodies resolve):
+	// local frame pushed UNDER the captured scopes with is_with FORCED to 1
+	// — the fourth member of the local-under-captured family — plus an
+	// unconditional this-stack push and the legacy name-bind of "this" on
+	// the local frame (INV_BIND_THIS: dead for reads via the this-cell fast
+	// path, preserved because the existing flag reproduces it exactly).
+	// The core's clamp/pad is inert on this dispatcher's queue-drain /
+	// frame-boundary call sites (empty eval stack; the guarded pop already
+	// synthesized undefined) — locked, not repro'd, by
+	// regression/onload_type1_args.
+	//
+	// Type 2: INV_ACT_THIS is precisely the arm's manual
+	// !preload_this && !suppress_this gate (bind "this" on the local frame
+	// + this-stack push); captured scopes in natural order with is_with
+	// COPIED, local frame on top; INV_MC_THIS_NULL_PTR keeps the ABI this
+	// NULL so the generated preload_this reads the MOVIECLIP off
+	// g_event_this_mc, exactly as the arm passed NULL.
+	ActionVar _ol_this = {0};
+	_ol_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_ol_this.data.numeric_value = (u64)(uintptr_t)mc;
+	u32 _ol_flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BASE_CLIP
+	              | INV_EVENT_THIS_MC;
+	u8 _ol_act = 0;
+	if (func->function_type == 2)
 	{
-		// Type 1: simple function — mirror actionInvokeRegisteredClassConstructor's
-		// type-1 setup so closure-captured free variables (e.g. `note` referenced
-		// from MyClass.prototype.onLoad) resolve via the function's captured WITH
-		// scopes. Without this, mtasc-compiled bodies that look up free names
-		// through the captured scope chain miss them and trace silently fails.
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-		u32 captured_count = func->captured_scope_count;
-		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
-		{
-			scope_is_with[scope_depth] = 1;
-			scope_mc[scope_depth] = (MovieClip*) func->captured_scope_mc[i];
-			scope_chain[scope_depth++] = (ASObject*) func->captured_scope[i];
-		}
-		MovieClip* saved_base = NULL;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-		{
-			saved_base = g_current_context;
-			actionSetCurrentContext(func->base_clip);
-		}
-		u32 saved_this_depth = g_this_depth;
-		if (g_this_depth < MAX_THIS_DEPTH)
-		{
-			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-			g_this_stack[g_this_depth].str_size = 0;
-			g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
-			g_this_depth++;
-		}
-		ActionVar this_var;
-		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-		this_var.str_size = 0;
-		this_var.data.numeric_value = (u64) mc;
-		setVariableByName("this", &this_var);
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-		g_this_depth = saved_this_depth;
-		if (saved_base != NULL)
-			actionSetCurrentContext(saved_base);
-		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
-			scope_depth--;
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
+		_ol_flags |= INV_MC_THIS_NULL_PTR;
+		_ol_act = INV_ACT_THIS;
 	}
-	else if (func->function_type == 2 && func->advanced_func != NULL)
+	else
 	{
-		// Type 2: advanced function with registers. Restore captured scope
-		// chain entries (closure support), push 'this' = mc onto g_this_stack
-		// (subject to preload_this/suppress_this flags), and switch to base_clip
-		// for SWF6+. Mirrors actionInvokeRegisteredClassConstructor's type-2 setup.
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-
-		ASObject* local_scope = allocObject(app_context, 4);
-		u32 saved_this_depth = g_this_depth;
-		{
-			u16 f2flags = func->flags;
-			int preload_this  = (f2flags & 0x0001);
-			int suppress_this = (f2flags & 0x0002);
-			if (!preload_this && !suppress_this)
-			{
-				if (g_this_depth < MAX_THIS_DEPTH)
-				{
-					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-					g_this_stack[g_this_depth].str_size = 0;
-					g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
-					g_this_depth++;
-				}
-				ActionVar this_var = {0};
-				this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-				this_var.data.numeric_value = (u64) mc;
-				setProperty(app_context, local_scope, "this", 4, &this_var);
-			}
-		}
-		u8 captured = func->captured_scope_count;
-		for (u8 ci = 0; ci < captured && scope_depth < MAX_SCOPE_DEPTH; ci++)
-		{
-			scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-			scope_mc[scope_depth] = func->captured_scope_mc[ci];
-			scope_chain[scope_depth++] = func->captured_scope[ci];
-		}
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-		MovieClip* saved_base = NULL;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-		{
-			saved_base = g_current_context;
-			actionSetCurrentContext(func->base_clip);
-		}
-		g_call_depth++;
-		func->advanced_func(app_context, NULL, 0, regs, NULL);
-		g_call_depth--;
-		g_this_depth = saved_this_depth;
-		if (saved_base != NULL)
-			actionSetCurrentContext(saved_base);
-		for (u8 ci = 0; ci < captured + 1; ci++)
-		{
-			if (scope_depth > 0) scope_depth--;
-		}
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
+		_ol_flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_FORCE_CAPTURED_WITH
+		           | INV_THIS_STACK | INV_BIND_THIS;
 	}
+	InvokeOpts _ol_opts = { .flags = _ol_flags, .act_flags = _ol_act };
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &_ol_this, NULL, 0, &_ol_opts);
+	g_call_depth--;
 
-	g_event_this_mc = saved_event_this;
 	actionSetCurrentContext(saved_ctx);
 }
 
@@ -35292,119 +35222,38 @@ static void actionDispatchMCOnConstruct(SWFAppContext* app_context, MovieClip* m
 
 	MovieClip* saved_ctx = g_current_context;
 	actionSetCurrentContext(mc);
-	MovieClip* saved_event_this = g_event_this_mc;
-	g_event_this_mc = mc;
 
-	if (func->function_type == 1 && func->simple_func != NULL)
+	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
+	// Consolidation, Stage 4). Ritual clone of actionDispatchMCOnLoad — see
+	// the flag rationale there. The setjmp exception bracket above stays
+	// OUTSIDE the core (it is dispatch policy, not an invocation step).
+	// One live difference from onLoad: this dispatcher fires MID-SCRIPT
+	// (createEmptyMovieClip / duplicate paths), so the core's type-1
+	// clamp/pad is a real fix here, not an inert normalization — the old
+	// arm let a param'd type-1 handler's prologue pop the CALLER's
+	// in-progress expression operands. Repro'd (fail-before verified) by
+	// regression/onconstruct_type1_args — TYPE1_ARG_ORDER instance 19.
+	ActionVar _oc_this = {0};
+	_oc_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+	_oc_this.data.numeric_value = (u64)(uintptr_t)mc;
+	u32 _oc_flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BASE_CLIP
+	              | INV_EVENT_THIS_MC;
+	u8 _oc_act = 0;
+	if (func->function_type == 2)
 	{
-		// Type 1: matches actionDispatchMCOnLoad's type-1 setup so closure-
-		// captured WITH scopes (e.g. `note` referenced by mtasc-compiled
-		// onConstruct bodies) resolve via the function's saved scope chain.
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-		u32 captured_count = func->captured_scope_count;
-		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
-		{
-			scope_is_with[scope_depth] = 1;
-			scope_mc[scope_depth] = (MovieClip*) func->captured_scope_mc[i];
-			scope_chain[scope_depth++] = (ASObject*) func->captured_scope[i];
-		}
-		MovieClip* saved_base = NULL;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-		{
-			saved_base = g_current_context;
-			actionSetCurrentContext(func->base_clip);
-		}
-		u32 saved_this_depth = g_this_depth;
-		if (g_this_depth < MAX_THIS_DEPTH)
-		{
-			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-			g_this_stack[g_this_depth].str_size = 0;
-			g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
-			g_this_depth++;
-		}
-		ActionVar this_var;
-		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-		this_var.str_size = 0;
-		this_var.data.numeric_value = (u64) mc;
-		setVariableByName("this", &this_var);
-		g_call_depth++;
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-		g_call_depth--;
-		g_this_depth = saved_this_depth;
-		if (saved_base != NULL)
-			actionSetCurrentContext(saved_base);
-		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
-			scope_depth--;
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
+		_oc_flags |= INV_MC_THIS_NULL_PTR;
+		_oc_act = INV_ACT_THIS;
 	}
-	else if (func->function_type == 2 && func->advanced_func != NULL)
+	else
 	{
-		ActionVar* regs = NULL;
-		if (func->register_count > 0)
-			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-
-		ASObject* local_scope = allocObject(app_context, 4);
-		u32 saved_this_depth = g_this_depth;
-		{
-			u16 f2flags = func->flags;
-			int preload_this  = (f2flags & 0x0001);
-			int suppress_this = (f2flags & 0x0002);
-			if (!preload_this && !suppress_this)
-			{
-				if (g_this_depth < MAX_THIS_DEPTH)
-				{
-					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-					g_this_stack[g_this_depth].str_size = 0;
-					g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
-					g_this_depth++;
-				}
-				ActionVar this_var = {0};
-				this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-				this_var.data.numeric_value = (u64) mc;
-				setProperty(app_context, local_scope, "this", 4, &this_var);
-			}
-		}
-		u8 captured = func->captured_scope_count;
-		for (u8 ci = 0; ci < captured && scope_depth < MAX_SCOPE_DEPTH; ci++)
-		{
-			scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-			scope_mc[scope_depth] = func->captured_scope_mc[ci];
-			scope_chain[scope_depth++] = func->captured_scope[ci];
-		}
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-		MovieClip* saved_base = NULL;
-		if (g_swf_version >= 6 && func->base_clip != NULL)
-		{
-			saved_base = g_current_context;
-			actionSetCurrentContext(func->base_clip);
-		}
-		g_call_depth++;
-		func->advanced_func(app_context, NULL, 0, regs, NULL);
-		g_call_depth--;
-		g_this_depth = saved_this_depth;
-		if (saved_base != NULL)
-			actionSetCurrentContext(saved_base);
-		for (u8 ci = 0; ci < captured + 1; ci++)
-		{
-			if (scope_depth > 0) scope_depth--;
-		}
-		releaseObject(app_context, local_scope);
-		if (regs != NULL) FREE(regs);
+		_oc_flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_FORCE_CAPTURED_WITH
+		           | INV_THIS_STACK | INV_BIND_THIS;
 	}
+	InvokeOpts _oc_opts = { .flags = _oc_flags, .act_flags = _oc_act };
+	g_call_depth++;
+	(void) invokeFunctionValue(app_context, func, &_oc_this, NULL, 0, &_oc_opts);
+	g_call_depth--;
 
-	g_event_this_mc = saved_event_this;
 	actionSetCurrentContext(saved_ctx);
 
 	// Pop the onConstruct exception frame (no throw — clear handler).
