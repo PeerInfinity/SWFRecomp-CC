@@ -15183,7 +15183,45 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 
 	int _iv_saved_ver = 0; ASObject* _iv_saved_global = NULL; int _iv_saved_midx = 0;
 	if (flags & INV_VERSION_SWITCH)
-		switchToFunctionVersion(func, &_iv_saved_ver, &_iv_saved_global, &_iv_saved_midx);
+	{
+		if (g_swf_version >= 6)
+		{
+			// v6+ caller: the callee is a closure and runs at its DEFINING
+			// movie's SWF version (Ruffle function.rs Avm1Function::call,
+			// is_closure branch).
+			switchToFunctionVersion(func, &_iv_saved_ver, &_iv_saved_global, &_iv_saved_midx);
+		}
+		else
+		{
+			// v5 caller: pre-closure — the callee runs at `this`/base-clip's
+			// CURRENT movie version (min 5), NOT its frozen defining version
+			// (Ruffle's !is_closure branch: base_clip = this_do, swf_version =
+			// base_clip.swf_version().max(5)). Non-clip `this` falls back to
+			// the ambient target clip. Pinned by avm1
+			// mcl_replace_root_swf7_to_swf5 (ruffle_matched): after a v5
+			// movie replaces root, v7-defined MCL listeners must run with v5
+			// undefined-coercion — installing the defining version there
+			// regressed the test in the first pass-(b) CI batch. The in-arm
+			// switchToFunctionVersion rituals (actionCallMethod's MC arms,
+			// oCVO/oCTS main branches) keep their historical unconditional
+			// install — swf5_to_6_cross_call pins that path's behavior.
+			_iv_saved_ver = g_swf_version;
+			_iv_saved_global = global_object;
+			_iv_saved_midx = 0;
+			int _v5v = 0;
+			if (this_is_mc && this_ptr != NULL)
+				_v5v = ((MovieClip*)this_ptr)->swf_version;
+			else if (g_current_context != NULL)
+				_v5v = g_current_context->swf_version;
+			if (_v5v > 0)
+			{
+				g_swf_version = (_v5v < 5) ? 5 : _v5v;
+				int _v5g = versionGroup(g_swf_version);
+				if (_v5g == 0 && g_global_legacy) global_object = g_global_legacy;
+				else if (_v5g == 1 && g_global_modern) global_object = g_global_modern;
+			}
+		}
+	}
 
 	ASFunction* prev_exec = g_current_executing_func;
 	if (flags & INV_EXEC_FUNC)
