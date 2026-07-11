@@ -58,6 +58,12 @@ typedef struct Resolved
 	int is_array_elem;
 	int is_vector_elem;
 	uint32_t arr_index;
+	// Proxy receiver whose declared traits missed: route the access to the
+	// flash_proxy hooks with QName(proxy_uri, proxy_local) — NULL = any
+	// (Ruffle proxy_object.rs *_local overrides).
+	int is_proxy;
+	const Avm2String* proxy_uri;
+	const Avm2String* proxy_local;
 } Resolved;
 
 static int value_is_null_like(Avm2Value v)
@@ -90,6 +96,44 @@ static int dict_object_key(Avm2Value recv, Avm2Value name_val,
 	*out_dict = recv.u.obj;
 	*out_key = name_val.u.obj;
 	return 1;
+}
+
+// QName components of a static multiname for Proxy hooks (Ruffle
+// QNameObject::from_name): single-ns set -> that URI, multi-ns set -> "",
+// the any namespace / any name -> NULL.
+static void mn_qname_parts(Avm2Context* ctx, const Avm2AbcFileData* data,
+                           uint32_t mn_idx, const Avm2String** uri,
+                           const Avm2String** local)
+{
+	const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
+	*local = (mn->name != 0) ? &data->strings[mn->name] : NULL;
+	switch (mn->kind)
+	{
+		case 0x07: case 0x0d:  // QName / QNameA
+			*uri = (mn->ns != 0) ? &data->strings[data->namespaces[mn->ns].name]
+			                     : NULL;
+			break;
+		case 0x09: case 0x0e: case 0x1b: case 0x1c:  // Multiname(L)(A)
+		{
+			const Avm2AbcNsSet* set = &data->ns_sets[mn->ns_set];
+			if (set->count == 1 && set->ns_indices[0] != 0)
+			{
+				*uri = &data->strings[data->namespaces[set->ns_indices[0]].name];
+			}
+			else if (set->count == 1)
+			{
+				*uri = NULL;
+			}
+			else
+			{
+				*uri = avm2_string_from_literal(ctx, "");
+			}
+			break;
+		}
+		default:
+			*uri = avm2_string_from_literal(ctx, "");
+			break;
+	}
 }
 
 // Try to parse a property name as an array index ("0", "42").
@@ -128,6 +172,15 @@ static int resolve_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
 	if (e != NULL)
 	{
 		out->entry = e;
+		return 1;
+	}
+	if (recv.kind == AVM2_VALUE_OBJECT && avm2_is_proxy(recv.u.obj))
+	{
+		// Proxies replace the whole local half (dynamic + proto) with the
+		// flash_proxy hooks, for ANY namespace.
+		out->is_proxy = 1;
+		out->proxy_uri = avm2_string_new(ctx, key->ns_uri, key->ns_len);
+		out->proxy_local = avm2_string_new(ctx, key->name, key->name_len);
 		return 1;
 	}
 	if (!public_ok) return 0;
@@ -193,6 +246,12 @@ static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Reso
 	if (e != NULL)
 	{
 		out->entry = e;
+		return 1;
+	}
+	if (recv.kind == AVM2_VALUE_OBJECT && avm2_is_proxy(recv.u.obj))
+	{
+		out->is_proxy = 1;
+		mn_qname_parts(ctx, data, mn_idx, &out->proxy_uri, &out->proxy_local);
 		return 1;
 	}
 	if (!avm2_mn_has_public_ns(data, mn_idx)) return 0;
@@ -277,6 +336,12 @@ static const char* class_name_of(Avm2Context* ctx, Avm2Value recv, char* buf, in
 static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* r,
                               const char* name, uint32_t name_len)
 {
+	if (r->is_proxy)
+	{
+		Avm2Value qn = avm2_object_value(
+			avm2_qname_new(ctx, r->proxy_uri, r->proxy_local));
+		return avm2_proxy_call_hook(ctx, recv.u.obj, "getProperty", &qn, 1);
+	}
 	if (r->is_array_elem)
 	{
 		Avm2Value v = avm2_array_get(recv.u.obj, r->arr_index);
@@ -445,6 +510,15 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
                                  const char* name, uint32_t name_len, Avm2Value value,
                                  int allow_const)
 {
+	if (r->is_proxy)
+	{
+		Avm2Value args[2];
+		args[0] = avm2_object_value(
+			avm2_qname_new(ctx, r->proxy_uri, r->proxy_local));
+		args[1] = value;
+		avm2_proxy_call_hook(ctx, recv.u.obj, "setProperty", args, 2);
+		return;
+	}
 	if (r->is_array_elem)
 	{
 		avm2_array_set(ctx, recv.u.obj, r->arr_index, value);
@@ -697,9 +771,26 @@ static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
 
 Avm2Value avm2_op_deleteproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
 {
+	Avm2Context* ctx = act->ctx;
 	const char* name;
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (recv.kind == AVM2_VALUE_OBJECT && avm2_is_proxy(recv.u.obj))
+	{
+		// Declared traits (in ANY ns of the multiname) can't be deleted;
+		// everything else routes to the deleteProperty hook.
+		if (avm2_vtable_find_mn(recv.u.obj->vtable, act->file->data, mn_idx))
+		{
+			return avm2_bool(false);
+		}
+		const Avm2String* uri;
+		const Avm2String* local;
+		mn_qname_parts(ctx, act->file->data, mn_idx, &uri, &local);
+		Avm2Value qn = avm2_object_value(avm2_qname_new(ctx, uri, local));
+		Avm2Value v = avm2_proxy_call_hook(ctx, recv.u.obj, "deleteProperty",
+		                                   &qn, 1);
+		return avm2_bool(avm2_coerce_to_boolean(v));
+	}
 	return deleteproperty_common(act, recv, name, name_len);
 }
 
@@ -720,6 +811,23 @@ Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32
 		}
 		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 		if (q != NULL) return deleteproperty_qname(act, recv, q);
+	}
+	if (recv.kind == AVM2_VALUE_OBJECT && avm2_is_proxy(recv.u.obj))
+	{
+		Avm2Context* dctx = act->ctx;
+		const Avm2String* nm = avm2_coerce_to_string(dctx, name_val);
+		if (avm2_vtable_find_mn_named(recv.u.obj->vtable, act->file->data,
+		                              mn_idx, nm->utf8, nm->len))
+		{
+			return avm2_bool(false);
+		}
+		const Avm2String* uri;
+		const Avm2String* local;
+		mn_qname_parts(dctx, act->file->data, mn_idx, &uri, &local);
+		Avm2Value qn = avm2_object_value(avm2_qname_new(dctx, uri, nm));
+		Avm2Value v = avm2_proxy_call_hook(dctx, recv.u.obj, "deleteProperty",
+		                                   &qn, 1);
+		return avm2_bool(avm2_coerce_to_boolean(v));
 	}
 	uint32_t idx;
 	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj != NULL
@@ -865,6 +973,14 @@ static Avm2Value deleteproperty_qname(Avm2Activation* act, Avm2Value recv,
 	Resolved r;
 	if (resolve_generic_key(ctx, recv, &key, 0, any_ns, &r))
 	{
+		if (r.is_proxy)
+		{
+			Avm2Value qn = avm2_object_value(
+				avm2_qname_new(ctx, q->uri, q->local));
+			Avm2Value v = avm2_proxy_call_hook(ctx, obj, "deleteProperty",
+			                                   &qn, 1);
+			return avm2_bool(avm2_coerce_to_boolean(v));
+		}
 		return avm2_bool(false);  // declared traits can't be deleted
 	}
 	if (pub && avm2_object_delete_dynamic(obj, key.name, key.name_len))
@@ -983,6 +1099,15 @@ static Avm2Value deleteproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 	if (avm2_vtable_find(vt, &key) != NULL)
 	{
 		return avm2_bool(false);
+	}
+	if (avm2_is_proxy(recv.u.obj))
+	{
+		Avm2Value qn = avm2_object_value(avm2_qname_new(
+			ctx, avm2_string_new(ctx, key.ns_uri, key.ns_len),
+			avm2_string_new(ctx, name, name_len)));
+		Avm2Value v = avm2_proxy_call_hook(ctx, recv.u.obj, "deleteProperty",
+		                                   &qn, 1);
+		return avm2_bool(avm2_coerce_to_boolean(v));
 	}
 	if (pub && avm2_object_delete_dynamic(recv.u.obj, name, name_len))
 	{
@@ -1390,6 +1515,14 @@ static Avm2Value callproperty_common(Avm2Context* ctx, Avm2Value recv,
                                      const Avm2Value* args, uint32_t argc,
                                      Avm2Value call_recv)
 {
+	if (resolved_ok && r->is_proxy)
+	{
+		Avm2Value* a = avm2_alloc(ctx, (argc + 1) * sizeof(Avm2Value));
+		a[0] = avm2_object_value(
+			avm2_qname_new(ctx, r->proxy_uri, r->proxy_local));
+		for (uint32_t i = 0; i < argc; i++) a[i + 1] = args[i];
+		return avm2_proxy_call_hook(ctx, recv.u.obj, "callProperty", a, argc + 1);
+	}
 	if (resolved_ok && r->entry != NULL && r->entry->kind == AVM2_PROP_METHOD)
 	{
 		return avm2_call_method_ref(ctx, &r->entry->method,
@@ -2077,6 +2210,14 @@ Avm2Value avm2_op_in(Avm2Activation* act, Avm2Value name, Avm2Value obj)
 		{
 			return avm2_bool(avm2_object_find_dynamic_obj(dict, key) != NULL);
 		}
+	}
+	if (obj.kind == AVM2_VALUE_OBJECT && avm2_is_proxy(obj.u.obj))
+	{
+		// `in` on a Proxy calls hasProperty with the STRING form of the
+		// name (QNames stringify — proxy_hasproperty).
+		Avm2Value arg = avm2_string(avm2_coerce_to_string(ctx, name));
+		Avm2Value v = avm2_proxy_call_hook(ctx, obj.u.obj, "hasProperty", &arg, 1);
+		return avm2_bool(avm2_coerce_to_boolean(v));
 	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name);
 	return avm2_bool(avm2_has_public_property(ctx, obj, ns->utf8, ns->len) != 0);

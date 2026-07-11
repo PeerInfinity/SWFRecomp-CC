@@ -328,11 +328,35 @@ static Avm2Value object_proto_has_own_property(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	if (act->argc == 0) return avm2_bool(false);
+	// The PROTOTYPE hasOwnProperty never consults a Proxy's hooks or its
+	// traits — always false on Proxy receivers (proxy_hasproperty).
+	if (act->this_val.kind == AVM2_VALUE_OBJECT
+	    && avm2_is_proxy(act->this_val.u.obj))
+	{
+		return avm2_bool(false);
+	}
 	// NOTE: Dictionary object-space keys are invisible here — avmplus
 	// hasOwnProperty stringifies its argument (dictionary_hasownproperty).
 	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
 	return avm2_bool(avm2_has_own_public_property(ctx, act->this_val,
 	                                              name->utf8, name->len) != 0);
+}
+
+// The AS3/public instance METHOD routes Proxy receivers to the hasProperty
+// hook (proxy_hasownproperty), unlike the prototype function above.
+static Avm2Value object_as3_has_own_property(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->this_val.kind == AVM2_VALUE_OBJECT
+	    && avm2_is_proxy(act->this_val.u.obj))
+	{
+		Avm2Value arg = (act->argc > 0) ? act->args[0] : avm2_undefined();
+		Avm2Value name = avm2_string(avm2_coerce_to_string(ctx, arg));
+		Avm2Value v = avm2_proxy_call_hook(ctx, act->this_val.u.obj,
+		                                   "hasProperty", &name, 1);
+		return avm2_bool(avm2_coerce_to_boolean(v));
+	}
+	return object_proto_has_own_property(act);
 }
 
 static Avm2Value object_proto_is_prototype_of(Avm2Activation* act)
@@ -1096,7 +1120,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	                        object_proto_set_property_is_enumerable);
 	// Instance-side mirrors (AS3 namespace methods surface publicly here).
 	avm2_builtin_add_method(ctx, b->object_class, "hasOwnProperty",
-	                        object_proto_has_own_property);
+	                        object_as3_has_own_property);
 	avm2_builtin_add_method(ctx, b->object_class, "isPrototypeOf",
 	                        object_proto_is_prototype_of);
 	avm2_builtin_add_method(ctx, b->object_class, "propertyIsEnumerable",
@@ -1130,6 +1154,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_regexp(ctx);
 	avm2_register_nsqname(ctx);
 	avm2_register_dictionary(ctx);
+	avm2_register_proxy(ctx);
 	// JSON is API-versioned (674 / FP11): invisible below SWF13
 	// (json_version_gated expects 1065 in a SWF12 movie).
 	if (ctx->swf_version >= 13)

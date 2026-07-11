@@ -1669,6 +1669,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             "src/avm2/avm2_json.c",
             "src/avm2/avm2_nsqname.c",
             "src/avm2/avm2_dictionary.c",
+            "src/avm2/avm2_proxy.c",
             "src/avm2/avm2_main.c",
         ])
         # QuickJS libregexp (vendored) backs the RegExp builtin.

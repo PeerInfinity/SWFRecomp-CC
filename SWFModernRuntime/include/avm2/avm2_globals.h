@@ -90,6 +90,19 @@ void avm2_register_nsqname(Avm2Context* ctx);  // Namespace + QName
 void avm2_register_dictionary(Avm2Context* ctx);  // flash.utils.Dictionary
 // Is `obj` an instance of (a subclass of) flash.utils.Dictionary?
 int avm2_is_dictionary(Avm2Object* obj);
+void avm2_register_proxy(Avm2Context* ctx);  // flash.utils.Proxy
+// Is `obj` an instance of (a subclass of) flash.utils.Proxy?
+int avm2_is_proxy(Avm2Object* obj);
+// Invoke a flash_proxy-namespace hook (getProperty/setProperty/...) on a
+// Proxy instance, honoring subclass overrides.
+Avm2Value avm2_proxy_call_hook(Avm2Context* ctx, Avm2Object* obj, const char* mname,
+                               const Avm2Value* args, uint32_t argc);
+// Enumeration hooks (avm2_object.c protocol); return 0 if not a Proxy.
+int avm2_proxy_next_enumerant(Avm2Object* obj, uint32_t cur, uint32_t* out);
+int avm2_proxy_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t idx,
+                              Avm2Value* out);
+int avm2_proxy_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_t idx,
+                               Avm2Value* out);
 
 // Namespace/QName instance state (avm2_nsqname.c). prefix == NULL is the
 // undefined prefix; a QName uri == NULL is the any namespace and local ==
@@ -214,6 +227,7 @@ typedef struct Avm2Builtins
 	Avm2Class* namespace_class;
 	Avm2Class* qname_class;
 	Avm2Class* dictionary_class;
+	Avm2Class* proxy_class;
 	Avm2Class* vector_class;         // generic __AS3__.vec::Vector
 	Avm2Class* vector_int_class;     // Vector.<int>
 	Avm2Class* vector_uint_class;    // Vector.<uint>
