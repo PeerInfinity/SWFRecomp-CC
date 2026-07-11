@@ -1501,7 +1501,7 @@ def recompile_swf(test_dir, force=False):
         pass
 
     # Remove old output if forcing OR auto-invalidating.
-    for d in ["RecompiledScripts", "RecompiledTags"]:
+    for d in ["RecompiledScripts", "RecompiledTags", "RecompiledABC"]:
         p = test_dir / d
         if p.exists():
             shutil.rmtree(p)
@@ -1612,6 +1612,20 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         core_sources.append("src/rendering/render_webgpu.c")
     else:
         core_sources.append("src/libswf/swf_core.c")
+
+    # AVM2 (AS3) test: the recompiler produced RecompiledABC/. Add the AVM2
+    # runtime module tree; -DSWF_AVM2 (below) routes main.c to runSWF_avm2()
+    # instead of swf_core.c's swfStart(). AVM1 tests never compile src/avm2.
+    is_avm2 = (test_dir / "RecompiledABC").exists()
+    if is_avm2:
+        core_sources.extend([
+            "src/avm2/avm2_value.c",
+            "src/avm2/avm2_object.c",
+            "src/avm2/avm2_class.c",
+            "src/avm2/avm2_ops.c",
+            "src/avm2/avm2_globals.c",
+            "src/avm2/avm2_main.c",
+        ])
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
 
@@ -1645,7 +1659,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     shutil.copy2(MAIN_C, build_dir)
 
     # Copy generated files for main SWF
-    for folder in ["RecompiledScripts", "RecompiledTags"]:
+    for folder in ["RecompiledScripts", "RecompiledTags", "RecompiledABC"]:
         src_dir = test_dir / folder
         if src_dir.exists():
             for f in src_dir.iterdir():
@@ -1770,6 +1784,8 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         # 2001-02-03 04:05:06 NPT (UTC+5:45) = 981152406000 ms since epoch
         mock_time = 981152406000
     extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
+    if is_avm2:
+        extra_defines.append("-DSWF_AVM2")
     viewport = get_viewport_dimensions(test_dir)
     if viewport is not None:
         extra_defines.append(f"-DVIEWPORT_WIDTH={viewport[0]}")

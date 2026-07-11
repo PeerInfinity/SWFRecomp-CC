@@ -14,6 +14,11 @@
 
 namespace SWFRecomp
 {
+	namespace abc
+	{
+		class AbcEmitter;
+	}
+
 	struct RECT
 	{
 		u8 nbits;
@@ -292,12 +297,18 @@ namespace SWFRecomp
 		bool use_network;
 		// FileAttributes AS3 bit: the SWF's code is AVM2 (DoABC tags).
 		bool is_as3;
-		// SymbolClass (tag 76) bindings: (char_id, AS3 class name). Read and
-		// recorded only — nothing acts on them until AVM2 codegen (Stage 2).
+		// SymbolClass (tag 76) bindings: (char_id, AS3 class name).
+		// Consumed by the AVM2 emitter's finalize (abc_registry.c).
 		std::vector<std::pair<u16, std::string>> symbol_class_bindings;
+		// AVM2 C emitter (RecompiledABC/), created on the first DoABC tag.
+		// finalizeAbcEmit() writes the registry after all tags are parsed
+		// (called from recompile()).
+		abc::AbcEmitter* abc_emitter;
 
 		SWF();
 		SWF(Context& context);
+
+		void finalizeAbcEmit();
 		
 		void parseMatrix(MATRIX& matrix_out);
 		void parseAllTags(Context& context);

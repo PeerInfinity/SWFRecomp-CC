@@ -16,6 +16,7 @@ out/
 # Recompiled output
 RecompiledTags/
 RecompiledScripts/
+RecompiledABC/
 
 # Flash files
 *.swf

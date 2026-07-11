@@ -57,6 +57,9 @@ namespace SWFRecomp
 			fprintf(stderr, "Caught unknown exception in parseAllTags\n");
 		}
 
+		// AVM2: write the RecompiledABC registry (no-op for AVM1 SWFs).
+		swf.finalizeAbcEmit();
+
 		// Flush the accumulated tag_main buffer to tagMain.c.
 		{
 			ofstream tag_main_file(string("") + context.output_tags_folder + "tagMain.c", ios_base::out);

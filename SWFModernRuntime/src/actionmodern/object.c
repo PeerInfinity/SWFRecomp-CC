@@ -2009,6 +2009,11 @@ static void gcParseConfig(void)
 		fprintf(stderr, "[swf-gc] mode=%s cadence=%u\n", mode, g_gc_cadence);
 }
 
+// AVM2 mark-roots participant (src/avm2/avm2_main.c registers it at
+// runSWF_avm2 startup). A function pointer, not a direct call, so AVM1-only
+// builds link object.c without the avm2 sources.
+void (*g_avm2_gc_mark_roots)(void) = NULL;
+
 static void gcCollect(SWFAppContext* app_context)
 {
 	g_gc_collections++;
@@ -2032,6 +2037,7 @@ static void gcCollect(SWFAppContext* app_context)
 	registeredClassGcMarkRoots();
 	mathGcMarkRoots();
 	dateGcMarkRoots();
+	if (g_avm2_gc_mark_roots != NULL) g_avm2_gc_mark_roots();
 	gcDrainWorklist();
 	if (g_gc_mark_failed) {
 		fprintf(stderr, "[swf-gc] mark worklist OOM — collection #%u aborted (nothing swept)\n",

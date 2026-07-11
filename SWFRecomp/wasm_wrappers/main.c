@@ -137,7 +137,16 @@ int main(int argc, char* argv[]) {
         input_events_load(argv[1]);
     }
 #endif
+#ifdef SWF_AVM2
+    // AS3 SWF (RecompiledABC/ present): dispatch to the AVM2 runtime.
+    // AVM1 builds never define SWF_AVM2 and never link src/avm2/*.c.
+    {
+        extern void runSWF_avm2(SWFAppContext* app_context);
+        runSWF_avm2(&app_context);
+    }
+#else
     swfStart(&app_context);
+#endif
 #else
     printf("WASM SWF Runtime Loaded!\n");
     printf("This is a recompiled Flash SWF running in WebAssembly.\n\n");

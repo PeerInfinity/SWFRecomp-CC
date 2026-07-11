@@ -20,6 +20,7 @@
 
 #include <swf.hpp>
 
+#include <abc/abc_emit.hpp>
 #include <abc/abc_parser.hpp>
 #include <abc/abc_verifier.hpp>
 
@@ -356,7 +357,22 @@ namespace SWFRecomp
 	
 	SWF::SWF()
 	{
-		
+		abc_emitter = nullptr;
+	}
+
+	// Writes RecompiledABC/abc_gen.h + abc_registry.c (file list +
+	// SymbolClass bindings) once every tag has been parsed. No-op for
+	// AVM1 SWFs (no DoABC tag ever created the emitter).
+	void SWF::finalizeAbcEmit()
+	{
+		if (abc_emitter != nullptr)
+		{
+			abc_emitter->finalize(symbol_class_bindings);
+			printf("DoABC: wrote RecompiledABC registry (%d tag(s), %zu SymbolClass binding(s))\n",
+			       abc_emitter->tagCount(), symbol_class_bindings.size());
+			delete abc_emitter;
+			abc_emitter = nullptr;
+		}
 	}
 	
 	SWF::SWF(Context& context) : num_finished_tags(0),
@@ -386,7 +402,8 @@ namespace SWFRecomp
 							 shape_is_v4(false),
 							 shape_is_morph2(false),
 							 use_network(false),
-							 is_as3(false)
+							 is_as3(false),
+							 abc_emitter(nullptr)
 	{
 		// Configure reusable struct records
 		//
@@ -6206,10 +6223,10 @@ namespace SWFRecomp
 			case SWF_TAG_DO_ABC:         // 82: Flags(UI32) + Name(STRING) + ABC data
 			case SWF_TAG_DO_ABC_DEFINE:  // 72: raw ABC data
 			{
-				// Stage 1 (avm2-support-plan §5): parse + verify the ABC
-				// block so AS3 SWFs are routed through the ABC front-end
-				// instead of silently producing empty AVM1 output. No C is
-				// emitted yet — codegen is Stage 2.
+				// avm2-support-plan §5: Stage 1 parses + verifies the ABC
+				// block; Stage 2 emits AVM2 C (RecompiledABC/) from the
+				// verified IR. Bodies that fail verification get an
+				// aborting stub so the test fails honestly at run time.
 				char* body_start = cur_pos;
 				const abc::u8* abc_data = (const abc::u8*) cur_pos;
 				size_t abc_len = tag.length;
@@ -6246,19 +6263,30 @@ namespace SWFRecomp
 					else
 					{
 						size_t verify_fails = 0;
+						std::vector<abc::EmitBody> bodies(abc_file.method_bodies.size());
 						for (size_t bi = 0; bi < abc_file.method_bodies.size(); ++bi)
 						{
-							abc::IrMethod ir;
 							abc::VerifyError body_err;
-							if (!abc::verifyMethodBody(abc_file, (abc::u32) bi, ir, body_err))
+							bodies[bi].verified = abc::verifyMethodBody(
+								abc_file, (abc::u32) bi, bodies[bi].ir, body_err);
+							if (!bodies[bi].verified)
 							{
 								verify_fails += 1;
+								bodies[bi].verify_error = body_err.message;
 							}
 						}
+
+						if (abc_emitter == nullptr)
+						{
+							abc_emitter = new abc::AbcEmitter();
+						}
+						abc_emitter->emitAbcTag(abc_file, bodies);
+
 						printf("DoABC: parsed OK (%zu classes, %zu methods, %zu bodies, "
-						       "%zu verify failure(s)); AVM2 codegen not implemented yet\n",
+						       "%zu verify failure(s)); emitted AVM2 C (tag %d)\n",
 						       abc_file.instances.size(), abc_file.methods.size(),
-						       abc_file.method_bodies.size(), verify_fails);
+						       abc_file.method_bodies.size(), verify_fails,
+						       abc_emitter->tagCount() - 1);
 					}
 				}
 

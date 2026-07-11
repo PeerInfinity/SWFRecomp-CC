@@ -20,6 +20,7 @@ set(SOURCES
     ${CMAKE_SOURCE_DIR}/src/tag.cpp
     ${CMAKE_SOURCE_DIR}/src/field.cpp
     ${CMAKE_SOURCE_DIR}/src/action/action.cpp
+    ${CMAKE_SOURCE_DIR}/src/abc/abc_emit.cpp
     ${CMAKE_SOURCE_DIR}/src/abc/abc_parser.cpp
     ${CMAKE_SOURCE_DIR}/src/abc/abc_verifier.cpp
     ${CMAKE_SOURCE_DIR}/src/abc/abc_dump.cpp
