@@ -1155,6 +1155,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_nsqname(ctx);
 	avm2_register_dictionary(ctx);
 	avm2_register_proxy(ctx);
+	avm2_register_bytearray(ctx);
 	// JSON is API-versioned (674 / FP11): invisible below SWF13
 	// (json_version_gated expects 1065 in a SWF12 movie).
 	if (ctx->swf_version >= 13)

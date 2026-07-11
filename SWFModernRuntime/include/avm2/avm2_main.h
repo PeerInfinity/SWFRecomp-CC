@@ -35,6 +35,7 @@ struct Avm2Context
 	Avm2Object* root;     // SymbolClass char-0 instance
 	struct Avm2TryFrame* try_top;  // innermost exception frame (avm2_error.h)
 	uint8_t swf_version;  // for string_to_f64 bug compatibility
+	uint8_t bytearray_default_encoding;  // ByteArray.defaultObjectEncoding
 	// Debug call stack (FP debug-player getStackTrace).
 	Avm2CallFrame* call_frames;
 	uint32_t call_depth;

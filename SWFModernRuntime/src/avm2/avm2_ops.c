@@ -57,6 +57,7 @@ typedef struct Resolved
 	Avm2Object* proto_holder;    // proto-chain holder of `dyn`
 	int is_array_elem;
 	int is_vector_elem;
+	int is_bytearray_elem;
 	uint32_t arr_index;
 	// Proxy receiver whose declared traits missed: route the access to the
 	// flash_proxy hooks with QName(proxy_uri, proxy_local) — NULL = any
@@ -208,6 +209,14 @@ static int resolve_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
 			out->arr_index = idx;
 			return 1;
 		}
+		if (avm2_bytearray_ext_of(recv) != NULL
+		    && name_as_index(key->name, key->name_len, &idx))
+		{
+			// ByteArrays never forward index access (even out of bounds).
+			out->is_bytearray_elem = 1;
+			out->arr_index = idx;
+			return 1;
+		}
 		out->dyn = avm2_object_find_dynamic(obj, key->name, key->name_len);
 		if (out->dyn != NULL) return 1;
 	}
@@ -282,6 +291,13 @@ static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Reso
 			out->arr_index = idx;
 			return 1;
 		}
+		if (avm2_bytearray_ext_of(recv) != NULL
+		    && name_as_index(key.name, key.name_len, &idx))
+		{
+			out->is_bytearray_elem = 1;
+			out->arr_index = idx;
+			return 1;
+		}
 		out->dyn = avm2_object_find_dynamic(obj, key.name, key.name_len);
 		if (out->dyn != NULL) return 1;
 	}
@@ -350,6 +366,15 @@ static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* 
 	if (r->is_vector_elem)
 	{
 		return avm2_vector_get_index(ctx, recv.u.obj, r->arr_index);
+	}
+	if (r->is_bytearray_elem)
+	{
+		Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(recv);
+		if (r->arr_index < ba->len)
+		{
+			return avm2_integer(ba->bytes[r->arr_index]);
+		}
+		return avm2_undefined();
 	}
 	if (r->dyn != NULL) return *r->dyn;
 	const Avm2PropEntry* e = r->entry;
@@ -471,6 +496,15 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 		if (v.kind != AVM2_VALUE_HOLE) return v;
 		// fall through (holes may be shadowed by dyn/proto)
 	}
+	{
+		Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(recv);
+		if (ba != NULL && avm2_value_as_index(name_val, &idx)
+		    && (interp || avm2_mn_has_public_ns(act->file->data, mn_idx)))
+		{
+			return (idx < ba->len) ? avm2_integer(ba->bytes[idx])
+			                       : avm2_undefined();
+		}
+	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
 	int mn_public = avm2_mn_has_public_ns(act->file->data, mn_idx);
 	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
@@ -527,6 +561,17 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 	if (r->is_vector_elem)
 	{
 		avm2_vector_set_index(ctx, recv.u.obj, r->arr_index, value);
+		return;
+	}
+	if (r->is_bytearray_elem)
+	{
+		Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(recv);
+		uint8_t byte = (uint8_t) avm2_coerce_to_u32(ctx, value);
+		if (r->arr_index >= ba->len)
+		{
+			avm2_bytearray_set_length_public(ctx, ba, r->arr_index + 1);
+		}
+		ba->bytes[r->arr_index] = byte;
 		return;
 	}
 	if (r->dyn != NULL && r->proto_holder == NULL)
@@ -681,6 +726,20 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	{
 		avm2_array_set(ctx, recv.u.obj, idx, value);
 		return;
+	}
+	{
+		Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(recv);
+		if (ba != NULL && avm2_value_as_index(name_val, &idx)
+		    && (interp || avm2_mn_has_public_ns(act->file->data, mn_idx)))
+		{
+			uint8_t byte = (uint8_t) avm2_coerce_to_u32(ctx, value);
+			if (idx >= ba->len)
+			{
+				avm2_bytearray_set_length_public(ctx, ba, idx + 1);
+			}
+			ba->bytes[idx] = byte;
+			return;
+		}
 	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
 	int mn_public = avm2_mn_has_public_ns(act->file->data, mn_idx);

@@ -90,6 +90,25 @@ void avm2_register_nsqname(Avm2Context* ctx);  // Namespace + QName
 void avm2_register_dictionary(Avm2Context* ctx);  // flash.utils.Dictionary
 // Is `obj` an instance of (a subclass of) flash.utils.Dictionary?
 int avm2_is_dictionary(Avm2Object* obj);
+void avm2_register_bytearray(Avm2Context* ctx);  // flash.utils.ByteArray (+Endian)
+
+// ByteArray instance state (avm2_bytearray.c).
+typedef struct Avm2ByteArrayExt
+{
+	uint8_t* bytes;
+	uint32_t len;
+	uint32_t cap;
+	uint32_t position;
+	uint8_t endian_little;    // 0 = bigEndian (default)
+	uint8_t object_encoding;  // 0 = AMF0, 3 = AMF3
+} Avm2ByteArrayExt;
+
+// NULL when the value is not a ByteArray (subclasses included).
+Avm2ByteArrayExt* avm2_bytearray_ext_of(Avm2Value v);
+// Grow/shrink storage (clamps position; used by the [] index write path).
+void avm2_bytearray_set_length_public(Avm2Context* ctx, Avm2ByteArrayExt* ba,
+                                      uint32_t new_len);
+
 void avm2_register_proxy(Avm2Context* ctx);  // flash.utils.Proxy
 // Is `obj` an instance of (a subclass of) flash.utils.Proxy?
 int avm2_is_proxy(Avm2Object* obj);
@@ -228,6 +247,8 @@ typedef struct Avm2Builtins
 	Avm2Class* qname_class;
 	Avm2Class* dictionary_class;
 	Avm2Class* proxy_class;
+	Avm2Class* bytearray_class;
+	Avm2Class* eof_error_class;
 	Avm2Class* vector_class;         // generic __AS3__.vec::Vector
 	Avm2Class* vector_int_class;     // Vector.<int>
 	Avm2Class* vector_uint_class;    // Vector.<uint>

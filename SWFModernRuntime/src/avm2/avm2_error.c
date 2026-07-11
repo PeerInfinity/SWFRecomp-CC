@@ -312,11 +312,14 @@ static Avm2Value error_init(Avm2Activation* act)
 	Avm2Value msg = (act->argc > 0)
 		? avm2_string(avm2_coerce_to_string(ctx, act->args[0]))
 		: avm2_string(avm2_string_from_literal(ctx, ""));
-	// this.name = prototype.name (Ruffle Error.as). The defining class's
-	// prototype carries it: dynamic on subclass prototypes, a slot on
-	// Error.prototype itself.
+	// Core error classes re-set `this.name = prototype.name` in their own
+	// constructors (Ruffle TypeError.as etc.); playerglobal flash.errors
+	// subclasses do NOT — their instances keep the "Error" that Error's
+	// constructor assigned (EOFError traces as "Error: Error #2030...").
 	Avm2Value name = avm2_string(avm2_string_from_literal(ctx, "Error"));
-	if (act->bound_class != NULL && act->bound_class->prototype_obj != NULL)
+	if (act->bound_class != NULL && act->bound_class->prototype_obj != NULL
+	    && !(act->bound_class->name.ns_len == 12
+	         && memcmp(act->bound_class->name.ns_uri, "flash.errors", 12) == 0))
 	{
 		Avm2Value pn = avm2_get_public_property(
 			ctx, avm2_object_value(act->bound_class->prototype_obj), "name", 4, NULL);
@@ -477,6 +480,7 @@ void avm2_register_error(Avm2Context* ctx)
 			made[i] = cls;
 		}
 		b->io_error_class = made[0];
+		b->eof_error_class = made[1];
 		b->memory_error_class = made[2];
 		b->illegal_operation_error_class = made[3];
 	}
