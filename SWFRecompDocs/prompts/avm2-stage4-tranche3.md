@@ -1,5 +1,14 @@
 # Session prompt — AVM2 Stage 4: tranche 3 (Namespace/QName, Proxy, Dictionary, ByteArray, AMF)
 
+**STATUS: COMPLETE (2026-07-11).** Landed at `7655bb69b`..`ee006f815`:
+48/53 candidates pass locally (exit ≥42 met). Misses, all triaged:
+bytearray_oom + dictionary_weak_keys (upstream-ignored), amf_xml +
+qname_as_lazy_name_attribute_multiname (E4X, deferred),
+amf_array_serialization (LocalConnection/NetConnection + test-framework
+fetch mock, deferred). Census ceiling 1155/1163 (TRANCHE3_OPS.txt, 124
+ops). See avm2-support-plan.md §5 tranche-3 landing note and
+avm2/_investigation/CURRENT_STATUS.md for the post-CI baseline.
+
 You are implementing the second half of **Stage 4** of
 `SWFRecompDocs/plans/avm2-support-plan.md` (§5 "tranches 2+3"; tranche 2
 is DONE — see its landing note in §5 and the COMPLETE header of

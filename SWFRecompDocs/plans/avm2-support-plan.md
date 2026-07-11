@@ -323,6 +323,34 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
     describeType-E4X ×1 (deferred), json_stringify ×1 (expected output
     hand-edited to Ruffle's FnvHashMap iteration order — unmatchable).
     Remaining Stage 4 work = tranche 3.
+  - **Tranche 3 — DONE 2026-07-11** (`7655bb69b`..`ee006f815`):
+    **48/53 tranche-3 candidates pass locally** (≥42 exit met; the 5
+    misses are 2 upstream-ignored, 2 E4X-deferred, and
+    amf_array_serialization which needs LocalConnection/NetConnection +
+    the Ruffle test-framework fetch mock). Emitter: PushNamespace and the
+    lazy-namespace multiname variants (RTQName/RTQNameL) for Find/Get/
+    Set/Delete/CallProperty. Runtime grew 5 modules — avm2_nsqname.c
+    (Namespace/QName per Ruffle namespace/q_name.rs incl. error 1098 +
+    enumeration order quirks; namespace trait defaults; uri-equality in
+    abstract_eq; QName-valued lazy names), avm2_dictionary.c
+    (object-identity keys interleaved with string expandos; numeric names
+    enumerate as numbers; tombstones + a dynamic_map-style cursor keep
+    delete-during-iteration stable; the object-key side path honors the
+    fast/slow op split), avm2_proxy.c (flash_proxy hooks routed from the
+    resolve engine on any trait miss — dynamic props and the proto chain
+    bypassed, which is what coerce_to_primitive_side_effects observes;
+    2088-family defaults; enumeration via nextNameIndex/nextName/
+    nextValue), avm2_bytearray.c (full endian-aware I/O; avmplus-lenient
+    UTF-8 decode (wstr DecodeAvmUtf8); readMultiByte/writeMultiByte with
+    utf-16le/be + iconv shift-jis; zlib compress/uncompress incl. raw
+    deflate; [] index access; EOF 2030 / 2006 / 2007 / 2008 semantics),
+    and avm2_amf.c (AMF3+AMF0 readObject/writeObject byte-exact against
+    Ruffle's flash-lso encoder incl. its reference-table quirks;
+    registerClassAlias/getClassByAlias; minimal Date; Point as a sealed
+    two-slot class). Census ceiling 1148 → **1155/1163** (TRANCHE3_OPS,
+    124 ops; remaining: GetDescendants/CheckFilter/DxnsLate — all E4X or
+    alchemy). **Stage 4 complete**; next = Stage 5 frame lifecycle or the
+    E4X/XML plan.
 - **Stage 5 — frame lifecycle + display basics**: broadcast events, 3-phase
   dispatch, `addFrameScript`, DisplayObject hierarchy bridged onto the existing
   display list. Unlocks the timeline-dependent minority + starts the path

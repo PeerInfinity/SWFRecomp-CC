@@ -1,7 +1,7 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-11 — Stage 4 tranche 2 (Vector/RegExp/JSON/proto
-edge cases) landed.
+Last updated: 2026-07-11 — Stage 4 tranche 3 (Namespace/QName, Proxy,
+Dictionary, ByteArray, AMF) landed; Stage 4 COMPLETE.
 
 **Plan:** `SWFRecompDocs/plans/avm2-support-plan.md` (umbrella; stages,
 architecture sketch, tranche definitions). Phase-1 metric: pass rate on this
@@ -9,6 +9,35 @@ suite's trace tests.
 
 ## State
 
+- **Stage 4 tranche 3 (2026-07-11): 48 / 53 tranche-3 candidates pass
+  locally** (`_investigation/TRANCHE3_CANDIDATES.txt`; exit criterion
+  >=42 met). CI baseline pending (see the pipeline run following commit
+  `ee006f815`). The 5 misses, all triaged: bytearray_oom +
+  dictionary_weak_keys (upstream-ignored / known_failure), amf_xml +
+  qname_as_lazy_name_attribute_multiname (E4X — XML literals /
+  GetDescendants, deferred to the E4X plan), amf_array_serialization
+  (needs flash.net.LocalConnection/NetConnection plus the Ruffle
+  test-framework Navigator fetch mock — deferred).
+  New since tranche 2: Namespace/QName classes + PushNamespace + the
+  full lazy-namespace multiname surface (RTQName/RTQNameL emission,
+  QName-valued lazy names, ns-set trait matching for lazy names),
+  flash.utils.Dictionary (object-identity keys, numeric-name enumerants,
+  tombstoned expandos + a Ruffle dynamic_map-style enumeration cursor so
+  delete-during-iteration doesn't shift the iterator),
+  flash.utils.Proxy (full property-engine hook routing incl. enumeration
+  + coerce_to_primitive side effects), flash.utils.ByteArray
+  (endian-aware I/O, avmplus-lenient UTF-8 decode, iconv-backed
+  readMultiByte/writeMultiByte, zlib compress/uncompress, [] index
+  access), AMF3/AMF0 readObject/writeObject byte-exact against Ruffle's
+  flash-lso output (string/trait/object reference-table quirks included),
+  flash.net.registerClassAlias/getClassByAlias/ObjectEncoding, a minimal
+  Date (millis + getTime/valueOf/toString), and flash.geom.Point as a
+  sealed two-slot class. flash.errors instances now keep name "Error"
+  (their constructors never re-set it after super()).
+  **Census ceiling 1148 -> 1155/1163** with 124 ops
+  (`_investigation/TRANCHE3_OPS.txt` = STAGE4_OPS + PushNamespace).
+  Remaining blocking ops: GetDescendants (3, E4X), CheckFilter (3, E4X),
+  DxnsLate/alchemy (1).
 - **CI baseline (run 29154109023, 2026-07-11): 354 / 1,200 passing
   (29.5%)** — up from Stage 3's 296/1198 (+58), zero pass→fail
   regressions in avm2 or ANY AVM1 suite (avm1 634/706, gnash suites,
