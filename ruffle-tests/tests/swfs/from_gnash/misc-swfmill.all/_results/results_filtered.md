@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-11 02:53 UTC
+**Date**: 2026-07-11 03:21 UTC
 
-**Git SHA**: `83bef14d7e`
+**Git SHA**: `03c86381db`
 
-**Run Duration**: 6m 23s
+**Run Duration**: 6m 22s
 
 **Filtered**: 0 tests ignored out of 20 available
 
@@ -13,44 +13,39 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 20 |
-| Passing | **18** (90.0%) |
+| Passing | **19** (95.0%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **19** (95.0%) |
-| Failing | 1 |
+| Effective pass | **20** (100.0%) |
+| Failing | 0 |
 | Total expected lines | 95 |
-| Matching lines | 92 (96.8%) |
-| Mismatched lines | 3 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Runtime Error | 1 | 100.0% |
+| Matching lines | 93 (97.9%) |
+| Mismatched lines | 2 |
 
 ## Passing Tests
 
-**18 tests passing**
+**19 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 19.2s |  |
-| 2 | `background` | 0 | 19.2s |  |
-| 3 | `dict_callframe` | 3 | 22.0s |  |
-| 4 | `dict_cross` | 3 | 19.3s |  |
-| 5 | `dict_event` | 5 | 18.8s |  |
-| 6 | `dict_override` | 2 | 19.0s |  |
-| 7 | `func_dict` | 3 | 16.0s |  |
-| 8 | `initaction_in_definesprite` | 2 | 19.2s |  |
-| 9 | `jump_after_end` | 3 | 19.2s |  |
-| 10 | `jump_to_prev_block` | 1 | 19.3s |  |
-| 11 | `missing_bitmap` | 0 | 20.0s |  |
-| 12 | `registers` | 36 | 20.2s |  |
-| 13 | `tags_after_last_showframe` | 1 | 19.4s |  |
-| 14 | `trace-as2/arguments` | 8 | 19.7s |  |
-| 15 | `trace-as2/root_onload` | 4 | 19.2s |  |
-| 16 | `trace-as2/shortstack` | 2 | 20.3s |  |
-| 17 | `trace-as2/super` | 8 | 15.4s |  |
-| 18 | `trace-as2/this` | 8 | 17.8s |  |
+| 1 | `afunc_dict` | 2 | 20.1s |  |
+| 2 | `background` | 0 | 19.5s |  |
+| 3 | `dict_callframe` | 3 | 19.2s |  |
+| 4 | `dict_cross` | 3 | 19.5s |  |
+| 5 | `dict_event` | 5 | 19.9s |  |
+| 6 | `dict_override` | 2 | 18.7s |  |
+| 7 | `func_dict` | 3 | 19.2s |  |
+| 8 | `initaction_in_definesprite` | 2 | 20.2s |  |
+| 9 | `jump_after_end` | 3 | 19.5s |  |
+| 10 | `jump_to_prev_block` | 1 | 19.4s |  |
+| 11 | `missing_bitmap` | 0 | 20.1s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 18.8s |  |
+| 13 | `registers` | 36 | 15.5s |  |
+| 14 | `tags_after_last_showframe` | 1 | 19.6s |  |
+| 15 | `trace-as2/arguments` | 8 | 19.3s |  |
+| 16 | `trace-as2/root_onload` | 4 | 19.7s |  |
+| 17 | `trace-as2/shortstack` | 2 | 19.0s |  |
+| 18 | `trace-as2/super` | 8 | 19.0s |  |
+| 19 | `trace-as2/this` | 8 | 15.5s |  |
 
 ## Ruffle-Matched Tests
 
@@ -58,7 +53,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 19.8s |  |
+| 1 | `zeroframe_definesprite` | 2 | 2 | 19.3s |  |
 
 ## Near-Passing Tests
 
@@ -74,11 +69,7 @@ No segfaults.
 
 ## Runtime Errors
 
-**1 tests** fail with runtime errors
-
-| # | Test | Detail | Duration | Notes |
-|---|------|--------|----------|-------|
-| 1 | `mixed-bytecode-as2` | exit code 1 | 19.3s |  |
+No runtime errors.
 
 ## Timeouts
 
