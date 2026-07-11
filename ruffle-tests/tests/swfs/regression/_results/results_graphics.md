@@ -1,67 +1,69 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-11 07:47 UTC
+**Date**: 2026-07-11 08:24 UTC
 
-**Git SHA**: `d2769302e1`
+**Git SHA**: `d4bd5b2fad`
 
-**Run Duration**: 8m 4s
+**Run Duration**: 8m 23s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 39 |
-| Passing | **39** (100.0%) |
+| Total tests | 41 |
+| Passing | **41** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 256 |
-| Matching lines | 256 (100.0%) |
+| Total expected lines | 260 |
+| Matching lines | 260 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**39 tests passing**
+**41 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array_element_type1_args` | 7 | 19.1s |  |
+| 1 | `array_element_type1_args` | 7 | 0.9s |  |
 | 2 | `array_method_type1_args` | 7 | 0.9s |  |
-| 3 | `broadcast_cross_swf_version` | 4 | 20.4s |  |
-| 4 | `broadcast_type1_args` | 14 | 1.9s |  |
-| 5 | `coerce_cross_swf_version` | 7 | 20.5s |  |
-| 6 | `coerce_type1_args` | 9 | 19.9s |  |
-| 7 | `ei_closure_scope_order` | 7 | 2.0s |  |
-| 8 | `ei_cross_swf_version` | 2 | 1.9s |  |
-| 9 | `ei_type1_args` | 7 | 1.4s |  |
-| 10 | `enterframe_type1_args` | 8 | 17.1s |  |
-| 11 | `fn_call_builtin_type1_args` | 10 | 21.1s |  |
-| 12 | `fn_call_type1_args` | 7 | 1.9s |  |
-| 13 | `fn_empty_method_type1_args` | 10 | 1.8s |  |
-| 14 | `lc_method_type1_args` | 7 | 0.9s |  |
-| 15 | `lc_onstatus_type1_args` | 3 | 19.7s |  |
-| 16 | `lv_cross_swf_version` | 5 | 20.3s |  |
-| 17 | `lv_ondata_type1_args` | 3 | 20.8s |  |
-| 18 | `mc_event_cross_swf_version` | 4 | 20.7s |  |
-| 19 | `mc_event_type1_args` | 3 | 0.9s |  |
-| 20 | `mc_method_v5_caller_gate` | 4 | 21.1s |  |
-| 21 | `mc_resolve_type1_args` | 6 | 0.9s |  |
-| 22 | `method_type1_args` | 10 | 1.0s |  |
-| 23 | `nc_onstatus_closure` | 2 | 20.2s |  |
-| 24 | `nc_onstatus_type1_args` | 3 | 1.8s |  |
-| 25 | `onconstruct_cross_swf_version` | 4 | 20.2s |  |
-| 26 | `onconstruct_type1_args` | 6 | 16.9s |  |
-| 27 | `onload_type1_args` | 7 | 20.2s |  |
-| 28 | `onunload_type1_args` | 6 | 1.2s |  |
-| 29 | `resolve_type1_args` | 13 | 21.1s |  |
-| 30 | `sort_comparator_type1_args` | 5 | 20.3s |  |
-| 31 | `string_prim_method_type1_args` | 19 | 1.9s |  |
-| 32 | `timer_cross_swf_version` | 3 | 19.7s |  |
-| 33 | `timer_type1_args` | 14 | 19.4s |  |
-| 34 | `watch_cross_swf_version` | 6 | 19.4s |  |
-| 35 | `watch_mc_reentrant_setmember` | 3 | 0.9s |  |
-| 36 | `watch_mc_type1_args` | 7 | 19.9s |  |
-| 37 | `watch_setmember_type1_args` | 7 | 1.9s |  |
-| 38 | `watch_timeline_named_params` | 4 | 19.9s |  |
-| 39 | `xml_onload_type1_args` | 3 | 20.3s |  |
+| 3 | `broadcast_cross_swf_version` | 4 | 22.7s |  |
+| 4 | `broadcast_type1_args` | 14 | 2.1s |  |
+| 5 | `coerce_cross_swf_version` | 7 | 19.8s |  |
+| 6 | `coerce_recursion_guard` | 1 | 1.8s |  |
+| 7 | `coerce_type1_args` | 9 | 18.6s |  |
+| 8 | `ei_closure_scope_order` | 7 | 1.8s |  |
+| 9 | `ei_cross_swf_version` | 2 | 17.0s |  |
+| 10 | `ei_type1_args` | 7 | 1.4s |  |
+| 11 | `enterframe_type1_args` | 8 | 19.9s |  |
+| 12 | `fn_call_builtin_type1_args` | 10 | 19.8s |  |
+| 13 | `fn_call_type1_args` | 7 | 19.9s |  |
+| 14 | `fn_empty_method_type1_args` | 10 | 1.9s |  |
+| 15 | `lc_method_type1_args` | 7 | 18.8s |  |
+| 16 | `lc_onstatus_type1_args` | 3 | 1.8s |  |
+| 17 | `lv_cross_swf_version` | 5 | 20.4s |  |
+| 18 | `lv_ondata_type1_args` | 3 | 20.0s |  |
+| 19 | `mc_event_cross_swf_version` | 4 | 19.8s |  |
+| 20 | `mc_event_type1_args` | 3 | 18.7s |  |
+| 21 | `mc_method_v5_caller_gate` | 4 | 20.0s |  |
+| 22 | `mc_resolve_type1_args` | 6 | 0.9s |  |
+| 23 | `method_type1_args` | 10 | 19.1s |  |
+| 24 | `nc_onstatus_closure` | 2 | 19.8s |  |
+| 25 | `nc_onstatus_type1_args` | 3 | 1.9s |  |
+| 26 | `onconstruct_cross_swf_version` | 4 | 20.4s |  |
+| 27 | `onconstruct_type1_args` | 6 | 16.6s |  |
+| 28 | `onload_type1_args` | 7 | 20.1s |  |
+| 29 | `onunload_type1_args` | 6 | 1.1s |  |
+| 30 | `resolve_type1_args` | 13 | 1.8s |  |
+| 31 | `sort_comparator_type1_args` | 5 | 1.9s |  |
+| 32 | `string_prim_method_type1_args` | 19 | 1.8s |  |
+| 33 | `timer_cross_swf_version` | 3 | 20.4s |  |
+| 34 | `timer_type1_args` | 14 | 20.1s |  |
+| 35 | `watch_cross_swf_version` | 6 | 19.9s |  |
+| 36 | `watch_mc_reentrant_setmember` | 3 | 1.1s |  |
+| 37 | `watch_mc_type1_args` | 7 | 1.9s |  |
+| 38 | `watch_setmember_type1_args` | 7 | 20.7s |  |
+| 39 | `watch_timeline_named_params` | 4 | 2.0s |  |
+| 40 | `watch_timeline_reentrant` | 3 | 19.9s |  |
+| 41 | `xml_onload_type1_args` | 3 | 21.2s |  |
 
 ## Near-Passing Tests
 
