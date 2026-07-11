@@ -2580,6 +2580,32 @@ Avm2Value avm2_call_public_property(Avm2Context* ctx, Avm2Value recv,
 	return callproperty_common(ctx, recv, name, name_len, ok, &r, args, argc, recv);
 }
 
+// Name-based public property WRITE (traits + setters + dynamic creation);
+// used by the AMF deserializer. Throws like SetProperty.
+void avm2_set_public_property(Avm2Context* ctx, Avm2Value recv,
+                              const char* name, uint32_t name_len, Avm2Value value)
+{
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	uint32_t idx;
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	    && name_as_index(name, name_len, &idx))
+	{
+		avm2_array_set(ctx, recv.u.obj, idx, value);
+		return;
+	}
+	Avm2PropKey key = avm2_public_key(name, name_len);
+	Resolved r;
+	if (resolve_key(ctx, recv, &key, 1, &r))
+	{
+		setproperty_resolved(ctx, recv, &r, name, name_len, value, 0);
+		return;
+	}
+	setproperty_miss(ctx, recv, name, name_len, value);
+}
+
 int avm2_has_public_property(Avm2Context* ctx, Avm2Value recv,
                              const char* name, uint32_t name_len)
 {

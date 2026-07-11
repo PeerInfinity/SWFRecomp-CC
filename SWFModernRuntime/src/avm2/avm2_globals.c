@@ -644,8 +644,13 @@ static Avm2Value point_init(Avm2Activation* act)
 		? avm2_number(avm2_coerce_to_number(ctx, act->args[0])) : avm2_integer(0);
 	Avm2Value y = act->argc > 1
 		? avm2_number(avm2_coerce_to_number(ctx, act->args[1])) : avm2_integer(0);
-	avm2_object_set_dynamic(ctx, self, "x", 1, x);
-	avm2_object_set_dynamic(ctx, self, "y", 1, y);
+	// x/y are proper SLOTS on a sealed class (AMF serializes Point as two
+	// static trait props — bytearray_method_serialization's 25 bytes).
+	if (self->slot_count > 2)
+	{
+		self->slots[1] = x;
+		self->slots[2] = y;
+	}
 	return avm2_undefined();
 }
 
@@ -1136,13 +1141,26 @@ void avm2_globals_init(Avm2Context* ctx)
 	// it exists so `x as Date` / `is Date` type checks resolve.
 	b->xml_class = avm2_builtin_class(ctx, "", "XML", b->object_class);
 	b->xml_list_class = avm2_builtin_class(ctx, "", "XMLList", b->object_class);
-	avm2_builtin_class(ctx, "", "Date", b->object_class);
+	b->date_class = avm2_builtin_class(ctx, "", "Date", b->object_class);
 	// flash.geom.Point minimal stub: constructible, x/y as expando props
 	// (slots_force_autoassigned only needs the definition to exist).
 	{
 		Avm2Class* point = avm2_builtin_class(ctx, "flash.geom", "Point", b->object_class);
+		point->flags |= AVM2_CLASS_FLAG_SEALED;
 		point->instance_init.fn = point_init;
 		point->instance_init.debug_name = "Point";
+		static const char* const xy[2] = { "x", "y" };
+		for (int i = 0; i < 2; i++)
+		{
+			Avm2PropEntry e;
+			memset(&e, 0, sizeof(e));
+			e.key = avm2_public_key(xy[i], 1);
+			e.kind = AVM2_PROP_SLOT;
+			e.slot_index = point->ivtable.slot_count + 1;
+			e.defining_class = point;
+			point->ivtable.slot_count++;
+			avm2_vtable_append(ctx, &point->ivtable, &e);
+		}
 	}
 
 	avm2_register_function_builtins(ctx);
@@ -1156,6 +1174,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_dictionary(ctx);
 	avm2_register_proxy(ctx);
 	avm2_register_bytearray(ctx);
+	avm2_register_amf(ctx);
 	// JSON is API-versioned (674 / FP11): invisible below SWF13
 	// (json_version_gated expects 1065 in a SWF12 movie).
 	if (ctx->swf_version >= 13)

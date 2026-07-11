@@ -55,6 +55,8 @@ Avm2Value avm2_call_public_property(Avm2Context* ctx, Avm2Value recv,
                                     const Avm2Value* args, uint32_t argc);
 int avm2_has_public_property(Avm2Context* ctx, Avm2Value recv,
                              const char* name, uint32_t name_len);
+void avm2_set_public_property(Avm2Context* ctx, Avm2Value recv,
+                              const char* name, uint32_t name_len, Avm2Value value);
 int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
                                  const char* name, uint32_t name_len);
 
@@ -91,6 +93,14 @@ void avm2_register_dictionary(Avm2Context* ctx);  // flash.utils.Dictionary
 // Is `obj` an instance of (a subclass of) flash.utils.Dictionary?
 int avm2_is_dictionary(Avm2Object* obj);
 void avm2_register_bytearray(Avm2Context* ctx);  // flash.utils.ByteArray (+Endian)
+void avm2_register_amf(Avm2Context* ctx);  // flash.net alias fns + Date upgrade
+
+// Minimal Date instance state (avm2_amf.c upgrades the stub).
+typedef struct Avm2DateExt
+{
+	double millis;
+} Avm2DateExt;
+Avm2DateExt* avm2_date_ext_of(Avm2Value v);
 
 // ByteArray instance state (avm2_bytearray.c).
 typedef struct Avm2ByteArrayExt
@@ -249,6 +259,7 @@ typedef struct Avm2Builtins
 	Avm2Class* proxy_class;
 	Avm2Class* bytearray_class;
 	Avm2Class* eof_error_class;
+	Avm2Class* date_class;
 	Avm2Class* vector_class;         // generic __AS3__.vec::Vector
 	Avm2Class* vector_int_class;     // Vector.<int>
 	Avm2Class* vector_uint_class;    // Vector.<uint>
