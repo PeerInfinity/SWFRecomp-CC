@@ -1,5 +1,14 @@
 # Session prompt — AVM2 Stage 2: hello_world end-to-end
 
+> **STATUS: COMPLETE 2026-07-10** (`0fec4fbe6` core, `40e98bb42` CI fan-out).
+> All deliverables met: emitter (`SWFRecomp/src/abc/abc_emit.{cpp,hpp}` →
+> `RecompiledABC/`), runtime module tree (`SWFModernRuntime/{src,include}/avm2/`),
+> harness auto-detection (`-DSWF_AVM2` + `src/avm2/*.c` when `RecompiledABC/`
+> exists), CI fan-out + download ALL_CATEGORIES. hello_world passes; near-miss
+> probes (`add`, `closures`, `es4_inheritance`) fail on named missing opcodes.
+> See plan §5 Stage-2 landing note and the avm2 CURRENT_STATUS.md.
+> Next session: Stage 3 (tranche 1) — branches/labels in the emitter first.
+
 You are implementing **Stage 2** of `SWFRecompDocs/plans/avm2-support-plan.md`.
 Read that plan first (§4 architecture sketch, §5 stages), then
 `ruffle-tests/tests/swfs/avm2/_investigation/CURRENT_STATUS.md`, then

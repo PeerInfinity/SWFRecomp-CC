@@ -245,11 +245,27 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   sources for `hello_world`, `add`, `closures`, `es4_inheritance`. IR divergences
   from Ruffle documented in `abc_ir.hpp` (GetGlobalScope not lowered, PushNaN kept,
   Coerce/AsType/IsType keep multiname indices).
-- **Stage 2 — hello_world end-to-end**: minimal C emitter (script init +
-  class + constructor), `Avm2Value` + core coercions, ScriptObject/vtable
-  minimum, `trace`, Sprite/MovieClip stub root, SymbolClass root binding,
-  `runSWF_avm2()`. Exit: `verify_output.py --test=hello_world
-  --tests-dir=.../avm2` passes.
+- **Stage 2 — hello_world end-to-end** — **DONE 2026-07-10** (`0fec4fbe6`
+  core + `40e98bb42` CI fan-out): C emitter `SWFRecomp/src/abc/abc_emit.{cpp,hpp}`
+  lowers verified IR into `RecompiledABC/` (static pools/class/script/trait/
+  SymbolClass tables + one C function per body; operand stack = C local array
+  sized by `computed_max_stack`); runtime module tree
+  `SWFModernRuntime/{src,include}/avm2/` — 16-byte `Avm2Value` (coercion
+  helpers named 1:1 with Ruffle value.rs), ScriptObject (slots + dynamic map
+  + vtable ptr), flattened vtables (inherit super + append traits), captured
+  scope chains, Ruffle-style definition domain with lazy script init,
+  builtin stubs (Object/Class/Function, EventDispatcher→…→MovieClip with
+  native addFrameScript, trace), `runSWF_avm2()` with the §4.4 load ordering.
+  Entry split: `wasm_wrappers/main.c` dispatches on `-DSWF_AVM2` (set by
+  verify_output.py when `RecompiledABC/` exists); `swf_core.c`/`action.c`
+  untouched. GC: Stage-2 AVM2 allocations are census-invisible/immortal; a
+  `g_avm2_gc_mark_roots` participant hook is registered in the object.c
+  aggregator with the Stage-3 enrollment TODO. Stage-2 opcode surface =
+  hello_world's 21 ops; everything else aborts at runtime with a named
+  `unimplemented op` (verified on `add`/`closures`/`es4_inheritance` — the
+  Stage-3 starting line). Exit met: hello_world passes locally; first avm2
+  CI baseline 1/1202 with the suite wired into `ruffle-tests.yml` and
+  `download_tests.sh` ALL_CATEGORIES.
 - **Stage 3 — tranche 1 (~90 language tests)**: full opcode coverage for
   arithmetic/logic/control flow, coercion matrix, primitives + their
   wrapper-class methods, Array, String, OOP (inheritance, interfaces, virtual
