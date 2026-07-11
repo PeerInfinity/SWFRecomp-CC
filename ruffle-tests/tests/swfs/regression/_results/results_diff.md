@@ -1,19 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `cbb390273734` (2026-07-11T06:50:31.992505+00:00)
-**Current:** `d2769302e10e` (2026-07-11T07:38:22.574383+00:00)
+**Previous:** `d2769302e10e` (2026-07-11T07:38:22.574383+00:00)
+**Current:** `d4bd5b2fad95` (2026-07-11T08:19:09.047538+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 38 | 39 | +1 |
-| Total | 38 | 39 | +1 |
+| Passing | 39 | 41 | +2 |
+| Total | 39 | 41 | +2 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (1)
+## Added Tests (2)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `mc_method_v5_caller_gate` | pass | 4/4 |
+| `coerce_recursion_guard` | pass | 1/1 |
+| `watch_timeline_reentrant` | pass | 3/3 |
