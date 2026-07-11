@@ -262,15 +262,41 @@ void runSWF_avm2(SWFAppContext* app_context)
 		// No char-0 binding: the movie's classes are bound to placed symbols
 		// (SymbolClass char N + PlaceObject on frame 1). Real timeline
 		// instantiation is Stage 5; until then, construct each bound class
-		// once in tag order — the single-frame test-movie behavior.
+		// once in tag order — the single-frame test-movie behavior. This is
+		// best-effort: a binding whose defining script aborted (its slot
+		// never became a class — negative_volume_panned's init dies on the
+		// Sound stub) is skipped, not fatal.
 		for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
 		{
-			if (avm2_generated_symbol_classes[i].class_name == NULL) continue;
+			const char* cname = avm2_generated_symbol_classes[i].class_name;
+			if (cname == NULL) continue;
+			Avm2PropKey key;
+			Avm2Object* globals = find_root_class_globals(ctx, cname, &key);
+			if (globals == NULL) continue;
+			const Avm2PropEntry* entry = avm2_vtable_find(globals->vtable, &key);
+			Avm2Value cls_val = avm2_undefined();
+			if (entry != NULL && entry->kind == AVM2_PROP_SLOT)
+			{
+				cls_val = globals->slots[entry->slot_index];
+			}
+			else
+			{
+				Avm2Value* dyn = avm2_object_find_dynamic(globals, key.name,
+				                                          key.name_len);
+				if (dyn != NULL) cls_val = *dyn;
+			}
+			if (cls_val.kind != AVM2_VALUE_OBJECT || cls_val.u.obj == NULL
+			    || cls_val.u.obj->kind != AVM2_OBJ_CLASS)
+			{
+				continue;
+			}
 			Avm2TryFrame top;
 			avm2_try_push_catch_all(ctx, &top);
 			if (setjmp(top.jb) == 0)
 			{
-				construct_root(ctx, avm2_generated_symbol_classes[i].class_name);
+				Avm2Value root = avm2_class_construct(
+					ctx, cls_val.u.obj->class_ref, NULL, 0);
+				ctx->root = root.u.obj;
 			}
 			avm2_try_pop_frame(&top);
 		}
