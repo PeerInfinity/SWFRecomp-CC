@@ -4753,11 +4753,12 @@ namespace SWFRecomp
 				if ((flags & 0b00001000) != 0)
 				{
 					// AS3 bit: the SWF's code lives in DoABC tags, which are
-					// parsed (not yet compiled) below. Frame/DoAction handling
-					// for AVM1 SWFs is unaffected — they never set this bit.
+					// compiled into RecompiledABC/ below. Frame/DoAction
+					// handling for AVM1 SWFs is unaffected — they never set
+					// this bit.
 					is_as3 = true;
-					printf("AS3 (AVM2) SWF detected: ABC tags will be parsed and verified, "
-					       "but AVM2 code generation is not implemented yet (plan Stage 2).\n");
+					printf("AS3 (AVM2) SWF detected: DoABC tags will be compiled into RecompiledABC/ "
+					       "(avm2-support-plan Stage 2).\n");
 				}
 
 				// Bit 0: UseNetwork
@@ -6228,6 +6229,20 @@ namespace SWFRecomp
 				// verified IR. Bodies that fail verification get an
 				// aborting stub so the test fails honestly at run time.
 				char* body_start = cur_pos;
+
+				// Flash only executes DoABC when the FileAttributes AS3 bit
+				// is set; in an AVM1 SWF the tag is inert and the DoAction
+				// bytecode runs instead (Ruffle gates on
+				// movie.is_action_script_3() the same way — see gnash's
+				// mixed-bytecode-as2 test). Emitting here would flip the
+				// whole build to the AVM2 entry point via RecompiledABC/
+				// detection, silencing the SWF's real AVM1 output.
+				if (!is_as3)
+				{
+					printf("DoABC: ignored (FileAttributes AS3 bit not set — AVM1 SWF)\n");
+					cur_pos = body_start + tag.length;
+					break;
+				}
 				const abc::u8* abc_data = (const abc::u8*) cur_pos;
 				size_t abc_len = tag.length;
 
