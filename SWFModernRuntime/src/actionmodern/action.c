@@ -35046,11 +35046,18 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
 	// Consolidation, Stage 4). this_var = MOVIECLIP(mc); INV_EVENT_THIS_MC
 	// reproduces the arm's g_event_this_mc save/set/restore around both
-	// branches. No version switch has EVER existed on this path (a
-	// normalization candidate, not this migration), so INV_BASE_CLIP's
-	// ambient g_swf_version gate is exactly the gate the arm read — the MC
-	// arms' callee-version accident does not arise here and no ClosureFrame
-	// is needed.
+	// branches. INV_VERSION_SWITCH added by normalization pass (b): handlers
+	// run at their DEFINING movie's SWF version + _global group (proven bug
+	// class — Stage 0's timer fix; the family repro is
+	// regression/onconstruct_cross_swf_version, whose row exercises the
+	// onConstruct ritual clone; onLoad's own cross-version trigger is not
+	// buildable today — attachMovie is its only queue site and a
+	// hand-assembled DefineSprite attachMovie doesn't instantiate in the
+	// child-movie environment). The base-clip switch therefore moves INTO
+	// the arm below, gated on the CALLER's g_swf_version read BEFORE the
+	// core installs the callee version — exactly the ambient gate the
+	// core's INV_BASE_CLIP applied here while no version switch existed
+	// (never INV_BASE_CLIP|INV_VERSION_SWITCH together).
 	//
 	// Type 1 (kept from actionInvokeRegisteredClassConstructor's setup so
 	// closure-captured free variables of mtasc-compiled bodies resolve):
@@ -35073,7 +35080,7 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 	ActionVar _ol_this = {0};
 	_ol_this.type = ACTION_STACK_VALUE_MOVIECLIP;
 	_ol_this.data.numeric_value = (u64)(uintptr_t)mc;
-	u32 _ol_flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BASE_CLIP
+	u32 _ol_flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_VERSION_SWITCH
 	              | INV_EVENT_THIS_MC;
 	u8 _ol_act = 0;
 	if (func->function_type == 2)
@@ -35086,10 +35093,15 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 		_ol_flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_FORCE_CAPTURED_WITH
 		           | INV_THIS_STACK | INV_BIND_THIS;
 	}
+	// Both branches: the core honored INV_BASE_CLIP on its t1 AND t2 paths.
+	MovieClip* _ol_saved_base = g_current_context;
+	if (g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = (MovieClip*)func->base_clip;
 	InvokeOpts _ol_opts = { .flags = _ol_flags, .act_flags = _ol_act };
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &_ol_this, NULL, 0, &_ol_opts);
 	g_call_depth--;
+	g_current_context = _ol_saved_base;
 
 	actionSetCurrentContext(saved_ctx);
 }
@@ -35202,10 +35214,14 @@ static void actionDispatchMCOnConstruct(SWFAppContext* app_context, MovieClip* m
 	// arm let a param'd type-1 handler's prologue pop the CALLER's
 	// in-progress expression operands. Repro'd (fail-before verified) by
 	// regression/onconstruct_type1_args — TYPE1_ARG_ORDER instance 19.
+	// INV_VERSION_SWITCH + the arm-computed caller-gated base-clip switch
+	// added by normalization pass (b), same as onLoad
+	// (regression/onconstruct_cross_swf_version is the family repro — it
+	// flips on THIS dispatcher, the mid-script one).
 	ActionVar _oc_this = {0};
 	_oc_this.type = ACTION_STACK_VALUE_MOVIECLIP;
 	_oc_this.data.numeric_value = (u64)(uintptr_t)mc;
-	u32 _oc_flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BASE_CLIP
+	u32 _oc_flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_VERSION_SWITCH
 	              | INV_EVENT_THIS_MC;
 	u8 _oc_act = 0;
 	if (func->function_type == 2)
@@ -35218,10 +35234,15 @@ static void actionDispatchMCOnConstruct(SWFAppContext* app_context, MovieClip* m
 		_oc_flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_FORCE_CAPTURED_WITH
 		           | INV_THIS_STACK | INV_BIND_THIS;
 	}
+	// Both branches: the core honored INV_BASE_CLIP on its t1 AND t2 paths.
+	MovieClip* _oc_saved_base = g_current_context;
+	if (g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = (MovieClip*)func->base_clip;
 	InvokeOpts _oc_opts = { .flags = _oc_flags, .act_flags = _oc_act };
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &_oc_this, NULL, 0, &_oc_opts);
 	g_call_depth--;
+	g_current_context = _oc_saved_base;
 
 	actionSetCurrentContext(saved_ctx);
 
