@@ -293,24 +293,48 @@ _Noreturn void avm2_throw_1065(Avm2Context* ctx, const char* name, uint32_t name
 // Error classes
 // ---------------------------------------------------------------------------
 
-// Error constructor body: this.message = args[0] (default ""), and
-// this.errorID = args[1] (default 0), stored as a dont-enum dynamic prop.
+// name/message are instance SLOTS (Ruffle Error.as `public var name` /
+// `public var message`): direct reads see them, but prototype-CHAIN reads
+// don't (only dynamic props delegate — error_prototype).
+enum
+{
+	ERROR_SLOT_NAME = 1,
+	ERROR_SLOT_MESSAGE = 2,
+};
+
+// Error constructor body: this.message = args[0] (default ""), this.name =
+// <constructing class>.prototype.name, errorID = args[1] (dont-enum
+// dynamic — the getter reads it back).
 static Avm2Value error_init(Avm2Activation* act)
 {
+	Avm2Context* ctx = act->ctx;
 	Avm2Object* self = act->this_val.u.obj;
 	Avm2Value msg = (act->argc > 0)
-		? avm2_string(avm2_coerce_to_string(act->ctx, act->args[0]))
-		: avm2_string(avm2_string_from_literal(act->ctx, ""));
-	Avm2DynProp* p = avm2_object_set_dynamic(act->ctx, self, "message", 7, msg);
-	p->dont_enum = 1;
+		? avm2_string(avm2_coerce_to_string(ctx, act->args[0]))
+		: avm2_string(avm2_string_from_literal(ctx, ""));
+	// this.name = prototype.name (Ruffle Error.as). The defining class's
+	// prototype carries it: dynamic on subclass prototypes, a slot on
+	// Error.prototype itself.
+	Avm2Value name = avm2_string(avm2_string_from_literal(ctx, "Error"));
+	if (act->bound_class != NULL && act->bound_class->prototype_obj != NULL)
+	{
+		Avm2Value pn = avm2_get_public_property(
+			ctx, avm2_object_value(act->bound_class->prototype_obj), "name", 4, NULL);
+		if (pn.kind != AVM2_VALUE_UNDEFINED) name = pn;
+	}
+	if (self->slot_count > ERROR_SLOT_MESSAGE)
+	{
+		self->slots[ERROR_SLOT_NAME] = name;
+		self->slots[ERROR_SLOT_MESSAGE] = msg;
+	}
 	Avm2Value eid = (act->argc > 1)
-		? avm2_integer(avm2_coerce_to_i32(act->ctx, act->args[1]))
+		? avm2_integer(avm2_coerce_to_i32(ctx, act->args[1]))
 		: avm2_integer(0);
-	p = avm2_object_set_dynamic(act->ctx, self, "errorID", 7, eid);
+	Avm2DynProp* p = avm2_object_set_dynamic(ctx, self, "errorID", 7, eid);
 	p->dont_enum = 1;
 	// FP debug player snapshots the call stack at construction.
-	p = avm2_object_set_dynamic(act->ctx, self, "__stacktrace_tail", 17,
-	                            avm2_string(callstack_snapshot(act->ctx)));
+	p = avm2_object_set_dynamic(ctx, self, "__stacktrace_tail", 17,
+	                            avm2_string(callstack_snapshot(ctx)));
 	p->dont_enum = 1;
 	return avm2_undefined();
 }
@@ -361,6 +385,19 @@ static Avm2Value error_call(Avm2Context* ctx, Avm2Class* cls,
 	return avm2_class_construct(ctx, cls, args, argc);
 }
 
+static void error_add_slot(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                           uint32_t slot_id)
+{
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key = avm2_public_key(name, (uint32_t) strlen(name));
+	e.kind = AVM2_PROP_SLOT;
+	e.slot_index = slot_id;
+	e.defining_class = cls;
+	avm2_vtable_append(ctx, &cls->ivtable, &e);
+	if (slot_id > cls->ivtable.slot_count) cls->ivtable.slot_count = slot_id;
+}
+
 static Avm2Class* make_error_class(Avm2Context* ctx, const char* name, Avm2Class* super)
 {
 	Avm2Class* cls = avm2_builtin_class(ctx, "", name, super);
@@ -371,13 +408,37 @@ static Avm2Class* make_error_class(Avm2Context* ctx, const char* name, Avm2Class
 	cls->instance_init.debug_name = name;
 	if (super == ctx->builtins.object_class)
 	{
+		error_add_slot(ctx, cls, "name", ERROR_SLOT_NAME);
+		error_add_slot(ctx, cls, "message", ERROR_SLOT_MESSAGE);
 		avm2_builtin_add_method(ctx, cls, "getStackTrace", error_get_stack_trace);
 		avm2_builtin_add_getter(ctx, cls, "errorID", error_get_error_id);
+
+		// Error.prototype is itself an ERROR instance (avmplus
+		// initCustomPrototype): name/message land in its slots (invisible
+		// to prototype-CHAIN reads), toString stays dynamic (delegated).
+		Avm2Object* proto = cls->prototype_obj;
+		proto->cls = cls;
+		proto->vtable = &cls->ivtable;
+		proto->slot_count = cls->ivtable.slot_count + 1;
+		proto->slots = avm2_alloc(ctx, proto->slot_count * sizeof(Avm2Value));
+		for (uint32_t i = 0; i < proto->slot_count; i++)
+		{
+			proto->slots[i] = avm2_undefined();
+		}
+		proto->slots[ERROR_SLOT_NAME] =
+			avm2_string(avm2_string_from_literal(ctx, "Error"));
+		proto->slots[ERROR_SLOT_MESSAGE] =
+			avm2_string(avm2_string_from_literal(ctx, "Error"));
+		avm2_proto_add_function(ctx, proto, "toString", error_proto_to_string);
 	}
-	// name lives on the prototype (instances don't own it).
-	avm2_object_set_dynamic(ctx, cls->prototype_obj, "name", 4,
-	                        avm2_string(avm2_string_from_literal(ctx, name)))->dont_enum = 1;
-	avm2_proto_add_function(ctx, cls->prototype_obj, "toString", error_proto_to_string);
+	else
+	{
+		// Subclass prototypes are plain objects carrying only a dynamic
+		// `name`; toString delegates to Error.prototype's (identity matters:
+		// TypeError.prototype.toString === Error.prototype.toString).
+		avm2_object_set_dynamic(ctx, cls->prototype_obj, "name", 4,
+			avm2_string(avm2_string_from_literal(ctx, name)))->dont_enum = 1;
+	}
 	return cls;
 }
 
@@ -396,4 +457,36 @@ void avm2_register_error(Avm2Context* ctx)
 	b->uri_error_class = make_error_class(ctx, "URIError", b->error_class);
 	b->syntax_error_class = make_error_class(ctx, "SyntaxError", b->error_class);
 	b->uninitialized_error_class = make_error_class(ctx, "UninitializedError", b->error_class);
+
+	// flash.errors family (playerglobal AS3 classes extending Error).
+	{
+		static const char* const names[7] = {
+			"IOError", "EOFError", "MemoryError", "IllegalOperationError",
+			"InvalidSWFError", "ScriptTimeoutError", "StackOverflowError",
+		};
+		Avm2Class* made[7];
+		for (int i = 0; i < 7; i++)
+		{
+			Avm2Class* cls = avm2_builtin_class(ctx, "flash.errors", names[i],
+			                                    b->error_class);
+			cls->native_call = error_call;
+			cls->instance_init.fn = error_init;
+			cls->instance_init.debug_name = names[i];
+			avm2_object_set_dynamic(ctx, cls->prototype_obj, "name", 4,
+				avm2_string(avm2_string_from_literal(ctx, names[i])))->dont_enum = 1;
+			made[i] = cls;
+		}
+		b->io_error_class = made[0];
+		b->memory_error_class = made[2];
+		b->illegal_operation_error_class = made[3];
+	}
+	{
+		// DRMManagerError uniquely sets NO prototype.name (Ruffle
+		// DRMManagerError.as note; error_prototype asserts undefined).
+		Avm2Class* cls = avm2_builtin_class(ctx, "flash.errors", "DRMManagerError",
+		                                    b->error_class);
+		cls->native_call = error_call;
+		cls->instance_init.fn = error_init;
+		cls->instance_init.debug_name = "DRMManagerError";
+	}
 }

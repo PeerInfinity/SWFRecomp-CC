@@ -897,6 +897,7 @@ Avm2Value avm2_construct_value(Avm2Context* ctx, Avm2Value ctor,
 			// replaces the new object.
 			Avm2Object* inst = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
 			inst->cls = ctx->builtins.object_class;
+			inst->vtable = &ctx->builtins.object_class->ivtable;
 			Avm2Value protov = avm2_get_public_property(
 				ctx, ctor, "prototype", 9, NULL);
 			if (protov.kind == AVM2_VALUE_OBJECT)
@@ -905,7 +906,12 @@ Avm2Value avm2_construct_value(Avm2Context* ctx, Avm2Value ctor,
 			}
 			else
 			{
-				inst->proto = ctx->builtins.object_class->prototype_obj;
+				// A nulled fn.prototype resets to Object.prototype on
+				// construction (Ruffle FunctionObject::construct;
+				// prototype_set_null).
+				o->fn_prototype = ctx->builtins.object_class->prototype_obj;
+				o->fn_proto_nulled = 0;
+				inst->proto = o->fn_prototype;
 			}
 			Avm2Value result = avm2_call_function_obj(ctx, o, avm2_object_value(inst),
 			                                          args, argc);
@@ -943,7 +949,14 @@ const Avm2VTable* avm2_value_vtable(Avm2Context* ctx, Avm2Value v)
 {
 	if (v.kind == AVM2_VALUE_OBJECT)
 	{
-		return v.u.obj->vtable;
+		if (v.u.obj->vtable != NULL)
+		{
+			return v.u.obj->vtable;
+		}
+		// Plain objects (NewObject, ES3-constructed instances, JSON) carry
+		// no own vtable: their class's instance vtable applies (Object's
+		// hasOwnProperty & co resolve through the AS3 namespace).
+		return v.u.obj->cls != NULL ? &v.u.obj->cls->ivtable : NULL;
 	}
 	Avm2Class* cls = avm2_value_class(ctx, v);
 	return &cls->ivtable;

@@ -122,9 +122,19 @@ typedef struct Avm2SortItem { uint32_t idx; Avm2Value v; } Avm2SortItem;
 typedef int (*Avm2SortCmp)(void* ud, const Avm2SortItem* a, const Avm2SortItem* b);
 void avm2_avmplus_qsort(void* ud, Avm2SortCmp cmp, Avm2SortItem* s, uint32_t n);
 
-// MovieClip stub instance state (Avm2Object.native_ext).
+// EventDispatcher instance state (Avm2Object.native_ext).
+typedef struct EDListener EDListener;
+typedef struct Avm2EventDispatcherExt
+{
+	EDListener* head;
+} Avm2EventDispatcherExt;
+
+// MovieClip stub instance state (Avm2Object.native_ext). The dispatcher
+// ext MUST stay first: MovieClips inherit EventDispatcher's natives, which
+// read native_ext as Avm2EventDispatcherExt.
 typedef struct Avm2MovieClipExt
 {
+	Avm2EventDispatcherExt dispatcher;
 	uint32_t frame_script_cap;
 	Avm2Value* frame_scripts;  // indexed by 0-based frame; unset = undefined kind
 } Avm2MovieClipExt;

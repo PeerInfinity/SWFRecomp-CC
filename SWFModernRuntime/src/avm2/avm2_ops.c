@@ -694,11 +694,23 @@ void avm2_op_setslot(Avm2Activation* act, Avm2Value objv, uint32_t index0, Avm2V
 
 Avm2Object* avm2_op_pushscope(Avm2Activation* act, Avm2Value v)
 {
-	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL)
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+	{
+		return v.u.obj;
+	}
+	if (value_is_null_like(v))
 	{
 		avm2_throw_null_or_undefined(act->ctx, v, NULL, 0);
 	}
-	return v.u.obj;
+	// A primitive scope (p-code can push anything): box it — vtable and
+	// prototype-chain lookups on the box behave like the primitive
+	// (findprop_global_prototype pushes the number 4 as its global scope).
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* box = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 1);
+	box->cls = avm2_value_class(ctx, v);
+	box->vtable = &box->cls->ivtable;
+	box->proto = box->cls->prototype_obj;
+	return box;
 }
 
 Avm2Object* avm2_op_getglobalscope(Avm2Activation* act, const Avm2ScopeEntry* lscope,
@@ -796,6 +808,28 @@ static Avm2Object* findproperty_impl(Avm2Activation* act, const Avm2ScopeEntry* 
 		}
 	}
 
+	// Last resort (Ruffle find_definition): the global scope's own dynamic
+	// props and its prototype chain (findprop_global_prototype).
+	if (avm2_mn_has_public_ns(data, mn_idx))
+	{
+		Avm2Object* global = NULL;
+		if (act->outer != NULL && act->outer->count > 0)
+		{
+			global = act->outer->entries[0].obj;
+		}
+		else if (scope_n > 0)
+		{
+			global = lscope[0].obj;
+		}
+		for (Avm2Object* p = global; p != NULL; p = p->proto)
+		{
+			if (avm2_object_find_dynamic(p, name, name_len) != NULL)
+			{
+				return global;
+			}
+		}
+	}
+
 	if (!strict)
 	{
 		return avm2_op_getglobalscope(act, lscope, scope_n);
@@ -854,6 +888,24 @@ Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* 
 	}
 	Avm2Object* g = avm2_domain_find(ctx, &key);
 	if (g != NULL) return g;
+	{
+		Avm2Object* global = NULL;
+		if (act->outer != NULL && act->outer->count > 0)
+		{
+			global = act->outer->entries[0].obj;
+		}
+		else if (scope_n > 0)
+		{
+			global = lscope[0].obj;
+		}
+		for (Avm2Object* p = global; p != NULL; p = p->proto)
+		{
+			if (avm2_object_find_dynamic(p, ns->utf8, ns->len) != NULL)
+			{
+				return global;
+			}
+		}
+	}
 	if (!strict)
 	{
 		return avm2_op_getglobalscope(act, lscope, scope_n);
@@ -1141,6 +1193,20 @@ Avm2Value avm2_op_construct(Avm2Activation* act, Avm2Value ctor,
 Avm2Value avm2_op_constructprop(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 const Avm2Value* args, uint32_t argc)
 {
+	// Primitive receivers resolve the ctor LENIENTLY: a miss yields
+	// undefined (→ TypeError 1007 in construct), not 1069 (Ruffle
+	// Value::construct_prop; constructprop_dynamic_primitive).
+	if (recv.kind != AVM2_VALUE_OBJECT && !value_is_null_like(recv))
+	{
+		const char* name;
+		uint32_t name_len;
+		avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+		Resolved r;
+		Avm2Value ctor = resolve_mn(act, recv, mn_idx, &r)
+			? resolved_get(act->ctx, recv, &r, name, name_len)
+			: avm2_undefined();
+		return avm2_construct_value(act->ctx, ctor, args, argc);
+	}
 	Avm2Value ctor = avm2_op_getproperty_static(act, recv, mn_idx);
 	return avm2_construct_value(act->ctx, ctor, args, argc);
 }
