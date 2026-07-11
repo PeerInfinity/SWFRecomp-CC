@@ -1076,6 +1076,23 @@ static Avm2Value appdomain_get_definition(Avm2Activation* act)
 	throw_1065_for_definition(ctx, s->utf8, s->len);
 }
 
+static Avm2Value system_noop(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+// flash.system.System: gc/pauseForGCIfCollectionImminent no-ops (tests
+// call System.gc() between phases; aborting there kills the frame script).
+static void register_system(Avm2Context* ctx)
+{
+	Avm2Class* cls = avm2_builtin_class(ctx, "flash.system", "System",
+	                                    ctx->builtins.object_class);
+	avm2_builtin_add_static_method(ctx, cls, "gc", system_noop);
+	avm2_builtin_add_static_method(ctx, cls, "pauseForGCIfCollectionImminent",
+	                               system_noop);
+}
+
 static void register_application_domain(Avm2Context* ctx)
 {
 	Avm2Class* cls = avm2_builtin_class(ctx, "flash.system", "ApplicationDomain",
@@ -1280,6 +1297,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	}
 	avm2_register_toplevel(ctx);
 	register_application_domain(ctx);
+	register_system(ctx);
 
 	// flash.events (Event/EventDispatcher/EventPhase/IEventDispatcher —
 	// avm2_events.c).

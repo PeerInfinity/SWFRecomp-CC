@@ -262,6 +262,10 @@ typedef struct Avm2DisplayObjectExt
 	uint8_t visible;             // default 1
 	uint8_t constructed;         // AVM2 constructor has run
 	uint8_t skip_next_enter_frame;
+	// Sprite.constructChildren is iterating this container (Ruffle
+	// RUNNING_CONSTRUCT_FRAME): nested construct_frame passes skip its
+	// still-unconstructed children (constructors_vs_timeline).
+	uint8_t running_construct_frame;
 	uint16_t char_id;            // 0 = script-created (or root)
 	int32_t depth;               // timeline depth
 	int32_t clip_depth;
@@ -283,6 +287,12 @@ typedef struct Avm2DisplayObjectExt
 	uint8_t focus_rect_set, focus_rect_val;
 	Avm2Value meta_data;         // metaData (undefined = unset)
 	Avm2Object* mask;
+
+	// Drawing API (flash.display.Graphics stub): cached instance +
+	// accumulated AABB of drawn geometry (twips), feeding self bounds.
+	Avm2Object* graphics_obj;
+	uint8_t draw_valid;
+	int32_t draw_xmin, draw_xmax, draw_ymin, draw_ymax;
 
 	// --- DisplayObjectContainer ---
 	Avm2Object** render_list;

@@ -143,9 +143,15 @@ static uint32_t g_symbol_map_count;
 
 static uint16_t char_for_class(Avm2Class* cls)
 {
-	for (uint32_t i = 0; i < g_symbol_map_count; i++)
+	// A class inherits its SymbolClass binding from any ancestor
+	// (movieclip_super_is_symbol: `new ChildClass()` where SuperClass is
+	// the bound class still instantiates the symbol's timeline).
+	for (Avm2Class* c = cls; c != NULL; c = c->super_class)
 	{
-		if (g_symbol_map[i].cls == cls) return g_symbol_map[i].char_id;
+		for (uint32_t i = 0; i < g_symbol_map_count; i++)
+		{
+			if (g_symbol_map[i].cls == c) return g_symbol_map[i].char_id;
+		}
 	}
 	return 0;
 }
@@ -157,6 +163,9 @@ static int g_timeline_instantiation;
 // ---------------------------------------------------------------------------
 // Static-table lookups
 // ---------------------------------------------------------------------------
+
+static Avm2Class* g_textfield_class;
+static Avm2Class* g_statictext_class;
 
 static const Avm2TimelineData* timeline_for_char(uint16_t char_id)
 {
@@ -337,15 +346,36 @@ static Rect char_self_bounds(uint16_t char_id)
 	return r;
 }
 
+static Rect display_self_bounds(const Avm2DisplayObjectExt* ext)
+{
+	Rect r = char_self_bounds(ext->char_id);
+	if (ext->draw_valid)
+	{
+		Rect d = { 1, (double) ext->draw_xmin, (double) ext->draw_xmax,
+		           (double) ext->draw_ymin, (double) ext->draw_ymax };
+		if (!r.valid)
+		{
+			r = d;
+		}
+		else
+		{
+			if (d.xmin < r.xmin) r.xmin = d.xmin;
+			if (d.xmax > r.xmax) r.xmax = d.xmax;
+			if (d.ymin < r.ymin) r.ymin = d.ymin;
+			if (d.ymax > r.ymax) r.ymax = d.ymax;
+		}
+	}
+	return r;
+}
+
 // bounds_with_transform: self bounds + children, all through `m`.
 static void bounds_with_transform(Avm2Context* ctx, Avm2Object* obj,
                                   const Mat* m, Rect* acc)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
-	if (ext->char_id != 0)
 	{
-		Rect self = char_self_bounds(ext->char_id);
+		Rect self = display_self_bounds(ext);
 		rect_union_xform(acc, &self, m);
 	}
 	for (uint32_t i = 0; i < ext->render_len; i++)
@@ -613,8 +643,8 @@ static void set_default_instance_name(Avm2Context* ctx, Avm2DisplayObjectExt* ex
 {
 	if (ext->name != NULL || ext->is_stage) return;
 	char buf[32];
+	ctx->instance_counter++;  // names are 1-based: instance1, instance2, ...
 	snprintf(buf, sizeof(buf), "instance%u", ctx->instance_counter);
-	ctx->instance_counter++;
 	ext->name = avm2_string_from_literal(ctx, buf);
 }
 
@@ -730,6 +760,10 @@ static void full_remove_child(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
 		if (!cext->placed_by_avm2_script && cext->has_explicit_name
 		    && cext->name != NULL && cext->parent != NULL)
 		{
+			// Read the current value first: null/undefined values are left
+			// alone (the setter is observably NOT invoked), read errors are
+			// swallowed entirely, and any other value is nulled — even one
+			// that is not this child (remove_child_clear_field).
 			Avm2TryFrame top;
 			avm2_try_push_catch_all(ctx, &top);
 			if (setjmp(top.jb) == 0)
@@ -737,7 +771,7 @@ static void full_remove_child(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
 				Avm2Value cur = avm2_get_public_property(
 					ctx, avm2_object_value(cext->parent),
 					cext->name->utf8, cext->name->len, NULL);
-				if (cur.kind == AVM2_VALUE_OBJECT && cur.u.obj == child)
+				if (cur.kind != AVM2_VALUE_NULL && cur.kind != AVM2_VALUE_UNDEFINED)
 				{
 					avm2_set_public_property(ctx, avm2_object_value(cext->parent),
 					                         cext->name->utf8, cext->name->len,
@@ -793,20 +827,6 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj);
 static void run_frame_scripts_obj(Avm2Context* ctx, Avm2Object* obj);
 static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_implicit);
 static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj);
-
-// catchup_display_object_to_frame (Ruffle frame_lifecycle.rs).
-static void catchup_to_frame(Avm2Context* ctx, Avm2Object* obj)
-{
-	if (ctx->frame_phase == PHASE_ENTER)
-	{
-		enter_frame_obj(ctx, obj);
-	}
-	else
-	{
-		enter_frame_obj(ctx, obj);
-		construct_frame_obj(ctx, obj);
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Class resolution for characters
@@ -880,6 +900,10 @@ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 			return ctx->builtins.shape_class;
 		case AVM2_CHAR_BUTTON:
 			return ctx->builtins.simple_button_class;
+		case AVM2_CHAR_TEXT:
+			return g_statictext_class;
+		case AVM2_CHAR_EDITTEXT:
+			return g_textfield_class;
 		default:
 			return ctx->builtins.movieclip_class;
 	}
@@ -1009,14 +1033,19 @@ enum
 
 static uint32_t frames_loaded(const Avm2DisplayObjectExt* ext)
 {
+	// A script-created clip reports frames_loaded 1 (Ruffle
+	// MovieClipShared::empty pre-completes preload) — but is created
+	// NOT PLAYING, so its playhead stays at 0 (movieclip_displayevents
+	// traces "frame 0" forever while movieclip_constr sees framesLoaded 1).
 	return ext->timeline != NULL ? ext->timeline->frame_count : 1;
 }
 
 static uint32_t total_frames(const Avm2DisplayObjectExt* ext)
 {
-	if (ext->timeline == NULL) return 1;
-	uint32_t declared = ext->timeline->declared_frames;
-	return declared > 0 ? declared : ext->timeline->frame_count;
+	// totalFrames = the DECLARED header/DefineSprite count verbatim, even
+	// 0 (zero_frame_clip) or fewer than the real ShowFrame count
+	// (swf_wrong_frame_count reports 1 while the playhead runs to 5).
+	return ext->timeline != NULL ? ext->timeline->declared_frames : 1;
 }
 
 static int determine_next_frame(const Avm2DisplayObjectExt* ext)
@@ -1147,6 +1176,7 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
+	int is_load_frame = !ext->initialized;
 	int needs_construction = !ext->constructed;
 	ext->loop_queued = 0;
 	if (needs_construction)
@@ -1155,10 +1185,25 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 		display_run_constructor(ctx, obj);
 		on_construction_complete(ctx, obj);
 	}
+	else if (is_load_frame && ext->placed_by_avm2_script)
+	{
+		// Load-frame script-created object: its children are constructed
+		// by Sprite.constructChildren during super(), not by this catchup
+		// pass (constructors_vs_timeline).
+	}
 	else
 	{
 		for (uint32_t i = 0; i < ext->render_len; i++)
 		{
+			Avm2DisplayObjectExt* cext =
+				avm2_display_ext_of(ctx, ext->render_list[i]);
+			// While Sprite.constructChildren iterates this container, a
+			// nested construct pass (e.g. a no-op goto inside a child's
+			// ctor) must not construct the remaining children.
+			if (cext != NULL && !cext->constructed && ext->running_construct_frame)
+			{
+				continue;
+			}
 			construct_frame_obj(ctx, ext->render_list[i]);
 		}
 	}
@@ -1945,7 +1990,8 @@ static Avm2Value do_set_name(Avm2Activation* act)
 		: avm2_string_from_literal(ctx, "null");
 	if (ext->instantiated_by_timeline)
 	{
-		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		// IllegalOperationError (flash.errors keeps name "Error").
+		avm2_throw_error(ctx, ctx->builtins.illegal_operation_error_class,
 			"Error #2078: The name property of a Timeline-placed object cannot be modified.");
 	}
 	ext->name = name;
@@ -2975,6 +3021,288 @@ static Avm2Value mc_add_frame_script(Avm2Activation* act)
 }
 
 // ===========================================================================
+// Natives: flash.display.Graphics (no rendering; tracks the AABB of drawn
+// geometry so width/height see drawing-API content)
+// ===========================================================================
+
+static Avm2Class* g_graphics_class;
+
+typedef struct Avm2GraphicsExt
+{
+	Avm2Object* owner;
+} Avm2GraphicsExt;
+
+static Avm2DisplayObjectExt* graphics_owner_ext(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL) return NULL;
+	Avm2GraphicsExt* g = self->native_ext;
+	return avm2_display_ext_of(act->ctx, g->owner);
+}
+
+static void draw_union_point(Avm2DisplayObjectExt* ext, double x_px, double y_px)
+{
+	int32_t x = twips_from_pixels(x_px);
+	int32_t y = twips_from_pixels(y_px);
+	if (!ext->draw_valid)
+	{
+		ext->draw_valid = 1;
+		ext->draw_xmin = ext->draw_xmax = x;
+		ext->draw_ymin = ext->draw_ymax = y;
+		return;
+	}
+	if (x < ext->draw_xmin) ext->draw_xmin = x;
+	if (x > ext->draw_xmax) ext->draw_xmax = x;
+	if (y < ext->draw_ymin) ext->draw_ymin = y;
+	if (y > ext->draw_ymax) ext->draw_ymax = y;
+}
+
+static Avm2Value gfx_noop(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+static Avm2Value gfx_clear(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+	if (ext != NULL) ext->draw_valid = 0;
+	return avm2_undefined();
+}
+
+// moveTo/lineTo(x, y)
+static Avm2Value gfx_point_op(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+	if (ext != NULL && act->argc >= 2)
+	{
+		draw_union_point(ext, avm2_coerce_to_number(act->ctx, act->args[0]),
+		                 avm2_coerce_to_number(act->ctx, act->args[1]));
+	}
+	return avm2_undefined();
+}
+
+// curveTo(cx, cy, ax, ay)
+static Avm2Value gfx_curve_to(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+	if (ext != NULL && act->argc >= 4)
+	{
+		draw_union_point(ext, avm2_coerce_to_number(act->ctx, act->args[0]),
+		                 avm2_coerce_to_number(act->ctx, act->args[1]));
+		draw_union_point(ext, avm2_coerce_to_number(act->ctx, act->args[2]),
+		                 avm2_coerce_to_number(act->ctx, act->args[3]));
+	}
+	return avm2_undefined();
+}
+
+// drawRect/drawEllipse(x, y, w, h)
+static Avm2Value gfx_draw_rect(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+	if (ext != NULL && act->argc >= 4)
+	{
+		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
+		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+		double w = avm2_coerce_to_number(act->ctx, act->args[2]);
+		double h = avm2_coerce_to_number(act->ctx, act->args[3]);
+		draw_union_point(ext, x, y);
+		draw_union_point(ext, x + w, y + h);
+	}
+	return avm2_undefined();
+}
+
+// drawCircle(x, y, r)
+static Avm2Value gfx_draw_circle(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+	if (ext != NULL && act->argc >= 3)
+	{
+		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
+		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+		double r = avm2_coerce_to_number(act->ctx, act->args[2]);
+		draw_union_point(ext, x - r, y - r);
+		draw_union_point(ext, x + r, y + r);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value do_get_graphics(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* obj = this_obj(act);
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL) return avm2_null();
+	if (ext->graphics_obj == NULL)
+	{
+		Avm2Value v = avm2_class_construct(ctx, g_graphics_class, NULL, 0);
+		((Avm2GraphicsExt*) v.u.obj->native_ext)->owner = obj;
+		ext->graphics_obj = v.u.obj;
+	}
+	return avm2_object_value(ext->graphics_obj);
+}
+
+// ===========================================================================
+// Natives: flash.geom.Matrix + Transform (enough for the transform.matrix
+// property surface — displayobject_invalid_floats / displayobject_transform)
+// ===========================================================================
+
+static Avm2Class* g_matrix_class;
+static Avm2Class* g_transform_class;
+
+typedef struct Avm2TransformExt
+{
+	Avm2Object* target;
+} Avm2TransformExt;
+
+static void matrix_set_prop(Avm2Context* ctx, Avm2Object* m, const char* name,
+                            double v)
+{
+	avm2_object_set_dynamic(ctx, m, name, (uint32_t) strlen(name), avm2_number(v));
+}
+
+static double matrix_get_prop(Avm2Context* ctx, Avm2Object* m, const char* name)
+{
+	Avm2Value* v = avm2_object_find_dynamic(m, name, (uint32_t) strlen(name));
+	return v != NULL ? avm2_coerce_to_number(ctx, *v) : 0.0;
+}
+
+static Avm2Value geom_matrix_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	static const char* const names[6] = { "a", "b", "c", "d", "tx", "ty" };
+	static const double defaults[6] = { 1, 0, 0, 1, 0, 0 };
+	for (int i = 0; i < 6; i++)
+	{
+		double v = (uint32_t) i < act->argc
+			? avm2_coerce_to_number(ctx, act->args[i]) : defaults[i];
+		matrix_set_prop(ctx, self, names[i], v);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	char buf[256];
+	char nums[6][40];
+	static const char* const names[6] = { "a", "b", "c", "d", "tx", "ty" };
+	for (int i = 0; i < 6; i++)
+	{
+		avm2_format_number(nums[i], sizeof(nums[i]),
+		                   matrix_get_prop(ctx, self, names[i]));
+	}
+	snprintf(buf, sizeof(buf), "(a=%s, b=%s, c=%s, d=%s, tx=%s, ty=%s)",
+	         nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]);
+	return avm2_string(avm2_string_from_literal(ctx, buf));
+}
+
+static Avm2Object* make_geom_matrix(Avm2Context* ctx, double a, double b, double c,
+                                    double d, double tx, double ty)
+{
+	Avm2Value args[6];
+	args[0] = avm2_number(a);
+	args[1] = avm2_number(b);
+	args[2] = avm2_number(c);
+	args[3] = avm2_number(d);
+	args[4] = avm2_number(tx);
+	args[5] = avm2_number(ty);
+	Avm2Value v = avm2_class_construct(ctx, g_matrix_class, args, 6);
+	return v.u.obj;
+}
+
+static Avm2Value transform_get_matrix(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL) return avm2_null();
+	Avm2TransformExt* text = self->native_ext;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
+	if (ext == NULL) return avm2_null();
+	return avm2_object_value(make_geom_matrix(
+		ctx, ext->mtx_a, ext->mtx_b, ext->mtx_c, ext->mtx_d,
+		twips_to_pixels(ext->mtx_tx), twips_to_pixels(ext->mtx_ty)));
+}
+
+static Avm2Value transform_set_matrix(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL || act->argc < 1
+	    || act->args[0].kind != AVM2_VALUE_OBJECT)
+	{
+		return avm2_undefined();
+	}
+	Avm2TransformExt* text = self->native_ext;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
+	if (ext == NULL) return avm2_undefined();
+	Avm2Object* m = act->args[0].u.obj;
+	ext->mtx_a = (float) matrix_get_prop(ctx, m, "a");
+	ext->mtx_b = (float) matrix_get_prop(ctx, m, "b");
+	ext->mtx_c = (float) matrix_get_prop(ctx, m, "c");
+	ext->mtx_d = (float) matrix_get_prop(ctx, m, "d");
+	ext->mtx_tx = twips_from_pixels(matrix_get_prop(ctx, m, "tx"));
+	ext->mtx_ty = twips_from_pixels(matrix_get_prop(ctx, m, "ty"));
+	ext->scale_rot_cached = 0;
+	return avm2_undefined();
+}
+
+static Avm2Value transform_get_color_transform(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_null();
+}
+
+static Avm2Value transform_set_color_transform(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+static Avm2Value do_get_transform(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* obj = this_obj(act);
+	if (avm2_display_ext_of(ctx, obj) == NULL) return avm2_null();
+	Avm2Value v = avm2_class_construct(ctx, g_transform_class, NULL, 0);
+	((Avm2TransformExt*) v.u.obj->native_ext)->target = obj;
+	return v;
+}
+
+static Avm2Value do_set_transform(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* obj = this_obj(act);
+	if (act->argc < 1 || act->args[0].kind != AVM2_VALUE_OBJECT)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter transform must be non-null.");
+	}
+	// Pull the matrix off the assigned Transform (a Transform bound to
+	// another object, per the AS3 pattern `a.transform = b.transform`).
+	Avm2Value mval = avm2_get_public_property(ctx, act->args[0], "matrix", 6, NULL);
+	if (mval.kind == AVM2_VALUE_OBJECT)
+	{
+		Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+		if (ext != NULL)
+		{
+			Avm2Object* m = mval.u.obj;
+			ext->mtx_a = (float) matrix_get_prop(ctx, m, "a");
+			ext->mtx_b = (float) matrix_get_prop(ctx, m, "b");
+			ext->mtx_c = (float) matrix_get_prop(ctx, m, "c");
+			ext->mtx_d = (float) matrix_get_prop(ctx, m, "d");
+			ext->mtx_tx = twips_from_pixels(matrix_get_prop(ctx, m, "tx"));
+			ext->mtx_ty = twips_from_pixels(matrix_get_prop(ctx, m, "ty"));
+			ext->scale_rot_cached = 0;
+		}
+	}
+	return avm2_undefined();
+}
+
+// ===========================================================================
 // Natives: FrameLabel / Scene (state = dont_enum dyn props)
 // ===========================================================================
 
@@ -3228,9 +3556,11 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 
 	if (!g_timeline_instantiation)
 	{
-		// Script-created (Ruffle AVM2 display-object allocator): attach
-		// the symbol timeline for SymbolClass-bound classes, auto-name,
-		// catch up to the current phase, and skip the first enterFrame.
+		// Script-created (Ruffle initialize_for_allocator): mark
+		// script-placed, attach the symbol timeline for SymbolClass-bound
+		// classes, auto-name, run the enter/construct catchup (with the
+		// load-frame child-recursion gate), skip the first enterFrame.
+		ext->placed_by_avm2_script = 1;
 		ext->constructed = 1;
 		uint16_t char_id = char_for_class(obj->cls);
 		if (char_id != 0)
@@ -3238,33 +3568,60 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 			ext->char_id = char_id;
 			ext->timeline = timeline_for_char(char_id);
 		}
+		// Ruffle new_with_avm2 does NOT set PLAYING (new_with_data does):
+		// a plain `new MovieClip()` never advances past frame 0.
+		ext->playing = (ext->timeline != NULL) ? 1 : 0;
 		set_default_instance_name(ctx, ext);
 		orphan_add(ctx, obj);
-		catchup_to_frame(ctx, obj);
+		enter_frame_obj(ctx, obj);
+		construct_frame_obj(ctx, obj);
 		ext->skip_next_enter_frame = 1;
+		// on_construction_complete's non-event half (the events are
+		// skipped for script-placed objects): initialized + the
+		// Sprite-typed-symbol auto-stop.
+		if (ext->timeline != NULL && !ext->is_root
+		    && !class_is_a(obj->cls, ctx->builtins.movieclip_class))
+		{
+			ext->playing = 0;
+		}
+		ext->initialized = 1;
 	}
 }
 
-// Sprite constructor body (runs at super() time): constructChildren —
-// timeline children placed before the ctor get their constructors here.
+// Abstract display classes (DisplayObject/InteractiveObject/
+// DisplayObjectContainer) throw at ALLOCATION time — before any
+// constructor body runs (displayobject_subclass traces prove the subclass
+// ctor is never reached). Concrete descendants override this hook back to
+// display_native_init.
+static void display_native_init_abstract(Avm2Context* ctx, Avm2Object* obj)
+{
+	const char* name = "?";
+	uint32_t name_len = 1;
+	if (obj->cls != NULL)
+	{
+		name = obj->cls->name.name;
+		name_len = obj->cls->name.name_len;
+	}
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #2012: %.*s$ class cannot be instantiated.",
+	                 (int) name_len, name);
+}
+
+// Sprite constructor body (runs at super() time): constructChildren
+// (Ruffle sprite.rs construct_children) — construct_frame on each child,
+// so timeline children placed before the ctor get their constructors
+// (and their own children recurse) here.
 static Avm2Value sprite_ctor_init(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2Object* obj = this_obj(act);
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext == NULL) return avm2_undefined();
+	ext->running_construct_frame = 1;
 	for (uint32_t i = 0; i < ext->render_len; i++)
 	{
-		Avm2Object* child = ext->render_list[i];
-		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
-		if (cext != NULL && !cext->constructed)
-		{
-			cext->constructed = 1;
-			display_run_constructor(ctx, child);
-			on_construction_complete(ctx, child);
-		}
+		construct_frame_obj(ctx, ext->render_list[i]);
 	}
-	(void) obj;
+	ext->running_construct_frame = 0;
 	return avm2_undefined();
 }
 
@@ -3286,7 +3643,7 @@ void avm2_register_display(Avm2Context* ctx)
 		avm2_builtin_class(ctx, "flash.display", "DisplayObject",
 		                   b->event_dispatcher_class);
 	dobj->native_ext_size = sizeof(Avm2DisplayObjectExt);
-	dobj->native_init = display_native_init;
+	dobj->native_init = display_native_init_abstract;
 	b->display_object_class = dobj;
 	add_getset(ctx, dobj, "x", do_get_x, do_set_x);
 	add_getset(ctx, dobj, "y", do_get_y, do_set_y);
@@ -3301,6 +3658,7 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, dobj, "mask", do_get_mask, do_set_mask);
 	add_getset(ctx, dobj, "metaData", do_get_metadata, do_set_metadata);
 	add_getset(ctx, dobj, "filters", do_get_filters, do_set_filters);
+	add_getset(ctx, dobj, "transform", do_get_transform, do_set_transform);
 	avm2_builtin_add_getter(ctx, dobj, "parent", do_get_parent);
 	avm2_builtin_add_getter(ctx, dobj, "root", do_get_root);
 	avm2_builtin_add_getter(ctx, dobj, "stage", do_get_stage);
@@ -3342,9 +3700,11 @@ void avm2_register_display(Avm2Context* ctx)
 	Avm2Class* sprite = avm2_builtin_class(ctx, "flash.display", "Sprite", doc);
 	sprite->instance_init.fn = sprite_ctor_init;
 	sprite->instance_init.debug_name = "Sprite";
+	sprite->native_init = display_native_init;  // concrete: no 2012
 	b->sprite_class = sprite;
 
 	Avm2Class* movieclip = avm2_builtin_class(ctx, "flash.display", "MovieClip", sprite);
+	movieclip->native_init = display_native_init;
 	// ConstructSuper only invokes the DIRECT super's init: a class
 	// extending MovieClip must still get Sprite's constructChildren.
 	movieclip->instance_init.fn = sprite_ctor_init;
@@ -3371,7 +3731,56 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, movieclip, "scenes", mc_get_scenes);
 
 	Avm2Class* shape = avm2_builtin_class(ctx, "flash.display", "Shape", dobj);
+	shape->native_init = display_native_init;
 	b->shape_class = shape;
+
+	// flash.text.TextField / StaticText (structural stubs: the timeline
+	// instantiates EditText/DefineText characters as these).
+	Avm2Class* textfield = avm2_builtin_class(ctx, "flash.text", "TextField", iobj);
+	textfield->native_init = display_native_init;
+	g_textfield_class = textfield;
+	Avm2Class* statictext = avm2_builtin_class(ctx, "flash.text", "StaticText", dobj);
+	statictext->native_init = display_native_init;
+	g_statictext_class = statictext;
+
+	// flash.display.Graphics (bounds-only stub); graphics getter on both
+	// Shape and Sprite.
+	Avm2Class* graphics = avm2_builtin_class(ctx, "flash.display", "Graphics",
+	                                         b->object_class);
+	graphics->native_ext_size = sizeof(Avm2GraphicsExt);
+	avm2_builtin_add_method(ctx, graphics, "beginFill", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "beginGradientFill", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "beginBitmapFill", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "endFill", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "lineStyle", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "clear", gfx_clear);
+	avm2_builtin_add_method(ctx, graphics, "moveTo", gfx_point_op);
+	avm2_builtin_add_method(ctx, graphics, "lineTo", gfx_point_op);
+	avm2_builtin_add_method(ctx, graphics, "curveTo", gfx_curve_to);
+	avm2_builtin_add_method(ctx, graphics, "drawRect", gfx_draw_rect);
+	avm2_builtin_add_method(ctx, graphics, "drawRoundRect", gfx_draw_rect);
+	avm2_builtin_add_method(ctx, graphics, "drawEllipse", gfx_draw_rect);
+	avm2_builtin_add_method(ctx, graphics, "drawCircle", gfx_draw_circle);
+	avm2_builtin_add_method(ctx, graphics, "copyFrom", gfx_noop);
+	g_graphics_class = graphics;
+	avm2_builtin_add_getter(ctx, shape, "graphics", do_get_graphics);
+	avm2_builtin_add_getter(ctx, sprite, "graphics", do_get_graphics);
+
+	// flash.geom.Matrix + Transform (transform.matrix surface).
+	Avm2Class* geom_matrix = avm2_builtin_class(ctx, "flash.geom", "Matrix",
+	                                            b->object_class);
+	geom_matrix->instance_init.fn = geom_matrix_init;
+	geom_matrix->instance_init.debug_name = "Matrix";
+	avm2_builtin_add_method(ctx, geom_matrix, "toString", geom_matrix_to_string);
+	g_matrix_class = geom_matrix;
+	Avm2Class* geom_transform = avm2_builtin_class(ctx, "flash.geom", "Transform",
+	                                               b->object_class);
+	geom_transform->native_ext_size = sizeof(Avm2TransformExt);
+	add_getset(ctx, geom_transform, "matrix", transform_get_matrix,
+	           transform_set_matrix);
+	add_getset(ctx, geom_transform, "colorTransform", transform_get_color_transform,
+	           transform_set_color_transform);
+	g_transform_class = geom_transform;
 
 	// flash.display.FrameLabel (extends EventDispatcher) + Scene.
 	Avm2Class* framelabel = avm2_builtin_class(ctx, "flash.display", "FrameLabel",
@@ -3393,10 +3802,12 @@ void avm2_register_display(Avm2Context* ctx)
 	// flash.display.SimpleButton (structural stub until tranche 5).
 	Avm2Class* button =
 		avm2_builtin_class(ctx, "flash.display", "SimpleButton", iobj);
+	button->native_init = display_native_init;
 	b->simple_button_class = button;
 
 	// flash.display.Stage.
 	Avm2Class* stage = avm2_builtin_class(ctx, "flash.display", "Stage", doc);
+	stage->native_init = display_native_init;
 	b->stage_class = stage;
 	add_getset(ctx, stage, "frameRate", stage_get_frame_rate, stage_set_frame_rate);
 	add_getset(ctx, stage, "color", stage_get_color, stage_set_color);
