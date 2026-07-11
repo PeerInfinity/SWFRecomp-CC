@@ -86,6 +86,42 @@ void avm2_register_toplevel(Avm2Context* ctx); // trace/isNaN/parseInt/...
 void avm2_register_vector(Avm2Context* ctx);   // __AS3__.vec::Vector + specializations
 void avm2_register_regexp(Avm2Context* ctx);   // RegExp + String regex paths
 void avm2_register_json(Avm2Context* ctx);     // SWF13+ (caller gates)
+void avm2_register_nsqname(Avm2Context* ctx);  // Namespace + QName
+
+// Namespace/QName instance state (avm2_nsqname.c). prefix == NULL is the
+// undefined prefix; a QName uri == NULL is the any namespace and local ==
+// NULL the any name. kind is the raw ABC namespace kind (0 = any).
+typedef struct Avm2NamespaceExt
+{
+	const Avm2String* uri;
+	const Avm2String* prefix;
+	uint8_t kind;
+} Avm2NamespaceExt;
+
+typedef struct Avm2QNameExt
+{
+	const Avm2String* uri;
+	const Avm2String* local;
+} Avm2QNameExt;
+
+// NULL when the value is not a Namespace / QName instance.
+Avm2NamespaceExt* avm2_namespace_ext_of(Avm2Value v);
+Avm2QNameExt* avm2_qname_ext_of(Avm2Value v);
+Avm2Object* avm2_namespace_new(Avm2Context* ctx, const Avm2String* uri,
+                               const Avm2String* prefix, uint8_t kind);
+// Box a constant-pool namespace (PushNamespace, namespace trait defaults).
+Avm2Object* avm2_namespace_from_pool(Avm2Context* ctx, Avm2AbcFileRt* file,
+                                     uint32_t ns_idx);
+Avm2Object* avm2_qname_new(Avm2Context* ctx, const Avm2String* uri,
+                           const Avm2String* local);
+const Avm2String* avm2_qname_to_string(Avm2Context* ctx, const Avm2QNameExt* ext);
+// Enumeration hooks (called from avm2_object.c); return 0 if `obj` is not
+// a Namespace/QName.
+int avm2_nsqname_next_enumerant(Avm2Object* obj, uint32_t cur, uint32_t* out);
+int avm2_nsqname_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t idx,
+                                Avm2Value* out);
+int avm2_nsqname_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_t idx,
+                                 Avm2Value* out);
 
 // Plain (non-regex) String.split — the regex-aware split falls back to it.
 Avm2Value avm2_string_split_plain(struct Avm2Activation* act);
@@ -172,6 +208,8 @@ typedef struct Avm2Builtins
 	Avm2Class* xml_list_class;  // stub
 	Avm2Class* movieclip_class;
 	Avm2Class* regexp_class;
+	Avm2Class* namespace_class;
+	Avm2Class* qname_class;
 	Avm2Class* vector_class;         // generic __AS3__.vec::Vector
 	Avm2Class* vector_int_class;     // Vector.<int>
 	Avm2Class* vector_uint_class;    // Vector.<uint>

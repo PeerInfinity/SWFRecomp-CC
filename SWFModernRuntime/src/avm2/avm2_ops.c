@@ -349,11 +349,20 @@ Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32
 	                          avm2_mn_has_public_ns(act->file->data, mn_idx));
 }
 
+static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
+                                   const Avm2QNameExt* q);
+
 Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                   Avm2Value name_val, int interp)
 {
 	Avm2Context* ctx = act->ctx;
 	(void) mn_idx;
+	{
+		// A QName object as the lazy name resolves by its own uri::local
+		// key (Ruffle fill_with_runtime_params — qname_indexing).
+		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+		if (q != NULL) return getproperty_qname(act, recv, q);
+	}
 	if (value_is_null_like(recv))
 	{
 		const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
@@ -518,11 +527,22 @@ void avm2_op_initproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, 
 	setproperty_impl(act, recv, mn_idx, val, 1);
 }
 
+static void setproperty_qname(Avm2Activation* act, Avm2Value recv,
+                              const Avm2QNameExt* q, Avm2Value value);
+
 void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                              Avm2Value name_val, Avm2Value value, int interp)
 {
 	Avm2Context* ctx = act->ctx;
 	(void) mn_idx;
+	{
+		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+		if (q != NULL)
+		{
+			setproperty_qname(act, recv, q, value);
+			return;
+		}
+	}
 	if (value_is_null_like(recv))
 	{
 		const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
@@ -617,10 +637,17 @@ Avm2Value avm2_op_deleteproperty(Avm2Activation* act, Avm2Value recv, uint32_t m
 	return deleteproperty_common(act, recv, name, name_len);
 }
 
+static Avm2Value deleteproperty_qname(Avm2Activation* act, Avm2Value recv,
+                                      const Avm2QNameExt* q);
+
 Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                      Avm2Value name_val)
 {
 	(void) mn_idx;
+	{
+		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+		if (q != NULL) return deleteproperty_qname(act, recv, q);
+	}
 	uint32_t idx;
 	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj != NULL
 	    && recv.u.obj->kind == AVM2_OBJ_ARRAY && avm2_value_as_index(name_val, &idx))
@@ -630,6 +657,287 @@ Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32
 	}
 	const Avm2String* ns = avm2_coerce_to_string(act->ctx, name_val);
 	return deleteproperty_common(act, recv, ns->utf8, ns->len);
+}
+
+// ---------------------------------------------------------------------------
+// Lazy-namespace (RTQName / RTQNameL) property ops + QName-valued lazy names
+// ---------------------------------------------------------------------------
+
+// Key from a popped Namespace value. Returns whether the namespace is the
+// public (empty-URI) one, i.e. whether dynamic props are reachable.
+static int key_from_ns_value(Avm2Value ns_val, const char* name, uint32_t name_len,
+                             Avm2PropKey* key)
+{
+	Avm2NamespaceExt* n = avm2_namespace_ext_of(ns_val);
+	if (n == NULL)
+	{
+		avm2_fatal("lazy-ns property op: popped namespace is not a Namespace value");
+	}
+	key->name = name;
+	key->name_len = name_len;
+	key->ns_kind = (n->kind != 0) ? n->kind : 0x16;
+	key->ns_uri = n->uri->utf8;
+	key->ns_len = n->uri->len;
+	return avm2_propkey_is_public(key);
+}
+
+// Key from a QName object used as a lazy name. `*any_ns` reports the
+// any-namespace QName (name-only matching).
+static int key_from_qname_ext(const Avm2QNameExt* q, Avm2PropKey* key, int* any_ns)
+{
+	const char* name = (q->local != NULL) ? q->local->utf8 : "*";
+	uint32_t name_len = (q->local != NULL) ? q->local->len : 1;
+	*any_ns = (q->uri == NULL);
+	if (q->uri == NULL)
+	{
+		*key = avm2_public_key(name, name_len);
+		return 1;
+	}
+	key->name = name;
+	key->name_len = name_len;
+	key->ns_kind = 0x16;
+	key->ns_uri = q->uri->utf8;
+	key->ns_len = q->uri->len;
+	return avm2_propkey_is_public(key);
+}
+
+// resolve_key plus the any-namespace fallback: a name-only vtable scan.
+static int resolve_generic_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
+                               int public_ok, int any_ns, Resolved* out)
+{
+	if (resolve_key(ctx, recv, key, public_ok, out)) return 1;
+	if (any_ns)
+	{
+		const Avm2VTable* vt = avm2_value_vtable(ctx, recv);
+		if (vt != NULL)
+		{
+			for (uint32_t i = 0; i < vt->count; i++)
+			{
+				if (vt->entries[i].key.name_len == key->name_len
+				    && memcmp(vt->entries[i].key.name, key->name, key->name_len) == 0)
+				{
+					memset(out, 0, sizeof(*out));
+					out->entry = &vt->entries[i];
+					return 1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
+                                   const Avm2QNameExt* q)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2PropKey key;
+	int any_ns;
+	int pub = key_from_qname_ext(q, &key, &any_ns);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, key.name, key.name_len);
+	}
+	Resolved r;
+	int ok = resolve_generic_key(ctx, recv, &key, pub, any_ns, &r);
+	return getproperty_common(act, recv, key.name, key.name_len, ok, &r, pub);
+}
+
+static void setproperty_nonpublic_miss(Avm2Context* ctx, Avm2Value recv,
+                                       const char* name, uint32_t name_len)
+{
+	char cn[160];
+	class_name_of(ctx, recv, cn, sizeof(cn));
+	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+	                 "Error #1056: Cannot create property %.*s on %s.",
+	                 (int) name_len, name, cn);
+}
+
+static void setproperty_qname(Avm2Activation* act, Avm2Value recv,
+                              const Avm2QNameExt* q, Avm2Value value)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2PropKey key;
+	int any_ns;
+	int pub = key_from_qname_ext(q, &key, &any_ns);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, key.name, key.name_len);
+	}
+	Resolved r;
+	if (resolve_generic_key(ctx, recv, &key, pub, any_ns, &r))
+	{
+		setproperty_resolved(ctx, recv, &r, key.name, key.name_len, value, 0);
+		return;
+	}
+	if (!pub && recv.kind == AVM2_VALUE_OBJECT)
+	{
+		setproperty_nonpublic_miss(ctx, recv, key.name, key.name_len);
+	}
+	setproperty_miss(ctx, recv, key.name, key.name_len, value);
+}
+
+static Avm2Value deleteproperty_qname(Avm2Activation* act, Avm2Value recv,
+                                      const Avm2QNameExt* q)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2PropKey key;
+	int any_ns;
+	int pub = key_from_qname_ext(q, &key, &any_ns);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, key.name, key.name_len);
+	}
+	if (recv.kind != AVM2_VALUE_OBJECT) return avm2_bool(false);
+	Avm2Object* obj = recv.u.obj;
+	Resolved r;
+	if (resolve_generic_key(ctx, recv, &key, 0, any_ns, &r))
+	{
+		return avm2_bool(false);  // declared traits can't be deleted
+	}
+	if (pub && avm2_object_delete_dynamic(obj, key.name, key.name_len))
+	{
+		return avm2_bool(true);
+	}
+	return avm2_bool(true);  // deleting a missing property returns true
+}
+
+Avm2Value avm2_op_pushnamespace(Avm2Activation* act, uint32_t ns_idx)
+{
+	return avm2_object_value(avm2_namespace_from_pool(act->ctx, act->file, ns_idx));
+}
+
+Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                   Avm2Value ns_val)
+{
+	Avm2Context* ctx = act->ctx;
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	Avm2PropKey key;
+	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	Resolved r;
+	int ok = resolve_key(ctx, recv, &key, pub, &r);
+	return getproperty_common(act, recv, name, name_len, ok, &r, pub);
+}
+
+Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                     Avm2Value ns_val, Avm2Value name_val)
+{
+	(void) mn_idx;
+	Avm2Context* ctx = act->ctx;
+	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+	if (q != NULL)
+	{
+		// A QName name overrides the popped namespace entirely.
+		return getproperty_qname(act, recv, q);
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, name_val);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, s->utf8, s->len);
+	}
+	Avm2PropKey key;
+	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
+	Resolved r;
+	int ok = resolve_key(ctx, recv, &key, pub, &r);
+	return getproperty_common(act, recv, s->utf8, s->len, ok, &r, pub);
+}
+
+static void setproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
+                                    Avm2Value ns_val, const char* name,
+                                    uint32_t name_len, Avm2Value value)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	Avm2PropKey key;
+	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	Resolved r;
+	if (resolve_key(ctx, recv, &key, pub, &r))
+	{
+		setproperty_resolved(ctx, recv, &r, name, name_len, value, 0);
+		return;
+	}
+	if (!pub && recv.kind == AVM2_VALUE_OBJECT)
+	{
+		setproperty_nonpublic_miss(ctx, recv, name, name_len);
+	}
+	setproperty_miss(ctx, recv, name, name_len, value);
+}
+
+void avm2_op_setproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                              Avm2Value ns_val, Avm2Value value)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	setproperty_rtns_common(act, recv, ns_val, name, name_len, value);
+}
+
+void avm2_op_setproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                Avm2Value ns_val, Avm2Value name_val, Avm2Value value)
+{
+	(void) mn_idx;
+	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+	if (q != NULL)
+	{
+		setproperty_qname(act, recv, q, value);
+		return;
+	}
+	const Avm2String* s = avm2_coerce_to_string(act->ctx, name_val);
+	setproperty_rtns_common(act, recv, ns_val, s->utf8, s->len, value);
+}
+
+static Avm2Value deleteproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
+                                            Avm2Value ns_val, const char* name,
+                                            uint32_t name_len)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	if (recv.kind != AVM2_VALUE_OBJECT) return avm2_bool(false);
+	Avm2PropKey key;
+	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	const Avm2VTable* vt = avm2_value_vtable(ctx, recv);
+	if (avm2_vtable_find(vt, &key) != NULL)
+	{
+		return avm2_bool(false);
+	}
+	if (pub && avm2_object_delete_dynamic(recv.u.obj, name, name_len))
+	{
+		return avm2_bool(true);
+	}
+	return avm2_bool(true);
+}
+
+Avm2Value avm2_op_deleteproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                      Avm2Value ns_val)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	return deleteproperty_rtns_common(act, recv, ns_val, name, name_len);
+}
+
+Avm2Value avm2_op_deleteproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                        Avm2Value ns_val, Avm2Value name_val)
+{
+	(void) mn_idx;
+	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+	if (q != NULL)
+	{
+		return deleteproperty_qname(act, recv, q);
+	}
+	const Avm2String* s = avm2_coerce_to_string(act->ctx, name_val);
+	return deleteproperty_rtns_common(act, recv, ns_val, s->utf8, s->len);
 }
 
 // ---------------------------------------------------------------------------
@@ -846,26 +1154,23 @@ Avm2Object* avm2_op_findproperty(Avm2Activation* act, const Avm2ScopeEntry* lsco
 	return findproperty_impl(act, lscope, scope_n, mn_idx, name, name_len, strict);
 }
 
-Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* lscope,
-                                     uint32_t scope_n, uint32_t mn_idx, Avm2Value name,
-                                     int strict)
+// Key-based scope search shared by the lazy-name and lazy-ns FindProperty
+// variants. `public_ok` gates dynamic-prop matching (with-scopes and the
+// global prototype-chain fallback).
+static Avm2Object* findproperty_key(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                    uint32_t scope_n, const Avm2PropKey* key,
+                                    int public_ok, int strict)
 {
-	// Resolve the runtime name to a string and search scope objects for a
-	// public property of that name (with-scope semantics apply the same).
 	Avm2Context* ctx = act->ctx;
-	(void) mn_idx;
-	const Avm2String* ns = avm2_coerce_to_string(ctx, name);
-	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
-
 	for (uint32_t i = scope_n; i > 0; i--)
 	{
 		Avm2Object* so = lscope[i - 1].obj;
 		Resolved r;
 		if (lscope[i - 1].is_with)
 		{
-			if (resolve_key(ctx, avm2_object_value(so), &key, 1, &r)) return so;
+			if (resolve_key(ctx, avm2_object_value(so), key, public_ok, &r)) return so;
 		}
-		else if (avm2_vtable_find(so->vtable, &key) != NULL)
+		else if (avm2_vtable_find(so->vtable, key) != NULL)
 		{
 			return so;
 		}
@@ -878,16 +1183,17 @@ Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* 
 			Resolved r;
 			if (act->outer->entries[i - 1].is_with)
 			{
-				if (resolve_key(ctx, avm2_object_value(so), &key, 1, &r)) return so;
+				if (resolve_key(ctx, avm2_object_value(so), key, public_ok, &r)) return so;
 			}
-			else if (avm2_vtable_find(so->vtable, &key) != NULL)
+			else if (avm2_vtable_find(so->vtable, key) != NULL)
 			{
 				return so;
 			}
 		}
 	}
-	Avm2Object* g = avm2_domain_find(ctx, &key);
+	Avm2Object* g = avm2_domain_find(ctx, key);
 	if (g != NULL) return g;
+	if (public_ok)
 	{
 		Avm2Object* global = NULL;
 		if (act->outer != NULL && act->outer->count > 0)
@@ -900,7 +1206,7 @@ Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* 
 		}
 		for (Avm2Object* p = global; p != NULL; p = p->proto)
 		{
-			if (avm2_object_find_dynamic(p, ns->utf8, ns->len) != NULL)
+			if (avm2_object_find_dynamic(p, key->name, key->name_len) != NULL)
 			{
 				return global;
 			}
@@ -910,7 +1216,63 @@ Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* 
 	{
 		return avm2_op_getglobalscope(act, lscope, scope_n);
 	}
-	avm2_throw_1065(ctx, ns->utf8, ns->len);
+	avm2_throw_1065(ctx, key->name, key->name_len);
+}
+
+Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                     uint32_t scope_n, uint32_t mn_idx, Avm2Value name,
+                                     int strict)
+{
+	// Resolve the runtime name to a string and search scope objects for a
+	// public property of that name (with-scope semantics apply the same).
+	Avm2Context* ctx = act->ctx;
+	(void) mn_idx;
+	{
+		const Avm2QNameExt* q = avm2_qname_ext_of(name);
+		if (q != NULL)
+		{
+			Avm2PropKey key;
+			int any_ns;
+			int pub = key_from_qname_ext(q, &key, &any_ns);
+			return findproperty_key(act, lscope, scope_n, &key, pub, strict);
+		}
+	}
+	const Avm2String* ns = avm2_coerce_to_string(ctx, name);
+	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
+	return findproperty_key(act, lscope, scope_n, &key, 1, strict);
+}
+
+Avm2Object* avm2_op_findproperty_rtns(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                      uint32_t scope_n, uint32_t mn_idx, Avm2Value ns_val,
+                                      int strict)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	Avm2PropKey key;
+	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	return findproperty_key(act, lscope, scope_n, &key, pub, strict);
+}
+
+Avm2Object* avm2_op_findproperty_rtns_l(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                        uint32_t scope_n, uint32_t mn_idx, Avm2Value ns_val,
+                                        Avm2Value name_val, int strict)
+{
+	(void) mn_idx;
+	{
+		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+		if (q != NULL)
+		{
+			Avm2PropKey key;
+			int any_ns;
+			int pub = key_from_qname_ext(q, &key, &any_ns);
+			return findproperty_key(act, lscope, scope_n, &key, pub, strict);
+		}
+	}
+	const Avm2String* s = avm2_coerce_to_string(act->ctx, name_val);
+	Avm2PropKey key;
+	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
+	return findproperty_key(act, lscope, scope_n, &key, pub, strict);
 }
 
 Avm2Object* avm2_op_finddef(Avm2Activation* act, uint32_t mn_idx)
@@ -1000,11 +1362,19 @@ Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_
 	return callproperty_common(act->ctx, recv, name, name_len, ok, &r, args, argc, recv);
 }
 
+static Avm2Value callproperty_qname(Avm2Activation* act, Avm2Value recv,
+                                    const Avm2QNameExt* q,
+                                    const Avm2Value* args, uint32_t argc);
+
 Avm2Value avm2_op_callproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                    Avm2Value name_val, const Avm2Value* args, uint32_t argc)
 {
 	Avm2Context* ctx = act->ctx;
 	(void) mn_idx;
+	{
+		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+		if (q != NULL) return callproperty_qname(act, recv, q, args, argc);
+	}
 	if (value_is_null_like(recv))
 	{
 		const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
@@ -1032,6 +1402,64 @@ Avm2Value avm2_op_callproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, 1, &r);
 	return callproperty_common(act->ctx, recv, ns->utf8, ns->len, ok, &r, args, argc, recv);
+}
+
+static Avm2Value callproperty_qname(Avm2Activation* act, Avm2Value recv,
+                                    const Avm2QNameExt* q,
+                                    const Avm2Value* args, uint32_t argc)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2PropKey key;
+	int any_ns;
+	int pub = key_from_qname_ext(q, &key, &any_ns);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, key.name, key.name_len);
+	}
+	Resolved r;
+	int ok = resolve_generic_key(ctx, recv, &key, pub, any_ns, &r);
+	return callproperty_common(ctx, recv, key.name, key.name_len, ok, &r, args, argc, recv);
+}
+
+Avm2Value avm2_op_callproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                    Avm2Value ns_val, const Avm2Value* args, uint32_t argc)
+{
+	Avm2Context* ctx = act->ctx;
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	Avm2PropKey key;
+	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	Resolved r;
+	int ok = resolve_key(ctx, recv, &key, pub, &r);
+	return callproperty_common(ctx, recv, name, name_len, ok, &r, args, argc, recv);
+}
+
+Avm2Value avm2_op_callproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                      Avm2Value ns_val, Avm2Value name_val,
+                                      const Avm2Value* args, uint32_t argc)
+{
+	(void) mn_idx;
+	Avm2Context* ctx = act->ctx;
+	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
+	if (q != NULL)
+	{
+		return callproperty_qname(act, recv, q, args, argc);
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, name_val);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, s->utf8, s->len);
+	}
+	Avm2PropKey key;
+	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
+	Resolved r;
+	int ok = resolve_key(ctx, recv, &key, pub, &r);
+	return callproperty_common(ctx, recv, s->utf8, s->len, ok, &r, args, argc, recv);
 }
 
 Avm2Value avm2_op_callproplex(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,

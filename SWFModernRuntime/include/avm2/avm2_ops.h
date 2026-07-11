@@ -61,6 +61,35 @@ Avm2Value avm2_op_deleteproperty(Avm2Activation* act, Avm2Value recv, uint32_t m
 Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                      Avm2Value name);
 
+// Lazy-namespace (RTQName/RTQNameL) property ops: `ns_val` is the popped
+// Namespace VALUE; the *_l variants also pop the runtime name (a QName
+// object name overrides the popped namespace, per Ruffle
+// fill_with_runtime_params).
+Avm2Value avm2_op_pushnamespace(Avm2Activation* act, uint32_t ns_idx);
+Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                   Avm2Value ns_val);
+Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                     Avm2Value ns_val, Avm2Value name_val);
+void avm2_op_setproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                              Avm2Value ns_val, Avm2Value value);
+void avm2_op_setproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                Avm2Value ns_val, Avm2Value name_val, Avm2Value value);
+Avm2Value avm2_op_deleteproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                      Avm2Value ns_val);
+Avm2Value avm2_op_deleteproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                        Avm2Value ns_val, Avm2Value name_val);
+Avm2Value avm2_op_callproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                    Avm2Value ns_val, const Avm2Value* args, uint32_t argc);
+Avm2Value avm2_op_callproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                      Avm2Value ns_val, Avm2Value name_val,
+                                      const Avm2Value* args, uint32_t argc);
+Avm2Object* avm2_op_findproperty_rtns(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                      uint32_t scope_n, uint32_t mn_idx, Avm2Value ns_val,
+                                      int strict);
+Avm2Object* avm2_op_findproperty_rtns_l(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                        uint32_t scope_n, uint32_t mn_idx, Avm2Value ns_val,
+                                        Avm2Value name_val, int strict);
+
 // Slots (IR indices are 0-based; runtime slot arrays are 1-based).
 Avm2Value avm2_op_getslot(Avm2Activation* act, Avm2Value obj, uint32_t index0);
 void avm2_op_setslot(Avm2Activation* act, Avm2Value obj, uint32_t index0, Avm2Value value);

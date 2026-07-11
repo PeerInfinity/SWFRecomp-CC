@@ -351,6 +351,10 @@ uint32_t avm2_object_next_enumerant(Avm2Object* obj, uint32_t cur)
 		Avm2VectorExt* ext = (Avm2VectorExt*) obj->native_ext;
 		return cur < ext->length ? cur + 1 : 0;
 	}
+	{
+		uint32_t next;
+		if (avm2_nsqname_next_enumerant(obj, cur, &next)) return next;
+	}
 	uint32_t total = array_enum_count(obj) + dyn_enum_count(obj);
 	if (cur + 1 <= total) return cur + 1;
 	return 0;
@@ -363,6 +367,10 @@ Avm2Value avm2_object_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t
 		Avm2VectorExt* ext = (Avm2VectorExt*) obj->native_ext;
 		if (idx >= 1 && idx <= ext->length) return avm2_uint_value(idx - 1);
 		return avm2_null();
+	}
+	{
+		Avm2Value v;
+		if (avm2_nsqname_enumerant_name(ctx, obj, idx, &v)) return v;
 	}
 	uint32_t arr_n = array_enum_count(obj);
 	if (idx >= 1 && idx <= arr_n)
@@ -382,6 +390,10 @@ Avm2Value avm2_object_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_
 		Avm2VectorExt* ext = (Avm2VectorExt*) obj->native_ext;
 		if (idx >= 1 && idx <= ext->length) return ext->elems[idx - 1];
 		return avm2_undefined();
+	}
+	{
+		Avm2Value v;
+		if (avm2_nsqname_enumerant_value(ctx, obj, idx, &v)) return v;
 	}
 	uint32_t arr_n = array_enum_count(obj);
 	if (idx >= 1 && idx <= arr_n)

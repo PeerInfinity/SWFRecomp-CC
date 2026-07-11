@@ -230,6 +230,10 @@ namespace abc
 			case IrOpcode::PushUndefined:
 				out << "\tstk[sp++] = avm2_undefined();" << endl;
 				return true;
+			case IrOpcode::PushNamespace:
+				out << "\tstk[sp++] = avm2_op_pushnamespace(act, " << op.arg1
+				    << ");" << endl;
+				return true;
 
 			// --- control flow ---
 			case IrOpcode::Jump:
@@ -285,7 +289,24 @@ namespace abc
 			case IrOpcode::FindProperty:
 			{
 				const char* strict = (op.op == IrOpcode::FindPropStrict) ? "1" : "0";
-				if (mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyNs(abc, op.arg1))
+				{
+					// RTQName pops [ns]; RTQNameL pops [ns, name].
+					if (mnLazyName(abc, op.arg1))
+					{
+						out << "\tsp -= 2; stk[sp] = avm2_object_value("
+						    << "avm2_op_findproperty_rtns_l(act, lscope, scope_n, "
+						    << op.arg1 << ", stk[sp], stk[sp + 1], " << strict
+						    << ")); sp++;" << endl;
+					}
+					else
+					{
+						out << "\tsp--; stk[sp] = avm2_object_value("
+						    << "avm2_op_findproperty_rtns(act, lscope, scope_n, "
+						    << op.arg1 << ", stk[sp], " << strict << ")); sp++;" << endl;
+					}
+					return true;
+				}
 				if (mnLazyName(abc, op.arg1))
 				{
 					out << "\tsp--; stk[sp] = avm2_object_value(avm2_op_findproperty_dyn(act, "
@@ -311,7 +332,23 @@ namespace abc
 				return true;
 			case IrOpcode::GetPropertyFast:
 			case IrOpcode::GetPropertySlow:
-				if (mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyNs(abc, op.arg1))
+				{
+					if (mnLazyName(abc, op.arg1))
+					{
+						// RTQNameL: [obj, ns, name]
+						out << "\tsp -= 3; stk[sp] = avm2_op_getproperty_rtns_l(act, "
+						    << "stk[sp], " << op.arg1
+						    << ", stk[sp + 1], stk[sp + 2]); sp++;" << endl;
+					}
+					else
+					{
+						// RTQName: [obj, ns]
+						out << "\tsp -= 2; stk[sp] = avm2_op_getproperty_rtns(act, "
+						    << "stk[sp], " << op.arg1 << ", stk[sp + 1]); sp++;" << endl;
+					}
+					return true;
+				}
 				out << "\tsp -= 2; stk[sp] = avm2_op_getproperty_dyn(act, stk[sp], "
 				    << op.arg1 << ", stk[sp + 1], " << (bc.interp_mode ? 1 : 0)
 				    << "); sp++;" << endl;
@@ -322,7 +359,23 @@ namespace abc
 				return true;
 			case IrOpcode::SetPropertyFast:
 			case IrOpcode::SetPropertySlow:
-				if (mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyNs(abc, op.arg1))
+				{
+					if (mnLazyName(abc, op.arg1))
+					{
+						// RTQNameL: [obj, ns, name, value]
+						out << "\tsp -= 4; avm2_op_setproperty_rtns_l(act, stk[sp], "
+						    << op.arg1 << ", stk[sp + 1], stk[sp + 2], stk[sp + 3]);"
+						    << endl;
+					}
+					else
+					{
+						// RTQName: [obj, ns, value]
+						out << "\tsp -= 3; avm2_op_setproperty_rtns(act, stk[sp], "
+						    << op.arg1 << ", stk[sp + 1], stk[sp + 2]);" << endl;
+					}
+					return true;
+				}
 				out << "\tsp -= 3; avm2_op_setproperty_dyn(act, stk[sp], " << op.arg1
 				    << ", stk[sp + 1], stk[sp + 2], " << (bc.interp_mode ? 1 : 0)
 				    << ");" << endl;
@@ -333,7 +386,21 @@ namespace abc
 				    << ", stk[sp + 1]);" << endl;
 				return true;
 			case IrOpcode::DeleteProperty:
-				if (mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyNs(abc, op.arg1))
+				{
+					if (mnLazyName(abc, op.arg1))
+					{
+						out << "\tsp -= 3; stk[sp] = avm2_op_deleteproperty_rtns_l(act, "
+						    << "stk[sp], " << op.arg1
+						    << ", stk[sp + 1], stk[sp + 2]); sp++;" << endl;
+					}
+					else
+					{
+						out << "\tsp -= 2; stk[sp] = avm2_op_deleteproperty_rtns(act, "
+						    << "stk[sp], " << op.arg1 << ", stk[sp + 1]); sp++;" << endl;
+					}
+					return true;
+				}
 				if (mnLazyName(abc, op.arg1))
 				{
 					out << "\tsp--; stk[sp - 1] = avm2_op_deleteproperty_dyn(act, "
@@ -371,7 +438,28 @@ namespace abc
 			case IrOpcode::CallPropVoid:
 			{
 				bool is_void = (op.op == IrOpcode::CallPropVoid);
-				if (mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyNs(abc, op.arg1))
+				{
+					if (mnLazyName(abc, op.arg1))
+					{
+						// RTQNameL: [obj, ns, name, args...]
+						out << "\tsp -= " << (op.arg2 + 3) << "; "
+						    << (is_void ? "" : "stk[sp] = ")
+						    << "avm2_op_callproperty_rtns_l(act, stk[sp], " << op.arg1
+						    << ", stk[sp + 1], stk[sp + 2], &stk[sp + 3], " << op.arg2
+						    << ");" << (is_void ? "" : " sp++;") << endl;
+					}
+					else
+					{
+						// RTQName: [obj, ns, args...]
+						out << "\tsp -= " << (op.arg2 + 2) << "; "
+						    << (is_void ? "" : "stk[sp] = ")
+						    << "avm2_op_callproperty_rtns(act, stk[sp], " << op.arg1
+						    << ", stk[sp + 1], &stk[sp + 2], " << op.arg2 << ");"
+						    << (is_void ? "" : " sp++;") << endl;
+					}
+					return true;
+				}
 				if (mnLazyName(abc, op.arg1))
 				{
 					out << "\tsp -= " << (op.arg2 + 2) << "; "

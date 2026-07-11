@@ -481,8 +481,12 @@ Avm2Value avm2_default_value(Avm2Context* ctx, Avm2AbcFileRt* file, const Avm2Ab
 		case 0x0b: return avm2_bool(true);
 		case 0x0c: return avm2_null();
 		case 0x00: return avm2_undefined();
+		// Namespace kinds (`namespace n = "uri"` consts): box the pool
+		// namespace as a Namespace object.
+		case 0x05: case 0x08: case 0x16: case 0x17: case 0x18: case 0x19:
+		case 0x1a:
+			return avm2_object_value(avm2_namespace_from_pool(ctx, file, d->index));
 		default:
-			// Namespace defaults (0x05/0x08/0x16...) — tranche 3.
 			return avm2_undefined();
 	}
 }

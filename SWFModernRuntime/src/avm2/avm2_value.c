@@ -755,6 +755,13 @@ bool avm2_abstract_eq(Avm2Context* ctx, Avm2Value a, Avm2Value b)
 	}
 	if (a.kind == AVM2_VALUE_OBJECT && b.kind == AVM2_VALUE_OBJECT)
 	{
+		// Two Namespaces compare by URI (Ruffle value.rs abstract_eq).
+		Avm2NamespaceExt* na = avm2_namespace_ext_of(a);
+		Avm2NamespaceExt* nb = avm2_namespace_ext_of(b);
+		if (na != NULL && nb != NULL)
+		{
+			return avm2_string_equals(na->uri, nb->uri);
+		}
 		return a.u.obj == b.u.obj;
 	}
 	if (a_num && b.kind == AVM2_VALUE_STRING)
