@@ -1,21 +1,22 @@
 # Ruffle Test Results Diff
 
-**Previous:** `2ab5d2685cab` (2026-07-10T23:34:28.849207+00:00)
-**Current:** `a2ded85b7ea6` (2026-07-11T00:15:36.650265+00:00)
+**Previous:** `a2ded85b7ea6` (2026-07-11T00:15:36.650265+00:00)
+**Current:** `83bef14d7e8b` (2026-07-11T03:06:11.788890+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 24 | 27 | +3 |
-| Total | 24 | 27 | +3 |
+| Passing | 27 | 31 | +4 |
+| Total | 27 | 31 | +4 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (3)
+## Added Tests (4)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `enterframe_type1_args` | pass | 8/8 |
-| `watch_mc_reentrant_setmember` | pass | 3/3 |
-| `watch_timeline_named_params` | pass | 4/4 |
+| `broadcast_type1_args` | pass | 14/14 |
+| `onconstruct_type1_args` | pass | 6/6 |
+| `onload_type1_args` | pass | 7/7 |
+| `onunload_type1_args` | pass | 6/6 |
