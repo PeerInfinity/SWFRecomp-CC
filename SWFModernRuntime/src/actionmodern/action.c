@@ -33603,8 +33603,14 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
         // INV_ACT_ARGUMENTS needs the core to own the swap so
         // arguments.caller stays the pre-swap caller); no depth guard of any
         // kind (the site never had one — a re-broadcasting listener recurses
-        // unguarded; normalization candidate, not this commit); no version
-        // switch, no base clip, no g_event_this_mc (never touched here).
+        // unguarded; normalization candidate, not this commit); no base clip,
+        // no g_event_this_mc (never touched here). INV_VERSION_SWITCH added by
+        // normalization pass (b): listeners run at their DEFINING movie's SWF
+        // version + _global group (Flash/Ruffle semantics; proven bug class —
+        // Stage 0's timer fix; regression/broadcast_cross_swf_version is the
+        // repro). Safe as a plain flag: no INV_BASE_CLIP here, and the arm's
+        // caller-version gates (captured-scope, super_bind) are computed
+        // before the core installs the callee version.
         //
         // this_var is per-branch to preserve the arms' both-NULL corner
         // disagreement: type-2 binds/pushes UNDEFINED via INV_ACT_THIS's
@@ -33651,7 +33657,7 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             ActionVar bm_override = {0};
             InvokeOpts bm_opts = {0};
             bm_opts.flags = (g_swf_version >= 6 ? INV_CAPTURED_SCOPE : 0)
-                          | INV_LOCAL_SCOPE | INV_EXEC_FUNC;
+                          | INV_LOCAL_SCOPE | INV_EXEC_FUNC | INV_VERSION_SWITCH;
             bm_opts.act_flags = INV_ACT_ARGUMENTS;
             bm_opts.has_this_ptr = 1;
             bm_opts.this_ptr = listener_obj;

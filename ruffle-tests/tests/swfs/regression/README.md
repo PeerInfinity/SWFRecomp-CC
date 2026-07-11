@@ -48,6 +48,7 @@ arms cannot be reached any other way.
 | `mc_event_type1_args` | `mc_call_as2_handler_ng`'s type-1 arm passes the event's arguments at all (fixed `9a8c6dce3`) |
 | `timer_cross_swf_version` | `fireTimerCallback` switches to the callback's own SWF version and `_global` group (fixed `60070d96a`) |
 | `mc_event_cross_swf_version` | `mc_call_as2_handler_ng` switches to the handler's own SWF version and `_global` group (normalization pass (b): a v6-defined `onSetFocus` handler fired from v7 host bytecode via `Selection.setFocus` ran with v7 undefined-coercion, tracing `cb:[undefined]` instead of `cb:[]`). Two-SWF test (SWF7 host + SWF6 child); the handler crosses movies via `_level0.cb` because per-version `_global` groups are exactly what the switch swaps |
+| `broadcast_cross_swf_version` | `builtin_broadcaster_broadcastMessage` switches to each listener's own SWF version (normalization pass (b): a v6-defined listener fired via `broadcastMessage` from v7 host bytecode ran with v7 undefined-coercion). Same two-SWF `_level0.cb` handoff as `mc_event_cross_swf_version` |
 | `nc_onstatus_closure` | `nc_dispatch_onStatus` restores the handler's captured scope chain — a behavior lock, not a bug fix |
 | `fn_call_type1_args` | `actionCallMethod`'s `.call`/`.apply`-via-GetMember arm: forward arg order + pad (fixed in dispatch Stage 3b) |
 | `lc_method_type1_args` | `lc_dispatch_method`'s type-1 arm: forward arg order + clamp/pad (instance ten; fixed migrating it onto `invokeFunctionValue` in dispatch Stage 4) |
