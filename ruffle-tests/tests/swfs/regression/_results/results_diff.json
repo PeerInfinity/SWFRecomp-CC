@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-10T23:27:19.946404+00:00",
-    "old_git_sha": "2ab5d2685cab208f84e77f3b7ae0856621879d75",
-    "new_timestamp": "2026-07-11T00:08:09.012629+00:00",
-    "new_git_sha": "a2ded85b7ea640583f36ea00a86aeac59034f431",
+    "old_timestamp": "2026-07-11T00:08:09.012629+00:00",
+    "old_git_sha": "a2ded85b7ea640583f36ea00a86aeac59034f431",
+    "new_timestamp": "2026-07-11T01:38:33.781922+00:00",
+    "new_git_sha": "a61e83aaa9e2b6fd59924e35489eb6fee464c6d4",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 24,
+    "old_pass": 27,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 24,
-    "old_total": 24,
+    "old_effective_pass": 27,
+    "old_total": 27,
     "old_pass_rate": 100.0,
-    "new_pass": 27,
+    "new_pass": 29,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 27,
-    "new_total": 27,
+    "new_effective_pass": 29,
+    "new_total": 29,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,45 +25,33 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 24,
-    "added": 3,
+    "unchanged": 27,
+    "added": 2,
     "removed": 0
   },
   "changes": [
     {
-      "test": "enterframe_type1_args",
+      "test": "onconstruct_type1_args",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
       }
     },
     {
-      "test": "watch_mc_reentrant_setmember",
+      "test": "onload_type1_args",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "watch_timeline_named_params",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
       }
     }
   ]
