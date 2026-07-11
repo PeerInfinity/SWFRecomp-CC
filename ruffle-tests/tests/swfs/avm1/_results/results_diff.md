@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `03c86381dbc2` (2026-07-11T03:21:21.831717+00:00)
-**Current:** `c0ce53c7286f` (2026-07-11T05:54:07.782415+00:00)
+**Previous:** `c0ce53c7286f` (2026-07-11T05:54:07.782415+00:00)
+**Current:** `cbb390273734` (2026-07-11T06:50:31.949734+00:00)
 
 ## Summary
 
@@ -10,17 +10,18 @@
 | Passing | 634 | 634 | 0 |
 | Total | 706 | 706 | 0 |
 | Pass rate | 89.8% | 89.8% | 0% |
-| Mismatched lines | 15176 | 15188 | +12 |
-|   Increased | | | +12 |
+| Mismatched lines | 15188 | 15181 | -7 |
+|   Decreased | | | -8 |
+|   Increased | | | +1 |
 
 ## Status Changed (1)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `mcl_replace_root_swf7_to_swf5` | ruffle_matched | output_mismatch | 56/57 | 48/57 |
+| `mcl_replace_root_swf7_to_swf5` | output_mismatch | ruffle_matched | 48/57 | 56/57 |
 
 ## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `mcl_replace_root_swf7_to_swf6` | ruffle_matched | 56/57 | 52/57 | +4 |
+| `set_property_values/swf4` | output_mismatch | 350/1571 | 349/1571 | +1 |
