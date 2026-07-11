@@ -332,3 +332,26 @@ CCACHE_DISABLE=1 python3 tools/divergence/gates/check_stroke_min_width.py
 ```
 
 Regressed before the min-stroke-width fix: row 1 (hairline) absent → 3 bands → FAIL.
+
+## check_dispatch_funnel (static source gate)
+
+Stage 5 of the Function-Dispatch Consolidation. Unlike the render/trace gates
+above, this is a **static source check** over
+`SWFModernRuntime/src/actionmodern/*.c` — no SWF, no build. It enforces:
+
+1. every raw `->simple_func(...)` / `->advanced_func(...)` invocation sits in
+   an allowlisted function (the `invokeFunctionValue` core,
+   `invokeSpecialFunction`'s one remaining caller chain, and the constructor/
+   native families the dispatcher survey never covered);
+2. no statement pairs `INV_BASE_CLIP` with `INV_VERSION_SWITCH` (the pairing
+   silently flips the base-clip gate to the callee's version — arms that need
+   both compute the base-clip switch themselves, caller-gated); the core's
+   documented `opts==NULL` accessor-default superset is the one exemption;
+3. `INV_LOCAL_SCOPE_UNDER_CAPTURED` (the scope-order inversion deleted by
+   normalization pass (b)) stays deleted.
+
+Gate (must print `GATE-GREEN`):
+
+```bash
+python3 tools/divergence/gates/check_dispatch_funnel.py
+```
