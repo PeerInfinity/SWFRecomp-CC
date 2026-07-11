@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-11T00:15:36.650265+00:00",
-    "old_git_sha": "a2ded85b7ea640583f36ea00a86aeac59034f431",
-    "new_timestamp": "2026-07-11T03:06:11.788890+00:00",
-    "new_git_sha": "83bef14d7e8baf8913bb6522165a98131d9b5628",
+    "old_timestamp": "2026-07-11T03:06:11.788890+00:00",
+    "old_git_sha": "83bef14d7e8baf8913bb6522165a98131d9b5628",
+    "new_timestamp": "2026-07-11T05:47:08.767339+00:00",
+    "new_git_sha": "c0ce53c7286f68c77df6e3cddb77564090fee00f",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 27,
+    "old_pass": 31,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 27,
-    "old_total": 27,
+    "old_effective_pass": 31,
+    "old_total": 31,
     "old_pass_rate": 100.0,
-    "new_pass": 31,
+    "new_pass": 36,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 31,
-    "new_total": 31,
+    "new_effective_pass": 36,
+    "new_total": 36,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,37 +25,25 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 27,
-    "added": 4,
+    "unchanged": 31,
+    "added": 5,
     "removed": 0
   },
   "changes": [
     {
-      "test": "broadcast_type1_args",
+      "test": "broadcast_cross_swf_version",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
       }
     },
     {
-      "test": "onconstruct_type1_args",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "onload_type1_args",
+      "test": "coerce_cross_swf_version",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -67,7 +55,31 @@
       }
     },
     {
-      "test": "onunload_type1_args",
+      "test": "mc_event_cross_swf_version",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "onconstruct_cross_swf_version",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "watch_cross_swf_version",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
