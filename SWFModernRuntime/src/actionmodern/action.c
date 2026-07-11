@@ -14262,16 +14262,18 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 				*found = 1;
 				// Migrated to invokeFunctionValue (dispatch Stage 4). The
 				// getter-returned function was invoked with literally no ritual
-				// (no scopes, no this-stack, no version — deliberately barer
-				// than oCTS's twin, which pushes captured scopes; do not
-				// equalize): flags = 0, receiver as ABI this via this_var. The
-				// core adds the canonical type-1 pad to param_count (the old
-				// arm pushed nothing — TYPE1_ARG_ORDER family instance,
-				// regression/coerce_type1_args).
+				// (no scopes, no this-stack — deliberately barer than oCTS's
+				// twin, which pushes captured scopes; do not equalize):
+				// receiver as ABI this via this_var. The core adds the
+				// canonical type-1 pad to param_count (the old arm pushed
+				// nothing — TYPE1_ARG_ORDER family instance,
+				// regression/coerce_type1_args). INV_VERSION_SWITCH added by
+				// normalization pass (b), same class as the main branch's
+				// kept-in-arm switch (regression/coerce_cross_swf_version).
 				ActionVar gv_this = {0};
 				gv_this.type = ACTION_STACK_VALUE_OBJECT;
 				gv_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts gv_opts = { .flags = 0 };
+				InvokeOpts gv_opts = { .flags = INV_VERSION_SWITCH };
 				return invokeFunctionValue(app_context, vof_func, &gv_this, NULL, 0, &gv_opts);
 			}
 		}
@@ -14499,10 +14501,13 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 				// getter branch pushed captured scopes only (unlike oCVO's
 				// bare twin — deliberate asymmetry, do not equalize):
 				// INV_CAPTURED_SCOPE, receiver as ABI this via this_var.
+				// + the pass-(b) INV_VERSION_SWITCH (same class as the main
+				// branch's kept-in-arm switch).
 				ActionVar tsg_this = {0};
 				tsg_this.type = ACTION_STACK_VALUE_OBJECT;
 				tsg_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts tsg_opts = { .flags = INV_CAPTURED_SCOPE };
+				InvokeOpts tsg_opts = { .flags = INV_CAPTURED_SCOPE
+				                               | INV_VERSION_SWITCH };
 				return invokeFunctionValue(app_context, ts_func, &tsg_this, NULL, 0, &tsg_opts);
 			}
 		}
@@ -14605,12 +14610,16 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 				// a type-2 callee never saw a this-cell here — gate the flag
 				// per-branch rather than normalize (a new this-cell is
 				// observable to nested calls via actionGetVariable's early
-				// path). No scopes, no version, no exec-func — never done.
+				// path). No scopes, no exec-func — never done.
+				// INV_VERSION_SWITCH added by normalization pass (b):
+				// valueOf runs at its DEFINING movie's SWF version
+				// (regression/coerce_cross_swf_version, Less2 row).
 				ActionVar otp_this = {0};
 				otp_this.type = ACTION_STACK_VALUE_OBJECT;
 				otp_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts otp_opts = { .flags = (func->function_type == 1)
-				                                     ? INV_THIS_STACK : 0u };
+				InvokeOpts otp_opts = { .flags = INV_VERSION_SWITCH |
+				                        ((func->function_type == 1)
+				                                     ? INV_THIS_STACK : 0u) };
 				ActionVar result = invokeFunctionValue(app_context, func, &otp_this,
 				                                       NULL, 0, &otp_opts);
 
@@ -14651,12 +14660,14 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 			if (func != NULL)
 			{
 				// Migrated to invokeFunctionValue (dispatch Stage 4) — same
-				// per-branch this-stack gate as the valueOf leg above.
+				// per-branch this-stack gate as the valueOf leg above, and
+				// the same pass-(b) INV_VERSION_SWITCH.
 				ActionVar otp_ts_this = {0};
 				otp_ts_this.type = ACTION_STACK_VALUE_OBJECT;
 				otp_ts_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts otp_ts_opts = { .flags = (func->function_type == 1)
-				                                        ? INV_THIS_STACK : 0u };
+				InvokeOpts otp_ts_opts = { .flags = INV_VERSION_SWITCH |
+				                           ((func->function_type == 1)
+				                                        ? INV_THIS_STACK : 0u) };
 				ActionVar result = invokeFunctionValue(app_context, func, &otp_ts_this,
 				                                       NULL, 0, &otp_ts_opts);
 
@@ -29737,16 +29748,20 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 							// Stage 4). Captured scopes only — this path has
 							// NEVER pushed a this-cell for either type (the
 							// un-propagated 14799 fix; normalizing it is a
-							// separate commit), no version switch, no
-							// exec-func. The core adds the canonical type-1
-							// pad (the old arm pushed nothing, and the
-							// operand under conversion sat on the stack top —
-							// regression/coerce_type1_args pins the stale
-							// pop).
+							// separate commit), no exec-func. The core adds
+							// the canonical type-1 pad (the old arm pushed
+							// nothing, and the operand under conversion sat
+							// on the stack top — regression/coerce_type1_args
+							// pins the stale pop). INV_VERSION_SWITCH added
+							// by normalization pass (b): valueOf runs at its
+							// DEFINING movie's SWF version
+							// (regression/coerce_cross_swf_version, Subtract
+							// row).
 							ActionVar cf_this = {0};
 							cf_this.type = ACTION_STACK_VALUE_OBJECT;
 							cf_this.data.numeric_value = (u64)(uintptr_t)obj;
-							InvokeOpts cf_opts = { .flags = INV_CAPTURED_SCOPE };
+							InvokeOpts cf_opts = { .flags = INV_CAPTURED_SCOPE
+							                              | INV_VERSION_SWITCH };
 							ActionVar result = invokeFunctionValue(app_context, func, &cf_this,
 							                                       NULL, 0, &cf_opts);
 
@@ -29785,11 +29800,13 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 					if (vof_func != NULL)
 					{
 						// Migrated to invokeFunctionValue (dispatch Stage 4):
-						// captured scopes only, same as the plain branch above.
+						// captured scopes only, same as the plain branch above
+						// (+ the same pass-(b) INV_VERSION_SWITCH).
 						ActionVar cfg_this = {0};
 						cfg_this.type = ACTION_STACK_VALUE_OBJECT;
 						cfg_this.data.numeric_value = (u64)(uintptr_t)obj;
-						InvokeOpts cfg_opts = { .flags = INV_CAPTURED_SCOPE };
+						InvokeOpts cfg_opts = { .flags = INV_CAPTURED_SCOPE
+						                               | INV_VERSION_SWITCH };
 						ActionVar result = invokeFunctionValue(app_context, vof_func, &cfg_this,
 						                                       NULL, 0, &cfg_opts);
 						if (result.type != ACTION_STACK_VALUE_OBJECT &&
@@ -72198,20 +72215,31 @@ static void call_function_with_this(SWFAppContext* app_context, ASFunction* func
 	//
 	// The entry halt-at-max-1 check (not INV_DEPTH_GUARD) and the bare
 	// g_call_depth++/-- bracket stay outside. Return value stays discarded.
+	//
+	// INV_VERSION_SWITCH added by normalization pass (b) (same class as the
+	// rest of the coercion/dispatch family; fixed-not-credited like the
+	// clamp/pad — asfunction is unreachable by the suite). The t2 base-clip
+	// switch moves into the arm, gated on the CALLER's version read before
+	// the core installs the callee version (never
+	// INV_BASE_CLIP|INV_VERSION_SWITCH together).
 	InvokeOpts opts;
 	if (func->function_type == 2)
 		opts = (InvokeOpts){ .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE |
 		                              INV_LOCAL_SCOPE | INV_BIND_THIS |
-		                              INV_LOCAL_SCOPE_MC | INV_BASE_CLIP |
+		                              INV_LOCAL_SCOPE_MC | INV_VERSION_SWITCH |
 		                              INV_EVENT_THIS_MC | INV_EXEC_FUNC |
 		                              INV_MC_THIS_NULL_PTR };
 	else
 		opts = (InvokeOpts){ .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE |
-		                              INV_EVENT_THIS_MC };
+		                              INV_EVENT_THIS_MC | INV_VERSION_SWITCH };
 
+	MovieClip* _cfwt_saved_base = g_current_context;
+	if (func->function_type == 2 && g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = (MovieClip*)func->base_clip;
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &this_var, args, (u32)arg_count, &opts);
 	g_call_depth--;
+	g_current_context = _cfwt_saved_base;
 }
 
 // Handle asfunction: URL from a hyperlink click in a text field.
