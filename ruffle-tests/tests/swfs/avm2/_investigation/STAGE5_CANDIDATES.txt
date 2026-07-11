@@ -1,0 +1,204 @@
+# Stage 5 (frame lifecycle + display basics) candidate tests.
+# Generated 2026-07-11 from the post-E4X CI results (run 29166383620,
+# avm2 476/1201 at 6841590f6): failing, non-ignored tests in the
+# movieclip / displayobject(container) / events / timeline / stage /
+# simplebutton families. Excluded (listed at the bottom): tests needing
+# injected input (input.json), hit-testing geometry, pixel/BitmapData
+# work, Stage3D, or LoaderInfo networking — those are their own plans.
+# Loader*/bitmapdata*/tab_ordering*/mouse_pick* families were never
+# included. All listed tests are FAILING at the baseline.
+
+# --- events (16) ---
+event_clone
+event_clone_error_redispatch
+event_clone_on_redispatch
+event_formattostring
+event_handler_exception
+event_isdefaultprevented
+event_target_getter
+event_target_set
+event_valueof_tostring
+eventdispatcher_dispatchevent
+eventdispatcher_dispatchevent_cancel
+eventdispatcher_dispatchevent_handlerorder
+eventdispatcher_dispatchevent_indirect
+eventdispatcher_interface_invoke
+eventdispatcher_tostring
+eventdispatcher_willtrigger
+
+# --- displayobject (20) ---
+displayobject_alpha
+displayobject_early_init
+displayobject_filters
+displayobject_from_enterframe
+displayobject_height
+displayobject_invalid_floats
+displayobject_invalid_props
+displayobject_metaData
+displayobject_name
+displayobject_name_from_timeline
+displayobject_parent
+displayobject_root
+displayobject_rotation
+displayobject_set_name_loaded
+displayobject_subclass
+displayobject_transform
+displayobject_visible
+displayobject_width
+displayobject_x
+displayobject_y
+
+# --- displayobjectcontainer (24) ---
+displayobjectcontainer_addchild
+displayobjectcontainer_addchild_lazy_sprite
+displayobjectcontainer_addchild_timelinepull0
+displayobjectcontainer_addchild_timelinepull1
+displayobjectcontainer_addchild_timelinepull2
+displayobjectcontainer_addchildat
+displayobjectcontainer_addchildat_timelinelock0
+displayobjectcontainer_addchildat_timelinelock1
+displayobjectcontainer_addchildat_timelinelock2
+displayobjectcontainer_contains
+displayobjectcontainer_getchildat
+displayobjectcontainer_getchildbyname
+displayobjectcontainer_getchildbyname_wrongcase
+displayobjectcontainer_getchildindex
+displayobjectcontainer_removechild
+displayobjectcontainer_removechild_errors
+displayobjectcontainer_removechild_timelinemanip_remove1
+displayobjectcontainer_removechildat
+displayobjectcontainer_removechildren
+displayobjectcontainer_setchildindex
+displayobjectcontainer_stopallmovieclips
+displayobjectcontainer_swapchildren
+displayobjectcontainer_swapchildrenat
+displayobjectcontainer_timelineinstance
+
+# --- movieclip (52) ---
+movieclip_addframescript
+movieclip_child_property
+movieclip_constr
+movieclip_currentlabels
+movieclip_currentlabels_dupes1
+movieclip_currentlabels_dupes2
+movieclip_currentlabels_dupes3
+movieclip_currentscene
+movieclip_dispatchevent
+movieclip_dispatchevent_cancel
+movieclip_dispatchevent_handlerorder
+movieclip_dispatchevent_selfadd
+movieclip_dispatchevent_target
+movieclip_displayevents
+movieclip_displayevents_constructframegoto
+movieclip_displayevents_constructframeplay
+movieclip_displayevents_constructframesymbol
+movieclip_displayevents_dblhandler
+movieclip_displayevents_enterframegoto
+movieclip_displayevents_enterframeplay
+movieclip_displayevents_enterframesymbol
+movieclip_displayevents_exitframegoto
+movieclip_displayevents_exitframeplay
+movieclip_displayevents_exitframesymbol
+movieclip_displayevents_looping
+movieclip_displayevents_stopped
+movieclip_displayevents_swap
+movieclip_displayevents_timeline
+movieclip_frameconstruct_skipped
+movieclip_goto_during_frame_script
+movieclip_goto_overwrite
+movieclip_goto_scene_last_frame_int
+movieclip_goto_scene_last_frame_label
+movieclip_gotoandplay
+movieclip_gotoandstop
+movieclip_gotoandstop_children
+movieclip_gotoandstop_framescripts1
+movieclip_gotoandstop_framescripts2
+movieclip_gotoandstop_framescripts_self
+movieclip_gotoandstop_queueing
+movieclip_next_frame
+movieclip_next_scene
+movieclip_play
+movieclip_prev_frame
+movieclip_prev_scene
+movieclip_properties
+movieclip_queued_noop_goto_swf10
+movieclip_queued_noop_goto_swf9
+movieclip_scenes
+movieclip_super_is_symbol
+movieclip_symbol_constr
+movieclip_willtrigger
+
+# --- frames/goto/timeline (22) ---
+construct_frame_list
+constructors_vs_timeline
+framelabel_constr
+goto_button_nested_framescript
+goto_in_constructframe
+goto_in_scene_last_frame
+goto_methods
+goto_methods_swfver10
+goto_nested_construct_sibling
+goto_nested_framescript
+goto_on_orphan
+instantiation_on_enter_frame
+instantiation_on_enterframe_gotoandstop
+place_object_replace
+place_object_replace_2
+place_object_same_depth_frame
+swf_9_goto_in_enter_frame
+swf_9_goto_in_enter_frame_simple
+swf_wrong_frame_count
+swf_wrong_frame_count_isplaying
+timeline_scripts
+zero_frame_clip
+
+# --- stage (11) ---
+stage_access
+stage_displayobject_properties
+stage_domain_getQualifiedDefinitionNames
+stage_framerate_nan
+stage_framerate_negative
+stage_framerate_zero
+stage_invalidate
+stage_mouseenabled
+stage_overriden_setters
+stage_properties
+stage_properties2
+
+# --- simplebutton (12) ---
+simplebutton_added_to_stage
+simplebutton_childevents
+simplebutton_childevents_nested
+simplebutton_childprops
+simplebutton_childshuffle
+simplebutton_constr
+simplebutton_constr_childevents
+simplebutton_constr_params
+simplebutton_mouseenabled
+simplebutton_multi_children
+simplebutton_structure
+simplebutton_symbolclass
+
+# --- misc-display (2) ---
+parent_early_access_child
+remove_child_clear_field
+
+# --- excluded (do not count toward the exit criterion) ---
+# displayobject_hittestobject — geometry/pixels/network scope
+# displayobject_hittestpoint — geometry/pixels/network scope
+# displayobject_hittestpoint_root — geometry/pixels/network scope
+# displayobjectcontainer_getobjectsunderpoint — geometry/pixels/network scope
+# movieclip_displayevents_clickgoto — input.json (injected mouse/keys)
+# movieclip_displayevents_clickgoto2 — input.json (injected mouse/keys)
+# movieclip_displayevents_clickplay — input.json (injected mouse/keys)
+# movieclip_displayevents_clicksymbol — input.json (injected mouse/keys)
+# movieclip_drawrect — geometry/pixels/network scope
+# movieclip_hittest — geometry/pixels/network scope
+# movieclip_soundtransform — geometry/pixels/network scope
+# movieclip_text_mousedown — geometry/pixels/network scope
+# stage_display_state — geometry/pixels/network scope
+# stage_loaderinfo_properties — geometry/pixels/network scope
+# stage_mousechildren — input.json (injected mouse/keys)
+# stage_stage3Ds_vector — geometry/pixels/network scope
+# simplebutton_soundtransform — geometry/pixels/network scope
+# mouse_children — input.json (injected mouse/keys)
