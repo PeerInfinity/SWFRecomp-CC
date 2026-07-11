@@ -1366,6 +1366,68 @@ dossier master list, then Stage 5 (delete dead loops, funnel gate).
   outside `invokeFunctionValue` + an allowlist — new dispatchers must use the
   funnel or consciously register an exemption.
 
+#### Normalization pass (b) + Stage 5 landing notes (2026-07-11, fourth session)
+
+Items 1–4 of the pass-(b) master list are **COMPLETE**, plus the Stage-5 gate.
+Twelve commits (`5f3a412d0`..`a77fa3f42`), CI green both modes per batch,
+regression **41/41**:
+
+- **Item 1, switchToFunctionVersion adds** (7 commits, one per family, each
+  with a fail-before `*_cross_swf_version` repro built on the two-SWF
+  `_level0.cb` handoff — `_global` cannot carry the function across movies
+  because per-version `_global` groups are exactly what the switch swaps):
+  `mc_call_as2_handler_ng`, `broadcastMessage`, the three watch arms,
+  onLoad/onConstruct, the coercion paths (incl. the oCVO/oCTS getter
+  sub-branches + `call_function_with_this`, fixed-not-credited), EI
+  (harness-injected ambient; EI itself is version-hidden below SWF8 so the
+  polarity is inverted), LV/XML/Sound. Every arm that carried
+  `INV_BASE_CLIP` moved its base-clip switch INTO the arm under the
+  caller-version gate (the forbidden pairing never arises); the funnel gate
+  now rejects the pairing mechanically. Documented NOs: MCL (drain stages
+  the version itself), oCVO/oCTS main branches (already switch in-arm).
+- **The v5 no-closure gate** (`cbb390273`): the first CI batch flipped avm1
+  `mcl_replace_root_swf7_to_swf5` (ruffle_matched → mismatch) — Ruffle's
+  `is_closure = activation.swf_version() >= 6` means a v5 CALLER never runs
+  a callee at its defining version. The gate lives in the core's
+  `INV_VERSION_SWITCH` handling (v5 ambient → install the `this`-clip's
+  current version, falling back to `g_current_context`);
+  `switchToFunctionVersion` itself stays unconditional (`swf5_to_6_cross_call`
+  pins the in-arm rituals — a blanket gate broke it).
+- **Item 2, the scope-order flip** (`8734e8bec`): `INV_LOCAL_SCOPE_UNDER_CAPTURED`
+  deleted from all seven users; locals are the innermost scope. Exactly the
+  two predicted lock rows flipped (`resolve_type1_args` "h a=one",
+  `ei_closure_scope_order` "shadow a=ARG"); `INV_FORCE_CAPTURED_WITH` kept
+  (the lv row still pins it).
+- **Item 3, the gate unification** (`21cbc2a3a`): the MC arms +
+  fireTimerCallback's function form + the enterFrame children arm now gate
+  on the CALLER's version (Ruffle settled the direction — the plan's
+  "property of the function" guess in §"Stage 3d landing note" was wrong).
+  New `CF_VERSION_RECEIVER` ClosureFrame mode for the v5-caller branch
+  (receiver's current version, receiver's timeline).
+  `regression/mc_method_v5_caller_gate` is the flip repro.
+- **Item 4, depth guards** (`a77fa3f42`): two segfault fixes — coercion
+  recursion (new core `INV_SPECIAL_GUARD`: g_special_depth, cap 66, HALT on
+  exceed = Ruffle's Special semantics) and watch Site A/C re-fire (Site B's
+  `watch_firing_*` ritual, Flash's 65-deep SWF7+ re-fire depth). Broadcaster
+  re-broadcast needs NO guard (probed: already halts via g_max_call_depth =
+  Ruffle's FunctionRecursionLimit).
+- **Stage 5**: `tools/divergence/gates/check_dispatch_funnel.py` — raw-site
+  allowlist (the constructor/native families that were never in the survey),
+  the pairing rule (one exemption: the core's documented opts==NULL accessor
+  default), and the deleted-flag rule. All three rules verified to trip on
+  synthetic violations. Dead-helper audit: none found.
+
+Remaining pass-(b) queue (master-list items 5–7): the onUnload t1 local
+frame, the sound family's exec-func/arguments/this-stack, watch D1/D6/D8,
+convertFloat's t1 this push, sort-comparator t2 captured scopes, LV
+grandparent-caller, `g_event_this_mc` for the MC arms' t1 branch — plus two
+new candidates found this session: the root-enterFrame/root-var-map arms'
+missing version switch (same class as item 1; unlisted in the dossiers) and
+migrating `lv_url_encode` off `invokeSpecialFunction` (would empty the
+legacy core). Three pre-existing loaded-movie bugs surfaced by the repro
+work are documented in the test docstrings (holder identity split, root-TF
+lookup breakage after loadMovie, prototype identity split).
+
 ## 5. Verification protocol
 
 - **Full CI, both modes, per stage** (shared runtime code). The suites are the
