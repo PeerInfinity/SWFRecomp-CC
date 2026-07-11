@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `a61e83aaa9e2` (2026-07-11T01:38:33.791144+00:00)
-**Current:** `83bef14d7e8b` (2026-07-11T02:53:36.819385+00:00)
+**Previous:** `83bef14d7e8b` (2026-07-11T02:53:36.819385+00:00)
+**Current:** `03c86381dbc2` (2026-07-11T03:21:21.889887+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 19 | 18 | -1 |
+| Passing | 18 | 19 | +1 |
 | Total | 20 | 20 | 0 |
-| Pass rate | 95.0% | 90.0% | -5.0% |
-| Mismatched lines | 2 | 3 | +1 |
-|   Increased | | | +1 |
+| Pass rate | 90.0% | 95.0% | +5.0% |
+| Mismatched lines | 3 | 2 | -1 |
+|   Decreased | | | -1 |
 
-## Newly Failing (1)
+## Newly Passing (1)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `mixed-bytecode-as2` | runtime_error | 1/1 | 0/1 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `mixed-bytecode-as2` | runtime_error | 0/1 | 1/1 |
