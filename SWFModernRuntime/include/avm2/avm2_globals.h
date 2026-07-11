@@ -236,24 +236,84 @@ typedef struct Avm2EventExt
 	uint8_t phase;               // 1 capturing, 2 at-target, 3 bubbling
 } Avm2EventExt;
 
-// DisplayObject instance state. The dispatcher ext MUST stay first:
+// DisplayObject instance state (avm2_display.c). One struct serves the
+// whole display ladder (DisplayObject..MovieClip/Stage): per-class size
+// juggling is not worth the bytes. The dispatcher ext MUST stay first:
 // display classes inherit EventDispatcher's natives, which read native_ext
-// as Avm2EventDispatcherExt. Display-tree fields land with Stage-5
-// tranche 2 (avm2_display.c); the parent link already feeds the event
-// machinery's ancestor walks (bubbling, willTrigger).
+// as Avm2EventDispatcherExt.
+typedef struct Avm2DepthEntry
+{
+	int32_t depth;
+	Avm2Object* child;
+} Avm2DepthEntry;
+
 typedef struct Avm2DisplayObjectExt
 {
 	Avm2EventDispatcherExt dispatcher;
+
+	// --- DisplayObject core ---
 	Avm2Object* parent;          // display parent (NULL = not on a tree)
+	const Avm2String* name;      // NULL only for the Stage
+	uint8_t has_explicit_name;
+	uint8_t instantiated_by_timeline;
+	uint8_t placed_by_avm2_script;
+	uint8_t is_root;
+	uint8_t is_stage;
+	uint8_t visible;             // default 1
+	uint8_t constructed;         // AVM2 constructor has run
+	uint8_t skip_next_enter_frame;
+	uint16_t char_id;            // 0 = script-created (or root)
+	int32_t depth;               // timeline depth
+	int32_t clip_depth;
+	int32_t place_frame;
+	// Matrix: scale/rot f32, translate twips (Ruffle Matrix layout).
+	float mtx_a, mtx_b, mtx_c, mtx_d;
+	int32_t mtx_tx, mtx_ty;
+	// Decomposed transform cache (Ruffle DisplayObjectBase).
+	uint8_t scale_rot_cached;
+	double rotation_deg;         // raw degrees (may be NaN/Inf)
+	double scale_x, scale_y;     // unit values (may be NaN)
+	double skew;                 // radians
+	int16_t alpha_fixed8;        // 8.8 fixed a_multiply; default 256
+	// InteractiveObject.
+	uint8_t mouse_enabled;       // default 1
+	uint8_t double_click_enabled;
+	uint8_t tab_enabled_set, tab_enabled_val;
+	int32_t tab_index;           // -1 = unset
+	uint8_t focus_rect_set, focus_rect_val;
+	Avm2Value meta_data;         // metaData (undefined = unset)
+	Avm2Object* mask;
+
+	// --- DisplayObjectContainer ---
+	Avm2Object** render_list;
+	uint32_t render_len, render_cap;
+	Avm2DepthEntry* depth_list;  // sorted ascending by depth
+	uint32_t depth_len, depth_cap;
+	uint8_t mouse_children;      // default 1
+	uint8_t tab_children;        // default 1
+
+	// --- MovieClip / timeline ---
+	const Avm2TimelineData* timeline;  // NULL = no timeline (plain Sprite etc.)
+	uint16_t current_frame;      // 1-based; 0 = before frame 1
+	uint8_t playing;             // default 1 for timeline clips
+	uint8_t programmatically_played;
+	uint8_t executing_frame_script;
+	uint8_t loop_queued;
+	uint8_t initialized;
+	int32_t queued_goto_frame;   // -1 = none
+	uint16_t queued_script_frame;
+	int32_t last_queued_script_frame;  // -1 = none
+	uint8_t has_pending_script;
+	// Queued AS3 place/remove tags for this tick (per-depth, Ruffle
+	// QueuedTagList): index into the current frame's op array, or -1.
+	int32_t* queued_places;      // [frame op count] worth of op indices
+	uint32_t queued_place_count;
+	uint32_t frame_script_cap;
+	Avm2Value* frame_scripts;    // indexed by 0-based frame; unset = undefined kind
 } Avm2DisplayObjectExt;
 
-// MovieClip instance state (Avm2Object.native_ext); display ext first.
-typedef struct Avm2MovieClipExt
-{
-	Avm2DisplayObjectExt display;
-	uint32_t frame_script_cap;
-	Avm2Value* frame_scripts;  // indexed by 0-based frame; unset = undefined kind
-} Avm2MovieClipExt;
+// Compatibility alias: MovieClip state is the shared display ext.
+typedef Avm2DisplayObjectExt Avm2MovieClipExt;
 
 // flash.events registration (avm2_events.c): Event (real internal state,
 // clone/formatToString/preventDefault family), EventDispatcher (3-phase
@@ -275,6 +335,17 @@ int avm2_dispatch_event(Avm2Context* ctx, Avm2Object* dispatcher, Avm2Object* ev
 void avm2_broadcast_event(Avm2Context* ctx, Avm2Object* event, Avm2Class* filter_class);
 // Display parent hook used for ancestor walks; reads the display ext.
 Avm2Object* avm2_display_parent(Avm2Context* ctx, Avm2Object* obj);
+
+// Display module (avm2_display.c — Stage-5 tranche 2+).
+void avm2_register_display(Avm2Context* ctx);
+// NULL when obj is not a DisplayObject descendant.
+Avm2DisplayObjectExt* avm2_display_ext_of(Avm2Context* ctx, Avm2Object* obj);
+// Build the stage + root (SymbolClass char 0 / bound placed symbols) and
+// remember them on ctx. Called from runSWF_avm2 after script eager-init.
+void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name);
+// One full frame tick: Enter -> Construct -> FrameScripts -> Exit
+// (Ruffle frame_lifecycle.rs run_all_phases_avm2).
+void avm2_display_run_tick(Avm2Context* ctx);
 
 // Builtin class handles the runtime needs by identity.
 typedef struct Avm2Builtins
@@ -312,6 +383,12 @@ typedef struct Avm2Builtins
 	Avm2Class* event_dispatcher_class;
 	Avm2Class* ievent_dispatcher_class;  // interface
 	Avm2Class* display_object_class;
+	Avm2Class* interactive_object_class;
+	Avm2Class* doc_class;                // DisplayObjectContainer
+	Avm2Class* sprite_class;
+	Avm2Class* shape_class;
+	Avm2Class* stage_class;
+	Avm2Class* simple_button_class;
 	Avm2Class* regexp_class;
 	Avm2Class* namespace_class;
 	Avm2Class* qname_class;

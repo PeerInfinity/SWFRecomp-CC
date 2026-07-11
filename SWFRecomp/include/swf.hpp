@@ -164,6 +164,8 @@ namespace SWFRecomp
 		SWFHeader header;
 		char* swf_buffer;
 		char* cur_pos;
+		// First RECORDHEADER after the SWF header (AVM2 timeline pass).
+		char* tags_start = nullptr;
 		size_t num_finished_tags;
 		size_t next_frame_i;
 		bool another_frame;

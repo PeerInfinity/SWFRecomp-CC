@@ -21,6 +21,7 @@
 #include <swf.hpp>
 
 #include <abc/abc_emit.hpp>
+#include <abc/abc_timeline.hpp>
 #include <abc/abc_parser.hpp>
 #include <abc/abc_verifier.hpp>
 
@@ -372,6 +373,21 @@ namespace SWFRecomp
 			       abc_emitter->tagCount(), symbol_class_bindings.size());
 			delete abc_emitter;
 			abc_emitter = nullptr;
+
+			// Stage-5 timeline tables: an independent second pass over the
+			// raw tag stream (AVM2 SWFs only — never runs for AVM1 output).
+			abc::TimelineEmitInfo tinfo;
+			tinfo.swf_version = header.version;
+			tinfo.header_frame_count = header.frame_count;
+			tinfo.frame_rate = header.framerate;
+			tinfo.stage_xmin = header.frame_size.xmin;
+			tinfo.stage_xmax = header.frame_size.xmax;
+			tinfo.stage_ymin = header.frame_size.ymin;
+			tinfo.stage_ymax = header.frame_size.ymax;
+			abc::emitAvm2Timeline((const uint8_t*) tags_start,
+			                      (const uint8_t*) swf_buffer + header.file_length,
+			                      tinfo, "RecompiledABC");
+			printf("DoABC: wrote RecompiledABC/abc_timeline.c\n");
 		}
 	}
 	
@@ -519,9 +535,13 @@ namespace SWFRecomp
 		}
 		
 		cur_pos = swf_buffer + 8;
-		
+
 		header.loadOtherData(cur_pos);
-		
+
+		// First RECORDHEADER position, for the AVM2 timeline second pass
+		// (finalizeAbcEmit); swf_buffer stays alive for the SWF's lifetime.
+		tags_start = cur_pos;
+
 		std::string width = to_string(FRAME_WIDTH/20);
 		std::string height = to_string(FRAME_HEIGHT/20);
 		std::string width_twips = to_string(FRAME_WIDTH);

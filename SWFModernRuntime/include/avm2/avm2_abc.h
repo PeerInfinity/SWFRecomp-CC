@@ -185,6 +185,125 @@ extern const uint32_t avm2_generated_symbol_class_count;
 extern const uint8_t avm2_generated_swf_version;
 
 // ---------------------------------------------------------------------------
+// Static timeline tables (Stage 5): emitted by the recompiler's
+// abc_timeline.cpp second pass over the tag stream (AVM2 SWFs only, into
+// RecompiledABC/abc_timeline.c). Mirrors Ruffle's static movie data; the
+// AVM2 display tree consumes these directly — zero entanglement with the
+// AVM1 tag.c runtime.
+// ---------------------------------------------------------------------------
+
+enum
+{
+	AVM2_TLOP_PLACE = 0,   // PlaceObject/2/3 (new character or modify/move)
+	AVM2_TLOP_REMOVE = 1,  // RemoveObject/2
+};
+
+enum
+{
+	AVM2_TLF_HAS_CHAR = 1 << 0,
+	AVM2_TLF_MOVE = 1 << 1,        // PlaceObject2 move flag
+	AVM2_TLF_HAS_MATRIX = 1 << 2,
+	AVM2_TLF_HAS_NAME = 1 << 3,
+	AVM2_TLF_HAS_CLIP_DEPTH = 1 << 4,
+	AVM2_TLF_HAS_RATIO = 1 << 5,
+	AVM2_TLF_HAS_VISIBLE = 1 << 6,  // PlaceObject3 visible flag present
+};
+
+typedef struct Avm2TimelineOp
+{
+	uint8_t kind;    // AVM2_TLOP_*
+	uint8_t flags;   // AVM2_TLF_*
+	uint8_t visible; // valid when HAS_VISIBLE
+	uint16_t char_id;
+	uint16_t depth;
+	uint16_t clip_depth;
+	uint16_t ratio;
+	const char* name;  // NULL unless HAS_NAME
+	// Matrix (valid when HAS_MATRIX): scale/rot as f32, translate twips.
+	float mtx_a, mtx_b, mtx_c, mtx_d;
+	int32_t mtx_tx, mtx_ty;
+} Avm2TimelineOp;
+
+typedef struct Avm2FrameLabelData
+{
+	uint32_t frame;      // 0-based frame index
+	const char* label;
+} Avm2FrameLabelData;
+
+typedef struct Avm2TimelineData
+{
+	uint16_t char_id;          // 0 = root/main timeline
+	uint32_t frame_count;      // ShowFrame count (incl. a trailing partial frame)
+	uint32_t declared_frames;  // header/DefineSprite frame count field
+	const Avm2TimelineOp* ops;
+	const uint32_t* frame_op_starts;  // frame_count + 1 entries into ops[]
+	uint32_t label_count;
+	const Avm2FrameLabelData* labels;
+} Avm2TimelineData;
+
+// Character dictionary entry (Define* tags): classification + bounds.
+enum
+{
+	AVM2_CHAR_SHAPE = 0,
+	AVM2_CHAR_SPRITE = 1,
+	AVM2_CHAR_BUTTON = 2,
+	AVM2_CHAR_TEXT = 3,      // DefineText/2 (static text)
+	AVM2_CHAR_EDITTEXT = 4,  // DefineEditText
+	AVM2_CHAR_BITMAP = 5,
+	AVM2_CHAR_MORPHSHAPE = 6,
+	AVM2_CHAR_VIDEO = 7,
+	AVM2_CHAR_OTHER = 8,     // fonts, sounds, ... (not placeable)
+};
+
+typedef struct Avm2CharInfo
+{
+	uint16_t char_id;
+	uint8_t kind;  // AVM2_CHAR_*
+	// Self bounds in twips (shapes/texts; zero for sprites — computed from
+	// children at runtime).
+	int32_t xmin, xmax, ymin, ymax;
+} Avm2CharInfo;
+
+// DefineSceneAndFrameLabelData (root timeline only).
+typedef struct Avm2SceneData
+{
+	const char* name;
+	uint32_t offset;  // 0-based start frame
+} Avm2SceneData;
+
+// DefineButton/2 state records (Stage-5 tranche 5).
+typedef struct Avm2ButtonRecordData
+{
+	uint16_t char_id;
+	uint16_t depth;
+	uint8_t state_flags;  // bit0 up, bit1 over, bit2 down, bit3 hitTest
+	uint8_t has_matrix;
+	float mtx_a, mtx_b, mtx_c, mtx_d;
+	int32_t mtx_tx, mtx_ty;
+} Avm2ButtonRecordData;
+
+typedef struct Avm2ButtonData
+{
+	uint16_t char_id;
+	uint32_t record_count;
+	const Avm2ButtonRecordData* records;
+} Avm2ButtonData;
+
+// Provided by the generated RecompiledABC/abc_timeline.c:
+extern const Avm2TimelineData avm2_generated_timelines[];
+extern const uint32_t avm2_generated_timeline_count;
+extern const Avm2CharInfo avm2_generated_chars[];
+extern const uint32_t avm2_generated_char_count;
+extern const Avm2SceneData avm2_generated_scenes[];
+extern const uint32_t avm2_generated_scene_count;
+extern const Avm2ButtonData avm2_generated_buttons[];
+extern const uint32_t avm2_generated_button_count;
+extern const int32_t avm2_generated_stage_rect[4];   // xmin xmax ymin ymax twips
+extern const uint16_t avm2_generated_frame_rate;     // 8.8 fixed
+extern const uint16_t avm2_generated_header_frames;  // header frame count
+extern const uint32_t avm2_generated_bg_color;       // 0xRRGGBB (SetBackgroundColor)
+
+// ---------------------------------------------------------------------------
 // Runtime-mutable per-file state
 // ---------------------------------------------------------------------------
 

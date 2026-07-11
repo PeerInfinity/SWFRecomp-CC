@@ -154,39 +154,6 @@ static Avm2Object* find_root_class_globals(Avm2Context* ctx, const char* dotted,
 	return avm2_domain_find(ctx, &key);
 }
 
-static void construct_root(Avm2Context* ctx, const char* class_name)
-{
-	Avm2PropKey key;
-	Avm2Object* globals = find_root_class_globals(ctx, class_name, &key);
-	if (globals == NULL)
-	{
-		avm2_fatal("SymbolClass root class '%s' is not defined", class_name);
-	}
-	const Avm2PropEntry* entry = avm2_vtable_find(globals->vtable, &key);
-	Avm2Value cls_val;
-	if (entry != NULL && entry->kind == AVM2_PROP_SLOT)
-	{
-		cls_val = globals->slots[entry->slot_index];
-	}
-	else
-	{
-		Avm2Value* dyn = avm2_object_find_dynamic(globals, key.name, key.name_len);
-		if (dyn == NULL)
-		{
-			avm2_fatal("SymbolClass root class '%s' resolved a globals object "
-			           "without the class slot", class_name);
-		}
-		cls_val = *dyn;
-	}
-	if (cls_val.kind != AVM2_VALUE_OBJECT || cls_val.u.obj == NULL
-	    || cls_val.u.obj->kind != AVM2_OBJ_CLASS)
-	{
-		avm2_fatal("SymbolClass root binding '%s' is not a class", class_name);
-	}
-	Avm2Value root = avm2_class_construct(ctx, cls_val.u.obj->class_ref, NULL, 0);
-	ctx->root = root.u.obj;
-}
-
 // ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
@@ -247,27 +214,29 @@ void runSWF_avm2(SWFAppContext* app_context)
 		}
 	}
 
-	// Step 4: construct the root class instance (its constructor typically
-	// calls addFrameScript on itself).
+	// Step 4: build the display tree (stage + root). The root's class
+	// constructor runs during the first tick's Construct phase, matching
+	// Ruffle's frame lifecycle.
 	if (root_class != NULL)
 	{
 		Avm2TryFrame top;
 		avm2_try_push_catch_all(ctx, &top);
 		if (setjmp(top.jb) == 0)
 		{
-			construct_root(ctx, root_class);
+			avm2_display_build_stage(ctx, root_class);
 		}
 		avm2_try_pop_frame(&top);
 	}
 	else
 	{
 		// No char-0 binding: the movie's classes are bound to placed symbols
-		// (SymbolClass char N + PlaceObject on frame 1). Real timeline
-		// instantiation is Stage 5; until then, construct each bound class
-		// once in tag order — the single-frame test-movie behavior. This is
-		// best-effort: a binding whose defining script aborted (its slot
-		// never became a class — negative_volume_panned's init dies on the
-		// Sound stub) is skipped, not fatal.
+		// (SymbolClass char N + PlaceObject on frame 1). Keep the pre-display
+		// behavior for these movies: construct each bound class once in tag
+		// order — the single-frame test-movie behavior. This is best-effort:
+		// a binding whose defining script aborted (its slot never became a
+		// class — negative_volume_panned's init dies on the Sound stub) is
+		// skipped, not fatal. The display tree is still built so the frame
+		// lifecycle (broadcast events) runs.
 		for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
 		{
 			const char* cname = avm2_generated_symbol_classes[i].class_name;
@@ -302,9 +271,19 @@ void runSWF_avm2(SWFAppContext* app_context)
 			}
 			avm2_try_pop_frame(&top);
 		}
+		{
+			Avm2TryFrame top;
+			avm2_try_push_catch_all(ctx, &top);
+			if (setjmp(top.jb) == 0)
+			{
+				avm2_display_build_stage(ctx, NULL);
+			}
+			avm2_try_pop_frame(&top);
+		}
 	}
 
-	// Step 5: tick loop, mirroring swf_core.c's MAX_FRAMES cadence.
+	// Step 5: tick loop (Ruffle frame_lifecycle.rs phase order), mirroring
+	// swf_core.c's MAX_FRAMES cadence.
 #ifdef MAX_FRAMES
 	const size_t max_ticks = MAX_FRAMES;
 #else
@@ -312,26 +291,13 @@ void runSWF_avm2(SWFAppContext* app_context)
 #endif
 	for (size_t tick = 0; tick < max_ticks; tick++)
 	{
-		// Stage-5 TODO: real timeline (playhead advance, enterFrame /
-		// frameConstructed broadcasts, non-root frame scripts). For now the
-		// root's frame-0 script runs once, on the first tick — the
-		// single-frame-movie behavior the pure-language tests need.
-		if (tick == 0 && ctx->root != NULL && ctx->root->native_ext != NULL)
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
 		{
-			Avm2MovieClipExt* ext = ctx->root->native_ext;
-			if (ext->frame_script_cap > 0
-			    && ext->frame_scripts[0].kind == AVM2_VALUE_OBJECT)
-			{
-				Avm2TryFrame top;
-				avm2_try_push_catch_all(ctx, &top);
-				if (setjmp(top.jb) == 0)
-				{
-					avm2_call_function_obj(ctx, ext->frame_scripts[0].u.obj,
-					                       avm2_object_value(ctx->root), NULL, 0);
-				}
-				avm2_try_pop_frame(&top);
-			}
+			avm2_display_run_tick(ctx);
 		}
+		avm2_try_pop_frame(&top);
 	}
 
 	fflush(stdout);

@@ -531,37 +531,6 @@ static Avm2Value native_trace(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-static Avm2Value native_addFrameScript(Avm2Activation* act)
-{
-	if (act->this_val.kind != AVM2_VALUE_OBJECT || act->this_val.u.obj == NULL
-	    || act->this_val.u.obj->native_ext == NULL)
-	{
-		avm2_fatal("addFrameScript on a non-MovieClip receiver");
-	}
-	Avm2MovieClipExt* ext = act->this_val.u.obj->native_ext;
-
-	// Arguments are (frameIndex, closure) pairs; frame indices are 0-based.
-	for (uint32_t i = 0; i + 1 < act->argc; i += 2)
-	{
-		int32_t frame = avm2_coerce_to_i32(act->ctx, act->args[i]);
-		if (frame < 0) continue;
-		if ((uint32_t) frame >= ext->frame_script_cap)
-		{
-			uint32_t new_cap = (uint32_t) frame + 8;
-			Avm2Value* grown = avm2_alloc(act->ctx, new_cap * sizeof(Avm2Value));
-			for (uint32_t j = 0; j < new_cap; j++)
-			{
-				grown[j] = (j < ext->frame_script_cap) ? ext->frame_scripts[j]
-				                                       : avm2_undefined();
-			}
-			ext->frame_scripts = grown;
-			ext->frame_script_cap = new_cap;
-		}
-		ext->frame_scripts[frame] = act->args[i + 1];
-	}
-	return avm2_undefined();
-}
-
 static Avm2Value point_init(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -1316,19 +1285,6 @@ void avm2_globals_init(Avm2Context* ctx)
 	// avm2_events.c).
 	avm2_register_events(ctx);
 
-	// The display chain (stubs: correct super links, constructible, no
-	// display behavior yet — the display model is Stage-5 tranche 2).
-	Avm2Class* display_object =
-		avm2_builtin_class(ctx, "flash.display", "DisplayObject", b->event_dispatcher_class);
-	display_object->native_ext_size = sizeof(Avm2DisplayObjectExt);
-	b->display_object_class = display_object;
-	Avm2Class* interactive_object =
-		avm2_builtin_class(ctx, "flash.display", "InteractiveObject", display_object);
-	Avm2Class* doc =
-		avm2_builtin_class(ctx, "flash.display", "DisplayObjectContainer", interactive_object);
-	Avm2Class* sprite = avm2_builtin_class(ctx, "flash.display", "Sprite", doc);
-	Avm2Class* movieclip = avm2_builtin_class(ctx, "flash.display", "MovieClip", sprite);
-	movieclip->native_ext_size = sizeof(Avm2MovieClipExt);
-	avm2_builtin_add_method(ctx, movieclip, "addFrameScript", native_addFrameScript);
-	b->movieclip_class = movieclip;
+	// flash.display (avm2_display.c — Stage-5 display tree).
+	avm2_register_display(ctx);
 }

@@ -33,6 +33,11 @@ struct Avm2Context
 	Avm2AbcFileRt** files;
 	uint32_t file_count;
 	Avm2Object* root;     // SymbolClass char-0 instance
+	Avm2Object* stage;    // flash.display.Stage singleton (avm2_display.c)
+	// Frame lifecycle (Ruffle frame_lifecycle.rs FramePhase):
+	// 0 Idle, 1 Enter, 2 Construct, 3 FrameScripts, 4 Exit.
+	uint8_t frame_phase;
+	uint32_t instance_counter;  // auto instance names ("instanceN")
 	struct Avm2TryFrame* try_top;  // innermost exception frame (avm2_error.h)
 	uint8_t swf_version;  // for string_to_f64 bug compatibility
 	uint8_t bytearray_default_encoding;  // ByteArray.defaultObjectEncoding
