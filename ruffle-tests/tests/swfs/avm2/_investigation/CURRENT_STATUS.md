@@ -1,6 +1,7 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-11 — Stage 3 (tranche-1 pure-language tests) landed.
+Last updated: 2026-07-11 — Stage 4 tranche 2 (Vector/RegExp/JSON/proto
+edge cases) landed; CI baseline pending the tranche-2 run (see git log).
 
 **Plan:** `SWFRecompDocs/plans/avm2-support-plan.md` (umbrella; stages,
 architecture sketch, tranche definitions). Phase-1 metric: pass rate on this
@@ -8,21 +9,35 @@ suite's trace tests.
 
 ## State
 
-- **CI baseline (run 29145483298, 2026-07-11): 296 / 1,198 passing
-  (24.7%)** — up from Stage 2's 8/1198 (+288), zero pass→fail regressions
-  in avm2 or ANY AVM1 suite (avm1 634/706, gnash suites, shumway 73/92 +
-  46/47, regression 41/41 all unchanged), wasm-link-smoke green.
-  **152 / 166 tranche-1 candidates pass in CI**
-  (`_investigation/TRANCHE1_CANDIDATES.txt`, the name-pattern superset of
-  the plan's ~90-test tranche 1 — the ≥80-of-~90 exit criterion is met
-  with room to spare). Remaining avm2 statuses: 823 output_mismatch,
-  68 runtime_error, 11 ruffle_matched.
-- **Static op-surface ceiling: 1069 / 1162 censused tests** (was 61) with
-  the Stage-3 op surface of 122 IR ops
-  (`python3 SWFRecomp/tools/abc_op_census.py --implemented-file <ops>`).
-  Remaining blocking ops: ApplyType (80 tests — Vector, tranche 2),
-  PushNamespace (6), GetDescendants (4, E4X), CheckFilter (3), the alchemy
-  load/store ops (1).
+- **Stage 4 tranche 2 (2026-07-11): 50 / 55 tranche-2 candidates pass
+  locally** (`_investigation/TRANCHE2_CANDIDATES.txt`; was 2 at the
+  Stage-3 baseline — the ≥45-of-55 exit criterion is met). The 5 misses
+  are all triaged to later work: class_call +
+  amf_nondynamic_function_prop (ByteArray/AMF, tranche 3),
+  coerce_to_primitive_side_effects (Proxy, tranche 3),
+  function_proto_created (avmplus-shell describeType XML / E4X, deferred),
+  json_stringify (its output.txt is hand-edited to Ruffle's FnvHashMap
+  property iteration order — unmatchable in principle; one line differs).
+  New since Stage 3: Vector (ApplyType + full runtime, avm2_vector.c),
+  RegExp backed by vendored QuickJS libregexp
+  (SWFModernRuntime/third_party/quickjs-libregexp, avm2_regexp.c) incl.
+  String match/replace/search/split regex paths, JSON (avm2_json.c,
+  SWF13+ gated), the avmplus Error name/message slot model +
+  flash.errors classes, minimal flash.events Event/EventDispatcher,
+  flash.system.ApplicationDomain (currentDomain + has/getDefinition),
+  a describeType attribute stub, findproperty's global-prototype-chain
+  fallback, primitive scope boxing, and lenient ConstructProp on
+  primitive receivers.
+- **Stage-3 CI baseline (run 29145483298, 2026-07-11): 296 / 1,198
+  passing (24.7%)** — zero pass→fail regressions in avm2 or ANY AVM1
+  suite, wasm-link-smoke green. 152/166 tranche-1 candidates.
+- **Static op-surface ceiling: 1148 / 1162 censused tests** with the
+  Stage-4 op surface of 123 IR ops
+  (`_investigation/STAGE4_OPS.txt`; Stage 3's 122 ops + ApplyType — the
+  census: `python3 SWFRecomp/tools/abc_op_census.py --implemented-file
+  ruffle-tests/tests/swfs/avm2/_investigation/STAGE4_OPS.txt`).
+  Remaining blocking ops: PushNamespace (6), GetDescendants (4, E4X),
+  CheckFilter (3), DxnsLate/alchemy ops (1).
 - **What exists now (Stage 3, 2026-07-11):**
   - **Emitter** (`SWFRecomp/src/abc/abc_emit.cpp`): full-body emission —
     `op_N:` labels for every branch/switch/exception target, gotos for

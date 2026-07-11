@@ -298,6 +298,31 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
 - **Stage 4 — tranches 2+3 (~110 tests)**: Vector, JSON, RegExp, proto edge
   cases; Namespace/QName/Proxy/Dictionary, ByteArray, AMF. Exit: climbing
   toward the 694-test phase-1 ceiling; re-triage what's left.
+  - **Tranche 2 — DONE 2026-07-11** (`1d4f0b6fb`..`65323bd60` + docs):
+    **50/55 tranche-2 candidates pass locally** (was 2; ≥45 exit met).
+    Emitter: TypeName (0x1d) multinames emit base_type + type_params;
+    ApplyType lowers to `avm2_op_applytype`. Runtime: `avm2_vector.c`
+    (parameterized-class cache keyed by T — builtin int/uint/Number/*
+    specializations extend Object, runtime applications extend Vector.<*>;
+    typed coerce-on-write storage, fixed flag/1126, 1125 index errors with
+    SWF10 fallbacks, full method family, class-call conversion, Vector$int
+    legacy aliases, Vector.<...> name resolution); `avm2_regexp.c` backed
+    by **vendored QuickJS libregexp**
+    (`SWFModernRuntime/third_party/quickjs-libregexp`, MIT) with a
+    PCRE-ism preprocessor ((?#...), (?P<name>), /x) and UTF-16 subject
+    indices, plus String match/replace/search/split regex paths;
+    `avm2_json.c` (strict parser, reviver/replacer/toJSON, serde-format
+    output, SWF13+ gate); Error family reshaped to the avmplus slot model
+    (name/message slots, Error.prototype an Error instance, flash.errors
+    registered); minimal flash.events Event/EventDispatcher,
+    ApplicationDomain, describeType attribute stub; findproperty
+    global-proto-chain fallback, primitive scope boxing, lenient
+    primitive ConstructProp, no-char-0 SymbolClass construction fallback.
+    Census ceiling 1069 → **1148/1162** (STAGE4_OPS.txt, 123 ops).
+    The 5 misses are triaged: ByteArray/AMF ×2 + Proxy ×1 (tranche 3),
+    describeType-E4X ×1 (deferred), json_stringify ×1 (expected output
+    hand-edited to Ruffle's FnvHashMap iteration order — unmatchable).
+    Remaining Stage 4 work = tranche 3.
 - **Stage 5 — frame lifecycle + display basics**: broadcast events, 3-phase
   dispatch, `addFrameScript`, DisplayObject hierarchy bridged onto the existing
   display list. Unlocks the timeline-dependent minority + starts the path

@@ -1,5 +1,14 @@
 # Session prompt — AVM2 Stage 4: tranche 2 (Vector, RegExp, JSON, proto edge cases)
 
+**COMPLETE 2026-07-11** — 50/55 tranche-2 candidates pass locally (exit
+criterion ≥45 met); landed at `1d4f0b6fb` (Vector), `cd4bd657a` (RegExp),
+`f076d822a` (JSON), `65323bd60` (proto edge cases + EventDispatcher).
+Misses all triaged (ByteArray/AMF ×2 + Proxy ×1 → tranche 3,
+describeType-E4X ×1 → deferred, json_stringify → unmatchable hash-order
+expectation). Census ceiling 1148/1162 (STAGE4_OPS.txt). Landing note in
+`avm2-support-plan.md` §5; next session = Stage 4 tranche 3
+(Namespace/QName/Proxy/Dictionary, ByteArray, AMF).
+
 You are implementing **Stage 4** of `SWFRecompDocs/plans/avm2-support-plan.md`
 (§5 "tranches 2+3"; this session covers tranche 2). Read that plan first
 (§4 architecture, §5 stage notes incl. the Stage-3 landing note), then
