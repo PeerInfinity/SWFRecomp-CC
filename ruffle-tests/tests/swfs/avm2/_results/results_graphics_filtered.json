@@ -6,18 +6,18 @@
     "total_available": 1198,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 225,
+    "ignored_count": 227,
     "filtered": true
   },
-  "total": 973,
+  "total": 971,
   "pass": 8,
   "ruffle_matched": 0,
-  "fail": 965,
+  "fail": 963,
   "pass_rate": 0.8,
   "effective_pass": 8,
   "effective_pass_rate": 0.8,
   "breakdown": {
-    "runtime_error": 942,
+    "runtime_error": 940,
     "output_mismatch": 23
   },
   "tests": [
@@ -2266,23 +2266,6 @@
       "lines": {
         "actual_lines": 0,
         "expected_lines": 1,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "bytearray_oom",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.266,
-        "run": 0.016
-      },
-      "num_frames": 1,
-      "status": "runtime_error",
-      "detail": "exit code 1",
-      "duration": 1.28,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 3,
         "matching_lines": 0
       }
     },
@@ -11352,23 +11335,6 @@
       "lines": {
         "actual_lines": 0,
         "expected_lines": 350,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "number_tostring",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.839,
-        "run": 0.033
-      },
-      "num_frames": 1,
-      "status": "runtime_error",
-      "detail": "exit code 1",
-      "duration": 1.87,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 1050,
         "matching_lines": 0
       }
     },
