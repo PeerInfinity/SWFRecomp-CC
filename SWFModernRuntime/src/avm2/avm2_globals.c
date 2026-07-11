@@ -221,6 +221,21 @@ void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }
 
+void avm2_builtin_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                             Avm2MethodFn getter, Avm2MethodFn setter)
+{
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key = builtin_key("", name);
+	e.kind = (setter != NULL) ? AVM2_PROP_GETSET : AVM2_PROP_GETTER;
+	e.method.fn = getter;
+	e.method.debug_name = name;
+	e.setter.fn = setter;
+	e.setter.debug_name = name;
+	e.defining_class = cls;
+	avm2_vtable_append(ctx, &cls->ivtable, &e);
+}
+
 // Class-object (static) members live on the class object's own vtable.
 static Avm2VTable* class_static_vtable(Avm2Context* ctx, Avm2Class* cls)
 {
@@ -545,112 +560,6 @@ static Avm2Value native_addFrameScript(Avm2Activation* act)
 		ext->frame_scripts[frame] = act->args[i + 1];
 	}
 	return avm2_undefined();
-}
-
-// --- flash.events.EventDispatcher (minimal: add/remove/has listener +
-// dispatchEvent; enough for callback-shaped tests like
-// function_unbound_this) ---
-
-struct EDListener
-{
-	EDListener* next;
-	const Avm2String* type;
-	Avm2Value fn;
-};
-
-static Avm2Value event_init(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	Avm2Object* self = act->this_val.u.obj;
-	Avm2Value type = act->argc > 0
-		? avm2_string(avm2_coerce_to_string(ctx, act->args[0]))
-		: avm2_null();
-	avm2_object_set_dynamic(ctx, self, "type", 4, type)->dont_enum = 1;
-	avm2_object_set_dynamic(ctx, self, "bubbles", 7,
-		avm2_bool(act->argc > 1 && avm2_coerce_to_boolean(act->args[1])))->dont_enum = 1;
-	avm2_object_set_dynamic(ctx, self, "cancelable", 10,
-		avm2_bool(act->argc > 2 && avm2_coerce_to_boolean(act->args[2])))->dont_enum = 1;
-	return avm2_undefined();
-}
-
-static Avm2EventDispatcherExt* this_dispatcher(Avm2Activation* act)
-{
-	if (act->this_val.kind == AVM2_VALUE_OBJECT
-	    && act->this_val.u.obj->native_ext != NULL)
-	{
-		return (Avm2EventDispatcherExt*) act->this_val.u.obj->native_ext;
-	}
-	return NULL;
-}
-
-static Avm2Value ed_add_event_listener(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	Avm2EventDispatcherExt* ext = this_dispatcher(act);
-	if (ext == NULL || act->argc < 2) return avm2_undefined();
-	EDListener* l = avm2_alloc(ctx, sizeof(EDListener));
-	l->type = avm2_coerce_to_string(ctx, act->args[0]);
-	l->fn = act->args[1];
-	l->next = NULL;
-	EDListener** link = &ext->head;
-	while (*link != NULL) link = &(*link)->next;
-	*link = l;
-	return avm2_undefined();
-}
-
-static Avm2Value ed_remove_event_listener(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	Avm2EventDispatcherExt* ext = this_dispatcher(act);
-	if (ext == NULL || act->argc < 2) return avm2_undefined();
-	const Avm2String* type = avm2_coerce_to_string(ctx, act->args[0]);
-	for (EDListener** link = &ext->head; *link != NULL; )
-	{
-		EDListener* l = *link;
-		if (avm2_string_equals(l->type, type) && avm2_strict_eq(l->fn, act->args[1]))
-		{
-			*link = l->next;
-		}
-		else
-		{
-			link = &l->next;
-		}
-	}
-	return avm2_undefined();
-}
-
-static Avm2Value ed_has_event_listener(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	Avm2EventDispatcherExt* ext = this_dispatcher(act);
-	if (ext == NULL || act->argc < 1) return avm2_bool(false);
-	const Avm2String* type = avm2_coerce_to_string(ctx, act->args[0]);
-	for (EDListener* l = ext->head; l != NULL; l = l->next)
-	{
-		if (avm2_string_equals(l->type, type)) return avm2_bool(true);
-	}
-	return avm2_bool(false);
-}
-
-static Avm2Value ed_dispatch_event(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	Avm2EventDispatcherExt* ext = this_dispatcher(act);
-	if (ext == NULL || act->argc < 1) return avm2_bool(false);
-	Avm2Value event = act->args[0];
-	Avm2Value tv = avm2_get_public_property(ctx, event, "type", 4, NULL);
-	const Avm2String* type = avm2_coerce_to_string(ctx, tv);
-	// Listeners run with the TOPLEVEL global as `this` (an unbound handler
-	// traces [object global] with parseFloat visible but no movie-script
-	// vars — function_unbound_this).
-	Avm2Value recv = avm2_object_value(ctx->builtin_globals);
-	for (EDListener* l = ext->head; l != NULL; l = l->next)
-	{
-		if (!avm2_string_equals(l->type, type)) continue;
-		Avm2Value args[1] = { event };
-		avm2_call_value(ctx, l->fn, recv, args, 1);
-	}
-	return avm2_bool(true);
 }
 
 static Avm2Value point_init(Avm2Activation* act)
@@ -1403,29 +1312,16 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_toplevel(ctx);
 	register_application_domain(ctx);
 
-	// flash.events.Event (minimal: type/bubbles/cancelable as expandos).
-	{
-		Avm2Class* event = avm2_builtin_class(ctx, "flash.events", "Event",
-		                                      b->object_class);
-		event->instance_init.fn = event_init;
-		event->instance_init.debug_name = "Event";
-	}
+	// flash.events (Event/EventDispatcher/EventPhase/IEventDispatcher —
+	// avm2_events.c).
+	avm2_register_events(ctx);
 
 	// The display chain (stubs: correct super links, constructible, no
-	// display behavior).
-	Avm2Class* event_dispatcher =
-		avm2_builtin_class(ctx, "flash.events", "EventDispatcher", b->object_class);
-	event_dispatcher->native_ext_size = sizeof(Avm2EventDispatcherExt);
-	avm2_builtin_add_method(ctx, event_dispatcher, "addEventListener",
-	                        ed_add_event_listener);
-	avm2_builtin_add_method(ctx, event_dispatcher, "removeEventListener",
-	                        ed_remove_event_listener);
-	avm2_builtin_add_method(ctx, event_dispatcher, "hasEventListener",
-	                        ed_has_event_listener);
-	avm2_builtin_add_method(ctx, event_dispatcher, "dispatchEvent",
-	                        ed_dispatch_event);
+	// display behavior yet — the display model is Stage-5 tranche 2).
 	Avm2Class* display_object =
-		avm2_builtin_class(ctx, "flash.display", "DisplayObject", event_dispatcher);
+		avm2_builtin_class(ctx, "flash.display", "DisplayObject", b->event_dispatcher_class);
+	display_object->native_ext_size = sizeof(Avm2DisplayObjectExt);
+	b->display_object_class = display_object;
 	Avm2Class* interactive_object =
 		avm2_builtin_class(ctx, "flash.display", "InteractiveObject", display_object);
 	Avm2Class* doc =

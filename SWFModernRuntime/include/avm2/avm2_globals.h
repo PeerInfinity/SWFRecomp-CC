@@ -67,6 +67,9 @@ void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn);
 void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn);
+// Instance accessor pair (setter may be NULL for a getter-only prop).
+void avm2_builtin_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                             Avm2MethodFn getter, Avm2MethodFn setter);
 void avm2_builtin_add_static_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
                                     Avm2MethodFn fn);
 void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char* name,
@@ -210,22 +213,68 @@ typedef struct Avm2SortItem { uint32_t idx; Avm2Value v; } Avm2SortItem;
 typedef int (*Avm2SortCmp)(void* ud, const Avm2SortItem* a, const Avm2SortItem* b);
 void avm2_avmplus_qsort(void* ud, Avm2SortCmp cmp, Avm2SortItem* s, uint32_t n);
 
-// EventDispatcher instance state (Avm2Object.native_ext).
+// EventDispatcher instance state (Avm2Object.native_ext). ed_target is the
+// EventDispatcher(target) constructor arg (the IEventDispatcher aggregation
+// pattern); undefined/null = the dispatcher itself is the target.
 typedef struct EDListener EDListener;
 typedef struct Avm2EventDispatcherExt
 {
+	Avm2Value ed_target;
 	EDListener* head;
 } Avm2EventDispatcherExt;
 
-// MovieClip stub instance state (Avm2Object.native_ext). The dispatcher
-// ext MUST stay first: MovieClips inherit EventDispatcher's natives, which
-// read native_ext as Avm2EventDispatcherExt.
-typedef struct Avm2MovieClipExt
+// flash.events.Event instance state (Ruffle events.rs Event struct).
+typedef struct Avm2EventExt
+{
+	const Avm2String* type;      // NULL until init
+	Avm2Object* target;
+	Avm2Object* current_target;
+	uint8_t bubbles;
+	uint8_t cancelable;
+	uint8_t cancelled;
+	uint8_t propagation;         // 0 allow, 1 stop, 2 stop-immediate
+	uint8_t phase;               // 1 capturing, 2 at-target, 3 bubbling
+} Avm2EventExt;
+
+// DisplayObject instance state. The dispatcher ext MUST stay first:
+// display classes inherit EventDispatcher's natives, which read native_ext
+// as Avm2EventDispatcherExt. Display-tree fields land with Stage-5
+// tranche 2 (avm2_display.c); the parent link already feeds the event
+// machinery's ancestor walks (bubbling, willTrigger).
+typedef struct Avm2DisplayObjectExt
 {
 	Avm2EventDispatcherExt dispatcher;
+	Avm2Object* parent;          // display parent (NULL = not on a tree)
+} Avm2DisplayObjectExt;
+
+// MovieClip instance state (Avm2Object.native_ext); display ext first.
+typedef struct Avm2MovieClipExt
+{
+	Avm2DisplayObjectExt display;
 	uint32_t frame_script_cap;
 	Avm2Value* frame_scripts;  // indexed by 0-based frame; unset = undefined kind
 } Avm2MovieClipExt;
+
+// flash.events registration (avm2_events.c): Event (real internal state,
+// clone/formatToString/preventDefault family), EventDispatcher (3-phase
+// dispatch, priority buckets, capture split, broadcast registry),
+// EventPhase, IEventDispatcher.
+void avm2_register_events(Avm2Context* ctx);
+// NULL when the value/object is not an Event / EventDispatcher-descendant.
+Avm2EventExt* avm2_event_ext_of(Avm2Value v);
+Avm2EventDispatcherExt* avm2_dispatcher_ext_of(Avm2Context* ctx, Avm2Object* obj);
+// New base flash.events.Event instance (type interned by the caller).
+Avm2Object* avm2_event_new(Avm2Context* ctx, const Avm2String* type,
+                           int bubbles, int cancelable);
+// Full 3-phase dispatch on a dispatcher object (Ruffle events.rs
+// dispatch_event). Returns 1 if the event was handled (some listener ran).
+int avm2_dispatch_event(Avm2Context* ctx, Avm2Object* dispatcher, Avm2Object* event);
+// FP broadcast semantics: deliver to every dispatcher registered for this
+// event type (registration order), no capture/bubble, ignoring propagation
+// stops between targets. `filter_class` NULL = no class filter.
+void avm2_broadcast_event(Avm2Context* ctx, Avm2Object* event, Avm2Class* filter_class);
+// Display parent hook used for ancestor walks; reads the display ext.
+Avm2Object* avm2_display_parent(Avm2Context* ctx, Avm2Object* obj);
 
 // Builtin class handles the runtime needs by identity.
 typedef struct Avm2Builtins
@@ -259,6 +308,10 @@ typedef struct Avm2Builtins
 	Avm2Class* xml_class;       // stub: only typeof/is checks
 	Avm2Class* xml_list_class;  // stub
 	Avm2Class* movieclip_class;
+	Avm2Class* event_class;
+	Avm2Class* event_dispatcher_class;
+	Avm2Class* ievent_dispatcher_class;  // interface
+	Avm2Class* display_object_class;
 	Avm2Class* regexp_class;
 	Avm2Class* namespace_class;
 	Avm2Class* qname_class;
