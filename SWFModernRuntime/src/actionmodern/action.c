@@ -42242,9 +42242,13 @@ void actionSetVariable(SWFAppContext* app_context)
 					// (regression/watch_timeline_named_params — glibc abort).
 					// Freeing instead of leaking would dangle any watcher-
 					// stored copy of the name (the same reason B leaks).
+					// INV_VERSION_SWITCH added by normalization pass (b):
+					// watchers run at their DEFINING movie's SWF version
+					// (regression/watch_cross_swf_version, Site A row).
+					// Safe as a plain flag: no INV_BASE_CLIP on this arm.
 					invokeWatchCallback(app_context, _wf, &_we->user_data, NULL,
 						var_name, var_name_len, &_old_val, &_new_val,
-						INV_LOCAL_SCOPE,
+						INV_LOCAL_SCOPE | INV_VERSION_SWITCH,
 						4, /*pname_owns*/0, /*free_pname*/0, /*clear_owns*/0);
 					*var = _new_val;
 					// Sync to hashmap if string_id path was used
@@ -47269,6 +47273,19 @@ void actionSetMember(SWFAppContext* app_context)
 							_wthis.type = ACTION_STACK_VALUE_OBJECT;
 							_wthis.data.numeric_value = (u64) obj;
 							watch_firing_push(obj, NULL, prop_name, prop_name_len);
+							// Normalization pass (b): watchers run at their DEFINING
+							// movie's SWF version (INV_VERSION_SWITCH;
+							// regression/watch_cross_swf_version, Site B row). The
+							// base-clip switch moves INTO the arm, gated on the
+							// CALLER's g_swf_version read here BEFORE the core
+							// installs the callee version — exactly the gate the
+							// core's INV_BASE_CLIP applied when no version switch
+							// existed (never INV_BASE_CLIP|INV_VERSION_SWITCH
+							// together; the pairing would silently flip the gate to
+							// the callee's version, the MC arms' preserved accident).
+							MovieClip* _wb_saved_base = g_current_context;
+							if (g_swf_version >= 6 && _wf->base_clip != NULL)
+								g_current_context = (MovieClip*)_wf->base_clip;
 							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
 							{
 								// pname handed non-owning and never freed (deliberate
@@ -47278,7 +47295,7 @@ void actionSetMember(SWFAppContext* app_context)
 								invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
 									&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
 									INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
-									INV_BIND_THIS | INV_BASE_CLIP,
+									INV_BIND_THIS | INV_VERSION_SWITCH,
 									4, /*pname_owns*/0, /*free_pname*/0, /*clear_owns*/1);
 							}
 							else if (_wf->function_type == 1 && _wf->simple_func != NULL)
@@ -47290,9 +47307,10 @@ void actionSetMember(SWFAppContext* app_context)
 								// eval stack (regression/watch_setmember_type1_args).
 								invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
 									&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
-									INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_BASE_CLIP,
+									INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_VERSION_SWITCH,
 									4, /*pname_owns*/1, /*free_pname*/0, /*clear_owns*/1);
 							}
+							g_current_context = _wb_saved_base;
 							watch_firing_pop();
 						}
 						break;
@@ -49180,9 +49198,15 @@ void actionSetMember(SWFAppContext* app_context)
 								// now — the old type-1 arm pushed it owning AND freed
 								// it, a latent double-free when the param bind's scope
 								// release also freed it.
+								// INV_VERSION_SWITCH added by normalization pass (b):
+								// watchers run at their DEFINING movie's SWF version
+								// (regression/watch_cross_swf_version, Site C row).
+								// Safe as a plain flag: no INV_BASE_CLIP on this arm
+								// (the receiver-context switch above is
+								// actionSetCurrentContext, not a base-clip gate).
 								invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
 									&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
-									INV_LOCAL_SCOPE | INV_BIND_THIS,
+									INV_LOCAL_SCOPE | INV_BIND_THIS | INV_VERSION_SWITCH,
 									_wf_t2 ? 4 : 3, /*pname_owns*/0, /*free_pname*/1, /*clear_owns*/1);
 								actionSetCurrentContext(_wsaved);
 							}
