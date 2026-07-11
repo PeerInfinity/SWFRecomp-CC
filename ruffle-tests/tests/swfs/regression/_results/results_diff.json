@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-11T02:53:36.809236+00:00",
-    "old_git_sha": "83bef14d7e8baf8913bb6522165a98131d9b5628",
-    "new_timestamp": "2026-07-11T03:21:21.875795+00:00",
-    "new_git_sha": "03c86381dbc29cf4e996991aa4f21efae412dc60",
+    "old_timestamp": "2026-07-11T03:21:21.875795+00:00",
+    "old_git_sha": "03c86381dbc29cf4e996991aa4f21efae412dc60",
+    "new_timestamp": "2026-07-11T05:54:07.826824+00:00",
+    "new_git_sha": "c0ce53c7286f68c77df6e3cddb77564090fee00f",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 31,
     "old_total": 31,
     "old_pass_rate": 100.0,
-    "new_pass": 31,
+    "new_pass": 36,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 31,
-    "new_total": 31,
+    "new_effective_pass": 36,
+    "new_total": 36,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,69 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 31,
-    "added": 0,
+    "added": 5,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "broadcast_cross_swf_version",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "coerce_cross_swf_version",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "mc_event_cross_swf_version",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "onconstruct_cross_swf_version",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "watch_cross_swf_version",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    }
+  ]
 }

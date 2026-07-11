@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-11T02:53:36.770399+00:00",
-    "old_git_sha": "83bef14d7e8baf8913bb6522165a98131d9b5628",
-    "new_timestamp": "2026-07-11T03:21:21.831717+00:00",
-    "new_git_sha": "03c86381dbc29cf4e996991aa4f21efae412dc60",
+    "old_timestamp": "2026-07-11T03:21:21.831717+00:00",
+    "old_git_sha": "03c86381dbc29cf4e996991aa4f21efae412dc60",
+    "new_timestamp": "2026-07-11T05:54:07.782415+00:00",
+    "new_git_sha": "c0ce53c7286f68c77df6e3cddb77564090fee00f",
     "partial": false,
     "same_commit": false
   },
@@ -14,20 +14,53 @@
     "old_total": 706,
     "old_pass_rate": 89.8,
     "new_pass": 634,
-    "new_ruffle_matched": 17,
-    "new_effective_pass": 651,
+    "new_ruffle_matched": 16,
+    "new_effective_pass": 650,
     "new_total": 706,
     "new_pass_rate": 89.8,
     "old_mismatched_lines": 15176,
-    "new_mismatched_lines": 15176,
-    "increased_mismatches": 0,
+    "new_mismatched_lines": 15188,
+    "increased_mismatches": 12,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 706,
+    "newly_failing": 1,
+    "status_changed": 1,
+    "unchanged": 704,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "mcl_replace_root_swf7_to_swf5",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 56
+      },
+      "new_lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 48
+      }
+    },
+    {
+      "test": "mcl_replace_root_swf7_to_swf6",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 56
+      },
+      "new_lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 52
+      }
+    }
+  ]
 }
