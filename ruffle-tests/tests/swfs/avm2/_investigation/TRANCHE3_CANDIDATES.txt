@@ -1,0 +1,59 @@
+# Tranche-3 candidate tests (generated 2026-07-11 from the tranche-2 CI
+# results, run 29154109023: namespace/qname/proxy/dictionary/bytearray/amf
+# families + the tranche-2 leftovers these features unlock (class_call
+# needs ByteArray, coerce_to_primitive_side_effects needs Proxy).
+# Statuses at 9a21db625; all failing. bytearray_oom is upstream-ignored
+# (already in ignored_tests.txt).
+amf_array_serialization
+amf_custom_obj
+amf_dictionary
+amf_function
+amf_invalid_date
+amf_missing_prop
+amf_nondynamic_function_prop
+amf_setter_error
+amf_vector
+amf_xml
+bytearray
+bytearray_compress
+bytearray_errors
+bytearray_method_serialization
+bytearray_oom
+bytearray_readobject_amf0
+bytearray_readobject_amf3
+bytearray_readutf8bytes_with_bom
+bytearray_serialization
+bytearray_string_null
+bytearray_tostring
+bytearray_utf16
+bytearray_writeobject
+class_call
+coerce_to_primitive_side_effects
+dictionary_access
+dictionary_access_no_pubns
+dictionary_delete
+dictionary_foreach
+dictionary_hasownproperty
+dictionary_in
+dictionary_iter_modify
+dictionary_namespaces
+dictionary_primitive_keys
+dictionary_weak_keys
+namespace_constr
+namespace_constr_args
+namespace_enumeration_order
+proxy_callproperty
+proxy_deleteproperty
+proxy_enumeration
+proxy_getproperty
+proxy_hasownproperty
+proxy_hasproperty
+proxy_serialize
+proxy_setproperty
+qname_as_lazy_name_attribute_multiname
+qname_constr
+qname_constr_namespace
+qname_enumeration
+qname_indexing
+qname_tostring
+qname_valueof
