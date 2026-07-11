@@ -23107,6 +23107,58 @@ void actionQueueChildUnloadsFiltered(MovieClip* parent_mc,
 	}
 }
 
+// Invoke an AS-set onUnload handler. Migrated to the unified
+// invokeFunctionValue core (Function-Dispatch Consolidation, Stage 4); all
+// EIGHT onUnload firing sites (the two deferred-queue drains + the six
+// synchronous mid-script sites: unloadMovie, loadMovie(""), GetURL2
+// empty-URL, actionGetURL's _level and named-clip empty-URL branches, and
+// MovieClipLoader.unloadClip) previously delegated to
+// invokeSpecialFunction, whose ritual this adapter reproduces exactly:
+//
+// - the g_special_depth bracket (NOT g_call_depth / INV_DEPTH_GUARD —
+//   unload dispatch has always counted against the accessor depth), kept
+//   outside the core because no INV_ flag models it;
+// - type-2: one bare unbound local frame (INV_LOCAL_SCOPE only — no
+//   captured scopes, no binds, no act_flags), NULL ABI this;
+// - type-1: NO local frame at all (preserved-by-omission — so a param'd
+//   handler's prologue binds leak to the ambient scope, a normalization
+//   candidate), plus the core's clamp/pad, which is a REAL fix on the
+//   mid-script sites: the old path let the prologue pop the caller's
+//   in-flight expression operands (instance twenty,
+//   regression/onunload_type1_args) — inert on the queue drains (empty
+//   between-frames stack).
+//
+// `this_mc` non-NULL reproduces aq_dispatch_unload's this-stack push
+// (MOVIECLIP receiver + NULL ABI this via INV_MC_THIS_NULL_PTR); the other
+// four sites never pushed one and pass NULL. The receiver-context bracket
+// (actionSetCurrentContext) stays at the call sites, whose save/restore
+// shapes differ.
+static void invokeUnloadHandler(SWFAppContext* app_context, ASFunction* func,
+                                MovieClip* this_mc)
+{
+	if (func == NULL || g_execution_halted) return;
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH)
+	{
+		g_special_depth--;
+		return;
+	}
+	ActionVar this_var = {0};
+	InvokeOpts opts = { .flags = 0 };
+	if (func->function_type == 2)
+		opts.flags |= INV_LOCAL_SCOPE;
+	if (this_mc != NULL)
+	{
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.data.numeric_value = (u64)(uintptr_t)this_mc;
+		opts.flags |= INV_THIS_STACK | INV_MC_THIS_NULL_PTR;
+	}
+	(void) invokeFunctionValue(app_context, func,
+	                           this_mc != NULL ? &this_var : NULL,
+	                           NULL, 0, &opts);
+	g_special_depth--;
+}
+
 // --- Deferred AS-level onUnload for timeline-removed clips ---
 // Captures (func, mc, swf_depth) at queue time. At drain time, shifts the MC's
 // depth to the removed-depth zone and sets avm1_removed=1 BEFORE invoking, so
@@ -23134,7 +23186,7 @@ static void aq_dispatch_timeline_unload(SWFAppContext* app_context, void* user)
 
 		MovieClip* saved_context = g_current_context;
 		actionSetCurrentContext(pu->mc);
-		invokeSpecialFunction(app_context, pu->func, NULL);
+		invokeUnloadHandler(app_context, pu->func, NULL);
 		actionSetCurrentContext(saved_context);
 	}
 	free(pu);
@@ -23646,13 +23698,13 @@ static void aq_dispatch_unload(SWFAppContext* app_context, void* user)
 	if (!g_execution_halted) {
 		MovieClip* saved = g_current_context;
 		actionSetCurrentContext(pu->mc);
-		if (g_this_depth < MAX_SCOPE_DEPTH) {
-			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-			g_this_stack[g_this_depth].data.numeric_value = (u64)(uintptr_t)pu->mc;
-			g_this_depth++;
-		}
-		invokeSpecialFunction(app_context, pu->func, NULL);
-		if (g_this_depth > 0) g_this_depth--;
+		// this_mc = pu->mc reproduces this site's this-stack push (the only
+		// onUnload site that ever had one). Inert deltas vs the old inline
+		// push: the core's bound is MAX_THIS_DEPTH (64) where this site
+		// checked MAX_SCOPE_DEPTH (32) — divergent only at depths 32..63,
+		// unreachable at queue-drain time — and the core copies a
+		// zero-initialized str_size where the old push left it stale.
+		invokeUnloadHandler(app_context, pu->func, pu->mc);
 		actionSetCurrentContext(saved);
 	}
 	free(pu);
@@ -33120,7 +33172,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 						if (func != NULL) {
 							MovieClip* saved = g_current_context;
 							actionSetCurrentContext(mc);
-							invokeSpecialFunction(app_context, func, NULL);
+							invokeUnloadHandler(app_context, func, NULL);
 							actionSetCurrentContext(saved);
 						}
 					}
@@ -33202,7 +33254,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 					if (func != NULL) {
 						MovieClip* saved = g_current_context;
 						actionSetCurrentContext(mc);
-						invokeSpecialFunction(app_context, func, NULL);
+						invokeUnloadHandler(app_context, func, NULL);
 						actionSetCurrentContext(saved);
 					}
 				}
@@ -34044,7 +34096,7 @@ static ActionVar builtin_mcl_unloadClip(SWFAppContext* app_context, ActionVar* a
             if (func != NULL) {
                 MovieClip* saved = g_current_context;
                 actionSetCurrentContext(target_mc);
-                invokeSpecialFunction(app_context, func, NULL);
+                invokeUnloadHandler(app_context, func, NULL);
                 actionSetCurrentContext(saved);
             }
         }
@@ -46109,7 +46161,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 						if (_ul_func != NULL) {
 							MovieClip* _ul_saved = g_current_context;
 							actionSetCurrentContext(_gu2_mc);
-							invokeSpecialFunction(app_context, _ul_func, NULL);
+							invokeUnloadHandler(app_context, _ul_func, NULL);
 							actionSetCurrentContext(_ul_saved);
 						}
 					}
@@ -69226,7 +69278,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							if (_ul_f != NULL) {
 								MovieClip* _ul_s = g_current_context;
 								actionSetCurrentContext(mc);
-								invokeSpecialFunction(app_context, _ul_f, NULL);
+								invokeUnloadHandler(app_context, _ul_f, NULL);
 								actionSetCurrentContext(_ul_s);
 							}
 						}
@@ -69270,7 +69322,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (_ul_f != NULL) {
 						MovieClip* _ul_s = g_current_context;
 						actionSetCurrentContext(mc);
-						invokeSpecialFunction(app_context, _ul_f, NULL);
+						invokeUnloadHandler(app_context, _ul_f, NULL);
 						actionSetCurrentContext(_ul_s);
 					}
 				}

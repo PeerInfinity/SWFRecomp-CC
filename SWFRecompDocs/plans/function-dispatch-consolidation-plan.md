@@ -1268,6 +1268,48 @@ pass (b).
   misc-mtasc.all 7+2rm/9 (mtasc onLoad closures), graphics-mode smoke of the
   repro. onUnload sites + `broadcastMessage` still unmigrated.
 
+**2026-07-10 third session, part 2 — the EIGHT onUnload firing sites,
+instance twenty:**
+
+- **All eight inline onUnload sites** migrated onto a shared
+  `invokeUnloadHandler()` adapter (same neighborhood as the unload queues):
+  `aq_dispatch_timeline_unload`, `aq_dispatch_unload`, GetURL2 empty-URL,
+  `loadMovie("")`, the `unloadMovie` method arm, **plus three the session
+  prompt's "5 sites" undercounted** — `actionGetURL`'s `_level` empty-URL
+  and named-clip empty-URL branches, and `MovieClipLoader.unloadClip`
+  (found by grepping `invokeSpecialFunction` callers; the dossier-era line
+  numbers had aliased them to the broadcaster loops). All eight delegated
+  to `invokeSpecialFunction`, whose ritual the adapter reproduces: the
+  `g_special_depth` bracket (NOT `g_call_depth` — kept outside the core, no
+  INV_ flag models it), type-2 = one bare unbound local frame
+  (`INV_LOCAL_SCOPE` only — **no captured scopes**, a preserved divergence
+  from every other event family), type-1 = **no local frame at all**
+  (preserved-by-omission; the prologue's param binds land ambiently — a
+  normalization candidate documented at the adapter). `invokeSpecialFunction`
+  itself STAYS with exactly ONE remaining caller: LoadVars'
+  `_global.escape` override in `lv_url_encode` (setter-style 1-arg call).
+  The broadcaster listener loop never called it — its raw arms are the
+  broadcastMessage migration's business.
+- Only `aq_dispatch_unload` ever pushed a this-stack entry; the adapter's
+  `this_mc` param reproduces it (`INV_THIS_STACK | INV_MC_THIS_NULL_PTR`,
+  MOVIECLIP receiver). Inert deltas noted in-code: its old bound was
+  MAX_SCOPE_DEPTH (32) vs the core's MAX_THIS_DEPTH (64) — divergent only at
+  depths 32..63, unreachable at queue-drain time — and stale vs zeroed
+  `str_size` on the pushed entry. The receiver-context brackets
+  (`actionSetCurrentContext`) stay at the sites.
+- **Instance twenty** (`regression/onunload_type1_args`, fail-before
+  verified): six of the eight sites fire MID-SCRIPT, so the missing type-1
+  pad popped the caller's in-flight operands. The signature differs from
+  onConstruct's instance 19: with no local frame, the stolen values bind
+  ambiently and the param rows read undefined either way — the discriminator
+  is the OUTER expression (`trace("X: " + m.unloadMovie())` → `0` before,
+  `X: ` after). The queue-drain sites' pad is inert (empty between-frames
+  stack).
+- Verified: regression 30/30; avm1 unload cluster (9 tests: unloadmovienum,
+  mcl_unloadclip, remove_movie_clip, load_cancel_via_* etc. — the 2 local
+  fails are baseline `output_mismatch`, byte-identical statuses); gnash
+  MovieClip-v5..v8 + MovieClipLoader-v6..v8 (hardref/ul4 onUnload sections).
+
 ### Stage 5 — lock it in
 
 - Delete the then-dead 32 marshalling loops and per-site casts.

@@ -43,6 +43,7 @@ Session start, in order:
 | `3d7788391` + `ecb5aeedb` | **two watch real-bug fixes** (probes confirmed): Site C's `_sm_buf` clobber across the watcher call; Site A's pname double-free with named-param watchers (suite's first hand-emitted DefineFunction2) |
 | `a2ded85b7` | **the enterFrame trio** (children/root/var-map arms) — no credited instance (pad inert at frame-loop level, A/B-proved); `regression/enterframe_type1_args` is a lock; children arm = third variant of the local-under-captured inversion (is_with COPIED) |
 | (this session) | **onLoad + onConstruct** (`actionDispatchMCOnLoad`/`MCOnConstruct`; `RootOnLoad` is a thin wrapper) — **instance nineteen** (`regression/onconstruct_type1_args`: onConstruct fires MID-SCRIPT from createEmptyMovieClip, the missing t1 pad swallowed the caller's in-flight `"X: "` operand); `regression/onload_type1_args` is a lock (queue-drain only; pins the t1 `this` channel). Live-code correction: these arms have NO version switch — INV_BASE_CLIP's ambient gate is exact, no ClosureFrame; t1 = FOURTH local-under-captured variant (is_with FORCED); t2 = INV_ACT_THIS + INV_MC_THIS_NULL_PTR; INV_BIND_THIS preserves the dead name-bind at zero cost |
+| (this session) | **the EIGHT onUnload firing sites** (the prompt's "5" undercounted: + actionGetURL's `_level`/named-clip empty-URL branches + MCL.unloadClip) → shared `invokeUnloadHandler()` adapter — **instance twenty** (`regression/onunload_type1_args`: 6 of 8 sites fire MID-SCRIPT; signature differs from onConstruct's — no local frame on the t1 path means the stolen operands bind ambiently and the param rows read undefined either way; the discriminator is the OUTER expression, `0` → `X: `). Ritual = invokeSpecialFunction's: g_special_depth bracket outside the core; t2 = bare INV_LOCAL_SCOPE, NO captured scopes (preserved divergence); t1 = no local frame (preserved; bind-leak is a normalization candidate). invokeSpecialFunction is down to ONE caller (lv_url_encode's escape override) |
 
 Each CI-green in **both** modes with zero pass→fail. **Eighteen** confirmed instances of
 the TYPE1_ARG_ORDER clamp/pad class; each has a permanent hand-assembled test in
@@ -159,19 +160,14 @@ preserved via per-branch flags.)
 
 **Remaining Stage-4 migrations**: ~~`fireTimerCallback`~~, ~~EI~~, ~~the watch
 arms~~, ~~the enterFrame trio~~ (all DONE 2026-07-10, second session),
-~~onLoad/onConstruct~~ (DONE 2026-07-10, third session — see the table
-above; instance nineteen). Left: **the inline onUnload firing sites** (5
-sites, all delegating to `invokeSpecialFunction` + their own
-context/this-stack brackets: `aq_dispatch_timeline_unload`,
-`aq_dispatch_unload`, GetURL2 empty-URL, `loadMovie` empty-URL,
-`unloadMovie` method — the last three fire MID-SCRIPT, so the missing t1
-pad is a live repro candidate there, same class as onConstruct's instance
-nineteen; note `invokeSpecialFunction` itself stays, it has non-unload
-callers), and **`broadcastMessage`** (LAST — needs the `super_bind` core
-extension, its own commit first). Then normalization pass (b) per the
-dossier master list (add: onLoad/onConstruct skip `switchToFunctionVersion`
-— confirmed from live code this session, the prompt's earlier "they
-version-switch" claim was wrong).
+~~onLoad/onConstruct~~ (instance nineteen), ~~the five onUnload firing
+sites~~ (instance twenty) — both DONE 2026-07-10, third session, see the
+table above. Left: **`broadcastMessage`** (LAST — needs the `super_bind`
+core extension, its own commit first). Then normalization pass (b) per the
+dossier master list (add two found this session: onLoad/onConstruct skip
+`switchToFunctionVersion` — confirmed from live code, the prompt's earlier
+"they version-switch" claim was wrong — and the onUnload t1 path pushes no
+local frame, so a param'd handler's prologue binds leak ambiently).
 
 Session-learned notes not yet in the dossiers: (1) EI's forced-with is NOT
 observable via SetVariable write-back (it writes THROUGH a with-frame where
@@ -266,7 +262,7 @@ Sensitive clusters: `as2_super_and_this_v6`/`_v8` (NOT `_swf6`), `super_edge_cas
 `coerce_to_object_monkeypatch`, `string_methods*`, `string_coercion`, `closure_scope`,
 `with`, `function_base_clip{,_removed,_readded}`, `this_swf5`/`_swf6`/`_swf7`.
 
-Standing guards in `regression/` (findable by bare name, 29 of them): `ei_type1_args`,
+Standing guards in `regression/` (findable by bare name, 30 of them): `ei_type1_args`,
 `mc_event_type1_args`, `timer_cross_swf_version`, `nc_onstatus_closure`,
 `fn_call_type1_args`, `fn_empty_method_type1_args`, `method_type1_args`,
 `fn_call_builtin_type1_args`, `array_method_type1_args`, `array_element_type1_args`,
@@ -276,7 +272,8 @@ Standing guards in `regression/` (findable by bare name, 29 of them): `ei_type1_
 `coerce_type1_args`, `timer_type1_args`, `ei_closure_scope_order`,
 `watch_setmember_type1_args`, `watch_mc_type1_args`,
 `watch_mc_reentrant_setmember`, `watch_timeline_named_params`,
-`enterframe_type1_args`, `onconstruct_type1_args`, `onload_type1_args`.
+`enterframe_type1_args`, `onconstruct_type1_args`, `onload_type1_args`,
+`onunload_type1_args`.
 
 Note `string_relational_compare` (avm1) is `output_mismatch` and on
 `ignored_tests.txt` — it will show up in a local cluster run. Not yours.
