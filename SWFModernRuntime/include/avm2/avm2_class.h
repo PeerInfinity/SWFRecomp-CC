@@ -164,6 +164,13 @@ const Avm2PropEntry* avm2_vtable_find_mn(const Avm2VTable* vt, const Avm2AbcFile
 // Name-only public lookup (for public-property calls by name).
 const Avm2PropEntry* avm2_vtable_find_public(const Avm2VTable* vt,
                                              const char* name, uint32_t name_len);
+// Lazy-name lookup honoring the multiname's static ns set: match `name`
+// against entries whose namespace is in mn's set (MultinameL with a
+// non-public set, e.g. dict.test::["test1"]).
+const Avm2PropEntry* avm2_vtable_find_mn_named(const Avm2VTable* vt,
+                                               const Avm2AbcFileData* data,
+                                               uint32_t mn_idx,
+                                               const char* name, uint32_t name_len);
 
 // Add trait entries from static data onto a vtable (used for class
 // instance/static traits, script globals, and activation objects). `file`

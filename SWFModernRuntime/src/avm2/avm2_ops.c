@@ -77,6 +77,21 @@ static int object_is_dynamic(Avm2Object* obj)
 	return (obj->cls->flags & AVM2_CLASS_FLAG_SEALED) == 0;
 }
 
+// Dictionary receivers route OBJECT-valued lazy names to object space
+// (Ruffle op_get_property_fast Object arm).
+static int dict_object_key(Avm2Value recv, Avm2Value name_val,
+                           Avm2Object** out_dict, Avm2Object** out_key)
+{
+	if (recv.kind != AVM2_VALUE_OBJECT || name_val.kind != AVM2_VALUE_OBJECT)
+	{
+		return 0;
+	}
+	if (!avm2_is_dictionary(recv.u.obj)) return 0;
+	*out_dict = recv.u.obj;
+	*out_key = name_val.u.obj;
+	return 1;
+}
+
 // Try to parse a property name as an array index ("0", "42").
 static int name_as_index(const char* name, uint32_t len, uint32_t* out)
 {
@@ -358,6 +373,18 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 	Avm2Context* ctx = act->ctx;
 	(void) mn_idx;
 	{
+		// Dictionary receivers key objects by identity — but only on the
+		// FAST path (public ns in the set, or an interpreter-mode body):
+		// Ruffle op_get_property_fast; the slow path stringifies the name
+		// (dictionary_access_no_pubns expects the 1056/1081 miss).
+		Avm2Object* dict;
+		Avm2Object* key;
+		if ((interp || avm2_mn_has_public_ns(act->file->data, mn_idx))
+		    && dict_object_key(recv, name_val, &dict, &key))
+		{
+			Avm2Value* v = avm2_object_find_dynamic_obj(dict, key);
+			return (v != NULL) ? *v : avm2_undefined();
+		}
 		// A QName object as the lazy name resolves by its own uri::local
 		// key (Ruffle fill_with_runtime_params — qname_indexing).
 		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
@@ -389,6 +416,22 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 		                            &out, avm2_undefined()))
 		{
 			return out;
+		}
+	}
+	if (!mn_public)
+	{
+		// Non-public ns set (dict.test::["name"]): traits keyed in any of
+		// the set's namespaces still match.
+		const Avm2PropEntry* e = avm2_vtable_find_mn_named(
+			avm2_value_vtable(ctx, recv), act->file->data, mn_idx,
+			ns->utf8, ns->len);
+		if (e != NULL)
+		{
+			Resolved r2;
+			memset(&r2, 0, sizeof(r2));
+			r2.entry = e;
+			return getproperty_common(act, recv, ns->utf8, ns->len, 1, &r2,
+			                          mn_public);
 		}
 	}
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
@@ -536,6 +579,15 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	Avm2Context* ctx = act->ctx;
 	(void) mn_idx;
 	{
+		// FAST-path-only, like the get side (dictionary_access_no_pubns).
+		Avm2Object* dict;
+		Avm2Object* key;
+		if ((interp || avm2_mn_has_public_ns(act->file->data, mn_idx))
+		    && dict_object_key(recv, name_val, &dict, &key))
+		{
+			avm2_object_set_dynamic_obj(ctx, dict, key, value);
+			return;
+		}
 		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 		if (q != NULL)
 		{
@@ -564,6 +616,20 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	                               NULL, value))
 	{
 		return;
+	}
+	if (!mn_public)
+	{
+		const Avm2PropEntry* e = avm2_vtable_find_mn_named(
+			avm2_value_vtable(ctx, recv), act->file->data, mn_idx,
+			ns->utf8, ns->len);
+		if (e != NULL)
+		{
+			Resolved r2;
+			memset(&r2, 0, sizeof(r2));
+			r2.entry = e;
+			setproperty_resolved(ctx, recv, &r2, ns->utf8, ns->len, value, 0);
+			return;
+		}
 	}
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
 	Resolved r;
@@ -645,6 +711,13 @@ Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32
 {
 	(void) mn_idx;
 	{
+		Avm2Object* dict;
+		Avm2Object* key;
+		if (dict_object_key(recv, name_val, &dict, &key))
+		{
+			avm2_object_delete_dynamic_obj(dict, key);
+			return avm2_bool(true);
+		}
 		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 		if (q != NULL) return deleteproperty_qname(act, recv, q);
 	}
@@ -1996,6 +2069,14 @@ Avm2Value avm2_op_in(Avm2Activation* act, Avm2Value name, Avm2Value obj)
 	if (value_is_null_like(obj))
 	{
 		avm2_throw_null_or_undefined(ctx, obj, NULL, 0);
+	}
+	{
+		Avm2Object* dict;
+		Avm2Object* key;
+		if (dict_object_key(obj, name, &dict, &key))
+		{
+			return avm2_bool(avm2_object_find_dynamic_obj(dict, key) != NULL);
+		}
 	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name);
 	return avm2_bool(avm2_has_public_property(ctx, obj, ns->utf8, ns->len) != 0);

@@ -30,6 +30,15 @@ typedef struct Avm2DynProp
 	Avm2String name;
 	Avm2Value value;
 	uint8_t dont_enum;
+	// Tombstone: deleted entries stay linked (dead=1) so an in-flight
+	// enumeration cursor survives deletion, mirroring Ruffle's
+	// dynamic_map.rs stable bucket indices (dictionary_iter_modify).
+	uint8_t dead;
+	// Dictionary object-space key (identity, no namespace). When set, the
+	// entry lives in "object space" (Ruffle dictionary_object.rs) and
+	// `name` is unused; string finders skip it. Interleaved in the same
+	// list so for-in order stays insertion order across both key kinds.
+	Avm2Object* key_obj;
 } Avm2DynProp;
 
 // Bound-method closure cache: obj.method === obj.method must hold (Ruffle
@@ -60,6 +69,10 @@ struct Avm2Object
 	uint32_t slot_count;
 	Avm2DynProp* dyn_props;   // insertion order (append at tail)
 	Avm2DynProp* dyn_tail;
+	// Enumeration cursor over the dyn-prop part (Ruffle dynamic_map.rs
+	// public_index/real_index): survives delete-during-iteration.
+	uint32_t dyn_enum_public;
+	Avm2DynProp* dyn_enum_pos;
 	Avm2BoundMethod* bound_methods;
 	void* native_ext;         // builtin instance data (arrays, MovieClip, ...)
 
@@ -116,6 +129,12 @@ Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const ch
                                      uint32_t name_len, Avm2Value value);
 // Returns 1 if the property existed and was removed.
 int avm2_object_delete_dynamic(Avm2Object* obj, const char* name, uint32_t name_len);
+
+// Dictionary object-space keys (identity semantics).
+Avm2Value* avm2_object_find_dynamic_obj(Avm2Object* obj, Avm2Object* key);
+void avm2_object_set_dynamic_obj(Avm2Context* ctx, Avm2Object* obj, Avm2Object* key,
+                                 Avm2Value value);
+int avm2_object_delete_dynamic_obj(Avm2Object* obj, Avm2Object* key);
 
 // Enumeration (Ruffle get_next_enumerant / get_enumerant_name protocol):
 // enumerants are numbered from 1; 0 means exhausted. Arrays enumerate

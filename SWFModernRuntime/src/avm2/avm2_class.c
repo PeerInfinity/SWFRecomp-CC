@@ -259,6 +259,43 @@ const Avm2PropEntry* avm2_vtable_find_public(const Avm2VTable* vt,
 	return NULL;
 }
 
+const Avm2PropEntry* avm2_vtable_find_mn_named(const Avm2VTable* vt,
+                                               const Avm2AbcFileData* data,
+                                               uint32_t mn_idx,
+                                               const char* name, uint32_t name_len)
+{
+	if (vt == NULL) return NULL;
+	const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
+	uint32_t single_ns = 0;
+	const Avm2AbcNsSet* set = NULL;
+	switch (mn->kind)
+	{
+		case 0x1b: case 0x1c:  // MultinameL / MultinameLA
+			set = &data->ns_sets[mn->ns_set];
+			break;
+		case 0x07: case 0x0d:  // QName kinds (name replaced at runtime)
+			single_ns = mn->ns;
+			break;
+		default:
+			return NULL;
+	}
+	uint32_t count = (set != NULL) ? set->count : 1;
+	for (uint32_t i = 0; i < count; i++)
+	{
+		uint32_t ns_idx = (set != NULL) ? set->ns_indices[i] : single_ns;
+		const Avm2AbcNamespace* ns = &data->namespaces[ns_idx];
+		Avm2PropKey key;
+		key.name = name;
+		key.name_len = name_len;
+		key.ns_kind = ns->kind;
+		key.ns_uri = data->strings[ns->name].utf8;
+		key.ns_len = data->strings[ns->name].len;
+		const Avm2PropEntry* e = avm2_vtable_find(vt, &key);
+		if (e != NULL) return e;
+	}
+	return NULL;
+}
+
 static Avm2PropEntry* vtable_find_mut(Avm2VTable* vt, const Avm2PropKey* key)
 {
 	for (uint32_t i = 0; i < vt->count; i++)

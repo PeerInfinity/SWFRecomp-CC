@@ -87,6 +87,9 @@ void avm2_register_vector(Avm2Context* ctx);   // __AS3__.vec::Vector + speciali
 void avm2_register_regexp(Avm2Context* ctx);   // RegExp + String regex paths
 void avm2_register_json(Avm2Context* ctx);     // SWF13+ (caller gates)
 void avm2_register_nsqname(Avm2Context* ctx);  // Namespace + QName
+void avm2_register_dictionary(Avm2Context* ctx);  // flash.utils.Dictionary
+// Is `obj` an instance of (a subclass of) flash.utils.Dictionary?
+int avm2_is_dictionary(Avm2Object* obj);
 
 // Namespace/QName instance state (avm2_nsqname.c). prefix == NULL is the
 // undefined prefix; a QName uri == NULL is the any namespace and local ==
@@ -210,6 +213,7 @@ typedef struct Avm2Builtins
 	Avm2Class* regexp_class;
 	Avm2Class* namespace_class;
 	Avm2Class* qname_class;
+	Avm2Class* dictionary_class;
 	Avm2Class* vector_class;         // generic __AS3__.vec::Vector
 	Avm2Class* vector_int_class;     // Vector.<int>
 	Avm2Class* vector_uint_class;    // Vector.<uint>

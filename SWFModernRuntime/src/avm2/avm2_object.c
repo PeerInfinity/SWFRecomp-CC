@@ -39,7 +39,8 @@ Avm2Value* avm2_object_find_dynamic(Avm2Object* obj, const char* name, uint32_t 
 {
 	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 	{
-		if (p->name.len == name_len && memcmp(p->name.utf8, name, name_len) == 0)
+		if (!p->dead && p->key_obj == NULL && p->name.len == name_len
+		    && memcmp(p->name.utf8, name, name_len) == 0)
 		{
 			return &p->value;
 		}
@@ -47,12 +48,53 @@ Avm2Value* avm2_object_find_dynamic(Avm2Object* obj, const char* name, uint32_t 
 	return NULL;
 }
 
+Avm2Value* avm2_object_find_dynamic_obj(Avm2Object* obj, Avm2Object* key)
+{
+	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
+	{
+		if (!p->dead && p->key_obj == key) return &p->value;
+	}
+	return NULL;
+}
+
+void avm2_object_set_dynamic_obj(Avm2Context* ctx, Avm2Object* obj, Avm2Object* key,
+                                 Avm2Value value)
+{
+	Avm2Value* v = avm2_object_find_dynamic_obj(obj, key);
+	if (v != NULL)
+	{
+		*v = value;
+		return;
+	}
+	Avm2DynProp* p = avm2_alloc(ctx, sizeof(Avm2DynProp));
+	memset(p, 0, sizeof(*p));
+	p->key_obj = key;
+	p->value = value;
+	if (obj->dyn_tail != NULL) obj->dyn_tail->next = p;
+	else obj->dyn_props = p;
+	obj->dyn_tail = p;
+}
+
+int avm2_object_delete_dynamic_obj(Avm2Object* obj, Avm2Object* key)
+{
+	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
+	{
+		if (!p->dead && p->key_obj == key)
+		{
+			p->dead = 1;  // tombstone (see Avm2DynProp.dead)
+			return 1;
+		}
+	}
+	return 0;
+}
+
 Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const char* name,
                                      uint32_t name_len, Avm2Value value)
 {
 	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 	{
-		if (p->name.len == name_len && memcmp(p->name.utf8, name, name_len) == 0)
+		if (!p->dead && p->key_obj == NULL && p->name.len == name_len
+		    && memcmp(p->name.utf8, name, name_len) == 0)
 		{
 			p->value = value;
 			return p;
@@ -79,14 +121,12 @@ Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const ch
 
 int avm2_object_delete_dynamic(Avm2Object* obj, const char* name, uint32_t name_len)
 {
-	Avm2DynProp* prev = NULL;
-	for (Avm2DynProp* p = obj->dyn_props; p != NULL; prev = p, p = p->next)
+	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 	{
-		if (p->name.len == name_len && memcmp(p->name.utf8, name, name_len) == 0)
+		if (!p->dead && p->key_obj == NULL && p->name.len == name_len
+		    && memcmp(p->name.utf8, name, name_len) == 0)
 		{
-			if (prev != NULL) prev->next = p->next;
-			else obj->dyn_props = p->next;
-			if (obj->dyn_tail == p) obj->dyn_tail = prev;
+			p->dead = 1;  // tombstone (see Avm2DynProp.dead)
 			return 1;
 		}
 	}
@@ -326,7 +366,7 @@ static Avm2DynProp* nth_enumerable_dyn(Avm2Object* obj, uint32_t nth)
 	uint32_t seen = 0;
 	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 	{
-		if (p->dont_enum) continue;
+		if (p->dead || p->dont_enum) continue;
 		seen++;
 		if (seen == nth) return p;
 	}
@@ -338,7 +378,7 @@ static uint32_t dyn_enum_count(Avm2Object* obj)
 	uint32_t n = 0;
 	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 	{
-		if (!p->dont_enum) n++;
+		if (!p->dead && !p->dont_enum) n++;
 	}
 	return n;
 }
@@ -355,8 +395,50 @@ uint32_t avm2_object_next_enumerant(Avm2Object* obj, uint32_t cur)
 		uint32_t next;
 		if (avm2_nsqname_next_enumerant(obj, cur, &next)) return next;
 	}
-	uint32_t total = array_enum_count(obj) + dyn_enum_count(obj);
-	if (cur + 1 <= total) return cur + 1;
+	uint32_t arr_n = array_enum_count(obj);
+	if (cur < arr_n) return cur + 1;
+	// Dyn-prop part: cursor-based (Ruffle dynamic_map.rs next) so entries
+	// deleted mid-iteration don't shift positions under the iterator.
+	uint32_t dpub = cur - arr_n;
+	if (dpub == 0)
+	{
+		for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
+		{
+			if (!p->dead && !p->dont_enum)
+			{
+				obj->dyn_enum_pos = p;
+				obj->dyn_enum_public = 1;
+				return arr_n + 1;
+			}
+		}
+		obj->dyn_enum_pos = NULL;
+		obj->dyn_enum_public = 0;
+		return 0;
+	}
+	if (obj->dyn_enum_public == 0 || dpub != obj->dyn_enum_public
+	    || obj->dyn_enum_pos == NULL)
+	{
+		Avm2DynProp* p = nth_enumerable_dyn(obj, dpub);
+		if (p == NULL)
+		{
+			obj->dyn_enum_pos = NULL;
+			obj->dyn_enum_public = 0;
+			return 0;
+		}
+		obj->dyn_enum_pos = p;
+		obj->dyn_enum_public = dpub;
+	}
+	for (Avm2DynProp* p = obj->dyn_enum_pos->next; p != NULL; p = p->next)
+	{
+		if (!p->dead && !p->dont_enum)
+		{
+			obj->dyn_enum_pos = p;
+			obj->dyn_enum_public = dpub + 1;
+			return arr_n + dpub + 1;
+		}
+	}
+	obj->dyn_enum_pos = NULL;
+	obj->dyn_enum_public = 0;
 	return 0;
 }
 
@@ -378,8 +460,31 @@ Avm2Value avm2_object_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t
 		int64_t dense = array_nth_index(obj, idx);
 		return avm2_uint_value((uint32_t) dense);
 	}
-	Avm2DynProp* p = nth_enumerable_dyn(obj, idx - arr_n);
+	Avm2DynProp* p = (obj->dyn_enum_public == idx - arr_n
+	                  && obj->dyn_enum_pos != NULL)
+	                     ? obj->dyn_enum_pos
+	                     : nth_enumerable_dyn(obj, idx - arr_n);
 	if (p == NULL) return avm2_null();
+	if (p->key_obj != NULL) return avm2_object_value(p->key_obj);
+	// Names that are pure natural numbers (no sign, no leading zeros)
+	// enumerate as NUMBERS (Ruffle DynamicKey::Uint / avmplus int atoms) —
+	// dictionary_primitive_keys asserts typeof key == "number".
+	if (p->name.len > 0 && p->name.len <= 10
+	    && !(p->name.len > 1 && p->name.utf8[0] == '0'))
+	{
+		uint64_t v = 0;
+		int numeric = 1;
+		for (uint32_t i = 0; i < p->name.len; i++)
+		{
+			char c = p->name.utf8[i];
+			if (c < '0' || c > '9') { numeric = 0; break; }
+			v = v * 10 + (uint64_t) (c - '0');
+		}
+		if (numeric && v <= 0xFFFFFFFFull)
+		{
+			return avm2_uint_value((uint32_t) v);
+		}
+	}
 	return avm2_string(avm2_string_new(ctx, p->name.utf8, p->name.len));
 }
 
@@ -403,7 +508,10 @@ Avm2Value avm2_object_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_
 		if (v.kind == AVM2_VALUE_HOLE) return avm2_undefined();
 		return v;
 	}
-	Avm2DynProp* p = nth_enumerable_dyn(obj, idx - arr_n);
+	Avm2DynProp* p = (obj->dyn_enum_public == idx - arr_n
+	                  && obj->dyn_enum_pos != NULL)
+	                     ? obj->dyn_enum_pos
+	                     : nth_enumerable_dyn(obj, idx - arr_n);
 	if (p == NULL) return avm2_undefined();
 	return p->value;
 }
