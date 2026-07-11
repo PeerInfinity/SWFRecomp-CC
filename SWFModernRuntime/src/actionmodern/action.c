@@ -6114,9 +6114,14 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 	// pushed the local frame FIRST with captured scopes forced-with ON TOP —
 	// the same double quirk as the __resolve arm (this is the flag's second
 	// user). regression/ei_closure_scope_order locks both on this path.
-	// INV_BASE_CLIP without INV_VERSION_SWITCH: no version switch has ever
-	// existed here (normalization candidate), so the core's gate reads the
-	// caller's live g_swf_version — exactly what the arms read.
+	// INV_VERSION_SWITCH added by normalization pass (b): the callback runs
+	// at its DEFINING movie's SWF version (regression/ei_cross_swf_version —
+	// a v8 callback fired under an injected v6 ambient must keep v8
+	// coercion). The base-clip switch moves INTO the arm below, gated on the
+	// CALLER's g_swf_version read BEFORE the core installs the callee
+	// version — exactly the ambient gate the core's INV_BASE_CLIP applied
+	// here while no version switch existed (never
+	// INV_BASE_CLIP|INV_VERSION_SWITCH together).
 	// INV_BIND_THIS, type-1 ONLY, and it is LIVE here (not dead-by-rule): EI
 	// pushes no g_this_stack entry and host-driven calls run at
 	// g_this_depth == 0, where GetVariable("this") falls through the early
@@ -6129,11 +6134,16 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 	// event-this, no exec-func (a preload_arguments callee keeps reading the
 	// stale g_prev_executing_func — current behavior), no ctor context.
 	u32 ei_flags = INV_DEPTH_GUARD | INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
-	               INV_LOCAL_SCOPE | INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_BASE_CLIP;
+	               INV_LOCAL_SCOPE | INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_VERSION_SWITCH;
 	if (func->function_type == 1)
 		ei_flags |= INV_BIND_THIS;
+	MovieClip* _ei_saved_base = g_current_context;
+	if (g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = (MovieClip*)func->base_clip;
 	InvokeOpts ei_opts = { .flags = ei_flags };
-	return invokeFunctionValue(app_context, func, &this_var, args, (u32)arg_count, &ei_opts);
+	ActionVar _ei_result = invokeFunctionValue(app_context, func, &this_var, args, (u32)arg_count, &ei_opts);
+	g_current_context = _ei_saved_base;
+	return _ei_result;
 }
 
 // Public: Convert an ActionVar STRING to a UTF-8 C string.
