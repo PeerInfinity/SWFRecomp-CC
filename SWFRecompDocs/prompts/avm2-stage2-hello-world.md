@@ -4,7 +4,9 @@
 > All deliverables met: emitter (`SWFRecomp/src/abc/abc_emit.{cpp,hpp}` →
 > `RecompiledABC/`), runtime module tree (`SWFModernRuntime/{src,include}/avm2/`),
 > harness auto-detection (`-DSWF_AVM2` + `src/avm2/*.c` when `RecompiledABC/`
-> exists), CI fan-out + download ALL_CATEGORIES. hello_world passes; near-miss
+> exists), CI fan-out + download ALL_CATEGORIES. First CI baseline **8/1198**
+> (zero AVM1 regressions after `03c86381d` gated DoABC on the AS3 bit);
+> hello_world passes; near-miss
 > probes (`add`, `closures`, `es4_inheritance`) fail on named missing opcodes.
 > See plan §5 Stage-2 landing note and the avm2 CURRENT_STATUS.md.
 > Next session: Stage 3 (tranche 1) — branches/labels in the emitter first.

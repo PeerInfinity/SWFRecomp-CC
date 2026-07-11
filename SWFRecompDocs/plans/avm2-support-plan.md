@@ -264,8 +264,15 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   hello_world's 21 ops; everything else aborts at runtime with a named
   `unimplemented op` (verified on `add`/`closures`/`es4_inheritance` — the
   Stage-3 starting line). Exit met: hello_world passes locally; first avm2
-  CI baseline 1/1202 with the suite wired into `ruffle-tests.yml` and
-  `download_tests.sh` ALL_CATEGORIES.
+  CI baseline **8/1198** (hello_world + 7 tests already inside the Stage-2
+  surface: duplicate_defs, eager_init, lazyinit, nonconflicting_declarations,
+  slot_disp_id_shared_numbering, swf8, symbolclass_invalid_utf8; 1163 named
+  unimplemented-op aborts, 0 compile failures) with the suite wired into
+  `ruffle-tests.yml` and `download_tests.sh` ALL_CATEGORIES. Follow-up
+  `03c86381d`: DoABC emission gated on the FileAttributes AS3 bit (inert in
+  AVM1 SWFs, matching Flash/Ruffle) — fixes the one AVM1-side regression the
+  first CI run caught (gnash swfmill mixed-bytecode-as2); zero regressions in
+  the confirming run.
 - **Stage 3 — tranche 1 (~90 language tests)**: full opcode coverage for
   arithmetic/logic/control flow, coercion matrix, primitives + their
   wrapper-class methods, Array, String, OOP (inheritance, interfaces, virtual

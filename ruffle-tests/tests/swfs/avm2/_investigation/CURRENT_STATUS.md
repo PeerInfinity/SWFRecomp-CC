@@ -9,12 +9,18 @@ suite's trace tests.
 
 ## State
 
-- **1 / 1,202 passing (hello_world)** — the Stage-2 baseline. Every other
-  test fails honestly: `runtime_error` with a named
+- **8 / 1,198 passing** — the Stage-2 CI baseline (hello_world plus 7
+  tests whose whole flow fits the Stage-2 surface: duplicate_defs,
+  eager_init, lazyinit, nonconflicting_declarations,
+  slot_disp_id_shared_numbering, swf8, symbolclass_invalid_utf8).
+  Every other test fails honestly: `runtime_error` with a named
   `AVM2: unimplemented op <Op> at op index N` on stderr (or a build/parse
   failure for exotic inputs). Stage 3 (tranche-1 opcode/coercion matrix)
   grows this.
 - **What exists now (Stage 2, 2026-07-10, `0fec4fbe6` + `40e98bb42`):**
+  - DoABC emission is gated on the FileAttributes AS3 bit (`03c86381d`):
+    a DoABC tag in an AVM1 SWF is inert, matching Flash/Ruffle (gnash's
+    mixed-bytecode-as2 exercises this).
   - **Recompiler**: `SWFRecomp/src/abc/abc_emit.{cpp,hpp}` emits
     `RecompiledABC/` per test (static pools, class/script/trait registry,
     SymbolClass bindings, one C function per verified method body).
