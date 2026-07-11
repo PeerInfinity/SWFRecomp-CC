@@ -1310,6 +1310,54 @@ instance twenty:**
   fails are baseline `output_mismatch`, byte-identical statuses); gnash
   MovieClip-v5..v8 + MovieClipLoader-v6..v8 (hardref/ul4 onUnload sections).
 
+**2026-07-10 third session, part 3 — `builtin_broadcaster_broadcastMessage`,
+instance twenty-one. Stage 4 migrations COMPLETE:**
+
+- **`super_bind` core extension landed first** (its own commit): new
+  `InvokeOpts` field; when non-NULL (+`INV_LOCAL_SCOPE`) the core binds it
+  as `"super"` on the local frame for BOTH function types, after
+  `buildActivationLocals` (wins over `INV_ACT_SUPER`). Rationale in the
+  header doc: the broadcaster's type-1 super NAME-SHADOW is live (the outer
+  actionCallMethod frame's `super = SUPER(broadcaster)` stays on the chain
+  for the whole listener loop — the chain HITS, unlike the dead-bind rule's
+  MISS assumption). Subsumes the type-2 value-source mismatch (§4b).
+- **The listener loop migrated per dossier §3**, both arms + the balancing
+  else → one bracketed core call. Stays in the arm: the loop (live-index
+  mutation semantics untouched), element filtering, manual proto-walk method
+  resolution + `method_search_depth`, and the conditional
+  `pushSuperContext(listener_obj, depth)` / `popSuperContext` bracket (the
+  receiver is the dprops object — underivable from `this_var`; the pop also
+  covers the core-skips-listener case, replacing the old balancing else).
+  Flags: caller-version-gated `INV_CAPTURED_SCOPE` (computed in the arm) |
+  `INV_LOCAL_SCOPE` | `INV_EXEC_FUNC`; act `INV_ACT_ARGUMENTS`; per-branch:
+  t2 adds `INV_ACT_THIS` (+ `INV_OVERRIDE_THIS` with MOVIECLIP(mc) for MC
+  listeners only — core's unconditional clear equals the site's
+  conditional one in end state), t1 adds `INV_THIS_STACK` with
+  OBJECT(listener_obj)-even-when-NULL preserved via a per-branch `this_var`
+  (the both-NULL corner disagreement kept). `has_this_ptr = 1,
+  this_ptr = listener_obj` for both (ABI receiver is the dprops object,
+  never the MC pointer). No depth guard, no version switch, no base clip,
+  no `g_event_this_mc` — all preserved-by-omission.
+- **Instance twenty-one** (`regression/broadcast_type1_args`, fail-before
+  verified): the type-1 arm padded but did NOT clamp — 3 extras to a
+  2-param listener bound `a=x2 b=x3` and stranded `x1`, surfacing as
+  `x1true` in the surrounding expression. bc1/bc2 rows are order/pad locks.
+- **Tripwires byte-diffed, not status-checked**: gnash `AsBroadcaster-v6`
+  (11× DefineFunction, the super shadow) and `-v7` (type-2 twin) actual
+  outputs captured pre-migration (empty-both-expected-files technique) and
+  post-migration — **byte-identical** both. Also green: regression 31/31,
+  avm1 broadcaster cluster (as_broadcaster*, mcl_as_broadcaster,
+  mouse_listeners, key_isToggled, stage_display_state), gnash
+  Key-v6/7/8 + Mouse-v7 + Stage-v8 + Selection-v8 (effective 8/8), avm1
+  focus/tab Selection cluster (3-arg broadcast path).
+
+Running total: **twenty-one** confirmed TYPE1_ARG_ORDER instances,
+regression **31/31** locally. **Stage 4's migration pass (a) is COMPLETE**
+— every dispatcher in the survey funnels through `invokeFunctionValue`.
+`invokeSpecialFunction` survives with exactly one caller (`lv_url_encode`'s
+`_global.escape` override). Remaining: normalization pass (b) per the
+dossier master list, then Stage 5 (delete dead loops, funnel gate).
+
 ### Stage 5 — lock it in
 
 - Delete the then-dead 32 marshalling loops and per-site casts.

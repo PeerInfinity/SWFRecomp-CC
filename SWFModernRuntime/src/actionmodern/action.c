@@ -33586,194 +33586,92 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             super_pushed = 1;
         }
 
-        if (func->function_type == 2 && func->advanced_func != NULL) {
-            ActionVar* regs = NULL;
-            if (func->register_count > 0)
-                regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-            // Only restore captured scopes for SWF6+ (SWF5 has no closure semantics)
-            u8 bm_captured = (g_swf_version >= 6) ? func->captured_scope_count : 0;
-            for (u8 ci = 0; ci < bm_captured; ci++) {
-                if (scope_depth < MAX_SCOPE_DEPTH) {
-                    scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-                    scope_mc[scope_depth] = func->captured_scope_mc[ci];
-                    scope_chain[scope_depth++] = func->captured_scope[ci];
-                }
-            }
-
-            // Build a local scope with this/super/arguments shadows so the
-            // listener function reads its OWN this/super/arguments instead of
-            // the outer broadcastMessage call's (which were set by
-            // actionCallMethod). Without this shadow, MTASC-compiled
-            // DefineFunction2 listeners (SWF7+ AsBroadcaster.as onTest, add)
-            // resolve `this` to bcast.dynamic_props instead of the listener,
-            // and `this.order = ...` writes to the wrong object.
-            // Mirrors actionCallMethod's type-2 setup (this/super/arguments
-            // on a fresh local_scope) when no preload/suppress flags are set.
-            u16 bm_f2flags = func->flags;
-            int bm_preload_this  = (bm_f2flags & 0x0001);
-            int bm_suppress_this = (bm_f2flags & 0x0002);
-            int bm_preload_args  = (bm_f2flags & 0x0004);
-            int bm_suppress_args = (bm_f2flags & 0x0008);
-            int bm_preload_super = (bm_f2flags & 0x0010);
-            int bm_suppress_super= (bm_f2flags & 0x0020);
-
-            ASObject* bm_local_scope_t2 = allocObject(app_context, 8);
-            u32 bm_saved_this_depth_t2 = g_this_depth;
-            if (!bm_preload_this && !bm_suppress_this) {
-                ActionVar this_var = {0};
-                if (listener_mc != NULL) {
-                    this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-                    this_var.data.numeric_value = (u64)listener_mc;
-                } else if (listener_obj != NULL) {
-                    this_var.type = ACTION_STACK_VALUE_OBJECT;
-                    this_var.data.numeric_value = (u64)listener_obj;
-                } else {
-                    this_var.type = ACTION_STACK_VALUE_UNDEFINED;
-                }
-                setProperty(app_context, bm_local_scope_t2, "this", 4, &this_var);
-                if (g_this_depth < MAX_THIS_DEPTH) {
-                    g_this_stack[g_this_depth] = this_var;
-                    g_this_depth++;
-                }
-            }
-
-            ASFunction* bm_prev_exec_t2 = g_current_executing_func;
-            if (!bm_preload_args && !bm_suppress_args) {
-                ASArray* args_arr = allocArray(app_context, extra_count > 0 ? extra_count : 1);
-                for (u32 ai = 0; ai < extra_count; ai++)
-                    setArrayElement(app_context, args_arr, ai, &extra_args[ai]);
-                setupArgumentsProps(app_context, args_arr, func, bm_prev_exec_t2);
-                ActionVar args_var = {0};
-                args_var.type = ACTION_STACK_VALUE_ARRAY;
-                args_var.data.numeric_value = (u64)args_arr;
-                setProperty(app_context, bm_local_scope_t2, "arguments", 9, &args_var);
-            }
-            {
-                ActionVar super_var = {0};
-                super_var.type = ACTION_STACK_VALUE_UNDEFINED;
-                if (!bm_preload_super && !bm_suppress_super && g_swf_version >= 6 && super_pushed) {
-                    super_var.type = ACTION_STACK_VALUE_SUPER;
-                    super_var.data.numeric_value = (u64)listener_obj;
-                    super_var.str_size = (u32)method_search_depth;
-                }
-                setProperty(app_context, bm_local_scope_t2, "super", 5, &super_var);
-            }
-            if (scope_depth < MAX_SCOPE_DEPTH) {
-                scope_is_with[scope_depth] = 0;
-                scope_mc[scope_depth] = NULL;
-                scope_chain[scope_depth++] = bm_local_scope_t2;
-            }
-
-            // When listener is a MovieClip, pass 'this' as MOVIECLIP type via g_override_this
-            // so preload_this in the function sees the correct type (not OBJECT from dynamic_props)
+        // Migrated to the unified invokeFunctionValue core (Function-Dispatch
+        // Consolidation, Stage 4). The loop, element filtering, method
+        // resolution + method_search_depth, and the conditional
+        // pushSuperContext/popSuperContext bracket stay in the arm — the
+        // super context receiver is listener_obj (an MC listener's
+        // dynamic_props), which the core's INV_SUPER_CTX could never derive
+        // from this_var (the .call/.apply precedent), and the pop must also
+        // run when the core skips a non-dispatchable func (the old balancing
+        // else).
+        //
+        // Flag mapping (dossier §3): captured scopes gated on the CALLER's
+        // g_swf_version (computed here — the core has no version gate; do not
+        // "fix" toward the MC arms' callee gate); INV_LOCAL_SCOPE +
+        // INV_EXEC_FUNC (the site wrote both exec globals, and
+        // INV_ACT_ARGUMENTS needs the core to own the swap so
+        // arguments.caller stays the pre-swap caller); no depth guard of any
+        // kind (the site never had one — a re-broadcasting listener recurses
+        // unguarded; normalization candidate, not this commit); no version
+        // switch, no base clip, no g_event_this_mc (never touched here).
+        //
+        // this_var is per-branch to preserve the arms' both-NULL corner
+        // disagreement: type-2 binds/pushes UNDEFINED via INV_ACT_THIS's
+        // !preload && !suppress gate; type-1 pushes unconditionally
+        // (INV_THIS_STACK), OBJECT(listener_obj) even when NULL. The ABI
+        // receiver is listener_obj for both (has_this_ptr — the core would
+        // otherwise pass the MC pointer for MOVIECLIP this_var).
+        //
+        // super_bind carries the arm-computed super NAME-SHADOW that hides
+        // the outer broadcastMessage invocation frame's `super` (LIVE on the
+        // scope chain for the whole loop; AsBroadcaster.as:312 super.add) —
+        // bound for BOTH types, SUPER value only under each arm's own gate
+        // (t2 adds the preload/suppress bits), UNDEFINED otherwise. This is
+        // deliberately NOT INV_ACT_SUPER, whose value-source (any live super
+        // context) differs from the site's (only when THIS arm pushed).
+        //
+        // The core's type-1 marshalling adds the missing CLAMP: the old arm
+        // pushed ALL extras (pad only), binding the last param_count args to
+        // the params and stranding the surplus on the caller's value stack —
+        // instance 21, regression/broadcast_type1_args. Type-2 extras pass
+        // through unclamped/unpadded as before. The t2 arguments capacity
+        // max(n,1) -> n delta is inert (allocArray clamps to >= 4).
+        {
+            ActionVar bm_this = {0};
             if (listener_mc != NULL) {
-                g_override_this.type = ACTION_STACK_VALUE_MOVIECLIP;
-                g_override_this.data.numeric_value = (u64)listener_mc;
-                g_override_this.str_size = 0;
-                g_override_this_set = 1;
+                bm_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+                bm_this.data.numeric_value = (u64)listener_mc;
+            } else if (listener_obj != NULL || func->function_type == 1) {
+                bm_this.type = ACTION_STACK_VALUE_OBJECT;
+                bm_this.data.numeric_value = (u64)listener_obj;
+            } else {
+                bm_this.type = ACTION_STACK_VALUE_UNDEFINED;
             }
-            g_prev_executing_func = bm_prev_exec_t2;
-            g_current_executing_func = func;
-            func->advanced_func(app_context, extra_args, extra_count, regs, listener_obj);
-            g_current_executing_func = bm_prev_exec_t2;
-            if (listener_mc != NULL && g_override_this_set) g_override_this_set = 0; // clear if unconsumed
 
-            if (scope_depth > 0) scope_depth--; // pop bm_local_scope_t2
-            releaseObject(app_context, bm_local_scope_t2);
-            g_this_depth = bm_saved_this_depth_t2;
+            ActionVar bm_super = {0};
+            bm_super.type = ACTION_STACK_VALUE_UNDEFINED;
+            u16 bm_f2 = (func->function_type == 2) ? func->flags : 0;
+            if (g_swf_version >= 6 && super_pushed && !(bm_f2 & 0x0030)) {
+                bm_super.type = ACTION_STACK_VALUE_SUPER;
+                bm_super.data.numeric_value = (u64)listener_obj;
+                bm_super.str_size = (u32)method_search_depth;
+            }
 
-            for (u8 ci = 0; ci < bm_captured; ci++) {
-                if (scope_depth > 0) scope_depth--;
-            }
-            if (regs) FREE(regs);
-            if (super_pushed) popSuperContext();
-        } else if (func->function_type == 1 && func->simple_func != NULL) {
-            // Only restore captured scopes for SWF6+ (SWF5 has no closure semantics)
-            u8 bm_captured_t1 = (g_swf_version >= 6) ? func->captured_scope_count : 0;
-            for (u8 ci = 0; ci < bm_captured_t1; ci++) {
-                if (scope_depth < MAX_SCOPE_DEPTH) {
-                    scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-                    scope_mc[scope_depth] = func->captured_scope_mc[ci];
-                    scope_chain[scope_depth++] = func->captured_scope[ci];
-                }
-            }
-            u32 saved_this_depth_bm_t1 = g_this_depth;
-            if (g_this_depth < MAX_THIS_DEPTH) {
-                // When listener is a MovieClip, push 'this' as MOVIECLIP type
+            ActionVar bm_override = {0};
+            InvokeOpts bm_opts = {0};
+            bm_opts.flags = (g_swf_version >= 6 ? INV_CAPTURED_SCOPE : 0)
+                          | INV_LOCAL_SCOPE | INV_EXEC_FUNC;
+            bm_opts.act_flags = INV_ACT_ARGUMENTS;
+            bm_opts.has_this_ptr = 1;
+            bm_opts.this_ptr = listener_obj;
+            bm_opts.super_bind = &bm_super;
+            if (func->function_type == 2) {
+                bm_opts.act_flags |= INV_ACT_THIS;
                 if (listener_mc != NULL) {
-                    g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-                    g_this_stack[g_this_depth].data.numeric_value = (u64)listener_mc;
-                } else {
-                    g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-                    g_this_stack[g_this_depth].data.numeric_value = (u64)listener_obj;
+                    bm_override.type = ACTION_STACK_VALUE_MOVIECLIP;
+                    bm_override.data.numeric_value = (u64)listener_mc;
+                    bm_opts.flags |= INV_OVERRIDE_THIS;
+                    bm_opts.override_this = &bm_override;
                 }
-                g_this_depth++;
+            } else {
+                bm_opts.flags |= INV_THIS_STACK;
             }
 
-            // Build a local scope with `arguments` so the listener function sees its
-            // own args, not the broadcaster's (otherwise `arguments[0]` resolves up
-            // the scope chain to broadcastMessage's `arguments`, which contains the
-            // method name as element 0). Also set `super` here to shadow the outer
-            // broadcastMessage call's local-scope `super` (set by actionCallMethod
-            // when broadcastMessage was invoked) — without this, the listener's
-            // `super.foo()` resolves the OUTER super (= broadcaster's prototype),
-            // not the listener's own (AsBroadcaster.as:312 super.add(o) test).
-            ASObject* bm_local_scope = allocObject(app_context, 8);
-            ASArray* bm_args_arr = allocArray(app_context, extra_count > 0 ? extra_count : 1);
-            for (u32 ai = 0; ai < extra_count; ai++) {
-                setArrayElement(app_context, bm_args_arr, ai, &extra_args[ai]);
-            }
-            ASFunction* bm_prev_exec = g_current_executing_func;
-            setupArgumentsProps(app_context, bm_args_arr, func, bm_prev_exec);
-            ActionVar bm_args_var = {0};
-            bm_args_var.type = ACTION_STACK_VALUE_ARRAY;
-            bm_args_var.data.numeric_value = (u64) bm_args_arr;
-            setProperty(app_context, bm_local_scope, "arguments", 9, &bm_args_var);
-            {
-                ActionVar bm_super_var = {0};
-                bm_super_var.type = ACTION_STACK_VALUE_UNDEFINED;
-                if (g_swf_version >= 6 && super_pushed) {
-                    bm_super_var.type = ACTION_STACK_VALUE_SUPER;
-                    bm_super_var.data.numeric_value = (u64)listener_obj;
-                    bm_super_var.str_size = (u32)method_search_depth;
-                }
-                setProperty(app_context, bm_local_scope, "super", 5, &bm_super_var);
-            }
-            if (scope_depth < MAX_SCOPE_DEPTH) {
-                scope_is_with[scope_depth] = 0;
-                scope_mc[scope_depth] = NULL;
-                scope_chain[scope_depth++] = bm_local_scope;
-            }
-
-            // Push args onto stack in forward order (caller pushes args[0] first,
-            // function pops args[N-1] first via its reverse-pop param binding).
-            for (u32 j = 0; j < extra_count; j++) {
-                pushVar(app_context, &extra_args[j]);
-            }
-            // Pad with undefined if the listener has named params beyond extra_count
-            // (generated code always pops exactly param_count values from the stack).
-            for (u32 j = extra_count; j < func->param_count; j++) {
-                PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-            }
-
-            g_prev_executing_func = bm_prev_exec;
-            g_current_executing_func = func;
-            ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-            g_current_executing_func = bm_prev_exec;
-
-            // Pop local scope
-            if (scope_depth > 0) scope_depth--;
-            releaseObject(app_context, bm_local_scope);
-
-            g_this_depth = saved_this_depth_bm_t1;
-            for (u8 ci = 0; ci < bm_captured_t1; ci++) {
-                if (scope_depth > 0) scope_depth--;
-            }
-            if (super_pushed) popSuperContext();
-        } else {
-            // No matching dispatch path — still balance super context push.
-            if (super_pushed) popSuperContext();
+            (void) invokeFunctionValue(app_context, func, &bm_this,
+                                       extra_args, extra_count, &bm_opts);
         }
+        if (super_pushed) popSuperContext();
     }
 
     ActionVar true_result = {0};

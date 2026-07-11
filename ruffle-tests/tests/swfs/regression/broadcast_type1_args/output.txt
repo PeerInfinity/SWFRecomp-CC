@@ -1,0 +1,14 @@
+bc1
+a=one
+b=two
+tb=string
+bc2
+a=solo
+b=
+tb=undefined
+bc3
+a=x1
+b=x2
+tb=string
+X: true
+after
