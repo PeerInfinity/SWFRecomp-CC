@@ -225,10 +225,26 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   **CI fan-out deliberately deferred to Stage 2** — with zero passing tests a
   CI baseline observes nothing (ci-only-when-observable), and the workflow
   file is in active use by concurrent AVM1 sessions.
-- **Stage 1 — ABC front-end**: parser (constant pool, multinames, methods,
-  bodies, classes, scripts, traits, exception tables) + verifier/IR translation
-  + `--dump-abc` tool. Exit: all 1,149 corpus ABCs parse + verify clean; dumps
-  spot-checked against Ruffle's for a sample.
+- **Stage 1 — ABC front-end** — **DONE 2026-07-10**: parser
+  (`SWFRecomp/src/abc/abc_parser.cpp`, ported from Ruffle `swf/src/avm2/read.rs`),
+  verifier/IR translation (`abc_verifier.cpp`, modeled on `core/src/avm2/verify.rs`:
+  reachability walk, op splits — GetLex/CallSuperVoid/GetGlobalSlot/compare-branches —
+  offsets→op indices, exception resolution, plus static stack/scope-depth checking
+  that Ruffle leaves to its optimizer), resolved IR with static table indices
+  (`include/abc/abc_ir.hpp`), and `SWFRecomp --dump-abc` / `--check-abc` modes
+  (`abc_dump.cpp`, `abc_tool.cpp`). Gated `swf.cpp` hooks: DoABC (72/82) parses +
+  verifies with a printed summary, SymbolClass read+recorded (no-op), FileAttributes
+  AS3 bit prints a clear not-yet-supported notice. Sweep
+  (`SWFRecomp/tools/abc_corpus_sweep.py`): **1,202/1,202 corpus SWFs parse clean;
+  1,193 verify clean; all 9 verify-flagged are correct flags** — 8 tests
+  intentionally ship invalid bytecode (`verification`, `verify_*`,
+  `cpool_index_invalid_bytecode_*` — they expect runtime VerifyErrors), and
+  `json_errors` embeds a never-called template function with genuinely unbalanced
+  scope depth at a merge (Ruffle's own `merge_with` would throw 1031 if it were
+  invoked; lazy verification means it never is). Dumps spot-checked against `.as`
+  sources for `hello_world`, `add`, `closures`, `es4_inheritance`. IR divergences
+  from Ruffle documented in `abc_ir.hpp` (GetGlobalScope not lowered, PushNaN kept,
+  Coerce/AsType/IsType keep multiname indices).
 - **Stage 2 — hello_world end-to-end**: minimal C emitter (script init +
   class + constructor), `Avm2Value` + core coercions, ScriptObject/vtable
   minimum, `trace`, Sprite/MovieClip stub root, SymbolClass root binding,

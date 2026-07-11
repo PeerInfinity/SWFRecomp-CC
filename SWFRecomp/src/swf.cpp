@@ -20,6 +20,9 @@
 
 #include <swf.hpp>
 
+#include <abc/abc_parser.hpp>
+#include <abc/abc_verifier.hpp>
+
 #define MIN(x, y) ((x < y) ? x : y)
 #define MAX(x, y) ((x > y) ? x : y)
 
@@ -382,7 +385,8 @@ namespace SWFRecomp
 							 shape_has_alpha(false),
 							 shape_is_v4(false),
 							 shape_is_morph2(false),
-							 use_network(false)
+							 use_network(false),
+							 is_as3(false)
 	{
 		// Configure reusable struct records
 		//
@@ -4731,7 +4735,12 @@ namespace SWFRecomp
 
 				if ((flags & 0b00001000) != 0)
 				{
-					//EXC("ActionScript 3 SWFs not implemented.\n");
+					// AS3 bit: the SWF's code lives in DoABC tags, which are
+					// parsed (not yet compiled) below. Frame/DoAction handling
+					// for AVM1 SWFs is unaffected — they never set this bit.
+					is_as3 = true;
+					printf("AS3 (AVM2) SWF detected: ABC tags will be parsed and verified, "
+					       "but AVM2 code generation is not implemented yet (plan Stage 2).\n");
 				}
 
 				// Bit 0: UseNetwork
@@ -4745,8 +4754,35 @@ namespace SWFRecomp
 			
 			case SWF_TAG_SYMBOL_CLASS:
 			{
-				cur_pos += tag.length;
-				
+				// Read + record only (Stage 1): nothing acts on the bindings
+				// until AVM2 codegen exists. char_id 0 = the root class.
+				char* body_start = cur_pos;
+				char* body_end = cur_pos + tag.length;
+				if (cur_pos + 2 <= body_end)
+				{
+					u16 symbol_count = (u8) cur_pos[0] | ((u8) cur_pos[1] << 8);
+					cur_pos += 2;
+					for (u16 si = 0; si < symbol_count && cur_pos + 2 <= body_end; ++si)
+					{
+						u16 symbol_char_id = (u8) cur_pos[0] | ((u8) cur_pos[1] << 8);
+						cur_pos += 2;
+						std::string symbol_name;
+						while (cur_pos < body_end && *cur_pos != 0)
+						{
+							symbol_name += *cur_pos;
+							cur_pos += 1;
+						}
+						if (cur_pos < body_end)
+						{
+							cur_pos += 1;  // NUL
+						}
+						symbol_class_bindings.push_back({ symbol_char_id, symbol_name });
+					}
+					printf("SymbolClass: recorded %zu binding(s) (no-op until AVM2 codegen)\n",
+					       symbol_class_bindings.size());
+				}
+				cur_pos = body_start + tag.length;
+
 				break;
 			}
 			
@@ -6167,12 +6203,69 @@ namespace SWFRecomp
 				break;
 			}
 
-			//~ case SWF_TAG_DO_ABC:
-			//~ {
-				//~ cur_pos += tag.length;
-				
-				//~ break;
-			//~ }
+			case SWF_TAG_DO_ABC:         // 82: Flags(UI32) + Name(STRING) + ABC data
+			case SWF_TAG_DO_ABC_DEFINE:  // 72: raw ABC data
+			{
+				// Stage 1 (avm2-support-plan §5): parse + verify the ABC
+				// block so AS3 SWFs are routed through the ABC front-end
+				// instead of silently producing empty AVM1 output. No C is
+				// emitted yet — codegen is Stage 2.
+				char* body_start = cur_pos;
+				const abc::u8* abc_data = (const abc::u8*) cur_pos;
+				size_t abc_len = tag.length;
+
+				if (tag.code == SWF_TAG_DO_ABC && abc_len >= 4)
+				{
+					const abc::u8* p = abc_data + 4;  // skip Flags
+					const abc::u8* p_end = abc_data + abc_len;
+					while (p < p_end && *p != 0)
+					{
+						++p;  // skip Name
+					}
+					if (p < p_end)
+					{
+						++p;  // NUL
+					}
+					abc_data = p;
+					abc_len = (size_t) (p_end - p);
+				}
+
+				abc::AbcFile abc_file;
+				std::string abc_error;
+				if (!abc::parseAbc(abc_data, abc_len, abc_file, abc_error))
+				{
+					fprintf(stderr, "DoABC: parse failed: %s\n", abc_error.c_str());
+				}
+				else
+				{
+					abc::VerifyError verr;
+					if (!abc::validateAbcFile(abc_file, verr))
+					{
+						fprintf(stderr, "DoABC: validation failed: %s\n", verr.message.c_str());
+					}
+					else
+					{
+						size_t verify_fails = 0;
+						for (size_t bi = 0; bi < abc_file.method_bodies.size(); ++bi)
+						{
+							abc::IrMethod ir;
+							abc::VerifyError body_err;
+							if (!abc::verifyMethodBody(abc_file, (abc::u32) bi, ir, body_err))
+							{
+								verify_fails += 1;
+							}
+						}
+						printf("DoABC: parsed OK (%zu classes, %zu methods, %zu bodies, "
+						       "%zu verify failure(s)); AVM2 codegen not implemented yet\n",
+						       abc_file.instances.size(), abc_file.methods.size(),
+						       abc_file.method_bodies.size(), verify_fails);
+					}
+				}
+
+				cur_pos = body_start + tag.length;
+
+				break;
+			}
 			
 			case SWF_TAG_DEFINE_BUTTON:
 			case SWF_TAG_DEFINE_BUTTON_2:

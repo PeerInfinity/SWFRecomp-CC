@@ -52,7 +52,8 @@ namespace SWFRecomp
 		SWF_TAG_FILE_ATTRIBUTES = 69,
 		SWF_TAG_SYMBOL_CLASS = 76,
 		SWF_TAG_METADATA = 77,
-		SWF_TAG_DO_ABC = 82,
+		SWF_TAG_DO_ABC_DEFINE = 72,  // early DoABC variant: raw ABC data, no flags/name
+		SWF_TAG_DO_ABC = 82,         // Flags(UI32) + Name(STRING) + ABC data
 		SWF_TAG_FREE_CHARACTER = 3,
 		SWF_TAG_EXPORT_ASSETS = 56,
 		SWF_TAG_DEBUG_ID = 63,

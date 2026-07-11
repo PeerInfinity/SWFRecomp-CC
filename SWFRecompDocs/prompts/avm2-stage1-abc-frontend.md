@@ -1,5 +1,12 @@
 # Session prompt — AVM2 Stage 1: ABC front-end (parser + resolved IR + dump tool)
 
+> **STATUS: COMPLETE 2026-07-10.** All deliverables and exit criteria met —
+> parser + verifier/IR in `SWFRecomp/src/abc/`, `--dump-abc`/`--check-abc`
+> modes, corpus sweep 1,202/1,202 parse clean (9 verify flags, all triaged
+> as intentional — see the table in
+> `ruffle-tests/tests/swfs/avm2/_investigation/CURRENT_STATUS.md`).
+> Next session: Stage 2 (hello_world end-to-end), per plan §5.
+
 You are implementing **Stage 1** of `SWFRecompDocs/plans/avm2-support-plan.md`.
 Read that plan first (especially §4.1 compiler pipeline, §5 stages), then
 `ruffle-tests/tests/swfs/avm2/_investigation/CURRENT_STATUS.md`. Stage 0

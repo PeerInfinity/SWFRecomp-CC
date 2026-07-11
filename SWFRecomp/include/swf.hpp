@@ -290,6 +290,11 @@ namespace SWFRecomp
 		bool shape_is_morph2;
 		bool shape_uses_nonzero_winding;
 		bool use_network;
+		// FileAttributes AS3 bit: the SWF's code is AVM2 (DoABC tags).
+		bool is_as3;
+		// SymbolClass (tag 76) bindings: (char_id, AS3 class name). Read and
+		// recorded only — nothing acts on them until AVM2 codegen (Stage 2).
+		std::vector<std::pair<u16, std::string>> symbol_class_bindings;
 
 		SWF();
 		SWF(Context& context);
