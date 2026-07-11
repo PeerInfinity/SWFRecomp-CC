@@ -289,10 +289,12 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   Function/String/Number/int/uint/Boolean/Array/Math/Error family/toplevel
   + XML/XMLList/Date/Point stubs). verify_output.py approximations now
   match Ruffle's framework (section-gated numeric compare + max_relative).
-  Exit met: **152/166 tranche-1 candidates** pass locally (≥80-of-~90
-  criterion); all 14 misses triaged to later-tranche deps (RegExp ×5,
-  Vector ×3, describeType ×2, AMF ×1, Proxy ×1, display ×1, upstream-ignored
-  ×1) in `avm2/_investigation/CURRENT_STATUS.md`.
+  Exit met: **152/166 tranche-1 candidates** pass in CI (≥80-of-~90
+  criterion); full-suite CI baseline **296/1198 (24.7%, up from 8)** with
+  zero regressions in any suite; all 14 misses triaged to later-tranche
+  deps (RegExp ×5, Vector ×3, describeType ×2, AMF ×1, Proxy ×1,
+  display ×1, upstream-ignored ×1) in
+  `avm2/_investigation/CURRENT_STATUS.md`. Landed at `2ceede962`.
 - **Stage 4 — tranches 2+3 (~110 tests)**: Vector, JSON, RegExp, proto edge
   cases; Namespace/QName/Proxy/Dictionary, ByteArray, AMF. Exit: climbing
   toward the 694-test phase-1 ceiling; re-triage what's left.

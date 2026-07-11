@@ -8,10 +8,15 @@ suite's trace tests.
 
 ## State
 
-- **Stage 3 local result: 152 / 166 tranche-1 candidates passing**
+- **CI baseline (run 29145483298, 2026-07-11): 296 / 1,198 passing
+  (24.7%)** — up from Stage 2's 8/1198 (+288), zero pass→fail regressions
+  in avm2 or ANY AVM1 suite (avm1 634/706, gnash suites, shumway 73/92 +
+  46/47, regression 41/41 all unchanged), wasm-link-smoke green.
+  **152 / 166 tranche-1 candidates pass in CI**
   (`_investigation/TRANCHE1_CANDIDATES.txt`, the name-pattern superset of
-  the plan's ~90-test tranche 1 — the ≥80-of-~90 exit criterion is met with
-  room to spare). Awaiting the full-suite CI baseline; Stage 2's was 8/1198.
+  the plan's ~90-test tranche 1 — the ≥80-of-~90 exit criterion is met
+  with room to spare). Remaining avm2 statuses: 823 output_mismatch,
+  68 runtime_error, 11 ruffle_matched.
 - **Static op-surface ceiling: 1069 / 1162 censused tests** (was 61) with
   the Stage-3 op surface of 122 IR ops
   (`python3 SWFRecomp/tools/abc_op_census.py --implemented-file <ops>`).
