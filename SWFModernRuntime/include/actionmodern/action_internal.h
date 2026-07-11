@@ -245,6 +245,15 @@ void actionRestoreFunctionVersion(int saved_ver, ASObject* saved_global, int sav
 #define INV_RESET_THIS_DEPTH     0x2000u  // zero g_this_depth for the call (accessor-setter isolation)
 #define INV_CTOR_CTX             0x4000u  // pushCtorContext(0)/popCtorContext around the callee body
 #define INV_OVERRIDE_THIS        0x8000u  // manage g_override_this{,_set} for the call (see opts->override_this)
+// Special-recursion guard (Ruffle ExecutionReason::Special, activation.rs:
+// special_count == 65 -> SpecialRecursionLimit -> avm1.halt()): increment
+// g_special_depth; at MAX_SPECIAL_DEPTH (66) decrement, HALT all script
+// execution, return undefined. Unlike the legacy g_special_depth users
+// (sound/LV/unload dispatch), which return non-fatally — a preserved
+// divergence — this flag matches Ruffle's halting semantics. First users:
+// the coercion paths (a recursive valueOf segfaulted before this;
+// regression/coerce_recursion_guard).
+#define INV_SPECIAL_GUARD        0x20000u
 // 0x10000u was INV_LOCAL_SCOPE_UNDER_CAPTURED (push the fresh local frame
 // BENEATH the captured scopes, letting a captured scope shadow the callee's
 // own params on lookup). Removed by normalization pass (b), 2026-07-11: all

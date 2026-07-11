@@ -14284,7 +14284,7 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 				ActionVar gv_this = {0};
 				gv_this.type = ACTION_STACK_VALUE_OBJECT;
 				gv_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts gv_opts = { .flags = INV_VERSION_SWITCH };
+				InvokeOpts gv_opts = { .flags = INV_VERSION_SWITCH | INV_SPECIAL_GUARD };
 				return invokeFunctionValue(app_context, vof_func, &gv_this, NULL, 0, &gv_opts);
 			}
 		}
@@ -14320,7 +14320,8 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 				ActionVar vof_this = {0};
 				vof_this.type = ACTION_STACK_VALUE_OBJECT;
 				vof_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts vof_opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE };
+				InvokeOpts vof_opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE |
+				                        INV_SPECIAL_GUARD };
 				ActionVar result = invokeFunctionValue(app_context, func, &vof_this,
 				                                       NULL, 0, &vof_opts);
 
@@ -14474,7 +14475,8 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 			ActionVar ts_this = {0};
 			ts_this.type = ACTION_STACK_VALUE_OBJECT;
 			ts_this.data.numeric_value = (u64)(uintptr_t)obj;
-			InvokeOpts ts_opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE };
+			InvokeOpts ts_opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE |
+			                       INV_SPECIAL_GUARD };
 			ActionVar result = invokeFunctionValue(app_context, func, &ts_this,
 			                                       NULL, 0, &ts_opts);
 
@@ -14517,8 +14519,8 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 				ActionVar tsg_this = {0};
 				tsg_this.type = ACTION_STACK_VALUE_OBJECT;
 				tsg_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts tsg_opts = { .flags = INV_CAPTURED_SCOPE
-				                               | INV_VERSION_SWITCH };
+				InvokeOpts tsg_opts = { .flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH
+				                               | INV_SPECIAL_GUARD };
 				return invokeFunctionValue(app_context, ts_func, &tsg_this, NULL, 0, &tsg_opts);
 			}
 		}
@@ -14628,7 +14630,7 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 				ActionVar otp_this = {0};
 				otp_this.type = ACTION_STACK_VALUE_OBJECT;
 				otp_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts otp_opts = { .flags = INV_VERSION_SWITCH |
+				InvokeOpts otp_opts = { .flags = INV_VERSION_SWITCH | INV_SPECIAL_GUARD |
 				                        ((func->function_type == 1)
 				                                     ? INV_THIS_STACK : 0u) };
 				ActionVar result = invokeFunctionValue(app_context, func, &otp_this,
@@ -14676,7 +14678,7 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 				ActionVar otp_ts_this = {0};
 				otp_ts_this.type = ACTION_STACK_VALUE_OBJECT;
 				otp_ts_this.data.numeric_value = (u64)(uintptr_t)obj;
-				InvokeOpts otp_ts_opts = { .flags = INV_VERSION_SWITCH |
+				InvokeOpts otp_ts_opts = { .flags = INV_VERSION_SWITCH | INV_SPECIAL_GUARD |
 				                           ((func->function_type == 1)
 				                                        ? INV_THIS_STACK : 0u) };
 				ActionVar result = invokeFunctionValue(app_context, func, &otp_ts_this,
@@ -15150,6 +15152,21 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 		}
 	}
 
+	// Special-recursion guard (Ruffle's ExecutionReason::Special counter):
+	// increment-then-check at 66, HALT on exceed (SpecialRecursionLimit is a
+	// halting error in Ruffle's handle_error). See the flag doc in
+	// action_internal.h.
+	if (flags & INV_SPECIAL_GUARD)
+	{
+		g_special_depth++;
+		if (g_special_depth >= MAX_SPECIAL_DEPTH)
+		{
+			g_special_depth--;
+			g_execution_halted = 1;
+			return undef;
+		}
+	}
+
 	// Receiver pointer + MC-ness derived from the this_var tag.
 	int this_is_mc = (this_var != NULL && this_var->type == ACTION_STACK_VALUE_MOVIECLIP);
 	void* this_ptr = (this_var != NULL &&
@@ -15345,6 +15362,7 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 	if (flags & INV_SUPER_CTX) popSuperContext();
 	g_this_depth = saved_this_depth;
 	if (flags & INV_DEPTH_GUARD) g_call_depth--;
+	if (flags & INV_SPECIAL_GUARD) g_special_depth--;
 	return result;
 }
 
@@ -29825,8 +29843,8 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 							ActionVar cf_this = {0};
 							cf_this.type = ACTION_STACK_VALUE_OBJECT;
 							cf_this.data.numeric_value = (u64)(uintptr_t)obj;
-							InvokeOpts cf_opts = { .flags = INV_CAPTURED_SCOPE
-							                              | INV_VERSION_SWITCH };
+							InvokeOpts cf_opts = { .flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH
+							                              | INV_SPECIAL_GUARD };
 							ActionVar result = invokeFunctionValue(app_context, func, &cf_this,
 							                                       NULL, 0, &cf_opts);
 
@@ -29870,8 +29888,8 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 						ActionVar cfg_this = {0};
 						cfg_this.type = ACTION_STACK_VALUE_OBJECT;
 						cfg_this.data.numeric_value = (u64)(uintptr_t)obj;
-						InvokeOpts cfg_opts = { .flags = INV_CAPTURED_SCOPE
-						                               | INV_VERSION_SWITCH };
+						InvokeOpts cfg_opts = { .flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH
+						                               | INV_SPECIAL_GUARD };
 						ActionVar result = invokeFunctionValue(app_context, vof_func, &cfg_this,
 						                                       NULL, 0, &cfg_opts);
 						if (result.type != ACTION_STACK_VALUE_OBJECT &&
@@ -42356,10 +42374,24 @@ void actionSetVariable(SWFAppContext* app_context)
 					// watchers run at their DEFINING movie's SWF version
 					// (regression/watch_cross_swf_version, Site A row).
 					// Safe as a plain flag: no INV_BASE_CLIP on this arm.
-					invokeWatchCallback(app_context, _wf, &_we->user_data, NULL,
-						var_name, var_name_len, &_old_val, &_new_val,
-						INV_LOCAL_SCOPE | INV_VERSION_SWITCH,
-						4, /*pname_owns*/0, /*free_pname*/0, /*clear_owns*/0);
+					//
+					// Re-entrancy guard (pass (b) item 4, Site B's ritual): a
+					// SetVariable of the SAME watched var inside its own
+					// watcher re-fires only up to Flash's version-specific
+					// depth (1 for SWF6, 65 for SWF7+); past that the value
+					// commits without re-firing. Without this the re-fire
+					// recursed on the C stack and SEGFAULTED
+					// (regression/watch_timeline_reentrant).
+					if (watch_firing_depth(NULL, _sv_ctx, var_name, var_name_len) < accessorReentryLimit()
+					    && g_watch_firing_count < MAX_SPECIAL_DEPTH)
+					{
+						watch_firing_push(NULL, _sv_ctx, var_name, var_name_len);
+						invokeWatchCallback(app_context, _wf, &_we->user_data, NULL,
+							var_name, var_name_len, &_old_val, &_new_val,
+							INV_LOCAL_SCOPE | INV_VERSION_SWITCH,
+							4, /*pname_owns*/0, /*free_pname*/0, /*clear_owns*/0);
+						watch_firing_pop();
+					}
 					*var = _new_val;
 					// Sync to hashmap if string_id path was used
 					if (string_id != 0) {
@@ -49314,10 +49346,24 @@ void actionSetMember(SWFAppContext* app_context)
 								// Safe as a plain flag: no INV_BASE_CLIP on this arm
 								// (the receiver-context switch above is
 								// actionSetCurrentContext, not a base-clip gate).
-								invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
-									&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
-									INV_LOCAL_SCOPE | INV_BIND_THIS | INV_VERSION_SWITCH,
-									_wf_t2 ? 4 : 3, /*pname_owns*/0, /*free_pname*/1, /*clear_owns*/1);
+								//
+								// Re-entrancy guard (pass (b) item 4, Site B's ritual):
+								// a SetMember of the SAME watched prop on the SAME MC
+								// inside its own watcher re-fires only up to Flash's
+								// version-specific depth; past that the value commits
+								// without re-firing. Without this the re-fire recursed
+								// on the C stack (the Site A sibling SEGFAULTED;
+								// regression/watch_timeline_reentrant covers the class).
+								if (watch_firing_depth(NULL, mc, prop_name, prop_name_len) < accessorReentryLimit()
+								    && g_watch_firing_count < MAX_SPECIAL_DEPTH)
+								{
+									watch_firing_push(NULL, mc, prop_name, prop_name_len);
+									invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
+										&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
+										INV_LOCAL_SCOPE | INV_BIND_THIS | INV_VERSION_SWITCH,
+										_wf_t2 ? 4 : 3, /*pname_owns*/0, /*free_pname*/1, /*clear_owns*/1);
+									watch_firing_pop();
+								}
 								actionSetCurrentContext(_wsaved);
 							}
 						}
