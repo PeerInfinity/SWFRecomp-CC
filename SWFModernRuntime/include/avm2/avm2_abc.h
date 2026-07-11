@@ -44,6 +44,15 @@ typedef struct Avm2AbcMultiname
 	uint32_t ns_set;  // ns-set index (Multiname*/MultinameL*)
 } Avm2AbcMultiname;
 
+// Slot/optional-parameter default value: raw ABC DefaultValueKind + a
+// pool index whose pool depends on the kind (abc_types.hpp).
+typedef struct Avm2AbcDefault
+{
+	uint8_t has_value;
+	uint8_t kind;
+	uint32_t index;
+} Avm2AbcDefault;
+
 // Trait kinds: raw ABC values (abc_types.hpp TraitKindType):
 // 0 Slot, 1 Method, 2 Getter, 3 Setter, 4 Class, 5 Function, 6 Const.
 typedef struct Avm2AbcTrait
@@ -53,13 +62,15 @@ typedef struct Avm2AbcTrait
 	uint32_t slot_or_disp_id; // 0 = auto-assign
 	uint32_t type_mn;         // multiname index (Slot/Const)
 	uint32_t method_or_class; // method index (Method/Getter/Setter/Function) or class index (Class)
+	Avm2AbcDefault value;     // Slot/Const initial value
 } Avm2AbcTrait;
 
 struct Avm2Activation;
 typedef Avm2Value (*Avm2MethodFn)(struct Avm2Activation* act);
 
-// Exception table entry, offsets resolved to op indices (data only in
-// Stage 2 — runtime dispatch is a Stage 3 TODO; see abc_ir.hpp).
+// Exception table entry, offsets resolved to op indices. Dispatch matches
+// Ruffle activation.rs handle_err: op in [from_op, to_op), typed match by
+// is_of_type (type_mn 0 = catch-all).
 typedef struct Avm2AbcException
 {
 	uint32_t from_op;
@@ -70,11 +81,32 @@ typedef struct Avm2AbcException
 	uint8_t active;
 } Avm2AbcException;
 
+// Method flags: raw ABC values (abc_types.hpp MethodFlags).
+enum
+{
+	AVM2_METHOD_NEED_ARGUMENTS = 1 << 0,
+	AVM2_METHOD_NEED_ACTIVATION = 1 << 1,
+	AVM2_METHOD_NEED_REST = 1 << 2,
+	AVM2_METHOD_HAS_OPTIONAL = 1 << 3,
+	AVM2_METHOD_IGNORE_REST = 1 << 4,
+	AVM2_METHOD_NATIVE = 1 << 5,
+};
+
 typedef struct Avm2AbcMethodData
 {
 	Avm2MethodFn fn;         // NULL = no body (native / interface method)
 	const char* debug_name;  // pool name, for diagnostics
+	uint8_t flags;
+	// Referenced by NewFunction / a Function trait (Ruffle is_function):
+	// with an all-untyped default-free signature the method is "unchecked"
+	// (missing args become undefined, extra args allowed).
+	uint8_t is_function;
 	uint32_t param_count;
+	const uint32_t* param_types;      // param_count multiname indices (NULL if 0)
+	const Avm2AbcDefault* optionals;  // param_count entries, trailing ones present (NULL if none)
+	uint32_t return_type_mn;
+	uint32_t body_trait_count;        // activation-object traits (method body traits)
+	const Avm2AbcTrait* body_traits;
 	uint32_t exception_count;
 	const Avm2AbcException* exceptions;
 } Avm2AbcMethodData;
@@ -91,6 +123,10 @@ typedef struct Avm2AbcClassData
 	uint32_t name_mn;       // multiname index (QName)
 	uint32_t super_mn;      // multiname index (0 = none: Object/interface)
 	uint8_t flags;
+	uint8_t has_protected_ns;
+	uint32_t protected_ns;  // namespace index
+	uint32_t interface_count;
+	const uint32_t* interface_mns;  // multiname indices
 	uint32_t instance_init; // method index
 	uint32_t class_init;    // method index (static initializer)
 	uint32_t instance_trait_count;
@@ -108,6 +144,12 @@ typedef struct Avm2AbcScriptData
 
 typedef struct Avm2AbcFileData
 {
+	uint32_t int_count;
+	const int32_t* ints;
+	uint32_t uint_count;
+	const uint32_t* uints;
+	uint32_t double_count;
+	const double* doubles;
 	uint32_t string_count;
 	const Avm2String* strings;
 	uint32_t namespace_count;
@@ -136,6 +178,7 @@ extern const Avm2AbcFileData* const avm2_generated_abc_files[];
 extern const uint32_t avm2_generated_abc_file_count;
 extern const Avm2SymbolClassBinding avm2_generated_symbol_classes[];
 extern const uint32_t avm2_generated_symbol_class_count;
+extern const uint8_t avm2_generated_swf_version;
 
 // ---------------------------------------------------------------------------
 // Runtime-mutable per-file state
@@ -167,6 +210,7 @@ typedef struct Avm2Activation
 	Avm2Value this_val;
 	const Avm2Value* args;
 	uint32_t argc;
+	Avm2Object* callee;        // function object being invoked (arguments.callee); may be NULL
 } Avm2Activation;
 
 #endif // AVM2_ABC_H

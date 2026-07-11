@@ -1,15 +1,18 @@
 // Opcode helpers backing the generated C in RecompiledABC/. Semantics per
-// Ruffle core/src/avm2/ops (interpreter.rs / activation dispatch); Stage 2
-// implements exactly what hello_world's 21-op surface needs, and every
-// unsupported path aborts loudly (honest failure for the rest of the
-// corpus).
+// Ruffle core/src/avm2/activation.rs (op impls) and value.rs (property
+// dispatch): vtable traits (slots / methods / accessors) → own dynamic
+// props → prototype chain, with array-index fast paths, primitive
+// receivers via their builtin class vtables, and typed errors everywhere
+// (avm2_error.h). Anything not implemented aborts loudly (honest failure).
 
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
@@ -29,93 +32,666 @@ _Noreturn void avm2_fatal(const char* fmt, ...)
 
 _Noreturn void avm2_unimplemented_op(Avm2Activation* act, const char* op_name, uint32_t op_index)
 {
+	(void) act;
 	fflush(stdout);
-	fprintf(stderr, "AVM2: unimplemented op %s at op index %u (Stage 2 supports "
-	        "only hello_world's opcode surface; see avm2-support-plan.md Stage 3)\n",
-	        op_name, op_index);
+	fprintf(stderr, "AVM2: unimplemented op %s at op index %u (Stage-3 surface; "
+	        "see avm2-support-plan.md)\n", op_name, op_index);
 	exit(1);
 }
 
 _Noreturn void avm2_verify_error_body(Avm2Activation* act, const char* message)
 {
-	(void) act;
-	fflush(stdout);
-	fprintf(stderr, "AVM2: VerifyError body invoked: %s\n", message);
-	exit(1);
+	// Reachable VerifyError bodies throw a catchable VerifyError.
+	avm2_throw_error(act->ctx, act->ctx->builtins.verify_error_class, "%s", message);
 }
 
-void avm2_setup_locals(Avm2Value* loc, uint32_t num_locals, const Avm2Activation* act)
+// ---------------------------------------------------------------------------
+// Property resolution engine
+// ---------------------------------------------------------------------------
+
+// How a property was resolved on a receiver.
+typedef struct Resolved
 {
-	if (num_locals == 0) return;
-	loc[0] = act->this_val;
-	for (uint32_t i = 1; i < num_locals; i++)
+	const Avm2PropEntry* entry;  // vtable trait
+	Avm2Value* dyn;              // own dynamic slot
+	Avm2Object* proto_holder;    // proto-chain holder of `dyn`
+	int is_array_elem;
+	uint32_t arr_index;
+} Resolved;
+
+static int value_is_null_like(Avm2Value v)
+{
+	return v.kind == AVM2_VALUE_UNDEFINED || v.kind == AVM2_VALUE_NULL;
+}
+
+// Is `obj` allowed to grow dynamic props?
+static int object_is_dynamic(Avm2Object* obj)
+{
+	if (obj->kind == AVM2_OBJ_CLASS || obj->kind == AVM2_OBJ_FUNCTION
+	    || obj->kind == AVM2_OBJ_ARRAY)
 	{
-		loc[i] = (i - 1 < act->argc) ? act->args[i - 1] : avm2_undefined();
+		return 1;
+	}
+	if (obj->cls == NULL) return 1;
+	return (obj->cls->flags & AVM2_CLASS_FLAG_SEALED) == 0;
+}
+
+// Try to parse a property name as an array index ("0", "42").
+static int name_as_index(const char* name, uint32_t len, uint32_t* out)
+{
+	if (len == 0 || len > 10) return 0;
+	uint64_t v = 0;
+	for (uint32_t i = 0; i < len; i++)
+	{
+		if (name[i] < '0' || name[i] > '9') return 0;
+		v = v * 10 + (uint64_t) (name[i] - '0');
+	}
+	if (len > 1 && name[0] == '0') return 0;
+	if (v >= 0xFFFFFFFFull) return 0;
+	*out = (uint32_t) v;
+	return 1;
+}
+
+// Resolve by name-key: vtable → array index → own dynamic → proto chain.
+// `public_ok` gates the dynamic/proto part (dynamic props are public).
+static int resolve_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
+                       int public_ok, Resolved* out)
+{
+	memset(out, 0, sizeof(*out));
+
+	const Avm2VTable* vt = avm2_value_vtable(ctx, recv);
+	const Avm2PropEntry* e = avm2_vtable_find(vt, key);
+	if (e == NULL && recv.kind == AVM2_VALUE_OBJECT
+	    && recv.u.obj->kind == AVM2_OBJ_CLASS
+	    && ctx->builtins.class_class != NULL)
+	{
+		// Class objects carry their static traits; Class's own instance
+		// members (the `prototype` getter) come from Class's ivtable.
+		e = avm2_vtable_find(&ctx->builtins.class_class->ivtable, key);
+	}
+	if (e != NULL)
+	{
+		out->entry = e;
+		return 1;
+	}
+	if (!public_ok) return 0;
+
+	if (recv.kind == AVM2_VALUE_OBJECT)
+	{
+		Avm2Object* obj = recv.u.obj;
+		uint32_t idx;
+		if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(key->name, key->name_len, &idx))
+		{
+			Avm2Value v = avm2_array_get(obj, idx);
+			if (v.kind != AVM2_VALUE_HOLE)
+			{
+				out->is_array_elem = 1;
+				out->arr_index = idx;
+				return 1;
+			}
+			// A hole / out-of-range falls through to dynamic + proto.
+		}
+		out->dyn = avm2_object_find_dynamic(obj, key->name, key->name_len);
+		if (out->dyn != NULL) return 1;
+	}
+
+	// Prototype chain (reads only).
+	Avm2Object* proto = avm2_value_proto(ctx, recv);
+	while (proto != NULL)
+	{
+		Avm2Value* dv = avm2_object_find_dynamic(proto, key->name, key->name_len);
+		if (dv != NULL)
+		{
+			out->dyn = dv;
+			out->proto_holder = proto;
+			return 1;
+		}
+		proto = proto->proto;
+	}
+	return 0;
+}
+
+// Resolve a static multiname: vtable by multiname → dynamic/proto by name.
+static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Resolved* out)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2AbcFileData* data = act->file->data;
+	memset(out, 0, sizeof(*out));
+
+	const Avm2VTable* vt = avm2_value_vtable(ctx, recv);
+	const Avm2PropEntry* e = avm2_vtable_find_mn(vt, data, mn_idx);
+	if (e == NULL && recv.kind == AVM2_VALUE_OBJECT
+	    && recv.u.obj->kind == AVM2_OBJ_CLASS
+	    && ctx->builtins.class_class != NULL)
+	{
+		e = avm2_vtable_find_mn(&ctx->builtins.class_class->ivtable, data, mn_idx);
+	}
+	if (e != NULL)
+	{
+		out->entry = e;
+		return 1;
+	}
+	if (!avm2_mn_has_public_ns(data, mn_idx)) return 0;
+
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(data, mn_idx, &name, &name_len);
+	Avm2PropKey key = avm2_public_key(name, name_len);
+	if (recv.kind == AVM2_VALUE_OBJECT)
+	{
+		Avm2Object* obj = recv.u.obj;
+		uint32_t idx;
+		if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(key.name, key.name_len, &idx))
+		{
+			Avm2Value v = avm2_array_get(obj, idx);
+			if (v.kind != AVM2_VALUE_HOLE)
+			{
+				out->is_array_elem = 1;
+				out->arr_index = idx;
+				return 1;
+			}
+		}
+		out->dyn = avm2_object_find_dynamic(obj, key.name, key.name_len);
+		if (out->dyn != NULL) return 1;
+	}
+	Avm2Object* proto = avm2_value_proto(ctx, recv);
+	while (proto != NULL)
+	{
+		Avm2Value* dv = avm2_object_find_dynamic(proto, key.name, key.name_len);
+		if (dv != NULL)
+		{
+			out->dyn = dv;
+			out->proto_holder = proto;
+			return 1;
+		}
+		proto = proto->proto;
+	}
+	return 0;
+}
+
+// Bind a method trait into a bound-method closure, cached per receiver so
+// obj.method === obj.method holds (Ruffle get_bound_method).
+static Avm2Value bind_method_entry(Avm2Context* ctx, const Avm2PropEntry* e, Avm2Value recv)
+{
+	Avm2Object* holder = (recv.kind == AVM2_VALUE_OBJECT) ? recv.u.obj : NULL;
+	if (holder != NULL)
+	{
+		for (Avm2BoundMethod* bm = holder->bound_methods; bm != NULL; bm = bm->next)
+		{
+			if (bm->entry == e) return avm2_object_value(bm->fn);
+		}
+	}
+	Avm2Object* fnobj = avm2_function_new(ctx, &e->method, e->defining_class,
+	                                      e->method_scope, recv, true);
+	if (holder != NULL)
+	{
+		Avm2BoundMethod* bm = avm2_alloc(ctx, sizeof(Avm2BoundMethod));
+		bm->entry = e;
+		bm->fn = fnobj;
+		bm->next = holder->bound_methods;
+		holder->bound_methods = bm;
+	}
+	return avm2_object_value(fnobj);
+}
+
+// Qualified class name of a receiver, for error messages.
+static const char* class_name_of(Avm2Context* ctx, Avm2Value recv, char* buf, int size)
+{
+	avm2_class_qname_buf(avm2_value_class(ctx, recv), buf, size);
+	return buf;
+}
+
+// Read the resolved property's value with `recv` as the getter receiver.
+static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* r,
+                              const char* name, uint32_t name_len)
+{
+	if (r->is_array_elem)
+	{
+		Avm2Value v = avm2_array_get(recv.u.obj, r->arr_index);
+		return v.kind == AVM2_VALUE_HOLE ? avm2_undefined() : v;
+	}
+	if (r->dyn != NULL) return *r->dyn;
+	const Avm2PropEntry* e = r->entry;
+	switch (e->kind)
+	{
+		case AVM2_PROP_SLOT:
+			return recv.u.obj->slots[e->slot_index];
+		case AVM2_PROP_METHOD:
+			return bind_method_entry(ctx, e, recv);
+		case AVM2_PROP_GETTER:
+		case AVM2_PROP_GETSET:
+			return avm2_call_method_ref(ctx, &e->method, e->defining_class,
+			                            e->method_scope, recv, NULL, 0);
+		default:
+		{
+			char cn[160];
+			class_name_of(ctx, recv, cn, sizeof(cn));
+			avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+			                 "Error #1077: Illegal read of write-only property "
+			                 "%.*s on %s.", (int) name_len, name, cn);
+		}
 	}
 }
 
+// ---------------------------------------------------------------------------
+// GetProperty / SetProperty / InitProperty / DeleteProperty
+// ---------------------------------------------------------------------------
+
+static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
+                                    const char* name, uint32_t name_len,
+                                    int resolved_ok, const Resolved* r,
+                                    int mn_public)
+{
+	Avm2Context* ctx = act->ctx;
+	if (resolved_ok)
+	{
+		return resolved_get(ctx, recv, r, name, name_len);
+	}
+	// Miss: dynamic receivers yield undefined for public names; a
+	// non-public multiname can never match an expando prop (1081 on a
+	// dynamic receiver). Sealed receivers always throw 1069.
+	int dynamic = recv.kind == AVM2_VALUE_OBJECT && object_is_dynamic(recv.u.obj);
+	if (dynamic && mn_public)
+	{
+		return avm2_undefined();
+	}
+	char cn[160];
+	class_name_of(ctx, recv, cn, sizeof(cn));
+	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+	                 "Error #%s: Property %.*s not found on %s and there is "
+	                 "no default value.", dynamic ? "1081" : "1069",
+	                 (int) name_len, name, cn);
+}
+
+Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
+	}
+	Resolved r;
+	int ok = resolve_mn(act, recv, mn_idx, &r);
+	return getproperty_common(act, recv, name, name_len, ok, &r,
+	                          avm2_mn_has_public_ns(act->file->data, mn_idx));
+}
+
+Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                  Avm2Value name_val, int interp)
+{
+	Avm2Context* ctx = act->ctx;
+	(void) mn_idx;
+	if (value_is_null_like(recv))
+	{
+		const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
+		avm2_throw_null_or_undefined(ctx, recv, ns->utf8, ns->len);
+	}
+	// Array index fast path with a numeric name value (public names only,
+	// except interpreter-mode bodies).
+	uint32_t idx;
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	    && avm2_value_as_index(name_val, &idx)
+	    && (interp || avm2_mn_has_public_ns(act->file->data, mn_idx)))
+	{
+		Avm2Value v = avm2_array_get(recv.u.obj, idx);
+		if (v.kind != AVM2_VALUE_HOLE) return v;
+		// fall through (holes may be shadowed by dyn/proto)
+	}
+	const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
+	int mn_public = avm2_mn_has_public_ns(act->file->data, mn_idx);
+	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
+	Resolved r;
+	int ok = resolve_key(ctx, recv, &key, mn_public, &r);
+	return getproperty_common(act, recv, ns->utf8, ns->len, ok, &r, mn_public);
+}
+
+// Common write path once resolution is done.
+static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolved* r,
+                                 const char* name, uint32_t name_len, Avm2Value value,
+                                 int allow_const)
+{
+	if (r->is_array_elem)
+	{
+		avm2_array_set(ctx, recv.u.obj, r->arr_index, value);
+		return;
+	}
+	if (r->dyn != NULL && r->proto_holder == NULL)
+	{
+		*r->dyn = value;
+		return;
+	}
+	if (r->dyn != NULL)
+	{
+		// Proto-chain hit: writes shadow on the receiver itself.
+		avm2_object_set_dynamic(ctx, recv.u.obj, name, name_len, value);
+		return;
+	}
+	const Avm2PropEntry* e = r->entry;
+	char cn[160];
+	class_name_of(ctx, recv, cn, sizeof(cn));
+	switch (e->kind)
+	{
+		case AVM2_PROP_SLOT:
+		{
+			if (e->is_const && !allow_const)
+			{
+				avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+				                 "Error #1074: Illegal write to read-only property "
+				                 "%.*s on %s.", (int) name_len, name, cn);
+			}
+			Avm2Value cv = value;
+			if (e->type_mn != 0 && e->type_file != NULL)
+			{
+				cv = avm2_coerce_to_type_mn(ctx, e->type_file, e->type_mn, value);
+			}
+			recv.u.obj->slots[e->slot_index] = cv;
+			return;
+		}
+		case AVM2_PROP_SETTER:
+			avm2_call_method_ref(ctx, &e->setter, e->defining_class,
+			                     e->method_scope, recv, &value, 1);
+			return;
+		case AVM2_PROP_GETSET:
+			avm2_call_method_ref(ctx, &e->setter, e->defining_class,
+			                     e->method_scope, recv, &value, 1);
+			return;
+		case AVM2_PROP_GETTER:
+			avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+			                 "Error #1074: Illegal write to read-only property "
+			                 "%.*s on %s.", (int) name_len, name, cn);
+		case AVM2_PROP_METHOD:
+		default:
+			avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+			                 "Error #1037: Cannot assign to a method %.*s on %s.",
+			                 (int) name_len, name, cn);
+	}
+}
+
+static void setproperty_miss(Avm2Context* ctx, Avm2Value recv,
+                             const char* name, uint32_t name_len, Avm2Value value)
+{
+	if (recv.kind == AVM2_VALUE_OBJECT && object_is_dynamic(recv.u.obj))
+	{
+		avm2_object_set_dynamic(ctx, recv.u.obj, name, name_len, value);
+		return;
+	}
+	char cn[160];
+	class_name_of(ctx, recv, cn, sizeof(cn));
+	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+	                 "Error #1056: Cannot create property %.*s on %s.",
+	                 (int) name_len, name, cn);
+}
+
+static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                             Avm2Value value, int allow_const)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
+	}
+	Resolved r;
+	if (resolve_mn(act, recv, mn_idx, &r))
+	{
+		// Proto-chain dynamic hits shadow onto the receiver; array holes
+		// resolved as miss go to setproperty_miss (below) — resolve_mn
+		// treats in-range holes as unresolved, but writes must still land
+		// in storage, so handle arrays first.
+		setproperty_resolved(act->ctx, recv, &r, name, name_len, value, allow_const);
+		return;
+	}
+	uint32_t idx;
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	    && name_as_index(name, name_len, &idx))
+	{
+		avm2_array_set(act->ctx, recv.u.obj, idx, value);
+		return;
+	}
+	setproperty_miss(act->ctx, recv, name, name_len, value);
+}
+
+void avm2_op_setproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                Avm2Value value)
+{
+	setproperty_impl(act, recv, mn_idx, value, 0);
+}
+
+void avm2_op_initproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value val)
+{
+	setproperty_impl(act, recv, mn_idx, val, 1);
+}
+
+void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                             Avm2Value name_val, Avm2Value value, int interp)
+{
+	Avm2Context* ctx = act->ctx;
+	(void) mn_idx;
+	if (value_is_null_like(recv))
+	{
+		const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
+		avm2_throw_null_or_undefined(ctx, recv, ns->utf8, ns->len);
+	}
+	uint32_t idx;
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	    && avm2_value_as_index(name_val, &idx)
+	    && (interp || avm2_mn_has_public_ns(act->file->data, mn_idx)))
+	{
+		avm2_array_set(ctx, recv.u.obj, idx, value);
+		return;
+	}
+	const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
+	int mn_public = avm2_mn_has_public_ns(act->file->data, mn_idx);
+	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
+	Resolved r;
+	if (resolve_key(ctx, recv, &key, mn_public, &r))
+	{
+		setproperty_resolved(ctx, recv, &r, ns->utf8, ns->len, value, 0);
+		return;
+	}
+	if (mn_public
+	    && recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	    && name_as_index(ns->utf8, ns->len, &idx))
+	{
+		avm2_array_set(ctx, recv.u.obj, idx, value);
+		return;
+	}
+	if (!mn_public && recv.kind == AVM2_VALUE_OBJECT)
+	{
+		// Expando props are public-only: a non-public name can't create one.
+		char cn[160];
+		class_name_of(ctx, recv, cn, sizeof(cn));
+		avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+		                 "Error #1056: Cannot create property %.*s on %s.",
+		                 (int) ns->len, ns->utf8, cn);
+	}
+	setproperty_miss(ctx, recv, ns->utf8, ns->len, value);
+}
+
+static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
+                                       const char* name, uint32_t name_len)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	if (recv.kind != AVM2_VALUE_OBJECT)
+	{
+		return avm2_bool(false);
+	}
+	Avm2Object* obj = recv.u.obj;
+	uint32_t idx;
+	if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(name, name_len, &idx))
+	{
+		avm2_array_delete(obj, idx);
+		return avm2_bool(true);
+	}
+	// Declared traits can't be deleted.
+	Avm2PropKey key = avm2_public_key(name, name_len);
+	if (avm2_vtable_find(obj->vtable, &key) != NULL)
+	{
+		return avm2_bool(false);
+	}
+	if (avm2_object_delete_dynamic(obj, name, name_len))
+	{
+		return avm2_bool(true);
+	}
+	// Deleting a missing property returns true (ES3).
+	return avm2_bool(true);
+}
+
+Avm2Value avm2_op_deleteproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	return deleteproperty_common(act, recv, name, name_len);
+}
+
+Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                     Avm2Value name_val)
+{
+	(void) mn_idx;
+	uint32_t idx;
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj != NULL
+	    && recv.u.obj->kind == AVM2_OBJ_ARRAY && avm2_value_as_index(name_val, &idx))
+	{
+		avm2_array_delete(recv.u.obj, idx);
+		return avm2_bool(true);
+	}
+	const Avm2String* ns = avm2_coerce_to_string(act->ctx, name_val);
+	return deleteproperty_common(act, recv, ns->utf8, ns->len);
+}
+
+// ---------------------------------------------------------------------------
+// Slots
+// ---------------------------------------------------------------------------
+
+static const Avm2PropEntry* find_slot_entry(const Avm2VTable* vt, uint32_t slot_index)
+{
+	if (vt == NULL) return NULL;
+	for (uint32_t i = 0; i < vt->count; i++)
+	{
+		if (vt->entries[i].kind == AVM2_PROP_SLOT
+		    && vt->entries[i].slot_index == slot_index)
+		{
+			return &vt->entries[i];
+		}
+	}
+	return NULL;
+}
+
+Avm2Value avm2_op_getslot(Avm2Activation* act, Avm2Value objv, uint32_t index0)
+{
+	if (value_is_null_like(objv))
+	{
+		avm2_throw_null_or_undefined(act->ctx, objv, NULL, 0);
+	}
+	Avm2Object* obj = objv.u.obj;
+	uint32_t slot = index0 + 1;  // IR is 0-based; slot arrays are 1-based
+	if (obj == NULL || slot >= obj->slot_count)
+	{
+		avm2_fatal("GetSlot %u out of range (slot_count %u)", slot,
+		           obj != NULL ? obj->slot_count : 0);
+	}
+	return obj->slots[slot];
+}
+
+void avm2_op_setslot(Avm2Activation* act, Avm2Value objv, uint32_t index0, Avm2Value value)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(objv))
+	{
+		avm2_throw_null_or_undefined(ctx, objv, NULL, 0);
+	}
+	Avm2Object* obj = objv.u.obj;
+	uint32_t slot = index0 + 1;
+	if (obj == NULL || slot >= obj->slot_count)
+	{
+		avm2_fatal("SetSlot %u out of range (slot_count %u)", slot,
+		           obj != NULL ? obj->slot_count : 0);
+	}
+	const Avm2PropEntry* e = find_slot_entry(obj->vtable, slot);
+	if (e != NULL && e->type_mn != 0 && e->type_file != NULL)
+	{
+		value = avm2_coerce_to_type_mn(ctx, e->type_file, e->type_mn, value);
+	}
+	obj->slots[slot] = value;
+}
+
+// ---------------------------------------------------------------------------
+// Scopes and name lookup
+// ---------------------------------------------------------------------------
+
 Avm2Object* avm2_op_pushscope(Avm2Activation* act, Avm2Value v)
 {
-	(void) act;
 	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL)
 	{
-		// TypeError 1009/1010 parity is Stage 3.
-		avm2_fatal("PushScope on a non-object value (kind %u)", v.kind);
+		avm2_throw_null_or_undefined(act->ctx, v, NULL, 0);
 	}
 	return v.u.obj;
 }
 
-// Resolve a static multiname on one object: flattened vtable, then dynamic
-// props (name-only match — expando props are public; Stage 3 refines).
-// Proto-chain walking is Stage 3.
-typedef struct ResolveResult
+Avm2Object* avm2_op_getglobalscope(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                   uint32_t scope_n)
 {
-	const Avm2PropEntry* entry;
-	Avm2Value* dyn;
-} ResolveResult;
-
-static int object_resolve(const Avm2AbcFileData* data, Avm2Object* obj,
-                          uint32_t mn_idx, ResolveResult* out)
-{
-	out->entry = NULL;
-	out->dyn = NULL;
-	if (obj->vtable != NULL)
+	if (act->outer != NULL && act->outer->count > 0)
 	{
-		for (uint32_t i = 0; i < obj->vtable->count; i++)
-		{
-			if (avm2_mn_match(data, mn_idx, &obj->vtable->entries[i].key))
-			{
-				out->entry = &obj->vtable->entries[i];
-				return 1;
-			}
-		}
+		return act->outer->entries[0].obj;
 	}
-	const char* name;
-	uint32_t name_len;
-	avm2_mn_name(data, mn_idx, &name, &name_len);
-	out->dyn = avm2_object_find_dynamic(obj, name, name_len);
-	return out->dyn != NULL;
+	if (scope_n > 0)
+	{
+		return lscope[0].obj;
+	}
+	avm2_fatal("GetGlobalScope with an empty scope stack");
 }
 
-Avm2Object* avm2_op_findpropstrict(Avm2Activation* act, Avm2Object* const* lscope,
-                                   uint32_t scope_n, uint32_t mn_idx)
+Avm2Object* avm2_op_getouterscope(Avm2Activation* act, uint32_t index)
+{
+	if (act->outer == NULL || index >= act->outer->count)
+	{
+		avm2_fatal("GetOuterScope %u out of range", index);
+	}
+	return act->outer->entries[index].obj;
+}
+
+// Does a scope object define the multiname? Plain scopes expose declared
+// traits only; with-scopes expose everything (Ruffle scope.rs find).
+static int scope_defines_mn(Avm2Activation* act, const Avm2ScopeEntry* se, uint32_t mn_idx)
+{
+	if (se->obj == NULL) return 0;
+	if (!se->is_with)
+	{
+		return avm2_vtable_find_mn(se->obj->vtable, act->file->data, mn_idx) != NULL;
+	}
+	Resolved r;
+	return resolve_mn(act, avm2_object_value(se->obj), mn_idx, &r);
+}
+
+static Avm2Object* findproperty_impl(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                     uint32_t scope_n, uint32_t mn_idx,
+                                     const char* name, uint32_t name_len, int strict)
 {
 	const Avm2AbcFileData* data = act->file->data;
-	ResolveResult r;
+	Avm2Context* ctx = act->ctx;
 
 	// Local scope stack, top → bottom.
 	for (uint32_t i = scope_n; i > 0; i--)
 	{
-		if (object_resolve(data, lscope[i - 1], mn_idx, &r)) return lscope[i - 1];
+		if (scope_defines_mn(act, &lscope[i - 1], mn_idx)) return lscope[i - 1].obj;
 	}
 	// Captured outer chain, top → bottom.
 	if (act->outer != NULL)
 	{
 		for (uint32_t i = act->outer->count; i > 0; i--)
 		{
-			if (object_resolve(data, act->outer->objs[i - 1], mn_idx, &r))
+			if (scope_defines_mn(act, &act->outer->entries[i - 1], mn_idx))
 			{
-				return act->outer->objs[i - 1];
+				return act->outer->entries[i - 1].obj;
 			}
 		}
 	}
@@ -127,7 +703,7 @@ Avm2Object* avm2_op_findpropstrict(Avm2Activation* act, Avm2Object* const* lscop
 		{
 			if (avm2_propkey_from_qname(data, mn_idx, &key))
 			{
-				Avm2Object* g = avm2_domain_find(act->ctx, &key);
+				Avm2Object* g = avm2_domain_find(ctx, &key);
 				if (g != NULL) return g;
 			}
 		}
@@ -142,163 +718,389 @@ Avm2Object* avm2_op_findpropstrict(Avm2Activation* act, Avm2Object* const* lscop
 				key.ns_kind = ns->kind;
 				key.ns_uri = data->strings[ns->name].utf8;
 				key.ns_len = data->strings[ns->name].len;
-				Avm2Object* g = avm2_domain_find(act->ctx, &key);
+				Avm2Object* g = avm2_domain_find(ctx, &key);
 				if (g != NULL) return g;
 			}
 		}
-	}
-
-	const char* name;
-	uint32_t name_len;
-	avm2_mn_name(data, mn_idx, &name, &name_len);
-	avm2_fatal("ReferenceError: Error #1065: Variable %.*s is not defined.",
-	           (int) name_len, name);
-}
-
-// Bind a method trait into a fresh closure (GetProperty on a method trait).
-static Avm2Value bind_method_entry(Avm2Context* ctx, const Avm2PropEntry* e, Avm2Value recv)
-{
-	Avm2Object* fnobj = avm2_object_alloc(ctx, AVM2_OBJ_FUNCTION, 0);
-	fnobj->cls = ctx->builtins.function_class;
-	fnobj->fn_method = e->method;
-	fnobj->fn_receiver = recv;
-	fnobj->fn_scope = e->method_scope;
-	fnobj->fn_bound_class = e->defining_class;
-	return avm2_object_value(fnobj);
-}
-
-static Avm2Object* require_object(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
-                                  const char* op)
-{
-	if (recv.kind != AVM2_VALUE_OBJECT || recv.u.obj == NULL)
-	{
-		const char* name;
-		uint32_t name_len;
-		avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
-		// Primitive receivers (String.length, ...) are Stage 3.
-		avm2_fatal("%s '%.*s' on a non-object value (kind %u)",
-		           op, (int) name_len, name, recv.kind);
-	}
-	return recv.u.obj;
-}
-
-Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
-{
-	Avm2Object* obj = require_object(act, recv, mn_idx, "GetProperty");
-	ResolveResult r;
-	if (!object_resolve(act->file->data, obj, mn_idx, &r))
-	{
-		const char* name;
-		uint32_t name_len;
-		avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
-		avm2_fatal("ReferenceError: Error #1069: Property %.*s not found and "
-		           "there is no default value.", (int) name_len, name);
-	}
-	if (r.dyn != NULL) return *r.dyn;
-	switch (r.entry->kind)
-	{
-		case AVM2_PROP_SLOT:
-			return obj->slots[r.entry->slot_index];
-		case AVM2_PROP_METHOD:
-			return bind_method_entry(act->ctx, r.entry, recv);
-		default:
-			// Getter dispatch is Stage 3.
-			avm2_fatal("GetProperty on a getter/setter trait (Stage 3)");
-	}
-}
-
-void avm2_op_initproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value val)
-{
-	Avm2Object* obj = require_object(act, recv, mn_idx, "InitProperty");
-	ResolveResult r;
-	if (object_resolve(act->file->data, obj, mn_idx, &r))
-	{
-		if (r.dyn != NULL)
+		else
 		{
-			*r.dyn = val;
-			return;
+			// Lazy name resolved by the caller: public key lookup.
+			key = avm2_public_key(name, name_len);
+			Avm2Object* g = avm2_domain_find(ctx, &key);
+			if (g != NULL) return g;
 		}
-		if (r.entry->kind == AVM2_PROP_SLOT)
-		{
-			obj->slots[r.entry->slot_index] = val;
-			return;
-		}
-		avm2_fatal("InitProperty on a non-slot trait");
 	}
-	// No declared trait: define as a dynamic property.
+
+	if (!strict)
+	{
+		return avm2_op_getglobalscope(act, lscope, scope_n);
+	}
+	avm2_throw_1065(ctx, name, name_len);
+}
+
+Avm2Object* avm2_op_findproperty(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                 uint32_t scope_n, uint32_t mn_idx, int strict)
+{
 	const char* name;
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
-	avm2_object_set_dynamic(act->ctx, obj, name, name_len, val);
+	return findproperty_impl(act, lscope, scope_n, mn_idx, name, name_len, strict);
+}
+
+Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                     uint32_t scope_n, uint32_t mn_idx, Avm2Value name,
+                                     int strict)
+{
+	// Resolve the runtime name to a string and search scope objects for a
+	// public property of that name (with-scope semantics apply the same).
+	Avm2Context* ctx = act->ctx;
+	(void) mn_idx;
+	const Avm2String* ns = avm2_coerce_to_string(ctx, name);
+	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
+
+	for (uint32_t i = scope_n; i > 0; i--)
+	{
+		Avm2Object* so = lscope[i - 1].obj;
+		Resolved r;
+		if (lscope[i - 1].is_with)
+		{
+			if (resolve_key(ctx, avm2_object_value(so), &key, 1, &r)) return so;
+		}
+		else if (avm2_vtable_find(so->vtable, &key) != NULL)
+		{
+			return so;
+		}
+	}
+	if (act->outer != NULL)
+	{
+		for (uint32_t i = act->outer->count; i > 0; i--)
+		{
+			Avm2Object* so = act->outer->entries[i - 1].obj;
+			Resolved r;
+			if (act->outer->entries[i - 1].is_with)
+			{
+				if (resolve_key(ctx, avm2_object_value(so), &key, 1, &r)) return so;
+			}
+			else if (avm2_vtable_find(so->vtable, &key) != NULL)
+			{
+				return so;
+			}
+		}
+	}
+	Avm2Object* g = avm2_domain_find(ctx, &key);
+	if (g != NULL) return g;
+	if (!strict)
+	{
+		return avm2_op_getglobalscope(act, lscope, scope_n);
+	}
+	avm2_throw_1065(ctx, ns->utf8, ns->len);
+}
+
+Avm2Object* avm2_op_finddef(Avm2Activation* act, uint32_t mn_idx)
+{
+	const Avm2AbcFileData* data = act->file->data;
+	Avm2PropKey key;
+	if (avm2_propkey_from_qname(data, mn_idx, &key))
+	{
+		Avm2Object* g = avm2_domain_find(act->ctx, &key);
+		if (g != NULL) return g;
+	}
+	else if (data->multinames[mn_idx].kind == 0x09
+	         || data->multinames[mn_idx].kind == 0x0e)
+	{
+		const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
+		const Avm2AbcNsSet* set = &data->ns_sets[mn->ns_set];
+		for (uint32_t i = 0; i < set->count; i++)
+		{
+			const Avm2AbcNamespace* ns = &data->namespaces[set->ns_indices[i]];
+			key.name = data->strings[mn->name].utf8;
+			key.name_len = data->strings[mn->name].len;
+			key.ns_kind = ns->kind;
+			key.ns_uri = data->strings[ns->name].utf8;
+			key.ns_len = data->strings[ns->name].len;
+			Avm2Object* g = avm2_domain_find(act->ctx, &key);
+			if (g != NULL) return g;
+		}
+	}
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(data, mn_idx, &name, &name_len);
+	avm2_throw_1065(act->ctx, name, name_len);
+}
+
+// ---------------------------------------------------------------------------
+// Calls
+// ---------------------------------------------------------------------------
+
+static Avm2Value callproperty_common(Avm2Context* ctx, Avm2Value recv,
+                                     const char* name, uint32_t name_len,
+                                     int resolved_ok, const Resolved* r,
+                                     const Avm2Value* args, uint32_t argc,
+                                     Avm2Value call_recv)
+{
+	if (resolved_ok && r->entry != NULL && r->entry->kind == AVM2_PROP_METHOD)
+	{
+		return avm2_call_method_ref(ctx, &r->entry->method,
+		                            r->entry->defining_class, r->entry->method_scope,
+		                            call_recv, args, argc);
+	}
+	if (resolved_ok)
+	{
+		Avm2Value v = resolved_get(ctx, recv, r, name, name_len);
+		if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+		{
+			return avm2_call_value(ctx, v, call_recv, args, argc);
+		}
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #1006: %.*s is not a function.",
+		                 (int) name_len, name);
+	}
+	// Miss.
+	if (recv.kind == AVM2_VALUE_OBJECT && !object_is_dynamic(recv.u.obj))
+	{
+		char cn[160];
+		class_name_of(ctx, recv, cn, sizeof(cn));
+		avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+		                 "Error #1069: Property %.*s not found on %s and there "
+		                 "is no default value.", (int) name_len, name, cn);
+	}
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #1006: %.*s is not a function.", (int) name_len, name);
 }
 
 Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                const Avm2Value* args, uint32_t argc)
 {
-	Avm2Object* obj = require_object(act, recv, mn_idx, "CallProperty");
-	ResolveResult r;
-	if (!object_resolve(act->file->data, obj, mn_idx, &r))
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
 	{
-		const char* name;
-		uint32_t name_len;
-		avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
-		avm2_fatal("TypeError: Error #1006: %.*s is not a function.",
-		           (int) name_len, name);
+		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
 	}
-	if (r.entry != NULL && r.entry->kind == AVM2_PROP_METHOD)
+	Resolved r;
+	int ok = resolve_mn(act, recv, mn_idx, &r);
+	return callproperty_common(act->ctx, recv, name, name_len, ok, &r, args, argc, recv);
+}
+
+Avm2Value avm2_op_callproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                   Avm2Value name_val, const Avm2Value* args, uint32_t argc)
+{
+	Avm2Context* ctx = act->ctx;
+	(void) mn_idx;
+	if (value_is_null_like(recv))
 	{
-		return avm2_call_method_ref(act->ctx, &r.entry->method,
-		                            r.entry->defining_class, r.entry->method_scope,
-		                            recv, args, argc);
+		const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
+		avm2_throw_null_or_undefined(ctx, recv, ns->utf8, ns->len);
 	}
-	// Slot / dynamic value: must hold a callable.
-	Avm2Value v = (r.dyn != NULL) ? *r.dyn : obj->slots[r.entry->slot_index];
-	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+	uint32_t idx;
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	    && avm2_value_as_index(name_val, &idx))
 	{
-		if (v.u.obj->kind == AVM2_OBJ_FUNCTION)
+		Avm2Value v = avm2_array_get(recv.u.obj, idx);
+		if (v.kind != AVM2_VALUE_HOLE)
 		{
-			return avm2_call_function_obj(act->ctx, v.u.obj, args, argc);
-		}
-		if (v.u.obj->kind == AVM2_OBJ_CLASS)
-		{
-			// Calling a class = coercion (Stage 3).
-			avm2_fatal("CallProperty on a class object (coercion call, Stage 3)");
+			return avm2_call_value(ctx, v, recv, args, argc);
 		}
 	}
-	avm2_fatal("TypeError: Error #1006: value is not a function.");
+	const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
+	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
+	Resolved r;
+	int ok = resolve_key(ctx, recv, &key, 1, &r);
+	return callproperty_common(act->ctx, recv, ns->utf8, ns->len, ok, &r, args, argc, recv);
+}
+
+Avm2Value avm2_op_callproplex(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                              const Avm2Value* args, uint32_t argc)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
+	}
+	Resolved r;
+	int ok = resolve_mn(act, recv, mn_idx, &r);
+	// Lex call: the callee receives null as `this`.
+	return callproperty_common(act->ctx, recv, name, name_len, ok, &r, args, argc,
+	                           avm2_null());
+}
+
+Avm2Value avm2_op_call(Avm2Activation* act, Avm2Value func, Avm2Value recv,
+                       const Avm2Value* args, uint32_t argc)
+{
+	return avm2_call_value(act->ctx, func, recv, args, argc);
+}
+
+Avm2Value avm2_op_callstatic(Avm2Activation* act, uint32_t method_index, Avm2Value recv,
+                             const Avm2Value* args, uint32_t argc)
+{
+	const Avm2AbcMethodData* m = &act->file->data->methods[method_index];
+	Avm2MethodRef ref = { m->fn, act->file, m->debug_name, method_index };
+	return avm2_call_method_ref(act->ctx, &ref, NULL, act->outer, recv, args, argc);
+}
+
+// Super dispatch: resolve on the bound class's SUPERCLASS vtable.
+static Avm2Class* super_class_of(Avm2Activation* act)
+{
+	if (act->bound_class == NULL || act->bound_class->super_class == NULL)
+	{
+		// avmplus VerifyError 1035 (catchable) — array_access_interpreter
+		// probes JIT-vs-interpreter behavior with an illegal super op.
+		avm2_throw_error(act->ctx, act->ctx->builtins.verify_error_class,
+		                 "Error #1035: Illegal super expression found in method.");
+	}
+	return act->bound_class->super_class;
+}
+
+Avm2Value avm2_op_callsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                            const Avm2Value* args, uint32_t argc)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Class* super = super_class_of(act);
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	const Avm2PropEntry* e = avm2_vtable_find_mn(&super->ivtable, act->file->data, mn_idx);
+	if (e == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+		                 "Error #1070: Method %.*s not found on %.*s",
+		                 (int) name_len, name,
+		                 (int) super->name.name_len, super->name.name);
+	}
+	switch (e->kind)
+	{
+		case AVM2_PROP_METHOD:
+			return avm2_call_method_ref(ctx, &e->method, e->defining_class,
+			                            e->method_scope, recv, args, argc);
+		case AVM2_PROP_GETTER:
+		case AVM2_PROP_GETSET:
+		{
+			Avm2Value v = avm2_call_method_ref(ctx, &e->method, e->defining_class,
+			                                   e->method_scope, recv, NULL, 0);
+			return avm2_call_value(ctx, v, recv, args, argc);
+		}
+		case AVM2_PROP_SLOT:
+		{
+			Avm2Value v = recv.u.obj->slots[e->slot_index];
+			return avm2_call_value(ctx, v, recv, args, argc);
+		}
+		default:
+			avm2_throw_1006(ctx, name, name_len);
+	}
+}
+
+Avm2Value avm2_op_getsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Class* super = super_class_of(act);
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	const Avm2PropEntry* e = avm2_vtable_find_mn(&super->ivtable, act->file->data, mn_idx);
+	if (e == NULL)
+	{
+		avm2_throw_1069(ctx, name, name_len, super);
+	}
+	Resolved r;
+	memset(&r, 0, sizeof(r));
+	r.entry = e;
+	return resolved_get(ctx, recv, &r, name, name_len);
+}
+
+void avm2_op_setsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value value)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Class* super = super_class_of(act);
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	const Avm2PropEntry* e = avm2_vtable_find_mn(&super->ivtable, act->file->data, mn_idx);
+	if (e == NULL)
+	{
+		avm2_throw_1069(ctx, name, name_len, super);
+	}
+	// avmplus is lenient on setsuper: writes to const slots and getter-only
+	// properties silently succeed / no-op (class_supercalls_errors e2/e5).
+	if (e->kind == AVM2_PROP_GETTER)
+	{
+		return;
+	}
+	if (e->kind == AVM2_PROP_SLOT && e->is_const)
+	{
+		Avm2Value cv = value;
+		if (e->type_mn != 0 && e->type_file != NULL)
+		{
+			cv = avm2_coerce_to_type_mn(ctx, e->type_file, e->type_mn, value);
+		}
+		recv.u.obj->slots[e->slot_index] = cv;
+		return;
+	}
+	Resolved r;
+	memset(&r, 0, sizeof(r));
+	r.entry = e;
+	setproperty_resolved(ctx, recv, &r, name, name_len, value, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Construction
+// ---------------------------------------------------------------------------
+
+Avm2Value avm2_op_construct(Avm2Activation* act, Avm2Value ctor,
+                            const Avm2Value* args, uint32_t argc)
+{
+	return avm2_construct_value(act->ctx, ctor, args, argc);
 }
 
 Avm2Value avm2_op_constructprop(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 const Avm2Value* args, uint32_t argc)
 {
-	Avm2Value v = avm2_op_getproperty_static(act, recv, mn_idx);
-	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL
-	    || v.u.obj->kind != AVM2_OBJ_CLASS)
-	{
-		const char* name;
-		uint32_t name_len;
-		avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
-		// Constructing plain functions is Stage 3.
-		avm2_fatal("ConstructProp: %.*s is not a class", (int) name_len, name);
-	}
-	return avm2_class_construct(act->ctx, v.u.obj->class_ref, args, argc);
+	Avm2Value ctor = avm2_op_getproperty_static(act, recv, mn_idx);
+	return avm2_construct_value(act->ctx, ctor, args, argc);
+}
+
+Avm2Value avm2_op_constructprop_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                    Avm2Value name, const Avm2Value* args, uint32_t argc)
+{
+	Avm2Value ctor = avm2_op_getproperty_dyn(act, recv, mn_idx, name, 0);
+	return avm2_construct_value(act->ctx, ctor, args, argc);
 }
 
 void avm2_op_constructsuper(Avm2Activation* act, Avm2Value recv,
                             const Avm2Value* args, uint32_t argc)
 {
-	if (act->bound_class == NULL || act->bound_class->super_class == NULL)
+	if (act->bound_class == NULL)
 	{
-		avm2_fatal("ConstructSuper outside a class constructor with a superclass");
+		// Script initializers may constructsuper on the global object; the
+		// global's superclass is Object, whose constructor is a no-op.
+		(void) recv;
+		(void) args;
+		(void) argc;
+		return;
 	}
-	Avm2Class* super = act->bound_class->super_class;
+	Avm2Class* super = super_class_of(act);
 	avm2_call_method_ref(act->ctx, &super->instance_init, super, super->scope,
 	                     recv, args, argc);
 }
 
 Avm2Value avm2_op_newclass(Avm2Activation* act, uint32_t class_idx, Avm2Value base,
-                           Avm2Object* const* lscope, uint32_t scope_n)
+                           const Avm2ScopeEntry* lscope, uint32_t scope_n)
 {
+	Avm2Context* ctx = act->ctx;
 	Avm2Class* super = NULL;
 	if (base.kind == AVM2_VALUE_OBJECT && base.u.obj != NULL
 	    && base.u.obj->kind == AVM2_OBJ_CLASS)
@@ -307,9 +1109,654 @@ Avm2Value avm2_op_newclass(Avm2Activation* act, uint32_t class_idx, Avm2Value ba
 	}
 	else if (base.kind != AVM2_VALUE_NULL)
 	{
-		avm2_fatal("NewClass: base value is not a class (kind %u)", base.kind);
+		avm2_throw_error(ctx, ctx->builtins.verify_error_class,
+		                 "Error #1108: The OP_newclass opcode was used with the "
+		                 "incorrect base class.");
 	}
-	Avm2ScopeChain* scope = avm2_scope_capture(act->ctx, act->outer, lscope, scope_n);
-	Avm2Class* cls = avm2_class_define(act->ctx, act->file, class_idx, super, scope);
+	Avm2ScopeChain* scope = avm2_scope_capture(ctx, act->outer, lscope, scope_n);
+	Avm2Class* cls = avm2_class_define(ctx, act->file, class_idx, super, scope);
 	return avm2_object_value(cls->class_object);
+}
+
+Avm2Value avm2_op_newfunction(Avm2Activation* act, uint32_t method_index,
+                              const Avm2ScopeEntry* lscope, uint32_t scope_n)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2AbcMethodData* m = &act->file->data->methods[method_index];
+	Avm2ScopeChain* scope = avm2_scope_capture(ctx, act->outer, lscope, scope_n);
+	Avm2MethodRef ref = { m->fn, act->file, m->debug_name, method_index };
+	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, scope,
+	                                      avm2_undefined(), false);
+	return avm2_object_value(fnobj);
+}
+
+Avm2Value avm2_op_newactivation(Avm2Activation* act, uint32_t method_index)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2AbcMethodData* m = &act->file->data->methods[method_index];
+	Avm2VTable* vt = avm2_alloc(ctx, sizeof(Avm2VTable));
+	memset(vt, 0, sizeof(Avm2VTable));
+	avm2_vtable_add_traits(ctx, vt, act->file, m->body_traits, m->body_trait_count,
+	                       act->bound_class, act->outer);
+	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, vt->slot_count + 1);
+	obj->cls = ctx->builtins.object_class;
+	obj->vtable = vt;
+	avm2_slots_init_defaults(ctx, obj, vt);
+	return avm2_object_value(obj);
+}
+
+Avm2Value avm2_op_newcatch(Avm2Activation* act, uint32_t method_index, uint32_t exc_index)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2AbcMethodData* m = &act->file->data->methods[method_index];
+	if (exc_index >= m->exception_count)
+	{
+		avm2_fatal("NewCatch exception index %u out of range", exc_index);
+	}
+	const Avm2AbcException* e = &m->exceptions[exc_index];
+	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 2);
+	obj->cls = ctx->builtins.object_class;
+	if (e->variable_mn != 0)
+	{
+		Avm2VTable* vt = avm2_alloc(ctx, sizeof(Avm2VTable));
+		memset(vt, 0, sizeof(Avm2VTable));
+		Avm2PropEntry pe;
+		memset(&pe, 0, sizeof(pe));
+		if (!avm2_propkey_from_qname(act->file->data, e->variable_mn, &pe.key))
+		{
+			avm2_fatal("NewCatch variable multiname %u is not a QName", e->variable_mn);
+		}
+		pe.kind = AVM2_PROP_SLOT;
+		pe.slot_index = 1;
+		// SetSlot into the catch variable coerces to the declared catch
+		// type (catch_scope_slot expects the 1034 from a mismatched write).
+		pe.type_mn = e->type_mn;
+		pe.type_file = act->file;
+		vt->slot_count = 1;
+		avm2_vtable_append(ctx, vt, &pe);
+		obj->vtable = vt;
+
+		// avmplus gives the catch scope a synthetic SEALED class named
+		// after the catch variable, with no prototype ("Property toString
+		// not found on e" in catch_scope_slot).
+		Avm2Class* cc = avm2_alloc(ctx, sizeof(Avm2Class));
+		memset(cc, 0, sizeof(Avm2Class));
+		cc->name = pe.key;
+		cc->flags = AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+		obj->cls = cc;
+	}
+	return avm2_object_value(obj);
+}
+
+Avm2Value avm2_op_newobject(Avm2Activation* act, const Avm2Value* name_value_pairs,
+                            uint32_t num_pairs)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
+	obj->cls = ctx->builtins.object_class;
+	obj->proto = ctx->builtins.object_class->prototype_obj;
+	// Ruffle pops pairs from the top of the stack, so the LAST pair is set
+	// first (visible in enumeration order).
+	for (uint32_t i = num_pairs; i > 0; i--)
+	{
+		Avm2Value name = name_value_pairs[(i - 1) * 2];
+		Avm2Value value = name_value_pairs[(i - 1) * 2 + 1];
+		const Avm2String* ns = avm2_coerce_to_string(ctx, name);
+		avm2_object_set_dynamic(ctx, obj, ns->utf8, ns->len, value);
+	}
+	return avm2_object_value(obj);
+}
+
+Avm2Value avm2_op_newarray(Avm2Activation* act, const Avm2Value* values, uint32_t n)
+{
+	return avm2_object_value(avm2_array_from_values(act->ctx, values, n));
+}
+
+// ---------------------------------------------------------------------------
+// Operators
+// ---------------------------------------------------------------------------
+
+Avm2Value avm2_op_add(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	return avm2_op_add_values(act->ctx, a, b);
+}
+
+Avm2Value avm2_op_subtract(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	double x = avm2_coerce_to_number(act->ctx, a);
+	double y = avm2_coerce_to_number(act->ctx, b);
+	return avm2_number(x - y);
+}
+
+Avm2Value avm2_op_multiply(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	double x = avm2_coerce_to_number(act->ctx, a);
+	double y = avm2_coerce_to_number(act->ctx, b);
+	return avm2_number(x * y);
+}
+
+Avm2Value avm2_op_divide(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	double x = avm2_coerce_to_number(act->ctx, a);
+	double y = avm2_coerce_to_number(act->ctx, b);
+	return avm2_number(x / y);
+}
+
+Avm2Value avm2_op_modulo(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	double x = avm2_coerce_to_number(act->ctx, a);
+	double y = avm2_coerce_to_number(act->ctx, b);
+	return avm2_number(fmod(x, y));
+}
+
+Avm2Value avm2_op_negate(Avm2Activation* act, Avm2Value a)
+{
+	return avm2_number(-avm2_coerce_to_number(act->ctx, a));
+}
+
+Avm2Value avm2_op_increment(Avm2Activation* act, Avm2Value a)
+{
+	return avm2_number(avm2_coerce_to_number(act->ctx, a) + 1.0);
+}
+
+Avm2Value avm2_op_decrement(Avm2Activation* act, Avm2Value a)
+{
+	return avm2_number(avm2_coerce_to_number(act->ctx, a) - 1.0);
+}
+
+Avm2Value avm2_op_add_i(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	int32_t y = avm2_coerce_to_i32(act->ctx, b);
+	return avm2_integer((int32_t) ((uint32_t) x + (uint32_t) y));
+}
+
+Avm2Value avm2_op_subtract_i(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	int32_t y = avm2_coerce_to_i32(act->ctx, b);
+	return avm2_integer((int32_t) ((uint32_t) x - (uint32_t) y));
+}
+
+Avm2Value avm2_op_multiply_i(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	int32_t y = avm2_coerce_to_i32(act->ctx, b);
+	return avm2_integer((int32_t) ((uint32_t) x * (uint32_t) y));
+}
+
+Avm2Value avm2_op_negate_i(Avm2Activation* act, Avm2Value a)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	return avm2_integer((int32_t) (0u - (uint32_t) x));
+}
+
+Avm2Value avm2_op_increment_i(Avm2Activation* act, Avm2Value a)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	return avm2_integer((int32_t) ((uint32_t) x + 1u));
+}
+
+Avm2Value avm2_op_decrement_i(Avm2Activation* act, Avm2Value a)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	return avm2_integer((int32_t) ((uint32_t) x - 1u));
+}
+
+Avm2Value avm2_op_bitand(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	int32_t y = avm2_coerce_to_i32(act->ctx, b);
+	return avm2_integer(x & y);
+}
+
+Avm2Value avm2_op_bitor(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	int32_t y = avm2_coerce_to_i32(act->ctx, b);
+	return avm2_integer(x | y);
+}
+
+Avm2Value avm2_op_bitxor(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	int32_t y = avm2_coerce_to_i32(act->ctx, b);
+	return avm2_integer(x ^ y);
+}
+
+Avm2Value avm2_op_bitnot(Avm2Activation* act, Avm2Value a)
+{
+	return avm2_integer(~avm2_coerce_to_i32(act->ctx, a));
+}
+
+Avm2Value avm2_op_lshift(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	uint32_t y = avm2_coerce_to_u32(act->ctx, b) & 0x1f;
+	return avm2_integer((int32_t) ((uint32_t) x << y));
+}
+
+Avm2Value avm2_op_rshift(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int32_t x = avm2_coerce_to_i32(act->ctx, a);
+	uint32_t y = avm2_coerce_to_u32(act->ctx, b) & 0x1f;
+	return avm2_integer(x >> y);
+}
+
+Avm2Value avm2_op_urshift(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	uint32_t x = avm2_coerce_to_u32(act->ctx, a);
+	uint32_t y = avm2_coerce_to_u32(act->ctx, b) & 0x1f;
+	return avm2_uint_value(x >> y);
+}
+
+Avm2Value avm2_op_equals(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	return avm2_bool(avm2_abstract_eq(act->ctx, a, b));
+}
+
+Avm2Value avm2_op_strictequals(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	(void) act;
+	return avm2_bool(avm2_strict_eq(a, b));
+}
+
+Avm2Value avm2_op_lessthan(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int r = avm2_abstract_lt(act->ctx, a, b);
+	return avm2_bool(r == 1);
+}
+
+Avm2Value avm2_op_lessequals(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int r = avm2_abstract_lt(act->ctx, b, a);
+	return avm2_bool(r == 0);
+}
+
+Avm2Value avm2_op_greaterthan(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int r = avm2_abstract_lt(act->ctx, b, a);
+	return avm2_bool(r == 1);
+}
+
+Avm2Value avm2_op_greaterequals(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	int r = avm2_abstract_lt(act->ctx, a, b);
+	return avm2_bool(r == 0);
+}
+
+Avm2Value avm2_op_not(Avm2Activation* act, Avm2Value a)
+{
+	(void) act;
+	return avm2_bool(!avm2_coerce_to_boolean(a));
+}
+
+Avm2Value avm2_op_typeof(Avm2Activation* act, Avm2Value a)
+{
+	Avm2Context* ctx = act->ctx;
+	const char* s;
+	switch (a.kind)
+	{
+		case AVM2_VALUE_UNDEFINED: s = "undefined"; break;
+		case AVM2_VALUE_NULL: s = "object"; break;
+		case AVM2_VALUE_BOOL: s = "boolean"; break;
+		case AVM2_VALUE_INTEGER:
+		case AVM2_VALUE_NUMBER: s = "number"; break;
+		case AVM2_VALUE_STRING: s = "string"; break;
+		case AVM2_VALUE_OBJECT:
+			if (a.u.obj->kind == AVM2_OBJ_FUNCTION
+			    && a.u.obj->cls == ctx->builtins.function_class)
+			{
+				s = "function";
+			}
+			else if (a.u.obj->cls == ctx->builtins.xml_class
+			         || a.u.obj->cls == ctx->builtins.xml_list_class)
+			{
+				s = "xml";
+			}
+			else
+			{
+				s = "object";
+			}
+			break;
+		default: s = "undefined"; break;
+	}
+	return avm2_string(avm2_string_from_literal(ctx, s));
+}
+
+Avm2Value avm2_op_in(Avm2Activation* act, Avm2Value name, Avm2Value obj)
+{
+	Avm2Context* ctx = act->ctx;
+	if (value_is_null_like(obj))
+	{
+		avm2_throw_null_or_undefined(ctx, obj, NULL, 0);
+	}
+	const Avm2String* ns = avm2_coerce_to_string(ctx, name);
+	return avm2_bool(avm2_has_public_property(ctx, obj, ns->utf8, ns->len) != 0);
+}
+
+Avm2Value avm2_op_instanceof(Avm2Activation* act, Avm2Value value, Avm2Value type)
+{
+	Avm2Context* ctx = act->ctx;
+	if (type.kind != AVM2_VALUE_OBJECT || type.u.obj == NULL
+	    || (type.u.obj->kind != AVM2_OBJ_CLASS && type.u.obj->kind != AVM2_OBJ_FUNCTION))
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #1040: The right-hand side of instanceof must be a "
+		                 "class or function.");
+	}
+	if (value.kind == AVM2_VALUE_UNDEFINED)
+	{
+		avm2_throw_null_or_undefined(ctx, value, NULL, 0);
+	}
+	if (value.kind == AVM2_VALUE_NULL)
+	{
+		return avm2_bool(false);
+	}
+	// ES3 proto-chain check.
+	Avm2Object* type_proto = NULL;
+	if (type.u.obj->kind == AVM2_OBJ_CLASS)
+	{
+		type_proto = type.u.obj->class_ref->prototype_obj;
+	}
+	else
+	{
+		Avm2Value pv = avm2_get_public_property(ctx, type, "prototype", 9, NULL);
+		if (pv.kind == AVM2_VALUE_OBJECT) type_proto = pv.u.obj;
+	}
+	if (type_proto == NULL) return avm2_bool(false);
+	for (Avm2Object* p = avm2_value_proto(ctx, value); p != NULL; p = p->proto)
+	{
+		if (p == type_proto) return avm2_bool(true);
+	}
+	return avm2_bool(false);
+}
+
+Avm2Value avm2_op_istype(Avm2Activation* act, Avm2Value value, uint32_t mn_idx)
+{
+	Avm2Class* cls = avm2_class_for_mn(act->ctx, act->file, mn_idx);
+	if (cls == NULL) return avm2_bool(false);
+	return avm2_bool(avm2_value_is_of_type(act->ctx, value, cls));
+}
+
+Avm2Value avm2_op_astype(Avm2Activation* act, Avm2Value value, uint32_t mn_idx)
+{
+	Avm2Class* cls = avm2_class_for_mn(act->ctx, act->file, mn_idx);
+	if (cls == NULL) return avm2_null();
+	return avm2_value_is_of_type(act->ctx, value, cls) ? value : avm2_null();
+}
+
+static Avm2Class* require_class_value(Avm2Context* ctx, Avm2Value type)
+{
+	if (type.kind == AVM2_VALUE_UNDEFINED)
+	{
+		avm2_throw_null_or_undefined(ctx, type, NULL, 0);
+	}
+	if (type.kind != AVM2_VALUE_OBJECT || type.u.obj == NULL)
+	{
+		avm2_throw_null_or_undefined(ctx, avm2_null(), NULL, 0);
+	}
+	if (type.u.obj->kind != AVM2_OBJ_CLASS)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #1041: The right-hand side of operator must be a class.");
+	}
+	return type.u.obj->class_ref;
+}
+
+Avm2Value avm2_op_istypelate(Avm2Activation* act, Avm2Value value, Avm2Value type)
+{
+	Avm2Class* cls = require_class_value(act->ctx, type);
+	return avm2_bool(avm2_value_is_of_type(act->ctx, value, cls));
+}
+
+Avm2Value avm2_op_astypelate(Avm2Activation* act, Avm2Value value, Avm2Value type)
+{
+	Avm2Class* cls = require_class_value(act->ctx, type);
+	return avm2_value_is_of_type(act->ctx, value, cls) ? value : avm2_null();
+}
+
+// ---------------------------------------------------------------------------
+// Coercion ops
+// ---------------------------------------------------------------------------
+
+Avm2Value avm2_op_coerce(Avm2Activation* act, Avm2Value v, uint32_t mn_idx)
+{
+	return avm2_coerce_to_type_mn(act->ctx, act->file, mn_idx, v);
+}
+
+Avm2Value avm2_op_coerce_s(Avm2Activation* act, Avm2Value v)
+{
+	if (value_is_null_like(v)) return avm2_null();
+	return avm2_string(avm2_coerce_to_string(act->ctx, v));
+}
+
+Avm2Value avm2_op_convert_s(Avm2Activation* act, Avm2Value v)
+{
+	return avm2_string(avm2_coerce_to_string(act->ctx, v));
+}
+
+Avm2Value avm2_op_coerce_o(Avm2Activation* act, Avm2Value v)
+{
+	(void) act;
+	if (v.kind == AVM2_VALUE_UNDEFINED) return avm2_null();
+	return v;
+}
+
+Avm2Value avm2_op_convert_o(Avm2Activation* act, Avm2Value v)
+{
+	if (value_is_null_like(v))
+	{
+		avm2_throw_null_or_undefined(act->ctx, v, NULL, 0);
+	}
+	return v;
+}
+
+
+// E4X escapes (ECMA-357 EscapeAttributeValue / EscapeElementValue).
+static Avm2Value esc_xml(Avm2Activation* act, Avm2Value v, int attr)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	char* out = avm2_alloc(ctx, s->len * 6 + 1);
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < s->len; i++)
+	{
+		char c = s->utf8[i];
+		const char* rep = NULL;
+		if (c == '&') rep = "&amp;";
+		else if (c == '<') rep = "&lt;";
+		else if (!attr && c == '>') rep = "&gt;";
+		else if (attr && c == '"') rep = "&quot;";
+		else if (attr && c == '\n') rep = "&#xA;";
+		else if (attr && c == '\r') rep = "&#xD;";
+		else if (attr && c == '\t') rep = "&#x9;";
+		if (rep != NULL)
+		{
+			size_t rl = strlen(rep);
+			memcpy(out + n, rep, rl);
+			n += (uint32_t) rl;
+		}
+		else
+		{
+			out[n++] = c;
+		}
+	}
+	return avm2_string(avm2_string_new(ctx, out, n));
+}
+
+Avm2Value avm2_op_esc_xattr(Avm2Activation* act, Avm2Value v)
+{
+	return esc_xml(act, v, 1);
+}
+
+Avm2Value avm2_op_esc_xelem(Avm2Activation* act, Avm2Value v)
+{
+	return esc_xml(act, v, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Enumeration (Ruffle activation.rs op_has_next_2 etc.)
+// ---------------------------------------------------------------------------
+
+Avm2Value avm2_op_hasnext2(Avm2Activation* act, Avm2Value* obj_reg, Avm2Value* idx_reg)
+{
+	Avm2Context* ctx = act->ctx;
+	int32_t cur = avm2_coerce_to_i32(ctx, *idx_reg);
+	if (cur < 0)
+	{
+		return avm2_bool(false);
+	}
+	uint32_t cur_index = (uint32_t) cur;
+	Avm2Value result_value = *obj_reg;
+	Avm2Object* object = NULL;
+
+	if (value_is_null_like(*obj_reg))
+	{
+		cur_index = 0;
+	}
+	else if (obj_reg->kind == AVM2_VALUE_OBJECT)
+	{
+		object = obj_reg->u.obj->proto;
+		cur_index = avm2_object_next_enumerant(obj_reg->u.obj, cur_index);
+	}
+	else
+	{
+		Avm2Object* proto = avm2_value_proto(ctx, *obj_reg);
+		if (proto != NULL)
+		{
+			object = proto->proto;
+			cur_index = avm2_object_next_enumerant(proto, cur_index);
+		}
+	}
+
+	while (object != NULL && cur_index == 0)
+	{
+		Avm2Object* cur_object = object;
+		cur_index = avm2_object_next_enumerant(cur_object, cur_index);
+		result_value = avm2_object_value(cur_object);
+		object = cur_object->proto;
+	}
+
+	if (cur_index == 0)
+	{
+		result_value = avm2_null();
+	}
+	*idx_reg = avm2_uint_value(cur_index);
+	*obj_reg = result_value;
+	return avm2_bool(cur_index != 0);
+}
+
+Avm2Value avm2_op_hasnext(Avm2Activation* act, Avm2Value obj, Avm2Value idx)
+{
+	Avm2Context* ctx = act->ctx;
+	int32_t cur = avm2_coerce_to_i32(ctx, idx);
+	if (cur < 0) return avm2_integer(0);
+	Avm2Object* o = NULL;
+	if (obj.kind == AVM2_VALUE_OBJECT) o = obj.u.obj;
+	else if (!value_is_null_like(obj)) o = avm2_value_proto(ctx, obj);
+	if (o == NULL) return avm2_integer(0);
+	return avm2_uint_value(avm2_object_next_enumerant(o, (uint32_t) cur));
+}
+
+Avm2Value avm2_op_nextname(Avm2Activation* act, Avm2Value obj, Avm2Value idx)
+{
+	Avm2Context* ctx = act->ctx;
+	int32_t cur = avm2_coerce_to_i32(ctx, idx);
+	if (cur <= 0) return avm2_null();
+	if (value_is_null_like(obj))
+	{
+		avm2_throw_null_or_undefined(ctx, obj, NULL, 0);
+	}
+	Avm2Object* o = (obj.kind == AVM2_VALUE_OBJECT) ? obj.u.obj
+	                                                : avm2_value_proto(ctx, obj);
+	return avm2_object_enumerant_name(ctx, o, (uint32_t) cur);
+}
+
+Avm2Value avm2_op_nextvalue(Avm2Activation* act, Avm2Value obj, Avm2Value idx)
+{
+	Avm2Context* ctx = act->ctx;
+	int32_t cur = avm2_coerce_to_i32(ctx, idx);
+	if (cur <= 0) return avm2_undefined();
+	if (value_is_null_like(obj))
+	{
+		avm2_throw_null_or_undefined(ctx, obj, NULL, 0);
+	}
+	Avm2Object* o = (obj.kind == AVM2_VALUE_OBJECT) ? obj.u.obj
+	                                                : avm2_value_proto(ctx, obj);
+	return avm2_object_enumerant_value(ctx, o, (uint32_t) cur);
+}
+
+// ---------------------------------------------------------------------------
+// Throw
+// ---------------------------------------------------------------------------
+
+_Noreturn void avm2_op_throw(Avm2Activation* act, Avm2Value v)
+{
+	avm2_throw(act->ctx, v);
+}
+
+// ---------------------------------------------------------------------------
+// Name-based public property access (no multiname pools; used by
+// coerce_to_primitive, builtins, `in`, and enumeration paths)
+// ---------------------------------------------------------------------------
+
+Avm2Value avm2_get_public_property(Avm2Context* ctx, Avm2Value recv,
+                                   const char* name, uint32_t name_len, int* found)
+{
+	if (found != NULL) *found = 0;
+	if (value_is_null_like(recv))
+	{
+		return avm2_undefined();
+	}
+	Avm2PropKey key = avm2_public_key(name, name_len);
+	Resolved r;
+	if (!resolve_key(ctx, recv, &key, 1, &r))
+	{
+		return avm2_undefined();
+	}
+	if (found != NULL) *found = 1;
+	return resolved_get(ctx, recv, &r, name, name_len);
+}
+
+Avm2Value avm2_call_public_property(Avm2Context* ctx, Avm2Value recv,
+                                    const char* name, uint32_t name_len,
+                                    const Avm2Value* args, uint32_t argc)
+{
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	Avm2PropKey key = avm2_public_key(name, name_len);
+	Resolved r;
+	int ok = resolve_key(ctx, recv, &key, 1, &r);
+	return callproperty_common(ctx, recv, name, name_len, ok, &r, args, argc, recv);
+}
+
+int avm2_has_public_property(Avm2Context* ctx, Avm2Value recv,
+                             const char* name, uint32_t name_len)
+{
+	if (value_is_null_like(recv)) return 0;
+	Avm2PropKey key = avm2_public_key(name, name_len);
+	Resolved r;
+	return resolve_key(ctx, recv, &key, 1, &r);
+}
+
+int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
+                                 const char* name, uint32_t name_len)
+{
+	if (value_is_null_like(recv)) return 0;
+	// STRICT publicness: hasOwnProperty must not see AS3-namespace traits
+	// (hasownproperty_namespaces).
+	const Avm2VTable* vt = avm2_value_vtable(ctx, recv);
+	if (avm2_vtable_find_public(vt, name, name_len) != NULL) return 1;
+	if (recv.kind != AVM2_VALUE_OBJECT) return 0;
+	Avm2Object* obj = recv.u.obj;
+	uint32_t idx;
+	if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(name, name_len, &idx))
+	{
+		Avm2Value v = avm2_array_get(obj, idx);
+		if (v.kind != AVM2_VALUE_HOLE) return 1;
+	}
+	return avm2_object_find_dynamic(obj, name, name_len) != NULL;
 }

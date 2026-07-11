@@ -17,6 +17,13 @@
 
 typedef struct SWFAppContext SWFAppContext;
 
+// One entry of the debug call stack (getStackTrace / error 1063 naming).
+typedef struct Avm2CallFrame
+{
+	Avm2MethodRef method;
+	Avm2Class* bound_class;
+} Avm2CallFrame;
+
 struct Avm2Context
 {
 	SWFAppContext* app;   // for heap_alloc/heap_calloc
@@ -26,9 +33,18 @@ struct Avm2Context
 	Avm2AbcFileRt** files;
 	uint32_t file_count;
 	Avm2Object* root;     // SymbolClass char-0 instance
+	struct Avm2TryFrame* try_top;  // innermost exception frame (avm2_error.h)
+	uint8_t swf_version;  // for string_to_f64 bug compatibility
+	// Debug call stack (FP debug-player getStackTrace).
+	Avm2CallFrame* call_frames;
+	uint32_t call_depth;
+	uint32_t call_cap;
 };
 
 void runSWF_avm2(SWFAppContext* app_context);
+
+// The (single) runtime context.
+Avm2Context* avm2_get_context(void);
 
 // Heap helpers bound to the shared o1heap allocator.
 void* avm2_alloc(Avm2Context* ctx, uint32_t size);

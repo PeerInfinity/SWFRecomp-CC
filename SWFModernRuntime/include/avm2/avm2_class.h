@@ -30,19 +30,40 @@ typedef enum Avm2PropKind
 {
 	AVM2_PROP_SLOT = 0,   // Slot/Const/Class/Function traits: value in slots[slot_index]
 	AVM2_PROP_METHOD = 1,
-	AVM2_PROP_GETTER = 2, // Stage 3
-	AVM2_PROP_SETTER = 3, // Stage 3
+	AVM2_PROP_GETTER = 2,
+	AVM2_PROP_SETTER = 3,
+	AVM2_PROP_GETSET = 4, // both accessors defined
 } Avm2PropKind;
 
 typedef struct Avm2PropEntry
 {
 	Avm2PropKey key;
 	uint8_t kind;  // Avm2PropKind
+	uint8_t is_const;               // Const trait: writable only via InitProperty
+	uint8_t is_function_trait;      // Function trait: slot defaults to a closure
 	uint32_t slot_index;
-	Avm2MethodRef method;
+	uint32_t type_mn;               // slot type multiname (coerce on write); 0 = any
+	Avm2AbcFileRt* type_file;       // file whose pools type_mn/value index (NULL = none)
+	Avm2AbcDefault value;           // slot default
+	Avm2MethodRef method;           // METHOD/GETTER (or getter half of GETSET)
+	Avm2MethodRef setter;           // SETTER half
 	Avm2Class* defining_class;      // bound_class for method dispatch
 	Avm2ScopeChain* method_scope;   // captured outer scope for the method
 } Avm2PropEntry;
+
+// Per-slot metadata (Ruffle's slot_table): survives name shadowing, so a
+// redeclared var's PARENT slot still gets its own type/default.
+typedef struct Avm2SlotMeta
+{
+	uint8_t used;
+	uint8_t is_function_trait;
+	uint32_t type_mn;
+	Avm2AbcFileRt* type_file;
+	Avm2AbcDefault value;
+	Avm2MethodRef fn_method;       // Function-trait default closure
+	Avm2Class* defining_class;
+	Avm2ScopeChain* method_scope;
+} Avm2SlotMeta;
 
 struct Avm2VTable
 {
@@ -50,7 +71,14 @@ struct Avm2VTable
 	uint32_t cap;
 	Avm2PropEntry* entries;
 	uint32_t slot_count;  // slots consumed by SLOT-kind entries (1-based ids; index 0 unused)
+	Avm2SlotMeta* metas;  // [meta_cap]; index = slot id
+	uint32_t meta_cap;
 };
+
+// Native construct/call hooks for builtins (String/Number/Array/... whose
+// `new`/call return primitives or special objects).
+typedef Avm2Value (*Avm2NativeCtor)(Avm2Context* ctx, struct Avm2Class* cls,
+                                    const Avm2Value* args, uint32_t argc);
 
 struct Avm2Class
 {
@@ -61,53 +89,112 @@ struct Avm2Class
 	Avm2MethodRef instance_init;
 	Avm2ScopeChain* scope;         // scope captured at NewClass (methods' outer chain)
 	Avm2Object* class_object;
+	Avm2Object* prototype_obj;     // ES3 prototype object (chain mirrors super)
+	// Protected namespace (per-class URI); inherited protected traits are
+	// re-keyed onto the subclass's protected ns at class-define time.
+	uint8_t has_protected_ns;
+	Avm2PropKey protected_key;     // ns_kind/ns_uri/ns_len meaningful only
+	// Declared interfaces (direct); resolution is lazy (mn indices against
+	// the defining file). Builtins have resolved==direct==NULL.
+	uint32_t interface_count;
+	const uint32_t* interface_mns;
+	Avm2AbcFileRt* iface_file;
+	Avm2Class** interfaces;        // resolved cache (NULL until first use)
 	// Builtins: bytes of native instance state to allocate into
 	// Avm2Object.native_ext at construction (nearest ancestor wins), plus
 	// an optional native constructor body.
 	uint32_t native_ext_size;
 	void (*native_init)(Avm2Context* ctx, Avm2Object* obj);
+	// If set, `new C(...)` returns this instead of the standard
+	// allocate + run-instance-init path (String/Number/Boolean/int/uint/
+	// Array/Function). Also used for coercion-style class calls when
+	// native_call is unset.
+	Avm2NativeCtor native_construct;
+	// If set, `C(...)` (class call) uses this; default is coerce-arg0.
+	Avm2NativeCtor native_call;
 };
 
-// Immutable captured scope chain (objects only; `with` scopes are Stage 3).
+// One local-scope stack entry in an emitted method body.
+typedef struct Avm2ScopeEntry
+{
+	Avm2Object* obj;
+	uint8_t is_with;
+} Avm2ScopeEntry;
+
+// Immutable captured scope chain.
 struct Avm2ScopeChain
 {
 	uint32_t count;
-	Avm2Object** objs;  // bottom (0) → top (count-1)
+	Avm2ScopeEntry* entries;  // bottom (0) → top (count-1)
 };
+
+// Dot-qualified class name for error messages ("pkg.Class" / "Class").
+int avm2_class_qname_buf(const Avm2Class* cls, char* buf, int size);
 
 // Namespace kind folding for comparisons (public kinds unify).
 uint8_t avm2_ns_fold(uint8_t kind);
 int avm2_propkey_matches(const Avm2PropKey* a, const Avm2PropKey* b);
+// Public-namespace check (kind public + empty URI). The AS3 builtin
+// namespace (http://adobe.com/AS3/2006/builtin) also counts: our builtins
+// register public-keyed methods only.
+int avm2_propkey_is_public(const Avm2PropKey* k);
+Avm2PropKey avm2_public_key(const char* name, uint32_t name_len);
 
 // Multiname resolution against a file's pools. propkey_from_qname fails
 // (returns 0) on lazy multinames; mn_match handles QName* and static
-// Multiname (ns-set) kinds — lazy kinds never reach the Stage-2 ops (the
-// verifier splits GetProperty into Static/Fast/Slow).
+// Multiname (ns-set) kinds. mn_is_lazy_name reports MultinameL kinds
+// (name popped from the stack at runtime).
 int avm2_propkey_from_qname(const Avm2AbcFileData* data, uint32_t mn_idx, Avm2PropKey* out);
 int avm2_mn_match(const Avm2AbcFileData* data, uint32_t mn_idx, const Avm2PropKey* key);
 void avm2_mn_name(const Avm2AbcFileData* data, uint32_t mn_idx,
                   const char** name, uint32_t* name_len);
+// Does the multiname's namespace (set) contain the public namespace?
+int avm2_mn_has_public_ns(const Avm2AbcFileData* data, uint32_t mn_idx);
 
 // VTable build/lookup.
 void avm2_vtable_append(Avm2Context* ctx, Avm2VTable* vt, const Avm2PropEntry* e);
 const Avm2PropEntry* avm2_vtable_find(const Avm2VTable* vt, const Avm2PropKey* key);
+const Avm2PropEntry* avm2_vtable_find_mn(const Avm2VTable* vt, const Avm2AbcFileData* data,
+                                         uint32_t mn_idx);
+// Name-only public lookup (for public-property calls by name).
+const Avm2PropEntry* avm2_vtable_find_public(const Avm2VTable* vt,
+                                             const char* name, uint32_t name_len);
 
 // Add trait entries from static data onto a vtable (used for class
-// instance/static traits and script globals). `file` provides pools and
-// the method fns; `defining_class`/`scope` are stamped on method entries.
+// instance/static traits, script globals, and activation objects). `file`
+// provides pools and the method fns; `defining_class`/`scope` are stamped
+// on method entries.
 void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* file,
                             const Avm2AbcTrait* traits, uint32_t trait_count,
                             Avm2Class* defining_class, Avm2ScopeChain* scope);
 
+// Initialize an object's slots from its vtable's slot defaults (trait
+// value if present, else the type's default: int/uint 0, Number NaN,
+// Boolean false, any undefined, other null).
+void avm2_slots_init_defaults(Avm2Context* ctx, Avm2Object* obj, const Avm2VTable* vt);
+
 // Scope chains.
 Avm2ScopeChain* avm2_scope_capture(Avm2Context* ctx, const Avm2ScopeChain* outer,
-                                   Avm2Object* const* lscope, uint32_t scope_n);
+                                   const Avm2ScopeEntry* lscope, uint32_t scope_n);
 
 // Class realization (NewClass) and construction (ConstructProp / root).
 Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t class_idx,
                              Avm2Class* super_class, Avm2ScopeChain* scope);
 Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
                                const Avm2Value* args, uint32_t argc);
+
+// ES4 type check (Ruffle value.rs is_of_type): class chain + interfaces,
+// with the numeric-duality special cases for the builtin primitive classes.
+bool avm2_value_is_of_type(Avm2Context* ctx, Avm2Value v, Avm2Class* type_class);
+bool avm2_class_has_interface(Avm2Context* ctx, Avm2Class* cls, Avm2Class* iface);
+
+// The class of a value (primitives map to their builtin classes; panics on
+// null/undefined — callers null-check first).
+Avm2Class* avm2_value_class(Avm2Context* ctx, Avm2Value v);
+// The vtable of a value (primitive receivers use their class ivtable).
+const Avm2VTable* avm2_value_vtable(Avm2Context* ctx, Avm2Value v);
+// The prototype object of a value's type (for proto-chain reads).
+Avm2Object* avm2_value_proto(Avm2Context* ctx, Avm2Value v);
 
 // Invoke a method reference (emitted or native).
 Avm2Value avm2_call_method_ref(Avm2Context* ctx, const Avm2MethodRef* m,
@@ -116,6 +203,32 @@ Avm2Value avm2_call_method_ref(Avm2Context* ctx, const Avm2MethodRef* m,
 
 // Invoke a function object (AVM2_OBJ_FUNCTION closure).
 Avm2Value avm2_call_function_obj(Avm2Context* ctx, Avm2Object* fnobj,
-                                 const Avm2Value* args, uint32_t argc);
+                                 Avm2Value receiver, const Avm2Value* args, uint32_t argc);
+
+// Call any callable value with an explicit receiver (Op::Call semantics).
+Avm2Value avm2_call_value(Avm2Context* ctx, Avm2Value func, Avm2Value receiver,
+                          const Avm2Value* args, uint32_t argc);
+
+// `new` on any value (class object, function object) — Op::Construct.
+Avm2Value avm2_construct_value(Avm2Context* ctx, Avm2Value ctor,
+                               const Avm2Value* args, uint32_t argc);
+
+// Coerce a value to the type named by a multiname (Ruffle coerce_to_type).
+// mn_idx 0 = any (no coercion). Throws TypeError 1034 on mismatch.
+Avm2Value avm2_coerce_to_type_mn(Avm2Context* ctx, Avm2AbcFileRt* file,
+                                 uint32_t mn_idx, Avm2Value v);
+// Coercion by resolved class (NULL class = no coercion).
+Avm2Value avm2_coerce_to_class(Avm2Context* ctx, Avm2Class* cls, Avm2Value v);
+// Resolve a multiname to a class (via file classes/domain/builtins);
+// NULL if not resolvable.
+Avm2Class* avm2_class_for_mn(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t mn_idx);
+
+// Decode an ABC default value against a file's pools.
+Avm2Value avm2_default_value(Avm2Context* ctx, Avm2AbcFileRt* file, const Avm2AbcDefault* d);
+
+// Function objects.
+Avm2Object* avm2_function_new(Avm2Context* ctx, const Avm2MethodRef* method,
+                              Avm2Class* bound_class, Avm2ScopeChain* scope,
+                              Avm2Value receiver, bool has_receiver);
 
 #endif // AVM2_CLASS_H

@@ -8,6 +8,11 @@
 //   4. construct the SymbolClass char-0 (root) class instance
 //   5. per-tick: run registered frame scripts
 //
+// Each top-level entry (script init, root construction, frame script) runs
+// under a catch-all try frame: an uncaught AVM2 error aborts that entry
+// only (logged to stderr) and the movie keeps running, matching
+// Flash/Ruffle.
+//
 // swf_core.c is not referenced from here and never references this file;
 // the shared wasm_wrappers/main.c picks runSWF_avm2 over swfStart only
 // under -DSWF_AVM2 (defined by verify_output.py for avm2 tests).
@@ -20,12 +25,18 @@
 
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 
 static Avm2Context g_avm2_ctx;
+
+Avm2Context* avm2_get_context(void)
+{
+	return &g_avm2_ctx;
+}
 
 void* avm2_alloc(Avm2Context* ctx, uint32_t size)
 {
@@ -38,14 +49,14 @@ void* avm2_alloc(Avm2Context* ctx, uint32_t size)
 }
 
 // GC participant registered with the object.c mark-sweep aggregator (see
-// g_avm2_gc_mark_roots there). Stage-2 inventory: every AVM2 allocation
-// (classes, vtables, globals, the root instance, closures, scope chains,
+// g_avm2_gc_mark_roots there). Inventory: every AVM2 allocation (classes,
+// vtables, globals, instances, closures, scope chains, strings, arrays,
 // domain entries) is reachable for the whole run AND is invisible to the
 // collector's census (only ASObject/ASArray enroll in g_mt_obj_head /
 // g_mt_arr_head), so there is nothing to mark: AVM2 objects are immortal
 // by construction and hold no edges into collectable AVM1 objects.
-// Stage 3 TODO: enroll AVM2 objects in their own census + mark scope/
-// globals/frame-script roots here once avm2 code can create garbage.
+// Tranche-1 runs are short (MAX_FRAMES-bounded), so immortality is
+// correct, just wasteful; enroll a real census if anything OOMs.
 static void avm2GcMarkRoots(void)
 {
 }
@@ -76,9 +87,11 @@ static Avm2AbcFileRt* avm2_abc_load(Avm2Context* ctx, const Avm2AbcFileData* dat
 		// the script's trait table. Script-level methods capture a scope
 		// chain of just [globals].
 		Avm2Object* globals = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
-		globals->cls = ctx->builtins.object_class;
+		globals->cls = ctx->builtins.global_class;
+		globals->proto = ctx->builtins.object_class->prototype_obj;
+		Avm2ScopeEntry scope_entry = { globals, 0 };
 		Avm2ScopeChain* script_scope =
-			avm2_scope_capture(ctx, NULL, &globals, 1);
+			avm2_scope_capture(ctx, NULL, &scope_entry, 1);
 		Avm2VTable* vt = avm2_alloc(ctx, sizeof(Avm2VTable));
 		memset(vt, 0, sizeof(Avm2VTable));
 		avm2_vtable_add_traits(ctx, vt, file, sd->traits, sd->trait_count,
@@ -92,6 +105,7 @@ static Avm2AbcFileRt* avm2_abc_load(Avm2Context* ctx, const Avm2AbcFileData* dat
 			{
 				globals->slots[i] = avm2_undefined();
 			}
+			avm2_slots_init_defaults(ctx, globals, vt);
 		}
 		file->script_globals[si] = globals;
 
@@ -188,6 +202,7 @@ void runSWF_avm2(SWFAppContext* app_context)
 	Avm2Context* ctx = &g_avm2_ctx;
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->app = app_context;
+	ctx->swf_version = avm2_generated_swf_version;
 	g_avm2_gc_mark_roots = avm2GcMarkRoots;
 
 	avm2_globals_init(ctx);
@@ -213,13 +228,20 @@ void runSWF_avm2(SWFAppContext* app_context)
 	}
 
 	// Step 3: eager-init each ABC's LAST script (the main/root script);
-	// all other scripts stay lazy (Ruffle movie_clip.rs:4246-4255).
+	// all other scripts stay lazy (Ruffle movie_clip.rs:4246-4255). An
+	// uncaught error aborts that script only.
 	for (uint32_t i = 0; i < ctx->file_count; i++)
 	{
 		if (ctx->files[i]->data->script_count > 0)
 		{
-			avm2_script_ensure_init(ctx->files[i],
-			                        ctx->files[i]->data->script_count - 1);
+			Avm2TryFrame top;
+			avm2_try_push_catch_all(ctx, &top);
+			if (setjmp(top.jb) == 0)
+			{
+				avm2_script_ensure_init(ctx->files[i],
+				                        ctx->files[i]->data->script_count - 1);
+			}
+			avm2_try_pop_frame(&top);
 		}
 	}
 
@@ -227,7 +249,13 @@ void runSWF_avm2(SWFAppContext* app_context)
 	// calls addFrameScript on itself).
 	if (root_class != NULL)
 	{
-		construct_root(ctx, root_class);
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
+		{
+			construct_root(ctx, root_class);
+		}
+		avm2_try_pop_frame(&top);
 	}
 
 	// Step 5: tick loop, mirroring swf_core.c's MAX_FRAMES cadence.
@@ -239,16 +267,23 @@ void runSWF_avm2(SWFAppContext* app_context)
 	for (size_t tick = 0; tick < max_ticks; tick++)
 	{
 		// Stage-5 TODO: real timeline (playhead advance, enterFrame /
-		// frameConstructed broadcasts, non-root frame scripts). Stage 2
-		// runs the root's frame-0 script once, on the first tick — the
-		// single-frame-movie behavior hello_world needs.
+		// frameConstructed broadcasts, non-root frame scripts). For now the
+		// root's frame-0 script runs once, on the first tick — the
+		// single-frame-movie behavior the pure-language tests need.
 		if (tick == 0 && ctx->root != NULL && ctx->root->native_ext != NULL)
 		{
 			Avm2MovieClipExt* ext = ctx->root->native_ext;
 			if (ext->frame_script_cap > 0
 			    && ext->frame_scripts[0].kind == AVM2_VALUE_OBJECT)
 			{
-				avm2_call_function_obj(ctx, ext->frame_scripts[0].u.obj, NULL, 0);
+				Avm2TryFrame top;
+				avm2_try_push_catch_all(ctx, &top);
+				if (setjmp(top.jb) == 0)
+				{
+					avm2_call_function_obj(ctx, ext->frame_scripts[0].u.obj,
+					                       avm2_object_value(ctx->root), NULL, 0);
+				}
+				avm2_try_pop_frame(&top);
 			}
 		}
 	}

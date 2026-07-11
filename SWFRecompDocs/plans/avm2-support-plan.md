@@ -273,11 +273,26 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   AVM1 SWFs, matching Flash/Ruffle) — fixes the one AVM1-side regression the
   first CI run caught (gnash swfmill mixed-bytecode-as2); zero regressions in
   the confirming run.
-- **Stage 3 — tranche 1 (~90 language tests)**: full opcode coverage for
-  arithmetic/logic/control flow, coercion matrix, primitives + their
-  wrapper-class methods, Array, String, OOP (inheritance, interfaces, virtual
-  properties, `super`), closures/scope chains, typed exceptions. Exit: ≥80 of
-  the ~90 passing; every miss triaged.
+- **Stage 3 — tranche 1 (~90 language tests)** — **DONE 2026-07-11**: full
+  emitter rework (labels + gotos for all control flow, no truncation,
+  setjmp try-frame prologues, pools/signatures/interfaces/protected-ns/
+  SWF-version in the static data, interpreter-mode marking for class and
+  script initializers) + the tranche-1 op surface (122 IR ops; census
+  ceiling 61 → 1069 tests). Runtime grew from 6 to 11 modules
+  (avm2_function/error/number/string/array.c): coercion matrix, shortest
+  round-trip Number formatting, property engine (accessors, proto chains,
+  bound-method cache, interface/protected aliases with override sync, slot
+  metadata for shadowed slots, 1069/1081/1056 miss semantics),
+  functions/closures (arguments/rest/defaults/unchecked/1063), typed
+  exceptions (longjmp dispatch, catch-scope objects, FP error strings,
+  debug call stack + getStackTrace), and the builtin core (Object/Class/
+  Function/String/Number/int/uint/Boolean/Array/Math/Error family/toplevel
+  + XML/XMLList/Date/Point stubs). verify_output.py approximations now
+  match Ruffle's framework (section-gated numeric compare + max_relative).
+  Exit met: **152/166 tranche-1 candidates** pass locally (≥80-of-~90
+  criterion); all 14 misses triaged to later-tranche deps (RegExp ×5,
+  Vector ×3, describeType ×2, AMF ×1, Proxy ×1, display ×1, upstream-ignored
+  ×1) in `avm2/_investigation/CURRENT_STATUS.md`.
 - **Stage 4 — tranches 2+3 (~110 tests)**: Vector, JSON, RegExp, proto edge
   cases; Namespace/QName/Proxy/Dictionary, ByteArray, AMF. Exit: climbing
   toward the 694-test phase-1 ceiling; re-triage what's left.

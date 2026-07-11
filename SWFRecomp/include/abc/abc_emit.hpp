@@ -42,7 +42,8 @@ namespace abc
 		void emitAbcTag(const AbcFile& abc, const std::vector<EmitBody>& bodies);
 
 		// Writes abc_gen.h + abc_registry.c. Call once, after all tags.
-		void finalize(const std::vector<std::pair<u16, std::string>>& symbol_bindings);
+		void finalize(const std::vector<std::pair<u16, std::string>>& symbol_bindings,
+		              u8 swf_version);
 
 		int tagCount() const { return next_tag_index_; }
 

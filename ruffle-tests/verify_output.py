@@ -707,22 +707,40 @@ def get_max_execution_duration(test_dir):
 
 
 def get_epsilon(test_dir):
-    """Parse [approximations] epsilon from test.toml, default 0 (exact match)."""
+    """Parse [approximations] epsilon from test.toml.
+
+    Returns None when the test has NO [approximations] section (exact string
+    compare), and a float (default 0.0) when it does. Matching Ruffle's test
+    framework, any [approximations] section enables parse-as-f64 numeric
+    comparison; epsilon 0 then means exact *double* equality, which accepts
+    differently-formatted representations of the same value (e.g. the avm2
+    `divide` test's "5.9820955879054e-8" vs "5.982095587905399e-8")."""
     toml_path = test_dir / "test.toml"
     if toml_path.exists():
         try:
             import tomllib
             with open(toml_path, "rb") as f:
                 data = tomllib.load(f)
+            if "approximations" not in data:
+                return None
             approx = data.get("approximations", {})
-            eps = approx.get("epsilon", 0.0)
-            return float(eps)
+            eps = float(approx.get("epsilon", 0.0))
+            max_rel = float(approx.get("max_relative", 0.0))
+            return (eps, max_rel)
         except Exception:
             text = toml_path.read_text()
+            if "[approximations]" not in text:
+                return None
+            eps = 0.0
+            max_rel = 0.0
             m = re.search(r"epsilon\s*=\s*([0-9.eE+-]+)", text)
             if m:
-                return float(m.group(1))
-    return 0.0
+                eps = float(m.group(1))
+            m = re.search(r"max_relative\s*=\s*([0-9.eE+-]+)", text)
+            if m:
+                max_rel = float(m.group(1))
+            return (eps, max_rel)
+    return None
 
 
 def get_number_patterns(test_dir):
@@ -750,13 +768,23 @@ def _lines_approx_equal(actual_line, expected_line, epsilon, number_patterns=Non
     Ruffle's test framework behavior for [approximations.number_patterns])."""
     if actual_line == expected_line:
         return True
-    if epsilon <= 0:
+    if epsilon is None:
+        # No [approximations] section: exact string compare only.
         return False
-    # Try to parse both as a single number and compare with epsilon
+    eps, max_rel = epsilon if isinstance(epsilon, tuple) else (epsilon, 0.0)
+    # Try to parse both as a single number and compare (Ruffle framework
+    # semantics: absolute epsilon and/or relative epsilon; 0/0 = exact
+    # double equality).
     try:
         a = float(actual_line)
         e = float(expected_line)
-        return abs(a - e) <= epsilon
+        if a == e:
+            return True
+        if abs(a - e) <= eps:
+            return True
+        if max_rel > 0.0 and abs(a - e) <= max_rel * max(abs(a), abs(e)):
+            return True
+        return False
     except (ValueError, OverflowError):
         pass
     # Try regex-based numeric comparison via [approximations.number_patterns]
@@ -769,8 +797,15 @@ def _lines_approx_equal(actual_line, expected_line, epsilon, number_patterns=Non
             if len(am.groups()) != len(em.groups()):
                 continue
             try:
+                eps2, max_rel2 = epsilon if isinstance(epsilon, tuple) else (epsilon or 0.0, 0.0)
+                def _close(av, ev):
+                    fa = float(av)
+                    fe = float(ev)
+                    if fa == fe or abs(fa - fe) <= eps2:
+                        return True
+                    return max_rel2 > 0.0 and abs(fa - fe) <= max_rel2 * max(abs(fa), abs(fe))
                 groups_match = all(
-                    abs(float(av) - float(ev)) <= epsilon
+                    _close(av, ev)
                     for av, ev in zip(am.groups(), em.groups())
                 )
             except (ValueError, OverflowError, TypeError):
@@ -1624,6 +1659,11 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             "src/avm2/avm2_class.c",
             "src/avm2/avm2_ops.c",
             "src/avm2/avm2_globals.c",
+            "src/avm2/avm2_function.c",
+            "src/avm2/avm2_error.c",
+            "src/avm2/avm2_number.c",
+            "src/avm2/avm2_string.c",
+            "src/avm2/avm2_array.c",
             "src/avm2/avm2_main.c",
         ])
     for src in core_sources:
@@ -2396,7 +2436,7 @@ def run_binary(build_dir, event_file=None, extra_env=None):
             b"".join(err_chunks).decode("utf-8", errors="replace"))
 
 
-def _diff_indices(actual, expected, epsilon=0.0, number_patterns=None):
+def _diff_indices(actual, expected, epsilon=None, number_patterns=None):
     """Return the set of 0-based line indices where `actual` differs from
     `expected` after the same whitespace-stripping compare_output does.
     Used by the Ruffle-subset-match check to compare diff-sets line-wise."""
@@ -2419,7 +2459,7 @@ def _diff_indices(actual, expected, epsilon=0.0, number_patterns=None):
     }
 
 
-def ruffle_subset_match(our_actual, flash_expected, ruffle_actual, epsilon=0.0, number_patterns=None):
+def ruffle_subset_match(our_actual, flash_expected, ruffle_actual, epsilon=None, number_patterns=None):
     """Return True if our diffs against Flash's `output.txt` are a subset of
     Ruffle's diffs against the same file. The subset is taken over line
     indices, so at every line where we disagree with Flash, Ruffle also
@@ -2445,7 +2485,7 @@ def _test_is_known_failure(test_dir):
     return bool(data.get("known_failure"))
 
 
-def compare_output(actual, expected, epsilon=0.0, number_patterns=None):
+def compare_output(actual, expected, epsilon=None, number_patterns=None):
     """Compare filtered actual output with expected output.
     Returns (match, diff_summary, stats_dict)."""
     actual_lines = actual.split("\n")
@@ -2497,7 +2537,7 @@ def compare_output(actual, expected, epsilon=0.0, number_patterns=None):
     return False, summary, line_stats
 
 
-def format_diff(actual, expected, context=3, epsilon=0.0, number_patterns=None):
+def format_diff(actual, expected, context=3, epsilon=None, number_patterns=None):
     """Generate a unified-diff-style view showing mismatches with context."""
     actual_lines = actual.split("\n")
     expected_lines = expected.split("\n")

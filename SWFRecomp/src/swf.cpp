@@ -367,7 +367,7 @@ namespace SWFRecomp
 	{
 		if (abc_emitter != nullptr)
 		{
-			abc_emitter->finalize(symbol_class_bindings);
+			abc_emitter->finalize(symbol_class_bindings, header.version);
 			printf("DoABC: wrote RecompiledABC registry (%d tag(s), %zu SymbolClass binding(s))\n",
 			       abc_emitter->tagCount(), symbol_class_bindings.size());
 			delete abc_emitter;

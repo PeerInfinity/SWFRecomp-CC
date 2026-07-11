@@ -11,8 +11,9 @@
 //
 // Number/Integer duality (avmplus): i32-representable numbers canonicalize
 // to AVM2_VALUE_INTEGER where the source pushes them that way (PushInt);
-// arithmetic promoting to f64 is a Stage 3 concern. Coercion helpers are
-// named 1:1 with Ruffle's value.rs methods (coerce_to_string, ...).
+// the distinction is invisible at the AS3 level (both are "Number"), so
+// arithmetic may produce either. Coercion helpers are named 1:1 with
+// Ruffle's value.rs methods (coerce_to_string, ...).
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -40,6 +41,9 @@ typedef enum Avm2ValueKind
 	AVM2_VALUE_NUMBER = 4,
 	AVM2_VALUE_STRING = 5,
 	AVM2_VALUE_OBJECT = 6,
+	// Internal-only: an array-storage hole. Never appears on the operand
+	// stack, in locals, or in any user-visible value.
+	AVM2_VALUE_HOLE = 7,
 } Avm2ValueKind;
 
 typedef struct Avm2Value
@@ -62,17 +66,56 @@ Avm2Value avm2_null(void);
 Avm2Value avm2_bool(bool b);
 Avm2Value avm2_integer(int32_t i);
 Avm2Value avm2_number(double d);
+Avm2Value avm2_uint_value(uint32_t u);  // Integer if it fits, else Number
 Avm2Value avm2_string(const Avm2String* s);
 Avm2Value avm2_object_value(Avm2Object* obj);
 
-// Coercions (port of Ruffle value.rs semantics; only the cases Stage 2
-// needs are complete — number formatting is minimal with a Stage 3 TODO).
-// coerce_to_string returns a heap or interned Avm2String, never NULL.
+// Coercions (port of Ruffle value.rs semantics). coerce_to_string returns
+// a heap or interned Avm2String, never NULL. Object arms call toString/
+// valueOf via the public-property machinery and may throw AVM2 errors.
 const Avm2String* avm2_coerce_to_string(Avm2Context* ctx, Avm2Value v);
 bool avm2_coerce_to_boolean(Avm2Value v);
-int32_t avm2_coerce_to_i32(Avm2Value v);
+double avm2_coerce_to_number(Avm2Context* ctx, Avm2Value v);
+int32_t avm2_coerce_to_i32(Avm2Context* ctx, Avm2Value v);
+uint32_t avm2_coerce_to_u32(Avm2Context* ctx, Avm2Value v);
+// ECMA ToPrimitive. hint: 0 = none/default, 1 = number, 2 = string.
+Avm2Value avm2_coerce_to_primitive(Avm2Context* ctx, Avm2Value v, int hint);
 
-// Heap string helper (copies bytes, NUL-terminates).
+// ECMA f64 -> i32/u32 wrapping conversion (Ruffle ecma_conversions).
+int32_t avm2_f64_to_wrapping_i32(double d);
+uint32_t avm2_f64_to_wrapping_u32(double d);
+
+// String parsing (Ruffle value.rs string_to_int / string_to_f64).
+double avm2_string_to_int(const char* s, uint32_t len, int32_t radix, bool strict);
+// Returns false if unparseable (out_d untouched).
+bool avm2_string_to_f64(const char* s, uint32_t len, bool strict, double* out_d);
+
+// AVM2 Number.toString() formatting (Ruffle value.rs coerce_to_string
+// Number arm: shortest round-trip decimal inside [1e-6, 1e21), otherwise
+// MAX_PRECISION exponential). Returns length written to buf.
+int avm2_format_number(char* buf, int buf_size, double d);
+
+// Operators (Ruffle activation.rs op impls / value.rs abstract algorithms).
+Avm2Value avm2_op_add_values(Avm2Context* ctx, Avm2Value a, Avm2Value b);
+bool avm2_abstract_eq(Avm2Context* ctx, Avm2Value a, Avm2Value b);
+bool avm2_strict_eq(Avm2Value a, Avm2Value b);
+// abstract_lt: returns -1 for undefined (NaN), else 0/1.
+int avm2_abstract_lt(Avm2Context* ctx, Avm2Value a, Avm2Value b);
+
+// Number checks (Ruffle value.rs is_number / is_u32 / is_i32).
+bool avm2_value_is_number(Avm2Value v);
+bool avm2_value_is_u32(Avm2Value v);
+bool avm2_value_is_i32(Avm2Value v);
+// Index-like check: value is an unsigned integer < 0xFFFFFFFF. Returns
+// false or sets *out_idx.
+bool avm2_value_as_index(Avm2Value v, uint32_t* out_idx);
+
+// Heap string helpers (copy bytes, NUL-terminate).
 const Avm2String* avm2_string_new(Avm2Context* ctx, const char* utf8, uint32_t len);
+const Avm2String* avm2_string_from_literal(Avm2Context* ctx, const char* lit);
+const Avm2String* avm2_string_concat(Avm2Context* ctx, const Avm2String* a, const Avm2String* b);
+bool avm2_string_equals(const Avm2String* a, const Avm2String* b);
+// UTF-16 code-unit-order comparison (-1/0/1).
+int avm2_string_utf16_cmp(const Avm2String* a, const Avm2String* b);
 
 #endif // AVM2_VALUE_H

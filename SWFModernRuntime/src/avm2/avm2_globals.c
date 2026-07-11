@@ -1,25 +1,29 @@
-// Stage-2 builtin stubs + the definition domain (avm2-support-plan §4.5).
+// Builtins + the definition domain (avm2-support-plan §4.5).
 //
-// Builtins are constructible with correct super links and register through
-// the same vtable mechanism as SWF-defined classes (playerglobal-shaped
-// binding surface); they have NO display-list behavior — the root
-// MovieClip stub only stores addFrameScript closures for the tick loop.
+// Builtins register through the same vtable mechanism as SWF-defined
+// classes (playerglobal-shaped binding surface). ES3-style methods
+// (toString, hasOwnProperty, ...) live on the class prototype objects as
+// dont-enum function-valued dynamic props, exactly where the proto-chain
+// read path finds them.
 //
 // The domain mirrors Ruffle's Domain: FindPropStrict's last resort maps a
 // definition name to the globals object defining it, running the defining
-// script's initializer lazily on first touch (this is what makes
-// hello_world's "Hello world!" fire from frame 1's `new Test()`).
-// Builtins are seeded first, so parent-domain (playerglobal) definitions
-// win over movie definitions, matching avmplus precedence.
+// script's initializer lazily on first touch. Builtins are seeded first,
+// so parent-domain (playerglobal) definitions win over movie definitions,
+// matching avmplus precedence.
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+
+void avm2_register_function_builtins(Avm2Context* ctx);
 
 // ---------------------------------------------------------------------------
 // Domain
@@ -56,7 +60,7 @@ void avm2_script_ensure_init(Avm2AbcFileRt* file, uint32_t script_index)
 
 	const Avm2AbcScriptData* sd = &file->data->scripts[script_index];
 	const Avm2AbcMethodData* init = &file->data->methods[sd->init_method];
-	Avm2MethodRef ref = { init->fn, file, init->debug_name };
+	Avm2MethodRef ref = { init->fn, file, init->debug_name, sd->init_method };
 	avm2_call_method_ref(file->ctx, &ref, NULL, NULL,
 	                     avm2_object_value(file->script_globals[script_index]),
 	                     NULL, 0);
@@ -81,55 +85,7 @@ Avm2Object* avm2_domain_find(Avm2Context* ctx, const Avm2PropKey* key)
 }
 
 // ---------------------------------------------------------------------------
-// Native methods
-// ---------------------------------------------------------------------------
-
-static Avm2Value native_trace(Avm2Activation* act)
-{
-	// Ruffle globals/toplevel.rs trace: join args with " ", newline-terminate.
-	for (uint32_t i = 0; i < act->argc; i++)
-	{
-		if (i > 0) fputc(' ', stdout);
-		const Avm2String* s = avm2_coerce_to_string(act->ctx, act->args[i]);
-		fwrite(s->utf8, 1, s->len, stdout);
-	}
-	fputc('\n', stdout);
-	return avm2_undefined();
-}
-
-static Avm2Value native_addFrameScript(Avm2Activation* act)
-{
-	if (act->this_val.kind != AVM2_VALUE_OBJECT || act->this_val.u.obj == NULL
-	    || act->this_val.u.obj->native_ext == NULL)
-	{
-		avm2_fatal("addFrameScript on a non-MovieClip receiver");
-	}
-	Avm2MovieClipExt* ext = act->this_val.u.obj->native_ext;
-
-	// Arguments are (frameIndex, closure) pairs; frame indices are 0-based.
-	for (uint32_t i = 0; i + 1 < act->argc; i += 2)
-	{
-		int32_t frame = avm2_coerce_to_i32(act->args[i]);
-		if (frame < 0) continue;
-		if ((uint32_t) frame >= ext->frame_script_cap)
-		{
-			uint32_t new_cap = (uint32_t) frame + 8;
-			Avm2Value* grown = avm2_alloc(act->ctx, new_cap * sizeof(Avm2Value));
-			for (uint32_t j = 0; j < new_cap; j++)
-			{
-				grown[j] = (j < ext->frame_script_cap) ? ext->frame_scripts[j]
-				                                       : avm2_undefined();
-			}
-			ext->frame_scripts = grown;
-			ext->frame_script_cap = new_cap;
-		}
-		ext->frame_scripts[frame] = act->args[i + 1];
-	}
-	return avm2_undefined();
-}
-
-// ---------------------------------------------------------------------------
-// Builtin classes
+// Builtin registration helpers
 // ---------------------------------------------------------------------------
 
 static Avm2PropKey builtin_key(const char* ns, const char* name)
@@ -143,8 +99,44 @@ static Avm2PropKey builtin_key(const char* ns, const char* name)
 	return k;
 }
 
-static Avm2Class* builtin_class(Avm2Context* ctx, const char* ns, const char* name,
-                                Avm2Class* super)
+// Define a value on the builtin globals object as a proper trait slot with
+// its package-qualified key (dynamic props are public-only, so a
+// package-qualified multiname like flash.display.MovieClip would never
+// match one).
+static void builtin_global_define(Avm2Context* ctx, Avm2PropKey key, Avm2Value value)
+{
+	Avm2Object* g = ctx->builtin_globals;
+	Avm2VTable* vt = (Avm2VTable*) g->vtable;
+	if (vt == NULL)
+	{
+		vt = avm2_alloc(ctx, sizeof(Avm2VTable));
+		memset(vt, 0, sizeof(Avm2VTable));
+		g->vtable = vt;
+	}
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key = key;
+	e.kind = AVM2_PROP_SLOT;
+	e.slot_index = vt->slot_count + 1;
+	vt->slot_count++;
+	avm2_vtable_append(ctx, vt, &e);
+
+	if (vt->slot_count + 1 > g->slot_count)
+	{
+		uint32_t new_count = (vt->slot_count + 1) * 2;
+		Avm2Value* grown = avm2_alloc(ctx, new_count * sizeof(Avm2Value));
+		for (uint32_t i = 0; i < new_count; i++)
+		{
+			grown[i] = (i < g->slot_count) ? g->slots[i] : avm2_undefined();
+		}
+		g->slots = grown;
+		g->slot_count = new_count;
+	}
+	g->slots[e.slot_index] = value;
+}
+
+Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name,
+                              Avm2Class* super)
 {
 	Avm2Class* cls = avm2_alloc(ctx, sizeof(Avm2Class));
 	memset(cls, 0, sizeof(Avm2Class));
@@ -167,17 +159,32 @@ static Avm2Class* builtin_class(Avm2Context* ctx, const char* ns, const char* na
 	Avm2Object* cobj = avm2_object_alloc(ctx, AVM2_OBJ_CLASS, 1);
 	cobj->class_ref = cls;
 	cobj->cls = ctx->builtins.class_class;  // NULL while bootstrapping Object/Class
+	if (ctx->builtins.class_class != NULL)
+	{
+		cobj->proto = ctx->builtins.class_class->prototype_obj;
+	}
 	cls->class_object = cobj;
 
+	// Prototype object.
+	Avm2Object* proto = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
+	proto->cls = ctx->builtins.object_class;  // may be NULL for Object itself
+	if (super != NULL)
+	{
+		proto->proto = super->prototype_obj;
+	}
+	cls->prototype_obj = proto;
+	Avm2DynProp* p = avm2_object_set_dynamic(ctx, proto, "constructor", 11,
+	                                         avm2_object_value(cobj));
+	p->dont_enum = 1;
+
 	// Expose on the builtin globals object + in the domain.
-	avm2_object_set_dynamic(ctx, ctx->builtin_globals, name,
-	                        (uint32_t) strlen(name), avm2_object_value(cobj));
+	builtin_global_define(ctx, cls->name, avm2_object_value(cobj));
 	avm2_domain_add(ctx, &cls->name, NULL, 0);
 	return cls;
 }
 
-static void builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
-                               Avm2MethodFn fn)
+void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                             Avm2MethodFn fn)
 {
 	Avm2PropEntry e;
 	memset(&e, 0, sizeof(e));
@@ -191,46 +198,688 @@ static void builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* nam
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }
 
+void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                             Avm2MethodFn fn)
+{
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key = builtin_key("", name);
+	e.kind = AVM2_PROP_GETTER;
+	e.method.fn = fn;
+	e.method.file = NULL;
+	e.method.debug_name = name;
+	e.defining_class = cls;
+	avm2_vtable_append(ctx, &cls->ivtable, &e);
+}
+
+// Class-object (static) members live on the class object's own vtable.
+static Avm2VTable* class_static_vtable(Avm2Context* ctx, Avm2Class* cls)
+{
+	if (cls->class_object->vtable == NULL)
+	{
+		Avm2VTable* vt = avm2_alloc(ctx, sizeof(Avm2VTable));
+		memset(vt, 0, sizeof(Avm2VTable));
+		cls->class_object->vtable = vt;
+	}
+	return (Avm2VTable*) cls->class_object->vtable;
+}
+
+void avm2_builtin_add_static_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                    Avm2MethodFn fn)
+{
+	Avm2VTable* vt = class_static_vtable(ctx, cls);
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key = builtin_key("", name);
+	e.kind = AVM2_PROP_METHOD;
+	e.method.fn = fn;
+	e.method.debug_name = name;
+	e.defining_class = cls;
+	avm2_vtable_append(ctx, vt, &e);
+}
+
+void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                   Avm2Value value)
+{
+	// Statics-as-slots would need slot storage; a dont-enum dynamic prop on
+	// the class object gives identical read behavior.
+	avm2_object_set_dynamic(ctx, cls->class_object, name,
+	                        (uint32_t) strlen(name), value)->dont_enum = 1;
+}
+
+void avm2_proto_add_function(Avm2Context* ctx, Avm2Object* proto, const char* name,
+                             Avm2MethodFn fn)
+{
+	Avm2MethodRef ref = { fn, NULL, name, 0 };
+	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, NULL,
+	                                      avm2_undefined(), false);
+	avm2_object_set_dynamic(ctx, proto, name, (uint32_t) strlen(name),
+	                        avm2_object_value(fnobj))->dont_enum = 1;
+}
+
+void avm2_builtin_add_global_fn(Avm2Context* ctx, const char* name, Avm2MethodFn fn)
+{
+	Avm2MethodRef ref = { fn, NULL, name, 0 };
+	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, NULL,
+	                                      avm2_object_value(ctx->builtin_globals), true);
+	// The key points at the caller's literal, which is static — fine.
+	Avm2PropKey key = builtin_key("", name);
+	builtin_global_define(ctx, key, avm2_object_value(fnobj));
+	avm2_domain_add(ctx, &key, NULL, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Object / Class builtins
+// ---------------------------------------------------------------------------
+
+static Avm2Value object_proto_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	char buf[160];
+	if (act->this_val.kind == AVM2_VALUE_OBJECT
+	    && act->this_val.u.obj->kind == AVM2_OBJ_CLASS)
+	{
+		// Ruffle's Object._toString reports class objects as [class N].
+		Avm2Class* c = act->this_val.u.obj->class_ref;
+		snprintf(buf, sizeof(buf), "[class %.*s]",
+		         (int) c->name.name_len, c->name.name);
+	}
+	else if (act->this_val.kind == AVM2_VALUE_OBJECT
+	         && act->this_val.u.obj->kind == AVM2_OBJ_FUNCTION)
+	{
+		snprintf(buf, sizeof(buf), "function Function() {}");
+	}
+	else if (act->this_val.kind == AVM2_VALUE_UNDEFINED
+	         || act->this_val.kind == AVM2_VALUE_NULL)
+	{
+		snprintf(buf, sizeof(buf), "[object Object]");
+	}
+	else
+	{
+		Avm2Class* c = avm2_value_class(ctx, act->this_val);
+		snprintf(buf, sizeof(buf), "[object %.*s]",
+		         (int) c->name.name_len, c->name.name);
+	}
+	return avm2_string(avm2_string_from_literal(ctx, buf));
+}
+
+static Avm2Value object_proto_value_of(Avm2Activation* act)
+{
+	return act->this_val;
+}
+
+static Avm2Value object_proto_to_locale_string(Avm2Activation* act)
+{
+	// avmplus Object.toLocaleString stringifies via Object.prototype's own
+	// toString, NOT the receiver's (a primitive string yields
+	// "[object String]" — array_tolocalestring).
+	return object_proto_to_string(act);
+}
+
+static Avm2Value object_proto_has_own_property(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0) return avm2_bool(false);
+	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
+	return avm2_bool(avm2_has_own_public_property(ctx, act->this_val,
+	                                              name->utf8, name->len) != 0);
+}
+
+static Avm2Value object_proto_is_prototype_of(Avm2Activation* act)
+{
+	if (act->argc == 0 || act->args[0].kind != AVM2_VALUE_OBJECT
+	    || act->this_val.kind != AVM2_VALUE_OBJECT)
+	{
+		return avm2_bool(false);
+	}
+	for (Avm2Object* p = act->args[0].u.obj->proto; p != NULL; p = p->proto)
+	{
+		if (p == act->this_val.u.obj) return avm2_bool(true);
+	}
+	return avm2_bool(false);
+}
+
+static Avm2Value object_proto_property_is_enumerable(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0 || act->this_val.kind != AVM2_VALUE_OBJECT)
+	{
+		return avm2_bool(false);
+	}
+	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
+	Avm2Object* obj = act->this_val.u.obj;
+	// Array index?
+	if (obj->kind == AVM2_OBJ_ARRAY && name->len > 0 && name->len <= 10)
+	{
+		uint64_t idx = 0;
+		int is_index = 1;
+		for (uint32_t i = 0; i < name->len; i++)
+		{
+			if (name->utf8[i] < '0' || name->utf8[i] > '9') { is_index = 0; break; }
+			idx = idx * 10 + (uint64_t) (name->utf8[i] - '0');
+		}
+		if (is_index && idx < 0xFFFFFFFFull)
+		{
+			Avm2Value v = avm2_array_get(obj, (uint32_t) idx);
+			return avm2_bool(v.kind != AVM2_VALUE_HOLE);
+		}
+	}
+	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
+	{
+		if (p->name.len == name->len && memcmp(p->name.utf8, name->utf8, name->len) == 0)
+		{
+			return avm2_bool(!p->dont_enum);
+		}
+	}
+	return avm2_bool(false);
+}
+
+static Avm2Value object_proto_set_property_is_enumerable(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc < 2 || act->this_val.kind != AVM2_VALUE_OBJECT)
+	{
+		return avm2_undefined();
+	}
+	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
+	bool enumerable = avm2_coerce_to_boolean(act->args[1]);
+	Avm2Object* obj = act->this_val.u.obj;
+	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
+	{
+		if (p->name.len == name->len && memcmp(p->name.utf8, name->utf8, name->len) == 0)
+		{
+			p->dont_enum = enumerable ? 0 : 1;
+		}
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value object_construct(Avm2Context* ctx, Avm2Class* cls,
+                                  const Avm2Value* args, uint32_t argc)
+{
+	(void) cls;
+	if (argc > 0 && args[0].kind != AVM2_VALUE_UNDEFINED
+	    && args[0].kind != AVM2_VALUE_NULL)
+	{
+		return args[0];
+	}
+	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
+	obj->cls = ctx->builtins.object_class;
+	obj->proto = ctx->builtins.object_class->prototype_obj;
+	return avm2_object_value(obj);
+}
+
+static Avm2Value class_proto_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	char buf[160];
+	if (act->this_val.kind == AVM2_VALUE_OBJECT
+	    && act->this_val.u.obj->kind == AVM2_OBJ_CLASS)
+	{
+		Avm2Class* c = act->this_val.u.obj->class_ref;
+		snprintf(buf, sizeof(buf), "[class %.*s]",
+		         (int) c->name.name_len, c->name.name);
+	}
+	else
+	{
+		snprintf(buf, sizeof(buf), "[object Class]");
+	}
+	return avm2_string(avm2_string_from_literal(ctx, buf));
+}
+
+static Avm2Value class_get_prototype(Avm2Activation* act)
+{
+	if (act->this_val.kind == AVM2_VALUE_OBJECT
+	    && act->this_val.u.obj->kind == AVM2_OBJ_CLASS)
+	{
+		Avm2Object* proto = act->this_val.u.obj->class_ref->prototype_obj;
+		if (proto != NULL) return avm2_object_value(proto);
+	}
+	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// flash.display stub chain + trace
+// ---------------------------------------------------------------------------
+
+static Avm2Value native_trace(Avm2Activation* act)
+{
+	// Ruffle globals/toplevel.rs trace: join args with " ", newline-terminate.
+	for (uint32_t i = 0; i < act->argc; i++)
+	{
+		if (i > 0) fputc(' ', stdout);
+		const Avm2String* s = avm2_coerce_to_string(act->ctx, act->args[i]);
+		// NUL bytes vanish from FP/Ruffle trace output.
+		for (uint32_t j = 0; j < s->len; j++)
+		{
+			if (s->utf8[j] != '\0') fputc(s->utf8[j], stdout);
+		}
+	}
+	fputc('\n', stdout);
+	return avm2_undefined();
+}
+
+static Avm2Value native_addFrameScript(Avm2Activation* act)
+{
+	if (act->this_val.kind != AVM2_VALUE_OBJECT || act->this_val.u.obj == NULL
+	    || act->this_val.u.obj->native_ext == NULL)
+	{
+		avm2_fatal("addFrameScript on a non-MovieClip receiver");
+	}
+	Avm2MovieClipExt* ext = act->this_val.u.obj->native_ext;
+
+	// Arguments are (frameIndex, closure) pairs; frame indices are 0-based.
+	for (uint32_t i = 0; i + 1 < act->argc; i += 2)
+	{
+		int32_t frame = avm2_coerce_to_i32(act->ctx, act->args[i]);
+		if (frame < 0) continue;
+		if ((uint32_t) frame >= ext->frame_script_cap)
+		{
+			uint32_t new_cap = (uint32_t) frame + 8;
+			Avm2Value* grown = avm2_alloc(act->ctx, new_cap * sizeof(Avm2Value));
+			for (uint32_t j = 0; j < new_cap; j++)
+			{
+				grown[j] = (j < ext->frame_script_cap) ? ext->frame_scripts[j]
+				                                       : avm2_undefined();
+			}
+			ext->frame_scripts = grown;
+			ext->frame_script_cap = new_cap;
+		}
+		ext->frame_scripts[frame] = act->args[i + 1];
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value point_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = act->this_val.u.obj;
+	Avm2Value x = act->argc > 0
+		? avm2_number(avm2_coerce_to_number(ctx, act->args[0])) : avm2_integer(0);
+	Avm2Value y = act->argc > 1
+		? avm2_number(avm2_coerce_to_number(ctx, act->args[1])) : avm2_integer(0);
+	avm2_object_set_dynamic(ctx, self, "x", 1, x);
+	avm2_object_set_dynamic(ctx, self, "y", 1, y);
+	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// Toplevel functions
+// ---------------------------------------------------------------------------
+
+static Avm2Value global_is_nan(Avm2Activation* act)
+{
+	double d = act->argc > 0 ? avm2_coerce_to_number(act->ctx, act->args[0]) : NAN;
+	return avm2_bool(isnan(d));
+}
+
+static Avm2Value global_is_finite(Avm2Activation* act)
+{
+	double d = act->argc > 0 ? avm2_coerce_to_number(act->ctx, act->args[0]) : NAN;
+	return avm2_bool(isfinite(d) != 0);
+}
+
+static Avm2Value global_parse_int(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0) return avm2_number(NAN);
+	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	int32_t radix = act->argc > 1 ? avm2_coerce_to_i32(ctx, act->args[1]) : 0;
+	return avm2_number(avm2_string_to_int(s->utf8, s->len, radix, false));
+}
+
+static Avm2Value global_parse_float(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0) return avm2_number(NAN);
+	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	double d;
+	if (avm2_string_to_f64(s->utf8, s->len, false, &d))
+	{
+		return avm2_number(d);
+	}
+	return avm2_number(NAN);
+}
+
+// escape(): encode everything except [A-Za-z0-9 @-_.*+/] (Ruffle toplevel.rs).
+static Avm2Value global_escape(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0)
+	{
+		return avm2_string(avm2_string_from_literal(ctx, "undefined"));
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	char* out = avm2_alloc(ctx, s->len * 3 + 1);
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < s->len; i++)
+	{
+		unsigned char c = (unsigned char) s->utf8[i];
+		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+		    || (c >= '0' && c <= '9')
+		    || c == '@' || c == '-' || c == '_' || c == '.' || c == '*'
+		    || c == '+' || c == '/')
+		{
+			out[n++] = (char) c;
+		}
+		else
+		{
+			n += (uint32_t) snprintf(out + n, 4, "%%%02X", c);
+		}
+	}
+	return avm2_string(avm2_string_new(ctx, out, n));
+}
+
+static int hex_digit(char c)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return -1;
+}
+
+static Avm2Value global_unescape(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0)
+	{
+		return avm2_string(avm2_string_from_literal(ctx, "undefined"));
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	char* out = avm2_alloc(ctx, s->len * 3 + 4);
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < s->len; )
+	{
+		if (s->utf8[i] == '%' && i + 5 < s->len
+		    && (s->utf8[i + 1] == 'u' || s->utf8[i + 1] == 'U')
+		    && hex_digit(s->utf8[i + 2]) >= 0 && hex_digit(s->utf8[i + 3]) >= 0
+		    && hex_digit(s->utf8[i + 4]) >= 0 && hex_digit(s->utf8[i + 5]) >= 0)
+		{
+			uint32_t cp = (uint32_t) ((hex_digit(s->utf8[i + 2]) << 12)
+			              | (hex_digit(s->utf8[i + 3]) << 8)
+			              | (hex_digit(s->utf8[i + 4]) << 4)
+			              | hex_digit(s->utf8[i + 5]));
+			// UTF-8 encode the BMP code point.
+			if (cp < 0x80) out[n++] = (char) cp;
+			else if (cp < 0x800)
+			{
+				out[n++] = (char) (0xC0 | (cp >> 6));
+				out[n++] = (char) (0x80 | (cp & 0x3F));
+			}
+			else
+			{
+				out[n++] = (char) (0xE0 | (cp >> 12));
+				out[n++] = (char) (0x80 | ((cp >> 6) & 0x3F));
+				out[n++] = (char) (0x80 | (cp & 0x3F));
+			}
+			i += 6;
+		}
+		else if (s->utf8[i] == '%' && i + 2 < s->len
+		         && hex_digit(s->utf8[i + 1]) >= 0 && hex_digit(s->utf8[i + 2]) >= 0)
+		{
+			unsigned char c = (unsigned char) ((hex_digit(s->utf8[i + 1]) << 4)
+			                  | hex_digit(s->utf8[i + 2]));
+			// Bytes >= 0x80 become Latin-1 code points → UTF-8.
+			if (c < 0x80) out[n++] = (char) c;
+			else
+			{
+				out[n++] = (char) (0xC0 | (c >> 6));
+				out[n++] = (char) (0x80 | (c & 0x3F));
+			}
+			i += 3;
+		}
+		else
+		{
+			out[n++] = s->utf8[i];
+			i++;
+		}
+	}
+	return avm2_string(avm2_string_new(ctx, out, n));
+}
+
+
+// --- flash.utils.getQualifiedClassName / getDefinitionByName ---
+
+// avmplus reports value classes: integral i32-representable numbers are
+// "int" (the Integer/Number duality is observable here).
+static Avm2Value global_get_qualified_class_name(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0)
+	{
+		return avm2_string(avm2_string_from_literal(ctx, "void"));
+	}
+	Avm2Value v = act->args[0];
+	const char* simple = NULL;
+	switch (v.kind)
+	{
+		case AVM2_VALUE_UNDEFINED: simple = "void"; break;
+		case AVM2_VALUE_NULL: simple = "null"; break;
+		case AVM2_VALUE_BOOL: simple = "Boolean"; break;
+		case AVM2_VALUE_STRING: simple = "String"; break;
+		case AVM2_VALUE_INTEGER:
+			// avmplus atom-int range (Ruffle fits_in_value_integer_i32):
+			// only 29-bit signed integers report as "int".
+			simple = (v.u.i < (1 << 28) && v.u.i >= -(1 << 28)) ? "int" : "Number";
+			break;
+		case AVM2_VALUE_NUMBER:
+		{
+			int32_t i = (int32_t) v.u.d;
+			simple = (v.u.d == (double) i && !(v.u.d == 0.0 && signbit(v.u.d))
+			          && i < (1 << 28) && i >= -(1 << 28)) ? "int" : "Number";
+			break;
+		}
+		default: break;
+	}
+	if (simple != NULL)
+	{
+		return avm2_string(avm2_string_from_literal(ctx, simple));
+	}
+	Avm2Class* cls = (v.u.obj->kind == AVM2_OBJ_CLASS)
+		? v.u.obj->class_ref : avm2_value_class(ctx, v);
+	char buf[256];
+	if (cls->name.ns_len > 0)
+	{
+		snprintf(buf, sizeof(buf), "%.*s::%.*s",
+		         (int) cls->name.ns_len, cls->name.ns_uri,
+		         (int) cls->name.name_len, cls->name.name);
+	}
+	else
+	{
+		snprintf(buf, sizeof(buf), "%.*s",
+		         (int) cls->name.name_len, cls->name.name);
+	}
+	return avm2_string(avm2_string_from_literal(ctx, buf));
+}
+
+static Avm2Value global_get_definition_by_name(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* s = (act->argc > 0)
+		? avm2_coerce_to_string(ctx, act->args[0])
+		: avm2_string_from_literal(ctx, "");
+	// Split "pkg::Name" or "pkg.Name" into (ns, name).
+	Avm2PropKey key;
+	key.ns_kind = 0x16;
+	key.ns_uri = s->utf8;
+	key.ns_len = 0;
+	key.name = s->utf8;
+	key.name_len = s->len;
+	for (int64_t i = (int64_t) s->len - 1; i >= 0; i--)
+	{
+		if (s->utf8[i] == ':' || s->utf8[i] == '.')
+		{
+			uint32_t name_start = (uint32_t) i + 1;
+			uint32_t ns_end = (uint32_t) i;
+			if (s->utf8[i] == ':' && i > 0 && s->utf8[i - 1] == ':') ns_end--;
+			key.name = s->utf8 + name_start;
+			key.name_len = s->len - name_start;
+			key.ns_len = ns_end;
+			break;
+		}
+	}
+	Avm2Object* g = avm2_domain_find(ctx, &key);
+	if (g != NULL)
+	{
+		const Avm2PropEntry* e = avm2_vtable_find(g->vtable, &key);
+		if (e != NULL && e->kind == AVM2_PROP_SLOT)
+		{
+			return g->slots[e->slot_index];
+		}
+		Avm2Value* dyn = avm2_object_find_dynamic(g, key.name, key.name_len);
+		if (dyn != NULL) return *dyn;
+	}
+	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+	                 "Error #1065: Variable %.*s is not defined.",
+	                 (int) key.name_len, key.name);
+}
+
+// Register a toplevel native in a specific package namespace.
+static void builtin_add_global_fn_ns(Avm2Context* ctx, const char* ns,
+                                     const char* name, Avm2MethodFn fn)
+{
+	// Prebuild the FP stack-frame form ("global/flash.utils::name").
+	char dbuf[160];
+	snprintf(dbuf, sizeof(dbuf), "global/%s%s%s", ns, ns[0] ? "::" : "", name);
+	char* dname = avm2_alloc(ctx, strlen(dbuf) + 1);
+	strcpy(dname, dbuf);
+	Avm2MethodRef ref = { fn, NULL, dname, 0 };
+	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, NULL,
+	                                      avm2_object_value(ctx->builtin_globals), true);
+	Avm2PropKey key = builtin_key(ns, name);
+	builtin_global_define(ctx, key, avm2_object_value(fnobj));
+	avm2_domain_add(ctx, &key, NULL, 0);
+}
+
+void avm2_register_toplevel(Avm2Context* ctx)
+{
+	avm2_builtin_add_global_fn(ctx, "trace", native_trace);
+	avm2_builtin_add_global_fn(ctx, "isNaN", global_is_nan);
+	avm2_builtin_add_global_fn(ctx, "isFinite", global_is_finite);
+	avm2_builtin_add_global_fn(ctx, "parseInt", global_parse_int);
+	avm2_builtin_add_global_fn(ctx, "parseFloat", global_parse_float);
+	avm2_builtin_add_global_fn(ctx, "escape", global_escape);
+	avm2_builtin_add_global_fn(ctx, "unescape", global_unescape);
+	builtin_add_global_fn_ns(ctx, "flash.utils", "getQualifiedClassName",
+	                         global_get_qualified_class_name);
+	builtin_add_global_fn_ns(ctx, "flash.utils", "getDefinitionByName",
+	                         global_get_definition_by_name);
+	// The avmplus shell exposes the same helpers in ns "avmplus"
+	// (number_autoconv and friends are compiled against it).
+	builtin_add_global_fn_ns(ctx, "avmplus", "getQualifiedClassName",
+	                         global_get_qualified_class_name);
+	builtin_add_global_fn_ns(ctx, "avmplus", "getDefinitionByName",
+	                         global_get_definition_by_name);
+
+	// Global constants.
+	static const char* const_names[3] = { "NaN", "Infinity", "undefined" };
+	Avm2Value const_vals[3];
+	const_vals[0] = avm2_number(NAN);
+	const_vals[1] = avm2_number(INFINITY);
+	const_vals[2] = avm2_undefined();
+	for (int i = 0; i < 3; i++)
+	{
+		Avm2PropKey key = builtin_key("", const_names[i]);
+		builtin_global_define(ctx, key, const_vals[i]);
+		avm2_domain_add(ctx, &key, NULL, 0);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+
 void avm2_globals_init(Avm2Context* ctx)
 {
 	ctx->builtin_globals = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
 
 	Avm2Builtins* b = &ctx->builtins;
-	b->object_class = builtin_class(ctx, "", "Object", NULL);
-	b->class_class = builtin_class(ctx, "", "Class", b->object_class);
-	b->function_class = builtin_class(ctx, "", "Function", b->object_class);
-	// Bootstrap fixup: Object/Class class objects were made before Class existed.
+	b->object_class = avm2_builtin_class(ctx, "", "Object", NULL);
+	b->class_class = avm2_builtin_class(ctx, "", "Class", b->object_class);
+	b->function_class = avm2_builtin_class(ctx, "", "Function", b->object_class);
+	// Bootstrap fixups: objects made before Object/Class fully existed.
 	b->object_class->class_object->cls = b->class_class;
 	b->class_class->class_object->cls = b->class_class;
-	ctx->builtin_globals->cls = b->object_class;
+	b->function_class->class_object->cls = b->class_class;
+	b->object_class->class_object->proto = b->class_class->prototype_obj;
+	b->class_class->class_object->proto = b->class_class->prototype_obj;
+	b->function_class->class_object->proto = b->class_class->prototype_obj;
+	b->object_class->prototype_obj->cls = b->object_class;
+	b->class_class->prototype_obj->cls = b->object_class;
+	b->function_class->prototype_obj->cls = b->object_class;
+	b->object_class->native_construct = object_construct;
+	b->object_class->native_call = object_construct;
 
-	// The display chain hello_world's script init walks (stubs: correct
-	// super links, constructible, no display behavior).
-	Avm2Class* event_dispatcher =
-		builtin_class(ctx, "flash.events", "EventDispatcher", b->object_class);
-	Avm2Class* display_object =
-		builtin_class(ctx, "flash.display", "DisplayObject", event_dispatcher);
-	Avm2Class* interactive_object =
-		builtin_class(ctx, "flash.display", "InteractiveObject", display_object);
-	Avm2Class* doc =
-		builtin_class(ctx, "flash.display", "DisplayObjectContainer", interactive_object);
-	Avm2Class* sprite = builtin_class(ctx, "flash.display", "Sprite", doc);
-	Avm2Class* movieclip = builtin_class(ctx, "flash.display", "MovieClip", sprite);
-	movieclip->native_ext_size = sizeof(Avm2MovieClipExt);
-	builtin_add_method(ctx, movieclip, "addFrameScript", native_addFrameScript);
-	b->movieclip_class = movieclip;
-
-	// Toplevel trace(): a function object on the builtin globals.
+	// The hidden "global" class: global objects trace as [object global]
+	// and never surface through the domain.
 	{
-		Avm2Object* fnobj = avm2_object_alloc(ctx, AVM2_OBJ_FUNCTION, 0);
-		fnobj->cls = b->function_class;
-		fnobj->fn_method.fn = native_trace;
-		fnobj->fn_method.file = NULL;
-		fnobj->fn_method.debug_name = "trace";
-		fnobj->fn_receiver = avm2_object_value(ctx->builtin_globals);
-		avm2_object_set_dynamic(ctx, ctx->builtin_globals, "trace", 5,
-		                        avm2_object_value(fnobj));
-		Avm2PropKey trace_key = builtin_key("", "trace");
-		avm2_domain_add(ctx, &trace_key, NULL, 0);
+		Avm2Class* gc = avm2_alloc(ctx, sizeof(Avm2Class));
+		memset(gc, 0, sizeof(Avm2Class));
+		gc->name = builtin_key("", "global");
+		gc->super_class = b->object_class;
+		b->global_class = gc;
 	}
+	ctx->builtin_globals->cls = b->global_class;
+	ctx->builtin_globals->proto = b->object_class->prototype_obj;
+
+	// Object.prototype methods.
+	Avm2Object* oproto = b->object_class->prototype_obj;
+	avm2_proto_add_function(ctx, oproto, "toString", object_proto_to_string);
+	avm2_proto_add_function(ctx, oproto, "toLocaleString", object_proto_to_locale_string);
+	avm2_proto_add_function(ctx, oproto, "valueOf", object_proto_value_of);
+	avm2_proto_add_function(ctx, oproto, "hasOwnProperty", object_proto_has_own_property);
+	avm2_proto_add_function(ctx, oproto, "isPrototypeOf", object_proto_is_prototype_of);
+	avm2_proto_add_function(ctx, oproto, "propertyIsEnumerable",
+	                        object_proto_property_is_enumerable);
+	avm2_proto_add_function(ctx, oproto, "setPropertyIsEnumerable",
+	                        object_proto_set_property_is_enumerable);
+	// Instance-side mirrors (AS3 namespace methods surface publicly here).
+	avm2_builtin_add_method(ctx, b->object_class, "hasOwnProperty",
+	                        object_proto_has_own_property);
+	avm2_builtin_add_method(ctx, b->object_class, "isPrototypeOf",
+	                        object_proto_is_prototype_of);
+	avm2_builtin_add_method(ctx, b->object_class, "propertyIsEnumerable",
+	                        object_proto_property_is_enumerable);
+
+	// Class.prototype.
+	avm2_proto_add_function(ctx, b->class_class->prototype_obj, "toString",
+	                        class_proto_to_string);
+	avm2_builtin_add_getter(ctx, b->class_class, "prototype", class_get_prototype);
+
+	// XML/XMLList stubs (constructible; only typeof/is behavior — E4X is a
+	// separate later plan). Date is a stub too (real impl = tranche 2):
+	// it exists so `x as Date` / `is Date` type checks resolve.
+	b->xml_class = avm2_builtin_class(ctx, "", "XML", b->object_class);
+	b->xml_list_class = avm2_builtin_class(ctx, "", "XMLList", b->object_class);
+	avm2_builtin_class(ctx, "", "Date", b->object_class);
+	// flash.geom.Point minimal stub: constructible, x/y as expando props
+	// (slots_force_autoassigned only needs the definition to exist).
+	{
+		Avm2Class* point = avm2_builtin_class(ctx, "flash.geom", "Point", b->object_class);
+		point->instance_init.fn = point_init;
+		point->instance_init.debug_name = "Point";
+	}
+
+	avm2_register_function_builtins(ctx);
+	avm2_register_error(ctx);
+	avm2_register_number(ctx);
+	avm2_register_string(ctx);
+	avm2_register_array(ctx);
+	avm2_register_toplevel(ctx);
+
+	// The display chain (stubs: correct super links, constructible, no
+	// display behavior).
+	Avm2Class* event_dispatcher =
+		avm2_builtin_class(ctx, "flash.events", "EventDispatcher", b->object_class);
+	Avm2Class* display_object =
+		avm2_builtin_class(ctx, "flash.display", "DisplayObject", event_dispatcher);
+	Avm2Class* interactive_object =
+		avm2_builtin_class(ctx, "flash.display", "InteractiveObject", display_object);
+	Avm2Class* doc =
+		avm2_builtin_class(ctx, "flash.display", "DisplayObjectContainer", interactive_object);
+	Avm2Class* sprite = avm2_builtin_class(ctx, "flash.display", "Sprite", doc);
+	Avm2Class* movieclip = avm2_builtin_class(ctx, "flash.display", "MovieClip", sprite);
+	movieclip->native_ext_size = sizeof(Avm2MovieClipExt);
+	avm2_builtin_add_method(ctx, movieclip, "addFrameScript", native_addFrameScript);
+	b->movieclip_class = movieclip;
 }

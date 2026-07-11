@@ -1,5 +1,13 @@
 # Session prompt — AVM2 Stage 3: tranche 1 (pure-language tests)
 
+**STATUS: COMPLETE (2026-07-11).** 152/166 tranche-1 candidates pass
+locally; every miss triaged (see
+`ruffle-tests/tests/swfs/avm2/_investigation/CURRENT_STATUS.md` and the
+Stage-3 landing note in `SWFRecompDocs/plans/avm2-support-plan.md` §5).
+Static census ceiling 61 → 1069 tests. Next session: Stage 4 (tranche 2 —
+Vector/ApplyType is the biggest unlock at 80 censused tests, then JSON,
+RegExp, proto edge cases).
+
 You are implementing **Stage 3** of `SWFRecompDocs/plans/avm2-support-plan.md`.
 Read that plan first (§4 architecture, §5 stages), then
 `ruffle-tests/tests/swfs/avm2/_investigation/CURRENT_STATUS.md`, then skim the

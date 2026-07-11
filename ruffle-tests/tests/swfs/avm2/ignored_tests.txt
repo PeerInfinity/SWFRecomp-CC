@@ -233,3 +233,6 @@ tab_ordering_stage_tab_children_remove_root
 uint_toexponential
 uint_toprecision
 weird_superinterface_properties
+# --- upstream ignore = true in test.toml (Stage 3 audit, 2026-07-11) ---
+bytearray_oom
+number_tostring
