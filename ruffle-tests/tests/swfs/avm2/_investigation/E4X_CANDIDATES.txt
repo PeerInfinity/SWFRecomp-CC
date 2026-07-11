@@ -1,0 +1,63 @@
+# E4X / XML candidate tests (generated 2026-07-11 from the tranche-3 CI
+# results, run 29158224391: all failing xml* tests + the deferred triage
+# leftovers that need E4X (amf_xml, qname_as_lazy_name_attribute_multiname
+# = GetDescendants, function_proto_created + number_autoconv =
+# describeType XML output). Statuses at b355ae701; all failing.
+# Likely triage members: xml_socket (needs XMLSocket networking),
+# xmldocument/xmlnode (legacy flash.xml API), xml_notification_bubbling
+# (undocumented XML notification API).
+amf_xml
+function_proto_created
+number_autoconv
+qname_as_lazy_name_attribute_multiname
+xml_abstract_equality
+xml_advanced
+xml_appendchild
+xml_appendchild_swf_v21
+xml_as_attribute
+xml_attribute
+xml_attribute_name
+xml_basic
+xml_child
+xml_childindex
+xml_children
+xml_class_call
+xml_contains
+xml_copy
+xml_ctor_from_tostring
+xml_delete
+xml_descendants
+xml_elements
+xml_equals_namespace_check
+xml_explicit_use_namespace
+xml_getdescendants_qname
+xml_has_property_via_in
+xml_hasownproperty
+xml_ignore_white
+xml_length
+xml_list_as_attribute
+xml_list_concat
+xml_list_enumerate
+xml_methods_settings
+xml_mismatched_tag
+xml_namespace
+xml_namespace_methods
+xml_namespaced_property
+xml_no_namespace
+xml_nodekind
+xml_normalize
+xml_notification_bubbling
+xml_parent
+xml_set_children
+xml_set_name
+xml_settings
+xml_simple_complex_content
+xml_socket
+xml_text
+xml_tostring
+xml_tostring_namespace
+xml_unescaping
+xml_weird_ignores
+xml_wildcard
+xmldocument
+xmlnode
