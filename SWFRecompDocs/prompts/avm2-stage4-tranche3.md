@@ -6,8 +6,10 @@ bytearray_oom + dictionary_weak_keys (upstream-ignored), amf_xml +
 qname_as_lazy_name_attribute_multiname (E4X, deferred),
 amf_array_serialization (LocalConnection/NetConnection + test-framework
 fetch mock, deferred). Census ceiling 1155/1163 (TRANCHE3_OPS.txt, 124
-ops). See avm2-support-plan.md §5 tranche-3 landing note and
-avm2/_investigation/CURRENT_STATUS.md for the post-CI baseline.
+ops). CI baseline: run 29158224391 — **avm2 411/1200 (34.2%)**, +57 over
+tranche 2, zero regressions in any suite, wasm-link-smoke green. See
+avm2-support-plan.md §5 tranche-3 landing note and
+avm2/_investigation/CURRENT_STATUS.md.
 
 You are implementing the second half of **Stage 4** of
 `SWFRecompDocs/plans/avm2-support-plan.md` (§5 "tranches 2+3"; tranche 2

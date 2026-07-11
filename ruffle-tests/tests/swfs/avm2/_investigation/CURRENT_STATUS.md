@@ -9,10 +9,21 @@ suite's trace tests.
 
 ## State
 
+- **CI baseline (run 29158224391, 2026-07-11): 411 / 1,200 passing
+  (34.2%)** — up from tranche 2's 354/1200 (+57), zero pass->fail
+  regressions in avm2 or ANY AVM1 suite (avm1 634/706, gnash suites,
+  shumway 73/92 + 46/47, regression 41/41 all unchanged),
+  wasm-link-smoke green. Beyond the candidate list, the tranche unlocked
+  error_tostring, fast_index_access, get_definition_by_name,
+  get_qualified_class_name, nested_iteration, net_getClassByAlias,
+  number_autoconv_amf, stage3d_sampler x2, and
+  coerce_to_primitive_side_effects_with_nulls (ruffle_matched). NOTE:
+  bytearray_oom now runs far enough to TIMEOUT in CI instead of
+  erroring (it is upstream-ignored, but it costs its timeout budget
+  each run).
 - **Stage 4 tranche 3 (2026-07-11): 48 / 53 tranche-3 candidates pass
-  locally** (`_investigation/TRANCHE3_CANDIDATES.txt`; exit criterion
-  >=42 met). CI baseline pending (see the pipeline run following commit
-  `ee006f815`). The 5 misses, all triaged: bytearray_oom +
+  locally and in CI** (`_investigation/TRANCHE3_CANDIDATES.txt`; exit
+  criterion >=42 met). The 5 misses, all triaged: bytearray_oom +
   dictionary_weak_keys (upstream-ignored / known_failure), amf_xml +
   qname_as_lazy_name_attribute_multiname (E4X — XML literals /
   GetDescendants, deferred to the E4X plan), amf_array_serialization
