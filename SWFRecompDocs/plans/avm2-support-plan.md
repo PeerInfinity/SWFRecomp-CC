@@ -214,11 +214,17 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
 
 ## 5. Stages
 
-- **Stage 0 — scaffolding** (small, mechanical): avm2 category in
-  `download_tests.sh` (inverted filter) + `SUITE_DIRS` + CI fan-out +
-  `tests/swfs/avm2/ignored_tests.txt` seeding (image/renderer/network/AIR/
-  Stage3D/E4X buckets + 40 upstream known_failures). Exit: avm2 suite runs in
-  CI, everything fails honestly.
+- **Stage 0 — scaffolding** — **DONE 2026-07-10 (local half)**: avm2 category
+  in `download_tests.sh` (new `swf_is_avm2.py --filter-avm2` inverted filter;
+  opt-in, not in ALL_CATEGORIES yet), `SUITE_DIRS` entry (last, so bare-name
+  collisions keep resolving to AVM1 suites), `.gitignore` block,
+  `tests/swfs/avm2/ignored_tests.txt` seeded (221 entries: GPU/AIR 63,
+  host-I/O 50, image-comparison 76, upstream known_failure 32),
+  `_investigation/CURRENT_STATUS.md`. Verified end-to-end: 1,202 tests
+  download; `hello_world` fails honestly (output_mismatch, empty output).
+  **CI fan-out deliberately deferred to Stage 2** — with zero passing tests a
+  CI baseline observes nothing (ci-only-when-observable), and the workflow
+  file is in active use by concurrent AVM1 sessions.
 - **Stage 1 — ABC front-end**: parser (constant pool, multinames, methods,
   bodies, classes, scripts, traits, exception tables) + verifier/IR translation
   + `--dump-abc` tool. Exit: all 1,149 corpus ABCs parse + verify clean; dumps

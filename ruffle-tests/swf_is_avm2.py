@@ -107,18 +107,20 @@ def _classify_one(swf_path: Path) -> str:
 def main() -> int:
     argv = sys.argv[1:]
     if not argv:
-        print(f"Usage: {sys.argv[0]} [--filter-avm1] path/to/test.swf ...", file=sys.stderr)
+        print(f"Usage: {sys.argv[0]} [--filter-avm1|--filter-avm2] path/to/test.swf ...", file=sys.stderr)
         print(f"       {sys.argv[0]} --filter-avm1 < paths.txt", file=sys.stderr)
         return 2
 
-    if argv[0] == "--filter-avm1":
+    if argv[0] in ("--filter-avm1", "--filter-avm2"):
         # Batch mode: read SWF paths from argv[1:] (if any) and stdin (if no TTY).
-        # Print only the paths whose SWFs are AVM1. Silent on AVM2 / errors.
+        # Print only the paths whose SWFs match the requested AVM generation.
+        # Silent on non-matching / errors.
+        want = "avm2" if argv[0] == "--filter-avm2" else "avm1"
         paths = [Path(p) for p in argv[1:]]
         if not paths:
             paths = [Path(line.strip()) for line in sys.stdin if line.strip()]
         for p in paths:
-            if _classify_one(p) == "avm1":
+            if _classify_one(p) == want:
                 print(p)
         return 0
 

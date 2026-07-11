@@ -524,6 +524,9 @@ SUITE_DIRS = [
     "from_gnash/misc-mtasc.all",
     "from_gnash/misc-swfc.all",
     "from_gnash/misc-swfmill.all",
+    # avm2 is last so bare --test=NAME collisions keep resolving to the AVM1
+    # suites first while AVM2 support is being built (plan: avm2-support-plan.md).
+    "avm2",
 ]
 
 # JSON result files (re-derived from TESTS_DIR in main() when --tests-dir is used)

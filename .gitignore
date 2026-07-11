@@ -132,6 +132,11 @@ ruffle-tests/tests/swfs/from_shumway/*/
 ruffle-tests/tests/swfs/from_shumway/avm1/*/
 !ruffle-tests/tests/swfs/from_shumway/avm1/_results/
 
+# AVM2 tests (downloaded test data, keep results and investigation)
+ruffle-tests/tests/swfs/avm2/*/
+!ruffle-tests/tests/swfs/avm2/_investigation/
+!ruffle-tests/tests/swfs/avm2/_results/
+
 # Gnash tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_gnash/*/
 !ruffle-tests/tests/swfs/from_gnash/_investigation/

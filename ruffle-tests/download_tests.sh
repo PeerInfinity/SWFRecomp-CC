@@ -51,6 +51,18 @@ CATEGORY_LOCAL_PATH[from_shumway]="${SCRIPT_DIR}/tests/swfs/from_shumway"
 CATEGORY_REPO_PATH[from_gnash]="tests/tests/swfs/from_gnash"
 CATEGORY_LOCAL_PATH[from_gnash]="${SCRIPT_DIR}/tests/swfs/from_gnash"
 
+CATEGORY_REPO_PATH[avm2]="tests/tests/swfs/avm2"
+CATEGORY_LOCAL_PATH[avm2]="${SCRIPT_DIR}/tests/swfs/avm2"
+
+# Which AVM generation each category keeps (default avm1). The avm2 suite
+# inverts the filter: keep AVM2 SWFs, skip stray AVM1 ones.
+declare -A CATEGORY_KEEP_AVM
+CATEGORY_KEEP_AVM[avm2]="avm2"
+
+# avm2 is deliberately NOT in ALL_CATEGORIES yet — AVM2 support is in early
+# implementation (see SWFRecompDocs/plans/avm2-support-plan.md); download it
+# explicitly with `./download_tests.sh avm2`. Add it here once the suite is
+# wired into CI (plan Stage 2).
 ALL_CATEGORIES=(avm1 from_shumway from_gnash)
 
 # Parse arguments
@@ -229,15 +241,16 @@ install_category() {
         all_swfs+=("${swf}")
     done < <(find "${src_dir}" -mindepth 2 -name test.swf -print0)
 
-    # Filter to AVM1 tests only — our recompiler is AVM1 only, and running
-    # AVM2 tests would just produce compile_fail noise. Uses swf_is_avm2.py
-    # in --filter-avm1 batch mode: feeds all paths on stdin, reads back the
-    # ones whose SWF headers indicate AVM1 (no FileAttributes HasActionScript3
-    # bit and no DoABC tag).
+    # Filter to the category's AVM generation (default AVM1 — running AVM2
+    # tests through the AVM1 pipeline would just produce compile_fail noise;
+    # the avm2 category inverts this and keeps only AVM2 SWFs). Uses
+    # swf_is_avm2.py batch mode: feeds all paths on stdin, reads back the ones
+    # whose SWF headers match (FileAttributes HasActionScript3 bit / DoABC tag).
+    local keep_avm="${CATEGORY_KEEP_AVM[${cat}]:-avm1}"
     local avm1_swfs=()
     if [[ ${#all_swfs[@]} -gt 0 ]]; then
         local filtered
-        filtered="$(printf '%s\n' "${all_swfs[@]}" | python3 "${SCRIPT_DIR}/swf_is_avm2.py" --filter-avm1)"
+        filtered="$(printf '%s\n' "${all_swfs[@]}" | python3 "${SCRIPT_DIR}/swf_is_avm2.py" "--filter-${keep_avm}")"
         if [[ -n "${filtered}" ]]; then
             while IFS= read -r line; do
                 [[ -n "${line}" ]] && avm1_swfs+=("${line}")
@@ -247,7 +260,7 @@ install_category() {
 
     local avm2_skipped=$(( ${#all_swfs[@]} - ${#avm1_swfs[@]} ))
 
-    # Install each AVM1 test, preserving its path relative to the category root.
+    # Install each kept test, preserving its path relative to the category root.
     for swf in "${avm1_swfs[@]}"; do
         local test_src rel_path
         test_src="$(dirname "${swf}")"
