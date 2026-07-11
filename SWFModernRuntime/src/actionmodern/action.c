@@ -70475,16 +70475,25 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 	// params/locals deliberately land in the enclosing chain — same preserved
 	// shape as nc_dispatch_onStatus) and its forward+clamp+pad marshalling was
 	// already the canonical loop (Stage-0 fix; regression/mc_event_type1_args).
-	// No version switch, no context switch, no scope reset — never done here
-	// (the comment above is load-bearing); the sibling enterFrame dispatcher
-	// differs on all three, a Stage-4 normalization question.
+	// No context switch, no scope reset — never done here (the comment above
+	// is load-bearing). INV_VERSION_SWITCH added by normalization pass (b):
+	// Flash/Ruffle run a handler at its DEFINING movie's SWF version, and this
+	// dispatcher fires handlers from arbitrary caller versions (proven bug
+	// class — Stage 0's timer fix; regression/mc_event_cross_swf_version is
+	// the repro). Safe without a ClosureFrame: no INV_BASE_CLIP here, so the
+	// forbidden pairing cannot arise. The handler-name lookup above stays
+	// pre-switch (caller's version); Ruffle roots its lookup activation at the
+	// TARGET clip (interactive.rs call_focus_handler -> run_stack_frame_for_method
+	// with active_clip = the focused DO), a finer case-folding parity point
+	// that only diverges for SWF<=6 mixed-version name folding — not chased.
 	//
 	// Stays outside the core: the entry depth pre-check (halt at max-1 WITHOUT
 	// incrementing — not INV_DEPTH_GUARD), the bare g_call_depth++/-- bracket,
 	// and the g_inside_event_handler bracket. Fixed for free: the old type-2
 	// arm called advanced_func with no NULL check; the core's strict dispatch
 	// returns undefined instead.
-	InvokeOpts opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE };
+	InvokeOpts opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE |
+	                             INV_VERSION_SWITCH };
 	if (func->function_type == 2)
 		opts.flags |= INV_LOCAL_SCOPE | INV_BIND_THIS | INV_LOCAL_SCOPE_MC |
 		              INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR | INV_EXEC_FUNC;
