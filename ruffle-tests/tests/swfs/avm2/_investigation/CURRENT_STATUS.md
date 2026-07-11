@@ -22,7 +22,8 @@ suite's trace tests.
   the end). A follow-up commit added describeType(null/undefined)
   ("null"/"void" types), getQualifiedSuperclassName, and the
   flash.utils-vs-avmplus describeType split (1010 on undefined) —
-  null_void_types passes locally on top of this baseline.
+  confirmed by run 29166383620: **476/1201 (39.6%)**, null_void_types
+  now passing, zero regressions anywhere, wasm-link-smoke green.
 - **E4X/XML engine (2026-07-11): 53 / 55 E4X candidates pass locally**
   (`_investigation/E4X_CANDIDATES.txt`; exit criterion >=40 met). The 2
   misses are triaged infrastructure gaps, not E4X gaps:
