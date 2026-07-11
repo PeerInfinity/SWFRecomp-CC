@@ -85,6 +85,7 @@ void avm2_register_error(Avm2Context* ctx);
 void avm2_register_toplevel(Avm2Context* ctx); // trace/isNaN/parseInt/...
 void avm2_register_vector(Avm2Context* ctx);   // __AS3__.vec::Vector + specializations
 void avm2_register_regexp(Avm2Context* ctx);   // RegExp + String regex paths
+void avm2_register_json(Avm2Context* ctx);     // SWF13+ (caller gates)
 
 // Plain (non-regex) String.split — the regex-aware split falls back to it.
 Avm2Value avm2_string_split_plain(struct Avm2Activation* act);
