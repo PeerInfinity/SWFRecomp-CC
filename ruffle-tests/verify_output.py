@@ -1665,8 +1665,14 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             "src/avm2/avm2_string.c",
             "src/avm2/avm2_array.c",
             "src/avm2/avm2_vector.c",
+            "src/avm2/avm2_regexp.c",
+            "src/avm2/avm2_json.c",
             "src/avm2/avm2_main.c",
         ])
+        # QuickJS libregexp (vendored) backs the RegExp builtin.
+        for f in (SWFMODERN / "third_party" / "quickjs-libregexp").iterdir():
+            if f.suffix in (".c", ".h"):
+                shutil.copy2(f, build_dir)
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
 

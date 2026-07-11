@@ -1126,9 +1126,20 @@ Avm2Value avm2_coerce_to_class(Avm2Context* ctx, Avm2Class* cls, Avm2Value v)
 	}
 	else if (v.kind == AVM2_VALUE_OBJECT)
 	{
-		char vq[128];
-		avm2_class_qname_buf(avm2_value_class(ctx, v), vq, sizeof(vq));
-		snprintf(dbg, sizeof(dbg), "%s@00000000000", vq);
+		// FP prints the VALUE's type ns::name (colons) but the TARGET
+		// class dotted (vector_coercion).
+		Avm2Class* vc = avm2_value_class(ctx, v);
+		if (vc->name.ns_len > 0)
+		{
+			snprintf(dbg, sizeof(dbg), "%.*s::%.*s@00000000000",
+			         (int) vc->name.ns_len, vc->name.ns_uri,
+			         (int) vc->name.name_len, vc->name.name);
+		}
+		else
+		{
+			snprintf(dbg, sizeof(dbg), "%.*s@00000000000",
+			         (int) vc->name.name_len, vc->name.name);
+		}
 	}
 	else
 	{

@@ -1013,6 +1013,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_string(ctx);
 	avm2_register_array(ctx);
 	avm2_register_vector(ctx);
+	avm2_register_regexp(ctx);
 	avm2_register_toplevel(ctx);
 	register_application_domain(ctx);
 

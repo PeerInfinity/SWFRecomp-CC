@@ -84,6 +84,10 @@ void avm2_register_array(Avm2Context* ctx);
 void avm2_register_error(Avm2Context* ctx);
 void avm2_register_toplevel(Avm2Context* ctx); // trace/isNaN/parseInt/...
 void avm2_register_vector(Avm2Context* ctx);   // __AS3__.vec::Vector + specializations
+void avm2_register_regexp(Avm2Context* ctx);   // RegExp + String regex paths
+
+// Plain (non-regex) String.split — the regex-aware split falls back to it.
+Avm2Value avm2_string_split_plain(struct Avm2Activation* act);
 
 // Definition lookup by dotted/:: name ("pkg::Name", "pkg.Name", "Name"),
 // including on-demand "Vector.<...>" applications. Sets *found.
@@ -156,6 +160,7 @@ typedef struct Avm2Builtins
 	Avm2Class* xml_class;       // stub: only typeof/is checks
 	Avm2Class* xml_list_class;  // stub
 	Avm2Class* movieclip_class;
+	Avm2Class* regexp_class;
 	Avm2Class* vector_class;         // generic __AS3__.vec::Vector
 	Avm2Class* vector_int_class;     // Vector.<int>
 	Avm2Class* vector_uint_class;    // Vector.<uint>

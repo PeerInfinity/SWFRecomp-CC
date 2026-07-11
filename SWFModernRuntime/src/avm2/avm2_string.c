@@ -351,7 +351,7 @@ static Avm2Value string_slice(Avm2Activation* act)
 	return make_str(act->ctx, "", 0);
 }
 
-static Avm2Value string_split(Avm2Activation* act)
+Avm2Value avm2_string_split_plain(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	const Avm2String* s = this_string(act);
@@ -585,7 +585,7 @@ void avm2_register_string(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, cls, "lastIndexOf", string_last_index_of);
 	avm2_builtin_add_method(ctx, cls, "localeCompare", string_locale_compare);
 	avm2_builtin_add_method(ctx, cls, "slice", string_slice);
-	avm2_builtin_add_method(ctx, cls, "split", string_split);
+	avm2_builtin_add_method(ctx, cls, "split", avm2_string_split_plain);
 	avm2_builtin_add_method(ctx, cls, "substr", string_substr);
 	avm2_builtin_add_method(ctx, cls, "substring", string_substring);
 	avm2_builtin_add_method(ctx, cls, "toLowerCase", string_to_lower_case);
