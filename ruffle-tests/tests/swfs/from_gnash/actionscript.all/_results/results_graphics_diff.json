@@ -1,130 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-10T22:53:59.499148+00:00",
-    "old_git_sha": "8a8ff17c73a3ea75a044eafc5f191be3308413a0",
-    "new_timestamp": "2026-07-10T23:34:28.865919+00:00",
-    "new_git_sha": "2ab5d2685cab208f84e77f3b7ae0856621879d75",
+    "old_timestamp": "2026-07-10T23:34:28.865919+00:00",
+    "old_git_sha": "2ab5d2685cab208f84e77f3b7ae0856621879d75",
+    "new_timestamp": "2026-07-11T00:15:36.667361+00:00",
+    "new_git_sha": "a2ded85b7ea640583f36ea00a86aeac59034f431",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 128,
-    "old_ruffle_matched": 94,
-    "old_effective_pass": 222,
-    "old_total": 235,
-    "old_pass_rate": 54.5,
+    "old_pass": 135,
+    "old_ruffle_matched": 95,
+    "old_effective_pass": 230,
+    "old_total": 243,
+    "old_pass_rate": 55.6,
     "new_pass": 135,
     "new_ruffle_matched": 95,
     "new_effective_pass": 230,
     "new_total": 243,
     "new_pass_rate": 55.6,
-    "old_mismatched_lines": 8427,
+    "old_mismatched_lines": 8435,
     "new_mismatched_lines": 8435,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 235,
-    "added": 8,
+    "unchanged": 243,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "NetStream-v5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "NetStream-v6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
-      }
-    },
-    {
-      "test": "NetStream-v7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
-      }
-    },
-    {
-      "test": "NetStream-v8",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
-      }
-    },
-    {
-      "test": "Number-v5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 244,
-        "expected_lines": 244,
-        "matching_lines": 236
-      }
-    },
-    {
-      "test": "Number-v6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 239,
-        "expected_lines": 239,
-        "matching_lines": 239
-      }
-    },
-    {
-      "test": "Number-v7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 237,
-        "expected_lines": 237,
-        "matching_lines": 237
-      }
-    },
-    {
-      "test": "Number-v8",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 237,
-        "expected_lines": 237,
-        "matching_lines": 237
-      }
-    }
-  ]
+  "changes": []
 }
