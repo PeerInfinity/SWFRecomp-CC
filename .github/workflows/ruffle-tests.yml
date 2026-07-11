@@ -11,6 +11,7 @@ on:
           - 'all'
           - 'no_gnash'
           - 'avm1'
+          - 'avm2'
           - 'from_shumway'
           - 'from_gnash'
         default: 'all'
@@ -95,6 +96,9 @@ env:
   SWF_GC: ${{ inputs.swf_gc }}
   SWF_GC_CADENCE: ${{ inputs.swf_gc != '' && '1' || '' }}
   AVM1_DIR: ruffle-tests/tests/swfs/avm1
+  # AVM2 (AS3) suite — plan Stage 2 baseline: 1/1202 (hello_world), everything
+  # else failing honestly (runtime abort on the first unimplemented opcode).
+  AVM2_DIR: ruffle-tests/tests/swfs/avm2
   # Hand-written regression tests. Not downloaded — download_tests.sh never
   # touches this tree, so it takes no `CATS` entry, only a DIRS entry.
   REGRESSION_DIR: ruffle-tests/tests/swfs/regression
@@ -115,6 +119,7 @@ jobs:
 
     env:
       RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'no_gnash' || inputs.categories == 'avm1' }}
+      RUN_AVM2: ${{ inputs.categories == 'all' || inputs.categories == 'no_gnash' || inputs.categories == 'avm2' }}
       RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'no_gnash' || inputs.categories == 'from_shumway' }}
       RUN_GNASH: ${{ inputs.categories == 'all' || inputs.categories == 'from_gnash' }}
 
@@ -230,6 +235,7 @@ jobs:
         run: |
           CATS=""
           [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
+          [ "$RUN_AVM2" = "true" ] && CATS="$CATS avm2"
           [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
           [ "$RUN_GNASH" = "true" ] && CATS="$CATS from_gnash"
           bash ruffle-tests/download_tests.sh $CATS
@@ -238,6 +244,7 @@ jobs:
         run: |
           DIRS=""
           [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
+          [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -250,6 +257,7 @@ jobs:
         run: |
           DIRS=""
           [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
+          [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -288,6 +296,7 @@ jobs:
         run: |
           DIRS=""
           [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
+          [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -589,11 +598,13 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       total: ${{ steps.matrix.outputs.total }}
       run_avm1: ${{ steps.cats.outputs.run_avm1 }}
+      run_avm2: ${{ steps.cats.outputs.run_avm2 }}
       run_shumway: ${{ steps.cats.outputs.run_shumway }}
       run_gnash: ${{ steps.cats.outputs.run_gnash }}
 
     env:
       RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'no_gnash' || inputs.categories == 'avm1' }}
+      RUN_AVM2: ${{ inputs.categories == 'all' || inputs.categories == 'no_gnash' || inputs.categories == 'avm2' }}
       RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'no_gnash' || inputs.categories == 'from_shumway' }}
       RUN_GNASH: ${{ inputs.categories == 'all' || inputs.categories == 'from_gnash' }}
 
@@ -602,6 +613,7 @@ jobs:
         id: cats
         run: |
           echo "run_avm1=$RUN_AVM1" >> "$GITHUB_OUTPUT"
+          echo "run_avm2=$RUN_AVM2" >> "$GITHUB_OUTPUT"
           echo "run_shumway=$RUN_SHUMWAY" >> "$GITHUB_OUTPUT"
           echo "run_gnash=$RUN_GNASH" >> "$GITHUB_OUTPUT"
 
@@ -666,6 +678,7 @@ jobs:
         run: |
           CATS=""
           [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
+          [ "$RUN_AVM2" = "true" ] && CATS="$CATS avm2"
           [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
           [ "$RUN_GNASH" = "true" ] && CATS="$CATS from_gnash"
           bash ruffle-tests/download_tests.sh $CATS
@@ -674,6 +687,7 @@ jobs:
         run: |
           DIRS=""
           [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
+          [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -705,6 +719,7 @@ jobs:
 
     env:
       RUN_AVM1: ${{ needs.setup-parallel.outputs.run_avm1 }}
+      RUN_AVM2: ${{ needs.setup-parallel.outputs.run_avm2 }}
       RUN_SHUMWAY: ${{ needs.setup-parallel.outputs.run_shumway }}
       RUN_GNASH: ${{ needs.setup-parallel.outputs.run_gnash }}
 
@@ -870,6 +885,32 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Verify AVM2 (shard ${{ matrix.shard }})
+        if: "!cancelled() && env.RUN_AVM2 == 'true'"
+        timeout-minutes: 30
+        env:
+          TZ: NPT-5:45
+        run: |
+          SHARD="${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          LIMIT_ARGS=""
+          if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
+            LIMIT_ARGS="--limit=${{ inputs.limit }}"
+          fi
+          python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
+            --tests-dir="$AVM2_DIR" \
+            --json=ruffle-tests/results-shard-avm2-${{ matrix.shard }}.json \
+            --shard="$SHARD" $LIMIT_ARGS || true
+
+      - name: Upload AVM2 results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-shard-${{ matrix.shard }}-avm2
+          path: ruffle-tests/results-shard-avm2-${{ matrix.shard }}.json
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Verify Shumway (shard ${{ matrix.shard }})
         if: "!cancelled() && env.RUN_SHUMWAY == 'true'"
         timeout-minutes: 10
@@ -1013,7 +1054,7 @@ jobs:
         # stale _results/ files from the master checkout, which would overwrite
         # the fetched previous results if we fetched first.
         run: |
-          DIRS="$AVM1_DIR $REGRESSION_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
+          DIRS="$AVM1_DIR $AVM2_DIR $REGRESSION_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
           # Per-mode previous baseline (graphics diffs against graphics, etc.).
           case "${{ inputs.mode }}" in
             graphics) PREV_STEM="results_graphics" ;;
@@ -1059,6 +1100,7 @@ jobs:
           # Map of shard tag -> output results dir
           categories = {
               "avm1": "ruffle-tests/tests/swfs/avm1/_results",
+              "avm2": "ruffle-tests/tests/swfs/avm2/_results",
               "regression": "ruffle-tests/tests/swfs/regression/_results",
               "shumway_avm1": "ruffle-tests/tests/swfs/from_shumway/avm1/_results",
               "shumway_flat": "ruffle-tests/tests/swfs/from_shumway/_results",

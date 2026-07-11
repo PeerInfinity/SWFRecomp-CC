@@ -59,11 +59,9 @@ CATEGORY_LOCAL_PATH[avm2]="${SCRIPT_DIR}/tests/swfs/avm2"
 declare -A CATEGORY_KEEP_AVM
 CATEGORY_KEEP_AVM[avm2]="avm2"
 
-# avm2 is deliberately NOT in ALL_CATEGORIES yet — AVM2 support is in early
-# implementation (see SWFRecompDocs/plans/avm2-support-plan.md); download it
-# explicitly with `./download_tests.sh avm2`. Add it here once the suite is
-# wired into CI (plan Stage 2).
-ALL_CATEGORIES=(avm1 from_shumway from_gnash)
+# avm2 joined ALL_CATEGORIES with plan Stage 2 (CI fan-out landed alongside
+# the hello_world end-to-end baseline; see SWFRecompDocs/plans/avm2-support-plan.md).
+ALL_CATEGORIES=(avm1 avm2 from_shumway from_gnash)
 
 # Parse arguments
 CLEAN=false
