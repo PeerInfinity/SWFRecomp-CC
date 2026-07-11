@@ -283,8 +283,11 @@ Custom AVM2 regression tests go in `ruffle-tests/tests/swfs/regression/`
 ## 7. Risks & open questions
 
 1. **LittleCube architecture input** — the sketch (§4) answers his
-   name-fetching question; send before Stage 2 locks the object layout.
-   Friendly-fork channel: GitHub issue + Discord.
+   name-fetching question; sent 2026-07-10 (GitHub issue + Discord).
+   **No reply as of 2026-07-10 end of Stage 1; user decision: proceed with
+   the §4.2 layout as sketched, non-conservatively.** If feedback arrives
+   mid-Stage-2, the exposed surfaces are only Avm2Value / ScriptObject /
+   vtable tables (kept in small dedicated headers so a reshape is cheap).
 2. **Dispatch-core normalization still in flight** (AVM1 Stage 4b). AVM2 has
    its own call machinery, so no hard dependency — but if AVM2 method dispatch
    ends up wanting to share `invokeFunctionValue` concepts, wait for the
