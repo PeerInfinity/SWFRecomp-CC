@@ -282,19 +282,25 @@ Standing guards in `regression/` (findable by bare name, 31 of them): `ei_type1_
 Note `string_relational_compare` (avm1) is `output_mismatch` and on
 `ignored_tests.txt` — it will show up in a local cluster run. Not yours.
 
-## CI baseline to hold (raw `pass`, both modes, @ `2ab5d2685`; regression grows with each landed guard — 24 at that SHA, 27 after `a2ded85b7`)
+## CI baseline to hold (raw `pass`, both modes, @ `83bef14d7` — the Stage-4-complete batch, 2026-07-11)
 
 | Suite | no-graphics | graphics |
 |---|---|---|
 | avm1 | 634/706 | 634/706 |
-| **regression** | **24/24** | **24/24** |
+| **regression** | **31/31** | **31/31** |
 | from_shumway | 73/92 | 73/92 |
 | from_shumway/avm1 | 46/47 | 46/47 |
 | from_gnash/actionscript.all | 135/243 | 135/243 |
 | from_gnash/misc-ming.all | 69/111 | 68/111 |
-| from_gnash/misc-swfmill.all | 19/20 | 19/20 |
+| from_gnash/misc-swfmill.all | 19/20 † | 19/20 † |
 | from_gnash/misc-mtasc.all | 7/9 | 7/9 |
 | from_gnash/misc-swfc.all | 11/20 | 11/20 |
+
+† `mixed-bytecode-as2` showed 19→18 at `83bef14d7` in BOTH modes — that was
+the concurrent **AVM2 Stage 2** emitter (unimplemented GetGlobalScope on a
+mixed AVM1+AVM2 SWF), not dispatch work, and was fixed same-day by
+`03c86381d` (DoABC gated on the FileAttributes AS3 bit). If it flips again,
+check the AVM2 emitter first.
 
 `results.json`'s `effective_pass` field includes `ruffle_matched` and is higher than
 these numbers; the table is raw `pass`. Compare like with like.
