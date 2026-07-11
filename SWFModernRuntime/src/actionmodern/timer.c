@@ -379,17 +379,14 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 		if (func == NULL) return;
 
 		// Base clip stays in the arm (never pair INV_BASE_CLIP with
-		// INV_VERSION_SWITCH): this form has always gated the base-clip switch
-		// on the CALLEE's SWF version, because it read g_swf_version after its
-		// own version switch. eff_ver is provably the value
-		// switchToFunctionVersion is about to install — the gate is now a named
-		// local instead of an accident of statement ordering. The context
-		// switch now precedes the core's version switch (they used to be the
-		// other way around); the two brackets write disjoint globals and
-		// nothing between them reads the other.
-		int eff_ver = (func->swf_version != 0) ? func->swf_version : g_swf_version;
+		// INV_VERSION_SWITCH). CALLER-gated since normalization pass (b)
+		// item 3 (was the callee-version accident of statement order):
+		// Ruffle's Avm1Function::call decides is_closure from the CALLER's
+		// activation version; a v5 ambient at fire time is pre-closure and
+		// keeps the caller's context (the core's INV_VERSION_SWITCH v5 branch
+		// handles the version side the same way).
 		MovieClip* old_context = g_current_context;
-		if (eff_ver >= 6 && func->base_clip != NULL)
+		if (g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = func->base_clip;
 
 		// this_var = NULL: the core passes NULL as the ABI receiver, as both

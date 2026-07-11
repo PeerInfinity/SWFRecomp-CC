@@ -28867,6 +28867,9 @@ void actionSetCurrentContext(MovieClip* mc) {
 #define CF_CTX_LIVE        0x08u  // as CF_CTX, but skip a DESTROYED clip and keep the sprite
 #define CF_CTX_MC_FALLBACK 0x10u  // as CF_CTX, but a DESTROYED clip enters ctx_receiver instead
 #define CF_CTX_RECEIVER    0x20u  // ignore base_clip entirely; enter ctx_receiver; clear sprite
+#define CF_VERSION_RECEIVER 0x40u // v5-caller pre-closure: install ctx_receiver's CURRENT
+                                  // version (min 5) instead of the callee's defining one
+                                  // (Ruffle function.rs !is_closure: base_clip.swf_version())
 
 // The four context modes, and why each exists:
 //
@@ -28874,24 +28877,27 @@ void actionSetCurrentContext(MovieClip* mc) {
 //                      re-resolved base clip even when it is destroyed; clears the sprite.
 //   CF_CTX_LIVE        the object-method and string-primitive arms. Refuses to enter a
 //                      destroyed clip (depth == INT_MIN) and leaves g_current_sprite_obj alone.
-//   CF_CTX_MC_FALLBACK the MOVIECLIP arms' SWF6+ branch. Enters the re-resolved base clip
-//                      when it is alive, else falls back to ctx_receiver (the method's
+//   CF_CTX_MC_FALLBACK the MOVIECLIP arms' v6+-CALLER branch. Enters the re-resolved base
+//                      clip when it is alive, else falls back to ctx_receiver (the method's
 //                      MOVIECLIP receiver); clears the sprite. A NULL base_clip — every
 //                      native reached through the MovieClip.prototype walk, e.g.
 //                      mc.valueOf() — switches nothing at all.
-//   CF_CTX_RECEIVER    the MOVIECLIP arms' SWF5 branch. SWF5 has no closures, so the callee
-//                      runs in its *receiver's* timeline and base_clip is ignored outright
-//                      (a SWF5 DefineFunction still carries one — actionDefineFunction sets
-//                      it unconditionally — so folding this into CF_CTX_MC_FALLBACK would
+//   CF_CTX_RECEIVER    the MOVIECLIP arms' v5-CALLER branch. A v5 caller is pre-closure
+//                      (Ruffle function.rs !is_closure), so the callee runs in its
+//                      *receiver's* timeline and base_clip is ignored outright (a SWF5
+//                      DefineFunction still carries one — actionDefineFunction sets it
+//                      unconditionally — so folding this into CF_CTX_MC_FALLBACK would
 //                      enter the defining clip where today we enter the receiver).
+//                      Pairs with CF_VERSION_RECEIVER, which installs the receiver's
+//                      CURRENT version instead of the callee's defining one.
 //
 // These asymmetries are load-bearing (plan §3) — reproduced, not normalized.
 //
 // All modes re-resolve AFTER CF_VERSION has installed the callee's version, because
 // reResolveDeadBaseClip -> resolveSlashPathToMC reads g_swf_version/global_object.
-// The *gate* stays with the arm, in the flags it computes. Note that the arm choosing
-// between CF_CTX_MC_FALLBACK and CF_CTX_RECEIVER gates on the CALLEE's version, not the
-// caller's, unlike every other arm — see the note at _mc_user_dispatch.
+// The *gate* stays with the arm, in the flags it computes; since normalization
+// pass (b) item 3 every arm gates on the CALLER's version (the MC arms'
+// callee-version accident was unified away — regression/mc_method_v5_caller_gate).
 
 typedef struct ClosureFrame {
 	u32 saved_scope_depth;
@@ -28914,6 +28920,20 @@ static void enterClosureFrame(SWFAppContext* app_context, ClosureFrame* cf,
 
 	if (cf_flags & CF_VERSION)
 		switchToFunctionVersion(func, &cf->saved_ver, &cf->saved_global, &cf->saved_movie_idx);
+	else if (cf_flags & CF_VERSION_RECEIVER)
+	{
+		cf->saved_ver = g_swf_version;
+		cf->saved_global = global_object;
+		cf->saved_movie_idx = 0;
+		int _cf_rv = (ctx_receiver != NULL) ? ctx_receiver->swf_version : 0;
+		if (_cf_rv > 0)
+		{
+			g_swf_version = (_cf_rv < 5) ? 5 : _cf_rv;
+			int _cf_vg = versionGroup(g_swf_version);
+			if (_cf_vg == 0 && g_global_legacy) global_object = g_global_legacy;
+			else if (_cf_vg == 1 && g_global_modern) global_object = g_global_modern;
+		}
+	}
 
 	cf->saved_scope_depth = scope_depth;
 	if (cf_flags & CF_RESET_SCOPE)
@@ -28974,7 +28994,7 @@ static void leaveClosureFrame(SWFAppContext* app_context, ClosureFrame* cf)
 	// Unconditional: a no-op assignment when CF_CTX never fired.
 	actionSetCurrentContext(cf->saved_ctx);
 	g_current_sprite_obj = cf->saved_sprite;
-	if (cf->flags & CF_VERSION)
+	if (cf->flags & (CF_VERSION | CF_VERSION_RECEIVER))
 		restoreFunctionVersion(cf->saved_ver, cf->saved_global, cf->saved_movie_idx);
 }
 // Flag set by actionCallMethod/actionNewMethod when target object is undefined/null.
@@ -34920,14 +34940,14 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		_ef_this.type = ACTION_STACK_VALUE_MOVIECLIP;
 		_ef_this.data.numeric_value = (u64)(uintptr_t)mc;
 
-		// Base clip stays in the arm (never INV_BASE_CLIP|INV_VERSION_SWITCH):
-		// this arm has always gated the base-clip switch on the CALLEE's SWF
-		// version (it read g_swf_version after its own switchToFunctionVersion)
-		// — same accident as the MC arms and fireTimerCallback's function form.
-		// eff_ver is provably the value the core's version switch installs.
-		int _ef_eff_ver = (func->swf_version != 0) ? func->swf_version : g_swf_version;
+		// Base clip stays in the arm (never INV_BASE_CLIP|INV_VERSION_SWITCH).
+		// CALLER-gated since normalization pass (b) item 3 (was the
+		// callee-version accident of statement order, same as the MC arms and
+		// fireTimerCallback's function form): Ruffle decides is_closure from
+		// the CALLER's activation version. The core's INV_VERSION_SWITCH v5
+		// branch handles the version side (receiver MC's current version).
 		MovieClip* ef_saved_base = g_current_context;
-		if (_ef_eff_ver >= 6 && func->base_clip != NULL)
+		if (g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = (MovieClip*)func->base_clip;
 
 		// Type-1 keeps its fresh local activation (absorbs plain assignments
@@ -69699,18 +69719,15 @@ _mc_user_dispatch: ;
 						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 						this_var.data.numeric_value = (u64) mc;
 
-						// THE MOVIECLIP ARMS GATE ON THE CALLEE'S SWF VERSION, not the
-						// caller's — unique among actionCallMethod's arms, and until now
-						// only an accident of statement order: the old code read
-						// g_swf_version *after* switchToFunctionVersion had installed
-						// func->swf_version. _mc_eff_ver is exactly the value that switch
-						// is about to install, so the gate is preserved verbatim while the
-						// ClosureFrame stays version-agnostic. Arguably this arm is the
-						// correct one and the other four are wrong — "SWF5 has no closures"
-						// is a property of the function, not of who calls it — but flipping
-						// either way is a Stage-4 normalization, not a Stage-3 migration.
-						int _mc_eff_ver = (func->swf_version != 0) ? (int)func->swf_version
-						                                           : g_swf_version;
+						// CALLER-gated (normalization pass (b) item 3, unifying the old
+						// callee-version accident of statement order): Ruffle's
+						// Avm1Function::call decides is_closure from the CALLER's
+						// activation version. A v6+ caller runs the callee as a closure
+						// (defining version + defining base clip); a v5 caller is
+						// pre-closure — the callee runs in its RECEIVER's timeline at
+						// the receiver's CURRENT version (CF_VERSION_RECEIVER).
+						// regression/mc_method_v5_caller_gate is the flip repro.
+						int _mc_caller_closure = (g_swf_version >= 6);
 
 						// Bind `this` = receiver MC on g_this_stack for a type-1 callee, not
 						// just on the local scope object. GetVariable("this") consults
@@ -69744,8 +69761,9 @@ _mc_user_dispatch: ;
 
 						ClosureFrame cf;
 						enterClosureFrame(app_context, &cf, func,
-						                  (u8)(CF_VERSION | (_mc_eff_ver >= 6 ? CF_CTX_MC_FALLBACK
-						                                                      : CF_CTX_RECEIVER)), mc);
+						                  (u8)(_mc_caller_closure
+						                           ? (CF_VERSION | CF_CTX_MC_FALLBACK)
+						                           : (CF_VERSION_RECEIVER | CF_CTX_RECEIVER)), mc);
 
 						ActionVar result = invokeFunctionValue(app_context, func, &this_var,
 						                                       args, num_args, &_mc_o);
@@ -69788,16 +69806,16 @@ _mc_user_dispatch: ;
 					this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 					this_var.data.numeric_value = (u64) mc;
 
-					// Same callee-version gate as the user-method arm above. Unlike that
-					// arm, the hook pushes NO g_this_stack entry — a type-1 __resolve body
-					// therefore reads the CALLER's `this`. Asymmetric, reproduced not
-					// normalized (plan §3). The core's single forward+clamp+pad loop
-					// subsumes the hand-rolled name-arg marshalling that was instance nine
-					// of the TYPE1_ARG_ORDER class (regression/mc_resolve_type1_args): with
-					// args = &name_arg / num_args = 1 it pushes the name into param slot 0
-					// and pads the rest with undefined, exactly as before.
-					int _res_eff_ver = (func->swf_version != 0) ? (int)func->swf_version
-					                                            : g_swf_version;
+					// Same CALLER gate as the user-method arm above (pass (b) item 3).
+					// Unlike that arm, the hook pushes NO g_this_stack entry — a type-1
+					// __resolve body therefore reads the CALLER's `this`. Asymmetric,
+					// reproduced not normalized (plan §3). The core's single
+					// forward+clamp+pad loop subsumes the hand-rolled name-arg
+					// marshalling that was instance nine of the TYPE1_ARG_ORDER class
+					// (regression/mc_resolve_type1_args): with args = &name_arg /
+					// num_args = 1 it pushes the name into param slot 0 and pads the
+					// rest with undefined, exactly as before.
+					int _res_caller_closure = (g_swf_version >= 6);
 					InvokeOpts _res_o = {0};
 					_res_o.flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BIND_THIS |
 					               (func->function_type == 1 ? 0u
@@ -69809,8 +69827,9 @@ _mc_user_dispatch: ;
 
 					ClosureFrame cf_r;
 					enterClosureFrame(app_context, &cf_r, func,
-					                  (u8)(CF_VERSION | (_res_eff_ver >= 6 ? CF_CTX_MC_FALLBACK
-					                                                       : CF_CTX_RECEIVER)), mc);
+					                  (u8)(_res_caller_closure
+					                           ? (CF_VERSION | CF_CTX_MC_FALLBACK)
+					                           : (CF_VERSION_RECEIVER | CF_CTX_RECEIVER)), mc);
 
 					ActionVar resolve_result = invokeFunctionValue(app_context, func, &this_var,
 					                                               &name_arg, 1, &_res_o);
@@ -69837,8 +69856,7 @@ _mc_user_dispatch: ;
 							// func — which actionBaseClipRemoved() reads. Reproduced, not
 							// normalized; INV_EXEC_FUNC would change it (and write
 							// g_prev_executing_func besides).
-							int _rf_eff_ver = (rf->swf_version != 0) ? (int)rf->swf_version
-							                                         : g_swf_version;
+							int _rf_caller_closure = (g_swf_version >= 6);
 							InvokeOpts _rf_o = {0};
 							_rf_o.flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BIND_THIS |
 							              (rf->function_type == 1 ? 0u
@@ -69846,8 +69864,9 @@ _mc_user_dispatch: ;
 
 							ClosureFrame cf_rf;
 							enterClosureFrame(app_context, &cf_rf, rf,
-							                  (u8)(CF_VERSION | (_rf_eff_ver >= 6 ? CF_CTX_MC_FALLBACK
-							                                                      : CF_CTX_RECEIVER)), mc);
+							                  (u8)(_rf_caller_closure
+							                           ? (CF_VERSION | CF_CTX_MC_FALLBACK)
+							                           : (CF_VERSION_RECEIVER | CF_CTX_RECEIVER)), mc);
 							g_call_depth++;
 
 							ActionVar call_result = invokeFunctionValue(app_context, rf, &tv,
