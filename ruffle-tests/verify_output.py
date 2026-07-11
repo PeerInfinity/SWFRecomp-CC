@@ -1664,6 +1664,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             "src/avm2/avm2_number.c",
             "src/avm2/avm2_string.c",
             "src/avm2/avm2_array.c",
+            "src/avm2/avm2_vector.c",
             "src/avm2/avm2_main.c",
         ])
     for src in core_sources:

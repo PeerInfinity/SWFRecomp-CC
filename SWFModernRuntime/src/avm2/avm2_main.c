@@ -257,6 +257,24 @@ void runSWF_avm2(SWFAppContext* app_context)
 		}
 		avm2_try_pop_frame(&top);
 	}
+	else
+	{
+		// No char-0 binding: the movie's classes are bound to placed symbols
+		// (SymbolClass char N + PlaceObject on frame 1). Real timeline
+		// instantiation is Stage 5; until then, construct each bound class
+		// once in tag order — the single-frame test-movie behavior.
+		for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
+		{
+			if (avm2_generated_symbol_classes[i].class_name == NULL) continue;
+			Avm2TryFrame top;
+			avm2_try_push_catch_all(ctx, &top);
+			if (setjmp(top.jb) == 0)
+			{
+				construct_root(ctx, avm2_generated_symbol_classes[i].class_name);
+			}
+			avm2_try_pop_frame(&top);
+		}
+	}
 
 	// Step 5: tick loop, mirroring swf_core.c's MAX_FRAMES cadence.
 #ifdef MAX_FRAMES

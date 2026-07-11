@@ -345,6 +345,12 @@ static uint32_t dyn_enum_count(Avm2Object* obj)
 
 uint32_t avm2_object_next_enumerant(Avm2Object* obj, uint32_t cur)
 {
+	if (obj->kind == AVM2_OBJ_VECTOR)
+	{
+		// Ruffle vector_object.rs: indices 0..length-1 (1-based enumerants).
+		Avm2VectorExt* ext = (Avm2VectorExt*) obj->native_ext;
+		return cur < ext->length ? cur + 1 : 0;
+	}
 	uint32_t total = array_enum_count(obj) + dyn_enum_count(obj);
 	if (cur + 1 <= total) return cur + 1;
 	return 0;
@@ -352,6 +358,12 @@ uint32_t avm2_object_next_enumerant(Avm2Object* obj, uint32_t cur)
 
 Avm2Value avm2_object_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t idx)
 {
+	if (obj->kind == AVM2_OBJ_VECTOR)
+	{
+		Avm2VectorExt* ext = (Avm2VectorExt*) obj->native_ext;
+		if (idx >= 1 && idx <= ext->length) return avm2_uint_value(idx - 1);
+		return avm2_null();
+	}
 	uint32_t arr_n = array_enum_count(obj);
 	if (idx >= 1 && idx <= arr_n)
 	{
@@ -365,6 +377,12 @@ Avm2Value avm2_object_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t
 
 Avm2Value avm2_object_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_t idx)
 {
+	if (obj->kind == AVM2_OBJ_VECTOR)
+	{
+		Avm2VectorExt* ext = (Avm2VectorExt*) obj->native_ext;
+		if (idx >= 1 && idx <= ext->length) return ext->elems[idx - 1];
+		return avm2_undefined();
+	}
 	uint32_t arr_n = array_enum_count(obj);
 	if (idx >= 1 && idx <= arr_n)
 	{

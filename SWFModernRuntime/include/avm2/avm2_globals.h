@@ -74,6 +74,8 @@ void avm2_proto_add_function(Avm2Context* ctx, Avm2Object* proto, const char* na
                              Avm2MethodFn fn);
 // Register a toplevel native function on the builtin globals + domain.
 void avm2_builtin_add_global_fn(Avm2Context* ctx, const char* name, Avm2MethodFn fn);
+// Expose a value on the builtin globals + domain under an arbitrary key.
+void avm2_builtin_define_alias(Avm2Context* ctx, Avm2PropKey key, Avm2Value value);
 
 // Per-module builtin registration (called from avm2_globals_init).
 void avm2_register_string(Avm2Context* ctx);
@@ -81,6 +83,39 @@ void avm2_register_number(Avm2Context* ctx);   // Number/int/uint/Boolean/Math
 void avm2_register_array(Avm2Context* ctx);
 void avm2_register_error(Avm2Context* ctx);
 void avm2_register_toplevel(Avm2Context* ctx); // trace/isNaN/parseInt/...
+void avm2_register_vector(Avm2Context* ctx);   // __AS3__.vec::Vector + specializations
+
+// Definition lookup by dotted/:: name ("pkg::Name", "pkg.Name", "Name"),
+// including on-demand "Vector.<...>" applications. Sets *found.
+Avm2Value avm2_find_definition(Avm2Context* ctx, const char* s, uint32_t len,
+                               int* found);
+
+// Vector machinery (avm2_vector.c).
+Avm2VectorExt* avm2_vector_ext(Avm2Object* obj);  // NULL if not a Vector
+// Resolve "Vector.<...>" (optional __AS3__.vec prefix) to the applied class.
+Avm2Class* avm2_vector_class_by_name(Avm2Context* ctx, const char* s, uint32_t len);
+// The parameterized class Vector.<param> (param NULL = *): cached per param.
+Avm2Class* avm2_vector_apply(Avm2Context* ctx, Avm2Class* param);
+// New Vector.<T> instance of the given PARAMETERIZED class.
+Avm2Object* avm2_vector_new(Avm2Context* ctx, Avm2Class* vec_class,
+                            uint32_t length, int fixed);
+// Index access with Ruffle vector_object.rs error semantics (1125 on
+// SWF>=11). set coerces to T; get throws on out-of-range.
+Avm2Value avm2_vector_get_index(Avm2Context* ctx, Avm2Object* obj, uint32_t idx);
+void avm2_vector_set_index(Avm2Context* ctx, Avm2Object* obj, uint32_t idx, Avm2Value v);
+// Numeric-name access path (name parses as f64 but maybe not a valid u32
+// index): returns 0 if the name is not numeric (caller falls through to the
+// normal property path), 1 if handled; throws per version semantics.
+// `out` NULL = write `set_value`, else read into *out. May "handle" a read
+// by falling back (returns 0) for negative indices on SWF10.
+int avm2_vector_name_access(Avm2Context* ctx, Avm2Object* obj, const char* name,
+                            uint32_t name_len, Avm2Value* out, Avm2Value set_value);
+
+// The avmplus QuickSort shared by Array.sort/sortOn and Vector.sort
+// (Ruffle globals/array.rs qsort).
+typedef struct Avm2SortItem { uint32_t idx; Avm2Value v; } Avm2SortItem;
+typedef int (*Avm2SortCmp)(void* ud, const Avm2SortItem* a, const Avm2SortItem* b);
+void avm2_avmplus_qsort(void* ud, Avm2SortCmp cmp, Avm2SortItem* s, uint32_t n);
 
 // MovieClip stub instance state (Avm2Object.native_ext).
 typedef struct Avm2MovieClipExt
@@ -121,6 +156,11 @@ typedef struct Avm2Builtins
 	Avm2Class* xml_class;       // stub: only typeof/is checks
 	Avm2Class* xml_list_class;  // stub
 	Avm2Class* movieclip_class;
+	Avm2Class* vector_class;         // generic __AS3__.vec::Vector
+	Avm2Class* vector_int_class;     // Vector.<int>
+	Avm2Class* vector_uint_class;    // Vector.<uint>
+	Avm2Class* vector_double_class;  // Vector.<Number>
+	Avm2Class* vector_object_class;  // Vector.<*>
 } Avm2Builtins;
 
 #endif // AVM2_GLOBALS_H

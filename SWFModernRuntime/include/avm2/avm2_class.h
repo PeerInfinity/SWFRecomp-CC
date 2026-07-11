@@ -112,6 +112,11 @@ struct Avm2Class
 	Avm2NativeCtor native_construct;
 	// If set, `C(...)` (class call) uses this; default is coerce-arg0.
 	Avm2NativeCtor native_call;
+	// Vector machinery (avm2_vector.c): the generic Vector class accepts
+	// ApplyType; parameterized Vector.<T> classes carry their element type.
+	uint8_t is_generic_vector;
+	uint8_t is_vector;           // parameterized Vector.<T> instance class
+	Avm2Class* vector_param;     // T (NULL = * — only meaningful when is_vector)
 };
 
 // One local-scope stack entry in an emitted method body.

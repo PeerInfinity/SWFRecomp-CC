@@ -91,6 +91,10 @@ Avm2Value avm2_op_constructprop_dyn(Avm2Activation* act, Avm2Value recv, uint32_
 void avm2_op_constructsuper(Avm2Activation* act, Avm2Value recv,
                             const Avm2Value* args, uint32_t argc);
 
+// ApplyType (Vector.<T>): pop type args, produce the parameterized class.
+Avm2Value avm2_op_applytype(Avm2Activation* act, Avm2Value base,
+                            const Avm2Value* params, uint32_t num_params);
+
 // Object model.
 Avm2Value avm2_op_newclass(Avm2Activation* act, uint32_t class_idx, Avm2Value base,
                            const Avm2ScopeEntry* lscope, uint32_t scope_n);

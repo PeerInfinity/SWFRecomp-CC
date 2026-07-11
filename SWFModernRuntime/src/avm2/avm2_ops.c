@@ -56,6 +56,7 @@ typedef struct Resolved
 	Avm2Value* dyn;              // own dynamic slot
 	Avm2Object* proto_holder;    // proto-chain holder of `dyn`
 	int is_array_elem;
+	int is_vector_elem;
 	uint32_t arr_index;
 } Resolved;
 
@@ -131,6 +132,14 @@ static int resolve_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
 			}
 			// A hole / out-of-range falls through to dynamic + proto.
 		}
+		if (obj->kind == AVM2_OBJ_VECTOR
+		    && name_as_index(key->name, key->name_len, &idx)
+		    && idx < avm2_vector_ext(obj)->length)
+		{
+			out->is_vector_elem = 1;
+			out->arr_index = idx;
+			return 1;
+		}
 		out->dyn = avm2_object_find_dynamic(obj, key->name, key->name_len);
 		if (out->dyn != NULL) return 1;
 	}
@@ -191,6 +200,14 @@ static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Reso
 				return 1;
 			}
 		}
+		if (obj->kind == AVM2_OBJ_VECTOR
+		    && name_as_index(key.name, key.name_len, &idx)
+		    && idx < avm2_vector_ext(obj)->length)
+		{
+			out->is_vector_elem = 1;
+			out->arr_index = idx;
+			return 1;
+		}
 		out->dyn = avm2_object_find_dynamic(obj, key.name, key.name_len);
 		if (out->dyn != NULL) return 1;
 	}
@@ -249,6 +266,10 @@ static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* 
 	{
 		Avm2Value v = avm2_array_get(recv.u.obj, r->arr_index);
 		return v.kind == AVM2_VALUE_HOLE ? avm2_undefined() : v;
+	}
+	if (r->is_vector_elem)
+	{
+		return avm2_vector_get_index(ctx, recv.u.obj, r->arr_index);
 	}
 	if (r->dyn != NULL) return *r->dyn;
 	const Avm2PropEntry* e = r->entry;
@@ -312,6 +333,16 @@ Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32
 	{
 		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
 	}
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
+	    && avm2_mn_has_public_ns(act->file->data, mn_idx))
+	{
+		Avm2Value out;
+		if (avm2_vector_name_access(act->ctx, recv.u.obj, name, name_len,
+		                            &out, avm2_undefined()))
+		{
+			return out;
+		}
+	}
 	Resolved r;
 	int ok = resolve_mn(act, recv, mn_idx, &r);
 	return getproperty_common(act, recv, name, name_len, ok, &r,
@@ -341,6 +372,16 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
 	int mn_public = avm2_mn_has_public_ns(act->file->data, mn_idx);
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
+	    && (interp || mn_public))
+	{
+		Avm2Value out;
+		if (avm2_vector_name_access(ctx, recv.u.obj, ns->utf8, ns->len,
+		                            &out, avm2_undefined()))
+		{
+			return out;
+		}
+	}
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, mn_public, &r);
@@ -355,6 +396,11 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 	if (r->is_array_elem)
 	{
 		avm2_array_set(ctx, recv.u.obj, r->arr_index, value);
+		return;
+	}
+	if (r->is_vector_elem)
+	{
+		avm2_vector_set_index(ctx, recv.u.obj, r->arr_index, value);
 		return;
 	}
 	if (r->dyn != NULL && r->proto_holder == NULL)
@@ -434,6 +480,13 @@ static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	{
 		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
 	}
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
+	    && avm2_mn_has_public_ns(act->file->data, mn_idx)
+	    && avm2_vector_name_access(act->ctx, recv.u.obj, name, name_len,
+	                               NULL, value))
+	{
+		return;
+	}
 	Resolved r;
 	if (resolve_mn(act, recv, mn_idx, &r))
 	{
@@ -485,6 +538,13 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
 	int mn_public = avm2_mn_has_public_ns(act->file->data, mn_idx);
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
+	    && (interp || mn_public)
+	    && avm2_vector_name_access(ctx, recv.u.obj, ns->utf8, ns->len,
+	                               NULL, value))
+	{
+		return;
+	}
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
 	Resolved r;
 	if (resolve_key(ctx, recv, &key, mn_public, &r))
@@ -528,6 +588,11 @@ static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
 	if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(name, name_len, &idx))
 	{
 		avm2_array_delete(obj, idx);
+		return avm2_bool(true);
+	}
+	if (obj->kind == AVM2_OBJ_VECTOR)
+	{
+		// FP never deletes vector elements; delete always reports true.
 		return avm2_bool(true);
 	}
 	// Declared traits can't be deleted.
@@ -902,6 +967,13 @@ Avm2Value avm2_op_callproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t
 		{
 			return avm2_call_value(ctx, v, recv, args, argc);
 		}
+	}
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_VECTOR
+	    && avm2_value_as_index(name_val, &idx)
+	    && idx < avm2_vector_ext(recv.u.obj)->length)
+	{
+		return avm2_call_value(ctx, avm2_vector_get_index(ctx, recv.u.obj, idx),
+		                       recv, args, argc);
 	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name_val);
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
@@ -1757,6 +1829,10 @@ int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
 	{
 		Avm2Value v = avm2_array_get(obj, idx);
 		if (v.kind != AVM2_VALUE_HOLE) return 1;
+	}
+	if (obj->kind == AVM2_OBJ_VECTOR && name_as_index(name, name_len, &idx))
+	{
+		return idx < avm2_vector_ext(obj)->length;
 	}
 	return avm2_object_find_dynamic(obj, name, name_len) != NULL;
 }

@@ -42,6 +42,10 @@ typedef struct Avm2AbcMultiname
 	uint32_t ns;      // namespace index (QName/QNameA)
 	uint32_t name;    // string index
 	uint32_t ns_set;  // ns-set index (Multiname*/MultinameL*)
+	// TypeName (0x1d): parameterized type, e.g. Vector.<int>.
+	uint32_t base_type;            // multiname index of the base (Vector)
+	uint32_t type_param_count;
+	const uint32_t* type_params;   // multiname indices (0 = "any" → Vector.<*>)
 } Avm2AbcMultiname;
 
 // Slot/optional-parameter default value: raw ABC DefaultValueKind + a

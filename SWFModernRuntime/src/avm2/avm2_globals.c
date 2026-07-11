@@ -135,6 +135,14 @@ static void builtin_global_define(Avm2Context* ctx, Avm2PropKey key, Avm2Value v
 	g->slots[e.slot_index] = value;
 }
 
+// Expose a value on the builtin globals + domain under an arbitrary key
+// (e.g. the package-internal Vector$int legacy aliases).
+void avm2_builtin_define_alias(Avm2Context* ctx, Avm2PropKey key, Avm2Value value)
+{
+	builtin_global_define(ctx, key, value);
+	avm2_domain_add(ctx, &key, NULL, 0);
+}
+
 Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name,
                               Avm2Class* super)
 {
@@ -692,46 +700,181 @@ static Avm2Value global_get_qualified_class_name(Avm2Activation* act)
 	return avm2_string(avm2_string_from_literal(ctx, buf));
 }
 
-static Avm2Value global_get_definition_by_name(Avm2Activation* act)
+// Splits "pkg::Name"/"pkg.Name"/"Name" into a public-package key.
+static void definition_key_split(const char* s, uint32_t len, Avm2PropKey* key)
 {
-	Avm2Context* ctx = act->ctx;
-	const Avm2String* s = (act->argc > 0)
-		? avm2_coerce_to_string(ctx, act->args[0])
-		: avm2_string_from_literal(ctx, "");
-	// Split "pkg::Name" or "pkg.Name" into (ns, name).
-	Avm2PropKey key;
-	key.ns_kind = 0x16;
-	key.ns_uri = s->utf8;
-	key.ns_len = 0;
-	key.name = s->utf8;
-	key.name_len = s->len;
-	for (int64_t i = (int64_t) s->len - 1; i >= 0; i--)
+	key->ns_kind = 0x16;
+	key->ns_uri = s;
+	key->ns_len = 0;
+	key->name = s;
+	key->name_len = len;
+	for (int64_t i = (int64_t) len - 1; i >= 0; i--)
 	{
-		if (s->utf8[i] == ':' || s->utf8[i] == '.')
+		if (s[i] == ':' || s[i] == '.')
 		{
 			uint32_t name_start = (uint32_t) i + 1;
 			uint32_t ns_end = (uint32_t) i;
-			if (s->utf8[i] == ':' && i > 0 && s->utf8[i - 1] == ':') ns_end--;
-			key.name = s->utf8 + name_start;
-			key.name_len = s->len - name_start;
-			key.ns_len = ns_end;
+			if (s[i] == ':' && i > 0 && s[i - 1] == ':') ns_end--;
+			key->name = s + name_start;
+			key->name_len = len - name_start;
+			key->ns_len = ns_end;
 			break;
 		}
 	}
+}
+
+Avm2Value avm2_find_definition(Avm2Context* ctx, const char* s, uint32_t len,
+                               int* found)
+{
+	*found = 0;
+	// Vector.<...> names resolve to (and create on demand) the applied class
+	// (avmplus behavior; the name embeds dots that would break the split).
+	Avm2Class* vc = avm2_vector_class_by_name(ctx, s, len);
+	if (vc != NULL)
+	{
+		*found = 1;
+		return avm2_object_value(vc->class_object);
+	}
+	Avm2PropKey key;
+	definition_key_split(s, len, &key);
 	Avm2Object* g = avm2_domain_find(ctx, &key);
 	if (g != NULL)
 	{
 		const Avm2PropEntry* e = avm2_vtable_find(g->vtable, &key);
 		if (e != NULL && e->kind == AVM2_PROP_SLOT)
 		{
+			*found = 1;
 			return g->slots[e->slot_index];
 		}
 		Avm2Value* dyn = avm2_object_find_dynamic(g, key.name, key.name_len);
-		if (dyn != NULL) return *dyn;
+		if (dyn != NULL)
+		{
+			*found = 1;
+			return *dyn;
+		}
 	}
+	return avm2_undefined();
+}
+
+_Noreturn static void throw_1065_for_definition(Avm2Context* ctx,
+                                                const char* s, uint32_t len)
+{
+	Avm2PropKey key;
+	definition_key_split(s, len, &key);
 	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 	                 "Error #1065: Variable %.*s is not defined.",
 	                 (int) key.name_len, key.name);
+}
+
+static Avm2Value global_get_definition_by_name(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* s = (act->argc > 0)
+		? avm2_coerce_to_string(ctx, act->args[0])
+		: avm2_string_from_literal(ctx, "");
+	int found = 0;
+	Avm2Value v = avm2_find_definition(ctx, s->utf8, s->len, &found);
+	if (found) return v;
+	throw_1065_for_definition(ctx, s->utf8, s->len);
+}
+
+// Minimal flash.utils.describeType: a plain dynamic object carrying the
+// attribute values simple tests read (@name/@base/@isDynamic/@isFinal/
+// @isStatic). Real describeType returns E4X XML — that's the deferred
+// XML plan; attribute GetProperty on this object resolves the same way.
+static Avm2Value global_describe_type(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* out = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
+	out->cls = ctx->builtins.object_class;
+	out->proto = ctx->builtins.object_class->prototype_obj;
+	if (act->argc == 0) return avm2_object_value(out);
+	Avm2Value v = act->args[0];
+	int is_static = v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
+	                && v.u.obj->kind == AVM2_OBJ_CLASS;
+	Avm2Class* cls = is_static ? v.u.obj->class_ref : avm2_value_class(ctx, v);
+	char nb[256];
+	if (cls->name.ns_len > 0)
+	{
+		snprintf(nb, sizeof(nb), "%.*s::%.*s",
+		         (int) cls->name.ns_len, cls->name.ns_uri,
+		         (int) cls->name.name_len, cls->name.name);
+	}
+	else
+	{
+		snprintf(nb, sizeof(nb), "%.*s",
+		         (int) cls->name.name_len, cls->name.name);
+	}
+	avm2_object_set_dynamic(ctx, out, "name", 4,
+	                        avm2_string(avm2_string_from_literal(ctx, nb)));
+	if (cls->super_class != NULL)
+	{
+		char bb[256];
+		avm2_class_qname_buf(cls->super_class, bb, sizeof(bb));
+		avm2_object_set_dynamic(ctx, out, "base", 4,
+		                        avm2_string(avm2_string_from_literal(ctx, bb)));
+	}
+	avm2_object_set_dynamic(ctx, out, "isDynamic", 9,
+	                        avm2_bool((cls->flags & AVM2_CLASS_FLAG_SEALED) == 0));
+	avm2_object_set_dynamic(ctx, out, "isFinal", 7,
+	                        avm2_bool((cls->flags & AVM2_CLASS_FLAG_FINAL) != 0));
+	avm2_object_set_dynamic(ctx, out, "isStatic", 8, avm2_bool(is_static != 0));
+	return avm2_object_value(out);
+}
+
+// --- flash.system.ApplicationDomain (minimal: currentDomain +
+// hasDefinition/getDefinition over the single global domain) ---
+
+static Avm2Object* g_current_domain;
+
+static Avm2Value appdomain_get_current(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_object_value(g_current_domain);
+}
+
+static Avm2Value appdomain_has_definition(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0) return avm2_bool(false);
+	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	int found = 0;
+	avm2_find_definition(ctx, s->utf8, s->len, &found);
+	return avm2_bool(found != 0);
+}
+
+static Avm2Value appdomain_get_definition(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* s = (act->argc > 0)
+		? avm2_coerce_to_string(ctx, act->args[0])
+		: avm2_string_from_literal(ctx, "");
+	int found = 0;
+	Avm2Value v = avm2_find_definition(ctx, s->utf8, s->len, &found);
+	if (found) return v;
+	throw_1065_for_definition(ctx, s->utf8, s->len);
+}
+
+static void register_application_domain(Avm2Context* ctx)
+{
+	Avm2Class* cls = avm2_builtin_class(ctx, "flash.system", "ApplicationDomain",
+	                                    ctx->builtins.object_class);
+	avm2_builtin_add_method(ctx, cls, "hasDefinition", appdomain_has_definition);
+	avm2_builtin_add_method(ctx, cls, "getDefinition", appdomain_get_definition);
+	g_current_domain = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 1);
+	g_current_domain->cls = cls;
+	g_current_domain->vtable = &cls->ivtable;
+	g_current_domain->proto = cls->prototype_obj;
+	// Static getter currentDomain on the class object.
+	Avm2VTable* vt = class_static_vtable(ctx, cls);
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key = avm2_public_key("currentDomain", 13);
+	e.kind = AVM2_PROP_GETTER;
+	e.method.fn = appdomain_get_current;
+	e.method.debug_name = "get currentDomain";
+	e.defining_class = cls;
+	avm2_vtable_append(ctx, vt, &e);
 }
 
 // Register a toplevel native in a specific package namespace.
@@ -770,6 +913,10 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	                         global_get_qualified_class_name);
 	builtin_add_global_fn_ns(ctx, "avmplus", "getDefinitionByName",
 	                         global_get_definition_by_name);
+	builtin_add_global_fn_ns(ctx, "flash.utils", "describeType",
+	                         global_describe_type);
+	builtin_add_global_fn_ns(ctx, "avmplus", "describeType",
+	                         global_describe_type);
 
 	// Global constants.
 	static const char* const_names[3] = { "NaN", "Infinity", "undefined" };
@@ -865,7 +1012,9 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_number(ctx);
 	avm2_register_string(ctx);
 	avm2_register_array(ctx);
+	avm2_register_vector(ctx);
 	avm2_register_toplevel(ctx);
+	register_application_domain(ctx);
 
 	// The display chain (stubs: correct super links, constructible, no
 	// display behavior).

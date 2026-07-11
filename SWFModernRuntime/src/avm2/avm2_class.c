@@ -1035,6 +1035,26 @@ Avm2Class* avm2_class_for_mn(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t mn_
 	const Avm2AbcFileData* data = file->data;
 	const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
 
+	if (mn->kind == 0x1d)  // TypeName: Vector.<T>
+	{
+		Avm2Class* base = avm2_class_for_mn(ctx, file, mn->base_type);
+		if (base == NULL || !base->is_generic_vector) return NULL;
+		Avm2Class* param = NULL;
+		if (mn->type_param_count >= 1 && mn->type_params[0] != 0)
+		{
+			// A param naming "*" also means Vector.<*>.
+			const char* pn;
+			uint32_t pn_len;
+			avm2_mn_name(data, mn->type_params[0], &pn, &pn_len);
+			if (!(pn_len == 1 && pn[0] == '*'))
+			{
+				param = avm2_class_for_mn(ctx, file, mn->type_params[0]);
+				if (param == NULL) return NULL;
+			}
+		}
+		return avm2_vector_apply(ctx, param);
+	}
+
 	Avm2PropKey key;
 	Avm2Object* globals = NULL;
 	if (mn->kind == 0x07 || mn->kind == 0x0d)

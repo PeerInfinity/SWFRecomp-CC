@@ -423,6 +423,11 @@ namespace abc
 				    << ", stk[sp + 1]);" << endl;
 				return true;
 
+			case IrOpcode::ApplyType:
+				out << "\tsp -= " << op.arg2 << "; stk[sp - 1] = avm2_op_applytype(act, "
+				    << "stk[sp - 1], &stk[sp], " << op.arg2 << ");" << endl;
+				return true;
+
 			// --- construction ---
 			case IrOpcode::Construct:
 				out << "\tsp -= " << (op.arg2 + 1) << "; stk[sp] = avm2_op_construct(act, "
@@ -854,12 +859,28 @@ namespace abc
 			}
 			out << "};" << endl << endl;
 
+			for (size_t i = 0; i < abc.pool.multinames.size(); i++)
+			{
+				if (abc.pool.multinames[i].type_params.empty()) continue;
+				out << "static const uint32_t " << p << "_mntp_" << i << "[] = { ";
+				for (size_t j = 0; j < abc.pool.multinames[i].type_params.size(); j++)
+				{
+					if (j > 0) out << ", ";
+					out << abc.pool.multinames[i].type_params[j];
+				}
+				out << " };" << endl;
+			}
 			out << "static const Avm2AbcMultiname " << p << "_multinames[] =" << endl
 			    << "{" << endl;
-			for (const AbcMultiname& mn : abc.pool.multinames)
+			for (size_t i = 0; i < abc.pool.multinames.size(); i++)
 			{
+				const AbcMultiname& mn = abc.pool.multinames[i];
+				string tp = mn.type_params.empty()
+					? "0, NULL"
+					: to_string(mn.type_params.size()) + ", " + p + "_mntp_" + to_string(i);
 				out << "\t{ " << (unsigned) mn.kind << ", " << mn.ns << ", "
-				    << mn.name << ", " << mn.ns_set << " }," << endl;
+				    << mn.name << ", " << mn.ns_set << ", " << mn.base_type << ", "
+				    << tp << " }," << endl;
 			}
 			out << "};" << endl << endl;
 

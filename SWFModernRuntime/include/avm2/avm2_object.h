@@ -21,6 +21,7 @@ typedef enum Avm2ObjectKind
 	AVM2_OBJ_CLASS = 1,    // class object (holds class_ref + static traits)
 	AVM2_OBJ_FUNCTION = 2, // function / bound-method closure
 	AVM2_OBJ_ARRAY = 3,    // Array instance (native_ext = Avm2ArrayExt)
+	AVM2_OBJ_VECTOR = 4,   // Vector.<T> instance (native_ext = Avm2VectorExt)
 } Avm2ObjectKind;
 
 typedef struct Avm2DynProp
@@ -93,6 +94,17 @@ typedef struct Avm2ArrayExt
 	Avm2Value* elems;    // AVM2_VALUE_HOLE marks holes
 	Avm2SparseElem* sparse;
 } Avm2ArrayExt;
+
+// Vector storage (Ruffle vector.rs VectorStorage): typed dense elements,
+// coerce-on-write to value_type (NULL = Vector.<*>), optional fixed length.
+typedef struct Avm2VectorExt
+{
+	Avm2Class* value_type;  // NULL = Vector.<*>
+	uint8_t fixed;
+	uint32_t length;
+	uint32_t cap;
+	Avm2Value* elems;
+} Avm2VectorExt;
 
 // Allocation (from the shared o1heap; see avm2GcMarkRoots in avm2_main.c
 // for the immortality note).

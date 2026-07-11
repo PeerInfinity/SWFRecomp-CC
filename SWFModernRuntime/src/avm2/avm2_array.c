@@ -508,6 +508,22 @@ static Avm2Value array_remove_at(Avm2Activation* act)
 // Iteration methods
 // ---------------------------------------------------------------------------
 
+// callback:Function parameter (Ruffle try_get_function): null/undefined →
+// no callback (each method returns its neutral value), non-callable → 1034.
+static int array_callback_arg(Avm2Context* ctx, Avm2Value v, Avm2Value* out)
+{
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED) return 0;
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj->kind == AVM2_OBJ_FUNCTION)
+	{
+		*out = v;
+		return 1;
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #1034: Type Coercion failed: cannot convert %.*s to "
+	                 "Function.", s->len > 100 ? 100 : (int) s->len, s->utf8);
+}
+
 static Avm2Value call_cb(Avm2Activation* act, Avm2Value cb, Avm2Value recv,
                          Avm2Value item, uint32_t index)
 {
@@ -521,8 +537,12 @@ static Avm2Value call_cb(Avm2Activation* act, Avm2Value cb, Avm2Value recv,
 static Avm2Value array_for_each(Avm2Activation* act)
 {
 	Avm2Object* arr = this_array(act);
-	if (arr == NULL || act->argc == 0) return avm2_undefined();
-	Avm2Value cb = act->args[0];
+	if (arr == NULL) return avm2_undefined();
+	Avm2Value cb;
+	if (!array_callback_arg(act->ctx, arg_or_undef(act, 0), &cb))
+	{
+		return avm2_undefined();
+	}
 	Avm2Value recv = arg_or_undef(act, 1);
 	for (uint32_t i = 0; i < avm2_array_ext(arr)->dense_len; i++)
 	{
@@ -536,8 +556,12 @@ static Avm2Value array_map(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* arr = this_array(act);
 	Avm2Object* out = avm2_array_new(ctx, 0);
-	if (arr == NULL || act->argc == 0) return avm2_object_value(out);
-	Avm2Value cb = act->args[0];
+	if (arr == NULL) return avm2_object_value(out);
+	Avm2Value cb;
+	if (!array_callback_arg(ctx, arg_or_undef(act, 0), &cb))
+	{
+		return avm2_object_value(out);
+	}
 	Avm2Value recv = arg_or_undef(act, 1);
 	for (uint32_t i = 0; i < avm2_array_ext(arr)->dense_len; i++)
 	{
@@ -551,8 +575,12 @@ static Avm2Value array_filter(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* arr = this_array(act);
 	Avm2Object* out = avm2_array_new(ctx, 0);
-	if (arr == NULL || act->argc == 0) return avm2_object_value(out);
-	Avm2Value cb = act->args[0];
+	if (arr == NULL) return avm2_object_value(out);
+	Avm2Value cb;
+	if (!array_callback_arg(ctx, arg_or_undef(act, 0), &cb))
+	{
+		return avm2_object_value(out);
+	}
 	Avm2Value recv = arg_or_undef(act, 1);
 	for (uint32_t i = 0; i < avm2_array_ext(arr)->dense_len; i++)
 	{
@@ -568,8 +596,12 @@ static Avm2Value array_filter(Avm2Activation* act)
 static Avm2Value array_every(Avm2Activation* act)
 {
 	Avm2Object* arr = this_array(act);
-	if (arr == NULL || act->argc == 0) return avm2_bool(true);
-	Avm2Value cb = act->args[0];
+	if (arr == NULL) return avm2_bool(true);
+	Avm2Value cb;
+	if (!array_callback_arg(act->ctx, arg_or_undef(act, 0), &cb))
+	{
+		return avm2_bool(true);
+	}
 	Avm2Value recv = arg_or_undef(act, 1);
 	for (uint32_t i = 0; i < avm2_array_ext(arr)->dense_len; i++)
 	{
@@ -584,8 +616,12 @@ static Avm2Value array_every(Avm2Activation* act)
 static Avm2Value array_some(Avm2Activation* act)
 {
 	Avm2Object* arr = this_array(act);
-	if (arr == NULL || act->argc == 0) return avm2_bool(false);
-	Avm2Value cb = act->args[0];
+	if (arr == NULL) return avm2_bool(false);
+	Avm2Value cb;
+	if (!array_callback_arg(act->ctx, arg_or_undef(act, 0), &cb))
+	{
+		return avm2_bool(false);
+	}
 	Avm2Value recv = arg_or_undef(act, 1);
 	for (uint32_t i = 0; i < avm2_array_ext(arr)->dense_len; i++)
 	{
@@ -603,7 +639,7 @@ static Avm2Value array_some(Avm2Activation* act)
 // SWF-version compare quirks)
 // ---------------------------------------------------------------------------
 
-typedef struct SortItem { uint32_t idx; Avm2Value v; } SortItem;
+typedef Avm2SortItem SortItem;
 
 typedef struct SortCtx
 {
@@ -688,8 +724,9 @@ static int cmp_numeric_values(Avm2Context* ctx, Avm2Value a, Avm2Value b, int co
 }
 
 // The wrapped comparator (Ruffle sort_inner's closure).
-static int sort_cmp(SortCtx* sc, const SortItem* pa, const SortItem* pb)
+static int sort_cmp(void* ud, const SortItem* pa, const SortItem* pb)
 {
+	SortCtx* sc = ud;
 	Avm2Context* ctx = sc->act->ctx;
 	Avm2Value a = pa->v;
 	Avm2Value b = pb->v;
@@ -779,22 +816,23 @@ static void sort_swap(SortItem* a, SortItem* b)
 	*b = t;
 }
 
-// Port of Ruffle's avmplus QuickSort (globals/array.rs qsort).
-static void avmplus_qsort(SortCtx* sc, SortItem* s, uint32_t n)
+// Port of Ruffle's avmplus QuickSort (globals/array.rs qsort). Shared with
+// Vector.sort (avm2_vector.c) — Ruffle exports it for exactly that reason.
+void avm2_avmplus_qsort(void* ud, Avm2SortCmp cmp, Avm2SortItem* s, uint32_t n)
 {
 	if (n < 2) return;
 	if (n == 2)
 	{
-		if (sort_cmp(sc, &s[0], &s[1]) > 0) sort_swap(&s[0], &s[1]);
+		if (cmp(ud, &s[0], &s[1]) > 0) sort_swap(&s[0], &s[1]);
 		return;
 	}
 	if (n == 3)
 	{
-		if (sort_cmp(sc, &s[0], &s[1]) > 0) sort_swap(&s[0], &s[1]);
-		if (sort_cmp(sc, &s[1], &s[2]) > 0)
+		if (cmp(ud, &s[0], &s[1]) > 0) sort_swap(&s[0], &s[1]);
+		if (cmp(ud, &s[1], &s[2]) > 0)
 		{
 			sort_swap(&s[1], &s[2]);
-			if (sort_cmp(sc, &s[0], &s[1]) > 0) sort_swap(&s[0], &s[1]);
+			if (cmp(ud, &s[0], &s[1]) > 0) sort_swap(&s[0], &s[1]);
 		}
 		return;
 	}
@@ -807,11 +845,11 @@ static void avmplus_qsort(SortCtx* sc, SortItem* s, uint32_t n)
 		do
 		{
 			left++;
-		} while (!(left >= n || sort_cmp(sc, &s[left], &s[0]) > 0));
+		} while (!(left >= n || cmp(ud, &s[left], &s[0]) > 0));
 		do
 		{
 			right--;
-		} while (!(right == 0 || sort_cmp(sc, &s[right], &s[0]) < 0));
+		} while (!(right == 0 || cmp(ud, &s[right], &s[0]) < 0));
 		if (right < left) break;
 		sort_swap(&s[left], &s[right]);
 	}
@@ -827,8 +865,8 @@ static void avmplus_qsort(SortCtx* sc, SortItem* s, uint32_t n)
 		SortItem* t = fst; fst = snd; snd = t;
 		uint32_t tn = fst_n; fst_n = snd_n; snd_n = tn;
 	}
-	avmplus_qsort(sc, fst, fst_n);
-	avmplus_qsort(sc, snd, snd_n);
+	avm2_avmplus_qsort(ud, cmp, fst, fst_n);
+	avm2_avmplus_qsort(ud, cmp, snd, snd_n);
 }
 
 static Avm2Value sort_apply(Avm2Activation* act, SortCtx* sc)
@@ -850,7 +888,7 @@ static Avm2Value sort_apply(Avm2Activation* act, SortCtx* sc)
 	}
 
 	sc->unique_satisfied = 1;
-	avmplus_qsort(sc, items, len);
+	avm2_avmplus_qsort(sc, sort_cmp, items, len);
 
 	// sort_postprocess.
 	if ((sc->options & 4) && !sc->unique_satisfied)
