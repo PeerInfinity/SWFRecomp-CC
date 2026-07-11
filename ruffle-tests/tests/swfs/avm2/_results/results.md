@@ -1,513 +1,514 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-11 19:59 UTC
+**Date**: 2026-07-11 20:21 UTC
 
-**Git SHA**: `f1d27c50cb`
+**Git SHA**: `6841590f69`
 
-**Run Duration**: 82m 46s
+**Run Duration**: 78m 49s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 1201 |
-| Passing | **475** (39.6%) |
+| Passing | **476** (39.6%) |
 | Ruffle-matched | 12 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **487** (40.5%) |
-| Failing | 714 |
+| Effective pass | **488** (40.6%) |
+| Failing | 713 |
 | Total expected lines | 149021 |
-| Matching lines | 51414 (34.5%) |
-| Mismatched lines | 97607 |
+| Matching lines | 51422 (34.5%) |
+| Mismatched lines | 97599 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 699 | 97.9% |
-| Runtime Error | 14 | 2.0% |
+| Output Mismatch | 699 | 98.0% |
+| Runtime Error | 13 | 1.8% |
 | Timeout | 1 | 0.1% |
 
 ## Passing Tests
 
-**475 tests passing**
+**476 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `add` | 1058 | 2.8s |  |
-| 2 | `air_hidden_lookup` | 2 | 0.8s |  |
-| 3 | `amf_custom_obj` | 26 | 0.8s |  |
-| 4 | `amf_dictionary` | 9 | 0.7s |  |
-| 5 | `amf_function` | 46 | 0.8s |  |
-| 6 | `amf_invalid_date` | 2 | 0.7s |  |
-| 7 | `amf_missing_prop` | 6 | 0.7s |  |
-| 8 | `amf_nondynamic_function_prop` | 6 | 1.7s |  |
-| 9 | `amf_setter_error` | 8 | 8.1s |  |
+| 1 | `add` | 1058 | 0.3s |  |
+| 2 | `air_hidden_lookup` | 2 | 0.3s |  |
+| 3 | `amf_custom_obj` | 26 | 0.3s |  |
+| 4 | `amf_dictionary` | 9 | 0.3s |  |
+| 5 | `amf_function` | 46 | 0.3s |  |
+| 6 | `amf_invalid_date` | 2 | 0.3s |  |
+| 7 | `amf_missing_prop` | 6 | 0.3s |  |
+| 8 | `amf_nondynamic_function_prop` | 6 | 0.3s |  |
+| 9 | `amf_setter_error` | 8 | 2.2s |  |
 | 10 | `amf_vector` | 40 | 1.8s |  |
-| 11 | `amf_xml` | 6 | 1.7s |  |
+| 11 | `amf_xml` | 6 | 1.6s |  |
 | 12 | `application_domain` | 4 | 1.7s |  |
-| 13 | `array_access` | 18 | 1.8s |  |
+| 13 | `array_access` | 18 | 1.7s |  |
 | 14 | `array_access_interpreter` | 4 | 1.7s |  |
-| 15 | `array_access_no_pubns` | 2 | 1.7s |  |
+| 15 | `array_access_no_pubns` | 2 | 1.6s |  |
 | 16 | `array_concat` | 41 | 1.7s |  |
 | 17 | `array_constr` | 10 | 1.7s |  |
-| 18 | `array_delete` | 44 | 1.8s |  |
+| 18 | `array_delete` | 44 | 1.7s |  |
 | 19 | `array_enumeration` | 10 | 1.7s |  |
-| 20 | `array_enumeration_elements` | 11 | 1.7s |  |
+| 20 | `array_enumeration_elements` | 11 | 1.6s |  |
 | 21 | `array_every` | 8 | 1.7s |  |
 | 22 | `array_filter` | 6 | 1.7s |  |
-| 23 | `array_foreach` | 18 | 1.7s |  |
+| 23 | `array_foreach` | 18 | 1.6s |  |
 | 24 | `array_hasownproperty` | 11 | 1.7s |  |
 | 25 | `array_holes` | 9 | 1.7s |  |
 | 26 | `array_index_max` | 84 | 1.4s |  |
 | 27 | `array_indexof` | 25 | 1.7s |  |
-| 28 | `array_join` | 26 | 1.8s |  |
+| 28 | `array_join` | 26 | 1.7s |  |
 | 29 | `array_lastindexof` | 29 | 1.7s |  |
 | 30 | `array_length` | 14 | 1.7s |  |
-| 31 | `array_literal` | 3 | 1.7s |  |
+| 31 | `array_literal` | 3 | 1.6s |  |
 | 32 | `array_map` | 8 | 0.4s |  |
 | 33 | `array_pop` | 52 | 1.7s |  |
 | 34 | `array_push` | 24 | 1.7s |  |
-| 35 | `array_reborrow_bug` | 6 | 1.7s |  |
+| 35 | `array_reborrow_bug` | 6 | 1.6s |  |
 | 36 | `array_reverse` | 28 | 1.7s |  |
-| 37 | `array_shift` | 51 | 1.8s |  |
-| 38 | `array_slice` | 39 | 1.8s |  |
-| 39 | `array_some` | 8 | 1.6s |  |
+| 37 | `array_shift` | 51 | 1.7s |  |
+| 38 | `array_slice` | 39 | 1.7s |  |
+| 39 | `array_some` | 8 | 1.7s |  |
 | 40 | `array_sort` | 297 | 1.9s |  |
 | 41 | `array_sort_fun_swf12` | 2 | 1.7s |  |
 | 42 | `array_sort_fun_swf13` | 2 | 0.5s |  |
 | 43 | `array_sort_random` | 210 | 1.7s |  |
 | 44 | `array_sort_swf10_32bit` | 1 | 1.6s |  |
-| 45 | `array_sorton` | 545 | 2.1s |  |
-| 46 | `array_sparse_ops` | 41 | 1.8s |  |
-| 47 | `array_splice` | 133 | 1.8s |  |
-| 48 | `array_splice2` | 428 | 2.0s |  |
-| 49 | `array_splice_types` | 48 | 1.8s |  |
-| 50 | `array_storage` | 8 | 1.7s |  |
-| 51 | `array_tolocalestring` | 9 | 1.7s |  |
-| 52 | `array_tostring` | 12 | 1.7s |  |
-| 53 | `array_unshift` | 24 | 1.7s |  |
-| 54 | `array_valueof` | 9 | 1.6s |  |
-| 55 | `array_vector_null_callback` | 10 | 1.7s |  |
-| 56 | `astype` | 28 | 1.8s |  |
-| 57 | `astypelate` | 24 | 1.8s |  |
-| 58 | `astypelate_propagates` | 1 | 1.7s |  |
-| 59 | `away3d_advanced_shallow_water_demo` | 0 | 63.0s |  |
-| 60 | `bitand` | 1058 | 4.1s |  |
-| 61 | `bitmapdata_applyfilter_blur` | 0 | 20.7s |  |
-| 62 | `bitmapdata_applyfilter_colormatrix` | 0 | 2.0s |  |
-| 63 | `bitmapdata_applyfilter_destpoint` | 0 | 20.6s |  |
-| 64 | `bitmapdata_applyfilter_destpoint_edges` | 0 | 20.7s |  |
-| 65 | `bitmapdata_colortransform` | 0 | 1.9s |  |
-| 66 | `bitmapdata_draw` | 0 | 20.1s |  |
-| 67 | `bitmapdata_draw_colortransform` | 0 | 1.7s |  |
-| 68 | `bitmapdata_draw_cpu_overwrite_gpu` | 0 | 20.3s |  |
-| 69 | `bitmapdata_draw_filters` | 0 | 19.8s |  |
-| 70 | `bitmapdata_draw_masks` | 0 | 1.7s |  |
-| 71 | `bitmapdata_draw_rotation` | 0 | 1.7s |  |
-| 72 | `bitmapdata_draw_self_via_graphic` | 0 | 1.7s |  |
-| 73 | `bitmapdata_draw_stage` | 0 | 19.8s |  |
-| 74 | `bitmapdata_drawwithquality` | 0 | 1.9s |  |
-| 75 | `bitmapdata_fillrect` | 0 | 1.7s |  |
-| 76 | `bitmapdata_filter_sourcerect` | 0 | 20.1s |  |
-| 77 | `bitmapdata_opaque` | 0 | 1.7s |  |
-| 78 | `bitmapdata_pixeldissolve_image` | 0 | 1.8s |  |
-| 79 | `bitmapdata_sync` | 0 | 1.8s |  |
-| 80 | `bitnot` | 46 | 1.7s |  |
-| 81 | `bitor` | 1058 | 3.7s |  |
-| 82 | `bitxor` | 1058 | 3.7s |  |
-| 83 | `blend_multiply_alpha` | 0 | 1.7s |  |
-| 84 | `blend_scroll` | 0 | 1.7s |  |
+| 45 | `array_sorton` | 545 | 1.8s |  |
+| 46 | `array_sparse_ops` | 41 | 1.5s |  |
+| 47 | `array_splice` | 133 | 1.4s |  |
+| 48 | `array_splice2` | 428 | 1.6s |  |
+| 49 | `array_splice_types` | 48 | 1.6s |  |
+| 50 | `array_storage` | 8 | 1.5s |  |
+| 51 | `array_tolocalestring` | 9 | 1.4s |  |
+| 52 | `array_tostring` | 12 | 1.4s |  |
+| 53 | `array_unshift` | 24 | 1.4s |  |
+| 54 | `array_valueof` | 9 | 1.3s |  |
+| 55 | `array_vector_null_callback` | 10 | 1.4s |  |
+| 56 | `astype` | 28 | 1.4s |  |
+| 57 | `astypelate` | 24 | 1.4s |  |
+| 58 | `astypelate_propagates` | 1 | 1.3s |  |
+| 59 | `away3d_advanced_shallow_water_demo` | 0 | 49.8s |  |
+| 60 | `bitand` | 1058 | 3.2s |  |
+| 61 | `bitmapdata_applyfilter_blur` | 0 | 16.2s |  |
+| 62 | `bitmapdata_applyfilter_colormatrix` | 0 | 1.5s |  |
+| 63 | `bitmapdata_applyfilter_destpoint` | 0 | 16.0s |  |
+| 64 | `bitmapdata_applyfilter_destpoint_edges` | 0 | 16.2s |  |
+| 65 | `bitmapdata_colortransform` | 0 | 1.5s |  |
+| 66 | `bitmapdata_draw` | 0 | 20.8s |  |
+| 67 | `bitmapdata_draw_colortransform` | 0 | 1.8s |  |
+| 68 | `bitmapdata_draw_cpu_overwrite_gpu` | 0 | 21.2s |  |
+| 69 | `bitmapdata_draw_filters` | 0 | 20.4s |  |
+| 70 | `bitmapdata_draw_masks` | 0 | 1.8s |  |
+| 71 | `bitmapdata_draw_rotation` | 0 | 1.8s |  |
+| 72 | `bitmapdata_draw_self_via_graphic` | 0 | 1.8s |  |
+| 73 | `bitmapdata_draw_stage` | 0 | 20.3s |  |
+| 74 | `bitmapdata_drawwithquality` | 0 | 2.0s |  |
+| 75 | `bitmapdata_fillrect` | 0 | 1.8s |  |
+| 76 | `bitmapdata_filter_sourcerect` | 0 | 20.4s |  |
+| 77 | `bitmapdata_opaque` | 0 | 1.8s |  |
+| 78 | `bitmapdata_pixeldissolve_image` | 0 | 2.0s |  |
+| 79 | `bitmapdata_sync` | 0 | 1.9s |  |
+| 80 | `bitnot` | 46 | 1.8s |  |
+| 81 | `bitor` | 1058 | 3.9s |  |
+| 82 | `bitxor` | 1058 | 4.0s |  |
+| 83 | `blend_multiply_alpha` | 0 | 1.8s |  |
+| 84 | `blend_scroll` | 0 | 1.8s |  |
 | 85 | `boolean_constr` | 32 | 1.7s |  |
 | 86 | `boolean_negation` | 30 | 1.7s |  |
-| 87 | `boolean_tostring` | 8 | 1.6s |  |
+| 87 | `boolean_tostring` | 8 | 1.7s |  |
 | 88 | `bytearray` | 48 | 1.9s |  |
 | 89 | `bytearray_compress` | 31 | 1.7s |  |
 | 90 | `bytearray_errors` | 24 | 1.8s |  |
 | 91 | `bytearray_method_serialization` | 1 | 1.7s |  |
 | 92 | `bytearray_readobject_amf0` | 50 | 0.7s |  |
-| 93 | `bytearray_readobject_amf3` | 53 | 1.7s |  |
-| 94 | `bytearray_readutf8bytes_with_bom` | 16 | 1.7s |  |
-| 95 | `bytearray_serialization` | 3 | 1.6s |  |
-| 96 | `bytearray_string_null` | 19 | 1.8s |  |
+| 93 | `bytearray_readobject_amf3` | 53 | 1.8s |  |
+| 94 | `bytearray_readutf8bytes_with_bom` | 16 | 1.8s |  |
+| 95 | `bytearray_serialization` | 3 | 1.7s |  |
+| 96 | `bytearray_string_null` | 19 | 1.9s |  |
 | 97 | `bytearray_tostring` | 15 | 1.7s |  |
 | 98 | `bytearray_utf16` | 8 | 1.7s |  |
 | 99 | `bytearray_writeobject` | 24 | 0.6s |  |
 | 100 | `callee_in_initializer` | 6 | 1.6s |  |
 | 101 | `callproplex_class` | 1 | 1.7s |  |
-| 102 | `catch_class` | 6 | 1.6s |  |
-| 103 | `catch_scope_slot` | 7 | 1.7s |  |
-| 104 | `checkfilter` | 4 | 1.6s |  |
-| 105 | `class_call` | 32 | 1.7s |  |
-| 106 | `class_cast_call` | 14 | 1.6s |  |
+| 102 | `catch_class` | 6 | 1.7s |  |
+| 103 | `catch_scope_slot` | 7 | 1.8s |  |
+| 104 | `checkfilter` | 4 | 1.7s |  |
+| 105 | `class_call` | 32 | 1.8s |  |
+| 106 | `class_cast_call` | 14 | 1.7s |  |
 | 107 | `class_enumeration` | 4 | 1.7s |  |
 | 108 | `class_has_own_property` | 2 | 1.7s |  |
 | 109 | `class_init_interpreter_mode` | 1 | 1.6s |  |
 | 110 | `class_is` | 32 | 1.7s |  |
 | 111 | `class_methods` | 5 | 1.7s |  |
 | 112 | `class_object_properties` | 10 | 1.8s |  |
-| 113 | `class_singleton` | 18 | 6.7s |  |
-| 114 | `class_supercalls_errors` | 35 | 1.6s |  |
-| 115 | `class_supercalls_mismatched` | 26 | 1.6s |  |
-| 116 | `class_superclass_wrong_order` | 1 | 1.4s |  |
-| 117 | `class_to_locale_string` | 2 | 1.4s |  |
-| 118 | `class_to_string` | 2 | 1.4s |  |
-| 119 | `class_value_of` | 2 | 1.4s |  |
-| 120 | `closures` | 12 | 1.5s |  |
-| 121 | `coerce_property` | 33 | 1.5s |  |
-| 122 | `coerce_return_type` | 40 | 1.7s |  |
-| 123 | `coerce_return_type_fail` | 2 | 1.6s |  |
-| 124 | `coerce_return_void` | 3 | 1.6s |  |
-| 125 | `coerce_string` | 86 | 1.5s |  |
-| 126 | `coerce_string_precision` | 28 | 1.4s |  |
-| 127 | `coerce_to_primitive_side_effects` | 29 | 1.5s |  |
-| 128 | `construct_errors_swf10` | 8 | 1.4s |  |
-| 129 | `constructor_call` | 3 | 1.5s |  |
-| 130 | `constructprop_dynamic_primitive` | 7 | 1.4s |  |
-| 131 | `control_flow_bool` | 4 | 1.6s |  |
-| 132 | `control_flow_stricteq` | 8 | 1.5s |  |
-| 133 | `convert_boolean` | 30 | 1.4s |  |
-| 134 | `convert_integer` | 90 | 1.4s |  |
-| 135 | `convert_number` | 56 | 1.4s |  |
-| 136 | `convert_uinteger` | 90 | 1.5s |  |
+| 113 | `class_singleton` | 18 | 2.2s |  |
+| 114 | `class_supercalls_errors` | 35 | 1.9s |  |
+| 115 | `class_supercalls_mismatched` | 26 | 1.8s |  |
+| 116 | `class_superclass_wrong_order` | 1 | 1.6s |  |
+| 117 | `class_to_locale_string` | 2 | 1.7s |  |
+| 118 | `class_to_string` | 2 | 1.6s |  |
+| 119 | `class_value_of` | 2 | 1.7s |  |
+| 120 | `closures` | 12 | 1.8s |  |
+| 121 | `coerce_property` | 33 | 1.9s |  |
+| 122 | `coerce_return_type` | 40 | 1.9s |  |
+| 123 | `coerce_return_type_fail` | 2 | 1.8s |  |
+| 124 | `coerce_return_void` | 3 | 1.7s |  |
+| 125 | `coerce_string` | 86 | 1.9s |  |
+| 126 | `coerce_string_precision` | 28 | 1.9s |  |
+| 127 | `coerce_to_primitive_side_effects` | 29 | 1.9s |  |
+| 128 | `construct_errors_swf10` | 8 | 1.8s |  |
+| 129 | `constructor_call` | 3 | 1.8s |  |
+| 130 | `constructprop_dynamic_primitive` | 7 | 1.8s |  |
+| 131 | `control_flow_bool` | 4 | 1.8s |  |
+| 132 | `control_flow_stricteq` | 8 | 1.8s |  |
+| 133 | `convert_boolean` | 30 | 1.8s |  |
+| 134 | `convert_integer` | 90 | 1.8s |  |
+| 135 | `convert_number` | 56 | 1.8s |  |
+| 136 | `convert_uinteger` | 90 | 1.9s |  |
 | 137 | `declocal` | 46 | 1.7s |  |
-| 138 | `declocal_i` | 46 | 1.6s |  |
-| 139 | `decrement` | 46 | 1.6s |  |
-| 140 | `decrement_i` | 46 | 1.6s |  |
-| 141 | `default_values` | 7 | 1.6s |  |
-| 142 | `dictionary_access` | 62 | 1.8s |  |
-| 143 | `dictionary_access_no_pubns` | 2 | 1.6s |  |
-| 144 | `dictionary_delete` | 101 | 1.8s |  |
+| 138 | `declocal_i` | 46 | 1.8s |  |
+| 139 | `decrement` | 46 | 1.8s |  |
+| 140 | `decrement_i` | 46 | 1.7s |  |
+| 141 | `default_values` | 7 | 1.7s |  |
+| 142 | `dictionary_access` | 62 | 1.9s |  |
+| 143 | `dictionary_access_no_pubns` | 2 | 1.7s |  |
+| 144 | `dictionary_delete` | 101 | 1.9s |  |
 | 145 | `dictionary_foreach` | 42 | 1.8s |  |
-| 146 | `dictionary_hasownproperty` | 63 | 1.7s |  |
-| 147 | `dictionary_in` | 62 | 1.8s |  |
-| 148 | `dictionary_iter_modify` | 8 | 1.6s |  |
-| 149 | `dictionary_namespaces` | 36 | 1.7s |  |
-| 150 | `dictionary_primitive_keys` | 29 | 1.6s |  |
-| 151 | `displayobject_blendmode` | 0 | 19.5s |  |
-| 152 | `displayobject_colortransform_nested` | 0 | 19.9s |  |
-| 153 | `displayobject_getbounds_shape` | 0 | 19.7s |  |
-| 154 | `displayobject_mask_self_referential` | 0 | 1.6s |  |
-| 155 | `displayobject_set_matrix_nested` | 0 | 20.4s |  |
-| 156 | `divide` | 1058 | 3.6s |  |
-| 157 | `doabc_is_eager` | 1 | 19.1s |  |
-| 158 | `duplicate_defs` | 1 | 0.5s |  |
-| 159 | `eager_init` | 1 | 1.6s |  |
-| 160 | `edittext_always_show_selection` | 0 | 20.2s |  |
-| 161 | `edittext_autosize_align` | 0 | 19.8s |  |
-| 162 | `edittext_autosize_lazy_bounds_visual` | 0 | 19.6s |  |
-| 163 | `equals` | 512 | 2.8s |  |
+| 146 | `dictionary_hasownproperty` | 63 | 1.8s |  |
+| 147 | `dictionary_in` | 62 | 1.9s |  |
+| 148 | `dictionary_iter_modify` | 8 | 1.8s |  |
+| 149 | `dictionary_namespaces` | 36 | 1.8s |  |
+| 150 | `dictionary_primitive_keys` | 29 | 1.7s |  |
+| 151 | `displayobject_blendmode` | 0 | 20.8s |  |
+| 152 | `displayobject_colortransform_nested` | 0 | 20.9s |  |
+| 153 | `displayobject_getbounds_shape` | 0 | 20.9s |  |
+| 154 | `displayobject_mask_self_referential` | 0 | 1.8s |  |
+| 155 | `displayobject_set_matrix_nested` | 0 | 21.1s |  |
+| 156 | `divide` | 1058 | 2.8s |  |
+| 157 | `doabc_is_eager` | 1 | 16.6s |  |
+| 158 | `duplicate_defs` | 1 | 0.3s |  |
+| 159 | `eager_init` | 1 | 1.2s |  |
+| 160 | `edittext_always_show_selection` | 0 | 17.5s |  |
+| 161 | `edittext_autosize_align` | 0 | 17.6s |  |
+| 162 | `edittext_autosize_lazy_bounds_visual` | 0 | 17.2s |  |
+| 163 | `equals` | 512 | 2.7s |  |
 | 164 | `error_prototype` | 15 | 1.7s |  |
-| 165 | `error_stack_trace_debug_swf17` | 0 | 21.3s |  |
+| 165 | `error_stack_trace_debug_swf17` | 0 | 20.3s |  |
 | 166 | `error_stack_trace_debug_swf18` | 0 | 0.5s |  |
-| 167 | `error_stack_trace_release_swf17` | 0 | 0.4s |  |
+| 167 | `error_stack_trace_release_swf17` | 0 | 0.3s |  |
 | 168 | `error_stack_trace_release_swf18` | 0 | 0.3s |  |
-| 169 | `error_tostring` | 29 | 1.8s |  |
+| 169 | `error_tostring` | 29 | 1.7s |  |
 | 170 | `es3_inheritance` | 31 | 1.8s |  |
 | 171 | `es4_inheritance` | 30 | 1.8s |  |
-| 172 | `es4_interfaces` | 30 | 1.9s |  |
-| 173 | `es4_method_binding` | 8 | 1.8s |  |
+| 172 | `es4_interfaces` | 30 | 1.8s |  |
+| 173 | `es4_method_binding` | 8 | 1.7s |  |
 | 174 | `es4_oop_prototypes` | 14 | 1.9s |  |
-| 175 | `es4_protected_inheritance` | 6 | 1.8s |  |
+| 175 | `es4_protected_inheritance` | 6 | 1.7s |  |
 | 176 | `event_bubbles` | 2 | 1.7s |  |
-| 177 | `event_cancelable` | 2 | 1.7s |  |
+| 177 | `event_cancelable` | 2 | 1.6s |  |
 | 178 | `event_type` | 1 | 1.6s |  |
-| 179 | `eventdispatcher_dispatchevent_this` | 5 | 1.7s |  |
+| 179 | `eventdispatcher_dispatchevent_this` | 5 | 1.6s |  |
 | 180 | `eventdispatcher_haseventlistener` | 25 | 1.7s |  |
-| 181 | `falsiness` | 30 | 1.7s |  |
-| 182 | `fast_index_access` | 12 | 1.9s |  |
-| 183 | `finddef` | 3 | 1.7s |  |
-| 184 | `findprop_global_prototype` | 6 | 1.7s |  |
+| 181 | `falsiness` | 30 | 1.6s |  |
+| 182 | `fast_index_access` | 12 | 1.8s |  |
+| 183 | `finddef` | 3 | 1.6s |  |
+| 184 | `findprop_global_prototype` | 6 | 1.6s |  |
 | 185 | `flash_xml` | 29 | 1.7s |  |
-| 186 | `flash_xml_cloneNode` | 22 | 6.3s |  |
-| 187 | `flash_xml_namespace` | 109 | 1.4s |  |
-| 188 | `flash_xml_removeNode` | 60 | 1.4s |  |
-| 189 | `function_call` | 12 | 1.4s |  |
-| 190 | `function_call_arguments` | 46 | 1.4s |  |
-| 191 | `function_call_arguments_enumerate` | 5 | 1.3s |  |
-| 192 | `function_call_coercion` | 108 | 1.5s |  |
-| 193 | `function_call_default` | 6 | 1.4s |  |
-| 194 | `function_call_rest` | 22 | 1.5s |  |
-| 195 | `function_call_types` | 3 | 1.4s |  |
-| 196 | `function_call_via_apply` | 11 | 1.3s |  |
-| 197 | `function_call_via_call` | 3 | 1.3s |  |
-| 198 | `function_display_anonymous` | 7 | 1.3s |  |
-| 199 | `function_length` | 6 | 1.3s |  |
-| 200 | `function_object` | 2 | 1.3s |  |
-| 201 | `function_proto` | 5 | 1.3s |  |
-| 202 | `function_proto_created` | 61 | 8.2s |  |
-| 203 | `function_to_locale_string` | 4 | 1.7s |  |
-| 204 | `function_to_string` | 4 | 1.7s |  |
-| 205 | `function_type` | 6 | 1.8s |  |
-| 206 | `function_unbound_this` | 51 | 1.9s |  |
-| 207 | `function_value_of` | 4 | 1.7s |  |
-| 208 | `get_definition_by_name` | 11 | 1.8s |  |
-| 209 | `get_qualified_class_name` | 20 | 1.8s |  |
-| 210 | `get_slot_edge_cases` | 1 | 1.7s |  |
-| 211 | `getglobalslot` | 1 | 1.7s |  |
-| 212 | `getouterscope` | 8 | 1.7s |  |
-| 213 | `getter_different_namespace_setter` | 2 | 1.8s |  |
-| 214 | `graphics_bitmaps` | 0 | 2.0s |  |
-| 215 | `graphics_direct_commands` | 0 | 1.9s |  |
-| 216 | `graphics_gradients` | 0 | 1.9s |  |
-| 217 | `graphics_gradients_nulls` | 0 | 1.8s |  |
-| 218 | `graphics_round_rects` | 0 | 1.8s |  |
-| 219 | `graphics_simple_shapes` | 0 | 1.8s |  |
-| 220 | `greaterequals` | 512 | 9.3s |  |
-| 221 | `greaterthan` | 512 | 2.9s |  |
+| 186 | `flash_xml_cloneNode` | 22 | 2.2s |  |
+| 187 | `flash_xml_namespace` | 109 | 1.7s |  |
+| 188 | `flash_xml_removeNode` | 60 | 1.7s |  |
+| 189 | `function_call` | 12 | 1.7s |  |
+| 190 | `function_call_arguments` | 46 | 1.8s |  |
+| 191 | `function_call_arguments_enumerate` | 5 | 1.7s |  |
+| 192 | `function_call_coercion` | 108 | 1.9s |  |
+| 193 | `function_call_default` | 6 | 1.6s |  |
+| 194 | `function_call_rest` | 22 | 1.7s |  |
+| 195 | `function_call_types` | 3 | 1.6s |  |
+| 196 | `function_call_via_apply` | 11 | 1.6s |  |
+| 197 | `function_call_via_call` | 3 | 1.6s |  |
+| 198 | `function_display_anonymous` | 7 | 1.7s |  |
+| 199 | `function_length` | 6 | 1.7s |  |
+| 200 | `function_object` | 2 | 1.6s |  |
+| 201 | `function_proto` | 5 | 1.6s |  |
+| 202 | `function_proto_created` | 61 | 2.0s |  |
+| 203 | `function_to_locale_string` | 4 | 1.6s |  |
+| 204 | `function_to_string` | 4 | 1.5s |  |
+| 205 | `function_type` | 6 | 1.6s |  |
+| 206 | `function_unbound_this` | 51 | 1.7s |  |
+| 207 | `function_value_of` | 4 | 1.6s |  |
+| 208 | `get_definition_by_name` | 11 | 1.6s |  |
+| 209 | `get_qualified_class_name` | 20 | 1.6s |  |
+| 210 | `get_slot_edge_cases` | 1 | 1.5s |  |
+| 211 | `getglobalslot` | 1 | 1.5s |  |
+| 212 | `getouterscope` | 8 | 1.5s |  |
+| 213 | `getter_different_namespace_setter` | 2 | 1.6s |  |
+| 214 | `graphics_bitmaps` | 0 | 1.9s |  |
+| 215 | `graphics_direct_commands` | 0 | 1.8s |  |
+| 216 | `graphics_gradients` | 0 | 1.7s |  |
+| 217 | `graphics_gradients_nulls` | 0 | 1.6s |  |
+| 218 | `graphics_round_rects` | 0 | 1.6s |  |
+| 219 | `graphics_simple_shapes` | 0 | 1.6s |  |
+| 220 | `greaterequals` | 512 | 3.1s |  |
+| 221 | `greaterthan` | 512 | 2.7s |  |
 | 222 | `has_own_property` | 102 | 2.0s |  |
 | 223 | `hasownproperty_namespaces` | 2 | 1.8s |  |
-| 224 | `hello_world` | 1 | 1.8s |  |
+| 224 | `hello_world` | 1 | 1.7s |  |
 | 225 | `if_eq` | 10 | 1.8s |  |
-| 226 | `if_gt` | 1 | 1.7s |  |
-| 227 | `if_gte` | 10 | 1.7s |  |
-| 228 | `if_lt` | 1 | 0.4s |  |
-| 229 | `if_lte` | 10 | 0.4s |  |
-| 230 | `if_ne` | 7 | 1.7s |  |
-| 231 | `if_stricteq` | 6 | 1.7s |  |
-| 232 | `if_strictne` | 11 | 1.7s |  |
-| 233 | `in` | 102 | 1.9s |  |
-| 234 | `inclocal` | 46 | 1.7s |  |
-| 235 | `inclocal_i` | 46 | 1.7s |  |
+| 226 | `if_gt` | 1 | 1.8s |  |
+| 227 | `if_gte` | 10 | 1.8s |  |
+| 228 | `if_lt` | 1 | 0.5s |  |
+| 229 | `if_lte` | 10 | 0.5s |  |
+| 230 | `if_ne` | 7 | 1.8s |  |
+| 231 | `if_stricteq` | 6 | 1.8s |  |
+| 232 | `if_strictne` | 11 | 1.8s |  |
+| 233 | `in` | 102 | 2.0s |  |
+| 234 | `inclocal` | 46 | 1.8s |  |
+| 235 | `inclocal_i` | 46 | 1.8s |  |
 | 236 | `increment` | 46 | 1.8s |  |
 | 237 | `increment_i` | 46 | 1.8s |  |
 | 238 | `instanceof` | 58 | 1.9s |  |
-| 239 | `int_constr` | 92 | 1.8s |  |
+| 239 | `int_constr` | 92 | 1.9s |  |
 | 240 | `int_edge_cases` | 19 | 1.8s |  |
-| 241 | `int_instanceof` | 3 | 1.7s |  |
+| 241 | `int_instanceof` | 3 | 1.6s |  |
 | 242 | `int_tofixed` | 1215 | 1.7s |  |
 | 243 | `int_tostring` | 3375 | 1.9s |  |
-| 244 | `interface_namespaces` | 78 | 1.8s |  |
+| 244 | `interface_namespaces` | 78 | 1.9s |  |
 | 245 | `is_finite` | 46 | 1.8s |  |
 | 246 | `is_nan` | 46 | 1.7s |  |
 | 247 | `is_prototype_of` | 12 | 1.7s |  |
 | 248 | `issue_10221` | 2 | 1.7s |  |
-| 249 | `issue_13780` | 12 | 7.8s |  |
-| 250 | `issue_14901` | 1 | 1.7s |  |
-| 251 | `istype` | 24 | 1.8s |  |
-| 252 | `istypelate` | 58 | 1.9s |  |
-| 253 | `istypelate_coerce` | 198 | 2.2s |  |
-| 254 | `json_errors` | 9 | 20.5s |  |
-| 255 | `json_parse` | 21 | 1.8s |  |
-| 256 | `json_version_gated` | 1 | 1.7s |  |
-| 257 | `lazyinit` | 17 | 1.7s |  |
-| 258 | `lessequals` | 512 | 2.8s |  |
-| 259 | `lessthan` | 512 | 2.7s |  |
-| 260 | `lshift` | 1058 | 3.7s |  |
-| 261 | `math` | 497 | 1.8s |  |
-| 262 | `modulo` | 1058 | 3.7s |  |
-| 263 | `movieclip_stop` | 1 | 19.6s |  |
-| 264 | `multiply` | 1058 | 3.8s |  |
-| 265 | `namespace_constr` | 253 | 2.0s |  |
-| 266 | `namespace_constr_args` | 1 | 1.6s |  |
-| 267 | `namespace_enumeration_order` | 7 | 1.6s |  |
-| 268 | `negate` | 30 | 1.7s |  |
-| 269 | `negative_volume_panned` | 0 | 1.8s |  |
-| 270 | `nested_iteration` | 11 | 1.7s |  |
-| 271 | `net_getClassByAlias` | 3 | 1.7s |  |
-| 272 | `newactivation_in_script_init` | 3 | 1.6s |  |
-| 273 | `newclass_twice` | 3 | 1.6s |  |
-| 274 | `nonconflicting_declarations` | 0 | 1.6s |  |
-| 275 | `number_autoconv` | 21 | 1.6s |  |
-| 276 | `number_autoconv_amf` | 132 | 1.6s |  |
-| 277 | `number_autoconv_array_sort_32bit` | 1 | 1.7s |  |
-| 278 | `number_constr` | 58 | 1.7s |  |
-| 279 | `number_toexponential` | 378 | 1.7s |  |
-| 280 | `number_toexponential2` | 35 | 1.6s |  |
-| 281 | `number_tofixed` | 378 | 1.6s |  |
-| 282 | `number_toprecision` | 350 | 1.7s |  |
-| 283 | `obfuscated_class_names` | 3 | 1.6s |  |
-| 284 | `object_enumeration` | 10 | 1.6s |  |
-| 285 | `object_prototype` | 4 | 1.7s |  |
-| 286 | `object_to_locale_string` | 2 | 1.6s |  |
-| 287 | `object_to_string` | 2 | 1.6s |  |
-| 288 | `object_value_of` | 2 | 1.4s |  |
-| 289 | `op_coerce` | 54 | 1.1s |  |
-| 290 | `op_coerce_x` | 54 | 1.7s |  |
-| 291 | `op_escxattr` | 2 | 1.6s |  |
-| 292 | `op_escxelem` | 2 | 1.6s |  |
-| 293 | `op_lookupswitch` | 4 | 1.6s |  |
-| 294 | `optimize_coerce` | 1 | 1.6s |  |
-| 295 | `param_default_value_has_zero_cpool_index` | 1 | 1.3s |  |
-| 296 | `parse_float` | 80 | 1.4s |  |
-| 297 | `pixelbender_effect_BlurredFocus` | 0 | 17.8s |  |
-| 298 | `pixelbender_effect_glassDisplace` | 0 | 5.0s |  |
-| 299 | `pixelbender_effect_smudge` | 0 | 3.1s |  |
-| 300 | `pixelbender_effect_tintype` | 0 | 2.7s |  |
-| 301 | `pixelbender_effect_twirl` | 0 | 3.5s |  |
-| 302 | `pixelbender_images` | 0 | 2.6s |  |
-| 303 | `primitive_edge_cases` | 1 | 1.6s |  |
-| 304 | `property_priority` | 22 | 2.0s |  |
-| 305 | `property_priority_three_level` | 6 | 1.8s |  |
-| 306 | `propertyisenumerable_namespaces` | 6 | 1.7s |  |
-| 307 | `prototype_set_null` | 7 | 1.7s |  |
-| 308 | `proxy_callproperty` | 24 | 1.7s |  |
-| 309 | `proxy_deleteproperty` | 64 | 1.8s |  |
-| 310 | `proxy_enumeration` | 34 | 1.7s |  |
-| 311 | `proxy_getproperty` | 77 | 1.7s |  |
-| 312 | `proxy_hasownproperty` | 8 | 1.7s |  |
-| 313 | `proxy_hasproperty` | 32 | 1.9s |  |
-| 314 | `proxy_serialize` | 9 | 1.7s |  |
-| 315 | `proxy_setproperty` | 42 | 1.7s |  |
-| 316 | `qname_as_lazy_name_attribute_multiname` | 1 | 1.6s |  |
-| 317 | `qname_constr` | 32 | 1.7s |  |
-| 318 | `qname_constr_namespace` | 24 | 1.7s |  |
-| 319 | `qname_enumeration` | 9 | 1.7s |  |
-| 320 | `qname_indexing` | 23 | 1.8s |  |
-| 321 | `qname_tostring` | 25 | 1.8s |  |
-| 322 | `qname_valueof` | 29 | 1.7s |  |
-| 323 | `regexp_constr` | 148 | 1.9s |  |
-| 324 | `regexp_exec` | 19 | 1.7s |  |
-| 325 | `regexp_extended` | 47 | 1.7s |  |
-| 326 | `regexp_multiargs` | 1 | 1.6s |  |
-| 327 | `regexp_test` | 27 | 8.1s |  |
-| 328 | `regexp_toString` | 10 | 1.8s |  |
-| 329 | `resolve_order` | 4 | 1.7s |  |
-| 330 | `rng` | 1 | 3.1s |  |
-| 331 | `rshift` | 1058 | 3.8s |  |
-| 332 | `set_property_is_enumerable` | 85 | 1.9s |  |
-| 333 | `slot_disp_id_shared_numbering` | 1 | 26.6s |  |
-| 334 | `slots_force_autoassigned` | 1 | 1.7s |  |
-| 335 | `sprite_with_frames` | 0 | 20.4s |  |
-| 336 | `stage3d_agal_cross_product` | 0 | 2.9s |  |
-| 337 | `stage3d_bitmap` | 0 | 22.8s |  |
-| 338 | `stage3d_float1_index` | 0 | 21.1s |  |
-| 339 | `stage3d_fractal` | 0 | 10.5s |  |
-| 340 | `stage3d_ignore_sampler_override` | 0 | 23.0s |  |
-| 341 | `stage3d_program_constants_bytearray_be` | 0 | 23.9s |  |
-| 342 | `stage3d_program_constants_bytearray_le` | 0 | 3.7s |  |
-| 343 | `stage3d_raytrace` | 0 | 21.8s |  |
-| 344 | `stage3d_sampler` | 0 | 3.4s |  |
-| 345 | `stage3d_sampler_partial_upload` | 0 | 3.4s |  |
-| 346 | `stage3d_stencil` | 0 | 23.4s |  |
-| 347 | `stage3d_texture` | 0 | 7.4s |  |
-| 348 | `stage3d_texture_bytearray` | 0 | 4.2s |  |
-| 349 | `stage3d_texture_bytearray_compressed_alpha` | 0 | 3.8s |  |
-| 350 | `stage3d_texture_bytearray_compressed_raw_alpha` | 0 | 4.4s |  |
-| 351 | `stage3d_triangle` | 0 | 3.4s |  |
-| 352 | `stage3d_triangle_bytes4` | 0 | 3.3s |  |
-| 353 | `stage3d_triangle_float1` | 0 | 3.3s |  |
-| 354 | `stage3d_triangle_index_upload` | 0 | 3.1s |  |
-| 355 | `static_var_with_this_in_ctor` | 2 | 1.7s |  |
-| 356 | `stored_properties` | 11 | 7.8s |  |
-| 357 | `strict_equality` | 34 | 1.7s |  |
-| 358 | `string_call` | 13 | 1.7s |  |
-| 359 | `string_case` | 23 | 1.7s |  |
-| 360 | `string_char_at` | 27 | 1.6s |  |
-| 361 | `string_char_code_at` | 28 | 1.6s |  |
-| 362 | `string_concat_fromcharcode` | 36 | 1.6s |  |
-| 363 | `string_constr` | 25 | 1.6s |  |
-| 364 | `string_indexof_lastindexof` | 87 | 1.7s |  |
-| 365 | `string_length` | 16 | 1.6s |  |
-| 366 | `string_locale_compare` | 39 | 1.8s |  |
-| 367 | `string_match` | 51 | 1.8s |  |
-| 368 | `string_relational_compare` | 4 | 1.6s |  |
-| 369 | `string_replace` | 51 | 1.8s |  |
-| 370 | `string_search` | 41 | 1.7s |  |
-| 371 | `string_slice_substr_substring` | 169 | 1.9s |  |
-| 372 | `string_split` | 29 | 1.7s |  |
-| 373 | `string_substr_negative` | 21 | 1.6s |  |
-| 374 | `string_substr_weird` | 182 | 1.6s |  |
-| 375 | `subtract` | 1058 | 3.7s |  |
-| 376 | `super_get_call` | 12 | 1.7s |  |
-| 377 | `supercall_two_classobjects` | 2 | 1.6s |  |
-| 378 | `swf8` | 1 | 1.4s |  |
-| 379 | `symbol_class_root_not_zero` | 1 | 1.6s |  |
-| 380 | `symbolclass_invalid_utf8` | 2 | 1.7s |  |
-| 381 | `throw` | 3 | 1.7s |  |
-| 382 | `truthiness` | 30 | 1.2s |  |
-| 383 | `try_catch` | 11 | 1.3s |  |
-| 384 | `try_catch_typed` | 12 | 1.4s |  |
-| 385 | `typeof` | 30 | 1.3s |  |
-| 386 | `uint_constr` | 92 | 1.3s |  |
-| 387 | `uint_tofixed` | 1215 | 1.2s |  |
-| 388 | `uint_tostring` | 3375 | 1.4s |  |
-| 389 | `unchecked_function` | 15 | 1.3s |  |
-| 390 | `urshift` | 1058 | 2.8s |  |
-| 391 | `vector_class` | 36 | 1.5s |  |
-| 392 | `vector_class_call` | 11 | 1.4s |  |
-| 393 | `vector_coercion` | 66 | 2.0s |  |
-| 394 | `vector_concat` | 90 | 1.5s |  |
-| 395 | `vector_constr` | 107 | 1.5s |  |
-| 396 | `vector_enumeration` | 5 | 1.5s |  |
-| 397 | `vector_every` | 92 | 1.6s |  |
-| 398 | `vector_filter` | 95 | 1.6s |  |
-| 399 | `vector_holes` | 24 | 1.3s |  |
-| 400 | `vector_indexof` | 302 | 1.9s |  |
-| 401 | `vector_insertat` | 270 | 1.6s |  |
-| 402 | `vector_int_access` | 4 | 1.2s |  |
-| 403 | `vector_int_delete` | 11 | 1.2s |  |
-| 404 | `vector_join` | 58 | 1.8s |  |
-| 405 | `vector_lastindexof` | 302 | 1.2s |  |
-| 406 | `vector_legacy` | 10 | 1.2s |  |
-| 407 | `vector_map` | 85 | 8.2s |  |
-| 408 | `vector_object_final` | 1 | 1.4s |  |
-| 409 | `vector_object_toString` | 10 | 0.7s |  |
-| 410 | `vector_pushpop` | 255 | 1.1s |  |
-| 411 | `vector_reborrow_bug` | 10 | 0.7s |  |
-| 412 | `vector_removeat` | 172 | 1.0s |  |
-| 413 | `vector_reverse` | 232 | 1.0s |  |
-| 414 | `vector_shiftunshift` | 252 | 0.7s |  |
-| 415 | `vector_slice` | 331 | 1.1s |  |
-| 416 | `vector_sort` | 905 | 2.3s |  |
-| 417 | `vector_splice` | 693 | 1.5s |  |
-| 418 | `vector_splice_fixed_bug_compat` | 4 | 0.7s |  |
-| 419 | `vector_tostring` | 79 | 0.9s |  |
-| 420 | `verify_abnormal_loop` | 1 | 0.7s |  |
-| 421 | `verify_exception_targets_edge_case` | 1 | 0.8s |  |
-| 422 | `verify_lookup_switch_edge_case` | 1 | 0.7s |  |
-| 423 | `verify_unreachable_exception` | 2 | 0.7s |  |
-| 424 | `versioned_isplaying` | 2 | 0.7s |  |
-| 425 | `virtual_properties` | 16 | 0.7s |  |
-| 426 | `with` | 4 | 0.7s |  |
-| 427 | `xml_abstract_equality` | 36 | 0.8s |  |
-| 428 | `xml_advanced` | 52 | 0.7s |  |
-| 429 | `xml_appendchild` | 10 | 0.7s |  |
-| 430 | `xml_as_attribute` | 9 | 0.7s |  |
-| 431 | `xml_attribute` | 35 | 0.8s |  |
-| 432 | `xml_attribute_name` | 40 | 0.7s |  |
-| 433 | `xml_basic` | 32 | 0.9s |  |
-| 434 | `xml_child` | 25 | 0.7s |  |
-| 435 | `xml_childindex` | 7 | 0.7s |  |
-| 436 | `xml_children` | 43 | 1.1s |  |
-| 437 | `xml_class_call` | 9 | 0.7s |  |
-| 438 | `xml_contains` | 197 | 7.1s |  |
-| 439 | `xml_copy` | 20 | 1.7s |  |
-| 440 | `xml_ctor_from_tostring` | 23 | 2.0s |  |
-| 441 | `xml_delete` | 114 | 1.8s |  |
-| 442 | `xml_descendants` | 83 | 1.7s |  |
-| 443 | `xml_elements` | 6 | 1.6s |  |
-| 444 | `xml_equals_namespace_check` | 2 | 1.6s |  |
-| 445 | `xml_explicit_use_namespace` | 5 | 1.6s |  |
-| 446 | `xml_getdescendants_qname` | 21 | 1.6s |  |
-| 447 | `xml_has_property_via_in` | 26 | 1.6s |  |
-| 448 | `xml_hasownproperty` | 6 | 1.6s |  |
-| 449 | `xml_ignore_white` | 6 | 1.7s |  |
-| 450 | `xml_length` | 2 | 1.6s |  |
-| 451 | `xml_list_as_attribute` | 9 | 1.0s |  |
-| 452 | `xml_list_concat` | 20 | 1.5s |  |
-| 453 | `xml_list_enumerate` | 4 | 1.6s |  |
-| 454 | `xml_methods_settings` | 3 | 1.6s |  |
-| 455 | `xml_mismatched_tag` | 37 | 1.7s |  |
-| 456 | `xml_namespace` | 39 | 1.7s |  |
-| 457 | `xml_namespace_methods` | 245 | 1.8s |  |
-| 458 | `xml_namespaced_property` | 7 | 1.7s |  |
-| 459 | `xml_no_namespace` | 1 | 1.6s |  |
-| 460 | `xml_nodekind` | 3 | 1.6s |  |
-| 461 | `xml_normalize` | 35 | 1.8s |  |
-| 462 | `xml_notification_bubbling` | 361 | 1.7s |  |
-| 463 | `xml_parent` | 8 | 1.7s |  |
-| 464 | `xml_set_children` | 17 | 1.5s |  |
-| 465 | `xml_set_name` | 34 | 1.6s |  |
-| 466 | `xml_settings` | 6 | 1.6s |  |
-| 467 | `xml_simple_complex_content` | 47 | 1.7s |  |
-| 468 | `xml_text` | 7 | 1.6s |  |
-| 469 | `xml_tostring` | 6 | 1.6s |  |
-| 470 | `xml_tostring_namespace` | 12 | 1.6s |  |
-| 471 | `xml_unescaping` | 23 | 1.7s |  |
-| 472 | `xml_weird_ignores` | 54 | 1.8s |  |
-| 473 | `xml_wildcard` | 11 | 1.6s |  |
-| 474 | `xmldocument` | 254 | 1.7s |  |
-| 475 | `xmlnode` | 3540 | 1.8s |  |
+| 249 | `issue_13780` | 12 | 2.0s |  |
+| 250 | `issue_14901` | 1 | 1.6s |  |
+| 251 | `istype` | 24 | 1.7s |  |
+| 252 | `istypelate` | 58 | 1.8s |  |
+| 253 | `istypelate_coerce` | 198 | 2.1s |  |
+| 254 | `json_errors` | 9 | 19.6s |  |
+| 255 | `json_parse` | 21 | 1.6s |  |
+| 256 | `json_version_gated` | 1 | 1.6s |  |
+| 257 | `lazyinit` | 17 | 1.6s |  |
+| 258 | `lessequals` | 512 | 2.5s |  |
+| 259 | `lessthan` | 512 | 2.5s |  |
+| 260 | `lshift` | 1058 | 4.1s |  |
+| 261 | `math` | 497 | 1.9s |  |
+| 262 | `modulo` | 1058 | 4.1s |  |
+| 263 | `movieclip_stop` | 1 | 20.2s |  |
+| 264 | `multiply` | 1058 | 3.7s |  |
+| 265 | `namespace_constr` | 253 | 1.9s |  |
+| 266 | `namespace_constr_args` | 1 | 1.4s |  |
+| 267 | `namespace_enumeration_order` | 7 | 1.5s |  |
+| 268 | `negate` | 30 | 1.5s |  |
+| 269 | `negative_volume_panned` | 0 | 1.7s |  |
+| 270 | `nested_iteration` | 11 | 1.5s |  |
+| 271 | `net_getClassByAlias` | 3 | 1.5s |  |
+| 272 | `newactivation_in_script_init` | 3 | 1.7s |  |
+| 273 | `newclass_twice` | 3 | 1.7s |  |
+| 274 | `nonconflicting_declarations` | 0 | 1.8s |  |
+| 275 | `null_void_types` | 8 | 1.8s |  |
+| 276 | `number_autoconv` | 21 | 1.8s |  |
+| 277 | `number_autoconv_amf` | 132 | 1.8s |  |
+| 278 | `number_autoconv_array_sort_32bit` | 1 | 1.7s |  |
+| 279 | `number_constr` | 58 | 1.8s |  |
+| 280 | `number_toexponential` | 378 | 1.8s |  |
+| 281 | `number_toexponential2` | 35 | 1.8s |  |
+| 282 | `number_tofixed` | 378 | 1.7s |  |
+| 283 | `number_toprecision` | 350 | 1.8s |  |
+| 284 | `obfuscated_class_names` | 3 | 1.7s |  |
+| 285 | `object_enumeration` | 10 | 1.8s |  |
+| 286 | `object_prototype` | 4 | 1.8s |  |
+| 287 | `object_to_locale_string` | 2 | 1.7s |  |
+| 288 | `object_to_string` | 2 | 1.7s |  |
+| 289 | `object_value_of` | 2 | 1.6s |  |
+| 290 | `op_coerce` | 54 | 1.1s |  |
+| 291 | `op_coerce_x` | 54 | 1.8s |  |
+| 292 | `op_escxattr` | 2 | 1.8s |  |
+| 293 | `op_escxelem` | 2 | 1.8s |  |
+| 294 | `op_lookupswitch` | 4 | 1.8s |  |
+| 295 | `optimize_coerce` | 1 | 1.7s |  |
+| 296 | `param_default_value_has_zero_cpool_index` | 1 | 1.2s |  |
+| 297 | `parse_float` | 80 | 1.3s |  |
+| 298 | `pixelbender_effect_BlurredFocus` | 0 | 20.1s |  |
+| 299 | `pixelbender_effect_glassDisplace` | 0 | 5.3s |  |
+| 300 | `pixelbender_effect_smudge` | 0 | 3.2s |  |
+| 301 | `pixelbender_effect_tintype` | 0 | 2.6s |  |
+| 302 | `pixelbender_effect_twirl` | 0 | 3.8s |  |
+| 303 | `pixelbender_images` | 0 | 2.5s |  |
+| 304 | `primitive_edge_cases` | 1 | 1.5s |  |
+| 305 | `property_priority` | 22 | 1.9s |  |
+| 306 | `property_priority_three_level` | 6 | 1.7s |  |
+| 307 | `propertyisenumerable_namespaces` | 6 | 1.6s |  |
+| 308 | `prototype_set_null` | 7 | 1.6s |  |
+| 309 | `proxy_callproperty` | 24 | 1.6s |  |
+| 310 | `proxy_deleteproperty` | 64 | 1.7s |  |
+| 311 | `proxy_enumeration` | 34 | 1.6s |  |
+| 312 | `proxy_getproperty` | 77 | 1.7s |  |
+| 313 | `proxy_hasownproperty` | 8 | 1.6s |  |
+| 314 | `proxy_hasproperty` | 32 | 1.7s |  |
+| 315 | `proxy_serialize` | 9 | 1.6s |  |
+| 316 | `proxy_setproperty` | 42 | 1.7s |  |
+| 317 | `qname_as_lazy_name_attribute_multiname` | 1 | 1.6s |  |
+| 318 | `qname_constr` | 32 | 1.6s |  |
+| 319 | `qname_constr_namespace` | 24 | 1.6s |  |
+| 320 | `qname_enumeration` | 9 | 1.6s |  |
+| 321 | `qname_indexing` | 23 | 1.7s |  |
+| 322 | `qname_tostring` | 25 | 1.6s |  |
+| 323 | `qname_valueof` | 29 | 1.7s |  |
+| 324 | `regexp_constr` | 148 | 1.8s |  |
+| 325 | `regexp_exec` | 19 | 1.6s |  |
+| 326 | `regexp_extended` | 47 | 1.6s |  |
+| 327 | `regexp_multiargs` | 1 | 1.5s |  |
+| 328 | `regexp_test` | 27 | 1.6s |  |
+| 329 | `regexp_toString` | 10 | 1.3s |  |
+| 330 | `resolve_order` | 4 | 1.3s |  |
+| 331 | `rng` | 1 | 2.4s |  |
+| 332 | `rshift` | 1058 | 3.0s |  |
+| 333 | `set_property_is_enumerable` | 85 | 1.5s |  |
+| 334 | `slot_disp_id_shared_numbering` | 1 | 20.1s |  |
+| 335 | `slots_force_autoassigned` | 1 | 1.7s |  |
+| 336 | `sprite_with_frames` | 0 | 21.3s |  |
+| 337 | `stage3d_agal_cross_product` | 0 | 3.0s |  |
+| 338 | `stage3d_bitmap` | 0 | 23.7s |  |
+| 339 | `stage3d_float1_index` | 0 | 21.6s |  |
+| 340 | `stage3d_fractal` | 0 | 3.5s |  |
+| 341 | `stage3d_ignore_sampler_override` | 0 | 19.2s |  |
+| 342 | `stage3d_program_constants_bytearray_be` | 0 | 19.8s |  |
+| 343 | `stage3d_program_constants_bytearray_le` | 0 | 3.0s |  |
+| 344 | `stage3d_raytrace` | 0 | 19.4s |  |
+| 345 | `stage3d_sampler` | 0 | 2.6s |  |
+| 346 | `stage3d_sampler_partial_upload` | 0 | 2.7s |  |
+| 347 | `stage3d_stencil` | 0 | 20.0s |  |
+| 348 | `stage3d_texture` | 0 | 6.8s |  |
+| 349 | `stage3d_texture_bytearray` | 0 | 3.5s |  |
+| 350 | `stage3d_texture_bytearray_compressed_alpha` | 0 | 3.2s |  |
+| 351 | `stage3d_texture_bytearray_compressed_raw_alpha` | 0 | 3.7s |  |
+| 352 | `stage3d_triangle` | 0 | 2.6s |  |
+| 353 | `stage3d_triangle_bytes4` | 0 | 2.6s |  |
+| 354 | `stage3d_triangle_float1` | 0 | 2.7s |  |
+| 355 | `stage3d_triangle_index_upload` | 0 | 2.6s |  |
+| 356 | `static_var_with_this_in_ctor` | 2 | 1.4s |  |
+| 357 | `stored_properties` | 11 | 2.1s |  |
+| 358 | `strict_equality` | 34 | 1.7s |  |
+| 359 | `string_call` | 13 | 1.7s |  |
+| 360 | `string_case` | 23 | 1.8s |  |
+| 361 | `string_char_at` | 27 | 1.7s |  |
+| 362 | `string_char_code_at` | 28 | 1.6s |  |
+| 363 | `string_concat_fromcharcode` | 36 | 1.7s |  |
+| 364 | `string_constr` | 25 | 1.7s |  |
+| 365 | `string_indexof_lastindexof` | 87 | 1.8s |  |
+| 366 | `string_length` | 16 | 1.7s |  |
+| 367 | `string_locale_compare` | 39 | 1.8s |  |
+| 368 | `string_match` | 51 | 1.8s |  |
+| 369 | `string_relational_compare` | 4 | 1.7s |  |
+| 370 | `string_replace` | 51 | 1.9s |  |
+| 371 | `string_search` | 41 | 1.8s |  |
+| 372 | `string_slice_substr_substring` | 169 | 2.0s |  |
+| 373 | `string_split` | 29 | 1.8s |  |
+| 374 | `string_substr_negative` | 21 | 1.7s |  |
+| 375 | `string_substr_weird` | 182 | 1.7s |  |
+| 376 | `subtract` | 1058 | 4.0s |  |
+| 377 | `super_get_call` | 12 | 1.7s |  |
+| 378 | `supercall_two_classobjects` | 2 | 1.8s |  |
+| 379 | `swf8` | 1 | 1.4s |  |
+| 380 | `symbol_class_root_not_zero` | 1 | 1.6s |  |
+| 381 | `symbolclass_invalid_utf8` | 2 | 1.7s |  |
+| 382 | `throw` | 3 | 1.7s |  |
+| 383 | `truthiness` | 30 | 1.9s |  |
+| 384 | `try_catch` | 11 | 1.9s |  |
+| 385 | `try_catch_typed` | 12 | 1.9s |  |
+| 386 | `typeof` | 30 | 1.9s |  |
+| 387 | `uint_constr` | 92 | 1.9s |  |
+| 388 | `uint_tofixed` | 1215 | 1.8s |  |
+| 389 | `uint_tostring` | 3375 | 2.0s |  |
+| 390 | `unchecked_function` | 15 | 1.8s |  |
+| 391 | `urshift` | 1058 | 4.3s |  |
+| 392 | `vector_class` | 36 | 2.2s |  |
+| 393 | `vector_class_call` | 11 | 2.0s |  |
+| 394 | `vector_coercion` | 66 | 2.5s |  |
+| 395 | `vector_concat` | 90 | 2.1s |  |
+| 396 | `vector_constr` | 107 | 2.0s |  |
+| 397 | `vector_enumeration` | 5 | 1.9s |  |
+| 398 | `vector_every` | 92 | 2.2s |  |
+| 399 | `vector_filter` | 95 | 2.2s |  |
+| 400 | `vector_holes` | 24 | 1.9s |  |
+| 401 | `vector_indexof` | 302 | 2.9s |  |
+| 402 | `vector_insertat` | 270 | 2.3s |  |
+| 403 | `vector_int_access` | 4 | 1.8s |  |
+| 404 | `vector_int_delete` | 11 | 1.8s |  |
+| 405 | `vector_join` | 58 | 2.1s |  |
+| 406 | `vector_lastindexof` | 302 | 1.8s |  |
+| 407 | `vector_legacy` | 10 | 1.9s |  |
+| 408 | `vector_map` | 85 | 2.6s |  |
+| 409 | `vector_object_final` | 1 | 1.7s |  |
+| 410 | `vector_object_toString` | 10 | 0.9s |  |
+| 411 | `vector_pushpop` | 255 | 1.4s |  |
+| 412 | `vector_reborrow_bug` | 10 | 0.9s |  |
+| 413 | `vector_removeat` | 172 | 1.3s |  |
+| 414 | `vector_reverse` | 232 | 1.3s |  |
+| 415 | `vector_shiftunshift` | 252 | 0.8s |  |
+| 416 | `vector_slice` | 331 | 1.9s |  |
+| 417 | `vector_sort` | 905 | 2.8s |  |
+| 418 | `vector_splice` | 693 | 1.7s |  |
+| 419 | `vector_splice_fixed_bug_compat` | 4 | 0.8s |  |
+| 420 | `vector_tostring` | 79 | 1.1s |  |
+| 421 | `verify_abnormal_loop` | 1 | 0.8s |  |
+| 422 | `verify_exception_targets_edge_case` | 1 | 0.8s |  |
+| 423 | `verify_lookup_switch_edge_case` | 1 | 0.8s |  |
+| 424 | `verify_unreachable_exception` | 2 | 0.8s |  |
+| 425 | `versioned_isplaying` | 2 | 0.8s |  |
+| 426 | `virtual_properties` | 16 | 0.9s |  |
+| 427 | `with` | 4 | 0.8s |  |
+| 428 | `xml_abstract_equality` | 36 | 1.0s |  |
+| 429 | `xml_advanced` | 52 | 0.8s |  |
+| 430 | `xml_appendchild` | 10 | 0.8s |  |
+| 431 | `xml_as_attribute` | 9 | 0.8s |  |
+| 432 | `xml_attribute` | 35 | 0.9s |  |
+| 433 | `xml_attribute_name` | 40 | 0.9s |  |
+| 434 | `xml_basic` | 32 | 1.1s |  |
+| 435 | `xml_child` | 25 | 0.9s |  |
+| 436 | `xml_childindex` | 7 | 0.8s |  |
+| 437 | `xml_children` | 43 | 1.3s |  |
+| 438 | `xml_class_call` | 9 | 0.8s |  |
+| 439 | `xml_contains` | 197 | 1.2s |  |
+| 440 | `xml_copy` | 20 | 1.6s |  |
+| 441 | `xml_ctor_from_tostring` | 23 | 1.9s |  |
+| 442 | `xml_delete` | 114 | 1.6s |  |
+| 443 | `xml_descendants` | 83 | 1.5s |  |
+| 444 | `xml_elements` | 6 | 1.5s |  |
+| 445 | `xml_equals_namespace_check` | 2 | 1.4s |  |
+| 446 | `xml_explicit_use_namespace` | 5 | 1.5s |  |
+| 447 | `xml_getdescendants_qname` | 21 | 1.4s |  |
+| 448 | `xml_has_property_via_in` | 26 | 1.5s |  |
+| 449 | `xml_hasownproperty` | 6 | 1.5s |  |
+| 450 | `xml_ignore_white` | 6 | 1.5s |  |
+| 451 | `xml_length` | 2 | 1.4s |  |
+| 452 | `xml_list_as_attribute` | 9 | 0.9s |  |
+| 453 | `xml_list_concat` | 20 | 1.4s |  |
+| 454 | `xml_list_enumerate` | 4 | 1.4s |  |
+| 455 | `xml_methods_settings` | 3 | 1.5s |  |
+| 456 | `xml_mismatched_tag` | 37 | 1.5s |  |
+| 457 | `xml_namespace` | 39 | 1.5s |  |
+| 458 | `xml_namespace_methods` | 245 | 1.6s |  |
+| 459 | `xml_namespaced_property` | 7 | 1.5s |  |
+| 460 | `xml_no_namespace` | 1 | 1.4s |  |
+| 461 | `xml_nodekind` | 3 | 1.5s |  |
+| 462 | `xml_normalize` | 35 | 1.6s |  |
+| 463 | `xml_notification_bubbling` | 361 | 1.5s |  |
+| 464 | `xml_parent` | 8 | 1.5s |  |
+| 465 | `xml_set_children` | 17 | 1.3s |  |
+| 466 | `xml_set_name` | 34 | 1.5s |  |
+| 467 | `xml_settings` | 6 | 1.5s |  |
+| 468 | `xml_simple_complex_content` | 47 | 1.5s |  |
+| 469 | `xml_text` | 7 | 1.5s |  |
+| 470 | `xml_tostring` | 6 | 1.5s |  |
+| 471 | `xml_tostring_namespace` | 12 | 1.4s |  |
+| 472 | `xml_unescaping` | 23 | 1.5s |  |
+| 473 | `xml_weird_ignores` | 54 | 1.5s |  |
+| 474 | `xml_wildcard` | 11 | 1.5s |  |
+| 475 | `xmldocument` | 254 | 1.6s |  |
+| 476 | `xmlnode` | 3540 | 1.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -515,18 +516,18 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `array_sort_swf10_64bit` | 1 | 1 | 8.0s |  |
+| 1 | `array_sort_swf10_64bit` | 1 | 1 | 1.7s |  |
 | 2 | `blend_transform` | 1 | 1 | 1.8s |  |
-| 3 | `coerce_to_primitive_side_effects_with_nulls` | 4 | 4 | 1.4s |  |
+| 3 | `coerce_to_primitive_side_effects_with_nulls` | 4 | 4 | 1.9s |  |
 | 4 | `encode_uri_surrogate_pair_swf10` | 15 | 15 | 1.7s |  |
-| 5 | `freestanding_superclass` | 3 | 4 | 1.4s |  |
+| 5 | `freestanding_superclass` | 3 | 4 | 1.6s |  |
 | 6 | `int_toexponential` | 76 | 76 | 1.9s |  |
-| 7 | `int_toprecision` | 441 | 441 | 1.9s |  |
+| 7 | `int_toprecision` | 441 | 441 | 1.8s |  |
 | 8 | `slot_holes_fail` | 1 | 1 | 1.6s |  |
 | 9 | `slot_id_exceeds_trait_count` | 1 | 1 | 1.6s |  |
-| 10 | `uint_toexponential` | 100 | 100 | 1.3s |  |
-| 11 | `uint_toprecision` | 433 | 433 | 1.3s |  |
-| 12 | `weird_superinterface_properties` | 1 | 1 | 1.1s |  |
+| 10 | `uint_toexponential` | 100 | 100 | 1.9s |  |
+| 11 | `uint_toprecision` | 433 | 433 | 1.9s |  |
+| 12 | `weird_superinterface_properties` | 1 | 1 | 0.8s |  |
 
 ## Near-Passing Tests
 
@@ -578,24 +579,23 @@ No segfaults.
 
 ## Runtime Errors
 
-**14 tests** fail with runtime errors
+**13 tests** fail with runtime errors
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
 | 1 | `array_access_oob_interpreter` | exit code 1 | 1.6s |  |
 | 2 | `bitmap_subclass` | exit code 1 | 2.9s |  |
-| 3 | `bitmap_subclass_properties` | exit code 1 | 2.1s |  |
-| 4 | `bitmapdata_copychannel` | exit code 1 (output matches) | 21.8s |  |
-| 5 | `content_element_basic` | exit code 1 | 1.5s |  |
-| 6 | `domain_memory` | exit code 1 | 1.6s |  |
-| 7 | `goto_nested_construct_sibling` | exit code 1 | 2.1s |  |
-| 8 | `graphics_bitmap_fill` | exit code 1 (output matches) | 3.1s |  |
-| 9 | `method_without_body` | exit code 1 | 19.0s |  |
-| 10 | `null_void_types` | exit code 1 | 1.6s |  |
-| 11 | `rtqname_not_namespace` | exit code 1 | 1.7s |  |
-| 12 | `stage3d_rotating_cube` | exit code 1 (output matches) | 3.7s |  |
-| 13 | `supercalls_weird` | exit code 1 | 1.6s |  |
-| 14 | `verify_typecheck` | exit code 1 | 0.7s |  |
+| 3 | `bitmap_subclass_properties` | exit code 1 | 1.7s |  |
+| 4 | `bitmapdata_copychannel` | exit code 1 (output matches) | 23.8s |  |
+| 5 | `content_element_basic` | exit code 1 | 2.0s |  |
+| 6 | `domain_memory` | exit code 1 | 1.3s |  |
+| 7 | `goto_nested_construct_sibling` | exit code 1 | 2.0s |  |
+| 8 | `graphics_bitmap_fill` | exit code 1 (output matches) | 2.9s |  |
+| 9 | `method_without_body` | exit code 1 | 20.1s |  |
+| 10 | `rtqname_not_namespace` | exit code 1 | 1.3s |  |
+| 11 | `stage3d_rotating_cube` | exit code 1 (output matches) | 3.2s |  |
+| 12 | `supercalls_weird` | exit code 1 | 1.6s |  |
+| 13 | `verify_typecheck` | exit code 1 | 0.9s |  |
 
 ## Timeouts
 
