@@ -9,6 +9,20 @@ suite's trace tests.
 
 ## State
 
+- **CI baseline (run 29165717217, 2026-07-11): 475 / 1,201 passing
+  (39.6%)** — up from tranche 3's 411/1200 (+64), **zero pass->fail
+  regressions** in avm2 or ANY AVM1 suite (avm1 634/706, gnash suites,
+  shumway 73/92 + 46/47, regression 41/41 all unchanged),
+  wasm-link-smoke green. Beyond the 51 candidate passes, the E4X commit
+  also unlocked flash_xml, flash_xml_cloneNode, flash_xml_namespace,
+  flash_xml_removeNode (the legacy family), issue_13780, checkfilter,
+  doabc_is_eager, bitmapdata_draw_cpu_overwrite_gpu, and three
+  edittext_autosize* runtime_error->0-line-mismatch conversions; 40
+  more tests moved runtime_error -> output_mismatch (they now run to
+  the end). A follow-up commit added describeType(null/undefined)
+  ("null"/"void" types), getQualifiedSuperclassName, and the
+  flash.utils-vs-avmplus describeType split (1010 on undefined) —
+  null_void_types passes locally on top of this baseline.
 - **E4X/XML engine (2026-07-11): 53 / 55 E4X candidates pass locally**
   (`_investigation/E4X_CANDIDATES.txt`; exit criterion >=40 met). The 2
   misses are triaged infrastructure gaps, not E4X gaps:

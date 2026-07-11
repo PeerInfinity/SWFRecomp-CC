@@ -972,6 +972,58 @@ static void dt_param(Avm2Context* ctx, E4XNode* parent, int index,
 	dt_set_attr(ctx, pe, "optional", optional ? "true" : "false");
 }
 
+static Avm2Value global_get_qualified_superclass_name(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		return avm2_null();
+	}
+	Avm2Class* cls;
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
+	    && v.u.obj->kind == AVM2_OBJ_CLASS)
+	{
+		cls = v.u.obj->class_ref;
+	}
+	else
+	{
+		cls = avm2_value_class(ctx, v);
+	}
+	if (cls == NULL || cls->super_class == NULL) return avm2_null();
+	char buf[256];
+	Avm2Class* sc = cls->super_class;
+	if (sc->name.ns_len > 0)
+	{
+		snprintf(buf, sizeof(buf), "%.*s::%.*s",
+		         (int) sc->name.ns_len, sc->name.ns_uri,
+		         (int) sc->name.name_len, sc->name.name);
+	}
+	else
+	{
+		snprintf(buf, sizeof(buf), "%.*s",
+		         (int) sc->name.name_len, sc->name.name);
+	}
+	return avm2_string(avm2_string_from_literal(ctx, buf));
+}
+
+static Avm2Value global_describe_type(Avm2Activation* act);
+
+// flash.utils.describeType: throws 1010 on undefined (Ruffle
+// flash/utils.as — avmplus raises it from the alias-lookup code), then
+// delegates to the avmplus form.
+static Avm2Value global_describe_type_utils(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0 || act->args[0].kind == AVM2_VALUE_UNDEFINED)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #1010: A term is undefined and has no "
+		                 "properties.");
+	}
+	return global_describe_type(act);
+}
+
 static Avm2Value global_describe_type(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -982,6 +1034,16 @@ static Avm2Value global_describe_type(Avm2Activation* act)
 		return avm2_object_value(avm2_xml_object_for_node(ctx, type));
 	}
 	Avm2Value v = act->args[0];
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		// describeType(null) / describeType(undefined) — null_void_types.
+		dt_set_attr(ctx, type, "name",
+		            v.kind == AVM2_VALUE_NULL ? "null" : "void");
+		dt_set_attr(ctx, type, "isDynamic", "false");
+		dt_set_attr(ctx, type, "isFinal", "true");
+		dt_set_attr(ctx, type, "isStatic", "false");
+		return avm2_object_value(avm2_xml_object_for_node(ctx, type));
+	}
 	int is_static = v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
 	                && v.u.obj->kind == AVM2_OBJ_CLASS;
 	Avm2Class* cls;
@@ -1194,8 +1256,12 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	                         global_get_qualified_class_name);
 	builtin_add_global_fn_ns(ctx, "avmplus", "getDefinitionByName",
 	                         global_get_definition_by_name);
+	builtin_add_global_fn_ns(ctx, "flash.utils", "getQualifiedSuperclassName",
+	                         global_get_qualified_superclass_name);
+	builtin_add_global_fn_ns(ctx, "avmplus", "getQualifiedSuperclassName",
+	                         global_get_qualified_superclass_name);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "describeType",
-	                         global_describe_type);
+	                         global_describe_type_utils);
 	builtin_add_global_fn_ns(ctx, "avmplus", "describeType",
 	                         global_describe_type);
 	// The avmplus describeTypeJSON flag constants (avmplus.as).
