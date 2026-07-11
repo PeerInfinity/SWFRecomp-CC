@@ -7,14 +7,19 @@ onto invokeFunctionValue. It pins the three EI dispatch quirks that the
 migration must preserve, so that normalizing any of them later is a deliberate,
 test-flipping change:
 
-1. SCOPE ORDER (INV_LOCAL_SCOPE_UNDER_CAPTURED). EI pushes the callee's fresh
-   local frame FIRST and the captured closure scopes ON TOP — the inverse of
-   every other dispatcher. Parameter binds still land on the local frame
-   (getCurrentLocalScope skips is_with frames), but actionGetVariable walks the
-   whole chain top-down, so a captured scope SHADOWS the callee's own params.
-   `shadow` is defined inside `with (w)` where `w.a` exists and the callback's
-   sole parameter is also named `a`: called through EI with "ARG" it must trace
-   w's value, not the argument. Direct analog of resolve_type1_args section 2.
+1. SCOPE ORDER — DELIBERATELY FLIPPED by normalization pass (b), 2026-07-11.
+   EI historically pushed the callee's fresh local frame FIRST and the
+   captured closure scopes ON TOP (INV_LOCAL_SCOPE_UNDER_CAPTURED — the
+   inverse of every other dispatcher). Parameter binds landed on the local
+   frame either way (getCurrentLocalScope skips is_with frames), but
+   actionGetVariable walks the whole chain top-down, so a captured scope
+   SHADOWED the callee's own params — wrong per Flash/Ruffle scope semantics
+   (locals are the innermost scope). Pass (b) removed the flag from every
+   user and deleted it. `shadow` is defined inside `with (w)` where `w.a`
+   exists and the callback's sole parameter is also named `a`: called through
+   EI with "ARG" it now traces the ARGUMENT (`shadow a=ARG`); under the old
+   inversion it traced w's value (`shadow a=W_A`). This row is the deliberate
+   lock flip. Direct analog of resolve_type1_args section 2.
 
 2. FORCED is_with=1 ON CAPTURED SCOPES (INV_FORCE_CAPTURED_WITH). `writer` and
    `reader` are defined inside the type-1 function `outer`, capturing outer's
@@ -27,13 +32,12 @@ test-flipping change:
      write-through itself. (The dossier's §7 prediction that forced-with makes
      the write skip the captured frame was wrong — verified empirically.)
    - `lv=undefined`: writer also runs `var lv = "LEAK"` (DefineLocal), which
-     binds via getCurrentLocalScope — and THAT skips is_with frames. Under
-     today's forced-with the topmost non-with frame is the callee's own
-     (discarded) local frame, so `lv` never reaches the captured frame and
-     reader sees undefined. If EI ever copied is_with (0 for a captured local
-     frame) the captured frame would be the topmost non-with frame under the
-     inversion, `lv` would land there and persist, and reader would trace
-     LEAK. This is the row that pins INV_FORCE_CAPTURED_WITH.
+     binds via getCurrentLocalScope — and THAT skips is_with frames. The
+     topmost non-with frame is the callee's own (discarded) local frame
+     (post-flip it sits ON TOP of the captured scopes, making this
+     unconditional), so `lv` never reaches the captured frame and reader sees
+     undefined. This is the row that pins INV_FORCE_CAPTURED_WITH (kept by
+     the pass-(b) flip — only the ordering flag was removed).
 
 3. TYPE-1 `this` BIND (INV_BIND_THIS) — LIVE here, unlike the migrated arms
    where the standing rule declared it dead: EI pushes no g_this_stack entry

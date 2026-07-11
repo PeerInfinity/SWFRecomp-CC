@@ -6110,10 +6110,11 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 	// INV_DEPTH_GUARD: EI's old guard was byte-equivalent to the core's
 	// (increment, max-check, halt, decrement, undefined) — unlike the LC
 	// family's bare bracket, the guard moves INTO the core here.
-	// INV_LOCAL_SCOPE_UNDER_CAPTURED + INV_FORCE_CAPTURED_WITH: both arms
-	// pushed the local frame FIRST with captured scopes forced-with ON TOP —
-	// the same double quirk as the __resolve arm (this is the flag's second
-	// user). regression/ei_closure_scope_order locks both on this path.
+	// INV_FORCE_CAPTURED_WITH: both arms force is_with=1 on captured scopes.
+	// The historical local-frame-under-captured inversion was FLIPPED by
+	// normalization pass (b) (locals are the innermost scope, per
+	// Flash/Ruffle) — the deliberate lock flip is ei_closure_scope_order's
+	// "shadow a=ARG" row.
 	// INV_VERSION_SWITCH added by normalization pass (b): the callback runs
 	// at its DEFINING movie's SWF version (regression/ei_cross_swf_version —
 	// a v8 callback fired under an injected v6 ambient must keep v8
@@ -6134,7 +6135,7 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 	// event-this, no exec-func (a preload_arguments callee keeps reading the
 	// stale g_prev_executing_func — current behavior), no ctor context.
 	u32 ei_flags = INV_DEPTH_GUARD | INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
-	               INV_LOCAL_SCOPE | INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_VERSION_SWITCH;
+	               INV_LOCAL_SCOPE | INV_VERSION_SWITCH;
 	if (func->function_type == 1)
 		ei_flags |= INV_BIND_THIS;
 	MovieClip* _ei_saved_base = g_current_context;
@@ -15040,21 +15041,17 @@ static ASObject* pushLocalScopeFrame(SWFAppContext* app_context, u32 flags,
 	return local_scope;
 }
 
-// Both frames, in the order INV_LOCAL_SCOPE_UNDER_CAPTURED selects. Teardown is
-// a plain depth decrement of (pushed_local + captured_count), so it is
-// order-independent and stays inline at the call site.
+// Both frames: captured scopes first, the callee's local frame on top — the
+// innermost scope, per Flash/Ruffle semantics. (Normalization pass (b)
+// removed INV_LOCAL_SCOPE_UNDER_CAPTURED, which let seven dispatch arms
+// invert this so a captured scope shadowed the callee's own params on
+// lookup; the flip is pinned by regression/resolve_type1_args and
+// regression/ei_closure_scope_order.) Teardown is a plain depth decrement of
+// (pushed_local + captured_count), so it stays inline at the call site.
 static ASObject* pushInvokeScopes(SWFAppContext* app_context, ASFunction* func, u32 flags,
                                   u8 captured_count, ActionVar* this_var, int this_is_mc,
                                   void* this_ptr, int* out_pushed_local)
 {
-	if (flags & INV_LOCAL_SCOPE_UNDER_CAPTURED)
-	{
-		ASObject* local_scope = pushLocalScopeFrame(app_context, flags, this_var,
-		                                            this_is_mc, this_ptr, out_pushed_local);
-		pushCapturedScopes(func, flags, captured_count);
-		return local_scope;
-	}
-
 	pushCapturedScopes(func, flags, captured_count);
 	return pushLocalScopeFrame(app_context, flags, this_var, this_is_mc, this_ptr,
 	                           out_pushed_local);
@@ -34935,10 +34932,9 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 
 		// Type-1 keeps its fresh local activation (absorbs plain assignments
 		// and `var` declarations that would otherwise leak onto the receiver)
-		// pushed UNDER the captured scopes — this arm is another instance of
-		// the local-under-captured inversion, with captured is_with COPIED
-		// (not forced): a third variant of the family. Type-2 has no local
-		// frame. Both push no this-stack and no exec-func. The core
+		// pushed with the captured scopes in standard order (is_with COPIED,
+		// not forced; the historical local-under-captured inversion was
+		// flipped by normalization pass (b)). Type-2 has no local frame. Both push no this-stack and no exec-func. The core
 		// additionally pads a type-1 handler's declared params with undefined
 		// instead of letting the prologue pop the empty between-frames stack —
 		// inert HERE (the guarded empty-stack pop already synthesized
@@ -34948,7 +34944,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		if (func->function_type == 2)
 			_ef_flags |= INV_MC_THIS_NULL_PTR;
 		else
-			_ef_flags |= INV_LOCAL_SCOPE | INV_LOCAL_SCOPE_UNDER_CAPTURED;
+			_ef_flags |= INV_LOCAL_SCOPE;
 		InvokeOpts _ef_opts = { .flags = _ef_flags };
 		g_call_depth++;
 		invokeFunctionValue(app_context, func, &_ef_this, NULL, 0, &_ef_opts);
@@ -35126,8 +35122,8 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 	//
 	// Type 1 (kept from actionInvokeRegisteredClassConstructor's setup so
 	// closure-captured free variables of mtasc-compiled bodies resolve):
-	// local frame pushed UNDER the captured scopes with is_with FORCED to 1
-	// — the fourth member of the local-under-captured family — plus an
+	// local frame pushed with is_with FORCED to 1 on the captured scopes
+	// (the local-under-captured inversion was flipped by pass (b)) — plus an
 	// unconditional this-stack push and the legacy name-bind of "this" on
 	// the local frame (INV_BIND_THIS: dead for reads via the this-cell fast
 	// path, preserved because the existing flag reproduces it exactly).
@@ -35155,8 +35151,7 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 	}
 	else
 	{
-		_ol_flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_FORCE_CAPTURED_WITH
-		           | INV_THIS_STACK | INV_BIND_THIS;
+		_ol_flags |= INV_FORCE_CAPTURED_WITH | INV_THIS_STACK | INV_BIND_THIS;
 	}
 	// Both branches: the core honored INV_BASE_CLIP on its t1 AND t2 paths.
 	MovieClip* _ol_saved_base = g_current_context;
@@ -35296,8 +35291,7 @@ static void actionDispatchMCOnConstruct(SWFAppContext* app_context, MovieClip* m
 	}
 	else
 	{
-		_oc_flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED | INV_FORCE_CAPTURED_WITH
-		           | INV_THIS_STACK | INV_BIND_THIS;
+		_oc_flags |= INV_FORCE_CAPTURED_WITH | INV_THIS_STACK | INV_BIND_THIS;
 	}
 	// Both branches: the core honored INV_BASE_CLIP on its t1 AND t2 paths.
 	MovieClip* _oc_saved_base = g_current_context;
@@ -60183,9 +60177,9 @@ static ActionVar _invoke_sort_comparator(SWFAppContext* app_context,
 	//   ignore the parameter and declare their own regs[]), but it is a
 	//   per-comparison alloc/free on the hot sort path — flagged in the
 	//   Stage-4 dossier; the candidate fix is core-level and separate.
-	// - Type-1 pushed its local frame FIRST with the captured scopes on top
-	//   (the __resolve-arm inversion — INV_LOCAL_SCOPE_UNDER_CAPTURED),
-	//   switched to the callee's base_clip under the caller's SWF6+ gate,
+	// - Type-1 pushes captured scopes + local frame in standard order (its
+	//   historical __resolve-style inversion was flipped by pass (b)),
+	//   switches to the callee's base_clip under the caller's SWF6+ gate,
 	//   and bound "this" = undefined by name (INV_BIND_THIS on the fresh
 	//   local frame; the old setVariableByName could land on a captured
 	//   outer frame — same lookup-identical bind-frame delta as
@@ -60211,7 +60205,6 @@ static ActionVar _invoke_sort_comparator(SWFAppContext* app_context,
 		ActionVar undef_this = {0};
 		undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
 		InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
-		                             INV_LOCAL_SCOPE_UNDER_CAPTURED |
 		                             INV_BASE_CLIP | INV_BIND_THIS };
 		result = invokeFunctionValue(app_context, comparator, &undef_this, args, 2, &opts);
 	}
@@ -63904,12 +63897,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// them, neither clamping nor padding — see
 						// regression/resolve_type1_args.
 						//
-						// INV_LOCAL_SCOPE_UNDER_CAPTURED reproduces this arm's
-						// inverted scope order (local frame beneath the captured
-						// scopes). Preserved, not normalized — same test pins it.
+						// The arm's historical inverted scope order (local frame
+						// beneath the captured scopes) was FLIPPED by
+						// normalization pass (b) — resolve_type1_args' "h a=one"
+						// row is the deliberate lock flip.
 						InvokeOpts opts = {
 							.flags = (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
-							          INV_LOCAL_SCOPE | INV_LOCAL_SCOPE_UNDER_CAPTURED |
+							          INV_LOCAL_SCOPE |
 							          INV_BASE_CLIP),
 							// advanced_func receives the receiver; nothing binds it
 							// as `this` on the callee's frame, so this_var is NULL.
@@ -73512,10 +73506,9 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 	// `this` via actionGetVariable sees the receiver — XML.as:903
 	// `++this.onLoadCalls`), and switched g_current_context to the callee's
 	// base_clip under the caller's SWF6+ gate. The old type-1 arm pushed its
-	// local frame FIRST with the captured scopes on top — the same inversion
-	// as the __resolve arm — preserved per-branch via
-	// INV_LOCAL_SCOPE_UNDER_CAPTURED. One deliberate delta inside that
-	// inversion: the old code's setVariableByName("this") landed on the
+	// local frame in standard order (its historical __resolve-style
+	// inversion was flipped by normalization pass (b)). One deliberate
+	// delta: the old code's setVariableByName("this") landed on the
 	// topmost non-with frame (possibly a captured outer frame — scope
 	// pollution); INV_BIND_THIS writes the fresh local frame instead.
 	// Lookup-identical, A/B'd across the sound/xml clusters. No this-stack,
@@ -73539,7 +73532,7 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 
 	InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
 	                             INV_BIND_THIS | INV_VERSION_SWITCH };
-	if (func->function_type != 2) opts.flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED;
+
 
 	MovieClip* _sfc_saved_base = g_current_context;
 	if (g_swf_version >= 6 && func->base_clip != NULL)

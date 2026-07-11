@@ -245,15 +245,15 @@ void actionRestoreFunctionVersion(int saved_ver, ASObject* saved_global, int sav
 #define INV_RESET_THIS_DEPTH     0x2000u  // zero g_this_depth for the call (accessor-setter isolation)
 #define INV_CTOR_CTX             0x4000u  // pushCtorContext(0)/popCtorContext around the callee body
 #define INV_OVERRIDE_THIS        0x8000u  // manage g_override_this{,_set} for the call (see opts->override_this)
-// Push the fresh local frame BENEATH the captured scopes instead of on top of
-// them. Parameter binds are unaffected either way (getCurrentLocalScope skips
-// is_with frames), but actionGetVariable walks the whole chain top-down, so a
-// captured scope then shadows the callee's own parameters and locals. Only the
-// __resolve arm does this today; actionEI_callInternalInterface has the same
-// inversion and will use this bit when Stage 4 migrates it. Almost certainly
-// wrong — normalizing it is a deliberate Stage-4 change, guarded by
-// regression/resolve_type1_args.
-#define INV_LOCAL_SCOPE_UNDER_CAPTURED 0x10000u
+// 0x10000u was INV_LOCAL_SCOPE_UNDER_CAPTURED (push the fresh local frame
+// BENEATH the captured scopes, letting a captured scope shadow the callee's
+// own params on lookup). Removed by normalization pass (b), 2026-07-11: all
+// seven users (the __resolve arm, EI, the enterFrame children arm,
+// onLoad/onConstruct, soundFireCallback t1, the sort comparator t1) now take
+// the standard order — locals are the innermost scope, per Flash/Ruffle.
+// Deliberate lock flips: regression/resolve_type1_args ("h a=one") and
+// regression/ei_closure_scope_order ("shadow a=ARG"). Do not reuse the bit
+// without checking gates/check_dispatch_funnel.py.
 
 // Callee activation (opts->act_flags): how the callee's *named* locals are bound
 // on the fresh local-scope frame. A type-1 body has no DefineFunction2 flags word,

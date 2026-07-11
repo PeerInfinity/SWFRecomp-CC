@@ -7,7 +7,7 @@ SENTINEL2
 a=one
 b=two
 SENTINEL3
-h a=W_A
+h a=one
 SENTINEL4
 w.a=W_A
 done

@@ -20,19 +20,23 @@ Two independent behaviours are pinned.
     Detected by pushing a sentinel string BENEATH the call operands and tracing
     it once the call's result is popped.
 
-(2) SCOPE ORDER. This arm pushes the callee's fresh local scope FIRST and its
-    captured closure scopes ON TOP of it — the inverse of every other dispatcher
-    and of invokeFunctionValue. Because `getCurrentLocalScope()` skips is_with
-    frames, parameter *binds* still land on the local frame either way; what
-    differs is *lookup*: actionGetVariable walks the chain top-down over all
-    frames, so under the inversion a captured scope shadows the callee's own
-    parameters and locals.
+(2) SCOPE ORDER — DELIBERATELY FLIPPED by normalization pass (b), 2026-07-11.
+    This arm historically pushed the callee's fresh local scope FIRST and its
+    captured closure scopes ON TOP of it — the inverse of every other
+    dispatcher. Because `getCurrentLocalScope()` skips is_with frames,
+    parameter *binds* landed on the local frame either way; what differed was
+    *lookup*: actionGetVariable walks the chain top-down over all frames, so
+    under the inversion a captured scope shadowed the callee's own parameters
+    and locals — wrong per Flash/Ruffle scope semantics (locals are the
+    innermost scope). Pass (b) removed INV_LOCAL_SCOPE_UNDER_CAPTURED from
+    every user (this arm, EI, the enterFrame children arm, onLoad/onConstruct,
+    soundFireCallback t1, the sort comparator t1) and deleted the flag.
 
-    `h` is defined inside `with (w)`, so it captures `w` (is_with). `w.a` exists
-    and `h`'s sole parameter is also named `a`. Under the inversion `h` reads
-    `w.a`; if the ordering were ever normalized it would read its own parameter.
-    That line is the guard on INV_LOCAL_SCOPE_UNDER_CAPTURED: normalizing the
-    ordering (a Stage-4 decision) must update this expectation deliberately.
+    `h` is defined inside `with (w)`, so it captures `w` (is_with). `w.a`
+    exists and `h`'s sole parameter is also named `a`. NORMALIZED expectation:
+    `h` reads its own parameter (`h a=one`). Under the old inversion it read
+    `w.a` (`h a=W_A`) — this row is the deliberate lock flip that proves the
+    normalization is observable.
 
 DefineFunction is emitted by hand because MTASC emits DefineFunction2 for SWF6+,
 and the type-1 arm cannot be reached any other way.
