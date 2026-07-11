@@ -36718,17 +36718,27 @@ static void fireLoadVarsCallback(SWFAppContext* app_context, ASObject* obj,
 	// LoadVars.onData. (2) neither arm NULL-checked its function pointer
 	// (the else was a catch-all); the core's strict dispatch returns
 	// undefined instead.
+	//
+	// INV_VERSION_SWITCH added by normalization pass (b): handlers run at
+	// their DEFINING movie's SWF version (regression/lv_cross_swf_version,
+	// lv row); the base-clip switch moves INTO the arm under the
+	// CALLER-version gate read before the core installs the callee version
+	// (never INV_BASE_CLIP|INV_VERSION_SWITCH).
 	ActionVar this_var = {0};
 	this_var.type = ACTION_STACK_VALUE_OBJECT;
 	this_var.data.numeric_value = (u64)(uintptr_t) obj;
 
 	InvokeOpts opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
-	                             INV_BASE_CLIP | INV_EXEC_FUNC,
+	                             INV_VERSION_SWITCH | INV_EXEC_FUNC,
 	                    .act_flags = INV_ACT_ARGUMENTS };
 
+	MovieClip* _flv_saved_base = g_current_context;
+	if (g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = (MovieClip*)func->base_clip;
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &this_var, cb_args, cb_arg_count, &opts);
 	g_call_depth--;
+	g_current_context = _flv_saved_base;
 
 	g_special_depth--;
 }
@@ -73471,8 +73481,12 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 	// topmost non-with frame (possibly a captured outer frame — scope
 	// pollution); INV_BIND_THIS writes the fresh local frame instead.
 	// Lookup-identical, A/B'd across the sound/xml clusters. No this-stack,
-	// no version switch, no exec-func — never done here. The bare
-	// g_call_depth++/-- bracket stays outside the core.
+	// no exec-func — never done here. The bare g_call_depth++/-- bracket
+	// stays outside the core. INV_VERSION_SWITCH added by normalization
+	// pass (b): handlers run at their DEFINING movie's SWF version
+	// (regression/lv_cross_swf_version, xml row); the base-clip switch moves
+	// INTO the arm below under the CALLER-version gate read before the core
+	// installs the callee version (never INV_BASE_CLIP|INV_VERSION_SWITCH).
 	//
 	// Two bugs the migration fixes for free: (1) the old type-1 arm pushed
 	// args in REVERSE with no clamp/pad — instance fourteen of the
@@ -73486,12 +73500,16 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 	this_var.data.numeric_value = (u64)(uintptr_t)sound_obj;
 
 	InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
-	                             INV_BIND_THIS | INV_BASE_CLIP };
+	                             INV_BIND_THIS | INV_VERSION_SWITCH };
 	if (func->function_type != 2) opts.flags |= INV_LOCAL_SCOPE_UNDER_CAPTURED;
 
+	MovieClip* _sfc_saved_base = g_current_context;
+	if (g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = (MovieClip*)func->base_clip;
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &this_var, cb_args, cb_arg_count, &opts);
 	g_call_depth--;
+	g_current_context = _sfc_saved_base;
 
 	g_special_depth--;
 }
