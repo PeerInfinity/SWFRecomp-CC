@@ -2,8 +2,27 @@
 # Generated 2026-07-12 from the post-Stage-5 CI results (run 29174330330,
 # avm2 639+18RM/1201 at b6fbe8447): failing, non-ignored text-family
 # tests. Excluded up front: 16 tests with input.json (injected
-# mouse/keyboard) and 4 image-comparison tests. All listed tests are
-# FAILING at the baseline.
+# mouse/keyboard) and 4 image-comparison tests. All listed tests were
+# FAILING at that baseline.
+#
+# STAGE-6 RESULT (2026-07-12, commits 45a507da5..415205ed7):
+# 75 / 85 pass locally (72 pass + 3 ruffle_matched:
+# edittext_getcharboundaries_culling, edittext_tab_stops,
+# edittext_getcharboundaries_missing_embedded_font). Exit criterion
+# (>=60) met. The 10 misses, all triaged:
+#   - flash.text.engine class family (7): text_element_basic,
+#     text_engine_groupelement, text_run, textline_inapplicable_properties,
+#     textline_name, textline_splitting_basic, textline_throwerror,
+#     textline_validity — need TextBlock/TextLine/TextElement/
+#     ElementFormat/GroupElement incl. createTextLine layout; own
+#     follow-up tranche. (FontDescription itself landed:
+#     text_engine_fontdescription + font_description_clone pass.)
+#   - flash.display.Loader infrastructure (2): font_registerfont,
+#     font_enumeratefonts_order (both load fonts.swf).
+#   - Device-font metric parity (1): edittext_device_transform_layout —
+#     our device fallback bakes the corpus's DefineFont3 Noto Sans
+#     table; Ruffle measures its bundled notosans TTF, so device-font
+#     advances differ by ttf-vs-DefineFont3 rounding.
 
 # --- text family (72) ---
 edittext_align

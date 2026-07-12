@@ -1,13 +1,47 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-12 — Stage 5 (frame lifecycle + display basics)
-COMPLETE; E4X and Stage 4 before it.
+Last updated: 2026-07-12 — Stage 6 (TextField/EditText engine) COMPLETE;
+Stage 5, E4X and Stage 4 before it.
 
 **Plan:** `SWFRecompDocs/plans/avm2-support-plan.md` (umbrella; stages,
 architecture sketch, tranche definitions). Phase-1 metric: pass rate on this
 suite's trace tests.
 
 ## State
+
+- **Stage 6 COMPLETE (2026-07-12, commits `45a507da5`..`415205ed7`):
+  75/85 Stage-6 candidates pass locally** (72 pass + 3 ruffle_matched;
+  exit criterion >=60 met; `_investigation/STAGE6_CANDIDATES.txt` carries
+  the triage of the 10 misses: 7 flash.text.engine
+  (TextBlock/TextLine family, own follow-up), 2 Loader-infrastructure
+  font tests, 1 device-font metric parity). CI baseline: see the run
+  recorded below this entry. What landed:
+  - Tranche 0 — all 13 Stage-5 stragglers: instance scope = class scope
+    + [class object] (static slot writes from ctors), SimpleButton
+    event/order/naming fixes (wrapper counter slot, nested-framescript
+    ctor ordering, set_state detach, set_state_child semantics,
+    addedToStage state recursion, button-parent added-event gate),
+    nextScene/prevScene current-scene fallback, goto Replace
+    swaps-in-place per type, manual_frame_construct.
+  - `SWFRecomp/src/abc/abc_timeline.cpp` — full DefineEditText parse ->
+    `avm2_generated_edittexts`; DefineFont2/3 (names/codes/advances/
+    metrics) -> `avm2_generated_fonts`; CSMTextSettings (tag 74).
+  - `SWFModernRuntime/src/avm2/avm2_text.c` (new, ~5K lines) — TextFormat
+    (nullable fields, round_to_even, 64-char font cap), FormatSpans
+    (normalize/get/set/replace/mix_with), from_html parser + to_html
+    writer (canonical FP form), condense_white_swf8, the layout engine
+    (f32-exact metrics, wrap_line, align/margins/justify/bullet,
+    two-pass autosize, LAZY autosize bounds incl. render-phase apply),
+    the full TextField property/method surface, flash.text.Font
+    (SymbolClass binding, enumerateFonts/registerFont), StyleSheet
+    (CSS parser + EditText integration), TextRun/TextLineMetrics/
+    Rectangle/ColorTransform classes, flash.text.engine.FontDescription
+    + constant classes, flash.utils setTimeout/setInterval.
+  - Display: TextField width/height/x/y route through EditText bounds;
+    hitTestObject/hitTestPoint/getBounds/getRect/globalToLocal/
+    localToGlobal; Transform concatenatedMatrix (FP quality quirk)/
+    pixelBounds/colorTransform; real stage.focus tracking; AVM2 trace
+    normalizes \r to \n.
 
 - **CI baseline (run 29174330330, 2026-07-12): 639 / 1,201 passing +
   18 ruffle_matched = 657 effective (54.7%)** — up from the E4X

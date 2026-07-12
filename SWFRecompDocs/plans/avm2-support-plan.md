@@ -387,8 +387,29 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   at run 29174330330, zero pass->fail regressions in any suite; the 18
   misses triaged in STAGE5_CANDIDATES.txt (infrastructure /
   edge-semantics / button event-order).
-- **Later / separate plans**: playerglobal recompilation,
-  graphics-mode avm2 tests, AVM1↔AVM2 interop, AS3 games.
+- **Stage 6 — TextField/EditText engine (+ Stage-5 stragglers)** —
+  **DONE 2026-07-12** (`45a507da5`..`415205ed7` + docs; prompt
+  `SWFRecompDocs/prompts/avm2-stage6-text.md`): all 13 Stage-5
+  stragglers first (instance scope = class scope + [class object] for
+  static-slot writes, SimpleButton event-order/naming/set_state_child
+  semantics, nextScene/prevScene fallback, per-type goto Replace,
+  manual_frame_construct), then the flash.text engine: recompiler
+  DefineEditText/DefineFont2-3/CSMTextSettings tables, avm2_text.c
+  (TextFormat, FormatSpans, from_html/to_html, condense_white_swf8, the
+  f32-exact measurement layout engine with wrap_line + lazy autosize
+  bounds, the full TextField surface, Font with SymbolClass binding,
+  StyleSheet with a real CSS parser, TextRun/TextLineMetrics/
+  FontDescription, setTimeout/setInterval), display-side TextField
+  bounds routing + hitTest*/getBounds/globalToLocal + Transform
+  concatenatedMatrix/pixelBounds + real stage.focus. Exit met:
+  **75/85 Stage-6 candidates** (>=60 criterion; 72 pass +
+  3 ruffle_matched); 10 misses triaged in STAGE6_CANDIDATES.txt
+  (7 flash.text.engine TextBlock/TextLine family — the natural next
+  text tranche, 2 Loader-infrastructure, 1 device-font metric parity).
+- **Later / separate plans**: playerglobal recompilation, the
+  flash.text.engine (TextBlock/TextLine) family, the input.json
+  harness, Loader/LoaderInfo, BitmapData, graphics-mode avm2 tests,
+  AVM1↔AVM2 interop, AS3 games.
 
 Custom AVM2 regression tests go in `ruffle-tests/tests/swfs/regression/`
 (compiled with `~/CC/flex-sdk/bin/mxmlc`), per the existing convention.
