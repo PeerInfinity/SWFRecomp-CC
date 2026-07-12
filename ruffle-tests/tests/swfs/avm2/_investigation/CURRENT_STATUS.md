@@ -37,7 +37,16 @@ before it.
   - Seedling smoke: recompiling the real SWF emits 284 bitmaps + 116 binaries
     + 88 sounds (matches the census); generated abc_timeline.c is ~46 MB of
     raw RGBA — compresses well, revisit before Stage 9 (see memory).
-  - CI baseline: <PENDING — run after commit; see git log>.
+  - **CI baseline (run 29209081975, 2026-07-12): 754 / 1,204 passing + 21
+    ruffle_matched = 775 effective (62.6%)** — +27 over Stage 6's 748, in
+    avm1 (634/706, unchanged), gnash/shumway (73/92, unchanged), regression
+    (41/41, unchanged); wasm-link-smoke green. 28 newly passing (all Stage-7
+    bitmap candidates). The single avm2 "newly failing" is a PHANTOM regression
+    from upstream test drift, NOT this change: `stage_properties2`'s output.txt
+    grew 8→213 lines upstream (now asserts full stack-TRACE frames for the
+    Stage 2071 setters — `Error$/throwError`/`set height`/`logError`); our
+    getStackTrace formatting for those setter frames differs. Unrelated to
+    BitmapData/Bitmap; a pre-existing getStackTrace gap newly exposed.
 
 
 **Plan:** `SWFRecompDocs/plans/avm2-support-plan.md` (umbrella; stages,
