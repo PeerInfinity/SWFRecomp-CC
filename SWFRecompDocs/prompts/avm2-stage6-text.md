@@ -5,8 +5,9 @@ tests pass: **75/85 candidates** (72 pass + 3 ruffle_matched; exit >=60
 met) at `45a507da5`..`415205ed7`. The 10 misses are triaged in
 `STAGE6_CANDIDATES.txt` (7 = flash.text.engine TextBlock/TextLine
 family — the natural follow-up tranche; 2 = Loader infrastructure;
-1 = device-font TTF metric parity). CI baseline: recorded in
-`avm2/_investigation/CURRENT_STATUS.md`.
+1 = device-font TTF metric parity). CI baseline run 29180816425:
+**avm2 727/1201 + 21 RM = 748 effective (62.3%)**, +91 over Stage 5's
+657, zero pass->fail regressions in ANY suite, wasm-link-smoke green.
 
 You are implementing **Stage 6** of the AVM2 plan
 (`SWFRecompDocs/plans/avm2-support-plan.md`): the flash.text engine —

@@ -9,13 +9,20 @@ suite's trace tests.
 
 ## State
 
+- **CI baseline (run 29180816425, 2026-07-12): 727 / 1,201 passing +
+  21 ruffle_matched = 748 effective (62.3%)** — up from Stage 5's 657
+  effective (+91), **zero pass->fail regressions** in avm2 or ANY AVM1
+  suite (avm1 634/706+17RM, gnash suites, shumway 73/92 + 46/47,
+  regression 41/41 all unchanged), wasm-link-smoke green. Beyond the 62
+  candidate passes, Stage 6 also unlocked all_classes/security/swf11,
+  cryptscore, button_nested_frame, displayobject_hittestobject,
+  edittext_autosize_height_dynamic and other bystanders (+88 raw).
 - **Stage 6 COMPLETE (2026-07-12, commits `45a507da5`..`415205ed7`):
   75/85 Stage-6 candidates pass locally** (72 pass + 3 ruffle_matched;
   exit criterion >=60 met; `_investigation/STAGE6_CANDIDATES.txt` carries
   the triage of the 10 misses: 7 flash.text.engine
   (TextBlock/TextLine family, own follow-up), 2 Loader-infrastructure
-  font tests, 1 device-font metric parity). CI baseline: see the run
-  recorded below this entry. What landed:
+  font tests, 1 device-font metric parity). What landed:
   - Tranche 0 — all 13 Stage-5 stragglers: instance scope = class scope
     + [class object] (static slot writes from ctors), SimpleButton
     event/order/naming fixes (wrapper counter slot, nested-framescript
