@@ -772,6 +772,12 @@ struct Avm2EditTextExt
 	double hscroll;        // scrollH in px
 	int32_t scroll;        // scrollV (1-based line)
 	int32_t sel_begin, sel_end;
+	// Editing anchor/caret (Ruffle TextSelection from/to). sel_begin/sel_end are
+	// the normalized [start,end] the AS3 API reads; sel_to is the moving caret.
+	int32_t sel_from, sel_to;
+	// Whether the runtime injected input has ever set a real selection (once a
+	// TextField is focused / clicked, the caret exists at end).
+	uint8_t sel_active;
 	// EditText-owned bounds (twips). Distinct from the display matrix.
 	int32_t bounds_x, bounds_y, bounds_w, bounds_h;
 	uint16_t font_id;
@@ -3870,6 +3876,9 @@ static Avm2Value txt_set_selection(Avm2Activation* act)
 	if (e > len) e = len;
 	et->sel_begin = b < e ? b : e;
 	et->sel_end = b < e ? e : b;
+	et->sel_from = b;
+	et->sel_to = e;
+	et->sel_active = 1;
 	return avm2_undefined();
 }
 
@@ -5805,4 +5814,436 @@ void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield)
 	avm2_builtin_add_method(ctx, textfield, "getLineIndexAtPoint", txt_get_line_index_at_point);
 	avm2_builtin_add_method(ctx, textfield, "getTextRuns", txt_get_text_runs);
 	avm2_builtin_add_method(ctx, textfield, "getImageReference", txt_get_image_reference);
+}
+
+// ---------------------------------------------------------------------------
+// Stage 8 text-editing bridge (Ruffle edit_text.rs text_input/text_control_input)
+// ---------------------------------------------------------------------------
+
+int avm2_text_is_selectable(struct Avm2EditTextExt* et)
+{ return et != NULL && !et->no_select; }
+int avm2_text_was_static(struct Avm2EditTextExt* et)
+{ return et != NULL && et->was_static; }
+int avm2_text_is_editable(struct Avm2EditTextExt* et)
+{ return et != NULL && !et->read_only; }
+
+// Sync the display ext's tf_text mirror after an edit.
+static void et_mirror(Avm2Context* ctx, Avm2Object* focus, Avm2EditTextExt* et)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, focus);
+	if (ext != NULL) ext->tf_text = et->text;
+}
+
+// Number of insertable chars remaining (Ruffle available_chars).
+static uint32_t et_available_chars(Avm2EditTextExt* et)
+{
+	if (et->max_chars <= 0) return 0xFFFFFFFFu;
+	int32_t text_len = (int32_t) u16_length(et->text);
+	int32_t sel_len = et->sel_end - et->sel_begin;
+	int32_t avail = et->max_chars - (text_len - sel_len);
+	return avail > 0 ? (uint32_t) avail : 0;
+}
+
+// Insert a text string at the current selection (Ruffle text_input body, after
+// the textInput event). `ins` already newline/control-filtered.
+static void et_do_insert(Avm2Context* ctx, Avm2Object* focus, Avm2EditTextExt* et,
+                         const Avm2String* ins)
+{
+	uint32_t avail = et_available_chars(et);
+	if (avail == 0) return;
+	// Clamp to available chars (UTF-16 units).
+	uint32_t ins_len = u16_length(ins);
+	if (ins_len > avail)
+	{
+		uint32_t keep_b = u16_to_byte(ins, avail);
+		ins = avm2_string_new(ctx, ins->utf8, keep_b);
+		ins_len = u16_length(ins);
+	}
+	uint32_t start = (uint32_t) et->sel_begin, end = (uint32_t) et->sel_end;
+	spans_replace_text(ctx, et, start, end, ins);
+	uint32_t new_pos = start + ins_len;
+	et->sel_begin = et->sel_end = et->sel_from = et->sel_to = (int32_t) new_pos;
+	et_relayout(ctx, et);
+	et_mirror(ctx, focus, et);
+}
+
+// Dispatch the "change" event (Ruffle on_changed for AVM2).
+static void et_dispatch_change(Avm2Context* ctx, Avm2Object* focus)
+{
+	Avm2Object* ev = avm2_event_new(ctx, avm2_string_from_literal(ctx, "change"),
+	                                1, 0);
+	avm2_dispatch_event(ctx, focus, ev);
+}
+
+// codepoint -> heap UTF-8 Avm2String.
+static const Avm2String* str_from_cp(Avm2Context* ctx, int32_t cp)
+{
+	char buf[8]; int n = 0;
+	if (cp < 0) cp = 0;
+	if (cp < 0x80) buf[n++] = (char) cp;
+	else if (cp < 0x800)
+	{ buf[n++] = (char) (0xC0 | (cp >> 6)); buf[n++] = (char) (0x80 | (cp & 0x3F)); }
+	else if (cp < 0x10000)
+	{
+		buf[n++] = (char) (0xE0 | (cp >> 12));
+		buf[n++] = (char) (0x80 | ((cp >> 6) & 0x3F));
+		buf[n++] = (char) (0x80 | (cp & 0x3F));
+	}
+	else
+	{
+		buf[n++] = (char) (0xF0 | (cp >> 18));
+		buf[n++] = (char) (0x80 | ((cp >> 12) & 0x3F));
+		buf[n++] = (char) (0x80 | ((cp >> 6) & 0x3F));
+		buf[n++] = (char) (0x80 | (cp & 0x3F));
+	}
+	return avm2_string_new(ctx, buf, n);
+}
+
+void avm2_text_input_key(Avm2Context* ctx, Avm2Object* focus, int32_t key_code,
+                         int32_t char_code, int shift)
+{
+	// Editing is driven by the explicit TextInput / TextControl events the
+	// harness injects; raw KeyDown only fires the KeyboardEvent (handled in
+	// avm2_display.c). Nothing to do here.
+	(void) ctx; (void) focus; (void) key_code; (void) char_code; (void) shift;
+}
+
+// --- restrict (Ruffle EditTextRestrict) ---
+// Decode the next UTF-8 codepoint at *p (< end); advance *p.
+static int32_t utf8_next(const char** p, const char* end)
+{
+	const unsigned char* s = (const unsigned char*) *p;
+	if ((const char*) s >= end) return -1;
+	int32_t cp; int n;
+	if (s[0] < 0x80) { cp = s[0]; n = 1; }
+	else if ((s[0] & 0xE0) == 0xC0) { cp = s[0] & 0x1F; n = 2; }
+	else if ((s[0] & 0xF0) == 0xE0) { cp = s[0] & 0x0F; n = 3; }
+	else { cp = s[0] & 0x07; n = 4; }
+	for (int i = 1; i < n && (const char*) (s + i) < end; i++)
+		cp = (cp << 6) | (s[i] & 0x3F);
+	*p = (const char*) (s + n);
+	return cp;
+}
+
+// Is codepoint allowed by the parsed restrict? Parses restrict_str each call
+// (short strings). Returns: 1 allowed, 0 not.
+static int restrict_is_allowed(const Avm2String* rs, int32_t cp)
+{
+	if (rs == NULL) return 1;  // allow_all
+	const char* p = rs->utf8;
+	const char* end = rs->utf8 + rs->len;
+	if (p >= end) return 0;    // empty restrict = allow_none
+	// Walk tokens, tracking allow/disallow phase; test membership on the fly.
+	int now_allowing = 1;
+	int allowed_hit = 0, disallowed_hit = 0;
+	int allowed_any_interval = 0;  // whether any explicit allowed interval seen
+	int32_t last = -1;
+	int started_with_caret_all = 0;
+	while (p < end)
+	{
+		int32_t c = utf8_next(&p, end);
+		if (c == '\\')
+		{
+			if (p < end) c = utf8_next(&p, end); else break;
+			// escaped literal char
+			if (now_allowing) { allowed_any_interval = 1; if (cp == c) allowed_hit = 1; }
+			else { if (cp == c) disallowed_hit = 1; }
+			last = c;
+		}
+		else if (c == '^')
+		{
+			if (now_allowing && !allowed_any_interval && last < 0
+			    && !started_with_caret_all)
+			{
+				// leading ^ = allow all, then disallow
+				started_with_caret_all = 1;
+				allowed_hit = 1;  // INTERVAL_ALL contains cp
+				allowed_any_interval = 1;
+			}
+			now_allowing = !now_allowing;
+			last = -1;
+		}
+		else if (c == '-')
+		{
+			int32_t rstart = last >= 0 ? last : 0;
+			int32_t rend;
+			// peek next char token
+			if (p < end)
+			{
+				const char* save = p;
+				int32_t nxt = utf8_next(&p, end);
+				if (nxt == '\\') { if (p < end) nxt = utf8_next(&p, end); }
+				else if (nxt == '^' || nxt == '-') { p = save; nxt = rstart; }
+				rend = nxt;
+			}
+			else rend = rstart;
+			if (rend < rstart) rend = rstart;
+			if (now_allowing) { allowed_any_interval = 1; if (cp >= rstart && cp <= rend) allowed_hit = 1; }
+			else { if (cp >= rstart && cp <= rend) disallowed_hit = 1; }
+			last = -1;
+		}
+		else
+		{
+			if (now_allowing) { allowed_any_interval = 1; if (cp == c) allowed_hit = 1; }
+			else { if (cp == c) disallowed_hit = 1; }
+			last = c;
+		}
+	}
+	return allowed_hit && !disallowed_hit;
+}
+
+// Ruffle to_allowed: try char, then ASCII upper, then ASCII lower. Returns
+// the allowed codepoint or -1.
+static int32_t restrict_to_allowed(const Avm2String* rs, int32_t cp)
+{
+	if (restrict_is_allowed(rs, cp)) return cp;
+	int32_t up = (cp >= 'a' && cp <= 'z') ? cp - 32 : cp;
+	if (up != cp && restrict_is_allowed(rs, up)) return up;
+	int32_t lo = (cp >= 'A' && cp <= 'Z') ? cp + 32 : cp;
+	if (lo != cp && restrict_is_allowed(rs, lo)) return lo;
+	return -1;
+}
+
+// Filter a string through the field's restrict; returns a (possibly empty)
+// Avm2String.
+static const Avm2String* et_restrict_filter(Avm2Context* ctx, Avm2EditTextExt* et,
+                                             const Avm2String* s)
+{
+	if (!et->has_restrict) return s;
+	char buf[1024]; uint32_t bl = 0;
+	const char* p = s->utf8;
+	const char* end = s->utf8 + s->len;
+	while (p < end && bl + 4 < sizeof(buf))
+	{
+		int32_t cp = utf8_next(&p, end);
+		int32_t a = restrict_to_allowed(et->restrict_str, cp);
+		if (a < 0) continue;
+		if (a < 0x80) buf[bl++] = (char) a;
+		else if (a < 0x800)
+		{ buf[bl++] = (char)(0xC0|(a>>6)); buf[bl++]=(char)(0x80|(a&0x3F)); }
+		else if (a < 0x10000)
+		{ buf[bl++]=(char)(0xE0|(a>>12)); buf[bl++]=(char)(0x80|((a>>6)&0x3F)); buf[bl++]=(char)(0x80|(a&0x3F)); }
+		else
+		{ buf[bl++]=(char)(0xF0|(a>>18)); buf[bl++]=(char)(0x80|((a>>12)&0x3F)); buf[bl++]=(char)(0x80|((a>>6)&0x3F)); buf[bl++]=(char)(0x80|(a&0x3F)); }
+	}
+	return avm2_string_new(ctx, buf, bl);
+}
+
+// Full Ruffle EditText::text_input over an arbitrary string (typed char or
+// pasted text). Internal newline is '\r'; the textInput event exposes '\n'.
+static void et_text_input_string(Avm2Context* ctx, Avm2Object* focus,
+                                 Avm2EditTextExt* et, const Avm2String* raw)
+{
+	if (!avm2_text_is_editable(et) || et_available_chars(et) == 0) return;
+	// Build processed string: drop newlines (non-multiline), drop control chars
+	// except newline; store newline as '\r'.
+	char buf[2048]; uint32_t bl = 0;
+	const char* p = raw->utf8;
+	const char* end = raw->utf8 + raw->len;
+	while (p < end && bl + 4 < sizeof(buf))
+	{
+		int32_t cp = utf8_next(&p, end);
+		int is_nl = (cp == '\r' || cp == '\n');
+		if (!et->multiline && is_nl) continue;
+		if (cp < 0x20 && !is_nl) continue;
+		if (cp == 0x7F) continue;
+		if (is_nl) { buf[bl++] = '\r'; continue; }
+		if (cp < 0x80) buf[bl++] = (char) cp;
+		else if (cp < 0x800)
+		{ buf[bl++] = (char)(0xC0|(cp>>6)); buf[bl++]=(char)(0x80|(cp&0x3F)); }
+		else if (cp < 0x10000)
+		{ buf[bl++]=(char)(0xE0|(cp>>12)); buf[bl++]=(char)(0x80|((cp>>6)&0x3F)); buf[bl++]=(char)(0x80|(cp&0x3F)); }
+		else
+		{ buf[bl++]=(char)(0xF0|(cp>>18)); buf[bl++]=(char)(0x80|((cp>>12)&0x3F)); buf[bl++]=(char)(0x80|((cp>>6)&0x3F)); buf[bl++]=(char)(0x80|(cp&0x3F)); }
+	}
+	if (bl == 0) return;
+	const Avm2String* processed = avm2_string_new(ctx, buf, bl);
+
+	// textInput event: text with '\r' normalized to '\n'.
+	char ebuf[2048];
+	for (uint32_t i = 0; i < bl; i++) ebuf[i] = (buf[i] == '\r') ? '\n' : buf[i];
+	const Avm2String* evt_text = avm2_string_new(ctx, ebuf, bl);
+	Avm2Object* ev = avm2_text_event_new(ctx,
+		avm2_string_from_literal(ctx, "textInput"), 1, 1, evt_text);
+	avm2_dispatch_event(ctx, focus, ev);
+	if (avm2_event_is_cancelled(ev)) return;
+
+	// Restrict filtering happens AFTER the event; replace_text + on_changed run
+	// UNCONDITIONALLY even when the filtered text is empty (an empty caret
+	// insert is a no-op but STILL fires `change` — edittext_restrict_events).
+	const Avm2String* filtered = et_restrict_filter(ctx, et, processed);
+	et_do_insert(ctx, focus, et, filtered);
+	et_dispatch_change(ctx, focus);
+}
+
+// A single typed character (Ruffle EditText::text_input).
+void avm2_text_input_char(Avm2Context* ctx, Avm2Object* focus, int32_t codepoint)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, focus);
+	if (et == NULL) return;
+	et_text_input_string(ctx, focus, et, str_from_cp(ctx, codepoint));
+}
+
+// UTF-16 char-boundary moves (approximate: 1 code unit; surrogate-agnostic).
+static uint32_t et_prev_pos(const Avm2EditTextExt* et, uint32_t pos)
+{ (void) et; return pos > 0 ? pos - 1 : 0; }
+static uint32_t et_next_pos(const Avm2EditTextExt* et, uint32_t pos)
+{ uint32_t len = u16_length(et->text); return pos < len ? pos + 1 : len; }
+static int et_is_newline_at(const Avm2EditTextExt* et, uint32_t idx)
+{
+	uint32_t b = u16_to_byte(et->text, idx);
+	if (b >= et->text->len) return 0;
+	char c = et->text->utf8[b];
+	return c == '\r' || c == '\n';
+}
+static uint32_t et_prev_line(const Avm2EditTextExt* et, uint32_t pos)
+{
+	if (pos == 0) return 0;
+	uint32_t p = pos;
+	while (p > 0 && !et_is_newline_at(et, p - 1)) p--;
+	return p;
+}
+static uint32_t et_next_line(const Avm2EditTextExt* et, uint32_t pos)
+{
+	uint32_t len = u16_length(et->text);
+	uint32_t p = pos;
+	while (p < len && !et_is_newline_at(et, p)) p++;
+	return p;
+}
+
+// Compute the new caret for a Move/Select/Backspace/Delete control code.
+static uint32_t et_find_new_pos(const Avm2EditTextExt* et, const char* code,
+                                uint32_t cur)
+{
+	// Right-moving family (next boundary).
+	if (strstr(code, "Right") != NULL || strcmp(code, "Delete") == 0)
+	{
+		if (strstr(code, "Document") != NULL) return u16_length(et->text);
+		if (strstr(code, "Line") != NULL) return et_next_line(et, cur);
+		return et_next_pos(et, cur);  // char or word (approx char)
+	}
+	// Left-moving family (prev boundary).
+	if (strstr(code, "Left") != NULL || strncmp(code, "Backspace", 9) == 0)
+	{
+		if (strstr(code, "Document") != NULL) return 0;
+		if (strstr(code, "Line") != NULL) return et_prev_line(et, cur);
+		return et_prev_pos(et, cur);
+	}
+	return cur;
+}
+
+void avm2_text_input_control(Avm2Context* ctx, Avm2Object* focus,
+                             const char* ctrl, const char* clipboard)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, focus);
+	if (et == NULL) return;
+	int selectable = avm2_text_is_selectable(et);
+	int editable = avm2_text_is_editable(et);
+
+	// Applicability gate (Ruffle is_text_control_applicable).
+	int is_move = strncmp(ctrl, "Move", 4) == 0;
+	int is_select = strncmp(ctrl, "Select", 6) == 0;
+	int is_edit = (strncmp(ctrl, "Backspace", 9) == 0 || strncmp(ctrl, "Delete", 6) == 0
+	               || strcmp(ctrl, "Enter") == 0 || strcmp(ctrl, "Cut") == 0
+	               || strcmp(ctrl, "Paste") == 0);
+	if (is_move && !editable) return;
+	if (is_select && !selectable) return;
+	if (is_edit && !editable) return;
+
+	uint32_t from = (uint32_t) et->sel_from, to = (uint32_t) et->sel_to;
+	uint32_t start = from < to ? from : to;
+	uint32_t end = from < to ? to : from;
+	int is_caret = (from == to);
+	int changed = 0;
+
+	if (strcmp(ctrl, "Enter") == 0)
+	{
+		avm2_text_input_char(ctx, focus, '\r');
+		return;
+	}
+	else if (is_move)
+	{
+		uint32_t np = is_caret ? et_find_new_pos(et, ctrl, to)
+		                       : (strstr(ctrl, "Left") ? start : end);
+		et->sel_from = et->sel_to = (int32_t) np;
+		et->sel_begin = et->sel_end = (int32_t) np;
+	}
+	else if (is_select)
+	{
+		if (strstr(ctrl, "All") != NULL)
+		{
+			et->sel_from = 0;
+			et->sel_to = (int32_t) u16_length(et->text);
+		}
+		else
+		{
+			uint32_t np = et_find_new_pos(et, ctrl, to);
+			et->sel_to = (int32_t) np;
+		}
+		uint32_t nf = (uint32_t) et->sel_from, nt = (uint32_t) et->sel_to;
+		et->sel_begin = (int32_t) (nf < nt ? nf : nt);
+		et->sel_end = (int32_t) (nf < nt ? nt : nf);
+	}
+	else if (strcmp(ctrl, "Copy") == 0 || strcmp(ctrl, "Cut") == 0)
+	{
+		// Clipboard copy is a no-op for our trace harness (no clipboard read
+		// back except Paste via injected SetClipboardText).
+		if (strcmp(ctrl, "Cut") == 0 && !is_caret)
+		{
+			spans_replace_text(ctx, et, start, end,
+			                   avm2_string_from_literal(ctx, ""));
+			et->sel_begin = et->sel_end = et->sel_from = et->sel_to = (int32_t) start;
+			et_relayout(ctx, et);
+			et_mirror(ctx, focus, et);
+			changed = 1;
+		}
+	}
+	else if (strcmp(ctrl, "Paste") == 0)
+	{
+		if (clipboard != NULL && clipboard[0] != '\0')
+		{
+			// Paste routes through the shared text_input path (newline/control
+			// filtering, textInput event, restrict, maxChars clamp).
+			et_text_input_string(ctx, focus, et,
+				avm2_string_new(ctx, clipboard, (uint32_t) strlen(clipboard)));
+			// et_text_input_string already fired `change`; suppress the
+			// caller's duplicate dispatch.
+			changed = 0;
+		}
+	}
+	else if (strncmp(ctrl, "Backspace", 9) == 0 || strncmp(ctrl, "Delete", 6) == 0)
+	{
+		if (!is_caret)
+		{
+			spans_replace_text(ctx, et, start, end,
+			                   avm2_string_from_literal(ctx, ""));
+			et->sel_begin = et->sel_end = et->sel_from = et->sel_to = (int32_t) start;
+			changed = 1;
+		}
+		else if (strncmp(ctrl, "Backspace", 9) == 0)
+		{
+			if (start > 0)
+			{
+				uint32_t np = et_find_new_pos(et, ctrl, start);
+				spans_replace_text(ctx, et, np, start,
+				                   avm2_string_from_literal(ctx, ""));
+				et->sel_begin = et->sel_end = et->sel_from = et->sel_to = (int32_t) np;
+				changed = 1;
+			}
+		}
+		else  // Delete with caret
+		{
+			if (end < u16_length(et->text))
+			{
+				uint32_t np = et_find_new_pos(et, ctrl, start);
+				spans_replace_text(ctx, et, start, np,
+				                   avm2_string_from_literal(ctx, ""));
+				changed = 1;
+			}
+		}
+		if (changed) { et_relayout(ctx, et); et_mirror(ctx, focus, et); }
+	}
+
+	if (changed)
+		et_dispatch_change(ctx, focus);
 }

@@ -108,6 +108,44 @@ def ruffle_key_to_flash_code(key):
     return 0
 
 
+# keyLocation for named keys (KeyLocation: STANDARD=0, LEFT=1, RIGHT=2, NUMPAD=3)
+# Mirrors Ruffle tests/framework automation.rs key_location.
+KEY_LOCATION = {
+    "LeftShift": 1, "LeftControl": 1, "LeftAlt": 1,
+    "RightShift": 2, "RightControl": 2, "RightAlt": 2,
+    # NumLock is serialized as Numpad by automation, but Ruffle's
+    # map_to_key_location reports Standard (0) for it (FP quirk).
+    "NumLock": 0,
+    "NumpadLeft": 3, "NumpadUp": 3, "NumpadRight": 3, "NumpadDown": 3,
+    "NumpadPageUp": 3, "NumpadPageDown": 3, "NumpadEnd": 3, "NumpadHome": 3,
+    "NumpadInsert": 3, "NumpadDelete": 3,
+}
+
+# charCode for named keys — Ruffle events.rs LogicalKey::character(): only a
+# handful of control keys produce a character; the rest are 0.
+NAMED_KEY_CHARCODE = {
+    "Backspace": 8, "Tab": 9, "Enter": 13, "Return": 13,
+    "Escape": 27, "Delete": 127, "NumpadDelete": 127,
+}
+
+
+def ruffle_key_full(key):
+    """Return (keyCode, charCode, keyLocation) for a KeyDown/KeyUp key, matching
+    Ruffle's KeyboardEvent fields (keyCode=physical Flash code, charCode=logical
+    key character or 0, keyLocation per KeyLocation enum)."""
+    keycode = ruffle_key_to_flash_code(key)
+    if isinstance(key, str):
+        charcode = NAMED_KEY_CHARCODE.get(key, 0)
+        location = KEY_LOCATION.get(key, 0)
+        return (keycode, charcode, location)
+    if isinstance(key, dict):
+        if "Char" in key:
+            return (keycode, ord(key["Char"]), 0)
+        if "Numpad" in key:
+            return (keycode, ord(key["Numpad"]), 3)
+    return (keycode, 0, 0)
+
+
 def get_scale_factor(test_dir):
     """Parse scale_factor from test.toml viewport_dimensions, default 1.0."""
     toml_path = test_dir / "test.toml"
@@ -457,7 +495,10 @@ def preprocess_input_json(src, dst, scale_factor=1.0):
         elif t == "MouseDown":
             x, y = evt["pos"]
             btn = evt.get("btn", "Left")
-            lines.append(f"MOUSE_DOWN_{btn.upper()} {x / scale_factor:.6f} {y / scale_factor:.6f}")
+            # Explicit double-click index (Ruffle automation); default 0. AVM1
+            # (swf_core.c) ignores the trailing token; AVM2 reads it.
+            idx = evt.get("index", 0)
+            lines.append(f"MOUSE_DOWN_{btn.upper()} {x / scale_factor:.6f} {y / scale_factor:.6f} {idx}")
         elif t == "MouseUp":
             x, y = evt["pos"]
             btn = evt.get("btn", "Left")
@@ -467,11 +508,12 @@ def preprocess_input_json(src, dst, scale_factor=1.0):
             delta = evt.get('lines') or evt.get('pixels') or 0
             lines.append(f"MOUSE_WHEEL {delta}")
         elif t == "KeyDown":
-            code = ruffle_key_to_flash_code(evt.get("key", 0))
-            lines.append(f"KEY_DOWN {code}")
+            code, char, loc = ruffle_key_full(evt.get("key", 0))
+            # AVM1 (swf_core.c) reads only the first int; AVM2 reads all three.
+            lines.append(f"KEY_DOWN {code} {char} {loc}")
         elif t == "KeyUp":
-            code = ruffle_key_to_flash_code(evt.get("key", 0))
-            lines.append(f"KEY_UP {code}")
+            code, char, loc = ruffle_key_full(evt.get("key", 0))
+            lines.append(f"KEY_UP {code} {char} {loc}")
         elif t == "TextInput":
             cp_raw = evt.get("codepoint", "")
             cp = ord(cp_raw[0]) if cp_raw else 0
@@ -481,7 +523,11 @@ def preprocess_input_json(src, dst, scale_factor=1.0):
         elif t == "FocusGained":
             lines.append("FOCUSGAINED")
         elif t == "SetClipboardText":
-            lines.append(f"SET_CLIPBOARD_TEXT {evt.get('text', '')}")
+            # Escape backslashes/newlines so multi-line clipboard text stays on
+            # one line (the AVM2 parser unescapes; AVM1 single-line is
+            # unaffected since it has no newline to escape).
+            ct = evt.get('text', '').replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
+            lines.append(f"SET_CLIPBOARD_TEXT {ct}")
         elif t == "FocusLost":
             lines.append("FOCUSLOST")
         elif t == "ImePreedit":

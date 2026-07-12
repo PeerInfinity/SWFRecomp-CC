@@ -132,19 +132,23 @@ int main(int argc, char* argv[]) {
 
 #ifndef __EMSCRIPTEN__
     printf("SWF Runtime Loaded (Native Build)\n\n");
+#ifdef SWF_AVM2
+    // AS3 SWF (RecompiledABC/ present): dispatch to the AVM2 runtime.
+    // AVM1 builds never define SWF_AVM2 and never link src/avm2/*.c.
+    {
+        extern void avm2_input_load(const char* path);
+        extern void runSWF_avm2(SWFAppContext* app_context);
+        if (argc > 1) {
+            avm2_input_load(argv[1]);
+        }
+        runSWF_avm2(&app_context);
+    }
+#else
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
     if (argc > 1) {
         input_events_load(argv[1]);
     }
 #endif
-#ifdef SWF_AVM2
-    // AS3 SWF (RecompiledABC/ present): dispatch to the AVM2 runtime.
-    // AVM1 builds never define SWF_AVM2 and never link src/avm2/*.c.
-    {
-        extern void runSWF_avm2(SWFAppContext* app_context);
-        runSWF_avm2(&app_context);
-    }
-#else
     swfStart(&app_context);
 #endif
 #else

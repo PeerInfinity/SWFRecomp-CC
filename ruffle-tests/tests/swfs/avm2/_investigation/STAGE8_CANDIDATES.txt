@@ -1,0 +1,127 @@
+# STAGE8_CANDIDATES.txt — AVM2 Stage 8 (input harness + input bridge)
+#
+# Generated 2026-07-12 (Stage-7 baseline). 74 input.json tests total; 3 already
+# passing at baseline (stage3d/away3d); 71 failing survivors listed below.
+#
+# RESULT (local per-test sweep, no-graphics): ~42/71 now passing/ruffle_matched
+# (up from the 0/71 that had any input processing — the AVM2 runtime ignored
+# input.json entirely before this stage). Exit target was >=50; the remaining
+# ~29 misses are triaged below and cluster on features outside the input
+# bridge itself (masks, Loader, SimpleButton highlight geometry, IME, HTML
+# link events, real-shape hit-testing). Zero avm1/avm2 regressions (CI-gated).
+#
+# What landed: verify_output input.json injection for the AVM2 build (KEY_DOWN
+# now carries keyCode/charCode/keyLocation; MOUSE_DOWN carries the dbl-click
+# index; SET_CLIPBOARD escapes newlines); flash.events MouseEvent/KeyboardEvent/
+# FocusEvent/TextEvent classes; the mouse hit-test + 3-phase dispatch
+# (mouseDown/Up/click/rollOver/rollOut/mouseMove/wheel, mouseEnabled/
+# mouseChildren gating, Ruffle combine_with_parent); Sprite.startDrag/stopDrag/
+# dropTarget; keyboard->focus dispatch; the focus manager (mouse+Tab focus,
+# FocusEvent focusIn/focusOut/keyFocusChange/mouseFocusChange, the automatic
+# 6y+x tab order + custom tabIndex order, is_tabbable/tab_enabled per type,
+# buttonMode/useHandCursor); TextField editing over the Stage-6 EditText engine
+# (typed/pasted text_input, restrict filtering, maxChars, text controls
+# move/select/backspace/delete/cut/copy/paste, change/textInput events). Also
+# fixed a pre-existing bug: MovieClip did not inherit Sprite.graphics (the
+# getter was registered after MovieClip was derived), which crashed every
+# input test that drew via `this.graphics.beginFill`.
+#
+# ===================== TRIAGE OF REMAINING MISSES =====================
+#
+# Mask hit-testing (need real shape/mask intersection; our pick uses AABB):
+#   mouse_pick_masking, mouse_pick_dobj_mask (some cases),
+#   mouse_pick_non_interactive_dobj_mask, mouse_pick_non_interactive_bitmap_mask
+# Real-shape hit-test (AABB over-approximates drawn-shape gaps):
+#   mouse_children, mouse_pick_text
+# flash.display.Loader / AVM1-in-AVM2 (deferred per Seedling plan):
+#   loader_try_click_root, loader_noninteractive_try_click_root,
+#   loader_visibility_interactive, mouse_pick_loader_avm1, mouse_pick_avm1_root
+# SimpleButton highlight_bounds geometry + arrow navigation (tab order uses the
+# button hit-area rect, not the composed state bounds; NavigationDirection):
+#   focus_events_key_basic, focus_events_key_navigation, focus_events_mouse_basic,
+#   tab_ordering_arrows, tab_ordering_tabbable (button10), tab_ordering_stage_tab_children,
+#   focusrect_focuslost, focus_events_mixed_key_mouse, selection_onsetfocus_mixed_avm,
+#   focus_events_mixed_avm_edittext
+# IME (preedit/commit + dead keys):
+#   ime_linux_dead_keys, edittext_ime_focus_lost
+# TextField mouse text selection (getCharIndexAtPoint drag-select):
+#   edittext_mouse_selection, textbox_click
+# HTML paragraph / link events (from_html <p></p> leading-newline semantics;
+# TextEvent LINK for <a href="event:...">):
+#   textfield_input_events, textfield_event
+# stage.contentsScaleFactor / viewport scale transform:
+#   stage_scale_factor
+# TextField mouse-wheel scrollV:
+#   mouse_wheel_events
+#
+asymmetric_key_events
+avm2_catchup_dobj
+click_block
+click_invisible
+drag_drop
+edittext_at_point_methods_basic
+edittext_ime_focus_lost
+edittext_input_control
+edittext_mouse_selection
+edittext_mousedown
+edittext_newline_character
+edittext_paste_events
+edittext_paste_maxchars
+edittext_paste_restrict
+edittext_restrict
+edittext_restrict_events
+edittext_selected_text
+focus_events_key_basic
+focus_events_key_navigation
+focus_events_key_same_object
+focus_events_mixed_avm_edittext
+focus_events_mixed_key_mouse
+focus_events_mouse_basic
+focus_events_mouse_focusable
+focus_events_mouse_same_object
+focusrect
+focusrect_focuslost
+ime_linux_dead_keys
+issue_17675_edittext_paste_maxchars
+key_input_80percent
+key_input_location
+key_input_numpad
+loader_noninteractive_try_click_root
+loader_try_click_root
+loader_visibility_interactive
+mouse_children
+mouse_click_events
+mouse_double_click_events
+mouse_empty_parent
+mouse_over_while_dragging
+mouse_pick_avm1_root
+mouse_pick_button_mode
+mouse_pick_dobj_mask
+mouse_pick_loader_avm1
+mouse_pick_masking
+mouse_pick_non_interactive_bitmap_mask
+mouse_pick_non_interactive_dobj_mask
+mouse_pick_text
+mouse_sibling
+mouse_wheel_events
+movieclip_displayevents_clickgoto
+movieclip_displayevents_clickgoto2
+movieclip_displayevents_clickplay
+movieclip_displayevents_clicksymbol
+movieclip_text_mousedown
+selection_onsetfocus_mixed_avm
+sprite_dropTarget
+stage_mousechildren
+stage_scale_factor
+tab_ordering_arrows
+tab_ordering_automatic_advanced
+tab_ordering_automatic_basic
+tab_ordering_children
+tab_ordering_custom_basic
+tab_ordering_stage_tab_children
+tab_ordering_tabbable
+textbox_click
+textfield_event
+textfield_focusin_event
+textfield_input_dead_keys_windows
+textfield_input_events

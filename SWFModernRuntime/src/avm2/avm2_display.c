@@ -792,6 +792,7 @@ static void insert_at_index(Avm2Context* ctx, Avm2Object* parent, Avm2Object* ch
 
 // Full removal (Ruffle remove_child, AVM2 direct path).
 static Avm2Object* g_stage_focus;
+static void set_focus(Avm2Context* ctx, Avm2Object* new_focus);
 
 static void full_remove_child(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
                               Avm2Object* child)
@@ -2117,6 +2118,10 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// on-stage TextField (Ruffle EditText::render_self ->
 	// apply_autosize_bounds; edittext_autosize_lazy_bounds_events).
 	render_apply_text_bounds(ctx, ctx->stage, 1);
+
+	// Stage 8: deliver this tick's injected input (Ruffle processes input at
+	// frame boundaries — after the frame's scripts). One WAIT group per tick.
+	avm2_input_pump_tick(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -2716,16 +2721,25 @@ static Avm2Value do_set_filters(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+static void local_mouse(Avm2Context* ctx, Avm2Object* obj, double* lx, double* ly);
+
 static Avm2Value do_get_mouse_x(Avm2Activation* act)
 {
-	(void) act;
-	return avm2_number(0);  // no input injection in trace tests
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_number(0);
+	double lx = 0, ly = 0;
+	local_mouse(act->ctx, self, &lx, &ly);
+	// mouseX is twips-quantized (Ruffle round to nearest twip -> pixels).
+	return avm2_number(round(lx * 20.0) / 20.0);
 }
 
 static Avm2Value do_get_mouse_y(Avm2Activation* act)
 {
-	(void) act;
-	return avm2_number(0);
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_number(0);
+	double lx = 0, ly = 0;
+	local_mouse(act->ctx, self, &lx, &ly);
+	return avm2_number(round(ly * 20.0) / 20.0);
 }
 
 static Avm2Value do_get_loader_info(Avm2Activation* act)
@@ -4708,14 +4722,12 @@ static Avm2Value stage_set_focus(Avm2Activation* act)
 	    && act->args[0].u.obj != NULL
 	    && avm2_display_ext_of(act->ctx, act->args[0].u.obj) != NULL)
 	{
-		// Focusing a TextField applies its pending autosize bounds
-		// (edittext_autosize_lazy_bounds_interactions).
-		avm2_text_apply_pending_bounds(act->ctx, act->args[0].u.obj);
-		g_stage_focus = act->args[0].u.obj;
+		// Programmatic focus fires focusOut/focusIn (Ruffle focus_tracker.set).
+		set_focus(act->ctx, act->args[0].u.obj);
 	}
 	else
 	{
-		g_stage_focus = NULL;
+		set_focus(act->ctx, NULL);
 	}
 	return avm2_undefined();
 }
@@ -4755,6 +4767,7 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 	ext->mouse_enabled = 1;
 	ext->mouse_children = 1;
 	ext->tab_children = 1;
+	ext->use_hand_cursor = 1;
 	ext->playing = 1;
 	ext->queued_goto_frame = -1;
 	ext->last_queued_script_frame = -1;
@@ -4869,6 +4882,944 @@ static void add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	avm2_builtin_add_getset(ctx, cls, name, getter, setter);
 }
 
+// ===========================================================================
+// Stage 8: input harness + input->event bridge
+//
+// Parses the line-based input_events.txt (verify_output.py::preprocess_input_json)
+// and drives the AVM2 mouse/keyboard/focus dispatch, mirroring Ruffle's
+// player.rs::update_mouse_state + interactive.rs::event_dispatch_to_avm2. Events
+// are pumped once per tick (at the tail of avm2_display_run_tick), one WAIT
+// group per tick — the same cadence swf_core.c uses for AVM1.
+// ===========================================================================
+
+typedef enum
+{
+	IN_WAIT, IN_MOUSE_MOVE, IN_MOUSE_DOWN, IN_MOUSE_UP, IN_MOUSE_WHEEL,
+	IN_KEY_DOWN, IN_KEY_UP, IN_TEXT_INPUT, IN_TEXT_CONTROL,
+	IN_FOCUS_GAINED, IN_FOCUS_LOST, IN_SET_CLIPBOARD, IN_IME_PREEDIT,
+	IN_IME_COMMIT
+} Avm2InputKind;
+
+typedef struct
+{
+	Avm2InputKind kind;
+	float x, y;       // mouse stage pixels
+	int32_t code;     // key code / text codepoint / wheel delta
+	int32_t code2;    // key charCode
+	int32_t code3;    // key keyLocation
+	int button;       // 0 left, 1 middle, 2 right
+	char text[1024];
+	char ctrl[32];
+} Avm2InputEvent;
+
+static Avm2InputEvent* g_in_events;
+static size_t g_in_count, g_in_pos;
+
+// Mouse/keyboard state (Ruffle context.input + mouse_data).
+static double g_mouse_x, g_mouse_y;       // stage pixels
+static uint8_t g_mouse_btn_down[3];       // left/middle/right
+static uint8_t g_key_down_map[256];       // modifier tracking by Flash keyCode
+static Avm2Object* g_mouse_hovered;       // interactive object under mouse
+static Avm2Object* g_mouse_pressed[3];    // per-button press target
+static uint32_t g_left_click_index;       // increments per left press (dbl-click)
+static const char* g_clipboard_text;      // SetClipboardText
+
+void avm2_input_load(const char* path)
+{
+	FILE* f = fopen(path, "r");
+	if (f == NULL) return;
+	char line[2048];
+	size_t count = 0;
+	while (fgets(line, sizeof(line), f)) count++;
+	rewind(f);
+	g_in_events = malloc((count + 1) * sizeof(Avm2InputEvent));
+	if (g_in_events == NULL) { fclose(f); return; }
+	g_in_count = 0;
+	while (fgets(line, sizeof(line), f))
+	{
+		Avm2InputEvent ev;
+		memset(&ev, 0, sizeof(ev));
+		if (strncmp(line, "WAIT", 4) == 0)
+			ev.kind = IN_WAIT;
+		else if (strncmp(line, "MOUSE_MOVE ", 11) == 0)
+			{ sscanf(line + 11, "%f %f", &ev.x, &ev.y); ev.kind = IN_MOUSE_MOVE; }
+		else if (strncmp(line, "MOUSE_DOWN_LEFT ", 16) == 0)
+			{ sscanf(line + 16, "%f %f %d", &ev.x, &ev.y, &ev.code); ev.kind = IN_MOUSE_DOWN; ev.button = 0; }
+		else if (strncmp(line, "MOUSE_UP_LEFT ", 14) == 0)
+			{ sscanf(line + 14, "%f %f", &ev.x, &ev.y); ev.kind = IN_MOUSE_UP; ev.button = 0; }
+		else if (strncmp(line, "MOUSE_DOWN_MIDDLE ", 18) == 0)
+			{ sscanf(line + 18, "%f %f", &ev.x, &ev.y); ev.kind = IN_MOUSE_DOWN; ev.button = 1; }
+		else if (strncmp(line, "MOUSE_UP_MIDDLE ", 16) == 0)
+			{ sscanf(line + 16, "%f %f", &ev.x, &ev.y); ev.kind = IN_MOUSE_UP; ev.button = 1; }
+		else if (strncmp(line, "MOUSE_DOWN_RIGHT ", 17) == 0)
+			{ sscanf(line + 17, "%f %f", &ev.x, &ev.y); ev.kind = IN_MOUSE_DOWN; ev.button = 2; }
+		else if (strncmp(line, "MOUSE_UP_RIGHT ", 15) == 0)
+			{ sscanf(line + 15, "%f %f", &ev.x, &ev.y); ev.kind = IN_MOUSE_UP; ev.button = 2; }
+		else if (strncmp(line, "MOUSE_WHEEL ", 12) == 0)
+			{ sscanf(line + 12, "%d", &ev.code); ev.kind = IN_MOUSE_WHEEL; }
+		else if (strncmp(line, "KEY_DOWN ", 9) == 0)
+			{ sscanf(line + 9, "%d %d %d", &ev.code, &ev.code2, &ev.code3); ev.kind = IN_KEY_DOWN; }
+		else if (strncmp(line, "KEY_UP ", 7) == 0)
+			{ sscanf(line + 7, "%d %d %d", &ev.code, &ev.code2, &ev.code3); ev.kind = IN_KEY_UP; }
+		else if (strncmp(line, "TEXT_INPUT ", 11) == 0)
+			{ sscanf(line + 11, "%d", &ev.code); ev.kind = IN_TEXT_INPUT; }
+		else if (strncmp(line, "TEXT_CONTROL ", 13) == 0)
+			{ sscanf(line + 13, "%31s", ev.ctrl); ev.kind = IN_TEXT_CONTROL; }
+		else if (strncmp(line, "FOCUSGAINED", 11) == 0)
+			ev.kind = IN_FOCUS_GAINED;
+		else if (strncmp(line, "FOCUSLOST", 9) == 0)
+			ev.kind = IN_FOCUS_LOST;
+		else if (strncmp(line, "SET_CLIPBOARD_TEXT", 18) == 0)
+		{
+			ev.kind = IN_SET_CLIPBOARD;
+			if (line[18] == ' ')
+			{
+				// Strip the trailing file newline first, then unescape
+				// \\ / \n / \r (the harness escapes embedded newlines).
+				char raw[1024];
+				strncpy(raw, line + 19, sizeof(raw) - 1);
+				raw[sizeof(raw) - 1] = '\0';
+				size_t rl = strlen(raw);
+				while (rl > 0 && (raw[rl-1] == '\n' || raw[rl-1] == '\r'))
+					raw[--rl] = '\0';
+				size_t o = 0;
+				for (size_t i = 0; i < rl && o < sizeof(ev.text) - 1; i++)
+				{
+					if (raw[i] == '\\' && i + 1 < rl)
+					{
+						char n = raw[++i];
+						ev.text[o++] = (n == 'n') ? '\n' : (n == 'r') ? '\r' : n;
+					}
+					else ev.text[o++] = raw[i];
+				}
+				ev.text[o] = '\0';
+			}
+		}
+		else
+			continue;
+		g_in_events[g_in_count++] = ev;
+	}
+	fclose(f);
+}
+
+static int mod_shift(void) { return g_key_down_map[16] != 0; }
+static int mod_ctrl(void)  { return g_key_down_map[17] != 0; }
+static int mod_alt(void)   { return g_key_down_map[18] != 0; }
+
+static int is_interactive(Avm2Context* ctx, Avm2Object* obj)
+{
+	return obj != NULL && obj->cls != NULL
+	       && class_is_a(obj->cls, ctx->builtins.interactive_object_class);
+}
+
+// Self bounds including flash.display.Bitmap dims (mirror bounds_with_transform).
+static Rect self_bounds_full(Avm2Context* ctx, Avm2Object* obj,
+                             Avm2DisplayObjectExt* ext)
+{
+	Rect self = display_self_bounds(ext);
+	if (!self.valid && ext->is_bitmap)
+	{
+		uint32_t bw = 0, bh = 0;
+		if (avm2_bitmap_self_dims(ctx, obj, &bw, &bh))
+		{
+			self.valid = 1;
+			self.xmin = 0;
+			self.xmax = (double) bw * 20.0;
+			self.ymin = 0;
+			self.ymax = (double) bh * 20.0;
+		}
+	}
+	return self;
+}
+
+// Does obj's OWN shape (self bounds) contain the stage point (twips)? Maps the
+// point into obj's local space so rotation/scale are honored (AABB hit test).
+static int point_in_self(Avm2Context* ctx, Avm2Object* obj, double px, double py)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return 0;
+	Rect self = self_bounds_full(ctx, obj, ext);
+	if (!self.valid) return 0;
+	Mat m = display_world_matrix(ctx, obj);
+	Mat inv = mat_invert(&m);
+	double lx = inv.a * px + inv.c * py + inv.tx;
+	double ly = inv.b * px + inv.d * py + inv.ty;
+	return lx >= self.xmin && lx <= self.xmax && ly >= self.ymin && ly <= self.ymax;
+}
+
+typedef enum { PK_MISS, PK_PROP, PK_HIT } PkKind;
+typedef struct { PkKind kind; Avm2Object* target; } Pk;
+
+static Pk pk_make(PkKind k, Avm2Object* t) { Pk p; p.kind = k; p.target = t; return p; }
+
+// Ruffle Avm2MousePick::combine_with_parent.
+static Pk pk_combine(Avm2Context* ctx, Pk p, Avm2Object* parent)
+{
+	Avm2DisplayObjectExt* pext = avm2_display_ext_of(ctx, parent);
+	int pme = pext == NULL || pext->mouse_enabled;
+	int pmc = pext == NULL || pext->mouse_children;
+	switch (p.kind)
+	{
+	case PK_HIT:
+		if (pmc) return p;
+		return pme ? pk_make(PK_HIT, parent) : pk_make(PK_PROP, NULL);
+	case PK_PROP:
+		return pme ? pk_make(PK_HIT, parent) : pk_make(PK_PROP, NULL);
+	default:
+		return pk_make(PK_MISS, NULL);
+	}
+}
+
+// Ruffle movie_clip.rs::mouse_pick_avm2 (AABB approximation; no masks/clip
+// layers). point in twips.
+static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return pk_make(PK_MISS, NULL);
+	if (!ext->is_stage && !ext->visible) return pk_make(PK_MISS, NULL);
+
+	// TextField (Ruffle edit_text.rs::mouse_pick_avm2): a hovered selectable OR
+	// non-static field hits; a static non-selectable field propagates to the
+	// parent (which may absorb it).
+	if (ext->edittext != NULL)
+	{
+		if (point_in_self(ctx, obj, px, py))
+		{
+			int selectable = avm2_text_is_selectable(ext->edittext);
+			int was_static = avm2_text_was_static(ext->edittext);
+			if (ext->mouse_enabled && (selectable || !was_static))
+				return pk_make(PK_HIT, obj);
+			return pk_make(PK_PROP, NULL);
+		}
+		return pk_make(PK_MISS, NULL);
+	}
+
+	Pk found_prop = pk_make(PK_MISS, NULL);
+	// Interactive children first (pass 0), then non-interactive (pass 1); each
+	// group top-down (reverse render order).
+	for (int pass = 0; pass < 2; pass++)
+	{
+		for (int32_t i = (int32_t) ext->render_len - 1; i >= 0; i--)
+		{
+			Avm2Object* child = ext->render_list[i];
+			int ci = is_interactive(ctx, child);
+			if (pass == 0 && !ci) continue;
+			if (pass == 1 && ci) continue;
+			Pk res;
+			if (ci)
+			{
+				res = mouse_pick(ctx, child, px, py);
+			}
+			else
+			{
+				Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+				if (cext != NULL && cext->visible && point_in_self(ctx, child, px, py))
+					res = ext->mouse_enabled ? pk_make(PK_HIT, obj)
+					                         : pk_make(PK_PROP, NULL);
+				else
+					res = pk_make(PK_MISS, NULL);
+			}
+			if (res.kind == PK_HIT) return pk_combine(ctx, res, obj);
+			if (res.kind == PK_PROP) found_prop = res;
+		}
+	}
+	if (found_prop.kind != PK_MISS) return pk_combine(ctx, found_prop, obj);
+
+	// Self drawing / shape.
+	if (point_in_self(ctx, obj, px, py))
+		return ext->mouse_enabled ? pk_make(PK_HIT, obj) : pk_make(PK_PROP, NULL);
+	return pk_make(PK_MISS, NULL);
+}
+
+// Ruffle player.rs::run_mouse_pick. Returns the interactive target under the
+// mouse, or NULL (stage / miss).
+static Avm2Object* run_mouse_pick(Avm2Context* ctx)
+{
+	Avm2Object* stage = ctx->stage;
+	Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, stage);
+	if (sext == NULL) return NULL;
+	double px = g_mouse_x * 20.0, py = g_mouse_y * 20.0;
+	for (int32_t i = (int32_t) sext->render_len - 1; i >= 0; i--)
+	{
+		Avm2Object* level = sext->render_list[i];
+		if (!is_interactive(ctx, level)) continue;
+		Pk pick = mouse_pick(ctx, level, px, py);
+		pick = pk_combine(ctx, pick, stage);
+		if (pick.kind == PK_HIT)
+		{
+			if (pick.target == stage) return NULL;
+			return pick.target;
+		}
+	}
+	return NULL;
+}
+
+// --- Drag (Sprite.startDrag / stopDrag / dropTarget; Ruffle update_drag) ---
+static Avm2Object* g_drag_object;
+static int g_drag_lock_center;
+static double g_drag_last_mx, g_drag_last_my;  // stage px
+static int g_drag_has_constraint;
+static double g_drag_cx0, g_drag_cy0, g_drag_cx1, g_drag_cy1;  // twips
+static Avm2Object* g_drag_drop_target;
+
+static void update_drag(Avm2Context* ctx)
+{
+	if (g_drag_object == NULL) return;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, g_drag_object);
+	if (ext == NULL) return;
+	Avm2Object* parent = ext->parent;
+	Mat l2g = parent != NULL ? display_world_matrix(ctx, parent) : mat_identity();
+	Mat g2l = mat_invert(&l2g);
+	double mx = g_mouse_x * 20.0, my = g_mouse_y * 20.0;
+	double nx, ny;
+	if (g_drag_lock_center)
+	{
+		nx = g2l.a * mx + g2l.c * my + g2l.tx;
+		ny = g2l.b * mx + g2l.d * my + g2l.ty;
+	}
+	else
+	{
+		double dmx = (g_mouse_x - g_drag_last_mx) * 20.0;
+		double dmy = (g_mouse_y - g_drag_last_my) * 20.0;
+		double ldx = g2l.a * dmx + g2l.c * dmy;
+		double ldy = g2l.b * dmx + g2l.d * dmy;
+		nx = (double) ext->mtx_tx + ldx;
+		ny = (double) ext->mtx_ty + ldy;
+		g_drag_last_mx = g_mouse_x;
+		g_drag_last_my = g_mouse_y;
+	}
+	if (g_drag_has_constraint)
+	{
+		if (nx < g_drag_cx0) nx = g_drag_cx0;
+		if (nx > g_drag_cx1) nx = g_drag_cx1;
+		if (ny < g_drag_cy0) ny = g_drag_cy0;
+		if (ny > g_drag_cy1) ny = g_drag_cy1;
+	}
+	ext->mtx_tx = (int32_t) nearbyint(nx);
+	ext->mtx_ty = (int32_t) nearbyint(ny);
+	// dropTarget = object under the mouse with the dragged object hidden.
+	uint8_t was_vis = ext->visible;
+	ext->visible = 0;
+	g_drag_drop_target = run_mouse_pick(ctx);
+	ext->visible = was_vis;
+}
+
+static Avm2Value do_start_drag(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(act->ctx, self);
+	if (ext == NULL) return avm2_undefined();
+	g_drag_object = self;
+	g_drag_lock_center = act->argc > 0 && avm2_coerce_to_boolean(act->args[0]);
+	g_drag_last_mx = g_mouse_x;
+	g_drag_last_my = g_mouse_y;
+	g_drag_has_constraint = 0;
+	if (act->argc > 1 && act->args[1].kind == AVM2_VALUE_OBJECT
+	    && act->args[1].u.obj != NULL)
+	{
+		Avm2Object* r = act->args[1].u.obj;
+		if (r->slot_count > 4)
+		{
+			double x = avm2_coerce_to_number(act->ctx, r->slots[1]);
+			double y = avm2_coerce_to_number(act->ctx, r->slots[2]);
+			double w = avm2_coerce_to_number(act->ctx, r->slots[3]);
+			double h = avm2_coerce_to_number(act->ctx, r->slots[4]);
+			double x0 = x * 20.0, y0 = y * 20.0, x1 = (x + w) * 20.0, y1 = (y + h) * 20.0;
+			g_drag_cx0 = x0 < x1 ? x0 : x1;
+			g_drag_cx1 = x0 < x1 ? x1 : x0;
+			g_drag_cy0 = y0 < y1 ? y0 : y1;
+			g_drag_cy1 = y0 < y1 ? y1 : y0;
+			g_drag_has_constraint = 1;
+		}
+	}
+	update_drag(act->ctx);
+	return avm2_undefined();
+}
+
+static Avm2Value do_stop_drag(Avm2Activation* act)
+{
+	(void) act;
+	g_drag_object = NULL;
+	return avm2_undefined();
+}
+
+static Avm2Value do_get_drop_target(Avm2Activation* act)
+{
+	(void) act;
+	return g_drag_drop_target != NULL ? avm2_object_value(g_drag_drop_target)
+	                                  : avm2_null();
+}
+
+static Avm2Value do_get_button_mode(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* e = this_display(act);
+	return avm2_bool(e != NULL && e->button_mode);
+}
+static Avm2Value do_set_button_mode(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* e = this_display(act);
+	if (e != NULL && act->argc > 0)
+		e->button_mode = avm2_coerce_to_boolean(act->args[0]) ? 1 : 0;
+	return avm2_undefined();
+}
+static Avm2Value do_get_use_hand(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* e = this_display(act);
+	return avm2_bool(e == NULL || e->use_hand_cursor);
+}
+static Avm2Value do_set_use_hand(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* e = this_display(act);
+	if (e != NULL && act->argc > 0)
+		e->use_hand_cursor = avm2_coerce_to_boolean(act->args[0]) ? 1 : 0;
+	return avm2_undefined();
+}
+
+// local mouse position of obj (pixels).
+static void local_mouse(Avm2Context* ctx, Avm2Object* obj, double* lx, double* ly)
+{
+	Mat m = display_world_matrix(ctx, obj);
+	Mat inv = mat_invert(&m);
+	double gx = g_mouse_x * 20.0, gy = g_mouse_y * 20.0;
+	*lx = (inv.a * gx + inv.c * gy + inv.tx) / 20.0;
+	*ly = (inv.b * gx + inv.d * gy + inv.ty) / 20.0;
+}
+
+void avm2_display_event_stage_coords(Avm2Context* ctx, Avm2Object* target,
+                                     double lx, double ly, double* sx, double* sy)
+{
+	if (target == NULL || avm2_display_ext_of(ctx, target) == NULL || isnan(lx))
+	{
+		*sx = lx; *sy = ly;
+		return;
+	}
+	Mat m = display_world_matrix(ctx, target);
+	double px = lx * 20.0, py = ly * 20.0;
+	*sx = (m.a * px + m.c * py + m.tx) / 20.0;
+	*sy = (m.b * px + m.d * py + m.ty) / 20.0;
+}
+
+// Construct + dispatch a MouseEvent to a display object (its object2 is itself).
+static int dispatch_mouse(Avm2Context* ctx, Avm2Object* target,
+                          const char* type, Avm2Object* related, int32_t delta,
+                          int bubbles, int button)
+{
+	if (target == NULL) return 0;
+	double lx = NAN, ly = NAN;
+	local_mouse(ctx, target, &lx, &ly);
+	int button_down = g_mouse_btn_down[button < 0 || button > 2 ? 0 : button];
+	Avm2Object* ev = avm2_mouse_event_new(
+		ctx, avm2_string_from_literal(ctx, type), bubbles, 0, lx, ly, related,
+		mod_shift(), mod_ctrl(), mod_alt(), button_down, delta);
+	return avm2_dispatch_event(ctx, target, ev);
+}
+
+static Avm2Object* display_parent_obj(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	return e != NULL ? e->parent : NULL;
+}
+
+static Avm2Object* lowest_common_ancestor(Avm2Context* ctx, Avm2Object* from,
+                                          Avm2Object* to)
+{
+	Avm2Object* from_p[64]; int fn = 0;
+	for (Avm2Object* u = from; u != NULL && fn < 64; u = display_parent_obj(ctx, u))
+		from_p[fn++] = u;
+	Avm2Object* to_p[64]; int tn = 0;
+	for (Avm2Object* u = to; u != NULL && tn < 64; u = display_parent_obj(ctx, u))
+		to_p[tn++] = u;
+	Avm2Object* hca = NULL;
+	int i = fn - 1, j = tn - 1;
+	while (i >= 0 && j >= 0)
+	{
+		if (from_p[i] == to_p[j]) { hca = from_p[i]; i--; j--; }
+		else break;
+	}
+	return hca;
+}
+
+// ClipEvent::RollOut{to} — mouseOut on self + rollOut up to the LCA.
+static void dispatch_roll_out(Avm2Context* ctx, Avm2Object* self, Avm2Object* to)
+{
+	dispatch_mouse(ctx, self, "mouseOut", to, 0, 1, 0);
+	Avm2Object* lca = lowest_common_ancestor(ctx, self,
+		to != NULL ? to : ctx->stage);
+	for (Avm2Object* tgt = self; tgt != NULL && tgt != lca;
+	     tgt = display_parent_obj(ctx, tgt))
+	{
+		dispatch_mouse(ctx, tgt, "rollOut", to, 0, 0, 0);
+	}
+}
+
+// ClipEvent::RollOver{from} — rollOver down from the LCA + mouseOver on self.
+static void dispatch_roll_over(Avm2Context* ctx, Avm2Object* self, Avm2Object* from)
+{
+	Avm2Object* lca = lowest_common_ancestor(ctx, self,
+		from != NULL ? from : ctx->stage);
+	for (Avm2Object* tgt = self; tgt != NULL && tgt != lca;
+	     tgt = display_parent_obj(ctx, tgt))
+	{
+		dispatch_mouse(ctx, tgt, "rollOver", from, 0, 0, 0);
+	}
+	dispatch_mouse(ctx, self, "mouseOver", from, 0, 1, 0);
+}
+
+// Focus change on left mouse press (Ruffle update_focus_on_mouse_press): the
+// nearest focusable-by-mouse ancestor gets focus; else focus is cleared. Fires
+// FocusEvent focusIn/focusOut. Defined in the focus section below.
+static void update_focus_on_press(Avm2Context* ctx, Avm2Object* pressed);
+
+static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_moved)
+{
+	Avm2Object* stage = ctx->stage;
+	// Dragged object follows the mouse before hit-testing (Ruffle update_drag).
+	update_drag(ctx);
+	int mouse_in_stage = 1;
+	Avm2Object* new_over = mouse_in_stage ? run_mouse_pick(ctx) : NULL;
+	Avm2Object* cur_over = g_mouse_hovered;
+	int left_down = g_mouse_btn_down[0];
+
+	if (is_moved)
+		dispatch_mouse(ctx, new_over != NULL ? new_over : stage,
+		               "mouseMove", NULL, 0, 1, 0);
+
+	// Hover change → roll/over events.
+	if (cur_over != new_over)
+	{
+		if (left_down)
+		{
+			g_mouse_hovered = new_over;
+			if (cur_over != NULL) dispatch_roll_out(ctx, cur_over, new_over);
+			if (new_over != NULL) dispatch_roll_over(ctx, new_over, cur_over);
+		}
+		else
+		{
+			if (cur_over != NULL) dispatch_roll_out(ctx, cur_over, new_over);
+			if (new_over != NULL) dispatch_roll_over(ctx, new_over, cur_over);
+		}
+	}
+	g_mouse_hovered = new_over;
+
+	if (changed_button >= 0 && changed_button <= 2)
+	{
+		int button = changed_button;
+		if (g_mouse_btn_down[button])
+		{
+			// Press.
+			Avm2Object* over = g_mouse_hovered;
+			const char* down_type = button == 0 ? "mouseDown"
+				: button == 1 ? "middleMouseDown" : "rightMouseDown";
+			(void) down_type;
+			// Ruffle dispatch loop: focus updates on the press BEFORE the AVM2
+			// mouseDown event is dispatched (update_focus_on_mouse_press runs
+			// between handle_clip_event and event_dispatch_to_avm2).
+			if (over != NULL)
+			{
+				g_mouse_pressed[button] = over;
+				if (button == 0) update_focus_on_press(ctx, over);
+				dispatch_mouse(ctx, over,
+					button == 0 ? "mouseDown" : button == 1 ? "middleMouseDown"
+					: "rightMouseDown", NULL, 0, 1, button);
+			}
+			else
+			{
+				if (button == 0) update_focus_on_press(ctx, NULL);
+				dispatch_mouse(ctx, stage,
+					button == 0 ? "mouseDown" : button == 1 ? "middleMouseDown"
+					: "rightMouseDown", NULL, 0, 1, button);
+			}
+		}
+		else
+		{
+			// Release.
+			Avm2Object* over = g_mouse_hovered;
+			const char* up_type = button == 0 ? "mouseUp"
+				: button == 1 ? "middleMouseUp" : "rightMouseUp";
+			dispatch_mouse(ctx, over != NULL ? over : stage, up_type, NULL, 0, 1,
+			               button);
+			int released_inside = (g_mouse_pressed[button] == over);
+			if (released_inside)
+			{
+				Avm2Object* down = g_mouse_pressed[button];
+				Avm2Object* rt = down != NULL ? down : stage;
+				if (button == 0)
+				{
+					int is_double = (g_left_click_index % 2) != 0;
+					Avm2DisplayObjectExt* de = avm2_display_ext_of(ctx, rt);
+					int dce = de != NULL && de->double_click_enabled;
+					if (is_double && dce)
+						dispatch_mouse(ctx, rt, "doubleClick", NULL, 0, 1, 0);
+					else
+						dispatch_mouse(ctx, rt, "click", NULL, 0, 1, 0);
+				}
+				else
+				{
+					dispatch_mouse(ctx, rt,
+						button == 1 ? "middleClick" : "rightClick", NULL, 0, 1,
+						button);
+				}
+			}
+			else
+			{
+				Avm2Object* down = g_mouse_pressed[button];
+				if (button == 0)
+				{
+					dispatch_mouse(ctx, down != NULL ? down : stage,
+					               "releaseOutside", NULL, 0, 1, 0);
+					// New object rolled over immediately.
+					if (g_mouse_hovered != NULL)
+						dispatch_roll_over(ctx, g_mouse_hovered, cur_over);
+				}
+			}
+			g_mouse_pressed[button] = NULL;
+		}
+	}
+}
+
+// --- Keyboard dispatch (Ruffle player.rs KeyDown/KeyUp -> KeyboardEvent) ---
+static void dispatch_key(Avm2Context* ctx, int is_down, int32_t key_code,
+                         int32_t char_code, int32_t key_location)
+{
+	Avm2Object* target = g_stage_focus != NULL ? g_stage_focus : ctx->stage;
+	if (target == NULL) return;
+	Avm2Object* ev = avm2_keyboard_event_new(
+		ctx, avm2_string_from_literal(ctx, is_down ? "keyDown" : "keyUp"),
+		1, 0, (uint32_t) char_code, (uint32_t) key_code,
+		(uint32_t) key_location, mod_ctrl(), mod_alt(), mod_shift());
+	avm2_dispatch_event(ctx, target, ev);
+}
+
+// Forward decls for keyboard/text/focus routing implemented in the focus/text
+// bridge sections.
+static void input_handle_key(Avm2Context* ctx, int is_down, int32_t key_code,
+                             int32_t char_code, int32_t key_location);
+static void input_handle_text(Avm2Context* ctx, int32_t codepoint);
+static void input_handle_text_control(Avm2Context* ctx, const char* ctrl);
+static void input_handle_tab(Avm2Context* ctx, int shift);
+
+static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
+{
+	switch (ev->kind)
+	{
+	case IN_MOUSE_MOVE:
+	{
+		int moved = (g_mouse_x != ev->x) || (g_mouse_y != ev->y);
+		g_mouse_x = ev->x; g_mouse_y = ev->y;
+		update_mouse_state(ctx, -1, moved);
+		break;
+	}
+	case IN_MOUSE_DOWN:
+	{
+		int moved = (g_mouse_x != ev->x) || (g_mouse_y != ev->y);
+		g_mouse_x = ev->x; g_mouse_y = ev->y;
+		g_mouse_btn_down[ev->button] = 1;
+		if (ev->button == 0) g_left_click_index = (uint32_t) ev->code;
+		update_mouse_state(ctx, ev->button, moved);
+		break;
+	}
+	case IN_MOUSE_UP:
+	{
+		int moved = (g_mouse_x != ev->x) || (g_mouse_y != ev->y);
+		g_mouse_x = ev->x; g_mouse_y = ev->y;
+		g_mouse_btn_down[ev->button] = 0;
+		update_mouse_state(ctx, ev->button, moved);
+		break;
+	}
+	case IN_MOUSE_WHEEL:
+	{
+		Avm2Object* target = g_mouse_hovered != NULL ? g_mouse_hovered : ctx->stage;
+		dispatch_mouse(ctx, target, "mouseWheel", NULL, ev->code, 1, 0);
+		break;
+	}
+	case IN_KEY_DOWN:
+		if (ev->code >= 0 && ev->code < 256) g_key_down_map[ev->code] = 1;
+		input_handle_key(ctx, 1, ev->code, ev->code2, ev->code3);
+		break;
+	case IN_KEY_UP:
+		if (ev->code >= 0 && ev->code < 256) g_key_down_map[ev->code] = 0;
+		input_handle_key(ctx, 0, ev->code, ev->code2, ev->code3);
+		break;
+	case IN_TEXT_INPUT:
+		input_handle_text(ctx, ev->code);
+		break;
+	case IN_TEXT_CONTROL:
+		input_handle_text_control(ctx, ev->ctrl);
+		break;
+	case IN_SET_CLIPBOARD:
+	{
+		size_t n = strlen(ev->text);
+		char* buf = malloc(n + 1);
+		if (buf != NULL) { memcpy(buf, ev->text, n + 1); g_clipboard_text = buf; }
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+void avm2_input_pump_tick(Avm2Context* ctx)
+{
+	while (g_in_pos < g_in_count)
+	{
+		Avm2InputEvent* ev = &g_in_events[g_in_pos];
+		if (ev->kind == IN_WAIT) { g_in_pos++; return; }
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
+		{
+			input_deliver(ctx, ev);
+		}
+		avm2_try_pop_frame(&top);
+		g_in_pos++;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Focus management (Ruffle focus_tracker.rs) + keyboard/text routing.
+// ---------------------------------------------------------------------------
+
+static int is_focusable_by_mouse(Avm2Context* ctx, Avm2Object* obj)
+{
+	// Ruffle: AVM2 objects are mouse-focusable when tabEnabled is true. A
+	// TextField that is selectable is also mouse-focusable.
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	if (e == NULL || e->is_stage || e->is_root) return 0;
+	if (e->edittext != NULL) return 1;
+	return e->tab_enabled_set && e->tab_enabled_val;
+}
+
+// Set focus to new_focus (may be NULL), firing FocusEvent focusOut/focusIn.
+// related = the "other" object in the transition; when key-driven, key_code=9.
+static void set_focus(Avm2Context* ctx, Avm2Object* new_focus)
+{
+	Avm2Object* old = g_stage_focus;
+	if (old == new_focus) return;
+	if (new_focus != NULL)
+		avm2_text_apply_pending_bounds(ctx, new_focus);
+	g_stage_focus = new_focus;
+	// focusOut on the old target (bubbles, related = new).
+	if (old != NULL)
+	{
+		Avm2Object* ev = avm2_focus_event_new(ctx,
+			avm2_string_from_literal(ctx, "focusOut"), 1, 0, new_focus, 0, 0,
+			"none");
+		avm2_dispatch_event(ctx, old, ev);
+	}
+	// focusIn on the new target (bubbles, related = old).
+	if (new_focus != NULL)
+	{
+		Avm2Object* ev = avm2_focus_event_new(ctx,
+			avm2_string_from_literal(ctx, "focusIn"), 1, 0, old, 0, 0, "none");
+		avm2_dispatch_event(ctx, new_focus, ev);
+	}
+}
+
+static void update_focus_on_press(Avm2Context* ctx, Avm2Object* pressed)
+{
+	// Walk up from the pressed object to the nearest mouse-focusable ancestor.
+	Avm2Object* focus = NULL;
+	for (Avm2Object* o = pressed; o != NULL; o = display_parent_obj(ctx, o))
+	{
+		if (is_focusable_by_mouse(ctx, o)) { focus = o; break; }
+	}
+	// A mouseFocusChange (cancelable) fires before the change when focus would
+	// move; if not cancelled, apply. (We do not model cancellation of the
+	// default yet — apply unconditionally.)
+	if (focus != g_stage_focus)
+	{
+		Avm2Object* related = focus;
+		Avm2Object* dispatch_on = g_stage_focus != NULL ? g_stage_focus : ctx->stage;
+		Avm2Object* ev = avm2_focus_event_new(ctx,
+			avm2_string_from_literal(ctx, "mouseFocusChange"), 1, 1, related, 0,
+			0, "none");
+		avm2_dispatch_event(ctx, dispatch_on, ev);
+		set_focus(ctx, focus);
+	}
+}
+
+// tab_enabled (Ruffle InteractiveObject::tab_enabled): explicit value or the
+// per-type default.
+static int obj_tab_enabled(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	if (e == NULL) return 0;
+	if (e->tab_enabled_set) return e->tab_enabled_val;
+	// tab_enabled_default per type.
+	if (e->edittext != NULL) return avm2_text_is_editable(e->edittext);
+	if (class_is_a(obj->cls, ctx->builtins.simple_button_class)) return 1;
+	if (class_is_a(obj->cls, ctx->builtins.movieclip_class))
+		return e->button_mode ? 1 : 0;
+	return 0;  // Sprite / base InteractiveObject
+}
+
+// is_tabbable (Ruffle per-type).
+static int obj_is_tabbable(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	if (e == NULL || e->is_root || e->is_stage) return 0;
+	if (e->edittext != NULL)
+		return avm2_text_is_editable(e->edittext) && obj_tab_enabled(ctx, obj);
+	return obj_tab_enabled(ctx, obj);
+}
+
+static int obj_tab_children(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	if (e == NULL) return 1;
+	return e->tab_children != 0;
+}
+
+// world top-left (twips) for the automatic order key 6*y + x.
+static void obj_world_topleft(Avm2Context* ctx, Avm2Object* obj,
+                              double* x, double* y)
+{
+	avm2_text_apply_pending_bounds(ctx, obj);
+	Mat m = display_world_matrix(ctx, obj);
+	Rect r = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, obj, &m, &r);
+	*x = r.valid ? r.xmin : 0;
+	*y = r.valid ? r.ymin : 0;
+}
+
+typedef struct { Avm2Object* obj; int32_t tab_index; int has_index;
+                 double key; uint32_t fill_ord; } TabEnt;
+
+// Ruffle container::fill_tab_order (DFS render order, tabChildren gate).
+static void fill_tab_order(Avm2Context* ctx, Avm2Object* obj, TabEnt* list,
+                           uint32_t* n, uint32_t cap, int* any_index)
+{
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	if (e == NULL) return;
+	if (obj != ctx->stage && !obj_tab_children(ctx, obj)) return;
+	for (uint32_t i = 0; i < e->render_len; i++)
+	{
+		Avm2Object* child = e->render_list[i];
+		Avm2DisplayObjectExt* ce = avm2_display_ext_of(ctx, child);
+		if (ce == NULL || !ce->visible) continue;
+		if (is_interactive(ctx, child) && obj_is_tabbable(ctx, child) && *n < cap)
+		{
+			TabEnt* t = &list[(*n)];
+			t->obj = child;
+			t->has_index = ce->tab_index >= 0;
+			t->tab_index = ce->tab_index;
+			t->fill_ord = *n;
+			if (t->has_index) *any_index = 1;
+			(*n)++;
+		}
+		fill_tab_order(ctx, child, list, n, cap, any_index);
+	}
+}
+
+static int tab_cmp_custom(const void* a, const void* b)
+{
+	const TabEnt* x = a; const TabEnt* y = b;
+	if (x->tab_index != y->tab_index) return x->tab_index < y->tab_index ? -1 : 1;
+	return x->fill_ord < y->fill_ord ? -1 : (x->fill_ord > y->fill_ord ? 1 : 0);
+}
+static int tab_cmp_auto(const void* a, const void* b)
+{
+	const TabEnt* x = a; const TabEnt* y = b;
+	if (x->key != y->key) return x->key < y->key ? -1 : 1;
+	return x->fill_ord < y->fill_ord ? -1 : (x->fill_ord > y->fill_ord ? 1 : 0);
+}
+
+// Build the sorted tab order into `out` (Ruffle TabOrder::sort). Returns count.
+static uint32_t build_tab_order(Avm2Context* ctx, Avm2Object** out, uint32_t cap)
+{
+	TabEnt list[256];
+	uint32_t n = 0;
+	int any_index = 0;
+	fill_tab_order(ctx, ctx->stage, list, &n, 256, &any_index);
+	if (any_index)
+	{
+		// Custom order: retain only tabIndex objects, sort by index.
+		uint32_t m = 0;
+		for (uint32_t i = 0; i < n; i++)
+			if (list[i].has_index) list[m++] = list[i];
+		n = m;
+		qsort(list, n, sizeof(TabEnt), tab_cmp_custom);
+	}
+	else
+	{
+		for (uint32_t i = 0; i < n; i++)
+		{
+			double x, y;
+			obj_world_topleft(ctx, list[i].obj, &x, &y);
+			list[i].key = 6.0 * y + x;
+		}
+		qsort(list, n, sizeof(TabEnt), tab_cmp_auto);
+		// Dedup by equal key (keep first in fill order — already the sort tie).
+		uint32_t m = 0;
+		for (uint32_t i = 0; i < n; i++)
+		{
+			if (m > 0 && list[i].key == list[m - 1].key) continue;
+			list[m++] = list[i];
+		}
+		n = m;
+	}
+	uint32_t k = n < cap ? n : cap;
+	for (uint32_t i = 0; i < k; i++) out[i] = list[i].obj;
+	return k;
+}
+
+static void input_handle_tab(Avm2Context* ctx, int shift)
+{
+	Avm2Object* order[256];
+	uint32_t n = build_tab_order(ctx, order, 256);
+
+	Avm2Object* cur = g_stage_focus;
+	Avm2Object* next = NULL;
+	if (n > 0)
+	{
+		int cur_idx = -1;
+		for (uint32_t i = 0; i < n; i++) if (order[i] == cur) { cur_idx = (int) i; break; }
+		if (cur_idx < 0)
+		{
+			next = shift ? order[n - 1] : order[0];
+		}
+		else
+		{
+			int ni = cur_idx + (shift ? -1 : 1);
+			if (ni < 0) ni = (int) n - 1;
+			if (ni >= (int) n) ni = 0;
+			next = order[ni];
+		}
+	}
+	// keyFocusChange (cancelable, bubbles) on the current focus (or stage),
+	// relatedObject = the next-focus candidate.
+	Avm2Object* dispatch_on = cur != NULL ? cur : ctx->stage;
+	Avm2Object* ev = avm2_focus_event_new(ctx,
+		avm2_string_from_literal(ctx, "keyFocusChange"), 1, 1, next, shift, 9,
+		"none");
+	avm2_dispatch_event(ctx, dispatch_on, ev);
+	Avm2EventExt* eext = (Avm2EventExt*) ev->native_ext;
+	if (eext == NULL || !eext->cancelled)
+		set_focus(ctx, next);
+}
+
+static void input_handle_key(Avm2Context* ctx, int is_down, int32_t key_code,
+                             int32_t char_code, int32_t key_location)
+{
+	dispatch_key(ctx, is_down, key_code, char_code, key_location);
+	// Tab drives focus traversal on keyDown (after the keyDown dispatch).
+	if (is_down && key_code == 9)
+		input_handle_tab(ctx, mod_shift());
+	// Text editing keys route to the focused TextField.
+	if (is_down)
+		avm2_text_input_key(ctx, g_stage_focus, key_code, char_code, mod_shift());
+}
+
+static void input_handle_text(Avm2Context* ctx, int32_t codepoint)
+{
+	avm2_text_input_char(ctx, g_stage_focus, codepoint);
+}
+
+static void input_handle_text_control(Avm2Context* ctx, const char* ctrl)
+{
+	avm2_text_input_control(ctx, g_stage_focus, ctrl, g_clipboard_text);
+}
+
 void avm2_register_display(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -4965,6 +5916,16 @@ void avm2_register_display(Avm2Context* ctx)
 	sprite->instance_init.debug_name = "Sprite";
 	sprite->native_init = display_native_init;  // concrete: no 2012
 	b->sprite_class = sprite;
+	avm2_builtin_add_method(ctx, sprite, "startDrag", do_start_drag);
+	avm2_builtin_add_method(ctx, sprite, "stopDrag", do_stop_drag);
+	avm2_builtin_add_getter(ctx, sprite, "dropTarget", do_get_drop_target);
+	add_getset(ctx, sprite, "buttonMode", do_get_button_mode, do_set_button_mode);
+	add_getset(ctx, sprite, "useHandCursor", do_get_use_hand, do_set_use_hand);
+	// `graphics` MUST be registered on Sprite before MovieClip is derived
+	// (below) so MovieClip and its subclasses inherit it (Ruffle: graphics is
+	// on Sprite). The Graphics class itself (g_graphics_class) is created later
+	// but only referenced when the getter is first called at runtime.
+	avm2_builtin_add_getter(ctx, sprite, "graphics", do_get_graphics);
 
 	Avm2Class* movieclip = avm2_builtin_class(ctx, "flash.display", "MovieClip", sprite);
 	movieclip->native_init = display_native_init;
@@ -5037,7 +5998,9 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, graphics, "copyFrom", gfx_noop);
 	g_graphics_class = graphics;
 	avm2_builtin_add_getter(ctx, shape, "graphics", do_get_graphics);
-	avm2_builtin_add_getter(ctx, sprite, "graphics", do_get_graphics);
+	// NOTE: Sprite's `graphics` getter is registered earlier (right after the
+	// Sprite class is created) so MovieClip — derived from Sprite before this
+	// point — inherits it. Re-adding here would be a no-op duplicate.
 
 	// flash.geom.Matrix + Transform (transform.matrix surface).
 	Avm2Class* geom_matrix = avm2_builtin_class(ctx, "flash.geom", "Matrix",

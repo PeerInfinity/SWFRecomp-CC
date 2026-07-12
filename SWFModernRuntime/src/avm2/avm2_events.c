@@ -11,6 +11,7 @@
 // Sources of truth: Ruffle core/src/avm2/events.rs,
 // globals/flash/events/{Event,EventDispatcher}.as + event*.rs.
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -694,6 +695,536 @@ static Avm2Value ed_to_string(Avm2Activation* act)
 // Registration
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// flash.events.MouseEvent / KeyboardEvent / FocusEvent (Stage 8)
+// ---------------------------------------------------------------------------
+
+static double arg_num_default_nan(Avm2Activation* act, uint32_t i)
+{
+	if (i >= act->argc) return NAN;
+	return avm2_coerce_to_number(act->ctx, act->args[i]);
+}
+
+static int arg_bool(Avm2Activation* act, uint32_t i)
+{
+	return i < act->argc && avm2_coerce_to_boolean(act->args[i]);
+}
+
+static int arg_bool_true_default(Avm2Activation* act, uint32_t i)
+{
+	// bubbles defaults to true for these subclasses.
+	return i >= act->argc ? 1 : (avm2_coerce_to_boolean(act->args[i]) ? 1 : 0);
+}
+
+static uint32_t arg_u32(Avm2Activation* act, uint32_t i)
+{
+	return i < act->argc ? avm2_coerce_to_u32(act->ctx, act->args[i]) : 0;
+}
+
+static int32_t arg_i32(Avm2Activation* act, uint32_t i)
+{
+	return i < act->argc ? avm2_coerce_to_i32(act->ctx, act->args[i]) : 0;
+}
+
+static Avm2Object* arg_obj(Avm2Activation* act, uint32_t i)
+{
+	if (i < act->argc && act->args[i].kind == AVM2_VALUE_OBJECT)
+		return act->args[i].u.obj;
+	return NULL;
+}
+
+// MouseEvent(type, bubbles=true, cancelable=false, localX=NaN, localY=NaN,
+//   relatedObject=null, ctrlKey=false, altKey=false, shiftKey=false,
+//   buttonDown=false, delta=0, commandKey=false, clickCount=0)
+static Avm2Value mouse_event_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool_true_default(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->local_x = arg_num_default_nan(act, 3);
+	ext->local_y = arg_num_default_nan(act, 4);
+	ext->related_object = arg_obj(act, 5);
+	ext->ctrl_key = arg_bool(act, 6);
+	ext->alt_key = arg_bool(act, 7);
+	ext->shift_key = arg_bool(act, 8);
+	ext->button_down = arg_bool(act, 9);
+	ext->delta = arg_i32(act, 10);
+	ext->command_key = arg_bool(act, 11);
+	return avm2_undefined();
+}
+
+static Avm2Value me_get_local_x(Avm2Activation* act)
+{
+	double v = this_event(act)->local_x;
+	return avm2_number(isnan(v) ? NAN : (double) (int) v);  // localX is int-rounded to twips? no — keep as-is
+}
+
+static Avm2Value me_get_local_y(Avm2Activation* act)
+{
+	double v = this_event(act)->local_y;
+	return avm2_number(isnan(v) ? NAN : (double) (int) v);
+}
+
+static Avm2Value me_get_related(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	return ext->related_object != NULL ? avm2_object_value(ext->related_object)
+	                                   : avm2_null();
+}
+
+static Avm2Value me_set_related(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->related_object = arg_obj(act, 0);
+	return avm2_undefined();
+}
+
+static Avm2Value me_get_ctrl(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->ctrl_key != 0); }
+static Avm2Value me_set_ctrl(Avm2Activation* act)
+{ this_event(act)->ctrl_key = arg_bool(act, 0); return avm2_undefined(); }
+static Avm2Value me_get_alt(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->alt_key != 0); }
+static Avm2Value me_set_alt(Avm2Activation* act)
+{ this_event(act)->alt_key = arg_bool(act, 0); return avm2_undefined(); }
+static Avm2Value me_get_shift(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->shift_key != 0); }
+static Avm2Value me_set_shift(Avm2Activation* act)
+{ this_event(act)->shift_key = arg_bool(act, 0); return avm2_undefined(); }
+static Avm2Value me_get_button_down(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->button_down != 0); }
+static Avm2Value me_set_button_down(Avm2Activation* act)
+{ this_event(act)->button_down = arg_bool(act, 0); return avm2_undefined(); }
+static Avm2Value me_get_delta(Avm2Activation* act)
+{ return avm2_integer(this_event(act)->delta); }
+static Avm2Value me_set_delta(Avm2Activation* act)
+{ this_event(act)->delta = arg_i32(act, 0); return avm2_undefined(); }
+static Avm2Value me_get_command(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->command_key != 0); }
+static Avm2Value me_set_command(Avm2Activation* act)
+{ this_event(act)->command_key = arg_bool(act, 0); return avm2_undefined(); }
+static Avm2Value me_get_movement_x(Avm2Activation* act)
+{ return avm2_number(this_event(act)->movement_x); }
+static Avm2Value me_set_movement_x(Avm2Activation* act)
+{ this_event(act)->movement_x = arg_i32(act, 0); return avm2_undefined(); }
+static Avm2Value me_get_movement_y(Avm2Activation* act)
+{ return avm2_number(this_event(act)->movement_y); }
+static Avm2Value me_set_movement_y(Avm2Activation* act)
+{ this_event(act)->movement_y = arg_i32(act, 0); return avm2_undefined(); }
+
+// stageX/stageY: localX/localY mapped through the target's world matrix.
+// Ruffle computes these lazily; for our AABB harness we approximate by
+// returning localX/localY when there is no target (the common traced path
+// prints them only after a mapping we already applied at construction time).
+extern void avm2_display_event_stage_coords(Avm2Context* ctx, Avm2Object* target,
+                                            double lx, double ly,
+                                            double* sx, double* sy);
+static Avm2Value me_get_stage_x(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	double sx = ext->local_x, sy = ext->local_y;
+	avm2_display_event_stage_coords(act->ctx, ext->target, ext->local_x,
+	                                ext->local_y, &sx, &sy);
+	return avm2_number(isnan(sx) ? NAN : (double) (int) sx);
+}
+static Avm2Value me_get_stage_y(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	double sx = ext->local_x, sy = ext->local_y;
+	avm2_display_event_stage_coords(act->ctx, ext->target, ext->local_x,
+	                                ext->local_y, &sx, &sy);
+	return avm2_number(isnan(sy) ? NAN : (double) (int) sy);
+}
+
+static Avm2Value me_update_after_event(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+static Avm2Value me_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"MouseEvent", "type", "bubbles", "cancelable", "eventPhase", "localX",
+		"localY", "stageX", "stageY", "relatedObject", "ctrlKey", "altKey",
+		"shiftKey", "buttonDown", "delta"
+	};
+	Avm2Value args[15];
+	for (int i = 0; i < 15; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 15);
+}
+
+// KeyboardEvent(type, bubbles=true, cancelable=false, charCodeValue=0,
+//   keyCodeValue=0, keyLocationValue=0, ctrlKeyValue=false, altKeyValue=false,
+//   shiftKeyValue=false, controlKeyValue=false, commandKeyValue=false)
+static Avm2Value keyboard_event_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool_true_default(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->char_code = arg_u32(act, 3);
+	ext->key_code = arg_u32(act, 4);
+	ext->key_location = arg_u32(act, 5);
+	ext->ctrl_key = arg_bool(act, 6);
+	ext->alt_key = arg_bool(act, 7);
+	ext->shift_key = arg_bool(act, 8);
+	ext->control_key = arg_bool(act, 9);
+	ext->command_key = arg_bool(act, 10);
+	return avm2_undefined();
+}
+
+static Avm2Value ke_get_char_code(Avm2Activation* act)
+{ return avm2_uint_value(this_event(act)->char_code); }
+static Avm2Value ke_set_char_code(Avm2Activation* act)
+{ this_event(act)->char_code = arg_u32(act, 0); return avm2_undefined(); }
+static Avm2Value ke_get_key_code(Avm2Activation* act)
+{ return avm2_uint_value(this_event(act)->key_code); }
+static Avm2Value ke_set_key_code(Avm2Activation* act)
+{ this_event(act)->key_code = arg_u32(act, 0); return avm2_undefined(); }
+static Avm2Value ke_get_key_location(Avm2Activation* act)
+{ return avm2_uint_value(this_event(act)->key_location); }
+static Avm2Value ke_set_key_location(Avm2Activation* act)
+{ this_event(act)->key_location = arg_u32(act, 0); return avm2_undefined(); }
+static Avm2Value ke_get_control(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->control_key != 0); }
+static Avm2Value ke_set_control(Avm2Activation* act)
+{ this_event(act)->control_key = arg_bool(act, 0); return avm2_undefined(); }
+
+static Avm2Value ke_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"KeyboardEvent", "type", "bubbles", "cancelable", "eventPhase",
+		"charCode", "keyCode", "keyLocation", "ctrlKey", "altKey", "shiftKey"
+	};
+	Avm2Value args[11];
+	for (int i = 0; i < 11; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 11);
+}
+
+// FocusEvent(type, bubbles=true, cancelable=false, relatedObject=null,
+//   shiftKey=false, keyCode=0, direction="none", isRelatedObjectInaccessible=false)
+static Avm2Value focus_event_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool_true_default(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->related_object = arg_obj(act, 3);
+	ext->shift_key = arg_bool(act, 4);
+	ext->key_code = arg_u32(act, 5);
+	ext->direction = act->argc > 6
+		? avm2_coerce_to_string(act->ctx, act->args[6]) : NULL;
+	ext->related_object_inaccessible = arg_bool(act, 7);
+	return avm2_undefined();
+}
+
+static Avm2Value fe_get_related(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	return ext->related_object != NULL ? avm2_object_value(ext->related_object)
+	                                   : avm2_null();
+}
+static Avm2Value fe_set_related(Avm2Activation* act)
+{ this_event(act)->related_object = arg_obj(act, 0); return avm2_undefined(); }
+static Avm2Value fe_get_shift(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->shift_key != 0); }
+static Avm2Value fe_set_shift(Avm2Activation* act)
+{ this_event(act)->shift_key = arg_bool(act, 0); return avm2_undefined(); }
+static Avm2Value fe_get_key_code(Avm2Activation* act)
+{ return avm2_uint_value(this_event(act)->key_code); }
+static Avm2Value fe_set_key_code(Avm2Activation* act)
+{ this_event(act)->key_code = arg_u32(act, 0); return avm2_undefined(); }
+static Avm2Value fe_get_direction(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	return avm2_string(ext->direction != NULL ? ext->direction
+		: avm2_string_from_literal(act->ctx, "none"));
+}
+static Avm2Value fe_set_direction(Avm2Activation* act)
+{
+	this_event(act)->direction = act->argc > 0
+		? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	return avm2_undefined();
+}
+static Avm2Value fe_get_rel_inaccessible(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->related_object_inaccessible != 0); }
+static Avm2Value fe_set_rel_inaccessible(Avm2Activation* act)
+{ this_event(act)->related_object_inaccessible = arg_bool(act, 0); return avm2_undefined(); }
+
+static Avm2Value fe_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"FocusEvent", "type", "bubbles", "cancelable", "eventPhase",
+		"relatedObject", "shiftKey", "keyCode"
+	};
+	Avm2Value args[8];
+	for (int i = 0; i < 8; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 8);
+}
+
+Avm2Object* avm2_mouse_event_new(Avm2Context* ctx, const Avm2String* type,
+                                 int bubbles, int cancelable, double local_x,
+                                 double local_y, Avm2Object* related,
+                                 int shift, int ctrl, int alt, int button_down,
+                                 int32_t delta)
+{
+	Avm2Value args[11];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(bubbles != 0);
+	args[2] = avm2_bool(cancelable != 0);
+	args[3] = avm2_number(local_x);
+	args[4] = avm2_number(local_y);
+	args[5] = related != NULL ? avm2_object_value(related) : avm2_null();
+	args[6] = avm2_bool(ctrl != 0);
+	args[7] = avm2_bool(alt != 0);
+	args[8] = avm2_bool(shift != 0);
+	args[9] = avm2_bool(button_down != 0);
+	args[10] = avm2_integer(delta);
+	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.mouse_event_class, args, 11);
+	return v.u.obj;
+}
+
+Avm2Object* avm2_keyboard_event_new(Avm2Context* ctx, const Avm2String* type,
+                                    int bubbles, int cancelable,
+                                    uint32_t char_code, uint32_t key_code,
+                                    uint32_t key_location, int ctrl, int alt,
+                                    int shift)
+{
+	Avm2Value args[9];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(bubbles != 0);
+	args[2] = avm2_bool(cancelable != 0);
+	args[3] = avm2_uint_value(char_code);
+	args[4] = avm2_uint_value(key_code);
+	args[5] = avm2_uint_value(key_location);
+	args[6] = avm2_bool(ctrl != 0);
+	args[7] = avm2_bool(alt != 0);
+	args[8] = avm2_bool(shift != 0);
+	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.keyboard_event_class,
+	                                   args, 9);
+	return v.u.obj;
+}
+
+Avm2Object* avm2_focus_event_new(Avm2Context* ctx, const Avm2String* type,
+                                 int bubbles, int cancelable,
+                                 Avm2Object* related, int shift,
+                                 uint32_t key_code, const char* direction)
+{
+	Avm2Value args[7];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(bubbles != 0);
+	args[2] = avm2_bool(cancelable != 0);
+	args[3] = related != NULL ? avm2_object_value(related) : avm2_null();
+	args[4] = avm2_bool(shift != 0);
+	args[5] = avm2_uint_value(key_code);
+	args[6] = avm2_string(avm2_string_from_literal(ctx,
+		direction != NULL ? direction : "none"));
+	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.focus_event_class,
+	                                   args, 7);
+	return v.u.obj;
+}
+
+// flash.events.TextEvent(type, bubbles=false, cancelable=false, text="")
+static Avm2Value text_event_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->text = act->argc > 3
+		? avm2_coerce_to_string(act->ctx, act->args[3])
+		: avm2_string_from_literal(act->ctx, "");
+	return avm2_undefined();
+}
+
+static Avm2Value te_get_text(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	return avm2_string(ext->text != NULL ? ext->text
+		: avm2_string_from_literal(act->ctx, ""));
+}
+static Avm2Value te_set_text(Avm2Activation* act)
+{
+	this_event(act)->text = act->argc > 0
+		? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	return avm2_undefined();
+}
+
+static Avm2Value te_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"TextEvent", "type", "bubbles", "cancelable", "eventPhase", "text"
+	};
+	Avm2Value args[6];
+	for (int i = 0; i < 6; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 6);
+}
+
+Avm2Object* avm2_text_event_new(Avm2Context* ctx, const Avm2String* type,
+                                int bubbles, int cancelable, const Avm2String* text)
+{
+	Avm2Value args[4];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(bubbles != 0);
+	args[2] = avm2_bool(cancelable != 0);
+	args[3] = avm2_string(text != NULL ? text : avm2_string_from_literal(ctx, ""));
+	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.text_event_class, args, 4);
+	return v.u.obj;
+}
+
+int avm2_event_is_cancelled(Avm2Object* event)
+{
+	if (event == NULL || event->native_ext == NULL) return 0;
+	return ((Avm2EventExt*) event->native_ext)->cancelled != 0;
+}
+
+// Replace an inherited public method in-place (the ivtable copies the super's
+// entries, and avm2_vtable_find returns the FIRST match, so a plain append
+// would be shadowed by the parent's method — e.g. Event.toString).
+static void event_override_method(Avm2Context* ctx, Avm2Class* cls,
+                                  const char* name, Avm2MethodFn fn)
+{
+	uint32_t nlen = (uint32_t) strlen(name);
+	for (uint32_t i = 0; i < cls->ivtable.count; i++)
+	{
+		Avm2PropEntry* e = &cls->ivtable.entries[i];
+		if (e->key.name_len == nlen && e->key.ns_len == 0
+		    && memcmp(e->key.name, name, nlen) == 0
+		    && e->kind == AVM2_PROP_METHOD)
+		{
+			e->method.fn = fn;
+			e->method.debug_name = name;
+			e->defining_class = cls;
+			return;
+		}
+	}
+	avm2_builtin_add_method(ctx, cls, name, fn);
+}
+
+static void register_input_events(Avm2Context* ctx)
+{
+	Avm2Builtins* b = &ctx->builtins;
+
+	// flash.events.TextEvent.
+	Avm2Class* te = avm2_builtin_class(ctx, "flash.events", "TextEvent",
+	                                   b->event_class);
+	te->instance_init.fn = text_event_init;
+	te->instance_init.debug_name = "TextEvent";
+	b->text_event_class = te;
+	avm2_builtin_add_getset(ctx, te, "text", te_get_text, te_set_text);
+	event_override_method(ctx, te, "toString", te_to_string);
+	avm2_builtin_add_static_const(ctx, te, "LINK",
+		avm2_string(avm2_string_from_literal(ctx, "link")));
+	avm2_builtin_add_static_const(ctx, te, "TEXT_INPUT",
+		avm2_string(avm2_string_from_literal(ctx, "textInput")));
+
+	// flash.events.MouseEvent.
+	Avm2Class* me = avm2_builtin_class(ctx, "flash.events", "MouseEvent",
+	                                   b->event_class);
+	me->instance_init.fn = mouse_event_init;
+	me->instance_init.debug_name = "MouseEvent";
+	b->mouse_event_class = me;
+	avm2_builtin_add_getset(ctx, me, "localX", me_get_local_x, NULL);
+	avm2_builtin_add_getset(ctx, me, "localY", me_get_local_y, NULL);
+	avm2_builtin_add_getter(ctx, me, "stageX", me_get_stage_x);
+	avm2_builtin_add_getter(ctx, me, "stageY", me_get_stage_y);
+	avm2_builtin_add_getset(ctx, me, "relatedObject", me_get_related, me_set_related);
+	avm2_builtin_add_getset(ctx, me, "ctrlKey", me_get_ctrl, me_set_ctrl);
+	avm2_builtin_add_getset(ctx, me, "altKey", me_get_alt, me_set_alt);
+	avm2_builtin_add_getset(ctx, me, "shiftKey", me_get_shift, me_set_shift);
+	avm2_builtin_add_getset(ctx, me, "buttonDown", me_get_button_down, me_set_button_down);
+	avm2_builtin_add_getset(ctx, me, "delta", me_get_delta, me_set_delta);
+	avm2_builtin_add_getset(ctx, me, "commandKey", me_get_command, me_set_command);
+	avm2_builtin_add_getset(ctx, me, "movementX", me_get_movement_x, me_set_movement_x);
+	avm2_builtin_add_getset(ctx, me, "movementY", me_get_movement_y, me_set_movement_y);
+	avm2_builtin_add_method(ctx, me, "updateAfterEvent", me_update_after_event);
+	event_override_method(ctx, me, "toString", me_to_string);
+	{
+		static const struct { const char* n; const char* v; } mc[] = {
+			{ "CLICK", "click" }, { "DOUBLE_CLICK", "doubleClick" },
+			{ "MOUSE_DOWN", "mouseDown" }, { "MOUSE_MOVE", "mouseMove" },
+			{ "MOUSE_OUT", "mouseOut" }, { "MOUSE_OVER", "mouseOver" },
+			{ "MOUSE_UP", "mouseUp" }, { "MOUSE_WHEEL", "mouseWheel" },
+			{ "ROLL_OUT", "rollOut" }, { "ROLL_OVER", "rollOver" },
+			{ "MIDDLE_CLICK", "middleClick" },
+			{ "MIDDLE_MOUSE_DOWN", "middleMouseDown" },
+			{ "MIDDLE_MOUSE_UP", "middleMouseUp" },
+			{ "RIGHT_CLICK", "rightClick" },
+			{ "RIGHT_MOUSE_DOWN", "rightMouseDown" },
+			{ "RIGHT_MOUSE_UP", "rightMouseUp" },
+			{ "CONTEXT_MENU", "contextMenu" },
+			{ "RELEASE_OUTSIDE", "releaseOutside" },
+			{ "MOUSE_LEAVE", "mouseLeave" },
+		};
+		for (size_t i = 0; i < sizeof(mc) / sizeof(mc[0]); i++)
+			avm2_builtin_add_static_const(ctx, me, mc[i].n,
+				avm2_string(avm2_string_from_literal(ctx, mc[i].v)));
+	}
+
+	// flash.events.KeyboardEvent.
+	Avm2Class* ke = avm2_builtin_class(ctx, "flash.events", "KeyboardEvent",
+	                                   b->event_class);
+	ke->instance_init.fn = keyboard_event_init;
+	ke->instance_init.debug_name = "KeyboardEvent";
+	b->keyboard_event_class = ke;
+	avm2_builtin_add_getset(ctx, ke, "charCode", ke_get_char_code, ke_set_char_code);
+	avm2_builtin_add_getset(ctx, ke, "keyCode", ke_get_key_code, ke_set_key_code);
+	avm2_builtin_add_getset(ctx, ke, "keyLocation", ke_get_key_location, ke_set_key_location);
+	avm2_builtin_add_getset(ctx, ke, "ctrlKey", me_get_ctrl, me_set_ctrl);
+	avm2_builtin_add_getset(ctx, ke, "altKey", me_get_alt, me_set_alt);
+	avm2_builtin_add_getset(ctx, ke, "shiftKey", me_get_shift, me_set_shift);
+	avm2_builtin_add_getset(ctx, ke, "controlKey", ke_get_control, ke_set_control);
+	avm2_builtin_add_getset(ctx, ke, "commandKey", me_get_command, me_set_command);
+	avm2_builtin_add_method(ctx, ke, "updateAfterEvent", me_update_after_event);
+	event_override_method(ctx, ke, "toString", ke_to_string);
+	{
+		static const struct { const char* n; const char* v; } kc[] = {
+			{ "KEY_DOWN", "keyDown" }, { "KEY_UP", "keyUp" },
+		};
+		for (size_t i = 0; i < sizeof(kc) / sizeof(kc[0]); i++)
+			avm2_builtin_add_static_const(ctx, ke, kc[i].n,
+				avm2_string(avm2_string_from_literal(ctx, kc[i].v)));
+	}
+
+	// flash.events.FocusEvent.
+	Avm2Class* fe = avm2_builtin_class(ctx, "flash.events", "FocusEvent",
+	                                   b->event_class);
+	fe->instance_init.fn = focus_event_init;
+	fe->instance_init.debug_name = "FocusEvent";
+	b->focus_event_class = fe;
+	avm2_builtin_add_getset(ctx, fe, "relatedObject", fe_get_related, fe_set_related);
+	avm2_builtin_add_getset(ctx, fe, "shiftKey", fe_get_shift, fe_set_shift);
+	avm2_builtin_add_getset(ctx, fe, "keyCode", fe_get_key_code, fe_set_key_code);
+	avm2_builtin_add_getset(ctx, fe, "direction", fe_get_direction, fe_set_direction);
+	avm2_builtin_add_getset(ctx, fe, "isRelatedObjectInaccessible",
+	                        fe_get_rel_inaccessible, fe_set_rel_inaccessible);
+	event_override_method(ctx, fe, "toString", fe_to_string);
+	{
+		static const struct { const char* n; const char* v; } fc[] = {
+			{ "FOCUS_IN", "focusIn" }, { "FOCUS_OUT", "focusOut" },
+			{ "KEY_FOCUS_CHANGE", "keyFocusChange" },
+			{ "MOUSE_FOCUS_CHANGE", "mouseFocusChange" },
+		};
+		for (size_t i = 0; i < sizeof(fc) / sizeof(fc[0]); i++)
+			avm2_builtin_add_static_const(ctx, fe, fc[i].n,
+				avm2_string(avm2_string_from_literal(ctx, fc[i].v)));
+	}
+}
+
 void avm2_register_events(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -814,4 +1345,7 @@ void avm2_register_events(Avm2Context* ctx)
 		alias.key = ie->key;
 		avm2_vtable_append(ctx, &ed->ivtable, &alias);
 	}
+
+	// flash.events.MouseEvent / KeyboardEvent / FocusEvent (Stage 8).
+	register_input_events(ctx);
 }

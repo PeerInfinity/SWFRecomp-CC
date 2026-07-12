@@ -228,6 +228,9 @@ typedef struct Avm2EventDispatcherExt
 } Avm2EventDispatcherExt;
 
 // flash.events.Event instance state (Ruffle events.rs Event struct).
+// Stage 8: the same struct also carries MouseEvent/KeyboardEvent/FocusEvent
+// subclass fields (the display-ext "one struct for the whole ladder" pattern);
+// Event subclasses inherit native_ext_size, so the base size below suffices.
 typedef struct Avm2EventExt
 {
 	const Avm2String* type;      // NULL until init
@@ -238,6 +241,28 @@ typedef struct Avm2EventExt
 	uint8_t cancelled;
 	uint8_t propagation;         // 0 allow, 1 stop, 2 stop-immediate
 	uint8_t phase;               // 1 capturing, 2 at-target, 3 bubbling
+
+	// --- MouseEvent / KeyboardEvent / FocusEvent shared modifier flags ---
+	uint8_t ctrl_key;
+	uint8_t alt_key;
+	uint8_t shift_key;
+	uint8_t control_key;         // KeyboardEvent controlKey (Mac ctrl)
+	uint8_t command_key;         // KeyboardEvent commandKey (Mac cmd)
+	uint8_t button_down;         // MouseEvent buttonDown
+	Avm2Object* related_object;  // MouseEvent/FocusEvent relatedObject
+	// --- MouseEvent ---
+	double local_x, local_y;     // NaN = unset
+	int32_t delta;
+	int32_t movement_x, movement_y;
+	// --- KeyboardEvent ---
+	uint32_t char_code;
+	uint32_t key_code;
+	uint32_t key_location;
+	// --- FocusEvent ---
+	const Avm2String* direction; // NULL = "none"
+	uint8_t related_object_inaccessible;
+	// --- TextEvent ---
+	const Avm2String* text;
 } Avm2EventExt;
 
 // DisplayObject instance state (avm2_display.c). One struct serves the
@@ -311,6 +336,9 @@ typedef struct Avm2DisplayObjectExt
 	uint32_t depth_len, depth_cap;
 	uint8_t mouse_children;      // default 1
 	uint8_t tab_children;        // default 1
+	uint8_t tab_children_set;    // tabChildren explicitly assigned
+	uint8_t button_mode;         // Sprite.buttonMode
+	uint8_t use_hand_cursor;     // Sprite.useHandCursor (default 1)
 
 	// --- MovieClip / timeline ---
 	const Avm2TimelineData* timeline;  // NULL = no timeline (plain Sprite etc.)
@@ -378,6 +406,30 @@ int avm2_dispatch_event(Avm2Context* ctx, Avm2Object* dispatcher, Avm2Object* ev
 // event type (registration order), no capture/bubble, ignoring propagation
 // stops between targets. `filter_class` NULL = no class filter.
 void avm2_broadcast_event(Avm2Context* ctx, Avm2Object* event, Avm2Class* filter_class);
+// Stage 8: construct a MouseEvent/KeyboardEvent/FocusEvent with its native
+// state filled directly (bypassing the AS3 ctor arg dance). `type` interned by
+// the caller. The returned object is a fully-formed Event subclass instance.
+Avm2Object* avm2_mouse_event_new(Avm2Context* ctx, const Avm2String* type,
+                                 int bubbles, int cancelable, double local_x,
+                                 double local_y, Avm2Object* related,
+                                 int shift, int ctrl, int alt, int button_down,
+                                 int32_t delta);
+Avm2Object* avm2_keyboard_event_new(Avm2Context* ctx, const Avm2String* type,
+                                    int bubbles, int cancelable,
+                                    uint32_t char_code, uint32_t key_code,
+                                    uint32_t key_location, int ctrl, int alt,
+                                    int shift);
+Avm2Object* avm2_focus_event_new(Avm2Context* ctx, const Avm2String* type,
+                                 int bubbles, int cancelable,
+                                 Avm2Object* related, int shift,
+                                 uint32_t key_code, const char* direction);
+// flash.events.TextEvent (Stage 8: TextField textInput). Returns the event;
+// dispatch it and read ->cancelled to honor preventDefault.
+Avm2Object* avm2_text_event_new(Avm2Context* ctx, const Avm2String* type,
+                                int bubbles, int cancelable,
+                                const Avm2String* text);
+// Was the event's default prevented (cancelled)? NULL-safe.
+int avm2_event_is_cancelled(Avm2Object* event);
 // Display parent hook used for ancestor walks; reads the display ext.
 Avm2Object* avm2_display_parent(Avm2Context* ctx, Avm2Object* obj);
 
@@ -440,6 +492,25 @@ void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name);
 // (Ruffle frame_lifecycle.rs run_all_phases_avm2).
 void avm2_display_run_tick(Avm2Context* ctx);
 
+// Stage 8 input harness (avm2_display.c): parse input_events.txt (main.c) and
+// pump one WAIT group per tick (called at the tail of avm2_display_run_tick).
+void avm2_input_load(const char* path);
+void avm2_input_pump_tick(Avm2Context* ctx);
+
+// Text-editing bridge (avm2_text.c): route a physical key / typed char /
+// text-control command to the focused TextField's EditText engine. `focus` may
+// be NULL or a non-TextField (ignored). Returns nothing; a non-editable field
+// still consumes selection/caret navigation keys.
+void avm2_text_input_key(Avm2Context* ctx, Avm2Object* focus, int32_t key_code,
+                         int32_t char_code, int shift);
+void avm2_text_input_char(Avm2Context* ctx, Avm2Object* focus, int32_t codepoint);
+void avm2_text_input_control(Avm2Context* ctx, Avm2Object* focus,
+                             const char* ctrl, const char* clipboard);
+// EditText flag accessors for the mouse-pick path (NULL-safe on the ext ptr).
+int avm2_text_is_selectable(struct Avm2EditTextExt* et);
+int avm2_text_was_static(struct Avm2EditTextExt* et);
+int avm2_text_is_editable(struct Avm2EditTextExt* et);
+
 // Builtin class handles the runtime needs by identity.
 typedef struct Avm2Builtins
 {
@@ -473,6 +544,10 @@ typedef struct Avm2Builtins
 	Avm2Class* xml_list_class;  // stub
 	Avm2Class* movieclip_class;
 	Avm2Class* event_class;
+	Avm2Class* mouse_event_class;
+	Avm2Class* keyboard_event_class;
+	Avm2Class* focus_event_class;
+	Avm2Class* text_event_class;
 	Avm2Class* event_dispatcher_class;
 	Avm2Class* ievent_dispatcher_class;  // interface
 	Avm2Class* display_object_class;
