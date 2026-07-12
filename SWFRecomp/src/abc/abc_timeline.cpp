@@ -43,6 +43,7 @@ enum
 	TAG_DEFINE_EDIT_TEXT = 37,
 	TAG_DEFINE_SPRITE = 39,
 	TAG_DEFINE_FONT2 = 48,
+	TAG_CSM_TEXT_SETTINGS = 74,
 	TAG_DEFINE_FONT3 = 75,
 	TAG_FRAME_LABEL = 43,
 	TAG_DEFINE_MORPH_SHAPE = 46,
@@ -307,6 +308,11 @@ struct EditTextDef
 	std::string variable_name;
 	bool has_text = false;
 	std::string raw_text;
+	// CSMTextSettings (tag 74).
+	bool has_render_settings = false;
+	uint8_t aa_advanced = 0;
+	uint8_t grid_fit = 0;
+	float cs_thickness = 0, cs_sharpness = 0;
 };
 
 // DefineFont2/3 measurement data (shapes not parsed).
@@ -342,6 +348,13 @@ struct Scanner
 	std::vector<ButtonDef> buttons;
 	std::vector<EditTextDef> edittexts;
 	std::vector<FontDef> fonts;
+	struct CsmSettings
+	{
+		uint16_t char_id;
+		uint8_t aa_advanced, grid_fit;
+		float thickness, sharpness;
+	};
+	std::vector<CsmSettings> csm;
 	std::vector<std::pair<uint32_t, std::string>> scenes;  // (offset, name)
 	std::vector<std::pair<uint32_t, std::string>> scene_labels;
 	uint32_t bg_color = 0xFFFFFF;
@@ -671,6 +684,23 @@ struct Scanner
 				}
 				chars.push_back(ci);
 				edittexts.push_back(et);
+				break;
+			}
+			case TAG_CSM_TEXT_SETTINGS:
+			{
+				uint16_t text_id = body.u16();
+				uint8_t bits = body.u8();
+				uint8_t use_flash_type = (bits >> 6) & 0x3;
+				uint8_t grid = (bits >> 3) & 0x7;
+				uint32_t th = body.u32();
+				uint32_t sh = body.u32();
+				CsmSettings cs;
+				cs.char_id = text_id;
+				cs.aa_advanced = use_flash_type != 0;
+				cs.grid_fit = grid > 2 ? 0 : (uint8_t) grid;
+				memcpy(&cs.thickness, &th, 4);
+				memcpy(&cs.sharpness, &sh, 4);
+				csm.push_back(cs);
 				break;
 			}
 			case TAG_DEFINE_FONT2:
@@ -1014,6 +1044,20 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	out << "const uint32_t avm2_generated_button_count = " << sc.buttons.size()
 	    << ";\n\n";
 
+	for (auto& cs : sc.csm)
+	{
+		for (auto& et : sc.edittexts)
+		{
+			if (et.char_id == cs.char_id)
+			{
+				et.has_render_settings = true;
+				et.aa_advanced = cs.aa_advanced;
+				et.grid_fit = cs.grid_fit;
+				et.cs_thickness = cs.thickness;
+				et.cs_sharpness = cs.sharpness;
+			}
+		}
+	}
 	if (!sc.edittexts.empty())
 	{
 		out << "const Avm2EditTextData avm2_generated_edittexts[] = {\n";
@@ -1034,6 +1078,9 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			    << ", "
 			    << (et.has_text ? ("\"" + cEscape(et.raw_text) + "\"")
 			                    : std::string("NULL"))
+			    << ", " << (et.has_render_settings ? 1 : 0) << ", "
+			    << (int) et.aa_advanced << ", " << (int) et.grid_fit << ", "
+			    << fmtFloat(et.cs_thickness) << ", " << fmtFloat(et.cs_sharpness)
 			    << " },\n";
 		}
 		out << "};\n";

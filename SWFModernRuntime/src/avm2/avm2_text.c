@@ -245,7 +245,16 @@ static Avm2TextFormatFields format_default(void)
 static void fields_apply(Avm2TextFormatFields* dst, const Avm2TextFormatFields* src)
 {
 	uint32_t p = src->present;
-	if (p & TFP_FONT) dst->font = src->font;
+	// Empty font faces never overwrite (Ruffle TextSpan::set_text_format
+	// filters them — edittext_format_empty_font).
+	if ((p & TFP_FONT) && src->font != NULL && src->font->len > 0)
+	{
+		dst->font = src->font;
+	}
+	else
+	{
+		p &= ~(uint32_t) TFP_FONT;
+	}
 	if (p & TFP_SIZE) dst->size = src->size;
 	if (p & TFP_COLOR) dst->color = src->color;
 	if (p & TFP_ALIGN) dst->align = src->align;
@@ -1026,6 +1035,42 @@ static void spans_replace_text(Avm2Context* ctx, Avm2EditTextExt* et,
 // HTML parser (FormatSpans::from_html port)
 // ===========================================================================
 
+// Decode the raw text to UTF-16 units (no password masking).
+static uint16_t* et_units_plain(Avm2Context* ctx, const Avm2EditTextExt* et,
+                                uint32_t* out_len)
+{
+	const Avm2String* str = et->text;
+	uint32_t n = u16_length(str);
+	uint16_t* u = avm2_alloc(ctx, (n + 1) * sizeof(uint16_t));
+	uint32_t k = 0;
+	for (uint32_t i = 0; i < str->len; )
+	{
+		unsigned char c = (unsigned char) str->utf8[i];
+		uint32_t cp, clen;
+		if (c < 0x80) { cp = c; clen = 1; }
+		else if (c < 0xE0) { cp = c & 0x1F; clen = 2; }
+		else if (c < 0xF0) { cp = c & 0x0F; clen = 3; }
+		else { cp = c & 0x07; clen = 4; }
+		for (uint32_t j = 1; j < clen && i + j < str->len; j++)
+		{
+			cp = (cp << 6) | ((unsigned char) str->utf8[i + j] & 0x3F);
+		}
+		if (clen == 4)
+		{
+			cp -= 0x10000;
+			u[k++] = (uint16_t) (0xD800 + (cp >> 10));
+			u[k++] = (uint16_t) (0xDC00 + (cp & 0x3FF));
+		}
+		else
+		{
+			u[k++] = (uint16_t) cp;
+		}
+		i += clen;
+	}
+	*out_len = k;
+	return u;
+}
+
 // Decode &entities; in [p, p+n) into sb (process_html_entity).
 static void html_decode_entities(Avm2Context* ctx, SB* sb, const char* p, uint32_t n)
 {
@@ -1148,8 +1193,9 @@ static int parse_f64_strict(const char* s, uint32_t len, double* out)
 // condense_white_in_text: any run of whitespace -> single space.
 static int swf_is_ws(char c)
 {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f'
-	       || c == '\v';
+	// Ruffle swf_is_whitespace: EXACTLY these four (control chars like
+	// \x0b are NOT whitespace — edittext_html_condensewhite).
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
 // from_html: parse html into et->text/spans. No stylesheet support yet.
@@ -1695,6 +1741,54 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 
 	et->text = sb_str(ctx, &text);
 	et->original_html = NULL;
+	if (condense_white && ctx->swf_version >= 8)
+	{
+		// condense_white_swf8: collapse whitespace runs down to their
+		// first char (leading whitespace removed entirely; newlines both
+		// break runs and start new ones).
+		spans_normalize(ctx, et);
+		uint32_t len;
+		uint16_t* u = et_units_plain(ctx, et, &len);
+		uint32_t to_remove[256][2];
+		uint32_t nrem = 0;
+		int have_start = 1;
+		uint32_t rem_start = 0;
+		for (uint32_t i = 0; i < len; i++)
+		{
+			int is_nl = (u[i] == '\r');
+			int is_sp = (u[i] == ' ');
+			if (is_nl || !is_sp)
+			{
+				if (have_start && nrem < 256)
+				{
+					to_remove[nrem][0] = rem_start;
+					to_remove[nrem][1] = i;
+					nrem++;
+				}
+				have_start = 0;
+			}
+			if ((is_nl || is_sp) && !have_start)
+			{
+				have_start = 1;
+				rem_start = i + 1;
+			}
+		}
+		if (have_start && nrem < 256)
+		{
+			to_remove[nrem][0] = rem_start;
+			to_remove[nrem][1] = len;
+			nrem++;
+		}
+		const Avm2String* empty = empty_string(ctx);
+		for (uint32_t k = nrem; k > 0; k--)
+		{
+			if (to_remove[k - 1][0] != to_remove[k - 1][1])
+			{
+				spans_replace_text(ctx, et, to_remove[k - 1][0],
+				                   to_remove[k - 1][1], empty);
+			}
+		}
+	}
 	spans_normalize(ctx, et);
 #undef PUSH_TEXT_SPAN
 }
@@ -2081,8 +2175,8 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
 	memset(et, 0, sizeof(*et));
 	ext->edittext = et;
 
-	et->aa_advanced = 1;
-	et->grid_fit = 1;  // pixel
+	et->aa_advanced = 0;  // TextRenderSettings::default() = Normal
+	et->grid_fit = 1;     // pixel
 	et->border_color = 0x000000;
 	et->background_color = 0xFFFFFF;
 	et->scroll = 1;
@@ -2090,6 +2184,13 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
 	et->style_sheet = NULL;
 
 	uint16_t flags = td != NULL ? td->flags : 0;
+	if (td != NULL && td->has_render_settings)
+	{
+		et->aa_advanced = td->aa_advanced;
+		et->grid_fit = td->grid_fit;
+		et->thickness = (double) td->cs_thickness;
+		et->sharpness = (double) td->cs_sharpness;
+	}
 	int has_font = (flags & AVM2_ETF_HAS_FONT) != 0;
 	int has_layout = (flags & AVM2_ETF_HAS_LAYOUT) != 0;
 	int is_html = (flags & AVM2_ETF_HTML) != 0;
@@ -3595,9 +3696,9 @@ static Avm2Value txt_set_thickness(Avm2Activation* act)
 	Avm2EditTextExt* et = this_et(act);
 	if (et == NULL) return avm2_undefined();
 	double v = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
-	if (v < -200.0 || isnan(v)) v = -200.0;
+	// Rust f64::clamp propagates NaN (edittext_antialiastype traces NaN).
+	if (v < -200.0) v = -200.0;
 	if (v > 200.0) v = 200.0;
-	// f32 storage in Ruffle; values here stay integral in tests.
 	et->thickness = (double) (float) v;
 	return avm2_undefined();
 }
@@ -3612,7 +3713,8 @@ static Avm2Value txt_set_sharpness(Avm2Activation* act)
 	Avm2EditTextExt* et = this_et(act);
 	if (et == NULL) return avm2_undefined();
 	double v = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
-	if (v < -400.0 || isnan(v)) v = -400.0;
+	// Rust f64::clamp propagates NaN.
+	if (v < -400.0) v = -400.0;
 	if (v > 400.0) v = 400.0;
 	et->sharpness = (double) (float) v;
 	return avm2_undefined();
@@ -3827,8 +3929,8 @@ static void et_transformed_size(Avm2DisplayObjectExt* ext, Avm2EditTextExt* et,
 	{
 		for (int j = 0; j < 2; j++)
 		{
-			int32_t tx = (int32_t) (a * (float) xs[i] + c * (float) ys[j]);
-			int32_t ty = (int32_t) (b * (float) xs[i] + d * (float) ys[j]);
+			int32_t tx = (int32_t) nearbyintf(a * (float) xs[i] + c * (float) ys[j]);
+			int32_t ty = (int32_t) nearbyintf(b * (float) xs[i] + d * (float) ys[j]);
 			if (first)
 			{
 				minx = maxx = tx;
@@ -4124,6 +4226,48 @@ static Avm2Value txt_get_paragraph_length(Avm2Activation* act)
 	while (i < len && u[i] != '\n' && u[i] != '\r') i++;
 	if (i < len && (u[i] == '\n' || u[i] == '\r')) i++;
 	return avm2_integer((int32_t) (i - start));
+}
+
+// flash.text.TextRun: three raw-valued slots.
+static Avm2Class* g_textrun_class;
+
+static Avm2Value textrun_init(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->slot_count < 4) return avm2_undefined();
+	self->slots[1] = act->argc > 0
+		? avm2_integer(avm2_coerce_to_i32(act->ctx, act->args[0])) : avm2_integer(0);
+	self->slots[2] = act->argc > 1
+		? avm2_integer(avm2_coerce_to_i32(act->ctx, act->args[1])) : avm2_integer(0);
+	self->slots[3] = act->argc > 2 ? act->args[2] : avm2_null();
+	return avm2_undefined();
+}
+
+// getTextRuns: one TextRun per non-empty span.
+static Avm2Value txt_get_text_runs(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	Avm2Object* arr = avm2_array_new(ctx, 0);
+	uint32_t acc = 0, out = 0;
+	uint32_t text_len = u16_length(et->text);
+	for (uint32_t i = 0; i < et->span_count; i++)
+	{
+		uint32_t start = acc;
+		uint32_t end = acc + et->spans[i].length;
+		acc = end;
+		if (end > text_len) end = text_len;
+		if (end <= start) continue;
+		Avm2Value args[3];
+		args[0] = avm2_integer((int32_t) start);
+		args[1] = avm2_integer((int32_t) end);
+		args[2] = avm2_object_value(
+			textformat_object_from_fields(ctx, &et->spans[i].fmt));
+		avm2_array_set(ctx, arr, out++, 
+		               avm2_class_construct(ctx, g_textrun_class, args, 3));
+	}
+	return avm2_object_value(arr);
 }
 
 // getLineMetrics -> TextLineMetrics(x, width, height, ascent, descent,
@@ -4506,6 +4650,56 @@ void avm2_register_text(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, tf, "tabStops", tfmt_get_tab_stops, tfmt_set_tab_stops);
 	avm2_builtin_add_getset(ctx, tf, "display", tfmt_get_display, tfmt_set_display);
 
+	// String-constant classes (AntiAliasType/GridFitType/TextFieldAutoSize/
+	// TextFormatAlign/TextFieldType).
+	{
+		Avm2Class* c;
+		c = avm2_builtin_class(ctx, "flash.text", "AntiAliasType",
+		                       ctx->builtins.object_class);
+		avm2_builtin_add_static_const(ctx, c, "ADVANCED",
+			avm2_string(avm2_string_from_literal(ctx, "advanced")));
+		avm2_builtin_add_static_const(ctx, c, "NORMAL",
+			avm2_string(avm2_string_from_literal(ctx, "normal")));
+		c = avm2_builtin_class(ctx, "flash.text", "GridFitType",
+		                       ctx->builtins.object_class);
+		avm2_builtin_add_static_const(ctx, c, "NONE",
+			avm2_string(avm2_string_from_literal(ctx, "none")));
+		avm2_builtin_add_static_const(ctx, c, "PIXEL",
+			avm2_string(avm2_string_from_literal(ctx, "pixel")));
+		avm2_builtin_add_static_const(ctx, c, "SUBPIXEL",
+			avm2_string(avm2_string_from_literal(ctx, "subpixel")));
+		c = avm2_builtin_class(ctx, "flash.text", "TextFieldAutoSize",
+		                       ctx->builtins.object_class);
+		avm2_builtin_add_static_const(ctx, c, "NONE",
+			avm2_string(avm2_string_from_literal(ctx, "none")));
+		avm2_builtin_add_static_const(ctx, c, "LEFT",
+			avm2_string(avm2_string_from_literal(ctx, "left")));
+		avm2_builtin_add_static_const(ctx, c, "CENTER",
+			avm2_string(avm2_string_from_literal(ctx, "center")));
+		avm2_builtin_add_static_const(ctx, c, "RIGHT",
+			avm2_string(avm2_string_from_literal(ctx, "right")));
+		c = avm2_builtin_class(ctx, "flash.text", "TextFormatAlign",
+		                       ctx->builtins.object_class);
+		avm2_builtin_add_static_const(ctx, c, "LEFT",
+			avm2_string(avm2_string_from_literal(ctx, "left")));
+		avm2_builtin_add_static_const(ctx, c, "CENTER",
+			avm2_string(avm2_string_from_literal(ctx, "center")));
+		avm2_builtin_add_static_const(ctx, c, "RIGHT",
+			avm2_string(avm2_string_from_literal(ctx, "right")));
+		avm2_builtin_add_static_const(ctx, c, "JUSTIFY",
+			avm2_string(avm2_string_from_literal(ctx, "justify")));
+		avm2_builtin_add_static_const(ctx, c, "START",
+			avm2_string(avm2_string_from_literal(ctx, "start")));
+		avm2_builtin_add_static_const(ctx, c, "END",
+			avm2_string(avm2_string_from_literal(ctx, "end")));
+		c = avm2_builtin_class(ctx, "flash.text", "TextFieldType",
+		                       ctx->builtins.object_class);
+		avm2_builtin_add_static_const(ctx, c, "INPUT",
+			avm2_string(avm2_string_from_literal(ctx, "input")));
+		avm2_builtin_add_static_const(ctx, c, "DYNAMIC",
+			avm2_string(avm2_string_from_literal(ctx, "dynamic")));
+	}
+
 	// flash.text.Font.
 	{
 		Avm2Class* font = avm2_builtin_class(ctx, "flash.text", "Font",
@@ -4531,6 +4725,12 @@ void avm2_register_text(Avm2Context* ctx)
 		                                    rect_fields, 4);
 		avm2_builtin_add_method(ctx, g_rectangle_class, "toString",
 		                        rectangle_to_string);
+		static const char* const textrun_fields[3] = {
+			"beginIndex", "endIndex", "textFormat",
+		};
+		g_textrun_class = make_slot_class(ctx, "flash.text", "TextRun",
+		                                  textrun_fields, 3);
+		g_textrun_class->instance_init.fn = textrun_init;
 		static const char* const tlm_fields[6] = {
 			"x", "width", "height", "ascent", "descent", "leading",
 		};
@@ -4596,4 +4796,5 @@ void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield)
 	avm2_builtin_add_method(ctx, textfield, "getFirstCharInParagraph", txt_get_first_char_in_paragraph);
 	avm2_builtin_add_method(ctx, textfield, "getParagraphLength", txt_get_paragraph_length);
 	avm2_builtin_add_method(ctx, textfield, "getCharIndexAtPoint", txt_get_char_index_at_point);
+	avm2_builtin_add_method(ctx, textfield, "getTextRuns", txt_get_text_runs);
 }

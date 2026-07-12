@@ -305,6 +305,11 @@ typedef struct Avm2EditTextData
 	int16_t leading;         // twips (HAS_LAYOUT)
 	const char* variable_name;  // NULL when empty
 	const char* raw_text;    // NULL unless HAS_TEXT
+	// CSMTextSettings (tag 74) for this character, if present.
+	uint8_t has_render_settings;
+	uint8_t aa_advanced;     // UseFlashType != 0
+	uint8_t grid_fit;        // 0 none, 1 pixel, 2 subpixel
+	float cs_thickness, cs_sharpness;
 } Avm2EditTextData;
 
 // DefineFont2/3 measurement data (Stage 6): enough for the text layout
