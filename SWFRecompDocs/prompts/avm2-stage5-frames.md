@@ -1,5 +1,11 @@
 # Session prompt — AVM2 Stage 5: frame lifecycle + display basics
 
+**STATUS: COMPLETE (2026-07-12).** 141/159 candidates pass (exit >=100);
+CI baseline 639/1201 (+18 RM = 657 effective, 54.7%) at run 29174330330,
+zero regressions anywhere, wasm-link-smoke green. Misses triaged in
+STAGE5_CANDIDATES.txt. The "resume state" section below is kept as the
+gotcha record for follow-up sessions (esp. the static-slot-write lead).
+
 ## RESUME STATE (2026-07-11, session 2 — read this first)
 
 Tranches 1-5 are all substantially implemented and committed

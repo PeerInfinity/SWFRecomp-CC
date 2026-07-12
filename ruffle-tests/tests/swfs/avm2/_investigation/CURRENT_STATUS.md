@@ -1,7 +1,7 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-11 — the E4X/XML engine landed (the §5 deferred
-plan); Stage 4 COMPLETE before it.
+Last updated: 2026-07-12 — Stage 5 (frame lifecycle + display basics)
+COMPLETE; E4X and Stage 4 before it.
 
 **Plan:** `SWFRecompDocs/plans/avm2-support-plan.md` (umbrella; stages,
 architecture sketch, tranche definitions). Phase-1 metric: pass rate on this
@@ -9,6 +9,48 @@ suite's trace tests.
 
 ## State
 
+- **CI baseline (run 29174330330, 2026-07-12): 639 / 1,201 passing +
+  18 ruffle_matched = 657 effective (54.7%)** — up from the E4X
+  baseline's 476 (+163), **zero pass->fail regressions** in avm2 or ANY
+  AVM1 suite, wasm-link-smoke green.
+- **Stage 5 COMPLETE (2026-07-12): 141/159 Stage-5 candidates pass
+  locally and in CI** (`_investigation/STAGE5_CANDIDATES.txt`; exit
+  criterion >=100 met; the 18 misses are triaged in that file's header —
+  5 infrastructure (Loader/BitmapData/filters/TextField-matrix/
+  ApplicationDomain), 6 frame/goto edge semantics, 7 SimpleButton
+  event-order details). What landed (commits `f662d9b9a`..`66ae469e1`):
+  - `SWFModernRuntime/src/avm2/avm2_events.c` — real flash.events:
+    Event internal state + const getters + clone/formatToString family,
+    EventDispatcher with priority buckets/capture split/dedup, the
+    3-phase DOM dispatch, EventDispatcher(target) aggregation,
+    willTrigger parent walk, IEventDispatcher interface aliases, the FP
+    broadcast registry (enterFrame/exitFrame/frameConstructed/render,
+    length-snapshotted iteration).
+  - `SWFRecomp/src/abc/abc_timeline.cpp` — an independent second pass
+    over the decompressed tag stream (AVM2 SWFs only) emitting
+    RecompiledABC/abc_timeline.c: per-timeline place/remove op tables
+    (matrices/names/depths/ratio/visible), frame labels (scene data
+    supersedes FrameLabel tags), scenes, a character dictionary with
+    bounds + EditText initial text (HTML pre-stripped), DefineButton/2
+    state records, stage rect/rate/bg color.
+  - `SWFModernRuntime/src/avm2/avm2_display.c` — the AVM2-owned display
+    tree: full DisplayObject property surface (matrix decomposition
+    cache, twips quantization, exact NaN/Infinity rules, width/height
+    cross-coupled scale formulas), container render/depth-list duality
+    (rotate-move insert, timeline lock/pull via placed_by_avm2_script,
+    2006/2024/2025/2150/3783), Ruffle's allocator model for
+    script-created objects, Sprite.constructChildren with the
+    RUNNING_CONSTRUCT_FRAME guard, the 5-phase tick, queued gotos +
+    survives_rewind, scenes/labels surface, Stage (frameRate clamps,
+    color alpha, 2071 setter overrides, invalidate->render),
+    SimpleButton eager state construction (wrapper sprites, the
+    has-MovieClip nested frame + one-shot framescript order),
+    TextField.text, FrameLabel/Scene/Graphics/Matrix/Transform/System
+    classes. runSWF_avm2 drives the real frame lifecycle.
+  Session prompt `SWFRecompDocs/prompts/avm2-stage5-frames.md` carries
+  the gotcha list + the static-slot-write lead for the button misses.
+  Next: input.json harness (interactive tests), flash.display.Loader /
+  LoaderInfo, BitmapData, or the AVM1-interop track.
 - **CI baseline (run 29165717217, 2026-07-11): 475 / 1,201 passing
   (39.6%)** — up from tranche 3's 411/1200 (+64), **zero pass->fail
   regressions** in avm2 or ANY AVM1 suite (avm1 634/706, gnash suites,

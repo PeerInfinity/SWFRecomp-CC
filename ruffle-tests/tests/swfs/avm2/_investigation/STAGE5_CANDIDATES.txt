@@ -1,3 +1,24 @@
+# STAGE 5 COMPLETE (2026-07-12, CI run 29174330330): 141/159 candidates
+# pass (exit criterion >=100 met); avm2 suite 639/1201 (+18 ruffle_matched
+# = 657 effective, 54.7%), up from 476; zero pass->fail regressions in any
+# suite; wasm-link-smoke green. The 18 misses, triaged:
+#   Infrastructure (own plans, not Stage 5):
+#     displayobject_early_init      - Graphics identity + BitmapData 2015
+#     displayobject_filters         - real flash.filters classes
+#     displayobject_set_name_loaded - flash.display.Loader
+#     displayobject_transform       - TextField + concatenatedMatrix quality scaling
+#     stage_domain_getQualifiedDefinitionNames - ApplicationDomain surface
+#   Frame/goto edge semantics (small, deferred):
+#     movieclip_frameconstruct_skipped - ctor-failure leaves children unconstructed
+#     movieclip_next_scene / movieclip_prev_scene - scene-relative goto edges
+#     goto_button_nested_framescript / goto_nested_construct_sibling
+#     place_object_replace_2 - Replace with per-type re-instantiation rules
+#   SimpleButton event-order details (structure/constr/multi_children pass):
+#     simplebutton_added_to_stage, _childevents, _childevents_nested,
+#     _childprops, _childshuffle, _constr_childevents,
+#     _symbolclass (blocked on a static-slot-write-in-ctor bug: see the
+#     session prompt's resume notes)
+
 # Stage 5 (frame lifecycle + display basics) candidate tests.
 # Generated 2026-07-11 from the post-E4X CI results (run 29166383620,
 # avm2 476/1201 at 6841590f6): failing, non-ignored tests in the

@@ -370,10 +370,23 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   xml_appendchild_swf_v21 = flash.display.Loader). Census ceiling
   1155 → **1163/1164** (E4X_OPS.txt, 128 ops; only the alchemy-ops test
   remains op-blocked).
-- **Stage 5 — frame lifecycle + display basics**: broadcast events, 3-phase
-  dispatch, `addFrameScript`, DisplayObject hierarchy bridged onto the existing
-  display list. Unlocks the timeline-dependent minority + starts the path
-  toward renderer-touching tests.
+- **Stage 5 — frame lifecycle + display basics** — **DONE 2026-07-12**
+  (`f662d9b9a`..`66ae469e1` + docs): real flash.events machinery
+  (avm2_events.c — Event state/clone/formatToString, priority-bucketed
+  3-phase dispatch, broadcast registry), the recompiler's static timeline
+  tables (abc_timeline.cpp — an independent tag-stream second pass, AVM2
+  SWFs only, per plan option 1), and the AVM2-owned display tree
+  (avm2_display.c — property surface with Ruffle's exact NaN/matrix
+  rules, render/depth-list container duality with timeline lock/pull,
+  Ruffle's allocator model, the 5-phase tick with broadcast ordering,
+  queued gotos + survives_rewind, scenes/labels, Stage with 2071
+  overrides, SimpleButton eager state construction, TextField.text,
+  Graphics/Matrix/Transform stubs). runSWF_avm2 drives the real frame
+  lifecycle. Exit met: **141/159 Stage-5 candidates** (>=100 criterion),
+  CI baseline **639/1201 + 18 RM = 657 effective (54.7%, up from 476)**
+  at run 29174330330, zero pass->fail regressions in any suite; the 18
+  misses triaged in STAGE5_CANDIDATES.txt (infrastructure /
+  edge-semantics / button event-order).
 - **Later / separate plans**: playerglobal recompilation,
   graphics-mode avm2 tests, AVM1↔AVM2 interop, AS3 games.
 
