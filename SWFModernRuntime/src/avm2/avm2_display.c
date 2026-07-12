@@ -157,6 +157,12 @@ static uint16_t char_for_class(Avm2Class* cls)
 	return 0;
 }
 
+// Exported for avm2_text.c (Font symbol binding).
+uint16_t avm2_display_char_for_class(Avm2Class* cls)
+{
+	return char_for_class(cls);
+}
+
 // While instantiating a timeline child the alloc hook must not apply the
 // script-created extras (skip flag, orphan registration, symbol lookup).
 static int g_timeline_instantiation;
@@ -2004,7 +2010,14 @@ void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name)
 static Avm2Value do_get_x(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = this_display(act);
-	return avm2_number(ext != NULL ? twips_to_pixels(ext->mtx_tx) : 0);
+	if (ext == NULL) return avm2_number(0);
+	int32_t off = 0;
+	if (ext->edittext != NULL)
+	{
+		cache_scale_rotation(ext);
+		off = avm2_text_bounds_x_offset(act->ctx, this_obj(act), ext->scale_x);
+	}
+	return avm2_number(twips_to_pixels(ext->mtx_tx + off));
 }
 
 static Avm2Value do_set_x(Avm2Activation* act)
@@ -2012,7 +2025,13 @@ static Avm2Value do_set_x(Avm2Activation* act)
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext != NULL && act->argc > 0)
 	{
-		ext->mtx_tx = twips_from_pixels(avm2_coerce_to_number(act->ctx, act->args[0]));
+		int32_t off = 0;
+		if (ext->edittext != NULL)
+		{
+			cache_scale_rotation(ext);
+			off = avm2_text_bounds_x_offset(act->ctx, this_obj(act), ext->scale_x);
+		}
+		ext->mtx_tx = twips_from_pixels(avm2_coerce_to_number(act->ctx, act->args[0])) - off;
 	}
 	return avm2_undefined();
 }
@@ -2020,7 +2039,14 @@ static Avm2Value do_set_x(Avm2Activation* act)
 static Avm2Value do_get_y(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = this_display(act);
-	return avm2_number(ext != NULL ? twips_to_pixels(ext->mtx_ty) : 0);
+	if (ext == NULL) return avm2_number(0);
+	int32_t off = 0;
+	if (ext->edittext != NULL)
+	{
+		cache_scale_rotation(ext);
+		off = avm2_text_bounds_y_offset(act->ctx, this_obj(act), ext->scale_y);
+	}
+	return avm2_number(twips_to_pixels(ext->mtx_ty + off));
 }
 
 static Avm2Value do_set_y(Avm2Activation* act)
@@ -2028,7 +2054,13 @@ static Avm2Value do_set_y(Avm2Activation* act)
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext != NULL && act->argc > 0)
 	{
-		ext->mtx_ty = twips_from_pixels(avm2_coerce_to_number(act->ctx, act->args[0]));
+		int32_t off = 0;
+		if (ext->edittext != NULL)
+		{
+			cache_scale_rotation(ext);
+			off = avm2_text_bounds_y_offset(act->ctx, this_obj(act), ext->scale_y);
+		}
+		ext->mtx_ty = twips_from_pixels(avm2_coerce_to_number(act->ctx, act->args[0])) - off;
 	}
 	return avm2_undefined();
 }
@@ -2092,6 +2124,10 @@ static Avm2Value do_get_width(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext == NULL) return avm2_number(0);
+	if (ext->edittext != NULL)
+	{
+		return avm2_number(avm2_text_get_width_px(act->ctx, this_obj(act)));
+	}
 	Rect r = display_bounds(act->ctx, this_obj(act), 1);
 	return avm2_number(rect_width_px(&r));
 }
@@ -2100,6 +2136,10 @@ static Avm2Value do_get_height(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext == NULL) return avm2_number(0);
+	if (ext->edittext != NULL)
+	{
+		return avm2_number(avm2_text_get_height_px(act->ctx, this_obj(act)));
+	}
 	Rect r = display_bounds(act->ctx, this_obj(act), 1);
 	return avm2_number(rect_height_px(&r));
 }
@@ -2110,6 +2150,14 @@ static void set_width_height(Avm2Activation* act, int is_width)
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext == NULL || act->argc < 1) return;
 	double value = avm2_coerce_to_number(act->ctx, act->args[0]);
+	if (ext->edittext != NULL)
+	{
+		// EditText bounds semantics (Ruffle EditText::set_width/set_height):
+		// the bounds resize, not the scale.
+		if (is_width) avm2_text_set_width_px(act->ctx, this_obj(act), value);
+		else avm2_text_set_height_px(act->ctx, this_obj(act), value);
+		return;
+	}
 	if (!(value >= 0.0)) return;  // rejects negatives AND NaN
 
 	Rect ob = display_bounds(act->ctx, this_obj(act), 0);

@@ -730,6 +730,8 @@ typedef struct Avm2TextSpan
 	Avm2TextFormatFields fmt;  // fully present
 } Avm2TextSpan;
 
+struct LLayout;
+
 struct Avm2EditTextExt
 {
 	const Avm2String* text;
@@ -738,6 +740,11 @@ struct Avm2EditTextExt
 	uint32_t span_count, span_cap;
 	const Avm2String* original_html;  // cache for html_text getter
 	Avm2Object* style_sheet;
+	// Current layout (rebuilt by et_relayout; NULL until first layout).
+	struct LLayout* layout;
+	// Lazily-applied autosize bounds (Ruffle autosize_lazy_bounds).
+	uint8_t has_lazy_bounds;
+	int32_t lazy_x, lazy_w, lazy_h;
 
 	uint8_t is_html, condense_white, word_wrap, multiline, password,
 	        read_only, no_select, border, background, was_static, device_font,
@@ -764,6 +771,8 @@ static Avm2EditTextExt* edittext_of(Avm2Context* ctx, Avm2Object* obj)
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	return ext != NULL ? ext->edittext : NULL;
 }
+
+static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et);
 
 static Avm2EditTextExt* this_et(Avm2Activation* act)
 {
@@ -1690,6 +1699,347 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 #undef PUSH_TEXT_SPAN
 }
 
+
+// ===========================================================================
+// HTML writer (FormatSpans::to_html port)
+// ===========================================================================
+
+// Tag order (Ruffle HtmlTag enum): TEXTFORMAT < P < LI < FONT < A < B < I < U.
+enum
+{
+	HT_TEXTFORMAT = 0, HT_P = 1, HT_LI = 2, HT_FONT = 3, HT_A = 4,
+	HT_B = 5, HT_I = 6, HT_U = 7,
+};
+
+typedef struct HtmlWriter
+{
+	Avm2Context* ctx;
+	SB out;
+	const Avm2TextFormatFields* font_stack[32];
+	uint32_t font_stack_n;
+	const Avm2TextFormatFields* current;
+	int open_tags[16];
+	uint32_t open_n;
+	Avm2TextFormatFields default_span;
+} HtmlWriter;
+
+static void hw_puts(HtmlWriter* w, const char* s)
+{
+	sb_bytes(w->ctx, &w->out, s, (uint32_t) strlen(s));
+}
+
+static void hw_num(HtmlWriter* w, double d)
+{
+	char buf[40];
+	avm2_format_number(buf, sizeof(buf), d);
+	hw_puts(w, buf);
+}
+
+static void hw_str(HtmlWriter* w, const Avm2String* s)
+{
+	if (s != NULL) sb_bytes(w->ctx, &w->out, s->utf8, s->len);
+}
+
+// TextSpanFont equality: face/size/color/letter_spacing/kerning.
+static int hw_font_eq(const Avm2TextFormatFields* a, const Avm2TextFormatFields* b)
+{
+	return str_eq(a->font, b->font) && a->size == b->size && a->color == b->color
+	       && a->letter_spacing == b->letter_spacing
+	       && (a->kerning != 0) == (b->kerning != 0);
+}
+
+static int hw_style_eq(const Avm2TextFormatFields* a, const Avm2TextFormatFields* b)
+{
+	return (a->bold != 0) == (b->bold != 0)
+	       && (a->italic != 0) == (b->italic != 0)
+	       && (a->underline != 0) == (b->underline != 0);
+}
+
+static int hw_tabs_nonempty(const Avm2TextFormatFields* f)
+{
+	return f->tab_stop_count > 0;
+}
+
+static void hw_close_tag(HtmlWriter* w, int tag)
+{
+	if (tag == HT_FONT)
+	{
+		for (uint32_t i = 0; i < w->font_stack_n; i++) hw_puts(w, "</FONT>");
+		w->font_stack_n = 0;
+		return;
+	}
+	switch (tag)
+	{
+		case HT_TEXTFORMAT: hw_puts(w, "</TEXTFORMAT>"); break;
+		case HT_P: hw_puts(w, "</P>"); break;
+		case HT_LI: hw_puts(w, "</LI>"); break;
+		case HT_A: hw_puts(w, "</A>"); break;
+		case HT_B: hw_puts(w, "</B>"); break;
+		case HT_I: hw_puts(w, "</I>"); break;
+		case HT_U: hw_puts(w, "</U>"); break;
+	}
+}
+
+static void hw_close_tags_till(HtmlWriter* w, int tag)
+{
+	while (w->open_n > 0 && w->open_tags[w->open_n - 1] >= tag)
+	{
+		hw_close_tag(w, w->open_tags[--w->open_n]);
+	}
+}
+
+static int hw_open_contains(HtmlWriter* w, int tag)
+{
+	for (uint32_t i = 0; i < w->open_n; i++)
+	{
+		if (w->open_tags[i] == tag) return 1;
+	}
+	return 0;
+}
+
+static void hw_open_tag(HtmlWriter* w, int tag)
+{
+	if (hw_open_contains(w, tag)) return;
+	if (w->open_n > 0 && w->open_tags[w->open_n - 1] > tag) return;
+	if (w->open_n >= 16) return;
+	w->open_tags[w->open_n++] = tag;
+	const Avm2TextFormatFields* c = w->current;
+	switch (tag)
+	{
+		case HT_TEXTFORMAT:
+			hw_puts(w, "<TEXTFORMAT");
+			if (c->left_margin != 0.0)
+			{
+				hw_puts(w, " LEFTMARGIN=\"");
+				hw_num(w, c->left_margin);
+				hw_puts(w, "\"");
+			}
+			if (c->right_margin != 0.0)
+			{
+				hw_puts(w, " RIGHTMARGIN=\"");
+				hw_num(w, c->right_margin);
+				hw_puts(w, "\"");
+			}
+			if (c->indent != 0.0)
+			{
+				hw_puts(w, " INDENT=\"");
+				hw_num(w, c->indent);
+				hw_puts(w, "\"");
+			}
+			if (c->leading != 0.0)
+			{
+				hw_puts(w, " LEADING=\"");
+				hw_num(w, c->leading);
+				hw_puts(w, "\"");
+			}
+			if (c->block_indent != 0.0)
+			{
+				hw_puts(w, " BLOCKINDENT=\"");
+				hw_num(w, c->block_indent);
+				hw_puts(w, "\"");
+			}
+			if (hw_tabs_nonempty(c))
+			{
+				hw_puts(w, " TABSTOPS=\"");
+				for (uint32_t i = 0; i < c->tab_stop_count; i++)
+				{
+					if (i > 0) hw_puts(w, ",");
+					hw_num(w, c->tab_stops[i]);
+				}
+				hw_puts(w, "\"");
+			}
+			hw_puts(w, ">");
+			break;
+		case HT_P:
+			hw_puts(w, "<P ALIGN=\"");
+			hw_puts(w, c->align == ALIGN_LEFT ? "LEFT"
+			        : c->align == ALIGN_CENTER ? "CENTER"
+			        : c->align == ALIGN_RIGHT ? "RIGHT" : "JUSTIFY");
+			hw_puts(w, "\">");
+			break;
+		case HT_LI: hw_puts(w, "<LI>"); break;
+		case HT_A:
+			hw_puts(w, "<A HREF=\"");
+			hw_str(w, c->url);
+			hw_puts(w, "\" TARGET=\"");
+			hw_str(w, c->target);
+			hw_puts(w, "\">");
+			break;
+		case HT_B: hw_puts(w, "<B>"); break;
+		case HT_I: hw_puts(w, "<I>"); break;
+		case HT_U: hw_puts(w, "<U>"); break;
+	}
+}
+
+static void hw_color_hex(HtmlWriter* w, uint32_t rgba)
+{
+	char buf[10];
+	snprintf(buf, sizeof(buf), "#%02X%02X%02X",
+	         (rgba >> 24) & 0xFF, (rgba >> 16) & 0xFF, (rgba >> 8) & 0xFF);
+	hw_puts(w, buf);
+}
+
+static void hw_set_font(HtmlWriter* w, const Avm2TextFormatFields* font)
+{
+	if (w->font_stack_n > 0)
+	{
+		const Avm2TextFormatFields* last = w->font_stack[w->font_stack_n - 1];
+		if (hw_font_eq(last, font)) return;
+		hw_close_tags_till(w, HT_A);
+		hw_puts(w, "<FONT");
+		if (!str_eq(font->font, last->font))
+		{
+			hw_puts(w, " FACE=\"");
+			hw_str(w, font->font);
+			hw_puts(w, "\"");
+		}
+		if (font->size != last->size)
+		{
+			hw_puts(w, " SIZE=\"");
+			hw_num(w, font->size);
+			hw_puts(w, "\"");
+		}
+		if (font->color != last->color)
+		{
+			hw_puts(w, " COLOR=\"");
+			hw_color_hex(w, font->color);
+			hw_puts(w, "\"");
+		}
+		if (font->letter_spacing != last->letter_spacing)
+		{
+			hw_puts(w, " LETTERSPACING=\"");
+			hw_num(w, font->letter_spacing);
+			hw_puts(w, "\"");
+		}
+		if ((font->kerning != 0) != (last->kerning != 0))
+		{
+			hw_puts(w, font->kerning ? " KERNING=\"1\"" : " KERNING=\"0\"");
+		}
+		hw_puts(w, ">");
+		if (w->font_stack_n < 32) w->font_stack[w->font_stack_n++] = font;
+	}
+	else
+	{
+		hw_close_tags_till(w, HT_A);
+		hw_puts(w, "<FONT FACE=\"");
+		hw_str(w, font->font);
+		hw_puts(w, "\" SIZE=\"");
+		hw_num(w, font->size);
+		hw_puts(w, "\" COLOR=\"");
+		hw_color_hex(w, font->color);
+		hw_puts(w, "\" LETTERSPACING=\"");
+		hw_num(w, font->letter_spacing);
+		hw_puts(w, "\" KERNING=\"");
+		hw_puts(w, font->kerning ? "1" : "0");
+		hw_puts(w, "\">");
+		w->font_stack[w->font_stack_n++] = font;
+		if (w->open_n < 16) w->open_tags[w->open_n++] = HT_FONT;
+	}
+}
+
+static void hw_close_font_if_feasible(HtmlWriter* w, const Avm2TextFormatFields* font)
+{
+	int64_t pos = -1;
+	for (uint32_t i = 0; i < w->font_stack_n; i++)
+	{
+		if (hw_font_eq(w->font_stack[i], font)) { pos = i; break; }
+	}
+	if (pos < 0) return;
+	if ((uint32_t) pos == w->font_stack_n - 1) return;
+	hw_close_tags_till(w, HT_A);
+	for (uint32_t i = (uint32_t) pos + 1; i < w->font_stack_n; i++)
+	{
+		hw_puts(w, "</FONT>");
+	}
+	w->font_stack_n = (uint32_t) pos + 1;
+}
+
+static void hw_set_span(HtmlWriter* w, const Avm2TextFormatFields* span)
+{
+	if (!hw_style_eq(span, w->current)) hw_close_tags_till(w, HT_B);
+	if (!str_eq(span->url, w->current->url)) hw_close_tags_till(w, HT_A);
+	hw_close_font_if_feasible(w, span);
+	w->current = span;
+	if (span->left_margin != 0.0 || span->right_margin != 0.0
+	    || span->indent != 0.0 || span->leading != 0.0
+	    || span->block_indent != 0.0 || hw_tabs_nonempty(span))
+	{
+		hw_open_tag(w, HT_TEXTFORMAT);
+	}
+	if (!hw_open_contains(w, HT_P) && !hw_open_contains(w, HT_LI))
+	{
+		hw_open_tag(w, span->bullet ? HT_LI : HT_P);
+	}
+	hw_set_font(w, span);
+	if (span->url != NULL && span->url->len > 0) hw_open_tag(w, HT_A);
+	if (span->bold) hw_open_tag(w, HT_B);
+	if (span->italic) hw_open_tag(w, HT_I);
+	if (span->underline) hw_open_tag(w, HT_U);
+}
+
+static void hw_push_line(HtmlWriter* w, const char* p, uint32_t n)
+{
+	if (n == 0) return;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		char c = p[i];
+		if (c == '&') hw_puts(w, "&amp;");
+		else if (c == '<') hw_puts(w, "&lt;");
+		else if (c == '>') hw_puts(w, "&gt;");
+		else if (c == 39) hw_puts(w, "&apos;");
+		else if (c == 34) hw_puts(w, "&quot;");
+		else sb_ch(w->ctx, &w->out, c);
+	}
+}
+
+static void hw_push_text(HtmlWriter* w, const char* p, uint32_t n)
+{
+	int ends_with_nl = n > 0 && (p[n - 1] == 10 || p[n - 1] == 13);
+	if (ends_with_nl) n--;
+	uint32_t seg = 0;
+	int first = 1;
+	for (uint32_t i = 0; i <= n; i++)
+	{
+		if (i < n && p[i] != 10 && p[i] != 13) continue;
+		if (!first)
+		{
+			hw_close_tags_till(w, HT_TEXTFORMAT);
+			hw_set_span(w, w->current);
+		}
+		first = 0;
+		hw_push_line(w, p + seg, i - seg);
+		seg = i + 1;
+	}
+	if (ends_with_nl) hw_close_tags_till(w, HT_TEXTFORMAT);
+}
+
+// FormatSpans::to_html.
+static const Avm2String* spans_to_html(Avm2Context* ctx, Avm2EditTextExt* et)
+{
+	if (et->text == NULL || et->text->len == 0) return empty_string(ctx);
+	HtmlWriter w;
+	memset(&w, 0, sizeof(w));
+	w.ctx = ctx;
+	sb_init(&w.out);
+	w.default_span = span_default(ctx);
+	w.current = &w.default_span;
+	uint32_t acc = 0;
+	for (uint32_t i = 0; i < et->span_count; i++)
+	{
+		uint32_t start = acc;
+		uint32_t end = acc + et->spans[i].length;
+		acc = end;
+		if (end > u16_length(et->text)) end = u16_length(et->text);
+		if (end <= start) continue;
+		hw_set_span(&w, &et->spans[i].fmt);
+		uint32_t sb2 = u16_to_byte(et->text, start);
+		uint32_t eb = u16_to_byte(et->text, end);
+		hw_push_text(&w, et->text->utf8 + sb2, eb - sb2);
+	}
+	hw_close_tags_till(&w, HT_TEXTFORMAT);
+	return sb_str(ctx, &w.out);
+}
+
 // ===========================================================================
 // EditText init / tag seeding
 // ===========================================================================
@@ -1860,6 +2210,7 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
 
 	// Keep the legacy tf_text mirror for display code.
 	ext->tf_text = et->text;
+	et_relayout(ctx, et);
 }
 
 // Alloc hook half for script-created TextFields (`new TextField()`).
@@ -1883,6 +2234,991 @@ void avm2_text_seed_from_tag(Avm2Context* ctx, Avm2Object* obj, uint16_t char_id
 	}
 	if (td == NULL) return;
 	edittext_init_common(ctx, obj, td, ci);
+}
+
+// ===========================================================================
+// Text layout engine (Ruffle html/layout.rs + font.rs measurement paths)
+// ===========================================================================
+
+#define GUTTER 40  // twips (2px each side)
+
+// Baked-in device-font fallback: Noto Sans as embedded by the Ruffle test
+// corpus (DefineFont3, em square 20480). Used when a span's font has no
+// embedded match; approximates Ruffle's bundled device Noto Sans.
+static const uint16_t noto_codes[] = {
+	32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+	50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85,
+	86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102,
+	103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+	117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 160, 710, 732, 8211,
+	8212, 8216, 8217, 8218, 8220, 8221, 8222, 8224, 8225, 8226, 8230, 8240,
+	8249, 8250, 8364, 8482,
+};
+static const int16_t noto_advances[] = {
+	5320, 7850, 10280, 13370, 11710, 16950, 14990, 6680, 7240, 7240, 12430,
+	11280, 5120, 6960, 5490, 8790, 11280, 11280, 11280, 11280, 11280, 11280,
+	11280, 11280, 11280, 11280, 6030, 6030, 11280, 11280, 11280, 10600,
+	18410, 13090, 13310, 12940, 14950, 11390, 10630, 14910, 15180, 6940,
+	5590, 12680, 10730, 18580, 15560, 15990, 12390, 15990, 12740, 11240,
+	11390, 14970, 12290, 19050, 12000, 11590, 11710, 7290, 8790, 7290,
+	11280, 8420, 11880, 11490, 12600, 9830, 12600, 11550, 7050, 12600,
+	12660, 5280, 5280, 10940, 5280, 19150, 12660, 12390, 12600, 12600,
+	8460, 9810, 7390, 12660, 10400, 16100, 10830, 10440, 9630, 8000, 11050,
+	7700, 11280, 5320, 12140, 12140, 10240, 20480, 6390, 6380, 5120, 10230,
+	10230, 8520, 10490, 10490, 7700, 16470, 24100, 6350, 6350, 11710, 15830,
+};
+static const Avm2FontData noto_device_font = {
+	0, "Noto Sans", 0, 0, 1, 20480, 21931, 5973, 3413,
+	sizeof(noto_codes) / sizeof(noto_codes[0]), noto_codes, noto_advances,
+};
+
+// Resolved font for measurement.
+typedef struct LFont
+{
+	const Avm2FontData* data;
+	uint8_t is_device;
+} LFont;
+
+static int name_eq_ci(const Avm2String* a, const char* b)
+{
+	uint32_t bl = (uint32_t) strlen(b);
+	if (a == NULL || a->len != bl) return 0;
+	return strncasecmp(a->utf8, b, bl) == 0;
+}
+
+// Ruffle resolve_font: embedded lookup by name+bold+italic (only when the
+// field embeds fonts), else the device fallback.
+static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields* fmt)
+{
+	LFont f;
+	if (!et->device_font)
+	{
+		for (uint32_t i = 0; i < avm2_generated_font_count; i++)
+		{
+			const Avm2FontData* fd = &avm2_generated_fonts[i];
+			if (fd->glyph_count > 0
+			    && name_eq_ci(fmt->font, fd->name)
+			    && (fd->bold != 0) == (fmt->bold != 0)
+			    && (fd->italic != 0) == (fmt->italic != 0))
+			{
+				f.data = fd;
+				f.is_device = 0;
+				return f;
+			}
+		}
+	}
+	f.data = &noto_device_font;
+	f.is_device = 1;
+	return f;
+}
+
+// FontMetrics::ascent/descent — f32 math, truncating casts (Ruffle).
+static int32_t font_ascent(const LFont* f, int32_t height_twips)
+{
+	float scale = (float) height_twips / (float) f->data->em_square;
+	return (int32_t) ((float) f->data->ascent * scale);
+}
+
+static int32_t font_descent(const LFont* f, int32_t height_twips)
+{
+	float scale = (float) height_twips / (float) f->data->em_square;
+	return (int32_t) ((float) f->data->descent * scale);
+}
+
+static int glyph_advance_units(const Avm2FontData* fd, uint32_t cp, int32_t* out)
+{
+	for (uint32_t i = 0; i < fd->glyph_count; i++)
+	{
+		if (fd->codes[i] == cp)
+		{
+			*out = fd->advances != NULL ? fd->advances[i] : 0;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Twips::from_pixels — round half away from zero (Rust f64::round).
+static int32_t twips_from_px(double px)
+{
+	double t = px * 20.0;
+	return (int32_t) (t >= 0 ? floor(t + 0.5) : ceil(t - 0.5));
+}
+
+// round Twips to the nearest pixel (Ruffle round_to_pixel).
+static int32_t round_to_pixel(int32_t twips)
+{
+	return twips_from_px(floor(((double) twips / 20.0) + 0.5));
+}
+
+static int32_t round_to_pixel_ties_even(int32_t twips)
+{
+	return (int32_t) (nearbyint((double) twips / 20.0) * 20.0);
+}
+
+typedef struct EvalParams
+{
+	int32_t height;          // twips
+	int32_t letter_spacing;  // twips
+	uint8_t kerning;
+} EvalParams;
+
+static EvalParams eval_params(const Avm2TextFormatFields* fmt)
+{
+	EvalParams p;
+	p.height = twips_from_px(fmt->size);
+	p.letter_spacing = twips_from_px(fmt->letter_spacing);
+	p.kerning = fmt->kerning;
+	return p;
+}
+
+// Per-character advance (Ruffle Font::evaluate). Returns twips.
+static int32_t char_advance(const LFont* f, EvalParams p, uint32_t cp)
+{
+	int32_t units;
+	if (!glyph_advance_units(f->data, cp, &units))
+	{
+		return 0;  // no glyph, zero advance
+	}
+	float scale = (float) p.height / (float) f->data->em_square;
+	if (f->is_device)
+	{
+		int32_t unspaced = round_to_pixel((int32_t) ((float) units * scale));
+		int32_t spaced = unspaced + round_to_pixel_ties_even(p.letter_spacing);
+		return spaced > 0 ? spaced : unspaced;
+	}
+	return (int32_t) ((float) units * scale) + p.letter_spacing;
+}
+
+// Measure a run of UTF-16 units (surrogates folded into codepoints):
+// max(x + advance) over the run.
+static int32_t measure_units(const LFont* f, EvalParams p,
+                             const uint16_t* u, uint32_t n)
+{
+	int32_t width = 0, x = 0;
+	for (uint32_t i = 0; i < n; )
+	{
+		uint32_t cp = u[i];
+		uint32_t step = 1;
+		if (cp >= 0xD800 && cp < 0xDC00 && i + 1 < n
+		    && u[i + 1] >= 0xDC00 && u[i + 1] < 0xE000)
+		{
+			cp = 0x10000 + ((cp - 0xD800) << 10) + (u[i + 1] - 0xDC00);
+			step = 2;
+		}
+		int32_t adv = char_advance(f, p, cp);
+		if (x + adv > width) width = x + adv;
+		x += adv;
+		i += step;
+	}
+	return width;
+}
+
+// --- layout data model ---
+
+typedef struct LBox
+{
+	uint32_t start, end;        // text unit positions
+	int32_t x, y, w, h;         // twips (final, layout-relative)
+	int32_t* char_end;          // per unit-position end-x relative to box
+	uint32_t char_count;
+	uint8_t is_bullet;
+	// First-box format info for getLineMetrics:
+	double size_px, leading_px;
+	LFont font;
+} LBox;
+
+typedef struct LLine
+{
+	uint32_t index;
+	uint32_t start, end;
+	int32_t x, y, w, h;
+	int32_t ascent, descent, leading;
+	LBox* boxes;
+	uint32_t box_count;
+} LLine;
+
+typedef struct LLayout
+{
+	LLine* lines;
+	uint32_t line_count;
+	int32_t bounds_x, bounds_y, bounds_w, bounds_h;
+	int32_t text_w, text_h;
+} LLayout;
+typedef struct LLayout LLayout;
+
+// Growable vectors for layout construction.
+typedef struct LCtx
+{
+	Avm2Context* ctx;
+	const Avm2EditTextExt* et;
+	const uint16_t* text;   // full text as UTF-16 units
+	uint32_t text_len;
+	int is_input;
+	int is_word_wrap;
+	int32_t max_bounds;     // twips
+
+	int32_t cursor_x, cursor_y;
+	LFont font;
+	int32_t max_font_size, max_ascent, max_descent, max_leading;
+
+	LLine* lines; uint32_t line_count, line_cap;
+	LBox* boxes; uint32_t box_count, box_cap;
+
+	int have_bounds;
+	int32_t b_x0, b_y0, b_x1, b_y1;
+	int have_ts_bounds;
+	int32_t ts_x0, ts_y0, ts_x1, ts_y1;
+
+	int is_first_line;
+	int has_line_break;
+	uint32_t current_line_index;
+	Avm2TextFormatFields current_line_span;  // concrete
+} LCtx;
+
+static void lbox_push(LCtx* lc, LBox b)
+{
+	if (lc->box_count == lc->box_cap)
+	{
+		uint32_t ncap = lc->box_cap ? lc->box_cap * 2 : 8;
+		LBox* nb = avm2_alloc(lc->ctx, ncap * sizeof(LBox));
+		memcpy(nb, lc->boxes, lc->box_count * sizeof(LBox));
+		lc->boxes = nb;
+		lc->box_cap = ncap;
+	}
+	lc->boxes[lc->box_count++] = b;
+}
+
+static int lc_start_of_line(const LCtx* lc) { return lc->box_count == 0; }
+
+// left_alignment_offset.
+static int32_t left_align_offset(const Avm2TextFormatFields* span, int is_first_line)
+{
+	double px = span->left_margin + span->block_indent
+	            + (is_first_line ? span->indent : 0.0);
+	if (span->bullet) px += 36.0;
+	int32_t t = twips_from_px(px);
+	return t > 0 ? t : 0;
+}
+
+static void lc_extend(int* have, int32_t* x0, int32_t* y0, int32_t* x1, int32_t* y1,
+                      int32_t bx, int32_t by, int32_t bw, int32_t bh)
+{
+	if (!*have)
+	{
+		*x0 = bx; *y0 = by; *x1 = bx + bw; *y1 = by + bh;
+		*have = 1;
+		return;
+	}
+	if (bx < *x0) *x0 = bx;
+	if (by < *y0) *y0 = by;
+	if (bx + bw > *x1) *x1 = bx + bw;
+	if (by + bh > *y1) *y1 = by + bh;
+}
+
+static void lc_append_text_fragment(LCtx* lc, uint32_t start, uint32_t end,
+                                    const Avm2TextFormatFields* span)
+{
+	EvalParams p = eval_params(span);
+	int32_t ascent = font_ascent(&lc->font, p.height);
+	int32_t descent = font_descent(&lc->font, p.height);
+
+	LBox b;
+	memset(&b, 0, sizeof(b));
+	b.start = start;
+	b.end = end;
+	b.font = lc->font;
+	b.size_px = span->size;
+	b.leading_px = span->leading;
+	uint32_t n = end - start;
+	b.char_count = n;
+	b.char_end = n > 0 ? avm2_alloc(lc->ctx, n * sizeof(int32_t)) : NULL;
+	int32_t x = 0;
+	for (uint32_t i = 0; i < n; )
+	{
+		uint32_t cp = lc->text[start + i];
+		uint32_t step = 1;
+		if (cp >= 0xD800 && cp < 0xDC00 && i + 1 < n
+		    && lc->text[start + i + 1] >= 0xDC00 && lc->text[start + i + 1] < 0xE000)
+		{
+			cp = 0x10000 + ((cp - 0xD800) << 10) + (lc->text[start + i + 1] - 0xDC00);
+			step = 2;
+		}
+		int32_t adv = char_advance(&lc->font, p, cp);
+		x += adv;
+		for (uint32_t k = 0; k < step; k++) b.char_end[i + k] = x;
+		i += step;
+	}
+	int32_t text_width = 0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		if (b.char_end[i] > text_width) text_width = b.char_end[i];
+	}
+	b.x = lc->cursor_x;
+	b.y = lc->cursor_y - ascent;
+	b.w = text_width;
+	b.h = ascent + descent;
+	lc->cursor_x += text_width;
+	lbox_push(lc, b);
+}
+
+static int lc_effective_align(const LCtx* lc)
+{
+	return lc->current_line_span.bullet ? ALIGN_LEFT : lc->current_line_span.align;
+}
+
+static void lc_append_text(LCtx* lc, uint32_t start, uint32_t end,
+                           const Avm2TextFormatFields* span)
+{
+	if (start != end && lc_effective_align(lc) == ALIGN_JUSTIFY)
+	{
+		// Split on spaces; each word keeps its trailing space.
+		uint32_t ws = start;
+		while (ws < end)
+		{
+			uint32_t we = ws;
+			while (we < end && lc->text[we] != ' ') we++;
+			if (we < end) we++;  // include the space
+			if (we > ws) lc_append_text_fragment(lc, ws, we, span);
+			ws = we;
+		}
+	}
+	else
+	{
+		lc_append_text_fragment(lc, start, end, span);
+	}
+}
+
+// Append the bullet box (position only — measurement uses the bullet char).
+static void lc_append_bullet(LCtx* lc, const Avm2TextFormatFields* span)
+{
+	LFont bullet_font = resolve_font(lc->et, span);
+	EvalParams p = eval_params(span);
+	int32_t ascent = font_ascent(&bullet_font, p.height);
+	int32_t descent = font_descent(&bullet_font, p.height);
+	int32_t x = twips_from_px(18.0);
+	{
+		double px = span->left_margin + span->block_indent
+		            + (lc->is_first_line ? span->indent : 0.0);
+		int32_t off = twips_from_px(px);
+		x += off > 0 ? off : 0;
+	}
+	uint16_t bullet_ch = 0x2022;
+	int32_t w = measure_units(&bullet_font, p, &bullet_ch, 1);
+	LBox b;
+	memset(&b, 0, sizeof(b));
+	b.is_bullet = 1;
+	b.start = b.end = lc->box_count > 0 ? lc->boxes[lc->box_count - 1].end : 0;
+	b.font = bullet_font;
+	b.size_px = span->size;
+	b.leading_px = span->leading;
+	b.x = x;
+	b.y = lc->cursor_y - ascent;
+	b.w = w;
+	b.h = ascent + descent;
+	lbox_push(lc, b);
+}
+
+static void lc_flush_line(LCtx* lc, uint32_t end)
+{
+	if (lc->box_count == 0) return;
+	int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+	int have = 0;
+	// Union starts from the FIRST box regardless of type, then text boxes.
+	lc_extend(&have, &x0, &y0, &x1, &y1, lc->boxes[0].x, lc->boxes[0].y,
+	          lc->boxes[0].w, lc->boxes[0].h);
+	for (uint32_t i = 0; i < lc->box_count; i++)
+	{
+		if (lc->boxes[i].is_bullet) continue;
+		lc_extend(&have, &x0, &y0, &x1, &y1, lc->boxes[i].x, lc->boxes[i].y,
+		          lc->boxes[i].w, lc->boxes[i].h);
+	}
+	uint32_t start = lc->boxes[0].start;
+	if (lc->line_count > 0)
+	{
+		lc->lines[lc->line_count - 1].end = start;
+	}
+	if (lc->line_count == lc->line_cap)
+	{
+		uint32_t ncap = lc->line_cap ? lc->line_cap * 2 : 8;
+		LLine* nl = avm2_alloc(lc->ctx, ncap * sizeof(LLine));
+		memcpy(nl, lc->lines, lc->line_count * sizeof(LLine));
+		lc->lines = nl;
+		lc->line_cap = ncap;
+	}
+	LLine* line = &lc->lines[lc->line_count++];
+	line->index = lc->current_line_index;
+	line->start = start;
+	line->end = end;
+	line->x = x0;
+	line->y = y0;
+	line->w = x1 - x0;
+	line->h = y1 - y0;
+	line->ascent = lc->max_ascent;
+	line->descent = lc->max_descent;
+	line->leading = lc->max_leading;
+	line->boxes = lc->boxes;
+	line->box_count = lc->box_count;
+	lc->current_line_index++;
+	lc_extend(&lc->have_bounds, &lc->b_x0, &lc->b_y0, &lc->b_x1, &lc->b_y1,
+	          x0, y0, x1 - x0, y1 - y0);
+	// The box vector is owned by the line now.
+	lc->boxes = NULL;
+	lc->box_count = lc->box_cap = 0;
+}
+
+static void lc_fixup_line(LCtx* lc, int last_line, int final_line_of_para,
+                          uint32_t end, const Avm2TextFormatFields* span)
+{
+	if (lc->box_count == 0)
+	{
+		lc_append_text(lc, end, end, span);
+		if (lc->box_count == 0) lc_append_text_fragment(lc, end, end, span);
+	}
+	int is_line_empty = (lc->boxes[0].start == end);
+
+	int have_ls = 0;
+	int32_t ls_x0 = 0, ls_y0 = 0, ls_x1 = 0, ls_y1 = 0;
+	int32_t box_count = 0;
+	for (uint32_t i = 0; i < lc->box_count; i++)
+	{
+		LBox* b = &lc->boxes[i];
+		// Trailing spaces are ignored when aligning (SWF>=8, non-left).
+		// char_end is monotonic, so the trimmed prefix width is direct.
+		if (lc->ctx->swf_version >= 8
+		    && lc->current_line_span.align != ALIGN_LEFT && !b->is_bullet)
+		{
+			uint32_t n = b->end - b->start;
+			while (n > 0 && lc->text[b->start + n - 1] == ' ') n--;
+			b->w = n > 0 ? b->char_end[n - 1] : 0;
+		}
+		lc_extend(&have_ls, &ls_x0, &ls_y0, &ls_x1, &ls_y1, b->x, b->y, b->w, b->h);
+		box_count++;
+	}
+	if (!have_ls) { ls_x0 = ls_y0 = ls_x1 = ls_y1 = 0; }
+
+	int32_t left_adjustment = left_align_offset(&lc->current_line_span,
+	                                            lc->is_first_line);
+	int32_t right_adjustment = twips_from_px(lc->current_line_span.right_margin);
+	int32_t misalignment = lc->max_bounds - left_adjustment - right_adjustment
+	                       - (ls_x1 - ls_x0);
+	int align = lc_effective_align(lc);
+	int32_t align_adjustment = 0;
+	if (align == ALIGN_CENTER) align_adjustment = misalignment / 2;
+	else if (align == ALIGN_RIGHT) align_adjustment = misalignment;
+	if (align_adjustment < 0) align_adjustment = 0;
+	int32_t interim_adjustment = 0;
+	if (!final_line_of_para && align == ALIGN_JUSTIFY)
+	{
+		int32_t denom = box_count - 1 > 1 ? box_count - 1 : 1;
+		interim_adjustment = misalignment / denom;
+		if (interim_adjustment < 0) interim_adjustment = 0;
+	}
+
+	if (lc->current_line_span.bullet && lc->is_first_line && box_count > 0)
+	{
+		Avm2TextFormatFields bullet_span = lc->current_line_span;
+		lc_append_bullet(lc, &bullet_span);
+	}
+
+	int32_t baseline_adjustment = lc->max_ascent;
+	int32_t bc = 0;
+	for (uint32_t i = 0; i < lc->box_count; i++)
+	{
+		LBox* b = &lc->boxes[i];
+		if (!b->is_bullet)
+		{
+			b->x += left_adjustment + align_adjustment + interim_adjustment * bc;
+			b->y += baseline_adjustment;
+		}
+		else
+		{
+			b->y += baseline_adjustment;
+		}
+		bc++;
+	}
+
+	ls_x0 += left_adjustment + align_adjustment;
+	ls_x1 += left_adjustment + align_adjustment;
+	ls_y0 += baseline_adjustment;
+	ls_y1 += baseline_adjustment;
+	if (lc->current_line_index == 0)
+	{
+		// The very first line always gets the leading.
+		ls_y1 += lc->max_leading;
+	}
+	if (!lc->is_input && is_line_empty && last_line)
+	{
+		// Skip the last empty line of non-input fields in text_size.
+	}
+	else
+	{
+		lc_extend(&lc->have_ts_bounds, &lc->ts_x0, &lc->ts_y0, &lc->ts_x1,
+		          &lc->ts_y1, ls_x0, ls_y0, ls_x1 - ls_x0, ls_y1 - ls_y0);
+	}
+	lc_flush_line(lc, end);
+}
+
+static void lc_newline(LCtx* lc, uint32_t end, const Avm2TextFormatFields* span,
+                       int end_of_para)
+{
+	lc_fixup_line(lc, 0, end_of_para, end, span);
+	lc->cursor_x = 0;
+	lc->cursor_y += lc->max_ascent + lc->max_descent
+	                + twips_from_px(lc->current_line_span.leading);
+	lc->is_first_line = end_of_para;
+	lc->has_line_break = 1;
+	int32_t font_size = twips_from_px(lc->current_line_span.size);
+	lc->max_font_size = font_size;
+	lc->max_ascent = font_ascent(&lc->font, font_size);
+	lc->max_descent = font_descent(&lc->font, font_size);
+	lc->max_leading = twips_from_px(span->leading);
+}
+
+static void lc_tab(LCtx* lc)
+{
+	if (lc->current_line_span.tab_stop_count == 0)
+	{
+		int32_t modulo_factor = twips_from_px(lc->current_line_span.size * 2.7);
+		if (modulo_factor <= 0) return;
+		int32_t stop = ((lc->cursor_x / modulo_factor) + 1) * modulo_factor;
+		lc->cursor_x = stop;
+	}
+	else
+	{
+		for (uint32_t i = 0; i < lc->current_line_span.tab_stop_count; i++)
+		{
+			int32_t stop = twips_from_px(lc->current_line_span.tab_stops[i]);
+			if (stop > lc->cursor_x)
+			{
+				lc->cursor_x = stop;
+				break;
+			}
+		}
+	}
+}
+
+static void lc_newspan(LCtx* lc, const Avm2TextFormatFields* span)
+{
+	int32_t font_size = twips_from_px(span->size);
+	int32_t ascent = font_ascent(&lc->font, font_size);
+	int32_t descent = font_descent(&lc->font, font_size);
+	int32_t leading = twips_from_px(span->leading);
+	if (lc_start_of_line(lc))
+	{
+		lc->current_line_span = *span;
+		lc->max_font_size = font_size;
+		lc->max_ascent = ascent;
+		lc->max_descent = descent;
+		lc->max_leading = leading;
+	}
+	else
+	{
+		if (font_size > lc->max_font_size) lc->max_font_size = font_size;
+		if (ascent > lc->max_ascent) lc->max_ascent = ascent;
+		if (descent > lc->max_descent) lc->max_descent = descent;
+		if (leading > lc->max_leading) lc->max_leading = leading;
+	}
+}
+
+// --- line wrapping (Ruffle html/line_wrapping.rs) ---
+
+// Ruffle ruffle_wstr::utils sets, ported verbatim.
+static int is_cjk_like(uint32_t c)
+{
+	return c >= 0x2300;
+}
+
+static int is_opening(uint32_t c)
+{
+	switch (c)
+	{
+		case '(': case '[': case '{':
+		case 0xFF08: case 0xFF3B: case 0xFF5B:  // （ ［ ｛
+		case 0x3008: case 0x300A: case 0x300C:  // 〈 《 「
+		case 0x2045: case 0x300E:               // ⁅ 『
+		case 0x3010: case 0x3016: case 0x301A:  // 【 〖 〚
+		case 0xFD3E:                            // ﴾
+		case 0xFE59:                            // ﹙
+		case 0x301D:                            // 〝
+		case 0xFE3B: case 0xFE41: case 0xFE43:  // ︻ ﹁ ﹃
+		case 0xFE35:                            // ︵
+			return 1;
+	}
+	return 0;
+}
+
+static int is_closing(uint32_t c)
+{
+	switch (c)
+	{
+		case ')': case ']': case '}':
+		case 0xFF09: case 0xFF3D: case 0xFF5D:  // ） ］ ｝
+		case 0x3009: case 0x300B:               // 〉 》
+		case '?': case '!': case ';': case ':': case ',': case '.':
+		case 0x300D: case 0x2046: case 0x300F:  // 」 ⁆ 』
+		case 0x3011: case 0x3015: case 0x3019: case 0xFE5E:  // 】 〕 〙 ﹞
+		case 0xFD3F:                            // ﴿
+		case 0xFE5A:                            // ﹚
+		case 0xFF1F: case 0xFF01: case 0xFF1B: case 0xFF1A:  // ？ ！ ； ：
+		case 0xFF0C: case 0xFF0E:               // ， ．
+		case 0x3001: case 0x3002:               // 、 。
+		case 0x301C:                            // 〜
+		case 0xFE3A: case 0xFE40: case 0xFE42: case 0xFE44: case 0xFE36:  // ︺ ﹀ ﹂ ﹄ ︶
+		case 0x301F:                            // 〟
+			return 1;
+	}
+	return 0;
+}
+
+// find_allowed_breaks: indices ending non-breakable spans; always ends with n.
+static uint32_t find_allowed_breaks(const uint16_t* u, uint32_t n, int swf8,
+                                    uint32_t* out, uint32_t out_cap)
+{
+	uint32_t cnt = 0;
+	for (uint32_t i = 1; i < n && cnt + 1 < out_cap; i++)
+	{
+		uint32_t prev = u[i - 1], curr = u[i];
+		if (swf8 && curr == ' ') continue;
+		if (prev == ' ') out[cnt++] = i;
+		else if (prev == '-' || (!swf8 && curr == '-')) out[cnt++] = i;
+		else if (is_cjk_like(prev) || is_cjk_like(curr))
+		{
+			if (!is_opening(prev) && !is_closing(curr)) out[cnt++] = i;
+		}
+	}
+	out[cnt++] = n;
+	return cnt;
+}
+
+// wrap_line: returns breakpoint or -1 (no break).
+static int64_t wrap_line(Avm2Context* ctx, const LFont* font,
+                         const uint16_t* u, uint32_t n,
+                         EvalParams params, int32_t width, int32_t offset,
+                         int is_start_of_line, uint8_t swf_version)
+{
+	int swf8 = swf_version >= 8;
+	if (n == 0) return -1;
+	int32_t remaining_width = width - offset;
+	if (remaining_width < 0)
+	{
+		return swf8 ? 1 : -1;
+	}
+	uint32_t line_end = 0;
+
+	uint32_t* breaks = avm2_alloc(ctx, (n + 1) * sizeof(uint32_t));
+	uint32_t nbreaks = find_allowed_breaks(u, n, swf8, breaks, n + 1);
+
+	uint32_t last_stop = 0;
+	for (uint32_t bi = 0; bi < nbreaks; bi++)
+	{
+		uint32_t word_start = last_stop;
+		uint32_t word_end = breaks[bi];
+		if (word_end <= word_start) continue;
+		uint32_t trimmed_end;
+		if (swf8)
+		{
+			trimmed_end = word_end;
+			while (trimmed_end > word_start && u[trimmed_end - 1] == ' ')
+			{
+				trimmed_end--;
+			}
+		}
+		else
+		{
+			trimmed_end = (u[word_end - 1] == ' ') ? word_end - 1 : word_end;
+		}
+		last_stop = trimmed_end;
+		int32_t measure = measure_units(font, params, u + word_start,
+		                                trimmed_end - word_start);
+		if (measure <= remaining_width)
+		{
+			line_end = word_end;
+			is_start_of_line = 0;
+			remaining_width -= measure;
+		}
+		else
+		{
+			if (is_start_of_line)
+			{
+				// Word wider than the field: break at the last fitting char.
+				uint32_t last_fitting_end = 0;
+				for (uint32_t frag = word_start; frag < trimmed_end; frag++)
+				{
+					int32_t w = measure_units(font, params, u + word_start,
+					                          frag - word_start);
+					if (w > remaining_width) break;
+					last_fitting_end = frag - word_start;
+				}
+				line_end = last_fitting_end;
+				if (swf8)
+				{
+					if (line_end < 1) line_end = 1;
+				}
+				else if (line_end <= 1)
+				{
+					return -1;
+				}
+			}
+			return (int64_t) line_end;
+		}
+	}
+	return -1;
+}
+
+// wrap_dimensions.
+static void lc_wrap_dimensions(const LCtx* lc, const Avm2TextFormatFields* span,
+                               int32_t* out_width, int32_t* out_offset)
+{
+	*out_width = lc->max_bounds - twips_from_px(lc->current_line_span.right_margin);
+	*out_offset = left_align_offset(span, lc->is_first_line) + lc->cursor_x;
+}
+
+static void lc_lay_out_span(LCtx* lc, uint32_t span_start, uint32_t span_end,
+                            const Avm2TextFormatFields* span)
+{
+	lc->font = resolve_font(lc->et, span);
+	lc_newspan(lc, span);
+	EvalParams params = eval_params(span);
+
+	// Split on \n \r \t (delimiters kept between slices).
+	uint32_t slice_start = span_start;
+	for (uint32_t i = span_start; i <= span_end; i++)
+	{
+		int at_end = (i == span_end);
+		uint16_t c = at_end ? 0 : lc->text[i];
+		int is_delim = !at_end && (c == '\n' || c == '\r' || c == '\t');
+		if (!is_delim && !at_end) continue;
+
+		// Handle the delimiter BEFORE this slice (the one at
+		// slice_start-1), matching Ruffle's split_indices walk.
+		if (slice_start > span_start)
+		{
+			uint16_t d = lc->text[slice_start - 1];
+			if (d == '\n' || d == '\r')
+			{
+				lc_newline(lc, slice_start - 1, span, 1);
+			}
+			else if (d == '\t')
+			{
+				lc_tab(lc);
+			}
+		}
+
+		uint32_t start = slice_start;
+		uint32_t text_len = i - slice_start;
+		const uint16_t* text = lc->text + start;
+		uint32_t last_breakpoint = 0;
+
+		if (lc->is_word_wrap)
+		{
+			int32_t width, offset;
+			lc_wrap_dimensions(lc, span, &width, &offset);
+			for (;;)
+			{
+				int64_t breakpoint = wrap_line(lc->ctx, &lc->font,
+				                               text + last_breakpoint,
+				                               text_len - last_breakpoint,
+				                               params, width, offset,
+				                               lc_start_of_line(lc),
+				                               lc->ctx->swf_version);
+				if (breakpoint < 0) break;
+				uint32_t next_breakpoint = last_breakpoint + (uint32_t) breakpoint;
+				if (breakpoint == 0)
+				{
+					lc_newline(lc, start + next_breakpoint, span, 0);
+					lc_wrap_dimensions(lc, span, &width, &offset);
+					if (last_breakpoint >= text_len) break;
+					continue;
+				}
+				lc_append_text(lc, start + last_breakpoint,
+				               start + next_breakpoint, span);
+				last_breakpoint = next_breakpoint;
+				if (last_breakpoint >= text_len) break;
+				lc_newline(lc, start + next_breakpoint, span, 0);
+				lc_wrap_dimensions(lc, span, &width, &offset);
+			}
+		}
+		if (last_breakpoint < text_len)
+		{
+			lc_append_text(lc, start + last_breakpoint, start + text_len, span);
+		}
+
+		slice_start = i + 1;
+		if (at_end) break;
+	}
+}
+
+// lower_from_text_spans_known_width.
+static LLayout* layout_spans_known_width(Avm2Context* ctx, Avm2EditTextExt* et,
+                                         const uint16_t* units, uint32_t unit_len,
+                                         int32_t bounds, int is_input,
+                                         int is_word_wrap)
+{
+	LCtx lc;
+	memset(&lc, 0, sizeof(lc));
+	lc.ctx = ctx;
+	lc.et = et;
+	lc.text = units;
+	lc.text_len = unit_len;
+	lc.is_input = is_input;
+	lc.is_word_wrap = is_word_wrap;
+	lc.max_bounds = bounds;
+	lc.is_first_line = 1;
+	lc.current_line_span = span_default(ctx);
+
+	// Iterate spans, clamped against the text length.
+	uint32_t acc = 0;
+	for (uint32_t i = 0; i < et->span_count; i++)
+	{
+		uint32_t s = acc;
+		uint32_t e = acc + et->spans[i].length;
+		acc = e;
+		if (s > unit_len) s = unit_len;
+		if (e > unit_len) e = unit_len;
+		lc_lay_out_span(&lc, s, e, &et->spans[i].fmt);
+	}
+
+	// end_layout.
+	const Avm2TextFormatFields* last_span = et->span_count > 0
+		? &et->spans[et->span_count - 1].fmt : &et->default_format;
+	lc_fixup_line(&lc, 1, 1, unit_len, last_span);
+
+	LLayout* out = avm2_alloc(ctx, sizeof(LLayout));
+	memset(out, 0, sizeof(*out));
+	out->lines = lc.lines;
+	out->line_count = lc.line_count;
+	if (lc.have_bounds)
+	{
+		out->bounds_x = lc.b_x0;
+		out->bounds_y = lc.b_y0;
+		out->bounds_w = lc.b_x1 - lc.b_x0;
+		out->bounds_h = lc.b_y1 - lc.b_y0;
+	}
+	if (lc.have_ts_bounds)
+	{
+		out->text_w = lc.ts_x1 - lc.ts_x0;
+		out->text_h = lc.ts_y1 - lc.ts_y0;
+	}
+	return out;
+}
+
+// Decode et's DISPLAYED text (password fields measure '*'s) to UTF-16.
+static uint16_t* et_units(Avm2Context* ctx, const Avm2EditTextExt* et,
+                          uint32_t* out_len)
+{
+	const Avm2String* s = et->text;
+	uint32_t n = u16_length(s);
+	uint16_t* u = avm2_alloc(ctx, (n + 1) * sizeof(uint16_t));
+	uint32_t k = 0;
+	for (uint32_t i = 0; i < s->len; )
+	{
+		unsigned char c = (unsigned char) s->utf8[i];
+		uint32_t cp, clen;
+		if (c < 0x80) { cp = c; clen = 1; }
+		else if (c < 0xE0) { cp = c & 0x1F; clen = 2; }
+		else if (c < 0xF0) { cp = c & 0x0F; clen = 3; }
+		else { cp = c & 0x07; clen = 4; }
+		for (uint32_t j = 1; j < clen && i + j < s->len; j++)
+		{
+			cp = (cp << 6) | ((unsigned char) s->utf8[i + j] & 0x3F);
+		}
+		if (clen == 4)
+		{
+			cp -= 0x10000;
+			u[k++] = (uint16_t) (0xD800 + (cp >> 10));
+			u[k++] = (uint16_t) (0xDC00 + (cp & 0x3FF));
+		}
+		else
+		{
+			u[k++] = (uint16_t) cp;
+		}
+		i += clen;
+	}
+	if (et->password)
+	{
+		for (uint32_t i = 0; i < k; i++) u[i] = '*';
+	}
+	*out_len = k;
+	return u;
+}
+
+// EditText::relayout.
+static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
+{
+	uint32_t unit_len;
+	uint16_t* units = et_units(ctx, et, &unit_len);
+	int is_input = !et->read_only;
+	int is_word_wrap = et->word_wrap;
+	int32_t padding = GUTTER * 2;
+
+	LLayout* layout;
+	if (et->autosize == 0 || is_word_wrap)
+	{
+		int32_t content_width = et->bounds_w - padding;
+		layout = layout_spans_known_width(ctx, et, units, unit_len,
+		                                  content_width, is_input, is_word_wrap);
+	}
+	else
+	{
+		// Unknown width: lay out once to find the max line width, then again.
+		LLayout* probe = layout_spans_known_width(ctx, et, units, unit_len, 0,
+		                                          is_input, 0);
+		int32_t max_w = 0;
+		for (uint32_t i = 0; i < probe->line_count; i++)
+		{
+			if (probe->lines[i].w > max_w) max_w = probe->lines[i].w;
+		}
+		layout = layout_spans_known_width(ctx, et, units, unit_len, max_w,
+		                                  is_input, is_word_wrap);
+	}
+	et->layout = layout;
+	et->hscroll = 0;
+	et->scroll = 1;
+
+	// Autosize bounds are applied lazily (Ruffle autosize_lazy_bounds).
+	int32_t new_x = et->bounds_x, new_w = et->bounds_w, new_h = et->bounds_h;
+	if (et->autosize != 0)
+	{
+		if (!is_word_wrap)
+		{
+			int32_t width = layout->text_w + padding;
+			if (is_input) width += twips_from_px(2.5);
+			switch (et->autosize)
+			{
+				case 1: break;  // left: x unchanged
+				case 2:         // center
+					new_x = (et->bounds_x + (et->bounds_x + et->bounds_w)
+					         - width) / 2;
+					break;
+				case 3:         // right
+					new_x = et->bounds_x + et->bounds_w - width;
+					break;
+			}
+			new_w = width;
+		}
+		new_h = layout->text_h + padding;
+	}
+	et->has_lazy_bounds = 1;
+	et->lazy_x = new_x;
+	et->lazy_w = new_w;
+	et->lazy_h = new_h;
+}
+
+static void et_apply_lazy_bounds(Avm2EditTextExt* et)
+{
+	if (!et->has_lazy_bounds) return;
+	et->has_lazy_bounds = 0;
+	et->bounds_x = et->lazy_x;
+	et->bounds_w = et->lazy_w;
+	et->bounds_h = et->lazy_h;
+}
+
+static LLayout* et_layout(Avm2Context* ctx, Avm2EditTextExt* et)
+{
+	if (et->layout == NULL) et_relayout(ctx, et);
+	return et->layout;
 }
 
 // ===========================================================================
@@ -1921,6 +3257,7 @@ static Avm2Value txt_set_text(Avm2Activation* act)
 	{
 		spans_from_text(act->ctx, et, s);
 	}
+	et_relayout(act->ctx, et);
 	et_sync_mirror(act, et);
 	return avm2_undefined();
 }
@@ -1931,9 +3268,10 @@ static Avm2Value txt_get_html_text(Avm2Activation* act)
 	if (et == NULL) return avm2_undefined();
 	if (et->is_html || et->style_sheet != NULL)
 	{
+		// original_html is cached only while a stylesheet is set
+		// (Ruffle parse_html); otherwise the canonical writer runs.
 		if (et->original_html != NULL) return avm2_string(et->original_html);
-		avm2_fatal("AVM2: TextField.htmlText getter (spans-to-html) is not "
-		           "implemented yet (Stage-6 tranche 3)");
+		return avm2_string(spans_to_html(act->ctx, et));
 	}
 	return avm2_string(et->text);
 }
@@ -1956,15 +3294,18 @@ static Avm2Value txt_set_html_text(Avm2Activation* act)
 	// The AS3 htmlText setter always switches the field into HTML mode
 	// (Ruffle set_html_text glue: set_is_html(true) first).
 	et->is_html = 1;
-	// set_html_text no-op check (observable: formats are not reset). We can
-	// only compare against the cached original html; the spans-to-html
-	// writer lands in tranche 3.
-	if (et->original_html != NULL && str_eq(et->original_html, s))
+	// set_html_text no-op check against the CURRENT html text (observable:
+	// formats are not reset when equal).
 	{
-		return avm2_undefined();
+		const Avm2String* cur = et->original_html != NULL
+			? et->original_html : spans_to_html(act->ctx, et);
+		if (str_eq(cur, s)) return avm2_undefined();
 	}
 	spans_from_html(act->ctx, et, s, et->multiline, et->condense_white);
-	if (et->style_sheet == NULL) et->original_html = s;
+	// original_html caches only while a stylesheet is set (Ruffle
+	// parse_html).
+	et->original_html = et->style_sheet != NULL ? s : NULL;
+	et_relayout(act->ctx, et);
 	et_sync_mirror(act, et);
 	return avm2_undefined();
 }
@@ -1978,7 +3319,7 @@ static Avm2Value txt_get_length(Avm2Activation* act)
 
 // --- boolean/data properties ---
 
-#define ET_BOOL_GETSET(name, field) \
+#define ET_BOOL_GETSET_IMPL(name, field, relayout) \
 	static Avm2Value txt_get_##name(Avm2Activation* act) \
 	{ \
 		Avm2EditTextExt* et = this_et(act); \
@@ -1987,18 +3328,22 @@ static Avm2Value txt_get_length(Avm2Activation* act)
 	static Avm2Value txt_set_##name(Avm2Activation* act) \
 	{ \
 		Avm2EditTextExt* et = this_et(act); \
-		if (et != NULL) et->field = avm2_coerce_to_boolean(arg_or_undef(act, 0)) ? 1 : 0; \
+		if (et != NULL) \
+		{ \
+			et->field = avm2_coerce_to_boolean(arg_or_undef(act, 0)) ? 1 : 0; \
+			if (relayout) et_relayout(act->ctx, et); \
+		} \
 		return avm2_undefined(); \
 	}
 
-ET_BOOL_GETSET(word_wrap, word_wrap)
-ET_BOOL_GETSET(multiline, multiline)
-ET_BOOL_GETSET(border, border)
-ET_BOOL_GETSET(background, background)
-ET_BOOL_GETSET(display_as_password, password)
-ET_BOOL_GETSET(condense_white, condense_white)
-ET_BOOL_GETSET(always_show_selection, always_show_selection)
-ET_BOOL_GETSET(mouse_wheel_enabled, mouse_wheel_enabled)
+ET_BOOL_GETSET_IMPL(word_wrap, word_wrap, 1)
+ET_BOOL_GETSET_IMPL(multiline, multiline, 1)
+ET_BOOL_GETSET_IMPL(border, border, 0)
+ET_BOOL_GETSET_IMPL(background, background, 0)
+ET_BOOL_GETSET_IMPL(display_as_password, password, 1)
+ET_BOOL_GETSET_IMPL(condense_white, condense_white, 0)
+ET_BOOL_GETSET_IMPL(always_show_selection, always_show_selection, 0)
+ET_BOOL_GETSET_IMPL(mouse_wheel_enabled, mouse_wheel_enabled, 0)
 
 static Avm2Value txt_get_selectable(Avm2Activation* act)
 {
@@ -2026,6 +3371,8 @@ static Avm2Value txt_set_embed_fonts(Avm2Activation* act)
 	if (et != NULL)
 	{
 		et->device_font = avm2_coerce_to_boolean(arg_or_undef(act, 0)) ? 0 : 1;
+		// Ruffle set_is_device_font relayouts.
+		et_relayout(act->ctx, et);
 	}
 	return avm2_undefined();
 }
@@ -2079,6 +3426,7 @@ static Avm2Value txt_set_auto_size(Avm2Activation* act)
 	else if (s->len == 5 && memcmp(s->utf8, "right", 5) == 0) et->autosize = 3;
 	else if (s->len == 4 && memcmp(s->utf8, "none", 4) == 0) et->autosize = 0;
 	else throw_2008(act->ctx, "autoSize");
+	et_relayout(act->ctx, et);
 	return avm2_undefined();
 }
 
@@ -2135,6 +3483,7 @@ static Avm2Value txt_set_text_color(Avm2Activation* act)
 	desired.present |= TFP_COLOR;
 	spans_set_format(act->ctx, et, 0, u16_length(et->text), &desired);
 	spans_set_default_format(act->ctx, et, &desired);
+	et_relayout(act->ctx, et);
 	return avm2_undefined();
 }
 
@@ -2348,6 +3697,7 @@ static Avm2Value txt_replace_selected_text(Avm2Activation* act)
 	const Avm2String* s = avm2_coerce_to_string(act->ctx, v);
 	spans_replace_text(act->ctx, et, (uint32_t) et->sel_begin,
 	                   (uint32_t) et->sel_end, s);
+	et_relayout(act->ctx, et);
 	et_sync_mirror(act, et);
 	return avm2_undefined();
 }
@@ -2420,6 +3770,7 @@ static Avm2Value txt_set_text_format(Avm2Activation* act)
 	if (end < 0) end = len;
 	if (end > len) throw_2006(act->ctx);
 	spans_set_format(act->ctx, et, (uint32_t) begin, (uint32_t) end, f);
+	et_relayout(act->ctx, et);
 	return avm2_undefined();
 }
 
@@ -2435,6 +3786,7 @@ static Avm2Value txt_append_text(Avm2Activation* act)
 	const Avm2String* s = avm2_coerce_to_string(act->ctx, v);
 	uint32_t len = u16_length(et->text);
 	spans_replace_text(act->ctx, et, len, len, s);
+	et_relayout(act->ctx, et);
 	et_sync_mirror(act, et);
 	return avm2_undefined();
 }
@@ -2452,13 +3804,679 @@ static Avm2Value txt_replace_text(Avm2Activation* act)
 	}
 	const Avm2String* s = avm2_coerce_to_string(act->ctx, v);
 	spans_replace_text(act->ctx, et, (uint32_t) begin, (uint32_t) end, s);
+	et_relayout(act->ctx, et);
 	et_sync_mirror(act, et);
 	return avm2_undefined();
 }
 
 // ===========================================================================
+// EditText bounds + measurement API (consumed by avm2_display.c accessors)
+// ===========================================================================
+
+// (matrix * bounds) AABB width/height, f32 per-corner like Ruffle's
+// Matrix<f32> * Rectangle<Twips>.
+static void et_transformed_size(Avm2DisplayObjectExt* ext, Avm2EditTextExt* et,
+                                int32_t* out_w, int32_t* out_h)
+{
+	float a = ext->mtx_a, b = ext->mtx_b, c = ext->mtx_c, d = ext->mtx_d;
+	int32_t xs[2] = { et->bounds_x, et->bounds_x + et->bounds_w };
+	int32_t ys[2] = { et->bounds_y, et->bounds_y + et->bounds_h };
+	int32_t minx = 0, maxx = 0, miny = 0, maxy = 0;
+	int first = 1;
+	for (int i = 0; i < 2; i++)
+	{
+		for (int j = 0; j < 2; j++)
+		{
+			int32_t tx = (int32_t) (a * (float) xs[i] + c * (float) ys[j]);
+			int32_t ty = (int32_t) (b * (float) xs[i] + d * (float) ys[j]);
+			if (first)
+			{
+				minx = maxx = tx;
+				miny = maxy = ty;
+				first = 0;
+			}
+			else
+			{
+				if (tx < minx) minx = tx;
+				if (tx > maxx) maxx = tx;
+				if (ty < miny) miny = ty;
+				if (ty > maxy) maxy = ty;
+			}
+		}
+	}
+	*out_w = maxx - minx;
+	*out_h = maxy - miny;
+}
+
+double avm2_text_get_width_px(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Avm2EditTextExt* et = ext->edittext;
+	et_apply_lazy_bounds(et);
+	int32_t w, h;
+	et_transformed_size(ext, et, &w, &h);
+	return (double) w / 20.0;
+}
+
+double avm2_text_get_height_px(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Avm2EditTextExt* et = ext->edittext;
+	et_apply_lazy_bounds(et);
+	int32_t w, h;
+	et_transformed_size(ext, et, &w, &h);
+	return (double) h / 20.0;
+}
+
+void avm2_text_set_width_px(Avm2Context* ctx, Avm2Object* obj, double value)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Avm2EditTextExt* et = ext->edittext;
+	et_apply_lazy_bounds(et);
+	et->bounds_w = isnan(value) ? 0 : twips_from_px(value);
+	et_relayout(ctx, et);
+}
+
+void avm2_text_set_height_px(Avm2Context* ctx, Avm2Object* obj, double value)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Avm2EditTextExt* et = ext->edittext;
+	et_apply_lazy_bounds(et);
+	et->bounds_h = isnan(value) ? 0 : twips_from_px(value);
+	et_relayout(ctx, et);
+}
+
+// bounds_x/y_offset (Ruffle EditText::bounds_x_offset): scale * bounds
+// origin, in twips. Applies lazy autosize bounds first.
+int32_t avm2_text_bounds_x_offset(Avm2Context* ctx, Avm2Object* obj,
+                                  double scale_x)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Avm2EditTextExt* et = ext->edittext;
+	et_apply_lazy_bounds(et);
+	return twips_from_px(scale_x * ((double) et->bounds_x / 20.0));
+}
+
+int32_t avm2_text_bounds_y_offset(Avm2Context* ctx, Avm2Object* obj,
+                                  double scale_y)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Avm2EditTextExt* et = ext->edittext;
+	et_apply_lazy_bounds(et);
+	return twips_from_px(scale_y * ((double) et->bounds_y / 20.0));
+}
+
+// ===========================================================================
+// Layout-backed TextField natives (Stage-6 tranche 2)
+// ===========================================================================
+
+static Avm2Class* g_rectangle_class;
+static Avm2Class* g_textlinemetrics_class;
+
+static Avm2Value txt_get_text_width(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	LLayout* l = et_layout(act->ctx, et);
+	return avm2_number((double) l->text_w / 20.0);
+}
+
+static Avm2Value txt_get_text_height(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	LLayout* l = et_layout(act->ctx, et);
+	return avm2_number((double) l->text_h / 20.0);
+}
+
+static Avm2Value txt_get_num_lines(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	LLayout* l = et_layout(act->ctx, et);
+	return avm2_integer((int32_t) l->line_count);
+}
+
+// maxscroll (Ruffle EditText::maxscroll).
+static int32_t et_maxscroll(Avm2Context* ctx, Avm2EditTextExt* et)
+{
+	LLayout* l = et_layout(ctx, et);
+	if (l->line_count == 0) return 1;
+	int32_t text_height = l->text_h;
+	int32_t window_height = et->bounds_h - GUTTER * 2;
+	int32_t target = text_height - window_height;
+	for (uint32_t i = 0; i < l->line_count; i++)
+	{
+		if (l->lines[i].y >= target)
+		{
+			return (int32_t) l->lines[i].index + 1;
+		}
+	}
+	return (int32_t) l->lines[l->line_count - 1].index + 1;
+}
+
+static Avm2Value txt_get_max_scroll_v(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	return avm2_integer(et_maxscroll(act->ctx, et));
+}
+
+static Avm2Value txt_get_bottom_scroll_v(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	LLayout* l = et_layout(act->ctx, et);
+	if (l->line_count == 0) return avm2_integer(1);
+	int32_t scroll_offset = 0;
+	uint32_t si = (uint32_t) (et->scroll - 1);
+	if (si < l->line_count) scroll_offset = l->lines[si].y;
+	int32_t target = et->bounds_h + scroll_offset - GUTTER * 2;
+	for (uint32_t i = 0; i < l->line_count; i++)
+	{
+		if (l->lines[i].y + l->lines[i].h > target)
+		{
+			int32_t idx = (int32_t) l->lines[i].index;
+			return avm2_integer(idx > 1 ? idx : 1);
+		}
+	}
+	return avm2_integer((int32_t) l->lines[l->line_count - 1].index + 1);
+}
+
+// maxhscroll (Ruffle EditText::maxhscroll), pixels.
+static double et_maxhscroll(Avm2Context* ctx, Avm2EditTextExt* et)
+{
+	if (et->word_wrap) return 0.0;
+	LLayout* l = et_layout(ctx, et);
+	int32_t text_width = l->text_w;
+	int32_t window_width = et->bounds_w - GUTTER * 2;
+	if (window_width < 0) window_width = 0;
+	if (!et->read_only) text_width += window_width / 4;
+	int32_t diff = text_width - window_width;
+	// trunc_to_pixel then to_pixels, min 0.
+	double px = (double) ((diff / 20) * 20) / 20.0;
+	return px > 0.0 ? px : 0.0;
+}
+
+static Avm2Value txt_get_max_scroll_h(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	return avm2_integer((int32_t) et_maxhscroll(act->ctx, et));
+}
+
+static Avm2Value txt_set_scroll_v(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t input = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	int32_t v = input < 0 ? 1 : input;
+	if (v < 1) v = 1;
+	int32_t maxv = et_maxscroll(act->ctx, et);
+	if (v > maxv) v = maxv;
+	et->scroll = v;
+	return avm2_undefined();
+}
+
+static Avm2Value txt_set_scroll_h(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	// AVM1-style clamp (Ruffle set_scroll_h note).
+	int32_t input = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	if (input < 0) input = input == INT32_MIN ? INT32_MAX : -input;
+	int32_t maxh = (int32_t) et_maxhscroll(act->ctx, et);
+	if (input > maxh) input = maxh;
+	et->hscroll = (double) input;
+	return avm2_undefined();
+}
+
+// Find the line containing a text position (start <= pos < end).
+static int64_t layout_line_of_pos(LLayout* l, uint32_t pos)
+{
+	for (uint32_t i = 0; i < l->line_count; i++)
+	{
+		if (pos >= l->lines[i].start && pos < l->lines[i].end)
+		{
+			return (int64_t) i;
+		}
+	}
+	return -1;
+}
+
+static Avm2Value txt_get_line_index_of_char(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t index = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	if (index < 0) return avm2_number(-1);
+	LLayout* l = et_layout(act->ctx, et);
+	int64_t line = layout_line_of_pos(l, (uint32_t) index);
+	return line >= 0 ? avm2_integer((int32_t) line) : avm2_number(-1);
+}
+
+static Avm2Value txt_get_line_length(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t n = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	LLayout* l = et_layout(act->ctx, et);
+	if (n < 0 || (uint32_t) n >= l->line_count) throw_2006(act->ctx);
+	return avm2_integer((int32_t) (l->lines[n].end - l->lines[n].start));
+}
+
+static Avm2Value txt_get_line_text(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t n = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	LLayout* l = et_layout(act->ctx, et);
+	if (n < 0 || (uint32_t) n >= l->line_count) throw_2006(act->ctx);
+	uint32_t sb2 = u16_to_byte(et->text, l->lines[n].start);
+	uint32_t eb = u16_to_byte(et->text, l->lines[n].end);
+	return avm2_string(avm2_string_new(act->ctx, et->text->utf8 + sb2, eb - sb2));
+}
+
+static Avm2Value txt_get_line_offset(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t n = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	LLayout* l = et_layout(act->ctx, et);
+	if (n < 0 || (uint32_t) n >= l->line_count || l->lines[n].box_count == 0)
+	{
+		throw_2006(act->ctx);
+	}
+	return avm2_integer((int32_t) l->lines[n].boxes[0].start);
+}
+
+static Avm2Value txt_get_first_char_in_paragraph(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t index = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	if (index < 0) return avm2_integer(-1);
+	uint32_t len;
+	uint16_t* u = et_units(act->ctx, et, &len);
+	if ((uint32_t) index > len) return avm2_integer(-1);
+	uint32_t i = (uint32_t) index;
+	while (i > 0 && u[i - 1] != '\n' && u[i - 1] != '\r') i--;
+	return avm2_integer((int32_t) i);
+}
+
+static Avm2Value txt_get_paragraph_length(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t index = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	if (index < 0) return avm2_integer(-1);
+	uint32_t len;
+	uint16_t* u = et_units(act->ctx, et, &len);
+	if ((uint32_t) index > len) return avm2_integer(-1);
+	uint32_t start = (uint32_t) index;
+	while (start > 0 && u[start - 1] != '\n' && u[start - 1] != '\r') start--;
+	if ((uint32_t) index == len)
+	{
+		// FP simulates a char at the end: last paragraph length + 1.
+		return avm2_integer((int32_t) (1 + len - start));
+	}
+	uint32_t i = (uint32_t) index;
+	while (i < len && u[i] != '\n' && u[i] != '\r') i++;
+	if (i < len && (u[i] == '\n' || u[i] == '\r')) i++;
+	return avm2_integer((int32_t) (i - start));
+}
+
+// getLineMetrics -> TextLineMetrics(x, width, height, ascent, descent,
+// leading).
+static Avm2Value txt_get_line_metrics(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t n = avm2_coerce_to_i32(ctx, arg_or_undef(act, 0));
+	LLayout* l = et_layout(ctx, et);
+	if (n < 0 || (uint32_t) n >= l->line_count) throw_2006(ctx);
+	LLine* line = &l->lines[n];
+	Avm2Value args[6];
+	args[0] = avm2_number((double) (line->x + GUTTER) / 20.0);
+	args[1] = avm2_number((double) line->w / 20.0);
+	args[2] = avm2_number((double) (line->h + line->leading) / 20.0);
+	args[3] = avm2_number((double) line->ascent / 20.0);
+	args[4] = avm2_number((double) line->descent / 20.0);
+	args[5] = avm2_number((double) line->leading / 20.0);
+	return avm2_class_construct(ctx, g_textlinemetrics_class, args, 6);
+}
+
+// getCharBoundaries -> Rectangle or null.
+static Avm2Value txt_get_char_boundaries(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	int32_t index = avm2_coerce_to_i32(ctx, arg_or_undef(act, 0));
+	if (index < 0) return avm2_null();
+	LLayout* l = et_layout(ctx, et);
+	int64_t li = layout_line_of_pos(l, (uint32_t) index);
+	if (li < 0) return avm2_null();
+	// Lines above the viewport return null.
+	if (li + 1 < et->scroll) return avm2_null();
+	LLine* line = &l->lines[li];
+	// Find the box containing the position.
+	LBox* box = NULL;
+	uint32_t box_index = 0;
+	for (uint32_t i = 0; i < line->box_count; i++)
+	{
+		LBox* b = &line->boxes[i];
+		if (b->is_bullet) continue;
+		if ((uint32_t) index >= b->start && (uint32_t) index < b->end)
+		{
+			box = b;
+			box_index = i;
+			break;
+		}
+	}
+	if (box == NULL) return avm2_null();
+	uint32_t rel = (uint32_t) index - box->start;
+	if (rel >= box->char_count) return avm2_null();
+	int32_t x_min = box->x + (rel == 0 ? 0 : box->char_end[rel - 1]);
+	int32_t x_max = box->x + box->char_end[rel];
+	// Justified stretch: a box-final char extends to the next box start.
+	if (box->end == (uint32_t) index + 1 && box_index + 1 < line->box_count)
+	{
+		LBox* nb = &line->boxes[box_index + 1];
+		if (!nb->is_bullet && nb->char_count > 0)
+		{
+			x_max = nb->x;
+		}
+	}
+	int32_t y_min = line->y;
+	int32_t y_max = line->y + line->h;
+	// layout -> local: + GUTTER on both axes, minus the vertical scroll
+	// offset (scroll line's y). FP does NOT apply hscroll here.
+	int32_t vscroll_off = 0;
+	{
+		uint32_t si = (uint32_t) (et->scroll - 1);
+		if (si > 0 && si < l->line_count) vscroll_off = l->lines[si].y;
+	}
+	x_min += GUTTER;
+	x_max += GUTTER;
+	y_min += GUTTER - vscroll_off;
+	y_max += GUTTER - vscroll_off;
+	if (x_max - x_min == 0) return avm2_null();
+	Avm2Value args[4];
+	args[0] = avm2_number((double) x_min / 20.0);
+	args[1] = avm2_number((double) y_min / 20.0);
+	args[2] = avm2_number((double) (x_max - x_min) / 20.0);
+	args[3] = avm2_number((double) (y_max - y_min) / 20.0);
+	return avm2_class_construct(ctx, g_rectangle_class, args, 4);
+}
+
+static Avm2Value txt_get_char_index_at_point(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	// FP applies a weird 1px translation on x.
+	double x_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 0)) + 1.0;
+	double y_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 1));
+	int32_t px = twips_from_px(x_px);
+	int32_t py = twips_from_px(y_px);
+	et_apply_lazy_bounds(et);
+	// Inside bounds shrunk by the gutter?
+	if (px < et->bounds_x + GUTTER || px > et->bounds_x + et->bounds_w - GUTTER
+	    || py < et->bounds_y + GUTTER || py > et->bounds_y + et->bounds_h - GUTTER)
+	{
+		return avm2_number(-1);
+	}
+	LLayout* l = et_layout(ctx, et);
+	// local -> layout y (embedded: minus gutter; scroll offset of scroll=1
+	// is 0).
+	int32_t ly = py - GUTTER;
+	int64_t li = -1;
+	for (uint32_t i = 0; i < l->line_count; i++)
+	{
+		if (ly < l->lines[i].y + l->lines[i].h) { li = i; break; }
+	}
+	if (li < 0) li = (int64_t) l->line_count - 1;
+	if (li < 0) return avm2_number(-1);
+	LLine* line = &l->lines[li];
+	int32_t x = px - GUTTER;
+	if (x == 0) return avm2_integer((int32_t) line->start);
+	for (uint32_t ch = line->start; ch < line->end; ch++)
+	{
+		// char x bounds within the line.
+		for (uint32_t i = 0; i < line->box_count; i++)
+		{
+			LBox* b = &line->boxes[i];
+			if (b->is_bullet || ch < b->start || ch >= b->end) continue;
+			uint32_t rel = ch - b->start;
+			if (rel >= b->char_count) continue;
+			int32_t a = b->x + (rel == 0 ? 0 : b->char_end[rel - 1]);
+			int32_t bx = b->x + b->char_end[rel];
+			if (a < x && x <= bx) return avm2_integer((int32_t) ch);
+		}
+	}
+	return avm2_number(-1);
+}
+
+
+// ===========================================================================
+// flash.text.Font
+// ===========================================================================
+
+uint16_t avm2_display_char_for_class(Avm2Class* cls);
+
+typedef struct Avm2FontExt
+{
+	const Avm2FontData* font;  // NULL when the class has no symbol binding
+} Avm2FontExt;
+
+static Avm2Class* g_font_class;
+static const Avm2FontData* g_registered_fonts[64];
+static uint32_t g_registered_font_count;
+
+static void font_native_init(Avm2Context* ctx, Avm2Object* obj)
+{
+	(void) ctx;
+	Avm2FontExt* fe = (Avm2FontExt*) obj->native_ext;
+	fe->font = NULL;
+	uint16_t char_id = avm2_display_char_for_class(obj->cls);
+	if (char_id != 0)
+	{
+		fe->font = font_by_id(char_id);
+	}
+}
+
+static Avm2FontExt* this_font(Avm2Activation* act)
+{
+	Avm2Object* obj = this_obj(act);
+	if (obj == NULL || obj->native_ext == NULL || g_font_class == NULL)
+	{
+		return NULL;
+	}
+	for (Avm2Class* c = obj->cls; c != NULL; c = c->super_class)
+	{
+		if (c == g_font_class) return (Avm2FontExt*) obj->native_ext;
+	}
+	return NULL;
+}
+
+static Avm2Value font_get_name(Avm2Activation* act)
+{
+	Avm2FontExt* fe = this_font(act);
+	if (fe == NULL || fe->font == NULL) return avm2_null();
+	return avm2_string(avm2_string_from_literal(act->ctx, fe->font->name));
+}
+
+static Avm2Value font_get_style(Avm2Activation* act)
+{
+	Avm2FontExt* fe = this_font(act);
+	if (fe == NULL || fe->font == NULL) return avm2_null();
+	const char* s = fe->font->bold
+		? (fe->font->italic ? "boldItalic" : "bold")
+		: (fe->font->italic ? "italic" : "regular");
+	return avm2_string(avm2_string_from_literal(act->ctx, s));
+}
+
+static Avm2Value font_get_type(Avm2Activation* act)
+{
+	Avm2FontExt* fe = this_font(act);
+	if (fe == NULL || fe->font == NULL) return avm2_null();
+	return avm2_string(avm2_string_from_literal(act->ctx, "embedded"));
+}
+
+static Avm2Value font_has_glyphs(Avm2Activation* act)
+{
+	Avm2FontExt* fe = this_font(act);
+	if (fe == NULL || fe->font == NULL) return avm2_bool(false);
+	Avm2Value v = arg_or_undef(act, 0);
+	const Avm2String* str = (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+		? avm2_string_from_literal(act->ctx, "null")
+		: avm2_coerce_to_string(act->ctx, v);
+	// Decode to codepoints; every one must have a glyph.
+	for (uint32_t i = 0; i < str->len; )
+	{
+		unsigned char c = (unsigned char) str->utf8[i];
+		uint32_t cp, clen;
+		if (c < 0x80) { cp = c; clen = 1; }
+		else if (c < 0xE0) { cp = c & 0x1F; clen = 2; }
+		else if (c < 0xF0) { cp = c & 0x0F; clen = 3; }
+		else { cp = c & 0x07; clen = 4; }
+		for (uint32_t j = 1; j < clen && i + j < str->len; j++)
+		{
+			cp = (cp << 6) | ((unsigned char) str->utf8[i + j] & 0x3F);
+		}
+		int32_t units;
+		if (!glyph_advance_units(fe->font, cp, &units)) return avm2_bool(false);
+		i += clen;
+	}
+	return avm2_bool(true);
+}
+
+static int font_name_ci_cmp(const char* a, const char* b)
+{
+	return strcasecmp(a, b);
+}
+
+static Avm2Value font_enumerate_fonts(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	// arg0 (device fonts) is stubbed like Ruffle.
+	const Avm2FontData* list[128];
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < g_registered_font_count && n < 128; i++)
+	{
+		list[n++] = g_registered_fonts[i];
+	}
+	for (uint32_t i = 0; i < avm2_generated_font_count && n < 128; i++)
+	{
+		const Avm2FontData* fd = &avm2_generated_fonts[i];
+		if (fd->has_layout) list[n++] = fd;
+	}
+	// Stable insertion sort by case-insensitive name.
+	for (uint32_t i = 1; i < n; i++)
+	{
+		const Avm2FontData* key = list[i];
+		uint32_t j = i;
+		while (j > 0 && font_name_ci_cmp(list[j - 1]->name, key->name) > 0)
+		{
+			list[j] = list[j - 1];
+			j--;
+		}
+		list[j] = key;
+	}
+	Avm2Object* arr = avm2_array_new(ctx, n);
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2Value v = avm2_class_construct(ctx, g_font_class, NULL, 0);
+		((Avm2FontExt*) v.u.obj->native_ext)->font = list[i];
+		avm2_array_set(ctx, arr, i, v);
+	}
+	return avm2_object_value(arr);
+}
+
+static Avm2Value font_register_font(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = arg_or_undef(act, 0);
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
+	    && v.u.obj->kind == AVM2_OBJ_CLASS)
+	{
+		uint16_t char_id = avm2_display_char_for_class(v.u.obj->class_ref);
+		const Avm2FontData* fd = char_id != 0 ? font_by_id(char_id) : NULL;
+		if (fd != NULL)
+		{
+			if (g_registered_font_count < 64)
+			{
+				g_registered_fonts[g_registered_font_count++] = fd;
+			}
+			return avm2_undefined();
+		}
+	}
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #1508: The value specified for argument font is "
+	                 "invalid.");
+}
+
+// ===========================================================================
 // Registration
 // ===========================================================================
+
+// Simple constructible slot class (Point pattern): args map 1:1 to slots.
+static Avm2Value slot_class_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	uint32_t n = self->slot_count > 0 ? self->slot_count - 1 : 0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2Value v = i < act->argc
+			? avm2_number(avm2_coerce_to_number(ctx, act->args[i]))
+			: avm2_integer(0);
+		self->slots[i + 1] = v;
+	}
+	return avm2_undefined();
+}
+
+// Rectangle.toString: "(x=X, y=Y, w=W, h=H)".
+static Avm2Value rectangle_to_string(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->slot_count < 5) return avm2_undefined();
+	char nums[4][40];
+	for (int i = 0; i < 4; i++)
+	{
+		double d = avm2_coerce_to_number(act->ctx, self->slots[i + 1]);
+		avm2_format_number(nums[i], sizeof(nums[i]), d);
+	}
+	char buf[192];
+	snprintf(buf, sizeof(buf), "(x=%s, y=%s, w=%s, h=%s)",
+	         nums[0], nums[1], nums[2], nums[3]);
+	return avm2_string(avm2_string_from_literal(act->ctx, buf));
+}
+
+static Avm2Class* make_slot_class(Avm2Context* ctx, const char* ns,
+                                  const char* name, const char* const* fields,
+                                  uint32_t nfields)
+{
+	Avm2Class* cls = avm2_builtin_class(ctx, ns, name, ctx->builtins.object_class);
+	cls->flags |= AVM2_CLASS_FLAG_SEALED;
+	cls->instance_init.fn = slot_class_init;
+	cls->instance_init.debug_name = name;
+	for (uint32_t i = 0; i < nfields; i++)
+	{
+		Avm2PropEntry e;
+		memset(&e, 0, sizeof(e));
+		e.key = avm2_public_key(fields[i], (uint32_t) strlen(fields[i]));
+		e.kind = AVM2_PROP_SLOT;
+		e.slot_index = cls->ivtable.slot_count + 1;
+		e.defining_class = cls;
+		cls->ivtable.slot_count++;
+		avm2_vtable_append(ctx, &cls->ivtable, &e);
+	}
+	return cls;
+}
 
 void avm2_register_text(Avm2Context* ctx)
 {
@@ -2487,6 +4505,39 @@ void avm2_register_text(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, tf, "bullet", tfmt_get_bullet, tfmt_set_bullet);
 	avm2_builtin_add_getset(ctx, tf, "tabStops", tfmt_get_tab_stops, tfmt_set_tab_stops);
 	avm2_builtin_add_getset(ctx, tf, "display", tfmt_get_display, tfmt_set_display);
+
+	// flash.text.Font.
+	{
+		Avm2Class* font = avm2_builtin_class(ctx, "flash.text", "Font",
+		                                     ctx->builtins.object_class);
+		g_font_class = font;
+		font->native_ext_size = sizeof(Avm2FontExt);
+		font->native_init = font_native_init;
+		avm2_builtin_add_getset(ctx, font, "fontName", font_get_name, NULL);
+		avm2_builtin_add_getset(ctx, font, "fontStyle", font_get_style, NULL);
+		avm2_builtin_add_getset(ctx, font, "fontType", font_get_type, NULL);
+		avm2_builtin_add_method(ctx, font, "hasGlyphs", font_has_glyphs);
+		avm2_builtin_add_static_method(ctx, font, "enumerateFonts",
+		                               font_enumerate_fonts);
+		avm2_builtin_add_static_method(ctx, font, "registerFont",
+		                               font_register_font);
+	}
+
+	// flash.geom.Rectangle (getCharBoundaries) + flash.text.TextLineMetrics
+	// (getLineMetrics).
+	{
+		static const char* const rect_fields[4] = { "x", "y", "width", "height" };
+		g_rectangle_class = make_slot_class(ctx, "flash.geom", "Rectangle",
+		                                    rect_fields, 4);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "toString",
+		                        rectangle_to_string);
+		static const char* const tlm_fields[6] = {
+			"x", "width", "height", "ascent", "descent", "leading",
+		};
+		g_textlinemetrics_class = make_slot_class(ctx, "flash.text",
+		                                          "TextLineMetrics",
+		                                          tlm_fields, 6);
+	}
 }
 
 void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield)
@@ -2528,6 +4579,21 @@ void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield)
 	avm2_builtin_add_method(ctx, textfield, "replaceText", txt_replace_text);
 	avm2_builtin_add_method(ctx, textfield, "setSelection", txt_set_selection);
 	avm2_builtin_add_method(ctx, textfield, "replaceSelectedText", txt_replace_selected_text);
-	avm2_builtin_add_getset(ctx, textfield, "scrollV", txt_get_scroll_v, NULL);
-	avm2_builtin_add_getset(ctx, textfield, "scrollH", txt_get_scroll_h, NULL);
+	avm2_builtin_add_getset(ctx, textfield, "scrollV", txt_get_scroll_v, txt_set_scroll_v);
+	avm2_builtin_add_getset(ctx, textfield, "scrollH", txt_get_scroll_h, txt_set_scroll_h);
+	avm2_builtin_add_getset(ctx, textfield, "maxScrollV", txt_get_max_scroll_v, NULL);
+	avm2_builtin_add_getset(ctx, textfield, "maxScrollH", txt_get_max_scroll_h, NULL);
+	avm2_builtin_add_getset(ctx, textfield, "bottomScrollV", txt_get_bottom_scroll_v, NULL);
+	avm2_builtin_add_getset(ctx, textfield, "textWidth", txt_get_text_width, NULL);
+	avm2_builtin_add_getset(ctx, textfield, "textHeight", txt_get_text_height, NULL);
+	avm2_builtin_add_getset(ctx, textfield, "numLines", txt_get_num_lines, NULL);
+	avm2_builtin_add_method(ctx, textfield, "getLineMetrics", txt_get_line_metrics);
+	avm2_builtin_add_method(ctx, textfield, "getCharBoundaries", txt_get_char_boundaries);
+	avm2_builtin_add_method(ctx, textfield, "getLineLength", txt_get_line_length);
+	avm2_builtin_add_method(ctx, textfield, "getLineText", txt_get_line_text);
+	avm2_builtin_add_method(ctx, textfield, "getLineOffset", txt_get_line_offset);
+	avm2_builtin_add_method(ctx, textfield, "getLineIndexOfChar", txt_get_line_index_of_char);
+	avm2_builtin_add_method(ctx, textfield, "getFirstCharInParagraph", txt_get_first_char_in_paragraph);
+	avm2_builtin_add_method(ctx, textfield, "getParagraphLength", txt_get_paragraph_length);
+	avm2_builtin_add_method(ctx, textfield, "getCharIndexAtPoint", txt_get_char_index_at_point);
 }

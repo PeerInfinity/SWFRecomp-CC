@@ -528,10 +528,14 @@ static Avm2Value native_trace(Avm2Activation* act)
 	{
 		if (i > 0) fputc(' ', stdout);
 		const Avm2String* s = avm2_coerce_to_string(act->ctx, act->args[i]);
-		// NUL bytes vanish from FP/Ruffle trace output.
+		// NUL bytes vanish from FP/Ruffle trace output; \r normalizes to
+		// \n (the Ruffle test framework's trace log semantics —
+		// edittext_newline_stripping prints "hello\rworld" as two lines).
 		for (uint32_t j = 0; j < s->len; j++)
 		{
-			if (s->utf8[j] != '\0') fputc(s->utf8[j], stdout);
+			char c = s->utf8[j];
+			if (c == '\0') continue;
+			fputc(c == '\r' ? '\n' : c, stdout);
 		}
 	}
 	fputc('\n', stdout);

@@ -374,6 +374,14 @@ void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield);
 void avm2_text_edittext_init(Avm2Context* ctx, Avm2Object* obj);
 // Timeline instantiation: seed EditText state from the DefineEditText tag.
 void avm2_text_seed_from_tag(Avm2Context* ctx, Avm2Object* obj, uint16_t char_id);
+// EditText-owned bounds accessors (TextField width/height/x/y semantics —
+// only valid when ext->edittext != NULL).
+double avm2_text_get_width_px(Avm2Context* ctx, Avm2Object* obj);
+double avm2_text_get_height_px(Avm2Context* ctx, Avm2Object* obj);
+void avm2_text_set_width_px(Avm2Context* ctx, Avm2Object* obj, double value);
+void avm2_text_set_height_px(Avm2Context* ctx, Avm2Object* obj, double value);
+int32_t avm2_text_bounds_x_offset(Avm2Context* ctx, Avm2Object* obj, double scale_x);
+int32_t avm2_text_bounds_y_offset(Avm2Context* ctx, Avm2Object* obj, double scale_y);
 
 // Display module (avm2_display.c — Stage-5 tranche 2+).
 void avm2_register_display(Avm2Context* ctx);
