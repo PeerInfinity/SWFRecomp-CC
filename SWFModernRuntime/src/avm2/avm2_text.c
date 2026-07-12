@@ -26,6 +26,8 @@
 
 static Avm2Class* g_textformat_class;
 static Avm2Class* g_textfield_class2;
+static Avm2Class* g_rectangle_class;
+static Avm2Class* g_textlinemetrics_class;
 
 static void throw_2006(Avm2Context* ctx)
 {
@@ -757,7 +759,8 @@ struct Avm2EditTextExt
 
 	uint8_t is_html, condense_white, word_wrap, multiline, password,
 	        read_only, no_select, border, background, was_static, device_font,
-	        always_show_selection, mouse_wheel_enabled, from_tag;
+	        always_show_selection, mouse_wheel_enabled, from_tag,
+	        use_rich_clipboard;
 	uint8_t autosize;      // 0 none 1 left 2 center 3 right
 	uint8_t aa_advanced;   // antiAliasType: 1 = advanced (default)
 	uint8_t grid_fit;      // 0 none 1 pixel (default) 2 subpixel
@@ -782,6 +785,10 @@ static Avm2EditTextExt* edittext_of(Avm2Context* ctx, Avm2Object* obj)
 }
 
 static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et);
+typedef struct Avm2StyleSheetExt Avm2StyleSheetExt;
+static Avm2StyleSheetExt* stylesheet_ext_of(Avm2Object* obj);
+static const struct Avm2TextFormatFields* stylesheet_style_for(
+	Avm2Context* ctx, Avm2Object* sheet, const char* sel, uint32_t sel_len);
 
 static Avm2EditTextExt* this_et(Avm2Activation* act)
 {
@@ -1198,7 +1205,38 @@ static int swf_is_ws(char c)
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-// from_html: parse html into et->text/spans. No stylesheet support yet.
+// apply_style: mix the selector's style over the format (style wins).
+static void html_apply_style(Avm2Context* ctx, const Avm2EditTextExt* et,
+                             Avm2TextFormatFields* format, const char* sel,
+                             uint32_t sel_len)
+{
+	if (et->style_sheet == NULL) return;
+	const Avm2TextFormatFields* style =
+		stylesheet_style_for(ctx, et->style_sheet, sel, sel_len);
+	if (style == NULL) return;
+	Avm2TextFormatFields mixed = *style;
+	fields_mix_with(&mixed, format);
+	*format = mixed;
+}
+
+static void html_apply_class_style(Avm2Context* ctx, const Avm2EditTextExt* et,
+                                   Avm2TextFormatFields* format,
+                                   const HtmlAttr* cls)
+{
+	if (cls == NULL || cls->value == NULL) return;
+	char sel[80];
+	uint32_t n = 0;
+	sel[n++] = '.';
+	for (uint32_t i = 0; i < cls->value_len && n < 79; i++)
+	{
+		char c = cls->value[i];
+		if (c >= 'A' && c <= 'Z') c += 32;
+		sel[n++] = c;
+	}
+	html_apply_style(ctx, et, format, sel, n);
+}
+
+// from_html: parse html into et->text/spans.
 static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
                             const Avm2String* html, int is_multiline,
                             int condense_white)
@@ -1442,6 +1480,8 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 			else if (strcmp(tag_name, "p") == 0)
 			{
 				p_open = 1;
+				html_apply_style(ctx, et, &format, "p", 1);
+				html_apply_class_style(ctx, et, &format, ATTR("class"));
 				const HtmlAttr* a = ATTR("align");
 				if (a != NULL && a->value != NULL)
 				{
@@ -1458,6 +1498,8 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 			else if (strcmp(tag_name, "a") == 0)
 			{
 				const HtmlAttr* href = ATTR("href");
+				html_apply_style(ctx, et, &format, "a", 1);
+				html_apply_class_style(ctx, et, &format, ATTR("class"));
 				if (href != NULL && href->value != NULL)
 				{
 					format.url = avm2_string_new(ctx, href->value, href->value_len);
@@ -1594,6 +1636,7 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 			}
 			else if (strcmp(tag_name, "li") == 0)
 			{
+				html_apply_style(ctx, et, &format, "li", 2);
 				int is_last_nl = text.len > 0 && text.buf[text.len - 1] == '\r';
 				if (is_multiline && !is_last_nl && text.len > 0)
 				{
@@ -1648,12 +1691,20 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 			}
 			else if (strcmp(tag_name, "span") == 0)
 			{
-				// Stylesheet-only tag; no-op without one.
+				html_apply_class_style(ctx, et, &format, ATTR("class"));
 			}
 			else
 			{
-				// Unstyled unknown tag: display resolves to inline.
+				// Unstyled unknown tag: display resolves to inline; styled
+				// tags with display block/none append a newline at close.
 				format.present &= ~(uint32_t) TFP_DISPLAY;
+				html_apply_style(ctx, et, &format, tag_name, tn);
+				if ((format.present & TFP_DISPLAY)
+				    && (format.display == DISPLAY_BLOCK
+				        || format.display == DISPLAY_NONE))
+				{
+					display_block = 1;
+				}
 			}
 
 			if (!skip_push)
@@ -3353,6 +3404,7 @@ static Avm2Value txt_set_text(Avm2Activation* act)
 	if (et->style_sheet != NULL)
 	{
 		spans_from_html(act->ctx, et, s, et->multiline, et->condense_white);
+		et->original_html = s;  // parse_html caches under a stylesheet
 	}
 	else
 	{
@@ -3730,19 +3782,64 @@ static Avm2Value txt_get_style_sheet(Avm2Activation* act)
 
 static Avm2Value txt_set_style_sheet(Avm2Activation* act)
 {
+	Avm2Context* ctx = act->ctx;
 	Avm2EditTextExt* et = this_et(act);
 	if (et == NULL) return avm2_undefined();
 	Avm2Value v = arg_or_undef(act, 0);
-	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+	Avm2Object* sheet = NULL;
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
+	    && stylesheet_ext_of(v.u.obj) != NULL)
 	{
-		avm2_fatal("AVM2: TextField.styleSheet is not implemented yet "
-		           "(Stage-6 tranche 3)");
+		sheet = v.u.obj;
 	}
-	et->style_sheet = NULL;
+	// set_style_sheet_avm2 flips the field into HTML mode permanently,
+	// even when clearing the sheet.
+	et->is_html = 1;
+	et->style_sheet = sheet;
+	// Ruffle set_style_sheet: removing the sheet drops the original-html
+	// cache; if a cache remains, the html reparses with the new styles.
+	if (sheet == NULL) et->original_html = NULL;
+	if (et->original_html != NULL)
+	{
+		spans_from_html(ctx, et, et->original_html, et->multiline,
+		                et->condense_white);
+		// parse_html keeps the cache while a sheet is set.
+	}
+	et_relayout(ctx, et);
+	et_sync_mirror(act, et);
 	return avm2_undefined();
 }
 
 // --- selection (data model) ---
+
+static Avm2Value txt_get_image_reference(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_null();  // Ruffle stub_method
+}
+
+static Avm2Value txt_get_text_interaction_mode(Avm2Activation* act)
+{
+	return avm2_string(avm2_string_from_literal(act->ctx, "normal"));
+}
+
+static Avm2Value txt_get_use_rich_clipboard(Avm2Activation* act)
+{
+	Avm2EditTextExt* et = this_et(act);
+	return et != NULL ? avm2_bool(et->use_rich_clipboard != 0) : avm2_bool(false);
+}
+
+static Avm2Value txt_set_use_rich_clipboard(Avm2Activation* act)
+{
+	// Stored but otherwise unused (Ruffle stub_setter).
+	Avm2EditTextExt* et = this_et(act);
+	if (et != NULL)
+	{
+		et->use_rich_clipboard =
+			avm2_coerce_to_boolean(arg_or_undef(act, 0)) ? 1 : 0;
+	}
+	return avm2_undefined();
+}
 
 static Avm2Value txt_get_selection_begin(Avm2Activation* act)
 {
@@ -3911,6 +4008,614 @@ static Avm2Value txt_replace_text(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+
+// ===========================================================================
+// flash.text.StyleSheet
+// ===========================================================================
+
+typedef struct Avm2StyleEntry
+{
+	const Avm2String* selector;   // lowercased
+	Avm2Object* style_obj;        // shallow copy of the user object
+	Avm2TextFormatFields fmt;     // transform() result
+} Avm2StyleEntry;
+
+typedef struct Avm2StyleSheetExt
+{
+	Avm2EventDispatcherExt dispatcher;
+	Avm2StyleEntry* entries;
+	uint32_t count, cap;
+} Avm2StyleSheetExt;
+
+static Avm2Class* g_stylesheet_class;
+
+static Avm2StyleSheetExt* stylesheet_ext_of(Avm2Object* obj)
+{
+	if (obj == NULL || obj->native_ext == NULL || g_stylesheet_class == NULL)
+	{
+		return NULL;
+	}
+	for (Avm2Class* c = obj->cls; c != NULL; c = c->super_class)
+	{
+		if (c == g_stylesheet_class) return (Avm2StyleSheetExt*) obj->native_ext;
+	}
+	return NULL;
+}
+
+static Avm2Object* plain_object(Avm2Context* ctx)
+{
+	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
+	obj->cls = ctx->builtins.object_class;
+	obj->proto = ctx->builtins.object_class->prototype_obj;
+	return obj;
+}
+
+// _createShallowCopy: fresh {} with the enumerable dyn props copied.
+static Avm2Object* shallow_copy(Avm2Context* ctx, Avm2Value src)
+{
+	Avm2Object* copy = plain_object(ctx);
+	if (src.kind == AVM2_VALUE_OBJECT && src.u.obj != NULL)
+	{
+		for (Avm2DynProp* dp = src.u.obj->dyn_props; dp != NULL; dp = dp->next)
+		{
+			if (dp->dead || dp->dont_enum) continue;
+			avm2_object_set_dynamic(ctx, copy, dp->name.utf8, dp->name.len,
+			                        dp->value);
+		}
+	}
+	return copy;
+}
+
+static const Avm2String* string_to_lower(Avm2Context* ctx, const Avm2String* s)
+{
+	char* buf = avm2_alloc(ctx, s->len + 1);
+	for (uint32_t i = 0; i < s->len; i++)
+	{
+		char c = s->utf8[i];
+		buf[i] = (c >= 'A' && c <= 'Z') ? (char) (c + 32) : c;
+	}
+	return avm2_string_new(ctx, buf, s->len);
+}
+
+// parseInt(v, 10) over a value (ES semantics via avm2_string_to_int).
+static double style_parse_int(Avm2Context* ctx, Avm2Value v)
+{
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	return avm2_string_to_int(s->utf8, s->len, 10, false);
+}
+
+static double style_parse_float(Avm2Context* ctx, Avm2Value v)
+{
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	double d;
+	if (!avm2_string_to_f64(s->utf8, s->len, false, &d)) return 0.0 / 0.0;
+	return d;
+}
+
+static int style_truthy(Avm2Value v)
+{
+	return avm2_coerce_to_boolean(v);
+}
+
+static Avm2Value style_prop(Avm2Context* ctx, Avm2Object* obj, const char* name)
+{
+	Avm2Value* v = avm2_object_find_dynamic(obj, name, (uint32_t) strlen(name));
+	(void) ctx;
+	return v != NULL ? *v : avm2_undefined();
+}
+
+static int str_val_eq(Avm2Context* ctx, Avm2Value v, const char* lit)
+{
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED) return 0;
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	return s->len == strlen(lit) && memcmp(s->utf8, lit, s->len) == 0;
+}
+
+// StyleSheet.transform(formatObject) -> internal fields (AS3 port).
+static Avm2TextFormatFields style_transform(Avm2Context* ctx, Avm2Object* obj)
+{
+	// result = new TextFormat(): display=block starts PRESENT.
+	Avm2TextFormatFields f = format_default();
+	Avm2Value v;
+
+	v = style_prop(ctx, obj, "color");
+	if (style_truthy(v))
+	{
+		// innerParseColor: "#rrggbb" -> number, else 0.
+		const Avm2String* cs = avm2_coerce_to_string(ctx, v);
+		uint32_t rgb = 0;
+		int ok = 0;
+		if (cs->len >= 1 && cs->utf8[0] == '#' && cs->len <= 7)
+		{
+			ok = 1;
+			for (uint32_t i = 1; i < cs->len && ok; i++)
+			{
+				char c = cs->utf8[i];
+				int d;
+				if (c >= '0' && c <= '9') d = c - '0';
+				else if ((c | 32) >= 'a' && (c | 32) <= 'f') d = (c | 32) - 'a' + 10;
+				else { ok = 0; break; }
+				rgb = (rgb << 4) | (uint32_t) d;
+			}
+		}
+		if (!ok) rgb = 0;
+		// TextFormat.color = <number>: from_rgba keeps the u32's alpha
+		// byte, which is 0 here (getter then prints the plain rgb).
+		f.color = rgb << 8;
+		f.present |= TFP_COLOR;
+	}
+	v = style_prop(ctx, obj, "display");
+	if (style_truthy(v))
+	{
+		const Avm2String* ds = avm2_coerce_to_string(ctx, v);
+		if (ds->len == 5 && memcmp(ds->utf8, "block", 5) == 0)
+		{ f.display = DISPLAY_BLOCK; f.present |= TFP_DISPLAY; }
+		else if (ds->len == 6 && memcmp(ds->utf8, "inline", 6) == 0)
+		{ f.display = DISPLAY_INLINE; f.present |= TFP_DISPLAY; }
+		else if (ds->len == 4 && memcmp(ds->utf8, "none", 4) == 0)
+		{ f.display = DISPLAY_NONE; f.present |= TFP_DISPLAY; }
+	}
+	v = style_prop(ctx, obj, "fontFamily");
+	if (style_truthy(v))
+	{
+		// innerParseFontFamily: split on commas, trim leading spaces, map
+		// mono/sans-serif/serif to device names, rejoin.
+		const Avm2String* fs = avm2_coerce_to_string(ctx, v);
+		SB out;
+		sb_init(&out);
+		uint32_t pos = 0;
+		int first = 1;
+		while (pos < fs->len)
+		{
+			while (pos < fs->len && fs->utf8[pos] == ' ') pos++;
+			uint32_t start = pos;
+			while (pos < fs->len && fs->utf8[pos] != ',') pos++;
+			uint32_t vlen = pos - start;
+			if (pos < fs->len) pos++;
+			if (!first) sb_ch(ctx, &out, ',');
+			first = 0;
+			if (vlen == 4 && memcmp(fs->utf8 + start, "mono", 4) == 0)
+			{
+				sb_bytes(ctx, &out, "_typewriter", 11);
+			}
+			else if (vlen == 10 && memcmp(fs->utf8 + start, "sans-serif", 10) == 0)
+			{
+				sb_bytes(ctx, &out, "_sans", 5);
+			}
+			else if (vlen == 5 && memcmp(fs->utf8 + start, "serif", 5) == 0)
+			{
+				sb_bytes(ctx, &out, "_serif", 6);
+			}
+			else
+			{
+				sb_bytes(ctx, &out, fs->utf8 + start, vlen);
+			}
+		}
+		f.font = sb_str(ctx, &out);
+		f.present |= TFP_FONT;
+	}
+	v = style_prop(ctx, obj, "fontSize");
+	if (style_truthy(v))
+	{
+		double size = style_parse_int(ctx, v);
+		if (size > 0)
+		{
+			f.size = (double) round_to_even_i32(size);
+			f.present |= TFP_SIZE;
+		}
+	}
+	v = style_prop(ctx, obj, "fontStyle");
+	if (str_val_eq(ctx, v, "italic")) { f.italic = 1; f.present |= TFP_ITALIC; }
+	else if (str_val_eq(ctx, v, "normal")) { f.italic = 0; f.present |= TFP_ITALIC; }
+	v = style_prop(ctx, obj, "fontWeight");
+	if (str_val_eq(ctx, v, "bold")) { f.bold = 1; f.present |= TFP_BOLD; }
+	else if (str_val_eq(ctx, v, "normal")) { f.bold = 0; f.present |= TFP_BOLD; }
+	v = style_prop(ctx, obj, "kerning");
+	if (str_val_eq(ctx, v, "true")) { f.kerning = 1; f.present |= TFP_KERNING; }
+	else if (str_val_eq(ctx, v, "false")) { f.kerning = 0; f.present |= TFP_KERNING; }
+	else
+	{
+		// AS3: result.kerning = parseInt(...) unconditionally.
+		double k = style_parse_int(ctx, v);
+		f.kerning = (k == k && k != 0) ? 1 : 0;
+		f.present |= TFP_KERNING;
+	}
+	v = style_prop(ctx, obj, "leading");
+	if (style_truthy(v))
+	{
+		f.leading = (double) round_to_even_i32(style_parse_int(ctx, v));
+		f.present |= TFP_LEADING;
+	}
+	v = style_prop(ctx, obj, "letterSpacing");
+	if (style_truthy(v))
+	{
+		f.letter_spacing = style_parse_float(ctx, v);
+		f.present |= TFP_LETTER_SPACING;
+	}
+	v = style_prop(ctx, obj, "marginLeft");
+	if (style_truthy(v))
+	{
+		f.left_margin = (double) round_to_even_i32(style_parse_float(ctx, v));
+		f.present |= TFP_LEFT_MARGIN;
+	}
+	v = style_prop(ctx, obj, "marginRight");
+	if (style_truthy(v))
+	{
+		f.right_margin = (double) round_to_even_i32(style_parse_float(ctx, v));
+		f.present |= TFP_RIGHT_MARGIN;
+	}
+	v = style_prop(ctx, obj, "textAlign");
+	if (style_truthy(v))
+	{
+		const Avm2String* as = avm2_coerce_to_string(ctx, v);
+		if (as->len == 4 && memcmp(as->utf8, "left", 4) == 0)
+		{ f.align = ALIGN_LEFT; f.present |= TFP_ALIGN; }
+		else if (as->len == 6 && memcmp(as->utf8, "center", 6) == 0)
+		{ f.align = ALIGN_CENTER; f.present |= TFP_ALIGN; }
+		else if (as->len == 5 && memcmp(as->utf8, "right", 5) == 0)
+		{ f.align = ALIGN_RIGHT; f.present |= TFP_ALIGN; }
+		else if (as->len == 7 && memcmp(as->utf8, "justify", 7) == 0)
+		{ f.align = ALIGN_JUSTIFY; f.present |= TFP_ALIGN; }
+		else throw_2008(ctx, "align");
+	}
+	v = style_prop(ctx, obj, "textDecoration");
+	if (str_val_eq(ctx, v, "underline")) { f.underline = 1; f.present |= TFP_UNDERLINE; }
+	else if (str_val_eq(ctx, v, "none")) { f.underline = 0; f.present |= TFP_UNDERLINE; }
+	v = style_prop(ctx, obj, "textIndent");
+	if (style_truthy(v))
+	{
+		f.indent = (double) round_to_even_i32(style_parse_int(ctx, v));
+		f.present |= TFP_INDENT;
+	}
+	return f;
+}
+
+static Avm2StyleEntry* stylesheet_find(Avm2StyleSheetExt* ss, const Avm2String* sel)
+{
+	for (uint32_t i = 0; i < ss->count; i++)
+	{
+		if (str_eq(ss->entries[i].selector, sel)) return &ss->entries[i];
+	}
+	return NULL;
+}
+
+// Live style lookup for the html parser (NULL if absent).
+static const Avm2TextFormatFields* stylesheet_style_for(Avm2Context* ctx,
+                                                        Avm2Object* sheet,
+                                                        const char* sel,
+                                                        uint32_t sel_len)
+{
+	Avm2StyleSheetExt* ss = stylesheet_ext_of(sheet);
+	if (ss == NULL) return NULL;
+	for (uint32_t i = 0; i < ss->count; i++)
+	{
+		const Avm2String* e = ss->entries[i].selector;
+		if (e->len == sel_len && strncasecmp(e->utf8, sel, sel_len) == 0)
+		{
+			return &ss->entries[i].fmt;
+		}
+	}
+	(void) ctx;
+	return NULL;
+}
+
+static Avm2Value ss_set_style(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2StyleSheetExt* ss = stylesheet_ext_of(this_obj(act));
+	if (ss == NULL) return avm2_undefined();
+	Avm2Value nv = arg_or_undef(act, 0);
+	if (nv.kind == AVM2_VALUE_NULL || nv.kind == AVM2_VALUE_UNDEFINED)
+	{
+		throw_2007(ctx, "styleName");
+	}
+	const Avm2String* name = string_to_lower(ctx, avm2_coerce_to_string(ctx, nv));
+	Avm2Object* copy = shallow_copy(ctx, arg_or_undef(act, 1));
+	Avm2StyleEntry* e = stylesheet_find(ss, name);
+	if (e == NULL)
+	{
+		if (ss->count == ss->cap)
+		{
+			uint32_t ncap = ss->cap ? ss->cap * 2 : 8;
+			Avm2StyleEntry* ne = avm2_alloc(ctx, ncap * sizeof(Avm2StyleEntry));
+			memcpy(ne, ss->entries, ss->count * sizeof(Avm2StyleEntry));
+			ss->entries = ne;
+			ss->cap = ncap;
+		}
+		e = &ss->entries[ss->count++];
+	}
+	e->selector = name;
+	e->style_obj = copy;
+	e->fmt = style_transform(ctx, copy);
+	return avm2_undefined();
+}
+
+static Avm2Value ss_get_style(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2StyleSheetExt* ss = stylesheet_ext_of(this_obj(act));
+	if (ss == NULL) return avm2_undefined();
+	Avm2Value nv = arg_or_undef(act, 0);
+	if (nv.kind == AVM2_VALUE_NULL || nv.kind == AVM2_VALUE_UNDEFINED)
+	{
+		throw_2007(ctx, "styleName");
+	}
+	const Avm2String* name = string_to_lower(ctx, avm2_coerce_to_string(ctx, nv));
+	Avm2StyleEntry* e = stylesheet_find(ss, name);
+	return avm2_object_value(shallow_copy(ctx, e != NULL
+		? avm2_object_value(e->style_obj) : avm2_undefined()));
+}
+
+static Avm2Value ss_style_names(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2StyleSheetExt* ss = stylesheet_ext_of(this_obj(act));
+	if (ss == NULL) return avm2_undefined();
+	Avm2Object* arr = avm2_array_new(ctx, 0);
+	for (uint32_t i = 0; i < ss->count; i++)
+	{
+		avm2_array_set(ctx, arr, i, avm2_string(ss->entries[i].selector));
+	}
+	return avm2_object_value(arr);
+}
+
+static Avm2Value ss_clear(Avm2Activation* act)
+{
+	Avm2StyleSheetExt* ss = stylesheet_ext_of(this_obj(act));
+	if (ss != NULL) ss->count = 0;
+	return avm2_undefined();
+}
+
+static Avm2Value ss_transform(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = arg_or_undef(act, 0);
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return avm2_null();
+	Avm2TextFormatFields f = style_transform(ctx, v.u.obj);
+	return avm2_object_value(textformat_object_from_fields(ctx, &f));
+}
+
+// parseCSS (CssStream port + camelCase transform). On any parse error the
+// whole document is ignored.
+typedef struct CssCursor
+{
+	const char* p;
+	uint32_t n, pos;
+} CssCursor;
+
+static int css_ws(char c)
+{
+	return c == ' ' || c == '\n' || c == '\r' || c == '\t';
+}
+
+static int css_skip_ws_comments(CssCursor* cu)
+{
+	int found = 0;
+	for (;;)
+	{
+		if (cu->pos < cu->n && css_ws(cu->p[cu->pos]))
+		{
+			cu->pos++;
+			found = 1;
+			continue;
+		}
+		if (cu->pos + 1 < cu->n && cu->p[cu->pos] == '/' && cu->p[cu->pos + 1] == '*')
+		{
+			cu->pos += 2;
+			while (cu->pos + 1 < cu->n
+			       && !(cu->p[cu->pos] == '*' && cu->p[cu->pos + 1] == '/'))
+			{
+				cu->pos++;
+			}
+			if (cu->pos + 1 >= cu->n) { cu->pos = cu->n; return found; }
+			cu->pos += 2;
+			found = 1;
+			continue;
+		}
+		return found;
+	}
+}
+
+static Avm2Value ss_parse_css(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2StyleSheetExt* ss = stylesheet_ext_of(self);
+	if (ss == NULL) return avm2_undefined();
+	Avm2Value cv = arg_or_undef(act, 0);
+	if (cv.kind == AVM2_VALUE_NULL || cv.kind == AVM2_VALUE_UNDEFINED)
+	{
+		throw_2007(ctx, "CSSText");
+	}
+	const Avm2String* css = avm2_coerce_to_string(ctx, cv);
+	CssCursor cu = { css->utf8, css->len, 0 };
+
+	// Parsed selector/props accumulate here first (all-or-nothing).
+	struct { const Avm2String* sel; Avm2Object* props; } out[64];
+	uint32_t out_n = 0;
+
+	for (;;)
+	{
+		css_skip_ws_comments(&cu);
+		if (cu.pos >= cu.n) break;
+		// selectors
+		const Avm2String* sels[16];
+		uint32_t nsels = 0;
+		int entered_block = 0;
+		while (!entered_block)
+		{
+			css_skip_ws_comments(&cu);
+			uint32_t start = cu.pos;
+			while (cu.pos < cu.n && cu.p[cu.pos] != '{' && cu.p[cu.pos] != ','
+			       && !css_ws(cu.p[cu.pos]))
+			{
+				cu.pos++;
+			}
+			if (cu.pos > start && nsels < 16)
+			{
+				sels[nsels++] = avm2_string_new(ctx, cu.p + start, cu.pos - start);
+			}
+			css_skip_ws_comments(&cu);
+			if (cu.pos >= cu.n) return avm2_undefined();  // silent failure
+			if (cu.p[cu.pos] == '{')
+			{
+				cu.pos++;
+				if (nsels == 0 && 0 < 16) sels[nsels++] = empty_string(ctx);
+				entered_block = 1;
+			}
+			else if (cu.p[cu.pos] == ',')
+			{
+				cu.pos++;
+			}
+			else
+			{
+				return avm2_undefined();  // space in selector name
+			}
+		}
+		// properties
+		Avm2Object* props = plain_object(ctx);
+		for (;;)
+		{
+			css_skip_ws_comments(&cu);
+			if (cu.pos >= cu.n) break;
+			if (cu.p[cu.pos] == '}') { cu.pos++; break; }
+			uint32_t name_start = cu.pos;
+			while (cu.pos < cu.n && cu.p[cu.pos] != ':' && !css_ws(cu.p[cu.pos]))
+			{
+				cu.pos++;
+			}
+			uint32_t name_end = cu.pos;
+			if (css_skip_ws_comments(&cu))
+			{
+				if (cu.pos < cu.n && cu.p[cu.pos] == ':')
+				{
+					name_end = cu.pos;  // trailing spaces kept in the name
+				}
+				else if (cu.pos < cu.n)
+				{
+					return avm2_undefined();  // space in property name
+				}
+			}
+			if (cu.pos >= cu.n) return avm2_undefined();  // value missing
+			cu.pos++;  // ':'
+			css_skip_ws_comments(&cu);
+			uint32_t value_start = cu.pos;
+			uint32_t value_end;
+			for (;;)
+			{
+				while (cu.pos < cu.n && cu.p[cu.pos] != ';' && cu.p[cu.pos] != ':'
+				       && cu.p[cu.pos] != '}')
+				{
+					cu.pos++;
+				}
+				if (cu.pos >= cu.n) return avm2_undefined();
+				if (cu.p[cu.pos] == ';')
+				{
+					value_end = cu.pos;
+					cu.pos++;
+					break;
+				}
+				if (cu.p[cu.pos] == '}')
+				{
+					value_end = cu.pos;
+					cu.pos++;
+					// Trim at the first newline.
+					for (uint32_t k = value_start; k < value_end; k++)
+					{
+						if (cu.p[k] == '\n' || cu.p[k] == '\r')
+						{
+							value_end = k;
+							break;
+						}
+					}
+					// This closes the block too.
+					goto have_value_and_block_end;
+				}
+				// ':' inside a value: try newline-delimited form.
+				{
+					cu.pos = value_start;
+					while (cu.pos < cu.n && cu.p[cu.pos] != '\n' && cu.p[cu.pos] != '\r')
+					{
+						cu.pos++;
+					}
+					if (cu.pos < cu.n)
+					{
+						value_end = cu.pos;
+						cu.pos++;
+						break;
+					}
+					cu.pos = value_start;
+					while (cu.pos < cu.n && cu.p[cu.pos] != ';' && cu.p[cu.pos] != '}')
+					{
+						cu.pos++;
+					}
+					continue;
+				}
+			}
+			// camelCase the name, store the property.
+			{
+				char nbuf[64];
+				uint32_t nn = 0;
+				int up = 0;
+				for (uint32_t k = name_start; k < name_end && nn < 63; k++)
+				{
+					char c = cu.p[k];
+					if (c == '-' && !up) { up = 1; continue; }
+					if (up)
+					{
+						up = 0;
+						if (c >= 'a' && c <= 'z') c -= 32;
+					}
+					nbuf[nn++] = c;
+				}
+				avm2_object_set_dynamic(ctx, props, nbuf, nn,
+					avm2_string(avm2_string_new(ctx, cu.p + value_start,
+					                            value_end - value_start)));
+			}
+			continue;
+have_value_and_block_end:
+			{
+				char nbuf[64];
+				uint32_t nn = 0;
+				int up = 0;
+				for (uint32_t k = name_start; k < name_end && nn < 63; k++)
+				{
+					char c = cu.p[k];
+					if (c == '-' && !up) { up = 1; continue; }
+					if (up)
+					{
+						up = 0;
+						if (c >= 'a' && c <= 'z') c -= 32;
+					}
+					nbuf[nn++] = c;
+				}
+				avm2_object_set_dynamic(ctx, props, nbuf, nn,
+					avm2_string(avm2_string_new(ctx, cu.p + value_start,
+					                            value_end - value_start)));
+			}
+			break;
+		}
+		for (uint32_t i = 0; i < nsels && out_n < 64; i++)
+		{
+			out[out_n].sel = sels[i];
+			out[out_n].props = props;
+			out_n++;
+		}
+	}
+
+	// Apply via setStyle semantics.
+	for (uint32_t i = 0; i < out_n; i++)
+	{
+		Avm2Value args[2] = { avm2_string(out[i].sel),
+		                      avm2_object_value(out[i].props) };
+		Avm2Activation sub = *act;
+		sub.args = args;
+		sub.argc = 2;
+		ss_set_style(&sub);
+	}
+	return avm2_undefined();
+}
+
 // ===========================================================================
 // EditText bounds + measurement API (consumed by avm2_display.c accessors)
 // ===========================================================================
@@ -3948,6 +4653,52 @@ static void et_transformed_size(Avm2DisplayObjectExt* ext, Avm2EditTextExt* et,
 	}
 	*out_w = maxx - minx;
 	*out_h = maxy - miny;
+}
+
+// Rectangle factory for display code (getBounds).
+Avm2Value avm2_text_new_rectangle(Avm2Context* ctx, double x, double y,
+                                  double w, double h)
+{
+	Avm2Value args[4] = { avm2_number(x), avm2_number(y), avm2_number(w),
+	                      avm2_number(h) };
+	return avm2_class_construct(ctx, g_rectangle_class, args, 4);
+}
+
+// Self bounds for the display bounds engine. Applies pending autosize
+// bounds first (Ruffle EditText::self_bounds). Returns x,y,w,h twips.
+int avm2_text_self_bounds(Avm2EditTextExt* et, int32_t* out_xywh)
+{
+	if (et == NULL) return 0;
+	et_apply_lazy_bounds(et);
+	out_xywh[0] = et->bounds_x;
+	out_xywh[1] = et->bounds_y;
+	out_xywh[2] = et->bounds_w;
+	out_xywh[3] = et->bounds_h;
+	return 1;
+}
+
+// Temporarily suppress pending lazy bounds (pixelBounds reads the raw
+// bounds without applying).
+int avm2_text_lazy_suspend(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et == NULL) return 0;
+	int saved = et->has_lazy_bounds;
+	et->has_lazy_bounds = 0;
+	return saved;
+}
+
+void avm2_text_lazy_restore(Avm2Context* ctx, Avm2Object* obj, int saved)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et != NULL && saved) et->has_lazy_bounds = 1;
+}
+
+// Render-phase hook: apply pending lazy autosize bounds.
+void avm2_text_apply_pending_bounds(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et != NULL) et_apply_lazy_bounds(et);
 }
 
 double avm2_text_get_width_px(Avm2Context* ctx, Avm2Object* obj)
@@ -4011,9 +4762,6 @@ int32_t avm2_text_bounds_y_offset(Avm2Context* ctx, Avm2Object* obj,
 // ===========================================================================
 // Layout-backed TextField natives (Stage-6 tranche 2)
 // ===========================================================================
-
-static Avm2Class* g_rectangle_class;
-static Avm2Class* g_textlinemetrics_class;
 
 static Avm2Value txt_get_text_width(Avm2Activation* act)
 {
@@ -4206,6 +4954,39 @@ static Avm2Value txt_get_first_char_in_paragraph(Avm2Activation* act)
 	return avm2_integer((int32_t) i);
 }
 
+// getLineIndexAtPoint(x, y) -> line index or -1 (Ruffle
+// line_index_at_point: bounds shrunk by the gutter, y below last line
+// clamps to the last line).
+static Avm2Value txt_get_line_index_at_point(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	double x_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 0));
+	double y_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 1));
+	int32_t px = twips_from_px(x_px);
+	int32_t py = twips_from_px(y_px);
+	// NB: reads the raw bounds; pending autosize bounds are NOT applied
+	// (Ruffle line_index_at_point).
+	if (px < et->bounds_x + GUTTER || px > et->bounds_x + et->bounds_w - GUTTER
+	    || py < et->bounds_y + GUTTER || py > et->bounds_y + et->bounds_h - GUTTER)
+	{
+		return avm2_number(-1);
+	}
+	LLayout* l = et_layout(ctx, et);
+	int32_t ly = py - GUTTER;
+	{
+		uint32_t si = (uint32_t) (et->scroll - 1);
+		if (si > 0 && si < l->line_count) ly += l->lines[si].y;
+	}
+	for (uint32_t i = 0; i < l->line_count; i++)
+	{
+		if (ly < l->lines[i].y + l->lines[i].h) return avm2_integer((int32_t) i);
+	}
+	if (l->line_count > 0) return avm2_integer((int32_t) l->line_count - 1);
+	return avm2_number(-1);
+}
+
 static Avm2Value txt_get_paragraph_length(Avm2Activation* act)
 {
 	Avm2EditTextExt* et = this_et(act);
@@ -4365,7 +5146,6 @@ static Avm2Value txt_get_char_index_at_point(Avm2Activation* act)
 	double y_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 1));
 	int32_t px = twips_from_px(x_px);
 	int32_t py = twips_from_px(y_px);
-	et_apply_lazy_bounds(et);
 	// Inside bounds shrunk by the gutter?
 	if (px < et->bounds_x + GUTTER || px > et->bounds_x + et->bounds_w - GUTTER
 	    || py < et->bounds_y + GUTTER || py > et->bounds_y + et->bounds_h - GUTTER)
@@ -4583,6 +5363,12 @@ static Avm2Value slot_class_init(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+static Avm2Value txt_noop_method(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
 // Rectangle.toString: "(x=X, y=Y, w=W, h=H)".
 static Avm2Value rectangle_to_string(Avm2Activation* act)
 {
@@ -4700,6 +5486,52 @@ void avm2_register_text(Avm2Context* ctx)
 			avm2_string(avm2_string_from_literal(ctx, "dynamic")));
 	}
 
+	// flash.accessibility stubs (constructible value holders).
+	{
+		Avm2Class* ai = avm2_builtin_class(ctx, "flash.accessibility",
+		                                   "AccessibilityImplementation",
+		                                   ctx->builtins.object_class);
+		(void) ai;
+		Avm2Class* ap = avm2_builtin_class(ctx, "flash.accessibility",
+		                                   "AccessibilityProperties",
+		                                   ctx->builtins.object_class);
+		(void) ap;
+	}
+
+	// flash.filters.DropShadowFilter stub.
+	{
+		Avm2Class* f = avm2_builtin_class(ctx, "flash.filters",
+		                                  "BitmapFilter",
+		                                  ctx->builtins.object_class);
+		Avm2Class* ds = avm2_builtin_class(ctx, "flash.filters",
+		                                   "DropShadowFilter", f);
+		(void) ds;
+	}
+
+	// flash.ui.ContextMenu stub.
+	{
+		Avm2Class* cm = avm2_builtin_class(ctx, "flash.ui", "ContextMenu",
+		                                   ctx->builtins.event_dispatcher_class);
+		avm2_builtin_add_method(ctx, cm, "hideBuiltInItems", txt_noop_method);
+	}
+
+	// flash.text.StyleSheet.
+	{
+		Avm2Class* ss = avm2_builtin_class(ctx, "flash.text", "StyleSheet",
+		                                   ctx->builtins.event_dispatcher_class);
+		g_stylesheet_class = ss;
+		if (ss->native_ext_size < sizeof(Avm2StyleSheetExt))
+		{
+			ss->native_ext_size = sizeof(Avm2StyleSheetExt);
+		}
+		avm2_builtin_add_method(ctx, ss, "setStyle", ss_set_style);
+		avm2_builtin_add_method(ctx, ss, "getStyle", ss_get_style);
+		avm2_builtin_add_method(ctx, ss, "clear", ss_clear);
+		avm2_builtin_add_method(ctx, ss, "parseCSS", ss_parse_css);
+		avm2_builtin_add_method(ctx, ss, "transform", ss_transform);
+		avm2_builtin_add_getset(ctx, ss, "styleNames", ss_style_names, NULL);
+	}
+
 	// flash.text.Font.
 	{
 		Avm2Class* font = avm2_builtin_class(ctx, "flash.text", "Font",
@@ -4773,6 +5605,8 @@ void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield)
 	avm2_builtin_add_getset(ctx, textfield, "selectionEndIndex", txt_get_selection_end, NULL);
 	avm2_builtin_add_getset(ctx, textfield, "caretIndex", txt_get_caret_index, NULL);
 	avm2_builtin_add_getset(ctx, textfield, "selectedText", txt_get_selected_text, NULL);
+	avm2_builtin_add_getset(ctx, textfield, "textInteractionMode", txt_get_text_interaction_mode, NULL);
+	avm2_builtin_add_getset(ctx, textfield, "useRichTextClipboard", txt_get_use_rich_clipboard, txt_set_use_rich_clipboard);
 	avm2_builtin_add_method(ctx, textfield, "getTextFormat", txt_get_text_format);
 	avm2_builtin_add_method(ctx, textfield, "setTextFormat", txt_set_text_format);
 	avm2_builtin_add_method(ctx, textfield, "appendText", txt_append_text);
@@ -4796,5 +5630,7 @@ void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield)
 	avm2_builtin_add_method(ctx, textfield, "getFirstCharInParagraph", txt_get_first_char_in_paragraph);
 	avm2_builtin_add_method(ctx, textfield, "getParagraphLength", txt_get_paragraph_length);
 	avm2_builtin_add_method(ctx, textfield, "getCharIndexAtPoint", txt_get_char_index_at_point);
+	avm2_builtin_add_method(ctx, textfield, "getLineIndexAtPoint", txt_get_line_index_at_point);
 	avm2_builtin_add_method(ctx, textfield, "getTextRuns", txt_get_text_runs);
+	avm2_builtin_add_method(ctx, textfield, "getImageReference", txt_get_image_reference);
 }

@@ -354,8 +354,20 @@ static Rect char_self_bounds(uint16_t char_id)
 	return r;
 }
 
+int avm2_text_self_bounds(struct Avm2EditTextExt* et, int32_t* out_xywh);
+
 static Rect display_self_bounds(const Avm2DisplayObjectExt* ext)
 {
+	if (ext->edittext != NULL)
+	{
+		int32_t b[4];
+		if (avm2_text_self_bounds(ext->edittext, b))
+		{
+			Rect r2 = { 1, (double) b[0], (double) (b[0] + b[2]),
+			            (double) b[1], (double) (b[1] + b[3]) };
+			return r2;
+		}
+	}
 	Rect r = char_self_bounds(ext->char_id);
 	if (ext->draw_valid)
 	{
@@ -1858,9 +1870,143 @@ static void mc_goto_frame(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int
 // Tick (frame_lifecycle.rs run_all_phases_avm2)
 // ---------------------------------------------------------------------------
 
+// Recursive render-pass walk: visible TextFields apply lazy autosize
+// bounds (invisible subtrees are skipped, like culled rendering).
+static void render_apply_text_bounds(Avm2Context* ctx, Avm2Object* obj,
+                                     int visible)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return;
+	if (!ext->is_stage && !ext->visible) visible = 0;
+	if (visible && ext->edittext != NULL)
+	{
+		avm2_text_apply_pending_bounds(ctx, obj);
+	}
+	for (uint32_t i = 0; i < ext->render_len; i++)
+	{
+		render_apply_text_bounds(ctx, ext->render_list[i], visible);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// flash.utils setTimeout/setInterval (fired at tick boundaries)
+// ---------------------------------------------------------------------------
+
+typedef struct Avm2TimerEntry
+{
+	uint32_t id;
+	double due_ms;
+	double interval_ms;  // 0 = one-shot
+	uint8_t active;
+	Avm2Value fn;
+	Avm2Value args[8];
+	uint32_t argc;
+} Avm2TimerEntry;
+
+static Avm2TimerEntry g_avm2_timers[128];
+static uint32_t g_avm2_timer_count;
+static uint32_t g_avm2_timer_next_id = 1;
+static double g_avm2_clock_ms;
+
+static Avm2Value timer_add(Avm2Activation* act, int repeating)
+{
+	if (act->argc < 2 || g_avm2_timer_count >= 128)
+	{
+		return avm2_integer(0);
+	}
+	double delay = avm2_coerce_to_number(act->ctx, act->args[1]);
+	if (!(delay >= 0)) delay = 0;
+	Avm2TimerEntry* t = &g_avm2_timers[g_avm2_timer_count++];
+	memset(t, 0, sizeof(*t));
+	t->id = g_avm2_timer_next_id++;
+	t->due_ms = g_avm2_clock_ms + delay;
+	t->interval_ms = repeating ? delay : 0;
+	t->active = 1;
+	t->fn = act->args[0];
+	t->argc = 0;
+	for (uint32_t i = 2; i < act->argc && t->argc < 8; i++)
+	{
+		t->args[t->argc++] = act->args[i];
+	}
+	return avm2_integer((int32_t) t->id);
+}
+
+static Avm2Value utils_set_timeout(Avm2Activation* act)
+{
+	return timer_add(act, 0);
+}
+
+static Avm2Value utils_set_interval(Avm2Activation* act)
+{
+	return timer_add(act, 1);
+}
+
+static Avm2Value utils_clear_timer(Avm2Activation* act)
+{
+	if (act->argc < 1) return avm2_undefined();
+	uint32_t id = (uint32_t) avm2_coerce_to_i32(act->ctx, act->args[0]);
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+	{
+		if (g_avm2_timers[i].id == id) g_avm2_timers[i].active = 0;
+	}
+	return avm2_undefined();
+}
+
+void avm2_builtin_add_flash_utils_fn(Avm2Context* ctx, const char* name,
+                                     Avm2MethodFn fn);
+
+void avm2_register_timer_fns(Avm2Context* ctx)
+{
+	avm2_builtin_add_flash_utils_fn(ctx, "setTimeout", utils_set_timeout);
+	avm2_builtin_add_flash_utils_fn(ctx, "setInterval", utils_set_interval);
+	avm2_builtin_add_flash_utils_fn(ctx, "clearTimeout", utils_clear_timer);
+	avm2_builtin_add_flash_utils_fn(ctx, "clearInterval", utils_clear_timer);
+}
+
+static void run_due_timers(Avm2Context* ctx)
+{
+	// Advance one frame interval (8.8 fixed frame rate).
+	double fps = avm2_generated_frame_rate / 256.0;
+	if (fps <= 0) fps = 24.0;
+	g_avm2_clock_ms += 1000.0 / fps;
+	// Fire due timers in registration order; new timers registered during
+	// callbacks wait for the next tick sweep.
+	uint32_t n = g_avm2_timer_count;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2TimerEntry* t = &g_avm2_timers[i];
+		if (!t->active || t->due_ms > g_avm2_clock_ms) continue;
+		if (t->interval_ms > 0)
+		{
+			t->due_ms += t->interval_ms;
+			if (t->due_ms <= g_avm2_clock_ms) t->due_ms = g_avm2_clock_ms;
+		}
+		else
+		{
+			t->active = 0;
+		}
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
+		{
+			avm2_call_value(ctx, t->fn, avm2_null(), t->args, t->argc);
+		}
+		avm2_try_pop_frame(&top);
+	}
+	// Compact dead one-shots.
+	uint32_t w = 0;
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+	{
+		if (g_avm2_timers[i].active) g_avm2_timers[w++] = g_avm2_timers[i];
+	}
+	g_avm2_timer_count = w;
+}
+
 void avm2_display_run_tick(Avm2Context* ctx)
 {
 	if (ctx->stage == NULL) return;
+
+	run_due_timers(ctx);
 
 	ctx->frame_phase = PHASE_ENTER;
 	for (uint32_t i = 0; i < g_orphan_count; i++)
@@ -1919,6 +2065,10 @@ void avm2_display_run_tick(Avm2Context* ctx)
 		g_stage_invalidated_flag = 0;
 		broadcast_named(ctx, "render");
 	}
+	// The render pass applies pending autosize bounds on every VISIBLE
+	// on-stage TextField (Ruffle EditText::render_self ->
+	// apply_autosize_bounds; edittext_autosize_lazy_bounds_events).
+	render_apply_text_bounds(ctx, ctx->stage, 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -2063,6 +2213,178 @@ static Avm2Value do_set_y(Avm2Activation* act)
 		ext->mtx_ty = twips_from_pixels(avm2_coerce_to_number(act->ctx, act->args[0])) - off;
 	}
 	return avm2_undefined();
+}
+
+// World matrix: concat ancestors' matrices.
+static Mat display_world_matrix(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Mat m = ext != NULL ? ext_matrix(ext) : mat_identity();
+	Avm2Object* p = ext != NULL ? ext->parent : NULL;
+	while (p != NULL)
+	{
+		Avm2DisplayObjectExt* pe = avm2_display_ext_of(ctx, p);
+		if (pe == NULL) break;
+		Mat pm = ext_matrix(pe);
+		m = mat_mul(&pm, &m);
+		p = pe->parent;
+	}
+	return m;
+}
+
+// Invert an affine Mat (a b c d tx ty).
+static Mat mat_invert(const Mat* m)
+{
+	Mat r = mat_identity();
+	double det = (double) m->a * m->d - (double) m->b * m->c;
+	if (det == 0.0) return r;
+	double ia = m->d / det, ib = -m->b / det, ic = -m->c / det, id = m->a / det;
+	r.a = (float) ia;
+	r.b = (float) ib;
+	r.c = (float) ic;
+	r.d = (float) id;
+	r.tx = (int32_t) nearbyint(-(ia * m->tx + ic * m->ty));
+	r.ty = (int32_t) nearbyint(-(ib * m->tx + id * m->ty));
+	return r;
+}
+
+static Mat display_world_matrix(Avm2Context* ctx, Avm2Object* obj);
+#define display_world_matrix_fwd display_world_matrix
+
+static Avm2Value do_get_bounds(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2Object* target = (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		? act->args[0].u.obj : NULL;
+	if (self == NULL) return avm2_undefined();
+	if (target == NULL || avm2_display_ext_of(ctx, target) == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter targetCoordinateSpace must be "
+		                 "non-null.");
+	}
+	Mat mw = display_world_matrix_fwd(ctx, self);
+	Mat tw = display_world_matrix_fwd(ctx, target);
+	Mat ti = mat_invert(&tw);
+	Mat m = mat_mul(&ti, &mw);
+	Rect r = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, self, &m, &r);
+	extern Avm2Value avm2_text_new_rectangle(Avm2Context* ctx, double x, double y,
+	                                         double w, double h);
+	if (!r.valid)
+	{
+		return avm2_text_new_rectangle(ctx, 0, 0, 0, 0);
+	}
+	return avm2_text_new_rectangle(ctx, r.xmin / 20.0, r.ymin / 20.0,
+	                               (r.xmax - r.xmin) / 20.0,
+	                               (r.ymax - r.ymin) / 20.0);
+}
+
+// globalToLocal / localToGlobal: Point through the (inverse) world matrix.
+static Avm2Value point_transform_native(Avm2Activation* act, int to_local)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2Value pv = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (self == NULL || pv.kind != AVM2_VALUE_OBJECT || pv.u.obj == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter point must be non-null.");
+	}
+	double x = 0, y = 0;
+	{
+		Avm2Object* pt = pv.u.obj;
+		if (pt->slot_count > 2)
+		{
+			x = avm2_coerce_to_number(ctx, pt->slots[1]);
+			y = avm2_coerce_to_number(ctx, pt->slots[2]);
+		}
+	}
+	Mat m = display_world_matrix(ctx, self);
+	if (to_local) m = mat_invert(&m);
+	double tx = m.a * (x * 20.0) + m.c * (y * 20.0) + m.tx;
+	double ty = m.b * (x * 20.0) + m.d * (y * 20.0) + m.ty;
+	// flash.geom.Point lives in the builtin domain.
+	Avm2PropKey key = avm2_public_key("Point", 5);
+	key.ns_kind = 0x16;
+	key.ns_uri = "flash.geom";
+	key.ns_len = 10;
+	(void) key;
+	extern Avm2Class* avm2_display_point_class(Avm2Context* ctx);
+	Avm2Value args[2] = { avm2_number(tx / 20.0), avm2_number(ty / 20.0) };
+	return avm2_class_construct(ctx, avm2_display_point_class(ctx), args, 2);
+}
+
+static Avm2Value do_global_to_local(Avm2Activation* act)
+{
+	return point_transform_native(act, 1);
+}
+
+static Avm2Value do_local_to_global(Avm2Activation* act)
+{
+	return point_transform_native(act, 0);
+}
+
+// hitTestPoint(x, y, shapeFlag=false): AABB world-bounds test (applies
+// pending autosize bounds like hit_test_object).
+static Avm2Value do_hit_test_point(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_bool(false);
+	double x = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0;
+	double y = act->argc > 1 ? avm2_coerce_to_number(ctx, act->args[1]) : 0;
+	avm2_text_apply_pending_bounds(ctx, self);
+	Mat m = display_world_matrix(ctx, self);
+	Rect r = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, self, &m, &r);
+	double tx = x * 20.0, ty = y * 20.0;
+	int hit = r.valid && tx >= r.xmin && tx <= r.xmax && ty >= r.ymin
+	          && ty <= r.ymax;
+	return avm2_bool(hit != 0);
+}
+
+// local3DToGlobal / globalToLocal3D: 2D fallbacks (no 3D transforms).
+static Avm2Value do_local3d_to_global(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2Value pv = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (self == NULL || pv.kind != AVM2_VALUE_OBJECT || pv.u.obj == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter point3d must be non-null.");
+	}
+	extern Avm2Class* avm2_display_point_class(Avm2Context* ctx);
+	Avm2Value args[2] = { avm2_number(0), avm2_number(0) };
+	return avm2_class_construct(ctx, avm2_display_point_class(ctx), args, 2);
+}
+
+static Avm2Value do_hit_test_object(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2Object* other = (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		? act->args[0].u.obj : NULL;
+	if (self == NULL || other == NULL
+	    || avm2_display_ext_of(ctx, other) == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter obj must be non-null.");
+	}
+	// world_bounds applies pending autosize bounds on TextFields.
+	avm2_text_apply_pending_bounds(ctx, self);
+	avm2_text_apply_pending_bounds(ctx, other);
+	Mat ma = display_world_matrix(ctx, self);
+	Mat mb = display_world_matrix(ctx, other);
+	Rect ra = { 0, 0, 0, 0, 0 }, rb = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, self, &ma, &ra);
+	bounds_with_transform(ctx, other, &mb, &rb);
+	int hit = ra.valid && rb.valid
+	          && ra.xmin <= rb.xmax && rb.xmin <= ra.xmax
+	          && ra.ymin <= rb.ymax && rb.ymin <= ra.ymax;
+	return avm2_bool(hit != 0);
 }
 
 static Avm2Value do_get_scale_x(Avm2Activation* act)
@@ -3566,16 +3888,133 @@ static Avm2Value transform_set_matrix(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+static Avm2Class* g_colortransform_class;
+
+static Avm2Value colortransform_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->slot_count < 9) return avm2_undefined();
+	static const double defaults[8] = { 1, 1, 1, 1, 0, 0, 0, 0 };
+	for (uint32_t i = 0; i < 8; i++)
+	{
+		double v = i < act->argc
+			? avm2_coerce_to_number(ctx, act->args[i]) : defaults[i];
+		self->slots[i + 1] = avm2_number(v);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value colortransform_to_string(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->slot_count < 9) return avm2_undefined();
+	static const char* const names[8] = {
+		"redMultiplier", "greenMultiplier", "blueMultiplier",
+		"alphaMultiplier", "redOffset", "greenOffset", "blueOffset",
+		"alphaOffset",
+	};
+	char buf[256];
+	int off = 0;
+	buf[off++] = '(';
+	for (int i = 0; i < 8; i++)
+	{
+		char num[40];
+		avm2_format_number(num, sizeof(num),
+		                   avm2_coerce_to_number(act->ctx, self->slots[i + 1]));
+		off += snprintf(buf + off, sizeof(buf) - (size_t) off, "%s%s=%s",
+		                i > 0 ? ", " : "", names[i], num);
+	}
+	if (off < (int) sizeof(buf) - 1) buf[off++] = ')';
+	buf[off] = '\0';
+	return avm2_string(avm2_string_new(act->ctx, buf, (uint32_t) off));
+}
+
 static Avm2Value transform_get_color_transform(Avm2Activation* act)
 {
-	(void) act;
-	return avm2_null();
+	// Identity color transform (per-object color transforms are not
+	// tracked in NO_GRAPHICS mode).
+	return avm2_class_construct(act->ctx, g_colortransform_class, NULL, 0);
 }
 
 static Avm2Value transform_set_color_transform(Avm2Activation* act)
 {
 	(void) act;
 	return avm2_undefined();
+}
+
+static Mat display_world_matrix(Avm2Context* ctx, Avm2Object* obj);
+
+static Avm2Value transform_get_concatenated_matrix(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL) return avm2_null();
+	Avm2TransformExt* text = self->native_ext;
+	if (text->target == NULL) return avm2_null();
+	// On-stage children report the true world matrix; the stage itself and
+	// off-stage objects mimic FP's bizarre quality-scaled local matrix
+	// (Ruffle transform.rs; default quality High -> x5).
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
+	int on_stage = 0;
+	for (Avm2Object* n = text->target; n != NULL; )
+	{
+		Avm2DisplayObjectExt* ne = avm2_display_ext_of(ctx, n);
+		if (ne == NULL) break;
+		if (ne->is_stage) { on_stage = 1; break; }
+		n = ne->parent;
+	}
+	if (on_stage && ext != NULL && !ext->is_stage)
+	{
+		Mat m = display_world_matrix(ctx, text->target);
+		return avm2_object_value(make_geom_matrix(
+			ctx, m.a, m.b, m.c, m.d,
+			twips_to_pixels((int32_t) m.tx), twips_to_pixels((int32_t) m.ty)));
+	}
+	double scale = 5.0;  // StageQuality::High
+	return avm2_object_value(make_geom_matrix(
+		ctx, (ext != NULL ? ext->mtx_a : 1) * scale,
+		ext != NULL ? ext->mtx_b : 0, ext != NULL ? ext->mtx_c : 0,
+		(ext != NULL ? ext->mtx_d : 1) * scale,
+		ext != NULL ? twips_to_pixels(ext->mtx_tx) : 0,
+		ext != NULL ? twips_to_pixels(ext->mtx_ty) : 0));
+}
+
+static Avm2Value transform_get_matrix3d(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_null();
+}
+
+static Avm2Value transform_set_stub(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+Avm2Value avm2_text_new_rectangle(Avm2Context* ctx, double x, double y,
+                                  double w, double h);
+
+static Avm2Value transform_get_pixel_bounds(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL) return avm2_null();
+	Avm2TransformExt* text = self->native_ext;
+	if (text->target == NULL) return avm2_null();
+	// pixelBounds reads the RAW bounds — pending autosize bounds stay
+	// pending (edittext_autosize_lazy_bounds_props).
+	extern int avm2_text_lazy_suspend(Avm2Context* ctx, Avm2Object* obj);
+	extern void avm2_text_lazy_restore(Avm2Context* ctx, Avm2Object* obj, int saved);
+	int saved = avm2_text_lazy_suspend(ctx, text->target);
+	Mat m = display_world_matrix(ctx, text->target);
+	Rect r = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, text->target, &m, &r);
+	avm2_text_lazy_restore(ctx, text->target, saved);
+	if (!r.valid) return avm2_text_new_rectangle(ctx, 0, 0, 0, 0);
+	return avm2_text_new_rectangle(ctx, r.xmin / 20.0, r.ymin / 20.0,
+	                               (r.xmax - r.xmin) / 20.0,
+	                               (r.ymax - r.ymin) / 20.0);
 }
 
 static Avm2Value do_get_transform(Avm2Activation* act)
@@ -3648,6 +4087,14 @@ STUB_GETSET(do_cab, "__cacheAsBitmap", avm2_bool(false))
 STUB_GETSET(do_opaquebg, "__opaqueBackground", avm2_null())
 STUB_GETSET(do_scrollrect, "__scrollRect", avm2_null())
 STUB_GETSET(do_accessprops, "__accessibilityProperties", avm2_null())
+STUB_GETSET(io_needssoftkbd, "__needsSoftKeyboard", avm2_bool(false))
+
+static Avm2Value io_request_soft_keyboard(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(false);
+}
+STUB_GETSET(io_softkbdarea, "__softKeyboardInputAreaOfInterest", avm2_null())
 STUB_GETSET(do_accessimpl, "__accessibilityImplementation", avm2_null())
 STUB_GETSET(do_contextmenu, "__contextMenu", avm2_null())
 STUB_GETSET(do_blendmode, "__blendMode",
@@ -4208,6 +4655,13 @@ static Avm2Value stage_get_focus(Avm2Activation* act)
 
 static Avm2Value stage_set_focus(Avm2Activation* act)
 {
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
+	    && act->args[0].u.obj != NULL)
+	{
+		// Focusing a TextField applies its pending autosize bounds
+		// (edittext_autosize_lazy_bounds_interactions).
+		avm2_text_apply_pending_bounds(act->ctx, act->args[0].u.obj);
+	}
 	(void) act;
 	return avm2_undefined();
 }
@@ -4371,6 +4825,14 @@ void avm2_register_display(Avm2Context* ctx)
 	dobj->native_ext_size = sizeof(Avm2DisplayObjectExt);
 	dobj->native_init = display_native_init_abstract;
 	b->display_object_class = dobj;
+	avm2_builtin_add_method(ctx, dobj, "hitTestObject", do_hit_test_object);
+	avm2_builtin_add_method(ctx, dobj, "getBounds", do_get_bounds);
+	avm2_builtin_add_method(ctx, dobj, "getRect", do_get_bounds);
+	avm2_builtin_add_method(ctx, dobj, "globalToLocal", do_global_to_local);
+	avm2_builtin_add_method(ctx, dobj, "localToGlobal", do_local_to_global);
+	avm2_builtin_add_method(ctx, dobj, "hitTestPoint", do_hit_test_point);
+	avm2_builtin_add_method(ctx, dobj, "local3DToGlobal", do_local3d_to_global);
+	avm2_builtin_add_method(ctx, dobj, "globalToLocal3D", do_local3d_to_global);
 	add_getset(ctx, dobj, "x", do_get_x, do_set_x);
 	add_getset(ctx, dobj, "y", do_get_y, do_set_y);
 	add_getset(ctx, dobj, "scaleX", do_get_scale_x, do_set_scale_x);
@@ -4413,6 +4875,12 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, iobj, "tabEnabled", io_get_tab_enabled, io_set_tab_enabled);
 	add_getset(ctx, iobj, "tabIndex", io_get_tab_index, io_set_tab_index);
 	add_getset(ctx, iobj, "focusRect", io_get_focus_rect, io_set_focus_rect);
+	add_getset(ctx, iobj, "needsSoftKeyboard", io_needssoftkbd_get,
+	           io_needssoftkbd_set);
+	avm2_builtin_add_method(ctx, iobj, "requestSoftKeyboard",
+	                        io_request_soft_keyboard);
+	add_getset(ctx, iobj, "softKeyboardInputAreaOfInterest",
+	           io_softkbdarea_get, io_softkbdarea_set);
 	add_getset(ctx, iobj, "accessibilityImplementation", do_accessimpl_get,
 	           do_accessimpl_set);
 	add_getset(ctx, iobj, "contextMenu", do_contextmenu_get, do_contextmenu_set);
@@ -4523,7 +4991,58 @@ void avm2_register_display(Avm2Context* ctx)
 	           transform_set_matrix);
 	add_getset(ctx, geom_transform, "colorTransform", transform_get_color_transform,
 	           transform_set_color_transform);
+	add_getset(ctx, geom_transform, "concatenatedColorTransform",
+	           transform_get_color_transform, NULL);
+	add_getset(ctx, geom_transform, "concatenatedMatrix",
+	           transform_get_concatenated_matrix, NULL);
+	add_getset(ctx, geom_transform, "matrix3D", transform_get_matrix3d,
+	           transform_set_stub);
+	add_getset(ctx, geom_transform, "perspectiveProjection",
+	           transform_get_matrix3d, transform_set_stub);
+	add_getset(ctx, geom_transform, "pixelBounds",
+	           transform_get_pixel_bounds, NULL);
 	g_transform_class = geom_transform;
+
+	// flash.geom.Matrix3D + PerspectiveProjection constructible stubs.
+	{
+		Avm2Class* m3 = avm2_builtin_class(ctx, "flash.geom", "Matrix3D",
+		                                   b->object_class);
+		(void) m3;
+		Avm2Class* pp = avm2_builtin_class(ctx, "flash.geom",
+		                                   "PerspectiveProjection",
+		                                   b->object_class);
+		(void) pp;
+		Avm2Class* v3 = avm2_builtin_class(ctx, "flash.geom", "Vector3D",
+		                                   b->object_class);
+		(void) v3;
+	}
+
+	// flash.geom.ColorTransform (8 numeric slots + FP toString).
+	{
+		Avm2Class* ct = avm2_builtin_class(ctx, "flash.geom", "ColorTransform",
+		                                   b->object_class);
+		ct->flags |= AVM2_CLASS_FLAG_SEALED;
+		ct->instance_init.fn = colortransform_init;
+		ct->instance_init.debug_name = "ColorTransform";
+		static const char* const ct_fields[8] = {
+			"redMultiplier", "greenMultiplier", "blueMultiplier",
+			"alphaMultiplier", "redOffset", "greenOffset", "blueOffset",
+			"alphaOffset",
+		};
+		for (int i = 0; i < 8; i++)
+		{
+			Avm2PropEntry e;
+			memset(&e, 0, sizeof(e));
+			e.key = avm2_public_key(ct_fields[i], (uint32_t) strlen(ct_fields[i]));
+			e.kind = AVM2_PROP_SLOT;
+			e.slot_index = ct->ivtable.slot_count + 1;
+			e.defining_class = ct;
+			ct->ivtable.slot_count++;
+			avm2_vtable_append(ctx, &ct->ivtable, &e);
+		}
+		avm2_builtin_add_method(ctx, ct, "toString", colortransform_to_string);
+		g_colortransform_class = ct;
+	}
 
 	// flash.display.FrameLabel (extends EventDispatcher) + Scene.
 	Avm2Class* framelabel = avm2_builtin_class(ctx, "flash.display", "FrameLabel",

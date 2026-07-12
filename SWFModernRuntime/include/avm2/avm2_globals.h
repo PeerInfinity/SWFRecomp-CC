@@ -339,6 +339,9 @@ typedef struct Avm2DisplayObjectExt
 	const Avm2String* tf_text;   // NULL = default "" (mirror of edittext->text)
 	// TextField/EditText engine state (avm2_text.c; NULL for non-TextFields).
 	struct Avm2EditTextExt* edittext;
+	// accessibilityImplementation/accessibilityProperties (stored verbatim).
+	Avm2Value accessibility_impl;
+	Avm2Value accessibility_props;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.
@@ -381,6 +384,7 @@ double avm2_text_get_height_px(Avm2Context* ctx, Avm2Object* obj);
 void avm2_text_set_width_px(Avm2Context* ctx, Avm2Object* obj, double value);
 void avm2_text_set_height_px(Avm2Context* ctx, Avm2Object* obj, double value);
 int32_t avm2_text_bounds_x_offset(Avm2Context* ctx, Avm2Object* obj, double scale_x);
+void avm2_text_apply_pending_bounds(Avm2Context* ctx, Avm2Object* obj);
 int32_t avm2_text_bounds_y_offset(Avm2Context* ctx, Avm2Object* obj, double scale_y);
 
 // Display module (avm2_display.c — Stage-5 tranche 2+).

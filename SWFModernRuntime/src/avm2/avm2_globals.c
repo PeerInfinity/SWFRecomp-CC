@@ -542,6 +542,14 @@ static Avm2Value native_trace(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+static Avm2Class* g_point_class;
+
+Avm2Class* avm2_display_point_class(Avm2Context* ctx)
+{
+	(void) ctx;
+	return g_point_class;
+}
+
 static Avm2Value point_init(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -1127,6 +1135,8 @@ static void register_application_domain(Avm2Context* ctx)
 }
 
 // Register a toplevel native in a specific package namespace.
+void avm2_register_timer_fns(Avm2Context* ctx);
+
 static void builtin_add_global_fn_ns(Avm2Context* ctx, const char* ns,
                                      const char* name, Avm2MethodFn fn)
 {
@@ -1143,9 +1153,16 @@ static void builtin_add_global_fn_ns(Avm2Context* ctx, const char* ns,
 	avm2_domain_add(ctx, &key, NULL, 0);
 }
 
+void avm2_builtin_add_flash_utils_fn(Avm2Context* ctx, const char* name,
+                                     Avm2MethodFn fn)
+{
+	builtin_add_global_fn_ns(ctx, "flash.utils", name, fn);
+}
+
 void avm2_register_toplevel(Avm2Context* ctx)
 {
 	avm2_builtin_add_global_fn(ctx, "trace", native_trace);
+	avm2_register_timer_fns(ctx);
 	avm2_builtin_add_global_fn(ctx, "isNaN", global_is_nan);
 	avm2_builtin_add_global_fn(ctx, "isFinite", global_is_finite);
 	avm2_builtin_add_global_fn(ctx, "parseInt", global_parse_int);
@@ -1271,6 +1288,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	// (slots_force_autoassigned only needs the definition to exist).
 	{
 		Avm2Class* point = avm2_builtin_class(ctx, "flash.geom", "Point", b->object_class);
+		g_point_class = point;
 		point->flags |= AVM2_CLASS_FLAG_SEALED;
 		point->instance_init.fn = point_init;
 		point->instance_init.debug_name = "Point";
