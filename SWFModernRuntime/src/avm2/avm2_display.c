@@ -396,6 +396,20 @@ static void bounds_with_transform(Avm2Context* ctx, Avm2Object* obj,
 	if (ext == NULL) return;
 	{
 		Rect self = display_self_bounds(ext);
+		// flash.display.Bitmap self bounds come from its cached BitmapData
+		// size (avm2_bitmap.c); always a valid rect (0x0 when no data).
+		if (!self.valid && ext->is_bitmap)
+		{
+			uint32_t bw = 0, bh = 0;
+			if (avm2_bitmap_self_dims(ctx, obj, &bw, &bh))
+			{
+				self.valid = 1;
+				self.xmin = 0;
+				self.xmax = (double) bw * 20.0;
+				self.ymin = 0;
+				self.ymax = (double) bh * 20.0;
+			}
+		}
 		rect_union_xform(acc, &self, m);
 	}
 	for (uint32_t i = 0; i < ext->render_len; i++)
@@ -931,7 +945,12 @@ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 		{
 			Avm2Class* cls = class_for_dotted_name(
 				ctx, avm2_generated_symbol_classes[i].class_name);
-			if (cls != NULL) return cls;
+			// A DisplayObject subclass IS the placed object. A non-display
+			// binding (e.g. a BitmapData subclass bound to a bitmap char) is
+			// not placeable directly — the display object stays a plain
+			// Bitmap whose bitmapData is that subclass (seeded at placement).
+			if (cls != NULL && class_is_a(cls, ctx->builtins.display_object_class))
+				return cls;
 		}
 	}
 	const Avm2CharInfo* ci = char_info(char_id);
@@ -947,9 +966,29 @@ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 			return g_statictext_class;
 		case AVM2_CHAR_EDITTEXT:
 			return g_textfield_class;
+		case AVM2_CHAR_BITMAP:
+			return ctx->builtins.bitmap_class;
 		default:
 			return ctx->builtins.movieclip_class;
 	}
+}
+
+// The (non-display) class bound to `char_id`, or NULL — used to build a
+// timeline Bitmap's bitmapData (BitmapData subclass binding).
+static Avm2Class* nondisplay_class_for_char(Avm2Context* ctx, uint16_t char_id)
+{
+	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
+	{
+		if (avm2_generated_symbol_classes[i].char_id == char_id
+		    && avm2_generated_symbol_classes[i].class_name != NULL)
+		{
+			Avm2Class* cls = class_for_dotted_name(
+				ctx, avm2_generated_symbol_classes[i].class_name);
+			if (cls != NULL && !class_is_a(cls, ctx->builtins.display_object_class))
+				return cls;
+		}
+	}
+	return NULL;
 }
 
 // ---------------------------------------------------------------------------
@@ -1028,6 +1067,11 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 		if (ci != NULL && ci->kind == AVM2_CHAR_EDITTEXT)
 		{
 			avm2_text_seed_from_tag(ctx, child, op->char_id);
+		}
+		else if (ci != NULL && ci->kind == AVM2_CHAR_BITMAP)
+		{
+			avm2_bitmap_seed_timeline(ctx, child, op->char_id,
+			                          nondisplay_class_for_char(ctx, op->char_id));
 		}
 		else if (ci != NULL && ci->init_text != NULL)
 		{
@@ -4952,6 +4996,14 @@ void avm2_register_display(Avm2Context* ctx)
 	Avm2Class* shape = avm2_builtin_class(ctx, "flash.display", "Shape", dobj);
 	shape->native_init = display_native_init;
 	b->shape_class = shape;
+
+	// flash.display.Bitmap (extends DisplayObject, NOT InteractiveObject).
+	// The class shell + display alloc hook live here so the display tree
+	// wiring matches; the ctor/accessors are added by avm2_bitmap.c.
+	Avm2Class* bitmap = avm2_builtin_class(ctx, "flash.display", "Bitmap", dobj);
+	bitmap->native_init = display_native_init;
+	b->bitmap_class = bitmap;
+	avm2_bitmap_wire_bitmap(ctx, bitmap);
 
 	// flash.text.TextField / StaticText. The property surface lives in
 	// avm2_text.c (Stage 6); the class shell stays here so the display

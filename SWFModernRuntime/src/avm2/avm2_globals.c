@@ -568,6 +568,20 @@ static Avm2Value point_init(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+static Avm2Value point_to_string(Avm2Activation* act)
+{
+	Avm2Object* self = act->this_val.kind == AVM2_VALUE_OBJECT
+		? act->this_val.u.obj : NULL;
+	if (self == NULL || self->slot_count < 3)
+		return avm2_string(avm2_string_from_literal(act->ctx, "(x=0, y=0)"));
+	char xb[40], yb[40];
+	avm2_format_number(xb, sizeof(xb), avm2_coerce_to_number(act->ctx, self->slots[1]));
+	avm2_format_number(yb, sizeof(yb), avm2_coerce_to_number(act->ctx, self->slots[2]));
+	char buf[96];
+	snprintf(buf, sizeof(buf), "(x=%s, y=%s)", xb, yb);
+	return avm2_string(avm2_string_from_literal(act->ctx, buf));
+}
+
 // ---------------------------------------------------------------------------
 // Toplevel functions
 // ---------------------------------------------------------------------------
@@ -1304,6 +1318,7 @@ void avm2_globals_init(Avm2Context* ctx)
 			point->ivtable.slot_count++;
 			avm2_vtable_append(ctx, &point->ivtable, &e);
 		}
+		avm2_builtin_add_method(ctx, point, "toString", point_to_string);
 	}
 
 	avm2_register_function_builtins(ctx);
@@ -1338,4 +1353,9 @@ void avm2_globals_init(Avm2Context* ctx)
 
 	// flash.display (avm2_display.c — Stage-5 display tree).
 	avm2_register_display(ctx);
+
+	// flash.display.BitmapData / Bitmap (avm2_bitmap.c — Stage 7). After
+	// display: the Bitmap class shell (created in register_display) wires
+	// its accessors here, and BitmapData needs the display char registry.
+	avm2_register_bitmap(ctx);
 }

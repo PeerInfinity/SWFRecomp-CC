@@ -1317,3 +1317,14 @@ void avm2_register_bytearray(Avm2Context* ctx)
 			avm2_string(avm2_string_from_literal(ctx, "lzma")));
 	}
 }
+
+// --- Public helpers for the BitmapData module (avm2_bitmap.c) ---
+void avm2_bytearray_write_uint_public(Avm2Context* ctx, Avm2ByteArrayExt* ba,
+                                      uint32_t v)
+{
+	ba_write_u32(ctx, ba, v);
+}
+uint32_t avm2_bytearray_read_uint_public(Avm2Context* ctx, Avm2ByteArrayExt* ba)
+{
+	return ba_read_u32(ctx, ba);
+}

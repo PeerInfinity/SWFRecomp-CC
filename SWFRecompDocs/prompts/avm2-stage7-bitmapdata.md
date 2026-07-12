@@ -1,5 +1,17 @@
 # Session prompt — AVM2 Stage 7: embedded assets + BitmapData/Bitmap
 
+> **STATUS: COMPLETE (2026-07-12).** 28/31 candidates pass locally (exit >=22
+> met). Landed: recompiler DefineBitsLossless/2 decode + binary/sound tables
+> (+ a PlaceObject3 className parse fix), `avm2_bitmap.c` (BitmapData full
+> operation kit + Bitmap display object + SymbolClass/timeline construction),
+> Point.toString. 3 triaged misses: draw_alpha_erase (Stage-9 draw() blend),
+> loader_bitmap_transparency (Loader — deferred), bitmap_pixelsnapping
+> (upstream ignore=true). Seedling smoke: 284 bitmaps/116 binaries/88 sounds
+> emit (~46 MB raw RGBA — compress before Stage 9). See the
+> `avm2-stage7-bitmapdata` memory + `avm2/_investigation/CURRENT_STATUS.md`.
+> Next: **Stage 8 — input.json harness** (per `avm2-seedling-plan.md`).
+
+
 You are implementing **Stage 7** of the AVM2 Seedling-directed plan
 (`SWFRecompDocs/plans/avm2-seedling-plan.md`): the embedded-asset
 pipeline (DefineBitsLossless/2 pixels, DefineBinaryData bytes,

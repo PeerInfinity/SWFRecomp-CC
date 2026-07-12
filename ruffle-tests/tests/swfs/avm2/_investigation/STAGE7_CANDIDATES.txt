@@ -1,3 +1,18 @@
+# RESULT (2026-07-12): 28 / 31 pass locally. Exit criterion (>=22) MET.
+#   Misses (all triaged):
+#   - bitmapdata_draw_alpha_erase: needs the BitmapData.draw() blend pipeline
+#     (alpha/erase blend modes composite a source Bitmap into the dest). draw
+#     is a no-op stub for now; the real draw arrives with the Stage-9 AVM2
+#     render path (it also has the [img] half). MISS.
+#   - loader_bitmap_transparency: needs flash.display.Loader + runtime JPEG/PNG
+#     decoders (loads external test.jpg/test.png/test_rgba.png). Loader
+#     infrastructure is deferred (phase-2 plan "Deferred"). MISS.
+#   - bitmap_pixelsnapping: upstream `ignore = true` (backends differ on the
+#     visual half); excluded from filtered results. Its two #2008 error traces
+#     DO pass now, but the test as a whole stays ignored. MISS (ignored).
+#   Everything else (BitmapData core + the full operation kit + Bitmap display
+#   object + embedded/timeline SymbolClass construction) passes.
+#
 # Stage 7 (embedded assets + BitmapData/Bitmap) candidate tests.
 # Generated 2026-07-12 from the post-Stage-6 CI results (run 29180816425,
 # avm2 727+21RM/1201 at f76422459): failing, non-ignored bitmap-family

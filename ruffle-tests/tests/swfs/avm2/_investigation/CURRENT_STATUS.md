@@ -1,7 +1,44 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-12 — Stage 6 (TextField/EditText engine) COMPLETE;
-Stage 5, E4X and Stage 4 before it.
+Last updated: 2026-07-12 — Stage 7 (embedded assets + BitmapData/Bitmap)
+COMPLETE; Stage 6 (TextField/EditText engine), Stage 5, E4X and Stage 4
+before it.
+
+## State (Stage 7)
+
+- **Stage 7 COMPLETE (2026-07-12): 28/31 Stage-7 candidates pass locally**
+  (`_investigation/STAGE7_CANDIDATES.txt`; exit >=22 met). The 3 misses are
+  triaged there: draw_alpha_erase (needs the Stage-9 draw() blend pipeline),
+  loader_bitmap_transparency (needs Loader + JPEG/PNG decoders — deferred),
+  bitmap_pixelsnapping (upstream `ignore = true`). What landed:
+  - `SWFRecomp/src/abc/abc_timeline.cpp` — decode DefineBitsLossless/2 to
+    straight-RGBA pixel tables at RECOMPILE time (zlib inflate + 8-bit
+    palettized / 15-bit / 32-bit swizzle, ported from Ruffle
+    render/utils.rs); emit `avm2_generated_bitmaps` + `avm2_generated_binaries`
+    (DefineBinaryData) + `avm2_generated_sounds` (DefineSound metadata). Also
+    fixed a PlaceObject3 className bug (the SWF19-spec `HasImage && HasChar`
+    wording is wrong — Ruffle uses `HasImage && !HasChar`; the old code
+    mis-parsed the char id of every image placed by id, e.g. timeline
+    Bitmaps).
+  - `SWFModernRuntime/src/avm2/avm2_bitmap.c` (new, ~1.1K lines) —
+    flash.display.BitmapData (premultiplied ARGB pixel store, exact Flash
+    un-premultiply table, ctor validation with the version-gated
+    is_size_valid, get/setPixel(32), fillRect, clone, dispose, noise,
+    get/setPixels + copyPixelsToByteArray, get/setVector, copyPixels (+alpha
+    source + blend_over), floodFill, threshold, hitTest, histogram,
+    pixelDissolve (Feistel permutation), colorTransform, copyChannel, scroll,
+    getColorBoundsRect; SymbolClass-bound subclass construction from the
+    embedded asset) and flash.display.Bitmap (bitmapData/pixelSnapping/
+    smoothing, cached-dims self bounds, timeline placement seeding).
+  - `avm2_display.c` — BITMAP chars instantiate as Bitmap display objects;
+    a BitmapData-subclass-bound bitmap char seeds a plain Bitmap whose
+    bitmapData is that subclass (ctor run with 1,1). Bitmap self bounds hook.
+  - `avm2_globals.c` — flash.geom.Point.toString ("(x=, y=)").
+  - Seedling smoke: recompiling the real SWF emits 284 bitmaps + 116 binaries
+    + 88 sounds (matches the census); generated abc_timeline.c is ~46 MB of
+    raw RGBA — compresses well, revisit before Stage 9 (see memory).
+  - CI baseline: <PENDING — run after commit; see git log>.
+
 
 **Plan:** `SWFRecompDocs/plans/avm2-support-plan.md` (umbrella; stages,
 architecture sketch, tranche definitions). Phase-1 metric: pass rate on this

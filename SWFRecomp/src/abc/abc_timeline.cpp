@@ -10,6 +10,8 @@
 #include <sstream>
 #include <vector>
 
+#include <zlib.h>
+
 namespace SWFRecomp
 {
 namespace abc
@@ -29,7 +31,9 @@ enum
 	TAG_DEFINE_BITS = 6,
 	TAG_DEFINE_BUTTON = 7,
 	TAG_SET_BACKGROUND_COLOR = 9,
+	TAG_DEFINE_SOUND = 14,
 	TAG_DEFINE_TEXT = 11,
+	TAG_DEFINE_BINARY_DATA = 87,
 	TAG_DEFINE_BITS_JPEG2 = 21,
 	TAG_DEFINE_SHAPE2 = 22,
 	TAG_PLACE_OBJECT2 = 26,
@@ -231,6 +235,142 @@ void skipFilterList(ByteReader& r)
 	}
 }
 
+// Decode a DefineBitsLossless/2 payload to STRAIGHT RGBA (R,G,B,A per pixel,
+// row-major). Ported from Ruffle render/src/utils.rs decode_define_bits_lossless.
+// `version` is 1 or 2; `format` is the SWF BitmapFormat byte (3 ColorMap8,
+// 4 Rgb15, 5 Rgb32). `num_colors` is BitmapColorTableSize (colors - 1), only
+// meaningful for format 3. `z`/`zlen` is the zlib-compressed pixel data.
+// Returns false (out untouched) on any decode error.
+bool decodeLossless(int version, int format, uint32_t w, uint32_t h,
+                    uint32_t num_colors, const uint8_t* z, size_t zlen,
+                    std::vector<uint8_t>& out)
+{
+	if (w == 0 || h == 0) return false;
+	bool has_alpha = (version == 2);
+	// Compute the expected decompressed size per format.
+	size_t decomp_size = 0;
+	uint32_t padded_width = w;
+	uint32_t palette_bytes = 0;
+	if (format == 3)
+	{
+		palette_bytes = (num_colors + 1) * (has_alpha ? 4u : 3u);
+		padded_width = (w + 3u) & ~3u;
+		decomp_size = palette_bytes + (size_t) padded_width * h;
+	}
+	else if (format == 4)
+	{
+		if (version != 1) return false;  // Rgb15 is v1 only
+		padded_width = (w + 1u) & ~1u;
+		decomp_size = (size_t) padded_width * h * 2;
+	}
+	else if (format == 5)
+	{
+		decomp_size = (size_t) w * h * 4;
+	}
+	else
+	{
+		return false;
+	}
+
+	std::vector<uint8_t> d(decomp_size);
+	uLongf dlen = (uLongf) decomp_size;
+	if (uncompress(d.data(), &dlen, z, (uLong) zlen) != Z_OK
+	    || (size_t) dlen != decomp_size)
+	{
+		return false;
+	}
+
+	out.assign((size_t) w * h * 4, 0);
+	size_t o = 0;
+	if (format == 5)
+	{
+		// Stored ARGB (v2 premultiplied per spec; kept as-is, matching
+		// Ruffle) — rotate_left(1): [a,r,g,b] -> [r,g,b,a].
+		for (uint32_t p = 0; p < w * h; p++)
+		{
+			uint8_t a = d[p * 4 + 0], r = d[p * 4 + 1];
+			uint8_t g = d[p * 4 + 2], b = d[p * 4 + 3];
+			out[o++] = r;
+			out[o++] = g;
+			out[o++] = b;
+			out[o++] = has_alpha ? a : 255;
+		}
+	}
+	else if (format == 4)
+	{
+		size_t i = 0;
+		for (uint32_t y = 0; y < h; y++)
+		{
+			for (uint32_t x = 0; x < w; x++)
+			{
+				uint16_t c = (uint16_t) ((d[i] << 8) | d[i + 1]);
+				auto comp = [c](int shift) -> uint8_t {
+					uint32_t v = (c >> shift) & 0x1F;
+					return (uint8_t) ((v * 255 + 15) / 31);
+				};
+				out[o++] = comp(10);
+				out[o++] = comp(5);
+				out[o++] = comp(0);
+				out[o++] = 255;
+				i += 2;
+			}
+			i += (size_t) (padded_width - w) * 2;
+		}
+	}
+	else  // format 3, ColorMap8
+	{
+		size_t i = 0;
+		struct Col { uint8_t r, g, b, a; };
+		std::vector<Col> pal(num_colors + 1);
+		for (uint32_t p = 0; p <= num_colors; p++)
+		{
+			Col c;
+			c.r = d[i]; c.g = d[i + 1]; c.b = d[i + 2];
+			c.a = has_alpha ? d[i + 3] : 255;
+			pal[p] = c;
+			i += has_alpha ? 4 : 3;
+		}
+		for (uint32_t y = 0; y < h; y++)
+		{
+			for (uint32_t x = 0; x < w; x++)
+			{
+				uint32_t e = d[i];
+				Col c;
+				if (e < pal.size()) c = pal[e];
+				else { c.r = c.g = c.b = 0; c.a = has_alpha ? 0 : 255; }
+				out[o++] = c.r;
+				out[o++] = c.g;
+				out[o++] = c.b;
+				out[o++] = c.a;
+				i += 1;
+			}
+			i += (size_t) (padded_width - w);
+		}
+	}
+	return true;
+}
+
+struct BitmapAsset
+{
+	uint16_t char_id;
+	uint16_t width, height;
+	uint8_t transparency;
+	std::vector<uint8_t> rgba;  // empty if decode failed
+};
+
+struct BinaryAsset
+{
+	uint16_t char_id;
+	std::vector<uint8_t> bytes;
+};
+
+struct SoundAsset
+{
+	uint16_t char_id;
+	uint8_t format, rate, sample_size, stereo;
+	uint32_t sample_count;
+};
+
 struct TOp
 {
 	uint8_t kind = 0;
@@ -348,6 +488,9 @@ struct Scanner
 	std::vector<ButtonDef> buttons;
 	std::vector<EditTextDef> edittexts;
 	std::vector<FontDef> fonts;
+	std::vector<BitmapAsset> bitmaps;
+	std::vector<BinaryAsset> binaries;
+	std::vector<SoundAsset> sounds;
 	struct CsmSettings
 	{
 		uint16_t char_id;
@@ -394,7 +537,10 @@ struct Scanner
 		(void) has_clip_actions;
 
 		op.depth = r.u16();
-		if (is_po3 && (has_class_name || (has_image && has_char)))
+		// ClassName present iff HAS_CLASS_NAME, or an image with NO character
+		// id (Ruffle read.rs:1911 — the SWF19 spec's "HasImage && HasChar"
+		// wording is wrong; a bitmap placed by id has no className).
+		if (is_po3 && (has_class_name || (has_image && !has_char)))
 		{
 			r.cstr();
 		}
@@ -779,7 +925,7 @@ struct Scanner
 				CharInfo ci;
 				ci.char_id = body.u16();
 				ci.kind = 5;  // BITMAP
-				body.u8();    // format
+				uint8_t format = body.u8();
 				int32_t w = body.u16();
 				int32_t h = body.u16();
 				ci.bounds[0] = 0;
@@ -787,6 +933,53 @@ struct Scanner
 				ci.bounds[2] = 0;
 				ci.bounds[3] = h * 20;
 				chars.push_back(ci);
+				int version = (code == TAG_DEFINE_BITS_LOSSLESS2) ? 2 : 1;
+				uint32_t num_colors = 0;
+				if (format == 3) num_colors = body.u8();  // BitmapColorTableSize
+				BitmapAsset ba;
+				ba.char_id = ci.char_id;
+				ba.width = (uint16_t) w;
+				ba.height = (uint16_t) h;
+				ba.transparency = (version == 2) ? 1 : 0;
+				// Remaining body bytes are the zlib-compressed pixel data.
+				if (body.p < body.end)
+				{
+					decodeLossless(version, format, (uint32_t) w, (uint32_t) h,
+					               num_colors, body.p,
+					               (size_t) (body.end - body.p), ba.rgba);
+				}
+				bitmaps.push_back(ba);
+				break;
+			}
+			case TAG_DEFINE_BINARY_DATA:
+			{
+				BinaryAsset ba;
+				ba.char_id = body.u16();
+				body.u32();  // reserved (always 0)
+				if (body.p < body.end)
+				{
+					ba.bytes.assign(body.p, body.end);
+				}
+				binaries.push_back(ba);
+				// Not a placeable character, but record a CharInfo so
+				// SymbolClass binding resolution can classify it.
+				CharInfo ci;
+				ci.char_id = ba.char_id;
+				ci.kind = 8;  // OTHER
+				chars.push_back(ci);
+				break;
+			}
+			case TAG_DEFINE_SOUND:
+			{
+				SoundAsset sa;
+				sa.char_id = body.u16();
+				uint8_t bits = body.u8();
+				sa.format = (bits >> 4) & 0x0F;
+				sa.rate = (bits >> 2) & 0x03;
+				sa.sample_size = (bits >> 1) & 0x01;
+				sa.stereo = bits & 0x01;
+				sa.sample_count = body.u32();
+				sounds.push_back(sa);
 				break;
 			}
 			case TAG_DEFINE_VIDEO_STREAM:
@@ -1134,6 +1327,92 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		out << "const Avm2FontData avm2_generated_fonts[1];\n";
 	}
 	out << "const uint32_t avm2_generated_font_count = " << sc.fonts.size()
+	    << ";\n\n";
+
+	// Embedded bitmaps (decoded straight RGBA).
+	for (size_t i = 0; i < sc.bitmaps.size(); i++)
+	{
+		const BitmapAsset& ba = sc.bitmaps[i];
+		if (ba.rgba.empty()) continue;
+		out << "static const uint8_t bmp_" << i << "_rgba[] = {";
+		for (size_t k = 0; k < ba.rgba.size(); k++)
+		{
+			if ((k & 31) == 0) out << "\n\t";
+			out << (int) ba.rgba[k] << ",";
+		}
+		out << "\n};\n";
+	}
+	if (!sc.bitmaps.empty())
+	{
+		out << "const Avm2BitmapData avm2_generated_bitmaps[] = {\n";
+		for (size_t i = 0; i < sc.bitmaps.size(); i++)
+		{
+			const BitmapAsset& ba = sc.bitmaps[i];
+			out << "\t{ " << ba.char_id << ", " << ba.width << ", " << ba.height
+			    << ", " << (int) ba.transparency << ", "
+			    << (ba.rgba.empty() ? std::string("NULL")
+			                        : ("bmp_" + std::to_string(i) + "_rgba"))
+			    << " },\n";
+		}
+		out << "};\n";
+	}
+	else
+	{
+		out << "const Avm2BitmapData avm2_generated_bitmaps[1];\n";
+	}
+	out << "const uint32_t avm2_generated_bitmap_count = " << sc.bitmaps.size()
+	    << ";\n\n";
+
+	// Embedded binary data (DefineBinaryData).
+	for (size_t i = 0; i < sc.binaries.size(); i++)
+	{
+		const BinaryAsset& ba = sc.binaries[i];
+		if (ba.bytes.empty()) continue;
+		out << "static const uint8_t bin_" << i << "_bytes[] = {";
+		for (size_t k = 0; k < ba.bytes.size(); k++)
+		{
+			if ((k & 31) == 0) out << "\n\t";
+			out << (int) ba.bytes[k] << ",";
+		}
+		out << "\n};\n";
+	}
+	if (!sc.binaries.empty())
+	{
+		out << "const Avm2BinaryData avm2_generated_binaries[] = {\n";
+		for (size_t i = 0; i < sc.binaries.size(); i++)
+		{
+			const BinaryAsset& ba = sc.binaries[i];
+			out << "\t{ " << ba.char_id << ", " << ba.bytes.size() << ", "
+			    << (ba.bytes.empty() ? std::string("NULL")
+			                         : ("bin_" + std::to_string(i) + "_bytes"))
+			    << " },\n";
+		}
+		out << "};\n";
+	}
+	else
+	{
+		out << "const Avm2BinaryData avm2_generated_binaries[1];\n";
+	}
+	out << "const uint32_t avm2_generated_binary_count = " << sc.binaries.size()
+	    << ";\n\n";
+
+	// Embedded sounds (metadata only).
+	if (!sc.sounds.empty())
+	{
+		out << "const Avm2SoundData avm2_generated_sounds[] = {\n";
+		for (auto& sa : sc.sounds)
+		{
+			out << "\t{ " << sa.char_id << ", " << (int) sa.format << ", "
+			    << (int) sa.rate << ", " << (int) sa.sample_size << ", "
+			    << (int) sa.stereo << ", " << sa.sample_count << " },\n";
+		}
+		out << "};\n";
+	}
+	else
+	{
+		out << "const Avm2SoundData avm2_generated_sounds[1];\n";
+	}
+	out << "const uint32_t avm2_generated_sound_count = " << sc.sounds.size()
 	    << ";\n\n";
 
 	out << "const int32_t avm2_generated_stage_rect[4] = { "

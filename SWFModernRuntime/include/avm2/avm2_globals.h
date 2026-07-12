@@ -124,6 +124,10 @@ Avm2ByteArrayExt* avm2_bytearray_ext_of(Avm2Value v);
 // Grow/shrink storage (clamps position; used by the [] index write path).
 void avm2_bytearray_set_length_public(Avm2Context* ctx, Avm2ByteArrayExt* ba,
                                       uint32_t new_len);
+// write/readUnsignedInt at the current position, honoring endianness (used
+// by BitmapData get/setPixels). The read throws EOFError on underflow.
+void avm2_bytearray_write_uint_public(Avm2Context* ctx, Avm2ByteArrayExt* ba, uint32_t v);
+uint32_t avm2_bytearray_read_uint_public(Avm2Context* ctx, Avm2ByteArrayExt* ba);
 
 void avm2_register_proxy(Avm2Context* ctx);  // flash.utils.Proxy
 // Is `obj` an instance of (a subclass of) flash.utils.Proxy?
@@ -335,6 +339,15 @@ typedef struct Avm2DisplayObjectExt
 	uint8_t btn_states_created;
 	uint8_t btn_weird_order;  // one-shot framescript order after construction
 
+	// --- Bitmap (flash.display.Bitmap; avm2_bitmap.c) ---
+	Avm2Object* bitmap_data;         // the BitmapData object (NULL = none)
+	const Avm2String* pixel_snapping;  // NULL = default "auto"
+	uint8_t smoothing;
+	uint8_t is_bitmap;               // this display object is a flash.display.Bitmap
+	// Cached width/height (pixels) captured when bitmapData is assigned —
+	// Ruffle Bitmap keeps these even after the BitmapData is disposed.
+	uint32_t bitmap_w, bitmap_h;
+
 	// --- TextField ---
 	const Avm2String* tf_text;   // NULL = default "" (mirror of edittext->text)
 	// TextField/EditText engine state (avm2_text.c; NULL for non-TextFields).
@@ -387,10 +400,39 @@ int32_t avm2_text_bounds_x_offset(Avm2Context* ctx, Avm2Object* obj, double scal
 void avm2_text_apply_pending_bounds(Avm2Context* ctx, Avm2Object* obj);
 int32_t avm2_text_bounds_y_offset(Avm2Context* ctx, Avm2Object* obj, double scale_y);
 
+// flash.display.BitmapData / Bitmap (avm2_bitmap.c — Stage 7).
+void avm2_register_bitmap(Avm2Context* ctx);
+// Wire the Bitmap class shell (created by avm2_register_display, so it gets
+// display_native_init): adds the ctor + bitmapData/pixelSnapping/smoothing
+// accessors. Called from avm2_register_display.
+void avm2_bitmap_wire_bitmap(Avm2Context* ctx, Avm2Class* bitmap_cls);
+// BitmapData instance state. Pixels are premultiplied ARGB, one uint32 per
+// pixel in 0xAARRGGBB form (the value AS3 reads/writes), row-major.
+typedef struct Avm2BitmapDataExt
+{
+	uint32_t width, height;
+	uint8_t transparency;
+	uint8_t disposed;
+	uint32_t* pixels;  // width*height entries; NULL when 0-size / disposed
+} Avm2BitmapDataExt;
+// NULL when the value is not a BitmapData (subclasses included).
+Avm2BitmapDataExt* avm2_bitmapdata_ext_of(Avm2Context* ctx, Avm2Value v);
+// Bitmap self-bounds hook for avm2_display.c: 1 + w/h (pixels) if obj is a
+// Bitmap with a live bitmapData, else 0.
+int avm2_bitmap_self_dims(Avm2Context* ctx, Avm2Object* obj, uint32_t* w, uint32_t* h);
+// Timeline placement of a bitmap character: seed `child` (a plain Bitmap
+// display object) with a bitmapData. `bd_class` (a BitmapData subclass bound
+// to the char, or NULL) is constructed with (1,1) — running its user ctor —
+// else a plain BitmapData is seeded from the embedded asset for char_id.
+void avm2_bitmap_seed_timeline(Avm2Context* ctx, Avm2Object* child,
+                               uint16_t char_id, Avm2Class* bd_class);
+
 // Display module (avm2_display.c — Stage-5 tranche 2+).
 void avm2_register_display(Avm2Context* ctx);
 // NULL when obj is not a DisplayObject descendant.
 Avm2DisplayObjectExt* avm2_display_ext_of(Avm2Context* ctx, Avm2Object* obj);
+// SymbolClass char bound to a class (walks the class hierarchy); 0 = none.
+uint16_t avm2_display_char_for_class(Avm2Class* cls);
 // Build the stage + root (SymbolClass char 0 / bound placed symbols) and
 // remember them on ctx. Called from runSWF_avm2 after script eager-init.
 void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name);
@@ -438,6 +480,8 @@ typedef struct Avm2Builtins
 	Avm2Class* doc_class;                // DisplayObjectContainer
 	Avm2Class* sprite_class;
 	Avm2Class* shape_class;
+	Avm2Class* bitmap_class;
+	Avm2Class* bitmapdata_class;
 	Avm2Class* stage_class;
 	Avm2Class* simple_button_class;
 	Avm2Class* regexp_class;

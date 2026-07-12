@@ -354,6 +354,40 @@ typedef struct Avm2ButtonData
 	const Avm2ButtonRecordData* records;
 } Avm2ButtonData;
 
+// Embedded bitmap (DefineBitsLossless/2), decoded at recompile time to
+// STRAIGHT (non-premultiplied) RGBA — byte order R,G,B,A per pixel, row
+// major, width*height*4 bytes (matches Ruffle decode_define_bits_lossless
+// out_data). `transparency` = the DefineBitsLossless2 alpha flag; when 0,
+// alpha bytes are all 255. The BitmapData runtime premultiplies on ingest.
+typedef struct Avm2BitmapData
+{
+	uint16_t char_id;
+	uint16_t width;
+	uint16_t height;
+	uint8_t transparency;
+	const uint8_t* rgba;  // width*height*4, straight RGBA (NULL if decode failed)
+} Avm2BitmapData;
+
+// Embedded binary (DefineBinaryData, tag 87): raw bytes, ByteArray seed.
+typedef struct Avm2BinaryData
+{
+	uint16_t char_id;
+	uint32_t len;
+	const uint8_t* bytes;  // NULL when len == 0
+} Avm2BinaryData;
+
+// Embedded sound (DefineSound, tag 14): format metadata only for now (the
+// PCM/MP3 payload lands in Stage 10). Fields mirror the tag bitfields.
+typedef struct Avm2SoundData
+{
+	uint16_t char_id;
+	uint8_t format;        // SoundFormat (0 uncompressed-native-endian, 2 MP3, ...)
+	uint8_t rate;          // 0=5512Hz 1=11025 2=22050 3=44100
+	uint8_t sample_size;   // 0=8-bit 1=16-bit
+	uint8_t stereo;        // 0=mono 1=stereo
+	uint32_t sample_count;
+} Avm2SoundData;
+
 // Provided by the generated RecompiledABC/abc_timeline.c:
 extern const Avm2TimelineData avm2_generated_timelines[];
 extern const uint32_t avm2_generated_timeline_count;
@@ -367,6 +401,12 @@ extern const Avm2EditTextData avm2_generated_edittexts[];
 extern const uint32_t avm2_generated_edittext_count;
 extern const Avm2FontData avm2_generated_fonts[];
 extern const uint32_t avm2_generated_font_count;
+extern const Avm2BitmapData avm2_generated_bitmaps[];
+extern const uint32_t avm2_generated_bitmap_count;
+extern const Avm2BinaryData avm2_generated_binaries[];
+extern const uint32_t avm2_generated_binary_count;
+extern const Avm2SoundData avm2_generated_sounds[];
+extern const uint32_t avm2_generated_sound_count;
 extern const int32_t avm2_generated_stage_rect[4];   // xmin xmax ymin ymax twips
 extern const uint16_t avm2_generated_frame_rate;     // 8.8 fixed
 extern const uint16_t avm2_generated_header_frames;  // header frame count

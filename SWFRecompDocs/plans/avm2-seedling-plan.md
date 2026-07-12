@@ -46,7 +46,16 @@ answer to "what could go wrong with game-first development"):
 
 ## 2. Stages
 
-- **Stage 7 — embedded assets + BitmapData/Bitmap (trace-level)**.
+- **Stage 7 — embedded assets + BitmapData/Bitmap (trace-level)** — **DONE
+  2026-07-12** (28/31 candidates; exit met). Recompiler decodes
+  DefineBitsLossless/2 to RGBA tables + emits DefineBinaryData/DefineSound
+  tables (+ a PlaceObject3 className parse fix); runtime `avm2_bitmap.c`
+  implements BitmapData (full operation kit, premultiply-exact) + Bitmap +
+  SymbolClass/timeline construction. 3 triaged misses: draw() blend
+  (Stage 9), Loader (deferred), pixelsnapping (upstream-ignored). Seedling
+  smoke: 284 bitmaps/116 binaries/88 sounds emit, ~46 MB raw RGBA (compress
+  before Stage 9). See `avm2/_investigation/CURRENT_STATUS.md` +
+  `avm2-stage7-bitmapdata` memory. Details below:
   Recompiler: decode DefineBitsLossless/2 to ARGB pixel tables, emit
   DefineBinaryData bytes, register both (and DefineSound metadata) as
   character kinds; runtime: flash.display.BitmapData (pixel store +
