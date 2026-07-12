@@ -406,10 +406,14 @@ is a delicate multi-phase dance, `avm2.rs:541-607`). So:
   3 ruffle_matched); 10 misses triaged in STAGE6_CANDIDATES.txt
   (7 flash.text.engine TextBlock/TextLine family — the natural next
   text tranche, 2 Loader-infrastructure, 1 device-font metric parity).
-- **Later / separate plans**: playerglobal recompilation, the
-  flash.text.engine (TextBlock/TextLine) family, the input.json
-  harness, Loader/LoaderInfo, BitmapData, graphics-mode avm2 tests,
-  AVM1↔AVM2 interop, AS3 games.
+- **Phase 2 (Stages 7+) — Seedling-directed**: continues in
+  `avm2-seedling-plan.md` (2026-07-12): embedded assets + BitmapData
+  (Stage 7), input.json harness + input bridge (8), minimal render
+  path (9), audio/timers/saves (10), GC enrollment (11), Seedling
+  bring-up (12). Same test-first playbook, stage order chosen by the
+  game's dependency graph. Still later/separate: playerglobal
+  recompilation, flash.text.engine family, Loader/LoaderInfo,
+  AVM1↔AVM2 interop.
 
 Custom AVM2 regression tests go in `ruffle-tests/tests/swfs/regression/`
 (compiled with `~/CC/flex-sdk/bin/mxmlc`), per the existing convention.

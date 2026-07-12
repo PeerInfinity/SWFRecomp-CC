@@ -1,0 +1,53 @@
+# Stage 7 (embedded assets + BitmapData/Bitmap) candidate tests.
+# Generated 2026-07-12 from the post-Stage-6 CI results (run 29180816425,
+# avm2 727+21RM/1201 at f76422459): failing, non-ignored bitmap-family
+# tests whose expected output has trace lines (trace-gradeable in
+# no-graphics mode). Tests marked [img] ALSO have an image comparison —
+# their trace half is gradeable now, the image half waits for Stage 9.
+#
+# NOT listed (already "passing" vacuously): ~20 bitmapdata_* tests whose
+# expected output is image-only (0 trace lines) — bitmapdata_fillrect,
+# bitmapdata_draw*, bitmapdata_applyfilter_*, bitmapdata_copychannel,
+# bitmapdata_colortransform, bitmapdata_opaque, bitmapdata_sync,
+# graphics_bitmap*, stage3d_bitmap. They stay green trivially in
+# no-graphics mode but become REAL tests in Stage 9 (graphics mode) —
+# do not break their vacuous pass (compile/run must still succeed).
+#
+# Also excluded: mouse_pick_non_interactive_bitmap_mask (input.json).
+
+# --- Bitmap display object (7) ---
+bitmap_constr            # [img]
+bitmap_data              # 1000 lines: bitmapData get/set surface
+bitmap_pixelsnapping     # [img]
+bitmap_properties        # [img]
+bitmap_subclass          # [img]
+bitmap_subclass_properties  # [img]
+bitmap_timeline          # [img]
+
+# --- BitmapData core (23) ---
+bitmapdata_accuracy
+bitmapdata_clone         # [img]
+bitmapdata_colortransform_oob
+bitmapdata_constr        # [img]
+bitmapdata_constructor_from_timeline
+bitmapdata_copypixels    # [img]
+bitmapdata_copypixels_blend_over
+bitmapdata_copypixelstobytearray
+bitmapdata_dispose
+bitmapdata_draw_alpha_erase  # [img]
+bitmapdata_embedded      # [img] — [Embed]-style SymbolClass binding
+bitmapdata_floodfill
+bitmapdata_getpixels
+bitmapdata_getvector
+bitmapdata_histogram
+bitmapdata_hittest
+bitmapdata_hittest_threshold
+bitmapdata_pixeldissolve
+bitmapdata_rectangle_rounding
+bitmapdata_setpixels
+bitmapdata_setvector
+bitmapdata_threshold
+bitmapdata_zero_size
+
+# --- Loader-adjacent (1; may need partial Loader plumbing) ---
+loader_bitmap_transparency  # [img]
