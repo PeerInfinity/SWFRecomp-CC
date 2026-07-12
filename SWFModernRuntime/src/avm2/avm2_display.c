@@ -694,6 +694,11 @@ static void dispatch_added_event(Avm2Context* ctx, Avm2Object* parent,
 
 static void dispatch_removed_event(Avm2Context* ctx, Avm2Object* child)
 {
+	// A never-constructed timeline child has no AVM2 object in Ruffle's
+	// model (object2 None): no events (a goto that places-then-removes a
+	// child within one tick is silent — movieclip_displayevents_*goto).
+	Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+	if (cext != NULL && !cext->constructed) return;
 	dispatch_simple_event(ctx, child, "removed", 1);
 	if (is_on_stage(ctx, child))
 	{
@@ -781,7 +786,12 @@ static void full_remove_child(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
 			avm2_try_pop_frame(&top);
 		}
 		cext->parent = NULL;
-		orphan_add(ctx, child);
+		// Never-constructed children have no AVM2 life to continue
+		// (object2 None in Ruffle): no orphan tracking, no frame scripts.
+		if (cext->constructed)
+		{
+			orphan_add(ctx, child);
+		}
 	}
 }
 
@@ -1219,10 +1229,13 @@ static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj)
 	if (ext == NULL) return;
 	if (!ext->placed_by_avm2_script && ext->parent != NULL)
 	{
+		// fire_added_events: added + addedToStage on SELF only — timeline
+		// children each fire their own at their own construction (the
+		// recursive form is the container script-add path).
 		dispatch_simple_event(ctx, obj, "added", 1);
 		if (is_on_stage(ctx, obj))
 		{
-			dispatch_added_to_stage_recursive(ctx, obj);
+			dispatch_simple_event(ctx, obj, "addedToStage", 0);
 		}
 	}
 	// set_on_parent_field (Ruffle DO:2328): a timeline child with an
@@ -1253,7 +1266,7 @@ static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj)
 static void run_local_frame_scripts(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
-	if (ext == NULL) return;
+	if (ext == NULL || !ext->constructed) return;
 	if (ext->has_pending_script && !ext->executing_frame_script)
 	{
 		uint32_t frame_id = ext->queued_script_frame;
@@ -1488,44 +1501,71 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 		}
 	}
 
-	if (is_rewind)
-	{
-		// Remove children that don't survive the rewind.
-		for (uint32_t i = ext->render_len; i > 0; i--)
-		{
-			Avm2Object* child = ext->render_list[i - 1];
-			Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
-			if (cext == NULL) continue;
-			int survives = 0;
-			if (cext->placed_by_avm2_script)
-			{
-				remove_child_from_depth_list(ext, child);
-				continue;
-			}
-			// Survives if a final placement at the same depth places the
-			// same character (reuse), and it was placed at or before the
-			// target frame.
-			for (uint32_t k = 0; k < cmd_count; k++)
-			{
-				if (cmds[k].depth == cext->depth && cmds[k].place != NULL
-				    && cmds[k].place->char_id == cext->char_id)
-				{
-					survives = 1;
-					break;
-				}
-			}
-			if (!survives)
-			{
-				full_remove_child(ctx, ext, child);
-			}
-		}
-	}
-
+	// The playhead lands on the target BEFORE the removal/materialize
+	// steps (a removed handler during the goto reads the NEW currentFrame
+	// — movieclip_displayevents_timeline).
 	ext->current_frame = clamped;
 	ext->queued_script_frame = clamped;
 	if (ext->last_queued_script_frame != (int32_t) clamped)
 	{
 		ext->last_queued_script_frame = -1;
+	}
+
+	if (is_rewind)
+	{
+		// Remove children that don't survive the rewind (Ruffle
+		// survives_rewind): a non-script child placed AT OR BEFORE the
+		// target frame survives unconditionally; later children survive
+		// only when the final placement at their depth re-places the same
+		// character with equal matrix/ratio/clip-depth.
+		for (uint32_t i = ext->render_len; i > 0; i--)
+		{
+			Avm2Object* child = ext->render_list[i - 1];
+			Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+			if (cext == NULL) continue;
+			int candidate = (cext->place_frame > (int32_t) clamped)
+			                || cext->placed_by_avm2_script;
+			int survives;
+			if (!candidate)
+			{
+				survives = 1;
+			}
+			else
+			{
+				survives = 0;
+				for (uint32_t k = 0; k < cmd_count; k++)
+				{
+					if (cmds[k].depth != cext->depth || cmds[k].place == NULL)
+					{
+						continue;
+					}
+					const Avm2TimelineOp* op = cmds[k].place;
+					int id_eq = (op->char_id == cext->char_id);
+					int ratio_eq = ((op->flags & AVM2_TLF_HAS_RATIO) == 0)
+					               || op->ratio == 0;
+					int clip_eq = ((op->flags & AVM2_TLF_HAS_CLIP_DEPTH) == 0)
+					              || op->clip_depth == cext->clip_depth;
+					int mtx_eq = ((op->flags & AVM2_TLF_HAS_MATRIX) == 0)
+					             || (op->mtx_a == cext->mtx_a && op->mtx_b == cext->mtx_b
+					                 && op->mtx_c == cext->mtx_c && op->mtx_d == cext->mtx_d
+					                 && op->mtx_tx == cext->mtx_tx
+					                 && op->mtx_ty == cext->mtx_ty);
+					survives = id_eq && ratio_eq && clip_eq && mtx_eq;
+					break;
+				}
+			}
+			if (!survives)
+			{
+				if (cext->placed_by_avm2_script)
+				{
+					remove_child_from_depth_list(ext, child);
+				}
+				else
+				{
+					full_remove_child(ctx, ext, child);
+				}
+			}
+		}
 	}
 
 	// Materialize commands in op order: reuse matching children, create
@@ -2849,16 +2889,35 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
 		}
 	}
 
-	int64_t frame = 0;
+	// Ruffle goto_frame arithmetic (globals movie_clip.rs): Integer VALUES
+	// add the scene offset directly; everything else takes the string path
+	// with i32 SATURATING parse + WRAPPING -1/+scene + SATURATING +1, and
+	// the final u16 cast TRUNCATES — goto_methods' -0x80000000 (a Number,
+	// not an Integer) wraps to i32::MAX and clamps to the LAST frame.
+	// normalize(): only atom-range ints (|i| < 2^28) stay Integer; larger
+	// Integers demote to Number and take the string path.
+	int32_t frame = 1;
 	Avm2Value arg = act->args[0];
-	int is_int = (arg.kind == AVM2_VALUE_INTEGER)
-	             || (arg.kind == AVM2_VALUE_NUMBER
-	                 && arg.u.d == floor(arg.u.d) && isfinite(arg.u.d)
-	                 && fabs(arg.u.d) <= 2147483647.0);
-	if (is_int)
+	int use_int_path = 0;
+	int32_t int_val = 0;
+	if (arg.kind == AVM2_VALUE_INTEGER)
 	{
-		int32_t i = arg.kind == AVM2_VALUE_INTEGER ? arg.u.i : (int32_t) arg.u.d;
-		frame = (int64_t) i + scene_offset;
+		int_val = arg.u.i;
+		use_int_path = (int_val >= -(1 << 28) && int_val < (1 << 28));
+	}
+	else if (arg.kind == AVM2_VALUE_NUMBER)
+	{
+		int32_t i = (int32_t) arg.u.d;
+		if ((double) i == arg.u.d && !(arg.u.d == 0.0 && signbit(arg.u.d))
+		    && i >= -(1 << 28) && i < (1 << 28))
+		{
+			int_val = i;
+			use_int_path = 1;
+		}
+	}
+	if (use_int_path)
+	{
+		frame = (int32_t) ((uint32_t) int_val + (uint32_t) scene_offset);
 	}
 	else
 	{
@@ -2866,7 +2925,13 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
 		double n = avm2_string_to_int(s->utf8, s->len, 10, true);
 		if (!isnan(n))
 		{
-			frame = (int64_t) n + scene_offset;
+			int32_t f;
+			if (n >= 2147483647.0) f = INT32_MAX;
+			else if (n <= -2147483648.0) f = INT32_MIN;
+			else f = (int32_t) n;
+			f = (int32_t) ((uint32_t) f - 1u);                 // wrapping_sub(1)
+			f = (int32_t) ((uint32_t) f + (uint32_t) scene_offset);
+			frame = (f == INT32_MAX) ? INT32_MAX : f + 1;      // saturating_add(1)
 		}
 		else
 		{
@@ -2916,8 +2981,8 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
 	}
 	if (!stop) mc_set_programmatically_played(ext);
 	if (frame < 1) frame = 1;
-	if (frame > 65535) frame = 65535;
-	mc_goto_frame(ctx, obj, (uint16_t) frame, stop);
+	// TRUNCATING u16 cast (Ruffle `frame.max(1) as u16`).
+	mc_goto_frame(ctx, obj, (uint16_t) (uint32_t) frame, stop);
 }
 
 static Avm2Value mc_goto_and_play(Avm2Activation* act)

@@ -641,9 +641,11 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	root.finish();
 	// Root goes first; sprites follow in definition order.
 	sc.timelines.insert(sc.timelines.begin(), root);
-	// Root frame labels: when DefineSceneAndFrameLabelData provides labels,
-	// plain FrameLabel tags are IGNORED (Ruffle movie_clip.rs:4064).
-	if (!sc.scene_labels.empty())
+	// Root frame labels: when DefineSceneAndFrameLabelData exists (any
+	// scenes), plain FrameLabel tags are IGNORED — even if the scene data
+	// carries zero labels (Ruffle movie_clip.rs frame_label gate;
+	// movieclip_currentlabels_dupes2).
+	if (!sc.scenes.empty())
 	{
 		sc.timelines[0].labels = sc.scene_labels;
 	}

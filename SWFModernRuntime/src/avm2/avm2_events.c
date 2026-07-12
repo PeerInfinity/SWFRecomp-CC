@@ -524,9 +524,11 @@ void avm2_broadcast_event(Avm2Context* ctx, Avm2Object* event, Avm2Class* filter
 	int bi = broadcast_index(evt->type);
 	if (bi < 0) return;
 	BroadcastBucket* b = &g_broadcast[bi];
-	// Registrations made DURING the broadcast are picked up by indexing
-	// live (Ruffle iterates by index over the live list too).
-	for (uint32_t i = 0; i < b->count; i++)
+	// Ruffle captures the list length BEFORE iterating: dispatchers
+	// registered DURING the broadcast wait until the next one
+	// (movieclip_displayevents_enterframesymbol).
+	uint32_t n = b->count;
+	for (uint32_t i = 0; i < n; i++)
 	{
 		Avm2Object* obj = b->objs[i];
 		if (filter_class != NULL
