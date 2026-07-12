@@ -228,10 +228,17 @@ void avm2_builtin_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	memset(&e, 0, sizeof(e));
 	e.key = builtin_key("", name);
 	e.kind = (setter != NULL) ? AVM2_PROP_GETSET : AVM2_PROP_GETTER;
+	// FP stack frames name accessors "get x"/"set x"
+	// ("at flash.text::TextFormat/set display()" — textformat_display).
+	size_t nlen = strlen(name);
+	char* gname = avm2_alloc(ctx, nlen + 5);
+	char* sname = avm2_alloc(ctx, nlen + 5);
+	snprintf(gname, nlen + 5, "get %s", name);
+	snprintf(sname, nlen + 5, "set %s", name);
 	e.method.fn = getter;
-	e.method.debug_name = name;
+	e.method.debug_name = gname;
 	e.setter.fn = setter;
-	e.setter.debug_name = name;
+	e.setter.debug_name = sname;
 	e.defining_class = cls;
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }
@@ -1302,6 +1309,10 @@ void avm2_globals_init(Avm2Context* ctx)
 	// flash.events (Event/EventDispatcher/EventPhase/IEventDispatcher —
 	// avm2_events.c).
 	avm2_register_events(ctx);
+
+	// flash.text (avm2_text.c — Stage-6 TextFormat/TextField engine).
+	// Before display: the TextField class shell wires into it.
+	avm2_register_text(ctx);
 
 	// flash.display (avm2_display.c — Stage-5 display tree).
 	avm2_register_display(ctx);

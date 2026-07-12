@@ -1003,7 +1003,11 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 	}
 	{
 		const Avm2CharInfo* ci = char_info(op->char_id);
-		if (ci != NULL && ci->init_text != NULL)
+		if (ci != NULL && ci->kind == AVM2_CHAR_EDITTEXT)
+		{
+			avm2_text_seed_from_tag(ctx, child, op->char_id);
+		}
+		else if (ci != NULL && ci->init_text != NULL)
 		{
 			cext->tf_text = avm2_string_from_literal(ctx, ci->init_text);
 		}
@@ -1032,8 +1036,15 @@ static void replace_child_character(Avm2Context* ctx, Avm2Object* child,
 	}
 	cext->char_id = char_id;
 	const Avm2CharInfo* ci = char_info(char_id);
-	cext->tf_text = (ci != NULL && ci->init_text != NULL)
-		? avm2_string_from_literal(ctx, ci->init_text) : NULL;
+	if (ci != NULL && ci->kind == AVM2_CHAR_EDITTEXT)
+	{
+		avm2_text_seed_from_tag(ctx, child, char_id);
+	}
+	else
+	{
+		cext->tf_text = (ci != NULL && ci->init_text != NULL)
+			? avm2_string_from_literal(ctx, ci->init_text) : NULL;
+	}
 }
 
 // Timeline place op against a live display list (non-goto path).
@@ -3667,7 +3678,11 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
 		}
 		{
 			const Avm2CharInfo* ci = char_info(rec->char_id);
-			if (ci != NULL && ci->init_text != NULL)
+			if (ci != NULL && ci->kind == AVM2_CHAR_EDITTEXT)
+			{
+				avm2_text_seed_from_tag(ctx, child, rec->char_id);
+			}
+			else if (ci != NULL && ci->init_text != NULL)
 			{
 				cext->tf_text = avm2_string_from_literal(ctx, ci->init_text);
 			}
@@ -3922,30 +3937,6 @@ static Avm2Value simplebutton_init(Avm2Activation* act)
 		{
 			*(Avm2Object**) ((char*) ext + offs[i]) = act->args[i].u.obj;
 		}
-	}
-	return avm2_undefined();
-}
-
-// ===========================================================================
-// Natives: TextField (text from the EditText character's initial text)
-// ===========================================================================
-
-static Avm2Value tf_get_text(Avm2Activation* act)
-{
-	Avm2DisplayObjectExt* ext = this_display(act);
-	if (ext == NULL || ext->tf_text == NULL)
-	{
-		return avm2_string(avm2_string_from_literal(act->ctx, ""));
-	}
-	return avm2_string(ext->tf_text);
-}
-
-static Avm2Value tf_set_text(Avm2Activation* act)
-{
-	Avm2DisplayObjectExt* ext = this_display(act);
-	if (ext != NULL && act->argc > 0)
-	{
-		ext->tf_text = avm2_coerce_to_string(act->ctx, act->args[0]);
 	}
 	return avm2_undefined();
 }
@@ -4213,6 +4204,13 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 	ext->last_queued_script_frame = -1;
 	ext->tab_index = -1;
 
+	// TextFields carry the EditText engine state (avm2_text.c). Timeline
+	// instantiation re-seeds it from the DefineEditText tag afterwards.
+	if (g_textfield_class != NULL && class_is_a(obj->cls, g_textfield_class))
+	{
+		avm2_text_edittext_init(ctx, obj);
+	}
+
 	if (!g_timeline_instantiation)
 	{
 		// Script-created (Ruffle initialize_for_allocator): mark
@@ -4429,12 +4427,13 @@ void avm2_register_display(Avm2Context* ctx)
 	shape->native_init = display_native_init;
 	b->shape_class = shape;
 
-	// flash.text.TextField / StaticText (structural stubs: the timeline
-	// instantiates EditText/DefineText characters as these).
+	// flash.text.TextField / StaticText. The property surface lives in
+	// avm2_text.c (Stage 6); the class shell stays here so the display
+	// alloc hook and timeline instantiation wire up.
 	Avm2Class* textfield = avm2_builtin_class(ctx, "flash.text", "TextField", iobj);
 	textfield->native_init = display_native_init;
-	add_getset(ctx, textfield, "text", tf_get_text, tf_set_text);
 	g_textfield_class = textfield;
+	avm2_text_init_textfield_class(ctx, textfield);
 	Avm2Class* statictext = avm2_builtin_class(ctx, "flash.text", "StaticText", dobj);
 	statictext->native_init = display_native_init;
 	g_statictext_class = statictext;

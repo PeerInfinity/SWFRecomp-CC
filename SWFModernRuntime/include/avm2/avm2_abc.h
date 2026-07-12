@@ -266,6 +266,64 @@ typedef struct Avm2CharInfo
 	const char* init_text;
 } Avm2CharInfo;
 
+// DefineEditText static data (Stage 6). Flags mirror the tag bit-for-bit
+// where possible; raw_text is the tag's InitialText verbatim (HTML markup
+// preserved when the html flag is set).
+enum
+{
+	AVM2_ETF_WORD_WRAP = 1 << 0,
+	AVM2_ETF_MULTILINE = 1 << 1,
+	AVM2_ETF_PASSWORD = 1 << 2,
+	AVM2_ETF_READ_ONLY = 1 << 3,
+	AVM2_ETF_AUTO_SIZE = 1 << 4,
+	AVM2_ETF_NO_SELECT = 1 << 5,
+	AVM2_ETF_BORDER = 1 << 6,
+	AVM2_ETF_WAS_STATIC = 1 << 7,
+	AVM2_ETF_HTML = 1 << 8,
+	AVM2_ETF_USE_OUTLINES = 1 << 9,
+	AVM2_ETF_HAS_FONT = 1 << 10,
+	AVM2_ETF_HAS_FONT_CLASS = 1 << 11,
+	AVM2_ETF_HAS_TEXT_COLOR = 1 << 12,
+	AVM2_ETF_HAS_MAX_LENGTH = 1 << 13,
+	AVM2_ETF_HAS_LAYOUT = 1 << 14,
+	AVM2_ETF_HAS_TEXT = 1 << 15,
+};
+
+typedef struct Avm2EditTextData
+{
+	uint16_t char_id;
+	uint16_t flags;          // AVM2_ETF_*
+	uint16_t font_id;        // meaningful when HAS_FONT
+	const char* font_class;  // NULL unless HAS_FONT_CLASS
+	uint16_t font_height;    // twips (HAS_FONT)
+	uint32_t color_rgba;     // 0xRRGGBBAA (HAS_TEXT_COLOR)
+	uint16_t max_length;     // HAS_MAX_LENGTH
+	uint8_t align;           // 0 left, 1 right, 2 center, 3 justify (HAS_LAYOUT)
+	uint16_t left_margin;    // twips (HAS_LAYOUT)
+	uint16_t right_margin;   // twips (HAS_LAYOUT)
+	uint16_t indent;         // twips (HAS_LAYOUT)
+	int16_t leading;         // twips (HAS_LAYOUT)
+	const char* variable_name;  // NULL when empty
+	const char* raw_text;    // NULL unless HAS_TEXT
+} Avm2EditTextData;
+
+// DefineFont2/3 measurement data (Stage 6): enough for the text layout
+// engine (advances + code table + vertical metrics); glyph shapes are not
+// parsed. Units are the font's EM square (1024 for DefineFont2, 20480 for
+// DefineFont3).
+typedef struct Avm2FontData
+{
+	uint16_t font_id;
+	const char* name;
+	uint8_t bold, italic;
+	uint8_t has_layout;
+	uint16_t em_square;      // 1024 (DefineFont2) or 20480 (DefineFont3)
+	int32_t ascent, descent, leading;  // font units (has_layout)
+	uint32_t glyph_count;
+	const uint16_t* codes;   // glyph index -> character code
+	const int16_t* advances; // glyph index -> advance, font units (has_layout)
+} Avm2FontData;
+
 // DefineSceneAndFrameLabelData (root timeline only).
 typedef struct Avm2SceneData
 {
@@ -300,6 +358,10 @@ extern const Avm2SceneData avm2_generated_scenes[];
 extern const uint32_t avm2_generated_scene_count;
 extern const Avm2ButtonData avm2_generated_buttons[];
 extern const uint32_t avm2_generated_button_count;
+extern const Avm2EditTextData avm2_generated_edittexts[];
+extern const uint32_t avm2_generated_edittext_count;
+extern const Avm2FontData avm2_generated_fonts[];
+extern const uint32_t avm2_generated_font_count;
 extern const int32_t avm2_generated_stage_rect[4];   // xmin xmax ymin ymax twips
 extern const uint16_t avm2_generated_frame_rate;     // 8.8 fixed
 extern const uint16_t avm2_generated_header_frames;  // header frame count

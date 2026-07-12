@@ -42,6 +42,8 @@ enum
 	TAG_DEFINE_BITS_LOSSLESS2 = 36,
 	TAG_DEFINE_EDIT_TEXT = 37,
 	TAG_DEFINE_SPRITE = 39,
+	TAG_DEFINE_FONT2 = 48,
+	TAG_DEFINE_FONT3 = 75,
 	TAG_FRAME_LABEL = 43,
 	TAG_DEFINE_MORPH_SHAPE = 46,
 	TAG_DEFINE_VIDEO_STREAM = 60,
@@ -288,6 +290,37 @@ struct CharInfo
 	std::string init_text;
 };
 
+// Full DefineEditText data (flag bits mirror AVM2_ETF_* in avm2_abc.h).
+struct EditTextDef
+{
+	uint16_t char_id = 0;
+	uint16_t flags = 0;
+	uint16_t font_id = 0;
+	bool has_font_class = false;
+	std::string font_class;
+	uint16_t font_height = 0;
+	uint32_t color_rgba = 0;
+	uint16_t max_length = 0;
+	uint8_t align = 0;
+	uint16_t left_margin = 0, right_margin = 0, indent = 0;
+	int16_t leading = 0;
+	std::string variable_name;
+	bool has_text = false;
+	std::string raw_text;
+};
+
+// DefineFont2/3 measurement data (shapes not parsed).
+struct FontDef
+{
+	uint16_t font_id = 0;
+	std::string name;
+	bool bold = false, italic = false, has_layout = false;
+	uint16_t em_square = 1024;
+	int32_t ascent = 0, descent = 0, leading = 0;
+	std::vector<uint16_t> codes;
+	std::vector<int16_t> advances;
+};
+
 struct ButtonRec
 {
 	uint16_t char_id;
@@ -307,6 +340,8 @@ struct Scanner
 	std::vector<Timeline> timelines;
 	std::vector<CharInfo> chars;
 	std::vector<ButtonDef> buttons;
+	std::vector<EditTextDef> edittexts;
+	std::vector<FontDef> fonts;
 	std::vector<std::pair<uint32_t, std::string>> scenes;  // (offset, name)
 	std::vector<std::pair<uint32_t, std::string>> scene_labels;
 	uint32_t bg_color = 0xFFFFFF;
@@ -515,7 +550,9 @@ struct Scanner
 			case TAG_DEFINE_EDIT_TEXT:
 			{
 				CharInfo ci;
+				EditTextDef et;
 				ci.char_id = body.u16();
+				et.char_id = ci.char_id;
 				ci.kind = 4;  // EDITTEXT
 				skipRect(body, ci.bounds);
 				uint8_t f1 = body.u8();
@@ -526,17 +563,56 @@ struct Scanner
 				bool has_font = (f1 & 0x01) != 0;
 				bool has_font_class = (f2 & 0x80) != 0;
 				bool has_layout = (f2 & 0x20) != 0;
-				if (has_font) body.u16();
-				if (has_font_class) body.cstr();
-				if (has_font) body.u16();  // height
-				if (has_text_color) body.skip(4);
-				if (has_max_length) body.u16();
-				if (has_layout) body.skip(1 + 2 + 2 + 2 + 2);
-				body.cstr();  // variable name
+				// Flag bits mirror AVM2_ETF_* (avm2_abc.h).
+				if (f1 & 0x40) et.flags |= 1 << 0;   // word wrap
+				if (f1 & 0x20) et.flags |= 1 << 1;   // multiline
+				if (f1 & 0x10) et.flags |= 1 << 2;   // password
+				if (f1 & 0x08) et.flags |= 1 << 3;   // read only
+				if (f2 & 0x40) et.flags |= 1 << 4;   // auto size
+				if (f2 & 0x10) et.flags |= 1 << 5;   // no select
+				if (f2 & 0x08) et.flags |= 1 << 6;   // border
+				if (f2 & 0x04) et.flags |= 1 << 7;   // was static
+				if (f2 & 0x02) et.flags |= 1 << 8;   // html
+				if (f2 & 0x01) et.flags |= 1 << 9;   // use outlines
+				if (has_font) et.flags |= 1 << 10;
+				if (has_font_class) et.flags |= 1 << 11;
+				if (has_text_color) et.flags |= 1 << 12;
+				if (has_max_length) et.flags |= 1 << 13;
+				if (has_layout) et.flags |= 1 << 14;
+				if (has_text) et.flags |= 1 << 15;
+				if (has_font) et.font_id = body.u16();
+				if (has_font_class)
+				{
+					et.has_font_class = true;
+					et.font_class = body.cstr();
+				}
+				if (has_font) et.font_height = body.u16();
+				if (has_text_color)
+				{
+					uint32_t rr = body.u8(), gg = body.u8(), bb = body.u8(),
+					         aa = body.u8();
+					et.color_rgba = (rr << 24) | (gg << 16) | (bb << 8) | aa;
+				}
+				if (has_max_length) et.max_length = body.u16();
+				if (has_layout)
+				{
+					et.align = body.u8();
+					et.left_margin = body.u16();
+					et.right_margin = body.u16();
+					et.indent = body.u16();
+					et.leading = (int16_t) body.u16();
+				}
+				et.variable_name = body.cstr();
+				if (has_text)
+				{
+					et.has_text = true;
+					et.raw_text = std::string();  // filled below alongside ci
+				}
 				if (has_text)
 				{
 					ci.has_text = true;
 					std::string raw = body.cstr();
+					et.raw_text = raw;
 					bool is_html = (f2 & 0x02) != 0;
 					if (!is_html)
 					{
@@ -594,6 +670,71 @@ struct Scanner
 					}
 				}
 				chars.push_back(ci);
+				edittexts.push_back(et);
+				break;
+			}
+			case TAG_DEFINE_FONT2:
+			case TAG_DEFINE_FONT3:
+			{
+				FontDef fd;
+				fd.font_id = body.u16();
+				uint8_t fflags = body.u8();
+				bool font_has_layout = (fflags & 0x80) != 0;
+				bool wide_offsets = (fflags & 0x08) != 0;
+				bool wide_codes = (fflags & 0x04) != 0;
+				fd.italic = (fflags & 0x02) != 0;
+				fd.bold = (fflags & 0x01) != 0;
+				fd.has_layout = font_has_layout;
+				fd.em_square = (code == TAG_DEFINE_FONT3) ? 20480 : 1024;
+				body.u8();  // language code
+				uint8_t name_len = body.u8();
+				for (uint8_t i = 0; i < name_len; i++)
+				{
+					char c = (char) body.u8();
+					if (c != '\0') fd.name += c;
+				}
+				uint16_t nglyphs = body.u16();
+				// Offset table start is the reference point for the glyph
+				// offsets and the code-table offset. A 0-glyph device font
+				// omits the remaining tables (Ruffle read.rs).
+				const uint8_t* offtab = body.p;
+				uint32_t code_table_off = 0;
+				if (nglyphs > 0)
+				{
+					if (wide_offsets)
+					{
+						body.skip(4u * nglyphs);
+						code_table_off = body.u32();
+					}
+					else
+					{
+						body.skip(2u * nglyphs);
+						code_table_off = body.u16();
+					}
+				}
+				// Jump over the glyph shapes to the code table.
+				if (nglyphs > 0 && offtab + code_table_off <= body.end)
+				{
+					body.p = offtab + code_table_off;
+					for (uint16_t i = 0; i < nglyphs; i++)
+					{
+						fd.codes.push_back(wide_codes || code == TAG_DEFINE_FONT3
+						                   ? body.u16() : body.u8());
+					}
+					if (font_has_layout)
+					{
+						fd.ascent = body.u16();
+						fd.descent = body.u16();
+						fd.leading = (int16_t) body.u16();
+						for (uint16_t i = 0; i < nglyphs; i++)
+						{
+							fd.advances.push_back((int16_t) body.u16());
+						}
+						// Glyph bounds + kerning follow; not needed.
+					}
+				}
+				fonts.push_back(fd);
+				// Fonts are not placeable characters: no CharInfo entry.
 				break;
 			}
 			case TAG_DEFINE_BITS:
@@ -871,6 +1012,81 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		out << "const Avm2ButtonData avm2_generated_buttons[1];\n";
 	}
 	out << "const uint32_t avm2_generated_button_count = " << sc.buttons.size()
+	    << ";\n\n";
+
+	if (!sc.edittexts.empty())
+	{
+		out << "const Avm2EditTextData avm2_generated_edittexts[] = {\n";
+		for (auto& et : sc.edittexts)
+		{
+			out << "\t{ " << et.char_id << ", " << et.flags << ", "
+			    << et.font_id << ", "
+			    << (et.has_font_class ? ("\"" + cEscape(et.font_class) + "\"")
+			                          : std::string("NULL"))
+			    << ", " << et.font_height << ", 0x" << std::hex
+			    << et.color_rgba << std::dec << "u, " << et.max_length << ", "
+			    << (int) et.align << ", " << et.left_margin << ", "
+			    << et.right_margin << ", " << et.indent << ", " << et.leading
+			    << ", "
+			    << (!et.variable_name.empty()
+			        ? ("\"" + cEscape(et.variable_name) + "\"")
+			        : std::string("NULL"))
+			    << ", "
+			    << (et.has_text ? ("\"" + cEscape(et.raw_text) + "\"")
+			                    : std::string("NULL"))
+			    << " },\n";
+		}
+		out << "};\n";
+	}
+	else
+	{
+		out << "const Avm2EditTextData avm2_generated_edittexts[1];\n";
+	}
+	out << "const uint32_t avm2_generated_edittext_count = "
+	    << sc.edittexts.size() << ";\n\n";
+
+	for (size_t i = 0; i < sc.fonts.size(); i++)
+	{
+		const FontDef& fd = sc.fonts[i];
+		if (!fd.codes.empty())
+		{
+			out << "static const uint16_t font_" << i << "_codes[] = { ";
+			for (auto c : fd.codes) out << c << ", ";
+			out << "};\n";
+		}
+		if (!fd.advances.empty())
+		{
+			out << "static const int16_t font_" << i << "_advances[] = { ";
+			for (auto a : fd.advances) out << a << ", ";
+			out << "};\n";
+		}
+	}
+	if (!sc.fonts.empty())
+	{
+		out << "const Avm2FontData avm2_generated_fonts[] = {\n";
+		for (size_t i = 0; i < sc.fonts.size(); i++)
+		{
+			const FontDef& fd = sc.fonts[i];
+			out << "\t{ " << fd.font_id << ", \"" << cEscape(fd.name) << "\", "
+			    << (fd.bold ? 1 : 0) << ", " << (fd.italic ? 1 : 0) << ", "
+			    << (fd.has_layout ? 1 : 0) << ", " << fd.em_square << ", "
+			    << fd.ascent << ", " << fd.descent << ", " << fd.leading << ", "
+			    << fd.codes.size() << ", "
+			    << (fd.codes.empty() ? std::string("NULL")
+			                         : ("font_" + std::to_string(i) + "_codes"))
+			    << ", "
+			    << (fd.advances.empty()
+			        ? std::string("NULL")
+			        : ("font_" + std::to_string(i) + "_advances"))
+			    << " },\n";
+		}
+		out << "};\n";
+	}
+	else
+	{
+		out << "const Avm2FontData avm2_generated_fonts[1];\n";
+	}
+	out << "const uint32_t avm2_generated_font_count = " << sc.fonts.size()
 	    << ";\n\n";
 
 	out << "const int32_t avm2_generated_stage_rect[4] = { "

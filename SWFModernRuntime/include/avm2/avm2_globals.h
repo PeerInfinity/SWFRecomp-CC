@@ -336,7 +336,9 @@ typedef struct Avm2DisplayObjectExt
 	uint8_t btn_weird_order;  // one-shot framescript order after construction
 
 	// --- TextField ---
-	const Avm2String* tf_text;   // NULL = default ""
+	const Avm2String* tf_text;   // NULL = default "" (mirror of edittext->text)
+	// TextField/EditText engine state (avm2_text.c; NULL for non-TextFields).
+	struct Avm2EditTextExt* edittext;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.
@@ -362,6 +364,16 @@ int avm2_dispatch_event(Avm2Context* ctx, Avm2Object* dispatcher, Avm2Object* ev
 void avm2_broadcast_event(Avm2Context* ctx, Avm2Object* event, Avm2Class* filter_class);
 // Display parent hook used for ancestor walks; reads the display ext.
 Avm2Object* avm2_display_parent(Avm2Context* ctx, Avm2Object* obj);
+
+// flash.text module (avm2_text.c — Stage 6): TextFormat/TextField engine.
+void avm2_register_text(Avm2Context* ctx);
+// Adds the full TextField property surface to the class shell created by
+// avm2_display.c.
+void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield);
+// Alloc hook half for script-created TextFields (`new TextField()`).
+void avm2_text_edittext_init(Avm2Context* ctx, Avm2Object* obj);
+// Timeline instantiation: seed EditText state from the DefineEditText tag.
+void avm2_text_seed_from_tag(Avm2Context* ctx, Avm2Object* obj, uint16_t char_id);
 
 // Display module (avm2_display.c — Stage-5 tranche 2+).
 void avm2_register_display(Avm2Context* ctx);
