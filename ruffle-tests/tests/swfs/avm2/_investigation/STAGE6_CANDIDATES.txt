@@ -1,0 +1,95 @@
+# Stage 6 (TextField/EditText engine) candidate tests.
+# Generated 2026-07-12 from the post-Stage-5 CI results (run 29174330330,
+# avm2 639+18RM/1201 at b6fbe8447): failing, non-ignored text-family
+# tests. Excluded up front: 16 tests with input.json (injected
+# mouse/keyboard) and 4 image-comparison tests. All listed tests are
+# FAILING at the baseline.
+
+# --- text family (72) ---
+edittext_align
+edittext_antialiastype
+edittext_autosize
+edittext_autosize_height_input
+edittext_autosize_lazy_bounds_events
+edittext_autosize_lazy_bounds_interactions
+edittext_autosize_lazy_bounds_props
+edittext_autosize_lazy_bounds_vs_relayout
+edittext_bottom_scroll_v_basic
+edittext_bounds_scale
+edittext_bullet
+edittext_default_format
+edittext_default_format_empty
+edittext_device_transform_layout
+edittext_empty_text_format
+edittext_focus_selection
+edittext_font_size
+edittext_format_empty_font
+edittext_get_line_index_of_char
+edittext_getcharboundaries
+edittext_getcharboundaries_culling
+edittext_getcharboundaries_missing_embedded_font
+edittext_getcharboundaries_missing_glyphs
+edittext_getcharboundaries_scroll
+edittext_getlinemetrics
+edittext_html
+edittext_html_condensewhite
+edittext_html_entity
+edittext_html_font_size_swf12
+edittext_html_font_size_swf13
+edittext_html_roundtrip
+edittext_leading
+edittext_letter_spacing
+edittext_line_methods
+edittext_line_metrics
+edittext_margins
+edittext_max_scroll_h_basic
+edittext_max_scroll_v_basic
+edittext_newline_stripping
+edittext_newlines
+edittext_paragraph_methods
+edittext_scrollh
+edittext_set_html_same
+edittext_set_text_vs_html
+edittext_stylesheet
+edittext_stylesheet_custom_tag
+edittext_stylesheet_display
+edittext_tab_stops
+edittext_underline
+edittext_width_height
+edittext_wordwrap_word
+edittext_wrap_breaks
+font_description_clone
+font_embedded
+font_enumeratefonts
+font_enumeratefonts_filter
+font_enumeratefonts_order
+font_hasglyphs
+font_registerfont
+text_element_basic
+text_engine_fontdescription
+text_engine_groupelement
+text_run
+textfield_unload
+textformat
+textformat_display
+textformat_font_max_length
+textline_inapplicable_properties
+textline_name
+textline_splitting_basic
+textline_throwerror
+textline_validity
+
+# --- Stage-5 stragglers (13; see STAGE5_CANDIDATES.txt triage) ---
+movieclip_frameconstruct_skipped
+movieclip_next_scene
+movieclip_prev_scene
+goto_button_nested_framescript
+goto_nested_construct_sibling
+place_object_replace_2
+simplebutton_added_to_stage
+simplebutton_childevents
+simplebutton_childevents_nested
+simplebutton_childprops
+simplebutton_childshuffle
+simplebutton_constr_childevents
+simplebutton_symbolclass
