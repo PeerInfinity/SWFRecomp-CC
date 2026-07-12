@@ -41,9 +41,13 @@ COMPLETE; Stage 7 (embedded assets + BitmapData/Bitmap), Stage 6
     green. **One pass→fail regression** — `edittext_autosize_lazy_bounds_
     interactions` (re-focusing the already-focused TextField stopped applying
     pending autosize bounds because the new `set_focus` early-returns on an
-    unchanged focus) — **fixed in the follow-up commit** (stage.focus applies
+    unchanged focus) — **fixed in commit `003b12c89`** (stage.focus applies
     pending bounds unconditionally, like the old setter; set_focus then only
     fires focusIn/Out when the focus actually changes).
+  - **Confirmation run 29213827286 (sha `003b12c89`): avm2 801 / 1,204 + 22 RM
+    = 823 effective (68.4%), ZERO pass→fail regressions in avm2 or ANY AVM1
+    suite** (edittext_autosize_lazy_bounds_interactions newly passing again),
+    wasm-link-smoke green. Net Stage-8 gain: **+48 effective** over Stage 7.
 
 
 ## State (Stage 7)
