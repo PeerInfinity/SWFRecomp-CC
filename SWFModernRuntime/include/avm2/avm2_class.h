@@ -87,7 +87,9 @@ struct Avm2Class
 	uint8_t flags;
 	Avm2VTable ivtable;            // instance vtable (inherited + own)
 	Avm2MethodRef instance_init;
-	Avm2ScopeChain* scope;         // scope captured at NewClass (methods' outer chain)
+	Avm2ScopeChain* scope;         // class scope: captured at NewClass (statics/cinit)
+	Avm2ScopeChain* iscope;        // instance scope: class scope + [class object]
+	                               // (instance traits + instance_init outer chain)
 	Avm2Object* class_object;
 	Avm2Object* prototype_obj;     // ES3 prototype object (chain mirrors super)
 	// Protected namespace (per-class URI); inherited protected traits are

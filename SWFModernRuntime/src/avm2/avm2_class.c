@@ -798,6 +798,21 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 	cls->super_class = super_class;
 	cls->flags = cd->flags;
 	cls->scope = scope;
+	// Instance scope = class scope + [class object] (Ruffle
+	// ClassObject::from_class): instance methods and the constructor see the
+	// class object on their outer chain, so FindProperty reaches static
+	// traits (`INSTANCE = this` inside a ctor). The entry is patched with
+	// the real class object once it exists below.
+	{
+		uint32_t outer_n = scope != NULL ? scope->count : 0;
+		Avm2ScopeChain* iscope = avm2_alloc(ctx, sizeof(Avm2ScopeChain));
+		iscope->count = outer_n + 1;
+		iscope->entries = avm2_alloc(ctx, iscope->count * sizeof(Avm2ScopeEntry));
+		for (uint32_t i = 0; i < outer_n; i++) iscope->entries[i] = scope->entries[i];
+		iscope->entries[outer_n].obj = NULL;
+		iscope->entries[outer_n].is_with = 0;
+		cls->iscope = iscope;
+	}
 	cls->interface_count = cd->interface_count;
 	cls->interface_mns = cd->interface_mns;
 	cls->iface_file = file;
@@ -868,7 +883,7 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 		// (its own constructor chains to super via ConstructSuper).
 	}
 	avm2_vtable_add_traits(ctx, &cls->ivtable, file,
-	                       cd->instance_traits, cd->instance_trait_count, cls, scope);
+	                       cd->instance_traits, cd->instance_trait_count, cls, cls->iscope);
 	if ((cd->flags & AVM2_CLASS_FLAG_INTERFACE) == 0)
 	{
 		class_add_interface_aliases(ctx, cls);
@@ -885,6 +900,7 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 	cobj->cls = ctx->builtins.class_class;
 	cobj->proto = ctx->builtins.class_class->prototype_obj;
 	cls->class_object = cobj;
+	cls->iscope->entries[cls->iscope->count - 1].obj = cobj;
 	avm2_slots_init_defaults(ctx, cobj, cvt);
 
 	class_setup_prototype(ctx, cls);
@@ -926,7 +942,8 @@ Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
 		cls->native_init(ctx, obj);
 	}
 	Avm2Value this_val = avm2_object_value(obj);
-	avm2_call_method_ref(ctx, &cls->instance_init, cls, cls->scope,
+	avm2_call_method_ref(ctx, &cls->instance_init, cls,
+	                     cls->iscope != NULL ? cls->iscope : cls->scope,
 	                     this_val, args, argc);
 	return this_val;
 }

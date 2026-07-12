@@ -2115,7 +2115,8 @@ void avm2_op_constructsuper(Avm2Activation* act, Avm2Value recv,
 		return;
 	}
 	Avm2Class* super = super_class_of(act);
-	avm2_call_method_ref(act->ctx, &super->instance_init, super, super->scope,
+	avm2_call_method_ref(act->ctx, &super->instance_init, super,
+	                     super->iscope != NULL ? super->iscope : super->scope,
 	                     recv, args, argc);
 }
 

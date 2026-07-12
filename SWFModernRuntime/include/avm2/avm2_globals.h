@@ -255,6 +255,12 @@ typedef struct Avm2DisplayObjectExt
 	Avm2Object* parent;          // display parent (NULL = not on a tree)
 	const Avm2String* name;      // NULL only for the Stage
 	uint8_t has_explicit_name;
+	uint8_t parent_field_done;   // set_on_parent_field already ran (buttons
+	                             // set the field BEFORE construction)
+	uint8_t manual_frame_construct; // placed while the parent was still
+	                             // unconstructed: ONLY Sprite.constructChildren
+	                             // may construct it (Ruffle MANUAL_FRAME_CONSTRUCT
+	                             // — movieclip_frameconstruct_skipped)
 	uint8_t instantiated_by_timeline;
 	uint8_t placed_by_avm2_script;
 	uint8_t is_root;

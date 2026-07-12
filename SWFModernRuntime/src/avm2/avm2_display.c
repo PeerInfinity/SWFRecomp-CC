@@ -671,6 +671,12 @@ static void dispatch_added_to_stage_recursive(Avm2Context* ctx, Avm2Object* chil
 	{
 		dispatch_added_to_stage_recursive(ctx, ext->render_list[i]);
 	}
+	// Buttons recurse into their CURRENT state child (Ruffle
+	// dispatch_added_to_stage_event's as_avm2_button arm).
+	if (ext->btn_up != NULL)
+	{
+		dispatch_added_to_stage_recursive(ctx, ext->btn_up);
+	}
 }
 
 static void dispatch_removed_from_stage_recursive(Avm2Context* ctx, Avm2Object* child)
@@ -828,7 +834,8 @@ static void display_run_constructor(Avm2Context* ctx, Avm2Object* obj)
 	avm2_try_push_catch_all(ctx, &top);
 	if (setjmp(top.jb) == 0)
 	{
-		avm2_call_method_ref(ctx, &cls->instance_init, cls, cls->scope,
+		avm2_call_method_ref(ctx, &cls->instance_init, cls,
+		                     cls->iscope != NULL ? cls->iscope : cls->scope,
 		                     avm2_object_value(obj), NULL, 0);
 	}
 	avm2_try_pop_frame(&top);
@@ -840,6 +847,7 @@ static void button_construct_states(Avm2Context* ctx, Avm2Object* button);
 static void run_frame_scripts_obj(Avm2Context* ctx, Avm2Object* obj);
 static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_implicit);
 static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj);
+static void set_on_parent_field(Avm2Context* ctx, Avm2Object* obj);
 
 // ---------------------------------------------------------------------------
 // Class resolution for characters
@@ -978,6 +986,11 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 	cext->depth = op->depth;
 	cext->parent = parent;
 	cext->place_frame = pext->current_frame;
+	// Placed while the parent is still unconstructed (Ruffle: parent
+	// object2 not yet allocated): only Sprite.constructChildren during the
+	// parent's super() may construct this child. If the parent's ctor
+	// never chains to super, the child stays unconstructed forever.
+	cext->manual_frame_construct = !pext->constructed;
 	apply_place_object(ctx, child, op);
 	if (op->flags & AVM2_TLF_HAS_NAME)
 	{
@@ -1004,6 +1017,25 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 	return child;
 }
 
+// Ruffle DisplayObject::replace_with: a Replace op keeps the SAME display
+// object and swaps the underlying character data — but only static assets
+// (graphics/text) actually swap; sprites/MovieClips no-op (the trait
+// default). place_object_replace_2 observes both halves.
+static void replace_child_character(Avm2Context* ctx, Avm2Object* child,
+                                    uint16_t char_id)
+{
+	Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+	if (cext == NULL) return;
+	if (cext->timeline != NULL || timeline_for_char(char_id) != NULL)
+	{
+		return;  // either side is a sprite: no swap
+	}
+	cext->char_id = char_id;
+	const Avm2CharInfo* ci = char_info(char_id);
+	cext->tf_text = (ci != NULL && ci->init_text != NULL)
+		? avm2_string_from_literal(ctx, ci->init_text) : NULL;
+}
+
 // Timeline place op against a live display list (non-goto path).
 static void run_place_op(Avm2Context* ctx, Avm2Object* parent, const Avm2TimelineOp* op)
 {
@@ -1014,16 +1046,12 @@ static void run_place_op(Avm2Context* ctx, Avm2Object* parent, const Avm2Timelin
 		Avm2Object* existing = child_by_depth(pext, op->depth);
 		if (existing != NULL && (op->flags & AVM2_TLF_MOVE))
 		{
-			// Replace: the SAME display object swaps its character
-			// (Ruffle replace_with) — no remove/add events.
+			// Replace: same object, per-type character swap — no
+			// remove/add events.
 			Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, existing);
 			if (cext != NULL)
 			{
-				cext->char_id = op->char_id;
-				cext->timeline = timeline_for_char(op->char_id);
-				const Avm2CharInfo* ci = char_info(op->char_id);
-				cext->tf_text = (ci != NULL && ci->init_text != NULL)
-					? avm2_string_from_literal(ctx, ci->init_text) : NULL;
+				replace_child_character(ctx, existing, op->char_id);
 				cext->place_frame = pext->current_frame;
 				apply_place_object(ctx, existing, op);
 			}
@@ -1254,12 +1282,25 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 	if (needs_construction)
 	{
 		// SimpleButton states are created eagerly, before the ctor runs
-		// (Ruffle avm2_button.rs construct_frame).
+		// (Ruffle avm2_button.rs construct_frame). `constructed` is set
+		// FIRST (Ruffle clears needs_frame_construction before
+		// create_state): the has-MovieClip nested stage pass inside
+		// button_construct_states re-enters this function on the button,
+		// and must not run the ctor — the ctor runs here, in the OUTER
+		// invocation, after the nested framescripts (the frame-2 script
+		// traces precede the ctor trace in simplebutton_symbolclass).
+		ext->constructed = 1;
 		if (class_is_a(obj->cls, ctx->builtins.simple_button_class))
 		{
+			// Buttons expose the named on-parent field BEFORE construction
+			// (Ruffle avm2_button.rs: the un-constructed object is visible
+			// via parent.<childName> from the nested framescript pass).
+			if (!ext->placed_by_avm2_script)
+			{
+				set_on_parent_field(ctx, obj);
+			}
 			button_construct_states(ctx, obj);
 		}
-		ext->constructed = 1;
 		display_run_constructor(ctx, obj);
 		on_construction_complete(ctx, obj);
 	}
@@ -1290,6 +1331,14 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 			{
 				continue;
 			}
+			// A child reserved for Sprite.constructChildren (placed before
+			// the parent's ctor) is never constructed by the catchup pass
+			// (movieclip_frameconstruct_skipped: the root ctor never calls
+			// super(), so its load-frame children stay unconstructed).
+			if (cext != NULL && !cext->constructed && cext->manual_frame_construct)
+			{
+				continue;
+			}
 			construct_frame_obj(ctx, ext->render_list[i]);
 		}
 	}
@@ -1299,15 +1348,43 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 	}
 }
 
+// Ruffle DisplayObject::set_on_parent_field: expose an explicitly-named
+// timeline child as a property on its parent. Runs once (buttons set the
+// field before construction; the completion path must not re-run the
+// setter).
+static void set_on_parent_field(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->parent_field_done) return;
+	if (!ext->has_explicit_name || ext->name == NULL || ext->parent == NULL)
+	{
+		return;
+	}
+	ext->parent_field_done = 1;
+	Avm2TryFrame top;
+	avm2_try_push_catch_all(ctx, &top);
+	if (setjmp(top.jb) == 0)
+	{
+		avm2_set_public_property(ctx, avm2_object_value(ext->parent),
+		                         ext->name->utf8, ext->name->len,
+		                         avm2_object_value(obj));
+	}
+	avm2_try_pop_frame(&top);
+}
+
 static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
-	if (!ext->placed_by_avm2_script && ext->parent != NULL)
+	if (!ext->placed_by_avm2_script && ext->parent != NULL
+	    && !class_is_a(ext->parent->cls, ctx->builtins.simple_button_class))
 	{
 		// fire_added_events: added + addedToStage on SELF only — timeline
 		// children each fire their own at their own construction (the
-		// recursive form is the container script-add path).
+		// recursive form is the container script-add path). Children whose
+		// display parent is a BUTTON at construction time fire nothing
+		// (Ruffle fire_added_events; button states get their events from
+		// fire_state_events instead).
 		dispatch_simple_event(ctx, obj, "added", 1);
 		if (is_on_stage(ctx, obj))
 		{
@@ -1316,18 +1393,9 @@ static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj)
 	}
 	// set_on_parent_field (Ruffle DO:2328): a timeline child with an
 	// explicit name becomes a property on its parent.
-	if (!ext->placed_by_avm2_script && ext->has_explicit_name
-	    && ext->name != NULL && ext->parent != NULL)
+	if (!ext->placed_by_avm2_script)
 	{
-		Avm2TryFrame top;
-		avm2_try_push_catch_all(ctx, &top);
-		if (setjmp(top.jb) == 0)
-		{
-			avm2_set_public_property(ctx, avm2_object_value(ext->parent),
-			                         ext->name->utf8, ext->name->len,
-			                         avm2_object_value(obj));
-		}
-		avm2_try_pop_frame(&top);
+		set_on_parent_field(ctx, obj);
 	}
 	// Timeline symbol whose class is Sprite-typed (no MovieClip in the
 	// chain): plays frame 1 then stops.
@@ -1667,9 +1735,21 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 		Avm2Object* child = child_by_depth(ext, cmd->depth);
 		Avm2DisplayObjectExt* cext = child != NULL
 			? avm2_display_ext_of(ctx, child) : NULL;
-		if (child != NULL && cext != NULL && cext->char_id == cmd->place->char_id)
+		if (child != NULL && cext != NULL && is_rewind)
 		{
+			// Rewind always modifies the surviving child in place
+			// (survives_rewind scrubbed the mismatches above).
 			apply_place_object(ctx, child, cmd->place);
+		}
+		else if (child != NULL && cext != NULL
+		         && (cmd->place->flags & AVM2_TLF_MOVE))
+		{
+			// Forward-goto Replace: SAME display object, per-type
+			// character swap + place_frame update (Ruffle goto arm
+			// Replace(id) + prev_child).
+			replace_child_character(ctx, child, cmd->place->char_id);
+			apply_place_object(ctx, child, cmd->place);
+			cext->place_frame = cmd->frame;
 		}
 		else
 		{
@@ -3114,6 +3194,14 @@ static Avm2Value mc_next_scene(Avm2Activation* act)
 	{
 		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, 0);
 	}
+	else
+	{
+		// No next scene: goto the CURRENT scene's start (Ruffle
+		// next_scene's .or(current_scene) — movieclip_next_scene).
+		SceneInfo cur;
+		current_scene_of(ext, &cur);
+		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, 0);
+	}
 	return avm2_undefined();
 }
 
@@ -3137,6 +3225,12 @@ static Avm2Value mc_prev_scene(Avm2Activation* act)
 	if (best >= 0)
 	{
 		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) scenes[best].start, 0);
+	}
+	else
+	{
+		// No previous scene: goto the CURRENT scene's start (Ruffle
+		// prev_scene's .or(current_scene) — movieclip_prev_scene).
+		mc_goto_frame(act->ctx, this_obj(act), (uint16_t) cur.start, 0);
 	}
 	return avm2_undefined();
 }
@@ -3641,6 +3735,10 @@ static void button_construct_states(Avm2Context* ctx, Avm2Object* button)
 	{
 		if (states[s] == NULL || !multis[s]) continue;
 		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, states[s]);
+		// Ruffle fire_state_events: state.post_instantiation names the
+		// wrapper AFTER all four states exist — it consumes a counter
+		// number here, not at creation (simplebutton_symbolclass).
+		set_default_instance_name(ctx, sext);
 		Avm2Object* old_parent = sext->parent;
 		sext->parent = NULL;
 		for (uint32_t i = 0; i < sext->render_len; i++)
@@ -3656,6 +3754,21 @@ static void button_construct_states(Avm2Context* ctx, Avm2Object* button)
 	if (is_on_stage(ctx, button))
 	{
 		dispatch_added_to_stage_recursive(ctx, button);
+	}
+
+	// set_state(Up) (Ruffle): detach every state child, then parent only
+	// the current (up) state — over/down/hit read parent=null/stage=null
+	// afterwards (simplebutton_childevents frameConstructed traces).
+	for (int s = 0; s < 4; s++)
+	{
+		if (states[s] == NULL) continue;
+		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, states[s]);
+		if (sext != NULL) sext->parent = NULL;
+	}
+	if (ext->btn_up != NULL)
+	{
+		Avm2DisplayObjectExt* uext = avm2_display_ext_of(ctx, ext->btn_up);
+		if (uext != NULL) uext->parent = button;
 	}
 
 	// A MovieClip in the up state (SWF>9) makes avmplus run a NESTED
@@ -3714,11 +3827,64 @@ static Avm2Value btn_state_get(Avm2Activation* act, size_t off)
 
 static Avm2Value btn_state_set(Avm2Activation* act, size_t off)
 {
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* button = this_obj(act);
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext == NULL) return avm2_undefined();
 	Avm2Object* v = (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
 		? act->args[0].u.obj : NULL;
+	Avm2Object* old = *(Avm2Object**) ((char*) ext + off);
+	int child_was_on_stage = (v != NULL) && is_on_stage(ctx, v);
+	// The rendered state is always Up in trace tests (no mouse input).
+	int is_cur_state = (off == offsetof(Avm2DisplayObjectExt, btn_up));
 	*(Avm2Object**) ((char*) ext + off) = v;
+
+	// Ruffle set_state_child: the new child is pulled out of its current
+	// container (simplebutton_childshuffle: numChildren drops, parent
+	// reads null through the non-container button).
+	if (v != NULL)
+	{
+		Avm2DisplayObjectExt* vext = avm2_display_ext_of(ctx, v);
+		if (vext != NULL && vext->parent != NULL)
+		{
+			Avm2DisplayObjectExt* pext = avm2_display_ext_of(ctx, vext->parent);
+			if (pext != NULL && render_index_of(pext, v) >= 0)
+			{
+				vext->placed_by_avm2_script = 1;
+				full_remove_child(ctx, pext, v);
+			}
+			vext->parent = NULL;
+		}
+		if (is_cur_state && vext != NULL)
+		{
+			vext->parent = button;
+		}
+	}
+	if (old != NULL && old != v)
+	{
+		Avm2DisplayObjectExt* oext = avm2_display_ext_of(ctx, old);
+		if (oext != NULL) oext->parent = NULL;
+	}
+	if (is_cur_state)
+	{
+		if (v != NULL)
+		{
+			dispatch_added_event(ctx, button, v, child_was_on_stage);
+		}
+		if (old != NULL && old != v)
+		{
+			dispatch_removed_event(ctx, old);
+		}
+		if (v != NULL)
+		{
+			// Ruffle set_state_child's trailing broadcasts (the "FIXME"
+			// block): frameConstructed, the child's frame scripts, then
+			// exitFrame (simplebutton_constr_childevents).
+			broadcast_named(ctx, "frameConstructed");
+			run_frame_scripts_obj(ctx, v);
+			broadcast_named(ctx, "exitFrame");
+		}
+	}
 	return avm2_undefined();
 }
 
