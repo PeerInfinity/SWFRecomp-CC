@@ -1,5 +1,60 @@
 # Session prompt — AVM2 Stage 5: frame lifecycle + display basics
 
+## RESUME STATE (2026-07-11, session 2 — read this first)
+
+Tranches 1-5 are all substantially implemented and committed
+(`f662d9b9a`..`66ae469e1`): avm2_events.c (full Event/EventDispatcher/
+broadcast registry), abc_timeline.cpp (static timeline tables incl.
+button records + EditText initial text), avm2_display.c (~4everything:
+property surface, containers, timeline instantiation, tick phases, goto
+machinery, Stage incl. 2071 overrides, SimpleButton, TextField.text,
+Graphics/Matrix/Transform/System stubs). runSWF_avm2 runs the real
+frame lifecycle; the no-char-0 fallback only constructs never-placed
+bindings.
+
+Local candidate status at last count: ~120+/159 expected (final sweep
+result in the CI baseline / commit messages; ≥100 exit already met).
+Known remaining misses (triaged):
+- displayobject_early_init (needs Graphics identity + BitmapData 2015),
+  displayobject_filters (real filter classes), displayobject_transform
+  (TextField + concatenatedMatrix), displayobject_set_name_loaded
+  (flash.display.Loader) — infrastructure, not Stage-5.
+- movieclip_frameconstruct_skipped (ctor-failure semantics: children
+  stay unconstructed after root ctor throws — needs archaeology).
+- simplebutton_symbolclass + a few button-event tests: static-slot
+  write INSTANCE=this inside ctor reads back null from Main.INSTANCE
+  (likely findproperty/class-scope static write bug — investigate in
+  avm2_ops.c FindProperty scope walk); simplebutton_childevents*
+  (event order details), goto_button_nested_framescript.
+- stage_domain_getQualifiedDefinitionNames (ApplicationDomain
+  parentDomain + getQualifiedDefinitionNames + fresh-instance-per-get).
+- goto_nested_framescript (TextField replace mid-goto — check tf_text
+  after run_goto materialize), movieclip_gotoandstop_framescripts2/
+  _self, goto_in_scene_last_frame, movieclip_goto_scene_last_frame_*,
+  movieclip_next_scene/prev_scene (scene-relative goto edges),
+  movieclip_dispatchevent_selfadd/_target/_handlerorder/willtrigger
+  (check individually — may already pass).
+
+Next steps: (1) read the final sweep result, fix cheap stragglers if
+any; (2) run the full CI pipeline (no-graphics mode) per
+.claude/pipeline-handoff.md — commits are already pushed-ready; (3)
+zero pass→fail regressions across all suites is the gate (avm2
+baseline was 476/1201 at run 29166383620); (4) bookkeeping: plan §5
+landing note, CURRENT_STATUS.md, avm2-e4x-engine/direction memories,
+mark this prompt COMPLETE or refresh again.
+
+Gotchas added this session (beyond the ones below): vtable accessor
+overrides must REPLACE in place (lookup returns first match); broadcast
+lists snapshot length before iterating; script-created display objects
+are placed_by_avm2_script + NOT playing (frame 0 forever, framesLoaded
+1); never-constructed children fire no events/scripts/orphans; normalize
+uses the ±2^28 atom-int range (goto arg arithmetic is wrapping/
+saturating with truncating u16 cast); FrameLabel tags ignored when
+scene DATA exists (even 0 labels); SimpleButton has the one-shot
+up/over/down/hit framescript order + nested frame when the up state
+holds a MovieClip (SWF>9).
+
+
 You are implementing **Stage 5** of the AVM2 plan
 (`SWFRecompDocs/plans/avm2-support-plan.md` §5): the frame lifecycle
 (broadcast events, addFrameScript, goto machinery) and the display
