@@ -4616,6 +4616,136 @@ have_value_and_block_end:
 	return avm2_undefined();
 }
 
+
+// ===========================================================================
+// flash.text.engine.FontDescription (+ constant classes)
+// ===========================================================================
+
+typedef struct Avm2FontDescExt
+{
+	const Avm2String* font_name;
+	const Avm2String* font_weight;
+	const Avm2String* font_posture;
+	const Avm2String* font_lookup;
+	const Avm2String* rendering_mode;
+	const Avm2String* cff_hinting;
+	uint8_t locked;
+} Avm2FontDescExt;
+
+static Avm2Class* g_fontdesc_class;
+
+static Avm2FontDescExt* this_fontdesc(Avm2Activation* act)
+{
+	Avm2Object* obj = this_obj(act);
+	if (obj == NULL || obj->native_ext == NULL || g_fontdesc_class == NULL)
+	{
+		return NULL;
+	}
+	for (Avm2Class* c = obj->cls; c != NULL; c = c->super_class)
+	{
+		if (c == g_fontdesc_class) return (Avm2FontDescExt*) obj->native_ext;
+	}
+	return NULL;
+}
+
+// Validated string setter shared by the five enum-ish props.
+static const Avm2String* fd_check(Avm2Context* ctx, Avm2Value v,
+                                  const char* pname, const char* a,
+                                  const char* b)
+{
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		throw_2007(ctx, pname);
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	if (a == NULL) return s;  // fontName: any non-null string
+	if ((s->len == strlen(a) && memcmp(s->utf8, a, s->len) == 0)
+	    || (b != NULL && s->len == strlen(b) && memcmp(s->utf8, b, s->len) == 0))
+	{
+		return s;
+	}
+	throw_2008(ctx, pname);
+}
+
+#define FD_GETSET(cname, field, pname, va, vb) \
+	static Avm2Value fd_get_##cname(Avm2Activation* act) \
+	{ \
+		Avm2FontDescExt* fd = this_fontdesc(act); \
+		return fd != NULL && fd->field != NULL ? avm2_string(fd->field) \
+		                                       : avm2_null(); \
+	} \
+	static Avm2Value fd_set_##cname(Avm2Activation* act) \
+	{ \
+		Avm2FontDescExt* fd = this_fontdesc(act); \
+		if (fd != NULL) \
+		{ \
+			fd->field = fd_check(act->ctx, arg_or_undef(act, 0), pname, va, vb); \
+		} \
+		return avm2_undefined(); \
+	}
+
+FD_GETSET(font_name, font_name, "fontName", NULL, NULL)
+FD_GETSET(font_weight, font_weight, "fontWeight", "normal", "bold")
+FD_GETSET(font_posture, font_posture, "fontPosture", "normal", "italic")
+FD_GETSET(font_lookup, font_lookup, "fontLookup", "device", "embeddedCFF")
+FD_GETSET(rendering_mode, rendering_mode, "renderingMode", "normal", "cff")
+FD_GETSET(cff_hinting, cff_hinting, "cffHinting", "none", "horizontalStem")
+
+static Avm2Value fd_get_locked(Avm2Activation* act)
+{
+	Avm2FontDescExt* fd = this_fontdesc(act);
+	return avm2_bool(fd != NULL && fd->locked);
+}
+
+static Avm2Value fd_set_locked(Avm2Activation* act)
+{
+	Avm2FontDescExt* fd = this_fontdesc(act);
+	if (fd != NULL)
+	{
+		fd->locked = avm2_coerce_to_boolean(arg_or_undef(act, 0)) ? 1 : 0;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value fd_ctor(Avm2Activation* act)
+{
+	static const char* const defaults[6] = {
+		"_serif", "normal", "normal", "device", "cff", "horizontalStem",
+	};
+	static Avm2Value (*setters[6])(Avm2Activation*) = {
+		fd_set_font_name, fd_set_font_weight, fd_set_font_posture,
+		fd_set_font_lookup, fd_set_rendering_mode, fd_set_cff_hinting,
+	};
+	for (uint32_t i = 0; i < 6; i++)
+	{
+		Avm2Value v = i < act->argc ? act->args[i]
+			: avm2_string(avm2_string_from_literal(act->ctx, defaults[i]));
+		Avm2Activation sub = *act;
+		sub.args = &v;
+		sub.argc = 1;
+		setters[i](&sub);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value fd_clone(Avm2Activation* act)
+{
+	Avm2FontDescExt* fd = this_fontdesc(act);
+	if (fd == NULL) return avm2_null();
+	Avm2Value args[6] = {
+		avm2_string(fd->font_name), avm2_string(fd->font_weight),
+		avm2_string(fd->font_posture), avm2_string(fd->font_lookup),
+		avm2_string(fd->rendering_mode), avm2_string(fd->cff_hinting),
+	};
+	return avm2_class_construct(act->ctx, g_fontdesc_class, args, 6);
+}
+
+static Avm2Value fd_is_font_compatible(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(false);  // Ruffle stub_method
+}
+
 // ===========================================================================
 // EditText bounds + measurement API (consumed by avm2_display.c accessors)
 // ===========================================================================
@@ -5547,6 +5677,48 @@ void avm2_register_text(Avm2Context* ctx)
 		                               font_enumerate_fonts);
 		avm2_builtin_add_static_method(ctx, font, "registerFont",
 		                               font_register_font);
+	}
+
+	// flash.text.engine: FontDescription + its constant classes.
+	{
+		struct { const char* name; const char* consts[3]; const char* vals[3]; } cc[5] = {
+			{ "FontWeight", { "NORMAL", "BOLD", NULL }, { "normal", "bold", NULL } },
+			{ "FontPosture", { "NORMAL", "ITALIC", NULL }, { "normal", "italic", NULL } },
+			{ "FontLookup", { "DEVICE", "EMBEDDED_CFF", NULL }, { "device", "embeddedCFF", NULL } },
+			{ "RenderingMode", { "NORMAL", "CFF", NULL }, { "normal", "cff", NULL } },
+			{ "CFFHinting", { "NONE", "HORIZONTAL_STEM", NULL }, { "none", "horizontalStem", NULL } },
+		};
+		for (int i = 0; i < 5; i++)
+		{
+			Avm2Class* c = avm2_builtin_class(ctx, "flash.text.engine",
+			                                  cc[i].name,
+			                                  ctx->builtins.object_class);
+			for (int k = 0; k < 3 && cc[i].consts[k] != NULL; k++)
+			{
+				avm2_builtin_add_static_const(ctx, c, cc[i].consts[k],
+					avm2_string(avm2_string_from_literal(ctx, cc[i].vals[k])));
+			}
+		}
+		Avm2Class* fdcls = avm2_builtin_class(ctx, "flash.text.engine",
+		                                      "FontDescription",
+		                                      ctx->builtins.object_class);
+		g_fontdesc_class = fdcls;
+		fdcls->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+		fdcls->native_ext_size = sizeof(Avm2FontDescExt);
+		fdcls->instance_init.fn = fd_ctor;
+		fdcls->instance_init.debug_name = "FontDescription";
+		avm2_builtin_add_getset(ctx, fdcls, "fontName", fd_get_font_name, fd_set_font_name);
+		avm2_builtin_add_getset(ctx, fdcls, "fontWeight", fd_get_font_weight, fd_set_font_weight);
+		avm2_builtin_add_getset(ctx, fdcls, "fontPosture", fd_get_font_posture, fd_set_font_posture);
+		avm2_builtin_add_getset(ctx, fdcls, "fontLookup", fd_get_font_lookup, fd_set_font_lookup);
+		avm2_builtin_add_getset(ctx, fdcls, "renderingMode", fd_get_rendering_mode, fd_set_rendering_mode);
+		avm2_builtin_add_getset(ctx, fdcls, "cffHinting", fd_get_cff_hinting, fd_set_cff_hinting);
+		avm2_builtin_add_getset(ctx, fdcls, "locked", fd_get_locked, fd_set_locked);
+		avm2_builtin_add_method(ctx, fdcls, "clone", fd_clone);
+		avm2_builtin_add_static_method(ctx, fdcls, "isFontCompatible",
+		                               fd_is_font_compatible);
+		avm2_builtin_add_static_method(ctx, fdcls, "isDeviceFontCompatible",
+		                               fd_is_font_compatible);
 	}
 
 	// flash.geom.Rectangle (getCharBoundaries) + flash.text.TextLineMetrics

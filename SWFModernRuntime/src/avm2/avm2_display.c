@@ -777,10 +777,14 @@ static void insert_at_index(Avm2Context* ctx, Avm2Object* parent, Avm2Object* ch
 }
 
 // Full removal (Ruffle remove_child, AVM2 direct path).
+static Avm2Object* g_stage_focus;
+
 static void full_remove_child(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
                               Avm2Object* child)
 {
 	Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+	// Removing the focused object clears stage.focus (textfield_unload).
+	if (child == g_stage_focus) g_stage_focus = NULL;
 	dispatch_removed_event(ctx, child);
 	remove_child_from_depth_list(pext, child);
 	int removed = render_list_remove(pext, child);
@@ -4650,19 +4654,25 @@ static Avm2Value stage_set_scale_mode(Avm2Activation* act)
 static Avm2Value stage_get_focus(Avm2Activation* act)
 {
 	(void) act;
-	return avm2_null();
+	return g_stage_focus != NULL ? avm2_object_value(g_stage_focus)
+	                             : avm2_null();
 }
 
 static Avm2Value stage_set_focus(Avm2Activation* act)
 {
 	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
-	    && act->args[0].u.obj != NULL)
+	    && act->args[0].u.obj != NULL
+	    && avm2_display_ext_of(act->ctx, act->args[0].u.obj) != NULL)
 	{
 		// Focusing a TextField applies its pending autosize bounds
 		// (edittext_autosize_lazy_bounds_interactions).
 		avm2_text_apply_pending_bounds(act->ctx, act->args[0].u.obj);
+		g_stage_focus = act->args[0].u.obj;
 	}
-	(void) act;
+	else
+	{
+		g_stage_focus = NULL;
+	}
 	return avm2_undefined();
 }
 
