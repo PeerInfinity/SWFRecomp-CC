@@ -1,5 +1,15 @@
 # Session prompt — AVM2 Stage 8: input harness + input bridge
 
+> **COMPLETE 2026-07-12 (commit `ee2107860`).** ~42/71 input.json candidates
+> pass (was 0). Harness injection wired to the AVM2 build; flash.events
+> Mouse/Keyboard/Focus/TextEvent + mouse hit-test/dispatch + drag + focus
+> manager + tab order + TextField editing landed. 29 misses triaged in
+> `avm2/_investigation/STAGE8_CANDIDATES.txt` (masks, Loader, SimpleButton
+> highlight geometry, IME, HTML link events, real-shape hit-test). Details in
+> the `avm2-stage8-input` memory + `CURRENT_STATUS.md`. Next: Stage 9 (minimal
+> AVM2 render path) — draft below.
+
+
 You are implementing **Stage 8** of the AVM2 Seedling-directed plan
 (`SWFRecompDocs/plans/avm2-seedling-plan.md`): the interactive-test input
 harness and the AVM2 input→event bridge. This unlocks the **74 input.json

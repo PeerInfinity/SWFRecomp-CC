@@ -67,14 +67,23 @@ answer to "what could go wrong with game-first development"):
   (`avm2/_investigation/STAGE7_CANDIDATES.txt`). Exit: >=22 of 31 +
   zero regressions. Session prompt:
   `SWFRecompDocs/prompts/avm2-stage7-bitmapdata.md`.
-- **Stage 8 — input harness + input bridge**. verify_output.py learns
-  Ruffle's input.json event-injection format (the 74 interactive
-  tests, incl. the 16 text-family ones excluded from Stage 6); the
-  AVM2 runtime gets KeyboardEvent/MouseEvent/FocusEvent dispatch from
-  injected (and later real) input, Keyboard/Mouse constants, focus
-  interplay. Graded by: the input.json test family (candidate list to
-  be generated at session start). This is also the bridge design for
-  real platform input in native/browser builds.
+- **Stage 8 — input harness + input bridge** — **DONE 2026-07-12**
+  (commit `ee2107860`; ~42/71 input.json candidates). verify_output.py
+  injects Ruffle's input.json into the AVM2 build; the runtime got
+  flash.events MouseEvent/KeyboardEvent/FocusEvent/TextEvent, mouse
+  hit-test + 3-phase dispatch, Sprite drag, a focus manager (mouse+Tab
+  focus, FocusEvent family, automatic 6y+x + custom tabIndex tab order),
+  and TextField editing over the Stage-6 EditText engine. 29 misses
+  triaged (masks, Loader, SimpleButton highlight geometry, IME, HTML
+  link events, real-shape hit-testing — mostly Stage-9/deferred). Fixed
+  a pre-existing MovieClip-missing-Sprite.graphics ordering bug. See
+  `avm2/_investigation/CURRENT_STATUS.md` + `avm2-stage8-input` memory.
+  Original scope: verify_output.py learns Ruffle's input.json
+  event-injection format (the 74 interactive tests, incl. the 16
+  text-family ones excluded from Stage 6); the AVM2 runtime gets
+  KeyboardEvent/MouseEvent/FocusEvent dispatch from injected (and later
+  real) input, Keyboard/Mouse constants, focus interplay. This is also
+  the bridge design for real platform input in native/browser builds.
 - **Stage 9 — minimal AVM2 render path**. A real render-tree traversal
   over the AVM2 display tree feeding the existing render backend,
   starting with the Bitmap/BitmapData blit path (+ solid-color

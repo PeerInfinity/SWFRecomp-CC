@@ -1,8 +1,50 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-12 — Stage 7 (embedded assets + BitmapData/Bitmap)
-COMPLETE; Stage 6 (TextField/EditText engine), Stage 5, E4X and Stage 4
-before it.
+Last updated: 2026-07-12 — Stage 8 (input harness + input→event bridge)
+COMPLETE; Stage 7 (embedded assets + BitmapData/Bitmap), Stage 6
+(TextField/EditText engine), Stage 5, E4X and Stage 4 before it.
+
+## State (Stage 8)
+
+- **Stage 8 COMPLETE (2026-07-12, commit `ee2107860`): ~42/71 input.json
+  candidates pass locally** (`_investigation/STAGE8_CANDIDATES.txt`; up from 0
+  — the AVM2 runtime ignored input.json entirely before this). The ~29 misses
+  are triaged there and cluster on features outside the input bridge: mask
+  hit-testing, flash.display.Loader (deferred), SimpleButton highlight_bounds
+  geometry + arrow navigation, IME, HTML link events, real-shape hit-testing.
+  What landed:
+  - `ruffle-tests/verify_output.py` — input.json injection wired to the AVM2
+    build; `KEY_DOWN` now carries keyCode/charCode/keyLocation, `MOUSE_DOWN`
+    the double-click index, `SET_CLIPBOARD_TEXT` escapes embedded newlines.
+  - `SWFModernRuntime/src/avm2/avm2_events.c` — flash.events MouseEvent /
+    KeyboardEvent / FocusEvent / TextEvent (subclass ctors, getters, toString
+    overrides via in-place vtable replace).
+  - `SWFModernRuntime/src/avm2/avm2_display.c` — the input section: parser +
+    per-WAIT-tick pump, mouse hit-test (Ruffle mouse_pick_avm2 AABB) + 3-phase
+    dispatch (down/up/click/middle/right/rollOver/rollOut/mouseMove/wheel with
+    mouseEnabled/mouseChildren gating), Sprite.startDrag/stopDrag/dropTarget,
+    keyboard→stage.focus dispatch, the focus manager (mouse+Tab focus, focusIn/
+    Out/keyFocusChange/mouseFocusChange, automatic 6y+x tab order + custom
+    tabIndex order, is_tabbable/tab_enabled per type, buttonMode/useHandCursor).
+    Also fixed a pre-existing bug — MovieClip did not inherit Sprite.graphics
+    (getter registered after MovieClip was derived), which crashed every input
+    test that drew via `this.graphics.beginFill`.
+  - `SWFModernRuntime/src/avm2/avm2_text.c` — TextField editing bridge over the
+    Stage-6 EditText engine: text_input (typed + pasted, newline/control
+    filter, textInput event, restrict, maxChars, change), text controls
+    (move/select/backspace/delete/cut/copy/paste), EditTextRestrict.
+  - **CI baseline (no-graphics, run 29213200637, sha `ee2107860`): avm2 800 /
+    1,204 passing + 22 ruffle_matched = 822 effective (68.3%)** — +47 over
+    Stage-7's 775 (the input harness + the MovieClip.graphics fix unlocked
+    bystanders well beyond the 71 candidates). avm1 (634/706+RM), gnash,
+    shumway (73/92+RM), regression (41/41) all unchanged; wasm-link-smoke
+    green. **One pass→fail regression** — `edittext_autosize_lazy_bounds_
+    interactions` (re-focusing the already-focused TextField stopped applying
+    pending autosize bounds because the new `set_focus` early-returns on an
+    unchanged focus) — **fixed in the follow-up commit** (stage.focus applies
+    pending bounds unconditionally, like the old setter; set_focus then only
+    fires focusIn/Out when the focus actually changes).
+
 
 ## State (Stage 7)
 

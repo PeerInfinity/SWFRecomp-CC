@@ -4722,7 +4722,11 @@ static Avm2Value stage_set_focus(Avm2Activation* act)
 	    && act->args[0].u.obj != NULL
 	    && avm2_display_ext_of(act->ctx, act->args[0].u.obj) != NULL)
 	{
-		// Programmatic focus fires focusOut/focusIn (Ruffle focus_tracker.set).
+		// Focusing a TextField applies its pending autosize bounds — even when
+		// re-focusing the already-focused object (edittext_autosize_lazy_bounds_
+		// interactions relies on this). set_focus then fires focusOut/focusIn
+		// only if the focus actually changes.
+		avm2_text_apply_pending_bounds(act->ctx, act->args[0].u.obj);
 		set_focus(act->ctx, act->args[0].u.obj);
 	}
 	else
