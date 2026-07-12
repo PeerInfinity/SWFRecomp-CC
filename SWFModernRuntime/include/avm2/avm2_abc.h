@@ -262,6 +262,8 @@ typedef struct Avm2CharInfo
 	// Self bounds in twips (shapes/texts; zero for sprites — computed from
 	// children at runtime).
 	int32_t xmin, xmax, ymin, ymax;
+	// DefineEditText initial text (NULL when absent / not an EditText).
+	const char* init_text;
 } Avm2CharInfo;
 
 // DefineSceneAndFrameLabelData (root timeline only).

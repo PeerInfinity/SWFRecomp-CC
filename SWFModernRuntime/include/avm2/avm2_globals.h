@@ -320,6 +320,17 @@ typedef struct Avm2DisplayObjectExt
 	uint32_t queued_place_count;
 	uint32_t frame_script_cap;
 	Avm2Value* frame_scripts;    // indexed by 0-based frame; unset = undefined kind
+
+	// --- SimpleButton ---
+	Avm2Object* btn_up;
+	Avm2Object* btn_over;
+	Avm2Object* btn_down;
+	Avm2Object* btn_hit;
+	uint8_t btn_states_created;
+	uint8_t btn_weird_order;  // one-shot framescript order after construction
+
+	// --- TextField ---
+	const Avm2String* tf_text;   // NULL = default ""
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.

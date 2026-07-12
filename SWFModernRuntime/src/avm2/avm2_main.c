@@ -229,18 +229,44 @@ void runSWF_avm2(SWFAppContext* app_context)
 	}
 	else
 	{
-		// No char-0 binding: the movie's classes are bound to placed symbols
-		// (SymbolClass char N + PlaceObject on frame 1). Keep the pre-display
-		// behavior for these movies: construct each bound class once in tag
-		// order — the single-frame test-movie behavior. This is best-effort:
-		// a binding whose defining script aborted (its slot never became a
-		// class — negative_volume_panned's init dies on the Sound stub) is
-		// skipped, not fatal. The display tree is still built so the frame
-		// lifecycle (broadcast events) runs.
+		// No char-0 binding: bindings whose characters ARE placed on a
+		// timeline now construct through real timeline instantiation
+		// (build_stage below). Bindings to never-placed characters keep
+		// the pre-display construct-once behavior (the single-frame
+		// test-movie pattern several Stage-2 baseline tests rely on).
+		// Best-effort: a binding whose defining script aborted is skipped.
 		for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
 		{
 			const char* cname = avm2_generated_symbol_classes[i].class_name;
 			if (cname == NULL) continue;
+			uint16_t cid = avm2_generated_symbol_classes[i].char_id;
+			int placed = 0;
+			for (uint32_t t = 0; t < avm2_generated_timeline_count && !placed; t++)
+			{
+				const Avm2TimelineData* tl = &avm2_generated_timelines[t];
+				uint32_t nops = tl->frame_op_starts[tl->frame_count];
+				for (uint32_t o = 0; o < nops; o++)
+				{
+					if ((tl->ops[o].flags & 1 /* HAS_CHAR */)
+					    && tl->ops[o].char_id == cid)
+					{
+						placed = 1;
+						break;
+					}
+				}
+			}
+			for (uint32_t b = 0; b < avm2_generated_button_count && !placed; b++)
+			{
+				for (uint32_t r = 0; r < avm2_generated_buttons[b].record_count; r++)
+				{
+					if (avm2_generated_buttons[b].records[r].char_id == cid)
+					{
+						placed = 1;
+						break;
+					}
+				}
+			}
+			if (placed) continue;
 			Avm2PropKey key;
 			Avm2Object* globals = find_root_class_globals(ctx, cname, &key);
 			if (globals == NULL) continue;

@@ -15,6 +15,7 @@
 // One ext struct (Avm2DisplayObjectExt) serves the whole ladder.
 
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -166,6 +167,7 @@ static int g_timeline_instantiation;
 
 static Avm2Class* g_textfield_class;
 static Avm2Class* g_statictext_class;
+static uint8_t g_stage_invalidated_flag;
 
 static const Avm2TimelineData* timeline_for_char(uint16_t char_id)
 {
@@ -834,6 +836,7 @@ static void display_run_constructor(Avm2Context* ctx, Avm2Object* obj)
 
 static void enter_frame_obj(Avm2Context* ctx, Avm2Object* obj);
 static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj);
+static void button_construct_states(Avm2Context* ctx, Avm2Object* button);
 static void run_frame_scripts_obj(Avm2Context* ctx, Avm2Object* obj);
 static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_implicit);
 static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj);
@@ -985,6 +988,13 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 	{
 		cext->clip_depth = op->clip_depth;
 	}
+	{
+		const Avm2CharInfo* ci = char_info(op->char_id);
+		if (ci != NULL && ci->init_text != NULL)
+		{
+			cext->tf_text = avm2_string_from_literal(ctx, ci->init_text);
+		}
+	}
 	set_default_instance_name(ctx, cext);
 	enter_frame_obj(ctx, child);
 	if (prev != NULL)
@@ -1001,7 +1011,27 @@ static void run_place_op(Avm2Context* ctx, Avm2Object* parent, const Avm2Timelin
 	if (pext == NULL) return;
 	if (op->flags & AVM2_TLF_HAS_CHAR)
 	{
-		instantiate_child(ctx, parent, op);
+		Avm2Object* existing = child_by_depth(pext, op->depth);
+		if (existing != NULL && (op->flags & AVM2_TLF_MOVE))
+		{
+			// Replace: the SAME display object swaps its character
+			// (Ruffle replace_with) — no remove/add events.
+			Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, existing);
+			if (cext != NULL)
+			{
+				cext->char_id = op->char_id;
+				cext->timeline = timeline_for_char(op->char_id);
+				const Avm2CharInfo* ci = char_info(op->char_id);
+				cext->tf_text = (ci != NULL && ci->init_text != NULL)
+					? avm2_string_from_literal(ctx, ci->init_text) : NULL;
+				cext->place_frame = pext->current_frame;
+				apply_place_object(ctx, existing, op);
+			}
+		}
+		else
+		{
+			instantiate_child(ctx, parent, op);
+		}
 	}
 	else
 	{
@@ -1107,7 +1137,25 @@ static void run_frame_internal(Avm2Context* ctx, Avm2Object* obj, int run_displa
 			const Avm2TimelineOp* op = &tl->ops[i];
 			if (op->kind == AVM2_TLOP_PLACE)
 			{
-				ext->queued_places[ext->queued_place_count++] = (int32_t) i;
+				// QueuedTagList: one queued Add per depth — the FIRST wins
+				// (place_object_same_depth_frame).
+				int dup = 0;
+				for (uint32_t k = 0; k < ext->queued_place_count; k++)
+				{
+					const Avm2TimelineOp* q = &tl->ops[ext->queued_places[k]];
+					if (q->depth == op->depth && (op->flags & AVM2_TLF_HAS_CHAR)
+					    && (q->flags & AVM2_TLF_HAS_CHAR))
+					{
+						fprintf(stderr, "AVM2 timeline: failed to queue place at "
+						        "depth %u (already queued)\n", op->depth);
+						dup = 1;
+						break;
+					}
+				}
+				if (!dup)
+				{
+					ext->queued_places[ext->queued_place_count++] = (int32_t) i;
+				}
 			}
 			else if (op->kind == AVM2_TLOP_REMOVE)
 			{
@@ -1157,6 +1205,20 @@ static void enter_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 		}
 		enter_frame_obj(ctx, child);
 	}
+	Avm2Object* states[4] = { ext->btn_up, ext->btn_over, ext->btn_down,
+	                          ext->btn_hit };
+	for (int s = 3; s >= 0; s--)
+	{
+		if (states[s] != NULL)
+		{
+			if (skip)
+			{
+				Avm2DisplayObjectExt* sx = avm2_display_ext_of(ctx, states[s]);
+				if (sx != NULL) sx->skip_next_enter_frame = 1;
+			}
+			enter_frame_obj(ctx, states[s]);
+		}
+	}
 	if (skip)
 	{
 		ext->skip_next_enter_frame = 0;
@@ -1191,6 +1253,12 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 	ext->loop_queued = 0;
 	if (needs_construction)
 	{
+		// SimpleButton states are created eagerly, before the ctor runs
+		// (Ruffle avm2_button.rs construct_frame).
+		if (class_is_a(obj->cls, ctx->builtins.simple_button_class))
+		{
+			button_construct_states(ctx, obj);
+		}
 		ext->constructed = 1;
 		display_run_constructor(ctx, obj);
 		on_construction_complete(ctx, obj);
@@ -1203,6 +1271,14 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 	}
 	else
 	{
+		{
+			Avm2Object* states[4] = { ext->btn_hit, ext->btn_up,
+			                          ext->btn_down, ext->btn_over };
+			for (int s = 0; s < 4; s++)
+			{
+				if (states[s] != NULL) construct_frame_obj(ctx, states[s]);
+			}
+		}
 		for (uint32_t i = 0; i < ext->render_len; i++)
 		{
 			Avm2DisplayObjectExt* cext =
@@ -1318,6 +1394,21 @@ static void run_frame_scripts_obj(Avm2Context* ctx, Avm2Object* obj)
 	for (uint32_t i = 0; i < ext->render_len; i++)
 	{
 		run_frame_scripts_obj(ctx, ext->render_list[i]);
+	}
+	{
+		// Normal order: hit, up, down, over; the one-shot "weird" order
+		// right after construction: up, over, down, hit (Ruffle
+		// all_state_children).
+		Avm2Object* normal[4] = { ext->btn_hit, ext->btn_up, ext->btn_down,
+		                          ext->btn_over };
+		Avm2Object* weird[4] = { ext->btn_up, ext->btn_over, ext->btn_down,
+		                         ext->btn_hit };
+		Avm2Object** order = ext->btn_weird_order ? weird : normal;
+		ext->btn_weird_order = 0;
+		for (int s = 0; s < 4; s++)
+		{
+			if (order[s] != NULL) run_frame_scripts_obj(ctx, order[s]);
+		}
 	}
 }
 
@@ -1725,6 +1816,12 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	orphan_cleanup(ctx);
 
 	ctx->frame_phase = PHASE_IDLE;
+	// Render phase: stage.invalidate() requests one "render" broadcast.
+	if (g_stage_invalidated_flag)
+	{
+		g_stage_invalidated_flag = 0;
+		broadcast_named(ctx, "render");
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1758,6 +1855,7 @@ void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name)
 	g_timeline_instantiation = 0;
 	Avm2DisplayObjectExt* sext = (Avm2DisplayObjectExt*) stage->native_ext;
 	sext->is_stage = 1;
+	sext->is_root = 1;  // stage.root === stage (stage_displayobject_properties)
 	sext->constructed = 1;
 	ctx->stage = stage;
 
@@ -3367,6 +3465,325 @@ static Avm2Value do_set_transform(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// --- generic stub props stored as dont_enum dyn props ---
+
+static Avm2Value dyn_prop_get(Avm2Activation* act, const char* key, Avm2Value dflt)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return dflt;
+	Avm2Value* v = avm2_object_find_dynamic(self, key, (uint32_t) strlen(key));
+	return v != NULL ? *v : dflt;
+}
+
+static void dyn_prop_set(Avm2Activation* act, const char* key)
+{
+	Avm2Object* self = this_obj(act);
+	if (self != NULL && act->argc > 0)
+	{
+		avm2_object_set_dynamic(act->ctx, self, key, (uint32_t) strlen(key),
+		                        act->args[0])->dont_enum = 1;
+	}
+}
+
+#define STUB_GETSET(fn, key, dflt) \
+	static Avm2Value fn##_get(Avm2Activation* act) \
+	{ return dyn_prop_get(act, key, dflt); } \
+	static Avm2Value fn##_set(Avm2Activation* act) \
+	{ dyn_prop_set(act, key); return avm2_undefined(); }
+
+STUB_GETSET(do_cab, "__cacheAsBitmap", avm2_bool(false))
+STUB_GETSET(do_opaquebg, "__opaqueBackground", avm2_null())
+STUB_GETSET(do_scrollrect, "__scrollRect", avm2_null())
+STUB_GETSET(do_accessprops, "__accessibilityProperties", avm2_null())
+STUB_GETSET(do_accessimpl, "__accessibilityImplementation", avm2_null())
+STUB_GETSET(do_contextmenu, "__contextMenu", avm2_null())
+STUB_GETSET(do_blendmode, "__blendMode",
+            avm2_string(avm2_string_from_literal(act->ctx, "normal")))
+
+static Avm2Value do_get_zero(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_number(0);
+}
+
+static Avm2Value do_get_one(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_number(1);
+}
+
+static Avm2Value do_set_noop(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+// ===========================================================================
+// Natives: SimpleButton (Ruffle avm2_button.rs — states created eagerly at
+// construct time, single-record states ARE the symbol, multi-record states
+// wrap in an auto Sprite-classed clip)
+// ===========================================================================
+
+static const Avm2ButtonData* button_data_for_char(uint16_t char_id)
+{
+	for (uint32_t i = 0; i < avm2_generated_button_count; i++)
+	{
+		if (avm2_generated_buttons[i].char_id == char_id)
+		{
+			return &avm2_generated_buttons[i];
+		}
+	}
+	return NULL;
+}
+
+static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
+                                       uint8_t state_bit, int* out_multi)
+{
+	Avm2DisplayObjectExt* bext = avm2_display_ext_of(ctx, button);
+	const Avm2ButtonData* bd = button_data_for_char(bext->char_id);
+	*out_multi = 0;
+	if (bd == NULL) return NULL;
+
+	Avm2Object* children[32];
+	const Avm2ButtonRecordData* recs[32];
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < bd->record_count && n < 32; i++)
+	{
+		const Avm2ButtonRecordData* rec = &bd->records[i];
+		if ((rec->state_flags & state_bit) == 0) continue;
+		Avm2Class* cls = class_for_char(ctx, rec->char_id);
+		if (cls == NULL) continue;
+		g_timeline_instantiation = 1;
+		Avm2Object* child = display_alloc_instance(ctx, cls);
+		g_timeline_instantiation = 0;
+		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+		cext->char_id = rec->char_id;
+		cext->timeline = timeline_for_char(rec->char_id);
+		cext->instantiated_by_timeline = 1;
+		cext->depth = rec->depth;
+		if (rec->has_matrix)
+		{
+			cext->mtx_a = rec->mtx_a;
+			cext->mtx_b = rec->mtx_b;
+			cext->mtx_c = rec->mtx_c;
+			cext->mtx_d = rec->mtx_d;
+			cext->mtx_tx = rec->mtx_tx;
+			cext->mtx_ty = rec->mtx_ty;
+			cext->scale_rot_cached = 0;
+		}
+		{
+			const Avm2CharInfo* ci = char_info(rec->char_id);
+			if (ci != NULL && ci->init_text != NULL)
+			{
+				cext->tf_text = avm2_string_from_literal(ctx, ci->init_text);
+			}
+		}
+		children[n] = child;
+		recs[n] = rec;
+		n++;
+	}
+	(void) recs;
+	if (n == 0) return NULL;
+	if (n == 1)
+	{
+		Avm2Object* child = children[0];
+		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+		cext->parent = button;
+		set_default_instance_name(ctx, cext);
+		enter_frame_obj(ctx, child);
+		construct_frame_obj(ctx, child);
+		return child;
+	}
+	*out_multi = 1;
+	// Wrapper: a MovieClip with the Sprite class (traces [object Sprite]),
+	// never auto-named.
+	g_timeline_instantiation = 1;
+	Avm2Object* wrapper = display_alloc_instance(ctx, ctx->builtins.sprite_class);
+	g_timeline_instantiation = 0;
+	Avm2DisplayObjectExt* wext = avm2_display_ext_of(ctx, wrapper);
+	wext->parent = button;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, children[i]);
+		replace_at_depth(ctx, wext, children[i], cext->depth);
+		// Construction happens while parent is the BUTTON (a
+		// non-container), so `parent` reads null from the ctor
+		// (simplebutton_childprops); the wrapper becomes parent after.
+		cext->parent = button;
+		set_default_instance_name(ctx, cext);
+		enter_frame_obj(ctx, children[i]);
+		construct_frame_obj(ctx, children[i]);
+		cext->parent = wrapper;
+	}
+	construct_frame_obj(ctx, wrapper);
+	return wrapper;
+}
+
+static void button_construct_states(Avm2Context* ctx, Avm2Object* button)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, button);
+	if (ext == NULL || ext->btn_states_created) return;
+	ext->btn_states_created = 1;
+	int up_multi, over_multi, down_multi, hit_multi;
+	ext->btn_up = button_create_state(ctx, button, 0x01, &up_multi);
+	ext->btn_over = button_create_state(ctx, button, 0x02, &over_multi);
+	ext->btn_down = button_create_state(ctx, button, 0x04, &down_multi);
+	ext->btn_hit = button_create_state(ctx, button, 0x08, &hit_multi);
+
+	// Event quirks (Ruffle construct_frame): wrapper-state children fire
+	// `added` with a temporarily-null parent; the UP state then fires
+	// `added` on the real parent; addedToStage fires on the BUTTON
+	// (recursively) when it is on stage.
+	Avm2Object* states[4] = { ext->btn_up, ext->btn_over, ext->btn_down,
+	                          ext->btn_hit };
+	int multis[4] = { up_multi, over_multi, down_multi, hit_multi };
+	for (int s = 0; s < 4; s++)
+	{
+		if (states[s] == NULL || !multis[s]) continue;
+		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, states[s]);
+		Avm2Object* old_parent = sext->parent;
+		sext->parent = NULL;
+		for (uint32_t i = 0; i < sext->render_len; i++)
+		{
+			dispatch_simple_event(ctx, sext->render_list[i], "added", 1);
+		}
+		sext->parent = old_parent;
+	}
+	if (ext->btn_up != NULL)
+	{
+		dispatch_simple_event(ctx, ext->btn_up, "added", 1);
+	}
+	if (is_on_stage(ctx, button))
+	{
+		dispatch_added_to_stage_recursive(ctx, button);
+	}
+
+	// A MovieClip in the up state (SWF>9) makes avmplus run a NESTED
+	// construct/framescript/exit frame before the button's own ctor —
+	// with the one-shot up/over/down/hit framescript order.
+	int has_mc = 0;
+	if (ext->btn_up != NULL)
+	{
+		Avm2DisplayObjectExt* uext = avm2_display_ext_of(ctx, ext->btn_up);
+		if (up_multi && uext != NULL)
+		{
+			for (uint32_t i = 0; i < uext->render_len; i++)
+			{
+				if (class_is_a(uext->render_list[i]->cls,
+				               ctx->builtins.movieclip_class))
+				{
+					has_mc = 1;
+				}
+			}
+		}
+		else if (class_is_a(ext->btn_up->cls, ctx->builtins.movieclip_class))
+		{
+			has_mc = 1;
+		}
+	}
+	if (has_mc && ctx->swf_version > 9 && ctx->stage != NULL)
+	{
+		ext->btn_weird_order = 1;
+		uint8_t old_phase = ctx->frame_phase;
+		Avm2DisplayObjectExt* stext = avm2_display_ext_of(ctx, ctx->stage);
+		ctx->frame_phase = PHASE_CONSTRUCT;
+		for (uint32_t i = 0; i < stext->render_len; i++)
+		{
+			construct_frame_obj(ctx, stext->render_list[i]);
+		}
+		broadcast_named(ctx, "frameConstructed");
+		ctx->frame_phase = PHASE_FRAME_SCRIPTS;
+		for (uint32_t i = 0; i < stext->render_len; i++)
+		{
+			run_frame_scripts_obj(ctx, stext->render_list[i]);
+		}
+		run_frame_script_cleanup(ctx);
+		ctx->frame_phase = PHASE_EXIT;
+		broadcast_named(ctx, "exitFrame");
+		ctx->frame_phase = old_phase;
+	}
+}
+
+static Avm2Value btn_state_get(Avm2Activation* act, size_t off)
+{
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL) return avm2_null();
+	Avm2Object* s = *(Avm2Object**) ((char*) ext + off);
+	return s != NULL ? avm2_object_value(s) : avm2_null();
+}
+
+static Avm2Value btn_state_set(Avm2Activation* act, size_t off)
+{
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL) return avm2_undefined();
+	Avm2Object* v = (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		? act->args[0].u.obj : NULL;
+	*(Avm2Object**) ((char*) ext + off) = v;
+	return avm2_undefined();
+}
+
+#define BTN_STATE(name, field) \
+	static Avm2Value btn_get_##name(Avm2Activation* act) \
+	{ return btn_state_get(act, offsetof(Avm2DisplayObjectExt, field)); } \
+	static Avm2Value btn_set_##name(Avm2Activation* act) \
+	{ return btn_state_set(act, offsetof(Avm2DisplayObjectExt, field)); }
+
+BTN_STATE(up, btn_up)
+BTN_STATE(over, btn_over)
+BTN_STATE(down, btn_down)
+BTN_STATE(hit, btn_hit)
+
+STUB_GETSET(btn_enabled, "__enabled", avm2_bool(true))
+STUB_GETSET(btn_handcursor, "__useHandCursor", avm2_bool(true))
+STUB_GETSET(btn_trackasmenu, "__trackAsMenu", avm2_bool(false))
+
+// SimpleButton(upState, overState, downState, hitTestState) constructor.
+static Avm2Value simplebutton_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL) return avm2_undefined();
+	button_construct_states(ctx, this_obj(act));
+	static const size_t offs[4] = {
+		offsetof(Avm2DisplayObjectExt, btn_up),
+		offsetof(Avm2DisplayObjectExt, btn_over),
+		offsetof(Avm2DisplayObjectExt, btn_down),
+		offsetof(Avm2DisplayObjectExt, btn_hit),
+	};
+	for (uint32_t i = 0; i < 4 && i < act->argc; i++)
+	{
+		if (act->args[i].kind == AVM2_VALUE_OBJECT)
+		{
+			*(Avm2Object**) ((char*) ext + offs[i]) = act->args[i].u.obj;
+		}
+	}
+	return avm2_undefined();
+}
+
+// ===========================================================================
+// Natives: TextField (text from the EditText character's initial text)
+// ===========================================================================
+
+static Avm2Value tf_get_text(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL || ext->tf_text == NULL)
+	{
+		return avm2_string(avm2_string_from_literal(act->ctx, ""));
+	}
+	return avm2_string(ext->tf_text);
+}
+
+static Avm2Value tf_set_text(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext != NULL && act->argc > 0)
+	{
+		ext->tf_text = avm2_coerce_to_string(act->ctx, act->args[0]);
+	}
+	return avm2_undefined();
+}
+
 // ===========================================================================
 // Natives: FrameLabel / Scene (state = dont_enum dyn props)
 // ===========================================================================
@@ -3590,11 +4007,22 @@ static Avm2Value stage_set_focus(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+
 static Avm2Value stage_invalidate(Avm2Activation* act)
 {
 	(void) act;
+	g_stage_invalidated_flag = 1;
 	return avm2_undefined();
 }
+
+// Stage overrides most DisplayObject setters to throw (plain Error).
+static Avm2Value stage_throw_2071(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	avm2_throw_error(ctx, ctx->builtins.error_class,
+	                 "Error #2071: The Stage class does not implement this property or method.");
+}
+
 
 // ===========================================================================
 // Constructors (instance_init natives)
@@ -3697,6 +4125,27 @@ static Avm2Value sprite_ctor_init(Avm2Activation* act)
 static void add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
                        Avm2MethodFn getter, Avm2MethodFn setter)
 {
+	// Replace an inherited accessor in place (lookup returns the FIRST
+	// match, so appending never shadows) — the Stage overrides depend on
+	// this.
+	uint32_t name_len = (uint32_t) strlen(name);
+	for (uint32_t i = 0; i < cls->ivtable.count; i++)
+	{
+		Avm2PropEntry* e = &cls->ivtable.entries[i];
+		if (e->key.name_len == name_len && e->key.ns_len == 0
+		    && memcmp(e->key.name, name, name_len) == 0
+		    && (e->kind == AVM2_PROP_GETTER || e->kind == AVM2_PROP_SETTER
+		        || e->kind == AVM2_PROP_GETSET))
+		{
+			e->kind = (setter != NULL) ? AVM2_PROP_GETSET : AVM2_PROP_GETTER;
+			e->method.fn = getter;
+			e->method.debug_name = name;
+			e->setter.fn = setter;
+			e->setter.debug_name = name;
+			e->defining_class = cls;
+			return;
+		}
+	}
 	avm2_builtin_add_getset(ctx, cls, name, getter, setter);
 }
 
@@ -3730,6 +4179,18 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, dobj, "mouseX", do_get_mouse_x);
 	avm2_builtin_add_getter(ctx, dobj, "mouseY", do_get_mouse_y);
 	avm2_builtin_add_getter(ctx, dobj, "loaderInfo", do_get_loader_info);
+	add_getset(ctx, dobj, "cacheAsBitmap", do_cab_get, do_cab_set);
+	add_getset(ctx, dobj, "opaqueBackground", do_opaquebg_get, do_opaquebg_set);
+	add_getset(ctx, dobj, "scrollRect", do_scrollrect_get, do_scrollrect_set);
+	add_getset(ctx, dobj, "accessibilityProperties", do_accessprops_get,
+	           do_accessprops_set);
+	add_getset(ctx, dobj, "blendMode", do_blendmode_get, do_blendmode_set);
+	add_getset(ctx, dobj, "scale9Grid", do_scrollrect_get, do_scrollrect_set);
+	add_getset(ctx, dobj, "z", do_get_zero, do_set_noop);
+	add_getset(ctx, dobj, "rotationX", do_get_zero, do_set_noop);
+	add_getset(ctx, dobj, "rotationY", do_get_zero, do_set_noop);
+	add_getset(ctx, dobj, "rotationZ", do_get_rotation, do_set_rotation);
+	add_getset(ctx, dobj, "scaleZ", do_get_one, do_set_noop);
 
 	Avm2Class* iobj =
 		avm2_builtin_class(ctx, "flash.display", "InteractiveObject", dobj);
@@ -3740,6 +4201,9 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, iobj, "tabEnabled", io_get_tab_enabled, io_set_tab_enabled);
 	add_getset(ctx, iobj, "tabIndex", io_get_tab_index, io_set_tab_index);
 	add_getset(ctx, iobj, "focusRect", io_get_focus_rect, io_set_focus_rect);
+	add_getset(ctx, iobj, "accessibilityImplementation", do_accessimpl_get,
+	           do_accessimpl_set);
+	add_getset(ctx, iobj, "contextMenu", do_contextmenu_get, do_contextmenu_set);
 
 	Avm2Class* doc =
 		avm2_builtin_class(ctx, "flash.display", "DisplayObjectContainer", iobj);
@@ -3803,6 +4267,7 @@ void avm2_register_display(Avm2Context* ctx)
 	// instantiates EditText/DefineText characters as these).
 	Avm2Class* textfield = avm2_builtin_class(ctx, "flash.text", "TextField", iobj);
 	textfield->native_init = display_native_init;
+	add_getset(ctx, textfield, "text", tf_get_text, tf_set_text);
 	g_textfield_class = textfield;
 	Avm2Class* statictext = avm2_builtin_class(ctx, "flash.text", "StaticText", dobj);
 	statictext->native_init = display_native_init;
@@ -3864,11 +4329,20 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, scene, "numFrames", scene_get_num_frames);
 	g_scene_class = scene;
 
-	// flash.display.SimpleButton (structural stub until tranche 5).
+	// flash.display.SimpleButton.
 	Avm2Class* button =
 		avm2_builtin_class(ctx, "flash.display", "SimpleButton", iobj);
 	button->native_init = display_native_init;
+	button->instance_init.fn = simplebutton_init;
+	button->instance_init.debug_name = "SimpleButton";
 	b->simple_button_class = button;
+	add_getset(ctx, button, "upState", btn_get_up, btn_set_up);
+	add_getset(ctx, button, "overState", btn_get_over, btn_set_over);
+	add_getset(ctx, button, "downState", btn_get_down, btn_set_down);
+	add_getset(ctx, button, "hitTestState", btn_get_hit, btn_set_hit);
+	add_getset(ctx, button, "enabled", btn_enabled_get, btn_enabled_set);
+	add_getset(ctx, button, "useHandCursor", btn_handcursor_get, btn_handcursor_set);
+	add_getset(ctx, button, "trackAsMenu", btn_trackasmenu_get, btn_trackasmenu_set);
 
 	// flash.display.Stage.
 	Avm2Class* stage = avm2_builtin_class(ctx, "flash.display", "Stage", doc);
@@ -3897,6 +4371,33 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, stage, "scaleMode", stage_get_scale_mode, stage_set_scale_mode);
 	add_getset(ctx, stage, "focus", stage_get_focus, stage_set_focus);
 	avm2_builtin_add_method(ctx, stage, "invalidate", stage_invalidate);
+	// Stage overrides: DisplayObject-surface SETTERS throw 2071 (getters
+	// still work); textSnapshot's GETTER throws too. mouseChildren is
+	// exempt (stage_overriden_setters).
+	{
+		static const struct { const char* name; Avm2MethodFn getter; } ov[] = {
+			{ "accessibilityImplementation", do_accessimpl_get },
+			{ "accessibilityProperties", do_accessprops_get },
+			{ "alpha", do_get_alpha }, { "blendMode", do_blendmode_get },
+			{ "cacheAsBitmap", do_cab_get }, { "contextMenu", do_contextmenu_get },
+			{ "filters", do_get_filters }, { "focusRect", io_get_focus_rect },
+			{ "height", do_get_height }, { "mask", do_get_mask },
+			{ "name", do_get_name }, { "opaqueBackground", do_opaquebg_get },
+			{ "rotation", do_get_rotation }, { "rotationX", do_get_zero },
+			{ "rotationY", do_get_zero }, { "rotationZ", do_get_rotation },
+			{ "scale9Grid", do_scrollrect_get }, { "scaleX", do_get_scale_x },
+			{ "scaleY", do_get_scale_y }, { "scaleZ", do_get_one },
+			{ "scrollRect", do_scrollrect_get }, { "tabEnabled", io_get_tab_enabled },
+			{ "tabIndex", io_get_tab_index }, { "transform", do_get_transform },
+			{ "visible", do_get_visible }, { "width", do_get_width },
+			{ "x", do_get_x }, { "y", do_get_y }, { "z", do_get_zero },
+		};
+		for (size_t i = 0; i < sizeof(ov) / sizeof(ov[0]); i++)
+		{
+			add_getset(ctx, stage, ov[i].name, ov[i].getter, stage_throw_2071);
+		}
+		avm2_builtin_add_getter(ctx, stage, "textSnapshot", stage_throw_2071);
+	}
 
 	// Stage parameters from the generated tables.
 	g_stage_frame_rate = (double) (int16_t) avm2_generated_frame_rate / 256.0;

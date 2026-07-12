@@ -284,6 +284,8 @@ struct CharInfo
 	uint16_t char_id;
 	uint8_t kind;  // AVM2_CHAR_*
 	int32_t bounds[4] = { 0, 0, 0, 0 };
+	bool has_text = false;
+	std::string init_text;
 };
 
 struct ButtonRec
@@ -511,8 +513,89 @@ struct Scanner
 				defineChar(body, 3 /* TEXT */, true);
 				break;
 			case TAG_DEFINE_EDIT_TEXT:
-				defineChar(body, 4 /* EDITTEXT */, true);
+			{
+				CharInfo ci;
+				ci.char_id = body.u16();
+				ci.kind = 4;  // EDITTEXT
+				skipRect(body, ci.bounds);
+				uint8_t f1 = body.u8();
+				uint8_t f2 = body.u8();
+				bool has_text = (f1 & 0x80) != 0;
+				bool has_text_color = (f1 & 0x04) != 0;
+				bool has_max_length = (f1 & 0x02) != 0;
+				bool has_font = (f1 & 0x01) != 0;
+				bool has_font_class = (f2 & 0x80) != 0;
+				bool has_layout = (f2 & 0x20) != 0;
+				if (has_font) body.u16();
+				if (has_font_class) body.cstr();
+				if (has_font) body.u16();  // height
+				if (has_text_color) body.skip(4);
+				if (has_max_length) body.u16();
+				if (has_layout) body.skip(1 + 2 + 2 + 2 + 2);
+				body.cstr();  // variable name
+				if (has_text)
+				{
+					ci.has_text = true;
+					std::string raw = body.cstr();
+					bool is_html = (f2 & 0x02) != 0;
+					if (!is_html)
+					{
+						ci.init_text = raw;
+					}
+					else
+					{
+						// TextField.text returns the PLAIN text: tags
+						// stripped, </p> becomes a newline, basic
+						// entities decoded.
+						std::string out;
+						for (size_t i = 0; i < raw.size(); )
+						{
+							if (raw[i] == '<')
+							{
+								size_t close = raw.find('>', i);
+								std::string tag = raw.substr(i + 1,
+									close == std::string::npos ? std::string::npos
+									                           : close - i - 1);
+								if (tag == "/p" || tag == "/P") out += '\n';
+								i = (close == std::string::npos) ? raw.size()
+								                                 : close + 1;
+							}
+							else if (raw.compare(i, 5, "&amp;") == 0)
+							{
+								out += '&';
+								i += 5;
+							}
+							else if (raw.compare(i, 4, "&lt;") == 0)
+							{
+								out += '<';
+								i += 4;
+							}
+							else if (raw.compare(i, 4, "&gt;") == 0)
+							{
+								out += '>';
+								i += 4;
+							}
+							else if (raw.compare(i, 6, "&quot;") == 0)
+							{
+								out += '"';
+								i += 6;
+							}
+							else if (raw.compare(i, 6, "&apos;") == 0)
+							{
+								out += '\'';
+								i += 6;
+							}
+							else
+							{
+								out += raw[i++];
+							}
+						}
+						ci.init_text = out;
+					}
+				}
+				chars.push_back(ci);
 				break;
+			}
 			case TAG_DEFINE_BITS:
 			case TAG_DEFINE_BITS_JPEG2:
 			case TAG_DEFINE_BITS_JPEG3:
@@ -725,7 +808,10 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		{
 			out << "\t{ " << ci.char_id << ", " << (int) ci.kind << ", "
 			    << ci.bounds[0] << ", " << ci.bounds[1] << ", " << ci.bounds[2]
-			    << ", " << ci.bounds[3] << " },\n";
+			    << ", " << ci.bounds[3] << ", "
+			    << (ci.has_text ? ("\"" + cEscape(ci.init_text) + "\"")
+			                    : std::string("NULL"))
+			    << " },\n";
 		}
 		out << "};\n";
 	}
