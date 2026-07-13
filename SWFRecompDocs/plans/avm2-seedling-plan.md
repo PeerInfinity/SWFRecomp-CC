@@ -163,9 +163,25 @@ answer to "what could go wrong with game-first development"):
   trace family where one exists (+5 passes: loaderinfo_properties/root/
   root_allows, sandbox_type_local_file, urlrequest). The preloader now runs
   with zero uncaught errors and its NG API connection times out gracefully
-  (no network) — reaching the play-button gate. **Not yet first-playable:**
-  reaching FlashPunk `Main` needs an injected play-button click, then first
-  render (+ the graphics-mode capture Vulkan OOM under WSL2). Detail in
+  (no network) — reaching the play-button gate.
+  **Session 2 (2026-07-13): the game reaches the FlashPunk Engine loop.**
+  Fixed the embedded-image decode gap that threw "Invalid source image" — a
+  Flex `[Embed]` image's class chain (`<owner>_<var>` → mx.core.BitmapAsset →
+  FlexBitmap → Bitmap) forwards a DEFAULT null bitmapData up `super()`, and the
+  native Bitmap ctor cleared bitmapData on the null arg instead of seeding from
+  the SymbolClass-bound embedded char (oracle `bitmap_subclass`; also unlocked
+  `bitmap_subclass_properties`). Then, driving the recompiled game on the
+  **portal auto-start path** (new `GAME_SWF_URL` verify override → armorgames
+  URL → NG preloader auto-starts, skipping the play-button gate + API.connect),
+  cleared 4 more small flash.* classes (StageDisplayState, LineScaleMode,
+  flash.ui.Mouse/MouseCursor). **The recompiled Seedling now runs 30 frames
+  headless with ZERO uncaught errors in BOTH modes**, reaching the FlashPunk
+  `Engine` game loop + `Splash` world. Graphics mode: the render path executes,
+  but the PNG *capture* still hits the WSL2 lavapipe Vulkan OOM (481×481×64
+  bitmap-tex array → device lost → buffer-map status 4) — render-infra, blocks
+  only the *visual* first-frame diff. **Not yet first-playable:** the visual
+  first frame (capture OOM), the file:// play-button click (Stage-8 input.json),
+  and driving past the 150-tick Splash into `Game`. Detail in
   `avm2/_investigation/CURRENT_STATUS.md` + the `avm2-stage12-seedling` memory.
   Post-baseline: AVM2 `Rando` counterpart for the injected variant.
 

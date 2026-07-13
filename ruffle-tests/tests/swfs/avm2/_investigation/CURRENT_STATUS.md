@@ -1,10 +1,66 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) IN PROGRESS; Stage 11
+Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) IN PROGRESS (session 2);
+Stage 11
 (GC enrollment + perf soak) COMPLETE; Stage 10 (audio + timers + saves + asset
 compression), Stage 9 (minimal AVM2 render path), Stage 8 (input harness +
 input→event bridge), Stage 7 (embedded assets + BitmapData/Bitmap), Stage 6
 (TextField/EditText engine), Stage 5, E4X and Stage 4 before it.
+
+## State (Stage 12 — Seedling bring-up, session 2 2026-07-13)
+
+- **Embedded-image assets fixed — the "Invalid source image" blocker is
+  cleared.** A Flex `[Embed]` image asset generates the class chain
+  `<owner>_<var>` → `mx.core.BitmapAsset` → `mx.core.FlexBitmap` →
+  `flash.display.Bitmap`, where FlexBitmap's ctor forwards its DEFAULT **null**
+  bitmapData up the `super()` chain. The native Bitmap init saw an explicit null
+  arg0 and *cleared* bitmapData instead of seeding from the SymbolClass-bound
+  embedded asset, so `(new EmbedClass()).bitmapData` returned null. FlashPunk's
+  `FP.getBitmap()` is exactly `(new source).bitmapData`, so every embedded image
+  resolved to a null BitmapData → the game's own `Image`/`Spritemap` threw
+  "Invalid source image". Fixed to match Ruffle `bitmap.rs`: only a real
+  BitmapData arg overwrites; a null/absent arg keeps any timeline-seeded value,
+  else creates a BitmapData from the (sub)class's embedded char.
+  **Backed by upstream oracle `bitmap_subclass`** (`new EmbedClass().bitmapData`);
+  also unlocked the former known-miss `bitmap_subclass_properties`.
+- **Toward `Main`: 4 more flash.* classes.** Driving the real recompiled
+  Seedling headless on the **portal auto-start path** (a new `GAME_SWF_URL`
+  override in verify_output.py points SWF_URL at an armorgames domain so the NG
+  preloader skips its play-button gate and auto-calls `startup()`) surfaced a
+  short divergence chain, each a small flash.* class FlashPunk's Engine/Splash
+  touch at startup / every frame:
+  - `flash.display.StageDisplayState` (NORMAL/FULL_SCREEN/FULL_SCREEN_INTERACTIVE)
+    — Engine.setStageProperties sets `stage.displayState = NORMAL`.
+  - `flash.display.LineScaleMode` (NORMAL/HORIZONTAL/VERTICAL/NONE) — FlashPunk
+    Draw.lineStyle. Both are enumerated by the `all_classes/display/swf*`
+    describeType oracles (constant sets match verbatim).
+  - `flash.ui.Mouse` (static `cursor` getset + hide/show no-ops) +
+    `flash.ui.MouseCursor` (AUTO/ARROW/BUTTON/HAND/IBEAM) — Splash sets
+    `Mouse.cursor` every frame. No `all_classes/ui` oracle in-suite; game-driven
+    stubs (headless has no cursor).
+- **Result: the recompiled Seedling.swf now runs 30 frames on the headless
+  portal auto-start path with ZERO uncaught errors, in BOTH build modes.** It
+  reaches the FlashPunk `Engine` game loop and the `Splash` world (past the
+  former "Invalid source image"). In **graphics mode** the render path executes
+  without crashing — but the PNG *capture* hits the known WSL2 lavapipe bug
+  (`VK_ERROR_OUT_OF_DEVICE_MEMORY` during the frame → device lost →
+  `render_webgpu_save_png: buffer map failed (status 4)`), so a visual
+  first-frame image diff vs Ruffle is still blocked. Characterized: the AVM2
+  render path allocates a 481×481×64-layer RGBA bitmap texture array
+  (MAX_DYNAMIC_BITMAPS=64) + MSAA + offscreen; under lavapipe's WSL2 memory
+  ceiling an in-frame allocation OOMs. **Render-infra, separate from game logic**
+  — the next unlock for a *visual* first frame, deferred.
+- **CI baseline (bitmap fix, sha `1af36539f`, avm2_gc=1):**
+  - **graphics (run 29270812691): avm2 827 / 1204 (68.7%)** — **+2** over the
+    Stage-12 825 baseline (`bitmap_subclass`, `bitmap_subclass_properties`);
+    zero newly-failing across all suites. (Cumulative no-graphics + graphics at
+    sha `c2506a703`, adding the 4 constant classes, dispatched — see the
+    `avm2-stage12-seedling` memory for the final numbers.)
+- **Next session (to first-playable):** (a) the graphics-mode capture OOM
+  (render-infra) for a visual first frame; (b) reach `Main` on the natural
+  `file://` path via an injected play-button click (Stage-8 input.json); (c)
+  drive past the 150-tick Splash into `Game`, surfacing the next divergences
+  (flash.ui.Keyboard capsLock, Music/Sound, Draw line paths).
 
 ## State (Stage 12 — Seedling bring-up, first session 2026-07-13)
 
