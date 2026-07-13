@@ -36,10 +36,24 @@ and Stage 4 before it.
     reclaimed); STRESS → **dead-flat live=370 across 5000 collections, 2,000,000
     objects swept**. ASAN stress soak (1500 collections) zero AddressSanitizer
     errors.
-  - **CI baseline BOTH modes (sha PENDING):** default watermark keeps avm2
-    819 / 1,204 unchanged (GC-inert on short tests); the `avm2_gc=1` STRESS run
-    proves zero pass→fail across all 1,204 avm2 tests (marking complete). [FILL
-    after CI.]
+  - **CI baseline (sha `b5695059b`, avm2_gc=1 STRESS = collect every tick):**
+    - **no-graphics (run 29224963308): avm2 819 / 1,204 (68.0%)** — zero
+      pass→fail vs the pre-Stage-11 baseline (8c4e8518e, 819). avm1 (634),
+      from_gnash, from_shumway (73), regression (41) all "No changes detected";
+      wasm-link-smoke green. The GC collecting on EVERY tick produces
+      byte-identical trace output across all 1,204 avm2 tests + every AVM1 suite
+      — the full marking-correctness gate.
+    - **graphics (run 29224968114, avm2_gc=1): avm2 819 / 1,204 (68.0%)** —
+      identical to no-graphics; supercall_two_classobjects segfault→2/2, all 10
+      fixed, zero newly-failing across all suites; wasm-link-smoke green. GC is
+      mode-independent (render reads the same tree), confirmed byte-identical in
+      both build modes under collect-every-tick.
+    - **The stress run FOUND two real marking bugs in the first pass** (10 avm2
+      failures at sha b4db40f98), both fixed in b5695059b: class-scope capture
+      of live instances (supercall_two_classobjects segfault) + uninitialized
+      Avm2DynProp.key_obj/dead exposed by GC memory reuse (scene/label/callee
+      cluster read null). The default 4 MB watermark keeps the trace suite
+      GC-inert (byte-identical) regardless.
 
 
 ## State (Stage 10)
