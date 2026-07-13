@@ -2004,6 +2004,13 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     if asan:
         sanitizer_flags = ["-fsanitize=address", "-fno-omit-frame-pointer", "-g"]
         opt_level = "-O1"  # ASan needs at least -O1 but -O2 can hide issues
+    # SWFRECOMP_OPT_LEVEL overrides the optimization level (default -O2 / -O1
+    # under ASan). Bring-up lever for huge single-TU AVM2 games (e.g. a Seedling
+    # rebuilt with one DoABC tag emits a ~13 MB abc0_methods.c that exceeds the
+    # -O2 compile budget) — set -O0 to compile in a fraction of the time.
+    _opt_env = os.environ.get("SWFRECOMP_OPT_LEVEL")
+    if _opt_env and not asan:
+        opt_level = _opt_env
 
     # ccache speeds up repeat compiles massively (action.c alone is ~50s at -O2,
     # ~0.01s on a cache hit). Auto-detect and wrap gcc unless disabled. ccache
@@ -2054,6 +2061,17 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         *sanitizer_flags,
     ]
 
+    # SWFRECOMP_COMPILE_TIMEOUT overrides the per-file gcc/link timeout (default
+    # 300 s). Bring-up lever for huge single-TU AVM2 games — a ~13 MB
+    # abc0_methods.c can exceed 300 s even at -O0 on a slow box.
+    compile_timeout = 300
+    _ct_env = os.environ.get("SWFRECOMP_COMPILE_TIMEOUT")
+    if _ct_env:
+        try:
+            compile_timeout = max(1, int(_ct_env))
+        except ValueError:
+            pass
+
     objects = []
     try:
         for src in sources:
@@ -2066,7 +2084,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
                 stderr=subprocess.PIPE,
                 env=cc_env,
             )
-            stdout, stderr = proc.communicate(timeout=300)
+            stdout, stderr = proc.communicate(timeout=compile_timeout)
             if proc.returncode != 0:
                 return False, stderr.decode("utf-8", errors="replace")
 
@@ -2084,7 +2102,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            stdout, stderr = proc.communicate(timeout=300)
+            stdout, stderr = proc.communicate(timeout=compile_timeout)
             if proc.returncode != 0:
                 return False, stderr.decode("utf-8", errors="replace")
 
@@ -2102,7 +2120,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        stdout, stderr = proc.communicate(timeout=300)
+        stdout, stderr = proc.communicate(timeout=compile_timeout)
         return proc.returncode == 0, stderr.decode("utf-8", errors="replace")
     except subprocess.TimeoutExpired:
         proc.kill()
