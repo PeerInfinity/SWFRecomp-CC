@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS_GRAPHICS.md](RUFFLE_RESULTS_GRAPHICS.md) for unfiltered results.*
 
-**Commit:** `1af36539fb93`  
-**Date:** 2026-07-13 17:50 UTC  
-**Total duration:** 4h06m00s
+**Commit:** `c2506a703785`  
+**Date:** 2026-07-13 18:14 UTC  
+**Total duration:** 4h07m41s
 
 ## Results by Suite
 
@@ -30,7 +30,7 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 104,035 | 107,545 | 96.7% |
-| avm2 | 94,268 | 125,365 | 75.2% |
+| avm2 | 94,266 | 125,365 | 75.2% |
 | from_gnash/actionscript.all | 29,253 | 31,358 | 93.3% |
 | from_gnash/misc-ming.all | 4,024 | 5,188 | 77.6% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -39,7 +39,7 @@
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
 | regression | 260 | 260 | 100% |
-| **Total** | **233,666** | **271,714** | **86.0%** |
+| **Total** | **233,664** | **271,714** | **86.0%** |
 
 ## Failure Breakdown
 
@@ -111,40 +111,40 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 - **Pass:** 631/661 (95.5%)
 - **Ignored:** 45 tests
-- **Duration:** 48m31s across 30 shards
+- **Duration:** 48m16s across 30 shards
 - **Lines:** 104,035/107,545 matching (96.7%)
-- **Avg test duration:** 4.1s — slowest: `sandbox_type_local_network` (31.6s)
+- **Avg test duration:** 4.0s — slowest: `sandbox_type_local_network` (30.8s)
 
 ### avm2
 
 - **Pass:** 732/977 (74.9%)
 - **Ignored:** 227 tests
-- **Duration:** 2h04m54s across 30 shards
-- **Lines:** 94,268/125,365 matching (75.2%)
-- **Avg test duration:** 5.5s — slowest: `bitmapdata_accuracy` (39.0s)
+- **Duration:** 2h06m21s across 30 shards
+- **Lines:** 94,266/125,365 matching (75.2%)
+- **Avg test duration:** 5.5s — slowest: `bitmapdata_accuracy` (34.0s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 132/236 (55.9%)
 - **Ignored:** 7 tests
-- **Duration:** 27m54s across 30 shards
+- **Duration:** 28m15s across 30 shards
 - **Lines:** 29,253/31,358 matching (93.3%)
-- **Avg test duration:** 6.8s — slowest: `MovieClip-v8` (54.9s)
+- **Avg test duration:** 6.8s — slowest: `MovieClip-v8` (70.6s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 67/109 (61.5%)
 - **Ignored:** 2 tests
-- **Duration:** 17m16s across 30 shards
+- **Duration:** 17m31s across 30 shards
 - **Lines:** 4,024/5,188 matching (77.6%)
-- **Avg test duration:** 9.3s — slowest: `matrix_test` (103.3s)
+- **Avg test duration:** 9.4s — slowest: `matrix_test` (106.8s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m57s across 30 shards
+- **Duration:** 1m47s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 13.0s — slowest: `implementsOpTest` (21.6s)
+- **Avg test duration:** 11.9s — slowest: `implementsOpTest` (21.3s)
 
 ### from_gnash/misc-swfc.all
 
@@ -152,34 +152,34 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 - **Ignored:** 2 tests
 - **Duration:** 3m28s across 30 shards
 - **Lines:** 421/555 matching (75.9%)
-- **Avg test duration:** 10.2s — slowest: `action_execution_order_test12` (20.9s)
+- **Avg test duration:** 10.2s — slowest: `soft_reference_test1` (22.5s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 3m02s across 30 shards
+- **Duration:** 2m58s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 9.0s — slowest: `trace-as2/arguments` (22.3s)
+- **Avg test duration:** 8.9s — slowest: `trace-as2/arguments` (21.1s)
 
 ### from_shumway
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 12m01s across 30 shards
+- **Duration:** 12m11s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 5.9s — slowest: `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` (22.6s)
+- **Avg test duration:** 5.9s — slowest: `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` (22.9s)
 
 ### from_shumway/avm1
 
 - **Pass:** 44/44 (100%)
 - **Ignored:** 3 tests
-- **Duration:** 2m05s across 30 shards
+- **Duration:** 2m06s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 2.2s — slowest: `label` (20.5s)
+- **Avg test duration:** 2.2s — slowest: `label` (20.9s)
 
 ### regression
 
 - **Pass:** 41/41 (100%)
-- **Duration:** 4m49s across 30 shards
+- **Duration:** 4m44s across 30 shards
 - **Lines:** 260/260 matching (100%)
-- **Avg test duration:** 7.0s — slowest: `coerce_cross_swf_version` (21.4s)
+- **Avg test duration:** 6.9s — slowest: `lv_cross_swf_version` (21.9s)
