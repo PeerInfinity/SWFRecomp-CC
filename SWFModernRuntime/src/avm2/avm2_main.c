@@ -52,12 +52,39 @@ void* avm2_alloc(Avm2Context* ctx, uint32_t size)
 	return p;
 }
 
+// Mark a class's structural roots: its class object + prototype object, and
+// the objects captured in its scope chains. The class/instance scope chains
+// (cls->scope / cls->iscope) and each method's captured method_scope are
+// referenced by every method activation's `outer` chain but are otherwise
+// invisible to the collector — a scope entry object that is neither a rooted
+// global nor a pinned class object (e.g. a with-scope object or a nested
+// capture) would be swept, and the next scope walk (scope_defines_mn) would
+// dereference a freed vtable. Trace them.
+static void mark_class_roots(Avm2Class* cls)
+{
+	if (cls == NULL) return;
+	avm2_gc_mark_object(cls->class_object);
+	avm2_gc_mark_object(cls->prototype_obj);
+	avm2_gc_mark_scope(cls->scope);
+	avm2_gc_mark_scope(cls->iscope);
+	for (uint32_t i = 0; i < cls->ivtable.count; i++)
+	{
+		avm2_gc_mark_scope(cls->ivtable.entries[i].method_scope);
+	}
+	for (uint32_t i = 0; i < cls->ivtable.meta_cap; i++)
+	{
+		if (cls->ivtable.metas != NULL && cls->ivtable.metas[i].used)
+			avm2_gc_mark_scope(cls->ivtable.metas[i].method_scope);
+	}
+}
+
 // AVM2 GC root marker for this module (avm2_gc.c invokes it each cycle).
 // Roots: the context singletons (root/stage/builtin globals), every script's
-// globals object, and every realized class's class object + prototype object
-// (classes are kept immortal — the win is in per-frame instances, not the
-// structural class/vtable/prototype world; see avm2_gc.h). The builtins
-// struct is entirely Avm2Class* fields, so it walks as an array.
+// globals object, and every realized class's structural roots (class object,
+// prototype, scope chains — see mark_class_roots). Classes are kept immortal —
+// the win is in per-frame instances, not the structural class/vtable/prototype
+// world (see avm2_gc.h). The builtins struct is entirely Avm2Class* fields, so
+// it walks as an array.
 void avm2_gc_mark_roots_main(Avm2Context* ctx)
 {
 	avm2_gc_mark_object(ctx->root);
@@ -66,12 +93,7 @@ void avm2_gc_mark_roots_main(Avm2Context* ctx)
 
 	Avm2Class** b = (Avm2Class**) &ctx->builtins;
 	uint32_t nb = (uint32_t) (sizeof(Avm2Builtins) / sizeof(Avm2Class*));
-	for (uint32_t i = 0; i < nb; i++)
-	{
-		if (b[i] == NULL) continue;
-		avm2_gc_mark_object(b[i]->class_object);
-		avm2_gc_mark_object(b[i]->prototype_obj);
-	}
+	for (uint32_t i = 0; i < nb; i++) mark_class_roots(b[i]);
 
 	for (uint32_t f = 0; f < ctx->file_count; f++)
 	{
@@ -88,10 +110,7 @@ void avm2_gc_mark_roots_main(Avm2Context* ctx)
 		{
 			for (uint32_t c = 0; c < file->data->class_count; c++)
 			{
-				Avm2Class* cls = file->classes[c];
-				if (cls == NULL) continue;
-				avm2_gc_mark_object(cls->class_object);
-				avm2_gc_mark_object(cls->prototype_obj);
+				mark_class_roots(file->classes[c]);
 			}
 		}
 	}

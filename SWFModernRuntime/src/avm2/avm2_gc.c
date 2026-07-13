@@ -211,12 +211,25 @@ static void trace_object(Avm2Object* o)
 	avm2_gc_mark_object(o->fn_prototype);
 	avm2_gc_mark_scope(o->fn_scope);
 	if (o->fn_bound_class != NULL) avm2_gc_mark_object(o->fn_bound_class->class_object);
-	// Class object payload: keep the class's proto + class object alive (also
-	// rooted by the class walk, but a live instance must pin its class too).
+	// Class object payload: keep the class's proto + class object alive, and
+	// trace the class's captured scope chains. A class scope can hold arbitrary
+	// objects (avmplus captures `new C()` instances as scope bases — see
+	// supercall_two_classobjects), and the object is reachable ONLY through the
+	// class object's scope. Because every class object is pinned (hence traced
+	// each cycle), tracing scopes here covers ALL class objects — including
+	// ones overwritten in file->classes when the ABC reuses a class index.
 	if (o->class_ref != NULL)
 	{
-		avm2_gc_mark_object(o->class_ref->prototype_obj);
-		avm2_gc_mark_object(o->class_ref->class_object);
+		Avm2Class* c = o->class_ref;
+		avm2_gc_mark_object(c->prototype_obj);
+		avm2_gc_mark_object(c->class_object);
+		avm2_gc_mark_scope(c->scope);
+		avm2_gc_mark_scope(c->iscope);
+		for (uint32_t i = 0; i < c->ivtable.count; i++)
+			avm2_gc_mark_scope(c->ivtable.entries[i].method_scope);
+		for (uint32_t i = 0; i < c->ivtable.meta_cap; i++)
+			if (c->ivtable.metas != NULL && c->ivtable.metas[i].used)
+				avm2_gc_mark_scope(c->ivtable.metas[i].method_scope);
 	}
 	// native_ext: precise for the two element-storage kinds; for every other
 	// ext blob, run the two module tracers that follow indirect edges the

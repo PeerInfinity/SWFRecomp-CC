@@ -100,6 +100,10 @@ Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const ch
 		}
 	}
 	Avm2DynProp* p = avm2_alloc(ctx, sizeof(Avm2DynProp));
+	memset(p, 0, sizeof(*p));  // key_obj/dead MUST start 0 — string finders skip
+	                           // non-NULL key_obj, and the GC traces key_obj; an
+	                           // uninitialized value (o1heap reuses freed memory
+	                           // once the collector runs) breaks both.
 	const Avm2String* s = avm2_string_new(ctx, name, name_len);
 	p->name = *s;
 	p->value = value;
