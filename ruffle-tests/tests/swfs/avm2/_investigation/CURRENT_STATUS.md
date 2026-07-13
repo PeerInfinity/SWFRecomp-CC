@@ -51,13 +51,30 @@ input→event bridge), Stage 7 (embedded assets + BitmapData/Bitmap), Stage 6
   `onMouseDown` handlers in the abc dump): starting the FlashPunk `Main` needs
   an injected mouse click — the next session's work (input.json harness, then
   first render).
-- **Known gaps found (next session):** (a) reach `Main` via injected play-button
-  click; (b) graphics-mode capture hits `render_webgpu_save_png: buffer map
-  failed (status 4)` / lavapipe `VK_ERROR_OUT_OF_DEVICE_MEMORY` under WSL2 — a
-  render-infra issue, separate from game logic (headless no-graphics path is
-  clean); (c) URLLoader.load never dispatches COMPLETE/IO_ERROR (no network) —
-  a faithful async IOError would let API-gated preloaders fall through without
-  waiting for the timeout Timer.
+- **Reading the game's own source** (`~/CC/seedling/src/Preloader.as` + Main.as)
+  confirmed the exact flow: on `file://` the preloader shows a Newgrounds
+  `FlashAd` **play button and waits for a MOUSE_UP click** → `onPlayClick` →
+  `startup()` → `getDefinitionByName("Main")` → `new Main()`. On a **portal URL**
+  (armorgames.com etc.) `flashAd` stays null and `onEnterFrame` calls
+  `startup()` **automatically** (no click, skips API.connect). Driving the game
+  with a portal `SWF_URL` is the headless auto-start lever; it pushed two more
+  divergences toward `Main`:
+  - **#1065 PixelSnapping** (Bitmap default pixelSnapping) → added
+    **flash.display.PixelSnapping** + the sibling constant classes FlashPunk's
+    `Engine` sets at startup (**BlendMode, StageScaleMode, StageAlign,
+    StageQuality**). Pure string-constant bags.
+  - **"Error: Invalid source image"** — thrown by the game's OWN FlashPunk code
+    (an `Image`/`Spritemap` built from a null/invalid `BitmapData`), i.e. an
+    **embedded-image-asset decode gap** (the NG-logo / FlashAd PNGs; and every
+    `[Embed]` image in `Game.as`). The next real unlock toward a rendered game.
+- **Known gaps / next session:** (a) embedded-image asset decode ("Invalid
+  source image"); (b) reach `Main` on the natural `file://` path via an injected
+  play-button click (Stage-8 input.json); (c) graphics-mode capture hits
+  `render_webgpu_save_png: buffer map failed (status 4)` / lavapipe
+  `VK_ERROR_OUT_OF_DEVICE_MEMORY` under WSL2 — render-infra, separate from game
+  logic (headless no-graphics path is clean); (d) URLLoader.load never
+  dispatches COMPLETE/IO_ERROR (no network) — a faithful async IOError would let
+  API-gated preloaders fall through without the ~3000-tick timeout Timer.
 - **The game is the INTEGRATION check, never the oracle:** every fix above is
   graded by its upstream trace family (5 new passes) except the flash.events
   network stubs (no upstream family) and the flash.net load()/navigator paths

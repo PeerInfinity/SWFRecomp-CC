@@ -3041,6 +3041,13 @@ static Avm2Value do_get_mouse_y(Avm2Activation* act)
 	return avm2_number(round(ly * 20.0) / 20.0);
 }
 
+static void disp_sconst(Avm2Context* ctx, Avm2Class* cls, const char* n,
+                        const char* v)
+{
+	avm2_builtin_add_static_const(ctx, cls, n,
+		avm2_string(avm2_string_from_literal(ctx, v)));
+}
+
 // --- flash.display.LoaderInfo (root movie only) ---
 //
 // The root SWF's LoaderInfo is a single shared object: every on-stage display
@@ -6691,6 +6698,55 @@ void avm2_register_display(Avm2Context* ctx)
 			add_getset(ctx, stage, ov[i].name, ov[i].getter, stage_throw_2071);
 		}
 		avm2_builtin_add_getter(ctx, stage, "textSnapshot", stage_throw_2071);
+	}
+
+	// flash.display string-constant classes (Bitmap.pixelSnapping, blendMode,
+	// and the Stage scaleMode/align/quality that FlashPunk's Engine sets at
+	// startup). Pure constant bags — no instances.
+	{
+		Avm2Class* ps = avm2_builtin_class(ctx, "flash.display",
+		                                   "PixelSnapping", b->object_class);
+		disp_sconst(ctx, ps, "NEVER", "never");
+		disp_sconst(ctx, ps, "AUTO", "auto");
+		disp_sconst(ctx, ps, "ALWAYS", "always");
+
+		Avm2Class* bm = avm2_builtin_class(ctx, "flash.display",
+		                                   "BlendMode", b->object_class);
+		static const char* const blends[][2] = {
+			{"NORMAL","normal"},{"LAYER","layer"},{"MULTIPLY","multiply"},
+			{"SCREEN","screen"},{"LIGHTEN","lighten"},{"DARKEN","darken"},
+			{"DIFFERENCE","difference"},{"ADD","add"},{"SUBTRACT","subtract"},
+			{"INVERT","invert"},{"ALPHA","alpha"},{"ERASE","erase"},
+			{"OVERLAY","overlay"},{"HARDLIGHT","hardlight"},{"SHADER","shader"},
+		};
+		for (size_t i = 0; i < sizeof(blends)/sizeof(blends[0]); i++)
+			disp_sconst(ctx, bm, blends[i][0], blends[i][1]);
+
+		Avm2Class* ssm = avm2_builtin_class(ctx, "flash.display",
+		                                    "StageScaleMode", b->object_class);
+		disp_sconst(ctx, ssm, "EXACT_FIT", "exactFit");
+		disp_sconst(ctx, ssm, "NO_BORDER", "noBorder");
+		disp_sconst(ctx, ssm, "NO_SCALE", "noScale");
+		disp_sconst(ctx, ssm, "SHOW_ALL", "showAll");
+
+		Avm2Class* sal = avm2_builtin_class(ctx, "flash.display",
+		                                    "StageAlign", b->object_class);
+		static const char* const aligns[][2] = {
+			{"TOP","T"},{"BOTTOM","B"},{"LEFT","L"},{"RIGHT","R"},
+			{"TOP_LEFT","TL"},{"TOP_RIGHT","TR"},
+			{"BOTTOM_LEFT","BL"},{"BOTTOM_RIGHT","BR"},
+		};
+		for (size_t i = 0; i < sizeof(aligns)/sizeof(aligns[0]); i++)
+			disp_sconst(ctx, sal, aligns[i][0], aligns[i][1]);
+
+		Avm2Class* sq = avm2_builtin_class(ctx, "flash.display",
+		                                   "StageQuality", b->object_class);
+		disp_sconst(ctx, sq, "LOW", "low");
+		disp_sconst(ctx, sq, "MEDIUM", "medium");
+		disp_sconst(ctx, sq, "HIGH", "high");
+		disp_sconst(ctx, sq, "BEST", "best");
+		disp_sconst(ctx, sq, "EIGHT_X_LINEAR", "8x8linear");
+		disp_sconst(ctx, sq, "SIXTEEN_X_LINEAR", "16x16linear");
 	}
 
 	// Stage parameters from the generated tables.
