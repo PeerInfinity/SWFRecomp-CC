@@ -17,6 +17,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifndef M_PI
@@ -6810,6 +6811,192 @@ void avm2_register_display(Avm2Context* ctx)
 	// Stage parameters from the generated tables.
 	g_stage_frame_rate = (double) (int16_t) avm2_generated_frame_rate / 256.0;
 	g_stage_color = avm2_generated_bg_color & 0xFFFFFF;
+}
+
+// ===========================================================================
+// AVM2 CPU-composite frame dump (env-gated: AVM2_CPU_DUMP=<path-prefix>).
+//
+// A GPU-free render-correctness sink for Seedling bring-up. It walks the SAME
+// display tree the tick already built, inverse-maps each on-stage Bitmap's
+// premultiplied-ARGB pixels into a plain CPU framebuffer, and writes a binary
+// PPM (P6) per captured tick. It bypasses the WebGPU/lavapipe path entirely, so
+// it validates render *correctness* (does the game produce the right pixels)
+// even under the WSL2 lavapipe capture OOM, and in BOTH build modes — this
+// block is compiled unconditionally (NOT under OFFSCREEN_RENDER). Scope matches
+// Stage 9: the Bitmap/BitmapData blit path only (a FlashPunk display tree is
+// just Bitmaps); shapes/gradients/text/masks are not composited.
+// ===========================================================================
+
+// Scale a premultiplied-ARGB colour by a 0..1 alpha factor (all four channels
+// — premultiplied form makes this a straight per-channel multiply).
+static uint32_t avm2_cpu_scale_premul(uint32_t c, double f)
+{
+	uint32_t a = (uint32_t) (((c >> 24) & 0xFF) * f + 0.5);
+	uint32_t r = (uint32_t) (((c >> 16) & 0xFF) * f + 0.5);
+	uint32_t g = (uint32_t) (((c >>  8) & 0xFF) * f + 0.5);
+	uint32_t b = (uint32_t) ((( c      ) & 0xFF) * f + 0.5);
+	return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+// Porter-Duff "over": premultiplied src on top of premultiplied dest
+// (matches avm2_bitmap.c blend_over).
+static uint32_t avm2_cpu_blend_over(uint32_t dest, uint32_t src)
+{
+	uint32_t sa = (src >> 24) & 0xFF;
+	uint32_t inv = 255 - sa;
+	uint32_t r = ((src >> 16) & 0xFF) + (((dest >> 16) & 0xFF) * inv) / 255;
+	uint32_t g = ((src >>  8) & 0xFF) + (((dest >>  8) & 0xFF) * inv) / 255;
+	uint32_t b = ( (src      ) & 0xFF) + (( (dest      ) & 0xFF) * inv) / 255;
+	uint32_t a = sa + (((dest >> 24) & 0xFF) * inv) / 255;
+	if (r > 255) r = 255; if (g > 255) g = 255; if (b > 255) b = 255; if (a > 255) a = 255;
+	return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+// Composite one on-stage Bitmap into fb via inverse (dest->src) affine
+// sampling, so upscales (FP.screen.scale) leave no holes. `world` maps local
+// twips -> stage twips (sx = a*lx + c*ly + tx; sy = b*lx + d*ly + ty), and a
+// bitmap pixel (px,py) lives at local twips (px*20, py*20) — the same
+// convention render_webgpu_draw_bitmap_quad_scaled uses (1 px = 20 twips).
+static void avm2_cpu_composite_bitmap(Avm2Context* ctx, Avm2Object* obj,
+                                      const Mat* world, double alpha,
+                                      uint32_t* fb, int fbw, int fbh)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->bitmap_data == NULL) return;
+	Avm2BitmapDataExt* bd =
+		avm2_bitmapdata_ext_of(ctx, avm2_object_value(ext->bitmap_data));
+	if (bd == NULL || bd->disposed || bd->pixels == NULL
+	    || bd->width == 0 || bd->height == 0)
+		return;
+
+	int bw = (int) bd->width, bh = (int) bd->height;
+	double corners[4][2] = {
+		{ 0.0, 0.0 }, { bw * 20.0, 0.0 },
+		{ 0.0, bh * 20.0 }, { bw * 20.0, bh * 20.0 }
+	};
+	double minx = 1e30, miny = 1e30, maxx = -1e30, maxy = -1e30;
+	for (int k = 0; k < 4; k++)
+	{
+		double lx = corners[k][0], ly = corners[k][1];
+		double sx = world->a * lx + world->c * ly + world->tx;
+		double sy = world->b * lx + world->d * ly + world->ty;
+		if (sx < minx) minx = sx;
+		if (sx > maxx) maxx = sx;
+		if (sy < miny) miny = sy;
+		if (sy > maxy) maxy = sy;
+	}
+	int px0 = (int) floor(minx / 20.0), px1 = (int) ceil(maxx / 20.0);
+	int py0 = (int) floor(miny / 20.0), py1 = (int) ceil(maxy / 20.0);
+	if (px0 < 0) px0 = 0;
+	if (py0 < 0) py0 = 0;
+	if (px1 > fbw) px1 = fbw;
+	if (py1 > fbh) py1 = fbh;
+
+	double det = world->a * world->d - world->c * world->b;
+	if (det == 0.0) return;
+	// [lx;ly] = inv([[a,c],[b,d]]) * [STx-tx; STy-ty]
+	double ia = world->d / det, ic = -world->c / det;
+	double ib = -world->b / det, id = world->a / det;
+
+	for (int dy = py0; dy < py1; dy++)
+	{
+		for (int dx = px0; dx < px1; dx++)
+		{
+			double stx = (dx + 0.5) * 20.0 - world->tx;
+			double sty = (dy + 0.5) * 20.0 - world->ty;
+			double lx = ia * stx + ic * sty;
+			double ly = ib * stx + id * sty;
+			int spx = (int) floor(lx / 20.0);
+			int spy = (int) floor(ly / 20.0);
+			if (spx < 0 || spy < 0 || spx >= bw || spy >= bh) continue;
+			uint32_t s = bd->pixels[spy * bw + spx];
+			if (alpha < 0.999) s = avm2_cpu_scale_premul(s, alpha);
+			if ((s >> 24) == 0) continue;  // fully transparent
+			uint32_t* d = &fb[dy * fbw + dx];
+			*d = avm2_cpu_blend_over(*d, s);
+		}
+	}
+}
+
+// Depth-ordered CPU composite walk (back-to-front paint order), accumulating
+// world matrix + concatenated alpha — the CPU twin of avm2_render_node.
+static void avm2_cpu_walk(Avm2Context* ctx, Avm2Object* obj,
+                          const Mat* parent_world, double parent_alpha,
+                          uint32_t* fb, int fbw, int fbh)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return;
+	if (!ext->is_stage && !ext->visible) return;
+
+	Mat local = ext_matrix(ext);
+	Mat world = mat_mul(parent_world, &local);
+	double alpha = parent_alpha * ((double) ext->alpha_fixed8 / 256.0);
+
+	if (ext->is_bitmap)
+		avm2_cpu_composite_bitmap(ctx, obj, &world, alpha, fb, fbw, fbh);
+
+	for (uint32_t i = 0; i < ext->render_len; i++)
+		avm2_cpu_walk(ctx, ext->render_list[i], &world, alpha, fb, fbw, fbh);
+}
+
+// Env-gated per-tick dump. AVM2_CPU_DUMP=<prefix> writes <prefix>NNN.ppm for
+// each tick (frame_index 0-based); AVM2_CPU_DUMP_FRAME=N restricts to one tick.
+// Cheap no-op when AVM2_CPU_DUMP is unset. Called from the runSWF_avm2 tick
+// loop after avm2_display_run_tick.
+void avm2_cpu_dump_frame(Avm2Context* ctx, int frame_index)
+{
+	const char* prefix = getenv("AVM2_CPU_DUMP");
+	if (prefix == NULL || prefix[0] == '\0') return;
+	const char* onlys = getenv("AVM2_CPU_DUMP_FRAME");
+	if (onlys != NULL && atoi(onlys) != frame_index) return;
+
+	// Stage pixel dims from the recompiler's stage rect (twips) — usable in
+	// NO_GRAPHICS builds where ctx->app (SWFAppContext) is an incomplete type.
+	int fbw = (int) ((avm2_generated_stage_rect[1]
+	                  - avm2_generated_stage_rect[0]) / 20);
+	int fbh = (int) ((avm2_generated_stage_rect[3]
+	                  - avm2_generated_stage_rect[2]) / 20);
+	if (fbw <= 0 || fbh <= 0) return;
+
+	uint32_t* fb = (uint32_t*) malloc((size_t) fbw * fbh * sizeof(uint32_t));
+	if (fb == NULL) return;
+	// Opaque stage background, premultiplied (alpha 255 => premul == straight).
+	uint32_t bg = 0xFF000000u | (g_stage_color & 0xFFFFFFu);
+	for (int i = 0; i < fbw * fbh; i++) fb[i] = bg;
+
+	if (ctx->stage != NULL)
+	{
+		Mat id = mat_identity();
+		avm2_cpu_walk(ctx, ctx->stage, &id, 1.0, fb, fbw, fbh);
+	}
+
+	char path[1024];
+	snprintf(path, sizeof(path), "%s%03d.ppm", prefix, frame_index);
+	FILE* f = fopen(path, "wb");
+	if (f == NULL) { free(fb); return; }
+	fprintf(f, "P6\n%d %d\n255\n", fbw, fbh);
+	uint8_t* row = (uint8_t*) malloc((size_t) fbw * 3);
+	if (row != NULL)
+	{
+		for (int y = 0; y < fbh; y++)
+		{
+			for (int x = 0; x < fbw; x++)
+			{
+				uint32_t c = fb[y * fbw + x];
+				row[x * 3 + 0] = (uint8_t) ((c >> 16) & 0xFF);
+				row[x * 3 + 1] = (uint8_t) ((c >>  8) & 0xFF);
+				row[x * 3 + 2] = (uint8_t) ((c      ) & 0xFF);
+			}
+			fwrite(row, 1, (size_t) fbw * 3, f);
+		}
+		free(row);
+	}
+	fclose(f);
+	free(fb);
+	// Quiet by default (a 600-frame drive would otherwise flood stderr and bury
+	// the AVM2-uncaught-error divergence signal); confirm every 50th frame.
+	if (frame_index == 0 || (frame_index % 50) == 0)
+		fprintf(stderr, "AVM2_CPU_DUMP: wrote %s (%dx%d)\n", path, fbw, fbh);
 }
 
 // ===========================================================================

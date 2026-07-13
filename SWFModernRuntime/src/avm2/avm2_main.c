@@ -358,6 +358,10 @@ void runSWF_avm2(SWFAppContext* app_context)
 		}
 	}
 
+	// GPU-free CPU-composite frame dump (avm2_display.c) — env-gated, compiled
+	// in every build. Declared unconditionally (the tick loop calls it always).
+	extern void avm2_cpu_dump_frame(Avm2Context* ctx, int frame_index);
+
 	// Stage 9: minimal AVM2 render path. In graphics builds (OFFSCREEN_RENDER)
 	// the WebGPU offscreen backend is linked but runSWF_avm2 never drove it;
 	// set it up now (after heap_init + build_stage). NO_GRAPHICS builds skip
@@ -393,10 +397,21 @@ void runSWF_avm2(SWFAppContext* app_context)
 	// Step 5: tick loop (Ruffle frame_lifecycle.rs phase order), mirroring
 	// swf_core.c's MAX_FRAMES cadence.
 #ifdef MAX_FRAMES
-	const size_t max_ticks = MAX_FRAMES;
+	size_t max_ticks = MAX_FRAMES;
 #else
-	const size_t max_ticks = 10000;
+	size_t max_ticks = 10000;
 #endif
+	// AVM2_MAX_TICKS runtime override — drive a bring-up game arbitrarily deep
+	// (past the built-in num_frames) without a full rebuild (MAX_FRAMES is a
+	// -D on every TU, so bumping it busts ccache for the whole AVM2 build).
+	{
+		const char* mt = getenv("AVM2_MAX_TICKS");
+		if (mt != NULL && mt[0] != '\0')
+		{
+			long v = strtol(mt, NULL, 10);
+			if (v > 0) max_ticks = (size_t) v;
+		}
+	}
 	for (size_t tick = 0; tick < max_ticks; tick++)
 	{
 		// Collect between ticks (VM quiescent — no method body on the C
@@ -413,6 +428,9 @@ void runSWF_avm2(SWFAppContext* app_context)
 			// Render the display tree the tick just built (Bitmap blit path).
 			avm2_render_frame(ctx);
 #endif
+			// GPU-free CPU-composite dump (env-gated AVM2_CPU_DUMP); compiled
+			// in every build, no-op when the env var is unset.
+			avm2_cpu_dump_frame(ctx, (int) tick);
 		}
 		avm2_try_pop_frame(&top);
 	}

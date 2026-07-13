@@ -585,6 +585,131 @@ static Avm2Value point_to_string(Avm2Activation* act)
 	return avm2_string(avm2_string_from_literal(act->ctx, buf));
 }
 
+// ---- flash.geom.Point full method surface -------------------------------
+// FlashPunk uses add/clone/distance/normalize/equals/length heavily; the
+// upstream `point` test covers add/subtract/distance/equals/clone/interpolate/
+// length/normalize/offset/polar. Ported from Ruffle globals/flash/geom/point.rs.
+// x/y are slots[1]/[2] on the sealed class (see point_init).
+
+static double point_num(Avm2Context* ctx, Avm2Object* o, int slot)
+{
+	if (o == NULL || o->slot_count <= (uint32_t) slot) return 0.0;
+	return avm2_coerce_to_number(ctx, o->slots[slot]);
+}
+
+static Avm2Object* point_self(Avm2Activation* act)
+{
+	return act->this_val.kind == AVM2_VALUE_OBJECT ? act->this_val.u.obj : NULL;
+}
+
+static Avm2Object* point_arg(Avm2Activation* act, uint32_t i)
+{
+	return (act->argc > i && act->args[i].kind == AVM2_VALUE_OBJECT)
+		? act->args[i].u.obj : NULL;
+}
+
+static Avm2Value point_make(Avm2Context* ctx, double x, double y)
+{
+	Avm2Value args[2] = { avm2_number(x), avm2_number(y) };
+	return avm2_class_construct(ctx, g_point_class, args, 2);
+}
+
+static Avm2Value point_clone(Avm2Activation* act)
+{
+	Avm2Object* s = point_self(act);
+	return point_make(act->ctx, point_num(act->ctx, s, 1), point_num(act->ctx, s, 2));
+}
+
+static Avm2Value point_add(Avm2Activation* act)
+{
+	Avm2Object* s = point_self(act);
+	Avm2Object* o = point_arg(act, 0);
+	return point_make(act->ctx,
+		point_num(act->ctx, s, 1) + point_num(act->ctx, o, 1),
+		point_num(act->ctx, s, 2) + point_num(act->ctx, o, 2));
+}
+
+static Avm2Value point_subtract(Avm2Activation* act)
+{
+	Avm2Object* s = point_self(act);
+	Avm2Object* o = point_arg(act, 0);
+	return point_make(act->ctx,
+		point_num(act->ctx, s, 1) - point_num(act->ctx, o, 1),
+		point_num(act->ctx, s, 2) - point_num(act->ctx, o, 2));
+}
+
+static Avm2Value point_equals(Avm2Activation* act)
+{
+	Avm2Object* s = point_self(act);
+	Avm2Object* o = point_arg(act, 0);
+	if (o == NULL) return avm2_bool(0);
+	return avm2_bool(point_num(act->ctx, s, 1) == point_num(act->ctx, o, 1)
+	              && point_num(act->ctx, s, 2) == point_num(act->ctx, o, 2));
+}
+
+static Avm2Value point_offset(Avm2Activation* act)
+{
+	Avm2Object* s = point_self(act);
+	double dx = act->argc > 0 ? avm2_coerce_to_number(act->ctx, act->args[0]) : 0.0;
+	double dy = act->argc > 1 ? avm2_coerce_to_number(act->ctx, act->args[1]) : 0.0;
+	if (s != NULL && s->slot_count > 2)
+	{
+		s->slots[1] = avm2_number(point_num(act->ctx, s, 1) + dx);
+		s->slots[2] = avm2_number(point_num(act->ctx, s, 2) + dy);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value point_get_length(Avm2Activation* act)
+{
+	Avm2Object* s = point_self(act);
+	double x = point_num(act->ctx, s, 1), y = point_num(act->ctx, s, 2);
+	return avm2_number(sqrt(x * x + y * y));
+}
+
+static Avm2Value point_normalize(Avm2Activation* act)
+{
+	Avm2Object* s = point_self(act);
+	double thickness = act->argc > 0 ? avm2_coerce_to_number(act->ctx, act->args[0]) : 0.0;
+	double x = point_num(act->ctx, s, 1), y = point_num(act->ctx, s, 2);
+	double length = sqrt(x * x + y * y);
+	// AS3 `if (length)` truthiness: skip on 0 AND NaN (point_normalize on a
+	// (NaN,100) point leaves y untouched — see the `point` oracle).
+	if (length != 0.0 && !isnan(length) && s != NULL && s->slot_count > 2)
+	{
+		double norm = thickness / length;
+		s->slots[1] = avm2_number(x * norm);
+		s->slots[2] = avm2_number(y * norm);
+	}
+	return avm2_undefined();
+}
+
+// Static (class) methods.
+static Avm2Value point_distance(Avm2Activation* act)
+{
+	Avm2Object* a = point_arg(act, 0), * b = point_arg(act, 1);
+	double dx = point_num(act->ctx, b, 1) - point_num(act->ctx, a, 1);
+	double dy = point_num(act->ctx, b, 2) - point_num(act->ctx, a, 2);
+	return avm2_number(sqrt(dx * dx + dy * dy));
+}
+
+static Avm2Value point_interpolate(Avm2Activation* act)
+{
+	Avm2Object* a = point_arg(act, 0), * b = point_arg(act, 1);
+	double f = act->argc > 2 ? avm2_coerce_to_number(act->ctx, act->args[2]) : 0.0;
+	// Ruffle: Point(b.x + f*(a.x-b.x), b.y + f*(a.y-b.y)).
+	double ax = point_num(act->ctx, a, 1), ay = point_num(act->ctx, a, 2);
+	double bx = point_num(act->ctx, b, 1), by = point_num(act->ctx, b, 2);
+	return point_make(act->ctx, bx + f * (ax - bx), by + f * (ay - by));
+}
+
+static Avm2Value point_polar(Avm2Activation* act)
+{
+	double len = act->argc > 0 ? avm2_coerce_to_number(act->ctx, act->args[0]) : 0.0;
+	double ang = act->argc > 1 ? avm2_coerce_to_number(act->ctx, act->args[1]) : 0.0;
+	return point_make(act->ctx, len * cos(ang), len * sin(ang));
+}
+
 // ---------------------------------------------------------------------------
 // Toplevel functions
 // ---------------------------------------------------------------------------
@@ -1565,6 +1690,16 @@ void avm2_globals_init(Avm2Context* ctx)
 			avm2_vtable_append(ctx, &point->ivtable, &e);
 		}
 		avm2_builtin_add_method(ctx, point, "toString", point_to_string);
+		avm2_builtin_add_method(ctx, point, "clone", point_clone);
+		avm2_builtin_add_method(ctx, point, "add", point_add);
+		avm2_builtin_add_method(ctx, point, "subtract", point_subtract);
+		avm2_builtin_add_method(ctx, point, "equals", point_equals);
+		avm2_builtin_add_method(ctx, point, "offset", point_offset);
+		avm2_builtin_add_method(ctx, point, "normalize", point_normalize);
+		avm2_builtin_add_getset(ctx, point, "length", point_get_length, NULL);
+		avm2_builtin_add_static_method(ctx, point, "distance", point_distance);
+		avm2_builtin_add_static_method(ctx, point, "interpolate", point_interpolate);
+		avm2_builtin_add_static_method(ctx, point, "polar", point_polar);
 	}
 
 	avm2_register_function_builtins(ctx);

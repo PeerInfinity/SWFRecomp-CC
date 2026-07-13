@@ -1,6 +1,62 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) IN PROGRESS (session 2);
+Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) IN PROGRESS (session 3);
+prior lines below are session 2.
+
+## State (Stage 12 — Seedling bring-up, session 3 2026-07-13)
+
+- **FIRST VISUALLY-VALIDATED Seedling frames — GPU-free.** Added an env-gated
+  CPU-composite frame dump (`AVM2_CPU_DUMP=<prefix>` → `<prefix>NNN.ppm`) in
+  `avm2_display.c`, compiled in EVERY build (NOT under `OFFSCREEN_RENDER`). It
+  walks the same display tree the tick built and inverse-maps each on-stage
+  Bitmap's premultiplied-ARGB pixels into a CPU framebuffer (Porter-Duff over,
+  concatenated alpha), bypassing the WebGPU/lavapipe capture OOM entirely. This
+  validates render *correctness* for a bitmap-based FlashPunk game with no GPU.
+- **Ruffle oracle state-matched to the Splash.** Ruffle's exporter on `file://`
+  shows the preloader PLAY button forever (needs a MOUSE_UP), so it never
+  matched our portal-auto-start state. Patched Ruffle
+  `core/src/tag_utils.rs::movie_from_path` to honor a **`RUFFLE_MOVIE_URL`** env
+  override (falls back to the `file://` URL) — set it to the same armorgames
+  portal URL and the NG preloader auto-starts into the game, matching our
+  `GAME_SWF_URL` lever. (This patch lives in `~/CC/ruffle`, the oracle tool
+  repo, NOT this project.)
+- **Validation (600 frames, our CPU dump vs Ruffle portal export):** 155/600
+  frames **pixel-perfect** (MAD < 0.01), 165 near-perfect (MAD < 1), **no frame
+  worse than MAD 15**. The NEWGROUNDS splash logo and the CONNOR ULLMANN credit
+  screen match to the pixel / 1px edge. Remaining diffs are all understood and
+  out of the Stage-9 Bitmap-blit scope: (a) 1px nearest-neighbor edges on
+  *fractionally-scaled* bitmaps (splash zoom, title art); (b) the FlashPunk
+  alpha fade-in on the "Music by" headphones — Ruffle applies it via
+  `BitmapData.draw` with an alpha colorTransform, which the Stage-9 draw() CPU
+  fast-path ignores (renders full opacity) — the documented draw()-colorxform
+  gap; (c) the NG preloader progress bar (`graphics.drawRect`) + "0%" TextField,
+  which are shape/text draws (not bitmaps).
+- **Drove past the 3-splash sequence into the Game title screen.** The splash is
+  3 sponsor logos × 150 ticks (`Splash(0→1→2)`) then `FP.world = new Game()`;
+  reaching Game needs ~500 frames. Added an **`AVM2_MAX_TICKS`** runtime
+  frame-depth override (avm2_main.c) so a bring-up game can be driven arbitrarily
+  deep without a full rebuild (`MAX_FRAMES` is a `-D` on every TU, so bumping it
+  busts ccache for the whole AVM2 build). At 600 ticks the game reaches its
+  **title/menu screen** (the "Seedling" vine logo + NEWGROUNDS tank + a green
+  continue arrow), rendered correctly.
+- **First Game divergence found + fixed: `flash.geom.Point` was a bare
+  x/y/toString stub.** FlashPunk hit `#1069: Property clone not found on Point`
+  (56×/frame). Implemented the full Point method surface (clone/add/subtract/
+  equals/offset/normalize + `length` getter + static distance/interpolate/polar)
+  in `avm2_globals.c`, ported from Ruffle `globals/flash/geom/point.rs` (incl.
+  the AS3-truthy `if(length)` guard in normalize — 0 AND NaN skip). **Backed by
+  the upstream `point` oracle: now 100% pass** (was aborting at the first
+  missing method). After the fix: **Seedling runs 600 frames with ZERO uncaught
+  errors** in no-graphics.
+- **Next session:** the render-fidelity gaps above are Stage-9 draw() work
+  (BitmapData.draw with colorTransform/alpha → correct FlashPunk fades; the 1px
+  NN edge is inherent to NN sampling of fractionally-scaled bitmaps). Drive
+  deeper (bump `AVM2_MAX_TICKS`) to reach interactive gameplay and level loading
+  (the `.oel` ByteArray/E4X path in Game.as, `ColorMatrixFilter`, Input/Key) —
+  the next expected divergences. Optional: the file:// play-button click via the
+  Stage-8 input.json harness (the natural user path).
+
+## State (Stage 12 — Seedling bring-up, session 2 2026-07-13)
 Stage 11
 (GC enrollment + perf soak) COMPLETE; Stage 10 (audio + timers + saves + asset
 compression), Stage 9 (minimal AVM2 render path), Stage 8 (input harness +
