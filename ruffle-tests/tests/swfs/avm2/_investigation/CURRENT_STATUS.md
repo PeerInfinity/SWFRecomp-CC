@@ -37,7 +37,18 @@ Stage 6 (TextField/EditText engine), Stage 5, E4X and Stage 4 before it.
     zlib-compressed bitmap tables in `SWFRecomp/src/abc/abc_timeline.cpp` +
     runtime inflate in avm2_bitmap.c; `getTimer`. verify_output.py adds
     avm2_media.c to the AVM2 source set.
-  - **CI baseline BOTH modes: see the pipeline run recorded below at commit time.**
+  - **CI baseline BOTH modes (sha `8c4e8518e`):**
+    - **no-graphics (run 29219023622): avm2 819 / 1,204 (68.0%)** — **+18** over
+      Stage 9's 801 (all 18 Stage-10 candidates + `agal_compiler` bystander).
+    - **graphics (run 29219031270): avm2 819 / 1,204 (68.0%)** — identical +18,
+      confirming the zlib-compressed bitmap tables render bit-identically.
+    - `soundchannel_position` + `soundchannel_soundcomplete` moved
+      output_mismatch → **ruffle_matched** (effective pass). `soundmixer_
+      soundtransform` (888/900) + `simplebutton_soundtransform` (829/887)
+      improved but not fully passing (multi-entity accumulation gap).
+    - **ZERO pass→fail regressions in EITHER mode across ALL suites** (avm1 634,
+      from_shumway 73, from_gnash sub-suites, regression 41 all unchanged);
+      wasm-link-smoke green in both runs.
 
 
 ## State (Stage 9)
