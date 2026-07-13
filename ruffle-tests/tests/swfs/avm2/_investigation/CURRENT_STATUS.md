@@ -48,13 +48,28 @@ prior lines below are session 2.
   the upstream `point` oracle: now 100% pass** (was aborting at the first
   missing method). After the fix: **Seedling runs 600 frames with ZERO uncaught
   errors** in no-graphics.
-- **Next session:** the render-fidelity gaps above are Stage-9 draw() work
-  (BitmapData.draw with colorTransform/alpha → correct FlashPunk fades; the 1px
-  NN edge is inherent to NN sampling of fractionally-scaled bitmaps). Drive
-  deeper (bump `AVM2_MAX_TICKS`) to reach interactive gameplay and level loading
-  (the `.oel` ByteArray/E4X path in Game.as, `ColorMatrixFilter`, Input/Key) —
-  the next expected divergences. Optional: the file:// play-button click via the
-  Stage-8 input.json harness (the natural user path).
+- **Reached real GAMEPLAY via a source-recompile teleport** (not `AVM2_MAX_TICKS`,
+  which only fast-forwards intros). Rebuilt the Seedling AS3 source with the Flex
+  SDK (`mxmlc`, `~/CC/seedling` + NewgroundsAPI.swc) using **`Main` as the
+  document class** (drops the whole Newgrounds preloader/ad chain) and
+  `Game.menu = false; new Game(0,80,128)` in `Main.begin()` — boots straight into
+  OverWorld1, controllable. Recompiles cleanly (703 classes, 0 verify fails);
+  built with `SWFRECOMP_OPT_LEVEL=-O0` + `SWFRECOMP_COMPILE_TIMEOUT=900` (new
+  verify_output env overrides — the single-DoABC 13 MB `abc0_methods.c` TU
+  exceeds the 300 s `-O2` budget). **Our AVM2 runtime runs 60 gameplay frames
+  with ZERO uncaught errors** (logic fully correct — character spawns, world
+  loads, HUD present). **Render gap:** vs the Ruffle export of the same SWF, our
+  output is ~99% black — only the character + HUD (`copyPixels` Image blits)
+  render; the tilemap/scenery composite via `BitmapData.draw` with camera
+  matrices, which the Stage-9 draw() CPU path only handles at identity → never
+  composites. Full FlashPunk software-buffer rendering (`BitmapData.draw` w/
+  arbitrary matrix + Canvas/Tilemap blits) is the next render target. Recipe +
+  finding in the `seedling-teleport-gameplay` memory.
+- **Next session:** the gameplay render gap (FlashPunk `BitmapData.draw`-matrix +
+  Canvas/Tilemap software-buffer compositing) is the highest-value render work —
+  now scoped by a live gameplay oracle. Also the splash-phase draw()-colorxform
+  alpha fade (same draw() family). Optional: feed input via the Stage-8
+  input.json harness to drive the character around.
 
 ## State (Stage 12 — Seedling bring-up, session 2 2026-07-13)
 Stage 11
