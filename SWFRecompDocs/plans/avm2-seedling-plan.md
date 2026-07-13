@@ -183,7 +183,11 @@ answer to "what could go wrong with game-first development"):
   first frame (capture OOM), the file:// play-button click (Stage-8 input.json),
   and driving past the 150-tick Splash into `Game`. Detail in
   `avm2/_investigation/CURRENT_STATUS.md` + the `avm2-stage12-seedling` memory.
-  Post-baseline: AVM2 `Rando` counterpart for the injected variant.
+  Post-baseline: AVM2 `Rando` counterpart for the injected variant — see
+  `avm2-seedling-ap-integration.md` for the AP-integration analysis (what the
+  flash-ap-api injection work gives us: reuse `games/seedling.json` + the
+  `__swfBridge` contract; the AVM2 ExternalInterface gap; and why source-mod +
+  an AVM2 `Rando` builtin is the recommended first path).
 
 Deferred (phase-1 leftovers, none Seedling-blocking):
 flash.text.engine TextBlock/TextLine family (7 tests), Loader/
