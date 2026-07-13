@@ -25,6 +25,9 @@
 
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
+#include <memory/heap.h>
+
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
@@ -856,6 +859,7 @@ static Avm2Object* display_alloc_instance(Avm2Context* ctx, Avm2Class* cls)
 	{
 		obj->native_ext = avm2_alloc(ctx, cls->native_ext_size);
 		memset(obj->native_ext, 0, cls->native_ext_size);
+		obj->native_ext_size = cls->native_ext_size;  // GC conservative-scan span
 	}
 	if (cls->native_init != NULL)
 	{
@@ -5222,6 +5226,74 @@ static Avm2Object* g_mouse_hovered;       // interactive object under mouse
 static Avm2Object* g_mouse_pressed[3];    // per-button press target
 static uint32_t g_left_click_index;       // increments per left press (dbl-click)
 static const char* g_clipboard_text;      // SetClipboardText
+
+// --- GC roots + tracing (Stage 11) ------------------------------------------
+
+// avm2_text.c helper: mark the collectable object edges inside an EditText ext
+// (currently the attached StyleSheet object). Declared here because the ext is
+// opaque to this TU.
+void avm2_text_gc_mark_edittext(struct Avm2EditTextExt* et);
+
+// Drag state (defined further down, near update_drag) — tentative decls so the
+// root marker below can reference the in-flight drag object + drop target.
+static Avm2Object* g_drag_object;
+static Avm2Object* g_drag_drop_target;
+
+// Root marker: display-module C-static Avm2Object/Avm2Value stashes that are
+// not reachable through the stage/root tree — orphan clips (auto-advance with
+// no parent), pending frame-script cleanup, stage focus, the mouse
+// hover/press targets, the in-flight drag object + drop target, and the timer
+// table (AS3 Timer instances + setTimeout/setInterval callback closures and
+// their bound args).
+void avm2_gc_mark_roots_display(Avm2Context* ctx)
+{
+	(void) ctx;
+	for (uint32_t i = 0; i < g_orphan_count; i++) avm2_gc_mark_object(g_orphans[i]);
+	for (uint32_t i = 0; i < g_fs_cleanup_count; i++) avm2_gc_mark_object(g_fs_cleanup[i]);
+	avm2_gc_mark_object(g_stage_focus);
+	avm2_gc_mark_object(g_mouse_hovered);
+	for (int i = 0; i < 3; i++) avm2_gc_mark_object(g_mouse_pressed[i]);
+	avm2_gc_mark_object(g_drag_object);
+	avm2_gc_mark_object(g_drag_drop_target);
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+	{
+		Avm2TimerEntry* t = &g_avm2_timers[i];
+		avm2_gc_mark_object(t->timer_obj);
+		avm2_gc_mark_value(t->fn);
+		for (uint32_t a = 0; a < t->argc; a++) avm2_gc_mark_value(t->args[a]);
+	}
+}
+
+// Ext tracer: a DisplayObject's ext holds indirect object edges the
+// conservative blob scan cannot reach — the render/depth child lists
+// (separately-allocated arrays), the frame-script closures, and the EditText
+// StyleSheet. Direct-in-blob fields (parent/mask/graphics/btn_*/bitmap_data/
+// meta/accessibility) are left to the conservative scan.
+void avm2_display_gc_trace_ext(Avm2Object* o)
+{
+	Avm2Context* ctx = avm2_get_context();
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, o);
+	if (ext == NULL) return;
+	for (uint32_t i = 0; i < ext->render_len; i++) avm2_gc_mark_object(ext->render_list[i]);
+	for (uint32_t i = 0; i < ext->depth_len; i++) avm2_gc_mark_object(ext->depth_list[i].child);
+	for (uint32_t i = 0; i < ext->frame_script_cap; i++) avm2_gc_mark_value(ext->frame_scripts[i]);
+	if (ext->edittext != NULL) avm2_text_gc_mark_edittext(ext->edittext);
+}
+
+// GC free hook: a swept DisplayObject's ext owns separately-allocated arrays
+// (the render/depth child lists, the frame-script table, the per-frame queued
+// place ops) — free them so reclaiming the object doesn't leak its backing
+// arrays. All avm2_alloc'd + per-object. (The attached EditText ext is freed by
+// avm2_text_gc_free_ext.)
+void avm2_display_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, o);
+	if (ext == NULL) return;
+	if (ext->render_list != NULL) heap_free(ctx->app, ext->render_list);
+	if (ext->depth_list != NULL) heap_free(ctx->app, ext->depth_list);
+	if (ext->frame_scripts != NULL) heap_free(ctx->app, ext->frame_scripts);
+	if (ext->queued_places != NULL) heap_free(ctx->app, ext->queued_places);
+}
 
 void avm2_input_load(const char* path)
 {

@@ -17,6 +17,9 @@
 
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
+#include <memory/heap.h>
+
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
@@ -371,6 +374,48 @@ typedef struct BroadcastBucket
 } BroadcastBucket;
 
 static BroadcastBucket g_broadcast[4];
+
+// --- GC roots + tracing (Stage 11) ------------------------------------------
+
+// Root marker: the broadcast registries (enterFrame/exitFrame/frameConstructed/
+// render) hold live listener objects by identity.
+void avm2_gc_mark_roots_events(Avm2Context* ctx)
+{
+	(void) ctx;
+	for (int i = 0; i < 4; i++)
+	{
+		BroadcastBucket* b = &g_broadcast[i];
+		for (uint32_t j = 0; j < b->count; j++) avm2_gc_mark_object(b->objs[j]);
+	}
+}
+
+// Ext tracer: the EventDispatcher listener list (ext->head) is a chain of
+// separately-allocated EDListener nodes hung off the ext, so the conservative
+// blob scan cannot reach the listener closures — mark them precisely. Covers
+// every EventDispatcher-derived object (all display objects, Timer, Sound,
+// SharedObject, plain EventDispatcher).
+void avm2_events_gc_trace_ext(Avm2Object* o)
+{
+	Avm2Context* ctx = avm2_get_context();
+	Avm2EventDispatcherExt* ext = avm2_dispatcher_ext_of(ctx, o);
+	if (ext == NULL) return;
+	for (EDListener* l = ext->head; l != NULL; l = l->next) avm2_gc_mark_value(l->fn);
+}
+
+// GC free hook: free the EDListener node chain a swept EventDispatcher owns
+// (avm2_alloc'd, per-dispatcher). No-op for non-dispatchers.
+void avm2_events_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
+{
+	Avm2EventDispatcherExt* ext = avm2_dispatcher_ext_of(ctx, o);
+	if (ext == NULL) return;
+	for (EDListener* l = ext->head; l != NULL; )
+	{
+		EDListener* next = l->next;
+		heap_free(ctx->app, l);
+		l = next;
+	}
+	ext->head = NULL;
+}
 
 static int broadcast_index(const Avm2String* type)
 {

@@ -19,6 +19,7 @@
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_e4x.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
@@ -173,6 +174,7 @@ Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name
 		cobj->proto = ctx->builtins.class_class->prototype_obj;
 	}
 	cls->class_object = cobj;
+	avm2_gc_pin(cobj);  // GC: class objects are immortal (structural)
 
 	// Prototype object.
 	Avm2Object* proto = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
@@ -182,6 +184,7 @@ Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name
 		proto->proto = super->prototype_obj;
 	}
 	cls->prototype_obj = proto;
+	avm2_gc_pin(proto);  // GC: class prototypes are immortal (structural)
 	Avm2DynProp* p = avm2_object_set_dynamic(ctx, proto, "constructor", 11,
 	                                         avm2_object_value(cobj));
 	p->dont_enum = 1;
@@ -1080,6 +1083,13 @@ static Avm2Value global_describe_type(Avm2Activation* act)
 // hasDefinition/getDefinition over the single global domain) ---
 
 static Avm2Object* g_current_domain;
+
+// GC root marker (Stage 11): the singleton ApplicationDomain instance.
+void avm2_gc_mark_roots_globals(Avm2Context* ctx)
+{
+	(void) ctx;
+	avm2_gc_mark_object(g_current_domain);
+}
 
 static Avm2Value appdomain_get_current(Avm2Activation* act)
 {

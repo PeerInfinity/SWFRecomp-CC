@@ -75,6 +75,16 @@ struct Avm2Object
 	Avm2DynProp* dyn_enum_pos;
 	Avm2BoundMethod* bound_methods;
 	void* native_ext;         // builtin instance data (arrays, MovieClip, ...)
+	// GC (avm2_gc.c): intrusive census list + mark byte + native_ext blob
+	// size (for the conservative ext pointer-scan). Every avm2_object_alloc'd
+	// object enrolls in the census; the collector marks from roots between
+	// ticks and sweeps the unmarked. native_ext_size is 0 for objects with no
+	// ext OR with a precisely-traced ext (ARRAY/VECTOR elems are walked, not
+	// scanned); a non-zero value means "conservatively scan this many bytes of
+	// native_ext for embedded object pointers".
+	Avm2Object* gc_next;
+	uint8_t gc_mark;          // 0 white, 1 marked, 2 pinned (never swept)
+	uint32_t native_ext_size;
 
 	// AVM2_OBJ_FUNCTION payload: a bound method closure.
 	Avm2MethodRef fn_method;

@@ -1,9 +1,46 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-12 — Stage 10 (audio + timers + saves + asset
-compression) COMPLETE; Stage 9 (minimal AVM2 render path), Stage 8 (input
-harness + input→event bridge), Stage 7 (embedded assets + BitmapData/Bitmap),
-Stage 6 (TextField/EditText engine), Stage 5, E4X and Stage 4 before it.
+Last updated: 2026-07-12 — Stage 11 (GC enrollment + perf soak) COMPLETE;
+Stage 10 (audio + timers + saves + asset compression), Stage 9 (minimal AVM2
+render path), Stage 8 (input harness + input→event bridge), Stage 7 (embedded
+assets + BitmapData/Bitmap), Stage 6 (TextField/EditText engine), Stage 5, E4X
+and Stage 4 before it.
+
+## State (Stage 11)
+
+- **Stage 11 COMPLETE (2026-07-12): AVM2 mark-sweep garbage collector.**
+  Before Stage 11 every `avm2_object_alloc`'d object was immortal (a deliberate
+  Stage-2 simplification — fine for MAX_FRAMES-bounded trace tests, unbounded
+  growth for a 30fps blitting game like Seedling). Now a real root-traced
+  mark-sweep collector reclaims per-frame garbage. New files
+  `SWFModernRuntime/src/avm2/avm2_gc.c` + `include/avm2/avm2_gc.h`; full design +
+  gotchas in the `avm2-stage11-gc` memory. Key design:
+  - **Collect only between ticks (VM quiescent).** `Avm2Activation` holds no
+    operand stack / locals (emitted bodies keep those as C locals), so the only
+    safe collection point is the top of the runSWF_avm2 tick loop, where the
+    live set == the persistent root graph. Separate census (`g_gc_head`) from
+    AVM1's ASObject/ASArray lists.
+  - **Deterministic byte-watermark trigger** (default 4 MB). Short trace tests
+    allocate << 4 MB → GC never triggers → trace output byte-identical.
+    `AVM2_GC_STRESS=1` forces collect-every-tick (CI correctness gate, workflow
+    input `avm2_gc`); `AVM2_GC=0` disables.
+  - **Marking:** precise struct fields (proto/slots/dyn_props/bound_methods/
+    fn_*/class_ref) + array/vector elems + module ext tracers (EventDispatcher
+    listeners, DisplayObject children/frame_scripts/EditText stylesheet) +
+    **conservative pointer-scan of every other native_ext blob** (the
+    missed-edge safety net — can only over-retain, never free a live object).
+    Class objects/prototypes + XML wrappers pinned immortal.
+  - **Soak evidence** (`AVM2_GC_SOAK=<ticks>`, synthetic per-frame garbage on
+    the real context): GC OFF → live climbs 770 → 2,000,370 over 5000 ticks
+    (611 MB, 0 freed); GC ON (4 MB) → bounded sawtooth ~370–11.5k (1,990,400
+    reclaimed); STRESS → **dead-flat live=370 across 5000 collections, 2,000,000
+    objects swept**. ASAN stress soak (1500 collections) zero AddressSanitizer
+    errors.
+  - **CI baseline BOTH modes (sha PENDING):** default watermark keeps avm2
+    819 / 1,204 unchanged (GC-inert on short tests); the `avm2_gc=1` STRESS run
+    proves zero pass→fail across all 1,204 avm2 tests (marking complete). [FILL
+    after CI.]
+
 
 ## State (Stage 10)
 

@@ -127,11 +127,32 @@ answer to "what could go wrong with game-first development"):
   embedded sounds in Seedling), flash.utils.Timer/TimerEvent on the
   Stage-6 timer core, SharedObject getLocal/flush over the existing
   AMF engine. Graded by sound*/timer*/shared_object* families.
-- **Stage 11 — GC enrollment + perf**. Enroll AVM2 allocations in the
-  object.c mark-sweep collector (g_avm2_gc_mark_roots is already
-  registered; Stage-2 TODO), root set = domain globals + display tree
-  + timers + scope chains + in-flight activations; then a long-run
-  soak (N-game methodology). Do this BEFORE extended play testing.
+- **Stage 11 — GC enrollment + perf** — **DONE 2026-07-12**. A self-contained
+  AVM2 mark-sweep collector (`SWFModernRuntime/src/avm2/avm2_gc.c` +
+  `avm2_gc.h`) — a SEPARATE census from AVM1's ASObject/ASArray. Collection runs
+  ONLY between ticks (VM quiescent): `Avm2Activation` holds no operand stack /
+  locals — emitted bodies keep those as C locals — so mid-tick collection could
+  free a C-stack-only value; the tick-boundary is the sole safe point, where the
+  live set == the persistent root graph (so "in-flight activations / scope
+  chains" is a non-root by construction). Deterministic 4 MB byte-watermark
+  trigger (short trace tests never trigger → byte-identical); `AVM2_GC_STRESS=1`
+  (CI input `avm2_gc`) forces collect-every-tick as the correctness gate.
+  Marking = precise struct fields + array/vector elems + module ext tracers
+  (EventDispatcher listeners, DisplayObject children/frame_scripts/EditText
+  stylesheet, StyleSheet entries) + a conservative pointer-scan of every other
+  native_ext blob (the missed-edge safety net); class objects/prototypes + XML
+  wrappers pinned immortal; per-module `*_gc_free_ext` hooks free the ext blob's
+  own sub-allocations (BitmapData pixels, ByteArray bytes, display child arrays,
+  listener nodes, style entries) so reclamation is byte-complete, not just
+  object-complete. **Soak (N-game methodology):** GC off → live climbs
+  770 → 2,000,370 over 5000 ticks; STRESS → dead-flat live=370, 2,000,000 swept;
+  ASAN-clean. A code-review workflow caught + fixed two real UAFs pre-commit
+  (missing drag roots, StyleSheet entry array not traced). See
+  `avm2/_investigation/CURRENT_STATUS.md` + the `avm2-stage11-gc` memory.
+  Original scope (for reference): enroll AVM2 allocations in the mark-sweep
+  collector, root set = domain globals + display tree + timers + scope chains +
+  in-flight activations; then a long-run soak. Do this BEFORE extended play
+  testing.
 - **Stage 12 — Seedling bring-up**. Recompile the real SWF, drive with
   the divergence-harness workflow (`wasm-game-debugging` memory).
   Post-baseline: AVM2 `Rando` counterpart for the injected variant.

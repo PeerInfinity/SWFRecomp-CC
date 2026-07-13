@@ -10,6 +10,7 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 
@@ -345,6 +346,7 @@ void avm2_register_function_builtins(Avm2Context* ctx)
 			fproto->dyn_tail = cls->prototype_obj->dyn_tail;
 		}
 		cls->prototype_obj = fproto;
+		avm2_gc_pin(fproto);  // GC: class prototypes are immortal (structural)
 	}
 	avm2_builtin_add_method(ctx, cls, "call", fn_call);
 	avm2_builtin_add_method(ctx, cls, "apply", fn_apply);

@@ -26,6 +26,7 @@
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
@@ -47,23 +48,54 @@ void* avm2_alloc(Avm2Context* ctx, uint32_t size)
 	{
 		avm2_fatal("out of memory allocating %u bytes", size);
 	}
+	avm2_gc_note_alloc(size > 0 ? size : 1);
 	return p;
 }
 
-// GC participant registered with the object.c mark-sweep aggregator (see
-// g_avm2_gc_mark_roots there). Inventory: every AVM2 allocation (classes,
-// vtables, globals, instances, closures, scope chains, strings, arrays,
-// domain entries) is reachable for the whole run AND is invisible to the
-// collector's census (only ASObject/ASArray enroll in g_mt_obj_head /
-// g_mt_arr_head), so there is nothing to mark: AVM2 objects are immortal
-// by construction and hold no edges into collectable AVM1 objects.
-// Tranche-1 runs are short (MAX_FRAMES-bounded), so immortality is
-// correct, just wasteful; enroll a real census if anything OOMs.
-static void avm2GcMarkRoots(void)
+// AVM2 GC root marker for this module (avm2_gc.c invokes it each cycle).
+// Roots: the context singletons (root/stage/builtin globals), every script's
+// globals object, and every realized class's class object + prototype object
+// (classes are kept immortal — the win is in per-frame instances, not the
+// structural class/vtable/prototype world; see avm2_gc.h). The builtins
+// struct is entirely Avm2Class* fields, so it walks as an array.
+void avm2_gc_mark_roots_main(Avm2Context* ctx)
 {
-}
+	avm2_gc_mark_object(ctx->root);
+	avm2_gc_mark_object(ctx->stage);
+	avm2_gc_mark_object(ctx->builtin_globals);
 
-extern void (*g_avm2_gc_mark_roots)(void);
+	Avm2Class** b = (Avm2Class**) &ctx->builtins;
+	uint32_t nb = (uint32_t) (sizeof(Avm2Builtins) / sizeof(Avm2Class*));
+	for (uint32_t i = 0; i < nb; i++)
+	{
+		if (b[i] == NULL) continue;
+		avm2_gc_mark_object(b[i]->class_object);
+		avm2_gc_mark_object(b[i]->prototype_obj);
+	}
+
+	for (uint32_t f = 0; f < ctx->file_count; f++)
+	{
+		Avm2AbcFileRt* file = ctx->files[f];
+		if (file == NULL) continue;
+		if (file->script_globals != NULL)
+		{
+			for (uint32_t s = 0; s < file->data->script_count; s++)
+			{
+				avm2_gc_mark_object(file->script_globals[s]);
+			}
+		}
+		if (file->classes != NULL)
+		{
+			for (uint32_t c = 0; c < file->data->class_count; c++)
+			{
+				Avm2Class* cls = file->classes[c];
+				if (cls == NULL) continue;
+				avm2_gc_mark_object(cls->class_object);
+				avm2_gc_mark_object(cls->prototype_obj);
+			}
+		}
+	}
+}
 
 // ---------------------------------------------------------------------------
 // ABC load (step 1)
@@ -172,7 +204,6 @@ void runSWF_avm2(SWFAppContext* app_context)
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->app = app_context;
 	ctx->swf_version = avm2_generated_swf_version;
-	g_avm2_gc_mark_roots = avm2GcMarkRoots;
 
 	avm2_globals_init(ctx);
 
@@ -327,6 +358,19 @@ void runSWF_avm2(SWFAppContext* app_context)
 	}
 #endif
 
+	// Stage-11 GC soak (AVM2_GC_SOAK=<ticks>): drive synthetic per-frame
+	// garbage on the fully-constructed context and log live-object N. Runs in
+	// place of the normal tick loop; stderr only, stdout untouched.
+	{
+		const char* soak = getenv("AVM2_GC_SOAK");
+		if (soak != NULL)
+		{
+			avm2_gc_soak(ctx, (uint64_t) strtoull(soak, NULL, 10));
+			fflush(stdout);
+			return;
+		}
+	}
+
 	// Step 5: tick loop (Ruffle frame_lifecycle.rs phase order), mirroring
 	// swf_core.c's MAX_FRAMES cadence.
 #ifdef MAX_FRAMES
@@ -336,6 +380,11 @@ void runSWF_avm2(SWFAppContext* app_context)
 #endif
 	for (size_t tick = 0; tick < max_ticks; tick++)
 	{
+		// Collect between ticks (VM quiescent — no method body on the C
+		// stack, so the live set is exactly the persistent root graph).
+		// Deterministic byte-watermark cadence; no-op under AVM2_GC=0.
+		avm2_gc_maybe_collect(ctx);
+
 		Avm2TryFrame top;
 		avm2_try_push_catch_all(ctx, &top);
 		if (setjmp(top.jb) == 0)

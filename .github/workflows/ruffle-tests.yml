@@ -49,6 +49,11 @@ on:
         required: false
         default: ''
         type: string
+      avm2_gc:
+        description: 'Stage 11 AVM2 GC stress for AVM2 test binaries (empty = off; 1 = collect every tick)'
+        required: false
+        default: ''
+        type: string
   workflow_call:
     inputs:
       categories:
@@ -81,6 +86,11 @@ on:
         required: false
         default: ''
         type: string
+      avm2_gc:
+        description: 'Stage 11 AVM2 GC stress for AVM2 test binaries (empty = off; 1 = collect every tick)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -95,6 +105,11 @@ env:
   # cadence 1 (collect every tick) for maximum coverage. Empty = off.
   SWF_GC: ${{ inputs.swf_gc }}
   SWF_GC_CADENCE: ${{ inputs.swf_gc != '' && '1' || '' }}
+  # Stage 11 AVM2 GC stress: when the avm2_gc input is set, every AVM2 test
+  # binary collects between every tick (watermark 0) so the trace suite
+  # exercises mark-sweep. Empty = off (default watermark; GC-inert on short
+  # tests). AVM1 binaries ignore it.
+  AVM2_GC_STRESS: ${{ inputs.avm2_gc }}
   AVM1_DIR: ruffle-tests/tests/swfs/avm1
   # AVM2 (AS3) suite — plan Stage 2 baseline: 1/1202 (hello_world), everything
   # else failing honestly (runtime abort on the first unimplemented opcode).

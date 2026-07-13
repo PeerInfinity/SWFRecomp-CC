@@ -33,6 +33,9 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
+#include <memory/heap.h>
+
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 
@@ -49,6 +52,16 @@ Avm2ByteArrayExt* avm2_bytearray_ext_of(Avm2Value v)
 		}
 	}
 	return NULL;
+}
+
+// GC (Stage 11): free the backing byte buffer a swept ByteArray owns
+// (avm2_alloc'd). No-op for non-ByteArrays / empty buffers.
+void avm2_bytearray_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
+{
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(avm2_object_value(o));
+	if (ba == NULL || ba->bytes == NULL) return;
+	heap_free(ctx->app, ba->bytes);
+	ba->bytes = NULL;
 }
 
 static _Noreturn void throw_eof(Avm2Context* ctx)

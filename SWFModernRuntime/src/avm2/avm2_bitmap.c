@@ -26,6 +26,9 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
+#include <memory/heap.h>
+
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_value.h>
 
@@ -134,6 +137,17 @@ Avm2BitmapDataExt* avm2_bitmapdata_ext_of(Avm2Context* ctx, Avm2Value v)
 	if (o->cls == NULL || g_bitmapdata_class == NULL) return NULL;
 	if (!class_is_a(o->cls, g_bitmapdata_class)) return NULL;
 	return (Avm2BitmapDataExt*) o->native_ext;
+}
+
+// GC (Stage 11): free the pixel buffer a swept BitmapData owns (avm2_alloc'd,
+// w*h*4 bytes — the dominant native-heap churn for a blitting game). No-op for
+// non-BitmapData and for already-disposed buffers (pixels NULL).
+void avm2_bitmap_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
+{
+	Avm2BitmapDataExt* bd = avm2_bitmapdata_ext_of(ctx, avm2_object_value(o));
+	if (bd == NULL || bd->pixels == NULL) return;
+	heap_free(ctx->app, bd->pixels);
+	bd->pixels = NULL;
 }
 
 static Avm2Object* this_obj(Avm2Activation* act)
@@ -637,6 +651,7 @@ static Avm2Object* bd_alloc_bare(Avm2Context* ctx)
 	avm2_slots_init_defaults(ctx, obj, &cls->ivtable);
 	obj->native_ext = avm2_alloc(ctx, sizeof(Avm2BitmapDataExt));
 	memset(obj->native_ext, 0, sizeof(Avm2BitmapDataExt));
+	obj->native_ext_size = sizeof(Avm2BitmapDataExt);  // GC conservative-scan span
 	return obj;
 }
 

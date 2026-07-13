@@ -424,6 +424,7 @@ static Avm2Value regexp_construct(Avm2Context* ctx, Avm2Class* cls,
 	Avm2RegExpExt* ext = avm2_alloc(ctx, sizeof(Avm2RegExpExt));
 	memset(ext, 0, sizeof(Avm2RegExpExt));
 	obj->native_ext = ext;
+	obj->native_ext_size = sizeof(Avm2RegExpExt);  // GC conservative-scan span
 	regexp_init_from_args(ctx, ext, args, argc);
 	return avm2_object_value(obj);
 }

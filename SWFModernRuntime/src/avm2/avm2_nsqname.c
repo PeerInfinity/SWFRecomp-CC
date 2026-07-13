@@ -51,6 +51,7 @@ static Avm2Object* alloc_instance(Avm2Context* ctx, Avm2Class* cls, uint32_t ext
 	obj->proto = cls->prototype_obj;
 	obj->native_ext = avm2_alloc(ctx, ext_size);
 	memset(obj->native_ext, 0, ext_size);
+	obj->native_ext_size = ext_size;  // GC conservative-scan span
 	return obj;
 }
 

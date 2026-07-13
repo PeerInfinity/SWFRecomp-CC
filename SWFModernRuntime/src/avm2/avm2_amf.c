@@ -40,6 +40,7 @@
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_e4x.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
@@ -1607,6 +1608,15 @@ static Avm2Object* this_obj_amf(Avm2Activation* act)
 typedef struct SoCacheEntry { char* name; Avm2Object* obj; } SoCacheEntry;
 static SoCacheEntry g_so_cache[64];
 static uint32_t g_so_cache_count;
+
+// GC root marker (Stage 11): the per-name SharedObject cache. Each entry's
+// SharedObject instance (and its dynamic `data` object, reached by tracing the
+// instance) persists across ticks reachable only from here.
+void avm2_gc_mark_roots_amf(Avm2Context* ctx)
+{
+	(void) ctx;
+	for (uint32_t i = 0; i < g_so_cache_count; i++) avm2_gc_mark_object(g_so_cache[i].obj);
+}
 
 static Avm2SharedObjectExt* so_ext_of(Avm2Context* ctx, Avm2Object* o)
 {

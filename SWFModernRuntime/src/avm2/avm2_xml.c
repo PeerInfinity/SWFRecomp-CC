@@ -12,6 +12,7 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 
@@ -64,6 +65,13 @@ static Avm2Object* alloc_instance(Avm2Context* ctx, Avm2Class* cls, uint32_t ext
 	obj->proto = cls->prototype_obj;
 	obj->native_ext = avm2_alloc(ctx, ext_size);
 	memset(obj->native_ext, 0, ext_size);
+	obj->native_ext_size = ext_size;  // GC conservative-scan span
+	// GC (Stage 11): XML/XMLList wrappers cache themselves in the (immortal,
+	// non-census) E4X node tree (node->obj); a collected wrapper would dangle
+	// that cache. The E4X tree is also the only path to child-element
+	// wrappers, which the conservative scan cannot follow. Pin the wrapper —
+	// XML is not on the Seedling hot path, so the over-retention is bounded.
+	avm2_gc_pin(obj);
 	return obj;
 }
 
@@ -2865,6 +2873,9 @@ static Avm2XmlNodeExt* xn_ensure_ext(Avm2Context* ctx, Avm2Object* obj)
 	{
 		obj->native_ext = avm2_alloc(ctx, sizeof(Avm2XmlNodeExt));
 		memset(obj->native_ext, 0, sizeof(Avm2XmlNodeExt));
+		// GC: children/attributes are direct in-blob object edges — the
+		// conservative scan follows them once the span is recorded.
+		obj->native_ext_size = sizeof(Avm2XmlNodeExt);
 	}
 	return (Avm2XmlNodeExt*) obj->native_ext;
 }

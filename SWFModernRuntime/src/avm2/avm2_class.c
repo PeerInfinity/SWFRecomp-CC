@@ -10,6 +10,7 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 
@@ -776,6 +777,7 @@ static void class_setup_prototype(Avm2Context* ctx, Avm2Class* cls)
 		proto->proto = cls->super_class->prototype_obj;
 	}
 	cls->prototype_obj = proto;
+	avm2_gc_pin(proto);  // GC: class prototypes are immortal (structural)
 	if (cls->class_object != NULL)
 	{
 		Avm2DynProp* p = avm2_object_set_dynamic(ctx, proto, "constructor", 11,
@@ -900,6 +902,7 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 	cobj->cls = ctx->builtins.class_class;
 	cobj->proto = ctx->builtins.class_class->prototype_obj;
 	cls->class_object = cobj;
+	avm2_gc_pin(cobj);  // GC: class objects are immortal (structural)
 	cls->iscope->entries[cls->iscope->count - 1].obj = cobj;
 	avm2_slots_init_defaults(ctx, cobj, cvt);
 
@@ -936,6 +939,7 @@ Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
 	{
 		obj->native_ext = avm2_alloc(ctx, cls->native_ext_size);
 		memset(obj->native_ext, 0, cls->native_ext_size);
+		obj->native_ext_size = cls->native_ext_size;  // GC conservative-scan span
 	}
 	if (cls->native_init != NULL)
 	{

@@ -1,5 +1,15 @@
 # Session prompt — AVM2 Stage 11: GC enrollment + perf soak
 
+> **STATUS: COMPLETE (2026-07-12).** Self-contained AVM2 mark-sweep collector
+> landed (`SWFModernRuntime/src/avm2/avm2_gc.c` + `avm2_gc.h`); collects only
+> between ticks (VM quiescent), deterministic 4 MB watermark + `AVM2_GC_STRESS`
+> CI gate, precise+conservative marking, per-module ext-free hooks. Soak proves
+> flat growth (GC off → 2M live; STRESS → dead-flat 370, 2M swept; ASAN-clean).
+> A code-review workflow caught + fixed two pre-commit UAFs (drag roots,
+> StyleSheet entry tracing). Details: `avm2/_investigation/CURRENT_STATUS.md`,
+> `SWFRecompDocs/plans/avm2-seedling-plan.md` §2, memory `avm2-stage11-gc`.
+> Next = Stage 12 (Seedling bring-up).
+
 You are implementing **Stage 11** of the AVM2 Seedling-directed plan
 (`SWFRecompDocs/plans/avm2-seedling-plan.md` §2). This is the one mandatory
 item invisible to any feature census: AVM2 allocations are currently

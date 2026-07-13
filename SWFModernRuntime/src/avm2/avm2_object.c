@@ -1,18 +1,16 @@
 // ScriptObject allocation + dynamic (expando) properties + array storage +
 // enumeration.
 //
-// GC note (memory-reclamation rules): AVM2 objects allocate from the shared
-// o1heap but are NOT enrolled in the AVM1 mark-sweep census (g_mt_obj_head /
-// g_mt_arr_head track ASObject/ASArray only), so the collector can neither
-// mark nor sweep them — every AVM2 allocation is immortal by construction,
-// and none holds an edge into a collectable AVM1 object. That satisfies
-// "rooted or scrubbed" trivially; see avm2GcMarkRoots in avm2_main.c.
-// Tranche-1 runs are short (MAX_FRAMES-bounded), so immortality is correct,
-// just wasteful; revisit if anything OOMs.
+// GC note (Stage 11): AVM2 objects allocate from the shared o1heap and enroll
+// in the AVM2 mark-sweep census (avm2_gc.c) — a SEPARATE census from AVM1's
+// g_mt_obj_head / g_mt_arr_head (ASObject/ASArray). Every avm2_object_alloc'd
+// object is collectable; the collector marks the reachable set from the
+// persistent root graph between ticks and sweeps the rest. See avm2_gc.h.
 
 #include <stdio.h>
 #include <string.h>
 
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_main.h>
@@ -22,6 +20,7 @@ Avm2Object* avm2_object_alloc(Avm2Context* ctx, uint8_t kind, uint32_t slot_coun
 {
 	Avm2Object* obj = avm2_alloc(ctx, sizeof(Avm2Object));
 	memset(obj, 0, sizeof(Avm2Object));
+	avm2_gc_enroll(obj);
 	obj->kind = kind;
 	obj->slot_count = slot_count;
 	if (slot_count > 0)

@@ -12,6 +12,9 @@
 #include <strings.h>
 
 #include <avm2/avm2_value.h>
+#include <memory/heap.h>
+
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
@@ -783,6 +786,17 @@ struct Avm2EditTextExt
 	uint16_t font_id;
 };
 typedef struct Avm2EditTextExt Avm2EditTextExt;
+
+// GC (Stage 11): mark the collectable object edges an EditText ext holds. The
+// spans store copied TextFormat FIELD values (immortal strings + numbers), not
+// TextFormat objects; the only object edge is the attached StyleSheet. Called
+// by avm2_display_gc_trace_ext (the ext hangs off the DisplayObjectExt, so the
+// GC's conservative blob scan cannot reach it).
+void avm2_text_gc_mark_edittext(struct Avm2EditTextExt* et)
+{
+	if (et == NULL) return;
+	avm2_gc_mark_object(et->style_sheet);
+}
 
 static Avm2EditTextExt* edittext_of(Avm2Context* ctx, Avm2Object* obj)
 {
@@ -4049,6 +4063,32 @@ static Avm2StyleSheetExt* stylesheet_ext_of(Avm2Object* obj)
 		if (c == g_stylesheet_class) return (Avm2StyleSheetExt*) obj->native_ext;
 	}
 	return NULL;
+}
+
+// GC ext tracer (Stage 11): a StyleSheet's ext holds per-selector style objects
+// in an out-of-line entries[] array — the GC's conservative blob scan sees only
+// the array pointer, not the style_obj pointers inside — so mark them here.
+// Invoked by the collector for every ext-bearing object; a no-op unless it is a
+// StyleSheet. (The dispatcher listeners hung off the same ext are handled by
+// avm2_events_gc_trace_ext.)
+void avm2_text_gc_trace_ext(Avm2Object* o)
+{
+	Avm2StyleSheetExt* ss = stylesheet_ext_of(o);
+	if (ss == NULL) return;
+	for (uint32_t i = 0; i < ss->count; i++) avm2_gc_mark_object(ss->entries[i].style_obj);
+}
+
+// GC free hook: free the out-of-line style entry array a swept StyleSheet owns
+// (avm2_alloc'd; a StyleSheet is script-creatable and droppable, so it does get
+// swept). The EditText ext (spans/layout) that hangs off a TextField's
+// DisplayObjectExt is NOT freed here — TextField display objects are rooted
+// while on the stage and rarely swept, so that residual is bounded.
+void avm2_text_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
+{
+	Avm2StyleSheetExt* ss = stylesheet_ext_of(o);
+	if (ss == NULL || ss->entries == NULL) return;
+	heap_free(ctx->app, ss->entries);
+	ss->entries = NULL;
 }
 
 static Avm2Object* plain_object(Avm2Context* ctx)
