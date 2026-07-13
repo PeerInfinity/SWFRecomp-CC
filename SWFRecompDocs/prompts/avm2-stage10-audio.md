@@ -1,5 +1,14 @@
 # Session prompt — AVM2 Stage 10: audio + timers + saves (+ deferred asset compression)
 
+> **STATUS: COMPLETE (2026-07-12, commit `8c4e8518e`).** Timer/TimerEvent +
+> getTimer 6/6; flash.media Sound family 12 pass; SharedObject
+> shared_object_no_root; asset zlib compression (Seedling 46 MB → 8.9 MB). CI
+> BOTH modes: avm2 801 → 819 (+18), zero regressions, wasm-link-smoke green. See
+> `avm2/_investigation/CURRENT_STATUS.md`, `STAGE10_CANDIDATES.txt`, and the
+> `avm2-stage10-audio` memory. Deferred: 2 multi-entity SoundMixer-accumulation
+> tests, 3 network-load sound tests, shared_object two-run .sol harness, real
+> audio OUTPUT wiring. Next = Stage 11 (`avm2-stage11-gc.md`).
+
 You are implementing **Stage 10** of the AVM2 Seedling-directed plan
 (`SWFRecompDocs/plans/avm2-seedling-plan.md`): flash.media.Sound /
 SoundChannel / SoundTransform over the existing MP3 backend, flash.utils.Timer /
