@@ -1,8 +1,56 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-12 — Stage 8 (input harness + input→event bridge)
-COMPLETE; Stage 7 (embedded assets + BitmapData/Bitmap), Stage 6
-(TextField/EditText engine), Stage 5, E4X and Stage 4 before it.
+Last updated: 2026-07-12 — Stage 9 (minimal AVM2 render path) COMPLETE;
+Stage 8 (input harness + input→event bridge), Stage 7 (embedded assets +
+BitmapData/Bitmap), Stage 6 (TextField/EditText engine), Stage 5, E4X and
+Stage 4 before it.
+
+## State (Stage 9)
+
+- **Stage 9 COMPLETE (2026-07-12, commit `bf93755e0`): minimal AVM2 render
+  path — 8/9 pure-blit bitmap family pass** under `--mode=graphics`
+  (`_investigation/STAGE9_CANDIDATES.txt`). A real render-tree walk over the
+  AVM2 display tree feeding the existing WebGPU offscreen backend (which was
+  already linked in AVM2 graphics builds but never driven). What landed:
+  - `SWFModernRuntime/src/avm2/avm2_display.c` — a new `#ifdef OFFSCREEN_RENDER`
+    render block. `avm2_render_init` replicates swfStart's renderer setup
+    (renderer_new/init, stage_to_ndc, stage bg from g_stage_color, dynamic-bitmap
+    layer sizing, capture triggers) for the AVM2 entry. `avm2_render_frame`/
+    `avm2_render_finish` run a depth-ordered render-list walk after each tick (a
+    NEW pass reading the SAME list the tick built — no timeline/goto re-run),
+    composing world matrix + concatenated alpha per node and blitting each
+    Bitmap's premultiplied-ARGB BitmapData pixels via
+    `renderer_draw_bitmap_quad_scaled` into a per-object dynamic xform slot.
+    Capture mirrors swf.c/capture.c (last_frame/iteration/fs_command).
+  - `SWFModernRuntime/src/avm2/avm2_main.c` — drives render_init before the tick
+    loop, render_frame after each tick, render_finish at the end, all gated on
+    OFFSCREEN_RENDER (NO_GRAPHICS builds compile none of it).
+  - `SWFModernRuntime/src/avm2/avm2_bitmap.c` — BitmapData.draw()'s CPU fast path
+    ported from Ruffle operations.rs (BitmapData/Bitmap source + normal blend +
+    identity 2x2 matrix -> copy_on_cpu / blend_and_transform; BitmapData-source
+    Alpha/Erase = documented Flash no-op). DisplayObject sources / impactful
+    blends / scaled matrices still need the offscreen GPU pipeline (Stage 10+).
+  - Passing (graphics): bitmapdata_fillrect, _clone, _copychannel, _copypixels,
+    _colortransform, _embedded, _sync, _pixeldissolve_image. Miss:
+    bitmap_subclass_properties (a pre-existing embedded-subclass trace abort,
+    fails identically in no-graphics — NOT a render bug).
+  - **DEFERRED to Stage 10+** (documented): asset-table zlib compression (the
+    ~46 MB Stage-7 finding — orthogonal to Stage-9 grading, tests use tiny
+    bitmaps; a broad recompiler change better done in the asset/audio session;
+    only blocks the real Seedling recompile), shape/gradient/text/mask rendering
+    (Graphics records only an AABB), and the draw() offscreen-GPU pipeline (the
+    bulk of the bitmapdata_draw* family).
+  - **CI baseline BOTH modes (sha `bf93755e0`):**
+    - **no-graphics (run 29216031666): avm2 801 / 1,204 + 22 RM = 823 effective
+      (68.4%)** — IDENTICAL to Stage 8's 823 (the render + draw() additions are
+      no-graphics-inert / net-zero); no-graphics diff "No changes detected".
+    - **graphics (run 29216038323): avm2 801 / 1,204 + 22 RM = 823 effective
+      (66.5% raw pass), +793 over the previously-broken graphics baseline (8)**
+      — this is the first real avm2 graphics baseline; the image tests now
+      render. Zero graphics regressions (vs trace AND vs previous graphics).
+  - **ZERO pass→fail regressions in EITHER mode across ALL suites** (avm1,
+    from_gnash all sub-suites, from_shumway, regression all "No changes
+    detected" in both modes); wasm-link-smoke green.
 
 ## State (Stage 8)
 

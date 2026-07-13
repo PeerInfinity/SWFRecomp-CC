@@ -84,11 +84,30 @@ answer to "what could go wrong with game-first development"):
   KeyboardEvent/MouseEvent/FocusEvent dispatch from injected (and later
   real) input, Keyboard/Mouse constants, focus interplay. This is also
   the bridge design for real platform input in native/browser builds.
-- **Stage 9 — minimal AVM2 render path**. A real render-tree traversal
-  over the AVM2 display tree feeding the existing render backend,
-  starting with the Bitmap/BitmapData blit path (+ solid-color
-  Graphics fills), OFFSCREEN_RENDER/graphics-mode wiring so the
-  bitmapdata image-comparison tests (~20 currently trace-empty
+- **Stage 9 — minimal AVM2 render path** — **DONE 2026-07-12** (commit
+  `bf93755e0`; 8/9 pure-blit bitmap family). A real render-tree walk over the
+  AVM2 display tree feeding the existing WebGPU offscreen backend (which was
+  already linked in AVM2 graphics builds but never driven). avm2_display.c gained
+  an `#ifdef OFFSCREEN_RENDER` render block: avm2_render_init replicates
+  swfStart's renderer setup; avm2_render_frame/finish walk the render_list after
+  each tick (world matrix + concat alpha per node), blitting each Bitmap's
+  premultiplied-ARGB BitmapData pixels via renderer_draw_bitmap_quad_scaled into
+  per-object dynamic xform slots, with swf.c/capture.c-style capture
+  (last_frame/iteration/fs_command). avm2_bitmap.c gained BitmapData.draw()'s CPU
+  fast path (BitmapData/Bitmap source + normal blend + identity 2x2 -> Ruffle
+  copy_on_cpu / blend_and_transform; BitmapData-source Alpha/Erase = Flash
+  no-op). Passing: fillrect, clone, copychannel, copypixels, colortransform,
+  embedded, sync, pixeldissolve_image. See `avm2/_investigation/
+  STAGE9_CANDIDATES.txt` + `avm2-stage9-render` memory. **Deferred to Stage 10+**
+  (documented): asset-table zlib compression (the ~46 MB Stage-7 finding — a
+  broad recompiler change, tests unaffected, only blocks the real Seedling
+  recompile), shape/gradient/text/mask rendering (Graphics records only an AABB),
+  and the draw() offscreen-GPU pipeline (DisplayObject sources + alpha/erase
+  group blends = the bulk of bitmapdata_draw*). Details below:
+  A real render-tree traversal over the AVM2 display tree feeding the
+  existing render backend, starting with the Bitmap/BitmapData blit path
+  (+ solid-color Graphics fills), OFFSCREEN_RENDER/graphics-mode wiring so
+  the bitmapdata image-comparison tests (~20 currently trace-empty
   "passes") become observable. Exit: Seedling-shaped content renders;
   image tests triaged.
 - **Stage 10 — audio + timers + saves**. flash.media.Sound/

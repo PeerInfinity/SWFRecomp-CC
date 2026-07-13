@@ -1,5 +1,15 @@
 # Session prompt — AVM2 Stage 9: minimal AVM2 render path
 
+> **STATUS: COMPLETE (2026-07-12, commit `bf93755e0`).** Bitmap blit render
+> path + BitmapData.draw() CPU fast path landed; 8/9 pure-blit bitmap family
+> pass under `--mode=graphics`; CI baseline recorded BOTH modes (avm2 823
+> effective each; zero pass→fail regressions anywhere; wasm-link-smoke green).
+> Deferred to Stage 10+ (documented): asset-table zlib compression, shape/text/
+> mask rendering, the draw() offscreen-GPU pipeline. See
+> `avm2/_investigation/CURRENT_STATUS.md`, `STAGE9_CANDIDATES.txt`, and the
+> `avm2-stage9-render` memory. Successor: `avm2-stage10-audio.md`.
+
+
 You are implementing **Stage 9** of the AVM2 Seedling-directed plan
 (`SWFRecompDocs/plans/avm2-seedling-plan.md`): a real render-tree traversal over
 the AVM2 display tree feeding the existing render backend, starting with the
