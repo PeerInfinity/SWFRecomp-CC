@@ -1173,6 +1173,152 @@ static void event_override_method(Avm2Context* ctx, Avm2Class* cls,
 	avm2_builtin_add_method(ctx, cls, name, fn);
 }
 
+// --- ProgressEvent / ErrorEvent family / HTTPStatusEvent / StatusEvent ---
+// These flash.events subclasses are dispatched on URLLoader/Loader/Sound
+// during network I/O. The native/headless runtime has no network layer, so
+// they are rarely dispatched, but the classes must exist (and expose their
+// static event-type constants) — the Newgrounds-API preloader wraps Seedling
+// and registers ProgressEvent/IOErrorEvent/SecurityErrorEvent listeners.
+
+static Avm2Value progress_event_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->bytes_loaded = act->argc > 3 ? avm2_coerce_to_number(act->ctx, act->args[3]) : 0;
+	ext->bytes_total = act->argc > 4 ? avm2_coerce_to_number(act->ctx, act->args[4]) : 0;
+	return avm2_undefined();
+}
+static Avm2Value pe_get_loaded(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return avm2_number(e ? e->bytes_loaded : 0); }
+static Avm2Value pe_set_loaded(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); if (e && act->argc > 0) e->bytes_loaded = avm2_coerce_to_number(act->ctx, act->args[0]); return avm2_undefined(); }
+static Avm2Value pe_get_total(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return avm2_number(e ? e->bytes_total : 0); }
+static Avm2Value pe_set_total(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); if (e && act->argc > 0) e->bytes_total = avm2_coerce_to_number(act->ctx, act->args[0]); return avm2_undefined(); }
+
+static Avm2Value error_event_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->text = act->argc > 3 ? avm2_coerce_to_string(act->ctx, act->args[3])
+		: avm2_string_from_literal(act->ctx, "");
+	ext->error_id = act->argc > 4 ? (int32_t) avm2_coerce_to_number(act->ctx, act->args[4]) : 0;
+	return avm2_undefined();
+}
+static Avm2Value ee_get_error_id(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return avm2_integer(e ? e->error_id : 0); }
+
+static Avm2Value http_status_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->http_status = act->argc > 3 ? (int32_t) avm2_coerce_to_number(act->ctx, act->args[3]) : 0;
+	ext->response_url = NULL;
+	return avm2_undefined();
+}
+static Avm2Value hse_get_status(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return avm2_integer(e ? e->http_status : 0); }
+static Avm2Value hse_get_redirected(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return avm2_bool(e && e->redirected); }
+static Avm2Value hse_set_redirected(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); if (e && act->argc > 0) e->redirected = avm2_coerce_to_boolean(act->args[0]) ? 1 : 0; return avm2_undefined(); }
+static Avm2Value hse_get_response_url(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return (e && e->response_url) ? avm2_string(e->response_url) : avm2_null(); }
+
+static Avm2Value status_event_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->status_code = act->argc > 3 ? avm2_coerce_to_string(act->ctx, act->args[3]) : NULL;
+	ext->status_level = act->argc > 4 ? avm2_coerce_to_string(act->ctx, act->args[4]) : NULL;
+	return avm2_undefined();
+}
+static Avm2Value se_get_code(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return (e && e->status_code) ? avm2_string(e->status_code) : avm2_null(); }
+static Avm2Value se_set_code(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); if (e && act->argc > 0) e->status_code = avm2_coerce_to_string(act->ctx, act->args[0]); return avm2_undefined(); }
+static Avm2Value se_get_level(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return (e && e->status_level) ? avm2_string(e->status_level) : avm2_null(); }
+static Avm2Value se_set_level(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); if (e && act->argc > 0) e->status_level = avm2_coerce_to_string(act->ctx, act->args[0]); return avm2_undefined(); }
+
+static void sconst(Avm2Context* ctx, Avm2Class* cls, const char* n, const char* v)
+{ avm2_builtin_add_static_const(ctx, cls, n, avm2_string(avm2_string_from_literal(ctx, v))); }
+
+static void register_net_events(Avm2Context* ctx)
+{
+	Avm2Builtins* b = &ctx->builtins;
+
+	// flash.events.ProgressEvent (extends Event).
+	Avm2Class* pe = avm2_builtin_class(ctx, "flash.events", "ProgressEvent",
+	                                   b->event_class);
+	pe->instance_init.fn = progress_event_init;
+	pe->instance_init.debug_name = "ProgressEvent";
+	avm2_builtin_add_getset(ctx, pe, "bytesLoaded", pe_get_loaded, pe_set_loaded);
+	avm2_builtin_add_getset(ctx, pe, "bytesTotal", pe_get_total, pe_set_total);
+	sconst(ctx, pe, "PROGRESS", "progress");
+	sconst(ctx, pe, "SOCKET_DATA", "socketData");
+
+	// flash.events.ErrorEvent (extends TextEvent) + IOErrorEvent /
+	// SecurityErrorEvent / AsyncErrorEvent / UncaughtErrorEvent (extend it).
+	Avm2Class* er = avm2_builtin_class(ctx, "flash.events", "ErrorEvent",
+	                                   b->text_event_class);
+	er->instance_init.fn = error_event_init;
+	er->instance_init.debug_name = "ErrorEvent";
+	avm2_builtin_add_getter(ctx, er, "errorID", ee_get_error_id);
+	sconst(ctx, er, "ERROR", "error");
+
+	Avm2Class* ioe = avm2_builtin_class(ctx, "flash.events", "IOErrorEvent", er);
+	ioe->instance_init.fn = error_event_init;
+	ioe->instance_init.debug_name = "IOErrorEvent";
+	sconst(ctx, ioe, "IO_ERROR", "ioError");
+	sconst(ctx, ioe, "NETWORK_ERROR", "networkError");
+	sconst(ctx, ioe, "DISK_ERROR", "diskError");
+	sconst(ctx, ioe, "VERIFY_ERROR", "verifyError");
+	sconst(ctx, ioe, "STANDARD_ERROR_IO_ERROR", "ioError");
+
+	Avm2Class* sec = avm2_builtin_class(ctx, "flash.events",
+	                                    "SecurityErrorEvent", er);
+	sec->instance_init.fn = error_event_init;
+	sec->instance_init.debug_name = "SecurityErrorEvent";
+	sconst(ctx, sec, "SECURITY_ERROR", "securityError");
+
+	Avm2Class* ase = avm2_builtin_class(ctx, "flash.events",
+	                                    "AsyncErrorEvent", er);
+	ase->instance_init.fn = error_event_init;
+	ase->instance_init.debug_name = "AsyncErrorEvent";
+	sconst(ctx, ase, "ASYNC_ERROR", "asyncError");
+
+	// flash.events.HTTPStatusEvent (extends Event).
+	Avm2Class* hse = avm2_builtin_class(ctx, "flash.events", "HTTPStatusEvent",
+	                                    b->event_class);
+	hse->instance_init.fn = http_status_init;
+	hse->instance_init.debug_name = "HTTPStatusEvent";
+	avm2_builtin_add_getter(ctx, hse, "status", hse_get_status);
+	avm2_builtin_add_getset(ctx, hse, "redirected", hse_get_redirected, hse_set_redirected);
+	avm2_builtin_add_getter(ctx, hse, "responseURL", hse_get_response_url);
+	sconst(ctx, hse, "HTTP_STATUS", "httpStatus");
+	sconst(ctx, hse, "HTTP_RESPONSE_STATUS", "httpResponseStatus");
+
+	// flash.events.StatusEvent (extends Event).
+	Avm2Class* ste = avm2_builtin_class(ctx, "flash.events", "StatusEvent",
+	                                    b->event_class);
+	ste->instance_init.fn = status_event_init;
+	ste->instance_init.debug_name = "StatusEvent";
+	avm2_builtin_add_getset(ctx, ste, "code", se_get_code, se_set_code);
+	avm2_builtin_add_getset(ctx, ste, "level", se_get_level, se_set_level);
+	sconst(ctx, ste, "STATUS", "status");
+}
+
 static void register_input_events(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -1406,6 +1552,11 @@ void avm2_register_events(Avm2Context* ctx)
 
 	// flash.events.MouseEvent / KeyboardEvent / FocusEvent (Stage 8).
 	register_input_events(ctx);
+
+	// flash.events.ProgressEvent / ErrorEvent family / HTTPStatusEvent /
+	// StatusEvent — network/loader events (after TextEvent: ErrorEvent
+	// extends it).
+	register_net_events(ctx);
 
 	// flash.events.TimerEvent (Stage 10). Base Event ctor + a toString that
 	// lists the standard 5 fields under the "TimerEvent" class name.

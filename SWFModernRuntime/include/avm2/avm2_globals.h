@@ -185,6 +185,9 @@ int avm2_nsqname_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_t idx
 // Plain (non-regex) String.split — the regex-aware split falls back to it.
 Avm2Value avm2_string_split_plain(struct Avm2Activation* act);
 
+// The current (root) ApplicationDomain as a value, or null if not yet built.
+Avm2Value avm2_current_domain_value(Avm2Context* ctx);
+
 // Definition lookup by dotted/:: name ("pkg::Name", "pkg.Name", "Name"),
 // including on-demand "Vector.<...>" applications. Sets *found.
 Avm2Value avm2_find_definition(Avm2Context* ctx, const char* s, uint32_t len,
@@ -261,8 +264,19 @@ typedef struct Avm2EventExt
 	// --- FocusEvent ---
 	const Avm2String* direction; // NULL = "none"
 	uint8_t related_object_inaccessible;
-	// --- TextEvent ---
+	// --- TextEvent / ErrorEvent (text = error message) ---
 	const Avm2String* text;
+	// --- ProgressEvent ---
+	double bytes_loaded, bytes_total;
+	// --- ErrorEvent family ---
+	int32_t error_id;
+	// --- HTTPStatusEvent ---
+	int32_t http_status;
+	uint8_t redirected;
+	const Avm2String* response_url;
+	// --- StatusEvent ---
+	const Avm2String* status_code;
+	const Avm2String* status_level;
 } Avm2EventExt;
 
 // DisplayObject instance state (avm2_display.c). One struct serves the
@@ -578,6 +592,7 @@ typedef struct Avm2Builtins
 	Avm2Class* event_dispatcher_class;
 	Avm2Class* ievent_dispatcher_class;  // interface
 	Avm2Class* display_object_class;
+	Avm2Class* loader_info_class;        // flash.display.LoaderInfo
 	Avm2Class* interactive_object_class;
 	Avm2Class* doc_class;                // DisplayObjectContainer
 	Avm2Class* sprite_class;

@@ -1,10 +1,67 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-12 — Stage 11 (GC enrollment + perf soak) COMPLETE;
-Stage 10 (audio + timers + saves + asset compression), Stage 9 (minimal AVM2
-render path), Stage 8 (input harness + input→event bridge), Stage 7 (embedded
-assets + BitmapData/Bitmap), Stage 6 (TextField/EditText engine), Stage 5, E4X
-and Stage 4 before it.
+Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) IN PROGRESS; Stage 11
+(GC enrollment + perf soak) COMPLETE; Stage 10 (audio + timers + saves + asset
+compression), Stage 9 (minimal AVM2 render path), Stage 8 (input harness +
+input→event bridge), Stage 7 (embedded assets + BitmapData/Bitmap), Stage 6
+(TextField/EditText engine), Stage 5, E4X and Stage 4 before it.
+
+## State (Stage 12 — Seedling bring-up, first session 2026-07-13)
+
+- **The real Seedling.swf recompiles + links + runs — both build modes.** The
+  recompiler emits exactly the census counts (284 DefineBitsLossless2 bitmaps,
+  116 DefineBinaryData, 88 DefineSound; abc_timeline.c 8.9 MB compressed, 0
+  verify failures over 3,607 bodies). Native no-graphics AND graphics (Dawn
+  offscreen) both link and run without crashing.
+- **Divergence-harness workflow (headless-first): the entire Newgrounds-API
+  preloader error chain is cleared.** Seedling's document class is the
+  **Newgrounds API v3.1.3 AS3** preloader (NG ads/medals wrapper around the
+  FlashPunk `Main`). Running the recompiled game headless surfaced a chain of
+  missing-class / null-access divergences, each fixed and (where an upstream
+  family exists) backed by a trace test:
+  1. `loaderInfo.url` → **#1009** (loaderInfo returned null). Implemented
+     **flash.display.LoaderInfo** (root-movie singleton: shared across all
+     on-stage objects, null off-stage; `content`=root; bytesLoaded/Total=on-disk
+     size; url/contentType/actionScriptVersion/frameRate/width/height/swfVersion/
+     parameters/applicationDomain/loader/childAllowsParent/parentAllowsChild/
+     sameDomain). **+3 tests: loaderinfo_properties, loaderinfo_root,
+     loaderinfo_root_allows.** Added `-DSWF_ONDISK_SIZE` to verify_output (the
+     root LoaderInfo reports the compressed download size, not SWF_FILE_SIZE's
+     uncompressed header size).
+  2. **#1065 Security** → implemented **flash.system.Security** (sandboxType
+     "localWithFile", allowDomain/allowInsecureDomain/loadPolicyFile no-ops,
+     sandbox-type constants). **+1 test: sandbox_type_local_file.**
+  3. **#1065 URLVariables** → implemented the **flash.net URL stack**
+     (URLRequest with #2008 method validation, URLVariables, URLRequestMethod,
+     URLLoaderDataFormat, URLRequestHeader, URLLoader [EventDispatcher;
+     load()=no-op, no network layer], navigateToURL/sendToURL). **+1 test:
+     urlrequest.**
+  4. **#1006 addEventListener on URLLoader** → registration-order bug:
+     `register_net` ran before `avm2_register_events`, so URLLoader was created
+     when `event_dispatcher_class` was still NULL (builtin classes snapshot the
+     parent vtable at creation). Moved `register_net` after events.
+  5. **#1065 ProgressEvent** → implemented the **flash.events network family**
+     (ProgressEvent, ErrorEvent, IOErrorEvent, SecurityErrorEvent,
+     AsyncErrorEvent, HTTPStatusEvent, StatusEvent) with static type constants.
+     No upstream trace family — game-driven stubs.
+- **Result:** Seedling now runs the NG preloader **with zero uncaught errors**;
+  at ~3000 ticks the NG API connection **times out gracefully** ("Unable to
+  connect to the API" — correct headless behaviour, there is no network). The
+  preloader then reaches its **play-button gate** (the `onPlayClick` /
+  `onMouseDown` handlers in the abc dump): starting the FlashPunk `Main` needs
+  an injected mouse click — the next session's work (input.json harness, then
+  first render).
+- **Known gaps found (next session):** (a) reach `Main` via injected play-button
+  click; (b) graphics-mode capture hits `render_webgpu_save_png: buffer map
+  failed (status 4)` / lavapipe `VK_ERROR_OUT_OF_DEVICE_MEMORY` under WSL2 — a
+  render-infra issue, separate from game logic (headless no-graphics path is
+  clean); (c) URLLoader.load never dispatches COMPLETE/IO_ERROR (no network) —
+  a faithful async IOError would let API-gated preloaders fall through without
+  waiting for the timeout Timer.
+- **The game is the INTEGRATION check, never the oracle:** every fix above is
+  graded by its upstream trace family (5 new passes) except the flash.events
+  network stubs (no upstream family) and the flash.net load()/navigator paths
+  (need Ruffle's navigator mock — url_loader/net_navigateToURL stay deferred).
 
 ## State (Stage 11)
 

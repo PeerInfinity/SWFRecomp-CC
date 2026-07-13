@@ -1919,6 +1919,11 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         else:
             swf_file_size = test_swf.stat().st_size
         extra_defines.append(f"-DSWF_FILE_SIZE={swf_file_size}")
+        # LoaderInfo.bytesLoaded/bytesTotal for the ROOT movie report the
+        # actual downloaded (on-disk, still-compressed) byte count — Ruffle
+        # returns swf.compressed_len(). This differs from SWF_FILE_SIZE (the
+        # uncompressed header size used by AVM1 getBytesLoaded/getBytesTotal).
+        extra_defines.append(f"-DSWF_ONDISK_SIZE={test_swf.stat().st_size}")
     # Pass movie URL matching Ruffle's VFS format (file:///test.swf)
     extra_defines.append('-DSWF_URL="file:///test.swf"')
     # Build compiler flags based on mode

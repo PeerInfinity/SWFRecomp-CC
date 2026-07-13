@@ -1097,6 +1097,14 @@ static Avm2Value appdomain_get_current(Avm2Activation* act)
 	return avm2_object_value(g_current_domain);
 }
 
+// Public accessor (LoaderInfo.applicationDomain returns the root domain).
+Avm2Value avm2_current_domain_value(Avm2Context* ctx)
+{
+	(void) ctx;
+	return g_current_domain != NULL ? avm2_object_value(g_current_domain)
+	                                : avm2_null();
+}
+
 static Avm2Value appdomain_has_definition(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -1134,6 +1142,234 @@ static void register_system(Avm2Context* ctx)
 	avm2_builtin_add_static_method(ctx, cls, "gc", system_noop);
 	avm2_builtin_add_static_method(ctx, cls, "pauseForGCIfCollectionImminent",
 	                               system_noop);
+}
+
+// flash.system.Security — minimal. Native/headless runs from a local file with
+// network disabled, so sandboxType is "localWithFile" (matches Ruffle's default
+// for a network-disabled local SWF; the sandbox_type_local_file test). The
+// domain-policy methods are no-ops (there is no cross-domain network layer);
+// the Newgrounds-style API preloaders call Security.allowDomain() at startup.
+static Avm2Value security_get_sandbox_type(Avm2Activation* act)
+{
+	return avm2_string(avm2_string_from_literal(act->ctx, "localWithFile"));
+}
+static Avm2Value security_get_exact_settings(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(true);
+}
+static Avm2Value security_get_false(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(false);
+}
+static Avm2Value security_const_remote(Avm2Activation* a)
+{ return avm2_string(avm2_string_from_literal(a->ctx, "remote")); }
+static Avm2Value security_const_local_trusted(Avm2Activation* a)
+{ return avm2_string(avm2_string_from_literal(a->ctx, "localTrusted")); }
+static Avm2Value security_const_local_with_file(Avm2Activation* a)
+{ return avm2_string(avm2_string_from_literal(a->ctx, "localWithFile")); }
+static Avm2Value security_const_local_with_network(Avm2Activation* a)
+{ return avm2_string(avm2_string_from_literal(a->ctx, "localWithNetwork")); }
+static Avm2Value security_const_application(Avm2Activation* a)
+{ return avm2_string(avm2_string_from_literal(a->ctx, "application")); }
+
+static void register_security(Avm2Context* ctx)
+{
+	Avm2Class* cls = avm2_builtin_class(ctx, "flash.system", "Security",
+	                                    ctx->builtins.object_class);
+	avm2_builtin_add_static_getset(ctx, cls, "sandboxType",
+	                               security_get_sandbox_type, NULL);
+	avm2_builtin_add_static_getset(ctx, cls, "exactSettings",
+	                               security_get_exact_settings, system_noop);
+	avm2_builtin_add_static_getset(ctx, cls, "disableAVM1Loading",
+	                               security_get_false, system_noop);
+	avm2_builtin_add_static_method(ctx, cls, "allowDomain", system_noop);
+	avm2_builtin_add_static_method(ctx, cls, "allowInsecureDomain", system_noop);
+	avm2_builtin_add_static_method(ctx, cls, "loadPolicyFile", system_noop);
+	avm2_builtin_add_static_method(ctx, cls, "showSettings", system_noop);
+	// Sandbox-type constants.
+	avm2_builtin_add_static_getset(ctx, cls, "REMOTE",
+	                               security_const_remote, NULL);
+	avm2_builtin_add_static_getset(ctx, cls, "LOCAL_TRUSTED",
+	                               security_const_local_trusted, NULL);
+	avm2_builtin_add_static_getset(ctx, cls, "LOCAL_WITH_FILE",
+	                               security_const_local_with_file, NULL);
+	avm2_builtin_add_static_getset(ctx, cls, "LOCAL_WITH_NETWORK",
+	                               security_const_local_with_network, NULL);
+	avm2_builtin_add_static_getset(ctx, cls, "APPLICATION",
+	                               security_const_application, NULL);
+}
+
+static void builtin_add_global_fn_ns(Avm2Context* ctx, const char* ns,
+                                     const char* name, Avm2MethodFn fn);
+
+// ============ flash.net URL stack (minimal, headless) ============
+// The Newgrounds-API wrappers around FlashPunk games (Seedling) build
+// URLRequest / URLVariables / URLLoader at startup. The native/headless
+// runtime has no network layer, so loads are no-ops; these classes exist so
+// the preloader constructs cleanly and reaches the game's Main class. The
+// pure-logic surface is graded by the `urlrequest` trace test (method #2008).
+
+typedef struct Avm2UrlRequestExt
+{
+	Avm2Value url;
+	const Avm2String* method;
+	Avm2Value data;
+	Avm2Value content_type;
+	Avm2Value request_headers;
+} Avm2UrlRequestExt;
+
+static int str_eq_lit(const Avm2String* s, const char* lit)
+{
+	size_t n = strlen(lit);
+	return s != NULL && s->len == n && memcmp(s->utf8, lit, n) == 0;
+}
+
+static Avm2UrlRequestExt* urlreq_ext(Avm2Activation* act)
+{
+	Avm2Object* o = act->this_val.u.obj;
+	return (act->this_val.kind == AVM2_VALUE_OBJECT && o != NULL
+	        && o->native_ext != NULL) ? (Avm2UrlRequestExt*) o->native_ext : NULL;
+}
+
+static int val_is_nullish(Avm2Value v)
+{
+	return v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED;
+}
+
+static Avm2Value urlreq_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2UrlRequestExt* e = urlreq_ext(act);
+	if (e == NULL) return avm2_undefined();
+	e->method = avm2_string_from_literal(ctx, "GET");
+	e->url = (act->argc > 0 && !val_is_nullish(act->args[0]))
+		? avm2_string(avm2_coerce_to_string(ctx, act->args[0])) : avm2_null();
+	e->data = avm2_null();
+	e->content_type = avm2_string(avm2_string_from_literal(ctx,
+		"application/x-www-form-urlencoded"));
+	e->request_headers = avm2_null();
+	return avm2_undefined();
+}
+
+static Avm2Value urlreq_get_url(Avm2Activation* act)
+{ Avm2UrlRequestExt* e = urlreq_ext(act); return e ? e->url : avm2_null(); }
+
+static Avm2Value urlreq_set_url(Avm2Activation* act)
+{
+	Avm2UrlRequestExt* e = urlreq_ext(act);
+	if (e && act->argc > 0)
+		e->url = val_is_nullish(act->args[0]) ? avm2_null()
+			: avm2_string(avm2_coerce_to_string(act->ctx, act->args[0]));
+	return avm2_undefined();
+}
+
+static Avm2Value urlreq_get_method(Avm2Activation* act)
+{
+	Avm2UrlRequestExt* e = urlreq_ext(act);
+	return (e && e->method) ? avm2_string(e->method)
+		: avm2_string(avm2_string_from_literal(act->ctx, "GET"));
+}
+
+static Avm2Value urlreq_set_method(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2UrlRequestExt* e = urlreq_ext(act);
+	if (e == NULL || act->argc == 0) return avm2_undefined();
+	const Avm2String* m = avm2_coerce_to_string(ctx, act->args[0]);
+	// Flash accepts exactly {"GET","get","POST","post"} (urlrequest test).
+	if (!(str_eq_lit(m, "GET") || str_eq_lit(m, "get")
+	      || str_eq_lit(m, "POST") || str_eq_lit(m, "post")))
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+			"Error #2008: Parameter method must be one of the accepted values.");
+	e->method = m;
+	return avm2_undefined();
+}
+
+static Avm2Value urlreq_get_data(Avm2Activation* act)
+{ Avm2UrlRequestExt* e = urlreq_ext(act); return e ? e->data : avm2_null(); }
+static Avm2Value urlreq_set_data(Avm2Activation* act)
+{ Avm2UrlRequestExt* e = urlreq_ext(act); if (e && act->argc > 0) e->data = act->args[0]; return avm2_undefined(); }
+static Avm2Value urlreq_get_ctype(Avm2Activation* act)
+{ Avm2UrlRequestExt* e = urlreq_ext(act); return e ? e->content_type : avm2_null(); }
+static Avm2Value urlreq_set_ctype(Avm2Activation* act)
+{ Avm2UrlRequestExt* e = urlreq_ext(act); if (e && act->argc > 0) e->content_type = act->args[0]; return avm2_undefined(); }
+static Avm2Value urlreq_get_headers(Avm2Activation* act)
+{ Avm2UrlRequestExt* e = urlreq_ext(act); return e ? e->request_headers : avm2_null(); }
+static Avm2Value urlreq_set_headers(Avm2Activation* act)
+{ Avm2UrlRequestExt* e = urlreq_ext(act); if (e && act->argc > 0) e->request_headers = act->args[0]; return avm2_undefined(); }
+
+static Avm2Value net_str_const(Avm2Activation* act, const char* s)
+{ return avm2_string(avm2_string_from_literal(act->ctx, s)); }
+static Avm2Value net_c_get(Avm2Activation* a){return net_str_const(a,"GET");}
+static Avm2Value net_c_post(Avm2Activation* a){return net_str_const(a,"POST");}
+static Avm2Value net_c_head(Avm2Activation* a){return net_str_const(a,"HEAD");}
+static Avm2Value net_c_put(Avm2Activation* a){return net_str_const(a,"PUT");}
+static Avm2Value net_c_del(Avm2Activation* a){return net_str_const(a,"DELETE");}
+static Avm2Value net_c_opts(Avm2Activation* a){return net_str_const(a,"OPTIONS");}
+static Avm2Value net_c_text(Avm2Activation* a){return net_str_const(a,"text");}
+static Avm2Value net_c_binary(Avm2Activation* a){return net_str_const(a,"binary");}
+static Avm2Value net_c_vars(Avm2Activation* a){return net_str_const(a,"variables");}
+
+static Avm2Value net_noop(Avm2Activation* act){ (void)act; return avm2_undefined(); }
+static Avm2Value net_get_zero(Avm2Activation* act){ (void)act; return avm2_integer(0); }
+static Avm2Value net_get_null(Avm2Activation* act){ (void)act; return avm2_null(); }
+static Avm2Value net_get_text_fmt(Avm2Activation* act){ return net_str_const(act, "text"); }
+
+static void register_net(Avm2Context* ctx)
+{
+	Avm2Builtins* b = &ctx->builtins;
+
+	// flash.net.URLRequest
+	Avm2Class* req = avm2_builtin_class(ctx, "flash.net", "URLRequest",
+	                                    b->object_class);
+	req->instance_init.fn = urlreq_ctor;
+	req->instance_init.debug_name = "URLRequest";
+	req->native_ext_size = sizeof(Avm2UrlRequestExt);
+	avm2_builtin_add_getset(ctx, req, "url", urlreq_get_url, urlreq_set_url);
+	avm2_builtin_add_getset(ctx, req, "method", urlreq_get_method, urlreq_set_method);
+	avm2_builtin_add_getset(ctx, req, "data", urlreq_get_data, urlreq_set_data);
+	avm2_builtin_add_getset(ctx, req, "contentType", urlreq_get_ctype, urlreq_set_ctype);
+	avm2_builtin_add_getset(ctx, req, "requestHeaders", urlreq_get_headers, urlreq_set_headers);
+	avm2_builtin_add_getset(ctx, req, "digest", net_get_null, net_noop);
+
+	// flash.net.URLRequestMethod / URLLoaderDataFormat / URLRequestHeader
+	Avm2Class* rm = avm2_builtin_class(ctx, "flash.net", "URLRequestMethod",
+	                                   b->object_class);
+	avm2_builtin_add_static_getset(ctx, rm, "GET", net_c_get, NULL);
+	avm2_builtin_add_static_getset(ctx, rm, "POST", net_c_post, NULL);
+	avm2_builtin_add_static_getset(ctx, rm, "HEAD", net_c_head, NULL);
+	avm2_builtin_add_static_getset(ctx, rm, "PUT", net_c_put, NULL);
+	avm2_builtin_add_static_getset(ctx, rm, "DELETE", net_c_del, NULL);
+	avm2_builtin_add_static_getset(ctx, rm, "OPTIONS", net_c_opts, NULL);
+
+	Avm2Class* df = avm2_builtin_class(ctx, "flash.net", "URLLoaderDataFormat",
+	                                   b->object_class);
+	avm2_builtin_add_static_getset(ctx, df, "TEXT", net_c_text, NULL);
+	avm2_builtin_add_static_getset(ctx, df, "BINARY", net_c_binary, NULL);
+	avm2_builtin_add_static_getset(ctx, df, "VARIABLES", net_c_vars, NULL);
+
+	(void) avm2_builtin_class(ctx, "flash.net", "URLRequestHeader",
+	                          b->object_class);
+
+	// flash.net.URLVariables — dynamic bag of properties (extends Object).
+	(void) avm2_builtin_class(ctx, "flash.net", "URLVariables", b->object_class);
+
+	// flash.net.URLLoader (extends EventDispatcher). load() is a no-op: there
+	// is no network layer, so no COMPLETE/IO_ERROR is dispatched.
+	Avm2Class* ul = avm2_builtin_class(ctx, "flash.net", "URLLoader",
+	                                   b->event_dispatcher_class);
+	avm2_builtin_add_method(ctx, ul, "load", net_noop);
+	avm2_builtin_add_method(ctx, ul, "close", net_noop);
+	avm2_builtin_add_getset(ctx, ul, "data", net_get_null, net_noop);
+	avm2_builtin_add_getset(ctx, ul, "dataFormat", net_get_text_fmt, net_noop);
+	avm2_builtin_add_getset(ctx, ul, "bytesLoaded", net_get_zero, NULL);
+	avm2_builtin_add_getset(ctx, ul, "bytesTotal", net_get_zero, NULL);
+
+	// Package-level functions.
+	builtin_add_global_fn_ns(ctx, "flash.net", "navigateToURL", net_noop);
+	builtin_add_global_fn_ns(ctx, "flash.net", "sendToURL", net_noop);
 }
 
 static void register_application_domain(Avm2Context* ctx)
@@ -1352,10 +1588,16 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_toplevel(ctx);
 	register_application_domain(ctx);
 	register_system(ctx);
+	register_security(ctx);
 
 	// flash.events (Event/EventDispatcher/EventPhase/IEventDispatcher —
 	// avm2_events.c).
 	avm2_register_events(ctx);
+
+	// flash.net URL stack: URLLoader extends EventDispatcher, so this MUST run
+	// after avm2_register_events populates event_dispatcher_class (builtin
+	// classes snapshot their parent vtable at creation time).
+	register_net(ctx);
 
 	// flash.text (avm2_text.c — Stage-6 TextFormat/TextField engine).
 	// Before display: the TextField class shell wires into it.

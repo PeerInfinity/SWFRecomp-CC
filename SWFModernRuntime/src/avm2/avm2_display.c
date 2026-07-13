@@ -3041,10 +3041,145 @@ static Avm2Value do_get_mouse_y(Avm2Activation* act)
 	return avm2_number(round(ly * 20.0) / 20.0);
 }
 
+// --- flash.display.LoaderInfo (root movie only) ---
+//
+// The root SWF's LoaderInfo is a single shared object: every on-stage display
+// object's `loaderInfo` returns it, and it is `=== root.loaderInfo` (test
+// loaderinfo_root). Off-stage objects (no is_root ancestor) return null.
+// flash.display.Loader (loading a *second* SWF) is still deferred, so there is
+// exactly one root and one LoaderInfo singleton.
+
+typedef struct Avm2LoaderInfoExt
+{
+	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+	Avm2Object* parameters;             // stable identity across reads
+} Avm2LoaderInfoExt;
+
+static Avm2Object* g_root_loader_info;   // GC-rooted in avm2_gc_mark_roots_display
+static double g_stage_frame_rate;        // tentative decl; defined below (Stage)
+
+static Avm2LoaderInfoExt* loaderinfo_ext_of(Avm2Context* ctx, Avm2Object* o)
+{
+	if (o == NULL || o->cls == NULL
+	    || !class_is_a(o->cls, ctx->builtins.loader_info_class))
+		return NULL;
+	return (Avm2LoaderInfoExt*) o->native_ext;
+}
+
+static Avm2Object* avm2_get_root_loader_info(Avm2Context* ctx)
+{
+	if (g_root_loader_info != NULL) return g_root_loader_info;
+	Avm2Class* cls = ctx->builtins.loader_info_class;
+	if (cls == NULL) return NULL;
+	Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
+	if (v.kind != AVM2_VALUE_OBJECT) return NULL;
+	g_root_loader_info = v.u.obj;
+	return g_root_loader_info;
+}
+
 static Avm2Value do_get_loader_info(Avm2Activation* act)
 {
+	Avm2Context* ctx = act->ctx;
+	// loaderInfo is non-null only for objects connected to the root SWF.
+	if (avm2_root_of(ctx, this_obj(act)) == NULL) return avm2_null();
+	Avm2Object* li = avm2_get_root_loader_info(ctx);
+	return li != NULL ? avm2_object_value(li) : avm2_null();
+}
+
+static Avm2Value li_get_bytes_total(Avm2Activation* act)
+{
 	(void) act;
-	return avm2_null();
+#ifdef SWF_ONDISK_SIZE
+	return avm2_number((double) SWF_ONDISK_SIZE);
+#else
+	return avm2_number(0);
+#endif
+}
+
+static Avm2Value li_get_content(Avm2Activation* act)
+{
+	Avm2Object* r = act->ctx->root;
+	return r != NULL ? avm2_object_value(r) : avm2_null();
+}
+
+static Avm2Value li_get_content_type(Avm2Activation* act)
+{
+	return avm2_string(avm2_string_from_literal(act->ctx,
+	                                             "application/x-shockwave-flash"));
+}
+
+static Avm2Value li_get_as_version(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_integer(3);
+}
+
+static Avm2Value li_get_frame_rate(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_number(g_stage_frame_rate);
+}
+
+static Avm2Value li_get_width(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_integer((avm2_generated_stage_rect[1]
+	                     - avm2_generated_stage_rect[0]) / 20);
+}
+
+static Avm2Value li_get_height(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_integer((avm2_generated_stage_rect[3]
+	                     - avm2_generated_stage_rect[2]) / 20);
+}
+
+static Avm2Value li_get_swf_version(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_integer(avm2_generated_swf_version);
+}
+
+static Avm2Value li_get_url(Avm2Activation* act)
+{
+#ifdef SWF_URL
+	return avm2_string(avm2_string_from_literal(act->ctx, SWF_URL));
+#else
+	return avm2_string(avm2_string_from_literal(act->ctx, ""));
+#endif
+}
+
+static Avm2Value li_get_true(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(1);
+}
+
+static Avm2Value li_get_parameters(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2LoaderInfoExt* ext = loaderinfo_ext_of(ctx, this_obj(act));
+	if (ext == NULL) return avm2_null();
+	if (ext->parameters == NULL)
+	{
+		// Empty dynamic Object (no flashvars in headless / native).
+		Avm2Value o = avm2_class_construct(ctx, ctx->builtins.object_class,
+		                                   NULL, 0);
+		ext->parameters = o.kind == AVM2_VALUE_OBJECT ? o.u.obj : NULL;
+	}
+	return ext->parameters != NULL ? avm2_object_value(ext->parameters)
+	                               : avm2_null();
+}
+
+static Avm2Value li_get_application_domain(Avm2Activation* act)
+{
+	return avm2_current_domain_value(act->ctx);
+}
+
+static Avm2Value li_get_loader(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_null();  // root movie has no parent Loader
 }
 
 // --- InteractiveObject ---
@@ -5251,6 +5386,7 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx)
 	for (uint32_t i = 0; i < g_orphan_count; i++) avm2_gc_mark_object(g_orphans[i]);
 	for (uint32_t i = 0; i < g_fs_cleanup_count; i++) avm2_gc_mark_object(g_fs_cleanup[i]);
 	avm2_gc_mark_object(g_stage_focus);
+	avm2_gc_mark_object(g_root_loader_info);
 	avm2_gc_mark_object(g_mouse_hovered);
 	for (int i = 0; i < 3; i++) avm2_gc_mark_object(g_mouse_pressed[i]);
 	avm2_gc_mark_object(g_drag_object);
@@ -6241,6 +6377,32 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, dobj, "rotationY", do_get_zero, do_set_noop);
 	add_getset(ctx, dobj, "rotationZ", do_get_rotation, do_set_rotation);
 	add_getset(ctx, dobj, "scaleZ", do_get_one, do_set_noop);
+
+	// flash.display.LoaderInfo (extends EventDispatcher). The root movie's
+	// LoaderInfo singleton is lazily built by avm2_get_root_loader_info.
+	Avm2Class* linfo =
+		avm2_builtin_class(ctx, "flash.display", "LoaderInfo",
+		                   b->event_dispatcher_class);
+	linfo->native_ext_size = sizeof(Avm2LoaderInfoExt);
+	b->loader_info_class = linfo;
+	avm2_builtin_add_getter(ctx, linfo, "bytesLoaded", li_get_bytes_total);
+	avm2_builtin_add_getter(ctx, linfo, "bytesTotal", li_get_bytes_total);
+	avm2_builtin_add_getter(ctx, linfo, "content", li_get_content);
+	avm2_builtin_add_getter(ctx, linfo, "contentType", li_get_content_type);
+	avm2_builtin_add_getter(ctx, linfo, "actionScriptVersion", li_get_as_version);
+	avm2_builtin_add_getter(ctx, linfo, "frameRate", li_get_frame_rate);
+	avm2_builtin_add_getter(ctx, linfo, "width", li_get_width);
+	avm2_builtin_add_getter(ctx, linfo, "height", li_get_height);
+	avm2_builtin_add_getter(ctx, linfo, "swfVersion", li_get_swf_version);
+	avm2_builtin_add_getter(ctx, linfo, "url", li_get_url);
+	avm2_builtin_add_getter(ctx, linfo, "loaderURL", li_get_url);
+	avm2_builtin_add_getter(ctx, linfo, "parameters", li_get_parameters);
+	avm2_builtin_add_getter(ctx, linfo, "applicationDomain",
+	                        li_get_application_domain);
+	avm2_builtin_add_getter(ctx, linfo, "loader", li_get_loader);
+	avm2_builtin_add_getter(ctx, linfo, "childAllowsParent", li_get_true);
+	avm2_builtin_add_getter(ctx, linfo, "parentAllowsChild", li_get_true);
+	avm2_builtin_add_getter(ctx, linfo, "sameDomain", li_get_true);
 
 	Avm2Class* iobj =
 		avm2_builtin_class(ctx, "flash.display", "InteractiveObject", dobj);

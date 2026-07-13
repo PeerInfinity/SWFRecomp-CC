@@ -153,8 +153,20 @@ answer to "what could go wrong with game-first development"):
   collector, root set = domain globals + display tree + timers + scope chains +
   in-flight activations; then a long-run soak. Do this BEFORE extended play
   testing.
-- **Stage 12 — Seedling bring-up**. Recompile the real SWF, drive with
-  the divergence-harness workflow (`wasm-game-debugging` memory).
+- **Stage 12 — Seedling bring-up** — **IN PROGRESS** (first session
+  2026-07-13). The real Seedling.swf recompiles (assets = census: 284/116/88;
+  8.9 MB; 0 verify fails) + links + runs in BOTH build modes. Driving it
+  headless (divergence-harness-first) revealed the document class is the
+  **Newgrounds API v3.1.3 AS3** preloader; the whole missing-class error chain
+  is cleared (LoaderInfo #1009 → Security #1065 → flash.net #1065 →
+  register-order #1006 → flash.events-net #1065), each backed by an upstream
+  trace family where one exists (+5 passes: loaderinfo_properties/root/
+  root_allows, sandbox_type_local_file, urlrequest). The preloader now runs
+  with zero uncaught errors and its NG API connection times out gracefully
+  (no network) — reaching the play-button gate. **Not yet first-playable:**
+  reaching FlashPunk `Main` needs an injected play-button click, then first
+  render (+ the graphics-mode capture Vulkan OOM under WSL2). Detail in
+  `avm2/_investigation/CURRENT_STATUS.md` + the `avm2-stage12-seedling` memory.
   Post-baseline: AVM2 `Rando` counterpart for the injected variant.
 
 Deferred (phase-1 leftovers, none Seedling-blocking):
