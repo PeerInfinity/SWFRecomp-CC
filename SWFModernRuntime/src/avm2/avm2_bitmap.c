@@ -1767,25 +1767,28 @@ static Avm2Value bitmap_init(Avm2Activation* act)
 	{
 		ext->bitmap_data = bdv.u.obj;
 	}
-	else if (arg_present(act, 0))
-	{
-		ext->bitmap_data = NULL;  // explicit null/other arg
-	}
 	else
 	{
-		// No bitmapData arg. An [Embed]-style Bitmap subclass bound to a
-		// bitmap char auto-creates a plain BitmapData from the asset (Ruffle
-		// bitmap.rs allocator symbol half). Otherwise KEEP any bitmapData
-		// already seeded by timeline placement (avm2_bitmap_seed_timeline) —
-		// the display-object ctor runs after placement and must not clobber it.
-		Avm2Object* self = this_obj(act);
-		uint16_t char_id = self != NULL ? avm2_display_char_for_class(self->cls) : 0;
-		const Avm2BitmapData* emb = char_id ? embedded_bitmap_for_char(char_id) : NULL;
-		if (emb != NULL)
+		// arg0 is absent, null, or undefined. A Flex [Embed]-style image
+		// asset (Test_TestBitmap -> mx.core::BitmapAsset -> FlexBitmap ->
+		// Bitmap) forwards its DEFAULT null bitmapData up the super() chain,
+		// so the native ctor sees an explicit null — NOT a signal to clear.
+		// Ruffle's bitmap.rs only overwrites bitmapData for a real BitmapData
+		// arg; a null arg keeps any bitmapData already seeded by timeline
+		// placement (avm2_bitmap_seed_timeline), else creates a plain
+		// BitmapData from the embedded asset bound to this (sub)class's
+		// SymbolClass char (the allocator symbol half).
+		if (ext->bitmap_data == NULL)
 		{
-			Avm2Object* bdo = bd_alloc_bare(ctx);
-			bd_seed_embedded(ctx, (Avm2BitmapDataExt*) bdo->native_ext, emb);
-			ext->bitmap_data = bdo;
+			Avm2Object* self = this_obj(act);
+			uint16_t char_id = self != NULL ? avm2_display_char_for_class(self->cls) : 0;
+			const Avm2BitmapData* emb = char_id ? embedded_bitmap_for_char(char_id) : NULL;
+			if (emb != NULL)
+			{
+				Avm2Object* bdo = bd_alloc_bare(ctx);
+				bd_seed_embedded(ctx, (Avm2BitmapDataExt*) bdo->native_ext, emb);
+				ext->bitmap_data = bdo;
+			}
 		}
 	}
 	bitmap_cache_dims(ctx, ext);
