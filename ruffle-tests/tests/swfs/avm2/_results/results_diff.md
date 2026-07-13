@@ -1,25 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1af36539fb93` (2026-07-13T18:01:48.677451+00:00)
-**Current:** `c2506a703785` (2026-07-13T18:07:24.674419+00:00)
+**Previous:** `c2506a703785` (2026-07-13T18:07:24.674419+00:00)
+**Current:** `e57b7f0e648d` (2026-07-13T21:20:29.892305+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 827 | 827 | 0 |
+| Passing | 827 | 828 | +1 |
 | Total | 1204 | 1204 | 0 |
-| Pass rate | 68.7% | 68.7% | 0% |
-| Mismatched lines | 47722 | 47724 | +2 |
-|   Increased | | | +2 |
+| Pass rate | 68.7% | 68.8% | +0.1% |
+| Mismatched lines | 47724 | 47608 | -116 |
+|   Decreased | | | -116 |
 
-## Line Count Changed (6)
+## Newly Passing (1)
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `all_classes/display/swf10` | output_mismatch | 1/2569 | 1/2569 | 0 |
-| `all_classes/display/swf11` | output_mismatch | 1/2593 | 1/2593 | 0 |
-| `all_classes/display/swf12` | output_mismatch | 1/2593 | 1/2593 | 0 |
-| `all_classes/display/swf13` | output_mismatch | 1/2671 | 1/2671 | 0 |
-| `all_classes/display/swf30` | output_mismatch | 0/2936 | 0/2936 | 0 |
-| `all_classes/display/swf9` | output_mismatch | 3/1959 | 1/1959 | +2 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `point` | output_mismatch | 16/132 | 132/132 |
