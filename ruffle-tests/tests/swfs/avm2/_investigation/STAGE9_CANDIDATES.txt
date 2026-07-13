@@ -1,0 +1,83 @@
+# AVM2 Stage 9 candidate list — minimal render path (Bitmap blit + solid fills)
+#
+# Generated at session start (2026-07-12) by cross-referencing the avm2 tests
+# carrying an [image_comparisons] section in test.toml against the graphics-mode
+# results. These tests currently "pass" in no-graphics only because they trace
+# nothing (output.txt is empty / trivial); they become observable only under
+# --mode=graphics, where the offscreen framebuffer is captured to PNG and
+# compared to output.expected.png with per-channel tolerance/max_outliers.
+#
+# The full [image_comparisons] set is 109 tests. Most need machinery far beyond
+# a minimal render path (Stage3D/AGAL, PixelBender/Shader, filters, gradients,
+# real shape tessellation, masks, Loader/JPEG-XR). Stage 9's scope is the
+# **Bitmap/BitmapData blit family** (+ trivial solid-color Graphics fills), so
+# this list is the blit-gradeable subset plus the explicitly-deferred siblings
+# for triage bookkeeping.
+#
+# Exit: a strong majority of TIER 1 + TIER 2 passing; image tests triaged;
+# zero pass->fail regressions in EITHER mode.
+#
+# LOCAL RESULTS (2026-07-12, --mode=graphics):
+#   TIER 1: 8/9 PASS. Passing: bitmapdata_fillrect, _clone, _copychannel,
+#     _copypixels, _colortransform, _embedded, _sync, _pixeldissolve_image.
+#     Miss: bitmap_subclass_properties — NOT a render bug: its `Test.TestBitmap`
+#     nested-subclass construction aborts the script at trace line 2 (a
+#     Stage-7-era embedded-subclass gap); fails identically in no-graphics, so
+#     it is a PRE-EXISTING miss, not a Stage-9 regression.
+#   TIER 2 (BitmapData.draw): the CPU fast path (BitmapData/Bitmap source +
+#     normal blend + identity 2x2 matrix) landed and is correct, but every
+#     TIER-2 candidate draws a DisplayObject that is NOT a Bitmap — a TextField
+#     (draw_cpu_overwrite_gpu, draw) or a MovieClip/Sprite-with-graphics
+#     (draw_self_via_graphic, draw, opaque) — which needs the offscreen GPU
+#     render pipeline + a shape/text rasterizer (out of Stage 9 scope). Those
+#     skip (honest no-op) exactly as before, so no regression. draw_alpha_erase:
+#     its BitmapData-source no-op lines are now correct, but the Bitmap-source
+#     alpha/erase lines need the GPU group-blend pipeline -> still a miss.
+#   => The pure-blit bitmap family (the Stage-9 target) is 8/9. draw()/shape
+#      rasterization is the natural Stage-10+ follow-up.
+
+## TIER 1 — pure Bitmap blit (BitmapData pixel ops already CPU-exact in
+## avm2_bitmap.c; only need the display-tree walk to blit the result)
+bitmapdata_fillrect
+bitmapdata_clone
+bitmapdata_copychannel
+bitmapdata_copypixels
+bitmapdata_colortransform
+bitmapdata_embedded
+bitmapdata_sync
+bitmapdata_pixeldissolve_image
+bitmap_subclass_properties
+
+## TIER 2 — BitmapData.draw() with a Bitmap/BitmapData source (CPU blit with a
+## matrix + colorTransform + blend mode; no shape rasterizer required)
+bitmapdata_draw_alpha_erase
+bitmapdata_draw_cpu_overwrite_gpu
+bitmapdata_draw_self_via_graphic
+bitmapdata_draw_rotation
+bitmapdata_draw_colortransform
+bitmapdata_draw
+
+## DEFERRED — need machinery out of Stage 9's minimal-render scope (triaged):
+#   graphics_simple_shapes / graphics_direct_commands / graphics_draw_path /
+#     graphics_draw_triangles / graphics_bad_direct_commands
+#       -> real path tessellation + stroke geometry (Graphics records only an
+#          AABB today, no fill/command list)
+#   graphics_gradients / graphics_gradients_nulls / graphics_bitmap_fill /
+#     graphics_bitmaps -> gradient + bitmap-fill shape rendering
+#   bitmapdata_opaque / bitmapdata_draw_stage / bitmapdata_drawwithquality /
+#     bitmapdata_draw_filters / bitmapdata_draw_masks
+#       -> draw() of a Sprite-with-graphics (shape rasterizer) / stage / filters
+#   bitmapdata_applyfilter_* / bitmapdata_filter_sourcerect -> BitmapData filters
+#   displayobject_set_matrix_nested / displayobject_getbounds_shape /
+#     displayobject_colortransform_nested / displayobject_blendmode /
+#     displayobject_mask / displayobject_opaque_background /
+#     displayobject_scrollrect / displayobject_hittestpoint_boundary
+#       -> timeline DefineShape geometry (recompiler emits only bounds) /
+#          full display ColorTransform / blend modes / masks / scrollRect
+#   mask_reapply / mouse_pick_*_mask -> masking
+#   bitmap_pixelsnapping -> upstream ignore=true
+#   stage3d_* / pixelbender_* / away3d_* / blend_shader_* -> GPU shader stacks
+#   loader_image / loader_jpegxr* / loader_events -> flash.display.Loader + decoders
+#   error_stack_trace_* / edittext_* / focus* / geom_transform / netstream_*
+#       -> not blit tests (text/focus/geometry trace tests that happen to also
+#          carry an image section)

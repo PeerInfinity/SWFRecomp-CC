@@ -1393,6 +1393,137 @@ static Avm2Value bd_color_transform(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
+// draw — the CPU fast path from Ruffle core/src/bitmap/operations.rs::draw.
+//
+// Full draw() renders any DisplayObject through the offscreen GPU pipeline; that
+// (and the Alpha/Erase group blends, and scaled/rotated matrices) is out of
+// Stage 9's minimal-render scope. What this covers is Ruffle's own CPU fast
+// path — the case FlashPunk's blit renderer and the bitmapdata_draw* tests
+// mostly hit:
+//   - source is a BitmapData, or a Bitmap display object wrapping one,
+//   - the composed matrix is identity 2x2 (translation only),
+//   - blend is Normal / Layer / null.
+// A BitmapData source with Alpha/Erase does nothing (a documented Flash quirk;
+// distinct from drawing a Bitmap with the same data). Anything outside the fast
+// path is skipped (honest no-op) and triaged in STAGE9_CANDIDATES.txt.
+static Avm2Value bd_draw(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2BitmapDataExt* dst = this_bd(act);
+	check_valid(ctx, dst);
+
+	Avm2Value src_val = arg(act, 0);
+	Avm2BitmapDataExt* src = avm2_bitmapdata_ext_of(ctx, src_val);
+	int source_is_bitmapdata = (src != NULL);
+	// A Bitmap display object's own matrix folds into the draw translation.
+	double extra_tx = 0.0, extra_ty = 0.0;
+	int extra_matrix_ok = 1;
+	if (src == NULL)
+	{
+		Avm2Object* so = (src_val.kind == AVM2_VALUE_OBJECT) ? src_val.u.obj : NULL;
+		Avm2DisplayObjectExt* sde = so ? avm2_display_ext_of(ctx, so) : NULL;
+		if (sde != NULL && sde->is_bitmap && sde->bitmap_data != NULL)
+		{
+			src = avm2_bitmapdata_ext_of(ctx, avm2_object_value(sde->bitmap_data));
+			if (sde->mtx_a != 1.0f || sde->mtx_b != 0.0f
+			    || sde->mtx_c != 0.0f || sde->mtx_d != 1.0f)
+				extra_matrix_ok = 0;  // rotated/scaled Bitmap -> GPU path
+			extra_tx = (double) sde->mtx_tx / 20.0;
+			extra_ty = (double) sde->mtx_ty / 20.0;
+		}
+	}
+	if (src == NULL || src->disposed || src->pixels == NULL) return avm2_undefined();
+
+	// blendMode (arg 3): default "normal".
+	int blend_alpha_or_erase = 0;
+	if (arg_present(act, 3))
+	{
+		const Avm2String* bm = avm2_coerce_to_string(ctx, act->args[3]);
+		if (bm != NULL && bm->utf8 != NULL
+		    && (strcmp(bm->utf8, "alpha") == 0 || strcmp(bm->utf8, "erase") == 0))
+			blend_alpha_or_erase = 1;
+	}
+
+	// A BitmapData source with alpha/erase does nothing (Flash quirk).
+	if (source_is_bitmapdata && blend_alpha_or_erase) return avm2_undefined();
+
+	// matrix (arg 1): only identity-2x2 (translation) is CPU-blittable.
+	double ma = 1, mb = 0, mc = 0, md = 1, mtx = 0, mty = 0;
+	if (arg_present(act, 1))
+	{
+		Avm2Value mv = act->args[1];
+		ma = read_prop_num(ctx, mv, "a");  mb = read_prop_num(ctx, mv, "b");
+		mc = read_prop_num(ctx, mv, "c");  md = read_prop_num(ctx, mv, "d");
+		mtx = read_prop_num(ctx, mv, "tx"); mty = read_prop_num(ctx, mv, "ty");
+	}
+	int identity_2x2 = (ma == 1.0 && mb == 0.0 && mc == 0.0 && md == 1.0);
+	if (!identity_2x2 || !extra_matrix_ok || blend_alpha_or_erase)
+		return avm2_undefined();  // needs the offscreen GPU render path
+
+	// colorTransform (arg 2): optional. Default = identity.
+	int has_cxform = 0;
+	int16_t rm = 256, gm = 256, bm = 256, am = 256;
+	int16_t ro = 0, go = 0, bo = 0, ao = 0;
+	if (arg_present(act, 2))
+	{
+		Avm2Value ctv = act->args[2];
+		rm = fixed8_from_f64(read_prop_num(ctx, ctv, "redMultiplier"));
+		gm = fixed8_from_f64(read_prop_num(ctx, ctv, "greenMultiplier"));
+		bm = fixed8_from_f64(read_prop_num(ctx, ctv, "blueMultiplier"));
+		am = fixed8_from_f64(read_prop_num(ctx, ctv, "alphaMultiplier"));
+		ro = (int16_t) read_prop_num(ctx, ctv, "redOffset");
+		go = (int16_t) read_prop_num(ctx, ctv, "greenOffset");
+		bo = (int16_t) read_prop_num(ctx, ctv, "blueOffset");
+		ao = (int16_t) read_prop_num(ctx, ctv, "alphaOffset");
+		has_cxform = !(rm == 256 && gm == 256 && bm == 256 && am == 256
+		               && ro == 0 && go == 0 && bo == 0 && ao == 0);
+	}
+
+	int32_t tx = (int32_t) floor(mtx + extra_tx);
+	int32_t ty = (int32_t) floor(mty + extra_ty);
+
+	// Whole source at (tx,ty) in dest (clip_rect not supported yet).
+	PixelRegion src_region = pr_whole(src->width, src->height);
+	PixelRegion dst_region = pr_whole(dst->width, dst->height);
+	pr_clamp_intersection(&dst_region, tx, ty, 0, 0,
+	                      (int32_t) src->width, (int32_t) src->height, &src_region);
+	if (pr_w(&dst_region) == 0 || pr_h(&dst_region) == 0) return avm2_undefined();
+
+	// copy_on_cpu: blend only when the source is transparent. blend_and_transform
+	// (has_cxform) always blends over the destination.
+	int blend = src->transparency ? 1 : 0;
+	int opaque = !dst->transparency;
+
+	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
+	for (uint32_t j = 0; j < rh; j++)
+	{
+		for (uint32_t i = 0; i < rw; i++)
+		{
+			uint32_t sxx = src_region.x_min + i, syy = src_region.y_min + j;
+			uint32_t dxx = dst_region.x_min + i, dyy = dst_region.y_min + j;
+			uint32_t color = bd_get_raw(src, sxx, syy);
+			if (has_cxform)
+			{
+				uint32_t c = unmul(color);
+				uint8_t r = ctx_channel(rm, ro, (uint8_t) CR(c));
+				uint8_t g = ctx_channel(gm, go, (uint8_t) CG(c));
+				uint8_t b = ctx_channel(bm, bo, (uint8_t) CB(c));
+				uint8_t a = ctx_channel(am, ao, (uint8_t) CA(c));
+				color = premul(CMK(r, g, b, a), 1);
+			}
+			if (blend || has_cxform)
+			{
+				uint32_t dc = bd_get_raw(dst, dxx, dyy);
+				color = blend_over(dc, color);
+			}
+			if (opaque) color = with_alpha(color, 0xFF);
+			bd_set_raw(dst, dxx, dyy, color);
+		}
+	}
+	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
 // Misc no-op / minimal stubs (kept so image-only tests keep compiling/running)
 // ---------------------------------------------------------------------------
 
@@ -1741,7 +1872,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	// vacuous image-comparison tests keep running.
 	avm2_builtin_add_method(ctx, bd, "lock", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "unlock", bd_noop);
-	avm2_builtin_add_method(ctx, bd, "draw", bd_noop);
+	avm2_builtin_add_method(ctx, bd, "draw", bd_draw);
 	avm2_builtin_add_method(ctx, bd, "drawWithQuality", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "applyFilter", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "merge", bd_noop);

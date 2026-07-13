@@ -308,6 +308,25 @@ void runSWF_avm2(SWFAppContext* app_context)
 		}
 	}
 
+	// Stage 9: minimal AVM2 render path. In graphics builds (OFFSCREEN_RENDER)
+	// the WebGPU offscreen backend is linked but runSWF_avm2 never drove it;
+	// set it up now (after heap_init + build_stage). NO_GRAPHICS builds skip
+	// this entirely.
+#ifdef OFFSCREEN_RENDER
+	extern void avm2_render_init(Avm2Context* ctx);
+	extern void avm2_render_frame(Avm2Context* ctx);
+	extern void avm2_render_finish(Avm2Context* ctx);
+	{
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
+		{
+			avm2_render_init(ctx);
+		}
+		avm2_try_pop_frame(&top);
+	}
+#endif
+
 	// Step 5: tick loop (Ruffle frame_lifecycle.rs phase order), mirroring
 	// swf_core.c's MAX_FRAMES cadence.
 #ifdef MAX_FRAMES
@@ -322,9 +341,25 @@ void runSWF_avm2(SWFAppContext* app_context)
 		if (setjmp(top.jb) == 0)
 		{
 			avm2_display_run_tick(ctx);
+#ifdef OFFSCREEN_RENDER
+			// Render the display tree the tick just built (Bitmap blit path).
+			avm2_render_frame(ctx);
+#endif
 		}
 		avm2_try_pop_frame(&top);
 	}
+
+#ifdef OFFSCREEN_RENDER
+	{
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
+		{
+			avm2_render_finish(ctx);
+		}
+		avm2_try_pop_frame(&top);
+	}
+#endif
 
 	fflush(stdout);
 }

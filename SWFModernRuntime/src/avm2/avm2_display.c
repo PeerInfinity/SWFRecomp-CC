@@ -6164,3 +6164,206 @@ void avm2_register_display(Avm2Context* ctx)
 	g_stage_frame_rate = (double) (int16_t) avm2_generated_frame_rate / 256.0;
 	g_stage_color = avm2_generated_bg_color & 0xFFFFFF;
 }
+
+// ===========================================================================
+// Stage 9 — minimal AVM2 render path (graphics mode only).
+//
+// A real render-tree traversal over the AVM2 display tree feeding the existing
+// WebGPU offscreen backend (the same primitives the AVM1 tag.c renderer uses).
+// Compiled ONLY in --mode=graphics builds (OFFSCREEN_RENDER); the NO_GRAPHICS
+// runtime never sees this code. Scope: the Bitmap/BitmapData blit path (a
+// FlashPunk display tree is just Bitmaps). Shapes/gradients/filters/masks are
+// future work — Graphics records only an AABB today.
+//
+// The render backend (`context`, render_webgpu.c, capture.c) is already
+// compiled + linkable in AVM2 graphics builds (verify_output.py adds swf.c +
+// render_webgpu.c + capture.c whenever mode==graphics, regardless of AVM2), but
+// runSWF_avm2 never drove it. avm2_render_init replicates swfStart's renderer
+// setup; avm2_render_frame / avm2_render_finish drive the per-tick + final
+// capture, mirroring swf.c/capture.c's last_frame/iteration/fs_command model.
+// The render pass reads the SAME depth/render list the tick already built — it
+// never re-runs any timeline/goto logic.
+// ===========================================================================
+#ifdef OFFSCREEN_RENDER
+
+#include <renderer.h>
+#include <libswf/capture.h>
+#include <libswf/swf.h>
+
+// Owned by swf.c (compiled in every graphics build); we drive the same handle.
+extern RenderContext* context;
+
+// Dynamic xform/cxform slot bump-allocators, past the recompiler's static slots
+// (mirrors compose_children's per-frame slot model in tag.c). Bases are set in
+// avm2_render_init from the static table sizes; the counters reset each frame.
+static uint32_t g_avm2_xform_base = 1;
+static uint32_t g_avm2_xform_next = 1;
+static uint32_t g_avm2_cxform_base = 1;
+static uint32_t g_avm2_cxform_next = 1;
+
+// Flatten an affine Mat (a,b,c,d dimensionless; tx,ty twips) into the
+// renderer's column-major mat4 (2D affine embedded), matching xform_buffer's
+// layout. The shader computes ndc = stage_to_ndc * xform[id] * pos, and the
+// bitmap quad's vertices are in local twips, so this world matrix maps local
+// twips -> stage twips.
+static void avm2_world_to_mat16(const Mat* m, float out[16])
+{
+	out[0]  = (float) m->a;  out[1]  = (float) m->b;  out[2]  = 0.0f; out[3]  = 0.0f;
+	out[4]  = (float) m->c;  out[5]  = (float) m->d;  out[6]  = 0.0f; out[7]  = 0.0f;
+	out[8]  = 0.0f;          out[9]  = 0.0f;          out[10] = 1.0f; out[11] = 0.0f;
+	out[12] = (float) m->tx; out[13] = (float) m->ty; out[14] = 0.0f; out[15] = 1.0f;
+}
+
+// Blit one Bitmap node: its BitmapData's premultiplied-ARGB pixels as a
+// textured quad under the node's world matrix + concatenated alpha. The
+// renderer uses a premultiplied-alpha blend, and the pixel store is already
+// premultiplied ARGB (0xAARRGGBB), so no conversion is needed.
+static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
+                               const Mat* world, double alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->bitmap_data == NULL) return;
+	Avm2BitmapDataExt* bd =
+		avm2_bitmapdata_ext_of(ctx, avm2_object_value(ext->bitmap_data));
+	if (bd == NULL || bd->disposed || bd->pixels == NULL
+	    || bd->width == 0 || bd->height == 0)
+		return;
+	// Honest failure: a BitmapData larger than the dynamic layer is skipped
+	// (blank) rather than corrupting the texture / crashing.
+	if (bd->width > context->dynamic_bitmap_max_w
+	    || bd->height > context->dynamic_bitmap_max_h)
+		return;
+
+	// Per-object world transform slot.
+	uint32_t xid = 0;  // identity fallback if we run out of slots
+	if (g_avm2_xform_next < context->xform_slot_count)
+	{
+		float m16[16];
+		avm2_world_to_mat16(world, m16);
+		xid = g_avm2_xform_next++;
+		renderer_write_transform(context, xid, m16);
+	}
+
+	// Concatenated-alpha cxform slot (0 = identity for the common alpha == 1).
+	uint32_t cxid = 0;
+	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
+	{
+		float cx[20];
+		memset(cx, 0, sizeof(cx));
+		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;  // r/g/b multiply = 1
+		cx[15] = (float) alpha;                      // alpha multiply
+		cxid = g_avm2_cxform_next++;
+		renderer_write_cxform(context, cxid, cx);
+	}
+
+	renderer_draw_bitmap_quad_scaled(context, bd->pixels,
+		bd->width, bd->height, bd->width, bd->height,
+		0.0f, 0.0f, xid, cxid);
+}
+
+// Depth-ordered render-list walk (paint order, back-to-front), accumulating the
+// world matrix + concatenated alpha down the tree. Invisible subtrees are
+// culled, matching render_apply_text_bounds.
+static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+                             const Mat* parent_world, double parent_alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return;
+	if (!ext->is_stage && !ext->visible) return;
+
+	Mat local = ext_matrix(ext);
+	Mat world = mat_mul(parent_world, &local);
+	double alpha = parent_alpha * ((double) ext->alpha_fixed8 / 256.0);
+
+	if (ext->is_bitmap)
+		avm2_render_bitmap(ctx, obj, &world, alpha);
+
+	for (uint32_t i = 0; i < ext->render_len; i++)
+		avm2_render_node(ctx, ext->render_list[i], &world, alpha);
+}
+
+static void avm2_render_walk(Avm2Context* ctx)
+{
+	renderer_open_pass(context);
+	g_avm2_xform_next = g_avm2_xform_base;
+	g_avm2_cxform_next = g_avm2_cxform_base;
+	Mat id = mat_identity();
+	if (ctx->stage != NULL)
+		avm2_render_node(ctx, ctx->stage, &id, 1.0);
+	renderer_close_pass(context);
+}
+
+// Replicate swfStart's renderer setup for the AVM2 entry (runSWF_avm2 never
+// called renderer_new/init). Must run AFTER heap_init (renderer_init uses the
+// heap allocator) and AFTER build_stage (reads g_stage_color for the clear).
+void avm2_render_init(Avm2Context* ctx)
+{
+	SWFAppContext* app = ctx->app;
+	context = renderer_new();
+
+	context->width = app->width;
+	context->height = app->height;
+	context->stage_to_ndc = app->stage_to_ndc;
+	context->bitmap_count = app->bitmap_count;
+	context->bitmap_highest_w = app->bitmap_highest_w;
+	context->bitmap_highest_h = app->bitmap_highest_h;
+	context->shape_data = app->shape_data;
+	context->shape_data_size = app->shape_data_size;
+	context->transform_data = app->transform_data;
+	context->transform_data_size = app->transform_data_size;
+	context->color_data = app->color_data;
+	context->color_data_size = app->color_data_size;
+	context->uninv_mat_data = app->uninv_mat_data;
+	context->uninv_mat_data_size = app->uninv_mat_data_size;
+	context->gradient_data = app->gradient_data;
+	context->gradient_data_size = app->gradient_data_size;
+	context->bitmap_data = app->bitmap_data;
+	context->bitmap_data_size = app->bitmap_data_size;
+	context->cxform_data = app->cxform_data;
+	context->cxform_data_size = app->cxform_data_size;
+
+	// Dynamic bitmap-layer dims. AVM2 has no static bitmaps (BITMAP_COUNT 0),
+	// so the dynamic layer is sized to dynamic_bitmap_max_{w,h}+1 (render_webgpu
+	// init) and every runtime BitmapData blits into it. Cover the whole stage;
+	// larger BitmapData is skipped (blank) in avm2_render_bitmap.
+	uint32_t maxdim = app->width > app->height ? app->width : app->height;
+	if (maxdim < 256) maxdim = 256;
+	context->dynamic_bitmap_max_w = maxdim;
+	context->dynamic_bitmap_max_h = maxdim;
+
+	// Stage background (opaque); g_stage_color was set by build_stage.
+	context->red   = (u8) ((g_stage_color >> 16) & 0xFF);
+	context->green = (u8) ((g_stage_color >> 8) & 0xFF);
+	context->blue  = (u8) (g_stage_color & 0xFF);
+
+	// Dynamic slot bases = count of the recompiler's static xform/cxform slots.
+	g_avm2_xform_base = app->transform_data_size
+		? (uint32_t) (app->transform_data_size / (16 * sizeof(float))) : 1;
+	g_avm2_cxform_base = app->cxform_data_size
+		? (uint32_t) (app->cxform_data_size / (20 * sizeof(float))) : 1;
+
+	renderer_init(app, context);
+	parse_capture_triggers();
+}
+
+// One rendered frame + the per-tick capture scheduling (last_frame /
+// iteration). Called at the tail of each tick, after avm2_display_run_tick.
+void avm2_render_frame(Avm2Context* ctx)
+{
+	if (context == NULL || !context->renderer_ok) return;
+	capture_tick_pre_frame();
+	avm2_render_walk(ctx);
+	capture_tick_post_frame();
+}
+
+// End-of-run: force a final capture + save any unsaved last_frame entries,
+// mirroring swfStart's tail.
+void avm2_render_finish(Avm2Context* ctx)
+{
+	if (context == NULL || !context->renderer_ok) return;
+	renderer_request_capture(context);
+	avm2_render_walk(ctx);
+	capture_save_last_frame();
+}
+
+#endif  // OFFSCREEN_RENDER
