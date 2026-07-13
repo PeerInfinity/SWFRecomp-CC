@@ -181,7 +181,25 @@ answer to "what could go wrong with game-first development"):
   bitmap-tex array → device lost → buffer-map status 4) — render-infra, blocks
   only the *visual* first-frame diff. **Not yet first-playable:** the visual
   first frame (capture OOM), the file:// play-button click (Stage-8 input.json),
-  and driving past the 150-tick Splash into `Game`. Detail in
+  and driving past the 150-tick Splash into `Game`.
+  **Session 3 (2026-07-13): FIRST visually-validated frames + reached the Game
+  title screen.** Sidestepped the capture OOM with a GPU-free CPU-composite
+  frame dump (`AVM2_CPU_DUMP`, compiled in every build): it inverse-maps each
+  on-stage Bitmap's pixels into a CPU framebuffer. Against a Ruffle portal-URL
+  export (oracle patched to honor `RUFFLE_MOVIE_URL` so it auto-starts into the
+  game like our `GAME_SWF_URL`), **155/600 frames are pixel-perfect, 165
+  near-perfect, none worse than MAD 15** — the NEWGROUNDS/Connor-Ullmann splash
+  screens match to the pixel; residual diffs are all Stage-9 Bitmap-blit scope
+  (1px NN edges on scaled bitmaps, the `BitmapData.draw`-colorTransform alpha
+  fade, the preloader's shape/text progress bar). Added an `AVM2_MAX_TICKS`
+  runtime frame-depth override (drive deep without a rebuild) and drove past the
+  3-splash sequence into the **Game title/menu screen** (~frame 500). First Game
+  divergence fixed: `flash.geom.Point` was a bare stub → implemented the full
+  method surface (clone/add/subtract/equals/offset/normalize + length + static
+  distance/interpolate/polar), **backed by the upstream `point` test (now 100%)**;
+  Seedling then runs **600 frames with ZERO uncaught errors**. Next: drive into
+  interactive gameplay + `.oel` level loading (ByteArray/E4X, ColorMatrixFilter,
+  Input/Key). Detail in
   `avm2/_investigation/CURRENT_STATUS.md` + the `avm2-stage12-seedling` memory.
   Post-baseline: AVM2 `Rando` counterpart for the injected variant — see
   `avm2-seedling-ap-integration.md` for the AP-integration analysis (what the
