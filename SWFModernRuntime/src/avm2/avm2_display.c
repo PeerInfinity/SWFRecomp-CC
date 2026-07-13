@@ -1938,46 +1938,117 @@ static void render_apply_text_bounds(Avm2Context* ctx, Avm2Object* obj,
 }
 
 // ---------------------------------------------------------------------------
-// flash.utils setTimeout/setInterval (fired at tick boundaries)
+// Timers: flash.utils setTimeout/setInterval + the flash.utils.Timer class.
+// Ported from Ruffle core/src/timer.rs: ONE priority-ordered list on a µs
+// clock, fired at the TAIL of each tick (Ruffle runs update_timers AFTER
+// run_frame). tick_time fires when strictly < cur_time; intervals clamp to
+// MIN_INTERVAL; MAX_TICKS caps ticks per frame. AS3 Timer entries carry a
+// timer_obj and fire through timer_on_update (currentCount++/dispatch/
+// stop-on-complete); setTimeout/setInterval entries call a plain function
+// whose boolean return cancels an interval (Ruffle Timer.as _onUpdateClosure).
 // ---------------------------------------------------------------------------
+
+#define AVM2_TIMER_MIN_INTERVAL 10       // ms (Ruffle Timers::MIN_INTERVAL)
+#define AVM2_TIMER_MAX_TICKS    10       // per frame (Ruffle Timers::MAX_TICKS)
+#define AVM2_TIMER_SCALE        1000ULL  // µs per ms (Ruffle Timers::TIMER_SCALE)
 
 typedef struct Avm2TimerEntry
 {
-	uint32_t id;
-	double due_ms;
-	double interval_ms;  // 0 = one-shot
+	int32_t id;
+	uint64_t tick_time;   // µs, absolute next fire
+	uint64_t interval;    // µs
+	uint8_t is_timeout;   // one-shot (setTimeout)
 	uint8_t active;
-	Avm2Value fn;
+	Avm2Object* timer_obj;  // non-NULL: AS3 Timer instance (fire via timer_on_update)
+	Avm2Value fn;           // setTimeout/setInterval callback (timer_obj == NULL)
 	Avm2Value args[8];
 	uint32_t argc;
 } Avm2TimerEntry;
 
-static Avm2TimerEntry g_avm2_timers[128];
+static Avm2TimerEntry g_avm2_timers[256];
 static uint32_t g_avm2_timer_count;
-static uint32_t g_avm2_timer_next_id = 1;
-static double g_avm2_clock_ms;
+static int32_t g_avm2_timer_next_id;    // pre-incremented; Ruffle never issues 0
+static uint64_t g_avm2_timer_cur_time;  // µs
+
+double avm2_timer_elapsed_ms(void)
+{
+	return (double) (g_avm2_timer_cur_time / AVM2_TIMER_SCALE);
+}
+
+// AS3 Timer instance state (native_ext; dispatcher MUST stay first so the
+// inherited EventDispatcher natives read it correctly).
+typedef struct Avm2TimerObjExt
+{
+	Avm2EventDispatcherExt dispatcher;
+	double delay;
+	int32_t repeat_count;
+	int32_t current_count;
+	int32_t timer_entry_id;  // 0 = not running (running getter)
+} Avm2TimerObjExt;
+
+static Avm2TimerObjExt* timer_obj_ext(Avm2Object* obj)
+{
+	return obj != NULL ? (Avm2TimerObjExt*) obj->native_ext : NULL;
+}
+
+// Register a new list entry; interval clamps to MIN_INTERVAL. Returns the id.
+static int32_t timer_list_add(int32_t interval_ms, int is_timeout,
+                              Avm2Object* timer_obj, Avm2Value fn,
+                              const Avm2Value* args, uint32_t argc)
+{
+	if (g_avm2_timer_count >= 256) return 0;
+	if (interval_ms < AVM2_TIMER_MIN_INTERVAL) interval_ms = AVM2_TIMER_MIN_INTERVAL;
+	uint64_t interval = (uint64_t) interval_ms * AVM2_TIMER_SCALE;
+	Avm2TimerEntry* t = &g_avm2_timers[g_avm2_timer_count++];
+	memset(t, 0, sizeof(*t));
+	g_avm2_timer_next_id += 1;
+	t->id = g_avm2_timer_next_id;
+	t->tick_time = g_avm2_timer_cur_time + interval;
+	t->interval = interval;
+	t->is_timeout = (uint8_t) is_timeout;
+	t->active = 1;
+	t->timer_obj = timer_obj;
+	t->fn = fn;
+	for (uint32_t i = 0; i < argc && t->argc < 8; i++) t->args[t->argc++] = args[i];
+	return t->id;
+}
+
+static void timer_list_remove(int32_t id)
+{
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+	{
+		if (g_avm2_timers[i].active && g_avm2_timers[i].id == id)
+			g_avm2_timers[i].active = 0;
+	}
+}
+
+// Reschedule an existing entry from NOW (Ruffle Timers::set_delay).
+static void timer_list_set_delay(int32_t id, int32_t interval_ms)
+{
+	if (interval_ms < AVM2_TIMER_MIN_INTERVAL) interval_ms = AVM2_TIMER_MIN_INTERVAL;
+	uint64_t interval = (uint64_t) interval_ms * AVM2_TIMER_SCALE;
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+	{
+		if (g_avm2_timers[i].active && g_avm2_timers[i].id == id)
+		{
+			g_avm2_timers[i].interval = interval;
+			g_avm2_timers[i].tick_time = g_avm2_timer_cur_time + interval;
+			return;
+		}
+	}
+}
 
 static Avm2Value timer_add(Avm2Activation* act, int repeating)
 {
-	if (act->argc < 2 || g_avm2_timer_count >= 128)
-	{
-		return avm2_integer(0);
-	}
-	double delay = avm2_coerce_to_number(act->ctx, act->args[1]);
+	if (act->argc < 1) return avm2_integer(0);
+	double delay = act->argc > 1 ? avm2_coerce_to_number(act->ctx, act->args[1]) : 0;
 	if (!(delay >= 0)) delay = 0;
-	Avm2TimerEntry* t = &g_avm2_timers[g_avm2_timer_count++];
-	memset(t, 0, sizeof(*t));
-	t->id = g_avm2_timer_next_id++;
-	t->due_ms = g_avm2_clock_ms + delay;
-	t->interval_ms = repeating ? delay : 0;
-	t->active = 1;
-	t->fn = act->args[0];
-	t->argc = 0;
-	for (uint32_t i = 2; i < act->argc && t->argc < 8; i++)
-	{
-		t->args[t->argc++] = act->args[i];
-	}
-	return avm2_integer((int32_t) t->id);
+	Avm2Value cbargs[8];
+	uint32_t n = 0;
+	for (uint32_t i = 2; i < act->argc && n < 8; i++) cbargs[n++] = act->args[i];
+	int32_t id = timer_list_add((int32_t) delay, !repeating, NULL, act->args[0],
+	                            cbargs, n);
+	return avm2_integer(id);
 }
 
 static Avm2Value utils_set_timeout(Avm2Activation* act)
@@ -1993,12 +2064,15 @@ static Avm2Value utils_set_interval(Avm2Activation* act)
 static Avm2Value utils_clear_timer(Avm2Activation* act)
 {
 	if (act->argc < 1) return avm2_undefined();
-	uint32_t id = (uint32_t) avm2_coerce_to_i32(act->ctx, act->args[0]);
-	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
-	{
-		if (g_avm2_timers[i].id == id) g_avm2_timers[i].active = 0;
-	}
+	int32_t id = avm2_coerce_to_i32(act->ctx, act->args[0]);
+	timer_list_remove(id);
 	return avm2_undefined();
+}
+
+static Avm2Value utils_get_timer(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_integer((int32_t) avm2_timer_elapsed_ms());
 }
 
 void avm2_builtin_add_flash_utils_fn(Avm2Context* ctx, const char* name,
@@ -2010,39 +2084,236 @@ void avm2_register_timer_fns(Avm2Context* ctx)
 	avm2_builtin_add_flash_utils_fn(ctx, "setInterval", utils_set_interval);
 	avm2_builtin_add_flash_utils_fn(ctx, "clearTimeout", utils_clear_timer);
 	avm2_builtin_add_flash_utils_fn(ctx, "clearInterval", utils_clear_timer);
+	avm2_builtin_add_flash_utils_fn(ctx, "getTimer", utils_get_timer);
 }
 
+// --- flash.utils.Timer natives -------------------------------------------
+
+static const Avm2String* g_str_timer;
+static const Avm2String* g_str_timer_complete;
+
+// One Timer tick: currentCount++, dispatch TimerEvent.TIMER; on the final
+// repeat clear running (so a TIMER_COMPLETE handler reads running==false) and
+// dispatch TimerEvent.TIMER_COMPLETE. Returns 1 to cancel the list entry.
+static int timer_on_update(Avm2Context* ctx, Avm2Object* timer)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(timer);
+	if (ext == NULL) return 1;
+	ext->current_count += 1;
+	Avm2Object* ev = avm2_timer_event_new(ctx, g_str_timer, 0, 0);
+	avm2_dispatch_event(ctx, timer, ev);
+	if (ext->repeat_count != 0 && ext->current_count >= ext->repeat_count)
+	{
+		ext->timer_entry_id = 0;  // running == false during TIMER_COMPLETE
+		Avm2Object* ev2 = avm2_timer_event_new(ctx, g_str_timer_complete, 0, 0);
+		avm2_dispatch_event(ctx, timer, ev2);
+		return 1;
+	}
+	return 0;
+}
+
+static void timer_check_delay(Avm2Context* ctx, double delay)
+{
+	if (!isfinite(delay) || delay < 0)
+	{
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #2066: The Timer delay specified is out of range.");
+	}
+}
+
+// Timer(delay:Number, repeatCount:int = 0)
+static Avm2Value timer_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	if (ext == NULL) return avm2_undefined();
+	double delay = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0;
+	timer_check_delay(ctx, delay);
+	ext->delay = delay;
+	ext->repeat_count = act->argc > 1 ? avm2_coerce_to_i32(ctx, act->args[1]) : 0;
+	ext->current_count = 0;
+	ext->timer_entry_id = 0;
+	return avm2_undefined();
+}
+
+static Avm2Value timer_start(Avm2Activation* act)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	if (ext == NULL) return avm2_undefined();
+	if (ext->timer_entry_id == 0)
+	{
+		int32_t id = timer_list_add((int32_t) ext->delay, 0, act->this_val.u.obj,
+		                            avm2_null(), NULL, 0);
+		ext->timer_entry_id = id;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value timer_stop(Avm2Activation* act)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	if (ext == NULL) return avm2_undefined();
+	if (ext->timer_entry_id != 0)
+	{
+		timer_list_remove(ext->timer_entry_id);
+		ext->timer_entry_id = 0;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value timer_reset(Avm2Activation* act)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	if (ext == NULL) return avm2_undefined();
+	ext->current_count = 0;
+	return timer_stop(act);
+}
+
+static Avm2Value timer_get_current_count(Avm2Activation* act)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	return avm2_integer(ext != NULL ? ext->current_count : 0);
+}
+
+static Avm2Value timer_get_delay(Avm2Activation* act)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	return avm2_number(ext != NULL ? ext->delay : 0);
+}
+
+static Avm2Value timer_set_delay(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	if (ext == NULL) return avm2_undefined();
+	// Ruffle Timer.as quirk: the setter validates the OLD delay (getter),
+	// not the incoming value — so the new value is never range-checked.
+	timer_check_delay(ctx, ext->delay);
+	double v = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0;
+	ext->delay = v;
+	if (ext->timer_entry_id != 0)
+	{
+		timer_list_set_delay(ext->timer_entry_id, (int32_t) v);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value timer_get_repeat_count(Avm2Activation* act)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	return avm2_integer(ext != NULL ? ext->repeat_count : 0);
+}
+
+static Avm2Value timer_set_repeat_count(Avm2Activation* act)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	if (ext == NULL) return avm2_undefined();
+	ext->repeat_count = act->argc > 0 ? avm2_coerce_to_i32(act->ctx, act->args[0]) : 0;
+	if (ext->repeat_count != 0 && ext->repeat_count <= ext->current_count)
+	{
+		timer_stop(act);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value timer_get_running(Avm2Activation* act)
+{
+	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+	return avm2_bool(ext != NULL && ext->timer_entry_id != 0);
+}
+
+void avm2_register_timer_class(Avm2Context* ctx)
+{
+	Avm2Builtins* b = &ctx->builtins;
+	Avm2Class* timer = avm2_builtin_class(ctx, "flash.utils", "Timer",
+	                                      b->event_dispatcher_class);
+	timer->instance_init.fn = timer_ctor;
+	timer->instance_init.debug_name = "Timer";
+	timer->native_ext_size = sizeof(Avm2TimerObjExt);
+	b->timer_class = timer;
+	avm2_builtin_add_method(ctx, timer, "start", timer_start);
+	avm2_builtin_add_method(ctx, timer, "stop", timer_stop);
+	avm2_builtin_add_method(ctx, timer, "reset", timer_reset);
+	avm2_builtin_add_getset(ctx, timer, "currentCount", timer_get_current_count, NULL);
+	avm2_builtin_add_getset(ctx, timer, "delay", timer_get_delay, timer_set_delay);
+	avm2_builtin_add_getset(ctx, timer, "repeatCount", timer_get_repeat_count,
+	                        timer_set_repeat_count);
+	avm2_builtin_add_getset(ctx, timer, "running", timer_get_running, NULL);
+
+	g_str_timer = avm2_string_from_literal(ctx, "timer");
+	g_str_timer_complete = avm2_string_from_literal(ctx, "timerComplete");
+}
+
+// Fire one list entry (returns cancel bool), routing to timer_on_update for
+// AS3 Timer entries and a plain function call for setTimeout/setInterval.
+static int timer_fire_entry(Avm2Context* ctx, Avm2TimerEntry* t)
+{
+	if (t->timer_obj != NULL) return timer_on_update(ctx, t->timer_obj);
+	Avm2Value ret = avm2_undefined();
+	Avm2TryFrame top;
+	avm2_try_push_catch_all(ctx, &top);
+	if (setjmp(top.jb) == 0)
+	{
+		ret = avm2_call_value(ctx, t->fn, avm2_null(), t->args, t->argc);
+	}
+	avm2_try_pop_frame(&top);
+	return avm2_coerce_to_boolean(ret) ? 1 : 0;
+}
+
+static Avm2TimerEntry* timer_find_min(void)
+{
+	Avm2TimerEntry* best = NULL;
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+	{
+		if (!g_avm2_timers[i].active) continue;
+		if (best == NULL || g_avm2_timers[i].tick_time < best->tick_time)
+			best = &g_avm2_timers[i];
+	}
+	return best;
+}
+
+static Avm2TimerEntry* timer_find_by_id(int32_t id)
+{
+	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
+		if (g_avm2_timers[i].active && g_avm2_timers[i].id == id)
+			return &g_avm2_timers[i];
+	return NULL;
+}
+
+// Ruffle Timers::update_timers: advance the µs clock by one frame, then fire
+// every entry whose tick_time is strictly < cur_time (earliest first), each at
+// most MAX_TICKS times per frame.
 static void run_due_timers(Avm2Context* ctx)
 {
-	// Advance one frame interval (8.8 fixed frame rate).
-	double fps = avm2_generated_frame_rate / 256.0;
+	double fps = (double) (int16_t) avm2_generated_frame_rate / 256.0;
 	if (fps <= 0) fps = 24.0;
-	g_avm2_clock_ms += 1000.0 / fps;
-	// Fire due timers in registration order; new timers registered during
-	// callbacks wait for the next tick sweep.
-	uint32_t n = g_avm2_timer_count;
-	for (uint32_t i = 0; i < n; i++)
+	uint64_t dt_us = (uint64_t) (1000.0 / fps * 1000.0);
+	g_avm2_timer_cur_time += dt_us;
+
+	int ticks = 0;
+	for (;;)
 	{
-		Avm2TimerEntry* t = &g_avm2_timers[i];
-		if (!t->active || t->due_ms > g_avm2_clock_ms) continue;
-		if (t->interval_ms > 0)
+		Avm2TimerEntry* t = timer_find_min();
+		if (t == NULL || !(t->tick_time < g_avm2_timer_cur_time)) break;
+		if (++ticks > AVM2_TIMER_MAX_TICKS)
 		{
-			t->due_ms += t->interval_ms;
-			if (t->due_ms <= g_avm2_clock_ms) t->due_ms = g_avm2_clock_ms;
+			// SANITY backstop: rewind to just before the nearest timer.
+			g_avm2_timer_cur_time =
+				t->tick_time > 100 ? t->tick_time - 100 : 0;
+			break;
 		}
-		else
+		int32_t fired_id = t->id;
+		uint8_t was_timeout = t->is_timeout;
+		int cancel = timer_fire_entry(ctx, t);
+		// The callback may have added/removed timers; re-find by id.
+		Avm2TimerEntry* e = timer_find_by_id(fired_id);
+		if (e != NULL)
 		{
-			t->active = 0;
+			if (was_timeout || cancel) e->active = 0;
+			else e->tick_time += e->interval;
 		}
-		Avm2TryFrame top;
-		avm2_try_push_catch_all(ctx, &top);
-		if (setjmp(top.jb) == 0)
-		{
-			avm2_call_value(ctx, t->fn, avm2_null(), t->args, t->argc);
-		}
-		avm2_try_pop_frame(&top);
 	}
-	// Compact dead one-shots.
+	// Compact dead entries.
 	uint32_t w = 0;
 	for (uint32_t i = 0; i < g_avm2_timer_count; i++)
 	{
@@ -2054,8 +2325,6 @@ static void run_due_timers(Avm2Context* ctx)
 void avm2_display_run_tick(Avm2Context* ctx)
 {
 	if (ctx->stage == NULL) return;
-
-	run_due_timers(ctx);
 
 	ctx->frame_phase = PHASE_ENTER;
 	for (uint32_t i = 0; i < g_orphan_count; i++)
@@ -2118,6 +2387,10 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// on-stage TextField (Ruffle EditText::render_self ->
 	// apply_autosize_bounds; edittext_autosize_lazy_bounds_events).
 	render_apply_text_bounds(ctx, ctx->stage, 1);
+
+	// Timers: Ruffle runs update_timers AFTER run_frame (player.rs::tick), so
+	// fire at the tail — the µs clock advances one frame here.
+	run_due_timers(ctx);
 
 	// Stage 8: deliver this tick's injected input (Ruffle processes input at
 	// frame boundaries — after the frame's scripts). One WAIT group per tick.
@@ -2605,6 +2878,28 @@ static Avm2Value do_set_alpha(Avm2Activation* act)
 		else if (v <= -32768.0) f = -32768;
 		else f = (int16_t) v;
 		ext->alpha_fixed8 = f;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value do_get_sound_transform(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = this_display(act);
+	static const int32_t def[5] = { 100, 0, 0, 100, 100 };  // l2l,l2r,r2l,r2r,vol
+	const int32_t* core = (ext != NULL && ext->sound_transform_set)
+		? ext->sound_transform : def;
+	return avm2_sound_transform_from_core(act->ctx, core);
+}
+
+static Avm2Value do_set_sound_transform(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL) return avm2_undefined();
+	int32_t core[5];
+	if (act->argc > 0 && avm2_sound_transform_read(act->ctx, act->args[0], core))
+	{
+		memcpy(ext->sound_transform, core, sizeof(core));
+		ext->sound_transform_set = 1;
 	}
 	return avm2_undefined();
 }
@@ -5893,6 +6188,10 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, iobj, "accessibilityImplementation", do_accessimpl_get,
 	           do_accessimpl_set);
 	add_getset(ctx, iobj, "contextMenu", do_contextmenu_get, do_contextmenu_set);
+	// soundTransform lives on Sprite + SimpleButton; both derive from
+	// InteractiveObject, so registering here covers MovieClip and SimpleButton.
+	add_getset(ctx, iobj, "soundTransform", do_get_sound_transform,
+	           do_set_sound_transform);
 
 	Avm2Class* doc =
 		avm2_builtin_class(ctx, "flash.display", "DisplayObjectContainer", iobj);

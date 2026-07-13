@@ -365,7 +365,13 @@ typedef struct Avm2BitmapData
 	uint16_t width;
 	uint16_t height;
 	uint8_t transparency;
-	const uint8_t* rgba;  // width*height*4, straight RGBA (NULL if decode failed)
+	// Straight RGBA, width*height*4 bytes (NULL if decode failed). When
+	// z_len != 0 the pointer is instead a zlib DEFLATE stream of length z_len
+	// that inflates to width*height*4 straight-RGBA bytes (recompile-time
+	// compression — the raw tables are ~46 MB for a real game); z_len == 0
+	// means `rgba` is the uncompressed pixels.
+	const uint8_t* rgba;
+	uint32_t z_len;
 } Avm2BitmapData;
 
 // Embedded binary (DefineBinaryData, tag 87): raw bytes, ByteArray seed.
@@ -386,6 +392,8 @@ typedef struct Avm2SoundData
 	uint8_t sample_size;   // 0=8-bit 1=16-bit
 	uint8_t stereo;        // 0=mono 1=stereo
 	uint32_t sample_count;
+	uint32_t data_size;    // bytesTotal: compressed payload bytes, minus the
+	                       // 2-byte MP3 seek prefix (Ruffle SoundInstance.size)
 } Avm2SoundData;
 
 // Provided by the generated RecompiledABC/abc_timeline.c:

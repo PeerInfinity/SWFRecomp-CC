@@ -1,9 +1,44 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-12 — Stage 9 (minimal AVM2 render path) COMPLETE;
-Stage 8 (input harness + input→event bridge), Stage 7 (embedded assets +
-BitmapData/Bitmap), Stage 6 (TextField/EditText engine), Stage 5, E4X and
-Stage 4 before it.
+Last updated: 2026-07-12 — Stage 10 (audio + timers + saves + asset
+compression) COMPLETE; Stage 9 (minimal AVM2 render path), Stage 8 (input
+harness + input→event bridge), Stage 7 (embedded assets + BitmapData/Bitmap),
+Stage 6 (TextField/EditText engine), Stage 5, E4X and Stage 4 before it.
+
+## State (Stage 10)
+
+- **Stage 10 COMPLETE (2026-07-12): audio + timers + saves + the deferred
+  asset-table compression.** Graded families (local single-test runs;
+  `_investigation/STAGE10_CANDIDATES.txt`):
+  - **flash.utils.Timer / TimerEvent + getTimer — 6/6** (timer, timer_events,
+    timer_finished, timer_reset, timer_setdelay, get_timer).
+  - **flash.media Sound family — 12 pass** (soundtransform, soundmixer_buffertime,
+    soundmixer_stopall, soundchannel_soundtransform{,_exists}, soundchannel_stop,
+    sound_valueof, sound_embeddedprops, sound_play, movieclip_soundtransform).
+    2 deferred (soundmixer_soundtransform / simplebutton_soundtransform: multi-
+    entity SoundMixer accumulation + timeline-child transform persistence), 3
+    network-load-deferred (sound_rootless / sound_constructor_with_args /
+    sound_load_multiple), 2 upstream known_failure (soundchannel_position /
+    _soundcomplete).
+  - **flash.net.SharedObject — shared_object_no_root pass** (getLocal → dynamic
+    `data` Object); shared_object deferred (two-run .sol harness + AMF byte-exact
+    size, unsupported by verify_output).
+  - **Asset-table zlib compression** (the Stage-7 ~46 MB finding): the recompiler
+    now zlib-DEFLATEs each DefineBitsLossless2 RGBA table (level 9); the runtime
+    inflates on BitmapData construction. **Seedling recompile 46 MB → 8.9 MB**
+    (~80% smaller), exit 0; bitmapdata_accuracy still bit-exact. Also added a
+    DefineSound `data_size` field (bytesTotal) to the recompiler tables.
+  - What landed: new `SWFModernRuntime/src/avm2/avm2_media.c` (Sound/SoundChannel/
+    SoundTransform/SoundMixer); the Timer class + a Ruffle-faithful µs timer core
+    (one priority list, strict `tick_time < cur_time`, MIN_INTERVAL/MAX_TICKS,
+    fired at the TAIL of the tick like Ruffle's run_frame→update_timers) in
+    avm2_display.c; TimerEvent in avm2_events.c; DisplayObject.soundTransform in
+    avm2_display.c; SharedObject in avm2_amf.c; DefineSound `data_size` +
+    zlib-compressed bitmap tables in `SWFRecomp/src/abc/abc_timeline.cpp` +
+    runtime inflate in avm2_bitmap.c; `getTimer`. verify_output.py adds
+    avm2_media.c to the AVM2 source set.
+  - **CI baseline BOTH modes: see the pipeline run recorded below at commit time.**
+
 
 ## State (Stage 9)
 

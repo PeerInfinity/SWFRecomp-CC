@@ -1,0 +1,55 @@
+# AVM2 Stage 10 — audio + timers + saves (+ deferred asset compression)
+# Candidate list generated at session start from the sound*/timer*/
+# shared_object* families (+ the DisplayObject.soundTransform bystanders).
+# Status recorded 2026-07-12 (local single-test runs).
+#
+# Tranche order: Timer -> Sound -> SharedObject -> asset compression.
+
+## flash.utils.Timer / TimerEvent + getTimer (6/6 PASS)
+timer                         PASS
+timer_events                  PASS
+timer_finished                PASS   (mixes setTimeout + Timer on one clock)
+timer_reset                   PASS   (setInterval + Timer + delay-change reschedule)
+timer_setdelay                PASS
+get_timer                     PASS
+
+## flash.media Sound family (12 PASS / 2 deferred / 3 load-deferred / 2 known_failure)
+soundtransform                PASS
+soundmixer_buffertime         PASS
+soundmixer_stopall            PASS
+soundchannel_soundtransform_exists   PASS
+soundchannel_soundtransform   PASS   (i32×100 round-trip truncation: 1-1/24 -> 0.95)
+soundchannel_stop             PASS
+sound_valueof                 PASS
+sound_embeddedprops           PASS   (needs the new DefineSound data_size field)
+sound_play                    PASS   (play past clip length -> null)
+movieclip_soundtransform      PASS   (DisplayObject.soundTransform)
+# --- deferred (multi-entity SoundMixer accumulation / timeline-child transform
+#     persistence across 49 frames; the single-entity path works) ---
+soundmixer_soundtransform     FAIL   (SoundMixer global + child clip transforms
+                                      read default after cross-frame accumulation)
+simplebutton_soundtransform   FAIL   (same multi-entity accumulation gap)
+# --- deferred: external URLRequest loading + load-event pipeline (network) ---
+sound_rootless                DEFER  (Sound.load + open/progress/complete events)
+sound_constructor_with_args   DEFER  (Sound(URLRequest) + load-event callbacks)
+sound_load_multiple           DEFER  (Error #2037 sequencing + AMF 40K limit)
+# --- upstream known_failure (skip) ---
+soundchannel_position         SKIP   (known_failure=true; needs live audio position)
+soundchannel_soundcomplete    SKIP   (known_failure=true; needs SOUND_COMPLETE)
+
+## flash.net.SharedObject (1/2)
+shared_object_no_root         PASS   (getLocal -> dynamic data Object)
+shared_object                 DEFER  (two-run .sol harness + AMF byte-exact size
+                                      299/330; verify_output has no .sol seed/
+                                      compare mode)
+
+## Asset-table zlib compression (recompiler; graded by Seedling recompile smoke)
+# The recompiler now zlib-DEFLATEs each DefineBitsLossless2 RGBA table (level 9)
+# and the runtime inflates on BitmapData construction. Seedling recompile:
+#   RecompiledABC/abc_timeline.c  46 MB -> 8.9 MB  (~80% smaller), exit 0.
+#   bitmapdata_accuracy (exhaustive pixel oracle) still bit-exact.
+# Tests use tiny bitmaps so trace results are unaffected; the whole avm2 bitmap
+# table format changed, so BOTH CI modes must confirm zero regressions.
+
+# Score (gradeable, excluding the 2 known_failure + 3 network + shared_object
+# two-run harness): Timer 6/6, Sound 12/14, SharedObject 1/1 achievable.

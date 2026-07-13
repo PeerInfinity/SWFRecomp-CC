@@ -1358,4 +1358,10 @@ void avm2_globals_init(Avm2Context* ctx)
 	// display: the Bitmap class shell (created in register_display) wires
 	// its accessors here, and BitmapData needs the display char registry.
 	avm2_register_bitmap(ctx);
+
+	// flash.utils.Timer (avm2_display.c) + flash.media Sound family
+	// (avm2_media.c) — Stage 10. After events (Timer extends EventDispatcher)
+	// and display (Sound.play returns a SoundChannel display-independent obj).
+	avm2_register_timer_class(ctx);
+	avm2_register_media(ctx);
 }

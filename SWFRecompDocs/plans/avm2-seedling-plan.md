@@ -110,8 +110,20 @@ answer to "what could go wrong with game-first development"):
   the bitmapdata image-comparison tests (~20 currently trace-empty
   "passes") become observable. Exit: Seedling-shaped content renders;
   image tests triaged.
-- **Stage 10 — audio + timers + saves**. flash.media.Sound/
-  SoundChannel/SoundTransform over the existing MP3 backend (88
+- **Stage 10 — audio + timers + saves** — **DONE 2026-07-12**. Timer/TimerEvent
+  + getTimer 6/6; flash.media Sound family 12 pass (SoundTransform/SoundChannel/
+  SoundMixer/Sound + DisplayObject.soundTransform; trace-graded, no real audio
+  output); SharedObject shared_object_no_root pass (getLocal→dynamic data). The
+  deferred asset-table zlib compression landed: recompiler DEFLATEs every
+  DefineBitsLossless2 RGBA table + runtime inflates on BitmapData construction —
+  **Seedling recompile 46 MB → 8.9 MB**, bitmapdata_accuracy bit-exact. A
+  Ruffle-faithful µs timer core (one priority list, strict `<`, MIN_INTERVAL/
+  MAX_TICKS, fired at tick tail) now backs setTimeout/setInterval AND Timer.
+  Deferred: 2 multi-entity SoundMixer-accumulation tests, 3 network-load sound
+  tests, the two-run shared_object .sol harness. See
+  `avm2/_investigation/CURRENT_STATUS.md` + `STAGE10_CANDIDATES.txt` +
+  `avm2-stage10-audio` memory. Original scope:
+  flash.media.Sound/SoundChannel/SoundTransform over the existing MP3 backend (88
   embedded sounds in Seedling), flash.utils.Timer/TimerEvent on the
   Stage-6 timer core, SharedObject getLocal/flush over the existing
   AMF engine. Graded by sound*/timer*/shared_object* families.

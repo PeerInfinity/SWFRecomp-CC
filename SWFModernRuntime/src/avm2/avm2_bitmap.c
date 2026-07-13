@@ -17,7 +17,10 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include <zlib.h>
 
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
@@ -418,21 +421,44 @@ static void bd_seed_embedded(Avm2Context* ctx, Avm2BitmapDataExt* bd,
 		return;
 	}
 	bd->pixels = avm2_alloc(ctx, n * (uint32_t) sizeof(uint32_t));
+	// The recompiler zlib-DEFLATEs the RGBA table (z_len != 0); inflate into a
+	// transient buffer that is freed after we copy into the premultiplied
+	// pixel store. z_len == 0 means the pointer is already raw RGBA.
+	const uint8_t* rgba = emb->rgba;
+	uint8_t* inflated = NULL;
+	if (emb->rgba != NULL && emb->z_len != 0)
+	{
+		uLongf dlen = (uLongf) n * 4;
+		inflated = (uint8_t*) malloc(dlen);
+		if (inflated != NULL
+		    && uncompress(inflated, &dlen, emb->rgba, emb->z_len) == Z_OK
+		    && dlen == (uLongf) n * 4)
+		{
+			rgba = inflated;
+		}
+		else
+		{
+			free(inflated);
+			inflated = NULL;
+			rgba = NULL;  // inflate failed: transparent
+		}
+	}
 	for (uint32_t i = 0; i < n; i++)
 	{
-		if (emb->rgba != NULL)
+		if (rgba != NULL)
 		{
-			uint8_t r = emb->rgba[i * 4 + 0];
-			uint8_t g = emb->rgba[i * 4 + 1];
-			uint8_t b = emb->rgba[i * 4 + 2];
-			uint8_t a = emb->rgba[i * 4 + 3];
+			uint8_t r = rgba[i * 4 + 0];
+			uint8_t g = rgba[i * 4 + 1];
+			uint8_t b = rgba[i * 4 + 2];
+			uint8_t a = rgba[i * 4 + 3];
 			bd->pixels[i] = CMK(r, g, b, a);
 		}
 		else
 		{
-			bd->pixels[i] = 0;  // decode failed: transparent
+			bd->pixels[i] = 0;  // decode/inflate failed: transparent
 		}
 	}
+	free(inflated);
 }
 
 // ---------------------------------------------------------------------------

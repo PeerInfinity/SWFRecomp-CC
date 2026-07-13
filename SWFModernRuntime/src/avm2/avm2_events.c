@@ -843,6 +843,19 @@ static Avm2Value me_update_after_event(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+static Avm2Value timer_event_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"TimerEvent", "type", "bubbles", "cancelable", "eventPhase"
+	};
+	Avm2Value args[5];
+	for (int i = 0; i < 5; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 5);
+}
+
 static Avm2Value me_to_string(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -1348,4 +1361,29 @@ void avm2_register_events(Avm2Context* ctx)
 
 	// flash.events.MouseEvent / KeyboardEvent / FocusEvent (Stage 8).
 	register_input_events(ctx);
+
+	// flash.events.TimerEvent (Stage 10). Base Event ctor + a toString that
+	// lists the standard 5 fields under the "TimerEvent" class name.
+	Avm2Class* tev = avm2_builtin_class(ctx, "flash.events", "TimerEvent",
+	                                    b->event_class);
+	tev->instance_init.fn = event_init;
+	tev->instance_init.debug_name = "TimerEvent";
+	b->timer_event_class = tev;
+	event_override_method(ctx, tev, "toString", timer_event_to_string);
+	avm2_builtin_add_method(ctx, tev, "updateAfterEvent", me_update_after_event);
+	avm2_builtin_add_static_const(ctx, tev, "TIMER",
+		avm2_string(avm2_string_from_literal(ctx, "timer")));
+	avm2_builtin_add_static_const(ctx, tev, "TIMER_COMPLETE",
+		avm2_string(avm2_string_from_literal(ctx, "timerComplete")));
+}
+
+Avm2Object* avm2_timer_event_new(Avm2Context* ctx, const Avm2String* type,
+                                 int bubbles, int cancelable)
+{
+	Avm2Value args[3];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(bubbles != 0);
+	args[2] = avm2_bool(cancelable != 0);
+	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.timer_event_class, args, 3);
+	return v.u.obj;
 }

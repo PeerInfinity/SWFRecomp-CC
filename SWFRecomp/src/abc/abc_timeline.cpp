@@ -369,6 +369,7 @@ struct SoundAsset
 	uint16_t char_id;
 	uint8_t format, rate, sample_size, stereo;
 	uint32_t sample_count;
+	uint32_t data_size;
 };
 
 struct TOp
@@ -979,6 +980,13 @@ struct Scanner
 				sa.sample_size = (bits >> 1) & 0x01;
 				sa.stereo = bits & 0x01;
 				sa.sample_count = body.u32();
+				// Payload = the remaining tag bytes; Ruffle's SoundInstance
+				// size excludes the 2-byte MP3 seek-samples prefix.
+				{
+					size_t payload = (size_t) (body.end - body.p);
+					if (sa.format == 2 && payload >= 2) payload -= 2;
+					sa.data_size = (uint32_t) payload;
+				}
 				sounds.push_back(sa);
 				break;
 			}
@@ -1329,16 +1337,29 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	out << "const uint32_t avm2_generated_font_count = " << sc.fonts.size()
 	    << ";\n\n";
 
-	// Embedded bitmaps (decoded straight RGBA).
+	// Embedded bitmaps: straight RGBA, zlib-DEFLATE-compressed at recompile
+	// time (raw RGBA is ~46 MB for a real game). The runtime inflates on
+	// BitmapData construction (avm2_bitmap.c bd_seed_embedded). A blob that
+	// fails to compress or does not shrink is emitted raw (z_len 0).
+	std::vector<uint32_t> bmp_zlen(sc.bitmaps.size(), 0);
 	for (size_t i = 0; i < sc.bitmaps.size(); i++)
 	{
 		const BitmapAsset& ba = sc.bitmaps[i];
 		if (ba.rgba.empty()) continue;
+		uLongf bound = compressBound((uLong) ba.rgba.size());
+		std::vector<uint8_t> z(bound);
+		uLongf zlen = bound;
+		bool ok = compress2(z.data(), &zlen, ba.rgba.data(),
+		                    (uLong) ba.rgba.size(), 9) == Z_OK
+		          && (size_t) zlen < ba.rgba.size();
+		const uint8_t* emit = ok ? z.data() : ba.rgba.data();
+		size_t emit_len = ok ? (size_t) zlen : ba.rgba.size();
+		bmp_zlen[i] = ok ? (uint32_t) zlen : 0;
 		out << "static const uint8_t bmp_" << i << "_rgba[] = {";
-		for (size_t k = 0; k < ba.rgba.size(); k++)
+		for (size_t k = 0; k < emit_len; k++)
 		{
 			if ((k & 31) == 0) out << "\n\t";
-			out << (int) ba.rgba[k] << ",";
+			out << (int) emit[k] << ",";
 		}
 		out << "\n};\n";
 	}
@@ -1352,7 +1373,7 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			    << ", " << (int) ba.transparency << ", "
 			    << (ba.rgba.empty() ? std::string("NULL")
 			                        : ("bmp_" + std::to_string(i) + "_rgba"))
-			    << " },\n";
+			    << ", " << bmp_zlen[i] << " },\n";
 		}
 		out << "};\n";
 	}
@@ -1404,7 +1425,8 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		{
 			out << "\t{ " << sa.char_id << ", " << (int) sa.format << ", "
 			    << (int) sa.rate << ", " << (int) sa.sample_size << ", "
-			    << (int) sa.stereo << ", " << sa.sample_count << " },\n";
+			    << (int) sa.stereo << ", " << sa.sample_count << ", "
+			    << sa.data_size << " },\n";
 		}
 		out << "};\n";
 	}

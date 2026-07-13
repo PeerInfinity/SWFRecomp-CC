@@ -383,6 +383,10 @@ typedef struct Avm2DisplayObjectExt
 	// accessibilityImplementation/accessibilityProperties (stored verbatim).
 	Avm2Value accessibility_impl;
 	Avm2Value accessibility_props;
+
+	// soundTransform: core i32×100 {l2l,l2r,r2l,r2r,volume}; unset = default.
+	int32_t sound_transform[5];
+	uint8_t sound_transform_set;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.
@@ -432,6 +436,24 @@ Avm2Object* avm2_text_event_new(Avm2Context* ctx, const Avm2String* type,
 int avm2_event_is_cancelled(Avm2Object* event);
 // Display parent hook used for ancestor walks; reads the display ext.
 Avm2Object* avm2_display_parent(Avm2Context* ctx, Avm2Object* obj);
+
+// flash.utils.Timer / flash.events.TimerEvent (Stage 10). The Timer class +
+// the shared setTimeout/setInterval/Timer priority list live in avm2_display.c
+// (co-located with the tick); TimerEvent lives in avm2_events.c.
+void avm2_register_timer_class(Avm2Context* ctx);   // avm2_display.c
+Avm2Object* avm2_timer_event_new(Avm2Context* ctx, const Avm2String* type,
+                                 int bubbles, int cancelable);
+// getTimer() elapsed-time value (ms since start), read off the timer clock.
+double avm2_timer_elapsed_ms(void);
+
+// flash.media Sound family (avm2_media.c — Stage 10).
+void avm2_register_media(Avm2Context* ctx);
+// Build an AS3 SoundTransform object from a core i32×100 transform, and read
+// one back into a 5-slot core array {l2l,l2r,r2l,r2r,volume}. Used by
+// SoundChannel/SoundMixer and DisplayObject.soundTransform. read returns 0 if
+// `v` is not a SoundTransform.
+Avm2Value avm2_sound_transform_from_core(Avm2Context* ctx, const int32_t core[5]);
+int avm2_sound_transform_read(Avm2Context* ctx, Avm2Value v, int32_t out[5]);
 
 // flash.text module (avm2_text.c — Stage 6): TextFormat/TextField engine.
 void avm2_register_text(Avm2Context* ctx);
@@ -548,6 +570,11 @@ typedef struct Avm2Builtins
 	Avm2Class* keyboard_event_class;
 	Avm2Class* focus_event_class;
 	Avm2Class* text_event_class;
+	Avm2Class* timer_event_class;
+	Avm2Class* timer_class;             // flash.utils.Timer
+	Avm2Class* sound_class;             // flash.media.Sound
+	Avm2Class* sound_channel_class;     // flash.media.SoundChannel
+	Avm2Class* sound_transform_class;   // flash.media.SoundTransform
 	Avm2Class* event_dispatcher_class;
 	Avm2Class* ievent_dispatcher_class;  // interface
 	Avm2Class* display_object_class;

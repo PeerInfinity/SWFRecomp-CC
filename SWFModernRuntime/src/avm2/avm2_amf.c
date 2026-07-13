@@ -1583,6 +1583,106 @@ static Avm2Value net_get_class_by_alias(Avm2Activation* act)
 	return avm2_object_value(cls->class_object);
 }
 
+// ---------------------------------------------------------------------------
+// flash.net.SharedObject (Stage 10). Minimal in-process model: getLocal(name)
+// returns a per-name SharedObject whose `data` is a dynamic Object. Persistence
+// to a .sol file + AMF `size` accounting are NOT modeled (the full shared_object
+// test needs the two-run .sol harness); flush reports "flushed" so the common
+// getLocal/data/flush path works (shared_object_no_root).
+// ---------------------------------------------------------------------------
+
+typedef struct Avm2SharedObjectExt
+{
+	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+	Avm2Object* data;                   // dynamic Object
+} Avm2SharedObjectExt;
+
+static Avm2Class* g_shared_object_class;
+
+static Avm2Object* this_obj_amf(Avm2Activation* act)
+{
+	return act->this_val.kind == AVM2_VALUE_OBJECT ? act->this_val.u.obj : NULL;
+}
+
+typedef struct SoCacheEntry { char* name; Avm2Object* obj; } SoCacheEntry;
+static SoCacheEntry g_so_cache[64];
+static uint32_t g_so_cache_count;
+
+static Avm2SharedObjectExt* so_ext_of(Avm2Context* ctx, Avm2Object* o)
+{
+	if (o == NULL || o->cls == NULL || g_shared_object_class == NULL) return NULL;
+	for (const Avm2Class* c = o->cls; c != NULL; c = c->super_class)
+		if (c == g_shared_object_class) return (Avm2SharedObjectExt*) o->native_ext;
+	return NULL;
+}
+
+static Avm2Object* so_new_data(Avm2Context* ctx)
+{
+	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.object_class, NULL, 0);
+	return v.u.obj;
+}
+
+static Avm2Value so_get_local(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* name = act->argc > 0
+		? avm2_coerce_to_string(ctx, act->args[0])
+		: avm2_string_from_literal(ctx, "");
+	// Same-run identity: return the cached instance for this name.
+	for (uint32_t i = 0; i < g_so_cache_count; i++)
+	{
+		if (strncmp(g_so_cache[i].name, name->utf8, name->len) == 0
+		    && g_so_cache[i].name[name->len] == '\0')
+			return avm2_object_value(g_so_cache[i].obj);
+	}
+	Avm2Value v = avm2_class_construct(ctx, g_shared_object_class, NULL, 0);
+	Avm2SharedObjectExt* ext = so_ext_of(ctx, v.u.obj);
+	if (ext != NULL && ext->data == NULL) ext->data = so_new_data(ctx);
+	if (g_so_cache_count < 64)
+	{
+		char* copy = avm2_alloc(ctx, name->len + 1);
+		memcpy(copy, name->utf8, name->len);
+		copy[name->len] = '\0';
+		g_so_cache[g_so_cache_count].name = copy;
+		g_so_cache[g_so_cache_count].obj = v.u.obj;
+		g_so_cache_count++;
+	}
+	return v;
+}
+
+static Avm2Value so_get_data(Avm2Activation* act)
+{
+	Avm2SharedObjectExt* ext = so_ext_of(act->ctx, this_obj_amf(act));
+	if (ext == NULL) return avm2_undefined();
+	if (ext->data == NULL) ext->data = so_new_data(act->ctx);
+	return avm2_object_value(ext->data);
+}
+
+static Avm2Value so_get_size(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_uint_value(0);
+}
+
+static Avm2Value so_flush(Avm2Activation* act)
+{
+	// SharedObjectFlushStatus.FLUSHED
+	return avm2_string(avm2_string_from_literal(act->ctx, "flushed"));
+}
+
+static Avm2Value so_clear(Avm2Activation* act)
+{
+	Avm2SharedObjectExt* ext = so_ext_of(act->ctx, this_obj_amf(act));
+	if (ext != NULL) ext->data = so_new_data(act->ctx);
+	return avm2_undefined();
+}
+
+static Avm2Value so_noop(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
 void avm2_register_amf(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -1617,6 +1717,23 @@ void avm2_register_amf(Avm2Context* ctx)
 		avm2_builtin_add_static_const(ctx, oe, "AMF0", avm2_uint_value(0));
 		avm2_builtin_add_static_const(ctx, oe, "AMF3", avm2_uint_value(3));
 		avm2_builtin_add_static_const(ctx, oe, "DEFAULT", avm2_uint_value(3));
+	}
+
+	// flash.net.SharedObject (extends EventDispatcher).
+	{
+		g_so_cache_count = 0;
+		Avm2Class* so = avm2_builtin_class(ctx, "flash.net", "SharedObject",
+		                                   b->event_dispatcher_class);
+		so->native_ext_size = sizeof(Avm2SharedObjectExt);
+		g_shared_object_class = so;
+		avm2_builtin_add_static_method(ctx, so, "getLocal", so_get_local);
+		avm2_builtin_add_static_method(ctx, so, "getRemote", so_get_local);
+		avm2_builtin_add_getset(ctx, so, "data", so_get_data, NULL);
+		avm2_builtin_add_getset(ctx, so, "size", so_get_size, NULL);
+		avm2_builtin_add_method(ctx, so, "flush", so_flush);
+		avm2_builtin_add_method(ctx, so, "clear", so_clear);
+		avm2_builtin_add_method(ctx, so, "close", so_noop);
+		avm2_builtin_add_method(ctx, so, "setProperty", so_noop);
 	}
 
 	// Upgrade the Date stub: millis state + the members AMF needs.
