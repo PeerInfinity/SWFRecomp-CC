@@ -96,14 +96,34 @@ correctness EARLY (see §4) — we have never seen a correct Seedling frame.
   `browser-perf-is-writebuffer-not-avm1-walks`).
 
 ## 4. Validation strategy — render correctness is UNPROVEN
-We have never seen a correct Seedling frame: the native capture is blocked by the
-WSL2 lavapipe OOM (`avm2-stage12-seedling`, the 481×481×64 bitmap-tex array), and
-Stage-9 render is Bitmap-blit only (no shapes/text/masks — FlashPunk is
-bitmap-based so this *should* suffice, but is untested on a real game).
-- **De-risk before 13b/13c:** either (a) fix the native capture OOM (shrink
-  `MAX_DYNAMIC_BITMAPS` / layer sizing for the AVM2 path in render_webgpu.c) to
-  get a validated PNG, or (b) get 13a painting in a real browser (real WebGPU,
-  not lavapipe — the OOM may not reproduce) and eyeball it vs Ruffle.
+We have never seen a correct Seedling frame FROM OUR RUNTIME: the native capture
+is blocked by the WSL2 lavapipe OOM (`avm2-stage12-seedling`, the 481×481×64
+bitmap-tex array), and Stage-9 render is Bitmap-blit only (no shapes/text/masks —
+FlashPunk is bitmap-based so this *should* suffice, but is untested on a real
+game).
+
+**The oracle half is already available — the Ruffle exporter works for AVM2.**
+The image-comparison harness compares two sides per frame: `.ruffle.png` /
+`.expected.png` (the oracle, from the Ruffle exporter) and `.actual.png` (our
+render, from `verify_output --mode=graphics` / OFFSCREEN_RENDER). The Ruffle
+exporter (`~/CC/ruffle/target/release/exporter`, driven by
+`ruffle-tests/triage_image_tests.py`) is a full headless Ruffle player and is
+**version-agnostic** — Ruffle renders AVM2 identically to AVM1. Verified
+2026-07-13: `exporter --frames 5 598977_Seedling.swf out/` produced correct
+reference PNGs of the Seedling NG preloader. So **expected AVM2 reference frames
+are free today**; only OUR-side capture gates a full comparison.
+- Caveat (game flow, not a tooling limit): on `file://` Ruffle renders the NG
+  preloader (PLAY button), not gameplay. `exporter --force-play` forces the main
+  timeline but Seedling's gate is an AS3 `MOUSE_UP` listener (not a timeline
+  `stop()`), and the exporter has no `--base-url` for the portal auto-start
+  trick. Reaching the game in Ruffle needs a per-game lever (patch a base URL,
+  or drive an input); same shape as the native `GAME_SWF_URL` lever.
+- **De-risk before 13b/13c** (now a diff, not an eyeball): either (a) fix the
+  native capture OOM (shrink `MAX_DYNAMIC_BITMAPS` / layer sizing for the AVM2
+  path in render_webgpu.c) to get an `.actual.png`, or (b) get 13a painting in a
+  real browser (real WebGPU, not lavapipe — the OOM may not reproduce) and grab
+  its canvas; then **diff our frame against the Ruffle-exporter reference** at
+  the same tick (the oracle side is ready).
 - Keep the divergence-harness discipline: any render bug found gets a minimal
   repro; the game is the integration check, never the oracle.
 
