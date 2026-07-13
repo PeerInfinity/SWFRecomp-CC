@@ -1924,8 +1924,12 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         # returns swf.compressed_len(). This differs from SWF_FILE_SIZE (the
         # uncompressed header size used by AVM1 getBytesLoaded/getBytesTotal).
         extra_defines.append(f"-DSWF_ONDISK_SIZE={test_swf.stat().st_size}")
-    # Pass movie URL matching Ruffle's VFS format (file:///test.swf)
-    extra_defines.append('-DSWF_URL="file:///test.swf"')
+    # Pass movie URL matching Ruffle's VFS format (file:///test.swf). The
+    # GAME_SWF_URL env override lets a Seedling-style bring-up drive the
+    # portal-URL auto-start path (a non-file:// URL) headlessly without
+    # editing this file — see the avm2-stage12-seedling memory.
+    swf_url = os.environ.get("GAME_SWF_URL", "file:///test.swf")
+    extra_defines.append(f'-DSWF_URL="{swf_url}"')
     # Build compiler flags based on mode
     mode_defines = []
     mode_includes = []

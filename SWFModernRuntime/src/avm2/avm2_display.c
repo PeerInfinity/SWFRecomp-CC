@@ -6334,6 +6334,28 @@ static void input_handle_text_control(Avm2Context* ctx, const char* ctrl)
 	avm2_text_input_control(ctx, g_stage_focus, ctrl, g_clipboard_text);
 }
 
+// flash.ui.Mouse — static cursor property + hide/show. Headless has no real
+// cursor; store the last-set string and no-op hide/show (FlashPunk's Splash
+// sets Mouse.cursor every frame).
+static const Avm2String* g_mouse_cursor;
+static Avm2Value mouse_get_cursor(Avm2Activation* act)
+{
+	const Avm2String* s = g_mouse_cursor != NULL
+		? g_mouse_cursor : avm2_string_from_literal(act->ctx, "auto");
+	return avm2_string(s);
+}
+static Avm2Value mouse_set_cursor(Avm2Activation* act)
+{
+	g_mouse_cursor = avm2_coerce_to_string(act->ctx,
+		act->argc > 0 ? act->args[0] : avm2_undefined());
+	return avm2_undefined();
+}
+static Avm2Value mouse_noop(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
 void avm2_register_display(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -6747,6 +6769,42 @@ void avm2_register_display(Avm2Context* ctx)
 		disp_sconst(ctx, sq, "BEST", "best");
 		disp_sconst(ctx, sq, "EIGHT_X_LINEAR", "8x8linear");
 		disp_sconst(ctx, sq, "SIXTEEN_X_LINEAR", "16x16linear");
+
+		// FlashPunk's Engine sets stage.displayState = StageDisplayState.NORMAL
+		// at startup (Engine.as:113).
+		Avm2Class* sds = avm2_builtin_class(ctx, "flash.display",
+		                                    "StageDisplayState", b->object_class);
+		disp_sconst(ctx, sds, "NORMAL", "normal");
+		disp_sconst(ctx, sds, "FULL_SCREEN", "fullScreen");
+		disp_sconst(ctx, sds, "FULL_SCREEN_INTERACTIVE", "fullScreenInteractive");
+
+		// FlashPunk's Draw uses LineScaleMode for graphics.lineStyle.
+		Avm2Class* lsm = avm2_builtin_class(ctx, "flash.display",
+		                                    "LineScaleMode", b->object_class);
+		disp_sconst(ctx, lsm, "NORMAL", "normal");
+		disp_sconst(ctx, lsm, "HORIZONTAL", "horizontal");
+		disp_sconst(ctx, lsm, "VERTICAL", "vertical");
+		disp_sconst(ctx, lsm, "NONE", "none");
+	}
+
+	// flash.ui.Mouse / MouseCursor — FlashPunk's Splash sets Mouse.cursor to a
+	// MouseCursor constant every frame. Headless has no cursor: store the value,
+	// no-op hide/show.
+	{
+		Avm2Class* mc = avm2_builtin_class(ctx, "flash.ui",
+		                                   "MouseCursor", b->object_class);
+		disp_sconst(ctx, mc, "AUTO", "auto");
+		disp_sconst(ctx, mc, "ARROW", "arrow");
+		disp_sconst(ctx, mc, "BUTTON", "button");
+		disp_sconst(ctx, mc, "HAND", "hand");
+		disp_sconst(ctx, mc, "IBEAM", "ibeam");
+
+		Avm2Class* mouse = avm2_builtin_class(ctx, "flash.ui",
+		                                      "Mouse", b->object_class);
+		avm2_builtin_add_static_getset(ctx, mouse, "cursor",
+		                               mouse_get_cursor, mouse_set_cursor);
+		avm2_builtin_add_static_method(ctx, mouse, "hide", mouse_noop);
+		avm2_builtin_add_static_method(ctx, mouse, "show", mouse_noop);
 	}
 
 	// Stage parameters from the generated tables.
