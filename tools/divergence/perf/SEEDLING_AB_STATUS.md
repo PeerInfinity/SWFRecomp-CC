@@ -1,5 +1,60 @@
 # Seedling perf A/B — status (2026-07-13, Stage 13a session 1)
 
+## ★★ UPDATE 2026-07-14 (session 2) — PARITY WITH RUFFLE: 62 → 47 ms/frame
+Three byte-identical AVM2 hot-path micro-optimizations landed (commit
+`c608083d4`), taking Seedling from the ~62 ms after-domain-hash baseline to
+**~47 ms/frame — parity with Ruffle (~46 ms), the milestone this whole arc
+targeted** (gap ~1.3x → ~1.02x). Real-GPU A/B, same rig (Intel Gen9,
+adapter "intel / gen-9"). Render VERIFIED byte-identical (`seedling_final.png`).
+avm2 CI **829 → 829, ZERO pass→fail, mismatched lines 47323 → 47323** ("No
+changes detected") — the emitter change was regenerated + graded across all
+1205 tests. Incremental measured deltas (each its own build):
+```
+                       frame CPU   avm+submit   the change
+  after domain-hash    ~62 ms      ~52 ms       (session-1 baseline)
+  + getproperty IC     ~56 ms      ~45 ms       inline cache (below #1)
+  + printf int paths   ~54 ms      ~43 ms       (below #3; small — printf hog was #2 not #3)
+  + lazy setprop cn    ~47 ms      ~36 ms       (below #2 — the DOMINANT win, ~8 ms)
+```
+**What each did (all proven byte-identical):**
+1. **Per-call-site monomorphic inline cache for GetPropertyStatic.** The
+   recompiler (`abc_emit.cpp`) now emits a block-scoped `static Avm2InlineCache`
+   per getproperty site (25 738 sites in Seedling) and threads its address into
+   a new `avm2_op_getproperty_static_ic` (avm2_ops.h/.c). A repeat call whose
+   receiver has the same vtable identity (+ unchanged `count`) replays the
+   resolved vtable entry, skipping multiname matching. Only plain-object
+   receivers whose PRIMARY vtable find hits are cached; XML (content-varying)
+   and the GC'd `no_index` newactivation/newcatch vtables are EXCLUDED, so a
+   hit is provably identical to the full path (a matching vt determines
+   not-null/not-xmlish/not-vector). Caches the entry INDEX (stable across
+   `entries` realloc), count-guarded. `avm2_vtable_find_mn` 6.5 → 3.7%.
+2. **Lazy class-name in `setproperty_resolved` — the real printf hog.** CDP
+   showed `printf_core`+`__fwritex`+`__vfprintf_internal`+`pad` ≈ 10% of frame,
+   and 98.7% of it was `avm2_class_qname_buf` called from `setproperty_resolved`
+   — NOT number formatting. `cn` (receiver class qname) was `snprintf`'d on
+   EVERY slot write but is only used on the throw branches. Now computed
+   per-throw. This one change: ~54 → 47 ms. The whole printf cluster vanished
+   from the top-15 self-time.
+3. **printf-free integer stringification.** Fast-path exact integers in
+   `avm2_format_number` (skip `shortest_digits`' up-to-18 `snprintf("%.*e")`/
+   `strtod` probes) + a `write_i32_decimal` for the INTEGER `coerce_to_string`
+   arm. Byte-identical (verified natively over millions of values + INT32_MIN).
+   Small on its own (the printf hog was #2), but legitimate and compounds.
+
+**Next levers (in `prof_cn.json`, the post-change profile):**
+- `writeTexture` is now the clear **#1 at ~17.6%** (GPU upload — FlashPunk's
+  full-buffer `copyPixels`→`writeBuffer` each frame). Dirty-rect / partial
+  upload / format tuning is the biggest remaining single slice.
+- `avm2_vtable_find_mn` **4.3%** residual comes from `callproperty`/
+  `findproperty`/`setproperty` (no IC there yet) — extend the inline-cache
+  pattern to those ops.
+- `__memset` **3.3%** — `resolve_mn`'s `memset(out,0,sizeof)` + the fast-path
+  `Resolved r={0}` per get; a leaner Resolved init could shave it.
+- `resolved_get` 6.0% + `getproperty_static_ic` 6.5% are now largely the
+  irreducible property READ (slot load / method bind / getter call).
+Raw profiles: `prof_ic.json`, `prof_printf.json`, `prof_int.json`, `prof_cn.json`
+(all in `C:\playwright\`); render `seedling_final.png`.
+
 ## ★ UPDATE 2026-07-14 — CDP self-time profile: the hot path is PROPERTY LOOKUP, not the blit
 Real-GPU Windows-Chrome CDP sampling profile of our tick (symbolicated build via
 `EMCC_CFLAGS=--profiling-funcs`, driver `seedling_cdp_profile_win.py`, Intel Gen9,
