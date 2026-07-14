@@ -7312,11 +7312,22 @@ void avm2_cpu_dump_frame(Avm2Context* ctx, int frame_index)
 // The render pass reads the SAME depth/render list the tick already built — it
 // never re-runs any timeline/goto logic.
 // ===========================================================================
-#ifdef OFFSCREEN_RENDER
+// Render gate: the OFFSCREEN_RENDER (graphics-native test) sink AND the browser
+// canvas sink (Stage 13a: __EMSCRIPTEN__ && !OFFSCREEN_RENDER, USE_WEBGPU). The
+// tree-walk + world-matrix/alpha compose is shared; only the frame driver
+// differs — OFFSCREEN captures a PNG, browser acquires+presents the swapchain
+// surface (renderer_open_pass/close_pass do that internally). NO_GRAPHICS builds
+// see none of this.
+#if defined(OFFSCREEN_RENDER) || (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))
 
 #include <renderer.h>
-#include <libswf/capture.h>
 #include <libswf/swf.h>
+#ifdef OFFSCREEN_RENDER
+#include <libswf/capture.h>
+#endif
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+#include <emscripten.h>
+#endif
 
 // Owned by swf.c (compiled in every graphics build); we drive the same handle.
 extern RenderContext* context;
@@ -7471,11 +7482,17 @@ void avm2_render_init(Avm2Context* ctx)
 		? (uint32_t) (app->cxform_data_size / (20 * sizeof(float))) : 1;
 
 	renderer_init(app, context);
+#ifdef OFFSCREEN_RENDER
+	// Capture triggers are a graphics-native-test concept (CAPTURE_TRIGGERS env);
+	// capture.c isn't linked in the browser build.
 	parse_capture_triggers();
+#endif
 }
 
+#ifdef OFFSCREEN_RENDER
 // One rendered frame + the per-tick capture scheduling (last_frame /
 // iteration). Called at the tail of each tick, after avm2_display_run_tick.
+// OFFSCREEN (graphics-native test) sink only.
 void avm2_render_frame(Avm2Context* ctx)
 {
 	if (context == NULL || !context->renderer_ok) return;
@@ -7493,5 +7510,22 @@ void avm2_render_finish(Avm2Context* ctx)
 	avm2_render_walk(ctx);
 	capture_save_last_frame();
 }
-
 #endif  // OFFSCREEN_RENDER
+
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+// Stage 13a browser sink: paint one frame onto the real canvas swapchain. The
+// SAME depth-ordered tree walk as OFFSCREEN, but renderer_open_pass acquires the
+// current surface texture and renderer_close_pass presents it (see
+// render_webgpu.c's __EMSCRIPTEN__ && !OFFSCREEN_RENDER surface path) — no PNG
+// readback, no capture bookkeeping. renderer_poll is a no-op event drain in the
+// browser (mouse/key arrive via emscripten callbacks) but is kept for symmetry
+// with swf.c's loop and so a window-close returns nonzero.
+int avm2_render_present(Avm2Context* ctx)
+{
+	if (context == NULL || !context->renderer_ok) return 0;
+	avm2_render_walk(ctx);
+	return renderer_poll(ctx->app);
+}
+#endif
+
+#endif  // render gate

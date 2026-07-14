@@ -479,6 +479,7 @@
             || testId.startsWith('local_batch/')
             || testId.startsWith('glaiel/')
             || testId.startsWith('flasharchive/')
+            || testId.startsWith('avm2/')
             || testId.startsWith('wasm_probes/');
         const baseName = testId.includes('/') ? testId.split('/').pop() : testId;
         const testDir = 'examples/' + testId + '/';

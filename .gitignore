@@ -176,6 +176,7 @@ docs2/examples/glaiel/
 docs2/examples/flasharchive/
 docs2/examples/graphics/
 docs2/examples/wasm_probes/
+docs2/examples/avm2/
 
 # Per-probe generated artifacts (probe sources live at wasm_probes/<slug>/test.xml
 # and wasm_probes/<slug>/config.toml; everything else under each probe dir is

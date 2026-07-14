@@ -1,6 +1,56 @@
 # AVM2 Stage 13 — browser-WASM bring-up (live Seedling demo)
 
-Status: **PLANNED, not started** (scoped 2026-07-13). Goal: a live, interactive
+## STATUS — 13a DONE, 13b DONE, A/B rig deployed (2026-07-13, session 1)
+
+**13a (async browser entry + render-to-surface) LANDED and validated end-to-end
+in a real browser.** Four code changes (all guard-scoped so native AVM1/AVM2 and
+NO_GRAPHICS builds are byte-identical — no CI risk):
+- `wasm_wrappers/main.c`: `runSWF()` dispatches `runSWF_avm2` under `-DSWF_AVM2`.
+- `src/avm2/avm2_display.c`: render block gate widened from `#ifdef
+  OFFSCREEN_RENDER` to also cover browser (`__EMSCRIPTEN__ && !NO_GRAPHICS`); new
+  `avm2_render_present()` = the SHARED tree walk + `renderer_open_pass`/
+  `close_pass` (which acquire+present the real canvas swapchain in browser mode —
+  the sink swap needed no new GPU code). `parse_capture_triggers` guarded
+  OFFSCREEN-only.
+- `src/avm2/avm2_main.c`: browser `while(1)` loop (ASYNCIFY `emscripten_sleep`
+  pacing, GC at tick top) replacing the batch `for` loop under `__EMSCRIPTEN__ &&
+  !OFFSCREEN`; feeds swf.c's `swf_perf_report` (`window.__swfPerf`) so the Windows
+  probe reads the same HUD as the AVM1 demos.
+- `docs2/demo.html`: `avm2/` treated as a graphics test.
+
+**13b (build+deploy) DONE.** `SWFRecomp/scripts/build_wasm_avm2.sh` (emscripten,
+`--use-port=emdawnwebgpu`, `-DSWF_AVM2`, `-sUSE_ZLIB=1`, `-sASYNCIFY`, per-TU
+incremental `.o` cache, giant ABC TUs at `-O1`) → **24 MB `seedling.wasm`** + 88 KB
+`.js` (all 46 TUs compile clean, including the 13 MB `abc0_methods.c`).
+`deploy_wasm_avm2.sh` publishes ours to `docs2/examples/avm2/seedling/` AND a
+side-by-side Ruffle profiling page to `…/seedling_ruffle/` (reuses the existing
+`~/CC/ruffle` profiling web bundle — no 40-min rebuild).
+
+**Validated (WSL headless Chrome, SwiftShader — correctness/liveness only, NOT
+perf):** module instantiates + `main()` runs; `runSWF_avm2` boots (`=== SWF
+Execution Started (AVM2…`); `avm2_render_init` gets a WebGPU device and sizes
+textures correctly; **the browser loop runs and feeds `__swfPerf` (8 frames
+captured)** — the whole 13a path is live. (First smoke hit 0×0 textures only
+because the harness called `runSWF` before `main()` populated `app_context`; the
+real demo's button-click path runs after `main()`, confirmed by a deferred re-run.)
+
+**Known gameplay gap (not a browser-path bug, deferred to 13c/correctness):** the
+unbounded browser loop reaches FlashPunk collision code that calls
+`flash.geom.Rectangle.intersects`, which is unimplemented → a per-frame *caught*
+`Error #1069` (movie keeps running). The native 60-frame CPU-dump (MAD 3.834)
+didn't reach it. Non-fatal to the loop / perf; add `Rectangle.intersects` (+ likely
+`intersection`/`union`) when doing gameplay correctness.
+
+**DELIVERABLE PENDING (the milestone):** the Windows real-GPU perf A/B. Runbook:
+`tools/divergence/perf/WINDOWS_SEEDLING_AB.md` — user opens
+`demo.html?test=avm2/seedling&perfhud=1` (click "Run SWF") and
+`examples/avm2/seedling_ruffle/` in Windows Chrome, reports steady-state frame
+CPU/FPS from both HUDs. **No perf numbers yet** (WSL is SwiftShader — cannot
+measure). Also open: WASM size (24 MB — try `-Oz`/streaming), and whether the
+481²×64 dynamic bitmap-tex array stays within real-browser limits (the WSL
+lavapipe OOM may not reproduce on a real GPU — this run tests it).
+
+Goal (original): a live, interactive
 browser-WASM demo of the recompiled AVM2 Seedling in `docs2/examples/avm2`,
 mirroring the AVM1 browser demos (flasharchive/glaiel). This is the prerequisite
 "missing subsystem" — today there is **no browser-WASM AVM2 path at all**.

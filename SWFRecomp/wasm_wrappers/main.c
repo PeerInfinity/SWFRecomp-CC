@@ -31,7 +31,17 @@ SWFAppContext app_context = {
 EMSCRIPTEN_KEEPALIVE
 void runSWF() {
     printf("Starting SWF execution from JavaScript...\n");
+#ifdef SWF_AVM2
+    // AS3 SWF (RecompiledABC/ present): drive the AVM2 runtime. Stage 13a — the
+    // AVM2 browser entry. runSWF_avm2 picks its browser loop shape (while(1) +
+    // emscripten_sleep, ASYNCIFY) under __EMSCRIPTEN__ && !OFFSCREEN_RENDER.
+    // app_context's graphics fields were populated in main() (the
+    // !defined(NO_GRAPHICS) block runs in the browser build).
+    extern void runSWF_avm2(SWFAppContext* app_context);
+    runSWF_avm2(&app_context);
+#else
     swfStart(&app_context);
+#endif
 }
 
 // Host->AS inward bridge: synchronously invoke an ExternalInterface callback the

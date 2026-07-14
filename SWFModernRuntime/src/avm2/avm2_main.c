@@ -32,6 +32,19 @@
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 
+#if defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#include <emscripten.h>
+#include <libswf/swf.h>   // full SWFAppContext (ctx->app->fps) for the browser loop
+// Reuse swf.c's in-browser perf HUD (published to window.__swfPerf, read by
+// demo.html's HUD + the Windows perf probe). swf.c is linked in every AVM2
+// graphics build (it owns the RenderContext* the render walk drives), so the
+// symbol is available; the AVM2 loop just feeds it AVM2 frame timings. Returns
+// nonzero when the "Uncapped" benchmark toggle is on (skip the pacing sleep).
+extern int swf_perf_report(double elapsed_ms, double budget_ms, double present_ms,
+                           int live_obj, int live_arr);
+extern int avm2_render_present(Avm2Context* ctx);
+#endif
+
 static Avm2Context g_avm2_ctx;
 
 Avm2Context* avm2_get_context(void)
@@ -362,14 +375,13 @@ void runSWF_avm2(SWFAppContext* app_context)
 	// in every build. Declared unconditionally (the tick loop calls it always).
 	extern void avm2_cpu_dump_frame(Avm2Context* ctx, int frame_index);
 
-	// Stage 9: minimal AVM2 render path. In graphics builds (OFFSCREEN_RENDER)
-	// the WebGPU offscreen backend is linked but runSWF_avm2 never drove it;
-	// set it up now (after heap_init + build_stage). NO_GRAPHICS builds skip
-	// this entirely.
-#ifdef OFFSCREEN_RENDER
+	// Stage 9 / Stage 13a: minimal AVM2 render path. In graphics builds the
+	// WebGPU backend is linked but runSWF_avm2 never drove it; set it up now
+	// (after heap_init + build_stage). Two sinks share avm2_render_init: the
+	// OFFSCREEN_RENDER PNG-capture path (native test mode) and the browser
+	// canvas swapchain (Stage 13a). NO_GRAPHICS builds skip this entirely.
+#if defined(OFFSCREEN_RENDER) || (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))
 	extern void avm2_render_init(Avm2Context* ctx);
-	extern void avm2_render_frame(Avm2Context* ctx);
-	extern void avm2_render_finish(Avm2Context* ctx);
 	{
 		Avm2TryFrame top;
 		avm2_try_push_catch_all(ctx, &top);
@@ -379,6 +391,10 @@ void runSWF_avm2(SWFAppContext* app_context)
 		}
 		avm2_try_pop_frame(&top);
 	}
+#endif
+#ifdef OFFSCREEN_RENDER
+	extern void avm2_render_frame(Avm2Context* ctx);
+	extern void avm2_render_finish(Avm2Context* ctx);
 #endif
 
 	// Stage-11 GC soak (AVM2_GC_SOAK=<ticks>): drive synthetic per-frame
@@ -393,6 +409,75 @@ void runSWF_avm2(SWFAppContext* app_context)
 			return;
 		}
 	}
+
+#if defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Stage 13a — browser loop shape. A browser cannot run a blocking batch
+	// loop (it starves the event loop and never paints); instead run an
+	// unbounded while(1) that yields to the event loop each frame via
+	// emscripten_sleep (ASYNCIFY), mirroring swf.c's wall-clock pacing. GC still
+	// runs at the top of each tick (VM quiescent — the Stage-11 invariant is
+	// loop-shape independent). No MAX_FRAMES bound: the demo plays until the tab
+	// closes. Perf timings feed swf.c's __swfPerf HUD (steady-state filtering,
+	// Uncapped toggle) so the Windows real-GPU A/B reads the same global as the
+	// AVM1 demos.
+	{
+		double fps = ctx->app->fps > 0 ? (double) ctx->app->fps : 30.0;
+		double frame_budget_ms = 1000.0 / fps;
+		double next_due_ms = 0.0;   // 0 = not yet anchored (set on the first frame)
+		while (1)
+		{
+			double frame_start = emscripten_get_now();
+
+			// Collect between ticks (VM quiescent). No-op under AVM2_GC=0.
+			avm2_gc_maybe_collect(ctx);
+
+			double present_ms = 0.0;
+			Avm2TryFrame top;
+			avm2_try_push_catch_all(ctx, &top);
+			if (setjmp(top.jb) == 0)
+			{
+				avm2_display_run_tick(ctx);
+				double present_start = emscripten_get_now();
+				int close = avm2_render_present(ctx);
+				present_ms = emscripten_get_now() - present_start;
+				if (close)
+				{
+					avm2_try_pop_frame(&top);
+					break;   // window closed
+				}
+			}
+			avm2_try_pop_frame(&top);
+
+			double now_ms = emscripten_get_now();
+			double elapsed = now_ms - frame_start;
+			int uncapped = swf_perf_report(elapsed, frame_budget_ms, present_ms, 0, 0);
+			if (next_due_ms == 0.0) next_due_ms = frame_start;   // anchor
+			next_due_ms += frame_budget_ms;
+			if (uncapped)
+			{
+				emscripten_sleep(0);
+				next_due_ms = now_ms;   // don't bank credit while uncapped
+			}
+			else
+			{
+				double remain_ms = next_due_ms - now_ms;
+				if (remain_ms > 0.0)
+				{
+					emscripten_sleep((unsigned) (remain_ms + 0.5));
+				}
+				else
+				{
+					emscripten_sleep(0);
+					// >1 frame behind (heavy frame / backgrounded tab): resync
+					// so we don't burst a catch-up storm.
+					if (remain_ms < -frame_budget_ms) next_due_ms = now_ms;
+				}
+			}
+		}
+		fflush(stdout);
+		return;
+	}
+#endif
 
 	// Step 5: tick loop (Ruffle frame_lifecycle.rs phase order), mirroring
 	// swf_core.c's MAX_FRAMES cadence.
