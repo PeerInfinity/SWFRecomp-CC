@@ -1,20 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9e27d9d61bdc` (2026-07-14T00:32:11.725287+00:00)
-**Current:** `b3ec6d48c007` (2026-07-14T02:36:08.468285+00:00)
+**Previous:** `a380ab7ddab4` (2026-07-14T04:22:37.865314+00:00)
+**Current:** `5fa736f1dd07` (2026-07-14T15:53:08.500242+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 828 | 829 | +1 |
-| Total | 1204 | 1204 | 0 |
-| Pass rate | 68.8% | 68.9% | +0.1% |
-| Mismatched lines | 47324 | 47322 | -2 |
-|   Decreased | | | -2 |
+| Passing | 829 | 829 | 0 |
+| Total | 1204 | 1205 | +1 |
+| Pass rate | 68.9% | 68.8% | -0.1% |
+| Mismatched lines | 47322 | 47323 | +1 |
 
-## Newly Passing (1)
+## Added Tests (2)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `symbol_class_binary_data` | output_mismatch | 6/8 | 8/8 |
+| Test | Status | Lines |
+|------|--------|-------|
+| `scopes_dont_cache/order-1` | output_mismatch | 0/1 |
+| `scopes_dont_cache/order-2` | output_mismatch | 0/1 |
+
+## Removed Tests (1)
+
+| Test | Previous Status | Lines |
+|------|----------------|-------|
+| `property_priority_scope_cache_order` | output_mismatch | 0/1 |

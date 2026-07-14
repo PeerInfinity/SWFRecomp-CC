@@ -3,16 +3,16 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `b3ec6d48c007`  
-**Date:** 2026-07-14 02:36 UTC  
-**Total duration:** 4h07m29s
+**Commit:** `5fa736f1dd07`  
+**Date:** 2026-07-14 15:53 UTC  
+**Total duration:** 4h18m29s
 
 ## Results by Suite
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | avm1 | 631 | 661 | 95.5% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
-| avm2 | 734 | 977 | 75.1% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
+| avm2 | 734 | 978 | 75.1% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
 | from_gnash/actionscript.all | 132 | 236 | 55.9% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_filtered.md) |
 | from_gnash/misc-ming.all | 68 | 109 | 62.4% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_filtered.md) |
 | from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_filtered.md) |
@@ -21,7 +21,7 @@
 | from_shumway | 73 | 76 | 96.1% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_filtered.md) |
 | from_shumway/avm1 | 44 | 44 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_filtered.md) |
 | regression | 42 | 42 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results_filtered.md) |
-| **Total** | **1761** | **2192** | **80.3%** | |
+| **Total** | **1761** | **2193** | **80.3%** | |
 
 *302 tests ignored.*
 
@@ -30,7 +30,7 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 104,035 | 107,545 | 96.7% |
-| avm2 | 94,656 | 125,365 | 75.5% |
+| avm2 | 94,656 | 125,366 | 75.5% |
 | from_gnash/actionscript.all | 29,253 | 31,358 | 93.3% |
 | from_gnash/misc-ming.all | 4,029 | 5,188 | 77.7% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -39,14 +39,14 @@
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
 | regression | 262 | 262 | 100% |
-| **Total** | **234,064** | **271,716** | **86.1%** |
+| **Total** | **234,064** | **271,717** | **86.1%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch | ruffle_matched | runtime_error |
 |-------|-----------------:|----------------:|---------------:|
 | avm1 | 18 | 12 | - |
-| avm2 | 238 | 1 | 4 |
+| avm2 | 239 | 1 | 4 |
 | from_gnash/actionscript.all | 9 | 95 | - |
 | from_gnash/misc-ming.all | 13 | 28 | - |
 | from_gnash/misc-mtasc.all | - | 2 | - |
@@ -55,7 +55,7 @@
 | from_shumway | - | 3 | - |
 | from_shumway/avm1 | - | - | - |
 | regression | - | - | - |
-| **Total** | **280** | **147** | **4** |
+| **Total** | **281** | **147** | **4** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -126,11 +126,11 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm2
 
-- **Pass:** 734/977 (75.1%)
+- **Pass:** 734/978 (75.1%)
 - **Ignored:** 227 tests
-- **Duration:** 2h02m09s across 30 shards
-- **Lines:** 94,656/125,365 matching (75.5%)
-- **Avg test duration:** 5.3s — slowest: `bitmapdata_accuracy` (38.4s)
+- **Duration:** 2h13m09s across 30 shards
+- **Lines:** 94,656/125,366 matching (75.5%)
+- **Avg test duration:** 5.9s — slowest: `bitmapdata_accuracy` (45.7s)
 
 ### from_gnash/actionscript.all
 
