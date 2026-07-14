@@ -4,6 +4,7 @@
 // (avm2_globals.c and friends) register through the same vtable mechanism.
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <avm2/avm2_class.h>
@@ -216,9 +217,106 @@ void avm2_vtable_append(Avm2Context* ctx, Avm2VTable* vt, const Avm2PropEntry* e
 	vt->entries[vt->count++] = *e;
 }
 
+// ---------------------------------------------------------------------------
+// VTable name-hash accelerator
+//
+// Each find matches on a full predicate (avm2_propkey_matches / avm2_mn_match)
+// that ALWAYS requires the entry's local name to equal the query name. So a
+// name-keyed hash lets us visit only entries whose name matches, shrinking the
+// O(count) linear scan to O(bucket) (~1). The bucket chain is built by walking
+// entries HIGH->LOW and prepending, so iteration yields ASCENDING entry index
+// — identical to a forward linear scan, preserving "first match wins" order
+// (matters for multiname ns-set lookups where several namespaces could hold
+// the name). The index is a pure derived cache: it stores entry indices only
+// (GC-invisible), and the same match predicate still runs on each candidate,
+// so behavior is byte-identical to the linear scan.
+// ---------------------------------------------------------------------------
+
+#define VT_INDEX_MIN 8u  // below this, a linear scan is already cheap
+
+typedef struct VtIndexNode
+{
+	uint32_t hash;
+	uint32_t entry;
+	int32_t next;
+} VtIndexNode;
+
+typedef struct Avm2VTableIndex
+{
+	uint32_t mask;      // nbuckets - 1 (power of two)
+	int32_t* buckets;   // [mask+1]; -1 = empty, else head node index
+	VtIndexNode* nodes; // [count]
+} Avm2VTableIndex;
+
+static uint32_t vt_name_hash(const char* s, uint32_t n)
+{
+	uint32_t h = 2166136261u;  // FNV-1a
+	for (uint32_t i = 0; i < n; i++)
+	{
+		h ^= (uint8_t) s[i];
+		h *= 16777619u;
+	}
+	return h;
+}
+
+static void vt_index_build(Avm2VTable* vt)
+{
+	Avm2VTableIndex* ix = (Avm2VTableIndex*) vt->name_index;
+	if (ix != NULL)
+	{
+		free(ix->buckets);
+		free(ix->nodes);
+		free(ix);
+	}
+	uint32_t nb = 8;
+	while (nb < vt->count * 2) nb <<= 1;
+	ix = (Avm2VTableIndex*) malloc(sizeof(Avm2VTableIndex));
+	ix->mask = nb - 1;
+	ix->buckets = (int32_t*) malloc(nb * sizeof(int32_t));
+	ix->nodes = (VtIndexNode*) malloc((vt->count ? vt->count : 1) * sizeof(VtIndexNode));
+	for (uint32_t b = 0; b < nb; b++) ix->buckets[b] = -1;
+	// Walk high->low so equal-name entries chain in ascending index order.
+	for (uint32_t i = vt->count; i-- > 0; )
+	{
+		const Avm2PropKey* k = &vt->entries[i].key;
+		uint32_t h = vt_name_hash(k->name, k->name_len);
+		uint32_t b = h & ix->mask;
+		ix->nodes[i].hash = h;
+		ix->nodes[i].entry = i;
+		ix->nodes[i].next = ix->buckets[b];
+		ix->buckets[b] = (int32_t) i;
+	}
+	vt->name_index = ix;
+	vt->indexed_count = vt->count;
+}
+
+// Get the (lazily (re)built) index, or NULL if this vtable should stay linear.
+static const Avm2VTableIndex* vt_index_get(const Avm2VTable* vt)
+{
+	if (vt->no_index || vt->count < VT_INDEX_MIN) return NULL;
+	Avm2VTable* mvt = (Avm2VTable*) vt;  // mutable cache on a const object
+	if (mvt->name_index == NULL || mvt->indexed_count != mvt->count)
+	{
+		vt_index_build(mvt);
+	}
+	return (const Avm2VTableIndex*) mvt->name_index;
+}
+
 const Avm2PropEntry* avm2_vtable_find(const Avm2VTable* vt, const Avm2PropKey* key)
 {
 	if (vt == NULL) return NULL;
+	const Avm2VTableIndex* ix = vt_index_get(vt);
+	if (ix != NULL)
+	{
+		uint32_t h = vt_name_hash(key->name, key->name_len);
+		for (int32_t n = ix->buckets[h & ix->mask]; n >= 0; n = ix->nodes[n].next)
+		{
+			if (ix->nodes[n].hash != h) continue;
+			const Avm2PropEntry* e = &vt->entries[ix->nodes[n].entry];
+			if (avm2_propkey_matches(&e->key, key)) return e;
+		}
+		return NULL;
+	}
 	for (uint32_t i = 0; i < vt->count; i++)
 	{
 		if (avm2_propkey_matches(&vt->entries[i].key, key))
@@ -233,6 +331,21 @@ const Avm2PropEntry* avm2_vtable_find_mn(const Avm2VTable* vt, const Avm2AbcFile
                                          uint32_t mn_idx)
 {
 	if (vt == NULL) return NULL;
+	const Avm2VTableIndex* ix = vt_index_get(vt);
+	if (ix != NULL)
+	{
+		const char* name;
+		uint32_t name_len;
+		avm2_mn_name(data, mn_idx, &name, &name_len);
+		uint32_t h = vt_name_hash(name, name_len);
+		for (int32_t n = ix->buckets[h & ix->mask]; n >= 0; n = ix->nodes[n].next)
+		{
+			if (ix->nodes[n].hash != h) continue;
+			const Avm2PropEntry* e = &vt->entries[ix->nodes[n].entry];
+			if (avm2_mn_match(data, mn_idx, &e->key)) return e;
+		}
+		return NULL;
+	}
 	for (uint32_t i = 0; i < vt->count; i++)
 	{
 		if (avm2_mn_match(data, mn_idx, &vt->entries[i].key))
@@ -247,6 +360,23 @@ const Avm2PropEntry* avm2_vtable_find_public(const Avm2VTable* vt,
                                              const char* name, uint32_t name_len)
 {
 	if (vt == NULL) return NULL;
+	const Avm2VTableIndex* ix = vt_index_get(vt);
+	if (ix != NULL)
+	{
+		uint32_t h = vt_name_hash(name, name_len);
+		for (int32_t n = ix->buckets[h & ix->mask]; n >= 0; n = ix->nodes[n].next)
+		{
+			if (ix->nodes[n].hash != h) continue;
+			const Avm2PropEntry* e = &vt->entries[ix->nodes[n].entry];
+			if (e->key.name_len == name_len
+			    && memcmp(e->key.name, name, name_len) == 0
+			    && avm2_propkey_is_public(&e->key))
+			{
+				return e;
+			}
+		}
+		return NULL;
+	}
 	for (uint32_t i = 0; i < vt->count; i++)
 	{
 		const Avm2PropEntry* e = &vt->entries[i];

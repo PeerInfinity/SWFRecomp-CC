@@ -73,6 +73,17 @@ struct Avm2VTable
 	uint32_t slot_count;  // slots consumed by SLOT-kind entries (1-based ids; index 0 unused)
 	Avm2SlotMeta* metas;  // [meta_cap]; index = slot id
 	uint32_t meta_cap;
+	// --- name-keyed lookup accelerator (avm2_class.c, opaque) ---
+	// Lazily built on the first find once `count` is stable, so the O(count)
+	// linear scans of avm2_vtable_find[_mn/_public] become O(1)+small-bucket
+	// (the AVM2 property-lookup hot path — ~60% of Seedling frame self-time).
+	// Holds only entry indices (no GC pointers): malloc'd, invisible to the
+	// GC, rebuilt when `indexed_count != count`, freed on rebuild. `no_index`
+	// opts a vtable out (set on the per-call newactivation/newcatch vtables,
+	// which are GC'd and would otherwise leak their index).
+	void* name_index;        // Avm2VTableIndex* (NULL until first index)
+	uint32_t indexed_count;  // `count` at the last index build
+	uint8_t no_index;        // 1 = never index (short-lived per-call vtable)
 };
 
 // Native construct/call hooks for builtins (String/Number/Array/... whose

@@ -2159,6 +2159,7 @@ Avm2Value avm2_op_newactivation(Avm2Activation* act, uint32_t method_index)
 	const Avm2AbcMethodData* m = &act->file->data->methods[method_index];
 	Avm2VTable* vt = avm2_alloc(ctx, sizeof(Avm2VTable));
 	memset(vt, 0, sizeof(Avm2VTable));
+	vt->no_index = 1;  // per-call activation vtable is GC'd; don't leak an index
 	avm2_vtable_add_traits(ctx, vt, act->file, m->body_traits, m->body_trait_count,
 	                       act->bound_class, act->outer);
 	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, vt->slot_count + 1);
@@ -2183,6 +2184,7 @@ Avm2Value avm2_op_newcatch(Avm2Activation* act, uint32_t method_index, uint32_t 
 	{
 		Avm2VTable* vt = avm2_alloc(ctx, sizeof(Avm2VTable));
 		memset(vt, 0, sizeof(Avm2VTable));
+		vt->no_index = 1;  // per-call catch vtable is GC'd; don't leak an index
 		Avm2PropEntry pe;
 		memset(&pe, 0, sizeof(pe));
 		if (!avm2_propkey_from_qname(act->file->data, e->variable_mn, &pe.key))

@@ -1,5 +1,64 @@
 # Seedling perf A/B — status (2026-07-13, Stage 13a session 1)
 
+## ★ UPDATE 2026-07-14 — CDP self-time profile: the hot path is PROPERTY LOOKUP, not the blit
+Real-GPU Windows-Chrome CDP sampling profile of our tick (symbolicated build via
+`EMCC_CFLAGS=--profiling-funcs`, driver `seedling_cdp_profile_win.py`, Intel Gen9,
+35 619 samples @ 200µs). **This overturns the expected suspect.** The FlashPunk
+`Image.render`→`copyPixels`/`bd_draw` blit is CHEAP (`bd_copy_pixels` 0.9%,
+`writeTexture` 4.7%). The frame is dominated by the **AVM2 property-lookup /
+method-resolution machinery**:
+
+```
+  31.9%  avm2_vtable_find_mn      ← linear O(count) scan of the receiver vtable
+  19.7%  avm2_propkey_matches     ← per-entry name+ns memcmp (called from the scan)
+   8.5%  avm2_domain_find         ← linear scan of the global domain (findproperty)
+   4.7%  writeTexture (GPU upload — not AVM)
+   2.6%  avm2_op_getproperty_static
+   2.2%  printf_core  (+ __vfprintf_internal/__fwritex/out/pad ≈ 4% — number→string fmt)
+   2.2%  resolved_get / 1.6% resolve_mn / 1.3% avm2_class_for_mn / 1.2% findproperty ...
+  MODULE: 93.5% seedling.wasm, 6.3% native/idle, 0.2% js
+```
+The property-lookup cluster (vtable_find_mn + propkey_matches + domain_find +
+class_for_mn + resolve_mn + findproperty + getproperty_common + value_vtable + …)
+is **~60–70% of all self-time**. Root cause: `avm2_vtable_find*` (avm2_class.c)
+does a **linear scan with per-entry string compares** on every getproperty/
+callproperty/findproperty — no hash, no inline cache. Ruffle's vtable is a
+HashMap (O(1)); that alone plausibly explains most of the ~6x gap. This is the
+AVM2 analog of the AVM1 `findOrCreateMovieClip`/property-name cluster.
+Raw profile: `seedling_profile_2026-07-14.json`. Driver+method:
+`WINDOWS_PLAYWRIGHT_FROM_WSL.md`.
+
+**Fix #1 LANDED + VERIFIED (this session):** lazy name-keyed hash index on
+`Avm2VTable` (avm2_class.c) → `avm2_vtable_find`/`find_mn`/`find_public` become
+O(1)+small-bucket, byte-identical match semantics preserved (same predicate on
+candidates, ascending-index order). Per-call newactivation/newcatch vtables opt
+out (`no_index`) so their GC'd index can't leak. **Measured real-GPU A/B (same
+rig, Intel Gen9):**
+```
+                    BEFORE            AFTER (vtable hash)     Δ
+  frame CPU mean    ~280 ms           154.1 ms               -45% (1.8x faster)
+  fps               ~3.6              6.5
+  avm+submit        ~264 ms           137.8 ms
+  present (GPU)     ~17 ms            16.4 ms  (unchanged)
+  avm2_vtable_find_mn  31.9%          5.3%     ← the target, collapsed
+  gap vs Ruffle (46ms) ~6.0x          ~3.3x
+```
+Render VERIFIED byte-identical (OverWorld house/grass/water/path/trees/player;
+scratchpad `seedling_after.png`). Profiles: `seedling_profile_2026-07-14.json`
+(before), `..._after_vtablehash.json` (after).
+
+**Next levers (in the after-profile, now the top of the frame):**
+1. `avm2_domain_find` **14.9%** (was 8.5%; now #1) — a linear scan of
+   `ctx->domain` calling `avm2_propkey_matches` per entry, on every
+   `findproperty`/`findpropstrict`. Hash it by name the same way (globals.c) →
+   should collapse it + much of the remaining `avm2_propkey_matches` **13.5%**.
+2. ~4% `printf_core`/`__vfprintf_internal` — number→string formatting; find the
+   per-frame caller (likely coordinate/hash-key stringification) and fast-path
+   integer/simple cases to skip printf.
+3. Then re-profile: the residual is `resolved_get`/`resolve_mn`/`getproperty`
+   dispatch — candidates for a per-call-site inline cache.
+
+
 **Goal (project headline milestone):** same-machine, real-GPU frame-time/FPS
 comparison of Seedling in **our WASM** vs **Ruffle-WASM**, both on the teleport
 SWF (boots straight to OverWorld1). See `swfrecomp-purpose-beat-ruffle-perf`.
