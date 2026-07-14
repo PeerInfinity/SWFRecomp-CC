@@ -29,7 +29,9 @@
 
 #include <cinttypes>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
+#include <map>
 #include <set>
 #include <sstream>
 #include <sys/stat.h>
@@ -917,8 +919,320 @@ namespace abc
 		out << "}" << endl << endl;
 	}
 
+	// =====================================================================
+	// READ-ONLY SCOUT (Step 1, compile-time type-specialization gate).
+	// Env-gated: set SWF_SCOUT_TYPES=<csv path>. Runs a lightweight forward
+	// abstract-interpretation over each verified method body, tracking a
+	// STATIC type per operand-stack slot / local, and at every static
+	// property op (GetPropertyStatic / SetPropertyStatic / CallProperty /
+	// CallPropVoid) classifies the receiver: is its static type a known user
+	// class, is that class sealed (non-dynamic), and does the accessed name
+	// resolve to a SLOT/CONST trait (the direct-slot lever) vs a
+	// getter/setter/method/dynamic. Emits one CSV row per site occurrence.
+	// Does NOT change emission — purely diagnostic.
+	// =====================================================================
+	namespace {
+		enum AVKind { AV_UNK = 0, AV_INST = 1, AV_CLS = 2, AV_SCOPE = 3 };
+		struct AV { u8 k = AV_UNK; int c = -1; u32 mn = 0; };
+
+		static void scoutStaticTypes(const AbcFile& abc,
+		                             const std::vector<EmitBody>& bodies,
+		                             const char* path)
+		{
+			const auto& S = abc.pool.strings;
+			const auto& MN = abc.pool.multinames;
+			auto mnLocalName = [&](u32 mi) -> string {
+				if (mi == 0 || mi >= MN.size()) return "";
+				u32 s = MN[mi].name;
+				return (s < S.size()) ? S[s] : "";
+			};
+			// user-class-name -> instance index (first wins)
+			std::map<string, int> nameToInst;
+			for (size_t i = 0; i < abc.instances.size(); i++)
+			{
+				string nm = mnLocalName(abc.instances[i].name);
+				if (!nm.empty() && nameToInst.find(nm) == nameToInst.end())
+					nameToInst[nm] = (int) i;
+			}
+			auto typeMnToInst = [&](u32 mi) -> int {
+				if (mi == 0) return -1;             // "*" / any
+				auto it = nameToInst.find(mnLocalName(mi));
+				return it == nameToInst.end() ? -1 : it->second;
+			};
+			// method index -> defining class + whether `this` is an instance
+			struct MInfo { int cls = -1; bool inst = true; };
+			std::map<u32, MInfo> m2c;
+			for (size_t i = 0; i < abc.instances.size(); i++)
+			{
+				const AbcInstance& in = abc.instances[i];
+				m2c[in.init_method] = { (int) i, true };
+				for (const AbcTrait& t : in.traits)
+					if (t.kind == TraitKindType::Method || t.kind == TraitKindType::Getter
+					    || t.kind == TraitKindType::Setter)
+						m2c[t.method_or_class] = { (int) i, true };
+				if (i < abc.classes.size())
+				{
+					m2c[abc.classes[i].init_method] = { (int) i, false };
+					for (const AbcTrait& t : abc.classes[i].traits)
+						if (t.kind == TraitKindType::Method || t.kind == TraitKindType::Getter
+						    || t.kind == TraitKindType::Setter)
+							m2c[t.method_or_class] = { (int) i, false };
+				}
+			}
+			// walk instance + superclass chain for a trait by local name
+			struct TR { bool found = false; TraitKindType kind = TraitKindType::Slot; u32 typeMn = 0; bool isFinal = false; };
+			auto findTrait = [&](int inst, const string& name) -> TR {
+				int cur = inst, guard = 0;
+				while (cur >= 0 && cur < (int) abc.instances.size() && guard++ < 64)
+				{
+					for (const AbcTrait& t : abc.instances[cur].traits)
+						if (mnLocalName(t.name) == name)
+							return { true, t.kind, t.type_name, t.is_final };
+					cur = typeMnToInst(abc.instances[cur].super_name);
+				}
+				return {};
+			};
+			auto isSealed = [&](int inst) -> bool {
+				return inst >= 0 && inst < (int) abc.instances.size()
+				    && abc.instances[inst].is_sealed && !abc.instances[inst].is_interface;
+			};
+
+			FILE* f = fopen(path, "w");
+			if (!f) { fprintf(stderr, "scout: cannot open %s\n", path); return; }
+			fprintf(f, "method,op,category,recv_class,prop\n");
+
+			for (const EmitBody& body : bodies)
+			{
+				if (!body.verified) continue;
+				u32 method_index = body.ir.method_index;
+				u32 bi = body.ir.body_index;
+				if (bi >= abc.method_bodies.size()) continue;
+				u32 num_locals = abc.method_bodies[bi].num_locals;
+				if (num_locals < 1) num_locals = 1;
+
+				std::vector<AV> locals(num_locals);
+				MInfo mi = m2c.count(method_index) ? m2c[method_index] : MInfo{ -1, true };
+				if (mi.cls >= 0) locals[0] = { (u8)(mi.inst ? AV_INST : AV_CLS), mi.cls, 0 };
+				const AbcMethod& meth = abc.methods[method_index];
+				for (size_t k = 0; k < meth.params.size() && (k + 1) < num_locals; k++)
+				{
+					int pc = typeMnToInst(meth.params[k].type);
+					if (pc >= 0) locals[k + 1] = { AV_INST, pc, 0 };
+				}
+
+				std::vector<AV> st;
+				auto push = [&](AV v) { st.push_back(v); };
+				auto pop = [&]() -> AV { if (st.empty()) return AV{}; AV v = st.back(); st.pop_back(); return v; };
+
+				auto classify = [&](const char* opn, const AV& recv, u32 mnIdx, bool isCall) {
+					string name = mnLocalName(mnIdx);
+					string cls = (recv.k == AV_INST && recv.c >= 0) ? mnLocalName(abc.instances[recv.c].name) : "";
+					const char* cat;
+					if (recv.k == AV_INST && recv.c >= 0)
+					{
+						TR tr = findTrait(recv.c, name);
+						bool sealed = isSealed(recv.c);
+						if (!tr.found) cat = "not_found";
+						else if (isCall)
+						{
+							if (tr.kind == TraitKindType::Method)
+								cat = sealed ? (tr.isFinal || abc.instances[recv.c].is_final
+								                ? "call_method_mono" : "call_method_virtual")
+								             : "call_method_dynclass";
+							else if (tr.kind == TraitKindType::Getter || tr.kind == TraitKindType::Setter)
+								cat = "call_accessor";
+							else cat = "call_slot_closure";
+						}
+						else
+						{
+							if (tr.kind == TraitKindType::Slot || tr.kind == TraitKindType::Const)
+								cat = sealed ? "slot_sealed" : "slot_dynclass";   // slot_sealed = ELIGIBLE
+							else if (tr.kind == TraitKindType::Getter || tr.kind == TraitKindType::Setter)
+								cat = "accessor";
+							else if (tr.kind == TraitKindType::Method)
+								cat = "method_as_prop";
+							else cat = "other";
+						}
+					}
+					else if (recv.k == AV_CLS) cat = "recv_classobj";
+					else if (recv.k == AV_SCOPE) cat = "recv_scope";
+					else cat = "recv_unknown";
+					fprintf(f, "%u,%s,%s,%s,%s\n", method_index, opn, cat,
+					        cls.c_str(), name.c_str());
+				};
+
+				for (const IrOp& op : body.ir.ops)
+				{
+					u32 pops = 0, pushes = 0; s32 sd = 0;
+					// replicate the verifier's stack effect for depth alignment
+					u32 lazy = 0;
+					switch (op.op) {
+						case IrOpcode::CallProperty: case IrOpcode::CallPropLex:
+						case IrOpcode::CallPropVoid: case IrOpcode::CallSuper:
+						case IrOpcode::ConstructProp: case IrOpcode::GetPropertyStatic:
+						case IrOpcode::GetPropertyFast: case IrOpcode::GetPropertySlow:
+						case IrOpcode::SetPropertyStatic: case IrOpcode::SetPropertyFast:
+						case IrOpcode::SetPropertySlow: case IrOpcode::InitProperty:
+						case IrOpcode::DeleteProperty: case IrOpcode::GetSuper:
+						case IrOpcode::SetSuper: case IrOpcode::GetDescendants:
+						case IrOpcode::FindProperty: case IrOpcode::FindPropStrict:
+						case IrOpcode::FindDef: {
+							if (op.arg1 < MN.size()) {
+								const AbcMultiname& m = MN[op.arg1];
+								lazy = (m.hasLazyName() ? 1u : 0u) + (m.hasLazyNs() ? 1u : 0u);
+							}
+							break;
+						}
+						default: break;
+					}
+
+					// ops we model for TYPE tracking (and their exact stack effect)
+					switch (op.op)
+					{
+						case IrOpcode::GetLocal:
+							push(op.arg1 < locals.size() ? locals[op.arg1] : AV{});
+							continue;
+						case IrOpcode::SetLocal: {
+							AV v = pop();
+							if (op.arg1 < locals.size()) locals[op.arg1] = v;
+							continue;
+						}
+						case IrOpcode::Dup: {
+							AV v = st.empty() ? AV{} : st.back(); push(v); continue;
+						}
+						case IrOpcode::Coerce: {
+							pop(); int c = typeMnToInst(op.arg1);
+							push(c >= 0 ? AV{ AV_INST, c, 0 } : AV{}); continue;
+						}
+						case IrOpcode::FindPropStrict: case IrOpcode::FindProperty: {
+							for (u32 i = 0; i < lazy; i++) pop();
+							push(AV{ AV_SCOPE, -1, op.arg1 }); continue;
+						}
+						case IrOpcode::GetPropertyStatic: {
+							AV recv = pop();
+							classify("get", recv, op.arg1, false);
+							// result type
+							AV res{};
+							if (recv.k == AV_SCOPE) {
+								int c = typeMnToInst(op.arg1);
+								if (c >= 0) res = AV{ AV_CLS, c, 0 };
+							} else if (recv.k == AV_INST && recv.c >= 0) {
+								TR tr = findTrait(recv.c, mnLocalName(op.arg1));
+								if (tr.found && (tr.kind == TraitKindType::Slot
+								    || tr.kind == TraitKindType::Const
+								    || tr.kind == TraitKindType::Getter)) {
+									int c = typeMnToInst(tr.typeMn);
+									if (c >= 0) res = AV{ AV_INST, c, 0 };
+								}
+							}
+							push(res); continue;
+						}
+						case IrOpcode::SetPropertyStatic: {
+							AV val = pop(); (void) val; AV recv = pop();
+							classify("set", recv, op.arg1, false);
+							continue;
+						}
+						case IrOpcode::CallProperty: case IrOpcode::CallPropVoid: {
+							for (u32 i = 0; i < op.arg2 + lazy; i++) pop();
+							AV recv = pop();
+							classify("call", recv, op.arg1, true);
+							if (op.op == IrOpcode::CallProperty) {
+								AV res{};
+								if (recv.k == AV_INST && recv.c >= 0) {
+									TR tr = findTrait(recv.c, mnLocalName(op.arg1));
+									if (tr.found && tr.kind == TraitKindType::Method) {
+										int c = typeMnToInst(abc.methods[tr.typeMn].return_type);
+										// tr.typeMn is not a method idx; skip return typing
+										(void) c;
+									}
+								}
+								push(res);
+							}
+							continue;
+						}
+						case IrOpcode::ConstructProp: {
+							for (u32 i = 0; i < op.arg2 + lazy; i++) pop();
+							pop(); // ctor receiver/scope
+							int c = typeMnToInst(op.arg1);
+							push(c >= 0 ? AV{ AV_INST, c, 0 } : AV{});
+							continue;
+						}
+						default: break;
+					}
+
+					// generic depth-preserving effect for everything else
+					switch (op.op) {
+						case IrOpcode::Add: case IrOpcode::AddI: case IrOpcode::Subtract:
+						case IrOpcode::SubtractI: case IrOpcode::Multiply: case IrOpcode::MultiplyI:
+						case IrOpcode::Divide: case IrOpcode::Modulo: case IrOpcode::LShift:
+						case IrOpcode::RShift: case IrOpcode::URShift: case IrOpcode::BitAnd:
+						case IrOpcode::BitOr: case IrOpcode::BitXor: case IrOpcode::Equals:
+						case IrOpcode::StrictEquals: case IrOpcode::LessThan: case IrOpcode::LessEquals:
+						case IrOpcode::GreaterThan: case IrOpcode::GreaterEquals: case IrOpcode::In:
+						case IrOpcode::InstanceOf: case IrOpcode::IsTypeLate: case IrOpcode::AsTypeLate:
+						case IrOpcode::HasNext: case IrOpcode::NextName: case IrOpcode::NextValue:
+							pops = 2; pushes = 1; break;
+						case IrOpcode::Negate: case IrOpcode::NegateI: case IrOpcode::BitNot:
+						case IrOpcode::Not: case IrOpcode::Increment: case IrOpcode::IncrementI:
+						case IrOpcode::Decrement: case IrOpcode::DecrementI: case IrOpcode::TypeOf:
+						case IrOpcode::ConvertO: case IrOpcode::ConvertS: case IrOpcode::CoerceA:
+						case IrOpcode::CoerceB: case IrOpcode::CoerceD: case IrOpcode::CoerceI:
+						case IrOpcode::CoerceO: case IrOpcode::CoerceS: case IrOpcode::CoerceU:
+						case IrOpcode::AsType: case IrOpcode::IsType: case IrOpcode::CheckFilter:
+						case IrOpcode::EscXAttr: case IrOpcode::EscXElem: case IrOpcode::Li8:
+						case IrOpcode::Li16: case IrOpcode::Li32: case IrOpcode::Lf32:
+						case IrOpcode::Lf64: case IrOpcode::Sxi1: case IrOpcode::Sxi8:
+						case IrOpcode::Sxi16: case IrOpcode::NewClass:
+							pops = 1; pushes = 1; break;
+						case IrOpcode::PushInt: case IrOpcode::PushUint: case IrOpcode::PushDouble:
+						case IrOpcode::PushString: case IrOpcode::PushNamespace: case IrOpcode::PushNaN:
+						case IrOpcode::PushNull: case IrOpcode::PushUndefined: case IrOpcode::PushTrue:
+						case IrOpcode::PushFalse: case IrOpcode::GetScopeObject:
+						case IrOpcode::GetOuterScope: case IrOpcode::GetGlobalScope:
+						case IrOpcode::GetGlobalSlot: case IrOpcode::NewFunction:
+						case IrOpcode::NewCatch: case IrOpcode::NewActivation: case IrOpcode::HasNext2:
+							pushes = 1; break;
+						case IrOpcode::Swap: pops = 2; pushes = 2; break;
+						case IrOpcode::Pop: case IrOpcode::SetGlobalSlot: case IrOpcode::DxnsLate:
+						case IrOpcode::IfTrue: case IrOpcode::IfFalse: case IrOpcode::LookupSwitch:
+						case IrOpcode::ReturnValue: case IrOpcode::Throw:
+							pops = 1; break;
+						case IrOpcode::PushScope: case IrOpcode::PushWith: pops = 1; break;
+						case IrOpcode::GetSlot: pops = 1; pushes = 1; break;
+						case IrOpcode::SetSlot: pops = 2; break;
+						case IrOpcode::GetPropertyFast: case IrOpcode::GetPropertySlow:
+						case IrOpcode::GetSuper: case IrOpcode::DeleteProperty:
+						case IrOpcode::GetDescendants:
+							pops = 1 + lazy; pushes = 1; break;
+						case IrOpcode::SetPropertyFast: case IrOpcode::SetPropertySlow:
+						case IrOpcode::InitProperty: case IrOpcode::SetSuper:
+							pops = 2 + lazy; break;
+						case IrOpcode::FindDef: pushes = 1; break;
+						case IrOpcode::Call: pops = op.arg2 + 2; pushes = 1; break;
+						case IrOpcode::CallStatic: pops = op.arg2 + 1; pushes = 1; break;
+						case IrOpcode::CallPropLex: case IrOpcode::CallSuper:
+							pops = op.arg2 + 1 + lazy; pushes = 1; break;
+						case IrOpcode::Construct: pops = op.arg2 + 1; pushes = 1; break;
+						case IrOpcode::ConstructSuper: pops = op.arg2 + 1; break;
+						case IrOpcode::NewObject: pops = op.arg2 * 2; pushes = 1; break;
+						case IrOpcode::NewArray: pops = op.arg2; pushes = 1; break;
+						case IrOpcode::ApplyType: pops = op.arg2 + 1; pushes = 1; break;
+						case IrOpcode::Si8: case IrOpcode::Si16: case IrOpcode::Si32:
+						case IrOpcode::Sf32: case IrOpcode::Sf64: pops = 2; break;
+						default: break;
+					}
+					for (u32 i = 0; i < pops; i++) pop();
+					for (u32 i = 0; i < pushes; i++) push(AV{});
+				}
+			}
+			fclose(f);
+			fprintf(stderr, "scout: wrote %s\n", path);
+		}
+	}  // namespace
+
 	void AbcEmitter::emitAbcTag(const AbcFile& abc, const std::vector<EmitBody>& bodies)
 	{
+		if (const char* sp = getenv("SWF_SCOUT_TYPES")) scoutStaticTypes(abc, bodies, sp);
 		ensureDir();
 		int tag = next_tag_index_++;
 		string p = "abc" + to_string(tag);
