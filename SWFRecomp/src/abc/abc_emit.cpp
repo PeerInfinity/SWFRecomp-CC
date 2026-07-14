@@ -357,8 +357,11 @@ namespace abc
 				    << "); sp++;" << endl;
 				return true;
 			case IrOpcode::SetPropertyStatic:
-				out << "\tsp -= 2; avm2_op_setproperty_static(act, stk[sp], " << op.arg1
-				    << ", stk[sp + 1]);" << endl;
+				// Per-call-site monomorphic inline cache (avm2_ops.h), same as
+				// GetPropertyStatic: a block-scoped static gives each site a slot.
+				out << "\t{ static Avm2InlineCache __ic; sp -= 2; "
+				       "avm2_op_setproperty_static_ic(act, stk[sp], " << op.arg1
+				    << ", stk[sp + 1], &__ic); }" << endl;
 				return true;
 			case IrOpcode::SetPropertyFast:
 			case IrOpcode::SetPropertySlow:
@@ -473,11 +476,13 @@ namespace abc
 				}
 				else
 				{
-					out << "\tsp -= " << (op.arg2 + 1) << "; "
-					    << (is_void ? "" : "stk[sp] = ")
-					    << "avm2_op_callproperty(act, stk[sp], " << op.arg1
-					    << ", &stk[sp + 1], " << op.arg2 << ");"
-					    << (is_void ? "" : " sp++;") << endl;
+					// Per-call-site monomorphic inline cache (avm2_ops.h), same
+					// as GetPropertyStatic: block-scoped static per site.
+					out << "\t{ static Avm2InlineCache __ic; sp -= " << (op.arg2 + 1)
+					    << "; " << (is_void ? "" : "stk[sp] = ")
+					    << "avm2_op_callproperty_ic(act, stk[sp], " << op.arg1
+					    << ", &stk[sp + 1], " << op.arg2 << ", &__ic);"
+					    << (is_void ? "" : " sp++;") << " }" << endl;
 				}
 				return true;
 			}

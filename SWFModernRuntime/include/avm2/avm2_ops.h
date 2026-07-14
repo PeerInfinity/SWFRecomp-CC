@@ -73,6 +73,12 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
                                   Avm2Value name, int interp);
 void avm2_op_setproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 Avm2Value value);
+// Inline-cached SetPropertyStatic: identical semantics, threads a per-call-site
+// cache. Same monomorphic-vtable design as getproperty (only plain-object
+// receivers whose primary vtable find hits are cached — the resolved slot/setter
+// entry is stable, so a matching vt replays it byte-identically).
+void avm2_op_setproperty_static_ic(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                   Avm2Value value, Avm2InlineCache* ic);
 void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                              Avm2Value name, Avm2Value value, int interp);
 void avm2_op_initproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value val);
@@ -116,6 +122,13 @@ void avm2_op_setslot(Avm2Activation* act, Avm2Value obj, uint32_t index0, Avm2Va
 // Calls. `opts` bit 1 = lex (receiver is null for the callee).
 Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                const Avm2Value* args, uint32_t argc);
+// Inline-cached CallProperty/CallPropVoid (static multiname): identical
+// semantics, threads a per-call-site cache. A repeat call whose receiver has the
+// same vtable identity replays the resolved method/property entry, skipping the
+// multiname match. Only plain-object receivers whose primary vtable find hit are
+// cached (xmlish + no_index excluded), so a matching vt is byte-identical.
+Avm2Value avm2_op_callproperty_ic(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                  const Avm2Value* args, uint32_t argc, Avm2InlineCache* ic);
 Avm2Value avm2_op_callproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                    Avm2Value name, const Avm2Value* args, uint32_t argc);
 Avm2Value avm2_op_callproplex(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,

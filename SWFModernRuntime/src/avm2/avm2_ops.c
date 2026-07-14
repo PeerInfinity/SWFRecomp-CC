@@ -781,7 +781,7 @@ static void setproperty_miss(Avm2Context* ctx, Avm2Value recv,
 }
 
 static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
-                             Avm2Value value, int allow_const)
+                             Avm2Value value, int allow_const, Avm2InlineCache* ic)
 {
 	const char* name;
 	uint32_t name_len;
@@ -801,6 +801,27 @@ static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	                               NULL, value))
 	{
 		return;
+	}
+	// Populate the per-call-site inline cache (SetPropertyStatic only, via the
+	// _ic entry point; ic == NULL for initproperty/allow_const). Same invariants
+	// as getproperty: plain-object receiver whose PRIMARY vtable find hits, XML
+	// and no_index vtables excluded. A static setproperty name is never numeric,
+	// so the vector name-access fast path above is a no-op for it and the
+	// reached-here resolve goes through the vtable → a matching entry replays
+	// byte-identically.
+	if (ic != NULL && recv.kind == AVM2_VALUE_OBJECT && !avm2_value_is_xmlish(recv))
+	{
+		const Avm2VTable* vt = avm2_value_vtable(act->ctx, recv);
+		if (vt != NULL && !vt->no_index)
+		{
+			const Avm2PropEntry* e = avm2_vtable_find_mn(vt, act->file->data, mn_idx);
+			if (e != NULL)
+			{
+				ic->vt = vt;
+				ic->vt_count = vt->count;
+				ic->entry_index = (uint32_t) (e - vt->entries);
+			}
+		}
 	}
 	Resolved r;
 	if (resolve_mn(act, recv, mn_idx, &r))
@@ -825,12 +846,36 @@ static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 void avm2_op_setproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 Avm2Value value)
 {
-	setproperty_impl(act, recv, mn_idx, value, 0);
+	setproperty_impl(act, recv, mn_idx, value, 0, NULL);
+}
+
+void avm2_op_setproperty_static_ic(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                   Avm2Value value, Avm2InlineCache* ic)
+{
+	// Fast path: cached receiver vtable (unchanged count) → replay the resolved
+	// slot/setter entry directly. A matching vt is a non-null, non-xmlish object
+	// whose primary find hits this entry, so this is byte-identical to the full
+	// setproperty path (allow_const == 0, as for the non-cached static op).
+	if (recv.kind == AVM2_VALUE_OBJECT)
+	{
+		const Avm2VTable* vt = avm2_value_vtable(act->ctx, recv);
+		if (vt != NULL && ic->vt == vt && ic->vt_count == vt->count)
+		{
+			Resolved r = {0};
+			r.entry = &vt->entries[ic->entry_index];
+			const char* name;
+			uint32_t name_len;
+			avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+			setproperty_resolved(act->ctx, recv, &r, name, name_len, value, 0);
+			return;
+		}
+	}
+	setproperty_impl(act, recv, mn_idx, value, 0, ic);
 }
 
 void avm2_op_initproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value val)
 {
-	setproperty_impl(act, recv, mn_idx, val, 1);
+	setproperty_impl(act, recv, mn_idx, val, 1, NULL);
 }
 
 static void setproperty_qname(Avm2Activation* act, Avm2Value recv,
@@ -1842,8 +1887,9 @@ static Avm2Value callproperty_common(Avm2Context* ctx, Avm2Value recv,
 	                 "Error #1006: %.*s is not a function.", (int) name_len, name);
 }
 
-Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
-                               const Avm2Value* args, uint32_t argc)
+static Avm2Value callproperty_static_impl(Avm2Activation* act, Avm2Value recv,
+                                          uint32_t mn_idx, const Avm2Value* args,
+                                          uint32_t argc, Avm2InlineCache* ic)
 {
 	const char* name;
 	uint32_t name_len;
@@ -1852,6 +1898,27 @@ Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_
 	{
 		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
 	}
+	// Populate the per-call-site inline cache: a plain-object receiver whose
+	// PRIMARY vtable find hits. Same invariants as getproperty_static_impl —
+	// XML excluded (its property/method set varies with content) and the GC'd
+	// no_index newactivation/newcatch vtables excluded (a freed-then-reused
+	// address could false-hit a stale entry). A static callproperty resolves
+	// purely through resolve_mn (no numeric-index fast path), so a matching
+	// vtable entry is exactly what resolve_mn would return → byte-identical.
+	if (ic != NULL && recv.kind == AVM2_VALUE_OBJECT && !avm2_value_is_xmlish(recv))
+	{
+		const Avm2VTable* vt = avm2_value_vtable(act->ctx, recv);
+		if (vt != NULL && !vt->no_index)
+		{
+			const Avm2PropEntry* e = avm2_vtable_find_mn(vt, act->file->data, mn_idx);
+			if (e != NULL)
+			{
+				ic->vt = vt;
+				ic->vt_count = vt->count;
+				ic->entry_index = (uint32_t) (e - vt->entries);
+			}
+		}
+	}
 	Resolved r;
 	int ok = resolve_mn(act, recv, mn_idx, &r);
 	if (!ok && avm2_value_is_xmlish(recv))
@@ -1859,6 +1926,36 @@ Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_
 		return avm2_xml_call_fallback(act->ctx, recv, name, name_len, args, argc);
 	}
 	return callproperty_common(act->ctx, recv, name, name_len, ok, &r, args, argc, recv);
+}
+
+Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                               const Avm2Value* args, uint32_t argc)
+{
+	return callproperty_static_impl(act, recv, mn_idx, args, argc, NULL);
+}
+
+Avm2Value avm2_op_callproperty_ic(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                  const Avm2Value* args, uint32_t argc, Avm2InlineCache* ic)
+{
+	// Fast path: same receiver vtable (and unchanged entry count) as the cached
+	// resolve → replay the resolved entry, skipping the multiname match. A
+	// matching vt guarantees a non-null, non-xmlish object whose primary find
+	// hits this same entry, so this is byte-identical to the full path.
+	if (recv.kind == AVM2_VALUE_OBJECT)
+	{
+		const Avm2VTable* vt = avm2_value_vtable(act->ctx, recv);
+		if (vt != NULL && ic->vt == vt && ic->vt_count == vt->count)
+		{
+			Resolved r = {0};
+			r.entry = &vt->entries[ic->entry_index];
+			const char* name;
+			uint32_t name_len;
+			avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+			return callproperty_common(act->ctx, recv, name, name_len, 1, &r,
+			                           args, argc, recv);
+		}
+	}
+	return callproperty_static_impl(act, recv, mn_idx, args, argc, ic);
 }
 
 static Avm2Value callproperty_qname(Avm2Activation* act, Avm2Value recv,
