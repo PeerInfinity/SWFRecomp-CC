@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-14T21:36:26.984153+00:00",
-    "git_sha": "ab236e611bc50ba39367cffd465b70edca449161",
-    "duration_seconds": 108.18,
+    "timestamp": "2026-07-14T22:08:35.862375+00:00",
+    "git_sha": "a3767a79a9ee27d4ae55cbcd34222feca2a97a46",
+    "duration_seconds": 113.63,
     "total_available": 47,
     "shards": 30,
     "expected_shards": 30
@@ -20,7 +20,7 @@
       "test": "array",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.103,
+        "compile": 0.654,
         "run": 0.004
       },
       "num_frames": 1,
@@ -29,14 +29,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 0.11,
+      "duration": 0.66,
       "status": "pass"
     },
     {
       "test": "bitmapdata/getPixel",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.102,
+        "compile": 0.64,
         "run": 0.004
       },
       "num_frames": 1,
@@ -45,14 +45,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 0.11,
+      "duration": 0.65,
       "status": "pass"
     },
     {
       "test": "bitmapdata/loadBitmap",
       "phases": {
         "recomp": 0.004,
-        "compile": 0.131,
+        "compile": 0.67,
         "run": 0.002
       },
       "num_frames": 1,
@@ -61,15 +61,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 0.14,
+      "duration": 0.68,
       "status": "pass"
     },
     {
       "test": "callee",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.89,
-        "run": 0.004
+        "compile": 0.897,
+        "run": 0.002
       },
       "num_frames": 1,
       "lines": {
@@ -84,7 +84,7 @@
       "test": "depth",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.879,
+        "compile": 1.206,
         "run": 0.064
       },
       "num_frames": 1,
@@ -93,14 +93,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 0.95,
+      "duration": 1.27,
       "status": "pass"
     },
     {
       "test": "doactionorder/doactionorder",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.079,
+        "compile": 1.483,
         "run": 0.004
       },
       "num_frames": 1,
@@ -109,14 +109,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.08,
+      "duration": 1.49,
       "status": "pass"
     },
     {
       "test": "doactionorder/symbolclass",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.308,
+        "compile": 1.366,
         "run": 0.004
       },
       "num_frames": 1,
@@ -125,14 +125,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.32,
+      "duration": 1.38,
       "status": "pass"
     },
     {
       "test": "duplicateMovieClip/dontremove",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.652,
+        "compile": 21.131,
         "run": 0.008
       },
       "num_frames": 4,
@@ -141,15 +141,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 19.66,
+      "duration": 21.14,
       "status": "pass"
     },
     {
       "test": "duplicateMovieClip/duplicateMovieClip",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.205,
-        "run": 0.004
+        "recomp": 0.003,
+        "compile": 0.76,
+        "run": 0.002
       },
       "num_frames": 1,
       "lines": {
@@ -157,15 +157,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.22,
+      "duration": 0.77,
       "status": "pass"
     },
     {
       "test": "duplicateMovieClip/name-coercion",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.065,
-        "run": 0.004
+        "recomp": 0.003,
+        "compile": 0.66,
+        "run": 0.002
       },
       "num_frames": 1,
       "lines": {
@@ -173,14 +173,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.08,
+      "duration": 0.67,
       "status": "pass"
     },
     {
       "test": "duplicateMovieClip/samedepth",
       "phases": {
-        "recomp": 0.01,
-        "compile": 1.296,
+        "recomp": 0.004,
+        "compile": 0.985,
         "run": 0.004
       },
       "num_frames": 3,
@@ -189,14 +189,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.31,
+      "duration": 1.0,
       "status": "pass"
     },
     {
       "test": "externalinterface",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.139,
+        "compile": 0.889,
         "run": 0.004
       },
       "num_frames": 1,
@@ -205,14 +205,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.15,
+      "duration": 0.9,
       "status": "pass"
     },
     {
       "test": "filters",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.2,
+        "compile": 1.493,
         "run": 0.004
       },
       "num_frames": 1,
@@ -221,14 +221,14 @@
         "expected_lines": 149,
         "matching_lines": 149
       },
-      "duration": 1.21,
+      "duration": 1.5,
       "status": "pass"
     },
     {
       "test": "haxe/flocons1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.912,
+        "compile": 1.136,
         "run": 0.004
       },
       "num_frames": 1,
@@ -237,14 +237,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 0.92,
+      "duration": 1.14,
       "status": "pass"
     },
     {
       "test": "haxe/flocons2",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.135,
+        "recomp": 0.003,
+        "compile": 0.897,
         "run": 0.004
       },
       "num_frames": 1,
@@ -253,14 +253,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.15,
+      "duration": 0.91,
       "status": "pass"
     },
     {
       "test": "hitarea",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.297,
+        "compile": 1.114,
         "run": 0.004
       },
       "num_frames": 7,
@@ -269,7 +269,7 @@
         "expected_lines": 4,
         "matching_lines": 2
       },
-      "duration": 1.3,
+      "duration": 1.12,
       "ruffle_diff_count": 2,
       "ours_diff_count": 2,
       "status": "ruffle_matched",
@@ -279,7 +279,7 @@
       "test": "label",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.931,
+        "compile": 18.815,
         "run": 0.002
       },
       "num_frames": 7,
@@ -288,14 +288,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 19.94,
+      "duration": 18.82,
       "status": "pass"
     },
     {
       "test": "levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.164,
+        "compile": 1.148,
         "run": 0.004
       },
       "num_frames": 2,
@@ -304,15 +304,15 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 1.17,
+      "duration": 1.16,
       "status": "pass"
     },
     {
       "test": "loadevent",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.829,
-        "run": 0.002
+        "compile": 1.464,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -320,15 +320,15 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 0.83,
+      "duration": 1.47,
       "status": "pass"
     },
     {
       "test": "loadvariables/loadvariables",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.747,
-        "run": 0.002
+        "compile": 1.236,
+        "run": 0.004
       },
       "num_frames": 2,
       "lines": {
@@ -336,14 +336,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 0.75,
+      "duration": 1.24,
       "status": "pass"
     },
     {
       "test": "loadvariables/loadvars",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.934,
+        "recomp": 0.005,
+        "compile": 1.149,
         "run": 0.004
       },
       "num_frames": 2,
@@ -352,14 +352,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 0.94,
+      "duration": 1.16,
       "status": "pass"
     },
     {
       "test": "lookup",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.016,
+        "compile": 1.29,
         "run": 0.004
       },
       "num_frames": 10,
@@ -368,14 +368,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.02,
+      "duration": 1.3,
       "status": "pass"
     },
     {
       "test": "mouse-transparency",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.273,
+        "compile": 1.33,
         "run": 0.002
       },
       "num_frames": 3,
@@ -384,14 +384,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.28,
+      "duration": 1.34,
       "status": "pass"
     },
     {
       "test": "moviecliploader",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.316,
+        "compile": 1.386,
         "run": 0.004
       },
       "num_frames": 3,
@@ -400,14 +400,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.32,
+      "duration": 1.39,
       "status": "pass"
     },
     {
       "test": "nativeinheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.219,
+        "compile": 1.158,
         "run": 0.004
       },
       "num_frames": 1,
@@ -416,14 +416,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.23,
+      "duration": 1.17,
       "status": "pass"
     },
     {
       "test": "nested-button",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.246,
+        "compile": 1.163,
         "run": 0.002
       },
       "num_frames": 4,
@@ -432,14 +432,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.25,
+      "duration": 1.17,
       "status": "pass"
     },
     {
       "test": "operations",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.172,
+        "compile": 1.19,
         "run": 0.002
       },
       "num_frames": 1,
@@ -448,14 +448,14 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 1.18,
+      "duration": 1.2,
       "status": "pass"
     },
     {
       "test": "property-paths/property-paths-6",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.114,
+        "compile": 1.132,
         "run": 0.004
       },
       "num_frames": 1,
@@ -464,14 +464,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.12,
+      "duration": 1.14,
       "status": "pass"
     },
     {
       "test": "property-paths/property-paths-7",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.14,
+        "compile": 1.128,
         "run": 0.004
       },
       "num_frames": 1,
@@ -480,14 +480,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.15,
+      "duration": 1.14,
       "status": "pass"
     },
     {
       "test": "propertycase/propertycase",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.111,
+        "compile": 1.115,
         "run": 0.004
       },
       "num_frames": 1,
@@ -502,8 +502,8 @@
     {
       "test": "propertycase/propertycase-preserving-6",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.011,
+        "recomp": 0.005,
+        "compile": 1.092,
         "run": 0.002
       },
       "num_frames": 1,
@@ -512,14 +512,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.02,
+      "duration": 1.1,
       "status": "pass"
     },
     {
       "test": "propertycase/propertycase-preserving-7",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.795,
+        "recomp": 0.005,
+        "compile": 0.8,
         "run": 0.004
       },
       "num_frames": 1,
@@ -535,7 +535,7 @@
       "test": "rollover",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.219,
+        "compile": 1.491,
         "run": 0.002
       },
       "num_frames": 6,
@@ -544,14 +544,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.22,
+      "duration": 1.5,
       "status": "pass"
     },
     {
       "test": "scope",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.124,
+        "compile": 1.372,
         "run": 0.004
       },
       "num_frames": 1,
@@ -560,14 +560,14 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 1.13,
+      "duration": 1.38,
       "status": "pass"
     },
     {
       "test": "setinterval",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.228,
+        "compile": 1.136,
         "run": 0.002
       },
       "num_frames": 50,
@@ -576,14 +576,14 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 1.23,
+      "duration": 1.14,
       "status": "pass"
     },
     {
       "test": "settimeout",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.185,
+        "compile": 1.205,
         "run": 0.004
       },
       "num_frames": 50,
@@ -592,15 +592,15 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 1.19,
+      "duration": 1.21,
       "status": "pass"
     },
     {
       "test": "super",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.055,
-        "run": 0.002
+        "compile": 1.2,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -608,14 +608,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 1.06,
+      "duration": 1.21,
       "status": "pass"
     },
     {
       "test": "target",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.192,
+        "compile": 1.17,
         "run": 0.004
       },
       "num_frames": 1,
@@ -624,14 +624,14 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 1.2,
+      "duration": 1.18,
       "status": "pass"
     },
     {
       "test": "text-bind",
       "phases": {
-        "recomp": 0.02,
-        "compile": 19.83,
+        "recomp": 0.023,
+        "compile": 22.163,
         "run": 0.004
       },
       "num_frames": 6,
@@ -640,14 +640,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.86,
+      "duration": 22.2,
       "status": "pass"
     },
     {
       "test": "textfield/textfield-html",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.386,
+        "compile": 1.11,
         "run": 0.004
       },
       "num_frames": 1,
@@ -656,14 +656,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.39,
+      "duration": 1.12,
       "status": "pass"
     },
     {
       "test": "textfield/textfield-text-setters",
       "phases": {
-        "recomp": 0.017,
-        "compile": 0.851,
+        "recomp": 0.021,
+        "compile": 1.178,
         "run": 0.004
       },
       "num_frames": 1,
@@ -672,14 +672,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 0.88,
+      "duration": 1.21,
       "status": "pass"
     },
     {
       "test": "undefined/undefined-swf6",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.195,
+        "compile": 1.161,
         "run": 0.002
       },
       "num_frames": 1,
@@ -688,14 +688,14 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 1.2,
+      "duration": 1.17,
       "status": "pass"
     },
     {
       "test": "undefined/undefined-swf7",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.19,
+        "recomp": 0.004,
+        "compile": 1.09,
         "run": 0.002
       },
       "num_frames": 1,
@@ -704,14 +704,14 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 1.2,
+      "duration": 1.1,
       "status": "pass"
     },
     {
       "test": "watch",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.106,
+        "compile": 1.126,
         "run": 0.002
       },
       "num_frames": 1,
@@ -720,15 +720,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.11,
+      "duration": 1.13,
       "status": "pass"
     },
     {
       "test": "xml/xmlbuild",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.112,
-        "run": 0.004
+        "compile": 0.67,
+        "run": 0.002
       },
       "num_frames": 1,
       "lines": {
@@ -736,14 +736,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.12,
+      "duration": 0.67,
       "status": "pass"
     },
     {
       "test": "xml/xmlload",
       "phases": {
-        "recomp": 0.022,
-        "compile": 0.923,
+        "recomp": 0.021,
+        "compile": 0.891,
         "run": 0.004
       },
       "num_frames": 1,
@@ -752,15 +752,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 0.95,
+      "duration": 0.92,
       "status": "pass"
     },
     {
       "test": "xml/xmlstring",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.082,
-        "run": 0.002
+        "recomp": 0.004,
+        "compile": 0.93,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -768,7 +768,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 1.09,
+      "duration": 0.94,
       "status": "pass"
     }
   ]
