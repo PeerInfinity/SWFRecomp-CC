@@ -327,8 +327,11 @@ namespace abc
 
 			// --- properties ---
 			case IrOpcode::GetPropertyStatic:
-				out << "\tstk[sp - 1] = avm2_op_getproperty_static(act, stk[sp - 1], "
-				    << op.arg1 << ");" << endl;
+				// Per-call-site monomorphic inline cache: a block-scoped static
+				// gives each getproperty its own cache slot (avm2_ops.h).
+				out << "\t{ static Avm2InlineCache __ic; stk[sp - 1] = "
+				       "avm2_op_getproperty_static_ic(act, stk[sp - 1], "
+				    << op.arg1 << ", &__ic); }" << endl;
 				return true;
 			case IrOpcode::GetPropertyFast:
 			case IrOpcode::GetPropertySlow:

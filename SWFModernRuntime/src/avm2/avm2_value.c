@@ -454,6 +454,24 @@ int avm2_format_number(char* buf, int buf_size, double d)
 	}
 	if (isinf(d)) return snprintf(buf, buf_size, "Infinity");
 
+	// Fast path: exact positive integers below 1e15 render as a plain decimal
+	// (floor(log10(d)) < 15 < MAX_DIGITS, so the plain branch would apply), but
+	// skip shortest_digits' up-to-18 snprintf("%.*e")/strtod round-trip probes —
+	// number formatting is ~10% of Seedling's frame self-time and dominated by
+	// integer coordinates/counters. Integers < 1e15 are exact in f64 (< 2^53),
+	// and this is byte-identical to format_plain (verified over 0..2e6 + edges).
+	if (d < 1e15 && d == floor(d))
+	{
+		uint64_t u = (uint64_t) d;
+		char tmp[20];
+		int n = 0;
+		do { tmp[n++] = (char) ('0' + (u % 10)); u /= 10; } while (u != 0);
+		int w = 0;
+		while (n > 0 && w < buf_size - 1) buf[w++] = tmp[--n];
+		buf[w] = '\0';
+		return w;
+	}
+
 	const double MIN_DIGITS = -6.0;
 	const double MAX_DIGITS = 21.0;
 	const double MAX_PRECISION = 15.0;
@@ -591,6 +609,23 @@ int32_t avm2_coerce_to_i32(Avm2Context* ctx, Avm2Value v)
 	}
 }
 
+// Signed 32-bit int -> decimal, no printf. Byte-identical to snprintf("%d"),
+// including INT32_MIN (magnitude taken in uint32 to avoid -INT32_MIN UB).
+// Integer stringification (counters, coordinates, String(int), concat) is a
+// hot path; snprintf's printf_core dominated ~10% of Seedling's frame.
+static int write_i32_decimal(char* buf, int32_t v)
+{
+	uint32_t mag = (v < 0) ? (uint32_t) -(int64_t) v : (uint32_t) v;
+	char tmp[10];
+	int n = 0;
+	do { tmp[n++] = (char) ('0' + (mag % 10)); mag /= 10; } while (mag != 0);
+	int w = 0;
+	if (v < 0) buf[w++] = '-';
+	while (n > 0) buf[w++] = tmp[--n];
+	buf[w] = '\0';
+	return w;
+}
+
 const Avm2String* avm2_coerce_to_string(Avm2Context* ctx, Avm2Value v)
 {
 	char buf[420];
@@ -603,7 +638,7 @@ const Avm2String* avm2_coerce_to_string(Avm2Context* ctx, Avm2Value v)
 		case AVM2_VALUE_BOOL:
 			return avm2_string_from_literal(ctx, v.u.b ? "true" : "false");
 		case AVM2_VALUE_INTEGER:
-			snprintf(buf, sizeof(buf), "%d", v.u.i);
+			write_i32_decimal(buf, v.u.i);
 			return avm2_string_from_literal(ctx, buf);
 		case AVM2_VALUE_NUMBER:
 			avm2_format_number(buf, sizeof(buf), v.u.d);

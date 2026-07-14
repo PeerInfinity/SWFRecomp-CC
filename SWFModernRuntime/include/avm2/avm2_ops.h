@@ -45,8 +45,27 @@ Avm2Object* avm2_op_getglobalscope(Avm2Activation* act, const Avm2ScopeEntry* ls
                                    uint32_t scope_n);
 Avm2Object* avm2_op_getouterscope(Avm2Activation* act, uint32_t index);
 
+// Per-call-site monomorphic inline cache for GetPropertyStatic. The generated
+// C declares one (block-scoped `static`) per getproperty call site and threads
+// its address in; a repeat call whose receiver has the same vtable identity
+// (and unchanged entry count) replays the resolved vtable entry directly,
+// skipping multiname matching. Zero-initialized (vt == NULL) = empty; only
+// plain-object receivers whose PRIMARY vtable find hit are ever cached, and a
+// matching vt is byte-identical to the full resolve path (the vtable pointer
+// alone determines not-null/not-xmlish/not-vector). See avm2_class.c's vtable
+// name index for the miss-path accelerator this sits on top of.
+typedef struct Avm2InlineCache
+{
+	const Avm2VTable* vt;    // receiver vtable this entry was resolved against
+	uint32_t vt_count;       // vt->count at resolve time (guards realloc/growth)
+	uint32_t entry_index;    // index into vt->entries (stable across realloc)
+} Avm2InlineCache;
+
 // Property access. *_dyn variants take the lazy runtime name.
 Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx);
+// Inline-cached variant: identical semantics, threads a per-call-site cache.
+Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
+                                        uint32_t mn_idx, Avm2InlineCache* ic);
 // `interp`: body is a class/script initializer — avmplus's interpreter
 // takes the index fast path regardless of the ns set
 // (class_init_interpreter_mode / array_access_interpreter).

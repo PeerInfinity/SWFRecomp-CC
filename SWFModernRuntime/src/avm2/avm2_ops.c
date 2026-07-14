@@ -493,7 +493,8 @@ static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
 	                 (int) name_len, name, cn);
 }
 
-Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
+static Avm2Value getproperty_static_impl(Avm2Activation* act, Avm2Value recv,
+                                         uint32_t mn_idx, Avm2InlineCache* ic)
 {
 	const char* name;
 	uint32_t name_len;
@@ -502,7 +503,8 @@ Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32
 	{
 		avm2_throw_null_or_undefined(act->ctx, recv, name, name_len);
 	}
-	if (avm2_value_is_xmlish(recv))
+	int xmlish = avm2_value_is_xmlish(recv);
+	if (xmlish)
 	{
 		Avm2Value out;
 		if (avm2_xml_get_mn(act->ctx, recv, act->file->data, mn_idx, &out))
@@ -520,10 +522,62 @@ Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32
 			return out;
 		}
 	}
+	// Populate the per-call-site inline cache for the common monomorphic case:
+	// a plain-object receiver whose PRIMARY vtable find hits. XML is excluded —
+	// its property set varies with content, so a vtable entry can't stand in.
+	// (The vector fast path above already returned for any name it handles, and
+	// static multinames never carry numeric-index names, so a reached-here
+	// vector always resolves through its vtable — safe to cache.)
+	if (ic != NULL && recv.kind == AVM2_VALUE_OBJECT && !xmlish)
+	{
+		const Avm2VTable* vt = avm2_value_vtable(act->ctx, recv);
+		// Never cache the per-call newactivation/newcatch vtables (no_index):
+		// they are GC'd, so a freed-then-reused address could false-hit a stale
+		// entry. Long-lived class ivtables are never freed → safe to cache.
+		if (vt != NULL && !vt->no_index)
+		{
+			const Avm2PropEntry* e = avm2_vtable_find_mn(vt, act->file->data, mn_idx);
+			if (e != NULL)
+			{
+				ic->vt = vt;
+				ic->vt_count = vt->count;
+				ic->entry_index = (uint32_t) (e - vt->entries);
+			}
+		}
+	}
 	Resolved r;
 	int ok = resolve_mn(act, recv, mn_idx, &r);
 	return getproperty_common(act, recv, name, name_len, ok, &r,
 	                          avm2_mn_has_public_ns(act->file->data, mn_idx));
+}
+
+Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
+{
+	return getproperty_static_impl(act, recv, mn_idx, NULL);
+}
+
+Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
+                                        uint32_t mn_idx, Avm2InlineCache* ic)
+{
+	// Fast path: same receiver vtable (and unchanged entry count) as the cached
+	// resolve → replay the resolved entry, skipping the multiname match. A
+	// matching vt guarantees the receiver is a non-null, non-xmlish object whose
+	// primary find hits this same entry, so this is byte-identical to the full
+	// path. `ic->vt != NULL` is implied by `ic->vt == vt` with vt != NULL.
+	if (recv.kind == AVM2_VALUE_OBJECT)
+	{
+		const Avm2VTable* vt = avm2_value_vtable(act->ctx, recv);
+		if (vt != NULL && ic->vt == vt && ic->vt_count == vt->count)
+		{
+			Resolved r = {0};
+			r.entry = &vt->entries[ic->entry_index];
+			const char* name;
+			uint32_t name_len;
+			avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+			return resolved_get(act->ctx, recv, &r, name, name_len);
+		}
+	}
+	return getproperty_static_impl(act, recv, mn_idx, ic);
 }
 
 static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
@@ -665,15 +719,18 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 		avm2_object_set_dynamic(ctx, recv.u.obj, name, name_len, value);
 		return;
 	}
+	// `cn` (the receiver's class qname) is only needed on the throw branches;
+	// building it eagerly ran an snprintf on EVERY slot write (~6% of Seedling's
+	// frame self-time via avm2_class_qname_buf). Compute it lazily per throw.
 	const Avm2PropEntry* e = r->entry;
 	char cn[160];
-	class_name_of(ctx, recv, cn, sizeof(cn));
 	switch (e->kind)
 	{
 		case AVM2_PROP_SLOT:
 		{
 			if (e->is_const && !allow_const)
 			{
+				class_name_of(ctx, recv, cn, sizeof(cn));
 				avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 				                 "Error #1074: Illegal write to read-only property "
 				                 "%.*s on %s.", (int) name_len, name, cn);
@@ -695,11 +752,13 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 			                     e->method_scope, recv, &value, 1);
 			return;
 		case AVM2_PROP_GETTER:
+			class_name_of(ctx, recv, cn, sizeof(cn));
 			avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 			                 "Error #1074: Illegal write to read-only property "
 			                 "%.*s on %s.", (int) name_len, name, cn);
 		case AVM2_PROP_METHOD:
 		default:
+			class_name_of(ctx, recv, cn, sizeof(cn));
 			avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 			                 "Error #1037: Cannot assign to a method %.*s on %s.",
 			                 (int) name_len, name, cn);
