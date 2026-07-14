@@ -50,19 +50,25 @@
 static unsigned long g_perf_wb_calls = 0;
 static unsigned long g_perf_wb_bytes = 0;
 static unsigned long g_perf_draw_calls = 0;
+static unsigned long g_perf_wt_calls = 0;
+static unsigned long g_perf_wt_bytes = 0;
 // Count + forward to the real API. The parenthesised callee name is NOT a
 // macro invocation (not followed by '('), so this does not recurse.
 #define wgpuQueueWriteBuffer(q, b, o, d, s) \
 	do { g_perf_wb_calls++; g_perf_wb_bytes += (unsigned long)(s); \
 	     (wgpuQueueWriteBuffer)(q, b, o, d, s); } while (0)
+#define wgpuQueueWriteTexture(q, d, data, sz, l, e) \
+	do { g_perf_wt_calls++; g_perf_wt_bytes += (unsigned long)(sz); \
+	     (wgpuQueueWriteTexture)(q, d, data, sz, l, e); } while (0)
 #define wgpuRenderPassEncoderDraw(p, vc, ic, fv, fi) \
 	do { g_perf_draw_calls++; (wgpuRenderPassEncoderDraw)(p, vc, ic, fv, fi); } while (0)
 
-EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, double submit_ms), {
+EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, double submit_ms, double wt_calls, double wt_bytes), {
 	var R = globalThis.__swfRender;
-	if (!R) R = globalThis.__swfRender = { wb: [], bytes: [], draws: [], submit: [], cap: 240, i: 0 };
+	if (!R) R = globalThis.__swfRender = { wb: [], bytes: [], draws: [], submit: [], wt: [], wtbytes: [], cap: 240, i: 0 };
 	var push = function(k, v) { if (R[k].length < R.cap) R[k].push(v); else R[k][R.i] = v; };
 	push('wb', wb_calls); push('bytes', wb_bytes); push('draws', draws); push('submit', submit_ms);
+	push('wt', wt_calls); push('wtbytes', wt_bytes);
 	if (R.wb.length >= R.cap) R.i = (R.i + 1) % R.cap;
 });
 #endif
@@ -2188,19 +2194,32 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 	ctx->dynamic_bitmap_used++;
 
 	// Upload ARGB pixels as RGBA to the bitmap texture layer.
-	// Texture upload uses src dims; layer is padded to (bw, bh).
+	//
+	// The padded layer is (bw, bh) — sized for the LARGEST bitmap in the shared
+	// static+dynamic texture array, which for embedded-asset SWFs (e.g. Seedling's
+	// 4480x640 atlas) dwarfs this dynamic source. But this quad's inverse matrix
+	// maps the on-stage quad EXACTLY onto bitmap coords [0, src] (see sx/sy below),
+	// and the sampler is Nearest + ClampToEdge, so the shader only ever addresses
+	// texels [0, src] of the layer. So upload just the (src+1)x(src+1) sub-region
+	// at the layer origin — the +1 edge-clamp row/col covers the boundary texel —
+	// and leave the rest of the padded layer untouched (never sampled).
+	// bitmap_sizes stays the PADDED {bw, bh} so the shader's UV normalization is
+	// unchanged → byte-identical output, but the per-frame upload shrinks from
+	// bw*bh to (src+1)^2 (Seedling: 11.5 MB -> ~104 KB per frame).
 	{
 		u32 bw = (u32)(ctx->bitmap_highest_w + 1);
 		u32 bh = (u32)(ctx->bitmap_highest_h + 1);
-		size_t slice_bytes = bw * bh * 4;
-		u8* temp = (u8*)calloc(1, slice_bytes);
+		u32 up_w = (src_w + 1 <= bw) ? src_w + 1 : bw;
+		u32 up_h = (src_h + 1 <= bh) ? src_h + 1 : bh;
+		size_t up_bytes = (size_t)up_w * up_h * 4;
+		u8* temp = (u8*)calloc(1, up_bytes);
 
 		// Convert premultiplied ARGB to premultiplied RGBA with edge clamping.
 		// Keep premultiplied — renderer uses premultiplied alpha blend mode.
 		u32* dst = (u32*)temp;
-		for (u32 y = 0; y <= src_h; y++) {
+		for (u32 y = 0; y < up_h; y++) {
 			u32 sy = (y < src_h) ? y : src_h - 1;
-			for (u32 x = 0; x <= src_w; x++) {
+			for (u32 x = 0; x < up_w; x++) {
 				u32 sx_px = (x < src_w) ? x : src_w - 1;
 				u32 argb = argb_pixels[sy * src_w + sx_px];
 				// ARGB u32: A=bits31-24, R=bits23-16, G=bits15-8, B=bits7-0
@@ -2209,7 +2228,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 				u32 g = (argb >> 8) & 0xFF;
 				u32 b = argb & 0xFF;
 				// RGBA bytes on little-endian: R=byte0, G=byte1, B=byte2, A=byte3
-				dst[y * bw + x] = r | (g << 8) | (b << 16) | (a << 24);
+				dst[y * up_w + x] = r | (g << 8) | (b << 16) | (a << 24);
 			}
 		}
 
@@ -2217,10 +2236,10 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 		dest.texture = ctx->bitmap_tex;
 		dest.origin = (WGPUOrigin3D){0, 0, bmp_layer};
 		WGPUTexelCopyBufferLayout layout = {0};
-		layout.bytesPerRow = bw * 4;
-		layout.rowsPerImage = bh;
-		WGPUExtent3D extent = {bw, bh, 1};
-		wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
+		layout.bytesPerRow = up_w * 4;
+		layout.rowsPerImage = up_h;
+		WGPUExtent3D extent = {up_w, up_h, 1};
+		wgpuQueueWriteTexture(ctx->queue, &dest, temp, up_bytes, &layout, &extent);
 
 		// Upload bitmap_sizes for this layer — must match texture layer padded dimensions
 		// so the shader's UV mapping (inv_pos / padded) correctly addresses the data.
@@ -2596,8 +2615,10 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	// Publish this frame's render workload (writeBuffer calls/bytes, draw calls,
 	// queue-submit time) and reset the per-frame counters for the next pass.
 	swf_render_stats((double)g_perf_wb_calls, (double)g_perf_wb_bytes,
-	                 (double)g_perf_draw_calls, emscripten_get_now() - _submit_t0);
+	                 (double)g_perf_draw_calls, emscripten_get_now() - _submit_t0,
+	                 (double)g_perf_wt_calls, (double)g_perf_wt_bytes);
 	g_perf_wb_calls = 0; g_perf_wb_bytes = 0; g_perf_draw_calls = 0;
+	g_perf_wt_calls = 0; g_perf_wt_bytes = 0;
 #endif
 
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)

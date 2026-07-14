@@ -1,5 +1,65 @@
 # Seedling perf A/B — status (2026-07-13, Stage 13a session 1)
 
+## ★★★ UPDATE 2026-07-14 (session 3) — writeTexture 110x GPU-traffic cut (byte-identical), but frame time is AVM-bound
+The session-2 profile flagged `writeTexture` as the clear #1 self-time slice
+(~17.6%). Measured it first (per the plan's FIRST STEP) and found the real story:
+Seedling's FP.buffer source is only **160×160** (FlashPunk renders at 160×160 and
+scales 3× to the 480×480 stage — retro pixel art), but the shared static+dynamic
+bitmap texture array is sized to Seedling's **4480×640 embedded atlas**, so each
+tiny dynamic upload padded to **4481×641** and uploaded **11.49 MB/frame for
+102 KB of real data — a ~112× waste bug.**
+
+**Fix (approach A, LANDED) — upload only the source sub-region.** In
+`render_webgpu_draw_bitmap_quad_scaled` (render_webgpu.c, the AVM2 + AVM1-
+attachBitmap + graphics-native blit path), upload just the `(src+1)×(src+1)`
+sub-rect at the layer origin instead of the full padded `bw×bh` layer.
+Byte-identical: the quad's inverse matrix maps the on-stage quad EXACTLY onto
+bitmap coords `[0,src]` (`sx = src_w/(dst_w·20)`), sampler is Nearest+ClampToEdge,
+`bitmap_sizes` stays the padded `{bw,bh}` so UV normalization is unchanged → the
+shader only ever addresses texels `[0,src]`; the untouched padding is never read.
+
+**Measured, real-GPU Windows Chrome (Intel Gen9, adapter "intel / gen-9"):**
+```
+                       BEFORE          AFTER (approach A)      Δ
+  writeTexture bytes   11,489,284 B    103,684 B (161²·4)     110.8× less  ← ✓ counter
+  writeTexture calls   1/frame         1/frame                (single FP.buffer)
+  present (renderer_poll) ~11.45 ms    ~0.68 ms               ~17× less
+  writeTexture self-time  ~17.6% (#1)  gone from top-35       collapsed    ← ✓ CDP re-profile
+  frame CPU mean       ~47 ms          ~47-51 ms (noisy ±10%) UNCHANGED
+  delivered fps        ~19-21          ~18-21 (within noise)  UNCHANGED
+  render               —               byte-identical          ✓ OverWorld matches oracle
+```
+**The upload was OFF the critical path** — it overlapped the AVM tick, so cutting
+it 110× removed the #1 CDP self-time slice + 110× GPU traffic + ~11 ms of present
+latency, all byte-identical, but did NOT move the delivered frame rate. The
+re-profile (`prof_approachA.json`) shows the frame is now unambiguously bound by
+the **AVM2 property-lookup tick**:
+```
+   8.1%  resolved_get
+   7.6%  avm2_op_getproperty_static_ic
+   6.8%  (idle)
+   5.1%  avm2_vtable_find_mn      ← residual: callproperty/findproperty/setproperty (no IC)
+   3.7%  avm2_propkey_matches
+   3.5%  avm2_domain_find
+   3.0%  bd_copy_pixels          ← FlashPunk CPU blit
+   2.8%  avm2_op_findproperty  2.7% avm2_call_method_ref  2.6% avm2_value_vtable ...
+```
+Still worth shipping: fixes a real 112× resource-waste bug, byte-identical, big
+GPU-bandwidth + present-latency win (matters on lower-end GPUs / battery / higher
+res), and clears the render path so future AVM-tick wins aren't masked by it.
+
+**THE REAL NEXT LEVER (unblocked, evidence above):** the AVM2 property-lookup
+tick. Extend the session-2 getproperty inline-cache to **callproperty /
+setproperty** (receiver-vtable analogs of getproperty — `avm2_vtable_find_mn`
+5.1% + `avm2_op_callproperty` + `setproperty_resolved`) and a scope/domain IC for
+**findproperty** (`avm2_op_findproperty` 2.8% + `avm2_domain_find` 3.5%). Pure
+reuse of the `Avm2InlineCache` design (avm2_ops.h) — AVM-only → simpler
+no-graphics CI. This is what will actually move fps beyond parity.
+Tools added: `render_bytes_win.py` (per-frame writeTexture/writeBuffer byte
+counters from `__swfRender`), `iv_perf_win.py` (ground-truth delivered frame
+period `S.iv`, steady-state filtered). Profiles: `prof_approachA.json`; render
+`seedling_approachA.png` (byte-identical to `seedling_final.png`).
+
 ## ★★ UPDATE 2026-07-14 (session 2) — PARITY WITH RUFFLE: 62 → 47 ms/frame
 Three byte-identical AVM2 hot-path micro-optimizations landed (commit
 `c608083d4`), taking Seedling from the ~62 ms after-domain-hash baseline to
