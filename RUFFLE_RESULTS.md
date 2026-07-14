@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `a3767a79a9ee`  
-**Date:** 2026-07-14 22:08 UTC  
-**Total duration:** 4h08m57s
+**Commit:** `dad41599053e`  
+**Date:** 2026-07-14 23:16 UTC  
+**Total duration:** 4h07m45s
 
 ## Results by Suite
 
@@ -118,11 +118,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm2 | - | - | - | 4 |
+*No changes since last run.*
 
-*Comparing `ab236e611bc5` → `a3767a79a9ee`*
+*Comparing `a3767a79a9ee` → `dad41599053e`*
 
 ## Flash-Spec Results
 
@@ -137,69 +135,69 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 634/707 (89.7%)
-- **Duration:** 49m44s across 30 shards
+- **Duration:** 48m36s across 30 shards
 - **Lines:** 115,814/131,124 matching (88.3%)
-- **Avg test duration:** 4.2s — slowest: `netstream_play_flv_screen` (35.5s)
+- **Avg test duration:** 4.1s — slowest: `netstream_play_flv_screen` (37.0s)
 
 ### avm2
 
 - **Pass:** 829/1205 (68.8%)
-- **Duration:** 2h06m54s across 30 shards
+- **Duration:** 2h07m25s across 30 shards
 - **Lines:** 102,546/149,869 matching (68.4%)
-- **Avg test duration:** 6.3s — slowest: `away3d_advanced_shallow_water_demo` (67.9s)
+- **Avg test duration:** 6.3s — slowest: `away3d_advanced_shallow_water_demo` (70.7s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 135/243 (55.6%)
-- **Duration:** 25m12s across 30 shards
+- **Duration:** 25m26s across 30 shards
 - **Lines:** 30,356/38,791 matching (78.3%)
 - **Avg test duration:** 6.2s — slowest: `MovieClip-v8` (65.3s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 69/111 (62.2%)
-- **Duration:** 18m43s across 30 shards
+- **Duration:** 18m32s across 30 shards
 - **Lines:** 4,054/5,248 matching (77.2%)
-- **Avg test duration:** 10.1s — slowest: `matrix_test` (107.7s)
+- **Avg test duration:** 10.0s — slowest: `matrix_test` (103.7s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m37s across 30 shards
+- **Duration:** 1m45s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 10.8s — slowest: `function_test` (21.1s)
+- **Avg test duration:** 11.6s — slowest: `hello` (20.6s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 11/20 (55.0%)
-- **Duration:** 4m11s across 30 shards
+- **Duration:** 3m52s across 30 shards
 - **Lines:** 441/580 matching (76.0%)
-- **Avg test duration:** 12.5s — slowest: `sound` (22.7s)
+- **Avg test duration:** 11.6s — slowest: `movieclip_destruction_test3` (20.9s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 2m49s across 30 shards
+- **Duration:** 2m34s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 8.4s — slowest: `zeroframe_definesprite` (20.5s)
+- **Avg test duration:** 7.7s — slowest: `mixed-bytecode-as2` (19.7s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 12m40s across 30 shards
+- **Duration:** 12m56s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 8.2s — slowest: `fuzz/65f0c0a49528b4350e0521d10c632e475a5670010f817d406246b9771a1c2121` (22.2s)
+- **Avg test duration:** 8.4s — slowest: `fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd` (21.3s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 1m53s across 30 shards
+- **Duration:** 1m48s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 2.4s — slowest: `text-bind` (22.2s)
+- **Avg test duration:** 2.3s — slowest: `duplicateMovieClip/dontremove` (19.9s)
 
 ### regression
 
 - **Pass:** 42/42 (100%)
-- **Duration:** 5m08s across 30 shards
+- **Duration:** 4m46s across 30 shards
 - **Lines:** 262/262 matching (100%)
-- **Avg test duration:** 7.3s — slowest: `onload_type1_args` (22.2s)
+- **Avg test duration:** 6.8s — slowest: `lv_cross_swf_version` (19.8s)
