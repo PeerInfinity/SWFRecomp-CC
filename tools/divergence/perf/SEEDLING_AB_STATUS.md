@@ -62,26 +62,32 @@ render-correctly: YES — our canvas paints the OverWorld CORRECTLY (house/grass
         STATIC image: no fade-in, grass doesn't animate. Ruffle shows both.
 ```
 
-## Render correctness (2026-07-13, user, real GPU): CORRECT but FROZEN
+## Render correctness (2026-07-13, user, real GPU): CORRECT + ANIMATING (just slow)
 The Stage-9 Bitmap-blit compose is validated live on the real WebGPU surface — the
-OverWorld renders correctly (matches the CPU-dump/oracle). **But the scene is
-STATIC: no fade-in tween, grass Spritemap doesn't animate; Ruffle animates both.**
-Not a browser-path or clock bug — ruled out:
-- `getTimer()` uses a frame-stepped µs clock (`g_avm2_timer_cur_time`), advanced
-  by `run_due_timers` inside `avm2_display_run_tick` (which the browser loop
-  calls). `avm2_generated_frame_rate = 7680` = 30fps → advances ~33 ms/tick.
-- `MOCK_DATE_TIME` only seeds Date/RNG, not getTimer.
-So the frozen animation is a runtime behavior: FlashPunk per-frame **update
-dispatch** — Spritemap/Tween state (`FP.elapsed`-driven) not advancing despite a
-running clock. Suspects: ENTER_FRAME not re-dispatched to the FlashPunk Engine
-each tick, or a fixed-timestep accumulator issue, or Spritemap.update/Tween not
-stepping. NOTE: 210 ms/frame is spent even though nothing animates → we re-blit
-the full tilemap every frame regardless (FlashPunk clears+redraws), so the perf
-comparison stays roughly valid (Ruffle also redraws every frame). Needs
-instrumented debugging (getTimer/FP.elapsed probe) next session — a "reach real
-animated gameplay" task alongside the perf arc.
+OverWorld renders correctly (matches the CPU-dump/oracle). **CORRECTION (user,
+follow-up): the animation is NOT frozen — the grass Spritemap IS advancing, it's
+just taking a few real seconds per animation frame because the game runs at
+~3.6-5 fps.** So there is NO separate "animation not advancing" bug — it's the
+SAME perf problem. The fade-in likewise just completes fast during the slow
+warmup. `getTimer` advances correctly (~33 ms/tick via `run_due_timers` in
+`avm2_display_run_tick`; `avm2_generated_frame_rate = 7680` = 30fps); the clock
+was never the issue. **One problem, not two: fix the ~2.5x perf gap and the
+animation runs at proper speed automatically.**
 
-## THE HEADLINE (2026-07-13): we are ~2.5x SLOWER than Ruffle on Seedling
+## UPDATE 2026-07-14 — self-service rig + same-harness A/B: ~6x SLOWER
+Now measurable from WSL: headed Playwright drives the user's real-GPU Windows
+Chrome via WSL→Windows interop (`WINDOWS_PLAYWRIGHT_FROM_WSL.md` +
+`seedling_perf_win.py`) — no more paste-the-HUD. Both sides measured through the
+SAME harness at real-GPU steady state (Intel Gen9, WebGPU adapter "intel / gen-9"):
+- **Ours:   ~280 ms/frame (~3.6 fps)** — avm+submit ~264, present ~17.
+- **Ruffle: ~46 ms/frame (~22 fps)** — tick ~45, render ~0.7.
+→ **Ruffle is ~6x faster** (280/46). The earlier "~2.5x" used a warmup-inflated
+Ruffle read (86 ms over 135 frames) vs our 222 ms; with both settled over the same
+harness (Ruffle 600 frames → 46 ms) the honest gap is ~6x. Both AVM/CPU-bound
+(render cheap on each). ANIMATION IS FINE (advances at the slow fps — one problem,
+perf, not two). This is THE number to close.
+
+## (SUPERSEDED by the ~6x same-harness read above) 2026-07-13: est. ~2.5x
 The milestone A/B is done and the answer is humbling but precise: our recompiled
 Seedling is **~2.5x slower** than Ruffle's interpreter, both AVM/CPU-bound. The
 perf-optimization arc now has a concrete target and a reproducible rig. Where our
