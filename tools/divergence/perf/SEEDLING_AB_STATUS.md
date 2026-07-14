@@ -1,5 +1,51 @@
 # Seedling perf A/B — status (2026-07-13, Stage 13a session 1)
 
+## ★★★★★ UPDATE 2026-07-14 (session 5) — COMPILE-TIME SLOT SPECIALIZATION: ~3-4 ms (~7-9%), the first win past the IC plateau
+Step 2 of the compile-time type-specialization arc (plan
+`seedling-perf-compile-time-specialization.md`). The recompiler now emits a bare
+`recv.u.obj->slots[K]` load for `GetPropertyStatic` sites it proves are
+`this.field` where the field is a SLOT/CONST trait — skipping the inline-cache
+call, vtable-identity check, count guard, and `resolved_get` dispatch that even an
+IC *hit* pays. This is the compile-time resolution an interpreter structurally
+cannot do (Step-1 scout's lever). **5039 specialized sites in Seedling.**
+
+**Real-GPU interleaved A/B (Intel Gen9, 4 rounds, same-session `--profiling-funcs`
+builds: `seedling` = specialized, `seedling_before` = IC-only via `SWF_NO_SLOT_SPEC=1`):**
+```
+  round   after(ms)   before(ms)   Δ
+    1       43.0        46.8       -3.8
+    2       42.1        47.1       -5.0
+    3       46.9        46.8       +0.1   ← after outlier (p95 69, machine hiccup)
+    4       42.5        45.8       -3.3
+  after mean 43.6   before mean 46.6   Δ 3.0 ms (6.4%)
+  excluding r3 outlier: after 42.5  before 46.6   Δ 4.0 ms (8.6%)
+```
+3 of 4 rounds show a clean 3.3-5.0 ms win — the first change to clear the ±10%
+noise floor since the IC arc plateaued at parity (the last IC extension bought
+~2%). Present ~0.6 ms both sides (render off the critical path, as established).
+
+**Correctness (the hard part):**
+- Compile-time slot index K mirrors `avm2_class.c` ivtable numbering exactly
+  (`inheritedBase` seed — 0 for an Object base — + sequential auto-assign,
+  honoring explicit `slot_or_disp_id`). `-DAVM2_SLOT_VERIFY` cross-checks K vs the
+  runtime resolve on every specialized read and aborts on mismatch.
+- Seedling verify smoke: 6 frames, hot per-frame methods' sites executing, ZERO
+  mismatches.
+- The verify build CAUGHT a real bug: `sub_super_same_field` mis-specialized
+  `this.pubSameName` (compile-time slot 1 != runtime slot 3 on a LevelTwo
+  receiver) because a SUBCLASS redeclares the field, shadowing it. Fixed by also
+  bailing when any descendant subclass redeclares the name (`subclassRedeclares`);
+  5041 → 5039 sites. Full-suite verify-mode CI validates all 829 tests.
+- Sound subset: receiver is `this` (local 0 of an instance method that never
+  writes local 0); `this`'s class sealed; full ABC chain to Object; name resolves
+  UNIQUELY to a slot/const trait in the chain AND no subclass redeclares it.
+
+**Next levers (Step 3, bigger — from the Step-1 scout):** the two LARGER get
+levers are still untouched — getlex-global resolution (~32% of get weight: bake
+the resolved global/class pointer, kills `avm2_domain_find`) and class-static slot
+(~22%: `FP.x` on a compile-time-known Class). Plus coercion elision (bucket C).
+
+
 ## ★★★★ UPDATE 2026-07-14 (session 4) — IC extended to callproperty + setproperty: ~1 ms (~2%), the AVM tick is near its floor
 Extended the session-2 getproperty inline-cache to the two other receiver-vtable
 property ops — **CallProperty/CallPropVoid** and **SetPropertyStatic** — the next
