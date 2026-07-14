@@ -1,15 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `c2506a703785` (2026-07-13T18:14:06.515897+00:00)
-**Current:** `e57b7f0e648d` (2026-07-13T21:29:24.549251+00:00)
+**Previous:** `9e27d9d61bdc` (2026-07-14T00:42:20.913262+00:00)
+**Current:** `b3ec6d48c007` (2026-07-14T02:44:48.450468+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 41 | 41 | 0 |
-| Total | 41 | 41 | 0 |
+| Passing | 41 | 42 | +1 |
+| Total | 41 | 42 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-No changes detected.
+## Added Tests (1)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `avm2_embed_bytearray` | pass | 2/2 |
