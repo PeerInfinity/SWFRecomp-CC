@@ -57,9 +57,29 @@ verdict: *** RUFFLE IS ~2.5x FASTER THAN OURS on Seedling ***
         project thesis (recompile beats interpret) and is THE number the perf arc
         must close. (Both are below Seedling's 30fps target → the "unplayable in
         Ruffle" premise holds: Ruffle only manages ~12fps; we manage ~4-5.)
-render-correctly: STILL UNCONFIRMED by the user (does OUR canvas paint OverWorld?
-        Ruffle's HUD populated, so Ruffle is at least ticking the SWF).
+render-correctly: YES — our canvas paints the OverWorld CORRECTLY (house/grass/
+        water/path/trees/player), confirmed by the user on real GPU. BUT it is a
+        STATIC image: no fade-in, grass doesn't animate. Ruffle shows both.
 ```
+
+## Render correctness (2026-07-13, user, real GPU): CORRECT but FROZEN
+The Stage-9 Bitmap-blit compose is validated live on the real WebGPU surface — the
+OverWorld renders correctly (matches the CPU-dump/oracle). **But the scene is
+STATIC: no fade-in tween, grass Spritemap doesn't animate; Ruffle animates both.**
+Not a browser-path or clock bug — ruled out:
+- `getTimer()` uses a frame-stepped µs clock (`g_avm2_timer_cur_time`), advanced
+  by `run_due_timers` inside `avm2_display_run_tick` (which the browser loop
+  calls). `avm2_generated_frame_rate = 7680` = 30fps → advances ~33 ms/tick.
+- `MOCK_DATE_TIME` only seeds Date/RNG, not getTimer.
+So the frozen animation is a runtime behavior: FlashPunk per-frame **update
+dispatch** — Spritemap/Tween state (`FP.elapsed`-driven) not advancing despite a
+running clock. Suspects: ENTER_FRAME not re-dispatched to the FlashPunk Engine
+each tick, or a fixed-timestep accumulator issue, or Spritemap.update/Tween not
+stepping. NOTE: 210 ms/frame is spent even though nothing animates → we re-blit
+the full tilemap every frame regardless (FlashPunk clears+redraws), so the perf
+comparison stays roughly valid (Ruffle also redraws every frame). Needs
+instrumented debugging (getTimer/FP.elapsed probe) next session — a "reach real
+animated gameplay" task alongside the perf arc.
 
 ## THE HEADLINE (2026-07-13): we are ~2.5x SLOWER than Ruffle on Seedling
 The milestone A/B is done and the answer is humbling but precise: our recompiled
