@@ -72,16 +72,23 @@ if [ -d "${RUFFLE_DIST}" ] && [ -f "${TELEPORT_SWF}" ]; then
 window.RufflePlayer = window.RufflePlayer || {};
 var rs = document.createElement('script'); rs.src = 'ruffle.js';
 rs.onload = function () {
+  // No preferredRenderer: let Ruffle auto-pick (WebGPU first, WebGL2 fallback).
+  // Forcing webgpu blank-fails where the swapchain image can't be created.
   window.RufflePlayer.config = { allowScriptAccess:true, autoplay:'on', unmuteOverlay:'hidden',
-    splashScreen:false, warnOnUnsupportedContent:false, contextMenu:'off', preferredRenderer:'webgpu' };
+    splashScreen:false, warnOnUnsupportedContent:false, contextMenu:'off' };
   var ruffle = window.RufflePlayer.newest();
   var player = ruffle.createPlayer();
   player.style.width='${W}px'; player.style.height='${H}px';
   document.getElementById('c').appendChild(player);
+  player.addEventListener('loadedmetadata', function(){ console.log('[harness] ruffle loadedmetadata'); });
   fetch('test.swf').then(r=>r.arrayBuffer()).then(function(buf){
+    console.log('[harness] swf fetched ' + buf.byteLength + ' bytes; loading into Ruffle');
     player.load({data:buf, allowScriptAccess:true, autoplay:'on'})
-      .then(function(){ window.__ruffleLoaded=true; }); });
+      .then(function(){ window.__ruffleLoaded=true; console.log('[harness] ruffle load() resolved'); })
+      .catch(function(e){ window.__ruffleErr=String(e); console.log('[harness] ruffle load() ERROR: ' + e); });
+  }).catch(function(e){ console.log('[harness] swf fetch error: ' + e); });
 };
+rs.onerror = function(){ console.log('[harness] ERROR loading ruffle.js'); };
 document.head.appendChild(rs);
 // Steady-state HUD over the profiling globals (trimmed mean, warmup/throttle
 // excluded) — mirrors our __swfPerf headline so the two are comparable.

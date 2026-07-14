@@ -34,13 +34,30 @@ Run 1 (2026-07-13, ours only, BEFORE the Rectangle.intersects fix):
   overdraw). Fixed in commit a380ab7dd; re-measure expected to improve.
   Rendered-correctly? — not yet reported.
 
-Run 2 (post-fix): PENDING re-run.
-ruffle: PENDING (the other half of the A/B — examples/avm2/seedling_ruffle/).
-verdict: PENDING.
+Run 2 (2026-07-13, ours, AFTER the Rectangle.intersects fix, real GPU):
+  ours: frame CPU ~222 ms mean (14 untainted steady-state frames; run-1 variant
+        345 ms all-throttled) → ~4-5 fps. Split: avm+submit ~210-325 ms,
+        present only ~13-20 ms.
+  *** The fix made the number look WORSE — because it's now HONEST. Pre-fix,
+  intersects threw on the FIRST call each frame, and the top-level catch aborted
+  the rest of the frame's FlashPunk World.update + World.render (the CPU
+  copyPixels tilemap blits). So 46.9 ms was a partial/aborted frame. With
+  intersects working the frame runs to completion → ~222 ms, and it is
+  overwhelmingly AVM/CPU-bound (present/GPU is cheap ~15 ms). The cost is the
+  recompiled AS3 FlashPunk per-frame software-buffer blitting (~279 Image.render
+  copyPixels/tick into FP.buffer). This is the real baseline the perf-optimization
+  arc must attack — NOT a browser-path bug. ***
+ruffle: PENDING (page fixed 2026-07-13 — was blank due to forced webgpu; now
+        auto-picks renderer and load() resolves. Re-run examples/avm2/
+        seedling_ruffle/ for the comparison).
+verdict: PENDING the Ruffle number.
+render-correctly: STILL UNCONFIRMED by the user (does OverWorld paint?).
 ```
-Split read on Run 1: present 22 ms ≈ avm+submit 25 ms, so cost is ~half GPU
-present / half AVM+submit — but the every-frame exception muddies it. Re-measure
-post-fix before drawing conclusions.
+**Next-session perf levers (AVM/CPU-bound, present cheap):** profile the AS3 tick
+— the FlashPunk `Image.render`→`BitmapData.copyPixels`/`bd_draw` CPU blit hot path
+(avm2_bitmap.c) and recompiled-method dispatch overhead. Real-GPU CDP profile of
+`demo.html?test=avm2/seedling` is the tool (symbolicate via
+`EMCC_CFLAGS=--profiling-funcs`).
 
 ## Liveness proof (WSL SwiftShader — correctness only, not perf)
 Headless-Chrome smoke of `examples/avm2/seedling/smoke.html`: `runSWF_avm2` boots,
