@@ -5565,6 +5565,191 @@ static Avm2Value rectangle_to_string(Avm2Activation* act)
 	return avm2_string(avm2_string_from_literal(act->ctx, buf));
 }
 
+// flash.geom.Rectangle method surface (ported from Ruffle avm2 geom/rectangle).
+// g_rectangle_class is a slot_class (x/y/width/height at slots[1..4]); until now
+// it carried only toString, so any AS3 that called intersects/union/etc. threw
+// Error #1069. FlashPunk's camera/collision culling calls intersects every frame
+// (Seedling gameplay), so the missing method spammed uncaught errors. Rect-only
+// methods (no Point) — reading a Rectangle slot object is the same shape as the
+// receiver.
+static void rect_xywh(Avm2Context* ctx, Avm2Object* o,
+                      double* x, double* y, double* w, double* h)
+{
+	if (o == NULL || o->slot_count < 5) { *x = *y = *w = *h = 0.0; return; }
+	*x = avm2_coerce_to_number(ctx, o->slots[1]);
+	*y = avm2_coerce_to_number(ctx, o->slots[2]);
+	*w = avm2_coerce_to_number(ctx, o->slots[3]);
+	*h = avm2_coerce_to_number(ctx, o->slots[4]);
+}
+
+static Avm2Object* rect_arg_obj(Avm2Activation* act, uint32_t i)
+{
+	Avm2Value v = arg_or_undef(act, i);
+	return (v.kind == AVM2_VALUE_OBJECT) ? v.u.obj : NULL;
+}
+
+static Avm2Value make_rect_value(Avm2Context* ctx, double x, double y,
+                                 double w, double h)
+{
+	if (g_rectangle_class == NULL) return avm2_null();
+	Avm2Value args[4] = { avm2_number(x), avm2_number(y),
+	                      avm2_number(w), avm2_number(h) };
+	return avm2_class_construct(ctx, g_rectangle_class, args, 4);
+}
+
+// intersects(other:Rectangle):Boolean — positive-area overlap (touching = false).
+static Avm2Value rectangle_intersects(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	Avm2Object* other = rect_arg_obj(act, 0);
+	if (self == NULL || other == NULL) return avm2_bool(false);
+	double ax, ay, aw, ah, bx, by, bw, bh;
+	rect_xywh(act->ctx, self, &ax, &ay, &aw, &ah);
+	rect_xywh(act->ctx, other, &bx, &by, &bw, &bh);
+	bool hit = (ax < bx + bw) && (ax + aw > bx)
+	        && (ay < by + bh) && (ay + ah > by);
+	return avm2_bool(hit);
+}
+
+// intersection(other):Rectangle — the overlap, or an empty (0,0,0,0) Rectangle.
+static Avm2Value rectangle_intersection(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	Avm2Object* other = rect_arg_obj(act, 0);
+	if (self == NULL || other == NULL) return make_rect_value(act->ctx, 0, 0, 0, 0);
+	double ax, ay, aw, ah, bx, by, bw, bh;
+	rect_xywh(act->ctx, self, &ax, &ay, &aw, &ah);
+	rect_xywh(act->ctx, other, &bx, &by, &bw, &bh);
+	double l = ax > bx ? ax : bx, t = ay > by ? ay : by;
+	double r = (ax + aw < bx + bw) ? ax + aw : bx + bw;
+	double b = (ay + ah < by + bh) ? ay + ah : by + bh;
+	if (r <= l || b <= t) return make_rect_value(act->ctx, 0, 0, 0, 0);
+	return make_rect_value(act->ctx, l, t, r - l, b - t);
+}
+
+// union(other):Rectangle — the bounding box of both (empty rects skipped).
+static Avm2Value rectangle_union(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	Avm2Object* other = rect_arg_obj(act, 0);
+	double ax, ay, aw, ah, bx, by, bw, bh;
+	rect_xywh(act->ctx, self, &ax, &ay, &aw, &ah);
+	if (other == NULL) return make_rect_value(act->ctx, ax, ay, aw, ah);
+	rect_xywh(act->ctx, other, &bx, &by, &bw, &bh);
+	if (aw <= 0 || ah <= 0) return make_rect_value(act->ctx, bx, by, bw, bh);
+	if (bw <= 0 || bh <= 0) return make_rect_value(act->ctx, ax, ay, aw, ah);
+	double l = ax < bx ? ax : bx, t = ay < by ? ay : by;
+	double r = (ax + aw > bx + bw) ? ax + aw : bx + bw;
+	double b = (ay + ah > by + bh) ? ay + ah : by + bh;
+	return make_rect_value(act->ctx, l, t, r - l, b - t);
+}
+
+// contains(x,y):Boolean — point inside [x, right) x [y, bottom).
+static Avm2Value rectangle_contains(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_bool(false);
+	double rx, ry, rw, rh;
+	rect_xywh(act->ctx, self, &rx, &ry, &rw, &rh);
+	double px = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
+	double py = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 1));
+	bool in = px >= rx && px < rx + rw && py >= ry && py < ry + rh;
+	return avm2_bool(in);
+}
+
+// containsRect(other):Boolean — other fully inside this.
+static Avm2Value rectangle_contains_rect(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	Avm2Object* other = rect_arg_obj(act, 0);
+	if (self == NULL || other == NULL) return avm2_bool(false);
+	double ax, ay, aw, ah, bx, by, bw, bh;
+	rect_xywh(act->ctx, self, &ax, &ay, &aw, &ah);
+	rect_xywh(act->ctx, other, &bx, &by, &bw, &bh);
+	bool in = bx >= ax && by >= ay && bx + bw <= ax + aw && by + bh <= ay + ah;
+	return avm2_bool(in);
+}
+
+static Avm2Value rectangle_equals(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	Avm2Object* other = rect_arg_obj(act, 0);
+	if (self == NULL || other == NULL) return avm2_bool(false);
+	double ax, ay, aw, ah, bx, by, bw, bh;
+	rect_xywh(act->ctx, self, &ax, &ay, &aw, &ah);
+	rect_xywh(act->ctx, other, &bx, &by, &bw, &bh);
+	return avm2_bool(ax == bx && ay == by && aw == bw && ah == bh);
+}
+
+static Avm2Value rectangle_is_empty(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_bool(true);
+	double x, y, w, h;
+	rect_xywh(act->ctx, self, &x, &y, &w, &h);
+	return avm2_bool(w <= 0.0 || h <= 0.0);
+}
+
+static Avm2Value rectangle_clone(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_null();
+	double x, y, w, h;
+	rect_xywh(act->ctx, self, &x, &y, &w, &h);
+	return make_rect_value(act->ctx, x, y, w, h);
+}
+
+// setTo/setEmpty/offset/inflate mutate the receiver's slots in place, return void.
+static Avm2Value rectangle_set_to(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self != NULL && self->slot_count >= 5)
+		for (int i = 0; i < 4; i++)
+			self->slots[i + 1] =
+				avm2_number(avm2_coerce_to_number(act->ctx, arg_or_undef(act, i)));
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_set_empty(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self != NULL && self->slot_count >= 5)
+		for (int i = 1; i <= 4; i++) self->slots[i] = avm2_number(0);
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_offset(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self != NULL && self->slot_count >= 5)
+	{
+		double dx = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
+		double dy = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 1));
+		self->slots[1] = avm2_number(avm2_coerce_to_number(act->ctx, self->slots[1]) + dx);
+		self->slots[2] = avm2_number(avm2_coerce_to_number(act->ctx, self->slots[2]) + dy);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_inflate(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self != NULL && self->slot_count >= 5)
+	{
+		double dx = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
+		double dy = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 1));
+		double x = avm2_coerce_to_number(act->ctx, self->slots[1]);
+		double y = avm2_coerce_to_number(act->ctx, self->slots[2]);
+		double w = avm2_coerce_to_number(act->ctx, self->slots[3]);
+		double h = avm2_coerce_to_number(act->ctx, self->slots[4]);
+		self->slots[1] = avm2_number(x - dx);
+		self->slots[2] = avm2_number(y - dy);
+		self->slots[3] = avm2_number(w + 2 * dx);
+		self->slots[4] = avm2_number(h + 2 * dy);
+	}
+	return avm2_undefined();
+}
+
 static Avm2Class* make_slot_class(Avm2Context* ctx, const char* ns,
                                   const char* name, const char* const* fields,
                                   uint32_t nfields)
@@ -5778,6 +5963,30 @@ void avm2_register_text(Avm2Context* ctx)
 		                                    rect_fields, 4);
 		avm2_builtin_add_method(ctx, g_rectangle_class, "toString",
 		                        rectangle_to_string);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "intersects",
+		                        rectangle_intersects);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "intersection",
+		                        rectangle_intersection);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "union",
+		                        rectangle_union);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "contains",
+		                        rectangle_contains);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "containsRect",
+		                        rectangle_contains_rect);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "equals",
+		                        rectangle_equals);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "isEmpty",
+		                        rectangle_is_empty);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "clone",
+		                        rectangle_clone);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "setTo",
+		                        rectangle_set_to);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "setEmpty",
+		                        rectangle_set_empty);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "offset",
+		                        rectangle_offset);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "inflate",
+		                        rectangle_inflate);
 		static const char* const textrun_fields[3] = {
 			"beginIndex", "endIndex", "textFormat",
 		};
