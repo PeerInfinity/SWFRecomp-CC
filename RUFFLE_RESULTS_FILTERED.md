@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `0e1b25912125`  
-**Date:** 2026-07-14 16:22 UTC  
-**Total duration:** 4h18m48s
+**Commit:** `c608083d452a`  
+**Date:** 2026-07-14 17:20 UTC  
+**Total duration:** 4h18m11s
 
 ## Results by Suite
 
@@ -128,9 +128,9 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 734/978 (75.1%)
 - **Ignored:** 227 tests
-- **Duration:** 2h13m29s across 30 shards
+- **Duration:** 2h12m52s across 30 shards
 - **Lines:** 94,656/125,366 matching (75.5%)
-- **Avg test duration:** 5.8s — slowest: `bitmapdata_accuracy` (37.9s)
+- **Avg test duration:** 5.8s — slowest: `bitmapdata_accuracy` (42.5s)
 
 ### from_gnash/actionscript.all
 

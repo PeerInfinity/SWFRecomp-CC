@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `0e1b25912125`  
-**Date:** 2026-07-14 16:22 UTC  
-**Total duration:** 4h18m48s
+**Commit:** `c608083d452a`  
+**Date:** 2026-07-14 17:20 UTC  
+**Total duration:** 4h18m11s
 
 ## Results by Suite
 
@@ -120,7 +120,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 *No changes since last run.*
 
-*Comparing `5fa736f1dd07` → `0e1b25912125`*
+*Comparing `0e1b25912125` → `c608083d452a`*
 
 ## Flash-Spec Results
 
@@ -142,9 +142,9 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm2
 
 - **Pass:** 829/1205 (68.8%)
-- **Duration:** 2h13m29s across 30 shards
+- **Duration:** 2h12m52s across 30 shards
 - **Lines:** 102,546/149,869 matching (68.4%)
-- **Avg test duration:** 6.6s — slowest: `away3d_advanced_shallow_water_demo` (64.3s)
+- **Avg test duration:** 6.5s — slowest: `away3d_advanced_shallow_water_demo` (68.0s)
 
 ### from_gnash/actionscript.all
 
