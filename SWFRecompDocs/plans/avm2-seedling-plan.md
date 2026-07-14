@@ -201,6 +201,28 @@ answer to "what could go wrong with game-first development"):
   interactive gameplay + `.oel` level loading (ByteArray/E4X, ColorMatrixFilter,
   Input/Key). Detail in
   `avm2/_investigation/CURRENT_STATUS.md` + the `avm2-stage12-seedling` memory.
+  **Session 4 (2026-07-13, `9e37c8...`): render-compositing built** —
+  `flash.geom.Matrix` full method surface + a general-affine `BitmapData.draw`
+  CPU raster (rotation oracle MAD 0.134). Teleport build (recompiled AS3, drop
+  Newgrounds, `Game.menu=false → new Game(0,80,128)`) reaches real gameplay,
+  60 frames zero uncaught, but the overworld still rendered ~99% black.
+  **Session 5 (2026-07-13, commit `b3ec6d48c`): SEEDLING GAMEPLAY RENDERS.**
+  Root cause of the black world = **empty embedded ByteArrays**: Flex
+  `[Embed(mimeType="application/octet-stream")]` `.oel` levels compile to
+  `ByteArrayAsset` subclasses SymbolClass-bound to a `DefineBinaryData` char,
+  and `new LevelClass()` was constructing an EMPTY ByteArray (never seeded) →
+  `readUTFBytes(0)="" → new XML("")` → `FP.width=0` → the tile-build loop ran
+  zero times → no tiles. Fix: `ba_native_init` (avm2_bytearray.c) seeds the
+  ByteArray from `avm2_generated_binaries[char_for_class(cls)]` (the ByteArray
+  analog of the s2 embedded-Bitmap seed). Result: real OverWorld.oel parses
+  (width=320, 405 tiles), `Image.render` ~4→~279 calls/tick, CPU-composite dump
+  **matches the Ruffle oracle — frame black 98.7%→0.1%, MAD 3.834** (house,
+  grass, water, path, trees, player all render). Backed by regression test
+  `avm2_embed_bytearray`. Remaining render-fidelity gaps (deferred, out of
+  scope per session prompt): day/night MULTIPLY/HARDLIGHT overlays feed
+  `BitmapData.draw` a **null matrix** (read as NaN → no-op) and need real
+  MULTIPLY/ADD blend in the CPU raster; HUD; Emitter particles;
+  ColorMatrixFilter.
   Post-baseline: AVM2 `Rando` counterpart for the injected variant — see
   `avm2-seedling-ap-integration.md` for the AP-integration analysis (what the
   flash-ap-api injection work gives us: reuse `games/seedling.json` + the

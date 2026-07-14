@@ -1,7 +1,39 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) IN PROGRESS (session 4);
-prior lines below are session 3.
+Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) session 5; prior
+sections below are sessions 4 and 3.
+
+## State (Stage 12 — Seedling bring-up, session 5 2026-07-13, commit `b3ec6d48c`)
+
+**SEEDLING GAMEPLAY RENDERS.** The ~99%-black overworld was root-caused to
+**empty embedded ByteArrays**, not the s4 NaN-matrix lead (those NaN draws are
+day/night MULTIPLY/HARDLIGHT overlays with a null matrix — unrelated to terrain).
+Flex `[Embed(mimeType="application/octet-stream")]` `.oel` levels compile to
+`ByteArrayAsset` subclasses SymbolClass-bound to a `DefineBinaryData` char, and
+`new LevelClass()` was constructing an EMPTY ByteArray (runtime never seeded it)
+→ FlashPunk `loadlevel` did `readUTFBytes(0)="" ; new XML("")` → `FP.width=0` →
+the tile-build loop ran zero times → zero tiles.
+
+- **Fix (`avm2_bytearray.c` `ba_native_init`):** when the constructed class
+  maps to a SymbolClass binary char (`avm2_display_char_for_class`), seed the
+  ByteArray from `avm2_generated_binaries` (len/bytes, position 0). The
+  ByteArray analog of the s2 embedded-Bitmap seed; binaries are emitted RAW.
+- **Result:** real OverWorld.oel parses (width=320, 405 tiles added),
+  `Image.render` goes ~4→~279 calls/tick, and the GPU-free `AVM2_CPU_DUMP`
+  matches the Ruffle oracle — **frame black 98.7%→0.1%, MAD 3.834 vs
+  `ruffle_oracle_60/41.png`** (house/grass/water/path/trees/player/fence).
+- **Regression test:** `regression/avm2_embed_bytearray` — a minimal AS3 SWF
+  embeds a 23-byte octet-stream asset and asserts `new Payload().length==23` +
+  its readUTFBytes content. Empty before, PASS after. Existing avm2
+  bytearray/bitmapdata_embedded tests unaffected.
+- **Deferred render-fidelity (out of scope per session prompt — do NOT reopen
+  bd_draw):** day/night MULTIPLY overlay + HARDLIGHT compose pass a **null
+  matrix** to `BitmapData.draw` → read as NaN → finite-guard no-ops them (no
+  tint applied). Needs null-matrix→identity AND real MULTIPLY/HARDLIGHT/ADD
+  blend in the CPU raster. Also: HUD hearts, Emitter particles,
+  ColorMatrixFilter.
+
+---
 
 ## State (Stage 12 — Seedling bring-up, session 4 2026-07-13)
 
