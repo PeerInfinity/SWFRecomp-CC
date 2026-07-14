@@ -867,6 +867,7 @@ namespace abc
 		std::map<string, int> nameToInst;   // user-class local name -> instance idx
 		struct MI { int cls = -1; bool inst = true; };
 		std::map<u32, MI> m2c;              // method index -> defining class + this-kind
+		std::map<int, std::vector<int>> children;  // instance idx -> direct subclasses
 		mutable std::map<int, int> slotCountMemo;
 
 		explicit AbcTypeModel(const AbcFile& a) : abc(a)
@@ -875,6 +876,11 @@ namespace abc
 			{
 				string nm = localName(abc.instances[i].name);
 				if (!nm.empty() && !nameToInst.count(nm)) nameToInst[nm] = (int) i;
+			}
+			for (size_t i = 0; i < abc.instances.size(); i++)
+			{
+				int sup = typeMnToInst(abc.instances[i].super_name);
+				if (sup >= 0) children[sup].push_back((int) i);
 			}
 			for (size_t i = 0; i < abc.instances.size(); i++)
 			{
@@ -974,6 +980,30 @@ namespace abc
 			if (hits != 1) res.ok = false;  // ambiguous/shadowed → bail
 			return res;
 		}
+		// Does any STRICT subclass of `cls` declare a trait with local name
+		// `name`? If so, a subclass receiver would resolve the multiname to that
+		// subclass's own (shadowing) slot — a different index than the ancestor
+		// slot the compile-time pass would bake — so the site is NOT safely
+		// specializable (`this` may be any subclass at runtime). Guards the
+		// sub/super same-field case (avm2 sub_super_same_field).
+		bool subclassRedeclares(int cls, const string& name) const
+		{
+			std::vector<int> stack;
+			auto it = children.find(cls);
+			if (it != children.end())
+				for (int c : it->second) stack.push_back(c);
+			int guard = 0;
+			while (!stack.empty() && guard++ < 100000)
+			{
+				int c = stack.back(); stack.pop_back();
+				for (const AbcTrait& t : abc.instances[c].traits)
+					if (localName(t.name) == name) return true;
+				auto cit = children.find(c);
+				if (cit != children.end())
+					for (int k : cit->second) stack.push_back(k);
+			}
+			return false;
+		}
 		// Runtime-matching slot index for the slot trait at traitIdx in declInst,
 		// or -1 if the chain is not fully ABC-defined.
 		int computeSlotIndex(int declInst, int traitIdx) const
@@ -1007,6 +1037,10 @@ namespace abc
 	{
 		std::vector<int> spec(body.ir.ops.size(), -1);
 		if (!body.verified) return spec;
+		// A/B baseline toggle: SWF_NO_SLOT_SPEC=1 emits the IC path everywhere
+		// (the pre-specialization build) for interleaved before/after measurement.
+		static const bool disabled = getenv("SWF_NO_SLOT_SPEC") != nullptr;
+		if (disabled) return spec;
 		auto mit = M.m2c.find(body.ir.method_index);
 		bool instMethod = mit != M.m2c.end() && mit->second.inst && mit->second.cls >= 0;
 		int thisCls = instMethod ? mit->second.cls : -1;
@@ -1041,8 +1075,13 @@ namespace abc
 				bool recv_is_this = pop();
 				if (recv_is_this)
 				{
-					AbcTypeModel::Found fnd = M.findUniqueSlot(thisCls, M.localName(op.arg1));
-					int K = fnd.ok ? M.computeSlotIndex(fnd.declInst, fnd.traitIdx) : -1;
+					string name = M.localName(op.arg1);
+					AbcTypeModel::Found fnd = M.findUniqueSlot(thisCls, name);
+					// Bail if a subclass redeclares the name: `this` may be that
+					// subclass at runtime, where the multiname resolves to the
+					// subclass's shadowing slot (a different index).
+					int K = (fnd.ok && !M.subclassRedeclares(thisCls, name))
+						? M.computeSlotIndex(fnd.declInst, fnd.traitIdx) : -1;
 					if (K > 0) spec[i] = K;
 				}
 				push(false);   // result is the field value, not `this`
