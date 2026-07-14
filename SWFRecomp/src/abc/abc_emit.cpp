@@ -161,6 +161,13 @@ namespace abc
 		// Class/script initializer: avmplus runs these in "interpreter
 		// mode", whose index fast path ignores the ns set.
 		bool interp_mode;
+		// The body has no PushWith → every scope lookup is trait/vtable-based,
+		// so a FindProperty scope walk's hit/miss is invariant across
+		// activations at a fixed call site (lets the domain inline cache skip
+		// the scope walk on a cached hit). See avm2_op_findpropstrict_ic.
+		bool scope_stable;
+		// SWF_NO_FIND_IC=1 A/B baseline: emit the plain (pre-lever-A) find ops.
+		bool find_ic;
 	};
 
 	static bool mnLazyName(const AbcFile& abc, u32 mn)
@@ -316,6 +323,16 @@ namespace abc
 					out << "\tsp--; stk[sp] = avm2_object_value(avm2_op_findproperty_dyn(act, "
 					    << "lscope, scope_n, " << op.arg1 << ", stk[sp], " << strict
 					    << ")); sp++;" << endl;
+				}
+				else if (bc.find_ic)
+				{
+					// Per-call-site domain inline cache (getlex-global lever):
+					// a block-scoped static gives each find site its own cache.
+					// `scope_stable` lets a cached domain hit skip the scope walk.
+					out << "\t{ static Avm2FindCache __fc; stk[sp++] = "
+					       "avm2_object_value(avm2_op_findpropstrict_ic(act, lscope, "
+					       "scope_n, " << op.arg1 << ", " << strict << ", "
+					    << (bc.scope_stable ? 1 : 0) << ", &__fc)); }" << endl;
 				}
 				else
 				{
@@ -1122,6 +1139,16 @@ namespace abc
 		bc.method_index = method_index;
 		bc.has_exc = false;
 		bc.interp_mode = false;
+		// A/B baseline toggle for lever A (getlex-global domain inline cache).
+		static const bool find_ic_disabled = getenv("SWF_NO_FIND_IC") != nullptr;
+		bc.find_ic = !find_ic_disabled;
+		// with-free ⟹ every scope lookup is trait/vtable-based ⟹ the find
+		// scope walk is invariant per site, so a cached domain hit may skip it.
+		bc.scope_stable = true;
+		for (const IrOp& op : body.ir.ops)
+		{
+			if (op.op == IrOpcode::PushWith) { bc.scope_stable = false; break; }
+		}
 		for (const AbcClass& c : abc.classes)
 		{
 			if (c.init_method == method_index) bc.interp_mode = true;

@@ -1619,19 +1619,23 @@ static int scope_defines_mn(Avm2Activation* act, const Avm2ScopeEntry* se, uint3
 	return resolve_mn(act, sv, mn_idx, &r);
 }
 
-static Avm2Object* findproperty_impl(Avm2Activation* act, const Avm2ScopeEntry* lscope,
-                                     uint32_t scope_n, uint32_t mn_idx,
-                                     const char* name, uint32_t name_len, int strict)
-{
-	const Avm2AbcFileData* data = act->file->data;
-	Avm2Context* ctx = act->ctx;
+// --- FindProperty resolution, split into the three phases so the plain op and
+// the per-call-site inline-cached op (avm2_op_findpropstrict_ic) share code. ---
 
-	// Local scope stack, top → bottom.
+// Scope walk (local scope stack, then captured outer chain), top → bottom.
+// Returns the matching scope object or NULL. Plain (non-with) scope entries
+// match on declared TRAITS only (avm2_vtable_find_mn) → the hit/miss for a
+// given static multiname depends solely on the entry object's vtable (its
+// class), so a with-free method's scope-walk result is invariant across
+// activations at a fixed call site (the property the inline cache exploits).
+static Avm2Object* findproperty_scope_walk(Avm2Activation* act,
+                                           const Avm2ScopeEntry* lscope,
+                                           uint32_t scope_n, uint32_t mn_idx)
+{
 	for (uint32_t i = scope_n; i > 0; i--)
 	{
 		if (scope_defines_mn(act, &lscope[i - 1], mn_idx)) return lscope[i - 1].obj;
 	}
-	// Captured outer chain, top → bottom.
 	if (act->outer != NULL)
 	{
 		for (uint32_t i = act->outer->count; i > 0; i--)
@@ -1642,69 +1646,105 @@ static Avm2Object* findproperty_impl(Avm2Activation* act, const Avm2ScopeEntry* 
 			}
 		}
 	}
-	// Domain of the defining file (lazy script init happens inside).
+	return NULL;
+}
+
+// Domain of the defining file (lazy script init happens inside). Returns the
+// resolved global/def object or NULL. `name`/`name_len` are only used for the
+// lazy-name fallback key. The domain is append-only with stable object
+// identity, and avm2_domain_find returns the first (lowest-index) match, so a
+// NON-NULL result here is permanently valid for a given ctx → cacheable.
+static Avm2Object* findproperty_domain_find(Avm2Activation* act, uint32_t mn_idx,
+                                            const char* name, uint32_t name_len)
+{
+	const Avm2AbcFileData* data = act->file->data;
+	Avm2Context* ctx = act->ctx;
+	Avm2PropKey key;
+	const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
+	if (mn->kind == 0x07 || mn->kind == 0x0d)
 	{
-		Avm2PropKey key;
-		const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
-		if (mn->kind == 0x07 || mn->kind == 0x0d)
+		if (avm2_propkey_from_qname(data, mn_idx, &key))
 		{
-			if (avm2_propkey_from_qname(data, mn_idx, &key))
-			{
-				Avm2Object* g = avm2_domain_find(ctx, &key);
-				if (g != NULL) return g;
-			}
+			return avm2_domain_find(ctx, &key);
 		}
-		else if (mn->kind == 0x09 || mn->kind == 0x0e)
+	}
+	else if (mn->kind == 0x09 || mn->kind == 0x0e)
+	{
+		const Avm2AbcNsSet* set = &data->ns_sets[mn->ns_set];
+		for (uint32_t i = 0; i < set->count; i++)
 		{
-			const Avm2AbcNsSet* set = &data->ns_sets[mn->ns_set];
-			for (uint32_t i = 0; i < set->count; i++)
-			{
-				const Avm2AbcNamespace* ns = &data->namespaces[set->ns_indices[i]];
-				key.name = data->strings[mn->name].utf8;
-				key.name_len = data->strings[mn->name].len;
-				key.ns_kind = ns->kind;
-				key.ns_uri = data->strings[ns->name].utf8;
-				key.ns_len = data->strings[ns->name].len;
-				Avm2Object* g = avm2_domain_find(ctx, &key);
-				if (g != NULL) return g;
-			}
-		}
-		else
-		{
-			// Lazy name resolved by the caller: public key lookup.
-			key = avm2_public_key(name, name_len);
+			const Avm2AbcNamespace* ns = &data->namespaces[set->ns_indices[i]];
+			key.name = data->strings[mn->name].utf8;
+			key.name_len = data->strings[mn->name].len;
+			key.ns_kind = ns->kind;
+			key.ns_uri = data->strings[ns->name].utf8;
+			key.ns_len = data->strings[ns->name].len;
 			Avm2Object* g = avm2_domain_find(ctx, &key);
 			if (g != NULL) return g;
 		}
 	}
-
-	// Last resort (Ruffle find_definition): the global scope's own dynamic
-	// props and its prototype chain (findprop_global_prototype).
-	if (avm2_mn_has_public_ns(data, mn_idx))
+	else
 	{
-		Avm2Object* global = NULL;
-		if (act->outer != NULL && act->outer->count > 0)
+		// Lazy name resolved by the caller: public key lookup.
+		key = avm2_public_key(name, name_len);
+		return avm2_domain_find(ctx, &key);
+	}
+	return NULL;
+}
+
+// Last resort (Ruffle find_definition): the global scope's own dynamic props
+// and its prototype chain (findprop_global_prototype). Returns the global
+// scope object or NULL. Dynamic → NOT cacheable.
+static Avm2Object* findproperty_global_proto(Avm2Activation* act,
+                                             const Avm2ScopeEntry* lscope,
+                                             uint32_t scope_n, uint32_t mn_idx,
+                                             const char* name, uint32_t name_len)
+{
+	if (!avm2_mn_has_public_ns(act->file->data, mn_idx)) return NULL;
+	Avm2Object* global = NULL;
+	if (act->outer != NULL && act->outer->count > 0)
+	{
+		global = act->outer->entries[0].obj;
+	}
+	else if (scope_n > 0)
+	{
+		global = lscope[0].obj;
+	}
+	for (Avm2Object* p = global; p != NULL; p = p->proto)
+	{
+		if (avm2_object_find_dynamic(p, name, name_len) != NULL)
 		{
-			global = act->outer->entries[0].obj;
-		}
-		else if (scope_n > 0)
-		{
-			global = lscope[0].obj;
-		}
-		for (Avm2Object* p = global; p != NULL; p = p->proto)
-		{
-			if (avm2_object_find_dynamic(p, name, name_len) != NULL)
-			{
-				return global;
-			}
+			return global;
 		}
 	}
+	return NULL;
+}
 
+// Full resolution (scope walk → domain → global-prototype), NO throw: returns
+// NULL on a total miss. The verify build cross-checks the inline-cached op
+// against this.
+static Avm2Object* findproperty_resolve(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                        uint32_t scope_n, uint32_t mn_idx,
+                                        const char* name, uint32_t name_len)
+{
+	Avm2Object* g = findproperty_scope_walk(act, lscope, scope_n, mn_idx);
+	if (g != NULL) return g;
+	g = findproperty_domain_find(act, mn_idx, name, name_len);
+	if (g != NULL) return g;
+	return findproperty_global_proto(act, lscope, scope_n, mn_idx, name, name_len);
+}
+
+static Avm2Object* findproperty_impl(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                     uint32_t scope_n, uint32_t mn_idx,
+                                     const char* name, uint32_t name_len, int strict)
+{
+	Avm2Object* g = findproperty_resolve(act, lscope, scope_n, mn_idx, name, name_len);
+	if (g != NULL) return g;
 	if (!strict)
 	{
 		return avm2_op_getglobalscope(act, lscope, scope_n);
 	}
-	avm2_throw_1065(ctx, name, name_len);
+	avm2_throw_1065(act->ctx, name, name_len);
 }
 
 Avm2Object* avm2_op_findproperty(Avm2Activation* act, const Avm2ScopeEntry* lscope,
@@ -1714,6 +1754,90 @@ Avm2Object* avm2_op_findproperty(Avm2Activation* act, const Avm2ScopeEntry* lsco
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
 	return findproperty_impl(act, lscope, scope_n, mn_idx, name, name_len, strict);
+}
+
+// Per-call-site domain inline cache for static-multiname FindProperty /
+// FindPropStrict (the recompiler's getlex-global type-specialization lever).
+// The scope walk varies per activation, so it is ALWAYS re-run to preserve
+// exact semantics; the cache only elides the DOMAIN resolution — key
+// construction + avm2_domain_find — which is stable per ctx (the domain is
+// append-only with stable object identity, and a non-NULL hit is the first
+// match ⟹ permanently valid). `scope_stable` (recompiler proved the method is
+// with-free ⟹ every scope lookup is trait/vtable-based ⟹ the scope-walk
+// hit/miss is invariant across activations at this site) additionally lets a
+// populated domain cache skip the scope walk entirely — the largest saving.
+// Only DOMAIN hits are ever cached; a scope hit or the dynamic global-proto
+// fallback always takes the slow path. strict: throw 1065 on a total miss.
+// Build -DAVM2_FIND_VERIFY to cross-check the returned object against the full
+// uncached resolve on every call and abort on any mismatch.
+Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                      uint32_t scope_n, uint32_t mn_idx, int strict,
+                                      int scope_stable, Avm2FindCache* ic)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* g;
+	if (scope_stable && ic->ctx == ctx && ic->obj != NULL)
+	{
+		// With-free method + a prior domain hit ⟹ the scope walk is a proven
+		// miss at this site: go straight to the cached def object.
+		g = ic->obj;
+	}
+	else
+	{
+		g = findproperty_scope_walk(act, lscope, scope_n, mn_idx);
+		if (g == NULL)
+		{
+			if (ic->ctx == ctx && ic->obj != NULL)
+			{
+				g = ic->obj;   // cached domain hit (scope missed)
+			}
+			else
+			{
+				const char* name;
+				uint32_t name_len;
+				avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+				g = findproperty_domain_find(act, mn_idx, name, name_len);
+				if (g != NULL)
+				{
+					ic->ctx = ctx;
+					ic->obj = g;
+				}
+				else
+				{
+					g = findproperty_global_proto(act, lscope, scope_n, mn_idx,
+					                               name, name_len);
+				}
+			}
+		}
+	}
+
+#ifdef AVM2_FIND_VERIFY
+	{
+		const char* vname;
+		uint32_t vname_len;
+		avm2_mn_name(act->file->data, mn_idx, &vname, &vname_len);
+		Avm2Object* ref = findproperty_resolve(act, lscope, scope_n, mn_idx,
+		                                        vname, vname_len);
+		if (g != ref)
+		{
+			avm2_fatal("[AVM2_FIND_VERIFY] findprop IC mismatch mn=%u strict=%d "
+			           "stable=%d: ic=%p ref=%p", mn_idx, strict, scope_stable,
+			           (void*) g, (void*) ref);
+		}
+	}
+#endif
+
+	if (g != NULL) return g;
+	if (!strict)
+	{
+		return avm2_op_getglobalscope(act, lscope, scope_n);
+	}
+	{
+		const char* name;
+		uint32_t name_len;
+		avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+		avm2_throw_1065(ctx, name, name_len);
+	}
 }
 
 // Key-based scope search shared by the lazy-name and lazy-ns FindProperty

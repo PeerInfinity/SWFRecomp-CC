@@ -40,6 +40,25 @@ Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* 
                                      int strict);
 // FindDef: domain lookup only.
 Avm2Object* avm2_op_finddef(Avm2Activation* act, uint32_t mn_idx);
+
+// Per-call-site domain inline cache for static-multiname FindProperty /
+// FindPropStrict (the getlex-global type-specialization lever). Caches only the
+// DOMAIN resolution (stable per ctx: the domain is append-only with stable
+// object identity). The generated C declares one (block-scoped, zero-init =
+// empty) per find site and threads its address in. See avm2_op_findpropstrict_ic
+// in avm2_ops.c for the full soundness argument.
+typedef struct Avm2FindCache
+{
+	Avm2Context* ctx;   // domain identity this entry was resolved against
+	Avm2Object* obj;    // cached domain-resolved def object (NULL = empty)
+} Avm2FindCache;
+
+// Inline-cached FindProperty/FindPropStrict. Identical semantics to
+// avm2_op_findproperty; `scope_stable` (recompiler proved the method with-free)
+// additionally allows a cached domain hit to skip the scope walk.
+Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                      uint32_t scope_n, uint32_t mn_idx, int strict,
+                                      int scope_stable, Avm2FindCache* ic);
 // GetGlobalScope: outer chain bottom, else local scope bottom.
 Avm2Object* avm2_op_getglobalscope(Avm2Activation* act, const Avm2ScopeEntry* lscope,
                                    uint32_t scope_n);

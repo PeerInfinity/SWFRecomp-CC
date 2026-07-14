@@ -36,7 +36,44 @@ in Seedling.** Real-GPU interleaved A/B (Intel Gen9): after **43.6 ms** vs befor
   interleave via `tools/divergence/perf/ab_interleave.sh` (in scratchpad — copy
   into perf/ if reused). Windows rig per [[windows-playwright-from-wsl]].
 
-## Step 3 (NEXT) — the two LARGER get levers (getlex-global + class-static)
+## Step 3 lever A DONE (2026-07-14) — getlex-global domain inline cache (~4 ms / ~11%)
+
+The FindProperty/FindPropStrict domain resolution is now per-call-site inline-
+cached. `getlex ClassName`/`getlex FP` is emitted as `FindPropStrict(mn) +
+GetPropertyStatic(mn)`; the FindPropStrict cost is the scope walk + the
+`avm2_domain_find`. The new `avm2_op_findpropstrict_ic` (avm2_ops.c) **always
+re-runs the scope walk** (exact semantics; scope varies per activation) but
+**caches the DOMAIN hit keyed on ctx identity** — sound because the domain is
+append-only with stable object identity and `avm2_domain_find` returns the
+first match, so a non-NULL hit is permanently valid for a ctx. When the method
+is **with-free** (`scope_stable`, recompiler-proved: no PushWith ⟹ every scope
+lookup is trait/vtable-based ⟹ the scope-walk hit/miss is invariant across
+activations at a fixed site), a populated domain cache also **skips the scope
+walk** — the largest saving. Only domain hits are cached; a scope hit or the
+dynamic global-proto fallback always takes the slow path.
+
+- **18,419 cached find sites in Seedling, ALL strict + scope_stable** (FlashPunk
+  is with-free) — far broader than Step-2's 5,039 slot sites.
+- **Real-GPU interleaved A/B (Intel Gen9, 6 rounds, `seedling` vs
+  `seedling_before` built `SWF_NO_FIND_IC=1`): 34.4 ms after vs ~39 ms before =
+  ~4-4.5 ms (~11%)** (all-6 median 4.6 ms/11.7%; settled r3-6 mean 4.1 ms/10.5%;
+  all-6 mean 7.5 ms/17.8% incl. baseline warmup drift). The IC side is
+  rock-stable **34.4 ± 0.29 ms** every round; noise is all on the un-cached
+  baseline. Cumulative arc: ~47 → Step-2 ~43.6 → **~34.4 ms ≈ 29 fps**,
+  essentially the 30 fps / 33.3 ms target.
+- **Code:** runtime `avm2_op_findpropstrict_ic` + `Avm2FindCache`
+  (avm2_ops.c/.h); `findproperty_impl` split into `findproperty_scope_walk` /
+  `findproperty_domain_find` / `findproperty_global_proto` / `findproperty_resolve`
+  helpers shared with the plain op. Recompiler `abc_emit.cpp`: emits the ic form
+  (block-scoped `static Avm2FindCache __fc`) for all static-multiname
+  FindProperty/FindPropStrict; `BodyCtx.scope_stable` = no PushWith;
+  `SWF_NO_FIND_IC=1` A/B toggle.
+- **Validation infra (reuse for lever B):** `-DAVM2_FIND_VERIFY` (avm2_ops.c)
+  cross-checks every ic return against the full uncached `findproperty_resolve`
+  and aborts on mismatch; `verify_output.py`/CI take `SWFRECOMP_EXTRA_DEFINES` /
+  `extra_defines`. Full-suite verify CI: <FILL after CI>.
+
+## Step 3 (NEXT) — lever B: class-static slot (~22%)
 
 Step-1 scout weights (of GET execution, the dominant property op ~15.7% of frame):
 this-slot ~23% (DONE), **getlex-global ~32%**, **class-static slot ~22%**. Step 2
