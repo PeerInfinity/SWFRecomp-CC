@@ -5,6 +5,22 @@ browser-WASM demo of the recompiled AVM2 Seedling in `docs2/examples/avm2`,
 mirroring the AVM1 browser demos (flasharchive/glaiel). This is the prerequisite
 "missing subsystem" — today there is **no browser-WASM AVM2 path at all**.
 
+## 0. Why this stage is THE milestone — beat Ruffle's browser performance
+
+The entire point of SWFRecomp is to run Flash content in the browser **faster
+than Ruffle** (a bytecode interpreter) by recompiling the bytecode to native
+C→WASM. **Seedling is the first target game where Ruffle's browser performance
+is poor enough that the game is effectively unplayable** — so a browser-WASM
+Seedling that runs smoothly is the project's headline result, not just another
+demo. The success metric for Stage 13 is therefore **a same-machine, same-frame
+performance comparison of our WASM build vs Ruffle-WASM on Seedling** (frame
+time / sustained FPS under real input), with our build clearly playable where
+Ruffle is not. Keep this framing while building: 13a/13b get a page up, but the
+deliverable that matters is the perf A/B — instrument frame timing from the
+first browser paint (13a) so the comparison is a measurement, not an impression.
+Perf levers to watch are already catalogued (`browser-perf-is-writebuffer-not-
+avm1-walks`, `wasm-game-performance-profiling`, and §3 below).
+
 Read first: `avm2-stage12-seedling` memory (Seedling runs 30 frames clean both
 NATIVE modes, reaches the FlashPunk Engine loop), `avm2-stage9-render` (the
 Stage-9 Bitmap-blit render path, OFFSCREEN_RENDER-only), `docs-vs-docs2-hosting`
@@ -95,12 +111,25 @@ correctness EARLY (see §4) — we have never seen a correct Seedling frame.
   `copyPixels`-style CPU blit per Bitmap. Watch `writeBuffer` cost (see
   `browser-perf-is-writebuffer-not-avm1-walks`).
 
-## 4. Validation strategy — render correctness is UNPROVEN
-We have never seen a correct Seedling frame FROM OUR RUNTIME: the native capture
-is blocked by the WSL2 lavapipe OOM (`avm2-stage12-seedling`, the 481×481×64
-bitmap-tex array), and Stage-9 render is Bitmap-blit only (no shapes/text/masks —
-FlashPunk is bitmap-based so this *should* suffice, but is untested on a real
-game).
+## 4. Validation strategy — render correctness is now PROVEN (as of 2026-07-13)
+**UPDATE (Stage 12 s5, commit `b3ec6d48c`): our runtime now renders correct
+Seedling GAMEPLAY frames.** After fixing the embedded-ByteArray seed (`.oel`
+levels were loading empty → zero tiles → ~99% black), the GPU-free
+`AVM2_CPU_DUMP` composite of the teleport build **matches the Ruffle oracle at
+MAD 3.834** (frame black 98.7%→0.1%; house/grass/water/path/trees/player/fence
+all correct). So the Stage-9 Bitmap-blit compose IS validated on a real
+FlashPunk game — the "we have never seen a correct Seedling frame" risk that
+gated this whole stage is retired. What remains UNVALIDATED for the browser is
+narrower: the same tree-walk painting onto a real **WebGPU canvas surface** (13a)
+rather than the CPU/offscreen sink. The residual ~5.6% pixel diff is documented
+(day/night MULTIPLY/HARDLIGHT blend + null-matrix, HUD, Emitter) and is
+fidelity, not a compose bug. See `seedling-teleport-gameplay`,
+`avm2-embedded-bytearray-seed`.
+
+Prior context (still true for the native GPU path): native OFFSCREEN_RENDER
+capture is blocked by the WSL2 lavapipe OOM (`avm2-stage12-seedling`, the
+481×481×64 bitmap-tex array), and Stage-9 render is Bitmap-blit only (no
+shapes/text/masks — fine for FlashPunk, which is bitmap-based, as s5 confirmed).
 
 **The oracle half is already available — the Ruffle exporter works for AVM2.**
 The image-comparison harness compares two sides per frame: `.ruffle.png` /
