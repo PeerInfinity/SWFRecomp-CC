@@ -1,9 +1,72 @@
 # Seedling perf — Phase: compile-time type specialization (the recompiler's real lever)
 
-**Status:** PLANNED (2026-07-14). Launch point for a fresh session. The prior arc
-(runtime resolver hashing + inline caches) reached **parity with Ruffle (~47 ms
-ours / ~46 ms Ruffle)** and plateaued there — the last IC extension bought ~2%
-(noise-floor). See [[seedling-perf-hotpath-is-property-lookup]] for that arc.
+**Status:** Step 0/1 DONE (gate GREEN). **Step 2 DONE 2026-07-14 — this.field
+slot specialization shipped: ~3-4 ms / 7-9% real-GPU win, the first gain past the
+IC plateau; full-suite verify-mode CI proves it byte-identical + slot-correct.**
+**Step 3 is the next launch point** (the two LARGER get levers — see below). The
+prior arc (runtime resolver hashing + inline caches) reached parity with Ruffle
+(~47 ms) and plateaued; Step 2 took Seedling to **~43.6 ms**. See
+[[seedling-perf-hotpath-is-property-lookup]] for the IC arc,
+[[seedling-perf-compile-time-specialization]] for this one.
+
+## Step 2 DONE (2026-07-14) — `this.field` slot specialization
+
+Recompiler emits a bare `recv.u.obj->slots[K]` load for `GetPropertyStatic` sites
+proven to be `this.field` on a SLOT/CONST trait — skips the IC call + vtable
+identity + count guard + `resolved_get` dispatch even an IC HIT pays. **5039 sites
+in Seedling.** Real-GPU interleaved A/B (Intel Gen9): after **43.6 ms** vs before
+46.6 ms = **3.0 ms (6.4%); 4.0 ms (8.6%) ex-outlier** — 3/4 rounds a clean
+3.3-5.0 ms, first change past the ±10% noise floor since the IC plateau.
+- Code: `abc_emit.cpp` `AbcTypeModel` + `analyzeSlotSpec` (is_this provenance bit,
+  stack-only so no branch merge leaks it); runtime `avm2_op_getproperty_slot`
+  (avm2_ops.h/.c). K mirrors `avm2_class.c` numbering exactly (`inheritedBase`
+  seed + sequential auto-assign, honoring explicit `slot_or_disp_id`).
+- **Sound gate:** `this` (local0 never written) + sealed class + full ABC chain to
+  Object + name UNIQUE in chain + NO subclass redeclares the name
+  (`subclassRedeclares`, the descendant check — the verify build caught the
+  sub/super same-field bug that motivated it).
+- **Validation infra (reuse for Step 3):** `-DAVM2_SLOT_VERIFY` (avm2_ops.c) makes
+  every specialized read cross-check its compile-time index vs the runtime resolve
+  and abort on mismatch; `verify_output.py` reads `SWFRECOMP_EXTRA_DEFINES`; CI has
+  an `extra_defines` input. Full-suite verify-mode CI (commit a3767a79a): **avm2
+  829 held, matched 102,546 = byte-identical baseline, zero mismatches.**
+- Commits: `ab236e611` (impl), `fe1b9e062` (subclass fix), `a3767a79a` (CI input).
+- A/B rig: `SWF_NO_SLOT_SPEC=1` env recompiles the IC-only baseline; build both
+  with `EMCC_CFLAGS=--profiling-funcs` as `seedling` / `seedling_before`, deploy,
+  interleave via `tools/divergence/perf/ab_interleave.sh` (in scratchpad — copy
+  into perf/ if reused). Windows rig per [[windows-playwright-from-wsl]].
+
+## Step 3 (NEXT) — the two LARGER get levers (getlex-global + class-static)
+
+Step-1 scout weights (of GET execution, the dominant property op ~15.7% of frame):
+this-slot ~23% (DONE), **getlex-global ~32%**, **class-static slot ~22%**. Step 2
+took the smallest of the three; Step 3 is the bigger two, which compose.
+
+**Lever A — getlex-global domain IC (~32%, the single biggest).** `getlex FP` /
+`getlex ClassName` is emitted as `FindPropStrict(mn) + GetPropertyStatic(mn)`; the
+cost is the FindPropStrict **`avm2_domain_find`** scan (avm2_ops.c
+`avm2_op_findproperty` / `avm2_op_finddef` at line 1710/1852). For a definitely-
+defined global class/singleton the resolved definition object is STABLE (the
+domain is append-only, the class defined once) → add a **per-call-site domain
+inline cache**: cache the resolved def object keyed on domain/ctx identity, replay
+on hit, skip the scan. This is the "different-shape" IC the IC arc flagged. Same
+`Avm2InlineCache`-style pattern; AVM2-only → simple no-graphics CI. Recompiler:
+detect `FindPropStrict`+`GetPropertyStatic` of the same static QName (the getlex
+pattern the verifier already produces) and emit a cached finddef.
+
+**Lever B — class-static slot (~22%).** After lever A resolves the Class object,
+`FP.staticField` reads a STATIC slot off it. Class (static) traits carry EXPLICIT
+`slot_or_disp_id` (unlike instance auto-assign — I saw 1,2,3… in abc0_tables.c), so
+the compile-time index is trivial and exact. Extend `AbcTypeModel` to a CLASSOBJ
+receiver: when the receiver is a compile-time-known Class (the getlex result, i.e.
+the `recv_classobj` case the Step-1 scout counts), and the accessed name is a
+static slot trait, emit `classobj->slots[K]`. Reuse the `avm2_op_getproperty_slot`
+runtime op + `-DAVM2_SLOT_VERIFY` validation as-is. Landmine: the class-object
+vtable (`cvt`, avm2_class.c ~line 1027) numbers static slots per-class fresh — mirror
+that (simpler than instance: explicit ids, no inheritance seed for statics).
+
+**Do lever A first** (bigger, self-contained), measure A/B, then B (composes on
+A's cached class object). Coercion elision (bucket C ~4.5 ms) is the Step-4 tail.
 
 ## Why this phase exists (the reframe)
 
@@ -177,11 +240,18 @@ method). Start with the **this/typed-local slot** lever (smallest blast radius,
 clearest correctness) to validate the slot-index-match invariant and measure a real
 A/B, THEN tackle the larger getlex-global + class-static levers.
 
-## Suggested fresh-session launch prompt
+## Suggested fresh-session launch prompt (Step 3)
 
-> Continue the Seedling perf arc — new phase: compile-time type specialization in
-> the recompiler. READ FIRST: SWFRecompDocs/plans/seedling-perf-compile-time-
-> specialization.md and memory [[seedling-perf-compile-time-specialization]] +
-> [[seedling-perf-hotpath-is-property-lookup]]. Do Step 0 (understand the 8.5%
-> idle) then Step 1 (the read-only static-type coverage scout) and report numbers
-> before building anything.
+> Continue the Seedling compile-time type-specialization arc — Step 3. Steps 0-2
+> are DONE: `this.field` slot specialization shipped (~3-4 ms / 7-9% real-GPU win,
+> byte-identical + slot-correct across the full avm2 suite). READ FIRST:
+> SWFRecompDocs/plans/seedling-perf-compile-time-specialization.md (esp. the
+> "Step 2 DONE" + "Step 3" sections) and memory
+> [[seedling-perf-compile-time-specialization]]. Do Step 3 lever A first — the
+> getlex-global domain inline cache (`getlex ClassName` = FindPropStrict +
+> GetPropertyStatic; cache the resolved `avm2_op_finddef`/`avm2_domain_find` def
+> object per site keyed on domain identity, skip the scan). Reuse the Step-2
+> validation infra: `-DAVM2_SLOT_VERIFY`-style guard, the `SWF_NO_SLOT_SPEC`-style
+> A/B baseline toggle, `tools/divergence/perf/ab_interleave.sh`, and full-suite
+> verify-mode CI (`extra_defines` input). Measure a real interleaved A/B and keep
+> avm2 at 829 byte-identical before shipping. Then lever B (class-static slot).
