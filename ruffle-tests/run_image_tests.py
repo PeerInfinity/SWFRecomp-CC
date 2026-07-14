@@ -1,13 +1,32 @@
 #!/usr/bin/env python3
 """
-Run all Ruffle AVM1 image comparison tests locally (headless WebGPU rendering).
+Run Ruffle image comparison tests locally (headless WebGPU rendering) across
+every suite that ships them — avm1, avm2, from_gnash, from_shumway.
 
 Discovers tests with [image_comparisons] in test.toml, runs each one via
-verify_output.py --headless, and writes results to image_results.json.
+verify_output.py --mode=graphics, and writes results to image_results.json
+plus the ruffle-image-results.{md,html} dashboard (the HTML groups by suite).
+
+IMPORTANT — image results are NOT the suite pass/fail metric. verify_output.py
+sets a test's status purely from the TRACE comparison; the image-comparison
+result is recorded separately and never gates pass/fail. These render tests all
+have empty/trivial output.txt, so they "pass" the trace check no matter what the
+pixels look like. This dashboard is therefore the ONLY place image correctness
+is actually observed — do not infer render health from the suite pass counts.
+
+avm2 scope: the full avm2 suite has ~108 image tests, but most need render
+machinery this project does not implement (Stage3D/AGAL, PixelBender/Shader,
+Loader/JPEG-XR image decode, NetStream video, BitmapData filters) and render
+nothing. By default the sweep includes only the avm2 tests that exercise our
+actual render path (bitmap/bitmapdata blit, shapes, text, display, masks);
+pass --all-avm2 to include the unsupported ones too. avm1/from_gnash/from_shumway
+are always included in full.
 
 Usage:
-    python3 ruffle-tests/run_image_tests.py                  # run all
-    python3 ruffle-tests/run_image_tests.py --test=color     # run one
+    python3 ruffle-tests/run_image_tests.py                  # run all suites (avm2 = render subset)
+    python3 ruffle-tests/run_image_tests.py --suite=avm2     # only one suite (repeatable)
+    python3 ruffle-tests/run_image_tests.py --all-avm2       # include unsupported avm2 render tests
+    python3 ruffle-tests/run_image_tests.py --test=color     # run one (bare leaf or suite/leaf)
     python3 ruffle-tests/run_image_tests.py --report-only    # regenerate .md from existing JSON
     python3 ruffle-tests/run_image_tests.py --no-run         # skip test run; redo JSON rebuild + PNG collect + MD + HTML
 """
@@ -47,10 +66,35 @@ _DISCOVERY_SKIP_DIRS = {
     "_swfbridge",
 }
 
+# avm2 image tests whose leaf name contains any of these substrings need a
+# render backend this project does not implement (Stage3D/AGAL, PixelBender/
+# Shader, Loader/JPEG-XR image decode, NetStream video, BitmapData filters), so
+# they render nothing. The default sweep skips them; --all-avm2 keeps them. Only
+# applied to the avm2 suite — other suites are always included in full.
+AVM2_OUT_OF_RENDER_SCOPE = (
+    "stage3d", "away3d", "pixelbender", "shader",
+    "loader_", "netstream", "jpegxr",
+    "applyfilter", "filter_sourcerect", "draw_filters",
+)
 
-def discover_image_tests():
+
+def _in_avm2_render_subset(rel):
+    """True unless `rel` is an avm2 test that needs an unsupported backend."""
+    if not rel.startswith("avm2/"):
+        return True
+    leaf = rel.split("/", 1)[1]
+    return not any(s in leaf for s in AVM2_OUT_OF_RENDER_SCOPE)
+
+
+def discover_image_tests(suites=None, avm2_full=False):
     """Find all test dirs (at any nesting depth) with [image_comparisons]
-    in their test.toml. Returns sorted relative paths (posix-style)."""
+    in their test.toml. Returns sorted relative paths (posix-style).
+
+    suites:    if given, restrict to these top-level suite dirs (e.g. {"avm2"}).
+    avm2_full: if False (default), drop avm2 tests that need an unsupported
+               render backend (see AVM2_OUT_OF_RENDER_SCOPE). Never affects
+               non-avm2 suites.
+    """
     tests = []
 
     def _walk(current):
@@ -78,7 +122,13 @@ def discover_image_tests():
             _walk(child)
 
     _walk(TESTS_DIR)
-    return sorted(tests)
+    tests = sorted(tests)
+    if suites:
+        wanted = set(suites)
+        tests = [t for t in tests if t.split("/")[0] in wanted]
+    if not avm2_full:
+        tests = [t for t in tests if _in_avm2_render_subset(t)]
+    return tests
 
 
 def run_single_test(test_name):
@@ -862,6 +912,15 @@ def main():
         "--test", metavar="NAME", action="append",
         help="Run specific test(s) (repeatable). Default: all image tests.")
     parser.add_argument(
+        "--suite", metavar="NAME", action="append",
+        help="Restrict to these suite dir(s) (repeatable): avm1, avm2, "
+             "from_gnash, from_shumway. Default: all suites.")
+    parser.add_argument(
+        "--all-avm2", action="store_true",
+        help="Include avm2 image tests that need an unsupported render backend "
+             "(Stage3D/AGAL, PixelBender/Shader, Loader/JPEG-XR, NetStream, "
+             "BitmapData filters). Default: skip them (they render nothing).")
+    parser.add_argument(
         "--json", metavar="PATH", default=str(RESULTS_JSON),
         help=f"Output JSON path (default: {RESULTS_JSON.name})")
     parser.add_argument(
@@ -909,7 +968,7 @@ def main():
         return
 
     if args.collect_only:
-        tests = discover_image_tests()
+        tests = discover_image_tests(suites=args.suite, avm2_full=args.all_avm2)
         print(f"Collecting image output for {len(tests)} test(s)...")
         ruffle_map = generate_ruffle_diffs(tests)
         if json_path.exists():
@@ -929,7 +988,7 @@ def main():
     # PNGs + collect into _image-test-output/ + regenerate MD + HTML)
     # without re-running the tests themselves.
     if args.no_run:
-        tests = discover_image_tests()
+        tests = discover_image_tests(suites=args.suite, avm2_full=args.all_avm2)
         print(f"Skipping test run; rebuilding JSON + collecting output + "
               f"regenerating reports for {len(tests)} test(s)...")
         rebuild_json_from_disk(tests, json_path)
@@ -952,14 +1011,17 @@ def main():
 
     # Discover tests
     if args.test:
-        all_image_tests = discover_image_tests()
+        # Validate against the UNFILTERED set so an explicit --test= for an
+        # out-of-subset avm2 test (e.g. a stage3d one) still runs without a
+        # spurious warning.
+        all_image_tests = discover_image_tests(avm2_full=True)
         tests = []
         for t in args.test:
             if t not in all_image_tests:
                 print(f"Warning: '{t}' does not have image_comparisons in test.toml")
             tests.append(t)
     else:
-        tests = discover_image_tests()
+        tests = discover_image_tests(suites=args.suite, avm2_full=args.all_avm2)
 
     if not tests:
         print("No image comparison tests found.")
@@ -1022,6 +1084,26 @@ def main():
     print(f"Image fail:         {report['image_fail']}")
     print(f"No render:          {report['image_no_render']}")
     print(f"Trace pass:         {report['trace_pass']}")
+    # Per-suite image breakdown (strict / tolerance / fail / no-render).
+    by_suite = {}
+    for t in test_results:
+        s = t["test"].split("/")[0]
+        b = by_suite.setdefault(s, {"strict": 0, "tol": 0, "fail": 0, "nr": 0})
+        if t.get("image_status_strict") == "pass":
+            b["strict"] += 1
+        elif t["image_status"] == "pass":
+            b["tol"] += 1
+        elif t["image_status"] == "no_render":
+            b["nr"] += 1
+        else:
+            b["fail"] += 1
+    if len(by_suite) > 1:
+        print("-" * 60)
+        print("Per-suite image results (strict / tolerance / fail / no-render):")
+        for s in sorted(by_suite):
+            b = by_suite[s]
+            print(f"  {s:<13} {b['strict']:>3} / {b['tol']:>3} / "
+                  f"{b['fail']:>3} / {b['nr']:>3}")
     print(f"{'='*60}")
 
     # Generate markdown

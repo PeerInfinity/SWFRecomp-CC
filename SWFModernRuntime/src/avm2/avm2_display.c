@@ -4325,6 +4325,279 @@ static Avm2Value geom_matrix_init(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// ---------------------------------------------------------------------------
+// flash.geom.Matrix method surface (ported from Ruffle avm1/globals/matrix.rs +
+// render/src/matrix.rs, in pure f64 pixel space to match Flash's own doubles —
+// NOT Ruffle's twips-quantized f32 render Matrix). Point transform semantics:
+//   x' = a*x + c*y + tx ,  y' = b*x + d*y + ty .
+// a/b/c/d/tx/ty live as dynamic props (see matrix_get/set_prop).
+// ---------------------------------------------------------------------------
+
+typedef struct { double a, b, c, d, tx, ty; } MatF;
+
+static Avm2Object* make_geom_matrix(Avm2Context* ctx, double a, double b, double c,
+                                    double d, double tx, double ty);
+
+static MatF matf_read(Avm2Context* ctx, Avm2Object* m)
+{
+	MatF r;
+	r.a = matrix_get_prop(ctx, m, "a");  r.b = matrix_get_prop(ctx, m, "b");
+	r.c = matrix_get_prop(ctx, m, "c");  r.d = matrix_get_prop(ctx, m, "d");
+	r.tx = matrix_get_prop(ctx, m, "tx"); r.ty = matrix_get_prop(ctx, m, "ty");
+	return r;
+}
+
+static void matf_write(Avm2Context* ctx, Avm2Object* m, MatF v)
+{
+	matrix_set_prop(ctx, m, "a", v.a);   matrix_set_prop(ctx, m, "b", v.b);
+	matrix_set_prop(ctx, m, "c", v.c);   matrix_set_prop(ctx, m, "d", v.d);
+	matrix_set_prop(ctx, m, "tx", v.tx); matrix_set_prop(ctx, m, "ty", v.ty);
+}
+
+// result = A * B (A applied AFTER B), matching Ruffle's Matrix Mul.
+static MatF matf_mul(MatF A, MatF B)
+{
+	MatF r;
+	r.a = A.a * B.a + A.c * B.b;
+	r.b = A.b * B.a + A.d * B.b;
+	r.c = A.a * B.c + A.c * B.d;
+	r.d = A.b * B.c + A.d * B.d;
+	r.tx = A.a * B.tx + A.c * B.ty + A.tx;
+	r.ty = A.b * B.tx + A.d * B.ty + A.ty;
+	return r;
+}
+
+// arg i coerced to Number; undefined/absent -> NaN (Ruffle's unwrap_or Undefined).
+static double matf_arg(Avm2Activation* act, uint32_t i)
+{
+	return i < act->argc ? avm2_coerce_to_number(act->ctx, act->args[i]) : (double) NAN;
+}
+// arg i coerced to Number; absent -> `def` (Ruffle's `if let Some` pattern).
+static double matf_arg_def(Avm2Activation* act, uint32_t i, double def)
+{
+	return i < act->argc ? avm2_coerce_to_number(act->ctx, act->args[i]) : def;
+}
+
+static Avm2Object* matf_obj_arg(Avm2Activation* act, uint32_t i)
+{
+	return (act->argc > i && act->args[i].kind == AVM2_VALUE_OBJECT)
+		? act->args[i].u.obj : NULL;
+}
+
+static double matf_read_num_prop(Avm2Context* ctx, Avm2Object* o, const char* name)
+{
+	if (o == NULL) return 0.0;
+	int found = 0;
+	Avm2Value v = avm2_get_public_property(ctx, avm2_object_value(o), name,
+	                                       (uint32_t) strlen(name), &found);
+	return found ? avm2_coerce_to_number(ctx, v) : 0.0;
+}
+
+static Avm2Value geom_matrix_identity(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s != NULL) matf_write(act->ctx, s, (MatF){ 1, 0, 0, 1, 0, 0 });
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_clone(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	MatF m = matf_read(act->ctx, s);
+	return avm2_object_value(
+		make_geom_matrix(act->ctx, m.a, m.b, m.c, m.d, m.tx, m.ty));
+}
+
+static Avm2Value geom_matrix_scale(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	double sx = matf_arg(act, 0), sy = matf_arg(act, 1);
+	MatF cur = matf_read(act->ctx, s);
+	matf_write(act->ctx, s, matf_mul((MatF){ sx, 0, 0, sy, 0, 0 }, cur));
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_rotate(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	double q = matf_arg(act, 0);
+	MatF R = { cos(q), sin(q), -sin(q), cos(q), 0, 0 };
+	matf_write(act->ctx, s, matf_mul(R, matf_read(act->ctx, s)));
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_translate(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	double dx = matf_arg(act, 0), dy = matf_arg(act, 1);
+	MatF cur = matf_read(act->ctx, s);
+	cur.tx += dx;
+	cur.ty += dy;
+	matf_write(act->ctx, s, cur);
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_concat(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	Avm2Object* o = matf_obj_arg(act, 0);
+	MatF other = o != NULL ? matf_read(act->ctx, o) : (MatF){ 1, 0, 0, 1, 0, 0 };
+	// this = other * this
+	matf_write(act->ctx, s, matf_mul(other, matf_read(act->ctx, s)));
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_invert(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	MatF m = matf_read(act->ctx, s);
+	double det = m.a * m.d - m.b * m.c;
+	MatF r;
+	if (det != 0.0 && isfinite(det))
+	{
+		r.a = m.d / det;   r.b = -m.b / det;
+		r.c = -m.c / det;  r.d = m.a / det;
+		r.tx = (m.c * m.ty - m.d * m.tx) / det;
+		r.ty = (m.b * m.tx - m.a * m.ty) / det;
+	}
+	else
+	{
+		r = (MatF){ 1, 0, 0, 1, 0, 0 };  // Ruffle: unwrap_or_default (identity)
+	}
+	matf_write(act->ctx, s, r);
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_create_box(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	double sx = matf_arg(act, 0), sy = matf_arg(act, 1), rot = matf_arg(act, 2);
+	double tx = matf_arg_def(act, 3, 0.0), ty = matf_arg_def(act, 4, 0.0);
+	MatF r = { cos(rot) * sx, sin(rot) * sy, -sin(rot) * sx, cos(rot) * sy, tx, ty };
+	matf_write(act->ctx, s, r);
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_create_gradient_box(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	double w = matf_arg(act, 0), h = matf_arg(act, 1);
+	double rot = matf_arg_def(act, 2, 0.0);
+	double tx = matf_arg_def(act, 3, 0.0), ty = matf_arg_def(act, 4, 0.0);
+	double sx = w / 1638.4, sy = h / 1638.4;
+	MatF r = { cos(rot) * sx, sin(rot) * sy, -sin(rot) * sx, cos(rot) * sy,
+	           tx + w / 2.0, ty + h / 2.0 };
+	matf_write(act->ctx, s, r);
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_transform_point_impl(Avm2Activation* act, int delta)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	MatF m = matf_read(ctx, s);
+	Avm2Object* pt = matf_obj_arg(act, 0);
+	double px = matf_read_num_prop(ctx, pt, "x");
+	double py = matf_read_num_prop(ctx, pt, "y");
+	double x = px * m.a + py * m.c + (delta ? 0.0 : m.tx);
+	double y = px * m.b + py * m.d + (delta ? 0.0 : m.ty);
+	extern Avm2Class* avm2_display_point_class(Avm2Context* ctx);
+	Avm2Value pa[2] = { avm2_number(x), avm2_number(y) };
+	return avm2_class_construct(ctx, avm2_display_point_class(ctx), pa, 2);
+}
+
+static Avm2Value geom_matrix_transform_point(Avm2Activation* act)
+{
+	return geom_matrix_transform_point_impl(act, 0);
+}
+
+static Avm2Value geom_matrix_delta_transform_point(Avm2Activation* act)
+{
+	return geom_matrix_transform_point_impl(act, 1);
+}
+
+static Avm2Value geom_matrix_set_to(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	MatF r = { matf_arg_def(act, 0, 0), matf_arg_def(act, 1, 0),
+	           matf_arg_def(act, 2, 0), matf_arg_def(act, 3, 0),
+	           matf_arg_def(act, 4, 0), matf_arg_def(act, 5, 0) };
+	matf_write(act->ctx, s, r);
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_copy_from(Avm2Activation* act)
+{
+	Avm2Object* s = this_obj(act);
+	Avm2Object* o = matf_obj_arg(act, 0);
+	if (s != NULL && o != NULL) matf_write(act->ctx, s, matf_read(act->ctx, o));
+	return avm2_undefined();
+}
+
+// copyRowFrom(index, Vector3D): row0 -> (a,c,tx), row1 -> (b,d,ty), row2 ignored.
+static Avm2Value geom_matrix_copy_row_from(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	int idx = (int) matf_arg(act, 0);
+	Avm2Object* v = matf_obj_arg(act, 1);
+	double vx = matf_read_num_prop(ctx, v, "x");
+	double vy = matf_read_num_prop(ctx, v, "y");
+	double vz = matf_read_num_prop(ctx, v, "z");
+	MatF m = matf_read(ctx, s);
+	if (idx == 0) { m.a = vx; m.c = vy; m.tx = vz; }
+	else if (idx == 1) { m.b = vx; m.d = vy; m.ty = vz; }
+	matf_write(ctx, s, m);
+	return avm2_undefined();
+}
+
+// copyColumnFrom(index, Vector3D): col0 -> (a,b), col1 -> (c,d), col2 -> (tx,ty).
+static Avm2Value geom_matrix_copy_column_from(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	int idx = (int) matf_arg(act, 0);
+	Avm2Object* v = matf_obj_arg(act, 1);
+	double vx = matf_read_num_prop(ctx, v, "x");
+	double vy = matf_read_num_prop(ctx, v, "y");
+	MatF m = matf_read(ctx, s);
+	if (idx == 0) { m.a = vx; m.b = vy; }
+	else if (idx == 1) { m.c = vx; m.d = vy; }
+	else if (idx == 2) { m.tx = vx; m.ty = vy; }
+	matf_write(ctx, s, m);
+	return avm2_undefined();
+}
+
+// flash.geom.Vector3D minimal init (x,y,z,w dynamic props) so Matrix
+// copyRow/copyColumnFrom read real components.
+static Avm2Value geom_vector3d_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	static const char* const n[4] = { "x", "y", "z", "w" };
+	for (int i = 0; i < 4; i++)
+	{
+		double v = (uint32_t) i < act->argc
+			? avm2_coerce_to_number(ctx, act->args[i]) : 0.0;
+		avm2_object_set_dynamic(ctx, self, n[i], (uint32_t) strlen(n[i]),
+		                        avm2_number(v));
+	}
+	return avm2_undefined();
+}
+
 static Avm2Value geom_matrix_to_string(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -6575,6 +6848,26 @@ void avm2_register_display(Avm2Context* ctx)
 	geom_matrix->instance_init.fn = geom_matrix_init;
 	geom_matrix->instance_init.debug_name = "Matrix";
 	avm2_builtin_add_method(ctx, geom_matrix, "toString", geom_matrix_to_string);
+	avm2_builtin_add_method(ctx, geom_matrix, "identity", geom_matrix_identity);
+	avm2_builtin_add_method(ctx, geom_matrix, "clone", geom_matrix_clone);
+	avm2_builtin_add_method(ctx, geom_matrix, "scale", geom_matrix_scale);
+	avm2_builtin_add_method(ctx, geom_matrix, "rotate", geom_matrix_rotate);
+	avm2_builtin_add_method(ctx, geom_matrix, "translate", geom_matrix_translate);
+	avm2_builtin_add_method(ctx, geom_matrix, "concat", geom_matrix_concat);
+	avm2_builtin_add_method(ctx, geom_matrix, "invert", geom_matrix_invert);
+	avm2_builtin_add_method(ctx, geom_matrix, "createBox", geom_matrix_create_box);
+	avm2_builtin_add_method(ctx, geom_matrix, "createGradientBox",
+	                        geom_matrix_create_gradient_box);
+	avm2_builtin_add_method(ctx, geom_matrix, "transformPoint",
+	                        geom_matrix_transform_point);
+	avm2_builtin_add_method(ctx, geom_matrix, "deltaTransformPoint",
+	                        geom_matrix_delta_transform_point);
+	avm2_builtin_add_method(ctx, geom_matrix, "setTo", geom_matrix_set_to);
+	avm2_builtin_add_method(ctx, geom_matrix, "copyFrom", geom_matrix_copy_from);
+	avm2_builtin_add_method(ctx, geom_matrix, "copyRowFrom",
+	                        geom_matrix_copy_row_from);
+	avm2_builtin_add_method(ctx, geom_matrix, "copyColumnFrom",
+	                        geom_matrix_copy_column_from);
 	g_matrix_class = geom_matrix;
 	Avm2Class* geom_transform = avm2_builtin_class(ctx, "flash.geom", "Transform",
 	                                               b->object_class);
@@ -6606,7 +6899,8 @@ void avm2_register_display(Avm2Context* ctx)
 		(void) pp;
 		Avm2Class* v3 = avm2_builtin_class(ctx, "flash.geom", "Vector3D",
 		                                   b->object_class);
-		(void) v3;
+		v3->instance_init.fn = geom_vector3d_init;
+		v3->instance_init.debug_name = "Vector3D";
 	}
 
 	// flash.geom.ColorTransform (8 numeric slots + FP toString).

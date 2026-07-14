@@ -1498,7 +1498,12 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		mtx = read_prop_num(ctx, mv, "tx"); mty = read_prop_num(ctx, mv, "ty");
 	}
 	int identity_2x2 = (ma == 1.0 && mb == 0.0 && mc == 0.0 && md == 1.0);
-	if (!identity_2x2 || !extra_matrix_ok || blend_alpha_or_erase)
+	// A BitmapData source under an arbitrary affine matrix is CPU-rasterized
+	// below (inverse-map). A Bitmap (DisplayObject) source keeps the Stage-9
+	// scope: only pure translation (identity 2x2) blits on the CPU; a
+	// rotated/scaled Bitmap source still needs the offscreen GPU path.
+	int can_affine = source_is_bitmapdata;
+	if ((!identity_2x2 && !can_affine) || !extra_matrix_ok || blend_alpha_or_erase)
 		return avm2_undefined();  // needs the offscreen GPU render path
 
 	// colorTransform (arg 2): optional. Default = identity.
@@ -1520,6 +1525,76 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		               && ro == 0 && go == 0 && bo == 0 && ao == 0);
 	}
 
+	// copy_on_cpu: blend only when the source is transparent. blend_and_transform
+	// (has_cxform) always blends over the destination.
+	int blend = src->transparency ? 1 : 0;
+	int opaque = !dst->transparency;
+
+	// --- General affine CPU raster (non-identity 2x2, BitmapData source) ------
+	// Inverse-map (dest->src) with pixel-center sampling + nearest-neighbor:
+	// a dest pixel is covered iff its center back-projects inside the source
+	// rectangle — the same coverage rule Ruffle's GPU quad draw applies. The
+	// matrix maps source pixels -> dest pixels directly (no twips).
+	if (!identity_2x2)
+	{
+		double det = ma * md - mc * mb;
+		// A degenerate or non-finite matrix (e.g. a NaN transform fed by a
+		// caller with uninitialized scale) maps nothing — no-op, don't
+		// floor(NaN) into out-of-bounds sampling below.
+		if (det == 0.0 || !isfinite(det)
+		    || !isfinite(mtx) || !isfinite(mty))
+			return avm2_undefined();
+		double sw = (double) src->width, sh = (double) src->height;
+		double cxs[4] = { 0.0, sw, 0.0, sw };
+		double cys[4] = { 0.0, 0.0, sh, sh };
+		double minx = 1e30, miny = 1e30, maxx = -1e30, maxy = -1e30;
+		for (int k = 0; k < 4; k++)
+		{
+			double dxp = ma * cxs[k] + mc * cys[k] + mtx;
+			double dyp = mb * cxs[k] + md * cys[k] + mty;
+			if (dxp < minx) minx = dxp;
+			if (dxp > maxx) maxx = dxp;
+			if (dyp < miny) miny = dyp;
+			if (dyp > maxy) maxy = dyp;
+		}
+		int px0 = (int) floor(minx), px1 = (int) ceil(maxx);
+		int py0 = (int) floor(miny), py1 = (int) ceil(maxy);
+		if (px0 < 0) px0 = 0;
+		if (py0 < 0) py0 = 0;
+		if (px1 > (int) dst->width) px1 = (int) dst->width;
+		if (py1 > (int) dst->height) py1 = (int) dst->height;
+		double ia = md / det, ic = -mc / det, ib = -mb / det, id = ma / det;
+		for (int dy = py0; dy < py1; dy++)
+		{
+			for (int dx = px0; dx < px1; dx++)
+			{
+				double ex = (dx + 0.5) - mtx;
+				double ey = (dy + 0.5) - mty;
+				int spx = (int) floor(ia * ex + ic * ey);
+				int spy = (int) floor(ib * ex + id * ey);
+				if (spx < 0 || spy < 0
+				    || spx >= (int) src->width || spy >= (int) src->height)
+					continue;
+				uint32_t color = bd_get_raw(src, (uint32_t) spx, (uint32_t) spy);
+				if (has_cxform)
+				{
+					uint32_t c = unmul(color);
+					uint8_t r = ctx_channel(rm, ro, (uint8_t) CR(c));
+					uint8_t g = ctx_channel(gm, go, (uint8_t) CG(c));
+					uint8_t b = ctx_channel(bm, bo, (uint8_t) CB(c));
+					uint8_t a = ctx_channel(am, ao, (uint8_t) CA(c));
+					color = premul(CMK(r, g, b, a), 1);
+				}
+				if (blend || has_cxform)
+					color = blend_over(
+						bd_get_raw(dst, (uint32_t) dx, (uint32_t) dy), color);
+				if (opaque) color = with_alpha(color, 0xFF);
+				bd_set_raw(dst, (uint32_t) dx, (uint32_t) dy, color);
+			}
+		}
+		return avm2_undefined();
+	}
+
 	int32_t tx = (int32_t) floor(mtx + extra_tx);
 	int32_t ty = (int32_t) floor(mty + extra_ty);
 
@@ -1529,11 +1604,6 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	pr_clamp_intersection(&dst_region, tx, ty, 0, 0,
 	                      (int32_t) src->width, (int32_t) src->height, &src_region);
 	if (pr_w(&dst_region) == 0 || pr_h(&dst_region) == 0) return avm2_undefined();
-
-	// copy_on_cpu: blend only when the source is transparent. blend_and_transform
-	// (has_cxform) always blends over the destination.
-	int blend = src->transparency ? 1 : 0;
-	int opaque = !dst->transparency;
 
 	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
 	for (uint32_t j = 0; j < rh; j++)

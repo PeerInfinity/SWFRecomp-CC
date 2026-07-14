@@ -1,7 +1,55 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) IN PROGRESS (session 3);
-prior lines below are session 2.
+Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) IN PROGRESS (session 4);
+prior lines below are session 3.
+
+## State (Stage 12 — Seedling bring-up, session 4 2026-07-13)
+
+Session 4 targeted the gameplay render gap (FlashPunk `BitmapData.draw` with a
+matrix). Three things landed; the Seedling gap moved but did not fully close.
+
+- **`flash.geom.Matrix` was a bare stub** (only `toString` + the a/b/c/d/tx/ty
+  ctor) — the *real* blocker. `bitmapdata_draw_rotation`'s `matrix.rotate()`
+  threw, aborting the test ctor **before** `b.draw(...)`, so `bd_draw` was never
+  even reached. Implemented the full method surface in `avm2_display.c`
+  (identity/clone/scale/rotate/translate/concat/invert/createBox/
+  createGradientBox/transformPoint/deltaTransformPoint/setTo/copyFrom/
+  copyRowFrom/copyColumnFrom), ported from Ruffle `avm1/globals/matrix.rs` +
+  `render/src/matrix.rs` but in **pure f64 pixel space** (Flash's own doubles),
+  not Ruffle's twips-quantized f32. Added a minimal `flash.geom.Vector3D` init
+  (x/y/z/w) so copyRow/copyColumnFrom read real components.
+- **`bd_draw` general affine CPU raster** (`avm2_bitmap.c`): the identity-2x2
+  guard now falls through to an inverse-map (dest→src, pixel-center,
+  nearest-neighbor) raster for a **BitmapData source under an arbitrary affine
+  matrix** (+ optional colorTransform), matching Ruffle's GPU quad coverage
+  rule. Non-finite/degenerate matrices are a clean no-op. Validated against the
+  Ruffle oracle via the GPU-free `AVM2_CPU_DUMP` path: **rotation frame is
+  MAD 0.134, only 116/220000 px differ (>10)** — all on the rotated diamond's
+  edge (nearest-neighbor boundary), i.e. essentially pixel-perfect.
+- **IMPORTANT metric finding: image comparisons never gate pass/fail.**
+  `verify_output.py` sets a test's `status` purely from the TRACE comparison
+  (`if match:`); `image_comparisons` is recorded but never read back into the
+  status. Every render test has an empty/trivial `output.txt`, so it "passes"
+  the trace check regardless of pixels. So the Stage-9 "8/9 bitmap tests pass"
+  and every graphics-mode avm2 pass count are **trace passes** — image
+  correctness was recorded but never gated. Decision (with the user): keep
+  pass/fail trace-based and use `run_image_tests.py` →
+  `ruffle-image-results.{md,html}` as the image source of truth. That script now
+  sweeps the **avm2 render subset** (62 of 108; skips Stage3D/AGAL/PixelBender/
+  Loader/JPEG-XR/NetStream/filter tests that need unsupported backends;
+  `--all-avm2` for the full set, `--suite=` to scope) and reports per-suite.
+  NOTE: local WSL2 rendering is not pixel-exact vs the expected PNGs even for
+  CI-passing tests (e.g. `copypixels` matches in mean but has 25k tol-0
+  outliers locally), so the CPU-dump is the reliable local validator.
+- **Seedling render gap re-diagnosed (finding corrected).** With Matrix methods
+  in, Seedling's scenery draws now **reach `bd_draw`'s affine branch** (not
+  dropped) — but the input matrices are **all NaN** (`m=[nan nan nan nan …]`).
+  FlashPunk `Image.render` computes `_matrix.a = scaleX * scale` etc.; the
+  character still renders via `copyPixels` (so *its* `scale==1`), but scenery
+  graphics feed NaN scale/origin — a property/level (`.oel`/Spritemap) init
+  divergence, NOT a `bd_draw` gap. Frame 59 is still ~98.7% black (unchanged
+  from s3), 0 uncaught. `bd_draw` now no-ops non-finite matrices so this is a
+  clean miss, not garbage. This NaN-matrix source is the next Seedling target.
 
 ## State (Stage 12 — Seedling bring-up, session 3 2026-07-13)
 
