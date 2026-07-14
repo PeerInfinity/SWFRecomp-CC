@@ -71,7 +71,11 @@ dynamic global-proto fallback always takes the slow path.
 - **Validation infra (reuse for lever B):** `-DAVM2_FIND_VERIFY` (avm2_ops.c)
   cross-checks every ic return against the full uncached `findproperty_resolve`
   and aborts on mismatch; `verify_output.py`/CI take `SWFRECOMP_EXTRA_DEFINES` /
-  `extra_defines`. Full-suite verify CI: <FILL after CI>.
+  `extra_defines`. **Full-suite verify CI (run 29374729764,
+  `-DAVM2_FIND_VERIFY`): avm2 829 held, 102,546 lines matched, ZERO mismatch
+  aborts — the IC + scope-skip is sound across the whole suite.** Normal
+  no-graphics CI (run 29374737324): avm2 829→829, mismatched 47323→47323
+  (byte-identical, zero pass→fail). Commit `dad415990`.
 
 ## Step 3 (NEXT) — lever B: class-static slot (~22%)
 
