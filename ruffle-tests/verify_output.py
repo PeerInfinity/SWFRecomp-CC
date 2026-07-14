@@ -1884,6 +1884,12 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     # Compile
     inc = SWFMODERN / "include"
     extra_defines = []
+    # Opt-in extra compile defines (space-separated -DFOO tokens), e.g.
+    # SWFRECOMP_EXTRA_DEFINES="-DAVM2_SLOT_VERIFY" to validate the compile-time
+    # slot-specialization numbering against the runtime resolve.
+    _extra = os.environ.get("SWFRECOMP_EXTRA_DEFINES", "").strip()
+    if _extra:
+        extra_defines.extend(_extra.split())
     mock_time = get_mock_date_time(test_dir)
     if mock_time is None:
         # Default mock time matches Ruffle's deterministic mode:

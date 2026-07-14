@@ -580,6 +580,48 @@ Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
 	return getproperty_static_impl(act, recv, mn_idx, ic);
 }
 
+#ifdef AVM2_SLOT_VERIFY
+// Verify build: prove the recompiler's compile-time slot index matches what the
+// full runtime resolve produces, for every specialized read that executes. Any
+// mismatch (receiver not a plain object, slot out of range, name doesn't resolve
+// to a slot, or resolves to a different index) aborts loudly with context.
+Avm2Value avm2_op_getproperty_slot(Avm2Activation* act, Avm2Value recv,
+                                   uint32_t slot, uint32_t mn_idx)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (recv.kind != AVM2_VALUE_OBJECT || recv.u.obj == NULL)
+	{
+		avm2_fatal("AVM2 slot-verify: receiver of %.*s is not an object (kind=%u)",
+		           (int) name_len, name, recv.kind);
+	}
+	if (slot == 0 || slot >= recv.u.obj->slot_count)
+	{
+		avm2_fatal("AVM2 slot-verify: slot %u of %.*s out of range (slot_count=%u)",
+		           slot, (int) name_len, name, recv.u.obj->slot_count);
+	}
+	Resolved r;
+	int ok = resolve_mn(act, recv, mn_idx, &r);
+	if (!ok || r.entry == NULL || r.entry->kind != AVM2_PROP_SLOT)
+	{
+		char cn[160];
+		class_name_of(act->ctx, recv, cn, sizeof(cn));
+		avm2_fatal("AVM2 slot-verify: %.*s on %s did not resolve to a slot "
+		           "(ok=%d)", (int) name_len, name, cn, ok);
+	}
+	if (r.entry->slot_index != slot)
+	{
+		char cn[160];
+		class_name_of(act->ctx, recv, cn, sizeof(cn));
+		avm2_fatal("AVM2 slot-verify: %.*s on %s — compile-time slot %u != "
+		           "runtime slot %u", (int) name_len, name, cn, slot,
+		           r.entry->slot_index);
+	}
+	return recv.u.obj->slots[slot];
+}
+#endif
+
 static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
                                    const Avm2QNameExt* q);
 

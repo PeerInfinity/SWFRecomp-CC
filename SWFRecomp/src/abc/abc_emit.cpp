@@ -174,8 +174,10 @@ namespace abc
 	}
 
 	// Emits one op's C. Returns false if the op is unsupported (caller
-	// emits an inline abort and continues with the next op).
-	static bool emitOp(ofstream& out, const BodyCtx& bc, const IrOp& op)
+	// emits an inline abort and continues with the next op). `slotSpec` >= 0
+	// marks a GetPropertyStatic the type-specialization pass proved is a bare
+	// `this.field` slot read at that compile-time slot index.
+	static bool emitOp(ofstream& out, const BodyCtx& bc, const IrOp& op, int slotSpec = -1)
 	{
 		const AbcFile& abc = *bc.abc;
 		switch (op.op)
@@ -329,6 +331,15 @@ namespace abc
 
 			// --- properties ---
 			case IrOpcode::GetPropertyStatic:
+				if (slotSpec >= 0)
+				{
+					// Type-specialized: receiver is provably `this` and the name
+					// is a slot trait at compile-time index slotSpec → bare load.
+					out << "\tstk[sp - 1] = avm2_op_getproperty_slot(act, "
+					       "stk[sp - 1], " << slotSpec << ", " << op.arg1 << ");"
+					    << endl;
+					return true;
+				}
 				// Per-call-site monomorphic inline cache: a block-scoped static
 				// gives each getproperty its own cache slot (avm2_ops.h).
 				out << "\t{ static Avm2InlineCache __ic; stk[sp - 1] = "
@@ -748,9 +759,305 @@ namespace abc
 		}
 	}
 
+	// =====================================================================
+	// Compile-time type-specialization model (Step 2: emit direct slot reads
+	// where the receiver is provably `this`, an instance of a sealed ABC class
+	// whose full chain to Object is ABC-defined, and the name is a slot trait).
+	// The compile-time slot index is numbered IDENTICALLY to avm2_class.c's
+	// ivtable assignment (parent slot_count seed + sequential auto-assign) so
+	// `slots[K]` matches the runtime; -DAVM2_SLOT_VERIFY cross-checks every read.
+	// =====================================================================
+
+	// Operand-stack pop/push counts, mirroring abc_verifier.cpp stackEffect
+	// (scope delta omitted — irrelevant to value-stack depth alignment).
+	static void irStackEffect(const IrOp& op, const AbcFile& abc, u32& pops, u32& pushes)
+	{
+		pops = 0; pushes = 0;
+		u32 lazy = 0;
+		switch (op.op) {
+			case IrOpcode::CallProperty: case IrOpcode::CallPropLex:
+			case IrOpcode::CallPropVoid: case IrOpcode::CallSuper:
+			case IrOpcode::ConstructProp: case IrOpcode::GetPropertyStatic:
+			case IrOpcode::GetPropertyFast: case IrOpcode::GetPropertySlow:
+			case IrOpcode::SetPropertyStatic: case IrOpcode::SetPropertyFast:
+			case IrOpcode::SetPropertySlow: case IrOpcode::InitProperty:
+			case IrOpcode::DeleteProperty: case IrOpcode::GetSuper:
+			case IrOpcode::SetSuper: case IrOpcode::GetDescendants:
+			case IrOpcode::FindProperty: case IrOpcode::FindPropStrict:
+			case IrOpcode::FindDef: {
+				if (op.arg1 < abc.pool.multinames.size()) {
+					const AbcMultiname& m = abc.pool.multinames[op.arg1];
+					lazy = (m.hasLazyName() ? 1u : 0u) + (m.hasLazyNs() ? 1u : 0u);
+				}
+				break;
+			}
+			default: break;
+		}
+		switch (op.op) {
+			case IrOpcode::Add: case IrOpcode::AddI: case IrOpcode::Subtract:
+			case IrOpcode::SubtractI: case IrOpcode::Multiply: case IrOpcode::MultiplyI:
+			case IrOpcode::Divide: case IrOpcode::Modulo: case IrOpcode::LShift:
+			case IrOpcode::RShift: case IrOpcode::URShift: case IrOpcode::BitAnd:
+			case IrOpcode::BitOr: case IrOpcode::BitXor: case IrOpcode::Equals:
+			case IrOpcode::StrictEquals: case IrOpcode::LessThan: case IrOpcode::LessEquals:
+			case IrOpcode::GreaterThan: case IrOpcode::GreaterEquals: case IrOpcode::In:
+			case IrOpcode::InstanceOf: case IrOpcode::IsTypeLate: case IrOpcode::AsTypeLate:
+			case IrOpcode::HasNext: case IrOpcode::NextName: case IrOpcode::NextValue:
+				pops = 2; pushes = 1; break;
+			case IrOpcode::Negate: case IrOpcode::NegateI: case IrOpcode::BitNot:
+			case IrOpcode::Not: case IrOpcode::Increment: case IrOpcode::IncrementI:
+			case IrOpcode::Decrement: case IrOpcode::DecrementI: case IrOpcode::TypeOf:
+			case IrOpcode::ConvertO: case IrOpcode::ConvertS: case IrOpcode::CoerceA:
+			case IrOpcode::CoerceB: case IrOpcode::CoerceD: case IrOpcode::CoerceI:
+			case IrOpcode::CoerceO: case IrOpcode::CoerceS: case IrOpcode::CoerceU:
+			case IrOpcode::Coerce: case IrOpcode::AsType: case IrOpcode::IsType:
+			case IrOpcode::CheckFilter: case IrOpcode::EscXAttr: case IrOpcode::EscXElem:
+			case IrOpcode::Li8: case IrOpcode::Li16: case IrOpcode::Li32:
+			case IrOpcode::Lf32: case IrOpcode::Lf64: case IrOpcode::Sxi1:
+			case IrOpcode::Sxi8: case IrOpcode::Sxi16: case IrOpcode::NewClass:
+				pops = 1; pushes = 1; break;
+			case IrOpcode::PushInt: case IrOpcode::PushUint: case IrOpcode::PushDouble:
+			case IrOpcode::PushString: case IrOpcode::PushNamespace: case IrOpcode::PushNaN:
+			case IrOpcode::PushNull: case IrOpcode::PushUndefined: case IrOpcode::PushTrue:
+			case IrOpcode::PushFalse: case IrOpcode::GetLocal: case IrOpcode::GetScopeObject:
+			case IrOpcode::GetOuterScope: case IrOpcode::GetGlobalScope:
+			case IrOpcode::GetGlobalSlot: case IrOpcode::NewFunction: case IrOpcode::NewCatch:
+			case IrOpcode::NewActivation: case IrOpcode::HasNext2:
+				pushes = 1; break;
+			case IrOpcode::Dup: pops = 1; pushes = 2; break;
+			case IrOpcode::Swap: pops = 2; pushes = 2; break;
+			case IrOpcode::Pop: case IrOpcode::SetLocal: case IrOpcode::SetGlobalSlot:
+			case IrOpcode::DxnsLate: case IrOpcode::IfTrue: case IrOpcode::IfFalse:
+			case IrOpcode::LookupSwitch: case IrOpcode::ReturnValue: case IrOpcode::Throw:
+				pops = 1; break;
+			case IrOpcode::PushScope: case IrOpcode::PushWith: pops = 1; break;
+			case IrOpcode::GetSlot: pops = 1; pushes = 1; break;
+			case IrOpcode::SetSlot: pops = 2; break;
+			case IrOpcode::GetPropertyStatic: case IrOpcode::GetPropertyFast:
+			case IrOpcode::GetPropertySlow: case IrOpcode::GetSuper:
+			case IrOpcode::DeleteProperty: case IrOpcode::GetDescendants:
+				pops = 1 + lazy; pushes = 1; break;
+			case IrOpcode::SetPropertyStatic: case IrOpcode::SetPropertyFast:
+			case IrOpcode::SetPropertySlow: case IrOpcode::InitProperty:
+			case IrOpcode::SetSuper:
+				pops = 2 + lazy; break;
+			case IrOpcode::FindProperty: case IrOpcode::FindPropStrict:
+			case IrOpcode::FindDef:
+				pops = lazy; pushes = 1; break;
+			case IrOpcode::Call: pops = op.arg2 + 2; pushes = 1; break;
+			case IrOpcode::CallStatic: pops = op.arg2 + 1; pushes = 1; break;
+			case IrOpcode::CallProperty: case IrOpcode::CallPropLex: case IrOpcode::CallSuper:
+				pops = op.arg2 + 1 + lazy; pushes = 1; break;
+			case IrOpcode::CallPropVoid: pops = op.arg2 + 1 + lazy; break;
+			case IrOpcode::Construct: pops = op.arg2 + 1; pushes = 1; break;
+			case IrOpcode::ConstructProp: pops = op.arg2 + 1 + lazy; pushes = 1; break;
+			case IrOpcode::ConstructSuper: pops = op.arg2 + 1; break;
+			case IrOpcode::NewObject: pops = op.arg2 * 2; pushes = 1; break;
+			case IrOpcode::NewArray: pops = op.arg2; pushes = 1; break;
+			case IrOpcode::ApplyType: pops = op.arg2 + 1; pushes = 1; break;
+			case IrOpcode::Si8: case IrOpcode::Si16: case IrOpcode::Si32:
+			case IrOpcode::Sf32: case IrOpcode::Sf64: pops = 2; break;
+			default: break;
+		}
+	}
+
+	struct AbcTypeModel
+	{
+		const AbcFile& abc;
+		std::map<string, int> nameToInst;   // user-class local name -> instance idx
+		struct MI { int cls = -1; bool inst = true; };
+		std::map<u32, MI> m2c;              // method index -> defining class + this-kind
+		mutable std::map<int, int> slotCountMemo;
+
+		explicit AbcTypeModel(const AbcFile& a) : abc(a)
+		{
+			for (size_t i = 0; i < abc.instances.size(); i++)
+			{
+				string nm = localName(abc.instances[i].name);
+				if (!nm.empty() && !nameToInst.count(nm)) nameToInst[nm] = (int) i;
+			}
+			for (size_t i = 0; i < abc.instances.size(); i++)
+			{
+				const AbcInstance& in = abc.instances[i];
+				m2c[in.init_method] = { (int) i, true };
+				for (const AbcTrait& t : in.traits)
+					if (t.kind == TraitKindType::Method || t.kind == TraitKindType::Getter
+					    || t.kind == TraitKindType::Setter)
+						m2c[t.method_or_class] = { (int) i, true };
+				if (i < abc.classes.size())
+				{
+					m2c[abc.classes[i].init_method] = { (int) i, false };
+					for (const AbcTrait& t : abc.classes[i].traits)
+						if (t.kind == TraitKindType::Method || t.kind == TraitKindType::Getter
+						    || t.kind == TraitKindType::Setter)
+							m2c[t.method_or_class] = { (int) i, false };
+				}
+			}
+		}
+		string localName(u32 mn) const
+		{
+			const auto& S = abc.pool.strings; const auto& MN = abc.pool.multinames;
+			if (mn == 0 || mn >= MN.size()) return "";
+			u32 s = MN[mn].name; return s < S.size() ? S[s] : "";
+		}
+		int typeMnToInst(u32 mn) const
+		{
+			if (mn == 0) return -1;
+			auto it = nameToInst.find(localName(mn));
+			return it == nameToInst.end() ? -1 : it->second;
+		}
+		bool isSealed(int inst) const
+		{
+			return inst >= 0 && inst < (int) abc.instances.size()
+			    && abc.instances[inst].is_sealed && !abc.instances[inst].is_interface;
+		}
+		static bool isSlotKind(TraitKindType k)
+		{
+			return k == TraitKindType::Slot || k == TraitKindType::Const
+			    || k == TraitKindType::Class || k == TraitKindType::Function;
+		}
+		// The ivtable slot_count a class inherits from its superclass: 0 if it
+		// extends Object (super_name 0, or a multiname naming the native root
+		// Object — which has no instance slots), the super's cumulative count if
+		// the super is ABC-defined, or -1 if the super is any OTHER native class
+		// (Sprite/EventDispatcher/... — unknown slot base, so not specializable).
+		int inheritedBase(u32 super_name) const
+		{
+			if (super_name == 0) return 0;
+			int sup = typeMnToInst(super_name);
+			if (sup >= 0) return slotCountOf(sup);
+			return localName(super_name) == "Object" ? 0 : -1;
+		}
+		// Cumulative ivtable slot_count (own + all ABC ancestors), or -1 if any
+		// ancestor is non-ABC (native base → unknown slot base) or the chain is
+		// malformed/cyclic. Mirrors avm2_class.c: parent seed + per-trait bump.
+		int slotCountOf(int inst) const
+		{
+			if (inst < 0 || inst >= (int) abc.instances.size()) return -1;
+			auto it = slotCountMemo.find(inst);
+			if (it != slotCountMemo.end()) return it->second;
+			slotCountMemo[inst] = -1;  // cycle guard
+			const AbcInstance& in = abc.instances[inst];
+			int base = inheritedBase(in.super_name);
+			if (base < 0) return -1;
+			int sc = base;
+			for (const AbcTrait& t : in.traits)
+				if (isSlotKind(t.kind)) {
+					u32 sid = t.slot_or_disp_id ? t.slot_or_disp_id : (u32)(sc + 1);
+					if ((int) sid > sc) sc = (int) sid;
+				}
+			slotCountMemo[inst] = sc;
+			return sc;
+		}
+		// A UNIQUE slot/const trait named `name` in inst's chain: returns the
+		// declaring instance + trait index. found=false on no-match, ambiguity
+		// (same local name appears more than once in the chain), or non-slot.
+		struct Found { bool ok = false; int declInst = -1; int traitIdx = -1; };
+		Found findUniqueSlot(int inst, const string& name) const
+		{
+			Found res; int hits = 0, cur = inst, guard = 0;
+			while (cur >= 0 && cur < (int) abc.instances.size() && guard++ < 64)
+			{
+				const AbcInstance& in = abc.instances[cur];
+				for (size_t ti = 0; ti < in.traits.size(); ti++)
+					if (localName(in.traits[ti].name) == name)
+					{
+						hits++;
+						TraitKindType k = in.traits[ti].kind;
+						if (k == TraitKindType::Slot || k == TraitKindType::Const)
+						{ res.ok = true; res.declInst = cur; res.traitIdx = (int) ti; }
+						else res.ok = false;
+					}
+				if (in.super_name == 0) break;
+				cur = typeMnToInst(in.super_name);
+			}
+			if (hits != 1) res.ok = false;  // ambiguous/shadowed → bail
+			return res;
+		}
+		// Runtime-matching slot index for the slot trait at traitIdx in declInst,
+		// or -1 if the chain is not fully ABC-defined.
+		int computeSlotIndex(int declInst, int traitIdx) const
+		{
+			if (declInst < 0) return -1;
+			const AbcInstance& in = abc.instances[declInst];
+			int base = inheritedBase(in.super_name);
+			if (base < 0) return -1;
+			int sc = base;
+			for (size_t ti = 0; ti < in.traits.size(); ti++)
+			{
+				const AbcTrait& t = in.traits[ti];
+				if (!isSlotKind(t.kind)) continue;
+				u32 sid = t.slot_or_disp_id ? t.slot_or_disp_id : (u32)(sc + 1);
+				if ((int) ti == traitIdx) return (int) sid;
+				if ((int) sid > sc) sc = (int) sid;
+			}
+			return -1;
+		}
+	};
+
+	// Per-body: for each op index, the compile-time slot index K if it is a
+	// specializable `this.field` GetPropertyStatic (a bare slots[K] read), else
+	// -1. Sound subset: receiver is `this` (local 0 of an instance method that
+	// never writes local 0), `this`'s class is sealed with an all-ABC chain, and
+	// the name resolves uniquely to a slot/const trait. The is_this bit lives on
+	// the operand stack only (a store into any local clears it), so no merge can
+	// leak it; `this` is invariantly the instance type on every path.
+	static std::vector<int> analyzeSlotSpec(const AbcTypeModel& M, const AbcFile& abc,
+	                                         const EmitBody& body)
+	{
+		std::vector<int> spec(body.ir.ops.size(), -1);
+		if (!body.verified) return spec;
+		auto mit = M.m2c.find(body.ir.method_index);
+		bool instMethod = mit != M.m2c.end() && mit->second.inst && mit->second.cls >= 0;
+		int thisCls = instMethod ? mit->second.cls : -1;
+		if (!instMethod || !M.isSealed(thisCls)) return spec;
+
+		bool local0_written = false;
+		for (const IrOp& op : body.ir.ops)
+		{
+			switch (op.op) {
+				case IrOpcode::SetLocal: case IrOpcode::Kill:
+				case IrOpcode::IncLocal: case IrOpcode::DecLocal:
+				case IrOpcode::IncLocalI: case IrOpcode::DecLocalI:
+					if (op.arg1 == 0) local0_written = true; break;
+				case IrOpcode::HasNext2:
+					if (op.arg1 == 0 || op.arg2 == 0) local0_written = true; break;
+				default: break;
+			}
+		}
+		if (local0_written) return spec;
+
+		std::vector<bool> st;   // is_this bit per stack slot
+		auto pop = [&]() -> bool { if (st.empty()) return false; bool v = st.back(); st.pop_back(); return v; };
+		auto push = [&](bool v) { st.push_back(v); };
+
+		for (size_t i = 0; i < body.ir.ops.size(); i++)
+		{
+			const IrOp& op = body.ir.ops[i];
+			if (op.op == IrOpcode::GetLocal) { push(op.arg1 == 0); continue; }
+			if (op.op == IrOpcode::Dup) { push(st.empty() ? false : st.back()); continue; }
+			if (op.op == IrOpcode::GetPropertyStatic)
+			{
+				bool recv_is_this = pop();
+				if (recv_is_this)
+				{
+					AbcTypeModel::Found fnd = M.findUniqueSlot(thisCls, M.localName(op.arg1));
+					int K = fnd.ok ? M.computeSlotIndex(fnd.declInst, fnd.traitIdx) : -1;
+					if (K > 0) spec[i] = K;
+				}
+				push(false);   // result is the field value, not `this`
+				continue;
+			}
+			u32 pops, pushes; irStackEffect(op, abc, pops, pushes);
+			for (u32 k = 0; k < pops; k++) pop();
+			for (u32 k = 0; k < pushes; k++) push(false);
+		}
+		return spec;
+	}
+
 	static void emitMethodBody(ofstream& out, const AbcFile& abc, const EmitBody& body,
 	                           const string& fn_name, u32 method_index,
-	                           const string& exc_sym)
+	                           const string& exc_sym, const AbcTypeModel* typeModel)
 	{
 		const string& mname = abc.pool.strings[abc.methods[method_index].name];
 		out << "// method[" << method_index << "] \"" << sanitizeComment(mname)
@@ -854,6 +1161,11 @@ namespace abc
 		const string mi_str = to_string(method_index);
 		bool ret_coerce = abc.methods[method_index].return_type != 0;
 
+		// Compile-time slot indices for specializable `this.field` reads.
+		std::vector<int> slotSpec = typeModel
+			? analyzeSlotSpec(*typeModel, abc, body)
+			: std::vector<int>(body.ir.ops.size(), -1);
+
 		for (size_t i = 0; i < body.ir.ops.size(); i++)
 		{
 			const IrOp& op = body.ir.ops[i];
@@ -902,7 +1214,7 @@ namespace abc
 				continue;
 			}
 
-			if (!emitOp(out, bc, op))
+			if (!emitOp(out, bc, op, slotSpec[i]))
 			{
 				out << "\tavm2_unimplemented_op(act, \"" << escapeCString(desc)
 				    << "\", " << i << ");" << endl;
@@ -1415,6 +1727,9 @@ namespace abc
 			    << "DoABC tag " << tag << ". Do not edit." << endl
 			    << "#include \"abc_gen.h\"" << endl << endl;
 
+			// Type model for the compile-time slot-specialization pass.
+			AbcTypeModel typeModel(abc);
+
 			// body index per method (-1 = none).
 			std::vector<int> method_body(abc.methods.size(), -1);
 			for (size_t bi = 0; bi < abc.method_bodies.size(); bi++)
@@ -1477,7 +1792,8 @@ namespace abc
 				emitTraitArray(out, p + "_m" + to_string(mi) + "_bt",
 				               abc.method_bodies[bi].traits);
 
-				emitMethodBody(out, abc, body, p + "_m" + to_string(mi), mi, exc_sym);
+				emitMethodBody(out, abc, body, p + "_m" + to_string(mi), mi, exc_sym,
+				               &typeModel);
 			}
 
 			// Per-method signature arrays (param types + optionals).

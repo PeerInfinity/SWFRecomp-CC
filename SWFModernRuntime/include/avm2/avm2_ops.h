@@ -66,6 +66,28 @@ Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32
 // Inline-cached variant: identical semantics, threads a per-call-site cache.
 Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
                                         uint32_t mn_idx, Avm2InlineCache* ic);
+// Compile-time slot-bound read (recompiler's type-specialization pass): the
+// recompiler proved the receiver is `this` — an instance of a sealed ABC class
+// whose full superclass chain to Object is ABC-defined — and the accessed name
+// resolves to a SLOT/CONST trait at compile-time slot index `slot` (numbered
+// identically to avm2_class.c's ivtable assignment). `this` is never null in a
+// verified instance method and slots aren't shadowable on a sealed class, so the
+// read is a bare `slots[slot]` load — no null check, no vtable fetch, no
+// multiname match, no resolved_get dispatch. `mn_idx` is carried only for the
+// verify build. Build with -DAVM2_SLOT_VERIFY to cross-check `slot` against the
+// full runtime resolve on every call and abort on any mismatch (validates the
+// compile-time numbering); the default build is the pure inline load below.
+#ifdef AVM2_SLOT_VERIFY
+Avm2Value avm2_op_getproperty_slot(Avm2Activation* act, Avm2Value recv,
+                                   uint32_t slot, uint32_t mn_idx);
+#else
+static inline Avm2Value avm2_op_getproperty_slot(Avm2Activation* act, Avm2Value recv,
+                                                 uint32_t slot, uint32_t mn_idx)
+{
+	(void) act; (void) mn_idx;
+	return recv.u.obj->slots[slot];
+}
+#endif
 // `interp`: body is a class/script initializer — avmplus's interpreter
 // takes the index fast path regardless of the ns set
 // (class_init_interpreter_mode / array_access_interpreter).
