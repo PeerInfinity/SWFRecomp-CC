@@ -29,6 +29,7 @@
 #include <iconv.h>
 #endif
 
+#include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
@@ -1211,9 +1212,32 @@ Avm2Value avm2_amf_write_object(Avm2Activation* act);
 
 static void ba_native_init(Avm2Context* ctx, Avm2Object* obj)
 {
-	(void) ctx;
 	Avm2ByteArrayExt* ba = (Avm2ByteArrayExt*) obj->native_ext;
 	ba->object_encoding = avm2_get_context()->bytearray_default_encoding;
+
+	// A SymbolClass-bound DefineBinaryData subclass (Flex
+	// `[Embed(mimeType="application/octet-stream")]` compiles the asset to a
+	// class extending mx.core.ByteArrayAsset -> flash.utils.ByteArray): seed
+	// the ByteArray with the embedded bytes, matching Ruffle's ByteArray
+	// symbol association (data filled, position reset to 0). A plain
+	// `new ByteArray()` (or any class with no binary binding) has char_id 0
+	// and is left empty.
+	uint16_t char_id = avm2_display_char_for_class(obj->cls);
+	if (char_id != 0)
+	{
+		for (uint32_t i = 0; i < avm2_generated_binary_count; i++)
+		{
+			if (avm2_generated_binaries[i].char_id != char_id) continue;
+			const Avm2BinaryData* bin = &avm2_generated_binaries[i];
+			if (bin->len > 0 && bin->bytes != NULL)
+			{
+				ba_set_length(ctx, ba, bin->len);
+				memcpy(ba->bytes, bin->bytes, bin->len);
+				ba->position = 0;
+			}
+			break;
+		}
+	}
 }
 
 static Avm2Value ba_proto_to_json(Avm2Activation* act)

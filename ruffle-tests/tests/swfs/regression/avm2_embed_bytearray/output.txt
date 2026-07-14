@@ -1,0 +1,2 @@
+length=23
+text=SWFRecomp-BinaryData-OK
