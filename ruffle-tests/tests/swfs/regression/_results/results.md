@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-14 20:02 UTC
+**Date**: 2026-07-14 21:36 UTC
 
-**Git SHA**: `c7f9f5e266`
+**Git SHA**: `ab236e611b`
 
-**Run Duration**: 5m 15s
+**Run Duration**: 4m 47s
 
 ## Summary
 
@@ -24,46 +24,46 @@
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `array_element_type1_args` | 7 | 0.2s |  |
-| 2 | `array_method_type1_args` | 7 | 0.2s |  |
-| 3 | `avm2_embed_bytearray` | 2 | 13.4s |  |
-| 4 | `broadcast_cross_swf_version` | 4 | 19.5s |  |
-| 5 | `broadcast_type1_args` | 14 | 1.2s |  |
-| 6 | `coerce_cross_swf_version` | 7 | 20.3s |  |
-| 7 | `coerce_recursion_guard` | 1 | 1.1s |  |
+| 2 | `array_method_type1_args` | 7 | 0.5s |  |
+| 3 | `avm2_embed_bytearray` | 2 | 10.6s |  |
+| 4 | `broadcast_cross_swf_version` | 4 | 15.5s |  |
+| 5 | `broadcast_type1_args` | 14 | 0.9s |  |
+| 6 | `coerce_cross_swf_version` | 7 | 16.1s |  |
+| 7 | `coerce_recursion_guard` | 1 | 1.2s |  |
 | 8 | `coerce_type1_args` | 9 | 1.2s |  |
-| 9 | `ei_closure_scope_order` | 7 | 1.3s |  |
-| 10 | `ei_cross_swf_version` | 2 | 1.2s |  |
+| 9 | `ei_closure_scope_order` | 7 | 1.2s |  |
+| 10 | `ei_cross_swf_version` | 2 | 1.1s |  |
 | 11 | `ei_type1_args` | 7 | 1.2s |  |
-| 12 | `enterframe_type1_args` | 8 | 19.4s |  |
+| 12 | `enterframe_type1_args` | 8 | 18.8s |  |
 | 13 | `fn_call_builtin_type1_args` | 10 | 0.9s |  |
 | 14 | `fn_call_type1_args` | 7 | 0.9s |  |
 | 15 | `fn_empty_method_type1_args` | 10 | 1.2s |  |
-| 16 | `lc_method_type1_args` | 7 | 1.3s |  |
-| 17 | `lc_onstatus_type1_args` | 3 | 1.1s |  |
-| 18 | `lv_cross_swf_version` | 5 | 19.3s |  |
-| 19 | `lv_ondata_type1_args` | 3 | 19.9s |  |
-| 20 | `mc_event_cross_swf_version` | 4 | 19.6s |  |
-| 21 | `mc_event_type1_args` | 3 | 1.2s |  |
-| 22 | `mc_method_v5_caller_gate` | 4 | 19.4s |  |
-| 23 | `mc_resolve_type1_args` | 6 | 1.0s |  |
-| 24 | `method_type1_args` | 10 | 1.0s |  |
-| 25 | `nc_onstatus_closure` | 2 | 18.2s |  |
-| 26 | `nc_onstatus_type1_args` | 3 | 1.2s |  |
-| 27 | `onconstruct_cross_swf_version` | 4 | 19.4s |  |
-| 28 | `onconstruct_type1_args` | 6 | 1.1s |  |
-| 29 | `onload_type1_args` | 7 | 20.0s |  |
+| 16 | `lc_method_type1_args` | 7 | 1.2s |  |
+| 17 | `lc_onstatus_type1_args` | 3 | 1.2s |  |
+| 18 | `lv_cross_swf_version` | 5 | 19.6s |  |
+| 19 | `lv_ondata_type1_args` | 3 | 14.3s |  |
+| 20 | `mc_event_cross_swf_version` | 4 | 14.3s |  |
+| 21 | `mc_event_type1_args` | 3 | 0.9s |  |
+| 22 | `mc_method_v5_caller_gate` | 4 | 17.4s |  |
+| 23 | `mc_resolve_type1_args` | 6 | 1.1s |  |
+| 24 | `method_type1_args` | 10 | 1.1s |  |
+| 25 | `nc_onstatus_closure` | 2 | 20.0s |  |
+| 26 | `nc_onstatus_type1_args` | 3 | 1.1s |  |
+| 27 | `onconstruct_cross_swf_version` | 4 | 19.7s |  |
+| 28 | `onconstruct_type1_args` | 6 | 0.9s |  |
+| 29 | `onload_type1_args` | 7 | 18.6s |  |
 | 30 | `onunload_type1_args` | 6 | 0.6s |  |
-| 31 | `resolve_type1_args` | 13 | 1.3s |  |
-| 32 | `sort_comparator_type1_args` | 5 | 1.3s |  |
-| 33 | `string_prim_method_type1_args` | 19 | 1.0s |  |
-| 34 | `timer_cross_swf_version` | 3 | 19.4s |  |
-| 35 | `timer_type1_args` | 14 | 18.8s |  |
-| 36 | `watch_cross_swf_version` | 6 | 20.1s |  |
-| 37 | `watch_mc_reentrant_setmember` | 3 | 0.4s |  |
-| 38 | `watch_mc_type1_args` | 7 | 1.0s |  |
-| 39 | `watch_setmember_type1_args` | 7 | 1.2s |  |
-| 40 | `watch_timeline_named_params` | 4 | 0.7s |  |
-| 41 | `watch_timeline_reentrant` | 3 | 0.9s |  |
+| 31 | `resolve_type1_args` | 13 | 1.2s |  |
+| 32 | `sort_comparator_type1_args` | 5 | 1.0s |  |
+| 33 | `string_prim_method_type1_args` | 19 | 1.2s |  |
+| 34 | `timer_cross_swf_version` | 3 | 19.3s |  |
+| 35 | `timer_type1_args` | 14 | 19.5s |  |
+| 36 | `watch_cross_swf_version` | 6 | 15.6s |  |
+| 37 | `watch_mc_reentrant_setmember` | 3 | 0.5s |  |
+| 38 | `watch_mc_type1_args` | 7 | 1.2s |  |
+| 39 | `watch_setmember_type1_args` | 7 | 1.1s |  |
+| 40 | `watch_timeline_named_params` | 4 | 0.9s |  |
+| 41 | `watch_timeline_reentrant` | 3 | 0.8s |  |
 | 42 | `xml_onload_type1_args` | 3 | 19.3s |  |
 
 ## Near-Passing Tests
