@@ -47,16 +47,38 @@ Render VERIFIED byte-identical (OverWorld house/grass/water/path/trees/player;
 scratchpad `seedling_after.png`). Profiles: `seedling_profile_2026-07-14.json`
 (before), `..._after_vtablehash.json` (after).
 
-**Next levers (in the after-profile, now the top of the frame):**
-1. `avm2_domain_find` **14.9%** (was 8.5%; now #1) — a linear scan of
-   `ctx->domain` calling `avm2_propkey_matches` per entry, on every
-   `findproperty`/`findpropstrict`. Hash it by name the same way (globals.c) →
-   should collapse it + much of the remaining `avm2_propkey_matches` **13.5%**.
-2. ~4% `printf_core`/`__vfprintf_internal` — number→string formatting; find the
-   per-frame caller (likely coordinate/hash-key stringification) and fast-path
-   integer/simple cases to skip printf.
-3. Then re-profile: the residual is `resolved_get`/`resolve_mn`/`getproperty`
-   dispatch — candidates for a per-call-site inline cache.
+**Fix #2 LANDED + VERIFIED — hash `avm2_domain_find` (`avm2_globals.c`).** Same
+lazy name-keyed index as the vtable (append-only domain, full-propkey match,
+ascending-index order → byte-identical). **Measured real-GPU A/B (same rig):**
+```
+                    after fix#1       after fix#2 (domain)    Δ (this fix)
+  frame CPU mean    154.1 ms          61.6-64.3 ms            -60% (2.5x)
+  fps               6.5               ~16
+  avm+submit        137.8 ms          ~52 ms
+  avm2_domain_find     14.9%          1.7%    ← collapsed
+  avm2_propkey_matches 13.5%          3.2%    (most calls came from domain scan)
+  gap vs Ruffle (46ms) ~3.3x          ~1.3x
+```
+Render VERIFIED byte-identical (`seedling_after2.png`). New profile:
+`seedling_profile_2026-07-14_after_domainhash.json`. A **22% "(idle)"** slice
+now appears — the tick is no longer CPU-saturated every ms.
+
+**CUMULATIVE: 280 → ~62 ms/frame (≈4.5x), ~6.0x → ~1.3x vs Ruffle**, from two
+lookup-hashing changes. We are now within striking distance of Ruffle on
+Seedling (the milestone that motivated the whole arc).
+
+**Next levers (in the after-domainhash profile):**
+1. `avm2_vtable_find_mn` still **6.5%** — the hash helped but big shared-name
+   buckets (or hot `mn_match` re-parsing) remain; consider caching the resolved
+   entry per (vtable, mn_idx) call site (a true inline cache) rather than
+   re-matching each call.
+2. ~4% `printf_core`/`__vfprintf_internal`/`__fwritex` — number→string
+   formatting per frame; fast-path integers to skip printf.
+3. `writeTexture` **10.3%** (GPU upload) is now a real slice — the FlashPunk
+   full-buffer `copyPixels`→writeBuffer each frame; dirty-rect or format tuning
+   could help once the AVM side is squeezed further.
+4. Residual dispatch (`resolved_get`/`resolve_mn`/`getproperty_static`) → the
+   per-call-site inline cache in (1) covers most of this too.
 
 
 **Goal (project headline milestone):** same-machine, real-GPU frame-time/FPS

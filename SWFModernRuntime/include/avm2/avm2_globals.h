@@ -28,6 +28,13 @@ typedef struct Avm2Domain
 	uint32_t count;
 	uint32_t cap;
 	Avm2DomainEntry* entries;
+	// Name-keyed lookup accelerator (avm2_globals.c, opaque), mirroring the
+	// Avm2VTable index: avm2_domain_find is a per-findproperty linear scan of
+	// every global class/function, so hashing by name makes it O(1)+small-
+	// bucket. Lazily (re)built when `indexed_count != count`; holds only entry
+	// indices (no GC pointers), malloc'd, GC-invisible.
+	void* name_index;        // Avm2DomainIndex* (NULL until first index)
+	uint32_t indexed_count;  // `count` at the last index build
 } Avm2Domain;
 
 // Creates builtin classes + the builtin globals object and seeds the domain.

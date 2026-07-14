@@ -14,6 +14,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <avm2/avm2_class.h>
@@ -70,11 +71,85 @@ void avm2_script_ensure_init(Avm2AbcFileRt* file, uint32_t script_index)
 	file->script_init_state[script_index] = AVM2_SCRIPT_INITIALIZED;
 }
 
+// ---------------------------------------------------------------------------
+// Domain name-hash accelerator (mirrors the Avm2VTable index in avm2_class.c).
+// avm2_propkey_matches always requires the entry name to equal the query name,
+// so a name-keyed hash visits only same-name candidates. The bucket chain is
+// built high->low so iteration is ascending index order — identical to the
+// forward linear scan, preserving first-match-wins. Pure derived cache: entry
+// indices only (GC-invisible), same predicate on each candidate.
+// ---------------------------------------------------------------------------
+
+typedef struct DomIndexNode
+{
+	uint32_t hash;
+	uint32_t entry;
+	int32_t next;
+} DomIndexNode;
+
+typedef struct Avm2DomainIndex
+{
+	uint32_t mask;      // nbuckets - 1 (power of two)
+	int32_t* buckets;   // [mask+1]; -1 = empty
+	DomIndexNode* nodes; // [count]
+} Avm2DomainIndex;
+
+static uint32_t dom_name_hash(const char* s, uint32_t n)
+{
+	uint32_t h = 2166136261u;  // FNV-1a
+	for (uint32_t i = 0; i < n; i++)
+	{
+		h ^= (uint8_t) s[i];
+		h *= 16777619u;
+	}
+	return h;
+}
+
+static const Avm2DomainIndex* dom_index_get(Avm2Domain* d)
+{
+	if (d->name_index != NULL && d->indexed_count == d->count)
+	{
+		return (const Avm2DomainIndex*) d->name_index;
+	}
+	Avm2DomainIndex* ix = (Avm2DomainIndex*) d->name_index;
+	if (ix != NULL)
+	{
+		free(ix->buckets);
+		free(ix->nodes);
+		free(ix);
+	}
+	uint32_t nb = 16;
+	while (nb < d->count * 2) nb <<= 1;
+	ix = (Avm2DomainIndex*) malloc(sizeof(Avm2DomainIndex));
+	ix->mask = nb - 1;
+	ix->buckets = (int32_t*) malloc(nb * sizeof(int32_t));
+	ix->nodes = (DomIndexNode*) malloc((d->count ? d->count : 1) * sizeof(DomIndexNode));
+	for (uint32_t b = 0; b < nb; b++) ix->buckets[b] = -1;
+	// Walk high->low so equal-name entries chain in ascending index order.
+	for (uint32_t i = d->count; i-- > 0; )
+	{
+		const Avm2PropKey* k = &d->entries[i].key;
+		uint32_t h = dom_name_hash(k->name, k->name_len);
+		uint32_t b = h & ix->mask;
+		ix->nodes[i].hash = h;
+		ix->nodes[i].entry = i;
+		ix->nodes[i].next = ix->buckets[b];
+		ix->buckets[b] = (int32_t) i;
+	}
+	d->name_index = ix;
+	d->indexed_count = d->count;
+	return ix;
+}
+
 Avm2Object* avm2_domain_find(Avm2Context* ctx, const Avm2PropKey* key)
 {
-	for (uint32_t i = 0; i < ctx->domain.count; i++)
+	Avm2Domain* d = &ctx->domain;
+	const Avm2DomainIndex* ix = dom_index_get(d);
+	uint32_t h = dom_name_hash(key->name, key->name_len);
+	for (int32_t n = ix->buckets[h & ix->mask]; n >= 0; n = ix->nodes[n].next)
 	{
-		Avm2DomainEntry* e = &ctx->domain.entries[i];
+		if (ix->nodes[n].hash != h) continue;
+		Avm2DomainEntry* e = &d->entries[ix->nodes[n].entry];
 		if (!avm2_propkey_matches(&e->key, key)) continue;
 		if (e->file == NULL)
 		{
