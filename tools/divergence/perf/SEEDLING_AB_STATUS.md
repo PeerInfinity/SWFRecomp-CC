@@ -47,12 +47,32 @@ Run 2 (2026-07-13, ours, AFTER the Rectangle.intersects fix, real GPU):
   recompiled AS3 FlashPunk per-frame software-buffer blitting (~279 Image.render
   copyPixels/tick into FP.buffer). This is the real baseline the perf-optimization
   arc must attack — NOT a browser-path bug. ***
-ruffle: PENDING (page fixed 2026-07-13 — was blank due to forced webgpu; now
-        auto-picks renderer and load() resolves. Re-run examples/avm2/
-        seedling_ruffle/ for the comparison).
-verdict: PENDING the Ruffle number.
-render-correctly: STILL UNCONFIRMED by the user (does OverWorld paint?).
+ruffle: ~86-97 ms/frame (mean 86, p95 117) → ~11-12 fps. tick(avm) ~97 ms,
+        render ~1 ms. (135 frames, real Windows GPU, 480x480, profiling build.)
+verdict: *** RUFFLE IS ~2.5x FASTER THAN OURS on Seedling ***
+        ours ~222 ms/frame (~4-5 fps) vs Ruffle ~90 ms/frame (~11-12 fps).
+        BOTH are pure AVM/CPU-bound (render ~1-15 ms on each side) — so this is a
+        clean interpreter-vs-recompiled AVM comparison, and our recompiled AS3 is
+        LOSING to Ruffle's interpreter by ~2.5x. This is the opposite of the
+        project thesis (recompile beats interpret) and is THE number the perf arc
+        must close. (Both are below Seedling's 30fps target → the "unplayable in
+        Ruffle" premise holds: Ruffle only manages ~12fps; we manage ~4-5.)
+render-correctly: STILL UNCONFIRMED by the user (does OUR canvas paint OverWorld?
+        Ruffle's HUD populated, so Ruffle is at least ticking the SWF).
 ```
+
+## THE HEADLINE (2026-07-13): we are ~2.5x SLOWER than Ruffle on Seedling
+The milestone A/B is done and the answer is humbling but precise: our recompiled
+Seedling is **~2.5x slower** than Ruffle's interpreter, both AVM/CPU-bound. The
+perf-optimization arc now has a concrete target and a reproducible rig. Where our
+time goes (next-session profiling, real-GPU CDP + `--profiling-funcs`):
+- The FlashPunk per-frame CPU software-buffer path: `Image.render` →
+  `BitmapData.copyPixels` / `bd_draw` (avm2_bitmap.c) — is our native blit slower
+  than Ruffle's Rust one? (~279 copyPixels/frame.)
+- Recompiled AS3 method-dispatch / property-lookup overhead per FlashPunk op
+  (the analog of the AVM1 `findOrCreateMovieClip`/property-name cluster).
+Ruffle's split (tick 97 / render 1) says its render is ~free (1 GPU draw of the
+buffer); ours present ~15 ms is also cheap — the whole gap is in the AVM tick.
 **Next-session perf levers (AVM/CPU-bound, present cheap):** profile the AS3 tick
 — the FlashPunk `Image.render`→`BitmapData.copyPixels`/`bd_draw` CPU blit hot path
 (avm2_bitmap.c) and recompiled-method dispatch overhead. Real-GPU CDP profile of
