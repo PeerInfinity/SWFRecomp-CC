@@ -1,5 +1,62 @@
 # Seedling perf A/B — status (2026-07-13, Stage 13a session 1)
 
+## ★★★★ UPDATE 2026-07-14 (session 4) — IC extended to callproperty + setproperty: ~1 ms (~2%), the AVM tick is near its floor
+Extended the session-2 getproperty inline-cache to the two other receiver-vtable
+property ops — **CallProperty/CallPropVoid** and **SetPropertyStatic** — the next
+lever flagged by `prof_approachA.json`. Pure reuse of the `Avm2InlineCache`
+design (avm2_ops.h): a repeat call/write whose receiver has the same vtable
+identity (unchanged `count`) replays the resolved entry INDEX directly, skipping
+the `avm2_vtable_find_mn` multiname match. Same correctness invariants as
+getproperty (cache only plain-object receivers whose PRIMARY find hit; exclude
+xmlish + `no_index` newactivation/newcatch; count-guarded; a matching vt ⟹
+byte-identical). Emitter change: block-scoped `static Avm2InlineCache` per site
+(4765 call + 2922 set sites in Seedling). Commit `c7f9f5e26`.
+
+**Real-GPU Windows Chrome A/B (Intel Gen9, adapter "intel / gen-9"), INTERLEAVED
+before/after in one session to cancel machine drift** (both fresh same-session
+`--profiling-funcs` builds; `seedling` = after, `seedling_before` = baseline):
+```
+  round   BEFORE(ms)   AFTER(ms)
+    1        47.6         47.6
+    2        50.1         46.5
+    3        48.7         58.2 ← after outlier (p95 83.9, max 134 — a hiccup)
+    4        46.1         46.5
+  BEFORE mean (ex-r3): ~47.9      AFTER mean (ex-r3): ~46.9    Δ ~1.0 ms (~2%)
+```
+The ~1 ms sits right at the ±10% run-to-run noise floor — as the plan predicted
+for a slice that was only ~2-3% of the frame. **Clean same-session CDP self-time
+profile confirms the mechanism landed** (`prof_before_baseline.json` vs
+`prof_callset_ic.json`, same rig):
+```
+  function                 BEFORE      AFTER
+  avm2_vtable_find_mn       5.1%(1583)  4.0%(1212)   ← -23%, the direct target
+  avm2_propkey_matches      3.7%(1149)  3.1%( 941)   ← drops with the scan
+  setproperty_impl (disp.)  1.3%( 391)  ~0           ← IC-hit bypasses the dispatcher
+  avm2_domain_find          3.6%        3.7%         ← unchanged (no findprop IC — expected)
+  callproperty path         op 1.0% + common 0.9%    _ic 1.2% + common 1.0%
+```
+Render byte-identical. Local avm2 correctness spot-checks pass across the tricky
+exclusion paths (class_methods, callproplex_class, getter_different_namespace_
+setter, event_target_getter, proxy_callproperty, proxy_getproperty, flash_xml,
+array_hasownproperty). Full-suite CI grade (no-graphics, run
+29362960851): **avm2 829 → 829, mismatched lines 47323 → 47323 ("No changes
+detected"), avm1 634 → 634** — ZERO pass→fail, byte-identical, the emitter change
+regenerated + graded across all 1205 avm2 tests.
+
+**HONEST CONCLUSION — the AVM tick is near its floor.** Cumulative arc: 280 → ~47
+ms (≈6x), gap vs Ruffle ~6.0x → ~1.02x. This IC extension nudges ~47.9 → ~46.9,
+keeping us at parity-to-marginally-ahead of Ruffle (~46 ms). The remaining top
+self-time slices are the **irreducible property READ / method dispatch**
+(`resolved_get`/`getproperty_static_ic`/`avm2_call_method_ref`/`resolve_mn`) plus
+the two levers with a *different* IC shape (`avm2_domain_find` 3.7% +
+`avm2_op_findproperty` 2.9% — scope-chain + global-domain scan, NOT a receiver
+vtable) and `bd_copy_pixels` 3.1% (the FlashPunk CPU blit). No single remaining
+change buys a landslide; the honest verdict is **at parity with marginal
+headroom**. The next real lever, if pursued, is a scope/domain IC for
+findproperty (harder — the resolved global-domain entry could be cached per site
+keyed on domain identity, but the scope-chain part varies per activation).
+
+
 ## ★★★ UPDATE 2026-07-14 (session 3) — writeTexture 110x GPU-traffic cut (byte-identical), but frame time is AVM-bound
 The session-2 profile flagged `writeTexture` as the clear #1 self-time slice
 (~17.6%). Measured it first (per the plan's FIRST STEP) and found the real story:
