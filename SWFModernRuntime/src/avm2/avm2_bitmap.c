@@ -346,14 +346,83 @@ static int32_t round_to_even(double n)
 	return (int32_t) r;
 }
 
+// Resolve (once) the flash.geom.Rectangle class into the file-static cache.
+static void ensure_rectangle_class(Avm2Context* ctx)
+{
+	if (g_rectangle_class != NULL) return;
+	int found = 0;
+	Avm2Value cv = avm2_find_definition(ctx, "flash.geom.Rectangle", 20, &found);
+	if (found && cv.kind == AVM2_VALUE_OBJECT && cv.u.obj != NULL
+	    && cv.u.obj->kind == AVM2_OBJ_CLASS)
+	{
+		g_rectangle_class = cv.u.obj->class_ref;
+	}
+}
+
+static void rect_by_name(Avm2Context* ctx, Avm2Value rect, double* x, double* y,
+                         double* w, double* h)
+{
+	*x = read_prop_num(ctx, rect, "x");
+	*y = read_prop_num(ctx, rect, "y");
+	*w = read_prop_num(ctx, rect, "width");
+	*h = read_prop_num(ctx, rect, "height");
+}
+
+// Rectangle field-slot fast path (perf). flash.geom.Rectangle is a sealed
+// slot-class: slot 1=x, 2=y, 3=width, 4=height (make_slot_class, avm2_text.c).
+// The blit calls rect_to_xywh once per copyPixels/draw/fillRect (~279
+// copyPixels/frame in Seedling); reading the four fields by public name does 4
+// full multiname vtable resolves per call (~4.3% of frame busy-time, profile
+// 2026-07-15). When `rect` is EXACTLY a flash.geom.Rectangle instance, read the
+// slots directly and skip the resolves; any other (duck-typed / subclass /
+// non-object) argument falls back to the by-name path, byte-for-byte identical.
+//   -DSWF_NO_RECT_SLOT       disables the fast path (A/B baseline build).
+//   -DAVM2_RECT_SLOT_VERIFY  reads BOTH ways every call and aborts on divergence.
+static int rect_by_slot(Avm2Context* ctx, Avm2Value rect, double* x, double* y,
+                        double* w, double* h)
+{
+#ifdef SWF_NO_RECT_SLOT
+	(void) ctx; (void) rect; (void) x; (void) y; (void) w; (void) h;
+	return 0;
+#else
+	if (rect.kind != AVM2_VALUE_OBJECT || rect.u.obj == NULL) return 0;
+	Avm2Object* o = rect.u.obj;
+	ensure_rectangle_class(ctx);
+	if (g_rectangle_class == NULL || o->cls != g_rectangle_class || o->slot_count < 5)
+		return 0;
+	*x = avm2_coerce_to_number(ctx, o->slots[1]);
+	*y = avm2_coerce_to_number(ctx, o->slots[2]);
+	*w = avm2_coerce_to_number(ctx, o->slots[3]);
+	*h = avm2_coerce_to_number(ctx, o->slots[4]);
+	return 1;
+#endif
+}
+
+#ifdef AVM2_RECT_SLOT_VERIFY
+_Noreturn void avm2_fatal(const char* fmt, ...);
+static int rect_num_eq(double a, double b) { return a == b || (isnan(a) && isnan(b)); }
+#endif
+
 // get_rectangle_x_y_width_height (bitmap_data.rs AS glue).
 static void rect_to_xywh(Avm2Context* ctx, Avm2Value rect, int32_t* ox, int32_t* oy,
                          int32_t* ow, int32_t* oh)
 {
-	double x = read_prop_num(ctx, rect, "x");
-	double y = read_prop_num(ctx, rect, "y");
-	double w = read_prop_num(ctx, rect, "width");
-	double h = read_prop_num(ctx, rect, "height");
+	double x, y, w, h;
+	if (rect_by_slot(ctx, rect, &x, &y, &w, &h))
+	{
+#ifdef AVM2_RECT_SLOT_VERIFY
+		double nx, ny, nw, nh;
+		rect_by_name(ctx, rect, &nx, &ny, &nw, &nh);
+		if (!(rect_num_eq(x, nx) && rect_num_eq(y, ny)
+		      && rect_num_eq(w, nw) && rect_num_eq(h, nh)))
+			avm2_fatal("rect-slot mismatch: slot=(%g,%g,%g,%g) byname=(%g,%g,%g,%g)",
+			           x, y, w, h, nx, ny, nw, nh);
+#endif
+	}
+	else
+	{
+		rect_by_name(ctx, rect, &x, &y, &w, &h);
+	}
 	int32_t x_max = round_to_even(x + w);
 	int32_t y_max = round_to_even(y + h);
 	int32_t x_int = round_to_even(x);
@@ -490,16 +559,7 @@ static void pr_clamp_intersection(PixelRegion* self, int32_t sp_x, int32_t sp_y,
 static Avm2Object* make_rectangle(Avm2Context* ctx, double x, double y, double w,
                                   double h)
 {
-	if (g_rectangle_class == NULL)
-	{
-		int found = 0;
-		Avm2Value cv = avm2_find_definition(ctx, "flash.geom.Rectangle", 20, &found);
-		if (found && cv.kind == AVM2_VALUE_OBJECT && cv.u.obj != NULL
-		    && cv.u.obj->kind == AVM2_OBJ_CLASS)
-		{
-			g_rectangle_class = cv.u.obj->class_ref;
-		}
-	}
+	ensure_rectangle_class(ctx);
 	if (g_rectangle_class == NULL) return NULL;
 	Avm2Value args[4] = { avm2_number(x), avm2_number(y), avm2_number(w),
 	                      avm2_number(h) };
