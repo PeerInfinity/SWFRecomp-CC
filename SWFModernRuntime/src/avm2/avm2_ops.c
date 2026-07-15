@@ -2919,6 +2919,84 @@ Avm2Value avm2_op_convert_o(Avm2Activation* act, Avm2Value v)
 	return v;
 }
 
+// -------------------------------------------------------------------------
+// Coerce-elision verify hooks (Step 4). Only compiled under
+// -DAVM2_COERCE_VERIFY; the normal build uses the identity inlines in
+// avm2_ops.h. Each hook runs the REAL coercion the recompiler elided and
+// aborts if the coerced value differs from the original, proving the
+// compile-time type-equality that justified the elision. It then returns the
+// ORIGINAL value so the verify build's output stays byte-identical to the
+// elided build (both keep `v`; a genuine mismatch aborts before returning).
+#ifdef AVM2_COERCE_VERIFY
+static int avm2_coerce_same_value(Avm2Value a, Avm2Value b)
+{
+	if (a.kind != b.kind) return 0;
+	switch (a.kind)
+	{
+		case AVM2_VALUE_UNDEFINED:
+		case AVM2_VALUE_NULL:    return 1;
+		case AVM2_VALUE_BOOL:    return a.u.b == b.u.b;
+		case AVM2_VALUE_INTEGER: return a.u.i == b.u.i;
+		case AVM2_VALUE_NUMBER:
+			// Bit-identical, with NaN==NaN (any NaN payload matches).
+			if (a.u.d != a.u.d && b.u.d != b.u.d) return 1;
+			return memcmp(&a.u.d, &b.u.d, sizeof(double)) == 0;
+		case AVM2_VALUE_STRING:
+			if (a.u.str == b.u.str) return 1;
+			if (a.u.str == NULL || b.u.str == NULL) return 0;
+			return a.u.str->len == b.u.str->len
+			    && memcmp(a.u.str->utf8, b.u.str->utf8, a.u.str->len) == 0;
+		default: return a.u.obj == b.u.obj;
+	}
+}
+
+static Avm2Value avm2_coerce_verify_check(Avm2Value before, Avm2Value after, const char* site)
+{
+	if (!avm2_coerce_same_value(before, after))
+	{
+		fprintf(stderr,
+		        "AVM2_COERCE_VERIFY: elided %s changed value "
+		        "(before kind=%u -> after kind=%u)\n",
+		        site, before.kind, after.kind);
+		avm2_fatal("coerce elision mismatch");
+	}
+	return before;
+}
+
+Avm2Value avm2_coerce_verify_return(Avm2Activation* act, uint32_t method_index, Avm2Value v)
+{
+	return avm2_coerce_verify_check(v, avm2_op_coerce_return(act, method_index, v),
+	                                "coerce_return");
+}
+Avm2Value avm2_coerce_verify_mn(Avm2Activation* act, Avm2Value v, uint32_t mn_idx)
+{
+	return avm2_coerce_verify_check(v, avm2_op_coerce(act, v, mn_idx), "coerce");
+}
+Avm2Value avm2_coerce_verify_d(Avm2Activation* act, Avm2Value v)
+{
+	return avm2_coerce_verify_check(v, avm2_number(avm2_coerce_to_number(act->ctx, v)),
+	                                "coerce_d");
+}
+Avm2Value avm2_coerce_verify_i(Avm2Activation* act, Avm2Value v)
+{
+	return avm2_coerce_verify_check(v, avm2_integer(avm2_coerce_to_i32(act->ctx, v)),
+	                                "coerce_i");
+}
+Avm2Value avm2_coerce_verify_u(Avm2Activation* act, Avm2Value v)
+{
+	return avm2_coerce_verify_check(v, avm2_uint_value(avm2_coerce_to_u32(act->ctx, v)),
+	                                "coerce_u");
+}
+Avm2Value avm2_coerce_verify_b(Avm2Activation* act, Avm2Value v)
+{
+	return avm2_coerce_verify_check(v, avm2_bool(avm2_coerce_to_boolean(v)), "coerce_b");
+}
+Avm2Value avm2_coerce_verify_s(Avm2Activation* act, Avm2Value v)
+{
+	return avm2_coerce_verify_check(v, avm2_op_coerce_s(act, v), "coerce_s");
+}
+#endif  // AVM2_COERCE_VERIFY
+
 
 // E4X escapes (ECMA-357 EscapeAttributeValue / EscapeElementValue).
 static Avm2Value esc_xml(Avm2Activation* act, Avm2Value v, int attr)

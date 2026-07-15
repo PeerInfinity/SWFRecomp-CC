@@ -252,6 +252,40 @@ Avm2Value avm2_op_coerce_s(Avm2Activation* act, Avm2Value v);   // null/undef �
 Avm2Value avm2_op_convert_s(Avm2Activation* act, Avm2Value v);  // always string
 Avm2Value avm2_op_coerce_o(Avm2Activation* act, Avm2Value v);   // undef → null
 Avm2Value avm2_op_convert_o(Avm2Activation* act, Avm2Value v);  // null check
+
+// -------------------------------------------------------------------------
+// Coerce-elision verify hooks (Step 4, compile-time type specialization).
+// The recompiler proves, via forward abstract-interpretation over the ABC,
+// that a coerce_* site's operand already has the target static type, so the
+// coercion is a value no-op and can be dropped. At every such elided site the
+// emitter emits one of these hooks in place of the real coerce:
+//   * normal build   — a `static inline` identity the optimizer removes,
+//                       so the coercion truly disappears (the perf win).
+//   * -DAVM2_COERCE_VERIFY — a real function that runs the ACTUAL coercion and
+//                       aborts if it would have changed the value, then returns
+//                       the ORIGINAL value (so output stays identical to the
+//                       elided build). This proves every elision is sound
+//                       across the whole test suite, exactly like
+//                       -DAVM2_SLOT_VERIFY does for slot specialization.
+#ifdef AVM2_COERCE_VERIFY
+Avm2Value avm2_coerce_verify_return(Avm2Activation* act, uint32_t method_index, Avm2Value v);
+Avm2Value avm2_coerce_verify_mn(Avm2Activation* act, Avm2Value v, uint32_t mn_idx);
+Avm2Value avm2_coerce_verify_d(Avm2Activation* act, Avm2Value v);
+Avm2Value avm2_coerce_verify_i(Avm2Activation* act, Avm2Value v);
+Avm2Value avm2_coerce_verify_u(Avm2Activation* act, Avm2Value v);
+Avm2Value avm2_coerce_verify_b(Avm2Activation* act, Avm2Value v);
+Avm2Value avm2_coerce_verify_s(Avm2Activation* act, Avm2Value v);
+#else
+static inline Avm2Value avm2_coerce_verify_return(Avm2Activation* act, uint32_t method_index, Avm2Value v)
+{ (void) act; (void) method_index; return v; }
+static inline Avm2Value avm2_coerce_verify_mn(Avm2Activation* act, Avm2Value v, uint32_t mn_idx)
+{ (void) act; (void) mn_idx; return v; }
+static inline Avm2Value avm2_coerce_verify_d(Avm2Activation* act, Avm2Value v) { (void) act; return v; }
+static inline Avm2Value avm2_coerce_verify_i(Avm2Activation* act, Avm2Value v) { (void) act; return v; }
+static inline Avm2Value avm2_coerce_verify_u(Avm2Activation* act, Avm2Value v) { (void) act; return v; }
+static inline Avm2Value avm2_coerce_verify_b(Avm2Activation* act, Avm2Value v) { (void) act; return v; }
+static inline Avm2Value avm2_coerce_verify_s(Avm2Activation* act, Avm2Value v) { (void) act; return v; }
+#endif
 // E4X ops (GetDescendants / CheckFilter / Dxns / DxnsLate).
 Avm2Value avm2_op_getdescendants(Avm2Activation* act, Avm2Value v, uint32_t mn_idx);
 Avm2Value avm2_op_getdescendants_dyn(Avm2Activation* act, Avm2Value v, uint32_t mn_idx,

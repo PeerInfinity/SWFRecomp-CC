@@ -183,8 +183,11 @@ namespace abc
 	// Emits one op's C. Returns false if the op is unsupported (caller
 	// emits an inline abort and continues with the next op). `slotSpec` >= 0
 	// marks a GetPropertyStatic the type-specialization pass proved is a bare
-	// `this.field` slot read at that compile-time slot index.
-	static bool emitOp(ofstream& out, const BodyCtx& bc, const IrOp& op, int slotSpec = -1)
+	// `this.field` slot read at that compile-time slot index. `elideCoerce`
+	// marks a coerce_* op the pass proved is a value no-op (operand already has
+	// the target static type) → emit the verify hook that drops it.
+	static bool emitOp(ofstream& out, const BodyCtx& bc, const IrOp& op,
+	                   int slotSpec = -1, bool elideCoerce = false)
 	{
 		const AbcFile& abc = *bc.abc;
 		switch (op.op)
@@ -653,7 +656,6 @@ namespace abc
 			UNOP(IncrementI, "avm2_op_increment_i")
 			UNOP(DecrementI, "avm2_op_decrement_i")
 			UNOP(TypeOf, "avm2_op_typeof")
-			UNOP(CoerceS, "avm2_op_coerce_s")
 			UNOP(ConvertS, "avm2_op_convert_s")
 			UNOP(CoerceO, "avm2_op_coerce_o")
 			UNOP(ConvertO, "avm2_op_convert_o")
@@ -679,24 +681,46 @@ namespace abc
 				return true;
 
 			// --- coercions / type ops ---
+			// Each elidable coerce, when the type pass proved it a value no-op,
+			// emits a verify hook: a no-op the optimizer removes in the normal
+			// build, a real coerce+abort-on-change under -DAVM2_COERCE_VERIFY.
 			case IrOpcode::CoerceB:
-				out << "\tstk[sp - 1] = avm2_bool(avm2_coerce_to_boolean(stk[sp - 1]));" << endl;
+				out << (elideCoerce
+					? "\tstk[sp - 1] = avm2_coerce_verify_b(act, stk[sp - 1]);"
+					: "\tstk[sp - 1] = avm2_bool(avm2_coerce_to_boolean(stk[sp - 1]));")
+				    << endl;
 				return true;
 			case IrOpcode::CoerceD:
-				out << "\tstk[sp - 1] = avm2_number(avm2_coerce_to_number(act->ctx, "
-				    << "stk[sp - 1]));" << endl;
+				out << (elideCoerce
+					? "\tstk[sp - 1] = avm2_coerce_verify_d(act, stk[sp - 1]);"
+					: "\tstk[sp - 1] = avm2_number(avm2_coerce_to_number(act->ctx, stk[sp - 1]));")
+				    << endl;
 				return true;
 			case IrOpcode::CoerceI:
-				out << "\tstk[sp - 1] = avm2_integer(avm2_coerce_to_i32(act->ctx, "
-				    << "stk[sp - 1]));" << endl;
+				out << (elideCoerce
+					? "\tstk[sp - 1] = avm2_coerce_verify_i(act, stk[sp - 1]);"
+					: "\tstk[sp - 1] = avm2_integer(avm2_coerce_to_i32(act->ctx, stk[sp - 1]));")
+				    << endl;
 				return true;
 			case IrOpcode::CoerceU:
-				out << "\tstk[sp - 1] = avm2_uint_value(avm2_coerce_to_u32(act->ctx, "
-				    << "stk[sp - 1]));" << endl;
+				out << (elideCoerce
+					? "\tstk[sp - 1] = avm2_coerce_verify_u(act, stk[sp - 1]);"
+					: "\tstk[sp - 1] = avm2_uint_value(avm2_coerce_to_u32(act->ctx, stk[sp - 1]));")
+				    << endl;
+				return true;
+			case IrOpcode::CoerceS:
+				if (elideCoerce)
+					out << "\tstk[sp - 1] = avm2_coerce_verify_s(act, stk[sp - 1]);" << endl;
+				else
+					out << "\tstk[sp - 1] = avm2_op_coerce_s(act, stk[sp - 1]);" << endl;
 				return true;
 			case IrOpcode::Coerce:
-				out << "\tstk[sp - 1] = avm2_op_coerce(act, stk[sp - 1], "
-				    << op.arg1 << ");" << endl;
+				if (elideCoerce)
+					out << "\tstk[sp - 1] = avm2_coerce_verify_mn(act, stk[sp - 1], "
+					    << op.arg1 << ");" << endl;
+				else
+					out << "\tstk[sp - 1] = avm2_op_coerce(act, stk[sp - 1], "
+					    << op.arg1 << ");" << endl;
 				return true;
 			case IrOpcode::IsType:
 				out << "\tstk[sp - 1] = avm2_op_istype(act, stk[sp - 1], "
@@ -877,6 +901,12 @@ namespace abc
 			default: break;
 		}
 	}
+
+	// Compile-time static-type lattice for coerce elision (Step 4). A value's
+	// static type is either a primitive builtin, a user ABC class instance, or
+	// UNKNOWN (any / Object / a native class with no ABC layout we model).
+	enum TK { TK_UNK = 0, TK_INT, TK_UINT, TK_NUM, TK_BOOL, TK_STR, TK_INST };
+	struct TV { TK k = TK_UNK; int inst = -1; };
 
 	struct AbcTypeModel
 	{
@@ -1088,6 +1118,81 @@ namespace abc
 			auto it = nameToInst.find(name);
 			return it == nameToInst.end() ? -1 : it->second;
 		}
+
+		// ---- Static-type lattice (coerce elision, Step 4) -------------------
+		// Resolve a TYPE multiname to the lattice: a user ABC class (INST), a
+		// primitive builtin, or UNKNOWN (any/Object/native class with no ABC
+		// slot layout). Native classes (Sprite/Point/...) are absent from
+		// nameToInst and are NOT in the primitive set → UNKNOWN → never elided.
+		TV typeOfMn(u32 mn) const
+		{
+			if (mn == 0) return TV{};             // "*" / any
+			int c = typeMnToInst(mn);
+			if (c >= 0) return TV{ TK_INST, c };
+			string n = localName(mn);
+			if (n == "int") return TV{ TK_INT };
+			if (n == "uint") return TV{ TK_UINT };
+			if (n == "Number") return TV{ TK_NUM };
+			if (n == "Boolean") return TV{ TK_BOOL };
+			if (n == "String") return TV{ TK_STR };
+			return TV{};                          // Object / void / native
+		}
+		// sc is `tc` or a subclass of `tc` via the ABC instance super chain.
+		bool isSubtypeOrEqual(int sc, int tc) const
+		{
+			int cur = sc, guard = 0;
+			while (cur >= 0 && cur < (int) abc.instances.size() && guard++ < 64)
+			{
+				if (cur == tc) return true;
+				if (abc.instances[cur].super_name == 0) break;
+				cur = typeMnToInst(abc.instances[cur].super_name);
+			}
+			return false;
+		}
+		// Is coercing a value of static type S to target type T a value no-op?
+		//   * T a user class/interface: S is that class or a subclass — the
+		//     value is already an instance of T, and a null value coerces to
+		//     null unchanged. Exact match also covers interface targets (a
+		//     value statically typed as the interface already implements it).
+		//   * T a primitive: S is EXACTLY the same primitive (int != Number:
+		//     the runtime representation differs, so no subtyping across
+		//     primitives).
+		//   * T UNKNOWN (any/Object/native): no guarantee → never elide (e.g.
+		//     coerce-to-Object turns undefined into null, not a no-op).
+		bool coerceIsNoop(TV S, TV T) const
+		{
+			if (T.k == TK_INST)
+				return S.k == TK_INST && isSubtypeOrEqual(S.inst, T.inst);
+			if (T.k == TK_UNK) return false;
+			return S.k == T.k;
+		}
+		// Static type of the value produced by reading property `name` off a
+		// receiver of instance type `inst`: a Slot/Const's declared type, a
+		// Getter/Method's return type. The value the runtime yields is coerced
+		// to this type (slot stores and param/return coercions guarantee it),
+		// so it is a SOUND seed. UNKNOWN if not found or setter-only.
+		TV memberReadType(int inst, const string& name) const
+		{
+			int cur = inst, guard = 0;
+			while (cur >= 0 && cur < (int) abc.instances.size() && guard++ < 64)
+			{
+				for (const AbcTrait& t : abc.instances[cur].traits)
+					if (localName(t.name) == name)
+					{
+						if (t.kind == TraitKindType::Slot
+						    || t.kind == TraitKindType::Const)
+							return typeOfMn(t.type_name);
+						if ((t.kind == TraitKindType::Getter
+						     || t.kind == TraitKindType::Method)
+						    && t.method_or_class < abc.methods.size())
+							return typeOfMn(abc.methods[t.method_or_class].return_type);
+						return TV{};   // setter-only / class / function
+					}
+				if (abc.instances[cur].super_name == 0) break;
+				cur = typeMnToInst(abc.instances[cur].super_name);
+			}
+			return TV{};
+		}
 	};
 
 	// Per-body: for each op index, the compile-time slot index K if the
@@ -1105,23 +1210,42 @@ namespace abc
 	//       of a UNIQUE user-class name), name is a static Slot/Const trait; the
 	//       class object is a singleton and statics aren't inherited/overridden,
 	//       so the static slot index is exact (Step 3 lever B).
-	static std::vector<int> analyzeSlotSpec(const AbcTypeModel& M, const AbcFile& abc,
-	                                         const EmitBody& body)
+	// Additionally (Step 4) the SAME pass tracks a STATIC TYPE per stack slot /
+	// local and marks each coerce_* / coerce_return site whose operand already
+	// has the target static type as `elide` — the coercion is a proven value
+	// no-op the emitter drops (verified end-to-end by -DAVM2_COERCE_VERIFY).
+	struct SlotSpecResult
 	{
-		std::vector<int> spec(body.ir.ops.size(), -1);
-		if (!body.verified) return spec;
+		std::vector<int> slot;    // GetPropertyStatic direct-slot index, or -1
+		std::vector<char> elide;  // coerce/coerce_return proven redundant here
+	};
+	static SlotSpecResult analyzeSlotSpec(const AbcTypeModel& M, const AbcFile& abc,
+	                                      const EmitBody& body)
+	{
+		SlotSpecResult R;
+		R.slot.assign(body.ir.ops.size(), -1);
+		R.elide.assign(body.ir.ops.size(), 0);
+		std::vector<int>& spec = R.slot;
+		if (!body.verified) return R;
 		// A/B baseline toggles (interleaved before/after measurement):
-		//   SWF_NO_SLOT_SPEC   disables BOTH levers (pre-specialization build).
-		//   SWF_NO_STATIC_SLOT disables lever B only (lever-A/this-field baseline).
-		static const bool all_disabled = getenv("SWF_NO_SLOT_SPEC") != nullptr;
+		//   SWF_NO_SLOT_SPEC     disables BOTH slot levers (pre-slot build).
+		//   SWF_NO_STATIC_SLOT   disables lever B only (lever-A/this-field base).
+		//   SWF_NO_COERCE_ELIDE  disables coerce elision only (Step-4 baseline).
+		static const bool slot_all_disabled = getenv("SWF_NO_SLOT_SPEC") != nullptr;
 		static const bool staticB_disabled = getenv("SWF_NO_STATIC_SLOT") != nullptr;
-		if (all_disabled) return spec;
+		static const bool coerce_disabled = getenv("SWF_NO_COERCE_ELIDE") != nullptr;
+		const bool coerce_enabled = !coerce_disabled;
 
-		// Lever A (this.field) gating — only enables the is_this tag.
+		// Defining class + this-kind (needed for BOTH slot lever A and the
+		// coerce `this`/param type seeds).
 		auto mit = M.m2c.find(body.ir.method_index);
 		bool instMethod = mit != M.m2c.end() && mit->second.inst && mit->second.cls >= 0;
 		int thisCls = instMethod ? mit->second.cls : -1;
-		bool this_lever = instMethod && M.isSealed(thisCls);
+
+		// Lever A (this.field slot) gating — enables the is_this SLOT tag only.
+		// (`this`'s TYPE is seeded independently below and survives local-0
+		// writes via the branch-target reset, so it needs no such gate.)
+		bool this_lever = !slot_all_disabled && instMethod && M.isSealed(thisCls);
 		if (this_lever)
 		{
 			for (const IrOp& op : body.ir.ops)
@@ -1138,21 +1262,110 @@ namespace abc
 				if (!this_lever) break;
 			}
 		}
-		bool staticB_lever = !staticB_disabled;
-		if (!this_lever && !staticB_lever) return spec;
+		bool staticB_lever = !slot_all_disabled && !staticB_disabled;
+		if (!this_lever && !staticB_lever && !coerce_enabled) return R;
 
-		// Per-stack-slot provenance tag.
-		struct SV { bool is_this = false; int fp_mn = -1; int cls = -1; };
+		// Per-stack-slot value: compile-time provenance (is_this/fp_mn/cls, all
+		// path-invariant by construction) plus a static TYPE (NOT path-invariant
+		// — reset at branch-target merges below).
+		struct SV { bool is_this = false; int fp_mn = -1; int cls = -1; TV type; };
 		std::vector<SV> st;
 		auto pop = [&]() -> SV { if (st.empty()) return SV{}; SV v = st.back(); st.pop_back(); return v; };
 		auto push = [&](SV v) { st.push_back(v); };
+		auto peek = [&](u32 depthFromTop) -> SV {
+			return depthFromTop < st.size() ? st[st.size() - 1 - depthFromTop] : SV{};
+		};
+
+		// Local static types, seeded from `this` and the declared param types
+		// (params are coerced to their declared type on method entry — a sound
+		// seed). A local that is ever written is not path-invariant, so its
+		// type is cleared at every branch-target merge (join = unknown).
+		u32 bi = body.ir.body_index;
+		u32 num_locals = (bi < abc.method_bodies.size() && abc.method_bodies[bi].num_locals > 0)
+			? abc.method_bodies[bi].num_locals : 1;
+		std::vector<TV> localTy(num_locals);
+		std::vector<char> localWritten(num_locals, 0);
+		if (instMethod && num_locals > 0) localTy[0] = TV{ TK_INST, thisCls };
+		const AbcMethod& meth = abc.methods[body.ir.method_index];
+		for (size_t k = 0; k < meth.params.size() && (k + 1) < num_locals; k++)
+			localTy[k + 1] = M.typeOfMn(meth.params[k].type);
+		auto markWritten = [&](u32 l) { if (l < localWritten.size()) localWritten[l] = 1; };
+		for (const IrOp& op : body.ir.ops)
+			switch (op.op) {
+				case IrOpcode::SetLocal: case IrOpcode::Kill: case IrOpcode::IncLocal:
+				case IrOpcode::DecLocal: case IrOpcode::IncLocalI: case IrOpcode::DecLocalI:
+					markWritten(op.arg1); break;
+				case IrOpcode::HasNext2: markWritten(op.arg1); markWritten(op.arg2); break;
+				default: break;
+			}
+
+		// Branch/switch/exception targets — at each, the operand stack and any
+		// written local carry the JOIN of predecessors, which the linear pass
+		// cannot compute, so their static types are reset to UNKNOWN.
+		std::set<u32> targets;
+		for (const IrOp& op : body.ir.ops)
+			switch (op.op) {
+				case IrOpcode::Jump: case IrOpcode::IfTrue: case IrOpcode::IfFalse:
+					targets.insert(op.target); break;
+				case IrOpcode::LookupSwitch:
+					targets.insert(op.target);
+					for (u32 t : op.switch_targets) targets.insert(t);
+					break;
+				default: break;
+			}
+		for (const IrException& e : body.ir.exceptions)
+			if (e.active) targets.insert(e.target_op);
+
+		// Static type produced by a generic (depth-preserving) op that pushes a
+		// value. Only sound, path-independent results.
+		auto resultTypeGeneric = [&](const IrOp& op) -> TV {
+			switch (op.op) {
+				case IrOpcode::PushInt: return TV{ TK_INT };
+				case IrOpcode::PushUint: return TV{ TK_UINT };
+				case IrOpcode::PushDouble: case IrOpcode::PushNaN: return TV{ TK_NUM };
+				case IrOpcode::PushString: return TV{ TK_STR };
+				case IrOpcode::PushTrue: case IrOpcode::PushFalse: return TV{ TK_BOOL };
+				case IrOpcode::AddI: case IrOpcode::SubtractI: case IrOpcode::MultiplyI:
+				case IrOpcode::IncrementI: case IrOpcode::DecrementI: case IrOpcode::NegateI:
+				case IrOpcode::BitNot: case IrOpcode::BitAnd: case IrOpcode::BitOr:
+				case IrOpcode::BitXor: case IrOpcode::LShift: case IrOpcode::RShift:
+					return TV{ TK_INT };
+				case IrOpcode::URShift: return TV{ TK_UINT };
+				case IrOpcode::Subtract: case IrOpcode::Multiply: case IrOpcode::Divide:
+				case IrOpcode::Modulo: case IrOpcode::Negate: case IrOpcode::Increment:
+				case IrOpcode::Decrement:
+					return TV{ TK_NUM };
+				case IrOpcode::Not: case IrOpcode::Equals: case IrOpcode::StrictEquals:
+				case IrOpcode::LessThan: case IrOpcode::LessEquals: case IrOpcode::GreaterThan:
+				case IrOpcode::GreaterEquals: case IrOpcode::In: case IrOpcode::InstanceOf:
+				case IrOpcode::IsType: case IrOpcode::IsTypeLate:
+					return TV{ TK_BOOL };
+				case IrOpcode::TypeOf: case IrOpcode::ConvertS: return TV{ TK_STR };
+				case IrOpcode::ConstructProp: return M.typeOfMn(op.arg1);
+				default: return TV{};
+			}
+		};
 
 		for (size_t i = 0; i < body.ir.ops.size(); i++)
 		{
 			const IrOp& op = body.ir.ops[i];
+			if (targets.count((u32) i))
+			{
+				for (SV& s : st) s.type = TV{};
+				for (u32 l = 0; l < localTy.size(); l++)
+					if (localWritten[l]) localTy[l] = TV{};
+			}
 			if (op.op == IrOpcode::GetLocal)
 			{
-				SV v; v.is_this = this_lever && op.arg1 == 0; push(v); continue;
+				SV v; v.is_this = this_lever && op.arg1 == 0;
+				if (op.arg1 < localTy.size()) v.type = localTy[op.arg1];
+				push(v); continue;
+			}
+			if (op.op == IrOpcode::SetLocal)
+			{
+				SV v = pop();
+				if (op.arg1 < localTy.size()) localTy[op.arg1] = v.type;
+				continue;
 			}
 			if (op.op == IrOpcode::Dup) { push(st.empty() ? SV{} : st.back()); continue; }
 			// FindPropStrict/FindProperty of a static (non-lazy) multiname tags
@@ -1166,7 +1379,7 @@ namespace abc
 			if (op.op == IrOpcode::GetPropertyStatic)
 			{
 				SV recv = pop();
-				SV res;   // provenance of the produced value
+				SV res;   // provenance + type of the produced value
 				if (recv.is_this)
 				{
 					// Lever A: this.field.
@@ -1191,14 +1404,71 @@ namespace abc
 					int K = M.computeStaticSlotIndex(recv.cls, M.localName(op.arg1));
 					if (K > 0) spec[i] = K;
 				}
+				// Static type of the read value (any receiver whose static type
+				// is a known instance) → seeds coerce elision on `return this.x`.
+				if (recv.type.k == TK_INST)
+					res.type = M.memberReadType(recv.type.inst, M.localName(op.arg1));
 				push(res);
+				continue;
+			}
+			// Coerce sites: elide when the operand already has the target type.
+			if (op.op == IrOpcode::Coerce || op.op == IrOpcode::CoerceD
+			    || op.op == IrOpcode::CoerceI || op.op == IrOpcode::CoerceU
+			    || op.op == IrOpcode::CoerceB || op.op == IrOpcode::CoerceS)
+			{
+				TV S = peek(0).type;
+				TV T = op.op == IrOpcode::Coerce ? M.typeOfMn(op.arg1)
+				     : op.op == IrOpcode::CoerceD ? TV{ TK_NUM }
+				     : op.op == IrOpcode::CoerceI ? TV{ TK_INT }
+				     : op.op == IrOpcode::CoerceU ? TV{ TK_UINT }
+				     : op.op == IrOpcode::CoerceB ? TV{ TK_BOOL }
+				     : TV{ TK_STR };
+				if (coerce_enabled && M.coerceIsNoop(S, T)) R.elide[i] = 1;
+				pop(); SV r; r.type = T; push(r);
+				continue;
+			}
+			// CallProperty: type the result as the callee's declared return type
+			// (enables `return this.foo()` elision).
+			if (op.op == IrOpcode::CallProperty && !mnLazyNs(abc, op.arg1)
+			    && !mnLazyName(abc, op.arg1))
+			{
+				SV recv = peek(op.arg2);   // receiver sits below the args
+				u32 pops, pushes; irStackEffect(op, abc, pops, pushes);
+				for (u32 k = 0; k < pops; k++) pop();
+				SV r;
+				if (recv.type.k == TK_INST)
+					r.type = M.memberReadType(recv.type.inst, M.localName(op.arg1));
+				for (u32 k = 0; k < pushes; k++) push(k + 1 == pushes ? r : SV{});
+				continue;
+			}
+			if (op.op == IrOpcode::ReturnValue)
+			{
+				TV S = peek(0).type;
+				if (coerce_enabled
+				    && M.coerceIsNoop(S, M.typeOfMn(meth.return_type)))
+					R.elide[i] = 1;
+				pop();
+				continue;
+			}
+			// Add is Number ONLY when both operands are numeric (else it may be
+			// string concatenation); typing it lets the redundant `coerce
+			// Number` the ABC compiler leaves after numeric `a + b` elide.
+			if (op.op == IrOpcode::Add)
+			{
+				auto numeric = [](TK k) { return k == TK_INT || k == TK_UINT || k == TK_NUM; };
+				bool both = numeric(peek(0).type.k) && numeric(peek(1).type.k);
+				pop(); pop(); SV r; if (both) r.type = TV{ TK_NUM }; push(r);
 				continue;
 			}
 			u32 pops, pushes; irStackEffect(op, abc, pops, pushes);
 			for (u32 k = 0; k < pops; k++) pop();
-			for (u32 k = 0; k < pushes; k++) push(SV{});
+			TV rt = pushes ? resultTypeGeneric(op) : TV{};
+			for (u32 k = 0; k < pushes; k++)
+			{
+				SV r; if (k + 1 == pushes) r.type = rt; push(r);
+			}
 		}
-		return spec;
+		return R;
 	}
 
 	static void emitMethodBody(ofstream& out, const AbcFile& abc, const EmitBody& body,
@@ -1317,10 +1587,13 @@ namespace abc
 		const string mi_str = to_string(method_index);
 		bool ret_coerce = abc.methods[method_index].return_type != 0;
 
-		// Compile-time slot indices for specializable `this.field` reads.
-		std::vector<int> slotSpec = typeModel
-			? analyzeSlotSpec(*typeModel, abc, body)
-			: std::vector<int>(body.ir.ops.size(), -1);
+		// Compile-time slot indices for specializable reads + coerce-elision
+		// flags for proven-redundant coerce_* / coerce_return sites.
+		SlotSpecResult spec;
+		if (typeModel) spec = analyzeSlotSpec(*typeModel, abc, body);
+		else { spec.slot.assign(body.ir.ops.size(), -1);
+		       spec.elide.assign(body.ir.ops.size(), 0); }
+		const std::vector<int>& slotSpec = spec.slot;
 
 		for (size_t i = 0; i < body.ir.ops.size(); i++)
 		{
@@ -1341,7 +1614,12 @@ namespace abc
 				out << "\t{ Avm2Value _rv = stk[--sp];";
 				if (ret_coerce)
 				{
-					out << " _rv = avm2_op_coerce_return(act, " << mi_str << ", _rv);";
+					// Elided when the returned value's static type already equals
+					// the return type — the verify hook is a no-op normally and
+					// a real coerce+abort-on-change under -DAVM2_COERCE_VERIFY.
+					const char* rc = spec.elide[i]
+						? "avm2_coerce_verify_return" : "avm2_op_coerce_return";
+					out << " _rv = " << rc << "(act, " << mi_str << ", _rv);";
 				}
 				if (bc.has_exc)
 				{
@@ -1370,7 +1648,7 @@ namespace abc
 				continue;
 			}
 
-			if (!emitOp(out, bc, op, slotSpec[i]))
+			if (!emitOp(out, bc, op, slotSpec[i], spec.elide[i] != 0))
 			{
 				out << "\tavm2_unimplemented_op(act, \"" << escapeCString(desc)
 				    << "\", " << i << ");" << endl;
