@@ -144,6 +144,12 @@ static Avm2AbcFileRt* avm2_abc_load(Avm2Context* ctx, const Avm2AbcFileData* dat
 	memset(file->script_init_state, AVM2_SCRIPT_UNINITIALIZED, data->script_count);
 	file->classes = avm2_alloc(ctx, data->class_count * sizeof(Avm2Class*));
 	memset(file->classes, 0, data->class_count * sizeof(Avm2Class*));
+#ifndef SWF_NO_CLASS_MEMO
+	file->coerce_class_memo =
+		avm2_alloc(ctx, data->multiname_count * sizeof(Avm2Class*));
+	memset(file->coerce_class_memo, 0,
+	       data->multiname_count * sizeof(Avm2Class*));
+#endif
 
 	for (uint32_t si = 0; si < data->script_count; si++)
 	{

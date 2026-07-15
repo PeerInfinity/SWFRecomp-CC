@@ -1244,7 +1244,8 @@ bool avm2_value_is_of_type(Avm2Context* ctx, Avm2Value v, Avm2Class* type_class)
 	return false;
 }
 
-Avm2Class* avm2_class_for_mn(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t mn_idx)
+static Avm2Class* avm2_class_for_mn_resolve(Avm2Context* ctx, Avm2AbcFileRt* file,
+                                            uint32_t mn_idx)
 {
 	if (mn_idx == 0 || file == NULL) return NULL;
 	const Avm2AbcFileData* data = file->data;
@@ -1311,6 +1312,49 @@ Avm2Class* avm2_class_for_mn(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t mn_
 		return cv.u.obj->class_ref;
 	}
 	return NULL;
+}
+
+// Resolve an mn_idx (a compile-time constant at each coerce / setup_locals /
+// setproperty / coerce_return site) to its Class, memoized per file.
+//
+// The (file, mn_idx) -> Class* mapping is a pure function of append-only state:
+// the class is installed into a script global exactly once and the domain is
+// append-only with stable object identity, so once resolution yields a non-NULL
+// Class that answer is permanent. We therefore cache only NON-NULL results —
+// during a class's own cinit its type name (and forward references) resolve to
+// NULL, and that transient miss must NOT be frozen. Vector.<T> and every
+// recursive base_type / type_param resolution route back through this wrapper,
+// so they are cached too.
+//
+// Build -DAVM2_CLASS_MEMO_VERIFY to re-run the full resolve on every memo HIT
+// and abort on any divergence; build -DSWF_NO_CLASS_MEMO to disable the cache
+// entirely (A/B baseline).
+Avm2Class* avm2_class_for_mn(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t mn_idx)
+{
+	if (mn_idx == 0 || file == NULL) return NULL;
+#ifndef SWF_NO_CLASS_MEMO
+	Avm2Class** memo = file->coerce_class_memo;
+	if (memo != NULL && mn_idx < file->data->multiname_count)
+	{
+		Avm2Class* hit = memo[mn_idx];
+		if (hit != NULL)
+		{
+#ifdef AVM2_CLASS_MEMO_VERIFY
+			Avm2Class* fresh = avm2_class_for_mn_resolve(ctx, file, mn_idx);
+			if (fresh != hit)
+			{
+				avm2_fatal("[AVM2_CLASS_MEMO_VERIFY] class-memo mismatch mn=%u: "
+				           "memo=%p fresh=%p", mn_idx, (void*) hit, (void*) fresh);
+			}
+#endif
+			return hit;
+		}
+		Avm2Class* cls = avm2_class_for_mn_resolve(ctx, file, mn_idx);
+		if (cls != NULL) memo[mn_idx] = cls;
+		return cls;
+	}
+#endif
+	return avm2_class_for_mn_resolve(ctx, file, mn_idx);
 }
 
 // Coercion by class (Ruffle value.rs coerce_to_type).

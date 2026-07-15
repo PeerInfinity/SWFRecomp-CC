@@ -438,6 +438,11 @@ struct Avm2AbcFileRt
 	Avm2Object** script_globals;  // one per script
 	uint8_t* script_init_state;
 	Avm2Class** classes;          // realized by NewClass; NULL until then
+	// (mn_idx -> resolved Class*) memo for avm2_class_for_mn. Sized to
+	// data->multiname_count; NULL entry = not-yet-cached. Only NON-NULL
+	// resolutions are cached (a type name is transiently unresolvable during
+	// its own cinit; the domain is append-only so a non-NULL hit is permanent).
+	Avm2Class** coerce_class_memo;
 };
 
 // Activation record passed to every emitted method body and native method.
