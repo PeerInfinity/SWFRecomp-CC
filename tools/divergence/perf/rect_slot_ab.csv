@@ -1,0 +1,13 @@
+round,build,mean_ms,p95,present,avm_submit,fps,frames,throttled
+1,seedling,20.7,26.6,0.4,20.3,48.4,826,False
+1,seedling_before,23.9,33.5,0.5,23.4,41.9,849,False
+2,seedling,19.3,22.9,0.4,18.9,51.9,836,False
+2,seedling_before,20.8,26.5,0.4,20.4,48,858,False
+3,seedling,19.4,22,0.4,19,51.7,855,False
+3,seedling_before,19.8,23.7,0.4,19.4,50.6,857,False
+4,seedling,21.8,44.2,0.5,21.3,45.9,842,False
+4,seedling_before,20.8,25.5,0.4,20.4,48.1,858,False
+5,seedling,19.7,22.1,0.4,19.3,50.8,854,False
+5,seedling_before,20.8,24.4,0.4,20.4,48,857,False
+6,seedling,19.7,22.2,0.4,19.4,50.7,854,False
+6,seedling_before,21,25.7,0.4,20.6,47.6,853,False

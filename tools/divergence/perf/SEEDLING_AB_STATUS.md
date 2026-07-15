@@ -1,5 +1,44 @@
 # Seedling perf A/B — status
 
+## ★★★ UPDATE 2026-07-15 (session 10) — RECTANGLE FIELD-SLOT FAST PATH in the blit: +1.1 ms (~5%), 5/6 rounds, byte-identical
+Step-9's Matrix/Point gate-out surfaced the one real geom lever: `rect_to_xywh`
+(`avm2_bitmap.c`) read a Rectangle's x/y/width/height **by public name — 4 full
+multiname vtable resolves per call**, once per copyPixels/draw/fillRect (~279
+copyPixels/frame). Fresh-profile inclusive cost **824 ms = 4.28% of frame busy-time**.
+`flash.geom.Rectangle` is already a sealed slot-class (slot 1=x,2=y,3=width,4=height);
+the fast path reads `slots[1..4]` directly when `obj->cls == g_rectangle_class`, else
+falls back to the by-name path. Runtime-only, ~10 lines, reuses the `rect_xywh` slot
+pattern already proven by Rectangle's own methods.
+
+**Real-GPU interleaved A/B (Intel Gen9, WSL idle, 6 rounds; `seedling`=fast path vs
+`seedling_before`=`-DSWF_NO_RECT_SLOT`). The toggle gates ONLY `rect_by_slot`, so it
+is the exact lever — no NEW-vs-master needed (unlike blit's global -msimd128):**
+```
+  round   ON(ms)   OFF(ms)    Δ
+    1      20.7     23.9     +3.2
+    2      19.3     20.8     +1.5
+    3      19.4     19.8     +0.4
+    4      21.8     20.8     -1.0   ← ON p95 44.2 (machine hiccup)
+    5      19.7     20.8     +1.1
+    6      19.7     21.0     +1.3
+  ON  mean 20.10  median 19.70  stdev 0.89
+  OFF mean 21.18  median 20.80  stdev 1.28
+  Δ = +1.08 ms mean / +1.20 ms median (~5.1%), ON<OFF in 5/6 rounds.
+  Ex-r4 outlier: ON 19.76 vs OFF 21.26 → +1.5 ms (~7%).
+```
+Above the ~0.9 ms noise floor at this ~20 ms light-load state; comparable to the blit
+lever (~1.4 ms/6%), clearly measurable unlike Steps 4/5. Present ~0.4 ms both sides.
+CSV: `tools/divergence/perf/rect_slot_ab.csv`.
+
+**Correctness:** `-DAVM2_RECT_SLOT_VERIFY` reads BOTH ways per call and `avm2_fatal`s on
+divergence; local verify-build run of the 7 rect-caller avm2 tests (copypixels,
+copypixels_blend_over, draw, fillrect, getpixels, copychannel, colortransform) — all
+pass, ZERO mismatches. Slots 1..4 ARE x/y/width/height by construction, read through the
+same `avm2_coerce_to_number` → proven value no-op. Full-suite verify + normal no-graphics
+CI: [pending — recorded on merge]. Commit `88f6f4ad6`.
+
+---
+
 ## ✗ UPDATE 2026-07-15 (session 9) — NON-`this` INSTANCE-SLOT GET SPEC: GATED OUT at Step-0 (not built, below-noise)
 The proposed lever (extend compile-time slot specialization to non-`this` typed-ABC-class
 instance receivers — a guarded `slots[K]` load instead of `getproperty_static_ic`, plan
