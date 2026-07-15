@@ -189,6 +189,7 @@ docs/local_catalog.json
 docs2/local_catalog.json
 docs2/glaiel_catalog.json
 docs2/flasharchive_catalog.json
+docs2/avm2_catalog.json
 SWFRecomp/tests/local_batch/
 SWFRecomp/tests/glaiel/
 SWFRecomp/tests/flasharchive/

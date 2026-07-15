@@ -371,6 +371,7 @@
 
             <!-- Demo cards -->
             <section class="demo-section" id="demo-section" style="display:none;">
+                <div id="avm2-demos"></div>
                 <div id="glaiel-demos"></div>
                 <div id="flasharchive-demos"></div>
                 <div id="local-batch-demos"></div>
@@ -422,7 +423,8 @@
             fetch('local_catalog.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
             fetch('glaiel_catalog.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
             fetch('flasharchive_catalog.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
-            fetch('opcode-index.json').then(function(r) { return r.ok ? r.json() : null; })
+            fetch('opcode-index.json').then(function(r) { return r.ok ? r.json() : null; }),
+            fetch('avm2_catalog.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; })
         ]).then(function(results) {
             catalog = results[0];
             var localCatalog = results[1];
@@ -437,6 +439,10 @@
             }
             if (catalog && flasharchiveCatalog && Array.isArray(flasharchiveCatalog.tests)) {
                 catalog.tests = (catalog.tests || []).concat(flasharchiveCatalog.tests);
+            }
+            var avm2Catalog = results[5];
+            if (catalog && avm2Catalog && Array.isArray(avm2Catalog.tests)) {
+                catalog.tests = (catalog.tests || []).concat(avm2Catalog.tests);
             }
             document.getElementById('loading').style.display = 'none';
             renderPage();
@@ -473,6 +479,10 @@
             var flasharchiveCount = tests.filter(function(t) { return t.type === 'flasharchive'; }).length;
             if (flasharchiveCount > 0) {
                 statsHtml += '<div class="stat"><span class="stat-value">' + flasharchiveCount + '</span><span class="stat-label">flasharchive demos</span></div>';
+            }
+            var avm2Count = tests.filter(function(t) { return t.type === 'avm2'; }).length;
+            if (avm2Count > 0) {
+                statsHtml += '<div class="stat"><span class="stat-value">' + avm2Count + '</span><span class="stat-label">AVM2 (AS3) demos</span></div>';
             }
             statsBar.innerHTML = statsHtml;
             statsBar.style.display = 'flex';
@@ -569,13 +579,15 @@
             var localBatch = tests.filter(function(t) { return t.type === 'local_batch'; });
             var glaiel = tests.filter(function(t) { return t.type === 'glaiel'; });
             var flasharchive = tests.filter(function(t) { return t.type === 'flasharchive'; });
+            var avm2 = tests.filter(function(t) { return t.type === 'avm2'; });
 
             // Apply filters
-            if (currentFilter === 'trace') { graphics = []; localBatch = []; glaiel = []; flasharchive = []; }
-            if (currentFilter === 'graphics') { trace = []; localBatch = []; glaiel = []; flasharchive = []; }
-            if (currentFilter === 'local_batch') { graphics = []; trace = []; glaiel = []; flasharchive = []; }
-            if (currentFilter === 'glaiel') { graphics = []; trace = []; localBatch = []; flasharchive = []; }
-            if (currentFilter === 'flasharchive') { graphics = []; trace = []; localBatch = []; glaiel = []; }
+            if (currentFilter === 'trace') { graphics = []; localBatch = []; glaiel = []; flasharchive = []; avm2 = []; }
+            if (currentFilter === 'graphics') { trace = []; localBatch = []; glaiel = []; flasharchive = []; avm2 = []; }
+            if (currentFilter === 'local_batch') { graphics = []; trace = []; glaiel = []; flasharchive = []; avm2 = []; }
+            if (currentFilter === 'glaiel') { graphics = []; trace = []; localBatch = []; flasharchive = []; avm2 = []; }
+            if (currentFilter === 'flasharchive') { graphics = []; trace = []; localBatch = []; glaiel = []; avm2 = []; }
+            if (currentFilter === 'avm2') { graphics = []; trace = []; localBatch = []; glaiel = []; flasharchive = []; }
 
             if (searchQuery) {
                 var q = searchQuery;
@@ -584,7 +596,21 @@
                 localBatch = localBatch.filter(function(t) { return matchesSearch(t, q); });
                 glaiel = glaiel.filter(function(t) { return matchesSearch(t, q); });
                 flasharchive = flasharchive.filter(function(t) { return matchesSearch(t, q); });
+                avm2 = avm2.filter(function(t) { return matchesSearch(t, q); });
             }
+
+            var avm2Html = '';
+            if (avm2.length > 0) {
+                avm2Html += '<h2 class="collapsible-header open" onclick="toggleSection(\'avm2\')" id="avm2-toggle" style="color: #EC407A; border-bottom: 2px solid #EC407A;">';
+                avm2Html += '<span class="arrow">&#9654;</span> AVM2 / AS3 <span style="color:#999;font-size:0.6em;font-weight:400;margin-left:8px;">' + avm2.length + ' demos</span></h2>';
+                avm2Html += '<div class="collapsible-body open" id="avm2-body">';
+                avm2Html += '<p style="margin-bottom: 15px; color: #b0b0b0;">ActionScript 3 (AVM2) games recompiled to WebAssembly with WebGPU rendering. Requires a WebGPU-capable browser.</p>';
+                avm2Html += '<div class="demo-grid">';
+                avm2.forEach(function(t) { avm2Html += renderCard(t); });
+                avm2Html += '</div></div>';
+            }
+            var avm2Container = document.getElementById('avm2-demos');
+            if (avm2Container) avm2Container.innerHTML = avm2Html;
 
             var glHtml = '';
             if (glaiel.length > 0) {
@@ -650,11 +676,11 @@
             document.getElementById('trace-demos').innerHTML = traceHtml;
 
             document.getElementById('demo-section').style.display =
-                (graphics.length > 0 || trace.length > 0 || localBatch.length > 0 || glaiel.length > 0 || flasharchive.length > 0) ? 'block' : 'none';
+                (graphics.length > 0 || trace.length > 0 || localBatch.length > 0 || glaiel.length > 0 || flasharchive.length > 0 || avm2.length > 0) ? 'block' : 'none';
         }
 
         function renderCard(t) {
-            var isGfx = t.type === 'graphics' || t.type === 'local_batch' || t.type === 'glaiel' || t.type === 'flasharchive';
+            var isGfx = t.type === 'graphics' || t.type === 'local_batch' || t.type === 'glaiel' || t.type === 'flasharchive' || t.type === 'avm2';
             var cls = isGfx ? 'demo-card graphics' : 'demo-card';
             var badge = isGfx ? '<span class="card-badge">WebGPU</span>' : '';
             var defaultDesc = t.type === 'local_batch'
