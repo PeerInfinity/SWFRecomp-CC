@@ -882,6 +882,7 @@ namespace abc
 	{
 		const AbcFile& abc;
 		std::map<string, int> nameToInst;   // user-class local name -> instance idx
+		std::map<string, int> nameCount;    // local name -> #instances with it
 		struct MI { int cls = -1; bool inst = true; };
 		std::map<u32, MI> m2c;              // method index -> defining class + this-kind
 		std::map<int, std::vector<int>> children;  // instance idx -> direct subclasses
@@ -892,7 +893,9 @@ namespace abc
 			for (size_t i = 0; i < abc.instances.size(); i++)
 			{
 				string nm = localName(abc.instances[i].name);
-				if (!nm.empty() && !nameToInst.count(nm)) nameToInst[nm] = (int) i;
+				if (nm.empty()) continue;
+				if (!nameToInst.count(nm)) nameToInst[nm] = (int) i;
+				nameCount[nm]++;
 			}
 			for (size_t i = 0; i < abc.instances.size(); i++)
 			{
@@ -1040,73 +1043,160 @@ namespace abc
 			}
 			return -1;
 		}
+		// The class (static) slot index for the static Slot/Const trait named
+		// `name` on class `cls`, or -1. Class-object slots are numbered by the
+		// runtime cvt (avm2_class.c ~1025: a FRESH vtable seeded from
+		// slot_count 0 — statics are NOT inherited, so unlike instance slots
+		// there is no super seed) over the class's OWN static traits, honoring
+		// explicit slot_or_disp_id. Every slot-kind trait (Slot/Const/Class/
+		// Function) consumes a slot id, so all are walked for numbering, but a
+		// direct read is emitted only for Slot/Const (Class/Function statics and
+		// getter/setter/method statics are not plain value slots we specialize).
+		int computeStaticSlotIndex(int cls, const string& name) const
+		{
+			if (cls < 0 || cls >= (int) abc.classes.size()) return -1;
+			const std::vector<AbcTrait>& traits = abc.classes[cls].traits;
+			int sc = 0, hits = 0, result = -1;
+			for (const AbcTrait& t : traits)
+			{
+				bool named = localName(t.name) == name;
+				if (named) hits++;
+				if (!isSlotKind(t.kind))
+				{
+					// A getter/setter/method static shadowing the name → not a
+					// plain slot: bail (handled by the hits!=1 guard below too).
+					continue;
+				}
+				u32 sid = t.slot_or_disp_id ? t.slot_or_disp_id : (u32)(sc + 1);
+				if (named && (t.kind == TraitKindType::Slot
+				              || t.kind == TraitKindType::Const))
+				{
+					result = (int) sid;
+				}
+				if ((int) sid > sc) sc = (int) sid;
+			}
+			return hits == 1 ? result : -1;   // ambiguous/accessor → bail
+		}
+		// Instance/class index for a class whose local name is UNIQUE across all
+		// instances (so a compile-time getlex-name → class mapping is
+		// unambiguous), else -1. Native classes (Math, flash.geom.*) are absent
+		// from nameToInst → -1 → never specialized.
+		int uniqueClassByName(const string& name) const
+		{
+			auto ci = nameCount.find(name);
+			if (ci == nameCount.end() || ci->second != 1) return -1;
+			auto it = nameToInst.find(name);
+			return it == nameToInst.end() ? -1 : it->second;
+		}
 	};
 
-	// Per-body: for each op index, the compile-time slot index K if it is a
-	// specializable `this.field` GetPropertyStatic (a bare slots[K] read), else
-	// -1. Sound subset: receiver is `this` (local 0 of an instance method that
-	// never writes local 0), `this`'s class is sealed with an all-ABC chain, and
-	// the name resolves uniquely to a slot/const trait. The is_this bit lives on
-	// the operand stack only (a store into any local clears it), so no merge can
-	// leak it; `this` is invariantly the instance type on every path.
+	// Per-body: for each op index, the compile-time slot index K if the
+	// GetPropertyStatic there is a specializable direct slot read (a bare
+	// `recv.u.obj->slots[K]` load), else -1. TWO levers, one forward
+	// abstract-interpretation over the operand stack (each slot tagged with its
+	// compile-time provenance; a store into any local can't leak a tag because
+	// tags live only on the stack, and `this`/a Class object is invariant on
+	// every path):
+	//   (A) this.field  — receiver is `this` (local 0 of a sealed instance
+	//       method that never writes local 0), name resolves uniquely to a
+	//       slot/const trait, no subclass redeclares it (Step 2).
+	//   (B) Class.staticField — receiver is a compile-time-known Class object (a
+	//       `getlex ClassName` result = FindPropStrict(mn)+GetPropertyStatic(mn)
+	//       of a UNIQUE user-class name), name is a static Slot/Const trait; the
+	//       class object is a singleton and statics aren't inherited/overridden,
+	//       so the static slot index is exact (Step 3 lever B).
 	static std::vector<int> analyzeSlotSpec(const AbcTypeModel& M, const AbcFile& abc,
 	                                         const EmitBody& body)
 	{
 		std::vector<int> spec(body.ir.ops.size(), -1);
 		if (!body.verified) return spec;
-		// A/B baseline toggle: SWF_NO_SLOT_SPEC=1 emits the IC path everywhere
-		// (the pre-specialization build) for interleaved before/after measurement.
-		static const bool disabled = getenv("SWF_NO_SLOT_SPEC") != nullptr;
-		if (disabled) return spec;
+		// A/B baseline toggles (interleaved before/after measurement):
+		//   SWF_NO_SLOT_SPEC   disables BOTH levers (pre-specialization build).
+		//   SWF_NO_STATIC_SLOT disables lever B only (lever-A/this-field baseline).
+		static const bool all_disabled = getenv("SWF_NO_SLOT_SPEC") != nullptr;
+		static const bool staticB_disabled = getenv("SWF_NO_STATIC_SLOT") != nullptr;
+		if (all_disabled) return spec;
+
+		// Lever A (this.field) gating — only enables the is_this tag.
 		auto mit = M.m2c.find(body.ir.method_index);
 		bool instMethod = mit != M.m2c.end() && mit->second.inst && mit->second.cls >= 0;
 		int thisCls = instMethod ? mit->second.cls : -1;
-		if (!instMethod || !M.isSealed(thisCls)) return spec;
-
-		bool local0_written = false;
-		for (const IrOp& op : body.ir.ops)
+		bool this_lever = instMethod && M.isSealed(thisCls);
+		if (this_lever)
 		{
-			switch (op.op) {
-				case IrOpcode::SetLocal: case IrOpcode::Kill:
-				case IrOpcode::IncLocal: case IrOpcode::DecLocal:
-				case IrOpcode::IncLocalI: case IrOpcode::DecLocalI:
-					if (op.arg1 == 0) local0_written = true; break;
-				case IrOpcode::HasNext2:
-					if (op.arg1 == 0 || op.arg2 == 0) local0_written = true; break;
-				default: break;
+			for (const IrOp& op : body.ir.ops)
+			{
+				switch (op.op) {
+					case IrOpcode::SetLocal: case IrOpcode::Kill:
+					case IrOpcode::IncLocal: case IrOpcode::DecLocal:
+					case IrOpcode::IncLocalI: case IrOpcode::DecLocalI:
+						if (op.arg1 == 0) this_lever = false; break;
+					case IrOpcode::HasNext2:
+						if (op.arg1 == 0 || op.arg2 == 0) this_lever = false; break;
+					default: break;
+				}
+				if (!this_lever) break;
 			}
 		}
-		if (local0_written) return spec;
+		bool staticB_lever = !staticB_disabled;
+		if (!this_lever && !staticB_lever) return spec;
 
-		std::vector<bool> st;   // is_this bit per stack slot
-		auto pop = [&]() -> bool { if (st.empty()) return false; bool v = st.back(); st.pop_back(); return v; };
-		auto push = [&](bool v) { st.push_back(v); };
+		// Per-stack-slot provenance tag.
+		struct SV { bool is_this = false; int fp_mn = -1; int cls = -1; };
+		std::vector<SV> st;
+		auto pop = [&]() -> SV { if (st.empty()) return SV{}; SV v = st.back(); st.pop_back(); return v; };
+		auto push = [&](SV v) { st.push_back(v); };
 
 		for (size_t i = 0; i < body.ir.ops.size(); i++)
 		{
 			const IrOp& op = body.ir.ops[i];
-			if (op.op == IrOpcode::GetLocal) { push(op.arg1 == 0); continue; }
-			if (op.op == IrOpcode::Dup) { push(st.empty() ? false : st.back()); continue; }
+			if (op.op == IrOpcode::GetLocal)
+			{
+				SV v; v.is_this = this_lever && op.arg1 == 0; push(v); continue;
+			}
+			if (op.op == IrOpcode::Dup) { push(st.empty() ? SV{} : st.back()); continue; }
+			// FindPropStrict/FindProperty of a static (non-lazy) multiname tags
+			// its result so a following GetPropertyStatic of the same mn (the
+			// getlex pattern) is recognized as a class load.
+			if ((op.op == IrOpcode::FindPropStrict || op.op == IrOpcode::FindProperty)
+			    && !mnLazyNs(abc, op.arg1) && !mnLazyName(abc, op.arg1))
+			{
+				SV v; v.fp_mn = (int) op.arg1; push(v); continue;
+			}
 			if (op.op == IrOpcode::GetPropertyStatic)
 			{
-				bool recv_is_this = pop();
-				if (recv_is_this)
+				SV recv = pop();
+				SV res;   // provenance of the produced value
+				if (recv.is_this)
 				{
+					// Lever A: this.field.
 					string name = M.localName(op.arg1);
 					AbcTypeModel::Found fnd = M.findUniqueSlot(thisCls, name);
-					// Bail if a subclass redeclares the name: `this` may be that
-					// subclass at runtime, where the multiname resolves to the
-					// subclass's shadowing slot (a different index).
 					int K = (fnd.ok && !M.subclassRedeclares(thisCls, name))
 						? M.computeSlotIndex(fnd.declInst, fnd.traitIdx) : -1;
 					if (K > 0) spec[i] = K;
 				}
-				push(false);   // result is the field value, not `this`
+				else if (recv.fp_mn == (int) op.arg1)
+				{
+					// getlex ClassName: FindPropStrict(mn)+GetPropertyStatic(mn).
+					// The read itself is NOT a slot access (it reads the class off
+					// the global); tag the RESULT as the known Class object.
+					int c = staticB_lever
+						? M.uniqueClassByName(M.localName(op.arg1)) : -1;
+					if (c >= 0) res.cls = c;
+				}
+				else if (recv.cls >= 0)
+				{
+					// Lever B: Class.staticField on a compile-time-known class.
+					int K = M.computeStaticSlotIndex(recv.cls, M.localName(op.arg1));
+					if (K > 0) spec[i] = K;
+				}
+				push(res);
 				continue;
 			}
 			u32 pops, pushes; irStackEffect(op, abc, pops, pushes);
 			for (u32 k = 0; k < pops; k++) pop();
-			for (u32 k = 0; k < pushes; k++) push(false);
+			for (u32 k = 0; k < pushes; k++) push(SV{});
 		}
 		return spec;
 	}

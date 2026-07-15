@@ -77,7 +77,39 @@ dynamic global-proto fallback always takes the slow path.
   no-graphics CI (run 29374737324): avm2 829→829, mismatched 47323→47323
   (byte-identical, zero pass→fail). Commit `dad415990`.
 
-## Step 3 (NEXT) — lever B: class-static slot (~22%)
+## Step 3 lever B DONE (2026-07-14) — class-static slot (~2-3 ms / ~6-8%)
+
+The getlex result (a compile-time-known Class object) now feeds a direct
+static-slot read: `FP.staticField` on a getlex-known class emits
+`avm2_op_getproperty_slot(classobj, K)`. **Recompiler-only** — reuses the
+Step-2 runtime op + `-DAVM2_SLOT_VERIFY` (the verify path's `resolve_mn`
+resolves the class object's static traits off its cvt, cross-checking K
+exactly). `analyzeSlotSpec` is now a unified forward abstract-interp tagging
+each operand-stack slot `{is_this, fp_mn, cls}`: `GetLocal 0`→is_this (lever A),
+`FindPropStrict(mn)`→fp_mn, `GetPropertyStatic(mn)` on an fp_mn==mn slot naming a
+UNIQUE user class → tags the result `cls=C` (the getlex read itself is NOT
+specialized), and `GetPropertyStatic(static)` on a `cls=C` slot → static-slot
+read. `computeStaticSlotIndex` mirrors the runtime cvt (avm2_class.c ~1025): a
+FRESH vtable from slot_count 0 (statics NOT inherited, no super seed) over the
+class's own static traits, honoring explicit slot_or_disp_id; emits only for
+Slot/Const (uniqueness-guarded). Class object is a singleton, statics aren't
+inherited/overridden → the index is exact, no subclass concern.
+
+- **1,432 class-static sites in Seedling** (this-field held at 5,039, proving the
+  unified refactor preserved lever A). `SWF_NO_STATIC_SLOT` disables lever B only.
+- **Real-GPU A/B (Intel Gen9, 6 rounds, both-levers vs `SWF_NO_STATIC_SLOT`):
+  32.6 ms after vs ~35.5 before = ~2-3 ms (~6-8%)** (median 2.9/8.2%; drop-max
+  mean 2.5/7.2%; all-6 mean 2.2/6.1%). Noisier run (both sides ~2.5 ms stdev) —
+  a near-noise-floor but real win, consistent with 1,432 sites vs lever A's
+  18,419. Render byte-identical. **Cumulative: ~47 → Step-2 ~43.6 → lever A
+  ~34.4 → lever B ~32.6 ms ≈ 30-31 fps — PAST the 30 fps / 33.3 ms target.**
+- Validation: full-suite `-DAVM2_SLOT_VERIFY` CI (covers BOTH this-field +
+  class-static): <FILL after CI>.
+- **NEXT (Step 4 tail):** coercion elision (bucket C ~4.5 ms — elide the
+  `coerce_*` the verifier proves redundant); then monomorphic devirtualization
+  (needs CHA — FlashPunk methods aren't `final`).
+
+## Step 3 plan (as executed)
 
 Step-1 scout weights (of GET execution, the dominant property op ~15.7% of frame):
 this-slot ~23% (DONE), **getlex-global ~32%**, **class-static slot ~22%**. Step 2
