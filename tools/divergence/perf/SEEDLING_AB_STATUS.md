@@ -34,8 +34,10 @@ CSV: `tools/divergence/perf/rect_slot_ab.csv`.
 divergence; local verify-build run of the 7 rect-caller avm2 tests (copypixels,
 copypixels_blend_over, draw, fillrect, getpixels, copychannel, colortransform) — all
 pass, ZERO mismatches. Slots 1..4 ARE x/y/width/height by construction, read through the
-same `avm2_coerce_to_number` → proven value no-op. Full-suite verify + normal no-graphics
-CI: [pending — recorded on merge]. Commit `88f6f4ad6`.
+same `avm2_coerce_to_number` → proven value no-op. **Full-suite CI both green: verify-mode
+(run 29456416434, `-DAVM2_RECT_SLOT_VERIFY`) all shards passed with ZERO rect-slot aborts;
+normal no-graphics (run 29456420319) avm2 821/1206, 102,541 matched lines — byte-identical
+to baseline, zero pass→fail.** Commit `88f6f4ad6`; `ruffle-test-results` merged (40b51f03b).
 
 ---
 
