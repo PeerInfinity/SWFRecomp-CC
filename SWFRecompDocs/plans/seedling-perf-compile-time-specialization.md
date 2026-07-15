@@ -103,8 +103,10 @@ inherited/overridden → the index is exact, no subclass concern.
   a near-noise-floor but real win, consistent with 1,432 sites vs lever A's
   18,419. Render byte-identical. **Cumulative: ~47 → Step-2 ~43.6 → lever A
   ~34.4 → lever B ~32.6 ms ≈ 30-31 fps — PAST the 30 fps / 33.3 ms target.**
-- Validation: full-suite `-DAVM2_SLOT_VERIFY` CI (covers BOTH this-field +
-  class-static): <FILL after CI>.
+- Validation: full-suite `-DAVM2_SLOT_VERIFY` CI (run 29378131090, covers BOTH
+  this-field + class-static): **avm2 829 held, ZERO slot-verify aborts.** Normal
+  no-graphics CI (run 29378139845): avm2 829→829, mismatched 47323→47323
+  (byte-identical, zero pass→fail). Commit `63cf3d5c9`.
 - **NEXT (Step 4 tail):** coercion elision (bucket C ~4.5 ms — elide the
   `coerce_*` the verifier proves redundant); then monomorphic devirtualization
   (needs CHA — FlashPunk methods aren't `final`).
