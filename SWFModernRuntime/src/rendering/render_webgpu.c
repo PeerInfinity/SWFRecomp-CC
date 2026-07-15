@@ -585,6 +585,15 @@ static EM_BOOL on_mouse_up(int type, const EmscriptenMouseEvent* evt, void* ud) 
 	return EM_TRUE;
 }
 
+#ifdef SWF_AVM2
+// AVM2 live-input bridge (Stage 13c): forward browser key events into the AVM2
+// KeyboardEvent queue (drained by avm2_input_pump_tick each frame). Declared
+// locally so this rendering TU stays free of AVM2 headers; only compiled in the
+// AVM2 build, where avm2_display.c defines the symbol. See avm2_globals.h.
+extern void avm2_input_inject_key(int is_down, int key_code,
+                                  int char_code, int key_location);
+#endif
+
 static EM_BOOL on_key_down(int type, const EmscriptenKeyboardEvent* evt, void* ud) {
 	(void)type; (void)ud;
 	if (g_mouse_app_context) {
@@ -598,6 +607,10 @@ static EM_BOOL on_key_down(int type, const EmscriptenKeyboardEvent* evt, void* u
 		g_mouse_app_context->keys.last_key_down = code;
 		g_mouse_app_context->keys.last_key_ascii = evt->which;
 	}
+#ifdef SWF_AVM2
+	// AVM2 ignores app_context->keys; feed its own KeyboardEvent queue instead.
+	avm2_input_inject_key(1, evt->keyCode, (int) evt->which, (int) evt->location);
+#endif
 	// When a text field is focused, the browser must still emit the `keypress`
 	// event that drives text input — and preventDefault() on keydown cancels it.
 	// So for a focused field, only preventDefault the non-character navigation /
@@ -634,6 +647,9 @@ static EM_BOOL on_key_up(int type, const EmscriptenKeyboardEvent* evt, void* ud)
 			g_mouse_app_context->keys.edge_up[code] = 1;
 		}
 	}
+#ifdef SWF_AVM2
+	avm2_input_inject_key(0, evt->keyCode, (int) evt->which, (int) evt->location);
+#endif
 	return EM_TRUE;
 }
 

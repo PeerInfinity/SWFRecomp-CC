@@ -539,6 +539,10 @@ void avm2_display_run_tick(Avm2Context* ctx);
 // pump one WAIT group per tick (called at the tail of avm2_display_run_tick).
 void avm2_input_load(const char* path);
 void avm2_input_pump_tick(Avm2Context* ctx);
+// Live browser key injection (Stage 13c) — called from the emscripten keyboard
+// callbacks to enqueue a keyDown/keyUp drained by avm2_input_pump_tick.
+void avm2_input_inject_key(int is_down, int32_t key_code,
+                           int32_t char_code, int32_t key_location);
 
 // Text-editing bridge (avm2_text.c): route a physical key / typed char /
 // text-control command to the focused TextField's EditText engine. `focus` may

@@ -5634,6 +5634,17 @@ typedef struct
 static Avm2InputEvent* g_in_events;
 static size_t g_in_count, g_in_pos;
 
+// Live browser key injection (Stage 13c). The g_in_events queue above is the
+// harness feed (load-once from a file, WAIT-paced). Live browser key events
+// arrive asynchronously via the emscripten keydown/keyup callbacks in
+// render_webgpu.c (which fire while the main loop is parked in
+// emscripten_sleep) — buffer them in a ring drained by avm2_input_pump_tick at
+// the same per-tick cadence. Single-threaded: the callback (during sleep) and
+// the pump (during the tick) never interleave, so plain indices are safe.
+#define AVM2_LIVE_IN_CAP 512
+static Avm2InputEvent g_live_in[AVM2_LIVE_IN_CAP];
+static size_t g_live_in_head, g_live_in_tail;   // ring: [head, tail)
+
 // Mouse/keyboard state (Ruffle context.input + mouse_data).
 static double g_mouse_x, g_mouse_y;       // stage pixels
 static uint8_t g_mouse_btn_down[3];       // left/middle/right
@@ -6346,8 +6357,44 @@ static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
 	}
 }
 
+// Live browser input injector (Stage 13c). Called from the emscripten key
+// callbacks (render_webgpu.c) to enqueue a keyDown/keyUp for delivery on the
+// next tick. keyCode/charCode/keyLocation come straight from the DOM event
+// (DOM keyCode == Flash keyCode for the keys games read). Non-static: the
+// rendering TU calls it through a local extern (see render_webgpu.c).
+void avm2_input_inject_key(int is_down, int32_t key_code,
+                           int32_t char_code, int32_t key_location)
+{
+	size_t next = (g_live_in_tail + 1) % AVM2_LIVE_IN_CAP;
+	if (next == g_live_in_head) return;   // ring full → drop this event
+	Avm2InputEvent* ev = &g_live_in[g_live_in_tail];
+	memset(ev, 0, sizeof(*ev));
+	ev->kind  = is_down ? IN_KEY_DOWN : IN_KEY_UP;
+	ev->code  = key_code;
+	ev->code2 = char_code;
+	ev->code3 = key_location;
+	g_live_in_tail = next;
+}
+
 void avm2_input_pump_tick(Avm2Context* ctx)
 {
+	// Live browser events first: drain everything buffered since the last tick
+	// (delivered in real time, so no WAIT pacing). Each in its own try frame so
+	// a throwing AS3 key handler can't abort the rest of the drain or the tick.
+	while (g_live_in_head != g_live_in_tail)
+	{
+		Avm2InputEvent* ev = &g_live_in[g_live_in_head];
+		Avm2TryFrame ltop;
+		avm2_try_push_catch_all(ctx, &ltop);
+		if (setjmp(ltop.jb) == 0)
+		{
+			input_deliver(ctx, ev);
+		}
+		avm2_try_pop_frame(&ltop);
+		g_live_in_head = (g_live_in_head + 1) % AVM2_LIVE_IN_CAP;
+	}
+
+	// Harness file queue: one WAIT group per tick.
 	while (g_in_pos < g_in_count)
 	{
 		Avm2InputEvent* ev = &g_in_events[g_in_pos];
@@ -7100,6 +7147,56 @@ void avm2_register_display(Avm2Context* ctx)
 		                               mouse_get_cursor, mouse_set_cursor);
 		avm2_builtin_add_static_method(ctx, mouse, "hide", mouse_noop);
 		avm2_builtin_add_static_method(ctx, mouse, "show", mouse_noop);
+	}
+
+	// flash.ui.Keyboard — FlashPunk's Input.onKeyDown reads Keyboard.capsLock on
+	// every printable keydown; if the class is unregistered, getlex flash.ui::
+	// Keyboard throws #1065 and the key handler aborts (space/letters never
+	// register in _key[], so only arrow keys — which skip that branch — would
+	// work). Headless has no lock state, so capsLock/numLock are const false. The
+	// key-code constants are provided for AS3 games that read Keyboard.LEFT etc.
+	// directly (FlashPunk uses its own Key class, so Seedling only needs capsLock).
+	{
+		Avm2Class* kb = avm2_builtin_class(ctx, "flash.ui",
+		                                   "Keyboard", b->object_class);
+		avm2_builtin_add_static_const(ctx, kb, "capsLock", avm2_bool(false));
+		avm2_builtin_add_static_const(ctx, kb, "numLock", avm2_bool(false));
+		avm2_builtin_add_static_const(ctx, kb, "hasVirtualKeyboard", avm2_bool(false));
+
+		// Named navigation / whitespace / modifier keys (Flash keyCode == DOM
+		// keyCode == AS3 Keyboard constant for all of these).
+		struct { const char* n; uint32_t c; } named[] = {
+			{"BACKSPACE",8},{"TAB",9},{"ENTER",13},{"SHIFT",16},{"CONTROL",17},
+			{"ALTERNATE",18},{"CAPS_LOCK",20},{"ESCAPE",27},{"SPACE",32},
+			{"PAGE_UP",33},{"PAGE_DOWN",34},{"END",35},{"HOME",36},
+			{"LEFT",37},{"UP",38},{"RIGHT",39},{"DOWN",40},
+			{"INSERT",45},{"DELETE",46},
+			{"NUMBER_0",48},{"NUMBER_1",49},{"NUMBER_2",50},{"NUMBER_3",51},
+			{"NUMBER_4",52},{"NUMBER_5",53},{"NUMBER_6",54},{"NUMBER_7",55},
+			{"NUMBER_8",56},{"NUMBER_9",57},
+			{"SEMICOLON",186},{"EQUAL",187},{"COMMA",188},{"MINUS",189},
+			{"PERIOD",190},{"SLASH",191},{"BACKQUOTE",192},{"LEFTBRACKET",219},
+			{"BACKSLASH",220},{"RIGHTBRACKET",221},{"QUOTE",222},
+		};
+		for (size_t i = 0; i < sizeof(named)/sizeof(named[0]); i++)
+			avm2_builtin_add_static_const(ctx, kb, named[i].n, avm2_uint_value(named[i].c));
+
+		// Letters A..Z (keyCode 65..90) and numpad NUMPAD_0..9 (96..105).
+		for (uint32_t c = 'A'; c <= 'Z'; c++)
+		{
+			char n[2] = { (char) c, 0 };
+			avm2_builtin_add_static_const(ctx, kb, n, avm2_uint_value(c));
+		}
+		for (uint32_t i = 0; i <= 9; i++)
+		{
+			char n[12]; snprintf(n, sizeof(n), "NUMPAD_%u", i);
+			avm2_builtin_add_static_const(ctx, kb, n, avm2_uint_value(96 + i));
+		}
+		for (uint32_t i = 1; i <= 15; i++)
+		{
+			char n[8]; snprintf(n, sizeof(n), "F%u", i);
+			avm2_builtin_add_static_const(ctx, kb, n, avm2_uint_value(111 + i));
+		}
 	}
 
 	// Stage parameters from the generated tables.
