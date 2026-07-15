@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `63cf3d5c98be` (2026-07-15T00:25:07.509371+00:00)
-**Current:** `63cf3d5c98be` (2026-07-15T00:32:52.514074+00:00)
+**Previous:** `e05a8fe0d131` (2026-07-15T03:39:09.595608+00:00)
+**Current:** `e05a8fe0d131` (2026-07-15T03:48:09.970705+00:00)
 *Re-run on same commit — no comparison available.*
 
 ## Summary
