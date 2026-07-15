@@ -1,4 +1,46 @@
-# Seedling perf A/B — status (2026-07-13, Stage 13a session 1)
+# Seedling perf A/B — status
+
+## ★★★ UPDATE 2026-07-14 (session 6) — STEP 4 coercion elision: sound but ~1 ms (below noise), hot path already coerce-clean
+Final step of the compile-time type-specialization arc (plan
+`seedling-perf-compile-time-specialization.md`). The recompiler now elides
+`coerce_*` / `coerce_return` sites its forward abstract-interp proves are value
+no-ops (operand already has the target static type). **735 elided sites in
+Seedling** (344 return, 167 CoerceD, 113 named, 76 Boolean, 18/9/8 I/S/U).
+
+**Real-GPU interleaved A/B (Intel Gen9, 6 rounds, `seedling` = elision vs
+`seedling_before` = `SWF_NO_COERCE_ELIDE`):**
+```
+  round   on(ms)   off(ms)
+    1      49.7      43.9    (r1 on = warmup hiccup, p95 68.5)
+    2      40.7      47.1
+    3      37.6      39.2
+    4      41.8      41.5
+    5      40.5      42.3
+    6      40.0      42.7
+  on mean 41.7 (median 40.6, stdev 3.8)   off mean 42.8 (median 42.5, stdev 2.4)
+  Δ = +1.1 ms mean / +1.9 ms median favoring elision — WITHIN the ±2.4-3.8 ms noise
+```
+Favorable direction, below clean measurability. **The hottest method m676
+(Image.render) has ZERO elidable coerces** (its coerces are `ReturnVoid`
+defaults + native flash.geom Matrix/Point types); the 735 sites live in
+cold/startup + per-frame-logic methods (m523=46, m630=24, m247=21). Coercion
+elision is structurally near-exhausted for steady-state frame time — the AS3
+compiler already leaves the hot arithmetic coerce-clean.
+
+**Correctness:** `-DAVM2_COERCE_VERIFY` makes every elided site run the REAL
+coerce and abort on any value change (mirrors `-DAVM2_SLOT_VERIFY`); 8
+coercion-critical avm2 tests pass locally with zero aborts. Full-suite CI
+(commit `3b5a6b925`): verify-mode run 29382549715 + normal run 29382556130 BOTH
+give the identical avm2 breakdown pass=829 / runtime_error=4 / output_mismatch=347
+— byte-identical to baseline, ZERO coerce aborts across all 829 tests. Commit
+`3b5a6b925`.
+
+**Arc verdict: 30 fps target met at Step 3 (~32.6 ms); Step 4 closes the arc.**
+The remaining lever is monomorphic devirtualization (needs class-hierarchy
+analysis — FlashPunk methods aren't `final`), deferred.
+
+---
+
 
 ## ★★★★★ UPDATE 2026-07-14 (session 5) — COMPILE-TIME SLOT SPECIALIZATION: ~3-4 ms (~7-9%), the first win past the IC plateau
 Step 2 of the compile-time type-specialization arc (plan

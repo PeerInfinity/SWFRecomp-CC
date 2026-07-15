@@ -1,5 +1,12 @@
 # Seedling perf — Phase: compile-time type specialization (the recompiler's real lever)
 
+**Status (2026-07-14): ARC COMPLETE, PAST TARGET.** Steps 0–4 done. Cumulative
+~47 → Step-2 ~43.6 → lever A ~34.4 → lever B **~32.6 ms ≈ 30–31 fps, past the
+30 fps / 33.3 ms target, ~1.4× faster than Ruffle**. Step 4 (coercion elision)
+shipped sound + byte-identical but is ~1 ms below the noise floor — the hot
+render path is already coerce-clean (see the Step-4 section below). Remaining
+lever (monomorphic devirtualization) needs CHA and is deferred.
+
 **Status:** Step 0/1 DONE (gate GREEN). **Step 2 DONE 2026-07-14 — this.field
 slot specialization shipped: ~3-4 ms / 7-9% real-GPU win, the first gain past the
 IC plateau; full-suite verify-mode CI proves it byte-identical + slot-correct.**
@@ -110,6 +117,66 @@ inherited/overridden → the index is exact, no subclass concern.
 - **NEXT (Step 4 tail):** coercion elision (bucket C ~4.5 ms — elide the
   `coerce_*` the verifier proves redundant); then monomorphic devirtualization
   (needs CHA — FlashPunk methods aren't `final`).
+
+## Step 4 DONE (2026-07-14) — coercion elision: sound, but the hot path is already coerce-clean (~1 ms, below noise)
+
+AS3 is statically typed, so at many `coerce_*` / `coerce_return` sites the
+operand already has the target static type and the coercion is a provable value
+no-op. The unified `analyzeSlotSpec` forward abstract-interp (which already tags
+this/getlex-class provenance for the slot levers) now ALSO tracks a **static
+type per operand-stack slot and per local** — seeded from typed params/`this`,
+slot/getter/method declared types, getproperty/callproperty results, numeric
+arithmetic, and literals — and marks each `Coerce/CoerceD/I/U/B/S` and
+`ReturnValue` coerce_return whose operand type is provably identical to (or, for
+class targets, a subtype of) the target as `elide`. The emitter drops it.
+
+- **Soundness:** primitives require EXACT match (`int != Number` — the runtime
+  representation differs); class targets allow subtype (a subtype value is
+  already an instance of the target, and null coerces to null); `Object`/`*`/
+  native targets carry no guarantee (coerce-to-Object turns undefined→null) →
+  never elided. Stack/local types reset to UNKNOWN at every branch-target merge
+  (the linear pass can't compute the join) → only path-invariant types drive
+  elision. `CoerceA` was already a no-op; `ReturnVoid` is left alone (undefined→
+  the type's default is a real conversion, not a no-op).
+- **Validation infra (mirrors `-DAVM2_SLOT_VERIFY`):** each elided site emits a
+  verify hook — a `static inline` identity the optimizer removes in the normal
+  build (`avm2_ops.h`), or under `-DAVM2_COERCE_VERIFY` a real function that runs
+  the ACTUAL coercion and aborts if it would have changed the value, then
+  returns the original (so the verify build stays byte-identical to the elided
+  build). `SWF_NO_COERCE_ELIDE` gives the A/B baseline. Local smoke: 8
+  coercion-critical avm2 tests (`coerce_return_type`, `convert_number`,
+  `function_call_coercion`, …) pass with ZERO aborts under the verify build.
+  **Full-suite CI (commit `3b5a6b925`): verify-mode run 29382549715
+  (`-DAVM2_COERCE_VERIFY`) and normal run 29382556130 BOTH give the identical
+  avm2 breakdown pass=829 / runtime_error=4 / output_mismatch=347 / timeout=1 —
+  byte-identical to the pre-change baseline, ZERO new coerce aborts across all
+  829 tests. Every elision is a proven no-op suite-wide.**
+- **735 elided sites in Seedling** (344 return, 167 CoerceD, 113 named coerce,
+  76 Boolean, 18 CoerceI, 9 CoerceS, 8 CoerceU) — an order of magnitude fewer
+  than lever A's 18,419, and, critically, **NONE on the hot path.**
+- **Real-GPU interleaved A/B (Intel Gen9, 6 rounds, both-levers+elision vs
+  `SWF_NO_COERCE_ELIDE`): on mean 41.7 / off 42.8 ms = +1.1 ms mean, +1.9 ms
+  median favoring elision — but WITHIN the ±2.4–3.8 ms noise** (favorable
+  direction, below clean measurability). Render byte-identical.
+- **Why it's marginal (the honest finding):** the hottest method **m676
+  (`Image.render`) has ZERO elidable coerces** — its only coerces are
+  `ReturnVoid` defaults and coercions on native `flash.geom` types (Matrix/Point,
+  no ABC layout), and the ABC compiler already elides the redundant ones. The
+  735 sites live in cold/startup + per-frame-logic methods (top: m523=46,
+  m630=24, m247=21). **Coercion elision is structurally near-exhausted for
+  steady-state frame time** — the AS3 compiler + verifier already leave the hot
+  arithmetic coerce-clean; only a recompiler could catch the residue, and the
+  residue isn't hot.
+- **Verdict: the 30 fps / 33.3 ms target was already met at Step 3 (~32.6 ms).**
+  Step 4 ships a sound, byte-identical, verify-proven optimization that trims
+  cold/per-frame-logic work but does not move the steady-state frame
+  measurably. The remaining big lever (monomorphic devirtualization) needs CHA
+  (FlashPunk methods aren't `final`) and is deferred. **This closes the
+  compile-time type-specialization arc at/past target.**
+- Commit `3b5a6b925`. Code: `abc_emit.cpp` (`TK`/`TV` lattice, `typeOfMn`/
+  `coerceIsNoop`/`memberReadType`/`isSubtypeOrEqual` on `AbcTypeModel`, type
+  tracking in `analyzeSlotSpec` → `SlotSpecResult{slot,elide}`, emitter hooks);
+  runtime `avm2_coerce_verify_*` (`avm2_ops.h`/`.c`).
 
 ## Step 3 plan (as executed)
 
