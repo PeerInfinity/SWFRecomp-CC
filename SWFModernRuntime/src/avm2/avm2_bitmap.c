@@ -113,6 +113,143 @@ static uint32_t blend_over(uint32_t dest, uint32_t src)
 }
 
 // ---------------------------------------------------------------------------
+// SIMD span kernels (perf lever: Seedling's FlashPunk Image.render is a per-frame
+// software blit — bd_copy_pixels/bd_draw were ~5.5% of frame self-time; the hot
+// branch is blend_over over contiguous rows into an opaque dest, confirmed by a
+// GPU-independent branch tally). The per-call blit MODE (blend vs raw copy, dest
+// transparency) is loop-invariant, so it is hoisted out and each destination row
+// is a contiguous span dispatched to one of these.
+//
+// Byte-exactness is the hard constraint: the SIMD lanes reproduce blend_over's
+// truncating /255 + uint8 wrap EXACTLY via the magic pair (x*32897)>>23 == x/255
+// for x in [0,65025] (proven exhaustively) — NOT a *257>>16 approximation. Guard
+// with the scalar fallback for native/verify gcc (no SIMD); -DAVM2_BLIT_VERIFY
+// re-runs the scalar per pixel and aborts on any divergence; -DSWF_NO_BLIT_SIMD
+// forces the scalar path (A/B baseline).
+// ---------------------------------------------------------------------------
+
+// out_c = (uint8)(src_c + (dst_c*(255-sa))/255) per channel; `opaque` forces the
+// dest alpha to 0xFF afterwards (with_alpha(...,0xFF)).
+static void blend_over_span_scalar(uint32_t* d, const uint32_t* s, uint32_t n,
+                                   int opaque)
+{
+	for (uint32_t i = 0; i < n; i++)
+	{
+		uint32_t out = blend_over(d[i], s[i]);
+		if (opaque) out = with_alpha(out, 0xFF);
+		d[i] = out;
+	}
+}
+
+// Raw copy of a span into an opaque dest (dst_transparency == 0, no blend):
+// out = with_alpha(src, 0xFF).
+static void copy_force_opaque_span_scalar(uint32_t* d, const uint32_t* s, uint32_t n)
+{
+	for (uint32_t i = 0; i < n; i++) d[i] = with_alpha(s[i], 0xFF);
+}
+
+#if defined(__wasm_simd128__) && !defined(SWF_NO_BLIT_SIMD)
+#include <wasm_simd128.h>
+
+// 4-pixel-wide byte-exact blend_over (see the exactness note above).
+static void blend_over_span_simd(uint32_t* d, const uint32_t* s, uint32_t n,
+                                 int opaque)
+{
+	const v128_t amask = wasm_i32x4_const(0xFF000000, 0xFF000000, 0xFF000000,
+	                                      0xFF000000);
+	const v128_t lo255 = wasm_i16x8_splat(0x00FF);
+	const v128_t magic = wasm_i32x4_splat(32897);
+	const v128_t ffb = wasm_i8x16_splat((int8_t) 0xFF);
+	uint32_t i = 0;
+	for (; i + 4 <= n; i += 4)
+	{
+		v128_t vs = wasm_v128_load(s + i);
+		v128_t vd = wasm_v128_load(d + i);
+		// factor = 255 - src_alpha, broadcast to each pixel's 4 byte lanes
+		// (byte lanes 3/7/11/15 hold alpha in little-endian 0xAARRGGBB storage).
+		v128_t sa = wasm_i8x16_shuffle(vs, vs, 3, 3, 3, 3, 7, 7, 7, 7,
+		                               11, 11, 11, 11, 15, 15, 15, 15);
+		v128_t fac = wasm_i8x16_sub(ffb, sa);  // 255 - sa (no wrap: sa<=255)
+		// low 8 bytes (pixels 0,1)
+		v128_t t_lo = wasm_i16x8_mul(wasm_u16x8_extend_low_u8x16(vd),
+		                             wasm_u16x8_extend_low_u8x16(fac));
+		v128_t div_lo = wasm_u16x8_narrow_i32x4(
+			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_low_u16x8(t_lo), magic), 23),
+			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_high_u16x8(t_lo), magic), 23));
+		v128_t o_lo = wasm_v128_and(
+			wasm_i16x8_add(wasm_u16x8_extend_low_u8x16(vs), div_lo), lo255);
+		// high 8 bytes (pixels 2,3)
+		v128_t t_hi = wasm_i16x8_mul(wasm_u16x8_extend_high_u8x16(vd),
+		                             wasm_u16x8_extend_high_u8x16(fac));
+		v128_t div_hi = wasm_u16x8_narrow_i32x4(
+			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_low_u16x8(t_hi), magic), 23),
+			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_high_u16x8(t_hi), magic), 23));
+		v128_t o_hi = wasm_v128_and(
+			wasm_i16x8_add(wasm_u16x8_extend_high_u8x16(vs), div_hi), lo255);
+		v128_t out = wasm_u8x16_narrow_i16x8(o_lo, o_hi);
+		if (opaque) out = wasm_v128_or(out, amask);
+		wasm_v128_store(d + i, out);
+	}
+	if (i < n) blend_over_span_scalar(d + i, s + i, n - i, opaque);
+}
+
+static void copy_force_opaque_span_simd(uint32_t* d, const uint32_t* s, uint32_t n)
+{
+	const v128_t amask = wasm_i32x4_const(0xFF000000, 0xFF000000, 0xFF000000,
+	                                      0xFF000000);
+	uint32_t i = 0;
+	for (; i + 4 <= n; i += 4)
+		wasm_v128_store(d + i, wasm_v128_or(wasm_v128_load(s + i), amask));
+	if (i < n) copy_force_opaque_span_scalar(d + i, s + i, n - i);
+}
+#endif  // __wasm_simd128__ && !SWF_NO_BLIT_SIMD
+
+// Dispatchers: pick SIMD when available, else scalar. Under -DAVM2_BLIT_VERIFY the
+// SIMD result is cross-checked against the scalar reference per pixel (aborts on
+// any mismatch) — the render-change analog of the coerce-memo lever's verify guard.
+static void blend_over_span(uint32_t* d, const uint32_t* s, uint32_t n, int opaque)
+{
+#if defined(__wasm_simd128__) && !defined(SWF_NO_BLIT_SIMD)
+#ifdef AVM2_BLIT_VERIFY
+	// Reference the scalar path into a temp copy of dst, run the REAL SIMD span in
+	// place, then compare — exercising the 4-wide vector body (chunks keep the temp
+	// small; row widths can reach the atlas width).
+	uint32_t off = 0;
+	while (off < n)
+	{
+		uint32_t ref[256];
+		uint32_t chunk = n - off > 256 ? 256 : n - off;
+		for (uint32_t k = 0; k < chunk; k++) ref[k] = d[off + k];
+		blend_over_span_scalar(ref, s + off, chunk, opaque);
+		blend_over_span_simd(d + off, s + off, chunk, opaque);
+		for (uint32_t k = 0; k < chunk; k++)
+			if (d[off + k] != ref[k])
+			{
+				fprintf(stderr, "blit-simd mismatch @%u: src=%08x opaque=%d "
+				        "simd=%08x scalar=%08x\n", off + k, s[off + k], opaque,
+				        d[off + k], ref[k]);
+				abort();
+			}
+		off += chunk;
+	}
+#else
+	blend_over_span_simd(d, s, n, opaque);
+#endif
+#else
+	blend_over_span_scalar(d, s, n, opaque);
+#endif
+}
+
+static void copy_force_opaque_span(uint32_t* d, const uint32_t* s, uint32_t n)
+{
+#if defined(__wasm_simd128__) && !defined(SWF_NO_BLIT_SIMD)
+	copy_force_opaque_span_simd(d, s, n);
+#else
+	copy_force_opaque_span_scalar(d, s, n);
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // BitmapData ext access
 // ---------------------------------------------------------------------------
 
@@ -905,6 +1042,36 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 	if (pr_w(&dst_region) == 0 || pr_h(&dst_region) == 0) return avm2_undefined();
 
 	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
+
+	// The blit mode is loop-invariant (alpha bitmap present, blend vs raw, dest
+	// transparency), so hoist it and dispatch each destination ROW as a contiguous
+	// span to the SIMD/scalar kernels. The alpha-bitmap path (per-pixel un/re-
+	// premultiply with double + round) is left per-pixel scalar — a gate tally
+	// confirmed FlashPunk/Seedling never hits it. A src==dst self-copy is also kept
+	// on the exact legacy per-pixel path (span kernels' 4-wide grouping would differ
+	// from the scalar forward order under intra-buffer overlap).
+	int has_alpha = (alpha != NULL && !alpha->disposed);
+	int same_buf = (src->pixels == dst->pixels);
+	if (!has_alpha && !same_buf)
+	{
+		int blend = src->transparency && (merge_alpha || !dst->transparency);
+		int opaque = !dst->transparency;
+		for (uint32_t j = 0; j < rh; j++)
+		{
+			uint32_t* drow = &dst->pixels[(dst_region.y_min + j) * dst->width
+			                              + dst_region.x_min];
+			const uint32_t* srow = &src->pixels[(src_region.y_min + j) * src->width
+			                                    + src_region.x_min];
+			if (blend)
+				blend_over_span(drow, srow, rw, opaque);
+			else if (opaque)
+				copy_force_opaque_span(drow, srow, rw);
+			else
+				memcpy(drow, srow, (size_t) rw * sizeof(uint32_t));
+		}
+		return avm2_undefined();
+	}
+
 	for (uint32_t j = 0; j < rh; j++)
 	{
 		for (uint32_t i = 0; i < rw; i++)
@@ -913,7 +1080,7 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 			uint32_t dxx = dst_region.x_min + i, dyy = dst_region.y_min + j;
 			uint32_t sc = bd_get_raw(src, sxx, syy);
 			uint32_t final_alpha;
-			if (alpha != NULL && !alpha->disposed)
+			if (has_alpha)
 			{
 				uint32_t axx = (uint32_t) (ax + (int32_t) sxx - sx);
 				uint32_t ayy = (uint32_t) (ay + (int32_t) syy - sy);
@@ -1606,6 +1773,29 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	if (pr_w(&dst_region) == 0 || pr_h(&dst_region) == 0) return avm2_undefined();
 
 	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
+
+	// Fast path: no colorTransform, distinct buffers -> each row is a contiguous
+	// span with a mode constant across the call, dispatched to the SIMD/scalar
+	// kernels. This is the hot FlashPunk Image.render(draw) branch (a gate tally
+	// found cxform never set here). The cxform path stays per-pixel scalar.
+	if (!has_cxform && src->pixels != dst->pixels)
+	{
+		for (uint32_t j = 0; j < rh; j++)
+		{
+			uint32_t* drow = &dst->pixels[(dst_region.y_min + j) * dst->width
+			                              + dst_region.x_min];
+			const uint32_t* srow = &src->pixels[(src_region.y_min + j) * src->width
+			                                    + src_region.x_min];
+			if (blend)
+				blend_over_span(drow, srow, rw, opaque);
+			else if (opaque)
+				copy_force_opaque_span(drow, srow, rw);
+			else
+				memcpy(drow, srow, (size_t) rw * sizeof(uint32_t));
+		}
+		return avm2_undefined();
+	}
+
 	for (uint32_t j = 0; j < rh; j++)
 	{
 		for (uint32_t i = 0; i < rw; i++)

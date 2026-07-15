@@ -1,5 +1,60 @@
 # Seedling perf A/B — status
 
+## ★★★ UPDATE 2026-07-15 (session 8) — BLIT SIMD (fresh-profile lever #2): byte-exact 4-px WASM-SIMD blend_over; ~+1.4 ms (~6%), UNANIMOUS 11/11 rounds vs master, render byte-identical
+The 2nd fresh-profile lever ([[seedling-fresh-profile-poststep4-lever-map]], lever #2:
+`bd_copy_pixels` 4.3% + `bd_draw` 1.2% self-time — FlashPunk's per-frame CPU software
+blit). **STEP-1 gate first** (a GPU-independent per-pixel branch tally, headless):
+Seedling's `Image.render` hits exactly two hot branches — `blend_over` into an
+**opaque** dest (~19.5M px/295 frames: copyPixels FP.buffer + bd_draw identity, no
+cxform) and a **raw copy into a transparent dest** (~11M px). The expensive
+alpha-bitmap path (per-pixel double + `round()`) is **never hit**. So the per-call
+blit MODE is loop-invariant → hoisted out; each destination ROW is dispatched as a
+contiguous span to: a 4-px WASM-SIMD `blend_over`, a `copy_force_opaque` span, or a
+plain `memcpy` (the transparent raw copy).
+
+**Byte-exactness (the hard constraint):** the SIMD lanes reproduce `blend_over`'s
+truncating `/255` + uint8 wrap EXACTLY via the magic pair `(x*32897)>>23 == floor(x/255)`
+for x in [0,65025] (proven exhaustively — a `*257>>16`-style approximation would NOT
+be byte-identical). **0 mismatches / 27.3M px** from the REAL emcc-compiled intrinsics
+vs scalar (randomized widths hitting every 4-group remainder + a full boundary alpha
+sweep), plus 0/16.7M on the native per-channel algorithm. `-DAVM2_BLIT_VERIFY` runs
+scalar per pixel and aborts on divergence; `-DSWF_NO_BLIT_SIMD` forces scalar (A/B
+toggle); `-msimd128` added to `build_wasm_avm2.sh`; scalar fallback + a src==dst
+self-copy guard preserve the exact legacy path where SIMD grouping could differ.
+
+**Render byte-identical on the real GPU** (`__swfRender` telemetry, both builds):
+writeTexture 1 call / 103684 B (161²·4), 1 draw, writeBuffer 7/312 B — identical → the
+SIMD blit yields a bit-identical FP.buffer.
+
+**Real-GPU A/B (Intel Gen9, WSL idle; `seedling`=NEW vs baselines). Two interleaved
+multi-round sessions + a 4-way decomposition:**
+```
+  build                                  mean(ms)  stdev
+  NEW  (refactor + hand-SIMD + msimd128)   20.4     0.5   (4-way) / 20.9 (3-way)
+  refactor + scalar blit + msimd128        21.8     0.6   / 21.2
+  orig blit + msimd128 only                21.6     0.6
+  master (orig, no msimd128)               22.1     0.4   / 22.0
+
+  TOTAL  NEW vs master : 3-way +1.1 (6/6) , 4-way +1.68 (5/5)  -> 11/11 rounds, ~+1.4 ms (~6%)
+  global -msimd128 alone (orig blit)       : +0.5 ms (4/5)
+  hand-SIMD kernel (NEW vs before)         : +0.3 (3/6) & +1.4 (5/5) -> 8/11, ~+0.8, noisy
+```
+**NEW is unanimously the fastest of the four across BOTH sessions (11/11 paired rounds).**
+The component attribution sits near the ~0.5 ms noise floor — global `-msimd128` gives
+~+0.5 (it also autovectorizes other AVM2 code; master's per-pixel blit has in-loop
+branches clang won't vectorize), and the blit-specific refactor + hand-SIMD supply the
+rest (~+0.9), with the hand-SIMD leaning positive but individually noisy. Absolute ms is
+small because THIS session's machine is lightly loaded (~22 ms / ~46 fps vs session-7's
+loaded ~49 ms); at a loaded state the blit's absolute share is larger. Present ~0.4 ms
+both sides (render off the critical path). A/B CSVs: `blit_ab.csv`/`blit_ab3.csv`/
+`blit_ab4.csv`.
+
+**Verdict:** ship — a clean, unanimous ~6% frame win, byte-identical render, byte-exact
+blit, no regression. Bigger + more consistent than Steps 4/5 (both below noise). Remaining
+fresh-profile levers: typed-Number arithmetic spec (~2-4%), Matrix/Point sealed slots (~2.3%).
+
+---
+
 ## ★★★★ UPDATE 2026-07-14 (session 7) — COERCE-CLASS-RESOLUTION MEMO: ~6 ms (~12%), CLEANLY ABOVE NOISE — the fresh-profile #1 lever, and the first win past the compile-time-slot arc
 New perf arc opened from the post-Step-4 fresh profile
 ([[seedling-fresh-profile-poststep4-lever-map]], lever #1). `avm2_coerce_to_type_mn`

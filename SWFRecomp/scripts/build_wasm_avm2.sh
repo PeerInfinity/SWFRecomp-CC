@@ -141,12 +141,22 @@ DEFINES=(
     -DSWF_ONDISK_SIZE=${SWF_ONDISK_SIZE}
     '-DSWF_URL="file:///test.swf"'
 )
+# WASM SIMD (128-bit) — enables __wasm_simd128__ so the AVM2 bitmap blit
+# (avm2_bitmap.c) uses its 4-pixel-wide byte-exact blend_over kernel on the hot
+# FlashPunk Image.render software-blit path. Universally supported in the target
+# browsers (baseline since ~2021). Scalar fallback compiles when this is absent.
+SIMD_FLAGS=(-msimd128)
 WARN=(
     -Wno-error=implicit-function-declaration
     -Wno-implicit-function-declaration
     -Wno-unused-variable -Wno-unused-but-set-variable
     -Wno-incompatible-pointer-types
 )
+# Extra compile flags (space-separated), e.g. EXTRA_CFLAGS="-DSWF_NO_BLIT_SIMD" for
+# an A/B baseline or "-DAVM2_BLIT_VERIFY" for the SIMD-vs-scalar guard. NOTE: the
+# .o cache keys on mtime, NOT on -D flags, so a flag change needs FRESH=1 (or touch
+# the affected .c) or you'll link stale objects (the coerce-memo flag-staleness trap).
+read -r -a EXTRA_CFLAGS_ARR <<< "${EXTRA_CFLAGS:-}"
 
 # Pick per-TU opt level: the two giant generated ABC TUs get ABC_OPT.
 opt_for() {
@@ -170,7 +180,7 @@ for src in "${ALL_SRC[@]}"; do
     if [ -f "${obj}" ] && [ "${obj}" -nt "${src}" ]; then continue; fi
     o="$(opt_for "$(basename "${src}")")"
     printf '  %-28s %s\n' "$(basename "${src}")" "${o}"
-    emcc "${DEFINES[@]}" --use-port=emdawnwebgpu "${INCLUDES[@]}" "${WARN[@]}" \
+    emcc "${DEFINES[@]}" "${SIMD_FLAGS[@]}" "${EXTRA_CFLAGS_ARR[@]}" --use-port=emdawnwebgpu "${INCLUDES[@]}" "${WARN[@]}" \
         "${o}" -c "${src}" -o "${obj}"
     NCOMPILED=$((NCOMPILED+1))
 done
@@ -180,6 +190,7 @@ echo "=== Linking ${NAME}.js / ${NAME}.wasm ==="
 EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer"]'
 emcc "${OBJS[@]}" \
     --use-port=emdawnwebgpu \
+    "${SIMD_FLAGS[@]}" \
     -o "${OUT_DIR}/${NAME}.js" \
     -s WASM=1 \
     -s EXPORTED_FUNCTIONS="${EXPORTED_FUNCS}" \
