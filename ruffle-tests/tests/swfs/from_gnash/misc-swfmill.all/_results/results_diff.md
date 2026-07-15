@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `dad41599053e` (2026-07-14T23:16:37.466982+00:00)
-**Current:** `dad41599053e` (2026-07-14T23:24:20.510155+00:00)
+**Previous:** `63cf3d5c98be` (2026-07-15T00:25:07.639893+00:00)
+**Current:** `63cf3d5c98be` (2026-07-15T00:32:52.527953+00:00)
 *Re-run on same commit — no comparison available.*
 
 ## Summary
