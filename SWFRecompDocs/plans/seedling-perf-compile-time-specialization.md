@@ -257,6 +257,63 @@ decision, add a `-DAVM2_CALL_VERIFY` guard + `SWF_NO_CALL_DEVIRT` A/B toggle
 calls (no single target), `callsuper`, getter/setter-as-call, and verifying any
 baked disp_id/method ref equals the runtime dispatch exactly.
 
+## Post-arc FRESH PROFILE (2026-07-14) — current-state map reshapes the next-lever ranking
+
+After closing the arc, captured a **fresh real-GPU CDP profile at the current
+(post-Step-4) state** to find further headroom — the on-disk profiles were all
+~47 ms pre-slot-lever *and* pre a `setproperty` qname fix, so their ranking was
+obsolete. Rig: Windows-Chrome via WSL interop ([[windows-playwright-from-wsl]]),
+Intel Gen9, `seedling_cdp_profile_win.py`, 24,609 samples @ 200 µs. Saved to
+`tools/divergence/perf/seedling_profile_2026-07-14_fresh_step4.json`.
+
+**Current-state self-time buckets (1% ≈ 0.33 ms at ~32.6 ms):**
+
+| bucket | % | note |
+|---|---|---|
+| GET name-resolution (`resolved_get` 6.8 + `getproperty_static_ic` 4.9) | **13.4%** | residue after slot levers — the easy this/static/getlex cases are DONE; the rest is native-receiver + IC-hit overhead, hard |
+| **COERCE / type-check** | **11.9%** | `avm2_class_for_mn` 2.9 + `value_is_of_type` 2.7 + `coerce_to_type_mn` 1.9 + `coerce_to_number` 2.2 + `coerce_to_class` 1.1 — **NEW major bucket, largely CACHEABLE** |
+| vtable / propkey machinery | 11.7% | shared substrate (feeds GET/CALL/COERCE) — shrinks as callers specialize |
+| game method bodies (`abc0_*`) | 10.1% | actual recompiled AS3 — ~irreducible |
+| CALL dispatch (`call_method_ref` 3.4 + `setup_locals` 2.1 + IC 1.5 + common 1.1) | 8.1% | dispatch-lookup already IC'd (Step-5 gate); `setup_locals` = typed-local coercion on frame entry (ties to COERCE) |
+| idle / program / native | 7.5% | browser between-frame gap (not ours, Step-0) |
+| **BLIT (software pixel copy)** | **5.7%** | `bd_copy_pixels` 4.3 + `bd_draw` 1.2 — **re-ranked UP from ~1.4%**; critical-path CPU (not GPU overlap); Ruffle does this in Rust |
+| FIND / domain | 4.4% | lever-A IC'd (`findpropstrict_ic` 1.7 is the IC); `domain_find` 2.7 residue |
+| arithmetic ops | 3.8% | feeds `coerce_to_number` — typed-Number arith spec candidate |
+| SET | 3.4% | `this.slot` setproperty spec (Step-2 analog) candidate |
+| DYNAMIC prop lookup (`avm2_object_find_dynamic`) | 2.3% | Matrix/Point fields stored as dynamic props (from `resolve_key`/`resolve_mn` misses) |
+
+**The measure-first payoff — the ranking is NOT what the pre-capture guess said.**
+The pre-capture pick was Matrix sealed-slots (dynamic-prop lookup); the fresh data
+puts that at #10 (2.3%). The real standouts:
+
+1. **COERCE-class-resolution cache/bake (~3–5%, highest confidence).**
+   `avm2_coerce_to_type_mn` (avm2_class.c:1372) re-runs `avm2_mn_name` + `*`/`void`
+   string compares + **`avm2_class_for_mn` (2.9%)** on EVERY coerce, for a
+   compile-time-CONSTANT `mn_idx` → a stable Class (domain append-only). Same
+   "different-shape IC → compile-time constant" pattern as lever A. Cache the
+   resolved Class per site (or a global `(file,mn)→Class` memo — also kills the
+   `avm2_class_for_mn` calls from `setup_locals`/`setproperty_resolved`/
+   `coerce_return`). **Step-4 elision did NOT touch this** — elision removes
+   provable no-ops; this accelerates the coerces that AREN'T no-ops. Reuse the
+   lever-A infra (`-DAVM2_*_VERIFY`, `SWF_NO_*` toggle). AVM2-only, no-graphics CI.
+2. **BLIT SIMD / inner-loop (~5.7%, biggest single cluster, no VM-correctness
+   risk).** `bd_copy_pixels`/`bd_draw` are scalar C software blits on the critical
+   path (all from `BitmapData.copyPixels` via `avm2_call_method_ref`); Ruffle's is
+   Rust (likely SIMD). WASM-SIMD the blend/copy inner loop, and/or skip
+   fully-transparent spans. Pure runtime, gated by the render image dashboard.
+3. **Typed-Number arithmetic spec (~2–4%).** `avm2_op_multiply`/`add`/`subtract`
+   call `coerce_to_number` on operands the recompiler's Step-4 type lattice often
+   already proves are `Number` → emit a raw `double` op. Reuses the Step-4 `TK/TV`
+   lattice.
+4. **Matrix/Point sealed slots (~2.3% + some GET/coerce).** Give `flash.geom`
+   Matrix/Point/Rectangle real slot traits (they're stored as dynamic props today —
+   avm2_display.c `matrix_get_prop` → `avm2_object_find_dynamic`). Spec-correct
+   (Matrix is sealed) + slot-cacheable. Real but smaller than 1–3.
+
+**Recommendation: coerce-class-resolution cache (#1) or blit SIMD (#2) first** —
+both bigger and cleaner than the pre-capture Matrix pick. These are NEW arcs, not
+the closed compile-time-slot arc; open a fresh plan when pursuing one.
+
 ## Step 3 plan (as executed)
 
 Step-1 scout weights (of GET execution, the dominant property op ~15.7% of frame):
