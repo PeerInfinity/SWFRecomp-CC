@@ -1,0 +1,2525 @@
+Tag type 41 not implemented.
+Warning: johnson cycle detection exceeded 4000 cycles, skipping remaining nodes
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+Tag type 87 not implemented.
+
+===== INST_SLOT CENSUS =====
+getstatic_total=25738 is_this=5826 classobj=1903 getlex=13335 typed_inst_cand=992
+typed_inst breakdown: reject_unsealed=26 reject_notuniqueslot=344 reject_subclass=0 reject_slotidx=1 NEWLY_SPECIALIZABLE=621
+CENSUS_METHOD 83 1
+CENSUS_METHOD 84 8
+CENSUS_METHOD 94 2
+CENSUS_METHOD 98 16
+CENSUS_METHOD 110 1
+CENSUS_METHOD 112 10
+CENSUS_METHOD 228 1
+CENSUS_METHOD 229 1
+CENSUS_METHOD 235 1
+CENSUS_METHOD 236 3
+CENSUS_METHOD 239 12
+CENSUS_METHOD 240 12
+CENSUS_METHOD 241 16
+CENSUS_METHOD 242 16
+CENSUS_METHOD 243 1
+CENSUS_METHOD 244 1
+CENSUS_METHOD 251 10
+CENSUS_METHOD 272 2
+CENSUS_METHOD 273 3
+CENSUS_METHOD 274 8
+CENSUS_METHOD 275 6
+CENSUS_METHOD 276 13
+CENSUS_METHOD 277 6
+CENSUS_METHOD 278 10
+CENSUS_METHOD 288 20
+CENSUS_METHOD 339 1
+CENSUS_METHOD 348 6
+CENSUS_METHOD 349 1
+CENSUS_METHOD 351 2
+CENSUS_METHOD 363 2
+CENSUS_METHOD 364 14
+CENSUS_METHOD 368 7
+CENSUS_METHOD 376 17
+CENSUS_METHOD 379 2
+CENSUS_METHOD 390 3
+CENSUS_METHOD 469 1
+CENSUS_METHOD 500 4
+CENSUS_METHOD 501 1
+CENSUS_METHOD 510 6
+CENSUS_METHOD 521 2
+CENSUS_METHOD 523 2
+CENSUS_METHOD 536 3
+CENSUS_METHOD 623 4
+CENSUS_METHOD 624 30
+CENSUS_METHOD 648 2
+CENSUS_METHOD 655 4
+CENSUS_METHOD 661 2
+CENSUS_METHOD 662 2
+CENSUS_METHOD 696 1
+CENSUS_METHOD 705 1
+CENSUS_METHOD 708 2
+CENSUS_METHOD 830 2
+CENSUS_METHOD 840 6
+CENSUS_METHOD 842 2
+CENSUS_METHOD 849 2
+CENSUS_METHOD 853 1
+CENSUS_METHOD 858 4
+CENSUS_METHOD 869 2
+CENSUS_METHOD 883 2
+CENSUS_METHOD 884 4
+CENSUS_METHOD 891 1
+CENSUS_METHOD 893 4
+CENSUS_METHOD 912 4
+CENSUS_METHOD 917 1
+CENSUS_METHOD 936 4
+CENSUS_METHOD 992 2
+CENSUS_METHOD 993 7
+CENSUS_METHOD 1002 1
+CENSUS_METHOD 1004 1
+CENSUS_METHOD 1076 5
+CENSUS_METHOD 1078 7
+CENSUS_METHOD 1103 1
+CENSUS_METHOD 1104 2
+CENSUS_METHOD 1126 1
+CENSUS_METHOD 1214 1
+CENSUS_METHOD 1274 2
+CENSUS_METHOD 1301 1
+CENSUS_METHOD 1310 1
+CENSUS_METHOD 1323 1
+CENSUS_METHOD 1413 1
+CENSUS_METHOD 1445 1
+CENSUS_METHOD 1499 1
+CENSUS_METHOD 1501 8
+CENSUS_METHOD 1524 2
+CENSUS_METHOD 1531 1
+CENSUS_METHOD 1532 2
+CENSUS_METHOD 1535 1
+CENSUS_METHOD 1541 2
+CENSUS_METHOD 1548 2
+CENSUS_METHOD 1569 2
+CENSUS_METHOD 1625 2
+CENSUS_METHOD 1628 5
+CENSUS_METHOD 1629 2
+CENSUS_METHOD 1641 1
+CENSUS_METHOD 1644 1
+CENSUS_METHOD 1657 1
+CENSUS_METHOD 1670 2
+CENSUS_METHOD 1715 2
+CENSUS_METHOD 1738 1
+CENSUS_METHOD 1767 1
+CENSUS_METHOD 1770 4
+CENSUS_METHOD 1773 2
+CENSUS_METHOD 1859 2
+CENSUS_METHOD 1860 2
+CENSUS_METHOD 1866 6
+CENSUS_METHOD 1873 2
+CENSUS_METHOD 1882 2
+CENSUS_METHOD 1887 2
+CENSUS_METHOD 1888 2
+CENSUS_METHOD 1891 1
+CENSUS_METHOD 1905 1
+CENSUS_METHOD 1934 4
+CENSUS_METHOD 1940 1
+CENSUS_METHOD 1942 2
+CENSUS_METHOD 1952 2
+CENSUS_METHOD 1958 3
+CENSUS_METHOD 1993 2
+CENSUS_METHOD 2000 1
+CENSUS_METHOD 2001 3
+CENSUS_METHOD 2009 2
+CENSUS_METHOD 2092 2
+CENSUS_METHOD 2093 2
+CENSUS_METHOD 2094 2
+CENSUS_METHOD 2097 2
+CENSUS_METHOD 2121 1
+CENSUS_METHOD 2134 1
+CENSUS_METHOD 2135 3
+CENSUS_METHOD 2156 1
+CENSUS_METHOD 2157 2
+CENSUS_METHOD 2183 4
+CENSUS_METHOD 2196 6
+CENSUS_METHOD 2206 4
+CENSUS_METHOD 2423 2
+CENSUS_METHOD 2424 1
+CENSUS_METHOD 2457 2
+CENSUS_METHOD 2469 1
+CENSUS_METHOD 2472 9
+CENSUS_METHOD 2475 2
+CENSUS_METHOD 2493 1
+CENSUS_METHOD 2521 5
+CENSUS_METHOD 2566 3
+CENSUS_METHOD 2573 2
+CENSUS_METHOD 2577 4
+CENSUS_METHOD 2584 1
+CENSUS_METHOD 2590 1
+CENSUS_METHOD 2593 1
+CENSUS_METHOD 2607 6
+CENSUS_METHOD 2643 2
+CENSUS_METHOD 2646 2
+CENSUS_METHOD 2666 4
+CENSUS_METHOD 2670 1
+CENSUS_METHOD 2984 20
+CENSUS_METHOD 2985 14
+CENSUS_METHOD 2999 1
+CENSUS_METHOD 3005 2
+CENSUS_METHOD 3031 2
+CENSUS_METHOD 3129 2
+CENSUS_METHOD 3160 2
+CENSUS_METHOD 3165 1
+CENSUS_METHOD 3255 12
+CENSUS_METHOD 3256 8
+CENSUS_METHOD 3257 8
+CENSUS_METHOD 3410 1
+CENSUS_METHOD 3470 2
+CENSUS_METHOD 3550 3
+CENSUS_METHOD 3552 1
+CENSUS_METHOD 3554 1
+CENSUS_PROV 1 total=18 this=1 classobj=1 getlex=15 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3 total=14 this=0 classobj=6 getlex=6 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 4 total=26 this=10 classobj=5 getlex=7 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 5 total=15 this=0 classobj=1 getlex=10 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 6 total=23 this=8 classobj=3 getlex=9 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 7 total=34 this=16 classobj=5 getlex=13 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 8 total=49 this=31 classobj=5 getlex=13 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 9 total=24 this=0 classobj=10 getlex=12 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 10 total=8 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 11 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 12 total=11 this=0 classobj=3 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 13 total=4 this=0 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 14 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 15 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 16 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 17 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 18 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 19 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 20 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 21 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 22 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 23 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 24 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 25 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 26 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 27 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 28 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 29 total=8 this=0 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 30 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 31 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 32 total=8 this=0 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 33 total=6 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 34 total=6 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 35 total=6 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 36 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 37 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 38 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 39 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 40 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 41 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 42 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 43 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 44 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 45 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 46 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 47 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 48 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 49 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 50 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 51 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 52 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 53 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 54 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 55 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 56 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 57 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 58 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 59 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 60 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 61 total=7 this=0 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 62 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 63 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 64 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 65 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 66 total=6 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 67 total=6 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 68 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 69 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 70 total=6 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 71 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 72 total=5 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 73 total=5 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 74 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 75 total=8 this=0 classobj=3 getlex=4 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 76 total=74 this=0 classobj=8 getlex=48 inst_new=0 inst_rej=0 other=18
+CENSUS_PROV 77 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 78 total=18 this=0 classobj=6 getlex=11 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 79 total=9 this=0 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 83 total=5 this=4 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 84 total=8 this=0 classobj=0 getlex=0 inst_new=8 inst_rej=0 other=0
+CENSUS_PROV 85 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 86 total=4 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 87 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 89 total=5 this=1 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 94 total=22 this=14 classobj=2 getlex=2 inst_new=2 inst_rej=0 other=2
+CENSUS_PROV 95 total=28 this=10 classobj=6 getlex=6 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 96 total=58 this=26 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=30
+CENSUS_PROV 98 total=36 this=20 classobj=0 getlex=0 inst_new=16 inst_rej=0 other=0
+CENSUS_PROV 99 total=25 this=14 classobj=5 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 100 total=25 this=14 classobj=5 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 101 total=55 this=22 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=31
+CENSUS_PROV 103 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 104 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 105 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 106 total=5 this=5 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 107 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 108 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 109 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 110 total=2 this=1 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 112 total=22 this=10 classobj=0 getlex=2 inst_new=10 inst_rej=0 other=0
+CENSUS_PROV 113 total=12 this=10 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 114 total=7 this=6 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 115 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 116 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 117 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 118 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 119 total=3 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 120 total=3 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 121 total=3 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 122 total=3 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 123 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 124 total=7 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 125 total=9 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 126 total=9 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 127 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 128 total=28 this=0 classobj=6 getlex=17 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 129 total=8 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 130 total=5 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 131 total=20 this=0 classobj=1 getlex=14 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 132 total=6 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 133 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 135 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 137 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 138 total=4 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 139 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 140 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 141 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 142 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 143 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 144 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 145 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 146 total=4 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 151 total=13 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 152 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 153 total=8 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 154 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 155 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 161 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 162 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 163 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 164 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 165 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 166 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 167 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 173 total=4 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 174 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 175 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 176 total=5 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 177 total=4 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 178 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 179 total=4 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 180 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 181 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 182 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 183 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 185 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 187 total=30 this=8 classobj=7 getlex=12 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 188 total=5 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 189 total=5 this=1 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 190 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 191 total=36 this=31 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 192 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 194 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 195 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 196 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 197 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 198 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 199 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 200 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 201 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 202 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 203 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 204 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 205 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 206 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 207 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 208 total=3 this=1 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 209 total=3 this=1 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 210 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 211 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 212 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 213 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 214 total=6 this=3 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 215 total=6 this=3 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 216 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 221 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 224 total=8 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 225 total=6 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 226 total=6 this=0 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 227 total=6 this=0 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 228 total=4 this=2 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=1
+CENSUS_PROV 229 total=4 this=2 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=1
+CENSUS_PROV 230 total=5 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 231 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 232 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 235 total=3 this=2 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 236 total=5 this=2 classobj=0 getlex=0 inst_new=3 inst_rej=0 other=0
+CENSUS_PROV 237 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 238 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 239 total=15 this=3 classobj=0 getlex=0 inst_new=12 inst_rej=0 other=0
+CENSUS_PROV 240 total=15 this=3 classobj=0 getlex=0 inst_new=12 inst_rej=0 other=0
+CENSUS_PROV 241 total=18 this=2 classobj=0 getlex=0 inst_new=16 inst_rej=0 other=0
+CENSUS_PROV 242 total=18 this=2 classobj=0 getlex=0 inst_new=16 inst_rej=0 other=0
+CENSUS_PROV 243 total=1 this=0 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 244 total=1 this=0 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 245 total=4 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 246 total=4 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 247 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 248 total=7 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 249 total=7 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 250 total=10 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 251 total=18 this=1 classobj=0 getlex=1 inst_new=10 inst_rej=0 other=6
+CENSUS_PROV 252 total=15 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=13
+CENSUS_PROV 253 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 254 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 255 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 256 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 257 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 258 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 259 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 260 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 261 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 262 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 263 total=7 this=4 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 264 total=5 this=3 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 265 total=5 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 266 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 267 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 268 total=5 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 269 total=5 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 270 total=5 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 271 total=5 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 272 total=17 this=9 classobj=0 getlex=1 inst_new=2 inst_rej=0 other=5
+CENSUS_PROV 273 total=10 this=7 classobj=0 getlex=0 inst_new=3 inst_rej=0 other=0
+CENSUS_PROV 274 total=11 this=3 classobj=0 getlex=0 inst_new=8 inst_rej=0 other=0
+CENSUS_PROV 275 total=14 this=7 classobj=0 getlex=0 inst_new=6 inst_rej=0 other=1
+CENSUS_PROV 276 total=25 this=9 classobj=0 getlex=0 inst_new=13 inst_rej=0 other=3
+CENSUS_PROV 277 total=12 this=6 classobj=0 getlex=0 inst_new=6 inst_rej=0 other=0
+CENSUS_PROV 278 total=13 this=3 classobj=0 getlex=0 inst_new=10 inst_rej=0 other=0
+CENSUS_PROV 279 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 280 total=5 this=0 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 281 total=3 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 282 total=5 this=0 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 283 total=11 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 284 total=18 this=0 classobj=1 getlex=12 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 285 total=22 this=0 classobj=1 getlex=17 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 286 total=16 this=0 classobj=0 getlex=14 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 287 total=18 this=0 classobj=1 getlex=13 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 288 total=66 this=0 classobj=1 getlex=37 inst_new=20 inst_rej=0 other=8
+CENSUS_PROV 289 total=8 this=0 classobj=1 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 291 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 295 total=7 this=3 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 297 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 298 total=11 this=1 classobj=1 getlex=7 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 299 total=13 this=7 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 300 total=11 this=1 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 301 total=11 this=1 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 302 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 304 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 305 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 306 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 307 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 308 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 309 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 310 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 311 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 312 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 313 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 314 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 315 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 316 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 317 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 318 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 319 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 320 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 321 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 322 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 323 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 324 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 325 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 326 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 327 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 328 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 329 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 330 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 331 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 332 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 333 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 334 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 335 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 336 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 337 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 338 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 339 total=231 this=184 classobj=11 getlex=29 inst_new=1 inst_rej=0 other=6
+CENSUS_PROV 340 total=9 this=1 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 341 total=93 this=24 classobj=6 getlex=57 inst_new=0 inst_rej=1 other=5
+CENSUS_PROV 343 total=9 this=5 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 344 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 345 total=5 this=3 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 346 total=19 this=18 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 347 total=5 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 348 total=25 this=3 classobj=1 getlex=11 inst_new=6 inst_rej=0 other=4
+CENSUS_PROV 349 total=4 this=0 classobj=1 getlex=2 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 350 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 351 total=24 this=9 classobj=2 getlex=7 inst_new=2 inst_rej=0 other=4
+CENSUS_PROV 352 total=71 this=7 classobj=15 getlex=40 inst_new=0 inst_rej=0 other=9
+CENSUS_PROV 353 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 354 total=22 this=12 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 355 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 356 total=9 this=7 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 357 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 358 total=11 this=7 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 359 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 360 total=15 this=11 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 361 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 362 total=7 this=6 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 363 total=61 this=17 classobj=2 getlex=20 inst_new=2 inst_rej=2 other=18
+CENSUS_PROV 364 total=54 this=23 classobj=0 getlex=9 inst_new=14 inst_rej=8 other=0
+CENSUS_PROV 365 total=27 this=17 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 366 total=21 this=6 classobj=1 getlex=9 inst_new=0 inst_rej=2 other=3
+CENSUS_PROV 367 total=18 this=6 classobj=1 getlex=8 inst_new=0 inst_rej=2 other=1
+CENSUS_PROV 368 total=41 this=14 classobj=1 getlex=13 inst_new=7 inst_rej=5 other=1
+CENSUS_PROV 374 total=40 this=4 classobj=1 getlex=34 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 375 total=6 this=3 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 376 total=368 this=124 classobj=29 getlex=144 inst_new=17 inst_rej=19 other=35
+CENSUS_PROV 377 total=5 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 378 total=6 this=4 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 379 total=31 this=10 classobj=7 getlex=11 inst_new=2 inst_rej=0 other=1
+CENSUS_PROV 380 total=22 this=10 classobj=1 getlex=11 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 381 total=18 this=7 classobj=2 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 382 total=22 this=11 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 383 total=16 this=8 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 384 total=9 this=7 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 385 total=3 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 386 total=18 this=2 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 387 total=58 this=17 classobj=4 getlex=27 inst_new=0 inst_rej=0 other=10
+CENSUS_PROV 388 total=7 this=6 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 389 total=65 this=31 classobj=1 getlex=22 inst_new=0 inst_rej=2 other=9
+CENSUS_PROV 390 total=20 this=8 classobj=0 getlex=8 inst_new=3 inst_rej=0 other=1
+CENSUS_PROV 391 total=10 this=2 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 392 total=10 this=2 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 393 total=86 this=0 classobj=9 getlex=77 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 394 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 395 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 396 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 397 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 398 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 399 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 401 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 402 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 403 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 404 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 405 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 406 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 407 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 408 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 409 total=3 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 410 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 411 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 412 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 413 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 414 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 415 total=39 this=0 classobj=7 getlex=28 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 416 total=48 this=0 classobj=0 getlex=30 inst_new=0 inst_rej=0 other=18
+CENSUS_PROV 417 total=50 this=0 classobj=3 getlex=27 inst_new=0 inst_rej=4 other=16
+CENSUS_PROV 418 total=108 this=0 classobj=6 getlex=49 inst_new=0 inst_rej=6 other=47
+CENSUS_PROV 419 total=12 this=0 classobj=2 getlex=9 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 420 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 421 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 422 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 423 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 424 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 425 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 426 total=10 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=3 other=3
+CENSUS_PROV 427 total=5 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=1 other=1
+CENSUS_PROV 428 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 429 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 430 total=6 this=0 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 431 total=12 this=0 classobj=4 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 432 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 433 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 434 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 435 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 436 total=15 this=0 classobj=2 getlex=4 inst_new=0 inst_rej=6 other=3
+CENSUS_PROV 437 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 438 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 439 total=6 this=0 classobj=3 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 441 total=9 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 442 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 443 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 444 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 445 total=11 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 446 total=15 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 447 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 448 total=5 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 449 total=6 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 450 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 451 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 452 total=12 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 454 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 455 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 456 total=5 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 457 total=117 this=46 classobj=0 getlex=44 inst_new=0 inst_rej=8 other=19
+CENSUS_PROV 458 total=5 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=1
+CENSUS_PROV 459 total=33 this=19 classobj=0 getlex=3 inst_new=0 inst_rej=2 other=9
+CENSUS_PROV 460 total=15 this=8 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 461 total=4 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 462 total=4 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 463 total=9 this=1 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 464 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 465 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 466 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 467 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 468 total=7 this=1 classobj=1 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 469 total=23 this=11 classobj=3 getlex=7 inst_new=1 inst_rej=0 other=1
+CENSUS_PROV 470 total=138 this=37 classobj=16 getlex=59 inst_new=0 inst_rej=2 other=24
+CENSUS_PROV 471 total=11 this=1 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 472 total=24 this=8 classobj=2 getlex=8 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 473 total=13 this=0 classobj=4 getlex=5 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 474 total=5 this=2 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 475 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 476 total=439 this=0 classobj=2 getlex=437 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 477 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 478 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 479 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 480 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 482 total=14 this=0 classobj=1 getlex=9 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 483 total=9 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=8
+CENSUS_PROV 484 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 485 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 486 total=3 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 487 total=3 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 488 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 490 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 492 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 493 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 494 total=4 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 495 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 496 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 497 total=49 this=5 classobj=12 getlex=22 inst_new=0 inst_rej=0 other=10
+CENSUS_PROV 498 total=11 this=2 classobj=2 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 499 total=99 this=6 classobj=7 getlex=79 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 500 total=179 this=35 classobj=22 getlex=69 inst_new=4 inst_rej=2 other=47
+CENSUS_PROV 501 total=199 this=22 classobj=33 getlex=94 inst_new=1 inst_rej=6 other=43
+CENSUS_PROV 502 total=29 this=0 classobj=5 getlex=17 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 503 total=2 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 504 total=64 this=15 classobj=10 getlex=35 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 505 total=137 this=22 classobj=22 getlex=67 inst_new=0 inst_rej=0 other=26
+CENSUS_PROV 506 total=3 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 507 total=43 this=10 classobj=8 getlex=11 inst_new=0 inst_rej=0 other=14
+CENSUS_PROV 508 total=65 this=13 classobj=8 getlex=22 inst_new=0 inst_rej=4 other=18
+CENSUS_PROV 509 total=67 this=17 classobj=7 getlex=18 inst_new=0 inst_rej=3 other=22
+CENSUS_PROV 510 total=41 this=19 classobj=2 getlex=6 inst_new=6 inst_rej=2 other=6
+CENSUS_PROV 511 total=8 this=1 classobj=2 getlex=2 inst_new=0 inst_rej=1 other=2
+CENSUS_PROV 512 total=5 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 513 total=124 this=25 classobj=10 getlex=59 inst_new=0 inst_rej=0 other=30
+CENSUS_PROV 514 total=2 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 515 total=6 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 518 total=111 this=6 classobj=19 getlex=53 inst_new=0 inst_rej=2 other=31
+CENSUS_PROV 519 total=26 this=11 classobj=4 getlex=7 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 520 total=25 this=0 classobj=0 getlex=25 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 521 total=129 this=0 classobj=40 getlex=61 inst_new=2 inst_rej=0 other=26
+CENSUS_PROV 522 total=6 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 523 total=930 this=11 classobj=16 getlex=43 inst_new=2 inst_rej=0 other=858
+CENSUS_PROV 524 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 525 total=245 this=0 classobj=0 getlex=245 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 526 total=7 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 527 total=96 this=0 classobj=0 getlex=83 inst_new=0 inst_rej=0 other=13
+CENSUS_PROV 528 total=12 this=0 classobj=0 getlex=12 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 529 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 530 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 531 total=9 this=0 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 532 total=9 this=0 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 533 total=15 this=0 classobj=0 getlex=14 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 534 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 535 total=18 this=0 classobj=0 getlex=15 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 536 total=12 this=0 classobj=2 getlex=7 inst_new=3 inst_rej=0 other=0
+CENSUS_PROV 537 total=8 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 538 total=8 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 539 total=10 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 540 total=11 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 541 total=19 this=0 classobj=0 getlex=12 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 543 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 545 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 546 total=7 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 547 total=18 this=0 classobj=0 getlex=13 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 548 total=8 this=0 classobj=1 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 549 total=30 this=0 classobj=0 getlex=18 inst_new=0 inst_rej=0 other=12
+CENSUS_PROV 550 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 551 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 553 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 554 total=8 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 556 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 558 total=4 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 559 total=5 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 560 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 561 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 563 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 564 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 565 total=3 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 566 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 567 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 568 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 569 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 570 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 571 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 572 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 573 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 574 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 575 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 576 total=12 this=7 classobj=1 getlex=3 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 578 total=8 this=2 classobj=1 getlex=3 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 579 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 581 total=9 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 582 total=25 this=0 classobj=0 getlex=13 inst_new=0 inst_rej=0 other=12
+CENSUS_PROV 584 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 585 total=21 this=0 classobj=1 getlex=15 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 587 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 588 total=13 this=0 classobj=2 getlex=8 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 589 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 590 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 591 total=19 this=2 classobj=0 getlex=13 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 593 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 594 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 595 total=123 this=36 classobj=9 getlex=49 inst_new=0 inst_rej=0 other=29
+CENSUS_PROV 596 total=14 this=0 classobj=7 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 597 total=135 this=23 classobj=11 getlex=62 inst_new=0 inst_rej=4 other=35
+CENSUS_PROV 598 total=19 this=0 classobj=2 getlex=9 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 599 total=13 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=10
+CENSUS_PROV 600 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 601 total=3 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 602 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 603 total=3 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 604 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 607 total=13 this=9 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 608 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 609 total=13 this=13 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 610 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 611 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 612 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 613 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 618 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 620 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 622 total=6 this=4 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 623 total=8 this=4 classobj=0 getlex=0 inst_new=4 inst_rej=0 other=0
+CENSUS_PROV 624 total=40 this=10 classobj=0 getlex=0 inst_new=30 inst_rej=0 other=0
+CENSUS_PROV 628 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 630 total=30 this=0 classobj=0 getlex=30 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 632 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 634 total=26 this=0 classobj=4 getlex=22 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 635 total=7 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 636 total=5 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 637 total=177 this=126 classobj=6 getlex=12 inst_new=0 inst_rej=0 other=33
+CENSUS_PROV 638 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 639 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 640 total=47 this=14 classobj=10 getlex=16 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 641 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 642 total=12 this=10 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 643 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 644 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 645 total=4 this=0 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 646 total=6 this=2 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 647 total=16 this=4 classobj=5 getlex=5 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 648 total=5 this=1 classobj=1 getlex=1 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 649 total=6 this=2 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 650 total=16 this=4 classobj=5 getlex=5 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 651 total=12 this=0 classobj=5 getlex=5 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 652 total=6 this=0 classobj=3 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 653 total=8 this=4 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 654 total=29 this=13 classobj=3 getlex=3 inst_new=0 inst_rej=0 other=10
+CENSUS_PROV 655 total=61 this=6 classobj=17 getlex=18 inst_new=4 inst_rej=0 other=16
+CENSUS_PROV 656 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 657 total=8 this=3 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 658 total=9 this=2 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 659 total=28 this=0 classobj=10 getlex=14 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 660 total=28 this=0 classobj=10 getlex=14 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 661 total=19 this=5 classobj=5 getlex=5 inst_new=2 inst_rej=0 other=2
+CENSUS_PROV 662 total=63 this=6 classobj=12 getlex=12 inst_new=2 inst_rej=0 other=31
+CENSUS_PROV 663 total=103 this=69 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=31
+CENSUS_PROV 664 total=13 this=3 classobj=5 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 665 total=53 this=25 classobj=4 getlex=5 inst_new=0 inst_rej=0 other=19
+CENSUS_PROV 666 total=4 this=1 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 667 total=66 this=32 classobj=7 getlex=7 inst_new=0 inst_rej=0 other=20
+CENSUS_PROV 668 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 669 total=9 this=0 classobj=3 getlex=3 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 670 total=9 this=0 classobj=3 getlex=3 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 671 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 674 total=14 this=4 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 675 total=6 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 676 total=56 this=36 classobj=3 getlex=7 inst_new=0 inst_rej=0 other=10
+CENSUS_PROV 677 total=10 this=8 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 678 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 679 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 680 total=12 this=12 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 681 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 682 total=12 this=12 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 683 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 684 total=26 this=12 classobj=4 getlex=7 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 685 total=4 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 686 total=8 this=4 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 687 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 688 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 689 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 690 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 691 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 693 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 694 total=47 this=9 classobj=6 getlex=29 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 695 total=13 this=2 classobj=1 getlex=8 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 696 total=6 this=0 classobj=1 getlex=4 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 697 total=28 this=19 classobj=1 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 699 total=20 this=0 classobj=2 getlex=13 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 700 total=13 this=2 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 701 total=18 this=9 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 702 total=19 this=0 classobj=0 getlex=14 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 703 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 705 total=20 this=12 classobj=2 getlex=4 inst_new=1 inst_rej=1 other=0
+CENSUS_PROV 706 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 707 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 708 total=20 this=1 classobj=4 getlex=11 inst_new=2 inst_rej=1 other=1
+CENSUS_PROV 709 total=10 this=0 classobj=3 getlex=6 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 711 total=24 this=7 classobj=2 getlex=12 inst_new=0 inst_rej=3 other=0
+CENSUS_PROV 712 total=5 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 713 total=9 this=3 classobj=0 getlex=3 inst_new=0 inst_rej=1 other=2
+CENSUS_PROV 714 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 715 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 716 total=9 this=7 classobj=0 getlex=0 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 717 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 779 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 780 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 781 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 789 total=9 this=1 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 790 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 791 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 792 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 793 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 794 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 795 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 796 total=9 this=3 classobj=0 getlex=3 inst_new=0 inst_rej=1 other=2
+CENSUS_PROV 797 total=6 this=6 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 798 total=9 this=3 classobj=0 getlex=3 inst_new=0 inst_rej=1 other=2
+CENSUS_PROV 799 total=5 this=5 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 800 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 801 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 802 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 803 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 804 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 805 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 806 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 807 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 808 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 809 total=6 this=5 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 810 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 811 total=5 this=4 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 812 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 813 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 814 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 815 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 816 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 817 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 818 total=12 this=7 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 822 total=16 this=13 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 823 total=7 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=3 other=0
+CENSUS_PROV 824 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 827 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 829 total=7 this=3 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 830 total=52 this=4 classobj=3 getlex=34 inst_new=2 inst_rej=0 other=9
+CENSUS_PROV 831 total=10 this=0 classobj=4 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 832 total=10 this=0 classobj=4 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 833 total=62 this=8 classobj=6 getlex=36 inst_new=0 inst_rej=0 other=12
+CENSUS_PROV 834 total=21 this=4 classobj=2 getlex=11 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 835 total=12 this=2 classobj=2 getlex=6 inst_new=0 inst_rej=1 other=1
+CENSUS_PROV 836 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 838 total=19 this=13 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 839 total=21 this=14 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 840 total=29 this=19 classobj=2 getlex=2 inst_new=6 inst_rej=0 other=0
+CENSUS_PROV 841 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 842 total=9 this=7 classobj=0 getlex=0 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 843 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 844 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 845 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 846 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 847 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 848 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 849 total=7 this=5 classobj=0 getlex=0 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 850 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 851 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 852 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 853 total=3 this=2 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 854 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 856 total=14 this=8 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 858 total=78 this=17 classobj=3 getlex=38 inst_new=4 inst_rej=0 other=16
+CENSUS_PROV 859 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 860 total=12 this=0 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 861 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 863 total=12 this=7 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 864 total=28 this=3 classobj=2 getlex=18 inst_new=0 inst_rej=2 other=3
+CENSUS_PROV 865 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 867 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 869 total=29 this=17 classobj=0 getlex=6 inst_new=2 inst_rej=0 other=4
+CENSUS_PROV 870 total=8 this=2 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 871 total=38 this=3 classobj=3 getlex=23 inst_new=0 inst_rej=0 other=9
+CENSUS_PROV 872 total=9 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 873 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 874 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 876 total=25 this=17 classobj=1 getlex=6 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 877 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 878 total=35 this=3 classobj=6 getlex=17 inst_new=0 inst_rej=0 other=9
+CENSUS_PROV 879 total=13 this=4 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 880 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 881 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 883 total=32 this=17 classobj=4 getlex=9 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 884 total=48 this=14 classobj=2 getlex=20 inst_new=4 inst_rej=4 other=4
+CENSUS_PROV 885 total=8 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 888 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 889 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 890 total=7 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 891 total=44 this=10 classobj=3 getlex=24 inst_new=1 inst_rej=1 other=5
+CENSUS_PROV 892 total=37 this=5 classobj=2 getlex=23 inst_new=0 inst_rej=1 other=6
+CENSUS_PROV 893 total=106 this=13 classobj=17 getlex=57 inst_new=4 inst_rej=1 other=14
+CENSUS_PROV 894 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 896 total=16 this=7 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 898 total=26 this=0 classobj=6 getlex=12 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 899 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 900 total=8 this=2 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 901 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 904 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 907 total=12 this=2 classobj=3 getlex=6 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 908 total=29 this=18 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 909 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 911 total=5 this=4 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 912 total=39 this=16 classobj=0 getlex=12 inst_new=4 inst_rej=0 other=7
+CENSUS_PROV 913 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 915 total=4 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 917 total=22 this=6 classobj=3 getlex=7 inst_new=1 inst_rej=5 other=0
+CENSUS_PROV 918 total=9 this=5 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 921 total=4 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 922 total=7 this=2 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 924 total=16 this=8 classobj=1 getlex=5 inst_new=0 inst_rej=1 other=1
+CENSUS_PROV 925 total=5 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 926 total=49 this=17 classobj=5 getlex=18 inst_new=0 inst_rej=0 other=9
+CENSUS_PROV 927 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 928 total=19 this=6 classobj=1 getlex=12 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 931 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 932 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 934 total=9 this=4 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 936 total=64 this=24 classobj=6 getlex=26 inst_new=4 inst_rej=1 other=3
+CENSUS_PROV 937 total=6 this=4 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 938 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 939 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 943 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 945 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 946 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 948 total=13 this=3 classobj=3 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 949 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 950 total=4 this=1 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 951 total=35 this=14 classobj=5 getlex=15 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 952 total=9 this=0 classobj=1 getlex=6 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 953 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 956 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 959 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 962 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 965 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 968 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 971 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 974 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 976 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 977 total=5 this=1 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 978 total=13 this=4 classobj=4 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 979 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 981 total=19 this=6 classobj=2 getlex=11 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 982 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 983 total=7 this=1 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 984 total=4 this=1 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 985 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 988 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 990 total=10 this=0 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 991 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 992 total=795 this=88 classobj=214 getlex=437 inst_new=2 inst_rej=0 other=54
+CENSUS_PROV 993 total=56 this=19 classobj=4 getlex=26 inst_new=7 inst_rej=0 other=0
+CENSUS_PROV 994 total=11 this=1 classobj=3 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 995 total=17 this=1 classobj=0 getlex=16 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 996 total=14 this=2 classobj=3 getlex=7 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 997 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 999 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1000 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1002 total=26 this=11 classobj=3 getlex=10 inst_new=1 inst_rej=1 other=0
+CENSUS_PROV 1004 total=30 this=6 classobj=6 getlex=15 inst_new=1 inst_rej=0 other=2
+CENSUS_PROV 1005 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1006 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1007 total=14 this=11 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1008 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1010 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1011 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1014 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1016 total=7 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1018 total=19 this=3 classobj=6 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1020 total=22 this=0 classobj=2 getlex=20 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1021 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1026 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1027 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1028 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1029 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1030 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1031 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1032 total=7 this=0 classobj=1 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1033 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1035 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1040 total=9 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1041 total=9 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1042 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1043 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1044 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1045 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1047 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1049 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1050 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1051 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1052 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1053 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1054 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1055 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1056 total=4 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1057 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1058 total=10 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1059 total=3 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1060 total=5 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1061 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1063 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1065 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1066 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1067 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1069 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1070 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1071 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1072 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1073 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1075 total=7 this=3 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1076 total=11 this=6 classobj=0 getlex=0 inst_new=5 inst_rej=0 other=0
+CENSUS_PROV 1077 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1078 total=33 this=10 classobj=0 getlex=15 inst_new=7 inst_rej=0 other=1
+CENSUS_PROV 1079 total=5 this=0 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1080 total=5 this=0 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1081 total=17 this=0 classobj=5 getlex=10 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1082 total=25 this=13 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 1083 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1084 total=4 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1086 total=25 this=1 classobj=0 getlex=18 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 1087 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1090 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1091 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1092 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1094 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1095 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1096 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1098 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1100 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1101 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1102 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1103 total=10 this=9 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 1104 total=14 this=6 classobj=2 getlex=4 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 1105 total=15 this=2 classobj=1 getlex=1 inst_new=0 inst_rej=1 other=10
+CENSUS_PROV 1106 total=9 this=0 classobj=1 getlex=3 inst_new=0 inst_rej=4 other=1
+CENSUS_PROV 1107 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1108 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1109 total=8 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1110 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1111 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1112 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1113 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1114 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1115 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1116 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1117 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1118 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1120 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1122 total=9 this=9 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1123 total=8 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=4 other=0
+CENSUS_PROV 1124 total=11 this=6 classobj=0 getlex=2 inst_new=0 inst_rej=3 other=0
+CENSUS_PROV 1125 total=14 this=6 classobj=0 getlex=5 inst_new=0 inst_rej=3 other=0
+CENSUS_PROV 1126 total=33 this=25 classobj=0 getlex=0 inst_new=1 inst_rej=1 other=6
+CENSUS_PROV 1127 total=16 this=2 classobj=2 getlex=4 inst_new=0 inst_rej=4 other=4
+CENSUS_PROV 1128 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1131 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1132 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1133 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1134 total=7 this=2 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1135 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1136 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1139 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1140 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1141 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1142 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1143 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1144 total=16 this=11 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1145 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1146 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1148 total=4 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 1149 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1150 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1151 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1152 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1153 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1154 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1155 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1156 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1157 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1158 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1159 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1160 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1163 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1164 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1165 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1166 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1167 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1168 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1169 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1170 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1171 total=3 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1172 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1175 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1177 total=11 this=6 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1178 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1179 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1182 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1183 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1184 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1185 total=32 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=2 other=25
+CENSUS_PROV 1186 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1187 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1188 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1190 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1192 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1193 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1195 total=5 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1196 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1197 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1198 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1200 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1201 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1202 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1203 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1204 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1205 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1206 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1207 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1208 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1210 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1211 total=13 this=1 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 1212 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1213 total=10 this=1 classobj=3 getlex=4 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 1214 total=43 this=21 classobj=1 getlex=4 inst_new=1 inst_rej=12 other=4
+CENSUS_PROV 1215 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1216 total=7 this=3 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1217 total=18 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=14
+CENSUS_PROV 1218 total=8 this=3 classobj=1 getlex=2 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 1219 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1220 total=5 this=0 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1221 total=5 this=0 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1222 total=16 this=2 classobj=2 getlex=4 inst_new=0 inst_rej=6 other=2
+CENSUS_PROV 1223 total=22 this=6 classobj=4 getlex=7 inst_new=0 inst_rej=2 other=3
+CENSUS_PROV 1224 total=18 this=2 classobj=3 getlex=5 inst_new=0 inst_rej=5 other=3
+CENSUS_PROV 1225 total=15 this=11 classobj=0 getlex=0 inst_new=0 inst_rej=2 other=2
+CENSUS_PROV 1226 total=23 this=13 classobj=1 getlex=5 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 1227 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1229 total=6 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 1230 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1233 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1236 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1239 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1241 total=14 this=4 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1244 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1245 total=5 this=1 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1246 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1247 total=4 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1248 total=9 this=2 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1249 total=18 this=8 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1250 total=7 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1252 total=17 this=11 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 1253 total=18 this=0 classobj=0 getlex=12 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 1254 total=15 this=9 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1255 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1257 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1258 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1259 total=8 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1261 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1262 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1265 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1266 total=9 this=0 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1269 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1271 total=13 this=5 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1272 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1273 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1274 total=16 this=4 classobj=2 getlex=8 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 1275 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1276 total=4 this=1 classobj=1 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1277 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1278 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1279 total=12 this=5 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1280 total=12 this=7 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1281 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1282 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1283 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1284 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1285 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1286 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1287 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1288 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1289 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1290 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1293 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1296 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1299 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1301 total=24 this=11 classobj=2 getlex=9 inst_new=1 inst_rej=1 other=0
+CENSUS_PROV 1302 total=25 this=15 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1303 total=5 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1304 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1306 total=12 this=1 classobj=4 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1307 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1308 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1309 total=30 this=10 classobj=1 getlex=19 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1310 total=66 this=19 classobj=3 getlex=36 inst_new=1 inst_rej=3 other=4
+CENSUS_PROV 1311 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1314 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1317 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1320 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1322 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1323 total=48 this=13 classobj=1 getlex=22 inst_new=1 inst_rej=0 other=11
+CENSUS_PROV 1324 total=43 this=13 classobj=3 getlex=20 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 1325 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1326 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1328 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1329 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1330 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1331 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1332 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1335 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1338 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1341 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1344 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1347 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1350 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1353 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1356 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1358 total=20 this=0 classobj=4 getlex=16 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1359 total=16 this=2 classobj=3 getlex=9 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1360 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1363 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1365 total=9 this=4 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1366 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1367 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1368 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1369 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1370 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1373 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1376 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1379 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1382 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1385 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1388 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1391 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1394 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1397 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1399 total=10 this=4 classobj=0 getlex=4 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 1400 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1401 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1404 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1407 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1409 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1410 total=51 this=12 classobj=7 getlex=24 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 1411 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1413 total=13 this=5 classobj=2 getlex=5 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 1414 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1417 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1420 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1423 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1426 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1428 total=11 this=1 classobj=5 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1429 total=9 this=1 classobj=3 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1430 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1433 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1435 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1436 total=21 this=4 classobj=5 getlex=12 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1437 total=36 this=11 classobj=7 getlex=12 inst_new=0 inst_rej=1 other=5
+CENSUS_PROV 1438 total=12 this=1 classobj=3 getlex=7 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1439 total=39 this=22 classobj=0 getlex=11 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 1440 total=48 this=25 classobj=0 getlex=15 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 1441 total=48 this=26 classobj=0 getlex=14 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 1442 total=10 this=6 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1443 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1445 total=10 this=5 classobj=0 getlex=4 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 1446 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1449 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1451 total=11 this=3 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1452 total=6 this=2 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1454 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1455 total=16 this=2 classobj=0 getlex=12 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1456 total=6 this=2 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1457 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1458 total=4 this=0 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1459 total=26 this=0 classobj=2 getlex=19 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 1460 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1462 total=6 this=4 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1463 total=16 this=6 classobj=2 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1464 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1465 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1467 total=8 this=4 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1468 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1469 total=17 this=4 classobj=0 getlex=11 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1470 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1473 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1476 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1479 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1482 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1484 total=9 this=1 classobj=4 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1485 total=4 this=1 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1486 total=27 this=4 classobj=2 getlex=19 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1487 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1488 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1490 total=12 this=5 classobj=1 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1491 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1494 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1496 total=8 this=4 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1497 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1499 total=27 this=14 classobj=4 getlex=8 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 1500 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1501 total=146 this=42 classobj=18 getlex=48 inst_new=8 inst_rej=3 other=27
+CENSUS_PROV 1502 total=4 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1503 total=8 this=0 classobj=3 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1504 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1507 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1509 total=10 this=3 classobj=3 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1510 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1511 total=7 this=2 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1513 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1514 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1515 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1518 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1521 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1523 total=9 this=2 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1524 total=74 this=21 classobj=7 getlex=29 inst_new=2 inst_rej=0 other=15
+CENSUS_PROV 1525 total=19 this=6 classobj=0 getlex=12 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1526 total=47 this=14 classobj=2 getlex=20 inst_new=0 inst_rej=0 other=11
+CENSUS_PROV 1527 total=12 this=2 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1528 total=12 this=2 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1529 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1531 total=24 this=16 classobj=2 getlex=5 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 1532 total=19 this=6 classobj=1 getlex=8 inst_new=2 inst_rej=2 other=0
+CENSUS_PROV 1535 total=18 this=1 classobj=3 getlex=11 inst_new=1 inst_rej=1 other=1
+CENSUS_PROV 1536 total=12 this=0 classobj=3 getlex=6 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1537 total=4 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1538 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1540 total=15 this=7 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1541 total=21 this=3 classobj=1 getlex=13 inst_new=2 inst_rej=1 other=1
+CENSUS_PROV 1544 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1545 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1546 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1548 total=14 this=10 classobj=0 getlex=2 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 1549 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1550 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1551 total=4 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1552 total=15 this=8 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1553 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1554 total=9 this=1 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1555 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1557 total=10 this=8 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1558 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1559 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1561 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1562 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1563 total=4 this=1 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1564 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1567 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1569 total=32 this=21 classobj=2 getlex=5 inst_new=2 inst_rej=2 other=0
+CENSUS_PROV 1570 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1571 total=44 this=8 classobj=11 getlex=19 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 1572 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1573 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1574 total=7 this=3 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1575 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1578 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1581 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1584 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1587 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1590 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1592 total=6 this=2 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1593 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1596 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1599 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1602 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1605 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1608 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1611 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1614 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1617 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1619 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1620 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1621 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1622 total=12 this=2 classobj=2 getlex=6 inst_new=0 inst_rej=1 other=1
+CENSUS_PROV 1623 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1625 total=24 this=10 classobj=2 getlex=8 inst_new=2 inst_rej=0 other=2
+CENSUS_PROV 1626 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1627 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1628 total=76 this=13 classobj=6 getlex=40 inst_new=5 inst_rej=1 other=11
+CENSUS_PROV 1629 total=47 this=21 classobj=4 getlex=17 inst_new=2 inst_rej=1 other=2
+CENSUS_PROV 1630 total=14 this=1 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1631 total=14 this=0 classobj=0 getlex=13 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1632 total=14 this=0 classobj=0 getlex=13 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1633 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1636 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1639 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1641 total=10 this=5 classobj=0 getlex=4 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 1642 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1644 total=22 this=7 classobj=4 getlex=8 inst_new=1 inst_rej=2 other=0
+CENSUS_PROV 1645 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1646 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1649 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1652 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1655 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1657 total=20 this=10 classobj=3 getlex=5 inst_new=1 inst_rej=0 other=1
+CENSUS_PROV 1658 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1659 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1660 total=27 this=11 classobj=1 getlex=8 inst_new=0 inst_rej=1 other=6
+CENSUS_PROV 1661 total=27 this=7 classobj=0 getlex=10 inst_new=0 inst_rej=1 other=9
+CENSUS_PROV 1662 total=9 this=6 classobj=0 getlex=0 inst_new=0 inst_rej=3 other=0
+CENSUS_PROV 1663 total=36 this=0 classobj=0 getlex=25 inst_new=0 inst_rej=0 other=11
+CENSUS_PROV 1664 total=6 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1665 total=20 this=0 classobj=0 getlex=17 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1666 total=20 this=0 classobj=0 getlex=17 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1667 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1669 total=14 this=9 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1670 total=15 this=3 classobj=1 getlex=8 inst_new=2 inst_rej=1 other=0
+CENSUS_PROV 1671 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1672 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1675 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1677 total=6 this=2 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1678 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1679 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1681 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1682 total=7 this=4 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1683 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1686 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1689 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1692 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1695 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1698 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1700 total=15 this=2 classobj=2 getlex=11 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1701 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1702 total=20 this=1 classobj=2 getlex=14 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1703 total=8 this=2 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1704 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1707 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1710 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1712 total=19 this=13 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1715 total=64 this=10 classobj=7 getlex=35 inst_new=2 inst_rej=3 other=7
+CENSUS_PROV 1716 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1717 total=10 this=8 classobj=0 getlex=0 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 1718 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1720 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1721 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1723 total=12 this=4 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1724 total=4 this=1 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1725 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1726 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1728 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1729 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1730 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1732 total=7 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1733 total=9 this=1 classobj=3 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1734 total=12 this=3 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1735 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1737 total=12 this=7 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1738 total=40 this=10 classobj=1 getlex=23 inst_new=1 inst_rej=0 other=5
+CENSUS_PROV 1739 total=4 this=1 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1740 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1741 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1742 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1743 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1746 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1749 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1752 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1755 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1758 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1761 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1763 total=5 this=4 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1764 total=8 this=5 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=1
+CENSUS_PROV 1765 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1767 total=29 this=11 classobj=2 getlex=11 inst_new=1 inst_rej=1 other=3
+CENSUS_PROV 1769 total=7 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1770 total=48 this=9 classobj=0 getlex=26 inst_new=4 inst_rej=0 other=9
+CENSUS_PROV 1771 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1772 total=11 this=7 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1773 total=31 this=13 classobj=0 getlex=11 inst_new=2 inst_rej=0 other=5
+CENSUS_PROV 1774 total=4 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1775 total=24 this=9 classobj=1 getlex=14 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1776 total=9 this=2 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1777 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1778 total=17 this=5 classobj=1 getlex=9 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1779 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1782 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1785 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1788 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1790 total=9 this=4 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1791 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1792 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1793 total=21 this=10 classobj=1 getlex=7 inst_new=0 inst_rej=3 other=0
+CENSUS_PROV 1794 total=20 this=0 classobj=2 getlex=14 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 1795 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1798 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1801 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1803 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1804 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1805 total=5 this=2 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1806 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1809 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1812 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1815 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1818 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1819 total=5 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1832 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1833 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1834 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1835 total=9 this=0 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1836 total=9 this=0 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1837 total=18 this=0 classobj=0 getlex=18 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1838 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1839 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1840 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1841 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1842 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1843 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1848 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1851 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1854 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1857 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1859 total=20 this=10 classobj=2 getlex=4 inst_new=2 inst_rej=2 other=0
+CENSUS_PROV 1860 total=74 this=35 classobj=1 getlex=24 inst_new=2 inst_rej=0 other=12
+CENSUS_PROV 1861 total=12 this=3 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1862 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1864 total=16 this=3 classobj=2 getlex=11 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1865 total=21 this=12 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1866 total=43 this=11 classobj=1 getlex=24 inst_new=6 inst_rej=0 other=1
+CENSUS_PROV 1867 total=37 this=15 classobj=4 getlex=16 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1868 total=5 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1869 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1871 total=16 this=8 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1872 total=15 this=5 classobj=1 getlex=7 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1873 total=15 this=3 classobj=2 getlex=7 inst_new=2 inst_rej=1 other=0
+CENSUS_PROV 1876 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1879 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1881 total=15 this=6 classobj=2 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1882 total=41 this=16 classobj=2 getlex=19 inst_new=2 inst_rej=0 other=2
+CENSUS_PROV 1883 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1884 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1885 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1887 total=25 this=19 classobj=0 getlex=4 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 1888 total=39 this=16 classobj=3 getlex=10 inst_new=2 inst_rej=4 other=4
+CENSUS_PROV 1890 total=12 this=6 classobj=1 getlex=4 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 1891 total=2 this=1 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 1892 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1895 total=3 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1896 total=9 this=0 classobj=3 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1897 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1900 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1903 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1905 total=10 this=5 classobj=0 getlex=4 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 1906 total=42 this=1 classobj=6 getlex=31 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 1907 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1908 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1909 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1912 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1915 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1918 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1921 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1923 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1924 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1925 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1927 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1928 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1931 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1933 total=15 this=6 classobj=2 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1934 total=57 this=21 classobj=5 getlex=24 inst_new=4 inst_rej=1 other=2
+CENSUS_PROV 1935 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1936 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1937 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1939 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1940 total=27 this=4 classobj=6 getlex=11 inst_new=1 inst_rej=0 other=5
+CENSUS_PROV 1941 total=26 this=10 classobj=3 getlex=9 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 1942 total=47 this=9 classobj=11 getlex=23 inst_new=2 inst_rej=0 other=2
+CENSUS_PROV 1943 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1946 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1949 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1951 total=29 this=23 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1952 total=76 this=14 classobj=1 getlex=40 inst_new=2 inst_rej=0 other=19
+CENSUS_PROV 1953 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1954 total=10 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 1955 total=4 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 1956 total=5 this=5 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1958 total=55 this=2 classobj=5 getlex=44 inst_new=3 inst_rej=0 other=1
+CENSUS_PROV 1959 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1962 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1964 total=13 this=3 classobj=2 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1965 total=18 this=1 classobj=0 getlex=14 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 1966 total=3 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1967 total=6 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 1968 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1971 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1974 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1977 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1980 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1983 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1986 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1989 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1991 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1992 total=6 this=2 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1993 total=17 this=0 classobj=6 getlex=9 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 1994 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1995 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1997 total=11 this=4 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1998 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 1999 total=12 this=4 classobj=1 getlex=6 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2000 total=26 this=2 classobj=2 getlex=17 inst_new=1 inst_rej=0 other=4
+CENSUS_PROV 2001 total=37 this=6 classobj=5 getlex=19 inst_new=3 inst_rej=1 other=3
+CENSUS_PROV 2002 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2005 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2007 total=20 this=4 classobj=2 getlex=14 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2008 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2009 total=26 this=1 classobj=1 getlex=19 inst_new=2 inst_rej=0 other=3
+CENSUS_PROV 2012 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2013 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2014 total=7 this=0 classobj=1 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2015 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2018 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2021 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2024 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2026 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2027 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2030 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2032 total=19 this=6 classobj=2 getlex=11 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2033 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2034 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2035 total=8 this=2 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2036 total=6 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2037 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2039 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2040 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2041 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2042 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2044 total=12 this=7 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2045 total=52 this=15 classobj=2 getlex=28 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 2046 total=13 this=6 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2047 total=5 this=0 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2048 total=16 this=8 classobj=1 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2049 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2051 total=6 this=5 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2052 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2054 total=5 this=0 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2055 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2056 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2057 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2059 total=13 this=0 classobj=0 getlex=13 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2060 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2062 total=12 this=3 classobj=2 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2063 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2064 total=6 this=2 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2065 total=15 this=0 classobj=1 getlex=14 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2066 total=16 this=4 classobj=2 getlex=9 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2067 total=9 this=6 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2068 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2070 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2071 total=7 this=4 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2072 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2073 total=20 this=0 classobj=10 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2074 total=17 this=6 classobj=3 getlex=4 inst_new=0 inst_rej=2 other=2
+CENSUS_PROV 2075 total=47 this=26 classobj=2 getlex=11 inst_new=0 inst_rej=6 other=2
+CENSUS_PROV 2076 total=43 this=11 classobj=3 getlex=11 inst_new=0 inst_rej=6 other=12
+CENSUS_PROV 2077 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2079 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2080 total=4 this=0 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2081 total=3 this=0 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2082 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2083 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2085 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2086 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2087 total=6 this=2 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2089 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2090 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2092 total=19 this=10 classobj=2 getlex=4 inst_new=2 inst_rej=1 other=0
+CENSUS_PROV 2093 total=30 this=11 classobj=2 getlex=14 inst_new=2 inst_rej=0 other=1
+CENSUS_PROV 2094 total=10 this=3 classobj=0 getlex=4 inst_new=2 inst_rej=0 other=1
+CENSUS_PROV 2095 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2097 total=23 this=8 classobj=6 getlex=7 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 2098 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2100 total=15 this=1 classobj=3 getlex=10 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2101 total=50 this=9 classobj=13 getlex=19 inst_new=0 inst_rej=0 other=9
+CENSUS_PROV 2102 total=7 this=4 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2103 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2106 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2109 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2112 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2114 total=10 this=8 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2115 total=55 this=3 classobj=4 getlex=37 inst_new=0 inst_rej=2 other=9
+CENSUS_PROV 2117 total=12 this=0 classobj=2 getlex=9 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2119 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2121 total=10 this=5 classobj=0 getlex=4 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 2122 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2123 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2126 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2129 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2131 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2132 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2133 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2134 total=20 this=1 classobj=1 getlex=14 inst_new=1 inst_rej=0 other=3
+CENSUS_PROV 2135 total=37 this=6 classobj=5 getlex=19 inst_new=3 inst_rej=1 other=3
+CENSUS_PROV 2136 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2139 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2142 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2144 total=11 this=4 classobj=1 getlex=5 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2145 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2146 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2147 total=22 this=5 classobj=3 getlex=12 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 2148 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2151 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2154 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2156 total=30 this=19 classobj=2 getlex=7 inst_new=1 inst_rej=1 other=0
+CENSUS_PROV 2157 total=58 this=24 classobj=3 getlex=20 inst_new=2 inst_rej=4 other=5
+CENSUS_PROV 2158 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2159 total=24 this=5 classobj=5 getlex=12 inst_new=0 inst_rej=1 other=1
+CENSUS_PROV 2160 total=16 this=6 classobj=1 getlex=8 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2161 total=6 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=2 other=1
+CENSUS_PROV 2165 total=4 this=1 classobj=1 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2166 total=5 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2167 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2170 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2173 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2176 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2179 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2181 total=15 this=9 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2183 total=55 this=14 classobj=1 getlex=25 inst_new=4 inst_rej=1 other=10
+CENSUS_PROV 2184 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2185 total=12 this=0 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2186 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2189 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2192 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2194 total=19 this=11 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2195 total=13 this=6 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 2196 total=145 this=36 classobj=17 getlex=65 inst_new=6 inst_rej=1 other=20
+CENSUS_PROV 2197 total=5 this=2 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2198 total=20 this=7 classobj=3 getlex=9 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2199 total=7 this=1 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2201 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2204 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2206 total=35 this=14 classobj=3 getlex=11 inst_new=4 inst_rej=0 other=3
+CENSUS_PROV 2207 total=6 this=4 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2208 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2211 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2214 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2217 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2220 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2223 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2226 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2229 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2232 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2235 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2238 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2241 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2244 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2247 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2250 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2253 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2256 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2259 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2262 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2265 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2268 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2270 total=9 this=0 classobj=3 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2271 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2274 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2277 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2280 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2282 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2283 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2284 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2287 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2290 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2293 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2296 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2298 total=9 this=4 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2299 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2302 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2305 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2308 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2311 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2314 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2316 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2317 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2318 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2320 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2321 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2323 total=7 this=0 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2324 total=9 this=3 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2325 total=6 this=1 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2326 total=8 this=1 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2327 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2329 total=5 this=4 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2330 total=39 this=5 classobj=9 getlex=16 inst_new=0 inst_rej=0 other=9
+CENSUS_PROV 2331 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2334 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2337 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2340 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2343 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2346 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2349 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2352 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2355 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2358 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2361 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2363 total=8 this=4 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2364 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2367 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2370 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2373 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2376 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2378 total=5 this=0 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2379 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2381 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2382 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2383 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2386 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2389 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2391 total=3 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2392 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2395 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2397 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2398 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2399 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2400 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2402 total=7 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2403 total=4 this=2 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2404 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2407 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2410 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2413 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2416 total=35 this=5 classobj=6 getlex=24 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2417 total=91 this=5 classobj=15 getlex=54 inst_new=0 inst_rej=0 other=17
+CENSUS_PROV 2418 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2421 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2423 total=19 this=15 classobj=0 getlex=2 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 2424 total=47 this=9 classobj=3 getlex=25 inst_new=1 inst_rej=1 other=8
+CENSUS_PROV 2425 total=8 this=6 classobj=0 getlex=0 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 2426 total=22 this=0 classobj=3 getlex=10 inst_new=0 inst_rej=0 other=9
+CENSUS_PROV 2427 total=17 this=2 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 2428 total=20 this=0 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=12
+CENSUS_PROV 2429 total=7 this=6 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2431 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2434 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2436 total=8 this=0 classobj=4 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2437 total=9 this=2 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2438 total=10 this=1 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2439 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2442 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2445 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2448 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2451 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2454 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2456 total=26 this=13 classobj=4 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2457 total=24 this=6 classobj=1 getlex=10 inst_new=2 inst_rej=4 other=1
+CENSUS_PROV 2459 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2460 total=4 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=2 other=0
+CENSUS_PROV 2461 total=4 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2462 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2464 total=11 this=10 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2465 total=144 this=59 classobj=13 getlex=55 inst_new=0 inst_rej=0 other=17
+CENSUS_PROV 2466 total=44 this=24 classobj=2 getlex=10 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 2467 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2468 total=18 this=2 classobj=4 getlex=11 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2469 total=4 this=1 classobj=0 getlex=2 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 2470 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2471 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2472 total=265 this=138 classobj=10 getlex=44 inst_new=9 inst_rej=0 other=64
+CENSUS_PROV 2473 total=26 this=4 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=14
+CENSUS_PROV 2474 total=42 this=3 classobj=2 getlex=27 inst_new=0 inst_rej=0 other=10
+CENSUS_PROV 2475 total=4 this=0 classobj=0 getlex=0 inst_new=2 inst_rej=0 other=2
+CENSUS_PROV 2476 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2477 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2479 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2482 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2485 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2487 total=10 this=6 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2488 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2491 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2492 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2493 total=40 this=11 classobj=6 getlex=20 inst_new=1 inst_rej=1 other=1
+CENSUS_PROV 2494 total=21 this=8 classobj=3 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2495 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2496 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2497 total=27 this=1 classobj=0 getlex=25 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2498 total=14 this=1 classobj=1 getlex=10 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2499 total=87 this=17 classobj=17 getlex=43 inst_new=0 inst_rej=0 other=10
+CENSUS_PROV 2500 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2503 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2506 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2509 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2512 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2515 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2517 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2518 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2519 total=10 this=7 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2520 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2521 total=83 this=25 classobj=6 getlex=37 inst_new=5 inst_rej=4 other=6
+CENSUS_PROV 2522 total=5 this=0 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2523 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2524 total=21 this=3 classobj=4 getlex=12 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2525 total=44 this=8 classobj=7 getlex=23 inst_new=0 inst_rej=6 other=0
+CENSUS_PROV 2526 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2529 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2532 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2535 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2537 total=11 this=2 classobj=0 getlex=9 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2538 total=39 this=15 classobj=4 getlex=12 inst_new=0 inst_rej=5 other=3
+CENSUS_PROV 2539 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2541 total=20 this=12 classobj=3 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2542 total=4 this=2 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2544 total=38 this=16 classobj=1 getlex=13 inst_new=0 inst_rej=2 other=6
+CENSUS_PROV 2545 total=16 this=6 classobj=2 getlex=6 inst_new=0 inst_rej=1 other=1
+CENSUS_PROV 2546 total=29 this=10 classobj=3 getlex=13 inst_new=0 inst_rej=1 other=2
+CENSUS_PROV 2548 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2551 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2553 total=10 this=3 classobj=3 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2554 total=10 this=3 classobj=1 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2555 total=6 this=1 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2556 total=22 this=6 classobj=1 getlex=13 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2557 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2560 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2563 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2565 total=5 this=4 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2566 total=19 this=5 classobj=1 getlex=9 inst_new=3 inst_rej=0 other=1
+CENSUS_PROV 2568 total=11 this=0 classobj=2 getlex=7 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2569 total=7 this=0 classobj=1 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2570 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2572 total=6 this=0 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2573 total=24 this=9 classobj=0 getlex=11 inst_new=2 inst_rej=0 other=2
+CENSUS_PROV 2574 total=18 this=3 classobj=2 getlex=12 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2575 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2577 total=28 this=12 classobj=3 getlex=7 inst_new=4 inst_rej=0 other=2
+CENSUS_PROV 2578 total=19 this=7 classobj=1 getlex=8 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 2579 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2582 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2584 total=10 this=5 classobj=0 getlex=4 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 2585 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2588 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2590 total=26 this=17 classobj=1 getlex=6 inst_new=1 inst_rej=1 other=0
+CENSUS_PROV 2591 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2592 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2593 total=56 this=10 classobj=10 getlex=24 inst_new=1 inst_rej=2 other=9
+CENSUS_PROV 2597 total=15 this=4 classobj=3 getlex=7 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2598 total=14 this=1 classobj=1 getlex=12 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2599 total=35 this=10 classobj=5 getlex=13 inst_new=0 inst_rej=5 other=2
+CENSUS_PROV 2600 total=48 this=12 classobj=9 getlex=22 inst_new=0 inst_rej=2 other=3
+CENSUS_PROV 2601 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2604 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2606 total=14 this=4 classobj=2 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2607 total=115 this=15 classobj=7 getlex=63 inst_new=6 inst_rej=0 other=24
+CENSUS_PROV 2608 total=10 this=0 classobj=4 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2609 total=10 this=4 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 2610 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 2611 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2614 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2617 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2620 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2623 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2626 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2629 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2632 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2635 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2638 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2641 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2643 total=23 this=13 classobj=2 getlex=6 inst_new=2 inst_rej=0 other=0
+CENSUS_PROV 2644 total=15 this=2 classobj=1 getlex=10 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2645 total=11 this=0 classobj=2 getlex=7 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2646 total=21 this=2 classobj=1 getlex=11 inst_new=2 inst_rej=0 other=5
+CENSUS_PROV 2647 total=27 this=0 classobj=1 getlex=25 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2648 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2649 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2650 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2653 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2656 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2659 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2662 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2664 total=18 this=10 classobj=2 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2666 total=43 this=13 classobj=2 getlex=16 inst_new=4 inst_rej=3 other=5
+CENSUS_PROV 2669 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2670 total=23 this=6 classobj=1 getlex=12 inst_new=1 inst_rej=1 other=2
+CENSUS_PROV 2671 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2674 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2677 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2680 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2683 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2686 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2689 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2692 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2695 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2698 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2701 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2704 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2707 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2710 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2713 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2716 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2719 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2722 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2725 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2728 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2730 total=3 this=1 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2731 total=9 this=7 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2732 total=9 this=7 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2733 total=8 this=5 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 2734 total=8 this=6 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2735 total=7 this=5 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2736 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2737 total=5 this=5 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2738 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2739 total=5 this=5 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2740 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2741 total=4 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2742 total=2 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2743 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2746 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2749 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2752 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2755 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2758 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2761 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2764 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2767 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2770 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2773 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2776 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2779 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2782 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2785 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2788 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2791 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2794 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2797 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2800 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2803 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2806 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2809 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2812 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2815 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2818 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2821 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2824 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2827 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2830 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2833 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2836 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2839 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2842 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2845 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2848 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2851 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2854 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2857 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2860 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2863 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2866 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2869 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2872 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2875 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2878 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2881 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2884 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2887 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2890 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2893 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2896 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2899 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2902 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2905 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2908 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2911 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2914 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2917 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2920 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2923 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2926 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2929 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2932 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2935 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2938 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2941 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2944 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2947 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2950 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2953 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2956 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2958 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2960 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2961 total=5 this=1 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 2962 total=12 this=6 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 2963 total=12 this=6 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 2964 total=5 this=5 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2965 total=15 this=4 classobj=2 getlex=4 inst_new=0 inst_rej=0 other=5
+CENSUS_PROV 2966 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2969 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2972 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2975 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2978 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2981 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2983 total=6 this=2 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2984 total=34 this=6 classobj=0 getlex=4 inst_new=20 inst_rej=0 other=4
+CENSUS_PROV 2985 total=28 this=6 classobj=0 getlex=4 inst_new=14 inst_rej=0 other=4
+CENSUS_PROV 2986 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2987 total=4 this=1 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2988 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2989 total=4 this=1 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2990 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2991 total=4 this=1 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2992 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2993 total=4 this=1 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2994 total=10 this=4 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2995 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2997 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2998 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 2999 total=2 this=1 classobj=0 getlex=0 inst_new=1 inst_rej=0 other=0
+CENSUS_PROV 3000 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3001 total=9 this=8 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3002 total=11 this=9 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3003 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3004 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3005 total=15 this=2 classobj=0 getlex=1 inst_new=2 inst_rej=0 other=10
+CENSUS_PROV 3006 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3007 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3010 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3013 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3016 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3019 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3022 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3025 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3028 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3030 total=18 this=13 classobj=1 getlex=3 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 3031 total=34 this=11 classobj=1 getlex=19 inst_new=2 inst_rej=0 other=1
+CENSUS_PROV 3033 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3034 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3035 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3037 total=4 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3038 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 3039 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3041 total=13 this=8 classobj=1 getlex=3 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 3042 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3043 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3044 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3047 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3049 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3050 total=8 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 3051 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3053 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3100 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3102 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3103 total=2 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3104 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3105 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3106 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3107 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3108 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3109 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3112 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3115 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3118 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3121 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3124 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3127 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3129 total=24 this=9 classobj=0 getlex=9 inst_new=2 inst_rej=0 other=4
+CENSUS_PROV 3130 total=28 this=3 classobj=1 getlex=17 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 3131 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3134 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3137 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3140 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3143 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3146 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3149 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3152 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3155 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3156 total=2 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3158 total=14 this=9 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3159 total=22 this=4 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=14
+CENSUS_PROV 3160 total=65 this=11 classobj=3 getlex=7 inst_new=2 inst_rej=0 other=42
+CENSUS_PROV 3161 total=5 this=5 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3162 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3163 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3164 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3165 total=23 this=6 classobj=3 getlex=5 inst_new=1 inst_rej=0 other=8
+CENSUS_PROV 3166 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3167 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3170 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3171 total=14 this=0 classobj=0 getlex=12 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3172 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3173 total=25 this=0 classobj=0 getlex=23 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3174 total=20 this=0 classobj=0 getlex=18 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3175 total=36 this=0 classobj=0 getlex=36 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3176 total=25 this=0 classobj=0 getlex=24 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3177 total=8 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3178 total=10 this=0 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3179 total=8 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3180 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3181 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3182 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3183 total=18 this=0 classobj=0 getlex=16 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3186 total=6 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3187 total=34 this=0 classobj=0 getlex=33 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3188 total=10 this=0 classobj=0 getlex=10 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3189 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3190 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3191 total=3 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3192 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3193 total=11 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 3197 total=7 this=4 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3198 total=5 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3199 total=3 this=2 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3200 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3204 total=6 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3210 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3211 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3212 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3213 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3214 total=1 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3217 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3219 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3222 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3223 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3224 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3225 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3226 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3227 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3228 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3230 total=6 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=6
+CENSUS_PROV 3231 total=6 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 3233 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3236 total=3 this=0 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3239 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3240 total=8 this=0 classobj=0 getlex=8 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3243 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3246 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3249 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3252 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3254 total=23 this=6 classobj=3 getlex=12 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3255 total=28 this=10 classobj=0 getlex=4 inst_new=12 inst_rej=0 other=2
+CENSUS_PROV 3256 total=24 this=10 classobj=0 getlex=4 inst_new=8 inst_rej=0 other=2
+CENSUS_PROV 3257 total=22 this=8 classobj=0 getlex=4 inst_new=8 inst_rej=0 other=2
+CENSUS_PROV 3258 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3259 total=2 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3260 total=4 this=0 classobj=0 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3263 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3266 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3269 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3272 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3275 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3278 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3281 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3284 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3287 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3290 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3293 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3296 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3299 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3302 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3305 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3308 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3311 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3314 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3317 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3320 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3323 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3326 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3329 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3332 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3335 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3338 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3341 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3344 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3347 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3350 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3353 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3356 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3359 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3362 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3365 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3368 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3371 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3374 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3377 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3380 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3383 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3386 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3389 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3392 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3395 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3398 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3401 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3404 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3407 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3409 total=20 this=8 classobj=0 getlex=5 inst_new=0 inst_rej=4 other=3
+CENSUS_PROV 3410 total=17 this=11 classobj=1 getlex=3 inst_new=1 inst_rej=0 other=1
+CENSUS_PROV 3411 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3412 total=5 this=1 classobj=1 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3413 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3416 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3419 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3422 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3425 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3428 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3431 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3434 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3437 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3439 total=8 this=3 classobj=2 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3440 total=5 this=2 classobj=1 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3441 total=9 this=3 classobj=1 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3443 total=2 this=1 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3444 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3447 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3450 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3453 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3456 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3459 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3462 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3465 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3468 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3470 total=24 this=9 classobj=0 getlex=9 inst_new=2 inst_rej=0 other=4
+CENSUS_PROV 3471 total=27 this=1 classobj=2 getlex=17 inst_new=0 inst_rej=0 other=7
+CENSUS_PROV 3472 total=9 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 3473 total=12 this=0 classobj=2 getlex=9 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3474 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3476 total=4 this=3 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3477 total=8 this=1 classobj=1 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3478 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3479 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3482 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3485 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3488 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3490 total=8 this=3 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3491 total=4 this=2 classobj=0 getlex=1 inst_new=0 inst_rej=1 other=0
+CENSUS_PROV 3492 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3493 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3496 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3499 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3502 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3505 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3508 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3511 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3514 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3517 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3520 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3523 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3526 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3529 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3531 total=14 this=4 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 3532 total=54 this=3 classobj=4 getlex=36 inst_new=0 inst_rej=0 other=11
+CENSUS_PROV 3533 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3536 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3539 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3542 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3545 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3548 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3550 total=27 this=14 classobj=0 getlex=9 inst_new=3 inst_rej=1 other=0
+CENSUS_PROV 3551 total=5 this=0 classobj=1 getlex=4 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3552 total=22 this=7 classobj=1 getlex=12 inst_new=1 inst_rej=0 other=1
+CENSUS_PROV 3553 total=1 this=1 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3554 total=29 this=11 classobj=1 getlex=15 inst_new=1 inst_rej=1 other=0
+CENSUS_PROV 3555 total=2 this=0 classobj=1 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3556 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3559 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3562 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3565 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3568 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3571 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3574 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3577 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3580 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3583 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3586 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3589 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3592 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3595 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3598 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3601 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3604 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3607 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3610 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3613 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3615 total=8 this=5 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3616 total=38 this=3 classobj=3 getlex=24 inst_new=0 inst_rej=0 other=8
+CENSUS_PROV 3617 total=9 this=1 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3618 total=8 this=0 classobj=2 getlex=5 inst_new=0 inst_rej=0 other=1
+CENSUS_PROV 3619 total=5 this=0 classobj=0 getlex=5 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3622 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3624 total=7 this=4 classobj=0 getlex=3 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3625 total=30 this=0 classobj=4 getlex=22 inst_new=0 inst_rej=0 other=4
+CENSUS_PROV 3626 total=6 this=0 classobj=0 getlex=6 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3629 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3632 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3635 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3638 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3641 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3644 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3647 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3650 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3653 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3656 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3659 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3662 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3665 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3668 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3671 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3674 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3677 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3691 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3693 total=2 this=0 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=2
+CENSUS_PROV 3694 total=4 this=0 classobj=2 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3695 total=1 this=0 classobj=0 getlex=1 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3697 total=3 this=3 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3698 total=7 this=4 classobj=0 getlex=0 inst_new=0 inst_rej=0 other=3
+CENSUS_PROV 3699 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3702 total=2 this=0 classobj=0 getlex=2 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3705 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3708 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3711 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3714 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3717 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3720 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3723 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3726 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3729 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3732 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+CENSUS_PROV 3735 total=7 this=0 classobj=0 getlex=7 inst_new=0 inst_rej=0 other=0
+===== END CENSUS =====

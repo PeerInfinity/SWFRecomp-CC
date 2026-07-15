@@ -1,5 +1,38 @@
 # Seedling perf A/B — status
 
+## ✗ UPDATE 2026-07-15 (session 9) — NON-`this` INSTANCE-SLOT GET SPEC: GATED OUT at Step-0 (not built, below-noise)
+The proposed lever (extend compile-time slot specialization to non-`this` typed-ABC-class
+instance receivers — a guarded `slots[K]` load instead of `getproperty_static_ic`, plan
+`SWFRecompDocs/plans/seedling-perf-instance-slot-lever.md`) was **killed by its own
+mandatory Step-0 gate — no code shipped.** Third lever in a row to close this way (Step-4
+coerce-elision, Step-5 call-devirt, now this): the measure-first census proves the hot
+path has nothing addressable.
+
+A temporary `SWF_CENSUS_INST_SLOT` counter in `analyzeSlotSpec` (reverted after measuring)
+classified all 25,738 Seedling `GetPropertyStatic` sites and tagged the newly-specializable
+ones by `method_index`; cross-referenced against the fresh profile's hot GET-cluster
+drivers (`seedling_profile_2026-07-15_post_blit.json`). Raw census:
+`tools/divergence/perf/inst_slot_census_2026-07-15.txt`.
+```
+  25,738 GetPropertyStatic:  this 5826 (lever-A ✓) | getlex 13335 (lever-A ✓)
+                             | classobj 1903 (lever-B ✓) | non-this typed-inst 992
+    of the 992:  reject non-unique-slot 344, unsealed 26, subclass 0, K<=0 1
+                 -> NEWLY SPECIALIZABLE = 621
+  BUT: top-5 GET drivers (m676/m224/m269/m225/m32 = 61% of GET cost) = 0 new sites.
+       new lever reaches 4 of 993 hot-driver static gets = 0.4%.
+  Hot-driver static-get provenance: this 18% + getlex 47% + classobj 23%
+       + native flash.geom 11% + NEW-typed-inst 0.4%  = 99.6% done/unaddressable.
+  The 621 sites live in cold/startup methods absent from the profile (m624=30, m288=20,…).
+```
+**Verdict:** GET-specialization arc is structurally exhausted — the three fat provenance
+classes (this/getlex/classobj) are all specialized; the residue is native `flash.geom`
+(a different lever — Matrix/Point ABC slot traits, fresh-profile #4 ~2.3%) + irreducible
+IC-hit glue. Building a nullable-guarded instance-slot op to hit 0.4% of hot gets would
+ship dead complexity below the ±2–3 ms noise floor. North-star already met (~1.4× faster
+than Ruffle). Memory: [[seedling-instance-slot-lever-gated-out]].
+
+---
+
 ## ★★★ UPDATE 2026-07-15 (session 8) — BLIT SIMD (fresh-profile lever #2): byte-exact 4-px WASM-SIMD blend_over; ~+1.4 ms (~6%), UNANIMOUS 11/11 rounds vs master, render byte-identical
 The 2nd fresh-profile lever ([[seedling-fresh-profile-poststep4-lever-map]], lever #2:
 `bd_copy_pixels` 4.3% + `bd_draw` 1.2% self-time — FlashPunk's per-frame CPU software
