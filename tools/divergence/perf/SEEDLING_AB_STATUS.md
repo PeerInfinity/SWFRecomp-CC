@@ -1,5 +1,60 @@
 # Seedling perf A/B — status
 
+## ★★★★ UPDATE 2026-07-14 (session 7) — COERCE-CLASS-RESOLUTION MEMO: ~6 ms (~12%), CLEANLY ABOVE NOISE — the fresh-profile #1 lever, and the first win past the compile-time-slot arc
+New perf arc opened from the post-Step-4 fresh profile
+([[seedling-fresh-profile-poststep4-lever-map]], lever #1). `avm2_coerce_to_type_mn`
+re-ran `avm2_class_for_mn` (**2.9 % self-time** — `avm2_domain_find` + `avm2_vtable_find`)
+on EVERY coerce, for a compile-time-constant `mn_idx` → a stable Class. The
+`(file, mn_idx) → Class*` mapping is a pure function of append-only state (a class
+installs into a script global once; the domain is append-only, first-match, stable
+identity), so a non-NULL resolution is permanent.
+
+**Runtime-only** (no recompiler change, unlike Steps 2-4). `avm2_class_for_mn` was
+split into `avm2_class_for_mn_resolve` (old body) + a memoizing wrapper backed by a
+per-file `coerce_class_memo[]` (sized `multiname_count`, in `Avm2AbcFileRt`). Only
+NON-NULL results are cached — a type name is transiently unresolvable during its own
+cinit and that miss must not be frozen. Vector.<T> and recursive base/param resolves
+route back through the wrapper, so they cache too. One choke point covers `op_coerce`
++ `setup_locals` (typed-param coercion) + `setproperty_resolved` + `coerce_return`.
+Commit `e05a8fe0d`.
+
+**Real-GPU interleaved A/B (Intel Gen9, `seedling` = memo ON vs `seedling_before` =
+`-DSWF_NO_CLASS_MEMO`, both fresh same-flags `--profiling-funcs` builds):**
+```
+  CLEAN batch (WSL idle, 6 rounds, settle 30s):
+  round   on(ms)   off(ms)   Δ
+    1      41.7     46.6     +4.9
+    2      40.8     46.0     +5.2
+    3      39.9     46.5     +6.6
+    4      44.2     53.1     +8.9
+    5      49.8     53.9     +4.1
+    6      43.5     50.6     +7.1
+  ON  mean 43.3  median 42.6  stdev 3.3
+  OFF mean 49.5  median 48.6  stdev 3.2
+  Δ = +6.1 ms mean / +6.0 ms median favoring the memo (~12%) — ON < OFF EVERY round,
+      cleanly above the ±3.3 ms noise.
+```
+A first (partially machine-contended) batch agreed in direction on all 6 rounds; its
+two clean opening rounds read ON 30.3 vs OFF 33.2/34.2 (+3.4 ms, fps 33 vs 30) at a
+lower machine-load baseline. Two independent batches, **unanimous ON < OFF**. Present
+~0.5-0.6 ms both sides (render off the critical path). **Unlike Step-4/Step-5 (both
+below noise), this lever is clearly measurable** — it removes a real 2.9 % self-time
+function that sits ON the per-frame coerce path, not a cold/startup site.
+
+**Correctness (mirrors lever A):** `-DAVM2_CLASS_MEMO_VERIFY` re-runs the full resolve
+on every memo HIT and aborts on divergence; `-DSWF_NO_CLASS_MEMO` disables the cache
+(A/B baseline). Full-suite verify CI (run 29386334757): **avm2 829/1205 held, ZERO
+`class-memo mismatch` aborts across all 829 tests.** Normal CI (run 29386363337):
+avm2 829/1205, avm1 634/707, shumway 73/92 — identical to the verify run and to
+baseline → byte-identical, no regression. `ruffle-test-results` merged.
+
+**Arc status:** the 30 fps / 33.3 ms target was met at Step 3 (~32.6 ms); this is a
+*fresh* arc (a different, cacheable hot bucket the compile-time-slot arc never
+touched). Remaining fresh-profile levers: blit SIMD (~5.7 %), typed-Number arithmetic
+spec (~2-4 %), Matrix/Point sealed slots (~2.3 %).
+
+---
+
 ## ★★★ UPDATE 2026-07-14 (session 6) — STEP 4 coercion elision: sound but ~1 ms (below noise), hot path already coerce-clean
 Final step of the compile-time type-specialization arc (plan
 `seedling-perf-compile-time-specialization.md`). The recompiler now elides

@@ -1,0 +1,35 @@
+round  on(ms)  off(ms)   (settle=40s port=8010)
+  1      30.3    33.2
+    on_json:  {"frames": 1041, "total": 120, "excluded": 0, "throttled": false, "mean": 30.3, "p95": 38.3, "max": 90.7, "present": 0.5, "avm_submit": 29.7, "fps": 33}
+    off_json: {"frames": 957, "total": 120, "excluded": 0, "throttled": false, "mean": 33.2, "p95": 44.3, "max": 73.5, "present": 0.6, "avm_submit": 32.6, "fps": 30.2}
+  2      30.3    34.2
+    on_json:  {"frames": 1056, "total": 120, "excluded": 0, "throttled": false, "mean": 30.3, "p95": 40.4, "max": 81.5, "present": 0.6, "avm_submit": 29.7, "fps": 33}
+    off_json: {"frames": 985, "total": 120, "excluded": 0, "throttled": false, "mean": 34.2, "p95": 46.6, "max": 92, "present": 0.5, "avm_submit": 33.7, "fps": 29.2}
+  3      31.3    54.3
+    on_json:  {"frames": 1046, "total": 120, "excluded": 0, "throttled": false, "mean": 31.3, "p95": 46.8, "max": 78.2, "present": 0.6, "avm_submit": 30.7, "fps": 32}
+    off_json: {"frames": 646, "total": 120, "excluded": 0, "throttled": false, "mean": 54.3, "p95": 75, "max": 112.6, "present": 0.9, "avm_submit": 53.4, "fps": 18.4}
+  4      46.9    53.4
+    on_json:  {"frames": 681, "total": 120, "excluded": 0, "throttled": false, "mean": 46.9, "p95": 67, "max": 130.2, "present": 0.8, "avm_submit": 46, "fps": 21.3}
+    off_json: {"frames": 598, "total": 120, "excluded": 0, "throttled": false, "mean": 53.4, "p95": 67.5, "max": 157.3, "present": 0.8, "avm_submit": 52.6, "fps": 18.7}
+  5        47    50.6
+    on_json:  {"frames": 728, "total": 120, "excluded": 0, "throttled": false, "mean": 47, "p95": 70.5, "max": 126.2, "present": 0.8, "avm_submit": 46.2, "fps": 21.3}
+    off_json: {"frames": 638, "total": 120, "excluded": 0, "throttled": false, "mean": 50.6, "p95": 61.3, "max": 132.4, "present": 0.8, "avm_submit": 49.8, "fps": 19.8}
+  6      39.1    47.2
+    on_json:  {"frames": 796, "total": 120, "excluded": 0, "throttled": false, "mean": 39.1, "p95": 48.6, "max": 119, "present": 0.7, "avm_submit": 38.4, "fps": 25.6}
+    off_json: {"frames": 712, "total": 120, "excluded": 0, "throttled": false, "mean": 47.2, "p95": 63.7, "max": 105.8, "present": 0.8, "avm_submit": 46.5, "fps": 21.2}
+---
+ON  means: 30.3 30.3 31.3 46.9 47 39.1
+OFF means: 33.2 34.2 54.3 53.4 50.6 47.2
+ON : mean 37.5 median 35.2 stdev 7.3
+OFF: mean 45.5 median 48.9 stdev 8.6
+Delta (off-on) = +8.0 ms mean, +13.7 ms median
+# Clean confirmatory batch (WSL idle, foreground, 6 rounds, settle 30s):
+round  on(ms)  off(ms)
+  1    41.7   46.6
+  2    40.8   46.0
+  3    39.9   46.5
+  4    44.2   53.1
+  5    49.8   53.9
+  6    43.5   50.6
+ON mean 43.3 median 42.6 stdev 3.3; OFF mean 49.5 median 48.6 stdev 3.2
+Delta = +6.1ms mean / +6.0ms median favoring memo (~12%), ON<OFF all 6 rounds

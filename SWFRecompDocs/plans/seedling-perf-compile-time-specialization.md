@@ -314,6 +314,37 @@ puts that at #10 (2.3%). The real standouts:
 both bigger and cleaner than the pre-capture Matrix pick. These are NEW arcs, not
 the closed compile-time-slot arc; open a fresh plan when pursuing one.
 
+## NEW ARC — coerce-class-resolution memo DONE (2026-07-14): ~6 ms (~12%), cleanly above noise
+
+Lever #1 of the fresh profile, BUILT and SHIPPED (commit `e05a8fe0d`). The
+`(file, mn_idx) → Class*` mapping is a pure function of append-only state, so
+`avm2_class_for_mn` (2.9% self-time) is memoized per file. **Runtime-only** — no
+recompiler change (all coerce sites already funnel through
+`avm2_coerce_to_type_mn → avm2_class_for_mn`). Split into
+`avm2_class_for_mn_resolve` (old body) + a memoizing wrapper backed by a per-file
+`coerce_class_memo[]` (`Avm2AbcFileRt`, sized `multiname_count`, allocated in
+`avm2_abc_load`). **Only NON-NULL results cached** — a type name resolves to NULL
+transiently during its own cinit, and that miss must not be frozen. Vector.<T> and
+recursive base/param resolves route back through the wrapper (cached too). One
+choke point covers `op_coerce` + `setup_locals` + `setproperty_resolved` +
+`coerce_return`.
+
+- **Real-GPU interleaved A/B (Intel Gen9, clean batch, 6 rounds): ON 43.3 vs OFF
+  49.5 = +6.1 ms mean / +6.0 ms median (~12%), ON < OFF every round, above the
+  ±3.3 ms noise.** A second (contended) batch agreed in direction on all 6 rounds
+  (clean opening rounds ON 30.3 vs OFF 33.7 at a lower load baseline). Present
+  ~0.5-0.6 ms both sides. **Unlike Step-4/Step-5 (below noise), this lever is
+  clearly measurable** — it removes a real 2.9% self-time function ON the per-frame
+  coerce path (Step-4 elision only touched cold/no-op sites; this accelerates the
+  coerces that AREN'T no-ops).
+- **Validation:** `-DAVM2_CLASS_MEMO_VERIFY` (re-resolve on every memo HIT, abort on
+  divergence) + `-DSWF_NO_CLASS_MEMO` (A/B toggle). Verify CI (run 29386334757):
+  avm2 829/1205 held, ZERO `class-memo mismatch` aborts across all 829 tests. Normal
+  CI (run 29386363337): avm2 829 / avm1 634 / shumway 73 — byte-identical, no
+  regression. Full A/B log: `tools/divergence/perf/coerce_class_memo_ab_2026-07-14.log`.
+- **NEXT fresh-profile levers (unbuilt):** blit SIMD (~5.7%), typed-Number
+  arithmetic spec (~2-4%), Matrix/Point sealed slots (~2.3%).
+
 ## Step 3 plan (as executed)
 
 Step-1 scout weights (of GET execution, the dominant property op ~15.7% of frame):
