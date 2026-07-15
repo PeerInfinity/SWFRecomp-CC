@@ -1,11 +1,15 @@
 # Seedling perf — Phase: compile-time type specialization (the recompiler's real lever)
 
-**Status (2026-07-14): ARC COMPLETE, PAST TARGET.** Steps 0–4 done. Cumulative
-~47 → Step-2 ~43.6 → lever A ~34.4 → lever B **~32.6 ms ≈ 30–31 fps, past the
-30 fps / 33.3 ms target, ~1.4× faster than Ruffle**. Step 4 (coercion elision)
-shipped sound + byte-identical but is ~1 ms below the noise floor — the hot
-render path is already coerce-clean (see the Step-4 section below). Remaining
-lever (monomorphic devirtualization) needs CHA and is deferred.
+**Status (2026-07-14): ARC COMPLETE + CLOSED, PAST TARGET.** Steps 0–5 done.
+Cumulative ~47 → Step-2 ~43.6 → lever A ~34.4 → lever B **~32.6 ms ≈ 30–31 fps,
+past the 30 fps / 33.3 ms target, ~1.4× faster than Ruffle**. Step 4 (coercion
+elision) shipped sound + byte-identical but ~1 ms below noise. **Step 5 GATE
+(call devirtualization) — NOT BUILT: gate closed the arc.** The last lever's
+prize ceiling is < 1 ms (the callproperty IC already caches every static-multiname
+call site; total CALL-side `vtable_find_mn` was only 1.79% of frame pre-IC, mostly
+cached away already), ≪ the ±2–3 ms Seedling noise floor. Building it would force
+a below-noise change — the Step-4 lesson applied. See the Step-5 section below.
+**The compile-time type-specialization arc is closed at/past target.**
 
 **Status:** Step 0/1 DONE (gate GREEN). **Step 2 DONE 2026-07-14 — this.field
 slot specialization shipped: ~3-4 ms / 7-9% real-GPU win, the first gain past the
@@ -177,6 +181,81 @@ class targets, a subtype of) the target as `elide`. The emitter drops it.
   `coerceIsNoop`/`memberReadType`/`isSubtypeOrEqual` on `AbcTypeModel`, type
   tracking in `analyzeSlotSpec` → `SlotSpecResult{slot,elide}`, emitter hooks);
   runtime `avm2_coerce_verify_*` (`avm2_ops.h`/`.c`).
+
+## Step 5 GATE (2026-07-14) — call devirtualization: gate CLOSED the arc (prize ceiling < 1 ms, below noise, NOT built)
+
+The last lever from the Step-1 scout was call devirtualization — of the 4765 call
+sites, `call_method_virtual` 1000 (sealed-class instance method, not `final` →
+`vtable_find_mn` dispatch) and `recv_classobj` 809 (static call on a getlex-known
+Class). Two sub-levers were planned: (1) CHA-free static-method bind (the call
+analog of Step-3 lever B), (2) CHA-based monomorphic instance devirt (bake the
+method ref where no subclass overrides). **Following the Step-4 lesson, the gate
+ran FIRST — and it closed the arc without building.** No code was written; this is
+a pure read-only analysis of the existing scout CSV + the CDP profile + the
+emitter/runtime source.
+
+**The gate is nuanced — the naïve coverage read is GREEN, but the prize-beyond-IC
+is below noise.** Unlike Step 4 (where the hot leaf m676 had *zero* addressable
+ops), the hot call path *does* contain addressable ABC calls. But three structural
+facts drop the achievable prize under the noise floor:
+
+1. **The hot LEAF (m676 `Image.render`, 11% inclusive) has only native calls** —
+   `rotate` / `draw` / `copyPixels` on `flash.geom` Matrix / BitmapData
+   (`recv_unknown`, no ABC vtable → not devirtualizable). Confirmed, as predicted.
+2. **The hot DRIVERS above it are addressable** — weighting each hot method's call
+   sites by its inclusive frame time (top-30 drivers), 43.8% of call sites are
+   addressable (`call_method_virtual` + `recv_classobj`), 42.0% native, 14.2%
+   scope. m7 (`Engine.update`/`render`), m501 (16 `render`/`draw*` virtual +
+   `rect` static), m225/m94 (`render`), m978 (`worldFrame` static), m847
+   (`updateBuffer`), m992 (44 `worldFrame`/`setTarget`/`resetTarget` static + 9
+   virtual). So the naïve coverage gate passes.
+3. **BUT every static-multiname `CallProperty`/`CallPropVoid` already emits
+   `avm2_op_callproperty_ic`** (abc_emit.cpp:514) — all 1000 virtual + 809 classobj
+   sites are *already* per-site IC-cached today. The devirt win is therefore only
+   the increment *beyond* the existing IC hit, NOT the full `vtable_find_mn`.
+
+**Sizing the increment (the airtight close):**
+- **CDP attribution** (`seedling_profile_..._after_domainhash.json`, pre-call-IC):
+  `vtable_find_mn` = 6.52% of frame, of which **CALL-side = 1.79%** (GET 4.23%, SET
+  0.47%). The GET share is already killed by the Step-2/3 slot levers (slot reads
+  skip the vtable entirely). The **entire** call-dispatch surface devirt could
+  target was ~1.79% of a 47 ms frame ≈ **0.84 ms**.
+- The callproperty IC (shipped after this profile, per
+  [[seedling-perf-hotpath-is-property-lookup]]: `vtable_find_mn` 5.1→4.0%) **already
+  removed most of that** on IC hits. What remains for devirt is the miss residual +
+  the IC-hit glue (vtable fetch + identity/count guard + entry indirection); the
+  actual invoke (`avm2_call_method_ref`, 1.18%) is irreducible — a devirt'd call
+  still calls the method.
+- **Static / classobj calls (sub-lever 1) hit a SINGLETON class-object vtable → the
+  IC never misses → prize ≈ 0.** The whole m992 static cluster is already free on
+  IC hits. Sub-lever 1, despite being self-contained and clean, is structurally
+  below-noise.
+- **Monomorphic virtual calls → IC hits → same tiny residual.** The only category
+  with a real increment is *polymorphic-effective-final* virtual sites (IC thrashes
+  on vtable identity, yet all receivers dispatch to one non-overridden method →
+  CHA could bake the single method ref, skipping the vtable). That's a *fraction*
+  of the < 0.84 ms residual.
+
+**Prize ceiling < 1 ms ≪ ±2–3 ms Seedling frame noise → below-noise, NOT built.**
+This is the same verdict as Step 4 (coercion elision), for the same structural
+reason on the call axis: **the existing inline cache already captures the
+steady-state dispatch cost; what a compile-time bake removes on top is real but
+sub-noise.** The arc's north-star target (30 fps / 33.3 ms) was met at Step 3
+(~32.6 ms); this lever was explicitly optional upside. Forcing it would ship a
+below-noise change against the Step-4 lesson.
+
+**If ever revisited** (only if a future Seedling variant shows hot polymorphic
+call sites in a fresh profile): the decisive missing datum is a *runtime* IC
+hit/miss rate per call site (static analysis can't see polymorphism). Instrument
+`avm2_op_callproperty_ic` to count hits vs misses per site, run the GPU-free
+avm2 Seedling frame path, and look for hot sites with high miss rates whose method
+is effective-final (`AbcTypeModel::subclassRedeclares(cls,name)==false`). Only
+those beat the IC measurably. Absent that evidence, the lever stays closed. Reuse
+plan: extend `analyzeSlotSpec`→`SlotSpecResult` with a per-CallProperty devirt
+decision, add a `-DAVM2_CALL_VERIFY` guard + `SWF_NO_CALL_DEVIRT` A/B toggle
+(mirroring `-DAVM2_COERCE_VERIFY`/`SWF_NO_COERCE_ELIDE`). Landmines: interface
+calls (no single target), `callsuper`, getter/setter-as-call, and verifying any
+baked disp_id/method ref equals the runtime dispatch exactly.
 
 ## Step 3 plan (as executed)
 
