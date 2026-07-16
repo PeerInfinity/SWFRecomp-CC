@@ -1733,11 +1733,18 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	if ((!identity_2x2 && !can_affine) || !extra_matrix_ok || blend_alpha_or_erase)
 		return avm2_undefined();  // needs the offscreen GPU render path
 
-	// colorTransform (arg 2): optional. Default = identity.
+	// colorTransform (arg 2): optional. Default = identity. A NULL argument
+	// (AS3 `draw(bmp, matrix, null, ...)` — FlashPunk Image.render passes null
+	// here for every untinted, transformed blit) means "no colorTransform", NOT
+	// an all-zero ColorTransform: `arg_present` is true for null (null is not
+	// undefined), but reading redMultiplier/... off null coerces to 0, which
+	// would build an all-channels-*0 transform that annihilates the source
+	// (Seedling's left/up-facing player rendered invisible). Only a real
+	// ColorTransform object counts.
 	int has_cxform = 0;
 	int16_t rm = 256, gm = 256, bm = 256, am = 256;
 	int16_t ro = 0, go = 0, bo = 0, ao = 0;
-	if (arg_present(act, 2))
+	if (arg_present(act, 2) && act->args[2].kind == AVM2_VALUE_OBJECT)
 	{
 		Avm2Value ctv = act->args[2];
 		rm = fixed8_from_f64(read_prop_num(ctx, ctv, "redMultiplier"));
