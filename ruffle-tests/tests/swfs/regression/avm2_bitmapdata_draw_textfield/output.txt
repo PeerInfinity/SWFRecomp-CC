@@ -1,0 +1,5 @@
+drawn: true
+solid red: true
+shifted: true
+cxform green: true
+done

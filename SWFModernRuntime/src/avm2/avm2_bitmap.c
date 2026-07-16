@@ -1729,6 +1729,180 @@ static Avm2Value bd_color_transform(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
+// draw(TextField) — CPU glyph rasterization (RWK-2)
+// ---------------------------------------------------------------------------
+
+// avm2_text.c: layout-engine glyph collection (placements in field-local
+// twips, plus the local mask rect).
+uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
+                                      Avm2GlyphPlacement** out,
+                                      int32_t out_clip[4]);
+
+// Rasterize a TextField source into dst: every glyph outline (flattened
+// contours in font units, recompile-time data) is transformed font units ->
+// field-local twips -> dest pixels through the draw matrix, then filled by
+// a non-zero-winding scanline pass with pixel-center coverage. The glyph
+// color comes from the span format (cxform applied per glyph — it composes
+// with the text color exactly like Ruffle's text_transform). The field's
+// render mask (bounds shrunk by the gutter in x) is enforced per pixel by
+// inverse-mapping the pixel center back to field-local space, which keeps
+// the test exact under any affine draw matrix. Border/background/underline
+// and device-font text (no outlines) are not rendered — same honest-no-op
+// policy as the rest of the Stage-9 CPU scope.
+static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                              Avm2Object* tf_obj,
+                              double ma, double mb, double mc, double md,
+                              double mtx, double mty, int has_cxform,
+                              int16_t rm, int16_t gm, int16_t bmul, int16_t am,
+                              int16_t ro, int16_t go, int16_t bo, int16_t ao,
+                              int blend_mode)
+{
+	double det = ma * md - mb * mc;
+	if (det == 0.0 || !isfinite(det) || !isfinite(mtx) || !isfinite(mty))
+		return;
+	Avm2GlyphPlacement* gl = NULL;
+	int32_t clip[4];
+	uint32_t n = avm2_edittext_collect_glyphs(ctx, tf_obj, &gl, clip);
+	if (n == 0) return;
+	// dest px -> field-local px (draw-matrix inverse) for the mask test.
+	double ia = md / det, ib = -mb / det, ic = -mc / det, id = ma / det;
+	int opaque = !dst->transparency;
+
+	// Per-glyph scratch: transformed outline points + scanline crossings.
+	uint32_t cap = 0;
+	double* xs = NULL;
+	double* ys = NULL;
+	double* cx = NULL;
+	int* cdir = NULL;
+
+	for (uint32_t g = 0; g < n; g++)
+	{
+		const Avm2FontData* fd = gl[g].font;
+		if (fd->glyph_pts == NULL) continue;
+		uint32_t p0 = fd->glyph_pt_start[gl[g].glyph];
+		uint32_t p1 = fd->glyph_pt_start[gl[g].glyph + 1];
+		uint32_t c0 = fd->glyph_contour_start[gl[g].glyph];
+		uint32_t c1 = fd->glyph_contour_start[gl[g].glyph + 1];
+		uint32_t np = p1 - p0;
+		if (np < 3 || c1 <= c0) continue;
+
+		uint32_t color = 0xFF000000u | gl[g].color;
+		if (has_cxform)
+		{
+			uint8_t r = ctx_channel(rm, ro, (uint8_t) CR(color));
+			uint8_t gc = ctx_channel(gm, go, (uint8_t) CG(color));
+			uint8_t b = ctx_channel(bmul, bo, (uint8_t) CB(color));
+			uint8_t a = ctx_channel(am, ao, (uint8_t) CA(color));
+			color = CMK(r, gc, b, a);
+		}
+		if (CA(color) == 0 && blend_mode == BM_NORMAL) continue;
+		uint32_t src_pm = premul(color, 1);
+
+		if (np > cap)
+		{
+			uint32_t ncap = np < 256 ? 256 : np;
+			xs = avm2_alloc(ctx, ncap * sizeof(double));
+			ys = avm2_alloc(ctx, ncap * sizeof(double));
+			cx = avm2_alloc(ctx, ncap * sizeof(double));
+			cdir = avm2_alloc(ctx, ncap * sizeof(int));
+			cap = ncap;
+		}
+
+		double s = (double) gl[g].scale;
+		double bx = (double) gl[g].x_twips / 20.0;
+		double by = (double) gl[g].y_twips / 20.0;
+		double minx = 1e30, miny = 1e30, maxx = -1e30, maxy = -1e30;
+		for (uint32_t i = 0; i < np; i++)
+		{
+			double lx = bx + s * (double) fd->glyph_pts[2 * (p0 + i)] / 20.0;
+			double ly = by + s * (double) fd->glyph_pts[2 * (p0 + i) + 1] / 20.0;
+			double dxp = ma * lx + mc * ly + mtx;
+			double dyp = mb * lx + md * ly + mty;
+			xs[i] = dxp;
+			ys[i] = dyp;
+			if (dxp < minx) minx = dxp;
+			if (dxp > maxx) maxx = dxp;
+			if (dyp < miny) miny = dyp;
+			if (dyp > maxy) maxy = dyp;
+		}
+		int py0 = (int) floor(miny), py1 = (int) ceil(maxy);
+		int px0 = (int) floor(minx), px1 = (int) ceil(maxx);
+		if (py0 < 0) py0 = 0;
+		if (py1 > (int) dst->height) py1 = (int) dst->height;
+		if (px0 < 0) px0 = 0;
+		if (px1 > (int) dst->width) px1 = (int) dst->width;
+
+		for (int y = py0; y < py1; y++)
+		{
+			double sy = y + 0.5;
+			uint32_t ncross = 0;
+			for (uint32_t k = c0; k < c1; k++)
+			{
+				uint32_t cs = (k == c0 ? p0 : fd->glyph_contour_ends[k - 1]) - p0;
+				uint32_t ce = fd->glyph_contour_ends[k] - p0;
+				for (uint32_t j = cs; j < ce; j++)
+				{
+					uint32_t jn = j + 1 < ce ? j + 1 : cs;
+					double y0 = ys[j], y1 = ys[jn];
+					int dir;
+					if (y0 <= sy && sy < y1) dir = 1;
+					else if (y1 <= sy && sy < y0) dir = -1;
+					else continue;
+					double x = xs[j] + (sy - y0) * (xs[jn] - xs[j]) / (y1 - y0);
+					// insertion sort by x
+					uint32_t at = ncross;
+					while (at > 0 && cx[at - 1] > x)
+					{
+						cx[at] = cx[at - 1];
+						cdir[at] = cdir[at - 1];
+						at--;
+					}
+					cx[at] = x;
+					cdir[at] = dir;
+					ncross++;
+				}
+			}
+			int winding = 0;
+			double open_x = 0.0;
+			for (uint32_t k = 0; k < ncross; k++)
+			{
+				int prev = winding;
+				winding += cdir[k];
+				if (prev == 0 && winding != 0)
+				{
+					open_x = cx[k];
+				}
+				else if (prev != 0 && winding == 0)
+				{
+					int fx0 = (int) ceil(open_x - 0.5);
+					int fx1 = (int) ceil(cx[k] - 0.5);
+					if (fx0 < px0) fx0 = px0;
+					if (fx1 > px1) fx1 = px1;
+					for (int px = fx0; px < fx1; px++)
+					{
+						// field-local mask test (exact under any affine)
+						double ex = (px + 0.5) - mtx, ey = sy - mty;
+						double ltx = (ia * ex + ic * ey) * 20.0;
+						double lty = (ib * ex + id * ey) * 20.0;
+						if (ltx < (double) clip[0]
+						    || ltx >= (double) (clip[0] + clip[2])
+						    || lty < (double) clip[1]
+						    || lty >= (double) (clip[1] + clip[3]))
+							continue;
+						uint32_t dc = bd_get_raw(dst, (uint32_t) px, (uint32_t) y);
+						uint32_t outc = blend_mode != BM_NORMAL
+							? blend_mode_apply(blend_mode, dc, src_pm)
+							: blend_over(dc, src_pm);
+						if (opaque) outc = with_alpha(outc, 0xFF);
+						bd_set_raw(dst, (uint32_t) px, (uint32_t) y, outc);
+					}
+				}
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // draw — the CPU fast path from Ruffle core/src/bitmap/operations.rs::draw.
 //
 // Full draw() renders any DisplayObject through the offscreen GPU pipeline; that
@@ -1754,6 +1928,7 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	// A Bitmap display object's own matrix folds into the draw translation.
 	double extra_tx = 0.0, extra_ty = 0.0;
 	int extra_matrix_ok = 1;
+	Avm2Object* text_src = NULL;  // TextField source -> CPU glyph raster
 	if (src == NULL)
 	{
 		Avm2Object* so = (src_val.kind == AVM2_VALUE_OBJECT) ? src_val.u.obj : NULL;
@@ -1767,8 +1942,14 @@ static Avm2Value bd_draw(Avm2Activation* act)
 			extra_tx = (double) sde->mtx_tx / 20.0;
 			extra_ty = (double) sde->mtx_ty / 20.0;
 		}
+		else if (sde != NULL && sde->edittext != NULL)
+		{
+			text_src = so;
+		}
 	}
-	if (src == NULL || src->disposed || src->pixels == NULL) return avm2_undefined();
+	if (text_src == NULL
+	    && (src == NULL || src->disposed || src->pixels == NULL))
+		return avm2_undefined();
 
 	// blendMode (arg 3): default "normal". alpha/erase are handled as the Flash
 	// no-op-for-BitmapData quirk; multiply/hardlight/add route the raster through
@@ -1807,10 +1988,11 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	}
 	int identity_2x2 = (ma == 1.0 && mb == 0.0 && mc == 0.0 && md == 1.0);
 	// A BitmapData source under an arbitrary affine matrix is CPU-rasterized
-	// below (inverse-map). A Bitmap (DisplayObject) source keeps the Stage-9
+	// below (inverse-map), and a TextField source rasterizes under any
+	// affine matrix. A Bitmap (DisplayObject) source keeps the Stage-9
 	// scope: only pure translation (identity 2x2) blits on the CPU; a
 	// rotated/scaled Bitmap source still needs the offscreen GPU path.
-	int can_affine = source_is_bitmapdata;
+	int can_affine = source_is_bitmapdata || text_src != NULL;
 	if ((!identity_2x2 && !can_affine) || !extra_matrix_ok || blend_alpha_or_erase)
 		return avm2_undefined();  // needs the offscreen GPU render path
 
@@ -1838,6 +2020,16 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		ao = (int16_t) read_prop_num(ctx, ctv, "alphaOffset");
 		has_cxform = !(rm == 256 && gm == 256 && bm == 256 && am == 256
 		               && ro == 0 && go == 0 && bo == 0 && ao == 0);
+	}
+
+	// TextField source: CPU glyph rasterization (clipRect, like the bitmap
+	// paths below, is not supported yet).
+	if (text_src != NULL)
+	{
+		bd_draw_textfield(ctx, dst, text_src, ma, mb, mc, md, mtx, mty,
+		                  has_cxform, rm, gm, bm, am, ro, go, bo, ao,
+		                  blend_mode);
+		return avm2_undefined();
 	}
 
 	// copy_on_cpu: blend only when the source is transparent. blend_and_transform

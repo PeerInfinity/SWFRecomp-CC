@@ -1,6 +1,38 @@
 # AVM2 next game — Robot Wants Kitty (Flixel) bring-up plan
 
-Status: **RWK-1 DONE (2026-07-16)** — headless bring-up complete, far faster
+Status: **RWK-2 DONE (2026-07-16)** — both levers landed. **Lever 1
+(`BitmapData.draw(TextField)` CPU glyph rasterization)**: the recompiler now
+parses DefineFont2/3 glyph shapes into flattened contour outlines
+(`abc_timeline.cpp` → `Avm2FontData.glyph_pts/...`), and `bd_draw` rasterizes
+TextField sources through the Stage-6 layout engine (glyph collection in
+`avm2_text.c::avm2_edittext_collect_glyphs`, non-zero-winding scanline fill +
+draw-matrix/cxform/blend composition in `avm2_bitmap.c::bd_draw_textfield`).
+Graded by new regression test **`avm2_bitmapdata_draw_textfield`** (mxmlc +
+DejaVu embed; drawn/solid-color/matrix-shift/cxform assertions; PASS both
+modes; Ruffle-verified expectations). RWK menu MAD collapsed **5.53 → 0.765**
+(3.11% → 0.69% px) vs the oracle; the only residual is the kitty-UFO
+oscillation phase (documented pacing artifact) — every text row is
+pixel-exact. Seedling smoke clean (recompile + 300 frames, zero errors,
+world unchanged). **Lever 2 (headless gameplay)**: menu click → PlayState
+boots (this exposed and fixed a REAL blocker: FlxTilemap.arrayToCSV's
+quadratic string concat OOM'd the 1 GB native heap at PlayState boot —
+strings are not GC'd; native 64-bit arena now 4 GB, `heap.c`; collectable
+strings stay the long-term fix). Keyboard input drives the player; tilemap,
+sprites, HUD clock, SetHelp FlxText all render in-game. **State-aligned
+gameplay frame vs a Ruffle oracle running the SAME scripted input: MAD 1.68,
+1.47% px — every diff is an entity patrol/animation phase** (wall-clock
+pacing artifact); tiles + player + text pixel-exact. Byte-identical-to-Ruffle
+Flixel physics verified by standalone probes (motion, FlxU.collide, tilemap
+preCollide). New reusable tooling: **input-scripted oracle** (local
+`~/CC/ruffle` exporter patch honoring `RUFFLE_INPUT_FILE`, Ruffle-test
+input.json format — keys/mouse now replayable under the exporter; gotcha:
+Flixel resets keys on state switch, press only after PlayState starts) +
+scratch TAS driver/tracker (`rwk_drive.py`/`rwk_track.py`, recipes in the
+`avm2-rwk2-text-gameplay` memory). Kitty-collection TAS handed to RWK-3:
+descent legs to the JUMP powerup proven individually; full chain needs
+alien-phase timing (aliens patrol at 20 px/s, deterministic per run).
+
+Previous: **RWK-1 DONE (2026-07-16)** — headless bring-up complete, far faster
 than budgeted: the injected SWF recompiles (2 abc tags, 812 bodies, 0 verify
 fails) + links + runs in BOTH build modes; the boot chain needed exactly ONE
 runtime fix (`flash.net.SharedObjectFlushStatus` constants, avm2_amf.c — FlxSave

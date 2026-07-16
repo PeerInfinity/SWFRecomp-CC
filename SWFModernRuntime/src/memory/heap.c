@@ -33,8 +33,17 @@
 
 #ifdef __wasi__
 #define DEFAULT_FULL_HEAP_SIZE (64ULL * 1024 * 1024)  // 64 MB for WASI (no virtual memory)
+#elif defined(__EMSCRIPTEN__) || !defined(__LP64__)
+#define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB (wasm32/32-bit address space)
 #else
-#define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB virtual space
+// 64-bit native: 4 GB virtual space, physical RAM still lazy. AVM2 strings
+// are not garbage-collected, and a single game tick can legitimately create
+// hundreds of MB of transient string garbage (Flixel FlxTilemap.arrayToCSV
+// builds a 188x84-tile CSV by repeated concatenation — Robot Wants Kitty's
+// PlayState boot OOM'd the old 1 GB arena before its first frame).
+// Collectable strings are the real fix; until then the native arena is
+// sized so real games boot.
+#define DEFAULT_FULL_HEAP_SIZE (4ULL * 1024 * 1024 * 1024)  // 4 GB virtual space
 #endif
 
 #ifdef HEAP_PASSTHROUGH

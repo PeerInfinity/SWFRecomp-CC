@@ -4,6 +4,7 @@
 
 #include <abc/abc_timeline.hpp>
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -459,7 +460,8 @@ struct EditTextDef
 	float cs_thickness = 0, cs_sharpness = 0;
 };
 
-// DefineFont2/3 measurement data (shapes not parsed).
+// DefineFont2/3 measurement data + glyph outlines (RWK-2: the outlines feed
+// the runtime CPU rasterizer behind BitmapData.draw(TextField)).
 struct FontDef
 {
 	uint16_t font_id = 0;
@@ -469,7 +471,118 @@ struct FontDef
 	int32_t ascent = 0, descent = 0, leading = 0;
 	std::vector<uint16_t> codes;
 	std::vector<int16_t> advances;
+	// Flattened contour polylines in font units (quadratic curves subdivided
+	// at parse time). Contours of glyph g are contour indices
+	// [glyph_contour_start[g], glyph_contour_start[g+1]); contour k's points
+	// are pair indices [k == glyph_contour_start[g] ? glyph_pt_start[g]
+	// : contour_ends[k-1], contour_ends[k]) into glyph_pts.
+	std::vector<int32_t> glyph_pts;             // x,y pairs
+	std::vector<uint32_t> glyph_pt_start;       // nglyphs+1
+	std::vector<uint32_t> glyph_contour_ends;   // absolute pair indices
+	std::vector<uint32_t> glyph_contour_start;  // nglyphs+1
 };
+
+// LSB-first SWF bit reader for glyph SHAPE records.
+struct GlyphBitReader
+{
+	const uint8_t* p;
+	const uint8_t* end;
+	uint32_t bit = 0;  // bits consumed in *p
+
+	uint32_t ub(uint32_t n)
+	{
+		uint32_t v = 0;
+		for (uint32_t i = 0; i < n; i++)
+		{
+			if (p >= end) return v << (n - i);
+			v = (v << 1) | ((*p >> (7 - bit)) & 1);
+			if (++bit == 8) { bit = 0; p++; }
+		}
+		return v;
+	}
+	int32_t sb(uint32_t n)
+	{
+		uint32_t v = ub(n);
+		if (n > 0 && (v & (1u << (n - 1)))) v |= ~((1u << n) - 1);
+		return (int32_t) v;
+	}
+};
+
+// Parse one glyph SHAPE (no styles): flatten contours into fd. Quadratic
+// curves are subdivided into 8 segments — glyphs render at text sizes, where
+// that is well under half a pixel of error.
+static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
+{
+	GlyphBitReader r{p, end};
+	uint32_t fill_bits = r.ub(4);
+	uint32_t line_bits = r.ub(4);
+	int32_t px = 0, py = 0;
+	std::vector<int32_t> cur;  // x,y pairs of the open contour
+
+	auto flush = [&]() {
+		if (cur.size() >= 6)  // a fillable contour needs >= 3 points
+		{
+			fd.glyph_pts.insert(fd.glyph_pts.end(), cur.begin(), cur.end());
+			fd.glyph_contour_ends.push_back((uint32_t) (fd.glyph_pts.size() / 2));
+		}
+		cur.clear();
+	};
+
+	for (;;)
+	{
+		if (r.p >= r.end) break;
+		if (r.ub(1) == 0)  // non-edge record
+		{
+			uint32_t flags = r.ub(5);
+			if (flags == 0) break;  // EndShapeRecord
+			if (flags & 0x10) break;  // StateNewStyles: invalid in a glyph
+			if (flags & 0x01)  // MoveTo (absolute)
+			{
+				uint32_t nb = r.ub(5);
+				px = r.sb(nb);
+				py = r.sb(nb);
+				flush();
+			}
+			if (flags & 0x02) r.ub(fill_bits);  // FillStyle0
+			if (flags & 0x04) r.ub(fill_bits);  // FillStyle1
+			if (flags & 0x08) r.ub(line_bits);  // LineStyle
+		}
+		else if (r.ub(1))  // straight edge
+		{
+			uint32_t nb = r.ub(4) + 2;
+			int32_t dx = 0, dy = 0;
+			if (r.ub(1)) { dx = r.sb(nb); dy = r.sb(nb); }
+			else if (r.ub(1)) dy = r.sb(nb);
+			else dx = r.sb(nb);
+			if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
+			px += dx;
+			py += dy;
+			cur.push_back(px);
+			cur.push_back(py);
+		}
+		else  // curved edge (quadratic)
+		{
+			uint32_t nb = r.ub(4) + 2;
+			int32_t cdx = r.sb(nb), cdy = r.sb(nb);
+			int32_t adx = r.sb(nb), ady = r.sb(nb);
+			double x0 = px, y0 = py;
+			double cx = px + cdx, cy = py + cdy;
+			double ax = cx + adx, ay = cy + ady;
+			if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
+			for (int k = 1; k <= 8; k++)
+			{
+				double t = k / 8.0, u = 1.0 - t;
+				double qx = u * u * x0 + 2.0 * u * t * cx + t * t * ax;
+				double qy = u * u * y0 + 2.0 * u * t * cy + t * t * ay;
+				cur.push_back((int32_t) lround(qx));
+				cur.push_back((int32_t) lround(qy));
+			}
+			px = (int32_t) lround(ax);
+			py = (int32_t) lround(ay);
+		}
+	}
+	flush();
+}
 
 struct ButtonRec
 {
@@ -879,20 +992,35 @@ struct Scanner
 				// omits the remaining tables (Ruffle read.rs).
 				const uint8_t* offtab = body.p;
 				uint32_t code_table_off = 0;
+				std::vector<uint32_t> glyph_offsets;
 				if (nglyphs > 0)
 				{
-					if (wide_offsets)
+					glyph_offsets.reserve(nglyphs);
+					for (uint16_t i = 0; i < nglyphs; i++)
 					{
-						body.skip(4u * nglyphs);
-						code_table_off = body.u32();
+						glyph_offsets.push_back(wide_offsets ? body.u32()
+						                                     : body.u16());
 					}
-					else
-					{
-						body.skip(2u * nglyphs);
-						code_table_off = body.u16();
-					}
+					code_table_off = wide_offsets ? body.u32() : body.u16();
 				}
-				// Jump over the glyph shapes to the code table.
+				// Parse each glyph SHAPE into flattened contour outlines
+				// (the CPU rasterizer behind BitmapData.draw(TextField)).
+				for (uint16_t i = 0; i < nglyphs; i++)
+				{
+					fd.glyph_pt_start.push_back(
+						(uint32_t) (fd.glyph_pts.size() / 2));
+					fd.glyph_contour_start.push_back(
+						(uint32_t) (fd.glyph_contour_ends.size()));
+					uint32_t g0 = glyph_offsets[i];
+					uint32_t g1 = i + 1 < nglyphs ? glyph_offsets[i + 1]
+					                              : code_table_off;
+					if (g1 <= g0 || offtab + g1 > body.end) continue;
+					parseGlyphShape(offtab + g0, offtab + g1, fd);
+				}
+				fd.glyph_pt_start.push_back((uint32_t) (fd.glyph_pts.size() / 2));
+				fd.glyph_contour_start.push_back(
+					(uint32_t) (fd.glyph_contour_ends.size()));
+				// Jump to the code table.
 				if (nglyphs > 0 && offtab + code_table_off <= body.end)
 				{
 					body.p = offtab + code_table_off;
@@ -1315,6 +1443,21 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			for (auto a : fd.advances) out << a << ", ";
 			out << "};\n";
 		}
+		if (!fd.glyph_pts.empty())
+		{
+			out << "static const int32_t font_" << i << "_pts[] = { ";
+			for (auto v : fd.glyph_pts) out << v << ", ";
+			out << "};\n";
+			out << "static const uint32_t font_" << i << "_pt_start[] = { ";
+			for (auto v : fd.glyph_pt_start) out << v << ", ";
+			out << "};\n";
+			out << "static const uint32_t font_" << i << "_contour_ends[] = { ";
+			for (auto v : fd.glyph_contour_ends) out << v << ", ";
+			out << "};\n";
+			out << "static const uint32_t font_" << i << "_contour_start[] = { ";
+			for (auto v : fd.glyph_contour_start) out << v << ", ";
+			out << "};\n";
+		}
 	}
 	if (!sc.fonts.empty())
 	{
@@ -1332,8 +1475,17 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			    << ", "
 			    << (fd.advances.empty()
 			        ? std::string("NULL")
-			        : ("font_" + std::to_string(i) + "_advances"))
-			    << " },\n";
+			        : ("font_" + std::to_string(i) + "_advances"));
+			if (fd.glyph_pts.empty())
+			{
+				out << ", NULL, NULL, NULL, NULL },\n";
+			}
+			else
+			{
+				out << ", font_" << i << "_pts, font_" << i << "_pt_start"
+				    << ", font_" << i << "_contour_ends"
+				    << ", font_" << i << "_contour_start },\n";
+			}
 		}
 		out << "};\n";
 	}

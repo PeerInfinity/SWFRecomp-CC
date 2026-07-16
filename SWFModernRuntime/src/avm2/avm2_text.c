@@ -3394,6 +3394,134 @@ static LLayout* et_layout(Avm2Context* ctx, Avm2EditTextExt* et)
 }
 
 // ===========================================================================
+// Glyph collection for BitmapData.draw(TextField) (RWK-2)
+// ===========================================================================
+
+// Glyph index for a codepoint (glyph_advance_units gives only the advance).
+static int glyph_index_of(const Avm2FontData* fd, uint32_t cp, uint32_t* out)
+{
+	for (uint32_t i = 0; i < fd->glyph_count; i++)
+	{
+		if (fd->codes[i] == cp)
+		{
+			*out = i;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Span format at a text unit position (spans store cumulative lengths).
+static const Avm2TextFormatFields* span_at_pos(const Avm2EditTextExt* et,
+                                               uint32_t pos)
+{
+	uint32_t acc = 0;
+	for (uint32_t i = 0; i < et->span_count; i++)
+	{
+		acc += et->spans[i].length;
+		if (pos < acc) return &et->spans[i].fmt;
+	}
+	return et->span_count > 0 ? &et->spans[et->span_count - 1].fmt
+	                          : &et->default_format;
+}
+
+// Collect the rendered glyphs of a TextField in field-local twips, matching
+// Ruffle EditText::render_text: layout_to_local (bounds origin + gutter -
+// scroll offsets) composed with render_layout_box (box origin) and
+// Font::evaluate (per-glyph pen x, baseline ty = ascent). out_clip receives
+// the {x, y, w, h} local-twips mask Ruffle draws (bounds shrunk by the
+// gutter in x only). Returns the glyph count; *out is avm2_alloc'ed.
+// Callers must check each placement's font->glyph_pts for outline
+// availability (the device fallback has none).
+uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
+                                      Avm2GlyphPlacement** out,
+                                      int32_t out_clip[4])
+{
+	Avm2EditTextExt* et = edittext_of(ctx, tf_obj);
+	if (et == NULL || et->text == NULL) return 0;
+	LLayout* l = et_layout(ctx, et);
+	et_apply_lazy_bounds(et);
+
+	int32_t vscroll = 0;
+	if (et->scroll > 1 && (uint32_t) et->scroll <= l->line_count)
+	{
+		vscroll = l->lines[et->scroll - 1].y;
+	}
+	int32_t off_x = et->bounds_x + GUTTER - twips_from_px(et->hscroll);
+	int32_t off_y = et->bounds_y + GUTTER - vscroll;
+	out_clip[0] = et->bounds_x + GUTTER;
+	out_clip[1] = et->bounds_y;
+	out_clip[2] = et->bounds_w - 2 * GUTTER;
+	out_clip[3] = et->bounds_h;
+
+	uint32_t text_len;
+	uint16_t* units = et_units(ctx, et, &text_len);
+
+	uint32_t cap = 0, n = 0;
+	Avm2GlyphPlacement* gl = NULL;
+	for (uint32_t li = 0; li < l->line_count; li++)
+	{
+		LLine* line = &l->lines[li];
+		for (uint32_t bi = 0; bi < line->box_count; bi++)
+		{
+			LBox* b = &line->boxes[bi];
+			if (b->is_bullet || b->char_count == 0 || b->char_end == NULL)
+				continue;
+			// Ruffle render_layout_box: a box whose top is under the field
+			// bottom is culled.
+			if (b->y + GUTTER - vscroll > et->bounds_h) continue;
+			EvalParams p;
+			p.height = twips_from_px(b->size_px);
+			int32_t ascent = font_ascent(&b->font, p.height);
+			int32_t baseline = off_y + b->y + ascent;
+			const Avm2TextFormatFields* fmt = span_at_pos(et, b->start);
+			uint32_t color = (fmt->color >> 8) & 0xFFFFFF;
+			float scale = (float) p.height / (float) b->font.data->em_square;
+			uint32_t cn = b->char_count;
+			for (uint32_t i = 0; i < cn; )
+			{
+				if (b->start + i >= text_len) break;
+				uint32_t cp = units[b->start + i];
+				uint32_t step = 1;
+				if (cp >= 0xD800 && cp < 0xDC00 && i + 1 < cn
+				    && b->start + i + 1 < text_len
+				    && units[b->start + i + 1] >= 0xDC00
+				    && units[b->start + i + 1] < 0xE000)
+				{
+					cp = 0x10000 + ((cp - 0xD800) << 10)
+					     + (units[b->start + i + 1] - 0xDC00);
+					step = 2;
+				}
+				uint32_t gi;
+				if (glyph_index_of(b->font.data, cp, &gi))
+				{
+					if (n == cap)
+					{
+						uint32_t ncap = cap ? cap * 2 : 64;
+						Avm2GlyphPlacement* ng =
+							avm2_alloc(ctx, ncap * sizeof(Avm2GlyphPlacement));
+						if (n > 0) memcpy(ng, gl, n * sizeof(Avm2GlyphPlacement));
+						gl = ng;
+						cap = ncap;
+					}
+					gl[n].font = b->font.data;
+					gl[n].glyph = gi;
+					gl[n].x_twips = off_x + b->x
+					                + (i > 0 ? b->char_end[i - 1] : 0);
+					gl[n].y_twips = baseline;
+					gl[n].scale = scale;
+					gl[n].color = color;
+					n++;
+				}
+				i += step;
+			}
+		}
+	}
+	*out = gl;
+	return n;
+}
+
+// ===========================================================================
 // TextField natives
 // ===========================================================================
 

@@ -1,8 +1,74 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-16 — RWK-1 (Robot Wants Kitty headless bring-up, Flixel)
-DONE; before it the same day: AVM2 ExternalInterface + the packaged Seedling
-`__swfBridge` page, and audio output. Prior sections are Stage 12 sessions.
+Last updated: 2026-07-16 — RWK-2 (BitmapData.draw(TextField) rasterization +
+RWK gameplay) DONE; same day earlier: RWK-1 bring-up, AVM2 ExternalInterface +
+packaged Seedling `__swfBridge` page, audio output. Prior sections are Stage
+12 sessions.
+
+## State (RWK-2 — FlxText rasterization + gameplay, 2026-07-16)
+
+**`BitmapData.draw(TextField)` now CPU-rasterizes glyphs — the two-game text
+fix (Flixel FlxText + FlashPunk Text both render text this way).**
+- **Recompiler**: DefineFont2/3 glyph SHAPEs are parsed (previously skipped,
+  `abc_timeline.cpp`) and emitted as flattened contour polylines in font
+  units (curves subdivided 8x at recompile time) — four new outline fields on
+  `Avm2FontData` (avm2_abc.h; all NULL for outline-less fonts, e.g. the Noto
+  device fallback, which stays an honest no-op).
+- **Runtime**: `avm2_edittext_collect_glyphs` (avm2_text.c) walks the Stage-6
+  layout (LLayout boxes → per-glyph pen x/baseline/color/scale, Ruffle's
+  layout_to_local + render_layout_box + Font::evaluate composition, box
+  culling + gutter mask incl. scroll offsets); `bd_draw_textfield`
+  (avm2_bitmap.c) fills outlines with a non-zero-winding scanline pass at
+  pixel centers through the full affine draw matrix, composing
+  colorTransform (per-glyph, like Ruffle's text_transform) and blend modes;
+  the field mask is enforced exactly by inverse-mapping pixel centers to
+  field-local twips. clipRect stays unsupported (same as the bitmap paths).
+- **Grade**: new regression test `avm2_bitmapdata_draw_textfield` (mxmlc,
+  [Embed] DejaVu ttf embedAsCFF=false): drawn-pixels / solid-text-color /
+  integer-matrix-shift / cxform-composition assertions, expectations captured
+  from Ruffle; PASS in BOTH modes. bitmapdata_draw* family + font/edittext
+  spot checks: all baseline results hold (alpha_erase mismatch pre-existing,
+  untouched).
+- **RWK menu**: state-aligned MAD **5.53 → 0.765** (3.11% → 0.69% px); the
+  ONLY residual is the kitty-UFO oscillation phase (pacing artifact). Every
+  text row (buttons, credits, splash) is pixel-exact vs the oracle.
+- **Seedling smoke**: recompile + 300 frames, zero errors, world unchanged.
+
+**Gameplay (headless keyboard) works; found + fixed a real PlayState
+blocker.** Menu click → PlayState **OOM'd the 1 GB heap** before its first
+frame: `FlxTilemap.arrayToCSV` builds a 15792-tile CSV by repeated string
+concatenation (~0.8+ GB of transient garbage in ONE tick) and **AVM2 strings
+are not garbage-collected** (GC also only runs between ticks). Fix: native
+64-bit arena default 1 GB → 4 GB (heap.c; wasm/wasi unchanged). Collectable
+strings are the honest long-term fix (flagged for a future session). After
+it: full gameplay loop headless — movement, gravity, alien kills, respawns,
+HUD clock, SetHelp FlxText in-world. **State-aligned gameplay frame vs
+Ruffle running the SAME scripted input: MAD 1.68, 1.47% px — every single
+diff is a moving entity's patrol/animation phase** (jellyfish/aliens/kitty
+bob/logo sparkle/clock digit); tilemap, player, and both help-text lines are
+pixel-identical. Flixel physics verified byte-identical to Ruffle via
+standalone mxmlc probes (vacuum motion, FlxU.collide + fixed floor, tilemap
+preCollide path).
+
+**New tooling (RWK-3 will want these):**
+- **Input-scripted oracle**: local `~/CC/ruffle` exporter patch — set
+  `RUFFLE_INPUT_FILE=<input.json>` (Ruffle-test format, one Wait per frame;
+  events injected after each run_frame). Rebuild: `cargo build --release -p
+  exporter`. GOTCHA: Flixel calls `FlxG.keys.reset()` on every state switch —
+  key events sent during a fade are wiped; press keys only after the target
+  state is live. Menu pacing drifts per export run (wall-clock getTimer) —
+  schedule clicks generously late and state-align afterwards.
+- Scratch TAS driver + tracker (`rwk_drive.py`, `rwk_track.py` — plan
+  compiler → line-format events → `./test_run <events>` with
+  `AVM2_MAX_TICKS`/`AVM2_CPU_DUMP`; camera tracking via FFT phase correlation
+  anchored on the kitty/J-powerup blobs). Recipes in the
+  `avm2-rwk2-text-gameplay` memory.
+- Kitty-collection TAS → RWK-3: spawn exits are RIGHT-fall only (left wall;
+  right step + shelf alien); descent legs to the JUMP powerup at tile (10,82)
+  each proven survivable; three aliens patrol the route at 20 px/s
+  (deterministic phases per run — measure from dumped frames, then time
+  crossings). Win condition is proximity (<30px both axes) on the kitty
+  block top.
 
 ## State (RWK-1 — Robot Wants Kitty headless bring-up, 2026-07-16)
 

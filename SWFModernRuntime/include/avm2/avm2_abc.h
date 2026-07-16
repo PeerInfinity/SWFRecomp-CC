@@ -312,10 +312,10 @@ typedef struct Avm2EditTextData
 	float cs_thickness, cs_sharpness;
 } Avm2EditTextData;
 
-// DefineFont2/3 measurement data (Stage 6): enough for the text layout
-// engine (advances + code table + vertical metrics); glyph shapes are not
-// parsed. Units are the font's EM square (1024 for DefineFont2, 20480 for
-// DefineFont3).
+// DefineFont2/3 data (Stage 6 + RWK-2): layout measurement (advances + code
+// table + vertical metrics) plus flattened glyph outlines for the CPU
+// rasterizer behind BitmapData.draw(TextField). Units are the font's EM
+// square (1024 for DefineFont2, 20480 for DefineFont3).
 typedef struct Avm2FontData
 {
 	uint16_t font_id;
@@ -327,7 +327,32 @@ typedef struct Avm2FontData
 	uint32_t glyph_count;
 	const uint16_t* codes;   // glyph index -> character code
 	const int16_t* advances; // glyph index -> advance, font units (has_layout)
+	// Glyph outlines: contour polylines in font units, curves pre-flattened
+	// at recompile time. All NULL when outlines are unavailable (device
+	// fallback font, older generated tables). Contours of glyph g are
+	// contour indices [glyph_contour_start[g], glyph_contour_start[g+1]);
+	// contour k's points are pair indices
+	// [k == glyph_contour_start[g] ? glyph_pt_start[g] : glyph_contour_ends[k-1],
+	//  glyph_contour_ends[k]) into glyph_pts. Contours are implicitly closed.
+	const int32_t* glyph_pts;             // x,y pairs
+	const uint32_t* glyph_pt_start;       // glyph_count+1 entries
+	const uint32_t* glyph_contour_ends;   // absolute pair indices
+	const uint32_t* glyph_contour_start;  // glyph_count+1 entries
 } Avm2FontData;
+
+// One rendered glyph of a TextField, as collected by
+// avm2_edittext_collect_glyphs (avm2_text.c) for BitmapData.draw: placement
+// is field-local twips (layout_to_local applied), color is the span's
+// 0xRRGGBB, scale converts font units to twips at the span's point size.
+typedef struct Avm2GlyphPlacement
+{
+	const Avm2FontData* font;
+	uint32_t glyph;    // glyph index into the font tables
+	int32_t x_twips;   // pen x (left edge of the glyph cell)
+	int32_t y_twips;   // baseline y
+	float scale;       // twips per font unit
+	uint32_t color;    // straight 0xRRGGBB
+} Avm2GlyphPlacement;
 
 // DefineSceneAndFrameLabelData (root timeline only).
 typedef struct Avm2SceneData
