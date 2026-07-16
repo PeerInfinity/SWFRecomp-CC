@@ -130,7 +130,9 @@ gets sound for free once that lands.
   Ruffle oracle frames via the exporter (free, per `avm2-stage13-browser.md`
   §4). Grade: menu renders in AVM2_CPU_DUMP with sane MAD vs oracle + any
   upstream avm2 trace tests fixed along the way + zero CI regressions.
-- **RWK-2 — render parity + gameplay**: tilemap/sprites/FlxText pixel parity
+- **RWK-2 — render parity + gameplay** ✅ DONE 2026-07-16 (see Status
+  header; kitty-collection TAS itself carried to RWK-3):
+  tilemap/sprites/FlxText pixel parity
   vs oracle; keyboard gameplay headless (jump, shoot, collect kitty on level 1).
   Lever #1 (from RWK-1): `BitmapData.draw(TextField)` rasterization (FlxText —
   every button label/credit line; probe recipe in the RWK-1 memory). Note the
