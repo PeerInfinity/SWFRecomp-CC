@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `88f6f4ad6040`  
-**Date:** 2026-07-15 23:09 UTC  
-**Total duration:** 4h12m16s
+**Commit:** `21e949f528cb`  
+**Date:** 2026-07-16 00:01 UTC  
+**Total duration:** 4h22m23s
 
 ## Results by Suite
 
@@ -27,7 +27,7 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 115,814 | 131,124 | 88.3% |
-| avm2 | 102,541 | 149,914 | 68.4% |
+| avm2 | 102,892 | 149,914 | 68.6% |
 | from_gnash/actionscript.all | 30,356 | 38,791 | 78.3% |
 | from_gnash/misc-ming.all | 4,054 | 5,248 | 77.2% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -36,7 +36,7 @@
 | from_shumway | 882 | 1,276 | 69.1% |
 | from_shumway/avm1 | 489 | 491 | 99.6% |
 | regression | 262 | 262 | 100% |
-| **Total** | **255,143** | **328,012** | **77.8%** |
+| **Total** | **255,494** | **328,012** | **77.9%** |
 
 ## Failure Breakdown
 
@@ -99,6 +99,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | avm2 | json_stringify | 93% |
 | from_gnash/actionscript.all | array-v7 | 92% |
 | from_gnash/actionscript.all | array-v8 | 92% |
+| avm2 | edittext_mouse_selection | 92% |
 | avm2 | stage_loaderinfo_properties | 92% |
 | avm2 | unescape | 89% |
 | avm2 | perspective_projection_basic | 88% |
@@ -122,7 +123,11 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-*No changes since last run.*
+| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
+|-------|-------------:|-------------:|--------------:|----------------:|
+| avm2 | - | - | 351 | - |
+
+*Comparing `88f6f4ad6040` → `21e949f528cb`*
 
 ## Flash-Spec Results
 
@@ -144,9 +149,9 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm2
 
 - **Pass:** 821/1206 (68.1%)
-- **Duration:** 2h07m25s across 30 shards
-- **Lines:** 102,541/149,914 matching (68.4%)
-- **Avg test duration:** 6.3s — slowest: `away3d_advanced_shallow_water_demo` (50.6s)
+- **Duration:** 2h17m32s across 30 shards
+- **Lines:** 102,892/149,914 matching (68.6%)
+- **Avg test duration:** 6.8s — slowest: `away3d_advanced_shallow_water_demo` (70.4s)
 
 ### from_gnash/actionscript.all
 

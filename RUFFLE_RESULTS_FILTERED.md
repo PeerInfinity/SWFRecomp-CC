@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `88f6f4ad6040`  
-**Date:** 2026-07-15 23:09 UTC  
-**Total duration:** 4h12m16s
+**Commit:** `21e949f528cb`  
+**Date:** 2026-07-16 00:01 UTC  
+**Total duration:** 4h22m23s
 
 ## Results by Suite
 
@@ -30,7 +30,7 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 104,052 | 107,691 | 96.6% |
-| avm2 | 94,651 | 125,411 | 75.5% |
+| avm2 | 95,002 | 125,411 | 75.8% |
 | from_gnash/actionscript.all | 29,253 | 31,358 | 93.3% |
 | from_gnash/misc-ming.all | 4,029 | 5,188 | 77.7% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -39,7 +39,7 @@
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
 | regression | 262 | 262 | 100% |
-| **Total** | **234,076** | **271,908** | **86.1%** |
+| **Total** | **234,427** | **271,908** | **86.2%** |
 
 ## Failure Breakdown
 
@@ -93,6 +93,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | avm2 | json_stringify | 93% |
 | from_gnash/actionscript.all | array-v7 | 92% |
 | from_gnash/actionscript.all | array-v8 | 92% |
+| avm2 | edittext_mouse_selection | 92% |
 | avm2 | stage_loaderinfo_properties | 92% |
 | avm2 | unescape | 89% |
 | avm2 | perspective_projection_basic | 88% |
@@ -132,9 +133,9 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 726/979 (74.2%)
 - **Ignored:** 227 tests
-- **Duration:** 2h07m25s across 30 shards
-- **Lines:** 94,651/125,411 matching (75.5%)
-- **Avg test duration:** 5.6s — slowest: `bitmapdata_accuracy` (42.9s)
+- **Duration:** 2h17m32s across 30 shards
+- **Lines:** 95,002/125,411 matching (75.8%)
+- **Avg test duration:** 6.0s — slowest: `bitmapdata_accuracy` (41.6s)
 
 ### from_gnash/actionscript.all
 
