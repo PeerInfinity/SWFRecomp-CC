@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-16T03:15:16.731764+00:00",
-    "old_git_sha": "cd80a6b014ccf49181f72b1dd79cc0a818edf2d8",
-    "new_timestamp": "2026-07-16T08:22:40.436916+00:00",
-    "new_git_sha": "68179b1353b31b32772a3a1e21ffb7df9672d2e3",
+    "old_timestamp": "2026-07-16T08:22:40.436916+00:00",
+    "old_git_sha": "68179b1353b31b32772a3a1e21ffb7df9672d2e3",
+    "new_timestamp": "2026-07-16T09:38:46.123014+00:00",
+    "new_git_sha": "b96c96b48a7b611eac2b2ef821fee981a3399af2",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 42,
     "old_total": 42,
     "old_pass_rate": 100.0,
-    "new_pass": 42,
+    "new_pass": 43,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 42,
-    "new_total": 42,
+    "new_effective_pass": 43,
+    "new_total": 43,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 42,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm2_external_interface_unavailable",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    }
+  ]
 }
