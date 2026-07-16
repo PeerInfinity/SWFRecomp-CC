@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Injected Seedling — NO shim (BridgeGeneric must no-op)</title>
+</head>
+<body>
+<h1>Injected Seedling, no __swfBridge shim</h1>
+<!-- Behavior A of the injected-Seedling verification: the page does NOT load
+     swf_bridge_avm2.js, so window.__swfBridge is absent, the runtime's EI
+     gate stays closed (available == false), and the injected BridgeGeneric's
+     init() returns immediately — the game must play exactly as the plain
+     build (no [BridgeGeneric] logs, no EI activity, no errors). -->
+<canvas id="canvas" width="480" height="480"></canvas>
+<button id="btn-run" disabled>Run SWF</button>
+
+<script>
+  window.__runtimeReady = false;
+  window.Module = {
+    locateFile: function (p) { return p; },
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.log('[err] ' + t); },
+    onRuntimeInitialized: function () { window.__runtimeReady = true; },
+  };
+  (function waitReady(n) {
+    if (window.__runtimeReady) {
+      document.getElementById('btn-run').disabled = false;
+      console.log('[harness] runtime ready (no shim)');
+    } else if (n > 0) {
+      setTimeout(function () { waitReady(n - 1); }, 50);
+    } else {
+      console.log('[harness] ERROR: runtime not ready');
+    }
+  })(600);
+  document.getElementById('btn-run').addEventListener('click', function () {
+    this.disabled = true;
+    console.log('[harness] running SWF');
+    Module.ccall('runSWF', null, [], [], { async: true });
+  });
+</script>
+<script src="seedling_ap.js"></script>
+</body>
+</html>

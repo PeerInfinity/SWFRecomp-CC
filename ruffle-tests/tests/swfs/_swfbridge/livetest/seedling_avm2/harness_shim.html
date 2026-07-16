@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Injected Seedling — with __swfBridge shim (BridgeGeneric live)</title>
+</head>
+<body>
+<h1>Injected Seedling + swf_bridge_avm2.js</h1>
+<!-- Behavior B of the injected-Seedling verification: the page loads the
+     production AVM2 shim (installs window.__swfBridge -> EI available), so
+     the injected BridgeGeneric comes alive. A mock host (the
+     flashBridgeAdapter role) then drives the full contract against the REAL
+     game: wireCheck / configure (a minimal classes+state_properties config —
+     the canonical Seedling mapping lives in Archipelago-CC, read-only) /
+     readState inbound; stateChanged / getItemQueue outbound; and one
+     property-write queue item (hasSword=true) applied to Main. -->
+<canvas id="canvas" width="480" height="480"></canvas>
+<button id="btn-run" disabled>Run SWF</button>
+
+<!-- 1) Production AVM2 bridge shim — must precede the WASM glue. -->
+<script src="swf_bridge_avm2.js"></script>
+
+<!-- 2) Mock host. -->
+<script>
+  window.__hostResults = { wireCheck: null, configureRet: null, readState: null };
+  window.__stateChanges = [];
+  window.__swfBridge.onStateChanged = function (pname, pvalue) {
+    window.__stateChanges.push({ name: pname, value: pvalue });
+    console.log('[host] stateChanged: ' + pname + ' = ' + pvalue +
+      ' (' + typeof pvalue + ')');
+  };
+  window.__hostDrive = function () {
+    (function waitGame(n) {
+      var g = window.__swfBridge.game;
+      if (g && g.wireCheck && g.configure && g.readState) {
+        var r = window.__hostResults;
+        r.wireCheck = g.wireCheck();
+        console.log('[host] wireCheck -> ' + r.wireCheck);
+        // Minimal config: one monitored boolean + one int on Main (shape per
+        // BridgeGeneric's contract; the full mapping is Archipelago-CC's).
+        r.configureRet = g.configure(JSON.stringify({
+          classes: { main: { name: 'Main', deferred: true } },
+          state_properties: [
+            { 'class': 'main', property: 'hasSword', type: 'boolean' },
+            { 'class': 'main', property: 'hitsMax', type: 'int' },
+          ],
+        }));
+        console.log('[host] configure -> ' + r.configureRet);
+        // Wait for the bridge to resolve Main and report initial state, then
+        // read state inbound and queue the item write.
+        (function waitState(m) {
+          var seen = window.__stateChanges.some(function (s) { return s.name === 'hasSword'; });
+          if (seen) {
+            r.readState = window.__swfBridge.game.readState();
+            console.log('[host] readState -> ' + r.readState);
+            console.log('[host] queueing item write: hasSword = true');
+            window.__swfBridge.queueItems([
+              { 'class': 'main', property: 'hasSword', value: true },
+            ]);
+          } else if (m > 0) {
+            setTimeout(function () { waitState(m - 1); }, 250);
+          } else {
+            console.log('[host] ERROR: no initial stateChanged (Main never readable)');
+          }
+        })(360);   // up to ~90 s for the game to boot far enough
+      } else if (n > 0) {
+        setTimeout(function () { waitGame(n - 1); }, 100);
+      } else {
+        console.log('[host] ERROR: BridgeGeneric callbacks never registered');
+      }
+    })(300);
+  };
+</script>
+
+<!-- 3) WASM module setup. -->
+<script>
+  window.__runtimeReady = false;
+  window.Module = {
+    locateFile: function (p) { return p; },
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.log('[err] ' + t); },
+    onRuntimeInitialized: function () { window.__runtimeReady = true; },
+  };
+  (function waitReady(n) {
+    if (window.__runtimeReady && window.__swfBridge) {
+      document.getElementById('btn-run').disabled = false;
+      console.log('[harness] runtime + bridge ready');
+    } else if (n > 0) {
+      setTimeout(function () { waitReady(n - 1); }, 50);
+    } else {
+      console.log('[harness] ERROR: runtime/bridge not ready');
+    }
+  })(600);
+  document.getElementById('btn-run').addEventListener('click', function () {
+    this.disabled = true;
+    console.log('[harness] running SWF');
+    window.__hostDrive();
+    Module.ccall('runSWF', null, [], [], { async: true });
+  });
+</script>
+<script src="seedling_ap.js"></script>
+</body>
+</html>
