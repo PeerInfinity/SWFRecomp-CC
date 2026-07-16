@@ -1746,6 +1746,18 @@ void avm2_register_amf(Avm2Context* ctx)
 		avm2_builtin_add_method(ctx, so, "setProperty", so_noop);
 	}
 
+	// flash.net.SharedObjectFlushStatus constants (FlxSave compares
+	// flush()'s return against FLUSHED).
+	{
+		Avm2Class* fs = avm2_builtin_class(ctx, "flash.net",
+		                                   "SharedObjectFlushStatus",
+		                                   b->object_class);
+		avm2_builtin_add_static_const(ctx, fs, "FLUSHED",
+			avm2_string(avm2_string_from_literal(ctx, "flushed")));
+		avm2_builtin_add_static_const(ctx, fs, "PENDING",
+			avm2_string(avm2_string_from_literal(ctx, "pending")));
+	}
+
 	// Upgrade the Date stub: millis state + the members AMF needs.
 	{
 		Avm2Class* date = b->date_class;

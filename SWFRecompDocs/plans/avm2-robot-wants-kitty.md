@@ -1,9 +1,25 @@
 # AVM2 next game — Robot Wants Kitty (Flixel) bring-up plan
 
-Status: **READY — RWK-1 unblocked** (2026-07-16: census done, stages proposed;
-same-day update: **AVM2 ExternalInterface is DONE** — see §4, the
-`avm2-external-interface-swfbridge` memory, and
-`prompts/avm2-rwk1-bringup.md` for the first session. Audio output also landed,
+Status: **RWK-1 DONE (2026-07-16)** — headless bring-up complete, far faster
+than budgeted: the injected SWF recompiles (2 abc tags, 812 bodies, 0 verify
+fails) + links + runs in BOTH build modes; the boot chain needed exactly ONE
+runtime fix (`flash.net.SharedObjectFlushStatus` constants, avm2_amf.c — FlxSave
+compares `flush()` against `FLUSHED`; graded by new regression test
+`avm2_sharedobject_flushstatus`); the game reaches the **TitleState menu with
+zero uncaught errors** (visually confirmed via `AVM2_CPU_DUMP`: MaxGames splash
+→ ROBOT WANTS KITTY title + tilemap + buttons + robot/kitty sprites). The
+Newgrounds `529817_max` variant has `Version.v="Plain"`, so the feared
+GameShedAchievement/Kong sponsor chain (§2 item 1) is compiled in but never
+invoked — no URLLoader/site-lock friction at all. Bridge no-op verified
+stronger than the Seedling precedent: injected-vs-plain over 300 frames is
+byte-identical on stdout/stderr AND on all 300 CPU-dumped frames. Ruffle-oracle
+menu comparison (state-aligned): **MAD 5.53, 3.11% px differ, all in the lower
+half** — everything attributable to the ONE render gap: **FlxText draws
+nothing** (`BitmapData.draw(TextField)` is a silent no-op in `bd_draw`;
+probe: Ruffle rasterizes glyphs, we return zero pixels). Divergence list +
+RWK-2 levers in the `avm2-rwk1-robotkitty-bringup` memory. (Older context:
+2026-07-16 census below; ExternalInterface DONE same day — see §4, the
+`avm2-external-interface-swfbridge` memory. Audio output also landed,
 so RWK gets FlxSound for free). Follows the
 Seedling playbook (`avm2-seedling-plan.md`, Stage 12/13 pattern): census → graded
 bring-up → render parity vs Ruffle oracle → browser demo. Chosen because it is
@@ -75,7 +91,8 @@ gets sound for free once that lands.
 
 ## 3. Proposed stages
 
-- **RWK-1 — headless bring-up**: recompile + link + run headless (both build
+- **RWK-1 — headless bring-up** ✅ DONE 2026-07-16 (see Status header):
+  recompile + link + run headless (both build
   modes compile); clear the boot/sponsor error chain; reach the menu state with
   zero uncaught errors. Divergence-harness-first per `wasm-game-debugging`;
   Ruffle oracle frames via the exporter (free, per `avm2-stage13-browser.md`
@@ -83,6 +100,11 @@ gets sound for free once that lands.
   upstream avm2 trace tests fixed along the way + zero CI regressions.
 - **RWK-2 — render parity + gameplay**: tilemap/sprites/FlxText pixel parity
   vs oracle; keyboard gameplay headless (jump, shoot, collect kitty on level 1).
+  Lever #1 (from RWK-1): `BitmapData.draw(TextField)` rasterization (FlxText —
+  every button label/credit line; probe recipe in the RWK-1 memory). Note the
+  Ruffle-exporter pacing artifact: AVM2 `getTimer` in Ruffle is WALL-CLOCK, so
+  Flixel's variable timestep desyncs frame indices vs our deterministic 33.3ms
+  tick — compare state-aligned (offset scan), not index-aligned.
 - **RWK-3 — browser demo**: deploy via `deploy_wasm_avm2.sh`, live keyboard
   (13c infra), audio if the parallel session has landed, docs2 demo listing.
 - **RWK-4 (later, optional)**: FlxSave localStorage persistence, Kong variant,

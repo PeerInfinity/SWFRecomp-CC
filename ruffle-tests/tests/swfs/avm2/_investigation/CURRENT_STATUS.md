@@ -1,8 +1,49 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-16 — AVM2 ExternalInterface (generic EI subset) + the
-packaged Seedling `__swfBridge` page (Archipelago handoff); the audio-output
-section below it is the same day, prior sections are Stage 12 sessions 5/4/3.
+Last updated: 2026-07-16 — RWK-1 (Robot Wants Kitty headless bring-up, Flixel)
+DONE; before it the same day: AVM2 ExternalInterface + the packaged Seedling
+`__swfBridge` page, and audio output. Prior sections are Stage 12 sessions.
+
+## State (RWK-1 — Robot Wants Kitty headless bring-up, 2026-07-16)
+
+**The second real game — and the first Flixel game — reaches its menu with
+zero uncaught errors, in both build modes.** Target was the *injected* SWF
+(`~/CC/Archipelago-CC/.../robotkitty_injected.swf`, BridgeGeneric spliced by
+flash-ap-api `inject.py`; recompiles to 2 abc tags / 812 bodies / 0 verify
+fails). Full plan/status: `SWFRecompDocs/plans/avm2-robot-wants-kitty.md`.
+
+- **Boot chain = ONE fix.** `flash.net.SharedObjectFlushStatus` was missing
+  (Error #1065): Flixel `FlxSave.forceSave` compares `SharedObject.flush()`
+  against `SharedObjectFlushStatus.FLUSHED` inside FlxGame's boot
+  (sound-persistence path). Added the constants class in `avm2_amf.c`
+  (FLUSHED="flushed"/PENDING="pending"; our flush() already returned
+  "flushed"). Graded by new regression test **`avm2_sharedobject_flushstatus`**
+  (mxmlc). After it: LogoState (MaxGames splash) auto-advances into the
+  **TitleState menu**, 300 frames, zero uncaught errors. The feared
+  GameShedAchievement/Kong sponsor chain never runs — this Newgrounds variant
+  ships `Version.v="Plain"`.
+- **Bridge no-op verified (stronger than the Seedling check):** without the
+  shim, injected-vs-plain over 300 headless frames is **byte-identical on
+  stdout AND on all 300 `AVM2_CPU_DUMP` frames**; EI stays unavailable, no
+  Error #2067 escapes (BridgeGeneric's availability gate works untouched).
+- **Ruffle-oracle menu comparison** (exporter, 300 frames): state-aligned menu
+  frame = **MAD 5.53, 3.11% px differ, all rows ≥240** — the title art,
+  tilemap, buttons and robot are pixel-identical. The ONE render gap:
+  **FlxText renders nothing** — Flixel draws a TextField into `_framePixels`
+  via `BitmapData.draw(tf)`, and `bd_draw` silently ignores non-Bitmap
+  DisplayObject sources (avm2_bitmap.c). Probe (mxmlc `[Embed]` DejaVu ttf,
+  `bd.draw(textField)` → count nonzero px): Ruffle=true, ours=false. That is
+  RWK-2 lever #1.
+- **GOTCHA (oracle pacing):** Ruffle's AVM2 `getTimer` is **wall-clock**
+  (`Instant::now()` — core/src/avm2/globals/flash/utils.rs), so under the
+  exporter a variable-timestep engine like Flixel advances by real render
+  time (~28ms/frame) while we advance a deterministic 33.3ms (== Flixel's
+  MAX_ELAPSED clamp). Frame indices drift (+15 @60 → +39 @220); compare
+  state-aligned via an offset scan. FlashPunk (Seedling) was immune — fixed
+  timestep.
+- Headless drive recipe unchanged from Seedling (scratch test dir +
+  `verify_output` with `KEEP_BUILD_DIR` patch, `SWFRECOMP_OPT_LEVEL=-O0`);
+  RWK builds in ~57s at -O0 (vs Seedling's minutes).
 
 ## State (AVM2 ExternalInterface + AP handoff page, 2026-07-16)
 

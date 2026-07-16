@@ -1,0 +1,4 @@
+FLUSHED: flushed
+PENDING: pending
+flush == FLUSHED: true
+done
