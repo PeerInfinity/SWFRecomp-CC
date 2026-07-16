@@ -139,6 +139,81 @@ static const SoundAsset* find_asset(AudioContext* ctx, u16 sound_id)
 	return NULL;
 }
 
+// Decode an asset and start it on a free channel with default state
+// (position 0, loop restart at 0, identity gains). Returns the channel
+// index, or -1 (no free channel / unsupported format / decode failed).
+// Callers adjust position/loop_start/gains afterwards.
+static int start_sound_core(AudioContext* ctx, const SoundAsset* asset,
+	u32 loop_count)
+{
+	// Find free channel
+	int ch = -1;
+	for (int i = 0; i < MAX_SOUND_CHANNELS; i++)
+	{
+		if (!ctx->channels[i].active)
+		{
+			ch = i;
+			break;
+		}
+	}
+	if (ch < 0) return -1; // All channels busy
+
+	// Decode
+	float* pcm = NULL;
+	size_t pcm_samples = 0;
+	int channels = 1;
+	int sample_rate = rate_code_to_hz(asset->rate);
+
+	if (asset->format == SOUND_FORMAT_MP3)
+	{
+		// MP3 data in DefineSound has a 2-byte SeekSamples field before the MP3 frames
+		if (asset->data_size < 2) return -1;
+		const u8* mp3_data = asset->data + 2;
+		size_t mp3_size = asset->data_size - 2;
+		pcm = decode_mp3(mp3_data, mp3_size, &pcm_samples, &channels, &sample_rate);
+	}
+	else if (asset->format == SOUND_FORMAT_UNCOMPRESSED_NE ||
+			 asset->format == SOUND_FORMAT_UNCOMPRESSED_LE)
+	{
+		channels = asset->stereo ? 2 : 1;
+		if (asset->sample_size == 1) // 16-bit
+		{
+			pcm_samples = asset->data_size / (2 * channels);
+			pcm = (float*)malloc(pcm_samples * channels * sizeof(float));
+			const s16* src = (const s16*)asset->data;
+			for (size_t i = 0; i < pcm_samples * (size_t)channels; i++)
+				pcm[i] = src[i] / 32768.0f;
+		}
+		else // 8-bit
+		{
+			pcm_samples = asset->data_size / channels;
+			pcm = (float*)malloc(pcm_samples * channels * sizeof(float));
+			for (size_t i = 0; i < pcm_samples * (size_t)channels; i++)
+				pcm[i] = (asset->data[i] - 128) / 128.0f;
+		}
+	}
+
+	if (!pcm) return -1;
+
+	SoundChannel* channel = &ctx->channels[ch];
+	channel->active = 1;
+	channel->asset = asset;
+	channel->pcm_data = pcm;
+	channel->pcm_samples = pcm_samples;
+	channel->pcm_position = 0.0;
+	channel->channels = channels;
+	channel->sample_rate = sample_rate;
+	channel->loop_count = loop_count;
+	channel->loop_start = 0.0;
+	channel->gain_l2l = 1.0f;
+	channel->gain_l2r = 0.0f;
+	channel->gain_r2l = 0.0f;
+	channel->gain_r2r = 1.0f;
+	channel->gain_vol = 1.0f;
+	channel->generation++;
+	return ch;
+}
+
 void audio_start_sound(SWFAppContext* app_context, u16 sound_id,
 	int stop, u32 loop_count, u32 in_point, u32 out_point)
 {
@@ -167,63 +242,12 @@ void audio_start_sound(SWFAppContext* app_context, u16 sound_id,
 	const SoundAsset* asset = find_asset(ctx, sound_id);
 	if (!asset) return;
 
-	// Find free channel
-	int ch = -1;
-	for (int i = 0; i < MAX_SOUND_CHANNELS; i++)
-	{
-		if (!ctx->channels[i].active)
-		{
-			ch = i;
-			break;
-		}
-	}
-	if (ch < 0) return; // All channels busy
-
-	// Decode
-	float* pcm = NULL;
-	size_t pcm_samples = 0;
-	int channels = 1;
-	int sample_rate = rate_code_to_hz(asset->rate);
-
-	if (asset->format == SOUND_FORMAT_MP3)
-	{
-		// MP3 data in DefineSound has a 2-byte SeekSamples field before the MP3 frames
-		const u8* mp3_data = asset->data + 2;
-		size_t mp3_size = asset->data_size - 2;
-		pcm = decode_mp3(mp3_data, mp3_size, &pcm_samples, &channels, &sample_rate);
-	}
-	else if (asset->format == SOUND_FORMAT_UNCOMPRESSED_NE ||
-			 asset->format == SOUND_FORMAT_UNCOMPRESSED_LE)
-	{
-		channels = asset->stereo ? 2 : 1;
-		if (asset->sample_size == 1) // 16-bit
-		{
-			pcm_samples = asset->data_size / (2 * channels);
-			pcm = (float*)malloc(pcm_samples * channels * sizeof(float));
-			const s16* src = (const s16*)asset->data;
-			for (size_t i = 0; i < pcm_samples * (size_t)channels; i++)
-				pcm[i] = src[i] / 32768.0f;
-		}
-		else // 8-bit
-		{
-			pcm_samples = asset->data_size / channels;
-			pcm = (float*)malloc(pcm_samples * channels * sizeof(float));
-			for (size_t i = 0; i < pcm_samples * (size_t)channels; i++)
-				pcm[i] = (asset->data[i] - 128) / 128.0f;
-		}
-	}
-
-	if (!pcm) return;
+	int ch = start_sound_core(ctx, asset, loop_count);
+	if (ch < 0) return;
 
 	SoundChannel* channel = &ctx->channels[ch];
-	channel->active = 1;
-	channel->asset = asset;
-	channel->pcm_data = pcm;
-	channel->pcm_samples = pcm_samples;
-	channel->pcm_position = (in_point < pcm_samples) ? (double)in_point : 0.0;
-	channel->channels = channels;
-	channel->sample_rate = sample_rate;
-	channel->loop_count = loop_count;
+	channel->pcm_position =
+		(in_point < channel->pcm_samples) ? (double)in_point : 0.0;
 }
 
 void audio_stop_all_sounds(SWFAppContext* app_context)
@@ -362,9 +386,18 @@ void audio_mix(AudioContext* ctx, float* output, size_t frames, int out_channels
 			{
 				if (ch->loop_count > 0)
 				{
+					// AVM2 play(startTime, loops) restarts each loop at
+					// startTime (loop_start); AVM1 starts leave it at 0.
 					ch->loop_count--;
-					ch->pcm_position = 0.0;
-					int_pos = 0;
+					ch->pcm_position = ch->loop_start;
+					int_pos = (size_t)ch->pcm_position;
+					if (int_pos >= ch->pcm_samples)
+					{
+						ch->active = 0;
+						free(ch->pcm_data);
+						ch->pcm_data = NULL;
+						break;
+					}
 				}
 				else
 				{
@@ -375,12 +408,18 @@ void audio_mix(AudioContext* ctx, float* output, size_t frames, int out_channels
 				}
 			}
 
-			for (int c = 0; c < out_channels; c++)
-			{
-				int src_c = (c < ch->channels) ? c : 0;
-				output[f * out_channels + c] +=
-					ch->pcm_data[int_pos * ch->channels + src_c] * ctx->master_volume;
-			}
+			// Per-channel SoundTransform (identity for AVM1 sounds, which
+			// reduces to the plain src*master_volume mix bit-for-bit).
+			float in_l = ch->pcm_data[int_pos * ch->channels];
+			float in_r = (ch->channels > 1)
+				? ch->pcm_data[int_pos * ch->channels + 1] : in_l;
+			float out_l = ch->gain_vol
+				* (in_l * ch->gain_l2l + in_r * ch->gain_r2l) * ctx->master_volume;
+			float out_r = ch->gain_vol
+				* (in_l * ch->gain_l2r + in_r * ch->gain_r2r) * ctx->master_volume;
+			output[f * out_channels] += out_l;
+			if (out_channels > 1)
+				output[f * out_channels + 1] += out_r;
 			ch->pcm_position += rate_ratio;
 		}
 	}
@@ -459,6 +498,101 @@ void audio_shutdown(SWFAppContext* app_context)
 	free(ctx->assets);
 	free(ctx);
 	app_context->audio_ctx = NULL;
+}
+
+// ---------------------------------------------------------------------------
+// AVM2 SoundChannel-shaped API (see audio.h). Handles are (index, generation)
+// pairs; every operation validates the generation so a stale AS3 SoundChannel
+// can never affect a reused slot.
+// ---------------------------------------------------------------------------
+
+static SoundChannel* channel_for_handle(SWFAppContext* app_context, int ch,
+	u32 generation)
+{
+	AudioContext* ctx = get_audio_ctx(app_context);
+	if (!ctx || ch < 0 || ch >= MAX_SOUND_CHANNELS) return NULL;
+	SoundChannel* channel = &ctx->channels[ch];
+	if (!channel->active || channel->generation != generation) return NULL;
+	return channel;
+}
+
+int audio_start_sound_ex(SWFAppContext* app_context, u16 sound_id,
+	u32 loop_count, double start_ms, const float gains[5],
+	u32* out_generation)
+{
+	AudioContext* ctx = get_audio_ctx(app_context);
+	if (!ctx) return -1;
+
+	const SoundAsset* asset = find_asset(ctx, sound_id);
+	if (!asset) return -1;
+
+	int ch = start_sound_core(ctx, asset, loop_count);
+	if (ch < 0) return -1;
+
+	SoundChannel* channel = &ctx->channels[ch];
+	if (start_ms > 0.0)
+	{
+		double start_sample = start_ms / 1000.0 * (double)channel->sample_rate;
+		if (start_sample < (double)channel->pcm_samples)
+		{
+			channel->pcm_position = start_sample;
+			channel->loop_start = start_sample;
+		}
+	}
+	if (gains != NULL)
+	{
+		channel->gain_l2l = gains[0];
+		channel->gain_l2r = gains[1];
+		channel->gain_r2l = gains[2];
+		channel->gain_r2r = gains[3];
+		channel->gain_vol = gains[4];
+	}
+	if (out_generation) *out_generation = channel->generation;
+	return ch;
+}
+
+int audio_channel_active(SWFAppContext* app_context, int ch, u32 generation)
+{
+	return channel_for_handle(app_context, ch, generation) != NULL;
+}
+
+void audio_channel_stop(SWFAppContext* app_context, int ch, u32 generation)
+{
+	SoundChannel* channel = channel_for_handle(app_context, ch, generation);
+	if (!channel) return;
+	channel->active = 0;
+	if (channel->pcm_data)
+	{
+		free(channel->pcm_data);
+		channel->pcm_data = NULL;
+	}
+}
+
+void audio_channel_set_gains(SWFAppContext* app_context, int ch,
+	u32 generation, const float gains[5])
+{
+	SoundChannel* channel = channel_for_handle(app_context, ch, generation);
+	if (!channel || gains == NULL) return;
+	channel->gain_l2l = gains[0];
+	channel->gain_l2r = gains[1];
+	channel->gain_r2l = gains[2];
+	channel->gain_r2r = gains[3];
+	channel->gain_vol = gains[4];
+}
+
+double audio_channel_position_ms(SWFAppContext* app_context, int ch,
+	u32 generation)
+{
+	SoundChannel* channel = channel_for_handle(app_context, ch, generation);
+	if (!channel || channel->sample_rate <= 0) return -1.0;
+	return channel->pcm_position / (double)channel->sample_rate * 1000.0;
+}
+
+void audio_set_master_volume(SWFAppContext* app_context, float volume)
+{
+	AudioContext* ctx = get_audio_ctx(app_context);
+	if (!ctx) return;
+	ctx->master_volume = volume;
 }
 
 // ---------------------------------------------------------------------------

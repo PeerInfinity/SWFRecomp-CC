@@ -382,8 +382,7 @@ typedef struct Avm2BinaryData
 	const uint8_t* bytes;  // NULL when len == 0
 } Avm2BinaryData;
 
-// Embedded sound (DefineSound, tag 14): format metadata only for now (the
-// PCM/MP3 payload lands in Stage 10). Fields mirror the tag bitfields.
+// Embedded sound (DefineSound, tag 14). Fields mirror the tag bitfields.
 typedef struct Avm2SoundData
 {
 	uint16_t char_id;
@@ -394,6 +393,11 @@ typedef struct Avm2SoundData
 	uint32_t sample_count;
 	uint32_t data_size;    // bytesTotal: compressed payload bytes, minus the
 	                       // 2-byte MP3 seek prefix (Ruffle SoundInstance.size)
+	// Full decodable payload — ALL remaining tag bytes, INCLUDING the 2-byte
+	// MP3 seek-samples prefix (what audio_define_sound expects). data_size
+	// above keeps its bytesTotal semantics; this pair feeds the mixer.
+	const uint8_t* data;   // NULL when data_len == 0
+	uint32_t data_len;
 } Avm2SoundData;
 
 // Provided by the generated RecompiledABC/abc_timeline.c:

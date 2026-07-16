@@ -475,6 +475,11 @@ void avm2_register_media(Avm2Context* ctx);
 // `v` is not a SoundTransform.
 Avm2Value avm2_sound_transform_from_core(Avm2Context* ctx, const int32_t core[5]);
 int avm2_sound_transform_read(Avm2Context* ctx, Avm2Value v, int32_t out[5]);
+// Mixer bridge (real audio output; both are no-ops under NO_GRAPHICS):
+// register embedded DefineSound payloads with the shared audio mixer at boot,
+// and per-tick dispatch Event.SOUND_COMPLETE for drained playbacks.
+void avm2_media_register_sounds(Avm2Context* ctx);
+void avm2_media_poll(Avm2Context* ctx);
 
 // flash.text module (avm2_text.c — Stage 6): TextFormat/TextField engine.
 void avm2_register_text(Avm2Context* ctx);

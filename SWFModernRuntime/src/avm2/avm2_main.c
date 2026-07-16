@@ -23,6 +23,8 @@
 
 #include <memory/heap.h>
 
+#include <audio/audio.h>
+
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
@@ -245,6 +247,23 @@ void runSWF_avm2(SWFAppContext* app_context)
 
 	avm2_globals_init(ctx);
 
+#ifndef NO_GRAPHICS
+	// Real audio output: in the browser create the Web Audio sink FIRST —
+	// before renderer init AND before any script runs — while the user
+	// gesture (the demo's click handler called runSWF) is still active;
+	// renderer_init's emscripten_sleep would consume it (same ordering rule
+	// as swf.c, see the web-audio notes). Then register every embedded
+	// DefineSound payload with the shared mixer so Sound.play() from ANY
+	// entry point (script init, root ctor, frame script) finds its asset.
+	// Native graphics builds register too (exercises the bridge in CI) but
+	// stay silent: nothing pulls audio_mix outside the browser.
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	if (app_context->audio_ctx == NULL) audio_init(app_context);
+	audio_output_init(app_context);
+#endif
+	avm2_media_register_sounds(ctx);
+#endif
+
 	// Step 1: load all ABC files — no script inits yet.
 	ctx->file_count = avm2_generated_abc_file_count;
 	ctx->files = avm2_alloc(ctx, ctx->file_count * sizeof(Avm2AbcFileRt*));
@@ -443,6 +462,7 @@ void runSWF_avm2(SWFAppContext* app_context)
 			if (setjmp(top.jb) == 0)
 			{
 				avm2_display_run_tick(ctx);
+				avm2_media_poll(ctx);   // Event.SOUND_COMPLETE for drained channels
 				double present_start = emscripten_get_now();
 				int close = avm2_render_present(ctx);
 				present_ms = emscripten_get_now() - present_start;
@@ -515,6 +535,10 @@ void runSWF_avm2(SWFAppContext* app_context)
 		if (setjmp(top.jb) == 0)
 		{
 			avm2_display_run_tick(ctx);
+			// SOUND_COMPLETE poll: no-op in NO_GRAPHICS; in native graphics
+			// nothing drains a channel (no sink), so this never fires in the
+			// trace harness — trace-inert by construction.
+			avm2_media_poll(ctx);
 #ifdef OFFSCREEN_RENDER
 			// Render the display tree the tick just built (Bitmap blit path).
 			avm2_render_frame(ctx);

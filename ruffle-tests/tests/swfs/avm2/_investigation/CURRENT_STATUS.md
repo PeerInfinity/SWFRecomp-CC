@@ -1,7 +1,43 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-13 — Stage 12 (Seedling bring-up) session 5; prior
-sections below are sessions 4 and 3.
+Last updated: 2026-07-16 — real audio output (browser-WASM); prior sections
+below are Stage 12 sessions 5/4/3.
+
+## State (real audio output — browser-WASM Seedling, 2026-07-16)
+
+**The AVM2 browser demo is AUDIBLE.** Stage 10's flash.media surface was
+trace-graded only; this session bridged it to the shared `src/audio` mixer and
+the Web Audio sink. Seedling plays music (FlashPunk `fadeToLoop`) + SFX in the
+browser; verified via headed-Chrome smoke (AudioContext `running`,
+`audio_fill_buffer` returns 4090/4096 nonzero samples).
+
+- **Recompiler:** `abc_timeline.cpp` now emits DefineSound payload bytes
+  (`snd_<i>_bytes[]`); `Avm2SoundData` gains `data`/`data_len` (full tag bytes
+  incl. the 2-byte MP3 seek prefix). `data_size` keeps its bytesTotal
+  semantics (trace-graded). Seedling: 88 payloads, wasm 24→30 MB.
+- **Mixer (`audio.c`):** per-channel SoundTransform gains (identity for AVM1 —
+  bit-identical mix), generation-checked channel handles
+  (`audio_start_sound_ex` / `audio_channel_stop/set_gains/position_ms/active`),
+  loops restart at startTime (AS3 semantics; AVM1 path still restarts at 0).
+- **Bridge (`avm2_media.c`):** sounds registered at boot
+  (`avm2_media_register_sounds`); `Sound.play(startTime, loops, transform)` →
+  mixer; `SoundChannel.stop`/`SoundMixer.stopAll` → mixer stops;
+  `soundTransform` setters push gains live; `SoundChannel.position` reads the
+  mixer clock; `avm2_media_poll` (per tick) dispatches `Event.SOUND_COMPLETE`
+  for drained channels (manual stops don't dispatch — Flash semantics). Live
+  channels are GC roots (`avm2_gc_mark_roots_media`) — a fire-and-forget
+  play()'s SoundChannel may have no other reference.
+- **Browser init (`avm2_main.c`):** `audio_output_init` runs before renderer
+  init AND before any script (the click gesture must still be active —
+  renderer's `emscripten_sleep` consumes it; same rule as AVM1 swf.c).
+- **Trace-inert by construction:** nothing prints; positions only advance when
+  a sink pulls `audio_mix` — never in the native harness. All sound tests
+  (NO_GRAPHICS + graphics) verified locally unchanged; the 3 network-load
+  sound failures (`sound_constructor_with_args`, `sound_load_multiple`,
+  `sound_rootless`) are byte-identical to baseline (still deferred).
+- **Still deferred:** `soundchannel_position` / `soundchannel_soundcomplete`
+  (upstream known_failure — need the harness to pull audio),
+  SoundMixer cross-frame accumulation, Sound.load network tests.
 
 ## State (Stage 12 — Seedling bring-up, session 5 2026-07-13, commit `b3ec6d48c`)
 

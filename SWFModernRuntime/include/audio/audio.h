@@ -48,6 +48,16 @@ typedef struct SoundChannel {
 	int channels;         // 1=mono, 2=stereo
 	int sample_rate;      // Actual sample rate in Hz
 	u32 loop_count;       // 0 = no loop, >0 = remaining loops
+	double loop_start;    // Sample index loops restart at (0 for AVM1 sounds)
+	// Per-channel SoundTransform gains (AVM2 SoundChannel.soundTransform):
+	// left_out  = vol * (l_in * l2l + r_in * r2l)
+	// right_out = vol * (l_in * l2r + r_in * r2r)
+	// AVM1 starts leave these at identity (l2l=r2r=vol=1, l2r=r2l=0), which
+	// mixes byte-identically to the pre-transform code path.
+	float gain_l2l, gain_l2r, gain_r2l, gain_r2r, gain_vol;
+	// Bumped every time a sound starts on this slot; (index, generation)
+	// pairs make AVM2 SoundChannel handles safe against slot reuse.
+	u32 generation;
 } SoundChannel;
 
 // Streaming sound state
@@ -95,6 +105,32 @@ void audio_start_sound(SWFAppContext* app_context, u16 sound_id,
 
 // Stop all sounds
 void audio_stop_all_sounds(SWFAppContext* app_context);
+
+// ---------------------------------------------------------------------------
+// AVM2 SoundChannel-shaped API: start returns a (channel index, generation)
+// handle so a specific playback instance can be stopped/adjusted/queried even
+// after the slot is reused. gains[5] = {l2l, l2r, r2l, r2r, volume} (see
+// SoundChannel). Loops restart at start_ms (AS3 play() semantics), unlike the
+// AVM1 path which restarts at 0.
+// ---------------------------------------------------------------------------
+
+// Start a sound; returns channel index (>= 0) and writes its generation to
+// *out_generation, or returns -1 (no asset / no free channel / decode failed).
+int audio_start_sound_ex(SWFAppContext* app_context, u16 sound_id,
+	u32 loop_count, double start_ms, const float gains[5],
+	u32* out_generation);
+
+// The handle-checked channel operations are no-ops / return defaults when the
+// handle is stale (slot reused or drained).
+int audio_channel_active(SWFAppContext* app_context, int ch, u32 generation);
+void audio_channel_stop(SWFAppContext* app_context, int ch, u32 generation);
+void audio_channel_set_gains(SWFAppContext* app_context, int ch,
+	u32 generation, const float gains[5]);
+double audio_channel_position_ms(SWFAppContext* app_context, int ch,
+	u32 generation);
+
+// Global output volume (AVM2 SoundMixer.soundTransform.volume; 1.0 default).
+void audio_set_master_volume(SWFAppContext* app_context, float volume);
 
 // Setup streaming sound header
 void audio_stream_head(SWFAppContext* app_context,

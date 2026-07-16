@@ -11,21 +11,44 @@
 //                     recompiler table); play() returns a SoundChannel unless
 //                     the start position is past the clip length (then null).
 //
-// Trace-graded: no actual audio output is produced here (the tests assert
-// volume/pan/position/length, not samples). Additive AVM2-only; the shared
-// src/audio backend is untouched.
+// Graphics builds additionally bridge to the shared src/audio mixer
+// (audio.c): embedded DefineSound payloads register at boot
+// (avm2_media_register_sounds), play()/stop()/stopAll()/soundTransform drive
+// real mixer channels, and avm2_media_poll dispatches Event.SOUND_COMPLETE
+// when a channel drains. The bridge is inert for trace grading: nothing here
+// writes stdout, and channel positions only advance when an output sink pulls
+// audio_mix (browser Web Audio) — never in the native test harness.
+//
+// NO_GRAPHICS builds compile the trace-graded surface only (the mixer does
+// not exist there); the bridge bodies compile away.
 
 #include <math.h>
 #include <string.h>
 
+#include <audio/audio.h>
+#ifndef NO_GRAPHICS
+#include <libswf/swf.h>   // full SWFAppContext (app->audio_ctx)
+#endif
+
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 #include <avm2/avm2_value.h>
+
+#ifndef NO_GRAPHICS
+// Live playback registry for SOUND_COMPLETE: mixer channel index -> the AS3
+// SoundChannel object whose playback occupies that slot. Entries are cleared
+// on stop()/stopAll() (Flash does not dispatch soundComplete for manual
+// stops) and when avm2_media_poll observes the channel drained. Registered
+// objects are GC roots (avm2_gc_mark_roots_media) — the mixer slot may be the
+// only live reference to a playing channel.
+static Avm2Object* g_live_channels[MAX_SOUND_CHANNELS];
+#endif
 
 static int media_class_is_a(const Avm2Class* cls, const Avm2Class* ancestor)
 {
@@ -172,6 +195,12 @@ typedef struct Avm2SoundChannelExt
 {
 	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
 	int32_t st_l2l, st_l2r, st_r2l, st_r2r, st_volume;  // core SoundTransform ×100
+	// Mixer playback handle (graphics builds; see audio_start_sound_ex).
+	// mixer_live means "a mixer start succeeded for this channel object" —
+	// the (mixer_ch, mixer_gen) pair stays valid-checked on every use.
+	int32_t mixer_ch;
+	uint32_t mixer_gen;
+	uint8_t mixer_live;
 } Avm2SoundChannelExt;
 
 static void sound_channel_native_init(Avm2Context* ctx, Avm2Object* obj)
@@ -183,7 +212,21 @@ static void sound_channel_native_init(Avm2Context* ctx, Avm2Object* obj)
 	sc->st_r2l = 0;
 	sc->st_r2r = 100;
 	sc->st_volume = 100;
+	sc->mixer_ch = -1;
 }
+
+#ifndef NO_GRAPHICS
+// Mixer gain vector {l2l, l2r, r2l, r2r, vol} from the channel's core
+// i32×100 SoundTransform store.
+static void sc_mixer_gains(const Avm2SoundChannelExt* sc, float gains[5])
+{
+	gains[0] = (float) sc->st_l2l / 100.0f;
+	gains[1] = (float) sc->st_l2r / 100.0f;
+	gains[2] = (float) sc->st_r2l / 100.0f;
+	gains[3] = (float) sc->st_r2r / 100.0f;
+	gains[4] = (float) sc->st_volume / 100.0f;
+}
+#endif
 
 static Avm2SoundChannelExt* this_sc(Avm2Activation* act)
 {
@@ -218,15 +261,33 @@ static Avm2Value sc_set_sound_transform(Avm2Activation* act)
 	sc->st_r2l = (int32_t) (st->right_to_left * 100.0);
 	sc->st_r2r = (int32_t) (st->right_to_right * 100.0);
 	sc->st_volume = (int32_t) (st->volume * 100.0);
+#ifndef NO_GRAPHICS
+	if (sc->mixer_live)
+	{
+		float gains[5];
+		sc_mixer_gains(sc, gains);
+		audio_channel_set_gains(act->ctx->app, sc->mixer_ch, sc->mixer_gen,
+		                        gains);
+	}
+#endif
 	return avm2_undefined();
 }
 
 static Avm2Value sc_get_position(Avm2Activation* act)
 {
-	// No live audio instance in the trace harness -> 0 (soundchannel_position
-	// is upstream known_failure; the real position needs the audio backend).
 	Avm2SoundChannelExt* sc = this_sc(act);
-	return avm2_number(sc != NULL ? 0.0 : 0.0);
+	if (sc == NULL) return avm2_number(0.0);
+#ifndef NO_GRAPHICS
+	// Live mixer playback clock (browser builds; in the native test harness
+	// nothing pulls audio_mix, so an active channel reports 0 — trace-inert).
+	if (sc->mixer_live)
+	{
+		double pos = audio_channel_position_ms(act->ctx->app, sc->mixer_ch,
+		                                       sc->mixer_gen);
+		if (pos >= 0.0) return avm2_number(pos);
+	}
+#endif
+	return avm2_number(0.0);
 }
 
 static Avm2Value sc_get_peak(Avm2Activation* act)
@@ -237,7 +298,19 @@ static Avm2Value sc_get_peak(Avm2Activation* act)
 
 static Avm2Value sc_stop(Avm2Activation* act)
 {
+#ifndef NO_GRAPHICS
+	Avm2SoundChannelExt* sc = this_sc(act);
+	if (sc != NULL && sc->mixer_live)
+	{
+		audio_channel_stop(act->ctx->app, sc->mixer_ch, sc->mixer_gen);
+		// Manual stop: no soundComplete (Flash semantics) — unregister.
+		if (g_live_channels[sc->mixer_ch] == this_obj(act))
+			g_live_channels[sc->mixer_ch] = NULL;
+		sc->mixer_live = 0;
+	}
+#else
 	(void) act;
+#endif
 	return avm2_undefined();
 }
 
@@ -285,12 +358,24 @@ static Avm2Value sm_set_sound_transform(Avm2Activation* act)
 	g_mixer_r2l = (int32_t) (st->right_to_left * 100.0);
 	g_mixer_r2r = (int32_t) (st->right_to_right * 100.0);
 	g_mixer_volume = (int32_t) (st->volume * 100.0);
+#ifndef NO_GRAPHICS
+	// Global transform applies at mix time as the output master volume
+	// (pan cross-gains on the global transform are not wired — volume is
+	// what real content uses).
+	audio_set_master_volume(act->ctx->app, (float) g_mixer_volume / 100.0f);
+#endif
 	return avm2_undefined();
 }
 
 static Avm2Value sm_stop_all(Avm2Activation* act)
 {
+#ifndef NO_GRAPHICS
+	audio_stop_all_sounds(act->ctx->app);
+	// stopAll is a manual stop: no soundComplete for any channel.
+	memset(g_live_channels, 0, sizeof(g_live_channels));
+#else
 	(void) act;
+#endif
 	return avm2_undefined();
 }
 
@@ -308,6 +393,7 @@ typedef struct Avm2SoundObjExt
 {
 	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
 	uint8_t has_sound;
+	uint16_t char_id;    // DefineSound char id (0 = none; mixer asset key)
 	uint32_t sample_count;
 	double sample_rate;
 	uint32_t data_size;  // bytesTotal (compressed, excl. MP3 seek prefix)
@@ -348,6 +434,7 @@ static Avm2Value sound_ctor(Avm2Activation* act)
 	if (sd != NULL)
 	{
 		s->has_sound = 1;
+		s->char_id = char_id;
 		s->sample_count = sd->sample_count;
 		s->sample_rate = rate_code_hz(sd->rate);
 		s->data_size = sd->data_size;
@@ -426,6 +513,30 @@ static Avm2Value sound_play(Avm2Activation* act)
 		sc->st_r2r = (int32_t) (st->right_to_right * 100.0);
 		sc->st_volume = (int32_t) (st->volume * 100.0);
 	}
+#ifndef NO_GRAPHICS
+	// Start real playback on the shared mixer. AS3 loops semantics: the
+	// sound plays max(loops, 1) times total, each pass restarting at
+	// startTime (Ruffle play_queued) — the mixer takes the ADDITIONAL plays.
+	if (ch != NULL && s->has_sound && s->char_id != 0)
+	{
+		Avm2SoundChannelExt* sc = (Avm2SoundChannelExt*) ch->native_ext;
+		int32_t loops = act->argc > 1 ? avm2_coerce_to_i32(ctx, act->args[1]) : 0;
+		if (loops < 1) loops = 1;
+		float gains[5];
+		sc_mixer_gains(sc, gains);
+		uint32_t gen = 0;
+		int mch = audio_start_sound_ex(ctx->app, s->char_id,
+		                               (uint32_t) (loops - 1), position,
+		                               gains, &gen);
+		if (mch >= 0)
+		{
+			sc->mixer_ch = mch;
+			sc->mixer_gen = gen;
+			sc->mixer_live = 1;
+			g_live_channels[mch] = ch;
+		}
+	}
+#endif
 	return avm2_object_value(ch);
 }
 
@@ -440,6 +551,70 @@ static Avm2Value sound_load(Avm2Activation* act)
 	// External loading deferred; a no-op keeps SymbolClass-bound sounds usable.
 	(void) act;
 	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// Mixer lifecycle (graphics builds; all no-ops under NO_GRAPHICS)
+// ---------------------------------------------------------------------------
+
+// Register every embedded DefineSound payload with the shared mixer so
+// Sound.play() can start it. Called once at AVM2 boot (runSWF_avm2).
+void avm2_media_register_sounds(Avm2Context* ctx)
+{
+#ifndef NO_GRAPHICS
+	if (avm2_generated_sound_count == 0) return;
+	if (ctx->app->audio_ctx == NULL) audio_init(ctx->app);
+	for (uint32_t i = 0; i < avm2_generated_sound_count; i++)
+	{
+		const Avm2SoundData* sd = &avm2_generated_sounds[i];
+		if (sd->data == NULL || sd->data_len == 0) continue;
+		audio_define_sound(ctx->app, sd->char_id, sd->format, sd->rate,
+		                   sd->sample_size, sd->stereo, sd->sample_count,
+		                   sd->data, sd->data_len);
+	}
+#else
+	(void) ctx;
+#endif
+}
+
+// Dispatch Event.SOUND_COMPLETE for channels whose mixer playback drained.
+// Called once per tick after frame scripts (may run user handlers — the
+// caller wraps it in the tick's catch-all try frame).
+void avm2_media_poll(Avm2Context* ctx)
+{
+#ifndef NO_GRAPHICS
+	for (int i = 0; i < MAX_SOUND_CHANNELS; i++)
+	{
+		Avm2Object* obj = g_live_channels[i];
+		if (obj == NULL) continue;
+		Avm2SoundChannelExt* sc = (Avm2SoundChannelExt*) obj->native_ext;
+		if (audio_channel_active(ctx->app, sc->mixer_ch, sc->mixer_gen))
+			continue;
+		// Unregister BEFORE dispatch: the handler may call play() and land
+		// on this same (now free) mixer slot.
+		g_live_channels[i] = NULL;
+		sc->mixer_live = 0;
+		Avm2Object* ev = avm2_event_new(
+			ctx, avm2_string_from_literal(ctx, "soundComplete"), 0, 0);
+		avm2_dispatch_event(ctx, obj, ev);
+	}
+#else
+	(void) ctx;
+#endif
+}
+
+// GC root marker: a playing SoundChannel may be referenced only by the
+// mixer registry (fire-and-forget play()); keep it alive until it drains.
+void avm2_gc_mark_roots_media(Avm2Context* ctx)
+{
+	(void) ctx;
+#ifndef NO_GRAPHICS
+	for (int i = 0; i < MAX_SOUND_CHANNELS; i++)
+	{
+		if (g_live_channels[i] != NULL)
+			avm2_gc_mark_object(g_live_channels[i]);
+	}
+#endif
 }
 
 // ---------------------------------------------------------------------------

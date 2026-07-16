@@ -370,6 +370,9 @@ struct SoundAsset
 	uint8_t format, rate, sample_size, stereo;
 	uint32_t sample_count;
 	uint32_t data_size;
+	// Full payload (all remaining tag bytes, incl. the 2-byte MP3 seek
+	// prefix) — emitted so the runtime mixer can decode and play it.
+	std::vector<uint8_t> payload;
 };
 
 struct TOp
@@ -987,6 +990,10 @@ struct Scanner
 					if (sa.format == 2 && payload >= 2) payload -= 2;
 					sa.data_size = (uint32_t) payload;
 				}
+				if (body.p < body.end)
+				{
+					sa.payload.assign(body.p, body.end);
+				}
 				sounds.push_back(sa);
 				break;
 			}
@@ -1417,16 +1424,33 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	out << "const uint32_t avm2_generated_binary_count = " << sc.binaries.size()
 	    << ";\n\n";
 
-	// Embedded sounds (metadata only).
+	// Embedded sounds: metadata + full payload bytes (MP3 stays compressed;
+	// the runtime mixer decodes on play, so no recompile-time zlib needed).
+	for (size_t i = 0; i < sc.sounds.size(); i++)
+	{
+		const SoundAsset& sa = sc.sounds[i];
+		if (sa.payload.empty()) continue;
+		out << "static const uint8_t snd_" << i << "_bytes[] = {";
+		for (size_t k = 0; k < sa.payload.size(); k++)
+		{
+			if ((k & 31) == 0) out << "\n\t";
+			out << (int) sa.payload[k] << ",";
+		}
+		out << "\n};\n";
+	}
 	if (!sc.sounds.empty())
 	{
 		out << "const Avm2SoundData avm2_generated_sounds[] = {\n";
-		for (auto& sa : sc.sounds)
+		for (size_t i = 0; i < sc.sounds.size(); i++)
 		{
+			const SoundAsset& sa = sc.sounds[i];
 			out << "\t{ " << sa.char_id << ", " << (int) sa.format << ", "
 			    << (int) sa.rate << ", " << (int) sa.sample_size << ", "
 			    << (int) sa.stereo << ", " << sa.sample_count << ", "
-			    << sa.data_size << " },\n";
+			    << sa.data_size << ", "
+			    << (sa.payload.empty() ? std::string("NULL")
+			                           : ("snd_" + std::to_string(i) + "_bytes"))
+			    << ", " << sa.payload.size() << " },\n";
 		}
 		out << "};\n";
 	}

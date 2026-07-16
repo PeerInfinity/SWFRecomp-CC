@@ -328,6 +328,7 @@ static void gc_collect(Avm2Context* ctx)
 	avm2_gc_mark_roots_display(ctx);
 	avm2_gc_mark_roots_events(ctx);
 	avm2_gc_mark_roots_amf(ctx);
+	avm2_gc_mark_roots_media(ctx);
 
 	// Drain: trace every marked object's edges (may mark more).
 	while (g_wl_count > 0)
