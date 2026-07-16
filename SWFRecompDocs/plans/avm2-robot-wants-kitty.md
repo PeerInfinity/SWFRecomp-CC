@@ -1,6 +1,10 @@
 # AVM2 next game — Robot Wants Kitty (Flixel) bring-up plan
 
-Status: **DRAFT sketch** (2026-07-16, census done, stages proposed). Follows the
+Status: **READY — RWK-1 unblocked** (2026-07-16: census done, stages proposed;
+same-day update: **AVM2 ExternalInterface is DONE** — see §4, the
+`avm2-external-interface-swfbridge` memory, and
+`prompts/avm2-rwk1-bringup.md` for the first session. Audio output also landed,
+so RWK gets FlxSound for free). Follows the
 Seedling playbook (`avm2-seedling-plan.md`, Stage 12/13 pattern): census → graded
 bring-up → render parity vs Ruffle oracle → browser demo. Chosen because it is
 tile-based, small, and — the strategic point — it is **Flixel**, the other big
@@ -117,14 +121,17 @@ deployed on the Ruffle/Flash side, in Archipelago-CC:
   front-end consumes the injected SWF as-is.
 - **Consequences for this plan**: do the RWK-1..3 bring-up on the **injected**
   SWF from the start — `BridgeGeneric` gates everything on
-  `ExternalInterface.available` and no-ops gracefully, so it costs nothing
-  before EI exists (verify this no-op holds in RWK-1). The AP layer then
-  needs exactly one new runtime feature: **`flash.external.ExternalInterface`**
-  (`available`/`addCallback`/`call`) bridged to JS in the browser-WASM build —
-  the blocker already named in `avm2-seedling-ap-integration.md` §4, now
-  promoted to the critical path since injection (not source-mod) is RWK's only
-  option. With EI + the existing `robotkitty.json`, the flashPanel integration
-  should light up with zero new AS3.
+  `ExternalInterface.available` and no-ops gracefully, so it costs nothing when
+  the shim isn't loaded (verify this no-op holds in RWK-1). **UPDATE
+  2026-07-16 (same day): `flash.external.ExternalInterface` is DONE** —
+  `avm2_external.c` + `swf_bridge_avm2.js` shim + livetests, with the injected
+  *Seedling* already round-tripping the full BridgeGeneric contract in a real
+  browser (memory `avm2-external-interface-swfbridge`; packaged handoff at
+  `docs2/examples/avm2/seedling_teleport_ap/`). So for RWK the AP layer needs
+  ZERO new runtime features on paper: EI + the existing `robotkitty.json`
+  should light up the flashPanel integration with no new AS3. The no-shim
+  no-op check (headless trace byte-identical injected-vs-plain) is the same
+  verification the Seedling EI session already ran — replicate it for RWK.
 - Historical note: the injection work targeted Basilisk+Flash because Seedling
   was unplayably slow under Ruffle — the exact performance gap our runtime was
   built to close (we now beat Ruffle ~1.4x). Our runtime is the intended
