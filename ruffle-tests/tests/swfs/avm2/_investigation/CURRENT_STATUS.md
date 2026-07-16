@@ -1,7 +1,58 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-16 — real audio output (browser-WASM); prior sections
-below are Stage 12 sessions 5/4/3.
+Last updated: 2026-07-16 — AVM2 ExternalInterface (generic EI subset) + the
+packaged Seedling `__swfBridge` page (Archipelago handoff); the audio-output
+section below it is the same day, prior sections are Stage 12 sessions 5/4/3.
+
+## State (AVM2 ExternalInterface + AP handoff page, 2026-07-16)
+
+**`flash.external.ExternalInterface` exists for AVM2** (`avm2_external.c` —
+the RULED generic subset: `available`/`addCallback`/variadic `call`, plus
+`objectID`→null and `marshallExceptions`). Browser availability gates on the
+page exposing `window.__swfBridge` (AVM1 gate design); everywhere else the
+class throws the FP `Error #2067` from call/addCallback — the upstream
+**`missing_external_interface` test flipped output_mismatch → PASS**. New
+regression test `avm2_external_interface_unavailable` (mxmlc; gotcha: mxmlc
+strips `trace()` without `-omit-trace-statements=false`). Inbound dispatch is
+the exported `avm2_ei_dispatch` (string name + string arg → string), safe
+while the browser loop parks at `emscripten_sleep`; outward args marshal
+string-first as a JSON scalar array so BridgeGeneric's 2-arg
+`stateChanged(pname, pvalue)` delivers real booleans/ints to the host.
+
+**Verification ladder (all green):**
+- `_swfbridge/livetest/toy_browser_avm2/` — mxmlc AS3 toy, headed Chrome,
+  **8/8** (available, wireCheck/configure/readState inbound, typed-bool
+  stateChanged, getItemQueue application, DONE).
+- `_swfbridge/livetest/seedling_avm2/` — the REAL injected Seedling
+  (flash-ap-api `inject.py`, `--check-abc` clean on both variants). Without
+  the shim BridgeGeneric no-ops silently: native headless 300-frame trace
+  **byte-identical** injected-vs-plain. With the shim, the teleport-injected
+  build passes **8/8** including a `hasSword=true` property write applied via
+  getItemQueue and re-reported. The injected ORIGINAL is verified through
+  configure + Main resolution; its state monitoring correctly waits for the
+  player to start the game (`Main.SAVE_FILE` is constructor-set behind the NG
+  preloader) — livetest grades it with `FULL_B=0`.
+- **Perf gate (real-GPU Windows Chrome, intel/gen-9, 3+3 runs):** bridge
+  active (14 monitored props, host `readState` every 33 ms, per-frame
+  `getItemQueue`) mean ≈33.6 ms vs plain baseline ≈34.8 ms — within
+  run-to-run noise; **~30 fps held**.
+
+**Handoff artifact (Archipelago-CC consumes this):**
+`docs2/examples/avm2/seedling_teleport_ap/` — self-contained
+(`game.html` + `seedling_teleport_ap.{js,wasm}` + `swf_bridge_avm2.js`),
+loadable as a SAME-ORIGIN iframe src. Usage (verified end-to-end via a parent
+page + `frameLocator`): click/call `__swfBridgeStart()` from a user gesture
+INSIDE the iframe (WebGPU+audio need the activation), then drive
+`iframe.contentWindow.__swfBridge` — `game.wireCheck()/configure(json)/
+readState()`, `queueItems([...])`, `onStateChanged` override. Regenerate with
+`inject.py` → `build_wasm_avm2.sh seedling_teleport_ap
+~/CC/seedling_ap_build/recompiled_teleport` → `deploy_wasm_avm2.sh` (game.html
+comes from `wasm_wrappers/swf_bridge_game_page.html`). Ruffle oracle: the
+deploy stages `seedling_teleport_ap_ruffle/` (same injected SWF under Ruffle)
+for side-by-side behavior checks; the teleport build's frame oracle remains
+`~/CC/seedling_teleport_build/ruffle_oracle_60`. Known-environmental: WSLg
+Chrome floods `Invalid Texture "bitmap_tex"` (adapter texture-array-layer cap
+vs Seedling's 284 bitmaps) — identical on the plain build, absent on real GPU.
 
 ## State (real audio output — browser-WASM Seedling, 2026-07-16)
 

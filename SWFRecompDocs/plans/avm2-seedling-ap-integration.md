@@ -1,6 +1,21 @@
 # AVM2 Seedling — Archipelago integration options (analysis + decision)
 
-Status: **ANALYSIS / DECISION DOC** (2026-07-13). Investigates whether the
+Status: **ANALYSIS / DECISION DOC** (2026-07-13) — **RESOLVED 2026-07-16**.
+Stage 12/13 + audio DONE; bridge delivery RULED (user, 2026-07-16) = the
+**generic EI subset** (Approach A/B's shared dependency, not compiled-in
+hooks) — see `~/CC/Archipelago-CC/NewDocs/plans/seedling-swfrecomp-task-split.md`.
+The §4 blocking gap is CLOSED: `flash.external.ExternalInterface` landed in
+`SWFModernRuntime/src/avm2/avm2_external.c` (available/addCallback/variadic
+call, `window.__swfBridge`-gated browser bridge + `avm2_ei_dispatch` inbound),
+and the injected Seedling (flash-ap-api `inject.py`, Approach A) is verified
+end-to-end in our runtime — packaged handoff page at
+`docs2/examples/avm2/seedling_teleport_ap/` (see the avm2 suite
+`_investigation/CURRENT_STATUS.md` §"AVM2 ExternalInterface + AP handoff
+page"). §7's SharedObject write-path caveat is confirmed working
+(`Main.hasSword = true` round-trips via BridgeGeneric). Original analysis
+below unchanged.
+
+Investigates whether the
 existing ActionScript-injection work (flash-ap-api / SeedlingArchipelagoInjector /
 Archipelago-CC flashPanel) is useful to the SWFRecomp AVM2 Seedling plan, and
 evaluates a third option — modifying Seedling's AS3 source and recompiling.

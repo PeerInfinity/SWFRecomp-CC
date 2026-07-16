@@ -33,6 +33,10 @@ cp "${BUILD_DIR}/${NAME}.js" "${BUILD_DIR}/${NAME}.wasm" "${OUR}/"
 # host surface). demo.html HEAD-probes and injects it; games without injected
 # bridge AS3 never call EI, so staging it is behavior-neutral for plain demos.
 cp "${SWFRECOMP_ROOT}/wasm_wrappers/swf_bridge_avm2.js" "${OUR}/"
+# game.html — the self-contained __swfBridge game page (iframe-embeddable
+# handoff artifact; see the template header for the host contract).
+sed -e "s/__GAME_NAME__/${NAME}/g" -e "s/__GAME_W__/${W}/g" -e "s/__GAME_H__/${H}/g" \
+    "${SWFRECOMP_ROOT}/wasm_wrappers/swf_bridge_game_page.html" > "${OUR}/game.html"
 echo "graphics" > "${OUR}/.demo_type"
 cat > "${OUR}/test_info.json" <<JSON
 {
