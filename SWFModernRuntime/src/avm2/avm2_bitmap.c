@@ -112,6 +112,74 @@ static uint32_t blend_over(uint32_t dest, uint32_t src)
 	return CMK(r, g, b, a);
 }
 
+// BitmapData.draw() blend modes beyond normal/layer. Values >0 route the CPU
+// raster through blend_mode_apply() per pixel; 0 keeps the blend_over/copy fast
+// paths. Only the modes Seedling's day/night compositor needs are implemented
+// (MULTIPLY night tint, HARDLIGHT solidBmp, ADD snow); other modes fall through
+// to BM_NORMAL (blend_over), i.e. the prior behaviour — no regression.
+enum { BM_NORMAL = 0, BM_MULTIPLY, BM_HARDLIGHT, BM_ADD };
+
+// ADD = the trivial hardware blend (render/wgpu/src/blend.rs TrivialBlend::Add):
+// premultiplied src + dst, clamped, all four channels.
+static uint32_t blend_add(uint32_t dst, uint32_t src)
+{
+	uint32_t a = CA(src) + CA(dst); if (a > 255) a = 255;
+	uint32_t r = CR(src) + CR(dst); if (r > 255) r = 255;
+	uint32_t g = CG(src) + CG(dst); if (g > 255) g = 255;
+	uint32_t b = CB(src) + CB(dst); if (b > 255) b = 255;
+	return CMK(r, g, b, a);
+}
+
+// MULTIPLY / HARDLIGHT = the "complex" blend the wgpu shaders run
+// (render/wgpu/shaders/blend/{multiply,hardlight}.wgsl). src/dst are
+// premultiplied; blend_func operates on UN-premultiplied channels; the result
+// is premultiplied:
+//   out.rgb = src*(1-da) + dst*(1-sa) + sa*da*B(src/sa, dst/da)
+//   out.a   = sa + da*(1-sa)
+// src.a==0 -> discard (leave dst). dst.a==0 -> src (both modes reduce to it;
+// avoids the shader's 0/0 in dst/da, which never arises for the opaque Seedling
+// buffers anyway).
+static uint32_t blend_complex(int mode, uint32_t dst, uint32_t src)
+{
+	double sa = CA(src) / 255.0, da = CA(dst) / 255.0;
+	if (sa <= 0.0) return dst;
+	if (da <= 0.0) return src;
+	double sr = CR(src) / 255.0, sg = CG(src) / 255.0, sb = CB(src) / 255.0;
+	double dr = CR(dst) / 255.0, dg = CG(dst) / 255.0, db = CB(dst) / 255.0;
+	double usr = sr / sa, usg = sg / sa, usb = sb / sa;   // un-premultiplied src
+	double udr = dr / da, udg = dg / da, udb = db / da;   // un-premultiplied dst
+	double br, bg, bb;
+	if (mode == BM_MULTIPLY)
+	{
+		br = usr * udr; bg = usg * udg; bb = usb * udb;
+	}
+	else  // BM_HARDLIGHT
+	{
+		br = usr <= 0.5 ? 2.0 * usr * udr : 1.0 - 2.0 * (1.0 - udr) * (1.0 - usr);
+		bg = usg <= 0.5 ? 2.0 * usg * udg : 1.0 - 2.0 * (1.0 - udg) * (1.0 - usg);
+		bb = usb <= 0.5 ? 2.0 * usb * udb : 1.0 - 2.0 * (1.0 - udb) * (1.0 - usb);
+	}
+	double outr = sr * (1.0 - da) + dr * (1.0 - sa) + sa * da * br;
+	double outg = sg * (1.0 - da) + dg * (1.0 - sa) + sa * da * bg;
+	double outb = sb * (1.0 - da) + db * (1.0 - sa) + sa * da * bb;
+	double outa = sa + da * (1.0 - sa);
+	int ri = (int) (outr * 255.0 + 0.5), gi = (int) (outg * 255.0 + 0.5);
+	int bi = (int) (outb * 255.0 + 0.5), ai = (int) (outa * 255.0 + 0.5);
+	if (ri < 0) ri = 0; if (ri > 255) ri = 255;
+	if (gi < 0) gi = 0; if (gi > 255) gi = 255;
+	if (bi < 0) bi = 0; if (bi > 255) bi = 255;
+	if (ai < 0) ai = 0; if (ai > 255) ai = 255;
+	return CMK(ri, gi, bi, ai);
+}
+
+// Blend the already-colorTransform'd premultiplied source over the premultiplied
+// dest per a non-normal Flash blend mode.
+static uint32_t blend_mode_apply(int mode, uint32_t dst, uint32_t src)
+{
+	if (mode == BM_ADD) return blend_add(dst, src);
+	return blend_complex(mode, dst, src);
+}
+
 // ---------------------------------------------------------------------------
 // SIMD span kernels (perf lever: Seedling's FlashPunk Image.render is a per-frame
 // software blit — bd_copy_pixels/bd_draw were ~5.5% of frame self-time; the hot
@@ -1702,22 +1770,35 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	}
 	if (src == NULL || src->disposed || src->pixels == NULL) return avm2_undefined();
 
-	// blendMode (arg 3): default "normal".
+	// blendMode (arg 3): default "normal". alpha/erase are handled as the Flash
+	// no-op-for-BitmapData quirk; multiply/hardlight/add route the raster through
+	// blend_mode_apply(); everything else stays normal (blend_over).
 	int blend_alpha_or_erase = 0;
+	int blend_mode = BM_NORMAL;
 	if (arg_present(act, 3))
 	{
 		const Avm2String* bm = avm2_coerce_to_string(ctx, act->args[3]);
-		if (bm != NULL && bm->utf8 != NULL
-		    && (strcmp(bm->utf8, "alpha") == 0 || strcmp(bm->utf8, "erase") == 0))
-			blend_alpha_or_erase = 1;
+		if (bm != NULL && bm->utf8 != NULL)
+		{
+			if (strcmp(bm->utf8, "alpha") == 0 || strcmp(bm->utf8, "erase") == 0)
+				blend_alpha_or_erase = 1;
+			else if (strcmp(bm->utf8, "multiply") == 0) blend_mode = BM_MULTIPLY;
+			else if (strcmp(bm->utf8, "hardlight") == 0) blend_mode = BM_HARDLIGHT;
+			else if (strcmp(bm->utf8, "add") == 0) blend_mode = BM_ADD;
+		}
 	}
 
 	// A BitmapData source with alpha/erase does nothing (Flash quirk).
 	if (source_is_bitmapdata && blend_alpha_or_erase) return avm2_undefined();
 
-	// matrix (arg 1): only identity-2x2 (translation) is CPU-blittable.
+	// matrix (arg 1): only identity-2x2 (translation) is CPU-blittable. A NULL
+	// matrix argument means identity (the AS3 default) — same null-vs-undefined
+	// trap as the colorTransform arg: `arg_present` is true for null, and reading
+	// a/b/c/d/tx/ty off null coerces to NaN (which the affine det-guard would then
+	// no-op). Only a real Matrix object overrides identity. (This is exactly the
+	// Seedling day/night overlay path: draw(bmp, null, cxform, MULTIPLY).)
 	double ma = 1, mb = 0, mc = 0, md = 1, mtx = 0, mty = 0;
-	if (arg_present(act, 1))
+	if (arg_present(act, 1) && act->args[1].kind == AVM2_VALUE_OBJECT)
 	{
 		Avm2Value mv = act->args[1];
 		ma = read_prop_num(ctx, mv, "a");  mb = read_prop_num(ctx, mv, "b");
@@ -1819,7 +1900,10 @@ static Avm2Value bd_draw(Avm2Activation* act)
 					uint8_t a = ctx_channel(am, ao, (uint8_t) CA(c));
 					color = premul(CMK(r, g, b, a), 1);
 				}
-				if (blend || has_cxform)
+				if (blend_mode != BM_NORMAL)
+					color = blend_mode_apply(blend_mode,
+						bd_get_raw(dst, (uint32_t) dx, (uint32_t) dy), color);
+				else if (blend || has_cxform)
 					color = blend_over(
 						bd_get_raw(dst, (uint32_t) dx, (uint32_t) dy), color);
 				if (opaque) color = with_alpha(color, 0xFF);
@@ -1841,11 +1925,12 @@ static Avm2Value bd_draw(Avm2Activation* act)
 
 	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
 
-	// Fast path: no colorTransform, distinct buffers -> each row is a contiguous
-	// span with a mode constant across the call, dispatched to the SIMD/scalar
-	// kernels. This is the hot FlashPunk Image.render(draw) branch (a gate tally
-	// found cxform never set here). The cxform path stays per-pixel scalar.
-	if (!has_cxform && src->pixels != dst->pixels)
+	// Fast path: no colorTransform, no non-normal blend mode, distinct buffers ->
+	// each row is a contiguous span with a mode constant across the call,
+	// dispatched to the SIMD/scalar kernels. This is the hot FlashPunk
+	// Image.render(draw) branch (a gate tally found cxform never set here). The
+	// cxform and blend-mode paths stay per-pixel scalar.
+	if (!has_cxform && blend_mode == BM_NORMAL && src->pixels != dst->pixels)
 	{
 		for (uint32_t j = 0; j < rh; j++)
 		{
@@ -1879,7 +1964,12 @@ static Avm2Value bd_draw(Avm2Activation* act)
 				uint8_t a = ctx_channel(am, ao, (uint8_t) CA(c));
 				color = premul(CMK(r, g, b, a), 1);
 			}
-			if (blend || has_cxform)
+			if (blend_mode != BM_NORMAL)
+			{
+				uint32_t dc = bd_get_raw(dst, dxx, dyy);
+				color = blend_mode_apply(blend_mode, dc, color);
+			}
+			else if (blend || has_cxform)
 			{
 				uint32_t dc = bd_get_raw(dst, dxx, dyy);
 				color = blend_over(dc, color);
