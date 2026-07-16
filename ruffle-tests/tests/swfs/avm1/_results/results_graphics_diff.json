@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-14T18:18:35.320638+00:00",
-    "old_git_sha": "4a3b0bdb22af8fb0879b4fa39191ba3277bd1187",
-    "new_timestamp": "2026-07-16T02:32:09.832435+00:00",
-    "new_git_sha": "c7f6aa70a0e63846f20c89efd2f2dbdcac7a1c5e",
+    "old_timestamp": "2026-07-16T02:32:09.832435+00:00",
+    "old_git_sha": "c7f6aa70a0e63846f20c89efd2f2dbdcac7a1c5e",
+    "new_timestamp": "2026-07-16T03:15:16.696200+00:00",
+    "new_git_sha": "cd80a6b014ccf49181f72b1dd79cc0a818edf2d8",
     "partial": false,
     "same_commit": false
   },
@@ -11,47 +11,39 @@
     "old_pass": 634,
     "old_ruffle_matched": 17,
     "old_effective_pass": 651,
-    "old_total": 706,
-    "old_pass_rate": 89.8,
+    "old_total": 708,
+    "old_pass_rate": 89.5,
     "new_pass": 634,
     "new_ruffle_matched": 17,
     "new_effective_pass": 651,
     "new_total": 708,
     "new_pass_rate": 89.5,
-    "old_mismatched_lines": 15181,
-    "new_mismatched_lines": 15311,
-    "increased_mismatches": 0,
+    "old_mismatched_lines": 15311,
+    "new_mismatched_lines": 15324,
+    "increased_mismatches": 13,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 706,
-    "added": 2,
+    "unchanged": 707,
+    "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "amf0_serde_suite",
-      "change_type": "added",
-      "old_status": null,
+      "test": "global_instance_decls",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
       "new_status": "output_mismatch",
-      "old_lines": null,
+      "old_lines": {
+        "actual_lines": 786,
+        "expected_lines": 758,
+        "matching_lines": 26
+      },
       "new_lines": {
-        "actual_lines": 141,
-        "expected_lines": 146,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "amf_sharedobject_strict_array_serialization",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 2
+        "actual_lines": 815,
+        "expected_lines": 758,
+        "matching_lines": 13
       }
     }
   ]

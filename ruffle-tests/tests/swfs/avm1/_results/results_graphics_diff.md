@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `4a3b0bdb22af` (2026-07-14T18:18:35.320638+00:00)
-**Current:** `c7f6aa70a0e6` (2026-07-16T02:32:09.832435+00:00)
+**Previous:** `c7f6aa70a0e6` (2026-07-16T02:32:09.832435+00:00)
+**Current:** `cd80a6b014cc` (2026-07-16T03:15:16.696200+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 634 | 634 | 0 |
-| Total | 706 | 708 | +2 |
-| Pass rate | 89.8% | 89.5% | -0.3% |
-| Mismatched lines | 15181 | 15311 | +130 |
+| Total | 708 | 708 | 0 |
+| Pass rate | 89.5% | 89.5% | 0% |
+| Mismatched lines | 15311 | 15324 | +13 |
+|   Increased | | | +13 |
 
-## Added Tests (2)
+## Line Count Changed (1)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `amf0_serde_suite` | output_mismatch | 17/146 |
-| `amf_sharedobject_strict_array_serialization` | output_mismatch | 2/3 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `global_instance_decls` | output_mismatch | 26/758 | 13/758 | +13 |
