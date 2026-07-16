@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-14T02:44:48.390280+00:00",
-    "old_git_sha": "b3ec6d48c0078c56fb7e34988fa68b49a5269cc6",
-    "new_timestamp": "2026-07-14T18:18:35.320638+00:00",
-    "new_git_sha": "4a3b0bdb22af8fb0879b4fa39191ba3277bd1187",
+    "old_timestamp": "2026-07-14T18:18:35.320638+00:00",
+    "old_git_sha": "4a3b0bdb22af8fb0879b4fa39191ba3277bd1187",
+    "new_timestamp": "2026-07-16T02:32:09.832435+00:00",
+    "new_git_sha": "c7f6aa70a0e63846f20c89efd2f2dbdcac7a1c5e",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,43 @@
     "new_pass": 634,
     "new_ruffle_matched": 17,
     "new_effective_pass": 651,
-    "new_total": 706,
-    "new_pass_rate": 89.8,
+    "new_total": 708,
+    "new_pass_rate": 89.5,
     "old_mismatched_lines": 15181,
-    "new_mismatched_lines": 15181,
+    "new_mismatched_lines": 15311,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 706,
-    "added": 0,
+    "added": 2,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "amf0_serde_suite",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 141,
+        "expected_lines": 146,
+        "matching_lines": 17
+      }
+    },
+    {
+      "test": "amf_sharedobject_strict_array_serialization",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 2
+      }
+    }
+  ]
 }
