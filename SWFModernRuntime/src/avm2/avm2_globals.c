@@ -1799,6 +1799,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	register_application_domain(ctx);
 	register_system(ctx);
 	register_security(ctx);
+	avm2_register_external(ctx);
 
 	// flash.events (Event/EventDispatcher/EventPhase/IEventDispatcher —
 	// avm2_events.c).

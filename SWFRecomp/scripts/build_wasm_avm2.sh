@@ -187,7 +187,10 @@ done
 echo "  (${NCOMPILED} TUs (re)compiled)"
 
 echo "=== Linking ${NAME}.js / ${NAME}.wasm ==="
-EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer"]'
+# _avm2_ei_dispatch: the ExternalInterface addCallback dispatcher (host JS ->
+# registered AS3 callback; avm2_external.c). _malloc/_free back its EM_ASM
+# string marshaling (module-scope _malloc is only present when exported).
+EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_avm2_ei_dispatch","_malloc","_free"]'
 emcc "${OBJS[@]}" \
     --use-port=emdawnwebgpu \
     "${SIMD_FLAGS[@]}" \

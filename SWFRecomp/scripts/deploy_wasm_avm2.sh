@@ -29,6 +29,10 @@ OUR="${DOCS2}/examples/avm2/${NAME}"
 mkdir -p "${OUR}"
 cp "${BUILD_DIR}/${NAME}.js" "${BUILD_DIR}/${NAME}.wasm" "${OUR}/"
 [ -f "${TELEPORT_SWF}" ] && cp "${TELEPORT_SWF}" "${OUR}/test.swf"
+# AVM2 ExternalInterface page shim (window.__swfBridge gate + BridgeGeneric
+# host surface). demo.html HEAD-probes and injects it; games without injected
+# bridge AS3 never call EI, so staging it is behavior-neutral for plain demos.
+cp "${SWFRECOMP_ROOT}/wasm_wrappers/swf_bridge_avm2.js" "${OUR}/"
 echo "graphics" > "${OUR}/.demo_type"
 cat > "${OUR}/test_info.json" <<JSON
 {

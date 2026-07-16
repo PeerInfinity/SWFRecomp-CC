@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SWFRecomp AVM2 ExternalInterface (__swfBridge) harness</title>
+</head>
+<body>
+<h1>AVM2 __swfBridge / BridgeGeneric-contract toy</h1>
+<!-- Headed-Chrome live test for the AVM2 ExternalInterface subset
+     (avm2_external.c). Loads the production AVM2 page shim
+     (swf_bridge_avm2.js -> installs window.__swfBridge + the BridgeGeneric
+     host surface stateChanged/getItemQueue), the recompiled AS3 toy
+     (swfbridge_toy_as3), and a MOCK HOST standing in for Archipelago-CC's
+     flashBridgeAdapter: once the game's addCallback wrappers appear under
+     __swfBridge.game it drives wireCheck / configure / readState inbound and
+     delivers items via queueItems, recording every stateChanged report.
+
+     The shim must load BEFORE the WASM module (classic script) so the
+     runtime's EI availability gate sees window.__swfBridge. -->
+<canvas id="canvas" width="200" height="150"></canvas>
+<button id="btn-run" disabled>Run SWF</button>
+
+<!-- 1) Production AVM2 bridge shim — installs window.__swfBridge. -->
+<script src="swf_bridge_avm2.js"></script>
+
+<!-- 2) Mock host: the Archipelago-CC-side role, simulated for this test. -->
+<script>
+  window.__hostResults = {
+    wireCheck: null,
+    configureRet: null,
+    readState: null,
+    readStateFinal: null,
+  };
+  // Record every game->host state report (typed values — booleans must
+  // arrive as booleans, not strings).
+  window.__stateChanges = [];
+  window.__swfBridge.onStateChanged = function (pname, pvalue) {
+    window.__stateChanges.push({ name: pname, value: pvalue });
+    console.log('[host] stateChanged: ' + pname + ' = ' + pvalue +
+      ' (' + typeof pvalue + ')');
+  };
+  // Drive the inbound host->game side once the game has registered its
+  // callbacks (polled after Run — registration happens in the root class
+  // constructor, i.e. after runSWF starts the timeline).
+  window.__hostDrive = function () {
+    (function waitGame(n) {
+      var g = window.__swfBridge.game;
+      if (g && g.wireCheck && g.configure && g.readState) {
+        var r = window.__hostResults;
+        r.wireCheck = g.wireCheck();
+        console.log('[host] wireCheck -> ' + r.wireCheck);
+        r.configureRet = g.configure(JSON.stringify({
+          gameId: 'swfbridge_toy_as3',
+          params: { difficulty: 'normal' },
+          regionId: 'r1',
+        }));
+        console.log('[host] configure -> ' + r.configureRet);
+        r.readState = g.readState();
+        console.log('[host] readState -> ' + r.readState);
+        // Deliver received items asynchronously (~1.2s), simulating host
+        // item arrival; the game polls getItemQueue each frame.
+        setTimeout(function () {
+          console.log('[host] delivering items: sword, key');
+          window.__swfBridge.queueItems([{ item: 'sword' }, { item: 'key' }]);
+          // Read state back after the game applied both (poll for DONE
+          // handled by the driver; grab a final readState a bit later).
+          setTimeout(function () {
+            r.readStateFinal = window.__swfBridge.game.readState();
+            console.log('[host] readState(final) -> ' + r.readStateFinal);
+          }, 1500);
+        }, 1200);
+      } else if (n > 0) {
+        setTimeout(function () { waitGame(n - 1); }, 100);
+      } else {
+        console.log('[host] ERROR: game callbacks never registered');
+      }
+    })(100);
+  };
+</script>
+
+<!-- 3) WASM module setup (mirrors docs2/demo.html). -->
+<script>
+  window.__runtimeReady = false;
+  window.Module = {
+    locateFile: function (p) { return p; },
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.log('[err] ' + t); },
+    onRuntimeInitialized: function () { window.__runtimeReady = true; },
+  };
+  (function waitReady(n) {
+    if (window.__runtimeReady && window.__swfBridge) {
+      document.getElementById('btn-run').disabled = false;
+      console.log('[harness] runtime + bridge ready');
+    } else if (n > 0) {
+      setTimeout(function () { waitReady(n - 1); }, 50);
+    } else {
+      console.log('[harness] ERROR: runtime/bridge not ready (runtime=' +
+        !!window.__runtimeReady + ' bridge=' + !!window.__swfBridge + ')');
+    }
+  })(400);
+  document.getElementById('btn-run').addEventListener('click', function () {
+    this.disabled = true;
+    console.log('[harness] running SWF');
+    window.__hostDrive();                 // waits for callbacks, then drives
+    Module.ccall('runSWF', null, [], [], { async: true });
+  });
+</script>
+<script src="swfbridge_toy_as3.js"></script>
+</body>
+</html>

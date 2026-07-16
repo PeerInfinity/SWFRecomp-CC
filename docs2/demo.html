@@ -614,6 +614,22 @@
             }
         };
 
+        // --- AVM2 ExternalInterface bridge shim (opt-in via staged file) ---
+        // deploy_wasm_avm2.sh stages swf_bridge_avm2.js next to AVM2 demos; it
+        // installs window.__swfBridge (the runtime's EI availability gate) and
+        // the BridgeGeneric host surface (stateChanged/getItemQueue + inbound
+        // callback wrappers). The gate is memoized at the SWF's first EI touch
+        // (after the Run click), so this async inject always lands in time.
+        // Demos without the staged file 404 the probe and are unaffected.
+        fetch(testDir + 'swf_bridge_avm2.js', { method: 'HEAD' })
+            .then(function(r) {
+                if (!r.ok) return;
+                var shim = document.createElement('script');
+                shim.src = testDir + 'swf_bridge_avm2.js';
+                document.body.appendChild(shim);
+            })
+            .catch(function() {});
+
         // --- Load the Emscripten JS ---
         updateStatus('loading', 'Loading WASM module...');
         var script = document.createElement('script');

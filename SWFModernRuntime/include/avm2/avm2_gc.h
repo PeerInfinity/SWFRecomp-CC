@@ -80,6 +80,7 @@ void avm2_gc_mark_roots_events(Avm2Context* ctx);
 void avm2_gc_mark_roots_amf(Avm2Context* ctx);
 void avm2_gc_mark_roots_media(Avm2Context* ctx);
 void avm2_gc_mark_roots_globals(Avm2Context* ctx);
+void avm2_gc_mark_roots_external(Avm2Context* ctx);
 
 // Per-module ext tracers for the exts whose object edges hang off intermediate
 // (non-census) allocations the conservative blob scan cannot follow: the
