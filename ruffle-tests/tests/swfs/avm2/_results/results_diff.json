@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-16T09:42:28.962769+00:00",
-    "old_git_sha": "b96c96b48a7b611eac2b2ef821fee981a3399af2",
-    "new_timestamp": "2026-07-16T10:42:39.264851+00:00",
-    "new_git_sha": "aca2a606e973717f6917aab5bb0b35f23aa2ab98",
+    "old_timestamp": "2026-07-16T10:42:39.264851+00:00",
+    "old_git_sha": "aca2a606e973717f6917aab5bb0b35f23aa2ab98",
+    "new_timestamp": "2026-07-16T22:43:17.631715+00:00",
+    "new_git_sha": "a05b56ddf0726ba4176c4c0b1de06ba33ac61ac1",
     "partial": false,
     "same_commit": false
   },
@@ -11,35 +11,59 @@
     "old_pass": 822,
     "old_ruffle_matched": 25,
     "old_effective_pass": 847,
-    "old_total": 1206,
-    "old_pass_rate": 68.2,
+    "old_total": 1207,
+    "old_pass_rate": 68.1,
     "new_pass": 822,
     "new_ruffle_matched": 25,
     "new_effective_pass": 847,
-    "new_total": 1207,
-    "new_pass_rate": 68.1,
-    "old_mismatched_lines": 47013,
-    "new_mismatched_lines": 47043,
+    "new_total": 1210,
+    "new_pass_rate": 67.9,
+    "old_mismatched_lines": 47043,
+    "new_mismatched_lines": 47047,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 1206,
-    "added": 1,
+    "unchanged": 1207,
+    "added": 3,
     "removed": 0
   },
   "changes": [
     {
-      "test": "xml_list_ctor_errors",
+      "test": "verify_illegal_opcode",
       "change_type": "added",
       "old_status": null,
       "new_status": "output_mismatch",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 28,
-        "expected_lines": 34,
-        "matching_lines": 4
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "verify_method_info_duplicate",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 2,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "verify_method_info_oob",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
       }
     }
   ]
