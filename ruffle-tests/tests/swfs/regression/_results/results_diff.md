@@ -1,14 +1,14 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b96c96b48a7b` (2026-07-16T09:42:28.988310+00:00)
-**Current:** `aca2a606e973` (2026-07-16T10:42:39.290445+00:00)
+**Previous:** `aca2a606e973` (2026-07-16T10:42:39.290445+00:00)
+**Current:** `a05b56ddf072` (2026-07-16T22:43:17.656722+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 43 | 44 | +1 |
-| Total | 43 | 44 | +1 |
+| Passing | 44 | 45 | +1 |
+| Total | 44 | 45 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
@@ -16,4 +16,4 @@
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm2_sharedobject_flushstatus` | pass | 4/4 |
+| `avm2_bitmapdata_draw_textfield` | pass | 5/5 |
