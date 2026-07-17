@@ -35006,24 +35006,32 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 				if (func != NULL) {
 					MovieClip* saved_ctx = g_current_context;
 					actionSetCurrentContext(&root_movieclip);
-					// Unlike the children arm above, this arm has NEVER
-					// version-switched (normalization candidate, not this
-					// migration), so INV_BASE_CLIP reads the caller's live
-					// g_swf_version — exactly what the arm read — and the
-					// forbidden pairing doesn't arise. Type-1 keeps no local
-					// frame AND no base clip here (both preserved-by-omission;
-					// another asymmetry vs the children arm). The core's
+					// Version switch normalized (pass (b) remainder, item 1):
+					// run the handler at its DEFINING movie's SWF version like
+					// the children arm, not the ambient host version.
+					// regression/root_enterframe_cross_swf_version flips on this.
+					// The type-2-only base-clip switch (an asymmetry vs the
+					// children arm's both-types switch, and vs this arm's type-1
+					// no-base-clip) moves INTO the arm under the CALLER-version
+					// gate (g_swf_version read before the invoke, exactly the
+					// value the old INV_BASE_CLIP read pre-switch) so it never
+					// pairs with INV_VERSION_SWITCH. Type-1 keeps no local frame
+					// AND no base clip (both preserved-by-omission). The core's
 					// clamp/pad covers a param'd type-1 handler as above.
 					ActionVar _ref_this = {0};
 					_ref_this.type = ACTION_STACK_VALUE_MOVIECLIP;
 					_ref_this.data.numeric_value = (u64)(uintptr_t)&root_movieclip;
-					u32 _ref_flags = INV_CAPTURED_SCOPE | INV_EVENT_THIS_MC;
+					MovieClip* _ref_saved_base = g_current_context;
+					if (func->function_type == 2 && g_swf_version >= 6 && func->base_clip != NULL)
+						g_current_context = (MovieClip*)func->base_clip;
+					u32 _ref_flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
 					if (func->function_type == 2)
-						_ref_flags |= INV_MC_THIS_NULL_PTR | INV_BASE_CLIP;
+						_ref_flags |= INV_MC_THIS_NULL_PTR;
 					InvokeOpts _ref_opts = { .flags = _ref_flags };
 					g_call_depth++;
 					invokeFunctionValue(app_context, func, &_ref_this, NULL, 0, &_ref_opts);
 					g_call_depth--;
+					g_current_context = _ref_saved_base;
 					actionSetCurrentContext(saved_ctx);
 				}
 			}
@@ -35078,16 +35086,26 @@ void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context)
 	MovieClip* saved_ctx = g_current_context;
 	actionSetCurrentContext(&root_movieclip);
 	// The barest arm of the family: no captured scopes, no local frame, no
-	// base clip, no version switch, and no g_call_depth bracket — all
-	// preserved by omission (this arm never had them; adding any is a
-	// normalization commit). INV_EVENT_THIS_MC reproduces the set/clear (the
-	// frame loop's saved value is NULL); INV_MC_THIS_NULL_PTR keeps the
-	// type-2 ABI this NULL for the g_event_this_mc preload. The core pads a
-	// param'd type-1 handler instead of under-popping the eval stack.
+	// base clip, and no g_call_depth bracket — all preserved by omission
+	// (this arm never had them; adding any is a further normalization commit).
+	// Version switch normalized (pass (b) remainder, item 1) for sibling
+	// consistency with the children arm and the root dynamic_props arm: run the
+	// handler at its DEFINING movie's SWF version, not the ambient host version.
+	// No base clip here, so INV_VERSION_SWITCH pairs with no INV_BASE_CLIP (the
+	// forbidden pairing never arises). Applied without an isolating flip test:
+	// this arm is unreachable via a bare `onEnterFrame =` SetVariable in the
+	// current runtime (that routes through the dynamic_props root arm above —
+	// probed 2026-07-17, this arm never fired), so the change is inert in every
+	// current test and correct if the arm is ever reached. The root arm's
+	// flip is locked by regression/root_enterframe_cross_swf_version.
+	// INV_EVENT_THIS_MC reproduces the set/clear (the frame loop's saved value
+	// is NULL); INV_MC_THIS_NULL_PTR keeps the type-2 ABI this NULL for the
+	// g_event_this_mc preload. The core pads a param'd type-1 handler instead
+	// of under-popping the eval stack.
 	ActionVar _rvm_this = {0};
 	_rvm_this.type = ACTION_STACK_VALUE_MOVIECLIP;
 	_rvm_this.data.numeric_value = (u64)(uintptr_t)&root_movieclip;
-	u32 _rvm_flags = INV_EVENT_THIS_MC;
+	u32 _rvm_flags = INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
 	if (func->function_type == 2)
 		_rvm_flags |= INV_MC_THIS_NULL_PTR;
 	InvokeOpts _rvm_opts = { .flags = _rvm_flags };
