@@ -1,9 +1,70 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-16 — RWK-2 (BitmapData.draw(TextField) rasterization +
-RWK gameplay) DONE; same day earlier: RWK-1 bring-up, AVM2 ExternalInterface +
-packaged Seedling `__swfBridge` page, audio output. Prior sections are Stage
-12 sessions.
+Last updated: 2026-07-18 — RWK-3 (browser demo + wasm heap gate) DONE; kitty
+TAS handed to RWK-4 with corrected phase tables. Prior: RWK-1/2 (2026-07-16),
+Stage 12 sessions.
+
+## State (RWK-3 — browser demo + wasm heap gate + kitty TAS, 2026-07-18)
+
+**The RWK browser demo is live and playable** (`docs2/examples/avm2/rwk/`,
+`demo.html?test=avm2/rwk`, 6.9 MB wasm, avm2_catalog.json listed): menu text
+renders on the real render path, **live mouse** click starts the game, live
+keys walk the player, title/game music mixes after the autoplay gesture
+(verified: `_swfAudioCtx.state === "running"` + non-zero samples pulled via
+`Module._audio_fill_buffer`), zero uncaught errors (the `rando_bridge.js`
+404 is demo.html's optional-AP HEAD probe). Real-GPU spot check
+(windows-playwright rig, Intel Gen9): **5.1 ms/frame mean (~195 fps
+capacity), present 0.6 ms**. WSL headed Chrome renders RWK fine (no
+Seedling-style texture-array limit), so menu/PlayState/input probes all
+work from the agent shell.
+
+**Lever 0 (wasm heap gate) — measured, arena sizing chosen:**
+- New env-gated `AVM2_HEAP_STATS=1` (avm2_main.c) prints o1heap diagnostics
+  after the native tick loop. RWK PlayState boot peak **1409 MB**;
+  steady-state 1373 MB; post-boot growth **~52 KB/tick ≈ 94 MB/min**
+  (AVM2 strings are never collected).
+- wasm32 AVM2 arena 1 GB → **1984 MB** (heap.c, `__EMSCRIPTEN__ &&
+  SWF_AVM2`): o1heap's 32-bit capacity max is 2 GB (FRAGMENT_SIZE_MAX) and
+  emscripten's anonymous mmap fails at exactly 2048 MB (1984 measured OK);
+  build_wasm_avm2.sh adds `-sMAXIMUM_MEMORY=4GB`. AVM1 demos keep 1 GB.
+- Fixed `vmem_reserve` (utils.c): mmap failure returns MAP_FAILED, not
+  NULL — heap_init's NULL check had let 0xffffffff flow into o1heapInit.
+- **Known limit:** the browser demo OOM-exits after ~6-7 minutes of play
+  (611 MB headroom / 94 MB-min). Collectable strings (string census +
+  sweep between ticks) is the follow-up — the C-side `const Avm2String*`
+  escape surface (display names, text ext, E4X, AMF, statics) needs its
+  own session; AVM2_GC_STRESS is the correctness tripwire.
+
+**Live mouse (Stage-13c ring extended):** `avm2_input_inject_mouse`
+(avm2_display.c; kind/x/y/button/click_count) fed from render_webgpu.c's
+emscripten mouse callbacks under `#ifdef SWF_AVM2`. Double-click detected
+in the callback (500 ms / 4 px — EmscriptenMouseEvent has no DOM `detail`);
+delivery keeps harness parity (MOUSE_DOWN code odd parity = doubleClick).
+Native/harness behavior byte-identical (the ring is only fed in browser).
+Browser getTimer note: AVM2 getTimer is the µs tick counter (33.3 ms/tick
+at 30 fps) — tick-driven, not wall-clock; pacing indistinguishable at full
+frame rate.
+
+**Kitty TAS (handed to RWK-4):** 7 iteration plans this session
+(`ruffle-tests/_rwk_tas/` — now git-tracked; README.md is the source of
+truth). Solid results: corrected physics (player max walk ~1.05 world
+px/tick = 1.6x alien speed — the RWK-2 "4x" note was wrong; falls ~15
+ticks; kill band < 20 world px), a world-coordinate map of the descent
+(J at world 168 anchors it), alien patrol schedules with periods
+(alien-2 317, alien-3 256, floor alien ~678), and decisive negatives:
+the shelf-2 "direct right" exit does not exist (1-tile step); platform-2
+has NO safe park (alien-3's right-end turnaround IS the lip — plan_l died
+there); the floor pocket at world ~310 is lethal during t~1030-1116.
+plan_k proved the clean platform-1 landing one alien-2 cycle later
+(t1203). Next session: re-measure alien-3's left-end turn (~t1210, the
+old t1192 anchor is early), then cross p2 in one motion. Powerups persist
+across deaths — segment the remaining route (SHOOT/DBLJUMP/corridor/
+shaft) with deliberate suicides. **Oracle spot-check done:** state-aligned
+park frame vs the RUFFLE_INPUT_FILE exporter: **MAD 1.23, 2.07% px**,
+player + tiles 0 diff px; every diff = a documented pacing-artifact class
+(entity phases, SetHelp text lifetime, HUD clock). Exporter gotcha: its
+wall-clock elapsed under-drives long holds — oracle inputs need their own
+schedule (click ~wait 655), never reuse native tick numbers.
 
 ## State (RWK-2 — FlxText rasterization + gameplay, 2026-07-16)
 

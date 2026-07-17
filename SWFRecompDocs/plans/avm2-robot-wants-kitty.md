@@ -1,6 +1,36 @@
 # AVM2 next game — Robot Wants Kitty (Flixel) bring-up plan
 
-Status: **RWK-2 DONE (2026-07-16)** — both levers landed. **Lever 1
+Status: **RWK-3 DONE (2026-07-18) — browser demo LIVE; kitty TAS handed
+forward.** **Lever 0 (wasm heap gate)**: measured with the new env-gated
+`AVM2_HEAP_STATS` o1heap diagnostics — PlayState boot peak is **1409 MB**
+(< 2 GB), so the gate was arena sizing: wasm32 AVM2 arena 1 GB → **1984 MB**
+(o1heap's 32-bit capacity max is 2 GB; emscripten's anonymous mmap refuses
+exactly 2048 MB) + `-sMAXIMUM_MEMORY=4GB`; also fixed `vmem_reserve`
+returning MAP_FAILED instead of NULL. Post-boot string leak measured at
+~52 KB/tick (~94 MB/min) → the browser demo OOMs after **~6-7 minutes of
+play**; collectable strings filed as the follow-up (deliberately not forced
+into this session). **Lever 1 (browser demo)**: `demo.html?test=avm2/rwk`
+deployed (6.9 MB wasm, catalog listed) — menu text on real GPU, **live
+mouse** (new `avm2_input_inject_mouse` riding the Stage-13c input ring from
+render_webgpu.c, SWF_AVM2-scoped, browser-only), live keys, audio verified
+(AudioContext running + non-zero mixer samples), zero uncaught errors.
+Real-GPU perf spot check (Windows Chrome, Intel Gen9): **5.1 ms/frame
+(~195 fps capacity)** — RWK sails past 30 fps. **Lever 2 (kitty TAS)**:
+descent-to-J advanced substantially but NOT closed — 7 iteration plans
+(e..l) produced corrected physics (player walk ~1.05 world px/tick = 1.6x
+alien speed, NOT the 4x in older notes), a world-coordinate map of the
+descent, exact alien patrol schedules, and the key negative results (no
+direct shelf-2 right exit; platform-2 has NO safe park — alien-3's
+turnaround IS the right lip; the floor pocket at world ~310 is lethal
+t~1030-1116). All tools + plans + autopsies now git-tracked in
+`ruffle-tests/_rwk_tas/` (README = source of truth). Oracle spot-check
+done: state-aligned park frame vs the RUFFLE_INPUT_FILE exporter, **MAD
+1.23 / 2.07% px**, player+tiles 0 diff px, all diffs = documented pacing
+artifact classes. RWK-4: finish the TAS from `_rwk_tas/README.md`'s phase
+tables (re-measure alien-3's left-end turn first), then FlxSave
+persistence + collectable strings.
+
+Previous: **RWK-2 DONE (2026-07-16)** — both levers landed. **Lever 1
 (`BitmapData.draw(TextField)` CPU glyph rasterization)**: the recompiler now
 parses DefineFont2/3 glyph shapes into flattened contour outlines
 (`abc_timeline.cpp` → `Avm2FontData.glyph_pts/...`), and `bd_draw` rasterizes
