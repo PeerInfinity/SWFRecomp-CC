@@ -23231,9 +23231,14 @@ static void invokeUnloadHandler(SWFAppContext* app_context, ASFunction* func,
 		return;
 	}
 	ActionVar this_var = {0};
-	InvokeOpts opts = { .flags = 0 };
-	if (func->function_type == 2)
-		opts.flags |= INV_LOCAL_SCOPE;
+	// Both function types get a fresh local activation frame (pass (b)
+	// remainder, item 5 / master-list item 5). type-2 always had it; type-1
+	// previously got NONE, so a type-1 handler's declared params (bound by its
+	// generated prologue via setVariableByName) leaked into the ambient scope
+	// and clobbered a same-named timeline variable. Flash runs every handler
+	// as a function call with its own activation — params are locals — so the
+	// leak was a real bug. regression/onunload_type1_local_frame flips on this.
+	InvokeOpts opts = { .flags = INV_LOCAL_SCOPE };
 	if (this_mc != NULL)
 	{
 		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
