@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-16T10:42:39.290445+00:00",
-    "old_git_sha": "aca2a606e973717f6917aab5bb0b35f23aa2ab98",
-    "new_timestamp": "2026-07-16T22:43:17.656722+00:00",
-    "new_git_sha": "a05b56ddf0726ba4176c4c0b1de06ba33ac61ac1",
+    "old_timestamp": "2026-07-16T22:43:17.656722+00:00",
+    "old_git_sha": "a05b56ddf0726ba4176c4c0b1de06ba33ac61ac1",
+    "new_timestamp": "2026-07-17T01:29:29.866525+00:00",
+    "new_git_sha": "0ff10028b52ad46f17d3495270749eff8eac9c37",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 44,
+    "old_pass": 45,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 44,
-    "old_total": 44,
+    "old_effective_pass": 45,
+    "old_total": 45,
     "old_pass_rate": 100.0,
     "new_pass": 45,
     "new_ruffle_matched": 0,
@@ -25,22 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 44,
-    "added": 1,
+    "unchanged": 45,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm2_bitmapdata_draw_textfield",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    }
-  ]
+  "changes": []
 }

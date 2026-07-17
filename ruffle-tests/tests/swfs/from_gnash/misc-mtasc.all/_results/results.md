@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-16 22:43 UTC
+**Date**: 2026-07-17 01:29 UTC
 
-**Git SHA**: `a05b56ddf0`
+**Git SHA**: `0ff10028b5`
 
-**Run Duration**: 1m 50s
+**Run Duration**: 1m 49s
 
 ## Summary
 
@@ -25,13 +25,13 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 19.9s |  |
-| 2 | `exception` | 35 | 19.3s |  |
-| 3 | `function_test` | 26 | 22.4s |  |
-| 4 | `hello` | 8 | 19.9s |  |
+| 1 | `enum` | 19 | 21.1s |  |
+| 2 | `exception` | 35 | 20.3s |  |
+| 3 | `function_test` | 26 | 19.5s |  |
+| 4 | `hello` | 8 | 19.5s |  |
 | 5 | `implementsOpTest` | 28 | 20.3s |  |
-| 6 | `inheritance` | 22 | 1.4s |  |
-| 7 | `super_test1` | 17 | 2.0s |  |
+| 6 | `inheritance` | 22 | 1.8s |  |
+| 7 | `super_test1` | 17 | 1.7s |  |
 
 ## Ruffle-Matched Tests
 

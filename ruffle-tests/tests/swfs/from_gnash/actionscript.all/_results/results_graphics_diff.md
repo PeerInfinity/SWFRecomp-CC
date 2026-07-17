@@ -1,29 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `aca2a606e973` (2026-07-16T10:37:05.803967+00:00)
-**Current:** `a05b56ddf072` (2026-07-16T22:53:07.483121+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `a05b56ddf072` (2026-07-16T22:53:07.483121+00:00)
+**Current:** `0ff10028b52a` (2026-07-17T01:37:56.802177+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 135 | 131 | -4 |
-| Total | 243 | 235 | -8 |
-| Pass rate | 55.6% | 55.7% | +0.1% |
-| Mismatched lines | 8435 | 8305 | -130 |
+| Passing | 131 | 135 | +4 |
+| Total | 235 | 243 | +8 |
+| Pass rate | 55.7% | 55.6% | -0.1% |
+| Mismatched lines | 8305 | 8435 | +130 |
 
-## Missing Tests — Shard Failure (8)
+## Added Tests (8)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 4 were previously passing
-- 4 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `array-v5` | output_mismatch | 552/560 |
 | `array-v6` | output_mismatch | 624/644 |
 | `array-v7` | output_mismatch | 603/654 |
@@ -32,5 +24,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `case-v6` | pass | 73/73 |
 | `case-v7` | pass | 67/67 |
 | `case-v8` | pass | 67/67 |
-
-</details>
