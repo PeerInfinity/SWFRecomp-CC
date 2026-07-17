@@ -1,21 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `a05b56ddf072` (2026-07-16T22:53:07.494610+00:00)
-**Current:** `0ff10028b52a` (2026-07-17T01:37:56.811379+00:00)
+**Previous:** `0ff10028b52a` (2026-07-17T01:37:56.811379+00:00)
+**Current:** `c0e0b3493697` (2026-07-17T05:11:28.318450+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 67 | 68 | +1 |
-| Total | 108 | 111 | +3 |
-| Pass rate | 62.0% | 61.3% | -0.7% |
-| Mismatched lines | 1169 | 1200 | +31 |
+| Passing | 68 | 68 | 0 |
+| Total | 111 | 111 | 0 |
+| Pass rate | 61.3% | 61.3% | 0% |
+| Mismatched lines | 1200 | 1200 | 0 |
 
-## Added Tests (3)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `place_and_remove_object_test` | pass | 13/13 |
-| `place_object_test` | ruffle_matched | 0/12 |
-| `place_object_test2` | ruffle_matched | 0/19 |
+No changes detected.
