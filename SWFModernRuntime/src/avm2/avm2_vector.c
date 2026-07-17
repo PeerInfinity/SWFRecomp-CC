@@ -21,6 +21,7 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+#include <memory/heap.h>
 
 // ---------------------------------------------------------------------------
 // Storage
@@ -1203,17 +1204,14 @@ static Avm2Value vec_sort(Avm2Activation* act)
 	avm2_avmplus_qsort(&sc, vec_sort_cmp, items, len);
 
 	// RETURNINDEXEDARRAY sorts but discards the result (Ruffle note).
-	if (sc.options & 8)
-	{
-		return act->this_val;
-	}
-	if (!(sc.options & 4) || sc.unique_satisfied)
+	if (!(sc.options & 8) && (!(sc.options & 4) || sc.unique_satisfied))
 	{
 		for (uint32_t i = 0; i < len && i < ext->length; i++)
 		{
 			ext->elems[i] = items[i].v;
 		}
 	}
+	heap_free(ctx->app, items);
 	return act->this_val;
 }
 

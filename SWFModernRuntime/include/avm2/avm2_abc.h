@@ -120,6 +120,9 @@ enum
 	AVM2_CLASS_FLAG_SEALED = 1 << 0,
 	AVM2_CLASS_FLAG_FINAL = 1 << 1,
 	AVM2_CLASS_FLAG_INTERFACE = 1 << 2,
+	// Synthetic per-newcatch class (avm2_op_newcatch): owned exclusively by
+	// its catch-scope object, freed when that object is swept.
+	AVM2_CLASS_FLAG_SYNTH_CATCH = 1 << 7,
 };
 
 typedef struct Avm2AbcClassData

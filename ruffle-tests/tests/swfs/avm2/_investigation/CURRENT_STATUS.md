@@ -1,9 +1,46 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-16 — collectable strings DONE (AVM2 string census +
-mark + sweep; the ~94 MB/min browser leak class and the RWK PlayState boot
-spike are gone). Prior: RWK-3 (browser demo + wasm heap gate), RWK-1/2,
-Stage 12 sessions.
+Last updated: 2026-07-17 — raw-alloc reclamation DONE (the residual
+~39.5 KB/tick RWK gameplay leak is now ~1.0 KB/tick; long browser
+playthroughs are effectively unbounded). Prior: collectable strings
+(2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
+sessions.
+
+## Raw-alloc reclamation (2026-07-17)
+
+**The census-invisible ~39.5 KB/tick RWK gameplay leak is fixed** (prompt
+`SWFRecompDocs/prompts/avm2-scratch-reclamation.md`). Measured attribution
+(RWK native, plan_k gameplay TAS, allocated delta over ticks 1560→3000):
+
+- Baseline: **39.55 KB/tick** (135.6 MB @1560 → 192.6 MB @3000).
+- Fix 1 — EditText relayout tree (`et_relayout` freed nothing: old layout
+  tree, autosize probe tree, UTF-16 `units`, grow-abandoned line/box
+  buffers): → **27.66 KB/tick** (−11.9, ~30%). The Flixel HUD rewrites
+  `text=` every frame, leaking a full layout tree per tick.
+- Fix 2 — per-call scratch (BitmapData.draw(TextField) glyph path: `gl`
+  placements + `units` + xs/ys/cx/cdir scanline buffers, per HUD blit per
+  frame; Array/Vector sort scratch): → **1.03 KB/tick** (−26.6, the
+  dominant share). t1560 level 121.5 → 85.4 MB.
+- Fix 3/4 — GC-sweep reclamations (dyn-prop tombstone purge on live
+  objects + newactivation/newcatch per-object vtables gated on `no_index`
+  + synthetic catch classes via `AVM2_CLASS_FLAG_SYNTH_CATCH` + swept
+  TextField EditText ext/layout/spans): steady-state share 0 in RWK, but
+  closes two unbounded-growth classes and drops the level ~1 MB.
+- Final: **1.03 KB/tick** (97.4% eliminated), 84.4 MB @1560 → 85.9 MB
+  @3000. Seedling/browser headroom at this burn rate ≈ many hours.
+
+**Deliberately NOT freed:** closure `fn_scope` chains — aliasing confirmed
+(`newactivation` stores `act->outer` as `method_scope` in activation
+vtable entries; an activation can outlive its defining closure), so
+freeing at closure sweep would be a UAF. Over-retained per the GC rule;
+this is the bulk of the residual ~1 KB/tick.
+
+**Verification:** RWK 600-tick traces byte-identical normal/stress/GC=0;
+350 frame dumps pixel-identical normal vs stress; the two
+`avm2_gc_string_*` regression tests + new `avm2_gc_dynprop_tombstone_purge`
+(delete→re-add for-in order stable across purges; mid-iteration delete
+unshifted; cursor reset re-derives) pass in all three GC modes; 11 sampled
+edittext/sort/bitmapdata suite tests identical default vs stress.
 
 ## Collectable strings (2026-07-16)
 

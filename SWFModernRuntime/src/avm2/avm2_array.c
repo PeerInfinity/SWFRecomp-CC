@@ -12,6 +12,7 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+#include <memory/heap.h>
 
 static Avm2Object* this_array(Avm2Activation* act)
 {
@@ -893,6 +894,8 @@ static Avm2Value sort_apply(Avm2Activation* act, SortCtx* sc)
 	// sort_postprocess.
 	if ((sc->options & 4) && !sc->unique_satisfied)
 	{
+		heap_free(ctx->app, items);
+		heap_free(ctx->app, was_hole);
 		return avm2_integer(0);
 	}
 	if (sc->options & 8)  // RETURNINDEXEDARRAY
@@ -902,6 +905,8 @@ static Avm2Value sort_apply(Avm2Activation* act, SortCtx* sc)
 		{
 			avm2_array_push(ctx, out, avm2_uint_value(items[i].idx));
 		}
+		heap_free(ctx->app, items);
+		heap_free(ctx->app, was_hole);
 		return avm2_object_value(out);
 	}
 	Avm2Value* new_elems = avm2_alloc(ctx, (len + 1) * sizeof(Avm2Value));
@@ -923,6 +928,9 @@ static Avm2Value sort_apply(Avm2Activation* act, SortCtx* sc)
 		}
 	}
 	memcpy(ext->elems, new_elems, len * sizeof(Avm2Value));
+	heap_free(ctx->app, items);
+	heap_free(ctx->app, was_hole);
+	heap_free(ctx->app, new_elems);
 	return act->this_val;
 }
 

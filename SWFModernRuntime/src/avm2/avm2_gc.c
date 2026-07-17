@@ -339,6 +339,45 @@ static void trace_object(Avm2Object* o)
 
 // --- sweep ------------------------------------------------------------------
 
+// Free a live object's tombstoned dyn-prop nodes. Tombstones exist only for
+// in-flight enumeration cursors (avm2_object.c next_enumerant), and
+// collections run strictly between ticks when no for-in can be mid-flight
+// (hasnext2 loops live inside method bodies, which complete within a tick) —
+// so at sweep time the only reference to a dead node is the object's cached
+// cursor, which is reset here (the cursor cache re-derives its position from
+// the public index on the next enumeration call; dead nodes are never
+// counted, so the enumerable sequence is unchanged). Without this purge, a
+// delete→re-add cycle on a long-lived object grows its chain unboundedly
+// (the set path skips dead nodes and appends a fresh node + name string).
+static void purge_dead_dyn_props(Avm2Context* ctx, Avm2Object* o)
+{
+	Avm2DynProp** link = &o->dyn_props;
+	Avm2DynProp* tail = NULL;
+	int purged = 0;
+	for (Avm2DynProp* p = o->dyn_props; p != NULL; )
+	{
+		Avm2DynProp* next = p->next;
+		if (p->dead)
+		{
+			*link = next;
+			heap_free(ctx->app, p);
+			purged = 1;
+		}
+		else
+		{
+			tail = p;
+			link = &p->next;
+		}
+		p = next;
+	}
+	if (purged)
+	{
+		o->dyn_tail = tail;
+		o->dyn_enum_pos = NULL;
+		o->dyn_enum_public = 0;
+	}
+}
+
 static void free_innards(Avm2Context* ctx, Avm2Object* o)
 {
 	SWFAppContext* app = ctx->app;
@@ -380,6 +419,25 @@ static void free_innards(Avm2Context* ctx, Avm2Object* o)
 		avm2_events_gc_free_ext(ctx, o);
 		avm2_text_gc_free_ext(ctx, o);
 		heap_free(app, o->native_ext);
+	}
+	// Per-object vtables: only newactivation/newcatch allocate a vtable owned
+	// by a single object, and they are exactly the `no_index` ones (every
+	// other object shares its class's embedded ivtable — never no_index, and
+	// never freed here). Entry keys point into ABC static data; method_scope
+	// chains are shared (not owned); name_index is never built for no_index
+	// vtables.
+	if (o->vtable != NULL && o->vtable->no_index)
+	{
+		if (o->vtable->entries != NULL) heap_free(app, o->vtable->entries);
+		if (o->vtable->metas != NULL) heap_free(app, o->vtable->metas);
+		heap_free(app, (void*) o->vtable);
+	}
+	// Synthetic catch-scope class (avm2_op_newcatch): owned exclusively by
+	// this object; nothing else can reach it (never registered in any
+	// file/domain table, has no class_object/prototype).
+	if (o->cls != NULL && (o->cls->flags & AVM2_CLASS_FLAG_SYNTH_CATCH))
+	{
+		heap_free(app, o->cls);
 	}
 }
 
@@ -479,6 +537,7 @@ static void gc_collect(Avm2Context* ctx)
 		Avm2Object* next = o->gc_next;
 		if (o->gc_mark & 1)
 		{
+			purge_dead_dyn_props(ctx, o);
 			link = &o->gc_next;
 			o = next;
 			continue;

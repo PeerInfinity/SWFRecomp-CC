@@ -1284,6 +1284,7 @@ static Avm2Value bd_flood_fill(Avm2Activation* act)
 			uint32_t nc = cap * 2;
 			uint64_t* g = avm2_alloc(ctx, nc * sizeof(uint64_t));
 			memcpy(g, stack, n * sizeof(uint64_t));
+			heap_free(ctx->app, stack);
 			stack = g;
 			cap = nc;
 		}
@@ -1293,6 +1294,7 @@ static Avm2Value bd_flood_fill(Avm2Activation* act)
 		if (py < bd->height - 1) stack[n++] = ((uint64_t) px << 32) | (py + 1);
 		bd_set_raw(bd, px, py, replace);
 	}
+	heap_free(ctx->app, stack);
 	return avm2_undefined();
 }
 
@@ -1801,6 +1803,13 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		if (np > cap)
 		{
 			uint32_t ncap = np < 256 ? 256 : np;
+			if (xs != NULL)
+			{
+				heap_free(ctx->app, xs);
+				heap_free(ctx->app, ys);
+				heap_free(ctx->app, cx);
+				heap_free(ctx->app, cdir);
+			}
 			xs = avm2_alloc(ctx, ncap * sizeof(double));
 			ys = avm2_alloc(ctx, ncap * sizeof(double));
 			cx = avm2_alloc(ctx, ncap * sizeof(double));
@@ -1900,6 +1909,14 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 			}
 		}
 	}
+	if (xs != NULL)
+	{
+		heap_free(ctx->app, xs);
+		heap_free(ctx->app, ys);
+		heap_free(ctx->app, cx);
+		heap_free(ctx->app, cdir);
+	}
+	heap_free(ctx->app, gl);
 }
 
 // ---------------------------------------------------------------------------

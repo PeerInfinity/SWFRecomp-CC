@@ -1,0 +1,8 @@
+t0: a=A1 c=C1 d=D1 b=B2 
+t1: a=A1 c=C1 d=D1 b=B2 
+t1-mid: a c b 
+t1b: a=A1 c=C1 b=B2 d=D2 
+t2: a=A1 c=C1 b=B2 d=D2 
+t2b: c=C1 b=B2 d=D2 a=A7 
+t3: c=C1 b=B2 d=D2 a=A7 
+done

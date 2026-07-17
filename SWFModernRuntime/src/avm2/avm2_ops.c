@@ -2529,7 +2529,8 @@ Avm2Value avm2_op_newcatch(Avm2Activation* act, uint32_t method_index, uint32_t 
 		Avm2Class* cc = avm2_alloc(ctx, sizeof(Avm2Class));
 		memset(cc, 0, sizeof(Avm2Class));
 		cc->name = pe.key;
-		cc->flags = AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+		cc->flags = AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL
+		            | AVM2_CLASS_FLAG_SYNTH_CATCH;
 		obj->cls = cc;
 	}
 	return avm2_object_value(obj);

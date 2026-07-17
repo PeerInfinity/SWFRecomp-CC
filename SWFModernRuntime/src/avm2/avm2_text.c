@@ -837,6 +837,7 @@ static void spans_reserve(Avm2Context* ctx, Avm2EditTextExt* et, uint32_t extra)
 	while (ncap < et->span_count + extra) ncap *= 2;
 	Avm2TextSpan* ns = avm2_alloc(ctx, ncap * sizeof(Avm2TextSpan));
 	if (et->span_count > 0) memcpy(ns, et->spans, et->span_count * sizeof(Avm2TextSpan));
+	if (et->spans != NULL) heap_free(ctx->app, et->spans);
 	et->spans = ns;
 	et->span_cap = ncap;
 }
@@ -2671,6 +2672,7 @@ static void lbox_push(LCtx* lc, LBox b)
 		uint32_t ncap = lc->box_cap ? lc->box_cap * 2 : 8;
 		LBox* nb = avm2_alloc(lc->ctx, ncap * sizeof(LBox));
 		memcpy(nb, lc->boxes, lc->box_count * sizeof(LBox));
+		if (lc->boxes != NULL) heap_free(lc->ctx->app, lc->boxes);
 		lc->boxes = nb;
 		lc->box_cap = ncap;
 	}
@@ -2831,6 +2833,7 @@ static void lc_flush_line(LCtx* lc, uint32_t end)
 		uint32_t ncap = lc->line_cap ? lc->line_cap * 2 : 8;
 		LLine* nl = avm2_alloc(lc->ctx, ncap * sizeof(LLine));
 		memcpy(nl, lc->lines, lc->line_count * sizeof(LLine));
+		if (lc->lines != NULL) heap_free(lc->ctx->app, lc->lines);
 		lc->lines = nl;
 		lc->line_cap = ncap;
 	}
@@ -3331,6 +3334,28 @@ static uint16_t* et_units(Avm2Context* ctx, const Avm2EditTextExt* et,
 	return u;
 }
 
+// Free a layout tree built by layout_spans_known_width. Single-owner:
+// et->layout is written only by et_relayout, every consumer takes a fresh
+// et_layout() pointer and no struct retains a pointer into the tree across
+// a relayout, and each LLine owns its boxes array exclusively (lc_flush_line
+// transfers lc->boxes and nulls it).
+static void et_free_layout(Avm2Context* ctx, LLayout* l)
+{
+	if (l == NULL) return;
+	for (uint32_t i = 0; i < l->line_count; i++)
+	{
+		LLine* line = &l->lines[i];
+		for (uint32_t b = 0; b < line->box_count; b++)
+		{
+			if (line->boxes[b].char_end != NULL)
+				heap_free(ctx->app, line->boxes[b].char_end);
+		}
+		if (line->boxes != NULL) heap_free(ctx->app, line->boxes);
+	}
+	if (l->lines != NULL) heap_free(ctx->app, l->lines);
+	heap_free(ctx->app, l);
+}
+
 // EditText::relayout.
 static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
 {
@@ -3357,9 +3382,11 @@ static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
 		{
 			if (probe->lines[i].w > max_w) max_w = probe->lines[i].w;
 		}
+		et_free_layout(ctx, probe);
 		layout = layout_spans_known_width(ctx, et, units, unit_len, max_w,
 		                                  is_input, is_word_wrap);
 	}
+	et_free_layout(ctx, et->layout);
 	et->layout = layout;
 	et->hscroll = 0;
 	et->scroll = 1;
@@ -3391,6 +3418,8 @@ static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
 	et->lazy_x = new_x;
 	et->lazy_w = new_w;
 	et->lazy_h = new_h;
+	// Layout stores only unit indexes/advances, never a pointer into units.
+	heap_free(ctx->app, units);
 }
 
 static void et_apply_lazy_bounds(Avm2EditTextExt* et)
@@ -3445,9 +3474,10 @@ static const Avm2TextFormatFields* span_at_pos(const Avm2EditTextExt* et,
 // scroll offsets) composed with render_layout_box (box origin) and
 // Font::evaluate (per-glyph pen x, baseline ty = ascent). out_clip receives
 // the {x, y, w, h} local-twips mask Ruffle draws (bounds shrunk by the
-// gutter in x only). Returns the glyph count; *out is avm2_alloc'ed.
-// Callers must check each placement's font->glyph_pts for outline
-// availability (the device fallback has none).
+// gutter in x only). Returns the glyph count; *out is avm2_alloc'ed and
+// owned by the caller (heap_free it when done). Callers must check each
+// placement's font->glyph_pts for outline availability (the device
+// fallback has none).
 uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
                                       Avm2GlyphPlacement** out,
                                       int32_t out_clip[4])
@@ -3516,6 +3546,7 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 						Avm2GlyphPlacement* ng =
 							avm2_alloc(ctx, ncap * sizeof(Avm2GlyphPlacement));
 						if (n > 0) memcpy(ng, gl, n * sizeof(Avm2GlyphPlacement));
+						if (gl != NULL) heap_free(ctx->app, gl);
 						gl = ng;
 						cap = ncap;
 					}
@@ -3532,6 +3563,7 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 			}
 		}
 	}
+	heap_free(ctx->app, units);
 	*out = gl;
 	return n;
 }
@@ -4228,15 +4260,25 @@ void avm2_text_gc_trace_ext(Avm2Object* o)
 
 // GC free hook: free the out-of-line style entry array a swept StyleSheet owns
 // (avm2_alloc'd; a StyleSheet is script-creatable and droppable, so it does get
-// swept). The EditText ext (spans/layout) that hangs off a TextField's
-// DisplayObjectExt is NOT freed here — TextField display objects are rooted
-// while on the stage and rarely swept, so that residual is bounded.
+// swept).
 void avm2_text_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
 {
 	Avm2StyleSheetExt* ss = stylesheet_ext_of(o);
-	if (ss == NULL || ss->entries == NULL) return;
-	heap_free(ctx->app, ss->entries);
-	ss->entries = NULL;
+	if (ss != NULL && ss->entries != NULL)
+	{
+		heap_free(ctx->app, ss->entries);
+		ss->entries = NULL;
+	}
+	// A swept TextField's EditText ext (single-owner: assigned once at
+	// edittext_init). Strings (text/original_html/restrict) are census
+	// strings swept separately; style_sheet is a census object.
+	Avm2EditTextExt* et = edittext_of(ctx, o);
+	if (et != NULL)
+	{
+		et_free_layout(ctx, et->layout);
+		if (et->spans != NULL) heap_free(ctx->app, et->spans);
+		heap_free(ctx->app, et);
+	}
 }
 
 static Avm2Object* plain_object(Avm2Context* ctx)
