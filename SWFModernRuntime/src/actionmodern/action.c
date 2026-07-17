@@ -29833,11 +29833,8 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 						if (func != NULL)
 						{
 							// Migrated to invokeFunctionValue (dispatch
-							// Stage 4). Captured scopes only — this path has
-							// NEVER pushed a this-cell for either type (the
-							// un-propagated 14799 fix; normalizing it is a
-							// separate commit), no exec-func. The core adds
-							// the canonical type-1 pad (the old arm pushed
+							// Stage 4). Captured scopes; no exec-func. The core
+							// adds the canonical type-1 pad (the old arm pushed
 							// nothing, and the operand under conversion sat
 							// on the stack top — regression/coerce_type1_args
 							// pins the stale pop). INV_VERSION_SWITCH added
@@ -29845,11 +29842,23 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 							// DEFINING movie's SWF version
 							// (regression/coerce_cross_swf_version, Subtract
 							// row).
+							// INV_THIS_STACK for the type-1 branch added by the
+							// pass-(b) remainder (master-list item 7): the
+							// receiver rides g_this_stack so a type-1 valueOf
+							// reading `this` sees the object under conversion,
+							// not the caller's this-cell — the 14799 fix
+							// propagated from objectToPrimitive, whose per-branch
+							// gate this mirrors exactly (a type-2 callee still
+							// gets no this-cell; a fresh cell is observable to
+							// nested calls via actionGetVariable's early path).
+							// regression/convertfloat_type1_this flips on it.
 							ActionVar cf_this = {0};
 							cf_this.type = ACTION_STACK_VALUE_OBJECT;
 							cf_this.data.numeric_value = (u64)(uintptr_t)obj;
 							InvokeOpts cf_opts = { .flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH
-							                              | INV_SPECIAL_GUARD };
+							                              | INV_SPECIAL_GUARD
+							                              | ((func->function_type == 1)
+							                                         ? INV_THIS_STACK : 0u) };
 							ActionVar result = invokeFunctionValue(app_context, func, &cf_this,
 							                                       NULL, 0, &cf_opts);
 
