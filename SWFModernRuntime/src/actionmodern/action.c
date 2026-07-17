@@ -60268,13 +60268,20 @@ static ActionVar _invoke_sort_comparator(SWFAppContext* app_context,
 	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
 	// Consolidation, Stage 4). Behavior-preserving, per-branch flags:
 	//
-	// - Type-2 was a completely bare call (no scopes, no this, no base clip):
-	//   flags = 0 with this_var = NULL reproduces it — with one accepted
-	//   delta: the old arm passed registers = NULL where the core HCALLOCs
-	//   register_count slots. Behaviorally inert (generated func2 bodies
-	//   ignore the parameter and declare their own regs[]), but it is a
-	//   per-comparison alloc/free on the hot sort path — flagged in the
-	//   Stage-4 dossier; the candidate fix is core-level and separate.
+	// - Type-2 restores the comparator's captured scope chain
+	//   (INV_CAPTURED_SCOPE), this_var = NULL. The migration originally
+	//   preserved the old bare call (flags = 0); the pass-(b) remainder
+	//   (master-list item 7, sort comparator captured scopes for type-2)
+	//   adds INV_CAPTURED_SCOPE — a factory-returned func2 closure comparator
+	//   `makeCmp(){ var f=100; return function(a,b){ return (a-b)*f; }; }` read
+	//   its captured `f` as undefined (its defining frame is gone when sort
+	//   runs), so it returned NaN and the array never reordered.
+	//   regression/sort_comparator_captured_scope flips on it. (One accepted
+	//   perf delta stays from the migration: the core HCALLOCs register_count
+	//   slots where the old arm passed registers = NULL — inert, since
+	//   generated func2 bodies declare their own regs[]; a core-level fix is
+	//   separate. INV_CAPTURED_SCOPE pushes/pops only the comparator's own
+	//   captured frames — empty and near-free for a non-closure comparator.)
 	// - Type-1 pushes captured scopes + local frame in standard order (its
 	//   historical __resolve-style inversion was flipped by pass (b)),
 	//   switches to the callee's base_clip under the caller's SWF6+ gate,
@@ -60295,7 +60302,7 @@ static ActionVar _invoke_sort_comparator(SWFAppContext* app_context,
 	ActionVar result;
 	if (comparator->function_type == 2)
 	{
-		InvokeOpts opts = { .flags = 0 };
+		InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE };
 		result = invokeFunctionValue(app_context, comparator, NULL, args, 2, &opts);
 	}
 	else
