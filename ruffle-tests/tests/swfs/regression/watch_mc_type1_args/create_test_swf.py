@@ -9,13 +9,15 @@ forward with no clamp and no pad, so a 4-param watcher
 newV=oldVal, oldV=name, and prop popped a stale caller eval-stack slot
 (detected here with a SENTINEL pushed beneath the assignment).
 
-Post-fix the core pushes exactly param_count values — the 4th pads with
-undefined. NOTE the migration-preserving expectation is ud=undefined, NOT
-"UD": Site C has always DROPPED userData (num_args stays 3). The follow-up
-normalization commit (deliver userData, D6, Ruffle as oracle) must flip that
-line to UD deliberately. The `stored:` line pins return-value-becomes-new-
-value on the MC arm; a 2-param watcher pins the clamp (the surplus newVal is
-dropped, nothing strands on the caller's stack).
+Post-fix the core pushes exactly param_count values. The `ud` param now
+receives the watch() userData ("UD"): normalization pass (b) remainder (D6 /
+master-list item 7) makes Site C deliver 4 args for BOTH function types, so a
+type-1 MC watcher declaring a 4th param gets the userData — Ruffle always
+delivers 4. (Before D6 landed, Site C type-1 dropped userData, num_args=3, and
+this row read `ud=` / undefined; the clamp/pad migration kept it that way and
+this line explicitly flipped when D6 landed.) The `stored:` line pins
+return-value-becomes-new-value on the MC arm; a 2-param watcher pins the clamp
+(the surplus newVal is dropped, nothing strands on the caller's stack).
 
 DefineFunction is emitted by hand because MTASC emits DefineFunction2 for
 SWF6+ and the type-1 arm cannot be reached any other way (zero suite

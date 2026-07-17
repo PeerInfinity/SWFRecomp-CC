@@ -49363,11 +49363,13 @@ void actionSetMember(SWFAppContext* app_context)
 								// that, deliberately (kin to Stage 3d's CF_CTX_RECEIVER).
 								MovieClip* _wsaved = g_current_context;
 								actionSetCurrentContext(mc);
-								// Type-1 stays 3 args (userData DROPPED — a preserved
-								// divergence, D6; delivering it is a normalization
-								// commit with Ruffle as oracle). The core pads the
-								// callee's 4th param with undefined instead of popping
-								// a stale caller slot (regression/watch_mc_type1_args).
+								// Both types deliver 4 args {name, oldVal, newVal,
+								// userData}. Normalization pass (b) remainder (D6 /
+								// master-list item 7): the type-1 branch used to pass
+								// only 3 (userData DROPPED); Ruffle always delivers 4,
+								// so a type-1 MC watcher declaring a 4th param now
+								// receives the userData (regression/watch_mc_type1_args
+								// flips its ud row from undefined to UD).
 								// pname handed non-owning + freed here for BOTH types
 								// now — the old type-1 arm pushed it owning AND freed
 								// it, a latent double-free when the param bind's scope
@@ -49393,7 +49395,7 @@ void actionSetMember(SWFAppContext* app_context)
 									invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
 										&_wthis, prop_name, prop_name_len, &_old_val, &value_var,
 										INV_LOCAL_SCOPE | INV_BIND_THIS | INV_VERSION_SWITCH,
-										_wf_t2 ? 4 : 3, /*pname_owns*/0, /*free_pname*/1, /*clear_owns*/1);
+										4, /*pname_owns*/0, /*free_pname*/1, /*clear_owns*/1);
 									watch_firing_pop();
 								}
 								actionSetCurrentContext(_wsaved);

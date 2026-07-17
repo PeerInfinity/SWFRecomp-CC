@@ -1,4 +1,4 @@
-w4: p||x|
+w4: p||x|UD
 SENTINEL1
 stored: x
 w2: q|
