@@ -1,6 +1,14 @@
 # Function-Dispatch Consolidation — Plan
 
 **Created:** July 4, 2026
+**Status: COMPLETE (2026-07-17).** All stages (0–5) plus the full normalization
+pass (b) — including the value-over-effort remainder — are landed. Every
+surveyed dispatcher funnels through `invokeFunctionValue`; the legacy
+`invokeSpecialFunction` is deleted; `check_dispatch_funnel.py` is GATE-GREEN.
+The five remaining low-value candidates are documented NO with evidence (see
+the "Pass-(b) remainder landing note (2026-07-17)" at the end of §4). No work
+is owed. Stage-by-stage history below.
+
 **Status:** Stage 0 COMPLETE (July 4, 2026) — see §4 Stage 0 results.
 Stage 1 COMPLETE (July 8, 2026) — `invokeFunctionValue()` core + `InvokeOpts`
 flags added and `invokeResolveFunction` wired to it (behavior-preserving); see the
@@ -1439,6 +1447,91 @@ migrating `lv_url_encode` off `invokeSpecialFunction` (would empty the
 legacy core). Three pre-existing loaded-movie bugs surfaced by the repro
 work are documented in the test docstrings (holder identity split, root-TF
 lookup breakage after loadMovie, prototype identity split).
+
+#### Pass-(b) remainder landing note (2026-07-17, fifth session) — queue drained; plan COMPLETE
+
+The value-over-effort remainder is fully dispositioned: **six commits landed**
+(each its own flipping/behavior-preserving change + test), **five sub-items
+documented NO** with evidence. `check_dispatch_funnel.py` GATE-GREEN before and
+after every commit; each landing verified fail-before against the parent
+`action.c`.
+
+**Landed (YES):**
+
+1. **Root-enterFrame version switch** (`efec1fa20`). The ROOT arm of
+   `actionDispatchEnterFrameHandlers` lacked `switchToFunctionVersion` (the
+   children arm always had it) — a v6-defined `_root.onEnterFrame` fired from a
+   v7 host loop ran at v7. Added `INV_VERSION_SWITCH`; the type-2-only base-clip
+   switch moved into the arm under the caller gate (no forbidden pairing).
+   `regression/root_enterframe_cross_swf_version` (self-terminates via a
+   closure-captured child-timeline guard — the loaded child's writes to the host
+   root's dynamic_props are invisible cross-side). The sibling
+   `actionDispatchRootVarMapEnterFrame` got the identical one-line switch **for
+   consistency, no isolating flip test**: probed, that arm never fires — a bare
+   `onEnterFrame =` SetVariable routes through the dynamic_props root arm, so the
+   change is inert in every current test and correct if ever reached.
+2. **onUnload type-1 local frame** (`da78adfd8`, master-list item 5).
+   `invokeUnloadHandler` pushed a local frame for type-2 only, so a type-1
+   handler's declared params leaked into the ambient timeline and clobbered a
+   same-named var. `INV_LOCAL_SCOPE` for both types.
+   `regression/onunload_type1_local_frame`: a param `x` clobbered root `x`
+   (`x=[]`→`x=[GLOBAL]`).
+3. **convertFloat type-1 this push** (`e5e392601`, master-list item 7).
+   Propagated the "14799 fix" from `objectToPrimitive`: `INV_THIS_STACK` on
+   convertFloat's type-1 branch (per-branch gate, mirroring oTP exactly) so a
+   type-1 `valueOf` reading `this` sees the object under conversion, not the
+   caller's. `regression/convertfloat_type1_this` (`o.valueOf=function(){return
+   this.n;}; o-1` → `r=-1`→`r=41`).
+4. **Sort comparator captured scopes for type-2** (`730462ce8`, master-list
+   item 7). `_invoke_sort_comparator`'s type-2 arm passed `flags=0`; a
+   factory-returned func2 closure comparator lost its captured local. Added
+   `INV_CAPTURED_SCOPE`. `regression/sort_comparator_captured_scope`
+   (MTASC-compiled; `factor=undefined`/`sorted=20,10` → `factor=100`/`10,20`).
+5. **Watch D6 — Site C delivers userData to type-1** (`393b217a4`, master-list
+   item 7). Site C passed only 3 args to a type-1 MC watcher (dropping the
+   `watch(prop,fn,userData)` userData); Ruffle always delivers 4. Flipped
+   `regression/watch_mc_type1_args`'s `ud` row (`undefined`→`UD`) — the flip its
+   docstring always anticipated.
+6. **`lv_url_encode` migration off `invokeSpecialFunction`** (`2579ee250`).
+   The last legacy dispatcher's sole caller now invokes through
+   `invokeFunctionValue`; `invokeSpecialFunction` **deleted** (−66 lines), its
+   funnel-gate allowlist entry removed. Behavior-preserving (non-fatal
+   g_special_depth bracket kept at the call site — the core's INV_SPECIAL_GUARD
+   HALTs; type-2 gets a bare local frame, type-1 none). No suite coverage of the
+   user-override path (probed: the suite's LoadVars/escape flows are AS-level via
+   the recompiled std lib, never the native `lv_url_encode`), so verified by
+   construction + no-regression; the native fast path is untouched.
+
+**Documented NO (evidence-backed):**
+
+- **Sound family exec-func/arguments** (master-list item 6). The dossier's "XML
+  handlers' `arguments` are broken" claim is **disproven by probe**: a type-2
+  XML.onLoad handler gets correct `arguments.length` and `arguments[i]` (the
+  DefineFunction2 preload prologue builds them from the ABI args the migration
+  passes). The only divergence is `arguments.caller` (a stale non-null Function
+  vs. null for a runtime-fired callback) — no real-world handler dependency, no
+  suite/Ruffle oracle to build a flip against, and fixing it needs
+  `INV_EXEC_FUNC`, which the MC-arm and original-migration decisions
+  deliberately kept off for exactly this `arguments.caller` reason. Also
+  `callee_ok=false` for the callee-identity comparison is a **general AVM1
+  quirk** (a plain direct call shows it too), unrelated to dispatch.
+- **Watch D1 (undefined-return fold)** and **D8 (old-value source)**. Both are
+  Ruffle-divergent but need a Flash-behavior verdict before any test can pin
+  them (the dossier flags D1 as "needs a Flash-behavior verdict"; no suite
+  watcher omits `return` or observes a second-set old value). Uncertain oracle,
+  no pass-rate cost today — deferred.
+- **LV grandparent-caller.** Same `arguments.caller` class as the sound-family
+  NO: near-inert, no clean oracle.
+- **`g_event_this_mc` for the MC arms' t1 branch.** The per-branch gating is
+  deliberate and correct — a type-1 MC method binds `this` via `g_this_stack`
+  (`INV_THIS_STACK`); natives read `g_event_this_mc` only when `this_obj` is NULL
+  (a type-2 path). No motivating observable → no flip test possible.
+
+**Status: the pass-(b) remainder is drained. The Function-Dispatch
+Consolidation is COMPLETE** — every dispatcher funnels through
+`invokeFunctionValue`, the legacy `invokeSpecialFunction` is gone, and the
+funnel gate is green. Any residual normalization ideas (D1/D8 pending a Flash
+oracle) are recorded here, not owed.
 
 ## 5. Verification protocol
 
