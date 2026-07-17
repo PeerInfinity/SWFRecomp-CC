@@ -1,5 +1,14 @@
 # Next-session prompt: Function-Dispatch Consolidation — pass (b) remainder
 
+> **Resumption note (2026-07-17):** state re-verified after the AVM2 detour.
+> Zero commits have touched `SWFModernRuntime/src/actionmodern/` or
+> `include/actionmodern/` since this work parked on 2026-07-11 (the AVM2 work
+> lives in `src/avm2/`) — no drift. `check_dispatch_funnel.py` re-run:
+> GATE-GREEN. Local toolchain smoke-tested: `regression/onunload_type1_args`
+> passes via `verify_output.py --tests-dir=ruffle-tests/tests/swfs/regression`.
+> The plan header now reflects Stages 0–5 core COMPLETE; everything below is
+> current.
+
 `SWFRecompDocs/prompts/dispatch-consolidation-stage4.md` — read it and follow it
 end-to-end; the plan it references
 (`SWFRecompDocs/plans/function-dispatch-consolidation-plan.md`) is the source of

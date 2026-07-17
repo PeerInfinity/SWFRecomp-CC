@@ -21,8 +21,20 @@ a new `INV_LOCAL_SCOPE_UNDER_CAPTURED` bit (its scope inversion is real and
 observable); the string-primitive arm needed **no** new flag (its type-1
 `this`/`super` name bindings are provably dead); the MC arm needed **no** new
 `InvokeOpts` flag but two new `ClosureFrame` context modes, and exposed the
-`INV_BASE_CLIP | INV_VERSION_SWITCH` hazard as *live*, not latent. Stages 4–5 not
-started.
+`INV_BASE_CLIP | INV_VERSION_SWITCH` hazard as *live*, not latent.
+Stage 4 pass (a) COMPLETE (July 10, 2026) — all 21 surveyed dispatcher instances
+funnel through `invokeFunctionValue`; `invokeSpecialFunction` down to one caller
+(`lv_url_encode`); see the Stage-4 landing notes in §4.
+Normalization pass (b) items 1–4 + Stage 5's funnel gate COMPLETE (July 11,
+2026) — version switches everywhere + the v5 no-closure gate, scope-order flip
+(`INV_LOCAL_SCOPE_UNDER_CAPTURED` deleted), caller-gate unification, depth
+guards; `tools/divergence/gates/check_dispatch_funnel.py` live and GATE-GREEN;
+41 regression guards; see "Normalization pass (b) + Stage 5 landing notes" at
+the end of §4.
+**REMAINING (parked 2026-07-11, all lower-value):** the pass-(b) remainder —
+master-list items 5–7, the root-enterFrame/root-var-map version switch, and the
+`lv_url_encode` migration. Session brief:
+`SWFRecompDocs/prompts/dispatch-consolidation-stage4.md`.
 **Origin:** upstream-comparison advantage #6 (upstream has one calling convention;
 we have ~38) and a four-times-shipped bug class. Survey of `action.c` (74,986
 lines) + `timer.c` performed July 4, 2026; figures below are from that survey.
