@@ -88,7 +88,12 @@ u32 get_elapsed_ms()
 
 char* vmem_reserve(size_t size)
 {
-	return mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+	// mmap failure is MAP_FAILED ((void*)-1), NOT NULL — callers (heap_init)
+	// check for NULL, so translate. Un-translated, a failed reserve flowed
+	// 0xffffffff into o1heapInit (seen when the wasm32 arena briefly exceeded
+	// emscripten's mmap ceiling).
+	void* p = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+	return p == MAP_FAILED ? NULL : (char*) p;
 }
 
 void vmem_release(char* addr, size_t size)

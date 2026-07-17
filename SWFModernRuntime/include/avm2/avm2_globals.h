@@ -549,6 +549,10 @@ void avm2_input_pump_tick(Avm2Context* ctx);
 // callbacks to enqueue a keyDown/keyUp drained by avm2_input_pump_tick.
 void avm2_input_inject_key(int is_down, int32_t key_code,
                            int32_t char_code, int32_t key_location);
+// Live browser mouse injection (RWK-3) — same ring. kind 0=move/1=down/2=up,
+// x/y stage pixels, button 0/1/2, click_count = DOM detail (>=2 → doubleClick).
+void avm2_input_inject_mouse(int kind, float x, float y, int button,
+                             int click_count);
 
 // Text-editing bridge (avm2_text.c): route a physical key / typed char /
 // text-control command to the focused TextField's EditText engine. `focus` may

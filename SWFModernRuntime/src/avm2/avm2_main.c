@@ -562,5 +562,11 @@ void runSWF_avm2(SWFAppContext* app_context)
 	}
 #endif
 
+	// AVM2_HEAP_STATS=1: end-of-run o1heap diagnostics (peak_allocated is
+	// cumulative) so arena sizing — e.g. the wasm32 heap for games whose boot
+	// creates GBs of transient string garbage — is measured, not guessed.
+	if (getenv("AVM2_HEAP_STATS") != NULL)
+		heap_stats(ctx->app);
+
 	fflush(stdout);
 }

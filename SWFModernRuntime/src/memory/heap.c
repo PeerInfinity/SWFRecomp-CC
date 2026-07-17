@@ -33,6 +33,18 @@
 
 #ifdef __wasi__
 #define DEFAULT_FULL_HEAP_SIZE (64ULL * 1024 * 1024)  // 64 MB for WASI (no virtual memory)
+#elif defined(__EMSCRIPTEN__) && defined(SWF_AVM2)
+// Browser AVM2: 1984 MB — just under both hard ceilings on wasm32: o1heap's
+// capacity max (FRAGMENT_SIZE_MAX = 2 GB) and emscripten's anonymous-mmap
+// limit (a single 2048 MB mmap fails, 1984 MB succeeds; measured, emsdk
+// 2026-07). AVM2 strings are not yet GC-collected and a single tick can
+// create GBs of transient string garbage: Robot Wants Kitty's PlayState boot
+// peaks at a measured 1409 MB (AVM2_HEAP_STATS, FlxTilemap.arrayToCSV
+// quadratic concat), which OOM'd the old 1 GB arena. The link must allow the
+// wasm memory to reach it: build_wasm_avm2.sh passes -sMAXIMUM_MEMORY=4GB.
+// AVM1 browser builds keep the 1 GB arena below so the existing demos'
+// memory footprint is untouched.
+#define DEFAULT_FULL_HEAP_SIZE (1984ULL * 1024 * 1024)  // wasm32 practical max
 #elif defined(__EMSCRIPTEN__) || !defined(__LP64__)
 #define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB (wasm32/32-bit address space)
 #else

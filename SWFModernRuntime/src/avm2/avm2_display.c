@@ -6376,6 +6376,29 @@ void avm2_input_inject_key(int is_down, int32_t key_code,
 	g_live_in_tail = next;
 }
 
+// Live browser mouse injection (RWK-3): same ring, called from the emscripten
+// mouse callbacks in render_webgpu.c. kind: 0 = move, 1 = down, 2 = up;
+// x/y are stage pixels (the callbacks already unscale CSS coordinates);
+// button 0/1/2 = left/middle/right, matching the harness event format.
+// click_count is the DOM event's `detail` (browser-native double-click
+// detection): the delivery path reads MOUSE_DOWN's code as a click index
+// whose ODD parity means doubleClick, so map detail>=2 → odd, else even.
+void avm2_input_inject_mouse(int kind, float x, float y, int button,
+                             int click_count)
+{
+	size_t next = (g_live_in_tail + 1) % AVM2_LIVE_IN_CAP;
+	if (next == g_live_in_head) return;   // ring full → drop this event
+	Avm2InputEvent* ev = &g_live_in[g_live_in_tail];
+	memset(ev, 0, sizeof(*ev));
+	ev->kind = kind == 1 ? IN_MOUSE_DOWN : kind == 2 ? IN_MOUSE_UP : IN_MOUSE_MOVE;
+	ev->x = x;
+	ev->y = y;
+	ev->button = (button >= 0 && button <= 2) ? button : 0;
+	if (ev->kind == IN_MOUSE_DOWN && ev->button == 0)
+		ev->code = (click_count >= 2) ? 1 : 0;
+	g_live_in_tail = next;
+}
+
 void avm2_input_pump_tick(Avm2Context* ctx)
 {
 	// Live browser events first: drain everything buffered since the last tick

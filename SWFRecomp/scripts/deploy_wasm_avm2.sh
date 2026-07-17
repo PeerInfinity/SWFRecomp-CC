@@ -11,6 +11,11 @@ set -euo pipefail
 NAME="${1:-seedling}"
 RECOMP_DIR="${2:-$HOME/CC/seedling_teleport_build/recompiled}"
 TELEPORT_SWF="${TELEPORT_SWF:-$HOME/CC/seedling_teleport_build/Seedling_teleport.swf}"
+# Non-Seedling games (RWK-3+): DEMO_SWF overrides the SWF staged as test.swf on
+# both pages (default keeps the Seedling teleport back-compat); DEMO_DESC the
+# test_info.json description line.
+DEMO_SWF="${DEMO_SWF:-${TELEPORT_SWF}}"
+DEMO_DESC="${DEMO_DESC:-AVM2 (AS3) Seedling — teleport build, boots straight to OverWorld1 (Stage 13a browser-WASM).}"
 RUFFLE_DIST="${RUFFLE_DIST:-$HOME/CC/ruffle/web/packages/selfhosted/dist}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +33,7 @@ H="$(grep -oP '#define FRAME_HEIGHT\s+\K[0-9]+' "${RECOMP_DIR}/RecompiledTags/co
 OUR="${DOCS2}/examples/avm2/${NAME}"
 mkdir -p "${OUR}"
 cp "${BUILD_DIR}/${NAME}.js" "${BUILD_DIR}/${NAME}.wasm" "${OUR}/"
-[ -f "${TELEPORT_SWF}" ] && cp "${TELEPORT_SWF}" "${OUR}/test.swf"
+[ -f "${DEMO_SWF}" ] && cp "${DEMO_SWF}" "${OUR}/test.swf"
 # AVM2 ExternalInterface page shim (window.__swfBridge gate + BridgeGeneric
 # host surface). demo.html HEAD-probes and injects it; games without injected
 # bridge AS3 never call EI, so staging it is behavior-neutral for plain demos.
@@ -41,7 +46,7 @@ echo "graphics" > "${OUR}/.demo_type"
 cat > "${OUR}/test_info.json" <<JSON
 {
   "metadata": {
-    "description": "AVM2 (AS3) Seedling — teleport build, boots straight to OverWorld1 (Stage 13a browser-WASM).",
+    "description": "${DEMO_DESC}",
     "swf_version": 38,
     "fully_implemented": false,
     "width": ${W},
@@ -60,14 +65,14 @@ HTML
 
 # ---- Ruffle comparison page (local profiling bundle) ----
 RUF="${DOCS2}/examples/avm2/${NAME}_ruffle"
-if [ -d "${RUFFLE_DIST}" ] && [ -f "${TELEPORT_SWF}" ]; then
+if [ -d "${RUFFLE_DIST}" ] && [ -f "${DEMO_SWF}" ]; then
     mkdir -p "${RUF}"
     cp "${RUFFLE_DIST}"/*.js "${RUFFLE_DIST}"/*.wasm "${RUF}/" 2>/dev/null || true
-    cp "${TELEPORT_SWF}" "${RUF}/test.swf"
+    cp "${DEMO_SWF}" "${RUF}/test.swf"
     cat > "${RUF}/index.html" <<HTML
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
-<title>Seedling — Ruffle (profiling build)</title>
+<title>${NAME} — Ruffle (profiling build)</title>
 <style>html,body{margin:0;background:#111;color:#7CFC00;font:12px monospace}
  #c{width:${W}px;height:${H}px;margin:8px auto;display:block}
  #hud{position:fixed;top:6px;left:6px;white-space:pre;background:rgba(0,0,0,.75);padding:6px 8px;border-radius:4px}</style>

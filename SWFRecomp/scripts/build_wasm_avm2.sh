@@ -200,6 +200,7 @@ emcc "${OBJS[@]}" \
     -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","HEAPU8"]' \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s INITIAL_MEMORY=512MB \
+    -s MAXIMUM_MEMORY=4GB \
     -s STACK_SIZE=8MB \
     -sUSE_ZLIB=1 \
     -sASYNCIFY \

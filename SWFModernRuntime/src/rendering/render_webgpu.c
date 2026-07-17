@@ -548,40 +548,81 @@ static void compute_canvas_mouse_pos(int target_x, int target_y, float* out_x, f
 	*out_y = (float)sy;
 }
 
+#ifdef SWF_AVM2
+// AVM2 live mouse bridge (RWK-3, the 13c key-ring pattern): forward browser
+// mouse events into the AVM2 input ring (drained by avm2_input_pump_tick).
+// AVM2 ignores app_context->mouse; without this the AVM2 stage never sees
+// MouseEvents in the browser, so menus are unreachable. Declared locally so
+// this rendering TU stays free of AVM2 headers. See avm2_globals.h.
+extern void avm2_input_inject_mouse(int kind, float x, float y, int button,
+                                    int click_count);
+#endif
+
 static EM_BOOL on_mouse_move(int type, const EmscriptenMouseEvent* evt, void* ud) {
 	(void)type; (void)ud;
+	float px = 0.0f, py = 0.0f;
+	compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
 	if (g_mouse_app_context) {
-		float px, py;
-		compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
 		g_mouse_app_context->mouse.stage_x = px * 20.0f;
 		g_mouse_app_context->mouse.stage_y = py * 20.0f;
 	}
+#ifdef SWF_AVM2
+	avm2_input_inject_mouse(0, px, py, (int) evt->button, 0);
+#endif
 	return EM_TRUE;
 }
 
 static EM_BOOL on_mouse_down(int type, const EmscriptenMouseEvent* evt, void* ud) {
 	(void)type; (void)ud;
+	float px = 0.0f, py = 0.0f;
+	compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
 	if (g_mouse_app_context && evt->button == 0) {
 		g_mouse_app_context->mouse.button_down = 1;
 		g_mouse_app_context->mouse.clicked = 1;
-		float px, py;
-		compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
 		g_mouse_app_context->mouse.stage_x = px * 20.0f;
 		g_mouse_app_context->mouse.stage_y = py * 20.0f;
 	}
+#ifdef SWF_AVM2
+	if (evt->button <= 2) {
+		// EmscriptenMouseEvent carries no DOM `detail` (click count), so
+		// detect double-clicks here: second left-down within 500 ms and a
+		// few pixels of the first. Reset after a double so a triple click
+		// reads single-double-single, like the browser's own counter parity.
+		static double last_left_down_ms = -1e9;
+		static float last_left_x, last_left_y;
+		int click_count = 1;
+		if (evt->button == 0) {
+			if (evt->timestamp - last_left_down_ms < 500.0 &&
+			    px - last_left_x < 4.0f && last_left_x - px < 4.0f &&
+			    py - last_left_y < 4.0f && last_left_y - py < 4.0f) {
+				click_count = 2;
+				last_left_down_ms = -1e9;
+			} else {
+				last_left_down_ms = evt->timestamp;
+				last_left_x = px;
+				last_left_y = py;
+			}
+		}
+		avm2_input_inject_mouse(1, px, py, (int) evt->button, click_count);
+	}
+#endif
 	return EM_TRUE;
 }
 
 static EM_BOOL on_mouse_up(int type, const EmscriptenMouseEvent* evt, void* ud) {
 	(void)type; (void)ud;
+	float px = 0.0f, py = 0.0f;
+	compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
 	if (g_mouse_app_context && evt->button == 0) {
 		g_mouse_app_context->mouse.button_down = 0;
 		g_mouse_app_context->mouse.released = 1;
-		float px, py;
-		compute_canvas_mouse_pos(evt->targetX, evt->targetY, &px, &py);
 		g_mouse_app_context->mouse.stage_x = px * 20.0f;
 		g_mouse_app_context->mouse.stage_y = py * 20.0f;
 	}
+#ifdef SWF_AVM2
+	if (evt->button <= 2)
+		avm2_input_inject_mouse(2, px, py, (int) evt->button, 0);
+#endif
 	return EM_TRUE;
 }
 
