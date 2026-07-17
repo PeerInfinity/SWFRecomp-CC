@@ -1,37 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `aca2a606e973` (2026-07-16T10:37:05.717645+00:00)
-**Current:** `a05b56ddf072` (2026-07-16T22:53:07.437819+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `a05b56ddf072` (2026-07-16T22:53:07.437819+00:00)
+**Current:** `0ff10028b52a` (2026-07-17T01:37:56.765943+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 822 | 793 | -29 |
-| Total | 1207 | 1170 | -37 |
-| Pass rate | 68.1% | 67.8% | -0.3% |
-| Mismatched lines | 47043 | 46757 | -286 |
+| Passing | 793 | 822 | +29 |
+| Total | 1170 | 1210 | +40 |
+| Pass rate | 67.8% | 67.9% | +0.1% |
+| Mismatched lines | 46757 | 47047 | +290 |
 
-## Added Tests (3)
+## Added Tests (40)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `verify_illegal_opcode` | output_mismatch | 0/1 |
-| `verify_method_info_duplicate` | output_mismatch | 0/2 |
-| `verify_method_info_oob` | output_mismatch | 0/1 |
-
-## Missing Tests — Shard Failure (40)
-
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 29 were previously passing
-- 11 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
 | `stage3d_program_constants_invalid_input` | output_mismatch | 0/21 |
 | `stage3d_raytrace` | pass | 0/0 |
 | `stage3d_rotating_cube` | pass | 0/0 |
@@ -72,5 +56,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `string_call` | pass | 13/13 |
 | `string_case` | pass | 23/23 |
 | `string_char_at` | pass | 27/27 |
-
-</details>

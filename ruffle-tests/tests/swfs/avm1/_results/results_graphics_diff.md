@@ -1,30 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `aca2a606e973` (2026-07-16T10:37:05.700568+00:00)
-**Current:** `a05b56ddf072` (2026-07-16T22:53:07.415287+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `a05b56ddf072` (2026-07-16T22:53:07.415287+00:00)
+**Current:** `0ff10028b52a` (2026-07-17T01:37:56.746810+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 634 | 612 | -22 |
-| Total | 708 | 685 | -23 |
-| Pass rate | 89.5% | 89.3% | -0.2% |
-| Mismatched lines | 15311 | 15307 | -4 |
-|   Decreased | | | -1 |
+| Passing | 612 | 634 | +22 |
+| Total | 685 | 708 | +23 |
+| Pass rate | 89.3% | 89.5% | +0.2% |
+| Mismatched lines | 15307 | 15310 | +3 |
 
-## Missing Tests — Shard Failure (23)
+## Added Tests (23)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 22 were previously passing
-- 1 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `swf5_global_funcs` | pass | 232/232 |
 | `swf5_no_closure` | pass | 19/19 |
 | `swf5_to_6_cross_call` | pass | 29/29 |
@@ -48,11 +39,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `tab_ordering_movieclip_enabled_default` | pass | 462/462 |
 | `tab_ordering_properties` | pass | 293/293 |
 | `tab_ordering_properties_tab_index_edge_case` | ruffle_matched | 1/4 |
-
-</details>
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `amf0_serde_suite` | output_mismatch | 17/146 | 16/144 | -1 |
