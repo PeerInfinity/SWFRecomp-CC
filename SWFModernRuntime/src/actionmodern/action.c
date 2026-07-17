@@ -7805,73 +7805,10 @@ static ASFunction* lookupFunctionFromVar(ActionVar* var) {
 	return (ASFunction*) var->data.numeric_value;
 }
 
-// Invoke a getter/setter function as a "special" invocation.
-// Uses g_special_depth (not g_call_depth). Returns the function's return value.
-// If special depth limit is reached, returns undefined without invoking.
-static ActionVar invokeSpecialFunction(SWFAppContext* app_context, ASFunction* func, ActionVar* arg)
-{
-	ActionVar undef = {0};
-	undef.type = ACTION_STACK_VALUE_UNDEFINED;
-
-	if (func == NULL || g_execution_halted) return undef;
-
-	// Check special recursion limit (non-fatal)
-	// Increment before check — Ruffle increments first, then checks >= 66
-	g_special_depth++;
-	if (g_special_depth >= MAX_SPECIAL_DEPTH)
-	{
-		g_special_depth--;
-		return undef;
-	}
-
-	ActionVar result;
-	if (func->function_type == 2)
-	{
-		// DefineFunction2
-		ActionVar* registers = NULL;
-		if (func->register_count > 0)
-		{
-			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-		}
-
-		ASObject* local_scope = allocObject(app_context, 8);
-		if (scope_depth < MAX_SCOPE_DEPTH)
-		{
-			scope_is_with[scope_depth] = 0;
-			scope_mc[scope_depth] = NULL;
-			scope_chain[scope_depth++] = local_scope;
-		}
-
-		if (arg != NULL)
-		{
-			// Setter: pass one argument
-			result = func->advanced_func(app_context, arg, 1, registers, NULL);
-		}
-		else
-		{
-			// Getter: no arguments
-			result = func->advanced_func(app_context, NULL, 0, registers, NULL);
-		}
-
-		if (scope_depth > 0) scope_depth--;
-		releaseObject(app_context, local_scope);
-		if (registers != NULL) FREE(registers);
-	}
-	else
-	{
-		// Simple DefineFunction (type 1)
-		// If setter, push the value arg onto the stack for the function to pop
-		if (arg != NULL)
-		{
-			pushVar(app_context, arg);
-		}
-		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-	}
-
-	g_special_depth--;
-	return result;
-}
-
+// (invokeSpecialFunction was deleted when its sole caller — lv_url_encode's
+// _global.escape override — was migrated onto invokeFunctionValue, completing
+// the Function-Dispatch Consolidation. It uses g_special_depth non-fatally,
+// bracketed at the call site.)
 
 // Invoke an addProperty getter with a specific this_obj
 static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* func, void* this_obj)
@@ -36582,9 +36519,9 @@ static ActionVar builtin_loadvars_decode(SWFAppContext* app_context, ActionVar* 
 // test-level overrides of `_global.escape` propagate through
 // LoadVars.toString (Gnash behavior; see LoadVars.as:267 'FAKED!=FAKED!').
 // Uses the native g_escape_func directly when the property value points at
-// it (avoids an invokeSpecialFunction round-trip that breaks for native
-// functions when called outside a bytecode context); otherwise invokes the
-// user override via invokeSpecialFunction.
+// it (avoids a dispatch round-trip that breaks for native functions when
+// called outside a bytecode context); otherwise invokes the user override
+// through the unified invokeFunctionValue core.
 static int lv_url_encode(SWFAppContext* app_context, const char* in, int in_len,
 	char* out, int out_size)
 {
@@ -36597,7 +36534,27 @@ static int lv_url_encode(SWFAppContext* app_context, const char* in, int in_len,
 	int user_override = (fn != NULL && fn != &g_escape_func);
 	if (user_override) {
 		ActionVar arg = makeStringActionVar(app_context, in, in_len);
-		ActionVar r = invokeSpecialFunction(app_context, fn, &arg);
+		// Migrated off the legacy invokeSpecialFunction onto the unified core
+		// (completes the Function-Dispatch Consolidation — invokeSpecialFunction
+		// is now deleted). Reproduces its ritual exactly: the NON-FATAL
+		// g_special_depth bracket stays here (the core's INV_SPECIAL_GUARD HALTs
+		// instead — a preserved divergence, the same reason invokeUnloadHandler
+		// brackets g_special_depth outside the core); type-2 gets one bare local
+		// frame (INV_LOCAL_SCOPE — no captured scopes, no this bind, no version
+		// switch), type-1 none; this_var = NULL (ABI this NULL). The core's
+		// canonical type-1 clamp/pad replaces the old bare single push — inert
+		// for the 1-param `escape(s)` override this path serves.
+		ActionVar r = {0};
+		r.type = ACTION_STACK_VALUE_UNDEFINED;
+		if (!g_execution_halted) {
+			g_special_depth++;
+			if (g_special_depth < MAX_SPECIAL_DEPTH) {
+				InvokeOpts opts = { .flags = (fn->function_type == 2)
+				                             ? INV_LOCAL_SCOPE : 0u };
+				r = invokeFunctionValue(app_context, fn, NULL, &arg, 1, &opts);
+			}
+			g_special_depth--;
+		}
 		if (r.type == ACTION_STACK_VALUE_STRING) {
 			const uint16_t* u16 = varGetU16Ptr(&r);
 			return u16_to_utf8(u16, r.str_size, out, out_size);

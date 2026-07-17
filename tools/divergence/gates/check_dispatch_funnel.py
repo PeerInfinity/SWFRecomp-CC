@@ -8,10 +8,11 @@ invokeFunctionValue():
 1. RAW-DISPATCH ALLOWLIST. Every raw `->simple_func(...)` / `->advanced_func(...)`
    invocation must sit inside a function on the checked-in allowlist below.
    The allowlist is the post-Stage-4 steady state: the invokeFunctionValue
-   core itself, invokeSpecialFunction (one caller left: lv_url_encode's
-   _global.escape override), and the CONSTRUCTOR family (NewObject/NewMethod,
+   core itself and the CONSTRUCTOR family (NewObject/NewMethod,
    registered-class ctors, boxing ctors, virtual setters and friends), which
-   was never in the dispatcher survey. Adding a NEW raw call site fails this
+   was never in the dispatcher survey. (invokeSpecialFunction was deleted when
+   its last caller — lv_url_encode's _global.escape override — was migrated
+   onto the core.) Adding a NEW raw call site fails this
    gate — route it through invokeFunctionValue (or extend the allowlist in
    the same commit as the design discussion that justifies it).
 
@@ -46,9 +47,6 @@ SRC_DIR = REPO / "SWFModernRuntime" / "src" / "actionmodern"
 ALLOWLIST = {
     # The core itself.
     ("action.c", "invokeFunctionValue"),
-    # The legacy special-function core — ONE caller left (lv_url_encode's
-    # _global.escape override); migrating it deletes this entry.
-    ("action.c", "invokeSpecialFunction"),
     # Primitive auto-boxing ctors (String/Number/Boolean wrappers).
     ("action.c", "tryAutoBoxPrimitive"),
     # The constructor family — never in the dispatcher survey; each is a
