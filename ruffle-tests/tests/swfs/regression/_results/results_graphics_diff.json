@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-17T01:37:56.788558+00:00",
-    "old_git_sha": "0ff10028b52ad46f17d3495270749eff8eac9c37",
-    "new_timestamp": "2026-07-17T05:11:28.294570+00:00",
-    "new_git_sha": "c0e0b3493697e63b0519852d2bc3dfb744d6ec22",
+    "old_timestamp": "2026-07-17T05:11:28.294570+00:00",
+    "old_git_sha": "c0e0b3493697e63b0519852d2bc3dfb744d6ec22",
+    "new_timestamp": "2026-07-17T16:55:07.862625+00:00",
+    "new_git_sha": "c9678c553bb00d3562b044f24f62ac3dcc1e39cf",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 45,
+    "old_pass": 47,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 45,
-    "old_total": 45,
+    "old_effective_pass": 47,
+    "old_total": 47,
     "old_pass_rate": 100.0,
-    "new_pass": 47,
+    "new_pass": 48,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 47,
-    "new_total": 47,
+    "new_effective_pass": 48,
+    "new_total": 48,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,33 +25,21 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 45,
-    "added": 2,
+    "unchanged": 47,
+    "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm2_gc_string_concat_reclaim",
+      "test": "avm2_gc_dynprop_tombstone_purge",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      }
-    },
-    {
-      "test": "avm2_gc_string_survives_collect",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
       }
     }
   ]
