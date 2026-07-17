@@ -28,7 +28,10 @@ done: state-aligned park frame vs the RUFFLE_INPUT_FILE exporter, **MAD
 1.23 / 2.07% px**, player+tiles 0 diff px, all diffs = documented pacing
 artifact classes. RWK-4: finish the TAS from `_rwk_tas/README.md`'s phase
 tables (re-measure alien-3's left-end turn first), then FlxSave
-persistence + collectable strings.
+persistence + collectable strings. **[Re-scoped 2026-07-18, see §3: the TAS
+is now its own optional RWK-TAS track — schedule deliberately; RWK-4 =
+FlxSave/variants/sequels; collectable strings is a runtime-wide task, not
+RWK-scoped.]**
 
 Previous: **RWK-2 DONE (2026-07-16)** — both levers landed. **Lever 1
 (`BitmapData.draw(TextField)` CPU glyph rasterization)**: the recompiler now
@@ -161,18 +164,38 @@ gets sound for free once that lands.
   §4). Grade: menu renders in AVM2_CPU_DUMP with sane MAD vs oracle + any
   upstream avm2 trace tests fixed along the way + zero CI regressions.
 - **RWK-2 — render parity + gameplay** ✅ DONE 2026-07-16 (see Status
-  header; kitty-collection TAS itself carried to RWK-3):
+  header; kitty-collection TAS itself carried forward — see RWK-TAS below):
   tilemap/sprites/FlxText pixel parity
-  vs oracle; keyboard gameplay headless (jump, shoot, collect kitty on level 1).
+  vs oracle; keyboard gameplay headless (jump, shoot, ~~collect kitty on
+  level 1~~ — **wording bug**: RWK has no levels, one 188×84 map, so "collect
+  the kitty" = complete the game; that goal is now the RWK-TAS track, and
+  RWK-2's gameplay grade was correctly satisfied by scripted
+  move/jump/shoot/death parity instead).
   Lever #1 (from RWK-1): `BitmapData.draw(TextField)` rasterization (FlxText —
   every button label/credit line; probe recipe in the RWK-1 memory). Note the
   Ruffle-exporter pacing artifact: AVM2 `getTimer` in Ruffle is WALL-CLOCK, so
   Flixel's variable timestep desyncs frame indices vs our deterministic 33.3ms
   tick — compare state-aligned (offset scan), not index-aligned.
-- **RWK-3 — browser demo**: deploy via `deploy_wasm_avm2.sh`, live keyboard
-  (13c infra), audio if the parallel session has landed, docs2 demo listing.
+- **RWK-3 — browser demo** ✅ DONE 2026-07-18 (see Status header): live at
+  `demo.html?test=avm2/rwk` — wasm heap gate (1984 MB arena +
+  MAXIMUM_MEMORY=4GB), live mouse (`avm2_input_inject_mouse` on the 13c ring),
+  live keys, audio verified, real-GPU 5.1 ms/frame.
+- **RWK-TAS (optional, own track — schedule deliberately)**: a full
+  tool-assisted completion run (spawn → all powerups → kitty → WinState).
+  Entered the plan by accident (the "level 1" wording above) but is genuinely
+  valuable: strongest end-to-end physics/determinism proof, reusable for the
+  three sequels, and it overlaps heavily with Archipelago-CC's
+  `robot-wants-kitty-playbot.md` (deterministic scripted navigation of this
+  exact game) — consider merging the two efforts when scheduling. State:
+  descent-to-J route solved after 7 iteration plans;
+  `ruffle-tests/_rwk_tas/README.md` is the source of truth (phase tables,
+  tools, negative results); next leg = re-measure alien-3's left-end turn,
+  then J → SHOOT → DBLJUMP → row-62 corridor → kitty.
 - **RWK-4 (later, optional)**: FlxSave localStorage persistence, Kong variant,
   sequels (robotpuppy/robotfishy) as cheap engine-regression checks.
+  (Collectable AVM2 strings — the ~94 MB/min leak that OOMs the browser demo
+  after ~6-7 min — is a **runtime-wide** task, not RWK-scoped; it needs its
+  own session and benefits Seedling too.)
 
 Estimate: Seedling Stage 12 took ~5 sessions from a far weaker runtime; RWK
 starts with everything built. Guess 2–3 sessions to browser-playable.
