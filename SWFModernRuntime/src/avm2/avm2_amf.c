@@ -1616,6 +1616,8 @@ void avm2_gc_mark_roots_amf(Avm2Context* ctx)
 {
 	(void) ctx;
 	for (uint32_t i = 0; i < g_so_cache_count; i++) avm2_gc_mark_object(g_so_cache[i].obj);
+	// registerClassAlias strings live only in this C-static registry.
+	for (AliasEntry* a = g_aliases; a != NULL; a = a->next) avm2_gc_mark_string(a->alias);
 }
 
 static Avm2SharedObjectExt* so_ext_of(Avm2Context* ctx, Avm2Object* o)

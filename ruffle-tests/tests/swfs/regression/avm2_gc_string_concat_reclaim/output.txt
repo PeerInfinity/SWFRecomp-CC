@@ -1,0 +1,10 @@
+start
+tick 1 len=10000
+tick 2 len=20000
+tick 3 len=30000
+tick 4 len=40000
+tick 5 len=50000
+head=abcdefghijkl
+tail=CDEFGHIJKLMN
+charAt=B
+done

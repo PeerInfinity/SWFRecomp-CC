@@ -11,6 +11,7 @@
 
 #include <avm2/avm2_value.h>
 #include <avm2/avm2_e4x.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
@@ -84,6 +85,7 @@ const Avm2String* avm2_string_new(Avm2Context* ctx, const char* utf8, uint32_t l
 	bytes[len] = '\0';
 	s->len = len;
 	s->utf8 = bytes;
+	avm2_gc_enroll_string(s);
 	return s;
 }
 
@@ -101,6 +103,7 @@ const Avm2String* avm2_string_concat(Avm2Context* ctx, const Avm2String* a, cons
 	bytes[a->len + b->len] = '\0';
 	s->len = a->len + b->len;
 	s->utf8 = bytes;
+	avm2_gc_enroll_string(s);
 	return s;
 }
 

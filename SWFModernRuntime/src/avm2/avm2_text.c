@@ -787,15 +787,30 @@ struct Avm2EditTextExt
 };
 typedef struct Avm2EditTextExt Avm2EditTextExt;
 
-// GC (Stage 11): mark the collectable object edges an EditText ext holds. The
-// spans store copied TextFormat FIELD values (immortal strings + numbers), not
-// TextFormat objects; the only object edge is the attached StyleSheet. Called
-// by avm2_display_gc_trace_ext (the ext hangs off the DisplayObjectExt, so the
-// GC's conservative blob scan cannot reach it).
+// GC: mark the collectable edges an EditText ext holds — the attached
+// StyleSheet object plus every string field (the ext and its spans array hang
+// off the DisplayObjectExt behind pointer hops the conservative blob scan
+// cannot follow; span/default formats carry user-set font/url/target heap
+// strings via setTextFormat).
+static void mark_format_fields_strings(const Avm2TextFormatFields* f)
+{
+	avm2_gc_mark_string(f->font);
+	avm2_gc_mark_string(f->url);
+	avm2_gc_mark_string(f->target);
+}
+
 void avm2_text_gc_mark_edittext(struct Avm2EditTextExt* et)
 {
 	if (et == NULL) return;
 	avm2_gc_mark_object(et->style_sheet);
+	avm2_gc_mark_string(et->text);
+	avm2_gc_mark_string(et->original_html);
+	avm2_gc_mark_string(et->restrict_str);
+	mark_format_fields_strings(&et->default_format);
+	for (uint32_t i = 0; i < et->span_count; i++)
+	{
+		mark_format_fields_strings(&et->spans[i].fmt);
+	}
 }
 
 static Avm2EditTextExt* edittext_of(Avm2Context* ctx, Avm2Object* obj)
@@ -4203,7 +4218,12 @@ void avm2_text_gc_trace_ext(Avm2Object* o)
 {
 	Avm2StyleSheetExt* ss = stylesheet_ext_of(o);
 	if (ss == NULL) return;
-	for (uint32_t i = 0; i < ss->count; i++) avm2_gc_mark_object(ss->entries[i].style_obj);
+	for (uint32_t i = 0; i < ss->count; i++)
+	{
+		avm2_gc_mark_object(ss->entries[i].style_obj);
+		avm2_gc_mark_string(ss->entries[i].selector);
+		mark_format_fields_strings(&ss->entries[i].fmt);
+	}
 }
 
 // GC free hook: free the out-of-line style entry array a swept StyleSheet owns

@@ -11,10 +11,14 @@
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_e4x.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+
+// All E4X nodes ever created (immortal; see avm2_gc_mark_roots_e4x).
+static E4XNode* g_e4x_all_nodes = NULL;
 
 // ---------------------------------------------------------------------------
 // Small growable byte buffer
@@ -101,7 +105,40 @@ E4XNode* avm2_e4x_node_new(Avm2Context* ctx, uint8_t kind, E4XNode* parent)
 	memset(n, 0, sizeof(*n));
 	n->kind = kind;
 	n->parent = parent;
+	// Enroll in the all-nodes registry: nodes are immortal but their string
+	// fields must be visible to the string GC as roots (see gc_all_next).
+	n->gc_all_next = g_e4x_all_nodes;
+	g_e4x_all_nodes = n;
 	return n;
+}
+
+// GC root marker: mark every string reachable from any E4X node. Nodes are
+// immortal non-census allocations mutated by raw field assignments all over
+// e4x/xml code, so instead of pinning at ~20 store sites (and every future
+// one), walk the registry each cycle and mark the CURRENT field values.
+void avm2_gc_mark_roots_e4x(Avm2Context* ctx)
+{
+	(void) ctx;
+	for (E4XNode* n = g_e4x_all_nodes; n != NULL; n = n->gc_all_next)
+	{
+		avm2_gc_mark_string(n->local);
+		avm2_gc_mark_string(n->text);
+		if (n->has_ns)
+		{
+			avm2_gc_mark_string(n->ns.uri);
+			avm2_gc_mark_string(n->ns.prefix);
+		}
+		for (uint32_t i = 0; i < n->ns_count; i++)
+		{
+			avm2_gc_mark_string(n->namespaces[i].uri);
+			avm2_gc_mark_string(n->namespaces[i].prefix);
+		}
+		// Object edges held only by the immortal node: the cached wrapper
+		// (also pinned at creation — defense) and the setNotification
+		// callback closure (otherwise invisible to the collector).
+		avm2_gc_mark_object(n->obj);
+		avm2_gc_mark_object(n->notify);
+	}
 }
 
 E4XNode* avm2_e4x_text(Avm2Context* ctx, const Avm2String* s, E4XNode* parent)

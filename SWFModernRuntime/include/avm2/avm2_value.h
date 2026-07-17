@@ -26,11 +26,23 @@ typedef struct Avm2Context Avm2Context;
 // strings are heap-allocated. `utf8` is also NUL-terminated for printf
 // convenience wherever the runtime creates one; pool entries emitted by
 // the recompiler are NUL-terminated too (string literals).
+//
+// GC (avm2_gc.c string census): heap strings created by avm2_string_new /
+// avm2_string_concat enroll in an intrusive census and are swept when
+// unreachable. The GC fields are APPENDED after the {len, utf8} prefix so
+// the recompiler's positional pool initializers `{ len, "..." }` zero them:
+// gc_flags == 0 means "not heap-enrolled" (static pool / rodata — immortal,
+// and the collector must never write to it).
 typedef struct Avm2String
 {
 	uint32_t len;
 	const char* utf8;
+	struct Avm2String* gc_next;  // census link (heap strings only)
+	uint32_t gc_flags;           // AVM2_STR_GC_* bits; 0 for static pool
 } Avm2String;
+
+#define AVM2_STR_GC_HEAP 1u  // heap-allocated + census-enrolled
+#define AVM2_STR_GC_MARK 2u  // reachable this cycle (cleared each collect)
 
 typedef enum Avm2ValueKind
 {

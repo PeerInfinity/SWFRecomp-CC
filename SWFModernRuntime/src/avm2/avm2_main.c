@@ -105,6 +105,8 @@ void avm2_gc_mark_roots_main(Avm2Context* ctx)
 	avm2_gc_mark_object(ctx->root);
 	avm2_gc_mark_object(ctx->stage);
 	avm2_gc_mark_object(ctx->builtin_globals);
+	// Default XML namespace: DxnsLate can leave a heap string here.
+	avm2_gc_mark_string(ctx->dxns);
 
 	Avm2Class** b = (Avm2Class**) &ctx->builtins;
 	uint32_t nb = (uint32_t) (sizeof(Avm2Builtins) / sizeof(Avm2Class*));

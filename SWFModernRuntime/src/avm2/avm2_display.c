@@ -2096,6 +2096,8 @@ void avm2_register_timer_fns(Avm2Context* ctx)
 
 static const Avm2String* g_str_timer;
 static const Avm2String* g_str_timer_complete;
+// Defined below (Mouse section); rooted in avm2_gc_mark_roots_display.
+static const Avm2String* g_mouse_cursor;
 
 // One Timer tick: currentCount++, dispatch TimerEvent.TIMER; on the final
 // repeat clear running (so a TIMER_COMPLETE handler reads running==false) and
@@ -5690,6 +5692,11 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx)
 		avm2_gc_mark_value(t->fn);
 		for (uint32_t a = 0; a < t->argc; a++) avm2_gc_mark_value(t->args[a]);
 	}
+	// C-static string stashes owned by this module: the Timer event-type
+	// singletons and Mouse.cursor (a user-supplied heap string, re-settable).
+	avm2_gc_mark_string(g_str_timer);
+	avm2_gc_mark_string(g_str_timer_complete);
+	avm2_gc_mark_string(g_mouse_cursor);
 }
 
 // Ext tracer: a DisplayObject's ext holds indirect object edges the

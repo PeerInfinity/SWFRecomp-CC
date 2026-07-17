@@ -67,6 +67,11 @@ struct E4XNode
 	Avm2Object* obj;
 	// setNotification callback (undocumented; xml_notification_bubbling).
 	Avm2Object* notify;
+	// GC: all-nodes registry link (avm2_e4x_node_new). E4X nodes are immortal
+	// non-census allocations, so the string GC walks EVERY node as a root each
+	// cycle, marking whatever local/text/ns strings its fields hold RIGHT NOW —
+	// robust against raw field assignments anywhere in e4x/xml code.
+	E4XNode* gc_all_next;
 };
 
 // ---------------------------------------------------------------------------

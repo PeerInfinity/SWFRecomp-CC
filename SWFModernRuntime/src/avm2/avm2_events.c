@@ -399,7 +399,11 @@ void avm2_events_gc_trace_ext(Avm2Object* o)
 	Avm2Context* ctx = avm2_get_context();
 	Avm2EventDispatcherExt* ext = avm2_dispatcher_ext_of(ctx, o);
 	if (ext == NULL) return;
-	for (EDListener* l = ext->head; l != NULL; l = l->next) avm2_gc_mark_value(l->fn);
+	for (EDListener* l = ext->head; l != NULL; l = l->next)
+	{
+		avm2_gc_mark_value(l->fn);
+		avm2_gc_mark_string(l->type);
+	}
 }
 
 // GC free hook: free the EDListener node chain a swept EventDispatcher owns

@@ -1,8 +1,44 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-18 — RWK-3 (browser demo + wasm heap gate) DONE; kitty
-TAS handed to RWK-4 with corrected phase tables. Prior: RWK-1/2 (2026-07-16),
+Last updated: 2026-07-16 — collectable strings DONE (AVM2 string census +
+mark + sweep; the ~94 MB/min browser leak class and the RWK PlayState boot
+spike are gone). Prior: RWK-3 (browser demo + wasm heap gate), RWK-1/2,
 Stage 12 sessions.
+
+## Collectable strings (2026-07-16)
+
+**Heap `Avm2String`s are now a swept species** (prompt
+`SWFRecompDocs/prompts/avm2-collectable-strings.md`). `Avm2String` gained
+appended GC fields (`gc_next`, `gc_flags` — static pool entries stay
+all-zero/rodata and are never written); the two constructors
+(`avm2_string_new`/`avm2_string_concat`) enroll in a string census;
+`avm2_gc_mark_value` marks string values; marking is byte-range-based
+(interior-pointer tolerant — dyn-prop names are by-value copies sharing the
+census string's inline bytes); the conservative ext scan also matches
+string ranges, covering every depth-0 ext string field. Precise tracer/root
+extensions: EDListener.type, EditText text/html/restrict + span/default
+formats, StyleSheet selectors+formats, `g_aliases` (registerClassAlias),
+`ctx->dxns`, Timer/Mouse.cursor statics, and an **E4X all-nodes registry**
+(every immortal E4XNode's local/text/ns strings marked as roots each cycle
+— robust against raw field stores; also closes the latent `notify`
+object edge). Kill switch: `AVM2_GC_STRINGS=0` disables the string sweep.
+
+**Measured (RWK native, plan_k gameplay TAS, 1560 ticks incl. PlayState
+boot):** allocated 1467 MB → **129 MB** (boot spike reclaimed); menu leak
+23.8 KB/tick → **flat**; gameplay steady-state 67.4 → 39.5 KB/tick with the
+string census dead flat (14,948 live strings at t1560 and t3000). Traces
+byte-identical GC-on/GC-off/stress. Seedling menu: stress-identical, flat.
+
+**Residual (follow-up, NOT strings):** the remaining ~39.5 KB/tick of RWK
+gameplay growth is non-census raw `avm2_alloc` churn — grow-and-abandon
+buffers (array/vector elems, dyn-prop chains) and per-call scratch
+(join/format/html builders, AMF reader tables); `heap_free` exists at only
+~8 sites. Needs its own free-on-grow / scratch-reclamation session.
+
+Two regression tests: `avm2_gc_string_concat_reclaim` (multi-frame
+loop-concat; length+slices survive reclamation) and
+`avm2_gc_string_survives_collect` (slot/array/dyn-prop name+value/
+Dictionary key/listener type/E4X text re-read across stress collects).
 
 ## State (RWK-3 — browser demo + wasm heap gate + kitty TAS, 2026-07-18)
 

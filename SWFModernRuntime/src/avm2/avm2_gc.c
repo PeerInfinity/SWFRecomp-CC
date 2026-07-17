@@ -24,10 +24,19 @@ static uint32_t g_gc_live_objects = 0; // enrolled minus swept (net live count)
 static uint64_t g_gc_total_alloc_bytes = 0;   // monotonic: every avm2_alloc byte
 static uint64_t g_gc_bytes_since_collect = 0; // reset each collect (watermark)
 
+// String census: every heap Avm2String (avm2_string_new / avm2_string_concat)
+// enrolls here and is swept when unreachable. Static pool strings never
+// enroll (gc_flags == 0) and are never written to (rodata).
+static Avm2String* g_gc_str_head = NULL;
+static uint32_t g_gc_live_strings = 0;
+static uint64_t g_gc_str_swept_total = 0;
+
 // --- config -----------------------------------------------------------------
 
 static int g_gc_configured = 0;
 static int g_gc_enabled = 1;              // AVM2_GC=0 disables
+static int g_gc_strings_enabled = 1;      // AVM2_GC_STRINGS=0 disables the
+                                          // string sweep only (A/B + kill switch)
 static uint64_t g_gc_watermark = 4u * 1024 * 1024; // bytes allocated between collects
 static int g_gc_verbose = 0;
 static uint32_t g_gc_collections = 0;
@@ -38,6 +47,8 @@ static void gc_configure(void)
 	g_gc_configured = 1;
 	const char* e = getenv("AVM2_GC");
 	if (e != NULL && strcmp(e, "0") == 0) g_gc_enabled = 0;
+	const char* es = getenv("AVM2_GC_STRINGS");
+	if (es != NULL && strcmp(es, "0") == 0) g_gc_strings_enabled = 0;
 	const char* w = getenv("AVM2_GC_WATERMARK");
 	if (w != NULL)
 	{
@@ -75,7 +86,17 @@ void avm2_gc_pin(Avm2Object* obj)
 	if (obj != NULL) obj->gc_mark |= 2;
 }
 
+void avm2_gc_enroll_string(Avm2String* s)
+{
+	s->gc_next = g_gc_str_head;
+	s->gc_flags = AVM2_STR_GC_HEAP;
+	g_gc_str_head = s;
+	g_gc_live_strings++;
+}
+
+
 uint32_t avm2_gc_live_objects(void) { return g_gc_live_objects; }
+uint32_t avm2_gc_live_strings(void) { return g_gc_live_strings; }
 uint64_t avm2_gc_live_bytes(void) { return g_gc_total_alloc_bytes; }
 
 // --- worklist ---------------------------------------------------------------
@@ -117,6 +138,7 @@ void avm2_gc_mark_object(Avm2Object* obj)
 void avm2_gc_mark_value(Avm2Value v)
 {
 	if (v.kind == AVM2_VALUE_OBJECT) avm2_gc_mark_object(v.u.obj);
+	else if (v.kind == AVM2_VALUE_STRING) avm2_gc_mark_string(v.u.str);
 }
 
 void avm2_gc_mark_scope(const Avm2ScopeChain* scope)
@@ -139,6 +161,64 @@ void avm2_gc_mark_scope(const Avm2ScopeChain* scope)
 
 static Avm2Object** g_census_sorted = NULL;
 static uint32_t g_census_sorted_count = 0, g_census_sorted_cap = 0;
+
+// Sorted snapshot of the STRING census, rebuilt each cycle. Unlike objects,
+// string lookups are RANGE-based: a census string's allocation spans
+// [s, s + sizeof(Avm2String) + s->len + 1) (header + inline bytes), and live
+// references may point at the header (Avm2Value.u.str), at the bytes (a
+// by-value Avm2String copy's utf8, e.g. Avm2DynProp.name), or anywhere inside
+// (conservative ext-scan words). Any pointer into the span marks the string.
+static Avm2String** g_str_census_sorted = NULL;
+static uint32_t g_str_census_count = 0, g_str_census_cap = 0;
+// O(1) address-bounds gate for the range lookup, set once per cycle after the
+// snapshot qsort. Most conservatively-scanned ext words are numbers/flags;
+// rejecting them before the binary search keeps the scan near its old cost.
+static const char* g_str_census_lo = NULL;
+static const char* g_str_census_hi = NULL;
+
+static int str_census_ptr_cmp(const void* a, const void* b)
+{
+	Avm2String* pa = *(Avm2String* const*) a;
+	Avm2String* pb = *(Avm2String* const*) b;
+	if (pa < pb) return -1;
+	if (pa > pb) return 1;
+	return 0;
+}
+
+void avm2_gc_mark_string_bytes(const void* p)
+{
+	if (p == NULL || g_str_census_count == 0) return;
+	if ((const char*) p < g_str_census_lo || (const char*) p >= g_str_census_hi) return;
+	// Greatest census string whose start <= p.
+	uint32_t lo = 0, hi = g_str_census_count;
+	while (lo < hi)
+	{
+		uint32_t mid = lo + (hi - lo) / 2;
+		if ((const void*) g_str_census_sorted[mid] <= p) lo = mid + 1;
+		else hi = mid;
+	}
+	if (lo == 0) return;
+	Avm2String* s = g_str_census_sorted[lo - 1];
+	if ((const char*) p < (const char*) s + sizeof(Avm2String) + s->len + 1)
+	{
+		s->gc_flags |= AVM2_STR_GC_MARK;
+	}
+}
+
+void avm2_gc_mark_string(const Avm2String* s)
+{
+	if (s == NULL) return;
+	if ((s->gc_flags & AVM2_STR_GC_HEAP) && s->utf8 == (const char*) (s + 1))
+	{
+		// The census header itself (every string minted by avm2_string_new /
+		// avm2_string_concat has its bytes inline) — O(1).
+		((Avm2String*) s)->gc_flags |= AVM2_STR_GC_MARK;
+		return;
+	}
+	// A by-value copy (its utf8 points into some census string's bytes) or a
+	// static pool string / literal (lookup misses; no-op).
+	avm2_gc_mark_string_bytes(s->utf8);
+}
 
 static int census_ptr_cmp(const void* a, const void* b)
 {
@@ -172,7 +252,13 @@ static void conservative_scan(Avm2Object* o)
 	{
 		Avm2Object* cand;
 		memcpy(&cand, base + i * sizeof(void*), sizeof(void*));
-		if (cand != NULL && census_contains(cand)) avm2_gc_mark_object(cand);
+		if (cand == NULL) continue;
+		if (census_contains(cand)) { avm2_gc_mark_object(cand); continue; }
+		// Not an object: it may be a census STRING edge — either an
+		// Avm2String* header (Avm2EventExt.type, DisplayObjectExt.name,
+		// RegExpExt.source, QName/Namespace ext, ...) or a bare utf8 byte
+		// pointer. The range lookup covers both; over-retention only.
+		avm2_gc_mark_string_bytes(cand);
 	}
 }
 
@@ -201,6 +287,10 @@ static void trace_object(Avm2Object* o)
 	{
 		avm2_gc_mark_value(p->value);
 		avm2_gc_mark_object(p->key_obj);
+		// The prop name is a by-value COPY of a heap string (set_dynamic:
+		// p->name = *avm2_string_new(...)); its utf8 points into that census
+		// string's inline bytes, which must survive as long as the prop does.
+		if (p->name.utf8 != NULL) avm2_gc_mark_string_bytes(p->name.utf8);
 	}
 	for (Avm2BoundMethod* bm = o->bound_methods; bm != NULL; bm = bm->next)
 	{
@@ -298,7 +388,11 @@ static void free_innards(Avm2Context* ctx, Avm2Object* o)
 static void gc_collect(Avm2Context* ctx)
 {
 	g_gc_collections++;
-	g_gc_bytes_since_collect = 0;
+	// NOTE: the watermark (g_gc_bytes_since_collect) is reset only after both
+	// census snapshots are built — a snapshot realloc OOM returns early, and
+	// resetting first would silently degrade the collector to a permanent
+	// no-op under exactly the memory pressure it exists to relieve (the next
+	// avm2_gc_maybe_collect must retry immediately).
 
 	// Clear pass: build the sorted census snapshot; reset white; seed pinned
 	// objects (marked + queued so their edges are traced).
@@ -311,7 +405,7 @@ static void gc_collect(Avm2Context* ctx)
 		{
 			uint32_t nc = g_census_sorted_cap == 0 ? 8192 : g_census_sorted_cap * 2;
 			Avm2Object** grown = realloc(g_census_sorted, nc * sizeof(Avm2Object*));
-			if (grown == NULL) { if (g_gc_verbose) fprintf(stderr, "[avm2-gc] census snapshot OOM — skip collect\n"); return; }
+			if (grown == NULL) { fprintf(stderr, "[avm2-gc] census snapshot OOM — skip collect\n"); return; }
 			g_census_sorted = grown;
 			g_census_sorted_cap = nc;
 		}
@@ -322,6 +416,35 @@ static void gc_collect(Avm2Context* ctx)
 	}
 	qsort(g_census_sorted, g_census_sorted_count, sizeof(Avm2Object*), census_ptr_cmp);
 
+	// String clear pass: reset white + build the sorted range-lookup snapshot.
+	// Strings have no outgoing edges, so nothing is seeded to the worklist.
+	g_str_census_count = 0;
+	for (Avm2String* s = g_gc_str_head; s != NULL; s = s->gc_next)
+	{
+		if (g_str_census_count == g_str_census_cap)
+		{
+			uint32_t nc = g_str_census_cap == 0 ? 8192 : g_str_census_cap * 2;
+			Avm2String** grown = realloc(g_str_census_sorted, nc * sizeof(Avm2String*));
+			if (grown == NULL) { fprintf(stderr, "[avm2-gc] string snapshot OOM — skip collect\n"); g_str_census_count = 0; return; }
+			g_str_census_sorted = grown;
+			g_str_census_cap = nc;
+		}
+		g_str_census_sorted[g_str_census_count++] = s;
+		s->gc_flags &= ~AVM2_STR_GC_MARK;
+	}
+	qsort(g_str_census_sorted, g_str_census_count, sizeof(Avm2String*), str_census_ptr_cmp);
+	// O(1) reject bounds for the range lookup (most conservatively-scanned
+	// ext words are numbers/flags, not string pointers).
+	if (g_str_census_count > 0)
+	{
+		Avm2String* last = g_str_census_sorted[g_str_census_count - 1];
+		g_str_census_lo = (const char*) g_str_census_sorted[0];
+		g_str_census_hi = (const char*) last + sizeof(Avm2String) + last->len + 1;
+	}
+
+	// Watermark reset: both snapshots built, the cycle will complete.
+	g_gc_bytes_since_collect = 0;
+
 	// Root markers (per module).
 	avm2_gc_mark_roots_main(ctx);
 	avm2_gc_mark_roots_globals(ctx);
@@ -330,6 +453,7 @@ static void gc_collect(Avm2Context* ctx)
 	avm2_gc_mark_roots_amf(ctx);
 	avm2_gc_mark_roots_media(ctx);
 	avm2_gc_mark_roots_external(ctx);
+	avm2_gc_mark_roots_e4x(ctx);
 
 	// Drain: trace every marked object's edges (may mark more).
 	while (g_wl_count > 0)
@@ -369,10 +493,42 @@ static void gc_collect(Avm2Context* ctx)
 	}
 	g_gc_swept_total += swept;
 
+	// String sweep: free every unmarked census string (header + inline bytes
+	// are one allocation). AVM2_GC_STRINGS=0 skips it (exact pre-string-GC
+	// behavior for A/B leak measurement, and a kill switch).
+	uint32_t str_swept = 0;
+	if (g_gc_strings_enabled)
+	{
+		Avm2String** slink = &g_gc_str_head;
+		for (Avm2String* s = g_gc_str_head; s != NULL; )
+		{
+			Avm2String* snext = s->gc_next;
+			if (s->gc_flags & AVM2_STR_GC_MARK)
+			{
+				slink = &s->gc_next;
+				s = snext;
+				continue;
+			}
+			*slink = snext;
+			heap_free(ctx->app, s);
+			g_gc_live_strings--;
+			str_swept++;
+			s = snext;
+		}
+		g_gc_str_swept_total += str_swept;
+	}
+
+	// Drop the per-cycle snapshot: it now holds dangling pointers to swept
+	// strings, and an out-of-cycle mark call must be a safe no-op, never a
+	// read of freed memory.
+	g_str_census_count = 0;
+	g_str_census_lo = g_str_census_hi = NULL;
+
 	if (g_gc_verbose)
 	{
-		fprintf(stderr, "[avm2-gc] #%u live=%u swept=%u (total alloc %.1f MB)\n",
+		fprintf(stderr, "[avm2-gc] #%u live=%u swept=%u strings live=%u swept=%u (total alloc %.1f MB)\n",
 		        g_gc_collections, g_gc_live_objects, swept,
+		        g_gc_live_strings, str_swept,
 		        (double) g_gc_total_alloc_bytes / (1024.0 * 1024.0));
 	}
 }
@@ -428,6 +584,8 @@ void avm2_gc_soak(Avm2Context* ctx, uint64_t ticks)
 			        g_gc_collections);
 		}
 	}
-	fprintf(stderr, "[avm2-gc-soak] END live=%u swept_total=%llu collections=%u\n",
-	        g_gc_live_objects, (unsigned long long) g_gc_swept_total, g_gc_collections);
+	fprintf(stderr, "[avm2-gc-soak] END live=%u swept_total=%llu strings_live=%u strings_swept_total=%llu collections=%u\n",
+	        g_gc_live_objects, (unsigned long long) g_gc_swept_total,
+	        g_gc_live_strings, (unsigned long long) g_gc_str_swept_total,
+	        g_gc_collections);
 }

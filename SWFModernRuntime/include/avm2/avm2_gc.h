@@ -39,6 +39,30 @@ typedef struct Avm2Context Avm2Context;
 // avm2_object_alloc). Sets gc_next/gc_mark.
 void avm2_gc_enroll(Avm2Object* obj);
 
+// String census (collectable strings). Heap strings enroll at their two
+// creation sites (avm2_string_new / avm2_string_concat) and are swept
+// alongside objects when unreachable. Static pool strings (gc_flags == 0)
+// are immortal and never written to.
+void avm2_gc_enroll_string(Avm2String* s);
+
+// Mark a string reachable. Handles all three shapes safely:
+//  - a census header (the common case: every Avm2Value string) — O(1) flag;
+//  - a by-value COPY of a census string (Avm2DynProp.name): the copy's
+//    utf8 points into the census string's inline bytes, so the byte owner
+//    is found by census range lookup;
+//  - a static pool string / literal: no-op.
+// Only valid during a collection (the range lookup uses the per-cycle
+// census snapshot; outside a cycle both calls are safe no-ops).
+// Strings stored into immortal NON-census structures need a root marker
+// that re-marks them each cycle (the E4X all-nodes registry pattern,
+// avm2_gc_mark_roots_e4x) — there is no pin API for strings.
+void avm2_gc_mark_string(const Avm2String* s);
+
+// Mark the census string whose allocation contains `p` (interior-pointer
+// tolerant). No-op if p is not inside any census string. Used for bare
+// `utf8` byte pointers and by the conservative ext scan.
+void avm2_gc_mark_string_bytes(const void* p);
+
 // Allocation accounting (called by avm2_alloc for every AVM2 allocation, so
 // the cadence trigger and the census report see the whole heap, not just
 // objects).
@@ -66,6 +90,7 @@ void avm2_gc_collect_now(Avm2Context* ctx);
 
 // Live-census accessors (soak / report).
 uint32_t avm2_gc_live_objects(void);
+uint32_t avm2_gc_live_strings(void);
 uint64_t avm2_gc_live_bytes(void);
 
 // Soak driver (AVM2_GC_SOAK=<ticks>): synthetic per-frame garbage on the real
@@ -81,6 +106,9 @@ void avm2_gc_mark_roots_amf(Avm2Context* ctx);
 void avm2_gc_mark_roots_media(Avm2Context* ctx);
 void avm2_gc_mark_roots_globals(Avm2Context* ctx);
 void avm2_gc_mark_roots_external(Avm2Context* ctx);
+// E4X all-nodes registry: nodes are immortal non-census allocations whose
+// local/text/namespace string fields must stay live (avm2_e4x.c).
+void avm2_gc_mark_roots_e4x(Avm2Context* ctx);
 
 // Per-module ext tracers for the exts whose object edges hang off intermediate
 // (non-census) allocations the conservative blob scan cannot follow: the
