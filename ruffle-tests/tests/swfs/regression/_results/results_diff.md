@@ -1,15 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `adec1e505eb9` (2026-07-18T19:02:58.247269+00:00)
-**Current:** `77f0d928b7d4` (2026-07-18T21:19:52.222997+00:00)
+**Previous:** `77f0d928b7d4` (2026-07-18T21:19:52.222997+00:00)
+**Current:** `e3102fb2925a` (2026-07-18T22:40:41.049335+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 52 | 52 | 0 |
-| Total | 52 | 52 | 0 |
+| Passing | 52 | 53 | +1 |
+| Total | 52 | 53 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-No changes detected.
+## Added Tests (1)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `avm2_localconnection_domain` | pass | 4/4 |
