@@ -1,8 +1,9 @@
 # avm2 Suite — Current Status
 
 Last updated: 2026-07-18 — **Robot Wants SEQUELS (Puppy, Fishy, Ice Cream)
-stages 1-3 DONE**: all three boot to their title menus and are playable
-headless with zero uncaught errors, on ONE runtime fix
+ALL STAGES DONE**: all three are playable headless with zero uncaught
+errors, their menus match Ruffle (MAD 2.334 / 0.001 / 0.200), and all three
+browser demos are LIVE — on ONE runtime fix
 (`flash.net.LocalConnection`). Prior: RWK AP handoff page DELIVERED
 (`docs2/examples/avm2/rwk_ap/`, 13/13 livetests incl. the live teleport).
 Prior: live-census growth FIXED (weak orphan registry): Seedling-teleport
@@ -70,9 +71,35 @@ rediscovered later:**
    runs three tilemap layers). Puppy at 330 MB is unaffected. The
    collectable-strings / eden-arena follow-up is the real fix.
 
-Remaining: stage 4 (Ruffle render parity, state-aligned per the RWK-1
-wall-clock `getTimer` gotcha) and stage 5 (browser demos
-`docs2/examples/avm2/{rwp,rwf,rwic}/`) for each game.
+**Stage 4 (menu render parity, state-aligned by offset scan — the RWK-1
+wall-clock `getTimer` gotcha):** Puppy MAD 2.334 / 5.74% px with the whole
+diff confined to two animated decorations (title art, every button and
+label, credits all 0.00% differing); Fishy MAD 0.001 / 0.00% px, i.e.
+pixel-perfect; Ice Cream MAD 0.200 / 0.45% px, the diff a 64x54 box around
+the bobbing ice-cream cone (the analogue of RWK's kitty-UFO artifact). The
+drift rate varies per game (Puppy 2.2x, Fishy ~1.04x) so tick offsets are
+NOT reusable across games; export ~700 oracle frames, since 300 left Ruffle
+still on Puppy's splash.
+
+**Stage 5: all three demos LIVE** — `docs2/examples/avm2/{rwp,rwf,rwic}/`,
+catalog entries added, each verified in headed Chrome on real WebGPU: menu
+renders, zero page errors, live mouse tracking confirmed. Fishy and Ice
+Cream are built with `SWF_URL="http://www.maxgames.com/test.swf"` (the
+former hardcoded `file:///test.swf` in `build_wasm_avm2.sh` is now an env
+override with an unchanged default).
+
+**Still open:** PlayState in-browser is UNMEASURED for Fishy and Ice Cream.
+`probe.py`'s synthetic click hovers the menu button correctly but never
+fires it — Flixel's `FlxButton` needs press and release on separate ticks
+and Playwright's down/up land in one event-loop turn. Probe tooling, not a
+demo defect (RWK-3 verified the live-mouse path), but it leaves the heap
+question unsettled, so make no browser-gameplay claim for those two yet.
+Two probe gotchas worth keeping: pass
+`--screenshot-timeout-ms 40000 --load-timeout-ms 60000` or the `#btn-run`
+click times out at 8 s on a 12 MB wasm; and `--click/--move` coordinates
+are CSS pixels of the displayed canvas (779x585 here, ~1.217x), NOT the
+game's internal 640x480 space — headless `input.json` files are the
+opposite.
 
 ## RWK Archipelago handoff page (2026-07-18)
 

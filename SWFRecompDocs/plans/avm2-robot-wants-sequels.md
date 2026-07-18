@@ -1,10 +1,12 @@
 # AVM2 — Robot Wants sequels bring-up (Puppy, Fishy, Ice Cream)
 
-Status: **STAGES 1–3 DONE for ALL THREE GAMES (2026-07-18).** Census clean,
-all three boot to their title menus and are **playable headless with zero
-uncaught errors**, on **exactly one runtime fix** (`flash.net.LocalConnection`).
-Remaining: stage 4 (Ruffle render parity spot-check) and stage 5 (browser
-demos) for each game.
+Status: **ALL FIVE STAGES DONE for ALL THREE GAMES (2026-07-18).** Census
+clean, all three are **playable headless with zero uncaught errors**, menus
+match Ruffle (MAD 2.334 / 0.001 / 0.200), and **all three browser demos are
+LIVE** — on **exactly one runtime fix** (`flash.net.LocalConnection`).
+Open follow-ups (§6): Ice Cream / Fishy PlayState is unmeasured in-browser
+(probe-click limitation) and their wasm heap headroom is thin; gameplay-level
+parity was not done (menus only).
 
 Session prompt: `SWFRecompDocs/prompts/avm2-robot-wants-sequels.md`.
 Template followed: `SWFRecompDocs/plans/avm2-robot-wants-kitty.md`.
@@ -125,8 +127,10 @@ no-ops (there is no IPC layer); `isPerUser` returns true.
 
 Consequence for demos: the browser demos must be built with an http
 `SWF_URL`, or the games blank-stage themselves. `build_wasm_avm2.sh`
-currently hardcodes `-DSWF_URL="file:///test.swf"` — **stage 5 must
-override it for Fishy and Ice Cream.**
+hardcoded `-DSWF_URL="file:///test.swf"`; it is now a `SWF_URL` env
+override with the same default, so Fishy and Ice Cream build with
+`SWF_URL="http://www.maxgames.com/test.swf"` and every other demo is
+unaffected.
 
 **Graded by** new regression test
 `ruffle-tests/tests/swfs/regression/avm2_localconnection_domain` (mxmlc,
@@ -205,31 +209,56 @@ ours would — do not take "Ruffle rendered it" as evidence the gate is inert.
 build them with `SWF_URL="http://www.maxgames.com/test.swf"`. The default is
 unchanged, so every other demo builds byte-identically.
 
-- **Puppy — LIVE.** `docs2/examples/avm2/rwp/`,
-  `demo.html?test=avm2/rwp`, 12 MB wasm, catalog entry added. Headed-Chrome
-  probe: module loads, `Run SWF` clicks, 25/25 canvas snapshots captured,
-  **full title menu renders on real WebGPU, zero page errors** (the single
-  console error is the expected `rando_bridge.js` 404 HEAD probe, per
-  RWK-3). Built with the default `file://` URL — Puppy has no domain gate.
-- **Fishy / Ice Cream — pending**, and gated on the heap headroom below
-  rather than on anything unknown.
+**All three demos are LIVE**, each with a catalog entry and a side-by-side
+Ruffle A/B page:
+
+| Demo | URL | wasm | SWF_URL |
+|---|---|---|---|
+| `rwp` | `demo.html?test=avm2/rwp` | 12 MB | default `file://` (no gate) |
+| `rwf` | `demo.html?test=avm2/rwf` | 11 MB | `http://www.maxgames.com/test.swf` |
+| `rwic` | `demo.html?test=avm2/rwic` | 12 MB | `http://www.maxgames.com/test.swf` |
+
+Headed-Chrome probe on each (`tools/browser-test/probe.py`, real WebGPU —
+functional only, never perf): module loads, `Run SWF` clicks, all canvas
+snapshots captured, **full title menu renders, zero page errors**. The one
+console error in every run is the expected `rando_bridge.js` 404 HEAD probe
+(per RWK-3). Mouse tracking is confirmed live in-browser — hovering
+Ice Cream's "New Game" highlights it.
+
+Probe defaults are too short for these demos: pass
+`--screenshot-timeout-ms 40000 --load-timeout-ms 60000` or the initial
+`#btn-run` click times out at 8 s on a 12 MB wasm.
+
+**GOTCHA — `probe.py --click/--move` coordinates are CSS pixels of the
+displayed canvas, not the game's internal 640x480 space.** The canvas
+renders at 779x585 here (scale ~1.217), so the menu button at internal
+(320,176) must be clicked at CSS (389,214). Clicking the internal
+coordinate lands short and silently does nothing. (Headless `input.json`
+event files are the opposite — those ARE in internal coordinates.)
 
 ## 6. Remaining work
 
-1. Fishy and Ice Cream browser demos (`rwf`, `rwic`). Build with the
-   `SWF_URL` override. **Expect heap trouble**: against the 1984 MB wasm
-   arena, Ice Cream peaks at 1770 MB and Fishy at 1577 MB, versus RWK's
-   1409 MB which already OOMs in-browser after ~6-7 min. The menu may well
-   be fine and PlayState the cliff — measure before assuming either way.
-   The collectable-strings / eden-arena follow-up is the real fix and is
-   runtime-wide, not sequel-scoped.
+1. **Ice Cream / Fishy PlayState in-browser is UNMEASURED** — the heap
+   question below is still open, not cleared. `probe.py`'s synthetic click
+   correctly hovers the button but never fires it: Flixel's `FlxButton`
+   needs the press and the release sampled on separate ticks, and
+   Playwright's down/up land in a single event-loop turn. A real human
+   click works (RWK-3 verified the live-mouse path), so this is probe
+   tooling, not a demo defect — but it means **no browser gameplay claim
+   should be made for these two until someone clicks through by hand or the
+   probe grows a click-hold duration.**
+   The heap risk it would settle: against the 1984 MB wasm arena, Ice Cream
+   peaks at 1770 MB natively and Fishy at 1577 MB, versus RWK's 1409 MB
+   which already OOMs in-browser after ~6-7 min. Menus are demonstrably
+   fine; PlayState is the suspected cliff. Collectable strings / eden arena
+   is the real fix and is runtime-wide, not sequel-scoped.
 2. Gameplay-parity spot-checks (stage 4 was menu-only here) via the
    `RUFFLE_INPUT_FILE` input-scripted oracle (RWK-2's local exporter patch).
    Gotcha carried over: Flixel calls `FlxG.keys.reset()` on every state
    switch, so keys pressed during a fade are wiped — press only once the
    target state is live.
 3. Readiness note to `~/CC/Archipelago-CC/NewDocs/plans/
-   seedling-swfrecomp-task-split.md` once all three demos are live
+   seedling-swfrecomp-task-split.md` now that all three demos are live
    (per the prompt's out-of-scope section — injection configs are their
    side's work).
 
