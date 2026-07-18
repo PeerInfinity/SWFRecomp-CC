@@ -1516,6 +1516,91 @@ static Avm2Value net_noop(Avm2Activation* act){ (void)act; return avm2_undefined
 static Avm2Value net_get_zero(Avm2Activation* act){ (void)act; return avm2_integer(0); }
 static Avm2Value net_get_null(Avm2Activation* act){ (void)act; return avm2_null(); }
 static Avm2Value net_get_text_fmt(Avm2Activation* act){ return net_str_const(act, "text"); }
+static Avm2Value net_get_true(Avm2Activation* act){ (void)act; return avm2_bool(1); }
+
+// flash.net.LocalConnection.domain — the domain of the SWF's own URL, matching
+// Ruffle's LocalConnections::get_domain (core/src/local_connection.rs): file://
+// (or a host-less / IP-literal URL) is "localhost", an unparseable URL is
+// "unknown", otherwise the exact host (no port, not the superdomain — AVM2 uses
+// get_domain, unlike AVM1's superdomain).
+static const char* lc_domain_from_url(const char* url)
+{
+	static char host[256];
+	const char* sep;
+
+	if (url == NULL || (sep = strstr(url, "://")) == NULL)
+	{
+		return "unknown";
+	}
+
+	if ((size_t) (sep - url) == 4 && strncmp(url, "file", 4) == 0)
+	{
+		return "localhost";
+	}
+
+	const char* h = sep + 3;
+	// Skip any userinfo ("user:pass@host"), bounded by the authority's end.
+	const char* auth_end = h;
+	while (*auth_end != '\0' && *auth_end != '/' && *auth_end != '?'
+	       && *auth_end != '#')
+	{
+		auth_end++;
+	}
+	for (const char* p = h; p < auth_end; p++)
+	{
+		if (*p == '@')
+		{
+			h = p + 1;
+			break;
+		}
+	}
+
+	// The host ends at a port separator or the end of the authority.
+	const char* end = h;
+	while (end < auth_end && *end != ':')
+	{
+		end++;
+	}
+
+	size_t len = (size_t) (end - h);
+	if (len == 0 || len >= sizeof(host))
+	{
+		return "localhost";
+	}
+
+	// url::Url::domain() yields None for IP literals, which Ruffle maps to
+	// "localhost". Detect IPv6 ("[::1]") and dotted-quad IPv4.
+	if (*h == '[')
+	{
+		return "localhost";
+	}
+	int all_digits_or_dots = 1;
+	for (const char* p = h; p < end; p++)
+	{
+		if ((*p < '0' || *p > '9') && *p != '.')
+		{
+			all_digits_or_dots = 0;
+			break;
+		}
+	}
+	if (all_digits_or_dots)
+	{
+		return "localhost";
+	}
+
+	memcpy(host, h, len);
+	host[len] = '\0';
+	return host;
+}
+
+static Avm2Value lc_get_domain(Avm2Activation* act)
+{
+#ifdef SWF_URL
+	return net_str_const(act, lc_domain_from_url(SWF_URL));
+#else
+	return net_str_const(act, "localhost");
+#endif
+}
 
 static void register_net(Avm2Context* ctx)
 {
@@ -1566,6 +1651,21 @@ static void register_net(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, ul, "dataFormat", net_get_text_fmt, net_noop);
 	avm2_builtin_add_getset(ctx, ul, "bytesLoaded", net_get_zero, NULL);
 	avm2_builtin_add_getset(ctx, ul, "bytesTotal", net_get_zero, NULL);
+
+	// flash.net.LocalConnection (extends EventDispatcher). There is no IPC
+	// layer, so connect/send/close are no-ops and no message is ever
+	// delivered; `domain` is the one live property (games use it as a
+	// cheap origin check).
+	Avm2Class* lc = avm2_builtin_class(ctx, "flash.net", "LocalConnection",
+	                                   b->event_dispatcher_class);
+	avm2_builtin_add_getter(ctx, lc, "domain", lc_get_domain);
+	avm2_builtin_add_method(ctx, lc, "connect", net_noop);
+	avm2_builtin_add_method(ctx, lc, "send", net_noop);
+	avm2_builtin_add_method(ctx, lc, "close", net_noop);
+	avm2_builtin_add_method(ctx, lc, "allowDomain", net_noop);
+	avm2_builtin_add_method(ctx, lc, "allowInsecureDomain", net_noop);
+	avm2_builtin_add_getset(ctx, lc, "client", net_get_null, net_noop);
+	avm2_builtin_add_getset(ctx, lc, "isPerUser", net_get_true, net_noop);
 
 	// Package-level functions.
 	builtin_add_global_fn_ns(ctx, "flash.net", "navigateToURL", net_noop);

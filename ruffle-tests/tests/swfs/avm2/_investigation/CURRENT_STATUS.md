@@ -1,12 +1,78 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-18 — **RWK AP handoff page DELIVERED**
+Last updated: 2026-07-18 — **Robot Wants SEQUELS (Puppy, Fishy, Ice Cream)
+stages 1-3 DONE**: all three boot to their title menus and are playable
+headless with zero uncaught errors, on ONE runtime fix
+(`flash.net.LocalConnection`). Prior: RWK AP handoff page DELIVERED
 (`docs2/examples/avm2/rwk_ap/`, 13/13 livetests incl. the live teleport).
 Prior: live-census growth FIXED (weak orphan registry): Seedling-teleport
-idle 9.5 → ~0 KB/tick, menu 2.0 → ~0; live object/string counts dead
+idle 9.5 -> ~0 KB/tick, menu 2.0 -> ~0; live object/string counts dead
 flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
+
+## Robot Wants sequels — Puppy / Fishy / Ice Cream (2026-07-18)
+
+Plan + full census: `SWFRecompDocs/plans/avm2-robot-wants-sequels.md`
+(source of truth). Template: the RWK plan. Three more Flixel/AS3 games on
+the AVM2 runtime, taking the count of real AVM2 games from 2 to 5.
+
+**Result: stages 1-3 (census, headless bring-up, gameplay probe) complete
+for all three, on exactly one runtime fix.**
+
+| Game | SWF ver | ABC bodies | verify_fails | New ops | Runtime fixes | Heap peak |
+|---|---|---|---|---|---|---|
+| Puppy | 9 | 1578 | 0 | 0 | none | 330 MB |
+| Fishy | 10 | 1241 | 0 | 0 | LocalConnection | 1577 MB |
+| Ice Cream | 10 | 1370 | 0 | 0 | LocalConnection | 1770 MB |
+
+**Census: no new opcode or verifier surface.** These are our first AVM2
+games above SWF v9, and the version bump brought nothing new — every op a
+sequel uses that RWK does not is already implemented. The sponsor chains
+(GameShed/Kong/MD5/Network) are dead in all three by the same mechanism as
+RWK: `xplor.Version.v = "Plain"`. Flixel is 2.21 (Puppy) / 2.35 (Fishy,
+Ice Cream); the 2.35 delta is `FlxPreloader` + `FlxMonitor` added and
+`FlxEmitter` removed. Fishy's water/swim is a plain second `FlxTilemap`
+layer plus game code, not an engine feature.
+
+**The one fix: `flash.net.LocalConnection` (`avm2_globals.c`).** Fishy and
+Ice Cream gate their entire boot on `new LocalConnection().domain` as the
+first instruction of the preloader; the class did not exist, so both died
+with Error #1065 before Flixel started. The `locallock` "site-lock" is an
+anti-local-copy stub whose whitelist array is EMPTY — any domain except
+`"localhost"` passes, so nothing needed spoofing and no SWF was patched.
+`domain` now mirrors Ruffle's `LocalConnections::get_domain` exactly:
+`file://` and IP literals -> `localhost`, unparseable -> `unknown`,
+otherwise the exact host (AVM2 uses the host, not AVM1's superdomain);
+userinfo and port are stripped. connect/send/close/allowDomain are no-ops.
+Graded by new regression test **`avm2_localconnection_domain`** (mxmlc;
+expectations captured from Ruffle, byte-identical).
+
+**GOTCHA — a silent blank-stage boot death reads as a PASS.** Fishy's
+pre-fix run produced no output at all, so the harness reported PASS against
+an empty `output.txt`. For a game bring-up, absence of trace output is not
+evidence of success; dump frames (`AVM2_CPU_DUMP`) before believing it.
+
+**FlxText carried over for free** — RWK-2's `bd_draw(TextField)` glyph
+rasterization renders every menu button, help text, and HUD label in all
+three games with no further work. This is the main reason the bring-ups
+were cheap.
+
+**Stage-5 (browser demo) blockers, measured now so they are not
+rediscovered later:**
+1. `build_wasm_avm2.sh` hardcodes `-DSWF_URL="file:///test.swf"`, which
+   yields `domain == "localhost"` -> Fishy and Ice Cream blank-stage
+   themselves. The demos must be built with an http `SWF_URL`.
+2. Heap. Against the 1984 MB wasm arena, Ice Cream peaks at 1770 MB
+   (~214 MB headroom) and Fishy at 1577 MB — versus RWK's 1409 MB, which
+   already OOMs in-browser after ~6-7 min. Same `FlxTilemap.arrayToCSV`
+   transient-string garbage, scaled by map size and layer count (Ice Cream
+   runs three tilemap layers). Puppy at 330 MB is unaffected. The
+   collectable-strings / eden-arena follow-up is the real fix.
+
+Remaining: stage 4 (Ruffle render parity, state-aligned per the RWK-1
+wall-clock `getTimer` gotcha) and stage 5 (browser demos
+`docs2/examples/avm2/{rwp,rwf,rwic}/`) for each game.
 
 ## RWK Archipelago handoff page (2026-07-18)
 

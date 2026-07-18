@@ -1,0 +1,4 @@
+domain: localhost
+is string: true
+no-op calls survived
+done

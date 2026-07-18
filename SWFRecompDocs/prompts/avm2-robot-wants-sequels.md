@@ -1,7 +1,16 @@
 # Session prompt — Robot Wants sequels bring-up (Puppy, Fishy, Ice Cream)
 
-Status: **NOT STARTED.** (Update this header per game as milestones land, the
-RWK-plan pattern; this doc serves multiple sessions if needed.)
+Status: **STAGES 1–3 DONE FOR ALL THREE GAMES (2026-07-18).** Census clean
+(0 verify_fails, 0 new ops, no v10 surface); all three boot to their title
+menus and are playable headless with zero uncaught errors, on **one runtime
+fix total** — `flash.net.LocalConnection` (Fishy/Ice Cream gate boot on
+`new LocalConnection().domain`; the class was simply missing, and the
+"site-lock" turned out to be an anti-local-copy stub with an EMPTY
+whitelist, so nothing needed spoofing). Remaining per game: **stage 4
+(Ruffle render parity) and stage 5 (browser demo)**. Full detail, including
+two stage-5 blockers (SWF_URL override; Ice Cream's 1770 MB heap peak vs the
+1984 MB wasm arena), is in `SWFRecompDocs/plans/avm2-robot-wants-sequels.md`
+— read that first, it is now the source of truth.
 
 You are bringing up the **three Robot Wants sequels** on the AVM2 runtime and
 shipping each as a browser demo, following the proven RWK playbook: census →
