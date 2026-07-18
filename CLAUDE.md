@@ -73,6 +73,19 @@ gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f single_test=TE
 
 2. **Old tests** (`SWFRecomp/tests/`): 115 hand-written tests. Per-test `validate.py` validators. Runner is `all_tests.sh`. Results in `test_results.json`. Run locally only.
 
+## Browser Performance Measurement (standing capability — don't rediscover)
+
+- **WSL/WSLg Chrome is SwiftShader (software rendering). NEVER use it for
+  performance numbers or frame-rate A/Bs** — every "gap" it shows is an
+  artifact. It's fine for functional/rendering-correctness probes.
+- **Real-GPU browser perf is measured FROM WSL by driving Windows Chrome via
+  WSL interop**: call `python.exe` (the Windows Python has Playwright;
+  `python3` is Linux and doesn't), keep scripts + outputs on the Windows disk
+  at `C:\playwright\` (= `/mnt/c/playwright/`, use `wslpath -w`), serve docs2
+  from WSL (`python3 -m http.server 8010` → `http://localhost:8010/`).
+  Full recipe, driver scripts, and the three interop gotchas:
+  `tools/divergence/perf/WINDOWS_PLAYWRIGHT_FROM_WSL.md`.
+
 ## Critical Runtime Architecture Notes
 
 - `ASObject` and `ASFunction` are **different structs** — never cast one to the other. Functions have `prototype_obj` and `own_props` fields; objects have a `properties` array. Code that handles both types must check the ActionVar type tag first.
