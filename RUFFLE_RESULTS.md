@@ -3,8 +3,8 @@
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
 **Commit:** `adec1e505eb9`  
-**Date:** 2026-07-18 18:50 UTC  
-**Total duration:** 4h35m49s
+**Date:** 2026-07-18 19:02 UTC  
+**Total duration:** 4h27m24s
 
 ## Results by Suite
 
@@ -125,13 +125,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm2 | - | 1 | - | 1 |
-
-**avm2 — newly failing:** `displayobject_rotation`
-
-*Comparing `b7cdae1c5bdc` → `adec1e505eb9`*
+*No changes since last run.*
 
 ## Flash-Spec Results
 
@@ -146,69 +140,69 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 635/711 (89.3%)
-- **Duration:** 55m36s across 30 shards
+- **Duration:** 54m03s across 30 shards
 - **Lines:** 115,824/131,157 matching (88.3%)
-- **Avg test duration:** 4.6s — slowest: `netstream_play_flv_screen` (38.1s)
+- **Avg test duration:** 4.5s — slowest: `netstream_play_flv_screen` (26.9s)
 
 ### avm2
 
 - **Pass:** 822/1215 (67.7%)
-- **Duration:** 2h15m49s across 30 shards
+- **Duration:** 2h10m13s across 30 shards
 - **Lines:** 103,123/151,085 matching (68.3%)
-- **Avg test duration:** 6.6s — slowest: `away3d_advanced_shallow_water_demo` (59.6s)
+- **Avg test duration:** 6.4s — slowest: `away3d_advanced_shallow_water_demo` (70.3s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 135/243 (55.6%)
-- **Duration:** 25m42s across 30 shards
+- **Duration:** 25m07s across 30 shards
 - **Lines:** 30,356/38,791 matching (78.3%)
-- **Avg test duration:** 6.3s — slowest: `MovieClip-v8` (72.2s)
+- **Avg test duration:** 6.1s — slowest: `MovieClip-v8` (69.5s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 69/111 (62.2%)
-- **Duration:** 28m04s across 30 shards
+- **Duration:** 27m29s across 30 shards
 - **Lines:** 4,054/5,248 matching (77.2%)
-- **Avg test duration:** 15.1s — slowest: `matrix_test` (100.9s)
+- **Avg test duration:** 14.8s — slowest: `matrix_test` (99.4s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m44s across 30 shards
+- **Duration:** 1m43s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 11.5s — slowest: `hello` (21.4s)
+- **Avg test duration:** 11.5s — slowest: `implementsOpTest` (21.9s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 11/20 (55.0%)
 - **Duration:** 4m55s across 30 shards
 - **Lines:** 441/580 matching (76.0%)
-- **Avg test duration:** 14.7s — slowest: `soft_reference_test1` (22.2s)
+- **Avg test duration:** 14.7s — slowest: `swf4opcode` (22.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 2m40s across 30 shards
+- **Duration:** 2m52s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 7.9s — slowest: `mixed-bytecode-as2` (21.3s)
+- **Avg test duration:** 8.6s — slowest: `zeroframe_definesprite` (21.3s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 13m22s across 30 shards
+- **Duration:** 13m23s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 8.7s — slowest: `fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096` (21.8s)
+- **Avg test duration:** 8.7s — slowest: `fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3` (22.3s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 1m45s across 30 shards
+- **Duration:** 1m46s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 2.2s — slowest: `label` (20.4s)
+- **Avg test duration:** 2.2s — slowest: `label` (19.5s)
 
 ### regression
 
 - **Pass:** 52/52 (100%)
-- **Duration:** 6m09s across 30 shards
+- **Duration:** 5m48s across 30 shards
 - **Lines:** 316/316 matching (100%)
-- **Avg test duration:** 7.0s — slowest: `nc_onstatus_closure` (21.2s)
+- **Avg test duration:** 6.7s — slowest: `root_enterframe_cross_swf_version` (21.4s)
