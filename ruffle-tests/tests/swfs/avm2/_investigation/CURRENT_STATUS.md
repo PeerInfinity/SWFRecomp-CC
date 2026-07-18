@@ -1,10 +1,45 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-17 — raw-alloc reclamation DONE (the residual
-~39.5 KB/tick RWK gameplay leak is now ~1.0 KB/tick; long browser
-playthroughs are effectively unbounded). Prior: collectable strings
-(2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
-sessions.
+Last updated: 2026-07-18 — live-census growth FIXED (weak orphan
+registry): Seedling-teleport idle 9.5 → ~0 KB/tick, menu 2.0 → ~0;
+live object/string counts dead flat. Prior: raw-alloc reclamation
+(2026-07-17), collectable strings (2026-07-16), RWK-3 (browser demo +
+wasm heap gate), RWK-1/2, Stage 12 sessions.
+
+## Live-census growth — weak orphan registry (2026-07-18)
+
+**The last AVM2 Seedling leak is fixed** (prompt
+`SWFRecompDocs/prompts/avm2-live-census-growth.md`). The ~9.5 KB/tick
+Seedling-teleport idle growth was LIVE census growth: exactly **2
+TextField objects + 6 strings per tick** (2 auto `instanceN` names + 4
+empty strings) stayed reachable — the FlashPunk HUD creates temp
+`new TextField()`s per frame, draws them into a BitmapData, and drops
+them, but `avm2_display.c`'s orphan registry (`g_orphans`) enrolled each
+at construction and marked them all as **strong** GC roots forever.
+Ruffle's `OrphanManager` stores `DisplayObjectWeak` explicitly ("we don't
+want to keep these objects alive if they would otherwise be
+garbage-collected... matches Flash's behavior").
+
+**Fix:** the orphan registry is now weak — `avm2_gc_mark_roots_display`
+no longer marks orphans; `avm2_display_gc_prune_dead_orphans()` (called
+by `gc_collect` after a *completed* mark, before sweep) drops entries
+whose object went unmarked. Orphan tests stay deterministic under GC
+stress because listener-bearing orphans remain rooted via the
+(deliberately strong, unlike Ruffle's weak) enterFrame broadcast
+registry, and `goto_on_orphan`'s clip is a class member.
+
+**Measured:** teleport idle live census flat at 14,565 objects / 6,810
+strings from collect #11 through #91 (was 15.2k→19.5k / 8.6k→21.3k);
+allocated 56.0 MB @300 → 55.9 MB @2400 ticks (was +9.5 KB/tick, 81 MB
+@2400). Stock menu flat at 2,219 / 1,396 (was +1,290 obj + 1,290 str per
+cycle, ~2.0 KB/tick). RWK unchanged: 1.008 KB/tick (prior 1.03), traces
+byte-identical, absolute footprint −5 MB (79.15 MB @1560).
+
+**Verification:** teleport + menu traces byte-identical
+normal/stress/GC=0 at 300 and 2400 ticks; 3 `avm2_gc_*` regression tests
+pass in all 3 modes; 11 sampled suite tests (orphan ×4, xml_advanced,
+broadcast_event, event_bubbles, closures, edittext ×2, timer)
+byte-identical default vs stress, no status changes.
 
 ## Raw-alloc reclamation (2026-07-17)
 

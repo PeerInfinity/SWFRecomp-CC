@@ -1,5 +1,11 @@
 # Session prompt — AVM2 live-census growth (Seedling residual ~9.5 KB/tick)
 
+> **STATUS: COMPLETE 2026-07-18.** Verdict: over-retain in our runtime — the
+> orphan display registry was a strong GC root (Ruffle's is weak). Fixed by
+> weak-orphan pruning; Seedling-teleport idle 9.5 → ~0 KB/tick, menu 2.0 → ~0,
+> RWK unchanged. See memory `avm2-weak-orphan-registry` and the avm2 suite
+> `CURRENT_STATUS.md` entry.
+
 You are finding the **retention path behind the last AVM2 Seedling leak**. After
 collectable strings (`c0e0b3493`) and raw-alloc scratch reclamation
 (`c9678c553`), RWK gameplay is essentially flat (~1 KB/tick, accepted), but

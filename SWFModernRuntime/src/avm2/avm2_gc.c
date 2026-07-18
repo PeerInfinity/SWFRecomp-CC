@@ -529,6 +529,11 @@ static void gc_collect(Avm2Context* ctx)
 		return;
 	}
 
+	// Weak registries: the orphan list must drop entries for objects the sweep
+	// below will free (it intentionally holds weak references — see
+	// avm2_display_gc_prune_dead_orphans). Runs only on a completed mark.
+	avm2_display_gc_prune_dead_orphans();
+
 	// Sweep: free every unmarked (white) census object.
 	uint32_t swept = 0;
 	Avm2Object** link = &g_gc_head;

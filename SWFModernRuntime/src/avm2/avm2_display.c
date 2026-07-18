@@ -5677,7 +5677,13 @@ static Avm2Object* g_drag_drop_target;
 void avm2_gc_mark_roots_display(Avm2Context* ctx)
 {
 	(void) ctx;
-	for (uint32_t i = 0; i < g_orphan_count; i++) avm2_gc_mark_object(g_orphans[i]);
+	// The orphan registry is deliberately NOT marked: it holds WEAK references
+	// (Ruffle's OrphanManager stores DisplayObjectWeak). A constructed-but-
+	// never-parented display object — e.g. a per-frame `new TextField()` drawn
+	// into a BitmapData and dropped — must die once nothing else references
+	// it; a strong root here retains every such object forever (measured:
+	// Seedling idle leaked exactly 2 TextFields + 6 strings per tick). Dead
+	// entries are pruned post-mark via avm2_display_gc_prune_dead_orphans().
 	for (uint32_t i = 0; i < g_fs_cleanup_count; i++) avm2_gc_mark_object(g_fs_cleanup[i]);
 	avm2_gc_mark_object(g_stage_focus);
 	avm2_gc_mark_object(g_root_loader_info);
@@ -5697,6 +5703,21 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx)
 	avm2_gc_mark_string(g_str_timer);
 	avm2_gc_mark_string(g_str_timer_complete);
 	avm2_gc_mark_string(g_mouse_cursor);
+}
+
+// Post-mark, pre-sweep hook (avm2_gc.c gc_collect): drop orphan entries whose
+// object went unmarked this cycle — the sweep is about to free them. This is
+// what makes the registry weak; skipping it would leave dangling entries. Only
+// called when the mark phase completed (never after a worklist OOM, where
+// unmarked does not mean unreachable).
+void avm2_display_gc_prune_dead_orphans(void)
+{
+	uint32_t w = 0;
+	for (uint32_t i = 0; i < g_orphan_count; i++)
+	{
+		if (g_orphans[i]->gc_mark & 1) g_orphans[w++] = g_orphans[i];
+	}
+	g_orphan_count = w;
 }
 
 // Ext tracer: a DisplayObject's ext holds indirect object edges the

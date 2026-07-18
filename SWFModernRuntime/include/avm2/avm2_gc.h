@@ -110,6 +110,13 @@ void avm2_gc_mark_roots_external(Avm2Context* ctx);
 // local/text/namespace string fields must stay live (avm2_e4x.c).
 void avm2_gc_mark_roots_e4x(Avm2Context* ctx);
 
+// Weak-registry prune (avm2_display.c): the orphan list holds WEAK references
+// (Ruffle OrphanManager stores DisplayObjectWeak — an otherwise-unreachable
+// orphan must not be kept ticking forever; Flash collects it). The collector
+// calls this after the mark phase completes and before the sweep, so entries
+// whose object is about to be freed are dropped first.
+void avm2_display_gc_prune_dead_orphans(void);
+
 // Per-module ext tracers for the exts whose object edges hang off intermediate
 // (non-census) allocations the conservative blob scan cannot follow: the
 // EventDispatcher listener list and the DisplayObject child/frame-script/
