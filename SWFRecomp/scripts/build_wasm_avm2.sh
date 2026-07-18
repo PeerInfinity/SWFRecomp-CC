@@ -20,6 +20,12 @@
 #                     -O0 compiles faster/bigger, -Oz smallest/slowest)
 #   RT_OPT            opt level for runtime + other TUs (default -O2)
 #   MOCK_DATE_TIME    deterministic clock ms (default 981152406000, Ruffle mode)
+#   SWF_URL           value of loaderInfo.url / the SWF's own origin (default
+#                     file:///test.swf). Games that gate boot on their origin
+#                     need an http URL here: Robot Wants Fishy and Ice Cream
+#                     check `new LocalConnection().domain` in their preloader
+#                     and blank the stage when it is "localhost", which is what
+#                     a file:// URL yields (see avm2-robot-wants-sequels plan).
 #   FRESH             1 = wipe .o cache first (default: incremental)
 #
 # The build is INCREMENTAL: a .c is only recompiled if its .o is missing or
@@ -41,6 +47,7 @@ SWFMODERN_INC="${SWFMODERN_ROOT}/include"
 ABC_OPT="${ABC_OPT:--O1}"
 RT_OPT="${RT_OPT:--O2}"
 MOCK_DATE_TIME="${MOCK_DATE_TIME:-981152406000}"
+SWF_URL="${SWF_URL:-file:///test.swf}"
 OUT_DIR="${AVM2_OUT_DIR:-${SWFRECOMP_ROOT}/build_wasm_avm2/${NAME}}"
 SRC_DIR="${OUT_DIR}/src"    # flat dir of .c we compile (keeps ccache-ish .o cache)
 OBJ_DIR="${OUT_DIR}/obj"
@@ -139,7 +146,7 @@ DEFINES=(
     -DMOCK_DATE_TIME=${MOCK_DATE_TIME}LL
     -DSWF_FILE_SIZE=${SWF_FILE_SIZE}
     -DSWF_ONDISK_SIZE=${SWF_ONDISK_SIZE}
-    '-DSWF_URL="file:///test.swf"'
+    "-DSWF_URL=\"${SWF_URL}\""
 )
 # WASM SIMD (128-bit) — enables __wasm_simd128__ so the AVM2 bitmap blit
 # (avm2_bitmap.c) uses its 4-pixel-wide byte-exact blend_over kernel on the hot

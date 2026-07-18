@@ -173,18 +173,61 @@ should not be attempted before measuring in-browser**; the collectable-
 strings / eden-arena follow-up already filed for RWK is the real fix.
 Puppy's browser demo is unaffected.
 
-## 4. Remaining work
+## 4. Stage 4 — Ruffle render parity (DONE, all three)
 
-1. **Stage 4 — render parity** vs Ruffle exports, per game. Use the RWK-1
-   gotcha: Ruffle's AVM2 `getTimer` is **wall-clock**, so Flixel pacing
-   drifts nondeterministically; always **state-align via an offset scan**
-   before computing MAD. Input-scripted oracle via `RUFFLE_INPUT_FILE`
-   (RWK-2's local exporter patch). Fishy is 60 fps in its SWF header vs
-   Puppy/Ice Cream's 30 — expect a different drift rate.
-2. **Stage 5 — browser demos** `docs2/examples/avm2/{rwp,rwf,rwic}/` via
-   `deploy_wasm_avm2.sh` with `DEMO_SWF`/`DEMO_DESC`, plus catalog entries.
-   **Two blockers to clear first:** the `SWF_URL` override above (Fishy,
-   Ice Cream), and the heap headroom above (Ice Cream, likely Fishy).
+Menu frames, **state-aligned by offset scan** (mandatory: Ruffle's AVM2
+`getTimer` is wall-clock, so Flixel pacing drifts — see the RWK-1 gotcha).
+Our tick 299 aligned against a 700-frame Ruffle export:
+
+| Game | Aligned oracle frame | MAD | px differing (>8) | Residual |
+|---|---|---|---|---|
+| Puppy | 660 (2.2x drift) | 2.334 | 5.74% | animated promo box + puppy sprite phase |
+| Fishy | 310 | **0.001** | **0.00%** | none — pixel-perfect |
+| Ice Cream | 512 | 0.200 | 0.45% | ice-cream-on-UFO bob phase |
+
+All residuals are the documented pacing-artifact class, confirmed by diff
+mask: for Puppy, rows 0-179 (title art, every button and label, credits) are
+**0.00% differing** and the entire diff is confined to the two animated
+decorations; Ice Cream's whole diff is a 64x54 px box around the bobbing
+ice-cream cone — the direct analogue of RWK's documented kitty-UFO artifact.
+Ruffle's trace output matches ours exactly. Note the drift rate really does
+vary per game as predicted (Puppy 2.2x, Fishy ~1.04x), so **never reuse a
+tick offset across games**.
+
+Ruffle's own exporter renders Fishy and Ice Cream fine from `file://`,
+i.e. Ruffle does not hit the domain gate the way a naive `file://` build of
+ours would — do not take "Ruffle rendered it" as evidence the gate is inert.
+
+## 5. Stage 5 — browser demos
+
+`SWF_URL` is now an env override in `build_wasm_avm2.sh` (it was a hardcoded
+`file:///test.swf`), which is what lets Fishy and Ice Cream boot in-browser:
+build them with `SWF_URL="http://www.maxgames.com/test.swf"`. The default is
+unchanged, so every other demo builds byte-identically.
+
+- **Puppy — LIVE.** `docs2/examples/avm2/rwp/`,
+  `demo.html?test=avm2/rwp`, 12 MB wasm, catalog entry added. Headed-Chrome
+  probe: module loads, `Run SWF` clicks, 25/25 canvas snapshots captured,
+  **full title menu renders on real WebGPU, zero page errors** (the single
+  console error is the expected `rando_bridge.js` 404 HEAD probe, per
+  RWK-3). Built with the default `file://` URL — Puppy has no domain gate.
+- **Fishy / Ice Cream — pending**, and gated on the heap headroom below
+  rather than on anything unknown.
+
+## 6. Remaining work
+
+1. Fishy and Ice Cream browser demos (`rwf`, `rwic`). Build with the
+   `SWF_URL` override. **Expect heap trouble**: against the 1984 MB wasm
+   arena, Ice Cream peaks at 1770 MB and Fishy at 1577 MB, versus RWK's
+   1409 MB which already OOMs in-browser after ~6-7 min. The menu may well
+   be fine and PlayState the cliff — measure before assuming either way.
+   The collectable-strings / eden-arena follow-up is the real fix and is
+   runtime-wide, not sequel-scoped.
+2. Gameplay-parity spot-checks (stage 4 was menu-only here) via the
+   `RUFFLE_INPUT_FILE` input-scripted oracle (RWK-2's local exporter patch).
+   Gotcha carried over: Flixel calls `FlxG.keys.reset()` on every state
+   switch, so keys pressed during a fade are wiped — press only once the
+   target state is live.
 3. Readiness note to `~/CC/Archipelago-CC/NewDocs/plans/
    seedling-swfrecomp-task-split.md` once all three demos are live
    (per the prompt's out-of-scope section — injection configs are their
