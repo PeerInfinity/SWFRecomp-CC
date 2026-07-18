@@ -58,6 +58,24 @@ first).
   fix when a game needs faithful nested/attached morph animation.
   (2026-06-27)
 
+## AVM2 — GC / memory
+
+- **Reevaluate the two accepted GC leak residuals** when requirements
+  change (e.g. truly indefinite/overnight browser sessions, or a game
+  that churns listener-bearing orphans). (1) `fn_scope` over-retain,
+  ~1.03 KB/tick in RWK gameplay: freeing at closure sweep is a PROVEN
+  UAF (`avm2_op_newactivation` aliases the chain as `method_scope` in
+  activation vtables — memory `avm2-raw-alloc-reclamation`); the real
+  fix is refcounted or GC-traced scope chains, a dedicated project.
+  (2) Orphan display objects WITH event listeners never die: the
+  enterFrame broadcast registry (`avm2_events.c g_broadcast`) is
+  deliberately STRONG (Ruffle's is weak) so listener-bearing orphans
+  tick deterministically under `AVM2_GC_STRESS=1`; weakening it would
+  regress orphan tests (memory `avm2-weak-orphan-registry`). Current
+  burn rates (~1.85 MB/min RWK worst case, ≈1.85 GB headroom → 16+ h)
+  make both harmless today; revisit if headroom shrinks or session
+  lengths grow. (2026-07-18)
+
 ## Deferred test failures
 
 - ~~**`from_gnash/actionscript.all/case-v6` CI-only flake.**~~ FIXED
