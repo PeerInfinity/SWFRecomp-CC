@@ -65,13 +65,25 @@ bridge costs **0 bytes/tick**; the injected build's entire footprint is a
 counts. (2.897 KB/tick is the TITLE-SCREEN figure — not comparable to the
 1.008 KB/tick gameplay number from the plan_k TAS measurement.)
 
-**GOTCHA — do NOT use `swf_perf_report`'s "live AS objs / arrays" as an
-AVM2 census.** Those are AVM1 counters: `avm2_main.c:481` passes literal
-`0, 0`, so an AVM2 page's HUD always reads 0 and any "flat census" gate
-built on it passes vacuously (this session built one, caught it, and
-replaced it). The runtime exposes no heap counter to JS — measure AVM2
-memory natively via `AVM2_HEAP_STATS`, and use browser soak survival as
-the only JS-visible signal.
+**FIXED 2026-07-18 — the HUD live counts are now real for AVM2.**
+Previously `avm2_main.c` passed literal `0, 0` to `swf_perf_report`, so an
+AVM2 page's HUD always read 0 and any "flat census" gate built on it passed
+vacuously (the RWK AP session built one, caught it, and replaced it). The
+AVM2 frame loop now passes `avm2_gc_live_objects()` and
+`avm2_gc_live_strings()`; the HUD label reads `live AS objs N
+arrays/strings M` (slot 2 is VM-dependent — AVM1 arrays, AVM2 strings —
+hence the neutral label; the `EM_JS` in `libswf/swf.c` is shared).
+`avm2_gc_live_bytes()` exists in `avm2_gc.h` but is NOT wired to JS (the
+two HUD slots are `int`).
+
+**Write browser-side AVM2 memory gates against a SAWTOOTH, not a flat
+line.** These are post-collection live censuses sampled between
+collections, so they ramp and then drop when the GC runs. Measured on
+`demo.html?test=avm2/rwk` (2026-07-18, idle title screen): objs climb
+~2400→5500 and strings ~8k→125k over ~60 s, then a collection drops them
+to ~3400 / ~15k and the ramp repeats at the same slope. The gate is
+"successive cycle PEAKS don't grow", not "the number is constant".
+Native `AVM2_HEAP_STATS` remains the precise per-tick instrument.
 
 **Perf note:** a frame-rate A/B under WSL cannot resolve bridge cost —
 WSL headed Chrome software-renders RWK at ~200 ms/frame, so the render

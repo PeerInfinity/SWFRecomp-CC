@@ -132,7 +132,9 @@ EM_JS(int, swf_perf_report, (double elapsed_ms, double budget_ms, double present
 			+ 'max sustainable ~' + susFps.toFixed(0) + ' fps\n'
 			// Live AS heap objects (memory-reclamation plan Stage 0): a count
 			// that climbs without bound on clip-churn gameplay = a leak.
-			+ 'live AS objs ' + live_obj + '  arrays ' + live_arr;
+			// Slot 2 is VM-dependent — AVM1 passes live arrays, AVM2 passes
+			// live strings (avm2_gc_live_strings) — hence the neutral label.
+			+ 'live AS objs ' + live_obj + '  arrays/strings ' + live_arr;
 	}
 	return S.uncapped ? 1 : 0;
 });

@@ -478,7 +478,13 @@ void runSWF_avm2(SWFAppContext* app_context)
 
 			double now_ms = emscripten_get_now();
 			double elapsed = now_ms - frame_start;
-			int uncapped = swf_perf_report(elapsed, frame_budget_ms, present_ms, 0, 0);
+			// Real AVM2 GC census in the HUD's two live-count slots (the AVM1
+			// loop passes objects+arrays; AVM2 has no array census, so slot 2
+			// carries live strings). Previously literal 0,0 — which silently
+			// made every browser-side AVM2 memory gate assert 0 == 0.
+			int uncapped = swf_perf_report(elapsed, frame_budget_ms, present_ms,
+			                               (int)avm2_gc_live_objects(),
+			                               (int)avm2_gc_live_strings());
 			if (next_due_ms == 0.0) next_due_ms = frame_start;   // anchor
 			next_due_ms += frame_budget_ms;
 			if (uncapped)

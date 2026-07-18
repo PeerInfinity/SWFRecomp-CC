@@ -2761,8 +2761,14 @@ static Avm2Value do_get_rotation(Avm2Activation* act)
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext == NULL) return avm2_number(0);
 	cache_scale_rotation(ext);
+	// Normalize into [-180, 180]. Both wraps are strict so that a rotation set
+	// to exactly +180 or -180 reads back with its original sign (Flash/Ruffle
+	// keep them distinct; the sign survives matrix decomposition as ±0 in the
+	// atan2 numerator).
 	double rem = fmod(ext->rotation_deg, 360.0);
-	return avm2_number(rem <= 180.0 ? rem : rem - 360.0);
+	if (rem > 180.0) rem -= 360.0;
+	else if (rem < -180.0) rem += 360.0;
+	return avm2_number(rem);
 }
 
 static Avm2Value do_set_rotation(Avm2Activation* act)
