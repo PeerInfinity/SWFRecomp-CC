@@ -64,12 +64,40 @@ Also note: the deployed .wasm files may be a MIXED bag of build vintages
 (check mtimes vs commit times — the staleness lesson). Rebuild all four from
 HEAD before measuring anything.
 
-## Step 0 — context from the user (if provided when this session starts)
+## Step 0 — user context (ALREADY PROVIDED 2026-07-19)
 
-Which browser/machine they played on, and whether it has WebGPU on a real
-GPU. If they can paste the perf HUD line (`?perfhud=1`) from their browser,
-that plus the adapter name may settle Fork B instantly. Don't block on this —
-the rig measurement proceeds regardless.
+The user confirms: **general slowdown AND a rhythmic pause** in RWK, and it
+is **unplayably slow in BOTH Firefox and Chrome**. Consequences:
+- Fork B (environment) is effectively dead — two engines, same result, and
+  Seedling is fine in the same browsers.
+- The rhythmic pause matches the collect-hitch signature; the *general*
+  slowdown on top of it suggests collects fire often enough to also drag the
+  average (or a second sustained cost exists — the distribution will say).
+- "Unplayable" vs RWK-3's 5.1 ms is a ~10x+ effect — look for something
+  pathological, not marginal.
+
+**Sharpened hypothesis — check this FIRST (native, minutes):** the GC
+watermark triggers on GROSS bytes allocated since last collect, not net
+growth. Flixel churns enormously even at ~zero net (per-frame FlxText/HUD
+string rebuilds; RWK-2 had to stopgap `arrayToCSV` at 4 GB because single
+calls allocate MBs of strings — find who calls it and how often). If RWK
+gameplay grosses several MB/sec against a ~4 MB watermark, collects fire
+every 1–3 s, each now paying the post-`c0e0b3493` price (string census
+snapshot rebuild + sort, byte-range marking, conservative ext scan against
+the string census, orphan prune) over an ~85k-object / 100k+-string census.
+That single mechanism produces BOTH observed shapes and the Seedling split
+(Seedling's gross churn is tiny post-fixes). Measure: gross alloc rate
+(bytes_since_collect growth), collect frequency, and per-collect duration
+(TEMP env-gated timer) during native RWK gameplay. If confirmed, candidate
+levers in rough order of cheapness: adaptive watermark (scale with live-set
+size, e.g. `max(default, k × live_bytes)` — collect frequency then tracks
+retention, not churn), cutting the dominant churn source at the runtime
+level if it's ours (e.g. a scratch path still allocating census strings),
+or making the collect itself cheaper (incremental/generational = a real
+project, don't start it in this session). Any watermark change must re-run
+the GC-correctness ladder AND re-verify the leak-arc soak targets (RWK +
+Seedling KB/tick numbers must not regress — less frequent collects must not
+reopen "browser OOMs after N minutes").
 
 ## Step 1 — objective measurement (Windows rig, rebuild first)
 
