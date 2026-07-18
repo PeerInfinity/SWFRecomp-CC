@@ -1,6 +1,22 @@
 # AVM2 next game — Robot Wants Kitty (Flixel) bring-up plan
 
-Status: **RWK-3 DONE (2026-07-18) — browser demo LIVE; kitty TAS handed
+Status: **RWK AP HANDOFF DONE (2026-07-18)** — `docs2/examples/avm2/rwk_ap/`
+packages the INJECTED RWK SWF as a self-contained same-origin-iframe
+`__swfBridge` game page, the Robot Wants counterpart of
+`seedling_teleport_ap/`. §4's prediction held exactly: **zero new runtime and
+zero recompiler changes**. Livetest `_swfbridge/livetest/rwk_avm2/` is
+**13/13** — no-shim no-op, then the full contract driven through the deployed
+`game.html` via `contentWindow` (wireCheck → configure(robotkitty.json) →
+`xplor.PlayState` resolved → config-driven TELEPORT → `stateChanged` outbound
+→ `readState` re-report `{"player_x":1072,"player_y":1202}`). Unlike Seedling
+ONE SWF reaches the full write→apply→re-report grade (no NG-preloader gate).
+No-op parity re-verified at HEAD: native NO_GRAPHICS 300-tick trace AND
+graphics **300/300 CPU-dumped frames byte-identical** injected-vs-plain; the
+native heap gate shows the dormant bridge costs **0 bytes/tick** (identical
+1,779,648 B growth over 600 ticks in both builds) for a constant 83,520 B ABC
+footprint. Details + the AVM1-counter gotcha: avm2 `CURRENT_STATUS.md`.
+
+Previous: **RWK-3 DONE (2026-07-18) — browser demo LIVE; kitty TAS handed
 forward.** **Lever 0 (wasm heap gate)**: measured with the new env-gated
 `AVM2_HEAP_STATS` o1heap diagnostics — PlayState boot peak is **1409 MB**
 (< 2 GB), so the gate was arena sizing: wasm32 AVM2 arena 1 GB → **1984 MB**

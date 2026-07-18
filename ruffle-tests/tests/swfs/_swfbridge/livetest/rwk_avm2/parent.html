@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RWK AP handoff — host page (same-origin iframe)</title>
+</head>
+<body>
+<h1>Robot Wants Kitty — __swfBridge host page</h1>
+<!-- Behavior B of the injected-RWK verification, driven through the REAL
+     deliverable: the packaged game page (docs2/examples/avm2/rwk_ap/game.html)
+     embedded as a SAME-ORIGIN iframe, exactly the way Archipelago-CC's
+     flashPanel / flashSubstrate bridge.js consumes it — the host reaches into
+     iframe.contentWindow.__swfBridge directly (no postMessage), which is why
+     the page must be served same-origin.
+
+     The driver (rwk_test.js) does the whole contract from the PARENT:
+       - user-gesture __swfBridgeStart() INSIDE the iframe (WebGPU/audio)
+       - game.wireCheck() / game.configure(robotkitty.json) / game.readState()
+       - queueItems(teleport pre_invocations + path writes) -> applyItem
+       - stateChanged reports observed outbound, then re-read via readState -->
+<iframe id="game" src="game.html" width="640" height="480"
+        style="border: 2px solid #333"></iframe>
+
+<script>
+  // The seam the host uses. Everything else is done by the driver via
+  // page.evaluate() so the test exercises the same reach-in the real host does.
+  window.__gameWindow = function () {
+    return document.getElementById('game').contentWindow;
+  };
+  window.__hostResults = { wireCheck: null, configureRet: null,
+                           readStateBefore: null, readStateAfter: null };
+  window.__stateChanges = [];
+</script>
+</body>
+</html>

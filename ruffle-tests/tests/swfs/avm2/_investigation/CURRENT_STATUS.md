@@ -1,10 +1,92 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-18 — live-census growth FIXED (weak orphan
-registry): Seedling-teleport idle 9.5 → ~0 KB/tick, menu 2.0 → ~0;
-live object/string counts dead flat. Prior: raw-alloc reclamation
-(2026-07-17), collectable strings (2026-07-16), RWK-3 (browser demo +
-wasm heap gate), RWK-1/2, Stage 12 sessions.
+Last updated: 2026-07-18 — **RWK AP handoff page DELIVERED**
+(`docs2/examples/avm2/rwk_ap/`, 13/13 livetests incl. the live teleport).
+Prior: live-census growth FIXED (weak orphan registry): Seedling-teleport
+idle 9.5 → ~0 KB/tick, menu 2.0 → ~0; live object/string counts dead
+flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
+(2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
+sessions.
+
+## RWK Archipelago handoff page (2026-07-18)
+
+**`docs2/examples/avm2/rwk_ap/` is the Robot Wants Kitty counterpart of
+`seedling_teleport_ap/`** — the injected RWK SWF (original +
+flash-ap-api `BridgeGeneric` DoABC, canonical artifact owned by
+Archipelago-CC and consumed read-only) packaged as a self-contained
+same-origin-iframe game page. **Zero runtime and zero recompiler changes
+were needed** — §4 of the RWK plan predicted this and it held exactly.
+
+**Host usage** (identical to Seedling): load `game.html` as a SAME-ORIGIN
+iframe, call `__swfBridgeStart()` from a user gesture INSIDE the iframe
+(WebGPU/audio consume the activation), then drive
+`contentWindow.__swfBridge` — `game.wireCheck()/configure(json)/
+readState()`, `queueItems()`, `onStateChanged`.
+
+**Unlike Seedling, ONE SWF reaches the full grade.** Seedling needed a
+separate teleport build because `Main.SAVE_FILE` is set in a constructor
+behind the NG preloader click, so unattended runs could not grade the
+write path. RWK has no preloader gate and `robotkitty.json` carries a
+config-driven teleport (`remove_last_child` of LogoState's stray
+logoBitmap + `new_instance` of `xplor.PlayState` into `FlxG.state`, then
+`path_write` of the live Player's x/y), so the single injected SWF goes
+title screen → gameplay → write → apply → re-report.
+
+**No-op parity re-verified at current HEAD** (stronger than a trace
+diff): `--check-abc` OK (2 abc_tags, 812 bodies, 0 verify fails); fresh
+recompiles of injected + plain; native NO_GRAPHICS 300 ticks stdout +
+stderr byte-identical; native **graphics 300 ticks: 300/300 CPU-dumped
+frames byte-identical** (stderr differs only in the dump filenames).
+
+**Livetest — `ruffle-tests/tests/swfs/_swfbridge/livetest/rwk_avm2/`,
+13/13 PASS** (`run_rwk_livetest.sh`). Behavior A (no shim): game boots,
+zero `[BridgeGeneric]` output, no page errors. Behavior B drives the
+DEPLOYED `game.html` in a same-origin iframe via `contentWindow`, exactly
+as `flashSubstrate/bridge.js` does: bridge alive → `wireCheck` →
+`configure(robotkitty.json)` (0 properties, 2 path reads, 1 class
+resolved) → `xplor.PlayState` resolved → pre-teleport `readState` =
+`{"player_x":null,"player_y":null}` (correct: no live Player on the title
+screen) → teleport queued → `RemoveLastChild` + `new xplor.PlayState()` +
+`PathWrite .x/.y` → `stateChanged("player_x", 1072)` outbound →
+post-teleport `readState` = `{"player_x":1072,"player_y":1202}` (y
+settled from the written 1200 under gravity — live physics, not an echo).
+
+**Memory gate (native `AVM2_HEAP_STATS`, injected vs plain @600 and
+@1200 ticks) — the cleanest no-op evidence in this arc:**
+
+| build    | allocated @600 | allocated @1200 | growth/tick |
+|----------|---------------:|----------------:|------------:|
+| injected |     23,487,168 |      25,266,816 |  2.897 KB   |
+| plain    |     23,403,648 |      25,183,296 |  2.897 KB   |
+
+The deltas are **equal to the byte** (1,779,648 B each), so the dormant
+bridge costs **0 bytes/tick**; the injected build's entire footprint is a
+**constant 83,520 B** (the BridgeGeneric ABC), identical at both tick
+counts. (2.897 KB/tick is the TITLE-SCREEN figure — not comparable to the
+1.008 KB/tick gameplay number from the plan_k TAS measurement.)
+
+**GOTCHA — do NOT use `swf_perf_report`'s "live AS objs / arrays" as an
+AVM2 census.** Those are AVM1 counters: `avm2_main.c:481` passes literal
+`0, 0`, so an AVM2 page's HUD always reads 0 and any "flat census" gate
+built on it passes vacuously (this session built one, caught it, and
+replaced it). The runtime exposes no heap counter to JS — measure AVM2
+memory natively via `AVM2_HEAP_STATS`, and use browser soak survival as
+the only JS-visible signal.
+
+**Perf note:** a frame-rate A/B under WSL cannot resolve bridge cost —
+WSL headed Chrome software-renders RWK at ~200 ms/frame, so the render
+path swamps everything. `run_rwk_livetest.sh --gates` therefore times the
+inbound EI round trip directly and soaks for bridge-active survival. The
+authoritative frame number remains the real-GPU rig (RWK-3: 5.1 ms/frame).
+
+**Gate results (`--gates`, 2026-07-18):** inbound EI round trip
+**1.049 ms/call** (300 `readState()` calls in 314.7 ms — each a full
+JS → `avm2_ei_dispatch` → BridgeGeneric → 2-path walk → JSON → JS trip).
+Bridge-active gameplay soak **10.0 min / 1984 frames / 1974 readState
+calls: zero aborts, zero page errors, still ticking and still answering
+`readState` at the end** — comfortably past the 6-7 min window where
+RWK-3 (pre collectable-strings, pre weak-orphan-registry) OOM-exited the
+browser at ~94 MB/min.
 
 ## Live-census growth — weak orphan registry (2026-07-18)
 
