@@ -83,7 +83,14 @@ struct Avm2Object
 	// scanned); a non-zero value means "conservatively scan this many bytes of
 	// native_ext for embedded object pointers".
 	Avm2Object* gc_next;
-	uint8_t gc_mark;          // 0 white, 1 marked, 2 pinned (never swept)
+	// bit 0 = pinned (immortal: class objects / prototypes / XML nodes);
+	// bits 1.. = MARK EPOCH — the object is marked iff (gc_mark >> 1) equals
+	// the collector's current epoch, which increments once per collect. That
+	// makes "reset every object to white" O(1) instead of a walk of the whole
+	// census (tier-2 lever 2; see avm2_gc.c). Widened from uint8_t into the
+	// padding that already sat between it and native_ext_size — sizeof and
+	// every field offset are unchanged (static_assert in avm2_gc.c).
+	uint32_t gc_mark;
 	uint32_t native_ext_size;
 
 	// AVM2_OBJ_FUNCTION payload: a bound method closure.

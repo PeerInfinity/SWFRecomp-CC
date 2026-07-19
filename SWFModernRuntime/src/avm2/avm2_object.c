@@ -20,7 +20,7 @@ Avm2Object* avm2_object_alloc(Avm2Context* ctx, uint8_t kind, uint32_t slot_coun
 {
 	Avm2Object* obj = avm2_alloc(ctx, sizeof(Avm2Object));
 	memset(obj, 0, sizeof(Avm2Object));
-	avm2_gc_enroll(obj);
+	avm2_gc_enroll(ctx, obj);
 	obj->kind = kind;
 	obj->slot_count = slot_count;
 	if (slot_count > 0)

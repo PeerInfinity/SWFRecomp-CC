@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <memory/heap.h>
 
@@ -63,7 +64,10 @@ static int g_gc_adaptive = 1;
 // the 2026 reference box (AVM2_GC_MAX_ENROLL overrides; 0 disables).
 static uint64_t g_gc_enroll_cap = 200000;
 static uint64_t g_gc_enrolled_since_collect = 0;
+static uint64_t g_gc_sweep_budget = 25000;  // census entries per sweep slice
+                                            // (≈2 ms on the 2026 reference box)
 static int g_gc_verbose = 0;
+static int g_gc_time = 0;                 // AVM2_GC_TIME=1: per-collect phase timings
 static uint32_t g_gc_collections = 0;
 static uint64_t g_gc_swept_total = 0;
 
@@ -99,19 +103,128 @@ static void gc_configure(void)
 	{
 		g_gc_watermark = 0;
 		g_gc_adaptive = 0;  // stress means collect EVERY tick — never retarget
+		g_gc_sweep_budget = 0;  // ...and sweep completely, so every tick is a
+		                        // full mark-sweep (the honest-failure tripwire)
 	}
+	const char* sb = getenv("AVM2_GC_SWEEP_BUDGET");
+	if (sb != NULL && sb[0] != '\0') g_gc_sweep_budget = (uint64_t) atoll(sb);
 	if (getenv("AVM2_GC_VERBOSE") != NULL) g_gc_verbose = 1;
+	if (getenv("AVM2_GC_TIME") != NULL) g_gc_time = 1;
+}
+
+// Per-collect phase timing (AVM2_GC_TIME=1). One clock read per phase per
+// collect — the collector's own cost model (the tier-2 lever ledger in
+// SWFRecompDocs/prompts/avm2-gc-collector-cost.md) is measured with this, so
+// it lives here rather than being re-patched in each session.
+static double gc_now_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (double) ts.tv_sec * 1000.0 + (double) ts.tv_nsec / 1e6;
 }
 
 // --- enrollment + accounting ------------------------------------------------
 
-void avm2_gc_enroll(Avm2Object* obj)
+// --- arena membership bitmap (tier-2 lever 1) --------------------------------
+//
+// The conservative ext scan needs one question answered per scanned word: does
+// a census object START at this address? That used to be a binary search over
+// a sorted snapshot of every census address, REBUILT (walk + qsort) at the top
+// of every collect — measured at HALF the collect pause on RWK gameplay
+// (36 ms of a 73 ms pause over a 284k-entry census).
+//
+// The bitmap answers it in O(1) with no per-collect work: 1 bit per
+// allocation-alignment cell of the heap arena, SET on enroll and CLEARED on
+// sweep, so it is always exactly the census. Every heap_alloc result is
+// alignment-aligned, so distinct live objects never share a cell; a cell whose
+// object was freed and whose memory now backs a different object reads as
+// "yes" for that new object — over-retention at worst, never a missed edge.
+//
+// Sizing: span/ALIGN/8 = 16 MB for the 4 GB native arena, 15.5 MB for the
+// 1984 MB wasm one. calloc'd, so native pages materialize only where objects
+// actually live (o1heap allocates from the arena front).
+//
+// When the heap reports no arena (HEAP_PASSTHROUGH — sanitizer builds route to
+// system malloc), g_bm stays NULL and the collector falls back to the sorted
+// snapshot below.
+static uint8_t* g_bm = NULL;
+static const char* g_bm_base = NULL;
+static size_t g_bm_span = 0;
+static size_t g_bm_cell = 0;
+static int g_bm_tried = 0;
+
+static void bm_init(Avm2Context* ctx)
 {
-	obj->gc_next = g_gc_head;
-	obj->gc_mark = 0;
-	g_gc_head = obj;
+	g_bm_tried = 1;
+	if (ctx == NULL || ctx->app == NULL) return;
+	const char* base = (const char*) heap_arena_base(ctx->app);
+	size_t span = heap_arena_span(ctx->app);
+	size_t cell = heap_arena_alignment();
+	if (base == NULL || span == 0 || cell == 0) return;
+	size_t bytes = (span / cell + 7) / 8 + 1;
+	uint8_t* bm = (uint8_t*) calloc(bytes, 1);
+	if (bm == NULL) return;  // fall back to the snapshot path
+	g_bm = bm;
+	g_bm_base = base;
+	g_bm_span = span;
+	g_bm_cell = cell;
+}
+
+static inline void bm_set(const void* p)
+{
+	size_t i = ((const char*) p - g_bm_base) / g_bm_cell;
+	g_bm[i >> 3] |= (uint8_t) (1u << (i & 7));
+}
+
+static inline void bm_clear(const void* p)
+{
+	size_t i = ((const char*) p - g_bm_base) / g_bm_cell;
+	g_bm[i >> 3] &= (uint8_t) ~(1u << (i & 7));
+}
+
+static inline int bm_test(const void* p)
+{
+	const char* c = (const char*) p;
+	if (c < g_bm_base || c >= g_bm_base + g_bm_span) return 0;
+	size_t off = (size_t) (c - g_bm_base);
+	if ((off & (g_bm_cell - 1)) != 0) return 0;  // not an allocation start
+	size_t i = off / g_bm_cell;
+	return (g_bm[i >> 3] >> (i & 7)) & 1;
+}
+
+// Sweep state (tier-2 lever 3, defined below): objects enrolled while a sweep
+// is in flight go to a nursery instead of the census list the sweep cursor is
+// walking, and are born BLACK.
+static int g_sweeping;
+static uint32_t g_sweep_epoch;
+static Avm2Object* g_nursery_head;
+static Avm2Object* g_nursery_tail;
+
+void avm2_gc_enroll(Avm2Context* ctx, Avm2Object* obj)
+{
+	if (!g_bm_tried) bm_init(ctx);
+	if (g_sweeping)
+	{
+		// Allocate black, off to the side: the cursor must not meet objects
+		// that did not exist when the mark ran, and prepending to the census
+		// under the cursor's `link` would splice them out on the next unlink.
+		// The nursery joins the census when the sweep finishes.
+		obj->gc_next = g_nursery_head;
+		obj->gc_mark = g_sweep_epoch << 1;
+		if (g_nursery_head == NULL) g_nursery_tail = obj;
+		g_nursery_head = obj;
+	}
+	else
+	{
+		obj->gc_next = g_gc_head;
+		obj->gc_mark = 0;
+		g_gc_head = obj;
+	}
 	g_gc_live_objects++;
 	g_gc_enrolled_since_collect++;
+	// An object outside the arena can only happen under HEAP_PASSTHROUGH (no
+	// bitmap at all); with an arena, avm2_alloc always lands inside it.
+	if (g_bm != NULL) bm_set(obj);
 }
 
 void avm2_gc_note_alloc(uint32_t bytes)
@@ -120,9 +233,43 @@ void avm2_gc_note_alloc(uint32_t bytes)
 	g_gc_bytes_since_collect += bytes;
 }
 
+// --- pins + mark epoch (tier-2 lever 2) --------------------------------------
+//
+// Pinned objects (class objects, prototypes, XML nodes) are structurally
+// immortal. They used to be found by walking the whole census at the top of
+// each collect — the same walk that reset every object to white. With epoch
+// marks there is no reset walk left, so pins live in their own append-only
+// array and seed the worklist directly. Pins are never removed (nothing
+// unpins, and a pinned object is never swept because it is always marked).
+static Avm2Object** g_pinned = NULL;
+static uint32_t g_pinned_count = 0, g_pinned_cap = 0;
+static uint32_t g_gc_epoch = 1;  // 0 = "never marked" (enroll state)
+
+_Static_assert(sizeof(((Avm2Object*) 0)->gc_mark) == 4, "gc_mark is the epoch word");
+
 void avm2_gc_pin(Avm2Object* obj)
 {
-	if (obj != NULL) obj->gc_mark |= 2;
+	if (obj == NULL) return;
+	if (obj->gc_mark & 1) return;  // already pinned (and already in the array)
+	if (g_pinned_count == g_pinned_cap)
+	{
+		uint32_t nc = g_pinned_cap == 0 ? 1024 : g_pinned_cap * 2;
+		Avm2Object** grown = realloc(g_pinned, nc * sizeof(Avm2Object*));
+		// Can't record the pin: leave the object UNPINNED rather than silently
+		// half-pinning it. It is still reachable from wherever it is stored
+		// (class tables are marked by the root markers), so this is a
+		// precision loss under OOM, not a UAF.
+		if (grown == NULL) return;
+		g_pinned = grown;
+		g_pinned_cap = nc;
+	}
+	obj->gc_mark |= 1;
+	g_pinned[g_pinned_count++] = obj;
+}
+
+int avm2_gc_is_marked(const Avm2Object* obj)
+{
+	return obj != NULL && (obj->gc_mark >> 1) == g_gc_epoch;
 }
 
 void avm2_gc_enroll_string(Avm2String* s)
@@ -170,8 +317,8 @@ static void wl_push(Avm2Object* o)
 void avm2_gc_mark_object(Avm2Object* obj)
 {
 	if (obj == NULL) return;
-	if (obj->gc_mark & 1) return;  // already marked (or pinned+marked)
-	obj->gc_mark |= 1;
+	if ((obj->gc_mark >> 1) == g_gc_epoch) return;  // already marked this cycle
+	obj->gc_mark = (g_gc_epoch << 1) | (obj->gc_mark & 1);
 	wl_push(obj);
 }
 
@@ -271,6 +418,9 @@ static int census_ptr_cmp(const void* a, const void* b)
 
 static int census_contains(Avm2Object* p)
 {
+	if (g_bm != NULL) return bm_test(p);
+	// Fallback (no arena — HEAP_PASSTHROUGH): binary search the per-cycle
+	// sorted snapshot.
 	uint32_t lo = 0, hi = g_census_sorted_count;
 	while (lo < hi)
 	{
@@ -481,38 +631,116 @@ static void free_innards(Avm2Context* ctx, Avm2Object* o)
 	}
 }
 
+// --- incremental sweep (tier-2 lever 3) --------------------------------------
+//
+// The mark phase must be atomic (it runs between ticks, off the C stack), but
+// the sweep only touches objects the completed mark already proved dead —
+// nothing can reach them, so freeing them can be spread over the ticks that
+// follow. That converts the whole `census × per-object free` term (the largest
+// remaining slice of the pause: ~24 ms of a ~40 ms RWK collect) from one
+// stop-the-world hit into a bounded slice per tick.
+//
+// The invariants that make it safe:
+//  - objects allocated during the sweep never meet the cursor: they enroll in
+//    a nursery (avm2_gc_enroll) and are born black, and the nursery is spliced
+//    into the census only once the cursor reaches the end;
+//  - no marking happens while a sweep is in flight — avm2_gc_maybe_collect
+//    finishes the sweep before it will start another cycle, so mark state is
+//    stable for the cursor's whole traversal;
+//  - a dead object cannot be resurrected mid-sweep: if the mutator could reach
+//    it, the mark would have marked it.
+//
+// Budget is per slice, in census entries (AVM2_GC_SWEEP_BUDGET; 0 = sweep
+// everything in one go, the pre-lever behaviour and the A/B kill switch).
+// Stress mode forces 0 so the CI gate keeps collecting completely each tick.
+static Avm2Object* g_sweep_cur;
+static Avm2Object** g_sweep_link;
+
+static uint32_t gc_sweep_slice(Avm2Context* ctx, uint64_t budget)
+{
+	uint32_t swept = 0;
+	uint64_t visited = 0;
+	while (g_sweep_cur != NULL && (budget == 0 || visited < budget))
+	{
+		Avm2Object* o = g_sweep_cur;
+		Avm2Object* next = o->gc_next;
+		visited++;
+		if ((o->gc_mark >> 1) == g_sweep_epoch)
+		{
+			purge_dead_dyn_props(ctx, o);
+			g_sweep_link = &o->gc_next;
+		}
+		else
+		{
+			// Unlink + free. The membership bit must drop with the object: the
+			// cell can be handed to a different allocation immediately.
+			*g_sweep_link = next;
+			if (g_bm != NULL) bm_clear(o);
+			free_innards(ctx, o);
+			heap_free(ctx->app, o);
+			g_gc_live_objects--;
+			swept++;
+		}
+		g_sweep_cur = next;
+	}
+	g_gc_swept_total += swept;
+	if (g_sweep_cur == NULL)
+	{
+		// Done: splice the nursery (objects born during this sweep) back onto
+		// the front of the census and reopen marking.
+		if (g_nursery_head != NULL)
+		{
+			g_nursery_tail->gc_next = g_gc_head;
+			g_gc_head = g_nursery_head;
+			g_nursery_head = g_nursery_tail = NULL;
+		}
+		g_sweeping = 0;
+		g_sweep_link = NULL;
+	}
+	return swept;
+}
+
 // --- collection -------------------------------------------------------------
 
 static void gc_collect(Avm2Context* ctx)
 {
 	g_gc_collections++;
+	double t_start = 0, t_snap = 0, t_strsnap = 0, t_trace = 0, t_sweep = 0, t_strsweep = 0;
+	if (g_gc_time) t_start = gc_now_ms();
+	const uint32_t census_n = g_gc_live_objects;  // census size (pre-sweep)
 	// NOTE: the watermark (g_gc_bytes_since_collect) is reset only after both
 	// census snapshots are built — a snapshot realloc OOM returns early, and
 	// resetting first would silently degrade the collector to a permanent
 	// no-op under exactly the memory pressure it exists to relieve (the next
 	// avm2_gc_maybe_collect must retry immediately).
 
-	// Clear pass: build the sorted census snapshot; reset white; seed pinned
-	// objects (marked + queued so their edges are traced).
+	// Clear pass: O(1) — bumping the epoch makes every object white at once
+	// (nothing carries the new epoch yet). Pinned objects are seeded from the
+	// pin array. The only remaining reason to walk the census here is the
+	// fallback membership snapshot, built only when there is no arena bitmap.
+	g_gc_epoch++;
+	if (g_gc_epoch > 0x7FFFFFFFu) g_gc_epoch = 1;  // (2^31 collects; wrap only over-retains)
 	g_census_sorted_count = 0;
 	g_wl_count = 0;
 	g_gc_mark_failed = 0;
-	for (Avm2Object* o = g_gc_head; o != NULL; o = o->gc_next)
+	if (g_bm == NULL)
 	{
-		if (g_census_sorted_count == g_census_sorted_cap)
+		for (Avm2Object* o = g_gc_head; o != NULL; o = o->gc_next)
 		{
-			uint32_t nc = g_census_sorted_cap == 0 ? 8192 : g_census_sorted_cap * 2;
-			Avm2Object** grown = realloc(g_census_sorted, nc * sizeof(Avm2Object*));
-			if (grown == NULL) { fprintf(stderr, "[avm2-gc] census snapshot OOM — skip collect\n"); return; }
-			g_census_sorted = grown;
-			g_census_sorted_cap = nc;
+			if (g_census_sorted_count == g_census_sorted_cap)
+			{
+				uint32_t nc = g_census_sorted_cap == 0 ? 8192 : g_census_sorted_cap * 2;
+				Avm2Object** grown = realloc(g_census_sorted, nc * sizeof(Avm2Object*));
+				if (grown == NULL) { fprintf(stderr, "[avm2-gc] census snapshot OOM — skip collect\n"); return; }
+				g_census_sorted = grown;
+				g_census_sorted_cap = nc;
+			}
+			g_census_sorted[g_census_sorted_count++] = o;
 		}
-		g_census_sorted[g_census_sorted_count++] = o;
-
-		if (o->gc_mark & 2) { o->gc_mark = 2 | 1; wl_push(o); }
-		else o->gc_mark = 0;
+		qsort(g_census_sorted, g_census_sorted_count, sizeof(Avm2Object*), census_ptr_cmp);
 	}
-	qsort(g_census_sorted, g_census_sorted_count, sizeof(Avm2Object*), census_ptr_cmp);
+	for (uint32_t i = 0; i < g_pinned_count; i++) avm2_gc_mark_object(g_pinned[i]);
+	if (g_gc_time) t_snap = gc_now_ms();
 
 	// String clear pass: reset white + build the sorted range-lookup snapshot.
 	// Strings have no outgoing edges, so nothing is seeded to the worklist.
@@ -540,6 +768,8 @@ static void gc_collect(Avm2Context* ctx)
 		g_str_census_hi = (const char*) last + sizeof(Avm2String) + last->len + 1;
 	}
 
+	if (g_gc_time) t_strsnap = gc_now_ms();
+
 	// Watermark reset: both snapshots built, the cycle will complete.
 	g_gc_bytes_since_collect = 0;
 	g_gc_enrolled_since_collect = 0;
@@ -561,6 +791,8 @@ static void gc_collect(Avm2Context* ctx)
 		trace_object(o);
 	}
 
+	if (g_gc_time) t_trace = gc_now_ms();
+
 	// If the worklist couldn't grow at any point this cycle, the mark is
 	// incomplete — abort the sweep (over-retain, never free a live object).
 	if (g_gc_mark_failed)
@@ -575,28 +807,25 @@ static void gc_collect(Avm2Context* ctx)
 	// avm2_display_gc_prune_dead_orphans). Runs only on a completed mark.
 	avm2_display_gc_prune_dead_orphans();
 
-	// Sweep: free every unmarked (white) census object.
-	uint32_t swept = 0;
-	Avm2Object** link = &g_gc_head;
-	for (Avm2Object* o = g_gc_head; o != NULL; )
+	// Sweep: free every unmarked (white) census object. Marking is atomic
+	// between ticks, but the sweep is resumable — see gc_sweep_slice.
+	g_sweeping = 1;
+	g_sweep_epoch = g_gc_epoch;
+	g_sweep_cur = g_gc_head;
+	g_sweep_link = &g_gc_head;
+	// Deferring frees costs headroom: the cycle's garbage stays allocated for
+	// the ~10 ticks the slices take. A game whose live set nearly fills the
+	// arena (rwic boots at ~1.7 GB of a 1770 MB heap) cannot afford that — an
+	// allocation failure is fatal, a long pause is not. Below 1/8 headroom,
+	// sweep the whole census right here.
+	uint64_t budget = g_gc_sweep_budget;
 	{
-		Avm2Object* next = o->gc_next;
-		if (o->gc_mark & 1)
-		{
-			purge_dead_dyn_props(ctx, o);
-			link = &o->gc_next;
-			o = next;
-			continue;
-		}
-		// Unlink + free.
-		*link = next;
-		free_innards(ctx, o);
-		heap_free(ctx->app, o);
-		g_gc_live_objects--;
-		swept++;
-		o = next;
+		uint64_t cap = heap_capacity_bytes(ctx->app);
+		uint64_t used = heap_allocated_bytes(ctx->app);
+		if (cap > 0 && used > cap - cap / 8) budget = 0;
 	}
-	g_gc_swept_total += swept;
+	uint32_t swept = gc_sweep_slice(ctx, budget);
+	if (g_gc_time) t_sweep = gc_now_ms();
 
 	// String sweep: free every unmarked census string (header + inline bytes
 	// are one allocation). AVM2_GC_STRINGS=0 skips it (exact pre-string-GC
@@ -623,6 +852,9 @@ static void gc_collect(Avm2Context* ctx)
 		g_gc_str_swept_total += str_swept;
 	}
 
+	if (g_gc_time) t_strsweep = gc_now_ms();
+	const uint32_t str_census_n = g_str_census_count;
+
 	// Drop the per-cycle snapshot: it now holds dangling pointers to swept
 	// strings, and an out-of-cycle mark call must be a safe no-op, never a
 	// read of freed memory.
@@ -647,6 +879,14 @@ static void gc_collect(Avm2Context* ctx)
 		}
 	}
 
+	if (g_gc_time)
+	{
+		fprintf(stderr, "[avm2-gc-time] #%u total=%.2f snap=%.2f strsnap=%.2f trace=%.2f sweep=%.2f strsweep=%.2f census=%u str=%u swept=%u\n",
+		        g_gc_collections, t_strsweep - t_start, t_snap - t_start,
+		        t_strsnap - t_snap, t_trace - t_strsnap, t_sweep - t_trace,
+		        t_strsweep - t_sweep, census_n, str_census_n, swept);
+	}
+
 	if (g_gc_verbose)
 	{
 		fprintf(stderr, "[avm2-gc] #%u live=%u swept=%u strings live=%u swept=%u (total alloc %.1f MB)\n",
@@ -660,13 +900,22 @@ void avm2_gc_collect_now(Avm2Context* ctx)
 {
 	if (!g_gc_configured) gc_configure();
 	if (!g_gc_enabled) return;
+	if (g_sweeping) gc_sweep_slice(ctx, 0);  // finish the in-flight sweep first
 	gc_collect(ctx);
+	if (g_sweeping) gc_sweep_slice(ctx, 0);  // "now" means fully collected
 }
 
 void avm2_gc_maybe_collect(Avm2Context* ctx)
 {
 	if (!g_gc_configured) gc_configure();
 	if (!g_gc_enabled) return;
+	if (g_sweeping)
+	{
+		// A cycle is already in flight — retire another slice of it. Marking
+		// cannot start until the cursor finishes.
+		gc_sweep_slice(ctx, g_gc_sweep_budget);
+		return;
+	}
 	if (g_gc_bytes_since_collect < g_gc_watermark
 	    && (g_gc_enroll_cap == 0 || g_gc_enrolled_since_collect < g_gc_enroll_cap))
 		return;

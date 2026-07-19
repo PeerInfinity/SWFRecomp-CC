@@ -5721,7 +5721,7 @@ void avm2_display_gc_prune_dead_orphans(void)
 	uint32_t w = 0;
 	for (uint32_t i = 0; i < g_orphan_count; i++)
 	{
-		if (g_orphans[i]->gc_mark & 1) g_orphans[w++] = g_orphans[i];
+		if (avm2_gc_is_marked(g_orphans[i])) g_orphans[w++] = g_orphans[i];
 	}
 	g_orphan_count = w;
 }

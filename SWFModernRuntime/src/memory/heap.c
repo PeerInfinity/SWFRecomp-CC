@@ -117,6 +117,18 @@ size_t heap_capacity_bytes(SWFAppContext* app_context)
 	return 0;
 }
 
+void* heap_arena_base(SWFAppContext* app_context)
+{
+	(void)app_context;
+	return NULL;  // system malloc: no arena — callers fall back
+}
+
+size_t heap_arena_span(SWFAppContext* app_context)
+{
+	(void)app_context;
+	return 0;
+}
+
 void heap_shutdown(SWFAppContext* app_context)
 {
 	// MC registry memory is going away — disable the mem-report atexit fallback.
@@ -262,6 +274,18 @@ size_t heap_capacity_bytes(SWFAppContext* app_context)
 	return o1heapGetDiagnostics(app_context->heap_instance).capacity;
 }
 
+void* heap_arena_base(SWFAppContext* app_context)
+{
+	if (app_context == NULL || !app_context->heap_inited) return NULL;
+	return (void*) app_context->heap;
+}
+
+size_t heap_arena_span(SWFAppContext* app_context)
+{
+	if (app_context == NULL || !app_context->heap_inited) return 0;
+	return app_context->heap_current_size;
+}
+
 void heap_stats(SWFAppContext* app_context)
 {
 	if (app_context == NULL || !app_context->heap_inited)
@@ -316,3 +340,12 @@ void heap_shutdown(SWFAppContext* app_context)
 }
 
 #endif  // !HEAP_PASSTHROUGH
+
+// Allocation alignment, both backends (system malloc guarantees at least
+// max_align_t, which is <= O1HEAP_ALIGNMENT on every target here — but the
+// passthrough backend reports no arena, so this value is only ever used with
+// the o1heap one).
+size_t heap_arena_alignment(void)
+{
+	return O1HEAP_ALIGNMENT;
+}

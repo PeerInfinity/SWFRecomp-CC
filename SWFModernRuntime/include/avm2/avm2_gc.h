@@ -36,8 +36,10 @@
 typedef struct Avm2Context Avm2Context;
 
 // Enroll a freshly-allocated object in the census (called by
-// avm2_object_alloc). Sets gc_next/gc_mark.
-void avm2_gc_enroll(Avm2Object* obj);
+// avm2_object_alloc). Sets gc_next/gc_mark and the object's arena-membership
+// bit (ctx is needed for the arena geometry — see the bitmap section in
+// avm2_gc.c).
+void avm2_gc_enroll(Avm2Context* ctx, Avm2Object* obj);
 
 // String census (collectable strings). Heap strings enroll at their two
 // creation sites (avm2_string_new / avm2_string_concat) and are swept
@@ -71,6 +73,12 @@ void avm2_gc_note_alloc(uint32_t bytes);
 // Mark primitives, called from root markers and edge tracers. Safe on NULL /
 // non-object values.
 void avm2_gc_mark_object(Avm2Object* obj);
+
+// Was this object marked by the CURRENT collection cycle? Only meaningful
+// between the mark and the sweep (the weak-registry prune point) — the mark
+// state is epoch-encoded in gc_mark, so callers must not test the bit
+// themselves.
+int avm2_gc_is_marked(const Avm2Object* obj);
 void avm2_gc_mark_value(Avm2Value v);
 // Mark a captured scope chain's entries.
 void avm2_gc_mark_scope(const Avm2ScopeChain* scope);

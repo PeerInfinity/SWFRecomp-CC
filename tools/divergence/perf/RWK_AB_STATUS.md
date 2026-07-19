@@ -9,6 +9,81 @@ real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
 
+## Headline — GC tier 2 (collector per-object cost: bitmap + epochs + lazy sweep, 2026-07-19)
+
+Session prompt `SWFRecompDocs/prompts/avm2-gc-collector-cost.md`. The base-compute
+arc took RWK gameplay to 69 ms/frame while the GC pause stayed put, so the
+collect became ~30-40% of wall-clock. Three levers, each measured on its own
+with the new per-collect phase timer (`AVM2_GC_TIME=1`, now permanent in
+avm2_gc.c), RWK plan_k TAS, 600 ticks, solo -O2 native:
+
+| build | pause | snap | strsnap | trace | sweep | strsweep |
+|---|---|---|---|---|---|---|
+| HEAD `a2e4758fb` (re-baseline) | **73 ms** | 36.5 | 2.1 | 11.2 | 21.8 | 1.2 |
+| + lever 1 arena bitmap | 55.5 | 19.8 | 2.1 | 10.1 | 22.0 | 1.1 |
+| + lever 2 epoch marks | 40 | **0.02** | 2.2 | 11.5 | 24.4 | 1.2 |
+| + lever 3 lazy sweep | **21-25** | 0.02 | 2.5 | 15.5 | 2.6 | 1.5 |
+
+**3.2x smaller stop-the-world pause** (73 → ~23 ms native; the 5x wasm
+multiplier puts the browser hitch at ~365 → ~115 ms). The residual sweep work
+is amortized at ~2-3 ms/tick over the ~11 ticks after each collect.
+
+- **Lever 1 — arena membership bitmap.** The conservative ext scan's
+  "does a census object start here?" test was a binary search over a sorted
+  snapshot REBUILT (walk + qsort) every collect — half the pause at a 284k
+  census. Replaced by 1 bit per allocation-alignment cell of the o1heap arena,
+  set on enroll / cleared on sweep (16 MB for the 4 GB native arena, calloc'd
+  so pages materialize only where objects live). New `heap_arena_base/span/
+  alignment()` accessors; HEAD's snapshot path survives as the fallback for
+  HEAP_PASSTHROUGH (sanitizer) builds, which have no arena.
+- **Lever 2 — epoch marks.** `gc_mark` widened uint8 → uint32 **into padding
+  that was already there** (sizeof and every offset unchanged, verified native
+  AND wasm32 — no FRESH rebuild needed): bit 0 = pinned, bits 1.. = mark epoch.
+  Bumping the epoch whitens the entire census in O(1), so the clear walk is
+  gone; pins moved to their own append-only array to seed the worklist.
+  `avm2_gc_is_marked()` replaces the one external `gc_mark & 1` reader
+  (the display orphan prune).
+- **Lever 3 — lazy sweep.** Marking stays atomic between ticks; the sweep runs
+  from a resumable cursor at `AVM2_GC_SWEEP_BUDGET` census entries per tick
+  (default 25 000 ≈ 2 ms; 0 = eager, the A/B kill switch, forced under
+  `AVM2_GC_STRESS`). Objects allocated during a sweep enroll in a nursery and
+  are born black, so the cursor never meets them; the nursery splices back when
+  the cursor finishes, and no mark can start before that. Safety valve: below
+  1/8 arena headroom the sweep runs eagerly (rwic lives at ~96% of its arena —
+  an allocation failure is fatal, a long pause is not).
+
+**Rig (Windows real-GPU Chrome, 5 interleaved rounds, RWK gameplay window):**
+
+| metric | base (HEAD) | after | |
+|---|---|---|---|
+| frames > 250 ms per round | **6** (463–820 ms each) | **0** | the collect hitch is gone |
+| mean cost over ALL gameplay frames | 103.5 ms | **81.6 ms** | **1.27x** |
+| cpu p50 (median frame) | 72.7 ms | 83.1 ms | 0.95x — the trade |
+| cpu max | 820 ms | 155 ms | |
+
+Same picture on the other two rig games (3 interleaved rounds each, all-frames
+mean / total >250 ms frames): **rwp 64.8 → 54.8 ms, 14 stalls → 0**;
+**seedling 26.0 → 22.7 ms, 1 stall → 0** — the low-churn control improved too,
+so no game pays for this.
+
+The p50 REGRESSION is the lever working as designed: ~2-3 ms/tick of native
+sweep (×5 in wasm) moved out of the half-second freeze and into the ~11 ticks
+that follow it. Judge this lever on the all-frames mean and the stall count,
+not p50 — and note the rig is bimodal ±30%, so only the paired per-round
+comparisons above count (base p50 alone ranged 68–95 across rounds).
+
+Open tuning knob: the budget (25 000 entries/tick) empties the census in ~11 of
+the ~35 ticks between collects. A smaller budget would spread the same work
+thinner (lower p50, longer sweep window) — untested; 25 000 was chosen for
+3x margin against the sweep failing to finish before the next collect is due.
+
+**Verification (native):** traces byte-identical to HEAD at 600 and 1200 ticks
+across normal / stress / GC=0; **600 CPU-dump frames byte-identical**; collect
+cadence, census size, swept counts and total-alloc all identical to HEAD
+(47 collects / 1200 ticks either way — retention unchanged, the lazy sweep
+always finishes well inside the interval); maxRSS 1212 MB → 1209 MB; the three
+`avm2_gc_*` regression tests pass in all three GC modes.
+
 ## Headline — levers 3+4 (own-class-static bake + store-path slot spec, 2026-07-19)
 
 **Three levers in one commit** (each independently toggleable at recompile

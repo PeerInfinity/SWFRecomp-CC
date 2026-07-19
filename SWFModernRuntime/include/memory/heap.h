@@ -118,6 +118,28 @@ size_t heap_allocated_bytes(SWFAppContext* app_context);
 size_t heap_capacity_bytes(SWFAppContext* app_context);
 
 /**
+ * Arena geometry, for allocators that want an O(1) address→cell mapping over
+ * the heap (the AVM2 collector's census-membership bitmap: 1 bit per
+ * allocation-alignment cell, set on enroll, cleared on sweep, replacing a
+ * per-collect sorted snapshot of every object address).
+ *
+ * heap_arena_base()      — first address of the arena; NULL when unknown
+ *                          (HEAP_PASSTHROUGH routes to system malloc, whose
+ *                          addresses are not confined to an arena).
+ * heap_arena_span()      — bytes of address space the arena covers; 0 unknown.
+ * heap_arena_alignment() — allocation alignment (O1HEAP_ALIGNMENT); every
+ *                          pointer heap_alloc returns is a multiple of it, so
+ *                          distinct live allocations never share a cell.
+ *
+ * Callers MUST treat base == NULL / span == 0 as "no arena" and fall back.
+ *
+ * @param app_context The SWF application context containing heap state
+ */
+void* heap_arena_base(SWFAppContext* app_context);
+size_t heap_arena_span(SWFAppContext* app_context);
+size_t heap_arena_alignment(void);
+
+/**
  * Shutdown the heap system
  *
  * Frees all heap arenas. Should be called at program exit.

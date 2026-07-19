@@ -1,5 +1,13 @@
 # Session prompt — AVM2 GC collector-cost reduction (tier 2 after the adaptive watermark)
 
+## STATUS 2026-07-19: levers 1-3 LANDED — see the GC section of
+## `tools/divergence/perf/RWK_AB_STATUS.md` + memory
+## `avm2-gc-tier2-collector-cost`. RWK collect pause 73 → ~23 ms native; on
+## the rig the >250 ms stalls went 6/round → 0 and the all-frames mean
+## 103.5 → 81.6 ms. Still open from this prompt: **lever 4 (inline slots)**,
+## **generational collection**, and tuning `AVM2_GC_SWEEP_BUDGET`. Note the
+## remaining pause is now dominated by TRACE (~15 ms), not sweep.
+
 ## 2026-07-19 REFRESH (post property-arc levers 2-4) — WHY THIS SESSION IS NOW
 
 The base-compute arc (RWK_AB_STATUS.md) has taken rig gameplay
