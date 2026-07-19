@@ -920,6 +920,107 @@ void avm2_op_initproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, 
 	setproperty_impl(act, recv, mn_idx, val, 1, NULL);
 }
 
+// Non-object receiver of a compile-time slot-bound store (avm2_ops.h): route
+// through the full generic path for the exact throw/no-op semantics.
+void avm2_setproperty_slot_fallback(Avm2Activation* act, Avm2Value recv,
+                                    uint32_t mn_idx, Avm2Value value, int is_init)
+{
+	setproperty_impl(act, recv, mn_idx, value, is_init ? 1 : 0, NULL);
+}
+
+#ifdef AVM2_SET_VERIFY
+// Verify build for the recompiler's store-path slot specialization: resolve
+// the multiname on the live receiver, prove the target is the compile-time
+// slot, compute the reference coerced value from the RESOLVED entry's
+// declared type, compare it against what the specialized path would store,
+// and only then perform the (single) store. "Store both ways" is not an
+// option — the first store would mask a divergent second one.
+static int avm2_values_bitident(Avm2Value a, Avm2Value b)
+{
+	if (a.kind != b.kind) return 0;
+	switch (a.kind)
+	{
+		case AVM2_VALUE_NUMBER:
+		{
+			uint64_t ab, bb;
+			memcpy(&ab, &a.u.d, 8);
+			memcpy(&bb, &b.u.d, 8);
+			return ab == bb;
+		}
+		case AVM2_VALUE_INTEGER: return a.u.i == b.u.i;
+		case AVM2_VALUE_BOOL: return a.u.b == b.u.b;
+		case AVM2_VALUE_STRING: return a.u.str == b.u.str;
+		case AVM2_VALUE_OBJECT: return a.u.obj == b.u.obj;
+		default: return 1;   // null/undefined carry no payload
+	}
+}
+
+static void setproperty_slot_verify(Avm2Activation* act, Avm2Value recv, uint32_t slot,
+                                    uint32_t mn_idx, int has_type, uint32_t type_mn,
+                                    Avm2Value value, int is_init)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	if (recv.kind != AVM2_VALUE_OBJECT || recv.u.obj == NULL)
+	{
+		// The specialized inline would take the generic fallback here.
+		avm2_setproperty_slot_fallback(act, recv, mn_idx, value, is_init);
+		return;
+	}
+	Resolved r;
+	int ok = resolve_mn(act, recv, mn_idx, &r);
+	if (!ok || r.entry == NULL || r.entry->kind != AVM2_PROP_SLOT)
+	{
+		avm2_fatal("[AVM2_SET_VERIFY] %.*s store did not resolve to a slot "
+		           "(ok=%d)", (int) name_len, name, ok);
+	}
+	if (r.entry->slot_index != slot)
+	{
+		avm2_fatal("[AVM2_SET_VERIFY] %.*s: compile-time slot %u != runtime "
+		           "slot %u", (int) name_len, name, slot, r.entry->slot_index);
+	}
+	if (r.entry->is_const && !is_init)
+	{
+		avm2_fatal("[AVM2_SET_VERIFY] %.*s: specialized SET of a const slot",
+		           (int) name_len, name);
+	}
+	// Reference coerced value from the RESOLVED entry (what the generic
+	// path would store).
+	Avm2Value ref = value;
+	if (r.entry->type_mn != 0 && r.entry->type_file != NULL)
+	{
+		ref = avm2_coerce_to_type_mn(act->ctx, r.entry->type_file,
+		                             r.entry->type_mn, value);
+	}
+	// What the specialized path would store.
+	Avm2Value ours = has_type
+		? avm2_coerce_to_type_mn(act->ctx, act->file, type_mn, value)
+		: value;
+	if (!avm2_values_bitident(ref, ours))
+	{
+		avm2_fatal("[AVM2_SET_VERIFY] %.*s: coerced value mismatch "
+		           "(ref kind=%u vs spec kind=%u, has_type=%d) — store-coerce "
+		           "elision/type unsound at this site", (int) name_len, name,
+		           ref.kind, ours.kind, has_type);
+	}
+	recv.u.obj->slots[slot] = ref;
+}
+
+void avm2_op_setproperty_slot(Avm2Activation* act, Avm2Value recv, uint32_t slot,
+                              uint32_t mn_idx, Avm2Value value, int is_init)
+{
+	setproperty_slot_verify(act, recv, slot, mn_idx, 0, 0, value, is_init);
+}
+
+void avm2_op_setproperty_slot_c(Avm2Activation* act, Avm2Value recv, uint32_t slot,
+                                uint32_t mn_idx, uint32_t type_mn, Avm2Value value,
+                                int is_init)
+{
+	setproperty_slot_verify(act, recv, slot, mn_idx, 1, type_mn, value, is_init);
+}
+#endif
+
 static void setproperty_qname(Avm2Activation* act, Avm2Value recv,
                               const Avm2QNameExt* q, Avm2Value value);
 
@@ -1918,6 +2019,141 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 		avm2_throw_1065(ctx, name, name_len);
 	}
 }
+
+// --- find→own-class-static lever (avm2_ops.h Avm2StaticFindCache) ----------
+
+// Shared slow path: full findpropstrict walk; populate the cache only when
+// the resolution lands exactly on the enclosing class's class object AND the
+// local scope has the canonical [this] shape the replay guards re-check.
+// Returns the walk result unconditionally (exact FindPropStrict semantics).
+static Avm2Object* findprop_ownstatic_resolve(Avm2Activation* act,
+                                              const Avm2ScopeEntry* lscope,
+                                              uint32_t scope_n, uint32_t mn_idx,
+                                              uint32_t class_index,
+                                              Avm2StaticFindCache* c)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	Avm2Object* g = findproperty_resolve(act, lscope, scope_n, mn_idx,
+	                                      name, name_len);
+	if (g == NULL)
+	{
+		avm2_throw_1065(act->ctx, name, name_len);
+	}
+	Avm2Class* cls = (act->file->classes != NULL)
+		? act->file->classes[class_index] : NULL;
+	if (cls != NULL && g == cls->class_object
+	    && scope_n == 1 && !lscope[0].is_with && lscope[0].obj != NULL)
+	{
+		c->ctx = act->ctx;
+		c->outer = act->outer;
+		c->l_vt0 = lscope[0].obj->vtable;
+		c->cls_obj = g;
+	}
+	return g;
+}
+
+Avm2Object* avm2_findprop_ownstatic_slow(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                         uint32_t scope_n, uint32_t mn_idx,
+                                         uint32_t class_index, Avm2StaticFindCache* c)
+{
+	return findprop_ownstatic_resolve(act, lscope, scope_n, mn_idx, class_index, c);
+}
+
+Avm2Value avm2_getlex_ownstatic_slow(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                     uint32_t scope_n, uint32_t mn_idx,
+                                     uint32_t class_index, uint32_t slot,
+                                     Avm2StaticFindCache* c)
+{
+	Avm2Object* g = findprop_ownstatic_resolve(act, lscope, scope_n, mn_idx,
+	                                           class_index, c);
+	if (c->ctx == act->ctx && c->cls_obj == g)
+	{
+		// Populated (or re-confirmed) as the expected class object → the
+		// compile-time static slot index applies (cvt-numbering mirror,
+		// cross-checked under -DAVM2_SLOT_VERIFY).
+		return g->slots[slot];
+	}
+	// Unexpected resolution (a shadow invisible at compile time): fully
+	// generic read on whatever the walk returned — exact semantics.
+	return avm2_op_getproperty_static(act, avm2_object_value(g), mn_idx);
+}
+
+#if defined(AVM2_FIND_VERIFY) || defined(AVM2_SLOT_VERIFY)
+// Verify build: every fused getlex-ownstatic site re-runs the full resolve;
+// a cache that WOULD have replayed must agree with the walk, and when the
+// walk lands on the expected class object the compile-time slot index must
+// match the runtime resolve exactly.
+Avm2Value avm2_op_getlex_ownstatic(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                   uint32_t scope_n, uint32_t mn_idx,
+                                   uint32_t class_index, uint32_t slot,
+                                   Avm2StaticFindCache* c)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	int would_replay = c->ctx == act->ctx && act->outer == c->outer
+		&& scope_n == 1 && !lscope[0].is_with && lscope[0].obj != NULL
+		&& lscope[0].obj->vtable == c->l_vt0;
+	Avm2Object* cached = would_replay ? c->cls_obj : NULL;
+	Avm2Object* g = findprop_ownstatic_resolve(act, lscope, scope_n, mn_idx,
+	                                           class_index, c);
+	if (would_replay && cached != g)
+	{
+		avm2_fatal("[AVM2_FIND_VERIFY] getlex_ownstatic replay mismatch mn=%u "
+		           "(%.*s): cached=%p walk=%p", mn_idx, (int) name_len, name,
+		           (void*) cached, (void*) g);
+	}
+	Avm2Class* cls = (act->file->classes != NULL)
+		? act->file->classes[class_index] : NULL;
+	if (cls != NULL && g == cls->class_object)
+	{
+		Resolved r;
+		int ok = resolve_mn(act, avm2_object_value(g), mn_idx, &r);
+		if (!ok || r.entry == NULL || r.entry->kind != AVM2_PROP_SLOT
+		    || r.entry->slot_index != slot)
+		{
+			avm2_fatal("[AVM2_SLOT_VERIFY] getlex_ownstatic %.*s: compile-time "
+			           "static slot %u does not match runtime resolve "
+			           "(ok=%d kind=%d slot=%u)", (int) name_len, name, slot,
+			           ok, (ok && r.entry) ? (int) r.entry->kind : -1,
+			           (ok && r.entry) ? r.entry->slot_index : 0);
+		}
+		return g->slots[slot];
+	}
+	fprintf(stderr, "[getlex_ownstatic] note: generic fallback engaged mn=%u "
+	        "(%.*s)\n", mn_idx, (int) name_len, name);
+	return avm2_op_getproperty_static(act, avm2_object_value(g), mn_idx);
+}
+#endif
+
+#ifdef AVM2_FIND_VERIFY
+// Verify build for the standalone guarded find: semantics are exact by
+// construction (fallback returns the walk result), so verification checks
+// that a cache that WOULD have replayed agrees with the full walk.
+Avm2Object* avm2_op_findprop_ownstatic(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                       uint32_t scope_n, uint32_t mn_idx,
+                                       uint32_t class_index, Avm2StaticFindCache* c)
+{
+	int would_replay = c->ctx == act->ctx && act->outer == c->outer
+		&& scope_n == 1 && !lscope[0].is_with && lscope[0].obj != NULL
+		&& lscope[0].obj->vtable == c->l_vt0;
+	Avm2Object* cached = would_replay ? c->cls_obj : NULL;
+	Avm2Object* g = findprop_ownstatic_resolve(act, lscope, scope_n, mn_idx,
+	                                           class_index, c);
+	if (would_replay && cached != g)
+	{
+		const char* name;
+		uint32_t name_len;
+		avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+		avm2_fatal("[AVM2_FIND_VERIFY] findprop_ownstatic replay mismatch mn=%u "
+		           "(%.*s): cached=%p walk=%p", mn_idx, (int) name_len, name,
+		           (void*) cached, (void*) g);
+	}
+	return g;
+}
+#endif
 
 #ifdef AVM2_FIND_VERIFY
 // Verify build for the recompiler's find→this lever (avm2_ops.h): every

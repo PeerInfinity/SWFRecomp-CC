@@ -1180,6 +1180,21 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 	// from the scalar forward order under intra-buffer overlap).
 	int has_alpha = (alpha != NULL && !alpha->disposed);
 	int same_buf = (src->pixels == dst->pixels);
+	// Identity self-copy on the pure-copy path: same buffer, same stride,
+	// src rect == dst rect, transparent dest (so the copy arm is exactly
+	// `dst[i] = dst[i]`, no with_alpha rewrite), no blend — every write is a
+	// provable no-op. Flixel (RWK) issues a full-frame one of these every
+	// tick (~36% of all blit pixels in the RWK gate tally); skip it outright.
+	// Blend and opaque-dest arms stay on the legacy per-pixel path below.
+	if (same_buf && !has_alpha && dst->transparency
+	    && src->width == dst->width
+	    && src_region.x_min == dst_region.x_min
+	    && src_region.y_min == dst_region.y_min)
+	{
+		int blend = (src->transparency && !dst->transparency) || merge_alpha;
+		if (!src->transparency) blend = 0;
+		if (!blend) return avm2_undefined();
+	}
 	if (!has_alpha && !same_buf)
 	{
 		int blend = src->transparency && (merge_alpha || !dst->transparency);

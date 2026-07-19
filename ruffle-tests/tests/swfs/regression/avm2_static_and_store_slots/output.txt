@@ -1,0 +1,14 @@
+1 base-static
+2 sub-instance
+3 0
+4 2
+5 1.5|2|true|aa
+6 7 true
+7 3
+8 null
+9 zz
+10 1009
+11 42
+12 ff112233 ff445566 ff778899 0
+13 ff112233 ff445566
+done

@@ -146,6 +146,91 @@ static inline Avm2Value avm2_op_findprop_this(Avm2Activation* act, Avm2Value thi
 	return thisv;
 }
 #endif
+// Per-call-site cache for the recompiler's find→own-class-static lever: the
+// site's multiname statically resolves to a declared STATIC trait of the
+// ENCLOSING class, the method has the canonical GetLocal0+PushScope preamble
+// as its only scope ops (same gate as find→this), and the enclosing
+// instance chain does NOT declare the name — so the scope walk provably
+// probes `this` (miss) and then the class object at the top of the outer
+// chain (hit). Soundness is RUNTIME-guarded, not assumed: the cache is
+// populated only after a full walk whose result equals the enclosing class's
+// class object (act->file->classes[class_index]->class_object), and replays
+// only under context + outer-chain identity + lscope[0] (this) vtable
+// identity — the exact facts that walk depended on (plain scopes match
+// declared traits only, so a fixed this-vtable re-misses and the fixed outer
+// chain re-hits at the same entry). Anything else (cross-file subclass
+// shadowing, native-ancestor traits invisible to the recompiler) falls back
+// to the full walk with exact semantics. Zero-init = empty.
+typedef struct Avm2StaticFindCache
+{
+	Avm2Context* ctx;            // context identity (restart guard)
+	const Avm2ScopeChain* outer; // outer-chain identity guard
+	const Avm2VTable* l_vt0;     // lscope[0] (`this`) vtable guard
+	Avm2Object* cls_obj;         // proven hit: the enclosing class's class object
+} Avm2StaticFindCache;
+
+// Fused FindPropStrict+GetPropertyStatic of the same multiname (the getlex-
+// ownstatic read pattern old ASC emits for unqualified own-class-static
+// reads, e.g. FlxQuadTree._min): on a cache hit returns the static SLOT
+// directly (slot index compile-time mirrored from the runtime cvt numbering,
+// computeStaticSlotIndex; -DAVM2_SLOT_VERIFY cross-checks). On miss: full
+// findpropstrict walk; if it lands on the expected class object, populate +
+// slot read, else a fully generic getproperty on whatever it returned.
+Avm2Value avm2_getlex_ownstatic_slow(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                     uint32_t scope_n, uint32_t mn_idx,
+                                     uint32_t class_index, uint32_t slot,
+                                     Avm2StaticFindCache* c);
+#if defined(AVM2_FIND_VERIFY) || defined(AVM2_SLOT_VERIFY)
+Avm2Value avm2_op_getlex_ownstatic(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                   uint32_t scope_n, uint32_t mn_idx,
+                                   uint32_t class_index, uint32_t slot,
+                                   Avm2StaticFindCache* c);
+#else
+static inline Avm2Value avm2_op_getlex_ownstatic(Avm2Activation* act,
+                                                 const Avm2ScopeEntry* lscope,
+                                                 uint32_t scope_n, uint32_t mn_idx,
+                                                 uint32_t class_index, uint32_t slot,
+                                                 Avm2StaticFindCache* c)
+{
+	if (c->ctx == act->ctx && act->outer == c->outer && scope_n == 1
+	    && !lscope[0].is_with && lscope[0].obj != NULL
+	    && lscope[0].obj->vtable == c->l_vt0)
+	{
+		return c->cls_obj->slots[slot];
+	}
+	return avm2_getlex_ownstatic_slow(act, lscope, scope_n, mn_idx, class_index,
+	                                  slot, c);
+}
+#endif
+
+// Standalone guarded find for own-class-static sites whose consumer is NOT
+// an adjacent same-mn read (e.g. static stores: findprop; <value>; setprop).
+// Identical semantics to FindPropStrict — the fallback returns whatever the
+// full walk resolves — so the consumer op stays fully generic.
+Avm2Object* avm2_findprop_ownstatic_slow(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                         uint32_t scope_n, uint32_t mn_idx,
+                                         uint32_t class_index, Avm2StaticFindCache* c);
+#ifdef AVM2_FIND_VERIFY
+Avm2Object* avm2_op_findprop_ownstatic(Avm2Activation* act, const Avm2ScopeEntry* lscope,
+                                       uint32_t scope_n, uint32_t mn_idx,
+                                       uint32_t class_index, Avm2StaticFindCache* c);
+#else
+static inline Avm2Object* avm2_op_findprop_ownstatic(Avm2Activation* act,
+                                                     const Avm2ScopeEntry* lscope,
+                                                     uint32_t scope_n, uint32_t mn_idx,
+                                                     uint32_t class_index,
+                                                     Avm2StaticFindCache* c)
+{
+	if (c->ctx == act->ctx && act->outer == c->outer && scope_n == 1
+	    && !lscope[0].is_with && lscope[0].obj != NULL
+	    && lscope[0].obj->vtable == c->l_vt0)
+	{
+		return c->cls_obj;
+	}
+	return avm2_findprop_ownstatic_slow(act, lscope, scope_n, mn_idx, class_index, c);
+}
+#endif
+
 // `interp`: body is a class/script initializer — avmplus's interpreter
 // takes the index fast path regardless of the ns set
 // (class_init_interpreter_mode / array_access_interpreter).
@@ -162,6 +247,55 @@ void avm2_op_setproperty_static_ic(Avm2Activation* act, Avm2Value recv, uint32_t
 void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                              Avm2Value name, Avm2Value value, int interp);
 void avm2_op_initproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value val);
+
+// Compile-time slot-bound STORE (recompiler store-path specialization): the
+// recompiler proved the receiver's static class is a sealed ABC class whose
+// chain to Object is ABC-defined, the name resolves uniquely (ns-aware,
+// mirroring avm2_mn_match) to a SLOT trait at compile-time index `slot` (no
+// subclass redeclares it; const slots only via the initproperty form), so
+// the write is `slots[slot] = coerce(value)` with no resolve. Two forms:
+// the bare op is emitted when the operand's static type provably satisfies
+// the declared slot type (the store coerce is a value no-op — Step-4 elide
+// rules extended with null literals); the `_c` op keeps the declared-type
+// coerce with a compile-time type multiname. A non-object receiver (null/
+// undefined — a typed local can be null) routes through the full generic
+// path for the exact throw. `is_init` selects the InitProperty fallback
+// (const stores legal). Build -DAVM2_SET_VERIFY to resolve + cross-check
+// the target slot and the coerced value BEFORE the store on every call.
+void avm2_setproperty_slot_fallback(Avm2Activation* act, Avm2Value recv,
+                                    uint32_t mn_idx, Avm2Value value, int is_init);
+#ifdef AVM2_SET_VERIFY
+void avm2_op_setproperty_slot(Avm2Activation* act, Avm2Value recv, uint32_t slot,
+                              uint32_t mn_idx, Avm2Value value, int is_init);
+void avm2_op_setproperty_slot_c(Avm2Activation* act, Avm2Value recv, uint32_t slot,
+                                uint32_t mn_idx, uint32_t type_mn, Avm2Value value,
+                                int is_init);
+#else
+static inline void avm2_op_setproperty_slot(Avm2Activation* act, Avm2Value recv,
+                                            uint32_t slot, uint32_t mn_idx,
+                                            Avm2Value value, int is_init)
+{
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj != NULL)
+	{
+		recv.u.obj->slots[slot] = value;
+		return;
+	}
+	avm2_setproperty_slot_fallback(act, recv, mn_idx, value, is_init);
+}
+static inline void avm2_op_setproperty_slot_c(Avm2Activation* act, Avm2Value recv,
+                                              uint32_t slot, uint32_t mn_idx,
+                                              uint32_t type_mn, Avm2Value value,
+                                              int is_init)
+{
+	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj != NULL)
+	{
+		recv.u.obj->slots[slot] =
+			avm2_coerce_to_type_mn(act->ctx, act->file, type_mn, value);
+		return;
+	}
+	avm2_setproperty_slot_fallback(act, recv, mn_idx, value, is_init);
+}
+#endif
 Avm2Value avm2_op_deleteproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx);
 Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                      Avm2Value name);

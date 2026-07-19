@@ -1,12 +1,87 @@
 # RWK base-compute perf arc — status & A/B log
 
 Sessions 2026-07-19 (lever 1: `avm2-rwk-base-compute-profile.md`; lever 2:
-`avm2-rwk-property-read-endgame.md`).
+`avm2-rwk-property-read-endgame.md`; levers 3+4:
+`avm2-rwk-store-and-statics.md`).
 Precedent/format: `SEEDLING_AB_STATUS.md`. All rig numbers: Windows Chrome,
 real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 (`WINDOWS_PLAYWRIGHT_FROM_WSL.md`); metric `__swfPerf.cpu` gameplay p50
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
+
+## Headline — levers 3+4 (own-class-static bake + store-path slot spec, 2026-07-19)
+
+**Three levers in one commit** (each independently toggleable at recompile
+time):
+
+- **Lever A — find→own-class-static bake** (`SWF_NO_FIND_STATIC=1` off):
+  adjacent `findpropstrict(mn); getproperty(mn)` of a static Slot/Const of
+  the ENCLOSING class (old-ASC's unqualified-static-read shape AND mxmlc's
+  `getlex` lowering) fuses into `avm2_op_getlex_ownstatic` — a per-site
+  guarded cache (ctx + outer-chain identity + `this`-vtable identity,
+  populated only when the full walk lands on the expected class object,
+  `file->classes[i]->class_object`) + a bare static-slot read
+  (`computeStaticSlotIndex` cvt mirror). Non-adjacent consumers (static
+  stores) get `avm2_op_findprop_ownstatic` (guarded find only). Soundness
+  is RUNTIME-guarded — cross-file subclass shadowing / native-ancestor
+  traits fall back to the exact full walk; the compile gate is the
+  find→this preamble gate + ns-aware `staticSlotForMn` + NOT
+  `chainDefinesMn`. RWK: 131 fused + 20 standalone (findpropstrict_ic
+  sites 2,739 → 2,588).
+- **Lever B — store-path slot spec + store-coerce elision**
+  (`SWF_NO_SET_SLOT=1` off): SetPropertyStatic/InitProperty whose receiver
+  is `this` (directly or via a find→this-substituted find) or a
+  statically-typed ABC instance, under the GET-lever gate list (sealed,
+  ns-aware chainDefinesMn, unique slot, no subclass redeclare, exact ABC
+  index, const only via init) → `avm2_op_setproperty_slot` (declared-type
+  coerce proven a value no-op — Step-4 rules + new TK_NULL: null literal →
+  class/String targets) or `_slot_c` (coerce kept, compile-time type mn).
+  Null receivers route through the full generic path for the exact throw.
+  New `-DAVM2_SET_VERIFY` resolves + cross-checks slot AND coerced value
+  BEFORE the single store. RWK: 837 sites (452 elided + 385 coercing);
+  initproperty sites 1,044 → 449 — the FlxQuadTree/FlxList ctor churn was
+  initproperty with NO IC doing a full resolve per store.
+- **Blit identity-self-copy skip** (avm2_bitmap.c): the Step-0 gate tally
+  (blit branch counters, 600t) showed spans engaged for ~64% of pixels and
+  ONE uncovered branch at ~36%: a full-frame 320×240 src==dst copyPixels,
+  ~1/tick, ALL identity (src rect == dst rect, zero offset) — Flixel's
+  buffer ritual. Pure-copy + transparent-dest + same-rect self-copies are
+  provable no-ops → skipped outright (blend/opaque arms keep the legacy
+  per-pixel path).
+
+| measurement | before (2c6461be2) | after | win |
+|---|---|---|---|
+| native Ir, 600 ticks GC=0 (callgrind) | 73.19B | 46.23B | **-36.8% (1.58x)** |
+| native user-s, 2900 ticks GC=0 (interleaved ×3) | 28.29 mean | 19.94 mean | **1.42x** |
+| — decomposition (toggle builds, same rotation) | | B-only 1.305x, A-only 1.122x | compound |
+| rig gameplay cpu p50 (6 interleaved rounds, median) | 108.1 ms (94.8–109.2) | **68.95 ms** (67.2–71.8) | **1.57x** |
+| rig gameplay cpu p95 (median of rounds) | 125.3 ms | 84.1 ms | **1.49x** |
+
+(Rig regime was tight this session — base 106.9–109.2 for rounds 2–6, no
+bimodal swing; paired p50 ratios 1.37–1.62. rAF interval p95 129→89 ms
+tracks it. Raw JSONs: `/mnt/c/playwright/rw_static_ab/`.)
+
+**Verification:** `-DAVM2_FIND_VERIFY -DAVM2_SLOT_VERIFY -DAVM2_SET_VERIFY
+-DAVM2_COERCE_VERIFY` build clean over 1200 ticks default-GC + 800 ticks
+GC=0 (zero aborts, **zero fallback engagements**); traces + 600 CPU-dump
+frames byte-identical to the post-lever-2 dumps across normal/stress/GC=0;
+regression test `regression/avm2_static_and_store_slots` (mxmlc + Ruffle
+exporter oracle; README documents the pre-existing early-binding
+divergence: Ruffle/avmplus verifier-bind lexical statics, our dynamic walk
+lets a subclass instance trait shadow — the lever preserves our semantics).
+
+**Post-lever-3+4 profile (46.23B Ir):** blend_over 5.95% (pure pixel work,
+now #1 — untouched, wasm runs the SIMD spans), **coerce cluster ~15%**
+(to_number 4.68 + to_class 2.79 + to_type_mn 2.76 + to_boolean 2.36 +
+to_primitive 2.10), getproperty IC-hit residue 8.9 (getproperty_static_ic
+4.64 + resolved_get 4.30), slots_init_defaults 4.14 + setup_locals 3.58 +
+o1heapAllocate 2.25 (alloc/ctor), abstract_eq/lt 6.85, xml_abstract_eq
+2.57. Name-resolution residue mostly gone: findpropstrict_ic -86%,
+mn_match -83%, vtable_find_mn -80%, setproperty_impl -99.7%. Next levers
+by size: coerce cluster (typed-Number arithmetic spec / coerce memo on the
+remaining paths), alloc/ctor (slots_init_defaults + setup_locals),
+getproperty IC residue, tier-2 GC. Also: Seedling gained 541 fused static
+reads + 2,152 slot stores, rwp 108 + 552 (unmeasured on their rigs).
 
 ## Headline — lever 2 (find→this compile-time resolution, 2026-07-19)
 
