@@ -31,6 +31,16 @@ during Flixel gameplay:
   ~21 ticks (0.7 s), retention/live census byte-identical, traces + 600
   CPU-dump frames byte-identical normal/stress/GC=0.
 
+Rig verification of tier 1 (2026-07-18, real-GPU Windows Chrome,
+before→after, gameplay CPU/frame median): rwk 484→205 ms, rwp 152→127,
+rwf 47→42, rwic 24→23 (~29 fps), seedling 32→22 (now holds 30 fps).
+Collects became discrete + metronomic (rwic cv 0.01). TWO measured
+constants tier 2 must respect: **wasm collect pause ≈ 5x native**
+(RWK: ~130 ms native → ~675 ms wasm), and **rwk's residual ~200 ms/frame
+is NON-GC base compute** — profile RWK PlayState via CDP self-time
+(seedling-perf method) as its own investigation before touching the
+collector further for that game.
+
 ## Why tier 2 exists — the measured cost model
 
 Native per-object collector costs (RWK, -O2): snap ≈ 0.22 µs/census-obj,

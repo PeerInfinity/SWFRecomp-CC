@@ -238,7 +238,19 @@ event files are the opposite — those ARE in internal coordinates.)
 
 ## 6. Remaining work
 
-1. **Ice Cream / Fishy PlayState in-browser is UNMEASURED** — the heap
+1. **RESOLVED 2026-07-18 (RW-demo perf session, Windows rig):** both
+   **rwf and rwic reached PlayState in-browser** via real press-release
+   clicks (Playwright at human speed on the real-GPU rig) — in-game HUD,
+   timer, inventory all live; ~60 s of gameplay each with no OOM and no
+   fatal errors. Pre-GC-fix frame cost: rwic ~27 ms/frame (~28 fps,
+   basically fine), rwf ~51 ms (~18 fps); rwp ~160 ms (~6 fps) and rwk
+   ~446 ms (~2 fps) were the bad ones — root cause was the GC gross-byte
+   watermark × Flixel quadtree churn, fixed by the adaptive watermark
+   (commit fd5931661; see SWFRecompDocs/prompts/avm2-gc-collector-cost.md
+   for the measured cost model + tier-2 handoff). Raw distributions:
+   /mnt/c/playwright/rw_perf_2026-07-18/*.json.
+   Original text (context for the heap worry, now largely cleared):
+   the heap
    question below is still open, not cleared. `probe.py`'s synthetic click
    correctly hovers the button but never fires it: Flixel's `FlxButton`
    needs the press and the release sampled on separate ticks, and
