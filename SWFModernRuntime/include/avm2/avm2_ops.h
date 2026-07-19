@@ -51,6 +51,21 @@ typedef struct Avm2FindCache
 {
 	Avm2Context* ctx;   // domain identity this entry was resolved against
 	Avm2Object* obj;    // cached domain-resolved def object (NULL = empty)
+	// Scope-walk HIT cache (avm2_op_findpropstrict_ic): populated only when
+	// the hit landed on the OUTER chain with a with-free checked prefix and
+	// scope_n <= 1. Outer chains are allocated once and never freed, so the
+	// chain-identity guard cannot alias; the same chain ⟹ the same entry
+	// objects ⟹ the same trait-based misses above the hit.
+	const Avm2ScopeChain* outer; // outer-chain identity guard
+	const Avm2VTable* l_vt0;     // lscope[0] vtable guard (NULL ⟺ cached scope_n==0)
+	Avm2Object* scope_obj;       // cached outer-chain hit object
+	uint32_t l_n;                // scope_n at populate time (0 or 1)
+	// scope_kind: 0 = no scope cache, 1 = OUTER-chain hit (replay returns
+	// scope_obj), 2 = hit at lscope[0] with scope_n==1 (replay returns the
+	// CURRENT activation's lscope[0].obj — the hit entry is the very first
+	// thing the walk examines, so vtable identity alone determines the hit;
+	// no prefix assumptions at all).
+	uint32_t scope_kind;
 } Avm2FindCache;
 
 // Inline-cached FindProperty/FindPropStrict. Identical semantics to

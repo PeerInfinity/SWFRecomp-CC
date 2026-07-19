@@ -1628,25 +1628,52 @@ static int scope_defines_mn(Avm2Activation* act, const Avm2ScopeEntry* se, uint3
 // given static multiname depends solely on the entry object's vtable (its
 // class), so a with-free method's scope-walk result is invariant across
 // activations at a fixed call site (the property the inline cache exploits).
-static Avm2Object* findproperty_scope_walk(Avm2Activation* act,
-                                           const Avm2ScopeEntry* lscope,
-                                           uint32_t scope_n, uint32_t mn_idx)
+// `out_outer_hit` reports whether the hit came from the OUTER chain, and
+// `out_prefix_pure` whether every entry examined up to AND including the hit
+// was a plain (non-with) scope — the two facts the findpropstrict scope-hit
+// inline cache needs (with-scope matches are content-dependent, so any with
+// entry in the checked prefix makes the walk result uncacheable).
+static Avm2Object* findproperty_scope_walk_loc(Avm2Activation* act,
+                                               const Avm2ScopeEntry* lscope,
+                                               uint32_t scope_n, uint32_t mn_idx,
+                                               int* out_outer_hit,
+                                               int* out_prefix_pure)
 {
+	int pure = 1;
+	*out_outer_hit = 0;
 	for (uint32_t i = scope_n; i > 0; i--)
 	{
-		if (scope_defines_mn(act, &lscope[i - 1], mn_idx)) return lscope[i - 1].obj;
+		if (lscope[i - 1].is_with) pure = 0;
+		if (scope_defines_mn(act, &lscope[i - 1], mn_idx))
+		{
+			*out_prefix_pure = pure;
+			return lscope[i - 1].obj;
+		}
 	}
 	if (act->outer != NULL)
 	{
 		for (uint32_t i = act->outer->count; i > 0; i--)
 		{
+			if (act->outer->entries[i - 1].is_with) pure = 0;
 			if (scope_defines_mn(act, &act->outer->entries[i - 1], mn_idx))
 			{
+				*out_outer_hit = 1;
+				*out_prefix_pure = pure;
 				return act->outer->entries[i - 1].obj;
 			}
 		}
 	}
+	*out_prefix_pure = pure;
 	return NULL;
+}
+
+static Avm2Object* findproperty_scope_walk(Avm2Activation* act,
+                                           const Avm2ScopeEntry* lscope,
+                                           uint32_t scope_n, uint32_t mn_idx)
+{
+	int outer_hit, prefix_pure;
+	return findproperty_scope_walk_loc(act, lscope, scope_n, mn_idx,
+	                                   &outer_hit, &prefix_pure);
 }
 
 // Domain of the defining file (lazy script init happens inside). Returns the
@@ -1776,7 +1803,29 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* g;
-	if (scope_stable && ic->ctx == ctx && ic->obj != NULL)
+	if (scope_stable && ic->ctx == ctx && ic->scope_kind == 2
+	    && scope_n == 1 && !lscope[0].is_with && lscope[0].obj != NULL
+	    && lscope[0].obj->vtable == ic->l_vt0)
+	{
+		// Cached LOCAL hit at lscope[0] (the walk's very first probe, so no
+		// prefix to re-validate): same vtable ⟹ vtable_find_mn re-hits ⟹
+		// the walk would return exactly this activation's lscope[0].obj.
+		g = lscope[0].obj;
+	}
+	else if (scope_stable && ic->ctx == ctx && ic->scope_kind == 1
+	    && act->outer == ic->outer && scope_n == ic->l_n
+	    && (scope_n == 0 || (!lscope[0].is_with && lscope[0].obj != NULL
+	                         && lscope[0].obj->vtable == ic->l_vt0)))
+	{
+		// Cached OUTER-chain scope hit. Outer chains are never freed, so the
+		// identity guard implies the exact entry objects (and their vtables)
+		// the populate-time walk examined: the entries above the hit re-miss
+		// (all non-with, trait-based ⟹ vtable-determined), the hit re-hits.
+		// The local prefix is re-guarded directly (same vtable, non-with,
+		// scope_n unchanged) — so the replay is byte-identical to a walk.
+		g = ic->scope_obj;
+	}
+	else if (scope_stable && ic->ctx == ctx && ic->obj != NULL)
 	{
 		// With-free method + a prior domain hit ⟹ the scope walk is a proven
 		// miss at this site: go straight to the cached def object.
@@ -1784,7 +1833,37 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 	}
 	else
 	{
-		g = findproperty_scope_walk(act, lscope, scope_n, mn_idx);
+		int outer_hit = 0, prefix_pure = 0;
+		g = findproperty_scope_walk_loc(act, lscope, scope_n, mn_idx,
+		                                &outer_hit, &prefix_pure);
+		if (g != NULL)
+		{
+			// Cache the hit LOCATION. Outer-chain hits (kind 1) replay the
+			// fixed hit object; a hit at lscope[0] with scope_n==1 (kind 2)
+			// replays "return the current lscope[0].obj" under a vtable
+			// guard. With-tainted prefixes are content-dependent — never
+			// cached (prefix_pure covers the hit entry itself).
+			if (scope_stable && prefix_pure && scope_n <= 1
+			    && (scope_n == 0 || (!lscope[0].is_with && lscope[0].obj != NULL)))
+			{
+				if (outer_hit)
+				{
+					ic->ctx = ctx;
+					ic->outer = act->outer;
+					ic->l_n = scope_n;
+					ic->l_vt0 = (scope_n == 1) ? lscope[0].obj->vtable : NULL;
+					ic->scope_obj = g;
+					ic->scope_kind = 1;
+				}
+				else if (scope_n == 1 && g == lscope[0].obj)
+				{
+					ic->ctx = ctx;
+					ic->l_vt0 = lscope[0].obj->vtable;
+					ic->l_n = 1;
+					ic->scope_kind = 2;
+				}
+			}
+		}
 		if (g == NULL)
 		{
 			if (ic->ctx == ctx && ic->obj != NULL)
