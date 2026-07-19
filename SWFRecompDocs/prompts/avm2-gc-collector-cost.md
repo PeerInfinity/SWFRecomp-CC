@@ -41,6 +41,17 @@ is NON-GC base compute** — profile RWK PlayState via CDP self-time
 (seedling-perf method) as its own investigation before touching the
 collector further for that game.
 
+UPDATE 2026-07-19 (base-compute session, `RWK_AB_STATUS.md`): that
+investigation ran. The base-compute #1 was the findpropstrict scope walk;
+the scope-hit IC (`8caf10e4e`) took RWK gameplay 219→165 ms p50 on the rig
+(native GC=0 1.54x). Constants here still hold: the 5x wasm pause
+multiplier is NOT a build-flag artifact (ABC_OPT -O2/-O3 A/B'd: no effect),
+and GC-on remains ~+8% native Ir over GC=0 at the adaptive watermark. The
+census qsort inside gc_collect is ~6.5% of wasm frame self-time in default
+mode — it dies with the tier-1 sort or tier-2 membership redesign as
+planned. Ruffle GAMEPLAY anchor corrected: 6.4 ms/frame p50 (old 5.5 was
+menu).
+
 ## Why tier 2 exists — the measured cost model
 
 Native per-object collector costs (RWK, -O2): snap ≈ 0.22 µs/census-obj,

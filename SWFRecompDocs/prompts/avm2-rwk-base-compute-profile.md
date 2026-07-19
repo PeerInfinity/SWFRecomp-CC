@@ -1,5 +1,15 @@
 # Session prompt — RWK base-compute profile (the non-GC ~200 ms/frame)
 
+> **RESULT 2026-07-19 — lever 1 landed, session complete.** Flag check:
+> ABC_OPT ruled out. Profiles (CDP + native callgrind) named the
+> findpropstrict SCOPE WALK (~30% of frame); the scope-hit IC
+> (`8caf10e4e`) delivered native 1.54x / rig 1.33x (219→165 ms p50),
+> byte-identical + FIND_VERIFY clean + both CI modes zero drift. Full log,
+> post-lever profile, and next-lever map:
+> `tools/divergence/perf/RWK_AB_STATUS.md`. Re-running this prompt should
+> START from that lever map (GET residue ~23%, coerce ~11%, IC guard
+> inlining ~9%), not re-derive it.
+
 You are profiling and fixing **RWK's residual gameplay cost**. After the
 adaptive watermark (`fd5931661`), GC is off the critical path, but RWK
 gameplay still runs **~205 ms/frame in browser wasm (4.8 fps)** and **~40

@@ -274,6 +274,18 @@ event files are the opposite — those ARE in internal coordinates.)
    (per the prompt's out-of-scope section — injection configs are their
    side's work).
 
+## 6b. Perf update 2026-07-19 — base-compute lever 1 landed (helps all RW games)
+
+The RWK base-compute session (`SWFRecompDocs/prompts/
+avm2-rwk-base-compute-profile.md`, log `tools/divergence/perf/
+RWK_AB_STATUS.md`) landed the findpropstrict scope-hit inline cache
+(`8caf10e4e`): RWK gameplay 219→165 ms p50 on the rig (1.33x), native 1.54x.
+The lever is Flixel-shape-generic (unqualified member reads + own-class
+statics), so rwp/rwf/rwic and the sequels inherit it for free — the rig
+per-game fps scoreboard should be re-measured whenever the next lever
+lands. Remaining lever map in RWK_AB_STATUS.md; Ruffle gameplay anchor
+6.4 ms/frame.
+
 ## 5. Rules carried over (unchanged)
 
 - The game is never the oracle — runtime fixes graded by a regression test.

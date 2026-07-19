@@ -1,6 +1,15 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-18 — **Robot Wants SEQUELS (Puppy, Fishy, Ice Cream)
+Last updated: 2026-07-19 — **RWK base-compute lever 1 LANDED
+(`8caf10e4e`, findpropstrict scope-hit inline cache)**: RWK browser
+gameplay 219→165 ms p50 on the real-GPU rig (1.33x; rAF p95 1.48x), native
+GC=0 TAS 1.54x, 98.7% of findpropstrict volume now replays from the IC.
+Suite impact: **zero** — 823/1215 unchanged, "No changes detected" in every
+suite diff, both CI modes. Arc log + next-lever map (GET residue ~23%,
+coerce ~11%, IC guard inlining ~9%):
+`tools/divergence/perf/RWK_AB_STATUS.md`. Ruffle gameplay anchor is
+6.4 ms/frame — the road to 30 fps continues next session.
+Prior: **Robot Wants SEQUELS (Puppy, Fishy, Ice Cream)
 ALL STAGES DONE**: all three are playable headless with zero uncaught
 errors, their menus match Ruffle (MAD 2.334 / 0.001 / 0.200), and all three
 browser demos are LIVE — on ONE runtime fix
