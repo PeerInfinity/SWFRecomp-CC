@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-19T17:45:45.572542+00:00",
-    "old_git_sha": "2c6461be23d6dfca363bbaa0df94ebfeff0a1553",
-    "new_timestamp": "2026-07-19T20:32:39.297724+00:00",
-    "new_git_sha": "a2e4758fb8bfe55c10796621ef718350ba111604",
+    "old_timestamp": "2026-07-19T20:32:39.297724+00:00",
+    "old_git_sha": "a2e4758fb8bfe55c10796621ef718350ba111604",
+    "new_timestamp": "2026-07-19T22:20:52.983396+00:00",
+    "new_git_sha": "bf4f4567137a10859f26bfcc5ff421c31a674715",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 54,
+    "old_pass": 55,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 54,
-    "old_total": 54,
+    "old_effective_pass": 55,
+    "old_total": 55,
     "old_pass_rate": 100.0,
     "new_pass": 55,
     "new_ruffle_matched": 0,
@@ -25,22 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 54,
-    "added": 1,
+    "unchanged": 55,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm2_static_and_store_slots",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
-      }
-    }
-  ]
+  "changes": []
 }
