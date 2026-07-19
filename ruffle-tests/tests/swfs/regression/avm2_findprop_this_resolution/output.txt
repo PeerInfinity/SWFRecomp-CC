@@ -1,0 +1,13 @@
+base.readField: 42
+base.readShadowed: base-shadowed
+base.readViaGetter: 5
+base.callOwn: own-method
+base.readGlobalCollide: global-helper
+base.readStatic: base-static
+sub.readField: 42
+sub.readShadowed: sub-shadowed
+sub.readOwnShadow: sub-shadowed
+sub.callOwn: sub-own-method
+dyn.readField: dyn-field
+base.withBlock: with:900
+base.tryBlock: try:41

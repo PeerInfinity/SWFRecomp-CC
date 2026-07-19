@@ -1919,6 +1919,32 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 	}
 }
 
+#ifdef AVM2_FIND_VERIFY
+// Verify build for the recompiler's find→this lever (avm2_ops.h): every
+// substituted find site re-runs the full resolve and aborts unless it lands
+// exactly on `this`.
+Avm2Value avm2_op_findprop_this(Avm2Activation* act, Avm2Value thisv,
+                                const Avm2ScopeEntry* lscope, uint32_t scope_n,
+                                uint32_t mn_idx)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	Avm2Object* ref = findproperty_resolve(act, lscope, scope_n, mn_idx,
+	                                        name, name_len);
+	if (thisv.kind != AVM2_VALUE_OBJECT || thisv.u.obj == NULL
+	    || ref != thisv.u.obj)
+	{
+		avm2_fatal("[AVM2_FIND_VERIFY] findprop_this mismatch mn=%u (%.*s): "
+		           "this=%p (kind=%u) ref=%p scope_n=%u", mn_idx,
+		           (int) name_len, name,
+		           (void*) (thisv.kind == AVM2_VALUE_OBJECT ? thisv.u.obj : NULL),
+		           thisv.kind, (void*) ref, scope_n);
+	}
+	return thisv;
+}
+#endif
+
 // Key-based scope search shared by the lazy-name and lazy-ns FindProperty
 // variants. `public_ok` gates dynamic-prop matching (with-scopes and the
 // global prototype-chain fallback).

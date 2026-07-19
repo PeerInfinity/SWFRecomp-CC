@@ -122,6 +122,30 @@ static inline Avm2Value avm2_op_getproperty_slot(Avm2Activation* act, Avm2Value 
 	return recv.u.obj->slots[slot];
 }
 #endif
+// Compile-time-resolved FindProperty/FindPropStrict (recompiler find→this
+// lever): the recompiler proved the scope walk at this site always hits
+// `this` — the enclosing instance method has the canonical GetLocal0+PushScope
+// preamble as its only scope ops (no with, no activation, no active
+// exceptions, no branch into the preamble), local 0 is never rewritten, and
+// the multiname statically matches a declared instance trait of the enclosing
+// class (ns-set aware, mirroring avm2_mn_match). Every runtime receiver (the
+// class or any subclass) declares that trait, and plain-scope probes match
+// declared traits only (scope_defines_mn), so the walk's FIRST probe
+// (lscope[0] == this) always hits. The op is an identity move of loc[0];
+// build -DAVM2_FIND_VERIFY to cross-check against the full resolve.
+#ifdef AVM2_FIND_VERIFY
+Avm2Value avm2_op_findprop_this(Avm2Activation* act, Avm2Value thisv,
+                                const Avm2ScopeEntry* lscope, uint32_t scope_n,
+                                uint32_t mn_idx);
+#else
+static inline Avm2Value avm2_op_findprop_this(Avm2Activation* act, Avm2Value thisv,
+                                              const Avm2ScopeEntry* lscope,
+                                              uint32_t scope_n, uint32_t mn_idx)
+{
+	(void) act; (void) lscope; (void) scope_n; (void) mn_idx;
+	return thisv;
+}
+#endif
 // `interp`: body is a class/script initializer — avmplus's interpreter
 // takes the index fast path regardless of the ns set
 // (class_init_interpreter_mode / array_access_interpreter).

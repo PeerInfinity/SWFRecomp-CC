@@ -1,15 +1,80 @@
 # RWK base-compute perf arc — status & A/B log
 
-Session 2026-07-19 (prompt: `SWFRecompDocs/prompts/avm2-rwk-base-compute-profile.md`).
+Sessions 2026-07-19 (lever 1: `avm2-rwk-base-compute-profile.md`; lever 2:
+`avm2-rwk-property-read-endgame.md`).
 Precedent/format: `SEEDLING_AB_STATUS.md`. All rig numbers: Windows Chrome,
 real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 (`WINDOWS_PLAYWRIGHT_FROM_WSL.md`); metric `__swfPerf.cpu` gameplay p50
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
 
-## Headline
+## Headline — lever 2 (find→this compile-time resolution, 2026-07-19)
 
-**Lever 1 (findpropstrict scope-hit inline cache, commit `8caf10e4e`):**
+**The Step-0 census answered WHY Seedling's GET levers missed Flixel:**
+Flixel-era ASC compiles unqualified own-member reads as
+`findpropstrict(mn); getproperty(mn)` — NOT `getlocal0; getproperty` — so
+only 60 `this`-receiver GET sites existed in all of RWK (Seedling's mxmlc
+emits getlocal0 → 5,039 sites). The GET residue and the find-IC overhead
+were the SAME miss. Census (temp tool kept: `SWF_CENSUS_PROPREAD=<path>` in
+abc_emit.cpp): of 6,082 find sites, 37% resolve at compile time to a unique
+own instance SLOT, and in the hot FlxQuadTree cluster (m484/486/482/487)
+**63.5% own-slot + 24.7% own-class-static + 8.6% getlex**.
+
+**The lever (recompiler; runtime byte-identical outside verify builds):**
+when the enclosing instance method has the canonical GetLocal0+PushScope
+preamble as its ONLY scope ops (no with/activation/active exceptions/branch
+into the preamble, local 0 never rewritten) and the site multiname matches a
+declared instance trait of the enclosing class (ns-set aware, mirroring
+avm2_mn_match — native ancestors can only under-approve), the scope walk
+provably hits `this` at its first probe → emit `loc[0]` push
+(`avm2_op_findprop_this`, an identity move; -DAVM2_FIND_VERIFY cross-checks
+vs the full resolve). The find result is tagged `this`/typed, so the
+following GetPropertyStatic slot-specializes through the existing lever-A
+machinery. `SWF_NO_FIND_THIS=1` is the A/B toggle.
+
+Coverage: RWK 3,343/6,082 find sites substituted; this-slot getprops
+308 → **1,981**; getproperty_static_ic sites 5,439 → 3,766. Also:
+rwp 2,794 find-this sites, **Seedling 3,376** (its "GET-spec exhausted"
+verdict never saw these — they were classified recv_scope), rwk_ap 3,343;
+rwf/rwic only 4 each (newer compiler, already getlocal0).
+
+| measurement | before (8caf10e4e) | after | win |
+|---|---|---|---|
+| native Ir, 600 ticks GC=0 (callgrind) | 91.69B | 73.19B | **-20.2% (1.25x)** |
+| native user-s, 2900 ticks GC=0 (interleaved ×3) | 36.30 mean (36.27/35.80/36.84) | 30.44 mean (28.42/31.76/31.15) | **1.19x** |
+| rig gameplay cpu p50 (6 interleaved rounds, median) | 130.1 ms (123.8–135.1) | 104.6 ms (99.5–104.9) | **1.24x** |
+| rig gameplay cpu p95 (median of rounds) | 149.2 ms | 123.8 ms | 1.21x |
+
+(This session's regime measured lighter than the 164.6 ms recorded after
+lever 1 — RWK click-driven gameplay is bimodal ±30%; the interleaved
+same-session ratio is the honest lever-2 number. After-side p50 was
+remarkably stable: 99.5–104.9 across all six rounds. Raw JSONs:
+`/mnt/c/playwright/rw_findthis_ab/`.)
+
+**Verification:** `-DAVM2_FIND_VERIFY -DAVM2_SLOT_VERIFY` build clean over
+1200 TAS ticks (zero aborts across 3,343 substituted + 1,981 slot sites);
+traces + 600 CPU-dump frames byte-identical before/after in
+normal/stress/GC=0 AND identical to the prior session's post-lever-1 dumps;
+regression test `regression/avm2_findprop_this_resolution` (mxmlc pins the
+resolution semantics; the old-ASC pattern itself is exercised by upstream
+avm2 tests es4_protected_inheritance + class_supercalls_errors and the
+games). Known pre-existing gap documented in that test's README: the
+runtime conflates same-uri private namespaces (mxmlc emits empty-uri
+privates), so Base/Sub private shadowing reads the subclass slot — Flash
+keeps privates distinct; unrelated to this lever.
+
+**Post-lever-2 profile (after, 73.19B Ir):** getproperty_static_ic 6.0%
+(was 9.5), resolved_get 5.15% (was 7.9), findpropstrict_ic 4.11% (was
+8.75); name-resolution residue mn_match 3.99 + vtable_find_mn 3.90 +
+propkey_matches 2.34 + mn_name 2.08 (remaining find/IC sites: getlex +
+own-class statics + rare-vtable misses); coerce cluster ~10.9%
+(to_class 3.39 + to_number 3.34 + to_type_mn 3.20 + class_for_mn 1.69);
+SET ~6.3%; blit 7.2% (blend_over 3.76 + bd_copy_pixels 3.42);
+slots_init_defaults 2.62 + setup_locals 2.26. Next levers by size:
+COERCE/store path (D), remaining find residue for own-class statics
+(class-object bake), SET slot spec, blit SIMD check (E), tier-2 GC.
+
+## Lever 1 (findpropstrict scope-hit inline cache, commit `8caf10e4e`)
 
 | measurement | before | after | win |
 |---|---|---|---|

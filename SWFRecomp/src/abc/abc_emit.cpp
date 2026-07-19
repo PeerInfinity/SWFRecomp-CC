@@ -187,7 +187,8 @@ namespace abc
 	// marks a coerce_* op the pass proved is a value no-op (operand already has
 	// the target static type) → emit the verify hook that drops it.
 	static bool emitOp(ofstream& out, const BodyCtx& bc, const IrOp& op,
-	                   int slotSpec = -1, bool elideCoerce = false)
+	                   int slotSpec = -1, bool elideCoerce = false,
+	                   bool findThis = false)
 	{
 		const AbcFile& abc = *bc.abc;
 		switch (op.op)
@@ -302,6 +303,15 @@ namespace abc
 			case IrOpcode::FindPropStrict:
 			case IrOpcode::FindProperty:
 			{
+				if (findThis)
+				{
+					// Compile-time-resolved: the scope walk provably hits
+					// `this` (avm2_op_findprop_this is an identity move of
+					// loc[0] outside -DAVM2_FIND_VERIFY builds).
+					out << "\tstk[sp++] = avm2_op_findprop_this(act, loc[0], "
+					       "lscope, scope_n, " << op.arg1 << ");" << endl;
+					return true;
+				}
 				const char* strict = (op.op == IrOpcode::FindPropStrict) ? "1" : "0";
 				if (mnLazyNs(abc, op.arg1))
 				{
@@ -1119,6 +1129,80 @@ namespace abc
 			return it == nameToInst.end() ? -1 : it->second;
 		}
 
+		// ---- Runtime-mirror multiname/trait ns matching (find→this lever) ---
+		// Mirrors avm2_class.c exactly: ns folding (Namespace 0x08 unifies with
+		// Package 0x16), public/AS3-builtin unification, uri string compare.
+		// Trait names are QNames; a site multiname matches on its QName ns or
+		// any ns in its set.
+		struct NsKey { u8 folded = 0x16; string uri; };
+		NsKey nsKeyOf(u32 ns_idx) const
+		{
+			NsKey k;
+			if (ns_idx < abc.pool.namespaces.size())
+			{
+				const AbcNamespace& ns = abc.pool.namespaces[ns_idx];
+				u8 kind = (u8) ns.kind;
+				k.folded = (kind == 0x08) ? 0x16 : kind;
+				k.uri = ns.name < abc.pool.strings.size()
+					? abc.pool.strings[ns.name] : "";
+			}
+			return k;
+		}
+		static bool nsKeyPublic(const NsKey& k)
+		{
+			return k.folded == 0x16
+			    && (k.uri.empty() || k.uri == "http://adobe.com/AS3/2006/builtin");
+		}
+		static bool nsKeysMatch(const NsKey& a, const NsKey& b)
+		{
+			bool pa = nsKeyPublic(a), pb = nsKeyPublic(b);
+			if (pa || pb) return pa && pb;
+			return a.folded == b.folded && a.uri == b.uri;
+		}
+		// Does the site multiname `mn` (QName 0x07/0x0d or static Multiname
+		// 0x09/0x0e) match the trait QName `tname`? (avm2_mn_match mirror)
+		bool mnMatchesQName(u32 mn, u32 tname) const
+		{
+			const auto& MNs = abc.pool.multinames;
+			if (mn == 0 || mn >= MNs.size()) return false;
+			if (tname == 0 || tname >= MNs.size()) return false;
+			string nm = localName(mn);
+			if (nm.empty() || nm != localName(tname)) return false;
+			const AbcMultiname& m = MNs[mn];
+			// Trait keys come from avm2_propkey_from_qname, which only
+			// accepts QName kinds — mirror that (non-QName trait names are
+			// never keyed by the runtime).
+			u8 tk_kind = (u8) MNs[tname].kind;
+			if (tk_kind != 0x07 && tk_kind != 0x0d) return false;
+			NsKey tk = nsKeyOf(MNs[tname].ns);
+			u8 mk = (u8) m.kind;
+			if (mk == 0x07 || mk == 0x0d)
+				return nsKeysMatch(nsKeyOf(m.ns), tk);
+			if (mk == 0x09 || mk == 0x0e)
+			{
+				if (m.ns_set >= abc.pool.ns_sets.size()) return false;
+				for (u32 nsi : abc.pool.ns_sets[m.ns_set])
+					if (nsKeysMatch(nsKeyOf(nsi), tk)) return true;
+			}
+			return false;
+		}
+		// Any declared instance trait in inst's ABC-visible chain matching
+		// `mn` (mirror of the runtime vtable probe scope_defines_mn uses).
+		// Native ancestors' traits are invisible here, which can only
+		// UNDER-approve (skip a valid substitution), never over-approve.
+		bool chainDefinesMn(int inst, u32 mn) const
+		{
+			int cur = inst, guard = 0;
+			while (cur >= 0 && cur < (int) abc.instances.size() && guard++ < 64)
+			{
+				for (const AbcTrait& t : abc.instances[cur].traits)
+					if (mnMatchesQName(mn, t.name)) return true;
+				if (abc.instances[cur].super_name == 0) break;
+				cur = typeMnToInst(abc.instances[cur].super_name);
+			}
+			return false;
+		}
+
 		// ---- Static-type lattice (coerce elision, Step 4) -------------------
 		// Resolve a TYPE multiname to the lattice: a user ABC class (INST), a
 		// primitive builtin, or UNKNOWN (any/Object/native class with no ABC
@@ -1218,6 +1302,9 @@ namespace abc
 	{
 		std::vector<int> slot;    // GetPropertyStatic direct-slot index, or -1
 		std::vector<char> elide;  // coerce/coerce_return proven redundant here
+		// FindPropStrict/FindProperty proven to resolve to `this` (the
+		// find→this lever): emit a loc[0] push instead of the scope walk.
+		std::vector<char> find_this;
 	};
 	static SlotSpecResult analyzeSlotSpec(const AbcTypeModel& M, const AbcFile& abc,
 	                                      const EmitBody& body)
@@ -1225,15 +1312,18 @@ namespace abc
 		SlotSpecResult R;
 		R.slot.assign(body.ir.ops.size(), -1);
 		R.elide.assign(body.ir.ops.size(), 0);
+		R.find_this.assign(body.ir.ops.size(), 0);
 		std::vector<int>& spec = R.slot;
 		if (!body.verified) return R;
 		// A/B baseline toggles (interleaved before/after measurement):
 		//   SWF_NO_SLOT_SPEC     disables BOTH slot levers (pre-slot build).
 		//   SWF_NO_STATIC_SLOT   disables lever B only (lever-A/this-field base).
 		//   SWF_NO_COERCE_ELIDE  disables coerce elision only (Step-4 baseline).
+		//   SWF_NO_FIND_THIS     disables the find→this substitution only.
 		static const bool slot_all_disabled = getenv("SWF_NO_SLOT_SPEC") != nullptr;
 		static const bool staticB_disabled = getenv("SWF_NO_STATIC_SLOT") != nullptr;
 		static const bool coerce_disabled = getenv("SWF_NO_COERCE_ELIDE") != nullptr;
+		static const bool findthis_disabled = getenv("SWF_NO_FIND_THIS") != nullptr;
 		const bool coerce_enabled = !coerce_disabled;
 
 		// Defining class + this-kind (needed for BOTH slot lever A and the
@@ -1242,28 +1332,53 @@ namespace abc
 		bool instMethod = mit != M.m2c.end() && mit->second.inst && mit->second.cls >= 0;
 		int thisCls = instMethod ? mit->second.cls : -1;
 
+		// Shared body scans: local-0 rewrites, scope-op shape, activation.
+		bool local0_written = false, only_preamble_scope = true, has_act = false;
+		for (size_t oi = 0; oi < body.ir.ops.size(); oi++)
+		{
+			const IrOp& op = body.ir.ops[oi];
+			switch (op.op) {
+				case IrOpcode::SetLocal: case IrOpcode::Kill:
+				case IrOpcode::IncLocal: case IrOpcode::DecLocal:
+				case IrOpcode::IncLocalI: case IrOpcode::DecLocalI:
+					if (op.arg1 == 0) local0_written = true; break;
+				case IrOpcode::HasNext2:
+					if (op.arg1 == 0 || op.arg2 == 0) local0_written = true; break;
+				case IrOpcode::PushScope:
+					if (oi != 1) only_preamble_scope = false; break;
+				case IrOpcode::PushWith: case IrOpcode::PopScope:
+					only_preamble_scope = false; break;
+				case IrOpcode::NewActivation: has_act = true; break;
+				default: break;
+			}
+		}
+
 		// Lever A (this.field slot) gating — enables the is_this SLOT tag only.
 		// (`this`'s TYPE is seeded independently below and survives local-0
 		// writes via the branch-target reset, so it needs no such gate.)
-		bool this_lever = !slot_all_disabled && instMethod && M.isSealed(thisCls);
-		if (this_lever)
-		{
-			for (const IrOp& op : body.ir.ops)
-			{
-				switch (op.op) {
-					case IrOpcode::SetLocal: case IrOpcode::Kill:
-					case IrOpcode::IncLocal: case IrOpcode::DecLocal:
-					case IrOpcode::IncLocalI: case IrOpcode::DecLocalI:
-						if (op.arg1 == 0) this_lever = false; break;
-					case IrOpcode::HasNext2:
-						if (op.arg1 == 0 || op.arg2 == 0) this_lever = false; break;
-					default: break;
-				}
-				if (!this_lever) break;
-			}
-		}
+		bool this_lever = !slot_all_disabled && instMethod && M.isSealed(thisCls)
+		               && !local0_written;
 		bool staticB_lever = !slot_all_disabled && !staticB_disabled;
-		if (!this_lever && !staticB_lever && !coerce_enabled) return R;
+
+		// find→this gate (see avm2_op_findprop_this in avm2_ops.h for the full
+		// soundness argument): canonical GetLocal0+PushScope preamble as the
+		// body's ONLY scope ops, no with/activation, no active exceptions,
+		// local 0 never rewritten. Branch targets into the preamble are
+		// excluded below (after targets are collected). Sites additionally
+		// require the multiname to match a declared instance trait of the
+		// enclosing class (chainDefinesMn, ns-aware).
+		bool active_exc = false;
+		for (const IrException& e : body.ir.exceptions)
+			if (e.active) active_exc = true;
+		bool findthis_gate = !findthis_disabled && instMethod
+			&& !local0_written && only_preamble_scope && !has_act && !active_exc
+			&& body.ir.ops.size() >= 2
+			&& body.ir.ops[0].op == IrOpcode::GetLocal
+			&& body.ir.ops[0].arg1 == 0
+			&& body.ir.ops[1].op == IrOpcode::PushScope;
+
+		if (!this_lever && !staticB_lever && !coerce_enabled && !findthis_gate)
+			return R;
 
 		// Per-stack-slot value: compile-time provenance (is_this/fp_mn/cls, all
 		// path-invariant by construction) plus a static TYPE (NOT path-invariant
@@ -1315,6 +1430,11 @@ namespace abc
 			}
 		for (const IrException& e : body.ir.exceptions)
 			if (e.active) targets.insert(e.target_op);
+
+		// A branch back into the preamble would re-run GetLocal0+PushScope and
+		// grow the scope stack — the [this]-only scope shape is no longer
+		// proven, so the find→this gate closes.
+		if (targets.count(0u) || targets.count(1u)) findthis_gate = false;
 
 		// Static type produced by a generic (depth-preserving) op that pushes a
 		// value. Only sound, path-independent results.
@@ -1368,12 +1488,25 @@ namespace abc
 				continue;
 			}
 			if (op.op == IrOpcode::Dup) { push(st.empty() ? SV{} : st.back()); continue; }
-			// FindPropStrict/FindProperty of a static (non-lazy) multiname tags
-			// its result so a following GetPropertyStatic of the same mn (the
-			// getlex pattern) is recognized as a class load.
+			// FindPropStrict/FindProperty of a static (non-lazy) multiname:
+			// when the find→this gate holds and the multiname matches a
+			// declared instance trait of the enclosing class, the walk
+			// provably resolves to `this` — mark the site for substitution
+			// and tag the result as `this` (typed), so a following
+			// GetPropertyStatic slot-specializes through the lever-A path.
+			// Otherwise tag the result with the multiname so a following
+			// GetPropertyStatic of the same mn (the getlex pattern) is
+			// recognized as a class load.
 			if ((op.op == IrOpcode::FindPropStrict || op.op == IrOpcode::FindProperty)
 			    && !mnLazyNs(abc, op.arg1) && !mnLazyName(abc, op.arg1))
 			{
+				if (findthis_gate && i >= 2 && M.chainDefinesMn(thisCls, op.arg1))
+				{
+					R.find_this[i] = 1;
+					SV v; v.is_this = this_lever;
+					v.type = TV{ TK_INST, thisCls };
+					push(v); continue;
+				}
 				SV v; v.fp_mn = (int) op.arg1; push(v); continue;
 			}
 			if (op.op == IrOpcode::GetPropertyStatic)
@@ -1592,7 +1725,8 @@ namespace abc
 		SlotSpecResult spec;
 		if (typeModel) spec = analyzeSlotSpec(*typeModel, abc, body);
 		else { spec.slot.assign(body.ir.ops.size(), -1);
-		       spec.elide.assign(body.ir.ops.size(), 0); }
+		       spec.elide.assign(body.ir.ops.size(), 0);
+		       spec.find_this.assign(body.ir.ops.size(), 0); }
 		const std::vector<int>& slotSpec = spec.slot;
 
 		for (size_t i = 0; i < body.ir.ops.size(); i++)
@@ -1648,7 +1782,8 @@ namespace abc
 				continue;
 			}
 
-			if (!emitOp(out, bc, op, slotSpec[i], spec.elide[i] != 0))
+			if (!emitOp(out, bc, op, slotSpec[i], spec.elide[i] != 0,
+			            spec.find_this[i] != 0))
 			{
 				out << "\tavm2_unimplemented_op(act, \"" << escapeCString(desc)
 				    << "\", " << i << ");" << endl;
@@ -1974,11 +2109,230 @@ namespace abc
 			fclose(f);
 			fprintf(stderr, "scout: wrote %s\n", path);
 		}
+
+		// =================================================================
+		// TEMP Step-0 census (RWK property-read endgame). Env-gated:
+		// SWF_CENSUS_PROPREAD=<csv path>. Read-only — mirrors analyzeSlotSpec's
+		// provenance interp and reports, per site:
+		//  * GetPropertyStatic on a `this` receiver: specialized, or WHY not
+		//    (body gate: not-instance/not-sealed/local0-written; trait: not
+		//    found / ambiguous / accessor / method / subclass-redeclares /
+		//    non-ABC slot chain).
+		//  * FindPropStrict/FindProperty static-mn sites: does the multiname
+		//    resolve to an instance trait of the ENCLOSING class (slot /
+		//    accessor / method), a static trait of the enclosing class or an
+		//    ancestor class, a unique global class name (getlex), or other.
+		//  * find→consumer pattern rows (find_get / find_call / find_set)
+		//    when the find result is consumed by a same-mn property op.
+		// CSV: method,op,category,cls,prop,scope_stable,has_activation
+		// =================================================================
+		static void censusPropRead(const AbcFile& abc,
+		                           const std::vector<EmitBody>& bodies,
+		                           const char* path)
+		{
+			AbcTypeModel M(abc);
+			FILE* f = fopen(path, "w");
+			if (!f) { fprintf(stderr, "census: cannot open %s\n", path); return; }
+			fprintf(f, "method,op,category,cls,prop,scope_stable,has_activation\n");
+
+			for (const EmitBody& body : bodies)
+			{
+				if (!body.verified) continue;
+				u32 method_index = body.ir.method_index;
+				auto mit = M.m2c.find(method_index);
+				bool instMethod = mit != M.m2c.end() && mit->second.inst
+				               && mit->second.cls >= 0;
+				int thisCls = instMethod ? mit->second.cls : -1;
+				string clsName = thisCls >= 0
+					? M.localName(abc.instances[thisCls].name) : "";
+
+				bool sealedCls = instMethod && M.isSealed(thisCls);
+				bool local0w = false, scope_stable = true, has_act = false;
+				for (const IrOp& op : body.ir.ops)
+				{
+					switch (op.op) {
+						case IrOpcode::SetLocal: case IrOpcode::Kill:
+						case IrOpcode::IncLocal: case IrOpcode::DecLocal:
+						case IrOpcode::IncLocalI: case IrOpcode::DecLocalI:
+							if (op.arg1 == 0) local0w = true; break;
+						case IrOpcode::HasNext2:
+							if (op.arg1 == 0 || op.arg2 == 0) local0w = true; break;
+						case IrOpcode::PushWith: scope_stable = false; break;
+						case IrOpcode::NewActivation: has_act = true; break;
+						default: break;
+					}
+				}
+
+				// Classify a property name against the enclosing class.
+				// Instance chain first (slot/accessor/method + specializable
+				// detail), then own/ancestor CLASS (static) traits, then a
+				// unique global class name, else other.
+				auto classifyOwn = [&](const string& name) -> string {
+					if (!instMethod) {
+						// class (static) method: `this` is the class object.
+						if (thisCls >= 0
+						    && M.computeStaticSlotIndex(thisCls, name) > 0)
+							return "cm_own_static_slot";
+						if (M.uniqueClassByName(name) >= 0) return "global_class";
+						return "cm_other";
+					}
+					// instance-trait walk with kind detail
+					int cur = thisCls, guard = 0, hits = 0;
+					TraitKindType kind = TraitKindType::Slot;
+					while (cur >= 0 && cur < (int) abc.instances.size()
+					       && guard++ < 64)
+					{
+						for (const AbcTrait& t : abc.instances[cur].traits)
+							if (M.localName(t.name) == name)
+							{ hits++; kind = t.kind; }
+						if (abc.instances[cur].super_name == 0) break;
+						cur = M.typeMnToInst(abc.instances[cur].super_name);
+					}
+					if (hits >= 1)
+					{
+						if (hits > 1) return "own_inst_ambig";
+						if (kind == TraitKindType::Slot
+						    || kind == TraitKindType::Const)
+						{
+							if (!sealedCls) return "own_slot_notsealed";
+							if (local0w) return "own_slot_local0w";
+							if (M.subclassRedeclares(thisCls, name))
+								return "own_slot_subredecl";
+							AbcTypeModel::Found fnd = M.findUniqueSlot(thisCls, name);
+							int K = fnd.ok
+								? M.computeSlotIndex(fnd.declInst, fnd.traitIdx) : -1;
+							return K > 0 ? "own_slot_ok" : "own_slot_nonabc";
+						}
+						if (kind == TraitKindType::Getter
+						    || kind == TraitKindType::Setter)
+							return "own_accessor";
+						if (kind == TraitKindType::Method) return "own_method";
+						return "own_other_kind";
+					}
+					// static trait of enclosing class or an ancestor class?
+					cur = thisCls; guard = 0;
+					while (cur >= 0 && cur < (int) abc.classes.size()
+					       && guard++ < 64)
+					{
+						for (const AbcTrait& t : abc.classes[cur].traits)
+							if (M.localName(t.name) == name)
+								return cur == thisCls ? "own_class_static"
+								                      : "ancestor_class_static";
+						if (abc.instances[cur].super_name == 0) break;
+						cur = M.typeMnToInst(abc.instances[cur].super_name);
+					}
+					if (M.uniqueClassByName(name) >= 0) return "global_class";
+					return "other";
+				};
+
+				auto emitRow = [&](const char* opn, const string& cat,
+				                   const string& prop) {
+					fprintf(f, "%u,%s,%s,%s,%s,%d,%d\n", method_index, opn,
+					        cat.c_str(), clsName.c_str(), prop.c_str(),
+					        scope_stable ? 1 : 0, has_act ? 1 : 0);
+				};
+
+				// provenance interp (mirror of analyzeSlotSpec, gate-independent
+				// is_l0 so gate rejections are countable)
+				struct CV { bool is_l0 = false; int fp_mn = -1; int cls = -1; };
+				std::vector<CV> st;
+				auto pop = [&]() -> CV {
+					if (st.empty()) return CV{};
+					CV v = st.back(); st.pop_back(); return v; };
+				auto push = [&](CV v) { st.push_back(v); };
+				auto peek = [&](u32 d) -> CV {
+					return d < st.size() ? st[st.size() - 1 - d] : CV{}; };
+
+				for (size_t i = 0; i < body.ir.ops.size(); i++)
+				{
+					const IrOp& op = body.ir.ops[i];
+					if (op.op == IrOpcode::GetLocal)
+					{ CV v; v.is_l0 = (op.arg1 == 0); push(v); continue; }
+					if (op.op == IrOpcode::Dup)
+					{ push(st.empty() ? CV{} : st.back()); continue; }
+					if ((op.op == IrOpcode::FindPropStrict
+					     || op.op == IrOpcode::FindProperty)
+					    && !mnLazyNs(abc, op.arg1) && !mnLazyName(abc, op.arg1))
+					{
+						string name = M.localName(op.arg1);
+						emitRow("find", classifyOwn(name), name);
+						CV v; v.fp_mn = (int) op.arg1; push(v); continue;
+					}
+					if (op.op == IrOpcode::GetPropertyStatic)
+					{
+						CV recv = pop();
+						string name = M.localName(op.arg1);
+						if (recv.is_l0)
+						{
+							string cat;
+							if (!instMethod) cat = "this_notinst";
+							else cat = classifyOwn(name);
+							emitRow("get_this", cat, name);
+						}
+						else if (recv.fp_mn == (int) op.arg1)
+						{
+							emitRow("find_get", classifyOwn(name), name);
+						}
+						else if (recv.cls >= 0)
+						{
+							int K = M.computeStaticSlotIndex(recv.cls, name);
+							emitRow("get_static",
+							        K > 0 ? "static_slot_ok" : "static_rej", name);
+						}
+						else emitRow("get_other", "unknown_recv", name);
+						CV res;
+						if (recv.fp_mn == (int) op.arg1)
+						{
+							int c = M.uniqueClassByName(name);
+							if (c >= 0) res.cls = c;
+						}
+						push(res);
+						continue;
+					}
+					if (op.op == IrOpcode::SetPropertyStatic)
+					{
+						pop();  // value
+						CV recv = pop();
+						string name = M.localName(op.arg1);
+						if (recv.is_l0 && instMethod)
+							emitRow("set_this", classifyOwn(name), name);
+						else if (recv.fp_mn == (int) op.arg1)
+							emitRow("find_set", classifyOwn(name), name);
+						continue;
+					}
+					if ((op.op == IrOpcode::CallProperty
+					     || op.op == IrOpcode::CallPropVoid)
+					    && !mnLazyNs(abc, op.arg1) && !mnLazyName(abc, op.arg1))
+					{
+						CV recv = peek(op.arg2);
+						string name = M.localName(op.arg1);
+						if (recv.fp_mn == (int) op.arg1)
+							emitRow("find_call", classifyOwn(name), name);
+						else if (recv.is_l0 && instMethod)
+							emitRow("call_this", classifyOwn(name), name);
+						u32 pops, pushes; irStackEffect(op, abc, pops, pushes);
+						for (u32 k = 0; k < pops; k++) pop();
+						for (u32 k = 0; k < pushes; k++) push(CV{});
+						continue;
+					}
+					u32 pops, pushes; irStackEffect(op, abc, pops, pushes);
+					for (u32 k = 0; k < pops; k++) pop();
+					for (u32 k = 0; k < pushes; k++) push(CV{});
+				}
+			}
+			fclose(f);
+			fprintf(stderr, "census: wrote %s\n", path);
+		}
 	}  // namespace
 
 	void AbcEmitter::emitAbcTag(const AbcFile& abc, const std::vector<EmitBody>& bodies)
 	{
-		if (const char* sp = getenv("SWF_SCOUT_TYPES")) scoutStaticTypes(abc, bodies, sp);
+		if (const char* sp = getenv("SWF_SCOUT_TYPES"))
+			scoutStaticTypes(abc, bodies,
+			                 (string(sp) + "." + to_string(next_tag_index_)).c_str());
+		if (const char* cp = getenv("SWF_CENSUS_PROPREAD"))
+			censusPropRead(abc, bodies,
+			               (string(cp) + "." + to_string(next_tag_index_) + ".csv").c_str());
 		ensureDir();
 		int tag = next_tag_index_++;
 		string p = "abc" + to_string(tag);
