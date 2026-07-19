@@ -1,5 +1,55 @@
 # Session prompt — AVM2 GC collector-cost reduction (tier 2 after the adaptive watermark)
 
+## 2026-07-19 REFRESH (post property-arc levers 2-4) — WHY THIS SESSION IS NOW
+
+The base-compute arc (RWK_AB_STATUS.md) has taken rig gameplay
+219 → 165 → 105 → **69 ms** p50 (HEAD `a2e4758fb`). The GC pause did NOT
+shrink with it: RWK still collects every ~21 ticks and the wasm pause is
+~675 ms (the 5x-native constant below). At 69 ms/frame that is ~1.45 s of
+compute punctuated by a ~675 ms freeze — **the GC is now ~30-40% of
+wall-clock and its share GROWS with every future compute lever.** This is
+the biggest single lever left in the game.
+
+Session shape: execute the tier-2 levers below (bitmap membership → epoch
+marks → lazy sweep, in that order, ONE at a time, A/B'd individually).
+Lever 4 (inline slots) and generational stay out unless the first three
+leave the pause dominated by free() cost.
+
+Step 0 — re-baseline at HEAD first (cheap, tooling exists): the pause
+model below was measured pre-levers-2-4. Nothing in those levers touches
+allocation volume, so cadence/census should be unchanged — VERIFY that
+(AVM2_GC_TIME temp timer + phase timers from the `avm2-rw-gc-duty-cycle`
+session memory; scratch-build recipe in RWK_AB_STATUS). Also re-measure
+GC-on vs GC=0 native user-s at HEAD: at 46B Ir the GC's relative share is
+much bigger than the ~8% recorded below at 92B.
+
+Method rules accumulated by the arc (binding here too):
+- Rig A/B: `/mnt/c/playwright/rw_scope_ab/rw_ab.py` driver (rw_perf.py
+  hangs); `__swfPerf.cpu` gameplay p50 + the >250 ms discrete-stall
+  count/spacing (THE collect signature — rAF >100ms counters mislead);
+  ≥5 interleaved rounds; RWK gameplay is bimodal ±30%, only same-session
+  interleaved ratios count. WebGPU screenshots blank on this rig.
+- Seedling + rwp must be in the A/B set too: collector changes hit every
+  game; Seedling (low churn, 30 fps at target) is the "don't regress the
+  good case" control, and its 3.7 s collect cadence hitches should
+  SHRINK.
+- Verification precedent from the property arc: an all-verify-defines CI
+  run (FIND/SLOT/SET/COERCE) on top of both normal CI modes; add the GC
+  ladder from the bar section below. Soak targets updated: RWK ~1.03
+  KB/tick and Seedling-teleport ~9.5 KB/tick still stand.
+- ABI TRAP: Avm2Object/Avm2String layout changes (epoch field!) →
+  FRESH=1 wasm rebuilds EVERYWHERE + all 7 demos redeployed + the
+  Archipelago-CC flashPanel restage. Appended fields zero-init in the
+  rodata string pool (the avm2-collectable-strings precedent) — check
+  padding first; gc_mark is a small int with likely adjacent padding.
+- Fable-led; Opus subagents for rebuilds, TAS/callgrind legs, rig rounds,
+  CI watching. Fable: the GC invariants, sweep/mark code, and every
+  free-vs-retain decision.
+
+(Original tier-1-era context follows — its per-object cost constants and
+lever designs remain the working plan; its "before" numbers predate the
+property arc.)
+
 Context (2026-07-18, RW-demo perf session): the RW-family "unplayably slow +
 rhythmic pause" browser report was attributed NATIVELY, with per-collect
 timers + a swept-class histogram, to the GC running at ~50%+ duty cycle
