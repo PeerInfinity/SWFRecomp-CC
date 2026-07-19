@@ -38,6 +38,31 @@ static int g_gc_enabled = 1;              // AVM2_GC=0 disables
 static int g_gc_strings_enabled = 1;      // AVM2_GC_STRINGS=0 disables the
                                           // string sweep only (A/B + kill switch)
 static uint64_t g_gc_watermark = 4u * 1024 * 1024; // bytes allocated between collects
+// Adaptive watermark (measured on RWK gameplay, 2026-07-18): the watermark
+// counts GROSS bytes allocated since the last collect, and Flixel's per-frame
+// churn (FlxQuadTree/FlxList rebuilt from scratch every tick — ~9k objects,
+// ~3.3 MB gross per tick) crossed the fixed 4 MB default every ~2 ticks,
+// putting a ~55 ms stop-the-world collect on nearly every other frame (~50%
+// GC duty cycle; "unplayably slow with a rhythmic pause" in browser wasm).
+// After each completed collect the watermark is retargeted to the LIVE heap
+// size — collect frequency then tracks retention, not churn:
+//   watermark = clamp(live_allocated_bytes, base, min(256 MB, headroom/4))
+// The headroom/4 clamp keeps garbage accumulation from OOMing a
+// near-capacity arena (rwic's live set boots at ~1.7 GB of a 1770 MB heap);
+// the 256 MB ceiling bounds the worst-case sweep pause. Deterministic: the
+// post-collect o1heap 'allocated' value is a pure function of the (already
+// deterministic) allocation sequence. AVM2_GC_WATERMARK (absolute override)
+// and AVM2_GC_STRESS (watermark 0) both disable adaptation.
+static uint64_t g_gc_watermark_base = 4u * 1024 * 1024;
+static int g_gc_adaptive = 1;
+// Companion trigger: a collect's snap+sweep cost is proportional to CENSUS
+// ENTRIES (objects + strings), not bytes — a big-live-set game whose byte
+// watermark allows long intervals could otherwise accumulate millions of
+// tiny dead FlxList-class objects and pay a multi-hundred-ms pause. Collect
+// when either trigger fires. 200k new entries ≈ ~100 ms of snap+sweep on
+// the 2026 reference box (AVM2_GC_MAX_ENROLL overrides; 0 disables).
+static uint64_t g_gc_enroll_cap = 200000;
+static uint64_t g_gc_enrolled_since_collect = 0;
 static int g_gc_verbose = 0;
 static uint32_t g_gc_collections = 0;
 static uint64_t g_gc_swept_total = 0;
@@ -53,15 +78,28 @@ static void gc_configure(void)
 	if (w != NULL)
 	{
 		long long v = atoll(w);
-		if (v > 0) g_gc_watermark = (uint64_t) v;
+		if (v > 0)
+		{
+			g_gc_watermark = (uint64_t) v;
+			g_gc_watermark_base = (uint64_t) v;
+			g_gc_adaptive = 0;  // explicit absolute request wins
+		}
 	}
+	const char* ad = getenv("AVM2_GC_ADAPTIVE");
+	if (ad != NULL && strcmp(ad, "0") == 0) g_gc_adaptive = 0;
+	const char* ec = getenv("AVM2_GC_MAX_ENROLL");
+	if (ec != NULL && ec[0] != '\0') g_gc_enroll_cap = (uint64_t) atoll(ec);
 	// Stress mode (CI correctness gate, the AVM1 swf_gc=1/cadence-1 precedent):
 	// collect between EVERY tick regardless of allocation volume, so short
 	// trace tests actually exercise mark-sweep. A collection that frees a live
 	// object surfaces as a wrong trace — the honest-failure tripwire. Treat
 	// empty / "0" as off (CI sets the var to "" when the input is blank).
 	const char* stress = getenv("AVM2_GC_STRESS");
-	if (stress != NULL && stress[0] != '\0' && strcmp(stress, "0") != 0) g_gc_watermark = 0;
+	if (stress != NULL && stress[0] != '\0' && strcmp(stress, "0") != 0)
+	{
+		g_gc_watermark = 0;
+		g_gc_adaptive = 0;  // stress means collect EVERY tick — never retarget
+	}
 	if (getenv("AVM2_GC_VERBOSE") != NULL) g_gc_verbose = 1;
 }
 
@@ -73,6 +111,7 @@ void avm2_gc_enroll(Avm2Object* obj)
 	obj->gc_mark = 0;
 	g_gc_head = obj;
 	g_gc_live_objects++;
+	g_gc_enrolled_since_collect++;
 }
 
 void avm2_gc_note_alloc(uint32_t bytes)
@@ -92,6 +131,7 @@ void avm2_gc_enroll_string(Avm2String* s)
 	s->gc_flags = AVM2_STR_GC_HEAP;
 	g_gc_str_head = s;
 	g_gc_live_strings++;
+	g_gc_enrolled_since_collect++;
 }
 
 
@@ -502,6 +542,7 @@ static void gc_collect(Avm2Context* ctx)
 
 	// Watermark reset: both snapshots built, the cycle will complete.
 	g_gc_bytes_since_collect = 0;
+	g_gc_enrolled_since_collect = 0;
 
 	// Root markers (per module).
 	avm2_gc_mark_roots_main(ctx);
@@ -588,6 +629,24 @@ static void gc_collect(Avm2Context* ctx)
 	g_str_census_count = 0;
 	g_str_census_lo = g_str_census_hi = NULL;
 
+	// Retarget the watermark to the post-collect live heap (see the field
+	// comment). Runs only on a completed cycle — aborted cycles (snapshot
+	// OOM, worklist OOM) keep the old watermark so the next maybe_collect
+	// retries immediately.
+	if (g_gc_adaptive)
+	{
+		uint64_t live = heap_allocated_bytes(ctx->app);
+		if (live > 0)
+		{
+			uint64_t w = live;
+			uint64_t cap = heap_capacity_bytes(ctx->app);
+			if (cap > live && w > (cap - live) / 4) w = (cap - live) / 4;
+			if (w > 256u * 1024 * 1024) w = 256u * 1024 * 1024;
+			if (w < g_gc_watermark_base) w = g_gc_watermark_base;
+			g_gc_watermark = w;
+		}
+	}
+
 	if (g_gc_verbose)
 	{
 		fprintf(stderr, "[avm2-gc] #%u live=%u swept=%u strings live=%u swept=%u (total alloc %.1f MB)\n",
@@ -608,7 +667,9 @@ void avm2_gc_maybe_collect(Avm2Context* ctx)
 {
 	if (!g_gc_configured) gc_configure();
 	if (!g_gc_enabled) return;
-	if (g_gc_bytes_since_collect < g_gc_watermark) return;
+	if (g_gc_bytes_since_collect < g_gc_watermark
+	    && (g_gc_enroll_cap == 0 || g_gc_enrolled_since_collect < g_gc_enroll_cap))
+		return;
 	gc_collect(ctx);
 }
 

@@ -105,6 +105,18 @@ void heap_stats(SWFAppContext* app_context)
 	printf("[HEAP] PASSTHROUGH mode: no o1heap statistics\n");
 }
 
+size_t heap_allocated_bytes(SWFAppContext* app_context)
+{
+	(void)app_context;
+	return 0;  // unknown — passthrough has no allocation accounting
+}
+
+size_t heap_capacity_bytes(SWFAppContext* app_context)
+{
+	(void)app_context;
+	return 0;
+}
+
 void heap_shutdown(SWFAppContext* app_context)
 {
 	// MC registry memory is going away — disable the mem-report atexit fallback.
@@ -236,6 +248,18 @@ void heap_free(SWFAppContext* app_context, void* ptr)
 	}
 
 	o1heapFree(app_context->heap_instance, ptr);
+}
+
+size_t heap_allocated_bytes(SWFAppContext* app_context)
+{
+	if (app_context == NULL || !app_context->heap_inited) return 0;
+	return o1heapGetDiagnostics(app_context->heap_instance).allocated;
+}
+
+size_t heap_capacity_bytes(SWFAppContext* app_context)
+{
+	if (app_context == NULL || !app_context->heap_inited) return 0;
+	return o1heapGetDiagnostics(app_context->heap_instance).capacity;
 }
 
 void heap_stats(SWFAppContext* app_context)

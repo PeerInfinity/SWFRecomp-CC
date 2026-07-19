@@ -101,6 +101,23 @@ void heap_free(SWFAppContext* app_context, void* ptr);
 void heap_stats(SWFAppContext* app_context);
 
 /**
+ * Currently allocated bytes in the heap arena (o1heap diagnostics.allocated,
+ * fragment-rounded). Deterministic for a deterministic allocation sequence.
+ * Returns 0 when the backend cannot report (HEAP_PASSTHROUGH) — callers must
+ * treat 0 as "unknown", not "empty".
+ *
+ * @param app_context The SWF application context containing heap state
+ */
+size_t heap_allocated_bytes(SWFAppContext* app_context);
+
+/**
+ * Total heap arena capacity in bytes; 0 when unknown (HEAP_PASSTHROUGH).
+ *
+ * @param app_context The SWF application context containing heap state
+ */
+size_t heap_capacity_bytes(SWFAppContext* app_context);
+
+/**
  * Shutdown the heap system
  *
  * Frees all heap arenas. Should be called at program exit.
