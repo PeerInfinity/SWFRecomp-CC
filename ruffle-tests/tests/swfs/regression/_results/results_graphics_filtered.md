@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-19 00:43 UTC
+**Date**: 2026-07-19 04:26 UTC
 
-**Git SHA**: `fd59316610`
+**Git SHA**: `8caf10e4e4`
 
-**Run Duration**: 13m 22s
+**Run Duration**: 13m 13s
 
 **Filtered**: 0 tests ignored out of 53 available
 
@@ -25,59 +25,59 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array_element_type1_args` | 7 | 19.9s |  |
-| 2 | `array_method_type1_args` | 7 | 1.1s |  |
-| 3 | `avm2_bitmapdata_draw_textfield` | 5 | 8.9s |  |
-| 4 | `avm2_embed_bytearray` | 2 | 23.2s |  |
-| 5 | `avm2_external_interface_unavailable` | 8 | 10.4s |  |
-| 6 | `avm2_gc_dynprop_tombstone_purge` | 8 | 5.4s |  |
-| 7 | `avm2_gc_string_concat_reclaim` | 10 | 9.7s |  |
-| 8 | `avm2_gc_string_survives_collect` | 9 | 4.8s |  |
-| 9 | `avm2_localconnection_domain` | 4 | 4.7s |  |
-| 10 | `avm2_sharedobject_flushstatus` | 4 | 4.6s |  |
-| 11 | `broadcast_cross_swf_version` | 4 | 20.1s |  |
-| 12 | `broadcast_type1_args` | 14 | 20.2s |  |
-| 13 | `coerce_cross_swf_version` | 7 | 20.7s |  |
-| 14 | `coerce_recursion_guard` | 1 | 20.8s |  |
-| 15 | `coerce_type1_args` | 9 | 18.6s |  |
-| 16 | `convertfloat_type1_this` | 3 | 1.5s |  |
-| 17 | `ei_closure_scope_order` | 7 | 21.6s |  |
-| 18 | `ei_cross_swf_version` | 2 | 1.8s |  |
-| 19 | `ei_type1_args` | 7 | 20.6s |  |
-| 20 | `enterframe_type1_args` | 8 | 20.7s |  |
-| 21 | `fn_call_builtin_type1_args` | 10 | 19.4s |  |
-| 22 | `fn_call_type1_args` | 7 | 1.0s |  |
-| 23 | `fn_empty_method_type1_args` | 10 | 21.8s |  |
-| 24 | `lc_method_type1_args` | 7 | 1.2s |  |
-| 25 | `lc_onstatus_type1_args` | 3 | 20.5s |  |
-| 26 | `lv_cross_swf_version` | 5 | 19.6s |  |
-| 27 | `lv_ondata_type1_args` | 3 | 19.7s |  |
-| 28 | `mc_event_cross_swf_version` | 4 | 19.5s |  |
-| 29 | `mc_event_type1_args` | 3 | 20.1s |  |
-| 30 | `mc_method_v5_caller_gate` | 4 | 20.1s |  |
-| 31 | `mc_resolve_type1_args` | 6 | 21.4s |  |
-| 32 | `method_type1_args` | 10 | 1.2s |  |
-| 33 | `nc_onstatus_closure` | 2 | 16.9s |  |
-| 34 | `nc_onstatus_type1_args` | 3 | 17.7s |  |
-| 35 | `onconstruct_cross_swf_version` | 4 | 19.2s |  |
-| 36 | `onconstruct_type1_args` | 6 | 19.1s |  |
-| 37 | `onload_type1_args` | 7 | 20.4s |  |
-| 38 | `onunload_type1_args` | 6 | 20.4s |  |
-| 39 | `onunload_type1_local_frame` | 2 | 19.8s |  |
+| 1 | `array_element_type1_args` | 7 | 22.3s |  |
+| 2 | `array_method_type1_args` | 7 | 1.3s |  |
+| 3 | `avm2_bitmapdata_draw_textfield` | 5 | 13.6s |  |
+| 4 | `avm2_embed_bytearray` | 2 | 3.6s |  |
+| 5 | `avm2_external_interface_unavailable` | 8 | 14.7s |  |
+| 6 | `avm2_gc_dynprop_tombstone_purge` | 8 | 5.1s |  |
+| 7 | `avm2_gc_string_concat_reclaim` | 10 | 14.4s |  |
+| 8 | `avm2_gc_string_survives_collect` | 9 | 5.1s |  |
+| 9 | `avm2_localconnection_domain` | 4 | 14.1s |  |
+| 10 | `avm2_sharedobject_flushstatus` | 4 | 4.8s |  |
+| 11 | `broadcast_cross_swf_version` | 4 | 19.6s |  |
+| 12 | `broadcast_type1_args` | 14 | 19.5s |  |
+| 13 | `coerce_cross_swf_version` | 7 | 15.8s |  |
+| 14 | `coerce_recursion_guard` | 1 | 15.6s |  |
+| 15 | `coerce_type1_args` | 9 | 15.7s |  |
+| 16 | `convertfloat_type1_this` | 3 | 1.4s |  |
+| 17 | `ei_closure_scope_order` | 7 | 20.8s |  |
+| 18 | `ei_cross_swf_version` | 2 | 2.0s |  |
+| 19 | `ei_type1_args` | 7 | 19.6s |  |
+| 20 | `enterframe_type1_args` | 8 | 19.7s |  |
+| 21 | `fn_call_builtin_type1_args` | 10 | 19.9s |  |
+| 22 | `fn_call_type1_args` | 7 | 1.1s |  |
+| 23 | `fn_empty_method_type1_args` | 10 | 19.1s |  |
+| 24 | `lc_method_type1_args` | 7 | 1.1s |  |
+| 25 | `lc_onstatus_type1_args` | 3 | 19.9s |  |
+| 26 | `lv_cross_swf_version` | 5 | 20.1s |  |
+| 27 | `lv_ondata_type1_args` | 3 | 18.8s |  |
+| 28 | `mc_event_cross_swf_version` | 4 | 18.5s |  |
+| 29 | `mc_event_type1_args` | 3 | 21.1s |  |
+| 30 | `mc_method_v5_caller_gate` | 4 | 20.9s |  |
+| 31 | `mc_resolve_type1_args` | 6 | 20.3s |  |
+| 32 | `method_type1_args` | 10 | 1.1s |  |
+| 33 | `nc_onstatus_closure` | 2 | 19.1s |  |
+| 34 | `nc_onstatus_type1_args` | 3 | 19.7s |  |
+| 35 | `onconstruct_cross_swf_version` | 4 | 19.9s |  |
+| 36 | `onconstruct_type1_args` | 6 | 19.7s |  |
+| 37 | `onload_type1_args` | 7 | 20.6s |  |
+| 38 | `onunload_type1_args` | 6 | 19.9s |  |
+| 39 | `onunload_type1_local_frame` | 2 | 19.9s |  |
 | 40 | `resolve_type1_args` | 13 | 1.8s |  |
-| 41 | `root_enterframe_cross_swf_version` | 3 | 21.0s |  |
-| 42 | `sort_comparator_captured_scope` | 2 | 2.2s |  |
-| 43 | `sort_comparator_type1_args` | 5 | 20.4s |  |
+| 41 | `root_enterframe_cross_swf_version` | 3 | 20.4s |  |
+| 42 | `sort_comparator_captured_scope` | 2 | 2.0s |  |
+| 43 | `sort_comparator_type1_args` | 5 | 21.8s |  |
 | 44 | `string_prim_method_type1_args` | 19 | 1.9s |  |
-| 45 | `timer_cross_swf_version` | 3 | 20.9s |  |
-| 46 | `timer_type1_args` | 14 | 20.9s |  |
-| 47 | `watch_cross_swf_version` | 6 | 15.2s |  |
-| 48 | `watch_mc_reentrant_setmember` | 3 | 19.4s |  |
+| 45 | `timer_cross_swf_version` | 3 | 20.4s |  |
+| 46 | `timer_type1_args` | 14 | 20.5s |  |
+| 47 | `watch_cross_swf_version` | 6 | 20.4s |  |
+| 48 | `watch_mc_reentrant_setmember` | 3 | 20.1s |  |
 | 49 | `watch_mc_type1_args` | 7 | 19.4s |  |
-| 50 | `watch_setmember_type1_args` | 7 | 17.2s |  |
-| 51 | `watch_timeline_named_params` | 4 | 20.1s |  |
-| 52 | `watch_timeline_reentrant` | 3 | 19.9s |  |
-| 53 | `xml_onload_type1_args` | 3 | 19.6s |  |
+| 50 | `watch_setmember_type1_args` | 7 | 19.3s |  |
+| 51 | `watch_timeline_named_params` | 4 | 20.5s |  |
+| 52 | `watch_timeline_reentrant` | 3 | 16.1s |  |
+| 53 | `xml_onload_type1_args` | 3 | 16.3s |  |
 
 ## Near-Passing Tests
 
