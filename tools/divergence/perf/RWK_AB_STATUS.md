@@ -64,10 +64,14 @@ the census's role became sizing/justification rather than gating.
   shape: census says **562/834 compares (67%) are branch-adjacent**. Fusing
   emits one `sp -= 2; if (avm2_op_lessthan_test(act, stk[sp], stk[sp+1]))
   goto op_N;`, removing both the `avm2_bool()` boxing and the
-  `avm2_coerce_to_boolean()` that read it straight back. RWK: **489 fused**
-  (not fused when the branch is itself a branch target, or in methods with
-  active exception bookkeeping) + **785 standalone branches** on the boolean
-  fast arm.
+  `avm2_coerce_to_boolean()` that read it straight back.
+  RWK emitted-site counts (grep the generated `RecompiledABC` — the two
+  figures measure DIFFERENT things, so quote them together): **909 total
+  compare sites using a `_test` inline = 489 FUSED (the `if (...) goto`
+  form) + 420 non-fused** (still the inline, just boxed back into an
+  Avm2Value — a compare is not fused when the branch is itself a branch
+  target, or in methods with active exception bookkeeping). Plus **785
+  standalone branches** on the boolean fast arm.
 - **Numeric fast arms** for subtract/multiply/divide/increment/decrement/not.
 - **XML-probe guard in `abstract_eq`** (runtime). The E4X arms ran five ext
   probes on EVERY abstract equality — 2.57% of total Ir in a game with zero
@@ -101,6 +105,25 @@ while the remaining work is memory-bound, so native time under-reflects the
 count. The rig read slightly BETTER than native user-s (1.12x mean / 1.16x
 p50), the usual wasm amplification of instruction-count wins, but nowhere
 near the Ir ratio. Treat this lever as a genuine ~1.1x, not a 1.15x.
+
+**Cross-title spot-checks (the lever is recompiler-WIDE).** Same base/after
+commits, FRESH=1 rebuilds, 3 interleaved rounds each, demos deployed under
+non-clobbering `*_tv_{base,after}` names:
+
+| title | fused / total compare sites | `to_boolean_fast` | all-frames mean | p50 | stalls |
+|---|---|---|---|---|---|
+| RWK (5 rounds) | 489 / 909 | 785 | 83.8 → 74.7 ms (**1.12x**) | 77.9 → 72.3 (**1.16x**) | 3 → 3 |
+| Seedling (3 rounds) | — / 1870 | 2439 | 26.2 → 16.5 ms (**1.54x**) | 27.4 → 15.9 (**1.76x**) | 0 → 0 |
+| RWP (3 rounds) | — / 1382 | 9810 | 50.0 → 43.0 ms (**1.15x**) | 48.4 → 41.9 (**1.14x**) | 0 → 0 |
+
+**Every round of every title favours the after side on mean and p50** (5/5,
+3/3, 3/3); stall counts unchanged everywhere. Seedling is the standout — it
+never got re-measured after silently gaining the lever-2/3 sites, and it has
+2x RWK's compare-site density. But read its headline as "comfortably
+positive, somewhere between 1.11x and 1.79x" rather than a hard 1.76x: its
+AFTER side is the stable one (p50 15.6–16.0 across rounds) while its BASE
+side is noisy (17.6–28.6), so the round-to-round paired ratios span
+1.107–1.788. RWP lands next to RWK at ~1.15x.
 
 **Post-lever profile (40.28B Ir):** `coerce_to_boolean`, `abstract_lt` and
 `xml_abstract_eq` have left the top-25 entirely; `coerce_to_number` 4.67 →
