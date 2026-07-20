@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-20 04:55 UTC
+**Date**: 2026-07-20 14:30 UTC
 
-**Git SHA**: `93299b884d`
+**Git SHA**: `6db550535a`
 
-**Run Duration**: 4m 14s
+**Run Duration**: 4m 13s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -33,17 +33,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 1.9s |  |
-| 2 | `edittext_test1` | 47 | 2.2s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 15.8s |  |
-| 4 | `hello` | 4 | 19.7s |  |
-| 5 | `mouse_drag_test` | 12 | 20.9s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 19.9s |  |
+| 1 | `button_test1` | 31 | 2.0s |  |
+| 2 | `edittext_test1` | 47 | 2.5s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 20.0s |  |
+| 4 | `hello` | 4 | 20.0s |  |
+| 5 | `mouse_drag_test` | 12 | 20.6s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 19.7s |  |
 | 7 | `opcode_guard_test2` | 24 | 2.2s |  |
-| 8 | `soft_reference_test1` | 45 | 20.5s |  |
-| 9 | `stackscope` | 11 | 19.7s |  |
-| 10 | `submoviegetvar` | 4 | 19.1s |  |
-| 11 | `swf4opcode` | 117 | 3.0s |  |
+| 8 | `soft_reference_test1` | 45 | 20.0s |  |
+| 9 | `stackscope` | 11 | 20.1s |  |
+| 10 | `submoviegetvar` | 4 | 15.7s |  |
+| 11 | `swf4opcode` | 117 | 2.5s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +51,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 1.1s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 19.9s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.8s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 21.0s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 1.7s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 0.2s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 15.3s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.7s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 20.5s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 2.1s |  |
 
 ## Near-Passing Tests
 
