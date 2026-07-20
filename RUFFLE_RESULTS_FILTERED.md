@@ -4,8 +4,8 @@
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
 **Commit:** `a35afa7b8a05`  
-**Date:** 2026-07-20 00:25 UTC  
-**Total duration:** 4h34m58s
+**Date:** 2026-07-20 00:36 UTC  
+**Total duration:** 4h38m44s
 
 ## Results by Suite
 
@@ -126,40 +126,40 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 632/666 (94.9%)
 - **Ignored:** 45 tests
-- **Duration:** 51m29s across 30 shards
+- **Duration:** 52m25s across 30 shards
 - **Lines:** 104,062/107,724 matching (96.6%)
-- **Avg test duration:** 4.3s — slowest: `movieclip_invalid_get_bounds_7` (26.2s)
+- **Avg test duration:** 4.3s — slowest: `movieclip_invalid_get_bounds_6` (25.5s)
 
 ### avm2
 
 - **Pass:** 728/988 (73.7%)
 - **Ignored:** 227 tests
-- **Duration:** 2h16m06s across 30 shards
+- **Duration:** 2h18m10s across 30 shards
 - **Lines:** 95,234/126,582 matching (75.2%)
-- **Avg test duration:** 5.9s — slowest: `bitmapdata_accuracy` (46.6s)
+- **Avg test duration:** 6.0s — slowest: `bitmapdata_accuracy` (50.5s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 132/236 (55.9%)
 - **Ignored:** 7 tests
-- **Duration:** 26m00s across 30 shards
+- **Duration:** 26m57s across 30 shards
 - **Lines:** 29,253/31,358 matching (93.3%)
-- **Avg test duration:** 6.3s — slowest: `MovieClip-v8` (52.2s)
+- **Avg test duration:** 6.5s — slowest: `MovieClip-v8` (69.0s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 68/109 (62.4%)
 - **Ignored:** 2 tests
-- **Duration:** 24m54s across 30 shards
+- **Duration:** 24m55s across 30 shards
 - **Lines:** 4,029/5,188 matching (77.7%)
-- **Avg test duration:** 13.5s — slowest: `matrix_test` (102.0s)
+- **Avg test duration:** 13.4s — slowest: `matrix_test` (110.0s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m08s across 30 shards
+- **Duration:** 2m03s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 14.2s — slowest: `implementsOpTest` (22.9s)
+- **Avg test duration:** 13.7s — slowest: `implementsOpTest` (22.5s)
 
 ### from_gnash/misc-swfc.all
 
@@ -167,34 +167,34 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Ignored:** 2 tests
 - **Duration:** 5m11s across 30 shards
 - **Lines:** 424/555 matching (76.4%)
-- **Avg test duration:** 16.0s — slowest: `soft_reference_test1` (23.0s)
+- **Avg test duration:** 16.0s — slowest: `gotoFrameLabelAsFunction` (21.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 6m28s across 30 shards
+- **Duration:** 6m05s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 19.4s — slowest: `trace-as2/root_onload` (22.6s)
+- **Avg test duration:** 18.2s — slowest: `dict_override` (21.1s)
 
 ### from_shumway
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 13m41s across 30 shards
+- **Duration:** 13m57s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 6.5s — slowest: `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` (22.5s)
+- **Avg test duration:** 6.6s — slowest: `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` (22.3s)
 
 ### from_shumway/avm1
 
 - **Pass:** 44/44 (100%)
 - **Ignored:** 3 tests
-- **Duration:** 1m51s across 30 shards
+- **Duration:** 1m52s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 2.0s — slowest: `duplicateMovieClip/dontremove` (20.1s)
+- **Avg test duration:** 1.9s — slowest: `label` (21.1s)
 
 ### regression
 
 - **Pass:** 56/56 (100%)
-- **Duration:** 7m06s across 30 shards
+- **Duration:** 7m04s across 30 shards
 - **Lines:** 377/377 matching (100%)
-- **Avg test duration:** 7.6s — slowest: `mc_event_cross_swf_version` (21.7s)
+- **Avg test duration:** 7.5s — slowest: `timer_cross_swf_version` (21.4s)
