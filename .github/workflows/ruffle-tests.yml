@@ -426,7 +426,17 @@ jobs:
           if-no-files-found: ignore
 
       - name: Commit results to ruffle-test-results branch
-        if: always()
+        # NEVER publish results from an extra-defines build. The result-JSON
+        # stem is chosen by `mode` alone, so a verify run (e.g.
+        # -DAVM2_SLOT_VERIFY at mode=no-graphics) writes the SAME
+        # results.json as a normal no-graphics run and force-pushes it to
+        # ruffle-test-results. That branch is what the NEXT run fetches as
+        # {STEM}_previous.json, so verify-build numbers silently become the
+        # baseline a later normal run diffs against — phantom regressions
+        # with no code change behind them. A verify run's value is its
+        # pass/fail signal, not its numbers; the JSONs remain available as
+        # workflow artifacts either way.
+        if: always() && inputs.extra_defines == ''
         run: |
           # Per-mode result-JSON stem. Each CI run produces a fresh
           # {STEM}.json plus a fetched {STEM}_previous.json; everything else
@@ -1316,7 +1326,17 @@ jobs:
           if-no-files-found: ignore
 
       - name: Commit results to ruffle-test-results branch
-        if: always()
+        # NEVER publish results from an extra-defines build. The result-JSON
+        # stem is chosen by `mode` alone, so a verify run (e.g.
+        # -DAVM2_SLOT_VERIFY at mode=no-graphics) writes the SAME
+        # results.json as a normal no-graphics run and force-pushes it to
+        # ruffle-test-results. That branch is what the NEXT run fetches as
+        # {STEM}_previous.json, so verify-build numbers silently become the
+        # baseline a later normal run diffs against — phantom regressions
+        # with no code change behind them. A verify run's value is its
+        # pass/fail signal, not its numbers; the JSONs remain available as
+        # workflow artifacts either way.
+        if: always() && inputs.extra_defines == ''
         run: |
           # Per-mode result-JSON stem. Each CI run produces a fresh
           # {STEM}.json plus a fetched {STEM}_previous.json; everything else
