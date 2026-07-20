@@ -109,20 +109,53 @@ building.
 
 ## §4 The strategic question to answer in writing (cheap, no code)
 
-Beating Ruffle needs 1.30x. **RWK's own 30 fps target needs ~3.2x**, and
-nobody has yet profiled Ruffle's 82.5 ms frame to ask whether 33 ms is
+**The objective is PLAYABILITY via a recompilation pipeline that "just
+works" — no per-game settings** (user, 2026-07-20). Beating Ruffle is a
+proxy, not the goal: Ruffle only manages ~11 fps on RWK here, so matching
+or beating it leaves the game unplayable either way. Judge levers against
+30 fps (33 ms), which from 107 ms needs **~3.2x**.
+
+Nobody has profiled Ruffle's 82.5 ms frame to ask whether 33 ms is
 reachable for this title in wasm at all. Using the fresh profile plus one
 Ruffle profile (its perf shim exists — [[ruffle-wasm-perf-shim-and-build]]),
 state a view on:
-1. Is RWK at 30 fps plausible on this rig, or is Flixel-on-wasm
-   structurally a ~10 fps title here? (Flixel rebuilds its collision
-   quadtree every frame — ~9.2k object constructions/tick — and Ruffle
-   pays that too, which is *why* it also sits at ~11 fps.)
-2. If it is not plausible, what is the honest goal for RWK — beat Ruffle
-   and stop? — and which title should carry the arc's 30 fps ambition
-   instead (Seedling is already at 30.5 ms, i.e. essentially there)?
+1. Is RWK at 30 fps plausible, or is Flixel-on-wasm structurally a ~10 fps
+   title here? Flixel 2.21 rebuilds its collision quadtree from scratch
+   every `FlxU.overlap` with **zero pooling** (verified in the decompiled
+   source at `~/CC/jpexs/output/robotkitty/scripts/org/flixel/`: bare
+   `new FlxQuadTree(...)` / `new FlxList()` in add/divide, no
+   `_cachedTreesHead`, no `recycle` — later Flixel versions added exactly
+   that pool). Ruffle pays the same churn, which is *why* it also sits at
+   ~11 fps.
+2. **How much of the 107 ms is the GAME being wasteful vs OUR runtime
+   being slow?** This is now the decisive question, because if the answer
+   is "mostly the game", the pipeline lever (library-aware handling of
+   Flixel — see §5) beats any further runtime micro-lever.
+3. Which title should carry the 30 fps ambition if RWK cannot (Seedling
+   is already at 30.5 ms)?
 
-A clear answer here is worth more than a marginal lever, and it decides
+## §5 Flag for the session AFTER this one (do not build here)
+
+Direction under active consideration: **library-aware recompilation**.
+Flixel is MIT and used by a large fraction of the Flash game corpus, so
+recognizing `org.flixel.*` and handling it better is a GENERIC pipeline
+capability, not a per-game hack — which is what makes it compatible with
+the "no per-game settings" objective. Two escalating forms:
+(a) recompile-time substitution of an optimized AS3/ABC implementation
+(pooled quadtree — algorithmic, engine-neutral, validated by the existing
+trace-identity harness); (b) native intrinsic classes bound at class-define
+time (the `flash.*` mechanism, applied to library classes), which is the
+only form that changes our standing versus Ruffle rather than helping both
+engines equally. **Non-negotiable safety property: fingerprint the class
+and FALL BACK to the game's own code on any mismatch** — Flixel versions
+differ across titles (RWK 2.21, sequels 2.35) and a silent substitution
+with different semantics is far worse than a slow game.
+
+Its first step is also this session's best instrument: build the pooled
+variant purely to MEASURE, and §4.2 answers itself. Prefer that over
+speculating.
+
+A clear §4 answer is worth more than a marginal lever, and it decides
 whether there is a lever 8 at all.
 
 ## Budget note (delegation)
