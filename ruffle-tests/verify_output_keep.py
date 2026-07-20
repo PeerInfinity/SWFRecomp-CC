@@ -1726,6 +1726,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             "src/avm2/avm2_bitmap.c",
             "src/avm2/avm2_media.c",
             "src/avm2/avm2_external.c",
+            "src/avm2/avm2_flixel.c",
             "src/avm2/avm2_gc.c",
             "src/avm2/avm2_main.c",
         ])

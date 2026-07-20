@@ -9,7 +9,220 @@ real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
 
-## ★ SESSION 2026-07-20b — playability scoreboard + the quadtree gate
+## ★ SESSION 2026-07-20c — native intrinsic org.flixel collision classes (lever 7)
+
+Prompt `SWFRecompDocs/prompts/avm2-flixel-native-collision-intrinsic.md`. Builds
+the lever the 2026-07-20b gate priced at ~24.1 ms. **Shipped.** Native
+wall-clock **2.593x**; rig verdict in §5 below.
+
+### §1 CORRECTION — the corpus does NOT share one quadtree
+
+`RWK_AB_STATUS.md:180` (previous session) claimed all four Robot Wants titles
+ship byte-identical quadtree source, and that "one substitution covers the whole
+corpus". **Both halves are wrong.** Settled with source diff + ABC bytecode:
+
+| title | `FlxQuadTree.as` | Flixel | obfuscated? |
+|---|---|---|---|
+| RWK | 418 lines | 2.21 | no |
+| RWP | 418 lines, **byte-identical to RWK** | 2.21 | namespace labels only |
+| RWF | 2838 lines | 2.35 | **yes** — control-flow flattening |
+| RWIC | 2694 lines | 2.35 | **yes**, different seed |
+
+RWF/RWIC decompile with `§§push`/`§§goto`/opaque predicates and their
+`FlxList.as` differ *from each other*, so no single 2.35 constant could ever
+cover them. **The 2.21 pair is exactly the two unplayable titles**, so scoping
+this session to 2.21 costs nothing that mattered.
+
+Semantic audit re-verified at HEAD: `FlxQuadTree` referenced only by `FlxU.as`
+and itself, `FlxList` only by `FlxQuadTree` and itself, zero `extends` of either
+in any title, `FlxU.roundingError` assigned exactly once (1e-7) and never
+mutated.
+
+### §2 The fingerprint gate — pool-normalized, not raw bytes
+
+**Raw method-body bytes are the wrong hash.** ABC embeds constant-pool
+*indices*, so identical source in two SWFs produces different bytes — one baked
+constant per game, i.e. exactly the per-game setting the objective forbids. The
+fingerprint therefore hashes *resolved content* (FNV-1a 64 over `abc_emit.cpp`):
+
+- multiname / string / int / uint / double / namespace operands → resolved
+  content, never the index;
+- **branch and `lookupswitch` offsets → instruction-index deltas**, not byte
+  deltas — cancels the varint-width artifact while preserving branch topology;
+- private / protected / static-protected namespace **labels** → fixed token
+  (kind and member local name still hashed) — RWP's obfuscator rewrites these
+  to tokens like `"20"`;
+- exception table `from`/`to`/`target` as instruction indices + resolved
+  `type_name` and `variable_name`;
+- any body that fails to decode → 0 → **never matches** (fail safe).
+
+| title | `org.flixel::FlxQuadTree` | `org.flixel.data::FlxList` | markers of 141 classes |
+|---|---|---|---|
+| **RWK** | `b7af5a5f4dc54f98` | `6e5f899d35ae5140` | **2** |
+| **RWP** | `b7af5a5f4dc54f98` | `6e5f899d35ae5140` | **2** |
+| RWF | `b92b57112bab6136` | `83ed6120348d3ae2` | 0 — falls back |
+| RWIC | `54fdfca6aedb7a83` | `a76edf059e8264ca` | 0 — falls back |
+
+One constant covers both 2.21 titles despite different pools *and* obfuscated
+namespaces: a library-signature table, not a per-game setting.
+
+**Why RWK and RWP first disagreed** (worth recording — it cost a diagnosis
+cycle): raw-byte hashing split them even though the classes are the same
+program. Cause was threefold — RWP's obfuscated namespace labels, plus branch
+byte-offsets shifted purely because RWK's *larger constant pool* widens U30
+varints (bodies 731 vs 699 bytes etc.). Disassembly proved 1069 instructions on
+both sides in identical order. **Falsified along the way:** debug opcodes were
+not involved.
+
+**Branch topology is provably still load-bearing.** Probe: shift every resolved
+branch target by one instruction → exactly the 46 RWK classes containing
+branches changed fingerprint, exactly the 95 without were unchanged. Zero false
+positives, zero false negatives. This matters because the tempting cheap fix —
+dropping offsets entirely — would let `if (a) X else Y` and `if (a) Y else X`
+hash alike, and that is precisely the substitution the gate exists to refuse.
+
+**Residual risk, on the record and NOT closed:**
+1. Two members with the same local name in two *different* private namespaces of
+   one class now collide (AS3 gives a class one protected + one static-protected
+   ns, so realistic exposure is private namespaces only).
+2. `hashMethodRef` (`NewFunction`/`CallStatic`) hashes only the callee's **debug
+   name**, never its body — and obfuscated SWFs frequently blank those names. A
+   class whose behavior lives inside a closure could match on an unchanged outer
+   body. `FlxQuadTree` contains no `NewFunction` (disassembly-confirmed), so
+   neither affects the baked constants — **but both must be closed before
+   intrinsifying any closure-building class.**
+
+### §3 The implementation — only the ROOT stays an AS3 object
+
+`SWFModernRuntime/src/avm2/avm2_flixel.c` (~950 lines), order-identical to the
+418-line 2.21 source, every C function tagged with its AS3 line numbers.
+
+The root `FlxQuadTree` must stay an `Avm2Object` (`FlxU.quadTree` is a typed
+static holding it); its `native_ext` carries the C tree + a per-root bump arena.
+**Every child node and every `FlxList` node is a pure C struct** — licensed by
+the audit (`_nw/_ne/_se/_sw` and `_headA/_tailA/_headB/_tailB` are `protected`,
+never subclassed, never escape). That is what removes the ~2410 object births
+per tick rather than only the dispatch. `FlxObject` stays fully AS3, read
+through cached vtable slot indices, so the callback-visible surface is
+unchanged — as the ~24.1 ms estimate already assumed.
+
+Mechanism corrections vs the session prompt, both load-bearing:
+- **The native signal is `ref.file == NULL`, NOT `fn == NULL`.** `fn==NULL,
+  file!=NULL` is a *fatal* "method with no body"; leaving a stale `file` makes
+  dispatch index `method_index` into the game's own method table.
+- **`native_construct` is the wrong hook** — it short-circuits object allocation
+  entirely (`avm2_class.c:1174-1177`). Correct hook is overriding
+  `cls->instance_init` plus `native_ext_size`/`native_init`.
+- `avm2_vtable_append` has no dedup and lookups are first-match-wins, so
+  overrides must mutate entries **in place**.
+- Install is **two-phase** (resolve every target, then commit). A first cut
+  could patch `overlap`, fail on `add`, and return 0 with a half-patched vtable
+  whose native `overlap` returns false — silently killing collision instead of
+  falling back.
+
+GC: precise ext tracer walks the C tree marking `FlxQTList.object` edges (the
+conservative blob scan cannot follow into arena chunks); free hook releases the
+arena on sweep; the `_o`/`_oc` statics became C globals and are marked as roots.
+
+Kill switch `AVM2_NO_INTRINSICS=1` skips installation, so one binary provides
+both A/B arms and a live escape hatch.
+
+### §4 Validation ladder
+
+**Rung 1 — TAS oracle: PASS, and non-vacuous.** plan_k, 1560 ticks, one binary,
+intrinsic arm vs `AVM2_NO_INTRINSICS=1`. **All 1560 `AVM2_CPU_DUMP` frames
+byte-identical** (sha256), trace identical, exit 0 both. Instrumented counters:
+native **ctor 11555, add 23112, overlap 17976 = 52,643 calls** in the intrinsic
+arm, zero in fallback. (RWK's stdout is only a boot banner, so the *frames* are
+the oracle; the trace half carries almost no signal.)
+
+**Rung 2 — fallback proof: PASS, strong form.** Raw SWF byte perturbation, not a
+table edit. `FlxQuadTree.addToList`'s body found at SWF offset `0xc2b82` via its
+`method_body_info` prefix; one byte at `0xc2b8b` `0x80`→`0x86` turns
+`coerce FlxList` into `astype FlxList` on a provably-dead local. Fingerprint
+`b7af5a5f4dc54f98` → `1af342200a397356`, `intrinsic=1` → **0**; FlxList
+untouched stayed at 2. The perturbed build printed no install message and its
+1560 frames are byte-identical to the *unperturbed fallback* frames — the
+perturbation was inert while still flipping the gate.
+
+**Rung 3 — native wall-clock A/B: 2.593x.** Default GC (GC=0 is invalid for
+wall-clock), 1560 equal ticks, strictly interleaved, 5 rounds, same binary.
+
+| round | intrinsic | fallback | speedup |
+|---|---|---|---|
+| 1 | 14.48 s | 35.68 s | 2.464x |
+| 2 | 13.69 s | 35.42 s | 2.587x |
+| 3 | 13.76 s | 35.48 s | 2.579x |
+| 4 | 13.55 s | 36.45 s | 2.689x |
+| 5 | 14.20 s | 36.47 s | 2.568x |
+| **median** | **13.76 s** | **35.68 s** | **2.593x** |
+
+Spreads do not overlap. Per-tick 8.82 ms vs 22.87 ms. **RWK needs 1.85x.**
+
+**This is the arc's third Ir→wall-clock conversion attempt and the first that
+converted** (lever 5: −13.1% Ir → ~1.1x; lever 6: −5.16% → nothing resolvable).
+The gate's stated reason for expecting this one to convert — the removed work is
+pointer-chasing with plausibly higher-than-average CPI, unlike the cheap
+predictable instructions levers 5/6 removed — held up.
+
+**Rung 4 — RWP: PASS, and a free second oracle.** RWP ships the same 2.21
+quadtree; the recompiler stamps the same markers (class 26 → id 1, class 48 →
+id 2), install confirmed (all four FlxRect slots resolved, ctor 6146 / add 12292
+/ overlap 9560 over 1200 ticks). Built an RWP TAS (click New Game, then
+right/left/jump cycles) and attested the stage live three ways (frame variety,
+visual inspection of title→in-level→scrolled-room, and the robot *resting on*
+platforms = tile collision through the quadtree). **All 1200 frames
+byte-identical between arms** — a free oracle on RWP's own geometry and object
+mix that RWK's plan never touched. *Gotcha recorded:* the intrinsic installs
+**lazily at the first `FlxU.collide`, not at boot** (class link is lazy), so any
+boot-only engagement check sees nothing and would wrongly call it dead.
+
+### §5 RIG SCOREBOARD — both unplayable 2.21 titles now clear 30 fps
+
+Fresh HEAD wasm for every arm (`build_wasm_avm2.sh`, staged wasm rots on runtime
+change — each redeploy md5-checked build→docs2). Real-GPU Windows Chrome from
+WSL, drain-polled `__swfPerf.cpu`, state-proven phases, **5 interleaved rounds
+on a quiet machine** (the rig waited out the concurrent native jobs — none
+overlapped these rounds). Raw: `/mnt/c/playwright/qt_2026-07-20/`.
+
+The A/B arms come from the **same recompiled game code**: `rwk` has the intrinsic
+engaged; `rwk_qtbase` is built `-DAVM2_FORCE_NO_INTRINSICS=1` so the game's own
+AS3 quadtree runs (wasm has no env for the `AVM2_NO_INTRINSICS` switch). Proven
+distinct: `FlxQuadTree/overlap$native` is present in the `rwk` wasm and absent —
+dead-stripped — from `rwk_qtbase`.
+
+| arm | mean | p50 | %>33ms | p95 | stalls>250 | 30 fps? |
+|---|---|---|---|---|---|---|
+| **RWK intrinsic** | **21.6** | 20.3 | **1.3%** | 29.5 | 0 | **YES** (was 61.1) |
+| RWK fallback (own AS3) | 60.8 | 58.4 | 100% | 88.2 | 0 | no — the control |
+| **RWP intrinsic** | **22.5** | 21.3 | **1.7%** | 28.0 | 0 | **YES** (was 47.5) |
+| RWF (2.35, no intrinsic) | 20.6 | 12.3 | 9.0% | 35.5 | 10 | falls back; re-measures well |
+
+Median across 5 rounds of each round's mean; RWK spread 19.5–25.8, RWP 21.7–23.5.
+
+**The verdict, against the 24.1 ms prediction: the lever BEAT it.** RWK landed at
+**21.6 ms**, under the predicted 24.1. **RWK same-session speedup 2.82x**
+(fallback 60.8 → intrinsic 21.6), against the 1.85x the bar required. The gate's
+counterfactual method, which failed twice on wall-clock (levers 5/6), converted
+here and slightly *under*-predicted the win — consistent with its own argument
+that the removed work is high-CPI pointer-chasing.
+
+**One fingerprint-gated intrinsic makes both 2.21 titles playable, generically —
+no per-game setting.** The scoreboard now reads: Seedling ✓, RWIC ✓, RWF
+borderline, **RWK ✓ (new), RWP ✓ (new)**. Four of five titles clear 30 fps; the
+fifth (RWF) is 2.35 and falls back correctly.
+
+Two honest side-notes:
+- **The 20b RWK absolute was NOT badly contaminated after all.** Its 61.1 ms
+  carried a self-owned caveat that a concurrent callgrind job might have
+  inflated it; this quiet-machine fallback arm reads 60.8 ms — essentially
+  identical, so 61.1 stands.
+- **RWF re-measures clearly better than 20b's borderline 30.8 ms/22%.** At 20.6
+  mean / 12.3 p50 / 9.0% over it is comfortably inside the bar on p50, though 10
+  frames >250 ms (level-gen churn, not the quadtree — RWF doesn't run the
+  intrinsic) drag the mean above p50. 20b flagged RWF as the one call a quieter
+  re-run could move; it moved.
+
 
 Prompt `SWFRecompDocs/prompts/avm2-playability-scoreboard-and-quadtree-gate.md`.
 Measurement + gate decision; **no lever shipped, by design**. Objective is
@@ -140,11 +353,17 @@ advance — which is precisely what levers 5 and 6 lacked.
 
 #### Corpus check + the validation tension
 
-- **All four Robot Wants titles ship the IDENTICAL unpooled quadtree** — zero
+- ~~**All four Robot Wants titles ship the IDENTICAL unpooled quadtree**~~ — zero
   `recycle`/`_cachedTreesHead` in RWK's 2.21 or the sequels' 2.35 (both predate
   the Flixel version that added pooling). So the hoped-for "sequels are faster
-  because they pool" natural experiment **does not exist**, and one substitution
-  covers the whole corpus.
+  because they pool" natural experiment **does not exist**, ~~and one substitution
+  covers the whole corpus.~~
+  > ⛔ **CORRECTED 2026-07-20c — see SESSION 2026-07-20c §1.** The "unpooled"
+  > half stands. The "identical" half is **wrong**: RWK/RWP ship Flixel 2.21
+  > (418 lines, byte-identical to each other) while RWF/RWIC ship a materially
+  > different 2.35 *and are control-flow obfuscated with different per-title
+  > seeds*. One substitution covers the 2.21 pair only — which is fine, because
+  > that pair is exactly the two unplayable titles.
 - **The cheap oracle only validates the worthless lever.** `_rwk_tas` proves
   byte-identical trace + frames, but `overlapNode` invokes the collision
   callback in node-list order and those callbacks **mutate positions** — so any

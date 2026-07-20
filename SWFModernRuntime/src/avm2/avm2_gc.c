@@ -12,6 +12,7 @@
 
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_flixel.h>
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
@@ -523,6 +524,9 @@ static void trace_object(Avm2Object* o)
 		avm2_events_gc_trace_ext(o);
 		avm2_display_gc_trace_ext(o);
 		avm2_text_gc_trace_ext(o);
+		// Flixel quadtree intrinsic: the FlxList object edges hang off arena
+		// chunks the conservative blob scan cannot follow into.
+		avm2_flixel_gc_trace_ext(o);
 		conservative_scan(o);
 	}
 }
@@ -608,6 +612,7 @@ static void free_innards(Avm2Context* ctx, Avm2Object* o)
 		avm2_display_gc_free_ext(ctx, o);
 		avm2_events_gc_free_ext(ctx, o);
 		avm2_text_gc_free_ext(ctx, o);
+		avm2_flixel_gc_free_ext(ctx, o);
 		heap_free(app, o->native_ext);
 	}
 	// Per-object vtables: only newactivation/newcatch allocate a vtable owned
@@ -783,6 +788,9 @@ static void gc_collect(Avm2Context* ctx)
 	avm2_gc_mark_roots_media(ctx);
 	avm2_gc_mark_roots_external(ctx);
 	avm2_gc_mark_roots_e4x(ctx);
+	// Flixel quadtree intrinsic: the AS3 `protected static _o / _oc` live as C
+	// globals and hold object refs across the tick boundary, as they did in AS3.
+	avm2_gc_mark_roots_flixel(ctx);
 
 	// Drain: trace every marked object's edges (may mark more).
 	while (g_wl_count > 0)

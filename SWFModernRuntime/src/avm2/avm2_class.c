@@ -9,6 +9,7 @@
 
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_flixel.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_gc.h>
@@ -1160,6 +1161,15 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 	Avm2MethodRef cinit_ref = { cinit->fn, file, cinit->debug_name, cd->class_init };
 	avm2_call_method_ref(ctx, &cinit_ref, cls, scope,
 	                     avm2_object_value(cobj), NULL, 0);
+
+	// Native intrinsics: the recompiler fingerprints each class's normalized
+	// method bodies + trait layout and stamps a marker on an exact match. A
+	// zero marker (any mismatch at all) means the game's own compiled code
+	// runs untouched — the fallback is non-negotiable.
+	if (cd->intrinsic_id != 0)
+	{
+		avm2_flixel_try_install(ctx, cls, cd->intrinsic_id);
+	}
 
 	file->classes[class_idx] = cls;
 	return cls;

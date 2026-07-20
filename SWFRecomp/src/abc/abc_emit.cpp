@@ -38,6 +38,7 @@
 
 #include <abc/abc_dump.hpp>
 #include <abc/abc_emit.hpp>
+#include <abc/abc_parser.hpp>
 
 using std::endl;
 using std::ofstream;
@@ -77,6 +78,627 @@ namespace abc
 			}
 		}
 		return out;
+	}
+
+	// ------------------------------------------------------------------
+	// Pool-normalized class fingerprints
+	//
+	// ABC bodies embed constant-pool *indices*, which differ between two
+	// SWFs compiled from identical AS3 source (different pool layout). A
+	// fingerprint that is stable across titles must therefore hash the
+	// *resolved pool content* — qualified names, string bytes, numeric
+	// values — never the raw index. Everything that is not a pool index
+	// (registers, arg counts, branch offsets) is hashed raw.
+	//
+	// A fingerprint of 0 means "unhashable" and must never be treated as a
+	// match by any consumer (fail safe).
+	// ------------------------------------------------------------------
+
+	static const u64 FNV_OFFSET = 14695981039346656037ull;
+	static const u64 FNV_PRIME = 1099511628211ull;
+
+	static inline u64 hashBytes(u64 h, const void* data, size_t n)
+	{
+		const unsigned char* p = (const unsigned char*) data;
+		for (size_t i = 0; i < n; i++)
+		{
+			h ^= (u64) p[i];
+			h *= FNV_PRIME;
+		}
+		return h;
+	}
+
+	static inline u64 hashU32(u64 h, u32 v)
+	{
+		return hashBytes(h, &v, sizeof(v));
+	}
+
+	// Length-delimited so "ab"+"c" and "a"+"bc" hash differently.
+	static inline u64 hashStr(u64 h, const string& s)
+	{
+		h = hashU32(h, (u32) s.size());
+		return hashBytes(h, s.data(), s.size());
+	}
+
+	// "org.flixel::FlxQuadTree" — package namespace name + "::" + local name.
+	// NOTE: this is NOT the protected-namespace string (which for that class
+	// is "org.flixel:FlxQuadTree", a single colon).
+	static string qualifiedName(const AbcFile& abc, u32 mn_index)
+	{
+		const auto& MN = abc.pool.multinames;
+		const auto& S = abc.pool.strings;
+		const auto& NS = abc.pool.namespaces;
+		if (mn_index == 0 || mn_index >= MN.size()) return "";
+		const AbcMultiname& mn = MN[mn_index];
+		string ns_name;
+		if (mn.ns != 0 && mn.ns < NS.size())
+		{
+			u32 si = NS[mn.ns].name;
+			if (si < S.size()) ns_name = S[si];
+		}
+		string local;
+		if (mn.name < S.size()) local = S[mn.name];
+		return ns_name + "::" + local;
+	}
+
+	static u64 hashPoolString(u64 h, const AbcFile& abc, u32 idx)
+	{
+		const auto& S = abc.pool.strings;
+		return hashStr(h, idx < S.size() ? S[idx] : string());
+	}
+
+	static u64 hashPoolInt(u64 h, const AbcFile& abc, u32 idx)
+	{
+		s32 v = idx < abc.pool.ints.size() ? abc.pool.ints[idx] : 0;
+		return hashBytes(h, &v, sizeof(v));
+	}
+
+	static u64 hashPoolUint(u64 h, const AbcFile& abc, u32 idx)
+	{
+		u32 v = idx < abc.pool.uints.size() ? abc.pool.uints[idx] : 0;
+		return hashBytes(h, &v, sizeof(v));
+	}
+
+	static u64 hashPoolDouble(u64 h, const AbcFile& abc, u32 idx)
+	{
+		double v = idx < abc.pool.doubles.size() ? abc.pool.doubles[idx] : 0.0;
+		return hashBytes(h, &v, sizeof(v));
+	}
+
+	static u64 hashPoolNamespace(u64 h, const AbcFile& abc, u32 idx)
+	{
+		const auto& NS = abc.pool.namespaces;
+		if (idx == 0 || idx >= NS.size()) return hashStr(h, "");
+		h = hashBytes(h, &NS[idx].kind, 1);
+		return hashPoolString(h, abc, NS[idx].name);
+	}
+
+	// Namespace-label canonicalization.
+	//
+	// Private / Protected / StaticProtected namespace NAME strings are opaque
+	// compiler-minted labels, not source-level identity. Two builds of
+	// byte-identical AS3 disagree on them: RWK names FlxQuadTree's protected
+	// namespace "org.flixel:FlxQuadTree" while RWP names it "20" (and
+	// FlxGame's is ","). So we hash the namespace KIND plus the member's
+	// local name, and drop the label itself.
+	//
+	// PackageInternalNs (0x17) and ExplicitNamespace (0x19) are deliberately
+	// still hashed BY NAME: those names are the package path / a user-declared
+	// namespace URI, which are stable across builds and semantically load-
+	// bearing.
+	//
+	// CAVEAT (accepted): two members with the same local name in two DIFFERENT
+	// namespaces of the SAME kind now collide. AS3 mints exactly one protected
+	// and one static-protected namespace per class, so 0x18/0x1a are not
+	// realistically exposed; the residual risk is 0x05, where a class carrying
+	// private members from two distinct compilation units could alias. The
+	// namespace kind is still hashed, so protected-vs-static-protected-vs-
+	// private confusion is still caught.
+	static u64 hashPoolMultiname(u64 h, const AbcFile& abc, u32 idx)
+	{
+		const auto& MN = abc.pool.multinames;
+		const auto& S = abc.pool.strings;
+		const auto& NS = abc.pool.namespaces;
+		if (idx != 0 && idx < MN.size())
+		{
+			const AbcMultiname& mn = MN[idx];
+			if (mn.ns != 0 && mn.ns < NS.size())
+			{
+				u8 k = (u8) NS[mn.ns].kind;
+				if (k == 0x05 || k == 0x18 || k == 0x1a)
+				{
+					string local;
+					if (mn.name < S.size()) local = S[mn.name];
+					h = hashBytes(h, &k, 1);
+					return hashStr(h, "\x04opaque::" + local);
+				}
+			}
+		}
+		return hashStr(h, qualifiedName(abc, idx));
+	}
+
+	// Method operand (NewFunction / CallStatic): the referenced method's
+	// debug name, plus a marker. Never recurses into that method's body.
+	static u64 hashMethodRef(u64 h, const AbcFile& abc, u32 idx)
+	{
+		h = hashStr(h, "\x01mref");
+		if (idx >= abc.methods.size()) return hashStr(h, "");
+		return hashPoolString(h, abc, abc.methods[idx].name);
+	}
+
+	// Class operand (NewClass): the qualified name of the instance.
+	static u64 hashClassRef(u64 h, const AbcFile& abc, u32 idx)
+	{
+		h = hashStr(h, "\x02cref");
+		if (idx >= abc.instances.size()) return hashStr(h, "");
+		return hashStr(h, qualifiedName(abc, abc.instances[idx].name));
+	}
+
+	// SWFRECOMP_FP_DISASM=1 (with a verbose fingerprint selection): a
+	// pool-resolved listing of each hashed body, for diffing two titles.
+	static void disasmBody(const AbcFile& abc, const AbcMethodBody& body,
+	                       const char* label)
+	{
+		fprintf(stderr, "FPD ==== %s (len=%zu) ====\n", label, body.code.size());
+		AbcReader r(body.code.data(), body.code.size());
+		try
+		{
+			while (r.pos() < body.code.size())
+			{
+				size_t at = r.pos();
+				RawOp op = readOp(r);
+				string extra;
+				switch (op.opcode)
+				{
+					case AbcOpcode::GetSuper: case AbcOpcode::SetSuper:
+					case AbcOpcode::GetDescendants: case AbcOpcode::FindPropStrict:
+					case AbcOpcode::FindProperty: case AbcOpcode::GetLex:
+					case AbcOpcode::SetProperty: case AbcOpcode::GetProperty:
+					case AbcOpcode::InitProperty: case AbcOpcode::DeleteProperty:
+					case AbcOpcode::Coerce: case AbcOpcode::AsType:
+					case AbcOpcode::IsType:
+						extra = " mn=" + qualifiedName(abc, op.arg1);
+						break;
+					case AbcOpcode::CallSuper: case AbcOpcode::CallProperty:
+					case AbcOpcode::ConstructProp: case AbcOpcode::CallPropLex:
+					case AbcOpcode::CallSuperVoid: case AbcOpcode::CallPropVoid:
+						extra = " mn=" + qualifiedName(abc, op.arg1)
+						        + " argc=" + to_string(op.arg2);
+						break;
+					case AbcOpcode::PushString:
+						extra = " str=" + (op.arg1 < abc.pool.strings.size()
+						                   ? abc.pool.strings[op.arg1] : string());
+						break;
+					case AbcOpcode::PushDouble:
+						extra = " d=" + to_string(op.arg1 < abc.pool.doubles.size()
+						                          ? abc.pool.doubles[op.arg1] : 0.0);
+						break;
+					case AbcOpcode::PushInt:
+						extra = " i=" + to_string(op.arg1 < abc.pool.ints.size()
+						                          ? abc.pool.ints[op.arg1] : 0);
+						break;
+					default:
+						extra = " a1=" + to_string(op.arg1) + " a2=" + to_string(op.arg2)
+						        + " off=" + to_string((long) op.offset)
+						        + " b=" + to_string((int) op.byte_arg);
+						break;
+				}
+				fprintf(stderr, "FPD %4zu op=%02x%s\n", at, (unsigned) (u8) op.opcode,
+				        extra.c_str());
+			}
+		}
+		catch (const AbcError&) { fprintf(stderr, "FPD <parse error>\n"); }
+	}
+
+	// Normalized hash of a method body. Returns 0 (= unhashable) if the
+	// linear walk throws, does not land exactly on the end of the code, or
+	// contains a branch / exception-range boundary that does not fall on a
+	// decoded instruction boundary.
+	//
+	// Branch targets are hashed as INSTRUCTION-INDEX DELTAS, never as byte
+	// offsets. Two builds of identical AS3 disagree on byte offsets purely
+	// because their constant pools differ in size, so the same operand encodes
+	// to a different number of U30 varint bytes and every branch distance
+	// shifts. The instruction-index delta cancels exactly that artifact and
+	// nothing else: branch TOPOLOGY is preserved bit-for-bit, so a swapped
+	// branch target still changes the fingerprint.
+	//
+	// Offset conventions (must match abc_verifier): plain branches are
+	// relative to the byte AFTER the instruction; LookupSwitch's default and
+	// case offsets are relative to the START of the LookupSwitch.
+	static u64 hashMethodBody(const AbcFile& abc, const AbcMethodBody& body)
+	{
+		u64 h = FNV_OFFSET;
+		h = hashU32(h, body.max_stack);
+		h = hashU32(h, body.num_locals);
+		h = hashU32(h, body.init_scope_depth);
+		h = hashU32(h, body.max_scope_depth);
+
+		if (body.code.empty())
+		{
+			// No code to index into: an exception table here is malformed.
+			h = hashU32(h, (u32) body.exceptions.size());
+			return body.exceptions.empty() ? (h ? h : 1) : 0;
+		}
+
+		// --- pass 1: byte offset -> instruction index -------------------
+		// One-past-the-end maps to the instruction count, so a branch to the
+		// end of the code is representable.
+		std::vector<s32> byte_to_idx(body.code.size() + 1, -1);
+		u32 op_count = 0;
+		{
+			AbcReader pre(body.code.data(), body.code.size());
+			try
+			{
+				while (pre.pos() < body.code.size())
+				{
+					byte_to_idx[pre.pos()] = (s32) op_count++;
+					readOp(pre);
+				}
+			}
+			catch (const AbcError&)
+			{
+				return 0;
+			}
+			if (pre.pos() != body.code.size()) return 0;
+		}
+		byte_to_idx[body.code.size()] = (s32) op_count;
+
+		// Resolves an absolute byte position to an instruction index.
+		// Sets `ok` false if it is not an instruction boundary.
+		bool ok = true;
+		auto idx_at = [&](s64 byte_pos) -> s32
+		{
+			if (byte_pos < 0 || byte_pos > (s64) body.code.size()) { ok = false; return 0; }
+			s32 idx = byte_to_idx[(size_t) byte_pos];
+			if (idx < 0) { ok = false; return 0; }
+			return idx;
+		};
+
+		// --- exception table (contents, as instruction indices) ---------
+		h = hashU32(h, (u32) body.exceptions.size());
+		for (const AbcException& exc : body.exceptions)
+		{
+			h = hashU32(h, (u32) idx_at((s64) exc.from_offset));
+			h = hashU32(h, (u32) idx_at((s64) exc.to_offset));
+			h = hashU32(h, (u32) idx_at((s64) exc.target_offset));
+			h = hashPoolMultiname(h, abc, exc.type_name);
+			h = hashPoolMultiname(h, abc, exc.variable_name);
+			if (!ok) return 0;
+		}
+
+		// --- pass 2: hash ----------------------------------------------
+		AbcReader r(body.code.data(), body.code.size());
+		try
+		{
+			u32 cur_idx = 0;
+			while (r.pos() < body.code.size())
+			{
+				size_t op_start = r.pos();
+				RawOp op = readOp(r);
+				size_t op_end = r.pos();
+				s32 here = (s32) cur_idx++;
+				u8 oc = (u8) op.opcode;
+				h = hashBytes(h, &oc, 1);
+
+				switch (op.opcode)
+				{
+					// --- multiname operand in arg1 ---
+					case AbcOpcode::GetSuper:
+					case AbcOpcode::SetSuper:
+					case AbcOpcode::GetDescendants:
+					case AbcOpcode::FindPropStrict:
+					case AbcOpcode::FindProperty:
+					case AbcOpcode::GetLex:
+					case AbcOpcode::SetProperty:
+					case AbcOpcode::GetProperty:
+					case AbcOpcode::InitProperty:
+					case AbcOpcode::DeleteProperty:
+					case AbcOpcode::Coerce:
+					case AbcOpcode::AsType:
+					case AbcOpcode::IsType:
+					{
+						h = hashPoolMultiname(h, abc, op.arg1);
+						break;
+					}
+
+					// --- multiname in arg1, raw arg count in arg2 ---
+					case AbcOpcode::CallSuper:
+					case AbcOpcode::CallProperty:
+					case AbcOpcode::ConstructProp:
+					case AbcOpcode::CallPropLex:
+					case AbcOpcode::CallSuperVoid:
+					case AbcOpcode::CallPropVoid:
+					{
+						h = hashPoolMultiname(h, abc, op.arg1);
+						h = hashU32(h, op.arg2);
+						break;
+					}
+
+					// --- string pool operand ---
+					case AbcOpcode::PushString:
+					case AbcOpcode::Dxns:
+					case AbcOpcode::DebugFile:
+					{
+						h = hashPoolString(h, abc, op.arg1);
+						break;
+					}
+
+					// --- numeric pools ---
+					case AbcOpcode::PushInt:    h = hashPoolInt(h, abc, op.arg1); break;
+					case AbcOpcode::PushUint:   h = hashPoolUint(h, abc, op.arg1); break;
+					case AbcOpcode::PushDouble: h = hashPoolDouble(h, abc, op.arg1); break;
+
+					// --- namespace pool ---
+					case AbcOpcode::PushNamespace:
+					{
+						h = hashPoolNamespace(h, abc, op.arg1);
+						break;
+					}
+
+					// --- method index ---
+					case AbcOpcode::NewFunction:
+					{
+						h = hashMethodRef(h, abc, op.arg1);
+						break;
+					}
+					case AbcOpcode::CallStatic:
+					{
+						h = hashMethodRef(h, abc, op.arg1);
+						h = hashU32(h, op.arg2);  // arg count
+						break;
+					}
+
+					// --- class index ---
+					case AbcOpcode::NewClass:
+					{
+						h = hashClassRef(h, abc, op.arg1);
+						break;
+					}
+
+					// --- Debug: arg1 is the register-name string index ---
+					case AbcOpcode::Debug:
+					{
+						h = hashU32(h, op.bool_arg ? 1u : 0u);
+						h = hashPoolString(h, abc, op.arg1);
+						h = hashBytes(h, &op.byte_arg, 1);
+						break;
+					}
+
+					// --- branches: instruction-index delta, not bytes ---
+					case AbcOpcode::IfNlt:
+					case AbcOpcode::IfNle:
+					case AbcOpcode::IfNgt:
+					case AbcOpcode::IfNge:
+					case AbcOpcode::Jump:
+					case AbcOpcode::IfTrue:
+					case AbcOpcode::IfFalse:
+					case AbcOpcode::IfEq:
+					case AbcOpcode::IfNe:
+					case AbcOpcode::IfLt:
+					case AbcOpcode::IfLe:
+					case AbcOpcode::IfGt:
+					case AbcOpcode::IfGe:
+					case AbcOpcode::IfStrictEq:
+					case AbcOpcode::IfStrictNe:
+					{
+						// s24 is relative to the byte AFTER the instruction.
+						s32 tgt = idx_at((s64) op_end + op.offset);
+						if (!ok) return 0;
+						h = hashU32(h, (u32) (tgt - here));
+						break;
+					}
+
+					// --- lookupswitch: default + every case, as deltas ---
+					case AbcOpcode::LookupSwitch:
+					{
+						// All LookupSwitch offsets are relative to the START of
+						// the instruction.
+						s32 dflt = idx_at((s64) op_start + op.offset);
+						if (!ok) return 0;
+						h = hashU32(h, (u32) (dflt - here));
+						h = hashU32(h, (u32) op.case_offsets.size());
+						for (s32 co : op.case_offsets)
+						{
+							s32 ct = idx_at((s64) op_start + co);
+							if (!ok) return 0;
+							h = hashU32(h, (u32) (ct - here));
+						}
+						break;
+					}
+
+					// --- everything else: raw operands ---
+					//
+					// Registers (Kill/GetLocal/SetLocal/IncLocal/DecLocal/
+					// IncLocalI/DecLocalI/HasNext2), arg counts (Call/
+					// Construct/ConstructSuper/ApplyType/NewObject/NewArray),
+					// CallMethod's disp_id + arg count, slot ids (GetSlot/
+					// SetSlot/GetGlobalSlot/SetGlobalSlot), NewCatch's
+					// exception-table index, PushShort's literal value,
+					// PushByte, GetScopeObject, and DebugLine's line number.
+					//
+					// Branch and LookupSwitch offsets do NOT reach here — they
+					// have dedicated arms above that hash instruction-index
+					// deltas.
+					//
+					// UNVERIFIED: FindDef (0x5f), GetOuterScope (0x67),
+					// Bkpt (0x01), BkptLine (0xf2), Timestamp (0xf3) — see
+					// the report; hashed raw on purpose (fail safe).
+					default:
+					{
+						h = hashU32(h, op.arg1);
+						h = hashU32(h, op.arg2);
+						h = hashBytes(h, &op.byte_arg, 1);
+						h = hashU32(h, op.bool_arg ? 1u : 0u);
+						break;
+					}
+				}
+			}
+		}
+		catch (const AbcError&)
+		{
+			return 0;
+		}
+
+		if (r.pos() != body.code.size()) return 0;  // did not land on the end
+		return h ? h : 1;  // never report a real hash as "unhashable"
+	}
+
+	// ------------------------------------------------------------------
+	// Known-intrinsic fingerprint table.
+	//
+	// A class is substituted with a native implementation ONLY on an exact
+	// match here. Every other class — including a near-miss, a different
+	// point release, or an obfuscated variant — keeps its own compiled
+	// bodies. That fallback is the whole safety story: a silent substitution
+	// with different semantics would poison the "just works" premise, so the
+	// gate is deliberately biased to refuse.
+	//
+	// Fingerprints are pool-normalized (resolved multiname/string/numeric
+	// content, instruction-index branch deltas, canonical private/protected
+	// namespace labels), so one entry covers every build of the same source
+	// regardless of constant-pool layout or namespace obfuscation.
+	//
+	// ids must match avm2_flixel.h: 1 = FlxQuadTree, 2 = FlxList.
+	struct IntrinsicEntry { u64 fp; unsigned id; const char* what; };
+	static const IntrinsicEntry INTRINSIC_TABLE[] =
+	{
+		// Flixel 2.21 collision classes. Verified identical opcode-for-opcode
+		// (1069 instructions) across Robot Wants Kitty and Robot Wants Puppy;
+		// the two SWFs differ only in constant-pool layout and obfuscated
+		// private/protected namespace labels, both of which normalize out.
+		// Robot Wants Fishy / Ice Cream ship Flixel 2.35 and correctly do NOT
+		// match (different source, plus per-title control-flow obfuscation).
+		{ 0xb7af5a5f4dc54f98ull, 1, "org.flixel::FlxQuadTree (Flixel 2.21)" },
+		{ 0x6e5f899d35ae5140ull, 2, "org.flixel.data::FlxList (Flixel 2.21)" },
+	};
+
+	static unsigned intrinsicIdForFingerprint(u64 fp)
+	{
+		if (fp == 0) return 0;   // unhashable body — never match
+		for (const IntrinsicEntry& e : INTRINSIC_TABLE)
+		{
+			if (e.fp != 0 && e.fp == fp) return e.id;
+		}
+		return 0;
+	}
+
+	// Fingerprint of one class (instance + static halves). 0 = unhashable:
+	// any referenced body that failed to hash poisons the whole class.
+	static u64 classFingerprint(const AbcFile& abc, size_t class_index,
+	                            const std::vector<int>& method_body,
+	                            bool verbose = false)
+	{
+		if (class_index >= abc.instances.size()) return 0;
+		const AbcInstance& inst = abc.instances[class_index];
+
+#define FPV(...) do { if (verbose) fprintf(stderr, "FPV " __VA_ARGS__); } while (0)
+
+		u64 h = FNV_OFFSET;
+		h = hashStr(h, qualifiedName(abc, inst.name));
+		FPV("name=%s h=%016llx\n", qualifiedName(abc, inst.name).c_str(), (unsigned long long) h);
+		h = hashStr(h, qualifiedName(abc, inst.super_name));
+		FPV("super=%s h=%016llx\n", qualifiedName(abc, inst.super_name).c_str(), (unsigned long long) h);
+
+		u8 flags = 0;
+		if (inst.is_sealed) flags |= 1;
+		if (inst.is_final) flags |= 2;
+		if (inst.is_interface) flags |= 4;
+		if (inst.has_protected_ns) flags |= 8;
+		h = hashBytes(h, &flags, 1);
+		FPV("flags=%u h=%016llx\n", (unsigned) flags, (unsigned long long) h);
+		if (verbose && inst.protected_ns < abc.pool.namespaces.size())
+		{
+			const AbcNamespace& pns = abc.pool.namespaces[inst.protected_ns];
+			fprintf(stderr, "FPV protected_ns idx=%u kind=0x%02x name='%s'\n",
+			        inst.protected_ns, (unsigned) pns.kind,
+			        pns.name < abc.pool.strings.size()
+			            ? abc.pool.strings[pns.name].c_str() : "?");
+		}
+		h = hashU32(h, (u32) inst.interfaces.size());
+		for (u32 iface : inst.interfaces)
+		{
+			h = hashStr(h, qualifiedName(abc, iface));
+			FPV("iface=%s h=%016llx\n", qualifiedName(abc, iface).c_str(), (unsigned long long) h);
+		}
+
+		bool ok = true;
+		auto fold_body = [&](u32 method_index)
+		{
+			if (method_index >= method_body.size() || method_body[method_index] < 0)
+			{
+				// No body (native/interface method): hash a marker.
+				h = hashStr(h, "\x03nobody");
+				FPV("  body=NONE h=%016llx\n", (unsigned long long) h);
+				return;
+			}
+			u64 bh = hashMethodBody(abc, abc.method_bodies[method_body[method_index]]);
+			if (bh == 0) ok = false;
+			h = hashBytes(h, &bh, sizeof(bh));
+			const AbcMethodBody& b = abc.method_bodies[method_body[method_index]];
+			if (verbose && getenv("SWFRECOMP_FP_DISASM"))
+			{
+				string mname;
+				if (method_index < abc.methods.size()
+				    && abc.methods[method_index].name < abc.pool.strings.size())
+					mname = abc.pool.strings[abc.methods[method_index].name];
+				disasmBody(abc, b, mname.c_str());
+			}
+			FPV("  body=%016llx codelen=%zu maxstack=%u nlocals=%u isd=%u msd=%u exc=%zu h=%016llx\n",
+			    (unsigned long long) bh, b.code.size(), b.max_stack, b.num_locals,
+			    b.init_scope_depth, b.max_scope_depth, b.exceptions.size(),
+			    (unsigned long long) h);
+		};
+
+		auto fold_traits = [&](const std::vector<AbcTrait>& traits)
+		{
+			h = hashU32(h, (u32) traits.size());
+			FPV("traitcount=%zu h=%016llx\n", traits.size(), (unsigned long long) h);
+			for (const AbcTrait& t : traits)
+			{
+				u8 k = (u8) t.kind;
+				h = hashBytes(h, &k, 1);
+				// Trait names are QNames; the local name is what source-level
+				// identity turns on.
+				const auto& MN = abc.pool.multinames;
+				const auto& S = abc.pool.strings;
+				string local;
+				if (t.name != 0 && t.name < MN.size() && MN[t.name].name < S.size())
+					local = S[MN[t.name].name];
+				h = hashStr(h, local);
+				h = hashU32(h, t.slot_or_disp_id);
+				h = hashStr(h, qualifiedName(abc, t.type_name));
+				FPV("trait kind=%u name=%s qname=%s slot_or_disp=%u type=%s h=%016llx\n",
+				    (unsigned) k, local.c_str(), qualifiedName(abc, t.name).c_str(),
+				    t.slot_or_disp_id, qualifiedName(abc, t.type_name).c_str(),
+				    (unsigned long long) h);
+				if (t.kind == TraitKindType::Method || t.kind == TraitKindType::Getter
+				    || t.kind == TraitKindType::Setter)
+				{
+					fold_body(t.method_or_class);
+				}
+			}
+		};
+
+		FPV("--- instance traits ---\n");
+		fold_traits(inst.traits);
+		if (class_index < abc.classes.size())
+		{
+			FPV("--- static traits ---\n");
+			fold_traits(abc.classes[class_index].traits);
+		}
+
+		FPV("--- iinit ---\n");
+		fold_body(inst.init_method);
+		if (class_index < abc.classes.size())
+		{
+			FPV("--- cinit ---\n");
+			fold_body(abc.classes[class_index].init_method);
+		}
+#undef FPV
+
+		if (!ok) return 0;
+		return h ? h : 1;
 	}
 
 	// Makes text safe inside a // comment: single line, and never ending
@@ -2999,6 +3621,17 @@ namespace abc
 		int tag = next_tag_index_++;
 		string p = "abc" + to_string(tag);
 
+		// body index per method (-1 = none). Used by both the tables block
+		// (class fingerprints) and the methods block.
+		std::vector<int> method_body(abc.methods.size(), -1);
+		for (size_t bi = 0; bi < abc.method_bodies.size(); bi++)
+		{
+			if (abc.method_bodies[bi].method < method_body.size())
+				method_body[abc.method_bodies[bi].method] = (int) bi;
+		}
+
+		const bool dump_fp = getenv("SWFRECOMP_DUMP_FINGERPRINTS") != NULL;
+
 		// ------------------------------------------------------------------
 		// abc<tag>_tables.c
 		// ------------------------------------------------------------------
@@ -3123,6 +3756,13 @@ namespace abc
 				string ifaces = inst.interfaces.empty()
 					? "0, NULL"
 					: to_string(inst.interfaces.size()) + ", " + p + "_c" + to_string(i) + "_if";
+
+				// Fingerprint gate: stamp an intrinsic marker only on an EXACT
+				// match of the normalized method bodies + trait layout. Any
+				// mismatch (including an unhashable body, which yields 0) leaves
+				// the marker at 0 and the game's own compiled code runs.
+				u64 fp = classFingerprint(abc, i, method_body, false);
+				unsigned intrinsic_id = intrinsicIdForFingerprint(fp);
 				out << "\t{ " << inst.name << ", " << inst.super_name << ", "
 				    << flags << ", " << (inst.has_protected_ns ? 1 : 0) << ", "
 				    << inst.protected_ns << ", " << ifaces << ", "
@@ -3131,11 +3771,30 @@ namespace abc
 				    << traitArrayRef(p + "_c" + to_string(i) + "_it", inst.traits.size())
 				    << ", "
 				    << traitArrayRef(p + "_c" + to_string(i) + "_ct", abc.classes[i].traits.size())
-				    << " }," << endl;
+				    << ", " << intrinsic_id << " }," << endl;
+
+				if (dump_fp)
+				{
+					// SWFRECOMP_DUMP_FINGERPRINTS=2 (or a class name) turns on a
+					// per-component breakdown for the matching class.
+					const char* fpv_env = getenv("SWFRECOMP_DUMP_FINGERPRINTS");
+					string qn = qualifiedName(abc, inst.name);
+					bool verbose = fpv_env
+					               && (string(fpv_env) == "2" || qn == fpv_env);
+					if (verbose)
+					{
+						fprintf(stderr, "FPV ===== %s =====\n", qn.c_str());
+						classFingerprint(abc, i, method_body, true);
+					}
+					fprintf(stderr, "FP %s %016llx traits=%zu/%zu intrinsic=%u\n",
+					        qn.c_str(), (unsigned long long) fp,
+					        inst.traits.size(), abc.classes[i].traits.size(),
+					        intrinsic_id);
+				}
 			}
 			if (abc.instances.empty())
 			{
-				out << "\t{ 0, 0, 0, 0, 0, 0, NULL, 0, 0, 0, NULL, 0, NULL }," << endl;
+				out << "\t{ 0, 0, 0, 0, 0, 0, NULL, 0, 0, 0, NULL, 0, NULL, 0 }," << endl;
 			}
 			out << "};" << endl << endl;
 
@@ -3179,13 +3838,6 @@ namespace abc
 
 			// Type model for the compile-time slot-specialization pass.
 			AbcTypeModel typeModel(abc);
-
-			// body index per method (-1 = none).
-			std::vector<int> method_body(abc.methods.size(), -1);
-			for (size_t bi = 0; bi < abc.method_bodies.size(); bi++)
-			{
-				method_body[abc.method_bodies[bi].method] = (int) bi;
-			}
 
 			// Methods realized as function closures (NewFunction ops or
 			// Function traits) — Ruffle's Method::is_function.

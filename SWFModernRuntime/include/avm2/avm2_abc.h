@@ -140,6 +140,10 @@ typedef struct Avm2AbcClassData
 	const Avm2AbcTrait* instance_traits;
 	uint32_t class_trait_count;
 	const Avm2AbcTrait* class_traits;
+	// Non-zero = this class matched a known native intrinsic implementation
+	// (pool-normalized fingerprint match at recompile time). 0 = no match.
+	// Appended at the END so existing positional initializers stay valid.
+	uint32_t intrinsic_id;
 } Avm2AbcClassData;
 
 typedef struct Avm2AbcScriptData
