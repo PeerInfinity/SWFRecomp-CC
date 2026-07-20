@@ -38,6 +38,128 @@ Use instead:
   live "Allocated:" + maxRSS**, not just speed. The inline-slots lever below
   was ruled out on exactly this axis after looking fine on Ir.
 
+## Headline — lever 6 (alloc/ctor: slot-default template + setup_locals memset, 2026-07-19)
+
+Session prompt `SWFRecompDocs/prompts/avm2-rwk-alloc-ctor.md`, commit
+`93299b884`. Target: the 11.4% alloc/ctor cluster lever 5's profile named
+(`slots_init_defaults` 4.76 + `setup_locals` 4.10 + `o1heapAllocate` 2.58).
+**Two of the three levers ship; the third was implemented, measured and
+reverted.**
+
+| measurement | base (`7ed9519d2`) | after (`93299b884`) | |
+|---|---|---|---|
+| native Ir, 600 ticks GC=0 (callgrind) | 40.081B | **38.012B** | **−5.16%** |
+| — `avm2_slots_init_defaults` | 1,956M (4.88%) | **159M (0.42%)** | **−92%** |
+| — `avm2_setup_locals` | 1,653M (4.12%) | 1,359M (3.58%) | −18% |
+| native user-s, 2900 ticks DEFAULT GC (4 interleaved rounds, median) | 89.52 s | 90.00 s | **no measurable difference** |
+| live heap @1560t (`AVM2_HEAP_STATS`) | 138 MB | 139 MB | +0.06% |
+| maxRSS | 1,206,904 KB | 1,206,764 KB | unchanged |
+
+**Read the wall-clock row honestly.** Base spanned 79.7–95.3 s and after
+74.3–106.4 s across four rounds — the distributions overlap almost entirely, so
+there is NO resolvable native wall-clock effect. The Ir win is real and
+deterministic (callgrind counts instructions; it has no noise floor); it simply
+did not convert into measurable native time. This is the lever-5 lesson harder:
+−13.1% Ir bought ~1.07x there, and −5.16% is below what this machine resolves
+in single-digit rounds.
+
+**Step-0 census** (`SWF_CENSUS_ALLOC`, temp tool, not committed), plan_k TAS,
+1560 ticks: **12.7M constructions / 97.4M slot inits**, categorized by what the
+slot's default actually is —
+
+| category | slot inits | share |
+|---|---|---|
+| type-declared default (`slot_type_default`) | 96,726,836 | **100.00%** |
+| non-pointer constant | 796 | ~0% |
+| pointer constant (string / namespace) | 314 | ~0% |
+| function-trait closure | **0** | 0% |
+
+The non-`td` categories total **1,250 inits over the whole run, all at boot**
+(identical absolute counts at 600 and 1560 ticks). FlxList (8.15M ctors × 2
+slots) + FlxQuadTree (3.76M × 21) are **93.7% of constructions**, the latter
+alone 81% of slot-init work — and every one of those inits ran `avm2_mn_name`
+plus a chain of up to five `memcmp`s to re-derive a constant like "int → 0".
+
+- **Lever B — per-class slot-default template** (the win). Built lazily per
+  vtable on first construction: a precomputed image of every NON-POINTER
+  default, so construction becomes a `memcpy` plus a patch loop over only the
+  slots needing per-object realization. **GC HAZARD RULE: the template never
+  holds a STRING or OBJECT pointer** — it is plain malloc'd memory the collector
+  neither traces nor sweeps, so a pointer parked there is an untraced root (see
+  [[avm2-collectable-strings]]). Realization is decided on the META, never by
+  computing the value, because computing a function-trait or namespace default
+  ALLOCATES and must happen per object, not per class; a result-kind check
+  backstops it. String constants are provably static-pool/immortal and *could*
+  be templated, but at 314 boot-only inits there is no upside to weakening the
+  invariant, so they stay in the patch loop and "no pointers, ever" stays
+  absolute. "What does this slot default to" is factored into one
+  `slot_default_for()` shared by the builder and the reference path, so
+  equivalence is structural, not asserted. Skipped for `no_index`
+  (newactivation/newcatch) vtables, which would build and discard a template
+  per call.
+- **Lever A' — `setup_locals` fill via `memset`.** The prompt and this doc both
+  claimed the function "recomputes an `unchecked` flag from method-static data
+  EVERY call". **Measured: `unchecked_probe_iters = 0`** — the loop is gated on
+  `md->is_function`, false for every hot method, so it exits before its first
+  iteration and the proposed per-method memo would have optimized away nothing.
+  The real cost is the fill: 50.7M calls / 1560 ticks × ~3.9 locals = 197M
+  scalar 16-byte stores, and `avm2_undefined()` is `{0,0,{0}}` — all 16 bytes
+  zero — so it is byte-exactly a `memset`.
+- **Lever C — inline slots — RULED OUT.** Carving the slot array out of the
+  object's own o1heap block killed one alloc + one free per construction
+  (`o1heapAllocate` 2.60% → 1.48%, −489M Ir) but grew the live heap **22%
+  (138 → 169 MB)** and cut GC=0 arena headroom ~17%. Cause: o1heap sizes every
+  allocation as `roundUpToPowerOf2(amount + O1HEAP_ALIGNMENT)` with ALIGNMENT
+  32, and `sizeof(Avm2Object)` is **208** → a 256-byte fragment with only 16
+  bytes of slack, so combining crosses a power of two for every class with more
+  than one slot: **FlxList 320 → 512, FlxQuadTree 768 → 1024**. It only pays
+  above ~57 slots, i.e. on classes with negligible construction volume — a
+  bin-gated variant would retain ~none of the win. Rejected for a 1.2%-of-Ir
+  gain given rwic runs at ~96% of its arena. Recorded as a comment on
+  `avm2_object_alloc`, where the next person would start re-deriving it. **Do
+  not retry without shrinking `Avm2Object` or changing o1heap's size classes.**
+
+**Rig (Windows real-GPU Chrome, 5 interleaved rounds, RWK gameplay window).**
+Run as a REGRESSION CHECK, not a win-proof — a ~5% Ir effect is below this
+rig's resolution (known bimodal ±15-30%), and 5 rounds cannot resolve it:
+
+| metric | base median (range) | after median (range) | paired median |
+|---|---|---|---|
+| all-frames mean | 102.0 (94.6–115.3) | 100.2 (96.6–109.0) | 1.057x |
+| cpu p50 | 71.0 (68.9–87.4) | 71.6 (68.3–81.6) | 1.009x |
+| cpu p95 | 104.0 (98.0–112.5) | 97.4 (89.4–109.8) | ~1.03x |
+| frames > 250 ms (5-round total) | 48 | 48 | unchanged |
+
+After favoured in **3/5 rounds** on mean_all and p50, 4/5 on p95; r4 and r5 went
+the other way with after's whole distribution shifted up. **Within-arm spread
+exceeds the between-arm difference on both headline metrics.** Verdict: **no
+regression, stall count identical, and a possible small win consistent with the
+Ir reduction — not resolvable at this round count.** Raw JSONs:
+`/mnt/c/playwright/rw_alloc_ab/`.
+
+**Verification:** RWK trace AND all **600 CPU-dump frames byte-identical** to
+HEAD across default / `AVM2_GC=0` / `AVM2_GC_STRESS=1` — hashes `64bdde47…` and
+`653ecf8e…`, i.e. **the same values this doc records for lever 5**, so this is
+identity with committed HEAD rather than base-vs-after self-consistency. New
+`-DAVM2_SLOTTPL_VERIFY` re-runs the reference loop against the templated image
+on EVERY construction: clean over 1200 ticks default-GC and 400 ticks
+GC-stress. New regression test `regression/avm2_slot_default_template` (mxmlc +
+Ruffle exporter oracle) pins the declared-type defaults, the string-constant
+patch path, the int-slot truncating coercion, per-object identity of realized
+slots, non-aliasing of the shared image, subclass shadowing, and 50 repeat
+constructions. Both CI modes + a verify-defines CI stacking `AVM2_SLOTTPL_VERIFY`
+onto the existing family: zero pass→fail; regression suite 56 → **57 at 100%**.
+
+**Post-lever-6 profile (38.01B Ir).** `slots_init_defaults` has left the top-25
+entirely. blend_over 7.23% (pure pixel work, still #1, wasm runs the SIMD
+spans), getproperty_static_ic 5.64 + resolved_get 5.23 (the IC-hit residue —
+the recompiler endgame), setup_locals 3.58, coerce_to_class 3.40 +
+coerce_to_type_mn 3.36, memcpy 2.79 (the template's own copy, plus blit),
+o1heapAllocate 2.74, abstract_eq 2.63, bd_copy_pixels 2.58, mn_name 1.87.
+Next levers by size: the getproperty IC-hit residue (~10.9%, recompiler work),
+the remaining coerce cluster (~6.8%), GC trace pause (~15 ms, generational —
+separate session), and `AVM2_GC_SWEEP_BUDGET` tuning (untried, pure config).
+
 ## Headline — lever 5 (typed-value emission: compare→branch fusion + inline fast arms, 2026-07-19)
 
 Session prompt `SWFRecompDocs/prompts/avm2-rwk-typed-values.md`, commit
