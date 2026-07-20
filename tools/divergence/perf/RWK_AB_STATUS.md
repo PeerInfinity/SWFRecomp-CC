@@ -9,6 +9,113 @@ real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
 
+## ⛔ VERDICT 2026-07-20 — the "11x Ruffle gap" never existed. Arc goal changed.
+
+Session prompt `SWFRecompDocs/prompts/avm2-title-inversion-diagnosis.md`
+(diagnosis, no lever shipped). Raw: `/mnt/c/playwright/ti_2026-07-20/`;
+drivers `ti_rwk_ruffle.py` (corrected Ruffle) + `ti_perf.py` + `rw_ab.py`.
+**Everything below supersedes the "Ruffle plays this at 6.4 ms" anchor quoted
+in the lever-1 section and in every session prompt written from this doc.**
+
+### Step 0 — the old anchor was the title screen. Proven, not inferred.
+
+`/mnt/c/playwright/rw_perf_2026-07-18/rwk_ruffle_final.png` — the screenshot
+saved by the very run that produced the 6.4 ms figure — **is the Robot Wants
+Kitty title screen**, buttons and all. The driver (`rw_perf_ruffle.py`) only
+ever centre-clicked (320,240) *for keyboard focus*; that is dead space, and it
+was a single-turn `mouse.click()`, which Flixel's `FlxButton` ignores (it needs
+press and release on separate ticks). Both "phases" sampled the same menu —
+hence the impossible +3% menu→"gameplay" delta that triggered this session.
+
+Corrected driver `ti_rwk_ruffle.py`: real press/hold/release at the "Play Game"
+button (CSS (200,311); the Ruffle page pins the stage 1:1 at 640x480, so no
+1.217 scale correction applies there — that factor is our `demo.html` canvas
+only), plus **state attestation**: `__rufflePerfDraws` p50 goes 1 → 65, and
+`rwk_ac_after_ruffle_final.png` shows the live PlayState (tilemap, robot, cat,
+enemies, HUD clock). Every round below is state-proven; no phase is labelled
+from hope.
+
+### The corrected table — same day, same rig, same drivers, 5 interleaved rounds
+
+| title | ours | Ruffle | verdict |
+|---|---|---|---|
+| RWK (Flixel 2.21) | **107.1 ms** p50 (105.7–109.5) | **82.5 ms** p50 (82.3–83.7) | **we lose 1.30x** |
+| Seedling (FlashPunk) | **30.5 ms** mean (29.6–30.7) | **46.2 ms** mean (46.1–46.8) | **we win 1.51x** |
+
+Round-to-round spread is remarkably tight on both sides (Ruffle RWK spans
+1.4 ms across five rounds), so these are not noise-limited. Effective tick rate
+agrees independently with frame CPU: ours ~9 fps (`__swfPerf.interval` p50
+110 ms) vs Ruffle ~11 fps (rAF p50 88 ms, and Ruffle ticks once per rAF).
+Capped vs `perfbench=1` uncapped is a no-op on both titles (RWK 107.1→106.9,
+Seedling 30.1→30.5), so no figure here is frame-limiter-bound.
+
+**Controls run:**
+- Ruffle on the plain un-AP-injected 716528-byte SWF: **83.1 ms** vs 82.5 ms on
+  the injected one. The injection is not what makes Ruffle slow.
+- Our 2026-07-15 `seedling_msimd` build re-measured today: **37.4 ms**, i.e.
+  *worse* than today's 30.5. So our Seedling progress is real and there is no
+  regression — but see below.
+
+### So: how much of the claimed 11x survives? **None of it.**
+
+The gap is **1.30x**, and the cross-title swing that motivated the session is
+**~2.0x**, not ~30x. There is no structural inversion to explain — a 2x spread
+between two engines' workload mixes is ordinary, and well inside what single
+levers in this arc have already moved.
+
+**Both headline anchors were unreliable, in opposite directions.** The RWK
+6.4 ms was a title screen. And the Seedling **16.5 ms** on record does not
+reproduce: Ruffle's Seedling side reproduces exactly (46.2 today vs ~46 on
+record), while ours measures 30.5 — and the older build measures *worse*, so it
+is not a regression. The 16.5 ms figure was a lighter scene or a different
+filter, and "2.8x faster than Ruffle" should be read as **1.51x** until someone
+re-derives it. `swfrecomp-purpose-beat-ruffle-perf` needs both numbers fixed.
+
+### Step 1 — object birth/death is NOT the next arc (falsified)
+
+Sized from the post-lever-1 CDP profile (`rwk_prof_postlever_2026-07-19.json`,
+31,338 samples), with call-tree ancestry rather than name-guessing:
+
+| cluster member | % self |
+|---|---|
+| GC census sort (`wrapper_cmp`/`sift`/`trinkle`/`cycle`/`__qsort_r`) | 7.88 |
+| constructor path (`setup_locals`, `slots_init_defaults`, `class_construct`, …) | 4.44 |
+| allocator (`o1heapAllocate`/`heap_alloc`/`heap_free`/`avm2_alloc`) | 1.72 |
+| GC mark/trace/sweep driver (`gc_collect`, `mark_value`) | 1.05 |
+| **cluster total** | **15.09** |
+
+But that profile predates tier-2 GC and lever 6, **both of which already
+harvested this cluster**: tier-2's arena bitmap deleted the census sort
+outright (snap 36.5 ms → 0.02 ms per collect — the whole 7.88% row), and lever 6
+cut `slots_init_defaults` −92%. Re-deriving leaves **~6% at current HEAD**;
+the most current native figure agrees (post-lever-6 Ir, GC=0: `setup_locals`
+3.58 + `o1heapAllocate` 2.74 + `slots_init_defaults` 0.42 = **6.74%**).
+
+Counterfactual ceiling if allocation were *free*: **<1.10x**. And this arc has
+repeatedly failed to convert Ir into wall-clock (lever 5: −13.1% Ir → ~1.07x;
+lever 6: −5.16% Ir → no resolvable wall-clock change at all). **A
+nursery/bump-allocator + generational collector is not the next arc** — it
+targets ~6% of the frame for at most 1.1x, and it would fight the conservative
+ext scan, the arena bitmap membership test and the pinned/immortal surfaces for
+that. Ruling it out is the point of this session.
+
+For scale, the largest remaining cluster in the same profile is **property GET
+at 28.4%** (`getproperty_static_ic` 8.82, `resolved_get` 6.78, `value_vtable`
+3.43, `vtable_find_mn` 2.56, …) — ~5x the allocator opportunity, and the thing
+six levers have already been chipping at.
+
+### What the arc's question becomes
+
+Not "why do we lose 11x to Ruffle" — we lose 1.30x. The real finding is that
+**Ruffle only manages ~11 fps on RWK gameplay on this rig either**. Both
+engines miss 30 fps (33 ms) by a wide margin: Ruffle by 2.5x, us by 3.2x. So
+the goal is **RWK's own frame budget**, not parity with Ruffle — and beating
+Ruffle on RWK now needs 1.3x, which is one good lever, not a multi-session arc.
+
+Open items this session deliberately did NOT chase: profiling Ruffle's own
+frame to see where *its* 82 ms goes (never done; would say whether 33 ms is
+even reachable for this title in wasm), and re-deriving the Seedling 16.5 ms.
+
 ## ⚠ Native measurement recipe — CORRECTED 2026-07-19 (read before A/B'ing)
 
 **The recipe used by levers 1-5 — "native user-s, 2900 ticks GC=0, interleaved
@@ -514,11 +621,16 @@ COERCE/store path (D), remaining find residue for own-class statics
 | rig rAF frame-time p95 | 260.9 ms | 175.8 ms | **1.48x** |
 | rig frames under 33 ms vsync | ~54% | ~64% | +10 pp |
 
-Honest anchors: **Ruffle plays the same SWF's gameplay at 6.4 ms p50**
+~~Honest anchors: **Ruffle plays the same SWF's gameplay at 6.4 ms p50**
 (5.3 tick + 1.0 render, measured this session — the first real Ruffle
 *gameplay* number; the old 5.5 ms was menu). We are still ~26x off; 30 fps
 (33 ms) needs ~5x more. This is a multi-session arc like Seedling's
-280→47 ms.
+280→47 ms.~~
+
+**RETRACTED 2026-07-20 — this 6.4 ms was ALSO the menu**, exactly like the
+5.5 ms it claimed to correct; the run's own screenshot shows the title screen.
+Real Ruffle RWK gameplay is **82.5 ms**. See the verdict section at the top of
+this file.
 
 ## Build-flag check (ruled OUT)
 
