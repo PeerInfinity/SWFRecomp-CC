@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ⚠ SUPERSEDED 2026-07-20b - DO NOT REUSE FOR A MEASUREMENT WINDOW > ~120 FRAMES.
+# This driver reads the perf ring ONCE at the end of the window. `__swfPerf.cpu`
+# is a 120-slot CIRCULAR buffer and Ruffle's rings are ~600, both SHORTER than a
+# 30 s window - so a single end-of-window read silently mixes in menu frames and
+# under-reports gameplay cost. Use pb_ours_win.py / pb_ruffle_win.py, which
+# DRAIN-POLL and reconstruct chronologically. See the 2026-07-20b session
+# section of RWK_AB_STATUS.md.
 # ti_perf.py - title-inversion diagnosis driver (2026-07-20).
 # Same rig as seedling_perf.py but ALWAYS saves a screenshot + JSON so every
 # phase label is backed by evidence (Step 0 rule: "prove the state").

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ⚠ SUPERSEDED 2026-07-20b - DO NOT REUSE FOR A MEASUREMENT WINDOW > ~120 FRAMES.
+# This driver reads the perf ring ONCE at the end of the window. `__swfPerf.cpu`
+# is a 120-slot CIRCULAR buffer and Ruffle's rings are ~600, both SHORTER than a
+# 30 s window - so a single end-of-window read silently mixes in menu frames and
+# under-reports gameplay cost. Use pb_ours_win.py / pb_ruffle_win.py, which
+# DRAIN-POLL and reconstruct chronologically. See the 2026-07-20b session
+# section of RWK_AB_STATUS.md.
 # ti_rwk_ruffle.py - CORRECTED Ruffle RWK driver (title-inversion diagnosis, 2026-07-20).
 #
 # Fixes vs rw_perf_ruffle.py, which produced the invalid 6.4 ms "gameplay" anchor:
