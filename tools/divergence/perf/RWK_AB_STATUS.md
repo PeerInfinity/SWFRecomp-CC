@@ -2,12 +2,118 @@
 
 Sessions 2026-07-19 (lever 1: `avm2-rwk-base-compute-profile.md`; lever 2:
 `avm2-rwk-property-read-endgame.md`; levers 3+4:
-`avm2-rwk-store-and-statics.md`).
+`avm2-rwk-store-and-statics.md`; lever 5: `avm2-rwk-typed-values.md`).
 Precedent/format: `SEEDLING_AB_STATUS.md`. All rig numbers: Windows Chrome,
 real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 (`WINDOWS_PLAYWRIGHT_FROM_WSL.md`); metric `__swfPerf.cpu` gameplay p50
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
+
+## Headline — lever 5 (typed-value emission: compare→branch fusion + inline fast arms, 2026-07-19)
+
+Session prompt `SWFRecompDocs/prompts/avm2-rwk-typed-values.md`, commit
+`a35afa7b8`. Target: the ~26% coerce/compare cluster the post-lever-3+4
+profile named (to_number 4.67 + to_class 2.79 + to_type_mn 2.75 + to_boolean
+2.36 + to_primitive 2.09, abstract_eq 3.64 + abstract_lt 3.19,
+xml_abstract_eq 2.57) — every branch, compare and arithmetic op round-tripped
+a boxed Avm2Value through generic dispatch, then coerced.
+
+| measurement | before (`20e22c605`) | after | win |
+|---|---|---|---|
+| native Ir, 600 ticks GC=0 (callgrind) | 46.34B | 40.28B | **-13.1% (1.15x)** |
+| native user-s, 2900 ticks GC=0 (8 interleaved rounds) | 25.06 mean (r2-8) | 23.51 mean | ~1.07x; median paired ratio 1.10 |
+| rig gameplay all-frames mean (5 interleaved rounds, median) | 83.8 ms (75.2–99.1) | **74.7 ms** (66.9–78.2) | **1.12x** |
+| rig gameplay cpu p50 (median of rounds) | 77.9 ms (74.1–98.0) | **72.3 ms** (60.8–76.3) | **1.16x** |
+| rig gameplay cpu p95 (median of rounds) | 115.4 ms (96.3–124.6) | 94.6 ms (87.9–109.7) | 1.10x |
+| rig frames > 250 ms (total over 5 rounds) | 3 | 3 | unchanged — GC collects, not this lever |
+
+Rig paired per-round ratios (base/after) — **after wins mean_all and p50 in
+5 of 5 rounds**; the only sub-1.0 cell anywhere is r1's p95:
+
+| rnd | mean_all | p50 | p95 |
+|---|---|---|---|
+| r1 | 1.082x | 1.065x | 0.962x |
+| r2 | 1.142x | 1.158x | 1.309x |
+| r3 | 1.124x | 1.219x | 1.096x |
+| r4 | 1.267x | 1.284x | 1.317x |
+| r5 | 1.122x | 1.072x | 1.089x |
+
+(Regime mostly tight — base p50 74.1–78.7 for four rounds, r4 alone at 98.0
+with its after arm rising too, so ±15% rather than the ±30% bimodal
+sessions. Both A/B demos deployed under fresh names `rwk_tv_base` /
+`rwk_tv_after`, FRESH=1 full rebuilds both sides — the `rwk_ap` reference
+demo was not touched. Raw JSONs: `/mnt/c/playwright/rw_tv_ab/`.)
+
+**The design decision that matters: runtime-checked, NOT type-gated.** The
+Step-0 census (new `SWF_CENSUS_TYPEDOPS=<csv>` hook in `analyzeSlotSpec`,
+reporting the operand static types the lattice already computes — 3,395 rows
+over RWK) found only **31% of fused compare sites have BOTH operands
+statically numeric**, and 68% of branches a statically-Boolean operand. A
+compile-time-gated lever — what the session prompt's levers B/C/D sketched —
+would have captured just that slice. So the fast arms are not gated on the
+lattice at all: each helper in `avm2_ops.h` is exactly equivalent to the op
+it shortcuts FOR ALL INPUTS (the fast arm decides only the kinds it can
+decide locally; every other kind falls through to the same generic
+implementation). Coverage is 100% of sites for one predictable branch, and
+the census's role became sizing/justification rather than gating.
+
+- **Compare→branch fusion** (recompiler, structural — no types involved).
+  The ABC verifier already splits every compare-and-branch bytecode
+  (`iflt`/`ifnlt`/`ifeq`/...) into a comparison op immediately followed by
+  IfTrue/IfFalse (`abc_verifier.cpp`), so the pair is the dominant branch
+  shape: census says **562/834 compares (67%) are branch-adjacent**. Fusing
+  emits one `sp -= 2; if (avm2_op_lessthan_test(act, stk[sp], stk[sp+1]))
+  goto op_N;`, removing both the `avm2_bool()` boxing and the
+  `avm2_coerce_to_boolean()` that read it straight back. RWK: **489 fused**
+  (not fused when the branch is itself a branch target, or in methods with
+  active exception bookkeeping) + **785 standalone branches** on the boolean
+  fast arm.
+- **Numeric fast arms** for subtract/multiply/divide/increment/decrement/not.
+- **XML-probe guard in `abstract_eq`** (runtime). The E4X arms ran five ext
+  probes on EVERY abstract equality — 2.57% of total Ir in a game with zero
+  E4X. The object-kind gate is exact, not heuristic: every probe tests
+  `kind == AVM2_VALUE_OBJECT` first, so `avm2_xml_abstract_eq(a,b)` needs `a`
+  to be an object, the mirrored call needs `b`, and the QName arm needs both;
+  the asymmetric cases the Ruffle ordering comment protects (empty XMLList ==
+  undefined) keep one object operand and still enter.
+- **Numeric fast path in `abstract_lt`**, equally exact
+  (`coerce_to_primitive` is the identity on non-objects; two numbers are
+  never both strings).
+
+**`add` was tried and REVERTED — the verify build caught it.** A both-numeric
+`add` arm looks equivalent by the same argument, but `avm2_op_add_values`
+already has an int+int arm returning an **INTEGER-kind** value, which the
+naive arm flattened to NUMBER — an observable kind difference.
+`-DAVM2_ARITH_VERIFY` aborted within 1200 ticks. `add` keeps the generic op.
+
+**Verification:** `-DAVM2_ARITH_VERIFY` (new — every specialized arm also
+runs the generic op and aborts on divergence) clean over 1200 ticks
+default-GC, 800 ticks GC=0 and 400 ticks GC-stress, zero aborts; RWK trace
+AND all **600 CPU-dump frames byte-identical** to a clean-worktree HEAD
+baseline (trace `64bdde47…`, frames `653ecf8e…` on both sides); new
+regression test `regression/avm2_typed_value_ops` (mxmlc + Ruffle exporter
+oracle) pins NaN branch pairs, signed zero, int/uint/Number width promotion,
+the add-concat gate, every `coerce_to_boolean` rule and unary-on-non-numbers.
+
+**Ir vs wall-clock, honestly:** -13.1% Ir bought only ~1.07x native user-s —
+the instructions removed are cheap and well-predicted (a call + a switch)
+while the remaining work is memory-bound, so native time under-reflects the
+count. The rig read slightly BETTER than native user-s (1.12x mean / 1.16x
+p50), the usual wasm amplification of instruction-count wins, but nowhere
+near the Ir ratio. Treat this lever as a genuine ~1.1x, not a 1.15x.
+
+**Post-lever profile (40.28B Ir):** `coerce_to_boolean`, `abstract_lt` and
+`xml_abstract_eq` have left the top-25 entirely; `coerce_to_number` 4.67 →
+1.19, `abstract_eq` 3.64 → 2.48. `blend_over` is now #1 at 6.82% (pure pixel
+work; wasm runs the SIMD spans). **The largest addressable cluster is now
+alloc/ctor: `slots_init_defaults` 4.76 + `setup_locals` 4.10 +
+`o1heapAllocate` 2.58 = 11.4%** — the session prompt's lever E, unbuilt.
+Sketch: `slots_init_defaults` is a per-element loop that could become a
+per-class precomputed default-slot image + memcpy, but ONLY for slots whose
+default is a non-pointer kind — a template holding a string/object pointer
+would be an un-traced GC root (see [[avm2-collectable-strings]]).
+`setup_locals` recomputes a per-call `unchecked` flag from method-static data
+every call; that is a pure per-method memo.
 
 ## Headline — GC tier 2 (collector per-object cost: bitmap + epochs + lazy sweep, 2026-07-19)
 
