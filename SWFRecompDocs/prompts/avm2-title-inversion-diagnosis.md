@@ -11,49 +11,83 @@ census discipline in the first place.
 
 Same runtime, same recompiler, same rig, measured within days:
 
-| title | engine | ours | Ruffle | verdict |
+| title | engine | ours | Ruffle (as recorded) | apparent verdict |
 |---|---|---|---|---|
-| Seedling | FlashPunk | ~16.5 ms | ~46 ms | **we win 2.8x** |
-| RWK | Flixel 2.21 | ~74 ms | ~6.4 ms | **we lose ~11x** |
+| Seedling | FlashPunk | ~16.5 ms | ~46 ms (stale) | we win 2.8x |
+| RWK | Flixel 2.21 | ~74 ms | ~6.4 ms (**suspect — see Step 0**) | we lose ~11x |
 
-That is a **~30x swing between two titles on one runtime**. Whatever
-explains it is structurally bigger than anything the six levers touched
-(they were 1.1x–1.5x each). If it names a real mechanism, that mechanism
-is the multi-session arc worth opening next; if it dissolves under
-scrutiny (see Step 0), the arc's target changes and we stop chasing a
-number that was never real.
+That would be a **~30x swing between two titles on one runtime** —
+structurally bigger than anything the six levers touched (1.1x–1.5x each).
+But **Step 0 shows the RWK Ruffle figure is almost certainly a title-screen
+measurement**, so the headline gap is unestablished and the first job is
+to replace it with a real one. Both outcomes are valuable: a surviving
+large gap names the next multi-session arc; a collapsed one retires a
+target we have been steering by for four sessions.
 
-## Step 0 — validate BOTH anchors before theorising (mandatory, cheap)
+## Step 0 — the RWK Ruffle anchor is almost certainly NOT gameplay
 
-The two Ruffle numbers were measured in different sessions, days apart,
-by different drivers, and neither has evidence that the *workload* matched
-ours:
+**Do not treat 6.4 ms as a gameplay number.** Re-reading the lever-1 raw
+data (`/mnt/c/playwright/rw_o2ab/rwk_ruffle_gp.json`) against the user's
+suspicion (2026-07-20) that it was captured on the title screen:
 
-- RWK's 6.4 ms (5.3 tick + 1.0 render) came from the lever-1 session via
-  `/mnt/c/playwright/rw_o2ab/`. RWK gameplay is **bimodal ±30% and
-  state-dependent** (the same doc records a "heavy regime" at ~340 ms vs
-  a ~219 ms p50 for OUR build). If Ruffle was sampled in an early/light
-  state — fewer entities, smaller quadtree, different level — while our
-  window is a later/heavier one, a large part of "11x" is workload
-  mismatch, not engine gap.
-- Seedling's ~46 ms Ruffle number predates the entire property arc
-  (~2026-07-14) and was measured on a different build of everything.
+| Ruffle phase | total p50 | tick p50 | rAF p50 |
+|---|---|---|---|
+| `ruffleperf_menu` (600 frames) | 6.2 ms | 5.0 | 16.7 |
+| `ruffleperf_gameplay` (600 frames) | **6.4 ms** | 5.3 | 16.7 |
 
-So: **re-measure both Ruffle anchors same-day, same rig, same states as
-ours, with the workload pinned by evidence, not assumption.** Capture on
-BOTH sides, simultaneously with the frame timings, something that proves
-the scenes match — entity/object counts, level id, tick number, a
-screenshot pair. `docs2/examples/avm2/{rwk,seedling}_ruffle/` already
-exist; the Ruffle profiling shim (per-frame tick/render CPU) is in
-[[ruffle-wasm-perf-shim-and-build]]. Method rules as ever: `rw_ab.py`
-driver, ≥5 interleaved rounds, same-session ratios only, all-frames mean
-+ p50 + stall count together.
+**A +3% menu→"gameplay" delta is not credible.** Over the same transition
+our build went ~6 ms → ~450 ms (75x) at that time; a Flixel PlayState
+rebuilding its whole collision quadtree every frame cannot cost 3% more
+than a static title screen with two buttons. The run also saved **no
+screenshot** (only the JSON), so nothing attests to the state; and an
+earlier session's rwk_ruffle probe is on record as having stayed on the
+title screen because a center-click missed the "Play Game" button — the
+same failure, one session earlier. Treat the 6.4 ms as menu/attract and
+the "~11x gap" as **unestablished**.
 
-**Report the corrected table before doing anything else.** If the RWK gap
-collapses to (say) 3x on matched workloads, say so loudly — it rewrites
-the arc's goal and this session's remaining steps.
+Likely mechanical cause, already documented in
+`SWFRecompDocs/plans/avm2-robot-wants-sequels.md`: **click coordinates are
+CSS pixels of the displayed canvas, not the game's internal 640x480
+space** — the canvas renders ~779x585 (scale ~1.217), so internal
+(320,176) is CSS (389,214). Center-clicking or clicking internal
+coordinates silently does nothing.
 
-## Step 1 — the leading hypothesis: object birth/death, not property access
+**Get a real number, with the state proven:**
+1. **Preferred — identical teleport SWF on BOTH sides** (the user's
+   suggestion, and the cleanest experimental design): inject AS3 that
+   boots straight into PlayState, exactly as `seedling_teleport` does
+   (precedent: [[seedling-teleport-gameplay]],
+   [[ruffle_injection_techniques]]). Loading the SAME teleport SWF in
+   Ruffle and in our demo removes the click-reliability variable
+   entirely AND guarantees an identical start state — a better comparison
+   than clicking through, not a compromise. Note the honest caveat in the
+   write-up: the anchor is then "RWK PlayState from a scripted start",
+   not "RWK as a player reaches it".
+2. Fallback — real press-release click at CSS-corrected coordinates
+   (down, ~100 ms, up; Flixel's FlxButton needs press and release on
+   separate ticks).
+3. **Whatever the method: prove the state.** Save a screenshot per phase
+   on both sides, plus an in-frame quantity that shows the scene matches
+   (HUD clock/level, entity count). A phase labelled "gameplay" with no
+   evidence is what produced this whole detour.
+
+Seedling's ~46 ms Ruffle anchor is also stale (pre-property-arc,
+~2026-07-14, different build of everything) — re-measure it the same day,
+same rig, same way.
+
+**Report the corrected table before doing anything else**, and state
+plainly how much of the claimed 11x survives. If it collapses to 2-3x —
+or inverts — that rewrites the arc's goal and the rest of this session.
+`docs2/examples/avm2/{rwk,seedling}_ruffle/` exist; the per-frame
+tick/render shim is [[ruffle-wasm-perf-shim-and-build]]. Method: `rw_ab.py`,
+≥5 interleaved rounds, same-session ratios, mean + p50 + stalls together.
+
+## Step 1 — (only once Step 0 has a trustworthy number) the leading hypothesis: object birth/death
+
+If the corrected gap is small or inverted, SKIP this step and write the
+verdict — the arc's remaining question becomes "what is RWK's own frame
+budget for 30 fps", not "why do we lose to Ruffle". If a substantial gap
+survives, test this:
 
 The two engines differ in exactly the dimension our runtime is weakest:
 
