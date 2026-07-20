@@ -1,0 +1,30 @@
+nan lt   false false
+nan le   false false
+nan gt   false false
+nan ge   false false
+nan iflt  not-taken
+nan ifge  not-taken
+nan !lt   taken
+nan eq   false true
+nan seq  false
+zero eq  true true
+zero lt  false false
+zero sgn -Infinity -Infinity Infinity
+zero str 0 0
+width eq false true false
+width lt true false false
+width big true true
+width zero true true false
+add mix  55 55 55
+add num  10 0 25
+add obj  1,2 11,2
+add nul  1 anull NaN
+sub str  7 NaN -1
+bool arm fffffTfTTTT
+bool not TTTTTfTffff
+unary s+ 6 number
+unary b+ 2
+unary n+ 1
+unary u+ NaN
+unary neg -7 NaN
+unary iov -2147483648

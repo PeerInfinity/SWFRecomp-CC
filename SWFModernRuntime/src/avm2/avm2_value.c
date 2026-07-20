@@ -801,6 +801,21 @@ bool avm2_abstract_eq(Avm2Context* ctx, Avm2Value a, Avm2Value b)
 {
 	// E4X arms come first (Ruffle value.rs: XML/XMLList/QName before the
 	// ECMA algorithm — an empty XMLList == undefined).
+	//
+	// The object-kind gate below is EXACT, not heuristic: every probe in this
+	// block (avm2_xml_ext_of / avm2_xmllist_ext_of / avm2_qname_ext_of) tests
+	// `v.kind == AVM2_VALUE_OBJECT` first and returns NULL otherwise, so
+	//   - avm2_xml_abstract_eq(ctx, a, b, ..) can only return nonzero if `a`
+	//     is an OBJECT (it dispatches solely on a's XML/XMLList ext),
+	//   - the mirrored call likewise needs `b` to be an OBJECT,
+	//   - the QName arm needs BOTH to be OBJECTs.
+	// So when neither operand is an object the whole block is a proven no-op.
+	// The asymmetric cases the Ruffle ordering comment protects (empty XMLList
+	// == undefined, XML == "string") keep one OBJECT operand and still enter.
+	// Motivation: this block was ~2.6% of all instructions in a game with zero
+	// E4X — five ext probes (each an avm2_get_context() + class compare) on
+	// every numeric/string equality.
+	if (a.kind == AVM2_VALUE_OBJECT || b.kind == AVM2_VALUE_OBJECT)
 	{
 		int eq;
 		if (avm2_xml_abstract_eq(ctx, a, b, &eq)) return eq != 0;
@@ -925,6 +940,18 @@ int avm2_abstract_lt(Avm2Context* ctx, Avm2Value a, Avm2Value b)
 	if (a.kind == AVM2_VALUE_INTEGER && b.kind == AVM2_VALUE_INTEGER)
 	{
 		return a.u.i < b.u.i ? 1 : 0;
+	}
+	// Mixed/double numeric fast path, exactly equivalent to the generic tail
+	// below: avm2_coerce_to_primitive is the identity on non-objects, two
+	// numbers are never both strings, and avm2_coerce_to_number on a numeric
+	// value is just the widening below. Saves two calls per compare on the
+	// dominant shape (Number vs int / Number vs Number).
+	if (avm2_value_is_number(a) && avm2_value_is_number(b))
+	{
+		double na = a.kind == AVM2_VALUE_INTEGER ? (double) a.u.i : a.u.d;
+		double nb = b.kind == AVM2_VALUE_INTEGER ? (double) b.u.i : b.u.d;
+		if (isnan(na) || isnan(nb)) return -1;
+		return na < nb ? 1 : 0;
 	}
 	Avm2Value pa = avm2_coerce_to_primitive(ctx, a, 1);
 	Avm2Value pb = avm2_coerce_to_primitive(ctx, b, 1);

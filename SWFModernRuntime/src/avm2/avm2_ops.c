@@ -3262,6 +3262,18 @@ Avm2Value avm2_op_convert_o(Avm2Activation* act, Avm2Value v)
 }
 
 // -------------------------------------------------------------------------
+// Typed-value fast-path verify hook. Only compiled under -DAVM2_ARITH_VERIFY;
+// the inline helpers in avm2_ops.h then run BOTH the specialized arm and the
+// generic op on every execution and call this on any divergence.
+#ifdef AVM2_ARITH_VERIFY
+void avm2_arith_verify_fail(const char* what)
+{
+	avm2_fatal("[AVM2_ARITH_VERIFY] %s: specialized result differs from the "
+	           "generic op", what);
+}
+#endif
+
+// -------------------------------------------------------------------------
 // Coerce-elision verify hooks (Step 4). Only compiled under
 // -DAVM2_COERCE_VERIFY; the normal build uses the identity inlines in
 // avm2_ops.h. Each hook runs the REAL coercion the recompiler elided and

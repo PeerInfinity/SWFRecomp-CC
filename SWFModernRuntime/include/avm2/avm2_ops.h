@@ -419,6 +419,190 @@ Avm2Value avm2_op_astype(Avm2Activation* act, Avm2Value value, uint32_t mn_idx);
 Avm2Value avm2_op_istypelate(Avm2Activation* act, Avm2Value value, Avm2Value type);
 Avm2Value avm2_op_astypelate(Avm2Activation* act, Avm2Value value, Avm2Value type);
 
+// -------------------------------------------------------------------------
+// Typed-value fast paths (inlined into the generated ABC TUs).
+//
+// Every helper here is EXACTLY equivalent to the out-of-line op it shortcuts
+// FOR ALL INPUTS — the fast arm only decides the kinds it can decide locally,
+// and every other kind falls through to the same generic implementation. They
+// are therefore NOT gated on the compile-time type lattice and need no
+// soundness argument beyond the per-helper equivalence noted below; the
+// recompiler's static types only decide where emitting them is worthwhile.
+//
+// The `_test` variants return a plain int instead of a boxed Avm2Value: the
+// ABC verifier always splits compare-and-branch bytecodes (iflt/ifnlt/...)
+// into a compare op followed immediately by IfTrue/IfFalse, so the recompiler
+// fuses that pair into one `if (avm2_op_*_test(...)) goto`, removing both the
+// avm2_bool() boxing and the avm2_coerce_to_boolean() call on the hottest
+// shape in the codebase.
+//
+// Build -DAVM2_ARITH_VERIFY to cross-check every fast arm against the generic
+// op on every execution (the FIND/SLOT/SET/COERCE precedent).
+#ifdef AVM2_ARITH_VERIFY
+// Aborts with the op name; defined in avm2_ops.c.
+void avm2_arith_verify_fail(const char* what);
+// Bit-exact "same value" for the verify compare: NaN counts as equal to NaN
+// (both paths compute the same NaN result) and -0 is distinguished from +0 so
+// a sign-losing specialization cannot slip through.
+static inline int avm2_arith_same(Avm2Value x, Avm2Value y)
+{
+	if (x.kind != y.kind) return 0;
+	if (x.kind == AVM2_VALUE_NUMBER)
+	{
+		if (x.u.d != x.u.d && y.u.d != y.u.d) return 1;      // NaN vs NaN
+		if (x.u.d == 0.0 && y.u.d == 0.0)                    // ±0 must match
+			return (1.0 / x.u.d) == (1.0 / y.u.d);
+		return x.u.d == y.u.d;
+	}
+	if (x.kind == AVM2_VALUE_INTEGER) return x.u.i == y.u.i;
+	if (x.kind == AVM2_VALUE_BOOL) return x.u.b == y.u.b;
+	return 1;
+}
+#define AVM2_ARITH_CHECK_INT(what, fast, generic) \
+	do { if ((int) (fast) != (int) (generic)) avm2_arith_verify_fail(what); } while (0)
+#define AVM2_ARITH_CHECK_VAL(what, fast, generic) \
+	do { if (!avm2_arith_same((fast), (generic))) avm2_arith_verify_fail(what); } while (0)
+#else
+#define AVM2_ARITH_CHECK_INT(what, fast, generic) ((void) 0)
+#define AVM2_ARITH_CHECK_VAL(what, fast, generic) ((void) 0)
+#endif
+
+// Boolean test. Equivalent: avm2_coerce_to_boolean's BOOL arm returns v.u.b.
+static inline int avm2_to_boolean_fast(Avm2Value v)
+{
+	return v.kind == AVM2_VALUE_BOOL ? (int) v.u.b : (int) avm2_coerce_to_boolean(v);
+}
+
+// Numeric widening. Equivalent: avm2_coerce_to_number's INTEGER/NUMBER arms
+// are exactly these widenings; every other kind (including OBJECT, whose
+// valueOf may run user code or throw) goes to the generic function.
+static inline double avm2_to_number_fast(Avm2Context* ctx, Avm2Value v)
+{
+	if (v.kind == AVM2_VALUE_NUMBER) return v.u.d;
+	if (v.kind == AVM2_VALUE_INTEGER) return (double) v.u.i;
+	return avm2_coerce_to_number(ctx, v);
+}
+
+// Both-numeric predicate: the kinds for which the arithmetic/comparison fast
+// arms below are decidable without any coercion.
+static inline int avm2_both_numeric(Avm2Value a, Avm2Value b)
+{
+	return (a.kind == AVM2_VALUE_INTEGER || a.kind == AVM2_VALUE_NUMBER)
+	    && (b.kind == AVM2_VALUE_INTEGER || b.kind == AVM2_VALUE_NUMBER);
+}
+
+// Comparison tests. NaN semantics are load-bearing and match the generic ops
+// exactly (avm2_abstract_lt returns -1 for NaN, so lessthan/greaterthan are
+// false and lessequals/greaterequals — which test `r == 0` — are ALSO false):
+// every C operator below is likewise false when either operand is NaN. Note
+// the generic lessequals/greaterequals swap their operands; the direct forms
+// here are the algebraic equivalents on non-NaN doubles.
+#define AVM2_DEFINE_CMP_TEST(name, cop)                                       \
+	static inline int avm2_op_##name##_test(Avm2Activation* act,              \
+	                                        Avm2Value a, Avm2Value b)         \
+	{                                                                         \
+		if (avm2_both_numeric(a, b))                                          \
+		{                                                                     \
+			double x = a.kind == AVM2_VALUE_INTEGER ? (double) a.u.i : a.u.d;  \
+			double y = b.kind == AVM2_VALUE_INTEGER ? (double) b.u.i : b.u.d;  \
+			int r = x cop y;                                                  \
+			AVM2_ARITH_CHECK_INT(#name, r,                                    \
+				avm2_coerce_to_boolean(avm2_op_##name(act, a, b)));           \
+			return r;                                                         \
+		}                                                                     \
+		return avm2_coerce_to_boolean(avm2_op_##name(act, a, b));             \
+	}
+AVM2_DEFINE_CMP_TEST(lessthan, <)
+AVM2_DEFINE_CMP_TEST(lessequals, <=)
+AVM2_DEFINE_CMP_TEST(greaterthan, >)
+AVM2_DEFINE_CMP_TEST(greaterequals, >=)
+#undef AVM2_DEFINE_CMP_TEST
+
+// equals: the generic abstract_eq's both-numeric arm is `to_number(a) ==
+// to_number(b)`, i.e. exactly this (-0 == +0 and NaN != NaN both fall out of
+// the IEEE compare, as they do generically).
+static inline int avm2_op_equals_test(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	if (avm2_both_numeric(a, b))
+	{
+		double x = a.kind == AVM2_VALUE_INTEGER ? (double) a.u.i : a.u.d;
+		double y = b.kind == AVM2_VALUE_INTEGER ? (double) b.u.i : b.u.d;
+		int r = x == y;
+		AVM2_ARITH_CHECK_INT("equals", r,
+			avm2_coerce_to_boolean(avm2_op_equals(act, a, b)));
+		return r;
+	}
+	return avm2_coerce_to_boolean(avm2_op_equals(act, a, b));
+}
+
+// strictequals: avm2_strict_eq's INTEGER/NUMBER arms already promote across
+// the two numeric kinds, so the both-numeric case is the same IEEE compare.
+static inline int avm2_op_strictequals_test(Avm2Activation* act, Avm2Value a, Avm2Value b)
+{
+	if (avm2_both_numeric(a, b))
+	{
+		double x = a.kind == AVM2_VALUE_INTEGER ? (double) a.u.i : a.u.d;
+		double y = b.kind == AVM2_VALUE_INTEGER ? (double) b.u.i : b.u.d;
+		int r = x == y;
+		AVM2_ARITH_CHECK_INT("strictequals", r, avm2_strict_eq(a, b));
+		return r;
+	}
+	(void) act;
+	return (int) avm2_strict_eq(a, b);
+}
+
+// Arithmetic. subtract/multiply/divide/modulo/increment/decrement/negate are
+// to_number-of-both by spec (never string-concatenating, never dispatching),
+// so inlining the numeric widening is equivalent for all inputs. `add` is NOT
+// here: it may concatenate or call valueOf, so it keeps its generic op.
+#define AVM2_DEFINE_ARITH(name, aop)                                          \
+	static inline Avm2Value avm2_op_##name##_fast(Avm2Activation* act,        \
+	                                              Avm2Value a, Avm2Value b)   \
+	{                                                                         \
+		if (avm2_both_numeric(a, b))                                          \
+		{                                                                     \
+			double x = a.kind == AVM2_VALUE_INTEGER ? (double) a.u.i : a.u.d;  \
+			double y = b.kind == AVM2_VALUE_INTEGER ? (double) b.u.i : b.u.d;  \
+			Avm2Value r = avm2_number(x aop y);                               \
+			AVM2_ARITH_CHECK_VAL(#name, r, avm2_op_##name(act, a, b));        \
+			return r;                                                         \
+		}                                                                     \
+		return avm2_op_##name(act, a, b);                                     \
+	}
+AVM2_DEFINE_ARITH(subtract, -)
+AVM2_DEFINE_ARITH(multiply, *)
+AVM2_DEFINE_ARITH(divide, /)
+#undef AVM2_DEFINE_ARITH
+
+#define AVM2_DEFINE_UNARY_ARITH(name, aop)                                    \
+	static inline Avm2Value avm2_op_##name##_fast(Avm2Activation* act,        \
+	                                              Avm2Value a)                \
+	{                                                                         \
+		if (a.kind == AVM2_VALUE_NUMBER || a.kind == AVM2_VALUE_INTEGER)      \
+		{                                                                     \
+			double x = a.kind == AVM2_VALUE_INTEGER ? (double) a.u.i : a.u.d;  \
+			Avm2Value r = avm2_number(x aop 1.0);                             \
+			AVM2_ARITH_CHECK_VAL(#name, r, avm2_op_##name(act, a));           \
+			return r;                                                         \
+		}                                                                     \
+		return avm2_op_##name(act, a);                                        \
+	}
+AVM2_DEFINE_UNARY_ARITH(increment, +)
+AVM2_DEFINE_UNARY_ARITH(decrement, -)
+#undef AVM2_DEFINE_UNARY_ARITH
+
+// Boolean negation (`not`): coerce_to_boolean of the operand, inverted.
+static inline Avm2Value avm2_op_not_fast(Avm2Activation* act, Avm2Value a)
+{
+	if (a.kind == AVM2_VALUE_BOOL)
+	{
+		Avm2Value r = avm2_bool(!a.u.b);
+		AVM2_ARITH_CHECK_VAL("not", r, avm2_op_not(act, a));
+		return r;
+	}
+	return avm2_op_not(act, a);
+}
+
 // Coercions.
 Avm2Value avm2_op_coerce(Avm2Activation* act, Avm2Value v, uint32_t mn_idx);
 Avm2Value avm2_op_coerce_s(Avm2Activation* act, Avm2Value v);   // null/undef → null

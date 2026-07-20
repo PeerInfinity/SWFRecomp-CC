@@ -193,7 +193,29 @@ namespace abc
 		int findstatic_cls = -1;  // standalone guarded own-static find
 		int store_slot = -1;      // Set/InitProperty: compile-time slot store
 		u32 store_coerce_mn = 0;  //   declared-type coerce mn (0 = elided)
+		// Compare→branch fusion (computed in emitMethodBody): on the COMPARE op,
+		// 1 = an IfTrue follows, 2 = an IfFalse follows, with cmp_target the
+		// branch's destination. On the fused IfTrue/IfFalse itself, op_skip.
+		int cmp_branch = 0;
+		u32 cmp_target = 0;
+		bool op_skip = false;
 	};
+
+	// The `*_test` inline for a comparison opcode (returns a plain int rather
+	// than a boxed Avm2Value), or nullptr if the opcode has no fused form.
+	static const char* cmpTestHelper(IrOpcode o)
+	{
+		switch (o)
+		{
+			case IrOpcode::Equals:        return "avm2_op_equals_test";
+			case IrOpcode::StrictEquals:  return "avm2_op_strictequals_test";
+			case IrOpcode::LessThan:      return "avm2_op_lessthan_test";
+			case IrOpcode::LessEquals:    return "avm2_op_lessequals_test";
+			case IrOpcode::GreaterThan:   return "avm2_op_greaterthan_test";
+			case IrOpcode::GreaterEquals: return "avm2_op_greaterequals_test";
+			default: return nullptr;
+		}
+	}
 
 	// Compile-time slot store (store-path lever): bare slot write when the
 	// declared-type coerce is proven a no-op, else the coercing variant with
@@ -287,12 +309,18 @@ namespace abc
 			case IrOpcode::Jump:
 				out << "\tgoto op_" << op.target << ";" << endl;
 				return true;
+			// A branch whose condition came from an immediately preceding
+			// comparison was already emitted as part of that compare (see
+			// the fusion pass in emitMethodBody); the compare consumed both operands and
+			// branched directly, so there is nothing left to do here.
 			case IrOpcode::IfTrue:
-				out << "\tif (avm2_coerce_to_boolean(stk[--sp])) goto op_"
+				if (os.op_skip) return true;
+				out << "\tsp--; if (avm2_to_boolean_fast(stk[sp])) goto op_"
 				    << op.target << ";" << endl;
 				return true;
 			case IrOpcode::IfFalse:
-				out << "\tif (!avm2_coerce_to_boolean(stk[--sp])) goto op_"
+				if (os.op_skip) return true;
+				out << "\tsp--; if (!avm2_to_boolean_fast(stk[sp])) goto op_"
 				    << op.target << ";" << endl;
 				return true;
 			case IrOpcode::LookupSwitch:
@@ -692,14 +720,35 @@ namespace abc
 				return true;
 
 			// --- operators (binary) ---
+			// Comparisons feeding an adjacent branch skip the boxed
+			// Avm2Value round-trip entirely: the `_test` inline returns a
+			// plain int and the branch is emitted right here.
+			case IrOpcode::Equals: case IrOpcode::StrictEquals:
+			case IrOpcode::LessThan: case IrOpcode::LessEquals:
+			case IrOpcode::GreaterThan: case IrOpcode::GreaterEquals:
+				if (os.cmp_branch != 0)
+				{
+					out << "\tsp -= 2; if ("
+					    << (os.cmp_branch == 2 ? "!" : "") << cmpTestHelper(op.op)
+					    << "(act, stk[sp], stk[sp + 1])) goto op_"
+					    << os.cmp_target << ";" << endl;
+					return true;
+				}
+				out << "\tsp--; stk[sp - 1] = avm2_bool("
+				    << cmpTestHelper(op.op) << "(act, stk[sp - 1], stk[sp]));"
+				    << endl;
+				return true;
+
 #define BINOP(irname, helper) \
 			case IrOpcode::irname: \
 				out << "\tsp--; stk[sp - 1] = " helper "(act, stk[sp - 1], stk[sp]);" << endl; \
 				return true;
+			// `add` keeps the generic op — it may concatenate strings or run
+			// valueOf, so there is no unconditionally-equivalent fast arm.
 			BINOP(Add, "avm2_op_add")
-			BINOP(Subtract, "avm2_op_subtract")
-			BINOP(Multiply, "avm2_op_multiply")
-			BINOP(Divide, "avm2_op_divide")
+			BINOP(Subtract, "avm2_op_subtract_fast")
+			BINOP(Multiply, "avm2_op_multiply_fast")
+			BINOP(Divide, "avm2_op_divide_fast")
 			BINOP(Modulo, "avm2_op_modulo")
 			BINOP(AddI, "avm2_op_add_i")
 			BINOP(SubtractI, "avm2_op_subtract_i")
@@ -710,12 +759,6 @@ namespace abc
 			BINOP(LShift, "avm2_op_lshift")
 			BINOP(RShift, "avm2_op_rshift")
 			BINOP(URShift, "avm2_op_urshift")
-			BINOP(Equals, "avm2_op_equals")
-			BINOP(StrictEquals, "avm2_op_strictequals")
-			BINOP(LessThan, "avm2_op_lessthan")
-			BINOP(LessEquals, "avm2_op_lessequals")
-			BINOP(GreaterThan, "avm2_op_greaterthan")
-			BINOP(GreaterEquals, "avm2_op_greaterequals")
 			BINOP(In, "avm2_op_in")
 			BINOP(InstanceOf, "avm2_op_instanceof")
 			BINOP(IsTypeLate, "avm2_op_istypelate")
@@ -732,10 +775,10 @@ namespace abc
 				return true;
 			UNOP(Negate, "avm2_op_negate")
 			UNOP(NegateI, "avm2_op_negate_i")
-			UNOP(Not, "avm2_op_not")
+			UNOP(Not, "avm2_op_not_fast")
 			UNOP(BitNot, "avm2_op_bitnot")
-			UNOP(Increment, "avm2_op_increment")
-			UNOP(Decrement, "avm2_op_decrement")
+			UNOP(Increment, "avm2_op_increment_fast")
+			UNOP(Decrement, "avm2_op_decrement_fast")
 			UNOP(IncrementI, "avm2_op_increment_i")
 			UNOP(DecrementI, "avm2_op_decrement_i")
 			UNOP(TypeOf, "avm2_op_typeof")
@@ -1463,6 +1506,70 @@ namespace abc
 		std::vector<int> store_slot;
 		std::vector<u32> store_coerce_mn;
 	};
+	// --- Step-0 census for the typed-value levers (temp tool, env-gated:
+	// SWF_CENSUS_TYPEDOPS=<csv path>). Read-only: it reports the static operand
+	// types the lattice ALREADY computes at every branch / compare / arithmetic
+	// site, so each lever's build decision is a hot-weighted coverage number
+	// rather than a site count. Mirrors the SWF_CENSUS_PROPREAD pattern.
+	// Columns: method,op_index,opcode,left_type,right_type
+	static const char* tkName(TK k)
+	{
+		switch (k)
+		{
+			case TK_INT:  return "int";
+			case TK_UINT: return "uint";
+			case TK_NUM:  return "Number";
+			case TK_BOOL: return "Boolean";
+			case TK_STR:  return "String";
+			case TK_INST: return "inst";
+			case TK_NULL: return "null";
+			default:      return "unk";
+		}
+	}
+	// Census-relevant opcodes and their operand count (0 = not of interest).
+	static const char* typedOpName(IrOpcode o, int& arity)
+	{
+		arity = 2;
+		switch (o)
+		{
+			case IrOpcode::Equals:        return "equals";
+			case IrOpcode::StrictEquals:  return "strictequals";
+			case IrOpcode::LessThan:      return "lessthan";
+			case IrOpcode::LessEquals:    return "lessequals";
+			case IrOpcode::GreaterThan:   return "greaterthan";
+			case IrOpcode::GreaterEquals: return "greaterequals";
+			case IrOpcode::Add:           return "add";
+			case IrOpcode::Subtract:      return "subtract";
+			case IrOpcode::Multiply:      return "multiply";
+			case IrOpcode::Divide:        return "divide";
+			case IrOpcode::Modulo:        return "modulo";
+			default: break;
+		}
+		arity = 1;
+		switch (o)
+		{
+			case IrOpcode::IfTrue:    return "iftrue";
+			case IrOpcode::IfFalse:   return "iffalse";
+			case IrOpcode::Not:       return "not";
+			case IrOpcode::Increment: return "increment";
+			case IrOpcode::Decrement: return "decrement";
+			case IrOpcode::Negate:    return "negate";
+			default: break;
+		}
+		arity = 0;
+		return nullptr;
+	}
+	static ofstream* typedOpCensus()
+	{
+		static ofstream* out = [] () -> ofstream* {
+			const char* p = getenv("SWF_CENSUS_TYPEDOPS");
+			if (p == nullptr) return nullptr;
+			ofstream* f = new ofstream(p, std::ios::app);
+			return f->good() ? f : nullptr;
+		} ();
+		return out;
+	}
+
 	static SlotSpecResult analyzeSlotSpec(const AbcTypeModel& M, const AbcFile& abc,
 	                                      const EmitBody& body)
 	{
@@ -1653,6 +1760,22 @@ namespace abc
 				for (SV& s : st) s.type = TV{};
 				for (u32 l = 0; l < localTy.size(); l++)
 					if (localWritten[l]) localTy[l] = TV{};
+			}
+			// Step-0 census: record operand static types BEFORE the op pops
+			// them (the branch-target reset above has already been applied, so
+			// these are exactly the types a lever would see at this site).
+			if (ofstream* cens = typedOpCensus())
+			{
+				int arity = 0;
+				if (const char* nm = typedOpName(op.op, arity))
+				{
+					// peek(0) is the stack top = the RIGHT operand.
+					const char* rhs = tkName(peek(0).type.k);
+					const char* lhs = arity == 2 ? tkName(peek(1).type.k) : "-";
+					if (arity == 1) { lhs = rhs; rhs = "-"; }
+					*cens << body.ir.method_index << ',' << i << ',' << nm
+					      << ',' << lhs << ',' << rhs << '\n';
+				}
 			}
 			if (op.op == IrOpcode::GetLocal)
 			{
@@ -1991,6 +2114,32 @@ namespace abc
 		       spec.store_slot.assign(body.ir.ops.size(), -1);
 		       spec.store_coerce_mn.assign(body.ir.ops.size(), 0); }
 
+		// Compare→branch fusion (structural — independent of the type
+		// lattice). The ABC verifier splits every compare-and-branch bytecode
+		// (iflt/ifnlt/ifeq/...) into a comparison op immediately followed by
+		// IfTrue/IfFalse, so the pair is the dominant branch shape. Fusing
+		// them removes the avm2_bool() boxing of the comparison result and
+		// the avm2_coerce_to_boolean() that would read it straight back.
+		// Not fused when the branch is itself a branch target (something else
+		// jumps to it, so the compare's operands would not be on the stack)
+		// or when exception bookkeeping needs a per-op index for the branch.
+		std::vector<int> cmp_branch(body.ir.ops.size(), 0);
+		std::vector<u32> cmp_target(body.ir.ops.size(), 0);
+		std::vector<char> op_skip(body.ir.ops.size(), 0);
+		if (!bc.has_exc)
+		{
+			for (size_t i = 0; i + 1 < body.ir.ops.size(); i++)
+			{
+				if (cmpTestHelper(body.ir.ops[i].op) == nullptr) continue;
+				const IrOp& nx = body.ir.ops[i + 1];
+				if (nx.op != IrOpcode::IfTrue && nx.op != IrOpcode::IfFalse) continue;
+				if (targets.count((u32) (i + 1))) continue;
+				cmp_branch[i] = nx.op == IrOpcode::IfTrue ? 1 : 2;
+				cmp_target[i] = nx.target;
+				op_skip[i + 1] = 1;
+			}
+		}
+
 		for (size_t i = 0; i < body.ir.ops.size(); i++)
 		{
 			const IrOp& op = body.ir.ops[i];
@@ -2054,6 +2203,9 @@ namespace abc
 			os.findstatic_cls = spec.findstatic_cls[i];
 			os.store_slot = spec.store_slot[i];
 			os.store_coerce_mn = spec.store_coerce_mn[i];
+			os.cmp_branch = cmp_branch[i];
+			os.cmp_target = cmp_target[i];
+			os.op_skip = op_skip[i] != 0;
 			if (!emitOp(out, bc, op, os))
 			{
 				out << "\tavm2_unimplemented_op(act, \"" << escapeCString(desc)
