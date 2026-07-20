@@ -83,6 +83,22 @@ struct Avm2VTable
 	// which are GC'd and would otherwise leak their index).
 	void* name_index;        // Avm2VTableIndex* (NULL until first index)
 	uint32_t indexed_count;  // `count` at the last index build
+	// --- default-slot template (avm2_slots_init_defaults fast path) ---
+	// Precomputed image of every slot default that is a NON-POINTER value,
+	// so construction is a memcpy plus a short patch loop over the slots
+	// that must be realized per object (function-trait closures, namespace
+	// and string defaults). GC HAZARD RULE: the template must never hold a
+	// STRING or OBJECT pointer — it is plain malloc'd memory the collector
+	// neither traces nor sweeps, so a pointer parked here would be an
+	// untraced root (see the collectable-strings work). Built lazily on the
+	// first construction, and rebuilt if `slot_count` grew since; never
+	// built for `no_index` (per-call newactivation/newcatch) vtables, whose
+	// objects would pay the build cost once per call.
+	Avm2Value* slot_tpl;      // [tpl_slot_n + 1]; index 0 unused
+	uint32_t* slot_patch;     // slot ids needing per-object realization
+	uint32_t slot_patch_n;
+	uint32_t tpl_slot_n;      // `slot_count` the template was built for
+	uint8_t tpl_built;
 	uint8_t no_index;        // 1 = never index (short-lived per-call vtable)
 };
 

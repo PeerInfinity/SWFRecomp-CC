@@ -659,44 +659,161 @@ Avm2Value avm2_default_value(Avm2Context* ctx, Avm2AbcFileRt* file, const Avm2Ab
 	}
 }
 
+// The default value one slot's meta produces. Factored out of the old
+// per-construction loop so the template builder and the patch loop share it
+// verbatim — there is exactly one definition of "what does this slot default
+// to", which is what makes the template provably equivalent.
+static Avm2Value slot_default_for(Avm2Context* ctx, const Avm2SlotMeta* m)
+{
+	if (m->value.has_value && m->type_file != NULL)
+	{
+		Avm2Value dv = avm2_default_value(ctx, m->type_file, &m->value);
+		// Coerce the constant to the slot's declared type (int slots with a
+		// double initializer, etc.).
+		if (m->type_mn != 0)
+		{
+			dv = avm2_coerce_to_type_mn(ctx, m->type_file, m->type_mn, dv);
+		}
+		return dv;
+	}
+	if (m->is_function_trait)
+	{
+		return avm2_object_value(
+			avm2_function_new(ctx, &m->fn_method, m->defining_class,
+			                  m->method_scope, avm2_undefined(), false));
+	}
+	if (m->type_mn != 0 && m->type_file != NULL)
+	{
+		Avm2PropEntry tmp;
+		memset(&tmp, 0, sizeof(tmp));
+		tmp.type_mn = m->type_mn;
+		tmp.type_file = m->type_file;
+		return slot_type_default(ctx, &tmp);
+	}
+	return avm2_undefined();
+}
+
+#ifndef AVM2_NO_SLOT_TPL
+// Does this slot have to be realized per object rather than templated?
+// Decided on the META, never by computing the value, because computing a
+// function-trait or namespace default has SIDE EFFECTS (it allocates a
+// closure / Namespace object) that must happen once per object, not once per
+// class.
+static int slot_needs_realization(const Avm2SlotMeta* m)
+{
+	if (m->is_function_trait) return 1;
+	if (m->value.has_value && m->type_file != NULL)
+	{
+		uint8_t k = m->value.kind;
+		// 0x01 string (static pool) and the namespace kinds are the
+		// pointer-valued constant defaults. Strings are provably immortal
+		// rodata and could in principle be templated, but the census says
+		// they are 314 boot-time slot inits out of 96.7M — zero upside for
+		// a weaker invariant, so they stay in the patch loop and the
+		// template's "no pointers, ever" rule stays absolute.
+		if (k == 0x01 || k == 0x05 || k == 0x08 || (k >= 0x16 && k <= 0x1a))
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static void slot_tpl_build(Avm2Context* ctx, Avm2VTable* vt)
+{
+	uint32_t n = vt->slot_count;
+	Avm2Value* tpl = avm2_alloc(ctx, (n + 1) * (uint32_t) sizeof(Avm2Value));
+	uint32_t* patch = avm2_alloc(ctx, (n + 1) * (uint32_t) sizeof(uint32_t));
+	// Zero == undefined, which is also what an unused/absent meta leaves.
+	memset(tpl, 0, (n + 1) * sizeof(Avm2Value));
+	uint32_t pn = 0;
+	for (uint32_t s = 1; s <= n; s++)
+	{
+		if (s >= vt->meta_cap || !vt->metas[s].used) continue;
+		const Avm2SlotMeta* m = &vt->metas[s];
+		if (slot_needs_realization(m))
+		{
+			patch[pn++] = s;
+			continue;
+		}
+		Avm2Value dv = slot_default_for(ctx, m);
+		// Backstop for the meta-side classification: if a default somehow
+		// still produced a traced pointer, refuse to template it.
+		if (dv.kind == AVM2_VALUE_STRING || dv.kind == AVM2_VALUE_OBJECT)
+		{
+			patch[pn++] = s;
+			continue;
+		}
+		tpl[s] = dv;
+	}
+	vt->slot_tpl = tpl;
+	vt->slot_patch = patch;
+	vt->slot_patch_n = pn;
+	vt->tpl_slot_n = n;
+	vt->tpl_built = 1;
+}
+#endif
+
 void avm2_slots_init_defaults(Avm2Context* ctx, Avm2Object* obj, const Avm2VTable* vt)
 {
 	if (vt == NULL) return;
 	// The slot-meta table covers every slot ever allocated, including
 	// parent slots shadowed by a subclass redeclaration.
-	for (uint32_t s = 1; s <= vt->slot_count && s < obj->slot_count; s++)
+	uint32_t n = vt->slot_count;
+	if (obj->slot_count > 0 && n > obj->slot_count - 1) n = obj->slot_count - 1;
+	if (n == 0) return;
+
+#ifndef AVM2_NO_SLOT_TPL
+	// Shared class vtables only: a no_index vtable belongs to a single
+	// newactivation/newcatch object, so a template would be built and thrown
+	// away once per call.
+	if (!vt->no_index)
+	{
+		Avm2VTable* mvt = (Avm2VTable*) vt;
+		// Rebuilt if the vtable grew slots since the template was built
+		// (class define appends traits; constructions only start after).
+		if (!mvt->tpl_built || mvt->tpl_slot_n != vt->slot_count)
+		{
+			slot_tpl_build(ctx, mvt);
+		}
+		memcpy(&obj->slots[1], &vt->slot_tpl[1], n * sizeof(Avm2Value));
+		for (uint32_t i = 0; i < vt->slot_patch_n; i++)
+		{
+			uint32_t s = vt->slot_patch[i];
+			if (s > n) continue;
+			obj->slots[s] = slot_default_for(ctx, &vt->metas[s]);
+		}
+#ifdef AVM2_SLOTTPL_VERIFY
+		// Cross-check the templated image against the reference loop for
+		// every construction. The reference is re-run into scratch AFTER
+		// the fast path so realization side effects (fresh closures) are
+		// compared by kind, not identity.
+		for (uint32_t s = 1; s <= n; s++)
+		{
+			Avm2Value want = (s < vt->meta_cap && vt->metas[s].used)
+				? slot_default_for(ctx, &vt->metas[s]) : avm2_undefined();
+			Avm2Value got = obj->slots[s];
+			int ok = (want.kind == got.kind);
+			if (ok && want.kind != AVM2_VALUE_OBJECT
+			    && memcmp(&want, &got, sizeof(Avm2Value)) != 0)
+			{
+				ok = 0;
+			}
+			if (!ok)
+			{
+				avm2_fatal("AVM2_SLOTTPL_VERIFY: slot %u kind %u != %u",
+				           s, got.kind, want.kind);
+			}
+		}
+#endif
+		return;
+	}
+#endif
+
+	for (uint32_t s = 1; s <= n; s++)
 	{
 		if (s >= vt->meta_cap || !vt->metas[s].used) continue;
-		const Avm2SlotMeta* m = &vt->metas[s];
-		if (m->value.has_value && m->type_file != NULL)
-		{
-			Avm2Value dv = avm2_default_value(ctx, m->type_file, &m->value);
-			// Coerce the constant to the slot's declared type (int slots
-			// with a double initializer, etc.).
-			if (m->type_mn != 0)
-			{
-				dv = avm2_coerce_to_type_mn(ctx, m->type_file, m->type_mn, dv);
-			}
-			obj->slots[s] = dv;
-		}
-		else if (m->is_function_trait)
-		{
-			obj->slots[s] = avm2_object_value(
-				avm2_function_new(ctx, &m->fn_method, m->defining_class,
-				                  m->method_scope, avm2_undefined(), false));
-		}
-		else if (m->type_mn != 0 && m->type_file != NULL)
-		{
-			Avm2PropEntry tmp;
-			memset(&tmp, 0, sizeof(tmp));
-			tmp.type_mn = m->type_mn;
-			tmp.type_file = m->type_file;
-			obj->slots[s] = slot_type_default(ctx, &tmp);
-		}
-		else
-		{
-			obj->slots[s] = avm2_undefined();
-		}
+		obj->slots[s] = slot_default_for(ctx, &vt->metas[s]);
 	}
 }
 

@@ -9,6 +9,35 @@ real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
 
+## ⚠ Native measurement recipe — CORRECTED 2026-07-19 (read before A/B'ing)
+
+**The recipe used by levers 1-5 — "native user-s, 2900 ticks GC=0, interleaved
+×3" — is INVALID for wall-clock comparison, and every session prompt written
+from this doc has inherited it. Do not reuse it.**
+
+At `AVM2_GC=0` the run ends when the 4 GB arena is exhausted, NOT at
+`AVM2_MAX_TICKS`. On the alloc/ctor session's builds that happened at **845
+ticks (base) vs 702 ticks (inline-slots arm)** — identical at 2900 / 2000 /
+1560 tick caps, because the cap is never reached. A GC=0 wall-clock A/B
+therefore measures *time to exhaust the heap* with the two arms doing
+**unequal amounts of work**, and any lever that changes allocation size or
+rate reads as a large fake win (or loss). The lever-1..5 GC=0 wall-clock
+figures should be read as indicative only; their Ir figures are unaffected.
+
+Use instead:
+
+- **Wall-clock: DEFAULT GC at equal tick counts** (2900 ticks completes, exit
+  0, both arms doing identical work). Interleave arms strictly, ≥3 rounds,
+  and report the MEDIAN — an idle-machine assumption is not safe here, single
+  rounds have shown ±8 s contention outliers.
+- **Ir / callgrind: GC=0 but only at ≤600 ticks**, which is below both arms'
+  OOM points, so the comparison is over identical work. This is the reliable
+  per-lever attribution — prefer it to wall-clock decomposition, which at
+  2-round granularity has been smaller than the noise floor.
+- **Any lever touching allocation shape must also report `AVM2_HEAP_STATS=1`
+  live "Allocated:" + maxRSS**, not just speed. The inline-slots lever below
+  was ruled out on exactly this axis after looking fine on Ir.
+
 ## Headline — lever 5 (typed-value emission: compare→branch fusion + inline fast arms, 2026-07-19)
 
 Session prompt `SWFRecompDocs/prompts/avm2-rwk-typed-values.md`, commit

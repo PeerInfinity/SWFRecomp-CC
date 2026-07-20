@@ -89,10 +89,18 @@ void avm2_setup_locals(Avm2Value* loc, uint32_t num_locals, Avm2Activation* act,
 {
 	Avm2Context* ctx = act->ctx;
 	if (num_locals == 0) return;
+	// `avm2_undefined()` is `{ AVM2_VALUE_UNDEFINED, 0, { 0 } }` — all 16
+	// bytes zero — so the per-local undefined fill is BYTE-EXACTLY a memset.
+	// It is not a small loop: the RWK plan_k TAS runs 50.7M setup_locals
+	// calls / 1560 ticks at ~3.9 locals each = 197M scalar 16-byte stores.
+#ifdef AVM2_NO_LOCALS_MEMSET
 	for (uint32_t i = 0; i < num_locals; i++)
 	{
 		loc[i] = avm2_undefined();
 	}
+#else
+	memset(loc, 0, (size_t) num_locals * sizeof(Avm2Value));
+#endif
 	loc[0] = act->this_val;
 
 	const Avm2AbcMethodData* md = &act->file->data->methods[method_index];

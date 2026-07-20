@@ -16,6 +16,17 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_value.h>
 
+// INLINE SLOTS WERE TRIED HERE AND RULED OUT — see RWK_AB_STATUS.md. Carving
+// the slot array out of the object's own allocation removed one alloc + one
+// free per construction (o1heapAllocate 2.60% -> 1.48% Ir, -489M) but grew the
+// live heap 22% (138 -> 169 MB at 1560 ticks) and cut GC=0 headroom ~17%.
+// Cause: o1heap bins by `roundUpToPowerOf2(amount + O1HEAP_ALIGNMENT)` with
+// ALIGNMENT 32, and sizeof(Avm2Object) is 208 -> a 256-byte fragment with only
+// 16 bytes of slack. Combining crosses a power of 2 for every class with more
+// than one slot: FlxList (2 slots, 64% of constructions) 320 -> 512 bytes,
+// FlxQuadTree (21 slots, 30%) 768 -> 1024. It only pays above ~57 slots, i.e.
+// on classes with negligible construction volume. Do not retry without first
+// changing the allocator's size classes or shrinking Avm2Object.
 Avm2Object* avm2_object_alloc(Avm2Context* ctx, uint8_t kind, uint32_t slot_count)
 {
 	Avm2Object* obj = avm2_alloc(ctx, sizeof(Avm2Object));
@@ -26,10 +37,9 @@ Avm2Object* avm2_object_alloc(Avm2Context* ctx, uint8_t kind, uint32_t slot_coun
 	if (slot_count > 0)
 	{
 		obj->slots = avm2_alloc(ctx, slot_count * sizeof(Avm2Value));
-		for (uint32_t i = 0; i < slot_count; i++)
-		{
-			obj->slots[i] = avm2_undefined();
-		}
+		// `avm2_undefined()` is { 0, 0, { 0 } } — all 16 bytes zero — so this
+		// is byte-exactly the old per-slot undefined fill.
+		memset(obj->slots, 0, slot_count * sizeof(Avm2Value));
 	}
 	return obj;
 }
