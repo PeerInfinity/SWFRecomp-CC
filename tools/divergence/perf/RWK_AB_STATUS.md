@@ -9,6 +9,196 @@ real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
 
+## ★ SESSION 2026-07-20b — playability scoreboard + the quadtree gate
+
+Prompt `SWFRecompDocs/prompts/avm2-playability-scoreboard-and-quadtree-gate.md`.
+Measurement + gate decision; **no lever shipped, by design**. Objective is
+**30 fps = 33 ms**, not parity with Ruffle. Raw: `/mnt/c/playwright/pb_2026-07-20/`
+(rig), session scratchpad (callgrind). All five demos were **recompiled and
+rebuilt FRESH at HEAD** first — every deployed wasm predated lever 5.
+
+### §1 The scoreboard — 5 titles, same day, same rig, 5 interleaved rounds, state-proven
+
+| title | ours mean | ours p50 | ours %>33ms | Ruffle mean | Ruffle %>33ms | 30 fps? |
+|---|---|---|---|---|---|---|
+| Seedling | **18.4** | 16.9 | **0.5%** | 36.9 | 77.3% | **YES (ours only)** — we win ~2.0x |
+| RWIC | **18.3** | 16.3 | **0.8%** | *Ruffle renders nothing* | — | **YES** |
+| RWF | 30.8 | 28.6 | ~22% | *Ruffle renders nothing* | — | **BORDERLINE** |
+| RWP | 47.5 | 44.7 | 100% | 41.7 | 99.1% | **NO — neither engine** |
+| RWK | 61.1 | 56.4 | 100% | 54.9 | 100% | **NO — neither engine** |
+
+**Two of five titles already clear 30 fps; a third is on the line.** The
+pipeline already "just works" for part of the corpus — the remaining problem is
+narrower than the arc assumed. Zero frames >250 ms in any of our arms (tier-2
+GC holding).
+
+- **We run two titles Ruffle cannot.** `rwf_ruffle` and `rwic_ruffle` load the
+  SWF, tick at ~60 fps for 90 s, and **never draw a single shape**
+  (`__rufflePerfDraws` stays 0, stage solid black). Byte-identical SWFs are
+  served to both engines, so this is Ruffle's own failure. Their "0.3-0.5 ms
+  frames" are the cost of rendering nothing — **never quote them as a Ruffle win.**
+- RWK/RWP: Ruffle is ahead in 5/5 paired rounds (~1.11x / ~1.14x on mean) but
+  the round spreads overlap heavily. A small consistent edge, not a defensible
+  ranking — and **moot**, since both engines are at ~100% of frames over budget.
+- RWF's `%>33ms` sits ON the line and swings 10%→65% on a small mean shift.
+  Read it as "borderline", never as a percentage.
+
+**Two measurement bugs found and fixed — both the title-screen trap in new
+clothes.** (1) `__swfPerf.cpu` is a **120-slot circular** buffer and Ruffle's
+rings ~600, both SHORTER than a 30 s window, so a single end-of-window read
+silently mixes in menu frames; both drivers now drain-poll. (2) RWIC/RWF stage
+through two cheap intermediate states and take ~45 s to reach a live level; the
+tell for the early-gate bug was **mean < p50**. Note `__swfPerf` marks
+level-generation stalls `bad`, so the bad-frame filter must run AFTER the
+phase cut or it deletes the marker being looked for.
+
+⚠ **Caveat I own:** part of this rig run overlapped a native callgrind job on
+the same machine, so the ABSOLUTES may be inflated (a single smoke run of RWK
+under heavier concurrent load read 94.7 ms p50 vs 56.4 here). All arms were
+interleaved under the same conditions, so **paired comparisons and the
+far-from-the-line verdicts (Seedling, RWIC) are sound**; RWF's borderline call
+is the one a quieter re-run could move.
+
+### §2 Fresh HEAD native profile (the first since post-lever-1)
+
+600t plan_k TAS, state-attested (tick 599 dumped: live PlayState, not a menu).
+GC=0 **38.012B Ir** — bit-identical to the recorded post-lever-6 figure, as
+expected since no runtime code changed since `93299b884`. Default GC 39.577B;
+**the collector is now only 3.95% of Ir** (tier-2 landed). Menu prefix = 5.8%.
+Ranked GC=0 leaders: `blend_over` 7.23, `getproperty_static_ic` 5.64,
+`resolved_get` 5.23, **`abc0_m484` (FlxQuadTree.addObject) 4.71**,
+`setup_locals` 3.58, `coerce_to_class` 3.40, `coerce_to_type_mn` 3.36,
+`o1heapAllocate` 2.74, **`abc0_m486` (FlxQuadTree.overlap) 2.72**.
+
+**The widely-quoted "property GET 28.4%" is retired** — it was extrapolation
+from the post-lever-1 profile. At HEAD the GET cluster is ~11%.
+
+### §3 THE GATE — the quadtree is 70.84% of the frame
+
+**Method (reusable).** ABC method IDs were *derived*, not guessed: parse the
+emitted `abc0_tables.c` pools + class/trait arrays to map `abc0_mNNN` → AS3
+(`scratchpad/abcmap.py`, `mapnames.py` — two independent implementations that
+agree). **m482 ctor, m483 add, m484 addObject, m485 addToList, m486 overlap,
+m487 overlapNode = `org.flixel::FlxQuadTree`; m593 = `FlxList` ctor.** Gotcha:
+the emitted string/namespace/multiname pools already contain their index-0
+sentinel — prepending a placeholder shifts every name by one and yields
+plausible garbage.
+
+**Attribution instrument: `--toggle-collect`** entered at `m483`/`m486`, the
+only two entry points that never nest (both called solely from
+`FlxU.overlap`/`collide`). Every descendant Ir is counted in caller context
+exactly once, with no attribution model. Validated: `blend_over` = **0 Ir**
+inside the region. **Two instruments were tried and DISCARDED — record them so
+nobody re-derives them:** proportional flow propagation smears through the
+single `avm2_call_method_ref` dispatcher (it assigned the software blitter
+w=0.54); callgrind edge-*inclusive* costs suffer cycle inflation (reports
+`m486`-inclusive as 85B against a 38B run). Also: `--toggle-collect` is a
+**toggle, not a nesting counter** — seeding it on `m482` anti-collects every
+nested `new FlxQuadTree`.
+
+**Result: the Flixel collision-quadtree subsystem is 70.84% of total Ir
+(26.926B / 38.012B), 75.22% of gameplay-only Ir.** Split:
+
+| | Ir | % of run | % of QT |
+|---|---|---|---|
+| (i) allocation + constructor execution — poolable | 7.078B | **18.62%** | 26.3% |
+| (ii) insert/traverse/overlap logic — NOT poolable | 19.848B | **52.21%** | 73.7% |
+
+Component breakdown of the region: property GET 17.10% of QT · AS3 method
+bodies 16.38 · coerce 14.46 · call/dispatch+locals 14.06 · arithmetic/equality
+9.25 · **allocator+object birth 9.21** · name resolution 9.70 · property SET
+3.91 · collision callbacks 2.29. Concentration: **54% of all `o1heapAllocate`
+Ir in the whole program runs inside FlxQuadTree constructors**; 38% of
+`setup_locals`. The non-quadtree remainder (29.16%) is almost entirely blit —
+**the RWK frame is quadtree + blit and very little else.**
+
+Structure (`xplor/PlayState.as:394-402`): **9 tree rebuilds + 14 traversals per
+tick**, every tree discarded (`collide` builds once and traverses twice, for the
+X then Y solve). Cross-checks with the lever-6 census (2410 nodes/tick).
+
+#### GATE VERDICT: **PASSES — but pooling is NOT the lever that passes it**
+
+RWK needs **1.85x** (mean 61.1 → 33 ms). Counterfactuals, Ir share as proxy:
+
+| scenario | Ir removed | frame | vs 33 ms |
+|---|---|---|---|
+| **entire subsystem free** | 70.84% | **17.8 ms** | **passes** |
+| pooling, generous (all of bucket (i)) | 18.62% | 49.7 ms | fails |
+| **pooling, honest** (allocator + object birth only) | 6.52% | 57.1 ms | **fails** |
+| order-identical AS3 reimplementation | ~39.2% | 37.1 ms | **misses** |
+| **order-identical NATIVE reimplementation** | ~60.5% | **24.1 ms** | **passes** |
+
+**Pooling is dead on arithmetic, structurally.** Only 9.21% of the region is
+allocation at all (`o1heapAllocate` is 3.43% of it); the rest is the AVM2 cost
+of *executing* the algorithm. And a recycled node is not a free node — the
+ctor body is dominated by the **parent-list copy loops** and ~12 field stores
+that any `recycle()` must still run (later Flixel's own `recycle()` does
+exactly this). This re-confirms [[avm2-alloc-arc-ruled-out]] from a new angle.
+
+**Do not build the pooled instrument of §4.** Its prize is now known in
+advance — which is precisely what levers 5 and 6 lacked.
+
+#### Corpus check + the validation tension
+
+- **All four Robot Wants titles ship the IDENTICAL unpooled quadtree** — zero
+  `recycle`/`_cachedTreesHead` in RWK's 2.21 or the sequels' 2.35 (both predate
+  the Flixel version that added pooling). So the hoped-for "sequels are faster
+  because they pool" natural experiment **does not exist**, and one substitution
+  covers the whole corpus.
+- **The cheap oracle only validates the worthless lever.** `_rwk_tas` proves
+  byte-identical trace + frames, but `overlapNode` invokes the collision
+  callback in node-list order and those callbacks **mutate positions** — so any
+  change to tree *shape* changes the frames even when correct. Pooling and an
+  order-identical reimplementation are TAS-validatable; an algorithm change
+  (spatial hash, skip-tree-for-small-N) has a bigger prize but **forfeits the
+  oracle** and needs a weaker one.
+- **Semantic-risk audit for the two classes, verified not assumed:** zero
+  `extends` of either class in any of the four titles; every
+  `describeType`/`getQualifiedClassName`/`getDefinitionByName` site is in
+  dead-linked `mx.*` Flex code and none targets them; `FlxList` never escapes
+  `FlxQuadTree`. Residual risk that does NOT go away: the callback still reads
+  `.x/.width/.exists/.solid` off real AS3 `FlxObject`s, so some AVM2 property
+  access survives any native implementation — the 60.5% row above is an
+  estimate with that already discounted, not a ceiling.
+
+### §5 DIRECTION CALL
+
+1. **Two of five titles are already playable** (Seedling, RWIC), RWF is on the
+   line, RWK and RWP are not — and Ruffle misses 30 fps on every title it can
+   render. This is a **workload** problem, not a competitive one.
+2. **The split:** the wasteful *algorithm* is the game's (9 rebuilds/tick,
+   discarded); the *cost per operation* is ours (property GET + coerce +
+   dispatch + name resolution = 55% of the region). RWK's frame is both,
+   multiplicatively. Six levers have attacked the second factor (~2.9x
+   compute); nobody has attacked the first.
+3. **Next investment: form (b), native intrinsic `org.flixel` collision
+   classes — and it should NOT be gated behind (a).** The prompt gates (b) on
+   semantic risk; for these two classes that risk is audited and tame, while
+   the arithmetic says **(a) alone lands at ~37 ms and misses the bar, and only
+   (b) reaches it (~24 ms)**. Fingerprint the class and **fall back to the
+   game's own code on any mismatch** — non-negotiable, and cheap here because
+   all four titles share byte-identical source.
+4. **Deferred, deliberately:** the lever-7 runtime work (form (c)). At 70.84%
+   quadtree, generic runtime levers are attacking the same instructions from a
+   worse angle.
+
+**Ir is not time.** Every counterfactual above is an instruction-count proxy;
+this arc has twice failed to convert Ir to wall-clock (lever 5: −13.1% Ir →
+~1.1x; lever 6: −5.16% → nothing resolvable). Two things argue this case
+converts better — the removed work is pointer-chasing (property GET, vtable
+walks), plausibly *higher* CPI than average, unlike levers 5/6 which removed
+cheap predictable instructions; and native runs the **scalar** blit, so the
+quadtree's share of the *wasm* frame is if anything higher. Validate any build
+on wall-clock, never on Ir.
+
+**Open, NOT answered here:** why RWK (61.1) is 3.3x RWIC (18.3) on identical
+quadtree code — static collide/overlap call-site counts *invert* the ordering
+(RWIC 16 sites, RWK 9), so the driver is dynamic (live object counts, map size).
+**The 70.84% is measured for RWK only; do not transfer it.** A per-title
+toggle-collect run settles it cheaply. Also unbuilt: the symbolicated
+(`--profiling-funcs`) wasm CDP profile at HEAD — `build_wasm_avm2.sh` has no
+such flag, so it needs its own FRESH build.
+
 ## ⛔ VERDICT 2026-07-20 — the "11x Ruffle gap" never existed. Arc goal changed.
 
 Session prompt `SWFRecompDocs/prompts/avm2-title-inversion-diagnosis.md`
@@ -99,10 +289,13 @@ targets ~6% of the frame for at most 1.1x, and it would fight the conservative
 ext scan, the arena bitmap membership test and the pinned/immortal surfaces for
 that. Ruling it out is the point of this session.
 
-For scale, the largest remaining cluster in the same profile is **property GET
+~~For scale, the largest remaining cluster in the same profile is **property GET
 at 28.4%** (`getproperty_static_ic` 8.82, `resolved_get` 6.78, `value_vtable`
 3.43, `vtable_find_mn` 2.56, …) — ~5x the allocator opportunity, and the thing
-six levers have already been chipping at.
+six levers have already been chipping at.~~ **RETRACTED 2026-07-20b — this was
+extrapolation from the post-lever-1 profile. The fresh HEAD profile puts the GET
+cluster at ~11%, and the real headline is the quadtree at 70.84%. See the
+session section at the top of this file.**
 
 ### What the arc's question becomes
 
