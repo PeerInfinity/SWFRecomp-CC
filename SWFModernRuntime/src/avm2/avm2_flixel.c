@@ -54,9 +54,20 @@
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_value.h>
 #include <memory/heap.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-// FlxQuadTree.as:22-26 — public static const.
+// FlxQuadTree.as:22-26 — public static const (Flixel 2.21).
+//
+// 2.35 replaced this fixed constant with a `protected static var _min:uint`
+// that the ROOT node computes as `(width + height) / (2 * FlxU.quadTreeDivisions)`
+// and every child reuses (it is static). `quadTreeDivisions` defaults to 3 and
+// neither RWF nor RWIC overrides it (both call FlxU.setWorldBounds without the
+// 5th argument, and FlxU resets it to 3), so for the two whitelisted 2.35
+// titles the divisor is a fixed 6. See the 2.35 variant in qt_node_new and the
+// per-title fingerprints in SWFRecomp/src/abc/abc_emit.cpp.
 #define FLXQT_MIN 48.0
+#define FLXQT_DIVISIONS_235 3u   // FlxU.quadTreeDivisions default; verified for RWF/RWIC
 #define FLXQT_A_LIST 0u
 #define FLXQT_B_LIST 1u
 
@@ -180,7 +191,22 @@ static uint32_t g_oa;        // _oa:uint
 static int g_no_intrinsics = -1;   // AVM2_NO_INTRINSICS, read once
 static int g_flxlist_verified = 0; // intrinsic_id 2 seen
 static Avm2Class* g_qt_pending;    // FlxQuadTree seen before FlxList
+static int g_qt_pending_is_235;    // variant of the parked FlxQuadTree
 static Avm2Class* g_qt_cls;        // installed FlxQuadTree class
+
+// Diagnostic call counters. Zero cost by default; AVM2_FLIXEL_STATS=1 prints
+// them at exit. The intrinsic installs LAZILY (first FlxU.collide), so a
+// boot-only check sees nothing — these counts are how the intrinsic-vs-fallback
+// frame oracle proves the native path was actually exercised (non-vacuous).
+static unsigned long g_stat_ctor, g_stat_add, g_stat_addobj,
+                     g_stat_overlap, g_stat_overlapnode;
+
+// Subdivision threshold. 2.21 (id 1) uses the fixed MIN=48 at every node; 2.35
+// (id 3) has the ROOT compute a shared `_min` from its size, which every child
+// reuses. `g_qt_is_235` selects the variant; `g_qt_min` holds the live value,
+// set once per root in qt_node_new and read by all nodes of that tree.
+static int g_qt_is_235 = 0;
+static double g_qt_min = FLXQT_MIN;
 
 // FlxRect slots on the root object (resolved at install time; 0 = fall back to
 // the public-property path).
@@ -350,6 +376,7 @@ static FlxQTNode* qt_node_new(Avm2Context* ctx, FlxQTExt* ext,
                               double param1, double param2, double param3, double param4,
                               FlxQTNode* param5)
 {
+	g_stat_ctor++;
 	FlxQTList* _loc6_ = NULL;
 	FlxQTList* _loc7_ = NULL;
 	FlxQTNode* self = (FlxQTNode*) arena_alloc(ctx, &ext->arena, (uint32_t) sizeof(FlxQTNode));
@@ -359,8 +386,20 @@ static FlxQTNode* qt_node_new(Avm2Context* ctx, FlxQTExt* ext,
 	self->y = param2;
 	self->width = param3;
 	self->height = param4;
-	// :67
-	self->_canSubdivide = (param3 > FLXQT_MIN || param4 > FLXQT_MIN) ? 1 : 0;
+	// :67 (2.21) / :113-114 (2.35) — the subdivision threshold.
+	//  2.21 (id 1): fixed MIN=48 at every node.
+	//  2.35 (id 3): the ROOT (param5==NULL) computes a shared `_min` from its
+	//    own size and FlxU.quadTreeDivisions (=6 for RWF/RWIC, see FLXQT_MIN
+	//    comment); the value is a uint (truncated), and every child reuses it
+	//    because `_min` is static. We mirror that by setting g_qt_min once on
+	//    the root and reading it on every node — faithful to the static.
+	if (param5 == NULL)
+	{
+		g_qt_min = g_qt_is_235
+			? (double) (uint32_t) ((param3 + param4) / (2.0 * FLXQT_DIVISIONS_235))
+			: FLXQT_MIN;
+	}
+	self->_canSubdivide = (param3 > g_qt_min || param4 > g_qt_min) ? 1 : 0;
 	// :68-69 — QUIRK 4: EVERY node, leaves included, allocates two list nodes.
 	self->_headA = self->_tailA = list_new(ctx, ext);
 	self->_headB = self->_tailB = list_new(ctx, ext);
@@ -454,6 +493,7 @@ static void qt_add_to_list(Avm2Context* ctx, FlxQTExt* ext, FlxQTNode* self)
 // FlxQuadTree.as:117-198
 static void qt_add_object(Avm2Context* ctx, FlxQTExt* ext, FlxQTNode* self)
 {
+	g_stat_addobj++;
 	// :119
 	if (!self->_canSubdivide
 	    || (self->_l >= g_ol && self->_r <= g_or && self->_t >= g_ot && self->_b <= g_ob))
@@ -528,6 +568,7 @@ static void qt_add_object(Avm2Context* ctx, FlxQTExt* ext, FlxQTNode* self)
 // FlxQuadTree.as:373-415
 static int qt_overlap_node(Avm2Context* ctx, FlxQTNode* self, FlxQTList* param1)
 {
+	g_stat_overlapnode++;
 	Avm2Object* _loc3_ = NULL;                       // :375
 	int _loc2_ = 0;                                  // :376
 	FlxQTList* _loc4_ = param1;                      // :377
@@ -592,6 +633,7 @@ static int qt_overlap_node(Avm2Context* ctx, FlxQTNode* self, FlxQTList* param1)
 // FlxQuadTree.as:245-326
 static int qt_overlap(Avm2Context* ctx, FlxQTNode* self, int param1, Avm2Value param2)
 {
+	g_stat_overlap++;
 	FlxQTList* _loc4_ = NULL;                        // :247
 	// QUIRK 7: _oc is reassigned from param2 on entry at EVERY recursion level.
 	g_oc = param2;                                   // :248
@@ -666,6 +708,7 @@ static int qt_overlap(Avm2Context* ctx, FlxQTNode* self, int param1, Avm2Value p
 static void qt_add(Avm2Context* ctx, FlxQTExt* ext, FlxQTNode* self,
                    Avm2Object* param1, uint32_t param2)
 {
+	g_stat_add++;
 	Avm2Object* _loc3_ = NULL;                       // :330
 	g_oa = param2;                                   // :334
 	if (fo_group(ctx, param1))                       // :335
@@ -869,9 +912,26 @@ static void qt_native_init(Avm2Context* ctx, Avm2Object* obj)
 	// immediately after this.
 }
 
-static int install_quadtree(Avm2Context* ctx, Avm2Class* cls)
+// AVM2_FLIXEL_STATS=1: dump the native call counters at exit, so the
+// intrinsic-vs-fallback oracle can prove the native path actually engaged.
+static void flixel_stats_atexit(void)
+{
+	fprintf(stderr,
+	        "FLIXEL_STATS variant=%s ctor=%lu add=%lu addObject=%lu "
+	        "overlap=%lu overlapNode=%lu\n",
+	        g_qt_is_235 ? "2.35" : "2.21", g_stat_ctor, g_stat_add,
+	        g_stat_addobj, g_stat_overlap, g_stat_overlapnode);
+}
+
+static int install_quadtree(Avm2Context* ctx, Avm2Class* cls, int is_235)
 {
 	(void) ctx;
+	g_qt_is_235 = is_235;
+	{
+		const char* s = getenv("AVM2_FLIXEL_STATS");
+		if (s != NULL && s[0] != '\0' && strcmp(s, "0") != 0)
+			atexit(flixel_stats_atexit);
+	}
 	Avm2VTable* vt = &cls->ivtable;
 
 	// Phase 1 — resolve every target. Any miss aborts with the vtable untouched.
@@ -925,28 +985,35 @@ int avm2_flixel_try_install(Avm2Context* ctx, Avm2Class* cls, uint32_t intrinsic
 	if (intrinsic_id == 2)
 	{
 		// FlxList: nothing to install — its instances are C structs. The id
-		// only certifies the 2.21 shape. If FlxQuadTree already linked and was
-		// parked, install it now.
+		// only certifies the shape (2.21 and 2.35 FlxList are byte-identical
+		// source, so one native struct serves both). If FlxQuadTree already
+		// linked and was parked, install it now with its recorded variant.
 		g_flxlist_verified = 1;
 		if (g_qt_pending != NULL && g_qt_cls == NULL)
 		{
 			Avm2Class* pending = g_qt_pending;
 			g_qt_pending = NULL;
-			install_quadtree(ctx, pending);
+			install_quadtree(ctx, pending, g_qt_pending_is_235);
 		}
 		return 0;
 	}
 
-	if (intrinsic_id == 1)
+	// id 1 = FlxQuadTree 2.21 (fixed MIN=48); id 3 = FlxQuadTree 2.35 (dynamic
+	// _min). Both couple to FlxList (id 2): install is refused/parked until
+	// FlxList is fingerprint-verified, so a native FlxList can never exist under
+	// an AS3 quadtree and vice versa — the pairing is all-or-nothing.
+	if (intrinsic_id == 1 || intrinsic_id == 3)
 	{
+		int is_235 = (intrinsic_id == 3);
 		if (g_qt_cls != NULL) return 0;  // already installed over a class
 		if (!g_flxlist_verified)
 		{
 			// FlxList not fingerprint-verified yet: refuse for now, park.
 			g_qt_pending = cls;
+			g_qt_pending_is_235 = is_235;
 			return 0;
 		}
-		return install_quadtree(ctx, cls);
+		return install_quadtree(ctx, cls, is_235);
 	}
 	return 0;
 }

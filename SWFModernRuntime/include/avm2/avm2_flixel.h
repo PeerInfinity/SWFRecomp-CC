@@ -31,16 +31,21 @@
 // this module implements. The id is a fingerprint-gated marker supplied by
 // the recompiler:
 //   0 = no match  -> installs nothing, returns 0
-//   1 = org.flixel::FlxQuadTree 2.21
-//   2 = org.flixel.data::FlxList 2.21
+//   1 = org.flixel::FlxQuadTree 2.21 (fixed MIN=48)
+//   2 = org.flixel.data::FlxList  2.21/2.35 (byte-identical source)
+//   3 = org.flixel::FlxQuadTree 2.35 (dynamic _min = (w+h)/(2*quadTreeDivisions))
 //
 // FlxList instances are replaced by C structs entirely, so id 2 installs
 // nothing and returns 0 — it exists purely so the fingerprint can VERIFY
-// FlxList is the expected 2.21 shape before FlxQuadTree's intrinsic is
-// trusted. FlxQuadTree's install is refused unless FlxList was also
+// FlxList is the expected shape before FlxQuadTree's intrinsic is trusted.
+// (Upstream Flixel FlxList is byte-identical between 2.21 and 2.35, so one
+// native struct serves both; the per-title fingerprints differ only by the
+// obfuscator's control-flow transforms and are all mapped to id 2.)
+// FlxQuadTree's install (id 1 or 3) is refused unless FlxList was also
 // fingerprint-verified; the two classes may link in either order and both
 // orderings are handled (a FlxQuadTree seen first is parked as pending and
-// installed when FlxList arrives).
+// installed when FlxList arrives). This coupling makes native FlxList +
+// native FlxQuadTree strictly all-or-nothing.
 //
 // Returns 1 if the native intrinsic was installed over THIS class, else 0.
 int avm2_flixel_try_install(Avm2Context* ctx, Avm2Class* cls, uint32_t intrinsic_id);

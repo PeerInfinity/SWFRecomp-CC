@@ -672,10 +672,30 @@ namespace abc
 		// (1069 instructions) across Robot Wants Kitty and Robot Wants Puppy;
 		// the two SWFs differ only in constant-pool layout and obfuscated
 		// private/protected namespace labels, both of which normalize out.
-		// Robot Wants Fishy / Ice Cream ship Flixel 2.35 and correctly do NOT
-		// match (different source, plus per-title control-flow obfuscation).
 		{ 0x2c1994f2e30e0642ull, 1, "org.flixel::FlxQuadTree (Flixel 2.21)" },
 		{ 0x6e5f899d35ae5140ull, 2, "org.flixel.data::FlxList (Flixel 2.21)" },
+
+		// Flixel 2.35 collision classes — Robot Wants Fishy / Ice Cream. These
+		// carry PER-TITLE control-flow obfuscation (opaque predicates + jump
+		// threading), so each title's FlxQuadTree AND FlxList fingerprint
+		// differently from 2.21 and from each other — hence one baked constant
+		// per (title, class). The obfuscation is NOT normalized away (a
+		// normalizer that cancels control flow would match wrong code); instead
+		// every method was verified semantically equivalent to clean upstream
+		// Flixel 2.35 by opaque-predicate folding on the raw AVM2 p-code (see
+		// tools/divergence/perf/RWK_AB_STATUS.md, the 2.35-extension §1 table).
+		//
+		// FlxList source is BYTE-IDENTICAL between upstream 2.21 and 2.35, so id
+		// 2 (native FlxList C struct) serves all four titles; only the
+		// obfuscation differs. FlxQuadTree 2.35 differs from 2.21 in exactly one
+		// spot — the ctor replaced the fixed `MIN=48` const with a computed
+		// static `_min = (width+height)/(2*FlxU.quadTreeDivisions)` — so 2.35
+		// uses id 3 (the dynamic-_min native variant in avm2_flixel.c). Both
+		// titles leave FlxU.quadTreeDivisions at its default 3.
+		{ 0xd2cd8bafd2ca5111ull, 3, "org.flixel::FlxQuadTree (Flixel 2.35, RWF)" },
+		{ 0xc15fc34addfdc947ull, 3, "org.flixel::FlxQuadTree (Flixel 2.35, RWIC)" },
+		{ 0x83ed6120348d3ae2ull, 2, "org.flixel.data::FlxList (Flixel 2.35, RWF)" },
+		{ 0xa76edf059e8264caull, 2, "org.flixel.data::FlxList (Flixel 2.35, RWIC)" },
 	};
 
 	static unsigned intrinsicIdForFingerprint(u64 fp)

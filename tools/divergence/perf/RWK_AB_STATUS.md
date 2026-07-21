@@ -9,6 +9,116 @@ real GPU (intel gen-9), driven from WSL via python.exe + Playwright
 unless noted. All native numbers: solo -O2 no-graphics build, RWK plan_k
 TAS (`_rwk_tas`), TZ=NPT-5:45.
 
+## ★ SESSION 2026-07-20d — extend the collision intrinsic to the 2.35 titles (RWF / RWIC)
+
+Prompt `SWFRecompDocs/prompts/avm2-flixel-235-extension.md`. Extends the native
+`org.flixel` collision intrinsic (lever 7, below) from the two Flixel-2.21
+titles to the two Flixel-2.35 titles. **Verification-led**: prove the 2.35
+obfuscated collision bytecode is semantically served by the native impl, bake
+per-title constants only on that proof, then validate with the same-binary
+frame oracle and the rig.
+
+### §0.1 — the lone-FlxList hazard: STRUCTURALLY IMPOSSIBLE (no code change)
+
+Fresh recompiles (post-bake) stamp, per title:
+
+| Title | FlxQuadTree fp / id | FlxList fp / id |
+|---|---|---|
+| RWK (2.21) | `2c1994f2e30e0642` / 1 | `6e5f899d35ae5140` / 2 |
+| RWP (2.21) | `2c1994f2e30e0642` / 1 | `6e5f899d35ae5140` / 2 |
+| RWF (2.35) | `d2cd8bafd2ca5111` / 3 | `83ed6120348d3ae2` / 2 |
+| RWIC (2.35)| `c15fc34addfdc947` / 3 | `a76edf059e8264ca` / 2 |
+
+Before this session, ALL FOUR of the 2.35 fingerprints stamped id=0 — so the
+deployed RWF (30.8 ms) / RWIC (18.3 ms) scoreboard numbers were **pure AS3, not
+partially intrinsified**. Critically, RWF/RWIC FlxList do NOT hash to the 2.21
+constant (`83ed…`/`a76e…` ≠ `6e5f…`) — the feared "lone FlxList matches while
+FlxQuadTree falls back" never occurred.
+
+And it *cannot* occur by construction: `intrinsic_id==2` (FlxList) performs **no
+class substitution** — it only sets the `g_flxlist_verified` certificate and
+releases a parked quadtree. The native `FlxQTList` C structs are allocated
+*exclusively* by `install_quadtree`'s native methods. FlxQuadTree (id 1 or 3)
+refuses/parks until FlxList is certified. So native FlxList and native
+FlxQuadTree install together or not at all — a native FlxList can never exist
+under an AS3 quadtree. **Ruling: the coupling is all-or-nothing; no change
+needed. This is the 2.35-and-beyond precedent.**
+
+### §0.2 — upstream ground truth (clean AdamAtomic/flixel source)
+
+Versions confirmed from each title's decompiled `FlxG.as`: RWF/RWIC = 2.35,
+RWK/RWP = 2.21. Anchored upstream revisions by the `LIBRARY_MINOR_VERSION`
+constant: 2.21 = commit `a2c4d98`, 2.35 = `c5c8369` (FlxQuadTree/FlxList
+unchanged across the whole 2.35 commit window). Upstream 2.21 matches RWK's
+418-line decompile method-for-method (the native impl's verified target).
+
+Diff of the two classes, **2.21 → 2.35**:
+- **FlxList: BYTE-IDENTICAL.** One native FlxList C struct serves all four
+  titles; only obfuscation differs.
+- **FlxQuadTree: exactly ONE genuine change, in the constructor.** The fixed
+  `public static const MIN:Number = 48` was replaced by a computed
+  `protected static var _min:uint`, set once by the ROOT as
+  `_min = (width + height) / (2 * FlxU.quadTreeDivisions)` and reused by every
+  child (it is static); `_canSubdivide = (width > _min) || (height > _min)`.
+  All FIVE other methods (`add`, `addObject`, `addToList`, `overlap`,
+  `overlapNode`) are byte-identical between 2.21 and 2.35. `quadTreeDivisions`
+  defaults to 3 and neither game overrides it (both call `setWorldBounds`
+  without the 5th arg), so the divisor is a fixed 6.
+
+Outcome: a **small variant** (§0.2 decision) — a distinct native id (3) that
+computes `_min` dynamically. Because coarser/finer subdivision changes tree
+depth → traversal → collision-callback order, the fixed-48 impl would diverge
+on the frame oracle; the faithful 2.35 variant is both correct AND necessary.
+
+### §1 — per-method bytecode verification table (what licenses the constants)
+
+Every method verified semantically equivalent to clean upstream 2.35 by folding
+the per-title opaque predicates (JPEXS decompile, cross-checked against raw
+AVM2 p-code exported with FFDec where the structured output was unsound). The
+obfuscation is per-title control flow — **not normalized away** (a normalizer
+that cancels control flow would match wrong code); instead each obfuscated body
+gets its own baked constant.
+
+| Method | RWF | RWIC | Class | Evidence |
+|---|---|---|---|---|
+| FlxList ctor | ≡ | ≡ | (b) | opaque-pred fold → `super(); object=null; next=null` (2.21≡2.35 source) |
+| FlxQuadTree ctor | ≡ | ≡ | **(c)** + (b) | the `_min` change; `_min` root-only, `_canSubdivide=w>_min\|\|h>_min` match clean 2.35 |
+| FlxQuadTree.add | ≡ | ≡ | (b) | p-code fold; member-loop null/exists guard, solid→addObject vs group→add |
+| FlxQuadTree.addToList | ≡ | ≡ | (b) | p-code fold; A/B head-relink (`_tailB.object!=null` — decompiler artifact cleared) |
+| FlxQuadTree.addObject | ≡ | ≡ | (b) | fold w/ operand-order proof; identical containment nw→sw→ne→se, partial nw→ne→se→sw |
+| FlxQuadTree.overlap | ≡ | ≡ | (b) | FFDec p-code fold; result-OR accumulation, BothLists split, nw→ne→se→sw recursion |
+| FlxQuadTree.overlapNode | ≡ | ≡ | (b) | p-code fold; 9-term short-circuit AABB reject + `_oc(_o,co)` callback order |
+
+Class key: (a) incidental encoding the normalizer cancels — **none found**;
+(b) obfuscator control-flow transform, per-title baked constant; (c) genuine
+2.35 source difference (the ctor `_min`), served by native id 3.
+
+### Baked constants (evidence chain above) — SWFRecomp/src/abc/abc_emit.cpp
+
+    { 0xd2cd8bafd2ca5111, 3, "org.flixel::FlxQuadTree (Flixel 2.35, RWF)" }
+    { 0xc15fc34addfdc947, 3, "org.flixel::FlxQuadTree (Flixel 2.35, RWIC)" }
+    { 0x83ed6120348d3ae2, 2, "org.flixel.data::FlxList (Flixel 2.35, RWF)" }
+    { 0xa76edf059e8264ca, 2, "org.flixel.data::FlxList (Flixel 2.35, RWIC)" }
+
+Fresh recompiles stamp exactly 2 classes per title (211/229/141/268 total
+classes; zero false positives). No normalizer change was made → the 2.21
+constants and RWK/RWP stamps are untouched (verified: id 1/2 unchanged).
+
+### §3.1 — per-title fallback proof (fail-safe)
+
+Decompressed each CWS SWF, flipped ONE byte inside the FlxQuadTree method body,
+re-emitted as FWS, recompiled:
+- **RWF:** FlxQuadTree fp `d2cd…` → `0000000000000000` (body no longer decodes →
+  poisoned to 0 → no match), intrinsic 3 → **0**; FlxList untouched (`83ed…`, id 2).
+- **RWIC:** FlxQuadTree fp `c15f…` → `e35e7675c840bc98` (decodes but hashes
+  differently), intrinsic 3 → **0**; FlxList untouched (`a76e…`, id 2).
+
+Both fail-safe modes demonstrated (undecodable→0, and decodable-but-different).
+A one-byte difference in the gated body drops the marker and the game's own
+compiled AS3 runs.
+
+### §2 frame oracle + §3.2-3.4 (CI / wasm / rig): rows appended below when complete.
+
 ## ★ SESSION 2026-07-20c — native intrinsic org.flixel collision classes (lever 7)
 
 Prompt `SWFRecompDocs/prompts/avm2-flixel-native-collision-intrinsic.md`. Builds
