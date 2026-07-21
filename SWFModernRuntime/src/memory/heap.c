@@ -52,27 +52,39 @@
 #ifdef __wasi__
 #define DEFAULT_FULL_HEAP_SIZE (64ULL * 1024 * 1024)  // 64 MB for WASI (no virtual memory)
 #elif defined(__EMSCRIPTEN__) && defined(SWF_AVM2)
-// Browser AVM2: 1984 MB — just under both hard ceilings on wasm32: o1heap's
-// capacity max (FRAGMENT_SIZE_MAX = 2 GB) and emscripten's anonymous-mmap
-// limit (a single 2048 MB mmap fails, 1984 MB succeeds; measured, emsdk
-// 2026-07). AVM2 strings are not yet GC-collected and a single tick can
-// create GBs of transient string garbage: Robot Wants Kitty's PlayState boot
-// peaks at a measured 1409 MB (AVM2_HEAP_STATS, FlxTilemap.arrayToCSV
-// quadratic concat), which OOM'd the old 1 GB arena. The link must allow the
-// wasm memory to reach it: build_wasm_avm2.sh passes -sMAXIMUM_MEMORY=4GB.
-// AVM1 browser builds keep the 1 GB arena below so the existing demos'
-// memory footprint is untouched.
-#define DEFAULT_FULL_HEAP_SIZE (1984ULL * 1024 * 1024)  // wasm32 practical max
-#elif defined(__EMSCRIPTEN__) || !defined(__LP64__)
-#define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB (wasm32/32-bit address space)
+// Browser AVM2: 512 MB. The arena is committed AND zero-filled resident at
+// heap_init under emscripten (see the WARNING block above), so its SIZE — not
+// its usage — is what a player's tab pays at Start. It was 1984 MB only to
+// hold a single tick's `FlxTilemap.arrayToCSV` O(n^2) concat transient
+// (measured ~1397 MB for RWK, up to ~1788 MB for RWIC). The native arrayToCSV
+// intrinsic (avm2_flixel.c id 4) removes that transient: with it, RWK's whole
+// run peaks at a MEASURED 246 MB (worst gameplay tick 118 MB, was 1397 MB) —
+// no title's post-intrinsic demand approaches 512 MB. 512 gives ~2x margin
+// under o1heap's 7/8 eager-sweep valve (448 MB) and the watermark self-clamps
+// to ~(512-live)/4, keeping the GC sawtooth well below the valve.
+//   FINAL GATE (per SWFRecompDocs/plans/avm2-browser-footprint.md §6.3): a
+//   browser soak (zero OOM, HEAPU8 flat at 512+base) and a real-GPU rig FPS
+//   check (all-frames mean + >250ms stall count, NOT p50; every title >=30fps)
+//   on the Windows Playwright rig. If GC cadence bites, raise via SWF_HEAP_MB
+//   or bump this to 768-1024 (still ~2x under the old 1984). See §3 Lever 1A.
+// Override at runtime for A/B sizing: SWF_HEAP_MB=<n> (native + wasm-with-env).
+#define DEFAULT_FULL_HEAP_SIZE (512ULL * 1024 * 1024)
+#elif defined(__EMSCRIPTEN__)
+// Browser AVM1: 256 MB. Same commit-at-load mechanism as AVM2 above; AVM1 live
+// sets are single-digit MB (Tetris/N/Bloons) with no Flixel transient, so the
+// old wasm32-default 1 GB was ~30x headroom paid resident at every demo's
+// Start. 256 MB is still ~30x the live set. (Native AVM1 is 64-bit -> the 4 GB
+// branch below; only the browser demos take this path.)
+#define DEFAULT_FULL_HEAP_SIZE (256ULL * 1024 * 1024)
+#elif !defined(__LP64__)
+#define DEFAULT_FULL_HEAP_SIZE (1ULL * 1024 * 1024 * 1024)  // 1 GB (32-bit native address space)
 #else
-// 64-bit native: 4 GB virtual space, physical RAM still lazy. AVM2 strings
-// are not garbage-collected, and a single game tick can legitimately create
-// hundreds of MB of transient string garbage (Flixel FlxTilemap.arrayToCSV
-// builds a 188x84-tile CSV by repeated concatenation — Robot Wants Kitty's
-// PlayState boot OOM'd the old 1 GB arena before its first frame).
-// Collectable strings are the real fix; until then the native arena is
-// sized so real games boot.
+// 64-bit native: 4 GB virtual space, physical RAM lazy (native Linux anonymous
+// mmap + demand paging — genuinely lazy here, unlike wasm), so the reservation
+// costs no resident RAM until touched. Kept roomy as a native-only convenience;
+// the FlxTilemap.arrayToCSV intrinsic (avm2_flixel.c id 4) already removed the
+// old multi-GB single-tick transient that motivated this (RWK measured
+// 1397 -> 118 MB worst tick), so real games now peak in the low hundreds of MB.
 #define DEFAULT_FULL_HEAP_SIZE (4ULL * 1024 * 1024 * 1024)  // 4 GB virtual space
 #endif
 
@@ -186,6 +198,17 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size)
 	// Use caller-specified heap size, or default
 	if (app_context->heap_full_size == 0)
 		app_context->heap_full_size = DEFAULT_FULL_HEAP_SIZE;
+	// SWF_HEAP_MB=<n> overrides the arena size (A/B arena sizing for the
+	// footprint work — native always, and wasm builds that expose the env).
+	{
+		const char* mb = getenv("SWF_HEAP_MB");
+		if (mb != NULL && mb[0] != '\0')
+		{
+			long long v = atoll(mb);
+			if (v > 0)
+				app_context->heap_full_size = (size_t) v * 1024ULL * 1024ULL;
+		}
+	}
 	app_context->heap = vmem_reserve(app_context->heap_full_size);
 
 	if (app_context->heap == NULL)

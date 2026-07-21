@@ -1,9 +1,38 @@
 # AVM2 browser memory footprint — does it really need 2 GB? (measure + plan)
 
-Status: **PLANNING (measurement session, 2026-07-21).** No lever shipped. The
-only code change this session is permanent instrumentation (worst-single-tick
-gross transient) — see §5. Session prompt:
-`SWFRecompDocs/prompts/avm2-browser-footprint-plan.md`.
+Status: **IMPLEMENTED — native-validated, browser-rig validation pending
+(2026-07-21).** Levers 2A + 1A + 4 shipped; see the §6 status block below.
+Session prompt: `SWFRecompDocs/prompts/avm2-browser-footprint-plan.md`.
+
+> **§6 IMPLEMENTATION STATUS (2026-07-21).**
+> - **Step 1 — native `FlxTilemap.arrayToCSV` intrinsic (Lever 2A): SHIPPED.**
+>   Method-level fingerprint gate (id 4) in `abc_emit.cpp`; native O(n) builder
+>   in `avm2_flixel.c`. Baked constants: RWK+RWP `1340f1fcfea0a94d`, RWF
+>   `0067a14b337b8c8b`, RWIC `56e9fc6d17820266` — each stamps EXACTLY FlxTilemap,
+>   0 false positives across all 4 titles, deterministic. **Byte-identity proven**
+>   two ways: a built-in `AVM2_ARRAYTOCSV_SELFCHECK` (fast O(n) builder vs a
+>   literal O(n²) transliteration of the AS3 nest, same runtime primitives) — 0
+>   mismatches on RWP's real boot maps — and a full **frame oracle** (RWP, 200/200
+>   frames byte-identical, intrinsic ON vs `AVM2_NO_INTRINSICS`).
+> - **Step 2 — native worst-single-tick re-measure: DONE for RWK (representative).**
+>   RWK worst gameplay-tick gross **1397 MB → 118 MB** (the residual is
+>   `loadMap`'s CSV-parse split, intrinsic-independent); run-wide peak_allocated
+>   **1423 → 246 MB**. The OFF figure reproduces §1a's 1397 MB exactly.
+>   *Pending:* RWF/RWP/RWIC gameplay re-measure needs each title's New-Game TAS
+>   click (RWK's `(158,303)@t255` did not transfer; boot-only runs confirm the
+>   intrinsic engages on all four).
+> - **Step 3 — AVM2 arena 1984 → 512 MB (Lever 1A): SHIPPED (code).** `heap.c`
+>   `__EMSCRIPTEN__ && SWF_AVM2` branch → 512 MB; `INITIAL_MEMORY` 512 → 128 MB.
+>   **Native no-OOM confirmed:** RWK peaks 246 MB (48% of 512, 0 OOM) and even
+>   survives a 256 MB arena (159 MB, 62% — watermark self-clamps as predicted).
+>   *Pending (the plan's final gate):* browser soak (zero-OOM, HEAPU8 flat) +
+>   real-GPU rig FPS (all-frames mean + >250 ms stall count, ≥30 fps) on the
+>   Windows Playwright rig. Back off to 768 MB–1 GB via `SWF_HEAP_MB` if GC
+>   cadence bites. A new `SWF_HEAP_MB=<n>` env overrides the arena for A/B sizing.
+> - **Step 4 — AVM1 arena 1024 → 256 MB (Lever 4): SHIPPED (code).** `heap.c`
+>   `__EMSCRIPTEN__` (AVM1) branch → 256 MB. **Native probe:** N (largest complex
+>   AVM1 demo) peaks 83 MB at a 256 MB arena (33%, 0 OOM) — ~3× margin. New
+>   `SWF_HEAP_STATS` env (AVM1 twin of `AVM2_HEAP_STATS`) added for the probe.
 
 Related memories: [[avm2-rwk3-browser-demo]] (how 1984 MB was chosen),
 [[avm2-collectable-strings]], [[avm2-raw-alloc-reclamation]],

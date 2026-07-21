@@ -198,6 +198,13 @@ echo "=== Linking ${NAME}.js / ${NAME}.wasm ==="
 # registered AS3 callback; avm2_external.c). _malloc/_free back its EM_ASM
 # string marshaling (module-scope _malloc is only present when exported).
 EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_avm2_ei_dispatch","_malloc","_free"]'
+# INITIAL_MEMORY is committed + zero-filled RESIDENT at page load (before the
+# user hits Start), so it is the pre-Start footprint. The o1heap arena (now
+# 512 MB, memory/heap.c) lands lazily at Start via ALLOW_MEMORY_GROWTH, so
+# INITIAL_MEMORY only needs the wasm base (~130 MB). Was 512 MB; 128 MB cuts
+# the at-load commit ~4x, grown on demand. MAXIMUM_MEMORY stays 4GB — a
+# harmless address-space cap; it can drop to ~1GB once the 512 MB arena is
+# browser-validated (avm2-browser-footprint.md §6.3).
 emcc "${OBJS[@]}" \
     --use-port=emdawnwebgpu \
     "${SIMD_FLAGS[@]}" \
@@ -206,7 +213,7 @@ emcc "${OBJS[@]}" \
     -s EXPORTED_FUNCTIONS="${EXPORTED_FUNCS}" \
     -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32","HEAPU8"]' \
     -s ALLOW_MEMORY_GROWTH=1 \
-    -s INITIAL_MEMORY=512MB \
+    -s INITIAL_MEMORY=128MB \
     -s MAXIMUM_MEMORY=4GB \
     -s STACK_SIZE=8MB \
     -sUSE_ZLIB=1 \

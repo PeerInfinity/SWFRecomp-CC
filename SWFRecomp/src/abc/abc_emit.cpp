@@ -708,6 +708,55 @@ namespace abc
 		return 0;
 	}
 
+	// Known-arrayToCSV method fingerprints (org.flixel::FlxTilemap.arrayToCSV).
+	//
+	// Unlike the FlxQuadTree/FlxList gate (which hashes the WHOLE class), this
+	// is a METHOD-level gate: the fingerprint is the normalized body hash of
+	// the single static method `arrayToCSV`, decoupled from the rest of the
+	// large FlxTilemap class (draw/loadMap/updateTile/... carry per-title
+	// obfuscation and game tweaks that would poison a whole-class hash). Only
+	// the CSV builder itself matters — it is a pure, stateless
+	// (Array, int)->String function — so substituting it is safe on a body
+	// match regardless of what else FlxTilemap contains.
+	//
+	// The transient this kills: arrayToCSV builds a tilemap CSV by O(n^2)
+	// string `+=` concatenation, three layers per PlayState.create — measured
+	// at ~1.7 GB of single-tick garbage on RWIC (see
+	// SWFRecompDocs/plans/avm2-browser-footprint.md §2). The native builder
+	// (avm2_flixel.c, id 4) writes ONE grow-realloc byte buffer — O(n).
+	//
+	// id must match avm2_flixel.h: 4 = FlxTilemap.arrayToCSV.
+	// The 2.21 titles (RWK/RWP) share a clean identical body; the 2.35 titles
+	// (RWF/RWIC) each carry their own opaque-predicate control-flow obfuscation
+	// (§§push/§§goto in the decompile) and fingerprint distinctly — one baked
+	// constant per obfuscated variant, verified byte-identical output.
+	static const IntrinsicEntry ARRAYTOCSV_TABLE[] =
+	{
+		// Flixel 2.21 — RWK and RWP share ONE constant: the clean upstream
+		// body (the `while` loops + `_loc5_ += ...` concat, verified against
+		// jpexs output org/flixel/FlxTilemap.as) is byte-identical between the
+		// two titles; only the constant pool differs and normalizes out.
+		{ 0x1340f1fcfea0a94dull, 4, "org.flixel::FlxTilemap.arrayToCSV (Flixel 2.21, RWK+RWP)" },
+		// Flixel 2.35 — RWF and RWIC each carry their own opaque-predicate
+		// control-flow obfuscation (the §§push(false)/§§goto jump-threaded
+		// decompile), so each fingerprints distinctly. Both were traced to the
+		// same clean CSV semantics by opaque-predicate folding (the always-true
+		// `_loc7_`/always-false `_loc8_` guards collapse to the 2.21 loop nest);
+		// the native builder's output is verified byte-identical per title.
+		{ 0x0067a14b337b8c8bull, 4, "org.flixel::FlxTilemap.arrayToCSV (Flixel 2.35, RWF)" },
+		{ 0x56e9fc6d17820266ull, 4, "org.flixel::FlxTilemap.arrayToCSV (Flixel 2.35, RWIC)" },
+	};
+
+	static unsigned arrayToCSVIdForFingerprint(u64 fp)
+	{
+		if (fp == 0) return 0;   // unhashable body — never match
+		for (const IntrinsicEntry& e : ARRAYTOCSV_TABLE)
+		{
+			if (e.fp != 0 && e.fp == fp) return e.id;
+		}
+		return 0;
+	}
+
 	// Fingerprint of one class (instance + static halves). 0 = unhashable:
 	// any referenced body that failed to hash poisons the whole class.
 	static u64 classFingerprint(const AbcFile& abc, size_t class_index,
@@ -829,6 +878,36 @@ namespace abc
 
 		if (!ok) return 0;
 		return h ? h : 1;
+	}
+
+	// Method-level fingerprint of a class's static `arrayToCSV` method (the
+	// FlxTilemap CSV builder). Returns the normalized body hash of that method,
+	// or 0 if the class has no static method named "arrayToCSV" or its body is
+	// unhashable (fail safe -> never match). A fresh FpCtx is used, exactly as
+	// a standalone method hash: opaque-ns ordinals and the closure guard are
+	// scoped to this one body, deterministically across builds.
+	static u64 arrayToCSVFingerprint(const AbcFile& abc, size_t class_index,
+	                                 const std::vector<int>& method_body)
+	{
+		if (class_index >= abc.classes.size()) return 0;
+		const auto& MN = abc.pool.multinames;
+		const auto& S = abc.pool.strings;
+		for (const AbcTrait& t : abc.classes[class_index].traits)
+		{
+			if (t.kind != TraitKindType::Method) continue;
+			string local;
+			if (t.name != 0 && t.name < MN.size() && MN[t.name].name < S.size())
+				local = S[MN[t.name].name];
+			if (local != "arrayToCSV") continue;
+			u32 method_index = t.method_or_class;
+			if (method_index >= method_body.size() || method_body[method_index] < 0)
+				return 0;
+			FpCtx ctx(abc);
+			u64 bh = hashMethodBody(ctx, abc.method_bodies[method_body[method_index]]);
+			if (ctx.poisoned) return 0;
+			return bh;
+		}
+		return 0;
 	}
 
 	// Makes text safe inside a // comment: single line, and never ending
@@ -3893,6 +3972,16 @@ namespace abc
 				// the marker at 0 and the game's own compiled code runs.
 				u64 fp = classFingerprint(abc, i, method_body, false);
 				unsigned intrinsic_id = intrinsicIdForFingerprint(fp);
+				// Method-level gate (independent of the whole-class hash above):
+				// substitute the native FlxTilemap.arrayToCSV builder (id 4) on a
+				// match of just that static method's body. A class matches at most
+				// one of {FlxQuadTree/FlxList, FlxTilemap.arrayToCSV}.
+				u64 actocsv_fp = 0;
+				if (intrinsic_id == 0)
+				{
+					actocsv_fp = arrayToCSVFingerprint(abc, i, method_body);
+					intrinsic_id = arrayToCSVIdForFingerprint(actocsv_fp);
+				}
 				out << "\t{ " << inst.name << ", " << inst.super_name << ", "
 				    << flags << ", " << (inst.has_protected_ns ? 1 : 0) << ", "
 				    << inst.protected_ns << ", " << ifaces << ", "
@@ -3920,6 +4009,15 @@ namespace abc
 					        qn.c_str(), (unsigned long long) fp,
 					        inst.traits.size(), abc.classes[i].traits.size(),
 					        intrinsic_id);
+					// Always report the arrayToCSV method fingerprint when the
+					// class has one, so its baked constant can be read even before
+					// the class-level fp matches anything (bake workflow).
+					u64 acsv = (actocsv_fp != 0)
+					           ? actocsv_fp
+					           : arrayToCSVFingerprint(abc, i, method_body);
+					if (acsv != 0)
+						fprintf(stderr, "FP-ARRAYTOCSV %s %016llx\n",
+						        qn.c_str(), (unsigned long long) acsv);
 				}
 			}
 			if (abc.instances.empty())

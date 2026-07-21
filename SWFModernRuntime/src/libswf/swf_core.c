@@ -1626,6 +1626,12 @@ frame_loop_exit:
 	actionDrainDpropsReleases(app_context);
 	swfMemReportAtExitIfEnabled();
 
+	// SWF_HEAP_STATS=1: o1heap peak/allocated at exit, so the AVM1 browser
+	// arena (256 MB, see memory/heap.c) can be sized against real demos'
+	// live/peak — the AVM1 twin of AVM2_HEAP_STATS. Must precede heap_shutdown.
+	if (getenv("SWF_HEAP_STATS") != NULL)
+		heap_stats(app_context);
+
 	// Cleanup (dictionary/display_list freed by heap_shutdown; stack uses system malloc)
 	heap_shutdown(app_context);
 	freeMap();

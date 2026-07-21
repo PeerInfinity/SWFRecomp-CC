@@ -193,13 +193,14 @@ static int g_flxlist_verified = 0; // intrinsic_id 2 seen
 static Avm2Class* g_qt_pending;    // FlxQuadTree seen before FlxList
 static int g_qt_pending_is_235;    // variant of the parked FlxQuadTree
 static Avm2Class* g_qt_cls;        // installed FlxQuadTree class
+static Avm2Class* g_tilemap_cls;   // class whose static arrayToCSV was substituted (id 4)
 
 // Diagnostic call counters. Zero cost by default; AVM2_FLIXEL_STATS=1 prints
 // them at exit. The intrinsic installs LAZILY (first FlxU.collide), so a
 // boot-only check sees nothing — these counts are how the intrinsic-vs-fallback
 // frame oracle proves the native path was actually exercised (non-vacuous).
 static unsigned long g_stat_ctor, g_stat_add, g_stat_addobj,
-                     g_stat_overlap, g_stat_overlapnode;
+                     g_stat_overlap, g_stat_overlapnode, g_stat_arraytocsv;
 
 // Subdivision threshold. 2.21 (id 1) uses the fixed MIN=48 at every node; 2.35
 // (id 3) has the ROOT compute a shared `_min` from its size, which every child
@@ -827,6 +828,186 @@ static Avm2Value qt_native_add(Avm2Activation* act)
 }
 
 // ============================================================================
+// FlxTilemap.arrayToCSV (intrinsic id 4)
+// ============================================================================
+//
+// AS3 source (jpexs org/flixel/FlxTilemap.as, Flixel 2.21 clean form; the two
+// 2.35 titles carry opaque-predicate obfuscation that folds to this exact
+// nest — see the per-title fingerprints in SWFRecomp/src/abc/abc_emit.cpp):
+//
+//   public static function arrayToCSV(param1:Array, param2:int) : String {
+//      var _loc5_:String = null;
+//      var _loc6_:int = param1.length / param2;
+//      _loc3_ = 0;
+//      while (_loc3_ < _loc6_) {                 // row
+//         _loc4_ = 0;
+//         while (_loc4_ < param2) {              // col
+//            if (_loc4_ == 0) {
+//               if (_loc3_ == 0) _loc5_ += param1[0];
+//               else             _loc5_ += "\n" + param1[_loc3_ * param2];
+//            } else               _loc5_ += ", " + param1[_loc3_ * param2 + _loc4_];
+//            _loc4_++;
+//         }
+//         _loc3_++;
+//      }
+//      return _loc5_;
+//   }
+//
+// The problem this replaces: `_loc5_ += ...` builds a fresh immutable String
+// every iteration — O(n^2) total intermediate bytes. For RWIC's 188x84 x3
+// tilemaps that is a measured ~1.7 GB single-tick transient (footprint plan
+// §2). The native builder appends each cell's short string into ONE
+// grow-realloc C scratch buffer (system malloc, freed before return, never
+// touches the AVM2 arena) and materializes the final CSV once — O(n).
+//
+// BYTE-IDENTITY (the hard contract). Every cell's contribution is produced by
+// the runtime's OWN coercion primitives, so the output matches the AS3 arm
+// bit-for-bit by construction, not by re-deriving Number->String formatting:
+//   * cell (0,0): `_loc5_` is null, so `null + param1[0]` is a NUMERIC add
+//     (neither operand is a String) whose result is then string-coerced by the
+//     typed-String `+=`. Reproduced with avm2_op_add_values(null, v) then
+//     avm2_coerce_to_string — the exact interpreter path.
+//   * every other cell: the literal ", "/"\n" separator is a String, so
+//     `sep + param1[i]` is a string concat = sep ++ ToString(param1[i]).
+//     Reproduced as append(sep) + append(avm2_coerce_to_string(v)).
+// The AVM2_ARRAYTOCSV_SELFCHECK=1 env compares this fast builder against a
+// literal O(n^2) transliteration of the loop nest above (using the same
+// primitives) on every call and aborts on any mismatch — a self-contained
+// byte-identity proof independent of any game.
+
+// Grow-realloc byte buffer (transient C scratch, system allocator).
+typedef struct { char* p; size_t n, cap; } CsvBuf;
+static void csv_reserve(CsvBuf* b, size_t extra)
+{
+	if (b->n + extra <= b->cap) return;
+	size_t nc = b->cap ? b->cap : 256;
+	while (b->n + extra > nc) nc += nc / 2 + 1;
+	b->p = (char*) realloc(b->p, nc);
+	b->cap = nc;
+}
+static void csv_append(CsvBuf* b, const char* s, size_t len)
+{
+	if (len == 0) return;
+	csv_reserve(b, len);
+	memcpy(b->p + b->n, s, len);
+	b->n += len;
+}
+
+// _loc6_:int = param1.length / param2. AS3 evaluates length/param2 as Number
+// division and `int(...)` truncates toward zero. Guard the degenerate divisors
+// exactly as AS3 would (int(±Inf)=0, int(NaN)=0), and note the loop body only
+// runs — and _loc5_ is only ever assigned — when rows>=1 AND width>=1; when it
+// never runs, `return _loc5_` returns null (NOT "").
+static int32_t csv_rows(uint32_t len, int32_t width)
+{
+	if (width == 0) return 0;             // int(±Inf or NaN) = 0
+	double q = (double) len / (double) width;
+	if (q != q) return 0;                 // NaN
+	return (int32_t) q;                   // trunc toward zero
+}
+
+// Append one cell's coerced-string contribution to `b`, faithfully.
+static void csv_emit_cell(Avm2Context* ctx, CsvBuf* b, Avm2Value arr,
+                          int32_t r, int32_t width, int32_t c)
+{
+	int64_t idx = (int64_t) r * (int64_t) width + (int64_t) c;
+	Avm2Value v = arr_get(ctx, arr, (uint32_t) idx);
+	if (r == 0 && c == 0)
+	{
+		// null + param1[0]: numeric add, then string-coerced by the typed +=.
+		Avm2Value sum = avm2_op_add_values(ctx, avm2_null(), v);
+		const Avm2String* s = avm2_coerce_to_string(ctx, sum);
+		csv_append(b, s->utf8, s->len);
+		return;
+	}
+	if (c == 0) csv_append(b, "\n", 1);
+	else        csv_append(b, ", ", 2);
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	csv_append(b, s->utf8, s->len);
+}
+
+// The fast O(n) builder. Returns the final Avm2String (or NULL to signal the
+// AS3 `null` return — loop never ran).
+static const Avm2String* csv_build_fast(Avm2Context* ctx, Avm2Value arr,
+                                        int32_t width, uint32_t len)
+{
+	int32_t rows = csv_rows(len, width);
+	if (rows < 1 || width < 1) return NULL;   // _loc5_ stays null
+	CsvBuf b = { NULL, 0, 0 };
+	for (int32_t r = 0; r < rows; r++)
+		for (int32_t c = 0; c < width; c++)
+			csv_emit_cell(ctx, &b, arr, r, width, c);
+	const Avm2String* out = avm2_string_new(ctx, b.p ? b.p : "", (uint32_t) b.n);
+	free(b.p);
+	return out;
+}
+
+// Literal O(n^2) transliteration of the AS3 loop nest — the byte-identity
+// reference. `_loc5_ += X` is `_loc5_ = coerce_s(_loc5_ + X)`; coerce_s of
+// null/undefined is null, else ToString. Used only under selfcheck.
+static const Avm2String* csv_build_ref(Avm2Context* ctx, Avm2Value arr,
+                                       int32_t width, uint32_t len)
+{
+	int32_t rows = csv_rows(len, width);
+	if (rows < 1 || width < 1) return NULL;
+	const Avm2String* nl = avm2_string_new(ctx, "\n", 1);
+	const Avm2String* cm = avm2_string_new(ctx, ", ", 2);
+	Avm2Value acc = avm2_null();
+	for (int32_t r = 0; r < rows; r++)
+	{
+		for (int32_t c = 0; c < width; c++)
+		{
+			int64_t idx = (int64_t) r * (int64_t) width + (int64_t) c;
+			Avm2Value v = arr_get(ctx, arr, (uint32_t) idx);
+			Avm2Value rhs;
+			if (r == 0 && c == 0)
+				rhs = v;                                  // _loc5_ += param1[0]
+			else
+				rhs = avm2_op_add_values(ctx,
+				          avm2_string(c == 0 ? nl : cm), v);   // sep + v
+			Avm2Value tmp = avm2_op_add_values(ctx, acc, rhs); // _loc5_ + rhs
+			// coerce_s: null/undef -> null, else ToString.
+			acc = (tmp.kind == AVM2_VALUE_NULL || tmp.kind == AVM2_VALUE_UNDEFINED)
+			      ? avm2_null()
+			      : avm2_string(avm2_coerce_to_string(ctx, tmp));
+		}
+	}
+	return (acc.kind == AVM2_VALUE_STRING) ? acc.u.str : NULL;
+}
+
+static int g_csv_selfcheck = -1;
+
+// FlxTilemap.as — `public static function arrayToCSV(param1:Array, param2:int)`
+static Avm2Value tilemap_native_arraytocsv(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value arr = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	int32_t width = (act->argc > 1) ? avm2_coerce_to_i32(ctx, act->args[1]) : 0;
+	uint32_t len = arr_length(ctx, arr);
+
+	const Avm2String* out = csv_build_fast(ctx, arr, width, len);
+
+	if (g_csv_selfcheck < 0)
+	{
+		const char* e = getenv("AVM2_ARRAYTOCSV_SELFCHECK");
+		g_csv_selfcheck = (e != NULL && e[0] != '\0' && strcmp(e, "0") != 0) ? 1 : 0;
+	}
+	if (g_csv_selfcheck)
+	{
+		const Avm2String* ref = csv_build_ref(ctx, arr, width, len);
+		int ok = (out == NULL && ref == NULL) ||
+		         (out != NULL && ref != NULL && avm2_string_equals(out, ref));
+		fprintf(stderr, "[ARRAYTOCSV] selfcheck len=%u width=%d rows=%d "
+		        "out=%u ref=%u %s\n", len, width, csv_rows(len, width),
+		        out ? out->len : 0u, ref ? ref->len : 0u, ok ? "OK" : "MISMATCH");
+		if (!ok) abort();
+	}
+
+	g_stat_arraytocsv++;
+	return (out != NULL) ? avm2_string(out) : avm2_null();
+}
+
+// ============================================================================
 // GC hooks
 // ============================================================================
 
@@ -918,9 +1099,9 @@ static void flixel_stats_atexit(void)
 {
 	fprintf(stderr,
 	        "FLIXEL_STATS variant=%s ctor=%lu add=%lu addObject=%lu "
-	        "overlap=%lu overlapNode=%lu\n",
+	        "overlap=%lu overlapNode=%lu arrayToCSV=%lu\n",
 	        g_qt_is_235 ? "2.35" : "2.21", g_stat_ctor, g_stat_add,
-	        g_stat_addobj, g_stat_overlap, g_stat_overlapnode);
+	        g_stat_addobj, g_stat_overlap, g_stat_overlapnode, g_stat_arraytocsv);
 }
 
 static int install_quadtree(Avm2Context* ctx, Avm2Class* cls, int is_235)
@@ -969,6 +1150,39 @@ static int install_quadtree(Avm2Context* ctx, Avm2Class* cls, int is_235)
 	g_ol = g_or = g_ot = g_ob = 0.0;
 	memset(g_slot_cache, 0, sizeof g_slot_cache);
 	g_qt_cls = cls;
+	return 1;
+}
+
+// Register the stats dump once, no matter how many intrinsics install.
+static void maybe_register_stats_atexit(void)
+{
+	static int registered = 0;
+	if (registered) return;
+	const char* s = getenv("AVM2_FLIXEL_STATS");
+	if (s != NULL && s[0] != '\0' && strcmp(s, "0") != 0)
+	{
+		atexit(flixel_stats_atexit);
+		registered = 1;
+	}
+}
+
+// id 4 — substitute FlxTilemap's static arrayToCSV with the native O(n) CSV
+// builder. Stateless: no native_ext, no GC hooks, no roots — just a vtable
+// method swap on the class object. Independent of the FlxQuadTree/FlxList
+// coupling (a title may match this and not the collision classes, or vice
+// versa). Returns 1 on success, 0 (fall back to the game's AS3) on any miss.
+static int install_tilemap_arraytocsv(Avm2Context* ctx, Avm2Class* cls)
+{
+	(void) ctx;
+	if (g_tilemap_cls != NULL) return 0;         // already installed
+	if (cls->class_object == NULL) return 0;
+	Avm2VTable* cvt = (Avm2VTable*) cls->class_object->vtable;
+	if (cvt == NULL) return 0;
+	Avm2PropEntry* e = resolve_method(cvt, "arrayToCSV", 10);
+	if (e == NULL) return 0;                      // not the shape we expect -> fall back
+	commit_method(e, tilemap_native_arraytocsv, "FlxTilemap/arrayToCSV$native");
+	maybe_register_stats_atexit();
+	g_tilemap_cls = cls;
 	return 1;
 }
 
@@ -1022,6 +1236,13 @@ int avm2_flixel_try_install(Avm2Context* ctx, Avm2Class* cls, uint32_t intrinsic
 			return 0;
 		}
 		return install_quadtree(ctx, cls, is_235);
+	}
+
+	// id 4 = FlxTilemap.arrayToCSV. Stateless static-method swap; no coupling
+	// to the collision classes.
+	if (intrinsic_id == 4)
+	{
+		return install_tilemap_arraytocsv(ctx, cls);
 	}
 	return 0;
 }

@@ -37,6 +37,12 @@
 //   1 = org.flixel::FlxQuadTree 2.21 (fixed MIN=48)
 //   2 = org.flixel.data::FlxList  2.21/2.35 (byte-identical source)
 //   3 = org.flixel::FlxQuadTree 2.35 (dynamic _min = (w+h)/(2*quadTreeDivisions))
+//   4 = org.flixel::FlxTilemap.arrayToCSV — native O(n) CSV builder replacing
+//       the O(n^2) string-concat that spikes ~1.7 GB of single-tick transient
+//       per level load (see SWFRecompDocs/plans/avm2-browser-footprint.md).
+//       METHOD-level gate (only that one static method's body is fingerprinted,
+//       decoupled from the rest of the large FlxTilemap class) and STATELESS —
+//       no native_ext/GC/roots, independent of the FlxQuadTree/FlxList coupling.
 //
 // FlxList instances are replaced by C structs entirely, so id 2 installs
 // nothing and returns 0 — it exists purely so the fingerprint can VERIFY
