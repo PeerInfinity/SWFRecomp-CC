@@ -117,7 +117,50 @@ Both fail-safe modes demonstrated (undecodable→0, and decodable-but-different)
 A one-byte difference in the gated body drops the marker and the game's own
 compiled AS3 runs.
 
-### §2 frame oracle + §3.2-3.4 (CI / wasm / rig): rows appended below when complete.
+### §2 — same-binary frame oracle (intrinsic vs AVM2_NO_INTRINSICS, native)
+
+Scripted gameplay, 2500 ticks, `AVM2_CPU_DUMP` frames diffed between arms:
+- **RWF: 2500/2500 frames byte-identical.** Non-vacuous (`FLIXEL_STATS
+  variant=2.35 ctor=146796 add=35738 addObject=2510701 overlap=200597
+  overlapNode=382270`); fallback arm emitted no stats line (install skipped —
+  correct control). Native wall-clock 1.19x (median of 4 interleaved).
+- **RWIC: 2500/2500 byte-identical.** Non-vacuous (overlap=132882,
+  addObject=270123); fallback control correct. Native wall-clock 1.09x.
+
+Byte-identical frames prove the dynamic-`_min` variant reproduces the game's own
+subdivision + traversal + callback order exactly (a wrong `_min` → different tree
+→ different callback order → divergence). Gotcha resolved: the blank-stage trap
+is the LocalConnection site-lock — build/run with
+`SWF_URL=http://www.maxgames.com/test.swf` (localhost blanks the stage). Event
+coords are STAGE PIXELS, not normalized.
+
+### §3.2 — CI: no-graphics, run 29795479062, **green, 0 regressions** across all
+10 suites ("No changes detected"). The recompiler bake is sweep-visible but the
+2.35 variant touches only Flixel titles, absent from the suites → 0 delta.
+
+### §3.4 — RIG SCOREBOARD (real-GPU Windows Chrome intel gen-9, 5 interleaved rounds, state-proven)
+
+Arms from the SAME recompiled game code: `rwf`/`rwic` have the intrinsic;
+`rwf_noint`/`rwic_noint` are built `-DAVM2_FORCE_NO_INTRINSICS=1` (the game's own
+AS3 quadtree; wasm has no getenv). Distinctness proven: `FlxQuadTree/*$native`
+symbols present in the intrinsic wasm, dead-stripped from `_noint`.
+
+| title | arm | round-mean median | p50 | %>33ms | p95 | 30 fps? |
+|---|---|---|---|---|---|---|
+| **RWF** | **intrinsic** | 22.8 | **21.6** | **1.4%** | 28.5 | **YES** (11.4 ms margin) |
+| RWF | fallback (own AS3) | 30.6 | 29.0 | 17.6% | 38.4 | marginal (p95 breaches) |
+| **RWIC**| **intrinsic** | 15.6 | **14.7** | **0.5%** | 20.9 | **YES** (18.3 ms margin) |
+| RWIC | fallback (own AS3) | 17.2 | 16.1 | 0.5% | 22.5 | yes |
+
+**HEADLINE: RWF intrinsic gameplay p50 = 21.6 ms — 11.4 ms under the 33 ms
+budget, comfortably (not borderline): only 1.4% of frames breach 33 ms and even
+p95 is under. Intrinsic 1.34x faster at p50, over-budget share 17.6% → 1.4%.**
+RWIC 14.7 ms p50 (1.10x; lighter quadtree share, per the honest-sizing clause
+§3.5 — RWIC's collision is a smaller slice of its frame than RWF's). Raw:
+`/mnt/c/playwright/pb_intr/`.
+
+### Scoreboard: with RWF at margin, the corpus is **5-of-5 clearing 30 fps**
+(Seedling ✓ RWIC ✓ RWF ✓ RWK ✓ RWP ✓).
 
 ## ★ SESSION 2026-07-20c — native intrinsic org.flixel collision classes (lever 7)
 
