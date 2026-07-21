@@ -1,5 +1,11 @@
 # Ruffle exporter `--trace-log` probing patch
 
+> **See also the full inventory:** [`reference/ruffle-local-patches.md`](reference/ruffle-local-patches.md)
+> documents *all* our Ruffle patches (this trace-log patch plus the oracle
+> harness — `RUFFLE_MOVIE_URL`/`RUFFLE_INPUT_FILE`/`RUST_LOG`/`RUFFLE_LOCAL_FETCH_DIR`
+> — and the browser perf instrumentation) and vendors a single re-appliable
+> `ruffle-local-patches.patch`. This page covers only the `--trace-log` piece.
+
 Local customization to the upstream Ruffle **exporter** (`~/CC/ruffle`) that
 captures AVM `trace()` / warning output to a file while rendering a SWF. This is
 how we generate Ruffle reference *trace* output (alongside the screenshot the

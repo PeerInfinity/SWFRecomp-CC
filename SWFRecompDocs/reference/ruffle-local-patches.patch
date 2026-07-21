@@ -1,0 +1,922 @@
+# Ruffle local patches vs upstream HEAD 7ea7c8882 (avm2: Clean up TextLine)
+# Generated 7ea7c8882ed30c2caa43f9191ee0c180bc43cb41 base; re-apply with: git apply <this file>  (run from ~/CC/ruffle)
+#
+diff --git a/Cargo.lock b/Cargo.lock
+index 0e3403dc6..555fe0909 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1669,13 +1669,18 @@ name = "exporter"
+ version = "0.3.0"
+ dependencies = [
+  "anyhow",
++ "async-channel",
+  "clap",
+  "futures",
+  "image",
+  "indicatif",
+  "rayon",
+  "ruffle_core",
++ "ruffle_input_format",
+  "ruffle_render_wgpu",
++ "tracing",
++ "tracing-subscriber",
++ "url",
+  "walkdir",
+ ]
+ 
+diff --git a/core/src/tag_utils.rs b/core/src/tag_utils.rs
+index 52e5b8f8b..82594c459 100644
+--- a/core/src/tag_utils.rs
++++ b/core/src/tag_utils.rs
+@@ -101,7 +101,16 @@ pub fn movie_from_path<P: AsRef<std::path::Path>>(
+     let data = std::fs::read(&path)?;
+ 
+     let abs_path = path.as_ref().canonicalize()?;
+-    let url = url::Url::from_file_path(abs_path).map_err(|()| Error::InvalidSwfUrl)?;
+-
+-    SwfMovie::from_data(&data, url.into(), loader_url).map_err(Error::InvalidSwf)
++    // RUFFLE_MOVIE_URL overrides the movie URL (stage.loaderInfo.url). Used by
++    // Seedling bring-up to make the exporter report a portal domain so the NG
++    // preloader auto-starts into the game, matching the SWFRecomp GAME_SWF_URL
++    // lever. Falls back to the canonical file:// URL when unset/empty.
++    let url: String = match std::env::var("RUFFLE_MOVIE_URL") {
++        Ok(u) if !u.is_empty() => u,
++        _ => url::Url::from_file_path(abs_path)
++            .map_err(|()| Error::InvalidSwfUrl)?
++            .into(),
++    };
++
++    SwfMovie::from_data(&data, url, loader_url).map_err(Error::InvalidSwf)
+ }
+diff --git a/exporter/Cargo.toml b/exporter/Cargo.toml
+index 5579b86d8..d7cdd8274 100644
+--- a/exporter/Cargo.toml
++++ b/exporter/Cargo.toml
+@@ -20,8 +20,15 @@ walkdir = { workspace = true }
+ indicatif = { workspace = true }
+ rayon = { workspace = true }
+ anyhow = { workspace = true }
++tracing = { workspace = true }
++tracing-subscriber = { workspace = true }
++url = { workspace = true }
++async-channel = { workspace = true }
+ 
+ [features]
+ avm_debug = ["ruffle_core/avm_debug"]
+ render_debug_labels = ["ruffle_render_wgpu/render_debug_labels"]
+ lzma = ["ruffle_core/lzma"]
++
++[dependencies.ruffle_input_format]
++path = "../tests/input-format"
+diff --git a/exporter/src/automation.rs b/exporter/src/automation.rs
+new file mode 100644
+index 000000000..4dcdfdbd6
+--- /dev/null
++++ b/exporter/src/automation.rs
+@@ -0,0 +1,283 @@
++use ruffle_core::events::{
++    ImeEvent, KeyDescriptor, KeyLocation, LogicalKey, NamedKey, PhysicalKey,
++    TextControlCode as RuffleTextControlCode,
++};
++use ruffle_core::events::{MouseButton as RuffleMouseButton, MouseWheelDelta};
++use ruffle_core::{Player, PlayerEvent};
++use ruffle_input_format::{
++    AutomatedEvent, AutomatedKey, MouseButton as InputMouseButton,
++    TextControlCode as InputTextControlCode,
++};
++
++pub fn perform_automated_event(evt: &AutomatedEvent, player: &mut Player) {
++    if let AutomatedEvent::SetClipboardText { text } = evt {
++        player.ui_mut().set_clipboard_content(text.to_owned());
++        return;
++    }
++
++    let handled = player.handle_event(match evt {
++        AutomatedEvent::MouseDown {
++            pos, btn, index, ..
++        } => PlayerEvent::MouseDown {
++            x: pos.0,
++            y: pos.1,
++            button: match btn {
++                InputMouseButton::Left => RuffleMouseButton::Left,
++                InputMouseButton::Middle => RuffleMouseButton::Middle,
++                InputMouseButton::Right => RuffleMouseButton::Right,
++            },
++            // None here means that the core will compute index automatically,
++            // however we do not want that in tests.
++            index: Some(index.unwrap_or_default()),
++        },
++        AutomatedEvent::MouseMove { pos } => PlayerEvent::MouseMove { x: pos.0, y: pos.1 },
++        AutomatedEvent::MouseUp { pos, btn } => PlayerEvent::MouseUp {
++            x: pos.0,
++            y: pos.1,
++            button: match btn {
++                InputMouseButton::Left => RuffleMouseButton::Left,
++                InputMouseButton::Middle => RuffleMouseButton::Middle,
++                InputMouseButton::Right => RuffleMouseButton::Right,
++            },
++        },
++        AutomatedEvent::MouseWheel { lines, pixels } => PlayerEvent::MouseWheel {
++            delta: match (lines, pixels) {
++                (Some(lines), None) => MouseWheelDelta::Lines(*lines),
++                (None, Some(pixels)) => MouseWheelDelta::Pixels(*pixels),
++                _ => panic!("MouseWheel: expected only one of 'lines' or 'pixels'"),
++            },
++        },
++        AutomatedEvent::KeyDown { key } => PlayerEvent::KeyDown {
++            key: automated_key_to_descriptor(*key),
++        },
++        AutomatedEvent::KeyUp { key } => PlayerEvent::KeyUp {
++            key: automated_key_to_descriptor(*key),
++        },
++        AutomatedEvent::TextInput { codepoint } => PlayerEvent::TextInput {
++            codepoint: *codepoint,
++        },
++        AutomatedEvent::TextControl { code } => PlayerEvent::TextControl {
++            code: match code {
++                InputTextControlCode::MoveLeft => RuffleTextControlCode::MoveLeft,
++                InputTextControlCode::MoveLeftWord => RuffleTextControlCode::MoveLeftWord,
++                InputTextControlCode::MoveLeftLine => RuffleTextControlCode::MoveLeftLine,
++                InputTextControlCode::MoveLeftDocument => RuffleTextControlCode::MoveLeftDocument,
++                InputTextControlCode::MoveRight => RuffleTextControlCode::MoveRight,
++                InputTextControlCode::MoveRightWord => RuffleTextControlCode::MoveRightWord,
++                InputTextControlCode::MoveRightLine => RuffleTextControlCode::MoveRightLine,
++                InputTextControlCode::MoveRightDocument => RuffleTextControlCode::MoveRightDocument,
++                InputTextControlCode::SelectLeft => RuffleTextControlCode::SelectLeft,
++                InputTextControlCode::SelectLeftWord => RuffleTextControlCode::SelectLeftWord,
++                InputTextControlCode::SelectLeftLine => RuffleTextControlCode::SelectLeftLine,
++                InputTextControlCode::SelectLeftDocument => {
++                    RuffleTextControlCode::SelectLeftDocument
++                }
++                InputTextControlCode::SelectRight => RuffleTextControlCode::SelectRight,
++                InputTextControlCode::SelectRightWord => RuffleTextControlCode::SelectRightWord,
++                InputTextControlCode::SelectRightLine => RuffleTextControlCode::SelectRightLine,
++                InputTextControlCode::SelectRightDocument => {
++                    RuffleTextControlCode::SelectRightDocument
++                }
++                InputTextControlCode::SelectAll => RuffleTextControlCode::SelectAll,
++                InputTextControlCode::Copy => RuffleTextControlCode::Copy,
++                InputTextControlCode::Paste => RuffleTextControlCode::Paste,
++                InputTextControlCode::Cut => RuffleTextControlCode::Cut,
++                InputTextControlCode::Backspace => RuffleTextControlCode::Backspace,
++                InputTextControlCode::Enter => RuffleTextControlCode::Enter,
++                InputTextControlCode::Delete => RuffleTextControlCode::Delete,
++            },
++        },
++        AutomatedEvent::FocusGained => PlayerEvent::FocusGained,
++        AutomatedEvent::FocusLost => PlayerEvent::FocusLost,
++        AutomatedEvent::ImePreedit { text, cursor } => {
++            PlayerEvent::Ime(ImeEvent::Preedit(text.clone(), *cursor))
++        }
++        AutomatedEvent::ImeCommit { text } => PlayerEvent::Ime(ImeEvent::Commit(text.clone())),
++        AutomatedEvent::Wait | AutomatedEvent::SetClipboardText { .. } => unreachable!(),
++    });
++
++    match evt {
++        AutomatedEvent::MouseDown {
++            assert_handled: Some(assert_handled),
++            ..
++        } if handled != assert_handled.value => {
++            panic!(
++                "Event handled status assertion failed: \n\
++                        \x20   expected to be handled: {}\n\
++                        \x20   was handled: {}\n\
++                        \x20   message: {}",
++                assert_handled.value, handled, assert_handled.message
++            );
++        }
++        _ => {}
++    }
++}
++
++pub fn automated_key_to_descriptor(automated_key: AutomatedKey) -> KeyDescriptor {
++    let (logical_key, physical_key) = match automated_key {
++        AutomatedKey::Char(ch) | AutomatedKey::Numpad(ch) => (
++            LogicalKey::Character(ch),
++            match ch {
++                'a' | 'A' => PhysicalKey::KeyA,
++                'b' | 'B' => PhysicalKey::KeyB,
++                'c' | 'C' => PhysicalKey::KeyC,
++                'd' | 'D' => PhysicalKey::KeyD,
++                'e' | 'E' => PhysicalKey::KeyE,
++                'f' | 'F' => PhysicalKey::KeyF,
++                'g' | 'G' => PhysicalKey::KeyG,
++                'h' | 'H' => PhysicalKey::KeyH,
++                'i' | 'I' => PhysicalKey::KeyI,
++                'j' | 'J' => PhysicalKey::KeyJ,
++                'k' | 'K' => PhysicalKey::KeyK,
++                'l' | 'L' => PhysicalKey::KeyL,
++                'm' | 'M' => PhysicalKey::KeyM,
++                'n' | 'N' => PhysicalKey::KeyN,
++                'o' | 'O' => PhysicalKey::KeyO,
++                'p' | 'P' => PhysicalKey::KeyP,
++                'q' | 'Q' => PhysicalKey::KeyQ,
++                'r' | 'R' => PhysicalKey::KeyR,
++                's' | 'S' => PhysicalKey::KeyS,
++                't' | 'T' => PhysicalKey::KeyT,
++                'u' | 'U' => PhysicalKey::KeyU,
++                'v' | 'V' => PhysicalKey::KeyV,
++                'w' | 'W' => PhysicalKey::KeyW,
++                'x' | 'X' => PhysicalKey::KeyX,
++                'y' | 'Y' => PhysicalKey::KeyY,
++                'z' | 'Z' => PhysicalKey::KeyZ,
++                '0' => PhysicalKey::Digit0,
++                '1' => PhysicalKey::Digit1,
++                '2' => PhysicalKey::Digit2,
++                '3' => PhysicalKey::Digit3,
++                '4' => PhysicalKey::Digit4,
++                '5' => PhysicalKey::Digit5,
++                '6' => PhysicalKey::Digit6,
++                '7' => PhysicalKey::Digit7,
++                '8' => PhysicalKey::Digit8,
++                '9' => PhysicalKey::Digit9,
++                '!' => PhysicalKey::Digit1,
++                '@' => PhysicalKey::Digit2,
++                '#' => PhysicalKey::Digit3,
++                '$' => PhysicalKey::Digit4,
++                '%' => PhysicalKey::Digit5,
++                '^' => PhysicalKey::Digit6,
++                '&' => PhysicalKey::Digit7,
++                '*' => PhysicalKey::Digit8,
++                '(' => PhysicalKey::Digit9,
++                ')' => PhysicalKey::Digit0,
++                '-' | '_' => PhysicalKey::Minus,
++                '=' | '+' => PhysicalKey::Equal,
++                '[' | '{' => PhysicalKey::BracketLeft,
++                ']' | '}' => PhysicalKey::BracketRight,
++                '\\' | '|' => PhysicalKey::Backslash,
++                ';' | ':' => PhysicalKey::Semicolon,
++                '\'' | '"' => PhysicalKey::Quote,
++                ',' | '<' => PhysicalKey::Comma,
++                '.' | '>' => PhysicalKey::Period,
++                '/' | '?' => PhysicalKey::Slash,
++                '`' | '~' => PhysicalKey::Backquote,
++                ' ' => PhysicalKey::Space,
++                _ => todo!("Key {ch} is unmapped"),
++            },
++        ),
++        AutomatedKey::ArrowDown => (
++            LogicalKey::Named(NamedKey::ArrowDown),
++            PhysicalKey::ArrowDown,
++        ),
++        AutomatedKey::ArrowLeft => (
++            LogicalKey::Named(NamedKey::ArrowLeft),
++            PhysicalKey::ArrowLeft,
++        ),
++        AutomatedKey::ArrowRight => (
++            LogicalKey::Named(NamedKey::ArrowRight),
++            PhysicalKey::ArrowRight,
++        ),
++        AutomatedKey::ArrowUp => (LogicalKey::Named(NamedKey::ArrowUp), PhysicalKey::ArrowUp),
++        AutomatedKey::Backspace => (
++            LogicalKey::Named(NamedKey::Backspace),
++            PhysicalKey::Backspace,
++        ),
++        AutomatedKey::CapsLock => (LogicalKey::Named(NamedKey::CapsLock), PhysicalKey::CapsLock),
++        AutomatedKey::Delete => (LogicalKey::Named(NamedKey::Delete), PhysicalKey::Delete),
++        AutomatedKey::End => (LogicalKey::Named(NamedKey::End), PhysicalKey::End),
++        AutomatedKey::Enter => (LogicalKey::Named(NamedKey::Enter), PhysicalKey::Enter),
++        AutomatedKey::Escape => (LogicalKey::Named(NamedKey::Escape), PhysicalKey::Escape),
++        AutomatedKey::F1 => (LogicalKey::Named(NamedKey::F1), PhysicalKey::F1),
++        AutomatedKey::F2 => (LogicalKey::Named(NamedKey::F2), PhysicalKey::F2),
++        AutomatedKey::F3 => (LogicalKey::Named(NamedKey::F3), PhysicalKey::F3),
++        AutomatedKey::F4 => (LogicalKey::Named(NamedKey::F4), PhysicalKey::F4),
++        AutomatedKey::F5 => (LogicalKey::Named(NamedKey::F5), PhysicalKey::F5),
++        AutomatedKey::F6 => (LogicalKey::Named(NamedKey::F6), PhysicalKey::F6),
++        AutomatedKey::F7 => (LogicalKey::Named(NamedKey::F7), PhysicalKey::F7),
++        AutomatedKey::F8 => (LogicalKey::Named(NamedKey::F8), PhysicalKey::F8),
++        AutomatedKey::F9 => (LogicalKey::Named(NamedKey::F9), PhysicalKey::F9),
++        AutomatedKey::Home => (LogicalKey::Named(NamedKey::Home), PhysicalKey::Home),
++        AutomatedKey::Insert => (LogicalKey::Named(NamedKey::Insert), PhysicalKey::Insert),
++        AutomatedKey::LeftAlt => (LogicalKey::Named(NamedKey::Alt), PhysicalKey::AltLeft),
++        AutomatedKey::LeftControl => (
++            LogicalKey::Named(NamedKey::Control),
++            PhysicalKey::ControlLeft,
++        ),
++        AutomatedKey::LeftShift => (LogicalKey::Named(NamedKey::Shift), PhysicalKey::ShiftLeft),
++        AutomatedKey::NumLock => (LogicalKey::Named(NamedKey::NumLock), PhysicalKey::NumLock),
++        AutomatedKey::NumpadDelete => (
++            LogicalKey::Named(NamedKey::Delete),
++            PhysicalKey::NumpadDecimal,
++        ),
++        AutomatedKey::NumpadDown => (LogicalKey::Named(NamedKey::ArrowDown), PhysicalKey::Numpad2),
++        AutomatedKey::NumpadEnd => (LogicalKey::Named(NamedKey::End), PhysicalKey::Numpad1),
++        AutomatedKey::NumpadHome => (LogicalKey::Named(NamedKey::Home), PhysicalKey::Numpad7),
++        AutomatedKey::NumpadInsert => (LogicalKey::Named(NamedKey::Insert), PhysicalKey::Numpad0),
++        AutomatedKey::NumpadLeft => (LogicalKey::Named(NamedKey::ArrowLeft), PhysicalKey::Numpad4),
++        AutomatedKey::NumpadPageDown => {
++            (LogicalKey::Named(NamedKey::PageDown), PhysicalKey::Numpad3)
++        }
++        AutomatedKey::NumpadPageUp => (LogicalKey::Named(NamedKey::PageUp), PhysicalKey::Numpad9),
++        AutomatedKey::NumpadRight => (
++            LogicalKey::Named(NamedKey::ArrowRight),
++            PhysicalKey::Numpad6,
++        ),
++        AutomatedKey::NumpadUp => (LogicalKey::Named(NamedKey::ArrowUp), PhysicalKey::Numpad8),
++        AutomatedKey::PageDown => (LogicalKey::Named(NamedKey::PageDown), PhysicalKey::PageDown),
++        AutomatedKey::PageUp => (LogicalKey::Named(NamedKey::PageUp), PhysicalKey::PageUp),
++        AutomatedKey::Pause => (LogicalKey::Named(NamedKey::Pause), PhysicalKey::Pause),
++        AutomatedKey::RightControl => (
++            LogicalKey::Named(NamedKey::Control),
++            PhysicalKey::ControlRight,
++        ),
++        AutomatedKey::RightShift => (LogicalKey::Named(NamedKey::Shift), PhysicalKey::ShiftRight),
++        AutomatedKey::ScrollLock => (
++            LogicalKey::Named(NamedKey::ScrollLock),
++            PhysicalKey::ScrollLock,
++        ),
++        AutomatedKey::Space => (LogicalKey::Character(' '), PhysicalKey::Space),
++        AutomatedKey::Tab => (LogicalKey::Named(NamedKey::Tab), PhysicalKey::Tab),
++        AutomatedKey::Unknown => (LogicalKey::Unknown, PhysicalKey::Unknown),
++    };
++
++    let key_location = match automated_key {
++        AutomatedKey::Numpad(_) => KeyLocation::Numpad,
++        AutomatedKey::LeftAlt => KeyLocation::Left,
++        AutomatedKey::LeftControl => KeyLocation::Left,
++        AutomatedKey::LeftShift => KeyLocation::Left,
++        AutomatedKey::NumLock => KeyLocation::Numpad,
++        AutomatedKey::NumpadDelete => KeyLocation::Numpad,
++        AutomatedKey::NumpadDown => KeyLocation::Numpad,
++        AutomatedKey::NumpadEnd => KeyLocation::Numpad,
++        AutomatedKey::NumpadHome => KeyLocation::Numpad,
++        AutomatedKey::NumpadInsert => KeyLocation::Numpad,
++        AutomatedKey::NumpadLeft => KeyLocation::Numpad,
++        AutomatedKey::NumpadPageDown => KeyLocation::Numpad,
++        AutomatedKey::NumpadPageUp => KeyLocation::Numpad,
++        AutomatedKey::NumpadRight => KeyLocation::Numpad,
++        AutomatedKey::NumpadUp => KeyLocation::Numpad,
++        AutomatedKey::RightControl => KeyLocation::Right,
++        AutomatedKey::RightShift => KeyLocation::Right,
++        _ => KeyLocation::Standard,
++    };
++
++    KeyDescriptor {
++        physical_key,
++        logical_key,
++        key_location,
++    }
++}
+diff --git a/exporter/src/cli.rs b/exporter/src/cli.rs
+index bbc9ed0fc..008637c9b 100644
+--- a/exporter/src/cli.rs
++++ b/exporter/src/cli.rs
+@@ -99,6 +99,11 @@ pub struct Opt {
+     #[clap(long)]
+     pub force_play: bool,
+ 
++    /// Capture AVM trace() output to this file (one message per line).
++    /// Only meaningful when exporting a single SWF.
++    #[clap(long = "trace-log")]
++    pub trace_log: Option<PathBuf>,
++
+     /// Type of graphics backend to use. Not all options may be supported by your current system.
+     /// Default will attempt to pick the most supported graphics backend.
+     #[clap(long, short, default_value = "default")]
+diff --git a/exporter/src/exporter.rs b/exporter/src/exporter.rs
+index cfb7d0b90..c397ae2a2 100644
+--- a/exporter/src/exporter.rs
++++ b/exporter/src/exporter.rs
+@@ -6,6 +6,7 @@ use std::sync::Mutex;
+ use image::RgbaImage;
+ use ruffle_core::Player;
+ use ruffle_core::PlayerBuilder;
++use ruffle_core::backend::log::LogBackend;
+ use ruffle_core::limits::ExecutionLimit;
+ use ruffle_core::tag_utils::movie_from_path;
+ use ruffle_render_wgpu::backend::{
+@@ -23,12 +24,38 @@ use crate::cli::Opt;
+ use crate::cli::SizeOpt;
+ use crate::player_ext::PlayerExporterExt;
+ 
++#[derive(Clone, Default)]
++pub struct TraceLogBackend {
++    output: Arc<Mutex<String>>,
++}
++
++impl TraceLogBackend {
++    pub fn take(&self) -> String {
++        std::mem::take(&mut *self.output.lock().unwrap())
++    }
++}
++
++impl LogBackend for TraceLogBackend {
++    fn avm_trace(&self, message: &str) {
++        let mut o = self.output.lock().unwrap();
++        o.push_str(message);
++        o.push('\n');
++    }
++    fn avm_warning(&self, message: &str) {
++        let mut o = self.output.lock().unwrap();
++        o.push_str("Warning: ");
++        o.push_str(message);
++        o.push('\n');
++    }
++}
++
+ pub struct Exporter {
+     descriptors: Arc<Descriptors>,
+     size: SizeOpt,
+     skipframes: u32,
+     frames: FrameSelection,
+     force_play: bool,
++    trace_log: Option<TraceLogBackend>,
+ }
+ 
+ impl Exporter {
+@@ -44,15 +71,22 @@ impl Exporter {
+ 
+         let descriptors = Arc::new(Descriptors::new(instance, adapter, device, queue));
+ 
++        let trace_log = opt.trace_log.as_ref().map(|_| TraceLogBackend::default());
++
+         Ok(Self {
+             descriptors,
+             size: opt.size,
+             skipframes: opt.skipframes,
+             frames: opt.frames,
+             force_play: opt.force_play,
++            trace_log,
+         })
+     }
+ 
++    pub fn trace_log(&self) -> Option<&TraceLogBackend> {
++        self.trace_log.as_ref()
++    }
++
+     pub fn start_exporting_movie(&self, swf_path: &Path) -> Result<MovieExport> {
+         let movie = movie_from_path(swf_path, None).map_err(|e| anyhow!(e.to_string()))?;
+ 
+@@ -72,20 +106,50 @@ impl Exporter {
+ 
+         let target = TextureTarget::new(&self.descriptors.device, (width, height))
+             .map_err(|e| anyhow!(e.to_string()))?;
+-        let player = PlayerBuilder::new()
++        let mut builder = PlayerBuilder::new()
+             .with_renderer(
+                 WgpuRenderBackend::new(self.descriptors.clone(), target)
+                     .map_err(|e| anyhow!(e.to_string()))?,
+             )
+             .with_movie(movie)
+-            .with_viewport_dimensions(width, height, self.size.scale)
+-            .build();
++            .with_viewport_dimensions(width, height, self.size.scale);
++        if let Some(log) = &self.trace_log {
++            builder = builder.with_log(log.clone());
++        }
++
++        // Local patch: optional file-serving navigator. When
++        // RUFFLE_LOCAL_FETCH_DIR is set, external fetches (e.g. AGI.swf)
++        // are resolved to local files under that dir (host/path layout),
++        // faithfully reproducing an environment where the dependency is
++        // available. Futures run on a NullExecutor polled per frame.
++        let executor = if let Ok(dir) = std::env::var("RUFFLE_LOCAL_FETCH_DIR") {
++            let executor = ruffle_core::backend::navigator::NullExecutor::new();
++            let navigator = crate::local_navigator::LocalFileNavigator::new(
++                std::path::PathBuf::from(dir),
++                executor.spawner(),
++            );
++            builder = builder.with_navigator(navigator);
++            Some(Mutex::new(executor))
++        } else {
++            None
++        };
++
++        let player = builder.build();
++
++        let injector = std::env::var("RUFFLE_INPUT_FILE").ok().map(|p| {
++            Mutex::new(
++                ruffle_input_format::InputInjector::from_file(p)
++                    .expect("RUFFLE_INPUT_FILE: failed to parse input file"),
++            )
++        });
+ 
+         Ok(MovieExport {
+             player,
+             skipframes: self.skipframes,
+             frames: self.frames,
+             force_play: self.force_play,
++            injector,
++            executor,
+         })
+     }
+ }
+@@ -95,6 +159,12 @@ pub struct MovieExport {
+     skipframes: u32,
+     frames: FrameSelection,
+     force_play: bool,
++    // Local patch: scripted input via RUFFLE_INPUT_FILE (Ruffle-test
++    // input.json format; one Wait per frame).
++    injector: Option<Mutex<ruffle_input_format::InputInjector>>,
++    // Local patch: async executor for the file-serving navigator, polled
++    // once per frame so fetch futures (AGI.swf load) can complete.
++    executor: Option<Mutex<ruffle_core::backend::navigator::NullExecutor>>,
+ }
+ 
+ impl MovieExport {
+@@ -107,12 +177,30 @@ impl MovieExport {
+             self.player.force_root_clip_play();
+         }
+ 
++        // Drive pending fetch futures before the frame.
++        if let Some(executor) = &self.executor {
++            executor.lock().unwrap().run();
++        }
++
+         self.player
+             .lock()
+             .unwrap()
+             .preload(&mut ExecutionLimit::none());
+ 
+         self.player.lock().unwrap().run_frame();
++
++        // And after, so loads triggered this frame make progress.
++        if let Some(executor) = &self.executor {
++            executor.lock().unwrap().run();
++        }
++
++        if let Some(injector) = &self.injector {
++            let mut injector = injector.lock().unwrap();
++            injector.next(|evt, _btns_down| {
++                let mut player = self.player.lock().unwrap();
++                crate::automation::perform_automated_event(evt, &mut player);
++            });
++        }
+     }
+ 
+     pub fn capture_frame(&self) -> Result<RgbaImage> {
+diff --git a/exporter/src/lib.rs b/exporter/src/lib.rs
+index 30f7f90c0..478f2d7e9 100644
+--- a/exporter/src/lib.rs
++++ b/exporter/src/lib.rs
+@@ -1,5 +1,7 @@
++mod automation;
+ pub mod cli;
+ mod exporter;
++mod local_navigator;
+ mod player_ext;
+ mod progress;
+ 
+@@ -132,6 +134,10 @@ fn capture_single_swf(exporter: &Exporter, opt: &Opt) -> Result<()> {
+         }
+     }
+ 
++    if let (Some(path), Some(log)) = (opt.trace_log.as_ref(), exporter.trace_log()) {
++        std::fs::write(path, log.take())?;
++    }
++
+     let message = if frames.len() == 1 {
+         if !opt.silent {
+             Some(format!(
+diff --git a/exporter/src/local_navigator.rs b/exporter/src/local_navigator.rs
+new file mode 100644
+index 000000000..bcf556f1a
+--- /dev/null
++++ b/exporter/src/local_navigator.rs
+@@ -0,0 +1,167 @@
++//! Local-patch navigator for the exporter.
++//!
++//! Minimal `NavigatorBackend` that serves `fetch` requests from a local
++//! directory, mapping `http(s)://host/path` -> `{base}/host/path` (same
++//! scheme as ruffle's own `TestNavigatorBackend`). Used to faithfully
++//! reproduce an environment where an external SWF dependency (e.g.
++//! armorgames AGI.swf) is available, without a live network stack.
++//!
++//! Enabled by env `RUFFLE_LOCAL_FETCH_DIR`. Futures run on a `NullExecutor`
++//! that the exporter polls once per frame.
++
++use async_channel::{Receiver, Sender};
++use ruffle_core::backend::navigator::{
++    ErrorResponse, NavigationMethod, NavigatorBackend, NullSpawner, OwnedFuture, Request,
++    SuccessResponse, async_return, create_fetch_error,
++};
++use ruffle_core::indexmap::IndexMap;
++use ruffle_core::loader::Error;
++use ruffle_core::socket::{SocketAction, SocketHandle};
++use ruffle_core::swf::Encoding;
++use std::borrow::Cow;
++use std::path::PathBuf;
++use std::time::Duration;
++use url::{ParseError, Url};
++
++struct LocalResponse {
++    url: String,
++    body: Vec<u8>,
++    chunk_gotten: bool,
++    status: u16,
++}
++
++impl SuccessResponse for LocalResponse {
++    fn url(&self) -> Cow<'_, str> {
++        Cow::Borrowed(&self.url)
++    }
++    fn set_url(&mut self, url: String) {
++        self.url = url;
++    }
++    fn body(self: Box<Self>) -> OwnedFuture<Vec<u8>, Error> {
++        Box::pin(async move { Ok(self.body) })
++    }
++    fn text_encoding(&self) -> Option<&'static Encoding> {
++        None
++    }
++    fn status(&self) -> u16 {
++        self.status
++    }
++    fn redirected(&self) -> bool {
++        false
++    }
++    fn next_chunk(&mut self) -> OwnedFuture<Option<Vec<u8>>, Error> {
++        if !self.chunk_gotten {
++            self.chunk_gotten = true;
++            let body = self.body.clone();
++            Box::pin(async move { Ok(Some(body)) })
++        } else {
++            Box::pin(async move { Ok(None) })
++        }
++    }
++    fn expected_length(&self) -> Result<Option<u64>, Error> {
++        Ok(Some(self.body.len() as u64))
++    }
++}
++
++pub struct LocalFileNavigator {
++    spawner: NullSpawner,
++    base_path: PathBuf,
++}
++
++impl LocalFileNavigator {
++    pub fn new(base_path: PathBuf, spawner: NullSpawner) -> Self {
++        Self { spawner, base_path }
++    }
++}
++
++impl NavigatorBackend for LocalFileNavigator {
++    fn navigate_to_url(
++        &self,
++        url: &str,
++        _target: &str,
++        _vars_method: Option<(NavigationMethod, IndexMap<String, String>)>,
++    ) {
++        tracing::info!("LocalFileNavigator: navigate_to_url ignored: {url}");
++    }
++
++    fn fetch(&self, request: Request) -> OwnedFuture<Box<dyn SuccessResponse>, ErrorResponse> {
++        let url = match self.resolve_url(request.url()) {
++            Ok(url) => url,
++            Err(e) => return async_return(Err(create_fetch_error(request.url(), e))),
++        };
++
++        // Map http(s)://host/path -> {base}/host/path
++        let mut path = self.base_path.clone();
++        if let Some(host) = url.host_str() {
++            path.push(host);
++        }
++        if let Some(rest) = url.path().strip_prefix('/') {
++            path.push(rest);
++        }
++        let url_str = url.to_string();
++
++        Box::pin(async move {
++            match std::fs::read(&path) {
++                Ok(body) => {
++                    tracing::info!(
++                        "LocalFileNavigator: served {} ({} bytes) from {}",
++                        url_str,
++                        body.len(),
++                        path.display()
++                    );
++                    let resp: Box<dyn SuccessResponse> = Box::new(LocalResponse {
++                        url: url_str,
++                        body,
++                        chunk_gotten: false,
++                        status: 200,
++                    });
++                    Ok(resp)
++                }
++                Err(e) => {
++                    tracing::warn!(
++                        "LocalFileNavigator: MISS {} (no local file {}): {}",
++                        url_str,
++                        path.display(),
++                        e
++                    );
++                    Err(ErrorResponse {
++                        url: url_str,
++                        error: Error::FetchError(e.to_string()),
++                    })
++                }
++            }
++        })
++    }
++
++    fn resolve_url(&self, url: &str) -> Result<Url, ParseError> {
++        match Url::parse(url) {
++            Ok(parsed) => Ok(parsed),
++            Err(ParseError::RelativeUrlWithoutBase) => {
++                let base = Url::parse("http://armorgames.com/").unwrap();
++                base.join(url)
++            }
++            Err(e) => Err(e),
++        }
++    }
++
++    fn spawn_future(&mut self, future: OwnedFuture<(), Error>) {
++        self.spawner.spawn_local(future);
++    }
++
++    fn pre_process_url(&self, url: Url) -> Url {
++        url
++    }
++
++    fn connect_socket(
++        &mut self,
++        _host: String,
++        _port: u16,
++        _timeout: Duration,
++        _handle: SocketHandle,
++        _receiver: Receiver<Vec<u8>>,
++        sender: Sender<SocketAction>,
++    ) {
++        // Sockets unsupported: immediately report failure.
++        let _ = sender.try_send(SocketAction::Connect(_handle, ruffle_core::socket::ConnectionState::Failed));
++    }
++}
+diff --git a/exporter/src/main.rs b/exporter/src/main.rs
+index d6544c039..ef40a858b 100644
+--- a/exporter/src/main.rs
++++ b/exporter/src/main.rs
+@@ -3,6 +3,17 @@ use clap::Parser;
+ use exporter::{cli::Opt, run_main};
+ 
+ fn main() -> Result<()> {
++    // Local patch: install a tracing subscriber so ruffle_core's
++    // tracing::error!/warn! (uncaught AVM2 errors, unimplemented API
++    // stubs) reach stderr. Controlled by RUST_LOG (default: info).
++    let env_filter = tracing_subscriber::EnvFilter::builder()
++        .with_default_directive(tracing::level_filters::LevelFilter::INFO.into())
++        .from_env_lossy();
++    tracing_subscriber::fmt()
++        .with_env_filter(env_filter)
++        .with_writer(std::io::stderr)
++        .init();
++
+     let opt: Opt = Opt::parse();
+     run_main(opt)
+ }
+diff --git a/render/wgpu/Cargo.toml b/render/wgpu/Cargo.toml
+index 3cef4bc95..a7097c50c 100644
+--- a/render/wgpu/Cargo.toml
++++ b/render/wgpu/Cargo.toml
+@@ -41,6 +41,10 @@ features = ["HtmlCanvasElement"]
+ render_debug_labels = []
+ webgl = ["wgpu/webgl"]
+ profile-with-tracy = ["profiling", "profiling/profile-with-tracy"]
++# Local perf instrumentation: count per-frame shape draw_indexed calls into a
++# global atomic, read+reset via take_draw_calls(). Off by default; enabled by the
++# web crate's `profiling` feature for the Ruffle-vs-SWFRecomp perf harness.
++draw_counter = []
+ 
+ [package.metadata.cargo-machete]
+ ignored = [
+diff --git a/render/wgpu/src/lib.rs b/render/wgpu/src/lib.rs
+index bcc8d5dbd..2b4165aa8 100644
+--- a/render/wgpu/src/lib.rs
++++ b/render/wgpu/src/lib.rs
+@@ -1,6 +1,19 @@
+ // Remove this when we decide on how to handle multithreaded rendering (especially on wasm)
+ #![allow(clippy::arc_with_non_send_sync)]
+ 
++// Local perf instrumentation (feature `draw_counter`): a global count of shape
++// draw_indexed calls, incremented in surface::commands and read+reset per frame
++// by the web crate's profiling shim. Relaxed ordering — an approximate per-frame
++// tally, not a synchronisation point.
++#[cfg(feature = "draw_counter")]
++pub static DRAW_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
++
++/// Read and reset the accumulated shape draw-call count (feature `draw_counter`).
++#[cfg(feature = "draw_counter")]
++pub fn take_draw_calls() -> u64 {
++    DRAW_CALLS.swap(0, std::sync::atomic::Ordering::Relaxed)
++}
++
+ use crate::backend::ActiveFrame;
+ use crate::bitmaps::BitmapSamplers;
+ use crate::buffer_pool::{BufferPool, PoolEntry};
+diff --git a/render/wgpu/src/surface/commands.rs b/render/wgpu/src/surface/commands.rs
+index 18706ef44..20632b87e 100644
+--- a/render/wgpu/src/surface/commands.rs
++++ b/render/wgpu/src/surface/commands.rs
+@@ -194,6 +194,9 @@ impl<'pass, 'frame: 'pass, 'global: 'frame> CommandRenderer<'pass, 'frame, 'glob
+         self.render_pass
+             .set_index_buffer(indices, wgpu::IndexFormat::Uint32);
+ 
++        #[cfg(feature = "draw_counter")]
++        crate::DRAW_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++
+         self.render_pass.draw_indexed(0..num_indices, 0, 0..1);
+     }
+ 
+diff --git a/web/Cargo.toml b/web/Cargo.toml
+index 2d2b18592..1bdd4bf4c 100644
+--- a/web/Cargo.toml
++++ b/web/Cargo.toml
+@@ -28,7 +28,7 @@ canvas = ["ruffle_render_canvas"]
+ webgl = ["ruffle_render_webgl"]
+ webgpu = ["ruffle_render_wgpu"]
+ wgpu-webgl = ["ruffle_render_wgpu", "ruffle_render_wgpu/webgl"]
+-profiling = []
++profiling = ["ruffle_render_wgpu?/draw_counter"]
+ 
+ [dependencies]
+ console_error_panic_hook = { version = "0.1.7", optional = true }
+@@ -74,7 +74,7 @@ features = [
+     "HtmlInputElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "PageTransitionEvent", "PointerEvent",
+     "Request", "RequestInit", "Response", "Storage", "WheelEvent", "Window", "ReadableStream", "RequestCredentials",
+     "Url", "WebGlContextEvent", "Clipboard", "FocusEvent", "FocusOptions", "ShadowRoot", "Gamepad", "GamepadButton", "OffscreenCanvas",
+-    "TextMetrics", "OffscreenCanvasRenderingContext2d"
++    "TextMetrics", "OffscreenCanvasRenderingContext2d", "Performance"
+ ]
+ 
+ [target.'cfg(target_family = "wasm")'.dependencies.getrandom]
+diff --git a/web/src/lib.rs b/web/src/lib.rs
+index 9e8f051a2..17fe684a4 100644
+--- a/web/src/lib.rs
++++ b/web/src/lib.rs
+@@ -1243,12 +1243,34 @@ impl RuffleHandle {
+                 });
+             }
+ 
++            // High-resolution per-frame CPU timing (tick = AVM/sim, render =
++            // command-build + GPU upload/submit). Gated behind the `profiling`
++            // feature so default builds are byte-for-byte unchanged. Mirrors
++            // SWFRecomp's `swf_perf_report` HUD for apples-to-apples comparison.
++            #[cfg(feature = "profiling")]
++            let _perf = web_sys::window().and_then(|w| w.performance());
++            #[cfg(feature = "profiling")]
++            let _t0 = _perf.as_ref().map(|p| p.now());
++
+             core.tick(FloatDuration::from_millis(dt));
+ 
++            #[cfg(feature = "profiling")]
++            let _t1 = _perf.as_ref().map(|p| p.now());
++
+             // Render if the core signals a new frame, or if we resized.
+             if core.needs_render() || new_dimensions.is_some() {
+                 core.render();
+             }
++
++            #[cfg(feature = "profiling")]
++            if let (Some(p), Some(t0), Some(t1)) = (_perf.as_ref(), _t0, _t1) {
++                let t2 = p.now();
++                #[cfg(feature = "webgpu")]
++                let draws = ruffle_render_wgpu::take_draw_calls() as f64;
++                #[cfg(not(feature = "webgpu"))]
++                let draws = 0.0_f64;
++                crate::record_frame_ms(t1 - t0, t2 - t1, draws);
++            }
+         });
+     }
+ 
+@@ -1276,6 +1298,42 @@ impl RuffleHandle {
+     }
+ }
+ 
++/// Record one frame's tick (AVM/sim) and render (command-build + GPU) CPU costs
++/// onto JS-side ring buffers (`window.__rufflePerfTick` / `__rufflePerfRender`,
++/// capped at 600 samples) plus scalar `__rufflePerfLastTick` / `__rufflePerfLastRender`.
++/// An external harness reads these to compute mean/p95/max, the same way it reads
++/// SWFRecomp's perf HUD. Only compiled with the `profiling` feature.
++#[cfg(feature = "profiling")]
++fn record_frame_ms(tick_ms: f64, render_ms: f64, draws: f64) {
++    use wasm_bindgen::{JsCast, JsValue};
++    const CAP: u32 = 600;
++    let Some(window) = web_sys::window() else {
++        return;
++    };
++    let push = |key: &str, last_key: &str, ms: f64| {
++        let mut arr = match js_sys::Reflect::get(&window, &JsValue::from_str(key)) {
++            Ok(v) if v.is_instance_of::<js_sys::Array>() => v.unchecked_into::<js_sys::Array>(),
++            _ => {
++                let a = js_sys::Array::new();
++                let _ = js_sys::Reflect::set(&window, &JsValue::from_str(key), &a);
++                a
++            }
++        };
++        arr.push(&JsValue::from_f64(ms));
++        let len = arr.length();
++        if len > CAP {
++            // Keep only the most recent CAP samples (slice does not mutate in
++            // place, so re-publish the trimmed array as the window global).
++            arr = arr.slice(len - CAP, len);
++            let _ = js_sys::Reflect::set(&window, &JsValue::from_str(key), &arr);
++        }
++        let _ = js_sys::Reflect::set(&window, &JsValue::from_str(last_key), &JsValue::from_f64(ms));
++    };
++    push("__rufflePerfTick", "__rufflePerfLastTick", tick_ms);
++    push("__rufflePerfRender", "__rufflePerfLastRender", render_ms);
++    push("__rufflePerfDraws", "__rufflePerfLastDraws", draws);
++}
++
+ impl RuffleInstance {
+     #[expect(dead_code)]
+     fn with_core<F, O>(&self, f: F) -> Result<O, RuffleInstanceError>
