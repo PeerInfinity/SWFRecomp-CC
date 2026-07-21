@@ -357,17 +357,39 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   `input.json` → `preprocess_input_json`, the RWK/TAS mechanism). Needs the
   Play-button stage coords + the load-complete gate. **EQ-2 first step.**
 
-### Gap 10 — [render-path · investigate] AVM2 CPU-dump doesn't composite timeline sprites
+### Gap 10 — [render-path · PLANNED · the AVM2 vector renderer] no vector rasterization on ANY AVM2 sink
 
-- `AVM2_CPU_DUMP` renders **blank gray `rgb(204,204,204)`** even though the
-  frame1 preloader clip (a timeline-placed `DefineSprite` with named children) is
-  instantiated and healthy. jmtb02's engine draws via the **timeline** (placed
-  sprites), not Flixel-style Bitmap blitting, and the AVM2 CPU-composite path
-  (`avm2_display.c:7265+`) appears built for the blit path. **Unconfirmed** whether
-  the CPU dump can composite AVM2 timeline `DisplayObject` trees at all — verify
-  before trusting *any* frame dump for EQ visuals. May force the graphics/Dawn
-  (`run_swfrecomp.py`, `mode=graphics`) path for EQ frame-proofs, OR a CPU-dump
-  extension. Blocks pixel-oracle parity (§3) until resolved. **Investigate at EQ-2.**
+- **Ruled (2026-07-21, planning session — see
+  `SWFRecompDocs/plans/avm2-vector-rendering-plan.md`, the source of truth for this
+  gap).** The blank `rgb(204,204,204)` is **not a CPU-dump quirk** — the entire AVM2
+  render path is **Bitmap-blit only**. Both walks paint solely `ext->is_bitmap`
+  nodes: the GPU/OFFSCREEN `avm2_render_node` (`avm2_display.c:7560-7576`, only
+  `renderer_draw_bitmap_quad_scaled`) and the headless CPU-dump `avm2_cpu_walk`
+  (`:7371-7388`). jmtb02's preloader is timeline-placed `DefineShape`/`DefineSprite`
+  vector, so it renders nothing on **either** sink.
+- **The stale "use the graphics/Dawn path" note is CORRECTED: Dawn is equally
+  Bitmap-only for AVM2 today.** `avm2_render_node` (the Dawn walk) and `avm2_cpu_walk`
+  (the CPU dump) are the *same* bitmap-gated recursion; switching sinks changes
+  nothing. The real fix is the **AVM2 vector renderer track**.
+- **Not a from-scratch rasterizer — a port.** The recompiler already tessellates
+  every `DefineShape` for AVM2 SWFs (`interpretShape`, `swf.cpp:2213/7609` → the
+  209 MB `draws.c`, §4) and the runtime already loads the triangles
+  (`avm2_render_init` copies `context->shape_data`, `avm2_display.c:7603-7616`). The
+  shared backend `renderer_draw_shape`/`draw_tris`/`draw_gradient_tris`
+  (`render_webgpu.h:235-291`) is display-model-agnostic and AVM2 already drives its
+  slot model for bitmaps. **The one missing link is a `char_id → (shape_offset,
+  size)` map for AVM2** (the AVM1 `Character` dictionary is not linked into the AVM2
+  runtime) plus the walk-side dispatch.
+- **Plan:** tranched T1–T7 in `avm2-vector-rendering-plan.md`. **T1 (solid-fill
+  timeline shapes) unblocks the frame1 preloader render on the GPU/Dawn sink;
+  T5 (ported `RASTER_TRI*` CPU rasterizer) resolves the headless `AVM2_CPU_DUMP`
+  render.** First-session prompt:
+  `prompts/avm2-vector-render-t1-solid-timeline-shapes.md`. Highest-risk unknown is
+  the baked `FRAME_HEIGHT-y` Y-flip in `shape_data` (Risk R1), front-loaded into T1.
+- **This renderer is its own deliberately-scheduled track, PARALLEL to the EQ
+  boot-chain** (EQ-2 click-injection / `agi` stub / `init2()` are trace-gradeable and
+  do not need rendering). The two tracks meet only at frame-proofing: once T1 lands,
+  EQ's preloader→title→world pixel oracle (§3) becomes usable.
 
 ---
 
