@@ -173,29 +173,74 @@ namespace abc
 		return hashPoolString(h, abc, NS[idx].name);
 	}
 
-	// Namespace-label canonicalization.
+	// ------------------------------------------------------------------
+	// Fingerprint hashing context — one instance per class fingerprint.
+	//
+	// Carries the two pieces of cross-body state the normalized hash needs.
+	// Because it is a local of classFingerprint it is naturally reset between
+	// classes: two classes never share ordinal or recursion state.
+	//   * ns_ordinals  — opaque-namespace canonicalization (hole 1). See
+	//                     hashPoolMultiname.
+	//   * methods_in_progress / depth — closure-body recursion guard (hole 2).
+	//                     See hashMethodRef.
+	//   * poisoned      — sticky fail-safe flag; any bodyless / undecodable
+	//                     referenced closure sets it and the whole fingerprint
+	//                     collapses to 0 (never-match).
+	// ------------------------------------------------------------------
+	struct FpCtx
+	{
+		const AbcFile& abc;
+		// Opaque-namespace (private/protected/static-protected) canonical
+		// ordinals, keyed by (kind, label). Duplicate pool entries with
+		// identical content collapse to one ordinal; distinct labels of the
+		// same kind get distinct ordinals. Assigned in hash-stream encounter
+		// order, which is deterministic across builds.
+		std::map<std::pair<u8, string>, u32> ns_ordinals;
+		// Method indices whose body is currently on the hash stack.
+		std::set<u32> methods_in_progress;
+		int depth = 0;
+		bool poisoned = false;
+
+		explicit FpCtx(const AbcFile& a) : abc(a) {}
+	};
+
+	// Recursion depth cap for NewFunction/CallStatic closure hashing. Real
+	// Flixel closures nest at most a couple deep; 8 is far above that and
+	// bounds pathological / adversarial inputs deterministically. Reaching it
+	// mixes a fixed marker (safe, deterministic) rather than poisoning — the
+	// only residual caveat this fix leaves (see the writeup).
+	static const int FP_MAX_METHOD_DEPTH = 8;
+
+	static u64 hashMethodBody(FpCtx& ctx, const AbcMethodBody& body);
+
+	// Namespace-label canonicalization (hole 1 CLOSED).
 	//
 	// Private / Protected / StaticProtected namespace NAME strings are opaque
 	// compiler-minted labels, not source-level identity. Two builds of
 	// byte-identical AS3 disagree on them: RWK names FlxQuadTree's protected
-	// namespace "org.flixel:FlxQuadTree" while RWP names it "20" (and
-	// FlxGame's is ","). So we hash the namespace KIND plus the member's
-	// local name, and drop the label itself.
+	// namespace "org.flixel:FlxQuadTree" while RWP names it "20" (and FlxGame's
+	// is ","). Hashing the label directly would split the two builds.
+	//
+	// But dropping the label entirely (the old behavior) let two members with
+	// the same local name in two DIFFERENT namespaces of the same kind collide.
+	// So instead we replace the unstable label with a dense ORDINAL assigned in
+	// encounter order within the class fingerprint: the first distinct opaque
+	// namespace seen is 0, the next distinct one 1, and so on. Encounter order
+	// is deterministic (the normalized instruction stream is), so the ordinals
+	// line up across builds even though the underlying labels do not — while two
+	// genuinely different namespaces still fingerprint differently.
+	//
+	// Keyed by (kind, label): duplicate pool entries with identical content
+	// collapse to one ordinal (obfuscators may duplicate pool entries), while
+	// distinct labels of the same kind stay distinct — that distinction is the
+	// whole fix. (Keying by pool index instead would fail the duplicate rule.)
 	//
 	// PackageInternalNs (0x17) and ExplicitNamespace (0x19) are deliberately
 	// still hashed BY NAME: those names are the package path / a user-declared
-	// namespace URI, which are stable across builds and semantically load-
-	// bearing.
-	//
-	// CAVEAT (accepted): two members with the same local name in two DIFFERENT
-	// namespaces of the SAME kind now collide. AS3 mints exactly one protected
-	// and one static-protected namespace per class, so 0x18/0x1a are not
-	// realistically exposed; the residual risk is 0x05, where a class carrying
-	// private members from two distinct compilation units could alias. The
-	// namespace kind is still hashed, so protected-vs-static-protected-vs-
-	// private confusion is still caught.
-	static u64 hashPoolMultiname(u64 h, const AbcFile& abc, u32 idx)
+	// namespace URI, stable across builds and semantically load-bearing.
+	static u64 hashPoolMultiname(u64 h, FpCtx& ctx, u32 idx)
 	{
+		const AbcFile& abc = ctx.abc;
 		const auto& MN = abc.pool.multinames;
 		const auto& S = abc.pool.strings;
 		const auto& NS = abc.pool.namespaces;
@@ -207,9 +252,24 @@ namespace abc
 				u8 k = (u8) NS[mn.ns].kind;
 				if (k == 0x05 || k == 0x18 || k == 0x1a)
 				{
+					string label;
+					if (NS[mn.ns].name < S.size()) label = S[NS[mn.ns].name];
+					auto key = std::make_pair(k, label);
+					auto it = ctx.ns_ordinals.find(key);
+					u32 ord;
+					if (it != ctx.ns_ordinals.end())
+					{
+						ord = it->second;
+					}
+					else
+					{
+						ord = (u32) ctx.ns_ordinals.size();
+						ctx.ns_ordinals.emplace(key, ord);
+					}
 					string local;
 					if (mn.name < S.size()) local = S[mn.name];
 					h = hashBytes(h, &k, 1);
+					h = hashU32(h, ord);
 					return hashStr(h, "\x04opaque::" + local);
 				}
 			}
@@ -217,13 +277,54 @@ namespace abc
 		return hashStr(h, qualifiedName(abc, idx));
 	}
 
-	// Method operand (NewFunction / CallStatic): the referenced method's
-	// debug name, plus a marker. Never recurses into that method's body.
-	static u64 hashMethodRef(u64 h, const AbcFile& abc, u32 idx)
+	// Method operand (NewFunction / CallStatic): hole 2 CLOSED.
+	//
+	// Hashes the referenced method's SIGNATURE (param count, param types,
+	// return type as resolved multinames) and its NORMALIZED BODY — reusing the
+	// exact same walk as the primary body. A closure whose behavior differs now
+	// changes the outer class fingerprint even when the callee's debug name is
+	// blanked (obfuscators routinely blank it), which the old debug-name-only
+	// hash could not detect.
+	//
+	// Recursion is bounded two ways: an in-progress set (a method whose body is
+	// already being hashed — a cycle) and a fixed depth cap. Either mixes a
+	// deterministic marker instead of recursing, so the hash stays stable
+	// across builds. A bodyless or undecodable referenced method poisons the
+	// fingerprint to 0 (fail safe) — the same rule the primary body follows.
+	static u64 hashMethodRef(u64 h, FpCtx& ctx, u32 idx)
 	{
+		const AbcFile& abc = ctx.abc;
 		h = hashStr(h, "\x01mref");
-		if (idx >= abc.methods.size()) return hashStr(h, "");
-		return hashPoolString(h, abc, abc.methods[idx].name);
+		if (idx >= abc.methods.size())
+		{
+			ctx.poisoned = true;  // dangling method ref → never match
+			return hashStr(h, "\x05mref-bad");
+		}
+		const AbcMethod& m = abc.methods[idx];
+
+		// Signature: resolved, constant-pool-layout independent.
+		h = hashU32(h, (u32) m.params.size());
+		for (const MethodParam& p : m.params)
+			h = hashPoolMultiname(h, ctx, p.type);
+		h = hashPoolMultiname(h, ctx, m.return_type);
+
+		// Body: recurse, guarded against cycles and runaway depth.
+		if (ctx.methods_in_progress.count(idx) || ctx.depth >= FP_MAX_METHOD_DEPTH)
+		{
+			return hashStr(h, "\x06mref-recur");  // deterministic marker, no recurse
+		}
+		if (m.body < 0 || (size_t) m.body >= abc.method_bodies.size())
+		{
+			ctx.poisoned = true;  // NewFunction/CallStatic to a bodyless method is malformed
+			return hashStr(h, "\x07mref-nobody");
+		}
+		ctx.methods_in_progress.insert(idx);
+		ctx.depth++;
+		u64 bh = hashMethodBody(ctx, abc.method_bodies[m.body]);
+		ctx.depth--;
+		ctx.methods_in_progress.erase(idx);
+		if (bh == 0) ctx.poisoned = true;  // referenced body was undecodable
+		return hashBytes(h, &bh, sizeof(bh));
 	}
 
 	// Class operand (NewClass): the qualified name of the instance.
@@ -306,8 +407,10 @@ namespace abc
 	// Offset conventions (must match abc_verifier): plain branches are
 	// relative to the byte AFTER the instruction; LookupSwitch's default and
 	// case offsets are relative to the START of the LookupSwitch.
-	static u64 hashMethodBody(const AbcFile& abc, const AbcMethodBody& body)
+	static u64 hashMethodBody(FpCtx& ctx, const AbcMethodBody& body)
 	{
+		const AbcFile& abc = ctx.abc;
+		if (ctx.poisoned) return 0;  // a sibling/closure already failed safe
 		u64 h = FNV_OFFSET;
 		h = hashU32(h, body.max_stack);
 		h = hashU32(h, body.num_locals);
@@ -362,8 +465,8 @@ namespace abc
 			h = hashU32(h, (u32) idx_at((s64) exc.from_offset));
 			h = hashU32(h, (u32) idx_at((s64) exc.to_offset));
 			h = hashU32(h, (u32) idx_at((s64) exc.target_offset));
-			h = hashPoolMultiname(h, abc, exc.type_name);
-			h = hashPoolMultiname(h, abc, exc.variable_name);
+			h = hashPoolMultiname(h, ctx, exc.type_name);
+			h = hashPoolMultiname(h, ctx, exc.variable_name);
 			if (!ok) return 0;
 		}
 
@@ -398,7 +501,7 @@ namespace abc
 					case AbcOpcode::AsType:
 					case AbcOpcode::IsType:
 					{
-						h = hashPoolMultiname(h, abc, op.arg1);
+						h = hashPoolMultiname(h, ctx, op.arg1);
 						break;
 					}
 
@@ -410,7 +513,7 @@ namespace abc
 					case AbcOpcode::CallSuperVoid:
 					case AbcOpcode::CallPropVoid:
 					{
-						h = hashPoolMultiname(h, abc, op.arg1);
+						h = hashPoolMultiname(h, ctx, op.arg1);
 						h = hashU32(h, op.arg2);
 						break;
 					}
@@ -439,12 +542,12 @@ namespace abc
 					// --- method index ---
 					case AbcOpcode::NewFunction:
 					{
-						h = hashMethodRef(h, abc, op.arg1);
+						h = hashMethodRef(h, ctx, op.arg1);
 						break;
 					}
 					case AbcOpcode::CallStatic:
 					{
-						h = hashMethodRef(h, abc, op.arg1);
+						h = hashMethodRef(h, ctx, op.arg1);
 						h = hashU32(h, op.arg2);  // arg count
 						break;
 					}
@@ -541,6 +644,7 @@ namespace abc
 		}
 
 		if (r.pos() != body.code.size()) return 0;  // did not land on the end
+		if (ctx.poisoned) return 0;  // a referenced closure failed safe mid-walk
 		return h ? h : 1;  // never report a real hash as "unhashable"
 	}
 
@@ -555,9 +659,10 @@ namespace abc
 	// gate is deliberately biased to refuse.
 	//
 	// Fingerprints are pool-normalized (resolved multiname/string/numeric
-	// content, instruction-index branch deltas, canonical private/protected
-	// namespace labels), so one entry covers every build of the same source
-	// regardless of constant-pool layout or namespace obfuscation.
+	// content, instruction-index branch deltas, opaque-namespace ordinals,
+	// recursively-hashed closure bodies), so one entry covers every build of
+	// the same source regardless of constant-pool layout or namespace
+	// obfuscation.
 	//
 	// ids must match avm2_flixel.h: 1 = FlxQuadTree, 2 = FlxList.
 	struct IntrinsicEntry { u64 fp; unsigned id; const char* what; };
@@ -569,7 +674,7 @@ namespace abc
 		// private/protected namespace labels, both of which normalize out.
 		// Robot Wants Fishy / Ice Cream ship Flixel 2.35 and correctly do NOT
 		// match (different source, plus per-title control-flow obfuscation).
-		{ 0xb7af5a5f4dc54f98ull, 1, "org.flixel::FlxQuadTree (Flixel 2.21)" },
+		{ 0x2c1994f2e30e0642ull, 1, "org.flixel::FlxQuadTree (Flixel 2.21)" },
 		{ 0x6e5f899d35ae5140ull, 2, "org.flixel.data::FlxList (Flixel 2.21)" },
 	};
 
@@ -622,6 +727,11 @@ namespace abc
 			FPV("iface=%s h=%016llx\n", qualifiedName(abc, iface).c_str(), (unsigned long long) h);
 		}
 
+		// Shared hashing context across every body of THIS class: opaque-ns
+		// ordinals and the closure-recursion guard must persist across the
+		// instance/static/iinit/cinit bodies (so the same namespace maps to
+		// one ordinal class-wide) but never leak between classes.
+		FpCtx ctx(abc);
 		bool ok = true;
 		auto fold_body = [&](u32 method_index)
 		{
@@ -632,7 +742,7 @@ namespace abc
 				FPV("  body=NONE h=%016llx\n", (unsigned long long) h);
 				return;
 			}
-			u64 bh = hashMethodBody(abc, abc.method_bodies[method_body[method_index]]);
+			u64 bh = hashMethodBody(ctx, abc.method_bodies[method_body[method_index]]);
 			if (bh == 0) ok = false;
 			h = hashBytes(h, &bh, sizeof(bh));
 			const AbcMethodBody& b = abc.method_bodies[method_body[method_index]];
