@@ -975,6 +975,14 @@ static int install_quadtree(Avm2Context* ctx, Avm2Class* cls, int is_235)
 int avm2_flixel_try_install(Avm2Context* ctx, Avm2Class* cls, uint32_t intrinsic_id)
 {
 	if (intrinsic_id == 0 || cls == NULL) return 0;
+#ifdef AVM2_FORCE_NO_INTRINSICS
+	// Compile-time kill switch. wasm has no environment to getenv the runtime
+	// AVM2_NO_INTRINSICS switch, so a browser-side intrinsic-vs-fallback A/B
+	// builds the fallback arm from the SAME recompiled game code with this -D.
+	// (Placed after the null check but above the install path so install_quadtree
+	// and the native methods stay referenced — no unused-function warnings.)
+	return 0;
+#endif
 	if (g_no_intrinsics < 0)
 	{
 		const char* e = getenv("AVM2_NO_INTRINSICS");

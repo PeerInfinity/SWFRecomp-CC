@@ -21,8 +21,11 @@
 // nodes and every FlxList node are pure C. FlxObject stays fully AS3 and is
 // read through cached vtable slot indices.
 //
-// Kill switch: AVM2_NO_INTRINSICS=1 in the environment skips installation
-// entirely and the game's own compiled AS3 runs untouched.
+// Kill switches: AVM2_NO_INTRINSICS=1 in the environment skips installation
+// entirely and the game's own compiled AS3 runs untouched. The compile-time
+// twin -DAVM2_FORCE_NO_INTRINSICS=1 does the same at build time — needed for a
+// browser-side intrinsic-vs-fallback A/B, since wasm has no environment to
+// getenv; both arms then build from the SAME recompiled game code.
 
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_object.h>
