@@ -234,6 +234,15 @@ positives, zero false negatives. This matters because the tempting cheap fix —
 dropping offsets entirely — would let `if (a) X else Y` and `if (a) Y else X`
 hash alike, and that is precisely the substitution the gate exists to refuse.
 
+**⚠ SUPERSEDED 2026-07-20 (`ad4ee3754`): both holes below are now CLOSED** —
+(1) by first-seen-ordinal canonicalization of opaque namespaces, (2) by
+recursive normalized closure-body + signature hashing (depth-capped,
+fail-safe). Constants re-baked (FlxQuadTree `2c1994f2e30e0642`; FlxList
+unchanged), RWK==RWP re-verified, emitted output byte-neutral, probe evidence
+per hole. See `SWFRecompDocs/prompts/avm2-fingerprint-gate-holes.md` §3 for
+the verification suite and the memory `avm2-fingerprint-gate-holes-closed`.
+The text below is retained as the historical record of the gap:
+
 **Residual risk, on the record and NOT closed:**
 1. Two members with the same local name in two *different* private namespaces of
    one class now collide (AS3 gives a class one protected + one static-protected
