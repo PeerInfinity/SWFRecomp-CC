@@ -4,6 +4,18 @@ Status: **IMPLEMENTED + BROWSER-RIG VALIDATED (2026-07-21).** Levers 2A + 1A + 4
 shipped and confirmed on real-GPU Windows Chrome. Session prompt:
 `SWFRecompDocs/prompts/avm2-browser-footprint-plan.md`.
 
+**FLEET DEPLOYED (2026-07-21, recorded here because docs2 is untracked):** all
+five AVM2 demos (fresh recompile — the four Flixel titles stamp intrinsic id 4
+on `FlxTilemap.arrayToCSV`; rwk/rwp `1340f1fc…`, rwf `0067a14b…`, rwic
+`56e9fc6d…` — plus FRESH=1 wasm) and two AVM1 demos (N, Doodle_Jump) redeployed
+to docs2 with the new arenas, md5-verified. Real-GPU browser smoke: AVM2 titles
+flat at ~634-654 MB HEAPU8 after Start (was 2117), AVM1 at ~307-369 MB (old
+arena showed ~1148), all title screens render, 0 OOM. rwf/rwic booting flat is
+their footprint validation (their AP-build gameplay rig runs deliberately
+skipped; RWK covers the cadence question). Seedling AP handoff wasm restaged to
+Archipelago-CC. Bloons excluded: pre-existing preloader hang (accepted
+network-pacing class), not memory — swapped for Doodle_Jump.
+
 > **BROWSER RIG RESULT (2026-07-21, Windows Chrome, real Intel gen-9 GPU, RWK —
 > the heaviest-churn title).** The 512 MB arena's final gate PASSES:
 > - **Footprint: HEAPU8 128 MB before Start → 633.9 MB first sample after Start
