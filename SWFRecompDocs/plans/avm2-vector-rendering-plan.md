@@ -1,9 +1,39 @@
 # AVM2 Vector Renderer — timeline shapes + `flash.display.Graphics`
 
-**Status:** Draft v1, 2026-07-21. Planning-session output; **no runtime/recompiler
-code written** (five grounded §1 surveys + four confirming probes only). Pattern:
-`avm2-support-plan.md` / `avm2-seedling-plan.md` (census-driven, dependency-ordered,
-test-first).
+**Status:** v1.1, 2026-07-21. **T1 SHIPPED** (commit `63ca22e39`, solid-fill
+timeline shapes render on the GPU/Dawn sink). Planning-session output otherwise.
+Pattern: `avm2-support-plan.md` / `avm2-seedling-plan.md` (census-driven,
+dependency-ordered, test-first).
+
+## T1 RESULT (2026-07-21) — solid-fill timeline shapes render
+
+Shipped exactly as designed §3 (new): recompiler `Avm2ShapeGeom` emission
+(`SWF::avm2_shape_geom` → `abc_timeline.c avm2_generated_shape_geom[]`),
+place-time resolution onto `Avm2DisplayObjectExt.shape_vert_offset/count`, and an
+`avm2_render_shape` dispatch beside the `is_bitmap` gate in `avm2_render_node`.
+Solid fills only — the recompiler clears a per-shape `solid_only` flag on any
+gradient/bitmap fill or stroke, so the walk skips non-solid shapes (T2/T3).
+
+**Risk R1 (baked Y-flip) — RESOLVED, no unflipped variant needed.** The feared
+stage-height bake does **not** exist: `shape_data`'s `y_f = FRAME_HEIGHT - y`
+(`swf.cpp:9017`) is the *inverse* of the tessellator's internal Y-up round-trip
+(`MoveTo` sets `last_y = FRAME_HEIGHT - move_y`, `swf.cpp:8159`; edges accumulate
+`last_y - delta_y`). The two `FRAME_HEIGHT` terms **cancel** → `shape_data`
+already stores **shape-local Flash Y-down twips**, exactly what AVM2's
+`avm2_world_to_mat16` (local→stage twips, Y-down) + `stage_to_ndc` expect. AVM2
+reuses the existing `shape_data` rows directly. **Confirmed empirically:**
+`graphic_linkage`'s timeline shape (char 22, placed at 50,50px) renders **upright
+at the correct stage position** under Dawn `--mode=graphics` (a double-flip would
+have inverted it and offset by the stage height).
+
+**Grading correction (EQ-0 lesson) — the getPixel gate needs T5.** The plan's §4
+premise that `BitmapData.draw()→getPixel` "already routes shapes through CPU
+raster" is **false today**: `bd_draw` (`avm2_bitmap.c:1951`) rasterizes only
+BitmapData/Bitmap/TextField sources — a shape `Sprite` → `avm2_undefined()`
+no-op. So pixel-as-trace grading of shapes **moves to T5** (the CPU shape
+rasterizer). T1's actual verification is **zero CI trace regressions (both modes)
++ the Dawn frame-proof** (`graphic_linkage` upright; EQ preloader). Image
+comparison stays informational (`image-comparisons-dont-gate-passfail`).
 **Scope:** give the AVM2 render path vector rasterization — timeline
 `DefineShape`/`DefineSprite` placement (Elephant Quest's need) **and**
 `flash.display.Graphics` runtime drawing (the gradeable upstream test family).
@@ -248,14 +278,17 @@ Each tranche: green on its gate **before** EQ is opened against it; game is the
 integration check, never the oracle; both CI modes where render code changes
 (`.claude/pipeline-handoff.md`). "Gate" = the trace tests that must pass.
 
-- **T1 — Solid-fill timeline shapes (the unlock).** Emit `Avm2ShapeGeom`
-  (`char_id`→vert offset/count) from the recompiler; resolve it on the ext; dispatch
-  `renderer_draw_shape` in `avm2_render_node` for solid-fill SHAPE nodes. **Resolve
-  Risk R1** (Y-flip / coordinate convention) with a one-shape probe vs Ruffle export.
-  **Gate:** authored `regression/` — place a solid `DefineShape`, `BitmapData.draw`
-  the stage, `getPixel` asserts the fill color at an interior point and background
-  outside; plus `graphic_linkage` width. **EQ milestone: the frame1 preloader clip
-  renders** (first non-blank AVM2 timeline frame). ~1 session.
+- **T1 — Solid-fill timeline shapes (the unlock). ✅ DONE 2026-07-21 (`63ca22e39`).**
+  Emitted `Avm2ShapeGeom` (`char_id`→vert offset/count + `solid_only`) from the
+  recompiler; resolved it on the ext at place-time; dispatched `renderer_draw_shape`
+  in `avm2_render_node` for solid-fill SHAPE nodes. **Risk R1 resolved** (no
+  Y-flip variant — `shape_data` is already shape-local Y-down; the `FRAME_HEIGHT`
+  round-trip cancels). **Gate (revised):** the `BitmapData.draw→getPixel` pixel
+  gate needs T5 (`bd_draw` doesn't rasterize shapes yet), so T1 is gated on **zero
+  CI regressions (both modes) + Dawn frame-proof** — `graphic_linkage`'s timeline
+  shape renders upright at (50,50)px; `graphic_linkage`/`shape_drawrect`/
+  `displayobject_getbounds_shape` unchanged. **EQ milestone: frame1 preloader
+  renders on the GPU/Dawn sink** (headless CPU-dump still blank until T5).
 - **T2 — Line strokes.** Dispatch stroke triangles (`0x80000000` style) already in
   `shape_data`; confirm Flash min-1px on-screen stroke rule. **Gate:** authored
   stroke-coverage `getPixel` test (pixel on the stroke path is stroke color, just
@@ -337,10 +370,11 @@ text-sibling → HUD numbers.
 
 ## 8. Risks
 
-- **R1 — baked Y-flip / coordinate convention** (§2). `shape_data` bakes
-  `FRAME_HEIGHT - y` (`swf.cpp:9017`); AVM2 composes its own matrices. First T1 probe
-  must render one shape and diff position vs Ruffle; likely emit an unflipped
-  shape-local AVM2 variant. **Highest-risk unknown; front-loaded into T1.**
+- **R1 — baked Y-flip / coordinate convention** (§2). ✅ **RESOLVED at T1 — a
+  non-issue.** `shape_data`'s `FRAME_HEIGHT - y` cancels the tessellator's internal
+  Y-up round-trip (`swf.cpp:8159` vs `:9017`), leaving shape-local Flash Y-down
+  twips — reused directly by AVM2, no unflipped variant. Frame-proven upright under
+  Dawn (`graphic_linkage`). See §"T1 RESULT".
 - **R2 — dynamic gradient pool** (backend survey). `renderer_draw_gradient_tris`
   needs `dynamic_gradient_capacity > 0`; AVM2 passes zero static gradient data —
   confirm `renderer_init` provisions a dynamic pool, else T3 draws nothing. Cheap to

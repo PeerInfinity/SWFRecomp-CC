@@ -3166,7 +3166,12 @@ def main():
             continue
 
         # Step 2: Compile native
-        with tempfile.TemporaryDirectory(prefix="swf_verify_") as tmpdir:
+        import contextlib as _ctxlib
+        _keepdir = os.environ.get("SWF_KEEP_BUILD_DIR")
+        _dir_cm = (_ctxlib.nullcontext(_keepdir) if _keepdir
+                   else tempfile.TemporaryDirectory(prefix="swf_verify_"))
+        with _dir_cm as tmpdir:
+            os.makedirs(tmpdir, exist_ok=True)
             build_dir = Path(tmpdir)
             input_json = test_dir / "input.json"
             event_file = None

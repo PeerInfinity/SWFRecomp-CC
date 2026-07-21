@@ -357,7 +357,31 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   `input.json` → `preprocess_input_json`, the RWK/TAS mechanism). Needs the
   Play-button stage coords + the load-complete gate. **EQ-2 first step.**
 
-### Gap 10 — [render-path · PLANNED · the AVM2 vector renderer] no vector rasterization on ANY AVM2 sink
+### Gap 10 — [render-path · T1 SHIPPED · the AVM2 vector renderer] solid-fill timeline shapes now render on the GPU/Dawn sink
+
+- **T1 DONE 2026-07-21 (`63ca22e39`).** The AVM2 render walk now paints
+  **solid-fill `DefineShape` timeline content**: the recompiler emits a
+  `char_id→(vert_offset,vert_count)` table (`avm2_generated_shape_geom[]`) into the
+  AVM2 char tables, the ext caches it at place-time, and `avm2_render_shape`
+  dispatches `renderer_draw_shape` beside the `is_bitmap` gate in
+  `avm2_render_node`. **Risk R1 (the baked Y-flip) was a non-issue** — `shape_data`
+  already stores shape-local Flash Y-down twips (the recompiler's `FRAME_HEIGHT-y`
+  round-trip cancels), so AVM2 reuses the resident triangles directly; a solid
+  timeline shape renders **upright at the correct stage position** under Dawn
+  (`graphic_linkage`, char 22 @ 50,50px, frame-proven). See
+  `avm2-vector-rendering-plan.md` §"T1 RESULT" + `[[avm2-shape-render-r1-noflip]]`.
+- **Still blank on the headless CPU-dump (`AVM2_CPU_DUMP`) — that is T5.** T1 lands
+  the **GPU/Dawn** sink only; `avm2_cpu_walk` stays bitmap-only until the ported
+  `RASTER_TRI*` rasterizer (T5). And `BitmapData.draw` does not yet rasterize
+  shapes (`bd_draw`, `avm2_bitmap.c:1951`), so the pixel-as-trace gate also waits
+  for T5. **The EQ preloader now renders vector content on GPU; the headless
+  frame-proof the EQ bring-up relies on stays blank until T5.**
+- Strokes (T2) / gradients (T3) / `Graphics` (T4) still blank by design — the
+  recompiler `solid_only` gate skips non-solid shapes this tranche.
+
+---
+
+#### (historical) Gap 10 — the pre-T1 survey that scoped this track
 
 - **Ruled (2026-07-21, planning session — see
   `SWFRecompDocs/plans/avm2-vector-rendering-plan.md`, the source of truth for this
@@ -475,10 +499,13 @@ never exercised.
   title).** Build works, no OOM at `-O0` (§gap-6). Error chain cleared so far:
   `#1065 ContextMenuItem` → fixed (§gap-8, + `avm2_contextmenu_stub`). Autonomous
   boot rests at the **frame1 preloader** — the Play button is CLICK-gated
-  (§gap-9), so reaching intro→title needs click injection (EQ-2). The CPU dump
-  renders blank (§gap-10 — timeline-sprite compositing unconfirmed), so the
-  preloader→title CPU-dump-vs-Ruffle pixel oracle is **not yet usable**; resolve
-  gap-10 first. Census still TODO (§EQ-0).
+  (§gap-9), so reaching intro→title needs click injection (EQ-2). **The frame1
+  preloader now RENDERS on the GPU/Dawn sink (gap #10 T1, 2026-07-21, `63ca22e39`):
+  the blue elephant + trunk-to-bowler-hat + gray cityscape draw instead of blank
+  `rgb(204,204,204)`** — frame-proven at ticks 3/6/8 under `--mode=graphics -O0`
+  (no OOM, ~1.5 GB cc1 peak on the 209 MB `draws.c`). The **headless CPU-dump stays
+  blank** (T5 ports the CPU shape rasterizer), so the CPU-dump-vs-Ruffle pixel
+  oracle is still not usable — but the Dawn sink now is. Census still TODO (§EQ-0).
 - **EQ-2 — New Game → world map (still Ruffle-oracle'd).** Requires gap #3 (the
   `agi` no-op stub) to clear the unguarded `hideAGILogin` #1010, exactly as
   Ruffle needed AGI.swf. Then drive New Game → story → `init2()`; confirm
