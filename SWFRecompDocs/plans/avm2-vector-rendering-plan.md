@@ -289,16 +289,25 @@ integration check, never the oracle; both CI modes where render code changes
   shape renders upright at (50,50)px; `graphic_linkage`/`shape_drawrect`/
   `displayobject_getbounds_shape` unchanged. **EQ milestone: frame1 preloader
   renders on the GPU/Dawn sink** (headless CPU-dump still blank until T5).
-- **T2 — Line strokes.** Dispatch stroke triangles (`0x80000000` style) already in
-  `shape_data`; confirm Flash min-1px on-screen stroke rule. **Gate:** authored
-  stroke-coverage `getPixel` test (pixel on the stroke path is stroke color, just
-  inside/outside is fill/bg). **EQ:** preloader bar / UI outlines. ~0.5 session.
-- **T3 — Gradients (linear/radial/focal, spread + interp).** Dispatch gradient-fill
-  shapes; verify the **dynamic gradient pool** is provisioned when static gradient
-  data is empty (`dynamic_gradient_capacity` in `renderer_init` — Risk R2, backend
-  survey). **Gate:** authored gradient `getPixel` at ramp endpoints/midpoint for
-  pad/reflect/repeat; upstream `graphics_gradients*` image comparison as
-  confirmation. **EQ:** title/HUD gradients. ~1 session.
+- **T2 — Line strokes.** **Sized post-T1: mostly a gate relax (~0.3 session).**
+  Stroke triangles (`0x80000000` style) are already in the same `shape_data` range
+  T1 draws — the recompiler `solid_only` flag currently skips any shape *with* a
+  stroke. T2 = split that flag into `has_gradient_or_bitmap_fill` (still skip) vs
+  `has_stroke` (now allow), so a solid-fill+stroke shape renders its full range;
+  the WGSL shader already shades `0x80000000` (AVM1 uses it). Confirm stroke
+  `color_data`/line-style indices resolve under AVM2 (`avm2_render_init` loads
+  `color_data`) + the Flash min-1px on-screen rule. **Gate:** Dawn frame-proof
+  (getPixel awaits T5); **EQ:** preloader bar / UI outlines.
+- **T3 — Gradients (linear/radial/focal, spread + interp).** **Sized post-T1:
+  timeline gradients are ALSO mostly a gate relax (~0.5 session); Risk R2 is a
+  T4-only concern.** Static timeline gradient shapes bake their ramp into
+  `gradient_data`/`uninv_mat_data` (already loaded by `avm2_render_init`) and shade
+  via the same `renderer_draw_shape` path (shader reads `inv_mats`/`gradient_tex`),
+  so T3-for-timeline = allow gradient-fill shapes through the gate + confirm the
+  static gradient texture/inv-mats are populated for AVM2. **R2 (dynamic gradient
+  pool, `dynamic_gradient_capacity`) only bites runtime `Graphics` gradients (T4),
+  not static timeline shapes** — verify at T4, not T3. **Gate:** Dawn frame-proof +
+  `graphics_gradients*` image comparison; **EQ:** title/HUD gradients.
 - **T4 — `flash.display.Graphics` runtime drawing.** Real backend for
   `beginFill`/`beginGradientFill`/`beginBitmapFill`/`lineStyle`/`moveTo`/`lineTo`/
   `curveTo`/`drawRect`/`drawCircle`/`drawEllipse`/`drawRoundRect` + `endFill`/`clear`,
