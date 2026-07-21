@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-21T16:42:27.605222+00:00",
-    "old_git_sha": "a5c8f86ee145d0cce078159d7c2fec2e7e1e9645",
-    "new_timestamp": "2026-07-21T20:26:49.432897+00:00",
-    "new_git_sha": "4c28d2e11f8c7aa2de279547646bac679e0a5336",
+    "old_timestamp": "2026-07-21T20:26:49.432897+00:00",
+    "old_git_sha": "4c28d2e11f8c7aa2de279547646bac679e0a5336",
+    "new_timestamp": "2026-07-21T21:05:56.718076+00:00",
+    "new_git_sha": "b36b9a2d401fca9245acfcc27c67f51501f6375a",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 57,
+    "old_pass": 58,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 57,
-    "old_total": 57,
+    "old_effective_pass": 58,
+    "old_total": 58,
     "old_pass_rate": 100.0,
-    "new_pass": 58,
+    "new_pass": 59,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 58,
-    "new_total": 58,
+    "new_effective_pass": 59,
+    "new_total": 59,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,21 +25,21 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 57,
+    "unchanged": 58,
     "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm2_tolerant_verify_quarantine",
+      "test": "avm2_contextmenu_stub",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
       }
     }
   ]
