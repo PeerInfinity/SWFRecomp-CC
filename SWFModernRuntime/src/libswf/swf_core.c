@@ -839,7 +839,12 @@ void swfStart(SWFAppContext* app_context)
 	initMap();
 
 	// Initialize heap allocator
-	if (!heap_init(app_context, 0)) {  // 0 = use default size (64 MB)
+	// 0 = DEFAULT_FULL_HEAP_SIZE (heap.c): 1 GB on wasm32/32-bit, 4 GB on
+	// 64-bit native, 64 MB only on WASI. NOT 64 MB in the browser — and under
+	// emscripten that whole arena is committed + zero-filled at load (see
+	// heap.c's emscripten warning). AVM1 live sets are a few MB; the browser
+	// arena is oversized — SWFRecompDocs/plans/avm2-browser-footprint.md §3 L4.
+	if (!heap_init(app_context, 0)) {
 		fprintf(stderr, "Failed to initialize heap allocator\n");
 		return;
 	}

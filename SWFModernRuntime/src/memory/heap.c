@@ -19,7 +19,7 @@
  * - No expansion logic needed - heap has full space from start
  * - Heap state stored in app_context for proper lifecycle management
  *
- * Key Insights:
+ * Key Insights (NATIVE — Linux anonymous mmap + demand paging):
  * 1. Reserving virtual address space is cheap (no physical RAM)
  * 2. Committing pages is also cheap (<1 ms for 1 GB) - still no physical RAM!
  * 3. Physical RAM only allocated when memory is first touched (lazy allocation)
@@ -29,6 +29,24 @@
  *
  * Performance: Committing 1 GB upfront is faster than trying to be "smart" about
  * incremental expansion. The OS handles lazy physical allocation better than we can.
+ *
+ * ****************************************************************************
+ * WARNING — the "lazy allocation" insight above is NATIVE-ONLY. It does NOT
+ * hold under emscripten. Emscripten implements anonymous mmap (see
+ * system/lib/libc/emscripten_mmap.c) as `emscripten_builtin_memalign(len)`
+ * followed by `memset(ptr, 0, len)`. So vmem_reserve(N) in the browser:
+ *   (1) grows WebAssembly.Memory from INITIAL_MEMORY to ~N at heap_init
+ *       (before the first frame), and
+ *   (2) memsets the whole region, so the browser physically backs all ~N
+ *       bytes of the linear-memory ArrayBuffer at LOAD.
+ * i.e. the tab pays the full arena size eagerly, not on touch. heap_init runs
+ * at the top of runSWF_avm2() (the first frame, right after the user hits
+ * Start), so page-load costs only INITIAL_MEMORY and the ~2 GB lands on Start.
+ * MEASURED 2026-07-21 (real-GPU Windows Chrome): rwk 512 MiB before Start ->
+ * 2117 MiB the first frame after, resident RSS ~2121 MiB (not just reserved).
+ * This is why the browser arena must be sized to real demand, not to
+ * comfortable headroom. See SWFRecompDocs/plans/avm2-browser-footprint.md.
+ * ****************************************************************************
  */
 
 #ifdef __wasi__
@@ -127,6 +145,17 @@ size_t heap_arena_span(SWFAppContext* app_context)
 {
 	(void)app_context;
 	return 0;
+}
+
+void heap_tick_mark(SWFAppContext* app_context)
+{
+	(void)app_context;  // passthrough: no per-fragment accounting
+}
+
+size_t heap_peak_since_mark_bytes(SWFAppContext* app_context)
+{
+	(void)app_context;
+	return 0;  // unknown — passthrough has no allocation accounting
 }
 
 void heap_shutdown(SWFAppContext* app_context)
@@ -284,6 +313,18 @@ size_t heap_arena_span(SWFAppContext* app_context)
 {
 	if (app_context == NULL || !app_context->heap_inited) return 0;
 	return app_context->heap_current_size;
+}
+
+void heap_tick_mark(SWFAppContext* app_context)
+{
+	if (app_context == NULL || !app_context->heap_inited) return;
+	o1heapMarkPeak(app_context->heap_instance);
+}
+
+size_t heap_peak_since_mark_bytes(SWFAppContext* app_context)
+{
+	if (app_context == NULL || !app_context->heap_inited) return 0;
+	return o1heapGetPeakSinceMark(app_context->heap_instance);
 }
 
 void heap_stats(SWFAppContext* app_context)

@@ -128,6 +128,16 @@ bool o1heapDoInvariantsHold(const O1HeapInstance* const handle);
 /// If the handle pointer is NULL, the behavior is undefined.
 O1HeapDiagnostics o1heapGetDiagnostics(const O1HeapInstance* const handle);
 
+/// Rebase the resettable high-water mark to the current allocated level. Call
+/// at the start of a measurement window (e.g. each game tick); afterwards
+/// o1heapGetPeakSinceMark() − allocated gives the window's gross transient.
+void o1heapMarkPeak(O1HeapInstance* const handle);
+
+/// The maximum value of 'allocated' seen since the last o1heapMarkPeak() (or
+/// since init). Unlike peak_allocated this is resettable, so it isolates the
+/// worst transient of a single window rather than the whole run.
+size_t o1heapGetPeakSinceMark(const O1HeapInstance* const handle);
+
 /// Advanced diagnostic hooks; not used by default.
 /// If O1HEAP_TRACE is not defined or is zero, these functions should be left unimplemented.
 /// Iff O1HEAP_TRACE is defined and is nonzero, the library will emit trace events by invoking these functions,

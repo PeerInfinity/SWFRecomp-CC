@@ -531,12 +531,23 @@ void runSWF_avm2(SWFAppContext* app_context)
 			if (v > 0) max_ticks = (size_t) v;
 		}
 	}
+	// Worst-single-tick transient tracking (AVM2_HEAP_STATS report). The arena
+	// floor is set by the largest transient a single tick allocates before the
+	// next between-tick collection, not by steady live — see heap.h.
+	size_t worst_boot_gross = 0;      // tick 0 (PlayState/boot construction)
+	size_t worst_play_gross = 0;      // any later tick
+	size_t worst_play_tick  = 0;
 	for (size_t tick = 0; tick < max_ticks; tick++)
 	{
 		// Collect between ticks (VM quiescent — no method body on the C
 		// stack, so the live set is exactly the persistent root graph).
 		// Deterministic byte-watermark cadence; no-op under AVM2_GC=0.
 		avm2_gc_maybe_collect(ctx);
+
+		// Rebase the resettable high-water at the post-collect boundary so
+		// heap_peak_since_mark − tick_base isolates THIS tick's gross transient.
+		size_t tick_base = heap_allocated_bytes(ctx->app);
+		heap_tick_mark(ctx->app);
 
 		Avm2TryFrame top;
 		avm2_try_push_catch_all(ctx, &top);
@@ -556,6 +567,18 @@ void runSWF_avm2(SWFAppContext* app_context)
 			avm2_cpu_dump_frame(ctx, (int) tick);
 		}
 		avm2_try_pop_frame(&top);
+
+		size_t tick_peak = heap_peak_since_mark_bytes(ctx->app);
+		size_t gross = (tick_peak > tick_base) ? (tick_peak - tick_base) : 0;
+		if (tick == 0)
+		{
+			if (gross > worst_boot_gross) worst_boot_gross = gross;
+		}
+		else if (gross > worst_play_gross)
+		{
+			worst_play_gross = gross;
+			worst_play_tick  = tick;
+		}
 	}
 
 #ifdef OFFSCREEN_RENDER
@@ -574,7 +597,19 @@ void runSWF_avm2(SWFAppContext* app_context)
 	// cumulative) so arena sizing — e.g. the wasm32 heap for games whose boot
 	// creates GBs of transient string garbage — is measured, not guessed.
 	if (getenv("AVM2_HEAP_STATS") != NULL)
+	{
 		heap_stats(ctx->app);
+		// Worst-single-tick gross transient (peak allocated within one tick,
+		// minus live at its start). This — not steady live — is what the arena
+		// must hold, because the GC only reclaims between ticks.
+		printf("Worst boot-tick gross:     %zu MB (%zu bytes, tick 0)\n",
+			worst_boot_gross / (1024 * 1024), worst_boot_gross);
+		printf("Worst gameplay-tick gross: %zu MB (%zu bytes, tick %zu)\n",
+			worst_play_gross / (1024 * 1024), worst_play_gross, worst_play_tick);
+		printf("Live at exit:              %zu MB (%zu bytes)\n\n",
+			heap_allocated_bytes(ctx->app) / (1024 * 1024),
+			heap_allocated_bytes(ctx->app));
+	}
 
 	fflush(stdout);
 }

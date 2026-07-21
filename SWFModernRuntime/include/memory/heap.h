@@ -140,6 +140,27 @@ size_t heap_arena_span(SWFAppContext* app_context);
 size_t heap_arena_alignment(void);
 
 /**
+ * Worst-single-tick transient instrumentation.
+ *
+ * The AVM2 GC only collects between ticks, so the arena floor is set not by
+ * steady live set but by the largest transient a *single* tick allocates
+ * before the next collection boundary (e.g. FlxTilemap.arrayToCSV building a
+ * multi-hundred-MB string in one boot tick). The run-wide o1heap
+ * peak_allocated cannot isolate this — it is monotonic across the whole run.
+ *
+ * heap_tick_mark()                — rebase the resettable high-water to the
+ *                                   current allocated level; call once at each
+ *                                   tick boundary (after the collect).
+ * heap_peak_since_mark_bytes()    — highest allocated level seen since the
+ *                                   last mark. The window's gross transient is
+ *                                   this minus heap_allocated_bytes() sampled
+ *                                   at the mark. Returns 0 when unknown
+ *                                   (HEAP_PASSTHROUGH) — treat as "unknown".
+ */
+void heap_tick_mark(SWFAppContext* app_context);
+size_t heap_peak_since_mark_bytes(SWFAppContext* app_context);
+
+/**
  * Shutdown the heap system
  *
  * Frees all heap arenas. Should be called at program exit.

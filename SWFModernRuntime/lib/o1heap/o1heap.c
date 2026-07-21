@@ -152,6 +152,16 @@ struct O1HeapInstance
     size_t    nonempty_bin_mask;   ///< Bit 1 represents a non-empty bin; bin at index 0 is for the smallest fragments.
 
     O1HeapDiagnostics diagnostics;
+
+    /// Resettable high-water mark of `diagnostics.allocated`, tracked in parallel
+    /// with the monotonic `peak_allocated` but rebased to the current allocated
+    /// level whenever o1heapMarkPeak() is called. This lets a caller measure the
+    /// worst transient allocation *within a bounded window* (e.g. a single game
+    /// tick) rather than only the run-wide peak: mark at the window's start,
+    /// then peak_since_mark − allocated_at_mark is the window's gross transient.
+    /// The AVM2 arena is sized by this number (GC runs only between ticks, so a
+    /// single tick's peak transient — not steady live — sets the floor).
+    size_t peak_since_mark;
 };
 
 /// The amount of space allocated for the heap instance.
@@ -306,6 +316,7 @@ O1HeapInstance* o1heapInit(void* const base, const size_t size)
         out->diagnostics.peak_allocated    = 0U;
         out->diagnostics.peak_request_size = 0U;
         out->diagnostics.oom_count         = 0U;
+        out->peak_since_mark               = 0U;
     }
 
     return out;
@@ -375,6 +386,10 @@ void* o1heapAllocate(O1HeapInstance* const handle, const size_t amount)
             if (O1HEAP_LIKELY(handle->diagnostics.peak_allocated < handle->diagnostics.allocated))
             {
                 handle->diagnostics.peak_allocated = handle->diagnostics.allocated;
+            }
+            if (O1HEAP_LIKELY(handle->peak_since_mark < handle->diagnostics.allocated))
+            {
+                handle->peak_since_mark = handle->diagnostics.allocated;
             }
 
             // Finalize the fragment we just allocated.
@@ -530,4 +545,16 @@ O1HeapDiagnostics o1heapGetDiagnostics(const O1HeapInstance* const handle)
     O1HEAP_ASSERT(handle != NULL);
     const O1HeapDiagnostics out = handle->diagnostics;
     return out;
+}
+
+void o1heapMarkPeak(O1HeapInstance* const handle)
+{
+    O1HEAP_ASSERT(handle != NULL);
+    handle->peak_since_mark = handle->diagnostics.allocated;
+}
+
+size_t o1heapGetPeakSinceMark(const O1HeapInstance* const handle)
+{
+    O1HEAP_ASSERT(handle != NULL);
+    return handle->peak_since_mark;
 }
