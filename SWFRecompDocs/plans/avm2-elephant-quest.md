@@ -1,7 +1,15 @@
 # AVM2 corpus expansion — Elephant Quest bring-up plan
 
-**Status: EQ-0 DONE (2026-07-21) — tolerant verify was ALREADY IMPLEMENTED; the
-recompile is UNBLOCKED.** The gap-#1 premise below was **stale**: `readOp` (the
+**Status: EQ-0 + EQ-1 DONE (2026-07-21).** EQ-0: tolerant verify was ALREADY
+IMPLEMENTED (recompile UNBLOCKED). EQ-1: the native build **compiles, links, and
+runs 300 ticks in ~1 s with no OOM**; frame dumps show frame1 executing (SWFStats
+beacon + `DOMAIN = armorgames.com`), the first wall **`#1065 ContextMenuItem`**
+(frame1:132) now **FIXED** (`flash.ui.ContextMenuItem` + `ContextMenu.customItems`
+stubs in `avm2_text.c` + regression test `avm2_contextmenu_stub`). Boot rests at
+the **frame1 preloader, healthy, awaiting a Play-button CLICK** — a *drive* gap;
+the title menu is EQ-2 (click injection + intro/menu chain; §4, §5 gap #8).
+
+The gap-#1 premise below was **stale**: `readOp` (the
 `0xf4` throw site, `abc_parser.cpp:830`) is **never called by `parseAbc`** — only
 by the verifier (`abc_verifier.cpp:1288`, which catches per-body and returns
 false) and the emitter's fingerprint hashing (all try/catch-guarded). Per-body
@@ -195,9 +203,30 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   quarantine stub), `RecompiledTags/draws.c` (**209 MB** — embedded assets),
   `abc_timeline.c` (12 MB). **The 209 MB `draws.c` + 6.4 MB single-TU
   `abc0_methods.c` are the gcc-OOM surface for EQ-1, not the recompile.**
-- **Native build / frame dumps: EQ-1 (next).** (Per
-  [[avm2-localconnection-silent-blank-stage]] no boot state is claimed until
-  dump-proven.)
+- **Native build: EQ-1 DONE 2026-07-21 — BUILDS, LINKS, RUNS, no OOM.**
+  no-graphics `-O0` (8 GB `ulimit -v` guard): recompile-cache + compile 36 s
+  (ccache-warm; ~237 s cold), **300 ticks in ~1 s** (no interpreter watchdog — the
+  beat-Ruffle premise holds). gcc compiles files one-at-a-time, so the 209 MB
+  `draws.c` / 6.4 MB `abc0_methods.c` never OOM at `-O0`; peak ~3.3 GB.
+- **Frame-proven boot state (`AVM2_CPU_DUMP`, 800×500 CPU composite):**
+  frame1 executes fully — SWFStats beacon fires with the correct
+  `armorgames.com` URL, `trace("DOMAIN = armorgames.com")` (matches the Ruffle
+  oracle), then `SoundBox.initContextMenu`. **First wall (now FIXED): `#1065
+  ContextMenuItem is not defined`** at `MainTimeline.frame1:132`, which aborted
+  frame1 *before* `preloadIt()` → blank stage (all 120 ticks byte-identical
+  `rgb(204,204,204)`). Added `flash.ui.ContextMenuItem` + `ContextMenu.customItems`
+  stubs (`avm2_text.c`; `.contextMenu` setter already existed) → the #1065 is
+  gone, zero errors, frame1 completes (initContextMenu → `preloadIt` → `stop`).
+- **Current autonomous ceiling = the frame1 PRELOADER, healthy, awaiting a Play
+  click.** `preloadIt` registers the `preload` ENTER_FRAME handler and all
+  `preloader.{agButton,itemsToBuy,playB,bar,l}` addEventListener calls succeed
+  (zero #1010 → the placed preloader clip + named children all exist). `preload`
+  shows the Play button when loaded and gates advance on a **CLICK →
+  `startIt` → `play()` → frame3 `new Shell(); shell.init()`** (MainTimeline:64-170).
+  Headless has no click, so boot rests here — a **drive** gap, not a bug. The CPU
+  dump renders blank gray (the timeline-placed preloader sprite does not
+  composite in the AVM2 CPU-dump path — see gap #9). **No boot state past the
+  preloader is claimed — none is dump-proven** ([[avm2-localconnection-silent-blank-stage]]).
 
 ---
 
@@ -283,15 +312,17 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   `navigateToURL` (user-click store/walkthrough links) must not throw. Expected
   already-fine per the sequels.
 
-### Gap 6 — [watch, don't fix · sizing] native build memory / single-TU OOM
+### Gap 6 — [RESOLVED · no OOM at -O0] native build memory / single-TU
 
-- The 262 KB DoABC → **1310 bodies** is ~1.6× RWK's body count; the generated C
-  is a huge single translation unit. **Running the full build concurrently with
-  other heavy work OOM-crashed this 16 GB WSL box this session.** The build must
-  use the large-TU compile lever (`verify_output.py` has the flags:
-  `SWFRECOMP_EXTRA_DEFINES`, split/large-TU handling ~lines 2016-2075) and be run
-  **alone with memory monitoring**. 512 MB arena is the default; a native OOM is
-  a finding to record, not fix today.
+- **RESOLVED 2026-07-21 (EQ-1).** No OOM. `compile_native` compiles files
+  **one-at-a-time** (`gcc -c src.name`), so the huge units never coexist: the
+  209 MB `draws.c` (embedded-asset data arrays) and 6.4 MB `abc0_methods.c` (1310
+  body fns) each fit at `-O0` with peak ~3.3 GB (8 GB `ulimit -v` guard, box has
+  13 GB free). Cold build ~237 s; ccache-warm ~36 s. The C-gen recompile is a
+  separate 632 MB / 18.5 s step (§4). **Do NOT retry the -O2 concurrent build that
+  crashed WSL — `-O0` alone is the recipe.** Run ALONE (no concurrent heavy
+  compiles) still holds. 512 MB arena default; not yet stressed (boot rests at
+  the preloader, no world-map build reached).
 
 ### Gap 7 — [low risk · note] betz control-flow obfuscation
 
@@ -299,6 +330,44 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   structurally unreliable — **read the ABC for semantics** (same as the sequels'
   obfuscated builds). `flash.desktop.*` appears only as a wildcard import (no
   real `NativeApplication` use expected); do not chase it.
+
+### Gap 8 (was the frame1 wall) — [RESOLVED · cheap stub] `flash.ui.ContextMenuItem` + `ContextMenu.customItems`
+
+- **RESOLVED 2026-07-21 (EQ-1).** `MainTimeline.frame1:132` →
+  `SoundBox.initContextMenu` (`SoundBox.as:180`) builds a cosmetic right-click
+  menu: `new ContextMenu()` (existed) → `hideBuiltInItems()` (existed) →
+  **`new ContextMenuItem(caption)`** (MISSING → `#1065`) → `item.enabled = false`
+  → `customItems.push(item)` (customItems MISSING) → `this.contextMenu = menu`
+  (InteractiveObject setter already a no-op stub). The `#1065` aborted frame1
+  **before `preloadIt()`** → blank stage. Fix: `flash.ui.ContextMenuItem`
+  (no-op ctor + settable-noop `enabled`) + `ContextMenu.customItems` (fresh
+  discardable Array) in `avm2_text.c`. Graded by `regression/avm2_contextmenu_stub`
+  (mirrors the exact init path). Cosmetic — the menu is never read back headless.
+
+### Gap 9 — [DRIVE, not a bug · EQ-2 gateway] preloader is Play-CLICK-gated
+
+- **The current autonomous ceiling.** `MainTimeline` `addFrameScript(0,frame1,2,
+  frame3)`; frame1 `stop()`s and `preloadIt()` registers the `preload`
+  ENTER_FRAME. `preload` (MainTimeline:64) shows the Play button when
+  `bytesLoaded >= bytesTotal` and gates advance on **CLICK → `startIt` →
+  `play()` → frame3 `new Shell(); shell.init()`**. Headless has no click, so boot
+  rests at frame1. **Not a bug** — every `preloader.{playB,agButton,itemsToBuy,
+  bar,l}` access succeeds (zero #1010). To advance: inject a click via the native
+  binary's **event-file arg** (`verify_output.run_binary(event_file=…)` ←
+  `input.json` → `preprocess_input_json`, the RWK/TAS mechanism). Needs the
+  Play-button stage coords + the load-complete gate. **EQ-2 first step.**
+
+### Gap 10 — [render-path · investigate] AVM2 CPU-dump doesn't composite timeline sprites
+
+- `AVM2_CPU_DUMP` renders **blank gray `rgb(204,204,204)`** even though the
+  frame1 preloader clip (a timeline-placed `DefineSprite` with named children) is
+  instantiated and healthy. jmtb02's engine draws via the **timeline** (placed
+  sprites), not Flixel-style Bitmap blitting, and the AVM2 CPU-composite path
+  (`avm2_display.c:7265+`) appears built for the blit path. **Unconfirmed** whether
+  the CPU dump can composite AVM2 timeline `DisplayObject` trees at all — verify
+  before trusting *any* frame dump for EQ visuals. May force the graphics/Dawn
+  (`run_swfrecomp.py`, `mode=graphics`) path for EQ frame-proofs, OR a CPU-dump
+  extension. Blocks pixel-oracle parity (§3) until resolved. **Investigate at EQ-2.**
 
 ---
 
@@ -380,12 +449,14 @@ never exercised.
   doc correction. Census (still TODO, cheap): `abc_op_census.py` over EQ **plus a
   shipped game as baseline in the same tests-dir** (the baseline diff is the
   signal, not the default "blocked" report, per [[avm2-rw-sequels-bringup]]).
-- **EQ-1 — native boot → title (Ruffle-oracle window).** Memory-monitored native
-  build (large-TU lever, §gap-6, run alone). Clear the missing-class /
-  unimplemented-op error chain to the title menu, each fix backed by an upstream
-  family or a new regression test (the Seedling session-1/2 pattern). Grade
-  preloader→intro→title with CPU-dump vs a Ruffle export (oracle still valid
-  here).
+- **EQ-1 — native boot. ✅ DONE 2026-07-21 (reached the preloader, not yet the
+  title).** Build works, no OOM at `-O0` (§gap-6). Error chain cleared so far:
+  `#1065 ContextMenuItem` → fixed (§gap-8, + `avm2_contextmenu_stub`). Autonomous
+  boot rests at the **frame1 preloader** — the Play button is CLICK-gated
+  (§gap-9), so reaching intro→title needs click injection (EQ-2). The CPU dump
+  renders blank (§gap-10 — timeline-sprite compositing unconfirmed), so the
+  preloader→title CPU-dump-vs-Ruffle pixel oracle is **not yet usable**; resolve
+  gap-10 first. Census still TODO (§EQ-0).
 - **EQ-2 — New Game → world map (still Ruffle-oracle'd).** Requires gap #3 (the
   `agi` no-op stub) to clear the unguarded `hideAGILogin` #1010, exactly as
   Ruffle needed AGI.swf. Then drive New Game → story → `init2()`; confirm

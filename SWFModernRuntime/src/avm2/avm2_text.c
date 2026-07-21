@@ -5738,6 +5738,28 @@ static Avm2Value txt_noop_method(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// flash.ui.ContextMenu.customItems — returns a fresh, discardable Array so the
+// game's `contextMenu.customItems.push(item)` succeeds. The right-click menu is
+// cosmetic; headless never reads the list back, so no persistence is needed.
+static Avm2Value cm_customitems_get(Avm2Activation* act)
+{
+	return avm2_object_value(avm2_array_new(act->ctx, 0));
+}
+
+// flash.ui.ContextMenuItem — cosmetic. Ctor ignores its (caption, ...) args;
+// `enabled` is a settable no-op (jmtb02/Elephant Quest sets it false).
+static Avm2Value cmi_ctor(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+static Avm2Value cmi_enabled_get(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(true);
+}
+
 // Rectangle.toString: "(x=X, y=Y, w=W, h=H)".
 static Avm2Value rectangle_to_string(Avm2Activation* act)
 {
@@ -6062,11 +6084,19 @@ void avm2_register_text(Avm2Context* ctx)
 		(void) ds;
 	}
 
-	// flash.ui.ContextMenu stub.
+	// flash.ui.ContextMenu / ContextMenuItem stubs (cosmetic right-click menu).
 	{
 		Avm2Class* cm = avm2_builtin_class(ctx, "flash.ui", "ContextMenu",
 		                                   ctx->builtins.event_dispatcher_class);
 		avm2_builtin_add_method(ctx, cm, "hideBuiltInItems", txt_noop_method);
+		avm2_builtin_add_getset(ctx, cm, "customItems", cm_customitems_get, NULL);
+
+		Avm2Class* cmi = avm2_builtin_class(ctx, "flash.ui", "ContextMenuItem",
+		                                    ctx->builtins.event_dispatcher_class);
+		cmi->instance_init.fn = cmi_ctor;
+		cmi->instance_init.debug_name = "ContextMenuItem";
+		avm2_builtin_add_getset(ctx, cmi, "enabled", cmi_enabled_get,
+		                        txt_noop_method);
 	}
 
 	// flash.text.StyleSheet.

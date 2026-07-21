@@ -1,0 +1,4 @@
+menu created: true
+item created: true
+push: 1
+assigned contextMenu, no throw
