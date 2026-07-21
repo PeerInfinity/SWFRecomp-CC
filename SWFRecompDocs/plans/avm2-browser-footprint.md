@@ -1,8 +1,24 @@
 # AVM2 browser memory footprint — does it really need 2 GB? (measure + plan)
 
-Status: **IMPLEMENTED — native-validated, browser-rig validation pending
-(2026-07-21).** Levers 2A + 1A + 4 shipped; see the §6 status block below.
-Session prompt: `SWFRecompDocs/prompts/avm2-browser-footprint-plan.md`.
+Status: **IMPLEMENTED + BROWSER-RIG VALIDATED (2026-07-21).** Levers 2A + 1A + 4
+shipped and confirmed on real-GPU Windows Chrome. Session prompt:
+`SWFRecompDocs/prompts/avm2-browser-footprint-plan.md`.
+
+> **BROWSER RIG RESULT (2026-07-21, Windows Chrome, real Intel gen-9 GPU, RWK —
+> the heaviest-churn title).** The 512 MB arena's final gate PASSES:
+> - **Footprint: HEAPU8 128 MB before Start → 633.9 MB first sample after Start
+>   (512 arena + 122 base), flat across a 60 s soak (min==max), 0 OOM.** Was
+>   2117 MB (§1b) — a **~1483 MB / 70% cut in resident RAM per player at Start.**
+>   `INITIAL_MEMORY` confirmed committing 128 MB at page load (was 512).
+> - **Gameplay (teleported into xplor.PlayState via the AP bridge — the plain
+>   build's in-canvas menu mouse doesn't reach Flixel): mean 22.5 ms → 44.4 fps,
+>   p50 21.2 ms (matches the native RWK 21.6 ms intrinsic baseline), p95
+>   29.2 ms, 0 stalls >250 ms, 1.6% frames >33 ms, HEAPU8 flat 633.9 MB, 0 OOM**
+>   over a 60 s live-gameplay soak (tilemap + player + patrolling enemies, quad-
+>   tree churning every frame). **The GC-cadence concern (smaller watermark →
+>   ~2.4× more collects) does NOT bite — no back-off to 768 MB–1 GB needed.**
+>   Since RWK is the heaviest-churn title and the arena size is a universal
+>   constant, this validates the 512 MB arena for the whole corpus.
 
 > **§6 IMPLEMENTATION STATUS (2026-07-21).**
 > - **Step 1 — native `FlxTilemap.arrayToCSV` intrinsic (Lever 2A): SHIPPED.**
@@ -21,14 +37,12 @@ Session prompt: `SWFRecompDocs/prompts/avm2-browser-footprint-plan.md`.
 >   *Pending:* RWF/RWP/RWIC gameplay re-measure needs each title's New-Game TAS
 >   click (RWK's `(158,303)@t255` did not transfer; boot-only runs confirm the
 >   intrinsic engages on all four).
-> - **Step 3 — AVM2 arena 1984 → 512 MB (Lever 1A): SHIPPED (code).** `heap.c`
->   `__EMSCRIPTEN__ && SWF_AVM2` branch → 512 MB; `INITIAL_MEMORY` 512 → 128 MB.
->   **Native no-OOM confirmed:** RWK peaks 246 MB (48% of 512, 0 OOM) and even
->   survives a 256 MB arena (159 MB, 62% — watermark self-clamps as predicted).
->   *Pending (the plan's final gate):* browser soak (zero-OOM, HEAPU8 flat) +
->   real-GPU rig FPS (all-frames mean + >250 ms stall count, ≥30 fps) on the
->   Windows Playwright rig. Back off to 768 MB–1 GB via `SWF_HEAP_MB` if GC
->   cadence bites. A new `SWF_HEAP_MB=<n>` env overrides the arena for A/B sizing.
+> - **Step 3 — AVM2 arena 1984 → 512 MB (Lever 1A): SHIPPED + RIG-VALIDATED.**
+>   `heap.c` `__EMSCRIPTEN__ && SWF_AVM2` branch → 512 MB; `INITIAL_MEMORY` 512
+>   → 128 MB. Native no-OOM (RWK 246 MB at 512, survives 256 MB) AND the
+>   real-GPU browser gate above: 634 MB resident (70% cut), 44 fps gameplay, 0
+>   stalls >250 ms, 0 OOM. No back-off needed. New `SWF_HEAP_MB=<n>` env
+>   overrides the arena for A/B sizing.
 > - **Step 4 — AVM1 arena 1024 → 256 MB (Lever 4): SHIPPED (code).** `heap.c`
 >   `__EMSCRIPTEN__` (AVM1) branch → 256 MB. **Native probe:** N (largest complex
 >   AVM1 demo) peaks 83 MB at a 256 MB arena (33%, 0 OOM) — ~3× margin. New
