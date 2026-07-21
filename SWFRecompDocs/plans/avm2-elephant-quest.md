@@ -1,6 +1,24 @@
 # AVM2 corpus expansion — Elephant Quest bring-up plan
 
-**Status: INVESTIGATION / GAP-MAP (2026-07-21).** First corpus title beyond the
+**Status: EQ-0 DONE (2026-07-21) — tolerant verify was ALREADY IMPLEMENTED; the
+recompile is UNBLOCKED.** The gap-#1 premise below was **stale**: `readOp` (the
+`0xf4` throw site, `abc_parser.cpp:830`) is **never called by `parseAbc`** — only
+by the verifier (`abc_verifier.cpp:1288`, which catches per-body and returns
+false) and the emitter's fingerprint hashing (all try/catch-guarded). Per-body
+verify with a runtime-throw quarantine stub (`avm2_verify_error_body`,
+`abc_emit.cpp:2828`) has existed since **AVM2 Stage 2 (`0fec4fbe6`)**. The
+diagnosis session never ran the recompile, so it mis-traced the throw to
+`parseAbc` (`:584`). **Empirically proven (2026-07-21):** the full C-gen recompile
+of Elephant Quest emits `parsed OK (221 classes, 1310 methods, 1310 bodies, 1
+verify failure(s)); emitted AVM2 C` — **1310 body fns, exactly 1 quarantine stub
+(body 1309, the `0xf4` decoy), no file abort**, 632 MB RSS / 18.5 s (well under
+the 4 GB recompile ulimit). Locked in by regression test
+`ruffle-tests/tests/swfs/regression/avm2_tolerant_verify_quarantine` (a
+hex-patched 5-body SWF: `bodies=5 verify_fails=1 body=3 "unknown ABC opcode 0xf4"`
+— same shape as EQ body 1309; good bodies trace, decoy never called). **EQ-0 was
+docs + a test, zero recompiler source change.** EQ-1 (native build) is next.
+
+**Original diagnosis (2026-07-21) below — corrected in place where stale.** First corpus title beyond the
 five hand-picked games, and the first target **Ruffle cannot play** — and we now
 know *why*: with AGI.swf served, Ruffle runs boot → menu → story → "loading world
 map" → `init2()` builds the level, then its **15 s AVM2 script watchdog
@@ -171,38 +189,47 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
 - **`--check-abc`: 1310 bodies, verify_fails = 1** —
   `body=1309 method="" code=1011 msg="unknown ABC opcode 0xf4"`. Cheap + safe
   (11 MB RSS). This is gap #1.
-- **Full recompile / native build: NOT ATTEMPTED** — blocked by gap #1 (the ABC
-  parse aborts for the whole file, §gap-1) and deferred for OOM safety (§5).
-  **No frame dumps yet.** (Per [[avm2-localconnection-silent-blank-stage]] we do
-  not claim any boot state we have not dump-proven — and we have proven none.)
+- **Full recompile (C-gen): DONE 2026-07-21, SUCCEEDS** — `1310 bodies, 1 verify
+  failure; emitted AVM2 C`, 632 MB RSS / 18.5 s. Gap #1 was never a real block
+  (§gap-1). Output: `RecompiledABC/abc0_methods.c` (6.4 MB, 1310 body fns + 1
+  quarantine stub), `RecompiledTags/draws.c` (**209 MB** — embedded assets),
+  `abc_timeline.c` (12 MB). **The 209 MB `draws.c` + 6.4 MB single-TU
+  `abc0_methods.c` are the gcc-OOM surface for EQ-1, not the recompile.**
+- **Native build / frame dumps: EQ-1 (next).** (Per
+  [[avm2-localconnection-silent-blank-stage]] no boot state is claimed until
+  dump-proven.)
 
 ---
 
 ## 5. Gap list — ranked cheap → expensive
 
-### Gap 1 — [BLOCKING · cheap-moderate recompiler] Tolerant per-body verify (quarantine the decoy body)
+### Gap 1 — [RESOLVED · was never a gap] Tolerant per-body verify (quarantine the decoy body)
 
-- **What:** body 1309 (the *last* body) contains **unknown opcode `0xf4`**.
-  `0xf4` is undefined in AVM2 (real debug ops stop at `0xf3` Timestamp), so it is
-  a **`betz` obfuscator decoy** in a dead body. Ruffle verifies **lazily per
-  method** and never executes this body, so it never chokes. Our recompiler
-  decodes/verifies **all** bodies AOT: the throw at
-  `abc_parser.cpp:830` propagates to `parseAbc` which returns **`false` for the
-  entire ABC** (`abc_parser.cpp:584`) — **all 1310 bodies fail to recompile.**
-- **Why it's the gateway:** nothing else can be tested until the ABC recompiles.
-- **Fix-shape (cheap, localized):** the structural parse already succeeds —
-  `readMethodBody` stores each body's code as an **isolated, length-delimited**
-  byte vector (`body.code`, `code_len` at `abc_parser.cpp:481-490`), so the byte
-  stream never desyncs. Move opcode-decode failure to a **per-body catch**:
-  quarantine the offending body (emit a stub that throws `VerifyError` at runtime
-  if ever invoked) instead of aborting the file. This mirrors Ruffle's lazy
-  per-method model. **Grade** with a new `regression/` test: a hand-built ABC
-  (mxmlc/asasm, or a crafted DoABC) with one junk-opcode body plus N good ones —
-  assert the good bodies run and the game reaches boot; the quarantined body only
-  throws if called. ([[custom-tests-live-in-regression-suite]])
-- **Risk:** verify only found **one** decoy, but other rarely-verified bodies
-  could hide more; the quarantine model makes that a non-event (each is isolated)
-  rather than a whack-a-mole.
+- **RESOLVED 2026-07-21 (EQ-0). The premise was wrong — this already worked.**
+  body 1309 (the *last* body) contains **unknown opcode `0xf4`** (undefined in
+  AVM2; real debug ops stop at `0xf3`), a **`betz` obfuscator decoy** in a dead
+  body. The claim that "the throw at `abc_parser.cpp:830` propagates to `parseAbc`
+  returning false for the entire ABC" was **never verified** (the recompile was
+  never run). It is **false**: `parseAbc` reads each body's code as an **opaque,
+  length-delimited** byte vector (`readMethodBody`, `:481-490`) and **never calls
+  `readOp`**. `readOp` (the `0xf4` throw at `:830`) runs only in (a) the verifier
+  (`abc_verifier.cpp:1288`), which **catches the throw per-body** and returns
+  `fail(1011, …)` → `verified=false`, and (b) the emitter's fingerprint hashing
+  (all try/catch-guarded). The recompile driver (`swf.cpp`) already loops
+  per-body: an unverified body just increments `verify_fails` and the emitter
+  drops a **runtime-throw stub** `avm2_verify_error_body(act, "unknown ABC opcode
+  0xf4")` (`abc_emit.cpp:2828`) — exactly Ruffle's lazy per-method model. This has
+  been in place since **AVM2 Stage 2 (`0fec4fbe6`)**.
+- **Empirical proof:** full C-gen recompile of EQ → `1310 bodies, 1 verify
+  failure; emitted AVM2 C`; generated `abc0_methods.c` has **1310 body fns and
+  exactly 1 `avm2_verify_error_body` stub** (body 1309). 632 MB RSS, 18.5 s.
+- **Regression net:** `regression/avm2_tolerant_verify_quarantine` (mxmlc +
+  `create_test_swf.py` hex-patch of one body's first op to `0xf4`; asserts the two
+  good bodies trace and the file does not abort). Non-empty `output.txt` so a
+  regression-to-abort fails loudly. ([[custom-tests-live-in-regression-suite]])
+- **Robustness note (still true):** verify found **one** decoy, but the quarantine
+  model makes any further hidden decoy a non-event — each bad body is isolated and
+  stubbed, never a whack-a-mole or a whole-file abort.
 
 ### Gap 2 — [low-risk · confirm at build] `getDefinitionByName("Level"+n)` dynamic class resolution
 
@@ -346,13 +373,13 @@ never exercised.
 
 **EQ stages (dependency-ordered, each test-graded):**
 
-- **EQ-0 — tolerant verify (gap #1).** Quarantine the `0xf4`-decoy body so the
-  ABC recompiles. Recompiler change + a hand-built regression ABC (one
-  junk-opcode body + N good ones). *Prerequisite for everything; grades on the
-  new regression test + CI zero-regression.* Prime the census the moment this
-  lands: `abc_op_census.py` over EQ **plus a shipped game as baseline in the same
-  tests-dir** (the baseline diff is the signal, not the default "blocked" report,
-  per [[avm2-rw-sequels-bringup]]).
+- **EQ-0 — tolerant verify (gap #1). ✅ DONE 2026-07-21.** No recompiler change
+  needed — the per-body quarantine already existed (§gap-1). Delivered: the
+  empirical recompile proof + regression test
+  `regression/avm2_tolerant_verify_quarantine` (hand-patched `0xf4` body) + this
+  doc correction. Census (still TODO, cheap): `abc_op_census.py` over EQ **plus a
+  shipped game as baseline in the same tests-dir** (the baseline diff is the
+  signal, not the default "blocked" report, per [[avm2-rw-sequels-bringup]]).
 - **EQ-1 — native boot → title (Ruffle-oracle window).** Memory-monitored native
   build (large-TU lever, §gap-6, run alone). Clear the missing-class /
   unimplemented-op error chain to the title menu, each fix backed by an upstream
