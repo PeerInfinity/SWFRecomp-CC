@@ -54,6 +54,7 @@ Branch merge documentation for coordinating updates across repositories (see [me
 
 Manually compiled reference material, separate from the official specifications:
 
+- **[performance-optimizations.md](reference/performance-optimizations.md)** - Catalog of every shipped performance optimization (AVM2/AVM1/GC/renderer), with mechanisms, measured impact, rejected candidates, and measurement rules
 - **[trace-swf4-wasm-generation.md](reference/trace-swf4-wasm-generation.md)** - Complete walkthrough: SWF → C → WebAssembly pipeline
 - **[abc-format.md](reference/abc-format.md)** - Technical reference for the ActionScript Byte Code (ABC) file format
 
