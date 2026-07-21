@@ -11,6 +11,7 @@
 #include <common.h>
 #include <tag.hpp>
 #include <action.hpp>
+#include <abc/abc_timeline.hpp>
 
 namespace SWFRecomp
 {
@@ -306,6 +307,12 @@ namespace SWFRecomp
 		// finalizeAbcEmit() writes the registry after all tags are parsed
 		// (called from recompile()).
 		abc::AbcEmitter* abc_emitter;
+		// Per-DefineShape geometry (char_id -> shape_data vertex range),
+		// recorded during interpretShape's tessellation pass and handed to the
+		// AVM2 timeline emitter (finalizeAbcEmit) so the AVM2 render walk can
+		// dispatch renderer_draw_shape. Populated for every SWF but only
+		// consumed for AS3 output. See abc::Avm2ShapeGeomRec.
+		std::vector<abc::Avm2ShapeGeomRec> avm2_shape_geom;
 
 		SWF();
 		SWF(Context& context);

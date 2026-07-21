@@ -1329,6 +1329,32 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	out << "const uint32_t avm2_generated_char_count = " << sc.chars.size()
 	    << ";\n\n";
 
+	// Shape geometry table (char_id -> shape_data vertex range), from the
+	// recompiler's tessellation pass. Drives the AVM2 solid-fill render walk
+	// (renderer_draw_shape). Present only when the caller recorded shapes.
+	{
+		const std::vector<Avm2ShapeGeomRec> empty_geom;
+		const std::vector<Avm2ShapeGeomRec>& geom =
+			info.shape_geom != nullptr ? *info.shape_geom : empty_geom;
+		if (!geom.empty())
+		{
+			out << "const Avm2ShapeGeom avm2_generated_shape_geom[] = {\n";
+			for (auto& g : geom)
+			{
+				out << "\t{ " << g.char_id << ", " << (int) g.solid_only << ", "
+				    << g.vert_offset << ", " << g.vert_count << ", "
+				    << g.morph_end_offset << " },\n";
+			}
+			out << "};\n";
+		}
+		else
+		{
+			out << "const Avm2ShapeGeom avm2_generated_shape_geom[1];\n";
+		}
+		out << "const uint32_t avm2_generated_shape_geom_count = "
+		    << geom.size() << ";\n\n";
+	}
+
 	if (!sc.scenes.empty())
 	{
 		out << "const Avm2SceneData avm2_generated_scenes[] = {\n";

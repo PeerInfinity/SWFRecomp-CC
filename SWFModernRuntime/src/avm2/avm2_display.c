@@ -203,6 +203,37 @@ static const Avm2CharInfo* char_info(uint16_t char_id)
 	return NULL;
 }
 
+static const Avm2ShapeGeom* shape_geom_for(uint16_t char_id)
+{
+	for (uint32_t i = 0; i < avm2_generated_shape_geom_count; i++)
+	{
+		if (avm2_generated_shape_geom[i].char_id == char_id)
+		{
+			return &avm2_generated_shape_geom[i];
+		}
+	}
+	return NULL;
+}
+
+// Resolve a placed character's solid-fill shape geometry onto its ext (T1).
+// Called at place-time so the render walk needs no per-frame lookup. Clears
+// the range for anything that isn't a renderable solid shape (sprite,
+// gradient/stroke shape, script-created, or unresolved char).
+static void resolve_shape_geom(Avm2DisplayObjectExt* ext, uint16_t char_id)
+{
+	const Avm2ShapeGeom* sg = shape_geom_for(char_id);
+	if (sg != NULL && sg->solid_only && sg->vert_count > 0)
+	{
+		ext->shape_vert_offset = sg->vert_offset;
+		ext->shape_vert_count = sg->vert_count;
+	}
+	else
+	{
+		ext->shape_vert_offset = 0;
+		ext->shape_vert_count = 0;
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Matrix / decomposition math (Ruffle DisplayObjectBase)
 // ---------------------------------------------------------------------------
@@ -1047,6 +1078,7 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 	Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
 	if (cext == NULL) return NULL;
 	cext->char_id = op->char_id;
+	resolve_shape_geom(cext, op->char_id);
 	cext->timeline = timeline_for_char(op->char_id);
 	Avm2Object* prev = replace_at_depth(ctx, pext, child, op->depth);
 	cext->instantiated_by_timeline = 1;
@@ -1107,6 +1139,7 @@ static void replace_child_character(Avm2Context* ctx, Avm2Object* child,
 		return;  // either side is a sprite: no swap
 	}
 	cext->char_id = char_id;
+	resolve_shape_geom(cext, char_id);
 	const Avm2CharInfo* ci = char_info(char_id);
 	if (ci != NULL && ci->kind == AVM2_CHAR_EDITTEXT)
 	{
@@ -7554,6 +7587,47 @@ static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
 		0.0f, 0.0f, xid, cxid);
 }
 
+// Draw one solid-fill timeline shape node (T1): its pre-tessellated triangles
+// (resident shape_data vertex range, resolved onto the ext at place-time) under
+// the node's world matrix + concatenated alpha. Mirrors avm2_render_bitmap's
+// slot-write model, swapping the bitmap quad for renderer_draw_shape — which
+// reads the shape_data verts (shape-local Flash Y-down twips) and shades each
+// FILL_SOLID triangle from the per-vertex color index (WGSL shader). The world
+// matrix maps local twips -> stage twips (Y-down), then stage_to_ndc; no
+// coordinate flip is applied because shape_data already stores shape-local
+// Y-down coordinates (the recompiler's FRAME_HEIGHT round-trip cancels).
+static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
+                              const Mat* world, double alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->shape_vert_count == 0) return;
+
+	// Per-object world transform slot (identity fallback if slots run out).
+	uint32_t xid = 0;
+	if (g_avm2_xform_next < context->xform_slot_count)
+	{
+		float m16[16];
+		avm2_world_to_mat16(world, m16);
+		xid = g_avm2_xform_next++;
+		renderer_write_transform(context, xid, m16);
+	}
+
+	// Concatenated-alpha cxform slot (0 = identity for the common alpha == 1).
+	uint32_t cxid = 0;
+	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
+	{
+		float cx[20];
+		memset(cx, 0, sizeof(cx));
+		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;  // r/g/b multiply = 1
+		cx[15] = (float) alpha;                      // alpha multiply
+		cxid = g_avm2_cxform_next++;
+		renderer_write_cxform(context, cxid, cx);
+	}
+
+	renderer_draw_shape(context, ext->shape_vert_offset, ext->shape_vert_count,
+	                    xid, cxid);
+}
+
 // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
 // world matrix + concatenated alpha down the tree. Invisible subtrees are
 // culled, matching render_apply_text_bounds.
@@ -7570,6 +7644,8 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 
 	if (ext->is_bitmap)
 		avm2_render_bitmap(ctx, obj, &world, alpha);
+	else if (ext->shape_vert_count > 0)
+		avm2_render_shape(ctx, obj, &world, alpha);
 
 	for (uint32_t i = 0; i < ext->render_len; i++)
 		avm2_render_node(ctx, ext->render_list[i], &world, alpha);

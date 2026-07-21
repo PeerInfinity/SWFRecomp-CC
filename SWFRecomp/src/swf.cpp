@@ -384,6 +384,7 @@ namespace SWFRecomp
 			tinfo.stage_xmax = header.frame_size.xmax;
 			tinfo.stage_ymin = header.frame_size.ymin;
 			tinfo.stage_ymax = header.frame_size.ymax;
+			tinfo.shape_geom = &avm2_shape_geom;
 			abc::emitAvm2Timeline((const uint8_t*) tags_start,
 			                      (const uint8_t*) swf_buffer + header.file_length,
 			                      tinfo, "RecompiledABC");
@@ -8975,6 +8976,12 @@ namespace SWFRecomp
 				}
 				
 				size_t tris_size = 0;
+				// T1 AVM2 shape-render gate: true iff every emitted triangle of
+				// this DefineShape is a FILL_SOLID fill (no gradient/bitmap fill,
+				// no stroke). Cleared below when a non-solid fill group or any
+				// stroke run is tessellated. Only meaningful for non-morph,
+				// non-font DefineShapes (the ones recorded into avm2_shape_geom).
+				bool shape_solid_only = true;
 				size_t morph_end_start_vertex = current_morph_end_vertex;
 
 				// Only morph shapes keep the earcut path: morph needs a per-vertex
@@ -9222,6 +9229,13 @@ namespace SWFRecomp
 						{
 							style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
 						}
+						// T1: a gradient/bitmap fill makes the whole shape
+						// non-solid (deferred to T3). Only tris.empty() groups
+						// leave the flag untouched.
+						if (fs.type != FILL_SOLID && !tris.empty())
+						{
+							shape_solid_only = false;
+						}
 
 						for (Tri t : tris)
 						{
@@ -9255,6 +9269,13 @@ namespace SWFRecomp
 						drawLines(paths[i], line_style.width, tris);
 
 						tris_size += tris.size();
+
+						// T1: strokes render in T2 — a shape with any stroke run
+						// is skipped by the AVM2 solid-fill walk this tranche.
+						if (!tris.empty())
+						{
+							shape_solid_only = false;
+						}
 
 						for (Tri t : tris)
 						{
@@ -9300,6 +9321,20 @@ namespace SWFRecomp
 					else
 					{
 						context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ", " << std::dec << to_string(shape_bounds_xmin) << ", " << to_string(shape_bounds_xmax) << ", " << to_string(shape_bounds_ymin) << ", " << to_string(shape_bounds_ymax) << ");" << endl;
+
+						// Record the same (vert_offset, vert_count) for the AVM2
+						// render walk. tag_main above populates the AVM1 Character
+						// dictionary, which is not linked into the AVM2 runtime;
+						// finalizeAbcEmit hands this vector to the AVM2 timeline
+						// emitter instead. (Harmless for AVM1 output — consumed
+						// only when a DoABC tag created the emitter.)
+						abc::Avm2ShapeGeomRec geom;
+						geom.char_id = shape_id;
+						geom.solid_only = shape_solid_only ? 1 : 0;
+						geom.vert_offset = (uint32_t) (3 * current_tri);
+						geom.vert_count = (uint32_t) (3 * tris_size);
+						geom.morph_end_offset = 0;
+						avm2_shape_geom.push_back(geom);
 					}
 
 					// Emit interleaved morph path data (deferred from edge parsing)

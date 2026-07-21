@@ -273,6 +273,24 @@ typedef struct Avm2CharInfo
 	const char* init_text;
 } Avm2CharInfo;
 
+// Per-DefineShape geometry: a (vert_offset, vert_count) range into the
+// resident shape_data[] vertex table (draws.c), keyed by char_id, so the
+// AVM2 render walk can issue renderer_draw_shape without the AVM1 Character
+// dictionary (which is not linked into the AVM2 runtime). Offsets are in
+// VERTICES (each shape_data row is one 4*u32 vertex), matching
+// render_webgpu_draw_shape's (offset, num_verts) arguments.
+typedef struct Avm2ShapeGeom
+{
+	uint16_t char_id;
+	// T1: 1 iff every triangle of this shape is a FILL_SOLID fill (no
+	// gradient/bitmap fill, no stroke). The solid-fill render walk skips
+	// shapes with solid_only == 0 (gradients render in T3, strokes in T2).
+	uint8_t  solid_only;
+	uint32_t vert_offset;
+	uint32_t vert_count;
+	uint32_t morph_end_offset;  // T6 morph twin; 0 in T1
+} Avm2ShapeGeom;
+
 // DefineEditText static data (Stage 6). Flags mirror the tag bit-for-bit
 // where possible; raw_text is the tag's InitialText verbatim (HTML markup
 // preserved when the html flag is set).
@@ -437,6 +455,8 @@ extern const Avm2TimelineData avm2_generated_timelines[];
 extern const uint32_t avm2_generated_timeline_count;
 extern const Avm2CharInfo avm2_generated_chars[];
 extern const uint32_t avm2_generated_char_count;
+extern const Avm2ShapeGeom avm2_generated_shape_geom[];
+extern const uint32_t avm2_generated_shape_geom_count;
 extern const Avm2SceneData avm2_generated_scenes[];
 extern const uint32_t avm2_generated_scene_count;
 extern const Avm2ButtonData avm2_generated_buttons[];
