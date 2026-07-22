@@ -1,13 +1,16 @@
 # AVM2 corpus expansion — Elephant Quest bring-up plan
 
-**Status: EQ-0 + EQ-1 DONE (2026-07-21).** EQ-0: tolerant verify was ALREADY
-IMPLEMENTED (recompile UNBLOCKED). EQ-1: the native build **compiles, links, and
-runs 300 ticks in ~1 s with no OOM**; frame dumps show frame1 executing (SWFStats
-beacon + `DOMAIN = armorgames.com`), the first wall **`#1065 ContextMenuItem`**
-(frame1:132) now **FIXED** (`flash.ui.ContextMenuItem` + `ContextMenu.customItems`
-stubs in `avm2_text.c` + regression test `avm2_contextmenu_stub`). Boot rests at
-the **frame1 preloader, healthy, awaiting a Play-button CLICK** — a *drive* gap;
-the title menu is EQ-2 (click injection + intro/menu chain; §4, §5 gap #8).
+**Status: EQ-0 + EQ-1 + EQ-2 DONE (EQ-2 2026-07-22).** EQ-0: tolerant verify was
+ALREADY IMPLEMENTED (recompile UNBLOCKED). EQ-1: the native build **compiles,
+links, and runs 300 ticks in ~1 s with no OOM**; frame dumps show frame1 executing,
+`#1065 ContextMenuItem` FIXED. **EQ-2: the Play click routes and boot advances past
+the preloader to frame3 `new Shell(); shell.init()`** — the real work was AVM2
+mouse hit-testing of the **nested SimpleButton** `playB` (its state children live in
+`btn_hit`/`btn_up`, not `render_list`, so `mouse_pick` MISSED it). Fixed in
+`mouse_pick` (`avm2_display.c`) + gated by `regression/avm2_simplebutton_click` (§5
+gap #9). **Next wall = `new Loader()` #1065 in `agi.init` (EQ-2.5, gap #3):** it
+runs inside `Shell.init` before `startIntro()`, so the title needs a
+`flash.display.Loader` stub + the `agi` no-op shell.
 
 The gap-#1 premise below was **stale**: `readOp` (the
 `0xf4` throw site, `abc_parser.cpp:830`) is **never called by `parseAbc`** — only
@@ -279,10 +282,19 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   (gap #6 — 1000 doors + level objects) and (b) any accidental super-linear cost.
   Not a blocker; our speed here is precisely the beat-Ruffle win (§3).
 
-### Gap 3 — [BLOCKING New Game · stub, moderate] `agi` must be a DEFINED no-op object
+### Gap 3 — [BLOCKING title AND New Game · stub, moderate] `flash.display.Loader` + `agi` no-op object
 
-- **Revised from "let the load fail" — that is wrong.** The New Game handler's
-  first line is the **unguarded** `this.shell.agi.hideAGILogin()` →
+- **UPDATED (EQ-2, 2026-07-22): this now blocks reaching the title, not just New
+  Game.** `Shell.init` calls `agi.init()` → `AGIStuff.initAGI` → **`new Loader()`**
+  BEFORE `startIntro()`. Our runtime defers `flash.display.Loader`
+  (`avm2_display.c:3136`), so this throws **#1065 "Loader is not defined"** and
+  aborts `Shell.init` before the intro. So EQ-2.5's first step is a minimal
+  `flash.display.Loader` stub (`new Loader()` non-throwing; `contentLoaderInfo` an
+  EventDispatcher; `load()` a no-op — the `COMPLETE` never fires, so `agi` stays
+  undefined, biting only at New Game's `hideAGILogin`). Then wire the `agi` no-op
+  shell below. Both are needed to get from Play → intro/title.
+- **The New Game handler's** first line is the **unguarded**
+  `this.shell.agi.hideAGILogin()` →
   `this.agi.hideLoginStatus()` (§2). If AGI.swf does not load, `agi` is
   `undefined` and New Game throws #1010 — this is **exactly Ruffle's Failure 1**,
   and it will bite our runtime identically. Letting `Loader.load` fail silently
@@ -344,18 +356,43 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   discardable Array) in `avm2_text.c`. Graded by `regression/avm2_contextmenu_stub`
   (mirrors the exact init path). Cosmetic — the menu is never read back headless.
 
-### Gap 9 — [DRIVE, not a bug · EQ-2 gateway] preloader is Play-CLICK-gated
+### Gap 9 — [RESOLVED 2026-07-22 · EQ-2 · the click routes, boot advances past the preloader] preloader is Play-CLICK-gated
 
-- **The current autonomous ceiling.** `MainTimeline` `addFrameScript(0,frame1,2,
-  frame3)`; frame1 `stop()`s and `preloadIt()` registers the `preload`
-  ENTER_FRAME. `preload` (MainTimeline:64) shows the Play button when
-  `bytesLoaded >= bytesTotal` and gates advance on **CLICK → `startIt` →
-  `play()` → frame3 `new Shell(); shell.init()`**. Headless has no click, so boot
-  rests at frame1. **Not a bug** — every `preloader.{playB,agButton,itemsToBuy,
-  bar,l}` access succeeds (zero #1010). To advance: inject a click via the native
-  binary's **event-file arg** (`verify_output.run_binary(event_file=…)` ←
-  `input.json` → `preprocess_input_json`, the RWK/TAS mechanism). Needs the
-  Play-button stage coords + the load-complete gate. **EQ-2 first step.**
+- **RESOLVED (EQ-2).** Injected a Play-button click via the native event-file arg
+  and the boot advances past frame1 to **frame3 `new Shell(); shell.init()`** —
+  frame-proven (tree dump shows the root timeline advance to frame-2/3 content
+  `musicIn_18` at the click tick, previously never reached). The three unknowns
+  were resolved empirically first (native `-O0` no-graphics EQ build + a new
+  env-gated `AVM2_DUMP_TREE` read-only display-tree dump in `avm2_display.c`):
+  1. **Load gate flips.** `LoaderInfo.bytesLoaded` and `bytesTotal` share the same
+     getter (`li_get_bytes_total` → `SWF_ONDISK_SIZE`), so `bytesLoaded >=
+     bytesTotal` is true on the first `preload` ENTER_FRAME tick; the dump shows
+     `SimpleButton 'playB' vis=1` from tick 1. No loaderInfo fix needed.
+  2. **`playB` stage coords.** The dump reads playB's **hit-state** world AABB =
+     `[39,206]..[281,274]px`, **centre (160,240)** (playB's own self bbox is
+     EMPTY — see below). Mined statically too: preloader (char 533) → `tl_206`
+     places playB (char 509, a **SimpleButton**) at (825,4169) twips scale 1.463.
+  3. **The click-to-nested-SimpleButton hit-test was the real work (the fix).**
+     A SimpleButton's visual/hit children live in `btn_up`/`btn_hit`, **not** the
+     container `render_list` that `mouse_pick` walks, so its self-bounds were
+     EMPTY and `mouse_pick` MISSED it — a click on playB dispatched nothing
+     (confirmed: pre-fix click produced zero new trace). Fix: `mouse_pick`
+     (`avm2_display.c`) now hit-tests a SimpleButton via its `hitTestState`
+     (fallback up state), inverse-mapping the stage point into the state's local
+     space, returning the **button** as the pick target (Ruffle
+     `avm2_button.rs::mouse_pick_avm2`). A down+up dispatches `"click"`, which
+     bubbles to the button's `addEventListener(CLICK)`. **Reusable — unblocks
+     every AVM2 button-driven game.** Gated by
+     `regression/avm2_simplebutton_click` (nested SimpleButton + injected click →
+     `CLICK ok target=true`; fails without the fix).
+- **Next wall (EQ-2.5, gap #3).** `startIt` → `play()` → frame3 `new Shell();
+  shell.init()` → `agi.init()` → `AGIStuff.initAGI` → **`new Loader()` → #1065
+  "Loader is not defined"** (our runtime defers `flash.display.Loader`,
+  `avm2_display.c:3136`), which aborts Shell.init **before** `startIntro()`. So
+  frame3/Shell.init **is reached** (the EQ-2 grade) but the title needs a
+  `flash.display.Loader` stub + the `agi` no-op shell (gap #3). The prompt's
+  assumption that the title is reachable *without* agi is corrected: `agi.init()`
+  runs inside `Shell.init` before the intro.
 
 ### Gap 10 — [render-path · T1+T2+T3+T5+T4+T6 + native TEXT SHIPPED · the AVM2 vector renderer] solid + stroke + gradient timeline shapes, morphshapes, script-drawn flash.display.Graphics, AND native timeline EditText render on GPU/Dawn AND headless CPU; getPixel gate live
 
@@ -504,7 +541,7 @@ session, gated on the build not OOMing.**
    Ruffle. Then the DOOR-build/world-map render is gradeable against a Ruffle
    export (§3).
 4. Beyond the first world-map frame (live gameplay — the beat-Ruffle moment,
-   EQ-2.5) is **further sessions** — this is a full custom engine (`john/*` + 47
+   EQ-3) is **further sessions** — this is a full custom engine (`john/*` + 47
    levels + `GunSystem`/`UpgradeTree`), not a known-engine reskin, so expect more
    surface than the Flixel sequels needed.
 
@@ -573,18 +610,26 @@ never exercised.
   (no OOM, ~1.5 GB cc1 peak on the 209 MB `draws.c`). The **headless CPU-dump stays
   blank** (T5 ports the CPU shape rasterizer), so the CPU-dump-vs-Ruffle pixel
   oracle is still not usable — but the Dawn sink now is. Census still TODO (§EQ-0).
-- **EQ-2 — New Game → world map (still Ruffle-oracle'd).** Requires gap #3 (the
-  `agi` no-op stub) to clear the unguarded `hideAGILogin` #1010, exactly as
-  Ruffle needed AGI.swf. Then drive New Game → story → `init2()`; confirm
+- **EQ-2 — Play click → frame3/Shell.init. ✅ DONE 2026-07-22.** The Play-button
+  click routes and the boot advances past the preloader to frame3 `new Shell();
+  shell.init()`. The real work was AVM2 mouse hit-testing of the nested
+  SimpleButton `playB` (§5 gap #9): `mouse_pick` now descends into a
+  SimpleButton's `hitTestState`, so a click dispatches to its listener. Gated by
+  `regression/avm2_simplebutton_click`. Reaching the title is EQ-2.5 (next wall =
+  `new Loader()` #1065 in `agi.init`).
+- **EQ-2.5 — Play → intro/title (Loader + agi stub).** Requires gap #3 (a
+  `flash.display.Loader` stub so `agi.init`'s `new Loader()` doesn't throw #1065,
+  then the `agi` no-op shell for the unguarded `hideAGILogin` #1010). Then drive
+  New Game → story → `init2()`; confirm
   `getDefinitionByName("Level"+n)` (gap #2), `SharedObject` empty-store (gap #4),
   and the heavy DOOR-build (gap #2b) all complete natively. **Grade the first
   world-map frame against a Ruffle export (oracle valid to here).** Watch native
   heap on the DOOR-build (gap #6).
-- **EQ-2.5 — the beat-Ruffle moment (instruments-only).** Drive *past* the
+- **EQ-3 — the beat-Ruffle moment (instruments-only).** Drive *past* the
   world-map frame where Ruffle's watchdog freezes. If our runtime keeps rendering
   live gameplay (player/enemies/animation) where Ruffle shows 210 frozen frames,
   EQ is the first title we play that Ruffle cannot. Frame-dump-proven; no oracle.
-- **EQ-3+ — gameplay depth.** Levels/combat/upgrades/world-map fidelity; then GC
+- **EQ-4+ — gameplay depth.** Levels/combat/upgrades/world-map fidelity; then GC
   soak before extended play; perf/footprint later and separate (out of scope
   now — the intrinsics don't transfer, §1).
 

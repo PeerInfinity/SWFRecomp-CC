@@ -1,0 +1,2 @@
+ready
+CLICK ok target=true

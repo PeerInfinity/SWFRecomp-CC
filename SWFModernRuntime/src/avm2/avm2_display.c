@@ -7069,6 +7069,41 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 	if (ext == NULL) return pk_make(PK_MISS, NULL);
 	if (!ext->is_stage && !ext->visible) return pk_make(PK_MISS, NULL);
 
+	// SimpleButton (Ruffle avm2_button.rs::mouse_pick_avm2): the visual/hit
+	// state children live in btn_hit/btn_up, NOT render_list, so the generic
+	// render_list + self-bounds pick below never sees them. Hit-test the hit
+	// state (fall back to the up state when there is no dedicated hit shape),
+	// inverse-mapping the stage point into the state's local space so
+	// rotation/scale are honored. The BUTTON itself is the pick target — a
+	// button's states are never interactive and never receive the event.
+	if (obj->cls != NULL
+	    && class_is_a(obj->cls, ctx->builtins.simple_button_class))
+	{
+		Avm2Object* hit = ext->btn_hit != NULL ? ext->btn_hit : ext->btn_up;
+		Avm2DisplayObjectExt* hext = hit != NULL
+			? avm2_display_ext_of(ctx, hit) : NULL;
+		if (hext != NULL)
+		{
+			Mat bw = display_world_matrix(ctx, obj);
+			Mat hl = ext_matrix(hext);
+			Mat hw = mat_mul(&bw, &hl);       // hit-local -> world
+			Mat idm = mat_identity();
+			Rect hb = { 0, 0, 0, 0, 0 };
+			bounds_with_transform(ctx, hit, &idm, &hb);  // subtree in hit-local
+			if (hb.valid)
+			{
+				Mat inv = mat_invert(&hw);
+				double lx = inv.a * px + inv.c * py + inv.tx;
+				double ly = inv.b * px + inv.d * py + inv.ty;
+				if (lx >= hb.xmin && lx <= hb.xmax
+				    && ly >= hb.ymin && ly <= hb.ymax)
+					return ext->mouse_enabled ? pk_make(PK_HIT, obj)
+					                          : pk_make(PK_PROP, NULL);
+			}
+		}
+		return pk_make(PK_MISS, NULL);
+	}
+
 	// TextField (Ruffle edit_text.rs::mouse_pick_avm2): a hovered selectable OR
 	// non-static field hits; a static non-selectable field propagates to the
 	// parent (which may absorb it).
@@ -7591,8 +7626,67 @@ void avm2_input_inject_mouse(int kind, float x, float y, int button,
 	g_live_in_tail = next;
 }
 
+// --- Debug: read-only display-tree dump (env AVM2_DUMP_TREE), stage-space AABB
+// in px, per node. For SimpleButtons the state children live in btn_up/btn_hit
+// (NOT render_list), so the self bbox is EMPTY; print the up/hit state world
+// bbox separately so a click coordinate can be read off. Never mutates state.
+static void avm2_dbg_dump_node(Avm2Context* ctx, Avm2Object* obj, int depth)
+{
+	if (obj == NULL || depth > 14) return;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return;
+	const char* cn = (obj->cls != NULL && obj->cls->name.name != NULL)
+		? obj->cls->name.name : "?";
+	const char* nm = (ext->name != NULL && ext->name->utf8 != NULL)
+		? ext->name->utf8 : "(anon)";
+	Mat wm = display_world_matrix(ctx, obj);
+	Rect acc = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, obj, &wm, &acc);
+	fprintf(stderr, "TREE ");
+	for (int i = 0; i < depth; i++) fprintf(stderr, "  ");
+	if (acc.valid)
+		fprintf(stderr, "%s '%s' vis=%d bbox=[%.1f,%.1f..%.1f,%.1f]px\n",
+			cn, nm, ext->visible, acc.xmin / 20.0, acc.ymin / 20.0,
+			acc.xmax / 20.0, acc.ymax / 20.0);
+	else
+		fprintf(stderr, "%s '%s' vis=%d bbox=EMPTY\n", cn, nm, ext->visible);
+	Avm2Object* st = ext->btn_hit != NULL ? ext->btn_hit
+		: ext->btn_up != NULL ? ext->btn_up : NULL;
+	if (st != NULL)
+	{
+		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, st);
+		if (sext != NULL)
+		{
+			Mat sl = ext_matrix(sext);
+			Mat sw = mat_mul(&wm, &sl);
+			Rect sb = { 0, 0, 0, 0, 0 };
+			bounds_with_transform(ctx, st, &sw, &sb);
+			fprintf(stderr, "TREE ");
+			for (int i = 0; i <= depth; i++) fprintf(stderr, "  ");
+			if (sb.valid)
+				fprintf(stderr, "[btn-%s state] bbox=[%.1f,%.1f..%.1f,%.1f]px "
+					"center=(%.1f,%.1f)\n",
+					ext->btn_hit != NULL ? "hit" : "up",
+					sb.xmin / 20.0, sb.ymin / 20.0, sb.xmax / 20.0, sb.ymax / 20.0,
+					(sb.xmin + sb.xmax) / 40.0, (sb.ymin + sb.ymax) / 40.0);
+			else
+				fprintf(stderr, "[btn state] bbox=EMPTY\n");
+		}
+	}
+	for (uint32_t i = 0; i < ext->render_len; i++)
+		avm2_dbg_dump_node(ctx, ext->render_list[i], depth + 1);
+}
+
+static void avm2_dbg_dump_tree(Avm2Context* ctx)
+{
+	if (getenv("AVM2_DUMP_TREE") == NULL) return;
+	fprintf(stderr, "TREE ===== tick tree dump =====\n");
+	if (ctx->stage != NULL) avm2_dbg_dump_node(ctx, ctx->stage, 0);
+}
+
 void avm2_input_pump_tick(Avm2Context* ctx)
 {
+	avm2_dbg_dump_tree(ctx);
 	// Live browser events first: drain everything buffered since the last tick
 	// (delivered in real time, so no WAIT pacing). Each in its own try frame so
 	// a throwing AS3 key handler can't abort the rest of the drain or the tick.
