@@ -1,9 +1,50 @@
 # AVM2 Vector Renderer — timeline shapes + `flash.display.Graphics`
 
-**Status:** v1.1, 2026-07-21. **T1 SHIPPED** (commit `63ca22e39`, solid-fill
-timeline shapes render on the GPU/Dawn sink). Planning-session output otherwise.
-Pattern: `avm2-support-plan.md` / `avm2-seedling-plan.md` (census-driven,
-dependency-ordered, test-first).
+**Status:** v1.2, 2026-07-21. **T1 SHIPPED** (`63ca22e39`, solid-fill timeline
+shapes). **T2+T3 SHIPPED** (this session — line strokes + gradient fills render
+on the GPU/Dawn sink; see the T2+T3 RESULT section). Planning-session output
+otherwise. Pattern: `avm2-support-plan.md` / `avm2-seedling-plan.md`
+(census-driven, dependency-ordered, test-first).
+
+## T2+T3 RESULT (2026-07-21) — strokes + gradients render, matching Ruffle
+
+Shipped exactly as the T2+T3 brief predicted: **pure gate-relaxation, no new
+geometry / tessellation / draw call.** The single per-shape `solid_only` flag was
+generalized into a `renderable` flag (`swf.cpp` `shape_renderable`,
+`abc_timeline.hpp`/`avm2_abc.h` struct field) whose cleared set shrank from
+"any gradient/bitmap fill OR any stroke" to **bitmap fills only** (`fs.type >=
+FILL_BITMAP_REPEAT`, i.e. `0x40-0x43`). Strokes (T2) and gradients (T3) are now
+admitted; the existing `renderer_draw_shape` dispatch (`avm2_display.c
+avm2_render_shape`) draws the shape's full `shape_data` range in one call, shaded
+per-vertex by the WGSL shader (stroke `0x80000000` color index; gradient
+`fill_type|spread|interp` sampling the resident ramp). Bitmap-fill timeline shapes
+stay deferred (`BITMAP_COUNT 0`; a later tranche) — leaving them blank is correct.
+
+- **R2 clarified & confirmed empirically.** The dynamic-gradient-pool risk
+  (`dynamic_gradient_capacity`) is a **T4** (`flash.display.Graphics`) concern, not
+  T3. Static timeline gradients bake into `gradient_data`/`uninv_mat_data`, both
+  copied into the AVM2 context by `avm2_render_init` (`avm2_display.c:7685-7690`)
+  **before** its `renderer_init` call (`:7716`), which fires `run_compute_pass` when
+  `uninv_mat_data_size>0` (`render_webgpu.c:933`). Proof: an authored radial-gradient
+  circle renders a correct **yellow→red radial falloff** matching the Ruffle
+  `--graphics gl` export — impossible without the inverse-matrix compute pass having
+  run. Confirmed for AVM2, not rebuilt.
+- **Baked-stroke-width parity note.** Timeline strokes are pre-tessellated at a fixed
+  width by `drawLines(path, line_style.width, tris)` (`swf.cpp:9269`) — **no runtime
+  Flash min-1px on-screen rule** (that lives only in the untouchable `action.c`
+  Drawing-API path). This matches how AVM1 timeline strokes render (baked). The
+  authored stroke probe renders identically to Ruffle at 1:1 scale; if hairlines
+  vanish at extreme scale it is a known parity note ([[n-thin-strokes-no-min-width]]),
+  **not** a bug to fix here.
+- **Grading (getPixel gate still awaits T5).** As with T1, `BitmapData.draw→getPixel`
+  doesn't read shape pixels yet (`bd_draw`, `avm2_bitmap.c`, no shape-Sprite raster),
+  so T2/T3 gate on **zero CI trace regressions (both modes) + Dawn frame-proofs**. Two
+  authored `regression/` probes are the pixel evidence, each MAD-matched to a Ruffle
+  export: `avm2_timeline_stroke_gradient` (black stroked rect + linear-gradient rect +
+  circle) and `avm2_timeline_gradients` (radial yellow→red, focal, reflect- and
+  repeat-spread linears). Both render **pixel-identical to Ruffle**; before T2/T3 all
+  their shapes were skipped blank. Image comparison stays informational
+  (`image-comparisons-dont-gate-passfail`).
 
 ## T1 RESULT (2026-07-21) — solid-fill timeline shapes render
 
@@ -289,25 +330,21 @@ integration check, never the oracle; both CI modes where render code changes
   shape renders upright at (50,50)px; `graphic_linkage`/`shape_drawrect`/
   `displayobject_getbounds_shape` unchanged. **EQ milestone: frame1 preloader
   renders on the GPU/Dawn sink** (headless CPU-dump still blank until T5).
-- **T2 — Line strokes.** **Sized post-T1: mostly a gate relax (~0.3 session).**
-  Stroke triangles (`0x80000000` style) are already in the same `shape_data` range
-  T1 draws — the recompiler `solid_only` flag currently skips any shape *with* a
-  stroke. T2 = split that flag into `has_gradient_or_bitmap_fill` (still skip) vs
-  `has_stroke` (now allow), so a solid-fill+stroke shape renders its full range;
-  the WGSL shader already shades `0x80000000` (AVM1 uses it). Confirm stroke
-  `color_data`/line-style indices resolve under AVM2 (`avm2_render_init` loads
-  `color_data`) + the Flash min-1px on-screen rule. **Gate:** Dawn frame-proof
-  (getPixel awaits T5); **EQ:** preloader bar / UI outlines.
-- **T3 — Gradients (linear/radial/focal, spread + interp).** **Sized post-T1:
-  timeline gradients are ALSO mostly a gate relax (~0.5 session); Risk R2 is a
-  T4-only concern.** Static timeline gradient shapes bake their ramp into
-  `gradient_data`/`uninv_mat_data` (already loaded by `avm2_render_init`) and shade
-  via the same `renderer_draw_shape` path (shader reads `inv_mats`/`gradient_tex`),
-  so T3-for-timeline = allow gradient-fill shapes through the gate + confirm the
-  static gradient texture/inv-mats are populated for AVM2. **R2 (dynamic gradient
-  pool, `dynamic_gradient_capacity`) only bites runtime `Graphics` gradients (T4),
-  not static timeline shapes** — verify at T4, not T3. **Gate:** Dawn frame-proof +
-  `graphics_gradients*` image comparison; **EQ:** title/HUD gradients.
+- **T2 — Line strokes. ✅ DONE 2026-07-21.** As sized (a gate relax): the recompiler
+  `solid_only` flag became `renderable`, cleared only by bitmap fills, so a stroke run
+  no longer skips its shape. Stroke `color_data`/line-style indices resolve under AVM2
+  (`avm2_render_init` loads `color_data`) and the WGSL shader shades `0x80000000` as a
+  solid via the color index. Baked stroke width, no runtime min-1px rule (parity note,
+  see RESULT). **Gate met:** authored `avm2_timeline_stroke_gradient` stroked rect
+  renders pixel-identical to the Ruffle export; getPixel awaits T5.
+- **T3 — Gradients (linear/radial/focal, spread + interp). ✅ DONE 2026-07-21.** As
+  sized (a gate relax; R2 is T4-only): gradient fills (`0x10/0x12/0x13`) join the
+  supported set, shading via the same `renderer_draw_shape` path. **Confirmed** the
+  static gradient inverse-matrix compute pass fires for AVM2 (`render_webgpu.c:933`
+  via `renderer_init`) — the authored radial probe's correct yellow→red falloff proves
+  it. **R2 (dynamic gradient pool) verified as a T4 concern, not here.** **Gate met:**
+  `avm2_timeline_gradients` (radial/focal + reflect/repeat spreads) renders
+  pixel-identical to Ruffle.
 > **Execution order (revised post-T1): T5 runs BEFORE T4.** Tranche *IDs* are kept
 > stable (T4 = `Graphics`, T5 = CPU rasterizer) so existing cross-references and the
 > `avm2-vector-render-t2-t3` prompt stay valid, but the T1 grading correction made T5

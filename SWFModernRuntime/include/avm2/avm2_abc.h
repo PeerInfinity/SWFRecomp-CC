@@ -282,10 +282,11 @@ typedef struct Avm2CharInfo
 typedef struct Avm2ShapeGeom
 {
 	uint16_t char_id;
-	// T1: 1 iff every triangle of this shape is a FILL_SOLID fill (no
-	// gradient/bitmap fill, no stroke). The solid-fill render walk skips
-	// shapes with solid_only == 0 (gradients render in T3, strokes in T2).
-	uint8_t  solid_only;
+	// 1 iff every triangle of this shape uses a fill class the AVM2 walk +
+	// WGSL shader render today: solid (T1), stroke (T2), gradient (T3). The
+	// render walk skips shapes with renderable == 0 — after T3 the only such
+	// class is BITMAP fills (0x40-0x43), deferred to a later tranche.
+	uint8_t  renderable;
 	uint32_t vert_offset;
 	uint32_t vert_count;
 	uint32_t morph_end_offset;  // T6 morph twin; 0 in T1

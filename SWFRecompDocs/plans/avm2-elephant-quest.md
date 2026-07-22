@@ -357,7 +357,7 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   `input.json` → `preprocess_input_json`, the RWK/TAS mechanism). Needs the
   Play-button stage coords + the load-complete gate. **EQ-2 first step.**
 
-### Gap 10 — [render-path · T1 SHIPPED · the AVM2 vector renderer] solid-fill timeline shapes now render on the GPU/Dawn sink
+### Gap 10 — [render-path · T1+T2+T3 SHIPPED · the AVM2 vector renderer] solid + stroke + gradient timeline shapes now render on the GPU/Dawn sink
 
 - **T1 DONE 2026-07-21 (`63ca22e39`).** The AVM2 render walk now paints
   **solid-fill `DefineShape` timeline content**: the recompiler emits a
@@ -376,8 +376,18 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   shapes (`bd_draw`, `avm2_bitmap.c:1951`), so the pixel-as-trace gate also waits
   for T5. **The EQ preloader now renders vector content on GPU; the headless
   frame-proof the EQ bring-up relies on stays blank until T5.**
-- Strokes (T2) / gradients (T3) / `Graphics` (T4) still blank by design — the
-  recompiler `solid_only` gate skips non-solid shapes this tranche.
+- **T2+T3 DONE 2026-07-21 (this session).** Line strokes and gradient fills
+  (linear/radial/focal + pad/reflect/repeat spreads) now render on the GPU/Dawn sink
+  too — pure gate-relaxation, the `solid_only` flag became `renderable` (cleared only
+  by bitmap fills). Authored probes (`avm2_timeline_stroke_gradient`,
+  `avm2_timeline_gradients`) render pixel-identical to Ruffle `--graphics gl` exports;
+  the radial falloff confirms the static-gradient inverse-matrix compute pass fires for
+  AVM2. So the EQ preloader's stroked outlines / bars and any title/HUD gradients now
+  paint on GPU/Dawn. See `avm2-vector-rendering-plan.md` §"T2+T3 RESULT".
+- **`Graphics` (T4) still blank by design; bitmap-fill timeline shapes deferred** — the
+  `renderable` gate now skips only bitmap-fill shapes (need a static bitmap atlas,
+  `BITMAP_COUNT 0`). Headless CPU-dump still blank until **T5** (the pulled-forward next
+  tranche — the CPU rasterizer + `BitmapData.draw→getPixel` headless gate for T1–T3).
 
 ---
 

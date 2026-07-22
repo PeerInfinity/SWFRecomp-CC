@@ -8976,12 +8976,15 @@ namespace SWFRecomp
 				}
 				
 				size_t tris_size = 0;
-				// T1 AVM2 shape-render gate: true iff every emitted triangle of
-				// this DefineShape is a FILL_SOLID fill (no gradient/bitmap fill,
-				// no stroke). Cleared below when a non-solid fill group or any
-				// stroke run is tessellated. Only meaningful for non-morph,
-				// non-font DefineShapes (the ones recorded into avm2_shape_geom).
-				bool shape_solid_only = true;
+				// AVM2 shape-render gate: true iff every emitted triangle of this
+				// DefineShape uses a fill class the AVM2 walk + WGSL shader can
+				// render today — solid (T1), stroke (T2, 0x80000000), and gradient
+				// (T3, linear/radial/focal). Cleared below only when a BITMAP fill
+				// group (0x40-0x43) is tessellated: bitmap-fill timeline shapes are
+				// deferred (they need a static bitmap atlas; a later tranche). Only
+				// meaningful for non-morph, non-font DefineShapes (the ones recorded
+				// into avm2_shape_geom).
+				bool shape_renderable = true;
 				size_t morph_end_start_vertex = current_morph_end_vertex;
 
 				// Only morph shapes keep the earcut path: morph needs a per-vertex
@@ -9229,12 +9232,13 @@ namespace SWFRecomp
 						{
 							style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
 						}
-						// T1: a gradient/bitmap fill makes the whole shape
-						// non-solid (deferred to T3). Only tris.empty() groups
+						// Only a BITMAP fill (0x40-0x43) makes the shape
+						// unrenderable this tranche — solid (T1) and gradient
+						// (T3, 0x10/0x12/0x13) are shader-handled. Empty groups
 						// leave the flag untouched.
-						if (fs.type != FILL_SOLID && !tris.empty())
+						if (fs.type >= FILL_BITMAP_REPEAT && !tris.empty())
 						{
-							shape_solid_only = false;
+							shape_renderable = false;
 						}
 
 						for (Tri t : tris)
@@ -9270,12 +9274,9 @@ namespace SWFRecomp
 
 						tris_size += tris.size();
 
-						// T1: strokes render in T2 — a shape with any stroke run
-						// is skipped by the AVM2 solid-fill walk this tranche.
-						if (!tris.empty())
-						{
-							shape_solid_only = false;
-						}
+						// T2: strokes are shader-handled (0x80000000 style, shaded
+						// as solids via the color index), so a stroke run no longer
+						// makes the shape unrenderable — it does not clear the flag.
 
 						for (Tri t : tris)
 						{
@@ -9330,7 +9331,7 @@ namespace SWFRecomp
 						// only when a DoABC tag created the emitter.)
 						abc::Avm2ShapeGeomRec geom;
 						geom.char_id = shape_id;
-						geom.solid_only = shape_solid_only ? 1 : 0;
+						geom.renderable = shape_renderable ? 1 : 0;
 						geom.vert_offset = (uint32_t) (3 * current_tri);
 						geom.vert_count = (uint32_t) (3 * tris_size);
 						geom.morph_end_offset = 0;

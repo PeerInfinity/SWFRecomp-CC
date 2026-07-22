@@ -215,14 +215,15 @@ static const Avm2ShapeGeom* shape_geom_for(uint16_t char_id)
 	return NULL;
 }
 
-// Resolve a placed character's solid-fill shape geometry onto its ext (T1).
+// Resolve a placed character's renderable shape geometry onto its ext.
 // Called at place-time so the render walk needs no per-frame lookup. Clears
-// the range for anything that isn't a renderable solid shape (sprite,
-// gradient/stroke shape, script-created, or unresolved char).
+// the range for anything that isn't a renderable shape (sprite, bitmap-fill
+// shape, script-created, or unresolved char). "Renderable" = solid (T1),
+// stroke (T2), and gradient (T3) fills; bitmap-fill shapes stay deferred.
 static void resolve_shape_geom(Avm2DisplayObjectExt* ext, uint16_t char_id)
 {
 	const Avm2ShapeGeom* sg = shape_geom_for(char_id);
-	if (sg != NULL && sg->solid_only && sg->vert_count > 0)
+	if (sg != NULL && sg->renderable && sg->vert_count > 0)
 	{
 		ext->shape_vert_offset = sg->vert_offset;
 		ext->shape_vert_count = sg->vert_count;
@@ -7587,12 +7588,13 @@ static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
 		0.0f, 0.0f, xid, cxid);
 }
 
-// Draw one solid-fill timeline shape node (T1): its pre-tessellated triangles
+// Draw one renderable timeline shape node: its pre-tessellated triangles
 // (resident shape_data vertex range, resolved onto the ext at place-time) under
 // the node's world matrix + concatenated alpha. Mirrors avm2_render_bitmap's
-// slot-write model, swapping the bitmap quad for renderer_draw_shape — which
-// reads the shape_data verts (shape-local Flash Y-down twips) and shades each
-// FILL_SOLID triangle from the per-vertex color index (WGSL shader). The world
+// slot-write model, swapping the bitmap quad for renderer_draw_shape — one draw
+// covers every triangle, shaded per-vertex by the WGSL shader from the packed
+// style bits: solid color index (T1), stroke 0x80000000 color index (T2), and
+// gradient fill_type|spread|interp sampling the resident ramp (T3). The world
 // matrix maps local twips -> stage twips (Y-down), then stage_to_ndc; no
 // coordinate flip is applied because shape_data already stores shape-local
 // Y-down coordinates (the recompiler's FRAME_HEIGHT round-trip cancels).

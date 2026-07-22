@@ -324,10 +324,10 @@ typedef struct Avm2DisplayObjectExt
 	// still-unconstructed children (constructors_vs_timeline).
 	uint8_t running_construct_frame;
 	uint16_t char_id;            // 0 = script-created (or root)
-	// T1 solid-fill shape geometry, resolved from char_id at place-time
-	// (avm2_generated_shape_geom). shape_vert_count == 0 means "no solid
-	// shape to draw" (script-created, sprite, gradient/stroke shape, or
-	// unresolved) — the render walk then draws nothing for this node.
+	// Renderable shape geometry (solid/stroke/gradient fills), resolved from
+	// char_id at place-time (avm2_generated_shape_geom). shape_vert_count == 0
+	// means "no renderable shape to draw" (script-created, sprite, bitmap-fill
+	// shape, or unresolved) — the render walk then draws nothing for this node.
 	uint32_t shape_vert_offset;
 	uint32_t shape_vert_count;
 	int32_t depth;               // timeline depth

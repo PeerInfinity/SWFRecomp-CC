@@ -24,12 +24,13 @@ namespace abc
 	// emitter (which otherwise only re-reads RECT bounds, never geometry).
 	// vert_offset/vert_count are in VERTICES (each vertex is 4*u32 in
 	// shape_data), matching render_webgpu_draw_shape's (offset, num_verts).
-	// solid_only: T1 renders a shape only when every triangle is a FILL_SOLID
-	// fill (no gradient/bitmap fill, no stroke) — see the T1 shape-level gate.
+	// renderable: 1 iff every triangle of this shape uses a fill class the AVM2
+	// walk + WGSL shader can render — solid (T1), stroke (T2), gradient (T3).
+	// Cleared only by a BITMAP fill (0x40-0x43), which stays deferred.
 	struct Avm2ShapeGeomRec
 	{
 		uint16_t char_id;
-		uint8_t  solid_only;
+		uint8_t  renderable;
 		uint32_t vert_offset;
 		uint32_t vert_count;
 		uint32_t morph_end_offset;  // T6 morph twin; 0 in T1

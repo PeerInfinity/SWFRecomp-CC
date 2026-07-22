@@ -1330,7 +1330,7 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	    << ";\n\n";
 
 	// Shape geometry table (char_id -> shape_data vertex range), from the
-	// recompiler's tessellation pass. Drives the AVM2 solid-fill render walk
+	// recompiler's tessellation pass. Drives the AVM2 shape render walk
 	// (renderer_draw_shape). Present only when the caller recorded shapes.
 	{
 		const std::vector<Avm2ShapeGeomRec> empty_geom;
@@ -1341,7 +1341,7 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			out << "const Avm2ShapeGeom avm2_generated_shape_geom[] = {\n";
 			for (auto& g : geom)
 			{
-				out << "\t{ " << g.char_id << ", " << (int) g.solid_only << ", "
+				out << "\t{ " << g.char_id << ", " << (int) g.renderable << ", "
 				    << g.vert_offset << ", " << g.vert_count << ", "
 				    << g.morph_end_offset << " },\n";
 			}
