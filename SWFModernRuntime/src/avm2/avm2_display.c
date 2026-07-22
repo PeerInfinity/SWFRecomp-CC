@@ -179,6 +179,7 @@ static int g_timeline_instantiation;
 
 static Avm2Class* g_textfield_class;
 static Avm2Class* g_statictext_class;
+static Avm2Class* g_morphshape_class;
 static uint8_t g_stage_invalidated_flag;
 
 static const Avm2TimelineData* timeline_for_char(uint16_t char_id)
@@ -998,8 +999,9 @@ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 	switch (kind)
 	{
 		case AVM2_CHAR_SHAPE:
-		case AVM2_CHAR_MORPHSHAPE:
 			return ctx->builtins.shape_class;
+		case AVM2_CHAR_MORPHSHAPE:
+			return g_morphshape_class;
 		case AVM2_CHAR_BUTTON:
 			return ctx->builtins.simple_button_class;
 		case AVM2_CHAR_TEXT:
@@ -6656,6 +6658,32 @@ static void display_native_init_abstract(Avm2Context* ctx, Avm2Object* obj)
 	                 (int) name_len, name);
 }
 
+// MorphShape (flash.display.MorphShape): a DisplayObject the timeline places
+// for a DefineMorphShape character, but which script CANNOT instantiate —
+// `new MorphShape()` throws #2012 (avmplus ArgumentError). Unlike the abstract
+// display bases (display_native_init_abstract, which throw unconditionally),
+// MorphShape IS timeline-instantiable, so the #2012 guard is conditional on
+// this being a script `new` (g_timeline_instantiation == 0). Timeline placement
+// runs the ordinary concrete init.
+static void morphshape_native_init(Avm2Context* ctx, Avm2Object* obj)
+{
+	if (!g_timeline_instantiation)
+	{
+		const char* name = "MorphShape";
+		uint32_t name_len = 10;
+		if (obj->cls != NULL)
+		{
+			name = obj->cls->name.name;
+			name_len = obj->cls->name.name_len;
+		}
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2012: %.*s$ class cannot be instantiated.",
+		                 (int) name_len, name);
+		return;
+	}
+	display_native_init(ctx, obj);
+}
+
 // Sprite constructor body (runs at super() time): constructChildren
 // (Ruffle sprite.rs construct_children) — construct_frame on each child,
 // so timeline children placed before the ctor get their constructors
@@ -7997,6 +8025,13 @@ void avm2_register_display(Avm2Context* ctx)
 	Avm2Class* shape = avm2_builtin_class(ctx, "flash.display", "Shape", dobj);
 	shape->native_init = display_native_init;
 	b->shape_class = shape;
+
+	// flash.display.MorphShape (extends DisplayObject): timeline-only —
+	// `new MorphShape()` throws #2012, timeline placement constructs normally.
+	Avm2Class* morphshape = avm2_builtin_class(ctx, "flash.display",
+	                                           "MorphShape", dobj);
+	morphshape->native_init = morphshape_native_init;
+	g_morphshape_class = morphshape;
 
 	// flash.display.Bitmap (extends DisplayObject, NOT InteractiveObject).
 	// The class shell + display alloc hook live here so the display tree
