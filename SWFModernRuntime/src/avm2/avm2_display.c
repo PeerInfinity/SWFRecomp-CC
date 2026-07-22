@@ -8544,6 +8544,13 @@ static void avm2_cpu_walk(Avm2Context* ctx, Avm2Object* obj,
 		                      world.a, world.b, world.c, world.d,
 		                      world.tx, world.ty, alpha);
 
+	// Native timeline TextField (DefineEditText) glyphs — CPU twin of
+	// avm2_render_text. Composites the laid-out field glyphs into the dump.
+	if (ext->edittext != NULL)
+		avm2_cpu_raster_text(fb, fbw, fbh, /*transparent=*/0, ctx, obj,
+		                     world.a, world.b, world.c, world.d,
+		                     world.tx, world.ty, alpha);
+
 	// T4: script-drawn Graphics geometry (independent of a timeline shape).
 	avm2_graphics_cpu_composite(ctx, obj, world.a, world.b, world.c, world.d,
 	                            world.tx, world.ty, alpha, fb, fbw, fbh, 0);
@@ -8914,6 +8921,120 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 	}
 }
 
+// avm2_text.c: layout-engine glyph collection (field-local twips placements).
+uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
+                                      Avm2GlyphPlacement** out,
+                                      int32_t out_clip[4]);
+
+// Native TEXT/EDITTEXT — draw a timeline-placed TextField on the GPU. GPU twin of
+// avm2_cpu_raster_text: collect the laid-out glyphs, tessellate each glyph's
+// flattened outline (field-local twips: x_twips + scale*px, y_twips + scale*py)
+// with libtess2 NONZERO winding (the same rule the CPU scanline uses, so glyph
+// holes render), and draw per glyph via renderer_draw_tris under one
+// world-transform + alpha-cxform slot. Chosen glyph-geometry form: runtime-
+// tessellate outlines -> tris (the T4/T6 runtime-tris path — crisp, scale-
+// independent). Device-font glyphs (no outlines) and x-clip to the field bounds
+// are skipped (see avm2-native-text-render-plan.md). CPU twin: avm2_cpu_raster_text.
+static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
+                             const Mat* world, double alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->edittext == NULL) return;
+	Avm2GlyphPlacement* gl = NULL;
+	int32_t clip[4];
+	uint32_t n = avm2_edittext_collect_glyphs(ctx, obj, &gl, clip);
+	if (n == 0) return;
+
+	// One world-transform slot (field-local twips -> stage) for the whole field.
+	uint32_t xid = 0;
+	if (g_avm2_xform_next < context->xform_slot_count)
+	{
+		float m16[16];
+		avm2_world_to_mat16(world, m16);
+		xid = g_avm2_xform_next++;
+		renderer_write_transform(context, xid, m16);
+	}
+	uint32_t cxid = 0;
+	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
+	{
+		float cx[20];
+		memset(cx, 0, sizeof(cx));
+		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;
+		cx[15] = (float) alpha;
+		cxid = g_avm2_cxform_next++;
+		renderer_write_cxform(context, cxid, cx);
+	}
+
+	for (uint32_t gi = 0; gi < n; gi++)
+	{
+		const Avm2FontData* fd = gl[gi].font;
+		if (fd == NULL || fd->glyph_pts == NULL) continue;
+		uint32_t g = gl[gi].glyph;
+		uint32_t p0 = fd->glyph_pt_start[g], p1 = fd->glyph_pt_start[g + 1];
+		uint32_t c0 = fd->glyph_contour_start[g], c1 = fd->glyph_contour_start[g + 1];
+		uint32_t np = p1 - p0;
+		if (np < 3 || c1 <= c0) continue;
+
+		// Glyph outline points -> field-local twips (font units * scale = twips).
+		double s = (double) gl[gi].scale;
+		double bx = (double) gl[gi].x_twips, by = (double) gl[gi].y_twips;
+		float* pts = (float*) malloc((size_t) np * 2 * sizeof(float));
+		if (pts == NULL) continue;
+		for (uint32_t i = 0; i < np; i++)
+		{
+			pts[i * 2]     = (float) (bx + s * (double) fd->glyph_pts[2 * (p0 + i)]);
+			pts[i * 2 + 1] = (float) (by + s * (double) fd->glyph_pts[2 * (p0 + i) + 1]);
+		}
+
+		TESStesselator* tess = tessNewTess(NULL);
+		if (tess != NULL)
+		{
+			tessSetOption(tess, TESS_CONSTRAINED_DELAUNAY_TRIANGULATION, 1);
+			int contrib = 0;
+			for (uint32_t k = c0; k < c1; k++)
+			{
+				uint32_t cs = (k == c0 ? p0 : fd->glyph_contour_ends[k - 1]) - p0;
+				uint32_t ce = fd->glyph_contour_ends[k] - p0;
+				int cn = (int) (ce - cs);
+				if (cn < 3) continue;
+				tessAddContour(tess, 2, &pts[cs * 2], sizeof(float) * 2, cn);
+				contrib++;
+			}
+			if (contrib > 0 && tessTesselate(tess, TESS_WINDING_NONZERO,
+			                                 TESS_POLYGONS, 3, 2, NULL))
+			{
+				const TESSreal* v = tessGetVertices(tess);
+				const TESSindex* el = tessGetElements(tess);
+				int nt = tessGetElementCount(tess);
+				if (nt > 0)
+				{
+					float* verts = (float*) malloc((size_t) nt * 3 * 2 * sizeof(float));
+					if (verts != NULL)
+					{
+						for (int i = 0; i < nt; i++)
+							for (int j = 0; j < 3; j++)
+							{
+								TESSindex idx = el[i * 3 + j];
+								verts[i * 6 + j * 2]     = v[idx * 2];
+								verts[i * 6 + j * 2 + 1] = v[idx * 2 + 1];
+							}
+						uint32_t col = gl[gi].color;
+						float r = (float) ((col >> 16) & 0xFF) / 255.0f;
+						float gg = (float) ((col >> 8) & 0xFF) / 255.0f;
+						float b = (float) (col & 0xFF) / 255.0f;
+						renderer_draw_tris(context, verts, (uint32_t) nt * 3,
+						                   r, gg, b, 1.0f, xid, cxid);
+						free(verts);
+					}
+				}
+			}
+			tessDeleteTess(tess);
+		}
+		free(pts);
+	}
+	heap_free(ctx->app, gl);
+}
+
 // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
 // world matrix + concatenated alpha down the tree. Invisible subtrees are
 // culled, matching render_apply_text_bounds.
@@ -8934,6 +9055,10 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 		avm2_render_morph(ctx, obj, &world, alpha);
 	else if (ext->shape_vert_count > 0)
 		avm2_render_shape(ctx, obj, &world, alpha);
+
+	// Native timeline TextField (DefineEditText) glyphs.
+	if (ext->edittext != NULL)
+		avm2_render_text(ctx, obj, &world, alpha);
 
 	// T4: script-drawn Graphics geometry (independent of a timeline shape).
 	avm2_render_graphics(ctx, obj, &world, alpha);

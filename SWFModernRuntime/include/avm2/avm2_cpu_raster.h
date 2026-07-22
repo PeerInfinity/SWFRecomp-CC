@@ -63,4 +63,18 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
                            double wa, double wb, double wc, double wd,
                            double wtx, double wty, double node_alpha);
 
+// Native TEXT/EDITTEXT — composite a timeline-placed TextField's laid-out glyphs
+// (avm2_edittext_collect_glyphs -> flattened outlines, non-zero winding scanline)
+// into a premultiplied-ARGB target under the node world matrix (`w*`: field-local
+// TWIPS -> target TWIPS; /20 -> device px) + concatenated `node_alpha`. Impl lives
+// in avm2_bitmap.c (needs the glyph rasterizer + cxform/blend helpers); this is the
+// walk-facing entry (identity cxform, normal blend). Device-font (no outlines) and
+// GPU-side x-clip are skipped (see avm2-native-text-render-plan.md).
+typedef struct Avm2Context Avm2Context;
+typedef struct Avm2Object Avm2Object;
+void avm2_cpu_raster_text(uint32_t* buf, int W, int H, int transparent,
+                          Avm2Context* ctx, Avm2Object* tf_obj,
+                          double wa, double wb, double wc, double wd,
+                          double wtx, double wty, double node_alpha);
+
 #endif // AVM2_CPU_RASTER_H

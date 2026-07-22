@@ -1767,14 +1767,23 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 // the test exact under any affine draw matrix. Border/background/underline
 // and device-font text (no outlines) are not rendered — same honest-no-op
 // policy as the rest of the Stage-9 CPU scope.
-static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
-                              Avm2Object* tf_obj,
-                              double ma, double mb, double mc, double md,
-                              double mtx, double mty, int has_cxform,
-                              int16_t rm, int16_t gm, int16_t bmul, int16_t am,
-                              int16_t ro, int16_t go, int16_t bo, int16_t ao,
-                              int blend_mode)
+// Core glyph-scanline rasterizer: composites a TextField's laid-out glyphs into
+// a raw premultiplied-ARGB buffer `buf` (W*H). The matrix maps field-local
+// PIXELS -> dest PIXELS (mtx/mty in pixels). `transparent` selects the store
+// representation (opaque targets force alpha 0xFF, matching BitmapData). Shared
+// by bd_draw_textfield (BitmapData.draw, cxform+blend) and the display walks
+// (avm2_cpu_raster_text, node_alpha, identity cxform, normal blend) — kept
+// byte-for-byte for the former by defaulting node_alpha=1 and honouring the
+// cxform/blend params. Never touches action.c.
+static void text_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
+                             int transparent, Avm2Object* tf_obj,
+                             double ma, double mb, double mc, double md,
+                             double mtx, double mty, int has_cxform,
+                             int16_t rm, int16_t gm, int16_t bmul, int16_t am,
+                             int16_t ro, int16_t go, int16_t bo, int16_t ao,
+                             int blend_mode, double node_alpha)
 {
+	if (buf == NULL || W <= 0 || H <= 0 || node_alpha <= 0.0) return;
 	double det = ma * md - mb * mc;
 	if (det == 0.0 || !isfinite(det) || !isfinite(mtx) || !isfinite(mty))
 		return;
@@ -1784,7 +1793,7 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	if (n == 0) return;
 	// dest px -> field-local px (draw-matrix inverse) for the mask test.
 	double ia = md / det, ib = -mb / det, ic = -mc / det, id = ma / det;
-	int opaque = !dst->transparency;
+	int opaque = !transparent;
 
 	// Per-glyph scratch: transformed outline points + scanline crossings.
 	uint32_t cap = 0;
@@ -1813,6 +1822,10 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 			uint8_t a = ctx_channel(am, ao, (uint8_t) CA(color));
 			color = CMK(r, gc, b, a);
 		}
+		// Concatenated display-tree alpha (walk callers); no-op for the
+		// BitmapData.draw gate (node_alpha == 1).
+		if (node_alpha < 0.999)
+			color = with_alpha(color, (uint32_t) (CA(color) * node_alpha + 0.5));
 		if (CA(color) == 0 && blend_mode == BM_NORMAL) continue;
 		uint32_t src_pm = premul(color, 1);
 
@@ -1853,9 +1866,9 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		int py0 = (int) floor(miny), py1 = (int) ceil(maxy);
 		int px0 = (int) floor(minx), px1 = (int) ceil(maxx);
 		if (py0 < 0) py0 = 0;
-		if (py1 > (int) dst->height) py1 = (int) dst->height;
+		if (py1 > H) py1 = H;
 		if (px0 < 0) px0 = 0;
-		if (px1 > (int) dst->width) px1 = (int) dst->width;
+		if (px1 > W) px1 = W;
 
 		for (int y = py0; y < py1; y++)
 		{
@@ -1914,12 +1927,13 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 						    || lty < (double) clip[1]
 						    || lty >= (double) (clip[1] + clip[3]))
 							continue;
-						uint32_t dc = bd_get_raw(dst, (uint32_t) px, (uint32_t) y);
+						size_t off = (size_t) px + (size_t) y * (size_t) W;
+						uint32_t dc = buf[off];
 						uint32_t outc = blend_mode != BM_NORMAL
 							? blend_mode_apply(blend_mode, dc, src_pm)
 							: blend_over(dc, src_pm);
 						if (opaque) outc = with_alpha(outc, 0xFF);
-						bd_set_raw(dst, (uint32_t) px, (uint32_t) y, outc);
+						buf[off] = outc;
 					}
 				}
 			}
@@ -1933,6 +1947,39 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		heap_free(ctx->app, cdir);
 	}
 	heap_free(ctx->app, gl);
+}
+
+// Thin BitmapData.draw wrapper — byte-for-byte the pre-refactor rasterizer
+// (node_alpha == 1, cxform/blend passed through). Keeps
+// avm2_bitmapdata_draw_textfield green.
+static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                              Avm2Object* tf_obj,
+                              double ma, double mb, double mc, double md,
+                              double mtx, double mty, int has_cxform,
+                              int16_t rm, int16_t gm, int16_t bmul, int16_t am,
+                              int16_t ro, int16_t go, int16_t bo, int16_t ao,
+                              int blend_mode)
+{
+	text_raster_core(ctx, dst->pixels, (int) dst->width, (int) dst->height,
+	                 dst->transparency, tf_obj, ma, mb, mc, md, mtx, mty,
+	                 has_cxform, rm, gm, bmul, am, ro, go, bo, ao,
+	                 blend_mode, 1.0);
+}
+
+// Public entry for the display walks (avm2_cpu_walk, bd_draw_shape_walk): render
+// a timeline-placed TextField's glyphs into a raw premultiplied-ARGB buffer under
+// the node's world matrix + concatenated alpha. `w*` map field-local TWIPS ->
+// target TWIPS (the shape/morph raster convention); the pixel-space core takes
+// the 2x2 unchanged and the translation /20. Identity cxform, normal blend.
+void avm2_cpu_raster_text(uint32_t* buf, int W, int H, int transparent,
+                          Avm2Context* ctx, Avm2Object* tf_obj,
+                          double wa, double wb, double wc, double wd,
+                          double wtx, double wty, double node_alpha)
+{
+	text_raster_core(ctx, buf, W, H, transparent, tf_obj,
+	                 wa, wb, wc, wd, wtx / 20.0, wty / 20.0,
+	                 /*has_cxform=*/0, 256, 256, 256, 256, 0, 0, 0, 0,
+	                 BM_NORMAL, node_alpha);
 }
 
 // ---------------------------------------------------------------------------
@@ -1980,6 +2027,12 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		                      dst->transparency,
 		                      ext->shape_vert_offset, ext->shape_vert_count,
 		                      wa, wb, wc, wd, wtx, wty, alpha);
+	else if (ext->edittext != NULL)
+		// Native timeline TextField glyphs — makes a placed field getPixel-gateable
+		// via BitmapData.draw(container) (the T6 gate shape, extended to text).
+		avm2_cpu_raster_text(dst->pixels, (int) dst->width, (int) dst->height,
+		                     dst->transparency, ctx, obj,
+		                     wa, wb, wc, wd, wtx, wty, alpha);
 
 	// T4: script-drawn Graphics geometry on this node (the getPixel gate reads
 	// runtime fills/strokes/gradients through this path).
