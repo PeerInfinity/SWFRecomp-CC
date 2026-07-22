@@ -25,6 +25,7 @@
 #endif
 
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_cpu_raster.h>
 #include <avm2/avm2_error.h>
 #include <memory/heap.h>
 
@@ -7416,6 +7417,14 @@ static void avm2_cpu_walk(Avm2Context* ctx, Avm2Object* obj,
 
 	if (ext->is_bitmap)
 		avm2_cpu_composite_bitmap(ctx, obj, &world, alpha, fb, fbw, fbh);
+	else if (ext->shape_vert_count > 0)
+		// T5: CPU-composite a resident timeline shape (the headless twin of
+		// avm2_render_shape's GPU dispatch), mirroring the WGSL shader so the
+		// dump matches the Dawn/Ruffle pixels. fb is premultiplied ARGB.
+		avm2_cpu_raster_shape(fb, fbw, fbh, /*transparent=*/0,
+		                      ext->shape_vert_offset, ext->shape_vert_count,
+		                      world.a, world.b, world.c, world.d,
+		                      world.tx, world.ty, alpha);
 
 	for (uint32_t i = 0; i < ext->render_len; i++)
 		avm2_cpu_walk(ctx, ext->render_list[i], &world, alpha, fb, fbw, fbh);

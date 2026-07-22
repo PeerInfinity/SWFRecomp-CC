@@ -1,0 +1,6 @@
+solid placed
+bg=ffffff
+blue=ff
+green=cc00
+orange=ff8800
+gap=ffffff

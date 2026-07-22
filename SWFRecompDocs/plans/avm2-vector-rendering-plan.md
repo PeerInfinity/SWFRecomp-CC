@@ -1,10 +1,83 @@
 # AVM2 Vector Renderer — timeline shapes + `flash.display.Graphics`
 
-**Status:** v1.2, 2026-07-21. **T1 SHIPPED** (`63ca22e39`, solid-fill timeline
-shapes). **T2+T3 SHIPPED** (this session — line strokes + gradient fills render
-on the GPU/Dawn sink; see the T2+T3 RESULT section). Planning-session output
-otherwise. Pattern: `avm2-support-plan.md` / `avm2-seedling-plan.md`
-(census-driven, dependency-ordered, test-first).
+**Status:** v1.3, 2026-07-21. **T1 SHIPPED** (`63ca22e39`, solid-fill timeline
+shapes). **T2+T3 SHIPPED** (line strokes + gradient fills on the GPU/Dawn sink;
+see the T2+T3 RESULT section). **T5 SHIPPED** (this session — CPU shape
+rasterizer for the headless path; `BitmapData.draw→getPixel` now reads shape
+pixels, promoting the T1/T2/T3 probes to CI-gating no-graphics trace tests; see
+the T5 RESULT section). Planning-session output otherwise. Pattern:
+`avm2-support-plan.md` / `avm2-seedling-plan.md` (census-driven,
+dependency-ordered, test-first).
+
+## T5 RESULT (2026-07-21) — CPU shape rasterizer; T1/T2/T3 getPixel gates go live
+
+Shipped both legs. **The T1/T2/T3 timeline-shape line now has its first
+headless, trace-gating pixel check** — `BitmapData.draw→getPixel` reads real
+shape pixels, and three `regression/` tests gate byte-exactly against the Ruffle
+`--graphics gl` exports in **no-graphics** mode:
+
+- `avm2_timeline_solid` (new) — solid-fill rect/circle interiors + background.
+- `avm2_timeline_stroke_gradient` — stroke centreline, hollow interior, linear
+  gradient start/mid/end (`de0021`/`690096`/`0000ff`), radial centre.
+- `avm2_timeline_gradients` — radial (`ff8400`), focal (`0000ff`), reflect-spread
+  (`005f00`), repeat-spread (`ff00ff`).
+
+**Every getPixel value equals the Ruffle export pixel at that coordinate,
+byte-for-byte** — closing **CPU == GPU == Ruffle** across solid, stroke, linear,
+radial, focal, and reflect/repeat spread. That is the payoff the T1 grading
+correction deferred to T5.
+
+**What was built (`SWFModernRuntime/src/avm2/`, no `action.c` touched):**
+- New `avm2_cpu_raster.c`/`.h`: a Dawn-free triangle rasterizer over the resident
+  `shape_data` vertex ranges. It reads the generated geometry tables
+  (`shape_data`/`color_data`/`gradient_data`/`uninv_mat_data`) **directly as
+  `extern` globals** — NOT via the render `context`, which is graphics-only —
+  because those tables are linked into every build (`verify_output.py`
+  `DRAWS_ARRAY_NAMES`), so the raster works in NO_GRAPHICS where the gate lives.
+- **Leg 1** dispatch in `avm2_cpu_walk` (beside the `is_bitmap` gate) — the CPU
+  twin of T1's `avm2_render_shape`.
+- **Leg 2** `bd_draw` shape-source arm (`avm2_bitmap.c`): a recursive subtree
+  walk composing child matrices into the target BitmapData buffer — the
+  mechanism getPixel needs.
+
+**★ The premul/sRGB-parity ruling (the tranche's central risk), resolved by the
+byte-exact getPixel-vs-Ruffle evidence:**
+1. **STORE via AVM2's `premul()` formula, not `action.c`'s.** Final straight
+   pixels are premultiplied with `(ch*a+127)/255` (the exact forward premul
+   `avm2_bitmap.c::premul()` uses) then source-over-blended, so `getPixel`'s
+   Flash brute-forced un-premultiply table round-trips opaque pixels identically.
+   The `de0021`/`690096`/`ff8400` gradient interpolants matching to the byte
+   confirm no ±1-channel drift.
+2. **The `action.c` gradient macros do NOT port verbatim for `shape_data`.** This
+   is the load-bearing correction to the brief's "copy the macros verbatim"
+   framing: `action.c`'s `RASTER_TRI_GRADIENT`/`SAMPLE_GRADIENT_RAMP` shade the
+   AVM1 **DrawingState** path, whose gradient coords live in raw ±16384 twips
+   space and whose ramp sampler is `t*255+0.5` with no sRGB pass. The **GPU
+   `shape_data` path** bakes the `[0,1]` UV normalisation into `uninv_mat_data`
+   (`swf.cpp recompileGradientMatrix`, `×32768`/`−16384`) and samples with the
+   hardware convention `t*256−0.5`. So only `INVERT_2D_AFFINE` and the
+   `RASTER_TRI` **coverage** math port verbatim; the gradient **shading** is
+   re-derived to mirror the WGSL `vs_main`/`fs_main`/`sample_gradient` exactly
+   (normalised UV → `linear_t`/`radial_t`/`focal_radial_t` → `t*256−0.5` sampler).
+   Timeline ramps are stored sRGB-encoded (`swf.cpp linearRgbLerp` bakes
+   linear→sRGB back) and shapes never set the `is_linear_rgb` style bit, so **no
+   linear→sRGB pass is applied** — matching the shader for timeline shapes. The
+   inverse of the forward gradient matrix is computed on the CPU
+   (`INVERT_2D_AFFINE` on `uninv_mat_data`), independent of the GPU compute pass.
+3. **Gradient matrix inversion:** `uninv_mat_data` is a pure 2D-affine-in-4×4
+   (z-identity), so the 2×3 `INVERT_2D_AFFINE` yields exactly the GPU
+   compute-pass inverse's `x,y` — no full 4×4 invert needed.
+
+**Deferred (documented, not silently dropped):**
+- **EQ gap #10 headless dump** — frame-proof deferred: the EQ SWF is not present
+  locally and its `-O0` recompile (209 MB `draws.c`) is the known OOM-risk heavy
+  compile (`avm2-elephant-quest.md §gap-6`). The mechanism is proven (the same
+  `shape_data`/gradient path the probes exercise byte-exactly); the dump walk
+  (`avm2_cpu_walk`) now composites shapes. Frame-proof when an EQ binary exists.
+- **Masks/`clip_depth` (T7)** — not wired (no stencil this tranche).
+- **Bitmap fills (0x40-0x43)** — skipped (a later tranche; `BITMAP_COUNT 0`).
+- **Non-alpha ColorTransform on a `bd_draw` shape source** — identity-only
+  (node alpha is honoured; probes use no cxform).
 
 ## T2+T3 RESULT (2026-07-21) — strokes + gradients render, matching Ruffle
 
@@ -352,13 +425,16 @@ integration check, never the oracle; both CI modes where render code changes
 > `BitmapData.draw→getPixel` read shape pixels, T1/T2/T3 have no headless trace gate,
 > only Dawn-eyeball + zero-regression. So the schedule is **T2 → T3 → T5 → T4 → T6**.
 
-- **T5 — CPU shape rasterizer for headless. → runs right after T3 (NEXT tranche).** Port `RASTER_TRI*`
-  into `avm2_cpu_walk` so `AVM2_CPU_DUMP` composites shapes/gradients/strokes.
-  **Resolves EQ gap #10** (the headless frame-proof the EQ bring-up depends on) **and
-  retroactively becomes the CI-gating pixel check for T1/T2/T3** — the authored
-  `BitmapData.draw→getPixel` trace tests for solid fills, strokes, and gradients all
-  go green here in **no-graphics** mode at once. **Gate:** those `getPixel` tests pass
-  in no-graphics; manual `.ppm` inspection of an EQ preloader dump. ~1 session.
+- **T5 — CPU shape rasterizer for headless. ✅ DONE 2026-07-21.** Ported the
+  triangle-coverage + `INVERT_2D_AFFINE` math into a new `avm2_cpu_raster.c`
+  (never calling `action.c`), **re-deriving the gradient shading to mirror the
+  WGSL shader** (the `shape_data` normalized-UV convention, not `action.c`'s
+  DrawingState ±16384 path — see the T5 RESULT for why the "verbatim" framing
+  was wrong for gradients). Dispatched in `avm2_cpu_walk` (Leg 1) and taught
+  `bd_draw` to raster a shape source (Leg 2). **Gate met:** three authored
+  `getPixel` regression tests pass byte-exact vs the Ruffle exports in
+  **no-graphics** — the first headless trace gate for T1/T2/T3. EQ gap #10 dump
+  deferred (no local EQ binary; OOM-risk recompile), mechanism proven.
 
   **T5 sizing (grounded post-T3, 2026-07-21) — ~1 session, two legs, low risk:**
   1. **Port the rasterizer into `src/avm2/` (the bulk).** `rasterizeMovieClipToBitmap`
@@ -402,16 +478,69 @@ integration check, never the oracle; both CI modes where render code changes
     the `action.c` source (`stencil`/`stencil_out` params) but is **T7**; port the
     signature but leave masks unwired unless EQ's preloader needs them (it did not for
     the GPU frame-proof).
-- **T4 — `flash.display.Graphics` runtime drawing. → after T5.** Real backend for
-  `beginFill`/`beginGradientFill`/`beginBitmapFill`/`lineStyle`/`moveTo`/`lineTo`/
-  `curveTo`/`drawRect`/`drawCircle`/`drawEllipse`/`drawRoundRect` + `endFill`/`clear`,
-  and add `drawPath`/`drawTriangles`/`GraphicsPath`/`GraphicsData` with argument
-  validation. Runtime tessellation ported from the `action.c:28016` pattern. **This is
-  where Risk R2 (dynamic gradient pool) bites** — verify `dynamic_gradient_capacity`.
-  **Gate:** upstream `graphics_draw_path`, `graphics_draw_triangles`, `graphics_path`,
-  `graphics_bad_direct_commands`, `graphics_direct_commands` (trace lines) +
-  `graphics_simple_shapes`/`graphics_bitmap_fill` image confirmation + authored
-  `getPixel`. **EQ:** any script-drawn UI. ~1.5 sessions.
+- **T4 — `flash.display.Graphics` runtime drawing. → NEXT (after T5).** Real
+  backend for `beginFill`/`beginGradientFill`/`beginBitmapFill`/`lineStyle`/
+  `moveTo`/`lineTo`/`curveTo`/`drawRect`/`drawCircle`/`drawEllipse`/
+  `drawRoundRect` + `endFill`/`clear`, and add `drawPath`/`drawTriangles`/
+  `GraphicsPath`/`GraphicsData` with argument validation. **EQ:** any
+  script-drawn UI.
+
+  **T4 sizing (grounded post-T5, 2026-07-21) — ~1.5 sessions, two parts, the
+  first low-risk and immediately gradeable, the second where R2 bites:**
+
+  **A. Argument-validation + command semantics (the trace backbone — do first).**
+  The gating upstream tests are pure TRACE and need **no pixels**:
+  `graphics_draw_path` (101 lines, `#2004`), `graphics_draw_triangles` (98,
+  `known_failure`), `graphics_path` (56, `GraphicsPath` winding `#2008`),
+  `graphics_bad_direct_commands` (5, `#2004`), `graphics_direct_commands`. Today
+  the AVM2 `Graphics` class (`avm2_display.c`, ext `Avm2GraphicsExt{owner}`) is an
+  **AABB recorder** — every fill/stroke method is `gfx_noop` and `moveTo`/`lineTo`/
+  `curveTo`/`drawRect`/`drawCircle` only union points into `draw_{xmin..ymax}` for
+  `getBounds`; `drawPath`/`drawTriangles`/`drawGraphicsData` **aren't in the
+  method table at all** (they throw / hit default handling). Part A = add those
+  methods + argument validation (the `#2004`/`#2008` error paths, `GraphicsPathWinding`,
+  `Vector.<int>`/`Vector.<Number>` command+data decoding) and record a real
+  command/contour list on the ext instead of only an AABB. This is
+  self-contained ABC-class work, gradeable in **no-graphics** the moment the trace
+  lines match — no rasterizer needed.
+
+  **B. Rendering the recorded geometry (reuses T5 + the backend).** Build contours
+  from the recorded commands, tessellate at runtime (mirror `action.c:28016`'s
+  libtess2 pattern — **copy, never call**; libtess2 is already linked), and feed
+  the result to **both** sinks the T5 work just wired: the GPU
+  `renderer_draw_tris/gradient_tris` (graphics mode) **and** the new
+  `avm2_cpu_raster.c` (headless). **T5 hands B a real pixel gate for free**:
+  `BitmapData.draw(spriteWithGraphics)→getPixel→trace` grades runtime-drawn fills
+  in no-graphics with the exact harness the three T5 probes use — extend
+  `avm2_cpu_raster.c` to accept a runtime command/vertex buffer alongside the
+  static `shape_data` range (same per-vertex `style_type|style_id` row format, so
+  the solid/gradient shading is unchanged).
+
+  **★ Where R2 finally bites (Risk R2 / `dynamic_gradient_capacity`).** T3 proved
+  the **static** timeline-gradient inverse-matrix compute pass fires for AVM2
+  (`uninv_mat_data_size>0` at `renderer_init`). Runtime `beginGradientFill` has
+  **no** static `gradient_data`/`uninv_mat_data` row — it must allocate a
+  **dynamic** gradient ramp + matrix slot at draw time. `render_webgpu.c`
+  over-allocates `MAX_DYNAMIC_GRADIENTS` texture rows and dynamic `uninv_mat`/
+  `inv_mat` slots (`create_textures`/init) and inverts them per-draw via the CPU
+  `invert_4x4_matrix` (`:2119`, the path T5 did NOT need). **T4-B must verify**
+  the AVM2 side actually provisions and writes those dynamic slots (build the
+  256-row ramp from the `beginGradientFill` stops with `linearRgbLerp` parity,
+  write the forward matrix, trigger the inverse) — on the CPU-raster side it can
+  reuse T5's `INVERT_2D_AFFINE` directly (no compute pass). If the dynamic pool is
+  unprovisioned, gradient fills draw nothing — cheap to check at B-start with one
+  authored `beginGradientFill`→`getPixel` probe.
+
+  **Gate:** Part A — `graphics_draw_path`, `graphics_draw_triangles`,
+  `graphics_path`, `graphics_bad_direct_commands`, `graphics_direct_commands`
+  (trace, no-graphics). Part B — authored `regression/` `BitmapData.draw→getPixel`
+  probes (one per `beginFill`/`beginGradientFill`/`drawPath` class, mirroring the
+  T5 probes) + `graphics_simple_shapes`/`graphics_bitmap_fill` image
+  confirmation under `--mode=graphics`. Both CI modes (touches shared render +
+  the `avm2_cpu_raster.c` TU). **Risk:** R2 (above) is the one real unknown;
+  runtime tessellation + the command decoder are mechanical ports. The upstream
+  pure-render tests ship empty `output.txt` and do **not** gate (they pass
+  trivially rendering nothing) — the authored `getPixel` probes are the real B gate.
 - **T6 — Morphshapes.** Emit start/end vert tables + ratio interpolation (mirror
   `morph_end_shape_data`); dispatch interpolated verts. **Gate:** upstream
   `morph_shape`, `hittest_morph` + authored ratio-midpoint `getPixel`. **EQ:** morph

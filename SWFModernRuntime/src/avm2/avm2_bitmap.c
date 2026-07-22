@@ -23,6 +23,7 @@
 #include <zlib.h>
 
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_cpu_raster.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
@@ -1948,6 +1949,49 @@ static void bd_draw_textfield(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 // A BitmapData source with Alpha/Erase does nothing (a documented Flash quirk;
 // distinct from drawing a Bitmap with the same data). Anything outside the fast
 // path is skipped (honest no-op) and triaged in STAGE9_CANDIDATES.txt.
+// T5 — BitmapData.draw() of a shape/Sprite source: CPU-raster each SHAPE node
+// in the source's display subtree into dst's premultiplied buffer, mirroring
+// avm2_cpu_walk's recursion but targeting the BitmapData. `w*` maps shape-local
+// twips -> dst-pixel*20 (avm2_cpu_raster_shape divides by 20). The source's OWN
+// transform/alpha are ignored (Flash draw() semantics — only the passed matrix
+// and the subtree's internal child matrices apply). ColorTransform/blendMode on
+// a shape source are not honoured yet (identity-only; probes use neither).
+static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                               Avm2Object* obj,
+                               double wa, double wb, double wc, double wd,
+                               double wtx, double wty, double alpha, int depth)
+{
+	if (obj == NULL || depth > 64) return;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return;
+	if (!ext->is_stage && !ext->visible) return;
+
+	if (ext->shape_vert_count > 0)
+		avm2_cpu_raster_shape(dst->pixels, (int) dst->width, (int) dst->height,
+		                      dst->transparency,
+		                      ext->shape_vert_offset, ext->shape_vert_count,
+		                      wa, wb, wc, wd, wtx, wty, alpha);
+
+	for (uint32_t i = 0; i < ext->render_len; i++)
+	{
+		Avm2Object* child = ext->render_list[i];
+		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+		if (cext == NULL) continue;
+		// child local matrix (twips->twips): compose world * child (mat_mul).
+		double ca = cext->mtx_a, cb = cext->mtx_b, cc = cext->mtx_c, cd = cext->mtx_d;
+		double ctx_ = (double) cext->mtx_tx, cty = (double) cext->mtx_ty;
+		double na = wa * ca + wc * cb;
+		double nb = wb * ca + wd * cb;
+		double nc = wa * cc + wc * cd;
+		double nd = wb * cc + wd * cd;
+		double ntx = wa * ctx_ + wc * cty + wtx;
+		double nty = wb * ctx_ + wd * cty + wty;
+		double calpha = alpha * ((double) cext->alpha_fixed8 / 256.0);
+		bd_draw_shape_walk(ctx, dst, child, na, nb, nc, nd, ntx, nty,
+		                   calpha, depth + 1);
+	}
+}
+
 static Avm2Value bd_draw(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -1961,6 +2005,7 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	double extra_tx = 0.0, extra_ty = 0.0;
 	int extra_matrix_ok = 1;
 	Avm2Object* text_src = NULL;  // TextField source -> CPU glyph raster
+	Avm2Object* shape_src = NULL; // shape/Sprite source -> CPU shape raster (T5)
 	if (src == NULL)
 	{
 		Avm2Object* so = (src_val.kind == AVM2_VALUE_OBJECT) ? src_val.u.obj : NULL;
@@ -1978,8 +2023,14 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		{
 			text_src = so;
 		}
+		else if (sde != NULL)
+		{
+			// Any other display object: treat as a shape/Sprite source and
+			// CPU-raster its shape subtree (harmless no-op if it has none).
+			shape_src = so;
+		}
 	}
-	if (text_src == NULL
+	if (text_src == NULL && shape_src == NULL
 	    && (src == NULL || src->disposed || src->pixels == NULL))
 		return avm2_undefined();
 
@@ -2024,7 +2075,7 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	// affine matrix. A Bitmap (DisplayObject) source keeps the Stage-9
 	// scope: only pure translation (identity 2x2) blits on the CPU; a
 	// rotated/scaled Bitmap source still needs the offscreen GPU path.
-	int can_affine = source_is_bitmapdata || text_src != NULL;
+	int can_affine = source_is_bitmapdata || text_src != NULL || shape_src != NULL;
 	if ((!identity_2x2 && !can_affine) || !extra_matrix_ok || blend_alpha_or_erase)
 		return avm2_undefined();  // needs the offscreen GPU render path
 
@@ -2061,6 +2112,16 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		bd_draw_textfield(ctx, dst, text_src, ma, mb, mc, md, mtx, mty,
 		                  has_cxform, rm, gm, bm, am, ro, go, bo, ao,
 		                  blend_mode);
+		return avm2_undefined();
+	}
+
+	// Shape/Sprite source: CPU-raster its shape subtree under the draw matrix.
+	// The world passed to the walk maps shape-local twips -> dst-pixel*20, so
+	// the draw matrix's pixel translation (mtx,mty) is scaled to twips.
+	if (shape_src != NULL)
+	{
+		bd_draw_shape_walk(ctx, dst, shape_src, ma, mb, mc, md,
+		                   mtx * 20.0, mty * 20.0, 1.0, 0);
 		return avm2_undefined();
 	}
 

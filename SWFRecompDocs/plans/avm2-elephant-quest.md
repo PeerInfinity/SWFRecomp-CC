@@ -357,7 +357,7 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   `input.json` → `preprocess_input_json`, the RWK/TAS mechanism). Needs the
   Play-button stage coords + the load-complete gate. **EQ-2 first step.**
 
-### Gap 10 — [render-path · T1+T2+T3 SHIPPED · the AVM2 vector renderer] solid + stroke + gradient timeline shapes now render on the GPU/Dawn sink
+### Gap 10 — [render-path · T1+T2+T3+T5 SHIPPED · the AVM2 vector renderer] solid + stroke + gradient timeline shapes render on GPU/Dawn AND the headless CPU-dump; getPixel gate live
 
 - **T1 DONE 2026-07-21 (`63ca22e39`).** The AVM2 render walk now paints
   **solid-fill `DefineShape` timeline content**: the recompiler emits a
@@ -390,10 +390,27 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   exercise the identical recompiler→runtime→shader→Dawn pipeline, and a local `-O0` EQ
   rebuild (209 MB `draws.c`, OOM-risky, §gap-6) is not worth the risk when it is the
   integration check, never the gate. Re-dump recipe is unchanged (§gap-6 / Appendix).
-- **`Graphics` (T4) still blank by design; bitmap-fill timeline shapes deferred** — the
-  `renderable` gate now skips only bitmap-fill shapes (need a static bitmap atlas,
-  `BITMAP_COUNT 0`). Headless CPU-dump still blank until **T5** (the pulled-forward next
-  tranche — the CPU rasterizer + `BitmapData.draw→getPixel` headless gate for T1–T3).
+- **T5 DONE 2026-07-21 (this session) — the headless CPU-dump now composites
+  shapes, and the `BitmapData.draw→getPixel` gate is live.** New
+  `avm2_cpu_raster.c` (a Dawn-free triangle rasterizer over the resident
+  `shape_data`, mirroring the WGSL shader) is dispatched in `avm2_cpu_walk`
+  (Leg 1) and drives a `bd_draw` shape-source arm (Leg 2). Three `regression/`
+  `getPixel` tests (`avm2_timeline_solid`, `avm2_timeline_stroke_gradient`,
+  `avm2_timeline_gradients`) now gate **byte-exact vs the Ruffle exports in
+  no-graphics** (solid/stroke/linear/radial/focal/reflect/repeat all match) —
+  CPU == GPU == Ruffle. See `avm2-vector-rendering-plan.md` §"T5 RESULT".
+  - **EQ preloader headless frame-proof: DEFERRED (documented).** The gap-#10
+    fix is the *mechanism*, and `avm2_cpu_walk` now composites the same
+    `shape_data`/gradient content the probes exercise byte-exactly — but no EQ
+    binary exists locally and its `-O0` recompile (209 MB `draws.c`) is the known
+    OOM-risk heavy compile (§gap-6). The headless dump will show the
+    elephant/cityscape once an EQ binary is built; the authored probes carry
+    correctness in the meantime (the same pipeline, isolated).
+- **`Graphics` (T4) still blank by design; bitmap-fill timeline shapes deferred**
+  — the `renderable` gate skips only bitmap-fill shapes (need a static bitmap
+  atlas, `BITMAP_COUNT 0`). T4 (runtime `flash.display.Graphics`) is now the next
+  tranche and inherits the T5 `getPixel` gate for free
+  (`avm2-vector-rendering-plan.md` §"T4 sizing").
 
 ---
 

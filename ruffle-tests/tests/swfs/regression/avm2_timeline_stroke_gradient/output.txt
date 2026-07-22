@@ -1,1 +1,9 @@
 probe placed
+bg=ffffff
+stroke_l=0
+stroke_t=0
+rect_hollow=ffffff
+lin_l=de0021
+lin_m=690096
+lin_r=ff
+rad_c=ff00

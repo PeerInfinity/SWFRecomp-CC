@@ -1,1 +1,7 @@
 grad placed
+bg=ffffff
+rad_c=ff8400
+rad_e=ff0000
+foc_c=ff
+reflect=5f00
+repeat=ff00ff
