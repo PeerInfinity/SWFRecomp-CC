@@ -352,13 +352,56 @@ integration check, never the oracle; both CI modes where render code changes
 > `BitmapData.draw→getPixel` read shape pixels, T1/T2/T3 have no headless trace gate,
 > only Dawn-eyeball + zero-regression. So the schedule is **T2 → T3 → T5 → T4 → T6**.
 
-- **T5 — CPU shape rasterizer for headless. → runs right after T3.** Port `RASTER_TRI*`
+- **T5 — CPU shape rasterizer for headless. → runs right after T3 (NEXT tranche).** Port `RASTER_TRI*`
   into `avm2_cpu_walk` so `AVM2_CPU_DUMP` composites shapes/gradients/strokes.
   **Resolves EQ gap #10** (the headless frame-proof the EQ bring-up depends on) **and
   retroactively becomes the CI-gating pixel check for T1/T2/T3** — the authored
   `BitmapData.draw→getPixel` trace tests for solid fills, strokes, and gradients all
   go green here in **no-graphics** mode at once. **Gate:** those `getPixel` tests pass
   in no-graphics; manual `.ppm` inspection of an EQ preloader dump. ~1 session.
+
+  **T5 sizing (grounded post-T3, 2026-07-21) — ~1 session, two legs, low risk:**
+  1. **Port the rasterizer into `src/avm2/` (the bulk).** `rasterizeMovieClipToBitmap`
+     (`action.c:13292-13623`, ~330 lines) is the battle-tested Dawn-free rasterizer,
+     with `INVERT_2D_AFFINE` (`:13314`), `SAMPLE_GRADIENT_RAMP` (`:13329`, pad/reflect/
+     repeat), `RASTER_TRI` (`:13354`, solid), and `RASTER_TRI_GRADIENT` (`:13397`,
+     linear/radial/focal) — **the exact shading the WGSL shader does** (mirror, not
+     invent). **The shading macros port verbatim**; only the *wrapper* is adapted: feed
+     the resident AVM2 `shape_data` range (`ext->shape_vert_offset/count` — already
+     resolved at place-time, T1) through the per-triangle loop, reading the packed
+     `style_type|spread|interp` + `style_index` per vertex (identical row format to the
+     GPU path) and AVM2's `color_data`/`gradient_data`/`uninv_mat_data` tables (already
+     copied into the context by `avm2_render_init`). Strokes need nothing extra — a
+     `0x80000000` triangle shades as a solid via its color index, same as the shader.
+     **Never call `action.c`** — copy the macros into an `avm2_cpu_raster.c`/`.h` in
+     `src/avm2/`. Then dispatch it in `avm2_cpu_walk` (`avm2_display.c:7405`) beside
+     `avm2_cpu_composite_bitmap`, gated on `ext->shape_vert_count > 0` (the mirror of
+     the GPU `avm2_render_shape` gate). Cxform: reuse `DrawColorTransform` param already
+     threaded through the raster. **~200-250 net lines.**
+  2. **Wire the `BitmapData.draw→getPixel` gate (the grading unlock).** `bd_draw`
+     (`avm2_bitmap.c:1951`) currently no-ops a shape/`Sprite` source. Extend it to
+     rasterize a shape-`Sprite` (or a container of shapes) via the ported raster into the
+     target `BitmapData` buffer, honoring the passed `Matrix`/`ColorTransform`. Then
+     `getPixel(x,y)` reads a real color → `trace()` → **CI-gating in no-graphics**.
+     **~60-100 lines** (the raster already exists from leg 1; this is the source-tree
+     walk + matrix compose, mirroring the existing TextField/Bitmap `bd_draw` arms).
+  3. **Author the `getPixel` regression tests** (`regression/`, no-graphics-gradeable):
+     one per fill class already Dawn-proven this session — solid-fill point color,
+     stroke coverage point, linear-gradient endpoint colors, radial-center vs edge — so
+     T1/T2/T3 all gain a **real headless CI gate** at T5, not just Dawn eyeball. Reuse
+     the two SVG-embed probe SWFs shipped this session (`avm2_timeline_stroke_gradient`,
+     `avm2_timeline_gradients`) as the shape sources — add `BitmapData.draw`+`getPixel`
+     assertions to their `Test.as`. **~4 small tests.**
+  - **Risks: low.** No new tessellation, no Dawn, no recompiler change (the geometry +
+    tables are all resident). R3 (script-constructed shape resolution) is orthogonal —
+    the `bd_draw` source is whatever Sprite the test hands it. The one watch item is
+    **premultiplied-alpha / sRGB parity** between the CPU raster and the WGSL shader
+    (the shader does linearRGB→sRGB for gradients, `render_webgpu.c:154-225`); match it
+    in `SAMPLE_GRADIENT_RAMP`'s output so getPixel values agree with the Dawn oracle.
+  - **Deferred to T5, explicitly NOT in T5:** mask/stencil (`clip_depth`) is present in
+    the `action.c` source (`stencil`/`stencil_out` params) but is **T7**; port the
+    signature but leave masks unwired unless EQ's preloader needs them (it did not for
+    the GPU frame-proof).
 - **T4 — `flash.display.Graphics` runtime drawing. → after T5.** Real backend for
   `beginFill`/`beginGradientFill`/`beginBitmapFill`/`lineStyle`/`moveTo`/`lineTo`/
   `curveTo`/`drawRect`/`drawCircle`/`drawEllipse`/`drawRoundRect` + `endFill`/`clear`,

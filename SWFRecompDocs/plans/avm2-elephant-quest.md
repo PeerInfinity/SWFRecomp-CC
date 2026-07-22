@@ -382,8 +382,14 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   by bitmap fills). Authored probes (`avm2_timeline_stroke_gradient`,
   `avm2_timeline_gradients`) render pixel-identical to Ruffle `--graphics gl` exports;
   the radial falloff confirms the static-gradient inverse-matrix compute pass fires for
-  AVM2. So the EQ preloader's stroked outlines / bars and any title/HUD gradients now
-  paint on GPU/Dawn. See `avm2-vector-rendering-plan.md` §"T2+T3 RESULT".
+  AVM2. See `avm2-vector-rendering-plan.md` §"T2+T3 RESULT". **The change is purely
+  additive** (it only *admits* previously-skipped stroke/gradient shapes; it cannot
+  regress the solid rendering T1 already frame-proved), so EQ's preloader stroked
+  outlines / bars and any title/HUD gradients now paint on GPU/Dawn by construction. A
+  fresh EQ `--mode=graphics` re-dump was **deferred this session** — the isolated probes
+  exercise the identical recompiler→runtime→shader→Dawn pipeline, and a local `-O0` EQ
+  rebuild (209 MB `draws.c`, OOM-risky, §gap-6) is not worth the risk when it is the
+  integration check, never the gate. Re-dump recipe is unchanged (§gap-6 / Appendix).
 - **`Graphics` (T4) still blank by design; bitmap-fill timeline shapes deferred** — the
   `renderable` gate now skips only bitmap-fill shapes (need a static bitmap atlas,
   `BITMAP_COUNT 0`). Headless CPU-dump still blank until **T5** (the pulled-forward next
