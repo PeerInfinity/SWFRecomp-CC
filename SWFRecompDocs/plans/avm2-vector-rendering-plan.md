@@ -308,20 +308,30 @@ integration check, never the oracle; both CI modes where render code changes
   pool, `dynamic_gradient_capacity`) only bites runtime `Graphics` gradients (T4),
   not static timeline shapes** — verify at T4, not T3. **Gate:** Dawn frame-proof +
   `graphics_gradients*` image comparison; **EQ:** title/HUD gradients.
-- **T4 — `flash.display.Graphics` runtime drawing.** Real backend for
+> **Execution order (revised post-T1): T5 runs BEFORE T4.** Tranche *IDs* are kept
+> stable (T4 = `Graphics`, T5 = CPU rasterizer) so existing cross-references and the
+> `avm2-vector-render-t2-t3` prompt stay valid, but the T1 grading correction made T5
+> the **grading backbone for T1–T3**: until the CPU rasterizer lets
+> `BitmapData.draw→getPixel` read shape pixels, T1/T2/T3 have no headless trace gate,
+> only Dawn-eyeball + zero-regression. So the schedule is **T2 → T3 → T5 → T4 → T6**.
+
+- **T5 — CPU shape rasterizer for headless. → runs right after T3.** Port `RASTER_TRI*`
+  into `avm2_cpu_walk` so `AVM2_CPU_DUMP` composites shapes/gradients/strokes.
+  **Resolves EQ gap #10** (the headless frame-proof the EQ bring-up depends on) **and
+  retroactively becomes the CI-gating pixel check for T1/T2/T3** — the authored
+  `BitmapData.draw→getPixel` trace tests for solid fills, strokes, and gradients all
+  go green here in **no-graphics** mode at once. **Gate:** those `getPixel` tests pass
+  in no-graphics; manual `.ppm` inspection of an EQ preloader dump. ~1 session.
+- **T4 — `flash.display.Graphics` runtime drawing. → after T5.** Real backend for
   `beginFill`/`beginGradientFill`/`beginBitmapFill`/`lineStyle`/`moveTo`/`lineTo`/
   `curveTo`/`drawRect`/`drawCircle`/`drawEllipse`/`drawRoundRect` + `endFill`/`clear`,
   and add `drawPath`/`drawTriangles`/`GraphicsPath`/`GraphicsData` with argument
-  validation. Runtime tessellation ported from the `action.c:28016` pattern.
+  validation. Runtime tessellation ported from the `action.c:28016` pattern. **This is
+  where Risk R2 (dynamic gradient pool) bites** — verify `dynamic_gradient_capacity`.
   **Gate:** upstream `graphics_draw_path`, `graphics_draw_triangles`, `graphics_path`,
   `graphics_bad_direct_commands`, `graphics_direct_commands` (trace lines) +
   `graphics_simple_shapes`/`graphics_bitmap_fill` image confirmation + authored
   `getPixel`. **EQ:** any script-drawn UI. ~1.5 sessions.
-- **T5 — CPU shape rasterizer for headless.** Port `RASTER_TRI*` into `avm2_cpu_walk`
-  so `AVM2_CPU_DUMP` composites shapes/gradients/strokes. **Resolves EQ gap #10** (the
-  headless frame-proof the EQ bring-up depends on). **Gate:** the same authored
-  `getPixel` tests pass in no-graphics mode (they already route through CPU raster for
-  `BitmapData.draw`); manual `.ppm` inspection of an EQ preloader dump. ~1 session.
 - **T6 — Morphshapes.** Emit start/end vert tables + ratio interpolation (mirror
   `morph_end_shape_data`); dispatch interpolated verts. **Gate:** upstream
   `morph_shape`, `hittest_morph` + authored ratio-midpoint `getPixel`. **EQ:** morph
