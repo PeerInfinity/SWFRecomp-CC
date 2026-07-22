@@ -1,22 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `63ca22e398c4` (2026-07-21T23:49:05.154932+00:00)
-**Current:** `f490e4b247e8` (2026-07-22T00:51:45.671616+00:00)
+**Previous:** `f490e4b247e8` (2026-07-22T00:51:45.671616+00:00)
+**Current:** `69369f32dece` (2026-07-22T02:06:25.882913+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 57 | 61 | +4 |
-| Total | 57 | 61 | +4 |
+| Passing | 61 | 62 | +1 |
+| Total | 61 | 62 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (4)
+## Added Tests (1)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm2_timeline_gradients` | pass | 1/1 |
-| `avm2_timeline_stroke_gradient` | pass | 1/1 |
-| `broadcast_cross_swf_version` | pass | 4/4 |
-| `broadcast_type1_args` | pass | 14/14 |
+| `avm2_timeline_solid` | pass | 6/6 |
+
+## Line Count Changed (2)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `avm2_timeline_gradients` | pass | 1/1 | 7/7 | 0 |
+| `avm2_timeline_stroke_gradient` | pass | 1/1 | 9/9 | 0 |

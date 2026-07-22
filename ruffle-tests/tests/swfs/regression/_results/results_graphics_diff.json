@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-21T23:49:05.154932+00:00",
-    "old_git_sha": "63ca22e398c4d42c6e1216fe21e2fb019661cb4a",
-    "new_timestamp": "2026-07-22T00:51:45.671616+00:00",
-    "new_git_sha": "f490e4b247e8d04ffabfb07564777243ffeb85d7",
+    "old_timestamp": "2026-07-22T00:51:45.671616+00:00",
+    "old_git_sha": "f490e4b247e8d04ffabfb07564777243ffeb85d7",
+    "new_timestamp": "2026-07-22T02:06:25.882913+00:00",
+    "new_git_sha": "69369f32dece2bdeb7968bdf7c4c52280ce0bf97",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 57,
+    "old_pass": 61,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 57,
-    "old_total": 57,
+    "old_effective_pass": 61,
+    "old_total": 61,
     "old_pass_rate": 100.0,
-    "new_pass": 61,
+    "new_pass": 62,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 61,
-    "new_total": 61,
+    "new_effective_pass": 62,
+    "new_total": 62,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,57 +25,53 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 57,
-    "added": 4,
+    "unchanged": 59,
+    "added": 1,
     "removed": 0
   },
   "changes": [
     {
       "test": "avm2_timeline_gradients",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "avm2_timeline_solid",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
       }
     },
     {
       "test": "avm2_timeline_stroke_gradient",
-      "change_type": "added",
-      "old_status": null,
+      "change_type": "changed",
+      "old_status": "pass",
       "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
+      "old_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      }
-    },
-    {
-      "test": "broadcast_cross_swf_version",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
+      },
       "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "broadcast_type1_args",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
       }
     }
   ]
