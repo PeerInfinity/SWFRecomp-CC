@@ -1,0 +1,5 @@
+loader created: true
+contentLoaderInfo: true
+addEventListener ok
+load ok, content=null
+no #1065, reached end

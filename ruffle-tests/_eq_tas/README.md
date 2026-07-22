@@ -22,5 +22,15 @@ node's class/name/visible + stage-space AABB in px; for a SimpleButton the
 hit/up state world bbox + center (the button's OWN self bbox is EMPTY — its state
 children live in btn_hit/btn_up, not render_list). Success = the root timeline
 advances off the preloader (frame-2/3 content, e.g. `musicIn_18`, appears at the
-click tick). EQ-2.5's next wall: `new Loader()` #1065 in `agi.init` (needs a
-`flash.display.Loader` stub); frame3/Shell.init aborts there before `startIntro()`.
+click tick).
+
+**EQ-2.5 DONE (2026-07-22): the TITLE is reachable.** With the
+`flash.display.Loader` stub (`regression/avm2_loader_stub`), the Play click →
+`Shell.init` → `startIntro()` → the intro logo sequence auto-plays (AGI logo
+`ag_intro_mc_499` 197f → jmtb02 logo `jmtb02_logo_505` 109f) → `Intro` frame3 →
+`loadMenuFromIntro()` → **`new MainMenu()`**. Drive ≥320 ticks:
+`AVM2_DUMP_TREE=1 python3 eq_drive.py run play_click_events.txt 360` — MainMenu
+(title logo `titleShineIN_354` + buttons `playB`/`hsB`/`credB`/…) appears at
+**tick 313, 0 errors**. **Next wall = EQ-3 New Game:** click `playB` (in the
+`extras`/menu SimpleButton set) → `agi.hideAGILogin()` #1010 (agi undefined,
+needs the gap #3 `agi` no-op shell), then the heavy `init2()` DOOR-build.

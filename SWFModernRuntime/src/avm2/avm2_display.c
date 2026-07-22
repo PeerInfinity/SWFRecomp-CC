@@ -3269,6 +3269,62 @@ static Avm2Value li_get_loader(Avm2Activation* act)
 	return avm2_null();  // root movie has no parent Loader
 }
 
+// --- flash.display.Loader (stub — loading a *second* SWF is not implemented) ---
+//
+// EQ (and any AGI/preloader-style game) does: new Loader() → non-throwing;
+// loader.contentLoaderInfo.addEventListener(COMPLETE, cb); loader.load(req).
+// We give the Loader its OWN contentLoaderInfo (a fresh LoaderInfo, which
+// extends EventDispatcher), so the addEventListener is a real no-op
+// registration, and load() is a no-op: no network layer, so COMPLETE never
+// fires and `content` stays null. This unblocks Shell.init reaching
+// startIntro() without implementing runtime SWF loading. `content`/`contentLoaderInfo`
+// are stored per-Loader so identity is stable across reads.
+
+typedef struct Avm2LoaderExt
+{
+	Avm2DisplayObjectExt display;       // extends DisplayObjectContainer (MUST be first)
+	Avm2Object* content_loader_info;    // own LoaderInfo (EventDispatcher), lazily built
+	Avm2Object* content;                // loaded content (null: nothing ever loads)
+} Avm2LoaderExt;
+
+static Avm2LoaderExt* loader_ext_of(Avm2Context* ctx, Avm2Object* o)
+{
+	if (o == NULL || o->cls == NULL
+	    || ctx->builtins.loader_class == NULL
+	    || !class_is_a(o->cls, ctx->builtins.loader_class))
+		return NULL;
+	return (Avm2LoaderExt*) o->native_ext;
+}
+
+static Avm2Value loader_get_content_loader_info(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2LoaderExt* ext = loader_ext_of(ctx, this_obj(act));
+	if (ext == NULL) return avm2_null();
+	if (ext->content_loader_info == NULL)
+	{
+		Avm2Class* cls = ctx->builtins.loader_info_class;
+		if (cls == NULL) return avm2_null();
+		Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
+		ext->content_loader_info = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+	}
+	return ext->content_loader_info != NULL
+	       ? avm2_object_value(ext->content_loader_info) : avm2_null();
+}
+
+static Avm2Value loader_get_content(Avm2Activation* act)
+{
+	Avm2LoaderExt* ext = loader_ext_of(act->ctx, this_obj(act));
+	if (ext == NULL || ext->content == NULL) return avm2_null();
+	return avm2_object_value(ext->content);
+}
+
+static Avm2Value loader_noop(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
 // --- InteractiveObject ---
 
 static Avm2Value io_get_mouse_enabled(Avm2Activation* act)
@@ -8106,6 +8162,27 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, doc, "mouseChildren", doc_get_mouse_children,
 	           doc_set_mouse_children);
 	add_getset(ctx, doc, "tabChildren", doc_get_tab_children, doc_set_tab_children);
+
+	// flash.display.Loader (extends DisplayObjectContainer). Stub: `new Loader()`
+	// is non-throwing (concrete display_native_init, larger native_ext for the
+	// per-instance contentLoaderInfo/content), contentLoaderInfo is a fresh
+	// LoaderInfo (EventDispatcher — so addEventListener is a real no-op
+	// registration), and load/unload/close are no-ops. No second SWF is ever
+	// loaded, so COMPLETE never fires and content stays null. Reusable: unblocks
+	// any AGI/preloader game that constructs a Loader during init.
+	Avm2Class* loader =
+		avm2_builtin_class(ctx, "flash.display", "Loader", doc);
+	loader->native_init = display_native_init;   // concrete: no #2012
+	loader->native_ext_size = sizeof(Avm2LoaderExt);
+	b->loader_class = loader;
+	avm2_builtin_add_getter(ctx, loader, "contentLoaderInfo",
+	                        loader_get_content_loader_info);
+	avm2_builtin_add_getter(ctx, loader, "content", loader_get_content);
+	avm2_builtin_add_method(ctx, loader, "load", loader_noop);
+	avm2_builtin_add_method(ctx, loader, "loadBytes", loader_noop);
+	avm2_builtin_add_method(ctx, loader, "close", loader_noop);
+	avm2_builtin_add_method(ctx, loader, "unload", loader_noop);
+	avm2_builtin_add_method(ctx, loader, "unloadAndStop", loader_noop);
 
 	Avm2Class* sprite = avm2_builtin_class(ctx, "flash.display", "Sprite", doc);
 	sprite->instance_init.fn = sprite_ctor_init;

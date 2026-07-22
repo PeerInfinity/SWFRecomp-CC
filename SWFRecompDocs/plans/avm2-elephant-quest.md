@@ -1,16 +1,20 @@
 # AVM2 corpus expansion — Elephant Quest bring-up plan
 
-**Status: EQ-0 + EQ-1 + EQ-2 DONE (EQ-2 2026-07-22).** EQ-0: tolerant verify was
-ALREADY IMPLEMENTED (recompile UNBLOCKED). EQ-1: the native build **compiles,
-links, and runs 300 ticks in ~1 s with no OOM**; frame dumps show frame1 executing,
-`#1065 ContextMenuItem` FIXED. **EQ-2: the Play click routes and boot advances past
-the preloader to frame3 `new Shell(); shell.init()`** — the real work was AVM2
-mouse hit-testing of the **nested SimpleButton** `playB` (its state children live in
-`btn_hit`/`btn_up`, not `render_list`, so `mouse_pick` MISSED it). Fixed in
-`mouse_pick` (`avm2_display.c`) + gated by `regression/avm2_simplebutton_click` (§5
-gap #9). **Next wall = `new Loader()` #1065 in `agi.init` (EQ-2.5, gap #3):** it
-runs inside `Shell.init` before `startIntro()`, so the title needs a
-`flash.display.Loader` stub + the `agi` no-op shell.
+**Status: EQ-0 + EQ-1 + EQ-2 + EQ-2.5 DONE (EQ-2.5 2026-07-22).** EQ-0: tolerant
+verify was ALREADY IMPLEMENTED (recompile UNBLOCKED). EQ-1: the native build
+**compiles, links, and runs with no OOM**; `#1065 ContextMenuItem` FIXED. EQ-2:
+the Play click routes past the preloader to frame3 `new Shell(); shell.init()`
+(nested-SimpleButton `mouse_pick` fix, `regression/avm2_simplebutton_click`).
+**EQ-2.5: the TITLE (MainMenu) is REACHED.** A minimal `flash.display.Loader`
+stub (`avm2_display.c`) clears the `new Loader()` #1065 in `agi.init`, so
+`Shell.init` proceeds to `startIntro()` → the intro logo sequence (AGI logo 197f
+→ jmtb02 logo 109f) auto-plays → `Intro` frame3 → `loadMenuFromIntro()` →
+`new MainMenu()`. Frame/tree-proven (`AVM2_DUMP_TREE`): MainMenu at **tick 313,
+0 errors across 360 ticks**; gated by `regression/avm2_loader_stub`. The title
+needs ONLY the Loader stub (no unguarded `agi.*` on the Play→title path). **Next
+wall = EQ-3 New Game:** click `playB` → `agi.hideAGILogin()` #1010 (agi
+undefined) — needs the gap #3 `agi` no-op shell, then the heavy `init2()`
+DOOR-build (the beat-Ruffle moment).
 
 The gap-#1 premise below was **stale**: `readOp` (the
 `0xf4` throw site, `abc_parser.cpp:830`) is **never called by `parseAbc`** — only
@@ -282,17 +286,20 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   (gap #6 — 1000 doors + level objects) and (b) any accidental super-linear cost.
   Not a blocker; our speed here is precisely the beat-Ruffle win (§3).
 
-### Gap 3 — [BLOCKING title AND New Game · stub, moderate] `flash.display.Loader` + `agi` no-op object
+### Gap 3 — [Loader ✅ DONE (EQ-2.5) · `agi` shell → EQ-3 New Game] `flash.display.Loader` + `agi` no-op object
 
-- **UPDATED (EQ-2, 2026-07-22): this now blocks reaching the title, not just New
-  Game.** `Shell.init` calls `agi.init()` → `AGIStuff.initAGI` → **`new Loader()`**
-  BEFORE `startIntro()`. Our runtime defers `flash.display.Loader`
-  (`avm2_display.c:3136`), so this throws **#1065 "Loader is not defined"** and
-  aborts `Shell.init` before the intro. So EQ-2.5's first step is a minimal
-  `flash.display.Loader` stub (`new Loader()` non-throwing; `contentLoaderInfo` an
-  EventDispatcher; `load()` a no-op — the `COMPLETE` never fires, so `agi` stays
-  undefined, biting only at New Game's `hideAGILogin`). Then wire the `agi` no-op
-  shell below. Both are needed to get from Play → intro/title.
+- **✅ Loader stub DONE (EQ-2.5, 2026-07-22): reaching the title no longer needs
+  the `agi` shell.** `Shell.init` calls `agi.init()` → `AGIStuff.initAGI` →
+  **`new Loader()`** (also in the `AGIStuff` ctor, `AGIStuff.as:56`) BEFORE
+  `startIntro()`; our runtime previously deferred `flash.display.Loader`, throwing
+  **#1065**. Fixed with a minimal `flash.display.Loader` stub in `avm2_display.c`
+  (extends `DisplayObjectContainer`: non-throwing ctor via `display_native_init`,
+  larger `native_ext` `Avm2LoaderExt` for a per-instance `contentLoaderInfo` =
+  fresh `LoaderInfo`/EventDispatcher, no-op `load`/`loadBytes`/`close`/`unload`).
+  `COMPLETE` never fires, so `content`/`agi` stays `null`/undefined — biting only
+  at New Game's `hideAGILogin`. Gated by `regression/avm2_loader_stub`.
+  **Empirically confirmed the Play→title path calls NO unguarded `agi.*`** (0
+  errors to MainMenu), so the `agi` no-op shell below is pure EQ-3 (New Game).
 - **The New Game handler's** first line is the **unguarded**
   `this.shell.agi.hideAGILogin()` →
   `this.agi.hideLoginStatus()` (§2). If AGI.swf does not load, `agi` is
@@ -617,15 +624,27 @@ never exercised.
   SimpleButton's `hitTestState`, so a click dispatches to its listener. Gated by
   `regression/avm2_simplebutton_click`. Reaching the title is EQ-2.5 (next wall =
   `new Loader()` #1065 in `agi.init`).
-- **EQ-2.5 — Play → intro/title (Loader + agi stub).** Requires gap #3 (a
-  `flash.display.Loader` stub so `agi.init`'s `new Loader()` doesn't throw #1065,
-  then the `agi` no-op shell for the unguarded `hideAGILogin` #1010). Then drive
-  New Game → story → `init2()`; confirm
-  `getDefinitionByName("Level"+n)` (gap #2), `SharedObject` empty-store (gap #4),
-  and the heavy DOOR-build (gap #2b) all complete natively. **Grade the first
-  world-map frame against a Ruffle export (oracle valid to here).** Watch native
-  heap on the DOOR-build (gap #6).
-- **EQ-3 — the beat-Ruffle moment (instruments-only).** Drive *past* the
+- **EQ-2.5 — Play → intro → title (MainMenu). ✅ DONE 2026-07-22.** A minimal
+  `flash.display.Loader` stub (`avm2_display.c`, extends `DisplayObjectContainer`:
+  non-throwing ctor, own `contentLoaderInfo` LoaderInfo/EventDispatcher, no-op
+  `load`) clears the `new Loader()` #1065 in `agi.init`, so `Shell.init` proceeds
+  to `startIntro()`. The intro then plays a **time-driven logo sequence** — AGI
+  logo `ag_intro_mc_499` (197 frames) → `parent.play()` → `Intro` frame2 jmtb02
+  logo `jmtb02_logo_505` (109 frames) → `parent.play()` → `Intro` frame3 →
+  `loadMenuFromIntro()` → `startMenu()` → **`new MainMenu()`**. Frame/tree-proven
+  via `AVM2_DUMP_TREE`: MainMenu (title logo `titleShineIN_354` + `playB`/`hsB`/
+  `credB`/`miscB`/`resetB`/social buttons) appears at **tick 313**, **0 errors
+  across 360 ticks**. **The title needs ONLY the Loader stub** — `AGIStuff` is
+  `addChild`'d but NO unguarded `agi.*` fires on the Play→title path (unknown #3
+  resolved empirically); the `agi` no-op shell is pure EQ-3 (New Game). Gated by
+  `regression/avm2_loader_stub`. See gap #3 (now: Loader DONE, `agi` shell → EQ-3).
+- **EQ-3 — New Game → world map → the beat-Ruffle moment.** Click `playB` on the
+  MainMenu (`MainMenu.clicky`) → `this.shell.agi.hideAGILogin()` #1010 (agi
+  undefined) — the gap #3 `agi` no-op shell. Then New Game → story → `init2()`;
+  confirm `getDefinitionByName("Level"+n)` (gap #2), `SharedObject` empty-store
+  (gap #4), and the heavy DOOR-build (gap #2b) complete natively. **Grade the
+  first world-map frame against a Ruffle export (oracle valid to here).** Watch
+  native heap on the DOOR-build (gap #6). Then drive *past* the
   world-map frame where Ruffle's watchdog freezes. If our runtime keeps rendering
   live gameplay (player/enemies/animation) where Ruffle shows 210 frozen frames,
   EQ is the first title we play that Ruffle cannot. Frame-dump-proven; no oracle.

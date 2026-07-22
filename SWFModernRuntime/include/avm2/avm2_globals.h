@@ -639,6 +639,7 @@ typedef struct Avm2Builtins
 	Avm2Class* ievent_dispatcher_class;  // interface
 	Avm2Class* display_object_class;
 	Avm2Class* loader_info_class;        // flash.display.LoaderInfo
+	Avm2Class* loader_class;             // flash.display.Loader (stub)
 	Avm2Class* interactive_object_class;
 	Avm2Class* doc_class;                // DisplayObjectContainer
 	Avm2Class* sprite_class;
