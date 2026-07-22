@@ -4328,6 +4328,310 @@ static Avm2Value do_get_graphics(Avm2Activation* act)
 }
 
 // ===========================================================================
+// T4 Part A — flash.display.Graphics runtime drawing: command decoding +
+// argument validation. drawPath / drawTriangles / drawGraphicsData plus the
+// GraphicsPath / GraphicsTrianglePath / GraphicsPathCommand / GraphicsPathWinding
+// / IGraphicsData / GraphicsSolidFill / GraphicsGradientFill / GraphicsStroke
+// surface. Error codes + stack frames mirror Ruffle/Flash exactly (upstream
+// graphics_draw_path / graphics_draw_triangles / graphics_path /
+// graphics_bad_direct_commands):
+//   - drawPath / drawTriangles throw #2004/#2008 DIRECTLY, so the trace top is
+//     the native method frame "flash.display::Graphics/drawPath()" — no
+//     throwError frame (Ruffle's make_error_2004/2008 add no AS frame).
+//   - GraphicsPath ctor + `set winding` throw #2008 through a synthetic
+//     "Error$/throwError()" frame (FP playerglobal routes through
+//     Error.throwError; Ruffle's GraphicsPath.as `throw new ArgumentError`).
+// Geometry recording + tessellation + rendering is Part B.
+// ===========================================================================
+
+static Avm2Class* g_graphicspath_class;
+static Avm2Class* g_graphicstrianglepath_class;
+static Avm2Class* g_igraphicsdata_class;
+
+// Exact byte compare of an Avm2String to a C literal.
+static int gfx_str_is(const Avm2String* s, const char* lit)
+{
+	size_t n = strlen(lit);
+	return s != NULL && s->len == n && memcmp(s->utf8, lit, n) == 0;
+}
+
+// The Vector.<T> storage behind arg[i], or NULL if the arg is absent, null, or
+// not a Vector.
+static Avm2VectorExt* gfx_vec_arg(Avm2Activation* act, uint32_t i)
+{
+	if (i >= act->argc) return NULL;
+	Avm2Value v = act->args[i];
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return NULL;
+	return avm2_vector_ext(v.u.obj);
+}
+
+// The Vector.<T> storage stored in dynamic property `name` of `o`, or NULL.
+static Avm2VectorExt* gfx_vec_prop(Avm2Object* o, const char* name, uint32_t nlen)
+{
+	Avm2Value* v = avm2_object_find_dynamic(o, name, nlen);
+	if (v == NULL || v->kind != AVM2_VALUE_OBJECT || v->u.obj == NULL) return NULL;
+	return avm2_vector_ext(v->u.obj);
+}
+
+static _Noreturn void gfx_throw_2004(Avm2Context* ctx)
+{
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #2004: One of the parameters is invalid.");
+}
+
+static _Noreturn void gfx_throw_2008(Avm2Context* ctx, const char* param)
+{
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #2008: Parameter %s must be one of the accepted values.",
+	                 param);
+}
+
+// #2008 as FP's playerglobal throws it: through Error.throwError, which shows as
+// an "Error$/throwError()" frame atop the trace. The synthetic native frame
+// (bound_class NULL + file NULL => debug_name printed verbatim by
+// avm2_callstack_frame_name) is discarded by the longjmp that unwinds call_depth
+// back to the nearest try frame, so no explicit pop is needed.
+static _Noreturn void gfx_throw_2008_via_throwerror(Avm2Context* ctx, const char* param)
+{
+	static const Avm2MethodRef throwerror = { NULL, NULL, "Error$/throwError", 0 };
+	avm2_callstack_push(ctx, &throwerror, NULL);
+	gfx_throw_2008(ctx, param);
+}
+
+// TriangleData::new validation (Ruffle graphics.rs) — throws #2004; empty /
+// out-of-bounds inputs produce no triangles (no throw). Part A: validation only.
+static void gfx_validate_triangles(Avm2Context* ctx, Avm2VectorExt* verts,
+                                   Avm2VectorExt* indices)
+{
+	uint32_t nv = verts != NULL ? verts->length : 0;
+	if ((nv & 1u) != 0) gfx_throw_2004(ctx);   // vertices not pairs
+	if (nv == 0) return;                        // no vertices -> no triangles
+	if (indices != NULL)
+	{
+		if ((indices->length % 3u) != 0) gfx_throw_2004(ctx);
+		return;   // empty / all-out-of-bounds -> no triangles (no throw)
+	}
+	if (((nv / 2u) % 3u) != 0) gfx_throw_2004(ctx);   // vertex triples
+}
+
+// Graphics.drawPath(commands:Vector.<int>, data:Vector.<Number>, winding:String)
+static Avm2Value gfx_draw_path(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* w = (act->argc > 2)
+		? avm2_coerce_to_string(ctx, act->args[2])
+		: avm2_string_from_literal(ctx, "evenOdd");
+	if (!gfx_str_is(w, "evenOdd") && !gfx_str_is(w, "nonZero"))
+		gfx_throw_2008(ctx, "winding");
+
+	// process_commands: empty commands is a no-op even with odd data; otherwise
+	// odd data.length is always #2004 (superfluous data included).
+	Avm2VectorExt* commands = gfx_vec_arg(act, 0);
+	Avm2VectorExt* data = gfx_vec_arg(act, 1);
+	uint32_t ncmd = commands != NULL ? commands->length : 0;
+	uint32_t ndata = data != NULL ? data->length : 0;
+	if (ncmd == 0) return avm2_undefined();
+	if ((ndata & 1u) != 0) gfx_throw_2004(ctx);
+	// Part B: record + tessellate the contours here.
+	return avm2_undefined();
+}
+
+// Graphics.drawTriangles(vertices, indices, uvtData, culling) — bad culling is
+// #2004 here (GraphicsTrianglePath's ctor reports the same as #2008).
+static Avm2Value gfx_draw_triangles(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* culling = (act->argc > 3)
+		? avm2_coerce_to_string(ctx, act->args[3])
+		: avm2_string_from_literal(ctx, "none");
+	if (!gfx_str_is(culling, "none") && !gfx_str_is(culling, "positive")
+	    && !gfx_str_is(culling, "negative"))
+		gfx_throw_2004(ctx);
+	gfx_validate_triangles(ctx, gfx_vec_arg(act, 0), gfx_vec_arg(act, 1));
+	// Part B: build triangle list + dispatch.
+	return avm2_undefined();
+}
+
+// Graphics.drawGraphicsData(graphicsData:Vector.<IGraphicsData>) — dispatch each
+// IGraphicsData item. A GraphicsPath re-runs process_commands validation (#2004);
+// its winding was validated at construction. Ruffle omits the inner drawPath /
+// drawPathObject frames here (output.ruffle.txt), so a single drawGraphicsData
+// frame is a subset of FP's trace => ruffle_matched.
+static Avm2Value gfx_draw_graphics_data(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2VectorExt* items = gfx_vec_arg(act, 0);
+	if (items == NULL) return avm2_undefined();
+	for (uint32_t i = 0; i < items->length; i++)
+	{
+		Avm2Value it = items->elems[i];
+		if (it.kind != AVM2_VALUE_OBJECT || it.u.obj == NULL) continue;
+		Avm2Object* o = it.u.obj;
+		if (o->cls == g_graphicspath_class)
+		{
+			Avm2VectorExt* cv = gfx_vec_prop(o, "commands", 8);
+			Avm2VectorExt* dv = gfx_vec_prop(o, "data", 4);
+			uint32_t ncmd = cv != NULL ? cv->length : 0;
+			uint32_t ndata = dv != NULL ? dv->length : 0;
+			if (ncmd != 0 && (ndata & 1u) != 0) gfx_throw_2004(ctx);
+		}
+		else if (o->cls == g_graphicstrianglepath_class)
+		{
+			gfx_validate_triangles(ctx, gfx_vec_prop(o, "vertices", 8),
+			                       gfx_vec_prop(o, "indices", 7));
+		}
+		// GraphicsSolidFill / GraphicsGradientFill / GraphicsStroke / bitmap fills
+		// set fill/stroke state (Part B); no Part-A validation error.
+	}
+	return avm2_undefined();
+}
+
+// GraphicsPath(commands = null, data = null, winding = "evenOdd"). Stores
+// commands/data as public dynamic vars; validates winding inline (NOT via the
+// `set winding` setter, so no "set winding" frame appears — matching FP's ctor
+// trace of just Error$/throwError -> GraphicsPath()).
+static Avm2Value graphicspath_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	avm2_object_set_dynamic(ctx, self, "commands", 8,
+	                        act->argc > 0 ? act->args[0] : avm2_null());
+	avm2_object_set_dynamic(ctx, self, "data", 4,
+	                        act->argc > 1 ? act->args[1] : avm2_null());
+	const Avm2String* w = (act->argc > 2)
+		? avm2_coerce_to_string(ctx, act->args[2])
+		: avm2_string_from_literal(ctx, "evenOdd");
+	if (!gfx_str_is(w, "evenOdd") && !gfx_str_is(w, "nonZero"))
+		gfx_throw_2008_via_throwerror(ctx, "winding");
+	avm2_object_set_dynamic(ctx, self, "_winding", 8, avm2_string(w))->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value graphicspath_get_winding(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	Avm2Value* v = avm2_object_find_dynamic(self, "_winding", 8);
+	return v != NULL ? *v : avm2_undefined();
+}
+
+static Avm2Value graphicspath_set_winding(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	const Avm2String* w = act->argc > 0
+		? avm2_coerce_to_string(ctx, act->args[0])
+		: avm2_string_from_literal(ctx, "");
+	if (!gfx_str_is(w, "evenOdd") && !gfx_str_is(w, "nonZero"))
+		gfx_throw_2008_via_throwerror(ctx, "winding");
+	if (self != NULL)
+		avm2_object_set_dynamic(ctx, self, "_winding", 8,
+		                        avm2_string(w))->dont_enum = 1;
+	return avm2_undefined();
+}
+
+// GraphicsTrianglePath(vertices, indices, uvtData, culling = "none"). Validates
+// culling (#2008 "culling"); vertex/index validation happens at draw time.
+static Avm2Value graphicstrianglepath_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	const Avm2String* culling = (act->argc > 3)
+		? avm2_coerce_to_string(ctx, act->args[3])
+		: avm2_string_from_literal(ctx, "none");
+	if (!gfx_str_is(culling, "none") && !gfx_str_is(culling, "positive")
+	    && !gfx_str_is(culling, "negative"))
+		gfx_throw_2008(ctx, "culling");
+	if (self != NULL)
+	{
+		avm2_object_set_dynamic(ctx, self, "vertices", 8,
+		                        act->argc > 0 ? act->args[0] : avm2_null());
+		avm2_object_set_dynamic(ctx, self, "indices", 7,
+		                        act->argc > 1 ? act->args[1] : avm2_null());
+		avm2_object_set_dynamic(ctx, self, "uvtData", 7,
+		                        act->argc > 2 ? act->args[2] : avm2_null());
+		avm2_object_set_dynamic(ctx, self, "culling", 7, avm2_string(culling));
+	}
+	return avm2_undefined();
+}
+
+// Register the T4 Graphics-drawing methods + data classes. `graphics` is the
+// flash.display.Graphics class; `object_class` its base.
+static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
+                                   Avm2Class* object_class)
+{
+	avm2_builtin_add_method(ctx, graphics, "drawPath", gfx_draw_path);
+	avm2_builtin_add_method(ctx, graphics, "drawTriangles", gfx_draw_triangles);
+	avm2_builtin_add_method(ctx, graphics, "drawGraphicsData", gfx_draw_graphics_data);
+
+	// IGraphicsData marker interface (Vector.<IGraphicsData> element coercion +
+	// `is IGraphicsData`).
+	Avm2Class* igd = avm2_builtin_class(ctx, "flash.display", "IGraphicsData", NULL);
+	igd->flags |= AVM2_CLASS_FLAG_INTERFACE;
+	g_igraphicsdata_class = igd;
+
+	// Implementors declare the interface directly (native classes skip the ABC
+	// mn-resolution path; avm2_class_has_interface reads the resolved cache).
+	#define GFX_IMPLEMENTS_IGRAPHICSDATA(cls) do { \
+		(cls)->interface_count = 1; \
+		(cls)->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*)); \
+		(cls)->interfaces[0] = igd; \
+	} while (0)
+
+	Avm2Class* gp = avm2_builtin_class(ctx, "flash.display", "GraphicsPath",
+	                                   object_class);
+	gp->instance_init.fn = graphicspath_init;
+	gp->instance_init.debug_name = "GraphicsPath";
+	avm2_builtin_add_getset(ctx, gp, "winding", graphicspath_get_winding,
+	                        graphicspath_set_winding);
+	GFX_IMPLEMENTS_IGRAPHICSDATA(gp);
+	g_graphicspath_class = gp;
+
+	Avm2Class* gtp = avm2_builtin_class(ctx, "flash.display",
+	                                    "GraphicsTrianglePath", object_class);
+	gtp->instance_init.fn = graphicstrianglepath_init;
+	gtp->instance_init.debug_name = "GraphicsTrianglePath";
+	GFX_IMPLEMENTS_IGRAPHICSDATA(gtp);
+	g_graphicstrianglepath_class = gtp;
+
+	// Fill / stroke IGraphicsData carriers — non-sealed so AS3 can set their
+	// properties (colors/matrix/fill/...); Part B reads them. No ctor needed.
+	const char* fills[3] = { "GraphicsSolidFill", "GraphicsGradientFill",
+	                         "GraphicsStroke" };
+	for (int i = 0; i < 3; i++)
+	{
+		Avm2Class* fc = avm2_builtin_class(ctx, "flash.display", fills[i],
+		                                   object_class);
+		GFX_IMPLEMENTS_IGRAPHICSDATA(fc);
+	}
+	#undef GFX_IMPLEMENTS_IGRAPHICSDATA
+
+	// GraphicsPathCommand (int) + GraphicsPathWinding (string) constant holders.
+	Avm2Class* gpc = avm2_builtin_class(ctx, "flash.display",
+	                                    "GraphicsPathCommand", object_class);
+	avm2_builtin_add_static_const(ctx, gpc, "NO_OP", avm2_integer(0));
+	avm2_builtin_add_static_const(ctx, gpc, "MOVE_TO", avm2_integer(1));
+	avm2_builtin_add_static_const(ctx, gpc, "LINE_TO", avm2_integer(2));
+	avm2_builtin_add_static_const(ctx, gpc, "CURVE_TO", avm2_integer(3));
+	avm2_builtin_add_static_const(ctx, gpc, "WIDE_MOVE_TO", avm2_integer(4));
+	avm2_builtin_add_static_const(ctx, gpc, "WIDE_LINE_TO", avm2_integer(5));
+	avm2_builtin_add_static_const(ctx, gpc, "CUBIC_CURVE_TO", avm2_integer(6));
+
+	Avm2Class* gpw = avm2_builtin_class(ctx, "flash.display",
+	                                    "GraphicsPathWinding", object_class);
+	disp_sconst(ctx, gpw, "EVEN_ODD", "evenOdd");
+	disp_sconst(ctx, gpw, "NON_ZERO", "nonZero");
+
+	// TriangleCulling constants (imported by some tests; string values).
+	Avm2Class* tc = avm2_builtin_class(ctx, "flash.display", "TriangleCulling",
+	                                   object_class);
+	disp_sconst(ctx, tc, "NONE", "none");
+	disp_sconst(ctx, tc, "POSITIVE", "positive");
+	disp_sconst(ctx, tc, "NEGATIVE", "negative");
+}
+
+// ===========================================================================
 // Natives: flash.geom.Matrix + Transform (enough for the transform.matrix
 // property surface — displayobject_invalid_floats / displayobject_transform)
 // ===========================================================================
@@ -6976,6 +7280,8 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, graphics, "drawCircle", gfx_draw_circle);
 	avm2_builtin_add_method(ctx, graphics, "copyFrom", gfx_noop);
 	g_graphics_class = graphics;
+	// T4: drawPath/drawTriangles/drawGraphicsData + the Graphics* data classes.
+	avm2_graphics_register(ctx, graphics, b->object_class);
 	avm2_builtin_add_getter(ctx, shape, "graphics", do_get_graphics);
 	// NOTE: Sprite's `graphics` getter is registered earlier (right after the
 	// Sprite class is created) so MovieClip — derived from Sprite before this

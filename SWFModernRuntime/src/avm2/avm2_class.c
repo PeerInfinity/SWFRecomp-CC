@@ -538,6 +538,23 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 				ref.file = file;
 				ref.debug_name = m->debug_name;
 				ref.method_index = t->method_or_class;
+				// avmplus names a method by its defining trait. ASC (unlike
+				// mxmlc) emits no method_info debug name, so without this the
+				// frame reads "Class/<anonymous>()"; fall back to the trait
+				// QName (null-terminated for %s), with the "get "/"set "
+				// prefix FP uses for accessors.
+				if ((ref.debug_name == NULL || ref.debug_name[0] == '\0')
+				    && e.key.name != NULL && e.key.name_len > 0)
+				{
+					const char* pfx = (t->kind == 2) ? "get "
+					                  : (t->kind == 3) ? "set " : "";
+					size_t pl = strlen(pfx);
+					char* nm = avm2_alloc(ctx, pl + e.key.name_len + 1);
+					memcpy(nm, pfx, pl);
+					memcpy(nm + pl, e.key.name, e.key.name_len);
+					nm[pl + e.key.name_len] = '\0';
+					ref.debug_name = nm;
+				}
 
 				Avm2PropEntry* existing = vtable_find_mut(vt, &e.key);
 				if (t->kind == 1)
