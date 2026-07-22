@@ -11,96 +11,122 @@ numbers/labels are what's left of gap #10. **Read
 sections — the reuse method + the `getPixel` gate you'll mirror; note text is called
 out there as the sibling deliverable). ~1–1.5 sessions, reuse-heavy like T6.
 
-## Bake in — don't re-derive (grounded 2026-07-22; confirm, don't trust)
+## Bake in — don't re-derive (grounded 2026-07-22 post-T6; confirm, don't trust — grep symbols, lines shift)
 
 - **The gap is wiring, not new infrastructure — same shape as T1.** The render walks
-  paint only `is_bitmap` + shape nodes (`avm2_display.c` `avm2_render_node` ~`:8527`
-  bitmap / `:8760` `renderer_draw_shape`; `avm2_cpu_walk`). `AVM2_CHAR_TEXT`/
-  `AVM2_CHAR_EDITTEXT` nodes exist in the tree and in `class_for_char`
-  (`:1011-1013`) but have **no render branch** — they descend unpainted, exactly as
-  shapes did pre-T1.
-- **The reuse levers already exist:**
-  - **A CPU glyph rasterizer** — `avm2_bitmap.c:1750` ("draw(TextField) — CPU glyph
-    rasterization"), already driving `BitmapData.draw(TextField)`. It walks a
-    TextField's laid-out glyphs and scanline-rasterizes them. **This is the headless
-    sink, already written** — the job is to invoke it from `avm2_cpu_walk`, not
-    rebuild it.
-  - **Glyph outlines** in `avm2_generated_fonts[]` (`avm2_abc.h:472`), font lookup +
-    glyph handling in `avm2_text.c` (`:2232`, `:2487`, `:5666`).
-  - **EditText text storage + layout** from AVM2 Stage 6 (`avm2_text.c`;
-    `avm2_generated_edittexts[]` `:470`) — `.text`/`.htmlText`, measurement,
-    getBounds already work. Dynamic HUD strings already live in the model; only the
-    on-screen **draw** is missing.
-- **★ THE ONE OPEN QUESTION — front-load it (the T1-probe discipline): what form is
-  glyph geometry in for the GPU sink?** Static text glyphs in Flash are shape outlines.
-  Determine whether AVM2 emits glyph geometry as **GPU-drawable triangles** (like the
-  AVM1 `glyph_data`/`renderer_draw_shape(glyph_data[gi], …)` path, `tag.c:3123-3126`,
-  where a text run is a sequence of glyph *shapes* with per-glyph transform slots) or
-  **only as CPU-rasterizer outlines** in `avm2_generated_fonts[]`. This decides the
-  GPU leg:
-  - if glyph triangles exist → GPU text reuses `renderer_draw_shape`/`draw_tris` per
-    glyph with per-glyph transform slots (the T1/AVM1 pattern — cheap);
-  - if only outlines exist → runtime-tessellate glyph outlines → `draw_tris` (the T4
-    runtime-tris path). **Probe first; don't assume.**
-- **Reuse, never fork:** GPU glyphs go through the shared backend (`renderer_draw_shape`
-  /`draw_tris`); CPU glyphs go through the existing `avm2_bitmap.c` rasterizer (and/or
-  T5's `avm2_cpu_raster`). **Never touch `action.c`** (mine `tag.c` text path for the
-  pattern only). AVM2 stays in `src/avm2/` (+ `src/abc/` only if the recompiler must
-  emit glyph triangles it doesn't today).
+  paint only `is_bitmap` → `is_morph_shape` → `shape_vert_count` → `avm2_render_graphics`
+  (GPU `avm2_render_node`, `avm2_display.c:8920`; CPU-dump twin `avm2_cpu_walk`,
+  `:8515`). `AVM2_CHAR_TEXT`/`AVM2_CHAR_EDITTEXT` nodes exist in the tree and in
+  `class_for_char` (`:1005-1008`) but have **no render branch** — they descend
+  unpainted, exactly as shapes did pre-T1. (Confirmed this session: no `text`/`edittext`
+  arm in either walk.)
+- **The CPU glyph rasterizer already exists AND is already getPixel-gated — but only
+  for EditText, and only via `BitmapData.draw`:**
+  - `avm2_edittext_collect_glyphs` (`avm2_text.c:3481`, decl `avm2_bitmap.c:1755`)
+    walks a `TextField`'s laid-out runs → `Avm2GlyphPlacement[]` (`avm2_abc.h:378` =
+    `{font, glyph, x_twips, y_twips, scale, color}`).
+  - `bd_draw_textfield` (`avm2_bitmap.c:1770`) scanline-rasterizes each glyph's
+    flattened outline (`Avm2FontData.glyph_pts`/`glyph_contour_start`, `avm2_abc.h:350`,
+    from `avm2_generated_fonts[]`) with cxform+premul+blend. **Invoked today ONLY from
+    `bd_draw` when `ext->edittext != NULL`** (`avm2_bitmap.c:2037` sets `text_src`,
+    `:2127` dispatches). Gate that already passes: `regression/avm2_bitmapdata_draw_textfield`.
+  - EditText storage + layout (AVM2 Stage 6; `avm2_generated_edittexts[]`) already work
+    — dynamic HUD strings live in the model; only the on-screen **draw** is missing.
+- **★ Scope ruling this session: EDITTEXT FIRST, static `DefineText` DEFERRED — they
+  are NOT the same size.** `text_src` is set only for `ext->edittext != NULL`; static
+  `DefineText` (`AVM2_CHAR_TEXT`, `StaticText`) has **no glyph-placement path for AVM2
+  at all** — the recompiler emits no per-glyph `{font,glyph,transform,color}` table for
+  it (grep confirmed: only `AVM2_CHAR_TEXT` the enum exists). Static text therefore
+  needs **recompiler emission** (parse `DefineText` GLYPHENTRY records → an
+  `avm2_generated_statictext[]` table) — a distinct, larger leg. EQ's HUD is dynamic
+  `TextField` (score/counters), so **do EditText first**; size static `DefineText` as
+  the follow-on (confirm EQ's actual usage before pulling it in).
+- **★ THE ONE OPEN QUESTION for the GPU sink — front-load it (T1-probe discipline):
+  what form for GPU glyph geometry?** The existing raster is a **CPU scanline over
+  outlines** (no glyph-tris path exists in AVM2 today — confirmed). Two options, pick
+  at the probe:
+  1. **Runtime-tessellate glyph outlines → `renderer_draw_tris`** (the T4/T6
+     runtime-tris path; libtess2 linked; one solid draw per glyph-colour run) — crisp,
+     scale-independent, GPU==Ruffle-clean. **Preferred.**
+  2. **CPU-raster the field to an offscreen ARGB, blit as a bitmap quad**
+     (`renderer_draw_bitmap_quad_scaled`, the resident bitmap-slot path) — fewer moving
+     parts as an MVP, but scale-baked. Acceptable fallback if (1) balloons.
+  **The getPixel gate rides the CPU path regardless** (BitmapData.draw is always CPU),
+  so the GPU choice is graded by the Dawn image oracle (informational), like T6.
+- **Reuse, never fork:** CPU glyphs go through the existing `avm2_bitmap.c` rasterizer
+  (refactored into a shared `avm2_cpu_raster_text`, see Leg A); GPU glyphs go through
+  the shared backend (`renderer_draw_tris` / bitmap-quad). **Never touch `action.c`**
+  (mine `tag.c`'s text path for the pattern only). AVM2 stays in `src/avm2/` (+
+  `src/abc/` only if static-text glyph emission is pulled in).
 - **Traps:** blank/no-op scores PASS vs empty `output.txt` — dump + LOOK. Image
   comparisons don't gate (`[[image-comparisons-dont-gate-passfail]]`). `getPixel` is
-  the trace gate (T5). Device-font (non-embedded) text may fall back — see scope. Line
-  numbers shifted across T1–T6 — grep symbols (EQ-0 lesson).
+  the trace gate (T5/T6). Device-font (non-embedded) text may fall back — see scope.
 
-## §1 — Leg A: headless/CPU text (biggest reuse; do first)
+## §1 — Leg A: headless/CPU EditText render (biggest reuse; do first)
 
-1. Invoke the existing `avm2_bitmap.c:1750` glyph rasterizer from `avm2_cpu_walk` for
-   `AVM2_CHAR_TEXT`/`AVM2_CHAR_EDITTEXT` nodes — composite the node's laid-out glyphs
-   into the CPU-dump framebuffer under the node's world matrix + alpha/cxform, beside
-   the shape/bitmap gates. Factor the glyph-emission core out of `bd_draw`'s
-   TextField path if needed so both `bd_draw` and `avm2_cpu_walk` share it.
-2. This makes `AVM2_CPU_DUMP` show text **and** makes text `getPixel`-gateable via
-   `BitmapData.draw(textField)→getPixel` (which already rasterizes today — so the gate
-   works the moment the on-screen walk matches it).
+1. **Refactor** `bd_draw_textfield`'s glyph-scanline core (`avm2_bitmap.c:1770`) into a
+   reusable `avm2_cpu_raster_text(uint32_t* fb, int W, int H, Avm2Object* tf_obj,
+   double wa..wty, double node_alpha)` (new decl in `avm2_cpu_raster.h` beside
+   `avm2_cpu_raster_morph`; stays CPU-only, no `action.c`). `bd_draw_textfield` becomes
+   a thin caller so its existing gate (`avm2_bitmapdata_draw_textfield`) stays
+   byte-for-byte.
+2. Dispatch it from `avm2_cpu_walk` (`:8515`) for `ext->edittext != NULL` nodes, beside
+   the morph/shape arms — composites the field's glyphs into the CPU-dump framebuffer
+   under the node's world matrix + alpha. **And** add the same arm to
+   `bd_draw_shape_walk` (`avm2_bitmap.c:1959`) so a *timeline-placed* field composites
+   when its container is `BitmapData.draw`-n — exactly how T6 added the morph arm there.
+3. This makes `AVM2_CPU_DUMP` show text **and** makes a *placed* text field
+   `getPixel`-gateable via `BitmapData.draw(container)→getPixel` (the T6 gate shape).
 
-## §2 — Leg B: GPU/Dawn text
+## §2 — Leg B: GPU/Dawn EditText render
 
-1. Per the §Bake-in probe: render glyphs on the GPU — reuse `renderer_draw_shape`/
-   `draw_tris` per glyph with per-glyph transforms (mirror `tag.c:3123-3126` +
-   `compose_text_transforms`), tessellating glyph outlines at load/runtime if triangles
-   aren't already emitted.
-2. Dispatch in `avm2_render_node` beside the shape/bitmap/graphics gates. Confirm CPU
-   (Leg A) and GPU render identically (== Ruffle) — the CPU==GPU==Ruffle invariant the
-   whole line holds.
+1. Resolve the §Bake-in GPU-glyph-form probe with one placed field rendered under Dawn
+   vs the Ruffle export: **runtime-tessellate glyph outlines → `renderer_draw_tris`**
+   (preferred, the T4/T6 path) or **offscreen-raster + bitmap-quad blit** (MVP).
+2. Dispatch in `avm2_render_node` (`:8920`) for `ext->edittext != NULL`, beside
+   `avm2_render_morph` — one transform/cxform slot per field (reuse the
+   `g_avm2_xform_next` bump-allocator), then per glyph-colour run a `renderer_draw_tris`
+   (option 1) or a bitmap-quad blit (option 2). Confirm CPU (Leg A) == GPU == Ruffle —
+   the invariant the whole line holds (T6 hit max-diff-0).
 
-## §3 — Scope (target EQ's HUD; defer the long tail)
+## §3 — Scope (EDITTEXT first for EQ's HUD; static text + long tail deferred)
 
-- **In scope:** embedded-font static `DefineText` + dynamic `DefineEditText` (the HUD
-  numbers/labels), single-/multi-line, color, size, alignment as the layout model
-  already computes it.
-- **Defer (document, skip-not-crash):** device-font (non-embedded) rasterization if EQ
-  uses embedded fonts (confirm from EQ's `DefineFont`), rich HTML text, advanced
-  wordwrap/kerning edge cases, input-field caret/selection rendering — unless an
-  upstream text trace family or EQ needs them. State what EQ actually uses.
+- **In scope:** dynamic `DefineEditText` / `TextField` (the HUD numbers/labels) with
+  embedded fonts — single-/multi-line, color, size, alignment as the layout model
+  already computes it. This is EQ's actual HUD case and the maximal reuse (the glyph
+  raster already handles it via `BitmapData.draw`).
+- **Deferred, sized as the follow-on:** **static `DefineText`** — needs recompiler
+  glyph-placement emission (`avm2_generated_statictext[]` from GLYPHENTRY records; no
+  such table today) + a walk arm. Pull in only if EQ uses static text (confirm from
+  EQ's tags); otherwise leave for the next session and document.
+- **Deferred (document, skip-not-crash):** device-font (non-embedded) rasterization
+  (confirm EQ uses embedded fonts), rich HTML text, advanced wordwrap/kerning edge
+  cases, input caret/selection rendering — unless an upstream family or EQ needs them.
 
 ## §4 — Grading
 
-1. **Authored `getPixel` probes (primary gate, no-graphics):** a placed static text
-   label and a dynamic EditText string; `BitmapData.draw→getPixel` asserts glyph
-   pixels (a point inside a stroke of a known glyph is text-color, background elsewhere)
-   at expected values from a Ruffle `--graphics gl` `--trace-log` export →
-   CPU == GPU == Ruffle. (`regression/`, the probe recipe in `[[avm2-vector-render-track]]`.)
-2. **Upstream:** the AVM2 text trace family (Stage 6 tests — `text_*`/`textfield_*`)
-   must not regress; any text image-comparison renders under `--mode=graphics`
-   (informational).
+1. **Authored `regression/avm2_timeline_text` `getPixel` probe (primary gate,
+   no-graphics):** a `DefineEditText` placed on the timeline with known
+   text/font/size/color; `BitmapData.draw(this)→getPixel` asserts a glyph-interior
+   pixel = text color and a between-glyphs pixel = bg, at expected values from a Ruffle
+   `--graphics gl --trace-log` export → CPU == GPU == Ruffle. (The `avm2_morph`
+   `build_morph.py` splice recipe generalises: mxmlc `Main.as` + a `DefineEditText` +
+   `PlaceObject2`; or embed a font and set `.text` in AS3.)
+2. **Upstream:** the large `edittext_*` family + `edit_text_linkage` must not regress
+   (mostly trace layout/metrics already passing — watch for any that become
+   render-dependent); `avm2_bitmapdata_draw_textfield` no-regress. Text
+   image-comparison renders under `--mode=graphics` (informational).
 3. Full CI both modes, **zero pass→fail**; re-dispatch `mode=graphics` on a shard flake
    (the T1 shard-9 lesson).
 
 ## §5 — Deliverables
 
-1. Native TEXT + EDITTEXT render on both sinks, `getPixel`-gated; deferred long-tail
-   documented. Both CI modes green, zero regressions. Autonomous commit/push/CI
-   authorized (`.claude/pipeline-handoff.md`; render paths → **both** modes).
+1. **Plan doc first (light):** `SWFRecompDocs/plans/avm2-native-text-render-plan.md`
+   — the EditText-first scope, the GPU-glyph-form ruling, and static `DefineText` sized
+   as the follow-on (mirror the vector-rendering-plan's tranche+RESULT shape). Then:
+   EditText renders on both sinks, `getPixel`-gated; deferred long-tail documented.
+   Both CI modes green, zero regressions. Autonomous commit/push/CI authorized
+   (`.claude/pipeline-handoff.md`; render paths → **both** modes).
 2. **Frame-prove EQ (the payoff):** with text rendering, EQ's preloader/title/HUD are
    now fully renderable — attempt an `AVM2_CPU_DUMP` (or `--mode=graphics`) frame-proof
    of the preloader/title showing text, per `avm2-elephant-quest.md`. If the -O0 EQ
