@@ -1,14 +1,73 @@
 # AVM2 Vector Renderer — timeline shapes + `flash.display.Graphics`
 
-**Status:** v1.4, 2026-07-21. **T1 SHIPPED** (`63ca22e39`, solid-fill timeline
+**Status:** v1.5, 2026-07-22. **T1 SHIPPED** (`63ca22e39`, solid-fill timeline
 shapes). **T2+T3 SHIPPED** (line strokes + gradient fills on the GPU/Dawn sink).
 **T5 SHIPPED** (CPU shape rasterizer for the headless path; `BitmapData.draw→
-getPixel` reads shape pixels). **T4 SHIPPED** (this session — `flash.display.
-Graphics` runtime drawing on both sinks: Part A `6f1508984` trace/validation, Part
-B rendering; R2 dynamic gradient pool confirmed live; see the T4 RESULT section).
-**T6 (morphshapes) sized as NEXT** (see the T6 tranche). Pattern:
-`avm2-support-plan.md` / `avm2-seedling-plan.md` (census-driven,
-dependency-ordered, test-first).
+getPixel` reads shape pixels). **T4 SHIPPED** (`flash.display.Graphics` runtime
+drawing on both sinks: Part A `6f1508984` trace/validation, Part B rendering; R2
+dynamic gradient pool confirmed live). **T6 SHIPPED** (this session — morphshapes:
+Leg A `382e9ff2b` MorphShape class semantics, Leg B `aad9104f2`
+ratio-interpolated render on both sinks; see the T6 RESULT section). **The
+timeline-shape line is now COMPLETE** (solid/stroke/gradient `DefineShape` + runtime
+`Graphics` + morphshapes, all `getPixel`-gated). Pattern: `avm2-support-plan.md` /
+`avm2-seedling-plan.md` (census-driven, dependency-ordered, test-first).
+
+## T6 RESULT (2026-07-22) — morphshapes render at their placement ratio, both sinks
+
+Shipped as two commits (Leg A trace semantics, Leg B rendering), as sized.
+
+**Leg A (`382e9ff2b`) — MorphShape class semantics.** `flash.display.MorphShape`
+is now its own class (extends DisplayObject), routed from `AVM2_CHAR_MORPHSHAPE`
+in `class_for_char`. Script `new MorphShape()` throws `ArgumentError #2012`
+(`morphshape_native_init`, guarded on `g_timeline_instantiation == 0` — MorphShape
+is timeline-instantiable, unlike the abstract display bases which throw
+unconditionally); a timeline morph child now traces `[object MorphShape]` /
+`flash.display::MorphShape`. Gate: `morph_shape` exact, `hittest_morph` no-regress.
+
+**Leg B (`aad9104f2`) — ratio-interpolated render.** The one architectural rule
+held: lerped verts are per-frame **runtime** geometry, so morph nodes go through
+T4's **runtime-tris** path (`renderer_draw_tris` / `avm2_cpu_raster_tris`'s sibling
+`avm2_cpu_raster_morph`), **not** the static `renderer_draw_shape`.
+
+- **The vertex-pairing invariant — CONFIRMED, by construction and by the byte-exact
+  probe.** The recompiler's morph pass already emits START verts into `shape_data`
+  and END verts into `morph_end_shape_data` in the **same loop iteration**
+  (`swf.cpp` is_morph branch), so `shape_data[vert_offset+n]` ↔
+  `morph_end_shape_data[morph_end_offset+n]` 1:1. What was missing: the is_morph
+  branch pushed **no** `Avm2ShapeGeom` (only the non-morph branch did) — Leg B adds
+  it with `morph_end_offset = morph_end_start_vertex` + `is_morph = 1`. Loaded the
+  two morph-end tables as **extern globals** (T5 pattern; they're in
+  `DRAWS_ARRAY_NAMES`, so linked in no-graphics).
+- **The end-colour index gotcha.** `morph_end_color_data` uses its **own** counter
+  (`current_morph_end_color`), independent of `color_data`'s `current_color`, so a
+  vertex's `fs.index` (start colour) does **not** index the end table. Fix: pack the
+  morph END-colour index into the **high 16 bits** of the solid vertex's
+  `style_index` (low 16 = start colour). Only the morph path reads those bits; the
+  static shader uses the high bits only for gradient focal (a deferred morph case),
+  so nothing else is disturbed.
+- **Ruffle-exact lerp (the fidelity point).** Both sinks match
+  `core/src/display_object/morph_shape.rs`: positions `round(start*a + end*b)` to
+  integer twips (`lerp_twips`), colours `(a*start_u8 + b*end_u8)` **truncated** to
+  u8 (`lerp_color`), `a = 1 − ratio/65535`, `b = ratio/65535`. The float-lerp+round
+  first tried for colour gave `7f0080`; Ruffle's truncation gives `7f007f` — the
+  probe caught the one-LSB gap.
+- **Gate (`regression/avm2_morph`, authored, no-graphics + graphics).** One
+  `DefineMorphShape` (solid rect, right edge 50→90px, fill RED→BLUE), hand-authored
+  as raw SWF tag bytes and spliced into an mxmlc base by `build_morph.py` (morphs
+  can't come from `[Embed]`/mxmlc), placed at ratio 0 / 32768 / 65535.
+  `BitmapData.draw→getPixel` asserts interpolated **edge position** (x=60 inside /
+  x=80 outside at the ratio-0.5 edge≈70px) and **fill colour** (`ff0000` @0,
+  `7f007f` @½, `0000ff` @1). Expected = a Ruffle `--graphics gl` `--trace-log` of
+  the same swf. **CPU getPixel == Ruffle byte-exact** in both modes; **GPU/Dawn
+  on-screen render == the Ruffle export image byte-exact** (0 outliers, max diff 0 —
+  local frame-proof; the shipped probe is getPixel-gated, no PNG, matching T5).
+
+**Complete vs deferred.** Solid-fill morph (position + colour lerp) renders on both
+sinks. **Deferred (documented, skipped-not-crashed):** gradient-ramp morph (rebuild
+the 256-texel ramp per ratio — reuses T4's dynamic-gradient path) and stroke morph
+(morph strokes aren't tessellated into `shape_data` today — the is_morph earcut
+branch handles fills only). Those triangles (`style_type != 0x00`) are skipped.
+`[[avm2-vector-render-track]]`.
 
 ## T4 RESULT (2026-07-21) — flash.display.Graphics runtime drawing, both sinks
 
@@ -603,7 +662,11 @@ integration check, never the oracle; both CI modes where render code changes
   runtime tessellation + the command decoder are mechanical ports. The upstream
   pure-render tests ship empty `output.txt` and do **not** gate (they pass
   trivially rendering nothing) — the authored `getPixel` probes are the real B gate.
-- **T6 — Morphshapes. → NEXT (the timeline-shape line's last tranche).**
+- **T6 — Morphshapes. ✅ DONE 2026-07-22 (Leg A `382e9ff2b`, Leg B `aad9104f2`).**
+  See the T6 RESULT section above. Shipped as sized: MorphShape class semantics
+  (#2012 + `[object MorphShape]`) then ratio-lerp render on both sinks via the T4
+  runtime-tris path, `getPixel`-gated CPU==GPU==Ruffle byte-exact. Gradient-ramp
+  and stroke morph deferred (documented). **The timeline-shape line is complete.**
 
   **T6 sizing (grounded post-T4, 2026-07-21) — ~1 session, two legs, low-moderate
   risk.** DefineMorphShape stores a *start* and *end* shape; the runtime displays
