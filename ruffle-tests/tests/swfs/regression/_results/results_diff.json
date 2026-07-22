@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-22T20:51:24.475234+00:00",
-    "old_git_sha": "cc33c10bf9455c66af99eed82d81be924b412a43",
-    "new_timestamp": "2026-07-22T21:54:21.846620+00:00",
-    "new_git_sha": "8a39a6797f338fa2f8165dd422f37365096bf597",
+    "old_timestamp": "2026-07-22T21:54:21.846620+00:00",
+    "old_git_sha": "8a39a6797f338fa2f8165dd422f37365096bf597",
+    "new_timestamp": "2026-07-22T23:11:18.177752+00:00",
+    "new_git_sha": "c36560845dbc83964c93bf462664aea8de27bbb8",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 66,
+    "old_pass": 67,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 66,
-    "old_total": 66,
+    "old_effective_pass": 67,
+    "old_total": 67,
     "old_pass_rate": 100.0,
-    "new_pass": 67,
+    "new_pass": 68,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 67,
-    "new_total": 67,
+    "new_effective_pass": 68,
+    "new_total": 68,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,21 +25,21 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 66,
+    "unchanged": 67,
     "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm2_simplebutton_click",
+      "test": "avm2_loader_stub",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
       }
     }
   ]
