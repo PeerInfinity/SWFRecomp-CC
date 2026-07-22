@@ -1,36 +1,37 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-21 23:49 UTC
+**Date**: 2026-07-22 00:51 UTC
 
-**Git SHA**: `63ca22e398`
+**Git SHA**: `f490e4b247`
 
-**Run Duration**: 2m 3s
+**Run Duration**: 1m 42s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 8 |
-| Passing | **6** (75.0%) |
+| Total tests | 9 |
+| Passing | **7** (77.8%) |
 | Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **8** (100.0%) |
+| Effective pass | **9** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 214 |
-| Matching lines | 194 (90.7%) |
+| Total expected lines | 231 |
+| Matching lines | 211 (91.3%) |
 | Mismatched lines | 20 |
 
 ## Passing Tests
 
-**6 tests passing**
+**7 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 19.4s |  |
-| 2 | `exception` | 35 | 21.4s |  |
-| 3 | `function_test` | 26 | 21.6s |  |
-| 4 | `hello` | 8 | 12.8s |  |
-| 5 | `implementsOpTest` | 28 | 21.4s |  |
-| 6 | `inheritance` | 22 | 2.6s |  |
+| 1 | `enum` | 19 | 19.5s |  |
+| 2 | `exception` | 35 | 17.4s |  |
+| 3 | `function_test` | 26 | 14.1s |  |
+| 4 | `hello` | 8 | 20.9s |  |
+| 5 | `implementsOpTest` | 28 | 19.1s |  |
+| 6 | `inheritance` | 22 | 2.2s |  |
+| 7 | `super_test1` | 17 | 2.9s |  |
 
 ## Ruffle-Matched Tests
 
@@ -38,8 +39,8 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `TextFieldTest` | 1 | 1 | 19.2s |  |
-| 2 | `levels` | 19 | 21 | 4.4s |  |
+| 1 | `TextFieldTest` | 1 | 1 | 1.0s |  |
+| 2 | `levels` | 19 | 21 | 4.5s |  |
 
 ## Near-Passing Tests
 

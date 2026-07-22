@@ -1,29 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `93299b884de8` (2026-07-20T04:49:53.386057+00:00)
-**Current:** `63ca22e398c4` (2026-07-21T23:49:05.106730+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `63ca22e398c4` (2026-07-21T23:49:05.106730+00:00)
+**Current:** `f490e4b247e8` (2026-07-22T00:51:45.619234+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 635 | 611 | -24 |
-| Total | 711 | 687 | -24 |
-| Pass rate | 89.3% | 88.9% | -0.4% |
+| Passing | 611 | 635 | +24 |
+| Total | 687 | 711 | +24 |
+| Pass rate | 88.9% | 89.3% | +0.4% |
 | Mismatched lines | 15333 | 15333 | 0 |
 
-## Missing Tests — Shard Failure (24)
+## Added Tests (24)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 24 were previously passing
-- 0 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `edittext_place_caret` | pass | 2/2 |
 | `edittext_programmatic_focus` | pass | 12/12 |
 | `edittext_restrict` | pass | 191/191 |
@@ -48,5 +40,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `error` | pass | 58/58 |
 | `escape` | pass | 14/14 |
 | `execution_order1` | pass | 5/5 |
-
-</details>
