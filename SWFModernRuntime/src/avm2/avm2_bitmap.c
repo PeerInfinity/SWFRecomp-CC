@@ -1972,6 +1972,12 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		                      ext->shape_vert_offset, ext->shape_vert_count,
 		                      wa, wb, wc, wd, wtx, wty, alpha);
 
+	// T4: script-drawn Graphics geometry on this node (the getPixel gate reads
+	// runtime fills/strokes/gradients through this path).
+	avm2_graphics_cpu_composite(ctx, obj, wa, wb, wc, wd, wtx, wty, alpha,
+	                            dst->pixels, (int) dst->width, (int) dst->height,
+	                            dst->transparency);
+
 	for (uint32_t i = 0; i < ext->render_len; i++)
 	{
 		Avm2Object* child = ext->render_list[i];

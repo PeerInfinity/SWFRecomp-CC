@@ -27,4 +27,30 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
                            double wa, double wb, double wc, double wd,
                            double wtx, double wty, double node_alpha);
 
+// T4 Part B — fill descriptor for runtime (flash.display.Graphics) triangles.
+// kind: 1 solid, 2 gradient. Solid uses r/g/b/a (straight 0..1). Gradient uses
+// grad_type (0x10/0x12/0x13), spread (0/1/2), interp (0 rgb / 1 linearRGB),
+// focal, a 256*4 RGBA8 `ramp`, and `inv2d` (the normalized inverse 2D affine
+// mapping shape-local twips -> UV[0,1], as render_webgpu.c's dynamic path does).
+typedef struct
+{
+	int kind;
+	float r, g, b, a;
+	unsigned char grad_type, spread, interp;
+	float focal;
+	const unsigned char* ramp;   // 256*4
+	float inv2d[6];              // a,b,c,d,tx,ty
+} Avm2GfxFill;
+
+// Rasterize an explicit runtime triangle list (`xy_twips`, shape-local twips,
+// vert_count % 3 == 0) into a premultiplied-ARGB target under the node world
+// matrix (shape-local twips -> target twips; /20 -> device px) + concatenated
+// alpha, shaded per `fill`. Mirrors avm2_cpu_raster_shape but for script-built
+// geometry (no static shape_data range).
+void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
+                          const float* xy_twips, uint32_t vert_count,
+                          const Avm2GfxFill* fill,
+                          double wa, double wb, double wc, double wd,
+                          double wtx, double wty, double node_alpha);
+
 #endif // AVM2_CPU_RASTER_H

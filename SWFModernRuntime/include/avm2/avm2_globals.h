@@ -538,6 +538,13 @@ void avm2_bitmap_seed_timeline(Avm2Context* ctx, Avm2Object* child,
 void avm2_register_display(Avm2Context* ctx);
 // NULL when obj is not a DisplayObject descendant.
 Avm2DisplayObjectExt* avm2_display_ext_of(Avm2Context* ctx, Avm2Object* obj);
+// T4 Part B — CPU-composite a node's recorded flash.display.Graphics geometry
+// into a premultiplied-ARGB target (`w*` = shape-local twips -> target twips).
+// No-op if the node has no recorded geometry. Used by BitmapData.draw (getPixel).
+void avm2_graphics_cpu_composite(Avm2Context* ctx, Avm2Object* obj,
+                                 double wa, double wb, double wc, double wd,
+                                 double wtx, double wty, double alpha,
+                                 uint32_t* buf, int W, int H, int transparent);
 // SymbolClass char bound to a class (walks the class hierarchy); 0 = none.
 uint16_t avm2_display_char_for_class(Avm2Class* cls);
 // Build the stage + root (SymbolClass char 0 / bound placed symbols) and

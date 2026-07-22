@@ -1,0 +1,8 @@
+# T4 Part B: flash.display.Graphics runtime drawing, getPixel-gated (no-graphics).
+# Every gated pixel is exact by construction (solid/stroke = literal colour;
+# gradient endpoints sampled in the pad region = pure end-stops; drawTriangles
+# interior = fill colour). grad_mid is our deterministic pixel-centre sample.
+num_frames = 1
+
+[image_comparisons.output]
+tolerance = 255

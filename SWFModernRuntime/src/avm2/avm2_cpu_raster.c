@@ -161,7 +161,48 @@ typedef struct {
 	// solid colour (straight ARGB, node-alpha already applied)
 	uint32_t solid_argb;
 	int is_gradient;
+	// Runtime gradient (T4): when `ramp` is non-NULL the gradient is shaded from
+	// this 256*4 RGBA8 buffer instead of the static gradient_data row; inv2d is
+	// pre-normalised (shape-local twips -> UV[0,1]); linear_out converts the
+	// sampled linear ramp back to sRGB (linearRGB interpolation).
+	const uint8_t* ramp;
+	int linear_out;
 } RasterCtx;
+
+// sRGB EOTF^-1 for linearRGB gradient output (mirror render_webgpu.c fs_main).
+static inline double cpu_linear_to_srgb(double c)
+{
+	if (c <= 0.0031308) return c * 12.92;
+	return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+}
+
+// Sample a runtime 256-row RGBA8 ramp at t in [0,1] (hardware-sampler phase,
+// clamp-to-edge, manual lerp), optionally converting linear->sRGB. Straight ARGB.
+static uint32_t grad_sample_ramp(const uint8_t* ramp, double t, int linear_out)
+{
+	if (t < 0.0) t = 0.0; else if (t > 1.0) t = 1.0;
+	double u = t * 256.0 - 0.5;
+	if (u < 0.0) u = 0.0; else if (u > 255.0) u = 255.0;
+	int u0 = (int) floor(u), u1 = u0 + 1; if (u1 > 255) u1 = 255;
+	double f = u - (double) u0;
+	const uint8_t* c0 = ramp + u0 * 4;
+	const uint8_t* c1 = ramp + u1 * 4;
+	double r = c0[0] * (1.0 - f) + c1[0] * f;
+	double g = c0[1] * (1.0 - f) + c1[1] * f;
+	double b = c0[2] * (1.0 - f) + c1[2] * f;
+	double a = c0[3] * (1.0 - f) + c1[3] * f;
+	if (linear_out)
+	{
+		r = cpu_linear_to_srgb(r / 255.0) * 255.0;
+		g = cpu_linear_to_srgb(g / 255.0) * 255.0;
+		b = cpu_linear_to_srgb(b / 255.0) * 255.0;
+	}
+	uint32_t ri = (uint32_t) (r + 0.5), gi = (uint32_t) (g + 0.5);
+	uint32_t bi = (uint32_t) (b + 0.5), ai = (uint32_t) (a + 0.5);
+	if (ri > 255) ri = 255; if (gi > 255) gi = 255;
+	if (bi > 255) bi = 255; if (ai > 255) ai = 255;
+	return (ai << 24) | (ri << 16) | (gi << 8) | bi;
+}
 
 static void raster_tri(RasterCtx* R,
                        double ax, double ay, double bx, double by,
@@ -212,7 +253,9 @@ static void raster_tri(RasterCtx* R,
 				double gu = R->ia * sx + R->ic * sy + R->itx;
 				double gv = R->ib * sx + R->id * sy + R->ity;
 				double t = grad_t(R->style_type, gu, gv, R->focal_z, R->spread);
-				uint32_t sampled = grad_sample(R->style_id, t);
+				uint32_t sampled = R->ramp != NULL
+					? grad_sample_ramp(R->ramp, t, R->linear_out)
+					: grad_sample(R->style_id, t);
 				if (R->node_alpha < 0.999)
 				{
 					uint32_t sa = (uint32_t) (((sampled >> 24) & 0xFF)
@@ -265,6 +308,7 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 		RasterCtx R;
 		R.buf = buf; R.W = W; R.H = H;
 		R.node_alpha = node_alpha;
+		R.ramp = NULL; R.linear_out = 0;   // static path: use gradient_data row
 
 		if (!is_grad)
 		{
@@ -307,6 +351,64 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 			R.ic = -_ic * _inv;  R.id =  _ia * _inv;
 			R.itx = (_ic * _ity - _id * _itx) * _inv;
 			R.ity = (_ib * _itx - _ia * _ity) * _inv;
+		}
+		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
+	}
+}
+
+// T4 Part B — rasterize an explicit runtime triangle list with a fill
+// descriptor (see avm2_cpu_raster.h). Solid or runtime-ramp gradient; reuses the
+// shared raster_tri coverage + shading.
+void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
+                          const float* xy_twips, uint32_t vert_count,
+                          const Avm2GfxFill* fill,
+                          double wa, double wb, double wc, double wd,
+                          double wtx, double wty, double node_alpha)
+{
+	(void) transparent;
+	if (buf == NULL || W <= 0 || H <= 0 || xy_twips == NULL || fill == NULL) return;
+	if (vert_count < 3 || node_alpha <= 0.0) return;
+
+	RasterCtx R;
+	R.buf = buf; R.W = W; R.H = H;
+	R.node_alpha = node_alpha;
+	R.ramp = NULL; R.linear_out = 0;
+
+	if (fill->kind == 2)
+	{
+		R.is_gradient = 1;
+		R.style_type = fill->grad_type;
+		R.style_id = 0;
+		R.spread = fill->spread;
+		R.focal_z = (fill->grad_type == 0x13) ? fill->focal : 0.0;
+		R.ramp = fill->ramp;
+		R.linear_out = fill->interp == 1;
+		R.ia = fill->inv2d[0]; R.ib = fill->inv2d[1];
+		R.ic = fill->inv2d[2]; R.id = fill->inv2d[3];
+		R.itx = fill->inv2d[4]; R.ity = fill->inv2d[5];
+	}
+	else
+	{
+		double a = (double) fill->a * node_alpha;
+		R.is_gradient = 0;
+		R.solid_argb = (f2b(a) << 24) | (f2b(fill->r) << 16)
+		             | (f2b(fill->g) << 8) | f2b(fill->b);
+	}
+
+	for (uint32_t t = 0; t + 3 <= vert_count; t += 3)
+	{
+		double sx[3], sy[3], dX[3], dY[3];
+		for (int k = 0; k < 3; k++)
+		{
+			sx[k] = xy_twips[(t + k) * 2];
+			sy[k] = xy_twips[(t + k) * 2 + 1];
+			dX[k] = (wa * sx[k] + wc * sy[k] + wtx) / 20.0;
+			dY[k] = (wb * sx[k] + wd * sy[k] + wty) / 20.0;
+		}
+		if (R.is_gradient)
+		{
+			R.sx0 = sx[0]; R.sy0 = sy[0]; R.sx1 = sx[1]; R.sy1 = sy[1];
+			R.sx2 = sx[2]; R.sy2 = sy[2];
 		}
 		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
 	}

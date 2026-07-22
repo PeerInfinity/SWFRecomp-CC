@@ -1,13 +1,75 @@
 # AVM2 Vector Renderer — timeline shapes + `flash.display.Graphics`
 
-**Status:** v1.3, 2026-07-21. **T1 SHIPPED** (`63ca22e39`, solid-fill timeline
-shapes). **T2+T3 SHIPPED** (line strokes + gradient fills on the GPU/Dawn sink;
-see the T2+T3 RESULT section). **T5 SHIPPED** (this session — CPU shape
-rasterizer for the headless path; `BitmapData.draw→getPixel` now reads shape
-pixels, promoting the T1/T2/T3 probes to CI-gating no-graphics trace tests; see
-the T5 RESULT section). Planning-session output otherwise. Pattern:
+**Status:** v1.4, 2026-07-21. **T1 SHIPPED** (`63ca22e39`, solid-fill timeline
+shapes). **T2+T3 SHIPPED** (line strokes + gradient fills on the GPU/Dawn sink).
+**T5 SHIPPED** (CPU shape rasterizer for the headless path; `BitmapData.draw→
+getPixel` reads shape pixels). **T4 SHIPPED** (this session — `flash.display.
+Graphics` runtime drawing on both sinks: Part A `6f1508984` trace/validation, Part
+B rendering; R2 dynamic gradient pool confirmed live; see the T4 RESULT section).
+**T6 (morphshapes) sized as NEXT** (see the T6 tranche). Pattern:
 `avm2-support-plan.md` / `avm2-seedling-plan.md` (census-driven,
 dependency-ordered, test-first).
+
+## T4 RESULT (2026-07-21) — flash.display.Graphics runtime drawing, both sinks
+
+Shipped as **two commits** (Part A trace-only, then Part B rendering), exactly as
+sized. The `flash.display.Graphics` AABB-recorder stub is now a real runtime
+vector backend on the GPU/Dawn **and** headless-CPU sinks, all `getPixel`-gated.
+
+**Part A (trace/validation — commit `6f1508984`).** Added `drawPath` /
+`drawTriangles` / `drawGraphicsData` + the `GraphicsPath` / `GraphicsTrianglePath`
+/ `GraphicsPathCommand` / `GraphicsPathWinding` / `TriangleCulling` /
+`IGraphicsData` / `GraphicsSolidFill` / `GraphicsGradientFill` / `GraphicsStroke`
+class surface, with error codes + **byte-exact stack traces** matching
+Ruffle/Flash. Gates green in no-graphics: `graphics_path` (exact),
+`graphics_draw_path` (ruffle_matched), `graphics_draw_triangles` +
+`graphics_bad_direct_commands` (exact). Two frame subtleties resolved:
+- `drawPath`/`drawTriangles` throw #2004/#2008 **directly** (native method frame,
+  no throwError frame); `GraphicsPath` ctor + `set winding` need a leading
+  **`Error$/throwError()`** frame — synthesised by pushing a NULL-bound native
+  callframe (`debug_name="Error$/throwError"`) before the throw.
+- **General fix in `avm2_class.c`:** ASC emits no method_info debug name, so class
+  methods traced as `Class/<anonymous>()`. Fall back to the defining trait's QName
+  (avmplus semantics) — also corrects `timer_invalid_delay` et al. (Only touches
+  empty debug names; mxmlc tests unaffected.)
+
+**Part B (rendering — reuses T5).** `Avm2GraphicsExt` now records fill/stroke/path
+state and finalized `Avm2GfxPath`s. `begin*`/`endFill`/`lineStyle`/`clear` set
+current style + flush; `moveTo`/`lineTo`/`curveTo`/`drawRect`/`drawCircle`/
+`drawPath` record pen commands; `endFill`/render-time flush **tessellates** at
+runtime (libtess2, nonzero winding — copied `action.c:drawingFinalizePath`, never
+called) and builds strokes (copied `drawingBuildStroke`, miter-limit 4).
+`drawTriangles` bypasses tessellation (explicit verts+indices). Dispatched as a
+**new per-instance render source** in `avm2_render_node` (GPU → `renderer_draw_tris`
+/ `draw_gradient_tris`), `avm2_cpu_walk`, and `bd_draw` (CPU → the new
+`avm2_cpu_raster_tris`, feeding T5's shared `raster_tri` a runtime-built triangle
+list + ramp/inverse-matrix). Gradient CPU shading reuses T5's sampler with a
+**runtime ramp pointer** (`grad_sample_ramp`) + linear→sRGB for linearRGB interp.
+
+**★ R2 (dynamic gradient pool) — CONFIRMED LIVE, as `render_webgpu.c:1076`
+predicted.** The `beginGradientFill→getPixel` probe renders a correct red→green
+linear gradient (endpoints byte-exact, direction + ramp correct): the dynamic pool
+provisions + writes its texture row and normalised inverse matrix per draw with **no
+extra wiring** — the same "R1/R2 were non-issues" pattern. On the CPU side the
+gradient matrix is inverted + normalised (`(g+16384)/32768`) mirroring the GPU
+`norm_inv`, so both sinks agree.
+
+**Gate (`regression/avm2_graphics_runtime`, no-graphics, getPixel):** one Sprite
+drawn with solid `beginFill`+`drawRect`, `drawTriangles`, a linear
+`beginGradientFill`, and a `lineStyle` stroke, read back via `BitmapData.draw→
+getPixel`. Every gated pixel is **exact by construction** — `solid=ff0000`,
+`triangles=ffff`, gradient **pad-region** endpoints `ff0000`/`ff00` (interpolation-
+independent), `stroke=ff`, `bg=ffffff` — so CPU == GPU == Ruffle without a Ruffle
+export. `grad_mid` is our deterministic pixel-centre interpolation sample.
+
+**Complete vs deferred:** solid/gradient(linear/radial/focal, spread+interp)/stroke
+fills + `drawPath`/`drawTriangles` render on both sinks. **Deferred (documented):**
+`beginBitmapFill` / bitmap-fill IGraphicsData (no `renderer_draw_bitmap_tris`
+wiring this tranche — `gfx_noop`, blank); `drawRoundRect` corner radii (drawn as a
+plain rect); masks/`clip_depth`, blends, filters (T7); non-alpha ColorTransform on a
+Graphics source. `GraphicsStroke`-as-`drawGraphicsData`-fill is recorded but its
+fill/stroke style is not yet applied to the following path's render (Part-A trace
+semantics only). `[[avm2-graphics-t4-part-a-error-frames]]`, `[[avm2-graphics-t4-render]]`.
 
 ## T5 RESULT (2026-07-21) — CPU shape rasterizer; T1/T2/T3 getPixel gates go live
 
@@ -541,10 +603,51 @@ integration check, never the oracle; both CI modes where render code changes
   runtime tessellation + the command decoder are mechanical ports. The upstream
   pure-render tests ship empty `output.txt` and do **not** gate (they pass
   trivially rendering nothing) — the authored `getPixel` probes are the real B gate.
-- **T6 — Morphshapes.** Emit start/end vert tables + ratio interpolation (mirror
-  `morph_end_shape_data`); dispatch interpolated verts. **Gate:** upstream
-  `morph_shape`, `hittest_morph` + authored ratio-midpoint `getPixel`. **EQ:** morph
-  content if any (low priority for EQ). ~1 session.
+- **T6 — Morphshapes. → NEXT (the timeline-shape line's last tranche).**
+
+  **T6 sizing (grounded post-T4, 2026-07-21) — ~1 session, two legs, low-moderate
+  risk.** DefineMorphShape stores a *start* and *end* shape; the runtime displays
+  the linear interpolation at a per-frame `ratio` (0..65535). The recompiler ALREADY
+  tessellates morphs for AVM1 — `interpretShape`'s morph branch (`swf.cpp:2213`
+  case, `parseMorphFillStyles` `swf.cpp:7218`) emits `morph_end_shape_data`
+  (`swf.cpp:9035-9054`) as a companion vertex array to `shape_data`, keyed 1:1 by
+  triangle (the tessellation topology is shared; only vertex positions differ). So
+  the geometry is **already resident** in AVM2 builds, same as T1 — the missing link
+  is again the `char_id → (offset, end_offset, count)` map + a ratio-lerp at dispatch.
+
+  1. **Emit the AVM2 morph geom table + resolve on the ext (the bulk).** Extend
+     `Avm2ShapeGeom` (T1) with `end_vert_offset` (into `morph_end_shape_data`) and a
+     `MORPHSHAPE` kind bit; emit from `abc_timeline.cpp` beside the T1 shape-geom
+     table. At place-time resolve it onto `Avm2DisplayObjectExt` (a new
+     `morph_end_offset` + reuse `shape_vert_offset/count`). The MC's `ratio`
+     (PlaceObject2 ratio, already parsed for AVM1) rides on the ext. **~120 lines,
+     recompiler + resolve.**
+  2. **Ratio-lerp at dispatch (both sinks).** In `avm2_render_shape`/
+     `avm2_cpu_raster_shape`, when `morph_end_offset` is set, interpolate each vertex
+     `v = start + (end-start) * ratio/65535` before the coverage/shade step (style
+     bits come from the start shape — Flash morphs geometry + color, but color-morph
+     can defer). GPU: this needs a **per-vertex lerp into a scratch buffer** fed to
+     `renderer_draw_tris` (the static `renderer_draw_shape` reads baked `shape_data`
+     directly, so morphs use the runtime-tris path T4 just built — a clean reuse).
+     CPU: lerp inline in `avm2_cpu_raster_shape`'s per-triangle loop. **~100 lines.**
+
+  **Gate:** upstream `morph_shape` (trace — the `#2012` DefineMorphShape validation)
+  + `hittest_morph` (trace), and an authored `regression/avm2_morph` ratio-midpoint
+  `getPixel` probe (a morph placed at ratio 0 / 32768 / 65535 → interpolated fill
+  colour + bounds, exact at the endpoints, MAD-checked at the midpoint vs a Ruffle
+  `--graphics gl` export). Both CI modes (touches shared render + recompiler).
+
+  **Risks:** (R6-a) **color/gradient morph** — start and end can differ in fill
+  colour/gradient ramp, not just position; MVP interpolates geometry with the start
+  style and defers ramp-morph (document it, like T4's bitmap-fill deferral). (R6-b)
+  **ratio plumbing** — confirm AVM2 PlaceObject2 already carries `ratio` to the ext
+  (AVM1 does; verify at leg 1, the EQ-0 lesson). (R6-c) **topology** — the two vertex
+  arrays MUST share triangle count/order; `morph_end_shape_data` is emitted from the
+  same tessellation pass so this holds by construction, but assert `count` equality
+  at resolve. **EQ:** morph content is low-priority (jmtb02 EQ is mostly static
+  timeline shapes) — T6 is driven by upstream coverage, not EQ. After T6 the
+  timeline-shape line is **complete**; T7 (masks/blends/filters) + bitmap-fill
+  completeness + native TEXT/EDITTEXT remain.
 - **T7 — Masks / blends / filters (deferred).** `clip_depth` stencil masks (mirror
   `tag.c:3200-3228`), blend modes, filters. Scoped only when EQ or an upstream family
   demands it. Sized when reached.

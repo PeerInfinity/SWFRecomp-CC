@@ -27,6 +27,7 @@
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_cpu_raster.h>
 #include <avm2/avm2_error.h>
+#include <tesselator.h>  // T4 Part B: runtime Graphics tessellation (libtess2)
 #include <memory/heap.h>
 
 #include <avm2/avm2_gc.h>
@@ -4212,9 +4213,56 @@ static Avm2Value mc_add_frame_script(Avm2Activation* act)
 
 static Avm2Class* g_graphics_class;
 
+// T4 Part B — runtime Graphics geometry recording. One recorded pen command
+// (pixels; cx/cy = quadratic control for CURVE). type: 0 move, 1 line, 2 curve.
+typedef struct { uint8_t type; float x, y, cx, cy; } Avm2GfxCmd;
+
+// A finalized subpath: fill kind + params + tessellated fill triangles, and the
+// stroke's triangle list, all in shape-LOCAL twips (the same convention T5's
+// static shape_data uses). Fill kind: 0 none, 1 solid, 2 gradient.
+typedef struct
+{
+	int      fill_kind;
+	float    fr, fg, fb, fa;        // solid straight 0..1
+	// gradient (fill_kind==2)
+	uint8_t  grad_type;             // 0x10 linear, 0x12 radial, 0x13 focal
+	uint8_t  grad_spread;           // 0 pad, 1 reflect, 2 repeat
+	uint8_t  grad_interp;           // 0 rgb, 1 linearRGB
+	float    grad_focal;
+	uint8_t  grad_ramp[256 * 4];    // RGBA8 (sRGB for rgb interp, linear for linearRGB)
+	float    grad_fwd16[16];        // GPU: col-major, gradient[-16384,16384] -> local twips
+	float    grad_inv2d[6];         // CPU: local twips -> UV[0,1] (normalized inverse)
+	float*   fill_verts;            // local twips, xy pairs, count%3==0
+	uint32_t fill_vert_count;
+	// stroke
+	int      has_line;
+	float    lr, lg, lb, la;        // straight 0..1
+	float*   line_verts;            // local twips
+	uint32_t line_vert_count;
+} Avm2GfxPath;
+
 typedef struct Avm2GraphicsExt
 {
 	Avm2Object* owner;
+	// Current recording state.
+	int      cur_fill;              // 0 none, 1 solid, 2 gradient
+	float    cfr, cfg, cfb, cfa;
+	uint8_t  cgt, cgs, cgi;         // gradient type/spread/interp
+	float    cgf;                   // focal
+	uint8_t  cramp[256 * 4];
+	float    cfwd16[16];
+	float    cinv2d[6];
+	int      cur_line;
+	float    clr, clg, clb, cla;
+	float    clw;                   // line width (pixels)
+	// Active pen-command buffer (flushed on begin*/endFill/clear/draw*).
+	Avm2GfxCmd* cmds;
+	uint32_t cmd_count, cmd_cap;
+	float    pen_x, pen_y;          // last pen position (pixels)
+	int      pen_set;
+	// Finalized paths.
+	Avm2GfxPath* paths;
+	uint32_t path_count, path_cap;
 } Avm2GraphicsExt;
 
 static Avm2DisplayObjectExt* graphics_owner_ext(Avm2Activation* act)
@@ -4242,27 +4290,581 @@ static void draw_union_point(Avm2DisplayObjectExt* ext, double x_px, double y_px
 	if (y > ext->draw_ymax) ext->draw_ymax = y;
 }
 
+// ---- T4 Part B: geometry recording, tessellation, strokes, gradient ramps ----
+
+static double matrix_get_prop(Avm2Context* ctx, Avm2Object* m, const char* name);
+static int gfx_str_is(const Avm2String* s, const char* lit);  // defined in Part A
+
+// The Graphics object's own ext (recorded geometry lives here, per-instance).
+static Avm2GraphicsExt* gfx_self_ext(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL) return NULL;
+	return (Avm2GraphicsExt*) self->native_ext;
+}
+
+static void gfx_add_cmd(Avm2GraphicsExt* g, uint8_t type, float x, float y,
+                        float cx, float cy)
+{
+	if (g->cmd_count >= g->cmd_cap)
+	{
+		g->cmd_cap = g->cmd_cap ? g->cmd_cap * 2 : 64;
+		g->cmds = realloc(g->cmds, g->cmd_cap * sizeof(Avm2GfxCmd));
+	}
+	Avm2GfxCmd* c = &g->cmds[g->cmd_count++];
+	c->type = type; c->x = x; c->y = y; c->cx = cx; c->cy = cy;
+	g->pen_x = x; g->pen_y = y; g->pen_set = 1;
+}
+
+static void gfx_free_path(Avm2GfxPath* p)
+{
+	free(p->fill_verts); p->fill_verts = NULL; p->fill_vert_count = 0;
+	free(p->line_verts); p->line_verts = NULL; p->line_vert_count = 0;
+}
+
+static void gfx_reset(Avm2GraphicsExt* g)
+{
+	for (uint32_t i = 0; i < g->path_count; i++) gfx_free_path(&g->paths[i]);
+	free(g->paths); g->paths = NULL; g->path_count = g->path_cap = 0;
+	free(g->cmds); g->cmds = NULL; g->cmd_count = g->cmd_cap = 0;
+	g->cur_fill = g->cur_line = 0; g->pen_set = 0;
+}
+
+// Miter/bevel join (miter-limit 4), mirrors action.c drawing_emit_stroke_join.
+// Inputs in pixels; outputs in twips. Returns verts written (0/3/6).
+static uint32_t gfx_stroke_join(float* out, float ax, float ay, float vx,
+                                float vy, float bx, float by, float half_w)
+{
+	ax *= 20.0f; ay *= 20.0f; vx *= 20.0f; vy *= 20.0f; bx *= 20.0f; by *= 20.0f;
+	float d0x = vx - ax, d0y = vy - ay, d1x = bx - vx, d1y = by - vy;
+	float l0 = sqrtf(d0x * d0x + d0y * d0y), l1 = sqrtf(d1x * d1x + d1y * d1y);
+	if (l0 < 0.001f || l1 < 0.001f) return 0;
+	d0x /= l0; d0y /= l0; d1x /= l1; d1y /= l1;
+	float cross = d0x * d1y - d0y * d1x;
+	if (fabsf(cross) < 1e-6f) return 0;
+	float sign = (cross > 0.0f) ? -1.0f : 1.0f;
+	float o0x = sign * -d0y, o0y = sign * d0x, o1x = sign * -d1y, o1y = sign * d1x;
+	float p0x = vx + o0x * half_w, p0y = vy + o0y * half_w;
+	float p1x = vx + o1x * half_w, p1y = vy + o1y * half_w;
+	float mx = o0x + o1x, my = o0y + o1y, mlen = sqrtf(mx * mx + my * my);
+	if (mlen > 1e-4f)
+	{
+		float mhx = mx / mlen, mhy = my / mlen, cos_half = mhx * o0x + mhy * o0y;
+		if (cos_half > 0.25f)
+		{
+			float ml = half_w / cos_half, Mx = vx + mhx * ml, My = vy + mhy * ml;
+			out[0]=vx; out[1]=vy; out[2]=p0x; out[3]=p0y; out[4]=Mx; out[5]=My;
+			out[6]=vx; out[7]=vy; out[8]=Mx; out[9]=My; out[10]=p1x; out[11]=p1y;
+			return 6;
+		}
+	}
+	out[0]=vx; out[1]=vy; out[2]=p0x; out[3]=p0y; out[4]=p1x; out[5]=p1y;
+	return 3;
+}
+
+// Build stroke triangles from a contour polyline (pixels) at half_w (twips).
+// Mirrors action.c drawingBuildStroke (butt caps, miter/bevel joins). `filled`
+// auto-closes open contours (Flash closes fill+stroke of `moveTo;lineTo*;endFill`).
+static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
+                             uint32_t poly_count, const uint32_t* cstarts,
+                             uint32_t ccount, int filled, float half_w)
+{
+	free(path->line_verts); path->line_verts = NULL; path->line_vert_count = 0;
+	if (poly == NULL || ccount == 0) return;
+	#define _GNEEDCLOSE(cs, ce) (filled && ((ce)-(cs)) >= 3 && ( \
+		fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   > 0.01f || \
+		fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) > 0.01f))
+	#define _GEXPLCLOSED(cs, ce) (((ce)-(cs)) >= 3 && \
+		fabsf(poly[((ce)-1)*2]   - poly[(cs)*2])   <= 0.01f && \
+		fabsf(poly[((ce)-1)*2+1] - poly[(cs)*2+1]) <= 0.01f)
+	uint32_t total_segs = 0;
+	for (uint32_t ci = 0; ci < ccount; ci++)
+	{
+		uint32_t cs = cstarts[ci];
+		uint32_t ce = (ci + 1 < ccount) ? cstarts[ci + 1] : poly_count;
+		if (ce > cs + 1) total_segs += (ce - cs - 1);
+		if (_GNEEDCLOSE(cs, ce)) total_segs += 1;
+	}
+	if (total_segs == 0) return;
+	uint32_t alloc_verts = total_segs * 6 + poly_count * 6;
+	path->line_verts = malloc(alloc_verts * 2 * sizeof(float));
+	uint32_t wv = 0;
+	#define _GSEG(_x0,_y0,_x1,_y1) do { \
+		float x0=(_x0)*20.0f, y0=(_y0)*20.0f, x1=(_x1)*20.0f, y1=(_y1)*20.0f; \
+		float dx=x1-x0, dy=y1-y0, len=sqrtf(dx*dx+dy*dy); if(len<0.001f)len=0.001f; \
+		float nx=-dy/len*half_w, ny=dx/len*half_w; float* o=&path->line_verts[wv*2]; \
+		o[0]=x0+nx;o[1]=y0+ny;o[2]=x0-nx;o[3]=y0-ny;o[4]=x1+nx;o[5]=y1+ny; \
+		o[6]=x0-nx;o[7]=y0-ny;o[8]=x1-nx;o[9]=y1-ny;o[10]=x1+nx;o[11]=y1+ny; wv+=6; \
+	} while (0)
+	#define _GJOIN(_kp,_kv,_kn) do { \
+		wv += gfx_stroke_join(&path->line_verts[wv*2], \
+			poly[(_kp)*2], poly[(_kp)*2+1], poly[(_kv)*2], poly[(_kv)*2+1], \
+			poly[(_kn)*2], poly[(_kn)*2+1], half_w); \
+	} while (0)
+	for (uint32_t ci = 0; ci < ccount; ci++)
+	{
+		uint32_t cs = cstarts[ci];
+		uint32_t ce = (ci + 1 < ccount) ? cstarts[ci + 1] : poly_count;
+		int needs_close = _GNEEDCLOSE(cs, ce), expl = _GEXPLCLOSED(cs, ce);
+		for (uint32_t i = cs; i + 1 < ce; i++)
+			_GSEG(poly[i*2], poly[i*2+1], poly[(i+1)*2], poly[(i+1)*2+1]);
+		if (needs_close)
+			_GSEG(poly[(ce-1)*2], poly[(ce-1)*2+1], poly[cs*2], poly[cs*2+1]);
+		for (uint32_t k = cs + 1; k + 1 < ce; k++) _GJOIN(k-1, k, k+1);
+		if (needs_close && (ce - cs) >= 2)
+		{
+			_GJOIN(ce-1, cs, cs+1);
+			_GJOIN(ce-2, ce-1, cs);
+		}
+		else if (expl) _GJOIN(ce-2, cs, cs+1);
+	}
+	#undef _GJOIN
+	#undef _GSEG
+	#undef _GEXPLCLOSED
+	#undef _GNEEDCLOSE
+	path->line_vert_count = wv;
+}
+
+// Flatten the active command buffer into contours (pixels), tessellate the fill
+// (libtess2, nonzero winding) and build the stroke, into a new Avm2GfxPath that
+// snapshots the current fill/line style. Mirrors action.c drawingFinalizePath.
+static void gfx_finalize_path(Avm2GraphicsExt* g)
+{
+	if (g->cmd_count == 0) return;
+	int want_fill = (g->cur_fill != 0);
+	int want_line = (g->cur_line != 0);
+	if (!want_fill && !want_line) { g->cmd_count = 0; return; }
+
+	float* poly = NULL; uint32_t poly_count = 0, poly_cap = 0;
+	uint32_t* cstarts = NULL, ccount = 0, ccap = 0;
+	#define _GADDC() do { if (ccount >= ccap) { ccap = ccap ? ccap*2 : 8; \
+		cstarts = realloc(cstarts, ccap * sizeof(uint32_t)); } \
+		cstarts[ccount++] = poly_count; } while (0)
+	#define _GADDP(px,py) do { if (poly_count >= poly_cap) { \
+		poly_cap = poly_cap ? poly_cap*2 : 64; \
+		poly = realloc(poly, poly_cap * 2 * sizeof(float)); } \
+		poly[poly_count*2] = (px); poly[poly_count*2+1] = (py); poly_count++; } while (0)
+	for (uint32_t i = 0; i < g->cmd_count; i++)
+	{
+		Avm2GfxCmd* c = &g->cmds[i];
+		if (c->type == 0) { _GADDC(); _GADDP(c->x, c->y); }
+		else if (c->type == 2)
+		{
+			float sx = (i > 0) ? g->cmds[i-1].x : 0.0f;
+			float sy = (i > 0) ? g->cmds[i-1].y : 0.0f;
+			if (ccount == 0) _GADDC();
+			float mx = (sx + c->x) * 0.5f, my = (sy + c->y) * 0.5f;
+			float dx = c->cx - mx, dy = c->cy - my, flat = dx*dx + dy*dy;
+			int segs = flat < 0.25f ? 1 : flat < 4.0f ? 4 : flat < 25.0f ? 8 : 16;
+			for (int s = 1; s <= segs; s++)
+			{
+				float t = (float) s / (float) segs, u = 1.0f - t;
+				_GADDP(u*u*sx + 2*u*t*c->cx + t*t*c->x,
+				       u*u*sy + 2*u*t*c->cy + t*t*c->y);
+			}
+		}
+		else { if (ccount == 0) _GADDC(); _GADDP(c->x, c->y); }
+	}
+	#undef _GADDP
+	#undef _GADDC
+
+	if (g->path_count >= g->path_cap)
+	{
+		g->path_cap = g->path_cap ? g->path_cap * 2 : 8;
+		g->paths = realloc(g->paths, g->path_cap * sizeof(Avm2GfxPath));
+	}
+	Avm2GfxPath* path = &g->paths[g->path_count++];
+	memset(path, 0, sizeof(Avm2GfxPath));
+	path->fill_kind = g->cur_fill;
+	path->fr = g->cfr; path->fg = g->cfg; path->fb = g->cfb; path->fa = g->cfa;
+	if (g->cur_fill == 2)
+	{
+		path->grad_type = g->cgt; path->grad_spread = g->cgs;
+		path->grad_interp = g->cgi; path->grad_focal = g->cgf;
+		memcpy(path->grad_ramp, g->cramp, sizeof(path->grad_ramp));
+		memcpy(path->grad_fwd16, g->cfwd16, sizeof(path->grad_fwd16));
+		memcpy(path->grad_inv2d, g->cinv2d, sizeof(path->grad_inv2d));
+	}
+	path->has_line = g->cur_line;
+	path->lr = g->clr; path->lg = g->clg; path->lb = g->clb; path->la = g->cla;
+
+	if (want_fill && poly_count >= 3 && ccount > 0)
+	{
+		float* tw = malloc(poly_count * 2 * sizeof(float));
+		for (uint32_t i = 0; i < poly_count; i++)
+		{
+			tw[i*2] = poly[i*2] * 20.0f; tw[i*2+1] = poly[i*2+1] * 20.0f;
+		}
+		TESStesselator* tess = tessNewTess(NULL);
+		if (tess)
+		{
+			tessSetOption(tess, TESS_CONSTRAINED_DELAUNAY_TRIANGULATION, 1);
+			int contrib = 0;
+			for (uint32_t ci = 0; ci < ccount; ci++)
+			{
+				uint32_t cs = cstarts[ci];
+				uint32_t ce = (ci + 1 < ccount) ? cstarts[ci + 1] : poly_count;
+				int n = (int) (ce - cs);
+				if (n < 3) continue;
+				tessAddContour(tess, 2, &tw[cs*2], sizeof(float) * 2, n);
+				contrib++;
+			}
+			if (contrib > 0 && tessTesselate(tess, TESS_WINDING_NONZERO,
+			                                 TESS_POLYGONS, 3, 2, NULL))
+			{
+				const TESSreal* v = tessGetVertices(tess);
+				const TESSindex* el = tessGetElements(tess);
+				int nt = tessGetElementCount(tess);
+				path->fill_vert_count = (uint32_t) nt * 3;
+				path->fill_verts = malloc(path->fill_vert_count * 2 * sizeof(float));
+				for (int i = 0; i < nt; i++)
+					for (int j = 0; j < 3; j++)
+					{
+						TESSindex idx = el[i*3 + j];
+						path->fill_verts[i*6 + j*2]   = v[idx*2];
+						path->fill_verts[i*6 + j*2+1] = v[idx*2+1];
+					}
+			}
+			tessDeleteTess(tess);
+		}
+		free(tw);
+	}
+	if (want_line)
+		gfx_build_stroke(path, poly, poly_count, cstarts, ccount,
+		                 want_fill, g->clw * 0.5f * 20.0f);
+
+	free(poly); free(cstarts);
+	g->cmd_count = 0;
+}
+
+// sRGB<->linear for linearRGB ramp interpolation (mirror action.c, Ruffle parity).
+static float gfx_srgb_to_linear(float c)
+{
+	return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+}
+static uint8_t gfx_srgb_to_linear_u8(uint8_t c)
+{
+	return (uint8_t) (gfx_srgb_to_linear(c / 255.0f) * 255.0f);
+}
+static uint8_t gfx_lin_lerp(uint8_t a, uint8_t b, float t)
+{
+	return (uint8_t) (a + t * (float) (b - a));
+}
+static uint8_t gfx_rgb_lerp(uint8_t a, uint8_t b, float t)
+{
+	return (uint8_t) (a + t * (b - a) + 0.5f);
+}
+
+// 256-row RGBA8 ramp from stops (colors 0xRRGGBB, alphas 0..1, ratios 0..255).
+// linearRGB stores linear (shader/raster converts back). Mirrors action.c.
+static void gfx_gen_ramp(const uint32_t* colors, const float* alphas,
+                         const uint8_t* ratios, int n, int linear, uint8_t* out)
+{
+	if (n <= 0) { memset(out, 0, 256 * 4); return; }
+	uint8_t r0 = (colors[0] >> 16) & 0xFF, g0 = (colors[0] >> 8) & 0xFF;
+	uint8_t b0 = colors[0] & 0xFF, a0 = (uint8_t) (alphas[0] * 255.0f + 0.5f);
+	if (linear) { r0 = gfx_srgb_to_linear_u8(r0); g0 = gfx_srgb_to_linear_u8(g0);
+	              b0 = gfx_srgb_to_linear_u8(b0); }
+	for (int i = 0; i < 256; i++)
+	{ out[i*4]=r0; out[i*4+1]=g0; out[i*4+2]=b0; out[i*4+3]=a0; }
+	for (int s = 1; s < n; s++)
+	{
+		uint8_t r_s = ratios[s-1], r_e = ratios[s];
+		uint8_t sr=(colors[s-1]>>16)&0xFF, sg=(colors[s-1]>>8)&0xFF, sb=colors[s-1]&0xFF;
+		uint8_t sa=(uint8_t)(alphas[s-1]*255.0f+0.5f);
+		uint8_t er=(colors[s]>>16)&0xFF, eg=(colors[s]>>8)&0xFF, eb=colors[s]&0xFF;
+		uint8_t ea=(uint8_t)(alphas[s]*255.0f+0.5f);
+		if (linear) { sr=gfx_srgb_to_linear_u8(sr); sg=gfx_srgb_to_linear_u8(sg);
+		              sb=gfx_srgb_to_linear_u8(sb); er=gfx_srgb_to_linear_u8(er);
+		              eg=gfx_srgb_to_linear_u8(eg); eb=gfx_srgb_to_linear_u8(eb); }
+		float range = (float) (r_e - r_s); if (range <= 0) range = 1;
+		for (int i = r_s; i <= r_e; i++)
+		{
+			float t = (float) (i - r_s) / range;
+			if (linear) { out[i*4]=gfx_lin_lerp(sr,er,t); out[i*4+1]=gfx_lin_lerp(sg,eg,t);
+			              out[i*4+2]=gfx_lin_lerp(sb,eb,t); }
+			else { out[i*4]=gfx_rgb_lerp(sr,er,t); out[i*4+1]=gfx_rgb_lerp(sg,eg,t);
+			       out[i*4+2]=gfx_rgb_lerp(sb,eb,t); }
+			out[i*4+3] = gfx_rgb_lerp(sa, ea, t);
+			if (i == 255) break;
+		}
+		if (s == n - 1 && r_e < 255)
+			for (int i = r_e + 1; i < 256; i++)
+			{ out[i*4]=er; out[i*4+1]=eg; out[i*4+2]=eb; out[i*4+3]=ea; }
+	}
+}
+
+// From a Flash 2x3 affine (a,b,c,d dimensionless; tx,ty twips) mapping gradient
+// [-16384,16384] -> local twips: fill grad_fwd16 (GPU) and grad_inv2d (CPU: the
+// normalized inverse local-twips -> UV[0,1], mirroring render_webgpu.c's dynamic
+// gradient norm_inv).
+static void gfx_set_gradient_matrix(Avm2GraphicsExt* g, float a, float b,
+                                    float c, float d, float tx, float ty)
+{
+	memset(g->cfwd16, 0, sizeof(g->cfwd16));
+	g->cfwd16[0]=a; g->cfwd16[1]=b; g->cfwd16[4]=c; g->cfwd16[5]=d;
+	g->cfwd16[10]=1.0f; g->cfwd16[12]=tx; g->cfwd16[13]=ty; g->cfwd16[15]=1.0f;
+	double det = (double) a * d - (double) b * c;
+	double ia, ib, ic, id, itx, ity;
+	if (det == 0.0) { ia=ib=ic=id=itx=ity=0.0; }
+	else
+	{
+		double inv = 1.0 / det;
+		ia =  d * inv; ib = -b * inv; ic = -c * inv; id = a * inv;
+		itx = ((double) c * ty - (double) d * tx) * inv;
+		ity = ((double) b * tx - (double) a * ty) * inv;
+	}
+	double s = 1.0 / 32768.0;
+	g->cinv2d[0] = (float) (ia * s); g->cinv2d[1] = (float) (ib * s);
+	g->cinv2d[2] = (float) (ic * s); g->cinv2d[3] = (float) (id * s);
+	g->cinv2d[4] = (float) (itx * s + 0.5); g->cinv2d[5] = (float) (ity * s + 0.5);
+}
+
+// Build a CPU-raster fill descriptor from a finalized path's fill style.
+static void gfx_fill_from_path(const Avm2GfxPath* p, Avm2GfxFill* f)
+{
+	memset(f, 0, sizeof(*f));
+	f->kind = p->fill_kind;
+	if (p->fill_kind == 1)
+	{ f->r = p->fr; f->g = p->fg; f->b = p->fb; f->a = p->fa; }
+	else if (p->fill_kind == 2)
+	{
+		f->grad_type = p->grad_type; f->spread = p->grad_spread;
+		f->interp = p->grad_interp; f->focal = p->grad_focal;
+		f->ramp = p->grad_ramp;
+		memcpy(f->inv2d, p->grad_inv2d, sizeof(f->inv2d));
+	}
+}
+
+// The Graphics ext attached to a display node (its `graphics` object), or NULL.
+static Avm2GraphicsExt* gfx_node_ext(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->graphics_obj == NULL
+	    || ext->graphics_obj->native_ext == NULL)
+		return NULL;
+	return (Avm2GraphicsExt*) ext->graphics_obj->native_ext;
+}
+
+// CPU-composite a node's recorded Graphics geometry into a premultiplied-ARGB
+// target (`w*` = shape-local twips -> target twips). Fills then strokes, back to
+// front, mirroring the WGSL/GPU order. Used by avm2_cpu_walk (headless dump) and
+// BitmapData.draw (the getPixel gate). Non-static: bd_draw calls it.
+void avm2_graphics_cpu_composite(Avm2Context* ctx, Avm2Object* obj,
+                                 double wa, double wb, double wc, double wd,
+                                 double wtx, double wty, double alpha,
+                                 uint32_t* buf, int W, int H, int transparent)
+{
+	Avm2GraphicsExt* g = gfx_node_ext(ctx, obj);
+	if (g == NULL) return;
+	gfx_finalize_path(g);  // commit any pending (un-endFilled) subpath
+	for (uint32_t i = 0; i < g->path_count; i++)
+	{
+		Avm2GfxPath* p = &g->paths[i];
+		if (p->fill_kind != 0 && p->fill_vert_count >= 3)
+		{
+			Avm2GfxFill f; gfx_fill_from_path(p, &f);
+			avm2_cpu_raster_tris(buf, W, H, transparent, p->fill_verts,
+			                     p->fill_vert_count, &f, wa, wb, wc, wd,
+			                     wtx, wty, alpha);
+		}
+		if (p->has_line && p->line_vert_count >= 3)
+		{
+			Avm2GfxFill sf; memset(&sf, 0, sizeof(sf));
+			sf.kind = 1; sf.r = p->lr; sf.g = p->lg; sf.b = p->lb; sf.a = p->la;
+			avm2_cpu_raster_tris(buf, W, H, transparent, p->line_verts,
+			                     p->line_vert_count, &sf, wa, wb, wc, wd,
+			                     wtx, wty, alpha);
+		}
+	}
+}
+
 static Avm2Value gfx_noop(Avm2Activation* act)
 {
 	(void) act;
 	return avm2_undefined();
 }
 
+// clear(): drop recorded geometry + AABB.
 static Avm2Value gfx_clear(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
 	if (ext != NULL) ext->draw_valid = 0;
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g != NULL) gfx_reset(g);
 	return avm2_undefined();
 }
 
-// moveTo/lineTo(x, y)
-static Avm2Value gfx_point_op(Avm2Activation* act)
+// beginFill(color:uint, alpha:Number=1): flush the pending subpath, then set a
+// solid current fill.
+static Avm2Value gfx_begin_fill(Avm2Activation* act)
+{
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL) return avm2_undefined();
+	gfx_finalize_path(g);
+	uint32_t rgb = act->argc > 0 ? avm2_coerce_to_u32(act->ctx, act->args[0]) : 0;
+	double a = act->argc > 1 ? avm2_coerce_to_number(act->ctx, act->args[1]) : 1.0;
+	if (a < 0) a = 0; else if (a > 1) a = 1;
+	g->cur_fill = 1;
+	g->cfr = ((rgb >> 16) & 0xFF) / 255.0f;
+	g->cfg = ((rgb >>  8) & 0xFF) / 255.0f;
+	g->cfb = ( rgb        & 0xFF) / 255.0f;
+	g->cfa = (float) a;
+	return avm2_undefined();
+}
+
+// Read an Array/Vector arg's numeric elements into out[max]; returns count.
+static uint32_t gfx_read_num_array(Avm2Context* ctx, Avm2Value v, double* out,
+                                   uint32_t max)
+{
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return 0;
+	Avm2VectorExt* vec = avm2_vector_ext(v.u.obj);
+	uint32_t n = 0;
+	if (vec != NULL)
+	{
+		for (uint32_t i = 0; i < vec->length && n < max; i++)
+			out[n++] = avm2_coerce_to_number(ctx, vec->elems[i]);
+		return n;
+	}
+	// Plain Array: read numeric-index length + elements.
+	double len = avm2_coerce_to_number(ctx,
+		avm2_get_public_property(ctx, v, "length", 6, NULL));
+	uint32_t ln = (len > 0 && len < (double) max) ? (uint32_t) len : max;
+	for (uint32_t i = 0; i < ln; i++)
+	{
+		char idx[16]; int il = snprintf(idx, sizeof(idx), "%u", i);
+		Avm2Value e = avm2_get_public_property(ctx, v, idx, (uint32_t) il, NULL);
+		if (e.kind == AVM2_VALUE_UNDEFINED) break;
+		out[n++] = avm2_coerce_to_number(ctx, e);
+	}
+	return n;
+}
+
+// beginGradientFill(type, colors, alphas, ratios, matrix, spread="pad",
+// interp="rgb", focal=0). Builds a 256-row ramp + gradient matrix now.
+static Avm2Value gfx_begin_gradient_fill(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL) return avm2_undefined();
+	gfx_finalize_path(g);
+	if (act->argc < 4) { g->cur_fill = 0; return avm2_undefined(); }
+
+	const Avm2String* ts = avm2_coerce_to_string(ctx, act->args[0]);
+	uint8_t gt = gfx_str_is(ts, "radial") ? 0x12 : 0x10;
+	double colv[64], alpv[64], ratv[64];
+	uint32_t nc = gfx_read_num_array(ctx, act->args[1], colv, 64);
+	uint32_t na = gfx_read_num_array(ctx, act->args[2], alpv, 64);
+	uint32_t nr = gfx_read_num_array(ctx, act->args[3], ratv, 64);
+	uint32_t n = nc < na ? nc : na; if (nr < n) n = nr;
+	if (n == 0) { g->cur_fill = 0; return avm2_undefined(); }
+	uint32_t cols[64]; float alps[64]; uint8_t rats[64];
+	for (uint32_t i = 0; i < n; i++)
+	{
+		cols[i] = (uint32_t) colv[i] & 0xFFFFFF;
+		float a = (float) alpv[i]; alps[i] = a < 0 ? 0 : a > 1 ? 1 : a;
+		int rr = (int) ratv[i]; rats[i] = rr < 0 ? 0 : rr > 255 ? 255 : (uint8_t) rr;
+	}
+	uint8_t spread = 0, interp = 0;
+	if (act->argc > 5)
+	{
+		const Avm2String* ss = avm2_coerce_to_string(ctx, act->args[5]);
+		spread = gfx_str_is(ss, "reflect") ? 1 : gfx_str_is(ss, "repeat") ? 2 : 0;
+	}
+	if (act->argc > 6)
+	{
+		const Avm2String* is = avm2_coerce_to_string(ctx, act->args[6]);
+		interp = gfx_str_is(is, "linearRGB") ? 1 : 0;
+	}
+	double focal = act->argc > 7 ? avm2_coerce_to_number(ctx, act->args[7]) : 0.0;
+	if (focal != 0.0) gt = 0x13;
+
+	g->cur_fill = 2;
+	g->cgt = gt; g->cgs = spread; g->cgi = interp; g->cgf = (float) focal;
+	gfx_gen_ramp(cols, alps, rats, (int) n, interp, g->cramp);
+
+	// Gradient matrix from the flash.geom.Matrix arg (a,b,c,d,tx,ty). Default
+	// identity box if absent.
+	double ma = 1, mb = 0, mc = 0, md = 1, mtx = 0, mty = 0;
+	if (act->argc > 4 && act->args[4].kind == AVM2_VALUE_OBJECT
+	    && act->args[4].u.obj != NULL)
+	{
+		Avm2Object* m = act->args[4].u.obj;
+		ma = matrix_get_prop(ctx, m, "a"); mb = matrix_get_prop(ctx, m, "b");
+		mc = matrix_get_prop(ctx, m, "c"); md = matrix_get_prop(ctx, m, "d");
+		mtx = matrix_get_prop(ctx, m, "tx"); mty = matrix_get_prop(ctx, m, "ty");
+	}
+	gfx_set_gradient_matrix(g, (float) ma, (float) mb, (float) mc, (float) md,
+	                        (float) (mtx * 20.0), (float) (mty * 20.0));
+	return avm2_undefined();
+}
+
+// endFill(): flush the pending subpath and clear the current fill.
+static Avm2Value gfx_end_fill(Avm2Activation* act)
+{
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL) return avm2_undefined();
+	gfx_finalize_path(g);
+	g->cur_fill = 0;
+	return avm2_undefined();
+}
+
+// lineStyle(thickness, color=0, alpha=1, ...): flush, then set the current
+// stroke (solid only this tranche; a fill-typed stroke degrades to no stroke).
+static Avm2Value gfx_line_style(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL) return avm2_undefined();
+	gfx_finalize_path(g);
+	if (act->argc == 0 || act->args[0].kind == AVM2_VALUE_UNDEFINED)
+	{
+		g->cur_line = 0;
+		return avm2_undefined();
+	}
+	double w = avm2_coerce_to_number(ctx, act->args[0]);
+	uint32_t rgb = act->argc > 1 ? avm2_coerce_to_u32(ctx, act->args[1]) : 0;
+	double a = act->argc > 2 ? avm2_coerce_to_number(ctx, act->args[2]) : 1.0;
+	if (a < 0) a = 0; else if (a > 1) a = 1;
+	g->cur_line = 1;
+	g->clw = (float) (w > 0 ? w : 1.0);  // hairline (0/NaN) -> nominal 1px
+	g->clr = ((rgb >> 16) & 0xFF) / 255.0f;
+	g->clg = ((rgb >>  8) & 0xFF) / 255.0f;
+	g->clb = ( rgb        & 0xFF) / 255.0f;
+	g->cla = (float) a;
+	return avm2_undefined();
+}
+
+// moveTo(x, y)
+static Avm2Value gfx_move_to(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
-	if (ext != NULL && act->argc >= 2)
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (act->argc >= 2)
 	{
-		draw_union_point(ext, avm2_coerce_to_number(act->ctx, act->args[0]),
-		                 avm2_coerce_to_number(act->ctx, act->args[1]));
+		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
+		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+		if (ext != NULL) draw_union_point(ext, x, y);
+		if (g != NULL) gfx_add_cmd(g, 0, (float) x, (float) y, 0, 0);
+	}
+	return avm2_undefined();
+}
+
+// lineTo(x, y)
+static Avm2Value gfx_line_to(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (act->argc >= 2)
+	{
+		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
+		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+		if (ext != NULL) draw_union_point(ext, x, y);
+		if (g != NULL)
+		{
+			if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);
+			gfx_add_cmd(g, 1, (float) x, (float) y, 0, 0);
+		}
 	}
 	return avm2_undefined();
 }
@@ -4271,43 +4873,79 @@ static Avm2Value gfx_point_op(Avm2Activation* act)
 static Avm2Value gfx_curve_to(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
-	if (ext != NULL && act->argc >= 4)
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (act->argc >= 4)
 	{
-		draw_union_point(ext, avm2_coerce_to_number(act->ctx, act->args[0]),
-		                 avm2_coerce_to_number(act->ctx, act->args[1]));
-		draw_union_point(ext, avm2_coerce_to_number(act->ctx, act->args[2]),
-		                 avm2_coerce_to_number(act->ctx, act->args[3]));
+		double cx = avm2_coerce_to_number(act->ctx, act->args[0]);
+		double cy = avm2_coerce_to_number(act->ctx, act->args[1]);
+		double ax = avm2_coerce_to_number(act->ctx, act->args[2]);
+		double ay = avm2_coerce_to_number(act->ctx, act->args[3]);
+		if (ext != NULL) { draw_union_point(ext, cx, cy); draw_union_point(ext, ax, ay); }
+		if (g != NULL)
+		{
+			if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);
+			gfx_add_cmd(g, 2, (float) ax, (float) ay, (float) cx, (float) cy);
+		}
 	}
 	return avm2_undefined();
 }
 
-// drawRect/drawEllipse(x, y, w, h)
+// Append a moveTo + n lineTo (closed) polygon to the pen buffer.
+static void gfx_emit_rect(Avm2GraphicsExt* g, double x, double y,
+                          double w, double h)
+{
+	gfx_add_cmd(g, 0, (float) x,       (float) y,       0, 0);
+	gfx_add_cmd(g, 1, (float)(x + w),  (float) y,       0, 0);
+	gfx_add_cmd(g, 1, (float)(x + w),  (float)(y + h),  0, 0);
+	gfx_add_cmd(g, 1, (float) x,       (float)(y + h),  0, 0);
+	gfx_add_cmd(g, 1, (float) x,       (float) y,       0, 0);
+}
+
+// drawRect/drawRoundRect/drawEllipse(x, y, w, h) — round-rect corner radii are
+// approximated as a plain rect this tranche (AABB unchanged).
 static Avm2Value gfx_draw_rect(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
-	if (ext != NULL && act->argc >= 4)
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (act->argc >= 4)
 	{
 		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
 		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
 		double w = avm2_coerce_to_number(act->ctx, act->args[2]);
 		double h = avm2_coerce_to_number(act->ctx, act->args[3]);
-		draw_union_point(ext, x, y);
-		draw_union_point(ext, x + w, y + h);
+		if (ext != NULL) { draw_union_point(ext, x, y); draw_union_point(ext, x + w, y + h); }
+		if (g != NULL) gfx_emit_rect(g, x, y, w, h);
 	}
 	return avm2_undefined();
 }
 
-// drawCircle(x, y, r)
+// drawCircle(x, y, r) / drawEllipse via 4 cubic-equivalent quadratic arcs.
 static Avm2Value gfx_draw_circle(Avm2Activation* act)
 {
 	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
-	if (ext != NULL && act->argc >= 3)
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (act->argc >= 3)
 	{
 		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
 		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
 		double r = avm2_coerce_to_number(act->ctx, act->args[2]);
-		draw_union_point(ext, x - r, y - r);
-		draw_union_point(ext, x + r, y + r);
+		if (ext != NULL) { draw_union_point(ext, x - r, y - r); draw_union_point(ext, x + r, y + r); }
+		if (g != NULL)
+		{
+			// 8 quadratic segments approximating the circle (control point at
+			// tan(pi/8) out along the bisector). Good to <0.1% radius.
+			const int N = 8;
+			double kct = 1.0 / cos(M_PI / N);   // control radius factor
+			gfx_add_cmd(g, 0, (float)(x + r), (float) y, 0, 0);
+			for (int i = 0; i < N; i++)
+			{
+				double a0 = 2.0 * M_PI * i / N, a1 = 2.0 * M_PI * (i + 1) / N;
+				double am = (a0 + a1) * 0.5;
+				double ex = x + r * cos(a1), ey = y + r * sin(a1);
+				double cxp = x + r * kct * cos(am), cyp = y + r * kct * sin(am);
+				gfx_add_cmd(g, 2, (float) ex, (float) ey, (float) cxp, (float) cyp);
+			}
+		}
 	}
 	return avm2_undefined();
 }
@@ -4414,6 +5052,117 @@ static void gfx_validate_triangles(Avm2Context* ctx, Avm2VectorExt* verts,
 	if (((nv / 2u) % 3u) != 0) gfx_throw_2004(ctx);   // vertex triples
 }
 
+// Snapshot the current fill into a fresh finalized path (no geometry yet); the
+// caller fills fill_verts. Used by drawTriangles (explicit triangles, no tess).
+static Avm2GfxPath* gfx_new_fill_path(Avm2GraphicsExt* g)
+{
+	if (g->path_count >= g->path_cap)
+	{
+		g->path_cap = g->path_cap ? g->path_cap * 2 : 8;
+		g->paths = realloc(g->paths, g->path_cap * sizeof(Avm2GfxPath));
+	}
+	Avm2GfxPath* p = &g->paths[g->path_count++];
+	memset(p, 0, sizeof(Avm2GfxPath));
+	p->fill_kind = g->cur_fill;
+	p->fr = g->cfr; p->fg = g->cfg; p->fb = g->cfb; p->fa = g->cfa;
+	if (g->cur_fill == 2)
+	{
+		p->grad_type = g->cgt; p->grad_spread = g->cgs;
+		p->grad_interp = g->cgi; p->grad_focal = g->cgf;
+		memcpy(p->grad_ramp, g->cramp, sizeof(p->grad_ramp));
+		memcpy(p->grad_fwd16, g->cfwd16, sizeof(p->grad_fwd16));
+		memcpy(p->grad_inv2d, g->cinv2d, sizeof(p->grad_inv2d));
+	}
+	return p;
+}
+
+// drawTriangles geometry: expand vertices(+indices) into a flat twips triangle
+// list. Flash stops at the first out-of-bounds index (mirrors TriangleData::new).
+static void gfx_append_triangles(Avm2GraphicsExt* g, Avm2Context* ctx,
+                                 Avm2VectorExt* verts, Avm2VectorExt* indices)
+{
+	uint32_t nvp = verts->length / 2;
+	if (nvp < 3) return;
+	uint32_t max_tris = indices != NULL ? indices->length / 3 : nvp / 3;
+	if (max_tris == 0) return;
+	float* out = malloc(max_tris * 3 * 2 * sizeof(float));
+	uint32_t vc = 0;
+	if (indices != NULL)
+	{
+		for (uint32_t t = 0; t + 3 <= indices->length; t += 3)
+		{
+			uint32_t i0 = (uint32_t) avm2_coerce_to_i32(ctx, indices->elems[t]);
+			uint32_t i1 = (uint32_t) avm2_coerce_to_i32(ctx, indices->elems[t + 1]);
+			uint32_t i2 = (uint32_t) avm2_coerce_to_i32(ctx, indices->elems[t + 2]);
+			if (i0 >= nvp || i1 >= nvp || i2 >= nvp) break;  // Flash stops here
+			uint32_t idx[3] = { i0, i1, i2 };
+			for (int k = 0; k < 3; k++)
+			{
+				out[vc * 2]     = (float)(avm2_coerce_to_number(ctx, verts->elems[idx[k]*2]) * 20.0);
+				out[vc * 2 + 1] = (float)(avm2_coerce_to_number(ctx, verts->elems[idx[k]*2+1]) * 20.0);
+				vc++;
+			}
+		}
+	}
+	else
+	{
+		uint32_t tris = nvp / 3;
+		for (uint32_t i = 0; i < tris * 3; i++)
+		{
+			out[vc * 2]     = (float)(avm2_coerce_to_number(ctx, verts->elems[i*2]) * 20.0);
+			out[vc * 2 + 1] = (float)(avm2_coerce_to_number(ctx, verts->elems[i*2+1]) * 20.0);
+			vc++;
+		}
+	}
+	if (vc < 3) { free(out); return; }
+	Avm2GfxPath* p = gfx_new_fill_path(g);
+	p->fill_verts = out;
+	p->fill_vert_count = vc;
+}
+
+// drawPath command decode: append pen commands (moveTo/lineTo/curveTo) mirroring
+// Ruffle process_commands. data is pixels. Cubic curves are flattened to lines.
+static void gfx_decode_path(Avm2GraphicsExt* g, Avm2Context* ctx,
+                            Avm2VectorExt* commands, Avm2VectorExt* data)
+{
+	uint32_t di = 0, nd = data != NULL ? data->length : 0;
+	#define _GRDPT(px, py) do { \
+		if (di + 2 > nd) return; \
+		(px) = avm2_coerce_to_number(ctx, data->elems[di]); \
+		(py) = avm2_coerce_to_number(ctx, data->elems[di + 1]); di += 2; } while (0)
+	for (uint32_t i = 0; i < commands->length; i++)
+	{
+		int32_t cmd = avm2_coerce_to_i32(ctx, commands->elems[i]);
+		double x, y, cx, cy, c2x, c2y;
+		switch (cmd)
+		{
+			case 0: break;                                  // NO_OP
+			case 1: _GRDPT(x, y); gfx_add_cmd(g, 0, (float)x, (float)y, 0, 0); break;
+			case 2: _GRDPT(x, y); gfx_add_cmd(g, 1, (float)x, (float)y, 0, 0); break;
+			case 3: _GRDPT(cx, cy); _GRDPT(x, y);
+				gfx_add_cmd(g, 2, (float)x, (float)y, (float)cx, (float)cy); break;
+			case 4: di += 2; _GRDPT(x, y); gfx_add_cmd(g, 0, (float)x, (float)y, 0, 0); break;
+			case 5: di += 2; _GRDPT(x, y); gfx_add_cmd(g, 1, (float)x, (float)y, 0, 0); break;
+			case 6:                                         // CUBIC -> flatten
+			{
+				double sx = g->pen_set ? g->pen_x : 0, sy = g->pen_set ? g->pen_y : 0;
+				_GRDPT(cx, cy); _GRDPT(c2x, c2y); _GRDPT(x, y);
+				const int N = 16;
+				for (int s = 1; s <= N; s++)
+				{
+					double t = (double) s / N, u = 1 - t;
+					double bx = u*u*u*sx + 3*u*u*t*cx + 3*u*t*t*c2x + t*t*t*x;
+					double by = u*u*u*sy + 3*u*u*t*cy + 3*u*t*t*c2y + t*t*t*y;
+					gfx_add_cmd(g, 1, (float) bx, (float) by, 0, 0);
+				}
+				break;
+			}
+			default: return;                                // unknown -> stop
+		}
+	}
+	#undef _GRDPT
+}
+
 // Graphics.drawPath(commands:Vector.<int>, data:Vector.<Number>, winding:String)
 static Avm2Value gfx_draw_path(Avm2Activation* act)
 {
@@ -4432,7 +5181,9 @@ static Avm2Value gfx_draw_path(Avm2Activation* act)
 	uint32_t ndata = data != NULL ? data->length : 0;
 	if (ncmd == 0) return avm2_undefined();
 	if ((ndata & 1u) != 0) gfx_throw_2004(ctx);
-	// Part B: record + tessellate the contours here.
+	// Part B: decode the command stream into pen commands (flushed on endFill).
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g != NULL) gfx_decode_path(g, ctx, commands, data);
 	return avm2_undefined();
 }
 
@@ -4447,8 +5198,14 @@ static Avm2Value gfx_draw_triangles(Avm2Activation* act)
 	if (!gfx_str_is(culling, "none") && !gfx_str_is(culling, "positive")
 	    && !gfx_str_is(culling, "negative"))
 		gfx_throw_2004(ctx);
-	gfx_validate_triangles(ctx, gfx_vec_arg(act, 0), gfx_vec_arg(act, 1));
-	// Part B: build triangle list + dispatch.
+	Avm2VectorExt* verts = gfx_vec_arg(act, 0);
+	Avm2VectorExt* indices = gfx_vec_arg(act, 1);
+	gfx_validate_triangles(ctx, verts, indices);
+	// Part B: build an explicit-triangle fill path (no tessellation) with the
+	// current fill. Winding/culling honoured only as far as the fill covers.
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g != NULL && g->cur_fill != 0 && verts != NULL)
+		gfx_append_triangles(g, ctx, verts, indices);
 	return avm2_undefined();
 }
 
@@ -7265,14 +8022,14 @@ void avm2_register_display(Avm2Context* ctx)
 	Avm2Class* graphics = avm2_builtin_class(ctx, "flash.display", "Graphics",
 	                                         b->object_class);
 	graphics->native_ext_size = sizeof(Avm2GraphicsExt);
-	avm2_builtin_add_method(ctx, graphics, "beginFill", gfx_noop);
-	avm2_builtin_add_method(ctx, graphics, "beginGradientFill", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "beginFill", gfx_begin_fill);
+	avm2_builtin_add_method(ctx, graphics, "beginGradientFill", gfx_begin_gradient_fill);
 	avm2_builtin_add_method(ctx, graphics, "beginBitmapFill", gfx_noop);
-	avm2_builtin_add_method(ctx, graphics, "endFill", gfx_noop);
-	avm2_builtin_add_method(ctx, graphics, "lineStyle", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "endFill", gfx_end_fill);
+	avm2_builtin_add_method(ctx, graphics, "lineStyle", gfx_line_style);
 	avm2_builtin_add_method(ctx, graphics, "clear", gfx_clear);
-	avm2_builtin_add_method(ctx, graphics, "moveTo", gfx_point_op);
-	avm2_builtin_add_method(ctx, graphics, "lineTo", gfx_point_op);
+	avm2_builtin_add_method(ctx, graphics, "moveTo", gfx_move_to);
+	avm2_builtin_add_method(ctx, graphics, "lineTo", gfx_line_to);
 	avm2_builtin_add_method(ctx, graphics, "curveTo", gfx_curve_to);
 	avm2_builtin_add_method(ctx, graphics, "drawRect", gfx_draw_rect);
 	avm2_builtin_add_method(ctx, graphics, "drawRoundRect", gfx_draw_rect);
@@ -7732,6 +8489,10 @@ static void avm2_cpu_walk(Avm2Context* ctx, Avm2Object* obj,
 		                      world.a, world.b, world.c, world.d,
 		                      world.tx, world.ty, alpha);
 
+	// T4: script-drawn Graphics geometry (independent of a timeline shape).
+	avm2_graphics_cpu_composite(ctx, obj, world.a, world.b, world.c, world.d,
+	                            world.tx, world.ty, alpha, fb, fbw, fbh, 0);
+
 	for (uint32_t i = 0; i < ext->render_len; i++)
 		avm2_cpu_walk(ctx, ext->render_list[i], &world, alpha, fb, fbw, fbh);
 }
@@ -7945,6 +8706,54 @@ static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
 	                    xid, cxid);
 }
 
+// T4: draw a node's recorded flash.display.Graphics geometry on the GPU. One
+// transform + cxform slot for the node, then per finalized path a solid /
+// gradient fill (renderer_draw_tris / draw_gradient_tris, dynamic gradient pool)
+// and a solid stroke. Mirrors action.c's render_drawing_path fill-type dispatch.
+static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
+                                 const Mat* world, double alpha)
+{
+	Avm2GraphicsExt* g = gfx_node_ext(ctx, obj);
+	if (g == NULL) return;
+	gfx_finalize_path(g);
+	if (g->path_count == 0) return;
+
+	uint32_t xid = 0;
+	if (g_avm2_xform_next < context->xform_slot_count)
+	{
+		float m16[16];
+		avm2_world_to_mat16(world, m16);
+		xid = g_avm2_xform_next++;
+		renderer_write_transform(context, xid, m16);
+	}
+	uint32_t cxid = 0;
+	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
+	{
+		float cx[20];
+		memset(cx, 0, sizeof(cx));
+		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;
+		cx[15] = (float) alpha;
+		cxid = g_avm2_cxform_next++;
+		renderer_write_cxform(context, cxid, cx);
+	}
+
+	for (uint32_t i = 0; i < g->path_count; i++)
+	{
+		Avm2GfxPath* p = &g->paths[i];
+		if (p->fill_kind == 1 && p->fill_vert_count >= 3)
+			renderer_draw_tris(context, p->fill_verts, p->fill_vert_count,
+			                   p->fr, p->fg, p->fb, p->fa, xid, cxid);
+		else if (p->fill_kind == 2 && p->fill_vert_count >= 3)
+			renderer_draw_gradient_tris(context, p->fill_verts, p->fill_vert_count,
+			                            p->grad_type, p->grad_spread, p->grad_interp,
+			                            p->grad_focal, p->grad_ramp, p->grad_fwd16,
+			                            xid, cxid);
+		if (p->has_line && p->line_vert_count >= 3)
+			renderer_draw_tris(context, p->line_verts, p->line_vert_count,
+			                   p->lr, p->lg, p->lb, p->la, xid, cxid);
+	}
+}
+
 // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
 // world matrix + concatenated alpha down the tree. Invisible subtrees are
 // culled, matching render_apply_text_bounds.
@@ -7963,6 +8772,9 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 		avm2_render_bitmap(ctx, obj, &world, alpha);
 	else if (ext->shape_vert_count > 0)
 		avm2_render_shape(ctx, obj, &world, alpha);
+
+	// T4: script-drawn Graphics geometry (independent of a timeline shape).
+	avm2_render_graphics(ctx, obj, &world, alpha);
 
 	for (uint32_t i = 0; i < ext->render_len; i++)
 		avm2_render_node(ctx, ext->render_list[i], &world, alpha);

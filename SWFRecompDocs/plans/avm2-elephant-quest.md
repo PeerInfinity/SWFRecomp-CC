@@ -357,7 +357,17 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   `input.json` → `preprocess_input_json`, the RWK/TAS mechanism). Needs the
   Play-button stage coords + the load-complete gate. **EQ-2 first step.**
 
-### Gap 10 — [render-path · T1+T2+T3+T5 SHIPPED · the AVM2 vector renderer] solid + stroke + gradient timeline shapes render on GPU/Dawn AND the headless CPU-dump; getPixel gate live
+### Gap 10 — [render-path · T1+T2+T3+T5+T4 SHIPPED · the AVM2 vector renderer] solid + stroke + gradient timeline shapes AND script-drawn flash.display.Graphics render on GPU/Dawn AND headless CPU; getPixel gate live
+
+- **T4 DONE 2026-07-21 — script-drawn UI now renders.** `flash.display.Graphics`
+  runtime drawing (`beginFill`/`beginGradientFill`/`lineStyle`/`drawRect`/`drawCircle`/
+  `moveTo`/`lineTo`/`curveTo`/`drawPath`/`drawTriangles`) is a real vector backend on
+  both sinks: recorded → tessellated at runtime → `avm2_render_graphics` (GPU) +
+  `avm2_graphics_cpu_composite` (CPU/`bd_draw`). So EQ's **script-drawn HUD/UI** (any
+  `graphics.*` drawing) now paints, not just timeline `DefineShape`s. R2 dynamic
+  gradient pool confirmed live. getPixel-gated (`regression/avm2_graphics_runtime`).
+  See `avm2-vector-rendering-plan.md` §"T4 RESULT" + `[[avm2-graphics-t4-render]]`.
+
 
 - **T1 DONE 2026-07-21 (`63ca22e39`).** The AVM2 render walk now paints
   **solid-fill `DefineShape` timeline content**: the recompiler emits a
