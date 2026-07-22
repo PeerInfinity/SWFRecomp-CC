@@ -1,29 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `93299b884de8` (2026-07-20T04:49:53.410106+00:00)
-**Current:** `63ca22e398c4` (2026-07-21T23:49:05.128836+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `63ca22e398c4` (2026-07-21T23:49:05.128836+00:00)
+**Current:** `f490e4b247e8` (2026-07-22T00:51:45.642767+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 823 | 790 | -33 |
-| Total | 1215 | 1174 | -41 |
-| Pass rate | 67.7% | 67.3% | -0.4% |
-| Mismatched lines | 47961 | 47211 | -750 |
+| Passing | 790 | 823 | +33 |
+| Total | 1174 | 1215 | +41 |
+| Pass rate | 67.3% | 67.7% | +0.4% |
+| Mismatched lines | 47211 | 47961 | +750 |
 
-## Missing Tests — Shard Failure (41)
+## Added Tests (41)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 33 were previously passing
-- 8 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `divide` | pass | 1058/1058 |
 | `doabc_and_symbolclass_script_init_goto` | output_mismatch | 1/7 |
 | `doabc_and_symbolclass_script_init_normal` | output_mismatch | 1/6 |
@@ -65,5 +57,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `edittext_getcharboundaries` | pass | 172/172 |
 | `edittext_getcharboundaries_culling` | ruffle_matched | 5/305 |
 | `edittext_getcharboundaries_missing_embedded_font` | ruffle_matched | 4/7 |
-
-</details>

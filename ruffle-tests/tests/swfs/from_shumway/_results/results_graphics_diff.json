@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-20T04:49:53.446143+00:00",
-    "old_git_sha": "93299b884de81a8c7ff932f67b9a4105bc593e69",
-    "new_timestamp": "2026-07-21T23:49:05.164016+00:00",
-    "new_git_sha": "63ca22e398c4d42c6e1216fe21e2fb019661cb4a",
+    "old_timestamp": "2026-07-21T23:49:05.164016+00:00",
+    "old_git_sha": "63ca22e398c4d42c6e1216fe21e2fb019661cb4a",
+    "new_timestamp": "2026-07-22T00:51:45.681640+00:00",
+    "new_git_sha": "f490e4b247e8d04ffabfb07564777243ffeb85d7",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 73,
+    "old_pass": 70,
     "old_ruffle_matched": 3,
-    "old_effective_pass": 76,
-    "old_total": 92,
-    "old_pass_rate": 79.3,
-    "new_pass": 70,
+    "old_effective_pass": 73,
+    "old_total": 89,
+    "old_pass_rate": 78.7,
+    "new_pass": 73,
     "new_ruffle_matched": 3,
-    "new_effective_pass": 73,
-    "new_total": 89,
-    "new_pass_rate": 78.7,
+    "new_effective_pass": 76,
+    "new_total": 92,
+    "new_pass_rate": 79.3,
     "old_mismatched_lines": 394,
     "new_mismatched_lines": 394,
     "increased_mismatches": 0,
@@ -29,46 +26,45 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 89,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 3
+    "added": 3,
+    "removed": 0
   },
   "changes": [
     {
       "test": "avm1/nested-button",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/operations",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 13,
         "expected_lines": 13,
         "matching_lines": 13
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/property-paths/property-paths-6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 6,
         "expected_lines": 6,
         "matching_lines": 6
-      },
-      "new_lines": null
+      }
     }
   ]
 }
