@@ -230,11 +230,15 @@ static void resolve_shape_geom(Avm2DisplayObjectExt* ext, uint16_t char_id)
 	{
 		ext->shape_vert_offset = sg->vert_offset;
 		ext->shape_vert_count = sg->vert_count;
+		ext->is_morph_shape = sg->is_morph;
+		ext->morph_end_offset = sg->morph_end_offset;
 	}
 	else
 	{
 		ext->shape_vert_offset = 0;
 		ext->shape_vert_count = 0;
+		ext->is_morph_shape = 0;
+		ext->morph_end_offset = 0;
 	}
 }
 
@@ -1058,6 +1062,13 @@ static void apply_place_object(Avm2Context* ctx, Avm2Object* child,
 	if (op->flags & AVM2_TLF_HAS_VISIBLE)
 	{
 		ext->visible = op->visible ? 1 : 0;
+	}
+	// T6: morph interpolation ratio (PlaceObject2 ratio). A move without a ratio
+	// field keeps the prior value (Flash semantics); the ext is zero-initialised,
+	// so a never-rated placement stays at ratio 0 (pure start shape).
+	if (op->flags & AVM2_TLF_HAS_RATIO)
+	{
+		ext->ratio = op->ratio;
 	}
 }
 
@@ -8515,6 +8526,15 @@ static void avm2_cpu_walk(Avm2Context* ctx, Avm2Object* obj,
 
 	if (ext->is_bitmap)
 		avm2_cpu_composite_bitmap(ctx, obj, &world, alpha, fb, fbw, fbh);
+	else if (ext->is_morph_shape && ext->shape_vert_count > 0)
+		// T6: CPU twin of avm2_render_morph — ratio-lerp the START/END verts +
+		// solid colour into the framebuffer.
+		avm2_cpu_raster_morph(fb, fbw, fbh, /*transparent=*/0,
+		                      ext->shape_vert_offset, ext->shape_vert_count,
+		                      ext->morph_end_offset,
+		                      (double) ext->ratio / 65535.0,
+		                      world.a, world.b, world.c, world.d,
+		                      world.tx, world.ty, alpha);
 	else if (ext->shape_vert_count > 0)
 		// T5: CPU-composite a resident timeline shape (the headless twin of
 		// avm2_render_shape's GPU dispatch), mirroring the WGSL shader so the
@@ -8741,6 +8761,111 @@ static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
 	                    xid, cxid);
 }
 
+// Resident recompiler geometry (draws.c), read directly for the morph lerp —
+// the same globals avm2_cpu_raster.c reads. shape_data/color_data are also
+// mirrored into the render context, but the START/END lerp is cleanest against
+// the raw tables. morph_end_* are NOT copied into the context (T6 loads them
+// as externs, the T5 pattern).
+extern uint32_t shape_data[][4];
+extern float    color_data[][4];
+extern float    morph_end_shape_data[][2];
+extern float    morph_end_color_data[][4];
+
+static inline float avm2_bits_to_f(uint32_t u)
+{
+	float f;
+	memcpy(&f, &u, sizeof(f));
+	return f;
+}
+
+// T6 — draw a DefineMorphShape node on the GPU at its placement ratio. Lerped
+// vertices are RUNTIME geometry (per-frame lerp(start, end, ratio)), so they go
+// through the runtime-tris path (renderer_draw_tris) T4 built, NOT the static
+// renderer_draw_shape. Solid fills lerp colour too; consecutive same-style
+// triangles are batched into one draw (the recompiler emits each fill's tris
+// contiguously). Gradient / stroke morph is deferred (skipped). CPU twin:
+// avm2_cpu_raster_morph.
+static void avm2_render_morph(Avm2Context* ctx, Avm2Object* obj,
+                              const Mat* world, double alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->shape_vert_count == 0) return;
+	double ratio = (double) ext->ratio / 65535.0;
+	if (ratio < 0.0) ratio = 0.0; else if (ratio > 1.0) ratio = 1.0;
+	double b_w = ratio, a_w = 1.0 - ratio;  // Ruffle: b weights END, a START
+
+	uint32_t n = ext->shape_vert_count;
+	float* verts = (float*) malloc((size_t) n * 2 * sizeof(float));
+	if (verts == NULL) return;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		uint32_t si = ext->shape_vert_offset + i;
+		uint32_t ei = ext->morph_end_offset + i;
+		double sxs = (double) avm2_bits_to_f(shape_data[si][0]);
+		double sys = (double) avm2_bits_to_f(shape_data[si][1]);
+		double sxe = (double) morph_end_shape_data[ei][0];
+		double sye = (double) morph_end_shape_data[ei][1];
+		// Ruffle lerp_twips: round(start*a + end*b) to integer twips.
+		verts[i * 2]     = (float) floor(sxs * a_w + sxe * b_w + 0.5);
+		verts[i * 2 + 1] = (float) floor(sys * a_w + sye * b_w + 0.5);
+	}
+
+	uint32_t xid = 0;
+	if (g_avm2_xform_next < context->xform_slot_count)
+	{
+		float m16[16];
+		avm2_world_to_mat16(world, m16);
+		xid = g_avm2_xform_next++;
+		renderer_write_transform(context, xid, m16);
+	}
+	uint32_t cxid = 0;
+	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
+	{
+		float cx[20];
+		memset(cx, 0, sizeof(cx));
+		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;
+		cx[15] = (float) alpha;
+		cxid = g_avm2_cxform_next++;
+		renderer_write_cxform(context, cxid, cx);
+	}
+
+	uint32_t t = 0;
+	while (t + 3 <= n)
+	{
+		uint32_t i0 = ext->shape_vert_offset + t;
+		uint32_t style_packed = shape_data[i0][2];
+		uint32_t style_index  = shape_data[i0][3];
+		uint32_t style_type   = style_packed & 0xFFu;
+
+		// Extend the run over triangles sharing this exact style_index.
+		uint32_t run_end = t + 3;
+		while (run_end + 3 <= n
+		       && (shape_data[ext->shape_vert_offset + run_end][2] & 0xFFu) == style_type
+		       && shape_data[ext->shape_vert_offset + run_end][3] == style_index)
+			run_end += 3;
+
+		if (style_type == 0x00u)
+		{
+			// Ruffle lerp_color: (a*start + b*end) as u8 (truncation), per
+			// channel. color_data holds u8/255; recover u8, lerp, re-normalise.
+			uint32_t sid = style_index & 0xFFFFu;
+			uint32_t eid = (style_index >> 16) & 0xFFFFu;
+			uint32_t sr = (uint32_t)(color_data[sid][0]*255.0f+0.5f), er = (uint32_t)(morph_end_color_data[eid][0]*255.0f+0.5f);
+			uint32_t sg = (uint32_t)(color_data[sid][1]*255.0f+0.5f), eg = (uint32_t)(morph_end_color_data[eid][1]*255.0f+0.5f);
+			uint32_t sb = (uint32_t)(color_data[sid][2]*255.0f+0.5f), eb = (uint32_t)(morph_end_color_data[eid][2]*255.0f+0.5f);
+			uint32_t sa = (uint32_t)(color_data[sid][3]*255.0f+0.5f), ea = (uint32_t)(morph_end_color_data[eid][3]*255.0f+0.5f);
+			float r = (float)(uint32_t)(a_w * sr + b_w * er) / 255.0f;
+			float g = (float)(uint32_t)(a_w * sg + b_w * eg) / 255.0f;
+			float b = (float)(uint32_t)(a_w * sb + b_w * eb) / 255.0f;
+			float a = (float)(uint32_t)(a_w * sa + b_w * ea) / 255.0f;
+			renderer_draw_tris(context, &verts[t * 2], run_end - t,
+			                   r, g, b, a, xid, cxid);
+		}
+		t = run_end;
+	}
+	free(verts);
+}
+
 // T4: draw a node's recorded flash.display.Graphics geometry on the GPU. One
 // transform + cxform slot for the node, then per finalized path a solid /
 // gradient fill (renderer_draw_tris / draw_gradient_tris, dynamic gradient pool)
@@ -8805,6 +8930,8 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 
 	if (ext->is_bitmap)
 		avm2_render_bitmap(ctx, obj, &world, alpha);
+	else if (ext->is_morph_shape && ext->shape_vert_count > 0)
+		avm2_render_morph(ctx, obj, &world, alpha);
 	else if (ext->shape_vert_count > 0)
 		avm2_render_shape(ctx, obj, &world, alpha);
 

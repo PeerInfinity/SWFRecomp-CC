@@ -1343,7 +1343,7 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			{
 				out << "\t{ " << g.char_id << ", " << (int) g.renderable << ", "
 				    << g.vert_offset << ", " << g.vert_count << ", "
-				    << g.morph_end_offset << " },\n";
+				    << g.morph_end_offset << ", " << (int) g.is_morph << " },\n";
 			}
 			out << "};\n";
 		}

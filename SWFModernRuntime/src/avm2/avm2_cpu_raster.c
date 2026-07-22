@@ -36,6 +36,10 @@ extern uint32_t shape_data[][4];    // {x_bits(float), y_bits(float), style_pack
 extern float    color_data[][4];    // {r,g,b,a} straight, 0..1
 extern float    uninv_mat_data[];   // 16 floats/gradient: forward UV[0,1]->twips (2D affine in 4x4)
 extern uint8_t  gradient_data[][4]; // 256 rows/gradient: {r,g,b,a} u8, sRGB-encoded
+// T6 (DefineMorphShape): END vertices paired 1:1 with the shape_data START
+// range, and END solid-fill colours indexed by the high 16 bits of style_index.
+extern float    morph_end_shape_data[][2];  // {x,y} twips, END positions
+extern float    morph_end_color_data[][4];  // {r,g,b,a} straight 0..1, END colours
 
 // ---------------------------------------------------------------------------
 // Store helpers — must match avm2_bitmap.c premul()/blend_over() exactly.
@@ -410,6 +414,78 @@ void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
 			R.sx0 = sx[0]; R.sy0 = sy[0]; R.sx1 = sx[1]; R.sy1 = sy[1];
 			R.sx2 = sx[2]; R.sy2 = sy[2];
 		}
+		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
+	}
+}
+
+// T6 — rasterize a DefineMorphShape at placement `ratio` (0..1). Each START
+// vertex (shape_data[vert_offset + n]) is paired 1:1 with its END vertex
+// (morph_end_shape_data[morph_end_offset + n]); position = lerp(start, end,
+// ratio). SOLID fills lerp colour too: color_data[low16] (start) ->
+// morph_end_color_data[high16] (end). Gradient / stroke morph is deferred (see
+// avm2-vector-rendering-plan.md T6 RESULT) — those triangles are skipped.
+// Mirrors avm2_cpu_raster_shape's coverage + store path (the CPU twin of the
+// GPU avm2_render_morph).
+void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
+                           uint32_t vert_offset, uint32_t vert_count,
+                           uint32_t morph_end_offset, double ratio,
+                           double wa, double wb, double wc, double wd,
+                           double wtx, double wty, double node_alpha)
+{
+	(void) transparent;
+	if (buf == NULL || W <= 0 || H <= 0 || vert_count < 3) return;
+	if (node_alpha <= 0.0) return;
+	if (ratio < 0.0) ratio = 0.0; else if (ratio > 1.0) ratio = 1.0;
+	// Ruffle morph_shape.rs weights: b weights END, a weights START (a+b=1).
+	double b_w = ratio, a_w = 1.0 - ratio;
+
+	for (uint32_t t = 0; t + 3 <= vert_count; t += 3)
+	{
+		uint32_t i0 = vert_offset + t;
+		uint32_t style_packed = shape_data[i0][2];
+		uint32_t style_index  = shape_data[i0][3];
+		uint32_t style_type   = style_packed & 0xFFu;
+
+		// Solid morph only this tranche (gradient/stroke morph deferred).
+		if (style_type != 0x00u) continue;
+
+		double dX[3], dY[3];
+		for (int k = 0; k < 3; k++)
+		{
+			uint32_t sj = i0 + (uint32_t) k;
+			uint32_t ej = morph_end_offset + t + (uint32_t) k;
+			double sxs = (double) bits_to_f(shape_data[sj][0]);
+			double sys = (double) bits_to_f(shape_data[sj][1]);
+			double sxe = (double) morph_end_shape_data[ej][0];
+			double sye = (double) morph_end_shape_data[ej][1];
+			// Ruffle lerp_twips: round(start*a + end*b) to integer twips.
+			double sx = floor(sxs * a_w + sxe * b_w + 0.5);
+			double sy = floor(sys * a_w + sye * b_w + 0.5);
+			dX[k] = (wa * sx + wc * sy + wtx) / 20.0;
+			dY[k] = (wb * sx + wd * sy + wty) / 20.0;
+		}
+
+		// Ruffle lerp_color: (a*start + b*end) as u8 — TRUNCATION, per channel.
+		// color_data / morph_end_color_data hold the u8 SWF colour / 255.
+		uint32_t sid = style_index & 0xFFFFu;
+		uint32_t eid = (style_index >> 16) & 0xFFFFu;
+		uint32_t sr = f2b(color_data[sid][0]), er = f2b(morph_end_color_data[eid][0]);
+		uint32_t sg = f2b(color_data[sid][1]), eg = f2b(morph_end_color_data[eid][1]);
+		uint32_t sb = f2b(color_data[sid][2]), eb = f2b(morph_end_color_data[eid][2]);
+		uint32_t sa = f2b(color_data[sid][3]), ea = f2b(morph_end_color_data[eid][3]);
+		uint32_t cr = (uint32_t) (a_w * sr + b_w * er);
+		uint32_t cg = (uint32_t) (a_w * sg + b_w * eg);
+		uint32_t cb = (uint32_t) (a_w * sb + b_w * eb);
+		uint32_t ca = (uint32_t) (a_w * sa + b_w * ea);
+		// node_alpha scales the (straight) alpha, matching the solid shape path.
+		uint32_t a_out = f2b((double) ca / 255.0 * node_alpha);
+
+		RasterCtx R;
+		R.buf = buf; R.W = W; R.H = H;
+		R.node_alpha = node_alpha;
+		R.ramp = NULL; R.linear_out = 0;
+		R.is_gradient = 0;
+		R.solid_argb = (a_out << 24) | (cr << 16) | (cg << 8) | cb;
 		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
 	}
 }

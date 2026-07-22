@@ -330,6 +330,13 @@ typedef struct Avm2DisplayObjectExt
 	// shape, or unresolved) — the render walk then draws nothing for this node.
 	uint32_t shape_vert_offset;
 	uint32_t shape_vert_count;
+	// T6 morph (DefineMorphShape): is_morph_shape routes this node through the
+	// ratio-lerp runtime-tris path; morph_end_offset is the paired start index
+	// into morph_end_shape_data; ratio (0..65535) is the placement interpolation
+	// factor (op->ratio, updated each frame the timeline re-places the morph).
+	uint32_t morph_end_offset;
+	uint8_t  is_morph_shape;
+	uint16_t ratio;
 	int32_t depth;               // timeline depth
 	int32_t clip_depth;
 	int32_t place_frame;

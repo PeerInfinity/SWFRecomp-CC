@@ -33,7 +33,8 @@ namespace abc
 		uint8_t  renderable;
 		uint32_t vert_offset;
 		uint32_t vert_count;
-		uint32_t morph_end_offset;  // T6 morph twin; 0 in T1
+		uint32_t morph_end_offset;  // T6: start index into morph_end_shape_data
+		uint8_t  is_morph = 0;      // T6: 1 => DefineMorphShape (ratio-lerp path)
 	};
 
 	struct TimelineEmitInfo

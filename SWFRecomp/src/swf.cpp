@@ -7254,6 +7254,10 @@ namespace SWFRecomp
 					u8 end_a = (u8) RGBA.fields[3].value;
 
 					fill_styles[i].index = current_color;
+					// END colour lives in morph_end_color_data at its own counter
+					// (NOT current_color): the two tables advance independently, so
+					// the AVM2 morph raster needs this explicit end index.
+					fill_styles[i].morph_end_index = current_morph_end_color;
 
 					color_data << "\t" << "{ "
 							   << to_string(fill_styles[i].r) << "/255.0f, "
@@ -9034,12 +9038,25 @@ namespace SWFRecomp
 										style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
 									}
 
+									// Morph solid fills carry the END colour index in the
+									// high 16 bits of style_index (low 16 = START colour,
+									// color_data). The AVM2 morph raster lerps between them
+									// by placement ratio. Only morph vertices are ever read
+									// through the morph path, so this never disturbs the
+									// static shader (which uses the high bits only for
+									// gradient focal, a deferred morph case).
+									u32 style_index_packed = (u32) fs.index;
+									if (fs.type == FILL_SOLID)
+									{
+										style_index_packed |= ((u32) fs.morph_end_index << 16);
+									}
+
 									shape_data << "\t" << "{ "
 											   << std::hex << std::uppercase
 											   << "0x" << VAL(u32, &x_f) << ", "
 											   << "0x" << VAL(u32, &y_f) << ", "
 											   << "0x" << style_type_packed << ", "
-											   << "0x" << (u32) fs.index
+											   << "0x" << style_index_packed
 											   << " }," << endl;
 
 									if (is_morph && t.verts[j].morph_index >= 0 && (size_t)t.verts[j].morph_index < morph_end_positions.size())
@@ -9318,6 +9335,21 @@ namespace SWFRecomp
 										 << to_string(morph_end_bounds_xmax) << ", "
 										 << to_string(morph_end_bounds_ymin) << ", "
 										 << to_string(morph_end_bounds_ymax) << ");" << endl;
+
+						// T6: record the AVM2 morph shape geom. vert_offset/count
+						// index the START verts (shape_data); morph_end_offset is the
+						// parallel start index into morph_end_shape_data (1:1 with the
+						// shape_data range — both were appended in lockstep above). The
+						// AVM2 walk lerps start<->end per placement ratio through the
+						// runtime-tris path (renderer_draw_tris / avm2_cpu_raster).
+						abc::Avm2ShapeGeomRec geom;
+						geom.char_id = shape_id;
+						geom.renderable = shape_renderable ? 1 : 0;
+						geom.vert_offset = (uint32_t) (3 * current_tri);
+						geom.vert_count = (uint32_t) (3 * tris_size);
+						geom.morph_end_offset = (uint32_t) morph_end_start_vertex;
+						geom.is_morph = 1;
+						avm2_shape_geom.push_back(geom);
 					}
 					else
 					{
@@ -9335,6 +9367,7 @@ namespace SWFRecomp
 						geom.vert_offset = (uint32_t) (3 * current_tri);
 						geom.vert_count = (uint32_t) (3 * tris_size);
 						geom.morph_end_offset = 0;
+						geom.is_morph = 0;
 						avm2_shape_geom.push_back(geom);
 					}
 

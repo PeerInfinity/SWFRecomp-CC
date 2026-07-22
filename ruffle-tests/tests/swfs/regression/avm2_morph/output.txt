@@ -1,0 +1,8 @@
+morph children=3 flash.display::MorphShape
+r0_fill=ff0000
+r0_out=ffffff
+r5_in=7f007f
+r5_out=ffffff
+r5_fill=7f007f
+r1_fill=ff
+r1_in=ff

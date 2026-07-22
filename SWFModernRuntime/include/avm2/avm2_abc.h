@@ -289,7 +289,12 @@ typedef struct Avm2ShapeGeom
 	uint8_t  renderable;
 	uint32_t vert_offset;
 	uint32_t vert_count;
-	uint32_t morph_end_offset;  // T6 morph twin; 0 in T1
+	// T6 (DefineMorphShape): start index into morph_end_shape_data for this
+	// shape's END vertices, paired 1:1 with the shape_data range above (both
+	// appended in lockstep by the recompiler). is_morph == 1 routes the node
+	// through the ratio-lerp runtime-tris path instead of renderer_draw_shape.
+	uint32_t morph_end_offset;
+	uint8_t  is_morph;
 } Avm2ShapeGeom;
 
 // DefineEditText static data (Stage 6). Flags mirror the tag bit-for-bit

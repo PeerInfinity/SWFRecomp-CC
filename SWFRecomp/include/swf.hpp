@@ -122,6 +122,10 @@ namespace SWFRecomp
 	{
 		u8 type;
 		size_t index;
+		// Morph (DefineMorphShape) solid fills: index into morph_end_color_data
+		// for this fill's END colour (parallels `index` into color_data for the
+		// START colour). 0 for non-morph fills.
+		size_t morph_end_index = 0;
 		u8 r;
 		u8 g;
 		u8 b;

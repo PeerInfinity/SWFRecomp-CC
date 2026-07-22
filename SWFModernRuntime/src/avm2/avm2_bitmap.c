@@ -1966,7 +1966,16 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	if (ext == NULL) return;
 	if (!ext->is_stage && !ext->visible) return;
 
-	if (ext->shape_vert_count > 0)
+	if (ext->is_morph_shape && ext->shape_vert_count > 0)
+		// T6: ratio-lerped morph shape (the getPixel gate reads its interpolated
+		// edge + fill colour through this path).
+		avm2_cpu_raster_morph(dst->pixels, (int) dst->width, (int) dst->height,
+		                      dst->transparency,
+		                      ext->shape_vert_offset, ext->shape_vert_count,
+		                      ext->morph_end_offset,
+		                      (double) ext->ratio / 65535.0,
+		                      wa, wb, wc, wd, wtx, wty, alpha);
+	else if (ext->shape_vert_count > 0)
 		avm2_cpu_raster_shape(dst->pixels, (int) dst->width, (int) dst->height,
 		                      dst->transparency,
 		                      ext->shape_vert_offset, ext->shape_vert_count,

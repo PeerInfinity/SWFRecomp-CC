@@ -53,4 +53,14 @@ void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
                           double wa, double wb, double wc, double wd,
                           double wtx, double wty, double node_alpha);
 
+// T6 — rasterize a DefineMorphShape at placement `ratio` (0..1): per-vertex
+// lerp of the START vertex range (shape_data[vert_offset..]) with its paired
+// END range (morph_end_shape_data[morph_end_offset..]), and per-triangle lerp
+// of the solid fill colour. Solid fills only (gradient/stroke morph deferred).
+void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
+                           uint32_t vert_offset, uint32_t vert_count,
+                           uint32_t morph_end_offset, double ratio,
+                           double wa, double wb, double wc, double wd,
+                           double wtx, double wty, double node_alpha);
+
 #endif // AVM2_CPU_RASTER_H
