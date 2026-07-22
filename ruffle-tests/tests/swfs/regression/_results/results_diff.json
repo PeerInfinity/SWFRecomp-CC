@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-22T01:55:21.819802+00:00",
-    "old_git_sha": "69369f32dece2bdeb7968bdf7c4c52280ce0bf97",
-    "new_timestamp": "2026-07-22T03:14:33.259218+00:00",
-    "new_git_sha": "6f1508984cfbaf4a8fffe997e9e0b357e81cccc7",
+    "old_timestamp": "2026-07-22T03:14:33.259218+00:00",
+    "old_git_sha": "6f1508984cfbaf4a8fffe997e9e0b357e81cccc7",
+    "new_timestamp": "2026-07-22T03:43:55.232625+00:00",
+    "new_git_sha": "6c040c32fc6bbc38d2e118b2e8ca94b28c25f7d5",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 62,
     "old_total": 62,
     "old_pass_rate": 100.0,
-    "new_pass": 62,
+    "new_pass": 63,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 62,
-    "new_total": 62,
+    "new_effective_pass": 63,
+    "new_total": 63,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 62,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm2_graphics_runtime",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    }
+  ]
 }
