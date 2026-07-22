@@ -448,12 +448,18 @@ loads it (already happens for `shape_data`) → AVM2 render walk dispatches
 5. **AVM2 CPU shape rasterizer** — ported `RASTER_TRI*` in `avm2_cpu_walk` so
    headless dumps show vector pixels (tranche-gated; see §4 decision).
 
-### Native `TEXT`/`EDITTEXT` — sibling track, not this plan
+### Native `TEXT`/`EDITTEXT` — sibling track (EditText SHIPPED 2026-07-22)
 The `TEXT`/`EDITTEXT` char kinds and glyph-outline tables (`avm2_generated_fonts[]`,
-already emitted; CPU glyph raster at `avm2_bitmap.c:1749`) are a **separate
-deliverable**. This plan renders `SHAPE`/`MORPHSHAPE` + `Graphics`. Text rides on the
-same slot/backend model and should be a follow-on plan once shapes land (EQ's HUD
-needs it, but after the world renders). Flagged, not folded in.
+already emitted; CPU glyph raster at `avm2_bitmap.c`) were a **separate
+deliverable**, now landed for EditText. **`DefineEditText` / dynamic `TextField`
+renders on both sinks** (`9ab376ded`): CPU `avm2_cpu_raster_text` (refactored from
+`bd_draw_textfield`) dispatched from `avm2_cpu_walk` + `bd_draw_shape_walk`, GPU
+`avm2_render_text` runtime-tessellating glyph outlines → `renderer_draw_tris` in
+`avm2_render_node` — riding the same slot/backend model as shapes.
+getPixel-gated (`regression/avm2_timeline_text`, exact-by-construction). **Static
+`DefineText` deferred** (needs recompiler `avm2_generated_statictext[]` glyph-
+placement emission — a distinct leg). Full plan + RESULT:
+`avm2-native-text-render-plan.md`. `[[avm2-vector-render-track]]`.
 
 ---
 

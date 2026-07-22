@@ -82,6 +82,58 @@ always CPU); the GPU choice is graded by the Dawn image oracle (informational).
   + `avm2_bitmapdata_draw_textfield`. Text image renders under `--mode=graphics`
   (informational). Both CI modes, zero pass→fail.
 
-## RESULT
+## RESULT (2026-07-22) — EditText renders on both sinks, `getPixel`-gated
 
-(to be filled in as each leg lands)
+Shipped as one commit (`9ab376ded`), both legs, exactly as sized. Native timeline
+`DefineEditText` / dynamic `TextField` now composites on the headless-CPU **and**
+GPU/Dawn AVM2 sinks, wired into the display walks beside the shape/morph arms.
+
+**Leg A (CPU).** `bd_draw_textfield`'s glyph-scanline core was lifted into a shared
+`text_raster_core` (`avm2_bitmap.c`) writing into a **raw** premultiplied-ARGB
+buffer (`buf[x + y*W]` replaces `bd_get_raw`/`bd_set_raw`; `opaque = !transparent`).
+The store convention was already identical to the T5 shape raster (`premul` +
+`blend_over` == `cpu_premul` + `cpu_blend_over`), so the pixel math ported with **no
+change** — the risk the brief flagged (two pixel conventions) was a non-issue. The
+public `avm2_cpu_raster_text(buf,W,H,transparent, ctx,tf_obj, wa..wty, node_alpha)`
+(decl in `avm2_cpu_raster.h`, impl in `avm2_bitmap.c` — it needs the glyph
+collector + cxform/blend helpers) drives the core with identity cxform / normal
+blend, folding node alpha as a post-cxform alpha scale (skipped when `>= 0.999`, so
+`bd_draw_textfield` stays byte-for-byte and `avm2_bitmapdata_draw_textfield` is
+unchanged). **Matrix-convention note:** the core works in field-local **pixels** →
+dest pixels (glyph coords `/20` early), while the walk world matrices are twips →
+twips; `avm2_cpu_raster_text` bridges by passing the 2×2 unchanged and the
+translation `/20` — so its `(wa..wty)` signature matches `avm2_cpu_raster_shape`
+(twips) exactly. Dispatched from `avm2_cpu_walk` (`AVM2_CPU_DUMP`) and from
+`bd_draw_shape_walk` (`else if (ext->edittext != NULL)`) — the latter makes a
+*placed* field `getPixel`-gateable through `BitmapData.draw(container)`.
+
+**Leg B (GPU).** `avm2_render_text` (`avm2_display.c`, inside the render gate)
+dispatched in `avm2_render_node` for `ext->edittext != NULL`. **Glyph-geometry-form
+ruling resolved (option 1):** collect glyphs → per glyph transform its flattened
+outline to field-local twips (`x_twips + scale*px`, `y_twips + scale*py`) →
+tessellate its contours with libtess2 **NONZERO winding** (matches the CPU
+scanline's nonzero rule, so glyph holes render) → `renderer_draw_tris` under one
+world-transform + alpha-cxform slot, glyph colour per draw. Reused the exact
+`gfx_finalize_path` libtess2 pattern; the offscreen-raster + bitmap-quad fallback
+(option 2) was not needed. Node alpha rides the cxform slot (shape/morph parity).
+
+**Gate.** Authored `regression/avm2_timeline_text`: a `TextField` child (embedded
+DejaVuSans, 30px, `0xFF0000`, "Hi") added to a `Sprite`, the *container* drawn via
+`BitmapData.draw(holder)` — routing through `bd_draw_shape_walk` →
+`avm2_cpu_raster_text` (the new arm; on the old runtime the container walk had no
+text arm → nothing drawn). Assertions **exact by construction** (T4-probe style, no
+Ruffle export): pure text-colour pixels (`0xFFFF0000`) appear, and drawing the
+container vs the field directly differs by exactly the child's integer `(10,10)`px
+placement (`shifted`), with the surrounding background clear. **Passes no-graphics
+AND graphics locally.** `avm2_bitmapdata_draw_textfield` + `edit_text_linkage`
+no-regress in both modes.
+
+**Complete vs deferred.** Embedded-font dynamic EditText (single/multi-line, colour,
+size, alignment as the layout model computes it) renders on both sinks. **Deferred
+(documented, skip-not-crash):** static `DefineText` (`AVM2_CHAR_TEXT`) — needs a
+recompiler `avm2_generated_statictext[]` glyph-placement emission from GLYPHENTRY
+records (a distinct, larger leg — size as the follow-on; confirm EQ's title/preloader
+static-text usage first); device-font (non-embedded, no outlines) fields; rich HTML
+text; wordwrap/kerning edge cases; input caret/selection; GPU-side x-clip to the
+field bounds (the CPU path clips exactly; the GPU path is the informational image
+oracle). `[[avm2-vector-render-track]]`, `[[avm2-elephant-quest-bringup]]`.
