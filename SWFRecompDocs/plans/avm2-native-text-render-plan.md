@@ -137,3 +137,67 @@ static-text usage first); device-font (non-embedded, no outlines) fields; rich H
 text; wordwrap/kerning edge cases; input caret/selection; GPU-side x-clip to the
 field bounds (the CPU path clips exactly; the GPU path is the informational image
 oracle). `[[avm2-vector-render-track]]`, `[[avm2-elephant-quest-bringup]]`.
+
+## RESULT — leg 2 (2026-07-22): static `DefineText`/2 renders on both sinks, `getPixel`-gated
+
+The deferred static-text leg landed exactly as sized — **maximal reuse, zero forks**.
+Native timeline static text (`DefineText`/`DefineText2` → the `StaticText` display
+object) now composites on the headless-CPU **and** GPU/Dawn AVM2 sinks, wired into
+all three display walks beside the EditText/shape/morph arms.
+
+**The gap was exactly what leg 1 predicted: a missing `char_id`→placement table +
+walk arms; the glyph raster was already placement-source-agnostic.** The two glyph
+renderers leg 1 left (`text_raster_core` CPU, `avm2_render_text` GPU) both internally
+called `avm2_edittext_collect_glyphs`. Each was split into a **placement-array core**
+plus a thin EditText-collecting wrapper, so EditText and StaticText share one draw
+path:
+- **CPU** (`avm2_bitmap.c`): the glyph-scanline body became `glyph_raster_core(...,
+  const Avm2GlyphPlacement* gl, uint32_t n, const int32_t* clip, ...)` — takes the
+  array, does **not** own it, and `clip == NULL` means unclipped (static text has no
+  field rect). `text_raster_core(...tf_obj...)` is now a thin wrapper (collect →
+  core → free), so `bd_draw_textfield` + `avm2_bitmapdata_draw_textfield` stay
+  byte-for-byte. New public `avm2_cpu_raster_statictext` collects from
+  `ext->statictext` and feeds the same core (NULL clip).
+- **GPU** (`avm2_display.c`): the tessellate+draw body became `avm2_render_glyphs(gl,
+  n, world, alpha)`; `avm2_render_text` (EditText) and new `avm2_render_statictext`
+  are thin collect-wrappers over it.
+
+**Recompiler emission (`abc_timeline.cpp`).** The `TAG_DEFINE_TEXT`/`TEXT2` case went
+from bounds-only (`defineChar(body, 3, true)`) to a full `parseDefineText` that mines
+the GLYPHENTRY runs — ported from the AVM1 parser (`swf.cpp:2799-3020`) using
+abc_timeline's own `ByteReader`/`BitReader`/`parseMatrix`. The running text-record pen
++ font/height/colour spans **persist across TEXTRECORDs** (SWF §11.3); an X/Y offset
+sets the pen absolutely (base matrix translate + offset), an advance moves it. Emits a
+flat `avm2_generated_static_glyphs[]` (`{font_id, glyph, x_twips, y_twips, scale,
+color}`, field-local twips) + per-char `avm2_generated_statictexts[]` range table
+(mirrors `avm2_generated_shape_geom`). **`scale` (= text_height / em) resolves at
+EMISSION, not parse** — so a `DefineText` that references a font defined *after* it
+still scales correctly (the AVM1 path's immediate-lookup ordering assumption avoided).
+Glyph OUTLINES are already shared with EditText (`avm2_generated_fonts[]`); only the
+placements were missing. **Simplification (matches AVM1):** the DefineText matrix's
+2×2 (rotation/shear/non-unit scale) is ignored — only its translation folds into the
+pen; text size comes from `text_height`. Non-identity 2×2 DefineText matrices are the
+one deferred case (rare — sizing is via `text_height`, positioning via PlaceObject).
+
+**Place-time seeding.** `resolve_static_text(ext, char_id)` sets `ext->statictext`
+(new field) from `avm2_generated_statictexts`, called beside `resolve_shape_geom` in
+`place`, `replace_child_character`, and the button-record path.
+
+**Gate — `regression/avm2_static_text` (exact by construction, no Ruffle export).**
+A hand-authored DefineFont3 (one glyph = a full-EM-box filled square) + DefineText
+(that glyph placed twice, height 400 twips → scale 400/20480, red, 800-twip advance)
++ PlaceObject2, spliced into an mxmlc base by `build_statictext.py` (the `build_morph`
+recipe — mxmlc won't emit a placed DefineText). `BitmapData.draw(this)→getPixel`
+routes through `bd_draw_shape_walk` → the new StaticText arm; assertions are pure
+geometry through the documented renderer transform: glyph interiors (`ff0000`),
+between-glyphs + outside (`ffffff` bg). **Passes no-graphics AND graphics locally.**
+No-regress: `avm2_timeline_text`, `avm2_bitmapdata_draw_textfield`, `avm2_morph` green
+in both modes (the AVM1 `edittext_*` family never compiles `src/avm2`).
+
+**EQ frame-proof (parser only — pixel rebuild deferred, T5/T6 precedent).** Recompiling
+the real EQ SWF (recompiler only, no OOM-prone `-O0` `draws.c` compile) emits **71
+static-text characters / 2427 glyph placements** — matching the census (72 tags; the
+one difference is a DefineText with zero glyph runs, correctly skipped) with no crash.
+The exact-by-construction probe (CPU == GPU) carries pixel correctness; EQ's title/menu
+static text uses the identical path. **Next EQ step:** EQ-2 click-injection past the
+Play-gated preloader (`avm2-elephant-quest.md §6`).

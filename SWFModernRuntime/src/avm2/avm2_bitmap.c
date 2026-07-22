@@ -1755,6 +1755,11 @@ static Avm2Value bd_color_transform(Avm2Activation* act)
 uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
                                       Avm2GlyphPlacement** out,
                                       int32_t out_clip[4]);
+// avm2_text.c: static-text (DefineText/2) glyph collection — resolves the
+// recompiler's baked placements (avm2_generated_static_glyphs) to fonts.
+uint32_t avm2_statictext_collect_glyphs(Avm2Context* ctx,
+                                        const Avm2StaticTextData* st,
+                                        Avm2GlyphPlacement** out);
 
 // Rasterize a TextField source into dst: every glyph outline (flattened
 // contours in font units, recompile-time data) is transformed font units ->
@@ -1775,22 +1780,29 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 // (avm2_cpu_raster_text, node_alpha, identity cxform, normal blend) — kept
 // byte-for-byte for the former by defaulting node_alpha=1 and honouring the
 // cxform/blend params. Never touches action.c.
-static void text_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
-                             int transparent, Avm2Object* tf_obj,
-                             double ma, double mb, double mc, double md,
-                             double mtx, double mty, int has_cxform,
-                             int16_t rm, int16_t gm, int16_t bmul, int16_t am,
-                             int16_t ro, int16_t go, int16_t bo, int16_t ao,
-                             int blend_mode, double node_alpha)
+// Shared glyph-scanline core (placement-source-agnostic): composites an
+// already-collected Avm2GlyphPlacement[] into a raw premultiplied-ARGB buffer.
+// Both EditText (text_raster_core -> avm2_edittext_collect_glyphs) and static
+// text (avm2_cpu_raster_statictext -> avm2_statictext_collect_glyphs) feed it,
+// so the two sources share ONE draw path. `clip` (field-local twips rect, or
+// NULL for no clip — static text is unclipped) is enforced per pixel by
+// inverse-mapping the pixel center back to field-local space. The caller owns
+// `gl` (this core does not free it).
+static void glyph_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
+                              int transparent,
+                              const Avm2GlyphPlacement* gl, uint32_t n,
+                              const int32_t* clip,
+                              double ma, double mb, double mc, double md,
+                              double mtx, double mty, int has_cxform,
+                              int16_t rm, int16_t gm, int16_t bmul, int16_t am,
+                              int16_t ro, int16_t go, int16_t bo, int16_t ao,
+                              int blend_mode, double node_alpha)
 {
 	if (buf == NULL || W <= 0 || H <= 0 || node_alpha <= 0.0) return;
+	if (gl == NULL || n == 0) return;
 	double det = ma * md - mb * mc;
 	if (det == 0.0 || !isfinite(det) || !isfinite(mtx) || !isfinite(mty))
 		return;
-	Avm2GlyphPlacement* gl = NULL;
-	int32_t clip[4];
-	uint32_t n = avm2_edittext_collect_glyphs(ctx, tf_obj, &gl, clip);
-	if (n == 0) return;
 	// dest px -> field-local px (draw-matrix inverse) for the mask test.
 	double ia = md / det, ib = -mb / det, ic = -mc / det, id = ma / det;
 	int opaque = !transparent;
@@ -1918,15 +1930,19 @@ static void text_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
 					if (fx1 > px1) fx1 = px1;
 					for (int px = fx0; px < fx1; px++)
 					{
-						// field-local mask test (exact under any affine)
-						double ex = (px + 0.5) - mtx, ey = sy - mty;
-						double ltx = (ia * ex + ic * ey) * 20.0;
-						double lty = (ib * ex + id * ey) * 20.0;
-						if (ltx < (double) clip[0]
-						    || ltx >= (double) (clip[0] + clip[2])
-						    || lty < (double) clip[1]
-						    || lty >= (double) (clip[1] + clip[3]))
-							continue;
+						// field-local mask test (exact under any affine);
+						// static text is unclipped (clip == NULL).
+						if (clip != NULL)
+						{
+							double ex = (px + 0.5) - mtx, ey = sy - mty;
+							double ltx = (ia * ex + ic * ey) * 20.0;
+							double lty = (ib * ex + id * ey) * 20.0;
+							if (ltx < (double) clip[0]
+							    || ltx >= (double) (clip[0] + clip[2])
+							    || lty < (double) clip[1]
+							    || lty >= (double) (clip[1] + clip[3]))
+								continue;
+						}
 						size_t off = (size_t) px + (size_t) y * (size_t) W;
 						uint32_t dc = buf[off];
 						uint32_t outc = blend_mode != BM_NORMAL
@@ -1946,6 +1962,31 @@ static void text_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
 		heap_free(ctx->app, cx);
 		heap_free(ctx->app, cdir);
 	}
+}
+
+// EditText/TextField entry: collect the field's laid-out glyphs (+ its clip
+// rect) and draw via the shared glyph_raster_core. Preserves the tf_obj-sourced
+// signature used by bd_draw_textfield (BitmapData.draw) and avm2_cpu_raster_text
+// (display walks) — those callers are unchanged.
+static void text_raster_core(Avm2Context* ctx, uint32_t* buf, int W, int H,
+                             int transparent, Avm2Object* tf_obj,
+                             double ma, double mb, double mc, double md,
+                             double mtx, double mty, int has_cxform,
+                             int16_t rm, int16_t gm, int16_t bmul, int16_t am,
+                             int16_t ro, int16_t go, int16_t bo, int16_t ao,
+                             int blend_mode, double node_alpha)
+{
+	Avm2GlyphPlacement* gl = NULL;
+	int32_t clip[4];
+	uint32_t n = avm2_edittext_collect_glyphs(ctx, tf_obj, &gl, clip);
+	if (n == 0)
+	{
+		if (gl != NULL) heap_free(ctx->app, gl);
+		return;
+	}
+	glyph_raster_core(ctx, buf, W, H, transparent, gl, n, clip,
+	                  ma, mb, mc, md, mtx, mty, has_cxform,
+	                  rm, gm, bmul, am, ro, go, bo, ao, blend_mode, node_alpha);
 	heap_free(ctx->app, gl);
 }
 
@@ -1980,6 +2021,34 @@ void avm2_cpu_raster_text(uint32_t* buf, int W, int H, int transparent,
 	                 wa, wb, wc, wd, wtx / 20.0, wty / 20.0,
 	                 /*has_cxform=*/0, 256, 256, 256, 256, 0, 0, 0, 0,
 	                 BM_NORMAL, node_alpha);
+}
+
+// Public entry for the display walks (avm2_cpu_walk, bd_draw_shape_walk): render
+// a placed StaticText (DefineText/2) node's glyphs into a raw premultiplied-ARGB
+// buffer under the node's world matrix + concatenated alpha. Twip->pixel bridge
+// matches avm2_cpu_raster_text (2x2 unchanged, translation /20); static text is
+// unclipped (NULL clip). Identity cxform, normal blend. Shares glyph_raster_core
+// with EditText — the recompiler baked the per-glyph placement into
+// avm2_generated_static_glyphs; avm2_statictext_collect_glyphs resolves fonts.
+void avm2_cpu_raster_statictext(uint32_t* buf, int W, int H, int transparent,
+                                Avm2Context* ctx, Avm2Object* obj,
+                                double wa, double wb, double wc, double wd,
+                                double wtx, double wty, double node_alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->statictext == NULL) return;
+	Avm2GlyphPlacement* gl = NULL;
+	uint32_t n = avm2_statictext_collect_glyphs(ctx, ext->statictext, &gl);
+	if (n == 0)
+	{
+		if (gl != NULL) heap_free(ctx->app, gl);
+		return;
+	}
+	glyph_raster_core(ctx, buf, W, H, transparent, gl, n, /*clip=*/NULL,
+	                  wa, wb, wc, wd, wtx / 20.0, wty / 20.0,
+	                  /*has_cxform=*/0, 256, 256, 256, 256, 0, 0, 0, 0,
+	                  BM_NORMAL, node_alpha);
+	heap_free(ctx->app, gl);
 }
 
 // ---------------------------------------------------------------------------
@@ -2033,6 +2102,12 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 		avm2_cpu_raster_text(dst->pixels, (int) dst->width, (int) dst->height,
 		                     dst->transparency, ctx, obj,
 		                     wa, wb, wc, wd, wtx, wty, alpha);
+	else if (ext->statictext != NULL)
+		// Native timeline static text (DefineText/2) — makes a placed StaticText
+		// getPixel-gateable via BitmapData.draw(container) (the probe gate).
+		avm2_cpu_raster_statictext(dst->pixels, (int) dst->width, (int) dst->height,
+		                           dst->transparency, ctx, obj,
+		                           wa, wb, wc, wd, wtx, wty, alpha);
 
 	// T4: script-drawn Graphics geometry on this node (the getPixel gate reads
 	// runtime fills/strokes/gradients through this path).

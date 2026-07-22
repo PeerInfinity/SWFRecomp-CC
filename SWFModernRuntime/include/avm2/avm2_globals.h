@@ -415,6 +415,11 @@ typedef struct Avm2DisplayObjectExt
 	const Avm2String* tf_text;   // NULL = default "" (mirror of edittext->text)
 	// TextField/EditText engine state (avm2_text.c; NULL for non-TextFields).
 	struct Avm2EditTextExt* edittext;
+	// Static text (DefineText/2 -> StaticText): resolved glyph-placement range
+	// from char_id at place-time (avm2_generated_statictexts). NULL for anything
+	// that isn't a placed static-text character. The render walks feed it through
+	// the same glyph raster/tessellation as edittext.
+	const struct Avm2StaticTextData* statictext;
 	// accessibilityImplementation/accessibilityProperties (stored verbatim).
 	Avm2Value accessibility_impl;
 	Avm2Value accessibility_props;

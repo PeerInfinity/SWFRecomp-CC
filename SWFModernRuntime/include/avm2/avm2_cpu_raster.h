@@ -77,4 +77,13 @@ void avm2_cpu_raster_text(uint32_t* buf, int W, int H, int transparent,
                           double wa, double wb, double wc, double wd,
                           double wtx, double wty, double node_alpha);
 
+// Native static TEXT (DefineText/2 -> StaticText) — walk-facing twin of
+// avm2_cpu_raster_text, sharing the same glyph-scanline core. Sources placements
+// from the node's resolved ext->statictext (avm2_generated_static_glyphs) rather
+// than the EditText layout engine. Unclipped; identity cxform, normal blend.
+void avm2_cpu_raster_statictext(uint32_t* buf, int W, int H, int transparent,
+                                Avm2Context* ctx, Avm2Object* obj,
+                                double wa, double wb, double wc, double wd,
+                                double wtx, double wty, double node_alpha);
+
 #endif // AVM2_CPU_RASTER_H

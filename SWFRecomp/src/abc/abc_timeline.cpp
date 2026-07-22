@@ -482,6 +482,27 @@ struct FontDef
 	std::vector<uint32_t> glyph_contour_start;  // nglyphs+1
 };
 
+// One placed glyph of a DefineText/2 (StaticText). Mined from the tag's
+// GLYPHENTRY runs (font/color spans + per-glyph index + advance) into
+// field-local twips, mirroring the AVM1 recompiler's DefineText parse
+// (swf.cpp). scale is resolved at emission (text_height / font em square) so
+// a DefineText that references a font defined later still scales correctly.
+struct StaticGlyphDef
+{
+	uint16_t font_id = 0;
+	uint32_t glyph = 0;
+	int32_t x_twips = 0;      // pen x, field-local twips
+	int32_t y_twips = 0;      // baseline y, field-local twips
+	uint16_t text_height = 0; // twips; scale = text_height / em at emit
+	uint32_t color = 0;       // 0xRRGGBB (straight)
+};
+
+struct StaticTextDef
+{
+	uint16_t char_id = 0;
+	std::vector<StaticGlyphDef> glyphs;
+};
+
 // LSB-first SWF bit reader for glyph SHAPE records.
 struct GlyphBitReader
 {
@@ -605,6 +626,7 @@ struct Scanner
 	std::vector<ButtonDef> buttons;
 	std::vector<EditTextDef> edittexts;
 	std::vector<FontDef> fonts;
+	std::vector<StaticTextDef> statictexts;
 	std::vector<BitmapAsset> bitmaps;
 	std::vector<BinaryAsset> binaries;
 	std::vector<SoundAsset> sounds;
@@ -745,6 +767,79 @@ struct Scanner
 		chars.push_back(ci);
 	}
 
+	// DefineText/2: register the placeable StaticText character (bounds) AND
+	// mine its GLYPHENTRY runs into field-local glyph placements, mirroring the
+	// AVM1 recompiler's DefineText parse (swf.cpp). The AVM2/ABC path previously
+	// kept only the bounds; the placements feed the same glyph raster/tessellation
+	// as EditText. The text-record pen (x/y) and font/height/color spans PERSIST
+	// across TEXTRECORDs per SWF spec §11.3; an XOffset/YOffset sets the pen
+	// absolutely relative to the text-matrix origin, a glyph advance moves it.
+	void parseDefineText(ByteReader body, bool has_alpha)
+	{
+		CharInfo ci;
+		ci.char_id = body.u16();
+		ci.kind = 3;  // TEXT
+		skipRect(body, ci.bounds);
+		chars.push_back(ci);
+
+		StaticTextDef st;
+		st.char_id = ci.char_id;
+
+		Matrix m = parseMatrix(body);
+		int32_t base_tx = m.tx, base_ty = m.ty;
+		uint8_t glyph_bits = body.u8();
+		uint8_t advance_bits = body.u8();
+
+		// Running text-record state (persists across records).
+		int32_t pen_x = base_tx, pen_y = base_ty;
+		uint16_t font_id = 0;
+		uint16_t text_height = 0;
+		uint32_t color = 0;  // 0xRRGGBB, SWF default black
+
+		size_t guard = 0;
+		while (body.ok(1))
+		{
+			if (++guard > 10000) break;
+			uint8_t flags = body.u8();
+			if (flags == 0) break;  // end of TEXTRECORDs
+			bool has_font = (flags & 0x08) != 0;
+			bool has_color = (flags & 0x04) != 0;
+			bool has_y = (flags & 0x02) != 0;
+			bool has_x = (flags & 0x01) != 0;
+
+			if (has_font) font_id = body.u16();
+			if (has_color)
+			{
+				uint8_t r = body.u8(), g = body.u8(), b = body.u8();
+				if (has_alpha) body.u8();  // alpha (glyph colour is straight RGB)
+				color = ((uint32_t) r << 16) | ((uint32_t) g << 8) | b;
+			}
+			if (has_x) pen_x = base_tx + (int16_t) body.u16();
+			if (has_y) pen_y = base_ty + (int16_t) body.u16();
+			if (has_font) text_height = body.u16();  // twips
+			uint8_t glyph_count = body.u8();
+
+			BitReader gr(body);
+			for (uint8_t i = 0; i < glyph_count; i++)
+			{
+				uint32_t glyph = gr.ub(glyph_bits);
+				int32_t advance = gr.sb(advance_bits);
+				StaticGlyphDef gp;
+				gp.font_id = font_id;
+				gp.glyph = glyph;
+				gp.x_twips = pen_x;
+				gp.y_twips = pen_y;
+				gp.text_height = text_height;
+				gp.color = color;
+				st.glyphs.push_back(gp);
+				pen_x += advance;
+			}
+			gr.align();  // GLYPHENTRY run is bit-packed; realign for next record
+		}
+
+		if (!st.glyphs.empty()) statictexts.push_back(st);
+	}
+
 	// Scan one tag stream (main or sprite body) into `tl`. Returns after
 	// TAG_END or when the reader is exhausted.
 	void scanStream(ByteReader& r, Timeline& tl, bool is_root)
@@ -821,7 +916,7 @@ struct Scanner
 				break;
 			case TAG_DEFINE_TEXT:
 			case TAG_DEFINE_TEXT2:
-				defineChar(body, 3 /* TEXT */, true);
+				parseDefineText(body, code == TAG_DEFINE_TEXT2);
 				break;
 			case TAG_DEFINE_EDIT_TEXT:
 			{
@@ -1521,6 +1616,70 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	}
 	out << "const uint32_t avm2_generated_font_count = " << sc.fonts.size()
 	    << ";\n\n";
+
+	// Static text (DefineText/2): a flat glyph-placement table + per-char range
+	// (mirrors avm2_generated_shape_geom). scale resolves HERE (text_height /
+	// font em square) with all fonts known, so a DefineText that references a
+	// font defined after it still scales correctly. char_id -> StaticText range;
+	// the runtime resolves font_id -> avm2_generated_fonts at collect-time.
+	{
+		std::vector<uint32_t> st_start(sc.statictexts.size());
+		std::vector<uint32_t> st_count(sc.statictexts.size());
+		uint32_t total = 0;
+		for (size_t i = 0; i < sc.statictexts.size(); i++)
+		{
+			st_start[i] = total;
+			st_count[i] = (uint32_t) sc.statictexts[i].glyphs.size();
+			total += st_count[i];
+		}
+		if (total > 0)
+		{
+			out << "const Avm2StaticGlyph avm2_generated_static_glyphs[] = {\n";
+			for (auto& st : sc.statictexts)
+			{
+				for (auto& g : st.glyphs)
+				{
+					float em = 1024.0f;
+					for (auto& fd : sc.fonts)
+						if (fd.font_id == g.font_id)
+						{
+							em = (float) fd.em_square;
+							break;
+						}
+					float scale = em != 0.0f
+						? (float) g.text_height / em : 0.0f;
+					out << "\t{ " << g.font_id << ", " << g.glyph << ", "
+					    << g.x_twips << ", " << g.y_twips << ", "
+					    << fmtFloat(scale) << ", 0x" << std::hex << g.color
+					    << std::dec << "u },\n";
+				}
+			}
+			out << "};\n";
+		}
+		else
+		{
+			out << "const Avm2StaticGlyph avm2_generated_static_glyphs[1];\n";
+		}
+		out << "const uint32_t avm2_generated_static_glyph_count = " << total
+		    << ";\n\n";
+
+		if (!sc.statictexts.empty())
+		{
+			out << "const Avm2StaticTextData avm2_generated_statictexts[] = {\n";
+			for (size_t i = 0; i < sc.statictexts.size(); i++)
+			{
+				out << "\t{ " << sc.statictexts[i].char_id << ", "
+				    << st_start[i] << ", " << st_count[i] << " },\n";
+			}
+			out << "};\n";
+		}
+		else
+		{
+			out << "const Avm2StaticTextData avm2_generated_statictexts[1];\n";
+		}
+		out << "const uint32_t avm2_generated_statictext_count = "
+		    << sc.statictexts.size() << ";\n\n";
+	}
 
 	// Embedded bitmaps: straight RGBA, zlib-DEFLATE-compressed at recompile
 	// time (raw RGBA is ~46 MB for a real game). The runtime inflates on

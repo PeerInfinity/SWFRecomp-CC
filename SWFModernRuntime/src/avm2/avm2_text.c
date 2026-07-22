@@ -3568,6 +3568,42 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 	return n;
 }
 
+// Collect a static-text (DefineText/2) character's glyphs into an
+// Avm2GlyphPlacement array — the placement-source-agnostic twin of
+// avm2_edittext_collect_glyphs. The recompiler already baked field-local
+// placement (twips) + scale + colour into avm2_generated_static_glyphs; this
+// just resolves each entry's font_id to the generated font table and drops
+// device-font / outline-less / out-of-range glyphs. The caller owns *out
+// (heap_free via ctx->app). Static text has no field clip (glyphs render
+// unclipped; the walk feeds a NULL clip to the shared raster).
+uint32_t avm2_statictext_collect_glyphs(Avm2Context* ctx,
+                                        const Avm2StaticTextData* st,
+                                        Avm2GlyphPlacement** out)
+{
+	*out = NULL;
+	if (st == NULL || st->glyph_count == 0) return 0;
+	Avm2GlyphPlacement* gl =
+		avm2_alloc(ctx, (size_t) st->glyph_count * sizeof(Avm2GlyphPlacement));
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < st->glyph_count; i++)
+	{
+		const Avm2StaticGlyph* sg =
+			&avm2_generated_static_glyphs[st->glyph_start + i];
+		const Avm2FontData* fd = font_by_id(sg->font_id);
+		if (fd == NULL || fd->glyph_pts == NULL) continue;
+		if (sg->glyph >= fd->glyph_count) continue;
+		gl[n].font = fd;
+		gl[n].glyph = sg->glyph;
+		gl[n].x_twips = sg->x_twips;
+		gl[n].y_twips = sg->y_twips;
+		gl[n].scale = sg->scale;
+		gl[n].color = sg->color;
+		n++;
+	}
+	*out = gl;
+	return n;
+}
+
 // ===========================================================================
 // TextField natives
 // ===========================================================================

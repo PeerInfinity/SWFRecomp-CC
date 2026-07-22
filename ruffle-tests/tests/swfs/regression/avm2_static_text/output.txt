@@ -1,0 +1,6 @@
+static children=1 flash.text::StaticText
+g0_in=ff0000
+g1_in=ff0000
+gap=ffffff
+below=ffffff
+left=ffffff

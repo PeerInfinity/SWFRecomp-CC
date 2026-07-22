@@ -370,6 +370,19 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   ruling; **confirm EQ's title/preloader static-text usage** before assuming it
   renders). getPixel-gated (`regression/avm2_timeline_text`). See
   `avm2-native-text-render-plan.md` §"RESULT".
+- **Native static `DefineText`/2 DONE 2026-07-22 (leg 2) — gap #10 blank-render is
+  fully closed.** The census-flagged 72 static-text tags (title/menu chrome) now
+  paint on both sinks: the recompiler mines GLYPHENTRY runs into
+  `avm2_generated_statictexts[]` (`abc_timeline.cpp::parseDefineText`, ported from the
+  AVM1 `swf.cpp` parse), seeded onto `ext->statictext` at place-time, and fed through
+  the SAME glyph raster/tessellation as EditText (`glyph_raster_core` CPU /
+  `avm2_render_glyphs` GPU — refactored to be placement-source-agnostic, no fork).
+  Recompiling the real EQ SWF emits **71 static-text chars / 2427 placements** (census
+  match; parser frame-proven). Pixel rebuild deferred (OOM-risky 209 MB `draws.c`,
+  T5/T6 precedent); the exact-by-construction `regression/avm2_static_text` getPixel
+  probe (CPU == GPU) carries correctness. With static + dynamic text + shapes +
+  Graphics + morphs all rendering, **EQ's title/menu is fully renderable**. See
+  `avm2-native-text-render-plan.md` §"RESULT — leg 2".
 - **T4 DONE 2026-07-21 — script-drawn UI now renders.** `flash.display.Graphics`
   runtime drawing (`beginFill`/`beginGradientFill`/`lineStyle`/`drawRect`/`drawCircle`/
   `moveTo`/`lineTo`/`curveTo`/`drawPath`/`drawTriangles`) is a real vector backend on

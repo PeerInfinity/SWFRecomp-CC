@@ -385,6 +385,32 @@ typedef struct Avm2GlyphPlacement
 	uint32_t color;    // straight 0xRRGGBB
 } Avm2GlyphPlacement;
 
+// Static text (DefineText/2, the StaticText display object). One placed glyph
+// of a DefineText character, parsed from the tag's GLYPHENTRY runs at recompile
+// time: font_id resolves to avm2_generated_fonts at place-time; placement is
+// field-local twips (the record matrix translation + running advance baked in),
+// scale converts font units to twips at the record's text height, color is the
+// span's straight 0xRRGGBB. Fed through the SAME glyph raster/tessellation as
+// EditText (avm2_statictext_collect_glyphs -> Avm2GlyphPlacement).
+typedef struct Avm2StaticGlyph
+{
+	uint16_t font_id;
+	uint32_t glyph;    // glyph index into the font tables
+	int32_t x_twips;   // pen x (left edge of the glyph cell), field-local
+	int32_t y_twips;   // baseline y, field-local
+	float scale;       // twips per font unit (text_height / em_square)
+	uint32_t color;    // straight 0xRRGGBB
+} Avm2StaticGlyph;
+
+// One DefineText/2 character: a contiguous run of placed glyphs in the flat
+// avm2_generated_static_glyphs table (mirrors Avm2ShapeGeom's range model).
+typedef struct Avm2StaticTextData
+{
+	uint16_t char_id;
+	uint32_t glyph_start;   // index into avm2_generated_static_glyphs
+	uint32_t glyph_count;
+} Avm2StaticTextData;
+
 // DefineSceneAndFrameLabelData (root timeline only).
 typedef struct Avm2SceneData
 {
@@ -471,6 +497,10 @@ extern const Avm2EditTextData avm2_generated_edittexts[];
 extern const uint32_t avm2_generated_edittext_count;
 extern const Avm2FontData avm2_generated_fonts[];
 extern const uint32_t avm2_generated_font_count;
+extern const Avm2StaticGlyph avm2_generated_static_glyphs[];
+extern const uint32_t avm2_generated_static_glyph_count;
+extern const Avm2StaticTextData avm2_generated_statictexts[];
+extern const uint32_t avm2_generated_statictext_count;
 extern const Avm2BitmapData avm2_generated_bitmaps[];
 extern const uint32_t avm2_generated_bitmap_count;
 extern const Avm2BinaryData avm2_generated_binaries[];

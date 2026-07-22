@@ -218,6 +218,26 @@ static const Avm2ShapeGeom* shape_geom_for(uint16_t char_id)
 	return NULL;
 }
 
+static const Avm2StaticTextData* statictext_for(uint16_t char_id)
+{
+	for (uint32_t i = 0; i < avm2_generated_statictext_count; i++)
+	{
+		if (avm2_generated_statictexts[i].char_id == char_id)
+		{
+			return &avm2_generated_statictexts[i];
+		}
+	}
+	return NULL;
+}
+
+// Resolve a placed character's static-text (DefineText/2) glyph range onto its
+// ext (NULL for anything that isn't a StaticText). Mirrors resolve_shape_geom;
+// called at place-time so the render walk needs no per-frame lookup.
+static void resolve_static_text(Avm2DisplayObjectExt* ext, uint16_t char_id)
+{
+	ext->statictext = statictext_for(char_id);
+}
+
 // Resolve a placed character's renderable shape geometry onto its ext.
 // Called at place-time so the render walk needs no per-frame lookup. Clears
 // the range for anything that isn't a renderable shape (sprite, bitmap-fill
@@ -1095,6 +1115,7 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 	if (cext == NULL) return NULL;
 	cext->char_id = op->char_id;
 	resolve_shape_geom(cext, op->char_id);
+	resolve_static_text(cext, op->char_id);
 	cext->timeline = timeline_for_char(op->char_id);
 	Avm2Object* prev = replace_at_depth(ctx, pext, child, op->depth);
 	cext->instantiated_by_timeline = 1;
@@ -1156,6 +1177,7 @@ static void replace_child_character(Avm2Context* ctx, Avm2Object* child,
 	}
 	cext->char_id = char_id;
 	resolve_shape_geom(cext, char_id);
+	resolve_static_text(cext, char_id);
 	const Avm2CharInfo* ci = char_info(char_id);
 	if (ci != NULL && ci->kind == AVM2_CHAR_EDITTEXT)
 	{
@@ -6052,6 +6074,7 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
 		g_timeline_instantiation = 0;
 		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
 		cext->char_id = rec->char_id;
+		resolve_static_text(cext, rec->char_id);
 		cext->timeline = timeline_for_char(rec->char_id);
 		cext->instantiated_by_timeline = 1;
 		cext->depth = rec->depth;
@@ -8551,6 +8574,13 @@ static void avm2_cpu_walk(Avm2Context* ctx, Avm2Object* obj,
 		                     world.a, world.b, world.c, world.d,
 		                     world.tx, world.ty, alpha);
 
+	// Native timeline static text (DefineText/2) glyphs — CPU twin of
+	// avm2_render_statictext.
+	if (ext->statictext != NULL)
+		avm2_cpu_raster_statictext(fb, fbw, fbh, /*transparent=*/0, ctx, obj,
+		                           world.a, world.b, world.c, world.d,
+		                           world.tx, world.ty, alpha);
+
 	// T4: script-drawn Graphics geometry (independent of a timeline shape).
 	avm2_graphics_cpu_composite(ctx, obj, world.a, world.b, world.c, world.d,
 	                            world.tx, world.ty, alpha, fb, fbw, fbh, 0);
@@ -8925,6 +8955,9 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
                                       Avm2GlyphPlacement** out,
                                       int32_t out_clip[4]);
+uint32_t avm2_statictext_collect_glyphs(Avm2Context* ctx,
+                                        const Avm2StaticTextData* st,
+                                        Avm2GlyphPlacement** out);
 
 // Native TEXT/EDITTEXT — draw a timeline-placed TextField on the GPU. GPU twin of
 // avm2_cpu_raster_text: collect the laid-out glyphs, tessellate each glyph's
@@ -8935,15 +8968,14 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 // tessellate outlines -> tris (the T4/T6 runtime-tris path — crisp, scale-
 // independent). Device-font glyphs (no outlines) and x-clip to the field bounds
 // are skipped (see avm2-native-text-render-plan.md). CPU twin: avm2_cpu_raster_text.
-static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
-                             const Mat* world, double alpha)
+// Shared GPU glyph draw (placement-source-agnostic): tessellate + draw an
+// already-collected Avm2GlyphPlacement[] under one world-transform + alpha-cxform
+// slot. Both EditText (avm2_render_text) and static text (avm2_render_statictext)
+// feed it, so the two sources share ONE GPU draw path. Caller owns `gl`.
+static void avm2_render_glyphs(Avm2Context* ctx, const Avm2GlyphPlacement* gl,
+                              uint32_t n, const Mat* world, double alpha)
 {
-	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
-	if (ext == NULL || ext->edittext == NULL) return;
-	Avm2GlyphPlacement* gl = NULL;
-	int32_t clip[4];
-	uint32_t n = avm2_edittext_collect_glyphs(ctx, obj, &gl, clip);
-	if (n == 0) return;
+	if (gl == NULL || n == 0) return;
 
 	// One world-transform slot (field-local twips -> stage) for the whole field.
 	uint32_t xid = 0;
@@ -9032,6 +9064,43 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 		}
 		free(pts);
 	}
+}
+
+// EditText/TextField GPU entry: collect the field's laid-out glyphs, draw via the
+// shared avm2_render_glyphs. Thin wrapper (unchanged dispatch from
+// avm2_render_node for ext->edittext).
+static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
+                             const Mat* world, double alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->edittext == NULL) return;
+	Avm2GlyphPlacement* gl = NULL;
+	int32_t clip[4];
+	uint32_t n = avm2_edittext_collect_glyphs(ctx, obj, &gl, clip);
+	if (n == 0)
+	{
+		if (gl != NULL) heap_free(ctx->app, gl);
+		return;
+	}
+	avm2_render_glyphs(ctx, gl, n, world, alpha);
+	heap_free(ctx->app, gl);
+}
+
+// Static text (DefineText/2 -> StaticText) GPU entry: same shared glyph draw,
+// sourcing placements from the recompiler-baked ext->statictext table.
+static void avm2_render_statictext(Avm2Context* ctx, Avm2Object* obj,
+                                   const Mat* world, double alpha)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->statictext == NULL) return;
+	Avm2GlyphPlacement* gl = NULL;
+	uint32_t n = avm2_statictext_collect_glyphs(ctx, ext->statictext, &gl);
+	if (n == 0)
+	{
+		if (gl != NULL) heap_free(ctx->app, gl);
+		return;
+	}
+	avm2_render_glyphs(ctx, gl, n, world, alpha);
 	heap_free(ctx->app, gl);
 }
 
@@ -9059,6 +9128,10 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// Native timeline TextField (DefineEditText) glyphs.
 	if (ext->edittext != NULL)
 		avm2_render_text(ctx, obj, &world, alpha);
+
+	// Native timeline static text (DefineText/2 -> StaticText) glyphs.
+	if (ext->statictext != NULL)
+		avm2_render_statictext(ctx, obj, &world, alpha);
 
 	// T4: script-drawn Graphics geometry (independent of a timeline shape).
 	avm2_render_graphics(ctx, obj, &world, alpha);

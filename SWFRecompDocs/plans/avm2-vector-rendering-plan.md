@@ -722,7 +722,16 @@ integration check, never the oracle; both CI modes where render code changes
   demands it. Sized when reached.
 
 **Native `TEXT`/`EDITTEXT`:** sibling plan after T1–T3 (§3); EQ's HUD text needs it
-but only once the world renders.
+but only once the world renders. **DONE 2026-07-22 — both legs shipped**
+(`avm2-native-text-render-plan.md`): EditText leg (`9ab376ded`) then static
+`DefineText`/2 leg. The two glyph renderers were refactored to be
+placement-source-agnostic (`glyph_raster_core` CPU / `avm2_render_glyphs` GPU — same
+libtess2 NONZERO tessellation as timeline shapes), so EditText and StaticText share
+one draw path; static text adds only a recompiler GLYPHENTRY parse
+(`abc_timeline.cpp::parseDefineText`) + `ext->statictext` place-time seeding + walk
+arms. getPixel-gated (`regression/avm2_timeline_text`, `avm2_static_text`), both CI
+modes. Closes EQ gap #10 (title/menu chrome, census 72 static-text tags).
+`[[avm2-native-text-render]]`.
 
 ---
 
