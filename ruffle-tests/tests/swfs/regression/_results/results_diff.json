@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-21T21:05:56.718076+00:00",
-    "old_git_sha": "b36b9a2d401fca9245acfcc27c67f51501f6375a",
-    "new_timestamp": "2026-07-21T23:56:35.797041+00:00",
-    "new_git_sha": "63ca22e398c4d42c6e1216fe21e2fb019661cb4a",
+    "old_timestamp": "2026-07-21T23:56:35.797041+00:00",
+    "old_git_sha": "63ca22e398c4d42c6e1216fe21e2fb019661cb4a",
+    "new_timestamp": "2026-07-22T00:58:42.826185+00:00",
+    "new_git_sha": "f490e4b247e8d04ffabfb07564777243ffeb85d7",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 59,
     "old_total": 59,
     "old_pass_rate": 100.0,
-    "new_pass": 59,
+    "new_pass": 61,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 59,
-    "new_total": 59,
+    "new_effective_pass": 61,
+    "new_total": 61,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,33 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 59,
-    "added": 0,
+    "added": 2,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm2_timeline_gradients",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "avm2_timeline_stroke_gradient",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    }
+  ]
 }
