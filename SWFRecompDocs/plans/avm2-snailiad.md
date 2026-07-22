@@ -177,6 +177,54 @@ MAD alignment (offset scan for getTimer wall-clock drift):
    matches Flash/Ruffle timing semantics for FlxGame's elapsed-based step.
 6. Low-prio: DefineShape3 char-37 parser exception (latent bug, offline-inert).
 
+## 8. Archipelago readiness assessment (2026-07-22)
+
+**VERDICT: all information needed for AP integration is available — Snailiad
+is a BETTER AP target than RWK was.** Recipe = the Seedling/RWK pattern
+([[seedling-ap-ei-ruling]] / avm2-rwk-ap-handoff): generic EI + `__swfBridge`
+(runtime side DONE, game-agnostic), `flash-ap-api` BridgeGeneric injection,
+plus a per-game mapping JSON (Archipelago-CC owns `flashPanel/games/*.json`).
+
+What Snailiad gives us (all verified in the decompile — fully readable, no
+obfuscation, unlike RWK's mangled sources):
+
+- **Item list (complete, from `WorldMap` spawn dispatch + Player API):**
+  Guns 1–3 (sp tiles 89/90/91), Heart Containers (88), Helix Fragments (92),
+  Hi-Jump (362), Grav Jump (363), Devastator (364), Ice Snail (365), Turbo
+  Fire (366), + Armor / Shell Shield / Gravity Shock / Rapid Fire /
+  Super-unique variants (adjacent cases in the same switch).
+- **Location list (mechanically extractable):** item placements are sp-layer
+  tiles; the sp CSV is embedded (`WorldMap_WorldMapSpTxt.bin`, ffdec
+  `-export binaryData`) and the `WorldMap` dispatch maps tile ID → item class
+  → exact world (x,y) for every check. NPC/boss tiles give event locations.
+- **Check detection (no bridge extension needed):**
+  `PlayState.uniqueBlocks.blocks` is a PUBLIC Array of collected item block
+  coords (`rememberBlock` on every unique pickup) — plain BridgeGeneric
+  path_read. `player.getPercentComplete()` / `hasWonGame` for goal.
+- **Item application:** possession is CheckBool/CipherInt anti-cheat wrapped
+  (private fields — NOT path-writable), but Player exposes PUBLIC setters
+  (`setHasWeapon(n,b)`, `setHasDevastator`, `setHasShellShield`, …) and
+  BridgeGeneric already supports **`method_call` invocations** — the clean
+  grant path. Public getters exist too (`hasArmor()`, `hasGravityJump()`, …)
+  but they are METHODS: BridgeGeneric's per-frame `state_properties`/
+  `path_reads` read properties only → possession polling either goes through
+  a small BridgeGeneric read-method extension (flash-ap-api owned,
+  coordination) or is derived host-side from uniqueBlocks + granted items
+  (sufficient; recommended).
+- **State anchors:** `PlayState.This`, `PlayState.player` (statics — same
+  shape as RWK's registered-class reads), `player.x/y` for teleport probes.
+- **No existing apworld** (checked `~/CC/Archipelago-CC/worlds/` + web) —
+  items/locations/logic must be authored on the AP side (APQuest is the
+  canonical template). Useful reference: **SnailiadPlus** (open-source Unity
+  port, git.gay/CE-Studio/SnailiadPlus) for region/logic cross-checking.
+- **Injection precondition:** SWF has 0 verify failures and our recompile of
+  it is proven; `inject.py` + `--check-abc` validation is the RWK flow.
+
+Suggested sequencing (mirrors RWK): injected-SWF no-op parity → mapping JSON
+(`snailiad.json`) with reads + method_call grants → teleport/write livetest →
+handoff page `docs2/examples/avm2/snailiad_ap/`. Browser-arena flag from §6
+applies to the AP page too (603 MB live vs 512 MB wasm arena) — resolve first.
+
 ## Appendix — reproduction commands
 
 ```bash
