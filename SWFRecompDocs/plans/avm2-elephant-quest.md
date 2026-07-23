@@ -1,6 +1,14 @@
 # AVM2 corpus expansion — Elephant Quest bring-up plan
 
-**Status: EQ-0 + EQ-1 + EQ-2 + EQ-2.5 DONE (EQ-2.5 2026-07-22).** EQ-0: tolerant
+**Status: EQ-0 → EQ-4 DONE (EQ-4 2026-07-22 — `init2()` completes, live
+gameplay runs past the point Ruffle freezes).** EQ-4: the **goto catch-up walk
+gate** (gap #2b) took the 600-tick drive to init2 from >1000 s (never finished)
+to **6.2 s** with a byte-identical trace; the DOOR build completes, the first
+world-map frame renders (player + minimap + HUD), and 1200 ticks of live,
+scrolling gameplay run in 8.0 s where Ruffle's 15 s watchdog freezes. Gate:
+`regression/avm2_goto_catchup_scale`.
+
+**Earlier status: EQ-0 + EQ-1 + EQ-2 + EQ-2.5 DONE (EQ-2.5 2026-07-22).** EQ-0: tolerant
 verify was ALREADY IMPLEMENTED (recompile UNBLOCKED). EQ-1: the native build
 **compiles, links, and runs with no OOM**; `#1065 ContextMenuItem` FIXED. EQ-2:
 the Play click routes past the preloader to frame3 `new Shell(); shell.init()`
@@ -276,7 +284,48 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   depth for **string-built** class names + `as Class` construction is untested on
   this corpus — confirm at `init2()`, but no longer a prime failure suspect.
 
-### Gap 2b — [⚠️ ACTIVE — init2 REACHED but PERF-BLOCKED (EQ-3, 2026-07-22); EQ-4 profiling target] `init2()` is a heavy synchronous build
+### Gap 2b — [✅ SOLVED (EQ-4, 2026-07-22) — the goto catch-up walk gate] `init2()` is a heavy synchronous build
+
+- **✅ ROOT-CAUSED AND FIXED (EQ-4, 2026-07-22).** The cost was **ours, not the
+  game's**: every explicit AVM2 goto runs a full stage + orphan catch-up pass
+  (Ruffle `frame_lifecycle.rs::run_inner_goto_frame`, mirrored by
+  `avm2_display_inner_goto_frame`), so `Level.initTiles`' `new Tile();
+  addChild(t); t.gotoAndStop(type)` loop was **O(n²)**.
+- **Measured before theorizing** (new env-gated `AVM2_GOTO_PROF` counter — per
+  outermost goto: nodes walked, orphan-vs-stage split, nested gotos, timeline
+  ops, scripts, ctors, wall time): by tile ~4000 a **single goto walked 60,952
+  nodes in ~35 ms**, and the split was decisive — the **stage** subtree stayed
+  small and constant (~3.7k nodes) while **57,257 of the nodes came from the
+  orphan list**, which grew to **27,661 entries** and was scanned **three times
+  per goto** (construct loop, frame-script loop, `orphan_cleanup`). `orphan_add`
+  additionally did a linear membership scan, quadratic in its own right.
+- **Ruffle does the SAME full walk** (confirmed by reading `movie_clip.rs`
+  `goto_frame`/`goto_frame_now`/`no_op_goto` + `frame_lifecycle.rs`) — even a
+  no-op goto runs it. So the divergence was never semantic; Ruffle survives on a
+  ~20-40× smaller per-node constant and still takes ~18 s here, which is exactly
+  why its own 15 s watchdog kills it. **Beating Ruffle needed a better algorithm,
+  not a faster copy of Ruffle's.**
+- **The fix** (`avm2_display.c`, "Catch-up walk gate"): the walks are pure no-ops
+  on a node that is constructed + initialized, has no queued goto, and whose
+  frame script already ran for its current frame. So skip those subtrees —
+  `walk_clean` per node (set only by a frame-script walk that found the node AND
+  its children quiescent; cleared up the whole ancestor chain when a node
+  acquires work: creation, goto, per-tick playhead advance, queued script,
+  re-parenting), `dirty_kids` per container (a container with thousands of
+  quiescent children skips its child loop outright; recounted exactly during the
+  walk), a **dirty-orphan candidate list** + `in_orphan_list` + amortized orphan
+  compaction, and `display_ext_fast` (the `class_is_a` walk in
+  `avm2_display_ext_of` dominated large child scans). `walk_clean` is
+  zero-initialized, so anything unaccounted for is walked — **fail-safe by
+  construction**. `AVM2_NO_WALK_SKIP=1` disables the gate for A/B.
+- **Result (-O0 native, 600-tick drive to init2): >1000 s projected → 6.2 s**,
+  byte-identical trace at every step (A/B'd against the gate-off build). init2's
+  DOOR build **COMPLETES** (98 doors → `ADD LEVEL 4` → `NEW LAND!`), and 1200
+  ticks of **live gameplay** run in 8.0 s. Gate:
+  `regression/avm2_goto_catchup_scale` (0.32 s with the fix, harness TIMEOUT
+  without). **Reusable perf win for every AVM2 title**, not just EQ.
+
+<details><summary>Original EQ-3 diagnosis (the profile that led here)</summary>
 
 - **REACHED natively 2026-07-22 (EQ-3).** With the agi shell + a driven New Game
   → 4 story clicks → `startGameFromStory`, `Game`/`LoadingThing` reach the stage
@@ -296,6 +345,8 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   `AVM2_MAX_TICKS=545`, direct binary with `stdbuf -oL` + `timeout` to watch
   `DOOR n` cadence). **Fix this and EQ becomes the first title we play that
   Ruffle cannot** (Ruffle times out at ~18 s; we must finish faster). EQ-4.
+
+</details>
 
 ### Gap 3 — [✅ DONE — Loader (EQ-2.5) + `agi` no-op shell (EQ-3, 2026-07-22)] `flash.display.Loader` + `agi` no-op object
 
@@ -703,7 +754,51 @@ never exercised.
     perf fix (EQ-4). Once init2 completes, grade the first world-map frame against
     a Ruffle export (oracle valid to here), then drive *past* Ruffle's watchdog
     freeze.
-- **EQ-4+ — gameplay depth.** Levels/combat/upgrades/world-map fidelity; then GC
+- **EQ-4 — init2 COMPLETES; live gameplay past Ruffle's freeze. ✅ DONE
+  2026-07-22 (commit `6fefd4552`).** The wall was **our** goto catch-up, not the
+  game: the fix is the **catch-up walk gate** (gap #2b above has the full
+  root-cause, the `AVM2_GOTO_PROF` evidence and the design). Headlines:
+  - **>1000 s projected → 6.2 s** for the 600-tick drive to init2 (-O0 native),
+    **byte-identical trace** — every step A/B'd against an `AVM2_NO_WALK_SKIP=1`
+    build, including the full 400-tick boot/intro/menu/story sequence.
+  - **init2's DOOR build COMPLETES**: 98 doors → `ADD LEVEL 4` → `NEW LAND!` →
+    `ELEPHANTS TALKED TO …`, 0 trace errors (3 non-fatal `#1009 "play"` inside
+    the embedded Story timeline remain — the known EQ-5 item).
+  - **The first world-map frame RENDERS** (`AVM2_CPU_DUMP` at tick 1199): the
+    player elephant, the crosshair, the minimap door-connection graph, and the
+    HUD (`Area 4`, `Level 1`, `0 credits`, XP bar) all paint. The level tile
+    field is still black — a *render* gap (EQ-5), not a perf or logic gap.
+  - **We play what Ruffle cannot — graded head-to-head, same drive, same
+    assets.** A fresh oracle export was run for exactly this comparison: the
+    real `AGI.swf` re-downloaded into `fetchroot/cache.armorgames.com/assets/agi/`,
+    `story_drive.txt` compiled to the exporter's `input.json` format, 1200
+    frames, `RUFFLE_MOVIE_URL=http://armorgames.com/566862_ElephantQuest.swf`.
+    Result:
+    - **Ruffle's trace DIES AT `DOOR 14`** — 18 doors, then 7×
+      `ERROR ruffle_core::avm2: "...taken too long to execute..."`. Ours runs
+      all **98** doors → `ADD LEVEL 4` → `NEW LAND!` → `ELEPHANTS TALKED TO …`.
+    - **Trace parity is EXACT for everything Ruffle produced**: the DOOR
+      sequence is identical door-for-door, all 18 (`999, 0, 1, 2, 16, 20, 21,
+      44, 48, 3, 4, 63, 60, 56, 61, 17, 18, 14`). The only non-DOOR diffs are
+      environment-by-design: Ruffle's SWFStats beacon URL + `DOMAIN =
+      armorgames.com` (our native binary was not built with `-DSWF_URL`, so
+      `DOMAIN` is empty) and the real AGI's `Armor Games Interface - Version
+      1.9.29` banner vs our no-op shell.
+    - 1200 ticks of ours run in **8.0 s** with a live 2541-node scene: `Level4`
+      + `Elephant` + HUD on stage and the world **scrolling per tick**
+      (`Level4` bbox moves every frame).
+  - **Pixel grade — valid only pre-init2, as ruled.** At the **menu** (frame
+    340, a state both reach) CPU-dump-vs-export **MAD = 37.1**: title,
+    characters, cart, and every button label match; the deltas are button
+    *panel* styling, the missing bottom social/Armor-Games logos, and our
+    stubbed "Loading AGI…" panel where Ruffle shows the real "Armor Games
+    Enabled". Past init2 the oracle is **void, not merely stale** — Ruffle's
+    watchdog aborts the build and it lands in a *different game state*
+    (its frame 1199 shows "Area 5 / 25,293 XP" against our new-game "Area 4"),
+    so a world-map MAD would compare two different games. Menu render fidelity
+    + the black tile field are EQ-5 render items.
+- **EQ-5+ — gameplay depth.** Level tile-field render; the Story-timeline
+  `#1009 "play"`; levels/combat/upgrades/world-map fidelity; then GC
   soak before extended play; perf/footprint later and separate (out of scope
   now — the intrinsics don't transfer, §1).
 

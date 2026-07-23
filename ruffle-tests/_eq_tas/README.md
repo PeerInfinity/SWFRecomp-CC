@@ -35,6 +35,20 @@ click tick).
 `extras`/menu SimpleButton set) → `agi.hideAGILogin()` #1010 (agi undefined,
 needs the gap #3 `agi` no-op shell), then the heavy `init2()` DOOR-build.
 
+**EQ-4 DONE — `init2()` COMPLETES; live gameplay past Ruffle's freeze
+(2026-07-22, `6fefd4552`).** The wall was OUR goto catch-up walk, not the game:
+see the **catch-up walk gate** (`avm2_display.c`) and
+`regression/avm2_goto_catchup_scale`. Same drive, -O0 native:
+`AVM2_MAX_TICKS=600` went from >1000 s projected (never finished) to **6.2 s**
+with a byte-identical trace; 1200 ticks now run in **8.0 s**. The DOOR build
+completes (98 doors → `ADD LEVEL 4` → `NEW LAND!`) and the first world-map frame
+renders (`AVM2_CPU_DUMP=<prefix> AVM2_CPU_DUMP_FRAME=1199`): player, crosshair,
+minimap door graph, HUD. Head-to-head oracle (same drive, real AGI.swf served
+via `RUFFLE_LOCAL_FETCH_DIR`): **Ruffle's trace dies at `DOOR 14`** under its
+15 s watchdog while our DOOR sequence matches it door-for-door for all 18 it
+managed. New perf instruments: `AVM2_GOTO_PROF=1` (rolling `[GOTOSUM]`) / `=2`
+(per-goto `[GOTOPROF]` + `[FS]`), `AVM2_NO_WALK_SKIP=1` (gate off, for A/B).
+
 **EQ-3 DONE — agi shell → New Game → story → `init2()` REACHED (2026-07-22).**
 - The MainMenu `playB` click at tick 321 was **too early** (menu intro still
   animating in → the pick hits the full-stage intro clips, not `playB`). The menu
