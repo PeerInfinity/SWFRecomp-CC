@@ -1055,6 +1055,40 @@ void tagMain(SWFAppContext* app_context)
 		// the next tick sees is_playing=0 (from gotoAndStop), so funcs[target]
 		// never runs. Mirrors swf_core.c outer catch-up loop (line ~1195+).
 		// Key test: avm1/goto_frame_number.
+#ifdef OFFSCREEN_RENDER
+		// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK), ported from swf_core.c
+		// (~line 1257): promote a natural backward wrap that leaves stale
+		// later-frame display-list entries into an implicit backward goto so
+		// the catch-up loop below applies survives_rewind semantics
+		// (tagPlaceObject2 modify-vs-replace, unsurvivor cleanup via
+		// g_natural_wrap_cleanup_pending in actionDrainOnloadAndScript).
+		// Without this, the light wrap path (~line 1257) re-places
+		// non-surviving entries fresh, resetting script-written transforms
+		// and skipping depth renames. Key test:
+		// place_and_remove_object_insane_test (the last strict no-graphics /
+		// graphics parity gap). OFFSCREEN_RENDER-only for now: browser-WASM
+		// keeps the light wrap path its restart flows were tuned on (see the
+		// Snake note above ng_display_clear_after) pending probe coverage.
+		extern int g_force_quit;
+		if (manual_next_frame && !goto_from_action && next_frame < current_frame
+		    && current_frame + 1 == g_frame_count
+		    && !g_force_quit)
+		{
+			int has_stale = 0;
+			for (size_t d = 1; d <= max_depth && d < 16384; d++) {
+				if (display_list[d].char_id != 0
+				    && display_list[d].placed_at_frame > next_frame) {
+					has_stale = 1;
+					break;
+				}
+			}
+			if (has_stale) {
+				goto_from_action = 1;
+				extern int g_natural_wrap_cleanup_pending;
+				g_natural_wrap_cleanup_pending = 1;
+			}
+		}
+#endif
 		{
 			int _goto_retry_limit = 16;
 			while (goto_from_action && manual_next_frame && _goto_retry_limit-- > 0)

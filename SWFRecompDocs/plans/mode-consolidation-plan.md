@@ -107,7 +107,27 @@ gotcha-#15 class) late rather than never.
 
 Savings estimate: ~147 no-graphics full-suite runs/month drop to ~4–5.
 
-## Phase 3 — Investigate `place_and_remove_object_insane_test`
+## Phase 3 — Investigate `place_and_remove_object_insane_test` — **DONE 2026-07-23**
+
+**Root cause found and fixed.** Not a `tag.c` bug as the May triage guessed —
+the survives-rewind machinery in `tag.c` is compiled into both native modes.
+The divergence was in the frame loops: `swf_core.c` (~line 1257,
+TRANSFORMED_BY_SCRIPT_WRAP_BACK Phase 4) *promotes* a natural backward wrap
+that leaves stale later-frame display-list entries into an implicit backward
+goto (`goto_from_action=1; g_natural_wrap_cleanup_pending=1`), routing frame-0
+re-placement through the catch-up path's survives_rewind semantics. `swf.c`
+never got that promotion — its light wrap path re-placed non-survivors fresh,
+resetting script-written `_x` (mc_blue 60→0) and skipping the depth rename
+(mc_black → mc_black_name_changed).
+
+Fix: ported the promotion block to `swf.c` immediately before its catch-up
+loop, gated `#ifdef OFFSCREEN_RENDER` — browser-WASM deliberately keeps the
+light wrap path its restart flows were tuned on (Snake game-over→restart; see
+the comment above `ng_display_clear_after`) pending Phase 5 probe coverage.
+Verified locally in graphics mode: target test passes; 11 sensitive neighbors
+(loop_test family, place/replace/reverse-execute tests,
+displaylist_depths_test8, avm1/looping, avm1/goto_frame_number, the shumway
+FSCommand:quit fuzz test) all match their baselines.
 
 The last real mode divergence (no-graphics PASS, graphics FAIL; CLAUDE.md calls
 it a shared-code bug). Goal: fix it or formally accept it, so "graphics is a
