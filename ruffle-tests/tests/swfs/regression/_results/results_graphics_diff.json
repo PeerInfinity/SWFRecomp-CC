@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-22T21:00:48.767282+00:00",
-    "old_git_sha": "cc33c10bf9455c66af99eed82d81be924b412a43",
-    "new_timestamp": "2026-07-23T02:55:15.723999+00:00",
-    "new_git_sha": "6fefd45526256e44a25f1518629ad6db741fe856",
+    "old_timestamp": "2026-07-23T02:55:15.723999+00:00",
+    "old_git_sha": "6fefd45526256e44a25f1518629ad6db741fe856",
+    "new_timestamp": "2026-07-23T17:18:52.366609+00:00",
+    "new_git_sha": "8cf9ce9e4837fec7b26838fda231d63619a5308a",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 66,
+    "old_pass": 70,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 66,
-    "old_total": 66,
+    "old_effective_pass": 70,
+    "old_total": 70,
     "old_pass_rate": 100.0,
     "new_pass": 70,
     "new_ruffle_matched": 0,
@@ -25,58 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 66,
-    "added": 4,
+    "unchanged": 70,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm2_agi_shell",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "avm2_goto_catchup_scale",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "avm2_loader_stub",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "avm2_simplebutton_click",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    }
-  ]
+  "changes": []
 }
