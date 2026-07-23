@@ -154,7 +154,30 @@ strict superset oracle" becomes true before Phase 2's cadence flip fully lands.
    the mechanism explained. Also re-check `case-v6` while in the area and
    document its flake mechanism if reproducible.
 
-## Phase 4 — Native graphics capability assessment
+## Phase 4 — Native graphics capability assessment — **DONE 2026-07-23**
+
+**Deliverable:** `SWFRecompDocs/reference/native-windowed-graphics-assessment.md`
+(capability matrix + per-gap costs). Findings: all native-windowed source
+(`render_webgpu.c`, `sdl3webgpu.c`, `swf.c`, `tag.c`, `flashbang.c`) compiles
+clean — no source rot — but **no build system produces a windowed binary
+today**: `build_test.sh --graphics` native omits the SDL3/Dawn link + sdl3webgpu.c,
+and the CMake `USE_WEBGPU=ON` native path fails to configure because a
+`.gitignore` `build_*/` rule swallowed SDL3's vendored `build_config/` templates.
+Mouse input already reaches AVM1 in a window; keyboard does not (native pumps are
+ESC-to-quit only) and AVM2 gets no live input. Audio is silent natively (only a
+Web Audio sink; native stub empty). Native pacing is vsync-only (SWF fps ignored).
+Reaching a playable native windowed AVM1 game is ~Medium: build wiring (S) →
+keyboard (S) → native SDL3 audio sink (S-M), all finishing wiring the
+offscreen/browser paths already prove out — not design work.
+
+**Follow-up (flashbang verdict — delete/fold):** `flashbang.c` is a second,
+older SDL3-GPU renderer that duplicates the pipeline in a different API, carries
+a shader set that diverged 2026-02 (WGSL updated, its GLSL frozen at 2025-11),
+needs a Vulkan + `glslc` toolchain `render_webgpu` avoids, has weaker input, and
+has never had CI. `render_webgpu.c` already serves all three surface configs
+(offscreen / browser canvas / native SDL window). Recommend a cleanup task:
+repoint the CMake default `else()` arm at `USE_WEBGPU` and delete
+`src/flashbang/` + its shaders. (Not done here — Phase 4 is assessment-only.)
 
 Question: can this repo run graphics in *native* builds, or has graphics
 testing been wasm-only?
