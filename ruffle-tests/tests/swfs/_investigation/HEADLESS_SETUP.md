@@ -1,16 +1,20 @@
-# Headless Graphics Mode Setup
+# Offscreen Graphics Mode Setup
 
-This document explains how to set up and run the headless graphics pipeline,
-which renders SWFs offscreen and compares the output against expected PNG images
-from the Ruffle test suite.
+This document explains how to set up and run the offscreen graphics pipeline
+(`--mode=graphics`), which renders SWFs offscreen and compares the output
+against expected PNG images from the Ruffle test suite.
+
+> **2026-07-23:** the old `graphics-headless-legacy` mode (`swf_headless.c` +
+> `HEADLESS_GRAPHICS`) was deleted. `--headless` now errors with a pointer to
+> `--mode=graphics`; the Dawn / lavapipe / Pillow setup below is unchanged.
 
 ## Overview
 
-The headless pipeline works like this:
+The offscreen pipeline works like this:
 
 1. **SWFRecomp** recompiles `test.swf` into C code
 2. The C code is compiled with the runtime, Dawn WebGPU library, and
-   headless-specific sources (`swf_headless.c`, `render_webgpu.c`)
+   the graphics-mode sources (`swf.c`, `render_webgpu.c`, `capture.c`)
 3. The binary runs with software Vulkan (lavapipe), rendering frames offscreen
 4. At specific ticks, rendered frames are captured as PNGs
 5. The PNGs are compared pixel-by-pixel against Ruffle's expected images
@@ -106,12 +110,12 @@ git clone https://github.com/nickelc/ruffle ~/CC/ruffle   # or the official repo
 `verify_output.py` looks for expected images at
 `~/CC/ruffle/tests/tests/swfs/avm1/{test}/output.*.expected.png`.
 
-## Running Headless Tests
+## Running Image Tests
 
 ### Single test
 
 ```bash
-python3 ruffle-tests/verify_output.py --test=TEST_NAME --headless --diff --verbose
+python3 ruffle-tests/verify_output.py --test=TEST_NAME --mode=graphics --diff --verbose
 ```
 
 Example output:
@@ -127,7 +131,7 @@ PASS
 ### Multiple tests
 
 ```bash
-python3 ruffle-tests/verify_output.py --test=color --test=focusrect_swf6 --headless --diff --verbose
+python3 ruffle-tests/verify_output.py --test=color --test=focusrect_swf6 --mode=graphics --diff --verbose
 ```
 
 ### All image tests (dedicated runner)
@@ -138,7 +142,7 @@ python3 ruffle-tests/run_image_tests.py --test=color  # single test
 ```
 
 `run_image_tests.py` auto-discovers tests with `[image_comparisons]` in their
-`test.toml`, runs each via `verify_output.py --headless`, collects results, and
+`test.toml`, runs each via `verify_output.py --mode=graphics`, collects results, and
 generates reports. Output PNGs are saved to
 `ruffle-tests/tests/swfs/avm1/_image-test-output/{test}/`.
 
@@ -146,25 +150,25 @@ generates reports. Output PNGs are saved to
 
 ### Compilation
 
-When `--headless` is passed, `verify_output.py` compiles with these differences
-from trace-only mode:
+When `--mode=graphics` is passed, `verify_output.py` compiles with these
+differences from trace-only mode:
 
-| Aspect | Trace-only | Headless |
+| Aspect | Trace-only (`no-graphics`) | `graphics` |
 |--------|-----------|----------|
-| Defines | `-DNO_GRAPHICS` | `-DNO_GRAPHICS -DHEADLESS_GRAPHICS -DUSE_WEBGPU -DNDEBUG` |
-| Frame loop | `swf_core.c` | `swf_headless.c` |
+| Defines | `-DNO_GRAPHICS` | `-DUSE_WEBGPU -DOFFSCREEN_RENDER -DNDEBUG` |
+| Frame loop | `swf_core.c` | `swf.c` (the same loop browsers run) |
 | Renderer | none | `render_webgpu.c` |
 | Extra includes | none | `rendering/`, `stb/`, Dawn headers |
 | Extra libs | none | `libwebgpu_dawn.a`, `-lstdc++`, `-lpthread`, `-ldl` |
 
 If the test has `[image_comparisons]` in its `test.toml`, the define
 `-DHEADLESS_RENDER_ENABLED` is also added. Without it, the binary runs the
-headless frame loop but skips all rendering (useful for headless trace-only
-tests that need the headless event pump but not GPU rendering).
+graphics frame loop but skips all rendering (useful for trace-only tests that
+need the offscreen event pump but not GPU rendering).
 
-### Frame loop (`swf_headless.c`)
+### Frame loop (`swf.c`)
 
-The headless frame loop runs for `MAX_FRAMES` ticks. Each tick:
+The offscreen frame loop runs for `MAX_FRAMES` ticks. Each tick:
 
 1. Request capture if this tick matches a `CAPTURE_TRIGGERS` entry
 2. Run frame scripts (same as trace-only mode)
@@ -245,14 +249,14 @@ directory as `output.*.actual.png` and `output.*.difference.png`.
 
 ## Architecture Notes
 
-- `swf_headless.c` replaces `swf_core.c` in headless mode. It has the same
-  frame/event/timer logic but adds renderer initialization, capture scheduling,
-  and re-render hooks.
+- `swf.c` replaces `swf_core.c` in graphics mode. It is the same frame loop
+  the browser-WASM build runs; under `OFFSCREEN_RENDER` it adds renderer
+  initialization, capture scheduling (`capture.c`), and re-render hooks.
 - `render_webgpu.c` is the WebGPU backend. It handles shape rendering, sprite
   composition, color transforms, clip masking, text fields, drawing API shapes,
   BitmapData quads, and focus rect rendering.
-- `tag.c` has rendering code under `#ifdef NO_GRAPHICS` (headless CPU-side
-  rendering) and also used by `tagRerenderFrame()` under `#ifdef HEADLESS_GRAPHICS`.
+- `tag.c` has rendering code under `#ifdef NO_GRAPHICS` (CPU-side rendering)
+  and `tagRerenderFrame()` under `#ifdef OFFSCREEN_RENDER`.
 - The `swf.c` stub for `actionGetFocusRectInfo()` (always returns 0) is only
-  compiled in full graphics mode (`!NO_GRAPHICS && !HEADLESS_GRAPHICS`). In
-  headless mode, the real implementation in `action.c` is used.
+  compiled in browser-WASM graphics (`!NO_GRAPHICS && !OFFSCREEN_RENDER`). In
+  `--mode=graphics`, the real implementation in `action.c` is used.

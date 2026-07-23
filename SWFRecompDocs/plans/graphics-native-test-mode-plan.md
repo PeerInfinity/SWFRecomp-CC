@@ -6,7 +6,7 @@ Add a third compile/run mode for the Ruffle test suites that exercises the **ful
 
 The new mode lets us run the same ~1100 tests across all suites against the production graphics path and surface parity gaps systematically. As `swf.c` reaches feature parity with `swf_core.c`, HEADLESS_GRAPHICS becomes redundant — its retirement is an explicit end-state goal of this plan.
 
-**Status**: Planning
+**Status**: COMPLETE — all phases closed (Phase 2 on 2026-05-12, Phase 3 on 2026-07-23)
 **Created**: 2026-05-09
 **Target Completion**: TBD (multi-phase; Phase 1 should be a few days)
 
@@ -958,15 +958,15 @@ code). Every suite is well within the 2% exit threshold, and the
 two outstanding tests are documented rather than undiagnosed. **Phase
 2 is closed.**
 
-### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS
+### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS — DONE (2026-07-23)
 
 Goal: one rendering path instead of two.
 
 1. Switch `run_image_tests.py` from `--headless` to `--mode=graphics`. Verify image-comparison results don't regress. **DONE (2026-05-12, commit `c0def42f` + flip).** 31/31 image tests parity confirmed locally; see post-port parity check below.
 2. Move CI to option A (parallel matrix). The legacy mode is no longer the primary rendering CI path. **READY.**
-3. Once the legacy mode has zero unique callers and graphics-native is matching it on every suite for ≥1 month: delete `swf_headless.c`, remove `HEADLESS_GRAPHICS` from `render_webgpu.c` / `audio_output_web.c` / `swf.c` / build scripts, drop the `--mode=graphics-headless-legacy` value (and the deprecated `--headless` alias). **BLOCKED on step 2 (1-month clock starts after step 2 lands).**
+3. Once the legacy mode has zero unique callers and graphics-native is matching it on every suite for ≥1 month: delete `swf_headless.c`, remove `HEADLESS_GRAPHICS` from `render_webgpu.c` / `audio_output_web.c` / `swf.c` / build scripts, drop the `--mode=graphics-headless-legacy` value (and the deprecated `--headless` alias). **DONE (2026-07-23)** — executed as Phase 1 of `mode-consolidation-plan.md`. The 1-month clock ran 2+ months (zero unique callers since `c0def42f`, 2026-05-12). `swf_headless.c` (1183 lines) deleted; ~90 `HEADLESS_GRAPHICS` gates reduced by substituting `defined(HEADLESS_GRAPHICS)` → false; the `--mode=graphics-headless-legacy` value and the `results_headless*` files are gone; `--headless` now **errors** with a pointer to `--mode=graphics` rather than silently remapping (the two modes wrote different results files).
 
-**Exit criteria:** `swf_headless.c` deleted, `HEADLESS_GRAPHICS` removed from the codebase.
+**Exit criteria:** `swf_headless.c` deleted, `HEADLESS_GRAPHICS` removed from the codebase. **MET (2026-07-23). Phase 3 is closed.**
 
 #### Phase 3 step 1 parity check (2026-05-12)
 

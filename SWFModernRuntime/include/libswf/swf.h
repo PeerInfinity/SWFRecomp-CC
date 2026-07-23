@@ -300,7 +300,7 @@ typedef struct SWFAppContext
 	char* transform_data;
 	size_t transform_data_size;
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 	int width;
 	int height;
 

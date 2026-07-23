@@ -15,7 +15,7 @@
 #include <emscripten.h>
 #endif
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 #include <renderer.h>
 extern RenderContext* context;
 #endif
@@ -27,7 +27,7 @@ extern RenderContext* context;
 // ActionQueue API for clip-event migration (Phase 4+ of ACTION_QUEUE_PLAN).
 #include <actionmodern/action_queue.h>
 
-// Frame execution state — defined in swf_core.c (NO_GRAPHICS), swf_headless.c (HEADLESS), swf.c (GRAPHICS)
+// Frame execution state — defined in swf_core.c (NO_GRAPHICS), swf.c (GRAPHICS)
 extern int catch_up_mode;
 extern int g_tag_skip_mode;
 
@@ -145,7 +145,7 @@ static void stamp_onenterframe_paths(void)
 // Per-movie transform data mapping (indexed by movie_id, 0 = main SWF).
 // Set during actionImportAssets/actionFirePendingLoadInits so that sprites from
 // child movies can reference the correct transform array during frame execution.
-// Needed in all build modes (NO_GRAPHICS, HEADLESS, and graphics).
+// Needed in all build modes (NO_GRAPHICS and graphics).
 #define MAX_MOVIE_TRANSFORM_ENTRIES 16
 static float (*g_movie_transform_data[MAX_MOVIE_TRANSFORM_ENTRIES])[16] = {0};
 
@@ -161,8 +161,8 @@ float (*ng_getMovieTransformData(u8 movie_id))[16] {
 
 extern float transform_data[][16];
 
-#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
-// NO_GRAPHICS / HEADLESS / graphics-native: cxform_data is graphics-side only here.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// NO_GRAPHICS / graphics-native: cxform_data is graphics-side only here.
 extern float cxform_data[];
 
 // Active transform data pointer — defaults to main SWF's transform_data.
@@ -209,11 +209,10 @@ size_t g_place_gen = 0;
 // NOT bumped by swapDepths — depth changes, instantiation order is preserved.
 size_t g_place_seq = 0;
 
-// Frame-helper machinery used by both NO_GRAPHICS / HEADLESS frame loops
-// (swf_core.c, swf_headless.c) and the new --mode=graphics native build
-// (swf.c with OFFSCREEN_RENDER). HEADLESS_GRAPHICS implies both NO_GRAPHICS
-// and OFFSCREEN_RENDER, so this gate covers all three modes. wasm graphics
-// still uses the #else stubs in graphics_stubs.c.
+// Frame-helper machinery used by both the NO_GRAPHICS frame loop
+// (swf_core.c) and the --mode=graphics native build (swf.c with
+// OFFSCREEN_RENDER). wasm graphics still uses the #else stubs in
+// graphics_stubs.c.
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Tracks the currently-executing sprite's DisplayObject.
 // Set by advance_sprite_frames before each sprite frame function call.
@@ -949,7 +948,7 @@ static void scrub_mc_display_obj_in_range(DisplayObject* base, size_t cap);
 // invalidate_descendants_of_mc is all-modes (clear_display_entry's freed-DL
 // walk needs it); invalidate_mc_for_dl_entry stays browser-WASM-only.
 static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* parent);
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 static void invalidate_mc_for_dl_entry(SWFAppContext* app_context, DisplayObject* obj);
 #endif
 
@@ -1083,7 +1082,7 @@ static void advance_sprite_children_only(SWFAppContext* app_context, DisplayObje
 	display_list_capacity = obj->sprite_dl_capacity;
 
 	MovieClip* sprite_mc = NULL;
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 	extern MovieClip root_movieclip;
 	MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 	if (obj->instance_name != NULL) {
@@ -1292,7 +1291,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					// Recurse nested sprites (set parent context for correct child MC creation)
 					{
 						extern MovieClip root_movieclip;
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 						MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 						MovieClip* smc = obj->instance_name ? actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc) : NULL;
 #else
@@ -1346,7 +1345,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					// Recurse nested sprites (set parent context for correct child MC creation)
 					{
 						extern MovieClip root_movieclip;
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 						MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 						MovieClip* smc = obj->instance_name ? actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc) : NULL;
 #else
@@ -1470,7 +1469,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 				}
 			}
 #endif
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 			// Browser-WASM: the NO_GRAPHICS/OFFSCREEN path above invalidates the
 			// cached child MovieClips for the soon-to-be-freed entries via
 			// fire_entry_unloads; mirror just the invalidation here (survivors
@@ -1582,7 +1581,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		else if (!g_advance_defer_nested)
 		{
 			MovieClip* sprite_mc = NULL;
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 			extern MovieClip root_movieclip;
 			MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 			if (obj->instance_name != NULL)
@@ -1794,7 +1793,7 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 
 		// Set context to this sprite's MC for correct child resolution
 		MovieClip* sprite_mc = NULL;
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 		{
 			extern MovieClip root_movieclip;
 			MovieClip* parent_for_recurse = (g_current_context != NULL) ? g_current_context : &root_movieclip;
@@ -2114,7 +2113,7 @@ static void presync_nested_cf_recurse(SWFAppContext* app_context)
 		MovieClip* smc = NULL;
 		if (obj->instance_name != NULL)
 		{
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 			extern MovieClip root_movieclip;
 			MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 			smc = tag_cached_walk_mc(obj, pmc, 0);
@@ -2182,7 +2181,7 @@ void presync_nested_sprite_currentframe(SWFAppContext* app_context)
 		MovieClip* smc = NULL;
 		if (obj->instance_name != NULL)
 		{
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 			extern MovieClip root_movieclip;
 			MovieClip* pmc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 			smc = actionFindOrCreateMovieClip(app_context, obj->instance_name, pmc);
@@ -2208,7 +2207,7 @@ void presync_nested_sprite_currentframe(SWFAppContext* app_context)
 	}
 }
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 // ---------------------------------------------------------------------------
 // Browser-WASM: apply DEFERRED gotoAndStop/Play navigation to attachMovie'd
 // clips. The MC-targeted gotoAndStop handler (action.c) sets sprite-local nav
@@ -2343,7 +2342,7 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 //   * One-shot: when the playhead wraps to frame 0 the clip stops (no loop), so a
 //     gotoAndPlay to a label plays forward once and parks on its last frame
 //     (matches a disappear/transition ending in stop()).
-// Browser-WASM only (OFFSCREEN/HEADLESS keep their counter pump; NO_GRAPHICS not
+// Browser-WASM only (OFFSCREEN keeps its counter pump; NO_GRAPHICS not
 // built here) → CI byte-identical, not CI-observable.
 void advance_attached_clip_natural(SWFAppContext* app_context)
 {
@@ -2487,7 +2486,7 @@ void upgrade_attached_clip_initialized(SWFAppContext* app_context)
 }
 #endif
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 // ---------------------------------------------------------------------------
 // Dynamic transform slot allocator for composed transforms.
 // When multiple sprite instances share the same child transform_id, we must
@@ -2644,7 +2643,7 @@ static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
 // parent's world transform would need to compose here. Tracked in
 // DYNAMIC_MC_DRAWING_TRANSFORM_PLAN.
 // ---------------------------------------------------------------------------
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 {
 	extern MovieClip* child_mc_cache[];
@@ -2802,7 +2801,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			local_xform = attached_xform;
 		} else {
 			local_xform = &transforms[obj->transform_id * 16];
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 			// Browser-WASM: a nested timeline child whose clip action mutated
 			// its spatial props (e.g. Doodle Jump blue platform charId 32 "aaa"
 			// doing `this._x += ac` each enterFrame). Overlay the MC's
@@ -3057,7 +3056,7 @@ static int cxform_forces_invisible(SWFAppContext* app_context, u32 cxform_id)
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
 	if (cxform_forces_invisible(app_context, obj->cxform_id)) return;
-#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#ifdef OFFSCREEN_RENDER
 	// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary because
 	// tagDefineVideoStream doesn't set a type. Check for video BEFORE the switch.
 	if (ng_isVideoChar(obj->char_id)) {
@@ -3099,7 +3098,7 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 				obj->transform_id, obj->cxform_id);
 			break;
 		case CHAR_TYPE_TEXT:
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 			// DefineEditText reuses CHAR_TYPE_TEXT in the dictionary so the
 			// recompiler can pre-bake glyph transforms for the initial text,
 			// but the EditText is rendered dynamically via
@@ -3227,7 +3226,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 			continue;
 		}
 
-#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#ifdef OFFSCREEN_RENDER
 		// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary.
 		// Check for video BEFORE the switch to avoid rendering as empty shape.
 		if (ng_isVideoChar(obj->char_id)) {
@@ -3265,7 +3264,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				break;
 
 			case CHAR_TYPE_TEXT:
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 				// See render_single_object — skip static draw for EditTexts;
 				// they render dynamically via actionIterateTextFieldGlyphs.
 				if (ng_getCharTextfieldIdx(obj->char_id) >= 0) break;
@@ -3342,7 +3341,7 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 	static int already_set = 0;
 	if (already_set) return;
 	already_set = 1;
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 	renderer_set_background(context, red, green, blue);
 #else
 	(void)red; (void)green; (void)blue;
@@ -3374,11 +3373,11 @@ static Character* resolve_hit_shape(size_t hit_char_id, u32* out_hit_transform_i
 	return NULL;
 }
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 // Browser-WASM only: also update DefineButton2 states inside attachMovie'd /
 // createEmptyMovieClip'd clips (child_mc_cache), which live outside the root
 // display_list. Defined below, after compute_mc_world_xform/render_attached_child.
-// Gated like the AS2-button-fire block below — NO_GRAPHICS / OFFSCREEN / HEADLESS
+// Gated like the AS2-button-fire block below — NO_GRAPHICS / OFFSCREEN
 // dispatch attached-clip buttons via their own per-event / process_sprite path.
 static void ng_update_button_states_attached(SWFAppContext* app_context, int* found_hover);
 #endif
@@ -3919,8 +3918,8 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		// dynamic_props (e.g. Tetris `play_btn.onRelease = function(){play();}`,
 		// whose DefineButton2 has ActionOffset=0 / no baked actions).
 		//
-		// BROWSER-WASM ONLY. In NO_GRAPHICS / OFFSCREEN_RENDER /
-		// HEADLESS_GRAPHICS, process_sprite_needs_init runs and sets
+		// BROWSER-WASM ONLY. In NO_GRAPHICS / OFFSCREEN_RENDER,
+		// process_sprite_needs_init runs and sets
 		// button_mc->display_obj, so the per-MC AABB dispatch
 		// (actionDispatchMCPress/Release/MouseMove) already fires these
 		// handlers from swf_core.c / input_events — doing it here too would
@@ -3928,7 +3927,7 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		// Browser-WASM is the one build where process_sprite_needs_init is
 		// gated out, so button MCs have display_obj==NULL, the AABB dispatch
 		// skips them, and this precise-hit-test dispatch is the only path.
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 		if (old_state != new_state && mc_enabled && obj->instance_name != NULL)
 		{
 			int as_allow = mc_visible;
@@ -3995,7 +3994,7 @@ int ng_update_button_states(SWFAppContext* app_context)
 		identity, &root_movieclip,
 		NULL,
 		&found_hover);
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: the root display_list above misses DefineButton2 buttons
 	// that live inside attachMovie'd / createEmptyMovieClip'd clips (e.g. N's
 	// entire menuMC UI). Walk those too.
@@ -4249,7 +4248,7 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	g_clip_ef_rebase_head = _ef_frame.prev;
 }
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 // Browser-WASM: dispatch CLIP_EVENT_ENTER_FRAME for sprites nested inside
 // attachMovie'd clips. The root walk above (over display_list) cannot reach
 // these: ng_attachMovie copies a parent display-list entry that it never marks
@@ -4377,7 +4376,7 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 		extern MovieClip root_movieclip;
 		dispatch_enterframe_clip_actions(app_context, display_list, max_depth, &root_movieclip);
 	}
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: fire enterFrame for clip actions on sprites nested inside
 	// attachMovie'd clips (e.g. Doodle Jump blue platform charId 32 "aaa"),
 	// which the root walk above structurally can't reach.
@@ -4392,7 +4391,7 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 // call() only runs DoAction scripts, not timeline management tags.
 int g_in_action_call = 0;
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 // Callback for actionIterateTextFields: render text field background/border rectangles.
 static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data)
 {
@@ -4643,7 +4642,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	// only; the field clip mask hides the scrolled-out glyphs. Browser-WASM only
 	// (in OFFSCREEN/headless nothing is focused → caret_char<0 → no shift → CI
 	// render byte-identical).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	if (info->caret_char >= 0 && info->mc != NULL) {
 		int multiline = 0;
 		for (size_t i = 0; i < text_len; i++) {
@@ -4695,7 +4694,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	// Selection highlight: draw a box behind the selected glyphs (single-line,
 	// focused field). Browser-WASM only, same rationale as the caret — nothing is
 	// selected in headless/OFFSCREEN, so CI render output is unchanged.
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	if (info->sel_begin >= 0 && info->sel_end >= 0 && info->sel_begin != info->sel_end) {
 		int sel_lo = info->sel_begin < info->sel_end ? info->sel_begin : info->sel_end;
 		int sel_hi = info->sel_begin > info->sel_end ? info->sel_begin : info->sel_end;
@@ -4750,7 +4749,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	// Browser-WASM only: the caret is an interactive element; OFFSCREEN / headless
 	// CI captures must stay caret-free (a test's Selection.setFocus would otherwise
 	// add a caret bar and diverge from Ruffle's baseline).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	size_t caret_count = 0;
 	float caret_x = -1.0f;
 	float caret_baseline = y_pos;
@@ -4792,7 +4791,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 		// Record the caret x at its character index (pen position before this
 		// char is laid out, on the current line's baseline).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 		if (info->caret_char >= 0 && caret_x < 0.0f &&
 		    caret_count == (size_t)info->caret_char) {
 			caret_x = x_pos;
@@ -4854,7 +4853,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	// Caret at (or past) the end of the text — pen is at its final position.
 	// Draw a thin vertical bar at the insertion point, in the text color,
 	// spanning the line's em height. Browser-WASM only (see tracking note above).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	if (info->caret_char >= 0 && caret_x < 0.0f &&
 	    (size_t)info->caret_char >= caret_count) {
 		caret_x = x_pos;
@@ -4973,7 +4972,7 @@ static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user
 
 // Re-render current display list state (for headless per-tick image capture).
 // Only does the rendering pass — no frame script processing, no sprite init, etc.
-#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#ifdef OFFSCREEN_RENDER
 void tagRerenderFrame(SWFAppContext* app_context)
 {
 	if (context == NULL || !context->renderer_ok) return;
@@ -5315,7 +5314,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 }
 #endif
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 // Browser-WASM: recursively finalize tagRemoveObject(2)'d entries that weren't
 // reclaimed by a same-tick Place. tagRemoveObject2 only marks pending_remove=1;
 // the finalize walk used to scan the ROOT display list only, so a remove inside
@@ -5363,7 +5362,7 @@ static void finalize_pending_removes_recursive(SWFAppContext* app_context)
 }
 #endif
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 // Compute an MC's local-to-world (stage-space) transform by walking its parent
 // chain. Used by the root-attached render pass to place attachMovie children of
 // a non-root sprite (e.g. Tetris's block cells parented to b_mc). _root itself
@@ -5407,7 +5406,7 @@ static void compute_mc_world_xform(SWFAppContext* app_context, MovieClip* mc, fl
 	hit_test_mat4_multiply(out, parent_world, local);
 }
 
-#if !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#ifndef OFFSCREEN_RENDER
 // Root display_list index of an attached MC's parent, or -1 if the parent is
 // _root or is not a timeline-placed object (i.e. itself an attached/dynamic MC
 // whose DisplayObject lives outside the global display_list array). Used to
@@ -5667,7 +5666,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max);
 			upgrade_sprite_initialized(display_list, max_depth);
 		}
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 		{
 			void upgrade_attached_clip_initialized(SWFAppContext* app_context);
 			upgrade_attached_clip_initialized(app_context);
@@ -5741,13 +5740,12 @@ void tagShowFrame(SWFAppContext* app_context)
 		void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max);
 		upgrade_sprite_initialized(display_list, max_depth);
 	}
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	{
 		void upgrade_attached_clip_initialized(SWFAppContext* app_context);
 		upgrade_attached_clip_initialized(app_context);
 	}
 #endif
-#if !defined(HEADLESS_GRAPHICS)
 	// Browser-WASM: finalize any tagRemoveObject(2)'d entries that weren't
 	// reclaimed by a same-tick tagPlaceObject2(Ratio) BEFORE the AQ_KIND_LOAD
 	// drain. pending_remove was deferred at tagRemoveObject2 time to give
@@ -5763,7 +5761,6 @@ void tagShowFrame(SWFAppContext* app_context)
 	// tick's ENTER_FRAME dispatch creates a fresh hero MC with no score
 	// property, and `_root.score_txt.text = "" + score` produces "undefined".
 	finalize_pending_removes_recursive(app_context);
-#endif
 	// Browser-WASM: drain deferred LOAD clip-actions queued onto
 	// AQ_KIND_LOAD at placement time. By now advance_sprite_frames has
 	// populated sprite children (e.g. button_txt inside Doodle Jump's
@@ -5782,7 +5779,7 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Button hit testing + state machine + action dispatch ---
 	// In NO_GRAPHICS mode, button states are updated per-tick from swf_core.c frame loop
 	// (after event delivery), and per-mouse-event from input_events_deliver().
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 	{
 #ifdef __EMSCRIPTEN__
 		// Browser-WASM perf gate. The button-state hover walk
@@ -5793,7 +5790,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		// hover/press state only changes when the mouse moves or a button
 		// transitions (Flash updates hover on mouse move), so skip the walk on
 		// frames where neither the pointer position nor the button state changed,
-		// and keep the previous cursor. Non-browser graphics (OFFSCREEN/HEADLESS,
+		// and keep the previous cursor. Non-browser graphics (OFFSCREEN,
 		// the CI path) keep the unconditional walk below → byte-identical results,
 		// so this is NOT CI-observable and can't regress the trace suites. Known
 		// tradeoff (accepted): a button that moves under a perfectly stationary
@@ -5828,7 +5825,7 @@ void tagShowFrame(SWFAppContext* app_context)
 	}
 #endif
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 	// Compute focus rect BEFORE compose_children modifies transform_ids.
 	// ng_getDisplayEntryBounds reads from CPU-side transform_data which only
 	// has original (non-composed) slots; composed dynamic slots exist only in GPU.
@@ -6227,7 +6224,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		if (obj->blend_mode > 1)
 			renderer_set_blend_mode(context, 0);
 
-#if !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#ifndef OFFSCREEN_RENDER
 		// Interleave attached (child_mc_cache) clips parented to THIS timeline
 		// object right after it, so they layer at the parent's depth instead of
 		// above all timeline content. Without this, a clip attached to a sprite
@@ -6236,7 +6233,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		// (depth 219) — paints OVER that object. Root-attached clips (parent ==
 		// _root, AS depth 16384+) keep going through the post-loop pass below so
 		// they stay above all timeline content, matching Flash. OFFSCREEN /
-		// HEADLESS skip non-root attaches entirely (see the post-loop pass), so
+		// skip non-root attaches entirely (see the post-loop pass), so
 		// this interleave is browser-WASM-only.
 		{
 			extern MovieClip* child_mc_cache[];
@@ -6269,7 +6266,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			MovieClip* mc = child_mc_cache[i];
 			if (mc == NULL) continue;
 			if (mc->depth == INT_MIN) continue;            // removed
-#if defined(OFFSCREEN_RENDER) || defined(HEADLESS_GRAPHICS)
+#ifdef OFFSCREEN_RENDER
 			// Graphics-native / headless keep the original root-only behavior
 			// (trace-based suites; rendering non-root attaches here is a
 			// browser-WASM-only feature, kept out of these modes to stay
@@ -6352,7 +6349,7 @@ int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
 		if (child->char_id == 0) continue;
 		Character* ch = &dictionary[child->char_id];
 
-#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifdef NO_GRAPHICS
 		// Use cached place_* values from the DisplayObject — these were
 		// captured at PlaceObject2 time using whichever transform_data
 		// table was active (parent's or imported child's). Indexing into
@@ -7534,7 +7531,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 #endif
 	ng_ensureDisplayListSize(app_context, depth);
 
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: consume any deferred pending_remove from a same-tick
 	// tagRemoveObject(2) at this depth.
 	//  * Same char_id  -> reclaim the cached MC by running a modify-style
@@ -8161,7 +8158,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	                              && (is_replace
 	                                  || display_list[depth].place_gen != g_place_gen);
 
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: before we overwrite this slot's char_id and drop the old
 	// sprite_display_list pointer, invalidate the cached MC bound to this
 	// display entry and all its descendants. Without this,
@@ -8506,7 +8503,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 #endif
 	ng_ensureDisplayListSize(app_context, depth);
 
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: consume any deferred pending_remove from a same-tick
 	// tagRemoveObject(2) at this depth. Different (char_id, ratio) -> fire
 	// the deferred invalidate + clear now and fall through to fresh-place.
@@ -9751,7 +9748,7 @@ static void invalidate_descendants_of_mc(SWFAppContext* app_context, MovieClip* 
 	}
 }
 
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 // Find the cached MC whose display_obj == `obj`, then invalidate it and all
 // its descendants. NULL display_obj match is skipped because many cached MCs
 // (e.g. dynamically-created clones) have display_obj=NULL legitimately.
@@ -9939,7 +9936,7 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 		display_list[depth].pending_remove = 1;
 #endif
 	}
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 	(void)app_context;
 #endif
 }
@@ -10165,7 +10162,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		actionInvalidateMCAtASDepth(app_context, (int)depth - 16384);
 	}
 #endif
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 	(void)app_context;
 #endif
 }
@@ -11270,7 +11267,7 @@ void ng_registerBitmapMetadata(u16 char_id, size_t offset, size_t size, u32 widt
 	}
 }
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
 {
 	renderer_upload_bitmap(context, offset, size, width, height);

@@ -1,9 +1,8 @@
 // Frame-capture state machine. See capture.h for the public API.
 //
-// Extracted from swf_headless.c so swf.c (OFFSCREEN_RENDER mode) can drive
-// the same scheduling code. Renderer-touching paths gate on
-// HEADLESS_RENDER_ENABLED; verify_output.py defines that for image-comparison
-// tests under both --mode=graphics and --mode=graphics-headless-legacy.
+// Drives frame-capture scheduling for swf.c (OFFSCREEN_RENDER mode).
+// Renderer-touching paths gate on HEADLESS_RENDER_ENABLED; verify_output.py
+// defines that for image-comparison tests under --mode=graphics.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,8 +12,8 @@
 #include <libswf/swf.h>
 #include <renderer.h>
 
-// The active RenderContext is owned by the frame-loop file (swf.c or
-// swf_headless.c). We borrow it via extern.
+// The active RenderContext is owned by the frame-loop file (swf.c).
+// We borrow it via extern.
 extern RenderContext* context;
 
 // Default capacity for the capture-trigger table. Override at runtime with the

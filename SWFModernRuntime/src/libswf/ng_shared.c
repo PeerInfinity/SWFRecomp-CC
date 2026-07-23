@@ -1,5 +1,5 @@
 // ng_shared.c — shared ng_* registry functions compiled in ALL build modes
-// (NO_GRAPHICS, HEADLESS_GRAPHICS, and GRAPHICS/USE_WEBGPU)
+// (NO_GRAPHICS and GRAPHICS/USE_WEBGPU)
 //
 // These functions provide access to SWF definition registries (fonts, textfields,
 // exports, character bounds/paths, sounds, videos, buttons) that are populated

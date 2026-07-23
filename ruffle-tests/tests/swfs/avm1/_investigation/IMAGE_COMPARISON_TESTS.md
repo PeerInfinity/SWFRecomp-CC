@@ -6,7 +6,7 @@
 
 **Pipeline**: SWFRecomp → C code → native binary (with `-DHEADLESS_RENDER_ENABLED`) → headless Dawn WebGPU → frame capture → PNG → pixel comparison
 
-**Running a test**: `python3 ruffle-tests/verify_output.py --test=TEST_NAME --headless --diff --verbose`
+**Running a test**: `python3 ruffle-tests/verify_output.py --test=TEST_NAME --mode=graphics --diff --verbose`
 
 Expected PNGs are now copied into each test directory as `output.expected.png` (from `~/CC/ruffle/tests/tests/swfs/avm1/`).
 Actual PNGs are saved to the test directory as `output.actual.png` when `--verbose` is passed.
@@ -300,7 +300,7 @@ All expected PNGs from `~/CC/ruffle/tests/tests/swfs/avm1/` have been copied to 
 ## Architecture Notes
 
 ### Render Pipeline (Headless)
-1. `swf_headless.c` frame loop ticks the SWF
+1. `swf.c` frame loop (under `OFFSCREEN_RENDER`) ticks the SWF
 2. Each `tagShowFrame` in `tag.c` triggers a render pass:
    a. **Compose phase**: Walk display list, compose parent×child transforms for sprites/buttons, write to GPU buffer
    b. **Render phase**: Open render pass, walk display list in depth order, draw each shape/text/sprite

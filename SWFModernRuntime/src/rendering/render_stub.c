@@ -1,7 +1,7 @@
 // render_stub.c — no-op implementation of the render_webgpu_* API.
 //
 // Purpose: compile the browser-WASM graphics arm (!NO_GRAPHICS &&
-// !OFFSCREEN_RENDER && !HEADLESS_GRAPHICS) NATIVELY, with no GPU, no SDL and
+// !OFFSCREEN_RENDER) NATIVELY, with no GPU, no SDL and
 // no Dawn link, so that sanitizers (ASAN + -DHEAP_PASSTHROUGH in heap.c) can
 // reach the attached-clip / display-list machinery that only that build mode
 // executes. All draw/upload calls are no-ops; init mimics the real renderer's

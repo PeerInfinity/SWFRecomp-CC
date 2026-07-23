@@ -62,7 +62,7 @@ The sections below explain the underlying two-step `build_test.sh` →
 
 Every demo is produced by two scripts:
 
-- **`build_test.sh <test_name> [native|wasm] [--clean] [--graphics] [--headless]`**
+- **`build_test.sh <test_name> [native|wasm] [--clean] [--graphics]`**
   — recompiles `SWFRecomp/tests/<test_name>/test.swf` and compiles the WASM into
   `SWFRecomp/tests/<test_name>/build/wasm/`. For demos always use `wasm`.
 - **`deploy_example.sh <test_name> [docs_dir] [--no-index] [--graphics]`**

@@ -1,7 +1,7 @@
 #pragma once
 
-// Frame-capture state machine shared by swf_headless.c (HEADLESS_GRAPHICS)
-// and swf.c (OFFSCREEN_RENDER). Reads CAPTURE_TRIGGERS / CAPTURE_OUTPUT_DIR
+// Frame-capture state machine used by swf.c (OFFSCREEN_RENDER).
+// Reads CAPTURE_TRIGGERS / CAPTURE_OUTPUT_DIR
 // env vars and writes rendered frames as PNGs via the renderer's readback
 // buffer. The renderer-touching paths gate on HEADLESS_RENDER_ENABLED;
 // without that define everything is a no-op (so non-image tests don't pay

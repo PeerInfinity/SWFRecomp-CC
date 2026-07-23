@@ -8,6 +8,17 @@ that actually came up while flipping 5 of 9 smoke tests. See
 `graphics-native-test-mode-phase2-results-2026-05-09.md` for what's
 already been done.
 
+> **2026-07-23 — `graphics-headless-legacy` is gone.** Phase 3 of the plan
+> (executed as Phase 1 of `mode-consolidation-plan.md`) deleted
+> `swf_headless.c` and the `HEADLESS_GRAPHICS` define. The two surviving
+> modes are `no-graphics` and `graphics`. Wherever this playbook's
+> historical notes describe *bisecting via the legacy mode*, use
+> **`no-graphics` as the control** instead: "passes in no-graphics, fails
+> in graphics" is now the whole signal, and it no longer distinguishes
+> "misgated `#ifndef NO_GRAPHICS` arm" (gotcha #13) from "`swf.c` main-loop
+> gap" (gotcha #14) — check both. The narrative sections below are left as
+> written; they are a record of the Phase 2 push.
+
 ## Setup: get a full-suite baseline
 
 Before triaging individual failures, get a per-suite pass-rate snapshot
@@ -17,12 +28,11 @@ under `--mode=graphics`. Two options:
 `mode` and `single_test` inputs:
 
 - `mode=no-graphics` (default) — existing behavior, unchanged
-- `mode=graphics` — runs the new full-graphics-native build
-- `mode=graphics-headless-legacy` — runs `swf_headless.c` + offscreen Dawn
+- `mode=graphics` — runs the full-graphics-native build
 - `single_test=NAME` — runs just one test (any mode), auto-uses the
   single-runner job
 
-**One-time prerequisite:** Both graphics modes need a prebuilt Dawn
+**One-time prerequisite:** Graphics mode needs a prebuilt Dawn
 binary in the GitHub Actions cache. Run the `build-dawn.yml` workflow
 once to populate it (~30 minutes). After that, a weekly cron keeps the
 cache warm so it doesn't evict. If `ruffle-tests.yml` runs in graphics
@@ -87,16 +97,18 @@ cause.
 
    First line of divergence usually points at what's missing.
 
-2. **Bisect via the legacy mode.**
+2. **Bisect against NO_GRAPHICS (the control).**
 
    ```bash
-   python3 ruffle-tests/verify_output.py --test=NAME --mode=graphics-headless-legacy --diff
+   python3 ruffle-tests/verify_output.py --test=NAME --diff
    ```
 
    - Passes there but fails in graphics-native → bug is in `swf.c`'s
-     frame loop or in a recently-widened gate. **Most common case.**
+     frame loop or in a misgated `#ifndef NO_GRAPHICS` arm. **Most
+     common case** — see gotchas #13 and #14, which the retired
+     `graphics-headless-legacy` mode used to tell apart.
    - Fails in both → shared-code bug in `tag.c` / `action.c` /
-     `action_queue.c`. Rarer; investigate with NO_GRAPHICS as control.
+     `action_queue.c`. Rarer.
 
 3. **Find what's missing.** Three things are usually missing:
 
@@ -133,17 +145,15 @@ cause.
    Plus run the test you were targeting and a handful of others from
    its cluster.
 
-5. **Verify legacy modes unchanged.** After any `tag.c` / `action.c`
-   gate change, sanity-check that NO_GRAPHICS and legacy headless
-   didn't regress:
+5. **Verify NO_GRAPHICS unchanged.** After any `tag.c` / `action.c`
+   gate change, sanity-check that NO_GRAPHICS didn't regress:
 
    ```bash
    python3 ruffle-tests/verify_output.py --test=NAME --diff                          # NO_GRAPHICS
-   python3 ruffle-tests/verify_output.py --test=NAME --mode=graphics-headless-legacy --diff
    ```
 
    For a structural change (gate widening, new call site), pick 2–3
-   tests in the suite and run all three modes.
+   tests in the suite and run both modes.
 
 6. **Commit.** Per-fix commits with a clear "what flipped" line in the
    message. After several fixes, push and let CI run the full suites
@@ -206,12 +216,11 @@ cause.
    `graphics_stubs.c` to trace function entry. **Both got committed
    accidentally in early iterations.** Revert these before `git add`.
 
-8. **`results_headless.json` and `results_graphics.json` get
-   overwritten by per-test runs.** They show up dirty in git status
-   after smoke runs; revert / delete before committing other changes:
+8. **`results_graphics.json` gets overwritten by per-test runs.** It
+   shows up dirty in git status after smoke runs; revert / delete
+   before committing other changes:
 
    ```bash
-   git checkout -- ruffle-tests/tests/swfs/avm1/_results/results_headless.json
    rm -f ruffle-tests/tests/swfs/avm1/_results/results_graphics.json
    ```
 
@@ -707,8 +716,8 @@ test and aren't converging:
   `actionGotoFrame` / `actionStop` calls are usually readable).
 - Add `fprintf(stderr, ...)` to the suspect handler to trace when and
   how it's called. Remember to revert before commit.
-- Compare against `--mode=graphics-headless-legacy` and read the
-  trace under that mode to see where the divergence first appears.
+- Compare against the NO_GRAPHICS run and read its trace to see where
+  the divergence first appears.
 
 Don't sink hours on one subtle test. Commit what you have (even
 "failure shifted to later line" is progress) and pick a different

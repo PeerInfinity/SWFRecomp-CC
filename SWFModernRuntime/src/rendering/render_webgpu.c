@@ -14,14 +14,8 @@
 #include <heap.h>
 
 // Renderer-mode flag. Set when the renderer must run without a window
-// surface — no SDL, no JS canvas. Decoupled from HEADLESS_GRAPHICS so the
-// new --mode=graphics native build can use offscreen rendering without
-// inheriting the legacy headless frame loop in swf_headless.c.
-// HEADLESS_GRAPHICS implies OFFSCREEN_RENDER (back-compat).
-#if defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-#define OFFSCREEN_RENDER
-#endif
-
+// surface — no SDL, no JS canvas. The --mode=graphics native build uses
+// offscreen rendering with the same swf.c frame loop the browser runs.
 #ifdef OFFSCREEN_RENDER
 // Offscreen mode: no SDL, no Emscripten — render to a buffer for capture.
 #define STB_IMAGE_WRITE_IMPLEMENTATION

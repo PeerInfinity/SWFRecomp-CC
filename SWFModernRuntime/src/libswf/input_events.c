@@ -2,11 +2,9 @@
 //
 // Loads a pre-processed event file written by verify_output.py's
 // preprocess_input_json and delivers events at tick boundaries to the
-// SWF runtime. Lives in a shared file so all three frame loops use the
-// same impl: NO_GRAPHICS swf_core.c, HEADLESS swf_headless.c, and
-// graphics-native swf.c (Phase 2 of graphics-native-test-mode-plan.md).
-// Phase 3 retires swf_headless.c and the duplication that made this
-// extraction necessary.
+// SWF runtime. Lives in a shared file so both frame loops use the
+// same impl: NO_GRAPHICS swf_core.c and graphics-native swf.c (Phase 2
+// of graphics-native-test-mode-plan.md).
 //
 // Compiled in any mode that needs file-driven input events. Currently
 // gated on the presence of a frame loop that calls input_events_pump_tick.

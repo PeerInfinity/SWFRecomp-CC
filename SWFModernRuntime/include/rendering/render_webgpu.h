@@ -11,12 +11,6 @@
 #include <webgpu/webgpu.h>
 #include <common.h>
 
-// HEADLESS_GRAPHICS implies OFFSCREEN_RENDER (back-compat). See the matching
-// shim in render_webgpu.c for rationale.
-#if defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-#define OFFSCREEN_RENDER
-#endif
-
 // Forward declaration
 typedef struct SWFAppContext SWFAppContext;
 

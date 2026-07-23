@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
     app_context.transform_data = (char*)transform_data;
     app_context.transform_data_size = sizeof(transform_data);
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
     app_context.width = FRAME_WIDTH;
     app_context.height = FRAME_HEIGHT;
     app_context.stage_to_ndc = stage_to_ndc;

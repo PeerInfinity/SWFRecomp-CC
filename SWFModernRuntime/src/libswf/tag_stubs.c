@@ -1,4 +1,4 @@
-// Compiled in NO_GRAPHICS, HEADLESS_GRAPHICS, AND graphics builds — most
+// Compiled in NO_GRAPHICS AND graphics builds — most
 // of the helpers here (display-list inspection, depth queries, sprite
 // frame helpers, transform/cxform getters/setters) are graphics-friendly
 // and useful for the un-gated AS2 dispatch / focus / textfield code in
@@ -24,7 +24,7 @@
 // ---------------------------------------------------------------------------
 // Global display state — defined here in NO_GRAPHICS (swf.c provides in GRAPHICS)
 // ---------------------------------------------------------------------------
-#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifdef NO_GRAPHICS
 Character* dictionary = NULL;
 DisplayObject* display_list = NULL;
 size_t max_depth = 0;
@@ -444,7 +444,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	new_mc->height = 0.0f;
 	// Don't reset frame counters here — they stay at createMovieClip defaults (1,1,1).
 	// attachMovie clips that run frame 0 get their counters set at the end of ng_attachMovie.
-#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifdef NO_GRAPHICS
 	new_mc->as_set_flags = 0;
 #endif
 
@@ -488,7 +488,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 			// Re-attach: clear existing children
 			DisplayObject* dobj = (DisplayObject*)new_mc->display_obj;
 			if (dobj->sprite_display_list) {
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 				// Browser-WASM: re-attaching a reused parent MC memsets away its
 				// child display list, but the cached child MovieClips (auto-named
 				// "instanceN" nested placements) keep parent==new_mc, which is
@@ -695,7 +695,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// render path — see render_root_attached_mcs(). resolveSlashPathToMC's
 	// name lookup already covers them via the parent dynamic_props binding above.
 	//
-	// Browser-WASM (USE_WEBGPU without OFFSCREEN_RENDER/HEADLESS_GRAPHICS) ALSO
+	// Browser-WASM (USE_WEBGPU without OFFSCREEN_RENDER) ALSO
 	// skips this for non-root attaches: there the child reaches the renderer via
 	// the child_mc_cache pass (render_attached_child), not the parent's
 	// sprite_display_list recursion, and is resolvable via child_mc_cache /
@@ -710,9 +710,9 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// bounds". Surfaced once registered-class constructors began running in
 	// browser-WASM (Minesweeper FRadioButton init attaches frb_states_mc /
 	// fLabel_mc / frb_hitArea_mc onto each level_* radio). The CI modes
-	// (NO_GRAPHICS / OFFSCREEN_RENDER / HEADLESS_GRAPHICS) keep the registration
+	// (NO_GRAPHICS / OFFSCREEN_RENDER) keep the registration
 	// unchanged.
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) || defined(HEADLESS_GRAPHICS)
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (parent != &root_movieclip && parent->display_obj != NULL) {
 		DisplayObject* pdobj = (DisplayObject*)parent->display_obj;
 		if (pdobj->sprite_display_list != NULL) {
@@ -760,7 +760,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		ng_record_attached_playable(new_mc);
 	}
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM one-shot particle auto-advance (Metanet "N"). N's
 	// ParticleManager attachMovie's every effect (dust, blood, laser spark/charge,
 	// ...) as "pfx"+depth into a cyclic ring buffer and relies on each clip's OWN
@@ -1267,7 +1267,7 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		else if (frame < current)
 		{
 			// Backward jump: clear display list and re-execute from frame 0
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 			// Browser-WASM: this clear frees the sprite's child display-list
 			// entries but leaves their materialized child MovieClips (auto-named
 			// "instanceN" nested placements) live in child_mc_cache with
@@ -1346,8 +1346,8 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		}
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-		// Finalize deferred removes from the synchronous replay. In browser-WASM /
-		// HEADLESS_GRAPHICS, tagRemoveObject2 only marks pending_remove=1 (it does
+		// Finalize deferred removes from the synchronous replay. In browser-WASM,
+		// tagRemoveObject2 only marks pending_remove=1 (it does
 		// NOT clear char_id) and relies on tagShowFrame's later pending-remove walk
 		// to finalize. This replay has no such pass, so a frame's RemoveObject2 left
 		// the old entry live: e.g. the Tetris `block` sprite swaps its colour shape
@@ -2755,7 +2755,7 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 			display_list[src_depth].clip_action_count);
 	}
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER) && !defined(HEADLESS_GRAPHICS)
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM render path: a sprite clone needs its OWN standalone display_obj
 	// (sprite content holder) populated by frame 0, because the child_mc_cache
 	// render pass (render_attached_child) draws nothing when mc->display_obj == NULL.
@@ -2972,8 +2972,8 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // No-op stubs for functions not needed in NO_GRAPHICS mode
 // ---------------------------------------------------------------------------
 
-#if defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
-// In HEADLESS_GRAPHICS and pure-graphics modes, tag.c provides real
+#ifdef NO_GRAPHICS
+// In graphics modes, tag.c provides real
 // implementations that call the renderer. These stubs are only needed in
 // pure NO_GRAPHICS (no renderer at all).
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
@@ -2991,7 +2991,7 @@ void finalizeBitmaps(void)
 // Sound tag stubs — real implementations live in audio.c for graphics
 // builds. tag_stubs.c provides no-ops only when audio.c isn't linked
 // (NO_GRAPHICS / HEADLESS without audio).
-#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifdef NO_GRAPHICS
 void tagDefineSound(SWFAppContext* app_context, u16 sound_id,
 	u8 format, u8 rate, u8 sample_size, u8 stereo,
 	u32 sample_count, const u8* data, size_t data_size)

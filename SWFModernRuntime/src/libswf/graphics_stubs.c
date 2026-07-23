@@ -1,9 +1,9 @@
 // graphics_stubs.c — definitions for symbols that exist as full
-// implementations in NO_GRAPHICS / HEADLESS / OFFSCREEN_RENDER builds but
+// implementations in NO_GRAPHICS / OFFSCREEN_RENDER builds but
 // are referenced (via extern in action_queue.c, etc.) in graphics builds.
 //
 // Compiled in both:
-//   - wasm browser graphics (USE_WEBGPU, no NO_GRAPHICS / HEADLESS_GRAPHICS / OFFSCREEN_RENDER)
+//   - wasm browser graphics (USE_WEBGPU, no NO_GRAPHICS / OFFSCREEN_RENDER)
 //   - --mode=graphics native (USE_WEBGPU + OFFSCREEN_RENDER)
 //
 // Symbols split into two groups:
@@ -14,7 +14,7 @@
 //      --mode=graphics — wasm graphics doesn't get those, so this file
 //      still needs to fill the gap.
 
-#if defined(USE_WEBGPU) && !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
+#if defined(USE_WEBGPU) && !defined(NO_GRAPHICS)
 
 #include <stddef.h>
 #include <stdint.h>
@@ -27,8 +27,8 @@
 // Group 1: Always-active stubs (both wasm and graphics-native)
 // ---------------------------------------------------------------------------
 
-// Backward-goto catch-up state. swf_core.c / swf_headless.c manage these in
-// NO_GRAPHICS / HEADLESS frame loops; in graphics builds the frame loop has
+// Backward-goto catch-up state. swf_core.c manages these in the
+// NO_GRAPHICS frame loop; in graphics builds the frame loop has
 // no catch-up phase, so the variables stay 0 here — that's the correct
 // "no catch-up in progress" state, not a stub. action_queue.c reads them
 // to gate cleanup work that would otherwise happen during a backward goto;
@@ -50,8 +50,8 @@ int g_settarget_none = 0;
 // Graphics frame loop in swf.c uses its own quit_swf flag.
 int g_force_quit = 0;
 
-// Active transform data pointer. Real impl in tag.c (NO_GRAPHICS / HEADLESS
-// arm) swaps to a child SWF's transform array; with NULL, ng_cache_transform
+// Active transform data pointer. Real impl in tag.c (NO_GRAPHICS arm)
+// swaps to a child SWF's transform array; with NULL, ng_cache_transform
 // in tag.c falls back to the main SWF's transform_data — correct for
 // single-SWF tests, possibly wrong for multi-SWF (loadMovie) tests.
 // In OFFSCREEN_RENDER, tag.c provides this via the widened gate.
@@ -416,4 +416,4 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
 
 #endif // !OFFSCREEN_RENDER
 
-#endif // USE_WEBGPU && !NO_GRAPHICS && !HEADLESS_GRAPHICS
+#endif // USE_WEBGPU && !NO_GRAPHICS

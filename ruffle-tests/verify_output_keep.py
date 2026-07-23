@@ -1650,7 +1650,7 @@ def get_self_load(test_dir):
 def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_image_comparisons=False, asan=False, use_ccache=True):
     """Compile generated C code with runtime into native binary.
 
-    mode is one of: "no-graphics", "graphics", "graphics-headless-legacy".
+    mode is one of: "no-graphics", "graphics".
     """
     mem_dir = build_dir / "memory"
     mem_dir.mkdir(exist_ok=True)
@@ -1678,11 +1678,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "src/libswf/stb_image_impl.c",
         "src/memory/heap.c",
     ]
-    if mode == "graphics-headless-legacy":
-        core_sources.append("src/libswf/swf_headless.c")
-        core_sources.append("src/libswf/capture.c")
-        core_sources.append("src/rendering/render_webgpu.c")
-    elif mode == "graphics":
+    if mode == "graphics":
         # Full graphics-mode runtime + offscreen Dawn rendering, native target.
         core_sources.append("src/libswf/swf.c")
         core_sources.append("src/libswf/capture.c")
@@ -1943,13 +1939,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     mode_defines = []
     mode_includes = []
     mode_libs = []
-    if mode in ("graphics-headless-legacy", "graphics"):
-        if mode == "graphics-headless-legacy":
-            mode_defines = ["-DNO_GRAPHICS", "-DHEADLESS_GRAPHICS", "-DUSE_WEBGPU", "-DNDEBUG"]
-        else:  # mode == "graphics"
-            # Full graphics native: NO_GRAPHICS / HEADLESS_GRAPHICS NOT defined;
-            # OFFSCREEN_RENDER tells render_webgpu.c to skip SDL3 / browser paths.
-            mode_defines = ["-DUSE_WEBGPU", "-DOFFSCREEN_RENDER", "-DNDEBUG"]
+    if mode == "graphics":
+        # Full graphics native: NO_GRAPHICS NOT defined; OFFSCREEN_RENDER
+        # tells render_webgpu.c to skip SDL3 / browser paths.
+        mode_defines = ["-DUSE_WEBGPU", "-DOFFSCREEN_RENDER", "-DNDEBUG"]
         if has_image_comparisons:
             mode_defines.append("-DHEADLESS_RENDER_ENABLED")
         mode_includes = [
@@ -2861,14 +2854,13 @@ examples:
         "--json", metavar="PATH",
         help="Write JSON results report to PATH")
     parser.add_argument(
-        "--mode", choices=["no-graphics", "graphics", "graphics-headless-legacy"],
+        "--mode", choices=["no-graphics", "graphics"],
         default=None,
         help="Build mode. Default 'no-graphics' (swf_core.c, no rendering). "
-             "'graphics' is the new full-graphics-native mode (swf.c + offscreen Dawn). "
-             "'graphics-headless-legacy' is the legacy headless mode (swf_headless.c + offscreen Dawn).")
+             "'graphics' is the full-graphics-native mode (swf.c + offscreen Dawn).")
     parser.add_argument(
         "--headless", action="store_true",
-        help="DEPRECATED alias for --mode=graphics-headless-legacy.")
+        help="REMOVED. The graphics-headless-legacy mode was deleted; use --mode=graphics.")
     parser.add_argument(
         "--append", action="store_true",
         help="Append to existing JSON results instead of overwriting (merge by test name)")
@@ -2915,15 +2907,17 @@ def main():
     global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
     args = parse_args()
 
-    # Resolve mode from --mode (preferred) and the deprecated --headless alias.
+    # The graphics-headless-legacy mode (swf_headless.c + HEADLESS_GRAPHICS)
+    # was deleted. Its --headless alias errors rather than remapping to
+    # --mode=graphics: the two modes wrote different results files, so a
+    # silent remap would hide stale muscle memory and stale automation.
+    if args.headless:
+        print("error: --headless (graphics-headless-legacy) has been removed. "
+              "Use --mode=graphics instead.", file=sys.stderr)
+        sys.exit(2)
     if args.mode is None:
-        args.mode = "graphics-headless-legacy" if args.headless else "no-graphics"
-    elif args.headless and args.mode != "graphics-headless-legacy":
-        print(f"Warning: --headless ignored because --mode={args.mode} was also given",
-              file=sys.stderr)
-    # Legacy boolean kept in sync so existing call sites still work.
-    args.headless = (args.mode == "graphics-headless-legacy")
-    args.uses_dawn = args.mode in ("graphics", "graphics-headless-legacy")
+        args.mode = "no-graphics"
+    args.uses_dawn = (args.mode == "graphics")
 
     # Expected-output filename is resolved per-test via
     # resolve_expected_filename, which honors --expected-suffix first, then
@@ -3070,9 +3064,7 @@ def main():
     # invocation made every --test invocation dirty the working tree.
     json_path = args.json
     if json_path is None and not args.test:
-        if args.mode == "graphics-headless-legacy":
-            json_path = str(RESULTS_DIR / "results_headless.json")
-        elif args.mode == "graphics":
+        if args.mode == "graphics":
             json_path = str(RESULTS_DIR / "results_graphics.json")
         else:
             json_path = str(RESULTS_FINAL)

@@ -263,7 +263,7 @@ void actionAttachInitLeave(void);
 // SHOW_FRAME drain.
 //
 // Invariant: depth must return to 0 by the start of every tick. swf_core.c /
-// swf_headless.c assert this in debug builds.
+// swf.c assert this in debug builds.
 void actionDrainSuppressEnter(void);
 void actionDrainSuppressLeave(void);
 int actionDrainSuppressed(void);

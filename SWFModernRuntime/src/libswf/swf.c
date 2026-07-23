@@ -1,4 +1,4 @@
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 
 #include <stdlib.h>
 #include <string.h>
@@ -172,8 +172,8 @@ int g_tag_skip_mode = 0;
 // (and Playwright input) stay responsive. No effect on native/headless builds.
 int g_debug_frame_floor_ms = 0;
 
-// Goto-catch-up state and executors — ported from swf_core.c. Phase 3
-// retires this duplication along with HEADLESS_GRAPHICS.
+// Goto-catch-up state and executors — ported from swf_core.c. This
+// duplication between the two surviving frame loops is still outstanding.
 int goto_from_action = 0;
 int g_deferred_root_goto = 0;
 int g_skip_inline_target_script = 0;
@@ -1626,4 +1626,4 @@ void getDataFilesMaxImageDims(int* out_w, int* out_h) {
 }
 #endif
 
-#endif // !NO_GRAPHICS && !HEADLESS_GRAPHICS
+#endif // !NO_GRAPHICS

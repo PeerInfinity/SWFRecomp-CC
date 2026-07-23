@@ -37,7 +37,6 @@ on:
         options:
           - 'no-graphics'
           - 'graphics'
-          - 'graphics-headless-legacy'
         default: 'no-graphics'
       single_test:
         description: 'Run a single test by name (overrides categories; auto-uses single runner)'
@@ -77,7 +76,7 @@ on:
         default: '30'
         type: string
       mode:
-        description: 'Build mode (no-graphics | graphics | graphics-headless-legacy)'
+        description: 'Build mode (no-graphics | graphics)'
         required: false
         default: 'no-graphics'
         type: string
@@ -168,8 +167,7 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake ccache
 
-      # Graphics modes (graphics, graphics-headless-legacy) need Vulkan +
-      # a prebuilt Dawn library. Dawn is built by .github/workflows/build-dawn.yml
+      # Graphics mode needs Vulkan + a prebuilt Dawn library. Dawn is built by .github/workflows/build-dawn.yml
       # and stored in the GitHub Actions cache. If the cache is missing
       # (first run on a new ref or post-eviction), trigger build-dawn.yml
       # manually first: `gh workflow run build-dawn.yml`.
@@ -293,11 +291,10 @@ jobs:
           fi
           [ "$RUN_GNASH" = "true" ] && DIRS="$DIRS $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
           # Per-mode previous baseline: graphics runs diff against the last
-          # graphics run, headless against the last headless run, etc. The
+          # graphics run, no-graphics against the last no-graphics run. The
           # commit step generates the actual diff after the branch switch.
           case "${{ inputs.mode }}" in
             graphics) PREV_STEM="results_graphics" ;;
-            graphics-headless-legacy) PREV_STEM="results_headless" ;;
             *) PREV_STEM="results" ;;
           esac
           if git fetch origin ruffle-test-results 2>/dev/null; then
@@ -445,7 +442,6 @@ jobs:
           # cover ALL modes consistently — not just the one we just ran.
           case "${{ inputs.mode }}" in
             graphics) STEM="results_graphics" ;;
-            graphics-headless-legacy) STEM="results_headless" ;;
             *) STEM="results" ;;
           esac
 
@@ -515,6 +511,13 @@ jobs:
             git rm -f "$f" 2>/dev/null || true
           done
 
+          # The graphics-headless-legacy mode was deleted (Phase 1 of
+          # mode-consolidation-plan.md). Drop its stale result files from the
+          # inherited branch state — otherwise every merge of
+          # ruffle-test-results back into master would re-add them.
+          git ls-files -z '*/_results/results_headless*' 'RUFFLE_RESULTS_HEADLESS*' \
+            | xargs -0 -r git rm -q -f --ignore-unmatch || true
+
           # Restore this mode's JSON outputs onto the inherited branch state.
           find /tmp/results_backup/ruffle-tests/tests/swfs -path '*/_results' -type d 2>/dev/null | while read dir; do
             real_dir="${dir#/tmp/results_backup/}"
@@ -550,7 +553,7 @@ jobs:
           # filter_results.py derives the output name from the input stem
           # (results.json → results_filtered.json,
           #  results_graphics.json → results_graphics_filtered.json, etc.).
-          for stem in results results_graphics results_headless; do
+          for stem in results results_graphics; do
             find ruffle-tests/tests/swfs -path "*/_results/${stem}.json" | while read f; do
               python3 ruffle-tests/filter_results.py "$f" || true
             done
@@ -1098,7 +1101,6 @@ jobs:
           # Per-mode previous baseline (graphics diffs against graphics, etc.).
           case "${{ inputs.mode }}" in
             graphics) PREV_STEM="results_graphics" ;;
-            graphics-headless-legacy) PREV_STEM="results_headless" ;;
             *) PREV_STEM="results" ;;
           esac
           if git fetch origin ruffle-test-results 2>/dev/null; then
@@ -1131,8 +1133,6 @@ jobs:
           mode = os.environ.get("MODE") or "no-graphics"
           if mode == "graphics":
               out_filename = "results_graphics.json"
-          elif mode == "graphics-headless-legacy":
-              out_filename = "results_headless.json"
           else:
               out_filename = "results.json"
           print(f"Mode: {mode} → writing combined results to {out_filename}")
@@ -1345,7 +1345,6 @@ jobs:
           # cover ALL modes consistently — not just the one we just ran.
           case "${{ inputs.mode }}" in
             graphics) STEM="results_graphics" ;;
-            graphics-headless-legacy) STEM="results_headless" ;;
             *) STEM="results" ;;
           esac
 
@@ -1415,6 +1414,13 @@ jobs:
             git rm -f "$f" 2>/dev/null || true
           done
 
+          # The graphics-headless-legacy mode was deleted (Phase 1 of
+          # mode-consolidation-plan.md). Drop its stale result files from the
+          # inherited branch state — otherwise every merge of
+          # ruffle-test-results back into master would re-add them.
+          git ls-files -z '*/_results/results_headless*' 'RUFFLE_RESULTS_HEADLESS*' \
+            | xargs -0 -r git rm -q -f --ignore-unmatch || true
+
           # Restore this mode's JSON outputs onto the inherited branch state.
           find /tmp/results_backup/ruffle-tests/tests/swfs -path '*/_results' -type d 2>/dev/null | while read dir; do
             real_dir="${dir#/tmp/results_backup/}"
@@ -1450,7 +1456,7 @@ jobs:
           # filter_results.py derives the output name from the input stem
           # (results.json → results_filtered.json,
           #  results_graphics.json → results_graphics_filtered.json, etc.).
-          for stem in results results_graphics results_headless; do
+          for stem in results results_graphics; do
             find ruffle-tests/tests/swfs -path "*/_results/${stem}.json" | while read f; do
               python3 ruffle-tests/filter_results.py "$f" || true
             done

@@ -508,16 +508,13 @@ def generate_investigation_legend(doc_list: list[tuple[str, str, list[str]]], da
 
 
 # ---------------------------------------------------------------------------
-# Headless regressions
+# Cross-mode regressions
 # ---------------------------------------------------------------------------
 
 def generate_mode_regressions(baseline_path: Path, current_path: Path, output_path: Path,
-                              baseline_label: str = "Normal", current_label: str = "Headless"):
+                              baseline_label: str = "Trace", current_label: str = "Graphics"):
     """Generate report of tests that pass in baseline mode but fail in the
     current mode (and vice versa).
-
-    Originally written for `Normal vs Headless`; generalized so it also covers
-    `Trace vs Graphics` etc. by accepting custom labels.
     """
     print(f"Generating {current_label.lower()} regressions report...")
 
@@ -601,13 +598,6 @@ def generate_mode_regressions(baseline_path: Path, current_path: Path, output_pa
     print(f"  {len(regressions)} regressions, {len(improvements)} improvements")
 
 
-def generate_headless_regressions(normal_path: Path, headless_path: Path, output_path: Path):
-    """Backwards-compatible wrapper for generate_mode_regressions with the
-    historical Normal/Headless labels."""
-    generate_mode_regressions(normal_path, headless_path, output_path,
-                              baseline_label="Normal", current_label="Headless")
-
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -617,13 +607,12 @@ _UNSET = object()
 
 # Per-mode result file stems and their human-readable labels. Used by the
 # multi-mode scan helper to discover all mode-specific JSONs and produce
-# matching .md outputs (results.md, results_graphics.md, results_headless.md)
-# plus regressions reports for non-baseline modes.
+# matching .md outputs (results.md, results_graphics.md) plus regressions
+# reports for non-baseline modes.
 MODE_STEMS = [
     # (stem, label, is_baseline)
     ("results",          "Trace",    True),
     ("results_graphics", "Graphics", False),
-    ("results_headless", "Headless", False),
 ]
 BASELINE_STEM = "results"
 BASELINE_LABEL = "Trace"
@@ -729,9 +718,6 @@ def generate_markdown():
         "--scan", action="store_true",
         help="Auto-discover all _results/ dirs under ruffle-tests/tests/swfs/")
     parser.add_argument(
-        "--headless", action="store_true",
-        help="Generate from results_headless.json instead of results.json")
-    parser.add_argument(
         "--json", metavar="PATH",
         help="(legacy) Path to a specific results JSON file; writes .md to project root")
     args = parser.parse_args()
@@ -758,7 +744,7 @@ def generate_markdown():
         print("\nDone.")
         return
 
-    # Legacy modes (--json, --headless, or default)
+    # Legacy modes (--json or default)
     if args.json:
         json_path = Path(args.json)
         if not json_path.exists():
@@ -766,25 +752,6 @@ def generate_markdown():
             sys.exit(1)
         out_name = json_path.stem.replace("results", "ruffle-results") + ".md"
         generate_one(json_path, BASE_DIR / out_name)
-        print("\nDone.")
-        return
-
-    if args.headless:
-        results_dir = RUFFLE_DIR / "tests" / "swfs" / "avm1" / "_results"
-        headless_json = results_dir / "results_headless.json"
-        if not headless_json.exists():
-            print(f"Error: {headless_json} not found", file=sys.stderr)
-            sys.exit(1)
-        inv_dir = results_dir.parent / "_investigation"
-        generate_one(headless_json, results_dir / "results_headless.md",
-                      investigation_dir=inv_dir if inv_dir.is_dir() else None)
-
-        # Generate headless regressions report (pass in normal, fail in headless)
-        normal_json = results_dir / "results.json"
-        if normal_json.exists():
-            generate_headless_regressions(normal_json, headless_json,
-                                          results_dir / "results_headless_regressions.md")
-
         print("\nDone.")
         return
 

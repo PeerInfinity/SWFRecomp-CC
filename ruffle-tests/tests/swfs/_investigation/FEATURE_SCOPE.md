@@ -49,7 +49,7 @@ comparison against Ruffle's expected output. Also validates trace output. No
 browser required.
 
 ```bash
-python3 ruffle-tests/verify_output.py --test=TEST_NAME --headless --diff --verbose
+python3 ruffle-tests/verify_output.py --test=TEST_NAME --mode=graphics --diff --verbose
 python3 ruffle-tests/run_image_tests.py              # all image tests
 python3 ruffle-tests/run_image_tests.py --test=color  # single image test
 ```

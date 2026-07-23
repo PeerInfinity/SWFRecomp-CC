@@ -25,7 +25,6 @@ MODE_INDEX_FILES = [
     # (stem,              label,      raw_path,                                  filtered_path)
     ("results",           "",         BASE_DIR / "RUFFLE_RESULTS.md",            BASE_DIR / "RUFFLE_RESULTS_FILTERED.md"),
     ("results_graphics",  "Graphics", BASE_DIR / "RUFFLE_RESULTS_GRAPHICS.md",   BASE_DIR / "RUFFLE_RESULTS_GRAPHICS_FILTERED.md"),
-    ("results_headless",  "Headless", BASE_DIR / "RUFFLE_RESULTS_HEADLESS.md",   BASE_DIR / "RUFFLE_RESULTS_HEADLESS_FILTERED.md"),
 ]
 
 
@@ -100,7 +99,6 @@ def load_all_suites(stem: str = "results"):
 
     stem="results"          → trace mode (results.json + results_filtered.json + …)
     stem="results_graphics" → graphics mode (results_graphics.json + results_graphics_filtered.json + …)
-    stem="results_headless" → legacy headless (results_headless.json + …)
 
     Returns an empty list when no suite has results for the requested mode.
     """
@@ -143,7 +141,7 @@ def generate_report(rows, filtered, mode_label: str = ""):
     If filtered=False, uses {stem}.json data.
 
     mode_label adjusts the heading and cross-link to disambiguate between the
-    trace, graphics, and headless index files. Empty string = trace (the
+    trace and graphics index files. Empty string = trace (the
     canonical RUFFLE_RESULTS.md / RUFFLE_RESULTS_FILTERED.md).
     """
     lines = []

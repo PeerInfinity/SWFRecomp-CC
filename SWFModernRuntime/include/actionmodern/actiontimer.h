@@ -9,7 +9,7 @@
 //
 // Note: the frame-loop integration hooks `processTimers` and
 // `hasActiveTimers` live in <actionmodern/action.h> for ABI stability —
-// swf_core.c / swf_headless.c already call them via that path and
+// swf_core.c / swf.c already call them via that path and
 // haven't been touched by this carve-out.
 
 #include <actionmodern/action_internal.h>  // ASFunction, ActionVar, SWFAppContext

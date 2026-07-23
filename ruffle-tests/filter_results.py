@@ -7,11 +7,10 @@ with ignored tests removed and stats recalculated.
 Usage:
     python3 filter_results.py results.json [results_filtered.json]
     python3 filter_results.py results_graphics.json   # → results_graphics_filtered.json
-    python3 filter_results.py results_headless.json   # → results_headless_filtered.json
 
 If output path is omitted, the output filename is derived from the input
 stem: <stem>.json → <stem>_filtered.json. This keeps per-mode results
-(results.json / results_graphics.json / results_headless.json) separate
+(results.json / results_graphics.json) separate
 in their corresponding _filtered counterparts.
 """
 
@@ -92,7 +91,6 @@ def main():
         # a matching _filtered.json. e.g.
         #   results.json          → results_filtered.json
         #   results_graphics.json → results_graphics_filtered.json
-        #   results_headless.json → results_headless_filtered.json
         output_path = input_path.parent / f"{input_path.stem}_filtered.json"
 
     # Load global ignore list (ruffle-tests/ignored_tests.txt)

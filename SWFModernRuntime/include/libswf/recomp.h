@@ -15,7 +15,7 @@
 // Goto catch-up mode flag.
 // When set, generated frame functions skip their script_N() calls
 // while tag functions (PlaceObject, RemoveObject, etc.) still execute.
-// Defined in swf_core.c (NO_GRAPHICS), swf_headless.c (HEADLESS), swf.c (GRAPHICS).
+// Defined in swf_core.c (NO_GRAPHICS) and swf.c (GRAPHICS).
 #ifndef DYNAMIC_GUEST
 extern int catch_up_mode;
 // When set, tag functions are no-ops but scripts still run.

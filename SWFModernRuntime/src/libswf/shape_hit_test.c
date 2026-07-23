@@ -7,7 +7,7 @@
 // every build mode (renderer-generated for graphics, NO_GRAPHICS-side
 // generated for trace).
 //
-// Compiled in NO_GRAPHICS, HEADLESS_GRAPHICS, and pure graphics builds.
+// Compiled in NO_GRAPHICS and graphics builds.
 
 #include <tag.h>
 #include <swf.h>
@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-// Globals defined elsewhere depending on build mode (swf.c, swf_core.c, swf_headless.c, tag_stubs.c)
+// Globals defined elsewhere depending on build mode (swf.c, swf_core.c, tag_stubs.c)
 extern Character* dictionary;
 extern DisplayObject* display_list;
 extern size_t max_depth;

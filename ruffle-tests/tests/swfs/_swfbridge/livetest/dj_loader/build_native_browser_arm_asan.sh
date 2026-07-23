@@ -1,6 +1,6 @@
 #!/bin/bash
 # build_native_browser_arm_asan.sh — compile the BROWSER-WASM graphics arm
-# (!NO_GRAPHICS && !OFFSCREEN_RENDER && !HEADLESS_GRAPHICS) natively with
+# (!NO_GRAPHICS && !OFFSCREEN_RENDER) natively with
 # ASAN + HEAP_PASSTHROUGH, using render_stub.c instead of a real GPU.
 #
 # Why: the dlmalloc-corruption hang only reproduces in the browser-only code

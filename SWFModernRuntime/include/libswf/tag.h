@@ -24,7 +24,7 @@ int ng_update_button_states(SWFAppContext* app_context);
 // dynamic GPU slot that has no entry in the CPU-side transform_data array;
 // callers that need the static transform must use this accessor. Defined in
 // tag.c in graphics builds; not available in NO_GRAPHICS.
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 u32 ng_get_original_transform_id(DisplayObject* obj);
 #endif
 
@@ -49,9 +49,6 @@ int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
 #endif
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue);
 void tagShowFrame(SWFAppContext* app_context);
-#ifdef HEADLESS_GRAPHICS
-void tagRerenderFrame(SWFAppContext* app_context);
-#endif
 void tagFlushPendingEnterFrame(SWFAppContext* app_context);
 
 // Tag functions needed by both graphics and trace (NO_GRAPHICS) builds.

@@ -26839,7 +26839,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 // ng_get_original_transform_id (defined in tag.c, which only exposes the
 // xform_overrides table in graphics modes). NO_GRAPHICS builds never run
 // rendering, so a stub-less compile unit is correct.
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+#ifndef NO_GRAPHICS
 
 static MovieClip* otf_find_child_mc(MovieClip* parent_mc, const char* name)
 {
@@ -27191,7 +27191,7 @@ int actionIterateOrphanTextFields(SWFAppContext* app_context,
 	return count;
 }
 
-#endif // !NO_GRAPHICS || HEADLESS_GRAPHICS
+#endif // !NO_GRAPHICS
 
 // ---------------------------------------------------------------------------
 // Drawing API — Path recording, tessellation, and iterator
@@ -33211,7 +33211,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			quit_swf = 1;
 			g_force_quit = 1;
 		}
-#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#ifdef OFFSCREEN_RENDER
 		else if (strcasecmp(cmd, "capture") == 0) {
 			extern void capture_on_fscommand(void);
 			capture_on_fscommand();
@@ -34242,7 +34242,7 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 }
 
 // Promote pending MCL loads from the _next_tick bucket into _this_tick. Called
-// from swf_core.c / swf_headless.c at the top of each frame tick (after
+// from swf_core.c / swf.c at the top of each frame tick (after
 // actionFinalizePendingRemovals, before sprite advance and root frame_func) so
 // that loads queued by the previous tick's loadClip drain at the END of THIS
 // tick — i.e. AFTER the loader's next-frame DoAction has already run.
@@ -46153,7 +46153,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				quit_swf = 1;
 				g_force_quit = 1;
 			}
-#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+#ifdef OFFSCREEN_RENDER
 			else if (strcasecmp(cmd, "capture") == 0) {
 				extern void capture_on_fscommand(void);
 				capture_on_fscommand();

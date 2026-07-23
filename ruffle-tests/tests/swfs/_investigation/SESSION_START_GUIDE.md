@@ -63,7 +63,7 @@ Each `_results/` directory contains: `results.json`, `results.md`, `results_filt
 | Document | Purpose |
 |----------|---------|
 | `_investigation/FEATURE_SCOPE.md` | Which features are implemented vs. not, and why |
-| `_investigation/HEADLESS_SETUP.md` | How to set up Dawn, lavapipe, and Pillow for headless image tests |
+| `_investigation/HEADLESS_SETUP.md` | How to set up Dawn, lavapipe, and Pillow for offscreen image tests |
 
 ### AVM1-specific reference documents
 
@@ -124,24 +124,26 @@ python3 ruffle-tests/verify_output.py --tests-dir=ruffle-tests/tests/swfs/regres
 python3 ruffle-tests/verify_output.py --test=test1 --test=test2 --diff --verbose
 ```
 
-### Run headless image tests
+### Run image-comparison tests
 
 Some tests have `[image_comparisons]` sections in their `test.toml` that compare
-rendered frames against expected PNGs. These require the `--headless` flag and
+rendered frames against expected PNGs. These require `--mode=graphics` and
 additional dependencies (Dawn WebGPU library, lavapipe Vulkan driver, Pillow).
 
 ```bash
 # Single image test
-python3 ruffle-tests/verify_output.py --test=TEST_NAME --headless --diff --verbose
+python3 ruffle-tests/verify_output.py --test=TEST_NAME --mode=graphics --diff --verbose
 
-# Run all image tests via dedicated runner
+# Run all image tests via dedicated runner (uses --mode=graphics internally)
 python3 ruffle-tests/run_image_tests.py
 ```
 
 See `HEADLESS_SETUP.md` for full setup instructions (Dawn build, lavapipe
-install, Pillow). Without Dawn installed at `~/CC/dawn-install/`, the
-`--headless` flag will error. Trace output is still checked in headless mode
-alongside image comparisons.
+install, Pillow). Without Dawn installed at `~/CC/dawn-install/`,
+`--mode=graphics` will error. Trace output is still checked in graphics mode
+alongside image comparisons. (The old `--headless` /
+`--mode=graphics-headless-legacy` mode was deleted on 2026-07-23; `--headless`
+now errors with a pointer to `--mode=graphics`.)
 
 ### Full test suites (use CI only)
 
