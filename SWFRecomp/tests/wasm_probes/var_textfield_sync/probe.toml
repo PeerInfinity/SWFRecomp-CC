@@ -1,0 +1,4 @@
+golden_source = "ruffle"
+trace_prefix = "PROBE:"
+
+description = "Gate-inventory cluster `var->textfield sync on var declare` (action.c:42849). `var bound = \"CHANGED\"` must refresh the EditText bound to `bound`; marker at x=200 iff field.text follows."

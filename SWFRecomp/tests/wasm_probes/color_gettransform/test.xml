@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    color_gettransform — gate-inventory cluster "Color.getTransform"
+    (action.c:10907, colorGetTransform).
+
+    Stage 320x240. `box` is a blue 40x40 sprite at (40,40); `mk` is a green
+    20x20 verdict marker.
+
+    DoAction (frame 1):
+        c = new Color(box)
+        c.setTransform({ra:100,ga:100,ba:100,aa:100,rb:255,gb:0,bb:0,ab:0})
+        trace("PROBE:rb=" + c.getTransform().rb)
+        trace("PROBE:ra=" + c.getTransform().ra)
+        setProperty("/mk", _x, (c.getTransform().rb == 255) / 0.005)
+
+    Flash / Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER: getTransform() reports
+    the transform just written — rb 255, ra 100 — and the box renders with a
+    +255 red offset (magenta). The marker lands at x=200.
+
+    browser-WASM: colorGetTransform's whole body is inside
+    `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`, so it returns the
+    identity it initialises the locals to (ra/ga/ba/aa 100, rb/gb/bb/ab 0)
+    regardless of what was set. rb reads 0 and the marker sits at x=0. If
+    setTransform is *also* a browser no-op the box additionally renders
+    un-tinted; the trace channel is what tells the two apart.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="0" right="800" top="0" bottom="800"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="box">
+        <transform><Transform transX="800" transY="800"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="mk">
+        <transform><Transform transX="0" transY="4000"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <!-- c = new Color(box) -->
+          <PushData><items><StackString value="c"/></items></PushData>
+          <PushData><items><StackString value="box"/></items></PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+              <StackString value="Color"/>
+            </items>
+          </PushData>
+          <New/>
+          <SetVariable/>
+
+          <!-- c.setTransform({ra:100,ga:100,ba:100,aa:100,rb:255,gb:0,bb:0,ab:0}) -->
+          <PushData>
+            <items>
+              <StackString value="ra"/><StackInteger value="100"/>
+              <StackString value="ga"/><StackInteger value="100"/>
+              <StackString value="ba"/><StackInteger value="100"/>
+              <StackString value="aa"/><StackInteger value="100"/>
+              <StackString value="rb"/><StackInteger value="255"/>
+              <StackString value="gb"/><StackInteger value="0"/>
+              <StackString value="bb"/><StackInteger value="0"/>
+              <StackString value="ab"/><StackInteger value="0"/>
+              <StackInteger value="8"/>
+            </items>
+          </PushData>
+          <DeclareObject/>
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="setTransform"/></items></PushData>
+          <CallMethod/>
+          <Pop/>
+
+          <!-- trace("PROBE:rb=" + c.getTransform().rb) -->
+          <PushData>
+            <items>
+              <StackString value="PROBE:rb="/>
+              <StackInteger value="0"/>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="getTransform"/></items></PushData>
+          <CallMethod/>
+          <PushData><items><StackString value="rb"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+
+          <!-- trace("PROBE:ra=" + c.getTransform().ra) -->
+          <PushData>
+            <items>
+              <StackString value="PROBE:ra="/>
+              <StackInteger value="0"/>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="getTransform"/></items></PushData>
+          <CallMethod/>
+          <PushData><items><StackString value="ra"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+
+          <!-- mk._x = (c.getTransform().rb == 255) / 0.005 -->
+          <PushData>
+            <items>
+              <StackString value="/mk"/>
+              <StackFloat value="0.0"/>
+              <StackInteger value="0"/>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="getTransform"/></items></PushData>
+          <CallMethod/>
+          <PushData><items><StackString value="rb"/></items></PushData>
+          <GetMember/>
+          <PushData><items><StackInteger value="255"/></items></PushData>
+          <EqualTyped/>
+          <PushData><items><StackDouble value="0.005"/></items></PushData>
+          <Divide/>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

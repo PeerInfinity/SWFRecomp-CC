@@ -1,0 +1,4 @@
+golden_source = "ruffle"
+known_red = true
+trace_prefix = "PROBE:"
+description = '''Gate-inventory cluster `typeof refinement` (action.c:43511/43545). SWF8 typeof of a textfield and of a button; the two markers sit at x=200 iff both report Flash's "object" rather than "movieclip". Golden captured from ~/CC/ruffle/target/release/exporter.'''

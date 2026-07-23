@@ -44,6 +44,20 @@ else
     done
 fi
 
+read_toml_int() {
+    # Extract a top-level integer key from probe.toml. Falls back to default.
+    local file="$1" key="$2" default="$3"
+    if [ -f "$file" ]; then
+        python3 -c "import tomllib,sys
+try:
+    print(int(tomllib.load(open('$file','rb')).get('$key', $default)))
+except Exception:
+    print($default)" 2>/dev/null || echo "$default"
+    else
+        echo "$default"
+    fi
+}
+
 read_dim() {
     # Extract metadata.<key> from test_info.json (integer). Falls back to default.
     local file="$1" key="$2" default="$3"
@@ -67,8 +81,14 @@ for probe_dir in "${PROBE_DIRS[@]}"; do
     fi
     width=$(read_dim "${probe_dir}/test_info.json" width 320)
     height=$(read_dim "${probe_dir}/test_info.json" height 240)
+    # Multi-frame probes settle on a later frame; probe.toml's ruffle_skipframes
+    # names it so the reference lands on the same frame the browser harness
+    # screenshots after settle_seconds.
+    skip=$(read_toml_int "${probe_dir}/probe.toml" ruffle_skipframes 0)
     out="${probe_dir}/golden_ruffle.png"
-    echo "[ruffle] ${slug} (${width}x${height})"
+    trace_out="${probe_dir}/ruffle_trace.txt"
+    echo "[ruffle] ${slug} (${width}x${height}, skipframes=${skip})"
     "${RUFFLE_EXPORTER}" --silent --width "${width}" --height "${height}" \
+        --skipframes "${skip}" --trace-log "${trace_out}" \
         "${swf}" "${out}"
 done

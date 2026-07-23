@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    transform_matrix_set — gate-inventory cluster "transform.matrix /
+    transform.colorTransform setters" (action.c:9072 transformMatrixSetter,
+    action.c:9146 transformCTSetter).
+
+    Stage 320x240. `box` is a blue 40x40 sprite placed at (40,40); `mk` is a
+    green 20x20 verdict marker.
+
+    DoAction (frame 1):
+        box.transform.matrix = new flash.geom.Matrix(1,0,0,1,80,40)
+        box.transform.colorTransform =
+            new flash.geom.ColorTransform(1,1,1,1,255,0,0,0)
+        trace("PROBE:x=" + getProperty("/box", _x))
+        trace("PROBE:y=" + getProperty("/box", _y))
+        setProperty("/mk", _x, getProperty("/box", _x))
+
+    Flash / Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER: assigning the matrix
+    moves the box to (80,40) and the colorTransform adds +255 red (blue box
+    -> magenta). The trace says 80 / 40 and the marker follows to x=80.
+
+    browser-WASM: both setters' bodies are inside
+    `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)` — the argument is
+    validated and then discarded. The box stays at (40,40) un-tinted, the
+    trace says 40 / 40, and the marker sits at x=40.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="0" right="800" top="0" bottom="800"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="box">
+        <transform><Transform transX="800" transY="800"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="mk">
+        <transform><Transform transX="0" transY="4000"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <!-- box.transform.matrix = new flash.geom.Matrix(1,0,0,1,80,40) -->
+          <PushData><items><StackString value="box"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="transform"/></items></PushData>
+          <GetMember/>
+          <PushData><items><StackString value="matrix"/></items></PushData>
+          <PushData>
+            <items>
+              <StackInteger value="40"/>
+              <StackInteger value="80"/>
+              <StackInteger value="1"/>
+              <StackInteger value="0"/>
+              <StackInteger value="0"/>
+              <StackInteger value="1"/>
+              <StackInteger value="6"/>
+              <StackString value="flash"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="geom"/></items></PushData>
+          <GetMember/>
+          <PushData><items><StackString value="Matrix"/></items></PushData>
+          <NewMethod/>
+          <SetMember/>
+
+          <!-- box.transform.colorTransform =
+                   new flash.geom.ColorTransform(1,1,1,1,255,0,0,0) -->
+          <PushData><items><StackString value="box"/></items></PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="transform"/></items></PushData>
+          <GetMember/>
+          <PushData><items><StackString value="colorTransform"/></items></PushData>
+          <PushData>
+            <items>
+              <StackInteger value="0"/>
+              <StackInteger value="0"/>
+              <StackInteger value="0"/>
+              <StackInteger value="255"/>
+              <StackInteger value="1"/>
+              <StackInteger value="1"/>
+              <StackInteger value="1"/>
+              <StackInteger value="1"/>
+              <StackInteger value="8"/>
+              <StackString value="flash"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="geom"/></items></PushData>
+          <GetMember/>
+          <PushData><items><StackString value="ColorTransform"/></items></PushData>
+          <NewMethod/>
+          <SetMember/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:x="/>
+              <StackString value="/box"/>
+              <StackFloat value="0.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:y="/>
+              <StackString value="/box"/>
+              <StackFloat value="1.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk"/>
+              <StackFloat value="0.0"/>
+              <StackString value="/box"/>
+              <StackFloat value="0.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

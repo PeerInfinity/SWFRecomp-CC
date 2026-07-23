@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    delete_child_mc — gate-inventory cluster "`delete` child-MC guard"
+    (action.c:43861 in actionDelete2).
+
+    Stage 320x240. `child` is a blue 40x40 sprite placed at (40,40); `mk1`
+    and `mk2` are green 20x20 verdict markers.
+
+    DoAction (frame 1):
+        trace("PROBE:del="  + (delete child))
+        trace("PROBE:type=" + typeof(child))
+        setProperty("/mk1", _x, (!(delete-result))          / 0.005)
+        setProperty("/mk2", _x, (typeof(child)=="movieclip")/ 0.005)
+
+    Flash / Ruffle: a timeline child MovieClip is not a deletable variable —
+    `delete child` returns false and the clip survives, so typeof is still
+    "movieclip" and the child stays on screen. Each marker sits at x=200 iff
+    the runtime agrees, at x=0 otherwise.
+
+    The gated block at action.c:43861 sets `success = false` when the name
+    matches a display-list entry — but the line immediately above it already
+    assigns `success = false` unconditionally for this branch, so the gate is
+    expected to be a NO-OP and this probe is expected to be GREEN. It exists
+    to convert that reading-of-the-source into evidence: if browser-WASM
+    diverges anyway, some other path sets success=true and the cluster is a
+    real bug.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="0" right="800" top="0" bottom="800"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="child">
+        <transform><Transform transX="800" transY="800"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="mk1">
+        <transform><Transform transX="0" transY="2800"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="3" objectID="4" name="mk2">
+        <transform><Transform transX="0" transY="4000"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="PROBE:del="/>
+              <StackString value="child"/>
+            </items>
+          </PushData>
+          <DeleteAll/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:type="/>
+              <StackString value="child"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <TypeOf/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk1"/>
+              <StackFloat value="0.0"/>
+              <StackString value="child"/>
+            </items>
+          </PushData>
+          <DeleteAll/>
+          <LogicalNOT/>
+          <PushData><items><StackDouble value="0.005"/></items></PushData>
+          <Divide/>
+          <SetProperty/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk2"/>
+              <StackFloat value="0.0"/>
+              <StackString value="child"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <TypeOf/>
+          <PushData><items><StackString value="movieclip"/></items></PushData>
+          <EqualTyped/>
+          <PushData><items><StackDouble value="0.005"/></items></PushData>
+          <Divide/>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

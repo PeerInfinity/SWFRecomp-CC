@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "description": "SWF6+ typeof(textfield) and typeof(button) must be \"object\", not \"movieclip\". Surfaces the actionTypeof build-mode gate at action.c:43511/43545.",
+    "width": 320,
+    "height": 240,
+    "swf_version": 8
+  },
+  "opcodes": {
+    "tested": ["TypeOf", "Equals2", "Divide", "SetProperty"]
+  }
+}

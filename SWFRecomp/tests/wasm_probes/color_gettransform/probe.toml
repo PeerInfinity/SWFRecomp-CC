@@ -1,0 +1,5 @@
+golden_source = "ruffle"
+known_red = true
+trace_prefix = "PROBE:"
+
+description = "Gate-inventory cluster `Color.getTransform` (action.c:10907). setTransform({rb:255}) then getTransform().rb; marker at x=200 iff the round-trip holds."

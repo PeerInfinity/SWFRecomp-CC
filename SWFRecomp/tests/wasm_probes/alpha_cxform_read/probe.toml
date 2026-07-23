@@ -1,0 +1,4 @@
+golden_source = "ruffle"
+known_red = true
+trace_prefix = "PROBE:"
+description = "Gate-inventory cluster `_alpha placement-cxform read` (action.c:26084 mcReadAlpha). Reads _alpha of a clip faded to 50% by a placement CXFORMWITHALPHA and encodes it as the green marker's _x. Flash/Ruffle/native: 50. Golden captured from ~/CC/ruffle/target/release/exporter."

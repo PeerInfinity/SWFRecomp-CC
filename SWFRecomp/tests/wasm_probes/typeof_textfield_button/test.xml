@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    typeof_textfield_button — gate-inventory cluster "typeof refinement"
+    (action.c:43511, 43545 in actionTypeof).
+
+    Stage 320x240. `fld` (a DefineEditText) and `btn` (a DefineButton2) are
+    placed BELOW the visible stage (transY=5200 twips = y 260 on a 240-high
+    stage) on purpose: their glyph/hit rasterization would otherwise dominate
+    the pixel diff for reasons unrelated to the gate. The verdict is carried
+    by two green 20x20 markers instead.
+
+    DoAction (frame 1):
+        trace("PROBE:tf="  + typeof(fld))
+        trace("PROBE:btn=" + typeof(btn))
+        setProperty("/mk1", _x, (typeof(fld) == "object") / 0.005)
+        setProperty("/mk2", _x, (typeof(btn) == "object") / 0.005)
+
+    A boolean divided by 0.005 is 200 when true and 0 when false, so each
+    marker sits at x=200 iff the runtime reports Flash's answer and at x=0
+    otherwise — the same fact the trace carries, in pixels.
+
+    Flash / Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER: SWF6+ reports "object"
+    for both textfields and buttons; only real sprites are "movieclip".
+
+    browser-WASM: actionTypeof's whole MOVIECLIP refinement (the peek at the
+    stack value plus the is_button_mc / MC_IS_TEXTFIELD tests) sits inside
+    `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`, so both report
+    "movieclip" and both markers stay at x=0.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineEditText objectID="1" wordWrap="0" multiLine="0" password="0"
+                      readOnly="1" autoSize="0" hasLayout="1" notSelectable="1"
+                      hasBorder="0" isHTML="0" useOutlines="0" fontHeight="240"
+                      align="0" leftMargin="0" rightMargin="0" indent="0"
+                      leading="40" initialText="tf">
+        <size><Rectangle left="0" right="2000" top="0" bottom="400"/></size>
+        <color><Color red="0" green="0" blue="0" alpha="255"/></color>
+      </DefineEditText>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="800" top="0" bottom="800"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineButton2 objectID="3" menu="0">
+        <buttons>
+          <Button hitTest="1" down="1" over="1" up="1" objectID="2" depth="1">
+            <transform><Transform transX="0" transY="0"/></transform>
+            <colorTransform><ColorTransform2/></colorTransform>
+          </Button>
+        </buttons>
+        <!--
+          A non-empty <conditions> block is REQUIRED, not decoration: with
+          `<conditions/>` swfmill writes ActionOffset=0 and Ruffle then never
+          instantiates the button at all — `btn` resolves to undefined and
+          typeof reports "undefined", which would make this probe compare our
+          runtimes against a broken reference instead of against Flash. The
+          handler body is a bare Play() that nothing ever triggers (there is
+          no pointer input in the harness).
+        -->
+        <conditions>
+          <Condition next="0" menuEnter="0" pointerReleaseOutside="0"
+                     pointerDragEnter="0" pointerDragLeave="0"
+                     pointerReleaseInside="0" pointerPush="1" pointerLeave="0"
+                     pointerEnter="0" key="0" menuLeave="0">
+            <actions><Play/><EndAction/></actions>
+          </Condition>
+        </conditions>
+      </DefineButton2>
+
+      <DefineShape objectID="4">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="5" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="4"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="1" name="fld">
+        <transform><Transform transX="200" transY="5200"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="3" name="btn">
+        <transform><Transform transX="200" transY="5200"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="3" objectID="5" name="mk1">
+        <transform><Transform transX="0" transY="800"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="4" objectID="5" name="mk2">
+        <transform><Transform transX="0" transY="2000"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="PROBE:tf="/>
+              <StackString value="fld"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <TypeOf/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:btn="/>
+              <StackString value="btn"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <TypeOf/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk1"/>
+              <StackFloat value="0.0"/>
+              <StackString value="fld"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <TypeOf/>
+          <PushData><items><StackString value="object"/></items></PushData>
+          <EqualTyped/>
+          <PushData><items><StackDouble value="0.005"/></items></PushData>
+          <Divide/>
+          <SetProperty/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk2"/>
+              <StackFloat value="0.0"/>
+              <StackString value="btn"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <TypeOf/>
+          <PushData><items><StackString value="object"/></items></PushData>
+          <EqualTyped/>
+          <PushData><items><StackDouble value="0.005"/></items></PushData>
+          <Divide/>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

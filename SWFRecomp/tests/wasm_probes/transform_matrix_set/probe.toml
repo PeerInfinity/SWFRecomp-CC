@@ -1,0 +1,5 @@
+golden_source = "ruffle"
+known_red = true
+trace_prefix = "PROBE:"
+
+description = "Gate-inventory cluster `transform.matrix / transform.colorTransform setters` (action.c:9072, 9146). Assigns a flash.geom.Matrix and a flash.geom.ColorTransform; box should move to (80,40) and tint, marker follows _x."

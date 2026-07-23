@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run the WASM probe suite: serve docs2/, drive each probe in headed Chrome,
-capture a canvas screenshot, diff vs the per-probe golden.png.
+capture a canvas screenshot, diff vs the per-probe golden.png, and (optionally)
+assert the page's trace output against expected_trace.txt.
 
 A "probe" lives at SWFRecomp/tests/wasm_probes/<slug>/. The harness reads
 each probe's metadata from `probe.toml` (optional) with these keys:
@@ -10,10 +11,21 @@ each probe's metadata from `probe.toml` (optional) with these keys:
     channel_threshold = 16        # max channel delta per pixel (default)
     known_red = false             # if true, expected to fail (gap probe)
     golden_source = "ours"        # "ours" (default) | "ruffle"
+    trace_prefix = "PROBE:"       # only console lines with this prefix count
+                                  #   as trace output (default: "" = all
+                                  #   console.log lines)
 
 Goldens live at SWFRecomp/tests/wasm_probes/<slug>/golden.png. KNOWN_RED
 probes ship golden_ruffle.png alongside; the harness still diffs vs whichever
 golden the toml selects and reports the result separately.
+
+Trace assertion: every console message emitted by the page is recorded into
+report.json (`console` = all messages, `trace` = the prefix-filtered log
+lines). If <probe>/expected_trace.txt exists, the filtered trace lines must
+exact-match its non-empty lines; a mismatch fails the probe with the same
+semantics as a pixel diff (and is absorbed by known_red the same way).
+`--capture-golden` also (re)writes expected_trace.txt for probes that already
+have one.
 
 Usage:
     python3 tools/wasm_probe_runner.py                          # run all
@@ -69,6 +81,7 @@ class ProbeConfig:
     known_red: bool = False
     golden_source: str = "ours"
     description: str = ""
+    trace_prefix: str = ""
 
     @property
     def golden_filename(self) -> str:
@@ -85,6 +98,11 @@ class ProbeResult:
     max_channel_delta: int = 0
     diff_path: Path | None = None
     actual_path: Path | None = None
+    console: list[dict] = field(default_factory=list)
+    trace: list[str] = field(default_factory=list)
+    # None = no expected_trace.txt for this probe (nothing asserted).
+    trace_ok: bool | None = None
+    trace_detail: str = ""
 
 
 def load_probe_config(slug: str) -> ProbeConfig:
@@ -92,14 +110,50 @@ def load_probe_config(slug: str) -> ProbeConfig:
     toml_path = PROBES_DIR / slug / "probe.toml"
     if toml_path.is_file():
         with open(toml_path, "rb") as f:
-            data = tomllib.load(f)
+            # A malformed probe.toml is that probe's problem — don't let it
+            # abort the whole suite run.
+            try:
+                data = tomllib.load(f)
+            except tomllib.TOMLDecodeError as e:
+                print(f"warning: {toml_path.relative_to(REPO_ROOT)}: {e}"
+                      " — using defaults", file=sys.stderr)
+                return cfg
         cfg.settle_seconds = float(data.get("settle_seconds", cfg.settle_seconds))
         cfg.pixel_threshold = int(data.get("pixel_threshold", cfg.pixel_threshold))
         cfg.channel_threshold = int(data.get("channel_threshold", cfg.channel_threshold))
         cfg.known_red = bool(data.get("known_red", cfg.known_red))
         cfg.golden_source = str(data.get("golden_source", cfg.golden_source))
         cfg.description = str(data.get("description", ""))
+        cfg.trace_prefix = str(data.get("trace_prefix", cfg.trace_prefix))
     return cfg
+
+
+def expected_trace_path(slug: str) -> Path:
+    return PROBES_DIR / slug / "expected_trace.txt"
+
+
+def load_expected_trace(slug: str) -> list[str] | None:
+    """Non-empty lines of <probe>/expected_trace.txt, or None if absent."""
+    path = expected_trace_path(slug)
+    if not path.is_file():
+        return None
+    return [ln.rstrip("\r\n") for ln in path.read_text().splitlines()
+            if ln.strip()]
+
+
+def diff_traces(actual: list[str], expected: list[str]) -> str:
+    """Empty string iff the two line lists are equal; else a short summary of
+    the first divergence plus the line counts."""
+    if actual == expected:
+        return ""
+    for i, (a, e) in enumerate(zip(actual, expected)):
+        if a != e:
+            return (f"trace line {i + 1}: got {a!r}, want {e!r} "
+                    f"({len(actual)} lines vs {len(expected)} expected)")
+    extra = actual[len(expected):] or expected[len(actual):]
+    which = "extra" if len(actual) > len(expected) else "missing"
+    return (f"trace {which} line {min(len(actual), len(expected)) + 1}: "
+            f"{extra[0]!r} ({len(actual)} lines vs {len(expected)} expected)")
 
 
 def discover_probes() -> list[str]:
@@ -188,21 +242,50 @@ async def run_one_probe(p, browser, url_base: str, cfg: ProbeConfig,
     ctx = await browser.new_context(viewport={"width": 900, "height": 700})
     ctx.set_default_timeout(20000)
     page = await ctx.new_page()
+
+    console_log: list[dict] = []
+    page.on("console", lambda msg: console_log.append(
+        {"type": msg.type, "text": msg.text}))
+
+    def trace_lines() -> list[str]:
+        """Console.log lines that count as probe trace output. With a
+        trace_prefix set, only lines carrying it (any console type, so a
+        stderr-routed trace still counts); otherwise every log-type line."""
+        if cfg.trace_prefix:
+            return [m["text"] for m in console_log
+                    if cfg.trace_prefix in m["text"]]
+        return [m["text"] for m in console_log if m["type"] == "log"]
+
     try:
         await page.goto(target_url, wait_until="domcontentloaded", timeout=20000)
         actual_path = out_dir / f"{cfg.slug}_actual.png"
         await capture_canvas(page, cfg.settle_seconds, actual_path)
+        traced = trace_lines()
 
         golden_path = PROBES_DIR / cfg.slug / cfg.golden_filename
         if capture_golden:
             golden_path.write_bytes(actual_path.read_bytes())
+            detail = f"captured golden -> {golden_path.relative_to(REPO_ROOT)}"
+            # Only refresh a trace expectation that already exists — never
+            # invent one, or a probe with no trace contract would silently
+            # acquire whatever it happened to print.
+            trace_path = expected_trace_path(cfg.slug)
+            if trace_path.is_file():
+                trace_path.write_text("".join(f"{ln}\n" for ln in traced))
+                detail += f", trace ({len(traced)} lines)"
             return ProbeResult(
                 slug=cfg.slug,
                 known_red=cfg.known_red,
                 status="pass",
-                detail=f"captured golden -> {golden_path.relative_to(REPO_ROOT)}",
+                detail=detail,
                 actual_path=actual_path,
+                console=console_log,
+                trace=traced,
             )
+
+        expected = load_expected_trace(cfg.slug)
+        trace_detail = "" if expected is None else diff_traces(traced, expected)
+        trace_ok = None if expected is None else not trace_detail
 
         if not golden_path.is_file():
             return ProbeResult(
@@ -211,6 +294,10 @@ async def run_one_probe(p, browser, url_base: str, cfg: ProbeConfig,
                 status="missing_golden",
                 detail=f"no {cfg.golden_filename} (run --capture-golden)",
                 actual_path=actual_path,
+                console=console_log,
+                trace=traced,
+                trace_ok=trace_ok,
+                trace_detail=trace_detail,
             )
 
         diff_pixels, max_delta, diff_img = diff_images(
@@ -219,16 +306,25 @@ async def run_one_probe(p, browser, url_base: str, cfg: ProbeConfig,
         diff_path = out_dir / f"{cfg.slug}_diff.png"
         diff_img.save(diff_path)
 
-        passed = diff_pixels <= cfg.pixel_threshold
+        passed = diff_pixels <= cfg.pixel_threshold and trace_ok is not False
+        detail = f"diff_pixels={diff_pixels} max_channel_delta={max_delta}"
+        if trace_ok is False:
+            detail += f"; {trace_detail}"
+        elif trace_ok is True:
+            detail += f"; trace ok ({len(traced)} lines)"
         return ProbeResult(
             slug=cfg.slug,
             known_red=cfg.known_red,
             status="pass" if passed else "fail",
-            detail=f"diff_pixels={diff_pixels} max_channel_delta={max_delta}",
+            detail=detail,
             diff_pixels=diff_pixels,
             max_channel_delta=max_delta,
             diff_path=diff_path,
             actual_path=actual_path,
+            console=console_log,
+            trace=traced,
+            trace_ok=trace_ok,
+            trace_detail=trace_detail,
         )
     except Exception as e:
         return ProbeResult(
@@ -236,6 +332,8 @@ async def run_one_probe(p, browser, url_base: str, cfg: ProbeConfig,
             known_red=cfg.known_red,
             status="error",
             detail=str(e)[:200],
+            console=console_log,
+            trace=trace_lines(),
         )
     finally:
         await ctx.close()
@@ -316,6 +414,10 @@ async def run(args) -> int:
                 if r.actual_path else None,
                 "diff_png": str(r.diff_path.relative_to(out_dir))
                 if r.diff_path else None,
+                "trace_ok": r.trace_ok,
+                "trace_detail": r.trace_detail,
+                "trace": r.trace,
+                "console": r.console,
             }
             for r in results
         ],

@@ -1,0 +1,1 @@
+{"metadata":{"description":"_droptarget after a scripted startDrag/stopDrag must name the clip under the drag hotspot. Probes the drag gates at action.c:32895 (actionEndDrag) and 70182 (startDrag hotspot init).","width":320,"height":240,"swf_version":8},"opcodes":{"tested":["StartDrag","EndDrag","GetProperty","SetProperty"]}}

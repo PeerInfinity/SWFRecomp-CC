@@ -1,0 +1,1 @@
+{"metadata":{"description":"`delete child` on a timeline child MC must return false and leave typeof(child)==\"movieclip\". Probes the actionDelete2 display-list guard gate at action.c:43861 (expected no-op).","width":320,"height":240,"swf_version":8},"opcodes":{"tested":["Delete2","TypeOf","Not","Divide","SetProperty"]}}

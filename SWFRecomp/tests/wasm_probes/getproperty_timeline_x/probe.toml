@@ -1,0 +1,6 @@
+golden_source = "ruffle"
+known_red = true
+trace_prefix = "PROBE:"
+ruffle_skipframes = 2
+settle_seconds = 2.0
+description = "Gate-inventory cluster `GetProperty display-truth reads` (action.c:43212-43292). Reads _x/_y of a purely timeline-moved clip on frame 3; marker follows the read. Golden captured from ~/CC/ruffle/target/release/exporter."

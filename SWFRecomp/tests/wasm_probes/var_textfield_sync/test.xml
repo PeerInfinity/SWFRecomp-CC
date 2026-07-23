@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    var_textfield_sync — gate-inventory cluster "var→textfield sync on `var`
+    declare" (action.c:42849 in actionDefineLocal).
+
+    Stage 320x240. `fld` is a DefineEditText bound to the timeline variable
+    `bound` (variableName="bound", initialText="INIT"), placed BELOW the
+    visible stage (transY=5200 = y 260 on a 240-high stage) so device-font
+    glyph rasterization — which differs between Ruffle and us for reasons
+    unrelated to this gate — cannot pollute the pixel diff. The verdict is
+    carried by a green 20x20 marker instead.
+
+    DoAction (frame 1):
+        var bound = "CHANGED"          ; ActionDefineLocal, NOT SetVariable
+        trace("PROBE:text=" + fld.text)
+        trace("PROBE:len="  + fld.length)
+        setProperty("/mk", _x, (fld.text == "CHANGED") / 0.005)
+
+    `length` is read as well as `text` on purpose. A runtime could satisfy
+    `fld.text` by proxying the read back to the bound variable without ever
+    refreshing the field, which would look green here while the rendered
+    glyphs stayed stale. `length` is written only by the real sync (it is
+    setProperty'd next to `text` in the sync code), so text="CHANGED" with
+    len=4 would mean proxying, and text="CHANGED" with len=7 means the
+    field's property bag genuinely tracked the write.
+
+    Flash / Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER: declaring the bound
+    variable pushes the value into every textfield bound to that name, so
+    fld.text is "CHANGED" and the marker lands at x=200.
+
+    browser-WASM: the ng_syncVarToTextFields call in actionDefineLocal is
+    inside `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`. If no
+    other path refreshes the binding, fld.text is still "INIT" and the marker
+    sits at x=0.
+
+    The `var` form is the point: a plain SetVariable takes a different code
+    path whose sync is not gated.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineEditText objectID="1" wordWrap="0" multiLine="0" password="0"
+                      readOnly="1" autoSize="0" hasLayout="1" notSelectable="1"
+                      hasBorder="0" isHTML="0" useOutlines="0" fontHeight="240"
+                      align="0" leftMargin="0" rightMargin="0" indent="0"
+                      leading="40" variableName="bound" initialText="INIT">
+        <size><Rectangle left="0" right="3000" top="0" bottom="400"/></size>
+        <color><Color red="0" green="0" blue="0" alpha="255"/></color>
+      </DefineEditText>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="1" name="fld">
+        <transform><Transform transX="200" transY="5200"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="3" name="mk">
+        <transform><Transform transX="0" transY="2000"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="bound"/>
+              <StackString value="CHANGED"/>
+            </items>
+          </PushData>
+          <SetLocalVariable/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:text="/>
+              <StackString value="fld"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="text"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:len="/>
+              <StackString value="fld"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="length"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk"/>
+              <StackFloat value="0.0"/>
+              <StackString value="fld"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="text"/></items></PushData>
+          <GetMember/>
+          <PushData><items><StackString value="CHANGED"/></items></PushData>
+          <EqualTyped/>
+          <PushData><items><StackDouble value="0.005"/></items></PushData>
+          <Divide/>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

@@ -1,0 +1,5 @@
+golden_source = "ruffle"
+known_red = true
+trace_prefix = "PROBE:"
+
+description = "Gate-inventory cluster `TextFormat from fields` (action.c:17312). field.getTextFormat().size/.align; marker at x=200 iff size is the tag-defined 12."

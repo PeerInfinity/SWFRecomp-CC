@@ -1,0 +1,1 @@
+{"metadata":{"description":"`var bound = \"CHANGED\"` must refresh an EditText bound to `bound`. Probes the ng_syncVarToTextFields gate in actionDefineLocal at action.c:42849.","width":320,"height":240,"swf_version":8},"opcodes":{"tested":["DefineLocal","GetMember","Equals2","Divide","SetProperty"]}}

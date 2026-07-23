@@ -1,0 +1,1 @@
+{"metadata":{"description":"GetProperty _x/_y on a timeline-moved (never script-positioned) clip must read display-list truth. Probes the display-entry lookup gate at action.c:43212-43292.","width":320,"height":240,"swf_version":8},"opcodes":{"tested":["GetProperty","SetProperty","Stop"]}}

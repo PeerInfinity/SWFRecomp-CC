@@ -1,0 +1,5 @@
+golden_source = "ruffle"
+known_red = true
+trace_prefix = "PROBE:"
+
+description = "Gate-inventory cluster `drag: _droptarget + virtual position` (action.c:32895, 70182). Scripted startDrag/stopDrag with no mouse input; marker at x=200 iff _droptarget names the clip under the hotspot."

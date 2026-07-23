@@ -1,0 +1,1 @@
+{"metadata":{"description":"field.getTextFormat() must report the field's tag-defined size/align. Probes the createTextFormatFromField gate at action.c:17312 (187 lines browser never compiles).","width":320,"height":240,"swf_version":8},"opcodes":{"tested":["CallMethod","GetMember","Equals2","Divide","SetProperty"]}}

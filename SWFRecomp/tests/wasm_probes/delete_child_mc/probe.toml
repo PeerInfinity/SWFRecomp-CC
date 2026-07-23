@@ -1,0 +1,3 @@
+golden_source = "ruffle"
+trace_prefix = "PROBE:"
+description = '''Gate-inventory cluster `delete child-MC guard` (action.c:43861). `delete child` on a timeline child must return false and leave typeof "movieclip"; both markers sit at x=200 iff so. Expected GREEN — the gated assignment is redundant with the unconditional `success = false` immediately above it, so this probe converts that source reading into evidence.'''

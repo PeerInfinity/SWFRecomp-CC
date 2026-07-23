@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    getproperty_timeline_x — gate-inventory cluster "GetProperty display-truth
+    reads" (action.c:43212-43292, the _x/_y arms of actionGetProperty).
+
+    Stage 320x240, three frames. `mover` is a blue 40x40 sprite the TIMELINE
+    walks: placed at x=40 on frame 1, MOVE-tagged to x=160 on frame 2 and to
+    x=200,y=100 on frame 3. No ActionScript ever writes its position, so
+    `mc->as_set_flags` stays 0 and the only truth about where it is lives in
+    the display-list entry.
+
+    Frame 3 DoAction:
+        trace("PROBE:x=" + getProperty("/mover", _x))
+        trace("PROBE:y=" + getProperty("/mover", _y))
+        setProperty("/mk", _x, getProperty("/mover", _x))
+        stop()
+
+    Flash / Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER: _x reads the display
+    entry (ng_getTransformXY_d) whenever the clip is not script-positioned,
+    so the trace says 200 / 100 and the green marker lands at x=200.
+
+    browser-WASM: that whole `!(mc->as_set_flags & 1)` display-entry lookup
+    is inside `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`, so the
+    read falls through to `mc->x` — whatever the placement machinery last
+    wrote there. If the browser sprite-advance model keeps mc->x in step with
+    timeline MOVE tags the probe is green (the gate is covered by an
+    equivalent path); if it reports the frame-1 position (40) or 0, it is a
+    bug.
+  -->
+  <Header framerate="12" frames="3">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="0" right="800" top="0" bottom="800"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="mover">
+        <transform><Transform transX="800" transY="800"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="mk">
+        <transform><Transform transX="0" transY="4000"/></transform>
+      </PlaceObject2>
+      <ShowFrame/>
+
+      <PlaceObject2 replace="1" depth="1">
+        <transform><Transform transX="3200" transY="800"/></transform>
+      </PlaceObject2>
+      <ShowFrame/>
+
+      <PlaceObject2 replace="1" depth="1">
+        <transform><Transform transX="4000" transY="2000"/></transform>
+      </PlaceObject2>
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="PROBE:x="/>
+              <StackString value="/mover"/>
+              <StackFloat value="0.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:y="/>
+              <StackString value="/mover"/>
+              <StackFloat value="1.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk"/>
+              <StackFloat value="0.0"/>
+              <StackString value="/mover"/>
+              <StackFloat value="0.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <SetProperty/>
+          <Stop/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

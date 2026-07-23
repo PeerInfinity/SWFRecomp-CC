@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    textformat_from_field — gate-inventory cluster "TextFormat from fields"
+    (action.c:17312, createTextFormatFromField — a 187-line block browser
+    never compiles).
+
+    Stage 320x240. `fld` is a DefineEditText with a known tag-defined format
+    (fontHeight 240 twips = size 12, align 0 = "left", leftMargin 0, indent 0)
+    and initialText "abc" so getTextFormat's has_text branch is taken. It is
+    placed BELOW the visible stage (transY=5200 = y 260 on a 240-high stage)
+    so device-font glyph rasterization cannot pollute the pixel diff; the
+    verdict is carried by a green 20x20 marker.
+
+    DoAction (frame 1):
+        tf = fld.getTextFormat()
+        trace("PROBE:size="  + tf.size)
+        trace("PROBE:align=" + tf.align)
+        setProperty("/mk", _x, (tf.size == 12) / 0.005)
+
+    Flash / Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER: the TextFormat is
+    populated from the field's tag metadata — size 12, align "left" — and the
+    marker lands at x=200.
+
+    browser-WASM: createTextFormatFromField does not exist in the build, so
+    whatever getTextFormat returns there cannot carry the field's metadata.
+    The trace shows what it does return (undefined, or a default-valued
+    TextFormat) and the marker sits at x=0.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineEditText objectID="1" wordWrap="0" multiLine="0" password="0"
+                      readOnly="1" autoSize="0" hasLayout="1" notSelectable="1"
+                      hasBorder="0" isHTML="0" useOutlines="0" fontHeight="240"
+                      align="0" leftMargin="0" rightMargin="0" indent="0"
+                      leading="40" initialText="abc">
+        <size><Rectangle left="0" right="3000" top="0" bottom="400"/></size>
+        <color><Color red="0" green="0" blue="0" alpha="255"/></color>
+      </DefineEditText>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="1" name="fld">
+        <transform><Transform transX="200" transY="5200"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="3" name="mk">
+        <transform><Transform transX="0" transY="2000"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <!-- tf = fld.getTextFormat() -->
+          <PushData><items><StackString value="tf"/></items></PushData>
+          <PushData>
+            <items>
+              <StackInteger value="0"/>
+              <StackString value="fld"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="getTextFormat"/></items></PushData>
+          <CallMethod/>
+          <SetVariable/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:size="/>
+              <StackString value="tf"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="size"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:align="/>
+              <StackString value="tf"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="align"/></items></PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk"/>
+              <StackFloat value="0.0"/>
+              <StackString value="tf"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData><items><StackString value="size"/></items></PushData>
+          <GetMember/>
+          <PushData><items><StackInteger value="12"/></items></PushData>
+          <EqualTyped/>
+          <PushData><items><StackDouble value="0.005"/></items></PushData>
+          <Divide/>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

@@ -1,0 +1,1 @@
+{"metadata":{"description":"mc.transform.matrix / mc.transform.colorTransform assignment must move and tint the clip. Probes the transformMatrixSetter/transformCTSetter gates at action.c:9072 and 9146.","width":320,"height":240,"swf_version":8},"opcodes":{"tested":["NewMethod","SetMember","GetProperty","SetProperty"]}}

@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "description": "_alpha of a clip faded by a placement CXFORM must read the effective multiplier (50), not mc->alpha (100). Surfaces the mcReadAlpha build-mode gate at action.c:26084.",
+    "width": 320,
+    "height": 240,
+    "swf_version": 8
+  },
+  "opcodes": {
+    "tested": ["GetProperty", "SetProperty"]
+  }
+}

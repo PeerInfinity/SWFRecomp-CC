@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    alpha_cxform_read — gate-inventory cluster "_alpha placement-cxform read"
+    (action.c:26084, mcReadAlpha).
+
+    Stage 320x240. `faded` is a blue 40x40 sprite placed at (40,40) with a
+    placement CXFORMWITHALPHA whose alpha multiplier is 128/256 = 0.5.
+    `marker` is a green 20x20 sprite parked at (0,180).
+
+    DoAction (frame 1):
+        trace("PROBE:alpha=" + getProperty("/faded", _alpha))
+        setProperty("/marker", _x, getProperty("/faded", _alpha))
+
+    Flash / Ruffle / NO_GRAPHICS / OFFSCREEN_RENDER: `_alpha` of a clip whose
+    alpha comes from a placement CXFORM reads the *effective* multiplier, so
+    the trace says 50 and the marker lands at x=50.
+
+    browser-WASM: mcReadAlpha's display-object branch is gated
+    `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`, so it falls
+    through to `mc->alpha`, which no placement CXFORM ever writes — 100. The
+    trace says 100 and the marker lands at x=100, 50 px right of the golden.
+
+    The marker encodes the read as a position so the pixel diff catches the
+    divergence even without the trace channel.
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="0" right="800" top="0" bottom="800"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="3" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="3" name="faded">
+        <transform><Transform transX="800" transY="800"/></transform>
+        <colorTransform>
+          <ColorTransform2 factorRed="256" factorGreen="256" factorBlue="256" factorAlpha="128"/>
+        </colorTransform>
+      </PlaceObject2>
+
+      <PlaceObject2 replace="0" depth="2" objectID="4" name="marker">
+        <transform><Transform transX="0" transY="3600"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="PROBE:alpha="/>
+              <StackString value="/faded"/>
+              <StackFloat value="6.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="/marker"/>
+              <StackFloat value="0.0"/>
+              <StackString value="/faded"/>
+              <StackFloat value="6.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

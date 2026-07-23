@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="8" compressed="0">
+  <!--
+    droptarget_scripted — gate-inventory cluster "drag: _droptarget + virtual
+    position" (action.c:32895 in actionEndDrag, action.c:70182 in the
+    startDrag opcode arm).
+
+    Stage 320x240. `b` is a red 80x80 sprite covering the stage origin (0,0)
+    at depth 1; `a` is a blue 40x40 sprite also at the origin at depth 2 —
+    the clip that gets dragged. `mk` is a green 20x20 verdict marker.
+
+    DoAction (frame 1) — no mouse input at all, so the drag hotspot stays at
+    the default mouse position (0,0):
+        startDrag("a", false, false)
+        stopDrag()
+        trace("PROBE:dt=" + getProperty("a", _droptarget))
+        setProperty("/mk", _x, (getProperty("a",_droptarget) == "/b") / 0.005)
+
+    The drag target is the BARE name "a", not "/a": actionEndDrag stores the
+    computed path on the clip it finds by instance name, taking the tail after
+    the last '.' of g_drag_target_name. A leading-slash path has no '.', so
+    the lookup is done with the literal "/a", finds nothing, and _droptarget
+    is never written — the probe would read "" on every build and adjudicate
+    nothing. (That leading-slash miss is a separate native-side quirk, not the
+    gate under test; noted in the README row.)
+
+    NO_GRAPHICS / OFFSCREEN_RENDER: actionEndDrag calls ng_compute_droptarget
+    with the virtual hotspot, finds `b` under (0,0) skipping the dragged clip
+    itself, and _droptarget becomes "/b" — marker at x=200.
+
+    browser-WASM: both the hotspot initialisation (startDrag) and the whole
+    droptarget computation (stopDrag) are inside
+    `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`, so _droptarget
+    stays "" and the marker sits at x=0.
+
+    CAVEAT, read the README row before trusting a red here: Ruffle derives
+    _droptarget from its mouse-driven update_drag, which never runs without
+    pointer input. If the Ruffle reference disagrees with our native build,
+    the divergence being measured is ours-vs-ours, not a Flash gap — the
+    probe's verdict is then "couldn't probe", not "bug".
+  -->
+  <Header framerate="12" frames="1">
+    <size>
+      <Rectangle left="0" right="6400" top="0" bottom="4800"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color><Color red="220" green="220" blue="220"/></color>
+      </SetBackgroundColor>
+
+      <DefineShape objectID="1">
+        <bounds><Rectangle left="0" right="1600" top="0" bottom="1600"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="220" green="40" blue="40"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="1600" y="0"/>
+              <LineTo x="0" y="1600"/>
+              <LineTo x="-1600" y="0"/>
+              <LineTo x="0" y="-1600"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="2">
+        <bounds><Rectangle left="0" right="800" top="0" bottom="800"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="40" green="40" blue="220"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="800" y="0"/>
+              <LineTo x="0" y="800"/>
+              <LineTo x="-800" y="0"/>
+              <LineTo x="0" y="-800"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineShape objectID="3">
+        <bounds><Rectangle left="0" right="400" top="0" bottom="400"/></bounds>
+        <styles>
+          <StyleList>
+            <fillStyles>
+              <Solid><color><Color red="20" green="180" blue="60"/></color></Solid>
+            </fillStyles>
+            <lineStyles/>
+          </StyleList>
+        </styles>
+        <shapes>
+          <Shape>
+            <edges>
+              <ShapeSetup x="0" y="0" fillStyle0="1"/>
+              <LineTo x="400" y="0"/>
+              <LineTo x="0" y="400"/>
+              <LineTo x="-400" y="0"/>
+              <LineTo x="0" y="-400"/>
+              <ShapeSetup/>
+            </edges>
+          </Shape>
+        </shapes>
+      </DefineShape>
+
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="5" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="2"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <DefineSprite objectID="6" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="3"/>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+
+      <PlaceObject2 replace="0" depth="1" objectID="4" name="b">
+        <transform><Transform transX="0" transY="0"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="2" objectID="5" name="a">
+        <transform><Transform transX="0" transY="0"/></transform>
+      </PlaceObject2>
+      <PlaceObject2 replace="0" depth="3" objectID="6" name="mk">
+        <transform><Transform transX="0" transY="4000"/></transform>
+      </PlaceObject2>
+
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackBoolean value="0"/>
+              <StackBoolean value="0"/>
+              <StackString value="a"/>
+            </items>
+          </PushData>
+          <StartDrag/>
+          <StopDrag/>
+
+          <PushData>
+            <items>
+              <StackString value="PROBE:dt="/>
+              <StackString value="a"/>
+              <StackFloat value="14.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <AddTyped/>
+          <Trace/>
+
+          <PushData>
+            <items>
+              <StackString value="/mk"/>
+              <StackFloat value="0.0"/>
+              <StackString value="a"/>
+              <StackFloat value="14.0"/>
+            </items>
+          </PushData>
+          <GetProperty/>
+          <PushData><items><StackString value="/b"/></items></PushData>
+          <EqualTyped/>
+          <PushData><items><StackDouble value="0.005"/></items></PushData>
+          <Divide/>
+          <SetProperty/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

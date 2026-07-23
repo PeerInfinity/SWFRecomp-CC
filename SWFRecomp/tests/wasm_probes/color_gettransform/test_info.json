@@ -1,0 +1,1 @@
+{"metadata":{"description":"Color.getTransform() must report the transform just set via setTransform (rb=255). Probes the colorGetTransform whole-body gate at action.c:10907.","width":320,"height":240,"swf_version":8},"opcodes":{"tested":["NewObject","InitObject","CallMethod","GetMember","SetProperty"]}}
