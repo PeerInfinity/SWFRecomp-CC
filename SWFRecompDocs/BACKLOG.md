@@ -93,6 +93,16 @@ first).
 
 ## Deferred test failures
 
+- **`avm2/edittext_align` intermittent segfault after byte-correct output
+  (60/60) in graphics CI.** Seen once (run 30053137733, 2026-07-23);
+  passed the 5 prior CI runs and 4/4 locally. This is the exact
+  SIGABRT/segfault-after-correct-output signature of case-v6 (entry
+  below), which sat mislabeled as a "CI flake" for two months and was
+  actually 3 heap bugs — and was DETERMINISTIC under ASAN where bare
+  runs were ~50/50. If it recurs even once: do not triage-and-move-on;
+  run `verify_output.py --test=edittext_align --mode=graphics --asan`
+  first. (2026-07-23)
+
 - ~~**`from_gnash/actionscript.all/case-v6` CI-only flake.**~~ FIXED
   2026-05-30. Was never CI-environment-specific — it was a real
   heap bug masked by heap layout. `case-v5` reproduced the same
