@@ -1,0 +1,6 @@
+COMPLETE fired
+content non-null: true
+content is DisplayObject: true
+addChild ok
+agi no-op methods ok, no #1010
+after load, reached end

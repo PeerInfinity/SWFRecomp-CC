@@ -3140,6 +3140,9 @@ typedef struct Avm2LoaderInfoExt
 {
 	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
 	Avm2Object* parameters;             // stable identity across reads
+	Avm2Object* content;                // non-NULL only for a Loader.load() that
+	                                    // seeded synthetic content (AGI shell);
+	                                    // NULL on the root LoaderInfo (→ root movie)
 } Avm2LoaderInfoExt;
 
 static Avm2Object* g_root_loader_info;   // GC-rooted in avm2_gc_mark_roots_display
@@ -3185,6 +3188,12 @@ static Avm2Value li_get_bytes_total(Avm2Activation* act)
 
 static Avm2Value li_get_content(Avm2Activation* act)
 {
+	// A per-Loader contentLoaderInfo that seeded synthetic content (the AGI
+	// no-op shell, see loader_load) returns it; the root LoaderInfo returns the
+	// root movie.
+	Avm2LoaderInfoExt* ext = loaderinfo_ext_of(act->ctx, this_obj(act));
+	if (ext != NULL && ext->content != NULL)
+		return avm2_object_value(ext->content);
 	Avm2Object* r = act->ctx->root;
 	return r != NULL ? avm2_object_value(r) : avm2_null();
 }
@@ -3296,20 +3305,32 @@ static Avm2LoaderExt* loader_ext_of(Avm2Context* ctx, Avm2Object* o)
 	return (Avm2LoaderExt*) o->native_ext;
 }
 
+// The AGI no-op shell class (see loader_load). A concrete Sprite subclass whose
+// ArmorGames-API methods are all no-ops; seeded as a Loader's `content` so a
+// game's COMPLETE handler can assign it and call those methods without #1010.
+static Avm2Class* g_agi_shell_class;
+
+// Lazily build (and cache) a Loader's own contentLoaderInfo (a fresh LoaderInfo,
+// which extends EventDispatcher). Shared by the getter and loader_load.
+static Avm2Object* loader_ensure_cli(Avm2Context* ctx, Avm2LoaderExt* ext)
+{
+	if (ext == NULL) return NULL;
+	if (ext->content_loader_info == NULL)
+	{
+		Avm2Class* cls = ctx->builtins.loader_info_class;
+		if (cls == NULL) return NULL;
+		Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
+		ext->content_loader_info = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+	}
+	return ext->content_loader_info;
+}
+
 static Avm2Value loader_get_content_loader_info(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2LoaderExt* ext = loader_ext_of(ctx, this_obj(act));
-	if (ext == NULL) return avm2_null();
-	if (ext->content_loader_info == NULL)
-	{
-		Avm2Class* cls = ctx->builtins.loader_info_class;
-		if (cls == NULL) return avm2_null();
-		Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
-		ext->content_loader_info = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
-	}
-	return ext->content_loader_info != NULL
-	       ? avm2_object_value(ext->content_loader_info) : avm2_null();
+	Avm2Object* cli = loader_ensure_cli(ctx, ext);
+	return cli != NULL ? avm2_object_value(cli) : avm2_null();
 }
 
 static Avm2Value loader_get_content(Avm2Activation* act)
@@ -3322,6 +3343,58 @@ static Avm2Value loader_get_content(Avm2Activation* act)
 static Avm2Value loader_noop(Avm2Activation* act)
 {
 	(void) act;
+	return avm2_undefined();
+}
+
+// Bounded substring search (Avm2String.utf8 is not guaranteed NUL-terminated).
+static int avm2_str_contains(const Avm2String* s, const char* needle)
+{
+	if (s == NULL || s->utf8 == NULL || needle == NULL) return 0;
+	size_t nl = strlen(needle);
+	if (nl == 0) return 1;
+	if ((size_t) s->len < nl) return 0;
+	for (size_t i = 0; i + nl <= (size_t) s->len; i++)
+		if (memcmp(s->utf8 + i, needle, nl) == 0) return 1;
+	return 0;
+}
+
+// flash.display.Loader.load(request). Generic behaviour is a no-op (no network
+// layer → COMPLETE never fires, `content` stays null). The one exception is the
+// ArmorGames AGI helper SWF (cache.armorgames.com/assets/agi/AGI.swf): EQ (and
+// every AG-portal game) constructs `new Loader()`, registers a COMPLETE handler
+// on contentLoaderInfo, and — critically — its New Game handler runs the
+// UNGUARDED `agi.hideLoginStatus()` where `agi = loaderInfo.content`. With no
+// content that throws #1010. So for the AGI URL we seed a no-op AGI shell as the
+// contentLoaderInfo's `content` and fire a synthetic COMPLETE, letting the
+// game's own loadComplete assign `agi = shell` and addChild it; every AG-API
+// method the game later calls on the shell (hideLoginStatus/showLoginStatus/
+// init/initAGUI/…) is a no-op. We do NOT implement the real ArmorGames API or
+// runtime SWF loading. Reusable: unblocks New Game on any AG/AGI game.
+static Avm2Value loader_load(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2LoaderExt* ext = loader_ext_of(ctx, this_obj(act));
+	if (ext == NULL) return avm2_undefined();
+
+	int is_agi = 0;
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+	{
+		int found = 0;
+		Avm2Value uv = avm2_get_public_property(ctx, act->args[0], "url", 3, &found);
+		if (found && uv.kind == AVM2_VALUE_STRING)
+			is_agi = avm2_str_contains(uv.u.str, "AGI.swf");
+	}
+	if (!is_agi || g_agi_shell_class == NULL)
+		return avm2_undefined();  // generic no-op: COMPLETE never fires
+
+	Avm2Value sv = avm2_class_construct(ctx, g_agi_shell_class, NULL, 0);
+	if (sv.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	ext->content = sv.u.obj;
+	Avm2Object* cli = loader_ensure_cli(ctx, ext);
+	if (cli == NULL) return avm2_undefined();
+	Avm2LoaderInfoExt* clx = loaderinfo_ext_of(ctx, cli);
+	if (clx != NULL) clx->content = sv.u.obj;  // contentLoaderInfo.content = shell
+	dispatch_simple_event(ctx, cli, "complete", 0);  // Event.COMPLETE
 	return avm2_undefined();
 }
 
@@ -7452,6 +7525,20 @@ static void dispatch_roll_over(Avm2Context* ctx, Avm2Object* self, Avm2Object* f
 // FocusEvent focusIn/focusOut. Defined in the focus section below.
 static void update_focus_on_press(Avm2Context* ctx, Avm2Object* pressed);
 
+// Env AVM2_MOUSE_DEBUG: compact "Class 'name'" label for a picked target.
+static void avm2_dbg_pick_label(Avm2Context* ctx, const char* tag, Avm2Object* o)
+{
+	if (getenv("AVM2_MOUSE_DEBUG") == NULL) return;
+	if (o == NULL) { fprintf(stderr, "MPICK %s = NULL (stage)\n", tag); return; }
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, o);
+	const char* cn = (o->cls != NULL && o->cls->name.name != NULL)
+		? o->cls->name.name : "?";
+	const char* nm = (ext != NULL && ext->name != NULL && ext->name->utf8 != NULL)
+		? ext->name->utf8 : "(anon)";
+	fprintf(stderr, "MPICK %s = %s '%s' me=%d\n", tag, cn, nm,
+		ext != NULL ? ext->mouse_enabled : -1);
+}
+
 static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_moved)
 {
 	Avm2Object* stage = ctx->stage;
@@ -7459,6 +7546,8 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 	update_drag(ctx);
 	int mouse_in_stage = 1;
 	Avm2Object* new_over = mouse_in_stage ? run_mouse_pick(ctx) : NULL;
+	if (changed_button == 0)
+		avm2_dbg_pick_label(ctx, g_mouse_btn_down[0] ? "down" : "up", new_over);
 	Avm2Object* cur_over = g_mouse_hovered;
 	int left_down = g_mouse_btn_down[0];
 
@@ -8178,7 +8267,7 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, loader, "contentLoaderInfo",
 	                        loader_get_content_loader_info);
 	avm2_builtin_add_getter(ctx, loader, "content", loader_get_content);
-	avm2_builtin_add_method(ctx, loader, "load", loader_noop);
+	avm2_builtin_add_method(ctx, loader, "load", loader_load);
 	avm2_builtin_add_method(ctx, loader, "loadBytes", loader_noop);
 	avm2_builtin_add_method(ctx, loader, "close", loader_noop);
 	avm2_builtin_add_method(ctx, loader, "unload", loader_noop);
@@ -8199,6 +8288,26 @@ void avm2_register_display(Avm2Context* ctx)
 	// on Sprite). The Graphics class itself (g_graphics_class) is created later
 	// but only referenced when the getter is first called at runtime.
 	avm2_builtin_add_getter(ctx, sprite, "graphics", do_get_graphics);
+
+	// The AGI no-op shell (see loader_load): a concrete Sprite subclass seeded as
+	// a Loader's `content` for the ArmorGames AGI SWF. Every AG-API method the
+	// game calls on it (AGIStuff.loadComplete → init/initAGUI; MainMenu New Game →
+	// hideAGILogin → hideLoginStatus; and the guarded show*/submit*/retrieve*
+	// paths) is a no-op returning undefined. Internal name — the game never
+	// constructs it by QName, only receives it as loaded content.
+	Avm2Class* agishell = avm2_builtin_class(ctx, "swfrecomp.internal",
+	                                         "AGINoopShell", sprite);
+	agishell->native_init = display_native_init;   // concrete: no #2012
+	agishell->instance_init.fn = sprite_ctor_init;  // constructChildren like Sprite
+	agishell->instance_init.debug_name = "AGINoopShell";
+	static const char* const agi_noop_methods[] = {
+		"init", "initAGUI", "hideLoginStatus", "showLoginStatus",
+		"retrieveUserData", "submitUserData", "showScoreboardSubmit",
+		"showScoreboardList", "showGameShareList", "showGameShareNavi",
+		"showAGILogin", "hideAGILogin", NULL };
+	for (int i = 0; agi_noop_methods[i] != NULL; i++)
+		avm2_builtin_add_method(ctx, agishell, agi_noop_methods[i], loader_noop);
+	g_agi_shell_class = agishell;
 
 	Avm2Class* movieclip = avm2_builtin_class(ctx, "flash.display", "MovieClip", sprite);
 	movieclip->native_init = display_native_init;

@@ -28,14 +28,19 @@ Stub shape (runtime: `avm2_display.c`, `flash.display.Loader` extends
 - `contentLoaderInfo` returns the Loader's **own** fresh `LoaderInfo` (which
   extends `EventDispatcher`), so `addEventListener(COMPLETE, …)` is a real
   no-op registration with stable identity across reads.
-- `load` / `loadBytes` / `close` / `unload` / `unloadAndStop` are no-ops. No
-  second SWF is ever loaded, so `COMPLETE` never fires (`onComplete` is never
-  traced) and `content` stays `null`.
+- `load` / `loadBytes` / `close` / `unload` / `unloadAndStop` are no-ops for a
+  **generic** URL. No second SWF is ever loaded, so `COMPLETE` never fires
+  (`onComplete` is never traced) and `content` stays `null`. This test now uses
+  a generic (non-AGI) URL to pin exactly that no-op path.
+
+**EQ-3 update:** the one exception is the ArmorGames **AGI helper SWF** URL
+(`…/agi/AGI.swf`), which now takes the *agi-shell* path — a synthetic `COMPLETE`
+with a no-op shell as `content` — so EQ's New Game handler's unguarded
+`agi.hideLoginStatus()` no-ops instead of throwing #1010. That behavior is
+covered by the sibling **`avm2_agi_shell`** test (gap #3's `agi` no-op shell).
 
 This is a **reusable capability** — it unblocks any AGI/preloader-style game
 that constructs a `Loader` during init. It does **not** implement real runtime
-SWF loading. (For EQ's *New Game* path, `agi` is set from the never-firing
-`COMPLETE`'s `content`, so it stays `undefined` — that bites only later at
-`hideAGILogin`, which is EQ-3 / gap #3's `agi` no-op shell, not this stub.)
+SWF loading.
 
 Rebuild the SWF with `./build_swf.sh` (mxmlc).

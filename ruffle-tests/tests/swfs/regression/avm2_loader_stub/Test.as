@@ -15,6 +15,10 @@ package {
 	//   loader.load(new URLRequest(url))
 	// load() is a no-op (no network layer), so COMPLETE never fires and
 	// content stays null — the addEventListener is a real no-op registration.
+	// NOTE: a generic (non-AGI) URL is used here on purpose — the ArmorGames
+	// AGI.swf URL now takes the EQ-3 agi-shell path (synthetic COMPLETE + no-op
+	// shell content), covered by the sibling `avm2_agi_shell` test. This test
+	// pins the *generic* Loader stub: any other load stays a pure no-op.
 	public class Test extends Sprite {
 		public function Test() {
 			var loader:Loader = new Loader();
@@ -26,7 +30,7 @@ package {
 			li.addEventListener(Event.COMPLETE, onComplete);
 			trace("addEventListener ok");
 
-			loader.load(new URLRequest("http://cache.armorgames.com/assets/agi/AGI.swf"));
+			loader.load(new URLRequest("http://example.com/other-helper.swf"));
 			trace("load ok, content=" + loader.content);
 
 			trace("no #1065, reached end");

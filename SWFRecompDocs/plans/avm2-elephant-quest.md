@@ -276,17 +276,40 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   depth for **string-built** class names + `as Class` construction is untested on
   this corpus — confirm at `init2()`, but no longer a prime failure suspect.
 
-### Gap 2b — [our advantage, watch · perf/memory] `init2()` is a heavy synchronous build
+### Gap 2b — [⚠️ ACTIVE — init2 REACHED but PERF-BLOCKED (EQ-3, 2026-07-22); EQ-4 profiling target] `init2()` is a heavy synchronous build
 
-- `init2()` synchronously constructs the world-map level: the DOOR-build alone
-  traces `DOOR 0`…`DOOR 999` and takes **~18 s in Ruffle's interpreter** (which
-  is *why* Ruffle times out, §2). This is a **finite, legitimate** build (the HUD
-  renders real data), not a loop bug. For our AOT runtime it should be fast — but
-  it is the one spot to watch for (a) native OOM against the 512 MB arena
-  (gap #6 — 1000 doors + level objects) and (b) any accidental super-linear cost.
-  Not a blocker; our speed here is precisely the beat-Ruffle win (§3).
+- **REACHED natively 2026-07-22 (EQ-3).** With the agi shell + a driven New Game
+  → 4 story clicks → `startGameFromStory`, `Game`/`LoadingThing` reach the stage
+  and **`init2()` runs the DOOR-build** — trace: `DOOR 999, 0, 1, 2, 16, 20, 21,
+  44, 48, 3, 4, 63, 60, 56, 61, 17, 18, 14, …` (graph/adjacency order).
+- **The wall is PERF, not OOM and not an infinite loop.** ~**1.7 s/door at -O0**
+  (18 unique doors in 30 s), RSS **stable ~168 MB** (arena untouched, gap #6 not
+  the issue). 18 *distinct* doors → progressing, not a cycle. So ~1000 doors ≈
+  1000+ s → the first world-map frame never completes. This is exactly the
+  "accidental super-linear cost" flagged here — the **beat-Ruffle crux is now a
+  native init2 profiling task**. Suspects: `getDefinitionByName("Level"+n)` doing
+  a linear scan over all classes per door, per-door filter/tessellation work, or
+  an O(doors²) link/adjacency pass. Repro: `_eq_tas/story_drive.txt` (build +
+  `AVM2_MAX_TICKS=545`, direct binary with `stdbuf -oL` + `timeout` to watch
+  `DOOR n` cadence). **Fix this and EQ becomes the first title we play that
+  Ruffle cannot** (Ruffle times out at ~18 s; we must finish faster). EQ-4.
 
-### Gap 3 — [Loader ✅ DONE (EQ-2.5) · `agi` shell → EQ-3 New Game] `flash.display.Loader` + `agi` no-op object
+### Gap 3 — [✅ DONE — Loader (EQ-2.5) + `agi` no-op shell (EQ-3, 2026-07-22)] `flash.display.Loader` + `agi` no-op object
+
+- **✅ `agi` no-op shell DONE (EQ-3, 2026-07-22).** `avm2_display.c`
+  `loader_load`: a `Loader.load()` whose request URL matches the ArmorGames AGI
+  helper SWF (`AGI.swf` marker) seeds a no-op `AGINoopShell` (internal concrete
+  `Sprite` subclass; all AG-API methods no-op) as `contentLoaderInfo.content`
+  (new `content` field on `Avm2LoaderInfoExt`; `li_get_content` prefers it) and
+  fires a **synchronous** `Event.COMPLETE`, so `AGIStuff.loadComplete` assigns
+  `agi = shell`, `addChild`s it, and `init`/`initAGUI` no-op. This clears New
+  Game's unguarded `#1010 hideLoginStatus` and the guarded `if(this.agi)` paths
+  (now true → no-op). Generic (non-AGI) `Loader.load()` stays a pure no-op
+  (COMPLETE never fires). Gated by `regression/avm2_agi_shell` (+ generic path
+  still `regression/avm2_loader_stub`, repointed to a non-AGI URL). Reusable for
+  any AG/AGI-portal game. **Result: New Game → story → `init2()` reached** (see §7
+  EQ-3); the remaining wall is init2 perf (gap #2b), not agi.
+
 
 - **✅ Loader stub DONE (EQ-2.5, 2026-07-22): reaching the title no longer needs
   the `agi` shell.** `Shell.init` calls `agi.init()` → `AGIStuff.initAGI` →
@@ -638,16 +661,45 @@ never exercised.
   `addChild`'d but NO unguarded `agi.*` fires on the Play→title path (unknown #3
   resolved empirically); the `agi` no-op shell is pure EQ-3 (New Game). Gated by
   `regression/avm2_loader_stub`. See gap #3 (now: Loader DONE, `agi` shell → EQ-3).
-- **EQ-3 — New Game → world map → the beat-Ruffle moment.** Click `playB` on the
-  MainMenu (`MainMenu.clicky`) → `this.shell.agi.hideAGILogin()` #1010 (agi
-  undefined) — the gap #3 `agi` no-op shell. Then New Game → story → `init2()`;
-  confirm `getDefinitionByName("Level"+n)` (gap #2), `SharedObject` empty-store
-  (gap #4), and the heavy DOOR-build (gap #2b) complete natively. **Grade the
-  first world-map frame against a Ruffle export (oracle valid to here).** Watch
-  native heap on the DOOR-build (gap #6). Then drive *past* the
-  world-map frame where Ruffle's watchdog freezes. If our runtime keeps rendering
-  live gameplay (player/enemies/animation) where Ruffle shows 210 frozen frames,
-  EQ is the first title we play that Ruffle cannot. Frame-dump-proven; no oracle.
+- **EQ-3 — New Game → story → `init2()` DOOR-build REACHED. ✅ agi shell DONE
+  2026-07-22; init2 REACHED but perf-blocked (gap #2b).** The gap #3 `agi` no-op
+  shell (`avm2_display.c` `loader_load` + `AGINoopShell`) clears the New Game
+  `#1010 hideLoginStatus`; the whole path is now tree/trace-proven natively:
+  - **Unknown #1 (drive) RESOLVED.** The committed drive clicked `playB` at tick
+    321 — **too early**: the MainMenu intro (`titleShineIN`/`extrasin`) still
+    animates in, so the pick hit `MovieClip instance172`/`instance186` (the
+    full-stage intro clips), not `playB` (0 errors, no advance). The menu settles
+    ~**tick 335**; a click at **tick 345** reliably picks `SimpleButton playB` →
+    `clicky` → `#1010 hideLoginStatus`. Fixed drive:
+    `_eq_tas/play_then_newgame_events.txt` (preloader click tick 5, playB tick
+    345). New env-gated diagnostic `AVM2_MOUSE_DEBUG=1` prints the picked target
+    per press/click (the pick analog of `AVM2_DUMP_TREE`).
+  - **Unknown #2 (agi shell) RESOLVED — all checkpoints met.** With the shell,
+    `clicky` completes (fadeToBlack.play/extras.play run), `ping` fires
+    `startStoryFromMenu` → `stopMenu` → **`Story`/`StoryFrame` appear on stage**
+    (tree-proven), and `AGINoopShell instance102` is seeded + `addChild`'d under
+    `AGIStuff`. `SharedObject "eleRPG0"` empty-store (gap #4) is fine —
+    `isThereALoadGame()` is false, so `playB` takes the new-game (`startStory`)
+    path (not `startNewGamePlus`). Driving 4 story click-to-continues →
+    `flagToGo` → `startGameFromStory` → `Game`/`LoadingThing` on stage →
+    **`init2()` runs** (`getDefinitionByName("Level"+n)`/gap #2 works). A sporadic
+    non-fatal `#1009 "play"` fires inside the embedded Story symbol's timeline
+    (per-frame try, doesn't block) — a minor EQ-4 item.
+  - **Unknown #3 (init2 OOM?) → NOT OOM; it's a PERF wall (gap #2b).** The
+    DOOR-build **runs** — trace shows `DOOR 999, 0, 1, 2, 16, 20, 21, 44, 48, 3,
+    4, 63, 60, …` (graph/adjacency order, not linear) — but is **pathologically
+    slow: ~1.7 s/door at -O0** (18 unique doors in 30 s, RSS **stable ~168 MB**),
+    so ~1000 doors ≈ 1000+ s → the world-map frame never completes. **NOT an
+    infinite loop** (18 distinct doors, progressing) and **NOT OOM** (arena not
+    stressed). This is exactly gap #2b's "accidental super-linear cost" — the
+    beat-Ruffle crux is now a **native `init2()` profiling task (EQ-4)**: find the
+    per-door O(N)/heavy op (candidate: `getDefinitionByName` linear class scan,
+    per-door filters/tessellation, or an O(doors²) link pass). Gate:
+    `regression/avm2_agi_shell` (unguarded AG-API on shell content → no #1010).
+  - **Remaining for the first world-map frame + beat-Ruffle grade:** the init2
+    perf fix (EQ-4). Once init2 completes, grade the first world-map frame against
+    a Ruffle export (oracle valid to here), then drive *past* Ruffle's watchdog
+    freeze.
 - **EQ-4+ — gameplay depth.** Levels/combat/upgrades/world-map fidelity; then GC
   soak before extended play; perf/footprint later and separate (out of scope
   now — the intrinsics don't transfer, §1).

@@ -34,3 +34,21 @@ click tick).
 **tick 313, 0 errors**. **Next wall = EQ-3 New Game:** click `playB` (in the
 `extras`/menu SimpleButton set) → `agi.hideAGILogin()` #1010 (agi undefined,
 needs the gap #3 `agi` no-op shell), then the heavy `init2()` DOOR-build.
+
+**EQ-3 DONE — agi shell → New Game → story → `init2()` REACHED (2026-07-22).**
+- The MainMenu `playB` click at tick 321 was **too early** (menu intro still
+  animating in → the pick hits the full-stage intro clips, not `playB`). The menu
+  settles ~**tick 335**; `play_then_newgame_events.txt` now clicks `playB` at
+  **tick 345**. New diagnostic `AVM2_MOUSE_DEBUG=1` prints the picked target per
+  press/click (the pick analog of `AVM2_DUMP_TREE`).
+- The gap #3 `agi` no-op shell (`avm2_display.c` `loader_load` + `AGINoopShell`,
+  gate `regression/avm2_agi_shell`) clears the New Game `#1010 hideLoginStatus`.
+  Driving `play_then_newgame_events.txt` (600 ticks): `clicky` completes →
+  `fadeToBlack` plays → `ping` fires `startStoryFromMenu` → **`Story`/`StoryFrame`
+  on stage** (tree-proven).
+- `story_drive.txt` extends the drive with 4 story click-to-continues → `flagToGo`
+  → `startGameFromStory` → `Game`/`LoadingThing` → **`init2()` DOOR-build runs**
+  (`AVM2_DUMP_TREE=1 python3 eq_drive.py run story_drive.txt 545`, or the direct
+  binary with `stdbuf -oL … | timeout` to watch `DOOR n`). **init2 is PERF-BLOCKED,
+  not OOM** — ~1.7 s/door at -O0, RSS stable ~168 MB; ~1000 doors → 1000+ s. The
+  init2 super-linear profile is the beat-Ruffle EQ-4 target (plan gap #2b).
