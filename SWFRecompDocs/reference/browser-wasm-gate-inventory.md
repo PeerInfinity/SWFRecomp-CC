@@ -8,7 +8,7 @@ python3 tools/gate_inventory.py --markdown \
     SWFRecompDocs/reference/browser-wasm-gate-inventory.md
 ```
 
-Source commit: `b8a308e71` (2026-07-23). Sites are ordered by path then line, so
+Source commit: `595667b57` (2026-07-23). Sites are ordered by path then line, so
 regenerated inventories diff cleanly.
 
 ## Config model
@@ -102,124 +102,124 @@ browser-WASM gets zero code; both native configs get code.
 
 | site | function | condition | enclosing | lines ng/gn/bw | arms (size → configs) | triage |
 |---|---|---|---|---|---|---|
-| `SWFModernRuntime/src/actionmodern/action.c`:9072-9106 | `transformMatrixSetter` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 26/26/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 26L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:9146-9150 | `transformCTSetter` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 3/3/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 3L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:10907-10923 | `colorGetTransform` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 14/14/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 14L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:17312-17558 | `textFormatSetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 187/187/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 187L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:19761-19770 | `xml_create_document` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 8/8/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 8L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:20089-20129 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 34/34/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 34L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:20135-20138 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:20175-20178 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:20193-20203 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 9/9/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 9L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:23937-24087 | `propagateTargetToDescendants` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 92/92/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 92L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:26084-26096 | `mcReadAlpha` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:28987-29008 | `setCurrentContext` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:31621-31714 | `actionNextFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 49/49/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 49L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32270-32324 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 32/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 32/27/32L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32373-32375 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32382-32389 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32398-32411 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32524-32553 | `actionGoToLabel` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 13/13/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 13L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32570-32577 | `actionGoToLabel` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32722-32769 | `actionGotoFrame2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 35/35/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 35L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32808-32844 | `actionGotoFrame2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 27/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 27L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:32895-32918 | `actionEndDrag` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 17/17/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 17L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:40245-40355 | `actionGetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 79/79/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 79L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:40867-40874 | `actionGetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:41645-41656 | `actionGetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:41824-41836 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 9/9/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 9L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:42039-42041 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:42190-42198 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:42480-42487 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:42849-42856 | `actionDefineLocal` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43212-43221 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43230-43242 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43246-43258 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43262-43264 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43268-43270 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43292-43294 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43511-43513 | `actionTypeof` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43545-43573 | `actionTypeof` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 22/22/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 22L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:43861-43873 | `actionDelete2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:45877-45894 | `actionCall` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 13/13/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 13L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:46017-46049 | `actionCall` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 28/28/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 28L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:51491-51493 | `actionGetMember` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:51496-51498 | `actionGetMember` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:51501-51503 | `actionGetMember` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:55902-55929 | `actionSetTarget` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 18/18/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 18L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:59207-59212 | `actionCallFunction` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:65732-65764 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 30/30/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 30L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:65771-65798 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 26/26/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 26L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:65974-65992 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 9/9/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 9L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:66688-66963 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 244/244/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 244L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:67278-67379 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 75/75/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 75L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:67424-67435 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:67691-67707 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 10/10/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 10L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:67759-67762 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:67794-67797 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:67956-68337 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 236/236/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 236L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:69153-69157 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 3/3/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 3L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:70182-70191 | `actionStartDrag` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:71861-71915 | `actionUpdateHighlightState` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 41/41/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 41L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/object.c`:462-468 | `swfMemMarkUnsafeToWalk` | `!defined(__EMSCRIPTEN__)` | — | 5/5/0 | `!defined(__EMSCRIPTEN__)` 5L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/object.c`:472-476 | `swfMemReportAtExitIfEnabled` | `!defined(__EMSCRIPTEN__)` | — | 3/3/0 | `!defined(__EMSCRIPTEN__)` 3L → ng,gn |  |
-| `SWFModernRuntime/src/actionmodern/object.c`:530-540 | `allocObject` | `!defined(__EMSCRIPTEN__)` | — | 8/8/0 | `!defined(__EMSCRIPTEN__)` 8L → ng,gn |  |
-| `SWFModernRuntime/src/avm2/avm2_bytearray.c`:27-30 | — | `!defined(__EMSCRIPTEN__)` | — | 2/2/0 | `!defined(__EMSCRIPTEN__)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/avm2/avm2_bytearray.c`:475-546 | `charset_classify` | `!defined(__EMSCRIPTEN__)` | — | 67/67/0 | `!defined(__EMSCRIPTEN__)` 67L → ng,gn |  |
-| `SWFModernRuntime/src/avm2/avm2_bytearray.c`:1010-1015 | `ba_write_multi_byte` | `!defined(__EMSCRIPTEN__)` | — | 4/4/0 | `!defined(__EMSCRIPTEN__)` 4L → ng,gn |  |
-| `SWFModernRuntime/src/avm2/avm2_bytearray.c`:1034-1039 | `ba_read_multi_byte` | `!defined(__EMSCRIPTEN__)` | — | 4/4/0 | `!defined(__EMSCRIPTEN__)` 4L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:216-320 | `ng_cache_transform` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 44/44/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 44L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:871-882 | `process_sprite_init_at_depth` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 8/8/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 8L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:933-939 | `ng_set_script_only_mode` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1005-1059 | `ng_set_script_only_mode` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 40/40/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 40L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1124-1126 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1441-1471 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 18/18/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 18L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1533-1537 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 3/3/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 3L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1539-1541 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1548-1569 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 16/16/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 16L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1728-1730 | `advance_nested_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1883-1891 | `ng_promote_attached_playheads` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1897-1919 | `ng_advance_attached_clip_playheads` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 21/21/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 21L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:1958-1960 | `ng_apply_pending_sprite_self_gotos` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:2012-2030 | `ng_apply_pending_sprite_self_gotos` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 16/16/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 16L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:2164-2166 | `presync_nested_sprite_currentframe` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:4360-4369 | `tagFlushPendingEnterFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:6334-6643 | `tagShowFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 233/233/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 233L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:7155-7372 | `fire_eager_constructors` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 145/145/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 145L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:7486-7525 | `queue_clip_load_events` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 24/24/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 24L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:7529-7531 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:7596-7645 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 25/25/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 25L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:7782-8015 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 123/123/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 123L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:8040-8092 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 27/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 27L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:8475-8477 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:8501-8503 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:8586-8715 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 96/96/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 96L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:8723-8725 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:8736-8769 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 29/29/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 29L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:9007-9009 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:9114-9128 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:9231-9237 | `dlr_rebase_queue_cb` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:9319-9324 | `dlr_rebase_copies_recurse` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:9405-9413 | `dlr_scrub_queue_cb` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:9860-9880 | `tagRemoveObject` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 17/17/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 17L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:9946-9948 | `tagRemoveObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:9951-10050 | `tagRemoveObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 52/52/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 52L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:10074-10090 | `tagRemoveObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 8/8/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 8L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:10149-10164 | `tagRemoveObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:10331-10333 | `tagDefineButton` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:10759-10767 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:10776-10850 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 27/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 27L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:10855-10858 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:10862-10864 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:10878-10952 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 59/59/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 59L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:11075-11121 | `hasClipEnterFrameHandlers` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 25/25/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 25L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:11129-11165 | `ng_fire_child_constructors` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 21/21/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 21L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:715-748 | `ng_attachMovie` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 24/24/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 24L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:1104-1107 | `ng_gotoFrameCurrentSprite` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:2325-2374 | `ng_getTextFieldIdx` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 24/24/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 24L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:2615-2655 | `ng_getTextFieldIdx` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 32/32/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 32L → ng,gn |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:2744-2750 | `ng_getTextFieldIdx` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn |  |
-| `SWFRecomp/wasm_wrappers/main.c`:88-90 | `swf_ei_call_internal` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn |  |
+| `SWFModernRuntime/src/actionmodern/action.c`:9072-9106 | `transformMatrixSetter` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 26/26/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 26L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:9146-9150 | `transformCTSetter` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 3/3/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 3L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:10907-10923 | `colorGetTransform` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 14/14/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 14L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:17312-17558 | `textFormatSetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 187/187/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 187L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:19761-19770 | `xml_create_document` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 8/8/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 8L → ng,gn | intentional |
+| `SWFModernRuntime/src/actionmodern/action.c`:20089-20129 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 34/34/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 34L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:20135-20138 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:20175-20178 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:20193-20203 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 9/9/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 9L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:23937-24087 | `propagateTargetToDescendants` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 92/92/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 92L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/actionmodern/action.c`:26084-26096 | `mcReadAlpha` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:28987-29008 | `setCurrentContext` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn | intentional |
+| `SWFModernRuntime/src/actionmodern/action.c`:31621-31714 | `actionNextFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 49/49/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 49L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/actionmodern/action.c`:32270-32324 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 32/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 32/27/32L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:32373-32375 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:32382-32389 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:32398-32411 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:32524-32553 | `actionGoToLabel` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 13/13/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 13L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:32570-32577 | `actionGoToLabel` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:32722-32769 | `actionGotoFrame2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 35/35/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 35L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:32808-32844 | `actionGotoFrame2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 27/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 27L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:32895-32918 | `actionEndDrag` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 17/17/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 17L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:40245-40355 | `actionGetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 79/79/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 79L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:40867-40874 | `actionGetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:41645-41656 | `actionGetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:41824-41836 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 9/9/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 9L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:42039-42041 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:42190-42198 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:42480-42487 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:42849-42856 | `actionDefineLocal` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43212-43221 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43230-43242 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43246-43258 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43262-43264 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43268-43270 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43292-43294 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43511-43513 | `actionTypeof` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43545-43573 | `actionTypeof` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 22/22/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 22L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:43861-43873 | `actionDelete2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:45877-45894 | `actionCall` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 13/13/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 13L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:46017-46049 | `actionCall` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 28/28/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 28L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:51491-51493 | `actionGetMember` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:51496-51498 | `actionGetMember` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:51501-51503 | `actionGetMember` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:55902-55929 | `actionSetTarget` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 18/18/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 18L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:59207-59212 | `actionCallFunction` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:65732-65764 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 30/30/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 30L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:65771-65798 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 26/26/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 26L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:65974-65992 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 9/9/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 9L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:66688-66963 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 244/244/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 244L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:67278-67379 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 75/75/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 75L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:67424-67435 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:67691-67707 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 10/10/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 10L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:67759-67762 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:67794-67797 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:67956-68337 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 236/236/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 236L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:69153-69157 | `actionCallMethod` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 3/3/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 3L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:70182-70191 | `actionStartDrag` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/action.c`:71861-71915 | `actionUpdateHighlightState` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 41/41/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 41L → ng,gn | suspicious |
+| `SWFModernRuntime/src/actionmodern/object.c`:462-468 | `swfMemMarkUnsafeToWalk` | `!defined(__EMSCRIPTEN__)` | — | 5/5/0 | `!defined(__EMSCRIPTEN__)` 5L → ng,gn | intentional |
+| `SWFModernRuntime/src/actionmodern/object.c`:472-476 | `swfMemReportAtExitIfEnabled` | `!defined(__EMSCRIPTEN__)` | — | 3/3/0 | `!defined(__EMSCRIPTEN__)` 3L → ng,gn | intentional |
+| `SWFModernRuntime/src/actionmodern/object.c`:530-540 | `allocObject` | `!defined(__EMSCRIPTEN__)` | — | 8/8/0 | `!defined(__EMSCRIPTEN__)` 8L → ng,gn | intentional |
+| `SWFModernRuntime/src/avm2/avm2_bytearray.c`:27-30 | — | `!defined(__EMSCRIPTEN__)` | — | 2/2/0 | `!defined(__EMSCRIPTEN__)` 2L → ng,gn | intentional |
+| `SWFModernRuntime/src/avm2/avm2_bytearray.c`:475-546 | `charset_classify` | `!defined(__EMSCRIPTEN__)` | — | 67/67/0 | `!defined(__EMSCRIPTEN__)` 67L → ng,gn | suspicious |
+| `SWFModernRuntime/src/avm2/avm2_bytearray.c`:1010-1015 | `ba_write_multi_byte` | `!defined(__EMSCRIPTEN__)` | — | 4/4/0 | `!defined(__EMSCRIPTEN__)` 4L → ng,gn | suspicious |
+| `SWFModernRuntime/src/avm2/avm2_bytearray.c`:1034-1039 | `ba_read_multi_byte` | `!defined(__EMSCRIPTEN__)` | — | 4/4/0 | `!defined(__EMSCRIPTEN__)` 4L → ng,gn | suspicious |
+| `SWFModernRuntime/src/libswf/tag.c`:216-320 | `ng_cache_transform` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 44/44/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 44L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:871-882 | `process_sprite_init_at_depth` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 8/8/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 8L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:933-939 | `ng_set_script_only_mode` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:1005-1059 | `ng_set_script_only_mode` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 40/40/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 40L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:1124-1126 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:1441-1471 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 18/18/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 18L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:1533-1537 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 3/3/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 3L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:1539-1541 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:1548-1569 | `advance_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 16/16/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 16L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:1728-1730 | `advance_nested_sprite_frames` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:1883-1891 | `ng_promote_attached_playheads` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:1897-1919 | `ng_advance_attached_clip_playheads` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 21/21/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 21L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:1958-1960 | `ng_apply_pending_sprite_self_gotos` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:2012-2030 | `ng_apply_pending_sprite_self_gotos` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 16/16/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 16L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:2164-2166 | `presync_nested_sprite_currentframe` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:4360-4369 | `tagFlushPendingEnterFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:6334-6643 | `tagShowFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 233/233/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 233L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:7155-7372 | `fire_eager_constructors` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 145/145/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 145L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:7486-7525 | `queue_clip_load_events` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 24/24/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 24L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:7529-7531 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:7596-7645 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 25/25/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 25L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:7782-8015 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 123/123/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 123L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:8040-8092 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 27/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 27L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:8475-8477 | `tagPlaceObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:8501-8503 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:8586-8715 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 96/96/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 96L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:8723-8725 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:8736-8769 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 29/29/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 29L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:9007-9009 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:9114-9128 | `tagSetClipActions` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:9231-9237 | `dlr_rebase_queue_cb` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:9319-9324 | `dlr_rebase_copies_recurse` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:9405-9413 | `dlr_scrub_queue_cb` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:9860-9880 | `tagRemoveObject` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 17/17/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 17L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:9946-9948 | `tagRemoveObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:9951-10050 | `tagRemoveObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 52/52/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 52L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:10074-10090 | `tagRemoveObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 8/8/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 8L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:10149-10164 | `tagRemoveObject2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:10331-10333 | `tagDefineButton` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:10759-10767 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:10776-10850 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 27/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 27L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:10855-10858 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:10862-10864 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:10878-10952 | `tagSetInstanceName` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 59/59/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 59L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:11075-11121 | `hasClipEnterFrameHandlers` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 25/25/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 25L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag.c`:11129-11165 | `ng_fire_child_constructors` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 21/21/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 21L → ng,gn | intentional-model |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:715-748 | `ng_attachMovie` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 24/24/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 24L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:1104-1107 | `ng_gotoFrameCurrentSprite` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:2325-2374 | `ng_getTextFieldIdx` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 24/24/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 24L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:2615-2655 | `ng_getTextFieldIdx` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 32/32/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 32L → ng,gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:2744-2750 | `ng_getTextFieldIdx` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | intentional-paired |
+| `SWFRecomp/wasm_wrappers/main.c`:88-90 | `swf_ei_call_internal` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | intentional |
 
 ### `browser-none-partial` — 39 sites
 
@@ -227,45 +227,45 @@ browser-WASM gets zero code; exactly one native config gets code (the other gets
 
 | site | function | condition | enclosing | lines ng/gn/bw | arms (size → configs) | triage |
 |---|---|---|---|---|---|---|
-| `SWFModernRuntime/include/libswf/tag.h`:44-49 | — | `defined(NO_GRAPHICS)` | — | 2/0/0 | `defined(NO_GRAPHICS)` 2L → ng |  |
-| `SWFModernRuntime/include/rendering/render_webgpu.h`:140-142 | — | `!defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` | — | 1/0/0 | `!defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` 1L → ng |  |
-| `SWFModernRuntime/include/rendering/render_webgpu.h`:144-151 | — | `defined(OFFSCREEN_RENDER)` | — | 0/5/0 | `defined(OFFSCREEN_RENDER)` 5L → gn |  |
-| `SWFModernRuntime/include/rendering/render_webgpu.h`:272-276 | — | `defined(OFFSCREEN_RENDER)` | — | 0/2/0 | `defined(OFFSCREEN_RENDER)` 2L → gn |  |
-| `SWFModernRuntime/include/rendering/renderer.h`:56-59 | — | `defined(OFFSCREEN_RENDER)` | `defined(USE_WEBGPU)` | –/2/0 | `defined(OFFSCREEN_RENDER)` 2L → gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:33214-33219 | `actionGetURL` | `defined(OFFSCREEN_RENDER)` | — | 0/4/0 | `defined(OFFSCREEN_RENDER)` 4L → gn |  |
-| `SWFModernRuntime/src/actionmodern/action.c`:46156-46161 | `actionGetURL2` | `defined(OFFSCREEN_RENDER)` | — | 0/4/0 | `defined(OFFSCREEN_RENDER)` 4L → gn |  |
-| `SWFModernRuntime/src/avm2/avm2_display.c`:9363-9365 | `avm2_cpu_dump_frame` | `defined(OFFSCREEN_RENDER)` | `defined(OFFSCREEN_RENDER) \|\| (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn |  |
-| `SWFModernRuntime/src/avm2/avm2_display.c`:9886-9890 | `avm2_render_init` | `defined(OFFSCREEN_RENDER)` | `defined(OFFSCREEN_RENDER) \|\| (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn |  |
-| `SWFModernRuntime/src/avm2/avm2_display.c`:9893-9914 | `avm2_render_init` | `defined(OFFSCREEN_RENDER)` | `defined(OFFSCREEN_RENDER) \|\| (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))` | –/14/0 | `defined(OFFSCREEN_RENDER)` 14L → gn |  |
-| `SWFModernRuntime/src/avm2/avm2_main.c`:422-425 | `runSWF_avm2` | `defined(OFFSCREEN_RENDER)` | — | 0/2/0 | `defined(OFFSCREEN_RENDER)` 2L → gn |  |
-| `SWFModernRuntime/src/avm2/avm2_main.c`:561-564 | `runSWF_avm2` | `defined(OFFSCREEN_RENDER)` | — | 0/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn |  |
-| `SWFModernRuntime/src/avm2/avm2_main.c`:584-594 | `runSWF_avm2` | `defined(OFFSCREEN_RENDER)` | — | 0/9/0 | `defined(OFFSCREEN_RENDER)` 9L → gn |  |
-| `SWFModernRuntime/src/libswf/graphics_stubs.c`:74-85 | — | `defined(OFFSCREEN_RENDER)` | `defined(USE_WEBGPU) && !defined(NO_GRAPHICS)` | –/10/0 | `defined(OFFSCREEN_RENDER)` 10L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:15-17 | — | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:391-409 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/7/0 | `defined(OFFSCREEN_RENDER)` 7L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:525-610 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/24/0 | `defined(OFFSCREEN_RENDER)` 24L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:854-886 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/15/0 | `defined(OFFSCREEN_RENDER)` 15L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:901-903 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:938-967 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/9/0 | `defined(OFFSCREEN_RENDER)` 9L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:970-1232 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/132/0 | `defined(OFFSCREEN_RENDER)` 109/132/109L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:1377-1381 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/2/0 | `defined(OFFSCREEN_RENDER)` 2L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:1542-1546 | `swfStart` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:1548-1581 | `swfStart` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/7/0 | `defined(OFFSCREEN_RENDER)` 7L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:1585-1594 | `swfStart` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/4/0 | `defined(OFFSCREEN_RENDER)` 4L → gn |  |
-| `SWFModernRuntime/src/libswf/swf.c`:1598-1615 | `swfStart` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/8/0 | `defined(OFFSCREEN_RENDER)` 8L → gn |  |
-| `SWFModernRuntime/src/libswf/swf_core.c`:1-1641 | — | `defined(NO_GRAPHICS)` | — | 935/0/0 | `defined(NO_GRAPHICS)` 935/905/905L → ng |  |
-| `SWFModernRuntime/src/libswf/tag.c`:3059-3088 | `render_single_object` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/19/0 | `defined(OFFSCREEN_RENDER)` 19L → gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:3229-3251 | `render_display_list` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/19/0 | `defined(OFFSCREEN_RENDER)` 19L → gn |  |
-| `SWFModernRuntime/src/libswf/tag.c`:4975-5315 | `attached_bitmap_render_cb` | `defined(OFFSCREEN_RENDER)` | — | 0/260/0 | `defined(OFFSCREEN_RENDER)` 260L → gn |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:27-31 | — | `defined(NO_GRAPHICS)` | — | 3/0/0 | `defined(NO_GRAPHICS)` 3L → ng |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:447-449 | `ng_attachMovie` | `defined(NO_GRAPHICS)` | — | 1/0/0 | `defined(NO_GRAPHICS)` 1L → ng |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:2975-2989 | `ng_getTextFieldIdx` | `defined(NO_GRAPHICS)` | — | 7/0/0 | `defined(NO_GRAPHICS)` 7L → ng |  |
-| `SWFModernRuntime/src/libswf/tag_stubs.c`:2994-3030 | `finalizeBitmaps` | `defined(NO_GRAPHICS)` | — | 30/0/0 | `defined(NO_GRAPHICS)` 30L → ng |  |
-| `SWFModernRuntime/src/rendering/render_webgpu.c`:2615-2634 | `render_webgpu_close_pass` | `defined(OFFSCREEN_RENDER)` | — | 0/15/0 | `defined(OFFSCREEN_RENDER)` 15L → gn |  |
-| `SWFModernRuntime/src/rendering/render_webgpu.c`:2689-2693 | `render_webgpu_close_pass` | `defined(OFFSCREEN_RENDER)` | — | 1/0/0 | `defined(OFFSCREEN_RENDER)` 0L → gn; `!defined(__EMSCRIPTEN__)` 1L → ng |  |
-| `SWFModernRuntime/src/rendering/render_webgpu.c`:3577-3580 | `render_webgpu_free` | `!defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` | — | 2/0/0 | `!defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` 2L → ng |  |
-| `SWFModernRuntime/src/rendering/render_webgpu.c`:3582-3587 | `render_webgpu_free` | `defined(OFFSCREEN_RENDER)` | — | 0/3/0 | `defined(OFFSCREEN_RENDER)` 3L → gn |  |
-| `SWFModernRuntime/src/rendering/render_webgpu.c`:3602-3684 | `render_webgpu_free` | `defined(OFFSCREEN_RENDER)` | — | 0/62/0 | `defined(OFFSCREEN_RENDER)` 62L → gn |  |
+| `SWFModernRuntime/include/libswf/tag.h`:44-49 | — | `defined(NO_GRAPHICS)` | — | 2/0/0 | `defined(NO_GRAPHICS)` 2L → ng | intentional |
+| `SWFModernRuntime/include/rendering/render_webgpu.h`:140-142 | — | `!defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` | — | 1/0/0 | `!defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` 1L → ng | intentional-paired |
+| `SWFModernRuntime/include/rendering/render_webgpu.h`:144-151 | — | `defined(OFFSCREEN_RENDER)` | — | 0/5/0 | `defined(OFFSCREEN_RENDER)` 5L → gn | intentional-paired |
+| `SWFModernRuntime/include/rendering/render_webgpu.h`:272-276 | — | `defined(OFFSCREEN_RENDER)` | — | 0/2/0 | `defined(OFFSCREEN_RENDER)` 2L → gn | intentional-paired |
+| `SWFModernRuntime/include/rendering/renderer.h`:56-59 | — | `defined(OFFSCREEN_RENDER)` | `defined(USE_WEBGPU)` | –/2/0 | `defined(OFFSCREEN_RENDER)` 2L → gn | intentional |
+| `SWFModernRuntime/src/actionmodern/action.c`:33214-33219 | `actionGetURL` | `defined(OFFSCREEN_RENDER)` | — | 0/4/0 | `defined(OFFSCREEN_RENDER)` 4L → gn | intentional-paired |
+| `SWFModernRuntime/src/actionmodern/action.c`:46156-46161 | `actionGetURL2` | `defined(OFFSCREEN_RENDER)` | — | 0/4/0 | `defined(OFFSCREEN_RENDER)` 4L → gn | intentional |
+| `SWFModernRuntime/src/avm2/avm2_display.c`:9363-9365 | `avm2_cpu_dump_frame` | `defined(OFFSCREEN_RENDER)` | `defined(OFFSCREEN_RENDER) \|\| (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn | intentional-paired |
+| `SWFModernRuntime/src/avm2/avm2_display.c`:9886-9890 | `avm2_render_init` | `defined(OFFSCREEN_RENDER)` | `defined(OFFSCREEN_RENDER) \|\| (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn | intentional |
+| `SWFModernRuntime/src/avm2/avm2_display.c`:9893-9914 | `avm2_render_init` | `defined(OFFSCREEN_RENDER)` | `defined(OFFSCREEN_RENDER) \|\| (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))` | –/14/0 | `defined(OFFSCREEN_RENDER)` 14L → gn | intentional |
+| `SWFModernRuntime/src/avm2/avm2_main.c`:422-425 | `runSWF_avm2` | `defined(OFFSCREEN_RENDER)` | — | 0/2/0 | `defined(OFFSCREEN_RENDER)` 2L → gn | intentional-paired |
+| `SWFModernRuntime/src/avm2/avm2_main.c`:561-564 | `runSWF_avm2` | `defined(OFFSCREEN_RENDER)` | — | 0/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn | intentional-paired |
+| `SWFModernRuntime/src/avm2/avm2_main.c`:584-594 | `runSWF_avm2` | `defined(OFFSCREEN_RENDER)` | — | 0/9/0 | `defined(OFFSCREEN_RENDER)` 9L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/graphics_stubs.c`:74-85 | — | `defined(OFFSCREEN_RENDER)` | `defined(USE_WEBGPU) && !defined(NO_GRAPHICS)` | –/10/0 | `defined(OFFSCREEN_RENDER)` 10L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:15-17 | — | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:391-409 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/7/0 | `defined(OFFSCREEN_RENDER)` 7L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:525-610 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/24/0 | `defined(OFFSCREEN_RENDER)` 24L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:854-886 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/15/0 | `defined(OFFSCREEN_RENDER)` 15L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:901-903 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:938-967 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/9/0 | `defined(OFFSCREEN_RENDER)` 9L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:970-1232 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/132/0 | `defined(OFFSCREEN_RENDER)` 109/132/109L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:1377-1381 | `tagMain` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/2/0 | `defined(OFFSCREEN_RENDER)` 2L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:1542-1546 | `swfStart` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/1/0 | `defined(OFFSCREEN_RENDER)` 1L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:1548-1581 | `swfStart` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/7/0 | `defined(OFFSCREEN_RENDER)` 7L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:1585-1594 | `swfStart` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/4/0 | `defined(OFFSCREEN_RENDER)` 4L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf.c`:1598-1615 | `swfStart` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/8/0 | `defined(OFFSCREEN_RENDER)` 8L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/swf_core.c`:1-1641 | — | `defined(NO_GRAPHICS)` | — | 935/0/0 | `defined(NO_GRAPHICS)` 935/905/905L → ng | intentional |
+| `SWFModernRuntime/src/libswf/tag.c`:3059-3088 | `render_single_object` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/19/0 | `defined(OFFSCREEN_RENDER)` 19L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:3229-3251 | `render_display_list` | `defined(OFFSCREEN_RENDER)` | `!defined(NO_GRAPHICS)` | –/19/0 | `defined(OFFSCREEN_RENDER)` 19L → gn | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag.c`:4975-5315 | `attached_bitmap_render_cb` | `defined(OFFSCREEN_RENDER)` | — | 0/260/0 | `defined(OFFSCREEN_RENDER)` 260L → gn | intentional |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:27-31 | — | `defined(NO_GRAPHICS)` | — | 3/0/0 | `defined(NO_GRAPHICS)` 3L → ng | intentional |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:447-449 | `ng_attachMovie` | `defined(NO_GRAPHICS)` | — | 1/0/0 | `defined(NO_GRAPHICS)` 1L → ng | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:2975-2989 | `ng_getTextFieldIdx` | `defined(NO_GRAPHICS)` | — | 7/0/0 | `defined(NO_GRAPHICS)` 7L → ng | intentional-paired |
+| `SWFModernRuntime/src/libswf/tag_stubs.c`:2994-3030 | `finalizeBitmaps` | `defined(NO_GRAPHICS)` | — | 30/0/0 | `defined(NO_GRAPHICS)` 30L → ng | intentional |
+| `SWFModernRuntime/src/rendering/render_webgpu.c`:2615-2634 | `render_webgpu_close_pass` | `defined(OFFSCREEN_RENDER)` | — | 0/15/0 | `defined(OFFSCREEN_RENDER)` 15L → gn | intentional-paired |
+| `SWFModernRuntime/src/rendering/render_webgpu.c`:2689-2693 | `render_webgpu_close_pass` | `defined(OFFSCREEN_RENDER)` | — | 1/0/0 | `defined(OFFSCREEN_RENDER)` 0L → gn; `!defined(__EMSCRIPTEN__)` 1L → ng | intentional-paired |
+| `SWFModernRuntime/src/rendering/render_webgpu.c`:3577-3580 | `render_webgpu_free` | `!defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` | — | 2/0/0 | `!defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` 2L → ng | intentional-paired |
+| `SWFModernRuntime/src/rendering/render_webgpu.c`:3582-3587 | `render_webgpu_free` | `defined(OFFSCREEN_RENDER)` | — | 0/3/0 | `defined(OFFSCREEN_RENDER)` 3L → gn | intentional-paired |
+| `SWFModernRuntime/src/rendering/render_webgpu.c`:3602-3684 | `render_webgpu_free` | `defined(OFFSCREEN_RENDER)` | — | 0/62/0 | `defined(OFFSCREEN_RENDER)` 62L → gn | intentional-paired |
 
 ## Secondary: browser-WASM-only arms
 
@@ -614,3 +614,48 @@ entries long and unread, not empty.
 3. **Ratchet** (Phase 5 step 4, optional) — CI-fail when the flagged count
    grows without a doc update. Deferred: the count is meaningless until the
    triage column exists, so a ratchet now would just pin 157.
+
+## Triage pass (2026-07-23)
+
+Method: sites whose enclosing function also contains a `browser-only` or
+`all-configs` site were classified `intentional-paired` (the browser arm
+lives elsewhere in the same function — 98 sites, spot-checked). The 59
+unpaired sites were read individually. Verdicts:
+
+- **`intentional-paired` (98)** — split implementations; presumption, not
+  proof. Revisit a site only if a browser-specific bug lands in its function.
+- **`intentional-model` (21)** — the native sprite-advance/goto machinery
+  (`ng_*` helpers in tag.c, rewind cleanup, inline catch-up in
+  `actionNextFrame`). Browser-WASM deliberately runs a different, lighter
+  model (see tag.c:212 comment and the Phase 3 wrap-promotion gate in swf.c).
+  Per-site absence is by design; the RISK is model drift, which per-site
+  triage cannot close — that is what the wasm-probe-suite plan is for.
+- **`intentional` (17)** — struct-field parity blocks, native-only
+  diagnostics (object.c mem tracking), test-harness hooks (fscommand
+  `capture`), stub files, headers, the swf_core.c whole-file site.
+- **`suspicious` (21)** — browser-WASM silently no-ops or returns degraded
+  values with NO parallel path found. None promoted to `bug` without a
+  reproducing SWF; these are the probe-suite priority list:
+
+| cluster | sites | browser-WASM symptom |
+|---|---|---|
+| `transform.matrix` / `transform.colorTransform` setters, `Color.getTransform` | action.c 9072, 9146, 10907 | assignment is a silent no-op; getTransform returns identity |
+| `TextFormat` from fields | action.c 17312 | `getTextFormat`/`getNewTextFormat` degraded (187-line native-only block) |
+| `GetProperty` display-truth reads + invalid-tellTarget gate | action.c 43212–43292 (6 sites) | `_x`/`_y`/`_xscale`/`_yscale`/`_rotation` read possibly-stale `mc` fields; invalid tellTarget doesn't force undefined |
+| `typeof` refinement | action.c 43511, 43545 | textfields/buttons report `"movieclip"` instead of `"object"` (SWF6+) |
+| `delete` child-MC guard | action.c 43861 | deleting a child MC name may wrongly return true |
+| `_alpha` placement-cxform read | action.c 26084 | timeline-faded clips read `mc->alpha`, not the effective cxform alpha |
+| drag: `_droptarget` + virtual position | action.c 32895, 70182 | `_droptarget` always empty after drop; drag hotspot init skipped |
+| var→textfield sync on `var` declare | action.c 42849 | `var v = ...` doesn't refresh a bound textfield |
+| focus rect info | action.c 71861 | `actionGetFocusRectInfo` unavailable → no focus rects |
+| ByteArray charset | avm2_bytearray.c 475, 1010, 1034 | `readMultiByte`/`writeMultiByte` charset handling degraded |
+
+Recommended next step (feeds `wasm-probe-suite`): one minimal probe SWF per
+row above, browser-run via the swfbridge harness; promote to `bug` or demote
+to `intentional` on evidence. The trend section above says the discovery
+rate never decayed — this table is where the remaining ones most likely are.
+
+Triage cells in the tables are preserved across regeneration
+(`_harvest_triage` in the tool, added with this pass); a site whose line
+numbers shift on regen drops its cell back to empty and should be re-keyed
+from this section.

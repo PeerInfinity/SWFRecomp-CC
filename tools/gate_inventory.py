@@ -760,6 +760,7 @@ TREND_MARKER = "<!-- BEGIN HAND-WRITTEN SECTIONS (preserved on regeneration) -->
 
 
 def markdown_report(sites, root, existing_path=None):
+    _harvest_triage(existing_path)
     sha, date = git_head(root)
     by_cat = {}
     by_file = {}
@@ -950,7 +951,7 @@ def _emit_table_body(w, rows, depends_col=False):
             macros = sorted({m for n in CONFIG_NAMES
                              for m in s.per_config[n]["macros"]})
             cells.append(", ".join("`%s`" % m for m in macros) or "—")
-        cells.append("")
+        cells.append(_TRIAGE.get("%s:%d-%d" % (s.path, s.start, s.end), ""))
         w("| " + " | ".join(cells) + " |")
     w("")
 
@@ -964,6 +965,28 @@ def _read_preserved(path):
         return None
     tail = text.split(TREND_MARKER, 1)[1]
     return tail.strip("\n").split("\n")
+
+
+# Triage values previously filled into the flagged tables. Harvested from the
+# existing report before regeneration so a regen never wipes the triage pass.
+# Keyed by the site cell ("path:start-end"). Line numbers shift when sources
+# change, so a stale key simply drops back to empty — the authoritative
+# cluster rulings live in the hand-written tail, which is always preserved.
+_TRIAGE = {}
+
+
+def _harvest_triage(path):
+    if not path or not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            if not line.startswith("| `"):
+                continue
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) < 3 or not cells[-1]:
+                continue
+            key = cells[0].replace("`", "")
+            _TRIAGE[key] = cells[-1]
 
 
 # --------------------------------------------------------------------------

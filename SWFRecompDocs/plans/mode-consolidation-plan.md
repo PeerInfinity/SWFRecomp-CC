@@ -248,6 +248,20 @@ them" is unsupported. Remaining: step 2 (fill the empty `triage` column, needs
 deep runtime context) and step 4 (ratchet — deferred until triage exists,
 otherwise it just pins 157).
 
+**Status 2026-07-23 (later) — triage DONE; Phase 5 complete.** All 157 flagged
+sites classified (see the inventory's "Triage pass" tail section):
+98 `intentional-paired`, 21 `intentional-model` (the native-vs-browser
+sprite-advance model split), 17 `intentional`, **21 `suspicious`** in 10
+behavioral clusters (transform setters, TextFormat-from-field, GetProperty
+display-truth reads, typeof refinement, delete guard, `_alpha` cxform read,
+drag/_droptarget, var→textfield sync, focus rect, ByteArray charset). None
+promoted to `bug` without a reproducing SWF — the 10 clusters are the
+priority list for `wasm-probe-suite`. The tool now preserves triage cells
+across regeneration (`_harvest_triage`). Ratchet decision: with triage done,
+a CI ratchet would pin "0 untriaged sites" — deferred until the probe suite
+exists to give a failed ratchet an actionable meaning; regenerating the
+inventory at session start when touching gated files is the interim practice.
+
 ## Sequencing
 
 Phase 1 → Phase 2 in order (the cadence text should describe the
