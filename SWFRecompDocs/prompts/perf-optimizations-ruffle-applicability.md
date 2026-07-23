@@ -1,5 +1,21 @@
 # Session prompt — which of our performance optimizations apply to Ruffle?
 
+> **RESULT 2026-07-22 — session complete, deliverable shipped
+> (`SWFRecompDocs/reference/performance-optimizations-vs-ruffle.md`, commit
+> `253c31786`).** Counts: **30 A / 6 B / 0 C / 0 D.** The prompt's expectation
+> that "most of §1's recompiler levers are D" was **wrong**, and reading the
+> code is what caught it: `core/src/avm2/optimizer/type_aware.rs::type_aware_optimize`
+> (2,400 lines, on by default) already performs find→this, scope-hit and domain
+> resolution, `this.field`/class-static slot specialization, and coercion
+> elision — statically, at verify time, against real vtables. gc-arena covers
+> the §2 GC arc (incremental, retention-paced); the wgpu backend covers all of
+> §5. **C is empty** (nothing is blocked by Ruffle's architecture; the native
+> intrinsic is blocked by *policy*), and **D is empty at the row level** — the
+> AOT moat is the substrate every row executes on, not any idea in the catalog.
+> Re-running this prompt should START from that classification, not re-derive
+> it. Open: whether the optimizer actually *fires* on Flixel/obfuscated-2.35
+> bytecode (needs a counter in `optimize_op_to!` on a local Ruffle build).
+
 **Objective (user, 2026-07-22):** take the shipped-optimization catalog,
 `SWFRecompDocs/reference/performance-optimizations.md` (~30 entries across §1-§5),
 and classify every entry by its relationship to Ruffle: **already there /

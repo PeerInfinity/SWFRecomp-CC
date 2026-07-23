@@ -922,6 +922,24 @@ already has an int+int arm returning an **INTEGER-kind** value, which the
 naive arm flattened to NUMBER — an observable kind difference.
 `-DAVM2_ARITH_VERIFY` aborted within 1200 ticks. `add` keeps the generic op.
 
+> **REVISIT (2026-07-22, Ruffle comparison).** Ruffle ships exactly this arm and
+> keeps the kind: `core/src/avm2/activation.rs::op_add` matches
+> `(Value::Integer(n1), Value::Integer(n2))` and uses `n1.checked_add(n2)`,
+> returning `Value::Integer` on success and only widening to `f64` on overflow.
+> So the arm is buildable — it just has to reproduce the generic op's kind
+> result, including the overflow widening, rather than going straight to NUMBER.
+> `-DAVM2_ARITH_VERIFY` is already the gate that would prove it.
+
+> **PORTABILITY (2026-07-22).** The compare→branch fusion half of this lever is
+> one of only six things in the whole optimization catalog that Ruffle does not
+> already do — and it currently goes the *other* way:
+> `core/src/avm2/verify.rs::translate_op` takes ABC's already-fused
+> `AbcOp::IfLt` and **splits** it into `Op::LessThan` + `Op::IfTrue`, with no
+> re-fusing rule in `optimizer/peephole.rs::postprocess_peephole`. Since an
+> interpreter pays more per op boundary than we do, this lever should be worth
+> *more* upstream than the ~1.1x it bought us. See
+> `SWFRecompDocs/reference/performance-optimizations-vs-ruffle.md` §B.
+
 **Verification:** `-DAVM2_ARITH_VERIFY` (new — every specialized arm also
 runs the generic op and aborts on divergence) clean over 1200 ticks
 default-GC, 800 ticks GC=0 and 400 ticks GC-stress, zero aborts; RWK trace

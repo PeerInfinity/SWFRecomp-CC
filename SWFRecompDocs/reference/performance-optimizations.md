@@ -40,6 +40,13 @@ than the game's own arithmetic. Layer legend: **[RT]** runtime
 (`SWFModernRuntime/src/avm2/`), **[RC]** recompiler
 (`SWFRecomp/src/abc/abc_emit.cpp` emit-time analysis), **[RC+RT]** both.
 
+> **Ruffle relationship (2026-07-22):** nearly every row in this section is
+> category **A** — Ruffle's verifier already performs the same static
+> resolution in `avm2/optimizer/type_aware.rs::type_aware_optimize`. Our win
+> is the substrate these rows execute on, not the analysis itself. Do not cite
+> an individual `[RC]` lever as an architectural advantage; see
+> [`performance-optimizations-vs-ruffle.md`](performance-optimizations-vs-ruffle.md).
+
 ### Seedling arc (2026-07-14/15, `SEEDLING_AB_STATUS.md`)
 
 | Optimization | Commit | Mechanism | Impact (same-session) |
@@ -169,7 +176,7 @@ arithmetic *before* being built, which is the arc's core method lesson.
 | Flixel quadtree **pooling** | dead on arithmetic before building: only 9.21% of the quadtree region is allocation; a recycled node still runs the ctor's parent-list copies + ~12 stores. Honest counterfactual 57.1 ms vs the 33 ms bar |
 | **inline slots** (object+slots in one alloc) | built, measured, REVERTED: −489M Ir but +22% live heap — o1heap power-of-2 binning (`Avm2Object`=208 B crosses bins). Don't retry without shrinking the object or changing size classes |
 | **nursery/bump allocator, generational GC** | ruled out: birth/death ~6% of frame at HEAD (already harvested by tier-2 + lever 6); ceiling <1.10x |
-| `add` numeric fast arm (lever 5) | REVERTED: int+int must return INTEGER kind; the arm flattened to NUMBER — observable. `add` stays generic |
+| `add` numeric fast arm (lever 5) | REVERTED: int+int must return INTEGER kind; the arm flattened to NUMBER — observable. `add` stays generic. **REVISIT (2026-07-22):** Ruffle ships this arm and keeps the kind — `avm2/activation.rs::op_add` does `(Integer, Integer) => n1.checked_add(n2)`, staying `Value::Integer` and falling to f64 only on overflow. The idea was sound; only our arm's kind handling was wrong |
 | call devirtualization (Seedling step 5) | gated out pre-build: prize <1 ms (calls already IC'd; static calls never miss) |
 | non-`this` instance-slot GET spec | gated out at census: top-5 GET drivers had 0 newly-specializable sites |
 | `ABC_OPT=-O2/-O3` on generated TUs | noise-identical to -O1; the wasm multiplier is not a compile-flag artifact |

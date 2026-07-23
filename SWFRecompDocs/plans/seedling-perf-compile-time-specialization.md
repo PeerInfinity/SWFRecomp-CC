@@ -393,6 +393,21 @@ thing an interpreter cannot do: resolve at COMPILE time.** AS3 is statically
 typed; the ABC verifier already knows the receiver's static type at a large
 fraction of property/coerce sites. That is the untapped lever.
 
+> **CORRECTION 2026-07-22 — the premise in the paragraph above is FALSE, and it
+> was never tested against Ruffle's source until now.** An interpreter *can*
+> resolve at compile time, and Ruffle does: `core/src/avm2/verify.rs` runs
+> `avm2/optimizer/type_aware.rs::type_aware_optimize` (on by default) at method
+> verification, rewriting `GetPropertyStatic`→`GetSlot`,
+> `FindPropStrict`→`GetLocal 0`/`GetScopeObject`/`GetScriptGlobals`,
+> `SetPropertyStatic`→`SetSlotNoCoerce`, and `Coerce`→`Nop` — i.e. **every lever
+> this plan calls untapped**, against real runtime vtables (so it needs no
+> subclass-shadow bail like ours). The lever table below is still right about
+> *what to build* and the measured wins are real; what is wrong is the reason
+> given for why they pay. They pay because our substrate executes the resolved
+> result without an interpreter dispatch, not because the resolution itself is
+> unavailable to an interpreter. Full classification:
+> `SWFRecompDocs/reference/performance-optimizations-vs-ruffle.md`.
+
 ## Evidence — the frame budget (real-GPU CDP self-time, `prof_callset_ic.json`, ~47 ms; 1% ≈ 0.47 ms)
 
 | bucket | % | ~ms | note |
@@ -505,7 +520,7 @@ runtime callee, not method self-time; inclusive over-weights frame drivers. GET'
 **GET (25738 sites; the dominant property op — `resolved_get` 8.1% +
 `getproperty_static_ic` 7.6% ≈ 15.7% of frame): ~77–90% is compile-time-resolvable.**
 Self-weighted share:
-| lever | share | mechanism (compile-time constant an interpreter can't precompute) |
+| lever | share | mechanism (compile-time constant; see the 07-22 correction above — Ruffle's verifier precomputes these too, we just execute the result cheaper) |
 |---|---|---|
 | **getlex-global** (recv_scope, 70% class-like) | **~32%** | `getlex FP`/`ClassName` → fixed global/domain slot; bake resolved pointer → kills `avm2_domain_find`/`findproperty` scan |
 | **this / typed-local slot** (slot_sealed) | **~23%** | sealed ABC class + slot trait → `recv.u.obj->slots[N]` direct (the plan's original lever) |
