@@ -1,0 +1,30 @@
+# Weekly no-graphics canary (mode-consolidation-plan.md Phase 2).
+#
+# Since 2026-07-23, per-change CI runs in `graphics` mode only (the
+# production frame loop). This scheduled run keeps the `no-graphics`
+# (swf_core.c) baselines fresh and exists to catch mask-type divergences —
+# bugs visible only in the trace loop (playbook gotcha #15 class).
+#
+# It is a thin caller so ruffle-tests.yml never runs with the empty
+# `inputs` context a direct `schedule:` trigger would produce.
+#
+# REVERSION CRITERION: if this canary ever reports a pass/fail divergence
+# that the per-change graphics runs missed, restore dual per-change runs
+# (revert the CLAUDE.md / pipeline-handoff.md policy flip) and reopen
+# mode-consolidation-plan.md Phase 2.
+name: Weekly No-Graphics Canary
+
+on:
+  schedule:
+    - cron: '0 8 * * 0'  # Sundays 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  no-graphics-suite:
+    uses: ./.github/workflows/ruffle-tests.yml
+    with:
+      mode: no-graphics

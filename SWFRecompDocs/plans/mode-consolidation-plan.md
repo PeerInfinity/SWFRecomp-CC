@@ -77,7 +77,15 @@ Verification: local single-test run in both surviving modes
 then full CI in **both** modes (this touches shared build config), zero
 regressions expected.
 
-## Phase 2 — CI cadence: graphics per-change, no-graphics weekly canary
+## Phase 2 — CI cadence: graphics per-change, no-graphics weekly canary — **DONE 2026-07-23**
+
+Implemented: policy flipped in `CLAUDE.md` + `.claude/pipeline-handoff.md`;
+weekly canary added as `.github/workflows/weekly-no-graphics.yml` — a thin
+`workflow_call` caller with a Sunday 08:00 UTC cron, so `ruffle-tests.yml`
+never runs with the empty `inputs` context a direct `schedule:` trigger
+would produce. Reversion criterion documented in the workflow header.
+Verified by a manual `workflow_dispatch` of the canary (full no-graphics
+suite green through the caller path).
 
 Rationale: with parity at 1 known divergence, the second full-suite run per
 shared-runtime change buys almost no signal. Graphics is the production

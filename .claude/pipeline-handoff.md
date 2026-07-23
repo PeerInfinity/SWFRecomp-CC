@@ -4,12 +4,12 @@ When a task ends — finished, blocked, or paused with progress — run the Ruff
 
 ## Build mode
 
-The `ruffle-tests.yml` workflow accepts a `mode` input. Match the mode to whatever the user's work targets:
+The `ruffle-tests.yml` workflow accepts a `mode` input:
 
-- `no-graphics` (default) — trace-only run. ~10 min. Result files: `results.json`, `results_diff.md`.
-- `graphics` — full graphics-native run with offscreen Dawn rendering. ~6 min on Dawn cache hit, ~30 min on cache miss (first run for a script_hash). Result files: `results_graphics.json`, `results_graphics_diff.md`.
+- `graphics` (**per-change default** since 2026-07-23) — full graphics-native run with offscreen Dawn rendering, i.e. the production frame loop (`swf.c`). ~6 min on Dawn cache hit, ~30 min on cache miss (first run for a script_hash). Result files: `results_graphics.json`, `results_graphics_diff.md`.
+- `no-graphics` — trace-only run (`swf_core.c`). ~10 min. Result files: `results.json`, `results_diff.md`. Runs weekly via `weekly-no-graphics.yml` (Sundays 08:00 UTC). Dispatch it per-change ONLY when the change touches no-graphics-only code: `swf_core.c`, `tag_stubs.c`, or `#ifdef NO_GRAPHICS` arms that lack `|| OFFSCREEN_RENDER`. When in doubt for shared runtime code, run both.
 
-All modes push results to the same branch (`ruffle-test-results`) — only the filenames differ. Default to no-graphics unless the user's changes touch graphics code (renderer, video, tag-render paths, etc.) or the user asks otherwise.
+All modes push results to the same branch (`ruffle-test-results`) — only the filenames differ. Rationale + reversion criterion: `SWFRecompDocs/plans/mode-consolidation-plan.md` Phase 2 (if the weekly canary ever catches a divergence graphics missed, restore dual per-change runs). Note the flake asymmetry when reading a red graphics run: `case-v6` and the apt/Vulkan shard flakes (see `graphics-ci-aptget-flaky-shards` memory) need triage before being called regressions.
 
 ### WASM link is now CI-observable
 

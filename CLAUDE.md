@@ -16,10 +16,12 @@ workflow in the matching mode, wait for completion with `gh run watch`, merge th
 with the project's standard trailer. Use the `.pipeline-state` file (gitignored)
 to make the pipeline resumable across sessions.
 
-- **Match the CI mode to the change** (`.claude/pipeline-handoff.md` §"Build
-  mode"): `no-graphics` by default; `graphics` when the change touches graphics /
-  renderer / tag-render paths or shared `OFFSCREEN_RENDER` code. When in doubt for
-  shared runtime code, run **both** modes.
+- **CI mode** (`.claude/pipeline-handoff.md` §"Build mode"): `graphics` is the
+  per-change default (production frame loop). Dispatch `no-graphics` per-change
+  ONLY when the change touches no-graphics-only code (`swf_core.c`,
+  `tag_stubs.c`, `#ifdef NO_GRAPHICS` arms without `|| OFFSCREEN_RENDER`);
+  otherwise the weekly `weekly-no-graphics.yml` canary covers it. When in
+  doubt for shared runtime code, run both.
 - Still ask before anything genuinely irreversible or out of scope (force-pushing
   over others' work, rewriting published history, deleting branches, etc.).
 - A failing-but-completed CI run is a result to report, not a blocker — surface
