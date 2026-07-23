@@ -12,9 +12,23 @@ Ruffle.
   ```bash
   cd ~/CC/ruffle && git apply /home/robert/CC/SWFRecomp-CC/SWFRecompDocs/reference/ruffle-local-patches.patch
   ```
-- **Base commit:** captured against upstream Ruffle HEAD `7ea7c8882`
-  ("avm2: Clean up TextLine", 2026-06-19). Regenerate the vendored patch after any
-  re-apply/rebase so this stays current (recipe at the bottom).
+- **Base commit:** captured against upstream Ruffle HEAD `be11d7e89`
+  ("chore: Bump the cargo-minor group with 13 updates", 2026-07-22). Regenerate
+  the vendored patch after any re-apply/rebase so this stays current (recipe at
+  the bottom).
+- **Last update: 2026-07-22, `7ea7c8882` → `be11d7e89` (228 commits).** Done with
+  `git stash push -u` → `git merge --ff-only origin/master` → `git stash pop`,
+  which 3-way-merges rather than context-matching a patch. Upstream had touched 3
+  of the 12 patched files; **one conflict**, in `core/src/tag_utils.rs` (B1):
+  `SwfMovie::from_data` gained a 4th parameter, so the call became
+  `from_data(&data, url, loader_url, None)` — our `url` is already a `String`, so
+  upstream's `.into()` is not needed. Verified after: exporter rebuilds clean
+  (4m57s), and a 360-frame Elephant Quest oracle run reproduces
+  `DOMAIN = armorgames.com` (B1), the served AGI.swf banner (B4), the input
+  replay (B2) and the tracing log (B3) — with the menu frame **byte-identical
+  (MAD 0.0000)** to the pre-update build. The pre-update stash is retained as
+  `stash@{0}` in that checkout ("SWFRecomp local patches pre-update 2026-07-22");
+  drop it once you trust the vendored patch.
 - **Older single-purpose doc:** [`../ruffle-probing-trace-log.md`](../ruffle-probing-trace-log.md)
   + `../probing-trace-log.patch` document **only** the `--trace-log` patch
   (family A below); this doc supersedes it as the full inventory. The trace-log
@@ -105,6 +119,11 @@ RUFFLE_MOVIE_URL="http://armorgames.com/566862_ElephantQuest.swf" \
 ```
 (The multi-frame output arg must be a **directory** — a `.png` path silently
 keeps one frame. `--frames N`, `-s`/`--silent`, `--graphics gl` are stock flags.)
+
+**Gotcha — frame filenames are zero-padded to the WIDTH OF THE FRAME COUNT**, not
+a fixed 4: `--frames 1200` writes `0000.png`…`1199.png`, `--frames 360` writes
+`000.png`…`359.png`. A comparison harness that hardcodes `%04d` silently finds
+nothing when the frame count changes. Glob the directory instead.
 
 ## Family C — browser perf-comparison instrumentation (web + wgpu)
 

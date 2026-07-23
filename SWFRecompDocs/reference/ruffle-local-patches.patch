@@ -1,12 +1,12 @@
-# Ruffle local patches vs upstream HEAD 7ea7c8882 (avm2: Clean up TextLine)
-# Generated 7ea7c8882ed30c2caa43f9191ee0c180bc43cb41 base; re-apply with: git apply <this file>  (run from ~/CC/ruffle)
+# Ruffle local patches vs upstream HEAD be11d7e89
+# Re-apply: git apply <this file>  (from ~/CC/ruffle)
 #
 diff --git a/Cargo.lock b/Cargo.lock
-index 0e3403dc6..555fe0909 100644
+index b61c8ea7a..e30c7f80c 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -1669,13 +1669,18 @@ name = "exporter"
- version = "0.3.0"
+ version = "0.4.1"
  dependencies = [
   "anyhow",
 + "async-channel",
@@ -25,7 +25,7 @@ index 0e3403dc6..555fe0909 100644
  ]
  
 diff --git a/core/src/tag_utils.rs b/core/src/tag_utils.rs
-index 52e5b8f8b..82594c459 100644
+index de961f010..8d2ea8233 100644
 --- a/core/src/tag_utils.rs
 +++ b/core/src/tag_utils.rs
 @@ -101,7 +101,16 @@ pub fn movie_from_path<P: AsRef<std::path::Path>>(
@@ -34,7 +34,7 @@ index 52e5b8f8b..82594c459 100644
      let abs_path = path.as_ref().canonicalize()?;
 -    let url = url::Url::from_file_path(abs_path).map_err(|()| Error::InvalidSwfUrl)?;
 -
--    SwfMovie::from_data(&data, url.into(), loader_url).map_err(Error::InvalidSwf)
+-    SwfMovie::from_data(&data, url.into(), loader_url, None).map_err(Error::InvalidSwf)
 +    // RUFFLE_MOVIE_URL overrides the movie URL (stage.loaderInfo.url). Used by
 +    // Seedling bring-up to make the exporter report a portal domain so the NG
 +    // preloader auto-starts into the game, matching the SWFRecomp GAME_SWF_URL
@@ -46,7 +46,7 @@ index 52e5b8f8b..82594c459 100644
 +            .into(),
 +    };
 +
-+    SwfMovie::from_data(&data, url, loader_url).map_err(Error::InvalidSwf)
++    SwfMovie::from_data(&data, url, loader_url, None).map_err(Error::InvalidSwf)
  }
 diff --git a/exporter/Cargo.toml b/exporter/Cargo.toml
 index 5579b86d8..d7cdd8274 100644
@@ -817,7 +817,7 @@ index 18706ef44..20632b87e 100644
      }
  
 diff --git a/web/Cargo.toml b/web/Cargo.toml
-index 2d2b18592..1bdd4bf4c 100644
+index 1dcd9d657..d90163f02 100644
 --- a/web/Cargo.toml
 +++ b/web/Cargo.toml
 @@ -28,7 +28,7 @@ canvas = ["ruffle_render_canvas"]
@@ -839,7 +839,7 @@ index 2d2b18592..1bdd4bf4c 100644
  
  [target.'cfg(target_family = "wasm")'.dependencies.getrandom]
 diff --git a/web/src/lib.rs b/web/src/lib.rs
-index 9e8f051a2..17fe684a4 100644
+index e8ce6b076..04a7c9756 100644
 --- a/web/src/lib.rs
 +++ b/web/src/lib.rs
 @@ -1243,12 +1243,34 @@ impl RuffleHandle {
