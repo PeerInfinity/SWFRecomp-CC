@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-23 17:03 UTC
+**Date**: 2026-07-23 18:38 UTC
 
-**Git SHA**: `8cf9ce9e48`
+**Git SHA**: `38e495669a`
 
-**Run Duration**: 15m 18s
+**Run Duration**: 8m 35s
 
 **Filtered**: 0 tests ignored out of 70 available
 
@@ -25,76 +25,76 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array_element_type1_args` | 7 | 19.2s |  |
-| 2 | `array_method_type1_args` | 7 | 1.0s |  |
-| 3 | `avm2_agi_shell` | 6 | 1.1s |  |
-| 4 | `avm2_bitmapdata_draw_textfield` | 5 | 4.8s |  |
-| 5 | `avm2_contextmenu_stub` | 4 | 4.8s |  |
-| 6 | `avm2_embed_bytearray` | 2 | 24.0s |  |
-| 7 | `avm2_external_interface_unavailable` | 8 | 5.1s |  |
+| 1 | `array_element_type1_args` | 7 | 0.2s |  |
+| 2 | `array_method_type1_args` | 7 | 0.2s |  |
+| 3 | `avm2_agi_shell` | 6 | 0.4s |  |
+| 4 | `avm2_bitmapdata_draw_textfield` | 5 | 4.7s |  |
+| 5 | `avm2_contextmenu_stub` | 4 | 4.9s |  |
+| 6 | `avm2_embed_bytearray` | 2 | 4.9s |  |
+| 7 | `avm2_external_interface_unavailable` | 8 | 5.0s |  |
 | 8 | `avm2_findprop_this_resolution` | 13 | 5.0s |  |
 | 9 | `avm2_gc_dynprop_tombstone_purge` | 8 | 5.1s |  |
-| 10 | `avm2_gc_string_concat_reclaim` | 10 | 4.9s |  |
-| 11 | `avm2_gc_string_survives_collect` | 9 | 5.0s |  |
-| 12 | `avm2_goto_catchup_scale` | 4 | 5.2s |  |
-| 13 | `avm2_graphics_runtime` | 7 | 24.5s |  |
+| 10 | `avm2_gc_string_concat_reclaim` | 10 | 4.0s |  |
+| 11 | `avm2_gc_string_survives_collect` | 9 | 4.0s |  |
+| 12 | `avm2_goto_catchup_scale` | 4 | 4.0s |  |
+| 13 | `avm2_graphics_runtime` | 7 | 23.7s |  |
 | 14 | `avm2_loader_stub` | 5 | 4.8s |  |
-| 15 | `avm2_localconnection_domain` | 4 | 4.8s |  |
-| 16 | `avm2_morph` | 8 | 24.9s |  |
-| 17 | `avm2_sharedobject_flushstatus` | 4 | 5.0s |  |
-| 18 | `avm2_simplebutton_click` | 2 | 5.1s |  |
-| 19 | `avm2_slot_default_template` | 34 | 5.3s |  |
-| 20 | `avm2_static_and_store_slots` | 14 | 5.0s |  |
-| 21 | `avm2_static_text` | 6 | 24.0s |  |
-| 22 | `avm2_timeline_gradients` | 7 | 24.5s |  |
-| 23 | `avm2_timeline_solid` | 6 | 5.7s |  |
-| 24 | `avm2_timeline_stroke_gradient` | 9 | 5.7s |  |
-| 25 | `avm2_timeline_text` | 4 | 5.0s |  |
-| 26 | `avm2_tolerant_verify_quarantine` | 2 | 4.7s |  |
-| 27 | `avm2_typed_value_ops` | 30 | 5.0s |  |
-| 28 | `broadcast_cross_swf_version` | 4 | 20.1s |  |
-| 29 | `broadcast_type1_args` | 14 | 19.5s |  |
+| 15 | `avm2_localconnection_domain` | 4 | 4.9s |  |
+| 16 | `avm2_morph` | 8 | 23.8s |  |
+| 17 | `avm2_sharedobject_flushstatus` | 4 | 4.7s |  |
+| 18 | `avm2_simplebutton_click` | 2 | 4.8s |  |
+| 19 | `avm2_slot_default_template` | 34 | 4.9s |  |
+| 20 | `avm2_static_and_store_slots` | 14 | 4.9s |  |
+| 21 | `avm2_static_text` | 6 | 23.2s |  |
+| 22 | `avm2_timeline_gradients` | 7 | 25.0s |  |
+| 23 | `avm2_timeline_solid` | 6 | 5.8s |  |
+| 24 | `avm2_timeline_stroke_gradient` | 9 | 5.9s |  |
+| 25 | `avm2_timeline_text` | 4 | 3.7s |  |
+| 26 | `avm2_tolerant_verify_quarantine` | 2 | 3.3s |  |
+| 27 | `avm2_typed_value_ops` | 30 | 3.8s |  |
+| 28 | `broadcast_cross_swf_version` | 4 | 19.6s |  |
+| 29 | `broadcast_type1_args` | 14 | 1.2s |  |
 | 30 | `coerce_cross_swf_version` | 7 | 1.3s |  |
-| 31 | `coerce_recursion_guard` | 1 | 18.9s |  |
+| 31 | `coerce_recursion_guard` | 1 | 1.2s |  |
 | 32 | `coerce_type1_args` | 9 | 1.1s |  |
-| 33 | `convertfloat_type1_this` | 3 | 21.6s |  |
-| 34 | `ei_closure_scope_order` | 7 | 1.4s |  |
-| 35 | `ei_cross_swf_version` | 2 | 19.8s |  |
-| 36 | `ei_type1_args` | 7 | 1.2s |  |
-| 37 | `enterframe_type1_args` | 8 | 20.0s |  |
-| 38 | `fn_call_builtin_type1_args` | 10 | 19.8s |  |
-| 39 | `fn_call_type1_args` | 7 | 18.7s |  |
-| 40 | `fn_empty_method_type1_args` | 10 | 1.1s |  |
-| 41 | `lc_method_type1_args` | 7 | 19.8s |  |
+| 33 | `convertfloat_type1_this` | 3 | 1.0s |  |
+| 34 | `ei_closure_scope_order` | 7 | 1.1s |  |
+| 35 | `ei_cross_swf_version` | 2 | 1.2s |  |
+| 36 | `ei_type1_args` | 7 | 1.1s |  |
+| 37 | `enterframe_type1_args` | 8 | 20.1s |  |
+| 38 | `fn_call_builtin_type1_args` | 10 | 1.2s |  |
+| 39 | `fn_call_type1_args` | 7 | 1.2s |  |
+| 40 | `fn_empty_method_type1_args` | 10 | 1.2s |  |
+| 41 | `lc_method_type1_args` | 7 | 1.2s |  |
 | 42 | `lc_onstatus_type1_args` | 3 | 1.2s |  |
-| 43 | `lv_cross_swf_version` | 5 | 20.5s |  |
-| 44 | `lv_ondata_type1_args` | 3 | 20.0s |  |
-| 45 | `mc_event_cross_swf_version` | 4 | 18.9s |  |
-| 46 | `mc_event_type1_args` | 3 | 19.1s |  |
-| 47 | `mc_method_v5_caller_gate` | 4 | 20.7s |  |
-| 48 | `mc_resolve_type1_args` | 6 | 20.2s |  |
-| 49 | `method_type1_args` | 10 | 19.2s |  |
-| 50 | `nc_onstatus_closure` | 2 | 19.3s |  |
-| 51 | `nc_onstatus_type1_args` | 3 | 19.6s |  |
-| 52 | `onconstruct_cross_swf_version` | 4 | 19.6s |  |
-| 53 | `onconstruct_type1_args` | 6 | 19.4s |  |
-| 54 | `onload_type1_args` | 7 | 19.4s |  |
-| 55 | `onunload_type1_args` | 6 | 13.9s |  |
-| 56 | `onunload_type1_local_frame` | 2 | 0.7s |  |
-| 57 | `resolve_type1_args` | 13 | 19.9s |  |
-| 58 | `root_enterframe_cross_swf_version` | 3 | 19.9s |  |
-| 59 | `sort_comparator_captured_scope` | 2 | 21.1s |  |
-| 60 | `sort_comparator_type1_args` | 5 | 20.6s |  |
-| 61 | `string_prim_method_type1_args` | 19 | 19.1s |  |
-| 62 | `timer_cross_swf_version` | 3 | 19.0s |  |
+| 43 | `lv_cross_swf_version` | 5 | 19.9s |  |
+| 44 | `lv_ondata_type1_args` | 3 | 19.7s |  |
+| 45 | `mc_event_cross_swf_version` | 4 | 17.1s |  |
+| 46 | `mc_event_type1_args` | 3 | 0.9s |  |
+| 47 | `mc_method_v5_caller_gate` | 4 | 19.0s |  |
+| 48 | `mc_resolve_type1_args` | 6 | 1.1s |  |
+| 49 | `method_type1_args` | 10 | 1.0s |  |
+| 50 | `nc_onstatus_closure` | 2 | 19.6s |  |
+| 51 | `nc_onstatus_type1_args` | 3 | 1.2s |  |
+| 52 | `onconstruct_cross_swf_version` | 4 | 20.6s |  |
+| 53 | `onconstruct_type1_args` | 6 | 1.1s |  |
+| 54 | `onload_type1_args` | 7 | 18.9s |  |
+| 55 | `onunload_type1_args` | 6 | 0.5s |  |
+| 56 | `onunload_type1_local_frame` | 2 | 1.1s |  |
+| 57 | `resolve_type1_args` | 13 | 1.2s |  |
+| 58 | `root_enterframe_cross_swf_version` | 3 | 19.4s |  |
+| 59 | `sort_comparator_captured_scope` | 2 | 19.0s |  |
+| 60 | `sort_comparator_type1_args` | 5 | 1.1s |  |
+| 61 | `string_prim_method_type1_args` | 19 | 1.1s |  |
+| 62 | `timer_cross_swf_version` | 3 | 19.3s |  |
 | 63 | `timer_type1_args` | 14 | 20.0s |  |
 | 64 | `watch_cross_swf_version` | 6 | 20.0s |  |
-| 65 | `watch_mc_reentrant_setmember` | 3 | 18.8s |  |
+| 65 | `watch_mc_reentrant_setmember` | 3 | 0.5s |  |
 | 66 | `watch_mc_type1_args` | 7 | 1.1s |  |
-| 67 | `watch_setmember_type1_args` | 7 | 19.3s |  |
-| 68 | `watch_timeline_named_params` | 4 | 1.2s |  |
-| 69 | `watch_timeline_reentrant` | 3 | 19.1s |  |
-| 70 | `xml_onload_type1_args` | 3 | 19.4s |  |
+| 67 | `watch_setmember_type1_args` | 7 | 1.2s |  |
+| 68 | `watch_timeline_named_params` | 4 | 1.1s |  |
+| 69 | `watch_timeline_reentrant` | 3 | 1.0s |  |
+| 70 | `xml_onload_type1_args` | 3 | 19.1s |  |
 
 ## Near-Passing Tests
 
