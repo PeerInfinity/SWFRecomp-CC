@@ -287,9 +287,12 @@ higher-value target than the rwf/rwic titles (which Ruffle merely renders blank)
   the issue). 18 *distinct* doors → progressing, not a cycle. So ~1000 doors ≈
   1000+ s → the first world-map frame never completes. This is exactly the
   "accidental super-linear cost" flagged here — the **beat-Ruffle crux is now a
-  native init2 profiling task**. Suspects: `getDefinitionByName("Level"+n)` doing
-  a linear scan over all classes per door, per-door filter/tessellation work, or
-  an O(doors²) link/adjacency pass. Repro: `_eq_tas/story_drive.txt` (build +
+  native init2 profiling task** (callgrind the native binary during the DOOR
+  build). `getDefinitionByName("Level"+n)` is **ruled out** — `avm2_find_definition`
+  is a hash/vtable lookup (`avm2_domain_find` + `avm2_vtable_find`), not a linear
+  class scan. Remaining suspects: per-door object construction / filter /
+  tessellation work, or an O(doors²) link/adjacency pass in the game's own
+  (recompiled) AS3. Repro: `_eq_tas/story_drive.txt` (build +
   `AVM2_MAX_TICKS=545`, direct binary with `stdbuf -oL` + `timeout` to watch
   `DOOR n` cadence). **Fix this and EQ becomes the first title we play that
   Ruffle cannot** (Ruffle times out at ~18 s; we must finish faster). EQ-4.
