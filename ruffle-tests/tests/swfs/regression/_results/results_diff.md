@@ -1,14 +1,14 @@
 # Ruffle Test Results Diff
 
-**Previous:** `8a39a6797f33` (2026-07-22T21:54:21.846620+00:00)
-**Current:** `c36560845dbc` (2026-07-22T23:11:18.177752+00:00)
+**Previous:** `c36560845dbc` (2026-07-22T23:11:18.177752+00:00)
+**Current:** `b8b5efbcdd44` (2026-07-23T00:32:51.969638+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 67 | 68 | +1 |
-| Total | 67 | 68 | +1 |
+| Passing | 68 | 69 | +1 |
+| Total | 68 | 69 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
@@ -16,4 +16,4 @@
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm2_loader_stub` | pass | 5/5 |
+| `avm2_agi_shell` | pass | 6/6 |
