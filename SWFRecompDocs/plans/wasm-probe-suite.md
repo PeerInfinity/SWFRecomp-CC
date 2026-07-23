@@ -1,5 +1,15 @@
 # WASM Probe Suite — Plan
 
+> **2026-07-23 update (c) — the six adjudicated bugs are FIXED** (`b04b44512`).
+> All six group-D reds (`transform_matrix_set`, `color_gettransform`,
+> `textformat_from_field`, `getproperty_timeline_x`,
+> `typeof_textfield_button`, `alpha_cxform_read`) flipped KNOWN_RED →
+> required; the full suite runs **16 pass / 0 fail / 1 known-red**
+> (`droptarget_scripted`, the couldn't-probe row). Fix evidence and shapes:
+> the "Probe adjudication" section of the gate inventory. Remaining
+> follow-ups from update (b) still open: Tab-key injection for focus rect,
+> and one more probe for the invalid-tellTarget `GetProperty` row.
+>
 > **2026-07-23 update (b) — the gate-inventory clusters are adjudicated.**
 > Nine new probes (group D in `SWFRecomp/tests/wasm_probes/README.md`) settled
 > eight of the ten suspicious clusters: **six bugs**

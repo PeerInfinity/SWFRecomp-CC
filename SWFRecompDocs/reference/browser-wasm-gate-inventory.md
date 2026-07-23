@@ -102,17 +102,17 @@ browser-WASM gets zero code; both native configs get code.
 
 | site | function | condition | enclosing | lines ng/gn/bw | arms (size → configs) | triage |
 |---|---|---|---|---|---|---|
-| `SWFModernRuntime/src/actionmodern/action.c`:9072-9106 | `transformMatrixSetter` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 26/26/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 26L → ng,gn | bug (probe: transform_matrix_set) |
-| `SWFModernRuntime/src/actionmodern/action.c`:9146-9150 | `transformCTSetter` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 3/3/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 3L → ng,gn | bug (probe: transform_matrix_set) |
-| `SWFModernRuntime/src/actionmodern/action.c`:10907-10923 | `colorGetTransform` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 14/14/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 14L → ng,gn | bug (probe: color_gettransform) |
-| `SWFModernRuntime/src/actionmodern/action.c`:17312-17558 | `textFormatSetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 187/187/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 187L → ng,gn | bug (probe: textformat_from_field) |
+| `SWFModernRuntime/src/actionmodern/action.c`:9072-9106 | `transformMatrixSetter` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 26/26/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 26L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:9146-9150 | `transformCTSetter` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 3/3/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 3L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:10907-10923 | `colorGetTransform` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 14/14/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 14L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:17312-17558 | `textFormatSetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 187/187/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 187L → ng,gn | fixed (b04b44512, probe green) |
 | `SWFModernRuntime/src/actionmodern/action.c`:19761-19770 | `xml_create_document` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 8/8/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 8L → ng,gn | intentional |
 | `SWFModernRuntime/src/actionmodern/action.c`:20089-20129 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 34/34/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 34L → ng,gn | intentional-paired |
 | `SWFModernRuntime/src/actionmodern/action.c`:20135-20138 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-paired |
 | `SWFModernRuntime/src/actionmodern/action.c`:20175-20178 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 2/2/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 2L → ng,gn | intentional-paired |
 | `SWFModernRuntime/src/actionmodern/action.c`:20193-20203 | `resolveSlashPathToMC` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 9/9/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 9L → ng,gn | intentional-paired |
 | `SWFModernRuntime/src/actionmodern/action.c`:23937-24087 | `propagateTargetToDescendants` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 92/92/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 92L → ng,gn | intentional-model |
-| `SWFModernRuntime/src/actionmodern/action.c`:26084-26096 | `mcReadAlpha` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn | bug (probe: alpha_cxform_read) |
+| `SWFModernRuntime/src/actionmodern/action.c`:26084-26096 | `mcReadAlpha` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 6/6/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 6L → ng,gn | fixed (b04b44512, probe green) |
 | `SWFModernRuntime/src/actionmodern/action.c`:28987-29008 | `setCurrentContext` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 4/4/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 4L → ng,gn | intentional |
 | `SWFModernRuntime/src/actionmodern/action.c`:31621-31714 | `actionNextFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 49/49/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 49L → ng,gn | intentional-model |
 | `SWFModernRuntime/src/actionmodern/action.c`:32270-32324 | `actionGotoFrame` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 32/27/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 32/27/32L → ng,gn | intentional-paired |
@@ -133,13 +133,13 @@ browser-WASM gets zero code; both native configs get code.
 | `SWFModernRuntime/src/actionmodern/action.c`:42480-42487 | `actionSetVariable` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | intentional-paired |
 | `SWFModernRuntime/src/actionmodern/action.c`:42849-42856 | `actionDefineLocal` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 5/5/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 5L → ng,gn | intentional (probe: var_textfield_sync green — TF binding registry) |
 | `SWFModernRuntime/src/actionmodern/action.c`:43212-43221 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 7/7/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 7L → ng,gn | suspicious (unprobed — see Probe adjudication) |
-| `SWFModernRuntime/src/actionmodern/action.c`:43230-43242 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn | bug (probe: getproperty_timeline_x) |
-| `SWFModernRuntime/src/actionmodern/action.c`:43246-43258 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn | bug (probe: getproperty_timeline_x) |
-| `SWFModernRuntime/src/actionmodern/action.c`:43262-43264 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | bug (probe: getproperty_timeline_x) |
-| `SWFModernRuntime/src/actionmodern/action.c`:43268-43270 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | bug (probe: getproperty_timeline_x) |
-| `SWFModernRuntime/src/actionmodern/action.c`:43292-43294 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | bug (probe: getproperty_timeline_x) |
-| `SWFModernRuntime/src/actionmodern/action.c`:43511-43513 | `actionTypeof` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | bug (probe: typeof_textfield_button) |
-| `SWFModernRuntime/src/actionmodern/action.c`:43545-43573 | `actionTypeof` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 22/22/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 22L → ng,gn | bug (probe: typeof_textfield_button) |
+| `SWFModernRuntime/src/actionmodern/action.c`:43230-43242 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:43246-43258 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:43262-43264 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:43268-43270 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:43292-43294 | `actionGetProperty` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:43511-43513 | `actionTypeof` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 1/1/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 1L → ng,gn | fixed (b04b44512, probe green) |
+| `SWFModernRuntime/src/actionmodern/action.c`:43545-43573 | `actionTypeof` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 22/22/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 22L → ng,gn | fixed (b04b44512, probe green) |
 | `SWFModernRuntime/src/actionmodern/action.c`:43861-43873 | `actionDelete2` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 11/11/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 11L → ng,gn | intentional (probe: delete_child_mc green — gate is a no-op) |
 | `SWFModernRuntime/src/actionmodern/action.c`:45877-45894 | `actionCall` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 13/13/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 13L → ng,gn | intentional-paired |
 | `SWFModernRuntime/src/actionmodern/action.c`:46017-46049 | `actionCall` | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` | — | 28/28/0 | `defined(NO_GRAPHICS) \|\| defined(OFFSCREEN_RENDER)` 28L → ng,gn | intentional-paired |
@@ -658,13 +658,13 @@ Ruffle and both native modes agreed on every probe except
 
 | cluster | sites | verdict | evidence |
 |---|---|---|---|
-| `transform.matrix` / `transform.colorTransform` setters | action.c 9072, 9146 | **bug** (probe: `transform_matrix_set`) | assigning a `flash.geom.Matrix` and a `flash.geom.ColorTransform` is discarded: `_x` traces 40 (placement) vs 80 expected, the box neither moves nor tints, 4000 px differ from the Ruffle golden |
-| `Color.getTransform` | action.c 10907 | **bug** (probe: `color_gettransform`) | `setTransform({rb:255})` then `getTransform().rb` traces 0 vs 255; the box also renders un-tinted, so *both* halves of the round-trip are gated |
-| `TextFormat` from fields | action.c 17312 | **bug** (probe: `textformat_from_field`) | `field.getTextFormat().size`/`.align` trace `undefined`/`undefined` vs 12/`left` |
-| `GetProperty` display-truth reads | action.c 43212–43292 | **bug** (probe: `getproperty_timeline_x`) | `_x`/`_y` of a purely timeline-moved clip trace **0, 0** vs 200, 100 — browser-WASM's `mc->x`/`mc->y` never track timeline MOVE tags at all, so the gated display-entry read is the only correct source. Widest blast radius of the set |
+| `transform.matrix` / `transform.colorTransform` setters | action.c 9072, 9146 | **bug → fixed** `b04b44512` (probe green) | assigning a `flash.geom.Matrix` and a `flash.geom.ColorTransform` is discarded: `_x` traces 40 (placement) vs 80 expected, the box neither moves nor tints, 4000 px differ from the Ruffle golden |
+| `Color.getTransform` | action.c 10907 | **bug → fixed** `b04b44512` (probe green) | `setTransform({rb:255})` then `getTransform().rb` traces 0 vs 255; the box also renders un-tinted, so *both* halves of the round-trip are gated |
+| `TextFormat` from fields | action.c 17312 | **bug → fixed** `b04b44512` (probe green) | `field.getTextFormat().size`/`.align` trace `undefined`/`undefined` vs 12/`left` |
+| `GetProperty` display-truth reads | action.c 43212–43292 | **bug → fixed** `b04b44512` (probe green) | `_x`/`_y` of a purely timeline-moved clip trace **0, 0** vs 200, 100 — browser-WASM's `mc->x`/`mc->y` never track timeline MOVE tags at all, so the gated display-entry read is the only correct source. Widest blast radius of the set |
 | …its invalid-tellTarget half | action.c 43212–43221 | **still suspicious, unprobed** | the pre-existing `settarget_failure_flag` probe is green, but it exercises `SetProperty` after a failed `SetTarget`, not `GetProperty` — this `g_settarget_invalid` early-return is a different site and nothing built here reads a property through it. One more probe would close it |
-| `typeof` refinement | action.c 43511, 43545 | **bug** (probe: `typeof_textfield_button`) | SWF8 `typeof` traces `movieclip`/`movieclip` vs `object`/`object` for a textfield and a button |
-| `_alpha` placement-cxform read | action.c 26084 | **bug** (probe: `alpha_cxform_read`) | `_alpha` of a clip faded to 50% by a placement CXFORM traces 100 vs 50. The *render* is correct — only the AS read is stale |
+| `typeof` refinement | action.c 43511, 43545 | **bug → fixed** `b04b44512` (probe green) | SWF8 `typeof` traces `movieclip`/`movieclip` vs `object`/`object` for a textfield and a button |
+| `_alpha` placement-cxform read | action.c 26084 | **bug → fixed** `b04b44512` (probe green) | `_alpha` of a clip faded to 50% by a placement CXFORM traces 100 vs 50. The *render* is correct — only the AS read is stale |
 | `delete` child-MC guard | action.c 43861 | **intentional** (probe: `delete_child_mc` green) | the gated `success = false` is redundant with the unconditional `success = false` on the line above it; browser traces `false` / `movieclip`, matching Ruffle exactly |
 | var→textfield sync on `var` declare | action.c 42849 | **intentional** (probe: `var_textfield_sync` green) | browser matches on `text` **and** on `length` (7, not INIT's 4), so the field's property bag genuinely tracks the write — the equivalent path is the un-gated TextField binding machinery (`actionRegisterTextFieldBinding` / the placement-time initial bind around action.c:21690–21760, mirroring Ruffle's `Avm1TextFieldBinding::bind_variables`), not the gated `ng_syncVarToTextFields` call |
 | drag: `_droptarget` + virtual position | action.c 32895, 70182 | **couldn't probe** (probe: `droptarget_scripted`, KNOWN_RED) | browser traces `""` — **and so does Ruffle**. Ruffle derives `_droptarget` from mouse-driven `update_drag`, which never runs without pointer input, so the oracle is blind here; our native builds synthesize `/b` from the virtual hotspot, making the probe's red native-vs-browser rather than Flash-vs-browser. Adjudicating it needs pointer injection the runner lacks *and* the Ruffle exporter cannot mirror. Side finding: native and Ruffle genuinely disagree on scripted-drag `_droptarget` |
@@ -675,6 +675,22 @@ Ruffle and both native modes agreed on every probe except
 open** (the invalid-tellTarget `GetProperty` row). The six reds
 are the work list for a runtime-fix session; each ships with its probe as the
 regression test. No runtime source was changed in this pass.
+
+**Update 2026-07-23 (`b04b44512`): all six bugs are FIXED** — every group-D
+probe flipped KNOWN_RED → required and the full suite runs 16 pass / 0 fail /
+1 known-red (`droptarget_scripted`, the couldn't-probe row, untouched). The
+fix shapes: straight un-gates (typeof, transform matrix/CT get+set,
+TextFormat-from-field, GetProperty display-truth arms — every helper they
+call already compiles in browser via tag_stubs.c/ng_shared.c), plus one
+genuine metadata bridge: browser placement paths skip `ng_on_place_object2`,
+so `init_cx_fields` (tag.c) gained a browser-only arm populating entry cx_*
+from `cxform_data` (render-neutral; fixes `_alpha`/`Color.getTransform`
+reads), and the Color/transform.colorTransform browser write paths now also
+write the resolved display entry so dynamic tints render. Bug 6 needed no
+architecture: `syncTransformIfNeeded` and the baked `transform_data` CPU
+table were already available in browser, and render's dynamic transform
+slots are pushed/restored around each frame so scripts only ever observe
+baked ids.
 
 The reds also answer the trend question at the top of this doc empirically:
 of eight clusters that could be probed, six were real gaps. "By now we caught
