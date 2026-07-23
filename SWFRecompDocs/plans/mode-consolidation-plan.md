@@ -154,6 +154,15 @@ strict superset oracle" becomes true before Phase 2's cadence flip fully lands.
    the mechanism explained. Also re-check `case-v6` while in the area and
    document its flake mechanism if reproducible.
 
+**case-v6 re-check (2026-07-23, closing the loop):** it is NOT an open
+flake. It was 3 real heap bugs (var_map case-fold UAF + 2 graphics OOB
+reads), ASAN-pinned and fixed 2026-05-28 in `d905efdb1` — result history
+shows `runtime_error` consistently through 2026-05-28 and pass at every
+sample since (15/15 runs the week of 2026-07-23). Every "case-v6 CI flake"
+reference in this plan's earlier sections (lines above, Background, Phase 2
+rationale) is pre-fix institutional memory. **Strict mode parity therefore
+has ZERO open items.** A case-v6 failure today is a genuine regression.
+
 ## Phase 4 — Native graphics capability assessment — **DONE 2026-07-23**
 
 **Deliverable:** `SWFRecompDocs/reference/native-windowed-graphics-assessment.md`

@@ -44,9 +44,9 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 
 # Run against the --mode=graphics native build (swf.c + offscreen Dawn).
 # Mode parity COMPLETE as of 2026-07-23: per-test results are identical to
-# no-graphics across all suites; the only strict-parity asterisk is the
-# case-v6 CI flake. Graphics is also the per-change CI mode (see Git
-# Workflow above). See
+# no-graphics across all suites, zero asterisks (the old "case-v6 CI flake"
+# was 3 real heap bugs, fixed 2026-05-28 in d905efdb1 — 15/15 recent runs
+# pass). Graphics is also the per-change CI mode (see Git Workflow above). See
 # SWFRecompDocs/plans/graphics-native-test-mode-*.md for the plan,
 # playbook, and full-suite baseline.
 # Local Dawn install required at ~/CC/dawn-install (or set DAWN_INSTALL env var).

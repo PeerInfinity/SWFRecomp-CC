@@ -927,8 +927,11 @@ Remaining strict parity gaps:
   swf_core.c; headless-legacy reproduced the failure because
   swf_headless.c also lacked it (the "shared code" inference
   conflated frame loops with tag handling). Ported to swf.c gated
-  `OFFSCREEN_RENDER`; CI both modes zero regressions. `case-v6`
-  is now the ONLY strict parity gap. Full story:
+  `OFFSCREEN_RENDER`; CI both modes zero regressions. And the
+  `case-v6` entry above was ALSO closed long ago: fixed 2026-05-28
+  in `d905efdb1` (3 ASAN-pinned heap bugs, not a CI-environment
+  flake) — the "flake" label just outlived the fix in the docs.
+  **Strict parity gaps: ZERO.** Full story:
   `mode-consolidation-plan.md` Phase 3.
 
 Combined: **+3 raw avm1 pass** (sound, netstream_seek_flv,
