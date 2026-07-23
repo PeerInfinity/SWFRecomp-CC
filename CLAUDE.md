@@ -43,7 +43,10 @@ We are improving the pass rate on the Ruffle AVM1 test suite (ActionScript 1/2 t
 python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 
 # Run against the --mode=graphics native build (swf.c + offscreen Dawn).
-# Phase 2 in progress — 948/1125 pass (84.3%) as of 2026-05-11; only 1 strict parity gap remains (case-v6 CI flake; place_and_remove_object_insane_test fixed 2026-07-23 by porting the natural-wrap catch-up promotion to swf.c). See
+# Mode parity COMPLETE as of 2026-07-23: per-test results are identical to
+# no-graphics across all suites; the only strict-parity asterisk is the
+# case-v6 CI flake. Graphics is also the per-change CI mode (see Git
+# Workflow above). See
 # SWFRecompDocs/plans/graphics-native-test-mode-*.md for the plan,
 # playbook, and full-suite baseline.
 # Local Dawn install required at ~/CC/dawn-install (or set DAWN_INSTALL env var).

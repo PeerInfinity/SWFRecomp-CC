@@ -4,6 +4,13 @@
 **Created:** 2026-05-25
 **Status:** Planning; no implementation yet.
 
+> **2026-07-23 update:** the "index of places needing a wasm branch" this
+> plan tried to maintain by hand now exists as a derived artifact:
+> `SWFRecompDocs/reference/browser-wasm-gate-inventory.md`
+> (`tools/gate_inventory.py`, 415 sites, triaged — 21 suspicious in 10
+> clusters). Use it, plus `wasm-probe-suite.md`, as the current entry points;
+> this doc remains the harness-architecture reference.
+
 Existing test infrastructure (`ruffle-tests/verify_output.py`) covers
 two build modes well — **trace** (`swf_core.c`, `NO_GRAPHICS`) and
 **graphics-native** (`swf.c` + offscreen Dawn, `OFFSCREEN_RENDER`) —

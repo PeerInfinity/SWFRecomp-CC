@@ -921,6 +921,15 @@ Remaining strict parity gaps:
   appears in `--mode=graphics-headless-legacy`, so the bug is in
   shared code (tag.c or `#ifdef NO_GRAPHICS`-gated tag handling),
   NOT in swf.c. Defer to a tag.c-focused session.
+  **CLOSED 2026-07-23 (`4e063e3b0`)** — the shared-code guess was
+  wrong: it WAS swf.c. The TRANSFORMED_BY_SCRIPT_WRAP_BACK Phase 4
+  natural-wrap→backward-goto promotion (above) only existed in
+  swf_core.c; headless-legacy reproduced the failure because
+  swf_headless.c also lacked it (the "shared code" inference
+  conflated frame loops with tag handling). Ported to swf.c gated
+  `OFFSCREEN_RENDER`; CI both modes zero regressions. `case-v6`
+  is now the ONLY strict parity gap. Full story:
+  `mode-consolidation-plan.md` Phase 3.
 
 Combined: **+3 raw avm1 pass** (sound, netstream_seek_flv,
 timeout). Smoke set (25 tests including the three keys) clean.

@@ -35,9 +35,9 @@ on:
         required: true
         type: choice
         options:
-          - 'no-graphics'
           - 'graphics'
-        default: 'no-graphics'
+          - 'no-graphics'
+        default: 'graphics'
       single_test:
         description: 'Run a single test by name (overrides categories; auto-uses single runner)'
         required: false
@@ -76,9 +76,9 @@ on:
         default: '30'
         type: string
       mode:
-        description: 'Build mode (no-graphics | graphics)'
+        description: 'Build mode (graphics | no-graphics); graphics is the per-change default since 2026-07-23'
         required: false
-        default: 'no-graphics'
+        default: 'graphics'
         type: string
       single_test:
         description: 'Run a single test by name'

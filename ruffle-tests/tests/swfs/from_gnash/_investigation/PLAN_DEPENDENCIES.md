@@ -57,7 +57,7 @@ DRAIN_SUPPRESS_PRIMITIVE_PLAN (complete/, commit d1cd1d1f)
 | If you land… | …it unblocks… |
 |--------------|---------------|
 | GOTO_FIFO_UNIFICATION_INCREMENTAL (Phases A-H complete) | landed `consecutive_goto_frame_test` 12/12 from Phase E; Phase G+H were pure cleanup with no further test deltas. |
-| TRANSFORMED_BY_SCRIPT_WRAP_BACK | `place_and_remove_object_insane_test` (the other Phase 6→Phase 7 split) |
+| TRANSFORMED_BY_SCRIPT_WRAP_BACK | `place_and_remove_object_insane_test` (the other Phase 6→Phase 7 split) — **fully closed 2026-07-23**: the wrap-back promotion was ported to swf.c (`4e063e3b0`), so the test now passes in BOTH native modes (see `SWFRecompDocs/plans/mode-consolidation-plan.md` Phase 3) |
 
 ## Other dependency relationships
 

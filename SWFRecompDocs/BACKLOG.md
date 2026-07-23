@@ -58,6 +58,21 @@ first).
   fix when a game needs faithful nested/attached morph animation.
   (2026-06-27)
 
+## Native windowed graphics (assessment: `reference/native-windowed-graphics-assessment.md`)
+
+- **flashbang backend: delete or fold into render_webgpu.c.** Second
+  SDL3-GPU renderer (`src/flashbang/`, 993 lines) with shaders frozen at
+  Nov 2025, a Vulkan+glslc toolchain the primary path avoids, weaker
+  input, no CI; render_webgpu.c already serves all three surface configs.
+  Still the default CMake graphics branch — flip that when removing.
+  (2026-07-23)
+- **Playable native windowed AVM1 game ≈ Medium, 3 steps.** Build wiring
+  (S — `build_test.sh --graphics native` omits sdl3webgpu.c + SDL3/Dawn
+  link; SDL3 vendoring itself was repaired in `8d843cd8e`), keyboard
+  events → AVM (S — native SDL pumps are ESC-only; mouse already works),
+  SDL3 audio sink (S-M — native `audio_output_*` arm is an empty stub).
+  Also: native pacing is vsync-only, SWF frameRate ignored. (2026-07-23)
+
 ## AVM2 — GC / memory
 
 - **Reevaluate the two accepted GC leak residuals** when requirements

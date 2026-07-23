@@ -22,3 +22,4 @@ jobs:
     with:
       limit: '0'
       parallel: '10'
+      mode: 'graphics'
