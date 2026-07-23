@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `8cf9ce9e4837`  
-**Date:** 2026-07-23 17:03 UTC  
-**Total duration:** 5h54m14s
+**Commit:** `38e495669a30`  
+**Date:** 2026-07-23 18:38 UTC  
+**Total duration:** 4h51m03s
 
 ## Results by Suite
 
@@ -127,13 +127,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm2 | 1 | - | 1 | - |
+*No changes since last run.*
 
-**avm2 — newly passing:** `json_stringify`
-
-*Comparing `6fefd4552625` → `8cf9ce9e4837`*
+*Comparing `8cf9ce9e4837` → `38e495669a30`*
 
 ## Flash-Spec Results
 
@@ -148,69 +144,69 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 635/711 (89.3%)
-- **Duration:** 1h17m12s across 30 shards
+- **Duration:** 56m30s across 30 shards
 - **Lines:** 115,824/131,157 matching (88.3%)
-- **Avg test duration:** 6.5s — slowest: `netstream_play_flv_screen` (36.5s)
+- **Avg test duration:** 4.7s — slowest: `netstream_play_flv_screen` (34.7s)
 
 ### avm2
 
 - **Pass:** 829/1216 (68.2%)
-- **Duration:** 2h40m13s across 30 shards
+- **Duration:** 2h26m22s across 30 shards
 - **Lines:** 103,606/151,084 matching (68.6%)
-- **Avg test duration:** 7.8s — slowest: `away3d_advanced_shallow_water_demo` (77.8s)
+- **Avg test duration:** 7.2s — slowest: `away3d_advanced_shallow_water_demo` (79.3s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 135/243 (55.6%)
-- **Duration:** 36m09s across 30 shards
+- **Duration:** 26m17s across 30 shards
 - **Lines:** 30,356/38,791 matching (78.3%)
-- **Avg test duration:** 8.9s — slowest: `MovieClip-v8` (63.9s)
+- **Avg test duration:** 6.4s — slowest: `MovieClip-v8` (56.4s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 69/111 (62.2%)
-- **Duration:** 34m47s across 30 shards
+- **Duration:** 28m09s across 30 shards
 - **Lines:** 4,054/5,248 matching (77.2%)
-- **Avg test duration:** 18.7s — slowest: `matrix_test` (105.2s)
+- **Avg test duration:** 15.2s — slowest: `matrix_test` (99.1s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m13s across 30 shards
+- **Duration:** 1m47s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 14.7s — slowest: `implementsOpTest` (21.7s)
+- **Avg test duration:** 11.9s — slowest: `implementsOpTest` (21.5s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 11/20 (55.0%)
-- **Duration:** 5m52s across 30 shards
+- **Duration:** 4m46s across 30 shards
 - **Lines:** 441/580 matching (76.0%)
-- **Avg test duration:** 17.6s — slowest: `action_execution_order_test12` (21.4s)
+- **Avg test duration:** 14.3s — slowest: `swf4opcode` (21.1s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 6m36s across 30 shards
+- **Duration:** 2m47s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 19.7s — slowest: `jump_to_prev_block` (21.1s)
+- **Avg test duration:** 8.3s — slowest: `tags_after_last_showframe` (20.4s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 13m57s across 30 shards
+- **Duration:** 14m03s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 9.0s — slowest: `fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b` (21.9s)
+- **Avg test duration:** 9.1s — slowest: `fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd` (22.1s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 1m55s across 30 shards
+- **Duration:** 1m43s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 2.4s — slowest: `text-bind` (20.0s)
+- **Avg test duration:** 2.1s — slowest: `text-bind` (19.3s)
 
 ### regression
 
 - **Pass:** 70/70 (100%)
-- **Duration:** 15m17s across 30 shards
+- **Duration:** 8m35s across 30 shards
 - **Lines:** 481/481 matching (100%)
-- **Avg test duration:** 13.1s — slowest: `avm2_morph` (24.9s)
+- **Avg test duration:** 7.3s — slowest: `avm2_timeline_gradients` (25.0s)

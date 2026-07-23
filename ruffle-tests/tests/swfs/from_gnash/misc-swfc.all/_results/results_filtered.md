@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-23 17:03 UTC
+**Date**: 2026-07-23 18:38 UTC
 
-**Git SHA**: `8cf9ce9e48`
+**Git SHA**: `38e495669a`
 
-**Run Duration**: 5m 53s
+**Run Duration**: 4m 46s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -33,17 +33,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 1.9s |  |
-| 2 | `edittext_test1` | 47 | 20.8s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 20.4s |  |
-| 4 | `hello` | 4 | 19.9s |  |
-| 5 | `mouse_drag_test` | 12 | 19.7s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 20.0s |  |
-| 7 | `opcode_guard_test2` | 24 | 20.6s |  |
-| 8 | `soft_reference_test1` | 45 | 19.9s |  |
-| 9 | `stackscope` | 11 | 18.9s |  |
-| 10 | `submoviegetvar` | 4 | 21.2s |  |
-| 11 | `swf4opcode` | 117 | 20.8s |  |
+| 1 | `button_test1` | 31 | 2.1s |  |
+| 2 | `edittext_test1` | 47 | 2.1s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 19.9s |  |
+| 4 | `hello` | 4 | 19.5s |  |
+| 5 | `mouse_drag_test` | 12 | 14.9s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 20.1s |  |
+| 7 | `opcode_guard_test2` | 24 | 2.2s |  |
+| 8 | `soft_reference_test1` | 45 | 20.1s |  |
+| 9 | `stackscope` | 11 | 17.4s |  |
+| 10 | `submoviegetvar` | 4 | 19.1s |  |
+| 11 | `swf4opcode` | 117 | 21.1s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +51,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 20.4s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 21.4s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 0.2s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 21.0s |  |
 | 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.8s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 21.1s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 19.6s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 20.9s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 20.4s |  |
 
 ## Near-Passing Tests
 
