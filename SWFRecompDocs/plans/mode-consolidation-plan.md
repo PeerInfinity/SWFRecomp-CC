@@ -237,6 +237,17 @@ testable.
 5. Cross-link with the browser-WASM testing plan: the inventory prioritizes
    which probe SWFs (wasm-probe-suite) would pay off first.
 
+**Status 2026-07-23 — tooling half DONE, triage pending.** `tools/gate_inventory.py`
+(steps 1 and 3) + the generated `SWFRecompDocs/reference/browser-wasm-gate-inventory.md`:
+415 gate sites, **157 where browser-WASM compiles nothing while a native config
+does** (action.c 61, tag.c 49); `--verify-cpp` cross-checks 1014 (site, config)
+line counts against `cpp` with 0 mismatches. The trend check says the fix-rate
+decay is an *exposure* artifact — the per-game-debug-commit hit rate peaked at
+0.92 in the last full week of AVM1 browser debugging — so "we caught most of
+them" is unsupported. Remaining: step 2 (fill the empty `triage` column, needs
+deep runtime context) and step 4 (ratchet — deferred until triage exists,
+otherwise it just pins 157).
+
 ## Sequencing
 
 Phase 1 → Phase 2 in order (the cadence text should describe the
