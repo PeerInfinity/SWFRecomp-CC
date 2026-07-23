@@ -1,0 +1,4 @@
+built kept=1500 children=1500
+enterFrame 1
+enterFrame 2
+timeline still live after catch-up gate

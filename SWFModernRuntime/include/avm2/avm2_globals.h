@@ -393,6 +393,23 @@ typedef struct Avm2DisplayObjectExt
 	uint32_t queued_place_count;
 	uint32_t frame_script_cap;
 	Avm2Value* frame_scripts;    // indexed by 0-based frame; unset = undefined kind
+	// Catch-up walk gate: 1 = this node AND its whole subtree are known
+	// quiescent, so the construct / frame-script walks can skip them.
+	// Zero-init means "must walk", so anything unaccounted for is walked
+	// (fail-safe). Cleared up the ancestor chain by display_mark_frame_work
+	// whenever a node acquires frame work; re-set only at the end of a
+	// frame-script walk that found nothing to do. See avm2_display.c
+	// "Catch-up walk gate".
+	uint8_t walk_clean;
+	// Number of direct children (render list + button states) that are not
+	// walk_clean. Zero lets the walks skip the child loop outright, which is
+	// what keeps a container with thousands of quiescent children cheap.
+	// Only ever read as "is it zero"; it is recounted exactly at the end of
+	// each frame-script walk, so an over-count merely costs one child scan.
+	uint32_t dirty_kids;
+	// Membership flag for the global orphan list (avm2_display.c), replacing
+	// a linear scan on every insert.
+	uint8_t in_orphan_list;
 
 	// --- SimpleButton ---
 	Avm2Object* btn_up;

@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -66,6 +67,12 @@ Avm2DisplayObjectExt* avm2_display_ext_of(Avm2Context* ctx, Avm2Object* obj)
 	return (Avm2DisplayObjectExt*) obj->native_ext;
 }
 
+// Catch-up walk gate (defined below, next to the walks it guards).
+void avm2_display_mark_frame_work(Avm2Context* ctx, Avm2Object* obj);
+static Avm2DisplayObjectExt* display_ext_fast(Avm2Object* obj);
+static void mark_attached(Avm2Context* ctx, Avm2DisplayObjectExt* cext,
+                          Avm2Object* parent);
+
 static int is_container(Avm2Context* ctx, Avm2Object* obj)
 {
 	return obj != NULL && obj->cls != NULL
@@ -90,13 +97,37 @@ static Avm2Object* this_obj(Avm2Activation* act)
 
 static Avm2Object** g_orphans;
 static uint32_t g_orphan_count, g_orphan_cap;
+// The subset of g_orphans that may need a catch-up walk (see "Catch-up walk
+// gate"). A build loop that creates and detaches thousands of clips leaves
+// tens of thousands of legitimately parentless orphans behind; walking that
+// whole list on every goto is the same O(n^2) trap as walking a clean
+// subtree. Entries here are candidates only — each is re-validated on use.
+static Avm2Object** g_orphan_dirty;
+static uint32_t g_orphan_dirty_count, g_orphan_dirty_cap;
+// Attach events since the last compaction: the compaction (dropping entries
+// that regained a parent) is a pure size optimization — the walk loops skip
+// parented entries anyway — so it is amortized instead of run per goto.
+static uint32_t g_orphan_reparented;
+
+static void orphan_dirty_push(Avm2Context* ctx, Avm2Object* obj)
+{
+	if (g_orphan_dirty_count == g_orphan_dirty_cap)
+	{
+		uint32_t nc = g_orphan_dirty_cap > 0 ? g_orphan_dirty_cap * 2 : 16;
+		Avm2Object** grown = avm2_alloc(ctx, nc * sizeof(Avm2Object*));
+		memcpy(grown, g_orphan_dirty, g_orphan_dirty_count * sizeof(Avm2Object*));
+		g_orphan_dirty = grown;
+		g_orphan_dirty_cap = nc;
+	}
+	g_orphan_dirty[g_orphan_dirty_count++] = obj;
+}
 
 static void orphan_add(Avm2Context* ctx, Avm2Object* obj)
 {
-	for (uint32_t i = 0; i < g_orphan_count; i++)
-	{
-		if (g_orphans[i] == obj) return;
-	}
+	Avm2DisplayObjectExt* e = display_ext_fast(obj);
+	// in_orphan_list replaces the old linear membership scan, which was
+	// itself quadratic once the list ran to tens of thousands of entries.
+	if (e == NULL || e->in_orphan_list) return;
 	if (g_orphan_count == g_orphan_cap)
 	{
 		uint32_t nc = g_orphan_cap > 0 ? g_orphan_cap * 2 : 16;
@@ -105,18 +136,56 @@ static void orphan_add(Avm2Context* ctx, Avm2Object* obj)
 		g_orphans = grown;
 		g_orphan_cap = nc;
 	}
+	e->in_orphan_list = 1;
 	g_orphans[g_orphan_count++] = obj;
+	avm2_display_mark_frame_work(ctx, obj);
+	orphan_dirty_push(ctx, obj);
+}
+
+// A dirty-list entry is walkable only while it is still a parentless member
+// of the orphan list with pending work.
+static Avm2DisplayObjectExt* orphan_dirty_ext(Avm2Object* obj, int gate)
+{
+	Avm2DisplayObjectExt* e = display_ext_fast(obj);
+	if (e == NULL || e->parent != NULL || !e->in_orphan_list) return NULL;
+	if (gate && e->walk_clean) return NULL;
+	return e;
+}
+
+// Drop entries that are done; keeps the candidate list proportional to the
+// work actually outstanding.
+static void orphan_dirty_compact(void)
+{
+	uint32_t w = 0;
+	for (uint32_t i = 0; i < g_orphan_dirty_count; i++)
+	{
+		if (orphan_dirty_ext(g_orphan_dirty[i], 1) != NULL)
+		{
+			g_orphan_dirty[w++] = g_orphan_dirty[i];
+		}
+	}
+	g_orphan_dirty_count = w;
 }
 
 static void orphan_cleanup(Avm2Context* ctx)
 {
+	(void) ctx;
+	orphan_dirty_compact();
+	// Ruffle compacts the orphan list on every inner goto; for us that is a
+	// pure optimization (the walks skip re-parented entries), so amortize it.
+	if (g_orphan_reparented < 64) return;
+	g_orphan_reparented = 0;
 	uint32_t w = 0;
 	for (uint32_t i = 0; i < g_orphan_count; i++)
 	{
-		Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, g_orphans[i]);
+		Avm2DisplayObjectExt* ext = display_ext_fast(g_orphans[i]);
 		if (ext != NULL && ext->parent == NULL)
 		{
 			g_orphans[w++] = g_orphans[i];
+		}
+		else if (ext != NULL)
+		{
+			ext->in_orphan_list = 0;
 		}
 	}
 	g_orphan_count = w;
@@ -846,6 +915,7 @@ static void insert_at_index(Avm2Context* ctx, Avm2Object* parent, Avm2Object* ch
 	int child_was_on_stage = is_on_stage(ctx, child);
 	cext->place_frame = 0;
 	cext->parent = parent;
+	mark_attached(ctx, cext, parent);
 	render_insert_at_id(ctx, pext, child, index);
 	if (parent_changed)
 	{
@@ -928,8 +998,11 @@ static Avm2Object* display_alloc_instance(Avm2Context* ctx, Avm2Class* cls)
 	return obj;
 }
 
+static uint64_t g_gp_ctors_run_fwd;
+
 static void display_run_constructor(Avm2Context* ctx, Avm2Object* obj)
 {
+	g_gp_ctors_run_fwd++;
 	Avm2Class* cls = obj->cls;
 	Avm2TryFrame top;
 	avm2_try_push_catch_all(ctx, &top);
@@ -949,6 +1022,164 @@ static void run_frame_scripts_obj(Avm2Context* ctx, Avm2Object* obj);
 static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_implicit);
 static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj);
 static void set_on_parent_field(Avm2Context* ctx, Avm2Object* obj);
+
+// ---------------------------------------------------------------------------
+// Catch-up walk gate
+//
+// Ruffle runs a FULL stage + orphan walk (construct_frame, then
+// run_frame_scripts) for every explicit AVM2 goto — frame_lifecycle.rs
+// run_inner_goto_frame — and so do we. That is O(display tree) per
+// gotoAndStop, which turns any build loop that creates clips and gotos them
+// into O(n^2): Elephant Quest's Level.initTiles does `new Tile(); addChild;
+// gotoAndStop(type)` a few thousand times, and each goto re-walked every clip
+// created so far (measured: 60k nodes and ~35 ms per goto by tile ~4000,
+// with 94% of the nodes in the never-shrinking orphan list).
+//
+// The walks are pure no-ops on a node that is already constructed and
+// initialized, has no queued goto, and whose frame script (if any) has
+// already run for its current frame. So each node carries `walk_clean`: set
+// only at the end of a frame-script walk that found the node AND all of its
+// children quiescent, and cleared up the whole ancestor chain the moment a
+// node acquires work (creation, goto, queued script, re-parenting). A clean
+// node's subtree is skipped by both walks.
+//
+// Fail-safe by construction: `walk_clean` is zero-initialized, so a node
+// nobody accounts for is walked, exactly as before. Env AVM2_NO_WALK_SKIP=1
+// disables the gate (A/B and bisecting aid).
+// ---------------------------------------------------------------------------
+
+// Fast ext fetch for objects already known to be display objects (render-list
+// members, button states, orphan roots). avm2_display_ext_of's class_is_a walk
+// is the dominant cost of scanning a large child list, and every ext that
+// extends the display ext (Avm2LoaderExt) keeps it as its first member.
+static Avm2DisplayObjectExt* display_ext_fast(Avm2Object* obj)
+{
+	return (obj != NULL && obj->native_ext != NULL)
+		? (Avm2DisplayObjectExt*) obj->native_ext : NULL;
+}
+
+static int g_walk_skip = -1;
+
+static int walk_skip_on(void)
+{
+	if (g_walk_skip < 0)
+	{
+		const char* e = getenv("AVM2_NO_WALK_SKIP");
+		g_walk_skip = (e != NULL && e[0] != '\0' && e[0] != '0') ? 0 : 1;
+	}
+	return g_walk_skip;
+}
+
+// Mark `obj` and every ancestor as needing a walk. Stops as soon as it finds
+// a node already marked: by the invariant, that node's ancestors are marked
+// too. Re-parenting is the one operation that can break the invariant, so
+// every site that gives a node a parent re-marks through the new parent.
+void avm2_display_mark_frame_work(Avm2Context* ctx, Avm2Object* obj)
+{
+	while (obj != NULL)
+	{
+		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+		if (e == NULL || !e->walk_clean) return;
+		e->walk_clean = 0;
+		if (e->parent != NULL)
+		{
+			Avm2DisplayObjectExt* pe = avm2_display_ext_of(ctx, e->parent);
+			if (pe != NULL) pe->dirty_kids++;
+		}
+		else if (e->in_orphan_list)
+		{
+			orphan_dirty_push(ctx, obj);
+		}
+		obj = e->parent;
+	}
+}
+
+// A node that gains a parent re-enters the walk under a new ancestor chain,
+// which is the one operation the "stop at the first marked ancestor" shortcut
+// above cannot see. Dirty the child (cheap: at worst one extra subtree walk)
+// and mark up through its new parent.
+static void mark_attached(Avm2Context* ctx, Avm2DisplayObjectExt* cext,
+                          Avm2Object* parent)
+{
+	if (cext != NULL) cext->walk_clean = 0;
+	g_orphan_reparented++;
+	// The child is dirty under its NEW parent, whatever it was before.
+	if (parent != NULL)
+	{
+		Avm2DisplayObjectExt* pe = avm2_display_ext_of(ctx, parent);
+		if (pe != NULL) pe->dirty_kids++;
+	}
+	avm2_display_mark_frame_work(ctx, parent);
+}
+
+// True when the construct + frame-script walks would do nothing at all for
+// this node (its children are accounted for separately by the caller).
+// Mirrors, condition for condition, the work in construct_frame_obj and
+// run_local_frame_scripts.
+static int node_quiescent(Avm2DisplayObjectExt* e)
+{
+	if (!e->constructed || !e->initialized) return 0;
+	if (e->loop_queued) return 0;             // construct_frame_obj clears it
+	if (e->btn_weird_order) return 0;         // run_frame_scripts_obj clears it
+	if (e->queued_goto_frame >= 0) return 0;  // run_local_frame_scripts flushes
+	if (e->executing_frame_script) return 0;
+	// A pending frame script only does something when it is FRESH for the
+	// frame it is queued on (run_local_frame_scripts' is_fresh).
+	uint32_t f = e->queued_script_frame;
+	if (e->has_pending_script && f < e->frame_script_cap
+	    && e->frame_scripts[f].kind == AVM2_VALUE_OBJECT
+	    && e->last_queued_script_frame != (int32_t) f)
+	{
+		return 0;
+	}
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Goto-walk profiler (env AVM2_GOTO_PROF=1) — read-only instrumentation for
+// the AVM2 timeline catch-up path. Prints, per OUTERMOST inner-goto, how many
+// display nodes the construct / frame-script walks touched, how many nested
+// gotos they triggered, and the wall time. The counter that matters is
+// nodes-per-goto: if it climbs as the display tree grows, the catch-up is
+// super-linear in tree size (EQ init2 DOOR-build, plan gap #2b).
+// ---------------------------------------------------------------------------
+
+static int g_goto_prof = -1;
+static uint64_t g_gp_construct_nodes;
+static uint64_t g_gp_fs_nodes;
+static uint64_t g_gp_inner_calls;
+static uint64_t g_gp_goto_calls;
+static uint64_t g_gp_goto_ops;
+static uint64_t g_gp_scripts_run;
+static uint64_t g_gp_scan;
+static const char* g_gp_src_cls = "?";
+static int g_gp_src_frame;
+static int g_gp_src_noop;
+static int g_gp_depth;
+static int g_gp_max_depth;
+
+// AVM2_GOTO_PROF=1: a rolling summary every 1000 outer gotos (low overhead).
+// AVM2_GOTO_PROF=2: additionally one line per outer goto and per frame script.
+static int goto_prof_on(void)
+{
+	if (g_goto_prof < 0)
+	{
+		const char* e = getenv("AVM2_GOTO_PROF");
+		g_goto_prof = (e == NULL || e[0] == '\0' || e[0] == '0')
+			? 0 : (e[0] == '2' ? 2 : 1);
+	}
+	return g_goto_prof;
+}
+
+static double g_gp_total_ms, g_gp_total_w1, g_gp_total_w2;
+static uint64_t g_gp_outer;
+
+static double goto_prof_now_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (double) ts.tv_sec * 1000.0 + (double) ts.tv_nsec / 1.0e6;
+}
 
 // ---------------------------------------------------------------------------
 // Class resolution for characters
@@ -1121,6 +1352,7 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 	cext->instantiated_by_timeline = 1;
 	cext->depth = op->depth;
 	cext->parent = parent;
+	mark_attached(ctx, cext, parent);
 	cext->place_frame = pext->current_frame;
 	// Placed while the parent is still unconstructed (Ruffle: parent
 	// object2 not yet allocated): only Sprite.constructChildren during the
@@ -1282,6 +1514,9 @@ static void run_frame_internal(Avm2Context* ctx, Avm2Object* obj, int run_displa
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL || ext->timeline == NULL) return;
+	// The per-tick playhead advance below moves current_frame WITHOUT going
+	// through run_goto, so it needs its own catch-up walk mark.
+	avm2_display_mark_frame_work(ctx, obj);
 
 	int next = determine_next_frame(ext);
 	if (next == NEXT_FRAME_FIRST)
@@ -1430,6 +1665,9 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
+	// Catch-up walk gate: a clean subtree has nothing to construct.
+	if (ext->walk_clean && walk_skip_on()) return;
+	g_gp_construct_nodes++;
 	int is_load_frame = !ext->initialized;
 	int needs_construction = !ext->constructed;
 	ext->loop_queued = 0;
@@ -1474,10 +1712,13 @@ static void construct_frame_obj(Avm2Context* ctx, Avm2Object* obj)
 				if (states[s] != NULL) construct_frame_obj(ctx, states[s]);
 			}
 		}
-		for (uint32_t i = 0; i < ext->render_len; i++)
+		int scan_kids = (ext->dirty_kids != 0 || !walk_skip_on());
+		g_gp_scan += scan_kids ? ext->render_len : 0;
+		for (uint32_t i = 0; scan_kids && i < ext->render_len; i++)
 		{
-			Avm2DisplayObjectExt* cext =
-				avm2_display_ext_of(ctx, ext->render_list[i]);
+			Avm2DisplayObjectExt* cext = display_ext_fast(ext->render_list[i]);
+			// Cheap skip of a clean child, before any recursion.
+			if (cext != NULL && cext->walk_clean && walk_skip_on()) continue;
 			// While Sprite.constructChildren iterates this container, a
 			// nested construct pass (e.g. a no-op goto inside a child's
 			// ctor) must not construct the remaining children.
@@ -1575,6 +1816,14 @@ static void run_local_frame_scripts(Avm2Context* ctx, Avm2Object* obj)
 			ext->last_queued_script_frame = (int32_t) frame_id;
 			ext->has_pending_script = 0;
 			ext->executing_frame_script = 1;
+			g_gp_scripts_run++;
+			if (g_goto_prof >= 2)
+			{
+				fprintf(stderr, "[FS] %s@%u phase=%d\n",
+				        (obj->cls != NULL && obj->cls->name.name != NULL)
+					? obj->cls->name.name : "?",
+				        (unsigned) frame_id, (int) ctx->frame_phase);
+			}
 			Avm2TryFrame top;
 			avm2_try_push_catch_all(ctx, &top);
 			if (setjmp(top.jb) == 0)
@@ -1612,12 +1861,21 @@ static void run_frame_scripts_obj(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
+	int gate = walk_skip_on();
+	// Catch-up walk gate: a clean subtree has no frame script to run.
+	if (ext->walk_clean && gate) return;
+	g_gp_fs_nodes++;
 	run_local_frame_scripts(ctx, obj);
-	for (uint32_t i = 0; i < ext->render_len; i++)
+	int scan_kids = (ext->dirty_kids != 0 || ext->btn_weird_order || !gate);
+	if (scan_kids)
 	{
-		run_frame_scripts_obj(ctx, ext->render_list[i]);
-	}
-	{
+		g_gp_scan += ext->render_len;
+		for (uint32_t i = 0; i < ext->render_len; i++)
+		{
+			Avm2DisplayObjectExt* c = display_ext_fast(ext->render_list[i]);
+			if (c != NULL && c->walk_clean && gate) continue;
+			run_frame_scripts_obj(ctx, ext->render_list[i]);
+		}
 		// Normal order: hit, up, down, over; the one-shot "weird" order
 		// right after construction: up, over, down, hit (Ruffle
 		// all_state_children).
@@ -1632,6 +1890,31 @@ static void run_frame_scripts_obj(Avm2Context* ctx, Avm2Object* obj)
 			if (order[s] != NULL) run_frame_scripts_obj(ctx, order[s]);
 		}
 	}
+	if (!gate) return;
+	// This walk is the last of the pair, so it is where a subtree can be
+	// certified clean. The frame scripts above may have created/gotoed
+	// anything, so re-read the children rather than trusting the state they
+	// had when we recursed into them — that re-read doubles as the exact
+	// recount of dirty_kids.
+	if (scan_kids)
+	{
+		uint32_t nd = 0;
+		for (uint32_t i = 0; i < ext->render_len; i++)
+		{
+			Avm2DisplayObjectExt* c = display_ext_fast(ext->render_list[i]);
+			if (c == NULL || !c->walk_clean) nd++;
+		}
+		Avm2Object* states[4] = { ext->btn_hit, ext->btn_up, ext->btn_down,
+		                          ext->btn_over };
+		for (int s = 0; s < 4; s++)
+		{
+			if (states[s] == NULL) continue;
+			Avm2DisplayObjectExt* c = display_ext_fast(states[s]);
+			if (c == NULL || !c->walk_clean) nd++;
+		}
+		ext->dirty_kids = nd;
+	}
+	if (ext->dirty_kids == 0 && node_quiescent(ext)) ext->walk_clean = 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -1654,6 +1937,7 @@ static void run_frame_script_cleanup(Avm2Context* ctx)
 		if (ext == NULL) continue;
 		ext->has_pending_script = 1;
 		ext->last_queued_script_frame = -1;
+		avm2_display_mark_frame_work(ctx, obj);
 		run_local_frame_scripts(ctx, obj);
 	}
 	g_fs_cleanup_count = 0;
@@ -1670,28 +1954,109 @@ void avm2_display_inner_goto_frame(Avm2Context* ctx)
 	uint8_t old_phase = ctx->frame_phase;
 	g_fs_cleanup_count = 0;
 
-	ctx->frame_phase = PHASE_CONSTRUCT;
-	for (uint32_t i = 0; i < g_orphan_count; i++)
+	int prof = goto_prof_on();
+	double prof_t0 = 0.0;
+	uint64_t p_cn = 0, p_fn = 0, p_gc = 0, p_go = 0, p_sr = 0, p_cr = 0;
+	uint64_t p_scan = 0;
+	int prof_outer = 0;
+	if (prof)
 	{
-		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, g_orphans[i]);
-		if (e != NULL && e->parent == NULL) construct_frame_obj(ctx, g_orphans[i]);
+		g_gp_inner_calls++;
+		if (g_gp_depth == 0)
+		{
+			prof_outer = 1;
+			g_gp_max_depth = 0;
+			g_gp_inner_calls = 1;
+			prof_t0 = goto_prof_now_ms();
+			p_cn = g_gp_construct_nodes;
+			p_scan = g_gp_scan;
+			p_fn = g_gp_fs_nodes;
+			p_gc = g_gp_goto_calls;
+			p_go = g_gp_goto_ops;
+			p_sr = g_gp_scripts_run;
+			p_cr = g_gp_ctors_run_fwd;
+		}
+		g_gp_depth++;
+		if (g_gp_depth > g_gp_max_depth) g_gp_max_depth = g_gp_depth;
 	}
+
+	ctx->frame_phase = PHASE_CONSTRUCT;
+	for (uint32_t i = 0;
+	     i < (walk_skip_on() ? g_orphan_dirty_count : g_orphan_count); i++)
+	{
+		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
+		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+		construct_frame_obj(ctx, o);
+	}
+	uint64_t p_orph_nodes = g_gp_construct_nodes;
 	if (ctx->stage != NULL) construct_frame_obj(ctx, ctx->stage);
+	uint64_t p_stage_nodes = g_gp_construct_nodes - p_orph_nodes;
+	double t_walk1 = prof_outer ? goto_prof_now_ms() : 0.0;
 	broadcast_named(ctx, "frameConstructed");
+	double t_bc1 = prof_outer ? goto_prof_now_ms() : 0.0;
 
 	ctx->frame_phase = PHASE_FRAME_SCRIPTS;
 	if (ctx->stage != NULL) run_frame_scripts_obj(ctx, ctx->stage);
-	for (uint32_t i = 0; i < g_orphan_count; i++)
+	for (uint32_t i = 0;
+	     i < (walk_skip_on() ? g_orphan_dirty_count : g_orphan_count); i++)
 	{
-		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, g_orphans[i]);
-		if (e != NULL && e->parent == NULL) run_frame_scripts_obj(ctx, g_orphans[i]);
+		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
+		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+		run_frame_scripts_obj(ctx, o);
 	}
 	run_frame_script_cleanup(ctx);
+	double t_walk2 = prof_outer ? goto_prof_now_ms() : 0.0;
 
 	ctx->frame_phase = PHASE_EXIT;
 	broadcast_named(ctx, "exitFrame");
+	double t_bc2 = prof_outer ? goto_prof_now_ms() : 0.0;
 	orphan_cleanup(ctx);
 	ctx->frame_phase = old_phase;
+
+	if (prof)
+	{
+		g_gp_depth--;
+		if (prof_outer)
+		{
+			g_gp_total_ms += goto_prof_now_ms() - prof_t0;
+			g_gp_total_w1 += t_walk1 - prof_t0;
+			g_gp_total_w2 += t_walk2 - t_bc1;
+			if (++g_gp_outer % 1000 == 0)
+			{
+				fprintf(stderr,
+				        "[GOTOSUM] gotos=%llu total=%.1fs construct=%.1fs "
+				        "scripts=%.1fs scan=%lluk cnodes=%lluk orphans=%u\n",
+				        (unsigned long long) g_gp_outer, g_gp_total_ms / 1000.0,
+				        g_gp_total_w1 / 1000.0, g_gp_total_w2 / 1000.0,
+				        (unsigned long long) (g_gp_scan / 1000),
+				        (unsigned long long) (g_gp_construct_nodes / 1000),
+				        (unsigned) g_orphan_count);
+			}
+		}
+		if (prof_outer && prof >= 2)
+		{
+			fprintf(stderr,
+			        "[GOTOPROF] src=%s@%d%s ms=%.2f w1=%.2f bc1=%.2f w2=%.2f bc2=%.2f "
+			        "orphans=%u onodes=%llu snodes=%llu "
+			        "inner=%llu depth=%d cnodes=%llu "
+			        "fsnodes=%llu scan=%llu gotos=%llu tlops=%llu scripts=%llu ctors=%llu\n",
+			        g_gp_src_cls, g_gp_src_frame, g_gp_src_noop ? "(noop)" : "",
+			        goto_prof_now_ms() - prof_t0,
+			        t_walk1 - prof_t0, t_bc1 - t_walk1, t_walk2 - t_bc1,
+			        t_bc2 - t_walk2,
+			        (unsigned) g_orphan_count,
+			        (unsigned long long) (p_orph_nodes - p_cn),
+			        (unsigned long long) p_stage_nodes,
+			        (unsigned long long) g_gp_inner_calls, g_gp_max_depth,
+			        (unsigned long long) (g_gp_construct_nodes - p_cn),
+			        (unsigned long long) (g_gp_fs_nodes - p_fn),
+			        (unsigned long long) (g_gp_scan - p_scan),
+			        (unsigned long long) (g_gp_goto_calls - p_gc),
+			        (unsigned long long) (g_gp_goto_ops - p_go),
+			        (unsigned long long) (g_gp_scripts_run - p_sr),
+			        (unsigned long long) (g_gp_ctors_run_fwd - p_cr));
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1713,6 +2078,10 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL || ext->timeline == NULL) return;
 	const Avm2TimelineData* tl = ext->timeline;
+	g_gp_goto_calls++;
+	// The playhead, the queued script frame and the child set are all about
+	// to change: this subtree needs the catch-up walks again.
+	avm2_display_mark_frame_work(ctx, obj);
 
 	uint16_t frame_before = ext->current_frame;
 	ext->skip_next_enter_frame = 0;
@@ -1939,6 +2308,7 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 		}
 	}
 
+	g_gp_goto_ops += op_index;
 	(void) frame_before;
 	if (!is_implicit)
 	{
@@ -1958,9 +2328,17 @@ static void mc_goto_frame(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
+	if (g_goto_prof >= 2)
+	{
+		g_gp_src_cls = (obj->cls != NULL && obj->cls->name.name != NULL)
+			? obj->cls->name.name : "?";
+		g_gp_src_frame = (int) frame;
+		g_gp_src_noop = (frame == ext->current_frame);
+	}
 	if (stop) ext->playing = 0;
 	else ext->playing = 1;
 	if (frame < 1) frame = 1;
+	avm2_display_mark_frame_work(ctx, obj);
 	if (ext->executing_frame_script)
 	{
 		if (ctx->swf_version <= 9 && frame == ext->current_frame)
@@ -2421,10 +2799,12 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	}
 
 	ctx->frame_phase = PHASE_CONSTRUCT;
-	for (uint32_t i = 0; i < g_orphan_count; i++)
+	for (uint32_t i = 0;
+	     i < (walk_skip_on() ? g_orphan_dirty_count : g_orphan_count); i++)
 	{
-		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, g_orphans[i]);
-		if (e != NULL && e->parent == NULL) construct_frame_obj(ctx, g_orphans[i]);
+		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
+		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+		construct_frame_obj(ctx, o);
 	}
 	{
 		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, ctx->stage);
@@ -2443,10 +2823,12 @@ void avm2_display_run_tick(Avm2Context* ctx)
 			run_frame_scripts_obj(ctx, sext->render_list[i]);
 		}
 	}
-	for (uint32_t i = 0; i < g_orphan_count; i++)
+	for (uint32_t i = 0;
+	     i < (walk_skip_on() ? g_orphan_dirty_count : g_orphan_count); i++)
 	{
-		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, g_orphans[i]);
-		if (e != NULL && e->parent == NULL) run_frame_scripts_obj(ctx, g_orphans[i]);
+		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
+		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+		run_frame_scripts_obj(ctx, o);
 	}
 	run_frame_script_cleanup(ctx);
 
@@ -2551,6 +2933,7 @@ void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name)
 	rext->instantiated_by_timeline = 1;
 	rext->depth = 0;
 	rext->parent = stage;
+	mark_attached(ctx, rext, stage);
 	rext->name = avm2_string_from_literal(ctx, "root1");
 	ctx->root = root;
 	// Stage depth/render lists.
@@ -4364,6 +4747,7 @@ static Avm2Value mc_add_frame_script(Avm2Activation* act)
 			{
 				ext->last_queued_script_frame = -1;
 				ext->has_pending_script = 1;
+				avm2_display_mark_frame_work(ctx, this_obj(act));
 			}
 		}
 	}
@@ -6239,6 +6623,7 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
 		Avm2Object* child = children[0];
 		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
 		cext->parent = button;
+		mark_attached(ctx, cext, button);
 		set_default_instance_name(ctx, cext);
 		enter_frame_obj(ctx, child);
 		construct_frame_obj(ctx, child);
@@ -6252,6 +6637,7 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
 	g_timeline_instantiation = 0;
 	Avm2DisplayObjectExt* wext = avm2_display_ext_of(ctx, wrapper);
 	wext->parent = button;
+	mark_attached(ctx, wext, button);
 	for (uint32_t i = 0; i < n; i++)
 	{
 		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, children[i]);
@@ -6260,10 +6646,12 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
 		// non-container), so `parent` reads null from the ctor
 		// (simplebutton_childprops); the wrapper becomes parent after.
 		cext->parent = button;
+		mark_attached(ctx, cext, button);
 		set_default_instance_name(ctx, cext);
 		enter_frame_obj(ctx, children[i]);
 		construct_frame_obj(ctx, children[i]);
 		cext->parent = wrapper;
+		mark_attached(ctx, cext, wrapper);
 	}
 	construct_frame_obj(ctx, wrapper);
 	return wrapper;
@@ -6302,6 +6690,7 @@ static void button_construct_states(Avm2Context* ctx, Avm2Object* button)
 			dispatch_simple_event(ctx, sext->render_list[i], "added", 1);
 		}
 		sext->parent = old_parent;
+		mark_attached(ctx, sext, old_parent);
 	}
 	if (ext->btn_up != NULL)
 	{
@@ -6325,6 +6714,7 @@ static void button_construct_states(Avm2Context* ctx, Avm2Object* button)
 	{
 		Avm2DisplayObjectExt* uext = avm2_display_ext_of(ctx, ext->btn_up);
 		if (uext != NULL) uext->parent = button;
+		mark_attached(ctx, uext, button);
 	}
 
 	// A MovieClip in the up state (SWF>9) makes avmplus run a NESTED
@@ -6414,6 +6804,7 @@ static Avm2Value btn_state_set(Avm2Activation* act, size_t off)
 		if (is_cur_state && vext != NULL)
 		{
 			vext->parent = button;
+			mark_attached(ctx, vext, button);
 		}
 	}
 	if (old != NULL && old != v)
@@ -7011,6 +7402,17 @@ void avm2_display_gc_prune_dead_orphans(void)
 		if (avm2_gc_is_marked(g_orphans[i])) g_orphans[w++] = g_orphans[i];
 	}
 	g_orphan_count = w;
+	// The candidate list aliases the same objects: an unmarked entry is
+	// about to be freed, so it must go too.
+	w = 0;
+	for (uint32_t i = 0; i < g_orphan_dirty_count; i++)
+	{
+		if (avm2_gc_is_marked(g_orphan_dirty[i]))
+		{
+			g_orphan_dirty[w++] = g_orphan_dirty[i];
+		}
+	}
+	g_orphan_dirty_count = w;
 }
 
 // Ext tracer: a DisplayObject's ext holds indirect object edges the
