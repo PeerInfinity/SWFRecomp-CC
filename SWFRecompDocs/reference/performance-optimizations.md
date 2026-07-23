@@ -7,6 +7,12 @@ measurement rules. Compiled 2026-07-20 at the close of the playability arc;
 §3 (display-tree/timeline walks) added 2026-07-22 with the Elephant Quest
 bring-up.
 
+**Ruffle relationship:** which of these Ruffle already has, which it could
+adopt, which its architecture forecloses, and which are AOT-only — see
+[`performance-optimizations-vs-ruffle.md`](performance-optimizations-vs-ruffle.md)
+(analysis session prompted by
+[`../prompts/perf-optimizations-ruffle-applicability.md`](../prompts/perf-optimizations-ruffle-applicability.md)).
+
 **Where the detailed records live:** per-lever A/B logs with full method are
 `tools/divergence/perf/RWK_AB_STATUS.md` (RWK/AVM2 base-compute arc) and
 `tools/divergence/perf/SEEDLING_AB_STATUS.md` (Seedling/AVM2 arc); AVM1-era
