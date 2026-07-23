@@ -3,7 +3,9 @@
 A catalog of every shipped performance optimization in SWFRecomp (recompiler)
 and SWFModernRuntime (runtime), with mechanism, layer, measured impact, and
 kill switches — plus the attempted-and-rejected list and the binding
-measurement rules. Compiled 2026-07-20 at the close of the playability arc.
+measurement rules. Compiled 2026-07-20 at the close of the playability arc;
+§3 (display-tree/timeline walks) added 2026-07-22 with the Elephant Quest
+bring-up.
 
 **Where the detailed records live:** per-lever A/B logs with full method are
 `tools/divergence/perf/RWK_AB_STATUS.md` (RWK/AVM2 base-compute arc) and
@@ -20,7 +22,7 @@ render. Seedling's arc alone went ~280 ms/frame → ~20 ms (~14x); RWK's went
 > **Reading impact numbers:** rig (browser) absolutes are only comparable
 > within one session — every ratio below is a same-session interleaved A/B.
 > "Ir" is native callgrind instruction count, a proxy that repeatedly failed
-> to predict wall-clock (see §6).
+> to predict wall-clock (see §7).
 
 ---
 
@@ -82,19 +84,67 @@ AVM1 side: the 2026-07-04 reclamation arc (`700e02a3a`..`ee0805363`) gave
 AVM1 its own default-on root-traced mark-sweep collector plus targeted leak
 fixes — primarily a correctness/footprint effort; see the commit chain.
 
-## §3 AVM1 runtime & shared per-frame path
+## §3 AVM2 — display tree & timeline walks
+
+The only arc so far where we beat Ruffle by **algorithm** rather than by
+constant factor: Ruffle runs the same walk we did, and its own watchdog kills
+it on the title that motivated the work.
+
+| Optimization | Commit | Mechanism | Impact |
+|---|---|---|---|
+| goto catch-up walk gate | `6fefd4552` | [RT] `avm2_display.c`: skip construct / frame-script catch-up on subtrees with no pending work. `walk_clean` per node (set only by a frame-script walk that found the node AND all children quiescent; cleared up the whole ancestor chain on creation, goto, playhead advance, queued script, re-parent), `dirty_kids` per container (skip the child loop outright; recounted exactly during the walk), a dirty-orphan candidate list + `in_orphan_list` + amortized orphan compaction, and `display_ext_fast` (skips `avm2_display_ext_of`'s `class_is_a` walk for nodes already known to be display objects) | Elephant Quest `init2()`: **>1000 s projected (never completed) → 6.2 s**, byte-identical trace; 1200 ticks of live gameplay in 8.0 s |
+
+**The trap.** Every explicit AVM2 goto — including a *no-op* goto to the frame
+you are already on — runs a full stage + orphan catch-up pass (Ruffle
+`frame_lifecycle.rs::run_inner_goto_frame`; ours
+`avm2_display_inner_goto_frame`). Any `new Clip(); addChild(c);
+c.gotoAndStop(n)` build loop is therefore **O(n²)**. Elephant Quest's
+`Level.initTiles` runs that loop a few thousand times.
+
+**Where the cost actually was** (`AVM2_GOTO_PROF`, see §8): by tile ~4000 one
+goto walked **60,952 nodes in ~35 ms** — but the *stage* subtree was small and
+constant (~3.7k nodes). **94% of the nodes were the orphan list**, which grew
+to **27,661 entries** and was scanned **three times per goto** (construct loop,
+frame-script loop, `orphan_cleanup`); `orphan_add`'s linear membership scan was
+quadratic in its own right. A stack sampler had already named the hot function
+in a prior session and still pointed at the wrong input — see rule 7 in §7.
+
+**Why "match Ruffle" was the wrong instinct.** Ruffle's `goto_frame` /
+`no_op_goto` / `run_inner_goto_frame` do the same full walk (read, not assumed).
+Ruffle survives on a ~20-40x smaller per-node constant and *still* takes ~18 s
+here, which is exactly why its 15 s `max_execution_duration` watchdog aborts the
+build. Aligning with the reference implementation would have capped us at
+Ruffle's number; the gate is what clears it.
+
+**Safety design.** `walk_clean` is zero-initialized, so any node nobody accounts
+for is walked exactly as before — a missed *mark* is a bug, a missed *certify*
+is only slower. The marks that are easy to miss: `run_frame_internal` advances
+`current_frame++` **without** going through `run_goto` (that one broke the boot
+until marked), and every site that gives a node a parent (10 of them —
+re-parenting is the one thing the "stop at the first marked ancestor" shortcut
+cannot see). Graded by `regression/avm2_goto_catchup_scale` (0.32 s with the
+gate, harness TIMEOUT without — verified failing) and by full CI in **both**
+modes: avm2 827/1215 and avm1 635/711 at a 0 delta, every other suite 0 delta.
+
+**Known residual.** A dirty container still re-scans its whole render list to
+find the one dirty child, so the child scan is O(n²) with a small constant
+(~1.7 s of EQ's total; harmless there). Removing it needs an *ordered*
+dirty-child structure, because frame-script execution order must stay
+render-list order — a plain dirty list would reorder scripts.
+
+## §4 AVM1 runtime & shared per-frame path
 
 | Optimization | Commit(s) | Mechanism | Impact |
 |---|---|---|---|
 | property-name hash gate + per-object hash index | `537951f4f`, `e13388a18` (2026-06-01) | hash-gate `object.c` property-name compares, then a per-object hash index + hash-once proto walks | −35% then −49% total instructions on Doodle Jump |
 | per-frame-walk MC resolution cache | `6308c4a03` | memoize resolved `MovieClip*` on the `DisplayObject`; hot walk sites revalidate the same predicate the resolver keys on. The 5 per-frame tree walks were ~59% of Minesweeper Ir (O(nodes × cache_size) string scans) | −38% Minesweeper tick cost |
-| event-driven enterFrame-walk pruning | `5f2530446` | the two pure-recursion enterFrame walks maintained event-driven instead of re-walked per tick (a shelved full-tree-recompute variant cost ~10% in NO_GRAPHICS — see §5) | −14% further |
+| event-driven enterFrame-walk pruning | `5f2530446` | the two pure-recursion enterFrame walks maintained event-driven instead of re-walked per tick (a shelved full-tree-recompute variant cost ~10% in NO_GRAPHICS — see §6) | −14% further |
 | N button-hover walk gate | `b3e45b9e2` | per-frame button-hover walk runs only on mouse-move | N-specific tick cost |
 | syncVarToTextFields fast-reject | `ca31201a1` | unbound var writes skip the textfield scan | −19% Ir |
 | ASCII fast path in name matching | `b7f1a1759` | `prop_name_match`/`swf_name_match` skip per-char UTF-8 decode for ASCII | leaf-cost cut under all walks |
 | findOrCreateMovieClip cache-scan cut | `65b09ad64` | cheapen the child-MC cache scan (hottest function on N) | N tick cost |
 
-## §4 Renderer / GPU
+## §5 Renderer / GPU
 
 | Optimization | Commit | Mechanism | Impact |
 |---|---|---|---|
@@ -103,7 +153,7 @@ fixes — primarily a correctness/footprint effort; see the commit chain.
 | fs_main fill-type specialization | `3d2ea1b5c` | per-fill-type fragment shader variants; solid fills do zero texture ops | pixel-identical (no measurable SwiftShader win; kept as real-GPU hygiene) |
 | writeTexture sub-region upload | `4a3b0bdb2` | upload only the source sub-rect, not the full padded atlas layer (Seedling uploaded 11.49 MB/frame for 102 KB of data) | 110.8x less upload; present latency 11.45 → 0.68 ms; fps unchanged (upload was off the critical path) |
 
-## §5 Attempted, rejected, or ruled out
+## §6 Attempted, rejected, or ruled out
 
 Recorded dead ends are as load-bearing as the wins — several were killed by
 arithmetic *before* being built, which is the arc's core method lesson.
@@ -117,9 +167,9 @@ arithmetic *before* being built, which is the arc's core method lesson.
 | call devirtualization (Seedling step 5) | gated out pre-build: prize <1 ms (calls already IC'd; static calls never miss) |
 | non-`this` instance-slot GET spec | gated out at census: top-5 GET drivers had 0 newly-specializable sites |
 | `ABC_OPT=-O2/-O3` on generated TUs | noise-identical to -O1; the wasm multiplier is not a compile-flag artifact |
-| AVM1 full-tree subtree-pruning recompute | shelved: the per-tick bottom-up recompute scanned to depth ~16,400 (attachMovie +16384 bias) → ~10% CI overhead; superseded by the event-driven re-port (§3) |
+| AVM1 full-tree subtree-pruning recompute | shelved: the per-tick bottom-up recompute scanned to depth ~16,400 (attachMovie +16384 bias) → ~10% CI overhead; superseded by the event-driven re-port (§4) |
 
-## §6 Measurement rules (binding — every A/B above followed these)
+## §7 Measurement rules (binding — every A/B above followed these)
 
 1. **Ir is not time.** Levers 5 and 6 turned −13.1% / −5.2% Ir into ~1.1x /
    nothing; lever 7 turned ~60% into 2.59x (high-CPI pointer-chasing).
@@ -138,12 +188,18 @@ arithmetic *before* being built, which is the arc's core method lesson.
    verify build (`-DAVM2_*_VERIFY` dual-run + abort) and/or a frame/trace
    oracle (TAS input, `AVM2_CPU_DUMP` sha256), plus full-suite CI in both
    normal and verify modes.
-6. **FRESH=1 after any widely-included struct change** — incremental wasm
+6. **A stack sampler names the function; only a counter names the growing
+   input.** EQ's hotspot was sampled correctly in one session (gdb SIGINT →
+   `run_frame_scripts_obj`) and still pointed at the wrong fix, because the
+   growing input was the orphan list, not the tree the function walks. Before
+   fixing an O(n²), instrument *which* n — an env-gated counter that splits the
+   candidate inputs (§3's orphan-vs-stage node split) is cheap and decisive.
+7. **FRESH=1 after any widely-included struct change** — incremental wasm
    builds ignore header deps and ship silently ABI-broken binaries; the
    `.o` cache also keys on mtime, not `-D` flags, so A/B toggle builds need
    fresh builds too.
 
-## §7 Kill switches & toggles (quick reference)
+## §8 Kill switches & toggles (quick reference)
 
 | Toggle | Effect |
 |---|---|
@@ -154,6 +210,8 @@ arithmetic *before* being built, which is the arc's core method lesson.
 | `AVM2_GC=0` / `AVM2_GC_STRESS=1` | env: GC off / collect every tick (correctness gate) |
 | `AVM2_GC_ADAPTIVE=0`, `AVM2_GC_WATERMARK`, `AVM2_GC_MAX_ENROLL`, `AVM2_GC_SWEEP_BUDGET` | env: watermark/cadence/sweep-budget controls (tier 1/2) |
 | `AVM2_HEAP_STATS=1`, `AVM2_GC_TIME=1` | env: live allocation / per-collect phase telemetry |
+| `AVM2_NO_WALK_SKIP=1` | env: disable the goto catch-up walk gate (§3) — the A/B and bisect switch |
+| `AVM2_GOTO_PROF=1` / `=2` | env: rolling `[GOTOSUM]` per 1000 gotos (wall time split, nodes walked, children scanned, orphan count) / per-goto `[GOTOPROF]` + `[FS]` lines |
 | `-DAVM2_SLOT_VERIFY`, `-DAVM2_ARITH_VERIFY` | verify builds: dual-run old+new path, abort on divergence |
 | `SWFRECOMP_DUMP_FINGERPRINTS`, `SWFRECOMP_FP_DISASM=1` | recompiler: fingerprint report / pool-resolved disassembly |
 
