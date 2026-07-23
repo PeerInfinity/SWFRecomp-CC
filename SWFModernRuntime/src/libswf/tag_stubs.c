@@ -847,8 +847,10 @@ void ng_fire_pending_loads(SWFAppContext* app_context)
 
 // ---------------------------------------------------------------------------
 // Helper: initialize cx_* from cxform_data (percentage format: 100.0 = normal)
+// Non-static: tag.c's init_cx_fields browser arm also populates entries from
+// it (browser-WASM skips ng_on_place_object2 on most placement paths).
 // ---------------------------------------------------------------------------
-static void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id)
+void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id)
 {
 	float* cx = &cxform_data[cxform_id * 20];
 	obj->cx_ra = (double)(int16_t)roundf(cx[0]  * 256.0f) * 100.0 / 256.0;

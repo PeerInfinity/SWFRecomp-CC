@@ -386,6 +386,8 @@ size_t ng_objRootDepth(DisplayObject* obj);
 int ng_getMatrixFromObj(DisplayObject* obj, double* out_a, double* out_b, double* out_c, double* out_d, double* out_tx, double* out_ty);
 int ng_getMatrixFromObj_render(DisplayObject* obj, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
 int ng_getCTFromObj(DisplayObject* obj, double* ra, double* ga, double* ba, double* aa, double* rb, double* gb, double* bb, double* ab);
+// Populate a display entry's cx_* fields from the baked cxform_data slot.
+void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id);
 int ng_setCTOnObj(DisplayObject* obj, double ra, double ga, double ba, double aa, double rb, double gb, double bb, double ab);
 int ng_getObjFilterData(DisplayObject* obj, u8* type, float* blur_x, float* blur_y,
     u8* quality, u8* flags, float* r, float* g, float* b, float* a,

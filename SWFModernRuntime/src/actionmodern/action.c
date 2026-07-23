@@ -9044,15 +9044,11 @@ static ActionVar transformMatrixGetter(SWFAppContext* app_context, ActionVar* ar
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
 	if (!flashGeomClassAvailable("Matrix", 6)) return r;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	double a, b, c, d, tx, ty;
 	getLocalMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
 	ASObject* mat = makeMatrixObject(app_context, a, b, c, d, tx, ty);
 	r.type = ACTION_STACK_VALUE_OBJECT;
 	r.data.numeric_value = (u64) mat;
-#else
-	(void)app_context;
-#endif
 	return r;
 }
 
@@ -9069,7 +9065,6 @@ static ActionVar transformMatrixSetter(SWFAppContext* app_context, ActionVar* ar
 	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
 	ASObject* mat_obj = (ASObject*) args[0].data.numeric_value;
 	if (!getProperty(mat_obj, "a", 1)) return undef;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	double a  = propToDouble(mat_obj, "a",  1);
 	double b  = propToDouble(mat_obj, "b",  1);
 	double c  = propToDouble(mat_obj, "c",  1);
@@ -9103,7 +9098,6 @@ static ActionVar transformMatrixSetter(SWFAppContext* app_context, ActionVar* ar
 	mc->exact_m_rot = mc->rotation; mc->exact_m_skew = mc->skew;
 	mc->has_exact_matrix = 1;
 	markTransformedByScript(mc);
-#endif
 	return undef;
 }
 
@@ -9118,15 +9112,11 @@ static ActionVar transformCTGetter(SWFAppContext* app_context, ActionVar* args, 
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
 	if (!flashGeomClassAvailable("ColorTransform", 14)) return r;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	getLocalCTRaw(mc, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
 	ASObject* ct = makeCTObject(app_context, ra, ga, ba, aa, rb, gb, bb, ab);
 	r.type = ACTION_STACK_VALUE_OBJECT;
 	r.data.numeric_value = (u64) ct;
-#else
-	(void)app_context;
-#endif
 	return r;
 }
 
@@ -9143,11 +9133,9 @@ static ActionVar transformCTSetter(SWFAppContext* app_context, ActionVar* args, 
 	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
 	ASObject* ct_obj = (ASObject*) args[0].data.numeric_value;
 	if (!getPropertyWithPrototype(ct_obj, "redMultiplier", 13)) return undef;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	ctObjToRaw(ct_obj, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
 	setLocalCTRaw(mc, ra, ga, ba, aa, rb, gb, bb, ab);
-#endif
 	return undef;
 }
 
@@ -10920,6 +10908,31 @@ static ActionVar colorGetTransform(SWFAppContext* app_context, ActionVar* args, 
 			bb = (double)_mc->cx_bb; ab = (double)_mc->cx_ab;
 		}
 	}
+#else
+	// Browser-WASM: resolve the bound clip (pointer-first — names can be
+	// ambiguous, see colorGetTargetMC) and read the same sources the browser
+	// setTransform/setRGB arms write: the display entry when one resolves,
+	// else the MC's cx_* mirror (dynamic clips).
+	{
+		MovieClip* _mc = colorGetTargetMC(app_context, obj);
+		if (!_mc) {
+			ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			return undef;
+		}
+		DisplayObject* _entry = (DisplayObject*)_mc->display_obj;
+		if (_entry == NULL) _entry = resolveMCDisplayEntry(_mc);
+		// Only trust entry cx_* when a cxform was actually applied (render's
+		// own condition) — an attached clip's zero-initialized slot would
+		// otherwise read as all-zero multipliers instead of identity.
+		if (_entry == NULL || !(_entry->cx_overridden || _entry->has_cxform)
+		    || !ng_getCTFromObj(_entry, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) {
+			ra = (double)_mc->cx_ra; ga = (double)_mc->cx_ga;
+			ba = (double)_mc->cx_ba; aa = (double)_mc->cx_aa;
+			rb = (double)_mc->cx_rb; gb = (double)_mc->cx_gb;
+			bb = (double)_mc->cx_bb; ab = (double)_mc->cx_ab;
+		}
+	}
+	(void)name;
 #endif
 
 	ASObject* result = allocObject(app_context, 10);
@@ -11017,6 +11030,14 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 		_mc->cx_ra = (float)ra; _mc->cx_ga = (float)ga; _mc->cx_ba = (float)ba; _mc->cx_aa = (float)aa;
 		_mc->cx_rb = (float)rb; _mc->cx_gb = (float)gb; _mc->cx_bb = (float)bb; _mc->cx_ab = (float)ab;
 		mcSyncColorToDisplayObj(_mc);
+		// mcSyncColorToDisplayObj only reaches clips with a linked display_obj
+		// (attached/nested); a root-timeline clip's entry is resolved by the
+		// name walk instead — write it so the tint renders (the cx_overridden
+		// pass allocates a dynamic cxform slot) and getTransform reads it back.
+		if (_mc->display_obj == NULL) {
+			DisplayObject* _entry = resolveMCDisplayEntry(_mc);
+			if (_entry) ng_setCTOnObj(_entry, ra, ga, ba, aa, rb, gb, bb, ab);
+		}
 	}
 	(void)name;
 #endif
@@ -17309,7 +17330,6 @@ static int textFormatSetProperty(SWFAppContext* app_context, ASObject* obj, cons
 
 static void initTextFormatPrototype(SWFAppContext* app_context);
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Create a TextFormat object populated from a textfield's metadata.
 // If tf_idx < 0, returns a TextFormat with default values (for dynamic/non-EditText fields).
 // If is_new_text_format is true, always populates all properties (getNewTextFormat behavior).
@@ -17555,7 +17575,6 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 
 	return tf_obj;
 }
-#endif
 
 static ASFunction g_textformat_fn_getTextExtent;
 
@@ -26081,19 +26100,27 @@ static void mcSyncColorToDisplayObj(MovieClip* mc) {
 
 static float mcReadAlpha(MovieClip* mc) {
 	if (mc == NULL) return 100.0f;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Only trust the entry's cx_aa when a placement CXFORM was actually applied
 	// (has_cxform): ng_init_cxform_from_data populates cx_aa from cxform_data
 	// only then, so a no-cxform entry's cx_aa is an uninitialized 0 that would
 	// wrongly read as _alpha=0 (regressed movieclip_library_state_values /
 	// MovieClip-v5..v8). Without a placement CXFORM, mc->alpha is authoritative.
 	DisplayObject* _obj = (DisplayObject*)mc->display_obj;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM: mc->display_obj is not linked for timeline placements, but
+	// ng_on_place_object2 populated the display entry's cx_* from cxform_data
+	// in every build mode — resolve the entry by name and read the same source
+	// the renderer composes from.
+	if (_obj == NULL && mc->name[0] != '\0') {
+		size_t _d = ng_findDisplayEntryByName(mc->name);
+		if (_d != SIZE_MAX) _obj = &display_list[_d];
+	}
+#endif
 	if (!(mc->as_set_flags & 32) && _obj != NULL && _obj->has_cxform) {
 		double _ra, _ga, _ba, _aa, _rb, _gb, _bb, _ab;
 		if (ng_getCTFromObj(_obj, &_ra, &_ga, &_ba, &_aa, &_rb, &_gb, &_bb, &_ab))
 			return (float)_aa;
 	}
-#endif
 	return mc->alpha;
 }
 
@@ -43227,7 +43254,6 @@ void actionGetProperty(SWFAppContext* app_context)
 
 	switch (prop_index) {
 		case 0:  // _x
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
 			if (mc && !(mc->as_set_flags & 1)) {
 				size_t _dep = ng_findDisplayEntryByName(mc->name);
@@ -43239,11 +43265,9 @@ void actionGetProperty(SWFAppContext* app_context)
 					}
 				}
 			}
-#endif
 			{ double _dx = mc ? round((double)mc->x * 20.0) / 20.0 : 0.0;
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx)); return; }
 		case 1:  // _y
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
 			if (mc && !(mc->as_set_flags & 2)) {
 				size_t _dep = ng_findDisplayEntryByName(mc->name);
@@ -43255,19 +43279,14 @@ void actionGetProperty(SWFAppContext* app_context)
 					}
 				}
 			}
-#endif
 			{ double _dy = mc ? round((double)mc->y * 20.0) / 20.0 : 0.0;
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy)); return; }
 		case 2:  // _xscale
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
-#endif
 			value = mc ? mc->xscale : 100.0f;
 			break;
 		case 3:  // _yscale
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
-#endif
 			value = mc ? mc->yscale : 100.0f;
 			break;
 		case 4:  // _currentframe
@@ -43289,9 +43308,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			if (mc) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); value = (float)_eh; } else { value = 0.0f; }
 			break;
 		case 10: // _rotation
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
-#endif
 			value = mc ? mc->rotation : 0.0f;
 			break;
 		case 11: // _target
@@ -43508,9 +43525,7 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 {
 	// Peek at the type without modifying value
 	u8 type = STACK_TOP_TYPE;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	u64 typeof_val = VAL(u64, &STACK_TOP_VALUE);
-#endif
 
 	// Pop the value
 	POP();
@@ -43542,7 +43557,6 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 			break;
 
 		case ACTION_STACK_VALUE_MOVIECLIP:
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// In Flash, text fields and buttons return "object" for typeof,
 			// only actual sprites/movieclips return "movieclip".
 			// Exception: in SWF5 the TextField class didn't exist yet, so
@@ -43570,7 +43584,6 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
-#endif
 			type_str = "movieclip";
 			break;
 
@@ -67073,7 +67086,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 13 && strncasecmp(method_name, "getTextFormat", 13) == 0)
 		{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			int tf_idx = mc->ng_textfield_idx;
 			// getTextFormat(beginIndex, endIndex): if range is zero-length, return all-null
 			int force_null = 0;
@@ -67220,15 +67232,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			result.type = ACTION_STACK_VALUE_OBJECT;
 			result.data.numeric_value = (u64) tf;
 			pushVar(app_context, &result);
-#else
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-#endif
 			return;
 		}
 		else if (method_name_len == 16 && strncasecmp(method_name, "getNewTextFormat", 16) == 0)
 		{
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			int tf_idx = mc->ng_textfield_idx;
 			// Compute HTML-aware alignment override (SWF7/SWF8 behavior differ)
 			int html_align_override_ntf = -1; // default: use tag-defined align
@@ -67267,10 +67274,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			result.type = ACTION_STACK_VALUE_OBJECT;
 			result.data.numeric_value = (u64) tf;
 			pushVar(app_context, &result);
-#else
-			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
-#endif
 			return;
 		}
 		else if (method_name_len == 10 && strncasecmp(method_name, "replaceSel", 10) == 0)

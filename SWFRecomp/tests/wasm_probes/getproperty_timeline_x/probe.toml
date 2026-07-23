@@ -1,5 +1,4 @@
 golden_source = "ruffle"
-known_red = true
 trace_prefix = "PROBE:"
 ruffle_skipframes = 2
 settle_seconds = 2.0

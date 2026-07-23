@@ -7096,6 +7096,16 @@ static void init_cx_fields(DisplayObject* obj)
 	obj->cx_ra = obj->cx_ga = obj->cx_ba = obj->cx_aa = 100.0;
 	obj->cx_rb = obj->cx_gb = obj->cx_bb = obj->cx_ab = 0.0;
 	obj->cx_overridden = 0;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM: ng_on_place_object2 (which populates cx_* from
+	// cxform_data on the native paths) is skipped on most placement paths
+	// here, leaving cx_* at identity while the renderer applies the
+	// placement cxform through cxform_id. Populate the CPU-side values so
+	// AS reads (_alpha, Color.getTransform) see the effective placement
+	// cxform. Render-neutral: cx_* is only composed when cx_overridden.
+	if (obj->has_cxform && obj->cxform_id != 0)
+		ng_init_cxform_from_data(obj, obj->cxform_id);
+#endif
 }
 
 // Pending clip actions to attach before eager init runs — set by WithClipActions variants
