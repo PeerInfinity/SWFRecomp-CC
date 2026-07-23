@@ -3,6 +3,13 @@ build/
 build-*/
 build_*/
 out/
+# The build-dir patterns above must never swallow vendored-library sources.
+# They already did once: SDL3's include/build_config/ matched `build_*/` and
+# was silently dropped from the 2025-11-05 submodule flatten, breaking CMake
+# USE_WEBGPU native configure (found by the 2026-07-23 native-windowed
+# assessment). Build artifacts under lib/ stay ignored via the extension
+# patterns below (*.o, *.a, ...), which come later and therefore still win.
+!lib/SDL3/**
 RecompiledTags/
 RecompiledScripts/
 *.swf
