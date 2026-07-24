@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-24T21:33:55.137143+00:00",
-    "old_git_sha": "127a5f4d39dc34915d1ef6a35d705cb8fa54008b",
-    "new_timestamp": "2026-07-24T22:06:49.422577+00:00",
-    "new_git_sha": "2cf4014fd6724a9b22415b88ba0adb9053818ff1",
+    "old_timestamp": "2026-07-24T22:06:49.422577+00:00",
+    "old_git_sha": "2cf4014fd6724a9b22415b88ba0adb9053818ff1",
+    "new_timestamp": "2026-07-24T23:01:01.359964+00:00",
+    "new_git_sha": "17c19040c9cdab632c3d092d5fd87245d2fc8abd",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 159,
@@ -13,11 +16,11 @@
     "old_effective_pass": 171,
     "old_total": 229,
     "old_pass_rate": 69.4,
-    "new_pass": 159,
+    "new_pass": 152,
     "new_ruffle_matched": 12,
-    "new_effective_pass": 171,
-    "new_total": 229,
-    "new_pass_rate": 69.4,
+    "new_effective_pass": 164,
+    "new_total": 222,
+    "new_pass_rate": 68.5,
     "old_mismatched_lines": 943,
     "new_mismatched_lines": 943,
     "increased_mismatches": 0,
@@ -25,9 +28,95 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 229,
+    "unchanged": 222,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 7
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "timeline/scene/Scene_1_MainTimeline",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 70,
+        "expected_lines": 70,
+        "matching_lines": 70
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_2_MovieClipTimeline",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 70,
+        "expected_lines": 70,
+        "matching_lines": 70
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_3_GotoAndStop_LabelScene",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_4_GotoAndStop_FrameScene",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_5_GotoAndPlay_LabelScene",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_6_GotoAndPlay_FrameScene",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 40
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_7_NextPrevScene",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    }
+  ]
 }
