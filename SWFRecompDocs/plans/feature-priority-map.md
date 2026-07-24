@@ -81,10 +81,15 @@ else (`getFullYear`, `setMonth`, `getTimezoneOffset`, the `UTC` statics,
 `Date.parse`, the ES3 string formats, the 2-through-7-argument constructor)
 is absent, and each missing method blanks a whole test file.
 
-Cost is bounded and known: ECMA-262 §15.9 is fully specified, AVM1 already
-has a complete Date implementation to port semantics from, and the test
-determinism story is already solved (`MOCK_DATE_TIME`). No display-list,
-no rendering, no new opcodes.
+Cost is bounded and known. ECMA-262 §15.9 is fully specified; the test
+determinism story is already solved (`MOCK_DATE_TIME`); and **AVM1 already
+has a complete Date** — `SWFModernRuntime/src/actionmodern/date.c`, 1014
+lines, 38 methods including the whole `getUTC*`/`setUTC*` family and
+`getTimezoneOffset`. The arc is largely "expose that engine as an AVM2
+class", plus the AS3-only surface (`Date.parse`, `Date.UTC`, the
+multi-argument constructor, the AS3 accessor properties, and the
+`toLocale*`/`toUTCString` formats). No display list, no rendering, no new
+opcodes.
 
 ### 2. String/Unicode semantics — ~102 tests · SMALL arc · **best ratio in the corpus**
 
@@ -93,13 +98,23 @@ the same three assertions** (16/21 or 17/21 lines match, uniformly):
 
 | Assertion | Expected | We produce | Fix |
 |---|---|---|---|
-| `String.search()` / `search(undefined)` | `-1` | `0` | no-arg / undefined pattern must not match |
-| `String.match()` / `match(undefined)` | `null` | `""` | ditto, returning null |
+| `String.search()` / `search(undefined)` | `-1` | `0` | coerce the pattern to a **string** first |
+| `String.match()` / `match(undefined)` | `null` | `""` | same coercion; non-global no-match returns `null` |
 | `String.split('')` | 128 elements | **256** | split by UTF-16 code unit, not UTF-8 byte |
 
-The split bug is the interesting one: for U+0080..U+00FF each character is
-two UTF-8 bytes, so we return exactly double. It is a real correctness bug
-in AVM2 string indexing, not just a test artifact.
+The first two are one bug. Ruffle (`globals/string.rs::search`,
+`match_internal`) does `pattern.coerce_to_string()` before constructing the
+implicit RegExp, so `undefined` becomes the *pattern* `"undefined"` and
+never matches. Our `pattern_to_regexp` (`avm2_regexp.c:567`) hands the raw
+value to the RegExp constructor, where `undefined` yields an empty pattern
+that matches at index 0.
+
+The split bug is separate and the more interesting one:
+`avm2_string_split_plain`'s empty-delimiter branch iterates `i < s->len`
+— the **UTF-8 byte** length — and pushes 1-byte substrings. For
+U+0080..U+00FF every character is two bytes, so we return exactly double.
+The file already has the right helper (`utf16_length`, used by `substr`).
+This is a real AVM2 string-indexing correctness bug, not a test artifact.
 
 Three small fixes, ~102 tests. Nothing else in the corpus comes close on
 effort-to-yield.
@@ -209,12 +224,13 @@ were e4x tests missing only the root-link line and are resolved by
 | `as3/Array/insertremove` | 30766/30870 lines | large-array edge cases |
 | e4x residue (~20) | 10 at 50–90%, 6 below | ordinary E4X polish |
 
-Misc-category failures (small, mostly one-off): `text` 6/11 (caret
-placement × 4, HTML entity parsing, links in scrolled text), `fonts` 3/6
-(device-font glyph fallback, kerning, list), `import_assets` 2/3, `audio`
-2/5 (AAC, G.711 codecs), `timeline` 2/17, `visual` 8/142 (mostly
-image-only; `blend_modes` is a `recomp_fail`). from_shumway's 58: 16 fuzz
-corpus, 9 `timeline/nav`, 9 `as3-loader`, 5 `acid`.
+Misc-category failures (counts are *failing of total*, small and mostly
+one-off): `text` 6 of 11 (caret placement ×4, HTML entity parsing, links in
+scrolled text), `fonts` 3 of 6 (device-font glyph fallback, kerning, list),
+`import_assets` 2 of 3, `audio` 2 of 5 (AAC, G.711 codecs), `timeline` 2 of
+17, `visual` 8 of 142 (mostly image-only; `blend_modes` is a `recomp_fail`).
+from_shumway's 58: 16 fuzz corpus, 9 `timeline/nav`, 9 `as3-loader`,
+5 `acid`, rest scattered.
 
 ---
 

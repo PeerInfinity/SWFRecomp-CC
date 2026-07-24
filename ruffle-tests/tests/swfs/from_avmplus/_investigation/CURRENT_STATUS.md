@@ -163,14 +163,21 @@ Full corpus-wide ranking with the avm2/misc/shumway folds:
 `SWFRecompDocs/plans/feature-priority-map.md`. Suite-local order:
 
 1. **`Date` class** — ~151 here + 2 in the avm2 suite. Biggest single
-   unlock left in the corpus. AVM1 already has a full Date; the AVM2 class
-   is a 3-method AMF stub (`avm2_amf.c`, `getTime`/`valueOf`/`toString`).
+   unlock left in the corpus. The AVM2 class is a 3-method AMF stub
+   (`avm2_amf.c:1763` — `getTime`/`valueOf`/`toString`), while AVM1 has a
+   complete one to port from: `actionmodern/date.c`, 1014 lines, 38 methods
+   including the full `getUTC*`/`setUTC*` family and `getTimezoneOffset`.
 2. **String/Unicode semantics** — ~102 `ecma3/Unicode` + part of
-   `ecma3/String`. Three bugs, all visible in every Unicode test:
-   `String.search()`/`search(undefined)` must return `-1`,
-   `String.match()`/`match(undefined)` must return `null`, and
-   `String.split('')` must split by UTF-16 code unit (we split by UTF-8
-   byte: 128 chars → 256 elements for U+0080..U+00FF).
+   `ecma3/String`. Two bugs, both visible in every Unicode test:
+   - `search`/`match` must coerce a non-RegExp pattern **to a string**
+     before building the implicit RegExp (Ruffle `globals/string.rs`), so
+     `undefined` becomes the pattern `"undefined"` and never matches →
+     `-1` / `null`. `pattern_to_regexp` (`avm2_regexp.c:567`) passes the
+     raw value through, giving an empty pattern that matches at 0.
+   - `String.split('')` must split by UTF-16 code unit.
+     `avm2_string_split_plain`'s empty-delimiter branch iterates
+     `i < s->len` (UTF-8 **bytes**), so U+0080..U+00FF yields 256 elements
+     instead of 128. `utf16_length` already exists in that file.
 3. **ES3 `.prototype` surface + `Function.length`** — ~35 blanked tests plus
    a long tail of one-line diffs (`parseInt.length` returns 0, expected 2).
    `String`/`Array`/`Number`/`Boolean` register zero prototype functions
