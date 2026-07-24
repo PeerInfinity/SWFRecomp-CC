@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-24 20:26 UTC
+**Date**: 2026-07-24 21:33 UTC
 
-**Git SHA**: `d36c8da2b2`
+**Git SHA**: `127a5f4d39`
 
-**Run Duration**: 0m 10s
+**Run Duration**: 0m 9s
 
 **Filtered**: 0 tests ignored out of 5 available
 
@@ -27,10 +27,10 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `convolution_filter_big_matrix` | 2 | 1.1s |  |
+| 1 | `convolution_filter_big_matrix` | 2 | 1.0s |  |
 | 2 | `swf_length_too_short_no_end` | 19 | 2.0s |  |
-| 3 | `swf_length_too_short_no_second_frame` | 18 | 2.1s |  |
-| 4 | `swf_length_zero` | 0 | 1.9s |  |
+| 3 | `swf_length_too_short_no_second_frame` | 18 | 2.2s |  |
+| 4 | `swf_length_zero` | 0 | 1.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -38,7 +38,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `swf_length_too_long` | 6 | 6 | 2.1s |  |
+| 1 | `swf_length_too_long` | 6 | 6 | 2.2s |  |
 
 ## Near-Passing Tests
 

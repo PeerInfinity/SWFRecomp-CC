@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-24 20:26 UTC
+**Date**: 2026-07-24 21:33 UTC
 
-**Git SHA**: `d36c8da2b2`
+**Git SHA**: `127a5f4d39`
 
-**Run Duration**: 2m 3s
+**Run Duration**: 2m 1s
 
 **Filtered**: 0 tests ignored out of 17 available
 
@@ -33,17 +33,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 0.9s |  |
-| 2 | `frame_label_count_oom` | 1 | 21.1s |  |
-| 3 | `frame_script_cleanup` | 30 | 6.2s |  |
-| 4 | `frame_script_cleanup2` | 32 | 6.3s |  |
-| 5 | `frame_script_cleanup3` | 30 | 6.4s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 6.0s |  |
-| 7 | `frame_script_construct` | 25 | 6.0s |  |
-| 8 | `scene_count_oom` | 1 | 2.1s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 6.0s |  |
-| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 6.1s |  |
-| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 6.0s |  |
+| 1 | `clip_action_no_key_code` | 1 | 0.8s |  |
+| 2 | `frame_label_count_oom` | 1 | 21.9s |  |
+| 3 | `frame_script_cleanup` | 30 | 6.3s |  |
+| 4 | `frame_script_cleanup2` | 32 | 4.8s |  |
+| 5 | `frame_script_cleanup3` | 30 | 6.2s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 4.4s |  |
+| 7 | `frame_script_construct` | 25 | 5.9s |  |
+| 8 | `scene_count_oom` | 1 | 2.2s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 5.7s |  |
+| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 6.0s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 6.2s |  |
 | 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 6.1s |  |
 
 ## Ruffle-Matched Tests
@@ -52,9 +52,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 24.4s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 4.2s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 4.1s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 23.4s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 3.8s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 4.3s |  |
 
 ## Near-Passing Tests
 

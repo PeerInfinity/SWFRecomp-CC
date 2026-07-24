@@ -1,39 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `e6f33267e7f3` (2026-07-24T18:56:22.021128+00:00)
-**Current:** `d36c8da2b2bd` (2026-07-24T20:26:59.030082+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `d36c8da2b2bd` (2026-07-24T20:26:59.030082+00:00)
+**Current:** `127a5f4d39dc` (2026-07-24T21:33:55.008605+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 829 | 803 | -26 |
-| Total | 1217 | 1177 | -40 |
-| Pass rate | 68.1% | 68.2% | +0.1% |
-| Mismatched lines | 47483 | 47213 | -270 |
-|   Decreased | | | -6 |
+| Passing | 803 | 833 | +30 |
+| Total | 1177 | 1217 | +40 |
+| Pass rate | 68.2% | 68.4% | +0.2% |
+| Mismatched lines | 47213 | 47477 | +264 |
 
-## Newly Passing (4)
+## Added Tests (40)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `parse_float` | output_mismatch | 80/81 | 81/81 |
-| `string_concat_fromcharcode` | output_mismatch | 36/37 | 37/37 |
-| `string_slice_substr_substring` | output_mismatch | 169/170 | 170/170 |
-| `xml_basic` | output_mismatch | 32/33 | 33/33 |
-
-## Missing Tests — Shard Failure (40)
-
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 30 were previously passing
-- 10 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `stage3d_raytrace` | pass | 0/0 |
 | `stage3d_rotating_cube` | pass | 0/0 |
 | `stage3d_sampler` | pass | 0/0 |
@@ -74,14 +56,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `string_case` | pass | 23/23 |
 | `string_char_at` | pass | 27/27 |
 | `string_char_code_at` | pass | 28/28 |
-
-</details>
-
-## Line Count Changed (4)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `parse_float_swf10` | output_mismatch | 78/81 | 79/81 | -1 |
-| `parse_int` | output_mismatch | 132/135 | 133/135 | -1 |
-| `external_interface` | output_mismatch | 3/105 | 3/105 | 0 |
-| `filefilter_properties` | output_mismatch | 0/4 | 0/4 | 0 |
