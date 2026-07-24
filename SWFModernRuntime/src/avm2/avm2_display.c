@@ -2892,36 +2892,34 @@ void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name)
 	sext->constructed = 1;
 	ctx->stage = stage;
 
-	// Root class: SymbolClass char 0, defaulting to MovieClip. A char-0
-	// class that is NOT a DisplayObject is constructed once with the
-	// stage as its sole argument (Ruffle's non-DO root special case).
+	// Root class: SymbolClass char 0, defaulting to MovieClip. Ruffle
+	// avm2.rs lookup_class_for_character: when the bound id names no
+	// character (the char-0 root binding) the class MUST inherit Sprite,
+	// otherwise linking fails with TypeError #2023 and the root stays a
+	// plain MovieClip. Flash and Ruffle (Debug player mode, which the test
+	// runner uses) trace the uncaught error — it is the last line of the
+	// expected output for every avmplus test whose `Test` class extends
+	// nothing (all 177 of them, e4x + as3/Vector).
 	Avm2Class* root_cls = ctx->builtins.movieclip_class;
 	Avm2Class* bound = NULL;
 	if (root_class_name != NULL)
 	{
 		bound = class_for_dotted_name(ctx, root_class_name);
 	}
-	Avm2Object* nondo_root_instance = NULL;
 	if (bound != NULL)
 	{
-		if (class_is_a(bound, ctx->builtins.display_object_class))
+		if (class_is_a(bound, ctx->builtins.sprite_class))
 		{
 			root_cls = bound;
 		}
 		else
 		{
-			Avm2TryFrame top;
-			avm2_try_push_catch_all(ctx, &top);
-			if (setjmp(top.jb) == 0)
-			{
-				Avm2Value args[1] = { avm2_object_value(stage) };
-				Avm2Value v = avm2_class_construct(ctx, bound, args, 1);
-				nondo_root_instance = v.u.obj;
-			}
-			avm2_try_pop_frame(&top);
+			// error.rs make_error_2023: the class object's name ("Test$").
+			printf("TypeError: Error #2023: Class %.*s$ must inherit from"
+			       " Sprite to link to the root.\n",
+			       (int) bound->name.name_len, bound->name.name);
 		}
 	}
-	(void) nondo_root_instance;
 
 	g_timeline_instantiation = 1;
 	Avm2Object* root = display_alloc_instance(ctx, root_cls);
