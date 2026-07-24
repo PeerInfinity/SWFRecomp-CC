@@ -22,6 +22,11 @@ to make the pipeline resumable across sessions.
   `tag_stubs.c`, `#ifdef NO_GRAPHICS` arms without `|| OFFSCREEN_RENDER`);
   otherwise the weekly `weekly-no-graphics.yml` canary covers it. When in
   doubt for shared runtime code, run both.
+- **CI categories**: `all` (classic five suites) is the per-change default;
+  use `categories=full` (adds from_avmplus, ~+64% runtime) when the change
+  touches AVM2 runtime/recompiler emission. Weekly canary runs `full`.
+  Policy: `ruffle-tests/tests/swfs/_investigation/FULL_SUITE_IMPORT_AUDIT.md`
+  §"Which tests run when".
 - Still ask before anything genuinely irreversible or out of scope (force-pushing
   over others' work, rewriting published history, deleting branches, etc.).
 - A failing-but-completed CI run is a result to report, not a blocker — surface

@@ -28,3 +28,9 @@ jobs:
     uses: ./.github/workflows/ruffle-tests.yml
     with:
       mode: no-graphics
+      # `full` = the classic five suites + from_avmplus. The weekly canary is
+      # deliberately the widest run: it also keeps the from_avmplus
+      # no-graphics baseline fresh without adding per-change cost (see
+      # ruffle-tests/tests/swfs/_investigation/FULL_SUITE_IMPORT_AUDIT.md
+      # §"Which tests run when").
+      categories: full

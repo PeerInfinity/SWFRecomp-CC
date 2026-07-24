@@ -90,3 +90,31 @@ CI note: from_avmplus alone is +1574 tests (~+64% suite size) — check shard
 counts/timeouts in `ruffle-tests.yml` before the first full dispatch, and
 run the import baseline in BOTH modes (corpus import = "when in doubt run
 both").
+
+## Which tests run when (selection policy, adopted 2026-07-24)
+
+from_avmplus was wired into `download_tests.sh` and `ruffle-tests.yml` on
+2026-07-24. To keep per-change CI wall-clock unchanged, the workflow gained
+two selectors instead of growing `all`:
+
+- `all` — the classic five suites (avm1, avm2, regression, from_shumway,
+  from_gnash). **Unchanged meaning; still the per-change default.**
+- `full` — `all` + from_avmplus. The complete corpus.
+- `from_avmplus` — the new suite alone (baselines, targeted reruns).
+
+| Situation | Dispatch |
+|---|---|
+| Per-change default | `categories=all`, `mode=graphics` (unchanged) |
+| Change touches AVM2 runtime/recompiler emission | `categories=full`, `mode=graphics` |
+| Weekly Sunday canary | `categories=full`, `mode=no-graphics` (widest run) |
+| Corpus imports, milestones, workflow/infra changes affecting all suites | `full`, both modes |
+| Single test | `single_test=NAME` as before |
+
+"Touches AVM2" means: AVM2 runtime sources in SWFModernRuntime, the AVM2
+translator/emission side of SWFRecomp, or shared code where AVM2 behavior
+could plausibly shift — when in doubt, `full`. Rationale: from_avmplus is
+pure AVM2 language/builtin coverage; AVM1-only changes can't move it, so
+per-change runs skip it and the weekly canary + AVM2-change runs keep its
+baselines fresh. Anti-clobber invariants are unchanged: category-scoped
+runs publish only the categories they ran; extra-defines (verify) runs
+publish nothing.

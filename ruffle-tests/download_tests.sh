@@ -15,6 +15,9 @@
 #
 # Available categories:
 #   avm1              tests/tests/swfs/avm1 (~644 AVM1 tests)
+#   avm2              tests/tests/swfs/avm2 (~1220 AVM2 tests)
+#   from_avmplus      tests/tests/swfs/from_avmplus (~1574 AVM2 tests — Adobe
+#                     Tamarin/avmplus acceptance suite: ecma3/as3/e4x/regress)
 #   from_shumway      tests/tests/swfs/from_shumway (~92 AVM1 tests, ~137 AVM2 skipped)
 #   from_gnash        tests/tests/swfs/from_gnash (~404 AVM1 tests)
 #
@@ -54,14 +57,20 @@ CATEGORY_LOCAL_PATH[from_gnash]="${SCRIPT_DIR}/tests/swfs/from_gnash"
 CATEGORY_REPO_PATH[avm2]="tests/tests/swfs/avm2"
 CATEGORY_LOCAL_PATH[avm2]="${SCRIPT_DIR}/tests/swfs/avm2"
 
-# Which AVM generation each category keeps (default avm1). The avm2 suite
-# inverts the filter: keep AVM2 SWFs, skip stray AVM1 ones.
+CATEGORY_REPO_PATH[from_avmplus]="tests/tests/swfs/from_avmplus"
+CATEGORY_LOCAL_PATH[from_avmplus]="${SCRIPT_DIR}/tests/swfs/from_avmplus"
+
+# Which AVM generation each category keeps (default avm1). The avm2 and
+# from_avmplus suites invert the filter: keep AVM2 SWFs, skip stray AVM1 ones.
 declare -A CATEGORY_KEEP_AVM
 CATEGORY_KEEP_AVM[avm2]="avm2"
+CATEGORY_KEEP_AVM[from_avmplus]="avm2"
 
 # avm2 joined ALL_CATEGORIES with plan Stage 2 (CI fan-out landed alongside
 # the hello_world end-to-end baseline; see SWFRecompDocs/plans/avm2-support-plan.md).
-ALL_CATEGORIES=(avm1 avm2 from_shumway from_gnash)
+# from_avmplus joined with the full-suite import
+# (_investigation/FULL_SUITE_IMPORT_AUDIT.md, 2026-07-24).
+ALL_CATEGORIES=(avm1 avm2 from_avmplus from_shumway from_gnash)
 
 # Parse arguments
 CLEAN=false

@@ -138,6 +138,11 @@ ruffle-tests/tests/swfs/avm2/*/
 !ruffle-tests/tests/swfs/avm2/_investigation/
 !ruffle-tests/tests/swfs/avm2/_results/
 
+# from_avmplus tests (downloaded test data, keep results and investigation)
+ruffle-tests/tests/swfs/from_avmplus/*/
+!ruffle-tests/tests/swfs/from_avmplus/_investigation/
+!ruffle-tests/tests/swfs/from_avmplus/_results/
+
 # Gnash tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_gnash/*/
 !ruffle-tests/tests/swfs/from_gnash/_investigation/
