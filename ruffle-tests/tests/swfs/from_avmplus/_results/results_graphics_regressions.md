@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 847/1574 passing | Graphics: 847/1574 passing
+Trace: 847/1574 passing | Graphics: 974/1522 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,8 +8,165 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (0 tests)
+## Graphics Improvements (156 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
-No improvements.
+| # | Test | Trace Status | Detail |
+|---|------|---------------|--------|
+| 1 | `as3/Vector/concat` | Output Mismatch | 9/10 lines match |
+| 2 | `e4x/Expressions/e11_1_3` | Output Mismatch | 7/8 lines match |
+| 3 | `e4x/Expressions/e11_1_5` | Output Mismatch | 16/17 lines match |
+| 4 | `e4x/Expressions/e11_2_1` | Output Mismatch | 39/40 lines match |
+| 5 | `e4x/Expressions/e11_2_2` | Output Mismatch | 23/24 lines match |
+| 6 | `e4x/Expressions/e11_2_3` | Output Mismatch | 9/10 lines match |
+| 7 | `e4x/Expressions/e11_2_4` | Output Mismatch | 14/15 lines match |
+| 8 | `e4x/Expressions/e11_3_2` | Output Mismatch | 6/7 lines match |
+| 9 | `e4x/Expressions/e11_4_1` | Output Mismatch | 17/18 lines match |
+| 10 | `e4x/Expressions/e11_5_1` | Output Mismatch | 65/66 lines match |
+| 11 | `e4x/Expressions/e11_6_1` | Output Mismatch | 18/19 lines match |
+| 12 | `e4x/Expressions/e11_6_2` | Output Mismatch | 14/15 lines match |
+| 13 | `e4x/Expressions/e11_6_3` | Output Mismatch | 5/6 lines match |
+| 14 | `e4x/Expressions/kXMLBadQNameErr` | Output Mismatch | 4/5 lines match |
+| 15 | `e4x/Namespace/e13_2_1` | Output Mismatch | 18/19 lines match |
+| 16 | `e4x/Namespace/e13_2_2` | Output Mismatch | 21/22 lines match |
+| 17 | `e4x/Namespace/e13_2_3_1` | Output Mismatch | 2/3 lines match |
+| 18 | `e4x/Namespace/e13_2_4_1` | Output Mismatch | 2/3 lines match |
+| 19 | `e4x/Namespace/e13_2_4_2` | Output Mismatch | 3/4 lines match |
+| 20 | `e4x/QName/e13_3_1` | Output Mismatch | 21/22 lines match |
+| 21 | `e4x/QName/e13_3_3_1` | Output Mismatch | 2/3 lines match |
+| 22 | `e4x/QName/e13_3_4_1` | Output Mismatch | 1/2 lines match |
+| 23 | `e4x/QName/e13_3_4_2` | Output Mismatch | 3/4 lines match |
+| 24 | `e4x/QName/e13_3_5` | Output Mismatch | 12/13 lines match |
+| 25 | `e4x/Regress/b121219` | Output Mismatch | 1/2 lines match |
+| 26 | `e4x/Regress/error1085` | Output Mismatch | 1/2 lines match |
+| 27 | `e4x/Regress/regress-257679` | Output Mismatch | 1/2 lines match |
+| 28 | `e4x/Regress/regress-263934` | Output Mismatch | 1/2 lines match |
+| 29 | `e4x/Regress/regress-263936` | Output Mismatch | 1/2 lines match |
+| 30 | `e4x/Regress/regress-264369` | Output Mismatch | 1/2 lines match |
+| 31 | `e4x/Regress/regress-271545` | Output Mismatch | 5/6 lines match |
+| 32 | `e4x/Regress/regress-277650` | Output Mismatch | 1/2 lines match |
+| 33 | `e4x/Regress/regress-277664` | Output Mismatch | 1/2 lines match |
+| 34 | `e4x/Regress/regress-277683` | Output Mismatch | 1/2 lines match |
+| 35 | `e4x/Regress/regress-277779` | Output Mismatch | 1/2 lines match |
+| 36 | `e4x/Regress/regress-278112` | Output Mismatch | 3/4 lines match |
+| 37 | `e4x/Statements/e12_2` | Output Mismatch | 13/14 lines match |
+| 38 | `e4x/Statements/e12_3` | Output Mismatch | 4/5 lines match |
+| 39 | `e4x/TypeConversion/bug153363` | Output Mismatch | 2/3 lines match |
+| 40 | `e4x/TypeConversion/bug153363_2` | Output Mismatch | 2/3 lines match |
+| 41 | `e4x/TypeConversion/e10_1_1` | Output Mismatch | 2/3 lines match |
+| 42 | `e4x/TypeConversion/e10_1_2` | Output Mismatch | 4/5 lines match |
+| 43 | `e4x/TypeConversion/e10_2_1` | Output Mismatch | 4/5 lines match |
+| 44 | `e4x/TypeConversion/e10_2_1_1` | Output Mismatch | 4/5 lines match |
+| 45 | `e4x/TypeConversion/e10_2_1_2` | Output Mismatch | 12/13 lines match |
+| 46 | `e4x/TypeConversion/e10_2_2` | Output Mismatch | 1/2 lines match |
+| 47 | `e4x/TypeConversion/e10_3` | Output Mismatch | 6/7 lines match |
+| 48 | `e4x/TypeConversion/e10_3_1` | Output Mismatch | 1/2 lines match |
+| 49 | `e4x/TypeConversion/e10_4` | Output Mismatch | 8/9 lines match |
+| 50 | `e4x/TypeConversion/e10_4_1` | Output Mismatch | 7/8 lines match |
+| 51 | `e4x/Types/e9_1_1_1` | Output Mismatch | 31/32 lines match |
+| 52 | `e4x/Types/e9_1_1_10` | Output Mismatch | 1/2 lines match |
+| 53 | `e4x/Types/e9_1_1_11` | Output Mismatch | 1/2 lines match |
+| 54 | `e4x/Types/e9_1_1_12` | Output Mismatch | 1/2 lines match |
+| 55 | `e4x/Types/e9_1_1_13` | Output Mismatch | 1/2 lines match |
+| 56 | `e4x/Types/e9_1_1_2` | Output Mismatch | 5/6 lines match |
+| 57 | `e4x/Types/e9_1_1_3` | Output Mismatch | 4/5 lines match |
+| 58 | `e4x/Types/e9_1_1_4` | Output Mismatch | 1/2 lines match |
+| 59 | `e4x/Types/e9_1_1_5` | Output Mismatch | 1/2 lines match |
+| 60 | `e4x/Types/e9_1_1_6` | Output Mismatch | 10/11 lines match |
+| 61 | `e4x/Types/e9_1_1_7` | Output Mismatch | 1/2 lines match |
+| 62 | `e4x/Types/e9_1_1_8` | Output Mismatch | 1/2 lines match |
+| 63 | `e4x/Types/e9_1_1_9` | Output Mismatch | 19/20 lines match |
+| 64 | `e4x/Types/e9_2_1_1` | Output Mismatch | 10/11 lines match |
+| 65 | `e4x/Types/e9_2_1_10` | Output Mismatch | 1/2 lines match |
+| 66 | `e4x/Types/e9_2_1_2` | Output Mismatch | 18/19 lines match |
+| 67 | `e4x/Types/e9_2_1_3` | Output Mismatch | 1/2 lines match |
+| 68 | `e4x/Types/e9_2_1_4` | Output Mismatch | 1/2 lines match |
+| 69 | `e4x/Types/e9_2_1_5` | Output Mismatch | 1/2 lines match |
+| 70 | `e4x/Types/e9_2_1_6` | Output Mismatch | 1/2 lines match |
+| 71 | `e4x/Types/e9_2_1_7` | Output Mismatch | 1/2 lines match |
+| 72 | `e4x/Types/e9_2_1_8` | Output Mismatch | 1/2 lines match |
+| 73 | `e4x/Types/e9_2_1_9` | Output Mismatch | 10/11 lines match |
+| 74 | `e4x/XML/bug157597` | Output Mismatch | 1/2 lines match |
+| 75 | `e4x/XML/bug157597_2` | Output Mismatch | 1/2 lines match |
+| 76 | `e4x/XML/bug157735` | Output Mismatch | 1/2 lines match |
+| 77 | `e4x/XML/bug158506` | Output Mismatch | 1/2 lines match |
+| 78 | `e4x/XML/e13_4_1` | Output Mismatch | 17/18 lines match |
+| 79 | `e4x/XML/e13_4_2` | Output Mismatch | 35/36 lines match |
+| 80 | `e4x/XML/e13_4_3` | Output Mismatch | 34/35 lines match |
+| 81 | `e4x/XML/e13_4_3_1` | Output Mismatch | 4/5 lines match |
+| 82 | `e4x/XML/e13_4_3_2` | Output Mismatch | 7/8 lines match |
+| 83 | `e4x/XML/e13_4_3_3` | Output Mismatch | 7/8 lines match |
+| 84 | `e4x/XML/e13_4_3_4` | Output Mismatch | 10/11 lines match |
+| 85 | `e4x/XML/e13_4_3_5` | Output Mismatch | 4/5 lines match |
+| 86 | `e4x/XML/e13_4_3_6` | Output Mismatch | 9/10 lines match |
+| 87 | `e4x/XML/e13_4_3_7` | Output Mismatch | 30/31 lines match |
+| 88 | `e4x/XML/e13_4_3_8` | Output Mismatch | 40/41 lines match |
+| 89 | `e4x/XML/e13_4_3_9` | Output Mismatch | 10/11 lines match |
+| 90 | `e4x/XML/e13_4_4_1` | Output Mismatch | 2/3 lines match |
+| 91 | `e4x/XML/e13_4_4_10` | Output Mismatch | 10/11 lines match |
+| 92 | `e4x/XML/e13_4_4_11` | Output Mismatch | 11/12 lines match |
+| 93 | `e4x/XML/e13_4_4_12` | Output Mismatch | 14/15 lines match |
+| 94 | `e4x/XML/e13_4_4_13` | Output Mismatch | 6/7 lines match |
+| 95 | `e4x/XML/e13_4_4_14` | Output Mismatch | 11/12 lines match |
+| 96 | `e4x/XML/e13_4_4_15` | Output Mismatch | 15/16 lines match |
+| 97 | `e4x/XML/e13_4_4_16` | Output Mismatch | 24/25 lines match |
+| 98 | `e4x/XML/e13_4_4_18` | Output Mismatch | 15/16 lines match |
+| 99 | `e4x/XML/e13_4_4_19` | Output Mismatch | 15/16 lines match |
+| 100 | `e4x/XML/e13_4_4_20` | Output Mismatch | 10/11 lines match |
+| 101 | `e4x/XML/e13_4_4_21` | Output Mismatch | 15/16 lines match |
+| 102 | `e4x/XML/e13_4_4_22` | Output Mismatch | 14/15 lines match |
+| 103 | `e4x/XML/e13_4_4_23` | Output Mismatch | 16/17 lines match |
+| 104 | `e4x/XML/e13_4_4_24` | Output Mismatch | 21/22 lines match |
+| 105 | `e4x/XML/e13_4_4_25` | Output Mismatch | 14/15 lines match |
+| 106 | `e4x/XML/e13_4_4_26` | Output Mismatch | 5/6 lines match |
+| 107 | `e4x/XML/e13_4_4_27` | Output Mismatch | 20/21 lines match |
+| 108 | `e4x/XML/e13_4_4_29/v10` | Output Mismatch | 18/19 lines match |
+| 109 | `e4x/XML/e13_4_4_29/v9` | Output Mismatch | 18/19 lines match |
+| 110 | `e4x/XML/e13_4_4_3/v10` | Output Mismatch | 15/16 lines match |
+| 111 | `e4x/XML/e13_4_4_3/v21` | Output Mismatch | 15/16 lines match |
+| 112 | `e4x/XML/e13_4_4_3/v9` | Output Mismatch | 15/16 lines match |
+| 113 | `e4x/XML/e13_4_4_31` | Output Mismatch | 18/19 lines match |
+| 114 | `e4x/XML/e13_4_4_32/v10` | Output Mismatch | 8/9 lines match |
+| 115 | `e4x/XML/e13_4_4_33` | Output Mismatch | 5/6 lines match |
+| 116 | `e4x/XML/e13_4_4_34` | Output Mismatch | 11/12 lines match |
+| 117 | `e4x/XML/e13_4_4_35` | Output Mismatch | 16/17 lines match |
+| 118 | `e4x/XML/e13_4_4_37` | Output Mismatch | 11/12 lines match |
+| 119 | `e4x/XML/e13_4_4_38` | Output Mismatch | 16/17 lines match |
+| 120 | `e4x/XML/e13_4_4_39` | Output Mismatch | 19/20 lines match |
+| 121 | `e4x/XML/e13_4_4_4` | Output Mismatch | 18/19 lines match |
+| 122 | `e4x/XML/e13_4_4_40` | Output Mismatch | 6/7 lines match |
+| 123 | `e4x/XML/e13_4_4_5` | Output Mismatch | 11/12 lines match |
+| 124 | `e4x/XML/e13_4_4_6` | Output Mismatch | 30/31 lines match |
+| 125 | `e4x/XML/e13_4_4_7` | Output Mismatch | 6/7 lines match |
+| 126 | `e4x/XML/e13_4_4_8` | Output Mismatch | 6/7 lines match |
+| 127 | `e4x/XML/e13_4_4_9` | Output Mismatch | 13/14 lines match |
+| 128 | `e4x/XML/kXMLAssignmentToIndexedXMLNotAllowedErr` | Output Mismatch | 2/3 lines match |
+| 129 | `e4x/XML/kXMLMarkupMustBeWellFormedErr` | Output Mismatch | 2/3 lines match |
+| 130 | `e4x/XML/kXMLPrefixNotBoundErr` | Output Mismatch | 6/7 lines match |
+| 131 | `e4x/XML/kXMLUnterminatedElementTagErr` | Output Mismatch | 4/5 lines match |
+| 132 | `e4x/XMLList/bug157735` | Output Mismatch | 1/2 lines match |
+| 133 | `e4x/XMLList/e13_5_1` | Output Mismatch | 25/26 lines match |
+| 134 | `e4x/XMLList/e13_5_2` | Output Mismatch | 36/37 lines match |
+| 135 | `e4x/XMLList/e13_5_3_1` | Output Mismatch | 4/5 lines match |
+| 136 | `e4x/XMLList/e13_5_4_1` | Output Mismatch | 2/3 lines match |
+| 137 | `e4x/XMLList/e13_5_4_10` | Output Mismatch | 6/7 lines match |
+| 138 | `e4x/XMLList/e13_5_4_11` | Output Mismatch | 12/13 lines match |
+| 139 | `e4x/XMLList/e13_5_4_12` | Output Mismatch | 18/19 lines match |
+| 140 | `e4x/XMLList/e13_5_4_13` | Output Mismatch | 27/28 lines match |
+| 141 | `e4x/XMLList/e13_5_4_14` | Output Mismatch | 10/11 lines match |
+| 142 | `e4x/XMLList/e13_5_4_15` | Output Mismatch | 2/3 lines match |
+| 143 | `e4x/XMLList/e13_5_4_16` | Output Mismatch | 23/24 lines match |
+| 144 | `e4x/XMLList/e13_5_4_19` | Output Mismatch | 4/5 lines match |
+| 145 | `e4x/XMLList/e13_5_4_2` | Output Mismatch | 27/28 lines match |
+| 146 | `e4x/XMLList/e13_5_4_20` | Output Mismatch | 11/12 lines match |
+| 147 | `e4x/XMLList/e13_5_4_21` | Output Mismatch | 11/12 lines match |
+| 148 | `e4x/XMLList/e13_5_4_22` | Output Mismatch | 4/5 lines match |
+| 149 | `e4x/XMLList/e13_5_4_3` | Output Mismatch | 15/16 lines match |
+| 150 | `e4x/XMLList/e13_5_4_4` | Output Mismatch | 38/39 lines match |
+| 151 | `e4x/XMLList/e13_5_4_5` | Output Mismatch | 10/11 lines match |
+| 152 | `e4x/XMLList/e13_5_4_6` | Output Mismatch | 5/6 lines match |
+| 153 | `e4x/XMLList/e13_5_4_7` | Output Mismatch | 5/6 lines match |
+| 154 | `e4x/XMLList/e13_5_4_8` | Output Mismatch | 10/11 lines match |
+| 155 | `e4x/XMLList/e13_5_4_9` | Output Mismatch | 9/10 lines match |
+| 156 | `e4x/XMLList/kXMLOnlyWorksWithOneItemListsErr` | Output Mismatch | 28/29 lines match |
