@@ -1,0 +1,433 @@
+# from_avmplus baseline seed data (2026-07-24, graphics, eabb3b366)
+
+Machine-extracted from results_graphics.json at the first-ever baseline
+(871/1574 effective, 55.3%). Input for the feature-priority-map session
+(SWFRecompDocs/prompts/avmplus-feature-priority-map.md).
+
+## Empty-actual mismatches (287) — suspected shared driver failure
+
+Test ran, no crash, but printed <=1 output line.
+
+- as3/ByteArray/ByteArrayLzmaThirdParty
+- as3/Definitions/Variable/AccessPrivateClassVariable_rt
+- as3/Expressions/deleteOperator/deleteFixedFunction
+- as3/Expressions/deleteOperator/deleteFixedVar
+- as3/Expressions/deleteOperator/deleteNonexistentFixedProperty
+- as3/RuntimeErrors/Error1004MethodInvokedOnIncompatibleObj
+- as3/RuntimeErrors/Error1050CannotConvertToPrimitive
+- as3/RuntimeErrors/Error1052InvalidUriPassed
+- as3/RuntimeErrors/Error1064CannotCallMethodAsConstructor
+- as3/RuntimeErrors/Error1066Function-body-NotAllowed
+- as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp
+- as3/RuntimeErrors/Error1075MathNotAFunction
+- as3/RuntimeErrors/Error1076MathNotAConstructor
+- as3/RuntimeErrors/Error1081ReadSealedErrorNs
+- as3/RuntimeErrors/Error1115NotAConstructor/v10
+- as3/RuntimeErrors/Error1117InvalidXmlName
+- as3/RuntimeErrors/Error1119DeleteDoesNotSupportXMLListOperand
+- as3/RuntimeErrors/Error1120CannotDeleteProperty
+- as3/Statements/Exceptions/MultipleCatchBlocksURI
+- as3/Types/Number/abs
+- as3/Types/Number/acos
+- as3/Types/Number/asin
+- as3/Types/Number/atan
+- as3/Types/Number/atan2
+- as3/Types/Number/ceil
+- as3/Types/Number/cos
+- as3/Types/Number/e15_7_4_6_1/swf14
+- as3/Types/Number/e15_7_4_6_1/swf15
+- as3/Types/Number/exp
+- as3/Types/Number/floor
+- as3/Types/Number/log
+- as3/Types/Number/max
+- as3/Types/Number/min
+- as3/Types/Number/pow
+- as3/Types/Number/random
+- as3/Types/Number/round
+- as3/Types/Number/sin
+- as3/Types/Number/sqrt
+- as3/Types/Number/tan
+- as3/Types/Number/visibility/v16
+- as3/Vector/nonindexproperty/v10
+- as3/Vector/nonindexproperty/v11
+- e4x/Global/e13_1_2_1
+- e4x/QName/e13_3_4_1
+- e4x/Regress/b121219
+- e4x/Regress/error1085
+- e4x/Regress/regress-257679
+- e4x/Regress/regress-263934
+- e4x/Regress/regress-263936
+- e4x/Regress/regress-264369
+- e4x/Regress/regress-277650
+- e4x/Regress/regress-277664
+- e4x/Regress/regress-277683
+- e4x/Regress/regress-277779
+- e4x/TypeConversion/e10_2_2
+- e4x/TypeConversion/e10_3_1
+- e4x/Types/e9_1_1_10
+- e4x/Types/e9_1_1_11
+- e4x/Types/e9_1_1_12
+- e4x/Types/e9_1_1_13
+- e4x/Types/e9_1_1_4
+- e4x/Types/e9_1_1_5
+- e4x/Types/e9_1_1_7
+- e4x/Types/e9_1_1_8
+- e4x/Types/e9_2_1_10
+- e4x/Types/e9_2_1_3
+- e4x/Types/e9_2_1_4
+- e4x/Types/e9_2_1_5
+- e4x/Types/e9_2_1_6
+- e4x/Types/e9_2_1_7
+- e4x/Types/e9_2_1_8
+- e4x/XML/bug157597
+- e4x/XML/bug157597_2
+- e4x/XML/bug157735
+- e4x/XML/bug158506
+- e4x/XMLList/bug157735
+- ecma3/Array/e15_4_3_2
+- ecma3/Array/e15_4_4_13
+- ecma3/Array/e15_4_4_4_1
+- ecma3/Array/e15_4_4_4_2
+- ecma3/Array/e15_4_4_5
+- ecma3/Boolean/e15_6_3_1_2
+- ecma3/Boolean/e15_6_3_1_3
+- ecma3/Date/e15_9_1_1_1
+- ecma3/Date/e15_9_1_1_2
+- ecma3/Date/e15_9_2_1
+- ecma3/Date/e15_9_2_2_1
+- ecma3/Date/e15_9_2_2_2
+- ecma3/Date/e15_9_2_2_3
+- ecma3/Date/e15_9_2_2_4
+- ecma3/Date/e15_9_2_2_5
+- ecma3/Date/e15_9_2_2_6
+- ecma3/Date/e15_9_3_1_1
+- ecma3/Date/e15_9_3_1_2
+- ecma3/Date/e15_9_3_1_3
+- ecma3/Date/e15_9_3_1_4
+- ecma3/Date/e15_9_3_1_5
+- ecma3/Date/e15_9_3_2_1
+- ecma3/Date/e15_9_3_2_2
+- ecma3/Date/e15_9_3_2_3
+- ecma3/Date/e15_9_3_2_4
+- ecma3/Date/e15_9_3_2_5
+- ecma3/Date/e15_9_3_8_1
+- ecma3/Date/e15_9_3_8_2
+- ecma3/Date/e15_9_3_8_3
+- ecma3/Date/e15_9_3_8_4
+- ecma3/Date/e15_9_3_8_5
+- ecma3/Date/e15_9_4_2
+- ecma3/Date/e15_9_4_2_1
+- ecma3/Date/e15_9_4_3
+- ecma3/Date/e15_9_5
+- ecma3/Date/e15_9_5_1
+- ecma3/Date/e15_9_5_10
+- ecma3/Date/e15_9_5_10_10
+- ecma3/Date/e15_9_5_10_11
+- ecma3/Date/e15_9_5_10_12
+- ecma3/Date/e15_9_5_10_13
+- ecma3/Date/e15_9_5_10_3
+- ecma3/Date/e15_9_5_10_4
+- ecma3/Date/e15_9_5_10_5
+- ecma3/Date/e15_9_5_10_6
+- ecma3/Date/e15_9_5_10_7
+- ecma3/Date/e15_9_5_10_8
+- ecma3/Date/e15_9_5_10_9
+- ecma3/Date/e15_9_5_11
+- ecma3/Date/e15_9_5_11_1
+- ecma3/Date/e15_9_5_11_3
+- ecma3/Date/e15_9_5_11_4
+- ecma3/Date/e15_9_5_11_5
+- ecma3/Date/e15_9_5_11_6
+- ecma3/Date/e15_9_5_11_7
+- ecma3/Date/e15_9_5_12
+- ecma3/Date/e15_9_5_12_3
+- ecma3/Date/e15_9_5_12_4
+- ecma3/Date/e15_9_5_12_5
+- ecma3/Date/e15_9_5_12_6
+- ecma3/Date/e15_9_5_12_7
+- ecma3/Date/e15_9_5_12_8
+- ecma3/Date/e15_9_5_13
+- ecma3/Date/e15_9_5_13_1
+- ecma3/Date/e15_9_5_13_2
+- ecma3/Date/e15_9_5_13_3
+- ecma3/Date/e15_9_5_13_4
+- ecma3/Date/e15_9_5_13_5
+- ecma3/Date/e15_9_5_13_6
+- ecma3/Date/e15_9_5_13_7
+- ecma3/Date/e15_9_5_13_8
+- ecma3/Date/e15_9_5_14
+- ecma3/Date/e15_9_5_15
+- ecma3/Date/e15_9_5_15_1
+- ecma3/Date/e15_9_5_16
+- ecma3/Date/e15_9_5_17
+- ecma3/Date/e15_9_5_17_1
+- ecma3/Date/e15_9_5_18
+- ecma3/Date/e15_9_5_19
+- ecma3/Date/e15_9_5_2
+- ecma3/Date/e15_9_5_20
+- ecma3/Date/e15_9_5_21_1
+- ecma3/Date/e15_9_5_21_2
+- ecma3/Date/e15_9_5_21_3
+- ecma3/Date/e15_9_5_21_4
+- ecma3/Date/e15_9_5_21_5
+- ecma3/Date/e15_9_5_21_6
+- ecma3/Date/e15_9_5_21_7
+- ecma3/Date/e15_9_5_21_8
+- ecma3/Date/e15_9_5_22_1
+- ecma3/Date/e15_9_5_22_2
+- ecma3/Date/e15_9_5_22_3
+- ecma3/Date/e15_9_5_22_4
+- ecma3/Date/e15_9_5_22_5
+- ecma3/Date/e15_9_5_22_6
+- ecma3/Date/e15_9_5_22_7
+- ecma3/Date/e15_9_5_22_8
+- ecma3/Date/e15_9_5_23_1
+- ecma3/Date/e15_9_5_23_10
+- ecma3/Date/e15_9_5_23_11
+- ecma3/Date/e15_9_5_23_12
+- ecma3/Date/e15_9_5_23_13
+- ecma3/Date/e15_9_5_23_14
+- ecma3/Date/e15_9_5_23_15
+- ecma3/Date/e15_9_5_23_16
+- ecma3/Date/e15_9_5_23_17
+- ecma3/Date/e15_9_5_23_18
+- ecma3/Date/e15_9_5_23_2
+- ecma3/Date/e15_9_5_23_3_rt
+- ecma3/Date/e15_9_5_23_4
+- ecma3/Date/e15_9_5_23_5
+- ecma3/Date/e15_9_5_23_6
+- ecma3/Date/e15_9_5_23_7
+- ecma3/Date/e15_9_5_23_8
+- ecma3/Date/e15_9_5_23_9
+- ecma3/Date/e15_9_5_24_1
+- ecma3/Date/e15_9_5_24_2
+- ecma3/Date/e15_9_5_24_3
+- ecma3/Date/e15_9_5_24_4
+- ecma3/Date/e15_9_5_24_5
+- ecma3/Date/e15_9_5_24_6
+- ecma3/Date/e15_9_5_24_7
+- ecma3/Date/e15_9_5_24_8
+- ecma3/Date/e15_9_5_25_1
+- ecma3/Date/e15_9_5_26_1
+- ecma3/Date/e15_9_5_27_1
+- ecma3/Date/e15_9_5_28_1
+- ecma3/Date/e15_9_5_29_1
+- ecma3/Date/e15_9_5_2_1
+- ecma3/Date/e15_9_5_2_2_rt
+- ecma3/Date/e15_9_5_3
+- ecma3/Date/e15_9_5_30_1
+- ecma3/Date/e15_9_5_31_1
+- ecma3/Date/e15_9_5_32_1
+- ecma3/Date/e15_9_5_33_1
+- ecma3/Date/e15_9_5_34_1
+- ecma3/Date/e15_9_5_35_1
+- ecma3/Date/e15_9_5_36_1
+- ecma3/Date/e15_9_5_36_2
+- ecma3/Date/e15_9_5_36_3
+- ecma3/Date/e15_9_5_36_4
+- ecma3/Date/e15_9_5_36_5
+- ecma3/Date/e15_9_5_36_6
+- ecma3/Date/e15_9_5_36_7
+- ecma3/Date/e15_9_5_37_1
+- ecma3/Date/e15_9_5_37_2
+- ecma3/Date/e15_9_5_37_3
+- ecma3/Date/e15_9_5_37_4
+- ecma3/Date/e15_9_5_37_5
+- ecma3/Date/e15_9_5_3_1_rt
+- ecma3/Date/e15_9_5_3_2
+- ecma3/Date/e15_9_5_4
+- ecma3/Date/e15_9_5_42
+- ecma3/Date/e15_9_5_4_1
+- ecma3/Date/e15_9_5_4_2_rt
+- ecma3/Date/e15_9_5_5
+- ecma3/Date/e15_9_5_6
+- ecma3/Date/e15_9_5_7
+- ecma3/Exceptions/date_002_rt
+- ecma3/Exceptions/date_004_rt
+- ecma3/Exceptions/exception_001_rt
+- ecma3/Exceptions/exception_002_rt
+- ecma3/Exceptions/exception_011_rt
+- ecma3/Exceptions/expression_005_rt
+- ecma3/Exceptions/number_001_rt
+- ecma3/Exceptions/number_002_rt
+- ecma3/Exceptions/string_001_rt
+- ecma3/Exceptions/string_002_rt
+- ecma3/Expressions/e11_2_2_10_rt
+- ecma3/FunctionObjects/e15_3_1_1_2_rt
+- ecma3/FunctionObjects/e15_3_1_1_3_rt
+- ecma3/FunctionObjects/e15_3_2_1_2_rt
+- ecma3/FunctionObjects/e15_3_2_1_3_rt
+- ecma3/FunctionObjects/e15_3_3_2
+- ecma3/FunctionObjects/e15_3_5_3_rt
+- ecma3/GlobalObject/decodeURI
+- ecma3/GlobalObject/decodeURIComponent
+- ecma3/GlobalObject/e15_1_2_1_2_rt
+- ecma3/GlobalObject/encodeURI
+- ecma3/GlobalObject/encodeURIComponent
+- ecma3/Number/e15_7_4_6_1
+- ecma3/Number/eregress_121952
+- ecma3/ObjectObjects/class_006
+- ecma3/ObjectObjects/e15_2_3_1_2
+- ecma3/Statements/e12_10
+- ecma3/String/concat
+- ecma3/String/e15_5_3_1_3
+- ecma3/String/e15_5_4_10_1_rt
+- ecma3/String/e15_5_4_11_1
+- ecma3/String/e15_5_4_11_5
+- ecma3/String/e15_5_4_12_1
+- ecma3/String/e15_5_4_13
+- ecma3/String/e15_5_4_4_3
+- ecma3/String/e15_5_4_5_2
+- ecma3/String/e15_5_4_5_3
+- ecma3/String/e15_5_4_5_5
+- ecma3/String/e15_5_4_6_2_rt
+- ecma3/String/e15_5_4_7_2
+- ecma3/String/e15_5_4_8_1_rt
+- ecma3/String/e15_5_4_9_1_rt
+- ecma3/String/ematch_004
+- ecma3/String/substr
+- ecma3/String/toLocaleLowerCase
+- ecma3/String/toLocaleLowerCase5
+- ecma3/String/toLocaleUpperCase5
+- recursion/pcre_could_be_empty_branch
+- regress/bug_538107
+- regress/bug_551587_2_swf10
+- regress/bug_551587_2_swf11
+- regress/bug_558863_swf11
+- regress/bug_609416_swf11
+
+## Near-passes (108) — >=90% of expected lines already match
+
+- as3/Array/insertremove (30766/30870)
+- as3/Definitions/Variable/ConstVariables_custom1 (16/17)
+- as3/ShellClasses/DictionarySubclass (20/22)
+- as3/Vector/concat (9/10)
+- as3/Vector/initializer_expressions (39/41)
+- as3/Vector/map (11/12)
+- as3/Vector/some (12/13)
+- as3/Vector/vectorIndexRangeExceptions (1260/1270)
+- e4x/Expressions/e11_1_5 (16/17)
+- e4x/Expressions/e11_2_1 (39/40)
+- e4x/Expressions/e11_2_2 (23/24)
+- e4x/Expressions/e11_2_3 (9/10)
+- e4x/Expressions/e11_2_4 (14/15)
+- e4x/Expressions/e11_4_1 (17/18)
+- e4x/Expressions/e11_5_1 (65/66)
+- e4x/Expressions/e11_6_1 (18/19)
+- e4x/Expressions/e11_6_2 (14/15)
+- e4x/Namespace/e13_2_1 (18/19)
+- e4x/Namespace/e13_2_2 (21/22)
+- e4x/Namespace/e13_2_5 (34/36)
+- e4x/QName/e13_3_1 (21/22)
+- e4x/QName/e13_3_2 (47/49)
+- e4x/QName/e13_3_5 (12/13)
+- e4x/Statements/e12_2 (13/14)
+- e4x/TypeConversion/e10_2_1_2 (12/13)
+- e4x/Types/e9_1_1_1 (31/32)
+- e4x/Types/e9_1_1_6 (10/11)
+- e4x/Types/e9_1_1_9 (19/20)
+- e4x/Types/e9_2_1_1 (10/11)
+- e4x/Types/e9_2_1_2 (18/19)
+- e4x/Types/e9_2_1_9 (10/11)
+- e4x/XML/e13_4_1 (17/18)
+- e4x/XML/e13_4_2 (35/36)
+- e4x/XML/e13_4_3 (34/35)
+- e4x/XML/e13_4_3_4 (10/11)
+- e4x/XML/e13_4_3_6 (9/10)
+- e4x/XML/e13_4_3_7 (30/31)
+- e4x/XML/e13_4_3_8 (40/41)
+- e4x/XML/e13_4_3_9 (10/11)
+- e4x/XML/e13_4_4_10 (10/11)
+- e4x/XML/e13_4_4_11 (11/12)
+- e4x/XML/e13_4_4_12 (14/15)
+- e4x/XML/e13_4_4_14 (11/12)
+- e4x/XML/e13_4_4_15 (15/16)
+- e4x/XML/e13_4_4_16 (24/25)
+- e4x/XML/e13_4_4_18 (15/16)
+- e4x/XML/e13_4_4_19 (15/16)
+- e4x/XML/e13_4_4_20 (10/11)
+- e4x/XML/e13_4_4_21 (15/16)
+- e4x/XML/e13_4_4_22 (14/15)
+- e4x/XML/e13_4_4_23 (16/17)
+- e4x/XML/e13_4_4_24 (21/22)
+- e4x/XML/e13_4_4_25 (14/15)
+- e4x/XML/e13_4_4_27 (20/21)
+- e4x/XML/e13_4_4_29/v10 (18/19)
+- e4x/XML/e13_4_4_29/v9 (18/19)
+- e4x/XML/e13_4_4_3/v10 (15/16)
+- e4x/XML/e13_4_4_3/v21 (15/16)
+- e4x/XML/e13_4_4_3/v9 (15/16)
+- e4x/XML/e13_4_4_31 (18/19)
+- e4x/XML/e13_4_4_34 (11/12)
+- e4x/XML/e13_4_4_35 (16/17)
+- e4x/XML/e13_4_4_37 (11/12)
+- e4x/XML/e13_4_4_38 (16/17)
+- e4x/XML/e13_4_4_39 (19/20)
+- e4x/XML/e13_4_4_4 (18/19)
+- e4x/XML/e13_4_4_5 (11/12)
+- e4x/XML/e13_4_4_6 (30/31)
+- e4x/XML/e13_4_4_9 (13/14)
+- e4x/XML/misc_errors (30/33)
+- e4x/XMLList/e13_5_1 (25/26)
+- e4x/XMLList/e13_5_2 (36/37)
+- e4x/XMLList/e13_5_4_11 (12/13)
+- e4x/XMLList/e13_5_4_12 (18/19)
+- e4x/XMLList/e13_5_4_13 (27/28)
+- e4x/XMLList/e13_5_4_14 (10/11)
+- e4x/XMLList/e13_5_4_16 (23/24)
+- e4x/XMLList/e13_5_4_2 (27/28)
+- e4x/XMLList/e13_5_4_20 (11/12)
+- e4x/XMLList/e13_5_4_21 (11/12)
+- e4x/XMLList/e13_5_4_3 (15/16)
+- e4x/XMLList/e13_5_4_4 (38/39)
+- e4x/XMLList/e13_5_4_5 (10/11)
+- e4x/XMLList/e13_5_4_8 (10/11)
+- e4x/XMLList/e13_5_4_9 (9/10)
+- e4x/XMLList/kXMLOnlyWorksWithOneItemListsErr (28/29)
+- ecma3/Array/e15_4_2_1_3 (1030/1031)
+- ecma3/Expressions/e11_4_1 (17/18)
+- ecma3/Function/e15_3_4_3_1 (13/14)
+- ecma3/Function/e15_3_4_4_1_rt (9/10)
+- ecma3/GlobalObject/e15_1_2_2_1 (274/276)
+- ecma3/GlobalObject/e15_1_2_2_2 (28/31)
+- ecma3/GlobalObject/e15_1_2_3_1 (184/186)
+- ecma3/GlobalObject/e15_1_2_5_1 (528/531)
+- ecma3/GlobalObject/e15_1_2_6 (60/62)
+- ecma3/GlobalObject/e15_1_2_7 (53/55)
+- ecma3/JSON/e15_12_1 (35/36)
+- ecma3/JSON/e15_12_3 (31/33)
+- ecma3/Number/e15_7_4_2_4 (49/51)
+- ecma3/ObjectObjects/e15_2_4_2 (9/10)
+- ecma3/String/e15_5_2 (69/75)
+- ecma3/String/e15_5_3_2_3 (474/481)
+- ecma3/String/e15_5_4_4_1 (188/189)
+- ecma3/String/e15_5_4_5_4 (321/323)
+- ecma3/String/e15_5_4_5_6_rt (10/11)
+- ecma3/String/e15_5_4_8_2 (54/60)
+- ecma3/TypeConversion/e9_3_1_3_rt (89/94)
+- regress/bug_687838 (104/111)
+
+## Non-mismatch failures (22)
+
+- as3/AMF/AMFSerializer: segfault
+- as3/ByteArray/ByteArray_bug662851_32bit: timeout
+- as3/ByteArray/ByteArray_bug662851_64bit: timeout
+- as3/Definitions/Super/SuperInForLoop: runtime_error
+- as3/Definitions/Super/SuperProps: runtime_error
+- as3/Vector/initializer_large_vector: compile_fail
+- ecma3/Exceptions/bug127913: segfault
+- misc/bug_508617: runtime_error
+- mops/lf32: runtime_error
+- mops/lf64: runtime_error
+- mops/li16: runtime_error
+- mops/li32: runtime_error
+- mops/li8: runtime_error
+- mops/lix16: runtime_error
+- mops/lix8: runtime_error
+- mops/mops_basics: timeout
+- mops/sf32: runtime_error
+- mops/sf64: runtime_error
+- mops/si16: runtime_error
+- mops/si32: runtime_error
+- mops/si8: runtime_error
+- regress/bug_483783: runtime_error
