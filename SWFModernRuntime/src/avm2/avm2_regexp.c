@@ -568,8 +568,13 @@ static Avm2RegExpExt* pattern_to_regexp(Avm2Context* ctx, Avm2Value pattern)
 {
 	Avm2RegExpExt* ext = regexp_ext(pattern);
 	if (ext != NULL) return ext;
+	// Coerce to a STRING first (Ruffle search / match_internal both call
+	// coerce_to_string before constructing). The RegExp constructor maps
+	// undefined to the EMPTY pattern per ECMA-262 §15.10.4.1, which matches
+	// at index 0; going through the string makes the pattern the literal
+	// "undefined", which never matches — so search() → -1, match() → null.
 	Avm2Value args[1];
-	args[0] = pattern;
+	args[0] = avm2_string(avm2_coerce_to_string(ctx, pattern));
 	Avm2Value re = regexp_construct(ctx, ctx->builtins.regexp_class, args, 1);
 	return regexp_ext(re);
 }

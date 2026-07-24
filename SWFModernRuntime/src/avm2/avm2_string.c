@@ -379,9 +379,23 @@ Avm2Value avm2_string_split_plain(Avm2Activation* act)
 			avm2_array_push(ctx, arr, avm2_string(avm2_string_from_literal(ctx, "")));
 			return avm2_object_value(arr);
 		}
-		for (uint32_t i = 0; i < s->len && i < limit; i++)
+		// One element per UTF-16 code unit, NOT per UTF-8 byte: mirrors
+		// charAt above, including the astral case (a 4-byte codepoint is
+		// two units, each a lone surrogate that surfaces as U+FFFD).
+		uint32_t len16 = utf16_length(s);
+		for (uint32_t i = 0; i < len16 && i < limit; i++)
 		{
-			avm2_array_push(ctx, arr, make_str(ctx, s->utf8 + i, 1));
+			uint32_t bs = 0;
+			uint32_t bl = 0;
+			if (utf16_unit_at(s, i, &bs, &bl) < 0) break;
+			if (bl == 4)
+			{
+				avm2_array_push(ctx, arr, make_str(ctx, "\xEF\xBF\xBD", 3));
+			}
+			else
+			{
+				avm2_array_push(ctx, arr, make_str(ctx, s->utf8 + bs, bl));
+			}
 		}
 		return avm2_object_value(arr);
 	}
