@@ -1,23 +1,34 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-24 — **first baseline + first fix, CI-confirmed**. The
+Last updated: 2026-07-24 — **String/Unicode arc landed, CI-confirmed**. The
 Adobe Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`:
 **871/1574 effective (55.3%)**, identical in graphics and no-graphics.
 
-This session cracked the "empty output" pattern and landed the first fix
-(`d36c8da2b`, root SymbolClass must inherit Sprite → trace TypeError
-`#2023`). CI run `30121943045` (graphics, `categories=full`):
-**+156 newly passing here, +4 in the avm2 suite, +3 promoted to
-ruffle_matched, ZERO regressions corpus-wide.** e4x went **2/177 → 160/177**
-and the suite to **1000/1522 (65.7%)**.
+Two fixes have landed since:
 
-⚠️ That run lost shard 25/30 to the known apt/Vulkan flake
-(`graphics-ci-aptget-flaky-shards`), so 52 from_avmplus tests were not
-executed — totals below read 1522 not 1574, and `ecma3/String` in
-particular is understated (41 of its 83 tests ran). Extrapolating the
-missing shard at its prior rate puts the true figure near
-**1029/1574 (65.4%)**. The next full run restores exact totals.
+1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
+   `#2023`. e4x **2/177 → 160/177**.
+2. `127a5f4d3` — the two AVM2 String semantics bugs (below).
+   `ecma3/Unicode` **6/108 → 107/108**.
+
+The suite now stands at **1131/1574 effective (71.9%)** — full shard
+coverage, no extrapolation.
+
+CI run `30126336695` (graphics, `categories=full`, at `127a5f4d3`)
+measured per-test against the previous run:
+**+101 newly effective — every one of them in `ecma3/Unicode` — and ZERO
+regressions in any suite.**
+
+⚠️ **Read the shard caveat before comparing to older numbers.** The
+*previous* run (`30121943045`) lost shard 25/30 to the known apt/Vulkan
+flake (`graphics-ci-aptget-flaky-shards`), so 52 from_avmplus tests (137
+corpus-wide) were never executed and its totals read 1522, not 1574. Run
+`30126336695` restored them. A naive run-to-run diff therefore shows ~137
+extra "newly passing" tests that are **shard recovery, not yield** — 98 of
+the recovered tests were already effective. The +101 figure above is
+computed only over tests present in *both* runs, which is the only
+comparison that means anything across a flaked run.
 
 The corpus-wide ranking this baseline feeds is
 `SWFRecompDocs/plans/feature-priority-map.md`.
@@ -60,23 +71,25 @@ gh workflow run ruffle-tests.yml --ref master \
 
 ## Baselines
 
-Import baseline `eabb3b366` (complete, both modes), and current
-`d36c8da2b` (graphics, 29/30 shards):
+Import baseline `eabb3b366` and current `127a5f4d3` — both complete
+(30/30 shards), graphics mode:
 
 | Area | at import | now | failing now | of which known_failure |
 |---|---|---|---|---|
-| ecma3 | 402/800 | 372/748 | 376 | 30 |
+| ecma3 | 402/800 | **503/800** | 297 | 30 |
 | e4x | **2/177** | **160/177** | 17 | 3 |
 | as3 | 410/509 | 411/509 | 98 | 6 |
 | mops | 0/13 | 0/13 | 13 | 0 |
 | regress | 43/55 | 43/55 | 12 | 4 |
 | recursion | 1/6 | 1/6 | 5 | 1 |
 | misc | 13/14 | 13/14 | 1 | 1 |
-| **total** | **871/1574** | **1000/1522** | **522** | **45** |
+| **total** | **871/1574** | **1131/1574** | **443** | **45** |
 
-(`ecma3` and the total lost 52 tests to the shard-25 flake; nothing there
-regressed.) Status breakdown of the 522: 500 output_mismatch,
-16 runtime_error, 3 timeout, 2 segfault, 1 compile_fail.
+Status breakdown of the 443: 421 output_mismatch, 16 runtime_error,
+3 timeout, 2 segfault, 1 compile_fail.
+
+`ecma3/Unicode` is now **107/108**. The single holdout is `utf8count` —
+see "Known residue" below.
 
 At import, 263 of the 703 failures were missing **exactly one** output
 line — 155 of them the e4x root-link line, now fixed.
@@ -168,6 +181,58 @@ of the same message (`parse_float`, `string_concat_fromcharcode`,
 `string_slice_substr_substring`, `xml_basic`). **No regressions in any
 suite.**
 
+## Fix landed: String/Unicode semantics (`127a5f4d3`)
+
+Two independent AVM2 String bugs, both visible in *every* `ecma3/Unicode`
+test (which is why the whole directory sat uniformly at 16/21 or 17/21
+matching lines).
+
+**1. `search`/`match` did not coerce the pattern to a string.**
+`pattern_to_regexp` (`avm2_regexp.c`) handed the raw `Avm2Value` to the
+RegExp constructor. `regexp_init_from_args` correctly maps `undefined` to
+the **empty** pattern per ECMA-262 §15.10.4.1 — and an empty pattern
+matches at index 0. So `search(undefined)` returned `0` and
+`match(undefined)` returned `""`. Ruffle (`globals/string.rs::search`,
+`match_internal`) calls `coerce_to_string()` *before* constructing, making
+the pattern the literal string `"undefined"`, which never matches → `-1`
+and `null`. Fixed in `pattern_to_regexp`, whose only two callers are those
+two paths; `replace` deliberately omits the coercion and does not use this
+helper.
+
+**2. `String.split('')` split by UTF-8 byte, not UTF-16 code unit.**
+`avm2_string_split_plain`'s empty-delimiter branch iterated `i < s->len`
+(the byte length) and pushed 1-byte substrings. Measured: U+0080–U+00FF
+gave **256** elements instead of 128; U+4E00–U+4EFA gave **753** instead
+of 251. ASCII was unaffected, which is exactly why `u0000_BasicLatin`
+scored 17/21 while every other block scored 16/21. Now mirrors `charAt`:
+iterate `utf16_length(s)` units via `utf16_unit_at`, honouring `limit`,
+including the astral case (a 4-byte codepoint is two code units, each a
+lone surrogate surfaced as U+FFFD).
+
+**Result (CI `30126336695`): +101, all in `ecma3/Unicode` (6/108 →
+107/108), zero regressions corpus-wide.**
+
+## Known residue: `ecma3/Unicode/utf8count` needs lone surrogates
+
+The one `ecma3/Unicode` test still failing is **not** the same class of
+bug and is **not cheap**. It builds a string by concatenating
+`String.fromCharCode(c)` over a list that includes surrogate *pairs*
+(U+20A1F, U+20BB7 …) and asserts it equals the equivalent UTF-8 literal:
+
+```as3
+str_utf16 += String.fromCharCode(c);          // one code unit at a time
+var str_utf8:String = "123𠮟咤ABC𠮷野屋abc南巽駅";
+Assert.expectEq("str_utf8 == str_utf16", true, str_utf8 == str_utf16);
+```
+
+`Avm2String` is UTF-8, which cannot represent an unpaired surrogate, so
+each half collapses to U+FFFD at `fromCharCode` time and the two never
+recombine on concatenation. Only the equality line fails — the adjacent
+`.length` comparison already passes. Fixing this properly means either a
+WTF-8 representation or surrogate-pairing at concatenation time. It is a
+representation change, not a one-line fix, and should be scoped on its own
+rather than folded into a String arc.
+
 ## E4X is NOT a coverage gap
 
 The probe asked whether 2/177 meant broad missing E4X. It does not: **155 of
@@ -182,30 +247,37 @@ known_failure) is ordinary polish, not an arc.
 Full corpus-wide ranking with the avm2/misc/shumway folds:
 `SWFRecompDocs/plans/feature-priority-map.md`. Suite-local order:
 
+- ~~String/Unicode semantics~~ — **DONE** (`127a5f4d3`, +101).
+- **ES3 `.prototype` surface + `Function.length`** — implemented in
+  `d90353066`, CI pending at time of writing. See below.
+
 1. **`Date` class** — ~151 here + 2 in the avm2 suite. Biggest single
    unlock left in the corpus. The AVM2 class is a 3-method AMF stub
    (`avm2_amf.c:1763` — `getTime`/`valueOf`/`toString`), while AVM1 has a
    complete one to port from: `actionmodern/date.c`, 1014 lines, 38 methods
    including the full `getUTC*`/`setUTC*` family and `getTimezoneOffset`.
-2. **String/Unicode semantics** — ~102 `ecma3/Unicode` + part of
-   `ecma3/String`. Two bugs, both visible in every Unicode test:
-   - `search`/`match` must coerce a non-RegExp pattern **to a string**
-     before building the implicit RegExp (Ruffle `globals/string.rs`), so
-     `undefined` becomes the pattern `"undefined"` and never matches →
-     `-1` / `null`. `pattern_to_regexp` (`avm2_regexp.c:567`) passes the
-     raw value through, giving an empty pattern that matches at 0.
-   - `String.split('')` must split by UTF-16 code unit.
-     `avm2_string_split_plain`'s empty-delimiter branch iterates
-     `i < s->len` (UTF-8 **bytes**), so U+0080..U+00FF yields 256 elements
-     instead of 128. `utf16_length` already exists in that file.
-3. **ES3 `.prototype` surface + `Function.length`** — ~35 blanked tests plus
-   a long tail of one-line diffs (`parseInt.length` returns 0, expected 2).
-   `String`/`Array`/`Number`/`Boolean` register zero prototype functions
-   today; Ruffle declares them in `globals/String.as` etc.
-4. **`Number` static math (API 680)** — 21 tests, ~19 methods + 8 constants,
+   The regenerated uncaught-error table confirms the shape: **151 tests die
+   on `TypeError #1006: getTimezoneOffset is not a function`** and a further
+   **15 on `getFullYear`**, the latter scattered through `as3/Definitions`
+   rather than `ecma3/Date` — so the Date arc is worth more than the
+   `ecma3/Date` directory count alone suggests.
+2. **`Number` static math (API 680)** — 21 tests, ~19 methods + 8 constants,
    mirroring `Math`.
-5. **Global URI functions** — `encodeURI`/`decodeURI`/`encodeURIComponent`/
+3. **Global URI functions** — `encodeURI`/`decodeURI`/`encodeURIComponent`/
    `decodeURIComponent`; ~6 here + 3 in the avm2 suite.
+4. **`flash.system.Capabilities`** — the error table now shows **5** tests
+   blocked on `ReferenceError #1065: Variable Capabilities is not defined`,
+   not the 2 previously estimated.
+
+Two smaller items the regenerated error table surfaced that were not in the
+original ranking:
+
+- **`ReferenceError #1037: Cannot assign to a method toString on Array`**
+  (2 tests, e.g. `ecma3/Array/e15_4_1_1`). ES3 code reassigns builtin
+  methods; our class methods are sealed against assignment.
+- **`ReferenceError #1065: Variable AS3 is not defined`**
+  (`as3/Array/length_mods`) and **`isXMLName` undefined**
+  (`e4x/Global/e13_1_2_1`) — one test each, both trivial-looking.
 
 Parked: **`mops`** (13 tests, all crash/error — Alchemy `li8/li16/li32/
 lf32/lf64/si*/sf*` domainMemory opcodes; needs `ApplicationDomain.

@@ -16,25 +16,32 @@ python3 scripts/generate_failing_by_feature.py --suite=gnash/actionscript.all
 
 ## Where we stand
 
-Full corpus, graphics mode at the import baseline `eabb3b366`:
-**3211/4463 effective (71.9%)**, 1252 failing. The table below is that
-baseline — it is complete, and it is what the ranking is computed from.
+**Denominator correction (2026-07-24).** The 4463 figure used below the
+import baseline double-counted three *nested* result directories that are
+already included in their parents: `from_shumway/avm1` (47),
+`from_shumway/timeline` (1) and
+`from_gnash/misc-ming.all/displaylist_depths` (1) — exactly 49 tests.
+`from_shumway`'s own `results_graphics.json` contains all 229 tests
+including the 50 named `avm1/*`. The correct corpus denominator is
+**4414**, and it is what this document uses from here on. Sum over
+top-level leaf suites only; do not add nested `_results` dirs.
 
-**Since then** (CI run `30121943045`, `d36c8da2b`): the root-SymbolClass fix
-took e4x from 2/177 to **160/177**, adding 156 tests in from_avmplus and 4
-in the avm2 suite with **zero regressions**. That run lost shard 25/30 to
-the known apt/Vulkan flake, so its totals are 4322 not 4463; corrected for
-the missing shard the corpus stands at roughly **3400/4463 (76%)**.
+Full corpus, graphics mode at **`127a5f4d3`** (CI `30126336695`, complete
+30/30 shards): **3426/4414 effective (77.6%)**, 988 failing.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | 871/1574 | 55.3 | 703 | **language + builtins** (Tamarin acceptance) |
-| avm2 | 855/1217 | 70.3 | 362 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
+| from_avmplus | 1131/1574 | 71.9 | 443 | **language + builtins** (Tamarin acceptance) |
+| avm2 | 859/1217 | 70.6 | 358 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 654/716 | 91.3 | 62 | long tail |
 | from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
-| from_gnash (5) | 342/379 | 90.2 | 32 | long tail |
-| misc (9 cats) | 180/220 | 81.8 | 40 | text/fonts/mixed_avm/stage3d markers |
+| from_gnash (5) | 371/403 | 92.1 | 32 | long tail |
+| misc (9 cats) | 170/205 | 82.9 | 35 | text/fonts/mixed_avm/stage3d markers |
 | regression | 70/70 | 100 | 0 | ours |
+
+For reference, the import baseline `eabb3b366` was **871/1574** in
+from_avmplus; the ranking below was originally computed from it, and the
+arc yields have been updated in place as each landed.
 
 The two big suites fail for *orthogonal* reasons, and that is the single
 most useful fact in this document:
@@ -99,7 +106,27 @@ multi-argument constructor, the AS3 accessor properties, and the
 `toLocale*`/`toUTCString` formats). No display list, no rendering, no new
 opcodes.
 
-### 2. String/Unicode semantics — ~102 tests · SMALL arc · **best ratio in the corpus**
+### 2. ~~String/Unicode semantics~~ — **DONE (`127a5f4d3`, +101)** · SMALL arc · best ratio in the corpus
+
+**Predicted ~102, delivered 101.** `ecma3/Unicode` 6/108 → **107/108**,
+zero regressions corpus-wide (CI `30126336695`). The 102nd test,
+`utf8count`, is a different and much deeper problem — see below. The
+diagnosis in this section was accurate in every particular and is kept
+for the record.
+
+**What did *not* flip as predicted:** `ecma3/String/esplit_002` and
+`ematch_004` were listed here, but neither was blocked on these two bugs.
+Both do `Number.prototype.split = String.prototype.split` — they need
+arc 3, not arc 2. They pass under `d90353066`.
+
+**`utf8count` is not adjacent-and-cheap.** It concatenates
+`String.fromCharCode()` over surrogate *pairs* and compares to a UTF-8
+literal. `Avm2String` is UTF-8 and cannot hold an unpaired surrogate, so
+each half becomes U+FFFD and they never recombine. That needs WTF-8 or
+pairing-at-concat — a representation change, and it should be scoped
+separately rather than treated as String polish.
+
+<details><summary>original diagnosis (kept — it was correct)</summary>
 
 `ecma3/Unicode` is 102/108 failing, and **every one of those tests fails on
 the same three assertions** (16/21 or 17/21 lines match, uniformly):
@@ -127,7 +154,9 @@ This is a real AVM2 string-indexing correctness bug, not a test artifact.
 Three small fixes, ~102 tests. Nothing else in the corpus comes close on
 effort-to-yield.
 
-### 3. ES3 `.prototype` surface on builtins + `Function.length` — ~35 blanked + long tail · MEDIUM
+</details>
+
+### 3. ES3 `.prototype` surface on builtins + `Function.length` — ~35 blanked + long tail · MEDIUM — **implemented (`d90353066`), CI pending**
 
 `String`, `Array`, `Number` and `Boolean` register **zero** prototype
 functions (`grep avm2_proto_add_function` finds none in `avm2_string.c`,
@@ -242,7 +271,30 @@ from_shumway's 58: 16 fuzz corpus, 9 `timeline/nav`, 9 `as3-loader`,
 
 ---
 
-## Landed this session
+## Landed
+
+**`127a5f4d3` — String/Unicode semantics (arc 2 above).**
+
+Two independent AVM2 String bugs. (a) `search`/`match` handed the raw
+argument to the implicit RegExp constructor, where `undefined` becomes the
+*empty* pattern (ECMA-262 §15.10.4.1) and matches at index 0; Ruffle
+coerces to a string first, making the pattern the literal `"undefined"`,
+which never matches. (b) `String.split('')` iterated UTF-8 **bytes**, so
+U+0080–U+00FF returned 256 elements instead of 128 and U+4E00–U+4EFA
+returned 753 instead of 251; it now walks UTF-16 code units via
+`utf16_unit_at`, mirroring `charAt` including the astral case.
+
+CI-confirmed (`30126336695`, graphics, `categories=full`, full 30/30
+shards): **+101 newly effective, every one in `ecma3/Unicode`
+(6/108 → 107/108), and zero regressions in any suite.**
+
+⚠️ **Shard-recovery caveat for anyone re-reading these runs.** The prior
+run `30121943045` lost shard 25/30 to the apt/Vulkan flake, so 137 tests
+corpus-wide (52 in from_avmplus) went unexecuted. Run `30126336695`
+restored them, and a naive run-to-run diff shows those 137 as "new" — 98
+of which were *already* effective. The +101 above counts only tests
+present in **both** runs. Always diff on the intersection when a flaked
+run is one of the endpoints.
 
 **`d36c8da2b` — root SymbolClass must inherit Sprite, trace `TypeError #2023`.**
 
@@ -266,21 +318,39 @@ This also settles the E4X question: **E4X is not a coverage gap.** Our
 engine passes Tamarin's XML/XMLList/QName/Namespace/TypeConversion suites
 essentially in full; 2/177 was one linking bug, not missing features.
 
-## Recommendation — the next 3 arcs
+## Recommendation — the next arcs
 
-| Order | Arc | Yield | Size | Why |
+| Order | Arc | Yield | Size | Status |
 |---|---|---|---|---|
-| 1 | String/Unicode: `search`/`match` no-arg + `split('')` by code unit | ~102 | small | three bugs, best ratio in the corpus, and a genuine string-indexing correctness fix |
-| 2 | `Date` class (ECMA-262 §15.9) | ~155 | large | biggest single unlock left; fully specified; AVM1 Date to port from; no new subsystems |
-| 3 | ES3 `.prototype` surface + `Function.length` | ~35 blanked + a long one-line tail | medium | unblocks Tamarin's standard opening assertion, so it also shortens the diffs of tests the other arcs touch |
+| ~~1~~ | String/Unicode: `search`/`match` coercion + `split('')` by code unit | **101 actual** (pred. ~102) | small | **DONE `127a5f4d3`** |
+| ~~2~~ | ES3 `.prototype` surface + `Function.length` | ~35 blanked + a long one-line tail | medium | **implemented `d90353066`**, CI pending |
+| 1 | `Date` class (ECMA-262 §15.9) | ~166 | large | biggest single unlock left; fully specified; AVM1 Date to port from; no new subsystems |
+| 2 | `Number` static math (API 680) | 21 | small | mechanical |
+| 3 | Global URI functions | ~9 | small | mechanical |
+| 4 | `flash.system.Capabilities` | 5 | trivial | mechanical |
 
-Then, as a cheap cleanup batch in one session: `Number` static math (21),
-global URI functions (9), `flash.system.Capabilities` (2) — ~32 tests of
-almost purely mechanical work.
+**Date is now the clear top item**, and it is worth *more* than the
+`ecma3/Date` directory count: the regenerated uncaught-error table shows
+**151** tests dying on `getTimezoneOffset is not a function` plus **15**
+more on `getFullYear` that live outside `ecma3/Date` (mostly
+`as3/Definitions`). Call it ~166.
 
-from_avmplus stands at ~1029/1574 after this session's fix. Doing arcs 1–3
-plus the cleanup batch would take it to roughly **1350/1574 (86%)** and the
-whole corpus from ~76% to about **83%**.
+The cheap cleanup batch (`Number` static math + URI functions +
+`Capabilities`) is ~35 tests of almost purely mechanical work and fits in
+one session.
+
+from_avmplus stands at **1131/1574 (71.9%)** with arc 2 landed. Adding the
+ES3 prototype arc, Date, and the cleanup batch should take it to roughly
+**1350/1574 (86%)** and the corpus from 77.6% to about **83%**.
+
+**Re-rank from the error table, not from first principles.** Every result
+now carries `error_signature`; `generate_failing_by_feature.py` emits a
+"Failing Tests by Uncaught Error" histogram
+(`from_avmplus/_investigation/FAILING_TESTS_BY_FEATURE.md`). It already
+corrected two estimates in this document — `Capabilities` is 5 tests, not
+2, and Date is ~166, not ~155 — and surfaced small items nobody had
+listed (`#1037 Cannot assign to a method toString on Array`, undefined
+`AS3` and `isXMLName`, each 1–2 tests).
 
 Regression-guard every one of these with
 `gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f categories=full`
