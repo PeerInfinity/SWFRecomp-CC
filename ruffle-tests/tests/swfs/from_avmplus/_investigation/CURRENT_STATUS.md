@@ -263,11 +263,15 @@ Four things worth remembering:
   `avm2_proto_add_function_n` / `avm2_builtin_add_global_fn_n`.
 - **Take arities from the corpus, not from ECMA-262.** The spec says
   `String.prototype.concat.length` is 1; Flash/Ruffle say **0** (rest
-  param) and the tests assert 0. One command gives the ground truth:
+  param) and the tests assert 0. `indexOf`/`lastIndexOf` are 2 where the
+  spec says 1. One command gives the ground truth:
   ```bash
   grep -rhoP '"\w+\.prototype\.\w+\.length",\s*\d+' \
       ruffle-tests/tests/swfs/from_avmplus/ | sort -u
   ```
+  Written up as a replicated Flash quirk — **do not "correct" these to the
+  spec values**: `avm1/_investigation/FLASH_BUGS_REPLICATED.md`
+  §"[AVM2] `Function.length` on builtins deviates from ECMA-262".
 
 **+36, CI `30128240863`.** `ecma3/String` 47/83 → 70/83.
 

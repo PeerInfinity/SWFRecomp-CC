@@ -10,6 +10,67 @@ This is distinct from:
 - `RUFFLE_VS_FLASH_DIFFERENCES.md` — cases where we match Flash but Ruffle disagrees
 - `RUFFLE_COMPAT_TWEAKS.md` — arbitrary choices where correct behavior is unclear
 
+**Scope note (2026-07-24):** this file lives under `avm1/_investigation/` for
+historical reasons, but the category is corpus-wide. Entries are tagged
+**[AVM1]** or **[AVM2]**; AVM2/avmplus entries are indexed from
+`from_avmplus/_investigation/CURRENT_STATUS.md`.
+
+---
+
+## [AVM2] `Function.length` on builtins deviates from ECMA-262
+
+**Affected tests**: `from_avmplus/ecma3/String/concat`,
+`ecma3/String/e15_5_4_6_2_rt`, and every Tamarin test whose opening
+assertion is `X.prototype.<method>.length` (~35 tests across `ecma3/String`,
+`Array`, `Number`, `Boolean`, `FunctionObjects`, `ObjectObjects`).
+
+**The bug**: ECMA-262 3rd ed. specifies the `length` of several built-in
+methods, and avmplus/Flash reports **different values** — because Flash
+implements them with rest parameters or extra optional parameters, and
+reports the resulting declared arity rather than the spec constant.
+
+| Method | ECMA-262 says | Flash / Ruffle / us |
+|---|---|---|
+| `String.prototype.concat` | 1 (§15.5.4.6) | **0** (rest param) |
+| `String.prototype.indexOf` | 1 (§15.5.4.7) | **2** |
+| `String.prototype.lastIndexOf` | 1 (§15.5.4.8) | **2** |
+| `Array.prototype.concat` | 1 (§15.4.4.4) | **0** (rest param) |
+
+**Evidence**: the Flash-generated expected output asserts the Flash values,
+not the spec ones. From `ecma3/String/concat/Test.as`:
+
+```as3
+Assert.expectEq( "String.prototype.concat.length", 0, String.prototype.concat.length );
+```
+
+and `ecma3/String/concat/output.txt` line 1 is
+`String.prototype.concat.length PASSED!`. Ruffle matches, declaring
+`prototype.concat = function(...args):String` in
+`core/src/avm2/globals/String.as` (a rest param, so arity 0) and
+`indexOf = function(str:String = "undefined", index:Number = 0)` (arity 2).
+
+**What we did** (`d90353066`): carry a declared arity on native builtin
+function objects — a `param_count` field on `Avm2MethodRef`, surfaced by
+`fn_get_length` — and register each prototype function with the **Flash**
+arity via `avm2_proto_add_function_n`.
+
+**Do not "fix" these to the spec values.** The rule for this codebase is:
+
+> Take builtin arities from the corpus's own assertions, never from
+> ECMA-262. One command gives the ground truth:
+> ```bash
+> grep -rhoP '"\w+\.prototype\.\w+\.length",\s*\d+' \
+>     ruffle-tests/tests/swfs/from_avmplus/ | sort -u
+> ```
+
+Global functions happen to agree with the spec (`parseInt` 2, `parseFloat`
+1, `escape`/`unescape`/`isNaN`/`isFinite` 1), so the deviation is confined
+to the `String`/`Array` prototype methods above — but check, don't assume.
+
+**Files**: `SWFModernRuntime/src/avm2/avm2_string.c`, `avm2_array.c`,
+`avm2_number.c`, `avm2_regexp.c`, `avm2_function.c`, `avm2_globals.c`;
+`SWFModernRuntime/include/avm2/avm2_object.h` (`Avm2MethodRef.param_count`).
+
 ---
 
 ## colorTransform: aMult-Only > 1 Has No Effect
