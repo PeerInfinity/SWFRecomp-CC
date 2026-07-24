@@ -13,18 +13,18 @@
 #   --clean-cache Remove cached RecompiledScripts/RecompiledTags only (no download)
 #   CATEGORY...   One or more test categories to download (default: avm1)
 #
-# Available categories:
-#   avm1              tests/tests/swfs/avm1 (~644 AVM1 tests)
-#   avm2              tests/tests/swfs/avm2 (~1220 AVM2 tests)
-#   from_avmplus      tests/tests/swfs/from_avmplus (~1574 AVM2 tests — Adobe
-#                     Tamarin/avmplus acceptance suite: ecma3/as3/e4x/regress)
-#   from_shumway      tests/tests/swfs/from_shumway (~92 AVM1 tests, ~137 AVM2 skipped)
-#   from_gnash        tests/tests/swfs/from_gnash (~404 AVM1 tests)
+# Available categories (the full upstream tests/tests/swfs/ tree):
+#   avm1              ~719 tests    from_avmplus      ~1574 tests (Tamarin)
+#   avm2              ~1221 tests   from_shumway      ~229 tests
+#   from_gnash        ~404 tests    visual            ~142 tests (mostly image-only)
+#   timeline ~17, text ~11, mixed_avm ~11, fonts ~6, audio ~5, stage3d ~5,
+#   swf ~5, import_assets ~3
 #
-# The installer walks each category tree recursively and detects AVM1 vs AVM2
-# from the SWF file header (swf_is_avm2.py). AVM2 / ActionScript 3 tests are
-# skipped because the SWFRecomp pipeline is AVM1-only; running them would
-# just produce compile_fail noise.
+# The installer walks each category tree recursively and installs every test
+# directory. Since 2026-07-24 there is NO AVM-generation filtering: the
+# pipeline detects AVM1 vs AVM2 per SWF at recompile time (RecompiledABC/),
+# so mixed suites are fine and the full upstream corpus is mirrored
+# (_investigation/FULL_SUITE_IMPORT_AUDIT.md).
 #
 # Examples:
 #   ./download_tests.sh                          # download avm1 only
@@ -60,17 +60,15 @@ CATEGORY_LOCAL_PATH[avm2]="${SCRIPT_DIR}/tests/swfs/avm2"
 CATEGORY_REPO_PATH[from_avmplus]="tests/tests/swfs/from_avmplus"
 CATEGORY_LOCAL_PATH[from_avmplus]="${SCRIPT_DIR}/tests/swfs/from_avmplus"
 
-# Which AVM generation each category keeps (default avm1). The avm2 and
-# from_avmplus suites invert the filter: keep AVM2 SWFs, skip stray AVM1 ones.
-declare -A CATEGORY_KEEP_AVM
-CATEGORY_KEEP_AVM[avm2]="avm2"
-CATEGORY_KEEP_AVM[from_avmplus]="avm2"
-
-# avm2 joined ALL_CATEGORIES with plan Stage 2 (CI fan-out landed alongside
-# the hello_world end-to-end baseline; see SWFRecompDocs/plans/avm2-support-plan.md).
-# from_avmplus joined with the full-suite import
+# The nine small categories joined with the full-suite import
 # (_investigation/FULL_SUITE_IMPORT_AUDIT.md, 2026-07-24).
-ALL_CATEGORIES=(avm1 avm2 from_avmplus from_shumway from_gnash)
+for small_cat in timeline text swf import_assets audio fonts visual mixed_avm stage3d; do
+    CATEGORY_REPO_PATH[${small_cat}]="tests/tests/swfs/${small_cat}"
+    CATEGORY_LOCAL_PATH[${small_cat}]="${SCRIPT_DIR}/tests/swfs/${small_cat}"
+done
+
+ALL_CATEGORIES=(avm1 avm2 from_avmplus from_shumway from_gnash
+                timeline text swf import_assets audio fonts visual mixed_avm stage3d)
 
 # Parse arguments
 CLEAN=false
@@ -150,7 +148,6 @@ git -C "${TMPDIR}/ruffle" sparse-checkout set "${SPARSE_PATHS[@]}" 2>&1
 
 # Install each category
 TOTAL_INSTALLED=0
-TOTAL_SKIPPED=0
 
 install_test_dir() {
     local test_dir="$1"
@@ -195,7 +192,6 @@ install_category() {
     local src_dir="${TMPDIR}/ruffle/${CATEGORY_REPO_PATH[${cat}]}"
     local dest_base="${CATEGORY_LOCAL_PATH[${cat}]}"
     local installed=0
-    local skipped=0
 
     if [[ ! -d "${src_dir}" ]]; then
         echo "Warning: Source directory not found for ${cat}: ${src_dir}"
@@ -248,27 +244,10 @@ install_category() {
         all_swfs+=("${swf}")
     done < <(find "${src_dir}" -mindepth 2 -name test.swf -print0)
 
-    # Filter to the category's AVM generation (default AVM1 — running AVM2
-    # tests through the AVM1 pipeline would just produce compile_fail noise;
-    # the avm2 category inverts this and keeps only AVM2 SWFs). Uses
-    # swf_is_avm2.py batch mode: feeds all paths on stdin, reads back the ones
-    # whose SWF headers match (FileAttributes HasActionScript3 bit / DoABC tag).
-    local keep_avm="${CATEGORY_KEEP_AVM[${cat}]:-avm1}"
-    local avm1_swfs=()
-    if [[ ${#all_swfs[@]} -gt 0 ]]; then
-        local filtered
-        filtered="$(printf '%s\n' "${all_swfs[@]}" | python3 "${SCRIPT_DIR}/swf_is_avm2.py" "--filter-${keep_avm}")"
-        if [[ -n "${filtered}" ]]; then
-            while IFS= read -r line; do
-                [[ -n "${line}" ]] && avm1_swfs+=("${line}")
-            done <<< "${filtered}"
-        fi
-    fi
-
-    local avm2_skipped=$(( ${#all_swfs[@]} - ${#avm1_swfs[@]} ))
-
-    # Install each kept test, preserving its path relative to the category root.
-    for swf in "${avm1_swfs[@]}"; do
+    # Install every test, preserving its path relative to the category root.
+    # No AVM-generation filtering (removed 2026-07-24): the pipeline detects
+    # AVM1 vs AVM2 per SWF at recompile time, so mixed suites are fine.
+    for swf in "${all_swfs[@]}"; do
         local test_src rel_path
         test_src="$(dirname "${swf}")"
         rel_path="${test_src#"${src_dir}"/}"
@@ -282,9 +261,8 @@ install_category() {
         cp -r "${src_dir}/__framework__/"* "${dest_base}/__framework__/"
     fi
 
-    echo "Installed ${installed} tests (skipped ${avm2_skipped} AVM2/non-AVM1)."
+    echo "Installed ${installed} tests."
     TOTAL_INSTALLED=$((TOTAL_INSTALLED + installed))
-    TOTAL_SKIPPED=$((TOTAL_SKIPPED + avm2_skipped))
 }
 
 for cat in "${CATEGORIES[@]}"; do
@@ -292,4 +270,4 @@ for cat in "${CATEGORIES[@]}"; do
 done
 
 echo ""
-echo "Done! Total: ${TOTAL_INSTALLED} tests installed, ${TOTAL_SKIPPED} skipped."
+echo "Done! Total: ${TOTAL_INSTALLED} tests installed."

@@ -91,16 +91,34 @@ counts/timeouts in `ruffle-tests.yml` before the first full dispatch, and
 run the import baseline in BOTH modes (corpus import = "when in doubt run
 both").
 
+## Import status (2026-07-24): COMPLETE — full corpus mirrored, no filtering
+
+Same-day follow-up (user direction): mirror the FULL upstream test set with
+no AVM-generation filtering at all. `download_tests.sh` now knows all 14
+upstream categories and installs every test directory; the old
+`swf_is_avm2.py` keep-avm filter is deleted (the pipeline detects AVM1 vs
+AVM2 per SWF at recompile time via `RecompiledABC/`, so mixed suites just
+work — from_shumway now installs all 229 including its 137 AVM2 tests).
+The nine small categories (timeline, text, swf, import_assets, audio,
+fonts, visual, mixed_avm, stage3d — ~215 tests) are wired into CI as the
+`misc` group (shard tags `misc_<name>`, one results dir each).
+
+Caveats now that everything is in:
+- **visual** is 130/142 image-only — under trace-only gating those grade on
+  incidental trace output (often trivially). Their value is recompiler
+  smoke coverage (e.g. `visual/blend_modes` is a `recomp_fail` today).
+- **mixed_avm** (dual-VM movies) and **stage3d** will mostly fail until
+  those capabilities exist — they are roadmap markers, not regressions.
+- Suites without filtering may gain a few upstream strays (e.g. avm1 picks
+  up its AVM2-header oddballs) — they surface as "Added Tests" in diffs.
+
 ## Which tests run when (selection policy, adopted 2026-07-24)
 
-from_avmplus was wired into `download_tests.sh` and `ruffle-tests.yml` on
-2026-07-24. To keep per-change CI wall-clock unchanged, the workflow gained
-two selectors instead of growing `all`:
-
 - `all` — the classic five suites (avm1, avm2, regression, from_shumway,
-  from_gnash). **Unchanged meaning; still the per-change default.**
-- `full` — `all` + from_avmplus. The complete corpus.
-- `from_avmplus` — the new suite alone (baselines, targeted reruns).
+  from_gnash). **Unchanged meaning; still the per-change default.** Note
+  from_shumway inside `all` now includes its AVM2 half.
+- `full` — the complete corpus: `all` + from_avmplus + the misc group.
+- `from_avmplus` / `misc` / per-suite selectors — targeted runs.
 
 | Situation | Dispatch |
 |---|---|

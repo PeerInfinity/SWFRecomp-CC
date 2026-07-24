@@ -143,6 +143,36 @@ ruffle-tests/tests/swfs/from_avmplus/*/
 !ruffle-tests/tests/swfs/from_avmplus/_investigation/
 !ruffle-tests/tests/swfs/from_avmplus/_results/
 
+# Small categories from the full-suite import (downloaded test data,
+# keep results and investigation) — see FULL_SUITE_IMPORT_AUDIT.md
+ruffle-tests/tests/swfs/timeline/*/
+!ruffle-tests/tests/swfs/timeline/_investigation/
+!ruffle-tests/tests/swfs/timeline/_results/
+ruffle-tests/tests/swfs/text/*/
+!ruffle-tests/tests/swfs/text/_investigation/
+!ruffle-tests/tests/swfs/text/_results/
+ruffle-tests/tests/swfs/swf/*/
+!ruffle-tests/tests/swfs/swf/_investigation/
+!ruffle-tests/tests/swfs/swf/_results/
+ruffle-tests/tests/swfs/import_assets/*/
+!ruffle-tests/tests/swfs/import_assets/_investigation/
+!ruffle-tests/tests/swfs/import_assets/_results/
+ruffle-tests/tests/swfs/audio/*/
+!ruffle-tests/tests/swfs/audio/_investigation/
+!ruffle-tests/tests/swfs/audio/_results/
+ruffle-tests/tests/swfs/fonts/*/
+!ruffle-tests/tests/swfs/fonts/_investigation/
+!ruffle-tests/tests/swfs/fonts/_results/
+ruffle-tests/tests/swfs/visual/*/
+!ruffle-tests/tests/swfs/visual/_investigation/
+!ruffle-tests/tests/swfs/visual/_results/
+ruffle-tests/tests/swfs/mixed_avm/*/
+!ruffle-tests/tests/swfs/mixed_avm/_investigation/
+!ruffle-tests/tests/swfs/mixed_avm/_results/
+ruffle-tests/tests/swfs/stage3d/*/
+!ruffle-tests/tests/swfs/stage3d/_investigation/
+!ruffle-tests/tests/swfs/stage3d/_results/
+
 # Gnash tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_gnash/*/
 !ruffle-tests/tests/swfs/from_gnash/_investigation/

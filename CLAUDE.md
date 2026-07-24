@@ -23,8 +23,9 @@ to make the pipeline resumable across sessions.
   otherwise the weekly `weekly-no-graphics.yml` canary covers it. When in
   doubt for shared runtime code, run both.
 - **CI categories**: `all` (classic five suites) is the per-change default;
-  use `categories=full` (adds from_avmplus, ~+64% runtime) when the change
-  touches AVM2 runtime/recompiler emission. Weekly canary runs `full`.
+  use `categories=full` (adds from_avmplus + the misc group, ~+73% tests)
+  when the change touches AVM2 runtime/recompiler emission. Weekly canary
+  runs `full`.
   Policy: `ruffle-tests/tests/swfs/_investigation/FULL_SUITE_IMPORT_AUDIT.md`
   §"Which tests run when".
 - Still ask before anything genuinely irreversible or out of scope (force-pushing
@@ -68,10 +69,13 @@ gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f single_test=TE
 
 - `SWFRecomp/` — Recompiler: converts SWF bytecode to C (`src/action/action.cpp` is the main bytecode→C translator)
 - `SWFModernRuntime/` — Runtime: executes the generated C (`src/actionmodern/action.c` is ~50K lines, the core runtime)
-- `ruffle-tests/` — Ruffle test suites:
-  - `tests/swfs/avm1/` — 641 AVM1 tests from Ruffle (100% filtered pass rate)
-  - `tests/swfs/from_gnash/` — 335 tests from Gnash (147 effective pass across 5 sub-suites)
-  - `tests/swfs/from_shumway/` — 92 flat + 47 avm1 tests from Shumway (61 + 45 effective)
+- `ruffle-tests/` — Ruffle test suites (since 2026-07-24 the FULL upstream corpus is mirrored, no AVM filtering; see `tests/swfs/_investigation/FULL_SUITE_IMPORT_AUDIT.md`):
+  - `tests/swfs/avm1/` — ~720 AVM1 tests from Ruffle (100% filtered pass rate)
+  - `tests/swfs/avm2/` — ~1220 AVM2 tests from Ruffle
+  - `tests/swfs/from_avmplus/` — 1574 AVM2 tests (Adobe Tamarin acceptance: ecma3/as3/e4x/regress)
+  - `tests/swfs/from_gnash/` — 404 tests from Gnash (5 sub-suites)
+  - `tests/swfs/from_shumway/` — 229 tests from Shumway (AVM1 + AVM2, unfiltered)
+  - nine small categories (`timeline`, `text`, `swf`, `import_assets`, `audio`, `fonts`, `visual`, `mixed_avm`, `stage3d`) — ~215 tests, CI `misc` group
   - `tests/swfs/regression/` — hand-written by this project, never downloaded; fully git-tracked. Run with `--tests-dir=ruffle-tests/tests/swfs/regression`. New custom tests go here, NOT in the upstream mirrors above (see that suite's `README.md`).
 - `SWFRecomp/tests/` — Old hand-written test suite (158 trace tests + 59 graphics tests, all passing)
 - `SWFRecomp/scripts/` — Build scripts (build_test.sh, deploy_example.sh, etc.)

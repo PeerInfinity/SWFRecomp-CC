@@ -574,6 +574,16 @@ SUITE_DIRS = [
     # suites first while AVM2 support is being built (plan: avm2-support-plan.md).
     "avm2",
     "from_avmplus",
+    # Small categories from the full-suite import (2026-07-24).
+    "timeline",
+    "text",
+    "swf",
+    "import_assets",
+    "audio",
+    "fonts",
+    "visual",
+    "mixed_avm",
+    "stage3d",
 ]
 
 # JSON result files (re-derived from TESTS_DIR in main() when --tests-dir is used)

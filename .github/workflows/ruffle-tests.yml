@@ -14,6 +14,7 @@ on:
           - 'avm1'
           - 'avm2'
           - 'from_avmplus'
+          - 'misc'
           - 'from_shumway'
           - 'from_gnash'
         default: 'all'
@@ -132,6 +133,9 @@ env:
   AVM2_DIR: ruffle-tests/tests/swfs/avm2
   # from_avmplus (AVM2, Tamarin acceptance) - full-suite import 2026-07-24.
   AVMPLUS_DIR: ruffle-tests/tests/swfs/from_avmplus
+  # The nine small categories from the full-suite import (one space-separated
+  # list; each gets its own results dir + shard tag misc_<name>).
+  MISC_DIRS: ruffle-tests/tests/swfs/timeline ruffle-tests/tests/swfs/text ruffle-tests/tests/swfs/swf ruffle-tests/tests/swfs/import_assets ruffle-tests/tests/swfs/audio ruffle-tests/tests/swfs/fonts ruffle-tests/tests/swfs/visual ruffle-tests/tests/swfs/mixed_avm ruffle-tests/tests/swfs/stage3d
   # Hand-written regression tests. Not downloaded — download_tests.sh never
   # touches this tree, so it takes no `CATS` entry, only a DIRS entry.
   REGRESSION_DIR: ruffle-tests/tests/swfs/regression
@@ -154,6 +158,7 @@ jobs:
       RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'avm1' }}
       RUN_AVM2: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'avm2' }}
       RUN_AVMPLUS: ${{ inputs.categories == 'full' || inputs.categories == 'from_avmplus' }}
+      RUN_MISC: ${{ inputs.categories == 'full' || inputs.categories == 'misc' }}
       RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'from_shumway' }}
       RUN_GNASH: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'from_gnash' }}
 
@@ -270,6 +275,7 @@ jobs:
           [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
           [ "$RUN_AVM2" = "true" ] && CATS="$CATS avm2"
           [ "$RUN_AVMPLUS" = "true" ] && CATS="$CATS from_avmplus"
+          [ "$RUN_MISC" = "true" ] && CATS="$CATS timeline text swf import_assets audio fonts visual mixed_avm stage3d"
           [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
           [ "$RUN_GNASH" = "true" ] && CATS="$CATS from_gnash"
           bash ruffle-tests/download_tests.sh $CATS
@@ -280,6 +286,7 @@ jobs:
           [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
           [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
           [ "$RUN_AVMPLUS" = "true" ] && DIRS="$DIRS $AVMPLUS_DIR"
+          [ "$RUN_MISC" = "true" ] && DIRS="$DIRS $MISC_DIRS"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -294,6 +301,7 @@ jobs:
           [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
           [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
           [ "$RUN_AVMPLUS" = "true" ] && DIRS="$DIRS $AVMPLUS_DIR"
+          [ "$RUN_MISC" = "true" ] && DIRS="$DIRS $MISC_DIRS"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -333,6 +341,7 @@ jobs:
           [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
           [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
           [ "$RUN_AVMPLUS" = "true" ] && DIRS="$DIRS $AVMPLUS_DIR"
+          [ "$RUN_MISC" = "true" ] && DIRS="$DIRS $MISC_DIRS"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -652,6 +661,7 @@ jobs:
       run_avm1: ${{ steps.cats.outputs.run_avm1 }}
       run_avm2: ${{ steps.cats.outputs.run_avm2 }}
       run_avmplus: ${{ steps.cats.outputs.run_avmplus }}
+      run_misc: ${{ steps.cats.outputs.run_misc }}
       run_shumway: ${{ steps.cats.outputs.run_shumway }}
       run_gnash: ${{ steps.cats.outputs.run_gnash }}
 
@@ -659,6 +669,7 @@ jobs:
       RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'avm1' }}
       RUN_AVM2: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'avm2' }}
       RUN_AVMPLUS: ${{ inputs.categories == 'full' || inputs.categories == 'from_avmplus' }}
+      RUN_MISC: ${{ inputs.categories == 'full' || inputs.categories == 'misc' }}
       RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'from_shumway' }}
       RUN_GNASH: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'from_gnash' }}
 
@@ -669,6 +680,7 @@ jobs:
           echo "run_avm1=$RUN_AVM1" >> "$GITHUB_OUTPUT"
           echo "run_avm2=$RUN_AVM2" >> "$GITHUB_OUTPUT"
           echo "run_avmplus=$RUN_AVMPLUS" >> "$GITHUB_OUTPUT"
+          echo "run_misc=$RUN_MISC" >> "$GITHUB_OUTPUT"
           echo "run_shumway=$RUN_SHUMWAY" >> "$GITHUB_OUTPUT"
           echo "run_gnash=$RUN_GNASH" >> "$GITHUB_OUTPUT"
 
@@ -735,6 +747,7 @@ jobs:
           [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
           [ "$RUN_AVM2" = "true" ] && CATS="$CATS avm2"
           [ "$RUN_AVMPLUS" = "true" ] && CATS="$CATS from_avmplus"
+          [ "$RUN_MISC" = "true" ] && CATS="$CATS timeline text swf import_assets audio fonts visual mixed_avm stage3d"
           [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
           [ "$RUN_GNASH" = "true" ] && CATS="$CATS from_gnash"
           bash ruffle-tests/download_tests.sh $CATS
@@ -745,6 +758,7 @@ jobs:
           [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
           [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
           [ "$RUN_AVMPLUS" = "true" ] && DIRS="$DIRS $AVMPLUS_DIR"
+          [ "$RUN_MISC" = "true" ] && DIRS="$DIRS $MISC_DIRS"
           if [ "$RUN_SHUMWAY" = "true" ]; then
             DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
           fi
@@ -778,6 +792,7 @@ jobs:
       RUN_AVM1: ${{ needs.setup-parallel.outputs.run_avm1 }}
       RUN_AVM2: ${{ needs.setup-parallel.outputs.run_avm2 }}
       RUN_AVMPLUS: ${{ needs.setup-parallel.outputs.run_avmplus }}
+      RUN_MISC: ${{ needs.setup-parallel.outputs.run_misc }}
       RUN_SHUMWAY: ${{ needs.setup-parallel.outputs.run_shumway }}
       RUN_GNASH: ${{ needs.setup-parallel.outputs.run_gnash }}
 
@@ -995,6 +1010,32 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Verify misc suites (shard ${{ matrix.shard }})
+        if: "!cancelled() && env.RUN_MISC == 'true'"
+        timeout-minutes: 20
+        env:
+          TZ: NPT-5:45
+        run: |
+          SHARD="${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          for dir in $MISC_DIRS; do
+            name=$(basename "$dir")
+            [ -d "$dir" ] || continue
+            python3 ruffle-tests/verify_output.py -v \
+              --mode='${{ inputs.mode }}' \
+              --tests-dir="$dir" \
+              --json=ruffle-tests/results-shard-misc_${name}-${{ matrix.shard }}.json \
+              --shard="$SHARD" || true
+          done
+
+      - name: Upload misc results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-shard-${{ matrix.shard }}-misc
+          path: ruffle-tests/results-shard-misc_*-${{ matrix.shard }}.json
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Verify Shumway (shard ${{ matrix.shard }})
         if: "!cancelled() && env.RUN_SHUMWAY == 'true'"
         timeout-minutes: 10
@@ -1138,7 +1179,7 @@ jobs:
         # stale _results/ files from the master checkout, which would overwrite
         # the fetched previous results if we fetched first.
         run: |
-          DIRS="$AVM1_DIR $AVM2_DIR $AVMPLUS_DIR $REGRESSION_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
+          DIRS="$AVM1_DIR $AVM2_DIR $AVMPLUS_DIR $MISC_DIRS $REGRESSION_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
           # Per-mode previous baseline (graphics diffs against graphics, etc.).
           case "${{ inputs.mode }}" in
             graphics) PREV_STEM="results_graphics" ;;
@@ -1183,6 +1224,15 @@ jobs:
               "avm1": "ruffle-tests/tests/swfs/avm1/_results",
               "avm2": "ruffle-tests/tests/swfs/avm2/_results",
               "avmplus": "ruffle-tests/tests/swfs/from_avmplus/_results",
+              "misc_timeline": "ruffle-tests/tests/swfs/timeline/_results",
+              "misc_text": "ruffle-tests/tests/swfs/text/_results",
+              "misc_swf": "ruffle-tests/tests/swfs/swf/_results",
+              "misc_import_assets": "ruffle-tests/tests/swfs/import_assets/_results",
+              "misc_audio": "ruffle-tests/tests/swfs/audio/_results",
+              "misc_fonts": "ruffle-tests/tests/swfs/fonts/_results",
+              "misc_visual": "ruffle-tests/tests/swfs/visual/_results",
+              "misc_mixed_avm": "ruffle-tests/tests/swfs/mixed_avm/_results",
+              "misc_stage3d": "ruffle-tests/tests/swfs/stage3d/_results",
               "regression": "ruffle-tests/tests/swfs/regression/_results",
               "shumway_avm1": "ruffle-tests/tests/swfs/from_shumway/avm1/_results",
               "shumway_flat": "ruffle-tests/tests/swfs/from_shumway/_results",
