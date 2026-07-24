@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-24T21:33:55.093206+00:00",
-    "git_sha": "127a5f4d39dc34915d1ef6a35d705cb8fa54008b",
-    "duration_seconds": 42.77,
+    "timestamp": "2026-07-24T22:06:49.379007+00:00",
+    "git_sha": "2cf4014fd6724a9b22415b88ba0adb9053818ff1",
+    "duration_seconds": 42.6,
     "total_available": 3,
     "shards": 30,
     "expected_shards": 30
@@ -22,8 +22,8 @@
       "test": "avm1_imports_avm1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.563,
-        "run": 0.265
+        "compile": 0.676,
+        "run": 0.317
       },
       "num_frames": 1,
       "lines": {
@@ -31,7 +31,7 @@
         "expected_lines": 6,
         "matching_lines": 0
       },
-      "duration": 1.06,
+      "duration": 1.25,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -52,7 +52,7 @@
       "test": "avm1_non_swf_import",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.255,
+        "compile": 20.371,
         "run": 0.215
       },
       "num_frames": 4,
@@ -61,7 +61,7 @@
         "expected_lines": 6,
         "matching_lines": 0
       },
-      "duration": 21.48,
+      "duration": 20.59,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=3, expected=6)",
       "actual_output": "frame 1\nframe 2\nframe 3",
@@ -71,7 +71,7 @@
       "test": "empty_url",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.832,
+        "compile": 20.332,
         "run": 0.215
       },
       "num_frames": 2,
@@ -80,7 +80,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 20.05,
+      "duration": 20.55,
       "status": "pass"
     }
   ]

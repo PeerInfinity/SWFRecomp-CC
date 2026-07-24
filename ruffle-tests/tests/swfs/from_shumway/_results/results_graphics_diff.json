@@ -1,118 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-24T20:26:59.158318+00:00",
-    "old_git_sha": "d36c8da2b2bdd0740f645050eb1f0933866193bd",
-    "new_timestamp": "2026-07-24T21:33:55.137143+00:00",
-    "new_git_sha": "127a5f4d39dc34915d1ef6a35d705cb8fa54008b",
+    "old_timestamp": "2026-07-24T21:33:55.137143+00:00",
+    "old_git_sha": "127a5f4d39dc34915d1ef6a35d705cb8fa54008b",
+    "new_timestamp": "2026-07-24T22:06:49.422577+00:00",
+    "new_git_sha": "2cf4014fd6724a9b22415b88ba0adb9053818ff1",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 155,
+    "old_pass": 159,
     "old_ruffle_matched": 12,
-    "old_effective_pass": 167,
-    "old_total": 222,
-    "old_pass_rate": 69.8,
+    "old_effective_pass": 171,
+    "old_total": 229,
+    "old_pass_rate": 69.4,
     "new_pass": 159,
     "new_ruffle_matched": 12,
     "new_effective_pass": 171,
     "new_total": 229,
     "new_pass_rate": 69.4,
-    "old_mismatched_lines": 932,
+    "old_mismatched_lines": 943,
     "new_mismatched_lines": 943,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 222,
-    "added": 7,
+    "unchanged": 229,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "mouse/start_drag",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "mouse/start_drag_lock",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "movieclip",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "movieinfo1",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "slider_component",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "stream1",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 9,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "stroke1",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 1,
-        "matching_lines": 0
-      }
-    }
-  ]
+  "changes": []
 }

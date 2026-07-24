@@ -1,13 +1,11 @@
 {
   "metadata": {
-    "timestamp": "2026-07-24T20:26:59.141912+00:00",
-    "git_sha": "d36c8da2b2bdd0740f645050eb1f0933866193bd",
-    "duration_seconds": 35.66,
+    "timestamp": "2026-07-24T21:33:55.120699+00:00",
+    "git_sha": "127a5f4d39dc34915d1ef6a35d705cb8fa54008b",
+    "duration_seconds": 31.08,
     "total_available": 5,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
   "total": 5,
   "pass": 1,
@@ -23,17 +21,18 @@
     {
       "test": "request_matching_profiles",
       "phases": {
-        "recomp": 0.0,
-        "compile": 3.681,
+        "recomp": 0.008,
+        "compile": 0.704,
         "run": 0.165
       },
       "num_frames": 126,
+      "error_signature": "ReferenceError: Error #1065: Variable Context3DProfile is not defined.",
       "lines": {
         "actual_lines": 0,
         "expected_lines": 190,
         "matching_lines": 0
       },
-      "duration": 3.86,
+      "duration": 0.89,
       "status": "output_mismatch",
       "detail": "190 line(s) differ (actual=0, expected=190)",
       "actual_output": "",
@@ -43,16 +42,17 @@
       "test": "request_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.772,
+        "compile": 5.797,
         "run": 0.165
       },
       "num_frames": 12,
+      "error_signature": "ReferenceError: Error #1065: Variable Context3DProfile is not defined.",
       "lines": {
         "actual_lines": 0,
         "expected_lines": 16,
         "matching_lines": 0
       },
-      "duration": 5.95,
+      "duration": 5.97,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=0, expected=16)",
       "actual_output": "",
@@ -61,17 +61,18 @@
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.0,
-        "compile": 7.729,
-        "run": 0.265
+        "recomp": 0.031,
+        "compile": 7.967,
+        "run": 0.266
       },
       "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
       "lines": {
         "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 8.23,
+      "duration": 8.5,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -91,17 +92,18 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.034,
-        "compile": 7.884,
-        "run": 0.315
+        "recomp": 0.031,
+        "compile": 8.148,
+        "run": 0.316
       },
       "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
       "lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.5,
+      "duration": 8.74,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -118,17 +120,18 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.032,
-        "compile": 8.229,
-        "run": 0.316
+        "recomp": 0.019,
+        "compile": 6.265,
+        "run": 0.215
       },
       "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
       "lines": {
         "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 8.81,
+      "duration": 6.68,
       "image_comparisons": {
         "output": {
           "status": "fail",
