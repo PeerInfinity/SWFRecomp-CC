@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-23T18:16:56.288895+00:00",
-    "old_git_sha": "4e063e3b0da6d94ef2af4157a5e45eb3cb440877",
-    "new_timestamp": "2026-07-23T23:46:33.775883+00:00",
-    "new_git_sha": "0c98ccc7ba9bd1f7ccf039422a2227cafeeae50a",
+    "old_timestamp": "2026-07-23T23:46:33.775883+00:00",
+    "old_git_sha": "0c98ccc7ba9bd1f7ccf039422a2227cafeeae50a",
+    "new_timestamp": "2026-07-24T18:21:07.259971+00:00",
+    "new_git_sha": "74a28f304a994acfe95ffebb1c9a4ddd6e62211e",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,55 @@
     "new_pass": 635,
     "new_ruffle_matched": 17,
     "new_effective_pass": 652,
-    "new_total": 711,
-    "new_pass_rate": 89.3,
+    "new_total": 714,
+    "new_pass_rate": 88.9,
     "old_mismatched_lines": 15333,
-    "new_mismatched_lines": 15333,
+    "new_mismatched_lines": 15348,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 711,
-    "added": 0,
+    "added": 3,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "amf_swf6_case_insensitive_typed_objects",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 6,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "amf_swf6_serialize_typed_objects",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 6,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "amf_swf8_case_sensitive_typed_objects",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 6,
+        "matching_lines": 1
+      }
+    }
+  ]
 }
