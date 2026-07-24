@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 829/1217 passing | Graphics: 833/1217 passing
+Trace: 829/1217 passing | Graphics: 805/1177 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (4 tests)
+## Graphics Improvements (3 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -17,4 +17,3 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 1 | `parse_float` | Output Mismatch | 80/81 lines match |
 | 2 | `string_concat_fromcharcode` | Output Mismatch | 36/37 lines match |
 | 3 | `string_slice_substr_substring` | Output Mismatch | 169/170 lines match |
-| 4 | `xml_basic` | Output Mismatch | 32/33 lines match |
