@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-24T20:26:59.128376+00:00",
-    "old_git_sha": "d36c8da2b2bdd0740f645050eb1f0933866193bd",
-    "new_timestamp": "2026-07-24T21:33:55.107253+00:00",
-    "new_git_sha": "127a5f4d39dc34915d1ef6a35d705cb8fa54008b",
+    "old_timestamp": "2026-07-24T21:33:55.107253+00:00",
+    "old_git_sha": "127a5f4d39dc34915d1ef6a35d705cb8fa54008b",
+    "new_timestamp": "2026-07-24T22:06:49.392846+00:00",
+    "new_git_sha": "2cf4014fd6724a9b22415b88ba0adb9053818ff1",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 130,
+    "old_pass": 134,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 130,
-    "old_total": 138,
-    "old_pass_rate": 94.2,
+    "old_effective_pass": 134,
+    "old_total": 142,
+    "old_pass_rate": 94.4,
     "new_pass": 134,
     "new_ruffle_matched": 0,
     "new_effective_pass": 134,
@@ -25,58 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 138,
-    "added": 4,
+    "unchanged": 142,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "opaque_background",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "scale_rotation_cache",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 106,
-        "expected_lines": 106,
-        "matching_lines": 106
-      }
-    },
-    {
-      "test": "simple_shapes/gradients/focal_radial",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "simple_shapes/gradients/gradients",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    }
-  ]
+  "changes": []
 }
