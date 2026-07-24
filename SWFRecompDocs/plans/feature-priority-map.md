@@ -85,17 +85,27 @@ table from it. **Read that table before re-deriving any of this by hand.**
 Yields are tests that flip from failing to effective-pass. Known-failure
 tests (Ruffle fails them too) are excluded from the yields.
 
-### 1. `Date` — ~167 tests · LARGE arc · **do this first**
+### 1. `Date` — **171 + 2 tests** · LARGE arc · **do this first**
 
 | Suite | tests |
 |---|---|
-| from_avmplus `ecma3/Date` | 151 (134 after removing 17 known_failure) |
-| from_avmplus, `getFullYear` blanked outside `ecma3/Date` (mostly `as3/Definitions`) | 15 |
-| from_avmplus `ecma3/Exceptions/date_*` | 2 |
-| avm2 `date`, `date_parse` | 2 |
+Exact, from the `error_signature` histogram at `17c19040c` (not estimated):
 
-The 15 is what the `error_signature` histogram added to the original
-estimate — it is why this arc is ~167, not the ~155 first written here.
+| Where | Tests | Blanking error |
+|---|---|---|
+| `ecma3/Date` | 153 (151 failing, 2 pass) | `getTimezoneOffset is not a function` |
+| `as3/Definitions/Classes/{ClassDef/*, Ext/AccStatPropSubClassMeth}` | 14 | `getFullYear is not a function` |
+| `ecma3/JSON/AS3Types` | 1 | `getFullYear` |
+| `ecma3/String/e15_5_4_6_2_rt` | 1 | `getTimezoneOffset` — the test is otherwise **231/232** |
+| plus 1 on `setTime` | 1 | |
+| **from_avmplus total blanked on a Date method** | **171** | |
+| avm2 suite `date`, `date_parse` | 2 | |
+
+Also `ecma3/Exceptions/date_002_rt` and `date_004_rt` are ordinary
+`output_mismatch` (not blanked) and may or may not fall out.
+
+**The 18 tests outside `ecma3/Date` are the reason this arc beats its
+directory count** — they were invisible until `error_signature` existed.
 
 AVM2 `Date` is a **three-method stub** — `getTime`, `valueOf`, `toString`,
 bolted on in `avm2_amf.c:1763` purely so AMF round-trips work. Everything
@@ -395,17 +405,18 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | String/Unicode: `search`/`match` coercion + `split('')` by code unit | **101** (pred. ~102) | small | **DONE `127a5f4d3`** |
 | ~~—~~ | ES3 `.prototype` surface + `Function.length` | **36** (pred. ~35) | medium | **DONE `d90353066`** |
 | ~~—~~ | prototype toString/valueOf self-coercion guard | **7** | tiny | **DONE `17c19040c`** — fixes a crash `d90353066` introduced |
-| 1 | `Date` class (ECMA-262 §15.9) | ~167 | large | biggest single unlock left; fully specified; AVM1 Date to port from; no new subsystems |
+| 1 | `Date` class (ECMA-262 §15.9) | **173** | large | biggest single unlock left; fully specified; AVM1 Date to port from; no new subsystems |
 | 2 | `Number` static math (API 680) | 21 | small | mechanical |
 | 3 | `[object Function]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | ~15 (`ecma3/FunctionObjects` 6/21) | small | see Polish |
 | 4 | Global URI functions | ~9 | small | mechanical |
 | 5 | `flash.system.Capabilities` | 5 | trivial | mechanical |
 
 **Date is now the clear top item**, and it is worth *more* than the
-`ecma3/Date` directory count: the regenerated uncaught-error table shows
-**151** tests dying on `getTimezoneOffset is not a function` plus **15**
-more on `getFullYear` that live outside `ecma3/Date` (mostly
-`as3/Definitions`). Call it ~166.
+`ecma3/Date` directory count: **171** from_avmplus tests are blanked by a
+missing Date method, of which **18 live outside `ecma3/Date`** — 14 in
+`as3/Definitions/Classes`, plus `ecma3/JSON/AS3Types`,
+`ecma3/String/e15_5_4_6_2_rt`, and one on `setTime`. Add the avm2 suite's
+`date` and `date_parse` for **173**. Exact breakdown in arc 1 above.
 
 The cheap cleanup batch (`Number` static math + URI functions +
 `Capabilities`) is ~35 tests of almost purely mechanical work and fits in
