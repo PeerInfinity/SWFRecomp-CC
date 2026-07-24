@@ -1,75 +1,76 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-24 20:26 UTC
+**Date**: 2026-07-24 21:33 UTC
 
-**Git SHA**: `d36c8da2b2`
+**Git SHA**: `127a5f4d39`
 
-**Run Duration**: 2m 4s
+**Run Duration**: 2m 3s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 46 |
-| Passing | **45** (97.8%) |
+| Total tests | 47 |
+| Passing | **46** (97.9%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **46** (100.0%) |
+| Effective pass | **47** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 452 |
-| Matching lines | 450 (99.6%) |
+| Total expected lines | 491 |
+| Matching lines | 489 (99.6%) |
 | Mismatched lines | 2 |
 
 ## Passing Tests
 
-**45 tests passing**
+**46 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `array` | 7 | 0.8s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 0.8s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 0.7s |  |
 | 3 | `bitmapdata/loadBitmap` | 3 | 0.8s |  |
-| 4 | `callee` | 2 | 1.8s |  |
-| 5 | `depth` | 6 | 1.8s |  |
-| 6 | `doactionorder/doactionorder` | 7 | 2.0s |  |
+| 4 | `callee` | 2 | 1.9s |  |
+| 5 | `depth` | 6 | 1.9s |  |
+| 6 | `doactionorder/doactionorder` | 7 | 2.1s |  |
 | 7 | `doactionorder/symbolclass` | 4 | 2.0s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 2.2s |  |
-| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 2.1s |  |
-| 10 | `duplicateMovieClip/name-coercion` | 3 | 2.0s |  |
-| 11 | `duplicateMovieClip/samedepth` | 6 | 2.1s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 2.1s |  |
+| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 1.5s |  |
+| 10 | `duplicateMovieClip/name-coercion` | 3 | 1.3s |  |
+| 11 | `duplicateMovieClip/samedepth` | 6 | 2.2s |  |
 | 12 | `externalinterface` | 4 | 1.9s |  |
-| 13 | `filters` | 149 | 2.3s |  |
-| 14 | `haxe/flocons1` | 2 | 1.9s |  |
-| 15 | `haxe/flocons2` | 3 | 1.5s |  |
-| 16 | `label` | 4 | 21.1s |  |
-| 17 | `levels` | 9 | 2.0s |  |
+| 13 | `filters` | 149 | 1.6s |  |
+| 14 | `haxe/flocons1` | 2 | 1.3s |  |
+| 15 | `haxe/flocons2` | 3 | 1.9s |  |
+| 16 | `label` | 4 | 20.0s |  |
+| 17 | `levels` | 9 | 1.9s |  |
 | 18 | `loadevent` | 9 | 2.0s |  |
 | 19 | `loadvariables/loadvariables` | 7 | 1.8s |  |
 | 20 | `loadvariables/loadvars` | 2 | 2.0s |  |
 | 21 | `lookup` | 3 | 2.1s |  |
-| 22 | `mouse-transparency` | 1 | 1.4s |  |
+| 22 | `mouse-transparency` | 1 | 1.3s |  |
 | 23 | `moviecliploader` | 7 | 1.3s |  |
 | 24 | `nativeinheritance` | 6 | 1.9s |  |
-| 25 | `nested-button` | 1 | 2.0s |  |
-| 26 | `operations` | 13 | 1.7s |  |
-| 27 | `property-paths/property-paths-6` | 6 | 1.7s |  |
-| 28 | `property-paths/property-paths-7` | 7 | 1.9s |  |
-| 29 | `propertycase/propertycase` | 7 | 1.8s |  |
-| 30 | `propertycase/propertycase-preserving-6` | 2 | 1.2s |  |
+| 25 | `nested-button` | 1 | 1.9s |  |
+| 26 | `operations` | 13 | 1.9s |  |
+| 27 | `property-paths/property-paths-6` | 6 | 1.8s |  |
+| 28 | `property-paths/property-paths-7` | 7 | 2.0s |  |
+| 29 | `propertycase/propertycase` | 7 | 1.9s |  |
+| 30 | `propertycase/propertycase-preserving-6` | 2 | 1.3s |  |
 | 31 | `propertycase/propertycase-preserving-7` | 5 | 1.1s |  |
 | 32 | `rollover` | 4 | 2.1s |  |
 | 33 | `scope` | 14 | 2.0s |  |
-| 34 | `setinterval` | 20 | 2.0s |  |
-| 35 | `settimeout` | 17 | 2.0s |  |
-| 36 | `super` | 11 | 2.1s |  |
-| 37 | `target` | 18 | 2.0s |  |
-| 38 | `text-bind` | 0 | 20.6s |  |
+| 34 | `setinterval` | 20 | 1.9s |  |
+| 35 | `settimeout` | 17 | 1.9s |  |
+| 36 | `super` | 11 | 1.7s |  |
+| 37 | `target` | 18 | 1.6s |  |
+| 38 | `text-bind` | 0 | 21.4s |  |
 | 39 | `textfield/textfield-html` | 4 | 2.0s |  |
-| 40 | `textfield/textfield-text-setters` | 8 | 2.1s |  |
-| 41 | `undefined/undefined-swf7` | 39 | 1.9s |  |
-| 42 | `watch` | 2 | 1.8s |  |
-| 43 | `xml/xmlbuild` | 1 | 1.9s |  |
-| 44 | `xml/xmlload` | 4 | 2.3s |  |
-| 45 | `xml/xmlstring` | 9 | 1.9s |  |
+| 40 | `textfield/textfield-text-setters` | 8 | 1.9s |  |
+| 41 | `undefined/undefined-swf6` | 39 | 1.7s |  |
+| 42 | `undefined/undefined-swf7` | 39 | 1.9s |  |
+| 43 | `watch` | 2 | 2.0s |  |
+| 44 | `xml/xmlbuild` | 1 | 2.0s |  |
+| 45 | `xml/xmlload` | 4 | 2.1s |  |
+| 46 | `xml/xmlstring` | 9 | 1.9s |  |
 
 ## Ruffle-Matched Tests
 
@@ -77,7 +78,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `hitarea` | 2 | 2 | 1.6s |  |
+| 1 | `hitarea` | 2 | 2 | 2.1s |  |
 
 ## Near-Passing Tests
 

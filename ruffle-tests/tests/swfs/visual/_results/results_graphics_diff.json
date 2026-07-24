@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-24T18:56:22.124330+00:00",
-    "old_git_sha": "e6f33267e7f3a4afa411eb906a4ae2b308e09550",
-    "new_timestamp": "2026-07-24T20:26:59.128376+00:00",
-    "new_git_sha": "d36c8da2b2bdd0740f645050eb1f0933866193bd",
+    "old_timestamp": "2026-07-24T20:26:59.128376+00:00",
+    "old_git_sha": "d36c8da2b2bdd0740f645050eb1f0933866193bd",
+    "new_timestamp": "2026-07-24T21:33:55.107253+00:00",
+    "new_git_sha": "127a5f4d39dc34915d1ef6a35d705cb8fa54008b",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 134,
+    "old_pass": 130,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 134,
-    "old_total": 142,
-    "old_pass_rate": 94.4,
-    "new_pass": 130,
+    "old_effective_pass": 130,
+    "old_total": 138,
+    "old_pass_rate": 94.2,
+    "new_pass": 134,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 130,
-    "new_total": 138,
-    "new_pass_rate": 94.2,
+    "new_effective_pass": 134,
+    "new_total": 142,
+    "new_pass_rate": 94.4,
     "old_mismatched_lines": 112,
     "new_mismatched_lines": 112,
     "increased_mismatches": 0,
@@ -29,58 +26,57 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 138,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 4
+    "added": 4,
+    "removed": 0
   },
   "changes": [
     {
       "test": "opaque_background",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "scale_rotation_cache",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 106,
         "expected_lines": 106,
         "matching_lines": 106
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "simple_shapes/gradients/focal_radial",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "simple_shapes/gradients/gradients",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     }
   ]
 }
