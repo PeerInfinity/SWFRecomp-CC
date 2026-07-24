@@ -382,6 +382,15 @@ static void add_number_methods(Avm2Context* ctx, Avm2Class* cls)
 	avm2_builtin_add_method(ctx, cls, "toFixed", number_to_fixed);
 	avm2_builtin_add_method(ctx, cls, "toExponential", number_to_exponential);
 	avm2_builtin_add_method(ctx, cls, "toPrecision", number_to_precision);
+
+	// ES3-compat layer on the prototype (Ruffle globals/Number.as).
+	Avm2Object* proto = cls->prototype_obj;
+	avm2_proto_add_function_n(ctx, proto, "toString", number_to_string, 1);
+	avm2_proto_add_function_n(ctx, proto, "toLocaleString", number_to_string, 1);
+	avm2_proto_add_function_n(ctx, proto, "valueOf", number_value_of, 0);
+	avm2_proto_add_function_n(ctx, proto, "toFixed", number_to_fixed, 1);
+	avm2_proto_add_function_n(ctx, proto, "toExponential", number_to_exponential, 1);
+	avm2_proto_add_function_n(ctx, proto, "toPrecision", number_to_precision, 1);
 }
 
 void avm2_register_number(Avm2Context* ctx)
@@ -428,6 +437,10 @@ void avm2_register_number(Avm2Context* ctx)
 	b->boolean_class->native_call = boolean_construct;
 	avm2_builtin_add_method(ctx, b->boolean_class, "toString", boolean_to_string);
 	avm2_builtin_add_method(ctx, b->boolean_class, "valueOf", boolean_value_of);
+	avm2_proto_add_function(ctx, b->boolean_class->prototype_obj, "toString",
+	                        boolean_to_string);
+	avm2_proto_add_function(ctx, b->boolean_class->prototype_obj, "valueOf",
+	                        boolean_value_of);
 
 	Avm2Class* math = avm2_builtin_class(ctx, "", "Math", b->object_class);
 	b->math_class = math;

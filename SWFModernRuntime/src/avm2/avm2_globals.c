@@ -372,25 +372,37 @@ void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char*
 	                        (uint32_t) strlen(name), value)->dont_enum = 1;
 }
 
-void avm2_proto_add_function(Avm2Context* ctx, Avm2Object* proto, const char* name,
-                             Avm2MethodFn fn)
+void avm2_proto_add_function_n(Avm2Context* ctx, Avm2Object* proto, const char* name,
+                               Avm2MethodFn fn, uint32_t param_count)
 {
-	Avm2MethodRef ref = { fn, NULL, name, 0 };
+	Avm2MethodRef ref = { fn, NULL, name, 0, param_count };
 	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, NULL,
 	                                      avm2_undefined(), false);
 	avm2_object_set_dynamic(ctx, proto, name, (uint32_t) strlen(name),
 	                        avm2_object_value(fnobj))->dont_enum = 1;
 }
 
-void avm2_builtin_add_global_fn(Avm2Context* ctx, const char* name, Avm2MethodFn fn)
+void avm2_proto_add_function(Avm2Context* ctx, Avm2Object* proto, const char* name,
+                             Avm2MethodFn fn)
 {
-	Avm2MethodRef ref = { fn, NULL, name, 0 };
+	avm2_proto_add_function_n(ctx, proto, name, fn, 0);
+}
+
+void avm2_builtin_add_global_fn_n(Avm2Context* ctx, const char* name, Avm2MethodFn fn,
+                                  uint32_t param_count)
+{
+	Avm2MethodRef ref = { fn, NULL, name, 0, param_count };
 	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, NULL,
 	                                      avm2_object_value(ctx->builtin_globals), true);
 	// The key points at the caller's literal, which is static — fine.
 	Avm2PropKey key = builtin_key("", name);
 	builtin_global_define(ctx, key, avm2_object_value(fnobj));
 	avm2_domain_add(ctx, &key, NULL, 0);
+}
+
+void avm2_builtin_add_global_fn(Avm2Context* ctx, const char* name, Avm2MethodFn fn)
+{
+	avm2_builtin_add_global_fn_n(ctx, name, fn, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -1723,12 +1735,12 @@ void avm2_register_toplevel(Avm2Context* ctx)
 {
 	avm2_builtin_add_global_fn(ctx, "trace", native_trace);
 	avm2_register_timer_fns(ctx);
-	avm2_builtin_add_global_fn(ctx, "isNaN", global_is_nan);
-	avm2_builtin_add_global_fn(ctx, "isFinite", global_is_finite);
-	avm2_builtin_add_global_fn(ctx, "parseInt", global_parse_int);
-	avm2_builtin_add_global_fn(ctx, "parseFloat", global_parse_float);
-	avm2_builtin_add_global_fn(ctx, "escape", global_escape);
-	avm2_builtin_add_global_fn(ctx, "unescape", global_unescape);
+	avm2_builtin_add_global_fn_n(ctx, "isNaN", global_is_nan, 1);
+	avm2_builtin_add_global_fn_n(ctx, "isFinite", global_is_finite, 1);
+	avm2_builtin_add_global_fn_n(ctx, "parseInt", global_parse_int, 2);
+	avm2_builtin_add_global_fn_n(ctx, "parseFloat", global_parse_float, 1);
+	avm2_builtin_add_global_fn_n(ctx, "escape", global_escape, 1);
+	avm2_builtin_add_global_fn_n(ctx, "unescape", global_unescape, 1);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "getQualifiedClassName",
 	                         global_get_qualified_class_name);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "getDefinitionByName",

@@ -285,7 +285,9 @@ static Avm2Value fn_get_length(Avm2Activation* act)
 			&fn->fn_method.file->data->methods[fn->fn_method.method_index];
 		return avm2_integer((int32_t) md->param_count);
 	}
-	return avm2_integer(0);
+	// Native builtin: no ABC method to read, so the arity is carried on the
+	// method ref itself (declared at registration).
+	return avm2_integer((int32_t) fn->fn_method.param_count);
 }
 
 static Avm2Value fn_get_prototype(Avm2Activation* act)
@@ -359,6 +361,9 @@ void avm2_register_function_builtins(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, cls, "call", fn_call);
 	avm2_builtin_add_method(ctx, cls, "apply", fn_apply);
 	avm2_builtin_add_getter(ctx, cls, "length", fn_get_length);
+	// ES3-compat layer on Function.prototype (Ruffle globals/Function.as).
+	avm2_proto_add_function_n(ctx, cls->prototype_obj, "call", fn_call, 1);
+	avm2_proto_add_function_n(ctx, cls->prototype_obj, "apply", fn_apply, 2);
 	// prototype is a getter/setter pair.
 	{
 		Avm2PropEntry e;

@@ -87,8 +87,14 @@ void avm2_builtin_add_static_getset(Avm2Context* ctx, Avm2Class* cls, const char
 // Install a native function on a prototype object (dont_enum).
 void avm2_proto_add_function(Avm2Context* ctx, Avm2Object* proto, const char* name,
                              Avm2MethodFn fn);
+// As above, declaring the arity that Function.length must report.
+void avm2_proto_add_function_n(Avm2Context* ctx, Avm2Object* proto, const char* name,
+                               Avm2MethodFn fn, uint32_t param_count);
 // Register a toplevel native function on the builtin globals + domain.
 void avm2_builtin_add_global_fn(Avm2Context* ctx, const char* name, Avm2MethodFn fn);
+// As above, declaring the arity that Function.length must report.
+void avm2_builtin_add_global_fn_n(Avm2Context* ctx, const char* name, Avm2MethodFn fn,
+                                  uint32_t param_count);
 // Expose a value on the builtin globals + domain under an arbitrary key.
 void avm2_builtin_define_alias(Avm2Context* ctx, Avm2PropKey key, Avm2Value value);
 

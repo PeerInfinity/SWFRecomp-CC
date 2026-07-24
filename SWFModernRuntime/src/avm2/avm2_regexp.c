@@ -983,4 +983,12 @@ void avm2_register_regexp(Avm2Context* ctx)
 			e->method.fn = string_split_regex;
 		}
 	}
+	// Same three on String.prototype for the ES3-compat layer, and re-point
+	// prototype.split at the regex-aware impl now that it exists (String
+	// registration seeded it with the plain one).
+	Avm2Object* sproto = sc->prototype_obj;
+	avm2_proto_add_function_n(ctx, sproto, "match", string_match_regex, 1);
+	avm2_proto_add_function_n(ctx, sproto, "replace", string_replace_regex, 2);
+	avm2_proto_add_function_n(ctx, sproto, "search", string_search_regex, 1);
+	avm2_proto_add_function_n(ctx, sproto, "split", string_split_regex, 2);
 }

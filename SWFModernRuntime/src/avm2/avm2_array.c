@@ -1097,4 +1097,28 @@ void avm2_register_array(Avm2Context* ctx)
 	avm2_builtin_add_static_const(ctx, cls, "UNIQUESORT", avm2_integer(4));
 	avm2_builtin_add_static_const(ctx, cls, "RETURNINDEXEDARRAY", avm2_integer(8));
 	avm2_builtin_add_static_const(ctx, cls, "NUMERIC", avm2_integer(16));
+
+	// ES3-compat layer on Array.prototype (Ruffle globals/Array.as). Ruffle
+	// omits insertAt/removeAt here — they are AS3-only additions, not ES3.
+	Avm2Object* proto = cls->prototype_obj;
+	avm2_proto_add_function_n(ctx, proto, "concat", array_concat, 0);
+	avm2_proto_add_function_n(ctx, proto, "every", array_every, 2);
+	avm2_proto_add_function_n(ctx, proto, "filter", array_filter, 2);
+	avm2_proto_add_function_n(ctx, proto, "forEach", array_for_each, 2);
+	avm2_proto_add_function_n(ctx, proto, "indexOf", array_index_of, 2);
+	avm2_proto_add_function_n(ctx, proto, "join", array_join, 1);
+	avm2_proto_add_function_n(ctx, proto, "lastIndexOf", array_last_index_of, 2);
+	avm2_proto_add_function_n(ctx, proto, "map", array_map, 2);
+	avm2_proto_add_function_n(ctx, proto, "pop", array_pop, 0);
+	avm2_proto_add_function_n(ctx, proto, "push", array_push, 0);
+	avm2_proto_add_function_n(ctx, proto, "reverse", array_reverse, 0);
+	avm2_proto_add_function_n(ctx, proto, "shift", array_shift, 0);
+	avm2_proto_add_function_n(ctx, proto, "slice", array_slice, 2);
+	avm2_proto_add_function_n(ctx, proto, "some", array_some, 2);
+	avm2_proto_add_function_n(ctx, proto, "sort", array_sort, 0);
+	avm2_proto_add_function_n(ctx, proto, "sortOn", array_sort_on, 2);
+	avm2_proto_add_function_n(ctx, proto, "splice", array_splice, 0);
+	avm2_proto_add_function_n(ctx, proto, "toLocaleString", array_to_locale_string, 0);
+	avm2_proto_add_function_n(ctx, proto, "toString", array_to_string, 0);
+	avm2_proto_add_function_n(ctx, proto, "unshift", array_unshift, 0);
 }

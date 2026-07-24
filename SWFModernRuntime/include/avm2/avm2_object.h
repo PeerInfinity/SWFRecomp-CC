@@ -57,6 +57,9 @@ typedef struct Avm2MethodRef
 	Avm2AbcFileRt* file;  // NULL for native builtins
 	const char* debug_name;
 	uint32_t method_index;  // index into file->data->methods (emitted only)
+	uint32_t param_count;   // declared arity; NATIVE builtins only (file==NULL),
+	                        // where there is no ABC method to read it from.
+	                        // Backs Function.length — see fn_get_length.
 } Avm2MethodRef;
 
 struct Avm2Object

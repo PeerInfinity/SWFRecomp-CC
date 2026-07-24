@@ -610,4 +610,30 @@ void avm2_register_string(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, cls, "toString", string_to_string);
 	avm2_builtin_add_method(ctx, cls, "valueOf", string_to_string);
 	avm2_builtin_add_static_method(ctx, cls, "fromCharCode", string_from_char_code);
+
+	// ES3-compat layer: the same methods also live on String.prototype as
+	// plain functions (Ruffle globals/String.as). Tamarin's standard opening
+	// assertion is `String.prototype.<m>.length`, and tests reassign them
+	// onto other prototypes (`Number.prototype.split = String.prototype.split`),
+	// so these must be real prototype properties. Every impl reads its
+	// receiver through this_string(), which coerces, so a foreign `this`
+	// works. match/replace/search are added in avm2_regexp.c alongside their
+	// class methods.
+	Avm2Object* proto = cls->prototype_obj;
+	avm2_proto_add_function_n(ctx, proto, "charAt", string_char_at, 1);
+	avm2_proto_add_function_n(ctx, proto, "charCodeAt", string_char_code_at, 1);
+	avm2_proto_add_function_n(ctx, proto, "concat", string_concat_method, 0);
+	avm2_proto_add_function_n(ctx, proto, "indexOf", string_index_of, 2);
+	avm2_proto_add_function_n(ctx, proto, "lastIndexOf", string_last_index_of, 2);
+	avm2_proto_add_function_n(ctx, proto, "localeCompare", string_locale_compare, 1);
+	avm2_proto_add_function_n(ctx, proto, "slice", string_slice, 2);
+	avm2_proto_add_function_n(ctx, proto, "split", avm2_string_split_plain, 2);
+	avm2_proto_add_function_n(ctx, proto, "substr", string_substr, 2);
+	avm2_proto_add_function_n(ctx, proto, "substring", string_substring, 2);
+	avm2_proto_add_function_n(ctx, proto, "toLowerCase", string_to_lower_case, 0);
+	avm2_proto_add_function_n(ctx, proto, "toLocaleLowerCase", string_to_lower_case, 0);
+	avm2_proto_add_function_n(ctx, proto, "toUpperCase", string_to_upper_case, 0);
+	avm2_proto_add_function_n(ctx, proto, "toLocaleUpperCase", string_to_upper_case, 0);
+	avm2_proto_add_function_n(ctx, proto, "toString", string_to_string, 0);
+	avm2_proto_add_function_n(ctx, proto, "valueOf", string_to_string, 0);
 }
