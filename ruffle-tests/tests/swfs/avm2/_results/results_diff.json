@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-23T17:03:25.377019+00:00",
-    "old_git_sha": "8cf9ce9e4837fec7b26838fda231d63619a5308a",
-    "new_timestamp": "2026-07-23T18:38:00.259761+00:00",
-    "new_git_sha": "38e495669a30fa4df1a4ad30a13f9b22308fbb09",
+    "old_timestamp": "2026-07-23T18:38:00.259761+00:00",
+    "old_git_sha": "38e495669a30fa4df1a4ad30a13f9b22308fbb09",
+    "new_timestamp": "2026-07-24T19:31:35.254726+00:00",
+    "new_git_sha": "f0e6fb25d672c874a2b9d03f23e82c01c50ad83d",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,31 @@
     "new_pass": 829,
     "new_ruffle_matched": 26,
     "new_effective_pass": 855,
-    "new_total": 1216,
-    "new_pass_rate": 68.2,
+    "new_total": 1217,
+    "new_pass_rate": 68.1,
     "old_mismatched_lines": 47478,
-    "new_mismatched_lines": 47478,
+    "new_mismatched_lines": 47483,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 1216,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "getouterscope_two_classobjects",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 9,
+        "expected_lines": 13,
+        "matching_lines": 8
+      }
+    }
+  ]
 }
