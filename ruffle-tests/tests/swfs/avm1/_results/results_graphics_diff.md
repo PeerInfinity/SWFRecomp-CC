@@ -1,21 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `0c98ccc7ba9b` (2026-07-23T23:46:33.775883+00:00)
-**Current:** `74a28f304a99` (2026-07-24T18:21:07.259971+00:00)
+**Previous:** `74a28f304a99` (2026-07-24T18:21:07.259971+00:00)
+**Current:** `e6f33267e7f3` (2026-07-24T18:56:21.995987+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 635 | 635 | 0 |
-| Total | 711 | 714 | +3 |
-| Pass rate | 89.3% | 88.9% | -0.4% |
-| Mismatched lines | 15333 | 15348 | +15 |
+| Passing | 635 | 637 | +2 |
+| Total | 714 | 716 | +2 |
+| Pass rate | 88.9% | 89.0% | +0.1% |
+| Mismatched lines | 15348 | 15348 | 0 |
 
-## Added Tests (3)
+## Added Tests (2)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `amf_swf6_case_insensitive_typed_objects` | output_mismatch | 1/6 |
-| `amf_swf6_serialize_typed_objects` | output_mismatch | 1/6 |
-| `amf_swf8_case_sensitive_typed_objects` | output_mismatch | 1/6 |
+| `define_font_glyph_table_order` | pass | 0/0 |
+| `define_font_glyph_table_overlap` | pass | 0/0 |

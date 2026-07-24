@@ -1,0 +1,149 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-24T18:56:22.138338+00:00",
+    "git_sha": "e6f33267e7f3a4afa411eb906a4ae2b308e09550",
+    "duration_seconds": 35.3,
+    "total_available": 5,
+    "shards": 30,
+    "expected_shards": 30,
+    "ignored_count": 0,
+    "filtered": true
+  },
+  "total": 5,
+  "pass": 1,
+  "ruffle_matched": 0,
+  "fail": 4,
+  "pass_rate": 20.0,
+  "effective_pass": 1,
+  "effective_pass_rate": 20.0,
+  "breakdown": {
+    "output_mismatch": 4
+  },
+  "tests": [
+    {
+      "test": "request_matching_profiles",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.683,
+        "run": 0.165
+      },
+      "num_frames": 126,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 190,
+        "matching_lines": 0
+      },
+      "duration": 4.86,
+      "status": "output_mismatch",
+      "detail": "190 line(s) differ (actual=0, expected=190)",
+      "actual_output": "",
+      "expected_output": "Caught: ArgumentError: Error #2008: Parameter profile must be one of the accepted values.\nCaught: ArgumentError: Error #2008: Parameter profiles must be one of the accepted values.\nCaught: ArgumentError: Error #2008: Parameter profile must be one of the accepted values.\nRequesting profiles: standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: standardConstrained,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standardConstrained,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standardConstrained,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profiles: baselineExtended,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profiles: baselineExtended\nGot profile: baselineExtended\nAfter dispose: null\nRequesting profiles: baseline,standardExtended\nGot profile: standardExtended\n... (140 lines after) ..."
+    },
+    {
+      "test": "request_profiles",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 5.658,
+        "run": 0.165
+      },
+      "num_frames": 12,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 16,
+        "matching_lines": 0
+      },
+      "duration": 5.84,
+      "status": "output_mismatch",
+      "detail": "16 line(s) differ (actual=0, expected=16)",
+      "actual_output": "",
+      "expected_output": "Requesting profile: standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profile: standard\nGot profile: standard\nAfter dispose: null\nRequesting profile: standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profile: baselineExtended\nGot profile: baselineExtended\nAfter dispose: null\nRequesting profile: baseline\nGot profile: baseline\nAfter dispose: null\nRequesting profile: baselineConstrained"
+    },
+    {
+      "test": "sampler_odd_size",
+      "phases": {
+        "recomp": 0.032,
+        "compile": 8.055,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 8.64,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 592737 outliers exceed limit of 782, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=0, expected=1)",
+      "actual_output": "",
+      "expected_output": "Corner: ffff00ff"
+    },
+    {
+      "test": "scissor_rectangle",
+      "phases": {
+        "recomp": 0.031,
+        "compile": 7.901,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.44,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 657946 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "scissor_rectangle_invalid",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 7.021,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 7.51,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 657072 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=0, expected=1)",
+      "actual_output": "",
+      "expected_output": "Setting rect: (x=10, y=20, w=0, h=300)"
+    }
+  ]
+}
