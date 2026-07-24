@@ -1,0 +1,4547 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-24T18:56:22.124330+00:00",
+    "git_sha": "e6f33267e7f3a4afa411eb906a4ae2b308e09550",
+    "duration_seconds": 1692.26,
+    "total_available": 142,
+    "shards": 30,
+    "expected_shards": 30,
+    "ignored_count": 0,
+    "filtered": true
+  },
+  "total": 142,
+  "pass": 134,
+  "ruffle_matched": 0,
+  "fail": 8,
+  "pass_rate": 94.4,
+  "effective_pass": 134,
+  "effective_pass_rate": 94.4,
+  "breakdown": {
+    "output_mismatch": 6,
+    "recomp_fail": 1,
+    "runtime_error": 1
+  },
+  "tests": [
+    {
+      "test": "avm2_button_scroll_rect",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.531,
+        "run": 0.165
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "duration": 19.74,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 28851 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=2, expected=2)",
+      "actual_output": "frame 1: (x=0, y=0, w=0, h=0)\nframe 2: (x=0, y=0, w=0, h=0)",
+      "expected_output": "frame 1: (x=0, y=0, w=100, h=100)\nframe 2: (x=0, y=0, w=100, h=100)"
+    },
+    {
+      "test": "bitmapdata_copypixels_with_alpha_oob",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.83,
+        "run": 0.315
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.28,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/add",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.469,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.98,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 13405 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/alpha_no_layer",
+      "phases": {
+        "recomp": 0.237,
+        "compile": 1.589,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.29,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 172259 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/darken",
+      "phases": {
+        "recomp": 0.237,
+        "compile": 1.614,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.36,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 42847 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/difference",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.859,
+        "run": 0.318
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.44,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 132923 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/erase_no_layer",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.855,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.43,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 169082 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/hardlight",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.665,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.23,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 30408 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/invert",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.672,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.24,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 141037 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/layer_alpha",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.786,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.35,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 172648 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/layer_erase",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.811,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.37,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 169556 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/lighten",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.819,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.47,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 18823 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/multiply",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.82,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.37,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 66608 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/overlay",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.63,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.18,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 84068 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/overlay_onto_stage",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.789,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.48,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 41293 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/screen",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.772,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.33,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 94731 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/shader_as_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.372,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.6,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 5283 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": true
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/shader_without_shader",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.124,
+        "run": 0.215
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 24.35,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/subtract",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.971,
+        "run": 0.466
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.67,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 65601 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "bmd_draw_with_msaa_issue_10579",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.436,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.69,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/avm1_color",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.212,
+        "run": 0.165
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.41,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1200 outliers exceed limit of 0, max difference 191",
+          "max_diff": 191,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/avm2_button",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 19.202,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.39,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 4692 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/avm2_button_state",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 1.477,
+        "run": 0.315
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.21,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 11253 outliers exceed limit of 900, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/bitmap_changed",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 22.632,
+        "run": 0.164
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 22.81,
+      "image_comparisons": {
+        "initial": {
+          "status": "fail",
+          "message": "No actual image produced for initial"
+        },
+        "fillrect": {
+          "status": "fail",
+          "message": "No actual image produced for fillrect"
+        },
+        "applyfilter": {
+          "status": "fail",
+          "message": "No actual image produced for applyfilter"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_bitmapdata_invalidate",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 22.49,
+        "run": 0.265
+      },
+      "num_frames": 12,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 22.77,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_mask_alpha",
+      "phases": {
+        "recomp": 0.021,
+        "compile": 20.678,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.98,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 4644 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_mask_filters",
+      "phases": {
+        "recomp": 0.02,
+        "compile": 4.616,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.81,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1554 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_mask_transform",
+      "phases": {
+        "recomp": 0.02,
+        "compile": 19.364,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.56,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 2340 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_mask_triangle",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.894,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.07,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 5280 outliers exceed limit of 200, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/children_changed",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.524,
+        "run": 0.215
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.87,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/color_transform",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.735,
+        "run": 0.265
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.24,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 169500 outliers exceed limit of 0, max difference 38",
+          "max_diff": 38,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/contains_grown_filter",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 1.65,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.92,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 10784 outliers exceed limit of 0, max difference 99",
+          "max_diff": 99,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/drawing_api",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.879,
+        "run": 0.265
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.44,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 8334 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/edittext_hscroll",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 19.629,
+        "run": 0.365
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 20.01,
+      "image_comparisons": {
+        "output.01": {
+          "status": "fail",
+          "message": "Image comparison failed: 96 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 960 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/edittext_scroll",
+      "phases": {
+        "recomp": 0.021,
+        "compile": 19.735,
+        "run": 0.215
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.98,
+      "image_comparisons": {
+        "output.01": {
+          "status": "fail",
+          "message": "Image comparison failed: 825 outliers exceed limit of 5, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 821 outliers exceed limit of 5, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/edittext_selection",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 16.82,
+        "run": 0.265
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 17.11,
+      "image_comparisons": {
+        "output.01": {
+          "status": "fail",
+          "message": "Image comparison failed: 366 outliers exceed limit of 8, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 6783 outliers exceed limit of 8, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03": {
+          "status": "fail",
+          "message": "Image comparison failed: 399 outliers exceed limit of 8, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/masks",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.714,
+        "run": 0.315
+      },
+      "num_frames": 7,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.91,
+      "image_comparisons": {
+        "output.01": {
+          "status": "fail",
+          "message": "Image comparison failed: 44823 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 44599 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03": {
+          "status": "fail",
+          "message": "Image comparison failed: 42031 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        },
+        "output.04": {
+          "status": "fail",
+          "message": "Image comparison failed: 40103 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false
+        },
+        "output.05": {
+          "status": "fail",
+          "message": "Image comparison failed: 39136 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        },
+        "output.06": {
+          "status": "fail",
+          "message": "Image comparison failed: 39553 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            6
+          ],
+          "known_failure": false
+        },
+        "output.07": {
+          "status": "fail",
+          "message": "Image comparison failed: 39128 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            7
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/morph",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 1.391,
+        "run": 0.214
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.78,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 2832 outliers exceed limit of 0, max difference 1",
+          "max_diff": 1,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/nested_color_transform",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.572,
+        "run": 0.215
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.96,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 24192 outliers exceed limit of 0, max difference 128",
+          "max_diff": 128,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/nested_matrix",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.369,
+        "run": 0.214
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.7,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/nested_rotation",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.922,
+        "run": 0.316
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.5,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 25665 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_10_masks",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.294,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.66,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 119943 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_10_too_big",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 5.546,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.88,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": true
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_9_masks",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 2.651,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 3.03,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 119943 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_9_too_big",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 5.462,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.79,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": true
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/scroll_rect",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.798,
+        "run": 0.265
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.3,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 18384 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/scroll_rect_scaled",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 20.178,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.51,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 41902 outliers exceed limit of 900, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/shape_changed",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.819,
+        "run": 0.266
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.25,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/text",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.319,
+        "run": 0.465
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.08,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 8910 outliers exceed limit of 1500, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "color_transform_issue_9698",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.441,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.69,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "define_bits_jpeg2_huge",
+      "phases": {
+        "recomp": 0.874,
+        "compile": 20.133,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 19,
+        "matching_lines": 2
+      },
+      "duration": 21.19,
+      "status": "output_mismatch",
+      "detail": "17 line(s) differ (actual=2, expected=19)",
+      "actual_output": "Loaded\nImage 1",
+      "expected_output": "Loaded\nImage 1\n524288\n2\n4286085240\n4285690482\nImage 2\n2\n524288\n4284243036\n4287401100\nImage 3\n65000\n2\nImage 4\n2\n65000\n4284177243\n4278190080"
+    },
+    {
+      "test": "definefont4",
+      "phases": {
+        "recomp": 1.029,
+        "compile": 86.632,
+        "run": 0.265
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 88.01,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 16086 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "drawing_api/cursor",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.81,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.29,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 600 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "drawing_api/drawing_order",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 21.686,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 22.27,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 15693 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "drawing_api/fills_and_lines",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.153,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.71,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 4966 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "drawing_api/gradient_focal_point",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 15.74,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.12,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 60 outliers exceed limit of 0, max difference 39",
+          "max_diff": 39,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_background_basic",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.536,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.72,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 2269 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_background_basic_scale2",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 15.463,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 15.64,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image size mismatch: actual 100x100, expected 200x200",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_border_basic",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 1.436,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.62,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 2046 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_border_basic_scale2",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 1.235,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.41,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image size mismatch: actual 100x100, expected 200x200",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_border_filters",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 15.793,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.08,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 832 outliers exceed limit of 17, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_border_transform",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 1.9,
+        "run": 0.164
+      },
+      "num_frames": 8,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.13,
+      "image_comparisons": {
+        "output.01": {
+          "status": "fail",
+          "message": "Image comparison failed: 375 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 2034 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03": {
+          "status": "fail",
+          "message": "Image comparison failed: 1717 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        },
+        "output.04": {
+          "status": "fail",
+          "message": "Image comparison failed: 524 outliers exceed limit of 20, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false
+        },
+        "output.05": {
+          "status": "fail",
+          "message": "Image comparison failed: 2822 outliers exceed limit of 20, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        },
+        "output.06": {
+          "status": "fail",
+          "message": "Image comparison failed: 2544 outliers exceed limit of 20, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            6
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_bounds_vs_position",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 1.598,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.77,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1104 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_caret_empty",
+      "phases": {
+        "recomp": 0.019,
+        "compile": 16.422,
+        "run": 0.164
+      },
+      "num_frames": 14,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.76,
+      "image_comparisons": {
+        "output.01": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 36 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03": {
+          "status": "fail",
+          "message": "Image comparison failed: 21 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        },
+        "output.04": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false
+        },
+        "output.05": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        },
+        "output.06": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            6
+          ],
+          "known_failure": false
+        },
+        "output.07": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            7
+          ],
+          "known_failure": false
+        },
+        "output.08": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            8
+          ],
+          "known_failure": false
+        },
+        "output.09": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            9
+          ],
+          "known_failure": false
+        },
+        "output.10": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            10
+          ],
+          "known_failure": false
+        },
+        "output.11": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            11
+          ],
+          "known_failure": false
+        },
+        "output.12": {
+          "status": "fail",
+          "message": "Image comparison failed: 48 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            12
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_device_transform_basic",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 5.291,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 24,
+        "expected_lines": 24,
+        "matching_lines": 12
+      },
+      "duration": 5.52,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 6720 outliers exceed limit of 90, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "output_mismatch",
+      "detail": "12 line(s) differ (actual=24, expected=24)",
+      "actual_output": "... (7 lines before) ...\nfalse = width=16\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = width=16\nfalse = 16\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = width=12\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = width=12\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = width=12\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = width=12\ntrue = 12",
+      "expected_output": "... (7 lines before) ...\nfalse = width=16\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = width=16\nfalse = 16\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = width=16\ntrue = 16\ntrue = (x=2, y=2, w=4, h=10),(x=6, y=2, w=4, h=10)\ntrue = width=8\ntrue = 8\ntrue = (x=2, y=2, w=16, h=10),(x=18, y=2, w=16, h=10)\ntrue = width=32\ntrue = 32\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = width=16\ntrue = 16"
+    },
+    {
+      "test": "edittext/edittext_device_transform_metrics",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.58,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 20
+      },
+      "duration": 23.75,
+      "status": "output_mismatch",
+      "detail": "20 line(s) differ (actual=40, expected=40)",
+      "actual_output": "... (15 lines before) ...\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12",
+      "expected_output": "... (15 lines before) ...\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = 0,0,0,0,1,1,1,-1,-1,-1,-1,\ntrue = height=10,width=16,x=102,ascent=8,descent=2\ntrue = 120\ntrue = 16\ntrue = (x=2, y=2, w=4, h=10),(x=6, y=2, w=4, h=10)\ntrue = 0,0,0,1,-1,-1,-1,-1,-1,-1,-1,\ntrue = height=5,width=8,x=52,ascent=4,descent=1\ntrue = 60\ntrue = 8\ntrue = (x=2, y=2, w=16, h=10),(x=18, y=2, w=16, h=10)\ntrue = 0,0,0,0,0,0,0,-1,-1,-1,-1,\ntrue = height=20,width=32,x=102,ascent=16,descent=4\ntrue = 240\ntrue = 32\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = 0,0,0,0,1,1,1,-1,-1,-1,-1,\ntrue = height=10,width=16,x=52,ascent=8,descent=2\ntrue = 120\ntrue = 16"
+    },
+    {
+      "test": "edittext/edittext_device_transform_negative",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.583,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 120,
+        "expected_lines": 120,
+        "matching_lines": 60
+      },
+      "duration": 6.11,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 11151 outliers exceed limit of 160, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "output_mismatch",
+      "detail": "60 line(s) differ (actual=120, expected=120)",
+      "actual_output": "... (25 lines before) ...\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\n... (45 lines after) ...",
+      "expected_output": "... (25 lines before) ...\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = 0,0,0,0,1,1,1,-1,-1,-1,-1,\ntrue = height=10,width=16,x=102,ascent=8,descent=2\ntrue = 120\ntrue = 16\ntrue = (x=2, y=2, w=4, h=10),(x=6, y=2, w=4, h=10)\ntrue = 0,0,0,1,-1,-1,-1,-1,-1,-1,-1,\ntrue = height=5,width=8,x=52,ascent=4,descent=1\ntrue = 60\ntrue = 8\ntrue = (x=2, y=2, w=16, h=10),(x=18, y=2, w=16, h=10)\ntrue = 0,0,0,0,0,0,0,-1,-1,-1,-1,\ntrue = height=20,width=32,x=102,ascent=16,descent=4\ntrue = 240\ntrue = 32\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = 0,0,0,0,1,1,1,-1,-1,-1,-1,\ntrue = height=10,width=16,x=52,ascent=8,descent=2\ntrue = 120\ntrue = 16\ntrue = (x=2, y=18, w=2, h=-2),(x=2, y=16, w=2, h=-2)\ntrue = 0,0,0,0,0,0,0,0,0,0,0,\ntrue = height=2,width=4,x=132,ascent=2,descent=0\ntrue = 24\ntrue = 4\ntrue = (x=2, y=18, w=2, h=-1),(x=2, y=17, w=2, h=-1)\ntrue = 0,0,0,0,0,0,0,0,0,0,0,\ntrue = height=1,width=2,x=57,ascent=1,descent=0\ntrue = 12\ntrue = 2\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\n... (45 lines after) ..."
+    },
+    {
+      "test": "edittext/edittext_device_transform_small_rotation",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.833,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.01,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 11), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_device_transform_small_shear",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.985,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.25,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1744 outliers exceed limit of 50, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_gutter",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.424,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 23.66,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 8436 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_justify",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.273,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.61,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 8916 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_negative_bounds",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.847,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.1,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 720 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_selection_font_size",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.275,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.52,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 18175 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_selection_leading",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.825,
+        "run": 0.265
+      },
+      "num_frames": 14,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 25.37,
+      "image_comparisons": {
+        "output.01": {
+          "status": "fail",
+          "message": "Image comparison failed: 18335 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 18335 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03": {
+          "status": "fail",
+          "message": "Image comparison failed: 20015 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        },
+        "output.04": {
+          "status": "fail",
+          "message": "Image comparison failed: 21563 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false
+        },
+        "output.05": {
+          "status": "fail",
+          "message": "Image comparison failed: 18335 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        },
+        "output.06": {
+          "status": "fail",
+          "message": "Image comparison failed: 18335 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            6
+          ],
+          "known_failure": false
+        },
+        "output.07": {
+          "status": "fail",
+          "message": "Image comparison failed: 20975 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            7
+          ],
+          "known_failure": false
+        },
+        "output.08": {
+          "status": "fail",
+          "message": "Image comparison failed: 22843 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            8
+          ],
+          "known_failure": false
+        },
+        "output.09": {
+          "status": "fail",
+          "message": "Image comparison failed: 18215 outliers exceed limit of 36, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            9
+          ],
+          "known_failure": false
+        },
+        "output.10": {
+          "status": "fail",
+          "message": "Image comparison failed: 18191 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            10
+          ],
+          "known_failure": false
+        },
+        "output.11": {
+          "status": "fail",
+          "message": "Image comparison failed: 19151 outliers exceed limit of 36, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            11
+          ],
+          "known_failure": false
+        },
+        "output.12": {
+          "status": "fail",
+          "message": "Image comparison failed: 20367 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            12
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_underline",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.829,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.65,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 13818 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_underline_scale2",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.68,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.13,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image size mismatch: actual 900x300, expected 1800x600",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/any_blur_scales_with_screen",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.193,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.57,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image size mismatch: actual 80x80, expected 160x160",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/avm1_convolution_initialization",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 20.167,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 17
+      },
+      "duration": 20.39,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=18, expected=18)",
+      "actual_output": "0\n0\ntrue\n128\n9\n1,1,1,1,1,1,1,1,1\n3\n3\ntrue\n0\n0\ntrue\n0\n9\n1,1,1,1,1,1,1,1,1\n3\n3\ntrue",
+      "expected_output": "1\n0\ntrue\n128\n9\n1,1,1,1,1,1,1,1,1\n3\n3\ntrue\n0\n0\ntrue\n0\n9\n1,1,1,1,1,1,1,1,1\n3\n3\ntrue"
+    },
+    {
+      "test": "filters/bevel",
+      "phases": {
+        "recomp": 0.052,
+        "compile": 20.851,
+        "run": 1.172
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 22.51,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 425335 outliers exceed limit of 6, max difference 254",
+          "max_diff": 254,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/bevel_full",
+      "phases": {
+        "recomp": 0.056,
+        "compile": 20.613,
+        "run": 2.978
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.47,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 693304 outliers exceed limit of 18, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/bevel_inner",
+      "phases": {
+        "recomp": 0.056,
+        "compile": 20.391,
+        "run": 3.179
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.43,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 606316 outliers exceed limit of 18, max difference 254",
+          "max_diff": 254,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/bevel_outer",
+      "phases": {
+        "recomp": 0.057,
+        "compile": 2.146,
+        "run": 3.028
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.05,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 648832 outliers exceed limit of 18, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/blur_fractional",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.55,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.6,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1850694 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/blur_pass_scaling",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.868,
+        "run": 0.466
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.74,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 181716 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/blur_quality",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 5.448,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.51,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1865877 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/blur_scales_with_screen",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 16.63,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.81,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image size mismatch: actual 200x200, expected 400x400",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/blur_size_grows",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.291,
+        "run": 0.366
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.84,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 110813 outliers exceed limit of 0, max difference 235",
+          "max_diff": 235,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/color_matrix",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.222,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.6,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 339 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/displacement_map",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.637,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.52,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 255918 outliers exceed limit of 160, max difference 254",
+          "max_diff": 254,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/displacement_map_scales_with_screen",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.169,
+        "run": 0.164
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.34,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image size mismatch: actual 400x200, expected 800x400",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/displacement_map_through_applyFilter",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.74,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.06,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 26645 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/displacement_map_through_filters",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.622,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.93,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 26645 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/drop_shadow",
+      "phases": {
+        "recomp": 0.049,
+        "compile": 1.935,
+        "run": 0.57
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.8,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 122356 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/drop_shadow_angles",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.849,
+        "run": 0.466
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.57,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 143915 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/drop_shadow_scales_with_screen",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.084,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.41,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image size mismatch: actual 400x200, expected 800x400",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/glow",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.025,
+        "run": 0.769
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 3.06,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 100412 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/glow_pass_scaling",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.397,
+        "run": 0.465
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.1,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 113680 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/glow_with_alpha_strength",
+      "phases": {
+        "recomp": 0.061,
+        "compile": 20.861,
+        "run": 3.033
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.82,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 357140 outliers exceed limit of 18, max difference 254",
+          "max_diff": 254,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/glow_without_composite_source",
+      "phases": {
+        "recomp": 0.054,
+        "compile": 2.071,
+        "run": 0.466
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.85,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 153114 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "focus_highlight/focus_highlight_avm1_button",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.296,
+        "run": 0.215
+      },
+      "num_frames": 8,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 21.58,
+      "image_comparisons": {
+        "output.01": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 168 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03": {
+          "status": "fail",
+          "message": "Image comparison failed: 1056 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        },
+        "output.04": {
+          "status": "fail",
+          "message": "Image comparison failed: 888 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false
+        },
+        "output.05": {
+          "status": "fail",
+          "message": "Image comparison failed: 888 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        },
+        "output.06": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            6
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "focus_highlight/focus_highlight_avm2_button_bounds",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 24.761,
+        "run": 0.215
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 25.0,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 800 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "focus_highlight/focus_highlight_basic",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 2.364,
+        "run": 0.466
+      },
+      "num_frames": 11,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.29,
+      "image_comparisons": {
+        "output.01_highlight_under": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02_highlight_over": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03_after_mouse_move": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        },
+        "output.04_after_mouse_up": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false
+        },
+        "output.05_after_mouse_down": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        },
+        "output.06_after_key_down": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            6
+          ],
+          "known_failure": false
+        },
+        "output.07_after_focus_change": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            7
+          ],
+          "known_failure": false
+        },
+        "output.08_after_focus_change_and_tab": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            8
+          ],
+          "known_failure": false
+        },
+        "output.09_after_focus_change_without_highlight": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            9
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "focus_highlight/focus_highlight_empty_clip",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 5.631,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.86,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "focus_highlight/focus_highlight_move",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 2.189,
+        "run": 0.215
+      },
+      "num_frames": 7,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.43,
+      "image_comparisons": {
+        "output.01": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        },
+        "output.04": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false
+        },
+        "output.05": {
+          "status": "fail",
+          "message": "Image comparison failed: 648 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "focus_highlight/focus_highlight_render",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.255,
+        "run": 0.415
+      },
+      "num_frames": 8,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.11,
+      "image_comparisons": {
+        "output.01": {
+          "status": "fail",
+          "message": "Image comparison failed: 2127 outliers exceed limit of 4, max difference 115",
+          "max_diff": 115,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false
+        },
+        "output.02": {
+          "status": "fail",
+          "message": "Image comparison failed: 2115 outliers exceed limit of 4, max difference 115",
+          "max_diff": 115,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false
+        },
+        "output.03": {
+          "status": "fail",
+          "message": "Image comparison failed: 4371 outliers exceed limit of 4, max difference 191",
+          "max_diff": 191,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false
+        },
+        "output.04": {
+          "status": "fail",
+          "message": "Image comparison failed: 2127 outliers exceed limit of 4, max difference 115",
+          "max_diff": 115,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false
+        },
+        "output.05": {
+          "status": "fail",
+          "message": "Image comparison failed: 2178 outliers exceed limit of 100, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        },
+        "output.06": {
+          "status": "fail",
+          "message": "Image comparison failed: 2495 outliers exceed limit of 4, max difference 128",
+          "max_diff": 128,
+          "trigger": [
+            "specific_iteration",
+            6
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "fonts/advance_u16",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.953,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.22,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 216 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "fonts/device-font",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 5.451,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.92,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 8205 outliers exceed limit of 3, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "fonts/duplicate_font",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.602,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.14,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 3999 outliers exceed limit of 0, max difference 191",
+          "max_diff": 191,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "fonts/font_lookup_as3",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.582,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.08,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 43095 outliers exceed limit of 72, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "fonts/glyph",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.445,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.94,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 4401 outliers exceed limit of 0, max difference 191",
+          "max_diff": 191,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "fonts/leading_define_font",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.607,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.13,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1728 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "fonts/leading_device_font",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.306,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.58,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 17622 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "fonts/leading_embedded_font",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 6.087,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.37,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 4680 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "gradient_issue_9892",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 20.528,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.41,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 3755 outliers exceed limit of 2329, max difference 252",
+          "max_diff": 252,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "gradient_nonsequential_ratios",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.664,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.07,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 61440 outliers exceed limit of 1300, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "gradient_radial_same_ratios",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.262,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.65,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 6675 outliers exceed limit of 3860, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "gradient_same_ratios",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.712,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.06,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 6912 outliers exceed limit of 5130, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "layout/line_vertical_align",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.399,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.63,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1488 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "opaque_background",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.116,
+        "run": 0.165
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.42,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 234040 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "scale_rotation_cache",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 15.075,
+        "run": 0.265
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 106,
+        "expected_lines": 106,
+        "matching_lines": 106
+      },
+      "duration": 15.57,
+      "image_comparisons": {
+        "output.5": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            5
+          ],
+          "known_failure": false
+        },
+        "output.15": {
+          "status": "fail",
+          "message": "Image comparison failed: 118784 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            15
+          ],
+          "known_failure": false
+        },
+        "output.25": {
+          "status": "fail",
+          "message": "Image comparison failed: 118784 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            25
+          ],
+          "known_failure": false
+        },
+        "output.35": {
+          "status": "fail",
+          "message": "Image comparison failed: 118784 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            35
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/gradients/focal_radial",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 1.191,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.57,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 10016 outliers exceed limit of 0, max difference 153",
+          "max_diff": 153,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/gradients/gradients",
+      "phases": {
+        "recomp": 0.016,
+        "compile": 1.167,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.54,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 4270 outliers exceed limit of 0, max difference 191",
+          "max_diff": 191,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/gradients/radial",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 1.865,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.37,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 5280 outliers exceed limit of 0, max difference 128",
+          "max_diff": 128,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/gradients/reflect",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 1.748,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.23,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 8847 outliers exceed limit of 0, max difference 128",
+          "max_diff": 128,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/gradients/repeat",
+      "phases": {
+        "recomp": 0.022,
+        "compile": 1.742,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.23,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 8847 outliers exceed limit of 0, max difference 128",
+          "max_diff": 128,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/heavy_tesselation",
+      "phases": {
+        "recomp": 30.106
+      },
+      "status": "recomp_fail",
+      "detail": "SWFRecomp failed",
+      "duration": 30.11
+    },
+    {
+      "test": "simple_shapes/layers",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.782,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.34,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 271 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/masks",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.837,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.4,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 248261 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/masks_equal_clipdepth",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.579,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.15,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 248261 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/overlaps",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.781,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.3,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 3770 outliers exceed limit of 0, max difference 179",
+          "max_diff": 179,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/scroll_rect_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.528,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.95,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 434721 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/strokes/scale",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.486,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.9,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 66243 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": true
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/text_field_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.602,
+        "run": 0.367
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.17,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 432212 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/winding_rule",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 16.148,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.51,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "text/String_path_variable_button",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.076,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.65,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1503 outliers exceed limit of 12, max difference 153",
+          "max_diff": 153,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "video/colorconversion/h263",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.847,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.54,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 686351 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "video/colorconversion/vp6",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.984,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.66,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 771570 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "video/colorconversion/vp6a",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 2.172,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.9,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 731370 outliers exceed limit of 0, max difference 240",
+          "max_diff": 240,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "video/deblocking",
+      "phases": {
+        "recomp": 0.013,
+        "compile": 21.631,
+        "run": 12.896
+      },
+      "num_frames": 1,
+      "status": "runtime_error",
+      "detail": "exit code -6",
+      "duration": 34.54
+    },
+    {
+      "test": "video/h264",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 26.192,
+        "run": 0.716
+      },
+      "num_frames": 120,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.47,
+      "image_comparisons": {
+        "frame2": {
+          "status": "fail",
+          "message": "Image comparison failed: 98961 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            25
+          ],
+          "known_failure": false
+        },
+        "frame3": {
+          "status": "fail",
+          "message": "Image comparison failed: 101969 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            35
+          ],
+          "known_failure": false
+        },
+        "frame4": {
+          "status": "fail",
+          "message": "Image comparison failed: 104945 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            45
+          ],
+          "known_failure": false
+        },
+        "frame5": {
+          "status": "fail",
+          "message": "Image comparison failed: 107937 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            55
+          ],
+          "known_failure": false
+        },
+        "frame6": {
+          "status": "fail",
+          "message": "Image comparison failed: 110865 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            65
+          ],
+          "known_failure": false
+        },
+        "frame7": {
+          "status": "fail",
+          "message": "Image comparison failed: 113825 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            75
+          ],
+          "known_failure": false
+        },
+        "frame8": {
+          "status": "fail",
+          "message": "Image comparison failed: 116817 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            85
+          ],
+          "known_failure": false
+        },
+        "frame9": {
+          "status": "fail",
+          "message": "Image comparison failed: 116817 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            95
+          ],
+          "known_failure": false
+        },
+        "frame10": {
+          "status": "fail",
+          "message": "Image comparison failed: 116817 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            105
+          ],
+          "known_failure": false
+        },
+        "frame11": {
+          "status": "fail",
+          "message": "Image comparison failed: 116817 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            115
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "video/vp6_alphaoffset",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 21.179,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.91,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 520506 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "video/vp6_dispsize",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 20.539,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.19,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 771570 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    }
+  ]
+}
