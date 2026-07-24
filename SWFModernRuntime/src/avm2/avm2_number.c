@@ -89,6 +89,35 @@ static Avm2Value number_value_of(Avm2Activation* act)
 	return act->this_val;
 }
 
+// Number.prototype.toString / .valueOf / .toLocaleString.
+//
+// Same hazard as String.prototype.toString: the receiver can be
+// `Number.prototype` itself, a bare object with no primitive value.
+// this_number() would coerce it, which calls valueOf -> number_value_of,
+// which hands the object straight back -> coerce again -> infinite
+// recursion and a stack-overflow SIGSEGV. In avmplus `Number.prototype`
+// is a Number object whose value is 0, and the tests assert exactly that
+// (`Number.prototype.valueOf()` -> 0, `Number.prototype.toString()` ->
+// "0"), so a non-numeric receiver is treated as 0.
+static bool numeric_receiver(Avm2Value v)
+{
+	return v.kind == AVM2_VALUE_NUMBER || v.kind == AVM2_VALUE_INTEGER;
+}
+
+static Avm2Value number_proto_to_string(Avm2Activation* act)
+{
+	if (numeric_receiver(act->this_val)) return number_to_string(act);
+	Avm2Activation zero = *act;
+	zero.this_val = avm2_number(0.0);
+	return number_to_string(&zero);
+}
+
+static Avm2Value number_proto_value_of(Avm2Activation* act)
+{
+	if (numeric_receiver(act->this_val)) return act->this_val;
+	return avm2_number(0.0);
+}
+
 static Avm2Value number_to_fixed(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -385,9 +414,9 @@ static void add_number_methods(Avm2Context* ctx, Avm2Class* cls)
 
 	// ES3-compat layer on the prototype (Ruffle globals/Number.as).
 	Avm2Object* proto = cls->prototype_obj;
-	avm2_proto_add_function_n(ctx, proto, "toString", number_to_string, 1);
-	avm2_proto_add_function_n(ctx, proto, "toLocaleString", number_to_string, 1);
-	avm2_proto_add_function_n(ctx, proto, "valueOf", number_value_of, 0);
+	avm2_proto_add_function_n(ctx, proto, "toString", number_proto_to_string, 1);
+	avm2_proto_add_function_n(ctx, proto, "toLocaleString", number_proto_to_string, 1);
+	avm2_proto_add_function_n(ctx, proto, "valueOf", number_proto_value_of, 0);
 	avm2_proto_add_function_n(ctx, proto, "toFixed", number_to_fixed, 1);
 	avm2_proto_add_function_n(ctx, proto, "toExponential", number_to_exponential, 1);
 	avm2_proto_add_function_n(ctx, proto, "toPrecision", number_to_precision, 1);

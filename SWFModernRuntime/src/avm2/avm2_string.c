@@ -572,6 +572,21 @@ static Avm2Value string_to_string(Avm2Activation* act)
 	return avm2_string(this_string(act));
 }
 
+// String.prototype.toString / .valueOf.
+//
+// Unlike the class method, the receiver here can be `String.prototype`
+// ITSELF (`String.prototype.toString()` is a direct call in the ES3 tests).
+// That is a bare Avm2Object with no primitive value, and coercing it would
+// look up `toString` on it -- i.e. re-enter this very function -- and
+// recurse until the stack dies. In avmplus `String.prototype` is a String
+// object whose primitive value is "", and the tests assert exactly that
+// (`String.prototype.toString()` -> ""), so a non-string receiver yields "".
+static Avm2Value string_proto_to_string(Avm2Activation* act)
+{
+	if (act->this_val.kind == AVM2_VALUE_STRING) return act->this_val;
+	return make_str(act->ctx, "", 0);
+}
+
 static Avm2Value string_construct(Avm2Context* ctx, Avm2Class* cls,
                                   const Avm2Value* args, uint32_t argc)
 {
@@ -634,6 +649,6 @@ void avm2_register_string(Avm2Context* ctx)
 	avm2_proto_add_function_n(ctx, proto, "toLocaleLowerCase", string_to_lower_case, 0);
 	avm2_proto_add_function_n(ctx, proto, "toUpperCase", string_to_upper_case, 0);
 	avm2_proto_add_function_n(ctx, proto, "toLocaleUpperCase", string_to_upper_case, 0);
-	avm2_proto_add_function_n(ctx, proto, "toString", string_to_string, 0);
-	avm2_proto_add_function_n(ctx, proto, "valueOf", string_to_string, 0);
+	avm2_proto_add_function_n(ctx, proto, "toString", string_proto_to_string, 0);
+	avm2_proto_add_function_n(ctx, proto, "valueOf", string_proto_to_string, 0);
 }
