@@ -1,15 +1,26 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-24 — **first baseline + first fix**. The Adobe
-Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
+Last updated: 2026-07-24 — **first baseline + first fix, CI-confirmed**. The
+Adobe Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`:
 **871/1574 effective (55.3%)**, identical in graphics and no-graphics.
 
 This session cracked the "empty output" pattern and landed the first fix
 (`d36c8da2b`, root SymbolClass must inherit Sprite → trace TypeError
-`#2023`), which is expected to take **e4x from 2/177 to ~157/177** and lift
-the suite to roughly **1026/1574 (65%)**. The corpus-wide ranking this
-baseline feeds is `SWFRecompDocs/plans/feature-priority-map.md`.
+`#2023`). CI run `30121943045` (graphics, `categories=full`):
+**+156 newly passing here, +4 in the avm2 suite, +3 promoted to
+ruffle_matched, ZERO regressions corpus-wide.** e4x went **2/177 → 160/177**
+and the suite to **1000/1522 (65.7%)**.
+
+⚠️ That run lost shard 25/30 to the known apt/Vulkan flake
+(`graphics-ci-aptget-flaky-shards`), so 52 from_avmplus tests were not
+executed — totals below read 1522 not 1574, and `ecma3/String` in
+particular is understated (41 of its 83 tests ran). Extrapolating the
+missing shard at its prior rate puts the true figure near
+**1029/1574 (65.4%)**. The next full run restores exact totals.
+
+The corpus-wide ranking this baseline feeds is
+`SWFRecompDocs/plans/feature-priority-map.md`.
 
 ## What this suite is
 
@@ -47,42 +58,48 @@ gh workflow run ruffle-tests.yml --ref master \
 `categories=full` does, and so does the weekly Sunday canary. Dispatch
 `full` for any change touching AVM2 runtime or recompiler emission.
 
-## Baseline at `eabb3b366` (graphics; no-graphics identical)
+## Baselines
 
-| Area | eff/total | failing | of which known_failure | failing that miss exactly 1 line |
+Import baseline `eabb3b366` (complete, both modes), and current
+`d36c8da2b` (graphics, 29/30 shards):
+
+| Area | at import | now | failing now | of which known_failure |
 |---|---|---|---|---|
-| ecma3 | 402/800 | 398 | 31 | 72 |
-| e4x | 2/177 | 175 | 6 | **155** |
-| as3 | 410/509 | 99 | 6 | 29 |
-| mops | 0/13 | 13 | 0 | 0 |
-| regress | 43/55 | 12 | 4 | 3 |
-| recursion | 1/6 | 5 | 1 | 4 |
-| misc | 13/14 | 1 | 1 | 0 |
-| **total** | **871/1574** | **703** | **49** | **263** |
+| ecma3 | 402/800 | 372/748 | 376 | 30 |
+| e4x | **2/177** | **160/177** | 17 | 3 |
+| as3 | 410/509 | 411/509 | 98 | 6 |
+| mops | 0/13 | 0/13 | 13 | 0 |
+| regress | 43/55 | 43/55 | 12 | 4 |
+| recursion | 1/6 | 1/6 | 5 | 1 |
+| misc | 13/14 | 13/14 | 1 | 1 |
+| **total** | **871/1574** | **1000/1522** | **522** | **45** |
 
-Status breakdown of the 703: 681 output_mismatch, 16 runtime_error,
-3 timeout, 2 segfault, 1 compile_fail.
+(`ecma3` and the total lost 52 tests to the shard-25 flake; nothing there
+regressed.) Status breakdown of the 522: 500 output_mismatch,
+16 runtime_error, 3 timeout, 2 segfault, 1 compile_fail.
+
+At import, 263 of the 703 failures were missing **exactly one** output
+line — 155 of them the e4x root-link line, now fixed.
 
 Top feature areas by failing count (auto-generated in
-`FAILING_TESTS_BY_FEATURE.md`):
+`FAILING_TESTS_BY_FEATURE.md`; `x/y` = failing of tests run):
 
 | Failing | Area | Root cause |
 |---|---|---|
 | 151/153 | `ecma3/Date` | Date is a 3-method stub |
-| 102/108 | `ecma3/Unicode` | 3 String semantics bugs (below) |
-| 65/67 | `e4x/XML` | root-link `#2023` — **fixed** `d36c8da2b` |
-| 36/83 | `ecma3/String` | ES3 `String.prototype.*` missing |
+| 102/108 | `ecma3/Unicode` | 2 String semantics bugs (below) |
 | 31/55 | `as3/Types` | `Number` static math (API 680) missing |
-| 27/27 | `e4x/XMLList` | `#2023` — **fixed** |
-| 23/23 | `e4x/Types` | `#2023` — **fixed** |
-| 21/53 | `ecma3/Number` | `Function.length`, `toString` rounding |
 | 21/212 | `as3/Definitions` | assorted; error-message wording |
-| 17/17 | `e4x/Expressions` | `#2023` — **fixed** |
-| 16/60 | `as3/Vector` | assorted |
+| 21/53 | `ecma3/Number` | `Function.length`, `toString` rounding |
+| 15/60 | `as3/Vector` | assorted |
 | 15/21 | `ecma3/FunctionObjects` | `Function.prototype.*` / `.length` |
 | 14/51 | `as3/RuntimeErrors` | error-message wording |
+| 14/41 | `ecma3/String` | ES3 `String.prototype.*` missing (42 tests unrun) |
+| 13/51 | `ecma3/Array` | ES3 `Array.prototype.*` missing |
 | 13/21 | `ecma3/GlobalObject` | `encodeURI`/`decodeURI` family missing |
 | 13/13 | `mops` | Alchemy `li*`/`si*` domainMemory opcodes |
+| 11/46 | `ecma3/Exceptions` | assorted |
+| 17/177 | `e4x` (all dirs) | residue after the `#2023` fix |
 
 ## The "empty output" pattern — SOLVED (it is not one bug)
 
@@ -144,9 +161,12 @@ the compiled ABC (verified: `regexp_constr`, `boolean_constr`,
 `stage_framerate_zero`, `set_property_is_enumerable` all still pass, despite
 `public class Test {}` in their visible source).
 
-Verified locally: `e4x/XML/e13_4_1`, `e4x/Expressions/e11_2_1`,
-`e4x/XMLList/e13_5_4_2`, `e4x/Types/e9_1_1_1`, `e4x/Types/e9_1_1_4`,
-`as3/Vector/concat` — all MISMATCH → PASS.
+CI run `30121943045` (graphics, `categories=full`) confirms:
+**156 newly passing here** (155 e4x + `as3/Vector/concat`), 3 promoted to
+`ruffle_matched`, and **4 in the avm2 suite** that were also one line short
+of the same message (`parse_float`, `string_concat_fromcharcode`,
+`string_slice_substr_substring`, `xml_basic`). **No regressions in any
+suite.**
 
 ## E4X is NOT a coverage gap
 
@@ -154,8 +174,8 @@ The probe asked whether 2/177 meant broad missing E4X. It does not: **155 of
 175 failures were the one root-link line**, with every real E4X assertion
 already passing. Our E4X engine (`avm2_e4x.c` / `avm2_xml.c`) handles
 Tamarin's XML/XMLList/QName/Namespace/TypeConversion suites essentially in
-full. After the fix, the residue is ~20 tests (10 at 50–90% line match, 6
-below 50%, plus 6 known_failure) — ordinary polish, not an arc.
+full. e4x now stands at **160/177**; the 17-test residue (3 of them
+known_failure) is ordinary polish, not an arc.
 
 ## Next arcs (expected yield)
 

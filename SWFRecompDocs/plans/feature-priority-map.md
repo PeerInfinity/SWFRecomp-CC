@@ -16,7 +16,15 @@ python3 scripts/generate_failing_by_feature.py --suite=gnash/actionscript.all
 
 ## Where we stand
 
-Full corpus, graphics mode: **3211/4463 effective (71.9%)**, 1252 failing.
+Full corpus, graphics mode at the import baseline `eabb3b366`:
+**3211/4463 effective (71.9%)**, 1252 failing. The table below is that
+baseline — it is complete, and it is what the ranking is computed from.
+
+**Since then** (CI run `30121943045`, `d36c8da2b`): the root-SymbolClass fix
+took e4x from 2/177 to **160/177**, adding 156 tests in from_avmplus and 4
+in the avm2 suite with **zero regressions**. That run lost shard 25/30 to
+the known apt/Vulkan flake, so its totals are 4322 not 4463; corrected for
+the missing shard the corpus stands at roughly **3400/4463 (76%)**.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
@@ -245,10 +253,14 @@ root.`, and keep running with a plain MovieClip root. We instead constructed
 the class with the stage as its sole argument, threw `ArgumentError #1063`
 to stderr, and printed nothing — losing exactly one line.
 
-**155 of the 175 failing e4x tests were missing only that line.** Expected
-yield ~157 tests, taking e4x from 2/177 to ~157/177 and from_avmplus from
-55.3% to roughly 65%. Verified locally on 5 e4x tests + `as3/Vector/concat`
-(all MISMATCH → PASS) with no regression in the avm2 suite.
+**155 of the 175 failing e4x tests were missing only that line.**
+
+CI-confirmed (`30121943045`, graphics, `categories=full`):
+**+156 in from_avmplus** (155 e4x + `as3/Vector/concat`), **+4 in the avm2
+suite** that were one line short of the same message (`parse_float`,
+`string_concat_fromcharcode`, `string_slice_substr_substring`,
+`xml_basic`), **+3 promoted to `ruffle_matched`**, and **zero regressions in
+any suite**. e4x: 2/177 → **160/177**. from_avmplus: 55.3% → **65.7%**.
 
 This also settles the E4X question: **E4X is not a coverage gap.** Our
 engine passes Tamarin's XML/XMLList/QName/Namespace/TypeConversion suites
@@ -266,8 +278,9 @@ Then, as a cheap cleanup batch in one session: `Number` static math (21),
 global URI functions (9), `flash.system.Capabilities` (2) — ~32 tests of
 almost purely mechanical work.
 
-Doing arcs 1–3 plus the cleanup batch takes from_avmplus from 871 to roughly
-**1350/1574 (86%)** and the whole corpus from 71.9% to about **80%**.
+from_avmplus stands at ~1029/1574 after this session's fix. Doing arcs 1–3
+plus the cleanup batch would take it to roughly **1350/1574 (86%)** and the
+whole corpus from ~76% to about **83%**.
 
 Regression-guard every one of these with
 `gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f categories=full`
