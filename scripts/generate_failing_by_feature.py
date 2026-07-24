@@ -8,10 +8,16 @@ Usage:
   python3 scripts/generate_failing_by_feature.py                      # default: avm1
   python3 scripts/generate_failing_by_feature.py --suite=avm1
   python3 scripts/generate_failing_by_feature.py --suite=gnash/actionscript.all
+  python3 scripts/generate_failing_by_feature.py --suite=from_avmplus
 
-Auto-categorization (Gnash) strips the `-v<N>` SWF-version suffix from each
-test name and groups by the remaining prefix — one category per class, no
-hand-written feature_categories.json needed.
+Auto-categorization modes (`auto_categorize` in the suite config):
+  False      hand-written feature_categories.json
+  "prefix"   (Gnash) strip the `-v<N>` SWF-version suffix and group by the
+             remaining prefix — one category per class.
+  "path2"    (from_avmplus) group by the first two path components of the
+             nested test name, e.g. `ecma3/String`, `e4x/XMLList`,
+             `as3/Types`. Tests with a single component (`mops/li8`) group
+             under that component alone.
 """
 
 import argparse
@@ -44,9 +50,27 @@ SUITES: dict[str, dict] = {
         "results_filtered_rel": "tests/swfs/from_gnash/actionscript.all/_results/results_filtered.json",
         "ignored_rel": "tests/swfs/from_gnash/actionscript.all/ignored_tests.txt",
         "rel_prefix": "ruffle-tests/tests/swfs/from_gnash/_investigation",
-        "auto_categorize": True,
+        "auto_categorize": "prefix",
+    },
+    # Adobe Tamarin/avmplus acceptance suite: nested paths, AVM2-only, and
+    # the corpus's language/builtin coverage instrument. Graded against the
+    # graphics-mode baseline (the per-change CI mode).
+    "from_avmplus": {
+        "investigation_rel": "tests/swfs/from_avmplus/_investigation",
+        "results_rel": "tests/swfs/from_avmplus/_results/results_graphics.json",
+        "results_filtered_rel": "tests/swfs/from_avmplus/_results/results_graphics_filtered.json",
+        "ignored_rel": "tests/swfs/from_avmplus/ignored_tests.txt",
+        "rel_prefix": "ruffle-tests/tests/swfs/from_avmplus/_investigation",
+        "auto_categorize": "path2",
+        "tests_dir_rel": "tests/swfs/from_avmplus",
     },
 }
+
+# Statuses that count as "we are doing as well as required". `ruffle_matched`
+# is a test Ruffle itself marks known_failure where our diff is a subset of
+# Ruffle's — it is not a gap to close, so it must not inflate the failing
+# counts this document ranks features by.
+EFFECTIVE_PASS_STATUSES = {"pass", "ruffle_matched"}
 
 # Module-level paths — set by main() from the chosen suite config.
 SUITE_NAME: str = ""
@@ -56,7 +80,8 @@ RESULTS_PATH: Path = Path()
 RESULTS_FILTERED_PATH: Path = Path()
 IGNORED_TESTS_PATH: Path = Path()
 INVESTIGATION_REL_PREFIX: str = ""
-AUTO_CATEGORIZE: bool = False
+AUTO_CATEGORIZE: str | bool = False
+TESTS_DIR: Path | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +184,8 @@ def auto_categorize_by_prefix(results: dict) -> dict:
         groups.setdefault(prefix, []).append(name)
 
     def failing_count(tests: list[str]) -> int:
-        return sum(1 for n in tests if status_by_name.get(n) != "pass")
+        return sum(1 for n in tests
+                   if status_by_name.get(n) not in EFFECTIVE_PASS_STATUSES)
 
     items = sorted(
         groups.items(),
@@ -178,6 +204,73 @@ def auto_categorize_by_prefix(results: dict) -> dict:
         "near_passing_notes": {},
         "crash_notes": {},
     }
+
+
+def auto_categorize_by_path(results: dict) -> dict:
+    """Synthesize feature categories from the first two path components.
+
+    from_avmplus test names are nested paths (`ecma3/String/substr`,
+    `e4x/XMLList/e13_5_4_2`, `mops/li8`). The first two components are
+    already the feature axis Tamarin organized the suite along — area plus
+    builtin/class — so no hand-written mapping is needed.
+    """
+    groups: dict[str, list[str]] = {}
+    status_by_name: dict[str, str] = {}
+    for t in results["tests"]:
+        name = t["test"]
+        status_by_name[name] = t["status"]
+        parts = name.split("/")
+        key = "/".join(parts[:2]) if len(parts) > 1 else parts[0]
+        groups.setdefault(key, []).append(name)
+
+    def failing_count(tests: list[str]) -> int:
+        return sum(
+            1 for n in tests
+            if status_by_name.get(n) not in EFFECTIVE_PASS_STATUSES
+        )
+
+    items = sorted(
+        groups.items(),
+        key=lambda kv: (-failing_count(kv[1]), kv[0].lower()),
+    )
+
+    categories = []
+    for prefix, tests in items:
+        categories.append({
+            "name": prefix,
+            "tests": sorted(tests),
+            "description": f"Tamarin acceptance tests under `{prefix}/`.",
+        })
+    return {
+        "categories": categories,
+        "near_passing_notes": {},
+        "crash_notes": {},
+    }
+
+
+def load_known_failures() -> set[str]:
+    """Test names whose test.toml sets `known_failure = true`.
+
+    These are tests Ruffle itself fails; they cap what a feature arc can
+    realistically unlock, so the docs annotate them rather than silently
+    counting them as our gaps.
+    """
+    if TESTS_DIR is None or not TESTS_DIR.is_dir():
+        return set()
+    try:
+        import tomllib
+    except ImportError:  # pragma: no cover - py<3.11
+        return set()
+    kf = set()
+    for toml_path in TESTS_DIR.rglob("test.toml"):
+        try:
+            with open(toml_path, "rb") as f:
+                data = tomllib.load(f)
+        except Exception:
+            continue
+        if data.get("known_failure"):
+            kf.add(str(toml_path.parent.relative_to(TESTS_DIR)))
+    return kf
 
 
 def get_git_sha() -> str:
@@ -217,19 +310,29 @@ def match_rate_str(test: dict) -> str:
     return f"{matching}/{total} ({pct:.0f}%)"
 
 
+def is_effective_pass(test: dict | None) -> bool:
+    return bool(test) and test.get("status") in EFFECTIVE_PASS_STATUSES
+
+
+KNOWN_FAILURES: set[str] = set()
+
+
 def test_annotation(test_name: str, lookup: dict[str, dict]) -> str:
     """Return inline annotation like (PASS), (SEGFAULT), (TIMEOUT), or empty."""
     t = lookup.get(test_name)
     if not t:
         return " (NOT IN RESULTS)"
+    kf = " (KNOWN_FAILURE)" if test_name in KNOWN_FAILURES else ""
     status = t["status"]
     if status == "pass":
-        return " (PASS)"
+        return " (PASS)" + kf
+    elif status == "ruffle_matched":
+        return " (RUFFLE_MATCHED)"
     elif status in ("segfault", "runtime_segfault"):
-        return " (SEGFAULT)"
+        return " (SEGFAULT)" + kf
     elif status == "timeout":
-        return " (TIMEOUT)"
-    return ""
+        return " (TIMEOUT)" + kf
+    return kf
 
 
 def format_test_list(tests: list[str], lookup: dict[str, dict]) -> str:
@@ -243,7 +346,7 @@ def format_test_list(tests: list[str], lookup: dict[str, dict]) -> str:
 
 def count_by_status(tests: list[str], lookup: dict[str, dict]) -> tuple[int, int, int]:
     """Return (passing, failing, total) counts."""
-    passing = sum(1 for t in tests if lookup.get(t, {}).get("status") == "pass")
+    passing = sum(1 for t in tests if is_effective_pass(lookup.get(t)))
     total = len(tests)
     return passing, total - passing, total
 
@@ -272,13 +375,20 @@ def generate_header(data: dict, filtered: bool, ignored_count: int) -> str:
         sha = sha[:10]
 
     total = data["total"]
-    passing = data["pass"]
-    failing = data["fail"]
-    rate = data["pass_rate"]
+    # Prefer the effective figures (pass + ruffle_matched) when the results
+    # file carries them — that is the number the gap ranking is based on.
+    passing = data.get("effective_pass", data["pass"])
+    failing = total - passing
+    rate = data.get("effective_pass_rate", data["pass_rate"])
     breakdown = data.get("breakdown", {})
+    rm = data.get("ruffle_matched", 0)
 
     md.append(f"- **Total tests**: {total}")
-    md.append(f"- **Passing**: {passing} ({rate}%)")
+    if rm:
+        md.append(f"- **Passing (effective)**: {passing} ({rate}%) "
+                  f"— {data['pass']} pass + {rm} ruffle_matched")
+    else:
+        md.append(f"- **Passing**: {passing} ({rate}%)")
 
     # Build breakdown string
     bd_parts = []
@@ -321,7 +431,7 @@ def generate_category_section(
         return None
 
     # Only include failing tests
-    failing_tests = [t for t in tests if lookup.get(t, {}).get("status") != "pass"]
+    failing_tests = [t for t in tests if not is_effective_pass(lookup.get(t))]
     if not failing_tests:
         return None
 
@@ -356,7 +466,7 @@ def generate_category_section(
                 sc_tests = [t for t in tests if t not in explicit_tests]
 
             # Only include failing tests in sub-category counts
-            sc_failing = [t for t in sc_tests if lookup.get(t, {}).get("status") != "pass"]
+            sc_failing = [t for t in sc_tests if not is_effective_pass(lookup.get(t))]
             if not sc_failing:
                 continue
 
@@ -429,6 +539,54 @@ def generate_near_passing(
     return "\n".join(md)
 
 
+def generate_error_signatures(
+    lookup: dict[str, dict],
+    ignored: set[str],
+    filtered: bool,
+) -> str:
+    """Group failing tests by the uncaught VM error that truncated them.
+
+    `error_signature` is recorded by verify_output.py from the runtime's
+    stderr. For the avmplus driver a single uncaught error at script-init
+    time (it builds its whole testcase array eagerly) suppresses ALL trace
+    output, so one missing builtin can blank hundreds of tests. Grouping by
+    the message turns that into a ranked list of missing builtins.
+
+    Returns "" when no result carries a signature (baselines predating the
+    instrumentation).
+    """
+    groups: dict[str, list[str]] = {}
+    for name, t in lookup.items():
+        if filtered and name in ignored:
+            continue
+        if is_effective_pass(t):
+            continue
+        sig = t.get("error_signature")
+        if not sig:
+            continue
+        groups.setdefault(sig, []).append(name)
+
+    if not groups:
+        return ""
+
+    md = []
+    total = sum(len(v) for v in groups.values())
+    md.append(f"## Failing Tests by Uncaught Error ({total} tests, "
+              f"{len(groups)} distinct errors)")
+    md.append("")
+    md.append("An uncaught error aborts the whole script, so these tests lose "
+              "*all* remaining output — the error is the root cause, not the "
+              "symptom. Ranked by how many tests one fix would unblock.")
+    md.append("")
+    md.append("| Tests | Uncaught error | Example |")
+    md.append("|-------|----------------|---------|")
+    for sig, tests in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+        example = sorted(tests)[0]
+        md.append(f"| {len(tests)} | `{sig}` | {example} |")
+    md.append("")
+    return "\n".join(md)
+
+
 def generate_crashes_timeouts(
     lookup: dict[str, dict],
     notes: dict[str, str],
@@ -492,7 +650,7 @@ def generate_uncategorized(
         return ""
 
     # Only show failing tests
-    failing = [t for t in uncategorized if lookup[t]["status"] != "pass"]
+    failing = [t for t in uncategorized if not is_effective_pass(lookup[t])]
 
     if not failing:
         return ""
@@ -604,6 +762,11 @@ def generate_document(data: dict, categories_data: dict, ignored: set[str], filt
     if uncat:
         sections.append(uncat)
 
+    # Root-cause grouping (only when the baseline carries error signatures)
+    sig_section = generate_error_signatures(lookup, ignored, filtered)
+    if sig_section:
+        sections.append(sig_section)
+
     # Near-passing
     sections.append(generate_near_passing(lookup, near_notes, ignored, filtered))
 
@@ -621,7 +784,7 @@ def configure_suite(suite_name: str) -> None:
     """Populate module-level path globals from a suite config entry."""
     global SUITE_NAME, INVESTIGATION_DIR, CATEGORIES_PATH
     global RESULTS_PATH, RESULTS_FILTERED_PATH, IGNORED_TESTS_PATH
-    global INVESTIGATION_REL_PREFIX, AUTO_CATEGORIZE
+    global INVESTIGATION_REL_PREFIX, AUTO_CATEGORIZE, TESTS_DIR
 
     if suite_name not in SUITES:
         print(
@@ -639,7 +802,8 @@ def configure_suite(suite_name: str) -> None:
     RESULTS_FILTERED_PATH = RUFFLE_DIR / cfg["results_filtered_rel"]
     IGNORED_TESTS_PATH = RUFFLE_DIR / cfg["ignored_rel"]
     INVESTIGATION_REL_PREFIX = cfg["rel_prefix"]
-    AUTO_CATEGORIZE = bool(cfg["auto_categorize"])
+    AUTO_CATEGORIZE = cfg["auto_categorize"]
+    TESTS_DIR = (RUFFLE_DIR / cfg["tests_dir_rel"]) if cfg.get("tests_dir_rel") else None
 
 
 def main():
@@ -652,13 +816,18 @@ def main():
     args = parser.parse_args()
     configure_suite(args.suite)
 
+    global KNOWN_FAILURES
+    KNOWN_FAILURES = load_known_failures()
+
     if not RESULTS_PATH.exists():
         print(f"Error: {RESULTS_PATH} not found", file=sys.stderr)
         sys.exit(1)
 
     ignored = load_ignored_tests()
 
-    if AUTO_CATEGORIZE:
+    if AUTO_CATEGORIZE == "path2":
+        categories_data = auto_categorize_by_path(load_results(RESULTS_PATH))
+    elif AUTO_CATEGORIZE:
         # Build categories from test name prefixes (strip -v<N>).
         categories_data = auto_categorize_by_prefix(load_results(RESULTS_PATH))
     else:
@@ -690,16 +859,28 @@ def main():
         results_filtered["pass"] = sum(
             1 for t in results_filtered["tests"] if t["status"] == "pass"
         )
+        results_filtered["ruffle_matched"] = sum(
+            1 for t in results_filtered["tests"]
+            if t["status"] == "ruffle_matched"
+        )
+        results_filtered["effective_pass"] = (
+            results_filtered["pass"] + results_filtered["ruffle_matched"]
+        )
         results_filtered["fail"] = results_filtered["total"] - results_filtered["pass"]
         if results_filtered["total"] > 0:
             results_filtered["pass_rate"] = round(
                 results_filtered["pass"] / results_filtered["total"] * 100, 1
             )
+            results_filtered["effective_pass_rate"] = round(
+                results_filtered["effective_pass"]
+                / results_filtered["total"] * 100, 1
+            )
         else:
             results_filtered["pass_rate"] = 0.0
+            results_filtered["effective_pass_rate"] = 0.0
         breakdown = {}
         for t in results_filtered["tests"]:
-            if t["status"] != "pass":
+            if t["status"] not in EFFECTIVE_PASS_STATUSES:
                 status = t["status"]
                 breakdown[status] = breakdown.get(status, 0) + 1
         results_filtered["breakdown"] = breakdown

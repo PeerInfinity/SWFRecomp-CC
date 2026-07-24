@@ -2,6 +2,19 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
+> **2026-07-24 — full corpus imported; read the feature-priority map first.**
+> The FULL upstream test set is now mirrored (14 categories, 4463 tests,
+> **3211 effective / 71.9%** in graphics mode). What to build next is now
+> decided by test yield, not intuition:
+> **[`SWFRecompDocs/plans/feature-priority-map.md`](../../../../SWFRecompDocs/plans/feature-priority-map.md)**
+> — every feature area ranked by unlockable test count, arcs separated from
+> polish. Import audit + CI selection policy (`all` / `full` / targeted):
+> [`FULL_SUITE_IMPORT_AUDIT.md`](FULL_SUITE_IMPORT_AUDIT.md). New suite:
+> [`from_avmplus`](../from_avmplus/_investigation/CURRENT_STATUS.md) (1574
+> Tamarin acceptance tests — the language/builtin coverage instrument).
+> The Suite Summary table below is a 2026-05-15 snapshot and understates
+> every suite.
+
 Last updated: 2026-07-02 — doc sync against merged CI of 2026-06-30 (SHA
 `56970ac27`); no new fixes this entry. Fresh effective-pass numbers (the Suite
 Summary table below still shows the 2026-05-15 snapshot and understates several

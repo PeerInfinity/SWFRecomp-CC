@@ -2474,6 +2474,24 @@ function startDemo() {{
 MAX_OUTPUT_BYTES = 32 * 1024 * 1024
 
 
+# The runtime prints uncaught VM errors to stderr as
+# `AVM2 uncaught error: TypeError: Error #1006: abs is not a function.`
+# (avm2_error.c print_uncaught). Capturing the message part in results.json
+# lets a whole suite's failures be grouped by root cause without re-running
+# anything — see `scripts/generate_failing_by_feature.py --suite=from_avmplus`.
+_ERR_SIG_RE = re.compile(r"^AVM[12] uncaught error:\s*(.+?)\s*$", re.MULTILINE)
+
+
+def extract_error_signature(stderr_text, max_len=200):
+    """First uncaught-VM-error message on stderr, or None."""
+    if not stderr_text:
+        return None
+    m = _ERR_SIG_RE.search(stderr_text)
+    if not m:
+        return None
+    return m.group(1)[:max_len]
+
+
 def run_binary(build_dir, event_file=None, extra_env=None):
     """Run the compiled binary and capture output.
 
@@ -3276,6 +3294,15 @@ def main():
                     print("TIMEOUT" + _fmt_phases(phase_times))
                 save_incremental()
                 continue
+            # Root-cause signature: the first uncaught VM error on stderr.
+            # A single uncaught error at script-init time silently truncates
+            # the whole trace log (the avmplus driver builds its testcase
+            # array eagerly), so this one field turns "empty actual" from a
+            # symptom into a mechanically groupable cause. Kept short and
+            # message-only so it aggregates across tests.
+            err_sig = extract_error_signature(run_stderr)
+            if err_sig:
+                entry["error_signature"] = err_sig
             if rc != 0 and rc not in (-11, 139):
                 crash_status = "runtime_error"
                 crash_detail = f"exit code {rc}"

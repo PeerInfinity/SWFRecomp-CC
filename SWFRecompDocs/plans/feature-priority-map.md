@@ -1,0 +1,258 @@
+# Feature-Priority Map — coverage gaps across the full Ruffle corpus
+
+**Created**: 2026-07-24 · **Baseline**: `eabb3b366`, mode=graphics
+(no-graphics identical bar two pre-existing one-test divergences).
+**Purpose**: the corpus is a roadmap instrument. Rank the features we have
+not implemented by how many tests each would unlock, so the map — not
+intuition — decides what to build next (user direction 2026-07-23).
+
+Regenerate the per-suite inputs with:
+
+```bash
+python3 scripts/generate_failing_by_feature.py --suite=from_avmplus
+python3 scripts/generate_failing_by_feature.py --suite=avm1
+python3 scripts/generate_failing_by_feature.py --suite=gnash/actionscript.all
+```
+
+## Where we stand
+
+Full corpus, graphics mode: **3211/4463 effective (71.9%)**, 1252 failing.
+
+| Suite | eff/total | % | failing | character of the failures |
+|---|---|---|---|---|
+| from_avmplus | 871/1574 | 55.3 | 703 | **language + builtins** (Tamarin acceptance) |
+| avm2 | 855/1217 | 70.3 | 362 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
+| avm1 | 654/716 | 91.3 | 62 | long tail |
+| from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
+| from_gnash (5) | 342/379 | 90.2 | 32 | long tail |
+| misc (9 cats) | 180/220 | 81.8 | 40 | text/fonts/mixed_avm/stage3d markers |
+| regression | 70/70 | 100 | 0 | ours |
+
+The two big suites fail for *orthogonal* reasons, and that is the single
+most useful fact in this document:
+
+- **from_avmplus tells us which ECMAScript/AS3 builtins are missing.** It
+  never touches the display list. Its failures are dense (one missing class
+  blanks 150 tests) and cheap per test.
+- **avm2 tells us which Flash platform APIs are missing.** Its failures are
+  sparse and expensive per test (a Loader arc is weeks; it buys 31 tests).
+
+Test-yield-per-unit-of-work is therefore *far* higher on the from_avmplus
+side today, and that is where the next few arcs should go.
+
+## How the avmplus driver amplifies a single gap
+
+Worth internalising before reading the ranking. Every avmplus test builds
+its whole assertion array eagerly at script-init time and prints as it goes:
+
+```as3
+var testcases = getTestCases();   // every Assert.expectEq() runs here
+```
+
+A single uncaught error anywhere in that build aborts the script and
+suppresses **all** remaining output. So "one missing method" does not cost
+one assertion — it costs the entire test, and (because Tamarin groups tests
+by builtin) usually the entire directory. This is why the Date arc is worth
+151 tests rather than 151 assertions.
+
+`verify_output.py` now records `error_signature` (the first
+`AVM[12] uncaught error:` line) on every result, and
+`generate_failing_by_feature.py` emits a "Failing Tests by Uncaught Error"
+table from it. **Read that table before re-deriving any of this by hand.**
+
+---
+
+## Ranked feature arcs (build X → unlock N)
+
+Yields are tests that flip from failing to effective-pass. Known-failure
+tests (Ruffle fails them too) are excluded from the yields.
+
+### 1. `Date` — ~155 tests · LARGE arc · **do this first**
+
+| Suite | tests |
+|---|---|
+| from_avmplus `ecma3/Date` | 151 (134 after removing 17 known_failure) |
+| from_avmplus `ecma3/Exceptions/date_*` | 2 |
+| avm2 `date`, `date_parse` | 2 |
+
+AVM2 `Date` is a **three-method stub** — `getTime`, `valueOf`, `toString`,
+bolted on in `avm2_amf.c:1763` purely so AMF round-trips work. Everything
+else (`getFullYear`, `setMonth`, `getTimezoneOffset`, the `UTC` statics,
+`Date.parse`, the ES3 string formats, the 2-through-7-argument constructor)
+is absent, and each missing method blanks a whole test file.
+
+Cost is bounded and known: ECMA-262 §15.9 is fully specified, AVM1 already
+has a complete Date implementation to port semantics from, and the test
+determinism story is already solved (`MOCK_DATE_TIME`). No display-list,
+no rendering, no new opcodes.
+
+### 2. String/Unicode semantics — ~102 tests · SMALL arc · **best ratio in the corpus**
+
+`ecma3/Unicode` is 102/108 failing, and **every one of those tests fails on
+the same three assertions** (16/21 or 17/21 lines match, uniformly):
+
+| Assertion | Expected | We produce | Fix |
+|---|---|---|---|
+| `String.search()` / `search(undefined)` | `-1` | `0` | no-arg / undefined pattern must not match |
+| `String.match()` / `match(undefined)` | `null` | `""` | ditto, returning null |
+| `String.split('')` | 128 elements | **256** | split by UTF-16 code unit, not UTF-8 byte |
+
+The split bug is the interesting one: for U+0080..U+00FF each character is
+two UTF-8 bytes, so we return exactly double. It is a real correctness bug
+in AVM2 string indexing, not just a test artifact.
+
+Three small fixes, ~102 tests. Nothing else in the corpus comes close on
+effort-to-yield.
+
+### 3. ES3 `.prototype` surface on builtins + `Function.length` — ~35 blanked + long tail · MEDIUM
+
+`String`, `Array`, `Number` and `Boolean` register **zero** prototype
+functions (`grep avm2_proto_add_function` finds none in `avm2_string.c`,
+`avm2_array.c`, `avm2_number.c`). In AS3 these exist as an ES3-compat layer
+— Ruffle declares them in `core/src/avm2/globals/String.as` and friends.
+
+Any test that opens with `String.prototype.substr.length` (Tamarin's
+standard first assertion for a builtin) dies immediately with
+`TypeError #1010`. That is ~35 blanked tests across `ecma3/String`,
+`ecma3/Array`, `ecma3/FunctionObjects`, `ecma3/Boolean`,
+`ecma3/ObjectObjects`, `ecma3/Number`.
+
+Paired sub-item: **`Function.length` is always 0.** `parseInt.length`
+returns 0 where 2 is expected (`ecma3/GlobalObject/e15_1_2_2_1`), and every
+`X.prototype.m.length` assertion depends on it. Declared arity must be
+carried on builtin function objects.
+
+### 4. `Number` static math (API 680) — 21 tests · SMALL arc
+
+`as3/Types/Number/{abs,acos,asin,atan,atan2,ceil,cos,exp,floor,log,max,min,
+pow,random,round,sin,sqrt,tan,e,ln2,ln10,log2e,log10e,pi,sqrt1_2,sqrt2}` —
+21 failing, all blanked by `TypeError #1006: abs is not a function`.
+
+These are real Flash Player members (Ruffle: `globals/Number.as`,
+`[API("680")]`), essentially `Math` re-exported on `Number` with
+`ArgumentError #1063` on missing args. Mechanical.
+
+### 5. Global URI functions — ~9 tests · SMALL arc
+
+`encodeURI`, `decodeURI`, `encodeURIComponent`, `decodeURIComponent` are
+undefined (`ReferenceError #1065`): ~6 in from_avmplus
+(`ecma3/GlobalObject`, `regress/bug_538107`) plus `decode_uri`,
+`encode_uri_surrogate_pair_invalid`, `encode_uri_surrogate_pair_swf11` in
+the avm2 suite.
+
+### 6. `mops` / Alchemy domainMemory — 13 tests · MEDIUM arc
+
+All 13 `mops` tests crash or error: `li8/li16/li32/lix8/lix16/lf32/lf64`,
+`si8/si16/si32/sf32/sf64`, `mops_basics` (timeout). These are the Alchemy
+memory opcodes over `ApplicationDomain.domainMemory`; the avm2 suite's
+`domain_memory` test is the same gap. Self-contained, but it is real
+runtime work (a ByteArray-backed memory window plus 12 opcodes).
+
+### 7. `flash.system.Capabilities` — 2 tests · TRIVIAL
+
+`as3/Vector/nonindexproperty/{v10,v11}` die on
+`ReferenceError #1065: Variable Capabilities is not defined`. Also unblocks
+`capabilities_resolution` in the avm2 suite.
+
+### 8. Dual-VM movies (AVM1 ↔ AVM2 in one player) — 8 tests · LARGE arc
+
+All 8 failing `mixed_avm` tests. A parked feature marker, not a regression
+— we have no dual-VM-in-one-movie support. Large architectural cost for a
+small, closed yield; the map does not recommend it now.
+
+### 9. Stage3D / Context3D — 17 tests · LARGE arc
+
+4 `stage3d` + 13 in the avm2 suite (`stage3d_*`, `matrix3d_*`). Also parked.
+Real GPU-API surface for a small yield.
+
+---
+
+## Platform arcs (the avm2 suite's 362 failures)
+
+Grouped by theme. These are the *expensive* arcs — listed so their cost is
+visible next to their yield, not because they are next.
+
+| Failing | Theme | Note |
+|---|---|---|
+| 31 | Loader / URLLoader / loaderInfo | + 9 more in from_shumway `as3-loader` |
+| 30 | Sockets, NetConnection, NetStream, FileReference, SharedObject | network stack |
+| 25 | Focus / Tab / Mouse / Keyboard input | partly reachable via `input.json` injection |
+| 25 | PixelBender (`Shader`) | needs a PBJ interpreter |
+| 22 | Display list / DisplayObject / Stage edge cases | closest to existing work |
+| 22 | Verifier / cpool / ABC edge cases | closest to existing work |
+| 13 | Stage3D / Context3D | parked (arc 9) |
+| 9 | TextField / EditText / StyleSheet | |
+| 8 | Security / sandbox / ApplicationDomain | |
+| 8 | Filters / blend modes | |
+| 7 | Text Layout Framework (`textline`, `textblock`, FTE) | |
+| 5 | Sound / audio | |
+| 4 | `describeType` / avmplus introspection | |
+| 25 | `all_classes/*` | per-SWF-version class-existence census — these tick up incrementally as *any* class is added, so they are a free rider on every other arc |
+
+Note `all_classes/*`: 25 tests that enumerate every class expected to exist
+at a given SWF version. They are the corpus's built-in progress meter for
+API surface, and no arc targets them directly.
+
+## Polish (near-passes — bug fixes, not features)
+
+108 from_avmplus tests were ≥90% line-matched at baseline. **60+ of those
+were e4x tests missing only the root-link line and are resolved by
+`d36c8da2b`** (below). The remaining polish bucket, with confirmed causes:
+
+| Test(s) | Diff | Cause |
+|---|---|---|
+| `ecma3/Number/e15_7_4_2_4` | `1.2345000000000002e-7` vs `1.2345e-7` | double→string needs shortest-round-trip formatting |
+| `ecma3/JSON/e15_12_1`, `e15_12_3` | array/object parse corruption around whitespace | JSON lexer whitespace handling |
+| `as3/Definitions/Variable/ConstVariables_custom1`, `as3/RuntimeErrors/*` | `…read-only property classItem7…` vs `…property Package1:ns1::classItem7…` | error messages must use the namespace-qualified name |
+| `ecma3/ObjectObjects/e15_2_4_2` | `Object.prototype.toString` on a function | `[object Function]` classification |
+| `ecma3/GlobalObject/e15_1_2_2_*`, `e15_1_2_3_1`, `e15_1_2_5_1` | `parseInt.length` → 0 | `Function.length` (arc 3) |
+| `as3/Array/insertremove` | 30766/30870 lines | large-array edge cases |
+| e4x residue (~20) | 10 at 50–90%, 6 below | ordinary E4X polish |
+
+Misc-category failures (small, mostly one-off): `text` 6/11 (caret
+placement × 4, HTML entity parsing, links in scrolled text), `fonts` 3/6
+(device-font glyph fallback, kerning, list), `import_assets` 2/3, `audio`
+2/5 (AAC, G.711 codecs), `timeline` 2/17, `visual` 8/142 (mostly
+image-only; `blend_modes` is a `recomp_fail`). from_shumway's 58: 16 fuzz
+corpus, 9 `timeline/nav`, 9 `as3-loader`, 5 `acid`.
+
+---
+
+## Landed this session
+
+**`d36c8da2b` — root SymbolClass must inherit Sprite, trace `TypeError #2023`.**
+
+177 avmplus tests declare `public class Test {}` with no base class. Flash
+and Ruffle fail to link such a class to the root, trace
+`TypeError: Error #2023: Class Test$ must inherit from Sprite to link to the
+root.`, and keep running with a plain MovieClip root. We instead constructed
+the class with the stage as its sole argument, threw `ArgumentError #1063`
+to stderr, and printed nothing — losing exactly one line.
+
+**155 of the 175 failing e4x tests were missing only that line.** Expected
+yield ~157 tests, taking e4x from 2/177 to ~157/177 and from_avmplus from
+55.3% to roughly 65%. Verified locally on 5 e4x tests + `as3/Vector/concat`
+(all MISMATCH → PASS) with no regression in the avm2 suite.
+
+This also settles the E4X question: **E4X is not a coverage gap.** Our
+engine passes Tamarin's XML/XMLList/QName/Namespace/TypeConversion suites
+essentially in full; 2/177 was one linking bug, not missing features.
+
+## Recommendation — the next 3 arcs
+
+| Order | Arc | Yield | Size | Why |
+|---|---|---|---|---|
+| 1 | String/Unicode: `search`/`match` no-arg + `split('')` by code unit | ~102 | small | three bugs, best ratio in the corpus, and a genuine string-indexing correctness fix |
+| 2 | `Date` class (ECMA-262 §15.9) | ~155 | large | biggest single unlock left; fully specified; AVM1 Date to port from; no new subsystems |
+| 3 | ES3 `.prototype` surface + `Function.length` | ~35 blanked + a long one-line tail | medium | unblocks Tamarin's standard opening assertion, so it also shortens the diffs of tests the other arcs touch |
+
+Then, as a cheap cleanup batch in one session: `Number` static math (21),
+global URI functions (9), `flash.system.Capabilities` (2) — ~32 tests of
+almost purely mechanical work.
+
+Doing arcs 1–3 plus the cleanup batch takes from_avmplus from 871 to roughly
+**1350/1574 (86%)** and the whole corpus from 71.9% to about **80%**.
+
+Regression-guard every one of these with
+`gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f categories=full`
+— they all touch shared AVM2 runtime code.
