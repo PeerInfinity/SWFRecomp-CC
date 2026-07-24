@@ -1853,8 +1853,8 @@ void avm2_globals_init(Avm2Context* ctx)
 
 	// XML/XMLList: the E4X engine (avm2_xml.c / avm2_e4x.c).
 	avm2_register_xml(ctx);
-	// Date is a stub (upgraded by avm2_register_amf): exists so
-	// `x as Date` / `is Date` type checks resolve.
+	// Date: created here so `x as Date` / `is Date` type checks resolve
+	// before the class is populated; avm2_register_date fills it in.
 	b->date_class = avm2_builtin_class(ctx, "", "Date", b->object_class);
 	// flash.geom.Point minimal stub: constructible, x/y as expando props
 	// (slots_force_autoassigned only needs the definition to exist).
@@ -1901,6 +1901,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_proxy(ctx);
 	avm2_register_bytearray(ctx);
 	avm2_register_amf(ctx);
+	avm2_register_date(ctx);
 	// JSON is API-versioned (674 / FP11): invisible below SWF13
 	// (json_version_gated expects 1065 in a SWF12 movie).
 	if (ctx->swf_version >= 13)

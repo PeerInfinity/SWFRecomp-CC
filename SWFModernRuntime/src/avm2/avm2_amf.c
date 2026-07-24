@@ -1,6 +1,10 @@
 // AMF3/AMF0 serialization — ByteArray.readObject/writeObject,
-// flash.net.registerClassAlias/getClassByAlias/ObjectEncoding, plus the
-// minimal Date the AMF tests need.
+// flash.net.registerClassAlias/getClassByAlias/ObjectEncoding.
+//
+// (The Date class used to be bolted on here as a three-method stub, purely so
+// AMF round-trips could carry a timestamp; it now lives in avm2_date.c. This
+// file still reaches into Avm2DateExt via avm2_date_ext_of() to read the
+// timestamp off the wire.)
 //
 // The wire format is a byte-exact port of the flash-lso crate
 // (amf3/write.rs + length.rs + element_cache.rs, amf0/write.rs, read.rs)
@@ -78,119 +82,6 @@ static const Avm2String* class_to_alias(Avm2Context* ctx, Avm2Class* cls)
 		if (a->cls == cls) return a->alias;
 	}
 	return avm2_string_from_literal(ctx, "");
-}
-
-// ---------------------------------------------------------------------------
-// Minimal Date (upgrades the Stage-3 stub; enough for AMF round-trips)
-// ---------------------------------------------------------------------------
-
-Avm2DateExt* avm2_date_ext_of(Avm2Value v)
-{
-	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return NULL;
-	Avm2Context* ctx = avm2_get_context();
-	if (ctx->builtins.date_class == NULL) return NULL;
-	for (Avm2Class* c = v.u.obj->cls; c != NULL; c = c->super_class)
-	{
-		if (c == ctx->builtins.date_class)
-		{
-			return (Avm2DateExt*) v.u.obj->native_ext;
-		}
-	}
-	return NULL;
-}
-
-#ifndef MOCK_DATE_TIME
-#define MOCK_DATE_TIME 981152406000ll
-#endif
-
-static void date_native_init(Avm2Context* ctx, Avm2Object* obj)
-{
-	(void) ctx;
-	((Avm2DateExt*) obj->native_ext)->millis = (double) MOCK_DATE_TIME;
-}
-
-static Avm2Value date_init(Avm2Activation* act)
-{
-	Avm2DateExt* ext = avm2_date_ext_of(act->this_val);
-	if (ext == NULL) return avm2_undefined();
-	if (act->argc == 1)
-	{
-		// One numeric-ish argument = milliseconds since epoch (strings
-		// would parse in FP; unsupported here -> NaN).
-		if (act->args[0].kind == AVM2_VALUE_STRING)
-		{
-			ext->millis = __builtin_nan("");
-		}
-		else
-		{
-			ext->millis = avm2_coerce_to_number(act->ctx, act->args[0]);
-		}
-	}
-	else if (act->argc > 1)
-	{
-		// Component form unimplemented (no AMF test constructs one).
-		ext->millis = __builtin_nan("");
-	}
-	if (!isnan(ext->millis))
-	{
-		// FP truncates fractional milliseconds.
-		ext->millis = trunc(ext->millis);
-	}
-	return avm2_undefined();
-}
-
-static Avm2Value date_get_time(Avm2Activation* act)
-{
-	Avm2DateExt* ext = avm2_date_ext_of(act->this_val);
-	return avm2_number(ext != NULL ? ext->millis : __builtin_nan(""));
-}
-
-static Avm2Value date_to_string(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	Avm2DateExt* ext = avm2_date_ext_of(act->this_val);
-	double m = (ext != NULL) ? ext->millis : __builtin_nan("");
-	if (isnan(m))
-	{
-		return avm2_string(avm2_string_from_literal(ctx, "Invalid Date"));
-	}
-	// UTC render (CI runs UTC); only reached if a test prints a valid Date.
-	static const char* const days[7] = { "Sun", "Mon", "Tue", "Wed", "Thu",
-	                                     "Fri", "Sat" };
-	static const char* const months[12] = { "Jan", "Feb", "Mar", "Apr", "May",
-	                                        "Jun", "Jul", "Aug", "Sep", "Oct",
-	                                        "Nov", "Dec" };
-	int64_t secs = (int64_t) floor(m / 1000.0);
-	int64_t days_since = secs / 86400;
-	int64_t tod = secs % 86400;
-	if (tod < 0)
-	{
-		tod += 86400;
-		days_since--;
-	}
-	// Civil-from-days (Howard Hinnant's algorithm).
-	int64_t z = days_since + 719468;
-	int64_t era = (z >= 0 ? z : z - 146096) / 146097;
-	int64_t doe = z - era * 146097;
-	int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-	int64_t y = yoe + era * 400;
-	int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-	int64_t mp = (5 * doy + 2) / 153;
-	int64_t d = doy - (153 * mp + 2) / 5 + 1;
-	int64_t mo = mp < 10 ? mp + 3 : mp - 9;
-	if (mo <= 2) y++;
-	int wd = (int) (((days_since % 7) + 11) % 7);  // 1970-01-01 = Thursday
-	char buf[64];
-	snprintf(buf, sizeof(buf), "%s %s %d %02d:%02d:%02d GMT+0000 %d",
-	         days[wd], months[mo - 1], (int) d,
-	         (int) (tod / 3600), (int) ((tod / 60) % 60), (int) (tod % 60),
-	         (int) y);
-	return avm2_string(avm2_string_from_literal(ctx, buf));
-}
-
-static Avm2Value date_value_of(Avm2Activation* act)
-{
-	return date_get_time(act);
 }
 
 // ---------------------------------------------------------------------------
@@ -1758,21 +1649,5 @@ void avm2_register_amf(Avm2Context* ctx)
 			avm2_string(avm2_string_from_literal(ctx, "flushed")));
 		avm2_builtin_add_static_const(ctx, fs, "PENDING",
 			avm2_string(avm2_string_from_literal(ctx, "pending")));
-	}
-
-	// Upgrade the Date stub: millis state + the members AMF needs.
-	{
-		Avm2Class* date = b->date_class;
-		date->native_ext_size = sizeof(Avm2DateExt);
-		date->native_init = date_native_init;
-		date->instance_init.fn = date_init;
-		date->instance_init.debug_name = "Date";
-		avm2_builtin_add_method(ctx, date, "getTime", date_get_time);
-		avm2_builtin_add_method(ctx, date, "valueOf", date_value_of);
-		avm2_builtin_add_method(ctx, date, "toString", date_to_string);
-		avm2_proto_add_function(ctx, date->prototype_obj, "toString",
-		                        date_to_string);
-		avm2_proto_add_function(ctx, date->prototype_obj, "valueOf",
-		                        date_value_of);
 	}
 }

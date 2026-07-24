@@ -112,10 +112,12 @@ void avm2_register_dictionary(Avm2Context* ctx);  // flash.utils.Dictionary
 // Is `obj` an instance of (a subclass of) flash.utils.Dictionary?
 int avm2_is_dictionary(Avm2Object* obj);
 void avm2_register_bytearray(Avm2Context* ctx);  // flash.utils.ByteArray (+Endian)
-void avm2_register_amf(Avm2Context* ctx);  // flash.net alias fns + Date upgrade
+void avm2_register_amf(Avm2Context* ctx);  // flash.net alias fns
+void avm2_register_date(Avm2Context* ctx); // Date (ECMA-262 §15.9 + AS3)
 void avm2_register_external(Avm2Context* ctx);  // flash.external.ExternalInterface
 
-// Minimal Date instance state (avm2_amf.c upgrades the stub).
+// Date instance state (avm2_date.c). `millis` is the ECMA time value: ms
+// since the epoch in UTC, or NaN for an invalid Date.
 typedef struct Avm2DateExt
 {
 	double millis;
