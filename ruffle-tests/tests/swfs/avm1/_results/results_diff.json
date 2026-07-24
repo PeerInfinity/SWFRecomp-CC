@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-23T17:03:25.359708+00:00",
-    "old_git_sha": "8cf9ce9e4837fec7b26838fda231d63619a5308a",
-    "new_timestamp": "2026-07-23T18:38:00.237101+00:00",
-    "new_git_sha": "38e495669a30fa4df1a4ad30a13f9b22308fbb09",
+    "old_timestamp": "2026-07-23T18:38:00.237101+00:00",
+    "old_git_sha": "38e495669a30fa4df1a4ad30a13f9b22308fbb09",
+    "new_timestamp": "2026-07-24T19:31:35.232031+00:00",
+    "new_git_sha": "f0e6fb25d672c874a2b9d03f23e82c01c50ad83d",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,82 @@
     "old_effective_pass": 652,
     "old_total": 711,
     "old_pass_rate": 89.3,
-    "new_pass": 635,
+    "new_pass": 637,
     "new_ruffle_matched": 17,
-    "new_effective_pass": 652,
-    "new_total": 711,
-    "new_pass_rate": 89.3,
+    "new_effective_pass": 654,
+    "new_total": 716,
+    "new_pass_rate": 89.0,
     "old_mismatched_lines": 15333,
-    "new_mismatched_lines": 15333,
+    "new_mismatched_lines": 15348,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 711,
-    "added": 0,
+    "added": 5,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "amf_swf6_case_insensitive_typed_objects",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 6,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "amf_swf6_serialize_typed_objects",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 6,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "amf_swf8_case_sensitive_typed_objects",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 6,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "define_font_glyph_table_order",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "define_font_glyph_table_overlap",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }

@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-24T19:31:35.338596+00:00",
+    "git_sha": "f0e6fb25d672c874a2b9d03f23e82c01c50ad83d",
+    "duration_seconds": 41.87,
+    "total_available": 3,
+    "shards": 30,
+    "expected_shards": 30,
+    "ignored_count": 0,
+    "filtered": true
+  },
+  "total": 3,
+  "pass": 1,
+  "ruffle_matched": 0,
+  "fail": 2,
+  "pass_rate": 33.3,
+  "effective_pass": 1,
+  "effective_pass_rate": 33.3,
+  "breakdown": {
+    "output_mismatch": 2
+  },
+  "tests": [
+    {
+      "test": "avm1_imports_avm1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.611,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 6,
+        "matching_lines": 0
+      },
+      "duration": 1.62,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=7, expected=6)",
+      "actual_output": "Hello from right_eye.swf\nHello from test.swf\nGuy_with_hat loaded!\nCircle loaded!\nSquare loaded!\nLeft eye loaded!\nRight eye loaded!",
+      "expected_output": "Hello from test.swf\nGuy_with_hat loaded!\nCircle loaded!\nSquare loaded!\nLeft eye loaded!\nRight eye loaded!"
+    },
+    {
+      "test": "avm1_non_swf_import",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.218,
+        "run": 0.004
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 6,
+        "matching_lines": 0
+      },
+      "duration": 21.23,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=3, expected=6)",
+      "actual_output": "frame 1\nframe 2\nframe 3",
+      "expected_output": "Navigator::fetch:\n  URL: dummy.png\n  Method: GET\nframe 1\nframe 2\nframe 3"
+    },
+    {
+      "test": "empty_url",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.009,
+        "run": 0.002
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 19.01,
+      "status": "pass"
+    }
+  ]
+}
