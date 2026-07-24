@@ -5,20 +5,26 @@ Adobe Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`:
 **871/1574 effective (55.3%)**, identical in graphics and no-graphics.
 
-Two fixes have landed since:
+Three fixes have landed since:
 
 1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
    `#2023`. e4x **2/177 → 160/177**.
 2. `127a5f4d3` — the two AVM2 String semantics bugs (below).
-   `ecma3/Unicode` **6/108 → 107/108**.
+   `ecma3/Unicode` **6/108 → 107/108**, **+101**, CI `30126336695`.
+3. `d90353066` — ES3 `.prototype` surface on builtins + `Function.length`
+   for natives. `ecma3/String` **47/83 → 70/83**, **+36**,
+   CI `30128240863`.
+4. `17c19040c` — guard prototype `toString`/`valueOf` against
+   self-coercion recursion (a crash *introduced* by 3; see below).
+   **+7**, corpus segfaults **17 → 3**, CI `30130444073`.
 
-The suite now stands at **1131/1574 effective (71.9%)** — full shard
-coverage, no extrapolation.
+The suite stands at **1174/1574 effective (74.6%)**. **Zero pass→fail
+regressions across all three runs.**
 
-CI run `30126336695` (graphics, `categories=full`, at `127a5f4d3`)
-measured per-test against the previous run:
-**+101 newly effective — every one of them in `ecma3/Unicode` — and ZERO
-regressions in any suite.**
+(Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
+file reads 1143/1522 — 52 from_avmplus tests ungraded. 1174 = the
+full-shard 1167 from run `30128240863` plus the 7 this run gained on the
+intersection. `ecma3/Unicode` scored **96/96** of the 96 that ran.)
 
 ⚠️ **Read the shard caveat before comparing to older numbers.** The
 *previous* run (`30121943045`) lost shard 25/30 to the known apt/Vulkan
@@ -232,6 +238,75 @@ recombine on concatenation. Only the equality line fails — the adjacent
 WTF-8 representation or surrogate-pairing at concatenation time. It is a
 representation change, not a one-line fix, and should be scoped on its own
 rather than folded into a String arc.
+
+## Fix landed: ES3 `.prototype` surface + `Function.length` (`d90353066`)
+
+`String`/`Array`/`Number`/`Boolean`/`Function` registered **zero**
+prototype functions, so Tamarin's standard opening assertion
+`X.prototype.<m>.length` threw `TypeError #1010` at script-init and
+blanked whole files. Now registered, mirroring Ruffle's
+`globals/{String,Array,Number,Boolean,Function}.as`.
+
+Four things worth remembering:
+
+- **The impls needed no change.** They already read the receiver through
+  a coercing `this_*()` helper, so a *foreign* `this` works — which is
+  exactly what these tests do
+  (`Number.prototype.split = String.prototype.split`). This is why
+  `esplit_002` and `ematch_004` were never a String/Unicode problem.
+- **`prototype.split` must point at the regex-aware `string_split_regex`**
+  (`avm2_regexp.c`), not the plain impl String registration seeds it with
+  — same as the class-vtable patch already done there.
+- **`Function.length` was hardcoded 0 for natives.** `fn_get_length`
+  reads `param_count` off the ABC method and natives have none. Added a
+  native-only `param_count` field on `Avm2MethodRef` plus
+  `avm2_proto_add_function_n` / `avm2_builtin_add_global_fn_n`.
+- **Take arities from the corpus, not from ECMA-262.** The spec says
+  `String.prototype.concat.length` is 1; Flash/Ruffle say **0** (rest
+  param) and the tests assert 0. One command gives the ground truth:
+  ```bash
+  grep -rhoP '"\w+\.prototype\.\w+\.length",\s*\d+' \
+      ruffle-tests/tests/swfs/from_avmplus/ | sort -u
+  ```
+
+**+36, CI `30128240863`.** `ecma3/String` 47/83 → 70/83.
+
+## Post-mortem: the crash that "zero regressions" hid (`17c19040c`)
+
+`d90353066` put `toString`/`valueOf` on the prototypes using the **class
+method** impls, which coerce their receiver. But the receiver of
+`String.prototype.toString()` **is `String.prototype`** — a bare
+`Avm2Object` with no primitive value. Coercing it looks up `toString` on
+it, re-entering the same function, until the stack dies. `Number` is the
+same via `valueOf`: `number_value_of` returns `this_val` unchanged, so
+`coerce_to_number` loops.
+
+This crashed 12 tests — `ecma3/String/{e15_5_4, e15_5_4_2_1,
+e15_5_4_2_rt, e15_5_4_3_1, localeCompare_rt}`,
+`ecma3/Number/{e15_7_4_2_1_rt, e15_7_4_2_2_rt, e15_7_4_3_1_rt,
+e15_7_4__1_rt, toLocaleString_rt}`,
+`ecma3/Exceptions/{number_001_rt, string_001_rt}`.
+
+⚠️ **All 12 were already failing as `output_mismatch`, so nothing crossed
+the pass/fail line and a transition-only diff reported "zero
+regressions".** The only signal was the status histogram: from_avmplus
+`segfault` went **2 → 14**. *Always diff the status histogram, not just
+the pass sets.*
+
+Fix: dedicated prototype impls that never coerce. In avmplus the builtin
+prototypes **are** instances carrying the default primitive value, and
+the tests assert exactly that — `String.prototype.toString()` is `""`,
+`Number.prototype.valueOf()` is `0`, `Number.prototype.toString()` is
+`"0"` — so a wrong-type receiver yields that default. `Boolean` needed no
+guard: `avm2_coerce_to_boolean` never calls back into user code.
+
+Confirmed by CI `30130444073`: corpus segfaults **17 → 3**,
+runtime_error **21 → 7**, **+7**, no pass→fail regressions. (The run
+also showed `avm1/array_shift` pass→timeout; it passes locally with 0.01s
+run time and this change is AVM2-only, so that is a slow-runner flake.)
+
+**Watch for this on any future builtin that gains ES3 prototype methods —
+`Date` is next and has both `toString` and `valueOf`.**
 
 ## E4X is NOT a coverage gap
 

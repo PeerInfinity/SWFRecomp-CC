@@ -26,12 +26,15 @@ including the 50 named `avm1/*`. The correct corpus denominator is
 **4414**, and it is what this document uses from here on. Sum over
 top-level leaf suites only; do not add nested `_results` dirs.
 
-Full corpus, graphics mode at **`127a5f4d3`** (CI `30126336695`, complete
-30/30 shards): **3426/4414 effective (77.6%)**, 988 failing.
+Full corpus, graphics mode at **`17c19040c`**: **3469/4414 effective
+(78.6%)**, 945 failing. (Measured as the complete run `30128240863` at
+`d90353066` plus the +7 that run `30130444073` gained on the intersection;
+that last run lost shard 29/30 to the apt/Vulkan flake, so its own file
+reads 4275 not 4414.)
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | 1131/1574 | 71.9 | 443 | **language + builtins** (Tamarin acceptance) |
+| from_avmplus | 1174/1574 | 74.6 | 400 | **language + builtins** (Tamarin acceptance) |
 | avm2 | 859/1217 | 70.6 | 358 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 654/716 | 91.3 | 62 | long tail |
 | from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
@@ -82,13 +85,17 @@ table from it. **Read that table before re-deriving any of this by hand.**
 Yields are tests that flip from failing to effective-pass. Known-failure
 tests (Ruffle fails them too) are excluded from the yields.
 
-### 1. `Date` — ~155 tests · LARGE arc · **do this first**
+### 1. `Date` — ~167 tests · LARGE arc · **do this first**
 
 | Suite | tests |
 |---|---|
 | from_avmplus `ecma3/Date` | 151 (134 after removing 17 known_failure) |
+| from_avmplus, `getFullYear` blanked outside `ecma3/Date` (mostly `as3/Definitions`) | 15 |
 | from_avmplus `ecma3/Exceptions/date_*` | 2 |
 | avm2 `date`, `date_parse` | 2 |
+
+The 15 is what the `error_signature` histogram added to the original
+estimate — it is why this arc is ~167, not the ~155 first written here.
 
 AVM2 `Date` is a **three-method stub** — `getTime`, `valueOf`, `toString`,
 bolted on in `avm2_amf.c:1763` purely so AMF round-trips work. Everything
@@ -156,7 +163,38 @@ effort-to-yield.
 
 </details>
 
-### 3. ES3 `.prototype` surface on builtins + `Function.length` — ~35 blanked + long tail · MEDIUM — **implemented (`d90353066`), CI pending**
+### 3. ~~ES3 `.prototype` surface + `Function.length`~~ — **DONE (`d90353066`, +36)** · MEDIUM
+
+**Predicted ~35 blanked + a long tail; delivered 36, zero regressions**
+(CI `30128240863`). `ecma3/String` 47/83 → **70/83**, `ecma3/Array`
+43/51, `ecma3/GlobalObject` +4, `ecma3/Number` +2, `as3/Types` +2.
+The whole `TypeError #1010 (accessing field: length)` cluster — 24 tests
+in the previous histogram — is gone, as are the
+`charAt/charCodeAt is not a function` entries.
+
+Implementation notes worth keeping:
+
+- The impls needed no change. Every String/Array/Number method already
+  reads its receiver through a coercing `this_*()` helper, so a *foreign*
+  `this` works — which is precisely what these tests do
+  (`Number.prototype.split = String.prototype.split`).
+- `prototype.split` must be re-pointed at the **regex-aware**
+  `string_split_regex` in `avm2_regexp.c`; String registration seeds it
+  with the plain one, matching how the class vtable entry is patched.
+- `Function.length` was hardcoded 0 for natives (`fn_get_length` reads
+  `param_count` off the ABC method, and natives have none). Added a
+  `param_count` field to `Avm2MethodRef` plus
+  `avm2_proto_add_function_n` / `avm2_builtin_add_global_fn_n`.
+- **Take the arities from the corpus, not the spec.** ECMA-262 gives
+  `String.prototype.concat.length` = 1; Flash/Ruffle give **0** (rest
+  param), and the tests assert 0. `grep -rhoP '"\w+\.prototype\.\w+\.length",\s*\d+'`
+  over the suite yields the ground-truth table directly.
+- Ruffle omits `insertAt`/`removeAt` from `Array.prototype` — AS3-only
+  additions, not ES3. Mirrored.
+
+**Not covered by this arc, despite living in the same directories:**
+`ecma3/FunctionObjects` is still 6/21, and its residue is four unrelated
+small items, not one — see "Polish" below.
 
 `String`, `Array`, `Number` and `Boolean` register **zero** prototype
 functions (`grep avm2_proto_add_function` finds none in `avm2_string.c`,
@@ -257,9 +295,23 @@ were e4x tests missing only the root-link line and are resolved by
 | `ecma3/JSON/e15_12_1`, `e15_12_3` | array/object parse corruption around whitespace | JSON lexer whitespace handling |
 | `as3/Definitions/Variable/ConstVariables_custom1`, `as3/RuntimeErrors/*` | `…read-only property classItem7…` vs `…property Package1:ns1::classItem7…` | error messages must use the namespace-qualified name |
 | `ecma3/ObjectObjects/e15_2_4_2` | `Object.prototype.toString` on a function | `[object Function]` classification |
-| `ecma3/GlobalObject/e15_1_2_2_*`, `e15_1_2_3_1`, `e15_1_2_5_1` | `parseInt.length` → 0 | `Function.length` (arc 3) |
+| ~~`ecma3/GlobalObject/e15_1_2_2_*`~~ | ~~`parseInt.length` → 0~~ | **fixed by `d90353066`** |
 | `as3/Array/insertremove` | 30766/30870 lines | large-array edge cases |
 | e4x residue (~20) | 10 at 50–90%, 6 below | ordinary E4X polish |
+
+**`ecma3/FunctionObjects` (6/21) — diagnosed 2026-07-24, four unrelated
+items, none of them blanking.** The ES3 prototype arc did not move this
+directory at all, so do not expect it to fall out of another arc:
+
+| Item | Example diff |
+|---|---|
+| `Object.prototype.toString` on a function must give `[object Function]` | `myfunc.toString = Object.prototype.toString; myfunc.toString()` → expected `true`, got `false` (same root cause as `ecma3/ObjectObjects/e15_2_4_2` above, and it recurs in `ecma3/String/e15_5_4_6_2_rt`) |
+| `Function('function body')` must throw `EvalError #1066` | `e15_3_5_1_rt`, `e15_3_2_1_1_rt`: expected `EvalError: Error #1066`, got `no error` |
+| Builtin **class objects** need `.length` (the constructor's arity) | `e15_3_3_2`: `Function.length` expected `1`, got `undefined`. Distinct from `Function.prototype.m.length`, which `d90353066` fixed |
+| `Boolean.prototype` classification | `ecall_1`: `ToString.call(Boolean, Boolean.prototype)` expected `false`, got `true` |
+
+The `[object Function]` item is the pick of these — it appears in at least
+three directories, so it is worth more than its `FunctionObjects` count.
 
 Misc-category failures (counts are *failing of total*, small and mostly
 one-off): `text` 6 of 11 (caret placement ×4, HTML entity parsing, links in
@@ -272,6 +324,24 @@ from_shumway's 58: 16 fuzz corpus, 9 `timeline/nav`, 9 `as3-loader`,
 ---
 
 ## Landed
+
+**`17c19040c` — guard prototype `toString`/`valueOf` against self-coercion.**
+
+`d90353066` reused the class-method impls on the prototypes; those coerce
+their receiver, and the receiver of `String.prototype.toString()` IS
+`String.prototype`, so coercion re-entered the same function until the
+stack died. 12 tests began crashing. **All 12 were already failing, so the
+pass/fail transition diff said "zero regressions" — only the status
+histogram showed it (from_avmplus segfault 2 → 14).** CI `30130444073`:
+corpus segfaults **17 → 3**, runtime_error **21 → 7**, **+7**. Full
+post-mortem in the suite's `CURRENT_STATUS.md`.
+
+**`d90353066` — ES3 `.prototype` surface + `Function.length` (arc 3 above).**
+
+CI `30128240863` (graphics, `categories=full`): **+36, zero regressions.**
+`ecma3/String` 47/83 → 70/83; the `TypeError #1010 (accessing field:
+length)` cluster is fully cleared. Details and the four implementation
+gotchas are in arc 3 above.
 
 **`127a5f4d3` — String/Unicode semantics (arc 2 above).**
 
@@ -322,12 +392,14 @@ essentially in full; 2/177 was one linking bug, not missing features.
 
 | Order | Arc | Yield | Size | Status |
 |---|---|---|---|---|
-| ~~1~~ | String/Unicode: `search`/`match` coercion + `split('')` by code unit | **101 actual** (pred. ~102) | small | **DONE `127a5f4d3`** |
-| ~~2~~ | ES3 `.prototype` surface + `Function.length` | ~35 blanked + a long one-line tail | medium | **implemented `d90353066`**, CI pending |
-| 1 | `Date` class (ECMA-262 §15.9) | ~166 | large | biggest single unlock left; fully specified; AVM1 Date to port from; no new subsystems |
+| ~~—~~ | String/Unicode: `search`/`match` coercion + `split('')` by code unit | **101** (pred. ~102) | small | **DONE `127a5f4d3`** |
+| ~~—~~ | ES3 `.prototype` surface + `Function.length` | **36** (pred. ~35) | medium | **DONE `d90353066`** |
+| ~~—~~ | prototype toString/valueOf self-coercion guard | **7** | tiny | **DONE `17c19040c`** — fixes a crash `d90353066` introduced |
+| 1 | `Date` class (ECMA-262 §15.9) | ~167 | large | biggest single unlock left; fully specified; AVM1 Date to port from; no new subsystems |
 | 2 | `Number` static math (API 680) | 21 | small | mechanical |
-| 3 | Global URI functions | ~9 | small | mechanical |
-| 4 | `flash.system.Capabilities` | 5 | trivial | mechanical |
+| 3 | `[object Function]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | ~15 (`ecma3/FunctionObjects` 6/21) | small | see Polish |
+| 4 | Global URI functions | ~9 | small | mechanical |
+| 5 | `flash.system.Capabilities` | 5 | trivial | mechanical |
 
 **Date is now the clear top item**, and it is worth *more* than the
 `ecma3/Date` directory count: the regenerated uncaught-error table shows
@@ -339,9 +411,9 @@ The cheap cleanup batch (`Number` static math + URI functions +
 `Capabilities`) is ~35 tests of almost purely mechanical work and fits in
 one session.
 
-from_avmplus stands at **1131/1574 (71.9%)** with arc 2 landed. Adding the
-ES3 prototype arc, Date, and the cleanup batch should take it to roughly
-**1350/1574 (86%)** and the corpus from 77.6% to about **83%**.
+from_avmplus stands at **1174/1574 (74.6%)** with both small arcs landed.
+Date plus the cleanup batch should take it to roughly **1370/1574 (87%)**
+and the corpus from 78.4% to about **83%**.
 
 **Re-rank from the error table, not from first principles.** Every result
 now carries `error_signature`; `generate_failing_by_feature.py` emits a
