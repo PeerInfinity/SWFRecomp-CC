@@ -517,8 +517,26 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | Static consts must be read-only (`#1074` + DontDelete) | **20** (pred. 10) | small | **DONE `c09985aa6`**, CI `30142225682` |
 | ~~—~~ | `[object Function-N]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | **25** (pred. ~15) | small | **DONE `e618f62ab`**, CI `30143218958`; `ecma3/FunctionObjects` 6/21 → 20/21 |
 | ~~—~~ | Builtin prototypes must be typed instances of their class (subsumes the old sealed-prototypes `#1037` item) | **24** (pred. 8-11) | medium | **DONE `cc4a7eece`+`e4d1e78f6`**, CI `30171938941` |
-| 1 | `as3/Vector` | 14 | ? | avg 85% line match, no single root cause found yet |
-| 2 | `ecma3/JSON` lexer whitespace | 6 | small | 6 of 12 |
+| ~~—~~ | `as3/Vector` (four independent root causes) | **15** (pred. 14) | medium | **DONE `81cf6a669`+`222b4a4b5`+`a85726a54`+`2b244c01b`**, CI `30174981516` |
+| 1 | `ecma3/JSON` lexer whitespace | 6 | small | 6 of 12 |
+
+**DONE — the `as3/Vector` arc.** `81cf6a669` + `222b4a4b5` + `a85726a54`
++ `2b244c01b`, CI `30174981516`: **+15** from_avmplus, 0 regressions,
+crash histogram flat, and corpus `compile_fail` **1 → 0**. Four
+independent root causes, all as diagnosed: zero-arg `#1063` on the five
+iteration methods (8); the Vector property-error taxonomy — valid-u32
+read misses are `#1125` in every SWF version, sealed receivers reject
+proto-chain writes with `#1056`, `delete` on a trait is `false`, and
+attribute multinames report `#1081` (4); parameterized-class names built
+at their true size instead of through `nb[224]`/`buf[160]` (1); and a
+recompiler peephole collapsing consecutive-index literal runs into a
+static table — the 250k-element literal emitted a 2M-line C function that
+made gcc ICE even at `-O0` (1). The 15th was
+`ecma3/String/localeCompare_rt`, from the `#1063` overshoot sweep.
+
+Full post-mortem, including the two things the diagnosis got wrong and the
+baseline-selection trap that manufactured a phantom regression:
+`SWFRecompDocs/plans/as3-vector-arc.md`.
 
 **DONE — builtin prototypes are typed instances of their class.**
 `cc4a7eece` + `e4d1e78f6` + the `avm2_array_proto_index` follow-up,

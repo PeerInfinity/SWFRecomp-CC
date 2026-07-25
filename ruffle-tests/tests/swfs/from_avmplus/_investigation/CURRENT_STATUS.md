@@ -1,13 +1,13 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-25 — **three arcs landed, all CI-confirmed: `static
-const` is read-only, the `ecma3/FunctionObjects` arc, and typed builtin
-prototypes.** The Adobe
+Last updated: 2026-07-25 — **four arcs landed, all CI-confirmed: `static
+const` is read-only, the `ecma3/FunctionObjects` arc, typed builtin
+prototypes, and the `as3/Vector` arc.** The Adobe
 Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`: **871/1574
 effective (55.3%)**, identical in graphics and no-graphics.
 
-Nine fixes have landed since:
+Ten fixes have landed since:
 
 1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
    `#2023`. e4x **2/177 → 160/177**.
@@ -36,8 +36,17 @@ Nine fixes have landed since:
    typed instances of their class (below). **+24** here, CI `30171938941`.
    Estimated 8–11.
 
-The suite stands at **1455/1574 effective (92.4%)**; the corpus at
-**3757/4414 (85.1%)**. **Zero pass→fail regressions across all nine
+10. `81cf6a669` + `222b4a4b5` + `a85726a54` + `2b244c01b` — the
+    `as3/Vector` arc: zero-arg `#1063` on the iteration methods, the
+    Vector property-error taxonomy (`#1125` / `#1056` / delete-on-trait /
+    `#1081`), unbounded parameterized-class names, and a recompiler
+    peephole that collapses big consecutive-index literal runs (below).
+    **+15** here, CI `30174981516`. Predicted 14; the 15th was
+    `ecma3/String/localeCompare_rt`, found by the `#1063` overshoot
+    sweep. This run took corpus `compile_fail` to **0**.
+
+The suite stands at **1470/1574 effective (93.4%)**; the corpus at
+**3773/4414 (85.5%)**. **Zero pass→fail regressions across all ten
 runs.**
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
