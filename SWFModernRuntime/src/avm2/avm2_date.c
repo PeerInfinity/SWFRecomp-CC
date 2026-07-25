@@ -1054,7 +1054,7 @@ void avm2_register_date(Avm2Context* ctx)
 	for (size_t i = 0; i < sizeof(DATE_METHODS) / sizeof(DATE_METHODS[0]); i++)
 	{
 		const DateMethod* m = &DATE_METHODS[i];
-		avm2_builtin_add_method(ctx, date, m->name, m->fn);
+		avm2_builtin_add_method_n(ctx, date, m->name, m->fn, m->arity);
 		avm2_proto_add_function_n(ctx, date->prototype_obj, m->name, m->fn,
 		                          m->arity);
 	}
@@ -1069,6 +1069,16 @@ void avm2_register_date(Avm2Context* ctx)
 	// the key argument JSON.stringify passes, which it ignores.
 	avm2_proto_add_function_n(ctx, date->prototype_obj, "toJSON",
 	                          date_to_string, 1);
+
+	// Date.prototype is a Date instance in avmplus (its time value is NaN), so
+	// a write to one of Date's method names resolves the ivtable trait and
+	// throws #1037 -- which is the whole of ecma3/Date/e15_9_5. Unlike Array
+	// and Boolean, Date's ES3 methods really are public traits there.
+	Avm2Object* proto = date->prototype_obj;
+	proto->cls = date;
+	Avm2DateExt* proto_ext = avm2_alloc(ctx, sizeof(Avm2DateExt));
+	proto_ext->millis = NAN;
+	proto->native_ext = proto_ext;
 
 	avm2_builtin_add_static_method(ctx, date, "parse", date_parse);
 	avm2_builtin_add_static_method(ctx, date, "UTC", date_utc_static);
