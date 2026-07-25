@@ -319,6 +319,17 @@ static Avm2Value string_last_index_of(Avm2Activation* act)
 static Avm2Value string_locale_compare(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	// Unlike the variadic ES3 String methods, avmplus declares localeCompare
+	// as `localeCompare(other:String):int` with no rest arg, so an extra
+	// argument is an arity error rather than being ignored
+	// (ecma3/String/localeCompare_rt calls it with two).
+	if (act->argc > 1)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #1063: Argument count mismatch on "
+		                 "String/localeCompare(). Expected 1, got %u.",
+		                 act->argc);
+	}
 	const Avm2String* s = this_string(act);
 	Avm2Value other_v = act->argc > 0 ? act->args[0] : avm2_undefined();
 	const Avm2String* other = avm2_coerce_to_string(ctx, other_v);
