@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `da35e5d771bb`  
-**Date:** 2026-07-25 00:20 UTC  
-**Total duration:** 8h30m52s
+**Commit:** `fe442792da93`  
+**Date:** 2026-07-25 01:24 UTC  
+**Total duration:** 8h23m50s
 
 ## Results by Suite
 
@@ -208,19 +208,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | 1 | - | - | - |
-| avm2 | 2 | - | 49 | - |
-| from_avmplus | 171 | - | 9170 | - |
+*No changes since last run.*
 
-**avm1 — newly passing:** `array_shift`
-
-**avm2 — newly passing:** `date`, `date_parse`
-
-**from_avmplus — newly passing:** `as3/Definitions/Classes/ClassDef/DefaultDynamicClass`, `as3/Definitions/Classes/ClassDef/FinalDefaultClass`, `as3/Definitions/Classes/ClassDef/FinalDefaultDynamicClass`, `as3/Definitions/Classes/ClassDef/FinalInternalClass`, `as3/Definitions/Classes/ClassDef/FinalInternalDynamicClass`, `as3/Definitions/Classes/ClassDef/FinalPublicClass`, `as3/Definitions/Classes/ClassDef/FinalPublicDynamicClass`, `as3/Definitions/Classes/ClassDef/InternalClass`, `as3/Definitions/Classes/ClassDef/InternalDynamicClass`, `as3/Definitions/Classes/ClassDef/PublicClass`, `as3/Definitions/Classes/ClassDef/PublicDynamicClass`, `as3/Definitions/Classes/ClassDef/PublicStaticFinalDynamicClassMethodAndProp`, `as3/Definitions/Classes/ClassDef/StaticClassMethodAndProp`, `as3/Definitions/Classes/Ext/AccStatPropSubClassMeth`, `ecma3/Array/e15_4_4_5_3`, `ecma3/Date/e15_9_1_1_1`, `ecma3/Date/e15_9_1_1_2`, `ecma3/Date/e15_9_2_1`, `ecma3/Date/e15_9_2_2_1`, `ecma3/Date/e15_9_2_2_2`, `ecma3/Date/e15_9_2_2_3`, `ecma3/Date/e15_9_2_2_4`, `ecma3/Date/e15_9_2_2_5`, `ecma3/Date/e15_9_2_2_6`, `ecma3/Date/e15_9_3_1_1`, `ecma3/Date/e15_9_3_1_2`, `ecma3/Date/e15_9_3_1_3`, `ecma3/Date/e15_9_3_1_4`, `ecma3/Date/e15_9_3_1_5`, `ecma3/Date/e15_9_3_2_1`, `ecma3/Date/e15_9_3_2_2`, `ecma3/Date/e15_9_3_2_3`, `ecma3/Date/e15_9_3_2_4`, `ecma3/Date/e15_9_3_2_5`, `ecma3/Date/e15_9_3_8_1`, `ecma3/Date/e15_9_3_8_2`, `ecma3/Date/e15_9_3_8_3`, `ecma3/Date/e15_9_3_8_4`, `ecma3/Date/e15_9_3_8_5`, `ecma3/Date/e15_9_4_2`, `ecma3/Date/e15_9_4_3`, `ecma3/Date/e15_9_5_1`, `ecma3/Date/e15_9_5_10_12`, `ecma3/Date/e15_9_5_10_13`, `ecma3/Date/e15_9_5_10_3`, `ecma3/Date/e15_9_5_10_4`, `ecma3/Date/e15_9_5_10_5`, `ecma3/Date/e15_9_5_10_6`, `ecma3/Date/e15_9_5_10_7`, `ecma3/Date/e15_9_5_10_8`, `ecma3/Date/e15_9_5_10_9`, `ecma3/Date/e15_9_5_11_1`, `ecma3/Date/e15_9_5_11_3`, `ecma3/Date/e15_9_5_11_4`, `ecma3/Date/e15_9_5_11_5`, `ecma3/Date/e15_9_5_11_6`, `ecma3/Date/e15_9_5_11_7`, `ecma3/Date/e15_9_5_12_3`, `ecma3/Date/e15_9_5_12_4`, `ecma3/Date/e15_9_5_12_5`, `ecma3/Date/e15_9_5_12_6`, `ecma3/Date/e15_9_5_12_7`, `ecma3/Date/e15_9_5_12_8`, `ecma3/Date/e15_9_5_13_1`, `ecma3/Date/e15_9_5_13_2`, `ecma3/Date/e15_9_5_13_3`, `ecma3/Date/e15_9_5_13_4`, `ecma3/Date/e15_9_5_13_5`, `ecma3/Date/e15_9_5_13_6`, `ecma3/Date/e15_9_5_13_7`, `ecma3/Date/e15_9_5_13_8`, `ecma3/Date/e15_9_5_14`, `ecma3/Date/e15_9_5_15`, `ecma3/Date/e15_9_5_16`, `ecma3/Date/e15_9_5_17`, `ecma3/Date/e15_9_5_18`, `ecma3/Date/e15_9_5_19`, `ecma3/Date/e15_9_5_2`, `ecma3/Date/e15_9_5_20`, `ecma3/Date/e15_9_5_21_1`, `ecma3/Date/e15_9_5_21_2`, `ecma3/Date/e15_9_5_21_3`, `ecma3/Date/e15_9_5_21_4`, `ecma3/Date/e15_9_5_21_5`, `ecma3/Date/e15_9_5_21_6`, `ecma3/Date/e15_9_5_21_7`, `ecma3/Date/e15_9_5_21_8`, `ecma3/Date/e15_9_5_22_2`, `ecma3/Date/e15_9_5_22_3`, `ecma3/Date/e15_9_5_22_4`, `ecma3/Date/e15_9_5_22_5`, `ecma3/Date/e15_9_5_22_6`, `ecma3/Date/e15_9_5_22_7`, `ecma3/Date/e15_9_5_22_8`, `ecma3/Date/e15_9_5_23_1`, `ecma3/Date/e15_9_5_23_10`, `ecma3/Date/e15_9_5_23_11`, `ecma3/Date/e15_9_5_23_12`, `ecma3/Date/e15_9_5_23_13`, `ecma3/Date/e15_9_5_23_14`, `ecma3/Date/e15_9_5_23_15`, `ecma3/Date/e15_9_5_23_16`, `ecma3/Date/e15_9_5_23_17`, `ecma3/Date/e15_9_5_23_18`, `ecma3/Date/e15_9_5_23_2`, `ecma3/Date/e15_9_5_23_3_rt`, `ecma3/Date/e15_9_5_23_4`, `ecma3/Date/e15_9_5_23_5`, `ecma3/Date/e15_9_5_23_6`, `ecma3/Date/e15_9_5_23_7`, `ecma3/Date/e15_9_5_23_8`, `ecma3/Date/e15_9_5_23_9`, `ecma3/Date/e15_9_5_24_1`, `ecma3/Date/e15_9_5_24_2`, `ecma3/Date/e15_9_5_24_3`, `ecma3/Date/e15_9_5_24_4`, `ecma3/Date/e15_9_5_24_5`, `ecma3/Date/e15_9_5_24_6`, `ecma3/Date/e15_9_5_24_7`, `ecma3/Date/e15_9_5_24_8`, `ecma3/Date/e15_9_5_25_1`, `ecma3/Date/e15_9_5_26_1`, `ecma3/Date/e15_9_5_27_1`, `ecma3/Date/e15_9_5_2_1`, `ecma3/Date/e15_9_5_2_2_rt`, `ecma3/Date/e15_9_5_3`, `ecma3/Date/e15_9_5_30_1`, `ecma3/Date/e15_9_5_31_1`, `ecma3/Date/e15_9_5_32_1`, `ecma3/Date/e15_9_5_33_1`, `ecma3/Date/e15_9_5_34_1`, `ecma3/Date/e15_9_5_36_1`, `ecma3/Date/e15_9_5_36_2`, `ecma3/Date/e15_9_5_36_3`, `ecma3/Date/e15_9_5_36_4`, `ecma3/Date/e15_9_5_36_5`, `ecma3/Date/e15_9_5_36_6`, `ecma3/Date/e15_9_5_36_7`, `ecma3/Date/e15_9_5_37_1`, `ecma3/Date/e15_9_5_37_2`, `ecma3/Date/e15_9_5_37_3`, `ecma3/Date/e15_9_5_37_4`, `ecma3/Date/e15_9_5_37_5`, `ecma3/Date/e15_9_5_3_1_rt`, `ecma3/Date/e15_9_5_3_2`, `ecma3/Date/e15_9_5_42`, `ecma3/Date/e15_9_5_4_1`, `ecma3/Date/e15_9_5_4_2_rt`, `ecma3/Date/e15_9_5_5`, `ecma3/Date/e15_9_5_6`, `ecma3/Date/e15_9_5_7`, `ecma3/Exceptions/date_002_rt`, `ecma3/Exceptions/date_004_rt`, `ecma3/GlobalObject/e15_1_2_1_2_rt`, `ecma3/JSON/AS3Types`, `ecma3/TypeConversion/e9_4_1`, `ecma3/TypeConversion/e9_4_2`
-
-*Comparing `17c19040c9cd` → `da35e5d771bb`*
+*Comparing `da35e5d771bb` → `fe442792da93`*
 
 ## Per-Suite Details
 
@@ -234,9 +224,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### avm1
 
 - **Pass:** 637/716 (89.0%)
-- **Duration:** 52m46s across 30 shards
+- **Duration:** 47m41s across 10 shards
 - **Lines:** 115,827/131,175 matching (88.3%)
-- **Avg test duration:** 4.4s — slowest: `netstream_play_flv_screen` (38.3s)
+- **Avg test duration:** 3.9s — slowest: `netstream_play_flv_screen` (29.1s)
 
 ### avm2
 
@@ -325,9 +315,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### regression
 
 - **Pass:** 70/70 (100%)
-- **Duration:** 10m20s across 30 shards
+- **Duration:** 8m23s across 10 shards
 - **Lines:** 481/481 matching (100%)
-- **Avg test duration:** 8.8s — slowest: `avm2_timeline_gradients` (36.6s)
+- **Avg test duration:** 7.1s — slowest: `avm2_timeline_gradients` (25.3s)
 
 ### stage3d
 

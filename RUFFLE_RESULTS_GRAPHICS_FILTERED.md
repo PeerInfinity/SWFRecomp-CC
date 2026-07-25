@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS_GRAPHICS.md](RUFFLE_RESULTS_GRAPHICS.md) for unfiltered results.*
 
-**Commit:** `da35e5d771bb`  
-**Date:** 2026-07-25 00:20 UTC  
-**Total duration:** 8h30m52s
+**Commit:** `fe442792da93`  
+**Date:** 2026-07-25 01:24 UTC  
+**Total duration:** 8h23m50s
 
 ## Results by Suite
 
@@ -209,9 +209,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 - **Pass:** 634/671 (94.5%)
 - **Ignored:** 45 tests
-- **Duration:** 52m46s across 30 shards
+- **Duration:** 47m41s across 10 shards
 - **Lines:** 104,065/107,742 matching (96.6%)
-- **Avg test duration:** 4.3s — slowest: `define_font_glyph_table_order` (36.5s)
+- **Avg test duration:** 3.9s — slowest: `root_button_mode` (28.8s)
 
 ### avm2
 
@@ -306,9 +306,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### regression
 
 - **Pass:** 70/70 (100%)
-- **Duration:** 10m20s across 30 shards
+- **Duration:** 8m23s across 10 shards
 - **Lines:** 481/481 matching (100%)
-- **Avg test duration:** 8.8s — slowest: `avm2_timeline_gradients` (36.6s)
+- **Avg test duration:** 7.1s — slowest: `avm2_timeline_gradients` (25.3s)
 
 ### stage3d
 
