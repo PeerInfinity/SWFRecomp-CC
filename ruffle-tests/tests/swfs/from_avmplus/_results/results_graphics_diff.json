@@ -1,65 +1,269 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-25T19:28:36.574035+00:00",
-    "old_git_sha": "e4d1e78f665edbea778296f851fb073f260c893b",
-    "new_timestamp": "2026-07-25T20:09:02.207279+00:00",
-    "new_git_sha": "9b6bbcb5757f92ffd2dd1e4d59a31844129276c6",
+    "old_timestamp": "2026-07-25T20:09:02.207279+00:00",
+    "old_git_sha": "9b6bbcb5757f92ffd2dd1e4d59a31844129276c6",
+    "new_timestamp": "2026-07-25T21:37:09.731727+00:00",
+    "new_git_sha": "2b244c01b173bb7288ed06e7e44138b0d1d0eb2d",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1407,
+    "old_pass": 1406,
     "old_ruffle_matched": 49,
-    "old_effective_pass": 1456,
+    "old_effective_pass": 1455,
     "old_total": 1574,
-    "old_pass_rate": 89.4,
-    "new_pass": 1406,
+    "old_pass_rate": 89.3,
+    "new_pass": 1421,
     "new_ruffle_matched": 49,
-    "new_effective_pass": 1455,
+    "new_effective_pass": 1470,
     "new_total": 1574,
-    "new_pass_rate": 89.3,
-    "old_mismatched_lines": 1821,
-    "new_mismatched_lines": 1914,
-    "increased_mismatches": 104,
-    "decreased_mismatches": 11,
-    "newly_passing": 0,
-    "newly_failing": 1,
-    "status_changed": 1,
-    "unchanged": 1572,
+    "new_pass_rate": 90.3,
+    "old_mismatched_lines": 1914,
+    "new_mismatched_lines": 1885,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 29,
+    "newly_passing": 15,
+    "newly_failing": 0,
+    "status_changed": 15,
+    "unchanged": 1559,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "as3/Array/insertremove",
+      "test": "as3/Vector/bug_678952",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 30870,
-        "expected_lines": 30870,
-        "matching_lines": 30870
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 30870,
-        "expected_lines": 30870,
-        "matching_lines": 30766
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
       }
     },
     {
-      "test": "regress/bug_687838",
+      "test": "as3/Vector/filter",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 111,
-        "expected_lines": 111,
-        "matching_lines": 74
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 8
       },
       "new_lines": {
-        "actual_lines": 111,
-        "expected_lines": 111,
-        "matching_lines": 85
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "as3/Vector/filter_initializers",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 4
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "as3/Vector/foreach",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "as3/Vector/foreach_initializers",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 4
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "as3/Vector/initializer_expressions",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 41,
+        "expected_lines": 41,
+        "matching_lines": 40
+      },
+      "new_lines": {
+        "actual_lines": 41,
+        "expected_lines": 41,
+        "matching_lines": 41
+      }
+    },
+    {
+      "test": "as3/Vector/initializer_large_vector",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "as3/Vector/map",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 11
+      },
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      }
+    },
+    {
+      "test": "as3/Vector/map_initializers",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "as3/Vector/nested",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 7
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "as3/Vector/nonindexproperty/v10",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 51,
+        "expected_lines": 51,
+        "matching_lines": 44
+      },
+      "new_lines": {
+        "actual_lines": 51,
+        "expected_lines": 51,
+        "matching_lines": 51
+      }
+    },
+    {
+      "test": "as3/Vector/some",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 12
+      },
+      "new_lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      }
+    },
+    {
+      "test": "as3/Vector/some_initializers",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "as3/Vector/vectorIndexRangeExceptions",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1270,
+        "expected_lines": 1270,
+        "matching_lines": 1260
+      },
+      "new_lines": {
+        "actual_lines": 1270,
+        "expected_lines": 1270,
+        "matching_lines": 1270
+      }
+    },
+    {
+      "test": "ecma3/String/localeCompare_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
       }
     }
   ]
