@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-24T22:06:49.422577+00:00",
-    "old_git_sha": "2cf4014fd6724a9b22415b88ba0adb9053818ff1",
-    "new_timestamp": "2026-07-24T23:01:01.359964+00:00",
-    "new_git_sha": "17c19040c9cdab632c3d092d5fd87245d2fc8abd",
+    "old_timestamp": "2026-07-24T23:01:01.359964+00:00",
+    "old_git_sha": "17c19040c9cdab632c3d092d5fd87245d2fc8abd",
+    "new_timestamp": "2026-07-25T00:20:14.105241+00:00",
+    "new_git_sha": "da35e5d771bb457cc87e3c941cf7811657cb859a",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 159,
+    "old_pass": 152,
     "old_ruffle_matched": 12,
-    "old_effective_pass": 171,
-    "old_total": 229,
-    "old_pass_rate": 69.4,
-    "new_pass": 152,
+    "old_effective_pass": 164,
+    "old_total": 222,
+    "old_pass_rate": 68.5,
+    "new_pass": 159,
     "new_ruffle_matched": 12,
-    "new_effective_pass": 164,
-    "new_total": 222,
-    "new_pass_rate": 68.5,
+    "new_effective_pass": 171,
+    "new_total": 229,
+    "new_pass_rate": 69.4,
     "old_mismatched_lines": 943,
     "new_mismatched_lines": 943,
     "increased_mismatches": 0,
@@ -29,94 +26,93 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 222,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 7
+    "added": 7,
+    "removed": 0
   },
   "changes": [
     {
       "test": "timeline/scene/Scene_1_MainTimeline",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 70,
         "expected_lines": 70,
         "matching_lines": 70
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "timeline/scene/Scene_2_MovieClipTimeline",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 70,
         "expected_lines": 70,
         "matching_lines": 70
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "timeline/scene/Scene_3_GotoAndStop_LabelScene",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 15,
         "expected_lines": 15,
         "matching_lines": 15
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "timeline/scene/Scene_4_GotoAndStop_FrameScene",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 15,
         "expected_lines": 15,
         "matching_lines": 15
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "timeline/scene/Scene_5_GotoAndPlay_LabelScene",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 15,
         "expected_lines": 15,
         "matching_lines": 15
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "timeline/scene/Scene_6_GotoAndPlay_FrameScene",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 40,
         "expected_lines": 40,
         "matching_lines": 40
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "timeline/scene/Scene_7_NextPrevScene",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 7,
         "expected_lines": 7,
         "matching_lines": 7
-      },
-      "new_lines": null
+      }
     }
   ]
 }
