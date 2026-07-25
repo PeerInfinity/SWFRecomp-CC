@@ -657,6 +657,24 @@ void avm2_op_dxnslate(Avm2Activation* act, Avm2Value v);
 Avm2Value avm2_op_esc_xattr(Avm2Activation* act, Avm2Value v);  // XML attr escape
 Avm2Value avm2_op_esc_xelem(Avm2Activation* act, Avm2Value v);  // XML elem escape
 
+// Alchemy/CrossBridge memory opcodes (avm2_mops.c). Loads/stores go
+// through ApplicationDomain.domainMemory (or the 1024-byte scratch when
+// unset); an out-of-range address throws RangeError 1506. Stores take the
+// operands in push order: value first, address second.
+Avm2Value avm2_op_li8(Avm2Activation* act, Avm2Value addr);
+Avm2Value avm2_op_li16(Avm2Activation* act, Avm2Value addr);
+Avm2Value avm2_op_li32(Avm2Activation* act, Avm2Value addr);
+Avm2Value avm2_op_lf32(Avm2Activation* act, Avm2Value addr);
+Avm2Value avm2_op_lf64(Avm2Activation* act, Avm2Value addr);
+void avm2_op_si8(Avm2Activation* act, Avm2Value value, Avm2Value addr);
+void avm2_op_si16(Avm2Activation* act, Avm2Value value, Avm2Value addr);
+void avm2_op_si32(Avm2Activation* act, Avm2Value value, Avm2Value addr);
+void avm2_op_sf32(Avm2Activation* act, Avm2Value value, Avm2Value addr);
+void avm2_op_sf64(Avm2Activation* act, Avm2Value value, Avm2Value addr);
+Avm2Value avm2_op_sxi1(Avm2Activation* act, Avm2Value v);
+Avm2Value avm2_op_sxi8(Avm2Activation* act, Avm2Value v);
+Avm2Value avm2_op_sxi16(Avm2Activation* act, Avm2Value v);
+
 // Enumeration.
 Avm2Value avm2_op_hasnext2(Avm2Activation* act, Avm2Value* obj_reg, Avm2Value* idx_reg);
 Avm2Value avm2_op_hasnext(Avm2Activation* act, Avm2Value obj, Avm2Value idx);

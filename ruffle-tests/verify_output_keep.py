@@ -1713,6 +1713,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             "src/avm2/avm2_dictionary.c",
             "src/avm2/avm2_proxy.c",
             "src/avm2/avm2_bytearray.c",
+            "src/avm2/avm2_mops.c",
             "src/avm2/avm2_amf.c",
             "src/avm2/avm2_date.c",
             "src/avm2/avm2_e4x.c",

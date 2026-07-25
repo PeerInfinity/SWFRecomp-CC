@@ -1551,11 +1551,13 @@ static Avm2Value global_describe_type(Avm2Activation* act)
 
 static Avm2Object* g_current_domain;
 
-// GC root marker (Stage 11): the singleton ApplicationDomain instance.
+// GC root marker (Stage 11): the singleton ApplicationDomain instance,
+// plus the ByteArray backing domainMemory (avm2_mops.c) -- the script
+// may drop its only other reference and keep using the memory opcodes.
 void avm2_gc_mark_roots_globals(Avm2Context* ctx)
 {
-	(void) ctx;
 	avm2_gc_mark_object(g_current_domain);
+	avm2_gc_mark_object(ctx->domain_memory);
 }
 
 static Avm2Value appdomain_get_current(Avm2Activation* act)
@@ -2075,6 +2077,7 @@ static void register_application_domain(Avm2Context* ctx)
 	                                    ctx->builtins.object_class);
 	avm2_builtin_add_method(ctx, cls, "hasDefinition", appdomain_has_definition);
 	avm2_builtin_add_method(ctx, cls, "getDefinition", appdomain_get_definition);
+	avm2_mops_register(ctx, cls);
 	g_current_domain = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 1);
 	g_current_domain->cls = cls;
 	g_current_domain->vtable = &cls->ivtable;

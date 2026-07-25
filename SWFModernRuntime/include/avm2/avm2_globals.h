@@ -154,6 +154,10 @@ void avm2_bytearray_set_length_public(Avm2Context* ctx, Avm2ByteArrayExt* ba,
 void avm2_bytearray_write_uint_public(Avm2Context* ctx, Avm2ByteArrayExt* ba, uint32_t v);
 uint32_t avm2_bytearray_read_uint_public(Avm2Context* ctx, Avm2ByteArrayExt* ba);
 
+// Install ApplicationDomain.domainMemory + MIN_DOMAIN_MEMORY_LENGTH, the
+// script-visible half of the Alchemy memory opcodes (avm2_mops.c).
+void avm2_mops_register(Avm2Context* ctx, Avm2Class* appdomain_cls);
+
 void avm2_register_proxy(Avm2Context* ctx);  // flash.utils.Proxy
 // Is `obj` an instance of (a subclass of) flash.utils.Proxy?
 int avm2_is_proxy(Avm2Object* obj);

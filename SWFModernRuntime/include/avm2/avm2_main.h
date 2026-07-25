@@ -49,6 +49,15 @@ struct Avm2Context
 	// resets it for methods with the SET_DXNS flag (Ruffle activation.rs
 	// default_xml_namespace propagation).
 	const Avm2String* dxns;
+	// Alchemy/CrossBridge domain memory (avm2_mops.c). `domain_memory` is
+	// the ByteArray object assigned to ApplicationDomain.domainMemory, or
+	// NULL when the default scratch buffer is in use. It is a GC root
+	// (marked from avm2_gc_mark_roots_globals). NEVER cache its bytes
+	// pointer: ByteArray.length reallocs the buffer.
+	Avm2Object* domain_memory;
+	// Lazily allocated zero-filled MIN_DOMAIN_MEMORY_LENGTH scratch used
+	// while domain_memory is NULL. Persistent across assignments.
+	uint8_t* domain_scratch;
 	// Debug call stack (FP debug-player getStackTrace).
 	Avm2CallFrame* call_frames;
 	uint32_t call_depth;

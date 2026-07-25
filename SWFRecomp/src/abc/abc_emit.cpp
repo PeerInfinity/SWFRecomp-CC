@@ -1620,6 +1620,35 @@ namespace abc
 			UNOP(EscXElem, "avm2_op_esc_xelem")
 #undef UNOP
 
+			// --- Alchemy/CrossBridge memory opcodes (avm2_mops.c) ---
+			// Loads and the sign-extends replace the top of stack in
+			// place. Stores pop two: the value was pushed first and the
+			// address second (ASC compiles SI8(v, addr) in that order),
+			// so the address is stk[sp + 1] after the decrement.
+#define MOPS_LOAD(irname, helper) \
+			case IrOpcode::irname: \
+				out << "\tstk[sp - 1] = " helper "(act, stk[sp - 1]);" << endl; \
+				return true;
+#define MOPS_STORE(irname, helper) \
+			case IrOpcode::irname: \
+				out << "\tsp -= 2; " helper "(act, stk[sp], stk[sp + 1]);" << endl; \
+				return true;
+			MOPS_LOAD(Li8, "avm2_op_li8")
+			MOPS_LOAD(Li16, "avm2_op_li16")
+			MOPS_LOAD(Li32, "avm2_op_li32")
+			MOPS_LOAD(Lf32, "avm2_op_lf32")
+			MOPS_LOAD(Lf64, "avm2_op_lf64")
+			MOPS_LOAD(Sxi1, "avm2_op_sxi1")
+			MOPS_LOAD(Sxi8, "avm2_op_sxi8")
+			MOPS_LOAD(Sxi16, "avm2_op_sxi16")
+			MOPS_STORE(Si8, "avm2_op_si8")
+			MOPS_STORE(Si16, "avm2_op_si16")
+			MOPS_STORE(Si32, "avm2_op_si32")
+			MOPS_STORE(Sf32, "avm2_op_sf32")
+			MOPS_STORE(Sf64, "avm2_op_sf64")
+#undef MOPS_LOAD
+#undef MOPS_STORE
+
 			case IrOpcode::IncLocal:
 				out << "\tloc[" << op.arg1 << "] = avm2_op_increment(act, loc["
 				    << op.arg1 << "]);" << endl;
