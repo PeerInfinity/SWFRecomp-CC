@@ -974,13 +974,20 @@ Avm2Value avm2_call_value(Avm2Context* ctx, Avm2Value func, Avm2Value receiver,
 			{
 				return cls->native_call(ctx, cls, args, argc);
 			}
-			if (argc == 0)
+			// Calling a class that has no call handler of its own IS the
+			// coercion C(x), which takes exactly one argument. avmplus
+			// reports any other count as #1112 rather than coercing
+			// undefined / ignoring the extras (ecma3/JSON/e15_12_0's
+			// `JSON()`, regress/bug_420755's `MyDynamicArray(1,2,3)`).
+			// Classes for which a 0- or n-arg call is meaningful --
+			// Array, String, Number, Error, Date, RegExp, Vector, XML --
+			// all install native_call above and never reach here.
+			if (argc != 1)
 			{
-				// C() behaves like C(undefined) coercion for primitives;
-				// for other classes avmplus throws 1112 — approximate by
-				// coercing undefined.
-				Avm2Value undef = avm2_undefined();
-				return avm2_coerce_to_class(ctx, cls, undef);
+				avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+				                 "Error #1112: Argument count mismatch on class "
+				                 "coercion.  Expected 1, got %u.",
+				                 argc);
 			}
 			return avm2_coerce_to_class(ctx, cls, args[0]);
 		}

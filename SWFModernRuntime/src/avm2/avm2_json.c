@@ -39,6 +39,19 @@ _Noreturn static void throw_1129(Avm2Context* ctx)
 	                 "JSON string.");
 }
 
+// avmplus serializes recursively and reports a genuinely too-deep structure as
+// a stack overflow, not as a cycle (ecma3/JSON/regress accepts either #1023 or
+// a successful serialization). The limit only exists to turn what would be a
+// native stack overflow into a catchable error; it is far above any real
+// document and above the 1e3 nesting that test builds.
+#define JS_MAX_DEPTH 5000
+
+_Noreturn static void throw_1023(Avm2Context* ctx)
+{
+	avm2_throw_error(ctx, ctx->builtins.error_class,
+	                 "Error #1023: Stack overflow occurred.");
+}
+
 // ---------------------------------------------------------------------------
 // Parse: strict JSON → JVal tree (validated before any reviver runs, like
 // Ruffle's serde_json::from_str pass)
@@ -589,13 +602,40 @@ typedef struct JSer
 	Avm2Context* ctx;
 	Avm2Activation* act;
 	Avm2Value replacer_fn;      // undefined = none
-	Avm2Object* prop_list;      // NULL = none
+	int has_prop_list;          // 0 = no PropList replacer
+	// ES5 15.12.3 step 4.b: the PropertyList is built ONCE, and a key already
+	// in it is not appended again -- `["a","b","b","a"]` serializes a and b
+	// once each, in first-occurrence order.
+	const Avm2String** prop_keys;
+	uint32_t prop_keys_n;
 	const char* indent;         // NULL = compact
 	uint32_t indent_len;
 	uint32_t depth;
-	Avm2Object* stack[256];     // cycle detection
+	// Cycle detection: the chain of objects currently being serialized. It
+	// grows with nesting depth, so it cannot be a fixed array -- a 1e3-deep
+	// acyclic structure is legal input, and capping it reported #1129 for
+	// structures that have no cycle at all.
+	Avm2Object** stack;
 	uint32_t stack_n;
+	uint32_t stack_cap;
 } JSer;
+
+static void js_stack_push(JSer* js, Avm2Object* obj)
+{
+	if (js->stack_n == js->stack_cap)
+	{
+		uint32_t new_cap = js->stack_cap == 0 ? 64 : js->stack_cap * 2;
+		Avm2Object** grown = avm2_alloc(js->ctx,
+		                                new_cap * (uint32_t) sizeof(Avm2Object*));
+		if (js->stack_n > 0)
+		{
+			memcpy(grown, js->stack, js->stack_n * sizeof(Avm2Object*));
+		}
+		js->stack = grown;
+		js->stack_cap = new_cap;
+	}
+	js->stack[js->stack_n++] = obj;
+}
 
 static void js_newline_indent(JSer* js, StrBuf* b)
 {
@@ -665,6 +705,54 @@ static Avm2Value js_iter_get(JSer* js, Avm2Object* obj, uint32_t i,
 	return avm2_get_public_property(ctx, avm2_object_value(obj), key, key_len, NULL);
 }
 
+// ES5 15.12.3 step 4.b: walk the replacer array once, coercing each entry to
+// a string and appending it to the PropertyList only if it is not already
+// there. Non-string/non-number entries and array holes still coerce (to
+// "[object Object]" / "undefined") and are simply properties no ordinary
+// object has, so they drop out at lookup time -- which is how the corpus's
+// "non-string entries" and "gaps" cases arrive at the same answer.
+static void js_build_prop_keys(JSer* js, Avm2Object* list)
+{
+	Avm2Context* ctx = js->ctx;
+	Avm2Value lenv = avm2_get_public_property(ctx, avm2_object_value(list),
+	                                          "length", 6, NULL);
+	uint32_t len = avm2_coerce_to_u32(ctx, lenv);
+	uint32_t cap = 0;
+	for (uint32_t i = 0; i < len; i++)
+	{
+		char kb[16];
+		int kl = snprintf(kb, sizeof(kb), "%u", i);
+		Avm2Value item = js_iter_get(js, list, i, kb, (uint32_t) kl);
+		const Avm2String* key = avm2_coerce_to_string(ctx, item);
+		int dup = 0;
+		for (uint32_t j = 0; j < js->prop_keys_n; j++)
+		{
+			const Avm2String* seen = js->prop_keys[j];
+			if (seen->len == key->len
+			    && memcmp(seen->utf8, key->utf8, key->len) == 0)
+			{
+				dup = 1;
+				break;
+			}
+		}
+		if (dup) continue;
+		if (js->prop_keys_n == cap)
+		{
+			uint32_t new_cap = cap == 0 ? 8 : cap * 2;
+			const Avm2String** grown = avm2_alloc(
+				ctx, new_cap * (uint32_t) sizeof(const Avm2String*));
+			if (js->prop_keys_n > 0)
+			{
+				memcpy(grown, js->prop_keys,
+				       js->prop_keys_n * sizeof(const Avm2String*));
+			}
+			js->prop_keys = grown;
+			cap = new_cap;
+		}
+		js->prop_keys[js->prop_keys_n++] = key;
+	}
+}
+
 static void js_serialize_iterable(JSer* js, StrBuf* b, Avm2Object* obj)
 {
 	Avm2Context* ctx = js->ctx;
@@ -706,18 +794,12 @@ static void js_serialize_object(JSer* js, StrBuf* b, Avm2Object* obj)
 	sb_putc(b, '{');
 	js->depth++;
 	int first = 1;
-	if (js->prop_list != NULL)
+	if (js->has_prop_list)
 	{
 		// PropList replacer: serialize exactly those properties.
-		Avm2Value lenv = avm2_get_public_property(
-			ctx, avm2_object_value(js->prop_list), "length", 6, NULL);
-		uint32_t len = avm2_coerce_to_u32(ctx, lenv);
-		for (uint32_t i = 0; i < len; i++)
+		for (uint32_t i = 0; i < js->prop_keys_n; i++)
 		{
-			char kb[16];
-			int kl = snprintf(kb, sizeof(kb), "%u", i);
-			Avm2Value item = js_iter_get(js, js->prop_list, i, kb, (uint32_t) kl);
-			const Avm2String* key = avm2_coerce_to_string(ctx, item);
+			const Avm2String* key = js->prop_keys[i];
 			Avm2Value value = avm2_get_public_property(
 				ctx, avm2_object_value(obj), key->utf8, key->len, NULL);
 			Avm2Value mapped = js_map_value(js, key->utf8, key->len, value);
@@ -803,8 +885,8 @@ static void js_serialize_value(JSer* js, StrBuf* b, Avm2Value v)
 			{
 				if (js->stack[i] == obj) throw_1129(ctx);
 			}
-			if (js->stack_n >= 256) throw_1129(ctx);
-			js->stack[js->stack_n++] = obj;
+			if (js->stack_n >= JS_MAX_DEPTH) throw_1023(ctx);
+			js_stack_push(js, obj);
 			if (obj->kind == AVM2_OBJ_ARRAY || obj->kind == AVM2_OBJ_VECTOR)
 			{
 				js_serialize_iterable(js, b, obj);
@@ -846,7 +928,8 @@ static Avm2Value json_stringify(Avm2Activation* act)
 		}
 		else if (replacer.u.obj->kind == AVM2_OBJ_ARRAY)
 		{
-			js.prop_list = replacer.u.obj;
+			js.has_prop_list = 1;
+			js_build_prop_keys(&js, replacer.u.obj);
 		}
 		else
 		{
@@ -891,10 +974,28 @@ static Avm2Value json_stringify(Avm2Activation* act)
 // Registration (avm2_globals.c gates on SWF version)
 // ---------------------------------------------------------------------------
 
+// JSON is all-static and abstract: `new JSON()` throws #2012 at allocation
+// time, the same shape flash.system.Capabilities uses (avm2_globals.c).
+static void json_native_init_abstract(Avm2Context* ctx, Avm2Object* obj)
+{
+	const char* name = "?";
+	uint32_t name_len = 1;
+	if (obj->cls != NULL)
+	{
+		name = obj->cls->name.name;
+		name_len = obj->cls->name.name_len;
+	}
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #2012: %.*s$ class cannot be instantiated.",
+	                 (int) name_len, name);
+}
+
 void avm2_register_json(Avm2Context* ctx)
 {
 	Avm2Class* cls = avm2_builtin_class(ctx, "", "JSON", ctx->builtins.object_class);
 	cls->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
-	avm2_builtin_add_static_method(ctx, cls, "parse", json_parse);
-	avm2_builtin_add_static_method(ctx, cls, "stringify", json_stringify);
+	cls->native_init = json_native_init_abstract;
+	// Arities are what Function.length reports (ecma3/JSON/e15_12_2, _3).
+	avm2_builtin_add_static_method_n(ctx, cls, "parse", json_parse, 2);
+	avm2_builtin_add_static_method_n(ctx, cls, "stringify", json_stringify, 3);
 }
