@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-25 20:09 UTC
+**Date**: 2026-07-25 21:37 UTC
 
-**Git SHA**: `9b6bbcb575`
+**Git SHA**: `2b244c01b1`
 
-**Run Duration**: 1m 11s
+**Run Duration**: 1m 14s
 
 ## Summary
 
@@ -29,9 +29,9 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `embed_matching/fallback_preferences` | 0 | 23.2s |  |
-| 2 | `embed_matching/match_style` | 0 | 6.4s |  |
-| 3 | `embed_matching/no_font_found` | 0 | 6.1s |  |
+| 1 | `embed_matching/fallback_preferences` | 0 | 26.0s |  |
+| 2 | `embed_matching/match_style` | 0 | 6.8s |  |
+| 3 | `embed_matching/no_font_found` | 0 | 6.2s |  |
 
 ## Near-Passing Tests
 
