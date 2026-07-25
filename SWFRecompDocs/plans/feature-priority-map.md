@@ -141,8 +141,8 @@ blanked → 230/232 (held back by the `[object Function]` item in Polish).
 Implementation notes and the three load-bearing invariants (non-coercing
 receivers, borrowed-receiver state, round-trip-pinned string formats) are in
 `from_avmplus/_investigation/CURRENT_STATUS.md` §"Fix landed: the full `Date`
-class". The single `ecma3/Date` holdout, `e15_9_5`, needs sealed builtin
-prototypes — now folded into the ranking below as a 3-test item.
+class". The single `ecma3/Date` holdout, `e15_9_5`, needed a typed
+`Date.prototype` and landed with that arc (`e4d1e78f6`).
 
 ### 2. ~~String/Unicode semantics~~ — **DONE (`127a5f4d3`, +101)** · SMALL arc · best ratio in the corpus
 
@@ -516,27 +516,37 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | `Number` static math + URI functions + `Capabilities` | **46** (pred. ~35) | small | **DONE `8e8370df1`** |
 | ~~—~~ | Static consts must be read-only (`#1074` + DontDelete) | **20** (pred. 10) | small | **DONE `c09985aa6`**, CI `30142225682` |
 | ~~—~~ | `[object Function-N]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | **25** (pred. ~15) | small | **DONE `e618f62ab`**, CI `30143218958`; `ecma3/FunctionObjects` 6/21 → 20/21 |
-| 1 | Builtin prototypes must be typed instances of their class (subsumes the old sealed-prototypes `#1037` item) | ~8-11 | medium | see below |
-| 2 | `as3/Vector` | 14 | ? | avg 85% line match, no single root cause found yet |
-| 3 | `ecma3/JSON` lexer whitespace | 6 | small | 6 of 12 |
+| ~~—~~ | Builtin prototypes must be typed instances of their class (subsumes the old sealed-prototypes `#1037` item) | **24** (pred. 8-11) | medium | **DONE `cc4a7eece`+`e4d1e78f6`**, CI `30171938941` |
+| 1 | `as3/Vector` | 14 | ? | avg 85% line match, no single root cause found yet |
+| 2 | `ecma3/JSON` lexer whitespace | 6 | small | 6 of 12 |
 
-**New #1: builtin prototypes must be typed instances of their class.**
-`cls->prototype_obj` is built as a plain `Object`; avmplus builds it as an
-instance of `cls` carrying `cls`'s primitive value. So
-`Boolean.prototype.valueOf()` gives `true` instead of `false`,
-`Array.prototype.length` is `undefined` instead of `0`, and
-`Object.prototype.toString.call(Array.prototype)` gives `[object Object]`
-instead of `[object Array]`. This is the same change as the old
-"sealed builtin prototypes (`#1037`)" item — do them together.
+**DONE — builtin prototypes are typed instances of their class.**
+`cc4a7eece` + `e4d1e78f6` + the `avm2_array_proto_index` follow-up,
+CI `30171938941`: **+24** from_avmplus, 0 regressions, crash histogram
+flat. Estimated 8–11, so the usual mechanism overshoot applied (four
+`ecma3/Exceptions` tests and one `ecma3/Expressions` test came along).
 
-Known members: `ecma3/Array/e15_4_4`, `ecma3/Boolean/{e15_6_3_1,
-e15_6_3_1_3, e15_6_4__1}`, `ecma3/ObjectObjects/{e15_2_3_rt,
-e15_2_3_1_rt}`, `ecma3/String/{e15_5_2, e15_5_4}`,
-`ecma3/FunctionObjects/{e15_3_4_rt, e15_3_4__1_rt, ecall_1}`,
-`ecma3/Exceptions/{number_002_rt, string_002_rt}`, the 2 Array `#1037`
-tests, and `ecma3/Date/e15_9_5`. ⚠️ Read the
-`avm2-prototype-toString-self-coercion` memory first: a prototype that
-coerces itself is exactly how `d90353066` introduced a crash.
+What landed: an `is_prototype` bit keeps prototypes dynamic through class
+sealing; `Array.prototype` and `Date.prototype` are real instances of
+their class; Array's public `toString` trait is gone (avmplus keeps it
+AS3-namespaced, so the public name stays shadowable); `Boolean.prototype`
+gets receiver-guarded shims; `class_proto_to_string` classifies by actual
+class; and the numeric/String/Boolean prototype methods throw `#1004` for
+receivers that are neither the right primitive nor that class's own
+prototype.
+
+Two traps for anyone touching prototypes again. **Typing a prototype makes
+ivtable traits shadow the ES3 prototype functions**, so
+`Cls.prototype.method.length` reads the *trait's* arity — which
+`avm2_builtin_add_method` left at 0, an instant regression until
+`avm2_builtin_add_method_n` carried it. And **`Array.prototype[3] = x` now
+lands in element storage, not a dyn prop named `"3"`**; every
+hole-resolution path had to learn that (`avm2_array_proto_index`), which
+cost 11 avm2-suite tests in CI `30170620108` before it was fixed.
+
+Still open from this arc: `as3/Array/insertremove` (one test — with a
+typed prototype, `insertAt`/`removeAt` shift holes in a way that disagrees
+with prototype-supplied indices; it was already failing at `fc9a9bdf4`).
 
 **Explicitly deprioritised.** `as3/RuntimeErrors` (now 13 tests, average 0%
 line match) reads like a single blanked group in the histogram but is 13

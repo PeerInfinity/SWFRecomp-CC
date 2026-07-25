@@ -1,12 +1,13 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-25 — **two arcs landed, both CI-confirmed: `static
-const` is read-only, and the `ecma3/FunctionObjects` arc.** The Adobe
+Last updated: 2026-07-25 — **three arcs landed, all CI-confirmed: `static
+const` is read-only, the `ecma3/FunctionObjects` arc, and typed builtin
+prototypes.** The Adobe
 Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`: **871/1574
 effective (55.3%)**, identical in graphics and no-graphics.
 
-Eight fixes have landed since:
+Nine fixes have landed since:
 
 1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
    `#2023`. e4x **2/177 → 160/177**.
@@ -31,8 +32,12 @@ Eight fixes have landed since:
    `.length`, and the `[object Function-N]` classification (below).
    **+25** here, CI `30143218958`. Estimated ~15.
 
-The suite stands at **1431/1574 effective (90.9%)**; the corpus at
-**3733/4414 (84.6%)**. **Zero pass→fail regressions across all eight
+9. `cc4a7eece` + `e4d1e78f6` + `9b6bbcb57` — builtin prototypes behave as
+   typed instances of their class (below). **+24** here, CI `30171938941`.
+   Estimated 8–11.
+
+The suite stands at **1455/1574 effective (92.4%)**; the corpus at
+**3757/4414 (85.1%)**. **Zero pass→fail regressions across all nine
 runs.**
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
