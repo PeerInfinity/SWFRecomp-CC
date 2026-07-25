@@ -26,19 +26,19 @@ including the 50 named `avm1/*`. The correct corpus denominator is
 **4414**, and it is what this document uses from here on. Sum over
 top-level leaf suites only; do not add nested `_results` dirs.
 
-Full corpus, graphics mode at **`8e8370df1`**: **3688/4414 effective
-(83.6%)**, 726 failing — from CI run `30139492178`, complete over the full
+Full corpus, graphics mode at **`e618f62ab`**: **3733/4414 effective
+(84.6%)**, 681 failing — from CI run `30143218958`, complete over the full
 4414-test intersection, so this figure needs no shard arithmetic.
 
-Status histogram vs the previous complete run (`30134726316` at
-`da35e5d77`), over all 4414: pass **3407 → 3452**, ruffle_matched
-**235 → 236**, output_mismatch **742 → 696**, and segfault (3),
-runtime_error (21), timeout (4) and compile_fail (1) all flat, with **zero
-pass→fail regressions**.
+Status histogram across the two runs of 2026-07-25, over all 4414: pass
+**3452 → 3472 → 3497**, output_mismatch **696 → 676 → 651**, and
+ruffle_matched (236), segfault (3), runtime_error (21), timeout (4) and
+compile_fail (1) **all flat in both**, with **zero pass→fail regressions**.
+Both gains are entirely inside `from_avmplus`.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | **1386/1574** | 88.1 | 188 | **language + builtins** (Tamarin acceptance) |
+| from_avmplus | **1431/1574** | 90.9 | 143 | **language + builtins** (Tamarin acceptance) |
 | avm2 | 866/1217 | 71.2 | 351 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 654/716 | 91.3 | 62 | long tail |
 | from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
@@ -351,24 +351,24 @@ were e4x tests missing only the root-link line and are resolved by
 | `ecma3/Number/e15_7_4_2_4` | `1.2345000000000002e-7` vs `1.2345e-7` | double→string needs shortest-round-trip formatting |
 | `ecma3/JSON/e15_12_1`, `e15_12_3` | array/object parse corruption around whitespace | JSON lexer whitespace handling |
 | `as3/Definitions/Variable/ConstVariables_custom1`, `as3/RuntimeErrors/*` | `…read-only property classItem7…` vs `…property Package1:ns1::classItem7…` | error messages must use the namespace-qualified name |
-| `ecma3/ObjectObjects/e15_2_4_2` | `Object.prototype.toString` on a function | `[object Function]` classification |
+| ~~`ecma3/ObjectObjects/e15_2_4_2`~~ | ~~`Object.prototype.toString` on a function~~ | **fixed by `e618f62ab`** (`[object Function-N]`) |
 | ~~`ecma3/GlobalObject/e15_1_2_2_*`~~ | ~~`parseInt.length` → 0~~ | **fixed by `d90353066`** |
 | `as3/Array/insertremove` | 30766/30870 lines | large-array edge cases |
 | e4x residue (~20) | 10 at 50–90%, 6 below | ordinary E4X polish |
 
-**`ecma3/FunctionObjects` (6/21) — diagnosed 2026-07-24, four unrelated
-items, none of them blanking.** The ES3 prototype arc did not move this
-directory at all, so do not expect it to fall out of another arc:
+**`ecma3/FunctionObjects` — diagnosed 2026-07-24 as four unrelated items;
+three of them shipped in `e618f62ab` and took the directory 6/21 → 20/21.**
+The diagnosis was right that nothing here falls out of another arc, and
+right that the classification item was worth more than its local count (it
+also carried `ObjectObjects/e15_2_4_2`, `class_006`, `toLocaleString_rt`
+and `String/e15_5_4_6_2_rt`).
 
-| Item | Example diff |
+| Item | Status |
 |---|---|
-| `Object.prototype.toString` on a function must give `[object Function]` | `myfunc.toString = Object.prototype.toString; myfunc.toString()` → expected `true`, got `false` (same root cause as `ecma3/ObjectObjects/e15_2_4_2` above, and it recurs in `ecma3/String/e15_5_4_6_2_rt`) |
-| `Function('function body')` must throw `EvalError #1066` | `e15_3_5_1_rt`, `e15_3_2_1_1_rt`: expected `EvalError: Error #1066`, got `no error` |
-| Builtin **class objects** need `.length` (the constructor's arity) | `e15_3_3_2`: `Function.length` expected `1`, got `undefined`. Distinct from `Function.prototype.m.length`, which `d90353066` fixed |
-| `Boolean.prototype` classification | `ecall_1`: `ToString.call(Boolean, Boolean.prototype)` expected `false`, got `true` |
-
-The `[object Function]` item is the pick of these — it appears in at least
-three directories, so it is worth more than its `FunctionObjects` count.
+| ~~`Object.prototype.toString` on a function → `[object Function-N]`~~ | **fixed `e618f62ab`** — note the format has a trailing `-<digits>`, which the tests regex-match; the plain text is Function.prototype's OWN toString |
+| ~~`Function('function body')` must throw `EvalError #1066`~~ | **fixed `e618f62ab`** — both the call and construct forms, any argc > 0 |
+| ~~Builtin **class objects** need `.length` (the ctor's arity)~~ | **fixed `e618f62ab`** — stated per class; nothing in the runtime carries builtin ctor arity |
+| `Boolean.prototype` classification (`ecall_1`: `ToString.call(Boolean, Boolean.prototype)` expected `false`, got `true`) | **open** — this is the typed-builtin-prototypes arc, now #1 |
 
 Misc-category failures (counts are *failing of total*, small and mostly
 one-off): `text` 6 of 11 (caret placement ×4, HTML entity parsing, links in
@@ -381,6 +381,50 @@ from_shumway's 58: 16 fuzz corpus, 9 `timeline/nav`, 9 `as3-loader`,
 ---
 
 ## Landed
+
+**`c09985aa6` — `static const` is read-only, and `delete` can see a class
+object's inherited traits.**
+
+CI `30142225682` (graphics, `categories=full`, complete 4414-test
+intersection): **+20 from_avmplus, zero regressions**, every crash bucket
+flat. from_avmplus **1386 → 1406 (89.3%)**; corpus **3688 → 3708 (84.0%)**.
+
+Predicted 10, local estimate 17, delivered 20. Two fixes in one commit:
+
+- A `read_only` flag on `Avm2DynProp`, honoured by `setproperty_resolved`
+  and `avm2_object_delete_dynamic`, gives all **91
+  `avm2_builtin_add_static_const` call sites** ReadOnly + DontDelete at
+  once. The C-side installer (`avm2_object_set_dynamic`) is deliberately
+  **not** gated, which is what kept a change touching every builtin class
+  safe: only ActionScript-level writes throw.
+- `delete_trait_find` adds the class_class-ivtable fallback the resolve
+  paths already had, so `delete Number.prototype` / `delete Array.prototype`
+  finds the inherited `prototype` getter and returns false.
+
+Where the 20 landed: the exact 10 `ecma3/Number/e15_7_3_*` predicted, plus
+`Number/e15_7_3_1_1`, `Array/e15_4_3_1_2`, `Boolean/e15_6_3_1_2`,
+`ObjectObjects/e15_2_3_1_2`, `String/e15_5_3_1_3`,
+`FunctionObjects/e15_3_3_1_3`, `Types/e8_6_1` — and three nobody had
+listed: `as3/Types/Int/{intMaxValue, intMinValue}` and
+`ecma3/Expressions/e11_4_1`.
+
+**`e618f62ab` — the `ecma3/FunctionObjects` arc.** `Function('body')` →
+`EvalError #1066`, class-object `.length` (the ctor arity, stated for the
+eleven ES3-visible classes), and the `[object Function-N]` classification.
+
+CI `30143218958`: **+25 from_avmplus, zero regressions**, crash buckets
+flat. from_avmplus **1406 → 1431 (90.9%)**; corpus **3708 → 3733 (84.6%)**.
+Estimated ~15. `ecma3/FunctionObjects` **6/21 → 20/21**; the other 12 were
+3 in `ObjectObjects`, 4 in `String`, plus `Number/e15_7_3`,
+`Array/e15_4_3_2`, `Expressions/e11_2_1_1`, `Boolean/e15_6_3` and
+`as3/RuntimeErrors/Error1066Function-body-NotAllowed`.
+
+Ordering gotcha worth remembering: `Function.prototype.toString` had to be
+registered *first* (returning `function Function() {}`, which ~19
+avm2-suite tests expect from a plain `fn.toString()`) before
+`Object.prototype.toString` could start reporting the classification —
+we had never registered one, so `fn.toString()` was reaching
+`Object.prototype.toString` by inheritance.
 
 **`8e8370df1` — the cleanup batch (arcs 4, 5 and 7 above).**
 
@@ -470,30 +514,51 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | prototype toString/valueOf self-coercion guard | **7** | tiny | **DONE `17c19040c`** — fixes a crash `d90353066` introduced |
 | ~~—~~ | `Date` class (ECMA-262 §15.9) | **173** (pred. 173) | large | **DONE `da35e5d77`** |
 | ~~—~~ | `Number` static math + URI functions + `Capabilities` | **46** (pred. ~35) | small | **DONE `8e8370df1`** |
-| 1 | Static consts must be read-only (`#1074` + DontDelete) | **10** | small | all in `ecma3/Number`; 91 call sites; see below |
-| 2 | `[object Function]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | ~15 (`ecma3/FunctionObjects` 6/21) | small | see Polish |
-| 3 | Sealed builtin prototypes (`#1037`) | 3 | small | 2 Array + `ecma3/Date/e15_9_5`; changes how builtin prototype objects are built |
+| ~~—~~ | Static consts must be read-only (`#1074` + DontDelete) | **20** (pred. 10) | small | **DONE `c09985aa6`**, CI `30142225682` |
+| ~~—~~ | `[object Function-N]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | **25** (pred. ~15) | small | **DONE `e618f62ab`**, CI `30143218958`; `ecma3/FunctionObjects` 6/21 → 20/21 |
+| 1 | Builtin prototypes must be typed instances of their class (subsumes the old sealed-prototypes `#1037` item) | ~8-11 | medium | see below |
+| 2 | `as3/Vector` | 14 | ? | avg 85% line match, no single root cause found yet |
+| 3 | `ecma3/JSON` lexer whitespace | 6 | small | 6 of 12 |
 
-**New #1, found while doing the cleanup batch.**
-`avm2_builtin_add_static_const` installs a dont-enum **dynamic** property
-on the class object, but AS3 `public static const` is read-only and
-non-deletable. So `Number.MAX_VALUE = 0` silently succeeds and
-`delete Number.MAX_VALUE` returns true, where both must fail. Mapping each
-failing test to the property it pins gives an **exact 10** — the five value
-constants (`MAX_VALUE`, `MIN_VALUE`, `NaN`, `POSITIVE_INFINITY`,
-`NEGATIVE_INFINITY`) × {DontDelete, ReadOnly}, i.e. `e15_7_3_2_2` through
-`e15_7_3_6_3_rt`.
+**New #1: builtin prototypes must be typed instances of their class.**
+`cls->prototype_obj` is built as a plain `Object`; avmplus builds it as an
+instance of `cls` carrying `cls`'s primitive value. So
+`Boolean.prototype.valueOf()` gives `true` instead of `false`,
+`Array.prototype.length` is `undefined` instead of `0`, and
+`Object.prototype.toString.call(Array.prototype)` gives `[object Object]`
+instead of `[object Array]`. This is the same change as the old
+"sealed builtin prototypes (`#1037`)" item — do them together.
 
-Do **not** generalise the getter-only static trait used for the eight new
-`Number` constants: a getter cannot carry a per-constant value without one
-function apiece, and there are **91 `add_static_const` call sites across 10
-files**. A `read_only` flag on `Avm2DynProp`, honoured by `setproperty_impl`
-and `avm2_object_delete_dynamic`, fixes all 91 at once and touches no vtable
-machinery. Small in code, but it touches every builtin class — own CI cycle.
+Known members: `ecma3/Array/e15_4_4`, `ecma3/Boolean/{e15_6_3_1,
+e15_6_3_1_3, e15_6_4__1}`, `ecma3/ObjectObjects/{e15_2_3_rt,
+e15_2_3_1_rt}`, `ecma3/String/{e15_5_2, e15_5_4}`,
+`ecma3/FunctionObjects/{e15_3_4_rt, e15_3_4__1_rt, ecall_1}`,
+`ecma3/Exceptions/{number_002_rt, string_002_rt}`, the 2 Array `#1037`
+tests, and `ecma3/Date/e15_9_5`. ⚠️ Read the
+`avm2-prototype-toString-self-coercion` memory first: a prototype that
+coerces itself is exactly how `d90353066` introduced a crash.
 
-from_avmplus stands at **1386/1574 (88.1%)** and the corpus at
-**3688/4414 (83.6%)** — the batch was projected to reach ~88% and ~83.3%,
-and landed slightly ahead of both.
+**Explicitly deprioritised.** `as3/RuntimeErrors` (now 13 tests, average 0%
+line match) reads like a single blanked group in the histogram but is 13
+*distinct* error ids with one assertion each — the worst
+yield-per-unit-effort on the board. (It was 14; `e618f62ab` picked up
+`Error1066Function-body-NotAllowed` for free, which is the *only* way to
+harvest from this bucket: as a side effect of an arc that wants the same
+error anyway.)
+
+from_avmplus stands at **1431/1574 (90.9%)** and the corpus at
+**3733/4414 (84.6%)**.
+
+**Calibration, after two more arcs.** Both overshot the line-match table
+(10 → 20, ~15 → 25), which is the mirror image of the error-histogram bias:
+a fix to a *shared mechanism* — dyn-prop attributes, class-object property
+lookup — drags in siblings that were failing on an ordinary line mismatch,
+and no per-test table can see those. Read the line-match table as a floor
+too, and expect the surplus to land in sibling directories rather than the
+one you targeted. Before committing to a mechanism-shaped arc, grep the
+whole corpus for the mechanism's *other users* — a one-minute pass over
+`_results/results_graphics.json` plus a regex on each failing `Test.as`
+found every surplus flip in both arcs before CI did.
 
 **Calibration note after four predicted arcs.** The error-signature
 histogram has now been right on `Date` (exactly 171 + 2) and *low* on this
