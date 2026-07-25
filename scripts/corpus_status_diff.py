@@ -99,14 +99,28 @@ def main():
 
     hist_old, hist_new = collections.Counter(), collections.Counter()
     regressions, gains, moves, ungraded, per_suite = [], [], [], [], []
+    flagged = []
     total = 0
 
     for path in paths:
         suite = suite_of(path)
         if suite in NESTED:
             continue
-        old = {t["test"]: t for t in load(args.old_ref, path).get("tests", [])}
-        new = {t["test"]: t for t in load(args.new_ref, path).get("tests", [])}
+        old_doc = load(args.old_ref, path)
+        new_doc = load(args.new_ref, path)
+        # The workflow labels a short run in metadata (and fails the job).
+        # Trust that over inference: it names the shard count, which absence
+        # alone cannot.
+        for ref, doc in ((args.old_ref, old_doc), (args.new_ref, new_doc)):
+            meta = doc.get("metadata") or {}
+            if meta.get("incomplete"):
+                flagged.append(
+                    f"{suite} @ {ref}: {meta.get('shards', '?')}/"
+                    f"{meta.get('expected_shards', '?')} shards"
+                    + (f", {meta['interrupted_shards']} interrupted"
+                       if meta.get("interrupted_shards") else ""))
+        old = {t["test"]: t for t in old_doc.get("tests", [])}
+        new = {t["test"]: t for t in new_doc.get("tests", [])}
         shared = old.keys() & new.keys()
         if old.keys() - new.keys():
             ungraded.append((suite, len(old.keys() - new.keys())))
@@ -130,6 +144,14 @@ def main():
 
     print(f"=== intersection: {total} tests "
           f"({args.old_ref} -> {args.new_ref}, {args.stem}) ===\n")
+    if flagged:
+        print("!! INCOMPLETE RUN — metadata.incomplete is set on:")
+        for item in flagged:
+            print(f"     {item}")
+        print("   Comparisons below are on the intersection and are still "
+              "valid,\n   but any absolute total from the flagged side is "
+              "short. Say so\n   when reporting, and name the ungraded "
+              "tests.\n")
     print("STATUS HISTOGRAM")
     for status in sorted(set(hist_old) | set(hist_new)):
         delta = hist_new[status] - hist_old[status]

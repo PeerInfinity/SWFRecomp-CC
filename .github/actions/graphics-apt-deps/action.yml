@@ -1,0 +1,107 @@
+name: Graphics apt dependencies
+description: >-
+  Provide the Vulkan + libav packages the graphics test path needs, from a
+  cached .deb set. Replaces a per-job `apt-get install`: with 30 shards that
+  was 31 independent apt transactions per run, and an intermittent
+  mirror/dpkg-lock failure in any one of them silently cost a whole shard's
+  worth of test results.
+
+inputs:
+  download-only:
+    description: >-
+      'true' in a setup job: populate the cache but install nothing. 'false'
+      (default) also installs and exports the Vulkan/Dawn env vars.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Compute apt .deb cache key
+      id: key
+      shell: bash
+      run: |
+        # Keep this list in ONE place. `vulkan-tools` used to be here and was
+        # dropped 2026-07-25: it is vulkaninfo and friends, diagnostics only —
+        # nothing in .github/, ruffle-tests/ or SWFRecomp/scripts/ invokes it.
+        pkgs="mesa-vulkan-drivers libvulkan1 libavcodec-dev libavutil-dev libswscale-dev"
+        echo "pkgs=$pkgs" >> "$GITHUB_OUTPUT"
+        hash=$(printf '%s' "$pkgs" | sha256sum | cut -c1-16)
+        # ImageVersion is load-bearing, not decoration. `--download-only`
+        # fetches only what the runner image LACKS, so the cached set is a
+        # delta against one specific image. dpkg -i'ing that delta onto a
+        # different image could install packages built against another libc.
+        # These are runner-process env vars, not workflow context, so the key
+        # has to be built in a shell step (same pattern as dawn_key).
+        echo "key=apt-graphics-${ImageOS:-unknown}-${ImageVersion:-unknown}-${hash}-v1" >> "$GITHUB_OUTPUT"
+
+    - name: Restore-or-save apt .deb cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/apt-debs
+        # Every shard saves this identical key; GitHub keeps the first writer
+        # and the rest get a harmless "cache already exists" (same pattern as
+        # the shared ccache key below). Normally setup-parallel populates it
+        # first and all shards restore, so no shard touches the network.
+        key: ${{ steps.key.outputs.key }}
+
+    - name: Download .debs (cache miss)
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        PKGS: ${{ steps.key.outputs.pkgs }}
+      run: |
+        echo "::notice::apt .deb cache miss — downloading ${PKGS}"
+        # Retained from the old inline step: noninteractive frontend, bounded
+        # dpkg-lock wait, hard outer timeout and retry, so a stuck lock fails
+        # fast instead of hanging the job.
+        export DEBIAN_FRONTEND=noninteractive
+        mkdir -p "$RUNNER_TEMP/apt-debs/partial"
+        for attempt in 1 2 3; do
+          if sudo timeout 300 apt-get -o DPkg::Lock::Timeout=180 update \
+             && sudo timeout 300 apt-get -o DPkg::Lock::Timeout=180 \
+                  -o Dir::Cache::archives="$RUNNER_TEMP/apt-debs" \
+                  install -y --download-only $PKGS; then
+            break
+          fi
+          if [ "$attempt" = 3 ]; then
+            echo "::error::apt-get download failed/timed out after 3 attempts"
+            exit 1
+          fi
+          echo "apt-get download attempt $attempt failed/timed out; retrying in 15s..."
+          sleep 15
+        done
+        # apt writes as root; make it readable so the cache save can pack it.
+        sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/apt-debs"
+        ls -1 "$RUNNER_TEMP/apt-debs"/*.deb | wc -l | xargs echo "debs downloaded:"
+
+    - name: Install from cached .debs
+      if: inputs.download-only != 'true'
+      shell: bash
+      run: |
+        export DEBIAN_FRONTEND=noninteractive
+        shopt -s nullglob
+        debs=("$RUNNER_TEMP/apt-debs"/*.deb)
+        if [ ${#debs[@]} -eq 0 ]; then
+          echo "::error::no .debs present — cache restore and download both produced nothing"
+          exit 1
+        fi
+        echo "installing ${#debs[@]} cached .debs (no network)"
+        # dpkg processes the whole set together, so intra-set dependency order
+        # resolves itself. The fallback only fires if the closure is somehow
+        # incomplete — it reaches the network, so make that loud rather than
+        # letting the flake quietly come back.
+        if ! sudo dpkg -i "${debs[@]}"; then
+          echo "::warning::dpkg -i needed apt -f install — the cached .deb closure is incomplete for this runner image"
+          sudo timeout 300 apt-get -o DPkg::Lock::Timeout=180 -f install -y
+        fi
+
+    - name: Export graphics env
+      if: inputs.download-only != 'true'
+      shell: bash
+      run: |
+        {
+          echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
+          echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
+          echo "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json"
+        } >> "$GITHUB_ENV"

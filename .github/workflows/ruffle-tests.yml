@@ -210,37 +210,13 @@ jobs:
           echo "::notice::Dawn cache miss — building inline (~30 min). actions/cache@v4 will save the result automatically."
           bash scripts/build_dawn.sh "${RUNNER_TEMP}/dawn-install"
 
+      # libav* back SWFModernRuntime's video codec
+      # (SWFRecompDocs/plans/video-codec-support-plan.md): verify_output.py
+      # probes pkg-config in graphics modes and defines SWF_HAVE_LIBAVCODEC
+      # when found; absent, only ScreenVideo (FLV codec 3) decodes.
       - name: Install Vulkan + libavcodec
         if: inputs.mode != 'no-graphics'
-        run: |
-          # libav* are needed by SWFModernRuntime's video codec backend
-          # (SWFRecompDocs/plans/video-codec-support-plan.md). verify_output.py
-          # probes pkg-config in graphics modes and defines SWF_HAVE_LIBAVCODEC
-          # when found; absent, only ScreenVideo (FLV codec 3) decodes.
-          # Hardened against the intermittent runner hang where apt blocks
-          # forever on a dpkg lock held by unattended-upgrades (froze random
-          # shards in graphics runs): noninteractive frontend + bounded dpkg
-          # lock wait + hard outer timeout + retry, so a stuck lock fails fast
-          # and retries instead of hanging the whole shard.
-          export DEBIAN_FRONTEND=noninteractive
-          for attempt in 1 2 3; do
-            if sudo timeout 300 apt-get -o DPkg::Lock::Timeout=180 install -y \
-                 mesa-vulkan-drivers vulkan-tools libvulkan1 \
-                 libavcodec-dev libavutil-dev libswscale-dev; then
-              break
-            fi
-            if [ "$attempt" = 3 ]; then
-              echo "::error::apt-get install failed/timed out after 3 attempts"
-              exit 1
-            fi
-            echo "apt-get install attempt $attempt failed/timed out; retrying in 15s..."
-            sleep 15
-          done
-          {
-            echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
-            echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
-            echo "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json"
-          } >> "$GITHUB_ENV"
+        uses: ./.github/actions/graphics-apt-deps
 
       - name: Pin ccache directory
         run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
@@ -734,6 +710,16 @@ jobs:
           echo "::notice::Dawn cache miss — building inline (~30 min). actions/cache@v4 will save the result automatically."
           bash scripts/build_dawn.sh "${RUNNER_TEMP}/dawn-install"
 
+      # Populate (not install) the graphics .deb cache while the shards are
+      # still queued, so all 30 restore it instead of each hitting apt.
+      # setup-parallel does not need the packages itself — it only builds the
+      # recompiler and recompiles SWFs.
+      - name: Populate graphics apt .deb cache
+        if: inputs.mode != 'no-graphics'
+        uses: ./.github/actions/graphics-apt-deps
+        with:
+          download-only: 'true'
+
       - name: Build SWFRecomp
         run: |
           mkdir -p SWFRecomp/build
@@ -832,37 +818,20 @@ jobs:
           path: ${{ runner.temp }}/dawn-install
           key: ${{ steps.dawn_key.outputs.key }}
 
-      - name: Install Vulkan + libavcodec + verify Dawn cache hit
+      - name: Verify Dawn cache hit
         if: inputs.mode != 'no-graphics'
         run: |
           if [ "${{ steps.dawn_cache.outputs.cache-hit }}" != "true" ]; then
             echo "::error::Dawn cache miss in shard. setup-parallel was supposed to populate it — investigate why this shard didn't see the cache."
             exit 1
           fi
-          # libav* are needed by SWFModernRuntime's video codec backend
-          # (see SWFRecompDocs/plans/video-codec-support-plan.md).
-          # Hardened against the intermittent apt/dpkg-lock hang that froze
-          # random shards (see the matching step in the setup job): noninteractive
-          # frontend + bounded dpkg lock wait + hard outer timeout + retry.
-          export DEBIAN_FRONTEND=noninteractive
-          for attempt in 1 2 3; do
-            if sudo timeout 300 apt-get -o DPkg::Lock::Timeout=180 install -y \
-                 mesa-vulkan-drivers vulkan-tools libvulkan1 \
-                 libavcodec-dev libavutil-dev libswscale-dev; then
-              break
-            fi
-            if [ "$attempt" = 3 ]; then
-              echo "::error::apt-get install failed/timed out after 3 attempts"
-              exit 1
-            fi
-            echo "apt-get install attempt $attempt failed/timed out; retrying in 15s..."
-            sleep 15
-          done
-          {
-            echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
-            echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
-            echo "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json"
-          } >> "$GITHUB_ENV"
+
+      # setup-parallel populated the .deb cache, so this restores and
+      # dpkg -i's with no network. That is the point: this step running
+      # `apt-get install` 30 times per run is what dropped shards.
+      - name: Install Vulkan + libavcodec
+        if: inputs.mode != 'no-graphics'
+        uses: ./.github/actions/graphics-apt-deps
 
       - name: Pin ccache directory
         run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
@@ -1243,6 +1212,15 @@ jobs:
               "gnash_swfc": "ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results",
           }
 
+          # A run that lost a shard produces a results file that is *valid* but
+          # short. metadata.incomplete records that, but a `::warning::` alone
+          # left the run green — and a green run whose numbers are quietly
+          # missing 139 tests is the single most expensive failure mode we
+          # have had. Collect them and fail the job at the end, AFTER every
+          # results file is written (all downstream steps are `if: always()`,
+          # so the labelled partial results still publish).
+          incomplete = []
+
           for tag, out_dir in categories.items():
               pattern = f"artifacts/results-shard-*/results-shard-{tag}-*.json"
               files = sorted(glob.glob(pattern))
@@ -1253,7 +1231,8 @@ jobs:
               actual_shards = len(files)
               missing_shards = max(0, expected_shards - actual_shards) if expected_shards > 0 else 0
               if missing_shards > 0:
-                  print(f"::warning::{tag}: only {actual_shards}/{expected_shards} shards produced results ({missing_shards} missing)")
+                  print(f"::error::{tag}: only {actual_shards}/{expected_shards} shards produced results ({missing_shards} missing)")
+                  incomplete.append(f"{tag} ({actual_shards}/{expected_shards} shards)")
               print(f"{tag}: combining {actual_shards} shard files")
 
               combined_tests = []
@@ -1304,7 +1283,8 @@ jobs:
               if interrupted_shards > 0:
                   metadata["interrupted_shards"] = interrupted_shards
                   metadata["incomplete"] = True
-                  print(f"::warning::{tag}: {interrupted_shards} shard(s) were interrupted (partial results)")
+                  print(f"::error::{tag}: {interrupted_shards} shard(s) were interrupted (partial results)")
+                  incomplete.append(f"{tag} ({interrupted_shards} interrupted)")
 
               report = {
                   "metadata": metadata,
@@ -1330,6 +1310,18 @@ jobs:
                         f" {effective_pass}/{total} effective ({report['effective_pass_rate']}%){suffix}")
               else:
                   print(f"  {pass_count}/{total} passing ({report['pass_rate']}%){suffix}")
+
+          if incomplete:
+              print()
+              print("::error::INCOMPLETE RUN — do not read these numbers as a baseline.")
+              for item in incomplete:
+                  print(f"::error::  {item}")
+              print("::error::The results files ARE published and carry "
+                    "metadata.incomplete=true; scripts/corpus_status_diff.py "
+                    "will refuse to treat the missing tests as regressions. "
+                    "Re-run the failed shards (`gh run rerun <id> --failed`) "
+                    "before quoting a corpus total.")
+              raise SystemExit(1)
           EOF
 
       - name: Verify Flash-spec expected output
