@@ -221,6 +221,18 @@ static Avm2Object* require_function_this(Avm2Activation* act)
 	return act->this_val.u.obj;
 }
 
+// Function.prototype.toString / .toLocaleString: every function stringifies as
+// the same generic source text (avm2/function_to_string). This has to live on
+// Function.prototype rather than being folded into Object.prototype.toString,
+// because that one reports functions as "[object Function-N]" — the ES3
+// classification the ecma3/FunctionObjects tests probe by reassigning
+// `fn.toString = Object.prototype.toString`.
+static Avm2Value fn_proto_to_string(Avm2Activation* act)
+{
+	require_function_this(act);
+	return avm2_string(avm2_string_from_literal(act->ctx, "function Function() {}"));
+}
+
 static Avm2Value fn_call(Avm2Activation* act)
 {
 	Avm2Object* fn = require_function_this(act);
@@ -329,10 +341,21 @@ static Avm2Value fn_set_prototype(Avm2Activation* act)
 }
 
 // Function() / new Function(): a fresh no-op function (Ruffle matches).
+//
+// With ANY argument it is the ES3 `Function('function body')` form, which
+// avmplus does not implement — there is no eval, so it throws EvalError
+// #1066 rather than compiling the body (ecma3/FunctionObjects e15_3_1_1_2_rt
+// and friends). Both the call and construct forms land here.
 static Avm2Value function_construct(Avm2Context* ctx, Avm2Class* cls,
                                     const Avm2Value* args, uint32_t argc)
 {
-	(void) cls; (void) args; (void) argc;
+	(void) cls; (void) args;
+	if (argc > 0)
+	{
+		avm2_throw_error(ctx, ctx->builtins.eval_error_class,
+		                 "Error #1066: The form function('function body') "
+		                 "is not supported.");
+	}
 	Avm2MethodRef ref = { NULL, NULL, "Function", 0 };
 	return avm2_object_value(avm2_function_new(ctx, &ref, NULL, NULL,
 	                                           avm2_undefined(), false));
@@ -364,6 +387,11 @@ void avm2_register_function_builtins(Avm2Context* ctx)
 	// ES3-compat layer on Function.prototype (Ruffle globals/Function.as).
 	avm2_proto_add_function_n(ctx, cls->prototype_obj, "call", fn_call, 1);
 	avm2_proto_add_function_n(ctx, cls->prototype_obj, "apply", fn_apply, 2);
+	avm2_proto_add_function(ctx, cls->prototype_obj, "toString", fn_proto_to_string);
+	avm2_proto_add_function(ctx, cls->prototype_obj, "toLocaleString",
+	                        fn_proto_to_string);
+	// NOT valueOf: e15_3_4__1_rt asserts Function.prototype.valueOf really is
+	// Object.prototype.valueOf (identity, not just equivalent behavior).
 	// prototype is a getter/setter pair.
 	{
 		Avm2PropEntry e;

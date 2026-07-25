@@ -38,6 +38,9 @@ struct Avm2Context
 	// 0 Idle, 1 Enter, 2 Construct, 3 FrameScripts, 4 Exit.
 	uint8_t frame_phase;
 	uint32_t instance_counter;  // auto instance names ("instanceN")
+	// Opaque ids for "[object Function-N]" (Avm2Object.fn_tostring_id). Starts
+	// at 0 so the first id is 1 — 0 doubles as "not yet assigned".
+	uint32_t fn_tostring_next_id;
 	struct Avm2TryFrame* try_top;  // innermost exception frame (avm2_error.h)
 	uint8_t swf_version;  // for string_to_f64 bug compatibility
 	uint8_t bytearray_default_encoding;  // ByteArray.defaultObjectEncoding

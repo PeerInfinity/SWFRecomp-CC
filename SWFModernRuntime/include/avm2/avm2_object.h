@@ -110,6 +110,12 @@ struct Avm2Object
 	Avm2Class* fn_bound_class;
 	Avm2Object* fn_prototype; // lazily created `prototype` object
 	uint8_t fn_proto_nulled;  // prototype was explicitly set to null
+	// Object.prototype.toString on a function reports "[object Function-N]"
+	// (avmplus). N is an opaque per-function id, assigned lazily on first ask
+	// so the counter only advances for functions that are actually asked —
+	// keeping it out of the allocation path. Sits in the padding before
+	// class_ref: no field offset and no sizeof change.
+	uint32_t fn_tostring_id;
 
 	// AVM2_OBJ_CLASS payload.
 	Avm2Class* class_ref;

@@ -435,7 +435,18 @@ static Avm2Value object_proto_to_string(Avm2Activation* act)
 	else if (act->this_val.kind == AVM2_VALUE_OBJECT
 	         && act->this_val.u.obj->kind == AVM2_OBJ_FUNCTION)
 	{
-		snprintf(buf, sizeof(buf), "function Function() {}");
+		// avmplus tags each function with an opaque id here. The plain
+		// "function Function() {}" form belongs to Function.prototype's OWN
+		// toString (avm2_register_function_builtins), which shadows this for
+		// an ordinary `fn.toString()`; reaching this branch means
+		// Object.prototype.toString was called on a function deliberately.
+		Avm2Object* fn = act->this_val.u.obj;
+		if (fn->fn_tostring_id == 0)
+		{
+			fn->fn_tostring_id = ++ctx->fn_tostring_next_id;
+		}
+		snprintf(buf, sizeof(buf), "[object Function-%u]",
+		         (unsigned) fn->fn_tostring_id);
 	}
 	else if (act->this_val.kind == AVM2_VALUE_UNDEFINED
 	         || act->this_val.kind == AVM2_VALUE_NULL)
@@ -2143,6 +2154,38 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	}
 }
 
+// A class object's own `length` is its constructor's declared arity, per
+// ECMA-262 §15 (Object/Function/Array/String/Boolean/Number are all 1, Date
+// is 7, RegExp 2). Nothing derives it: builtin classes are registered with
+// native ctor hooks that take (args, argc) and carry no arity. So state it,
+// the same way Namespace/QName/XML/XMLList already state theirs
+// (avm2_nsqname.c, avm2_xml.c). dont-enum + read-only comes free from
+// add_static_const, which `for (p in Array)` and `delete Array.length`
+// both require.
+static void register_class_object_lengths(Avm2Context* ctx)
+{
+	Avm2Builtins* b = &ctx->builtins;
+	const struct { Avm2Class* cls; int32_t len; } lengths[] = {
+		{ b->object_class,   1 },
+		{ b->class_class,    1 },
+		{ b->function_class, 1 },
+		{ b->array_class,    1 },
+		{ b->string_class,   1 },
+		{ b->boolean_class,  1 },
+		{ b->number_class,   1 },
+		{ b->int_class,      1 },
+		{ b->uint_class,     1 },
+		{ b->regexp_class,   2 },
+		{ b->date_class,     7 },
+	};
+	for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++)
+	{
+		if (lengths[i].cls == NULL) continue;
+		avm2_builtin_add_static_const(ctx, lengths[i].cls, "length",
+		                              avm2_integer(lengths[i].len));
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
@@ -2294,4 +2337,6 @@ void avm2_globals_init(Avm2Context* ctx)
 	// and display (Sound.play returns a SoundChannel display-independent obj).
 	avm2_register_timer_class(ctx);
 	avm2_register_media(ctx);
+
+	register_class_object_lengths(ctx);
 }
