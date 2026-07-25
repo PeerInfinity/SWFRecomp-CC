@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-25T03:57:22.625196+00:00",
-    "old_git_sha": "c09985aa65ee99f8ca94242bfafa386ac2062d55",
-    "new_timestamp": "2026-07-25T04:33:02.479301+00:00",
-    "new_git_sha": "b46ac6ee92f233a581c41c1aec77e65cf8665f2d",
+    "old_timestamp": "2026-07-25T04:33:02.479301+00:00",
+    "old_git_sha": "b46ac6ee92f233a581c41c1aec77e65cf8665f2d",
+    "new_timestamp": "2026-07-25T19:28:36.516534+00:00",
+    "new_git_sha": "e4d1e78f665edbea778296f851fb073f260c893b",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 654,
     "old_total": 716,
     "old_pass_rate": 89.0,
-    "new_pass": 637,
+    "new_pass": 638,
     "new_ruffle_matched": 17,
-    "new_effective_pass": 654,
-    "new_total": 716,
+    "new_effective_pass": 655,
+    "new_total": 717,
     "new_pass_rate": 89.0,
     "old_mismatched_lines": 15348,
     "new_mismatched_lines": 15348,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 716,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "shared_object_serialize_typed_objects",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    }
+  ]
 }
