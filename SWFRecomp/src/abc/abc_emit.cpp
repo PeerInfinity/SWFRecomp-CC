@@ -2971,12 +2971,122 @@ namespace abc
 			}
 		}
 
+		// Big-literal collapse. An AS3 array/vector literal emits one
+		// `Dup / PushInt <index> / PushInt <value> / SetProperty` quad per
+		// element. as3/Vector/initializer_large_vector has 250,000 of them,
+		// which expands to a 2-million-line C function that makes gcc ICE
+		// (cc1 segfault) even at -O0 — there is no compiler-flag workaround.
+		// A run of consecutive-index writes of int constants through one
+		// multiname collapses to a static table plus a loop: same semantics,
+		// same order, ~1/60th the code. Generic AOT hygiene, not test-only —
+		// any content with a big literal table hits the same wall.
+		// DebugLine ops interleave inside the run and are skipped (they emit
+		// nothing). Bodies with an exception table are left alone: they need
+		// a per-op `_tf.op_index`, which a collapsed loop cannot carry.
+		struct LitRun { u32 mn; s32 base; size_t end; std::vector<s32> vals; };
+		std::map<size_t, LitRun> lit_runs;
+		std::vector<char> lit_skip(body.ir.ops.size(), 0);
+		if (!bc.has_exc)
+		{
+			const size_t kMinRun = 64;
+			const size_t n_ops = body.ir.ops.size();
+			auto nextReal = [&](size_t k)
+			{
+				while (k < n_ops && (body.ir.ops[k].op == IrOpcode::DebugLine
+				                     || body.ir.ops[k].op == IrOpcode::Nop))
+				{
+					k++;
+				}
+				return k;
+			};
+			size_t i = 0;
+			while (i < n_ops)
+			{
+				if (body.ir.ops[i].op != IrOpcode::Dup) { i++; continue; }
+				std::vector<s32> vals;
+				u32 mn = 0;
+				s32 base = 0;
+				size_t last_end = 0;
+				size_t p = i;
+				while (p < n_ops)
+				{
+					if (!vals.empty() && targets.count((u32) p)) break;
+					if (body.ir.ops[p].op != IrOpcode::Dup) break;
+					size_t q = nextReal(p + 1);
+					if (q >= n_ops || body.ir.ops[q].op != IrOpcode::PushInt) break;
+					size_t r = nextReal(q + 1);
+					if (r >= n_ops || body.ir.ops[r].op != IrOpcode::PushInt) break;
+					size_t s = nextReal(r + 1);
+					if (s >= n_ops) break;
+					const IrOp& so = body.ir.ops[s];
+					if (so.op != IrOpcode::SetPropertyFast
+					    && so.op != IrOpcode::SetPropertySlow) break;
+					if (mnLazyNs(abc, so.arg1)) break;
+					if (vals.empty()) { mn = so.arg1; base = body.ir.ops[q].imm; }
+					else if (so.arg1 != mn) break;
+					if (body.ir.ops[q].imm != base + (s32) vals.size()) break;
+					bool tgt = false;
+					for (size_t k = p + 1; k <= s; k++)
+					{
+						if (targets.count((u32) k)) { tgt = true; break; }
+					}
+					if (tgt) break;
+					vals.push_back(body.ir.ops[r].imm);
+					last_end = s;
+					p = nextReal(s + 1);
+				}
+				if (vals.size() >= kMinRun)
+				{
+					LitRun run;
+					run.mn = mn;
+					run.base = base;
+					run.end = last_end;
+					run.vals = vals;
+					lit_runs[i] = run;
+					for (size_t k = i + 1; k <= last_end; k++) lit_skip[k] = 1;
+					i = last_end + 1;
+					continue;
+				}
+				i++;
+			}
+		}
+
 		for (size_t i = 0; i < body.ir.ops.size(); i++)
 		{
+			if (lit_skip[i]) continue;
 			const IrOp& op = body.ir.ops[i];
 			if (targets.count((u32) i))
 			{
 				out << "op_" << i << ":;" << endl;
+			}
+			{
+				std::map<size_t, LitRun>::const_iterator lr = lit_runs.find(i);
+				if (lr != lit_runs.end())
+				{
+					const LitRun& run = lr->second;
+					const string sym = "__vlit" + to_string(method_index) + "_"
+					                   + to_string(i);
+					out << "\t// " << i << ".." << run.end << ": "
+					    << run.vals.size() << " consecutive index writes "
+					    << "(base " << run.base << ") collapsed into a table"
+					    << endl;
+					out << "\tstatic const int32_t " << sym << "[] = {";
+					for (size_t k = 0; k < run.vals.size(); k++)
+					{
+						if (k % 16 == 0) out << endl << "\t\t";
+						out << run.vals[k] << ",";
+					}
+					out << endl << "\t};" << endl
+					    << "\tfor (uint32_t __li = 0; __li < " << run.vals.size()
+					    << "u; __li++)" << endl
+					    << "\t{" << endl
+					    << "\t\tavm2_op_setproperty_dyn(act, stk[sp - 1], "
+					    << run.mn << ", avm2_integer(" << run.base
+					    << " + (int32_t) __li), avm2_integer(" << sym
+					    << "[__li]), " << (bc.interp_mode ? 1 : 0) << ");" << endl
+					    << "\t}" << endl;
+					continue;
+				}
 			}
 			string desc = sanitizeComment(formatIrOp(abc, op));
 			out << "\t// " << i << ": " << desc << endl;
