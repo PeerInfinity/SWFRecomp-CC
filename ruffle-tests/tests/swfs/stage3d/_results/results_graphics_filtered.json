@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-25T00:20:14.089339+00:00",
-    "git_sha": "da35e5d771bb457cc87e3c941cf7811657cb859a",
-    "duration_seconds": 33.23,
+    "timestamp": "2026-07-25T02:29:17.061368+00:00",
+    "git_sha": "8e8370df1193bf0a4c310fc5ab66e8a3cac852fd",
+    "duration_seconds": 37.1,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -24,7 +24,7 @@
       "test": "request_matching_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 3.933,
+        "compile": 4.235,
         "run": 0.165
       },
       "num_frames": 126,
@@ -34,7 +34,7 @@
         "expected_lines": 190,
         "matching_lines": 0
       },
-      "duration": 4.1,
+      "duration": 4.41,
       "status": "output_mismatch",
       "detail": "190 line(s) differ (actual=0, expected=190)",
       "actual_output": "",
@@ -44,7 +44,7 @@
       "test": "request_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.858,
+        "compile": 5.811,
         "run": 0.165
       },
       "num_frames": 12,
@@ -54,7 +54,7 @@
         "expected_lines": 16,
         "matching_lines": 0
       },
-      "duration": 6.03,
+      "duration": 5.99,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=0, expected=16)",
       "actual_output": "",
@@ -63,9 +63,9 @@
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.032,
-        "compile": 7.879,
-        "run": 0.266
+        "recomp": 0.034,
+        "compile": 7.985,
+        "run": 0.315
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
@@ -74,7 +74,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 8.41,
+      "duration": 8.59,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -94,8 +94,8 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.033,
-        "compile": 7.839,
+        "recomp": 0.032,
+        "compile": 8.032,
         "run": 0.315
       },
       "num_frames": 1,
@@ -105,7 +105,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.45,
+      "duration": 8.62,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -122,9 +122,9 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.015,
-        "compile": 5.582,
-        "run": 0.215
+        "recomp": 0.035,
+        "compile": 8.582,
+        "run": 0.315
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
@@ -133,7 +133,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 5.96,
+      "duration": 9.19,
       "image_comparisons": {
         "output": {
           "status": "fail",
