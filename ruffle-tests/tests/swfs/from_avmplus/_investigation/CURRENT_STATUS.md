@@ -83,21 +83,21 @@ gh workflow run ruffle-tests.yml --ref master \
 
 ## Baselines
 
-Import baseline `eabb3b366` and current `da35e5d77` — both complete
-(30/30 shards), graphics mode:
+Import baseline `eabb3b366` and current `8e8370df1` — both complete,
+graphics mode:
 
 | Area | at import | now | failing now |
 |---|---|---|---|
-| ecma3 | 402/800 | **701/800** | 99 |
+| ecma3 | 402/800 | **708/800** | 92 |
 | e4x | **2/177** | **160/177** | 17 |
-| as3 | 410/509 | **427/509** | 82 |
+| as3 | 410/509 | **457/509** | 52 |
 | mops | 0/13 | 0/13 | 13 |
-| regress | 43/55 | 43/55 | 12 |
+| regress | 43/55 | **47/55** | 8 |
 | recursion | 1/6 | 1/6 | 5 |
 | misc | 13/14 | 13/14 | 1 |
-| **total** | **871/1574** | **1345/1574** | **229** |
+| **total** | **871/1574** | **1386/1574** | **188** |
 
-Status breakdown of the 229: 207 output_mismatch, 16 runtime_error,
+Status breakdown of the 188: 166 output_mismatch, 16 runtime_error,
 3 timeout, 2 segfault, 1 compile_fail.
 
 `ecma3/Unicode` is now **107/108**. The single holdout is `utf8count` —
@@ -111,23 +111,23 @@ Top feature areas by failing count (auto-generated in
 
 | Failing | Area | Root cause |
 |---|---|---|
-| 29/55 | `as3/Types` | `Number` static math (API 680) missing |
-| 15/60 | `as3/Vector` | assorted |
-| 15/21 | `ecma3/FunctionObjects` | `Function.prototype.*` / `.length` |
-| 15/53 | `ecma3/Number` | `toString` rounding |
-| 14/51 | `as3/RuntimeErrors` | error-message wording |
+| 15/21 | `ecma3/FunctionObjects` | `[object Function]` + `Function('body')` + class-object `.length` |
+| 15/53 | `ecma3/Number` | **10 = static consts are writable** (next arc); rest is `toString` rounding |
+| 14/51 | `as3/RuntimeErrors` | error-message wording (namespace-qualified names) |
+| 14/60 | `as3/Vector` | assorted |
 | 13/13 | `mops` | Alchemy `li*`/`si*` domainMemory opcodes |
 | 10/83 | `ecma3/String` | `[object Function]` classification residue |
 | 9/46 | `ecma3/Exceptions` | assorted |
-| 8/21 | `ecma3/GlobalObject` | `encodeURI`/`decodeURI` family missing |
 | 8/27 | `ecma3/ObjectObjects` | `[object Function]` classification |
 | 7/212 | `as3/Definitions` | error-message wording |
-| 7/51 | `ecma3/Array` | assorted |
+| 7/51 | `ecma3/Array` | assorted; 2 need sealed prototypes (`#1037`) |
 | 6/29 | `ecma3/Boolean` | assorted |
+| 6/12 | `ecma3/JSON` | lexer whitespace handling |
+| 5/5 | `as3/ByteArray` | LZMA compress/decompress |
 | 17/177 | `e4x` (all dirs) | residue after the `#2023` fix |
 
-`ecma3/Date` is now **152/153** and `ecma3/Unicode` **107/108**; both have
-dropped off this table.
+`ecma3/Date` (152/153), `ecma3/Unicode` (107/108), `as3/Types` (**55/55**)
+and `ecma3/GlobalObject` (**20/21**) have all dropped off this table.
 
 ## The "empty output" pattern — SOLVED (it is not one bug)
 
@@ -150,10 +150,15 @@ The causes are distinct, per-builtin, and each is a separate arc:
 |---|---|---|
 | `TypeError #1006: getTimezoneOffset/setTime is not a function` | `Date` methods | ~151 (`ecma3/Date`) |
 | `TypeError #1010: … (accessing field: length)` on `X.prototype.m.length` | ES3 methods on builtin `.prototype` objects | ~35 (`ecma3/String`, `Array`, `FunctionObjects`, `Boolean`, `ObjectObjects`, `Number`) |
-| `TypeError #1006: abs/sin/… is not a function` | `Number` static math (API 680) | 21 (`as3/Types/Number`) |
-| `ReferenceError #1065: Variable encodeURI/decodeURI/decodeURIComponent is not defined` | global URI functions | ~6 (`ecma3/GlobalObject`, `regress`) |
-| `ReferenceError #1065: Variable Capabilities is not defined` | `flash.system.Capabilities` | 2 (`as3/Vector/nonindexproperty`) |
-| `ArgumentError #1063: Argument count mismatch on Test()` | root SymbolClass linking | 175 (all of `e4x`) — **FIXED** |
+| `TypeError #1006: abs/sin/… is not a function` | `Number` static math (API 680) | 21 (`as3/Types/Number`) — **FIXED** `8e8370df1` |
+| `ReferenceError #1065: Variable encodeURI/decodeURI/decodeURIComponent is not defined` | global URI functions | ~6 (`ecma3/GlobalObject`, `regress`) — **FIXED** `8e8370df1` |
+| `ReferenceError #1065: Variable Capabilities is not defined` | `flash.system.Capabilities` | 5 — **FIXED** `8e8370df1` (3 flipped; 2 now run and fail on real assertions) |
+| `ArgumentError #1063: Argument count mismatch on Test()` | root SymbolClass linking | 175 (all of `e4x`) — **FIXED** `d36c8da2b` |
+
+**All six rows are now fixed**, which is why the uncaught-error histogram is
+down to 12 tests. The blanking mechanism described above still applies to any
+*future* missing builtin — it is why a single gap costs a whole directory —
+but it no longer describes the current failure set.
 
 **Caveat on the seed list.** `BASELINE_SEED_2026-07-24.md` classified
 "empty actual" as `actual_lines <= 1`, which also swept up genuine
@@ -477,14 +482,38 @@ Number.MAX_VALUE = 0            expected ReferenceError #1074, got no error
 delete( Number.MAX_VALUE )      expected false, got true
 ```
 
-That is **12 of the 15 `ecma3/Number` tests still failing**
-(`e15_7_3_1_1` … `e15_7_3_6_3_rt`, plus `e15_7_3` which also wants the
-class object's own `.length`). The fix is the one already used for the
-eight new `Number` constants — a getter-only static trait — generalised
-into `avm2_builtin_add_static_const` itself. It is deliberately **not**
-in `8e8370df1`: that helper is used by every builtin class in the runtime,
-so it wants its own CI cycle with clean attribution rather than being
-folded into a run that had to be read for regressions.
+Mapping each failing test to the property it pins gives an **exact 10**,
+the five value constants × {DontDelete, ReadOnly}:
+
+| Constant | `delete` → false | `= 0` → `#1074` |
+|---|---|---|
+| `MAX_VALUE` | `e15_7_3_2_2` | `e15_7_3_2_3` |
+| `MIN_VALUE` | `e15_7_3_3_2` | `e15_7_3_3_3` |
+| `NaN` | `e15_7_3_4_2` | `e15_7_3_4_3` |
+| `NEGATIVE_INFINITY` | `e15_7_3_5_2` | `e15_7_3_5_3_rt` |
+| `POSITIVE_INFINITY` | `e15_7_3_6_2` | `e15_7_3_6_3_rt` |
+
+Two neighbours look like part of it and are **not**: `e15_7_3_1_1`
+(`delete(Number.prototype)` → false) is a different bug — `prototype` is an
+instance getter on `class_class`, but `deleteproperty_common` searches
+`obj->vtable`, which for a class object is its *static* vtable, so the
+trait is never found and delete reports true. And `e15_7_3` wants the class
+object's own `.length`, which belongs to the `FunctionObjects` arc. The
+remaining three (`e15_7_4_2_2_rt`, `e15_7_4_2_4`, `toLocaleString_rt`) are
+double→string formatting, already in Polish.
+
+**Design note.** The obvious fix — reuse the getter-only static trait from
+the eight new `Number` constants — does not generalise: a getter cannot
+capture a per-constant value without one function apiece, and there are
+**91 `add_static_const` call sites across 10 files**. Prefer a `read_only`
+flag on `Avm2DynProp` honoured by `setproperty_impl`'s
+`r->dyn != NULL && r->proto_holder == NULL` branch and by
+`avm2_object_delete_dynamic`. That is contained, fixes all 91 sites at
+once, and touches none of the vtable machinery.
+
+Deliberately **not** in `8e8370df1`: the helper is used by every builtin
+class in the runtime, so it wants its own CI cycle with clean attribution
+rather than being folded into a run that had to be read for regressions.
 
 ### Known residue: `avm2/encode_uri_surrogate_pair_invalid` is a `utf8count` clone
 
@@ -542,11 +571,11 @@ being the primary ranking instrument — what remains is line-level polish,
 which the "Likely Fixable" table in `FAILING_TESTS_BY_FEATURE.md` ranks
 instead. With that batch landed, the ranking is:
 
-1. **Static consts must be read-only** — ~12 tests, all in `ecma3/Number`.
-   See the section above; it is the same getter-only-static-trait change
-   already proven on the eight new `Number` constants, generalised into
-   `avm2_builtin_add_static_const`. Highest remaining yield here and
-   mechanically small, but corpus-wide blast radius.
+1. **Static consts must be read-only** — **10** tests, all in
+   `ecma3/Number` (exact list in the section above), plus 1 adjacent
+   (`delete(Number.prototype)`, a different one-line fix). Highest
+   remaining yield here and mechanically small, but 91 call sites across
+   10 files, so give it its own CI cycle.
 2. **`[object Function]` classification** + `Function('body')` →
    `EvalError #1066` + class-object `.length` — ~15
    (`ecma3/FunctionObjects` 6/21, and the classification item recurs in

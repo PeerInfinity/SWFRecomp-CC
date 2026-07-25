@@ -470,7 +470,7 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | prototype toString/valueOf self-coercion guard | **7** | tiny | **DONE `17c19040c`** — fixes a crash `d90353066` introduced |
 | ~~—~~ | `Date` class (ECMA-262 §15.9) | **173** (pred. 173) | large | **DONE `da35e5d77`** |
 | ~~—~~ | `Number` static math + URI functions + `Capabilities` | **46** (pred. ~35) | small | **DONE `8e8370df1`** |
-| 1 | Static consts must be read-only (`#1074` + DontDelete) | ~12 | small | all in `ecma3/Number`; see below |
+| 1 | Static consts must be read-only (`#1074` + DontDelete) | **10** | small | all in `ecma3/Number`; 91 call sites; see below |
 | 2 | `[object Function]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | ~15 (`ecma3/FunctionObjects` 6/21) | small | see Polish |
 | 3 | Sealed builtin prototypes (`#1037`) | 3 | small | 2 Array + `ecma3/Date/e15_9_5`; changes how builtin prototype objects are built |
 
@@ -478,11 +478,18 @@ essentially in full; 2/177 was one linking bug, not missing features.
 `avm2_builtin_add_static_const` installs a dont-enum **dynamic** property
 on the class object, but AS3 `public static const` is read-only and
 non-deletable. So `Number.MAX_VALUE = 0` silently succeeds and
-`delete Number.MAX_VALUE` returns true, where both must fail. That is **12
-of the 15 `ecma3/Number` tests still failing** (`e15_7_3_1_1` …
-`e15_7_3_6_3_rt`). The fix is the getter-only static trait already proven
-on the eight new `Number` constants, generalised into the helper — small
-in code, but it touches every builtin class, so give it its own CI cycle.
+`delete Number.MAX_VALUE` returns true, where both must fail. Mapping each
+failing test to the property it pins gives an **exact 10** — the five value
+constants (`MAX_VALUE`, `MIN_VALUE`, `NaN`, `POSITIVE_INFINITY`,
+`NEGATIVE_INFINITY`) × {DontDelete, ReadOnly}, i.e. `e15_7_3_2_2` through
+`e15_7_3_6_3_rt`.
+
+Do **not** generalise the getter-only static trait used for the eight new
+`Number` constants: a getter cannot carry a per-constant value without one
+function apiece, and there are **91 `add_static_const` call sites across 10
+files**. A `read_only` flag on `Avm2DynProp`, honoured by `setproperty_impl`
+and `avm2_object_delete_dynamic`, fixes all 91 at once and touches no vtable
+machinery. Small in code, but it touches every builtin class — own CI cycle.
 
 from_avmplus stands at **1386/1574 (88.1%)** and the corpus at
 **3688/4414 (83.6%)** — the batch was projected to reach ~88% and ~83.3%,
