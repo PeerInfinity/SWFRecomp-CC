@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-25T02:29:17.100613+00:00",
-    "git_sha": "8e8370df1193bf0a4c310fc5ab66e8a3cac852fd",
-    "duration_seconds": 131.41,
+    "timestamp": "2026-07-25T03:57:22.755018+00:00",
+    "git_sha": "c09985aa65ee99f8ca94242bfafa386ac2062d55",
+    "duration_seconds": 131.92,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30
@@ -19,8 +19,8 @@
     {
       "test": "TextFieldTest",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.465,
+        "recomp": 0.006,
+        "compile": 0.578,
         "run": 0.215
       },
       "num_frames": 30,
@@ -29,7 +29,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 0.69,
+      "duration": 0.81,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -39,8 +39,8 @@
       "test": "enum",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.779,
-        "run": 0.266
+        "compile": 20.273,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -48,14 +48,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 22.05,
+      "duration": 20.49,
       "status": "pass"
     },
     {
       "test": "exception",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.194,
+        "compile": 23.538,
         "run": 0.265
       },
       "num_frames": 30,
@@ -64,15 +64,15 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 21.47,
+      "duration": 23.81,
       "status": "pass"
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.93,
-        "run": 0.265
+        "compile": 21.601,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -80,15 +80,15 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 21.2,
+      "duration": 21.82,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.912,
-        "run": 0.265
+        "compile": 15.871,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -96,15 +96,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 23.19,
+      "duration": 16.09,
       "status": "pass"
     },
     {
       "test": "implementsOpTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.324,
-        "run": 0.265
+        "compile": 20.667,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -112,15 +112,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 21.6,
+      "duration": 20.89,
       "status": "pass"
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 13.133,
-        "run": 0.164
+        "compile": 20.04,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -128,14 +128,14 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 13.3,
+      "duration": 20.26,
       "status": "pass"
     },
     {
       "test": "levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.224,
+        "compile": 4.238,
         "run": 0.265
       },
       "num_frames": 30,
@@ -144,7 +144,7 @@
         "expected_lines": 68,
         "matching_lines": 49
       },
-      "duration": 4.5,
+      "duration": 4.51,
       "ruffle_diff_count": 21,
       "ours_diff_count": 19,
       "status": "ruffle_matched",
@@ -154,8 +154,8 @@
       "test": "super_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.615,
-        "run": 0.266
+        "compile": 2.475,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -163,7 +163,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 2.89,
+      "duration": 2.7,
       "status": "pass"
     }
   ]
