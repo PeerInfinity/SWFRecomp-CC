@@ -26,20 +26,20 @@ including the 50 named `avm1/*`. The correct corpus denominator is
 **4414**, and it is what this document uses from here on. Sum over
 top-level leaf suites only; do not add nested `_results` dirs.
 
-Full corpus, graphics mode at **`da35e5d77`**: **3642/4414 effective
-(82.5%)**, 772 failing — from CI run `30134726316`, complete at 30/30
-shards, so this figure needs no intersection arithmetic.
+Full corpus, graphics mode at **`8e8370df1`**: **3688/4414 effective
+(83.6%)**, 726 failing — from CI run `30139492178`, complete over the full
+4414-test intersection, so this figure needs no shard arithmetic.
 
-Status histogram vs the previous complete run (`14b57c476` at
-`d90353066`), over all 4414: pass **3241 → 3407**, ruffle_matched
-**221 → 235**, output_mismatch **908 → 742**, segfault **17 → 3**,
-runtime_error flat at **21**, timeout flat at **4**, and **zero pass→fail
-regressions**.
+Status histogram vs the previous complete run (`30134726316` at
+`da35e5d77`), over all 4414: pass **3407 → 3452**, ruffle_matched
+**235 → 236**, output_mismatch **742 → 696**, and segfault (3),
+runtime_error (21), timeout (4) and compile_fail (1) all flat, with **zero
+pass→fail regressions**.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | **1345/1574** | 85.5 | 229 | **language + builtins** (Tamarin acceptance) |
-| avm2 | 861/1217 | 70.7 | 356 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
+| from_avmplus | **1386/1574** | 88.1 | 188 | **language + builtins** (Tamarin acceptance) |
+| avm2 | 866/1217 | 71.2 | 351 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 654/716 | 91.3 | 62 | long tail |
 | from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
 | from_gnash (5) | 371/403 | 92.1 | 32 | long tail |
@@ -243,23 +243,39 @@ returns 0 where 2 is expected (`ecma3/GlobalObject/e15_1_2_2_1`), and every
 `X.prototype.m.length` assertion depends on it. Declared arity must be
 carried on builtin function objects.
 
-### 4. `Number` static math (API 680) — 21 tests · SMALL arc
+### 4. ~~`Number` static math (API 680)~~ — **DONE (`8e8370df1`, +27)** · SMALL
 
-`as3/Types/Number/{abs,acos,asin,atan,atan2,ceil,cos,exp,floor,log,max,min,
-pow,random,round,sin,sqrt,tan,e,ln2,ln10,log2e,log10e,pi,sqrt1_2,sqrt2}` —
-21 failing, all blanked by `TypeError #1006: abs is not a function`.
+Predicted 21, delivered **27**: `as3/Types/Number` **3/30 → 30/30**. The
+histogram counted only the 21 blanked by `TypeError #1006`; the eight
+constant tests and `visibility/v16` failed on ordinary line mismatches, so
+they never showed up there but fell out of the same fix. **When an arc
+registers a whole API surface, treat the blanked count as a floor.**
 
-These are real Flash Player members (Ruffle: `globals/Number.as`,
-`[API("680")]`), essentially `Math` re-exported on `Number` with
-`ArgumentError #1063` on missing args. Mechanical.
+Not an alias for `Math`, as predicted — and two further shape items the
+map had not anticipated. The eight constants must be **read-only,
+DontDelete and DontEnum** (`Number.E = 0` → `ReferenceError #1074`), which
+`avm2_builtin_add_static_const` cannot do; they are getter-only static
+traits instead. And the whole surface is **SWF16-gated** —
+`as3/Types/Number/visibility/v15` asserts every member is still
+`undefined` for SWF15 content, so registering them ungated would have
+turned a *passing* test red.
 
-### 5. Global URI functions — ~9 tests · SMALL arc
+### 5. ~~Global URI functions~~ — **DONE (`8e8370df1`, +11 + 5)** · SMALL
 
-`encodeURI`, `decodeURI`, `encodeURIComponent`, `decodeURIComponent` are
-undefined (`ReferenceError #1065`): ~6 in from_avmplus
-(`ecma3/GlobalObject`, `regress/bug_538107`) plus `decode_uri`,
-`encode_uri_surrogate_pair_invalid`, `encode_uri_surrogate_pair_swf11` in
-the avm2 suite.
+Predicted ~9, delivered **11 in from_avmplus and 5 in the avm2 suite**.
+The four functions themselves were mechanical (ECMA-262 §15.1.3 over the
+UTF-8 bytes our strings already are). The extra yield came from `escape`
+and `unescape`, which turned out to belong to this arc: **`escape` encodes
+by UTF-16 code unit, not UTF-8 byte** (`escape("😭")` is `%uD83D%uDE2D`),
+and `unescape` has to re-pair those halves and must reject `%U`. That
+fixed `ecma3/GlobalObject/e15_1_2_4` and `e15_1_2_5_1` (the latter had been
+stuck at 530/531) plus the avm2 suite's `escape` and `unescape`.
+
+`encode_uri_surrogate_pair_invalid` did **not** flip and is not part of
+this arc: it needs `encodeURI` to throw on an unpaired surrogate, but
+`String.fromCharCode(0xDC00)` collapses to U+FFFD before `encodeURI` sees
+it. Same root cause as `utf8count` (arc 2) — it moves when the
+representation does.
 
 ### 6. `mops` / Alchemy domainMemory — 13 tests · MEDIUM arc
 
@@ -269,11 +285,21 @@ memory opcodes over `ApplicationDomain.domainMemory`; the avm2 suite's
 `domain_memory` test is the same gap. Self-contained, but it is real
 runtime work (a ByteArray-backed memory window plus 12 opcodes).
 
-### 7. `flash.system.Capabilities` — 2 tests · TRIVIAL
+### 7. ~~`flash.system.Capabilities`~~ — **DONE (`8e8370df1`, +3 + 1)** · TRIVIAL
 
-`as3/Vector/nonindexproperty/{v10,v11}` die on
-`ReferenceError #1065: Variable Capabilities is not defined`. Also unblocks
-`capabilities_resolution` in the avm2 suite.
+The five blanked tests all only read `Capabilities.playerType` and branch
+on it being `'AVMPlus'` (the Tamarin shell), so the class merely had to
+exist and not claim to be the shell. **Three of the five flipped**;
+`as3/Vector/nonindexproperty/v10` and
+`as3/RuntimeErrors/Error1115NotAConstructor/v10` now *run* but fail on
+their real assertions (`RangeError #1125` vs our `ReferenceError`, and
+`TypeError #1115` vs `#1007`) — unblocking is not the same as passing, and
+the error-signature histogram cannot tell you which you will get.
+
+`capabilities_resolution` in the avm2 suite also passes: it needed
+`screenResolutionX/Y` = viewport ÷ HiDPI scale factor, so
+`verify_output.py` now passes `-DVIEWPORT_SCALE_FACTOR` alongside the
+viewport dimensions it already defined.
 
 ### 8. Dual-VM movies (AVM1 ↔ AVM2 in one player) — 8 tests · LARGE arc
 
@@ -356,6 +382,22 @@ from_shumway's 58: 16 fuzz corpus, 9 `timeline/nav`, 9 `as3-loader`,
 
 ## Landed
 
+**`8e8370df1` — the cleanup batch (arcs 4, 5 and 7 above).**
+
+CI `30139492178` (graphics, `categories=full`, complete 4414-test
+intersection): **+41 from_avmplus, +5 avm2 = +46, zero regressions** and no
+movement in `segfault` / `timeout` / `runtime_error`. from_avmplus
+**1345 → 1386 (88.1%)**; corpus **3642 → 3688 (83.6%)**.
+
+Where the 46 landed: `as3/Types/Number` **27**,
+`ecma3/GlobalObject` **7**, `regress` **4**, `as3/Statements` **2**,
+`as3/Vector` **1**, avm2 suite **5** (`escape`, `unescape`, `decode_uri`,
+`encode_uri_surrogate_pair_swf11`, `capabilities_resolution`). The two
+`as3/Statements/Exceptions` tests were unpredicted — both were catching a
+`URIError` that had never existed.
+
+**`da35e5d77` — the full `Date` class (arc 1 above).**
+
 **`17c19040c` — guard prototype `toString`/`valueOf` against self-coercion.**
 
 `d90353066` reused the class-method impls on the prototypes; those coerce
@@ -427,36 +469,45 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | ES3 `.prototype` surface + `Function.length` | **36** (pred. ~35) | medium | **DONE `d90353066`** |
 | ~~—~~ | prototype toString/valueOf self-coercion guard | **7** | tiny | **DONE `17c19040c`** — fixes a crash `d90353066` introduced |
 | ~~—~~ | `Date` class (ECMA-262 §15.9) | **173** (pred. 173) | large | **DONE `da35e5d77`** |
-| 1 | `Number` static math (API 680) | 21 | small | mechanical, but see the shape note below |
+| ~~—~~ | `Number` static math + URI functions + `Capabilities` | **46** (pred. ~35) | small | **DONE `8e8370df1`** |
+| 1 | Static consts must be read-only (`#1074` + DontDelete) | ~12 | small | all in `ecma3/Number`; see below |
 | 2 | `[object Function]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | ~15 (`ecma3/FunctionObjects` 6/21) | small | see Polish |
-| 3 | Global URI functions | ~9 | small | mechanical |
-| 4 | `flash.system.Capabilities` | 5 | trivial | mechanical |
-| 5 | Sealed builtin prototypes (`#1037`) | 3 | small | 2 Array + `ecma3/Date/e15_9_5`; changes how builtin prototype objects are built |
+| 3 | Sealed builtin prototypes (`#1037`) | 3 | small | 2 Array + `ecma3/Date/e15_9_5`; changes how builtin prototype objects are built |
 
-**Date is done and the eager-driver blanking is largely drained**: only
-**44** from_avmplus tests still die on an uncaught error, down from ~200.
-That makes the remaining ranking unusually reliable — it is read straight
-off the histogram rather than estimated.
+**New #1, found while doing the cleanup batch.**
+`avm2_builtin_add_static_const` installs a dont-enum **dynamic** property
+on the class object, but AS3 `public static const` is read-only and
+non-deletable. So `Number.MAX_VALUE = 0` silently succeeds and
+`delete Number.MAX_VALUE` returns true, where both must fail. That is **12
+of the 15 `ecma3/Number` tests still failing** (`e15_7_3_1_1` …
+`e15_7_3_6_3_rt`). The fix is the getter-only static trait already proven
+on the eight new `Number` constants, generalised into the helper — small
+in code, but it touches every builtin class, so give it its own CI cycle.
 
-**`Number` static math is not a plain `Math` alias.** `as3/Types/Number`
-asserts `getQualifiedClassName(Number.abs(1)) == "int"` while
-`Number.abs(3.14) == "Number"`, requires `ArgumentError #1063` on a no-arg
-call, and pins each method's `.length`. Budget for that, not for 19
-one-line forwarders.
+from_avmplus stands at **1386/1574 (88.1%)** and the corpus at
+**3688/4414 (83.6%)** — the batch was projected to reach ~88% and ~83.3%,
+and landed slightly ahead of both.
 
-from_avmplus stands at **1345/1574 (85.5%)**. The cheap cleanup batch
-(`Number` static math + URI functions + `Capabilities` ≈ 35 tests) should
-take it to roughly **1380/1574 (88%)** and the corpus to about **83.3%**.
+**Calibration note after four predicted arcs.** The error-signature
+histogram has now been right on `Date` (exactly 171 + 2) and *low* on this
+batch (35 predicted, 46 delivered). Its systematic bias is understood:
+it counts only tests killed by an uncaught error, so it **undercounts**
+whenever an arc registers a whole API surface — sibling tests failing on
+ordinary line mismatches come along for free. It also cannot tell
+"unblocked" from "passing": two `Capabilities` tests started running and
+still failed. Read it as a floor on yield and a ceiling on confidence.
 
-**Re-rank from the error table, not from first principles.** Every result
-now carries `error_signature`; `generate_failing_by_feature.py` emits a
+**The error table has done its job and is now nearly empty.** Every result
+carries `error_signature`, and `generate_failing_by_feature.py` emits a
 "Failing Tests by Uncaught Error" histogram
-(`from_avmplus/_investigation/FAILING_TESTS_BY_FEATURE.md`). It already
-corrected two estimates in this document — `Capabilities` is 5 tests, not
-2, and Date is ~166, not ~155 (finally 173, exactly as the histogram said
-once `error_signature` existed) — and surfaced small items nobody had
-listed (`#1037 Cannot assign to a method toString on Array`, undefined
-`AS3` and `isXMLName`, each 1–2 tests).
+(`from_avmplus/_investigation/FAILING_TESTS_BY_FEATURE.md`). It corrected
+several estimates in this document — `Capabilities` is 5 tests, not 2, and
+Date is ~166, not ~155 (finally 173, exactly as it said) — and surfaced
+small items nobody had listed. As of `8e8370df1` it is down to **12 tests
+across 11 distinct errors**, from ~200 at import and 44 before the cleanup
+batch. **Rank the remaining work off the "Likely Fixable" line-match table
+in the same document instead** — what is left is polish, not blanking, and
+a histogram of uncaught errors can no longer see it.
 
 Regression-guard every one of these with
 `gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f categories=full`

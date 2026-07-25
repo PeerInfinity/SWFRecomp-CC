@@ -1,11 +1,11 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-25 — **Date arc landed, CI-confirmed**. The
+Last updated: 2026-07-25 — **cleanup batch landed, CI-confirmed**. The
 Adobe Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`:
 **871/1574 effective (55.3%)**, identical in graphics and no-graphics.
 
-Four fixes have landed since:
+Six fixes have landed since:
 
 1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
    `#2023`. e4x **2/177 → 160/177**.
@@ -20,9 +20,12 @@ Four fixes have landed since:
 5. `da35e5d77` — the full `Date` class (below). **+171** here (+2 in the
    avm2 suite), `ecma3/Date` **2/153 → 152/153**, CI `30134726316`
    (30/30 shards).
+6. `8e8370df1` — the cleanup batch: `Number` static math, the global URI
+   functions, `flash.system.Capabilities` (below). **+41** here (+5 in the
+   avm2 suite), CI `30139492178` (full 4414-test intersection).
 
-The suite stands at **1345/1574 effective (85.5%)**; the corpus at
-**3642/4414 (82.5%)**. **Zero pass→fail regressions across all four runs.**
+The suite stands at **1386/1574 effective (88.1%)**; the corpus at
+**3688/4414 (83.6%)**. **Zero pass→fail regressions across all six runs.**
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
 file reads 1143/1522 — 52 from_avmplus tests ungraded. 1174 = the
@@ -373,7 +376,127 @@ Four things worth remembering:
 `getYear`/`setYear` are deliberately absent: `ecma3/Expressions/e11_2_1_1`
 asserts `typeof Date.prototype.getYear == "undefined"`.
 
-### Known residue: `ecma3/Date/e15_9_5` needs sealed builtin prototypes
+### Fix landed: the cleanup batch (`8e8370df1`)
+
+Three small arcs in one commit. **CI `30139492178` (graphics,
+`categories=full`, complete 4414-test intersection): +41 here, +5 in the
+avm2 suite, zero pass→fail regressions and zero movement in
+`segfault`/`timeout`/`runtime_error`.** The map predicted ~35 total; the
+delivered 46 beat it for two reasons worth remembering.
+
+**`Number` static math (API 680) — 27, not the predicted 21.**
+`as3/Types/Number` went **3/30 → 30/30**. The histogram only counted the
+21 tests blanked by `TypeError #1006`; the other six were the *constant*
+tests (`e`, `pi`, `ln2`, …) plus `visibility/v16`, which failed on
+ordinary line mismatches and so never appeared in the uncaught-error
+table. **When an arc registers a whole API surface, the blanked count is a
+floor, not an estimate** — sibling tests in the same directory that fail
+for adjacent reasons come along with it.
+
+Three shape notes, none of which is "alias `Math`":
+
+- **Arity is declared and enforced.** A count mismatch throws
+  `ArgumentError #1063` (`Number.abs()` with no args, and also
+  `Number.random(12)` with too *many*), and `Number.abs.length` must
+  report 1. Natives had no way to carry that, so
+  `avm2_builtin_add_static_method_n` now sets `param_count` — the static
+  counterpart of what `d90353066` added for prototype functions. Arities
+  come from the corpus: 1 for the trig/rounding family, 2 for
+  `atan2`/`pow`/`max`/`min`, 0 for `random`. `max`/`min` are variadic
+  despite the declared 2 (`visibility/v16` calls both with no arguments).
+- **The eight constants are getter-only static traits, not
+  `avm2_builtin_add_static_const`.** `as3/Types/Number/e` asserts all four
+  of read-only (`Number.E = 0` → `ReferenceError #1074`), DontDelete,
+  DontEnum and the value. `add_static_const` installs a dont-enum
+  *dynamic* property, which is writable and deletable — see the follow-on
+  arc below, where that same gap is worth ~12 more tests.
+- **SWF16 gate.** `as3/Types/Number/visibility/v15` asserts every one of
+  these is still `undefined` for SWF15 content and passes *today* for the
+  wrong reason (they don't exist at all). Registering them ungated would
+  have turned a passing test red. `ctx->swf_version` is set immediately
+  before `avm2_globals_init`, so the gate is just an `if` at registration.
+
+Integral results needed no work: `getQualifiedClassName` already maps an
+integral double to `"int"`, which is what `Number.abs(1)` → `"int"` /
+`Number.abs(3.14)` → `"Number"` is really testing.
+
+**The URI arc is an `escape` arc too.** The four new functions
+(`encodeURI`, `encodeURIComponent`, `decodeURI`, `decodeURIComponent`,
+ECMA-262 §15.1.3) are a straight transform over the UTF-8 bytes our
+strings already are. But probing them surfaced two real `escape`/`unescape`
+bugs, and fixing those is where four of the extra tests came from
+(`ecma3/GlobalObject/e15_1_2_4`, `e15_1_2_5_1` — which had been sitting at
+**530/531** — and the avm2 suite's `escape` and `unescape`):
+
+- **`escape` works on UTF-16 code units, not UTF-8 bytes.** `%XX` below
+  U+0100 and `%uXXXX` above, so an astral character comes out as its two
+  surrogate halves: `escape("😭")` is `%uD83D%uDE2D`, not the four
+  percent-encoded UTF-8 bytes we used to emit. `encodeURI` is the opposite
+  — byte-based — so the two cannot share a code path.
+- **`unescape` must re-pair those halves**, or `unescape(escape(x))` is
+  not the identity for astral input (each half alone becomes U+FFFD). It
+  must also *not* accept `%U` — the avm2 suite pins
+  `unescape("%U3333") === "%U3333"`, and we were decoding it.
+- All five natives return the string `"undefined"` for a no-arg call and
+  `"null"` for an explicit `undefined` — the AS3 `String`-typed parameter
+  coerces `undefined` to null, which then stringifies.
+
+One deliberate spec divergence: ECMA-262 throws `URIError` on a decoded
+surrogate, and **Flash does not**. `regress/bug_538107` exists precisely
+to pin that (`"%ED%B0%80%ED%A0%80"` must decode to a 2-unit string, not
+raise), so decoded surrogates become U+FFFD instead.
+
+**`Capabilities` was 5 tests for a class nobody reads.** Every one of the
+five only does `var playerType:String = Capabilities.playerType` and
+branches on it being `'AVMPlus'` — the Tamarin *shell* — so all that
+mattered was that the class exist and not claim to be the shell. Values
+mirror Ruffle's fixed "Flash Player on Windows" profile. Two details did
+matter: the class is abstract (`new Capabilities()` throws `#2012`, which
+`abstract_classes` enumerates), and `screenResolutionX/Y` are the viewport
+divided by the HiDPI scale factor, so `verify_output.py` now passes
+`-DVIEWPORT_SCALE_FACTOR` next to the viewport dimensions it already
+defined — that is what makes the avm2 suite's `capabilities_resolution`
+land on 1536×864 rather than by luck.
+
+Two unpredicted bonuses came from tests that merely *used* a URI function
+en route to something else: `as3/Statements/Exceptions/MultipleCatchBlocksURI`
+and `TryCatchBlockUserWithBuiltInExceptions` (the latter was the
+`Variable e is not defined` entry in the uncaught-error table — it was
+catching a `URIError` that never existed).
+
+### Next arc, discovered here: static consts are writable (~12 tests)
+
+`avm2_builtin_add_static_const` installs a **dont-enum dynamic property**
+on the class object. AS3 `public static const` is read-only and
+non-deletable, so every constant registered through it fails three
+assertions that `ecma3/Number` makes on each of `MAX_VALUE`, `MIN_VALUE`,
+`NaN`, `POSITIVE_INFINITY`, `NEGATIVE_INFINITY` and `prototype`:
+
+```
+Number.MAX_VALUE = 0            expected ReferenceError #1074, got no error
+delete( Number.MAX_VALUE )      expected false, got true
+```
+
+That is **12 of the 15 `ecma3/Number` tests still failing**
+(`e15_7_3_1_1` … `e15_7_3_6_3_rt`, plus `e15_7_3` which also wants the
+class object's own `.length`). The fix is the one already used for the
+eight new `Number` constants — a getter-only static trait — generalised
+into `avm2_builtin_add_static_const` itself. It is deliberately **not**
+in `8e8370df1`: that helper is used by every builtin class in the runtime,
+so it wants its own CI cycle with clean attribution rather than being
+folded into a run that had to be read for regressions.
+
+### Known residue: `avm2/encode_uri_surrogate_pair_invalid` is a `utf8count` clone
+
+The one URI test that did not flip, and it is not fixable in this arc. It
+calls `String.fromCharCode(0xDC00)` and expects `encodeURI` to throw
+`URIError`. Our `Avm2String` is UTF-8, so the lone surrogate has already
+collapsed to U+FFFD *before* `encodeURI` ever sees it — a legitimate
+character, correctly encoded as `%EF%BF%BD`. Identical root cause to
+`ecma3/Unicode/utf8count` below, and it flips only when that
+representation change does.
+
+## Known residue: `ecma3/Date/e15_9_5` needs sealed builtin prototypes
 
 The one `ecma3/Date` holdout. It requires
 `Date.prototype.valueOf = Object.prototype.toString` to throw
@@ -408,19 +531,28 @@ Full corpus-wide ranking with the avm2/misc/shumway folds:
   (`d90353066`, +36; crash fixed by `17c19040c`, +7).
 - ~~**`Date` class**~~ — **DONE** (`da35e5d77`, **+171** here, +2 in the
   avm2 suite). Predicted 171 + 2; delivered exactly that.
+- ~~**Cleanup batch** (`Number` statics + URI functions +
+  `Capabilities`)~~ — **DONE** (`8e8370df1`, **+41** here, +5 in the avm2
+  suite). Predicted ~35; delivered 46.
 
-**Only 44 tests are still blanked by an uncaught error** (down from ~200),
-and the regenerated histogram makes the remaining order unambiguous:
+**The eager-driver blanking is essentially drained: only 12 tests
+corpus-wide still die on an uncaught error**, down from ~200 at import and
+44 before this batch. The `error_signature` histogram has therefore stopped
+being the primary ranking instrument — what remains is line-level polish,
+which the "Likely Fixable" table in `FAILING_TESTS_BY_FEATURE.md` ranks
+instead. With that batch landed, the ranking is:
 
-1. **`Number` static math (API 680)** — 21 tests in `as3/Types/Number`,
-   ~19 methods + 8 constants mirroring `Math`. Note the shape is *not* a
-   plain alias: `getQualifiedClassName(Number.abs(1))` must be `"int"` while
-   `Number.abs(3.14)` is `"Number"`, a no-arg call must throw
-   `ArgumentError #1063`, and each has an asserted `.length`.
-2. **Global URI functions** — `encodeURI` (2), `encodeURIComponent` (2),
-   `decodeURIComponent` (2), `decodeURI` (1) here, plus ~3 in the avm2 suite.
-3. **`flash.system.Capabilities`** — 5 tests.
-4. **Sealed builtin prototypes (`#1037`)** — 3 tests: 2 on Array
+1. **Static consts must be read-only** — ~12 tests, all in `ecma3/Number`.
+   See the section above; it is the same getter-only-static-trait change
+   already proven on the eight new `Number` constants, generalised into
+   `avm2_builtin_add_static_const`. Highest remaining yield here and
+   mechanically small, but corpus-wide blast radius.
+2. **`[object Function]` classification** + `Function('body')` →
+   `EvalError #1066` + class-object `.length` — ~15
+   (`ecma3/FunctionObjects` 6/21, and the classification item recurs in
+   `ecma3/ObjectObjects/e15_2_4_2`, `ecma3/String/e15_5_4_6_2_rt` and
+   `ecma3/ObjectObjects/class_006`).
+3. **Sealed builtin prototypes (`#1037`)** — 3 tests: 2 on Array
    (`Cannot assign to a method toString on Array`) plus `ecma3/Date/e15_9_5`.
    See the Date residue section above; this is a change to how builtin
    prototype objects are constructed, not a per-class fix.
