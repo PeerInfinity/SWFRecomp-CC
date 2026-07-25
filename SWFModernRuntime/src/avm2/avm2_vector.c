@@ -199,10 +199,15 @@ int avm2_vector_name_access(Avm2Context* ctx, Avm2Object* obj, const char* name,
 				*out = ext->elems[u];
 				return 1;
 			}
-			// fail_read_error
-			if (ctx->swf_version >= 11) vec_throw_1125(ctx, d, ext->length);
-			if (d > 0.0) avm2_throw_1069(ctx, name, name_len, obj->cls);
-			return 0;  // SWF10: non-positive miss falls back to the proto chain
+			// fail_read_error. A name that IS a valid u32 index is a
+			// RangeError in every SWF version: avmplus routes an integer
+			// index straight at getUintProperty, which range-checks. Ruffle
+			// gates #1125 behind version >= 11 and answers #1069 below it,
+			// but as3/Vector/nonindexproperty/v10 asserts #1125 for reads of
+			// max_int28_m1..max_uint_m1 on a v10 movie. Only non-u32 names
+			// (fractional, negative, non-numeric) keep the versioned
+			// ReferenceError / proto-chain behavior, below.
+			vec_throw_1125(ctx, d, ext->length);
 		}
 		avm2_vector_set_index(ctx, obj, u, set_value);
 		return 1;
@@ -280,13 +285,17 @@ Avm2Class* avm2_vector_apply(Avm2Context* ctx, Avm2Class* param)
 		if (a->param == param) return a->cls;
 	}
 	// Not int/uint/Number/* → a Vector.<*>-derived application
-	// (Ruffle with_type_param).
-	char pq[192];
-	vec_qualified_name(param, pq, sizeof(pq));
-	char nb[224];
-	snprintf(nb, sizeof(nb), "Vector.<%s>", pq);
-	char* name = avm2_alloc(ctx, (uint32_t) strlen(nb) + 1);
-	strcpy(name, nb);
+	// (Ruffle with_type_param). The name is built at its exact size rather
+	// than through fixed buffers: applications nest without limit, and
+	// as3/Vector/nested builds 500 levels (~4.5KB) and then compares the tail
+	// of the class's toString.
+	int pn = vec_qualified_name(param, NULL, 0);
+	if (pn < 0) pn = 0;
+	char* name = avm2_alloc(ctx, (uint32_t) pn + 10);  // "Vector.<" + p + ">" + NUL
+	memcpy(name, "Vector.<", 8);
+	vec_qualified_name(param, name + 8, pn + 1);
+	name[8 + pn] = '>';
+	name[9 + pn] = '\0';
 
 	Avm2Class* cls = avm2_builtin_class(ctx, "__AS3__.vec", name,
 	                                    ctx->builtins.vector_object_class);
@@ -982,6 +991,18 @@ static int vec_callback_arg(Avm2Context* ctx, Avm2Value v, Avm2Value* out)
 	                 "Function.", dbg);
 }
 
+// The AS3 signatures declare `callback:Function` with no default, so avmplus
+// rejects a zero-arg call on arity before it ever looks at the callback --
+// as3/Vector/{some,map,filter,foreach} assert #1063 for `v.some()`. `every`
+// has no corpus assertion but takes the same guard.
+static void vec_check_cb_argc(Avm2Activation* act, const char* name)
+{
+	if (act->argc >= 1) return;
+	avm2_throw_error(act->ctx, act->ctx->builtins.argument_error_class,
+	                 "Error #1063: Argument count mismatch on Vector/%s(). "
+	                 "Expected 1, got 0.", name);
+}
+
 static Avm2Value vec_call_cb(Avm2Activation* act, Avm2Value cb, Avm2Value recv,
                              Avm2Value item, uint32_t index)
 {
@@ -995,6 +1016,7 @@ static Avm2Value vec_call_cb(Avm2Activation* act, Avm2Value cb, Avm2Value recv,
 static Avm2Value vec_every(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	vec_check_cb_argc(act, "every");
 	Avm2Object* v = this_vector(act);
 	if (v == NULL) return avm2_bool(true);
 	Avm2Value cb;
@@ -1015,6 +1037,7 @@ static Avm2Value vec_every(Avm2Activation* act)
 static Avm2Value vec_some(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	vec_check_cb_argc(act, "some");
 	Avm2Object* v = this_vector(act);
 	if (v == NULL) return avm2_bool(false);
 	Avm2Value cb;
@@ -1035,6 +1058,7 @@ static Avm2Value vec_some(Avm2Activation* act)
 static Avm2Value vec_for_each(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	vec_check_cb_argc(act, "forEach");
 	Avm2Object* v = this_vector(act);
 	if (v == NULL) return avm2_undefined();
 	Avm2Value cb;
@@ -1051,6 +1075,7 @@ static Avm2Value vec_for_each(Avm2Activation* act)
 static Avm2Value vec_filter(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	vec_check_cb_argc(act, "filter");
 	Avm2Object* v = this_vector(act);
 	if (v == NULL) return avm2_undefined();
 	Avm2Object* out = avm2_vector_new(ctx, v->cls, 0, 0);
@@ -1077,6 +1102,7 @@ static Avm2Value vec_filter(Avm2Activation* act)
 static Avm2Value vec_map(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	vec_check_cb_argc(act, "map");
 	Avm2Object* v = this_vector(act);
 	if (v == NULL) return avm2_undefined();
 	Avm2Object* out = avm2_vector_new(ctx, v->cls, 0, 0);

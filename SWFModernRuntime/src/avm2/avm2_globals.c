@@ -428,6 +428,20 @@ void avm2_builtin_add_global_fn(Avm2Context* ctx, const char* name, Avm2MethodFn
 // Object / Class builtins
 // ---------------------------------------------------------------------------
 
+// "[class N]" / "[object N]" where N can be arbitrarily long: a parameterized
+// Vector nests without limit, and as3/Vector/nested builds a ~4.5KB class name
+// and then compares the LAST 501 chars of its toString -- exactly what a fixed
+// buffer truncates away.
+static Avm2Value tagged_class_string(Avm2Context* ctx, const char* tag,
+                                     const char* name, uint32_t name_len)
+{
+	char stack[160];
+	uint32_t need = (uint32_t) strlen(tag) + name_len + 4;  // "[" tag " " N "]" NUL
+	char* buf = (need <= sizeof(stack)) ? stack : avm2_alloc(ctx, need);
+	int n = snprintf(buf, need, "[%s %.*s]", tag, (int) name_len, name);
+	return avm2_string(avm2_string_new(ctx, buf, (uint32_t) (n < 0 ? 0 : n)));
+}
+
 static Avm2Value object_proto_to_string(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -437,8 +451,7 @@ static Avm2Value object_proto_to_string(Avm2Activation* act)
 	{
 		// Ruffle's Object._toString reports class objects as [class N].
 		Avm2Class* c = act->this_val.u.obj->class_ref;
-		snprintf(buf, sizeof(buf), "[class %.*s]",
-		         (int) c->name.name_len, c->name.name);
+		return tagged_class_string(ctx, "class", c->name.name, c->name.name_len);
 	}
 	else if (act->this_val.kind == AVM2_VALUE_OBJECT
 	         && act->this_val.u.obj->kind == AVM2_OBJ_FUNCTION)
@@ -464,8 +477,7 @@ static Avm2Value object_proto_to_string(Avm2Activation* act)
 	else
 	{
 		Avm2Class* c = avm2_value_class(ctx, act->this_val);
-		snprintf(buf, sizeof(buf), "[object %.*s]",
-		         (int) c->name.name_len, c->name.name);
+		return tagged_class_string(ctx, "object", c->name.name, c->name.name_len);
 	}
 	return avm2_string(avm2_string_from_literal(ctx, buf));
 }
@@ -611,13 +623,11 @@ static Avm2Value object_construct(Avm2Context* ctx, Avm2Class* cls,
 static Avm2Value class_proto_to_string(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	char buf[160];
 	if (act->this_val.kind == AVM2_VALUE_OBJECT
 	    && act->this_val.u.obj->kind == AVM2_OBJ_CLASS)
 	{
 		Avm2Class* c = act->this_val.u.obj->class_ref;
-		snprintf(buf, sizeof(buf), "[class %.*s]",
-		         (int) c->name.name_len, c->name.name);
+		return tagged_class_string(ctx, "class", c->name.name, c->name.name_len);
 	}
 	else
 	{
@@ -631,10 +641,8 @@ static Avm2Value class_proto_to_string(Avm2Activation* act)
 		                || act->this_val.kind == AVM2_VALUE_NULL)
 		                   ? ctx->builtins.object_class
 		                   : avm2_value_class(ctx, act->this_val);
-		snprintf(buf, sizeof(buf), "[object %.*s]",
-		         (int) c->name.name_len, c->name.name);
+		return tagged_class_string(ctx, "object", c->name.name, c->name.name_len);
 	}
-	return avm2_string(avm2_string_from_literal(ctx, buf));
 }
 
 static Avm2Value class_get_prototype(Avm2Activation* act)
