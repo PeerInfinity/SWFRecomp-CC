@@ -1913,6 +1913,9 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     if viewport is not None:
         extra_defines.append(f"-DVIEWPORT_WIDTH={viewport[0]}")
         extra_defines.append(f"-DVIEWPORT_HEIGHT={viewport[1]}")
+        # flash.system.Capabilities.screenResolution* is the viewport divided
+        # by the HiDPI scale factor (Ruffle capabilities.rs).
+        extra_defines.append(f"-DVIEWPORT_SCALE_FACTOR={get_scale_factor(test_dir)}")
     if has_children:
         extra_defines.append("-DHAS_CHILD_MOVIES")
     if has_data_files:

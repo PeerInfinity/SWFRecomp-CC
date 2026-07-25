@@ -79,6 +79,9 @@ void avm2_builtin_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn getter, Avm2MethodFn setter);
 void avm2_builtin_add_static_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
                                     Avm2MethodFn fn);
+// As above, declaring the arity that Function.length must report.
+void avm2_builtin_add_static_method_n(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                      Avm2MethodFn fn, uint32_t param_count);
 void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char* name,
                                    Avm2Value value);
 // Static accessor pair on the class object (setter may be NULL).

@@ -400,6 +400,108 @@ static Avm2Value math_random(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
+// Number static math (Flash 11.3 / API 680)
+// ---------------------------------------------------------------------------
+//
+// `Number` re-exports the whole `Math` surface as statics. It is NOT a plain
+// alias: these are *declared* natives, so the arg count is checked (avmplus
+// throws ArgumentError #1063 when it does not match the signature) and each
+// one's `.length` is the declared arity, which as3/Types/Number pins per
+// method. `max`/`min` are variadic (`...rest`) with a declared length of 2, so
+// they accept any count — as3/Types/Number/visibility/v16 calls both with none.
+//
+// The results still come back as plain doubles: getQualifiedClassName maps an
+// integral double to "int", which is exactly what the tests assert
+// (`Number.abs(1)` → "int", `Number.abs(3.14)` → "Number").
+
+static void num_check_argc(Avm2Activation* act, const char* name, uint32_t expected)
+{
+	if (act->argc == expected) return;
+	avm2_throw_error(act->ctx, act->ctx->builtins.argument_error_class,
+	                 "Error #1063: Argument count mismatch on Number$/%s(). "
+	                 "Expected %u, got %u.", name, expected, act->argc);
+}
+
+#define NUMSTATIC(name, arity) \
+	static Avm2Value number_static_##name(Avm2Activation* act) \
+	{ \
+		num_check_argc(act, #name, arity); \
+		return math_##name(act); \
+	}
+
+NUMSTATIC(abs, 1)
+NUMSTATIC(acos, 1)
+NUMSTATIC(asin, 1)
+NUMSTATIC(atan, 1)
+NUMSTATIC(ceil, 1)
+NUMSTATIC(cos, 1)
+NUMSTATIC(exp, 1)
+NUMSTATIC(floor, 1)
+NUMSTATIC(log, 1)
+NUMSTATIC(round, 1)
+NUMSTATIC(sin, 1)
+NUMSTATIC(sqrt, 1)
+NUMSTATIC(tan, 1)
+NUMSTATIC(atan2, 2)
+NUMSTATIC(pow, 2)
+NUMSTATIC(random, 0)
+#undef NUMSTATIC
+
+// The eight constants must be read-only (`Number.E = 0` throws
+// ReferenceError #1074), non-deletable and non-enumerable — as3/Types/Number/e
+// asserts all four. A getter-only static trait gives all of that for free;
+// `avm2_builtin_add_static_const` installs a dont-enum *dynamic* property,
+// which is writable and deletable.
+#define NUMCONST(fname, value) \
+	static Avm2Value number_const_##fname(Avm2Activation* act) \
+	{ \
+		(void) act; \
+		return avm2_number(value); \
+	}
+
+NUMCONST(e, 2.718281828459045)
+NUMCONST(ln10, 2.302585092994046)
+NUMCONST(ln2, 0.6931471805599453)
+NUMCONST(log10e, 0.4342944819032518)
+NUMCONST(log2e, 1.4426950408889634)
+NUMCONST(pi, 3.141592653589793)
+NUMCONST(sqrt1_2, 0.7071067811865476)
+NUMCONST(sqrt2, 1.4142135623730951)
+#undef NUMCONST
+
+static void add_number_statics(Avm2Context* ctx, Avm2Class* cls)
+{
+	static const struct { const char* name; Avm2MethodFn fn; uint32_t arity; }
+	methods[] = {
+		{ "abs", number_static_abs, 1 },     { "acos", number_static_acos, 1 },
+		{ "asin", number_static_asin, 1 },   { "atan", number_static_atan, 1 },
+		{ "atan2", number_static_atan2, 2 }, { "ceil", number_static_ceil, 1 },
+		{ "cos", number_static_cos, 1 },     { "exp", number_static_exp, 1 },
+		{ "floor", number_static_floor, 1 }, { "log", number_static_log, 1 },
+		{ "max", math_max, 2 },              { "min", math_min, 2 },
+		{ "pow", number_static_pow, 2 },     { "random", number_static_random, 0 },
+		{ "round", number_static_round, 1 }, { "sin", number_static_sin, 1 },
+		{ "sqrt", number_static_sqrt, 1 },   { "tan", number_static_tan, 1 },
+	};
+	for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++)
+	{
+		avm2_builtin_add_static_method_n(ctx, cls, methods[i].name,
+		                                 methods[i].fn, methods[i].arity);
+	}
+
+	static const struct { const char* name; Avm2MethodFn fn; } consts[] = {
+		{ "E", number_const_e },           { "LN10", number_const_ln10 },
+		{ "LN2", number_const_ln2 },       { "LOG10E", number_const_log10e },
+		{ "LOG2E", number_const_log2e },   { "PI", number_const_pi },
+		{ "SQRT1_2", number_const_sqrt1_2 }, { "SQRT2", number_const_sqrt2 },
+	};
+	for (size_t i = 0; i < sizeof(consts) / sizeof(consts[0]); i++)
+	{
+		avm2_builtin_add_static_getset(ctx, cls, consts[i].name, consts[i].fn, NULL);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -440,6 +542,10 @@ void avm2_register_number(Avm2Context* ctx)
 	                              avm2_number(INFINITY));
 	avm2_builtin_add_static_const(ctx, b->number_class, "NEGATIVE_INFINITY",
 	                              avm2_number(-INFINITY));
+	// API 680: the Math surface on Number is SWF16+ only. SWF15 content must
+	// still see `Number.abs` as undefined (as3/Types/Number/visibility/v15
+	// asserts TypeError #1006 for every one of them).
+	if (ctx->swf_version >= 16) add_number_statics(ctx, b->number_class);
 
 	b->int_class = avm2_builtin_class(ctx, "", "int", b->object_class);
 	b->int_class->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;

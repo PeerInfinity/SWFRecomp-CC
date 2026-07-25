@@ -333,8 +333,8 @@ static Avm2VTable* class_static_vtable(Avm2Context* ctx, Avm2Class* cls)
 	return (Avm2VTable*) cls->class_object->vtable;
 }
 
-void avm2_builtin_add_static_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
-                                    Avm2MethodFn fn)
+void avm2_builtin_add_static_method_n(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                      Avm2MethodFn fn, uint32_t param_count)
 {
 	Avm2VTable* vt = class_static_vtable(ctx, cls);
 	Avm2PropEntry e;
@@ -343,8 +343,15 @@ void avm2_builtin_add_static_method(Avm2Context* ctx, Avm2Class* cls, const char
 	e.kind = AVM2_PROP_METHOD;
 	e.method.fn = fn;
 	e.method.debug_name = name;
+	e.method.param_count = param_count;
 	e.defining_class = cls;
 	avm2_vtable_append(ctx, vt, &e);
+}
+
+void avm2_builtin_add_static_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                    Avm2MethodFn fn)
+{
+	avm2_builtin_add_static_method_n(ctx, cls, name, fn, 0);
 }
 
 void avm2_builtin_add_static_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
@@ -835,30 +842,108 @@ static Avm2Value global_parse_float(Avm2Activation* act)
 	return avm2_number(NAN);
 }
 
-// escape(): encode everything except [A-Za-z0-9 @-_.*+/] (Ruffle toplevel.rs).
+// The five URI natives (escape/encodeURI[Component]/decodeURI[Component]) all
+// declare a single `s:String` parameter, and the corpus pins the two degenerate
+// calls: with NO argument the result is the string "undefined", and with an
+// explicit `undefined` the AS3 String coercion makes the parameter *null*,
+// which then stringifies as "null" (avm2 suite `escape`, `decode_uri`).
+static const Avm2String* uri_arg_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0) return avm2_string_from_literal(ctx, "undefined");
+	if (act->args[0].kind == AVM2_VALUE_UNDEFINED)
+	{
+		return avm2_string_from_literal(ctx, "null");
+	}
+	return avm2_coerce_to_string(ctx, act->args[0]);
+}
+
+// Decode one UTF-8 code point at `i`, advancing it. Malformed bytes are
+// consumed one at a time as U+FFFD (our strings are always well-formed UTF-8,
+// so this is only a safety net).
+static uint32_t utf8_next_cp(const Avm2String* s, uint32_t* i)
+{
+	unsigned char b = (unsigned char) s->utf8[*i];
+	uint32_t extra, cp;
+	if (b < 0x80) { (*i)++; return b; }
+	else if ((b & 0xE0) == 0xC0) { extra = 1; cp = b & 0x1F; }
+	else if ((b & 0xF0) == 0xE0) { extra = 2; cp = b & 0x0F; }
+	else if ((b & 0xF8) == 0xF0) { extra = 3; cp = b & 0x07; }
+	else { (*i)++; return 0xFFFD; }
+	if (*i + extra >= s->len) { (*i)++; return 0xFFFD; }
+	for (uint32_t k = 1; k <= extra; k++)
+	{
+		unsigned char c = (unsigned char) s->utf8[*i + k];
+		if ((c & 0xC0) != 0x80) { (*i)++; return 0xFFFD; }
+		cp = (cp << 6) | (c & 0x3F);
+	}
+	*i += extra + 1;
+	return cp;
+}
+
+// Append `cp` to `out` as UTF-8; returns the number of bytes written.
+static uint32_t utf8_put_cp(char* out, uint32_t cp)
+{
+	if (cp < 0x80) { out[0] = (char) cp; return 1; }
+	if (cp < 0x800)
+	{
+		out[0] = (char) (0xC0 | (cp >> 6));
+		out[1] = (char) (0x80 | (cp & 0x3F));
+		return 2;
+	}
+	if (cp < 0x10000)
+	{
+		out[0] = (char) (0xE0 | (cp >> 12));
+		out[1] = (char) (0x80 | ((cp >> 6) & 0x3F));
+		out[2] = (char) (0x80 | (cp & 0x3F));
+		return 3;
+	}
+	out[0] = (char) (0xF0 | (cp >> 18));
+	out[1] = (char) (0x80 | ((cp >> 12) & 0x3F));
+	out[2] = (char) (0x80 | ((cp >> 6) & 0x3F));
+	out[3] = (char) (0x80 | (cp & 0x3F));
+	return 4;
+}
+
+// escape(): keep [A-Za-z0-9 @-_.*+/], and escape everything else by UTF-16
+// *code unit* — `%XX` below U+0100 and `%uXXXX` above, so an astral character
+// comes out as its two surrogate halves (`escape("\u{1F62D}")` is
+// "%uD83D%uDE2D"). This is not the same encoding as encodeURI, which works on
+// UTF-8 bytes.
 static Avm2Value global_escape(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	if (act->argc == 0)
-	{
-		return avm2_string(avm2_string_from_literal(ctx, "undefined"));
-	}
-	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
-	char* out = avm2_alloc(ctx, s->len * 3 + 1);
+	const Avm2String* s = uri_arg_string(act);
+	char* out = avm2_alloc(ctx, s->len * 6 + 1);
 	uint32_t n = 0;
-	for (uint32_t i = 0; i < s->len; i++)
+	for (uint32_t i = 0; i < s->len; )
 	{
-		unsigned char c = (unsigned char) s->utf8[i];
-		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-		    || (c >= '0' && c <= '9')
-		    || c == '@' || c == '-' || c == '_' || c == '.' || c == '*'
-		    || c == '+' || c == '/')
+		uint32_t cp = utf8_next_cp(s, &i);
+		if (cp < 0x80)
 		{
-			out[n++] = (char) c;
+			unsigned char c = (unsigned char) cp;
+			if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+			    || (c >= '0' && c <= '9')
+			    || c == '@' || c == '-' || c == '_' || c == '.' || c == '*'
+			    || c == '+' || c == '/')
+			{
+				out[n++] = (char) c;
+				continue;
+			}
+		}
+		if (cp < 0x100)
+		{
+			n += (uint32_t) snprintf(out + n, 4, "%%%02X", cp);
+		}
+		else if (cp < 0x10000)
+		{
+			n += (uint32_t) snprintf(out + n, 7, "%%u%04X", cp);
 		}
 		else
 		{
-			n += (uint32_t) snprintf(out + n, 4, "%%%02X", c);
+			uint32_t v = cp - 0x10000;
+			n += (uint32_t) snprintf(out + n, 7, "%%u%04X", 0xD800 + (v >> 10));
+			n += (uint32_t) snprintf(out + n, 7, "%%u%04X", 0xDC00 + (v & 0x3FF));
 		}
 	}
 	return avm2_string(avm2_string_new(ctx, out, n));
@@ -872,40 +957,47 @@ static int hex_digit(char c)
 	return -1;
 }
 
+// A "%uXXXX" escape at `i`, or -1. Only lowercase `u` counts: the avm2 suite's
+// unescape test pins unescape("%U3333") === "%U3333".
+static int32_t unescape_unit_at(const Avm2String* s, uint32_t i)
+{
+	if (i + 5 >= s->len || s->utf8[i] != '%' || s->utf8[i + 1] != 'u') return -1;
+	int32_t v = 0;
+	for (uint32_t k = 2; k < 6; k++)
+	{
+		int d = hex_digit(s->utf8[i + k]);
+		if (d < 0) return -1;
+		v = (v << 4) | d;
+	}
+	return v;
+}
+
 static Avm2Value global_unescape(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	if (act->argc == 0)
-	{
-		return avm2_string(avm2_string_from_literal(ctx, "undefined"));
-	}
-	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	const Avm2String* s = uri_arg_string(act);
 	char* out = avm2_alloc(ctx, s->len * 3 + 4);
 	uint32_t n = 0;
 	for (uint32_t i = 0; i < s->len; )
 	{
-		if (s->utf8[i] == '%' && i + 5 < s->len
-		    && (s->utf8[i + 1] == 'u' || s->utf8[i + 1] == 'U')
-		    && hex_digit(s->utf8[i + 2]) >= 0 && hex_digit(s->utf8[i + 3]) >= 0
-		    && hex_digit(s->utf8[i + 4]) >= 0 && hex_digit(s->utf8[i + 5]) >= 0)
+		int32_t cp = unescape_unit_at(s, i);
+		if (cp >= 0)
 		{
-			uint32_t cp = (uint32_t) ((hex_digit(s->utf8[i + 2]) << 12)
-			              | (hex_digit(s->utf8[i + 3]) << 8)
-			              | (hex_digit(s->utf8[i + 4]) << 4)
-			              | hex_digit(s->utf8[i + 5]));
-			// UTF-8 encode the BMP code point.
-			if (cp < 0x80) out[n++] = (char) cp;
-			else if (cp < 0x800)
+			// escape() emits an astral character as its two surrogate halves,
+			// so unescape has to put them back together — otherwise
+			// unescape(escape("\u{1F60A}")) yields two U+FFFDs (our strings are
+			// UTF-8 and cannot hold a lone surrogate).
+			if (cp >= 0xD800 && cp <= 0xDBFF)
 			{
-				out[n++] = (char) (0xC0 | (cp >> 6));
-				out[n++] = (char) (0x80 | (cp & 0x3F));
+				int32_t lo = unescape_unit_at(s, i + 6);
+				if (lo >= 0xDC00 && lo <= 0xDFFF)
+				{
+					cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+					i += 6;
+				}
 			}
-			else
-			{
-				out[n++] = (char) (0xE0 | (cp >> 12));
-				out[n++] = (char) (0x80 | ((cp >> 6) & 0x3F));
-				out[n++] = (char) (0x80 | (cp & 0x3F));
-			}
+			if (cp >= 0xD800 && cp <= 0xDFFF) cp = 0xFFFD;
+			n += utf8_put_cp(out + n, (uint32_t) cp);
 			i += 6;
 		}
 		else if (s->utf8[i] == '%' && i + 2 < s->len
@@ -930,6 +1022,127 @@ static Avm2Value global_unescape(Avm2Activation* act)
 	}
 	return avm2_string(avm2_string_new(ctx, out, n));
 }
+
+// --- encodeURI / encodeURIComponent / decodeURI / decodeURIComponent ---
+//
+// ECMA-262 §15.1.3. Both directions work on the UTF-8 *byte* sequence, which
+// is what our strings already are, so no transcoding step is needed:
+//   uriUnescaped = alphanumeric + "-_.!~*'()"     — never escaped
+//   uriReserved  = ";/?:@&=+$," plus "#"          — kept literal by encodeURI
+//                                                   and left encoded by
+//                                                   decodeURI; the Component
+//                                                   variants ignore this set.
+
+static int uri_is_unescaped(unsigned char c)
+{
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+	    || (c >= '0' && c <= '9')
+	    || c == '-' || c == '_' || c == '.' || c == '!' || c == '~'
+	    || c == '*' || c == '\'' || c == '(' || c == ')';
+}
+
+static int uri_is_reserved(unsigned char c)
+{
+	return c == ';' || c == '/' || c == '?' || c == ':' || c == '@'
+	    || c == '&' || c == '=' || c == '+' || c == '$' || c == ','
+	    || c == '#';
+}
+
+static Avm2Value uri_encode(Avm2Activation* act, int keep_reserved)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* s = uri_arg_string(act);
+	char* out = avm2_alloc(ctx, s->len * 3 + 1);
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < s->len; i++)
+	{
+		unsigned char c = (unsigned char) s->utf8[i];
+		if (uri_is_unescaped(c) || (keep_reserved && uri_is_reserved(c)))
+		{
+			out[n++] = (char) c;
+		}
+		else
+		{
+			n += (uint32_t) snprintf(out + n, 4, "%%%02X", c);
+		}
+	}
+	return avm2_string(avm2_string_new(ctx, out, n));
+}
+
+_Noreturn static void uri_throw(Avm2Context* ctx, const char* fn)
+{
+	avm2_throw_error(ctx, ctx->builtins.uri_error_class,
+	                 "Error #1052: Invalid URI passed to %s function.", fn);
+}
+
+// Reads "%XX" at `i` (advancing past it) or throws. Returns the byte.
+static unsigned char uri_take_octet(Avm2Context* ctx, const Avm2String* s,
+                                    uint32_t* i, const char* fn)
+{
+	if (*i + 2 >= s->len || s->utf8[*i] != '%') uri_throw(ctx, fn);
+	int hi = hex_digit(s->utf8[*i + 1]);
+	int lo = hex_digit(s->utf8[*i + 2]);
+	if (hi < 0 || lo < 0) uri_throw(ctx, fn);
+	*i += 3;
+	return (unsigned char) ((hi << 4) | lo);
+}
+
+static Avm2Value uri_decode(Avm2Activation* act, int keep_reserved, const char* fn)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* s = uri_arg_string(act);
+	char* out = avm2_alloc(ctx, s->len + 4);
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < s->len; )
+	{
+		if (s->utf8[i] != '%') { out[n++] = s->utf8[i++]; continue; }
+		uint32_t start = i;
+		unsigned char b = uri_take_octet(ctx, s, &i, fn);
+		if (b < 0x80)
+		{
+			// A reserved character stays in its escaped form, verbatim.
+			if (keep_reserved && uri_is_reserved(b))
+			{
+				memcpy(out + n, s->utf8 + start, 3);
+				n += 3;
+			}
+			else
+			{
+				out[n++] = (char) b;
+			}
+			continue;
+		}
+		uint32_t extra, cp;
+		if ((b & 0xE0) == 0xC0) { extra = 1; cp = b & 0x1F; }
+		else if ((b & 0xF0) == 0xE0) { extra = 2; cp = b & 0x0F; }
+		else if ((b & 0xF8) == 0xF0) { extra = 3; cp = b & 0x07; }
+		else uri_throw(ctx, fn);
+		for (uint32_t k = 0; k < extra; k++)
+		{
+			unsigned char c = uri_take_octet(ctx, s, &i, fn);
+			if ((c & 0xC0) != 0x80) uri_throw(ctx, fn);
+			cp = (cp << 6) | (c & 0x3F);
+		}
+		if (cp > 0x10FFFF) uri_throw(ctx, fn);
+		// ECMA-262 rejects a decoded surrogate; Flash accepts it (Tamarin
+		// regress/bug_538107 requires "%ED%B0%80%ED%A0%80" to decode to a
+		// 2-unit string rather than throw). Our strings are UTF-8 and cannot
+		// hold a lone surrogate, so each becomes U+FFFD — still one UTF-16
+		// unit apiece, which is what the test measures.
+		if (cp >= 0xD800 && cp <= 0xDFFF) cp = 0xFFFD;
+		n += utf8_put_cp(out + n, cp);
+	}
+	return avm2_string(avm2_string_new(ctx, out, n));
+}
+
+static Avm2Value global_encode_uri(Avm2Activation* act)
+{ return uri_encode(act, 1); }
+static Avm2Value global_encode_uri_component(Avm2Activation* act)
+{ return uri_encode(act, 0); }
+static Avm2Value global_decode_uri(Avm2Activation* act)
+{ return uri_decode(act, 1, "decodeURI"); }
+static Avm2Value global_decode_uri_component(Avm2Activation* act)
+{ return uri_decode(act, 0, "decodeURIComponent"); }
 
 
 // --- flash.utils.getQualifiedClassName / getDefinitionByName ---
@@ -1413,6 +1626,136 @@ static void register_security(Avm2Context* ctx)
 	                               security_const_application, NULL);
 }
 
+// flash.system.Capabilities — all-static, all read-only. Every value mirrors
+// Ruffle's (globals/flash/system/Capabilities.as + capabilities.rs), which is
+// itself a fixed "Flash Player on Windows" profile; nothing here inspects the
+// host. The Tamarin tests that need this class only read `playerType` and
+// branch on it being 'AVMPlus' (the Tamarin *shell*), so any player value takes
+// the non-shell path — but the avm2 suite's capabilities_resolution does
+// compare the four screen numbers, so those follow Ruffle's formula.
+
+// Ruffle divides the viewport by the HiDPI scale factor; verify_output.py
+// passes both through from test.toml's [player_options]. With no override the
+// SWF's own stage box is the screen.
+static double capabilities_screen_dim(int vertical)
+{
+#if defined(VIEWPORT_WIDTH) && defined(VIEWPORT_HEIGHT)
+	double v = vertical ? (double) VIEWPORT_HEIGHT : (double) VIEWPORT_WIDTH;
+#else
+	double v = vertical
+		? (double) (avm2_generated_stage_rect[3] - avm2_generated_stage_rect[2]) / 20.0
+		: (double) (avm2_generated_stage_rect[1] - avm2_generated_stage_rect[0]) / 20.0;
+#endif
+#ifdef VIEWPORT_SCALE_FACTOR
+	v /= (double) (VIEWPORT_SCALE_FACTOR);
+#endif
+	return floor(v + 0.5);
+}
+
+static Avm2Value cap_screen_resolution_x(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_number(capabilities_screen_dim(0));
+}
+
+static Avm2Value cap_screen_resolution_y(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_number(capabilities_screen_dim(1));
+}
+
+static Avm2Value cap_true(Avm2Activation* act) { (void) act; return avm2_bool(true); }
+static Avm2Value cap_false(Avm2Activation* act) { (void) act; return avm2_bool(false); }
+static Avm2Value cap_pixel_aspect_ratio(Avm2Activation* act)
+{ (void) act; return avm2_number(1.0); }
+static Avm2Value cap_screen_dpi(Avm2Activation* act)
+{ (void) act; return avm2_number(72.0); }
+static Avm2Value cap_has_multi_channel_audio(Avm2Activation* act)
+{ (void) act; return avm2_bool(false); }
+
+// Capabilities is all-static and abstract: `new Capabilities()` throws #2012
+// at allocation time (the avm2 suite's abstract_classes enumerates it).
+static void cap_native_init_abstract(Avm2Context* ctx, Avm2Object* obj)
+{
+	const char* name = "?";
+	uint32_t name_len = 1;
+	if (obj->cls != NULL)
+	{
+		name = obj->cls->name.name;
+		name_len = obj->cls->name.name_len;
+	}
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #2012: %.*s$ class cannot be instantiated.",
+	                 (int) name_len, name);
+}
+
+static void register_capabilities(Avm2Context* ctx)
+{
+	Avm2Class* cls = avm2_builtin_class(ctx, "flash.system", "Capabilities",
+	                                    ctx->builtins.object_class);
+	cls->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+	cls->native_init = cap_native_init_abstract;
+
+	static const struct { const char* name; const char* value; } strings[] = {
+		{ "cpuArchitecture", "x86" },
+		{ "language", "en" },
+		{ "manufacturer", "Adobe Windows" },
+		{ "maxLevelIDC", "5.1" },
+		{ "os", "Windows 8" },
+		// Not "AVMPlus": that string means the Tamarin command-line shell, and
+		// five avmplus tests take a shell-only code path when they see it.
+#ifdef __EMSCRIPTEN__
+		{ "playerType", "PlugIn" },
+#else
+		{ "playerType", "StandAlone" },
+#endif
+		{ "screenColor", "color" },
+		{ "serverString", "A=t&SA=t&SV=t&EV=t&MP3=t&AE=t&VE=t&ACC=f&PR=f&SP=t&SB=f"
+		                  "&DEB=t&V=WIN%208%2C5%2C0%2C208&M=Adobe%20Windows"
+		                  "&R=1600x1200&DP=72&COL=color&AR=1.0&OS=Windows%20XP"
+		                  "&L=en&PT=External&AVD=f&LFD=f&WD=f" },
+		{ "touchscreenType", "none" },
+		{ "version", "WIN 32,0,0,0" },
+	};
+	for (size_t i = 0; i < sizeof(strings) / sizeof(strings[0]); i++)
+	{
+		// One shared getter would need per-property state; a dont-enum value on
+		// the class object reads identically and nothing writes these.
+		avm2_builtin_add_static_const(ctx, cls, strings[i].name,
+		                              avm2_string(avm2_string_from_literal(
+		                                  ctx, strings[i].value)));
+	}
+
+	static const char* const yes[] = {
+		"hasAudio", "hasAudioEncoder", "hasEmbeddedVideo", "hasIME", "hasMP3",
+		"hasStreamingAudio", "hasStreamingVideo", "hasTLS", "hasVideoEncoder",
+		"supports32BitProcesses", "supports64BitProcesses",
+	};
+	for (size_t i = 0; i < sizeof(yes) / sizeof(yes[0]); i++)
+	{
+		avm2_builtin_add_static_getset(ctx, cls, yes[i], cap_true, NULL);
+	}
+	static const char* const no[] = {
+		"avHardwareDisable", "hasAccessibility", "hasPrinting",
+		"hasScreenBroadcast", "hasScreenPlayback", "isDebugger",
+		"isEmbeddedInAcrobat", "localFileReadDisable",
+	};
+	for (size_t i = 0; i < sizeof(no) / sizeof(no[0]); i++)
+	{
+		avm2_builtin_add_static_getset(ctx, cls, no[i], cap_false, NULL);
+	}
+
+	avm2_builtin_add_static_getset(ctx, cls, "pixelAspectRatio",
+	                               cap_pixel_aspect_ratio, NULL);
+	avm2_builtin_add_static_getset(ctx, cls, "screenDPI", cap_screen_dpi, NULL);
+	avm2_builtin_add_static_getset(ctx, cls, "screenResolutionX",
+	                               cap_screen_resolution_x, NULL);
+	avm2_builtin_add_static_getset(ctx, cls, "screenResolutionY",
+	                               cap_screen_resolution_y, NULL);
+	avm2_builtin_add_static_method_n(ctx, cls, "hasMultiChannelAudio",
+	                                 cap_has_multi_channel_audio, 1);
+}
+
 static void builtin_add_global_fn_ns(Avm2Context* ctx, const char* ns,
                                      const char* name, Avm2MethodFn fn);
 
@@ -1741,6 +2084,12 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	avm2_builtin_add_global_fn_n(ctx, "parseFloat", global_parse_float, 1);
 	avm2_builtin_add_global_fn_n(ctx, "escape", global_escape, 1);
 	avm2_builtin_add_global_fn_n(ctx, "unescape", global_unescape, 1);
+	avm2_builtin_add_global_fn_n(ctx, "encodeURI", global_encode_uri, 1);
+	avm2_builtin_add_global_fn_n(ctx, "encodeURIComponent",
+	                             global_encode_uri_component, 1);
+	avm2_builtin_add_global_fn_n(ctx, "decodeURI", global_decode_uri, 1);
+	avm2_builtin_add_global_fn_n(ctx, "decodeURIComponent",
+	                             global_decode_uri_component, 1);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "getQualifiedClassName",
 	                         global_get_qualified_class_name);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "getDefinitionByName",
@@ -1912,6 +2261,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	register_application_domain(ctx);
 	register_system(ctx);
 	register_security(ctx);
+	register_capabilities(ctx);
 	avm2_register_external(ctx);
 
 	// flash.events (Event/EventDispatcher/EventPhase/IEventDispatcher —
