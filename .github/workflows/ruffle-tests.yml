@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       categories:
-        description: 'Test categories to run (all = the classic five suites; full = all + from_avmplus)'
+        description: 'Test categories to run (all = the classic five suites; full = all + from_avmplus + the nine misc categories)'
         required: true
         type: choice
         options:

@@ -1,11 +1,11 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-24 — **String/Unicode arc landed, CI-confirmed**. The
+Last updated: 2026-07-25 — **Date arc landed, CI-confirmed**. The
 Adobe Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`:
 **871/1574 effective (55.3%)**, identical in graphics and no-graphics.
 
-Three fixes have landed since:
+Four fixes have landed since:
 
 1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
    `#2023`. e4x **2/177 → 160/177**.
@@ -17,9 +17,12 @@ Three fixes have landed since:
 4. `17c19040c` — guard prototype `toString`/`valueOf` against
    self-coercion recursion (a crash *introduced* by 3; see below).
    **+7**, corpus segfaults **17 → 3**, CI `30130444073`.
+5. `da35e5d77` — the full `Date` class (below). **+171** here (+2 in the
+   avm2 suite), `ecma3/Date` **2/153 → 152/153**, CI `30134726316`
+   (30/30 shards).
 
-The suite stands at **1174/1574 effective (74.6%)**. **Zero pass→fail
-regressions across all three runs.**
+The suite stands at **1345/1574 effective (85.5%)**; the corpus at
+**3642/4414 (82.5%)**. **Zero pass→fail regressions across all four runs.**
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
 file reads 1143/1522 — 52 from_avmplus tests ungraded. 1174 = the
@@ -77,21 +80,21 @@ gh workflow run ruffle-tests.yml --ref master \
 
 ## Baselines
 
-Import baseline `eabb3b366` and current `127a5f4d3` — both complete
+Import baseline `eabb3b366` and current `da35e5d77` — both complete
 (30/30 shards), graphics mode:
 
-| Area | at import | now | failing now | of which known_failure |
-|---|---|---|---|---|
-| ecma3 | 402/800 | **503/800** | 297 | 30 |
-| e4x | **2/177** | **160/177** | 17 | 3 |
-| as3 | 410/509 | 411/509 | 98 | 6 |
-| mops | 0/13 | 0/13 | 13 | 0 |
-| regress | 43/55 | 43/55 | 12 | 4 |
-| recursion | 1/6 | 1/6 | 5 | 1 |
-| misc | 13/14 | 13/14 | 1 | 1 |
-| **total** | **871/1574** | **1131/1574** | **443** | **45** |
+| Area | at import | now | failing now |
+|---|---|---|---|
+| ecma3 | 402/800 | **701/800** | 99 |
+| e4x | **2/177** | **160/177** | 17 |
+| as3 | 410/509 | **427/509** | 82 |
+| mops | 0/13 | 0/13 | 13 |
+| regress | 43/55 | 43/55 | 12 |
+| recursion | 1/6 | 1/6 | 5 |
+| misc | 13/14 | 13/14 | 1 |
+| **total** | **871/1574** | **1345/1574** | **229** |
 
-Status breakdown of the 443: 421 output_mismatch, 16 runtime_error,
+Status breakdown of the 229: 207 output_mismatch, 16 runtime_error,
 3 timeout, 2 segfault, 1 compile_fail.
 
 `ecma3/Unicode` is now **107/108**. The single holdout is `utf8count` —
@@ -105,20 +108,23 @@ Top feature areas by failing count (auto-generated in
 
 | Failing | Area | Root cause |
 |---|---|---|
-| 151/153 | `ecma3/Date` | Date is a 3-method stub |
-| 102/108 | `ecma3/Unicode` | 2 String semantics bugs (below) |
-| 31/55 | `as3/Types` | `Number` static math (API 680) missing |
-| 21/212 | `as3/Definitions` | assorted; error-message wording |
-| 21/53 | `ecma3/Number` | `Function.length`, `toString` rounding |
+| 29/55 | `as3/Types` | `Number` static math (API 680) missing |
 | 15/60 | `as3/Vector` | assorted |
 | 15/21 | `ecma3/FunctionObjects` | `Function.prototype.*` / `.length` |
+| 15/53 | `ecma3/Number` | `toString` rounding |
 | 14/51 | `as3/RuntimeErrors` | error-message wording |
-| 14/41 | `ecma3/String` | ES3 `String.prototype.*` missing (42 tests unrun) |
-| 13/51 | `ecma3/Array` | ES3 `Array.prototype.*` missing |
-| 13/21 | `ecma3/GlobalObject` | `encodeURI`/`decodeURI` family missing |
 | 13/13 | `mops` | Alchemy `li*`/`si*` domainMemory opcodes |
-| 11/46 | `ecma3/Exceptions` | assorted |
+| 10/83 | `ecma3/String` | `[object Function]` classification residue |
+| 9/46 | `ecma3/Exceptions` | assorted |
+| 8/21 | `ecma3/GlobalObject` | `encodeURI`/`decodeURI` family missing |
+| 8/27 | `ecma3/ObjectObjects` | `[object Function]` classification |
+| 7/212 | `as3/Definitions` | error-message wording |
+| 7/51 | `ecma3/Array` | assorted |
+| 6/29 | `ecma3/Boolean` | assorted |
 | 17/177 | `e4x` (all dirs) | residue after the `#2023` fix |
+
+`ecma3/Date` is now **152/153** and `ecma3/Unicode` **107/108**; both have
+dropped off this table.
 
 ## The "empty output" pattern — SOLVED (it is not one bug)
 
@@ -312,6 +318,77 @@ run time and this change is AVM2-only, so that is a slow-runner flake.)
 **Watch for this on any future builtin that gains ES3 prototype methods —
 `Date` is next and has both `toString` and `valueOf`.**
 
+## Fix landed: the full `Date` class (`da35e5d77`)
+
+`Date` was a three-method stub (`getTime`/`valueOf`/`toString`) bolted onto
+`avm2_amf.c` so AMF round-trips could carry a timestamp. Replaced by
+`SWFModernRuntime/src/avm2/avm2_date.c`: the ECMA-262 §15.9.1 algebra, 18
+getters, 14 setters (local + UTC), `getTimezoneOffset`, `setTime`, six string
+formats, `toJSON`, `Date.parse`, `Date.UTC`, the 0/1/2-to-7-argument
+constructor, `Date(...)`-as-a-function, and the 18 AS3 accessor properties.
+
+**Yield (CI `30134726316`, 30/30 shards): +171 here, +2 in the avm2 suite
+(`date`, `date_parse`), zero pass→fail regressions corpus-wide.** Exactly the
+171 + 2 the feature map predicted from the `error_signature` histogram. On the
+full 4414-test corpus vs the last complete run (`14b57c476`): effective
+**3462 → 3642**, `runtime_error` flat at 21, `timeout` flat at 4, `segfault`
+**17 → 3** (that part is the recursion guard, not this arc).
+
+Where the 171 landed: `ecma3/Date` **150** (2/153 → 152/153),
+`as3/Definitions` **14**, `ecma3/Exceptions` **2**,
+`ecma3/TypeConversion` **2**, `ecma3/GlobalObject` **1**, `ecma3/Array` **1**,
+`ecma3/JSON` **1**. The last four were not predicted — small bonuses from
+tests that merely *constructed* a Date on the way to something else.
+`ecma3/String/e15_5_4_6_2_rt` was predicted to flip and did not: it went from
+blanked to **230/232**, held back by the unrelated `[object Function]`
+classification item.
+
+Four things worth remembering:
+
+- **The non-coercing receiver rule is Flash's own semantics, not just a
+  crash workaround.** Every prototype-facing method resolves through
+  `avm2_date_ext_of()`, which returns NULL for a foreign receiver.
+  `ecma3/Exceptions/date_00{1,3,4}_rt` assert exactly that: a borrowed
+  `Date.prototype.toString` on a plain object yields `"Invalid Date"`, and
+  `valueOf`/`getTime` yield `NaN` — no throw. A coercing helper would both
+  fail those tests *and* infinitely recurse when the receiver is
+  `Date.prototype` itself.
+- **A borrowed receiver still has to hold state.** `e15_9_5_23_3_rt` does
+  `o.setTime = Date.prototype.setTime; o.getTime = Date.prototype.getTime`
+  and requires the value to round-trip on a plain object. It is kept in a
+  hidden non-enumerable own property. This was the one local probe failure.
+- **The string formats are pinned by round-trips, not by literals.**
+  `Date.parse(d.toLocaleString())` must equal `d` *exactly* (`e15_9_5_5`),
+  and `toTimeString` must equal `toString` minus `toDateString`'s prefix and
+  the trailing year (`e15_9_5_4`). That rules out an AM/PM marker in
+  `toLocaleString` — neither parser has a token for one. Ruffle's format
+  carries one, which is likely why Ruffle marks `e15_9_5_5` `known_failure`.
+- **Local time is a fixed offset, no DST term.** The harness pins
+  `TZ=NPT-5:45` (`verify_output.py::run_binary`), and the avmplus Date tests
+  themselves assume a single whole-run offset — they derive one `TZ_DIFF`
+  from `new Date(2000,1,1).getTimezoneOffset()` and adjust every hard-coded
+  PST result array by it. A per-timestamp DST lookup would disagree with the
+  tests in any zone that has DST.
+
+`getYear`/`setYear` are deliberately absent: `ecma3/Expressions/e11_2_1_1`
+asserts `typeof Date.prototype.getYear == "undefined"`.
+
+### Known residue: `ecma3/Date/e15_9_5` needs sealed builtin prototypes
+
+The one `ecma3/Date` holdout. It requires
+`Date.prototype.valueOf = Object.prototype.toString` to throw
+`ReferenceError #1037: Cannot assign to a method valueOf on Date`. In avmplus
+a builtin prototype **is an instance of its sealed class**, so assigning a
+name that collides with a class method trait throws, while an unrelated name
+(`Date.prototype.toJSON`, which `ecma3/JSON/AS3Types` assigns and expects to
+*succeed*) becomes an ordinary dynamic property. Our prototypes are plain
+dynamic objects, so both assignments succeed.
+
+This is **not** Date-specific — the same histogram shows
+`#1037 Cannot assign to a method toString on Array` (2 tests). Fixing it means
+changing how builtin prototype objects are constructed corpus-wide, so it
+should be scoped on its own. Worth ~3 tests.
+
 ## E4X is NOT a coverage gap
 
 The probe asked whether 2/177 meant broad missing E4X. It does not: **155 of
@@ -327,36 +404,30 @@ Full corpus-wide ranking with the avm2/misc/shumway folds:
 `SWFRecompDocs/plans/feature-priority-map.md`. Suite-local order:
 
 - ~~String/Unicode semantics~~ — **DONE** (`127a5f4d3`, +101).
-- **ES3 `.prototype` surface + `Function.length`** — implemented in
-  `d90353066`, CI pending at time of writing. See below.
+- ~~ES3 `.prototype` surface + `Function.length`~~ — **DONE**
+  (`d90353066`, +36; crash fixed by `17c19040c`, +7).
+- ~~**`Date` class**~~ — **DONE** (`da35e5d77`, **+171** here, +2 in the
+  avm2 suite). Predicted 171 + 2; delivered exactly that.
 
-1. **`Date` class** — ~151 here + 2 in the avm2 suite. Biggest single
-   unlock left in the corpus. The AVM2 class is a 3-method AMF stub
-   (`avm2_amf.c:1763` — `getTime`/`valueOf`/`toString`), while AVM1 has a
-   complete one to port from: `actionmodern/date.c`, 1014 lines, 38 methods
-   including the full `getUTC*`/`setUTC*` family and `getTimezoneOffset`.
-   The regenerated uncaught-error table confirms the shape: **151 tests die
-   on `TypeError #1006: getTimezoneOffset is not a function`** and a further
-   **15 on `getFullYear`**, the latter scattered through `as3/Definitions`
-   rather than `ecma3/Date` — so the Date arc is worth more than the
-   `ecma3/Date` directory count alone suggests.
-2. **`Number` static math (API 680)** — 21 tests, ~19 methods + 8 constants,
-   mirroring `Math`.
-3. **Global URI functions** — `encodeURI`/`decodeURI`/`encodeURIComponent`/
-   `decodeURIComponent`; ~6 here + 3 in the avm2 suite.
-4. **`flash.system.Capabilities`** — the error table now shows **5** tests
-   blocked on `ReferenceError #1065: Variable Capabilities is not defined`,
-   not the 2 previously estimated.
+**Only 44 tests are still blanked by an uncaught error** (down from ~200),
+and the regenerated histogram makes the remaining order unambiguous:
 
-Two smaller items the regenerated error table surfaced that were not in the
-original ranking:
+1. **`Number` static math (API 680)** — 21 tests in `as3/Types/Number`,
+   ~19 methods + 8 constants mirroring `Math`. Note the shape is *not* a
+   plain alias: `getQualifiedClassName(Number.abs(1))` must be `"int"` while
+   `Number.abs(3.14)` is `"Number"`, a no-arg call must throw
+   `ArgumentError #1063`, and each has an asserted `.length`.
+2. **Global URI functions** — `encodeURI` (2), `encodeURIComponent` (2),
+   `decodeURIComponent` (2), `decodeURI` (1) here, plus ~3 in the avm2 suite.
+3. **`flash.system.Capabilities`** — 5 tests.
+4. **Sealed builtin prototypes (`#1037`)** — 3 tests: 2 on Array
+   (`Cannot assign to a method toString on Array`) plus `ecma3/Date/e15_9_5`.
+   See the Date residue section above; this is a change to how builtin
+   prototype objects are constructed, not a per-class fix.
 
-- **`ReferenceError #1037: Cannot assign to a method toString on Array`**
-  (2 tests, e.g. `ecma3/Array/e15_4_1_1`). ES3 code reassigns builtin
-  methods; our class methods are sealed against assignment.
-- **`ReferenceError #1065: Variable AS3 is not defined`**
-  (`as3/Array/length_mods`) and **`isXMLName` undefined**
-  (`e4x/Global/e13_1_2_1`) — one test each, both trivial-looking.
+Two one-test items also still open: **`Variable AS3 is not defined`**
+(`as3/Array/length_mods`) and **`isXMLName` undefined**
+(`e4x/Global/e13_1_2_1`).
 
 Parked: **`mops`** (13 tests, all crash/error — Alchemy `li8/li16/li32/
 lf32/lf64/si*/sf*` domainMemory opcodes; needs `ApplicationDomain.

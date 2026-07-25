@@ -26,16 +26,20 @@ including the 50 named `avm1/*`. The correct corpus denominator is
 **4414**, and it is what this document uses from here on. Sum over
 top-level leaf suites only; do not add nested `_results` dirs.
 
-Full corpus, graphics mode at **`17c19040c`**: **3469/4414 effective
-(78.6%)**, 945 failing. (Measured as the complete run `30128240863` at
-`d90353066` plus the +7 that run `30130444073` gained on the intersection;
-that last run lost shard 29/30 to the apt/Vulkan flake, so its own file
-reads 4275 not 4414.)
+Full corpus, graphics mode at **`da35e5d77`**: **3642/4414 effective
+(82.5%)**, 772 failing — from CI run `30134726316`, complete at 30/30
+shards, so this figure needs no intersection arithmetic.
+
+Status histogram vs the previous complete run (`14b57c476` at
+`d90353066`), over all 4414: pass **3241 → 3407**, ruffle_matched
+**221 → 235**, output_mismatch **908 → 742**, segfault **17 → 3**,
+runtime_error flat at **21**, timeout flat at **4**, and **zero pass→fail
+regressions**.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | 1174/1574 | 74.6 | 400 | **language + builtins** (Tamarin acceptance) |
-| avm2 | 859/1217 | 70.6 | 358 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
+| from_avmplus | **1345/1574** | 85.5 | 229 | **language + builtins** (Tamarin acceptance) |
+| avm2 | 861/1217 | 70.7 | 356 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 654/716 | 91.3 | 62 | long tail |
 | from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
 | from_gnash (5) | 371/403 | 92.1 | 32 | long tail |
@@ -85,7 +89,7 @@ table from it. **Read that table before re-deriving any of this by hand.**
 Yields are tests that flip from failing to effective-pass. Known-failure
 tests (Ruffle fails them too) are excluded from the yields.
 
-### 1. `Date` — **171 + 2 tests** · LARGE arc · **do this first**
+### 1. ~~`Date`~~ — **DONE (`da35e5d77`, +171 + 2)** · LARGE arc · best-predicted arc in this document
 
 | Suite | tests |
 |---|---|
@@ -122,6 +126,23 @@ class", plus the AS3-only surface (`Date.parse`, `Date.UTC`, the
 multi-argument constructor, the AS3 accessor properties, and the
 `toLocale*`/`toUTCString` formats). No display list, no rendering, no new
 opcodes.
+
+**Landed `da35e5d77`, CI `30134726316` (30/30 shards). Predicted 171 + 2;
+delivered exactly 171 + 2, zero regressions.** `ecma3/Date` **2/153 →
+152/153**; from_avmplus **1174 → 1345 (85.5%)**; corpus **78.6% → 82.5%**.
+
+The 171 landed as: `ecma3/Date` 150, `as3/Definitions` 14,
+`ecma3/Exceptions` 2, `ecma3/TypeConversion` 2, `ecma3/GlobalObject` 1,
+`ecma3/Array` 1, `ecma3/JSON` 1. The last four were unpredicted bonuses
+(tests that merely constructed a Date en route to something else), offsetting
+`ecma3/String/e15_5_4_6_2_rt`, which was predicted to flip but only went
+blanked → 230/232 (held back by the `[object Function]` item in Polish).
+
+Implementation notes and the three load-bearing invariants (non-coercing
+receivers, borrowed-receiver state, round-trip-pinned string formats) are in
+`from_avmplus/_investigation/CURRENT_STATUS.md` §"Fix landed: the full `Date`
+class". The single `ecma3/Date` holdout, `e15_9_5`, needs sealed builtin
+prototypes — now folded into the ranking below as a 3-test item.
 
 ### 2. ~~String/Unicode semantics~~ — **DONE (`127a5f4d3`, +101)** · SMALL arc · best ratio in the corpus
 
@@ -405,33 +426,35 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | String/Unicode: `search`/`match` coercion + `split('')` by code unit | **101** (pred. ~102) | small | **DONE `127a5f4d3`** |
 | ~~—~~ | ES3 `.prototype` surface + `Function.length` | **36** (pred. ~35) | medium | **DONE `d90353066`** |
 | ~~—~~ | prototype toString/valueOf self-coercion guard | **7** | tiny | **DONE `17c19040c`** — fixes a crash `d90353066` introduced |
-| 1 | `Date` class (ECMA-262 §15.9) | **173** | large | biggest single unlock left; fully specified; AVM1 Date to port from; no new subsystems |
-| 2 | `Number` static math (API 680) | 21 | small | mechanical |
-| 3 | `[object Function]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | ~15 (`ecma3/FunctionObjects` 6/21) | small | see Polish |
-| 4 | Global URI functions | ~9 | small | mechanical |
-| 5 | `flash.system.Capabilities` | 5 | trivial | mechanical |
+| ~~—~~ | `Date` class (ECMA-262 §15.9) | **173** (pred. 173) | large | **DONE `da35e5d77`** |
+| 1 | `Number` static math (API 680) | 21 | small | mechanical, but see the shape note below |
+| 2 | `[object Function]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | ~15 (`ecma3/FunctionObjects` 6/21) | small | see Polish |
+| 3 | Global URI functions | ~9 | small | mechanical |
+| 4 | `flash.system.Capabilities` | 5 | trivial | mechanical |
+| 5 | Sealed builtin prototypes (`#1037`) | 3 | small | 2 Array + `ecma3/Date/e15_9_5`; changes how builtin prototype objects are built |
 
-**Date is now the clear top item**, and it is worth *more* than the
-`ecma3/Date` directory count: **171** from_avmplus tests are blanked by a
-missing Date method, of which **18 live outside `ecma3/Date`** — 14 in
-`as3/Definitions/Classes`, plus `ecma3/JSON/AS3Types`,
-`ecma3/String/e15_5_4_6_2_rt`, and one on `setTime`. Add the avm2 suite's
-`date` and `date_parse` for **173**. Exact breakdown in arc 1 above.
+**Date is done and the eager-driver blanking is largely drained**: only
+**44** from_avmplus tests still die on an uncaught error, down from ~200.
+That makes the remaining ranking unusually reliable — it is read straight
+off the histogram rather than estimated.
 
-The cheap cleanup batch (`Number` static math + URI functions +
-`Capabilities`) is ~35 tests of almost purely mechanical work and fits in
-one session.
+**`Number` static math is not a plain `Math` alias.** `as3/Types/Number`
+asserts `getQualifiedClassName(Number.abs(1)) == "int"` while
+`Number.abs(3.14) == "Number"`, requires `ArgumentError #1063` on a no-arg
+call, and pins each method's `.length`. Budget for that, not for 19
+one-line forwarders.
 
-from_avmplus stands at **1174/1574 (74.6%)** with both small arcs landed.
-Date plus the cleanup batch should take it to roughly **1370/1574 (87%)**
-and the corpus from 78.4% to about **83%**.
+from_avmplus stands at **1345/1574 (85.5%)**. The cheap cleanup batch
+(`Number` static math + URI functions + `Capabilities` ≈ 35 tests) should
+take it to roughly **1380/1574 (88%)** and the corpus to about **83.3%**.
 
 **Re-rank from the error table, not from first principles.** Every result
 now carries `error_signature`; `generate_failing_by_feature.py` emits a
 "Failing Tests by Uncaught Error" histogram
 (`from_avmplus/_investigation/FAILING_TESTS_BY_FEATURE.md`). It already
 corrected two estimates in this document — `Capabilities` is 5 tests, not
-2, and Date is ~166, not ~155 — and surfaced small items nobody had
+2, and Date is ~166, not ~155 (finally 173, exactly as the histogram said
+once `error_signature` existed) — and surfaced small items nobody had
 listed (`#1037 Cannot assign to a method toString on Array`, undefined
 `AS3` and `isXMLName`, each 1–2 tests).
 

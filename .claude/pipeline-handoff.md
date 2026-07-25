@@ -6,7 +6,7 @@ When a task ends — finished, blocked, or paused with progress — run the Ruff
 
 The `ruffle-tests.yml` workflow accepts a `mode` input:
 
-- `graphics` (**per-change default** since 2026-07-23) — full graphics-native run with offscreen Dawn rendering, i.e. the production frame loop (`swf.c`). ~6 min on Dawn cache hit, ~30 min on cache miss (first run for a script_hash). Result files: `results_graphics.json`, `results_graphics_diff.md`.
+- `graphics` (**per-change default** since 2026-07-23) — full graphics-native run with offscreen Dawn rendering, i.e. the production frame loop (`swf.c`). Durations depend far more on `categories` than on Dawn — see the table in §"running → wait for completion". Result files: `results_graphics.json`, `results_graphics_diff.md`.
 - `no-graphics` — trace-only run (`swf_core.c`). ~10 min. Result files: `results.json`, `results_diff.md`. Runs weekly via `weekly-no-graphics.yml` (Sundays 08:00 UTC). Dispatch it per-change ONLY when the change touches no-graphics-only code: `swf_core.c`, `tag_stubs.c`, or `#ifdef NO_GRAPHICS` arms that lack `|| OFFSCREEN_RENDER`. When in doubt for shared runtime code, run both.
 
 All modes push results to the same branch (`ruffle-test-results`) — only the filenames differ. Rationale + reversion criterion: `SWFRecompDocs/plans/mode-consolidation-plan.md` Phase 2 (if the weekly canary ever catches a divergence graphics missed, restore dual per-change runs). Note when reading a red graphics run: the apt/Vulkan shard flakes (see `graphics-ci-aptget-flaky-shards` memory) need triage before being called regressions. (The old `case-v6` flake no longer exists — it was 3 real heap bugs, fixed 2026-05-28 in `d905efdb1`; a case-v6 failure today is a genuine regression.)
@@ -49,7 +49,13 @@ Dispatch by current `stage`. After each stage completes, fall through to the nex
 1. `gh workflow run ruffle-tests.yml --ref <branch> -f mode=graphics` — graphics is the per-change mode and the workflow default; pass the flag anyway for explicitness. Dispatch `mode=no-graphics` instead/additionally only per the §"Build mode" rules. Categories: `all` (the default, the classic five suites) for AVM1-side changes; add `-f categories=full` (the complete corpus: all + from_avmplus + the misc group) when the change touches AVM2 runtime/recompiler emission or shared code where AVM2 behavior could shift — see `ruffle-tests/tests/swfs/_investigation/FULL_SUITE_IMPORT_AUDIT.md` §"Which tests run when". Other default inputs (limit=0, parallel=30) are fine unless the user asked for something else.
 2. `sleep 3`, then `gh run list --workflow=ruffle-tests.yml --branch=<branch> --limit=1 --json databaseId,status,createdAt`. Take the first entry's `databaseId` as `run_id`. Sanity-check its `createdAt` is within the last ~30 seconds (so you don't pick up a stale run).
 3. Save `run_id`, set `stage=running`. Also record the mode you triggered (in-memory; the analyze step needs it to pick the right diff file). Report the run URL: `gh run view <run_id> --json url -q .url`.
-4. **Locally sync the Ruffle tests to upstream master** while the workflow runs: `./ruffle-tests/download_tests.sh <categories>` (NO `--clean`). CI re-downloads the tests fresh from `ruffle-rs` master on every run, but the local copy is whatever was last synced — so a stale local tree drifts from what CI actually graded. That drift shows up as **phantom regressions**: a test "passes locally but fails in CI" (or vice versa) purely because upstream changed its `output.txt` (line totals shift, e.g. `17/17 → 16/22`) or added/removed tests — NOT because of your code change. Syncing now means any local re-run (and the analyze step's reasoning) compares against the same test set CI used. Run the categories your run covered: `avm1` by default; add `from_shumway from_gnash` when the trigger used `categories=all` or those suites are in scope. (Don't commit the synced test files unless that's the explicit task — the sync is a local consistency step.) Fall through.
+4. **Locally sync the Ruffle tests to upstream master** while the workflow runs: `./ruffle-tests/download_tests.sh <categories>` (NO `--clean`). CI re-downloads the tests fresh from `ruffle-rs` master on every run, but the local copy is whatever was last synced — so a stale local tree drifts from what CI actually graded. That drift shows up as **phantom regressions**: a test "passes locally but fails in CI" (or vice versa) purely because upstream changed its `output.txt` (line totals shift, e.g. `17/17 → 16/22`) or added/removed tests — NOT because of your code change. Syncing now means any local re-run (and the analyze step's reasoning) compares against the same test set CI used. Run the categories your run covered — they must match the dispatch:
+
+- `categories=avm1` → `avm1`
+- `categories=all` → `avm1 avm2 from_shumway from_gnash`
+- `categories=full` → `avm1 avm2 from_avmplus from_shumway from_gnash` plus the nine misc categories (`timeline text swf import_assets audio fonts visual mixed_avm stage3d`)
+
+`./ruffle-tests/download_tests.sh` with no arguments syncs `avm1` only, so always pass the list explicitly. (`--help` prints the accepted names.) (Don't commit the synced test files unless that's the explicit task — the sync is a local consistency step.) Fall through.
 
 ### running → wait for completion
 
@@ -59,7 +65,16 @@ Dispatch by current `stage`. After each stage completes, fall through to the nex
 2. When it returns, re-check: `gh run view <run_id> --json status,conclusion -q '.status+" "+(.conclusion//"")'`.
    - `completed success` or `completed failure` → advance (the user wants to see results either way). Set `stage=merging`. Fall through.
    - `completed cancelled` (or other completed-but-non-terminal state) → report and stop at `stage=running`.
-   - Not yet completed (Bash timed out at 10 min) → re-run `gh run watch` with the same parameters. No-graphics runs typically finish in ~10 min, so one or two calls is enough. Graphics runs finish in ~6 min on Dawn cache hit but can take up to ~30 min on cache miss (a Dawn rebuild is triggered when `scripts/build_dawn.sh`'s hash changes); plan for up to **four** consecutive `gh run watch` calls in that case before declaring it stuck.
+   - Not yet completed (Bash timed out at 10 min) → **`pkill -f "gh run watch"` first**, then re-run `gh run watch` with the same parameters. A timed-out Bash call is not dead — the harness moves it to the background, where it keeps polling; re-invoking without killing it stacks watchers. `gh run watch` polls every ~3s and each poll fetches the full job list, so on a 30-shard run each live watcher costs ~1,200 requests/hour against the **5,000/hr GitHub API quota that is shared by every tool and agent in the session**. Three stacked watchers exhausted it on run `30134726316` and 403'd every `gh` call for 17 minutes. For the same reason, don't interleave `gh run view --json jobs` status polls with an active watcher. (If the quota is already gone: `gh api rate_limit --jq .resources.core` gives the reset epoch — wait it out, the CI run itself is unaffected.) **Expected durations** (measured, not estimated — the corpus nearly doubled with the 2026-07-24 full-suite import, so older figures in this doc were wrong):
+
+| Dispatch | Wall clock | Notes |
+|---|---|---|
+| `categories=all`, graphics, Dawn cache hit | ~10-15 min | the classic five suites |
+| `categories=full`, graphics, Dawn cache hit | **~33 min** | measured on run `30134726316`: 6 min Setup + ~26 min of 30-wide sharding. This is *test volume*, not a Dawn rebuild — do not mistake it for a cache miss |
+| any graphics mode, Dawn cache **miss** | add ~25 min | a rebuild is triggered when `scripts/build_dawn.sh`'s hash changes |
+| `no-graphics` | ~10 min | |
+
+So plan for up to **two** `gh run watch` calls for `categories=all`, and up to **four** for `categories=full` (or `full` + a Dawn rebuild), before declaring it stuck.
 
 ### merging → merge test results
 The workflow force-pushes results to `origin/ruffle-test-results`. Merge that branch into the current branch.
@@ -76,10 +91,17 @@ The workflow force-pushes results to `origin/ruffle-test-results`. Merge that br
 1. Diff result JSONs against `pre_merge_sha`. Each suite maintains its own `_results/<stem>_diff.md` where `<stem>` matches the mode:
    - `no-graphics` → `results_diff.md`
    - `graphics` → `results_graphics_diff.md`
-   Read those — they already have the pass/fail delta table you need.
-2. For each suite (avm1, from_gnash/*, from_shumway/*): summarize. Call out **regressions** (pass→fail) by name — those are the load-bearing signal. **Before blaming your change for any single-test regression, rule out upstream drift** (you synced the tests in the trigger stage): if the reported delta is a line-total shift (`N/N → M/K` with a changed denominator) or an added/removed test, re-run that test locally (`verify_output.py --test=<name> --diff`) against the now-synced tree. If it passes locally, the CI "regression" is upstream having changed that test's `output.txt`, not your code — note it as drift and don't chase it.
-3. If any suite's `_investigation/CURRENT_STATUS.md` is affected, skim it for context.
-4. Set `stage=done`. Report findings in the final message, naming the mode that ran.
+   Read those for the per-test pass/fail delta — but they are **not sufficient on their own**; see step 2.
+
+2. **Diff the STATUS HISTOGRAM, not just pass→fail transitions.** A `_diff.md` shows tests that crossed the pass/fail line. A test that was *already failing* and starts **segfaulting** crosses no line and appears nowhere — that is how a change once introduced 12 new segfaults while the diff honestly reported "zero regressions". Compare `collections.Counter(t['status'] for t in results['tests'])` between the two commits and treat any rise in `segfault` / `timeout` / `runtime_error` / `compile_fail` as a regression to chase, even at a constant effective-pass count.
+
+   **Compare on the INTERSECTION of tests present in both runs.** If either endpoint lost a shard to the apt/Vulkan flake, the missing tests reappear in the other run and a naive diff scores every one of them as "newly passing". Bucket keys missing from the baseline separately as *shard recovery* — never as yield — and say how many tests went ungraded. A per-suite `total` that moved between runs (e.g. 1522 vs 1574) is the tell.
+
+   **The corpus denominator is 4414, not 4463.** Three nested `_results` dirs are already inside their parents and must not be added again: `from_shumway/avm1`, `from_shumway/timeline`, `from_gnash/misc-ming.all/displaylist_depths`. Sum top-level leaf suites only.
+
+3. **Cover every suite the dispatch actually ran** — 19 top-level leaf suites exist, not the three this doc used to list. For `categories=full` that is: `avm1`, `avm2`, `from_avmplus`, `from_shumway`, the five `from_gnash/*`, `regression`, and the nine misc categories (`timeline`, `text`, `swf`, `import_assets`, `audio`, `fonts`, `visual`, `mixed_avm`, `stage3d`). Summarize each; call out **regressions** by name — those are the load-bearing signal. Omitting `avm2` / `from_avmplus` would have hidden the entire yield of the AVM2 arcs. **Before blaming your change for any single-test regression, rule out upstream drift** (you synced the tests in the trigger stage): if the reported delta is a line-total shift (`N/N → M/K` with a changed denominator) or an added/removed test, re-run that test locally (`verify_output.py --test=<name> --diff`) against the now-synced tree. If it passes locally, the CI "regression" is upstream having changed that test's `output.txt`, not your code — note it as drift and don't chase it.
+4. If any suite's `_investigation/CURRENT_STATUS.md` is affected, skim it for context and update it with the confirmed numbers.
+5. Set `stage=done`. Report findings in the final message, naming the mode that ran and the run ID.
 
 ## Error handling
 
