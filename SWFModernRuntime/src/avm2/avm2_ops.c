@@ -117,7 +117,8 @@ _Noreturn void avm2_verify_error_body(Avm2Activation* act, const char* message)
 typedef struct Resolved
 {
 	const Avm2PropEntry* entry;  // vtable trait
-	Avm2Value* dyn;              // own dynamic slot
+	Avm2DynProp* dyn;            // own dynamic prop (the entry, so writes can
+	                             // see its read_only attribute)
 	Avm2Object* proto_holder;    // proto-chain holder of `dyn`
 	int is_array_elem;
 	int is_vector_elem;
@@ -281,7 +282,7 @@ static int resolve_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
 			out->arr_index = idx;
 			return 1;
 		}
-		out->dyn = avm2_object_find_dynamic(obj, key->name, key->name_len);
+		out->dyn = avm2_object_find_dynamic_entry(obj, key->name, key->name_len);
 		if (out->dyn != NULL) return 1;
 	}
 
@@ -289,7 +290,8 @@ static int resolve_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
 	Avm2Object* proto = avm2_value_proto(ctx, recv);
 	while (proto != NULL)
 	{
-		Avm2Value* dv = avm2_object_find_dynamic(proto, key->name, key->name_len);
+		Avm2DynProp* dv = avm2_object_find_dynamic_entry(proto, key->name,
+		                                                 key->name_len);
 		if (dv != NULL)
 		{
 			out->dyn = dv;
@@ -362,13 +364,13 @@ static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Reso
 			out->arr_index = idx;
 			return 1;
 		}
-		out->dyn = avm2_object_find_dynamic(obj, key.name, key.name_len);
+		out->dyn = avm2_object_find_dynamic_entry(obj, key.name, key.name_len);
 		if (out->dyn != NULL) return 1;
 	}
 	Avm2Object* proto = avm2_value_proto(ctx, recv);
 	while (proto != NULL)
 	{
-		Avm2Value* dv = avm2_object_find_dynamic(proto, key.name, key.name_len);
+		Avm2DynProp* dv = avm2_object_find_dynamic_entry(proto, key.name, key.name_len);
 		if (dv != NULL)
 		{
 			out->dyn = dv;
@@ -440,7 +442,7 @@ static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* 
 		}
 		return avm2_undefined();
 	}
-	if (r->dyn != NULL) return *r->dyn;
+	if (r->dyn != NULL) return r->dyn->value;
 	const Avm2PropEntry* e = r->entry;
 	switch (e->kind)
 	{
@@ -752,7 +754,17 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 	}
 	if (r->dyn != NULL && r->proto_holder == NULL)
 	{
-		*r->dyn = value;
+		// A builtin `static const` carried in a dynamic prop is ReadOnly, and
+		// reports it the same way a const SLOT trait does (below).
+		if (r->dyn->read_only && !allow_const)
+		{
+			char cn[160];
+			class_name_of(ctx, recv, cn, sizeof(cn));
+			avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+			                 "Error #1074: Illegal write to read-only property "
+			                 "%.*s on %s.", (int) name_len, name, cn);
+		}
+		r->dyn->value = value;
 		return;
 	}
 	if (r->dyn != NULL)
@@ -1129,6 +1141,25 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	setproperty_miss(ctx, recv, ns->utf8, ns->len, value);
 }
 
+// Declared trait visible to `delete` on this receiver. A class object's own
+// `vtable` is its STATIC vtable, so Class's instance members (notably the
+// `prototype` getter) need the same class_class fallback the resolve paths use
+// — without it `delete(Number.prototype)` misses the trait and reports true
+// (ecma3/Number/e15_7_3_1_1).
+static const Avm2PropEntry* delete_trait_find(Avm2Context* ctx, Avm2Value recv,
+                                              const Avm2VTable* vt,
+                                              const Avm2PropKey* key)
+{
+	const Avm2PropEntry* e = avm2_vtable_find(vt, key);
+	if (e == NULL && recv.kind == AVM2_VALUE_OBJECT
+	    && recv.u.obj->kind == AVM2_OBJ_CLASS
+	    && ctx->builtins.class_class != NULL)
+	{
+		e = avm2_vtable_find(&ctx->builtins.class_class->ivtable, key);
+	}
+	return e;
+}
+
 static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
                                        const char* name, uint32_t name_len)
 {
@@ -1155,15 +1186,16 @@ static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
 	}
 	// Declared traits can't be deleted.
 	Avm2PropKey key = avm2_public_key(name, name_len);
-	if (avm2_vtable_find(obj->vtable, &key) != NULL)
+	if (delete_trait_find(ctx, recv, obj->vtable, &key) != NULL)
 	{
 		return avm2_bool(false);
 	}
-	if (avm2_object_delete_dynamic(obj, name, name_len))
+	// -1 = present but DontDelete (a builtin `static const`).
+	if (avm2_object_delete_dynamic(obj, name, name_len) < 0)
 	{
-		return avm2_bool(true);
+		return avm2_bool(false);
 	}
-	// Deleting a missing property returns true (ES3).
+	// Deleting a missing property returns true (ES3), same as a successful one.
 	return avm2_bool(true);
 }
 
@@ -1415,9 +1447,9 @@ static Avm2Value deleteproperty_qname(Avm2Activation* act, Avm2Value recv,
 		}
 		return avm2_bool(false);  // declared traits can't be deleted
 	}
-	if (pub && avm2_object_delete_dynamic(obj, key.name, key.name_len))
+	if (pub && avm2_object_delete_dynamic(obj, key.name, key.name_len) < 0)
 	{
-		return avm2_bool(true);
+		return avm2_bool(false);  // present but DontDelete (`static const`)
 	}
 	return avm2_bool(true);  // deleting a missing property returns true
 }
@@ -1555,7 +1587,7 @@ static Avm2Value deleteproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 	Avm2PropKey key;
 	int pub = key_from_ns_value(ns_val, name, name_len, &key);
 	const Avm2VTable* vt = avm2_value_vtable(ctx, recv);
-	if (avm2_vtable_find(vt, &key) != NULL)
+	if (delete_trait_find(ctx, recv, vt, &key) != NULL)
 	{
 		return avm2_bool(false);
 	}
@@ -1568,9 +1600,9 @@ static Avm2Value deleteproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 		                                   &qn, 1);
 		return avm2_bool(avm2_coerce_to_boolean(v));
 	}
-	if (pub && avm2_object_delete_dynamic(recv.u.obj, name, name_len))
+	if (pub && avm2_object_delete_dynamic(recv.u.obj, name, name_len) < 0)
 	{
-		return avm2_bool(true);
+		return avm2_bool(false);  // present but DontDelete (`static const`)
 	}
 	return avm2_bool(true);
 }

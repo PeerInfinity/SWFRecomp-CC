@@ -44,17 +44,24 @@ Avm2Object* avm2_object_alloc(Avm2Context* ctx, uint8_t kind, uint32_t slot_coun
 	return obj;
 }
 
-Avm2Value* avm2_object_find_dynamic(Avm2Object* obj, const char* name, uint32_t name_len)
+Avm2DynProp* avm2_object_find_dynamic_entry(Avm2Object* obj, const char* name,
+                                            uint32_t name_len)
 {
 	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 	{
 		if (!p->dead && p->key_obj == NULL && p->name.len == name_len
 		    && memcmp(p->name.utf8, name, name_len) == 0)
 		{
-			return &p->value;
+			return p;
 		}
 	}
 	return NULL;
+}
+
+Avm2Value* avm2_object_find_dynamic(Avm2Object* obj, const char* name, uint32_t name_len)
+{
+	Avm2DynProp* p = avm2_object_find_dynamic_entry(obj, name, name_len);
+	return (p != NULL) ? &p->value : NULL;
 }
 
 Avm2Value* avm2_object_find_dynamic_obj(Avm2Object* obj, Avm2Object* key)
@@ -139,6 +146,8 @@ int avm2_object_delete_dynamic(Avm2Object* obj, const char* name, uint32_t name_
 		if (!p->dead && p->key_obj == NULL && p->name.len == name_len
 		    && memcmp(p->name.utf8, name, name_len) == 0)
 		{
+			// A `static const` value prop is DontDelete (see read_only).
+			if (p->read_only) return -1;
 			p->dead = 1;  // tombstone (see Avm2DynProp.dead)
 			return 1;
 		}

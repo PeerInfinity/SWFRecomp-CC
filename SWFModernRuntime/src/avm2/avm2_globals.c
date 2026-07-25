@@ -374,9 +374,13 @@ void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char*
                                    Avm2Value value)
 {
 	// Statics-as-slots would need slot storage; a dont-enum dynamic prop on
-	// the class object gives identical read behavior.
-	avm2_object_set_dynamic(ctx, cls->class_object, name,
-	                        (uint32_t) strlen(name), value)->dont_enum = 1;
+	// the class object gives identical read behavior. `read_only` restores the
+	// other two `const` attributes the slot form would have carried: an AS
+	// write throws #1074 and `delete` returns false (ecma3/Number e15_7_3_*).
+	Avm2DynProp* p = avm2_object_set_dynamic(ctx, cls->class_object, name,
+	                                         (uint32_t) strlen(name), value);
+	p->dont_enum = 1;
+	p->read_only = 1;
 }
 
 void avm2_proto_add_function_n(Avm2Context* ctx, Avm2Object* proto, const char* name,

@@ -30,6 +30,12 @@ typedef struct Avm2DynProp
 	Avm2String name;
 	Avm2Value value;
 	uint8_t dont_enum;
+	// AS3 `public static const` semantics for a value carried in a dynamic
+	// prop (avm2_builtin_add_static_const): ReadOnly *and* DontDelete, so an
+	// AS-level write throws #1074 and `delete` reports false. Only the
+	// ActionScript paths honour it — avm2_object_set_dynamic is the C-side
+	// installer and still overwrites, so builtin registration is unaffected.
+	uint8_t read_only;
 	// Tombstone: deleted entries stay linked (dead=1) so an in-flight
 	// enumeration cursor survives deletion, mirroring Ruffle's
 	// dynamic_map.rs stable bucket indices (dictionary_iter_modify).
@@ -145,9 +151,12 @@ Avm2Object* avm2_object_alloc(Avm2Context* ctx, uint8_t kind, uint32_t slot_coun
 
 // Dynamic (expando) properties.
 Avm2Value* avm2_object_find_dynamic(Avm2Object* obj, const char* name, uint32_t name_len);
+Avm2DynProp* avm2_object_find_dynamic_entry(Avm2Object* obj, const char* name,
+                                            uint32_t name_len);
 Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const char* name,
                                      uint32_t name_len, Avm2Value value);
-// Returns 1 if the property existed and was removed.
+// 1 = existed and was removed, 0 = no such property,
+// -1 = exists but is DontDelete (read_only) — the caller must report false.
 int avm2_object_delete_dynamic(Avm2Object* obj, const char* name, uint32_t name_len);
 
 // Dictionary object-space keys (identity semantics).
