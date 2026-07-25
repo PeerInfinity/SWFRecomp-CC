@@ -71,6 +71,12 @@ typedef struct Avm2MethodRef
 struct Avm2Object
 {
 	uint8_t kind;             // Avm2ObjectKind
+	// This object is some class's `prototype`. avmplus keeps prototypes
+	// dynamic even when their class is sealed (ES3 code assigns onto
+	// Boolean.prototype & co constantly, and our own bootstrap does too),
+	// so object_is_dynamic() honours this bit ahead of the class flags.
+	// Lives in the padding after `kind`: no sizeof or field-offset change.
+	uint8_t is_prototype;
 	Avm2Class* cls;           // class this object is an instance of
 	Avm2Object* proto;        // prototype link (ES3 chain, dynamic reads)
 	const Avm2VTable* vtable; // instance vtable (usually &cls->ivtable) or own

@@ -1037,6 +1037,7 @@ static void class_setup_prototype(Avm2Context* ctx, Avm2Class* cls)
 {
 	Avm2Object* proto = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
 	proto->cls = ctx->builtins.object_class;
+	proto->is_prototype = 1;  // dynamic even for sealed classes
 	if (cls->super_class != NULL)
 	{
 		proto->proto = cls->super_class->prototype_obj;

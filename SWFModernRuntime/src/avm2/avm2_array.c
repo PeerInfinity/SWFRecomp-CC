@@ -1069,8 +1069,14 @@ void avm2_register_array(Avm2Context* ctx)
 		e.setter.debug_name = "set length";
 		avm2_vtable_append(ctx, &cls->ivtable, &e);
 	}
-	avm2_builtin_add_method(ctx, cls, "join", array_join);
-	avm2_builtin_add_method(ctx, cls, "toString", array_to_string);
+	avm2_builtin_add_method_n(ctx, cls, "join", array_join, 1);
+	// No public `toString` trait: in avmplus Array's is AS3-namespaced, with a
+	// *public prototype function* alongside it, so the public name is shadowable.
+	// ecma3/Array/e15_4_1_1 assigns `arr.toString = Object.prototype.toString`
+	// on an instance and e15_4_4 does the same on Array.prototype; both expect
+	// the write to land (a public method trait here would throw #1037) and the
+	// assigned function to win the subsequent call. The prototype entries added
+	// at the bottom of this function keep ordinary `arr.toString()` working.
 	avm2_builtin_add_method(ctx, cls, "toLocaleString", array_to_locale_string);
 	avm2_builtin_add_method(ctx, cls, "push", array_push);
 	avm2_builtin_add_method(ctx, cls, "pop", array_pop);
@@ -1078,17 +1084,17 @@ void avm2_register_array(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, cls, "unshift", array_unshift);
 	avm2_builtin_add_method(ctx, cls, "reverse", array_reverse);
 	avm2_builtin_add_method(ctx, cls, "concat", array_concat);
-	avm2_builtin_add_method(ctx, cls, "slice", array_slice);
+	avm2_builtin_add_method_n(ctx, cls, "slice", array_slice, 2);
 	avm2_builtin_add_method(ctx, cls, "splice", array_splice);
-	avm2_builtin_add_method(ctx, cls, "indexOf", array_index_of);
-	avm2_builtin_add_method(ctx, cls, "lastIndexOf", array_last_index_of);
-	avm2_builtin_add_method(ctx, cls, "forEach", array_for_each);
-	avm2_builtin_add_method(ctx, cls, "map", array_map);
-	avm2_builtin_add_method(ctx, cls, "filter", array_filter);
-	avm2_builtin_add_method(ctx, cls, "every", array_every);
-	avm2_builtin_add_method(ctx, cls, "some", array_some);
+	avm2_builtin_add_method_n(ctx, cls, "indexOf", array_index_of, 2);
+	avm2_builtin_add_method_n(ctx, cls, "lastIndexOf", array_last_index_of, 2);
+	avm2_builtin_add_method_n(ctx, cls, "forEach", array_for_each, 2);
+	avm2_builtin_add_method_n(ctx, cls, "map", array_map, 2);
+	avm2_builtin_add_method_n(ctx, cls, "filter", array_filter, 2);
+	avm2_builtin_add_method_n(ctx, cls, "every", array_every, 2);
+	avm2_builtin_add_method_n(ctx, cls, "some", array_some, 2);
 	avm2_builtin_add_method(ctx, cls, "sort", array_sort);
-	avm2_builtin_add_method(ctx, cls, "sortOn", array_sort_on);
+	avm2_builtin_add_method_n(ctx, cls, "sortOn", array_sort_on, 2);
 	avm2_builtin_add_method(ctx, cls, "insertAt", array_insert_at);
 	avm2_builtin_add_method(ctx, cls, "removeAt", array_remove_at);
 
@@ -1101,6 +1107,20 @@ void avm2_register_array(Avm2Context* ctx)
 	// ES3-compat layer on Array.prototype (Ruffle globals/Array.as). Ruffle
 	// omits insertAt/removeAt here — they are AS3-only additions, not ES3.
 	Avm2Object* proto = cls->prototype_obj;
+
+	// avmplus builds each builtin's prototype as an instance of that class, so
+	// `Array.prototype` is a genuine empty Array: `Array.prototype.length` is 0
+	// (not undefined) and Object.prototype.toString.call(it) says
+	// "[object Array]" (ecma3/Array/e15_4_4). Retype the object in place -- it
+	// is already GC-pinned, already carries `constructor`, and its proto link
+	// to Object.prototype stays put.
+	proto->kind = AVM2_OBJ_ARRAY;
+	proto->cls = cls;
+	proto->vtable = &cls->ivtable;
+	Avm2ArrayExt* proto_ext = avm2_alloc(ctx, sizeof(Avm2ArrayExt));
+	memset(proto_ext, 0, sizeof(Avm2ArrayExt));
+	proto->native_ext = proto_ext;
+
 	avm2_proto_add_function_n(ctx, proto, "concat", array_concat, 0);
 	avm2_proto_add_function_n(ctx, proto, "every", array_every, 2);
 	avm2_proto_add_function_n(ctx, proto, "filter", array_filter, 2);

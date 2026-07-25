@@ -104,19 +104,45 @@ static bool numeric_receiver(Avm2Value v)
 	return v.kind == AVM2_VALUE_NUMBER || v.kind == AVM2_VALUE_INTEGER;
 }
 
-static Avm2Value number_proto_to_string(Avm2Activation* act)
+// ...but only for the prototype ITSELF. Any other object receiver is
+// incompatible, and avmplus says so with #1004 (avm2/primitive_valueOf,
+// ecma3/Exceptions/number_002_rt assign Number.prototype.valueOf onto a plain
+// Object and expect the call to throw). The class name in the message is the
+// prototype the shim was installed on, hence one pair per class.
+static void number_proto_receiver_check(Avm2Activation* act, Avm2Class* cls,
+                                        const char* cls_name, const char* meth)
 {
-	if (numeric_receiver(act->this_val)) return number_to_string(act);
-	Avm2Activation zero = *act;
-	zero.this_val = avm2_number(0.0);
-	return number_to_string(&zero);
+	if (act->this_val.kind == AVM2_VALUE_OBJECT
+	    && act->this_val.u.obj == cls->prototype_obj)
+	{
+		return;
+	}
+	avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
+	                 "Error #1004: Method %s.prototype.%s was invoked on an "
+	                 "incompatible object.", cls_name, meth);
 }
 
-static Avm2Value number_proto_value_of(Avm2Activation* act)
-{
-	if (numeric_receiver(act->this_val)) return act->this_val;
-	return avm2_number(0.0);
-}
+#define DEFINE_NUMBER_PROTO_SHIMS(tag, cls_field, cls_name)                    \
+	static Avm2Value tag##_proto_to_string(Avm2Activation* act)                \
+	{                                                                          \
+		if (numeric_receiver(act->this_val)) return number_to_string(act);     \
+		number_proto_receiver_check(act, act->ctx->builtins.cls_field,         \
+		                            cls_name, "toString");                     \
+		Avm2Activation zero = *act;                                            \
+		zero.this_val = avm2_number(0.0);                                      \
+		return number_to_string(&zero);                                        \
+	}                                                                          \
+	static Avm2Value tag##_proto_value_of(Avm2Activation* act)                 \
+	{                                                                          \
+		if (numeric_receiver(act->this_val)) return act->this_val;             \
+		number_proto_receiver_check(act, act->ctx->builtins.cls_field,         \
+		                            cls_name, "valueOf");                      \
+		return avm2_number(0.0);                                               \
+	}
+
+DEFINE_NUMBER_PROTO_SHIMS(number, number_class, "Number")
+DEFINE_NUMBER_PROTO_SHIMS(int, int_class, "int")
+DEFINE_NUMBER_PROTO_SHIMS(uint, uint_class, "uint")
 
 static Avm2Value number_to_fixed(Avm2Activation* act)
 {
@@ -261,6 +287,34 @@ static Avm2Value boolean_to_string(Avm2Activation* act)
 static Avm2Value boolean_value_of(Avm2Activation* act)
 {
 	return avm2_bool(avm2_coerce_to_boolean(act->this_val));
+}
+
+// Boolean.prototype.toString / .valueOf.
+//
+// Same shape as number_proto_to_string/value_of above: in avmplus
+// `Boolean.prototype` is a Boolean object whose value is false, so the
+// tests assert `Boolean.prototype.valueOf()` -> false and
+// `String(Boolean.prototype)` -> "false". The class methods coerce their
+// receiver, and an object coerces to true, so registering them directly
+// on the prototype yields true for both. A non-boolean receiver is the
+// prototype (or something equally value-less) and reads as false.
+static Avm2Value boolean_proto_to_string(Avm2Activation* act)
+{
+	if (act->this_val.kind != AVM2_VALUE_BOOL)
+	{
+		number_proto_receiver_check(act, act->ctx->builtins.boolean_class,
+		                            "Boolean", "toString");
+	}
+	bool b = act->this_val.kind == AVM2_VALUE_BOOL && act->this_val.u.b;
+	return avm2_string(avm2_string_from_literal(act->ctx, b ? "true" : "false"));
+}
+
+static Avm2Value boolean_proto_value_of(Avm2Activation* act)
+{
+	if (act->this_val.kind == AVM2_VALUE_BOOL) return act->this_val;
+	number_proto_receiver_check(act, act->ctx->builtins.boolean_class,
+	                            "Boolean", "valueOf");
+	return avm2_bool(false);
 }
 
 // ---------------------------------------------------------------------------
@@ -505,7 +559,9 @@ static void add_number_statics(Avm2Context* ctx, Avm2Class* cls)
 // Registration
 // ---------------------------------------------------------------------------
 
-static void add_number_methods(Avm2Context* ctx, Avm2Class* cls)
+static void add_number_methods(Avm2Context* ctx, Avm2Class* cls,
+                               Avm2MethodFn proto_to_string,
+                               Avm2MethodFn proto_value_of)
 {
 	avm2_builtin_add_method(ctx, cls, "toString", number_to_string);
 	avm2_builtin_add_method(ctx, cls, "toLocaleString", number_to_string);
@@ -516,9 +572,9 @@ static void add_number_methods(Avm2Context* ctx, Avm2Class* cls)
 
 	// ES3-compat layer on the prototype (Ruffle globals/Number.as).
 	Avm2Object* proto = cls->prototype_obj;
-	avm2_proto_add_function_n(ctx, proto, "toString", number_proto_to_string, 1);
-	avm2_proto_add_function_n(ctx, proto, "toLocaleString", number_proto_to_string, 1);
-	avm2_proto_add_function_n(ctx, proto, "valueOf", number_proto_value_of, 0);
+	avm2_proto_add_function_n(ctx, proto, "toString", proto_to_string, 1);
+	avm2_proto_add_function_n(ctx, proto, "toLocaleString", proto_to_string, 1);
+	avm2_proto_add_function_n(ctx, proto, "valueOf", proto_value_of, 0);
 	avm2_proto_add_function_n(ctx, proto, "toFixed", number_to_fixed, 1);
 	avm2_proto_add_function_n(ctx, proto, "toExponential", number_to_exponential, 1);
 	avm2_proto_add_function_n(ctx, proto, "toPrecision", number_to_precision, 1);
@@ -532,7 +588,8 @@ void avm2_register_number(Avm2Context* ctx)
 	b->number_class->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	b->number_class->native_construct = number_construct;
 	b->number_class->native_call = number_construct;
-	add_number_methods(ctx, b->number_class);
+	add_number_methods(ctx, b->number_class, number_proto_to_string,
+	                   number_proto_value_of);
 	avm2_builtin_add_static_const(ctx, b->number_class, "MAX_VALUE",
 	                              avm2_number(1.7976931348623157e308));
 	avm2_builtin_add_static_const(ctx, b->number_class, "MIN_VALUE",
@@ -551,7 +608,8 @@ void avm2_register_number(Avm2Context* ctx)
 	b->int_class->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	b->int_class->native_construct = int_construct;
 	b->int_class->native_call = int_construct;
-	add_number_methods(ctx, b->int_class);
+	add_number_methods(ctx, b->int_class, int_proto_to_string,
+	                   int_proto_value_of);
 	avm2_builtin_add_static_const(ctx, b->int_class, "MAX_VALUE",
 	                              avm2_integer(2147483647));
 	avm2_builtin_add_static_const(ctx, b->int_class, "MIN_VALUE",
@@ -561,7 +619,8 @@ void avm2_register_number(Avm2Context* ctx)
 	b->uint_class->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	b->uint_class->native_construct = uint_construct;
 	b->uint_class->native_call = uint_construct;
-	add_number_methods(ctx, b->uint_class);
+	add_number_methods(ctx, b->uint_class, uint_proto_to_string,
+	                   uint_proto_value_of);
 	avm2_builtin_add_static_const(ctx, b->uint_class, "MAX_VALUE",
 	                              avm2_number(4294967295.0));
 	avm2_builtin_add_static_const(ctx, b->uint_class, "MIN_VALUE", avm2_integer(0));
@@ -573,9 +632,9 @@ void avm2_register_number(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, b->boolean_class, "toString", boolean_to_string);
 	avm2_builtin_add_method(ctx, b->boolean_class, "valueOf", boolean_value_of);
 	avm2_proto_add_function(ctx, b->boolean_class->prototype_obj, "toString",
-	                        boolean_to_string);
+	                        boolean_proto_to_string);
 	avm2_proto_add_function(ctx, b->boolean_class->prototype_obj, "valueOf",
-	                        boolean_value_of);
+	                        boolean_proto_value_of);
 
 	Avm2Class* math = avm2_builtin_class(ctx, "", "Math", b->object_class);
 	b->math_class = math;

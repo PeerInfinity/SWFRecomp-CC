@@ -581,10 +581,31 @@ static Avm2Value string_to_string(Avm2Activation* act)
 // recurse until the stack dies. In avmplus `String.prototype` is a String
 // object whose primitive value is "", and the tests assert exactly that
 // (`String.prototype.toString()` -> ""), so a non-string receiver yields "".
-static Avm2Value string_proto_to_string(Avm2Activation* act)
+// Any OTHER object receiver is an incompatible one -- avmplus reports #1004
+// there (avm2/primitive_valueOf, ecma3/Exceptions/string_002_rt assign
+// String.prototype.valueOf onto a plain Object and expect the call to throw).
+static Avm2Value string_proto_receiver(Avm2Activation* act, const char* meth)
 {
 	if (act->this_val.kind == AVM2_VALUE_STRING) return act->this_val;
-	return make_str(act->ctx, "", 0);
+	Avm2Context* ctx = act->ctx;
+	if (act->this_val.kind == AVM2_VALUE_OBJECT
+	    && act->this_val.u.obj == ctx->builtins.string_class->prototype_obj)
+	{
+		return make_str(ctx, "", 0);
+	}
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #1004: Method String.prototype.%s was invoked on an "
+	                 "incompatible object.", meth);
+}
+
+static Avm2Value string_proto_to_string(Avm2Activation* act)
+{
+	return string_proto_receiver(act, "toString");
+}
+
+static Avm2Value string_proto_value_of(Avm2Activation* act)
+{
+	return string_proto_receiver(act, "valueOf");
 }
 
 static Avm2Value string_construct(Avm2Context* ctx, Avm2Class* cls,
@@ -650,5 +671,5 @@ void avm2_register_string(Avm2Context* ctx)
 	avm2_proto_add_function_n(ctx, proto, "toUpperCase", string_to_upper_case, 0);
 	avm2_proto_add_function_n(ctx, proto, "toLocaleUpperCase", string_to_upper_case, 0);
 	avm2_proto_add_function_n(ctx, proto, "toString", string_proto_to_string, 0);
-	avm2_proto_add_function_n(ctx, proto, "valueOf", string_proto_to_string, 0);
+	avm2_proto_add_function_n(ctx, proto, "valueOf", string_proto_value_of, 0);
 }

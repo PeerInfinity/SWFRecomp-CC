@@ -254,6 +254,7 @@ Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name
 	// Prototype object.
 	Avm2Object* proto = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
 	proto->cls = ctx->builtins.object_class;  // may be NULL for Object itself
+	proto->is_prototype = 1;                  // dynamic even for sealed classes
 	if (super != NULL)
 	{
 		proto->proto = super->prototype_obj;
@@ -270,8 +271,8 @@ Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name
 	return cls;
 }
 
-void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
-                             Avm2MethodFn fn)
+void avm2_builtin_add_method_n(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                               Avm2MethodFn fn, uint32_t param_count)
 {
 	Avm2PropEntry e;
 	memset(&e, 0, sizeof(e));
@@ -280,9 +281,16 @@ void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	e.method.fn = fn;
 	e.method.file = NULL;
 	e.method.debug_name = name;
+	e.method.param_count = param_count;
 	e.defining_class = cls;
 	e.method_scope = NULL;
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
+}
+
+void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                             Avm2MethodFn fn)
+{
+	avm2_builtin_add_method_n(ctx, cls, name, fn, 0);
 }
 
 void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
@@ -613,7 +621,18 @@ static Avm2Value class_proto_to_string(Avm2Activation* act)
 	}
 	else
 	{
-		snprintf(buf, sizeof(buf), "[object Class]");
+		// Not a class object: the receiver is `Class.prototype` itself (a
+		// plain Object in avmplus too), or something it was .call()ed on.
+		// avmplus classifies it by its actual class rather than printing a
+		// blanket "[object Class]" -- ecma3/ObjectObjects/e15_2_3{,_1}_rt
+		// assert `Object.constructor.prototype + ""` == `Object.prototype
+		// + ""` == "[object Object]".
+		Avm2Class* c = (act->this_val.kind == AVM2_VALUE_UNDEFINED
+		                || act->this_val.kind == AVM2_VALUE_NULL)
+		                   ? ctx->builtins.object_class
+		                   : avm2_value_class(ctx, act->this_val);
+		snprintf(buf, sizeof(buf), "[object %.*s]",
+		         (int) c->name.name_len, c->name.name);
 	}
 	return avm2_string(avm2_string_from_literal(ctx, buf));
 }

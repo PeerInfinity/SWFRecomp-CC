@@ -145,6 +145,7 @@ static int object_is_dynamic(Avm2Object* obj)
 	{
 		return 1;
 	}
+	if (obj->is_prototype) return 1;
 	if (obj->cls == NULL) return 1;
 	return (obj->cls->flags & AVM2_CLASS_FLAG_SEALED) == 0;
 }

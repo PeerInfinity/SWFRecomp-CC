@@ -72,6 +72,12 @@ Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name
                               Avm2Class* super);
 void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn);
+// ...with a declared arity, which is what Function.length reports. Needed
+// wherever a class's prototype is an instance of that class (Array), because
+// then the ivtable trait -- not the ES3 prototype function -- is what
+// `Cls.prototype.method.length` resolves to.
+void avm2_builtin_add_method_n(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                               Avm2MethodFn fn, uint32_t param_count);
 void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn);
 // Instance accessor pair (setter may be NULL for a getter-only prop).
