@@ -1,37 +1,29 @@
 # Ruffle Test Results Diff
 
-**Previous:** `2cf4014fd672` (2026-07-24T22:06:49.298471+00:00)
-**Current:** `17c19040c9cd` (2026-07-24T23:01:01.235807+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `17c19040c9cd` (2026-07-24T23:01:01.235807+00:00)
+**Current:** `da35e5d771bb` (2026-07-25T00:20:13.972877+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 833 | 805 | -28 |
-| Total | 1217 | 1177 | -40 |
-| Pass rate | 68.4% | 68.4% | 0% |
-| Mismatched lines | 46941 | 47442 | +501 |
-|   Increased | | | +532 |
+| Passing | 805 | 835 | +30 |
+| Total | 1177 | 1217 | +40 |
+| Pass rate | 68.4% | 68.6% | +0.2% |
+| Mismatched lines | 47442 | 47424 | -18 |
+|   Decreased | | | -49 |
 
-## Status Changed (2)
+## Newly Passing (2)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `primitive_toString` | segfault | output_mismatch | - | 16/277 |
-| `primitive_valueOf` | segfault | output_mismatch | - | 14/285 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `date` | output_mismatch | 15/30 | 30/30 |
+| `date_parse` | output_mismatch | 2/36 | 36/36 |
 
-## Missing Tests — Shard Failure (40)
+## Added Tests (40)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 28 were previously passing
-- 12 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `vector_reborrow_bug` | pass | 10/10 |
 | `vector_removeat` | pass | 172/172 |
 | `vector_reverse` | pass | 232/232 |
@@ -72,5 +64,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `xml_children` | pass | 43/43 |
 | `xml_class_call` | pass | 9/9 |
 | `xml_contains` | pass | 197/197 |
-
-</details>

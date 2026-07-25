@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-24 23:01 UTC
+**Date**: 2026-07-25 00:20 UTC
 
-**Git SHA**: `17c19040c9`
+**Git SHA**: `da35e5d771`
 
-**Run Duration**: 0m 43s
+**Run Duration**: 0m 46s
 
 **Filtered**: 0 tests ignored out of 11 available
 
@@ -31,9 +31,9 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `avm1_doabc` | 1 | 0.8s |  |
-| 2 | `avm1_sprite_sc_ignored` | 3 | 1.9s |  |
-| 3 | `avm2_doaction` | 1 | 5.5s |  |
+| 1 | `avm1_doabc` | 1 | 0.6s |  |
+| 2 | `avm1_sprite_sc_ignored` | 3 | 2.1s |  |
+| 3 | `avm2_doaction` | 1 | 4.2s |  |
 
 ## Near-Passing Tests
 

@@ -1,35 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `2cf4014fd672` (2026-07-24T22:06:49.274731+00:00)
-**Current:** `17c19040c9cd` (2026-07-24T23:01:01.212550+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `17c19040c9cd` (2026-07-24T23:01:01.212550+00:00)
+**Current:** `da35e5d771bb` (2026-07-25T00:20:13.948262+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 637 | 619 | -18 |
-| Total | 716 | 693 | -23 |
-| Pass rate | 89.0% | 89.3% | +0.3% |
-| Mismatched lines | 15348 | 12540 | -2808 |
+| Passing | 619 | 637 | +18 |
+| Total | 693 | 716 | +23 |
+| Pass rate | 89.3% | 89.0% | -0.3% |
+| Mismatched lines | 12540 | 15348 | +2808 |
 
-## Newly Failing (1)
+## Newly Passing (1)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `array_shift` | timeout | 216/216 | - |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `array_shift` | timeout | - | 216/216 |
 
-## Missing Tests — Shard Failure (23)
+## Added Tests (23)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
-
-- 17 were previously passing
-- 6 were previously failing
-
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
 | `watch` | pass | 117/117 |
 | `watch_infinite_recursion` | pass | 1/1 |
 | `watch_proto_recursion` | pass | 1/1 |
@@ -53,5 +45,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `xml_first_last_child` | pass | 8/8 |
 | `xml_getbytes` | output_mismatch | 9/17 |
 | `xml_has_child_nodes` | pass | 3/3 |
-
-</details>
