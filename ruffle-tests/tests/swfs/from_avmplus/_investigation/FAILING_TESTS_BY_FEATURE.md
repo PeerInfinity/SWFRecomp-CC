@@ -4,39 +4,23 @@
 <!-- Do not edit manually — regenerate with `scripts/generate_failing_by_feature.py --suite=from_avmplus` -->
 
 - **Total tests**: 1574
-- **Passing (effective)**: 1431 (90.9%) — 1384 pass + 47 ruffle_matched
-- **Failing**: 143 (1 compile fail, 121 output mismatch, 16 runtime error, 2 runtime segfault, 3 timeout)
-- **Based on**: CI run at commit `b46ac6ee92`
+- **Passing (effective)**: 1475 (93.7%) — 1426 pass + 49 ruffle_matched
+- **Failing**: 99 (78 output mismatch, 16 runtime error, 2 runtime segfault, 3 timeout)
+- **Based on**: CI run at commit `7ad4e04194`
 
 Tests are sorted by category (ordered by priority). Within each category, tests are listed alphabetically.
 
 ---
 
-## 1. as3/Vector (14 failing / 60 total)
+## 1. as3/RuntimeErrors (11 failing / 51 total)
 
-Failing tests: as3/Vector/bug_678952, as3/Vector/filter, as3/Vector/filter_initializers, as3/Vector/foreach, as3/Vector/foreach_initializers, as3/Vector/initializer_expressions, as3/Vector/initializer_large_vector, as3/Vector/map, as3/Vector/map_initializers, as3/Vector/nested, as3/Vector/nonindexproperty/v10, as3/Vector/some, as3/Vector/some_initializers, as3/Vector/vectorIndexRangeExceptions
-
-Description: Tamarin acceptance tests under `as3/Vector/`.
-
----
-
-## 2. as3/RuntimeErrors (13 failing / 51 total)
-
-Failing tests: as3/RuntimeErrors/Error1004MethodInvokedOnIncompatibleObj, as3/RuntimeErrors/Error1050CannotConvertToPrimitive, as3/RuntimeErrors/Error1052InvalidUriPassed, as3/RuntimeErrors/Error1064CannotCallMethodAsConstructor, as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp, as3/RuntimeErrors/Error1075MathNotAFunction, as3/RuntimeErrors/Error1076MathNotAConstructor, as3/RuntimeErrors/Error1081ReadSealedErrorNs, as3/RuntimeErrors/Error1112ArgCountMismatchOnClassCoercion, as3/RuntimeErrors/Error1115NotAConstructor/v10, as3/RuntimeErrors/Error1117InvalidXmlName, as3/RuntimeErrors/Error1119DeleteDoesNotSupportXMLListOperand, as3/RuntimeErrors/Error1120CannotDeleteProperty
+Failing tests: as3/RuntimeErrors/Error1050CannotConvertToPrimitive, as3/RuntimeErrors/Error1052InvalidUriPassed, as3/RuntimeErrors/Error1064CannotCallMethodAsConstructor, as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp, as3/RuntimeErrors/Error1075MathNotAFunction, as3/RuntimeErrors/Error1076MathNotAConstructor, as3/RuntimeErrors/Error1081ReadSealedErrorNs, as3/RuntimeErrors/Error1115NotAConstructor/v10, as3/RuntimeErrors/Error1117InvalidXmlName, as3/RuntimeErrors/Error1119DeleteDoesNotSupportXMLListOperand, as3/RuntimeErrors/Error1120CannotDeleteProperty
 
 Description: Tamarin acceptance tests under `as3/RuntimeErrors/`.
 
 ---
 
-## 3. ecma3/Exceptions (9 failing / 46 total)
-
-Failing tests: ecma3/Exceptions/bug127913 (SEGFAULT) (KNOWN_FAILURE), ecma3/Exceptions/exception_001_rt, ecma3/Exceptions/exception_002_rt, ecma3/Exceptions/exception_011_rt, ecma3/Exceptions/expression_005_rt, ecma3/Exceptions/number_001_rt, ecma3/Exceptions/number_002_rt, ecma3/Exceptions/string_001_rt, ecma3/Exceptions/string_002_rt
-
-Description: Tamarin acceptance tests under `ecma3/Exceptions/`.
-
----
-
-## 4. as3/Definitions (7 failing / 212 total)
+## 2. as3/Definitions (7 failing / 212 total)
 
 Failing tests: as3/Definitions/Classes/ClassDef/Bug118272Package, as3/Definitions/Classes/Ext/ExtPublicClassPriv, as3/Definitions/Super/SuperInForLoop, as3/Definitions/Super/SuperProps, as3/Definitions/Super/SuperRuntimeError, as3/Definitions/Variable/AccessPrivateClassVariable_rt, as3/Definitions/Variable/ConstVariables_custom1
 
@@ -44,15 +28,7 @@ Description: Tamarin acceptance tests under `as3/Definitions/`.
 
 ---
 
-## 5. ecma3/JSON (6 failing / 12 total)
-
-Failing tests: ecma3/JSON/adhoc (KNOWN_FAILURE), ecma3/JSON/e15_12_0, ecma3/JSON/e15_12_1, ecma3/JSON/e15_12_2, ecma3/JSON/e15_12_3, ecma3/JSON/regress
-
-Description: Tamarin acceptance tests under `ecma3/JSON/`.
-
----
-
-## 6. as3/ByteArray (5 failing / 5 total)
+## 3. as3/ByteArray (5 failing / 5 total)
 
 Failing tests: as3/ByteArray/ByteArray, as3/ByteArray/ByteArrayLzma, as3/ByteArray/ByteArrayLzmaThirdParty, as3/ByteArray/ByteArray_bug662851_32bit (TIMEOUT), as3/ByteArray/ByteArray_bug662851_64bit (TIMEOUT)
 
@@ -60,7 +36,7 @@ Description: Tamarin acceptance tests under `as3/ByteArray/`.
 
 ---
 
-## 7. e4x/XML (5 failing / 67 total)
+## 4. e4x/XML (5 failing / 67 total)
 
 Failing tests: e4x/XML/e13_4_4_17, e4x/XML/e13_4_4_2, e4x/XML/e13_4_4_28, e4x/XML/e13_4_4_32/v9, e4x/XML/e13_4_4_36 (KNOWN_FAILURE)
 
@@ -68,23 +44,15 @@ Description: Tamarin acceptance tests under `e4x/XML/`.
 
 ---
 
-## 8. ecma3/Array (5 failing / 51 total)
+## 5. ecma3/Exceptions (5 failing / 46 total)
 
-Failing tests: ecma3/Array/e15_4_1, ecma3/Array/e15_4_1_1, ecma3/Array/e15_4_2_1_3, ecma3/Array/e15_4_2_3, ecma3/Array/e15_4_4
+Failing tests: ecma3/Exceptions/bug127913 (SEGFAULT) (KNOWN_FAILURE), ecma3/Exceptions/exception_001_rt, ecma3/Exceptions/exception_002_rt, ecma3/Exceptions/exception_011_rt, ecma3/Exceptions/expression_005_rt
 
-Description: Tamarin acceptance tests under `ecma3/Array/`.
-
----
-
-## 9. ecma3/String (5 failing / 83 total)
-
-Failing tests: ecma3/String/e15_5_3_2_3, ecma3/String/e15_5_4_5_4, ecma3/String/e15_5_4_8_2, ecma3/String/e15_5_5_1, ecma3/String/localeCompare_rt
-
-Description: Tamarin acceptance tests under `ecma3/String/`.
+Description: Tamarin acceptance tests under `ecma3/Exceptions/`.
 
 ---
 
-## 10. as3/Expressions (4 failing / 35 total)
+## 6. as3/Expressions (4 failing / 35 total)
 
 Failing tests: as3/Expressions/QualifiedReferences/WildcardOperator, as3/Expressions/deleteOperator/deleteFixedFunction, as3/Expressions/deleteOperator/deleteFixedVar, as3/Expressions/deleteOperator/deleteNonexistentFixedProperty
 
@@ -92,7 +60,7 @@ Description: Tamarin acceptance tests under `as3/Expressions/`.
 
 ---
 
-## 11. e4x/Expressions (4 failing / 17 total)
+## 7. e4x/Expressions (4 failing / 17 total)
 
 Failing tests: e4x/Expressions/e11_1_1, e4x/Expressions/e11_1_2, e4x/Expressions/e11_1_4, e4x/Expressions/e11_3_1
 
@@ -100,23 +68,15 @@ Description: Tamarin acceptance tests under `e4x/Expressions/`.
 
 ---
 
-## 12. ecma3/Boolean (4 failing / 29 total)
+## 8. ecma3/String (4 failing / 83 total)
 
-Failing tests: ecma3/Boolean/e15_6_3_1, ecma3/Boolean/e15_6_3_1_3, ecma3/Boolean/e15_6_4, ecma3/Boolean/e15_6_4__1
+Failing tests: ecma3/String/e15_5_3_2_3, ecma3/String/e15_5_4_5_4, ecma3/String/e15_5_4_8_2, ecma3/String/e15_5_5_1
 
-Description: Tamarin acceptance tests under `ecma3/Boolean/`.
-
----
-
-## 13. ecma3/ObjectObjects (4 failing / 27 total)
-
-Failing tests: ecma3/ObjectObjects/e15_2_3_1_rt, ecma3/ObjectObjects/e15_2_3_rt, ecma3/ObjectObjects/hasOwnProperty, ecma3/ObjectObjects/isPrototypeOf
-
-Description: Tamarin acceptance tests under `ecma3/ObjectObjects/`.
+Description: Tamarin acceptance tests under `ecma3/String/`.
 
 ---
 
-## 14. as3/Array (3 failing / 7 total)
+## 9. as3/Array (3 failing / 7 total)
 
 Failing tests: as3/Array/bug_535446 (KNOWN_FAILURE), as3/Array/insertremove (KNOWN_FAILURE), as3/Array/length_mods (KNOWN_FAILURE)
 
@@ -124,23 +84,7 @@ Description: Tamarin acceptance tests under `as3/Array/`.
 
 ---
 
-## 15. ecma3/Expressions (3 failing / 76 total)
-
-Failing tests: ecma3/Expressions/e11_1_4, ecma3/Expressions/e11_2_2_10_rt, ecma3/Expressions/e11_6_1_3
-
-Description: Tamarin acceptance tests under `ecma3/Expressions/`.
-
----
-
-## 16. ecma3/Number (3 failing / 53 total)
-
-Failing tests: ecma3/Number/e15_7_4_2_2_rt, ecma3/Number/e15_7_4_2_4 (KNOWN_FAILURE), ecma3/Number/toLocaleString_rt (KNOWN_FAILURE)
-
-Description: Tamarin acceptance tests under `ecma3/Number/`.
-
----
-
-## 17. ecma3/Statements (3 failing / 64 total)
+## 10. ecma3/Statements (3 failing / 64 total)
 
 Failing tests: ecma3/Statements/e12_10, ecma3/Statements/eforin_001 (KNOWN_FAILURE), ecma3/Statements/eforin_002 (KNOWN_FAILURE)
 
@@ -148,7 +92,7 @@ Description: Tamarin acceptance tests under `ecma3/Statements/`.
 
 ---
 
-## 18. e4x/Global (2 failing / 2 total)
+## 11. e4x/Global (2 failing / 2 total)
 
 Failing tests: e4x/Global/e13_1_2_1, e4x/Global/isXMLNameTypeErr
 
@@ -156,7 +100,7 @@ Description: Tamarin acceptance tests under `e4x/Global/`.
 
 ---
 
-## 19. e4x/Regress (2 failing / 14 total)
+## 12. e4x/Regress (2 failing / 14 total)
 
 Failing tests: e4x/Regress/regress-263935, e4x/Regress/regress-524214 (KNOWN_FAILURE)
 
@@ -164,7 +108,15 @@ Description: Tamarin acceptance tests under `e4x/Regress/`.
 
 ---
 
-## 20. ecma3/Function (2 failing / 13 total)
+## 13. ecma3/Expressions (2 failing / 76 total)
+
+Failing tests: ecma3/Expressions/e11_2_2_10_rt, ecma3/Expressions/e11_6_1_3
+
+Description: Tamarin acceptance tests under `ecma3/Expressions/`.
+
+---
+
+## 14. ecma3/Function (2 failing / 13 total)
 
 Failing tests: ecma3/Function/e15_3_4_3_1, ecma3/Function/e15_3_4_4_1_rt
 
@@ -172,7 +124,15 @@ Description: Tamarin acceptance tests under `ecma3/Function/`.
 
 ---
 
-## 21. as3/AMF (1 failing / 1 total)
+## 15. ecma3/ObjectObjects (2 failing / 27 total)
+
+Failing tests: ecma3/ObjectObjects/hasOwnProperty, ecma3/ObjectObjects/isPrototypeOf
+
+Description: Tamarin acceptance tests under `ecma3/ObjectObjects/`.
+
+---
+
+## 16. as3/AMF (1 failing / 1 total)
 
 Failing tests: as3/AMF/AMFSerializer (SEGFAULT)
 
@@ -180,7 +140,7 @@ Description: Tamarin acceptance tests under `as3/AMF/`.
 
 ---
 
-## 22. as3/ShellClasses (1 failing / 2 total)
+## 17. as3/ShellClasses (1 failing / 2 total)
 
 Failing tests: as3/ShellClasses/DictionarySubclass
 
@@ -188,7 +148,7 @@ Description: Tamarin acceptance tests under `as3/ShellClasses/`.
 
 ---
 
-## 23. as3/String (1 failing / 2 total)
+## 18. as3/String (1 failing / 2 total)
 
 Failing tests: as3/String/localeCompare_585791/v9
 
@@ -196,7 +156,7 @@ Description: Tamarin acceptance tests under `as3/String/`.
 
 ---
 
-## 24. e4x/Namespace (1 failing / 6 total)
+## 19. e4x/Namespace (1 failing / 6 total)
 
 Failing tests: e4x/Namespace/e13_2_5
 
@@ -204,7 +164,7 @@ Description: Tamarin acceptance tests under `e4x/Namespace/`.
 
 ---
 
-## 25. e4x/QName (1 failing / 6 total)
+## 20. e4x/QName (1 failing / 6 total)
 
 Failing tests: e4x/QName/e13_3_2
 
@@ -212,7 +172,7 @@ Description: Tamarin acceptance tests under `e4x/QName/`.
 
 ---
 
-## 26. e4x/Statements (1 failing / 3 total)
+## 21. e4x/Statements (1 failing / 3 total)
 
 Failing tests: e4x/Statements/e12_1 (KNOWN_FAILURE)
 
@@ -220,7 +180,7 @@ Description: Tamarin acceptance tests under `e4x/Statements/`.
 
 ---
 
-## 27. e4x/XMLList (1 failing / 27 total)
+## 22. e4x/XMLList (1 failing / 27 total)
 
 Failing tests: e4x/XMLList/e13_5_4_17
 
@@ -228,23 +188,7 @@ Description: Tamarin acceptance tests under `e4x/XMLList/`.
 
 ---
 
-## 28. ecma3/Date (1 failing / 153 total)
-
-Failing tests: ecma3/Date/e15_9_5
-
-Description: Tamarin acceptance tests under `ecma3/Date/`.
-
----
-
-## 29. ecma3/FunctionObjects (1 failing / 21 total)
-
-Failing tests: ecma3/FunctionObjects/ecall_1
-
-Description: Tamarin acceptance tests under `ecma3/FunctionObjects/`.
-
----
-
-## 30. ecma3/GlobalObject (1 failing / 21 total)
+## 23. ecma3/GlobalObject (1 failing / 21 total)
 
 Failing tests: ecma3/GlobalObject/e15_1_2_2_2 (KNOWN_FAILURE)
 
@@ -252,15 +196,15 @@ Description: Tamarin acceptance tests under `ecma3/GlobalObject/`.
 
 ---
 
-## 31. ecma3/NativeObjects (1 failing / 1 total)
+## 24. ecma3/Number (1 failing / 53 total)
 
-Failing tests: ecma3/NativeObjects/e15_2_rt
+Failing tests: ecma3/Number/toLocaleString_rt (KNOWN_FAILURE)
 
-Description: Tamarin acceptance tests under `ecma3/NativeObjects/`.
+Description: Tamarin acceptance tests under `ecma3/Number/`.
 
 ---
 
-## 32. ecma3/TypeConversion (1 failing / 13 total)
+## 25. ecma3/TypeConversion (1 failing / 13 total)
 
 Failing tests: ecma3/TypeConversion/e9_3_1_3_rt (KNOWN_FAILURE)
 
@@ -268,7 +212,7 @@ Description: Tamarin acceptance tests under `ecma3/TypeConversion/`.
 
 ---
 
-## 33. ecma3/Unicode (1 failing / 108 total)
+## 26. ecma3/Unicode (1 failing / 108 total)
 
 Failing tests: ecma3/Unicode/utf8count
 
@@ -276,7 +220,7 @@ Description: Tamarin acceptance tests under `ecma3/Unicode/`.
 
 ---
 
-## 34. misc/bug_508617 (1 failing / 1 total)
+## 27. misc/bug_508617 (1 failing / 1 total)
 
 Failing tests: misc/bug_508617 (KNOWN_FAILURE)
 
@@ -284,7 +228,7 @@ Description: Tamarin acceptance tests under `misc/bug_508617/`.
 
 ---
 
-## 35. mops/lf32 (1 failing / 1 total)
+## 28. mops/lf32 (1 failing / 1 total)
 
 Failing tests: mops/lf32
 
@@ -292,7 +236,7 @@ Description: Tamarin acceptance tests under `mops/lf32/`.
 
 ---
 
-## 36. mops/lf64 (1 failing / 1 total)
+## 29. mops/lf64 (1 failing / 1 total)
 
 Failing tests: mops/lf64
 
@@ -300,7 +244,7 @@ Description: Tamarin acceptance tests under `mops/lf64/`.
 
 ---
 
-## 37. mops/li16 (1 failing / 1 total)
+## 30. mops/li16 (1 failing / 1 total)
 
 Failing tests: mops/li16
 
@@ -308,7 +252,7 @@ Description: Tamarin acceptance tests under `mops/li16/`.
 
 ---
 
-## 38. mops/li32 (1 failing / 1 total)
+## 31. mops/li32 (1 failing / 1 total)
 
 Failing tests: mops/li32
 
@@ -316,7 +260,7 @@ Description: Tamarin acceptance tests under `mops/li32/`.
 
 ---
 
-## 39. mops/li8 (1 failing / 1 total)
+## 32. mops/li8 (1 failing / 1 total)
 
 Failing tests: mops/li8
 
@@ -324,7 +268,7 @@ Description: Tamarin acceptance tests under `mops/li8/`.
 
 ---
 
-## 40. mops/lix16 (1 failing / 1 total)
+## 33. mops/lix16 (1 failing / 1 total)
 
 Failing tests: mops/lix16
 
@@ -332,7 +276,7 @@ Description: Tamarin acceptance tests under `mops/lix16/`.
 
 ---
 
-## 41. mops/lix8 (1 failing / 1 total)
+## 34. mops/lix8 (1 failing / 1 total)
 
 Failing tests: mops/lix8
 
@@ -340,7 +284,7 @@ Description: Tamarin acceptance tests under `mops/lix8/`.
 
 ---
 
-## 42. mops/mops_basics (1 failing / 1 total)
+## 35. mops/mops_basics (1 failing / 1 total)
 
 Failing tests: mops/mops_basics (TIMEOUT)
 
@@ -348,7 +292,7 @@ Description: Tamarin acceptance tests under `mops/mops_basics/`.
 
 ---
 
-## 43. mops/sf32 (1 failing / 1 total)
+## 36. mops/sf32 (1 failing / 1 total)
 
 Failing tests: mops/sf32
 
@@ -356,7 +300,7 @@ Description: Tamarin acceptance tests under `mops/sf32/`.
 
 ---
 
-## 44. mops/sf64 (1 failing / 1 total)
+## 37. mops/sf64 (1 failing / 1 total)
 
 Failing tests: mops/sf64
 
@@ -364,7 +308,7 @@ Description: Tamarin acceptance tests under `mops/sf64/`.
 
 ---
 
-## 45. mops/si16 (1 failing / 1 total)
+## 38. mops/si16 (1 failing / 1 total)
 
 Failing tests: mops/si16
 
@@ -372,7 +316,7 @@ Description: Tamarin acceptance tests under `mops/si16/`.
 
 ---
 
-## 46. mops/si32 (1 failing / 1 total)
+## 39. mops/si32 (1 failing / 1 total)
 
 Failing tests: mops/si32
 
@@ -380,7 +324,7 @@ Description: Tamarin acceptance tests under `mops/si32/`.
 
 ---
 
-## 47. mops/si8 (1 failing / 1 total)
+## 40. mops/si8 (1 failing / 1 total)
 
 Failing tests: mops/si8
 
@@ -388,7 +332,7 @@ Description: Tamarin acceptance tests under `mops/si8/`.
 
 ---
 
-## 48. recursion/pcre_could_be_empty_branch (1 failing / 1 total)
+## 41. recursion/pcre_could_be_empty_branch (1 failing / 1 total)
 
 Failing tests: recursion/pcre_could_be_empty_branch
 
@@ -396,7 +340,7 @@ Description: Tamarin acceptance tests under `recursion/pcre_could_be_empty_branc
 
 ---
 
-## 49. recursion/pcre_find_firstassertedchar (1 failing / 1 total)
+## 42. recursion/pcre_find_firstassertedchar (1 failing / 1 total)
 
 Failing tests: recursion/pcre_find_firstassertedchar
 
@@ -404,7 +348,7 @@ Description: Tamarin acceptance tests under `recursion/pcre_find_firstassertedch
 
 ---
 
-## 50. recursion/pcre_find_fixedlength (1 failing / 1 total)
+## 43. recursion/pcre_find_fixedlength (1 failing / 1 total)
 
 Failing tests: recursion/pcre_find_fixedlength (KNOWN_FAILURE)
 
@@ -412,7 +356,7 @@ Description: Tamarin acceptance tests under `recursion/pcre_find_fixedlength/`.
 
 ---
 
-## 51. recursion/pcre_is_anchored (1 failing / 1 total)
+## 44. recursion/pcre_is_anchored (1 failing / 1 total)
 
 Failing tests: recursion/pcre_is_anchored
 
@@ -420,7 +364,7 @@ Description: Tamarin acceptance tests under `recursion/pcre_is_anchored/`.
 
 ---
 
-## 52. recursion/pcre_is_startline (1 failing / 1 total)
+## 45. recursion/pcre_is_startline (1 failing / 1 total)
 
 Failing tests: recursion/pcre_is_startline
 
@@ -428,7 +372,7 @@ Description: Tamarin acceptance tests under `recursion/pcre_is_startline/`.
 
 ---
 
-## 53. regress/bug_420755 (1 failing / 1 total)
+## 46. regress/bug_420755 (1 failing / 1 total)
 
 Failing tests: regress/bug_420755 (KNOWN_FAILURE)
 
@@ -436,7 +380,7 @@ Description: Tamarin acceptance tests under `regress/bug_420755/`.
 
 ---
 
-## 54. regress/bug_483783 (1 failing / 1 total)
+## 47. regress/bug_483783 (1 failing / 1 total)
 
 Failing tests: regress/bug_483783
 
@@ -444,7 +388,7 @@ Description: Tamarin acceptance tests under `regress/bug_483783/`.
 
 ---
 
-## 55. regress/bug_539328 (1 failing / 1 total)
+## 48. regress/bug_539328 (1 failing / 1 total)
 
 Failing tests: regress/bug_539328 (KNOWN_FAILURE)
 
@@ -452,7 +396,7 @@ Description: Tamarin acceptance tests under `regress/bug_539328/`.
 
 ---
 
-## 56. regress/bug_550958 (1 failing / 1 total)
+## 49. regress/bug_550958 (1 failing / 1 total)
 
 Failing tests: regress/bug_550958
 
@@ -460,7 +404,7 @@ Description: Tamarin acceptance tests under `regress/bug_550958/`.
 
 ---
 
-## 57. regress/bug_558863_swf11 (1 failing / 1 total)
+## 50. regress/bug_558863_swf11 (1 failing / 1 total)
 
 Failing tests: regress/bug_558863_swf11
 
@@ -468,7 +412,7 @@ Description: Tamarin acceptance tests under `regress/bug_558863_swf11/`.
 
 ---
 
-## 58. regress/bug_654807_swf12 (1 failing / 1 total)
+## 51. regress/bug_654807_swf12 (1 failing / 1 total)
 
 Failing tests: regress/bug_654807_swf12 (KNOWN_FAILURE)
 
@@ -476,7 +420,7 @@ Description: Tamarin acceptance tests under `regress/bug_654807_swf12/`.
 
 ---
 
-## 59. regress/bug_654807_swf13 (1 failing / 1 total)
+## 52. regress/bug_654807_swf13 (1 failing / 1 total)
 
 Failing tests: regress/bug_654807_swf13 (KNOWN_FAILURE)
 
@@ -484,7 +428,7 @@ Description: Tamarin acceptance tests under `regress/bug_654807_swf13/`.
 
 ---
 
-## 60. regress/bug_687838 (1 failing / 1 total)
+## 53. regress/bug_687838 (1 failing / 1 total)
 
 Failing tests: regress/bug_687838
 
@@ -492,20 +436,17 @@ Description: Tamarin acceptance tests under `regress/bug_687838/`.
 
 ---
 
-## Failing Tests by Uncaught Error (12 tests, 11 distinct errors)
+## Failing Tests by Uncaught Error (8 tests, 8 distinct errors)
 
 An uncaught error aborts the whole script, so these tests lose *all* remaining output — the error is the root cause, not the symptom. Ranked by how many tests one fix would unblock.
 
 | Tests | Uncaught error | Example |
 |-------|----------------|---------|
-| 2 | `ReferenceError: Error #1037: Cannot assign to a method toString on Array.` | ecma3/Array/e15_4_1_1 |
 | 1 | `Error: Error #2030: End of file was encountered.` | as3/ByteArray/ByteArrayLzma |
 | 1 | `Error: Error #2058: There was an error decompressing the data.` | as3/ByteArray/ByteArrayLzmaThirdParty |
 | 1 | `ReferenceError: Error #1065: Variable AS3 is not defined.` | as3/Array/length_mods |
 | 1 | `ReferenceError: Error #1065: Variable isXMLName is not defined.` | e4x/Global/e13_1_2_1 |
-| 1 | `ReferenceError: Error #1065: Variable thisError is not defined.` | ecma3/Date/e15_9_5 |
 | 1 | `TypeError: Error #1006: slice is not a function.` | ecma3/Exceptions/exception_002_rt |
-| 1 | `TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: slice)` | ecma3/Exceptions/exception_001_rt |
 | 1 | `TypeError: Error #1090: XML parser failure: element is malformed.` | regress/bug_550958 |
 | 1 | `VerifyError: Error #1108: The OP_newclass opcode was used with the incorrect base class.` | as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp |
 | 1 | `undefined` | ecma3/Exceptions/exception_011_rt |
@@ -516,27 +457,18 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 
 | Test | Match Rate | Likely Issue |
 |------|-----------|-------------|
-| ecma3/Array/e15_4_2_1_3 | 1030/1031 (100%) |  |
 | as3/ByteArray/ByteArray | 424/425 (100%) |  |
 | as3/Array/insertremove | 30766/30870 (100%) |  |
 | ecma3/String/e15_5_4_5_4 | 321/323 (99%) |  |
-| as3/Vector/vectorIndexRangeExceptions | 1260/1270 (99%) |  |
 | ecma3/String/e15_5_3_2_3 | 474/481 (99%) |  |
 | e4x/QName/e13_3_2 | 48/49 (98%) |  |
-| as3/Vector/initializer_expressions | 40/41 (98%) |  |
-| ecma3/JSON/e15_12_1 | 35/36 (97%) |  |
-| ecma3/Number/e15_7_4_2_4 | 49/51 (96%) |  |
 | e4x/XML/e13_4_4_17 | 18/19 (95%) |  |
 | ecma3/TypeConversion/e9_3_1_3_rt | 89/94 (95%) |  |
 | e4x/Namespace/e13_2_5 | 34/36 (94%) |  |
 | as3/Definitions/Variable/ConstVariables_custom1 | 16/17 (94%) |  |
-| ecma3/JSON/e15_12_3 | 31/33 (94%) |  |
-| regress/bug_687838 | 104/111 (94%) |  |
 | ecma3/Function/e15_3_4_3_1 | 13/14 (93%) |  |
-| as3/Vector/some | 12/13 (92%) |  |
+| regress/bug_420755 | 25/27 (93%) |  |
 | e4x/XML/e13_4_4_28 | 12/13 (92%) |  |
-| as3/Vector/map | 11/12 (92%) |  |
-| ecma3/JSON/e15_12_2 | 11/12 (92%) |  |
 | ecma3/Number/toLocaleString_rt | 44/48 (92%) |  |
 | as3/ShellClasses/DictionarySubclass | 20/22 (91%) |  |
 | ecma3/GlobalObject/e15_1_2_2_2 | 28/31 (90%) |  |
@@ -545,30 +477,16 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | ecma3/ObjectObjects/hasOwnProperty | 9/10 (90%) |  |
 | ecma3/String/e15_5_4_8_2 | 54/60 (90%) |  |
 | e4x/Expressions/e11_1_1 | 35/39 (90%) |  |
-| ecma3/Expressions/e11_1_4 | 25/28 (89%) |  |
-| as3/Vector/filter | 8/9 (89%) |  |
 | e4x/XML/e13_4_4_32/v9 | 8/9 (89%) |  |
-| as3/Vector/nested | 7/8 (88%) |  |
-| as3/Vector/nonindexproperty/v10 | 44/51 (86%) |  |
-| as3/Vector/map_initializers | 6/7 (86%) |  |
-| as3/Vector/foreach | 5/6 (83%) |  |
-| as3/Vector/some_initializers | 5/6 (83%) |  |
 | e4x/XML/e13_4_4_36 | 13/16 (81%) |  |
-| as3/Vector/filter_initializers | 4/5 (80%) |  |
-| as3/Vector/foreach_initializers | 4/5 (80%) |  |
-| ecma3/Array/e15_4_2_3 | 4/5 (80%) |  |
-| ecma3/Array/e15_4_1 | 11/14 (79%) |  |
-| ecma3/Boolean/e15_6_4__1 | 3/4 (75%) |  |
-| ecma3/JSON/adhoc | 30/40 (75%) |  |
+| regress/bug_687838 | 85/111 (77%) |  |
 | ecma3/ObjectObjects/isPrototypeOf | 6/8 (75%) |  |
 | ecma3/Statements/eforin_001 | 12/16 (75%) |  |
-| ecma3/String/localeCompare_rt | 3/4 (75%) |  |
 | ecma3/String/e15_5_5_1 | 7/10 (70%) |  |
 | as3/Definitions/Super/SuperRuntimeError | 2/3 (67%) |  |
 | ecma3/Unicode/utf8count | 2/3 (67%) |  |
 | regress/bug_550958 | 2/3 (67%) |  |
 | e4x/Statements/e12_1 | 11/17 (65%) |  |
-| regress/bug_420755 | 17/27 (63%) |  |
 | regress/bug_654807_swf13 | 102/170 (60%) |  |
 
 ## Crashes and Timeouts (5 tests)
@@ -587,76 +505,76 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 
 | Priority | Feature | Failing | Total | Notes |
 |----------|---------|---------|-------|-------|
-| 1 | as3/Vector | 14 | 60 | avg 85% match |
-| 2 | as3/RuntimeErrors | 13 | 51 | avg 0% match |
-| 3 | ecma3/Exceptions | 9 | 46 | avg 4% match |
-| 4 | as3/Definitions | 7 | 212 | avg 35% match |
-| 5 | ecma3/JSON | 6 | 12 | avg 76% match |
-| 6 | as3/ByteArray | 5 | 5 | avg 34% match |
-| 7 | e4x/XML | 5 | 67 | avg 77% match |
-| 8 | ecma3/Array | 5 | 51 | avg 67% match |
-| 9 | ecma3/String | 5 | 83 | avg 87% match |
-| 10 | as3/Expressions | 4 | 35 | avg 8% match |
-| 11 | e4x/Expressions | 4 | 17 | avg 52% match |
-| 12 | ecma3/Boolean | 4 | 29 | avg 44% match |
-| 13 | ecma3/ObjectObjects | 4 | 27 | avg 66% match |
-| 14 | as3/Array | 3 | 7 | avg 40% match |
-| 15 | ecma3/Expressions | 3 | 76 | avg 41% match |
-| 16 | ecma3/Number | 3 | 53 | avg 63% match |
-| 17 | ecma3/Statements | 3 | 64 | avg 25% match |
-| 18 | e4x/Global | 2 | 2 | avg 0% match |
-| 19 | e4x/Regress | 2 | 14 | avg 5% match |
-| 20 | ecma3/Function | 2 | 13 | avg 91% match |
-| 21 | as3/AMF | 1 | 1 |  |
-| 22 | as3/ShellClasses | 1 | 2 | avg 91% match |
-| 23 | as3/String | 1 | 2 | avg 25% match |
-| 24 | e4x/Namespace | 1 | 6 | avg 94% match |
-| 25 | e4x/QName | 1 | 6 | avg 98% match |
-| 26 | e4x/Statements | 1 | 3 | avg 65% match |
-| 27 | e4x/XMLList | 1 | 27 | avg 90% match |
-| 28 | ecma3/Date | 1 | 153 | avg 0% match |
-| 29 | ecma3/FunctionObjects | 1 | 21 | avg 33% match |
-| 30 | ecma3/GlobalObject | 1 | 21 | avg 90% match |
-| 31 | ecma3/NativeObjects | 1 | 1 | avg 33% match |
-| 32 | ecma3/TypeConversion | 1 | 13 | avg 95% match |
-| 33 | ecma3/Unicode | 1 | 108 | avg 67% match |
-| 34 | misc/bug_508617 | 1 | 1 |  |
-| 35 | mops/lf32 | 1 | 1 |  |
-| 36 | mops/lf64 | 1 | 1 |  |
-| 37 | mops/li16 | 1 | 1 |  |
-| 38 | mops/li32 | 1 | 1 |  |
-| 39 | mops/li8 | 1 | 1 |  |
-| 40 | mops/lix16 | 1 | 1 |  |
-| 41 | mops/lix8 | 1 | 1 |  |
-| 42 | mops/mops_basics | 1 | 1 |  |
-| 43 | mops/sf32 | 1 | 1 |  |
-| 44 | mops/sf64 | 1 | 1 |  |
-| 45 | mops/si16 | 1 | 1 |  |
-| 46 | mops/si32 | 1 | 1 |  |
-| 47 | mops/si8 | 1 | 1 |  |
-| 48 | recursion/pcre_could_be_empty_branch | 1 | 1 | avg 0% match |
-| 49 | recursion/pcre_find_firstassertedchar | 1 | 1 | avg 50% match |
-| 50 | recursion/pcre_find_fixedlength | 1 | 1 | avg 50% match |
-| 51 | recursion/pcre_is_anchored | 1 | 1 | avg 50% match |
-| 52 | recursion/pcre_is_startline | 1 | 1 | avg 50% match |
-| 53 | regress/bug_420755 | 1 | 1 | avg 63% match |
-| 54 | regress/bug_483783 | 1 | 1 |  |
-| 55 | regress/bug_539328 | 1 | 1 | avg 47% match |
-| 56 | regress/bug_550958 | 1 | 1 | avg 67% match |
-| 57 | regress/bug_558863_swf11 | 1 | 1 | avg 0% match |
-| 58 | regress/bug_654807_swf12 | 1 | 1 | avg 32% match |
-| 59 | regress/bug_654807_swf13 | 1 | 1 | avg 60% match |
-| 60 | regress/bug_687838 | 1 | 1 | avg 94% match |
-| 61 | as3/Math | 0 | 7 |  |
-| 62 | as3/MethodClosures | 0 | 2 |  |
-| 63 | as3/RegExp | 0 | 3 |  |
-| 64 | as3/Statements | 0 | 67 |  |
-| 65 | as3/Types | 0 | 55 |  |
-| 66 | e4x/TypeConversion | 0 | 12 |  |
-| 67 | e4x/Types | 0 | 23 |  |
-| 68 | ecma3/ErrorObject | 0 | 2 |  |
-| 69 | ecma3/ExecutionContexts | 0 | 17 |  |
-| 70 | ecma3/instanceof | 0 | 4 |  |
+| 1 | as3/RuntimeErrors | 11 | 51 | avg 0% match |
+| 2 | as3/Definitions | 7 | 212 | avg 35% match |
+| 3 | as3/ByteArray | 5 | 5 | avg 34% match |
+| 4 | e4x/XML | 5 | 67 | avg 77% match |
+| 5 | ecma3/Exceptions | 5 | 46 | avg 8% match |
+| 6 | as3/Expressions | 4 | 35 | avg 8% match |
+| 7 | e4x/Expressions | 4 | 17 | avg 52% match |
+| 8 | ecma3/String | 4 | 83 | avg 89% match |
+| 9 | as3/Array | 3 | 7 | avg 40% match |
+| 10 | ecma3/Statements | 3 | 64 | avg 25% match |
+| 11 | e4x/Global | 2 | 2 | avg 0% match |
+| 12 | e4x/Regress | 2 | 14 | avg 5% match |
+| 13 | ecma3/Expressions | 2 | 76 | avg 17% match |
+| 14 | ecma3/Function | 2 | 13 | avg 91% match |
+| 15 | ecma3/ObjectObjects | 2 | 27 | avg 82% match |
+| 16 | as3/AMF | 1 | 1 |  |
+| 17 | as3/ShellClasses | 1 | 2 | avg 91% match |
+| 18 | as3/String | 1 | 2 | avg 25% match |
+| 19 | e4x/Namespace | 1 | 6 | avg 94% match |
+| 20 | e4x/QName | 1 | 6 | avg 98% match |
+| 21 | e4x/Statements | 1 | 3 | avg 65% match |
+| 22 | e4x/XMLList | 1 | 27 | avg 90% match |
+| 23 | ecma3/GlobalObject | 1 | 21 | avg 90% match |
+| 24 | ecma3/Number | 1 | 53 | avg 92% match |
+| 25 | ecma3/TypeConversion | 1 | 13 | avg 95% match |
+| 26 | ecma3/Unicode | 1 | 108 | avg 67% match |
+| 27 | misc/bug_508617 | 1 | 1 |  |
+| 28 | mops/lf32 | 1 | 1 |  |
+| 29 | mops/lf64 | 1 | 1 |  |
+| 30 | mops/li16 | 1 | 1 |  |
+| 31 | mops/li32 | 1 | 1 |  |
+| 32 | mops/li8 | 1 | 1 |  |
+| 33 | mops/lix16 | 1 | 1 |  |
+| 34 | mops/lix8 | 1 | 1 |  |
+| 35 | mops/mops_basics | 1 | 1 |  |
+| 36 | mops/sf32 | 1 | 1 |  |
+| 37 | mops/sf64 | 1 | 1 |  |
+| 38 | mops/si16 | 1 | 1 |  |
+| 39 | mops/si32 | 1 | 1 |  |
+| 40 | mops/si8 | 1 | 1 |  |
+| 41 | recursion/pcre_could_be_empty_branch | 1 | 1 | avg 0% match |
+| 42 | recursion/pcre_find_firstassertedchar | 1 | 1 | avg 50% match |
+| 43 | recursion/pcre_find_fixedlength | 1 | 1 | avg 50% match |
+| 44 | recursion/pcre_is_anchored | 1 | 1 | avg 50% match |
+| 45 | recursion/pcre_is_startline | 1 | 1 | avg 50% match |
+| 46 | regress/bug_420755 | 1 | 1 | avg 93% match |
+| 47 | regress/bug_483783 | 1 | 1 |  |
+| 48 | regress/bug_539328 | 1 | 1 | avg 47% match |
+| 49 | regress/bug_550958 | 1 | 1 | avg 67% match |
+| 50 | regress/bug_558863_swf11 | 1 | 1 | avg 0% match |
+| 51 | regress/bug_654807_swf12 | 1 | 1 | avg 32% match |
+| 52 | regress/bug_654807_swf13 | 1 | 1 | avg 60% match |
+| 53 | regress/bug_687838 | 1 | 1 | avg 77% match |
+| 54 | as3/Math | 0 | 7 |  |
+| 55 | as3/MethodClosures | 0 | 2 |  |
+| 56 | as3/RegExp | 0 | 3 |  |
+| 57 | as3/Statements | 0 | 67 |  |
+| 58 | as3/Types | 0 | 55 |  |
+| 59 | as3/Vector | 0 | 60 |  |
+| 60 | e4x/TypeConversion | 0 | 12 |  |
+| 61 | e4x/Types | 0 | 23 |  |
+| 62 | ecma3/Array | 0 | 51 |  |
+| 63 | ecma3/Boolean | 0 | 29 |  |
+| 64 | ecma3/Date | 0 | 153 |  |
+| 65 | ecma3/ErrorObject | 0 | 2 |  |
+| 66 | ecma3/ExecutionContexts | 0 | 17 |  |
+| 67 | ecma3/FunctionObjects | 0 | 21 |  |
+| 68 | ecma3/instanceof | 0 | 4 |  |
+| 69 | ecma3/JSON | 0 | 12 |  |
+| 70 | ecma3/NativeObjects | 0 | 1 |  |
 | 71 | ecma3/Types | 0 | 6 |  |
 | 72 | misc/addNull | 0 | 1 |  |
 | 73 | misc/bug_490371 | 0 | 1 |  |
@@ -718,4 +636,4 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | 129 | regress/bug_707133 | 0 | 1 |  |
 | 130 | regress/bug_723461 | 0 | 1 |  |
 | 131 | regress/security | 0 | 2 |  |
-| | **Total** | **143** | **1574** | |
+| | **Total** | **99** | **1574** | |

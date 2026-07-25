@@ -22,12 +22,16 @@ already included in their parents: `from_shumway/avm1` (47),
 `from_shumway/timeline` (1) and
 `from_gnash/misc-ming.all/displaylist_depths` (1) — exactly 49 tests.
 `from_shumway`'s own `results_graphics.json` contains all 229 tests
-including the 50 named `avm1/*`. The correct corpus denominator is
-**4414**, and it is what this document uses from here on. Sum over
-top-level leaf suites only; do not add nested `_results` dirs.
+including the 50 named `avm1/*`. Sum over top-level leaf suites only; do
+not add nested `_results` dirs. **The `as3/Vector` arc added two more
+nested dirs** to exclude — `from_avmplus/as3/Vector` (59) and
+`from_avmplus/as3/Vector/nonindexproperty` (2) — so the naive sum is now
+4477 against a true denominator of **4416** (up from 4414: upstream added
+one `avm1` and one `avm2` test). Older figures in this document quote
+4414; the two-test drift does not change any of them materially.
 
-Full corpus, graphics mode at **`e618f62ab`**: **3733/4414 effective
-(84.6%)**, 681 failing — from CI run `30143218958`, complete over the full
+Full corpus, graphics mode at **`7ad4e0419`**: **3778/4414 effective
+(85.6%)**, 636 failing — from CI run `30176986441`, complete over the full
 4414-test intersection, so this figure needs no shard arithmetic.
 
 Status histogram across the two runs of 2026-07-25, over all 4414: pass
@@ -38,9 +42,9 @@ Both gains are entirely inside `from_avmplus`.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | **1431/1574** | 90.9 | 143 | **language + builtins** (Tamarin acceptance) |
-| avm2 | 866/1217 | 71.2 | 351 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
-| avm1 | 654/716 | 91.3 | 62 | long tail |
+| from_avmplus | **1475/1574** | 93.7 | 99 | **language + builtins** (Tamarin acceptance) |
+| avm2 | 866/1218 | 71.1 | 352 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
+| avm1 | 655/717 | 91.4 | 62 | long tail |
 | from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
 | from_gnash (5) | 371/403 | 92.1 | 32 | long tail |
 | misc (9 cats) | 170/205 | 82.9 | 35 | text/fonts/mixed_avm/stage3d markers |
@@ -349,7 +353,7 @@ were e4x tests missing only the root-link line and are resolved by
 | Test(s) | Diff | Cause |
 |---|---|---|
 | `ecma3/Number/e15_7_4_2_4` | `1.2345000000000002e-7` vs `1.2345e-7` | double→string needs shortest-round-trip formatting |
-| `ecma3/JSON/e15_12_1`, `e15_12_3` | array/object parse corruption around whitespace | JSON lexer whitespace handling |
+| ~~`ecma3/JSON/e15_12_1`, `e15_12_3`~~ | ~~array/object parse corruption around whitespace~~ | **wrong diagnosis; both fixed** — `e15_12_1` by an earlier mechanism arc, `e15_12_3` by replacer dedup (`7ad4e0419`) |
 | `as3/Definitions/Variable/ConstVariables_custom1`, `as3/RuntimeErrors/*` | `…read-only property classItem7…` vs `…property Package1:ns1::classItem7…` | error messages must use the namespace-qualified name |
 | ~~`ecma3/ObjectObjects/e15_2_4_2`~~ | ~~`Object.prototype.toString` on a function~~ | **fixed by `e618f62ab`** (`[object Function-N]`) |
 | ~~`ecma3/GlobalObject/e15_1_2_2_*`~~ | ~~`parseInt.length` → 0~~ | **fixed by `d90353066`** |
@@ -518,7 +522,54 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | `[object Function-N]` classification + `Function('body')` → `EvalError #1066` + class-object `.length` | **25** (pred. ~15) | small | **DONE `e618f62ab`**, CI `30143218958`; `ecma3/FunctionObjects` 6/21 → 20/21 |
 | ~~—~~ | Builtin prototypes must be typed instances of their class (subsumes the old sealed-prototypes `#1037` item) | **24** (pred. 8-11) | medium | **DONE `cc4a7eece`+`e4d1e78f6`**, CI `30171938941` |
 | ~~—~~ | `as3/Vector` (four independent root causes) | **15** (pred. 14) | medium | **DONE `81cf6a669`+`222b4a4b5`+`a85726a54`+`2b244c01b`**, CI `30174981516` |
-| 1 | `ecma3/JSON` lexer whitespace | 6 | small | 6 of 12 |
+| ~~—~~ | `ecma3/JSON` (four independent root causes) | **5** (pred. 4) | small | **DONE `7ad4e0419`**, CI `30176986441`; `ecma3/JSON` 8/12 → 12/12 |
+| 1 | Alchemy domain memory (`li8`…`sf64` + `ApplicationDomain.domainMemory`) | **13** | medium | `mops/*`, all blank |
+| 2 | Builtin-container subclasses get no element storage | ~7 | medium | see below |
+| 3 | `as3/ByteArray` | 5 (2 of them timeouts) | ? | undiagnosed |
+| 4 | `recursion/pcre_*` | 5 | ? | undiagnosed |
+
+**DONE — the `ecma3/JSON` arc.** `7ad4e0419`, CI `30176986441`: **+5**,
+0 regressions, crash histogram flat. **The diagnosis this table carried
+was wrong** — the arc had nothing to do with lexer whitespace, and
+`e15_12_1`, the test named for it, had already been fixed by an earlier
+mechanism arc. The four real causes were: `new JSON()` must throw `#2012`
+and `JSON()` `#1112`; `JSON.parse`/`stringify` must report arity 2/3;
+the PropertyList replacer must dedup (ES5 15.12.3 step 4.b); and cycle
+detection capped nesting at 256 and reported the excess as `#1129` — a
+cycle error for an acyclic structure.
+
+The `#1112` half is the reusable piece: **calling a class object is the
+coercion `C(x)` and takes exactly one argument**, so any other count is
+`#1112`, not a coerce-undefined / ignore-the-extras approximation.
+`avm2_call_value` now enforces that for every class without its own
+`native_call`. That is what harvested
+`as3/RuntimeErrors/Error1112ArgCountMismatchOnClassCoercion` for free and
+fixed half of `regress/bug_420755`.
+
+**Next arc — Alchemy domain memory (13 tests).** `mops/li8`, `li16`,
+`li32`, `lix8`, `lix16`, `lf32`, `lf64`, `si8`, `si16`, `si32`, `sf32`,
+`sf64` and `mops_basics` are **all blank** (0 lines of output;
+`mops_basics` times out). The 13 memory opcodes reach `IrOpcode` — the
+parser and verifier both decode them — but `abc_emit.cpp` has no
+emission for any of them beyond a stack-effect entry, and the runtime has
+no `ApplicationDomain.domainMemory` at all. One coherent feature, and the
+only item on this board with value outside the corpus: every
+Alchemy/CrossBridge-compiled SWF (a large share of late-era Flash games)
+runs on these opcodes.
+
+**Runner-up — builtin-container subclasses (~7 tests).** A SWF class that
+`extends Array` allocates as `AVM2_OBJ_SCRIPT`, so it gets no element
+storage: `avm2_array_ext` returns NULL, index writes fall through to
+dynamic props, and `length` stays 0. `avm2_class_construct` already
+inherits `native_ext_size` down the superclass chain — it just doesn't
+inherit the object *kind*. Tests: `as3/Array/length_mods`,
+`regress/bug_654807_swf12`, `regress/bug_654807_swf13`,
+`regress/bug_420755` (its remaining half), `regress/bug_687838`,
+`as3/ShellClasses/DictionarySubclass`, `avm2/displayobject_early_init`.
+The cluster is **not** homogeneous — the Dictionary and `bug_687838`
+diffs look like separate sealed-delete and prototype-index causes — so
+treat 7 as an upper bound on what one mechanism buys, unlike the mops
+group.
 
 **DONE — the `as3/Vector` arc.** `81cf6a669` + `222b4a4b5` + `a85726a54`
 + `2b244c01b`, CI `30174981516`: **+15** from_avmplus, 0 regressions,
@@ -574,8 +625,8 @@ yield-per-unit-effort on the board. (It was 14; `e618f62ab` picked up
 harvest from this bucket: as a side effect of an arc that wants the same
 error anyway.)
 
-from_avmplus stands at **1431/1574 (90.9%)** and the corpus at
-**3733/4414 (84.6%)**.
+from_avmplus stands at **1475/1574 (93.7%)** and the corpus at
+**3778/4414 (85.6%)**.
 
 **Calibration, after two more arcs.** Both overshot the line-match table
 (10 → 20, ~15 → 25), which is the mirror image of the error-histogram bias:

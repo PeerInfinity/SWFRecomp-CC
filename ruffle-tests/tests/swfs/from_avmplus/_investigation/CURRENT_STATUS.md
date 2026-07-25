@@ -1,13 +1,13 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-25 — **four arcs landed, all CI-confirmed: `static
+Last updated: 2026-07-25 — **five arcs landed, all CI-confirmed: `static
 const` is read-only, the `ecma3/FunctionObjects` arc, typed builtin
-prototypes, and the `as3/Vector` arc.** The Adobe
+prototypes, the `as3/Vector` arc, and the `ecma3/JSON` arc.** The Adobe
 Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`: **871/1574
 effective (55.3%)**, identical in graphics and no-graphics.
 
-Ten fixes have landed since:
+Eleven fixes have landed since:
 
 1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
    `#2023`. e4x **2/177 → 160/177**.
@@ -45,8 +45,17 @@ Ten fixes have landed since:
     `ecma3/String/localeCompare_rt`, found by the `#1063` overshoot
     sweep. This run took corpus `compile_fail` to **0**.
 
-The suite stands at **1470/1574 effective (93.4%)**; the corpus at
-**3773/4414 (85.5%)**. **Zero pass→fail regressions across all ten
+11. `7ad4e0419` — the `ecma3/JSON` arc: `JSON` is abstract (`#2012`) and a
+    class call with any argument count but 1 is `#1112`, `parse`/
+    `stringify` report arity 2/3, the PropertyList replacer dedups, and
+    cycle detection no longer caps nesting at 256 (below). **+5** here,
+    CI `30176986441`. Predicted 4; the 5th was
+    `as3/RuntimeErrors/Error1112ArgCountMismatchOnClassCoercion` — the
+    "harvest RuntimeErrors only as a side effect" case the priority map
+    calls for. `ecma3/JSON` **8/12 → 12/12**.
+
+The suite stands at **1475/1574 effective (93.7%)**; the corpus at
+**3778/4414 (85.6%)**. **Zero pass→fail regressions across all eleven
 runs.**
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
