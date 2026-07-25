@@ -473,7 +473,7 @@ static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* 
 static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
                                     const char* name, uint32_t name_len,
                                     int resolved_ok, const Resolved* r,
-                                    int mn_public)
+                                    int mn_public, int mn_attr)
 {
 	Avm2Context* ctx = act->ctx;
 	if (resolved_ok)
@@ -482,7 +482,10 @@ static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
 	}
 	// Miss: dynamic receivers yield undefined for public names; a
 	// non-public multiname can never match an expando prop (1081 on a
-	// dynamic receiver). Sealed receivers always throw 1069.
+	// dynamic receiver). Sealed receivers throw 1069 -- except for an
+	// ATTRIBUTE multiname, which avmplus routes to 1081 as well
+	// (Toplevel: `isAttr() || !containsAnyPublicNamespace()`; as3/Vector/
+	// bug_678952 reads `v.@attr` off a sealed Vector and asserts #1081).
 	int dynamic = recv.kind == AVM2_VALUE_OBJECT && object_is_dynamic(recv.u.obj);
 	if (dynamic && mn_public)
 	{
@@ -492,7 +495,7 @@ static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
 	class_name_of(ctx, recv, cn, sizeof(cn));
 	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 	                 "Error #%s: Property %.*s not found on %s and there is "
-	                 "no default value.", dynamic ? "1081" : "1069",
+	                 "no default value.", (dynamic || mn_attr) ? "1081" : "1069",
 	                 (int) name_len, name, cn);
 }
 
@@ -551,7 +554,8 @@ static Avm2Value getproperty_static_impl(Avm2Activation* act, Avm2Value recv,
 	Resolved r;
 	int ok = resolve_mn(act, recv, mn_idx, &r);
 	return getproperty_common(act, recv, name, name_len, ok, &r,
-	                          avm2_mn_has_public_ns(act->file->data, mn_idx));
+	                          avm2_mn_has_public_ns(act->file->data, mn_idx),
+	                          mn_is_attribute_kind(act->file->data, mn_idx));
 }
 
 Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
@@ -715,14 +719,19 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 			memset(&r2, 0, sizeof(r2));
 			r2.entry = e;
 			return getproperty_common(act, recv, ns->utf8, ns->len, 1, &r2,
-			                          mn_public);
+			                          mn_public,
+			                          mn_is_attribute_kind(act->file->data, mn_idx));
 		}
 	}
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, mn_public, &r);
-	return getproperty_common(act, recv, ns->utf8, ns->len, ok, &r, mn_public);
+	return getproperty_common(act, recv, ns->utf8, ns->len, ok, &r, mn_public,
+	                          mn_is_attribute_kind(act->file->data, mn_idx));
 }
+
+static void setproperty_miss(Avm2Context* ctx, Avm2Value recv,
+                             const char* name, uint32_t name_len, Avm2Value value);
 
 // Common write path once resolution is done.
 static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolved* r,
@@ -776,7 +785,17 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 	}
 	if (r->dyn != NULL)
 	{
-		// Proto-chain hit: writes shadow on the receiver itself.
+		// Proto-chain hit: writes shadow on the receiver itself -- but only
+		// where the receiver can actually grow dynamic props. Finding the name
+		// on the prototype does not make a sealed receiver writable:
+		// as3/Vector/vectorIndexRangeExceptions sets Vector.<*>.prototype.bar
+		// and then asserts #1056 for `v['bar'] = x` (while the READ still
+		// resolves through the proto chain).
+		if (!object_is_dynamic(recv.u.obj))
+		{
+			setproperty_miss(ctx, recv, name, name_len, value);
+			return;
+		}
 		avm2_object_set_dynamic(ctx, recv.u.obj, name, name_len, value);
 		return;
 	}
@@ -1188,7 +1207,15 @@ static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
 	}
 	if (obj->kind == AVM2_OBJ_VECTOR)
 	{
-		// FP never deletes vector elements; delete always reports true.
+		// FP never deletes vector elements, and reports true for them -- but a
+		// name that resolves to a declared trait is still undeletable, same as
+		// on any other object: as3/Vector/initializer_expressions asserts
+		// `delete (new <int>[1,2,3]).length` === false.
+		Avm2PropKey vkey = avm2_public_key(name, name_len);
+		if (delete_trait_find(ctx, recv, obj->vtable, &vkey) != NULL)
+		{
+			return avm2_bool(false);
+		}
 		return avm2_bool(true);
 	}
 	// Declared traits can't be deleted.
@@ -1380,7 +1407,7 @@ static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
 	}
 	Resolved r;
 	int ok = resolve_generic_key(ctx, recv, &key, pub, any_ns, &r);
-	return getproperty_common(act, recv, key.name, key.name_len, ok, &r, pub);
+	return getproperty_common(act, recv, key.name, key.name_len, ok, &r, pub, 0);
 }
 
 static void setproperty_nonpublic_miss(Avm2Context* ctx, Avm2Value recv,
@@ -1489,7 +1516,7 @@ Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t
 	int pub = key_from_ns_value(ns_val, name, name_len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
-	return getproperty_common(act, recv, name, name_len, ok, &r, pub);
+	return getproperty_common(act, recv, name, name_len, ok, &r, pub, 0);
 }
 
 Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
@@ -1518,7 +1545,7 @@ Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32
 	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
-	return getproperty_common(act, recv, s->utf8, s->len, ok, &r, pub);
+	return getproperty_common(act, recv, s->utf8, s->len, ok, &r, pub, 0);
 }
 
 static void setproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
