@@ -273,14 +273,8 @@ static Avm2Value fn_apply(Avm2Activation* act)
 			Avm2Value v = ext->elems[i];
 			if (v.kind == AVM2_VALUE_HOLE)
 			{
-				char nb[16];
-				int nl = snprintf(nb, sizeof(nb), "%u", i);
-				v = avm2_undefined();
-				for (Avm2Object* pr = arr_obj->proto; pr != NULL; pr = pr->proto)
-				{
-					Avm2Value* dv = avm2_object_find_dynamic(pr, nb, (uint32_t) nl);
-					if (dv != NULL) { v = *dv; break; }
-				}
+				Avm2Value pv;
+				v = avm2_array_proto_index(arr_obj, i, &pv) ? pv : avm2_undefined();
 			}
 			args[i] = v;
 		}

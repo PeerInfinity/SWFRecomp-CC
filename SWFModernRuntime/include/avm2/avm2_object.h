@@ -190,6 +190,10 @@ Avm2Object* avm2_array_from_values(Avm2Context* ctx, const Avm2Value* vals, uint
 Avm2ArrayExt* avm2_array_ext(Avm2Object* obj);  // NULL if not an array
 // Element get: returns HOLE-kind value if out of range / a hole.
 Avm2Value avm2_array_get(Avm2Object* arr, uint32_t idx);
+// Resolve index `idx` through `arr`'s PROTOTYPE chain (what a hole falls back
+// to). Checks each prototype's element storage as well as its dynamic props,
+// because Array.prototype is itself an Array.
+bool avm2_array_proto_index(Avm2Object* arr, uint32_t idx, Avm2Value* out);
 void avm2_array_set(Avm2Context* ctx, Avm2Object* arr, uint32_t idx, Avm2Value v);
 void avm2_array_set_length(Avm2Context* ctx, Avm2Object* arr, uint32_t new_len);
 int avm2_array_delete(Avm2Object* arr, uint32_t idx);  // 1 if it became a hole

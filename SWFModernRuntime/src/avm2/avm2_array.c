@@ -50,19 +50,34 @@ static uint32_t wrap_index(double i, uint32_t len)
 }
 
 
+// Look index `i` up along `arr`'s prototype chain; true if a prototype
+// supplies a value. Two places can hold one: element storage (Array.prototype
+// is ITSELF an Array, so `Array.prototype[3] = x` lands there) and an ordinary
+// dynamic prop named "3" (any non-Array prototype).
+bool avm2_array_proto_index(Avm2Object* arr, uint32_t i, Avm2Value* out)
+{
+	char nb[16];
+	int nl = snprintf(nb, sizeof(nb), "%u", i);
+	for (Avm2Object* p = arr->proto; p != NULL; p = p->proto)
+	{
+		if (p->kind == AVM2_OBJ_ARRAY)
+		{
+			Avm2Value pv = avm2_array_get(p, i);
+			if (pv.kind != AVM2_VALUE_HOLE) { *out = pv; return true; }
+		}
+		Avm2Value* dv = avm2_object_find_dynamic(p, nb, (uint32_t) nl);
+		if (dv != NULL) { *out = *dv; return true; }
+	}
+	return false;
+}
+
 // Holes resolve through the prototype chain by index name (Ruffle
 // globals/array.rs resolve_array_hole).
 static Avm2Value resolve_hole(Avm2Object* arr, uint32_t i, Avm2Value v)
 {
 	if (v.kind != AVM2_VALUE_HOLE) return v;
-	char nb[16];
-	int nl = snprintf(nb, sizeof(nb), "%u", i);
-	for (Avm2Object* p = arr->proto; p != NULL; p = p->proto)
-	{
-		Avm2Value* dv = avm2_object_find_dynamic(p, nb, (uint32_t) nl);
-		if (dv != NULL) return *dv;
-	}
-	return avm2_undefined();
+	Avm2Value out;
+	return avm2_array_proto_index(arr, i, &out) ? out : avm2_undefined();
 }
 
 // ---------------------------------------------------------------------------

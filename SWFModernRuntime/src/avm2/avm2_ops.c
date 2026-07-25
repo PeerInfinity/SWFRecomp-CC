@@ -673,6 +673,12 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 	{
 		Avm2Value v = avm2_array_get(recv.u.obj, idx);
 		if (v.kind != AVM2_VALUE_HOLE) return v;
+		// A prototype can itself be an Array -- Array.prototype is one -- and
+		// then `Array.prototype[3] = x` lands in ELEMENT storage, which the
+		// dyn-prop-by-name walk below cannot see (avm2/array_push & co set
+		// that up and read it back through a hole in an instance).
+		Avm2Value pv;
+		if (avm2_array_proto_index(recv.u.obj, idx, &pv)) return pv;
 		// fall through (holes may be shadowed by dyn/proto)
 	}
 	{
