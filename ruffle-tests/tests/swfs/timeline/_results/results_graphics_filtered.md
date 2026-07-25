@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-25 03:57 UTC
+**Date**: 2026-07-25 04:33 UTC
 
-**Git SHA**: `c09985aa65`
+**Git SHA**: `b46ac6ee92`
 
-**Run Duration**: 1m 27s
+**Run Duration**: 1m 28s
 
 **Filtered**: 0 tests ignored out of 17 available
 
@@ -34,17 +34,17 @@
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `clip_action_no_key_code` | 1 | 0.9s |  |
-| 2 | `frame_label_count_oom` | 1 | 2.0s |  |
-| 3 | `frame_script_cleanup` | 30 | 6.3s |  |
-| 4 | `frame_script_cleanup2` | 32 | 4.8s |  |
-| 5 | `frame_script_cleanup3` | 30 | 5.9s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 6.4s |  |
-| 7 | `frame_script_construct` | 25 | 6.0s |  |
-| 8 | `scene_count_oom` | 1 | 2.1s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 5.2s |  |
-| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 6.1s |  |
-| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 5.9s |  |
-| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 4.6s |  |
+| 2 | `frame_label_count_oom` | 1 | 1.8s |  |
+| 3 | `frame_script_cleanup` | 30 | 4.8s |  |
+| 4 | `frame_script_cleanup2` | 32 | 5.8s |  |
+| 5 | `frame_script_cleanup3` | 30 | 6.1s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 6.0s |  |
+| 7 | `frame_script_construct` | 25 | 6.2s |  |
+| 8 | `scene_count_oom` | 1 | 2.0s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 5.7s |  |
+| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 6.2s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 6.4s |  |
+| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 5.8s |  |
 
 ## Ruffle-Matched Tests
 
@@ -52,9 +52,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 6.2s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 5.4s |  |
 | 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 5.8s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 6.0s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 5.7s |  |
 
 ## Near-Passing Tests
 
