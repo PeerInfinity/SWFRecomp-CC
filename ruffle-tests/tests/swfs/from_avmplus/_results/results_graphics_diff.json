@@ -1,44 +1,44 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-25T20:09:02.207279+00:00",
-    "old_git_sha": "9b6bbcb5757f92ffd2dd1e4d59a31844129276c6",
-    "new_timestamp": "2026-07-25T21:37:09.731727+00:00",
-    "new_git_sha": "2b244c01b173bb7288ed06e7e44138b0d1d0eb2d",
+    "old_timestamp": "2026-07-25T21:37:09.731727+00:00",
+    "old_git_sha": "2b244c01b173bb7288ed06e7e44138b0d1d0eb2d",
+    "new_timestamp": "2026-07-25T22:42:41.043507+00:00",
+    "new_git_sha": "7ad4e041942791576fd779e7817b41575c8b0976",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1406,
+    "old_pass": 1421,
     "old_ruffle_matched": 49,
-    "old_effective_pass": 1455,
+    "old_effective_pass": 1470,
     "old_total": 1574,
-    "old_pass_rate": 89.3,
-    "new_pass": 1421,
+    "old_pass_rate": 90.3,
+    "new_pass": 1426,
     "new_ruffle_matched": 49,
-    "new_effective_pass": 1470,
+    "new_effective_pass": 1475,
     "new_total": 1574,
-    "new_pass_rate": 90.3,
-    "old_mismatched_lines": 1914,
-    "new_mismatched_lines": 1885,
+    "new_pass_rate": 90.6,
+    "old_mismatched_lines": 1885,
+    "new_mismatched_lines": 1868,
     "increased_mismatches": 0,
-    "decreased_mismatches": 29,
-    "newly_passing": 15,
+    "decreased_mismatches": 17,
+    "newly_passing": 5,
     "newly_failing": 0,
-    "status_changed": 15,
-    "unchanged": 1559,
+    "status_changed": 5,
+    "unchanged": 1567,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "as3/Vector/bug_678952",
+      "test": "as3/RuntimeErrors/Error1112ArgCountMismatchOnClassCoercion",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
-        "matching_lines": 1
+        "matching_lines": 0
       },
       "new_lines": {
         "actual_lines": 2,
@@ -47,99 +47,39 @@
       }
     },
     {
-      "test": "as3/Vector/filter",
+      "test": "ecma3/Exceptions/exception_001_rt",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 8
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
       },
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "as3/Vector/filter_initializers",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 4
-      },
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "as3/Vector/foreach",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 5
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "as3/Vector/foreach_initializers",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 4
-      },
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "as3/Vector/initializer_expressions",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 40
-      },
-      "new_lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 41
-      }
-    },
-    {
-      "test": "as3/Vector/initializer_large_vector",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
       "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
-        "matching_lines": 1
+        "matching_lines": 0
       }
     },
     {
-      "test": "as3/Vector/map",
+      "test": "ecma3/JSON/e15_12_0",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "ecma3/JSON/e15_12_2",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
@@ -155,115 +95,51 @@
       }
     },
     {
-      "test": "as3/Vector/map_initializers",
+      "test": "ecma3/JSON/e15_12_3",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 6
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 31
       },
       "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 33
       }
     },
     {
-      "test": "as3/Vector/nested",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 7
-      },
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "as3/Vector/nonindexproperty/v10",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 51,
-        "expected_lines": 51,
-        "matching_lines": 44
-      },
-      "new_lines": {
-        "actual_lines": 51,
-        "expected_lines": 51,
-        "matching_lines": 51
-      }
-    },
-    {
-      "test": "as3/Vector/some",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 12
-      },
-      "new_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      }
-    },
-    {
-      "test": "as3/Vector/some_initializers",
+      "test": "ecma3/JSON/regress",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
         "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 5
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "as3/Vector/vectorIndexRangeExceptions",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1270,
-        "expected_lines": 1270,
-        "matching_lines": 1260
-      },
-      "new_lines": {
-        "actual_lines": 1270,
-        "expected_lines": 1270,
-        "matching_lines": 1270
-      }
-    },
-    {
-      "test": "ecma3/String/localeCompare_rt",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
+        "expected_lines": 5,
         "matching_lines": 3
       },
       "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "regress/bug_420755",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 17
+      },
+      "new_lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 25
       }
     }
   ]
