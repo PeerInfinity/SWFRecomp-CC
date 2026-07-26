@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-26 21:32 UTC
+**Date**: 2026-07-26 22:42 UTC
 
-**Git SHA**: `24cb841ec0`
+**Git SHA**: `9f4be9647b`
 
-**Run Duration**: 0m 25s
+**Run Duration**: 0m 24s
 
 ## Summary
 
@@ -29,7 +29,7 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `empty_url` | 2 | 20.8s |  |
+| 1 | `empty_url` | 2 | 19.5s |  |
 
 ## Near-Passing Tests
 
