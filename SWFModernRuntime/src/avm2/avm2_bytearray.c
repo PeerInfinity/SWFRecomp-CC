@@ -103,12 +103,35 @@ static _Noreturn void throw_2058(Avm2Context* ctx)
 void avm2_bytearray_set_length_public(Avm2Context* ctx, Avm2ByteArrayExt* ba,
                                       uint32_t new_len);
 
+// avmplus caps a ByteArray's backing store at MMgc's kMaxObjectSize. Both
+// failure routes in tamarin-redux's ByteArrayGlue.cpp — mmfx_new_array_opt()
+// returning null (:147, the 32-bit case) and the minimumCapacity check (:132)
+// — surface to AS3 as Error #1000. The corpus pins the boundary at
+// 0xFFFFC000 = 2^32 - 0x4000: as3/ByteArray/ByteArray_bug662851_{32,64}bit
+// walk 0xFFFFC000..0xFFFFF000 and expect #1000 on every step. The check must
+// come before any allocation: our capacity doubling below cannot represent
+// such a size (and heap exhaustion is fatal, not catchable).
+#define BA_MAX_LENGTH 0xFFFFC000u
+
 static void ba_set_length(Avm2Context* ctx, Avm2ByteArrayExt* ba, uint32_t new_len)
 {
+	if (new_len >= BA_MAX_LENGTH)
+	{
+		avm2_throw_error(ctx, ctx->builtins.error_class,
+		                 "Error #1000: The system is out of memory.");
+	}
 	if (new_len > ba->cap)
 	{
+		// Double until it fits. new_len < BA_MAX_LENGTH < 2^32 and the
+		// doubling starts at 32, so new_cap tops out at 2^31 before the
+		// guard below hands it the exact size — without that arm the
+		// multiply overflows to 0 and the loop spins forever.
 		uint32_t new_cap = ba->cap == 0 ? 32 : ba->cap;
-		while (new_cap < new_len) new_cap *= 2;
+		while (new_cap < new_len)
+		{
+			if (new_cap > 0x40000000u) { new_cap = new_len; break; }
+			new_cap *= 2;
+		}
 		uint8_t* grown = avm2_alloc(ctx, new_cap);
 		if (ba->len > 0) memcpy(grown, ba->bytes, ba->len);
 		ba->bytes = grown;
