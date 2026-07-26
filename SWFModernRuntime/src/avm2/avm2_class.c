@@ -1206,16 +1206,27 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 	return cls;
 }
 
-// Object kind for instances of `cls`. Normally the kind inherited from the
-// builtin ancestor, except that a SEALED subclass of Array gets none: avmplus
-// gives sealed Array subclasses no element storage, so their Array methods run
-// the generic (property-based) paths and index access answers through the
-// ordinary sealed-object rules (regress/bug_654807_swf13 "sealed" columns,
-// regress/bug_420755's MyNonDynamicArray → #1056).
-uint8_t avm2_class_instance_kind(const Avm2Class* cls)
+// Object kind for instances of `cls`: the kind inherited from the builtin
+// ancestor, minus avmplus's version-gated rule for SEALED subclasses of Array
+// (bugzilla 654807, regress/bug_654807_swf12 vs _swf13 -- same source, SWF 12
+// and 13, opposite expectations).
+//
+//   SWF >= 13: a sealed Array subclass gets NO element storage. Its Array
+//     methods take their generic (property-based) paths, so a method that
+//     writes reports #1056 and `length` stays 0 -- the "sealed" columns.
+//   SWF <= 12: it keeps element storage, so the dense-path methods work,
+//     but index property access still follows the sealed-object rules
+//     (#1069 / #1056 / false) -- the inconsistent "semisealed" behaviour
+//     that the bug fixed.
+//
+// The gate reads the LEAF class's own dynamic bit, never an inherited one:
+// `dynamic class D extends SealedArray` is a plain dynamic array in both
+// versions, and `class S extends DynamicArray` is gated in both.
+uint8_t avm2_class_instance_kind(Avm2Context* ctx, const Avm2Class* cls)
 {
 	uint8_t kind = cls->instance_kind;
-	if (kind == AVM2_OBJ_ARRAY && (cls->flags & AVM2_CLASS_FLAG_SEALED))
+	if (kind == AVM2_OBJ_ARRAY && (cls->flags & AVM2_CLASS_FLAG_SEALED)
+	    && ctx->swf_version >= 13)
 	{
 		return AVM2_OBJ_SCRIPT;
 	}
@@ -1234,7 +1245,7 @@ Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
 	{
 		return cls->native_construct(ctx, cls, args, argc);
 	}
-	uint8_t kind = avm2_class_instance_kind(cls);
+	uint8_t kind = avm2_class_instance_kind(ctx, cls);
 	Avm2Object* obj = avm2_object_alloc(ctx, kind, cls->ivtable.slot_count + 1);
 	obj->cls = cls;
 	obj->vtable = &cls->ivtable;

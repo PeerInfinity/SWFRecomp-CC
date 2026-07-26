@@ -29,6 +29,64 @@ static Avm2Value arg_or_undef(Avm2Activation* act, uint32_t i)
 	return i < act->argc ? act->args[i] : avm2_undefined();
 }
 
+// --- sealed Array subclasses (avmplus bugzilla 654807) ----------------------
+//
+// Below SWF 13 a sealed `extends Array` subclass keeps element storage, so
+// this_array() finds it and the dense-path methods (push/pop/shift/unshift/
+// reverse/concat/slice, splice with delCount 0) work exactly as on an Array.
+// The rest of avmplus's Array methods walk the receiver with a generic
+// get-property loop instead, and index properties are NOT reachable on a
+// sealed instance — so the first element read throws #1069. That split is the
+// whole "semisealed" column of regress/bug_654807_swf12.
+//
+// From SWF 13 the subclass gets no storage at all (this_array() is NULL) and
+// the same generic paths apply to writes too, which cannot create a property
+// on a sealed object: #1056. That is the "sealed" column of _swf13.
+
+// A sealed `extends Array` receiver, and only that: an unrelated sealed
+// builtin borrowing an Array method through .call() keeps the pre-existing
+// neutral-return behaviour (as3/Array/length_mods runs
+// `Array.prototype.public::pop.call(byteArray)`).
+static int sealed_receiver(Avm2Activation* act)
+{
+	Avm2Value t = act->this_val;
+	return t.kind == AVM2_VALUE_OBJECT && t.u.obj != NULL
+	       && t.u.obj->cls != NULL
+	       && t.u.obj->cls->instance_kind == AVM2_OBJ_ARRAY
+	       && !avm2_object_is_dynamic(t.u.obj);
+}
+
+static void receiver_class_name(Avm2Activation* act, char* buf, int size)
+{
+	Avm2Value t = act->this_val;
+	Avm2Class* cls = (t.kind == AVM2_VALUE_OBJECT && t.u.obj != NULL)
+		? t.u.obj->cls : NULL;
+	if (cls != NULL) avm2_class_qname_buf(cls, buf, size);
+	else snprintf(buf, (size_t) size, "Object");
+}
+
+// Generic element READ against a sealed receiver: #1069. `count` is how many
+// elements the method would have read — zero means it never touches one.
+static void sealed_generic_read(Avm2Activation* act, Avm2Object* arr, uint32_t count)
+{
+	if (arr == NULL || count == 0 || !sealed_receiver(act)) return;
+	char cn[160];
+	receiver_class_name(act, cn, sizeof(cn));
+	avm2_throw_error(act->ctx, act->ctx->builtins.reference_error_class,
+	                 "Error #1069: Property 0 not found on %s and there is "
+	                 "no default value.", cn);
+}
+
+// Generic element WRITE against a sealed receiver that has no storage: #1056.
+static void sealed_generic_write(Avm2Activation* act)
+{
+	if (!sealed_receiver(act)) return;
+	char cn[160];
+	receiver_class_name(act, cn, sizeof(cn));
+	avm2_throw_error(act->ctx, act->ctx->builtins.reference_error_class,
+	                 "Error #1056: Cannot create property 0 on %s.", cn);
+}
+
 // Resolve holes to undefined for callback-visible values.
 static Avm2Value elem_or_undef(Avm2Object* arr, uint32_t i)
 {
@@ -93,7 +151,10 @@ static Avm2Value array_get_length(Avm2Activation* act)
 static Avm2Value array_set_length(Avm2Activation* act)
 {
 	Avm2Object* arr = this_array(act);
-	if (arr != NULL && act->argc > 0)
+	// avmplus's set_length goes through the property path, so on a sealed
+	// subclass the write is silently dropped -- bug_654807_swf12's
+	// "semisealed set_length" still reads 5 after `b.length = 3`.
+	if (arr != NULL && act->argc > 0 && !sealed_receiver(act))
 	{
 		avm2_array_set_length(act->ctx, arr, avm2_coerce_to_u32(act->ctx, act->args[0]));
 	}
@@ -123,6 +184,7 @@ static Avm2Value array_join(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* arr = this_array(act);
 	if (arr == NULL) return avm2_string(avm2_string_from_literal(ctx, ""));
+	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
 	const Avm2String* sep;
 	if (act->argc > 0 && act->args[0].kind != AVM2_VALUE_UNDEFINED)
 	{
@@ -141,6 +203,7 @@ static Avm2Value array_to_locale_string(Avm2Activation* act)
 	Avm2Object* arr = this_array(act);
 	if (arr == NULL) return avm2_string(avm2_string_from_literal(ctx, ""));
 	Avm2ArrayExt* ext = avm2_array_ext(arr);
+	sealed_generic_read(act, arr, ext->length);
 	const Avm2String* sep = avm2_string_from_literal(ctx, ",");
 	const Avm2String* out = avm2_string_from_literal(ctx, "");
 	for (uint32_t i = 0; i < ext->dense_len; i++)
@@ -162,13 +225,18 @@ static Avm2Value array_to_string(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* arr = this_array(act);
 	if (arr == NULL) return avm2_string(avm2_string_from_literal(ctx, ""));
+	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
 	return avm2_string(array_join_inner(ctx, arr, avm2_string_from_literal(ctx, ",")));
 }
 
 static Avm2Value array_push(Avm2Activation* act)
 {
 	Avm2Object* arr = this_array(act);
-	if (arr == NULL) return avm2_integer(0);
+	if (arr == NULL)
+	{
+		if (act->argc > 0) sealed_generic_write(act);
+		return avm2_integer(0);
+	}
 	for (uint32_t i = 0; i < act->argc; i++)
 	{
 		avm2_array_push(act->ctx, arr, act->args[i]);
@@ -233,7 +301,11 @@ static Avm2Value array_unshift(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* arr = this_array(act);
-	if (arr == NULL) return avm2_integer(0);
+	if (arr == NULL)
+	{
+		if (act->argc > 0) sealed_generic_write(act);
+		return avm2_integer(0);
+	}
 	Avm2ArrayExt* ext = avm2_array_ext(arr);
 	uint32_t n = act->argc;
 	if (n > 0)
@@ -349,7 +421,12 @@ static Avm2Value array_splice(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* arr = this_array(act);
 	Avm2Object* removed = avm2_array_new(ctx, 0);
-	if (arr == NULL || act->argc == 0) return avm2_undefined();
+	if (arr == NULL)
+	{
+		if (act->argc > 0) sealed_generic_write(act);
+		return avm2_undefined();
+	}
+	if (act->argc == 0) return avm2_undefined();
 	Avm2ArrayExt* ext = avm2_array_ext(arr);
 	uint32_t len = ext->dense_len;
 	uint32_t start = wrap_index(avm2_coerce_to_number(ctx, act->args[0]), len);
@@ -366,6 +443,9 @@ static Avm2Value array_splice(Avm2Activation* act)
 		del = len - start;
 	}
 	uint32_t ins = act->argc > 2 ? act->argc - 2 : 0;
+	// Removing elements means reading them back for the result array, which
+	// is the generic path; inserting only (delCount 0) is not.
+	sealed_generic_read(act, arr, del);
 
 	// Resolve holes across the tail before mutating (Ruffle splice).
 	for (uint32_t i = start; i < len; i++)
@@ -406,6 +486,7 @@ static Avm2Value array_index_of(Avm2Activation* act)
 	Avm2Object* arr = this_array(act);
 	if (arr == NULL || act->argc == 0) return avm2_integer(-1);
 	Avm2ArrayExt* ext = avm2_array_ext(arr);
+	sealed_generic_read(act, arr, ext->length);
 	double fromf = act->argc > 1 ? avm2_coerce_to_number(ctx, act->args[1]) : 0.0;
 	uint32_t from = wrap_index(fromf, ext->length);
 	for (uint32_t i = from; i < ext->dense_len; i++)
@@ -433,6 +514,7 @@ static Avm2Value array_last_index_of(Avm2Activation* act)
 	if (arr == NULL || act->argc == 0) return avm2_integer(-1);
 	Avm2ArrayExt* ext = avm2_array_ext(arr);
 	if (ext->length == 0) return avm2_integer(-1);
+	sealed_generic_read(act, arr, ext->length);
 	uint32_t from = ext->length - 1;
 	if (act->argc > 1)
 	{
@@ -554,6 +636,7 @@ static Avm2Value array_for_each(Avm2Activation* act)
 {
 	Avm2Object* arr = this_array(act);
 	if (arr == NULL) return avm2_undefined();
+	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
 	Avm2Value cb;
 	if (!array_callback_arg(act->ctx, arg_or_undef(act, 0), &cb))
 	{
@@ -573,6 +656,7 @@ static Avm2Value array_map(Avm2Activation* act)
 	Avm2Object* arr = this_array(act);
 	Avm2Object* out = avm2_array_new(ctx, 0);
 	if (arr == NULL) return avm2_object_value(out);
+	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
 	Avm2Value cb;
 	if (!array_callback_arg(ctx, arg_or_undef(act, 0), &cb))
 	{
@@ -592,6 +676,7 @@ static Avm2Value array_filter(Avm2Activation* act)
 	Avm2Object* arr = this_array(act);
 	Avm2Object* out = avm2_array_new(ctx, 0);
 	if (arr == NULL) return avm2_object_value(out);
+	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
 	Avm2Value cb;
 	if (!array_callback_arg(ctx, arg_or_undef(act, 0), &cb))
 	{
@@ -613,6 +698,7 @@ static Avm2Value array_every(Avm2Activation* act)
 {
 	Avm2Object* arr = this_array(act);
 	if (arr == NULL) return avm2_bool(true);
+	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
 	Avm2Value cb;
 	if (!array_callback_arg(act->ctx, arg_or_undef(act, 0), &cb))
 	{
@@ -633,6 +719,7 @@ static Avm2Value array_some(Avm2Activation* act)
 {
 	Avm2Object* arr = this_array(act);
 	if (arr == NULL) return avm2_bool(false);
+	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
 	Avm2Value cb;
 	if (!array_callback_arg(act->ctx, arg_or_undef(act, 0), &cb))
 	{
@@ -889,9 +976,12 @@ static Avm2Value sort_apply(Avm2Activation* act, SortCtx* sc)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* arr = this_array(act);
-	if (arr == NULL) return avm2_integer(0);
+	// avmplus's sort returns the receiver, so `String(b.sort(...))` on a
+	// storage-less sealed subclass stringifies an empty array.
+	if (arr == NULL) return act->this_val;
 	Avm2ArrayExt* ext = avm2_array_ext(arr);
 	uint32_t len = ext->dense_len;
+	sealed_generic_read(act, arr, ext->length);
 
 	// values = (index, hole-resolved value) — Ruffle extract_array_values.
 	SortItem* items = avm2_alloc(ctx, (len + 1) * sizeof(SortItem));

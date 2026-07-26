@@ -161,6 +161,11 @@ typedef struct Avm2VectorExt
 // for the immortality note).
 Avm2Object* avm2_object_alloc(Avm2Context* ctx, uint8_t kind, uint32_t slot_count);
 
+// May `obj` grow dynamic (expando) properties? False for instances of a
+// sealed class — prototypes, globals and activations are always dynamic.
+// (Defined in avm2_ops.c, next to the property paths that consult it.)
+int avm2_object_is_dynamic(Avm2Object* obj);
+
 // Dynamic (expando) properties.
 Avm2Value* avm2_object_find_dynamic(Avm2Object* obj, const char* name, uint32_t name_len);
 Avm2DynProp* avm2_object_find_dynamic_entry(Avm2Object* obj, const char* name,

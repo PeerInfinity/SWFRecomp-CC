@@ -180,7 +180,7 @@ struct Avm2ScopeChain
 int avm2_class_qname_buf(const Avm2Class* cls, char* buf, int size);
 
 // Avm2ObjectKind instances of `cls` are allocated with (see instance_kind).
-uint8_t avm2_class_instance_kind(const Avm2Class* cls);
+uint8_t avm2_class_instance_kind(Avm2Context* ctx, const Avm2Class* cls);
 
 // Namespace kind folding for comparisons (public kinds unify).
 uint8_t avm2_ns_fold(uint8_t kind);

@@ -137,17 +137,36 @@ static int value_is_null_like(Avm2Value v)
 	return v.kind == AVM2_VALUE_UNDEFINED || v.kind == AVM2_VALUE_NULL;
 }
 
-// Is `obj` allowed to grow dynamic props?
-static int object_is_dynamic(Avm2Object* obj)
+// Is `obj` allowed to grow dynamic props? Array kind is NOT automatically
+// dynamic any more: a sealed `extends Array` subclass carries element storage
+// below SWF 13 (avm2_class_instance_kind) and must still answer the sealed
+// rules for property access. Array itself and every dynamic subclass have an
+// unsealed class, so they land on the flag test below.
+int avm2_object_is_dynamic(Avm2Object* obj)
 {
-	if (obj->kind == AVM2_OBJ_CLASS || obj->kind == AVM2_OBJ_FUNCTION
-	    || obj->kind == AVM2_OBJ_ARRAY)
+	if (obj->kind == AVM2_OBJ_CLASS || obj->kind == AVM2_OBJ_FUNCTION)
 	{
 		return 1;
 	}
 	if (obj->is_prototype) return 1;
 	if (obj->cls == NULL) return 1;
 	return (obj->cls->flags & AVM2_CLASS_FLAG_SEALED) == 0;
+}
+
+static int object_is_dynamic(Avm2Object* obj)
+{
+	return avm2_object_is_dynamic(obj);
+}
+
+// Does index-keyed property ACCESS on `obj` reach element storage? Only on a
+// dynamic array receiver. A sealed Array subclass keeps its storage for the
+// Array methods, but `b[0]` / `b[0] = x` / `hasOwnProperty(0)` / `delete b[0]`
+// go through the ordinary sealed-object rules — #1069 / #1056 / false / false
+// (regress/bug_654807_swf12 "semisealed" columns). Enumeration is deliberately
+// NOT gated: for-in on such an instance still yields its element indices.
+static int array_index_access(Avm2Object* obj)
+{
+	return obj != NULL && obj->kind == AVM2_OBJ_ARRAY && object_is_dynamic(obj);
 }
 
 // Dictionary receivers route OBJECT-valued lazy names to object space
@@ -256,7 +275,7 @@ static int resolve_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
 	{
 		Avm2Object* obj = recv.u.obj;
 		uint32_t idx;
-		if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(key->name, key->name_len, &idx))
+		if (array_index_access(obj) && name_as_index(key->name, key->name_len, &idx))
 		{
 			Avm2Value v = avm2_array_get(obj, idx);
 			if (v.kind != AVM2_VALUE_HOLE)
@@ -340,7 +359,7 @@ static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Reso
 	{
 		Avm2Object* obj = recv.u.obj;
 		uint32_t idx;
-		if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(key.name, key.name_len, &idx))
+		if (array_index_access(obj) && name_as_index(key.name, key.name_len, &idx))
 		{
 			Avm2Value v = avm2_array_get(obj, idx);
 			if (v.kind != AVM2_VALUE_HOLE)
@@ -671,7 +690,7 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 	// Array index fast path with a numeric name value (public names only,
 	// except interpreter-mode bodies).
 	uint32_t idx;
-	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	if (recv.kind == AVM2_VALUE_OBJECT && array_index_access(recv.u.obj)
 	    && avm2_value_as_index(name_val, &idx)
 	    && (interp || avm2_mn_has_public_ns(act->file->data, mn_idx)))
 	{
@@ -914,7 +933,7 @@ static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 		return;
 	}
 	uint32_t idx;
-	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	if (recv.kind == AVM2_VALUE_OBJECT && array_index_access(recv.u.obj)
 	    && name_as_index(name, name_len, &idx))
 	{
 		avm2_array_set(act->ctx, recv.u.obj, idx, value);
@@ -1097,7 +1116,7 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 		avm2_throw_null_or_undefined(ctx, recv, ns->utf8, ns->len);
 	}
 	uint32_t idx;
-	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	if (recv.kind == AVM2_VALUE_OBJECT && array_index_access(recv.u.obj)
 	    && avm2_value_as_index(name_val, &idx)
 	    && (interp || avm2_mn_has_public_ns(act->file->data, mn_idx)))
 	{
@@ -1149,7 +1168,7 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 		return;
 	}
 	if (mn_public
-	    && recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	    && recv.kind == AVM2_VALUE_OBJECT && array_index_access(recv.u.obj)
 	    && name_as_index(ns->utf8, ns->len, &idx))
 	{
 		avm2_array_set(ctx, recv.u.obj, idx, value);
@@ -1200,7 +1219,7 @@ static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
 	}
 	Avm2Object* obj = recv.u.obj;
 	uint32_t idx;
-	if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(name, name_len, &idx))
+	if (array_index_access(obj) && name_as_index(name, name_len, &idx))
 	{
 		avm2_array_delete(obj, idx);
 		return avm2_bool(true);
@@ -1325,7 +1344,7 @@ Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32
 	}
 	uint32_t idx;
 	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj != NULL
-	    && recv.u.obj->kind == AVM2_OBJ_ARRAY && avm2_value_as_index(name_val, &idx))
+	    && array_index_access(recv.u.obj) && avm2_value_as_index(name_val, &idx))
 	{
 		avm2_array_delete(recv.u.obj, idx);
 		return avm2_bool(true);
@@ -2563,7 +2582,7 @@ Avm2Value avm2_op_callproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t
 		avm2_throw_null_or_undefined(ctx, recv, ns->utf8, ns->len);
 	}
 	uint32_t idx;
-	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	if (recv.kind == AVM2_VALUE_OBJECT && array_index_access(recv.u.obj)
 	    && avm2_value_as_index(name_val, &idx))
 	{
 		Avm2Value v = avm2_array_get(recv.u.obj, idx);
@@ -3652,7 +3671,7 @@ void avm2_set_public_property(Avm2Context* ctx, Avm2Value recv,
 		if (avm2_xml_set_name(ctx, recv, &n, value)) return;
 	}
 	uint32_t idx;
-	if (recv.kind == AVM2_VALUE_OBJECT && recv.u.obj->kind == AVM2_OBJ_ARRAY
+	if (recv.kind == AVM2_VALUE_OBJECT && array_index_access(recv.u.obj)
 	    && name_as_index(name, name_len, &idx))
 	{
 		avm2_array_set(ctx, recv.u.obj, idx, value);
@@ -3697,7 +3716,7 @@ int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
 	if (recv.kind != AVM2_VALUE_OBJECT) return 0;
 	Avm2Object* obj = recv.u.obj;
 	uint32_t idx;
-	if (obj->kind == AVM2_OBJ_ARRAY && name_as_index(name, name_len, &idx))
+	if (array_index_access(obj) && name_as_index(name, name_len, &idx))
 	{
 		Avm2Value v = avm2_array_get(obj, idx);
 		if (v.kind != AVM2_VALUE_HOLE) return 1;
