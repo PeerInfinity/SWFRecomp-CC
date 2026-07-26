@@ -1224,9 +1224,22 @@ static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
 	{
 		return avm2_bool(false);
 	}
-	// -1 = present but DontDelete (a builtin `static const`).
-	if (avm2_object_delete_dynamic(obj, name, name_len) < 0)
+	// -1 = present but DontDelete (a builtin `static const`),
+	// 0 = no such property, 1 = removed.
+	int removed = avm2_object_delete_dynamic(obj, name, name_len);
+	if (removed < 0)
 	{
+		return avm2_bool(false);
+	}
+	if (removed == 0 && !object_is_dynamic(obj))
+	{
+		// A sealed (non-dynamic) class instance could never have held the
+		// property, and avmplus reports that as false rather than the ES3
+		// missing-property `true` (as3/ShellClasses/DictionarySubclass
+		// "delete literal key from SealedDictionary" -- the write that would
+		// have created it threw #1056 -- and regress/bug_654807 "delprop").
+		// Dynamic receivers, prototypes, globals and activations keep the
+		// ES3 answer; Dictionary object-space keys never reach here.
 		return avm2_bool(false);
 	}
 	// Deleting a missing property returns true (ES3), same as a successful one.
