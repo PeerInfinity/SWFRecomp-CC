@@ -15,6 +15,10 @@ All modes push results to the same branch (`ruffle-test-results`) — only the f
 
 Every `ruffle-tests.yml` dispatch (any mode / any `parallel` / with or without `single_test`) also runs a **`wasm-link-smoke`** job that compiles+links one trace-WASM demo (`swf_core.c` path) and one browser-WASM graphics demo (`swf.c` path). A runtime change that breaks either WASM link turns the run red as its own named job. So the old manual smoke ritual (from the `wasm-build-modes-rot-without-ci` memory) is **no longer needed to catch link/compile breakage** — CI catches it. Still run a manual browser smoke for **behavioural** checks (rendering, interactivity), which this job deliberately does NOT do (compile+link only, no execution).
 
+### `single_test` runs no longer publish (2026-07-26)
+
+`-f single_test=NAME` now runs in its own lean **`Single test`** job that builds, runs the one test, and uploads the result JSON as an artifact — it does **not** touch `ruffle-test-results`. Previously it satisfied the publish guard and force-pushed a whole results tree rebuilt from the *master checkout*, so dispatching one before pushing a results merge reverted the branch to its pre-merge state (run `30186909756`). The old "push the merge before dispatching a single-test verify" ordering rule is therefore obsolete. Read the verdict from the `Verify single test` log step. Two behavior notes: it downloads **every** category (so a `from_avmplus` or misc test is runnable, which it wasn't before), and in `mode=graphics` it requires a warm Dawn cache — on a miss it fails fast telling you to run `build-dawn.yml`, rather than building Dawn inline for ~30 min.
+
 ## State file
 
 Path: `.pipeline-state` (gitignored). Compact JSON, one line:

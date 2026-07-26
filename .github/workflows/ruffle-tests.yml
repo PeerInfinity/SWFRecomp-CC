@@ -24,7 +24,7 @@ on:
         default: '0'
         type: string
       parallel:
-        description: 'Number of parallel runners'
+        description: 'Number of shards (1 = one shard, not a separate serial path)'
         required: true
         type: choice
         options:
@@ -74,7 +74,7 @@ on:
         default: '0'
         type: string
       parallel:
-        description: 'Number of parallel runners'
+        description: 'Number of shards (1 = one shard, not a separate serial path)'
         required: false
         default: '30'
         type: string
@@ -148,19 +148,25 @@ env:
   GNASH_SWFC_DIR: ruffle-tests/tests/swfs/from_gnash/misc-swfc.all
 
 jobs:
-  # --- Single runner path ---
-  ruffle-tests:
-    name: Run Tests
-    if: inputs.parallel == '1' || inputs.single_test != ''
+  # --- Single-test path (debugging one named test) ---
+  #
+  # Replaces the old `ruffle-tests` single-runner job, which handled both
+  # `parallel: '1'` and `single_test`. Nothing used the former: across the 20
+  # runs before 2026-07-26 the job executed exactly once, for a single_test
+  # dispatch, and no caller sets parallel=1 (all-tests.yml passes 10,
+  # weekly-no-graphics.yml takes the default 30). `parallel: '1'` now simply
+  # means a one-shard matrix through the normal path, so there is no longer a
+  # second full copy of the setup + publish tail to keep in sync — which is
+  # what let the results_flash.json bug hide in one copy for 2.5 months.
+  #
+  # This job deliberately does NOT publish. See the guard on combine-results'
+  # "Commit results" step: a single-test run rebuilds the results tree from
+  # the master checkout, so publishing it force-pushed a stale tree over the
+  # branch. The verdict here is the log line plus the uploaded artifact.
+  single-test:
+    name: Single test (${{ inputs.single_test }})
+    if: inputs.single_test != ''
     runs-on: ubuntu-latest
-
-    env:
-      RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'avm1' }}
-      RUN_AVM2: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'avm2' }}
-      RUN_AVMPLUS: ${{ inputs.categories == 'full' || inputs.categories == 'from_avmplus' }}
-      RUN_MISC: ${{ inputs.categories == 'full' || inputs.categories == 'misc' }}
-      RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'no_gnash' || inputs.categories == 'from_shumway' }}
-      RUN_GNASH: ${{ inputs.categories == 'all' || inputs.categories == 'full' || inputs.categories == 'from_gnash' }}
 
     steps:
       - name: Checkout repository
@@ -177,10 +183,10 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake ccache
 
-      # Graphics mode needs Vulkan + a prebuilt Dawn library. Dawn is built by .github/workflows/build-dawn.yml
-      # and stored in the GitHub Actions cache. If the cache is missing
-      # (first run on a new ref or post-eviction), trigger build-dawn.yml
-      # manually first: `gh workflow run build-dawn.yml`.
+      # Graphics mode needs Vulkan + a prebuilt Dawn library. Dawn is built by
+      # .github/workflows/build-dawn.yml and stored in the GitHub Actions
+      # cache. Restore-only, like the shards: a one-test debug run should fail
+      # fast with instructions rather than sit through a ~30 min inline build.
       - name: Compute Dawn cache key
         if: inputs.mode != 'no-graphics'
         id: dawn_key
@@ -191,24 +197,21 @@ jobs:
           key="dawn-prebuilt-linux-x64-${script_hash}-v1"
           echo "key=$key" >> "$GITHUB_OUTPUT"
 
-      - name: Restore-or-save Dawn cache
+      - name: Restore Dawn from cache
         if: inputs.mode != 'no-graphics'
         id: dawn_cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/dawn-install
           key: ${{ steps.dawn_key.outputs.key }}
 
-      - name: Install Dawn build dependencies (cache miss)
-        if: inputs.mode != 'no-graphics' && steps.dawn_cache.outputs.cache-hit != 'true'
+      - name: Verify Dawn cache hit
+        if: inputs.mode != 'no-graphics'
         run: |
-          sudo apt-get install -y git ninja-build python3
-
-      - name: Build Dawn (cache miss)
-        if: inputs.mode != 'no-graphics' && steps.dawn_cache.outputs.cache-hit != 'true'
-        run: |
-          echo "::notice::Dawn cache miss — building inline (~30 min). actions/cache@v4 will save the result automatically."
-          bash scripts/build_dawn.sh "${RUNNER_TEMP}/dawn-install"
+          if [ "${{ steps.dawn_cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Dawn cache miss. Populate it with 'gh workflow run build-dawn.yml' and re-dispatch, or use -f mode=no-graphics."
+            exit 1
+          fi
 
       # libav* back SWFModernRuntime's video codec
       # (SWFRecompDocs/plans/video-codec-support-plan.md): verify_output.py
@@ -221,20 +224,21 @@ jobs:
       - name: Pin ccache directory
         run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
 
+      # Restore-only: a debug run reuses whatever the sharded runs left warm
+      # and never writes a cache entry of its own. That is what the old job's
+      # 35-line "Prune old ccache entries" tail existed to clean up.
       - name: Restore ccache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-ruffle-single-${{ inputs.mode }}-${{ github.run_id }}
+          key: ccache-ruffle-shard-${{ inputs.mode }}-
           restore-keys: |
-            ccache-ruffle-single-${{ inputs.mode }}-
+            ccache-ruffle-shard-${{ inputs.mode }}-
+            ccache-ruffle-shard-
             ccache-ruffle-single-
 
       - name: Configure ccache
         run: |
-          # Single-runner path: one ccache entry per mode (key above is
-          # per-mode, not per-shard), so total stays small and leaves room for
-          # the Dawn cache under the 10 GiB per-repo limit.
           ccache --max-size=300M
           ccache -z
 
@@ -245,60 +249,21 @@ jobs:
           cmake ..
           make -j$(nproc)
 
+      # Every category, not the `categories` selection: single_test takes a
+      # bare test name and verify_output.py locates the suite that owns it, so
+      # filtering the download would make a from_avmplus or misc test
+      # un-runnable under the default categories=all. (regression/ is
+      # git-tracked, never downloaded.)
       - name: Download Ruffle test SWFs
         run: |
-          CATS=""
-          [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
-          [ "$RUN_AVM2" = "true" ] && CATS="$CATS avm2"
-          [ "$RUN_AVMPLUS" = "true" ] && CATS="$CATS from_avmplus"
-          [ "$RUN_MISC" = "true" ] && CATS="$CATS timeline text swf import_assets audio fonts visual mixed_avm stage3d"
-          [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
-          [ "$RUN_GNASH" = "true" ] && CATS="$CATS from_gnash"
-          bash ruffle-tests/download_tests.sh $CATS
+          bash ruffle-tests/download_tests.sh \
+            avm1 avm2 from_avmplus from_shumway from_gnash \
+            timeline text swf import_assets audio fonts visual mixed_avm stage3d
 
-      - name: Run recompiler on test SWFs
-        run: |
-          DIRS=""
-          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
-          [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
-          [ "$RUN_AVMPLUS" = "true" ] && DIRS="$DIRS $AVMPLUS_DIR"
-          [ "$RUN_MISC" = "true" ] && DIRS="$DIRS $MISC_DIRS"
-          if [ "$RUN_SHUMWAY" = "true" ]; then
-            DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
-          fi
-          [ "$RUN_GNASH" = "true" ] && DIRS="$DIRS $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
-          for dir in $DIRS; do
-            [ -d "$dir" ] && python3 ruffle-tests/run_tests.py --tests-dir="$dir" || true
-          done
-
-      - name: Fetch previous results
-        run: |
-          DIRS=""
-          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
-          [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
-          [ "$RUN_AVMPLUS" = "true" ] && DIRS="$DIRS $AVMPLUS_DIR"
-          [ "$RUN_MISC" = "true" ] && DIRS="$DIRS $MISC_DIRS"
-          if [ "$RUN_SHUMWAY" = "true" ]; then
-            DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
-          fi
-          [ "$RUN_GNASH" = "true" ] && DIRS="$DIRS $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
-          # Per-mode previous baseline: graphics runs diff against the last
-          # graphics run, no-graphics against the last no-graphics run. The
-          # commit step generates the actual diff after the branch switch.
-          case "${{ inputs.mode }}" in
-            graphics) PREV_STEM="results_graphics" ;;
-            *) PREV_STEM="results" ;;
-          esac
-          if git fetch origin ruffle-test-results 2>/dev/null; then
-            for dir in $DIRS; do
-              mkdir -p "$dir/_results"
-              git show "origin/ruffle-test-results:$dir/_results/${PREV_STEM}.json" \
-                > "$dir/_results/${PREV_STEM}_previous.json" 2>/dev/null || true
-            done
-          fi
-
+      # No bulk recompiler pass: verify_output.py recompiles the test it is
+      # about to run (recompile_swf(), mtime-cached), so the sharded path's
+      # separate recompile step buys a single test nothing.
       - name: Verify single test
-        if: inputs.single_test != ''
         env:
           TZ: NPT-5:45
         run: |
@@ -308,193 +273,19 @@ jobs:
             --mode='${{ inputs.mode }}' \
             --diff
 
-      - name: Verify runtime output
-        if: inputs.single_test == ''
-        env:
-          TZ: NPT-5:45
-        run: |
-          DIRS=""
-          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR $REGRESSION_DIR"
-          [ "$RUN_AVM2" = "true" ] && DIRS="$DIRS $AVM2_DIR"
-          [ "$RUN_AVMPLUS" = "true" ] && DIRS="$DIRS $AVMPLUS_DIR"
-          [ "$RUN_MISC" = "true" ] && DIRS="$DIRS $MISC_DIRS"
-          if [ "$RUN_SHUMWAY" = "true" ]; then
-            DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
-          fi
-          [ "$RUN_GNASH" = "true" ] && DIRS="$DIRS $GNASH_SWFMILL_DIR $GNASH_AS_DIR $GNASH_MTASC_DIR $GNASH_MING_DIR $GNASH_SWFC_DIR"
-          LIMIT_ARGS=""
-          if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
-            LIMIT_ARGS="--limit=${{ inputs.limit }}"
-          fi
-          for dir in $DIRS; do
-            [ -d "$dir" ] || continue
-            echo "=== Running: $dir ==="
-            python3 ruffle-tests/verify_output.py -v --tests-dir="$dir" \
-              --mode='${{ inputs.mode }}' $LIMIT_ARGS || true
-          done
-
-      - name: Verify Flash-spec expected output
-        if: always() && inputs.single_test == '' && (env.RUN_AVM1 == 'true')
-        env:
-          TZ: NPT-5:45
-        run: |
-          # Always no-graphics, regardless of `mode`. These are the three
-          # avm1 trace tests that ship an output.flash.txt (Flash's real
-          # behavior, where Ruffle's output.txt encodes Ruffle's own); the
-          # graphics build would produce identical trace output. More to the
-          # point, results_flash.json has no per-mode stem, so running it
-          # under two modes would have them overwrite each other — and the
-          # combine-results job (the path every sharded run takes) has no
-          # Dawn install, so at mode=graphics this step aborted instantly
-          # with "Dawn library not found" and produced nothing at all.
-          echo "=== Running Flash-spec tests (output.flash.txt) ==="
-          python3 ruffle-tests/verify_output.py -v \
-            --mode=no-graphics \
-            --expected-suffix=flash || true
-
-      - name: ccache stats
-        if: always()
-        run: ccache -s
-
-      # Filter / diff / markdown / index generation moved to the "Commit
-      # results" step below so it runs AFTER the branch switch to
-      # ruffle-test-results. That way the .md files reflect the merged
-      # state (this run's results + previous runs' inherited results)
-      # rather than master's potentially-stale snapshot.
-
-      - name: Generate step summary
-        if: always()
-        run: |
-          python3 << 'PYEOF' >> "$GITHUB_STEP_SUMMARY"
-          import json, glob, os
-          print("## Ruffle Test Results\n")
-          for rj in sorted(glob.glob("ruffle-tests/tests/swfs/**/_results/results.json", recursive=True)):
-              with open(rj) as f:
-                  r = json.load(f)
-              cat = os.path.dirname(rj).replace("ruffle-tests/tests/swfs/", "").replace("/_results", "")
-              m = r.get("metadata", {})
-              fj = os.path.join(os.path.dirname(rj), "results_filtered.json")
-              try:
-                  with open(fj) as f:
-                      rf = json.load(f)
-                  ignored = rf["metadata"].get("ignored_count", 0)
-                  rf_rm = rf.get("ruffle_matched", 0)
-                  rf_eff = rf.get("effective_pass", rf["pass"])
-                  rf_eff_rate = rf.get("effective_pass_rate", rf["pass_rate"])
-                  r_rm = r.get("ruffle_matched", 0)
-                  print(f"### {cat}")
-                  if rf_rm:
-                      print(f"**{rf_eff}/{rf['total']}** effective ({rf_eff_rate}%)"
-                            f" = {rf['pass']} pass + {rf_rm} ruffle_matched — filtered")
-                  else:
-                      print(f"**{rf['pass']}/{rf['total']}** passing ({rf['pass_rate']}%) — filtered")
-                  if r_rm:
-                      print(f"({r['pass']}+{r_rm} rm / {r['total']} raw, {ignored} ignored)\n")
-                  else:
-                      print(f"({r['pass']}/{r['total']} raw, {ignored} ignored)\n")
-              except FileNotFoundError:
-                  r_rm = r.get("ruffle_matched", 0)
-                  print(f"### {cat}")
-                  if r_rm:
-                      r_eff = r.get("effective_pass", r["pass"])
-                      r_eff_rate = r.get("effective_pass_rate", r["pass_rate"])
-                      print(f"**{r_eff}/{r['total']}** effective ({r_eff_rate}%)"
-                            f" = {r['pass']} pass + {r_rm} ruffle_matched\n")
-                  else:
-                      print(f"**{r['pass']}/{r['total']}** passing ({r['pass_rate']}%)\n")
-              if m.get("git_sha"):
-                  print(f"Commit: `{m['git_sha'][:12]}`")
-              if r.get("breakdown"):
-                  print("| Category | Count |")
-                  print("|----------|------:|")
-                  print(f"| Pass | {r['pass']} |")
-                  for k, v in r["breakdown"].items():
-                      print(f"| {k} | {v} |")
-              print()
-          PYEOF
-
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ruffle-test-results
-          path: |
-            ruffle-tests/tests/swfs/**/_results/
-            RUFFLE_RESULTS.md
-            RUFFLE_RESULTS_FILTERED.md
-          retention-days: 90
+          name: single-test-results
+          path: ruffle-tests/tests/swfs/**/_results/*.json
+          retention-days: 30
           if-no-files-found: ignore
-
-      - name: Commit results to ruffle-test-results branch
-        # NEVER publish results from an extra-defines build. The result-JSON
-        # stem is chosen by `mode` alone, so a verify run (e.g.
-        # -DAVM2_SLOT_VERIFY at mode=no-graphics) writes the SAME
-        # results.json as a normal no-graphics run and force-pushes it to
-        # ruffle-test-results. That branch is what the NEXT run fetches as
-        # {STEM}_previous.json, so verify-build numbers silently become the
-        # baseline a later normal run diffs against — phantom regressions
-        # with no code change behind them. A verify run's value is its
-        # pass/fail signal, not its numbers; the JSONs remain available as
-        # workflow artifacts either way.
-        #
-        # The same reasoning covers `single_test`, which used to satisfy this
-        # guard and publish. A single-test run rebuilds the results tree from
-        # the MASTER CHECKOUT with one test patched in, so dispatching one
-        # before pushing a results merge force-pushed a pre-merge tree over
-        # the branch and erased an arc's published numbers (run 30186909756,
-        # 2026-07-26). Its value is the per-test verdict in the log and the
-        # uploaded artifact — never the branch.
-        if: always() && inputs.extra_defines == '' && inputs.single_test == ''
-        env:
-          MODE: ${{ inputs.mode }}
-          LIMIT: ${{ inputs.limit }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        # Run from a copy outside the work tree: the script switches branches,
-        # so the on-disk scripts/ci/publish_results.sh is replaced (or removed)
-        # while bash is still reading it.
-        run: |
-          cp scripts/ci/publish_results.sh "$RUNNER_TEMP/publish_results.sh"
-          bash "$RUNNER_TEMP/publish_results.sh"
-
-      - name: Prune old ccache entries
-        # Defense-in-depth against the per-repo 10 GiB cache cap. With the
-        # shared per-mode ccache key a run now produces ~1 entry per mode
-        # (was ~30 per shard per mode), but stale entries from prior runs and
-        # the old per-shard keys still accumulate. Keep the 2 most recent
-        # entries per cache-key prefix; delete the rest so the Dawn cache
-        # (small, refreshed only on graphics runs) is never LRU-evicted.
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -eu
-          # List ccache-ruffle-* entries newest-first, group by prefix
-          # (key with trailing -<run_id> stripped), and emit IDs beyond the
-          # first 2 in each group.
-          to_delete=$(gh cache list --limit 500 --order desc --sort created_at \
-            --json id,key | \
-            jq -r '
-              [.[] | select(.key | startswith("ccache-ruffle-")) |
-                {id: .id, prefix: (.key | sub("-[0-9]+$"; ""))}] |
-              group_by(.prefix) |
-              map(.[2:]) |
-              flatten |
-              .[].id
-            ')
-          if [ -z "$to_delete" ]; then
-            echo "No old ccache entries to prune."
-            exit 0
-          fi
-          echo "$to_delete" | while read -r id; do
-            [ -z "$id" ] && continue
-            echo "Pruning ccache id=$id"
-            gh cache delete "$id" || true
-          done
 
   # --- Parallel runner path: shared setup ---
   setup-parallel:
     name: Setup (Build + Download + Recompile)
-    if: inputs.parallel != '1' && inputs.single_test == ''
+    if: inputs.single_test == ''
     runs-on: ubuntu-latest
 
     outputs:
@@ -636,7 +427,7 @@ jobs:
   # --- Parallel runner path: shards ---
   ruffle-tests-shard:
     name: Shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}
-    if: inputs.parallel != '1' && inputs.single_test == ''
+    if: inputs.single_test == ''
     needs: setup-parallel
     runs-on: ubuntu-latest
 
@@ -667,7 +458,8 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential ccache
 
-      # Same Dawn cache restore as the single-runner job — see comment there.
+      # Dawn comes from the cache that setup-parallel populated; see the
+      # single-test job for how that cache is produced and keyed.
       - name: Compute Dawn cache key
         if: inputs.mode != 'no-graphics'
         id: dawn_key
@@ -956,7 +748,7 @@ jobs:
   # --- Combine shard results ---
   combine-results:
     name: Combine Results
-    if: inputs.parallel != '1' && inputs.single_test == '' && !cancelled()
+    if: inputs.single_test == '' && !cancelled()
     needs: [setup-parallel, ruffle-tests-shard]
     runs-on: ubuntu-latest
 
