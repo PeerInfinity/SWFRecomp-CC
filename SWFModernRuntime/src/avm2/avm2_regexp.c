@@ -171,12 +171,82 @@ static int is_x_space(char c)
 	       || c == '\v';
 }
 
+// Skip a character class starting at the '[' in s[i]; returns the index just
+// past the closing ']' (or len).
+static uint32_t re_skip_class(const char* s, uint32_t len, uint32_t i)
+{
+	i++;  // '['
+	while (i < len && s[i] != ']')
+	{
+		if (s[i] == '\\' && i + 1 < len) i++;
+		i++;
+	}
+	return (i < len) ? i + 1 : i;
+}
+
+// Count capturing groups and spot backreferences, using the same escape /
+// character-class skipping as the emit loop below.
+static uint32_t re_count_captures(const char* s, uint32_t len, int* has_backref)
+{
+	uint32_t caps = 0;
+	*has_backref = 0;
+	for (uint32_t i = 0; i < len; )
+	{
+		char c = s[i];
+		if (c == '\\')
+		{
+			if (i + 1 < len)
+			{
+				char e = s[i + 1];
+				if ((e >= '1' && e <= '9') || e == 'k') *has_backref = 1;
+			}
+			i += 2;
+			continue;
+		}
+		if (c == '[')
+		{
+			i = re_skip_class(s, len, i);
+			continue;
+		}
+		if (c != '(')
+		{
+			i++;
+			continue;
+		}
+		i++;
+		if (i >= len || s[i] != '?')
+		{
+			caps++;  // plain capturing group
+			continue;
+		}
+		// Of the (?...) forms only the named-group ones capture. `(?<` is a
+		// named group unless it is the `(?<=` / `(?<!` lookbehind.
+		if (i + 2 < len && s[i + 1] == '<' && s[i + 2] != '=' && s[i + 2] != '!')
+		{
+			caps++;
+		}
+		else if (i + 2 < len && s[i + 1] == 'P' && s[i + 2] == '<')
+		{
+			caps++;
+		}
+	}
+	return caps;
+}
+
 static char* re_preprocess(Avm2Context* ctx, const Avm2String* src,
                            uint32_t flags, uint32_t* out_len)
 {
 	const char* s = src->utf8;
 	uint32_t len = src->len;
-	char* out = avm2_alloc(ctx, len + 1);
+	// Tamarin's PCRE has no capture ceiling; libregexp caps at
+	// CAPTURE_COUNT_MAX (255) and a pattern over it fails to compile, so it
+	// never matches at all. Such a pattern only needs its grouping unless
+	// something reads the groups back, so when there are no backreferences
+	// to renumber, demote plain `(` to `(?:`. Strictly monotone — the
+	// affected patterns match nothing today. (from_avmplus recursion/pcre_*)
+	int has_backref = 0;
+	int demote = (re_count_captures(s, len, &has_backref) >= 255) && !has_backref;
+	char* out = avm2_alloc(ctx, (demote ? len * 3 : len) + 1);
 	uint32_t n = 0;
 	int in_class = 0;
 	uint32_t i = 0;
@@ -219,6 +289,14 @@ static char* re_preprocess(Avm2Context* ctx, const Avm2String* src,
 			out[n++] = '(';
 			out[n++] = '?';
 			i += 3;
+			continue;
+		}
+		if (demote && c == '(' && (i + 1 >= len || s[i + 1] != '?'))
+		{
+			out[n++] = '(';
+			out[n++] = '?';
+			out[n++] = ':';
+			i++;
 			continue;
 		}
 		if (flags & AVM2_RE_EXTENDED)
