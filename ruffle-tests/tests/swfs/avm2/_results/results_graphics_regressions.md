@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 | # | Test | Graphics Status | Detail |
 |---|------|-----------------|--------|
-| 1 | `bytearray_oom` | Timeout | runtime timeout (>10s) |
+| 1 | `edittext_align` | Segfault | 60/60 lines match |
 
 ## Graphics Improvements (0 tests)
 

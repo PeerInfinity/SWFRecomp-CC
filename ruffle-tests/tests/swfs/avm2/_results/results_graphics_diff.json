@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-26T03:36:27.347082+00:00",
-    "old_git_sha": "1884c6ab93fe4b8e005c16e12e8d2772675ea902",
-    "new_timestamp": "2026-07-26T02:00:51.594418+00:00",
-    "new_git_sha": "ffe48dff672ecf24e5b15ba8d9a2c56b52fcd06c",
+    "old_timestamp": "2026-07-26T02:00:51.594418+00:00",
+    "old_git_sha": "ffe48dff672ecf24e5b15ba8d9a2c56b52fcd06c",
+    "new_timestamp": "2026-07-26T03:36:27.347082+00:00",
+    "new_git_sha": "1884c6ab93fe4b8e005c16e12e8d2772675ea902",
     "partial": false,
     "same_commit": false
   },
@@ -33,20 +33,20 @@
     {
       "test": "bytearray_oom",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "timeout",
-      "old_lines": {
+      "old_status": "timeout",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 3
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "edittext_align",
       "change_type": "changed",
-      "old_status": "segfault",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "segfault",
       "old_lines": {
         "actual_lines": 60,
         "expected_lines": 60,

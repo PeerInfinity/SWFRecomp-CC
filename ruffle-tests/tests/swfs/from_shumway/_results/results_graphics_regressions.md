@@ -1,14 +1,12 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 160/229 passing | Graphics: 159/229 passing
+Trace: 160/229 passing | Graphics: 160/229 passing
 
-## Graphics Regressions (1 tests)
+## Graphics Regressions (0 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-| # | Test | Graphics Status | Detail |
-|---|------|-----------------|--------|
-| 1 | `lzma_bytes` | Output Mismatch | 0/2 lines match |
+No regressions.
 
 ## Graphics Improvements (0 tests)
 

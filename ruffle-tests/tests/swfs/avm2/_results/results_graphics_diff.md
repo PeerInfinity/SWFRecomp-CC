@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1884c6ab93fe` (2026-07-26T03:36:27.347082+00:00)
-**Current:** `ffe48dff672e` (2026-07-26T02:00:51.594418+00:00)
+**Previous:** `ffe48dff672e` (2026-07-26T02:00:51.594418+00:00)
+**Current:** `1884c6ab93fe` (2026-07-26T03:36:27.347082+00:00)
 
 ## Summary
 
@@ -16,10 +16,10 @@
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `edittext_align` | segfault | 60/60 | 60/60 |
+| `bytearray_oom` | timeout | - | 3/3 |
 
 ## Newly Failing (1)
 
 | Test | New Status | Lines (prev) | Lines (now) |
 |------|-----------|--------------|-------------|
-| `bytearray_oom` | timeout | 3/3 | - |
+| `edittext_align` | segfault | 60/60 | 60/60 |
