@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS_GRAPHICS.md](RUFFLE_RESULTS_GRAPHICS.md) for unfiltered results.*
 
-**Commit:** `d7738492a363`  
-**Date:** 2026-07-26 17:31 UTC  
-**Total duration:** 8h01m11s
+**Commit:** `2fa17c5b8d94`  
+**Date:** 2026-07-26 18:09 UTC  
+**Total duration:** 8h00m04s
 
 ## Results by Suite
 
@@ -178,9 +178,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 - **Pass:** 635/672 (94.5%)
 - **Ignored:** 45 tests
-- **Duration:** 45m26s across 30 shards
+- **Duration:** 44m10s across 30 shards
 - **Lines:** 104,066/107,743 matching (96.6%)
-- **Avg test duration:** 3.7s — slowest: `movieclip_invalid_get_bounds_7` (32.5s)
+- **Avg test duration:** 3.6s — slowest: `movieclip_invalid_get_bounds_6` (26.8s)
 
 ### avm2
 
@@ -275,9 +275,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### regression
 
 - **Pass:** 70/70 (100%)
-- **Duration:** 5m50s across 30 shards
+- **Duration:** 5m59s across 30 shards
 - **Lines:** 481/481 matching (100%)
-- **Avg test duration:** 5.0s — slowest: `avm2_morph` (23.6s)
+- **Avg test duration:** 5.1s — slowest: `avm2_morph` (25.9s)
 
 ### stage3d
 

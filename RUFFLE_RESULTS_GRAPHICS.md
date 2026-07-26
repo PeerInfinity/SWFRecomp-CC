@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `d7738492a363`  
-**Date:** 2026-07-26 17:31 UTC  
-**Total duration:** 8h01m11s
+**Commit:** `2fa17c5b8d94`  
+**Date:** 2026-07-26 18:09 UTC  
+**Total duration:** 8h00m04s
 
 ## Results by Suite
 
@@ -177,21 +177,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm2 | 1 | 1 | - | - |
-| from_avmplus | 10 | - | 407 | - |
-| from_shumway | 1 | - | 2 | - |
+*No changes since last run.*
 
-**avm2 — newly passing:** `bytearray_oom`
-
-**avm2 — newly failing:** `edittext_align`
-
-**from_avmplus — newly passing:** `as3/ByteArray/ByteArray`, `as3/ByteArray/ByteArrayLzma`, `as3/ByteArray/ByteArrayLzmaThirdParty`, `as3/ByteArray/ByteArray_bug662851_32bit`, `as3/ByteArray/ByteArray_bug662851_64bit`, `recursion/pcre_could_be_empty_branch`, `recursion/pcre_find_firstassertedchar`, `recursion/pcre_is_anchored`, `recursion/pcre_is_startline`, `regress/bug_558863_swf11`
-
-**from_shumway — newly passing:** `lzma_bytes`
-
-*Comparing `ffe48dff672e` → `1884c6ab93fe`*
+*Comparing `d7738492a363` → `2fa17c5b8d94`*
 
 ## Per-Suite Details
 
@@ -205,9 +193,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### avm1
 
 - **Pass:** 638/717 (89.0%)
-- **Duration:** 45m26s across 30 shards
+- **Duration:** 44m10s across 30 shards
 - **Lines:** 115,828/131,176 matching (88.3%)
-- **Avg test duration:** 3.7s — slowest: `netstream_play_flv_screen` (37.4s)
+- **Avg test duration:** 3.6s — slowest: `netstream_play_flv_screen` (35.8s)
 
 ### avm2
 
@@ -296,9 +284,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### regression
 
 - **Pass:** 70/70 (100%)
-- **Duration:** 5m50s across 30 shards
+- **Duration:** 5m59s across 30 shards
 - **Lines:** 481/481 matching (100%)
-- **Avg test duration:** 5.0s — slowest: `avm2_morph` (23.6s)
+- **Avg test duration:** 5.1s — slowest: `avm2_morph` (25.9s)
 
 ### stage3d
 
