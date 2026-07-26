@@ -21,6 +21,43 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
+## Loader / LoaderInfo — SCOPED, not yet implemented (2026-07-26)
+
+The "flash.display.Loader (deferred)" line that appears in the Stage 8 and
+Stage 9 notes below is still accurate for the *runtime*, but the arc is no
+longer un-triaged. Full plan:
+**`SWFRecompDocs/plans/loader-arc.md`** (per-test triage of all 35
+`loader*`/`loaderinfo*` tests, 8 ranked tranches).
+
+Three findings worth having here:
+
+1. **The biggest single defect is not a missing feature.** Every
+   `LoaderInfo` getter in `avm2_display.c` ignores its receiver and answers
+   with the ROOT movie's values, so `new Loader().contentLoaderInfo` reports
+   the parent SWF's `content`, `bytesTotal`, `url` and `contentType`. That
+   alone breaks the first block of nearly every test in the group. Ruffle's
+   model is a per-instance `LoaderStream` (NotYetLoaded/Swf) plus
+   `init_event_fired`/`expose_content`, with `#2099` from the eight
+   movie-describing getters while not loaded.
+2. **`stage.loaderInfo` is a DIFFERENT object from `root.loaderInfo`** in
+   Flash/Ruffle (`context.rs:390` vs `movie_clip.rs:335`). Only the root
+   clip's ever fires `init`, which is why `stage_loaderinfo_properties`
+   expects `contentType` **null** while the passing `loaderinfo_properties`
+   expects `application/x-shockwave-flash`. We conflate them into one
+   singleton.
+3. **AOT is not the blocker it looks like.** `verify_output.py` already
+   recompiles every sibling `.swf` of a test at build time and registers it
+   in `findMovieEntry(filename)` (the AVM1 `loadMovie` path). The child
+   SWFs these tests load are already in the binary; the gaps are that
+   `MovieEntry` has no AVM2/ABC entry point, that `download_tests.sh`
+   drops nested `child/child.swf` children, and that `loadBytes` needs a
+   bytes→movie identity (resolvable at build time in every corpus case).
+
+Reachable: 26 of the 32 failures (+ up to 9 in `from_shumway/as3-loader`).
+Won't-do: `loader_jpegxr`, `loader_jpegxr_alpha` (no JPEG-XR decoder;
+upstream feature-gates them), `loader_applicationDomain` (needs the real
+Flex framework SWZ). `mouse_pick_loader_avm1` belongs to the dual-VM arc.
+
 ## Robot Wants sequels — Puppy / Fishy / Ice Cream (2026-07-18)
 
 Plan + full census: `SWFRecompDocs/plans/avm2-robot-wants-sequels.md`

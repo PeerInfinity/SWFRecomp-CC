@@ -68,7 +68,9 @@ most useful fact in this document:
   never touches the display list. Its failures are dense (one missing class
   blanks 150 tests) and cheap per test.
 - **avm2 tells us which Flash platform APIs are missing.** Its failures are
-  sparse and expensive per test (a Loader arc is weeks; it buys 31 tests).
+  sparse and expensive per test. (The "a Loader arc is weeks" gloss below was
+  written before the arc was triaged — see `loader-arc.md`: the arc *does*
+  contain a large tranche, but it front-loads 8 tests of cheap work.)
 
 Test-yield-per-unit-of-work is therefore *far* higher on the from_avmplus
 side today, and that is where the next few arcs should go.
@@ -331,7 +333,7 @@ visible next to their yield, not because they are next.
 
 | Failing | Theme | Note |
 |---|---|---|
-| 31 | Loader / URLLoader / loaderInfo | + 9 more in from_shumway `as3-loader` |
+| 32 | Loader / URLLoader / loaderInfo | **SCOPED 2026-07-26: `SWFRecompDocs/plans/loader-arc.md`** — per-test triage, 8 tranches, 26 of 32 reachable (+ up to 9 in from_shumway `as3-loader`); 3 won't-do (JPEG-XR ×2, Flex SWZ), 1 belongs to the dual-VM arc. **Not weeks-of-work-before-anything**: tranches 1+2 are 8 tests for a small, one-file change |
 | 30 | Sockets, NetConnection, NetStream, FileReference, SharedObject | network stack |
 | 25 | Focus / Tab / Mouse / Keyboard input | partly reachable via `input.json` injection |
 | 25 | PixelBender (`Shader`) | needs a PBJ interpreter |
@@ -532,8 +534,8 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | Alchemy domain memory (`li8`…`sf64` + `ApplicationDomain.domainMemory`) | **14** (pred. 13) | medium | **DONE `5da28a6a5`**, CI `30179405893`; `mops` 0/13 → 13/13 + `avm2/domain_memory` |
 | ~~—~~ | Builtin-container subclasses (five independent causes) | **11** (pred. 4-6) | medium | **DONE** `20a3d24c7`+`4c6b18d5c`+`505b330f2`+`81b18da78`+`ffe48dff6`, CI `30182973510` |
 | ~~—~~ | `as3/ByteArray` + `recursion/pcre_*` + `from_shumway/lzma_bytes` (five independent causes) | **11** (pred. 8–11) | medium | **DONE** `997d0c003`+`db7135ae5`+`e482c8b02`+`4cdea28fe`+`1884c6ab9`, CI `30185616752`; **timeout 3 → 0** |
-| 1 | Declared-ABC method arity checking (`avm2/wrong_arg_count`, `avm2/error_geterrormessage`) | 2 | small | undiagnosed |
-| 2 | avm2-platform mass: Loader (31), net/socket (30), input (25) | ~86 | large | the next real mass — see the avm2 section below |
+| ~~1~~ | Error-message formatting: `#1063` package-qualified names + `Error.getErrorMessage` | **2** (pred. 2) | small | **DONE `9f4be9647`** — the diagnosis in this row was wrong: nothing was missing from arity checking. `wrong_arg_count` already produced all 7 lines and 6 differed only in how the function name was rendered (unqualified class for constructors; mxmlc's single-colon ABC debug name for methods). `error_geterrormessage` was a genuinely absent 705-entry message table, ported from Ruffle `error_messages.rs` |
+| 2 | avm2-platform mass: Loader (32), net/socket (30), input (25) | ~86 | large | **Loader now scoped**: `SWFRecompDocs/plans/loader-arc.md`. Start at its tranche 1 (per-instance LoaderInfo state machine, +5) |
 
 **DONE — the `ecma3/JSON` arc.** `7ad4e0419`, CI `30176986441`: **+5**,
 0 regressions, crash histogram flat. **The diagnosis this table carried
