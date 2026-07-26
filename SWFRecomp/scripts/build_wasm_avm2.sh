@@ -94,6 +94,12 @@ if [ -d "${SWFMODERN_ROOT}/third_party/quickjs-libregexp" ]; then
     cp -p "${SWFMODERN_ROOT}/third_party/quickjs-libregexp"/*.h "${SRC_DIR}/" 2>/dev/null || true
 fi
 
+# LZMA SDK (vendored) backs ByteArray.compress/uncompress("lzma").
+if [ -d "${SWFMODERN_ROOT}/third_party/lzma" ]; then
+    cp -p "${SWFMODERN_ROOT}/third_party/lzma"/*.c "${SRC_DIR}/" 2>/dev/null || true
+    cp -p "${SWFMODERN_ROOT}/third_party/lzma"/*.h "${SRC_DIR}/" 2>/dev/null || true
+fi
+
 # libtess2 + support libs
 cp -p "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${SRC_DIR}/"
 cp -p "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${SRC_DIR}/"

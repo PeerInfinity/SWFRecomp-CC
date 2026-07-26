@@ -13,8 +13,10 @@
 //
 // compress/uncompress use the already-linked zlib ("zlib" = zlib wrapper,
 // "deflate" = raw stream, level 9 = Ruffle's Compression::best); "lzma"
-// is not compiled in (compress yields an empty buffer, uncompress throws
-// 2058, matching Ruffle-without-lzma). readMultiByte/writeMultiByte
+// goes through the vendored LZMA SDK (third_party/lzma) in the LZMA-alone
+// container, which is what Ruffle's lzma_rs speaks — compress yields an
+// empty buffer on encoder error, uncompress throws 2058 on any decode
+// failure. readMultiByte/writeMultiByte
 // handle utf-8 and utf-16le/be natively and delegate other charsets
 // (shift-jis) to iconv; unknown labels fall back to UTF-8 exactly like
 // encoding_rs's for_label().unwrap_or(UTF_8).
@@ -39,6 +41,8 @@
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+
+#include "lzma_alone.h"
 
 Avm2ByteArrayExt* avm2_bytearray_ext_of(Avm2Value v)
 {
@@ -1097,7 +1101,22 @@ static Avm2Value ba_compress(Avm2Activation* act)
 	int alg = parse_algorithm(act, s);
 	uint8_t* out = NULL;
 	uint32_t out_len = 0;
-	if (alg != ALG_LZMA && ba->len > 0)
+	if (alg == ALG_LZMA)
+	{
+		uint8_t* lz = NULL;
+		size_t lz_len = 0;
+		static const uint8_t empty = 0;
+		if (swf_lzma_alone_compress(ba->bytes != NULL ? ba->bytes : &empty,
+		                            ba->len, &lz, &lz_len))
+		{
+			out = avm2_alloc(ctx, (uint32_t) lz_len);
+			memcpy(out, lz, lz_len);
+			out_len = (uint32_t) lz_len;
+			free(lz);
+		}
+		// Ruffle clears the buffer when the encoder errors.
+	}
+	else if (ba->len > 0)
 	{
 		z_stream strm;
 		memset(&strm, 0, sizeof(strm));
@@ -1121,7 +1140,7 @@ static Avm2Value ba_compress(Avm2Activation* act)
 			deflateEnd(&strm);
 		}
 	}
-	else if (alg != ALG_LZMA)
+	else
 	{
 		// Compressing an empty buffer still yields a valid stream.
 		z_stream strm;
@@ -1139,7 +1158,6 @@ static Avm2Value ba_compress(Avm2Activation* act)
 			deflateEnd(&strm);
 		}
 	}
-	// LZMA: not compiled in -> empty result (Ruffle warns and clears).
 	ba->len = 0;
 	ba->position = 0;
 	if (out_len > 0) ba_write_bytes(ctx, ba, out, out_len);
@@ -1155,7 +1173,23 @@ static Avm2Value ba_uncompress(Avm2Activation* act)
 		? arg_string_non_null(act, 0, "algorithm")
 		: avm2_string_from_literal(ctx, "zlib");
 	int alg = parse_algorithm(act, s);
-	if (alg == ALG_LZMA) throw_2058(ctx);
+	if (alg == ALG_LZMA)
+	{
+		uint8_t* raw = NULL;
+		size_t raw_len = 0;
+		// lzma_rs has no empty-input special case: a stream shorter than the
+		// 13-byte header is simply a decode error.
+		if (!swf_lzma_alone_decompress(ba->bytes, ba->len, &raw, &raw_len))
+		{
+			throw_2058(ctx);
+		}
+		ba->len = 0;
+		ba->position = 0;
+		if (raw_len > 0) ba_write_bytes(ctx, ba, raw, (uint32_t) raw_len);
+		free(raw);
+		ba->position = 0;
+		return avm2_undefined();
+	}
 	// flate2 succeeds with empty output on an empty input stream.
 	if (ba->len == 0)
 	{
@@ -1278,7 +1312,17 @@ static void ba_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	e.method.fn = getter;
 	e.method.debug_name = name;
 	e.setter.fn = setter;
-	e.setter.debug_name = name;
+	// Flash names an accessor frame "Class/set prop()" — avm2/bytearray_oom
+	// pins it for `ByteArray.length`. (Native accessors registered through
+	// the shared avm2_builtin_add_getter/setter helpers elsewhere are still
+	// unprefixed; nothing in the corpus observes those yet.)
+	{
+		size_t nlen = strlen(name);
+		char* sname = avm2_alloc(ctx, (uint32_t) nlen + 5);
+		memcpy(sname, "set ", 4);
+		memcpy(sname + 4, name, nlen + 1);
+		e.setter.debug_name = sname;
+	}
 	e.defining_class = cls;
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }

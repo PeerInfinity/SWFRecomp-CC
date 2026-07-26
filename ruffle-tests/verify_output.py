@@ -1744,6 +1744,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         for f in (SWFMODERN / "third_party" / "quickjs-libregexp").iterdir():
             if f.suffix in (".c", ".h"):
                 shutil.copy2(f, build_dir)
+        # LZMA SDK (vendored) backs ByteArray.compress/uncompress("lzma").
+        for f in (SWFMODERN / "third_party" / "lzma").iterdir():
+            if f.suffix in (".c", ".h"):
+                shutil.copy2(f, build_dir)
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
 
