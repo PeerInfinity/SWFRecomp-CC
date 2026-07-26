@@ -233,6 +233,310 @@ static uint32_t re_count_captures(const char* s, uint32_t len, int* has_backref)
 	return caps;
 }
 
+// ---------------------------------------------------------------------------
+// Fixed-length lookbehind (Tamarin/PCRE) validation
+//
+// avmplus's PCRE requires a lookbehind to have a fixed length and reports a
+// compile error otherwise, which surfaces to AS3 as a regex that never
+// matches. libregexp implements ES2018 variable-length lookbehind, so we
+// matched where avmplus does not. Reject exactly what PCRE rejects: every
+// branch of the lookbehind must be fixed-length, but the lookbehind's OWN
+// top-level branches may differ from one another; a *nested* group whose
+// branches differ in length is an error, as is any inexact quantifier
+// (`?`, `*`, `+`, `{n,}`, `{n,m}` with n != m).
+//
+// Pinned row by row from from_avmplus/recursion/pcre_find_fixedlength:
+// `(?<=a{3}|b{2})` is legal (top-level branches 3 and 2), `(?<=(a{3}|b{2}))`
+// is not, `(?<=(a{3}|b{2}b))` and `(?<=(x(a|b)c|bbb))` are (equal-length
+// nested branches). Anything this scanner cannot model returns UNKNOWN and
+// is left alone — under-rejecting only costs yield, over-rejecting breaks
+// working patterns.
+// ---------------------------------------------------------------------------
+
+enum
+{
+	RE_LEN_VARIABLE = -2,  // proven non-fixed: PCRE would reject
+	RE_LEN_UNKNOWN = -1,   // not modelled: leave the pattern alone
+};
+
+// Nesting depth past which we stop analysing (recursion budget; the WASM
+// stack is small). Over-deep groups come back UNKNOWN.
+#define RE_LB_MAX_DEPTH 200
+
+typedef struct ReLbScan
+{
+	const char* s;
+	uint32_t len;
+	uint32_t i;
+	int depth;
+} ReLbScan;
+
+static int re_lb_alt(ReLbScan* sc, int top);
+
+// Consume through the ')' closing the group we are already inside, leaving i
+// ON that ')'.
+static void re_lb_skip_group(ReLbScan* sc)
+{
+	int depth = 1;
+	while (sc->i < sc->len)
+	{
+		char c = sc->s[sc->i];
+		if (c == '\\') { sc->i += 2; continue; }
+		if (c == '[') { sc->i = re_skip_class(sc->s, sc->len, sc->i); continue; }
+		if (c == '(') depth++;
+		else if (c == ')' && --depth == 0) return;
+		sc->i++;
+	}
+}
+
+static int re_lb_hex(const char* s, uint32_t len, uint32_t i, uint32_t n)
+{
+	uint32_t k = 0;
+	while (k < n && i + k < len)
+	{
+		char c = s[i + k];
+		if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+		      || (c >= 'A' && c <= 'F')))
+		{
+			break;
+		}
+		k++;
+	}
+	return (int) k;
+}
+
+// One atom plus its quantifier.
+static int re_lb_atom(ReLbScan* sc)
+{
+	const char* s = sc->s;
+	uint32_t len = sc->len;
+	char c = s[sc->i];
+	int alen;
+	int quantifiable = 1;
+
+	if (c == '(')
+	{
+		sc->i++;
+		int assertion = 0;
+		if (sc->i < len && s[sc->i] == '?')
+		{
+			if (sc->i + 1 < len && (s[sc->i + 1] == '=' || s[sc->i + 1] == '!'))
+			{
+				assertion = 1;
+				sc->i += 2;
+			}
+			else if (sc->i + 2 < len && s[sc->i + 1] == '<'
+			         && (s[sc->i + 2] == '=' || s[sc->i + 2] == '!'))
+			{
+				assertion = 1;
+				sc->i += 3;
+			}
+			else if (sc->i + 1 < len && s[sc->i + 1] == ':')
+			{
+				sc->i += 2;
+			}
+			else if (sc->i + 1 < len && s[sc->i + 1] == '<')
+			{
+				sc->i += 2;  // named group (?<name>
+				while (sc->i < len && s[sc->i] != '>') sc->i++;
+				if (sc->i < len) sc->i++;
+			}
+			else
+			{
+				// (?i) and friends — not modelled.
+				re_lb_skip_group(sc);
+				if (sc->i < len) sc->i++;
+				return RE_LEN_UNKNOWN;
+			}
+		}
+		if (sc->depth >= RE_LB_MAX_DEPTH)
+		{
+			re_lb_skip_group(sc);
+			if (sc->i < len) sc->i++;
+			alen = RE_LEN_UNKNOWN;
+		}
+		else
+		{
+			sc->depth++;
+			int inner = re_lb_alt(sc, 0);
+			sc->depth--;
+			if (sc->i < len && s[sc->i] == ')') sc->i++;
+			// A nested assertion consumes nothing, so its content's length
+			// never constrains ours.
+			alen = assertion ? 0 : inner;
+		}
+	}
+	else if (c == '[')
+	{
+		sc->i = re_skip_class(s, len, sc->i);
+		alen = 1;
+	}
+	else if (c == '\\')
+	{
+		sc->i++;
+		if (sc->i >= len)
+		{
+			alen = 1;
+		}
+		else
+		{
+			char e = s[sc->i++];
+			if (e == 'b' || e == 'B')
+			{
+				alen = 0;
+				quantifiable = 0;
+			}
+			else if (e >= '1' && e <= '9')
+			{
+				while (sc->i < len && s[sc->i] >= '0' && s[sc->i] <= '9') sc->i++;
+				alen = RE_LEN_UNKNOWN;  // backreference: length unknowable
+			}
+			else if (e == 'k')
+			{
+				if (sc->i < len && s[sc->i] == '<')
+				{
+					while (sc->i < len && s[sc->i] != '>') sc->i++;
+					if (sc->i < len) sc->i++;
+				}
+				alen = RE_LEN_UNKNOWN;
+			}
+			else if ((e == 'p' || e == 'P') && sc->i < len && s[sc->i] == '{')
+			{
+				while (sc->i < len && s[sc->i] != '}') sc->i++;
+				if (sc->i < len) sc->i++;
+				alen = 1;
+			}
+			else if (e == 'x')
+			{
+				sc->i += (uint32_t) re_lb_hex(s, len, sc->i, 2);
+				alen = 1;
+			}
+			else if (e == 'u')
+			{
+				if (sc->i < len && s[sc->i] == '{')
+				{
+					while (sc->i < len && s[sc->i] != '}') sc->i++;
+					if (sc->i < len) sc->i++;
+				}
+				else
+				{
+					sc->i += (uint32_t) re_lb_hex(s, len, sc->i, 4);
+				}
+				alen = 1;
+			}
+			else if (e == 'c')
+			{
+				if (sc->i < len) sc->i++;
+				alen = 1;
+			}
+			else
+			{
+				alen = 1;
+			}
+		}
+	}
+	else if (c == '^' || c == '$')
+	{
+		sc->i++;
+		alen = 0;
+		quantifiable = 0;
+	}
+	else
+	{
+		sc->i++;
+		alen = 1;
+	}
+
+	if (!quantifiable || sc->i >= len) return alen;
+
+	int qmin = -1;
+	int qmax = -1;
+	char q = s[sc->i];
+	if (q == '*') { sc->i++; qmin = 0; qmax = -1; }
+	else if (q == '+') { sc->i++; qmin = 1; qmax = -1; }
+	else if (q == '?') { sc->i++; qmin = 0; qmax = 1; }
+	else if (q == '{')
+	{
+		uint32_t j = sc->i + 1;
+		uint32_t lo = 0;
+		int have_lo = 0;
+		while (j < len && s[j] >= '0' && s[j] <= '9') { lo = lo * 10 + (uint32_t) (s[j] - '0'); j++; have_lo = 1; }
+		if (have_lo && j < len && s[j] == '}')
+		{
+			qmin = qmax = (int) lo;
+			sc->i = j + 1;
+		}
+		else if (have_lo && j < len && s[j] == ',')
+		{
+			j++;
+			uint32_t hi = 0;
+			int have_hi = 0;
+			while (j < len && s[j] >= '0' && s[j] <= '9') { hi = hi * 10 + (uint32_t) (s[j] - '0'); j++; have_hi = 1; }
+			if (j < len && s[j] == '}')
+			{
+				qmin = (int) lo;
+				qmax = have_hi ? (int) hi : -1;
+				sc->i = j + 1;
+			}
+		}
+		// Otherwise it is a literal '{' — the next atom will eat it.
+	}
+	if (qmin < 0) return alen;
+	if (sc->i < len && (s[sc->i] == '?' || s[sc->i] == '+')) sc->i++;  // lazy/possessive
+	if (qmin != qmax) return (alen == 0) ? 0 : RE_LEN_VARIABLE;
+	if (alen < 0) return alen;
+	return alen * qmin;
+}
+
+static int re_lb_branch(ReLbScan* sc)
+{
+	int total = 0;
+	while (sc->i < sc->len && sc->s[sc->i] != '|' && sc->s[sc->i] != ')')
+	{
+		int a = re_lb_atom(sc);
+		if (a == RE_LEN_VARIABLE) total = RE_LEN_VARIABLE;
+		else if (a == RE_LEN_UNKNOWN) { if (total != RE_LEN_VARIABLE) total = RE_LEN_UNKNOWN; }
+		else if (total >= 0) total += a;
+	}
+	return total;
+}
+
+// `top` = the lookbehind's own alternation, where PCRE lets branches differ.
+static int re_lb_alt(ReLbScan* sc, int top)
+{
+	int total = re_lb_branch(sc);
+	while (sc->i < sc->len && sc->s[sc->i] == '|')
+	{
+		sc->i++;
+		int b = re_lb_branch(sc);
+		if (total == RE_LEN_VARIABLE || b == RE_LEN_VARIABLE) total = RE_LEN_VARIABLE;
+		else if (total == RE_LEN_UNKNOWN || b == RE_LEN_UNKNOWN) total = RE_LEN_UNKNOWN;
+		else if (b != total) total = top ? RE_LEN_UNKNOWN : RE_LEN_VARIABLE;
+	}
+	return total;
+}
+
+// 0 = some lookbehind in the pattern is one PCRE would refuse to compile.
+static int re_lookbehind_ok(const char* s, uint32_t len)
+{
+	for (uint32_t i = 0; i < len; )
+	{
+		char c = s[i];
+		if (c == '\\') { i += 2; continue; }
+		if (c == '[') { i = re_skip_class(s, len, i); continue; }
+		if (c == '(' && i + 3 < len && s[i + 1] == '?' && s[i + 2] == '<'
+		    && (s[i + 3] == '=' || s[i + 3] == '!'))
+		{
+			ReLbScan sc = { s, len, i + 4, 0 };
+			if (re_lb_alt(&sc, 1) == RE_LEN_VARIABLE) return 0;
+			// Fall through by one char so nested lookbehinds get their own
+			// pass.
+		}
+		i++;
+	}
+	return 1;
+}
+
 static char* re_preprocess(Avm2Context* ctx, const Avm2String* src,
                            uint32_t flags, uint32_t* out_len)
 {
@@ -327,6 +631,13 @@ static int re_ensure_compiled(Avm2Context* ctx, Avm2RegExpExt* ext)
 	ext->compile_tried = 1;
 	uint32_t plen = 0;
 	char* pat = re_preprocess(ctx, ext->source, ext->flags, &plen);
+	if (!re_lookbehind_ok(pat, plen))
+	{
+		// PCRE (so avmplus) refuses a variable-length lookbehind; libregexp
+		// would happily compile one. Join the never-match path.
+		ext->compile_failed = 1;
+		return 0;
+	}
 	int re_flags = 0;
 	if (ext->flags & AVM2_RE_IGNORECASE) re_flags |= LRE_FLAG_IGNORECASE;
 	if (ext->flags & AVM2_RE_MULTILINE) re_flags |= LRE_FLAG_MULTILINE;
