@@ -91,6 +91,8 @@ typedef struct ASObject
 	// infrastructure for the (measurement-gated) Stage 3 collector. ---
 	u8 mt_kind;             // MT_KIND_* allocation-site tag (leak attribution)
 	u8 mt_mark;             // scratch mark bit (report classifier / future sweep)
+	u8 mt_pending;          // queued for tick-boundary destruction (see releaseObject)
+	u32 mt_pending_idx;     // its slot in that queue, so an inline destroy can tombstone it
 	struct ASObject* mt_prev;  // intrusive all-objects list (O(1) link/unlink)
 	struct ASObject* mt_next;
 } ASObject;
@@ -271,6 +273,8 @@ typedef struct ASArray
 	// Memory-reclamation instrumentation (see ASObject counterparts)
 	u8 mt_mark;             // scratch mark bit (report classifier / GC sweep)
 	u8 mt_kind;             // MT_KIND_* tag (poison marker for the GC quarantine)
+	u8 mt_pending;          // queued for tick-boundary destruction (see releaseArray)
+	u32 mt_pending_idx;     // its slot in that queue, so an inline destroy can tombstone it
 	struct ASArray* mt_prev;   // intrusive all-arrays list (O(1) link/unlink)
 	struct ASArray* mt_next;
 } ASArray;
@@ -343,8 +347,17 @@ void swfGcMarkFunctionPtr(void* fn);
 
 // Per-tick entry point — env config on first call, cadence + quiescence gate,
 // then a full collection. Call at tick boundaries only (after the eval-stack
-// reset). No-op unless SWF_GC is set.
+// reset). The collection itself is a no-op unless SWF_GC is set, but the call
+// ALWAYS drains pending destroys first (see swfDrainPendingDestroys), so it is
+// not a no-op even with the collector off.
 void swfGcMaybeCollect(SWFAppContext* app_context);
+
+// Destroy everything that reached refcount 0 since the last call. Safe ONLY at
+// a tick boundary, where the VM is quiescent (eval stack reset, no script frame
+// alive) — the same precondition as actionDrainDpropsReleases. Called from
+// swfGcMaybeCollect (every tick-boundary path already calls that) and once
+// after each frame loop exits.
+void swfDrainPendingDestroys(SWFAppContext* app_context);
 
 // Loud abort on access to a quarantined (swept) object — a missed GC root.
 void swfGcPoisonTrap(const void* p, const char* where);

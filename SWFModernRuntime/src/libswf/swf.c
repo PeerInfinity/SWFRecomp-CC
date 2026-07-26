@@ -1623,6 +1623,9 @@ void swfStart(SWFAppContext* app_context)
 	// env-gated (SWF_MEM_REPORT) leak-tracking summary; both must precede
 	// heap_shutdown, which unmaps the pool the MC registry lives in.
 	actionDrainDpropsReleases(app_context);
+	// ...and destroy whatever that release (or the last tick's script) parked,
+	// so the exit-time leak report counts reclaimable structs as reclaimed.
+	swfDrainPendingDestroys(app_context);
 	swfMemReportAtExitIfEnabled();
 
 	heap_shutdown(app_context);

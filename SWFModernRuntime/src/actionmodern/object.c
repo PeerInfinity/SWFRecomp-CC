@@ -525,6 +525,8 @@ ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity)
 
 	obj->mt_kind = MT_KIND_PLAIN;
 	obj->mt_mark = 0;
+	obj->mt_pending = 0;
+	obj->mt_pending_idx = 0;
 	mtLinkObject(obj);
 
 #ifndef __EMSCRIPTEN__
@@ -577,12 +579,109 @@ void retainObject(ASObject* obj)
 #endif
 }
 
+// --- Deferred destruction (tick boundary) -----------------------------------
+//
+// AVM1 script-visible values borrow ASObject*/ASArray* WITHOUT holding a
+// reference count: locals and registers live in `ActionVar regs[]` arrays that
+// are plain C locals inside generated functions, so they are invisible to both
+// refcounting and actionGcScrubStashes (which only reaches the four global
+// g_registers). A runtime path that drops an object's last COUNTED reference
+// mid-script therefore frees memory the script can still name. Flash keeps any
+// object reachable from a live local alive, and draws no distinction between a
+// built-in prototype and a user object, so the borrow must not be fatal.
+//
+// avm1/global_proto_decls is the corpus case — testDecls() save/restores every
+// property it enumerates:
+//
+//     var old = object[key];   // borrows; refcount unchanged
+//     object[key] = "OTHER";   // ONE statement drops BOTH runtime refs -> freed
+//     object[key] = old;       // -> retainObject() on freed memory
+//
+// (TextFormat.prototype is held twice — ASFunction.prototype_obj and
+// own_props["prototype"] — and actionSetMember's non-object-prototype branch
+// releases both: action.c:47832 then setProperty at action.c:47839.)
+//
+// Fix: reaching refcount 0 queues the struct instead of tearing it down. The
+// queue drains at the tick boundary, where the VM is quiescent — the same
+// reasoning and the same moment as actionDeferDpropsRelease (a38bbe7ea), whose
+// commit message states the rule: "script can still hold borrowed references
+// when a detach happens mid-handler... At the tick boundary the VM is
+// quiescent, and destruction is pure reclamation, so deferring is
+// script-invisible." If script resurrects a queued object before the drain, its
+// refcount is back above zero and the drain simply unparks it.
+//
+// Destruction during the drain stays INLINE-RECURSIVE, exactly as before this
+// change. That is load-bearing for reference cycles: A->B->A with both at zero
+// only survives because A is still allocated while B's teardown releases it.
+// Queueing children instead would free A first and make B's teardown a UAF.
+// The cost is that a child destroyed inline may already sit in the queue, so
+// it tombstones its own slot (mt_pending_idx) on the way out.
+typedef struct { void* p; u8 is_array; } PendingDestroy;
+static PendingDestroy* g_pending_destroy = NULL;
+static int g_pending_destroy_count = 0;
+static int g_pending_destroy_capacity = 0;
+static int g_in_destroy_drain = 0;
+
+// Returns 1 if queued, 0 on OOM (caller destroys inline = pre-fix behavior).
+static int pendingDestroyPush(void* p, u8 is_array, u32* out_idx)
+{
+	if (g_pending_destroy_count >= g_pending_destroy_capacity)
+	{
+		int ncap = g_pending_destroy_capacity ? g_pending_destroy_capacity * 2 : 64;
+		PendingDestroy* nq = (PendingDestroy*) realloc(
+			g_pending_destroy, (size_t)ncap * sizeof(PendingDestroy));
+		if (nq == NULL) return 0;
+		g_pending_destroy = nq;
+		g_pending_destroy_capacity = ncap;
+	}
+	*out_idx = (u32) g_pending_destroy_count;
+	g_pending_destroy[g_pending_destroy_count].p = p;
+	g_pending_destroy[g_pending_destroy_count].is_array = is_array;
+	g_pending_destroy_count++;
+	return 1;
+}
+
+void swfDrainPendingDestroys(SWFAppContext* app_context)
+{
+	if (g_pending_destroy_count == 0) return;
+	g_in_destroy_drain = 1;
+	// Index walk, not a pop loop. Nothing is appended below — deferral is off
+	// for the duration, so a child reaching zero is destroyed inline — but a
+	// child destroyed that way may itself be queued, and it tombstones its own
+	// slot on the way out. Walking by index (never removing slots) is what
+	// keeps the recorded mt_pending_idx values valid.
+	for (int i = 0; i < g_pending_destroy_count; i++)
+	{
+		PendingDestroy e = g_pending_destroy[i];
+		if (e.p == NULL) continue;              // already destroyed as a child
+		if (e.is_array)
+		{
+			ASArray* a = (ASArray*) e.p;
+			a->mt_pending = 0;
+			if (a->refcount != 0) continue;     // script resurrected it
+			a->refcount = 1;                    // so the release below lands on 0
+			releaseArray(app_context, a);
+		}
+		else
+		{
+			ASObject* o = (ASObject*) e.p;
+			o->mt_pending = 0;
+			if (o->refcount != 0) continue;     // script resurrected it
+			o->refcount = 1;
+			releaseObject(app_context, o);
+		}
+	}
+	g_pending_destroy_count = 0;
+	g_in_destroy_drain = 0;
+}
+
 /**
  * Release Object
  *
  * Decrements the reference count of an object.
- * When refcount reaches 0, frees the object and all its properties.
- * Recursively releases any objects stored in properties.
+ * When refcount reaches 0, queues the object for tick-boundary destruction
+ * (see the deferred-destruction note above), which then frees it and all its
+ * properties, recursively releasing any objects stored in properties.
  */
 void releaseObject(SWFAppContext* app_context, ASObject* obj)
 {
@@ -601,6 +700,27 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 
 	if (obj->refcount == 0)
 	{
+		// Outside the drain, park instead of destroying: a script local may
+		// still name this object (see the deferred-destruction note above).
+		if (!g_in_destroy_drain)
+		{
+			if (obj->mt_pending) return;
+			u32 idx;
+			if (pendingDestroyPush(obj, 0, &idx))
+			{
+				obj->mt_pending = 1;
+				obj->mt_pending_idx = idx;
+				return;
+			}
+			// Queue OOM: fall through and destroy inline (pre-fix behavior).
+		}
+		// Destroying inline while queued (cycle child): tombstone the slot so
+		// the drain does not touch this struct after it is freed.
+		if (obj->mt_pending)
+		{
+			g_pending_destroy[obj->mt_pending_idx].p = NULL;
+			obj->mt_pending = 0;
+		}
 #ifdef DEBUG
 		printf("[DEBUG] releaseObject: obj=%p reached refcount=0, freeing\n", (void*)obj);
 #endif
@@ -1465,6 +1585,8 @@ ASArray* allocArray(SWFAppContext* app_context, u32 initial_capacity)
 
 	arr->mt_mark = 0;
 	arr->mt_kind = MT_KIND_PLAIN;
+	arr->mt_pending = 0;
+	arr->mt_pending_idx = 0;
 	mtLinkArray(arr);
 
 #ifdef DEBUG
@@ -1508,6 +1630,24 @@ void releaseArray(SWFAppContext* app_context, ASArray* arr)
 
 	if (arr->refcount == 0)
 	{
+		// Same deferral as releaseObject — see the note above it.
+		if (!g_in_destroy_drain)
+		{
+			if (arr->mt_pending) return;
+			u32 idx;
+			if (pendingDestroyPush(arr, 1, &idx))
+			{
+				arr->mt_pending = 1;
+				arr->mt_pending_idx = idx;
+				return;
+			}
+			// Queue OOM: fall through and destroy inline (pre-fix behavior).
+		}
+		if (arr->mt_pending)
+		{
+			g_pending_destroy[arr->mt_pending_idx].p = NULL;
+			arr->mt_pending = 0;
+		}
 #ifdef DEBUG
 		printf("[DEBUG] releaseArray: arr=%p reached refcount=0, freeing\n", (void*)arr);
 #endif
@@ -2116,6 +2256,19 @@ static void gcCollect(SWFAppContext* app_context)
 
 void swfGcMaybeCollect(SWFAppContext* app_context)
 {
+	// Deliberately FIRST, ahead of every early return below. This runs at the
+	// tick boundary in all three frame loops, which makes it the one place that
+	// is guaranteed to see each tick — and the drain must happen every tick,
+	// not on the collector's cadence and not only when the collector is on.
+	//
+	// It must also precede the sweep. A parked struct is unreachable from the
+	// roots, so the sweep would free it and leave the queue holding a dangling
+	// pointer; worse, skipping parked structs in the sweep is not a fix either,
+	// since their doomed outbound edges would be freed around them and the
+	// later drain would release freed children. Draining first keeps the queue
+	// empty whenever the sweep runs, so the two reclaimers never overlap.
+	swfDrainPendingDestroys(app_context);
+
 	if (!g_gc_config_parsed) gcParseConfig();
 	if (g_gc_mode == SWF_GC_MODE_OFF) return;
 	g_gc_tick++;

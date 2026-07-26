@@ -1624,6 +1624,9 @@ frame_loop_exit:
 	// env-gated (SWF_MEM_REPORT) leak-tracking summary; both must precede
 	// heap_shutdown, which unmaps the pool the MC registry lives in.
 	actionDrainDpropsReleases(app_context);
+	// ...and destroy whatever that release (or the last tick's script) parked,
+	// so the exit-time leak report counts reclaimable structs as reclaimed.
+	swfDrainPendingDestroys(app_context);
 	swfMemReportAtExitIfEnabled();
 
 	// SWF_HEAP_STATS=1: o1heap peak/allocated at exit, so the AVM1 browser
