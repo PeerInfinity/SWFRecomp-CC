@@ -1,0 +1,114 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-24T19:31:35.362522+00:00",
+    "git_sha": "f0e6fb25d672c874a2b9d03f23e82c01c50ad83d",
+    "duration_seconds": 31.56,
+    "total_available": 5,
+    "shards": 30,
+    "expected_shards": 30
+  },
+  "total": 5,
+  "pass": 1,
+  "ruffle_matched": 0,
+  "fail": 4,
+  "pass_rate": 20.0,
+  "effective_pass": 1,
+  "effective_pass_rate": 20.0,
+  "breakdown": {
+    "output_mismatch": 4
+  },
+  "tests": [
+    {
+      "test": "request_matching_profiles",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.013,
+        "run": 0.002
+      },
+      "num_frames": 126,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 190,
+        "matching_lines": 0
+      },
+      "duration": 5.02,
+      "status": "output_mismatch",
+      "detail": "190 line(s) differ (actual=0, expected=190)",
+      "actual_output": "",
+      "expected_output": "Caught: ArgumentError: Error #2008: Parameter profile must be one of the accepted values.\nCaught: ArgumentError: Error #2008: Parameter profiles must be one of the accepted values.\nCaught: ArgumentError: Error #2008: Parameter profile must be one of the accepted values.\nRequesting profiles: standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: standardConstrained,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standardConstrained,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standardConstrained,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profiles: baselineExtended,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profiles: baselineExtended\nGot profile: baselineExtended\nAfter dispose: null\nRequesting profiles: baseline,standardExtended\nGot profile: standardExtended\n... (140 lines after) ..."
+    },
+    {
+      "test": "request_profiles",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.17,
+        "run": 0.002
+      },
+      "num_frames": 12,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 16,
+        "matching_lines": 0
+      },
+      "duration": 5.18,
+      "status": "output_mismatch",
+      "detail": "16 line(s) differ (actual=0, expected=16)",
+      "actual_output": "",
+      "expected_output": "Requesting profile: standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profile: standard\nGot profile: standard\nAfter dispose: null\nRequesting profile: standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profile: baselineExtended\nGot profile: baselineExtended\nAfter dispose: null\nRequesting profile: baseline\nGot profile: baseline\nAfter dispose: null\nRequesting profile: baselineConstrained"
+    },
+    {
+      "test": "sampler_odd_size",
+      "phases": {
+        "recomp": 0.032,
+        "compile": 7.126,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 7.17,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=0, expected=1)",
+      "actual_output": "",
+      "expected_output": "Corner: ffff00ff"
+    },
+    {
+      "test": "scissor_rectangle",
+      "phases": {
+        "recomp": 0.033,
+        "compile": 7.148,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 7.19,
+      "status": "pass"
+    },
+    {
+      "test": "scissor_rectangle_invalid",
+      "phases": {
+        "recomp": 0.031,
+        "compile": 6.963,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 7.0,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=0, expected=1)",
+      "actual_output": "",
+      "expected_output": "Setting rect: (x=10, y=20, w=0, h=300)"
+    }
+  ]
+}

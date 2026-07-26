@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `1884c6ab93fe`  
-**Date:** 2026-07-26 03:36 UTC  
-**Total duration:** 8h01m27s
+**Commit:** `d7738492a363`  
+**Date:** 2026-07-26 17:31 UTC  
+**Total duration:** 8h01m11s
 
 ## Results by Suite
 
@@ -205,9 +205,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### avm1
 
 - **Pass:** 638/717 (89.0%)
-- **Duration:** 45m12s across 30 shards
+- **Duration:** 45m26s across 30 shards
 - **Lines:** 115,828/131,176 matching (88.3%)
-- **Avg test duration:** 3.7s — slowest: `movieclip_invalid_get_bounds_7` (34.4s)
+- **Avg test duration:** 3.7s — slowest: `netstream_play_flv_screen` (37.4s)
 
 ### avm2
 
@@ -296,9 +296,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### regression
 
 - **Pass:** 70/70 (100%)
-- **Duration:** 6m20s across 30 shards
+- **Duration:** 5m50s across 30 shards
 - **Lines:** 481/481 matching (100%)
-- **Avg test duration:** 5.4s — slowest: `avm2_timeline_gradients` (32.2s)
+- **Avg test duration:** 5.0s — slowest: `avm2_morph` (23.6s)
 
 ### stage3d
 
