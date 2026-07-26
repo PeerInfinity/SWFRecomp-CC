@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-24T19:31:35.358175+00:00",
-    "git_sha": "f0e6fb25d672c874a2b9d03f23e82c01c50ad83d",
-    "duration_seconds": 38.61,
+    "timestamp": "2026-07-26T09:20:04.992907+00:00",
+    "git_sha": "b615844ac34104b9665678e2ff9223ea069380ae",
+    "duration_seconds": 37.68,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "avm1_doabc",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.21,
+        "compile": 1.261,
         "run": 0.002
       },
       "num_frames": 1,
@@ -31,14 +31,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.22,
+      "duration": 1.27,
       "status": "pass"
     },
     {
       "test": "avm1_loads_avm2",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.345,
+        "compile": 1.242,
         "run": 0.004
       },
       "num_frames": 2,
@@ -47,7 +47,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 1.35,
+      "duration": 1.25,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "Created clip\nLoaded AVM2 movie into non-root\nLoaded AVM2 movie into root",
@@ -57,7 +57,7 @@
       "test": "avm1_loads_avm2_doaction",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.244,
+        "compile": 0.898,
         "run": 0.004
       },
       "num_frames": 3,
@@ -66,7 +66,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.25,
+      "duration": 0.9,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=4, expected=2)",
       "actual_output": "Hello from outer SWF\nOuter SWF: Called loadMovie\nHello from inner SWF (DoInitAction) - this shouldn't print\nHello from inner SWF - this shouldn't print",
@@ -76,7 +76,7 @@
       "test": "avm1_sprite_sc_ignored",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.262,
+        "compile": 1.222,
         "run": 0.002
       },
       "num_frames": 3,
@@ -85,14 +85,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.27,
+      "duration": 1.23,
       "status": "pass"
     },
     {
       "test": "avm2_doaction",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.637,
+        "compile": 4.826,
         "run": 0.002
       },
       "num_frames": 1,
@@ -101,14 +101,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 4.64,
+      "duration": 4.83,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.037,
+        "compile": 5.156,
         "run": 0.004
       },
       "num_frames": 4,
@@ -117,7 +117,7 @@
         "expected_lines": 14,
         "matching_lines": 1
       },
-      "duration": 4.04,
+      "duration": 5.17,
       "status": "output_mismatch",
       "detail": "13 line(s) differ (actual=1, expected=14)",
       "actual_output": "Starting load...",
@@ -126,8 +126,8 @@
     {
       "test": "avm2_loads_avm1_doabc",
       "phases": {
-        "recomp": 0.005,
-        "compile": 4.721,
+        "recomp": 0.006,
+        "compile": 5.456,
         "run": 0.002
       },
       "num_frames": 4,
@@ -136,7 +136,7 @@
         "expected_lines": 4,
         "matching_lines": 1
       },
-      "duration": 4.73,
+      "duration": 5.47,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=1, expected=4)",
       "actual_output": "Finished constructor of class of root MovieClip",
@@ -146,7 +146,7 @@
       "test": "avm2_loads_avm1_loads_avm2_doabc",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.078,
+        "compile": 4.812,
         "run": 0.002
       },
       "num_frames": 4,
@@ -155,7 +155,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 5.09,
+      "duration": 4.82,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=1, expected=3)",
       "actual_output": "Outer avm2 SWF: Called load",
@@ -165,8 +165,8 @@
       "test": "avm2_loads_avm1_loads_into_root",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.051,
-        "run": 0.004
+        "compile": 3.545,
+        "run": 0.002
       },
       "num_frames": 3,
       "lines": {
@@ -174,7 +174,7 @@
         "expected_lines": 2,
         "matching_lines": 1
       },
-      "duration": 5.06,
+      "duration": 3.55,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=1, expected=2)",
       "actual_output": "Loading avm1-outer...",
@@ -184,7 +184,7 @@
       "test": "avm2_loads_avm1_v10",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.712,
+        "compile": 3.385,
         "run": 0.002
       },
       "num_frames": 3,
@@ -193,7 +193,7 @@
         "expected_lines": 8,
         "matching_lines": 1
       },
-      "duration": 4.72,
+      "duration": 3.39,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=1, expected=8)",
       "actual_output": "Content before load: null",
@@ -203,8 +203,8 @@
       "test": "avm2_loads_avm1_v9",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.193,
-        "run": 0.002
+        "compile": 5.162,
+        "run": 0.004
       },
       "num_frames": 3,
       "lines": {
@@ -212,7 +212,7 @@
         "expected_lines": 8,
         "matching_lines": 1
       },
-      "duration": 5.2,
+      "duration": 5.17,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=1, expected=8)",
       "actual_output": "Content before load: null",

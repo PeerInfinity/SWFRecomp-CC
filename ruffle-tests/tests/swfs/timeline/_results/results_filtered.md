@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-26 09:20 UTC
+**Date**: 2026-07-26 20:13 UTC
 
-**Git SHA**: `b615844ac3`
+**Git SHA**: `8df2d730c3`
 
-**Run Duration**: 1m 35s
+**Run Duration**: 3m 34s
 
 **Filtered**: 0 tests ignored out of 17 available
 
@@ -33,18 +33,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 22.5s |  |
-| 2 | `frame_label_count_oom` | 1 | 1.4s |  |
-| 3 | `frame_script_cleanup` | 30 | 5.2s |  |
-| 4 | `frame_script_cleanup2` | 32 | 5.2s |  |
+| 1 | `clip_action_no_key_code` | 1 | 19.6s |  |
+| 2 | `frame_label_count_oom` | 1 | 20.5s |  |
+| 3 | `frame_script_cleanup` | 30 | 19.9s |  |
+| 4 | `frame_script_cleanup2` | 32 | 21.6s |  |
 | 5 | `frame_script_cleanup3` | 30 | 5.4s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 5.6s |  |
-| 7 | `frame_script_construct` | 25 | 3.6s |  |
-| 8 | `scene_count_oom` | 1 | 1.3s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 5.1s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 5.3s |  |
+| 7 | `frame_script_construct` | 25 | 22.9s |  |
+| 8 | `scene_count_oom` | 1 | 1.4s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 5.3s |  |
 | 10 | `swf_9_frame_script_cleanup_goto` | 30 | 5.4s |  |
-| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 5.3s |  |
-| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 5.1s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 17.8s |  |
+| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 5.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -52,9 +52,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 3.8s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 5.2s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 5.0s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 23.1s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 4.9s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 24.6s |  |
 
 ## Near-Passing Tests
 

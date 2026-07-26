@@ -1,19 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `f0e6fb25d672` (2026-07-24T19:31:35.232031+00:00)
-**Current:** `b615844ac341` (2026-07-26T09:20:04.922690+00:00)
+**Previous:** `b615844ac341` (2026-07-26T09:20:04.922690+00:00)
+**Current:** `8df2d730c3f0` (2026-07-26T20:13:07.854313+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 637 | 638 | +1 |
-| Total | 716 | 717 | +1 |
+| Passing | 638 | 638 | 0 |
+| Total | 717 | 717 | 0 |
 | Pass rate | 89.0% | 89.0% | 0% |
-| Mismatched lines | 15348 | 15348 | 0 |
+| Mismatched lines | 15348 | 15285 | -63 |
+|   Decreased | | | -63 |
 
-## Added Tests (1)
+## Status Changed (1)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `shared_object_serialize_typed_objects` | pass | 1/1 |
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `global_proto_decls` | segfault | output_mismatch | 740/4497 | 803/4497 |
