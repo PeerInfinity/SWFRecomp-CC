@@ -2172,6 +2172,21 @@ void avm2_register_toplevel(Avm2Context* ctx)
 		}
 	}
 
+	// The AS3 builtin namespace as a global value. avmplus defines it in the
+	// toplevel, and code written against it says `a.AS3::pop()` -- which
+	// evaluates AS3 as a runtime namespace *value* before qualifying the
+	// lookup (as3/Array/length_mods dies on its 9th line with #1065 without
+	// it). Our builtins register public keys and avm2_propkey_matches folds
+	// the AS3 URI onto public, so the qualified lookup lands on the same
+	// traits an unqualified one would.
+	{
+		Avm2PropKey key = builtin_key("", "AS3");
+		const Avm2String* uri =
+			avm2_string_from_literal(ctx, "http://adobe.com/AS3/2006/builtin");
+		avm2_builtin_define_alias(
+			ctx, key, avm2_object_value(avm2_namespace_new(ctx, uri, NULL, 0x08)));
+	}
+
 	// Global constants.
 	static const char* const_names[3] = { "NaN", "Infinity", "undefined" };
 	Avm2Value const_vals[3];
