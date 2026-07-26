@@ -120,6 +120,8 @@ typedef struct Resolved
 	Avm2DynProp* dyn;            // own dynamic prop (the entry, so writes can
 	                             // see its read_only attribute)
 	Avm2Object* proto_holder;    // proto-chain holder of `dyn`
+	Avm2Object* proto_arr;       // proto-chain Array whose ELEMENT storage
+	                             // holds the value (read-only; writes shadow)
 	int is_array_elem;
 	int is_vector_elem;
 	int is_bytearray_elem;
@@ -307,9 +309,30 @@ static int resolve_key(Avm2Context* ctx, Avm2Value recv, const Avm2PropKey* key,
 	}
 
 	// Prototype chain (reads only).
+	// A prototype can itself be an Array -- `D.prototype = new Array` and
+	// Array.prototype are both one -- and then an index write to it lands in
+	// ELEMENT storage, which the by-name dyn-prop walk below cannot see. An
+	// ARRAY receiver already resolves that through avm2_array_proto_index;
+	// this covers every other receiver (regress/bug_687838's `Fcn .proto
+	// ... array trans/immed` rows: a plain object whose prototype is a real
+	// Array).
+	uint32_t pidx;
+	int proto_index_name =
+		(recv.kind != AVM2_VALUE_OBJECT || recv.u.obj->kind != AVM2_OBJ_ARRAY)
+		&& name_as_index(key->name, key->name_len, &pidx);
 	Avm2Object* proto = avm2_value_proto(ctx, recv);
 	while (proto != NULL)
 	{
+		if (proto_index_name && proto->kind == AVM2_OBJ_ARRAY)
+		{
+			Avm2Value pv = avm2_array_get(proto, pidx);
+			if (pv.kind != AVM2_VALUE_HOLE)
+			{
+				out->proto_arr = proto;
+				out->arr_index = pidx;
+				return 1;
+			}
+		}
 		Avm2DynProp* dv = avm2_object_find_dynamic_entry(proto, key->name,
 		                                                 key->name_len);
 		if (dv != NULL)
@@ -387,9 +410,25 @@ static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Reso
 		out->dyn = avm2_object_find_dynamic_entry(obj, key.name, key.name_len);
 		if (out->dyn != NULL) return 1;
 	}
+	// Element storage on a prototype that is itself an Array -- see the
+	// matching walk in resolve_key.
+	uint32_t pidx;
+	int proto_index_name =
+		(recv.kind != AVM2_VALUE_OBJECT || recv.u.obj->kind != AVM2_OBJ_ARRAY)
+		&& name_as_index(key.name, key.name_len, &pidx);
 	Avm2Object* proto = avm2_value_proto(ctx, recv);
 	while (proto != NULL)
 	{
+		if (proto_index_name && proto->kind == AVM2_OBJ_ARRAY)
+		{
+			Avm2Value pv = avm2_array_get(proto, pidx);
+			if (pv.kind != AVM2_VALUE_HOLE)
+			{
+				out->proto_arr = proto;
+				out->arr_index = pidx;
+				return 1;
+			}
+		}
 		Avm2DynProp* dv = avm2_object_find_dynamic_entry(proto, key.name, key.name_len);
 		if (dv != NULL)
 		{
@@ -443,6 +482,11 @@ static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* 
 		Avm2Value qn = avm2_object_value(
 			avm2_qname_new(ctx, r->proxy_uri, r->proxy_local));
 		return avm2_proxy_call_hook(ctx, recv.u.obj, "getProperty", &qn, 1);
+	}
+	if (r->proto_arr != NULL)
+	{
+		Avm2Value v = avm2_array_get(r->proto_arr, r->arr_index);
+		return v.kind == AVM2_VALUE_HOLE ? avm2_undefined() : v;
 	}
 	if (r->is_array_elem)
 	{
@@ -764,6 +808,18 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 			avm2_qname_new(ctx, r->proxy_uri, r->proxy_local));
 		args[1] = value;
 		avm2_proxy_call_hook(ctx, recv.u.obj, "setProperty", args, 2);
+		return;
+	}
+	if (r->proto_arr != NULL)
+	{
+		// Proto-chain element hit: a write shadows on the receiver, exactly
+		// as a proto-chain dyn-prop hit does (and #1056 where it cannot).
+		if (!object_is_dynamic(recv.u.obj))
+		{
+			setproperty_miss(ctx, recv, name, name_len, value);
+			return;
+		}
+		avm2_object_set_dynamic(ctx, recv.u.obj, name, name_len, value);
 		return;
 	}
 	if (r->is_array_elem)
