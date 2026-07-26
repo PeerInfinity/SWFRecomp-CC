@@ -526,8 +526,7 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | `ecma3/JSON` (four independent root causes) | **5** (pred. 4) | small | **DONE `7ad4e0419`**, CI `30176986441`; `ecma3/JSON` 8/12 → 12/12 |
 | ~~—~~ | Alchemy domain memory (`li8`…`sf64` + `ApplicationDomain.domainMemory`) | **14** (pred. 13) | medium | **DONE `5da28a6a5`**, CI `30179405893`; `mops` 0/13 → 13/13 + `avm2/domain_memory` |
 | ~~—~~ | Builtin-container subclasses (five independent causes) | **11** (pred. 4-6) | medium | **DONE** `20a3d24c7`+`4c6b18d5c`+`505b330f2`+`81b18da78`+`ffe48dff6`, CI `30182973510` |
-| 1 | `as3/ByteArray` | 5 (2 of them timeouts) | ? | undiagnosed |
-| 2 | `recursion/pcre_*` | 5 | ? | undiagnosed |
+| 1 | `as3/ByteArray` + `recursion/pcre_*` + `from_shumway/lzma_bytes` | **8–11** | medium | **diagnosed 2026-07-26; Opus-ready handoff: `SWFRecompDocs/plans/bytearray-pcre-compat-arc.md`.** The "timeouts" are an infinite loop (uint32 cap-doubling overflow); LZMA needs a vendored codec; the pcre tests pin Tamarin-PCRE quirks (>255 captures, fixed-length lookbehind) fixable in the regex preprocessor |
 | 3 | Declared-ABC method arity checking (`avm2/wrong_arg_count`, `avm2/error_geterrormessage`) | 2 | small | undiagnosed |
 
 **DONE — the `ecma3/JSON` arc.** `7ad4e0419`, CI `30176986441`: **+5**,
