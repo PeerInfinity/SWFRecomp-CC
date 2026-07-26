@@ -2844,6 +2844,16 @@ void avm2_op_constructsuper(Avm2Activation* act, Avm2Value recv,
 		return;
 	}
 	Avm2Class* super = super_class_of(act);
+	// Builtin bases have a no-op instance_init stub — their real constructor
+	// semantics live in native_construct, which allocates and so cannot run
+	// on an already-allocated receiver. native_super_init is the in-place
+	// form (Array: `super(length)` / `super(a, b, c)`).
+	if (super->instance_init.fn == NULL && super->native_super_init != NULL
+	    && recv.kind == AVM2_VALUE_OBJECT && recv.u.obj != NULL)
+	{
+		super->native_super_init(act->ctx, recv.u.obj, args, argc);
+		return;
+	}
 	avm2_call_method_ref(act->ctx, &super->instance_init, super,
 	                     super->iscope != NULL ? super->iscope : super->scope,
 	                     recv, args, argc);

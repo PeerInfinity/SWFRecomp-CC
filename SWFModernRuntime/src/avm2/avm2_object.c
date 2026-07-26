@@ -186,15 +186,25 @@ static void array_reserve(Avm2Context* ctx, Avm2ArrayExt* ext, uint32_t need)
 	ext->cap = new_cap;
 }
 
+// Attach empty element storage to an already-allocated AVM2_OBJ_ARRAY object.
+// Used by avm2_array_new and by avm2_class_construct for `extends Array`
+// subclass instances, which keep their own cls/vtable/proto.
+// native_ext_size stays 0: the GC traces array ext precisely (trace_array).
+Avm2ArrayExt* avm2_array_ext_attach(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2ArrayExt* ext = avm2_alloc(ctx, sizeof(Avm2ArrayExt));
+	memset(ext, 0, sizeof(Avm2ArrayExt));
+	obj->native_ext = ext;
+	return ext;
+}
+
 Avm2Object* avm2_array_new(Avm2Context* ctx, uint32_t length)
 {
 	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_ARRAY, 1);
 	obj->cls = ctx->builtins.array_class;
 	obj->vtable = &ctx->builtins.array_class->ivtable;
 	obj->proto = ctx->builtins.array_class->prototype_obj;
-	Avm2ArrayExt* ext = avm2_alloc(ctx, sizeof(Avm2ArrayExt));
-	memset(ext, 0, sizeof(Avm2ArrayExt));
-	obj->native_ext = ext;
+	Avm2ArrayExt* ext = avm2_array_ext_attach(ctx, obj);
 	if (length > 0)
 	{
 		if (length <= AVM2_ARRAY_MAX_DENSE)

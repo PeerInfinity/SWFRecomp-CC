@@ -188,6 +188,8 @@ Avm2Value avm2_object_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_
 Avm2Object* avm2_array_new(Avm2Context* ctx, uint32_t length);  // length holes
 Avm2Object* avm2_array_from_values(Avm2Context* ctx, const Avm2Value* vals, uint32_t n);
 Avm2ArrayExt* avm2_array_ext(Avm2Object* obj);  // NULL if not an array
+// Attach zeroed element storage to an already-allocated AVM2_OBJ_ARRAY object.
+Avm2ArrayExt* avm2_array_ext_attach(Avm2Context* ctx, Avm2Object* obj);
 // Element get: returns HOLE-kind value if out of range / a hole.
 Avm2Value avm2_array_get(Avm2Object* arr, uint32_t idx);
 // Resolve index `idx` through `arr`'s PROTOTYPE chain (what a hole falls back

@@ -1153,6 +1153,12 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 		}
 		cls->native_ext_size = super_class->native_ext_size;
 		cls->native_init = super_class->native_init;
+		// Builtin-container kind IS inherited: `class MyList extends Array`
+		// allocates element storage (avm2_class_construct). The chain is
+		// complete here — builtins register at boot and a SWF class defines
+		// before any instance of it exists.
+		cls->instance_kind = super_class->instance_kind;
+		cls->native_super_init = super_class->native_super_init;
 		// native_construct is deliberately NOT inherited: a SWF subclass of
 		// Object/Error/... constructs through the standard alloc+init path
 		// (its own constructor chains to super via ConstructSuper).
@@ -1200,6 +1206,22 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 	return cls;
 }
 
+// Object kind for instances of `cls`. Normally the kind inherited from the
+// builtin ancestor, except that a SEALED subclass of Array gets none: avmplus
+// gives sealed Array subclasses no element storage, so their Array methods run
+// the generic (property-based) paths and index access answers through the
+// ordinary sealed-object rules (regress/bug_654807_swf13 "sealed" columns,
+// regress/bug_420755's MyNonDynamicArray → #1056).
+uint8_t avm2_class_instance_kind(const Avm2Class* cls)
+{
+	uint8_t kind = cls->instance_kind;
+	if (kind == AVM2_OBJ_ARRAY && (cls->flags & AVM2_CLASS_FLAG_SEALED))
+	{
+		return AVM2_OBJ_SCRIPT;
+	}
+	return kind;
+}
+
 Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
                                const Avm2Value* args, uint32_t argc)
 {
@@ -1212,12 +1234,17 @@ Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
 	{
 		return cls->native_construct(ctx, cls, args, argc);
 	}
-	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, cls->ivtable.slot_count + 1);
+	uint8_t kind = avm2_class_instance_kind(cls);
+	Avm2Object* obj = avm2_object_alloc(ctx, kind, cls->ivtable.slot_count + 1);
 	obj->cls = cls;
 	obj->vtable = &cls->ivtable;
 	obj->proto = cls->prototype_obj;
 	avm2_slots_init_defaults(ctx, obj, &cls->ivtable);
-	if (cls->native_ext_size > 0)
+	if (kind == AVM2_OBJ_ARRAY)
+	{
+		avm2_array_ext_attach(ctx, obj);
+	}
+	else if (cls->native_ext_size > 0)
 	{
 		obj->native_ext = avm2_alloc(ctx, cls->native_ext_size);
 		memset(obj->native_ext, 0, cls->native_ext_size);

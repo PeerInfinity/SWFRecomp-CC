@@ -134,6 +134,20 @@ struct Avm2Class
 	// an optional native constructor body.
 	uint32_t native_ext_size;
 	void (*native_init)(Avm2Context* ctx, Avm2Object* obj);
+	// Builtin-container inheritance: the object KIND that instances of this
+	// class get (0 = AVM2_OBJ_SCRIPT). Resolved once per class at define
+	// time by walking the super chain, so `class MyList extends Array`
+	// instances allocate real element storage and every Array method sees
+	// it (regress/bug_420755, regress/bug_654807_*). Separate from
+	// native_ext_size on purpose — Array's is 0 (avm2_array_new attaches
+	// the Avm2ArrayExt by hand) and ByteArray already owns that mechanism.
+	uint8_t instance_kind;
+	// Constructor semantics a SWF subclass's ConstructSuper must run on the
+	// already-allocated receiver, for builtin bases whose `new` lives in
+	// native_construct (which is deliberately not inherited). Array's is
+	// `super(length)` / `super(a, b, c)` — as3/Array/length_mods's Subarray.
+	void (*native_super_init)(Avm2Context* ctx, Avm2Object* obj,
+	                          const Avm2Value* args, uint32_t argc);
 	// If set, `new C(...)` returns this instead of the standard
 	// allocate + run-instance-init path (String/Number/Boolean/int/uint/
 	// Array/Function). Also used for coercion-style class calls when
@@ -164,6 +178,9 @@ struct Avm2ScopeChain
 
 // Dot-qualified class name for error messages ("pkg.Class" / "Class").
 int avm2_class_qname_buf(const Avm2Class* cls, char* buf, int size);
+
+// Avm2ObjectKind instances of `cls` are allocated with (see instance_kind).
+uint8_t avm2_class_instance_kind(const Avm2Class* cls);
 
 // Namespace kind folding for comparisons (public kinds unify).
 uint8_t avm2_ns_fold(uint8_t kind);

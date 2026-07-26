@@ -1045,6 +1045,32 @@ static Avm2Value array_sort_on(Avm2Activation* act)
 // Constructor
 // ---------------------------------------------------------------------------
 
+// `new Array(...)` semantics applied to an already-allocated array object.
+// Shared by array_construct and array_super_init, so a SWF subclass's
+// `super(length)` behaves exactly like `new Array(length)`
+// (as3/Array/length_mods's Subarray passes its ctor arg straight through).
+static void array_init_ctor_args(Avm2Context* ctx, Avm2Object* obj,
+                                 const Avm2Value* args, uint32_t argc)
+{
+	if (argc == 1 && avm2_value_is_number(args[0]))
+	{
+		double d = avm2_coerce_to_number(ctx, args[0]);
+		uint32_t n = (uint32_t) d;
+		if ((double) n != d)
+		{
+			avm2_throw_error(ctx, ctx->builtins.range_error_class,
+			                 "Error #1005: Array index is not a positive integer (%s).",
+			                 avm2_coerce_to_string(ctx, args[0])->utf8);
+		}
+		avm2_array_set_length(ctx, obj, n);
+		return;
+	}
+	for (uint32_t i = 0; i < argc; i++)
+	{
+		avm2_array_set(ctx, obj, i, args[i]);
+	}
+}
+
 static Avm2Value array_construct(Avm2Context* ctx, Avm2Class* cls,
                                  const Avm2Value* args, uint32_t argc)
 {
@@ -1064,6 +1090,17 @@ static Avm2Value array_construct(Avm2Context* ctx, Avm2Class* cls,
 	return avm2_object_value(avm2_array_from_values(ctx, args, argc));
 }
 
+// ConstructSuper into Array from a SWF subclass: the receiver is already
+// allocated (with element storage, when the subclass is not sealed), so run
+// Array's constructor semantics on it in place. A sealed subclass has no
+// storage and avm2_array_ext returns NULL — nothing to initialize.
+static void array_super_init(Avm2Context* ctx, Avm2Object* obj,
+                             const Avm2Value* args, uint32_t argc)
+{
+	if (avm2_array_ext(obj) == NULL) return;
+	array_init_ctor_args(ctx, obj, args, argc);
+}
+
 void avm2_register_array(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -1071,6 +1108,9 @@ void avm2_register_array(Avm2Context* ctx)
 	b->array_class = cls;
 	cls->native_construct = array_construct;
 	cls->native_call = array_construct;
+	// Subclasses inherit element storage + `super(...)` semantics.
+	cls->instance_kind = AVM2_OBJ_ARRAY;
+	cls->native_super_init = array_super_init;
 
 	// length is a getter/setter pair.
 	{

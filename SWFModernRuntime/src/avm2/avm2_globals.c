@@ -239,6 +239,8 @@ Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name
 		}
 		cls->native_ext_size = super->native_ext_size;
 		cls->native_init = super->native_init;
+		cls->instance_kind = super->instance_kind;
+		cls->native_super_init = super->native_super_init;
 	}
 
 	Avm2Object* cobj = avm2_object_alloc(ctx, AVM2_OBJ_CLASS, 1);
