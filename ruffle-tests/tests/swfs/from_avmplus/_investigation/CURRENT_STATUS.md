@@ -54,8 +54,19 @@ Eleven fixes have landed since:
     "harvest RuntimeErrors only as a side effect" case the priority map
     calls for. `ecma3/JSON` **8/12 → 12/12**.
 
-The suite stands at **1475/1574 effective (93.7%)**; the corpus at
-**3778/4414 (85.6%)**. **Zero pass→fail regressions across all eleven
+12. `5da28a6a5` — the Alchemy domain-memory (mops) arc: the 13 memory
+    opcodes (`li8`…`sf64`, `sxi1/sxi8/sxi16`) emit real code and
+    `ApplicationDomain.domainMemory` exists. Domain memory IS the
+    assigned ByteArray's buffer (re-fetched per access, so `set_length`
+    reallocs never go stale); unassigned falls back to a persistent
+    1024-byte zero scratch. **+13** here (`mops` 0/13 → 13/13, all at
+    full line count, `mops_basics` was a timeout) plus
+    `avm2/domain_memory` (1/133 → 133/133) = **+14** corpus, predicted
+    13. CI `30179405893`. Crash histogram improved: runtime_error
+    21 → 8, timeout 4 → 3.
+
+The suite stands at **1488/1574 effective (94.5%)**; the corpus at
+**3792/4416 (85.9%)**. **Zero pass→fail regressions across all twelve
 runs.**
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
@@ -736,6 +747,5 @@ Two one-test items also still open: **`Variable AS3 is not defined`**
 (`as3/Array/length_mods`) and **`isXMLName` undefined**
 (`e4x/Global/e13_1_2_1`).
 
-Parked: **`mops`** (13 tests, all crash/error — Alchemy `li8/li16/li32/
-lf32/lf64/si*/sf*` domainMemory opcodes; needs `ApplicationDomain.
-domainMemory`), and the 49 remaining `known_failure` tests.
+Parked: the 49 remaining `known_failure` tests. (**`mops`** was un-parked
+and completed 2026-07-25 — `5da28a6a5`, 13/13; see run 12 above.)

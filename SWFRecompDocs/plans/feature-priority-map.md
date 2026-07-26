@@ -30,9 +30,11 @@ nested dirs** to exclude — `from_avmplus/as3/Vector` (59) and
 one `avm1` and one `avm2` test). Older figures in this document quote
 4414; the two-test drift does not change any of them materially.
 
-Full corpus, graphics mode at **`7ad4e0419`**: **3778/4414 effective
-(85.6%)**, 636 failing — from CI run `30176986441`, complete over the full
-4414-test intersection, so this figure needs no shard arithmetic.
+Full corpus, graphics mode at **`5da28a6a5`**: **3792/4416 effective
+(85.9%)**, 624 failing — from CI run `30179405893`, complete over the full
+4416-test intersection, so this figure needs no shard arithmetic. The mops
+run also improved the crash histogram: runtime_error 21 → 8, timeout
+4 → 3.
 
 Status histogram across the two runs of 2026-07-25, over all 4414: pass
 **3452 → 3472 → 3497**, output_mismatch **696 → 676 → 651**, and
@@ -42,8 +44,8 @@ Both gains are entirely inside `from_avmplus`.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | **1475/1574** | 93.7 | 99 | **language + builtins** (Tamarin acceptance) |
-| avm2 | 866/1218 | 71.1 | 352 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
+| from_avmplus | **1488/1574** | 94.5 | 86 | **language + builtins** (Tamarin acceptance) |
+| avm2 | 867/1218 | 71.2 | 351 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 655/717 | 91.4 | 62 | long tail |
 | from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
 | from_gnash (5) | 371/403 | 92.1 | 32 | long tail |
@@ -281,13 +283,12 @@ this arc: it needs `encodeURI` to throw on an unpaired surrogate, but
 it. Same root cause as `utf8count` (arc 2) — it moves when the
 representation does.
 
-### 6. `mops` / Alchemy domainMemory — 13 tests · MEDIUM arc
+### 6. ~~`mops` / Alchemy domainMemory~~ — **DONE (`5da28a6a5`, +14)** · MEDIUM arc
 
-All 13 `mops` tests crash or error: `li8/li16/li32/lix8/lix16/lf32/lf64`,
-`si8/si16/si32/sf32/sf64`, `mops_basics` (timeout). These are the Alchemy
-memory opcodes over `ApplicationDomain.domainMemory`; the avm2 suite's
-`domain_memory` test is the same gap. Self-contained, but it is real
-runtime work (a ByteArray-backed memory window plus 12 opcodes).
+All 13 `mops` tests were blank (the emitter's `avm2_unimplemented_op`
+killed the driver's eager init); the avm2 suite's `domain_memory` test was
+the same gap and landed as the 14th. CI `30179405893`, 0 regressions.
+Post-mortem: `SWFRecompDocs/plans/alchemy-domain-memory-arc.md`.
 
 ### 7. ~~`flash.system.Capabilities`~~ — **DONE (`8e8370df1`, +3 + 1)** · TRIVIAL
 
@@ -523,10 +524,10 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | Builtin prototypes must be typed instances of their class (subsumes the old sealed-prototypes `#1037` item) | **24** (pred. 8-11) | medium | **DONE `cc4a7eece`+`e4d1e78f6`**, CI `30171938941` |
 | ~~—~~ | `as3/Vector` (four independent root causes) | **15** (pred. 14) | medium | **DONE `81cf6a669`+`222b4a4b5`+`a85726a54`+`2b244c01b`**, CI `30174981516` |
 | ~~—~~ | `ecma3/JSON` (four independent root causes) | **5** (pred. 4) | small | **DONE `7ad4e0419`**, CI `30176986441`; `ecma3/JSON` 8/12 → 12/12 |
-| 1 | Alchemy domain memory (`li8`…`sf64` + `ApplicationDomain.domainMemory`) | **13** | medium | `mops/*`, all blank |
-| 2 | Builtin-container subclasses get no element storage | ~7 | medium | see below |
-| 3 | `as3/ByteArray` | 5 (2 of them timeouts) | ? | undiagnosed |
-| 4 | `recursion/pcre_*` | 5 | ? | undiagnosed |
+| ~~—~~ | Alchemy domain memory (`li8`…`sf64` + `ApplicationDomain.domainMemory`) | **14** (pred. 13) | medium | **DONE `5da28a6a5`**, CI `30179405893`; `mops` 0/13 → 13/13 + `avm2/domain_memory` |
+| 1 | Builtin-container subclasses get no element storage | ~7 | medium | see below |
+| 2 | `as3/ByteArray` | 5 (2 of them timeouts) | ? | undiagnosed |
+| 3 | `recursion/pcre_*` | 5 | ? | undiagnosed |
 
 **DONE — the `ecma3/JSON` arc.** `7ad4e0419`, CI `30176986441`: **+5**,
 0 regressions, crash histogram flat. **The diagnosis this table carried
@@ -546,18 +547,21 @@ coercion `C(x)` and takes exactly one argument**, so any other count is
 `as3/RuntimeErrors/Error1112ArgCountMismatchOnClassCoercion` for free and
 fixed half of `regress/bug_420755`.
 
-**Next arc — Alchemy domain memory (13 tests).** `mops/li8`, `li16`,
-`li32`, `lix8`, `lix16`, `lf32`, `lf64`, `si8`, `si16`, `si32`, `sf32`,
-`sf64` and `mops_basics` are **all blank** (0 lines of output;
-`mops_basics` times out). The 13 memory opcodes reach `IrOpcode` — the
-parser and verifier both decode them — but `abc_emit.cpp` has no
-emission for any of them beyond a stack-effect entry, and the runtime has
-no `ApplicationDomain.domainMemory` at all. One coherent feature, and the
-only item on this board with value outside the corpus: every
-Alchemy/CrossBridge-compiled SWF (a large share of late-era Flash games)
-runs on these opcodes.
+**DONE — the Alchemy domain-memory (mops) arc.** `5da28a6a5`, CI
+`30179405893`: **+14** (predicted 13), 0 regressions, and the crash
+histogram *improved* — runtime_error 21 → 8, timeout 4 → 3, everything
+else flat. All 13 `mops/*` tests pass at full line count (`mops_basics`
+was the timeout), and `avm2/domain_memory` (1/133 → 133/133) was the
+14th. Domain memory IS the assigned ByteArray's buffer: every access
+re-fetches `ext->bytes/len` through the object, so `set_length` reallocs
+can never leave a stale pointer, and an unassigned domain uses a
+persistent lazily-allocated 1024-byte zero-filled scratch. Loads
+zero-extend, stores truncate, byte order is always little-endian
+regardless of `ByteArray.endian`, out-of-range is `#1506`. Beyond the
+corpus this unlocks Alchemy/CrossBridge-compiled SWFs. Post-mortem in
+`SWFRecompDocs/plans/alchemy-domain-memory-arc.md`.
 
-**Runner-up — builtin-container subclasses (~7 tests).** A SWF class that
+**Next arc — builtin-container subclasses (~7 tests).** A SWF class that
 `extends Array` allocates as `AVM2_OBJ_SCRIPT`, so it gets no element
 storage: `avm2_array_ext` returns NULL, index writes fall through to
 dynamic props, and `length` stays 0. `avm2_class_construct` already
@@ -625,8 +629,8 @@ yield-per-unit-effort on the board. (It was 14; `e618f62ab` picked up
 harvest from this bucket: as a side effect of an arc that wants the same
 error anyway.)
 
-from_avmplus stands at **1475/1574 (93.7%)** and the corpus at
-**3778/4414 (85.6%)**.
+from_avmplus stands at **1488/1574 (94.5%)** and the corpus at
+**3792/4416 (85.9%)**.
 
 **Calibration, after two more arcs.** Both overshot the line-match table
 (10 → 20, ~15 → 25), which is the mirror image of the error-histogram bias:

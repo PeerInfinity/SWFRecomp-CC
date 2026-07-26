@@ -1,8 +1,17 @@
 # Arc: Alchemy domain memory (mops) — 13 tests + real-game value
 
-Opus-ready handoff. Fable design pass 2026-07-25 (code sites verified at
-`6ad610ad5`). Execute the prescription; where a detail says "pin from the
-test", read the named test's Test.as + output.txt before coding it.
+**DONE — `5da28a6a5`, CI `30179405893` (2026-07-25): +14, predicted 13.**
+All 13 `from_avmplus/mops/*` pass (each at full line count, including
+`mops_basics` 56/56, previously a timeout), plus `avm2/domain_memory`
+(1/133 → 133/133) as the 14th. Zero regressions; crash histogram improved
+(runtime_error 21 → 8, timeout 4 → 3). The prescription below survived
+contact intact — the load-bearing choices were re-fetching
+`ext->bytes/len` through the ByteArray on every access (never caching the
+pointer across `set_length` reallocs) and the persistent 1024-byte
+zero-filled scratch while nothing is assigned.
+
+Original handoff below, kept for the design rationale. Fable design pass
+2026-07-25 (code sites verified at `6ad610ad5`).
 
 ## Goal
 
