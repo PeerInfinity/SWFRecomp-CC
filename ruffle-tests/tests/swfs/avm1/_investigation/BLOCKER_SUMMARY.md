@@ -88,7 +88,16 @@ function addGetter(obj, name, val) {
 
 ### ~~Blocker 4: Global Constructor Enumeration Order + Missing Globals~~ — RESOLVED
 
-**Resolved 2026-04-02.** Ruffle vs Flash difference reclassified; Flash-spec baselines created. All 3 global_*_decls tests now pass via `--expected-suffix=flash`. Ruffle versions moved to `ignored_tests.txt`. See `complete/GLOBALS_PLAN.md` and `complete/GLOBALS_ALIGNMENT_PLAN.md`.
+**Resolved 2026-04-02.** Ruffle vs Flash difference reclassified; Flash-spec baselines created. All 3 global_*_decls tests passed via `--expected-suffix=flash` at the time. Ruffle versions moved to `ignored_tests.txt`. See `complete/GLOBALS_PLAN.md` and `complete/GLOBALS_ALIGNMENT_PLAN.md`.
+
+**Regressed since — status as of 2026-07-26**: 0/3 pass against the Flash-spec
+baselines. `global_proto_decls` **segfaults**; the other two are
+`output_mismatch`. This went unnoticed because CI's "Verify Flash-spec expected
+output" step was silently dead from 2026-05-09 (it aborted on missing Dawn, and
+its results file was clobbered by the results-branch checkout before it could be
+committed) — fixed 2026-07-26, so the numbers in `RUFFLE_RESULTS.md`
+§"Flash-Spec Results" are live again. These 3 tests are in `ignored_tests.txt`,
+so the regression never showed in any filtered pass rate.
 
 **Impact**: 3 tests, ~11,000+ lines (but low value — tests enumerate all globals)
 

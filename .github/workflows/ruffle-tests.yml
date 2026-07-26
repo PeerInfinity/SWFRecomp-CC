@@ -338,9 +338,18 @@ jobs:
         env:
           TZ: NPT-5:45
         run: |
+          # Always no-graphics, regardless of `mode`. These are the three
+          # avm1 trace tests that ship an output.flash.txt (Flash's real
+          # behavior, where Ruffle's output.txt encodes Ruffle's own); the
+          # graphics build would produce identical trace output. More to the
+          # point, results_flash.json has no per-mode stem, so running it
+          # under two modes would have them overwrite each other — and the
+          # combine-results job (the path every sharded run takes) has no
+          # Dawn install, so at mode=graphics this step aborted instantly
+          # with "Dawn library not found" and produced nothing at all.
           echo "=== Running Flash-spec tests (output.flash.txt) ==="
           python3 ruffle-tests/verify_output.py -v \
-            --mode='${{ inputs.mode }}' \
+            --mode=no-graphics \
             --expected-suffix=flash || true
 
       - name: ccache stats
@@ -447,8 +456,18 @@ jobs:
           # Save this run's JSON outputs to /tmp before the branch switch
           # (the JSONs are this run's only unique contribution — everything
           # else gets regenerated from the merged state).
+          #
+          # results_flash.json must ride along for the same reason, and it is
+          # easy to miss because its stem is not derived from `mode`: it is
+          # TRACKED on ruffle-test-results, so the `git checkout -B` below
+          # overwrites the freshly generated file with the branch's copy and
+          # the `git add` at the end re-commits that stale copy. Left out of
+          # this loop between 2026-05-09 and 2026-07-26, which froze the
+          # "Flash-Spec Results" table in RUFFLE_RESULTS.md at a 2.5-month-old
+          # snapshot. Any future non-mode-derived result stem needs adding
+          # here too.
           find ruffle-tests/tests/swfs -path '*/_results' -type d | while read dir; do
-            for name in "${STEM}.json" "${STEM}_previous.json"; do
+            for name in "${STEM}.json" "${STEM}_previous.json" results_flash.json; do
               if [ -f "$dir/$name" ]; then
                 mkdir -p "/tmp/results_backup/$dir"
                 cp "$dir/$name" "/tmp/results_backup/$dir/"
@@ -510,6 +529,14 @@ jobs:
           # inherited branch state — otherwise every merge of
           # ruffle-test-results back into master would re-add them.
           git ls-files -z '*/_results/results_headless*' 'RUFFLE_RESULTS_HEADLESS*' \
+            | xargs -0 -r git rm -q -f --ignore-unmatch || true
+
+          # *_current.json is a per-run intermediate that verify_output.py
+          # writes only for a partial/interrupted run; nothing reads it after
+          # the process exits. One (results_flash_current.json) was captured
+          # by the `git add` glob during a May 2026 run and has been carried
+          # forward on the branch ever since. Drop the whole class.
+          git ls-files -z '*/_results/*_current.json' \
             | xargs -0 -r git rm -q -f --ignore-unmatch || true
 
           # Restore this mode's JSON outputs onto the inherited branch state.
@@ -1329,9 +1356,18 @@ jobs:
         env:
           TZ: NPT-5:45
         run: |
+          # Always no-graphics, regardless of `mode`. These are the three
+          # avm1 trace tests that ship an output.flash.txt (Flash's real
+          # behavior, where Ruffle's output.txt encodes Ruffle's own); the
+          # graphics build would produce identical trace output. More to the
+          # point, results_flash.json has no per-mode stem, so running it
+          # under two modes would have them overwrite each other — and the
+          # combine-results job (the path every sharded run takes) has no
+          # Dawn install, so at mode=graphics this step aborted instantly
+          # with "Dawn library not found" and produced nothing at all.
           echo "=== Running Flash-spec tests (output.flash.txt) ==="
           python3 ruffle-tests/verify_output.py -v \
-            --mode='${{ inputs.mode }}' \
+            --mode=no-graphics \
             --expected-suffix=flash || true
 
       - name: ccache stats
@@ -1440,8 +1476,18 @@ jobs:
           # Save this run's JSON outputs to /tmp before the branch switch
           # (the JSONs are this run's only unique contribution — everything
           # else gets regenerated from the merged state).
+          #
+          # results_flash.json must ride along for the same reason, and it is
+          # easy to miss because its stem is not derived from `mode`: it is
+          # TRACKED on ruffle-test-results, so the `git checkout -B` below
+          # overwrites the freshly generated file with the branch's copy and
+          # the `git add` at the end re-commits that stale copy. Left out of
+          # this loop between 2026-05-09 and 2026-07-26, which froze the
+          # "Flash-Spec Results" table in RUFFLE_RESULTS.md at a 2.5-month-old
+          # snapshot. Any future non-mode-derived result stem needs adding
+          # here too.
           find ruffle-tests/tests/swfs -path '*/_results' -type d | while read dir; do
-            for name in "${STEM}.json" "${STEM}_previous.json"; do
+            for name in "${STEM}.json" "${STEM}_previous.json" results_flash.json; do
               if [ -f "$dir/$name" ]; then
                 mkdir -p "/tmp/results_backup/$dir"
                 cp "$dir/$name" "/tmp/results_backup/$dir/"
@@ -1503,6 +1549,14 @@ jobs:
           # inherited branch state — otherwise every merge of
           # ruffle-test-results back into master would re-add them.
           git ls-files -z '*/_results/results_headless*' 'RUFFLE_RESULTS_HEADLESS*' \
+            | xargs -0 -r git rm -q -f --ignore-unmatch || true
+
+          # *_current.json is a per-run intermediate that verify_output.py
+          # writes only for a partial/interrupted run; nothing reads it after
+          # the process exits. One (results_flash_current.json) was captured
+          # by the `git add` glob during a May 2026 run and has been carried
+          # forward on the branch ever since. Drop the whole class.
+          git ls-files -z '*/_results/*_current.json' \
             | xargs -0 -r git rm -q -f --ignore-unmatch || true
 
           # Restore this mode's JSON outputs onto the inherited branch state.
