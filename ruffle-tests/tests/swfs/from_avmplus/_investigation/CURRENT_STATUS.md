@@ -96,9 +96,19 @@ Fourteen fixes have landed since:
     `avm2/bytearray_oom` turned out to be the same infinite loop.
     segfault 3 → 4, runtime_error 8, recomp_fail 1.
 
-The suite stands at **1508/1574 effective (95.8%)**; the corpus at
-**3814/4416 (86.4%)**. **Zero pass→fail regressions across all fourteen
-runs**, with one intermittent crash to watch (below).
+15. `24cb841ec` — the last two corpus segfaults, both unbounded recursion
+    running the C stack out, at two different layers (below):
+    `ecma3/Exceptions/bug127913` recursed forever because AVM2 had **no
+    recursion bound at all**, and `as3/AMF/AMFSerializer` because the AMF3
+    writer never emitted object references, so a genuine `A→B→A` cycle
+    re-serialized forever. **+1** effective here, and **corpus segfaults
+    2 → 0**. CI `30220072867` (30/30 shards).
+
+The suite stands at **1509/1574 effective (95.9%)**; the corpus at
+**3816/4419 (86.4%)**. **Zero pass→fail regressions across all fifteen
+runs**, and — as of run 15 — **zero segfaults, zero timeouts and zero
+compile failures anywhere in the corpus** (what remains is 8
+`runtime_error` and 1 `recomp_fail`).
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
 file reads 1143/1522 — 52 from_avmplus tests ungraded. 1174 = the
@@ -809,6 +819,80 @@ case-v6-style latent crash to watch. None of this arc's code runs in that
 test — the plausible mechanism is link/heap layout shifting a latent bug,
 which the four extra LZMA translation units would do. Re-check it on the
 next full run; if it recurs, it is worth chasing on its own.
+
+**RESOLVED** (2026-07-26, `add3e60ce`): it was a real bug, not a flake —
+the AVM1 borrowed-local UAF (`avm1-locals-borrow-uncounted`). The test
+passes and has stayed passing since.
+
+## Fix landed: the last two corpus segfaults (`24cb841ec`, +1)
+
+Neither was memory corruption. Both were unbounded recursion exhausting
+the C stack, at two different layers — so they needed two different fixes.
+
+### `ecma3/Exceptions/bug127913` — AVM2 had no recursion bound
+
+The test recurses forever on purpose (`foo()` ↔ `foo2()`) inside a
+`try/catch` and expects one line of output from the `finally`. Flash
+survives it because avmplus bounds AS3 recursion by the **real machine
+stack** (`AvmCore::stackLimit`, checked in the interpreter loop) and
+reports exhaustion as a *catchable* `Error #1023 "Stack overflow
+occurred."`. We had nothing: `ctx->call_depth` existed but only sized the
+debug stack-trace buffer, so the process died ~107k AS frames deep.
+
+`avm2_stack_guard_init` (avm2_error.c) snapshots the stack address and a
+budget at startup — `getrlimit(RLIMIT_STACK)` natively, the emscripten
+stack API in wasm builds, less 1/8 (capped at 1 MB) held back as reserve —
+and `avm2_stack_check` throws #1023 from the two invocation choke points
+(`avm2_call_method_ref`, `avm2_call_function_obj`). Unwinding is free:
+`ctx->call_depth` is already restored from the try frame's
+`saved_call_depth`, and the `longjmp` restores the stack pointer.
+
+**A frame count would have been the wrong instrument.** Generated method
+frames span a few dozen bytes to several KB, so no single depth is both
+safe and non-restrictive; probing the stack pointer also catches native
+recursion mixed into the AS call chain.
+
+**The trap this hides:** building the `Error` is *itself* an AS3
+invocation, so the first version recursed on its own diagnosis
+(`stack_check → throw_error → error_new → class_construct →
+call_method_ref → stack_check → …`). `ctx->stack_overflow_pending` makes
+the guard stand down from the moment it fires until `avm2_throw`'s
+`longjmp` hands the reserve back — and it must stay set across the handler
+search and the uncaught-error printout, both of which can re-enter AS3
+(type checks, `toString`).
+
+### `as3/AMF/AMFSerializer` — the AMF3 writer had no object references
+
+C-level recursion, not AS-level, so the depth guard above does not catch
+it: `w3_value` recursed straight into itself. The test's "Objects with
+Circular Reference" block builds a real `A.refobject = B;
+B.refobject = A` cycle, and the writer re-serialized objects in full every
+time it met them — a deliberate flash-lso port (`Length::Size` hardcoded
+for objects/arrays). Ruffle cannot pass this either: its
+`get_or_create_value` registers an object in the table only *after*
+serializing it, and it stubs "same Object used multiple times".
+
+Every complex value now goes through `w3_ref_or_store`, which registers it
+**before** its children and replaces a repeat with an AMF3 object
+reference — what Flash does. The kinds stored now match exactly what the
+reader's `rd3_obj_reserve` materialises; they did **not** before (Dates,
+ByteArrays, XML and scalar Vectors were reserved on read but never stored
+on write), so the two index spaces would have drifted and misresolved any
+reference emitted after one of those. The AMF0 writer still keeps no
+table — deliberately, see the comment there.
+
+Fixing the crash exposed one more real bug behind it: rebuilding a class
+with a `public const` member traced `#1074` three times, because the
+deserializer wrote through plain setproperty. It now uses
+`avm2_init_public_property` (initproperty semantics), the way a
+deserializer constructing an object should.
+
+**Result:** segfault (crashed at line 118) → **223/225 matching lines**.
+The two that remain are unimplemented features, not crashes:
+`ObjectEncoding.dynamicPropertyWriter` (with `IDynamicPropertyOutput`)
+and `IExternalizable`. Both need interface plumbing that does not exist
+yet; the reader still `avm2_fatal`s on the externalizable trait bit,
+which nothing writes.
 
 ## Next arcs (expected yield)
 
