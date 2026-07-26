@@ -64,6 +64,10 @@ int avm2_has_public_property(Avm2Context* ctx, Avm2Value recv,
                              const char* name, uint32_t name_len);
 void avm2_set_public_property(Avm2Context* ctx, Avm2Value recv,
                               const char* name, uint32_t name_len, Avm2Value value);
+// As above but with initproperty semantics (const slots writable) — for
+// deserializers reconstructing an object, not for script-visible assignment.
+void avm2_init_public_property(Avm2Context* ctx, Avm2Value recv,
+                               const char* name, uint32_t name_len, Avm2Value value);
 int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
                                  const char* name, uint32_t name_len);
 

@@ -38,6 +38,16 @@ typedef struct Avm2TryFrame
 	uint32_t handler_target;  // op index to resume at
 } Avm2TryFrame;
 
+// Native C-stack guard. avmplus bounds AS3 recursion by the real machine
+// stack (AvmCore::stackLimit / interpreter.cpp's stackAvailable check), not by
+// a frame count, and reports exhaustion as a catchable Error #1023 "Stack
+// overflow occurred." — infinitely recursive scripts are expected to survive
+// as a caught exception (ecma3/Exceptions/bug127913). avm2_stack_guard_init
+// records the startup stack address and budget; avm2_stack_check throws when
+// an invocation would run past it.
+void avm2_stack_guard_init(Avm2Context* ctx);
+void avm2_stack_check(Avm2Context* ctx);
+
 // Debug call stack (avm2_class.c pushes/pops around every invocation).
 void avm2_callstack_push(Avm2Context* ctx, const Avm2MethodRef* m, Avm2Class* bound_class);
 void avm2_callstack_pop(Avm2Context* ctx);

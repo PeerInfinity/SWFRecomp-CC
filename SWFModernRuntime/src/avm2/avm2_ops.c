@@ -3711,10 +3711,15 @@ Avm2Value avm2_call_public_property(Avm2Context* ctx, Avm2Value recv,
 	return callproperty_common(ctx, recv, name, name_len, ok, &r, args, argc, recv);
 }
 
-// Name-based public property WRITE (traits + setters + dynamic creation);
-// used by the AMF deserializer. Throws like SetProperty.
-void avm2_set_public_property(Avm2Context* ctx, Avm2Value recv,
-                              const char* name, uint32_t name_len, Avm2Value value)
+// Name-based public property WRITE (traits + setters + dynamic creation).
+// Throws like SetProperty. `allow_const` is the initproperty distinction: the
+// AMF deserializer is *constructing* an object, so it writes const slots the
+// way the class's own initialiser would instead of reporting #1074 (a class
+// with a `public const` member is serializable and round-trips in Flash —
+// as3/AMF/AMFSerializer's "User Defined Final Class - Const").
+static void set_public_property_impl(Avm2Context* ctx, Avm2Value recv,
+                                     const char* name, uint32_t name_len,
+                                     Avm2Value value, int allow_const)
 {
 	if (value_is_null_like(recv))
 	{
@@ -3737,10 +3742,22 @@ void avm2_set_public_property(Avm2Context* ctx, Avm2Value recv,
 	Resolved r;
 	if (resolve_key(ctx, recv, &key, 1, &r))
 	{
-		setproperty_resolved(ctx, recv, &r, name, name_len, value, 0);
+		setproperty_resolved(ctx, recv, &r, name, name_len, value, allow_const);
 		return;
 	}
 	setproperty_miss(ctx, recv, name, name_len, value);
+}
+
+void avm2_set_public_property(Avm2Context* ctx, Avm2Value recv,
+                              const char* name, uint32_t name_len, Avm2Value value)
+{
+	set_public_property_impl(ctx, recv, name, name_len, value, 0);
+}
+
+void avm2_init_public_property(Avm2Context* ctx, Avm2Value recv,
+                               const char* name, uint32_t name_len, Avm2Value value)
+{
+	set_public_property_impl(ctx, recv, name, name_len, value, 1);
 }
 
 int avm2_has_public_property(Avm2Context* ctx, Avm2Value recv,

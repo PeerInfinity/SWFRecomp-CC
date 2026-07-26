@@ -4,6 +4,7 @@
 // many tests assert them).
 
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +15,72 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/stack.h>
+#else
+#include <sys/resource.h>
+#endif
+
+// ---------------------------------------------------------------------------
+// Native C-stack guard
+// ---------------------------------------------------------------------------
+//
+// Every AS3 invocation consumes a real C frame (the generated method body plus
+// the runtime's own dispatch frames), so unbounded AS recursion is a segfault
+// unless something stops it. avmplus stops it by comparing the stack pointer
+// against a limit derived from the thread's stack (AvmCore::stackLimit) and
+// throwing a *catchable* Error #1023; scripts that recurse forever inside a
+// try/catch are expected to keep running. We do the same. A fixed call-depth
+// cap would be the wrong instrument: generated frames range from a few dozen
+// bytes to several KB, so no single count is both safe and non-restrictive.
+
+// Headroom kept below the limit so the throw itself — snprintf, Error
+// construction, the unwind — always has room. Capped so a small wasm stack
+// still gets most of its depth.
+#define AVM2_STACK_RESERVE_MAX (1u * 1024u * 1024u)
+// Assumed usable stack when the platform will not say (RLIM_INFINITY).
+#define AVM2_STACK_DEFAULT_TOTAL (8u * 1024u * 1024u)
+
+void avm2_stack_guard_init(Avm2Context* ctx)
+{
+	size_t total;
+#if defined(__EMSCRIPTEN__)
+	ctx->stack_base = (char*) emscripten_stack_get_base();
+	total = (size_t) (emscripten_stack_get_base() - emscripten_stack_get_end());
+#else
+	char here;
+	ctx->stack_base = &here;
+	total = AVM2_STACK_DEFAULT_TOTAL;
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_STACK, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY
+	    && rl.rlim_cur > 0)
+	{
+		total = (size_t) rl.rlim_cur;
+		// Ridiculous values (some CI images set 512 MB) would defeat the
+		// guard's purpose: the process would thrash long before we throw.
+		if (total > 64u * 1024u * 1024u) total = 64u * 1024u * 1024u;
+	}
+#endif
+	size_t reserve = total / 8;
+	if (reserve > AVM2_STACK_RESERVE_MAX) reserve = AVM2_STACK_RESERVE_MAX;
+	ctx->stack_budget = (total > reserve) ? total - reserve : total / 2;
+}
+
+void avm2_stack_check(Avm2Context* ctx)
+{
+	if (ctx->stack_base == NULL) return;  // guard not initialised (unit tests)
+	if (ctx->stack_overflow_pending) return;
+	char probe;
+	// The stack grows down on every target we build for; a negative delta
+	// (a callback entered on some other stack) simply reads as "plenty left".
+	ptrdiff_t used = ctx->stack_base - &probe;
+	if (used > 0 && (size_t) used > ctx->stack_budget)
+	{
+		ctx->stack_overflow_pending = 1;  // cleared by avm2_throw's longjmp
+		avm2_throw_error(ctx, NULL, "Error #1023: Stack overflow occurred.");
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Debug call stack
@@ -186,6 +253,10 @@ static void print_uncaught(Avm2Context* ctx, Avm2Value v)
 
 _Noreturn void avm2_throw(Avm2Context* ctx, Avm2Value value)
 {
+	// stack_overflow_pending (if set) stays set across the search and the
+	// uncaught-error printout — both can re-enter AS3 (type checks, toString)
+	// while the stack is still past its budget — and is cleared at each exit
+	// below, where the longjmp hands the consumed headroom back.
 	for (Avm2TryFrame* tf = ctx->try_top; tf != NULL; tf = tf->prev)
 	{
 		if (tf->catch_all)
@@ -194,6 +265,7 @@ _Noreturn void avm2_throw(Avm2Context* ctx, Avm2Value value)
 			ctx->try_top = tf;  // drop frames above
 			ctx->call_depth = tf->saved_call_depth;
 			tf->exc = value;
+			ctx->stack_overflow_pending = 0;
 			longjmp(tf->jb, 1);
 		}
 		for (uint32_t i = 0; i < tf->exc_count; i++)
@@ -211,10 +283,12 @@ _Noreturn void avm2_throw(Avm2Context* ctx, Avm2Value value)
 			ctx->call_depth = tf->saved_call_depth;
 			tf->exc = value;
 			tf->handler_target = e->target_op;
+			ctx->stack_overflow_pending = 0;
 			longjmp(tf->jb, 1);
 		}
 	}
 	// No frame at all (shouldn't happen: avm2_main installs a catch-all).
+	ctx->stack_overflow_pending = 0;
 	print_uncaught(ctx, value);
 	exit(1);
 }

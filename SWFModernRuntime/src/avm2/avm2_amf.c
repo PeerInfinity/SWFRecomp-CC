@@ -10,14 +10,14 @@
 // (amf3/write.rs + length.rs + element_cache.rs, amf0/write.rs, read.rs)
 // as DRIVEN BY Ruffle's bridge (core/src/avm2/amf.rs), quirks included:
 //
-// - Objects/arrays are never written as object references (flash-lso
-//   hardcodes Length::Size for them) — repeated objects re-serialize in
-//   full, but their TRAIT definition is reference-shared. Only repeated
-//   VectorObject/Dictionary values collapse to object references; Date/
-//   ByteArray/scalar-Vector values are looked up in the object table but
-//   never stored into it, so they always write in full.
-// - The object reference table still accumulates Object/ECMAArray/
-//   StrictArray/VectorObject/Dictionary entries (index bookkeeping).
+// - EXCEPTION (deliberate divergence from flash-lso/Ruffle, see
+//   w3_ref_or_store): every repeated complex value collapses to an AMF3
+//   object reference, as Flash does. flash-lso hardcodes Length::Size for
+//   objects/arrays and Ruffle's get_or_create_value only registers an object
+//   AFTER serializing it, so a self-referential graph recurses forever there
+//   (Ruffle even stubs "with same Object used multiple times"). Flash writes
+//   references, and as3/AMF/AMFSerializer's "Objects with Circular Reference"
+//   round-trip depends on it.
 // - Static (trait) properties are the class's public slots and full
 //   get/set accessor pairs, SORTED by name (Ruffle sorts for stable
 //   output); dynamic props follow in enumeration order. Function-valued
@@ -261,6 +261,30 @@ static void w3_obj_store(Amf3Wr* w, Avm2Object* src)
 	w->objs[w->obj_count++].src = src;
 }
 
+// AMF3 object-reference gate, applied to EVERY complex value: a value already
+// written in this packet is replaced by `marker` + u29 with the low bit clear
+// (its table index), and a first sighting is registered BEFORE its children are
+// written so self-referential graphs terminate.
+//
+// Returns 1 when a reference was emitted (nothing else to write).
+//
+// The set and order of what lands in this table is exactly what the reader's
+// rd3_obj_reserve materialises, which is what keeps the two index spaces in
+// step — a writer that stores fewer kinds than the reader reserves would emit
+// references that resolve to the wrong object.
+static int w3_ref_or_store(Amf3Wr* w, Avm2Object* obj, uint8_t marker)
+{
+	int32_t r = w3_obj_find(w, obj);
+	if (r >= 0)
+	{
+		buf_u8(&w->out, marker);
+		w3_u29(w, r << 1);
+		return 1;
+	}
+	w3_obj_store(w, obj);
+	return 0;
+}
+
 static void w3_value(Amf3Wr* w, Avm2Value v);
 static void w0_value(Amf3Wr* w, Avm2Value v);
 
@@ -376,7 +400,7 @@ static void w3_object_body(Amf3Wr* w, Avm2Object* obj, int dynamic,
 static void w3_object(Amf3Wr* w, Avm2Object* obj)
 {
 	Avm2Context* ctx = w->ctx;
-	w3_obj_store(w, obj);
+	if (w3_ref_or_store(w, obj, M3_OBJECT)) return;
 
 	const Avm2String* alias = class_to_alias(ctx, avm2_value_class(
 		ctx, avm2_object_value(obj)));
@@ -445,7 +469,7 @@ static void w3_object(Amf3Wr* w, Avm2Object* obj)
 static void w3_array(Amf3Wr* w, Avm2Object* arr)
 {
 	Avm2Context* ctx = w->ctx;
-	w3_obj_store(w, arr);
+	if (w3_ref_or_store(w, arr, M3_ARRAY)) return;
 
 	// Ruffle amf.rs: enumerate everything, splitting entries whose name
 	// matches its running position into the dense part.
@@ -523,11 +547,10 @@ static void w3_vector(Amf3Wr* w, Avm2Object* vec)
 	Avm2Class* t = ext->value_type;
 	if (t == b->int_class || t == b->uint_class || t == b->number_class)
 	{
-		// Scalar vectors: looked up in the object table but never stored
-		// (flash-lso to_length without store) — always full.
 		uint8_t marker = (t == b->int_class) ? M3_VECINT
 		                 : (t == b->uint_class) ? M3_VECUINT
 		                                        : M3_VECDOUBLE;
+		if (w3_ref_or_store(w, vec, marker)) return;
 		buf_u8(&w->out, marker);
 		w3_u29(w, (int32_t) ((ext->length << 1) | 1));
 		buf_u8(&w->out, ext->fixed ? 1 : 0);
@@ -544,15 +567,8 @@ static void w3_vector(Amf3Wr* w, Avm2Object* vec)
 		}
 		return;
 	}
-	// Object vectors participate in the reference table for real.
-	int32_t r = w3_obj_find(w, vec);
+	if (w3_ref_or_store(w, vec, M3_VECOBJ)) return;
 	buf_u8(&w->out, M3_VECOBJ);
-	if (r >= 0)
-	{
-		w3_u29(w, r << 1);
-		return;
-	}
-	w3_obj_store(w, vec);
 	const Avm2String* tname = class_to_alias(
 		ctx, (t != NULL) ? t : b->object_class);
 	w3_u29(w, (int32_t) ((ext->length << 1) | 1));
@@ -567,14 +583,8 @@ static void w3_vector(Amf3Wr* w, Avm2Object* vec)
 static void w3_dictionary(Amf3Wr* w, Avm2Object* dict)
 {
 	Avm2Context* ctx = w->ctx;
-	int32_t r = w3_obj_find(w, dict);
+	if (w3_ref_or_store(w, dict, M3_DICT)) return;
 	buf_u8(&w->out, M3_DICT);
-	if (r >= 0)
-	{
-		w3_u29(w, r << 1);
-		return;
-	}
-	w3_obj_store(w, dict);
 	uint32_t count = 0;
 	uint32_t idx = avm2_object_next_enumerant(dict, 0);
 	while (idx != 0)
@@ -635,7 +645,7 @@ static void w3_value(Amf3Wr* w, Avm2Value v)
 	Avm2DateExt* date = avm2_date_ext_of(v);
 	if (date != NULL)
 	{
-		// Dates are never stored in the table (flash-lso to_length-only).
+		if (w3_ref_or_store(w, obj, M3_DATE)) return;
 		buf_u8(&w->out, M3_DATE);
 		w3_u29(w, 1);  // Size(0)
 		buf_f64be(&w->out, date->millis);
@@ -644,6 +654,7 @@ static void w3_value(Amf3Wr* w, Avm2Value v)
 	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(v);
 	if (ba != NULL)
 	{
+		if (w3_ref_or_store(w, obj, M3_BYTEARRAY)) return;
 		buf_u8(&w->out, M3_BYTEARRAY);
 		w3_u29(w, (int32_t) ((ba->len << 1) | 1));
 		buf_put(&w->out, ba->bytes, ba->len);
@@ -660,6 +671,7 @@ static void w3_value(Amf3Wr* w, Avm2Value v)
 		Avm2XmlExt* xe = avm2_xml_ext_of(v);
 		if (xe != NULL)
 		{
+			if (w3_ref_or_store(w, obj, M3_XMLSTR)) return;
 			const Avm2String* xs = avm2_e4x_to_xml_string(w->ctx, xe->node);
 			buf_u8(&w->out, M3_XMLSTR);
 			w3_u29(w, (int32_t) ((xs->len << 1) | 1));
@@ -673,6 +685,13 @@ static void w3_value(Amf3Wr* w, Avm2Value v)
 // ---------------------------------------------------------------------------
 // AMF0 writer (flash-lso amf0/write.rs; no reference table on write)
 // ---------------------------------------------------------------------------
+//
+// Unlike the AMF3 writer above this one keeps no object table, so an object
+// graph with a cycle recurses until the C stack runs out. The AMF0 *reader*
+// does support 0x07 references and reserves in the same order the writer
+// visits, so the symmetric fix is available — nothing in the corpus writes a
+// cyclic graph at objectEncoding 0, so it is left alone rather than perturb
+// AMF0 bytes for repeated (acyclic) objects.
 
 enum
 {
@@ -940,7 +959,7 @@ static void rd_set_prop_guarded(Rd* r, Avm2Value recv, const Avm2String* name,
 	tf.op_index = 1;
 	if (setjmp(tf.jb) == 0)
 	{
-		avm2_set_public_property(ctx, recv, name->utf8, name->len, value);
+		avm2_init_public_property(ctx, recv, name->utf8, name->len, value);
 		avm2_try_pop_frame(&tf);
 	}
 	else
@@ -1094,7 +1113,7 @@ static Avm2Value rd3_value(Rd* r)
 				const Avm2String* name = rd3_str(r);
 				if (name->len == 0) break;
 				Avm2Value v = rd3_value(r);
-				avm2_set_public_property(ctx, arrv, name->utf8, name->len, v);
+				avm2_init_public_property(ctx, arrv, name->utf8, name->len, v);
 			}
 			for (uint32_t i = 0; i < dense_n; i++)
 			{
@@ -1336,7 +1355,7 @@ static Avm2Value rd0_value(Rd* r)
 					break;
 				}
 				Avm2Value v = rd0_value(r);
-				avm2_set_public_property(ctx, arrv, name->utf8, name->len, v);
+				avm2_init_public_property(ctx, arrv, name->utf8, name->len, v);
 			}
 			return arrv;
 		}

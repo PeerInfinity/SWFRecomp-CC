@@ -874,6 +874,7 @@ Avm2Value avm2_call_method_ref(Avm2Context* ctx, const Avm2MethodRef* m,
 		avm2_fatal("AVM2: call to method '%s' with no body",
 		           m->debug_name ? m->debug_name : "<anon>");
 	}
+	avm2_stack_check(ctx);
 	Avm2Activation act;
 	act.ctx = ctx;
 	act.file = m->file;
@@ -941,6 +942,7 @@ Avm2Value avm2_call_function_obj(Avm2Context* ctx, Avm2Object* fnobj,
 	{
 		return avm2_undefined();
 	}
+	avm2_stack_check(ctx);
 	Avm2Activation act;
 	act.ctx = ctx;
 	act.file = fnobj->fn_method.file;

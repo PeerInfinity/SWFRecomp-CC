@@ -12,6 +12,8 @@
 // runSWF_avm2() only under -DSWF_AVM2 (defined by verify_output.py when
 // the recompiler produced RecompiledABC/).
 
+#include <stddef.h>
+
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_globals.h>
 
@@ -62,6 +64,19 @@ struct Avm2Context
 	Avm2CallFrame* call_frames;
 	uint32_t call_depth;
 	uint32_t call_cap;
+	// Native C-stack guard (avm2_error.c). AS3 recursion is bounded by the
+	// real machine stack, exactly as in avmplus (AvmCore::stackLimit) — a
+	// frame count would be wrong because generated method frames vary in size
+	// by orders of magnitude. `stack_base` is the deepest-known-safe address
+	// captured at startup; exceeding `stack_budget` bytes below it throws
+	// Error #1023.
+	char* stack_base;
+	size_t stack_budget;
+	// Set while an Error #1023 is being built and dispatched: constructing the
+	// Error is itself an AS3 invocation, so the guard must stand down until the
+	// throw lands or it recurses on its own diagnosis. The reserved headroom
+	// below stack_budget is what that construction runs in.
+	uint8_t stack_overflow_pending;
 };
 
 void runSWF_avm2(SWFAppContext* app_context);

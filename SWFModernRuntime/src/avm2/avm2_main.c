@@ -246,6 +246,9 @@ void runSWF_avm2(SWFAppContext* app_context)
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->app = app_context;
 	ctx->swf_version = avm2_generated_swf_version;
+	// Snapshot the C stack here, before any script can run: everything below
+	// this point is measured against it (avm2_stack_check → Error #1023).
+	avm2_stack_guard_init(ctx);
 
 	avm2_globals_init(ctx);
 
