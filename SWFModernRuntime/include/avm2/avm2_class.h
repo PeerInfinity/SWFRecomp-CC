@@ -179,6 +179,10 @@ struct Avm2ScopeChain
 // Dot-qualified class name for error messages ("pkg.Class" / "Class").
 int avm2_class_qname_buf(const Avm2Class* cls, char* buf, int size);
 
+// "::"-qualified class name for stack frames and function display names
+// ("pkg::Class" / "Class") — Ruffle to_qualified_name_no_mc.
+int avm2_class_qname_colons_buf(const Avm2Class* cls, char* buf, int size);
+
 // Avm2ObjectKind instances of `cls` are allocated with (see instance_kind).
 uint8_t avm2_class_instance_kind(Avm2Context* ctx, const Avm2Class* cls);
 

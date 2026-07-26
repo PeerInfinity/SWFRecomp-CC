@@ -20,29 +20,31 @@ static void display_function(char* buf, size_t buf_size, Avm2Activation* act,
 {
 	if (act->bound_class != NULL)
 	{
-		const Avm2PropKey* cn = &act->bound_class->name;
+		// Ruffle prints the class as to_qualified_name_no_mc ("pkg::Class"),
+		// then the method TRAIT's local name — not the ABC debug name, which
+		// mxmlc emits pre-qualified with single colons
+		// ("com.ruffle:MyClass/myMethod"). Same normalization as
+		// avm2_callstack_frame_name: keep only the last segment.
+		char cq[128];
+		avm2_class_qname_colons_buf(act->bound_class, cq, sizeof(cq));
 		if (act->bound_class->instance_init.file == act->file
 		    && act->bound_class->instance_init.method_index == method_index
 		    && act->bound_class->instance_init.fn == md->fn)
 		{
-			snprintf(buf, buf_size, "%.*s()", (int) cn->name_len, cn->name);
+			snprintf(buf, buf_size, "%s()", cq);
 			return;
 		}
 		if (md->debug_name != NULL && md->debug_name[0] != '\0')
 		{
-			// ABC method names from mxmlc are often already qualified
-			// ("Class/method"); use them as-is when they contain '/'.
-			if (strchr(md->debug_name, '/') != NULL)
-			{
-				snprintf(buf, buf_size, "%s()", md->debug_name);
-				return;
-			}
-			snprintf(buf, buf_size, "%.*s/%s()", (int) cn->name_len, cn->name,
-			         md->debug_name);
+			const char* dn = md->debug_name;
+			const char* slash = strrchr(dn, '/');
+			if (slash != NULL) dn = slash + 1;
+			const char* colon = strrchr(dn, ':');
+			if (colon != NULL) dn = colon + 1;
+			snprintf(buf, buf_size, "%s/%s()", cq, dn);
 			return;
 		}
-		snprintf(buf, buf_size, "%.*s/MethodInfo-%u()", (int) cn->name_len,
-		         cn->name, method_index);
+		snprintf(buf, buf_size, "%s/MethodInfo-%u()", cq, method_index);
 		return;
 	}
 	if (md->is_function)

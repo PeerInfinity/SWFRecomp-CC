@@ -31,6 +31,21 @@ int avm2_class_qname_buf(const Avm2Class* cls, char* buf, int size)
 	return snprintf(buf, size, "%.*s", (int) cls->name.name_len, cls->name.name);
 }
 
+int avm2_class_qname_colons_buf(const Avm2Class* cls, char* buf, int size)
+{
+	if (cls == NULL)
+	{
+		return snprintf(buf, size, "Object");
+	}
+	if (cls->name.ns_len > 0)
+	{
+		return snprintf(buf, size, "%.*s::%.*s",
+		                (int) cls->name.ns_len, cls->name.ns_uri,
+		                (int) cls->name.name_len, cls->name.name);
+	}
+	return snprintf(buf, size, "%.*s", (int) cls->name.name_len, cls->name.name);
+}
+
 uint8_t avm2_ns_fold(uint8_t kind)
 {
 	// Namespace (0x08) and Package (0x16) are both "public" (Ruffle
