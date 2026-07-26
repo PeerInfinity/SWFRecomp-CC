@@ -1,34 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1884c6ab93fe` (2026-07-26T03:36:27.347082+00:00)
-**Current:** `add3e60cef2f` (2026-07-26T19:38:35.168426+00:00)
+**Previous:** `add3e60cef2f` (2026-07-26T19:38:35.168426+00:00)
+**Current:** `24cb841ec0d1` (2026-07-26T21:32:12.247179+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 842 | 843 | +1 |
-| Total | 1218 | 1221 | +3 |
-| Pass rate | 69.1% | 69.0% | -0.1% |
-| Mismatched lines | 47149 | 47194 | +45 |
-|   Increased | | | +5 |
+| Passing | 843 | 843 | 0 |
+| Total | 1221 | 1221 | 0 |
+| Pass rate | 69.0% | 69.0% | 0% |
+| Mismatched lines | 47194 | 47194 | 0 |
 
-## Newly Passing (1)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `edittext_align` | segfault | 60/60 | 60/60 |
-
-## Added Tests (3)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `displayobject_getrect` | output_mismatch | 2/16 |
-| `system_exit` | output_mismatch | 0/3 |
-| `textblock_createline_errors` | output_mismatch | 0/23 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `textblock_createline_fte` | output_mismatch | 0/4 | 0/9 | +5 |
+No changes detected.
