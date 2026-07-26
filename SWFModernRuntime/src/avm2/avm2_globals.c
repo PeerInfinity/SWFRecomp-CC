@@ -2096,6 +2096,193 @@ static void register_application_domain(Avm2Context* ctx)
 	avm2_vtable_append(ctx, vt, &e);
 }
 
+// --- flash.system.LoaderContext / JPEGLoaderContext -------------------------
+//
+// Plain option bags handed to Loader.load/loadBytes. The only field the runtime
+// itself reads is `applicationDomain` (LoaderInfo.applicationDomain reports it
+// once the movie loads — loaderinfo_more); the rest are stored and handed back
+// so scripts that configure a context before loading behave (jpeg_loader_context,
+// font_enumeratefonts_order, font_registerfont).
+
+typedef struct Avm2LoaderContextExt
+{
+	Avm2Object* application_domain;
+	Avm2Object* security_domain;
+	Avm2Object* requested_content_parent;
+	Avm2Object* parameters;
+	const Avm2String* image_decoding_policy;
+	double deblocking_filter;          // JPEGLoaderContext only
+	uint8_t check_policy_file;
+	uint8_t allow_code_import;
+	uint8_t allow_load_bytes_code_execution;
+} Avm2LoaderContextExt;
+
+static Avm2Class* g_loader_context_class;
+
+static Avm2LoaderContextExt* this_loader_context(Avm2Activation* act)
+{
+	Avm2Value v = act->this_val;
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj->cls == NULL) return NULL;
+	if (g_loader_context_class == NULL) return NULL;
+	for (Avm2Class* c = v.u.obj->cls; c != NULL; c = c->super_class)
+		if (c == g_loader_context_class)
+			return (Avm2LoaderContextExt*) v.u.obj->native_ext;
+	return NULL;
+}
+
+static Avm2Object* lctx_arg_obj(Avm2Activation* act, uint32_t i)
+{
+	return (act->argc > i && act->args[i].kind == AVM2_VALUE_OBJECT)
+		? act->args[i].u.obj : NULL;
+}
+
+static void lctx_init_common(Avm2Activation* act, Avm2LoaderContextExt* ext,
+                             uint32_t check_idx)
+{
+	if (ext == NULL) return;
+	// LoaderContext.as defaults: allowCodeImport true, imageDecodingPolicy
+	// "onDemand", everything else false/null.
+	ext->allow_code_import = 1;
+	ext->image_decoding_policy =
+		avm2_string_from_literal(act->ctx, "onDemand");
+	ext->check_policy_file = (act->argc > check_idx
+	                          && avm2_coerce_to_boolean(act->args[check_idx]))
+		? 1 : 0;
+	ext->application_domain = lctx_arg_obj(act, check_idx + 1);
+	ext->security_domain = lctx_arg_obj(act, check_idx + 2);
+}
+
+// LoaderContext(checkPolicyFile = false, applicationDomain = null,
+//               securityDomain = null)
+static Avm2Value loader_context_ctor(Avm2Activation* act)
+{
+	lctx_init_common(act, this_loader_context(act), 0);
+	return avm2_undefined();
+}
+
+// JPEGLoaderContext(deblockingFilter = 0, checkPolicyFile = false,
+//                   applicationDomain = null, securityDomain = null)
+static Avm2Value jpeg_loader_context_ctor(Avm2Activation* act)
+{
+	Avm2LoaderContextExt* ext = this_loader_context(act);
+	lctx_init_common(act, ext, 1);
+	if (ext != NULL)
+	{
+		ext->deblocking_filter = act->argc > 0
+			? avm2_coerce_to_number(act->ctx, act->args[0]) : 0;
+	}
+	return avm2_undefined();
+}
+
+#define LCTX_OBJ_ACCESSORS(fn_prefix, field)                                   \
+	static Avm2Value fn_prefix##_get(Avm2Activation* act)                      \
+	{                                                                          \
+		Avm2LoaderContextExt* e = this_loader_context(act);                    \
+		return (e != NULL && e->field != NULL) ? avm2_object_value(e->field)   \
+		                                       : avm2_null();                  \
+	}                                                                          \
+	static Avm2Value fn_prefix##_set(Avm2Activation* act)                      \
+	{                                                                          \
+		Avm2LoaderContextExt* e = this_loader_context(act);                    \
+		if (e != NULL && act->argc > 0)                                        \
+			e->field = act->args[0].kind == AVM2_VALUE_OBJECT                  \
+				? act->args[0].u.obj : NULL;                                   \
+		return avm2_undefined();                                               \
+	}
+
+LCTX_OBJ_ACCESSORS(lctx_app_domain, application_domain)
+LCTX_OBJ_ACCESSORS(lctx_sec_domain, security_domain)
+LCTX_OBJ_ACCESSORS(lctx_content_parent, requested_content_parent)
+LCTX_OBJ_ACCESSORS(lctx_parameters, parameters)
+
+#define LCTX_BOOL_ACCESSORS(fn_prefix, field)                                  \
+	static Avm2Value fn_prefix##_get(Avm2Activation* act)                      \
+	{                                                                          \
+		Avm2LoaderContextExt* e = this_loader_context(act);                    \
+		return avm2_bool(e != NULL && e->field != 0);                          \
+	}                                                                          \
+	static Avm2Value fn_prefix##_set(Avm2Activation* act)                      \
+	{                                                                          \
+		Avm2LoaderContextExt* e = this_loader_context(act);                    \
+		if (e != NULL && act->argc > 0)                                        \
+			e->field = avm2_coerce_to_boolean(act->args[0]) ? 1 : 0;           \
+		return avm2_undefined();                                               \
+	}
+
+LCTX_BOOL_ACCESSORS(lctx_check_policy, check_policy_file)
+LCTX_BOOL_ACCESSORS(lctx_allow_code_import, allow_code_import)
+LCTX_BOOL_ACCESSORS(lctx_allow_lb_exec, allow_load_bytes_code_execution)
+
+static Avm2Value lctx_image_policy_get(Avm2Activation* act)
+{
+	Avm2LoaderContextExt* e = this_loader_context(act);
+	return (e != NULL && e->image_decoding_policy != NULL)
+		? avm2_string(e->image_decoding_policy) : avm2_null();
+}
+static Avm2Value lctx_image_policy_set(Avm2Activation* act)
+{
+	Avm2LoaderContextExt* e = this_loader_context(act);
+	if (e != NULL && act->argc > 0)
+		e->image_decoding_policy = avm2_coerce_to_string(act->ctx, act->args[0]);
+	return avm2_undefined();
+}
+
+static Avm2Value lctx_deblocking_get(Avm2Activation* act)
+{
+	Avm2LoaderContextExt* e = this_loader_context(act);
+	return avm2_number(e != NULL ? e->deblocking_filter : 0);
+}
+static Avm2Value lctx_deblocking_set(Avm2Activation* act)
+{
+	Avm2LoaderContextExt* e = this_loader_context(act);
+	if (e != NULL && act->argc > 0)
+		e->deblocking_filter = avm2_coerce_to_number(act->ctx, act->args[0]);
+	return avm2_undefined();
+}
+
+static void register_loader_context(Avm2Context* ctx)
+{
+	Avm2Class* cls = avm2_builtin_class(ctx, "flash.system", "LoaderContext",
+	                                    ctx->builtins.object_class);
+	cls->instance_init.fn = loader_context_ctor;
+	cls->instance_init.debug_name = "LoaderContext";
+	cls->native_ext_size = sizeof(Avm2LoaderContextExt);
+	g_loader_context_class = cls;
+	avm2_builtin_add_getset(ctx, cls, "applicationDomain",
+	                        lctx_app_domain_get, lctx_app_domain_set);
+	avm2_builtin_add_getset(ctx, cls, "securityDomain",
+	                        lctx_sec_domain_get, lctx_sec_domain_set);
+	avm2_builtin_add_getset(ctx, cls, "requestedContentParent",
+	                        lctx_content_parent_get, lctx_content_parent_set);
+	avm2_builtin_add_getset(ctx, cls, "parameters",
+	                        lctx_parameters_get, lctx_parameters_set);
+	avm2_builtin_add_getset(ctx, cls, "checkPolicyFile",
+	                        lctx_check_policy_get, lctx_check_policy_set);
+	avm2_builtin_add_getset(ctx, cls, "allowCodeImport",
+	                        lctx_allow_code_import_get, lctx_allow_code_import_set);
+	avm2_builtin_add_getset(ctx, cls, "allowLoadBytesCodeExecution",
+	                        lctx_allow_lb_exec_get, lctx_allow_lb_exec_set);
+	avm2_builtin_add_getset(ctx, cls, "imageDecodingPolicy",
+	                        lctx_image_policy_get, lctx_image_policy_set);
+
+	Avm2Class* jpeg = avm2_builtin_class(ctx, "flash.system",
+	                                     "JPEGLoaderContext", cls);
+	jpeg->instance_init.fn = jpeg_loader_context_ctor;
+	jpeg->instance_init.debug_name = "JPEGLoaderContext";
+	jpeg->native_ext_size = sizeof(Avm2LoaderContextExt);
+	avm2_builtin_add_getset(ctx, jpeg, "deblockingFilter",
+	                        lctx_deblocking_get, lctx_deblocking_set);
+
+	// flash.system.ImageDecodingPolicy constants.
+	Avm2Class* idp = avm2_builtin_class(ctx, "flash.system",
+	                                    "ImageDecodingPolicy",
+	                                    ctx->builtins.object_class);
+	avm2_builtin_add_static_const(ctx, idp, "ON_DEMAND",
+		avm2_string(avm2_string_from_literal(ctx, "onDemand")));
+	avm2_builtin_add_static_const(ctx, idp, "ON_LOAD",
+		avm2_string(avm2_string_from_literal(ctx, "onLoad")));
+}
+
 // Register a toplevel native in a specific package namespace.
 void avm2_register_timer_fns(Avm2Context* ctx);
 
@@ -2353,6 +2540,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	}
 	avm2_register_toplevel(ctx);
 	register_application_domain(ctx);
+	register_loader_context(ctx);
 	register_system(ctx);
 	register_security(ctx);
 	register_capabilities(ctx);

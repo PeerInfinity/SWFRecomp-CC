@@ -514,6 +514,12 @@ Avm2Object* avm2_focus_event_new(Avm2Context* ctx, const Avm2String* type,
 Avm2Object* avm2_text_event_new(Avm2Context* ctx, const Avm2String* type,
                                 int bubbles, int cancelable,
                                 const Avm2String* text);
+// flash.events.ProgressEvent / IOErrorEvent, dispatched from C by the Loader
+// pipeline (avm2_display.c). Both are non-bubbling and non-cancelable.
+Avm2Object* avm2_progress_event_new(Avm2Context* ctx, const Avm2String* type,
+                                    double bytes_loaded, double bytes_total);
+Avm2Object* avm2_io_error_event_new(Avm2Context* ctx, const Avm2String* type,
+                                    const Avm2String* text, int32_t error_id);
 // Was the event's default prevented (cancelled)? NULL-safe.
 int avm2_event_is_cancelled(Avm2Object* event);
 // Display parent hook used for ancestor walks; reads the display ext.

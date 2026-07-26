@@ -37,6 +37,9 @@
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 #include <avm2/avm2_value.h>
+// findDataFile / findMovieEntry: the build-time registries of bundled sibling
+// assets that flash.display.Loader loads from (see the load pipeline below).
+#include <libswf/swf.h>
 
 enum
 {
@@ -2778,9 +2781,20 @@ static void run_due_timers(Avm2Context* ctx)
 	g_avm2_timer_count = w;
 }
 
+// Loader/LoaderInfo frame hooks (defined with the LoaderInfo state machine
+// below): queued fetches resolve at the frame's start, init/complete fire at
+// its end.
+static void avm2_loader_run_pending(Avm2Context* ctx);
+static void avm2_loaderinfo_run_exit_frame(Avm2Context* ctx);
+static void avm2_loader_run_exit_frame(Avm2Context* ctx);
+
 void avm2_display_run_tick(Avm2Context* ctx)
 {
 	if (ctx->stage == NULL) return;
+
+	// Ruffle fetches queued loads from the player's preload tick, before the
+	// frame runs (player.rs::preload -> LoadManager::preload_tick).
+	avm2_loader_run_pending(ctx);
 
 	ctx->frame_phase = PHASE_ENTER;
 	for (uint32_t i = 0; i < g_orphan_count; i++)
@@ -2834,6 +2848,11 @@ void avm2_display_run_tick(Avm2Context* ctx)
 
 	ctx->frame_phase = PHASE_EXIT;
 	broadcast_named(ctx, "exitFrame");
+	// Ruffle run_exit_frame: the root movie's LoaderInfo, then every in-flight
+	// loader, fire init/complete here — after exitFrame, before the next
+	// frame's enterFrame (loaderinfo_events pins this ordering).
+	avm2_loaderinfo_run_exit_frame(ctx);
+	avm2_loader_run_exit_frame(ctx);
 	orphan_cleanup(ctx);
 
 	ctx->frame_phase = PHASE_IDLE;
@@ -3509,24 +3528,62 @@ static void disp_sconst(Avm2Context* ctx, Avm2Class* cls, const char* n,
 		avm2_string(avm2_string_from_literal(ctx, v)));
 }
 
-// --- flash.display.LoaderInfo (root movie only) ---
+// --- flash.display.LoaderInfo (per-instance stream state) ---
 //
-// The root SWF's LoaderInfo is a single shared object: every on-stage display
-// object's `loaderInfo` returns it, and it is `=== root.loaderInfo` (test
-// loaderinfo_root). Off-stage objects (no is_root ancestor) return null.
-// flash.display.Loader (loading a *second* SWF) is still deferred, so there is
-// exactly one root and one LoaderInfo singleton.
+// Ruffle model (core/src/avm2/object/loaderinfo_object.rs): every LoaderInfo
+// carries a LoaderStream — NotYetLoaded(movie, root_clip, is_stage) or
+// Swf(movie, root) — plus init/complete-fired flags, `expose_content`,
+// `errored` and a sniffed content type. Three flavours exist:
+//
+//   ROOT   the root movie's LoaderInfo, shared by every on-stage display
+//          object and `=== root.loaderInfo` (loaderinfo_root). Its stream is
+//          Swf from the start (frameRate/width/… answer immediately) and
+//          `expose_content` is set, but `init` does not fire until the first
+//          frame's exitFrame boundary and `contentType` stays null until then
+//          (content_type_hide_before_init).
+//   STAGE  stage.loaderInfo — a DISTINCT object (Ruffle context.rs, is_stage),
+//          permanently NotYetLoaded over the root movie: byte counts, url and
+//          content read through, but the eight movie-describing getters throw
+//          #2099 and contentType is null forever because `init` never fires
+//          (stage_loaderinfo_properties).
+//   LOADER a Loader's contentLoaderInfo. NotYetLoaded with no root clip until
+//          something loads: url/content are null (expose_content unset) and
+//          the eight getters throw #2099 (loaderinfo_properties_not_loaded).
+//
+// Every gate below keys on the state of the receiving instance, never on
+// "is this a Loader's LoaderInfo".
+
+enum { LI_KIND_LOADER = 0, LI_KIND_ROOT, LI_KIND_STAGE };
+
+// Ruffle loader::ContentType.
+enum { LI_CT_UNKNOWN = 0, LI_CT_SWF, LI_CT_JPEG, LI_CT_JPEGXR, LI_CT_PNG,
+       LI_CT_GIF };
 
 typedef struct Avm2LoaderInfoExt
 {
 	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
 	Avm2Object* parameters;             // stable identity across reads
-	Avm2Object* content;                // non-NULL only for a Loader.load() that
-	                                    // seeded synthetic content (AGI shell);
-	                                    // NULL on the root LoaderInfo (→ root movie)
+	Avm2Object* content;                // stream root clip (LOADER only; ROOT
+	                                    // and STAGE read ctx->root via `kind`)
+	Avm2Object* loader;                 // owning Loader (NULL for ROOT/STAGE)
+	Avm2Object* shared_events;          // sharedEvents (lazy EventDispatcher)
+	Avm2Object* app_domain;             // LoaderContext's ApplicationDomain
+	const Avm2String* url;              // stream movie URL (LOADER only)
+	uint32_t bytes_loaded;
+	uint32_t bytes_total;
+	uint8_t kind;
+	uint8_t loaded;          // 1 = LoaderStream::Swf (else NotYetLoaded)
+	uint8_t expose_content;  // content/url readable
+	uint8_t load_started;    // a load()/loadBytes() has begun (bytes != null)
+	uint8_t init_fired;
+	uint8_t complete_fired;
+	uint8_t errored;
+	uint8_t content_type;
 } Avm2LoaderInfoExt;
 
-static Avm2Object* g_root_loader_info;   // GC-rooted in avm2_gc_mark_roots_display
+// GC-rooted in avm2_gc_mark_roots_display.
+static Avm2Object* g_root_loader_info;
+static Avm2Object* g_stage_loader_info;
 static double g_stage_frame_rate;        // tentative decl; defined below (Stage)
 
 static Avm2LoaderInfoExt* loaderinfo_ext_of(Avm2Context* ctx, Avm2Object* o)
@@ -3537,99 +3594,237 @@ static Avm2LoaderInfoExt* loaderinfo_ext_of(Avm2Context* ctx, Avm2Object* o)
 	return (Avm2LoaderInfoExt*) o->native_ext;
 }
 
-static Avm2Object* avm2_get_root_loader_info(Avm2Context* ctx)
+static uint32_t root_swf_size(void)
 {
-	if (g_root_loader_info != NULL) return g_root_loader_info;
+#ifdef SWF_ONDISK_SIZE
+	return (uint32_t) SWF_ONDISK_SIZE;
+#else
+	return 0;
+#endif
+}
+
+static const Avm2String* root_swf_url(Avm2Context* ctx)
+{
+#ifdef SWF_URL
+	return avm2_string_from_literal(ctx, SWF_URL);
+#else
+	return avm2_string_from_literal(ctx, "");
+#endif
+}
+
+static Avm2Object* loaderinfo_new(Avm2Context* ctx, uint8_t kind)
+{
 	Avm2Class* cls = ctx->builtins.loader_info_class;
 	if (cls == NULL) return NULL;
 	Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
 	if (v.kind != AVM2_VALUE_OBJECT) return NULL;
-	g_root_loader_info = v.u.obj;
+	Avm2LoaderInfoExt* ext = loaderinfo_ext_of(ctx, v.u.obj);
+	if (ext != NULL)
+	{
+		ext->kind = kind;
+		if (kind != LI_KIND_LOADER)
+		{
+			// Both describe the root SWF and expose their content before
+			// `init` (movie_clip.rs::player_root_movie / context.rs).
+			ext->expose_content = 1;
+			ext->bytes_loaded = ext->bytes_total = root_swf_size();
+		}
+		if (kind == LI_KIND_ROOT)
+		{
+			ext->loaded = 1;              // LoaderStream::Swf from the start
+			ext->content_type = LI_CT_SWF;
+		}
+	}
+	return v.u.obj;
+}
+
+static Avm2Object* avm2_get_root_loader_info(Avm2Context* ctx)
+{
+	if (g_root_loader_info == NULL)
+		g_root_loader_info = loaderinfo_new(ctx, LI_KIND_ROOT);
 	return g_root_loader_info;
+}
+
+static Avm2Object* avm2_get_stage_loader_info(Avm2Context* ctx)
+{
+	if (g_stage_loader_info == NULL)
+		g_stage_loader_info = loaderinfo_new(ctx, LI_KIND_STAGE);
+	return g_stage_loader_info;
 }
 
 static Avm2Value do_get_loader_info(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	// The Stage has its OWN LoaderInfo, distinct from the root clip's
+	// (Ruffle context.rs, is_stage = true): it never fires `init`.
+	Avm2DisplayObjectExt* dext = avm2_display_ext_of(ctx, self);
+	if (dext != NULL && dext->is_stage)
+	{
+		Avm2Object* sli = avm2_get_stage_loader_info(ctx);
+		return sli != NULL ? avm2_object_value(sli) : avm2_null();
+	}
 	// loaderInfo is non-null only for objects connected to the root SWF.
-	if (avm2_root_of(ctx, this_obj(act)) == NULL) return avm2_null();
+	if (avm2_root_of(ctx, self) == NULL) return avm2_null();
 	Avm2Object* li = avm2_get_root_loader_info(ctx);
 	return li != NULL ? avm2_object_value(li) : avm2_null();
 }
 
+static Avm2LoaderInfoExt* this_li(Avm2Activation* act)
+{
+	return loaderinfo_ext_of(act->ctx, this_obj(act));
+}
+
+// The eight getters that describe the *loaded movie* throw while the stream is
+// NotYetLoaded (Ruffle make_error_2099): actionScriptVersion, childAllowsParent,
+// frameRate, height, parentAllowsChild, sameDomain, swfVersion, width.
+static void li_require_loaded(Avm2Activation* act, Avm2LoaderInfoExt* ext)
+{
+	if (ext != NULL && ext->loaded) return;
+	avm2_throw_error(act->ctx, act->ctx->builtins.error_class,
+	                 "Error #2099: The loading object is not sufficiently "
+	                 "loaded to provide this information.");
+}
+
+static Avm2Value li_get_bytes_loaded(Avm2Activation* act)
+{
+	Avm2LoaderInfoExt* ext = this_li(act);
+	return avm2_number(ext != NULL ? (double) ext->bytes_loaded : 0);
+}
+
 static Avm2Value li_get_bytes_total(Avm2Activation* act)
 {
-	(void) act;
-#ifdef SWF_ONDISK_SIZE
-	return avm2_number((double) SWF_ONDISK_SIZE);
-#else
-	return avm2_number(0);
-#endif
+	Avm2LoaderInfoExt* ext = this_li(act);
+	return avm2_number(ext != NULL ? (double) ext->bytes_total : 0);
 }
 
 static Avm2Value li_get_content(Avm2Activation* act)
 {
-	// A per-Loader contentLoaderInfo that seeded synthetic content (the AGI
-	// no-op shell, see loader_load) returns it; the root LoaderInfo returns the
-	// root movie.
-	Avm2LoaderInfoExt* ext = loaderinfo_ext_of(act->ctx, this_obj(act));
-	if (ext != NULL && ext->content != NULL)
-		return avm2_object_value(ext->content);
-	Avm2Object* r = act->ctx->root;
-	return r != NULL ? avm2_object_value(r) : avm2_null();
+	Avm2LoaderInfoExt* ext = this_li(act);
+	if (ext == NULL || !ext->expose_content) return avm2_null();
+	if (ext->kind != LI_KIND_LOADER)
+	{
+		Avm2Object* r = act->ctx->root;
+		return r != NULL ? avm2_object_value(r) : avm2_null();
+	}
+	return ext->content != NULL ? avm2_object_value(ext->content) : avm2_null();
 }
 
 static Avm2Value li_get_content_type(Avm2Activation* act)
 {
-	return avm2_string(avm2_string_from_literal(act->ctx,
-	                                             "application/x-shockwave-flash"));
+	Avm2LoaderInfoExt* ext = this_li(act);
+	if (ext == NULL) return avm2_undefined();
+	// content_type_hide_before_init: Unknown (→ null) until `init` fired on
+	// THIS LoaderInfo. The Stage's never does, so its contentType stays null.
+	uint8_t ct = ext->init_fired ? ext->content_type : LI_CT_UNKNOWN;
+	const char* s = NULL;
+	switch (ct)
+	{
+		case LI_CT_SWF:    s = "application/x-shockwave-flash"; break;
+		case LI_CT_JPEG:   s = "image/jpeg"; break;
+		case LI_CT_JPEGXR: s = "image/jpegxr"; break;
+		case LI_CT_PNG:    s = "image/png"; break;
+		case LI_CT_GIF:    s = "image/gif"; break;
+		default: return avm2_null();
+	}
+	return avm2_string(avm2_string_from_literal(act->ctx, s));
 }
 
 static Avm2Value li_get_as_version(Avm2Activation* act)
 {
-	(void) act;
+	li_require_loaded(act, this_li(act));
 	return avm2_integer(3);
 }
 
 static Avm2Value li_get_frame_rate(Avm2Activation* act)
 {
-	(void) act;
+	li_require_loaded(act, this_li(act));
 	return avm2_number(g_stage_frame_rate);
 }
 
 static Avm2Value li_get_width(Avm2Activation* act)
 {
-	(void) act;
+	li_require_loaded(act, this_li(act));
 	return avm2_integer((avm2_generated_stage_rect[1]
 	                     - avm2_generated_stage_rect[0]) / 20);
 }
 
 static Avm2Value li_get_height(Avm2Activation* act)
 {
-	(void) act;
+	li_require_loaded(act, this_li(act));
 	return avm2_integer((avm2_generated_stage_rect[3]
 	                     - avm2_generated_stage_rect[2]) / 20);
 }
 
 static Avm2Value li_get_swf_version(Avm2Activation* act)
 {
-	(void) act;
+	li_require_loaded(act, this_li(act));
 	return avm2_integer(avm2_generated_swf_version);
 }
 
 static Avm2Value li_get_url(Avm2Activation* act)
 {
-#ifdef SWF_URL
-	return avm2_string(avm2_string_from_literal(act->ctx, SWF_URL));
-#else
-	return avm2_string(avm2_string_from_literal(act->ctx, ""));
-#endif
+	Avm2LoaderInfoExt* ext = this_li(act);
+	// Ruffle returns null for a LoaderInfo that is not exposing content — a
+	// fresh Loader's url is null before, during and after a load
+	// (loaderinfo_loadurl).
+	if (ext == NULL || !ext->expose_content) return avm2_null();
+	if (ext->kind == LI_KIND_LOADER && ext->url != NULL)
+		return avm2_string(ext->url);
+	return avm2_string(root_swf_url(act->ctx));
 }
 
-static Avm2Value li_get_true(Avm2Activation* act)
+// loaderURL is the URL of the movie that *initiated* the load, so for every
+// LoaderInfo in a single-SWF run it is the root SWF's own URL.
+static Avm2Value li_get_loader_url(Avm2Activation* act)
+{
+	return avm2_string(root_swf_url(act->ctx));
+}
+
+// childAllowsParent / parentAllowsChild / sameDomain: Ruffle compares the
+// child's and the parent's URL hosts, which for our file:// corpus always
+// match. Both are stubbed true; the meaningful part is the NotYetLoaded throw.
+static Avm2Value li_get_allows(Avm2Activation* act)
+{
+	li_require_loaded(act, this_li(act));
+	return avm2_bool(1);
+}
+
+static Avm2Value li_get_is_url_inaccessible(Avm2Activation* act)
 {
 	(void) act;
-	return avm2_bool(1);
+	return avm2_bool(0);
+}
+
+static Avm2Value li_get_shared_events(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2LoaderInfoExt* ext = this_li(act);
+	if (ext == NULL) return avm2_undefined();
+	if (ext->shared_events == NULL)
+	{
+		Avm2Value v = avm2_class_construct(ctx, ctx->builtins.event_dispatcher_class,
+		                                   NULL, 0);
+		ext->shared_events = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+	}
+	return ext->shared_events != NULL ? avm2_object_value(ext->shared_events)
+	                                  : avm2_null();
+}
+
+// Three-state (Ruffle get_bytes): null before anything starts loading, an
+// empty ByteArray while loading or after an unknown-type error, the real
+// (decompressed) SWF bytes once a movie is loaded. We have no source bytes to
+// hand back, so the loaded case is an empty ByteArray too — tranche 2 only
+// needs the first two states (loaderinfo_quine wants the real bytes).
+static Avm2Value li_get_bytes(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2LoaderInfoExt* ext = this_li(act);
+	if (ext == NULL) return avm2_undefined();
+	if (ext->kind == LI_KIND_LOADER && !ext->load_started) return avm2_null();
+	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.bytearray_class,
+	                                   NULL, 0);
+	return v.kind == AVM2_VALUE_OBJECT ? v : avm2_null();
 }
 
 static Avm2Value li_get_parameters(Avm2Activation* act)
@@ -3650,31 +3845,69 @@ static Avm2Value li_get_parameters(Avm2Activation* act)
 
 static Avm2Value li_get_application_domain(Avm2Activation* act)
 {
-	return avm2_current_domain_value(act->ctx);
+	Avm2LoaderInfoExt* ext = this_li(act);
+	if (ext == NULL) return avm2_undefined();
+	// The root SWF always has a domain; a Loader's is null until its movie is
+	// registered in one, then it is the LoaderContext's (loaderinfo_more).
+	if (ext->kind != LI_KIND_LOADER) return avm2_current_domain_value(act->ctx);
+	return ext->app_domain != NULL ? avm2_object_value(ext->app_domain)
+	                               : avm2_null();
 }
 
 static Avm2Value li_get_loader(Avm2Activation* act)
 {
-	(void) act;
-	return avm2_null();  // root movie has no parent Loader
+	Avm2LoaderInfoExt* ext = this_li(act);
+	if (ext == NULL || ext->loader == NULL) return avm2_null();
+	return avm2_object_value(ext->loader);
 }
 
-// --- flash.display.Loader (stub — loading a *second* SWF is not implemented) ---
+// Ruffle fire_init_and_complete_events: idempotent, called at the end of every
+// frame for the root movie and for every in-flight loader. `init` precedes
+// `complete`, and both land AFTER the frame's exitFrame broadcast
+// (loaderinfo_events: … exitFrame, init!, enterFrame, exitFrame).
+static void loaderinfo_fire_init_and_complete(Avm2Context* ctx, Avm2Object* li)
+{
+	Avm2LoaderInfoExt* ext = loaderinfo_ext_of(ctx, li);
+	if (ext == NULL) return;
+	ext->expose_content = 1;
+	if (!ext->init_fired)
+	{
+		ext->init_fired = 1;
+		dispatch_simple_event(ctx, li, "init", 0);
+	}
+	if (!ext->complete_fired && ext->loaded)
+	{
+		ext->complete_fired = 1;
+		dispatch_simple_event(ctx, li, "complete", 0);
+	}
+}
+
+// End-of-frame hook: the root movie's LoaderInfo fires init/complete once, at
+// the first frame's exitFrame boundary. The Stage's LoaderInfo is deliberately
+// left alone — it is permanently NotYetLoaded and never fires `init`.
+static void avm2_loaderinfo_run_exit_frame(Avm2Context* ctx)
+{
+	Avm2Object* li = avm2_get_root_loader_info(ctx);
+	if (li != NULL) loaderinfo_fire_init_and_complete(ctx, li);
+}
+
+// --- flash.display.Loader ---
 //
-// EQ (and any AGI/preloader-style game) does: new Loader() → non-throwing;
-// loader.contentLoaderInfo.addEventListener(COMPLETE, cb); loader.load(req).
-// We give the Loader its OWN contentLoaderInfo (a fresh LoaderInfo, which
-// extends EventDispatcher), so the addEventListener is a real no-op
-// registration, and load() is a no-op: no network layer, so COMPLETE never
-// fires and `content` stays null. This unblocks Shell.init reaching
-// startIntro() without implementing runtime SWF loading. `content`/`contentLoaderInfo`
-// are stored per-Loader so identity is stable across reads.
+// A Loader owns its own contentLoaderInfo (a LoaderInfo in the LOADER flavour
+// above), so listener registrations and every LoaderInfo getter are per
+// instance. `load`/`loadBytes` drive the state machine and the event sequence;
+// what they do NOT do yet is instantiate the loaded content — an AVM2 child
+// SWF has no runtime entry point (see SWFRecompDocs/plans/loader-arc.md
+// tranche 6), so `content` stays null and `bytes` hands back an empty
+// ByteArray. Everything a script can observe *about the load itself* (open /
+// progress / init / complete / ioError, byte counts, contentType, url,
+// applicationDomain) is real.
 
 typedef struct Avm2LoaderExt
 {
 	Avm2DisplayObjectExt display;       // extends DisplayObjectContainer (MUST be first)
 	Avm2Object* content_loader_info;    // own LoaderInfo (EventDispatcher), lazily built
-	Avm2Object* content;                // loaded content (null: nothing ever loads)
+	Avm2Object* content;                // loaded content (null until tranche 6)
 } Avm2LoaderExt;
 
 static Avm2LoaderExt* loader_ext_of(Avm2Context* ctx, Avm2Object* o)
@@ -3691,17 +3924,17 @@ static Avm2LoaderExt* loader_ext_of(Avm2Context* ctx, Avm2Object* o)
 // game's COMPLETE handler can assign it and call those methods without #1010.
 static Avm2Class* g_agi_shell_class;
 
-// Lazily build (and cache) a Loader's own contentLoaderInfo (a fresh LoaderInfo,
-// which extends EventDispatcher). Shared by the getter and loader_load.
-static Avm2Object* loader_ensure_cli(Avm2Context* ctx, Avm2LoaderExt* ext)
+// Lazily build (and cache) a Loader's own contentLoaderInfo. Shared by the
+// getter and the load paths.
+static Avm2Object* loader_ensure_cli(Avm2Context* ctx, Avm2LoaderExt* ext,
+                                     Avm2Object* self)
 {
 	if (ext == NULL) return NULL;
 	if (ext->content_loader_info == NULL)
 	{
-		Avm2Class* cls = ctx->builtins.loader_info_class;
-		if (cls == NULL) return NULL;
-		Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
-		ext->content_loader_info = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+		ext->content_loader_info = loaderinfo_new(ctx, LI_KIND_LOADER);
+		Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, ext->content_loader_info);
+		if (lx != NULL) lx->loader = self;
 	}
 	return ext->content_loader_info;
 }
@@ -3709,8 +3942,9 @@ static Avm2Object* loader_ensure_cli(Avm2Context* ctx, Avm2LoaderExt* ext)
 static Avm2Value loader_get_content_loader_info(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2LoaderExt* ext = loader_ext_of(ctx, this_obj(act));
-	Avm2Object* cli = loader_ensure_cli(ctx, ext);
+	Avm2Object* self = this_obj(act);
+	Avm2LoaderExt* ext = loader_ext_of(ctx, self);
+	Avm2Object* cli = loader_ensure_cli(ctx, ext, self);
 	return cli != NULL ? avm2_object_value(cli) : avm2_null();
 }
 
@@ -3739,43 +3973,376 @@ static int avm2_str_contains(const Avm2String* s, const char* needle)
 	return 0;
 }
 
-// flash.display.Loader.load(request). Generic behaviour is a no-op (no network
-// layer → COMPLETE never fires, `content` stays null). The one exception is the
-// ArmorGames AGI helper SWF (cache.armorgames.com/assets/agi/AGI.swf): EQ (and
-// every AG-portal game) constructs `new Loader()`, registers a COMPLETE handler
-// on contentLoaderInfo, and — critically — its New Game handler runs the
-// UNGUARDED `agi.hideLoginStatus()` where `agi = loaderInfo.content`. With no
-// content that throws #1010. So for the AGI URL we seed a no-op AGI shell as the
-// contentLoaderInfo's `content` and fire a synthetic COMPLETE, letting the
-// game's own loadComplete assign `agi = shell` and addChild it; every AG-API
-// method the game later calls on the shell (hideLoginStatus/showLoginStatus/
-// init/initAGUI/…) is a no-op. We do NOT implement the real ArmorGames API or
-// runtime SWF loading. Reusable: unblocks New Game on any AG/AGI game.
+// --- the load pipeline ------------------------------------------------------
+
+// Ruffle ContentType::sniff. Anything we cannot name is Unknown, which is what
+// drives the #2124 error path.
+static uint8_t loader_sniff(const uint8_t* d, uint32_t n)
+{
+	if (d == NULL || n < 4) return LI_CT_UNKNOWN;
+	if ((d[0] == 'F' || d[0] == 'C' || d[0] == 'Z')
+	    && d[1] == 'W' && d[2] == 'S')
+		return LI_CT_SWF;
+	if (d[0] == 0xFF && d[1] == 0xD8 && d[2] == 0xFF) return LI_CT_JPEG;
+	if (d[0] == 0x89 && d[1] == 'P' && d[2] == 'N' && d[3] == 'G')
+		return LI_CT_PNG;
+	if (memcmp(d, "GIF8", 4) == 0) return LI_CT_GIF;
+	if (d[0] == 'I' && d[1] == 'I' && d[2] == 0xBC) return LI_CT_JPEGXR;
+	return LI_CT_UNKNOWN;
+}
+
+// Ruffle resolves a request URL against the loading movie's URL before the
+// load ever starts, so a relative "data.txt" is reported — and named in the
+// #2124 message — as "file:///data.txt".
+static const Avm2String* loader_absolute_url(Avm2Context* ctx,
+                                             const Avm2String* url)
+{
+	if (url == NULL || url->utf8 == NULL) return url;
+	for (uint32_t i = 0; i + 3 <= (uint32_t) url->len; i++)
+		if (memcmp(url->utf8 + i, "://", 3) == 0) return url;
+	const Avm2String* base = root_swf_url(ctx);
+	if (base == NULL || base->len == 0) return url;
+	uint32_t cut = 0;   // base up to and including its last '/'
+	for (uint32_t i = 0; i < (uint32_t) base->len; i++)
+		if (base->utf8[i] == '/') cut = i + 1;
+	uint32_t skip = (url->len > 0 && url->utf8[0] == '/') ? 1 : 0;
+	char buf[512];
+	int n = snprintf(buf, sizeof(buf), "%.*s%.*s", (int) cut, base->utf8,
+	                 (int) ((uint32_t) url->len - skip), url->utf8 + skip);
+	if (n <= 0) return url;
+	if (n > (int) sizeof(buf) - 1) n = (int) sizeof(buf) - 1;
+	return avm2_string_new(ctx, buf, (uint32_t) n);
+}
+
+// Trailing path component of a URL, as the bundled-asset registries key them.
+static void loader_basename(const Avm2String* url, char* out, size_t out_len)
+{
+	out[0] = '\0';
+	if (url == NULL || url->utf8 == NULL) return;
+	uint32_t start = 0;
+	for (uint32_t i = 0; i < (uint32_t) url->len; i++)
+		if (url->utf8[i] == '/' || url->utf8[i] == '\\') start = i + 1;
+	uint32_t n = (uint32_t) url->len - start;
+	if (n >= out_len) n = (uint32_t) out_len - 1;
+	memcpy(out, url->utf8 + start, n);
+	out[n] = '\0';
+}
+
+// Everything a queued load needs to replay at the next frame boundary.
+typedef struct Avm2PendingLoad
+{
+	Avm2Object* loader_info;
+	Avm2Object* app_domain;    // the LoaderContext's domain, or NULL
+	const Avm2String* url;
+	const uint8_t* data;       // NULL when only a byte count is known
+	uint32_t len;
+	uint8_t content_type;
+} Avm2PendingLoad;
+
+// Loads issued in one frame all resolve at the next frame's start; a handful
+// is all any test (or game) has in flight at once.
+#define AVM2_MAX_PENDING_LOADS 32
+static Avm2PendingLoad g_pending_loads[AVM2_MAX_PENDING_LOADS];
+static uint32_t g_pending_load_count;
+
+// LoaderInfos with a load in flight. Walked at the end of every frame so that
+// init/complete land after the exitFrame broadcast (Ruffle run_exit_frame).
+#define AVM2_MAX_ACTIVE_LOADS 32
+static Avm2Object* g_active_loader_infos[AVM2_MAX_ACTIVE_LOADS];
+static uint32_t g_active_loader_info_count;
+
+static void loader_track_active(Avm2Object* li)
+{
+	for (uint32_t i = 0; i < g_active_loader_info_count; i++)
+		if (g_active_loader_infos[i] == li) return;
+	if (g_active_loader_info_count < AVM2_MAX_ACTIVE_LOADS)
+		g_active_loader_infos[g_active_loader_info_count++] = li;
+}
+
+// Reset a LoaderInfo to the fresh NotYetLoaded state — Ruffle's
+// LoaderInfoObject::unload, run both by Loader.unload() and at the start of
+// every load (loaderinfo_more reads applicationDomain back as null after
+// unload; loaderinfo_loadurl reads url as null in all four states).
+static void loaderinfo_reset_stream(Avm2LoaderInfoExt* lx)
+{
+	if (lx == NULL) return;
+	lx->loaded = 0;
+	lx->expose_content = 0;
+	lx->load_started = 0;
+	lx->init_fired = 0;
+	lx->complete_fired = 0;
+	lx->errored = 0;
+	lx->content_type = LI_CT_UNKNOWN;
+	lx->content = NULL;
+	lx->app_domain = NULL;
+	lx->url = NULL;
+	lx->bytes_loaded = 0;
+	lx->bytes_total = 0;
+}
+
+// Read `applicationDomain` off a LoaderContext argument (null when absent).
+static Avm2Object* loader_context_domain(Avm2Context* ctx, Avm2Value v)
+{
+	if (v.kind != AVM2_VALUE_OBJECT) return NULL;
+	int found = 0;
+	Avm2Value d = avm2_get_public_property(ctx, v, "applicationDomain", 17,
+	                                       &found);
+	return (found && d.kind == AVM2_VALUE_OBJECT) ? d.u.obj : NULL;
+}
+
+// The tail of a load, shared by the deferred `load` path and the synchronous
+// `loadBytes` path (Ruffle movie_loader_data). `from_bytes` suppresses the URL
+// suffix on the #2124 message, exactly as Ruffle does.
+static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
+                           const Avm2PendingLoad* pl, int from_bytes)
+{
+	Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, li);
+	if (lx == NULL) return;
+
+	// Ruffle swaps in a "fake" movie whose compressed length is the fetched
+	// byte count, so bytesTotal is live during the first progress event while
+	// bytesLoaded is still 0.
+	lx->content_type = pl->content_type;
+	lx->bytes_loaded = 0;
+	lx->bytes_total = pl->len;
+	Avm2Object* ev = avm2_progress_event_new(
+		ctx, avm2_string_from_literal(ctx, "progress"), 0, (double) pl->len);
+	if (ev != NULL) avm2_dispatch_event(ctx, li, ev);
+
+	if (pl->content_type == LI_CT_UNKNOWN)
+	{
+		lx->errored = 1;
+		lx->bytes_loaded = pl->len;
+		ev = avm2_progress_event_new(ctx,
+		                             avm2_string_from_literal(ctx, "progress"),
+		                             (double) pl->len, (double) pl->len);
+		if (ev != NULL) avm2_dispatch_event(ctx, li, ev);
+
+		char msg[512];
+		if (from_bytes || pl->url == NULL)
+		{
+			snprintf(msg, sizeof(msg),
+			         "Error #2124: Loaded file is an unknown type.");
+		}
+		else
+		{
+			snprintf(msg, sizeof(msg),
+			         "Error #2124: Loaded file is an unknown type. URL: %.*s",
+			         (int) pl->url->len, pl->url->utf8);
+		}
+		ev = avm2_io_error_event_new(ctx,
+		                             avm2_string_from_literal(ctx, "ioError"),
+		                             avm2_string_from_literal(ctx, msg), 2124);
+		if (ev != NULL) avm2_dispatch_event(ctx, li, ev);
+		return;
+	}
+
+	// Known content. The stream becomes Swf (so the eight movie getters answer
+	// and contentType resolves once `init` fires); the content itself is not
+	// instantiated yet — see the Loader comment above.
+	lx->bytes_loaded = pl->len;
+	ev = avm2_progress_event_new(ctx, avm2_string_from_literal(ctx, "progress"),
+	                             (double) pl->len, (double) pl->len);
+	if (ev != NULL) avm2_dispatch_event(ctx, li, ev);
+	lx->loaded = 1;
+	lx->url = pl->url;
+	if (pl->app_domain != NULL)
+	{
+		lx->app_domain = pl->app_domain;
+	}
+	else
+	{
+		// No LoaderContext: Ruffle gives the movie a fresh child domain of the
+		// loader's. We have one global domain, so hand that back.
+		Avm2Value cur = avm2_current_domain_value(ctx);
+		lx->app_domain = cur.kind == AVM2_VALUE_OBJECT ? cur.u.obj : NULL;
+	}
+}
+
+// Frame-start hook: Ruffle fetches queued loads from the player's preload tick,
+// i.e. a load() issued during frame N is delivered at the start of frame N+1.
+// loaderinfo_more depends on the delay — it traces applicationDomain twice as
+// null before its `complete` handler ever runs.
+static void avm2_loader_run_pending(Avm2Context* ctx)
+{
+	uint32_t n = g_pending_load_count;
+	if (n == 0) return;
+	Avm2PendingLoad batch[AVM2_MAX_PENDING_LOADS];
+	memcpy(batch, g_pending_loads, n * sizeof(Avm2PendingLoad));
+	g_pending_load_count = 0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2Object* li = batch[i].loader_info;
+		if (li == NULL) continue;
+		// The fetch opened successfully; loadBytes has no fetch and so no
+		// `open` event (loader_bytes_unknown_content).
+		dispatch_simple_event(ctx, li, "open", 0);
+		loader_deliver(ctx, li, &batch[i], 0);
+	}
+}
+
+// End-of-frame hook: every tracked LoaderInfo whose stream reached Swf fires
+// init and then complete, after the frame's exitFrame broadcast. Entries whose
+// load has not resolved yet stay tracked; errored and completed ones drop out.
+static void avm2_loader_run_exit_frame(Avm2Context* ctx)
+{
+	uint32_t n = g_active_loader_info_count;
+	if (n == 0) return;
+	Avm2Object* batch[AVM2_MAX_ACTIVE_LOADS];
+	memcpy(batch, g_active_loader_infos, n * sizeof(Avm2Object*));
+	g_active_loader_info_count = 0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, batch[i]);
+		if (lx == NULL || lx->errored) continue;
+		if (lx->loaded) loaderinfo_fire_init_and_complete(ctx, batch[i]);
+		else loader_track_active(batch[i]);
+	}
+}
+
+// Resolve a URL to bundled bytes. Sibling data files (`data.txt`, `test.png`)
+// are linked verbatim; sibling SWFs are recompiled into the binary and carry
+// only their size in the movie registry. Returns 0 when nothing matches, in
+// which case the load stays silent rather than inventing an #2032 ioError for
+// URLs a game legitimately fetches from the network.
+static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
+{
+	char name[256];
+	loader_basename(url, name, sizeof(name));
+	if (name[0] == '\0') return 0;
+	DataFileEntry* d = findDataFile(name);
+	if (d != NULL && d->content != NULL)
+	{
+		out->data = (const uint8_t*) d->content;
+		out->len = (uint32_t) d->content_length;
+		out->content_type = loader_sniff(out->data, out->len);
+		return 1;
+	}
+	MovieEntry* m = findMovieEntry(name);
+	if (m != NULL)
+	{
+		out->data = NULL;
+		out->len = m->file_size;
+		out->content_type = LI_CT_SWF;
+		return 1;
+	}
+	return 0;
+}
+
+// flash.display.Loader.load(request, context). One URL is special-cased before
+// the pipeline: the ArmorGames AGI helper SWF (cache.armorgames.com/assets/agi/
+// AGI.swf). EQ (and every AG-portal game) registers a COMPLETE handler on
+// contentLoaderInfo and then runs the UNGUARDED `agi.hideLoginStatus()` where
+// `agi = loaderInfo.content`; with no content that throws #1010. AGI.swf is not
+// bundled, so the pipeline below would leave the load silent — instead we seed a
+// no-op AGI shell as `content` and fire a synthetic COMPLETE, letting the game's
+// own loadComplete assign and addChild it. Reusable: unblocks New Game on any
+// AG/AGI game.
 static Avm2Value loader_load(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2LoaderExt* ext = loader_ext_of(ctx, this_obj(act));
+	Avm2Object* self = this_obj(act);
+	Avm2LoaderExt* ext = loader_ext_of(ctx, self);
 	if (ext == NULL) return avm2_undefined();
+	Avm2Object* cli = loader_ensure_cli(ctx, ext, self);
+	if (cli == NULL) return avm2_undefined();
 
-	int is_agi = 0;
+	const Avm2String* url = NULL;
 	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
 	{
 		int found = 0;
 		Avm2Value uv = avm2_get_public_property(ctx, act->args[0], "url", 3, &found);
-		if (found && uv.kind == AVM2_VALUE_STRING)
-			is_agi = avm2_str_contains(uv.u.str, "AGI.swf");
+		if (found && uv.kind == AVM2_VALUE_STRING) url = uv.u.str;
 	}
-	if (!is_agi || g_agi_shell_class == NULL)
-		return avm2_undefined();  // generic no-op: COMPLETE never fires
 
-	Avm2Value sv = avm2_class_construct(ctx, g_agi_shell_class, NULL, 0);
-	if (sv.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
-	ext->content = sv.u.obj;
-	Avm2Object* cli = loader_ensure_cli(ctx, ext);
+	if (url != NULL && avm2_str_contains(url, "AGI.swf")
+	    && g_agi_shell_class != NULL)
+	{
+		Avm2Value sv = avm2_class_construct(ctx, g_agi_shell_class, NULL, 0);
+		if (sv.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+		ext->content = sv.u.obj;
+		Avm2LoaderInfoExt* clx = loaderinfo_ext_of(ctx, cli);
+		if (clx != NULL)
+		{
+			// Present the shell as a finished SWF load, so a game reading
+			// contentType/frameRate/applicationDomain off it sees a loaded
+			// stream rather than #2099.
+			clx->content = sv.u.obj;   // contentLoaderInfo.content = shell
+			clx->expose_content = 1;
+			clx->loaded = 1;
+			clx->load_started = 1;
+			clx->init_fired = 1;
+			clx->complete_fired = 1;
+			clx->content_type = LI_CT_SWF;
+			clx->url = url;
+			Avm2Value cur = avm2_current_domain_value(ctx);
+			clx->app_domain = cur.kind == AVM2_VALUE_OBJECT ? cur.u.obj : NULL;
+		}
+		dispatch_simple_event(ctx, cli, "complete", 0);  // Event.COMPLETE
+		return avm2_undefined();
+	}
+
+	// Starting a load unloads whatever was there (Ruffle Loader.load).
+	Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, cli);
+	loaderinfo_reset_stream(lx);
+	ext->content = NULL;
+
+	Avm2PendingLoad pl;
+	memset(&pl, 0, sizeof(pl));
+	if (url == NULL || !loader_resolve_url(url, &pl)) return avm2_undefined();
+	if (lx != NULL) lx->load_started = 1;
+	pl.loader_info = cli;
+	pl.url = loader_absolute_url(ctx, url);
+	pl.app_domain = act->argc > 1 ? loader_context_domain(ctx, act->args[1]) : NULL;
+	if (g_pending_load_count < AVM2_MAX_PENDING_LOADS)
+		g_pending_loads[g_pending_load_count++] = pl;
+	loader_track_active(cli);
+	return avm2_undefined();
+}
+
+// flash.display.Loader.loadBytes(bytes, context). No fetch, so no `open` event
+// and no deferral: Flash (and Ruffle) run the whole sequence synchronously —
+// loader_bytes_unknown_content prints every event before the line that follows
+// the loadBytes call.
+static Avm2Value loader_load_bytes(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2LoaderExt* ext = loader_ext_of(ctx, self);
+	if (ext == NULL) return avm2_undefined();
+	Avm2Object* cli = loader_ensure_cli(ctx, ext, self);
 	if (cli == NULL) return avm2_undefined();
-	Avm2LoaderInfoExt* clx = loaderinfo_ext_of(ctx, cli);
-	if (clx != NULL) clx->content = sv.u.obj;  // contentLoaderInfo.content = shell
-	dispatch_simple_event(ctx, cli, "complete", 0);  // Event.COMPLETE
+
+	Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, cli);
+	loaderinfo_reset_stream(lx);
+	ext->content = NULL;
+
+	Avm2ByteArrayExt* ba = act->argc > 0 ? avm2_bytearray_ext_of(act->args[0])
+	                                     : NULL;
+	if (ba == NULL) return avm2_undefined();
+	if (lx != NULL) lx->load_started = 1;
+
+	Avm2PendingLoad pl;
+	memset(&pl, 0, sizeof(pl));
+	pl.loader_info = cli;
+	pl.data = ba->bytes;
+	pl.len = ba->len;
+	pl.content_type = loader_sniff(ba->bytes, ba->len);
+	pl.app_domain = act->argc > 1 ? loader_context_domain(ctx, act->args[1]) : NULL;
+	loader_deliver(ctx, cli, &pl, 1);
+	loader_track_active(cli);   // init/complete still land at the frame's end
+	return avm2_undefined();
+}
+
+// flash.display.Loader.unload() / unloadAndStop(): drop the content and put the
+// LoaderInfo back in the fresh NotYetLoaded state.
+static Avm2Value loader_unload(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2LoaderExt* ext = loader_ext_of(ctx, this_obj(act));
+	if (ext == NULL) return avm2_undefined();
+	ext->content = NULL;
+	loaderinfo_reset_stream(loaderinfo_ext_of(ctx, ext->content_loader_info));
 	return avm2_undefined();
 }
 
@@ -7369,6 +7936,17 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx)
 	for (uint32_t i = 0; i < g_fs_cleanup_count; i++) avm2_gc_mark_object(g_fs_cleanup[i]);
 	avm2_gc_mark_object(g_stage_focus);
 	avm2_gc_mark_object(g_root_loader_info);
+	avm2_gc_mark_object(g_stage_loader_info);
+	// In-flight loads: the queue and the tracked LoaderInfos are the only
+	// reference to a Loader whose script dropped it mid-load.
+	for (uint32_t i = 0; i < g_pending_load_count; i++)
+	{
+		avm2_gc_mark_object(g_pending_loads[i].loader_info);
+		avm2_gc_mark_object(g_pending_loads[i].app_domain);
+		avm2_gc_mark_string(g_pending_loads[i].url);
+	}
+	for (uint32_t i = 0; i < g_active_loader_info_count; i++)
+		avm2_gc_mark_object(g_active_loader_infos[i]);
 	avm2_gc_mark_object(g_mouse_hovered);
 	for (int i = 0; i < 3; i++) avm2_gc_mark_object(g_mouse_pressed[i]);
 	avm2_gc_mark_object(g_drag_object);
@@ -8582,15 +9160,17 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, dobj, "rotationZ", do_get_rotation, do_set_rotation);
 	add_getset(ctx, dobj, "scaleZ", do_get_one, do_set_noop);
 
-	// flash.display.LoaderInfo (extends EventDispatcher). The root movie's
-	// LoaderInfo singleton is lazily built by avm2_get_root_loader_info.
+	// flash.display.LoaderInfo (extends EventDispatcher). Every getter reads
+	// the receiving instance's stream state; the root movie's and the Stage's
+	// instances are lazily built by avm2_get_{root,stage}_loader_info.
 	Avm2Class* linfo =
 		avm2_builtin_class(ctx, "flash.display", "LoaderInfo",
 		                   b->event_dispatcher_class);
 	linfo->native_ext_size = sizeof(Avm2LoaderInfoExt);
 	b->loader_info_class = linfo;
-	avm2_builtin_add_getter(ctx, linfo, "bytesLoaded", li_get_bytes_total);
+	avm2_builtin_add_getter(ctx, linfo, "bytesLoaded", li_get_bytes_loaded);
 	avm2_builtin_add_getter(ctx, linfo, "bytesTotal", li_get_bytes_total);
+	avm2_builtin_add_getter(ctx, linfo, "bytes", li_get_bytes);
 	avm2_builtin_add_getter(ctx, linfo, "content", li_get_content);
 	avm2_builtin_add_getter(ctx, linfo, "contentType", li_get_content_type);
 	avm2_builtin_add_getter(ctx, linfo, "actionScriptVersion", li_get_as_version);
@@ -8599,14 +9179,17 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, linfo, "height", li_get_height);
 	avm2_builtin_add_getter(ctx, linfo, "swfVersion", li_get_swf_version);
 	avm2_builtin_add_getter(ctx, linfo, "url", li_get_url);
-	avm2_builtin_add_getter(ctx, linfo, "loaderURL", li_get_url);
+	avm2_builtin_add_getter(ctx, linfo, "loaderURL", li_get_loader_url);
 	avm2_builtin_add_getter(ctx, linfo, "parameters", li_get_parameters);
 	avm2_builtin_add_getter(ctx, linfo, "applicationDomain",
 	                        li_get_application_domain);
 	avm2_builtin_add_getter(ctx, linfo, "loader", li_get_loader);
-	avm2_builtin_add_getter(ctx, linfo, "childAllowsParent", li_get_true);
-	avm2_builtin_add_getter(ctx, linfo, "parentAllowsChild", li_get_true);
-	avm2_builtin_add_getter(ctx, linfo, "sameDomain", li_get_true);
+	avm2_builtin_add_getter(ctx, linfo, "isURLInaccessible",
+	                        li_get_is_url_inaccessible);
+	avm2_builtin_add_getter(ctx, linfo, "sharedEvents", li_get_shared_events);
+	avm2_builtin_add_getter(ctx, linfo, "childAllowsParent", li_get_allows);
+	avm2_builtin_add_getter(ctx, linfo, "parentAllowsChild", li_get_allows);
+	avm2_builtin_add_getter(ctx, linfo, "sameDomain", li_get_allows);
 
 	Avm2Class* iobj =
 		avm2_builtin_class(ctx, "flash.display", "InteractiveObject", dobj);
@@ -8652,13 +9235,11 @@ void avm2_register_display(Avm2Context* ctx)
 	           doc_set_mouse_children);
 	add_getset(ctx, doc, "tabChildren", doc_get_tab_children, doc_set_tab_children);
 
-	// flash.display.Loader (extends DisplayObjectContainer). Stub: `new Loader()`
-	// is non-throwing (concrete display_native_init, larger native_ext for the
-	// per-instance contentLoaderInfo/content), contentLoaderInfo is a fresh
-	// LoaderInfo (EventDispatcher — so addEventListener is a real no-op
-	// registration), and load/unload/close are no-ops. No second SWF is ever
-	// loaded, so COMPLETE never fires and content stays null. Reusable: unblocks
-	// any AGI/preloader game that constructs a Loader during init.
+	// flash.display.Loader (extends DisplayObjectContainer). `new Loader()` is
+	// non-throwing (concrete display_native_init, larger native_ext for the
+	// per-instance contentLoaderInfo/content); load/loadBytes drive the
+	// LoaderInfo state machine and event sequence but do not yet instantiate
+	// loaded content (loader-arc tranche 6), so `content` stays null.
 	Avm2Class* loader =
 		avm2_builtin_class(ctx, "flash.display", "Loader", doc);
 	loader->native_init = display_native_init;   // concrete: no #2012
@@ -8668,10 +9249,10 @@ void avm2_register_display(Avm2Context* ctx)
 	                        loader_get_content_loader_info);
 	avm2_builtin_add_getter(ctx, loader, "content", loader_get_content);
 	avm2_builtin_add_method(ctx, loader, "load", loader_load);
-	avm2_builtin_add_method(ctx, loader, "loadBytes", loader_noop);
+	avm2_builtin_add_method(ctx, loader, "loadBytes", loader_load_bytes);
 	avm2_builtin_add_method(ctx, loader, "close", loader_noop);
-	avm2_builtin_add_method(ctx, loader, "unload", loader_noop);
-	avm2_builtin_add_method(ctx, loader, "unloadAndStop", loader_noop);
+	avm2_builtin_add_method(ctx, loader, "unload", loader_unload);
+	avm2_builtin_add_method(ctx, loader, "unloadAndStop", loader_unload);
 
 	Avm2Class* sprite = avm2_builtin_class(ctx, "flash.display", "Sprite", doc);
 	sprite->instance_init.fn = sprite_ctor_init;

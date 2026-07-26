@@ -1203,6 +1203,46 @@ static Avm2Value pe_get_total(Avm2Activation* act)
 static Avm2Value pe_set_total(Avm2Activation* act)
 { Avm2EventExt* e = this_event(act); if (e && act->argc > 0) e->bytes_total = avm2_coerce_to_number(act->ctx, act->args[0]); return avm2_undefined(); }
 
+// ProgressEvent.as / ErrorEvent.as toString(): each subclass names itself and
+// adds its own fields to Event's four. ErrorEvent and friends inherit
+// TextEvent's toString otherwise and would print "[TextEvent ...]".
+static Avm2Value pe_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"ProgressEvent", "type", "bubbles", "cancelable", "eventPhase",
+		"bytesLoaded", "bytesTotal"
+	};
+	Avm2Value args[7];
+	for (int i = 0; i < 7; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 7);
+}
+
+static Avm2Value error_event_to_string_named(Avm2Activation* act,
+                                             const char* cname)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"type", "bubbles", "cancelable", "eventPhase", "text"
+	};
+	Avm2Value args[6];
+	args[0] = avm2_string(avm2_string_from_literal(ctx, cname));
+	for (int i = 0; i < 5; i++)
+		args[i + 1] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 6);
+}
+static Avm2Value ee_to_string(Avm2Activation* act)
+{ return error_event_to_string_named(act, "ErrorEvent"); }
+static Avm2Value ioe_to_string(Avm2Activation* act)
+{ return error_event_to_string_named(act, "IOErrorEvent"); }
+static Avm2Value sece_to_string(Avm2Activation* act)
+{ return error_event_to_string_named(act, "SecurityErrorEvent"); }
+static Avm2Value asye_to_string(Avm2Activation* act)
+{ return error_event_to_string_named(act, "AsyncErrorEvent"); }
+
 static Avm2Value error_event_init(Avm2Activation* act)
 {
 	Avm2EventExt* ext = this_event(act);
@@ -1258,6 +1298,11 @@ static Avm2Value se_set_level(Avm2Activation* act)
 static void sconst(Avm2Context* ctx, Avm2Class* cls, const char* n, const char* v)
 { avm2_builtin_add_static_const(ctx, cls, n, avm2_string(avm2_string_from_literal(ctx, v))); }
 
+// Cached for the C-side constructors below (avm2_progress_event_new /
+// avm2_io_error_event_new), which the Loader pipeline dispatches from.
+static Avm2Class* g_progress_event_class;
+static Avm2Class* g_io_error_event_class;
+
 static void register_net_events(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -1267,8 +1312,10 @@ static void register_net_events(Avm2Context* ctx)
 	                                   b->event_class);
 	pe->instance_init.fn = progress_event_init;
 	pe->instance_init.debug_name = "ProgressEvent";
+	g_progress_event_class = pe;
 	avm2_builtin_add_getset(ctx, pe, "bytesLoaded", pe_get_loaded, pe_set_loaded);
 	avm2_builtin_add_getset(ctx, pe, "bytesTotal", pe_get_total, pe_set_total);
+	event_override_method(ctx, pe, "toString", pe_to_string);
 	sconst(ctx, pe, "PROGRESS", "progress");
 	sconst(ctx, pe, "SOCKET_DATA", "socketData");
 
@@ -1279,11 +1326,14 @@ static void register_net_events(Avm2Context* ctx)
 	er->instance_init.fn = error_event_init;
 	er->instance_init.debug_name = "ErrorEvent";
 	avm2_builtin_add_getter(ctx, er, "errorID", ee_get_error_id);
+	event_override_method(ctx, er, "toString", ee_to_string);
 	sconst(ctx, er, "ERROR", "error");
 
 	Avm2Class* ioe = avm2_builtin_class(ctx, "flash.events", "IOErrorEvent", er);
 	ioe->instance_init.fn = error_event_init;
 	ioe->instance_init.debug_name = "IOErrorEvent";
+	g_io_error_event_class = ioe;
+	event_override_method(ctx, ioe, "toString", ioe_to_string);
 	sconst(ctx, ioe, "IO_ERROR", "ioError");
 	sconst(ctx, ioe, "NETWORK_ERROR", "networkError");
 	sconst(ctx, ioe, "DISK_ERROR", "diskError");
@@ -1294,12 +1344,14 @@ static void register_net_events(Avm2Context* ctx)
 	                                    "SecurityErrorEvent", er);
 	sec->instance_init.fn = error_event_init;
 	sec->instance_init.debug_name = "SecurityErrorEvent";
+	event_override_method(ctx, sec, "toString", sece_to_string);
 	sconst(ctx, sec, "SECURITY_ERROR", "securityError");
 
 	Avm2Class* ase = avm2_builtin_class(ctx, "flash.events",
 	                                    "AsyncErrorEvent", er);
 	ase->instance_init.fn = error_event_init;
 	ase->instance_init.debug_name = "AsyncErrorEvent";
+	event_override_method(ctx, ase, "toString", asye_to_string);
 	sconst(ctx, ase, "ASYNC_ERROR", "asyncError");
 
 	// flash.events.HTTPStatusEvent (extends Event).
@@ -1321,6 +1373,36 @@ static void register_net_events(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, ste, "code", se_get_code, se_set_code);
 	avm2_builtin_add_getset(ctx, ste, "level", se_get_level, se_set_level);
 	sconst(ctx, ste, "STATUS", "status");
+}
+
+// The Loader pipeline (avm2_display.c) dispatches these from C; both events
+// are non-bubbling and non-cancelable in Ruffle's loader.
+Avm2Object* avm2_progress_event_new(Avm2Context* ctx, const Avm2String* type,
+                                    double bytes_loaded, double bytes_total)
+{
+	if (g_progress_event_class == NULL) return NULL;
+	Avm2Value args[5];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(0);
+	args[2] = avm2_bool(0);
+	args[3] = avm2_number(bytes_loaded);
+	args[4] = avm2_number(bytes_total);
+	Avm2Value v = avm2_class_construct(ctx, g_progress_event_class, args, 5);
+	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+}
+
+Avm2Object* avm2_io_error_event_new(Avm2Context* ctx, const Avm2String* type,
+                                    const Avm2String* text, int32_t error_id)
+{
+	if (g_io_error_event_class == NULL) return NULL;
+	Avm2Value args[5];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(0);
+	args[2] = avm2_bool(0);
+	args[3] = avm2_string(text);
+	args[4] = avm2_integer(error_id);
+	Avm2Value v = avm2_class_construct(ctx, g_io_error_event_class, args, 5);
+	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
 }
 
 static void register_input_events(Avm2Context* ctx)
