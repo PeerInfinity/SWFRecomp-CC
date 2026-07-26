@@ -3754,7 +3754,15 @@ int avm2_has_public_property(Avm2Context* ctx, Avm2Value recv,
 	}
 	Avm2PropKey key = avm2_public_key(name, name_len);
 	Resolved r;
-	return resolve_key(ctx, recv, &key, 1, &r);
+	if (!resolve_key(ctx, recv, &key, 1, &r)) return 0;
+	// A ByteArray index always resolves (index access never forwards to the
+	// prototype, even out of bounds), but `in` answers false past the end --
+	// as3/ByteArray's "hasAtomProperty false" row, `5 in ba` with length 3.
+	if (r.is_bytearray_elem)
+	{
+		return r.arr_index < avm2_bytearray_ext_of(recv)->len;
+	}
+	return 1;
 }
 
 int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
