@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 847/1574 passing | Graphics: 1426/1574 passing
+Trace: 847/1574 passing | Graphics: 1439/1574 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (579 tests)
+## Graphics Improvements (592 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -589,7 +589,20 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 573 | `ecma3/Unicode/uFE70_ArabicPresentationForms_B` | Output Mismatch | 16/21 lines match |
 | 574 | `ecma3/Unicode/uFF00_HalfwidthandFullwidthForms` | Output Mismatch | 16/21 lines match |
 | 575 | `ecma3/Unicode/uFFF0_Specials` | Output Mismatch | 16/21 lines match |
-| 576 | `regress/bug_538107` | Output Mismatch | 0/2 lines match |
-| 577 | `regress/bug_551587_2_swf10` | Output Mismatch | 0/2 lines match |
-| 578 | `regress/bug_551587_2_swf11` | Output Mismatch | 0/2 lines match |
-| 579 | `regress/bug_609416_swf11` | Output Mismatch | 0/1 lines match |
+| 576 | `mops/lf32` | Runtime Error | 0/20 lines match |
+| 577 | `mops/lf64` | Runtime Error | 0/21 lines match |
+| 578 | `mops/li16` | Runtime Error | 0/26 lines match |
+| 579 | `mops/li32` | Runtime Error | 0/20 lines match |
+| 580 | `mops/li8` | Runtime Error | 0/46 lines match |
+| 581 | `mops/lix16` | Runtime Error | 0/17 lines match |
+| 582 | `mops/lix8` | Runtime Error | 0/21 lines match |
+| 583 | `mops/mops_basics` | Timeout | runtime timeout (>10s) |
+| 584 | `mops/sf32` | Runtime Error | 0/26 lines match |
+| 585 | `mops/sf64` | Runtime Error | 0/51 lines match |
+| 586 | `mops/si16` | Runtime Error | 0/28 lines match |
+| 587 | `mops/si32` | Runtime Error | 0/33 lines match |
+| 588 | `mops/si8` | Runtime Error | 0/28 lines match |
+| 589 | `regress/bug_538107` | Output Mismatch | 0/2 lines match |
+| 590 | `regress/bug_551587_2_swf10` | Output Mismatch | 0/2 lines match |
+| 591 | `regress/bug_551587_2_swf11` | Output Mismatch | 0/2 lines match |
+| 592 | `regress/bug_609416_swf11` | Output Mismatch | 0/1 lines match |
