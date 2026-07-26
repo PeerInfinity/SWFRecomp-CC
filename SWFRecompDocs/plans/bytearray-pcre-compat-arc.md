@@ -1,5 +1,28 @@
 # Arc: ByteArray hardening + Tamarin-PCRE compat — two independent tracks, ~8–11 tests
 
+**STATUS: DONE 2026-07-26 — `997d0c003` + `db7135ae5` + `e482c8b02` +
+`4cdea28fe` + `1884c6ab9`, CI `30185616752` (graphics, `categories=full`).
+Delivered +11 corpus against a predicted 8–11, zero pass→fail regressions,
+and the crash histogram's timeout 3 → 0 (this doc predicted 3 → 1;
+`avm2/bytearray_oom` turned out to be the same infinite loop, so it came
+free). The full write-up is
+`ruffle-tests/tests/swfs/from_avmplus/_investigation/CURRENT_STATUS.md`
+§"Fix landed: the ByteArray + Tamarin-PCRE compat arc".**
+
+Two corrections to the prescription below, both found while implementing:
+
+- **1b's iteration count is 4 and 2, not 8-16k.** `0x100000000 -
+  0xFFFFC000 = 0x4000`, stepped by 4096. The tests are short; they were
+  hanging on the *first* iteration.
+- **2b cannot finish `pcre_find_fixedlength`.** Its `match(re)` row records
+  avmplus returning 500 real capture *values*; the >255 rewrite only
+  restores grouping, so that test caps at 19/20 unless libregexp is forked
+  (its bytecode stores capture indices as bytes). Track 2 therefore yields
+  4 tests, not 5 — the shortfall was covered by `avm2/bytearray_oom` on
+  track 1.
+
+---
+
 Opus-ready handoff. Fable diagnosis pass 2026-07-26 (code sites and every
 test diff verified at `48d443f01`). The map listed both clusters as
 "undiagnosed"; they are now fully diagnosed and neither needs new

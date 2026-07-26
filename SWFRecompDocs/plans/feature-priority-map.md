@@ -30,11 +30,16 @@ nested dirs** to exclude — `from_avmplus/as3/Vector` (59) and
 one `avm1` and one `avm2` test). Older figures in this document quote
 4414; the two-test drift does not change any of them materially.
 
-Full corpus, graphics mode at **`ffe48dff6`**: **3803/4416 effective
-(86.1%)**, 613 failing — from CI run `30182973510`, complete over the full
+Full corpus, graphics mode at **`1884c6ab9`**: **3814/4416 effective
+(86.4%)**, 602 failing — from CI run `30185616752`, complete over the full
 4416-test intersection, so this figure needs no shard arithmetic. The mops
-run before it improved the crash histogram (runtime_error 21 → 8, timeout
-4 → 3) and the builtin-container-subclass arc held it flat.
+run improved the crash histogram (runtime_error 21 → 8, timeout 4 → 3),
+the builtin-container-subclass arc held it flat, and the ByteArray +
+Tamarin-PCRE arc **took timeout to 0** — all three remaining ones were the
+same uint32 capacity-doubling infinite loop. segfault went 3 → 4 on
+`avm2/edittext_align`, which is an intermittent crash-after-correct-output,
+not a functional regression (see the arc's entry in the from_avmplus
+CURRENT_STATUS).
 
 Status histogram across the two runs of 2026-07-25, over all 4414: pass
 **3452 → 3472 → 3497**, output_mismatch **696 → 676 → 651**, and
@@ -44,10 +49,10 @@ Both gains are entirely inside `from_avmplus`.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | **1498/1574** | 95.2 | 76 | **language + builtins** (Tamarin acceptance) |
+| from_avmplus | **1508/1574** | 95.8 | 66 | **language + builtins** (Tamarin acceptance) |
 | avm2 | 868/1218 | 71.3 | 350 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 655/717 | 91.4 | 62 | long tail |
-| from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
+| from_shumway | 172/229 | 75.1 | 57 | AVM2 half: Loader, timeline nav, fuzz corpus |
 | from_gnash (5) | 371/403 | 92.1 | 32 | long tail |
 | misc (9 cats) | 170/205 | 82.9 | 35 | text/fonts/mixed_avm/stage3d markers |
 | regression | 70/70 | 100 | 0 | ours |
@@ -526,8 +531,9 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | `ecma3/JSON` (four independent root causes) | **5** (pred. 4) | small | **DONE `7ad4e0419`**, CI `30176986441`; `ecma3/JSON` 8/12 → 12/12 |
 | ~~—~~ | Alchemy domain memory (`li8`…`sf64` + `ApplicationDomain.domainMemory`) | **14** (pred. 13) | medium | **DONE `5da28a6a5`**, CI `30179405893`; `mops` 0/13 → 13/13 + `avm2/domain_memory` |
 | ~~—~~ | Builtin-container subclasses (five independent causes) | **11** (pred. 4-6) | medium | **DONE** `20a3d24c7`+`4c6b18d5c`+`505b330f2`+`81b18da78`+`ffe48dff6`, CI `30182973510` |
-| 1 | `as3/ByteArray` + `recursion/pcre_*` + `from_shumway/lzma_bytes` | **8–11** | medium | **diagnosed 2026-07-26; Opus-ready handoff: `SWFRecompDocs/plans/bytearray-pcre-compat-arc.md`.** The "timeouts" are an infinite loop (uint32 cap-doubling overflow); LZMA needs a vendored codec; the pcre tests pin Tamarin-PCRE quirks (>255 captures, fixed-length lookbehind) fixable in the regex preprocessor |
-| 3 | Declared-ABC method arity checking (`avm2/wrong_arg_count`, `avm2/error_geterrormessage`) | 2 | small | undiagnosed |
+| ~~—~~ | `as3/ByteArray` + `recursion/pcre_*` + `from_shumway/lzma_bytes` (five independent causes) | **11** (pred. 8–11) | medium | **DONE** `997d0c003`+`db7135ae5`+`e482c8b02`+`4cdea28fe`+`1884c6ab9`, CI `30185616752`; **timeout 3 → 0** |
+| 1 | Declared-ABC method arity checking (`avm2/wrong_arg_count`, `avm2/error_geterrormessage`) | 2 | small | undiagnosed |
+| 2 | avm2-platform mass: Loader (31), net/socket (30), input (25) | ~86 | large | the next real mass — see the avm2 section below |
 
 **DONE — the `ecma3/JSON` arc.** `7ad4e0419`, CI `30176986441`: **+5**,
 0 regressions, crash histogram flat. **The diagnosis this table carried

@@ -1,14 +1,15 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-25 — **seven arcs landed, all CI-confirmed: `static
+Last updated: 2026-07-26 — **eight arcs landed, all CI-confirmed: `static
 const` is read-only, the `ecma3/FunctionObjects` arc, typed builtin
 prototypes, the `as3/Vector` arc, the `ecma3/JSON` arc, the Alchemy
-domain-memory (mops) arc, and the builtin-container-subclass arc.** The Adobe
+domain-memory (mops) arc, the builtin-container-subclass arc, and the
+ByteArray + Tamarin-PCRE compat arc.** The Adobe
 Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`: **871/1574
 effective (55.3%)**, identical in graphics and no-graphics.
 
-Thirteen fixes have landed since:
+Fourteen fixes have landed since:
 
 1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
    `#2023`. e4x **2/177 → 160/177**.
@@ -81,9 +82,23 @@ Thirteen fixes have landed since:
     deleteNonexistentFixedProperty}` — the sealed-delete rule again, as
     `shared-mechanism-fixes-overshoot-estimates` predicts.
 
-The suite stands at **1498/1574 effective (95.2%)**; the corpus at
-**3803/4416 (86.1%)**. **Zero pass→fail regressions across all thirteen
-runs.**
+14. `997d0c003` + `db7135ae5` + `e482c8b02` + `4cdea28fe` + `1884c6ab9` —
+    the ByteArray + Tamarin-PCRE compat arc, two independent tracks
+    (below): `in` on a ByteArray bounds-checks the index; a huge
+    `ByteArray.length` throws `#1000` instead of spinning forever in an
+    overflowed capacity-doubling loop; `compress`/`uncompress("lzma")` go
+    through a vendored LZMA SDK; >255-capture patterns compile as
+    non-capturing groups; and a variable-length lookbehind is rejected the
+    way PCRE does. **+10** here plus `avm2/bytearray_oom` and
+    `from_shumway/lzma_bytes` = **+11** corpus (1 net in `avm2` — see the
+    regression note), predicted 8–11. CI `30185616752`. **Crash histogram:
+    timeout 3 → 0** (all three were ByteArray) — the doc predicted 3 → 1;
+    `avm2/bytearray_oom` turned out to be the same infinite loop.
+    segfault 3 → 4, runtime_error 8, recomp_fail 1.
+
+The suite stands at **1508/1574 effective (95.8%)**; the corpus at
+**3814/4416 (86.4%)**. **Zero pass→fail regressions across all fourteen
+runs**, with one intermittent crash to watch (below).
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
 file reads 1143/1522 — 52 from_avmplus tests ungraded. 1174 = the
@@ -179,7 +194,7 @@ At `e618f62ab`:
 | 9/46 | `ecma3/Exceptions` | assorted |
 | 7/212 | `as3/Definitions` | error-message wording |
 | 6/12 | `ecma3/JSON` | lexer whitespace handling |
-| 5/5 | `as3/ByteArray` | LZMA compress/decompress |
+| 0/5 | `as3/ByteArray` | LZMA compress/decompress — **fixed**, arc 14 |
 | 5/67 | `e4x/XML` | E4X polish |
 | 5/51 | `ecma3/Array` | typed builtin prototypes + assorted |
 | 5/83 | `ecma3/String` | typed builtin prototypes + assorted |
@@ -698,6 +713,102 @@ already passing. Our E4X engine (`avm2_e4x.c` / `avm2_xml.c`) handles
 Tamarin's XML/XMLList/QName/Namespace/TypeConversion suites essentially in
 full. e4x now stands at **160/177**; the 17-test residue (3 of them
 known_failure) is ordinary polish, not an arc.
+
+## Fix landed: the ByteArray + Tamarin-PCRE compat arc (`1884c6ab9`, +11)
+
+CI `30185616752`, mode=graphics, `categories=full`, complete 4416-test
+intersection. Two tracks that share nothing, five commits, **+11 corpus**
+against a predicted 8–11 — and the crash histogram's **timeout 3 → 0**
+(the handoff predicted 3 → 1; the third timeout turned out to be the same
+bug).
+
+### Track 1 — ByteArray
+
+- **`in` bounds-checks the index** (`997d0c003`). `resolve_key` marks any
+  numeric name on a ByteArray receiver as an element hit — index access
+  must never forward to the prototype, even out of bounds — and
+  `avm2_has_public_property` read that as "has". `5 in ba` with
+  `ba.length == 3` answered true. `as3/ByteArray/ByteArray` 424/425 → pass.
+
+- **Huge `length` throws `#1000` instead of hanging** (`db7135ae5`).
+  `ba_set_length`'s `while (new_cap < new_len) new_cap *= 2` overflows
+  uint32 to 0 once `new_cap` reaches 2^31 and then spins forever, so
+  `new ByteArray().length = 0xFFFFC000` was an **infinite loop, not a slow
+  allocation** — and every `write_at` / `writeBytes` / `readBytes` caller
+  that grew past 2 GB reached the same loop. avmplus caps the backing store
+  at MMgc's `kMaxObjectSize`; both failure routes in `ByteArrayGlue.cpp`
+  (the `mmfx_new_array_opt()` null return at :147 and the
+  `minimumCapacity` check at :132) surface as Error #1000. The guard sits
+  at the boundary the corpus pins, `0xFFFFC000`, **before any allocation**
+  — heap exhaustion here is `avm2_fatal`, not catchable. Flips
+  `ByteArray_bug662851_{32,64}bit`, and **`avm2/bytearray_oom`** was the
+  same loop.
+
+- **Real LZMA** (`1884c6ab9`). `compress`/`uncompress("lzma")` were
+  deliberately absent, matching Ruffle built *without* its `lzma` feature;
+  upstream runs the corpus **with** it, so the expected outputs are real
+  round-trips. LZMA SDK 18.05 (public domain) is vendored at
+  `SWFModernRuntime/third_party/lzma` with a `lzma_alone.[ch]` wrapper for
+  the LZMA-alone container (13-byte header: properties byte, u32le dict
+  size, u64le uncompressed size) — the format lzma_rs speaks and the one
+  the `LZMA.jar` blobs in `ByteArrayLzmaThirdParty` pin. `ByteArrayLzma`
+  7/397 → 397/397, plus `ByteArrayLzmaThirdParty` and
+  `from_shumway/lzma_bytes`.
+
+### Track 2 — Tamarin-PCRE compat, entirely in `re_preprocess`
+
+**Read those expected outputs as behaviour recordings, not assertions to
+satisfy**: avmplus FAILED some of its own assertions and `output.txt`
+records the `FAILED! expected: -1 got: 0` lines verbatim. The job is to
+reproduce avmplus's behaviour, including its assertion failures.
+
+- **>255 captures** (`e482c8b02`). libregexp caps at `CAPTURE_COUNT_MAX`
+  (255); a pattern over it fails to compile and never matches. avmplus
+  handles them. The preprocessor counts capturing groups and, at ≥ 255
+  **with no backreferences to renumber**, demotes plain `(` to `(?:`. That
+  gate is what makes it strictly monotone — every pattern it touches
+  matches nothing today. Fixes `pcre_could_be_empty_branch`,
+  `pcre_is_anchored`, `pcre_is_startline`, `pcre_find_firstassertedchar`.
+
+- **Fixed-length lookbehind** (`4cdea28fe`). PCRE requires it; libregexp
+  implements ES2018 variable-length lookbehind, so we matched where
+  avmplus errors. A validator in the preprocessor routes a violation to
+  the existing failed-compile / never-match path. The rule, pinned row by
+  row from `pcre_find_fixedlength`: every branch must be fixed-length, but
+  the lookbehind's **own top-level** branches may differ —
+  `(?<=a{3}|b{2})` is legal, `(?<=(a{3}|b{2}))` is not, and
+  `(?<=(x(a|b)c|bbb))` is legal again because the nested branches are
+  equal-length. Inexact quantifiers (`?`, `*`, `+`, `{n,}`, `{n,m}`) are
+  errors. Anything the scanner cannot model — backreferences, inline
+  modifiers, nesting past 200 deep — returns UNKNOWN and is left matching:
+  under-rejecting costs yield, over-rejecting breaks working patterns.
+  `regress/bug_673284` (differing top-level branches) and the avm2 regexp
+  and string tests are unaffected.
+
+### Known residue: `pcre_find_fixedlength` is capped at 19/20
+
+The one line left is `strOriginal.match(re)`, whose recorded avmplus
+output is `hello` followed by **500 `blah` captures**. Reproducing it needs
+500 *real* capture groups; libregexp stores capture indices as bytes in its
+bytecode, so raising `CAPTURE_COUNT_MAX` is a fork of the vendored engine,
+not a tweak. Track 2's rewrite gets the other two rows of that family
+(`search` → 4 and `replace` → `blahgoodbye`, which do not read groups).
+This test cannot pass without forking libregexp.
+
+### Watch: `avm2/edittext_align` (segfault 3 → 4)
+
+The one status regression in this run, and it is **not** a functional one:
+`SIGSEGV (output matches)` with 60/60 lines, i.e. it crashed after
+producing byte-identical output, and its run phase took 15.9 s against a
+normal 0.3 s. Evidence that it is intermittent rather than caused by this
+arc: a single-test CI run at the same commit (`30186909756`) **passed**, as
+did 20 consecutive local graphics runs after one initial failure (1/29),
+and an ASAN build passes clean with no memory error. The
+`mode-consolidation-plan` memory already flagged this exact test as a
+case-v6-style latent crash to watch. None of this arc's code runs in that
+test — the plausible mechanism is link/heap layout shifting a latent bug,
+which the four extra LZMA translation units would do. Re-check it on the
+next full run; if it recurs, it is worth chasing on its own.
 
 ## Next arcs (expected yield)
 
