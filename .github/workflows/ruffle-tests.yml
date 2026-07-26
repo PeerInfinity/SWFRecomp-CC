@@ -436,7 +436,15 @@ jobs:
         # with no code change behind them. A verify run's value is its
         # pass/fail signal, not its numbers; the JSONs remain available as
         # workflow artifacts either way.
-        if: always() && inputs.extra_defines == ''
+        #
+        # The same reasoning covers `single_test`, which used to satisfy this
+        # guard and publish. A single-test run rebuilds the results tree from
+        # the MASTER CHECKOUT with one test patched in, so dispatching one
+        # before pushing a results merge force-pushed a pre-merge tree over
+        # the branch and erased an arc's published numbers (run 30186909756,
+        # 2026-07-26). Its value is the per-test verdict in the log and the
+        # uploaded artifact — never the branch.
+        if: always() && inputs.extra_defines == '' && inputs.single_test == ''
         run: |
           # Per-mode result-JSON stem. Each CI run produces a fresh
           # {STEM}.json plus a fetched {STEM}_previous.json; everything else
@@ -1456,7 +1464,15 @@ jobs:
         # with no code change behind them. A verify run's value is its
         # pass/fail signal, not its numbers; the JSONs remain available as
         # workflow artifacts either way.
-        if: always() && inputs.extra_defines == ''
+        #
+        # The same reasoning covers `single_test`, which used to satisfy this
+        # guard and publish. A single-test run rebuilds the results tree from
+        # the MASTER CHECKOUT with one test patched in, so dispatching one
+        # before pushing a results merge force-pushed a pre-merge tree over
+        # the branch and erased an arc's published numbers (run 30186909756,
+        # 2026-07-26). Its value is the per-test verdict in the log and the
+        # uploaded artifact — never the branch.
+        if: always() && inputs.extra_defines == '' && inputs.single_test == ''
         run: |
           # Per-mode result-JSON stem. Each CI run produces a fresh
           # {STEM}.json plus a fetched {STEM}_previous.json; everything else
