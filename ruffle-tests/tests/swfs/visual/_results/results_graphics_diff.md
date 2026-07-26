@@ -1,8 +1,7 @@
 # Ruffle Test Results Diff
 
 **Previous:** `1884c6ab93fe` (2026-07-26T03:36:27.438477+00:00)
-**Current:** `1884c6ab93fe` (2026-07-26T03:36:27.438477+00:00)
-*Re-run on same commit — no comparison available.*
+**Current:** `add3e60cef2f` (2026-07-26T19:38:35.262038+00:00)
 
 ## Summary
 
@@ -12,3 +11,5 @@
 | Total | 142 | 142 | 0 |
 | Pass rate | 94.4% | 94.4% | 0% |
 | Mismatched lines | 112 | 112 | 0 |
+
+No changes detected.
