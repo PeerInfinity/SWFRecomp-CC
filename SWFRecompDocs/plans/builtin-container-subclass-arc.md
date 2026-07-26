@@ -1,4 +1,43 @@
-# Arc: builtin-container subclasses — ~4–6 tests, four sub-causes
+# Arc: builtin-container subclasses — **DONE, +11** (predicted 4–6)
+
+**Status 2026-07-25: complete and CI-confirmed.** `20a3d24c7` (A) +
+`4c6b18d5c` (B) + `505b330f2` (C) + `81b18da78` (D) + `ffe48dff6` (E),
+CI run `30182973510` (graphics, `categories=full`): **+11 effective, 0
+regressions**, crash histogram flat at the post-mops target
+(segfault 3 / timeout 3 / runtime_error 8 / recomp_fail 1).
+from_avmplus 1488 → 1498, avm2 867 → 868, corpus 3792 → 3803/4416.
+
+All six targeted tests are effective passes: `bug_420755`,
+`bug_654807_swf12`, `bug_654807_swf13`, `DictionarySubclass`,
+`bug_687838` pass outright; `length_mods` goes 9 lines → 15/20 and is
+promoted to `ruffle_matched` (Ruffle itself dies on line 10 with #1034).
+Overshoot: sub-cause B also took
+`as3/Expressions/deleteOperator/{deleteFixedFunction, deleteFixedVar,
+deleteNonexistentFixedProperty}` and `avm2/indexing_delete`.
+
+**What the prescription got wrong, for the next design pass:**
+- **E was not optional and not adjacent — it was cheap and it was a real
+  fifth cause.** Sub-cause A alone fixed bug_687838's `Cls .proto array
+  trans` rows (an `extends Array` prototype is now a real array
+  instance), leaving only the `Fcn .proto array trans/immed` family: a
+  ~30-line proto-chain walk in `resolve_key`/`resolve_mn`. Take it.
+- **D's direction was inverted.** The doc says "swf13 expects the
+  semisealed method rows to succeed; swf12 expects #1069". It is the
+  other way round: swf12 is the "semisealed" column (methods work, index
+  access throws), swf13 the "sealed" one (no storage at all). Our
+  pre-arc behaviour already matched swf13's column, which is why it read
+  102/170 against swf12's 54/170. Diffing the two `output.txt` files
+  showed only the label word changing — the real signal was the
+  `true ? "semisealed" : "sealed"` ternary in each `Test.as`.
+- **A `super(args)` hook WAS needed.** The doc said don't build it
+  speculatively and to check whether any test passes a length arg —
+  `length_mods`'s `Subarray` does exactly that (`Subarray(l) { super(l) }`,
+  constructed with `uint.MAX_VALUE`). It is ~20 lines
+  (`Avm2Class.native_super_init` + one arm in `avm2_op_constructsuper`).
+
+The original prescription follows unchanged, for the record.
+
+---
 
 Opus-ready handoff. Fable design pass 2026-07-25 (code sites verified at
 `33b3d75be`). Execute the prescription; where a detail says "pin from the

@@ -30,11 +30,11 @@ nested dirs** to exclude — `from_avmplus/as3/Vector` (59) and
 one `avm1` and one `avm2` test). Older figures in this document quote
 4414; the two-test drift does not change any of them materially.
 
-Full corpus, graphics mode at **`5da28a6a5`**: **3792/4416 effective
-(85.9%)**, 624 failing — from CI run `30179405893`, complete over the full
+Full corpus, graphics mode at **`ffe48dff6`**: **3803/4416 effective
+(86.1%)**, 613 failing — from CI run `30182973510`, complete over the full
 4416-test intersection, so this figure needs no shard arithmetic. The mops
-run also improved the crash histogram: runtime_error 21 → 8, timeout
-4 → 3.
+run before it improved the crash histogram (runtime_error 21 → 8, timeout
+4 → 3) and the builtin-container-subclass arc held it flat.
 
 Status histogram across the two runs of 2026-07-25, over all 4414: pass
 **3452 → 3472 → 3497**, output_mismatch **696 → 676 → 651**, and
@@ -44,8 +44,8 @@ Both gains are entirely inside `from_avmplus`.
 
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
-| from_avmplus | **1488/1574** | 94.5 | 86 | **language + builtins** (Tamarin acceptance) |
-| avm2 | 867/1218 | 71.2 | 351 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
+| from_avmplus | **1498/1574** | 95.2 | 76 | **language + builtins** (Tamarin acceptance) |
+| avm2 | 868/1218 | 71.3 | 350 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 655/717 | 91.4 | 62 | long tail |
 | from_shumway | 171/229 | 74.7 | 58 | AVM2 half: Loader, timeline nav, fuzz corpus |
 | from_gnash (5) | 371/403 | 92.1 | 32 | long tail |
@@ -525,9 +525,10 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | `as3/Vector` (four independent root causes) | **15** (pred. 14) | medium | **DONE `81cf6a669`+`222b4a4b5`+`a85726a54`+`2b244c01b`**, CI `30174981516` |
 | ~~—~~ | `ecma3/JSON` (four independent root causes) | **5** (pred. 4) | small | **DONE `7ad4e0419`**, CI `30176986441`; `ecma3/JSON` 8/12 → 12/12 |
 | ~~—~~ | Alchemy domain memory (`li8`…`sf64` + `ApplicationDomain.domainMemory`) | **14** (pred. 13) | medium | **DONE `5da28a6a5`**, CI `30179405893`; `mops` 0/13 → 13/13 + `avm2/domain_memory` |
-| 1 | Builtin-container subclasses get no element storage | ~7 | medium | see below |
-| 2 | `as3/ByteArray` | 5 (2 of them timeouts) | ? | undiagnosed |
-| 3 | `recursion/pcre_*` | 5 | ? | undiagnosed |
+| ~~—~~ | Builtin-container subclasses (five independent causes) | **11** (pred. 4-6) | medium | **DONE** `20a3d24c7`+`4c6b18d5c`+`505b330f2`+`81b18da78`+`ffe48dff6`, CI `30182973510` |
+| 1 | `as3/ByteArray` | 5 (2 of them timeouts) | ? | undiagnosed |
+| 2 | `recursion/pcre_*` | 5 | ? | undiagnosed |
+| 3 | Declared-ABC method arity checking (`avm2/wrong_arg_count`, `avm2/error_geterrormessage`) | 2 | small | undiagnosed |
 
 **DONE — the `ecma3/JSON` arc.** `7ad4e0419`, CI `30176986441`: **+5**,
 0 regressions, crash histogram flat. **The diagnosis this table carried
@@ -561,19 +562,40 @@ regardless of `ByteArray.endian`, out-of-range is `#1506`. Beyond the
 corpus this unlocks Alchemy/CrossBridge-compiled SWFs. Post-mortem in
 `SWFRecompDocs/plans/alchemy-domain-memory-arc.md`.
 
-**Next arc — builtin-container subclasses (~7 tests).** A SWF class that
-`extends Array` allocates as `AVM2_OBJ_SCRIPT`, so it gets no element
-storage: `avm2_array_ext` returns NULL, index writes fall through to
-dynamic props, and `length` stays 0. `avm2_class_construct` already
-inherits `native_ext_size` down the superclass chain — it just doesn't
-inherit the object *kind*. Tests: `as3/Array/length_mods`,
-`regress/bug_654807_swf12`, `regress/bug_654807_swf13`,
-`regress/bug_420755` (its remaining half), `regress/bug_687838`,
-`as3/ShellClasses/DictionarySubclass`, `avm2/displayobject_early_init`.
-The cluster is **not** homogeneous — the Dictionary and `bug_687838`
-diffs look like separate sealed-delete and prototype-index causes — so
-treat 7 as an upper bound on what one mechanism buys, unlike the mops
-group.
+**DONE — the builtin-container-subclass arc.** `20a3d24c7` + `4c6b18d5c`
++ `505b330f2` + `81b18da78` + `ffe48dff6`, CI `30182973510`: **+11**
+(predicted 4-6), 0 regressions, crash histogram flat (segfault 3 /
+timeout 3 / runtime_error 8 / recomp_fail 1). All six targeted tests are
+now effective passes. The "not homogeneous" warning was right — it was
+**five** independent causes, not one:
+
+1. **Object kind is not inherited.** `extends Array` allocated as
+   `AVM2_OBJ_SCRIPT`, so `avm2_array_ext` returned NULL and every Array
+   method saw no storage. Fixed with a per-class `instance_kind`
+   resolved once at class-define time (NOT through `native_ext_size` —
+   Array's is 0 by design and ByteArray already owns that mechanism).
+   The same commit adds `native_super_init`, because `super(length)`
+   into a builtin was a silent no-op: builtins get an `instance_init`
+   stub and their real constructor lives in `native_construct`, which
+   allocates and therefore cannot run on an already-allocated receiver.
+2. **`delete` of a missing property on a sealed instance is `false`,**
+   not the ES3 `true`. Cheapest cause, biggest overshoot: it took
+   `DictionarySubclass` plus three `as3/Expressions/deleteOperator`
+   tests and `avm2/indexing_delete`.
+3. **The toplevel `AS3` namespace did not exist,** so `a.AS3::pop()`
+   died with `#1065` before anything else could run.
+4. **avmplus bug 654807 is version-gated,** and `bug_654807_swf12` vs
+   `_swf13` — same source, SWF 12 and 13, opposite expectations — is
+   the test *for that gate*. From SWF 13 a sealed Array subclass gets no
+   element storage; below it, storage but sealed index access, so the
+   dense-path methods work while the generic-loop ones throw `#1069`.
+5. **Index reads did not resolve through an Array-valued prototype**
+   (`D.prototype = new Array; D.prototype[1] = x`) for non-array
+   receivers — the same family as `avm2-array-prototype-index-storage`,
+   which had only covered array receivers.
+
+`avm2/displayobject_early_init` was correctly excluded: its residue is
+BitmapData `#2015` validation, i.e. platform work.
 
 **DONE — the `as3/Vector` arc.** `81cf6a669` + `222b4a4b5` + `a85726a54`
 + `2b244c01b`, CI `30174981516`: **+15** from_avmplus, 0 regressions,

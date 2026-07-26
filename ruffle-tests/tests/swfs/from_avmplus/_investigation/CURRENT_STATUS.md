@@ -1,13 +1,14 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-25 — **five arcs landed, all CI-confirmed: `static
+Last updated: 2026-07-25 — **seven arcs landed, all CI-confirmed: `static
 const` is read-only, the `ecma3/FunctionObjects` arc, typed builtin
-prototypes, the `as3/Vector` arc, and the `ecma3/JSON` arc.** The Adobe
+prototypes, the `as3/Vector` arc, the `ecma3/JSON` arc, the Alchemy
+domain-memory (mops) arc, and the builtin-container-subclass arc.** The Adobe
 Tamarin/avmplus acceptance suite (1574 tests, 100% AVM2) was imported
 2026-07-24 and baselined in both CI modes at `eabb3b366`: **871/1574
 effective (55.3%)**, identical in graphics and no-graphics.
 
-Eleven fixes have landed since:
+Thirteen fixes have landed since:
 
 1. `d36c8da2b` — root SymbolClass must inherit Sprite → trace TypeError
    `#2023`. e4x **2/177 → 160/177**.
@@ -65,8 +66,23 @@ Eleven fixes have landed since:
     13. CI `30179405893`. Crash histogram improved: runtime_error
     21 → 8, timeout 4 → 3.
 
-The suite stands at **1488/1574 effective (94.5%)**; the corpus at
-**3792/4416 (85.9%)**. **Zero pass→fail regressions across all twelve
+13. `20a3d24c7` + `4c6b18d5c` + `505b330f2` + `81b18da78` + `ffe48dff6` —
+    the builtin-container-subclass arc, five independent causes (below):
+    `extends Array` instances get real element storage (a per-class
+    inherited object kind) and `super(args)` into a builtin runs on the
+    already-allocated receiver; `delete` of a missing property on a sealed
+    instance is `false`; the global `AS3` namespace exists; sealed Array
+    subclasses are version-gated per avmplus bug 654807; and index reads
+    resolve through an Array-valued prototype. **+10** here plus
+    `avm2/indexing_delete` = **+11** corpus, predicted 4–6.
+    CI `30182973510`. Crash histogram flat (segfault 3 / timeout 3 /
+    runtime_error 8 / recomp_fail 1). The three-test overshoot is
+    `as3/Expressions/deleteOperator/{deleteFixedFunction, deleteFixedVar,
+    deleteNonexistentFixedProperty}` — the sealed-delete rule again, as
+    `shared-mechanism-fixes-overshoot-estimates` predicts.
+
+The suite stands at **1498/1574 effective (95.2%)**; the corpus at
+**3803/4416 (86.1%)**. **Zero pass→fail regressions across all thirteen
 runs.**
 
 (Run `30130444073` lost shard 29/30 to the apt/Vulkan flake, so its own
@@ -743,9 +759,12 @@ board. `Error1074IllegalWriteToReadOnlyProp` is additionally blocked by
 `VerifyError #1108` (`OP_newclass` with the incorrect base class), a
 separate recompiler bug.
 
-Two one-test items also still open: **`Variable AS3 is not defined`**
-(`as3/Array/length_mods`) and **`isXMLName` undefined**
-(`e4x/Global/e13_1_2_1`).
+One one-test item is still open: **`isXMLName` undefined**
+(`e4x/Global/e13_1_2_1`). (**`Variable AS3 is not defined`** was fixed in
+run 13 — `505b330f2` defines the toplevel `AS3` namespace, and
+`as3/Array/length_mods` went 9 lines → 15/20, promoted to
+`ruffle_matched`. Its five remaining rows are avmplus's separate
+`public::`-generic-prototype-function length arithmetic, Bugzilla 681803.)
 
 Parked: the 49 remaining `known_failure` tests. (**`mops`** was un-parked
 and completed 2026-07-25 — `5da28a6a5`, 13/13; see run 12 above.)
