@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-26 21:32 UTC
+**Date**: 2026-07-26 22:42 UTC
 
-**Git SHA**: `24cb841ec0`
+**Git SHA**: `9f4be9647b`
 
-**Run Duration**: 39m 59s
+**Run Duration**: 39m 34s
 
 ## Summary
 
@@ -31,167 +31,167 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `3_joystick` | 4 | 24.2s |  |
+| 1 | `3_joystick` | 4 | 24.1s |  |
 | 2 | `MaskTest` | 0 | 5.4s |  |
 | 3 | `MaskTest-2` | 0 | 5.7s |  |
-| 4 | `ZeroClipboardTest` | 3 | 23.6s |  |
-| 5 | `acid/acid` | 1 | 33.6s |  |
-| 6 | `acid/acid-big` | 0 | 39.1s |  |
+| 4 | `ZeroClipboardTest` | 3 | 23.4s |  |
+| 5 | `acid/acid` | 1 | 33.4s |  |
+| 6 | `acid/acid-big` | 0 | 38.8s |  |
 | 7 | `acid/acid-bitmap-draw_quality_high` | 0 | 24.2s |  |
-| 8 | `acid/acid-bitmap-draw_quality_low` | 0 | 24.8s |  |
-| 9 | `acid/acid-bitmap-fill` | 0 | 24.2s |  |
-| 10 | `acid/acid-bitmap-fill-2` | 0 | 4.1s |  |
-| 11 | `acid/acid-bitmapData-copyPixels` | 0 | 6.6s |  |
-| 12 | `acid/acid-bitmapData-draw` | 0 | 6.3s |  |
-| 13 | `acid/acid-bitmaps` | 0 | 25.6s |  |
-| 14 | `acid/acid-blend` | 0 | 40.9s |  |
-| 15 | `acid/acid-blend-2` | 0 | 24.4s |  |
-| 16 | `acid/acid-chars` | 0 | 2.3s |  |
-| 17 | `acid/acid-child` | 0 | 22.1s |  |
-| 18 | `acid/acid-clip` | 0 | 2.5s |  |
-| 19 | `acid/acid-clip-2` | 0 | 2.3s |  |
-| 20 | `acid/acid-clip-3` | 0 | 6.8s |  |
-| 21 | `acid/acid-color` | 0 | 34.1s |  |
-| 22 | `acid/acid-color-0` | 0 | 5.3s |  |
-| 23 | `acid/acid-color-2` | 0 | 2.3s |  |
-| 24 | `acid/acid-filter-2` | 0 | 2.6s |  |
-| 25 | `acid/acid-gc` | 0 | 2.4s |  |
-| 26 | `acid/acid-gradient` | 0 | 2.4s |  |
-| 27 | `acid/acid-gradient-0` | 0 | 22.5s |  |
-| 28 | `acid/acid-gradient-1` | 0 | 2.3s |  |
-| 29 | `acid/acid-gradient-2` | 0 | 2.3s |  |
-| 30 | `acid/acid-image` | 0 | 29.3s |  |
-| 31 | `acid/acid-large` | 0 | 62.3s |  |
-| 32 | `acid/acid-mask` | 0 | 6.2s |  |
-| 33 | `acid/acid-scale` | 0 | 2.1s |  |
-| 34 | `acid/acid-small` | 0 | 2.4s |  |
-| 35 | `acid/acid-stroke-0` | 0 | 20.7s |  |
-| 36 | `acid/acid-text` | 0 | 2.3s |  |
-| 37 | `acid/acid-text-3` | 0 | 2.2s |  |
+| 8 | `acid/acid-bitmap-draw_quality_low` | 0 | 24.9s |  |
+| 9 | `acid/acid-bitmap-fill` | 0 | 23.9s |  |
+| 10 | `acid/acid-bitmap-fill-2` | 0 | 4.0s |  |
+| 11 | `acid/acid-bitmapData-copyPixels` | 0 | 6.4s |  |
+| 12 | `acid/acid-bitmapData-draw` | 0 | 6.2s |  |
+| 13 | `acid/acid-bitmaps` | 0 | 25.3s |  |
+| 14 | `acid/acid-blend` | 0 | 40.2s |  |
+| 15 | `acid/acid-blend-2` | 0 | 23.5s |  |
+| 16 | `acid/acid-chars` | 0 | 2.2s |  |
+| 17 | `acid/acid-child` | 0 | 20.3s |  |
+| 18 | `acid/acid-clip` | 0 | 2.4s |  |
+| 19 | `acid/acid-clip-2` | 0 | 2.1s |  |
+| 20 | `acid/acid-clip-3` | 0 | 6.5s |  |
+| 21 | `acid/acid-color` | 0 | 33.1s |  |
+| 22 | `acid/acid-color-0` | 0 | 5.0s |  |
+| 23 | `acid/acid-color-2` | 0 | 2.1s |  |
+| 24 | `acid/acid-filter-2` | 0 | 2.2s |  |
+| 25 | `acid/acid-gc` | 0 | 2.0s |  |
+| 26 | `acid/acid-gradient` | 0 | 2.0s |  |
+| 27 | `acid/acid-gradient-0` | 0 | 18.4s |  |
+| 28 | `acid/acid-gradient-1` | 0 | 1.9s |  |
+| 29 | `acid/acid-gradient-2` | 0 | 2.0s |  |
+| 30 | `acid/acid-image` | 0 | 23.6s |  |
+| 31 | `acid/acid-large` | 0 | 74.3s |  |
+| 32 | `acid/acid-mask` | 0 | 7.0s |  |
+| 33 | `acid/acid-scale` | 0 | 2.0s |  |
+| 34 | `acid/acid-small` | 0 | 2.5s |  |
+| 35 | `acid/acid-stroke-0` | 0 | 25.2s |  |
+| 36 | `acid/acid-text` | 0 | 2.4s |  |
+| 37 | `acid/acid-text-3` | 0 | 2.3s |  |
 | 38 | `acid/acid-text-4` | 0 | 6.5s |  |
-| 39 | `acid/acid-text-5` | 0 | 27.0s |  |
-| 40 | `acid/acid-text-6` | 0 | 24.3s |  |
-| 41 | `acid/acid-text-escape` | 0 | 2.2s |  |
-| 42 | `acid/acid-textfield-scroll` | 5 | 6.5s |  |
-| 43 | `acid/acid-video` | 0 | 23.0s |  |
+| 39 | `acid/acid-text-5` | 0 | 27.7s |  |
+| 40 | `acid/acid-text-6` | 0 | 25.2s |  |
+| 41 | `acid/acid-text-escape` | 0 | 2.3s |  |
+| 42 | `acid/acid-textfield-scroll` | 5 | 6.8s |  |
+| 43 | `acid/acid-video` | 0 | 24.8s |  |
 | 44 | `add` | 11 | 1.9s |  |
-| 45 | `as3-loader/loaderinfo/Preloader` | 1 | 5.8s |  |
-| 46 | `avm1/array` | 7 | 1.6s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 47 | `avm1/bitmapdata/getPixel` | 2 | 1.5s |  |
-| 48 | `avm1/bitmapdata/loadBitmap` | 3 | 2.1s |  |
-| 49 | `avm1/callee` | 2 | 2.0s |  |
-| 50 | `avm1/depth` | 6 | 2.2s |  |
-| 51 | `avm1/doactionorder/doactionorder` | 7 | 2.4s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
-| 52 | `avm1/doactionorder/symbolclass` | 4 | 2.3s |  |
-| 53 | `avm1/duplicateMovieClip/dontremove` | 6 | 2.3s |  |
-| 54 | `avm1/duplicateMovieClip/duplicateMovieClip` | 4 | 2.2s |  |
-| 55 | `avm1/duplicateMovieClip/name-coercion` | 3 | 1.2s |  |
-| 56 | `avm1/duplicateMovieClip/samedepth` | 6 | 1.3s |  |
-| 57 | `avm1/externalinterface` | 4 | 1.2s |  |
-| 58 | `avm1/filters` | 149 | 1.6s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 59 | `avm1/haxe/flocons1` | 2 | 1.5s |  |
-| 60 | `avm1/haxe/flocons2` | 3 | 1.2s |  |
-| 61 | `avm1/label` | 4 | 1.5s |  |
-| 62 | `avm1/levels` | 9 | 1.9s |  |
-| 63 | `avm1/loadevent` | 9 | 2.1s |  |
-| 64 | `avm1/loadvariables/loadvariables` | 7 | 1.9s |  |
-| 65 | `avm1/loadvariables/loadvars` | 2 | 0.7s |  |
-| 66 | `avm1/lookup` | 3 | 0.7s |  |
-| 67 | `avm1/mouse-transparency` | 1 | 2.0s |  |
-| 68 | `avm1/moviecliploader` | 7 | 2.0s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
-| 69 | `avm1/nativeinheritance` | 6 | 1.9s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 70 | `avm1/nested-button` | 1 | 2.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 71 | `avm1/operations` | 13 | 1.9s |  |
+| 45 | `as3-loader/loaderinfo/Preloader` | 1 | 4.5s |  |
+| 46 | `avm1/array` | 7 | 1.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 47 | `avm1/bitmapdata/getPixel` | 2 | 1.4s |  |
+| 48 | `avm1/bitmapdata/loadBitmap` | 3 | 1.8s |  |
+| 49 | `avm1/callee` | 2 | 1.7s |  |
+| 50 | `avm1/depth` | 6 | 2.0s |  |
+| 51 | `avm1/doactionorder/doactionorder` | 7 | 2.2s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 52 | `avm1/doactionorder/symbolclass` | 4 | 2.0s |  |
+| 53 | `avm1/duplicateMovieClip/dontremove` | 6 | 2.1s |  |
+| 54 | `avm1/duplicateMovieClip/duplicateMovieClip` | 4 | 2.0s |  |
+| 55 | `avm1/duplicateMovieClip/name-coercion` | 3 | 1.8s |  |
+| 56 | `avm1/duplicateMovieClip/samedepth` | 6 | 2.0s |  |
+| 57 | `avm1/externalinterface` | 4 | 1.8s |  |
+| 58 | `avm1/filters` | 149 | 2.3s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 59 | `avm1/haxe/flocons1` | 2 | 1.9s |  |
+| 60 | `avm1/haxe/flocons2` | 3 | 1.8s |  |
+| 61 | `avm1/label` | 4 | 2.1s |  |
+| 62 | `avm1/levels` | 9 | 2.0s |  |
+| 63 | `avm1/loadevent` | 9 | 2.2s |  |
+| 64 | `avm1/loadvariables/loadvariables` | 7 | 2.0s |  |
+| 65 | `avm1/loadvariables/loadvars` | 2 | 0.8s |  |
+| 66 | `avm1/lookup` | 3 | 0.8s |  |
+| 67 | `avm1/mouse-transparency` | 1 | 2.1s |  |
+| 68 | `avm1/moviecliploader` | 7 | 2.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
+| 69 | `avm1/nativeinheritance` | 6 | 2.0s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 70 | `avm1/nested-button` | 1 | 2.0s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 71 | `avm1/operations` | 13 | 2.0s |  |
 | 72 | `avm1/property-paths/property-paths-6` | 6 | 1.9s |  |
 | 73 | `avm1/property-paths/property-paths-7` | 7 | 1.7s |  |
-| 74 | `avm1/propertycase/propertycase` | 7 | 2.0s |  |
+| 74 | `avm1/propertycase/propertycase` | 7 | 1.9s |  |
 | 75 | `avm1/propertycase/propertycase-preserving-6` | 2 | 2.0s |  |
 | 76 | `avm1/propertycase/propertycase-preserving-7` | 5 | 1.7s |  |
 | 77 | `avm1/rollover` | 4 | 2.1s |  |
-| 78 | `avm1/scope` | 14 | 2.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 79 | `avm1/setinterval` | 20 | 2.0s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 80 | `avm1/settimeout` | 17 | 2.0s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 81 | `avm1/super` | 11 | 2.0s |  |
-| 82 | `avm1/target` | 18 | 2.0s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 83 | `avm1/text-bind` | 0 | 22.2s |  |
-| 84 | `avm1/textfield/textfield-html` | 4 | 2.1s |  |
-| 85 | `avm1/textfield/textfield-text-setters` | 8 | 2.1s |  |
-| 86 | `avm1/undefined/undefined-swf6` | 39 | 2.2s |  |
-| 87 | `avm1/undefined/undefined-swf7` | 39 | 1.8s |  |
-| 88 | `avm1/watch` | 2 | 2.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 89 | `avm1/xml/xmlbuild` | 1 | 0.9s |  |
-| 90 | `avm1/xml/xmlload` | 4 | 2.6s |  |
-| 91 | `avm1/xml/xmlstring` | 9 | 2.1s |  |
-| 92 | `avm1timeline1` | 3 | 2.3s |  |
-| 93 | `avm1timeline2` | 6 | 1.8s |  |
-| 94 | `avm2/event-dispatching` | 5 | 5.3s |  |
-| 95 | `avm2/flash/display/bitmapdata/bitmapdata-clone` | 0 | 5.9s |  |
-| 96 | `bitmapbuttons` | 0 | 26.7s |  |
-| 97 | `bitmapdata/draw-and-read` | 1 | 4.7s |  |
-| 98 | `blendmode/blendmode_3` | 2 | 4.7s |  |
-| 99 | `button1` | 1 | 3.6s |  |
-| 100 | `button2` | 1 | 5.8s |  |
-| 101 | `button3` | 1 | 2.7s |  |
-| 102 | `captions` | 8 | 6.8s |  |
-| 103 | `clipping` | 0 | 2.4s |  |
-| 104 | `doubleAndRegister` | 2 | 2.6s |  |
-| 105 | `encoding1` | 31 | 6.2s |  |
-| 106 | `flash_events_Event` | 3 | 26.4s |  |
-| 107 | `flash_geom_ColorTransform` | 0 | 27.1s |  |
-| 108 | `flash_net_classes` | 22 | 6.4s |  |
-| 109 | `flash_utils_Timer` | 2 | 6.1s |  |
-| 110 | `fscommand1` | 1 | 2.1s |  |
-| 111 | `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` | 6 | 22.9s |  |
-| 112 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 14.3s |  |
-| 113 | `fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0` | 3 | 1.3s |  |
-| 114 | `fuzz/2f4f46bf21d6cd33a751b090ad97552e8cdd8f7a606e7f0796deba04abb2e229` | 1 | 14.5s |  |
-| 115 | `fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26` | 7 | 21.0s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
-| 116 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 19.9s |  |
-| 117 | `fuzz/81004241e3a9278ee3c26c5d7d04a3677e7a28618dd0dd2ad041a98374a280f0` | 3 | 19.8s |  |
-| 118 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 21.3s |  |
-| 119 | `fuzz/a86fee6d68f77c63cd83f33d136be2c48f0ab7ab0414a93a0b711ec2a19c6883` | 3 | 21.7s |  |
-| 120 | `fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732` | 8 | 22.0s |  |
-| 121 | `fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca` | 5 | 21.6s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
-| 122 | `fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69` | 6 | 20.3s |  |
-| 123 | `gradient` | 0 | 2.3s |  |
-| 124 | `gradientTransform` | 0 | 20.2s |  |
-| 125 | `hardwrap` | 1 | 6.2s |  |
-| 126 | `hitTestStyleChange` | 1 | 23.6s |  |
-| 127 | `invalidClipDepth` | 0 | 20.5s |  |
-| 128 | `local2global` | 1 | 5.6s |  |
-| 129 | `lzma` | 5 | 5.5s |  |
-| 130 | `lzma_bytes` | 2 | 23.4s |  |
-| 131 | `mouse/mouse_coords` | 2 | 5.7s |  |
-| 132 | `mouse/start_drag` | 3 | 26.5s |  |
-| 133 | `movieclip` | 9 | 6.0s |  |
+| 78 | `avm1/scope` | 14 | 1.9s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 79 | `avm1/setinterval` | 20 | 1.9s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 80 | `avm1/settimeout` | 17 | 1.9s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 81 | `avm1/super` | 11 | 1.9s |  |
+| 82 | `avm1/target` | 18 | 1.9s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 83 | `avm1/text-bind` | 0 | 20.8s |  |
+| 84 | `avm1/textfield/textfield-html` | 4 | 2.0s |  |
+| 85 | `avm1/textfield/textfield-text-setters` | 8 | 2.0s |  |
+| 86 | `avm1/undefined/undefined-swf6` | 39 | 1.9s |  |
+| 87 | `avm1/undefined/undefined-swf7` | 39 | 1.6s |  |
+| 88 | `avm1/watch` | 2 | 1.8s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 89 | `avm1/xml/xmlbuild` | 1 | 0.7s |  |
+| 90 | `avm1/xml/xmlload` | 4 | 2.2s |  |
+| 91 | `avm1/xml/xmlstring` | 9 | 1.8s |  |
+| 92 | `avm1timeline1` | 3 | 1.9s |  |
+| 93 | `avm1timeline2` | 6 | 1.4s |  |
+| 94 | `avm2/event-dispatching` | 5 | 3.9s |  |
+| 95 | `avm2/flash/display/bitmapdata/bitmapdata-clone` | 0 | 4.8s |  |
+| 96 | `bitmapbuttons` | 0 | 20.1s |  |
+| 97 | `bitmapdata/draw-and-read` | 1 | 4.5s |  |
+| 98 | `blendmode/blendmode_3` | 2 | 4.5s |  |
+| 99 | `button1` | 1 | 3.5s |  |
+| 100 | `button2` | 1 | 5.6s |  |
+| 101 | `button3` | 1 | 2.6s |  |
+| 102 | `captions` | 8 | 6.2s |  |
+| 103 | `clipping` | 0 | 2.1s |  |
+| 104 | `doubleAndRegister` | 2 | 2.3s |  |
+| 105 | `encoding1` | 31 | 5.6s |  |
+| 106 | `flash_events_Event` | 3 | 24.3s |  |
+| 107 | `flash_geom_ColorTransform` | 0 | 24.1s |  |
+| 108 | `flash_net_classes` | 22 | 6.1s |  |
+| 109 | `flash_utils_Timer` | 2 | 5.8s |  |
+| 110 | `fscommand1` | 1 | 1.9s |  |
+| 111 | `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` | 6 | 22.5s |  |
+| 112 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 19.8s |  |
+| 113 | `fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0` | 3 | 2.1s |  |
+| 114 | `fuzz/2f4f46bf21d6cd33a751b090ad97552e8cdd8f7a606e7f0796deba04abb2e229` | 1 | 20.1s |  |
+| 115 | `fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26` | 7 | 21.3s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 116 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 20.3s |  |
+| 117 | `fuzz/81004241e3a9278ee3c26c5d7d04a3677e7a28618dd0dd2ad041a98374a280f0` | 3 | 20.2s |  |
+| 118 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 20.4s |  |
+| 119 | `fuzz/a86fee6d68f77c63cd83f33d136be2c48f0ab7ab0414a93a0b711ec2a19c6883` | 3 | 20.6s |  |
+| 120 | `fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732` | 8 | 20.3s |  |
+| 121 | `fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca` | 5 | 20.5s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 122 | `fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69` | 6 | 21.5s |  |
+| 123 | `gradient` | 0 | 1.6s |  |
+| 124 | `gradientTransform` | 0 | 17.1s |  |
+| 125 | `hardwrap` | 1 | 4.9s |  |
+| 126 | `hitTestStyleChange` | 1 | 19.9s |  |
+| 127 | `invalidClipDepth` | 0 | 18.3s |  |
+| 128 | `local2global` | 1 | 4.8s |  |
+| 129 | `lzma` | 5 | 4.8s |  |
+| 130 | `lzma_bytes` | 2 | 21.1s |  |
+| 131 | `mouse/mouse_coords` | 2 | 4.9s |  |
+| 132 | `mouse/start_drag` | 3 | 26.1s |  |
+| 133 | `movieclip` | 9 | 6.1s |  |
 | 134 | `movieinfo1` | 3 | 2.1s |  |
-| 135 | `slider_component` | 4 | 12.0s |  |
-| 136 | `stylesheet` | 3 | 5.0s |  |
+| 135 | `slider_component` | 4 | 11.6s |  |
+| 136 | `stylesheet` | 3 | 5.7s |  |
 | 137 | `targetPath1` | 8 | 1.6s |  |
-| 138 | `timeline/Timeline3` | 5 | 19.4s |  |
-| 139 | `timeline/Timeline4` | 5 | 19.5s |  |
-| 140 | `timeline/Timeline8` | 5 | 4.7s |  |
-| 141 | `timeline/Timeline9` | 11 | 5.0s |  |
-| 142 | `timeline/events/timeline_events_fp10` | 67 | 5.0s |  |
-| 143 | `timeline/events/timeline_events_fp9` | 48 | 6.2s |  |
-| 144 | `timeline/nav/name` | 8 | 4.7s |  |
-| 145 | `timeline/nav/ratio3` | 4 | 0.9s |  |
-| 146 | `timeline/nav/shape` | 4 | 4.6s |  |
-| 147 | `timeline/scene/EncodedU32` | 1 | 4.6s |  |
-| 148 | `timeline/scene/Scene_1_MainTimeline` | 70 | 24.7s |  |
-| 149 | `timeline/scene/Scene_2_MovieClipTimeline` | 70 | 5.9s |  |
-| 150 | `timeline/scene/Scene_3_GotoAndStop_LabelScene` | 15 | 5.9s |  |
-| 151 | `timeline/scene/Scene_4_GotoAndStop_FrameScene` | 15 | 5.9s |  |
-| 152 | `timeline/scene/Scene_5_GotoAndPlay_LabelScene` | 15 | 5.6s |  |
-| 153 | `timeline/scene/Scene_6_GotoAndPlay_FrameScene` | 40 | 5.8s |  |
-| 154 | `timeline/scene/Scene_7_NextPrevScene` | 7 | 24.6s |  |
-| 155 | `timeline/timeline_as2_1` | 3 | 20.9s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 138 | `timeline/Timeline3` | 5 | 21.4s |  |
+| 139 | `timeline/Timeline4` | 5 | 21.3s |  |
+| 140 | `timeline/Timeline8` | 5 | 5.0s |  |
+| 141 | `timeline/Timeline9` | 11 | 4.8s |  |
+| 142 | `timeline/events/timeline_events_fp10` | 67 | 5.1s |  |
+| 143 | `timeline/events/timeline_events_fp9` | 48 | 4.2s |  |
+| 144 | `timeline/nav/name` | 8 | 4.8s |  |
+| 145 | `timeline/nav/ratio3` | 4 | 1.0s |  |
+| 146 | `timeline/nav/shape` | 4 | 4.7s |  |
+| 147 | `timeline/scene/EncodedU32` | 1 | 4.8s |  |
+| 148 | `timeline/scene/Scene_1_MainTimeline` | 70 | 23.9s |  |
+| 149 | `timeline/scene/Scene_2_MovieClipTimeline` | 70 | 5.7s |  |
+| 150 | `timeline/scene/Scene_3_GotoAndStop_LabelScene` | 15 | 5.7s |  |
+| 151 | `timeline/scene/Scene_4_GotoAndStop_FrameScene` | 15 | 5.6s |  |
+| 152 | `timeline/scene/Scene_5_GotoAndPlay_LabelScene` | 15 | 5.4s |  |
+| 153 | `timeline/scene/Scene_6_GotoAndPlay_FrameScene` | 40 | 5.7s |  |
+| 154 | `timeline/scene/Scene_7_NextPrevScene` | 7 | 24.4s |  |
+| 155 | `timeline/timeline_as2_1` | 3 | 20.0s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
 | 156 | `timeline/timeline_as2_2` | 3 | 2.0s |  |
-| 157 | `timeline/timeline_as2_3` | 3 | 2.0s |  |
-| 158 | `timeline/timeline_as2_4` | 2 | 2.0s |  |
-| 159 | `timeline/timeline_as2_5` | 4 | 4.2s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
-| 160 | `timeline/timeline_loop` | 7 | 8.2s |  |
-| 161 | `timeline/timeline_name_0` | 13 | 5.9s |  |
+| 157 | `timeline/timeline_as2_3` | 3 | 1.9s |  |
+| 158 | `timeline/timeline_as2_4` | 2 | 1.9s |  |
+| 159 | `timeline/timeline_as2_5` | 4 | 4.1s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 160 | `timeline/timeline_loop` | 7 | 8.0s |  |
+| 161 | `timeline/timeline_name_0` | 13 | 5.7s |  |
 
 ## Ruffle-Matched Tests
 
@@ -200,16 +200,16 @@
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `MaskTest-3` | 1 | 1 | 5.6s |  |
-| 2 | `acid/acid-text-x` | 1 | 1 | 6.3s |  |
-| 3 | `acid/acid-textfield` | 6 | 7 | 6.8s |  |
-| 4 | `avm1/hitarea` | 2 | 2 | 15.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 5 | `avm2/flash/geom/transform/pixelBounds` | 1 | 1 | 5.2s |  |
-| 6 | `flash_net_SharedObject` | 1 | 1 | 6.3s |  |
-| 7 | `flash_text_TextField` | 5 | 8 | 27.6s |  |
-| 8 | `flash_text_TextField2` | 9 | 9 | 6.9s |  |
-| 9 | `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` | 4 | 27 | 20.5s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
-| 10 | `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` | 20 | 38 | 23.4s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
-| 11 | `hittesting/mask-hit-test` | 1 | 1 | 2.8s |  |
+| 2 | `acid/acid-text-x` | 1 | 1 | 6.4s |  |
+| 3 | `acid/acid-textfield` | 6 | 7 | 7.1s |  |
+| 4 | `avm1/hitarea` | 2 | 2 | 19.9s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 5 | `avm2/flash/geom/transform/pixelBounds` | 1 | 1 | 3.8s |  |
+| 6 | `flash_net_SharedObject` | 1 | 1 | 5.7s |  |
+| 7 | `flash_text_TextField` | 5 | 8 | 26.9s |  |
+| 8 | `flash_text_TextField2` | 9 | 9 | 6.5s |  |
+| 9 | `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` | 4 | 27 | 21.0s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 10 | `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` | 20 | 38 | 21.7s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 11 | `hittesting/mask-hit-test` | 1 | 1 | 2.1s |  |
 
 ## Near-Passing Tests
 

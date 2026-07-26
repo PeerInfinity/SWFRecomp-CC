@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-26T21:32:12.341612+00:00",
-    "git_sha": "24cb841ec0d1aed1aff1d4757a0a82de05068b9e",
-    "duration_seconds": 70.53,
+    "timestamp": "2026-07-26T22:42:49.133872+00:00",
+    "git_sha": "9f4be9647bf4a230676ded70a4934b8b146402ff",
+    "duration_seconds": 68.86,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -24,7 +24,7 @@
       "test": "aac",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.292,
+        "compile": 5.283,
         "run": 0.165
       },
       "num_frames": 400,
@@ -34,7 +34,7 @@
         "expected_lines": 18,
         "matching_lines": 3
       },
-      "duration": 5.47,
+      "duration": 5.46,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=12, expected=18)",
       "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...",
@@ -43,8 +43,8 @@
     {
       "test": "g711",
       "phases": {
-        "recomp": 0.0,
-        "compile": 5.996,
+        "recomp": 0.008,
+        "compile": 5.835,
         "run": 0.165
       },
       "num_frames": 600,
@@ -54,7 +54,7 @@
         "expected_lines": 6,
         "matching_lines": 2
       },
-      "duration": 6.17,
+      "duration": 6.02,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=4, expected=6)",
       "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nStarting tone: tone_mulaw_mono.flv\nMeasuring...",
@@ -64,7 +64,7 @@
       "test": "g711_event_alaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.751,
+        "compile": 19.454,
         "run": 0.215
       },
       "num_frames": 2,
@@ -73,15 +73,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.97,
+      "duration": 19.68,
       "status": "pass"
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.97,
-        "run": 0.215
+        "compile": 16.539,
+        "run": 0.165
       },
       "num_frames": 2,
       "lines": {
@@ -89,15 +89,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.19,
+      "duration": 16.71,
       "status": "pass"
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
-        "recomp": 0.007,
-        "compile": 16.12,
-        "run": 0.315
+        "recomp": 0.008,
+        "compile": 20.334,
+        "run": 0.366
       },
       "num_frames": 120,
       "lines": {
@@ -105,7 +105,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.45,
+      "duration": 20.71,
       "status": "pass"
     }
   ]
