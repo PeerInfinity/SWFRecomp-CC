@@ -39,13 +39,7 @@ Full plan + per-tranche postmortems:
   (predicted 4). Image payloads decode through stb into a
   `BitmapData`/`Bitmap` `content`, and `URLLoader` really reads bundled
   sibling assets.
-- **Tranche 5** (navigator fetch log): implemented, **REVERTED**
-  (`55775c6b6`) — it turned `edittext_align` into a SIGSEGV and the corpus
-  invariant is zero segfaults. Attribution is settled (same single-test job:
-  baseline pass, ours segfault) but the crash is almost certainly latent and
-  merely layout-exposed; ASan is clean even with `-DHEAP_PASSTHROUGH`
-  instrumenting the arena, and there is no local repro. Re-landing needs
-  core-dump capture in the graphics CI job. Worth **+2 in this suite** —
+- **Tranche 5** (navigator fetch log, `a9900a478`): **+2 in this suite** —
   `net_navigateToURL`, `navigateToURL_target_normalize` — plus 2 in avm1
   (see that suite's status). The runtime now emits Ruffle's
   `TestNavigatorBackend` request log under `-DLOG_FETCH` (set from
@@ -98,7 +92,14 @@ Related: parameter coercion is attributed to the CALLER (Ruffle coerces the
 signature in `init_from_method`, before the callee's call-stack frame
 exists), so a `#1034` from an argument prints `at Caller/method()`.
 
-Reachable: 12 of the 21 remaining avm2 failures (+ up to 9 in
+**`avm2/edittext_align` is a NONDETERMINISTIC graphics-CI segfault** (all
+60/60 lines correct, then SIGSEGV; ~50% per run; byte-identical builds give
+both outcomes — loader-arc.md §7 has the run table). It is a real
+pre-existing bug, not a flake to dismiss and not attributable to any recent
+commit. Expect the corpus segfault count to flicker 0/1 on unrelated work
+until the graphics job captures a core dump.
+
+Reachable: 12 of the 19 remaining avm2 failures (+ up to 9 in
 `from_shumway/as3-loader`). Next up is tranche 6 (AVM2 child-SWF execution,
 +6 and up to 9 more in from_shumway) — the one large item in the arc.
 Won't-do: `loader_applicationDomain` (needs the real Flex framework SWZ).

@@ -1,10 +1,7 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-07-27 — **navigator log (+2), IMPLEMENTED BUT REVERTED**
-(`55775c6b6`; it tripped a latent `avm2/edittext_align` crash — see
-`SWFRecompDocs/plans/loader-arc.md` §7). When re-landed:
-`geturl_target_normalize` 0 → 89/89 and `geturl_opcode_target_normalize`
-0 → 45/45. Both are pure
+Last updated: 2026-07-27 — **navigator log (+2)**: `geturl_target_normalize`
+0 → 89/89 and `geturl_opcode_target_normalize` 0 → 45/45. Both are pure
 `log_fetch` tests: the runtime now emits Ruffle's `TestNavigatorBackend`
 `Navigator::navigate_to_url:` block from `actionGetURL` (the opcode) and from
 `actionGetURL2`'s `getURL` tail, and `MovieClip.prototype.getURL` became a
