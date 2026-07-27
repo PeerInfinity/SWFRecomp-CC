@@ -3,8 +3,10 @@
 **Created**: 2026-07-26 · **Baseline**: `9f4be9647`'s parent (`cf5b42970`),
 `avm2/_results/results_graphics.json` from CI `30185616752`.
 **Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`, §5 Postmortem),
-**tranches 3 + 4 SHIPPED** (`f6ba5c677` + `28577da2a`, §6 Postmortem), and
-**tranche 5 SHIPPED** (§7 Postmortem). Tranches 6–8 are still scoping only;
+**tranches 3 + 4 SHIPPED** (`f6ba5c677` + `28577da2a`, §6 Postmortem).
+**Tranche 5 is IMPLEMENTED BUT REVERTED** (`55775c6b6`, §7 Postmortem) — it
+is +4 and ready to re-land once an unrelated latent crash is fixed.
+Tranches 6–8 are still scoping only;
 tranche 7 shrank to +1 as a side effect of 3. The re-ranked feature-priority
 list puts the avm2-platform mass next, and `flash.display.Loader` is its
 largest single block.
@@ -227,7 +229,7 @@ postmortemed against CI.
 | 2 | **Load pipeline without content** — `open`/`progress`/`complete`/`ioError` dispatch, byte accounting from the real source length, the three-state `bytes`, `#2124` for unknown types, `applicationDomain` from `LoaderContext`, `unload` resetting the stream | B | **+3** (`loader_unknown_content`, `loader_bytes_unknown_content`, `loaderinfo_more`) | small |
 | 3 | ~~**Image content** — stb decode → `BitmapData` → `Bitmap` as `content`, `contentType` per sniffed format~~ **SHIPPED `f6ba5c677`** | C (minus JXR) | **+3** (`loader_image`, `loader_bitmap_transparency`, `loader_loadbytes_invalid_png`) — all three, plus `loader_visibility_interactive` free; see §6 | medium |
 | 4 | ~~**URLLoader over bundled data**~~ **SHIPPED `28577da2a`** | G | **+1** (`url_loader`); prerequisite for two bucket-F tests | small |
-| 5 | ~~**Navigator fetch log**~~ **SHIPPED** | E | **+2** (`loader_method`, `loader_load`) — actual **+4**, all adopters outside the arc; neither predicted test landed (§7) | small-medium |
+| 5 | **Navigator fetch log** — implemented, **reverted** (`55775c6b6`) | E | **+2** (`loader_method`, `loader_load`) — actual **+4**, all adopters outside the arc; blocked on an `edittext_align` latent crash (§7) | small-medium |
 | 6 | **AVM2 child-SWF execution** — `MovieEntry` gains an ABC/script-init entry point, `generate_child_movie_file` handles `RecompiledABC`, `Loader.load`/`loadBytes` resolve through `findMovieEntry`, child root construction + `addChild` into the Loader, event ordering, LoaderInfo reset on reload | F (unblocked part) | **+6** (`loader_events`, `loader_loadbytes_events`, `loader_reuse`, `loader_loaderurl`, `loader_error_in_root_ctor`, `loader_loadbytes_url`) **+ up to 9** `from_shumway/as3-loader/*` | **large** |
 | 7 | **Loader hit-testing** | D (minus AVM1) | ~~+3~~ **+1** — image content alone passed `loader_visibility_interactive` and took `loader_noninteractive_try_click_root` to 4/5, so only `loader_try_click_root` is left and it needs tranche 6's SWF content (§6) | medium |
 | 8 | **Nested-child download + ApplicationDomain isolation** — recurse in `install_test_dir`/`find_child_swfs`, then per-movie domains with duplicate class names | F (blocked part) | **+4** (`loader_child_getdefinition`, `loader_duplicate_class`, `loader_duplicate_coerce`, `loader_duplicate_coerce_new_domain`) | large |
@@ -469,13 +471,16 @@ to `contentLoaderInfo.content` as `Loader.as` does, so it honours the
 
 ## 7. Postmortem — tranche 5 (navigator fetch log)
 
-**Predicted +2 (`loader_method`, `loader_load`), delivered +4 — and neither
-predicted test is among them.** Both need uncaught-error tracing, which
-turned out to be un-landable on its own (see "The tracing tripwire" below);
-`loader_load` is unreachable outright. The four gains are all adopters from
-the sweep.
+**Predicted +2 (`loader_method`, `loader_load`), delivered +4 — then
+REVERTED.** Neither predicted test is among the four: both need
+uncaught-error tracing, which is un-landable on its own (see "The tracing
+tripwire"), and `loader_load` is unreachable outright. The four gains are all
+adopters from the sweep, and they are **not on master** — the implementation
+tripped a latent crash (see "The edittext_align block" below) and was
+reverted in `55775c6b6`. Everything in this section is a record of work that
+is ready to re-land, not of work that is live.
 
-| Gain | Suite | Predicted? |
+| Gain (all reverted, ready to re-land) | Suite | Predicted? |
 |---|---|---|
 | `net_navigateToURL` | avm2 | sweep candidate |
 | `navigateToURL_target_normalize` | avm2 | sweep candidate |
@@ -486,6 +491,49 @@ Line movement in the still-failing tests: `loader_load` 12 → 124,
 `loader_method` 16 → 83, `geturl` 0 → 4, `url_vars` 1 → 3. No test lost
 matching lines; `import_assets/empty_url` (the one `log_fetch` test that
 passed before this work, with **no** fetch lines expected) still passes.
+
+### The edittext_align block (why the +4 is not on master)
+
+`avm2/edittext_align` went **pass → SIGSEGV** in graphics CI, and the corpus
+invariant is zero segfaults. The test emits all 60/60 correct lines and
+faults afterwards.
+
+Attribution is settled — the SAME single-test job, same environment:
+baseline `68325524d` **pass** (run `30282115559`) vs master `a81aad257`
+**segfault** (run `30281823960`), and it also reproduced in the full run
+`30238729383`. It passes `no-graphics` at the same SHA.
+
+It is almost certainly **latent**, merely exposed:
+
+- The only always-on parts of the commit are three class-registration
+  additions (`URLRequestHeader` ctor + 2 slots, `URLVariables.toString`,
+  `MovieClip.prototype.getURL` becoming a real function). `edittext_align`
+  touches none of them.
+- The result is **non-monotonic**: `a9900a478` *plus* the uncaught-error
+  tracing (run `30235525066`) **passed**. Adding more code made it pass.
+  That is a heap-layout signature, not a semantic one.
+- This test did exactly this once before and was misfiled as a CI flake for
+  months (root-caused as a real UAF, fixed in `add3e60ce`).
+
+**Diagnosis exhausted locally without a repro** — record this so nobody
+repeats it:
+
+| Probe | Result |
+|---|---|
+| ASan, graphics | **zero** AddressSanitizer errors |
+| ASan + `-DHEAP_PASSTHROUGH` (routes the `HALLOC`/o1heap arena to system `malloc`, so arena memory IS instrumented) | **zero** errors |
+| bare local, graphics | 30/30 clean |
+| `MALLOC_PERTURB_={0,85,165,255}` | 32/32 clean |
+| lavapipe, the CI renderer (`VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json`) | 8/8 clean |
+
+Both ASan runs only trip **LeakSanitizer** on pre-existing
+`render_webgpu_init` / `utf8_to_u16` leaks — which is what makes
+`verify_output --asan` score the test `runtime_error`. Read the SUMMARY line
+before calling an ASan run a reproduction.
+
+**To re-land:** CI is the only reproducer and it yields no stack trace, so
+the prerequisite is **core-dump / gdb capture in the graphics job**. Add
+that, root-cause the crash, then `git revert 55775c6b6`.
 
 ### The tracing tripwire (CI `30235525066`, reverted in `d1c307c51`)
 
