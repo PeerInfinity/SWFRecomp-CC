@@ -1,31 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-27T02:18:25.306184+00:00",
-    "old_git_sha": "28577da2aa5c307218e90a3e0a09bf4b82218f2f",
-    "new_timestamp": "2026-07-27T04:25:43.212677+00:00",
-    "new_git_sha": "a9900a478651ad3505390c73078f73561eebf185",
+    "old_timestamp": "2026-07-27T04:25:43.212677+00:00",
+    "old_git_sha": "a9900a478651ad3505390c73078f73561eebf185",
+    "new_timestamp": "2026-07-27T05:37:49.155062+00:00",
+    "new_git_sha": "dfef7a9d6945c5123ab2ab86ba1c0474f7756ef3",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 860,
+    "old_pass": 820,
     "old_ruffle_matched": 26,
-    "old_effective_pass": 886,
+    "old_effective_pass": 846,
     "old_total": 1221,
-    "old_pass_rate": 70.4,
-    "new_pass": 820,
+    "old_pass_rate": 67.2,
+    "new_pass": 861,
     "new_ruffle_matched": 26,
-    "new_effective_pass": 846,
+    "new_effective_pass": 887,
     "new_total": 1221,
-    "new_pass_rate": 67.2,
-    "old_mismatched_lines": 46257,
-    "new_mismatched_lines": 46006,
-    "increased_mismatches": 102,
-    "decreased_mismatches": 353,
-    "newly_passing": 4,
-    "newly_failing": 44,
-    "status_changed": 48,
-    "unchanged": 1014,
+    "new_pass_rate": 70.5,
+    "old_mismatched_lines": 46006,
+    "new_mismatched_lines": 45922,
+    "increased_mismatches": 18,
+    "decreased_mismatches": 102,
+    "newly_passing": 44,
+    "newly_failing": 3,
+    "status_changed": 47,
+    "unchanged": 1015,
     "added": 0,
     "removed": 0
   },
@@ -36,12 +36,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 132,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 132,
         "matching_lines": 0
       }
@@ -52,12 +52,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -68,12 +68,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 2,
+        "actual_lines": 4,
         "expected_lines": 18,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 2,
         "expected_lines": 18,
         "matching_lines": 0
       }
@@ -84,12 +84,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -100,12 +100,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -116,12 +116,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 4,
+        "actual_lines": 6,
         "expected_lines": 17,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 6,
+        "actual_lines": 4,
         "expected_lines": 17,
         "matching_lines": 4
       }
@@ -132,12 +132,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 8,
+        "actual_lines": 11,
         "expected_lines": 32,
         "matching_lines": 7
       },
       "new_lines": {
-        "actual_lines": 11,
+        "actual_lines": 8,
         "expected_lines": 32,
         "matching_lines": 7
       }
@@ -148,12 +148,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 9,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 9,
         "matching_lines": 0
       }
@@ -164,12 +164,12 @@
       "old_status": "ruffle_matched",
       "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -180,12 +180,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 478,
         "expected_lines": 118,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 478,
+        "actual_lines": 0,
         "expected_lines": 118,
         "matching_lines": 0
       }
@@ -196,12 +196,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 9,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 9,
         "matching_lines": 0
       }
@@ -212,12 +212,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 2,
         "matching_lines": 0
       }
@@ -228,12 +228,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 3,
+        "actual_lines": 6,
         "expected_lines": 58,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 6,
+        "actual_lines": 3,
         "expected_lines": 58,
         "matching_lines": 0
       }
@@ -241,15 +241,15 @@
     {
       "test": "away3d_advanced_shallow_water_demo",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 8,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 8,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -260,12 +260,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 187,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 187,
         "matching_lines": 4
       }
@@ -273,15 +273,15 @@
     {
       "test": "bitmapdata_applyfilter_blur",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -289,15 +289,15 @@
     {
       "test": "bitmapdata_applyfilter_colormatrix",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -305,15 +305,15 @@
     {
       "test": "bitmapdata_applyfilter_destpoint",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -321,15 +321,15 @@
     {
       "test": "bitmapdata_applyfilter_destpoint_edges",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -337,15 +337,15 @@
     {
       "test": "bitmapdata_colortransform",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -353,15 +353,15 @@
     {
       "test": "bitmapdata_copychannel",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -369,15 +369,15 @@
     {
       "test": "bitmapdata_draw_filters",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -385,15 +385,15 @@
     {
       "test": "bitmapdata_filter_sourcerect",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -404,14 +404,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 5,
-        "expected_lines": 8,
-        "matching_lines": 5
-      },
-      "new_lines": {
         "actual_lines": 8,
         "expected_lines": 8,
         "matching_lines": 7
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 8,
+        "matching_lines": 5
       }
     },
     {
@@ -420,12 +420,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 1,
         "expected_lines": 3,
         "matching_lines": 1
       }
@@ -436,12 +436,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 43,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 43,
         "matching_lines": 4
       }
@@ -452,14 +452,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 39,
-        "expected_lines": 27,
-        "matching_lines": 27
-      },
-      "new_lines": {
         "actual_lines": 41,
         "expected_lines": 27,
         "matching_lines": 24
+      },
+      "new_lines": {
+        "actual_lines": 39,
+        "expected_lines": 27,
+        "matching_lines": 27
       }
     },
     {
@@ -468,12 +468,12 @@
       "old_status": "ruffle_matched",
       "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 33,
+        "actual_lines": 36,
         "expected_lines": 36,
         "matching_lines": 33
       },
       "new_lines": {
-        "actual_lines": 36,
+        "actual_lines": 33,
         "expected_lines": 36,
         "matching_lines": 33
       }
@@ -484,12 +484,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 19,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 19,
         "matching_lines": 4
       }
@@ -500,12 +500,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 50,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 50,
         "matching_lines": 0
       }
@@ -516,12 +516,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 9,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 9,
         "matching_lines": 0
       }
@@ -532,12 +532,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 89,
         "matching_lines": 7
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 89,
         "matching_lines": 7
       }
@@ -548,12 +548,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 7,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 7,
         "matching_lines": 0
       }
@@ -564,12 +564,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 5,
         "expected_lines": 301,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 5,
+        "actual_lines": 1,
         "expected_lines": 301,
         "matching_lines": 1
       }
@@ -580,12 +580,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 61,
         "matching_lines": 7
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 61,
         "matching_lines": 7
       }
@@ -593,15 +593,15 @@
     {
       "test": "displayobject_colortransform_nested",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -612,12 +612,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 5,
+        "actual_lines": 7,
         "expected_lines": 17,
         "matching_lines": 5
       },
       "new_lines": {
-        "actual_lines": 7,
+        "actual_lines": 5,
         "expected_lines": 17,
         "matching_lines": 5
       }
@@ -628,12 +628,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 2,
+        "actual_lines": 5,
         "expected_lines": 16,
         "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 5,
+        "actual_lines": 2,
         "expected_lines": 16,
         "matching_lines": 2
       }
@@ -644,12 +644,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 13,
         "matching_lines": 5
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 13,
         "matching_lines": 5
       }
@@ -660,12 +660,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 13,
+        "actual_lines": 15,
         "expected_lines": 15,
         "matching_lines": 13
       },
       "new_lines": {
-        "actual_lines": 15,
+        "actual_lines": 13,
         "expected_lines": 15,
         "matching_lines": 13
       }
@@ -676,14 +676,30 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 8,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 8,
         "matching_lines": 0
+      }
+    },
+    {
+      "test": "edittext_align",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "segfault",
+      "old_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 60
+      },
+      "new_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 60
       }
     },
     {
@@ -692,12 +708,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 44,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 44,
         "matching_lines": 0
       }
@@ -708,12 +724,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 235,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 235,
         "matching_lines": 0
       }
@@ -724,12 +740,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 3,
         "expected_lines": 45,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 1,
         "expected_lines": 45,
         "matching_lines": 1
       }
@@ -740,14 +756,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 11,
-        "matching_lines": 1
-      },
-      "new_lines": {
         "actual_lines": 10,
         "expected_lines": 11,
         "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 11,
+        "matching_lines": 1
       }
     },
     {
@@ -756,12 +772,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 5,
+        "actual_lines": 8,
         "expected_lines": 105,
         "matching_lines": 3
       },
       "new_lines": {
-        "actual_lines": 8,
+        "actual_lines": 5,
         "expected_lines": 105,
         "matching_lines": 3
       }
@@ -772,14 +788,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 4,
-        "matching_lines": 0
-      },
-      "new_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 4,
+        "matching_lines": 0
       }
     },
     {
@@ -788,12 +804,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 3,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 3,
         "matching_lines": 0
       }
@@ -804,12 +820,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 9,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 9,
         "matching_lines": 0
       }
@@ -820,12 +836,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 31,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 31,
         "matching_lines": 0
       }
@@ -836,12 +852,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 16,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 16,
         "matching_lines": 0
       }
@@ -852,12 +868,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 42,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 42,
         "matching_lines": 0
       }
@@ -868,12 +884,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 22,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 22,
         "matching_lines": 0
       }
@@ -884,12 +900,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 8,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 8,
         "matching_lines": 0
       }
@@ -900,12 +916,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 6,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 6,
         "matching_lines": 0
       }
@@ -916,12 +932,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 7,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 7,
         "matching_lines": 0
       }
@@ -932,12 +948,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 10,
         "expected_lines": 25,
         "matching_lines": 7
       },
       "new_lines": {
-        "actual_lines": 10,
+        "actual_lines": 7,
         "expected_lines": 25,
         "matching_lines": 7
       }
@@ -948,14 +964,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 110,
-        "expected_lines": 156,
-        "matching_lines": 25
-      },
-      "new_lines": {
         "actual_lines": 116,
         "expected_lines": 156,
         "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 110,
+        "expected_lines": 156,
+        "matching_lines": 25
       }
     },
     {
@@ -964,12 +980,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 5,
         "expected_lines": 27,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 5,
+        "actual_lines": 1,
         "expected_lines": 27,
         "matching_lines": 1
       }
@@ -980,12 +996,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 4,
         "expected_lines": 40,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 1,
         "expected_lines": 40,
         "matching_lines": 1
       }
@@ -993,15 +1009,15 @@
     {
       "test": "font_enumeratefonts",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 41,
+        "actual_lines": 46,
         "expected_lines": 41,
         "matching_lines": 41
       },
       "new_lines": {
-        "actual_lines": 46,
+        "actual_lines": 41,
         "expected_lines": 41,
         "matching_lines": 41
       }
@@ -1012,12 +1028,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 9,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 9,
         "matching_lines": 0
       }
@@ -1028,12 +1044,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 4,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 4,
         "matching_lines": 0
       }
@@ -1044,12 +1060,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 3,
         "matching_lines": 0
       }
@@ -1060,12 +1076,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 23,
+        "actual_lines": 26,
         "expected_lines": 74,
         "matching_lines": 20
       },
       "new_lines": {
-        "actual_lines": 26,
+        "actual_lines": 23,
         "expected_lines": 74,
         "matching_lines": 20
       }
@@ -1076,12 +1092,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 9,
+        "actual_lines": 13,
         "expected_lines": 13,
         "matching_lines": 8
       },
       "new_lines": {
-        "actual_lines": 13,
+        "actual_lines": 9,
         "expected_lines": 13,
         "matching_lines": 8
       }
@@ -1092,12 +1108,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 127,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 127,
         "matching_lines": 4
       }
@@ -1108,12 +1124,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 206,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 206,
         "matching_lines": 4
       }
@@ -1124,12 +1140,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 7,
+        "actual_lines": 9,
         "expected_lines": 206,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 206,
         "matching_lines": 4
       }
@@ -1137,15 +1153,15 @@
     {
       "test": "graphics_bitmap_fill",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1153,15 +1169,15 @@
     {
       "test": "graphics_bitmaps",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1169,15 +1185,15 @@
     {
       "test": "graphics_direct_commands",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1185,15 +1201,15 @@
     {
       "test": "graphics_gradients",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1201,15 +1217,15 @@
     {
       "test": "graphics_round_rects",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1220,12 +1236,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 4,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 4,
         "matching_lines": 0
       }
@@ -1236,12 +1252,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 23,
+        "actual_lines": 25,
         "expected_lines": 51,
         "matching_lines": 18
       },
       "new_lines": {
-        "actual_lines": 25,
+        "actual_lines": 23,
         "expected_lines": 51,
         "matching_lines": 18
       }
@@ -1252,14 +1268,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 66,
-        "expected_lines": 128,
-        "matching_lines": 12
-      },
-      "new_lines": {
         "actual_lines": 128,
         "expected_lines": 128,
         "matching_lines": 126
+      },
+      "new_lines": {
+        "actual_lines": 126,
+        "expected_lines": 128,
+        "matching_lines": 124
       }
     },
     {
@@ -1268,12 +1284,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 16,
+        "actual_lines": 21,
         "expected_lines": 30,
         "matching_lines": 11
       },
       "new_lines": {
-        "actual_lines": 21,
+        "actual_lines": 16,
         "expected_lines": 30,
         "matching_lines": 11
       }
@@ -1281,17 +1297,17 @@
     {
       "test": "loader_method",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 66,
-        "expected_lines": 85,
-        "matching_lines": 16
-      },
-      "new_lines": {
         "actual_lines": 85,
         "expected_lines": 85,
         "matching_lines": 85
+      },
+      "new_lines": {
+        "actual_lines": 83,
+        "expected_lines": 85,
+        "matching_lines": 83
       }
     },
     {
@@ -1300,12 +1316,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 16,
+        "actual_lines": 19,
         "expected_lines": 16,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 19,
+        "actual_lines": 16,
         "expected_lines": 16,
         "matching_lines": 0
       }
@@ -1316,12 +1332,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 621,
+        "actual_lines": 971,
         "expected_lines": 890,
         "matching_lines": 76
       },
       "new_lines": {
-        "actual_lines": 971,
+        "actual_lines": 621,
         "expected_lines": 890,
         "matching_lines": 76
       }
@@ -1332,12 +1348,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 283,
+        "actual_lines": 286,
         "expected_lines": 338,
         "matching_lines": 281
       },
       "new_lines": {
-        "actual_lines": 286,
+        "actual_lines": 283,
         "expected_lines": 338,
         "matching_lines": 281
       }
@@ -1348,12 +1364,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 2,
+        "actual_lines": 4,
         "expected_lines": 57,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 2,
         "expected_lines": 57,
         "matching_lines": 1
       }
@@ -1364,12 +1380,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 34,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 34,
         "matching_lines": 0
       }
@@ -1380,12 +1396,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 18,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 18,
         "matching_lines": 0
       }
@@ -1393,15 +1409,15 @@
     {
       "test": "mouse_over_while_dragging",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 3,
+        "actual_lines": 5,
         "expected_lines": 3,
         "matching_lines": 3
       },
       "new_lines": {
-        "actual_lines": 5,
+        "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 3
       }
@@ -1412,14 +1428,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 11,
-        "expected_lines": 35,
-        "matching_lines": 1
-      },
-      "new_lines": {
         "actual_lines": 33,
         "expected_lines": 35,
         "matching_lines": 4
+      },
+      "new_lines": {
+        "actual_lines": 11,
+        "expected_lines": 35,
+        "matching_lines": 1
       }
     },
     {
@@ -1428,46 +1444,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 19,
-        "matching_lines": 0
-      },
-      "new_lines": {
         "actual_lines": 3,
         "expected_lines": 19,
         "matching_lines": 0
-      }
-    },
-    {
-      "test": "navigateToURL_target_normalize",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 35,
-        "expected_lines": 107,
-        "matching_lines": 6
       },
       "new_lines": {
-        "actual_lines": 107,
-        "expected_lines": 107,
-        "matching_lines": 107
-      }
-    },
-    {
-      "test": "net_navigateToURL",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 23,
-        "expected_lines": 57,
-        "matching_lines": 4
-      },
-      "new_lines": {
-        "actual_lines": 57,
-        "expected_lines": 57,
-        "matching_lines": 57
+        "actual_lines": 0,
+        "expected_lines": 19,
+        "matching_lines": 0
       }
     },
     {
@@ -1476,12 +1460,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 6,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 6,
         "matching_lines": 0
       }
@@ -1492,12 +1476,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 55,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 55,
         "matching_lines": 0
       }
@@ -1508,12 +1492,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 78,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 78,
         "matching_lines": 0
       }
@@ -1524,12 +1508,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 50,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 50,
         "matching_lines": 0
       }
@@ -1540,12 +1524,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 6,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 6,
         "matching_lines": 0
       }
@@ -1556,12 +1540,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 10,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 10,
         "matching_lines": 0
       }
@@ -1572,12 +1556,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 10,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 10,
         "matching_lines": 0
       }
@@ -1588,12 +1572,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 7,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 7,
         "matching_lines": 0
       }
@@ -1604,12 +1588,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 3,
         "expected_lines": 4,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 1,
         "expected_lines": 4,
         "matching_lines": 1
       }
@@ -1620,12 +1604,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 16,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 16,
         "matching_lines": 0
       }
@@ -1636,12 +1620,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 11,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 11,
         "matching_lines": 0
       }
@@ -1652,12 +1636,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 2,
+        "actual_lines": 12,
         "expected_lines": 49,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 12,
+        "actual_lines": 2,
         "expected_lines": 49,
         "matching_lines": 0
       }
@@ -1668,12 +1652,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1245,
+        "actual_lines": 1248,
         "expected_lines": 1443,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 1248,
+        "actual_lines": 1245,
         "expected_lines": 1443,
         "matching_lines": 4
       }
@@ -1684,12 +1668,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 16,
+        "actual_lines": 20,
         "expected_lines": 77,
         "matching_lines": 5
       },
       "new_lines": {
-        "actual_lines": 20,
+        "actual_lines": 16,
         "expected_lines": 77,
         "matching_lines": 5
       }
@@ -1700,12 +1684,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 138,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 138,
         "matching_lines": 0
       }
@@ -1716,12 +1700,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 6,
         "expected_lines": 270,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 6,
+        "actual_lines": 1,
         "expected_lines": 270,
         "matching_lines": 1
       }
@@ -1732,12 +1716,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 8,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 8,
         "matching_lines": 0
       }
@@ -1748,12 +1732,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 4,
         "expected_lines": 36,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 1,
         "expected_lines": 36,
         "matching_lines": 1
       }
@@ -1761,15 +1745,15 @@
     {
       "test": "pixelbender_effect_BlurredFocus",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1777,15 +1761,15 @@
     {
       "test": "pixelbender_effect_glassDisplace",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1796,12 +1780,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 4,
         "matching_lines": 0
       }
@@ -1809,15 +1793,15 @@
     {
       "test": "pixelbender_effect_smudge",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1825,15 +1809,15 @@
     {
       "test": "pixelbender_effect_tintype",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1841,15 +1825,15 @@
     {
       "test": "pixelbender_effect_twirl",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1857,15 +1841,15 @@
     {
       "test": "pixelbender_images",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -1876,12 +1860,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 4,
+        "actual_lines": 8,
         "expected_lines": 103,
         "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 8,
+        "actual_lines": 4,
         "expected_lines": 103,
         "matching_lines": 4
       }
@@ -1892,12 +1876,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 20,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 20,
         "matching_lines": 0
       }
@@ -1908,12 +1892,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 190,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 190,
         "matching_lines": 0
       }
@@ -1924,12 +1908,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -1940,12 +1924,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 5,
+        "actual_lines": 8,
         "expected_lines": 13,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 8,
+        "actual_lines": 5,
         "expected_lines": 13,
         "matching_lines": 0
       }
@@ -1956,12 +1940,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 256,
+        "actual_lines": 259,
         "expected_lines": 512,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 259,
+        "actual_lines": 256,
         "expected_lines": 512,
         "matching_lines": 0
       }
@@ -1972,12 +1956,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 5,
         "expected_lines": 1563,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 5,
+        "actual_lines": 1,
         "expected_lines": 1563,
         "matching_lines": 1
       }
@@ -1988,12 +1972,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 240,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 240,
         "matching_lines": 0
       }
@@ -2004,12 +1988,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 54,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 54,
         "matching_lines": 0
       }
@@ -2020,12 +2004,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 4,
         "expected_lines": 24,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 1,
         "expected_lines": 24,
         "matching_lines": 1
       }
@@ -2036,12 +2020,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 49,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 49,
         "matching_lines": 0
       }
@@ -2052,12 +2036,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 3,
+        "actual_lines": 6,
         "expected_lines": 99,
         "matching_lines": 3
       },
       "new_lines": {
-        "actual_lines": 6,
+        "actual_lines": 3,
         "expected_lines": 99,
         "matching_lines": 3
       }
@@ -2068,12 +2052,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 16,
+        "actual_lines": 20,
         "expected_lines": 60,
         "matching_lines": 5
       },
       "new_lines": {
-        "actual_lines": 20,
+        "actual_lines": 16,
         "expected_lines": 60,
         "matching_lines": 5
       }
@@ -2084,12 +2068,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 4,
         "expected_lines": 11,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 1,
         "expected_lines": 11,
         "matching_lines": 1
       }
@@ -2100,12 +2084,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 32,
+        "actual_lines": 34,
         "expected_lines": 33,
         "matching_lines": 29
       },
       "new_lines": {
-        "actual_lines": 34,
+        "actual_lines": 32,
         "expected_lines": 33,
         "matching_lines": 29
       }
@@ -2116,12 +2100,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 32,
+        "actual_lines": 34,
         "expected_lines": 33,
         "matching_lines": 29
       },
       "new_lines": {
-        "actual_lines": 34,
+        "actual_lines": 32,
         "expected_lines": 33,
         "matching_lines": 29
       }
@@ -2132,12 +2116,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 3,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 3,
         "matching_lines": 0
       }
@@ -2148,12 +2132,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 25,
+        "actual_lines": 27,
         "expected_lines": 114,
         "matching_lines": 25
       },
       "new_lines": {
-        "actual_lines": 27,
+        "actual_lines": 25,
         "expected_lines": 114,
         "matching_lines": 25
       }
@@ -2164,12 +2148,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 2,
         "matching_lines": 0
       }
@@ -2180,30 +2164,30 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1094,
-        "matching_lines": 1
-      },
-      "new_lines": {
         "actual_lines": 6,
         "expected_lines": 1094,
         "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1094,
+        "matching_lines": 1
       }
     },
     {
       "test": "remove_child_clear_field",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 88,
-        "expected_lines": 88,
-        "matching_lines": 88
-      },
-      "new_lines": {
         "actual_lines": 92,
         "expected_lines": 88,
         "matching_lines": 23
+      },
+      "new_lines": {
+        "actual_lines": 88,
+        "expected_lines": 88,
+        "matching_lines": 88
       }
     },
     {
@@ -2212,12 +2196,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -2228,12 +2212,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -2244,12 +2228,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -2260,12 +2244,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 2,
         "matching_lines": 0
       }
@@ -2276,12 +2260,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 4,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 4,
         "matching_lines": 0
       }
@@ -2292,12 +2276,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -2308,12 +2292,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 2,
         "matching_lines": 0
       }
@@ -2324,12 +2308,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 4,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 4,
         "matching_lines": 0
       }
@@ -2340,12 +2324,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 56,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 56,
         "matching_lines": 0
       }
@@ -2356,12 +2340,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 48,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 48,
         "matching_lines": 0
       }
@@ -2372,12 +2356,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 48,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 48,
         "matching_lines": 0
       }
@@ -2388,12 +2372,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 8,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 8,
         "matching_lines": 0
       }
@@ -2404,12 +2388,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 15,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 15,
         "matching_lines": 0
       }
@@ -2420,12 +2404,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 14,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 14,
         "matching_lines": 0
       }
@@ -2436,12 +2420,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 5,
+        "actual_lines": 7,
         "expected_lines": 19,
         "matching_lines": 3
       },
       "new_lines": {
-        "actual_lines": 7,
+        "actual_lines": 5,
         "expected_lines": 19,
         "matching_lines": 3
       }
@@ -2452,12 +2436,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 12,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 12,
         "matching_lines": 0
       }
@@ -2468,28 +2452,28 @@
       "old_status": "ruffle_matched",
       "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 15
-      },
-      "new_lines": {
         "actual_lines": 21,
         "expected_lines": 19,
         "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 15
       }
     },
     {
       "test": "stage3d_agal_cross_product",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2500,12 +2484,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 66,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 66,
         "matching_lines": 0
       }
@@ -2513,15 +2497,15 @@
     {
       "test": "stage3d_bitmap",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2532,12 +2516,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 81,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 81,
         "matching_lines": 0
       }
@@ -2548,12 +2532,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 158,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 158,
         "matching_lines": 0
       }
@@ -2564,12 +2548,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 7,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 7,
         "matching_lines": 0
       }
@@ -2580,12 +2564,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 3,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 3,
         "matching_lines": 0
       }
@@ -2596,12 +2580,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 6,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 6,
         "matching_lines": 0
       }
@@ -2609,15 +2593,15 @@
     {
       "test": "stage3d_float1_index",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2625,15 +2609,15 @@
     {
       "test": "stage3d_fractal",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2641,15 +2625,15 @@
     {
       "test": "stage3d_ignore_sampler_override",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2660,12 +2644,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 3,
         "matching_lines": 0
       }
@@ -2673,15 +2657,15 @@
     {
       "test": "stage3d_program_constants_bytearray_be",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2689,15 +2673,15 @@
     {
       "test": "stage3d_program_constants_bytearray_le",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2708,12 +2692,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 21,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 21,
         "matching_lines": 0
       }
@@ -2721,15 +2705,15 @@
     {
       "test": "stage3d_raytrace",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 4,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2737,15 +2721,15 @@
     {
       "test": "stage3d_rotating_cube",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2753,15 +2737,15 @@
     {
       "test": "stage3d_sampler",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2769,15 +2753,15 @@
     {
       "test": "stage3d_sampler_partial_upload",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2785,15 +2769,15 @@
     {
       "test": "stage3d_stencil",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2801,15 +2785,15 @@
     {
       "test": "stage3d_texture",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2817,15 +2801,15 @@
     {
       "test": "stage3d_texture_bytearray",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2833,15 +2817,15 @@
     {
       "test": "stage3d_texture_bytearray_compressed_alpha",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2849,15 +2833,15 @@
     {
       "test": "stage3d_texture_bytearray_compressed_raw_alpha",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2865,15 +2849,15 @@
     {
       "test": "stage3d_triangle",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2881,15 +2865,15 @@
     {
       "test": "stage3d_triangle_bytes4",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2897,15 +2881,15 @@
     {
       "test": "stage3d_triangle_float1",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2913,15 +2897,15 @@
     {
       "test": "stage3d_triangle_index_upload",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -2932,12 +2916,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 22,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 22,
         "matching_lines": 0
       }
@@ -2948,12 +2932,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 6,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 6,
         "matching_lines": 0
       }
@@ -2964,12 +2948,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 4,
         "expected_lines": 5,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 1,
         "expected_lines": 5,
         "matching_lines": 0
       }
@@ -2980,12 +2964,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 12,
+        "actual_lines": 16,
         "expected_lines": 12,
         "matching_lines": 6
       },
       "new_lines": {
-        "actual_lines": 16,
+        "actual_lines": 12,
         "expected_lines": 12,
         "matching_lines": 6
       }
@@ -2996,12 +2980,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -3012,12 +2996,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 2,
         "matching_lines": 0
       }
@@ -3028,12 +3012,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 15,
+        "actual_lines": 18,
         "expected_lines": 20,
         "matching_lines": 15
       },
       "new_lines": {
-        "actual_lines": 18,
+        "actual_lines": 15,
         "expected_lines": 20,
         "matching_lines": 15
       }
@@ -3044,12 +3028,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 105,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 105,
         "matching_lines": 0
       }
@@ -3060,12 +3044,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 34,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 34,
         "matching_lines": 0
       }
@@ -3076,12 +3060,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 4,
         "expected_lines": 64,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 1,
         "expected_lines": 64,
         "matching_lines": 1
       }
@@ -3092,12 +3076,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 23,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 23,
         "matching_lines": 0
       }
@@ -3108,12 +3092,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 9,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 9,
         "matching_lines": 0
       }
@@ -3124,12 +3108,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 118,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 118,
         "matching_lines": 0
       }
@@ -3140,12 +3124,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 10,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 10,
         "matching_lines": 0
       }
@@ -3156,12 +3140,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -3172,12 +3156,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 76,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 76,
         "matching_lines": 0
       }
@@ -3188,12 +3172,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 30,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 30,
         "matching_lines": 0
       }
@@ -3204,12 +3188,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1,
+        "actual_lines": 3,
         "expected_lines": 162,
         "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 1,
         "expected_lines": 162,
         "matching_lines": 1
       }
@@ -3217,17 +3201,17 @@
     {
       "test": "uncaught_error_basic",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 2,
-        "matching_lines": 0
-      },
-      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 2,
+        "matching_lines": 0
       }
     },
     {
@@ -3236,14 +3220,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 18,
-        "matching_lines": 1
-      },
-      "new_lines": {
         "actual_lines": 7,
         "expected_lines": 18,
         "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 18,
+        "matching_lines": 1
       }
     },
     {
@@ -3252,12 +3236,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 3,
+        "actual_lines": 5,
         "expected_lines": 27,
-        "matching_lines": 1
+        "matching_lines": 3
       },
       "new_lines": {
-        "actual_lines": 5,
+        "actual_lines": 3,
         "expected_lines": 27,
         "matching_lines": 3
       }
@@ -3268,12 +3252,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 5,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 5,
         "matching_lines": 0
       }
@@ -3284,12 +3268,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 7,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 7,
         "matching_lines": 0
       }
@@ -3300,12 +3284,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 33,
+        "actual_lines": 38,
         "expected_lines": 397,
         "matching_lines": 24
       },
       "new_lines": {
-        "actual_lines": 38,
+        "actual_lines": 33,
         "expected_lines": 397,
         "matching_lines": 24
       }
@@ -3316,12 +3300,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       }
@@ -3332,12 +3316,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 11,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 11,
         "matching_lines": 0
       }

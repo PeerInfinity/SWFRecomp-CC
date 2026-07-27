@@ -1,32 +1,23 @@
 # Ruffle Test Results Diff
 
-**Previous:** `28577da2aa5c` (2026-07-27T02:18:25.306184+00:00)
-**Current:** `a9900a478651` (2026-07-27T04:25:43.212677+00:00)
+**Previous:** `a9900a478651` (2026-07-27T04:25:43.212677+00:00)
+**Current:** `dfef7a9d6945` (2026-07-27T05:37:49.155062+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 860 | 820 | -40 |
+| Passing | 820 | 861 | +41 |
 | Total | 1221 | 1221 | 0 |
-| Pass rate | 70.4% | 67.2% | -3.2% |
-| Mismatched lines | 46257 | 46006 | -251 |
-|   Decreased | | | -353 |
-|   Increased | | | +102 |
+| Pass rate | 67.2% | 70.5% | +3.3% |
+| Mismatched lines | 46006 | 45922 | -84 |
+|   Decreased | | | -102 |
+|   Increased | | | +18 |
 
-## Newly Passing (4)
+## Newly Passing (44)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `loader_method` | output_mismatch | 16/85 | 85/85 |
-| `navigateToURL_target_normalize` | output_mismatch | 6/107 | 107/107 |
-| `net_navigateToURL` | output_mismatch | 4/57 | 57/57 |
-| `uncaught_error_basic` | output_mismatch | 0/2 | 2/2 |
-
-## Newly Failing (44)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
 | `away3d_advanced_shallow_water_demo` | output_mismatch | 0/0 | 0/0 |
 | `bitmapdata_applyfilter_blur` | output_mismatch | 0/0 | 0/0 |
 | `bitmapdata_applyfilter_colormatrix` | output_mismatch | 0/0 | 0/0 |
@@ -50,7 +41,7 @@
 | `pixelbender_effect_tintype` | output_mismatch | 0/0 | 0/0 |
 | `pixelbender_effect_twirl` | output_mismatch | 0/0 | 0/0 |
 | `pixelbender_images` | output_mismatch | 0/0 | 0/0 |
-| `remove_child_clear_field` | output_mismatch | 88/88 | 23/88 |
+| `remove_child_clear_field` | output_mismatch | 23/88 | 88/88 |
 | `stage3d_agal_cross_product` | output_mismatch | 0/0 | 0/0 |
 | `stage3d_bitmap` | output_mismatch | 0/0 | 0/0 |
 | `stage3d_float1_index` | output_mismatch | 0/0 | 0/0 |
@@ -72,18 +63,21 @@
 | `stage3d_triangle_float1` | output_mismatch | 0/0 | 0/0 |
 | `stage3d_triangle_index_upload` | output_mismatch | 0/0 | 0/0 |
 
+## Newly Failing (3)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `edittext_align` | segfault | 60/60 | 60/60 |
+| `loader_method` | output_mismatch | 85/85 | 83/85 |
+| `uncaught_error_basic` | output_mismatch | 2/2 | 0/2 |
+
 ## Line Count Changed (159)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `loader_load` | output_mismatch | 12/128 | 126/128 | -114 |
-| `event_handler_exception` | output_mismatch | 1/11 | 5/11 | -4 |
-| `mouseevent_stagexy` | output_mismatch | 1/35 | 4/35 | -3 |
-| `bitmapdata_zero_size` | output_mismatch | 5/8 | 7/8 | -2 |
-| `url_vars` | output_mismatch | 1/27 | 3/27 | -2 |
-| `filefilter_properties` | output_mismatch | 0/4 | 1/4 | -1 |
-| `rectangle` | output_mismatch | 1/1094 | 2/1094 | -1 |
-| `uncaught_errors_stringified` | output_mismatch | 1/18 | 2/18 | -1 |
+| `flash_media_video_constructor` | output_mismatch | 0/156 | 25/156 | -25 |
+| `sprite_dropTarget` | ruffle_matched | 6/19 | 15/19 | -9 |
+| `button_nested_frame_simple` | output_mismatch | 24/27 | 27/27 | -3 |
 | `abstract_classes` | output_mismatch | 0/132 | 0/132 | 0 |
 | `accessibility` | output_mismatch | 0/1 | 0/1 | 0 |
 | `accessibilityimplementation` | output_mismatch | 0/18 | 0/18 | 0 |
@@ -227,11 +221,16 @@
 | `textline_splitting_basic` | output_mismatch | 0/76 | 0/76 | 0 |
 | `textline_throwerror` | output_mismatch | 0/30 | 0/30 | 0 |
 | `textline_validity` | output_mismatch | 1/162 | 1/162 | 0 |
+| `url_vars` | output_mismatch | 3/27 | 3/27 | 0 |
 | `urlstream_basic` | output_mismatch | 0/5 | 0/5 | 0 |
 | `utils3d` | output_mismatch | 0/7 | 0/7 | 0 |
 | `vector3d` | output_mismatch | 24/397 | 24/397 | 0 |
 | `verify_illegal_opcode` | output_mismatch | 0/1 | 0/1 | 0 |
 | `xml_socket` | output_mismatch | 0/11 | 0/11 | 0 |
-| `button_nested_frame_simple` | output_mismatch | 27/27 | 24/27 | +3 |
-| `sprite_dropTarget` | ruffle_matched | 15/19 | 6/19 | +9 |
-| `flash_media_video_constructor` | output_mismatch | 25/156 | 0/156 | +25 |
+| `filefilter_properties` | output_mismatch | 1/4 | 0/4 | +1 |
+| `rectangle` | output_mismatch | 2/1094 | 1/1094 | +1 |
+| `uncaught_errors_stringified` | output_mismatch | 2/18 | 1/18 | +1 |
+| `bitmapdata_zero_size` | output_mismatch | 7/8 | 5/8 | +2 |
+| `loader_load` | output_mismatch | 126/128 | 124/128 | +2 |
+| `mouseevent_stagexy` | output_mismatch | 4/35 | 1/35 | +3 |
+| `event_handler_exception` | output_mismatch | 5/11 | 1/11 | +4 |
