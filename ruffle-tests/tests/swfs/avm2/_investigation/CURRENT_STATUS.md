@@ -21,13 +21,13 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
-## Loader / LoaderInfo — tranches 1–4 SHIPPED (2026-07-26/27)
+## Loader / LoaderInfo — tranches 1–5 SHIPPED (2026-07-26/27)
 
 Full plan + per-tranche postmortems:
 **`SWFRecompDocs/plans/loader-arc.md`** (per-test triage of all 35
 `loader*`/`loaderinfo*` tests, 8 ranked tranches; §5 covers 1+2, §6 covers
-3+4). The "flash.display.Loader (deferred)" line in the Stage 8/9 notes
-below is now out of date.
+3+4, §7 covers 5). The "flash.display.Loader (deferred)" line in the Stage
+8/9 notes below is now out of date.
 
 - **Tranches 1+2** (`8213dd4d6`, CI `30226375815`): **+12** (predicted 8).
   Per-instance `LoaderInfo` state machine — every getter now keys on the
@@ -39,6 +39,15 @@ below is now out of date.
   (predicted 4). Image payloads decode through stb into a
   `BitmapData`/`Bitmap` `content`, and `URLLoader` really reads bundled
   sibling assets.
+- **Tranche 5** (navigator fetch log): **+4 in this suite** — `loader_method`,
+  `net_navigateToURL`, `navigateToURL_target_normalize`,
+  `uncaught_error_basic` — plus 2 in avm1 (see that suite's status). The
+  runtime now emits Ruffle's `TestNavigatorBackend` request log under
+  `-DLOG_FETCH` (set from `log_fetch = true` in `test.toml`), shared between
+  both VMs in `SWFModernRuntime/src/utils.c`. `loader_load`, the second
+  predicted test, reaches 126/128 and stops on Ruffle's hash-ordered
+  property enumeration — see `avm1/_investigation/
+  RUFFLE_VS_FLASH_DIFFERENCES.md` §"AVM2 dynamic-property enumeration order".
 
 Findings worth having here rather than only in the plan:
 
@@ -62,8 +71,18 @@ Findings worth having here rather than only in the plan:
    `loadBytes` needs a bytes→movie identity (resolvable at build time in
    every corpus case). That is tranche 6, the one large item.
 
-Reachable: 15 of the 21 remaining avm2 failures (+ up to 9 in
-`from_shumway/as3-loader`). Next up is tranche 5 (navigator fetch log, +2).
+A fifth finding, from tranche 5: **uncaught AVM2 errors are TRACED**, not
+just logged. Ruffle's `Avm2::uncaught_error` runs `error.to_string()` — the
+value coerced to a string plus the call stack the Error captured — through
+`avm_trace` whenever the player is in Debug mode, which the test harness
+always is. Our `print_uncaught` used to write only to stderr. Related:
+parameter coercion is attributed to the CALLER (Ruffle coerces the signature
+in `init_from_method`, before the callee's call-stack frame exists), so a
+`#1034` from an argument prints `at Caller/method()` and never the callee.
+
+Reachable: 11 of the 17 remaining avm2 failures (+ up to 9 in
+`from_shumway/as3-loader`). Next up is tranche 6 (AVM2 child-SWF execution,
++6 and up to 9 more in from_shumway) — the one large item in the arc.
 Won't-do: `loader_applicationDomain` (needs the real Flex framework SWZ).
 `mouse_pick_loader_avm1` belongs to the dual-VM arc. Note the earlier
 won't-do call on `loader_jpegxr`/`loader_jpegxr_alpha` was **wrong** — they

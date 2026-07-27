@@ -282,3 +282,28 @@ SWFRecomp rendering bug (not a Ruffle-vs-Flash spec difference): e.g.
 `movieclip_setmask` (now fixed: drawing-API stroke closing + mask-fill-only + miter
 joins → 0px, beating Ruffle), and the still-open **gradient color-ramp/banding** gap
 on `movieclip_begin_gradient_fill` / `movieclip_line_gradient_style`.
+
+## AVM2 dynamic-property enumeration order: `URLVariables.toString`
+
+**Test:** `avm2/loader_load` (126/128 — the only two lines that differ)
+
+`URLVariables.toString` (Ruffle `globals/flash/net/URLVariables.as`) joins the
+bag's properties with `&` **in `for (p in this)` order**. That order is not
+specified anywhere; each player just exposes its own property store:
+
+- **Ruffle** stores AVM2 dynamic properties in a `DynamicMap`, an FNV-hashed
+  `hashbrown` table (`core/src/avm2/dynamic_map.rs`), and enumerates in *bucket*
+  order. `loader_load` sets `vars.aaa` then `vars.cccc` and expects
+  `cccc=true&aaa=bbb` — pure hash artifact.
+- **We** (and Flash) enumerate in insertion order, so we emit
+  `aaa=bbb&cccc=true`, on both the `trace(request.data)` line and the
+  `Body:` line of the navigator log.
+
+Ruffle's own `avm2/url_vars` test documents the problem in a source comment —
+*"Ruffle's property iteration order is not consistent with Flash's (yet)"* — and
+works around it by calling `.toString().split("&").sort()` before tracing.
+`loader_load` does not, so its expectation is unreproducible without emulating
+FNV-1a plus hashbrown's SIMD bucket layout, which would break the moment either
+crate changes.
+
+**Decision:** keep insertion order. `loader_load` is accepted at 126/128 lines.

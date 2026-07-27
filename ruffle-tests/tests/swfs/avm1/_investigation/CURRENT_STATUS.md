@@ -1,7 +1,26 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-07-02 (doc sync against merged CI of 2026-06-30, SHA
-`56970ac27` — no new fixes this entry). Suite is now **704 tests** (upstream
+Last updated: 2026-07-27 — **navigator log (+2)**: `geturl_target_normalize`
+0 → 89/89 and `geturl_opcode_target_normalize` 0 → 45/45. Both are pure
+`log_fetch` tests: the runtime now emits Ruffle's `TestNavigatorBackend`
+`Navigator::navigate_to_url:` block from `actionGetURL` (the opcode) and from
+`actionGetURL2`'s `getURL` tail, and `MovieClip.prototype.getURL` became a
+real function instead of a no-op stub (a bare `getURL(url, window)` in a
+timeline script resolves through the prototype chain to it). The emitter is
+shared with the AVM2 runtime in `SWFModernRuntime/src/utils.c` and compiles
+to nothing without `-DLOG_FETCH`, which `verify_output.py` sets only for
+tests whose `test.toml` says `log_fetch = true`. Arc doc:
+`SWFRecompDocs/plans/loader-arc.md` §7.
+
+**Still short in this family:** `geturl` (4/7) and `loadvariables_method`
+(0/7) need the `Param:`/`Body:` form values, i.e. the timeline's variables in
+AVM1 enumeration order. Root-timeline variables live in the global
+`var_array`/`var_map`, not in `root_movieclip.dynamic_props`, so there is no
+insertion order to walk — the same gap `for (i in _root)` has. Fixing it is
+a variable-storage change, not a navigator one.
+
+Prior entry: 2026-07-02 (doc sync against merged CI of 2026-06-30, SHA
+`56970ac27` — no new fixes that entry). Suite is now **704 tests** (upstream
 sync keeps growing it); filtered **639/661 effective (96.7%)** = 627 pass +
 12 ruffle_matched, **20 non-ignored filtered failures**. All 20 are triaged in
 `NEW_UPSTREAM_AVM1_TRIAGE.md` (see its 2026-07-02 update): the bulk are

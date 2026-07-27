@@ -2,11 +2,12 @@
 
 **Created**: 2026-07-26 · **Baseline**: `9f4be9647`'s parent (`cf5b42970`),
 `avm2/_results/results_graphics.json` from CI `30185616752`.
-**Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`, §5 Postmortem) and
-**tranches 3 + 4 SHIPPED** (`f6ba5c677` + `28577da2a`, §6 Postmortem).
-Tranches 5–8 are still scoping only; tranche 7 shrank to +1 as a side effect
-of 3. The re-ranked feature-priority list puts the avm2-platform mass next,
-and `flash.display.Loader` is its largest single block.
+**Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`, §5 Postmortem),
+**tranches 3 + 4 SHIPPED** (`f6ba5c677` + `28577da2a`, §6 Postmortem), and
+**tranche 5 SHIPPED** (§7 Postmortem). Tranches 6–8 are still scoping only;
+tranche 7 shrank to +1 as a side effect of 3. The re-ranked feature-priority
+list puts the avm2-platform mass next, and `flash.display.Loader` is its
+largest single block.
 
 Scope of this document: the 35 avm2 tests whose name matches
 `loader`/`loaderinfo` (32 failing, 3 already passing:
@@ -226,7 +227,7 @@ postmortemed against CI.
 | 2 | **Load pipeline without content** — `open`/`progress`/`complete`/`ioError` dispatch, byte accounting from the real source length, the three-state `bytes`, `#2124` for unknown types, `applicationDomain` from `LoaderContext`, `unload` resetting the stream | B | **+3** (`loader_unknown_content`, `loader_bytes_unknown_content`, `loaderinfo_more`) | small |
 | 3 | ~~**Image content** — stb decode → `BitmapData` → `Bitmap` as `content`, `contentType` per sniffed format~~ **SHIPPED `f6ba5c677`** | C (minus JXR) | **+3** (`loader_image`, `loader_bitmap_transparency`, `loader_loadbytes_invalid_png`) — all three, plus `loader_visibility_interactive` free; see §6 | medium |
 | 4 | ~~**URLLoader over bundled data**~~ **SHIPPED `28577da2a`** | G | **+1** (`url_loader`); prerequisite for two bucket-F tests | small |
-| 5 | **Navigator fetch log** | E | **+2** (`loader_method`, `loader_load`) | small-medium |
+| 5 | ~~**Navigator fetch log**~~ **SHIPPED** | E | **+2** (`loader_method`, `loader_load`) — actual: `loader_method` only, plus 5 adopters outside the arc; see §7 | small-medium |
 | 6 | **AVM2 child-SWF execution** — `MovieEntry` gains an ABC/script-init entry point, `generate_child_movie_file` handles `RecompiledABC`, `Loader.load`/`loadBytes` resolve through `findMovieEntry`, child root construction + `addChild` into the Loader, event ordering, LoaderInfo reset on reload | F (unblocked part) | **+6** (`loader_events`, `loader_loadbytes_events`, `loader_reuse`, `loader_loaderurl`, `loader_error_in_root_ctor`, `loader_loadbytes_url`) **+ up to 9** `from_shumway/as3-loader/*` | **large** |
 | 7 | **Loader hit-testing** | D (minus AVM1) | ~~+3~~ **+1** — image content alone passed `loader_visibility_interactive` and took `loader_noninteractive_try_click_root` to 4/5, so only `loader_try_click_root` is left and it needs tranche 6's SWF content (§6) | medium |
 | 8 | **Nested-child download + ApplicationDomain isolation** — recurse in `install_test_dir`/`find_child_swfs`, then per-movie domains with duplicate class names | F (blocked part) | **+4** (`loader_child_getdefinition`, `loader_duplicate_class`, `loader_duplicate_coerce`, `loader_duplicate_coerce_new_domain`) | large |
@@ -465,3 +466,121 @@ to `contentLoaderInfo.content` as `Loader.as` does, so it honours the
 - URLLoader's `dataFormat = "variables"` falls through to text. No test uses
   URLVariables as a URLLoader *response* (only as a request body, which is
   tranche 5's `loader_method`), so parsing it would be untested code.
+
+## 7. Postmortem — tranche 5 (navigator fetch log)
+
+**Predicted +2 (`loader_method`, `loader_load`), actual +6 — but only one of
+the two predicted tests.** `loader_method` passes; `loader_load` stops at
+126/128 on something the triage never looked at. The other five gains come
+from the adopters sweep and from a mechanism the triage did not know the
+tranche needed at all.
+
+| Gain | Suite | Predicted? |
+|---|---|---|
+| `loader_method` | avm2 | yes |
+| `net_navigateToURL` | avm2 | sweep candidate |
+| `navigateToURL_target_normalize` | avm2 | sweep candidate |
+| `geturl_target_normalize` | avm1 | sweep candidate |
+| `geturl_opcode_target_normalize` | avm1 | sweep candidate |
+| `uncaught_error_basic` | avm2 | **no — not a `log_fetch` test at all** |
+
+Line movement in the still-failing tests: `loader_load` 12 → 126,
+`geturl` 0 → 4, `event_handler_exception` 1 → 5,
+`uncaught_errors_stringified` 1 → 2, `url_vars` 1 → 3. No test lost
+matching lines; `import_assets/empty_url` (the one `log_fetch` test that
+passed before this work, with **no** fetch lines expected) still passes.
+
+### What the triage got wrong
+
+- **The blocker was not the log — it was uncaught-error tracing.** Both
+  target tests end on a `#1034` that escapes an `ENTER_FRAME` handler, and
+  the last two lines of each are that error plus its stack. Ruffle's
+  `Avm2::uncaught_error` calls `avm_trace` whenever the player is in Debug
+  mode, which the test harness always is, so an uncaught error is *graded
+  output*. Our `print_uncaught` wrote to stderr only, with a comment
+  asserting the opposite. That single change is worth more than the log
+  itself: it also took `uncaught_error_basic` to a pass and moved three
+  other tests, and it is the mechanism `loader_error_in_root_ctor`
+  (tranche 6) will need.
+- **Attribution: a parameter coercion belongs to the CALLER.** Ruffle
+  coerces the whole signature in `Activation::init_from_method`, which runs
+  before the callee's call-stack frame is pushed, so `loader_method`'s
+  `#1034` prints `at Test/onFrame()` and never `at Test/load()`. Our
+  `avm2_setup_locals` already popped the frame for the `#1063` arg-count
+  check for exactly this reason; the coercion needed the same treatment.
+- **`loader_load` is unreachable, and the reason has nothing to do with
+  Loader.** Its expected `URLVariables` body is `cccc=true&aaa=bbb` — the
+  bag was populated `aaa` then `cccc`. Ruffle's AVM2 dynamic properties live
+  in an FNV-hashed `hashbrown` table and enumerate in bucket order; we and
+  Flash use insertion order. Ruffle's own `url_vars` test sorts its output to
+  dodge this and says so in a comment. Filed in
+  `RUFFLE_VS_FLASH_DIFFERENCES.md`; the test is accepted at 126/128.
+- **The sweep's AVM1 candidates split cleanly in two, and the triage did not
+  see the line.** `geturl_target_normalize` / `geturl_opcode_target_normalize`
+  are *pure* navigate-log tests and both went to 100%. `geturl` (4/7) and
+  `loadvariables_method` (0/7) want `Param:`/`Body:` **form values** — the
+  timeline's variables in enumeration order — and root-timeline variables in
+  our runtime live in the global `var_array`/`var_map`, not in
+  `root_movieclip.dynamic_props`. There is no insertion order to walk. That
+  is a variable-storage gap (the same one `for (i in _root)` has), not a
+  navigator one, and it is why the collector in `action.c` is written but
+  returns nothing at root scope.
+- **`getURL` was not wired at all.** A bare `getURL(url, window)` in a
+  timeline script is `MovieClip.prototype.getURL` reached through the
+  prototype chain (Ruffle `globals/movie_clip.rs`), and ours was one of the
+  name-only stubs. The GetURL2 *opcode* path was separate and already
+  present. Two call sites, not one.
+
+### What it got right
+
+- The format, read straight out of `tests/framework/src/backends/navigator.rs`,
+  needed no guessing: headers as one trace entry whose first line is
+  `  Headers:`, `Mime-Type`/`Body` only when a body exists, and Rust's
+  `{:02X?}` slice debug for a non-form body.
+- **The placement warning was the single most valuable line in the brief.**
+  `fetch` runs inside the spawned load future, which Ruffle's harness polls
+  only after the frame — so the block lands *after* the calling frame's
+  traces (`loader_method` prints `undefined` from
+  `trace(loader.load(request))` **before** its own fetch block). Logging
+  inline would have inverted every pair. `navigate_to_url` is the opposite:
+  a plain synchronous backend call, printed immediately. The queue-and-flush
+  split in `utils.c` exists entirely because of that asymmetry.
+- The URL in the log is the request's own URL, not resolved to
+  `file:///…` — the brief's guess that §5's absolute-URL lesson applied here
+  was wrong, but harmlessly so, because Ruffle logs before `resolve_url`.
+- Gating on a per-test macro was the right protection: `url_loader`,
+  `loader_events`, `loader_reuse` and every other Loader test are byte
+  identical, and `import_assets/empty_url` still emits nothing.
+
+### Shape of the delivered code
+
+`SWFModernRuntime/src/utils.c` (already compiled into every build and both
+VMs) gained `swf_log_fetch_queue` / `swf_log_fetch_pending` /
+`swf_log_fetch_flush` / `swf_log_navigate`, all no-ops without `-DLOG_FETCH`.
+Target normalization (`blank`/`BLANK`/`_BlAnK` → `_blank`) lives in
+`swf_log_navigate` because Ruffle normalizes at the navigator sink, shared by
+both VMs. `verify_output.py` parses `log_fetch` in `test.toml` and adds
+`-DLOG_FETCH=1`, in both the native and the wasm compile paths.
+
+AVM2: `avm2_display.c` grew `avm2_log_fetch_request`, a transcription of
+`request_from_url_request` (GET appends data to the query, headers are an
+IndexMap insert so a repeat name keeps its first position and last value,
+a ByteArray body is its raw bytes, an empty payload demotes POST to GET),
+called from `Loader.load` and `URLLoader.load`; `avm2_loader_drain` flushes
+the queue at the top of each round. `avm2_globals.c` gained
+`flash.net.navigateToURL` (was a no-op), `URLVariables.toString` with
+`escapeMultiByte`, and a real `URLRequestHeader` constructor with `name`/
+`value` slots. AVM1: `action.c` gained `avm1_log_navigate` plus a real
+`MovieClip.prototype.getURL`, reporting from both `actionGetURL` and
+`actionGetURL2`.
+
+Uncaught errors are a separate commit: `avm2_error.c`'s `print_uncaught`
+now traces `coerce_to_string(value)` plus the Error's `__stacktrace_tail`,
+and `avm2_function.c` drops the callee frame around parameter coercion.
+
+### What tranche 6 inherits
+
+- Uncaught-error tracing already works, so `loader_error_in_root_ctor`
+  (0/4) needs only the child-SWF execution itself.
+- `loader_load` will not pass on any amount of Loader work; do not re-file
+  it under a later tranche.
