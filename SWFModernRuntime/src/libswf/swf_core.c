@@ -59,6 +59,10 @@ MovieEntry* getPreludeEntry(int idx) {
 	(void)idx;
 	return NULL;
 }
+MovieEntry* getMovieEntryAt(int idx) {
+	(void)idx;
+	return NULL;
+}
 #endif
 
 // Default findDataFile stub when no data files are linked

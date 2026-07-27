@@ -257,6 +257,16 @@ static Avm2Class* g_statictext_class;
 static Avm2Class* g_morphshape_class;
 static uint8_t g_stage_invalidated_flag;
 
+// Child movies loaded through flash.display.Loader (loader-arc tranche 6).
+// The MAIN movie is never in this list — it stays on the avm2_generated_*
+// globals, which every one of the ~97 table-reading sites keeps using
+// unchanged. Only the char lookups below gain a second place to look, and
+// because a child's char ids are offset by its char_id_base at emission,
+// the key stays a bare id and a parent id can never match a child row.
+#define AVM2_MAX_CHILD_MOVIES 8
+static const Avm2MovieTables* g_child_movies[AVM2_MAX_CHILD_MOVIES];
+static uint32_t g_child_movie_count;
+
 static const Avm2TimelineData* timeline_for_char(uint16_t char_id)
 {
 	for (uint32_t i = 0; i < avm2_generated_timeline_count; i++)
@@ -265,6 +275,12 @@ static const Avm2TimelineData* timeline_for_char(uint16_t char_id)
 		{
 			return &avm2_generated_timelines[i];
 		}
+	}
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->timeline_count; i++)
+			if (t->timelines[i].char_id == char_id) return &t->timelines[i];
 	}
 	return NULL;
 }
@@ -277,6 +293,12 @@ static const Avm2CharInfo* char_info(uint16_t char_id)
 		{
 			return &avm2_generated_chars[i];
 		}
+	}
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->char_count; i++)
+			if (t->chars[i].char_id == char_id) return &t->chars[i];
 	}
 	return NULL;
 }
@@ -1255,6 +1277,19 @@ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 				return cls;
 		}
 	}
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->symbol_class_count; i++)
+		{
+			if (t->symbol_classes[i].char_id != char_id
+			    || t->symbol_classes[i].class_name == NULL) continue;
+			Avm2Class* cls = class_for_dotted_name(
+				ctx, t->symbol_classes[i].class_name);
+			if (cls != NULL && class_is_a(cls, ctx->builtins.display_object_class))
+				return cls;
+		}
+	}
 	const Avm2CharInfo* ci = char_info(char_id);
 	uint8_t kind = ci != NULL ? ci->kind : AVM2_CHAR_SPRITE;
 	switch (kind)
@@ -1287,6 +1322,19 @@ static Avm2Class* nondisplay_class_for_char(Avm2Context* ctx, uint16_t char_id)
 		{
 			Avm2Class* cls = class_for_dotted_name(
 				ctx, avm2_generated_symbol_classes[i].class_name);
+			if (cls != NULL && !class_is_a(cls, ctx->builtins.display_object_class))
+				return cls;
+		}
+	}
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->symbol_class_count; i++)
+		{
+			if (t->symbol_classes[i].char_id != char_id
+			    || t->symbol_classes[i].class_name == NULL) continue;
+			Avm2Class* cls = class_for_dotted_name(
+				ctx, t->symbol_classes[i].class_name);
 			if (cls != NULL && !class_is_a(cls, ctx->builtins.display_object_class))
 				return cls;
 		}
@@ -3580,6 +3628,11 @@ typedef struct Avm2LoaderInfoExt
 	uint8_t complete_fired;
 	uint8_t errored;
 	uint8_t content_type;
+	// The stream came from a real fetch, not loadBytes. Ruffle's navigator
+	// reports an HTTPStatusEvent for every fetch (status 0 over file://) and
+	// loadBytes never fetches, so this gates the event between init and
+	// complete (loader_events expects it; loader_loadbytes_events must not).
+	uint8_t from_fetch;
 } Avm2LoaderInfoExt;
 
 // GC-rooted in avm2_gc_mark_roots_display.
@@ -3666,7 +3719,14 @@ static Avm2Value do_get_loader_info(Avm2Activation* act)
 		return sli != NULL ? avm2_object_value(sli) : avm2_null();
 	}
 	// loaderInfo is non-null only for objects connected to the root SWF.
-	if (avm2_root_of(ctx, self) == NULL) return avm2_null();
+	Avm2Object* root = avm2_root_of(ctx, self);
+	if (root == NULL) return avm2_null();
+	// A Loader-loaded child movie answers ITS OWN contentLoaderInfo, so
+	// `loader.contentLoaderInfo === loader.content.loaderInfo` holds for the
+	// child root and for everything under it (loader-arc tranche 6).
+	Avm2DisplayObjectExt* rext = avm2_display_ext_of(ctx, root);
+	if (rext != NULL && rext->loader_info != NULL)
+		return avm2_object_value(rext->loader_info);
 	Avm2Object* li = avm2_get_root_loader_info(ctx);
 	return li != NULL ? avm2_object_value(li) : avm2_null();
 }
@@ -3888,6 +3948,13 @@ static void loaderinfo_fire_init_and_complete(Avm2Context* ctx, Avm2Object* li)
 		ext->init_fired = 1;
 		dispatch_simple_event(ctx, li, "init", 0);
 	}
+	if (ext->kind == LI_KIND_LOADER && ext->from_fetch && !ext->complete_fired
+	    && ext->loaded)
+	{
+		Avm2Object* hs = avm2_http_status_event_new(
+			ctx, avm2_string_from_literal(ctx, "httpStatus"), 0, 0);
+		if (hs != NULL) avm2_dispatch_event(ctx, li, hs);
+	}
 	if (!ext->complete_fired && ext->loaded)
 	{
 		ext->complete_fired = 1;
@@ -4037,10 +4104,15 @@ static void loader_basename(const Avm2String* url, char* out, size_t out_len)
 {
 	out[0] = '\0';
 	if (url == NULL || url->utf8 == NULL) return;
+	// A query string is not part of the file name: `./loadable.swf?a=1` keys
+	// the registry as `loadable.swf` (loader_events).
+	uint32_t end = 0;
+	while (end < (uint32_t) url->len && url->utf8[end] != '?'
+	       && url->utf8[end] != '#') end++;
 	uint32_t start = 0;
-	for (uint32_t i = 0; i < (uint32_t) url->len; i++)
+	for (uint32_t i = 0; i < end; i++)
 		if (url->utf8[i] == '/' || url->utf8[i] == '\\') start = i + 1;
-	uint32_t n = (uint32_t) url->len - start;
+	uint32_t n = end - start;
 	if (n >= out_len) n = (uint32_t) out_len - 1;
 	memcpy(out, url->utf8 + start, n);
 	out[n] = '\0';
@@ -4054,6 +4126,12 @@ typedef struct Avm2PendingLoad
 	const Avm2String* url;
 	const uint8_t* data;       // NULL when only a byte count is known
 	uint32_t len;
+	// SWF content only (loader-arc tranche 6). `len` above stays the FILE
+	// size, which is what the progress events report; a compressed SWF's
+	// `bytes` is its DECOMPRESSED image, so it needs its own pair.
+	const Avm2MovieTables* tables;  // child's emitted table set (NULL = none)
+	const uint8_t* swf_bytes;
+	uint32_t swf_bytes_len;
 	uint8_t content_type;
 	uint8_t data_static;       // `data` is generated-static (safe to alias)
 } Avm2PendingLoad;
@@ -4099,6 +4177,12 @@ static void loaderinfo_reset_stream(Avm2LoaderInfoExt* lx)
 	lx->bytes_len = 0;
 	lx->bytes_loaded = 0;
 	lx->bytes_total = 0;
+	lx->from_fetch = 0;
+	// `parameters` keeps its identity across a reload (Ruffle rebuilds the
+	// bag per movie, but no test observes the old object surviving) — its
+	// CONTENTS must not, or a second load of a query-less URL would still
+	// report the first load's flashvars.
+	lx->parameters = NULL;
 }
 
 // Drop whatever a Loader is currently showing: Ruffle's Loader::unload removes
@@ -4301,6 +4385,168 @@ static Avm2Object* loader_context_domain(Avm2Context* ctx, Avm2Value v)
 	return (found && d.kind == AVM2_VALUE_OBJECT) ? d.u.obj : NULL;
 }
 
+static int loader_hex_digit(char c)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return -1;
+}
+
+// Populate LoaderInfo.parameters from the load URL's query string (Ruffle
+// LoaderInfo parameters: the loaded movie's own flashvars). `?a=1&b=2` becomes
+// two dynamic properties; a key with no `=` maps to the empty string, and
+// percent-escapes are decoded. Called once per delivery, before the final
+// progress event — loader_events reads `Parameters: (len=2)` there.
+static void loaderinfo_fill_parameters(Avm2Context* ctx,
+                                       Avm2LoaderInfoExt* lx,
+                                       const Avm2String* url)
+{
+	if (lx == NULL || url == NULL || url->utf8 == NULL) return;
+	uint32_t q = 0;
+	while (q < (uint32_t) url->len && url->utf8[q] != '?') q++;
+	if (q >= (uint32_t) url->len) return;
+	if (lx->parameters == NULL)
+	{
+		Avm2Value o = avm2_class_construct(ctx, ctx->builtins.object_class,
+		                                   NULL, 0);
+		lx->parameters = o.kind == AVM2_VALUE_OBJECT ? o.u.obj : NULL;
+	}
+	if (lx->parameters == NULL) return;
+	uint32_t i = q + 1;
+	while (i < (uint32_t) url->len)
+	{
+		uint32_t start = i;
+		while (i < (uint32_t) url->len && url->utf8[i] != '&') i++;
+		uint32_t eq = start;
+		while (eq < i && url->utf8[eq] != '=') eq++;
+		char key[128], val[512];
+		uint32_t kn = 0, vn = 0;
+		for (uint32_t k = start; k < eq && kn + 1 < sizeof(key); k++)
+			key[kn++] = url->utf8[k];
+		key[kn] = '\0';
+		for (uint32_t v = (eq < i ? eq + 1 : i); v < i && vn + 1 < sizeof(val); v++)
+		{
+			// %XX and '+' are the two escapes a query string can carry.
+			if (url->utf8[v] == '+') { val[vn++] = ' '; continue; }
+			if (url->utf8[v] == '%' && v + 2 < i)
+			{
+				int hi = loader_hex_digit(url->utf8[v + 1]);
+				int lo = loader_hex_digit(url->utf8[v + 2]);
+				if (hi >= 0 && lo >= 0)
+				{
+					val[vn++] = (char) ((hi << 4) | lo);
+					v += 2;
+					continue;
+				}
+			}
+			val[vn++] = url->utf8[v];
+		}
+		val[vn] = '\0';
+		if (kn != 0)
+		{
+			avm2_set_public_property(ctx, avm2_object_value(lx->parameters),
+			                         key, kn,
+			                         avm2_string(avm2_string_new(ctx, val, vn)));
+		}
+		i++;  // step past the '&'
+	}
+}
+
+// Instantiate a loaded child SWF's root and hand it to the Loader
+// (loader-arc.md tranche 6). Ruffle's movie_loader_data for SWF content
+// registers the movie's ABC, links its root class and builds the root clip;
+// the ORDER here is pinned by loader_events' output.txt, where the child's
+// constructor traces `this.stage=null this.parent=null` and the circle it
+// adds fires `added` (parent = the child root, stage null) BEFORE the child
+// is attached to the Loader — so the ctor runs first, attachment second, and
+// the recursive addedToStage falls out of insert_at_index.
+static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
+                                  Avm2LoaderInfoExt* lx,
+                                  const Avm2MovieTables* tables)
+{
+	if (tables == NULL || lx == NULL || lx->loader == NULL) return;
+	avm2_abc_register_movie(ctx, tables);
+	if (g_child_movie_count < AVM2_MAX_CHILD_MOVIES)
+	{
+		uint32_t i = 0;
+		while (i < g_child_movie_count && g_child_movies[i] != tables) i++;
+		if (i == g_child_movie_count) g_child_movies[g_child_movie_count++] = tables;
+	}
+
+	// The movie's own root binding: SymbolClass char 0, which the emitter
+	// wrote as char_id_base + 0.
+	uint16_t root_char = (uint16_t) tables->char_id_base;
+	const char* root_name = NULL;
+	for (uint32_t i = 0; i < tables->symbol_class_count; i++)
+	{
+		if (tables->symbol_classes[i].char_id == root_char)
+			root_name = tables->symbol_classes[i].class_name;
+	}
+	Avm2Class* root_cls = ctx->builtins.movieclip_class;
+	if (root_name != NULL)
+	{
+		Avm2Class* bound = class_for_dotted_name(ctx, root_name);
+		if (bound != NULL)
+		{
+			// Same #2023 gate as the main movie's root (build_stage).
+			if (class_is_a(bound, ctx->builtins.sprite_class)) root_cls = bound;
+			else
+				printf("TypeError: Error #2023: Class %.*s$ must inherit from"
+				       " Sprite to link to the root.\n",
+				       (int) bound->name.name_len, bound->name.name);
+		}
+	}
+
+	g_timeline_instantiation = 1;
+	Avm2Object* child = display_alloc_instance(ctx, root_cls);
+	g_timeline_instantiation = 0;
+	Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+	if (cext == NULL) return;
+	cext->is_root = 1;
+	cext->char_id = root_char;
+	cext->timeline = timeline_for_char(root_char);
+	cext->instantiated_by_timeline = 1;
+	cext->depth = 0;
+	cext->loader_info = li;   // loader.content.loaderInfo === contentLoaderInfo
+
+	// Constructed here, not by the next tick's construct walk: the ctor must
+	// observe a null stage and a null parent.
+	cext->constructed = 1;
+	display_run_constructor(ctx, child);
+
+	lx->content = child;
+	// content/url become readable at ATTACH, not at init: the child's own
+	// ctor reads them as null (`Loaded swf loaderInfo.url: null content:
+	// null`) and its addedToStage handler, one step later, reads them both
+	// (loader_loadbytes_events).
+	lx->expose_content = 1;
+	Avm2LoaderExt* lext = loader_ext_of(ctx, lx->loader);
+	if (lext != NULL) lext->content = child;
+	insert_at_index(ctx, lx->loader, child, 0);
+	// Ruffle's movie_loader_data catches the new root up to its first frame
+	// as part of the load (catchup_display_object_to_frame), so a child whose
+	// constructor called addFrameScript runs it HERE — before init, not on
+	// the next tick. loader_loadbytes_events pins the position: `Framescript
+	// frame 1` sits between addedToStage and the identity checks.
+	// Enter -> Construct -> FrameScripts for this subtree only. The phase is
+	// borrowed for the construct leg because that is what arms a frame script
+	// (check_has_pending_script runs only in PHASE_CONSTRUCT), and restored
+	// afterwards so the caller's phase is unchanged.
+	uint8_t saved_phase = ctx->frame_phase;
+	if (cext->timeline != NULL && cext->playing) run_frame_internal(ctx, child, 1);
+	ctx->frame_phase = PHASE_CONSTRUCT;
+	construct_frame_obj(ctx, child);
+	ctx->frame_phase = PHASE_FRAME_SCRIPTS;
+	run_frame_scripts_obj(ctx, child);
+	ctx->frame_phase = saved_phase;
+	// The catch-up WAS this movie's first frame, so the next tick's enter
+	// phase must not advance it again — otherwise a two-frame child runs
+	// frames 1,2,1,2 across four ticks where Flash runs 1,1,2,1
+	// (loader_loadbytes_events' trailing framescript traces).
+	cext->skip_next_enter_frame = 1;
+}
+
 // The tail of a load, shared by the deferred `load` path and the synchronous
 // `loadBytes` path (Ruffle movie_loader_data). `from_bytes` suppresses the URL
 // suffix on the #2124 message, exactly as Ruffle does.
@@ -4314,6 +4560,7 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 	// byte count, so bytesTotal is live during the first progress event while
 	// bytesLoaded is still 0.
 	lx->content_type = pl->content_type;
+	lx->from_fetch = from_bytes ? 0 : 1;
 	lx->bytes_loaded = 0;
 	lx->bytes_total = pl->len;
 	Avm2Object* ev = avm2_progress_event_new(
@@ -4358,6 +4605,16 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 	// tranche 6), so `content` stays null for it.
 	int is_image = (pl->content_type == LI_CT_PNG || pl->content_type == LI_CT_JPEG
 	                || pl->content_type == LI_CT_GIF);
+	// A child SWF's `bytes` and `parameters` are readable from the FINAL
+	// progress event onwards (loader_events reads bytes.length = 1490 and
+	// Parameters: (len=2) there), so they land before it — unlike the byte
+	// aliasing below, which stays where it is for image/loadBytes content.
+	if (pl->content_type == LI_CT_SWF && pl->swf_bytes != NULL)
+	{
+		lx->bytes = pl->swf_bytes;
+		lx->bytes_len = pl->swf_bytes_len;
+	}
+	if (pl->content_type == LI_CT_SWF) loaderinfo_fill_parameters(ctx, lx, pl->url);
 	if (is_image && pl->data != NULL)
 	{
 		Avm2Object* bmp = avm2_bitmap_from_image_bytes(ctx, pl->data, pl->len);
@@ -4381,6 +4638,12 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 	if (ev != NULL) avm2_dispatch_event(ctx, li, ev);
 	lx->loaded = 1;
 	lx->url = pl->url;
+	// The child SWF's root: constructed and attached after the final progress
+	// event, before init/complete (which the active list still defers a tick).
+	if (pl->content_type == LI_CT_SWF && pl->tables != NULL)
+	{
+		loader_boot_child_swf(ctx, li, lx, pl->tables);
+	}
 	// Third `bytes` state: the real source bytes, now that content is loaded.
 	// Only bundled assets are kept — their storage is generated-static and
 	// outlives everything. A loadBytes source ByteArray can be resized or
@@ -4519,6 +4782,12 @@ static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
 		out->data = NULL;
 		out->len = m->file_size;
 		out->content_type = LI_CT_SWF;
+		// AVM2 child (loader-arc tranche 6): its emitted tables and its
+		// decompressed bytes. Both stay NULL for an AVM1 child or an image
+		// shell, which is exactly the pre-tranche-6 behaviour.
+		out->tables = (const Avm2MovieTables*) m->avm2_tables;
+		out->swf_bytes = m->swf_bytes;
+		out->swf_bytes_len = m->swf_bytes_len;
 		return 1;
 	}
 	return 0;
@@ -4621,6 +4890,25 @@ static Avm2Value loader_load_bytes(Avm2Activation* act)
 	pl.data = ba->bytes;
 	pl.len = ba->len;
 	pl.content_type = loader_sniff(ba->bytes, ba->len);
+	// A loadBytes SWF payload carries no filename, so it is matched to a
+	// recompiled sibling movie by its file size — the payload IS one of the
+	// test's own .swf files, embedded (loader_loadbytes_events embeds
+	// loadable.swf via [Embed]). Ahead-of-time compilation means an
+	// unrecognized payload can never run: it stays content-less, exactly as
+	// before tranche 6.
+	if (pl.content_type == LI_CT_SWF)
+	{
+		for (int i = 0; ; i++)
+		{
+			MovieEntry* m = getMovieEntryAt(i);
+			if (m == NULL) break;
+			if (m->avm2_tables == NULL || m->file_size != ba->len) continue;
+			pl.tables = (const Avm2MovieTables*) m->avm2_tables;
+			pl.swf_bytes = m->swf_bytes;
+			pl.swf_bytes_len = m->swf_bytes_len;
+			break;
+		}
+	}
 	pl.app_domain = act->argc > 1 ? loader_context_domain(ctx, act->args[1]) : NULL;
 	loader_deliver(ctx, cli, &pl, 1);
 	loader_track_active(cli);   // init/complete still land at the frame's end

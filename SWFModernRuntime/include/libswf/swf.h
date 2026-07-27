@@ -394,6 +394,12 @@ typedef struct MovieEntry {
 	u8 movie_id;                       // 0 = main SWF, 1+ = child SWFs (for per-movie export isolation)
 	u8 is_prelude;                     // 1 = prelude SWF (runs before main SWF, shares scope)
 	float (*transform_data_ptr)[16];   // pointer to child SWF's transform_data (NULL = use main SWF's)
+	// AVM2 child SWF (loader-arc tranche 6). All three are zero-init-safe:
+	// NULL/0 means "AVM1 child, image shell, or self-load", which is every
+	// entry the generator produced before tranche 6.
+	const void* avm2_tables;           // const Avm2MovieTables* (avm2_abc.h)
+	const u8* swf_bytes;               // DECOMPRESSED movie image
+	u32 swf_bytes_len;                 // = the header's declared file length
 } MovieEntry;
 
 // Find a pre-compiled movie entry by filename (defined in movie_registry.c when HAS_CHILD_MOVIES)
@@ -401,6 +407,11 @@ MovieEntry* findMovieEntry(const char* filename);
 
 // Iterate prelude movie entries (returns NULL when exhausted; call with idx=0,1,2,...)
 MovieEntry* getPreludeEntry(int idx);
+
+// Iterate ALL movie entries (returns NULL when exhausted). Used by
+// Loader.loadBytes, which has a byte payload and no filename to key on
+// (loader-arc tranche 6).
+MovieEntry* getMovieEntryAt(int idx);
 
 // Data file entry for loadVariables pre-bundled data
 typedef struct DataFileEntry {

@@ -199,6 +199,83 @@ static Avm2AbcFileRt* avm2_abc_load(Avm2Context* ctx, const Avm2AbcFileData* dat
 	return file;
 }
 
+// Register a CHILD movie's ABC files (loader-arc tranche 6). Same three steps
+// the main movie's boot runs — load, publish script traits into the domain,
+// eager-init each file's last script under a catch-all — but scoped to one
+// Loader delivery and idempotent, because loader_reuse loads the same child
+// twice and the second load must not re-run its scripts.
+//
+// One global domain for now: first match wins, so a name the parent already
+// defines resolves to the parent's. True per-movie ApplicationDomain isolation
+// is tranche 8; none of the tranche-6 targets collide.
+void avm2_abc_register_movie(Avm2Context* ctx, const Avm2MovieTables* tables)
+{
+	static const Avm2MovieTables* registered[8];
+	static uint32_t reg_base[8];
+	static uint32_t registered_count;
+	if (ctx == NULL || tables == NULL) return;
+	uint32_t n = tables->abc_file_count;
+	if (n == 0) return;
+	for (uint32_t i = 0; i < registered_count; i++)
+	{
+		if (registered[i] != tables) continue;
+		// Already loaded — but Ruffle builds a FRESH movie for every load,
+		// so the scripts run again (loader_reuse loads the same child twice
+		// and expects its root script's trace both times). Re-arm the init
+		// state and re-run the eager script; the loaded ABC, its domain
+		// entries and its globals objects are reused rather than duplicated
+		// (one global domain, tranche 8 gives each load its own).
+		for (uint32_t f = 0; f < n; f++)
+		{
+			Avm2AbcFileRt* file = ctx->files[reg_base[i] + f];
+			for (uint32_t s = 0; s < file->data->script_count; s++)
+				file->script_init_state[s] = AVM2_SCRIPT_UNINITIALIZED;
+		}
+		for (uint32_t f = 0; f < n; f++)
+		{
+			Avm2AbcFileRt* file = ctx->files[reg_base[i] + f];
+			if (file->data->script_count == 0) continue;
+			Avm2TryFrame top;
+			avm2_try_push_catch_all(ctx, &top);
+			if (setjmp(top.jb) == 0)
+			{
+				avm2_script_ensure_init(file, file->data->script_count - 1);
+			}
+			avm2_try_pop_frame(&top);
+		}
+		return;
+	}
+
+	uint32_t base = ctx->file_count;
+	if (registered_count < 8)
+	{
+		reg_base[registered_count] = base;
+		registered[registered_count++] = tables;
+	}
+	Avm2AbcFileRt** grown =
+		avm2_alloc(ctx, (base + n) * sizeof(Avm2AbcFileRt*));
+	if (base != 0 && ctx->files != NULL)
+		memcpy(grown, ctx->files, base * sizeof(Avm2AbcFileRt*));
+	ctx->files = grown;
+	ctx->file_count = base + n;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		ctx->files[base + i] = avm2_abc_load(ctx, tables->abc_files[i]);
+	}
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2AbcFileRt* f = ctx->files[base + i];
+		if (f->data->script_count == 0) continue;
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
+		{
+			avm2_script_ensure_init(f, f->data->script_count - 1);
+		}
+		avm2_try_pop_frame(&top);
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Root binding (steps 2 + 4)
 // ---------------------------------------------------------------------------

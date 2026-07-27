@@ -469,6 +469,12 @@ typedef struct Avm2DisplayObjectExt
 	// soundTransform: core i32×100 {l2l,l2r,r2l,r2r,volume}; unset = default.
 	int32_t sound_transform[5];
 	uint8_t sound_transform_set;
+	// The LoaderInfo this object's MOVIE was loaded through (loader-arc
+	// tranche 6). Set on a Loader-loaded child's ROOT only; every other
+	// object reaches it by walking to its root, which is what makes
+	// `loader.contentLoaderInfo === loader.content.loaderInfo` true.
+	// NULL = the main movie, whose objects answer g_root_loader_info.
+	Avm2Object* loader_info;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.
@@ -624,6 +630,11 @@ uint16_t avm2_display_char_for_class(Avm2Class* cls);
 // Build the stage + root (SymbolClass char 0 / bound placed symbols) and
 // remember them on ctx. Called from runSWF_avm2 after script eager-init.
 void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name);
+// Load a CHILD movie's ABC files into the running context (loader-arc tranche
+// 6): grows ctx->files, publishes each script's traits into the domain and
+// eager-inits every file's last script. Idempotent per tables pointer — a
+// second load of the same child re-uses the already-loaded scripts.
+void avm2_abc_register_movie(Avm2Context* ctx, const Avm2MovieTables* tables);
 // One full frame tick: Enter -> Construct -> FrameScripts -> Exit
 // (Ruffle frame_lifecycle.rs run_all_phases_avm2).
 void avm2_display_run_tick(Avm2Context* ctx);
