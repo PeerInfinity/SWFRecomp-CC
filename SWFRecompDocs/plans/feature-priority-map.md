@@ -47,11 +47,13 @@ ruffle_matched (236), segfault (3), runtime_error (21), timeout (4) and
 compile_fail (1) **all flat in both**, with **zero pass→fail regressions**.
 Both gains are entirely inside `from_avmplus`.
 
-**Current, at `3c0d4817f` (CI `30301034257`, Loader tranches 6b+6c+7):
-3852/4419 effective (87.2%)**, 567 failing — +5 over `535885e66`, zero
-pass→fail regressions, and no crash bucket at all (`compile_fail`,
-`segfault` and `timeout` are all absent from the histogram). All five gains
-are in `avm2`. The per-suite table below is still kept at the `28577da2a`
+**Current, at `1b63b2e6d` (CI `30303826686`, Loader tranches 6b+6c+7):
+3851/4419 effective (87.1%)**, 568 failing — +5 gains over `535885e66`, all
+in `avm2`, and one regression: `avm2/edittext_align` `pass → segfault`, the
+unattributed full-shard intermittent (`loader-arc.md` §7/§9 — the preceding
+run `30301034257` carried every code change in this arc with **no segfault
+bucket at all**, and the one commit added afterwards is a provable no-op for
+that test). `compile_fail` and `timeout` are absent from both runs. The per-suite table below is still kept at the `28577da2a`
 figures (3836); the arc rows further down each record the run they landed
 on.
 

@@ -887,8 +887,25 @@ design pass with file:line anchors rather than from reading diffs.
 
 Shipped in three commits: `d44c99991` (6b-easy), `3c0d4817f` (7 + 6c, one
 commit because both land in `avm2_display.c` with interleaved hunks), and
-`0dbc5b41e` (the root-binding fix below, confirmed separately by
-`30303826686`).
+`0dbc5b41e` (the root-binding fix below).
+
+**Confirming run `30303826686` @ `1b63b2e6d`** (adds `0dbc5b41e`) reproduces
+the same five gains and CI-confirms `loader_loadbytes_url` at **3/12** (from
+1/12). It also reports `avm2/edittext_align` `pass → segfault`, which is the
+**unattributed full-shard intermittent of §7** (~1 in 12 full runs), not a
+regression from this work — and for once that is provable rather than
+asserted:
+
+- Run `30301034257` carried *every* other change in this arc (the mouse-pick
+  rule, the URL plumbing, `raw_bytes`, the deferred loadBytes boot) and its
+  histogram has **no segfault bucket at all**.
+- The only delta in the confirming run is `0dbc5b41e`, whose new loop is
+  guarded on `root_class == NULL`. `edittext_align`'s SWF binds
+  `{ 0, "test_fla.MainTimeline" }`, so the first pass sets `root_class` and
+  the new loop never executes. The commit is a literal no-op for this test.
+
+Per the standing play, no attribution A/B was run; the open action remains
+ASAN on a shard in a dedicated session.
 
 ### What the tests taught
 
@@ -964,8 +981,8 @@ rows that have it before arguing about risk.
 
 ### Where 6b-stretch stopped, and why it is tranche 8
 
-`loader_loadbytes_url` reached **3/12** (from 1/12): the root now reports its
-own `url` and `loaderURL`. The remaining nine lines need the MAIN movie to
+`loader_loadbytes_url` reached **3/12** (from 1/12, CI-confirmed by
+`30303826686`): the root now reports its own `url` and `loaderURL`. The remaining nine lines need the MAIN movie to
 be loadable as a child, and every step of that is tranche-8 shaped:
 
 1. The `avm2_movie_tables` aggregate is emitted **only when `symbol_prefix`
