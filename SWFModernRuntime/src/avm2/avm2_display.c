@@ -4517,8 +4517,8 @@ static Avm2PendingUrlLoad g_pending_url_loads[AVM2_MAX_PENDING_URL_LOADS];
 
 // Ruffle's set_data. `body`/`len` may be empty, which is exactly what the error
 // arm passes in to clear `data`.
-static void ul_set_data(Avm2Context* ctx, Avm2Object* self,
-                        Avm2UrlLoaderExt* ext, const uint8_t* body, uint32_t len)
+static void ul_set_data(Avm2Context* ctx, Avm2UrlLoaderExt* ext,
+                        const uint8_t* body, uint32_t len)
 {
 	ext->bytes_loaded = len;
 	ext->bytes_total = len;
@@ -4547,7 +4547,6 @@ static void ul_set_data(Avm2Context* ctx, Avm2Object* self,
 	}
 	ext->data = avm2_string(avm2_string_new(ctx, (const char*) (p != NULL ? p : ""),
 	                                       len));
-	(void) self;
 }
 
 static void ul_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl)
@@ -4558,7 +4557,7 @@ static void ul_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl)
 
 	if (!pl->found)
 	{
-		ul_set_data(ctx, self, ext, NULL, 0);
+		ul_set_data(ctx, ext, NULL, 0);
 		Avm2Object* ev = avm2_http_status_event_new(
 			ctx, avm2_string_from_literal(ctx, "httpStatus"), 0, 0);
 		if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
@@ -4570,7 +4569,7 @@ static void ul_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl)
 	}
 
 	dispatch_simple_event(ctx, self, "open", 0);
-	ul_set_data(ctx, self, ext, pl->data, pl->len);
+	ul_set_data(ctx, ext, pl->data, pl->len);
 	Avm2Object* ev = avm2_progress_event_new(
 		ctx, avm2_string_from_literal(ctx, "progress"), (double) pl->len,
 		(double) pl->len);

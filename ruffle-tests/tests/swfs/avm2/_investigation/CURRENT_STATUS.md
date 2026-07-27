@@ -21,42 +21,54 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
-## Loader / LoaderInfo — SCOPED, not yet implemented (2026-07-26)
+## Loader / LoaderInfo — tranches 1–4 SHIPPED (2026-07-26/27)
 
-The "flash.display.Loader (deferred)" line that appears in the Stage 8 and
-Stage 9 notes below is still accurate for the *runtime*, but the arc is no
-longer un-triaged. Full plan:
+Full plan + per-tranche postmortems:
 **`SWFRecompDocs/plans/loader-arc.md`** (per-test triage of all 35
-`loader*`/`loaderinfo*` tests, 8 ranked tranches).
+`loader*`/`loaderinfo*` tests, 8 ranked tranches; §5 covers 1+2, §6 covers
+3+4). The "flash.display.Loader (deferred)" line in the Stage 8/9 notes
+below is now out of date.
 
-Three findings worth having here:
+- **Tranches 1+2** (`8213dd4d6`, CI `30226375815`): **+12** (predicted 8).
+  Per-instance `LoaderInfo` state machine — every getter now keys on the
+  receiving instance's stream state, `stage.loaderInfo` is a distinct
+  never-`init`ed object, `#2099` from the eight movie-describing getters
+  while NotYetLoaded — plus the load pipeline without content
+  (open/progress/complete/ioError, byte accounting, `#2124`).
+- **Tranches 3+4** (`f6ba5c677` + `28577da2a`, CI `30230575524`): **+6**
+  (predicted 4). Image payloads decode through stb into a
+  `BitmapData`/`Bitmap` `content`, and `URLLoader` really reads bundled
+  sibling assets.
 
-1. **The biggest single defect is not a missing feature.** Every
-   `LoaderInfo` getter in `avm2_display.c` ignores its receiver and answers
-   with the ROOT movie's values, so `new Loader().contentLoaderInfo` reports
-   the parent SWF's `content`, `bytesTotal`, `url` and `contentType`. That
-   alone breaks the first block of nearly every test in the group. Ruffle's
-   model is a per-instance `LoaderStream` (NotYetLoaded/Swf) plus
-   `init_event_fired`/`expose_content`, with `#2099` from the eight
-   movie-describing getters while not loaded.
-2. **`stage.loaderInfo` is a DIFFERENT object from `root.loaderInfo`** in
-   Flash/Ruffle (`context.rs:390` vs `movie_clip.rs:335`). Only the root
-   clip's ever fires `init`, which is why `stage_loaderinfo_properties`
-   expects `contentType` **null** while the passing `loaderinfo_properties`
-   expects `application/x-shockwave-flash`. We conflate them into one
-   singleton.
+Findings worth having here rather than only in the plan:
+
+1. **The load timing model is Ruffle's async executor, not "one frame
+   later".** A fetch resolves *after* the frame that issued it, and a load
+   started by the resulting `complete`/`ioError` handler resolves in the
+   **same** drain — `loader_bitmap_transparency` chains three loads inside
+   `num_ticks = 2`. Separately, init/complete are not uniform: an image's
+   fire inline out of `movie_loader_complete`, a child SWF's wait for the
+   clip's own `on_exit_frame` one tick later.
+2. **A malformed image is not an ioError.** Ruffle's `decode_png` hands back
+   an empty bitmap at the header's declared dimensions
+   (`loader_loadbytes_invalid_png`), so a failed full decode falls back to
+   `stbi_info_from_memory` + transparent pixels.
 3. **AOT is not the blocker it looks like.** `verify_output.py` already
    recompiles every sibling `.swf` of a test at build time and registers it
    in `findMovieEntry(filename)` (the AVM1 `loadMovie` path). The child
-   SWFs these tests load are already in the binary; the gaps are that
-   `MovieEntry` has no AVM2/ABC entry point, that `download_tests.sh`
-   drops nested `child/child.swf` children, and that `loadBytes` needs a
-   bytes→movie identity (resolvable at build time in every corpus case).
+   SWFs these tests load are already in the binary; the remaining gaps are
+   that `MovieEntry` has no AVM2/ABC entry point and carries no bytes, that
+   `download_tests.sh` drops nested `child/child.swf` children, and that
+   `loadBytes` needs a bytes→movie identity (resolvable at build time in
+   every corpus case). That is tranche 6, the one large item.
 
-Reachable: 26 of the 32 failures (+ up to 9 in `from_shumway/as3-loader`).
-Won't-do: `loader_jpegxr`, `loader_jpegxr_alpha` (no JPEG-XR decoder;
-upstream feature-gates them), `loader_applicationDomain` (needs the real
-Flex framework SWZ). `mouse_pick_loader_avm1` belongs to the dual-VM arc.
+Reachable: 15 of the 21 remaining avm2 failures (+ up to 9 in
+`from_shumway/as3-loader`). Next up is tranche 5 (navigator fetch log, +2).
+Won't-do: `loader_applicationDomain` (needs the real Flex framework SWZ).
+`mouse_pick_loader_avm1` belongs to the dual-VM arc. Note the earlier
+won't-do call on `loader_jpegxr`/`loader_jpegxr_alpha` was **wrong** — they
+only trace `contentType`, so a magic-byte sniff passed both without any
+JPEG-XR decoder.
 
 ## Robot Wants sequels — Puppy / Fishy / Ice Cream (2026-07-18)
 

@@ -2,10 +2,11 @@
 
 **Created**: 2026-07-26 · **Baseline**: `9f4be9647`'s parent (`cf5b42970`),
 `avm2/_results/results_graphics.json` from CI `30185616752`.
-**Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`) — see
-§5 Postmortem at the bottom. Tranches 3–8 are still scoping only. The
-re-ranked feature-priority list puts the avm2-platform mass next, and
-`flash.display.Loader` is its largest single block.
+**Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`, §5 Postmortem) and
+**tranches 3 + 4 SHIPPED** (`f6ba5c677` + `28577da2a`, §6 Postmortem).
+Tranches 5–8 are still scoping only; tranche 7 shrank to +1 as a side effect
+of 3. The re-ranked feature-priority list puts the avm2-platform mass next,
+and `flash.display.Loader` is its largest single block.
 
 Scope of this document: the 35 avm2 tests whose name matches
 `loader`/`loaderinfo` (32 failing, 3 already passing:
@@ -223,11 +224,11 @@ postmortemed against CI.
 |---|---|---|---|---|
 | 1 | **Per-instance LoaderInfo state machine** — `LoaderStream` equivalent (NotYetLoaded/Loaded + `init_fired`/`expose_content`/`content_type`), a **separate Stage LoaderInfo**, `#2099` on the 8 movie getters, `url` null until loaded, `isURLInaccessible`, `sharedEvents`, root-movie `init`/`complete` firing at the frame-1 `exitFrame` boundary, `LoaderContext` + `JPEGLoaderContext` class surface | A + `jpeg_loader_context` | **+5** (`loaderinfo_loadurl`, `loaderinfo_properties_not_loaded`, `stage_loaderinfo_properties`, `loaderinfo_events`, `jpeg_loader_context`) and ~45 newly-matching lines in 8 more | small |
 | 2 | **Load pipeline without content** — `open`/`progress`/`complete`/`ioError` dispatch, byte accounting from the real source length, the three-state `bytes`, `#2124` for unknown types, `applicationDomain` from `LoaderContext`, `unload` resetting the stream | B | **+3** (`loader_unknown_content`, `loader_bytes_unknown_content`, `loaderinfo_more`) | small |
-| 3 | **Image content** — stb decode → `BitmapData` → `Bitmap` as `content`, `contentType` per sniffed format | C (minus JXR) | **+3** (`loader_image`, `loader_bitmap_transparency`, `loader_loadbytes_invalid_png`) | medium |
-| 4 | **URLLoader over bundled data** | G | **+1** (`url_loader`); prerequisite for two bucket-F tests | small |
+| 3 | ~~**Image content** — stb decode → `BitmapData` → `Bitmap` as `content`, `contentType` per sniffed format~~ **SHIPPED `f6ba5c677`** | C (minus JXR) | **+3** (`loader_image`, `loader_bitmap_transparency`, `loader_loadbytes_invalid_png`) — all three, plus `loader_visibility_interactive` free; see §6 | medium |
+| 4 | ~~**URLLoader over bundled data**~~ **SHIPPED `28577da2a`** | G | **+1** (`url_loader`); prerequisite for two bucket-F tests | small |
 | 5 | **Navigator fetch log** | E | **+2** (`loader_method`, `loader_load`) | small-medium |
 | 6 | **AVM2 child-SWF execution** — `MovieEntry` gains an ABC/script-init entry point, `generate_child_movie_file` handles `RecompiledABC`, `Loader.load`/`loadBytes` resolve through `findMovieEntry`, child root construction + `addChild` into the Loader, event ordering, LoaderInfo reset on reload | F (unblocked part) | **+6** (`loader_events`, `loader_loadbytes_events`, `loader_reuse`, `loader_loaderurl`, `loader_error_in_root_ctor`, `loader_loadbytes_url`) **+ up to 9** `from_shumway/as3-loader/*` | **large** |
-| 7 | **Loader hit-testing** | D (minus AVM1) | **+3** (`loader_visibility_interactive`, `loader_noninteractive_try_click_root`, `loader_try_click_root`) | medium |
+| 7 | **Loader hit-testing** | D (minus AVM1) | ~~+3~~ **+1** — image content alone passed `loader_visibility_interactive` and took `loader_noninteractive_try_click_root` to 4/5, so only `loader_try_click_root` is left and it needs tranche 6's SWF content (§6) | medium |
 | 8 | **Nested-child download + ApplicationDomain isolation** — recurse in `install_test_dir`/`find_child_swfs`, then per-movie domains with duplicate class names | F (blocked part) | **+4** (`loader_child_getdefinition`, `loader_duplicate_class`, `loader_duplicate_coerce`, `loader_duplicate_coerce_new_domain`) | large |
 
 **Won't-do (3 tests):** `loader_jpegxr`, `loader_jpegxr_alpha` (no JPEG-XR
@@ -352,3 +353,115 @@ already sniffs PNG/JPEG/GIF correctly and marks the stream loaded, so
 tranche 3 is exactly "decode the bytes stb already can read into a
 `BitmapData`, wrap it in a `Bitmap`, and set it as the stream's root
 clip" — the events, byte accounting and `contentType` around it are done.
+
+## 6. Postmortem — tranches 3 + 4 (`f6ba5c677` + `28577da2a`, CI `30230575524`)
+
+**Predicted +4 (3 for tranche 3, 1 for tranche 4), actual +6. Zero
+regressions**; every crash bucket flat (`recomp_fail` 1, `runtime_error` 8,
+and segfault/timeout/compile_fail still absent corpus-wide). Corpus 3830 →
+3836 effective over the 4419-test intersection with `28577da2a`'s baseline
+results; avm2 881 → 886, from_shumway 174 → 175. All four predicted tests
+pass, and the extras are `loader_visibility_interactive` (bucket D) and
+`from_shumway/flash_net_URLRequest`. Mode parity holds: the five new avm2
+passes were verified in `--mode=graphics` locally as well as no-graphics, and
+CI's graphics run reproduced the local deltas test-for-test.
+
+| Gain | Suite | Predicted? |
+|---|---|---|
+| `loader_image`, `loader_bitmap_transparency`, `loader_loadbytes_invalid_png` | avm2 | yes (tranche 3) |
+| `url_loader` | avm2 | yes (tranche 4) |
+| `loader_visibility_interactive` | avm2 | **no — filed under tranche 7** |
+| `flash_net_URLRequest` | from_shumway | **no** |
+
+Line movement in the still-failing tests:
+`loader_noninteractive_try_click_root` 0 → 4,
+`from_shumway/as3-loader/loaded-content-properties` 35 → 36, `bom` 3 → 4,
+`blend_shader_luma_lighten` 0 → 1. No test lost matching lines.
+
+### What the triage got wrong
+
+- **The timing model was NOT settled, and the session brief said it was.**
+  §5 concluded "`load()` defers to the next tick's start; `loadBytes()` is
+  synchronous" and tranche 3 was told not to change it. But
+  `loader_bitmap_transparency` chains **three** `load()`s through each
+  other's `complete` handlers inside `num_ticks = 2`, which one-tick-per-link
+  cannot finish. Ruffle's actual model is its async executor: the test
+  harness (`tests/framework/src/runner.rs::do_tick`) runs it to quiescence
+  **after** every tick, so a fetch resolves past the frame that issued it
+  (not at the next frame's *start*), and a load spawned inside one of those
+  handlers is picked up by the same `executor.run()`. Two ticks suffice
+  because all three links share one drain. **Lesson: "defers by a frame" and
+  "resolves after this frame" are indistinguishable on a single load and
+  wildly different on a chain — a timing model inferred from one-shot tests
+  is a hypothesis, not a settled fact.**
+- **init/complete are not uniform across content types.** Ruffle's
+  `movie_loader_complete` calls `fire_init_and_complete_events` inline only
+  when the loaded object is *not* a MovieClip — i.e. only for an image. A
+  child SWF's are deferred to the clip's own `on_exit_frame`, one tick later.
+  Firing both the same way cost exactly **one matching line** in
+  `from_shumway/as3-loader/LoaderTest` (5 → 4), whose `enterFrame` sits
+  between the last progress event and `init`. That single line was the only
+  signal separating the two models anywhere in the corpus — the line-floor
+  watch list earned its keep.
+- **`loader_loadbytes_invalid_png`'s `1024` is `content.width`, not
+  `bytes.length`.** §3's bucket C row and §5's three-state `bytes` note both
+  read it as a byte count; the embedded PNG is 24514 bytes and 1024 is its
+  IHDR width. So `bytes`' third state was never on tranche 3's critical path.
+- **stb rejects that PNG outright**, with "not enough pixels": its IDAT zlib
+  stream is valid *and complete* but only carries 128 of the 512 declared
+  rows. The brief guessed stb would cope because it skips CRC checks — the
+  corruption is not a CRC. The answer came from the oracle's error arm, not
+  the decoder: Ruffle's `decode_png` catches a malformed stream and returns
+  an **empty bitmap at the header's declared size**, so
+  `stbi_info_from_memory` plus all-transparent pixels is the entire fix.
+  **Lesson: on a decoder-tolerance question, read what the oracle does when
+  its decoder fails.**
+- **Bucket D is mostly a side effect of bucket C, not its own tranche.**
+  `loader_visibility_interactive` passes and
+  `loader_noninteractive_try_click_root` goes 0 → 4 purely because a Loader
+  now has content to hit. Tranche 7 should be re-read as **+1**
+  (`loader_try_click_root` alone, and it needs SWF content from tranche 6).
+
+### What it got right
+
+- `transparent` from the decoded channel count rather than "PNG ⇒ true":
+  stb reports the *source* comp as 3/3/4 for `test.jpg`/`test.png`/
+  `test_rgba.png`, which maps exactly onto the expected false/false/true.
+  Ruffle reaches the same answer through
+  `BitmapFormat::supports_transparency`.
+- JPEG-XR staying sniff-only. It is excluded from the decode branch
+  explicitly, and would have been safe regardless — stb cannot read a JXR
+  header either, so the fallback would have returned NULL rather than
+  erroring the flow.
+- Tranche 4 landed first-try with no surprises beyond needing a
+  `HTTPStatusEvent.toString` (it was inheriting `Event`'s four fields, the
+  same class of bug as tranche 2's ErrorEvent family).
+
+### Shape of the delivered code
+
+`avm2_bitmap.c` gained `avm2_bitmap_from_image_bytes` (stb decode →
+premultiplied `BitmapData` → constructed `Bitmap`; truncating premultiply to
+match Ruffle's `premultiply_alpha_rgba`). `avm2_display.c`'s loader phase is
+now a single `avm2_loader_drain` after the `exitFrame` broadcast: flush the
+active list (deferred SWF init/complete, and loadBytes deliveries), then
+resolve queued fetches in a bounded loop so chains close inside one tick. The
+same file holds the URLLoader pipeline, wired into `avm2_globals.c`'s class
+shell through `avm2_display_wire_url_loader`. `Loader.content` now delegates
+to `contentLoaderInfo.content` as `Loader.as` does, so it honours the
+`expose_content` gate; `load`/`loadBytes`/`unload` share a
+`loader_drop_content` that also removes the old content child.
+
+### What tranche 5/6 inherit
+
+- `bytes` reaches its third state only for **bundled** assets, whose storage
+  is generated-static. A `loadBytes` source ByteArray is deliberately not
+  aliased (the script can resize it), and a child SWF's decompressed bytes
+  are not in the movie registry at all — `loader_events`' expected
+  `bytes.length` of 1490 is tranche 6's problem, and it needs the registry to
+  carry the bytes, not just `file_size`.
+- `from_shumway/flash_net_URLLoader` is **not** reachable from tranche 4: it
+  fetches an unbundled 2674-byte asset, so it correctly takes the #2032 arm.
+  It needs the asset bundled, which is a harness change.
+- URLLoader's `dataFormat = "variables"` falls through to text. No test uses
+  URLVariables as a URLLoader *response* (only as a request body, which is
+  tranche 5's `loader_method`), so parsing it would be untested code.
