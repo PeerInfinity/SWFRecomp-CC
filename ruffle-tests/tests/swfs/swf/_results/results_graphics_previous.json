@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-27T04:25:43.288593+00:00",
-    "git_sha": "a9900a478651ad3505390c73078f73561eebf185",
-    "duration_seconds": 46.89,
+    "timestamp": "2026-07-27T05:37:49.231719+00:00",
+    "git_sha": "dfef7a9d6945c5123ab2ab86ba1c0474f7756ef3",
+    "duration_seconds": 28.43,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -20,8 +20,8 @@
       "test": "convolution_filter_big_matrix",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.752,
-        "run": 0.466
+        "compile": 0.931,
+        "run": 0.315
       },
       "num_frames": 16,
       "lines": {
@@ -29,15 +29,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 20.22,
+      "duration": 1.25,
       "status": "pass"
     },
     {
       "test": "swf_length_too_long",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.588,
-        "run": 0.165
+        "compile": 2.03,
+        "run": 0.215
       },
       "num_frames": 16,
       "lines": {
@@ -45,7 +45,7 @@
         "expected_lines": 18,
         "matching_lines": 12
       },
-      "duration": 1.76,
+      "duration": 2.25,
       "ruffle_diff_count": 6,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -55,8 +55,8 @@
       "test": "swf_length_too_short_no_end",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.177,
-        "run": 0.165
+        "compile": 1.151,
+        "run": 0.164
       },
       "num_frames": 16,
       "lines": {
@@ -64,14 +64,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 1.35,
+      "duration": 1.32,
       "status": "pass"
     },
     {
       "test": "swf_length_too_short_no_second_frame",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.115,
+        "compile": 20.935,
         "run": 0.215
       },
       "num_frames": 16,
@@ -80,14 +80,14 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 21.34,
+      "duration": 21.16,
       "status": "pass"
     },
     {
       "test": "swf_length_zero",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.731,
+        "compile": 1.953,
         "run": 0.215
       },
       "num_frames": 16,
@@ -96,7 +96,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.95,
+      "duration": 2.18,
       "status": "pass"
     }
   ]
