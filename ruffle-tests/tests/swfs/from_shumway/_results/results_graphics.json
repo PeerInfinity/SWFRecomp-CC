@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "timestamp": "2026-07-27T04:25:43.338962+00:00",
-    "git_sha": "a9900a478651ad3505390c73078f73561eebf185",
-    "duration_seconds": 2718.0,
+    "timestamp": "2026-07-27T05:37:49.282074+00:00",
+    "git_sha": "dfef7a9d6945c5123ab2ab86ba1c0474f7756ef3",
+    "duration_seconds": 2386.03,
     "total_available": 229,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 229,
-  "pass": 150,
+  "pass": 163,
   "ruffle_matched": 12,
-  "fail": 67,
-  "pass_rate": 65.5,
-  "effective_pass": 162,
-  "effective_pass_rate": 70.7,
+  "fail": 54,
+  "pass_rate": 71.2,
+  "effective_pass": 175,
+  "effective_pass_rate": 76.4,
   "breakdown": {
-    "output_mismatch": 67
+    "output_mismatch": 54
   },
   "tests": [
     {
       "test": "3_joystick",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.011,
-        "run": 0.315
+        "compile": 18.393,
+        "run": 0.215
       },
       "num_frames": 21,
       "lines": {
@@ -31,7 +31,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 24.5,
+      "duration": 18.72,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -50,8 +50,8 @@
       "test": "MaskTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.424,
-        "run": 0.265
+        "compile": 3.761,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -59,7 +59,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 5.89,
+      "duration": 4.1,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -77,8 +77,8 @@
       "test": "MaskTest-2",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.42,
-        "run": 0.315
+        "compile": 1.666,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -86,7 +86,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 5.97,
+      "duration": 2.02,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -104,8 +104,8 @@
       "test": "MaskTest-3",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.957,
-        "run": 0.315
+        "compile": 3.876,
+        "run": 0.215
       },
       "num_frames": 4,
       "lines": {
@@ -113,7 +113,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 24.43,
+      "duration": 4.19,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -134,8 +134,8 @@
       "test": "ZeroClipboardTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.595,
-        "run": 0.165
+        "compile": 18.48,
+        "run": 0.115
       },
       "num_frames": 9,
       "lines": {
@@ -143,15 +143,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 23.77,
+      "duration": 18.6,
       "status": "pass"
     },
     {
       "test": "acid/acid",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.545,
-        "run": 1.119
+        "compile": 19.505,
+        "run": 0.767
       },
       "num_frames": 18,
       "lines": {
@@ -159,7 +159,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 34.13,
+      "duration": 25.39,
       "image_comparisons": {
         "output.01": {
           "status": "fail",
@@ -335,9 +335,9 @@
     {
       "test": "acid/acid-big",
       "phases": {
-        "recomp": 0.714,
-        "compile": 37.202,
-        "run": 1.471
+        "recomp": 0.497,
+        "compile": 29.2,
+        "run": 1.069
       },
       "num_frames": 300,
       "lines": {
@@ -345,7 +345,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 39.67,
+      "duration": 30.94,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -363,8 +363,8 @@
       "test": "acid/acid-bitmap-draw_quality_high",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.09,
-        "run": 0.515
+        "compile": 18.521,
+        "run": 0.365
       },
       "num_frames": 1,
       "lines": {
@@ -372,7 +372,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.72,
+      "duration": 18.96,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -390,8 +390,8 @@
       "test": "acid/acid-bitmap-draw_quality_low",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.921,
-        "run": 0.415
+        "compile": 25.928,
+        "run": 0.566
       },
       "num_frames": 1,
       "lines": {
@@ -399,7 +399,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.44,
+      "duration": 26.63,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -416,9 +416,9 @@
     {
       "test": "acid/acid-bitmap-fill",
       "phases": {
-        "recomp": 0.073,
-        "compile": 18.717,
-        "run": 0.365
+        "recomp": 0.095,
+        "compile": 23.673,
+        "run": 0.467
       },
       "num_frames": 1,
       "lines": {
@@ -426,7 +426,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.97,
+      "duration": 25.38,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -443,9 +443,9 @@
     {
       "test": "acid/acid-bitmap-fill-2",
       "phases": {
-        "recomp": 0.074,
-        "compile": 2.495,
-        "run": 0.265
+        "recomp": 0.095,
+        "compile": 3.581,
+        "run": 0.366
       },
       "num_frames": 1,
       "lines": {
@@ -453,7 +453,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 3.04,
+      "duration": 4.33,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -471,8 +471,8 @@
       "test": "acid/acid-bitmapData-copyPixels",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.761,
-        "run": 0.315
+        "compile": 6.343,
+        "run": 0.465
       },
       "num_frames": 1,
       "lines": {
@@ -480,7 +480,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 5.26,
+      "duration": 7.06,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -498,8 +498,8 @@
       "test": "acid/acid-bitmapData-draw",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.687,
-        "run": 0.214
+        "compile": 6.149,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -507,7 +507,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 5.08,
+      "duration": 6.72,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -525,8 +525,8 @@
       "test": "acid/acid-bitmaps",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.026,
-        "run": 0.315
+        "compile": 26.45,
+        "run": 0.416
       },
       "num_frames": 10,
       "lines": {
@@ -534,7 +534,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.61,
+      "duration": 27.27,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -561,9 +561,9 @@
     {
       "test": "acid/acid-blend",
       "phases": {
-        "recomp": 0.963,
-        "compile": 32.514,
-        "run": 0.766
+        "recomp": 1.153,
+        "compile": 40.93,
+        "run": 1.32
       },
       "num_frames": 30,
       "lines": {
@@ -571,7 +571,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 34.44,
+      "duration": 43.68,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -588,9 +588,9 @@
     {
       "test": "acid/acid-blend-2",
       "phases": {
-        "recomp": 0.959,
-        "compile": 16.454,
-        "run": 0.916
+        "recomp": 1.142,
+        "compile": 21.287,
+        "run": 1.418
       },
       "num_frames": 40,
       "lines": {
@@ -598,7 +598,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.54,
+      "duration": 25.58,
       "image_comparisons": {
         "output.10": {
           "status": "fail",
@@ -657,7 +657,7 @@
       "test": "acid/acid-chars",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.136,
+        "compile": 1.05,
         "run": 0.215
       },
       "num_frames": 1,
@@ -666,7 +666,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.5,
+      "duration": 1.43,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -684,7 +684,7 @@
       "test": "acid/acid-child",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.081,
+        "compile": 15.363,
         "run": 0.165
       },
       "num_frames": 10,
@@ -693,7 +693,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.4,
+      "duration": 15.68,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -721,8 +721,8 @@
       "test": "acid/acid-clip",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.243,
-        "run": 0.215
+        "compile": 1.329,
+        "run": 0.214
       },
       "num_frames": 1,
       "lines": {
@@ -730,7 +730,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.68,
+      "duration": 1.76,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -748,8 +748,8 @@
       "test": "acid/acid-clip-2",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.115,
-        "run": 0.215
+        "compile": 1.094,
+        "run": 0.165
       },
       "num_frames": 1,
       "lines": {
@@ -757,7 +757,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.47,
+      "duration": 1.39,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -775,7 +775,7 @@
       "test": "acid/acid-clip-3",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.126,
+        "compile": 4.19,
         "run": 0.215
       },
       "num_frames": 10,
@@ -784,7 +784,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 4.61,
+      "duration": 4.67,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -811,8 +811,8 @@
     {
       "test": "acid/acid-color",
       "phases": {
-        "recomp": 1.47,
-        "compile": 23.925,
+        "recomp": 1.451,
+        "compile": 22.648,
         "run": 0.666
       },
       "num_frames": 10,
@@ -821,7 +821,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 26.41,
+      "duration": 25.16,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -849,7 +849,7 @@
       "test": "acid/acid-color-0",
       "phases": {
         "recomp": 0.076,
-        "compile": 2.771,
+        "compile": 2.489,
         "run": 0.465
       },
       "num_frames": 1,
@@ -858,7 +858,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 3.95,
+      "duration": 3.67,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -876,7 +876,7 @@
       "test": "acid/acid-color-2",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.59,
+        "compile": 1.176,
         "run": 0.214
       },
       "num_frames": 1,
@@ -885,7 +885,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.94,
+      "duration": 1.53,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -902,18 +902,18 @@
     {
       "test": "acid/acid-filter",
       "phases": {
-        "recomp": 0.007,
-        "compile": 6.171,
-        "run": 0.315
+        "recomp": 0.006,
+        "compile": 5.853,
+        "run": 0.265
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: color)",
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 6.74,
+      "duration": 6.37,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -926,16 +926,16 @@
         }
       },
       "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=2, expected=2)",
-      "actual_output": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: color)\n\tat acid_filter_fla::MainTimeline/frame1()",
+      "detail": "2 line(s) differ (actual=0, expected=2)",
+      "actual_output": "",
       "expected_output": "3300ff\n1"
     },
     {
       "test": "acid/acid-filter-2",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.761,
-        "run": 0.518
+        "compile": 1.675,
+        "run": 0.517
       },
       "num_frames": 1,
       "lines": {
@@ -943,7 +943,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.58,
+      "duration": 2.49,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -961,8 +961,8 @@
       "test": "acid/acid-gc",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.955,
-        "run": 0.315
+        "compile": 1.788,
+        "run": 0.316
       },
       "num_frames": 10,
       "lines": {
@@ -970,7 +970,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.5,
+      "duration": 2.33,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -988,7 +988,7 @@
       "test": "acid/acid-gradient",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.856,
+        "compile": 1.779,
         "run": 0.315
       },
       "num_frames": 1,
@@ -997,7 +997,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.4,
+      "duration": 2.33,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1015,7 +1015,7 @@
       "test": "acid/acid-gradient-0",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.819,
+        "compile": 19.973,
         "run": 0.616
       },
       "num_frames": 1,
@@ -1024,7 +1024,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.47,
+      "duration": 21.59,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -1042,7 +1042,7 @@
       "test": "acid/acid-gradient-1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.752,
+        "compile": 1.669,
         "run": 0.315
       },
       "num_frames": 1,
@@ -1051,7 +1051,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.3,
+      "duration": 2.21,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1069,8 +1069,8 @@
       "test": "acid/acid-gradient-2",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.777,
-        "run": 0.315
+        "compile": 1.664,
+        "run": 0.316
       },
       "num_frames": 1,
       "lines": {
@@ -1078,7 +1078,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.33,
+      "duration": 2.2,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1095,8 +1095,8 @@
     {
       "test": "acid/acid-image",
       "phases": {
-        "recomp": 0.304,
-        "compile": 28.568,
+        "recomp": 0.303,
+        "compile": 27.017,
         "run": 0.415
       },
       "num_frames": 10,
@@ -1105,7 +1105,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 29.56,
+      "duration": 28.01,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1122,8 +1122,8 @@
     {
       "test": "acid/acid-large",
       "phases": {
-        "recomp": 3.091,
-        "compile": 74.422,
+        "recomp": 3.09,
+        "compile": 78.296,
         "run": 0.115
       },
       "num_frames": 500,
@@ -1132,7 +1132,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 77.66,
+      "duration": 81.53,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1145,8 +1145,8 @@
       "test": "acid/acid-mask",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.581,
-        "run": 0.415
+        "compile": 7.158,
+        "run": 0.467
       },
       "num_frames": 10,
       "lines": {
@@ -1154,7 +1154,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.69,
+      "duration": 8.34,
       "image_comparisons": {
         "output.01": {
           "status": "fail",
@@ -1193,7 +1193,7 @@
       "test": "acid/acid-morph",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.581,
+        "compile": 26.807,
         "run": 0.416
       },
       "num_frames": 30,
@@ -1202,7 +1202,7 @@
         "expected_lines": 6,
         "matching_lines": 4
       },
-      "duration": 25.31,
+      "duration": 27.53,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1223,8 +1223,8 @@
       "test": "acid/acid-scale",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.719,
-        "run": 0.265
+        "compile": 1.984,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -1232,7 +1232,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.21,
+      "duration": 2.53,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1250,17 +1250,17 @@
       "test": "acid/acid-shapes",
       "phases": {
         "recomp": 0.012,
-        "compile": 24.883,
-        "run": 0.616
+        "compile": 26.784,
+        "run": 0.666
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #2007: Parameter targetCoordinateSpace must be non-null.",
       "lines": {
-        "actual_lines": 7,
+        "actual_lines": 1,
         "expected_lines": 120,
         "matching_lines": 0
       },
-      "duration": 28.27,
+      "duration": 30.22,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1273,16 +1273,16 @@
         }
       },
       "status": "output_mismatch",
-      "detail": "120 line(s) differ (actual=7, expected=120)",
-      "actual_output": "20 30\nTypeError: Error #2007: Parameter targetCoordinateSpace must be non-null.\n\tat flash.display::DisplayObject/getBounds()\n\tat acid_shapes_fla::MainTimeline/placeShape()\n\tat Function/<anonymous>()\n\tat Array/forEach()\n\tat acid_shapes_fla::MainTimeline/frame1()",
+      "detail": "120 line(s) differ (actual=1, expected=120)",
+      "actual_output": "20 30",
       "expected_output": "24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n24 34\n... (70 lines after) ..."
     },
     {
       "test": "acid/acid-shapes-testing",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.689,
-        "run": 0.616
+        "compile": 26.073,
+        "run": 0.617
       },
       "num_frames": 1,
       "lines": {
@@ -1290,7 +1290,7 @@
         "expected_lines": 120,
         "matching_lines": 36
       },
-      "duration": 26.18,
+      "duration": 27.57,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1311,8 +1311,8 @@
       "test": "acid/acid-small",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.968,
-        "run": 0.415
+        "compile": 2.198,
+        "run": 0.418
       },
       "num_frames": 5,
       "lines": {
@@ -1320,7 +1320,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.86,
+      "duration": 3.07,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -1349,8 +1349,8 @@
       "test": "acid/acid-stroke-0",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.523,
-        "run": 0.567
+        "compile": 26.93,
+        "run": 0.616
       },
       "num_frames": 1,
       "lines": {
@@ -1358,7 +1358,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 25.63,
+      "duration": 28.09,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1376,7 +1376,7 @@
       "test": "acid/acid-text",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.678,
+        "compile": 1.772,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1385,7 +1385,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.18,
+      "duration": 2.28,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1403,7 +1403,7 @@
       "test": "acid/acid-text-2",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.73,
+        "compile": 2.863,
         "run": 0.315
       },
       "num_frames": 1,
@@ -1412,7 +1412,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 3.27,
+      "duration": 3.41,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1433,8 +1433,8 @@
       "test": "acid/acid-text-3",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.674,
-        "run": 0.265
+        "compile": 1.741,
+        "run": 0.316
       },
       "num_frames": 1,
       "lines": {
@@ -1442,7 +1442,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.1,
+      "duration": 2.21,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -1460,7 +1460,7 @@
       "test": "acid/acid-text-4",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.885,
+        "compile": 6.011,
         "run": 0.315
       },
       "num_frames": 1,
@@ -1469,7 +1469,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.44,
+      "duration": 6.56,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1486,9 +1486,9 @@
     {
       "test": "acid/acid-text-5",
       "phases": {
-        "recomp": 0.0,
-        "compile": 24.294,
-        "run": 0.671
+        "recomp": 0.029,
+        "compile": 24.984,
+        "run": 0.666
       },
       "num_frames": 1,
       "lines": {
@@ -1496,7 +1496,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 26.03,
+      "duration": 26.76,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1514,8 +1514,8 @@
       "test": "acid/acid-text-6",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.226,
-        "run": 0.918
+        "compile": 20.677,
+        "run": 0.916
       },
       "num_frames": 20,
       "lines": {
@@ -1523,7 +1523,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 23.22,
+      "duration": 23.69,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1551,7 +1551,7 @@
       "test": "acid/acid-text-escape",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.69,
+        "compile": 1.717,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1560,7 +1560,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.19,
+      "duration": 2.22,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1578,7 +1578,7 @@
       "test": "acid/acid-text-x",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.834,
+        "compile": 5.907,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1587,7 +1587,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 6.33,
+      "duration": 6.41,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1608,8 +1608,8 @@
       "test": "acid/acid-textfield",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.361,
-        "run": 0.315
+        "compile": 6.023,
+        "run": 0.266
       },
       "num_frames": 1,
       "lines": {
@@ -1617,7 +1617,7 @@
         "expected_lines": 15,
         "matching_lines": 9
       },
-      "duration": 6.92,
+      "duration": 6.53,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1638,8 +1638,8 @@
       "test": "acid/acid-textfield-scroll",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.125,
-        "run": 0.315
+        "compile": 5.786,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -1647,7 +1647,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 6.67,
+      "duration": 6.28,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1665,8 +1665,8 @@
       "test": "acid/acid-video",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.691,
-        "run": 0.566
+        "compile": 20.343,
+        "run": 0.568
       },
       "num_frames": 20,
       "lines": {
@@ -1674,7 +1674,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 23.06,
+      "duration": 21.71,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -1701,7 +1701,7 @@
       "test": "add",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.693,
+        "compile": 1.56,
         "run": 0.215
       },
       "num_frames": 1,
@@ -1710,114 +1710,114 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 1.92,
+      "duration": 1.78,
       "status": "pass"
     },
     {
       "test": "as3-interfaces",
       "phases": {
         "recomp": 0.006,
-        "compile": 25.072,
+        "compile": 24.051,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: run)",
       "lines": {
-        "actual_lines": 6,
+        "actual_lines": 4,
         "expected_lines": 6,
         "matching_lines": 1
       },
-      "duration": 25.25,
+      "duration": 24.23,
       "status": "output_mismatch",
-      "detail": "5 line(s) differ (actual=6, expected=6)",
-      "actual_output": "loading started\nloading complete\ncontent as Interface1 != null: false\nnull\nTypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: run)\n\tat LoadService/loader_complete()",
+      "detail": "5 line(s) differ (actual=4, expected=6)",
+      "actual_output": "loading started\nloading complete\ncontent as Interface1 != null: false\nnull",
       "expected_output": "loading started\nservice initialized\nloading complete\ncontent as Interface1 != null: true\n[object Service1]\nservice: run()"
     },
     {
       "test": "as3-loader/LoaderLoadBytesTest",
       "phases": {
         "recomp": 0.009,
-        "compile": 6.285,
+        "compile": 6.129,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 5,
+        "actual_lines": 3,
         "expected_lines": 4,
         "matching_lines": 1
       },
-      "duration": 6.47,
+      "duration": 6.31,
       "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=5, expected=4)",
-      "actual_output": "loading progress 0 821 TODO: make sure this is dispatched twice before content is initialized\nloadee initialized, url relative to swf: \nloading of 821 bytes complete\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat LoaderLoadBytesTest/loader_complete()",
+      "detail": "3 line(s) differ (actual=3, expected=4)",
+      "actual_output": "loading progress 0 821 TODO: make sure this is dispatched twice before content is initialized\nloadee initialized, url relative to swf: \nloading of 821 bytes complete",
       "expected_output": "loading progress 0 821 TODO: make sure this is dispatched twice before content is initialized\nfrom loadee: loaded\nloadee initialized, url relative to swf: /[[DYNAMIC]]/1\nloading of 821 bytes complete"
     },
     {
       "test": "as3-loader/LoaderLoadBytesTest2",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.98,
+        "compile": 5.757,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 5,
+        "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 2
       },
-      "duration": 6.16,
+      "duration": 5.94,
       "status": "output_mismatch",
-      "detail": "3 line(s) differ (actual=5, expected=3)",
-      "actual_output": "loading progress 0 70 TODO: make sure this is dispatched twice before content is initialized\nloadee initialized, url relative to swf: \nloading of 70 bytes complete\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat LoaderLoadBytesTest2/loader_complete()",
+      "detail": "1 line(s) differ (actual=3, expected=3)",
+      "actual_output": "loading progress 0 70 TODO: make sure this is dispatched twice before content is initialized\nloadee initialized, url relative to swf: \nloading of 70 bytes complete",
       "expected_output": "loading progress 0 70 TODO: make sure this is dispatched twice before content is initialized\nloadee initialized, url relative to swf: /[[DYNAMIC]]/1\nloading of 70 bytes complete"
     },
     {
       "test": "as3-loader/LoaderTest",
       "phases": {
-        "recomp": 0.007,
-        "compile": 25.004,
+        "recomp": 0.006,
+        "compile": 23.823,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 10,
+        "actual_lines": 8,
         "expected_lines": 9,
         "matching_lines": 5
       },
-      "duration": 25.18,
+      "duration": 24.0,
       "status": "output_mismatch",
-      "detail": "5 line(s) differ (actual=10, expected=9)",
-      "actual_output": "loader constructed\nloading started\nloading progress 0,821\nloading progress 821,821\nenterFrame\nloadee initialized\nloading complete\nbytes loaded: 821\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat LoaderTest/loader_complete()",
+      "detail": "4 line(s) differ (actual=8, expected=9)",
+      "actual_output": "loader constructed\nloading started\nloading progress 0,821\nloading progress 821,821\nenterFrame\nloadee initialized\nloading complete\nbytes loaded: 821",
       "expected_output": "loader constructed\nloading started\nloading progress 0,821\nloading progress 821,821\nenterFrame\nfrom loadee: loaded\nloadee initialized\nloading complete\nbytes loaded: 821"
     },
     {
       "test": "as3-loader/LoaderTest2",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.673,
+        "compile": 27.359,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "RangeError: Error #2006: The supplied index is out of bounds.",
       "lines": {
-        "actual_lines": 7,
+        "actual_lines": 4,
         "expected_lines": 7,
         "matching_lines": 2
       },
-      "duration": 26.85,
+      "duration": 27.53,
       "status": "output_mismatch",
-      "detail": "5 line(s) differ (actual=7, expected=7)",
-      "actual_output": "loader constructed\nloading started\nloadee initialized\nloading complete\nRangeError: Error #2006: The supplied index is out of bounds.\n\tat flash.display::DisplayObjectContainer/getChildAt()\n\tat LoaderTest2/loader_complete()",
+      "detail": "5 line(s) differ (actual=4, expected=7)",
+      "actual_output": "loader constructed\nloading started\nloadee initialized\nloading complete",
       "expected_output": "loader constructed\nloading started\nloadee: frame1\nloadee initialized\nloading complete\ntestProperty: loadee\ntestSymbol present: true"
     },
     {
       "test": "as3-loader/bug1093712/loader",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.239,
+        "compile": 6.319,
         "run": 0.165
       },
       "num_frames": 2,
@@ -1826,7 +1826,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 6.41,
+      "duration": 6.49,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -1836,7 +1836,7 @@
       "test": "as3-loader/bug1157243/empty",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.289,
+        "compile": 6.394,
         "run": 0.165
       },
       "num_frames": 2,
@@ -1845,7 +1845,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 6.46,
+      "duration": 6.57,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -1854,8 +1854,8 @@
     {
       "test": "as3-loader/bug1157243/invalid",
       "phases": {
-        "recomp": 0.006,
-        "compile": 6.115,
+        "recomp": 0.007,
+        "compile": 6.253,
         "run": 0.165
       },
       "num_frames": 2,
@@ -1864,7 +1864,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 6.3,
+      "duration": 6.43,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -1873,28 +1873,28 @@
     {
       "test": "as3-loader/events/loader-events",
       "phases": {
-        "recomp": 0.008,
-        "compile": 27.11,
+        "recomp": 0.009,
+        "compile": 6.624,
         "run": 0.165
       },
       "num_frames": 4,
       "error_signature": "RangeError: Error #2006: The supplied index is out of bounds.",
       "lines": {
-        "actual_lines": 31,
+        "actual_lines": 26,
         "expected_lines": 36,
         "matching_lines": 5
       },
-      "duration": 27.29,
+      "duration": 6.81,
       "status": "output_mismatch",
-      "detail": "31 line(s) differ (actual=31, expected=36)",
-      "actual_output": "constructed root1\nadded root1\nadded instance1\nadded instance2\nexitFrame 1\nroot loader: init 1293\nroot loader: complete 1293\nchild 1 loader: open 0\nchild 1 loader: progress 0\nchild 1 loader: progress 8700\nchild 2 loader: open 0\nchild 2 loader: progress 0\nchild 2 loader: progress 8700\nenterFrame 2\nrun frame 2 in root1\nexitFrame 2\nchild 1 loader: init 8700\nchild 1 loader: complete 8700\nchild 2 loader: init 8700\nchild 2 loader: complete 8700\nenterFrame 3\nrun frame 3 in root1\nexitFrame 3\nenterFrame 4\nrun frame 4 in root1\nRangeError: Error #2006: The supplied index is out of bounds.\n\tat flash.display::DisplayObjectContainer/getChildAt()\n\tat LoaderEvents/frame4()\nexitFrame 4\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat LoaderEvents/enterFrameListener()",
+      "detail": "31 line(s) differ (actual=26, expected=36)",
+      "actual_output": "constructed root1\nadded root1\nadded instance1\nadded instance2\nexitFrame 1\nroot loader: init 1293\nroot loader: complete 1293\nchild 1 loader: open 0\nchild 1 loader: progress 0\nchild 1 loader: progress 8700\nchild 2 loader: open 0\nchild 2 loader: progress 0\nchild 2 loader: progress 8700\nenterFrame 2\nrun frame 2 in root1\nexitFrame 2\nchild 1 loader: init 8700\nchild 1 loader: complete 8700\nchild 2 loader: init 8700\nchild 2 loader: complete 8700\nenterFrame 3\nrun frame 3 in root1\nexitFrame 3\nenterFrame 4\nrun frame 4 in root1\nexitFrame 4",
       "expected_output": "constructed root1\nadded root1\nadded instance1\nadded instance3\nexitFrame 1\nroot loader: init 1293\nroot loader: progress 1293\nroot loader: complete 1293\nenterFrame 2\nrun frame 2 in root1\nexitFrame 2\nchild 1 loader: open 0\nchild 1 loader: progress 0\nchild 1 loader: progress 8700\nchild 2 loader: open 0\nchild 2 loader: progress 0\nchild 2 loader: progress 8700\nenterFrame 3\nconstruct instance4, parent: null\nadded instance4\nconstruct instance2, parent: null\nadded instance2\nrun frame 3 in root1\nrun frame 1 in instance2\nrun frame 1 in instance4\nexitFrame 3\nchild 2 loader: init 8700\nchild 2 loader: httpStatus 8700\nchild 2 loader: complete 8700\nchild 1 loader: init 8700\nchild 1 loader: httpStatus 8700\nchild 1 loader: complete 8700\nenterFrame 4\nrun frame 4 in root1\ninstance4\nexitFrame 4"
     },
     {
       "test": "as3-loader/loaderinfo/Preloader",
       "phases": {
         "recomp": 0.006,
-        "compile": 6.179,
+        "compile": 6.363,
         "run": 0.165
       },
       "num_frames": 2,
@@ -1903,34 +1903,34 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 6.36,
+      "duration": 6.54,
       "status": "pass"
     },
     {
       "test": "as3-loader/loaderinfo/loaded-content-properties",
       "phases": {
-        "recomp": 0.007,
-        "compile": 6.321,
+        "recomp": 0.008,
+        "compile": 6.48,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 50,
+        "actual_lines": 48,
         "expected_lines": 48,
         "matching_lines": 36
       },
-      "duration": 6.5,
+      "duration": 6.66,
       "status": "output_mismatch",
-      "detail": "14 line(s) differ (actual=50, expected=48)",
-      "actual_output": "... (1 lines before) ...\napplicationDomain: null\nTODO: support `bytes` getter\nbytesLoaded: 0\nbytesTotal: 0\nchildAllowsParent: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nchildSandboxBridge: undefined\ncontent: null\ncontentType: null\nframeRate: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nheight: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nisURLInaccessible: false\nloader: [object Loader]\nloaderURL: test.swf\nparameters: [object Object]\nparentAllowsChild: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nparentSandboxBridge: undefined\nsameDomain: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nsharedEvents: [object EventDispatcher]\nswfVersion: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nuncaughtErrorEvents: undefined\nurl: null\nwidth: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\n\ncomplete\nactionScriptVersion: 3\napplicationDomain: [object ApplicationDomain]\nTODO: support `bytes` getter\nbytesLoaded: 8647\nbytesTotal: 8647\nchildAllowsParent: true\nchildSandboxBridge: undefined\ncontent: [object Bitmap]\ncontentType: image/jpeg\nframeRate: 24\nheight: 400\nisURLInaccessible: false\nloader: [object Loader]\nloaderURL: test.swf\nparameters: [object Object]\nparentAllowsChild: true\nparentSandboxBridge: undefined\nsameDomain: true\nsharedEvents: [object EventDispatcher]\nswfVersion: 25\nuncaughtErrorEvents: undefined\nurl: alf.jpg\nwidth: 550\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat loaded_content_properties_fla::MainTimeline/handler()",
+      "detail": "12 line(s) differ (actual=48, expected=48)",
+      "actual_output": "... (1 lines before) ...\napplicationDomain: null\nTODO: support `bytes` getter\nbytesLoaded: 0\nbytesTotal: 0\nchildAllowsParent: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nchildSandboxBridge: undefined\ncontent: null\ncontentType: null\nframeRate: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nheight: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nisURLInaccessible: false\nloader: [object Loader]\nloaderURL: test.swf\nparameters: [object Object]\nparentAllowsChild: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nparentSandboxBridge: undefined\nsameDomain: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nsharedEvents: [object EventDispatcher]\nswfVersion: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nuncaughtErrorEvents: undefined\nurl: null\nwidth: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\n\ncomplete\nactionScriptVersion: 3\napplicationDomain: [object ApplicationDomain]\nTODO: support `bytes` getter\nbytesLoaded: 8647\nbytesTotal: 8647\nchildAllowsParent: true\nchildSandboxBridge: undefined\ncontent: [object Bitmap]\ncontentType: image/jpeg\nframeRate: 24\nheight: 400\nisURLInaccessible: false\nloader: [object Loader]\nloaderURL: test.swf\nparameters: [object Object]\nparentAllowsChild: true\nparentSandboxBridge: undefined\nsameDomain: true\nsharedEvents: [object EventDispatcher]\nswfVersion: 25\nuncaughtErrorEvents: undefined\nurl: alf.jpg\nwidth: 550",
       "expected_output": "... (1 lines before) ...\napplicationDomain: null\nTODO: support `bytes` getter\nbytesLoaded: 0\nbytesTotal: 0\nchildAllowsParent: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nchildSandboxBridge: null\ncontent: null\ncontentType: null\nframeRate: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nheight: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nisURLInaccessible: true\nloader: [object Loader]\nloaderURL: test.swf\nparameters: [object Object]\nparentAllowsChild: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nparentSandboxBridge: null\nsameDomain: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nsharedEvents: [object EventDispatcher]\nswfVersion: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\nuncaughtErrorEvents: [object UncaughtErrorEvents]\nurl: null\nwidth: Error: Error #2099: The loading object is not sufficiently loaded to provide this information.\n\ncomplete\nactionScriptVersion: Error: Error #2098: The loading object is not a .swf file, you cannot request SWF properties from it.\napplicationDomain: [object ApplicationDomain]\nTODO: support `bytes` getter\nbytesLoaded: 8647\nbytesTotal: 8647\nchildAllowsParent: true\nchildSandboxBridge: null\ncontent: [object Bitmap]\ncontentType: image/jpeg\nframeRate: Error: Error #2098: The loading object is not a .swf file, you cannot request SWF properties from it.\nheight: 140\nisURLInaccessible: false\nloader: [object Loader]\nloaderURL: test.swf\nparameters: [object Object]\nparentAllowsChild: true\nparentSandboxBridge: null\nsameDomain: true\nsharedEvents: [object EventDispatcher]\nswfVersion: Error: Error #2098: The loading object is not a .swf file, you cannot request SWF properties from it.\nuncaughtErrorEvents: [object UncaughtErrorEvents]\nurl: alf.jpg\nwidth: 140"
     },
     {
       "test": "avm1/array",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.459,
+        "compile": 1.484,
         "run": 0.215
       },
       "num_frames": 1,
@@ -1939,15 +1939,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.68,
+      "duration": 1.71,
       "status": "pass"
     },
     {
       "test": "avm1/bitmapdata/getPixel",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.061,
-        "run": 0.217
+        "compile": 1.249,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -1955,15 +1955,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.28,
+      "duration": 1.47,
       "status": "pass"
     },
     {
       "test": "avm1/bitmapdata/loadBitmap",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.47,
-        "run": 0.164
+        "recomp": 0.005,
+        "compile": 1.689,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -1971,15 +1971,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.64,
+      "duration": 1.92,
       "status": "pass"
     },
     {
       "test": "avm1/callee",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.438,
-        "run": 0.164
+        "compile": 1.585,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -1987,15 +1987,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.61,
+      "duration": 1.81,
       "status": "pass"
     },
     {
       "test": "avm1/depth",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.505,
-        "run": 0.215
+        "compile": 1.732,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -2003,15 +2003,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.72,
+      "duration": 2.0,
       "status": "pass"
     },
     {
       "test": "avm1/doactionorder/doactionorder",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.697,
-        "run": 0.164
+        "compile": 2.091,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -2019,15 +2019,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.87,
+      "duration": 2.31,
       "status": "pass"
     },
     {
       "test": "avm1/doactionorder/symbolclass",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.548,
-        "run": 0.164
+        "compile": 1.986,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -2035,15 +2035,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.72,
+      "duration": 2.21,
       "status": "pass"
     },
     {
       "test": "avm1/duplicateMovieClip/dontremove",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.574,
-        "run": 0.214
+        "compile": 1.825,
+        "run": 0.215
       },
       "num_frames": 4,
       "lines": {
@@ -2051,15 +2051,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.79,
+      "duration": 2.05,
       "status": "pass"
     },
     {
       "test": "avm1/duplicateMovieClip/duplicateMovieClip",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.53,
-        "run": 0.165
+        "compile": 1.827,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -2067,15 +2067,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.7,
+      "duration": 2.05,
       "status": "pass"
     },
     {
       "test": "avm1/duplicateMovieClip/name-coercion",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.416,
-        "run": 0.165
+        "recomp": 0.005,
+        "compile": 1.628,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -2083,14 +2083,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.59,
+      "duration": 1.85,
       "status": "pass"
     },
     {
       "test": "avm1/duplicateMovieClip/samedepth",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.548,
+        "recomp": 0.005,
+        "compile": 1.804,
         "run": 0.215
       },
       "num_frames": 3,
@@ -2099,15 +2099,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.77,
+      "duration": 2.03,
       "status": "pass"
     },
     {
       "test": "avm1/externalinterface",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.411,
-        "run": 0.165
+        "compile": 1.634,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -2115,15 +2115,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.58,
+      "duration": 1.85,
       "status": "pass"
     },
     {
       "test": "avm1/filters",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.731,
-        "run": 0.315
+        "compile": 2.027,
+        "run": 0.366
       },
       "num_frames": 1,
       "lines": {
@@ -2131,15 +2131,15 @@
         "expected_lines": 149,
         "matching_lines": 149
       },
-      "duration": 2.05,
+      "duration": 2.4,
       "status": "pass"
     },
     {
       "test": "avm1/haxe/flocons1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.512,
-        "run": 0.164
+        "compile": 1.72,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -2147,15 +2147,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.68,
+      "duration": 1.94,
       "status": "pass"
     },
     {
       "test": "avm1/haxe/flocons2",
       "phases": {
         "recomp": 0.004,
-        "compile": 1.429,
-        "run": 0.164
+        "compile": 1.642,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -2163,14 +2163,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.6,
+      "duration": 1.87,
       "status": "pass"
     },
     {
       "test": "avm1/hitarea",
       "phases": {
         "recomp": 0.0,
-        "compile": 16.856,
+        "compile": 20.121,
         "run": 0.215
       },
       "num_frames": 7,
@@ -2179,7 +2179,7 @@
         "expected_lines": 4,
         "matching_lines": 2
       },
-      "duration": 17.08,
+      "duration": 20.34,
       "ruffle_diff_count": 2,
       "ours_diff_count": 2,
       "status": "ruffle_matched",
@@ -2189,7 +2189,7 @@
       "test": "avm1/label",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.69,
+        "compile": 1.949,
         "run": 0.215
       },
       "num_frames": 7,
@@ -2198,14 +2198,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 1.91,
+      "duration": 2.17,
       "status": "pass"
     },
     {
       "test": "avm1/levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.731,
+        "compile": 1.835,
         "run": 0.215
       },
       "num_frames": 2,
@@ -2214,14 +2214,14 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 1.95,
+      "duration": 2.06,
       "status": "pass"
     },
     {
       "test": "avm1/loadevent",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.915,
+        "compile": 2.008,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2230,14 +2230,14 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 2.14,
+      "duration": 2.23,
       "status": "pass"
     },
     {
       "test": "avm1/loadvariables/loadvariables",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.753,
+        "compile": 1.826,
         "run": 0.215
       },
       "num_frames": 2,
@@ -2246,14 +2246,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.97,
+      "duration": 2.05,
       "status": "pass"
     },
     {
       "test": "avm1/loadvariables/loadvars",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.542,
+        "compile": 0.555,
         "run": 0.215
       },
       "num_frames": 2,
@@ -2262,14 +2262,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 0.76,
+      "duration": 0.78,
       "status": "pass"
     },
     {
       "test": "avm1/lookup",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.546,
+        "compile": 0.57,
         "run": 0.215
       },
       "num_frames": 10,
@@ -2278,15 +2278,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 0.77,
+      "duration": 0.79,
       "status": "pass"
     },
     {
       "test": "avm1/mouse-transparency",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.804,
-        "run": 0.215
+        "compile": 1.893,
+        "run": 0.265
       },
       "num_frames": 3,
       "lines": {
@@ -2294,14 +2294,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 2.03,
+      "duration": 2.17,
       "status": "pass"
     },
     {
       "test": "avm1/moviecliploader",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.222,
+        "compile": 1.938,
         "run": 0.215
       },
       "num_frames": 3,
@@ -2310,14 +2310,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 20.44,
+      "duration": 2.16,
       "status": "pass"
     },
     {
       "test": "avm1/nativeinheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.712,
+        "compile": 1.812,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2326,14 +2326,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.93,
+      "duration": 2.03,
       "status": "pass"
     },
     {
       "test": "avm1/nested-button",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.794,
+        "compile": 1.565,
         "run": 0.215
       },
       "num_frames": 4,
@@ -2342,14 +2342,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 2.02,
+      "duration": 1.78,
       "status": "pass"
     },
     {
       "test": "avm1/operations",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.757,
+        "compile": 1.537,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2358,14 +2358,14 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 1.98,
+      "duration": 1.76,
       "status": "pass"
     },
     {
       "test": "avm1/property-paths/property-paths-6",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.658,
+        "compile": 1.445,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2374,14 +2374,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.88,
+      "duration": 1.66,
       "status": "pass"
     },
     {
       "test": "avm1/property-paths/property-paths-7",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.478,
+        "recomp": 0.004,
+        "compile": 1.257,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2390,14 +2390,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.7,
+      "duration": 1.48,
       "status": "pass"
     },
     {
       "test": "avm1/propertycase/propertycase",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.715,
+        "compile": 1.469,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2406,14 +2406,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 1.94,
+      "duration": 1.69,
       "status": "pass"
     },
     {
       "test": "avm1/propertycase/propertycase-preserving-6",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.699,
+        "recomp": 0.004,
+        "compile": 1.447,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2422,14 +2422,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.93,
+      "duration": 1.67,
       "status": "pass"
     },
     {
       "test": "avm1/propertycase/propertycase-preserving-7",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.483,
+        "recomp": 0.004,
+        "compile": 1.273,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2438,14 +2438,14 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 1.71,
+      "duration": 1.5,
       "status": "pass"
     },
     {
       "test": "avm1/rollover",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.844,
+        "compile": 1.599,
         "run": 0.215
       },
       "num_frames": 6,
@@ -2454,14 +2454,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 2.07,
+      "duration": 1.82,
       "status": "pass"
     },
     {
       "test": "avm1/scope",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.678,
+        "compile": 1.67,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2470,14 +2470,14 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 1.9,
+      "duration": 1.89,
       "status": "pass"
     },
     {
       "test": "avm1/setinterval",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.689,
+        "compile": 1.701,
         "run": 0.215
       },
       "num_frames": 50,
@@ -2493,7 +2493,7 @@
       "test": "avm1/settimeout",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.685,
+        "compile": 1.682,
         "run": 0.215
       },
       "num_frames": 50,
@@ -2502,14 +2502,14 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 1.91,
+      "duration": 1.9,
       "status": "pass"
     },
     {
       "test": "avm1/super",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.626,
+        "compile": 1.669,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2518,14 +2518,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 1.85,
+      "duration": 1.89,
       "status": "pass"
     },
     {
       "test": "avm1/target",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.658,
+        "compile": 1.649,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2534,14 +2534,14 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 1.88,
+      "duration": 1.87,
       "status": "pass"
     },
     {
       "test": "avm1/text-bind",
       "phases": {
-        "recomp": 0.021,
-        "compile": 20.183,
+        "recomp": 0.022,
+        "compile": 20.203,
         "run": 0.516
       },
       "num_frames": 6,
@@ -2550,7 +2550,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.03,
+      "duration": 21.04,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2568,7 +2568,7 @@
       "test": "avm1/textfield/textfield-html",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.799,
+        "compile": 1.817,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2577,14 +2577,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 2.02,
+      "duration": 2.04,
       "status": "pass"
     },
     {
       "test": "avm1/textfield/textfield-text-setters",
       "phases": {
         "recomp": 0.021,
-        "compile": 1.764,
+        "compile": 1.769,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2600,7 +2600,7 @@
       "test": "avm1/undefined/undefined-swf6",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.906,
+        "compile": 1.655,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2609,14 +2609,14 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 2.13,
+      "duration": 1.88,
       "status": "pass"
     },
     {
       "test": "avm1/undefined/undefined-swf7",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.58,
+        "recomp": 0.005,
+        "compile": 1.392,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2625,14 +2625,14 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 1.81,
+      "duration": 1.62,
       "status": "pass"
     },
     {
       "test": "avm1/watch",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.829,
+        "compile": 1.624,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2641,14 +2641,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 2.05,
+      "duration": 1.85,
       "status": "pass"
     },
     {
       "test": "avm1/xml/xmlbuild",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.968,
+        "compile": 0.514,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2657,14 +2657,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.19,
+      "duration": 0.74,
       "status": "pass"
     },
     {
       "test": "avm1/xml/xmlload",
       "phases": {
-        "recomp": 0.022,
-        "compile": 2.103,
+        "recomp": 0.021,
+        "compile": 1.861,
         "run": 0.365
       },
       "num_frames": 1,
@@ -2673,14 +2673,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 2.5,
+      "duration": 2.25,
       "status": "pass"
     },
     {
       "test": "avm1/xml/xmlstring",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.808,
+        "compile": 1.597,
         "run": 0.215
       },
       "num_frames": 1,
@@ -2689,24 +2689,24 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 2.03,
+      "duration": 1.82,
       "status": "pass"
     },
     {
       "test": "avm1movie",
       "phases": {
         "recomp": 0.007,
-        "compile": 27.442,
+        "compile": 23.737,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "ReferenceError: Error #1069: Property getObjectsUnderPoint not found on AVM1MovieTest and there is no default value.",
       "lines": {
-        "actual_lines": 6,
+        "actual_lines": 4,
         "expected_lines": 13,
         "matching_lines": 4
       },
-      "duration": 27.62,
+      "duration": 23.92,
       "ruffle_diff_count": 12,
       "ours_diff_count": 9,
       "status": "ruffle_matched",
@@ -2716,7 +2716,7 @@
       "test": "avm1timeline1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.975,
+        "compile": 1.727,
         "run": 0.215
       },
       "num_frames": 3,
@@ -2725,14 +2725,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 2.2,
+      "duration": 1.95,
       "status": "pass"
     },
     {
       "test": "avm1timeline2",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.768,
+        "compile": 1.831,
         "run": 0.215
       },
       "num_frames": 3,
@@ -2741,14 +2741,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.99,
+      "duration": 2.05,
       "status": "pass"
     },
     {
       "test": "avm2/event-dispatching",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.743,
+        "compile": 5.757,
         "run": 0.165
       },
       "num_frames": 1,
@@ -2757,15 +2757,15 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 5.92,
+      "duration": 5.93,
       "status": "pass"
     },
     {
       "test": "avm2/flash/display/bitmapdata/bitmapdata-clone",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.034,
-        "run": 0.415
+        "compile": 6.229,
+        "run": 0.466
       },
       "num_frames": 1,
       "lines": {
@@ -2773,7 +2773,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.69,
+      "duration": 6.95,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2791,67 +2791,67 @@
       "test": "avm2/flash/geom/matrix3d/Matrix3DClass",
       "phases": {
         "recomp": 0.023,
-        "compile": 25.103,
+        "compile": 26.103,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: 0)",
       "lines": {
-        "actual_lines": 4,
+        "actual_lines": 0,
         "expected_lines": 56,
         "matching_lines": 0
       },
-      "duration": 25.3,
+      "duration": 26.3,
       "status": "output_mismatch",
-      "detail": "56 line(s) differ (actual=4, expected=56)",
-      "actual_output": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: 0)\n\tat flash_geom_Matrix3D.as$1::NativeMatrix3DUnitTest/equalMatrices()\n\tat flash_geom_Matrix3D.as$1::NativeMatrix3DUnitTest/constructIdentity()\n\tat Matrix3DTest()",
+      "detail": "56 line(s) differ (actual=0, expected=56)",
+      "actual_output": "",
       "expected_output": "SUCCESS | Identity matrix correct\nSUCCESS | Identity matrix has no effect\nSUCCESS | Identity matrix has no effect\nSUCCESS | Construct correct\nSUCCESS | Clone equals original\nSUCCESS | Cloned matrices are not the same\nSUCCESS | Scale vector correct\nSUCCESS | Scale point correct\nSUCCESS | Scale vector correct\nSUCCESS | Scale point correct\nSUCCESS | New rotation doesn't transform own axis\nSUCCESS | New rotation doesn't transform point on axis\nSUCCESS | New rotation doesn't transform point on axis\nSUCCESS | New rotation axis length is irrelevant\nSUCCESS | New rotation 360 degrees doesn't transform point\nSUCCESS | New rotation transform on x axis\nSUCCESS | New rotation transform on y axis\nSUCCESS | New rotation transform on z axis\nSUCCESS | New rotation transform on p + x axis\nSUCCESS | New rotation transform on p + y axis\nSUCCESS | New rotation transform on p + z axis\nSUCCESS | Append 1 success\nSUCCESS | Append 2 success\nSUCCESS | Append scale success\nSUCCESS | Append translation success\nSUCCESS | Append rotation success\nSUCCESS | Prepend 3 success\nSUCCESS | Prepend scale success\nSUCCESS | Prepend translation success\nSUCCESS | Prepend rotation success\nSUCCESS | Matrix 1 determinant correct\nSUCCESS | Matrix 2 determinant correct\nSUCCESS | Random inverse correct\nSUCCESS | Matrix 1 inverse correct\nSUCCESS | Matrix 2 inverse correct\nSUCCESS | Vector transform one correct\nSUCCESS | Vector transform two correct\nSUCCESS | Point transform one correct\nSUCCESS | Point transform two correct\nSUCCESS | Points transform 0\nSUCCESS | Points transform 1\nSUCCESS | Points transform 2\nSUCCESS | Points transform 3\nSUCCESS | Points transform 4\nSUCCESS | Points transform 5\nSUCCESS | Points transform 6\nSUCCESS | Points transform 7\nSUCCESS | Points transform 8\nSUCCESS | Position x get correct\nSUCCESS | Position y get correct\n... (6 lines after) ..."
     },
     {
       "test": "avm2/flash/geom/matrix3d/TransformBasics",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.888,
+        "compile": 5.895,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 13)",
       "lines": {
-        "actual_lines": 8,
+        "actual_lines": 6,
         "expected_lines": 13,
         "matching_lines": 2
       },
-      "duration": 6.07,
+      "duration": 6.08,
       "status": "output_mismatch",
-      "detail": "11 line(s) differ (actual=8, expected=13)",
-      "actual_output": "matrix is initially set: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nmatrix3D is initially null: null\nmatrix3D is set: null\nSetting matrix3D nulls matrix: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nMatrix3D#rawData returns clone: false\nMatrix3D#rawData has initial values: undefined\nTypeError: Error #1010: A term is undefined and has no properties. (accessing field: 13)\n\tat TransformBasics()",
+      "detail": "11 line(s) differ (actual=6, expected=13)",
+      "actual_output": "matrix is initially set: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nmatrix3D is initially null: null\nmatrix3D is set: null\nSetting matrix3D nulls matrix: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nMatrix3D#rawData returns clone: false\nMatrix3D#rawData has initial values: undefined",
       "expected_output": "matrix is initially set: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nmatrix3D is initially null: null\nmatrix3D is set: [object Matrix3D]\nSetting matrix3D nulls matrix: null\nMatrix3D#rawData returns clone: true\nMatrix3D#rawData has initial values: 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1\nAssigning to rawData fields does nothing: 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1\nAssigning same Matrix3D instance to two DisplayObject's transforms throws:\nArgumentError: Error #2189: A Matrix3D can not be assigned to more than one DisplayObject.\nCalling getRelativeMatrix3D with null target throws:\nTypeError: Error #2007: Parameter relativeTo must be non-null.\nTransform#getRelativeMatrix3D returns null if no Matrix3D is set: null\nTransform#getRelativeMatrix3D returns Matrix3D if Matrix3D is set: [object Matrix3D]"
     },
     {
       "test": "avm2/flash/geom/perspectiveprojection/PerspectiveProjectionClass",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.758,
+        "compile": 5.838,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: projectionCenter)",
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 20,
         "matching_lines": 0
       },
-      "duration": 5.94,
+      "duration": 6.02,
       "status": "output_mismatch",
-      "detail": "20 line(s) differ (actual=2, expected=20)",
-      "actual_output": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: projectionCenter)\n\tat PerspectiveProjectionClass()",
+      "detail": "20 line(s) differ (actual=0, expected=20)",
+      "actual_output": "",
       "expected_output": "Initial stage projectionCenter: (x=250, y=250)\nmatrix is initially set: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nmatrix3D is initially null: null\nnull\nperspectiveProjection is initially null: null\nInitial fieldOfView: 55\nInitial focalLength: 480.2455317428\nInitial projectionCenter: (x=250, y=250)\nperspectiveProjection is set: [object PerspectiveProjection]\nmatrix is still set: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nmatrix3D is still null: null\nperspectiveProjection returns a clone: true\nroot has a default projection: [object PerspectiveProjection]\nInitial root fieldOfView: 55\nInitial root focalLength: 480.2455317428\nInitial root projectionCenter: (x=250, y=187.5)\nchanged root fieldOfView: 100\nchanged root focalLength: 209.7749077943\nchanged root fieldOfView: 100\nchanged root focalLength: 209.7749077943"
     },
     {
       "test": "avm2/flash/geom/transform/pixelBounds",
       "phases": {
         "recomp": 0.006,
-        "compile": 5.623,
+        "compile": 5.759,
         "run": 0.165
       },
       "num_frames": 1,
@@ -2860,7 +2860,7 @@
         "expected_lines": 3,
         "matching_lines": 2
       },
-      "duration": 5.8,
+      "duration": 5.94,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -2869,9 +2869,9 @@
     {
       "test": "bitmapbuttons",
       "phases": {
-        "recomp": 0.135,
-        "compile": 26.377,
-        "run": 0.315
+        "recomp": 0.138,
+        "compile": 27.32,
+        "run": 0.365
       },
       "num_frames": 1,
       "lines": {
@@ -2879,7 +2879,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.04,
+      "duration": 28.04,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2897,7 +2897,7 @@
       "test": "bitmapdata/draw-and-read",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.304,
+        "compile": 6.173,
         "run": 0.165
       },
       "num_frames": 1,
@@ -2906,34 +2906,34 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 5.48,
+      "duration": 6.35,
       "status": "pass"
     },
     {
       "test": "bitmapdata/getpixel-from-embedded",
       "phases": {
-        "recomp": 0.012,
-        "compile": 5.35,
+        "recomp": 0.016,
+        "compile": 6.245,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 4,
+        "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 5.53,
+      "duration": 6.44,
       "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=4, expected=2)",
-      "actual_output": "ffffff\nffffff\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat getpixel_from_embedded_fla::MainTimeline/frame1()",
+      "detail": "2 line(s) differ (actual=2, expected=2)",
+      "actual_output": "ffffff\nffffff",
       "expected_output": "908a8c\n200d04"
     },
     {
       "test": "blendmode/blendmode_1",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.936,
+        "compile": 25.112,
         "run": 0.165
       },
       "num_frames": 1,
@@ -2942,7 +2942,7 @@
         "expected_lines": 2,
         "matching_lines": 1
       },
-      "duration": 23.11,
+      "duration": 25.29,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=2, expected=2)",
       "actual_output": "normal\nnormal",
@@ -2951,8 +2951,8 @@
     {
       "test": "blendmode/blendmode_2",
       "phases": {
-        "recomp": 0.005,
-        "compile": 5.342,
+        "recomp": 0.007,
+        "compile": 6.202,
         "run": 0.165
       },
       "num_frames": 1,
@@ -2961,7 +2961,7 @@
         "expected_lines": 4,
         "matching_lines": 2
       },
-      "duration": 5.52,
+      "duration": 6.38,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=3, expected=4)",
       "actual_output": "normal\ndifference\nN/A",
@@ -2970,8 +2970,8 @@
     {
       "test": "blendmode/blendmode_3",
       "phases": {
-        "recomp": 0.004,
-        "compile": 5.062,
+        "recomp": 0.006,
+        "compile": 6.163,
         "run": 0.165
       },
       "num_frames": 1,
@@ -2980,15 +2980,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 5.24,
+      "duration": 6.34,
       "status": "pass"
     },
     {
       "test": "button1",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.46,
-        "run": 0.315
+        "compile": 3.309,
+        "run": 0.365
       },
       "num_frames": 5,
       "lines": {
@@ -2996,7 +2996,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 3.53,
+      "duration": 4.64,
       "image_comparisons": {
         "output.1": {
           "status": "fail",
@@ -3045,8 +3045,8 @@
       "test": "button2",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.273,
-        "run": 0.315
+        "compile": 6.569,
+        "run": 0.365
       },
       "num_frames": 5,
       "lines": {
@@ -3054,7 +3054,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 6.27,
+      "duration": 7.82,
       "image_comparisons": {
         "output.1": {
           "status": "pass",
@@ -3103,8 +3103,8 @@
       "test": "button3",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.552,
-        "run": 0.315
+        "compile": 2.113,
+        "run": 0.365
       },
       "num_frames": 5,
       "lines": {
@@ -3112,7 +3112,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 2.62,
+      "duration": 3.46,
       "image_comparisons": {
         "output.1": {
           "status": "pass",
@@ -3161,8 +3161,8 @@
       "test": "captions",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.438,
-        "run": 0.315
+        "compile": 5.936,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -3170,7 +3170,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 6.99,
+      "duration": 6.44,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3188,7 +3188,7 @@
       "test": "clipping",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.873,
+        "compile": 1.682,
         "run": 0.265
       },
       "num_frames": 1,
@@ -3197,7 +3197,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.36,
+      "duration": 2.16,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3215,7 +3215,7 @@
       "test": "doubleAndRegister",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.105,
+        "compile": 1.9,
         "run": 0.265
       },
       "num_frames": 1,
@@ -3224,7 +3224,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 2.59,
+      "duration": 2.39,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3242,67 +3242,61 @@
       "test": "encoding1",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.195,
+        "compile": 5.74,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 33,
+        "actual_lines": 31,
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 6.37,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=33, expected=31)",
-      "actual_output": "... (26 lines before) ...\nobject\n. 3.1\n. test0\nobject\n. null\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat encoding1_fla::MainTimeline/frame1()",
-      "expected_output": "... (26 lines before) ...\nobject\n. 3.1\n. test0\nobject\n. null"
+      "duration": 5.91,
+      "status": "pass"
     },
     {
       "test": "esc",
       "phases": {
-        "recomp": 0.613,
-        "compile": 68.946,
+        "recomp": 0.603,
+        "compile": 62.125,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "TypeError: Error #1009: Cannot access a property or method of a null object reference.",
       "lines": {
-        "actual_lines": 13,
+        "actual_lines": 0,
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 69.74,
+      "duration": 62.91,
       "status": "output_mismatch",
-      "detail": "13 line(s) differ (actual=13, expected=2)",
-      "actual_output": "TypeError: Error #1009: Cannot access a property or method of a null object reference.\n\tat Util::Hashtable/makeTable()\n\tat Util::Hashtable()\n\tat global$init()\nTypeError: Error #1010: A term is undefined and has no properties. (accessing field: kind)\n\tat Function/makeInstance()\n\tat Function/intern()\n\tat Function/<anonymous ../src/comp-env.l0:57>()\n\tat Array/map()\n\tat global$init()\nTypeError: Error #1009: Cannot access a property or method of a null object reference.\n\tat Main/compile()\n\tat Main()",
+      "detail": "2 line(s) differ (actual=0, expected=2)",
+      "actual_output": "",
       "expected_output": "388 bytes in 78 ms\nhello, world!"
     },
     {
       "test": "flash_events_Event",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.514,
+        "compile": 23.653,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 5,
+        "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 26.69,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=5, expected=3)",
-      "actual_output": "dispatch\ns0 event: test 4\ns1 event: test 4\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat EventTest/frame1()",
-      "expected_output": "dispatch\ns0 event: test 4\ns1 event: test 4"
+      "duration": 23.83,
+      "status": "pass"
     },
     {
       "test": "flash_geom_ColorTransform",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.217,
+        "compile": 23.88,
         "run": 0.215
       },
       "num_frames": 1,
@@ -3311,7 +3305,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.45,
+      "duration": 24.11,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3329,7 +3323,7 @@
       "test": "flash_net_SharedObject",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.402,
+        "compile": 5.7,
         "run": 0.165
       },
       "num_frames": 4,
@@ -3338,7 +3332,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 6.58,
+      "duration": 5.87,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -3348,8 +3342,8 @@
       "test": "flash_net_URLLoader",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.651,
-        "run": 0.165
+        "compile": 20.084,
+        "run": 0.114
       },
       "num_frames": 2,
       "lines": {
@@ -3357,7 +3351,7 @@
         "expected_lines": 7,
         "matching_lines": 0
       },
-      "duration": 23.83,
+      "duration": 20.2,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=1, expected=7)",
       "actual_output": "httpStatusHandler: 1",
@@ -3367,8 +3361,8 @@
       "test": "flash_net_URLRequest",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.411,
-        "run": 0.165
+        "compile": 4.556,
+        "run": 0.114
       },
       "num_frames": 2,
       "lines": {
@@ -3376,15 +3370,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 5.58,
+      "duration": 4.68,
       "status": "pass"
     },
     {
       "test": "flash_net_classes",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.487,
-        "run": 0.165
+        "compile": 4.635,
+        "run": 0.114
       },
       "num_frames": 1,
       "lines": {
@@ -3392,14 +3386,14 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 5.66,
+      "duration": 4.75,
       "status": "pass"
     },
     {
       "test": "flash_text_TextField",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.335,
+        "compile": 20.459,
         "run": 0.265
       },
       "num_frames": 1,
@@ -3408,7 +3402,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.94,
+      "duration": 21.01,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3429,8 +3423,8 @@
       "test": "flash_text_TextField2",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.462,
-        "run": 0.265
+        "compile": 4.668,
+        "run": 0.214
       },
       "num_frames": 1,
       "lines": {
@@ -3438,7 +3432,7 @@
         "expected_lines": 18,
         "matching_lines": 9
       },
-      "duration": 5.98,
+      "duration": 5.1,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3459,8 +3453,8 @@
       "test": "flash_utils_Timer",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.255,
-        "run": 0.165
+        "compile": 4.535,
+        "run": 0.114
       },
       "num_frames": 3,
       "lines": {
@@ -3468,15 +3462,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 5.43,
+      "duration": 4.65,
       "status": "pass"
     },
     {
       "test": "fscommand1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.427,
-        "run": 0.164
+        "compile": 1.189,
+        "run": 0.165
       },
       "num_frames": 1,
       "lines": {
@@ -3484,14 +3478,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.6,
+      "duration": 1.36,
       "status": "pass"
     },
     {
       "test": "fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.196,
+        "compile": 17.038,
         "run": 0.164
       },
       "num_frames": 50,
@@ -3500,14 +3494,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 20.37,
+      "duration": 17.21,
       "status": "pass"
     },
     {
       "test": "fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82",
       "phases": {
         "recomp": 0.009,
-        "compile": 23.291,
+        "compile": 23.239,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3516,7 +3510,7 @@
         "expected_lines": 48,
         "matching_lines": 11
       },
-      "duration": 23.52,
+      "duration": 23.47,
       "status": "output_mismatch",
       "detail": "81 line(s) differ (actual=92, expected=48)",
       "actual_output": "... (2 lines before) ...\n1\n2\n1\n2\n1\n5\n2\n6\n5\n7\n1\n1\n2\n3\n6\n1\n2\n5\n2\n1\n6\n2\n10\n3\n1\n5\n11\n5\n2\n5\n6\n7\n12\n6\n6\n1\n3\n5\n13\n3\n1\n1\n2\n6\n14\n1\n2\n7\n5\n2\n... (40 lines after) ...",
@@ -3526,7 +3520,7 @@
       "test": "fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2",
       "phases": {
         "recomp": 0.005,
-        "compile": 20.7,
+        "compile": 20.584,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3535,14 +3529,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.93,
+      "duration": 20.81,
       "status": "pass"
     },
     {
       "test": "fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0",
       "phases": {
-        "recomp": 0.007,
-        "compile": 2.103,
+        "recomp": 0.006,
+        "compile": 2.011,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3551,14 +3545,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 2.33,
+      "duration": 2.24,
       "status": "pass"
     },
     {
       "test": "fuzz/2f4f46bf21d6cd33a751b090ad97552e8cdd8f7a606e7f0796deba04abb2e229",
       "phases": {
         "recomp": 0.005,
-        "compile": 20.9,
+        "compile": 20.521,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3567,14 +3561,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 21.13,
+      "duration": 20.75,
       "status": "pass"
     },
     {
       "test": "fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096",
       "phases": {
         "recomp": 0.008,
-        "compile": 21.705,
+        "compile": 21.466,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3583,7 +3577,7 @@
         "expected_lines": 70,
         "matching_lines": 29
       },
-      "duration": 21.94,
+      "duration": 21.7,
       "status": "output_mismatch",
       "detail": "67 line(s) differ (actual=96, expected=70)",
       "actual_output": "... (15 lines before) ...\n6\n1\n5\n7\n12\n6\n3\n8\n7\n4\n9\n2\n14\n8\n2\n5\n10\n3\n1\n9\n3\n6\n1\n4\n1\n3\n10\n4\n7\n4\n2\n1\n8\n3\n3\n18\n5\n3\n9\n4\n4\n2\n6\n4\n3\n2\n10\n5\n5\n3\n... (31 lines after) ...",
@@ -3593,7 +3587,7 @@
       "test": "fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77",
       "phases": {
         "recomp": 0.009,
-        "compile": 22.033,
+        "compile": 22.151,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3602,7 +3596,7 @@
         "expected_lines": 57,
         "matching_lines": 25
       },
-      "duration": 22.27,
+      "duration": 22.38,
       "status": "output_mismatch",
       "detail": "50 line(s) differ (actual=75, expected=57)",
       "actual_output": "... (13 lines before) ...\n8\n5\n6\n8\n1\n9\n7\n8\n2\n1\n15\n9\n5\n2\n1\n1\n5\n2\n1\n2\n10\n1\n2\n7\n18\n2\n7\n6\n5\n5\n3\n20\n3\n8\n5\n10\n21\n6\n3\n10\n9\n5\n8\n5\n6\n5\n8\n6\n23\n1\n... (12 lines after) ...",
@@ -3612,7 +3606,7 @@
       "test": "fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3",
       "phases": {
         "recomp": 0.011,
-        "compile": 22.842,
+        "compile": 22.873,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3621,7 +3615,7 @@
         "expected_lines": 71,
         "matching_lines": 15
       },
-      "duration": 23.08,
+      "duration": 23.11,
       "status": "output_mismatch",
       "detail": "158 line(s) differ (actual=173, expected=71)",
       "actual_output": "... (1 lines before) ...\n1\n6\n3\n7\n1\n4\n2\n1\n3\n1\n6\n3\n4\n3\n1\n4\n1\n4\n12\n1\n3\n6\n7\n13\n1\n6\n2\n4\n3\n1\n4\n1\n1\n3\n4\n9\n15\n4\n6\n3\n3\n6\n16\n1\n3\n1\n6\n4\n4\n1\n... (122 lines after) ...",
@@ -3631,7 +3625,7 @@
       "test": "fuzz/438789f3e93da74855898cceed80e21291c6ab14cf36314a856c6f2716606a49",
       "phases": {
         "recomp": 0.008,
-        "compile": 21.635,
+        "compile": 21.448,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3640,7 +3634,7 @@
         "expected_lines": 16,
         "matching_lines": 10
       },
-      "duration": 21.87,
+      "duration": 21.68,
       "status": "output_mismatch",
       "detail": "8 line(s) differ (actual=18, expected=16)",
       "actual_output": "... (4 lines before) ...\n3\n8\n4\n4\n1\n4\n6\n1\n3\n7\n4\n13\n6\n3",
@@ -3649,8 +3643,8 @@
     {
       "test": "fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26",
       "phases": {
-        "recomp": 0.007,
-        "compile": 23.436,
+        "recomp": 0.0,
+        "compile": 20.406,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3659,14 +3653,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 23.67,
+      "duration": 20.63,
       "status": "pass"
     },
     {
       "test": "fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.109,
+        "compile": 20.119,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3675,7 +3669,7 @@
         "expected_lines": 23,
         "matching_lines": 22
       },
-      "duration": 24.33,
+      "duration": 20.34,
       "ruffle_diff_count": 27,
       "ours_diff_count": 4,
       "status": "ruffle_matched",
@@ -3685,7 +3679,7 @@
       "test": "fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.451,
+        "compile": 21.365,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3694,7 +3688,7 @@
         "expected_lines": 50,
         "matching_lines": 21
       },
-      "duration": 25.68,
+      "duration": 21.59,
       "status": "output_mismatch",
       "detail": "54 line(s) differ (actual=75, expected=50)",
       "actual_output": "... (10 lines before) ...\n13\n1\n14\n6\n15\n7\n6\n16\n1\n5\n1\n7\n2\n17\n1\n3\n18\n2\n7\n4\n19\n1\n3\n1\n1\n4\n6\n21\n5\n6\n22\n5\n7\n6\n1\n23\n7\n5\n1\n7\n2\n24\n1\n6\n7\n2\n1\n3\n25\n2\n... (15 lines after) ...",
@@ -3704,7 +3698,7 @@
       "test": "fuzz/65f0c0a49528b4350e0521d10c632e475a5670010f817d406246b9771a1c2121",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.926,
+        "compile": 20.367,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3713,7 +3707,7 @@
         "expected_lines": 67,
         "matching_lines": 13
       },
-      "duration": 24.15,
+      "duration": 20.59,
       "status": "output_mismatch",
       "detail": "95 line(s) differ (actual=108, expected=67)",
       "actual_output": "3\n2\n3\n2\n3\n2\n3\n9\n2\n2\n3\n3\n2\n12\n1\n3\n2\n13\n3\n3\n2\n4\n3\n15\n1\n2\n2\n16\n1\n3\n3\n6\n3\n17\n2\n7\n2\n4\n3\n18\n3\n2\n8\n3\n4\n1\n3\n2\n6\n20\n... (58 lines after) ...",
@@ -3723,7 +3717,7 @@
       "test": "fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.802,
+        "compile": 19.412,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3732,14 +3726,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 23.02,
+      "duration": 19.63,
       "status": "pass"
     },
     {
       "test": "fuzz/7318344161196391b369e91217937687ebc437e42fdcc10c4c456bde55e0db61",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.331,
+        "compile": 20.346,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3748,7 +3742,7 @@
         "expected_lines": 26,
         "matching_lines": 18
       },
-      "duration": 22.56,
+      "duration": 20.57,
       "status": "output_mismatch",
       "detail": "14 line(s) differ (actual=32, expected=26)",
       "actual_output": "... (11 lines before) ...\n8\n10\n6\n7\n13\n4\n14\n4\n4\n15\n10\n6\n4\n16\n6\n6\n4\n17\n2\n8\n6",
@@ -3758,7 +3752,7 @@
       "test": "fuzz/81004241e3a9278ee3c26c5d7d04a3677e7a28618dd0dd2ad041a98374a280f0",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.302,
+        "compile": 19.384,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3767,15 +3761,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 21.52,
+      "duration": 19.61,
       "status": "pass"
     },
     {
       "test": "fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.158,
-        "run": 0.215
+        "compile": 17.606,
+        "run": 0.164
       },
       "num_frames": 50,
       "lines": {
@@ -3783,7 +3777,7 @@
         "expected_lines": 31,
         "matching_lines": 18
       },
-      "duration": 23.38,
+      "duration": 17.78,
       "ruffle_diff_count": 38,
       "ours_diff_count": 20,
       "status": "ruffle_matched",
@@ -3793,8 +3787,8 @@
       "test": "fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.09,
-        "run": 0.215
+        "compile": 16.4,
+        "run": 0.164
       },
       "num_frames": 50,
       "lines": {
@@ -3802,15 +3796,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.31,
+      "duration": 16.57,
       "status": "pass"
     },
     {
       "test": "fuzz/a86fee6d68f77c63cd83f33d136be2c48f0ab7ab0414a93a0b711ec2a19c6883",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.532,
-        "run": 0.215
+        "compile": 16.615,
+        "run": 0.164
       },
       "num_frames": 50,
       "lines": {
@@ -3818,15 +3812,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 21.75,
+      "duration": 16.78,
       "status": "pass"
     },
     {
       "test": "fuzz/ac649dcf28572cc8250759cc0f8571a4111361fb6923db34ff02901095cdc580",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.046,
-        "run": 0.215
+        "compile": 16.743,
+        "run": 0.164
       },
       "num_frames": 50,
       "lines": {
@@ -3834,7 +3828,7 @@
         "expected_lines": 25,
         "matching_lines": 14
       },
-      "duration": 22.27,
+      "duration": 16.91,
       "status": "output_mismatch",
       "detail": "14 line(s) differ (actual=28, expected=25)",
       "actual_output": "... (1 lines before) ...\n8\n2\n2\n4\n1\n5\n4\n2\n14\n1\n6\n5\n2\n7\n6\n1\n7\n2\n17\n3\n1\n18\n1\n10\n1\n2\n2",
@@ -3844,8 +3838,8 @@
       "test": "fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.472,
-        "run": 0.215
+        "compile": 16.595,
+        "run": 0.164
       },
       "num_frames": 50,
       "lines": {
@@ -3853,15 +3847,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 21.69,
+      "duration": 16.76,
       "status": "pass"
     },
     {
       "test": "fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.411,
-        "run": 0.215
+        "compile": 17.269,
+        "run": 0.164
       },
       "num_frames": 50,
       "lines": {
@@ -3869,7 +3863,7 @@
         "expected_lines": 29,
         "matching_lines": 12
       },
-      "duration": 22.63,
+      "duration": 17.44,
       "status": "output_mismatch",
       "detail": "24 line(s) differ (actual=36, expected=29)",
       "actual_output": "... (4 lines before) ...\n7\n7\n10\n1\n7\n1\n12\n1\n13\n1\n4\n3\n5\n4\n4\n7\n16\n5\n17\n1\n6\n1\n8\n7\n18\n7\n3\n4\n7\n1\n4\n4",
@@ -3879,8 +3873,8 @@
       "test": "fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.26,
-        "run": 0.215
+        "compile": 16.748,
+        "run": 0.164
       },
       "num_frames": 50,
       "lines": {
@@ -3888,14 +3882,14 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 21.48,
+      "duration": 16.92,
       "status": "pass"
     },
     {
       "test": "fuzz/c24e6e559fd66b092283a3bdcd925792e8dd7ca55ce1c7729d44d5b315ad8f75",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.085,
+        "compile": 20.718,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3904,7 +3898,7 @@
         "expected_lines": 35,
         "matching_lines": 17
       },
-      "duration": 20.31,
+      "duration": 20.94,
       "status": "output_mismatch",
       "detail": "24 line(s) differ (actual=41, expected=35)",
       "actual_output": "... (9 lines before) ...\n1\n6\n3\n11\n1\n1\n5\n1\n6\n3\n13\n3\n3\n14\n1\n5\n1\n5\n1\n5\n6\n3\n16\n1\n6\n6\n3\n17\n1\n3\n3\n5",
@@ -3914,7 +3908,7 @@
       "test": "fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.513,
+        "compile": 20.201,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3923,14 +3917,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 19.73,
+      "duration": 20.42,
       "status": "pass"
     },
     {
       "test": "fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.846,
+        "compile": 21.488,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3939,7 +3933,7 @@
         "expected_lines": 37,
         "matching_lines": 17
       },
-      "duration": 21.07,
+      "duration": 21.71,
       "status": "output_mismatch",
       "detail": "46 line(s) differ (actual=63, expected=37)",
       "actual_output": "... (11 lines before) ...\n3\n12\n3\n1\n3\n3\n5\n14\n3\n6\n5\n5\n4\n5\n3\n17\n8\n1\n18\n9\n3\n3\n5\n3\n5\n5\n4\n2\n5\n3\n3\n3\n1\n23\n3\n3\n3\n5\n5\n3\n25\n1\n2\n6\n5\n5\n5\n4\n3\n5\n... (2 lines after) ...",
@@ -3949,7 +3943,7 @@
       "test": "fuzz/e152812e2cfc0971237321dfadc37e3484631c355cb2e4b86344ff90bb89c75e",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.985,
+        "compile": 21.116,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3958,7 +3952,7 @@
         "expected_lines": 43,
         "matching_lines": 19
       },
-      "duration": 20.21,
+      "duration": 21.34,
       "status": "output_mismatch",
       "detail": "44 line(s) differ (actual=63, expected=43)",
       "actual_output": "... (12 lines before) ...\n8\n1\n6\n9\n1\n8\n1\n5\n2\n15\n1\n9\n5\n6\n16\n6\n3\n8\n17\n1\n1\n8\n5\n8\n2\n9\n6\n6\n9\n1\n20\n1\n1\n1\n5\n8\n1\n3\n2\n2\n1\n6\n9\n2\n24\n8\n1\n1\n3\n8\n... (1 lines after) ...",
@@ -3968,7 +3962,7 @@
       "test": "fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.302,
+        "compile": 2.417,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3977,7 +3971,7 @@
         "expected_lines": 22,
         "matching_lines": 16
       },
-      "duration": 2.52,
+      "duration": 2.64,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=32, expected=22)",
       "actual_output": "... (10 lines before) ...\n8\n5\n16\n6\n17\n1\n3\n4\n3\n5\n20\n4\n21\n5\n6\n8\n1\n2\n1\n3\n1\n4",
@@ -3987,7 +3981,7 @@
       "test": "fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.602,
+        "compile": 20.367,
         "run": 0.215
       },
       "num_frames": 50,
@@ -3996,7 +3990,7 @@
         "expected_lines": 19,
         "matching_lines": 14
       },
-      "duration": 19.82,
+      "duration": 20.59,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=19, expected=19)",
       "actual_output": "... (2 lines before) ...\n2\n5\n2\n3\n1\n3\n2\n4\n7\n4\n5\n5\n5\n7\n7\n4\n6",
@@ -4006,7 +4000,7 @@
       "test": "fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.797,
+        "compile": 20.641,
         "run": 0.215
       },
       "num_frames": 50,
@@ -4015,7 +4009,7 @@
         "expected_lines": 24,
         "matching_lines": 10
       },
-      "duration": 20.02,
+      "duration": 20.86,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=26, expected=24)",
       "actual_output": "... (2 lines before) ...\n1\n1\n1\n5\n5\n7\n5\n8\n3\n5\n7\n10\n2\n8\n7\n1\n1\n3\n7\n8\n12\n6\n8\n1",
@@ -4025,27 +4019,27 @@
       "test": "getobjectsunderpoint",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.118,
+        "compile": 5.874,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1006: getObjectsUnderPoint is not a function.",
       "lines": {
-        "actual_lines": 3,
+        "actual_lines": 1,
         "expected_lines": 34,
         "matching_lines": 1
       },
-      "duration": 6.29,
+      "duration": 6.05,
       "status": "output_mismatch",
-      "detail": "33 line(s) differ (actual=3, expected=34)",
-      "actual_output": "shapes in MovieClips are hit:\nTypeError: Error #1006: getObjectsUnderPoint is not a function.\n\tat getobjectsunderpoint_fla::MainTimeline/frame1()",
+      "detail": "33 line(s) differ (actual=1, expected=34)",
+      "actual_output": "shapes in MovieClips are hit:",
       "expected_output": "shapes in MovieClips are hit:\n[object Shape]\n\ntextfields are hit:\n[object TextField]\n\nbitmaps are hit:\n[object Bitmap]\n\nsprite includes self in results:\n[object Sprite]\n\nbutton's up state is hit, but not the parents:\ncount: 1\nelements: [object Shape]\nhits[0].parent: null\n\nmouseChildren and mouseEnabled don't affect the result:\ncount: 1\nelements: [object Shape]\nhits[0].parent: null\n\nhitArea doesn't affect the result:\ncount: 1\nelements: [object Shape]\nhits[0].parent: null\nmask: null\nmask: null\n\ninvisible elements aren't included:\ncount: 0\n\nmasks *do* affect the result:\ncount: 0"
     },
     {
       "test": "gradient",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.858,
+        "compile": 1.719,
         "run": 0.315
       },
       "num_frames": 1,
@@ -4054,7 +4048,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.41,
+      "duration": 2.26,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4072,7 +4066,7 @@
       "test": "gradientTransform",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.644,
+        "compile": 19.893,
         "run": 0.215
       },
       "num_frames": 1,
@@ -4081,7 +4075,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.87,
+      "duration": 20.12,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4099,8 +4093,8 @@
       "test": "hardwrap",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.18,
-        "run": 0.315
+        "compile": 5.979,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -4108,7 +4102,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 6.73,
+      "duration": 6.47,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4126,47 +4120,44 @@
       "test": "hitTestStyleChange",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.045,
+        "compile": 23.682,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 3,
+        "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 24.22,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=3, expected=1)",
-      "actual_output": "true\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat Shape44_swf_fla::MainTimeline/frame1()",
-      "expected_output": "true"
+      "duration": 23.86,
+      "status": "pass"
     },
     {
       "test": "hittesting/hittesting",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.848,
+        "compile": 5.755,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable getObjectsUnderPoint is not defined.",
       "lines": {
-        "actual_lines": 12,
+        "actual_lines": 10,
         "expected_lines": 18,
         "matching_lines": 9
       },
-      "duration": 6.02,
+      "duration": 5.93,
       "status": "output_mismatch",
-      "detail": "9 line(s) differ (actual=12, expected=18)",
-      "actual_output": "... (3 lines before) ...\ninvisible object contains point: true\nremoved object contains point: true\nnew object contains point: true\n\none-layer button:\nhitTestState doesn't affect bounds: (x=0, y=0, w=0, h=0)\nhitTestState doesn't affect hit-testing: true\nReferenceError: Error #1065: Variable getObjectsUnderPoint is not defined.\n\tat hittesting_fla::MainTimeline/frame1()",
+      "detail": "9 line(s) differ (actual=10, expected=18)",
+      "actual_output": "... (3 lines before) ...\ninvisible object contains point: true\nremoved object contains point: true\nnew object contains point: true\n\none-layer button:\nhitTestState doesn't affect bounds: (x=0, y=0, w=0, h=0)\nhitTestState doesn't affect hit-testing: true",
       "expected_output": "... (3 lines before) ...\ninvisible object contains point: true\nremoved object contains point: true\nnew object contains point: true\n\none-layer button:\nhitTestState doesn't affect bounds: (x=200, y=100, w=10, h=10)\nhitTestState doesn't affect hit-testing: true\nhitTestState doesn't affect getObjectsUnderPoint: true\nhitTestState doesn't affect getObjectsUnderPoint: true\n\ntwo-layer button:\nhitTestState doesn't affect bounds: (x=200, y=200, w=10, h=10)\nhitTestState doesn't affect hit-testing: true\nhitTestState doesn't affect getObjectsUnderPoint: true\nhitTestState doesn't affect getObjectsUnderPoint: true"
     },
     {
       "test": "hittesting/mask-hit-test",
       "phases": {
         "recomp": 0.007,
-        "compile": 2.713,
+        "compile": 2.632,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4175,7 +4166,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 2.89,
+      "duration": 2.81,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -4185,28 +4176,25 @@
       "test": "image-loading",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.351,
+        "compile": 5.831,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 6,
+        "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 5.52,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=6, expected=4)",
-      "actual_output": "progress, bytesLoaded: 0, bytesLoaded: 8647\nprogress, bytesLoaded: 8647, bytesLoaded: 8647\ninit\ncomplete\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat Function/<anonymous>()",
-      "expected_output": "progress, bytesLoaded: 0, bytesLoaded: 8647\nprogress, bytesLoaded: 8647, bytesLoaded: 8647\ninit\ncomplete"
+      "duration": 6.01,
+      "status": "pass"
     },
     {
       "test": "invalidClipDepth",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.984,
-        "run": 0.165
+        "compile": 20.56,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -4214,7 +4202,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.16,
+      "duration": 20.79,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4232,28 +4220,25 @@
       "test": "local2global",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.331,
+        "compile": 5.826,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 3,
+        "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 5.5,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=3, expected=1)",
-      "actual_output": "Done\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat local2global_fla::MainTimeline/frame1()",
-      "expected_output": "Done"
+      "duration": 6.0,
+      "status": "pass"
     },
     {
       "test": "localconnection",
       "phases": {
-        "recomp": 0.005,
-        "compile": 5.371,
-        "run": 0.164
+        "recomp": 0.007,
+        "compile": 5.835,
+        "run": 0.165
       },
       "num_frames": 3,
       "lines": {
@@ -4261,7 +4246,7 @@
         "expected_lines": 12,
         "matching_lines": 0
       },
-      "duration": 5.55,
+      "duration": 6.02,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=2, expected=12)",
       "actual_output": "Before send\nAfter send",
@@ -4271,47 +4256,41 @@
       "test": "lzma",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.17,
+        "compile": 5.618,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 7,
+        "actual_lines": 5,
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 5.34,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=7, expected=5)",
-      "actual_output": "1---------------------\n2    LZMA Demo        \n3=====================\n4 Demo demo demo demo \n5---------------------\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat lzma_fla::MainTimeline/frame1()",
-      "expected_output": "1---------------------\n2    LZMA Demo        \n3=====================\n4 Demo demo demo demo \n5---------------------"
+      "duration": 5.79,
+      "status": "pass"
     },
     {
       "test": "lzma_bytes",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.095,
+        "compile": 23.879,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 4,
+        "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 23.27,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=4, expected=2)",
-      "actual_output": "19\nDemo LZMA demo demo\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat LzmaBytesTest()",
-      "expected_output": "19\nDemo LZMA demo demo"
+      "duration": 24.05,
+      "status": "pass"
     },
     {
       "test": "mouse/mouse_coords",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.343,
+        "compile": 5.766,
         "run": 0.165
       },
       "num_frames": 6,
@@ -4320,14 +4299,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 5.51,
+      "duration": 5.94,
       "status": "pass"
     },
     {
       "test": "mouse/start_drag",
       "phases": {
         "recomp": 0.006,
-        "compile": 23.901,
+        "compile": 23.938,
         "run": 0.165
       },
       "num_frames": 6,
@@ -4336,14 +4315,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 24.08,
+      "duration": 24.12,
       "status": "pass"
     },
     {
       "test": "mouse/start_drag_lock",
       "phases": {
         "recomp": 0.006,
-        "compile": 5.549,
+        "compile": 5.705,
         "run": 0.165
       },
       "num_frames": 6,
@@ -4352,7 +4331,7 @@
         "expected_lines": 3,
         "matching_lines": 2
       },
-      "duration": 5.73,
+      "duration": 5.88,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=3, expected=3)",
       "actual_output": "100 100\n110 90\n80 120",
@@ -4362,7 +4341,7 @@
       "test": "movieclip",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.63,
+        "compile": 5.706,
         "run": 0.165
       },
       "num_frames": 1,
@@ -4371,14 +4350,14 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 5.8,
+      "duration": 5.88,
       "status": "pass"
     },
     {
       "test": "movieinfo1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.642,
+        "compile": 1.714,
         "run": 0.215
       },
       "num_frames": 1,
@@ -4387,14 +4366,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.86,
+      "duration": 1.93,
       "status": "pass"
     },
     {
       "test": "slider_component",
       "phases": {
-        "recomp": 0.218,
-        "compile": 10.888,
+        "recomp": 0.233,
+        "compile": 11.177,
         "run": 0.165
       },
       "num_frames": 11,
@@ -4403,55 +4382,55 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 11.28,
+      "duration": 11.58,
       "status": "pass"
     },
     {
       "test": "stream1",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.792,
+        "compile": 5.916,
         "run": 0.165
       },
       "num_frames": 2,
       "error_signature": "ReferenceError: Error #1065: Variable URLStream is not defined.",
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 9,
         "matching_lines": 0
       },
-      "duration": 5.97,
+      "duration": 6.09,
       "status": "output_mismatch",
-      "detail": "9 line(s) differ (actual=2, expected=9)",
-      "actual_output": "ReferenceError: Error #1065: Variable URLStream is not defined.\n\tat stream1_fla::MainTimeline/frame1()",
+      "detail": "9 line(s) differ (actual=0, expected=9)",
+      "actual_output": "",
       "expected_output": "progress: 9/9\nstart: 9\nbyte BE: 18\nword BE: 13398\nbyte LE: 18\nword LE: 22068\nmid: 3\nbuf: 119,136,153\nend: 0"
     },
     {
       "test": "stroke1",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.742,
+        "compile": 5.864,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 6,
+        "actual_lines": 4,
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 5.92,
+      "duration": 6.04,
       "status": "output_mismatch",
-      "detail": "6 line(s) differ (actual=6, expected=1)",
-      "actual_output": "ERROR: (3,3) shall be outside\nERROR: (3,50) shall be outside\nERROR: (314, 282) shall be outside\nDone\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat stroke1_fla::MainTimeline/frame1()",
+      "detail": "4 line(s) differ (actual=4, expected=1)",
+      "actual_output": "ERROR: (3,3) shall be outside\nERROR: (3,50) shall be outside\nERROR: (314, 282) shall be outside\nDone",
       "expected_output": "Done"
     },
     {
       "test": "stylesheet",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.764,
-        "run": 0.316
+        "compile": 5.987,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -4459,7 +4438,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 6.32,
+      "duration": 6.54,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4477,7 +4456,7 @@
       "test": "targetPath1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.653,
+        "compile": 1.755,
         "run": 0.215
       },
       "num_frames": 1,
@@ -4486,14 +4465,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 1.87,
+      "duration": 1.98,
       "status": "pass"
     },
     {
       "test": "timeline/Timeline3",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.097,
+        "compile": 25.353,
         "run": 0.265
       },
       "num_frames": 20,
@@ -4502,7 +4481,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 24.42,
+      "duration": 25.67,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4520,7 +4499,7 @@
       "test": "timeline/Timeline4",
       "phases": {
         "recomp": 0.007,
-        "compile": 24.315,
+        "compile": 25.335,
         "run": 0.215
       },
       "num_frames": 10,
@@ -4529,7 +4508,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 24.61,
+      "duration": 25.63,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4547,7 +4526,7 @@
       "test": "timeline/Timeline8",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.903,
+        "compile": 6.114,
         "run": 0.165
       },
       "num_frames": 13,
@@ -4556,14 +4535,14 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 6.08,
+      "duration": 6.29,
       "status": "pass"
     },
     {
       "test": "timeline/Timeline9",
       "phases": {
         "recomp": 0.006,
-        "compile": 5.948,
+        "compile": 6.234,
         "run": 0.165
       },
       "num_frames": 32,
@@ -4572,14 +4551,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 6.13,
+      "duration": 6.41,
       "status": "pass"
     },
     {
       "test": "timeline/events/timeline_events_fp10",
       "phases": {
         "recomp": 0.011,
-        "compile": 6.27,
+        "compile": 6.512,
         "run": 0.165
       },
       "num_frames": 4,
@@ -4588,14 +4567,14 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 6.45,
+      "duration": 6.7,
       "status": "pass"
     },
     {
       "test": "timeline/events/timeline_events_fp9",
       "phases": {
         "recomp": 0.011,
-        "compile": 25.593,
+        "compile": 6.225,
         "run": 0.165
       },
       "num_frames": 4,
@@ -4604,14 +4583,14 @@
         "expected_lines": 48,
         "matching_lines": 48
       },
-      "duration": 25.78,
+      "duration": 6.41,
       "status": "pass"
     },
     {
       "test": "timeline/nav/blendMode",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.042,
+        "compile": 5.835,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4620,7 +4599,7 @@
         "expected_lines": 8,
         "matching_lines": 6
       },
-      "duration": 25.22,
+      "duration": 6.01,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=8, expected=8)",
       "actual_output": "Element placed on frame 1\nBlend mode: normal\nNew object placed on frame 2: false\nBlend mode: normal\nNew object placed on frame 3: false\nBlend mode: normal\nNew object placed on frame 1: false\nBlend mode: normal",
@@ -4630,7 +4609,7 @@
       "test": "timeline/nav/cacheAsBitmap",
       "phases": {
         "recomp": 0.006,
-        "compile": 5.878,
+        "compile": 5.729,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4639,7 +4618,7 @@
         "expected_lines": 8,
         "matching_lines": 6
       },
-      "duration": 6.06,
+      "duration": 5.91,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=8, expected=8)",
       "actual_output": "Element placed on frame 1\nCache as bitmap: false\nNew object placed on frame 2: false\nCache as bitmap: false\nNew object placed on frame 3: false\nCache as bitmap: false\nNew object placed on frame 1: false\nCache as bitmap: false",
@@ -4649,27 +4628,27 @@
       "test": "timeline/nav/clipDepth",
       "phases": {
         "recomp": 0.007,
-        "compile": 6.091,
+        "compile": 5.905,
         "run": 0.165
       },
       "num_frames": 3,
       "error_signature": "ReferenceError: Error #1065: Variable getObjectsUnderPoint is not defined.",
       "lines": {
-        "actual_lines": 9,
+        "actual_lines": 3,
         "expected_lines": 8,
         "matching_lines": 1
       },
-      "duration": 6.27,
+      "duration": 6.08,
       "status": "output_mismatch",
-      "detail": "8 line(s) differ (actual=9, expected=8)",
-      "actual_output": "Element placed on frame 1\nReferenceError: Error #1065: Variable getObjectsUnderPoint is not defined.\n\tat clipDepth_fla::MainTimeline/frame1()\nNew object placed on frame 2: false\nReferenceError: Error #1065: Variable getObjectsUnderPoint is not defined.\n\tat clipDepth_fla::MainTimeline/frame2()\nNew object placed on frame 3: true\nReferenceError: Error #1065: Variable getObjectsUnderPoint is not defined.\n\tat clipDepth_fla::MainTimeline/frame3()",
+      "detail": "7 line(s) differ (actual=3, expected=8)",
+      "actual_output": "Element placed on frame 1\nNew object placed on frame 2: false\nNew object placed on frame 3: true",
       "expected_output": "Element placed on frame 1\nMasked: true\nNew object placed on frame 2: false\nMasked: true\nNew object placed on frame 3: true\nMasked: false\nNew object placed on frame 1: false\nMasked: false"
     },
     {
       "test": "timeline/nav/colorTransform",
       "phases": {
-        "recomp": 0.007,
-        "compile": 6.054,
+        "recomp": 0.006,
+        "compile": 5.864,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4678,7 +4657,7 @@
         "expected_lines": 8,
         "matching_lines": 6
       },
-      "duration": 6.23,
+      "duration": 6.04,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=8, expected=8)",
       "actual_output": "Element placed on frame 1\nColor transform: (redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)\nNew object placed on frame 2: false\nColor transform: (redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)\nNew object placed on frame 3: false\nColor transform: (redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)\nNew object placed on frame 1: false\nColor transform: (redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)",
@@ -4687,8 +4666,8 @@
     {
       "test": "timeline/nav/filters",
       "phases": {
-        "recomp": 0.007,
-        "compile": 5.923,
+        "recomp": 0.006,
+        "compile": 5.77,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4697,7 +4676,7 @@
         "expected_lines": 8,
         "matching_lines": 6
       },
-      "duration": 6.1,
+      "duration": 5.95,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=8, expected=8)",
       "actual_output": "Element placed on frame 1\nNumber of filters: 0\nNew object placed on frame 2: false\nNumber of filters: 0\nNew object placed on frame 3: false\nNumber of filters: 0\nNew object placed on frame 1: false\nNumber of filters: 0",
@@ -4706,8 +4685,8 @@
     {
       "test": "timeline/nav/matrix",
       "phases": {
-        "recomp": 0.006,
-        "compile": 6.014,
+        "recomp": 0.007,
+        "compile": 5.825,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4716,7 +4695,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 6.19,
+      "duration": 6.0,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=8, expected=8)",
       "actual_output": "... (2 lines before) ...\nNew object placed on frame 2: false\nMatrix: (a=1, b=0, c=0, d=1, tx=225, ty=150)\nNew object placed on frame 3: false\nMatrix: (a=1, b=0, c=0, d=1, tx=225, ty=150)\nNew object placed on frame 1: false\nMatrix transform: (a=1, b=0, c=0, d=1, tx=225, ty=150)",
@@ -4726,7 +4705,7 @@
       "test": "timeline/nav/morphShape",
       "phases": {
         "recomp": 0.007,
-        "compile": 23.159,
+        "compile": 0.738,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4735,7 +4714,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 23.34,
+      "duration": 0.92,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=4, expected=4)",
       "actual_output": "Element placed on frame 1\nNew object placed on frame 2: false\nNew object placed on frame 3: false\nNew object placed on frame 1: false",
@@ -4744,8 +4723,8 @@
     {
       "test": "timeline/nav/name",
       "phases": {
-        "recomp": 0.007,
-        "compile": 22.92,
+        "recomp": 0.0,
+        "compile": 0.732,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4754,14 +4733,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 23.1,
+      "duration": 0.91,
       "status": "pass"
     },
     {
       "test": "timeline/nav/ratio",
       "phases": {
-        "recomp": 0.007,
-        "compile": 4.382,
+        "recomp": 0.0,
+        "compile": 0.736,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4770,7 +4749,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 4.56,
+      "duration": 0.91,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=4, expected=4)",
       "actual_output": "Element placed on frame 1\nNew object placed on frame 2: false\nNew object placed on frame 3: true\nNew object placed on frame 1: false",
@@ -4779,8 +4758,8 @@
     {
       "test": "timeline/nav/ratio2",
       "phases": {
-        "recomp": 0.007,
-        "compile": 4.373,
+        "recomp": 0.0,
+        "compile": 0.71,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4789,7 +4768,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 4.55,
+      "duration": 0.88,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=4, expected=4)",
       "actual_output": "Element placed on frame 1\nNew object placed on frame 2: false\nNew object placed on frame 3: true\nNew object placed on frame 1: true",
@@ -4798,8 +4777,8 @@
     {
       "test": "timeline/nav/ratio3",
       "phases": {
-        "recomp": 0.007,
-        "compile": 0.768,
+        "recomp": 0.0,
+        "compile": 0.708,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4808,14 +4787,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 0.95,
+      "duration": 0.88,
       "status": "pass"
     },
     {
       "test": "timeline/nav/shape",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.353,
+        "compile": 0.723,
         "run": 0.165
       },
       "num_frames": 3,
@@ -4824,74 +4803,65 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 4.53,
+      "duration": 0.9,
       "status": "pass"
     },
     {
       "test": "timeline/scene/EncodedU32",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.107,
+        "compile": 0.715,
         "run": 0.165
       },
       "num_frames": 1,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 3,
+        "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 23.28,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=3, expected=1)",
-      "actual_output": "282\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat EncodedU32_fla::MainTimeline/frame1()",
-      "expected_output": "282"
+      "duration": 0.89,
+      "status": "pass"
     },
     {
       "test": "timeline/scene/Scene_1_MainTimeline",
       "phases": {
         "recomp": 0.006,
-        "compile": 23.756,
+        "compile": 23.888,
         "run": 0.165
       },
       "num_frames": 15,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 72,
+        "actual_lines": 70,
         "expected_lines": 70,
         "matching_lines": 70
       },
-      "duration": 23.94,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=72, expected=70)",
-      "actual_output": "... (65 lines before) ...\nFRAME 9\ncurrentFrameLabel: S2F9\ncurrentLabel: S2F9\ncurrentLabels: [FrameLabel 'S2F1':1], [FrameLabel 'S2F5':5], [FrameLabel 'S2F9':9]\ncurrentScene: [Scene 'Scene 2', frames: 10, labels: [FrameLabel 'S2F1':1], [FrameLabel 'S2F5':5], [FrameLabel 'S2F9':9]]\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat Scene_1_MainTimeline_fla::MainTimeline/frame15()",
-      "expected_output": "... (65 lines before) ...\nFRAME 9\ncurrentFrameLabel: S2F9\ncurrentLabel: S2F9\ncurrentLabels: [FrameLabel 'S2F1':1], [FrameLabel 'S2F5':5], [FrameLabel 'S2F9':9]\ncurrentScene: [Scene 'Scene 2', frames: 10, labels: [FrameLabel 'S2F1':1], [FrameLabel 'S2F5':5], [FrameLabel 'S2F9':9]]"
+      "duration": 24.07,
+      "status": "pass"
     },
     {
       "test": "timeline/scene/Scene_2_MovieClipTimeline",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.731,
+        "compile": 5.741,
         "run": 0.165
       },
       "num_frames": 15,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 72,
+        "actual_lines": 70,
         "expected_lines": 70,
         "matching_lines": 70
       },
-      "duration": 5.91,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=72, expected=70)",
-      "actual_output": "... (65 lines before) ...\nFRAME 14\ncurrentFrameLabel: null\ncurrentLabel: MC_F10\ncurrentLabels: [FrameLabel 'MC_F1':1], [FrameLabel 'MC_F5':5], [FrameLabel 'MC_F10':10], [FrameLabel 'MC_F15':15]\ncurrentScene: [Scene '', frames: 15, labels: [FrameLabel 'MC_F1':1], [FrameLabel 'MC_F5':5], [FrameLabel 'MC_F10':10], [FrameLabel 'MC_F15':15]]\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat Scene_2_MovieClipTimeline_fla::MainTimeline/frame15()",
-      "expected_output": "... (65 lines before) ...\nFRAME 14\ncurrentFrameLabel: null\ncurrentLabel: MC_F10\ncurrentLabels: [FrameLabel 'MC_F1':1], [FrameLabel 'MC_F5':5], [FrameLabel 'MC_F10':10], [FrameLabel 'MC_F15':15]\ncurrentScene: [Scene '', frames: 15, labels: [FrameLabel 'MC_F1':1], [FrameLabel 'MC_F5':5], [FrameLabel 'MC_F10':10], [FrameLabel 'MC_F15':15]]"
+      "duration": 5.92,
+      "status": "pass"
     },
     {
       "test": "timeline/scene/Scene_3_GotoAndStop_LabelScene",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.743,
+        "compile": 5.75,
         "run": 0.165
       },
       "num_frames": 15,
@@ -4900,14 +4870,14 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 5.92,
+      "duration": 5.93,
       "status": "pass"
     },
     {
       "test": "timeline/scene/Scene_4_GotoAndStop_FrameScene",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.682,
+        "compile": 5.668,
         "run": 0.165
       },
       "num_frames": 15,
@@ -4916,14 +4886,14 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 5.86,
+      "duration": 5.85,
       "status": "pass"
     },
     {
       "test": "timeline/scene/Scene_5_GotoAndPlay_LabelScene",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.417,
+        "compile": 5.426,
         "run": 0.165
       },
       "num_frames": 15,
@@ -4932,54 +4902,48 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 5.6,
+      "duration": 5.61,
       "status": "pass"
     },
     {
       "test": "timeline/scene/Scene_6_GotoAndPlay_FrameScene",
       "phases": {
         "recomp": 0.007,
-        "compile": 5.656,
+        "compile": 5.662,
         "run": 0.165
       },
       "num_frames": 10,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 42,
+        "actual_lines": 40,
         "expected_lines": 40,
         "matching_lines": 40
       },
       "duration": 5.84,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=42, expected=40)",
-      "actual_output": "... (35 lines before) ...\nFRAME 10\ncurrentFrameLabel: S2F10\ncurrentLabel: S2F10\ncurrentLabels: [FrameLabel 'S2F1':1], [FrameLabel 'S2F5':5], [FrameLabel 'S2F9':9], [FrameLabel 'S2F10':10]\ncurrentScene: [Scene 'Scene 2', frames: 10, labels: [FrameLabel 'S2F1':1], [FrameLabel 'S2F5':5], [FrameLabel 'S2F9':9], [FrameLabel 'S2F10':10]]\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat Scene_6_GotoAndPlay_FrameScene_fla::MainTimeline/frame15()",
-      "expected_output": "... (35 lines before) ...\nFRAME 10\ncurrentFrameLabel: S2F10\ncurrentLabel: S2F10\ncurrentLabels: [FrameLabel 'S2F1':1], [FrameLabel 'S2F5':5], [FrameLabel 'S2F9':9], [FrameLabel 'S2F10':10]\ncurrentScene: [Scene 'Scene 2', frames: 10, labels: [FrameLabel 'S2F1':1], [FrameLabel 'S2F5':5], [FrameLabel 'S2F9':9], [FrameLabel 'S2F10':10]]"
+      "status": "pass"
     },
     {
       "test": "timeline/scene/Scene_7_NextPrevScene",
       "phases": {
         "recomp": 0.006,
-        "compile": 23.578,
+        "compile": 20.506,
         "run": 0.165
       },
       "num_frames": 10,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 23.76,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=9, expected=7)",
-      "actual_output": "... (2 lines before) ...\ncurrentFrame: 1, currentScene: [Scene 'Scene 2'] S2 nextScene()\ncurrentFrame: 2, currentScene: [Scene 'Scene 2']\ncurrentFrame: 5, currentScene: [Scene 'Scene 2'] S2 prevScene()\ncurrentFrame: 1, currentScene: [Scene 'Scene 1']\ncurrentFrame: 2, currentScene: [Scene 'Scene 1'] S1 stop()\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat Scene_7_NextPrevScene_fla::MainTimeline/frame2()",
-      "expected_output": "... (2 lines before) ...\ncurrentFrame: 1, currentScene: [Scene 'Scene 2'] S2 nextScene()\ncurrentFrame: 2, currentScene: [Scene 'Scene 2']\ncurrentFrame: 5, currentScene: [Scene 'Scene 2'] S2 prevScene()\ncurrentFrame: 1, currentScene: [Scene 'Scene 1']\ncurrentFrame: 2, currentScene: [Scene 'Scene 1'] S1 stop()"
+      "duration": 20.69,
+      "status": "pass"
     },
     {
       "test": "timeline/timeline_as2_1",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.792,
+        "compile": 19.985,
         "run": 0.215
       },
       "num_frames": 10,
@@ -4988,14 +4952,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 20.01,
+      "duration": 20.21,
       "status": "pass"
     },
     {
       "test": "timeline/timeline_as2_2",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.784,
+        "compile": 1.774,
         "run": 0.215
       },
       "num_frames": 10,
@@ -5004,14 +4968,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 2.01,
+      "duration": 1.99,
       "status": "pass"
     },
     {
       "test": "timeline/timeline_as2_3",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.647,
+        "compile": 1.738,
         "run": 0.215
       },
       "num_frames": 10,
@@ -5020,14 +4984,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 19.87,
+      "duration": 1.96,
       "status": "pass"
     },
     {
       "test": "timeline/timeline_as2_4",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.832,
+        "compile": 1.776,
         "run": 0.215
       },
       "num_frames": 10,
@@ -5036,14 +5000,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 20.05,
+      "duration": 2.0,
       "status": "pass"
     },
     {
       "test": "timeline/timeline_as2_5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.234,
+        "compile": 2.248,
         "run": 0.415
       },
       "num_frames": 10,
@@ -5052,7 +5016,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 4.18,
+      "duration": 4.16,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -5131,17 +5095,17 @@
       "test": "timeline/timeline_loop",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.613,
+        "compile": 6.338,
         "run": 0.466
       },
       "num_frames": 20,
       "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
       "lines": {
-        "actual_lines": 9,
+        "actual_lines": 7,
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 26.61,
+      "duration": 8.31,
       "image_comparisons": {
         "output.02": {
           "status": "fail",
@@ -5213,16 +5177,13 @@
           "known_failure": false
         }
       },
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=9, expected=7)",
-      "actual_output": "... (2 lines before) ...\nrewind: 3\nrewind: 2\nrewind: 1\nloop: 2\nloop: 1\nReferenceError: Error #1065: Variable fscommand is not defined.\n\tat timeline_loop_fla::Symbol1_1/frame1()",
-      "expected_output": "... (2 lines before) ...\nrewind: 3\nrewind: 2\nrewind: 1\nloop: 2\nloop: 1"
+      "status": "pass"
     },
     {
       "test": "timeline/timeline_name_0",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.995,
+        "compile": 5.834,
         "run": 0.165
       },
       "num_frames": 20,
@@ -5231,7 +5192,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 24.17,
+      "duration": 6.01,
       "status": "pass"
     }
   ]

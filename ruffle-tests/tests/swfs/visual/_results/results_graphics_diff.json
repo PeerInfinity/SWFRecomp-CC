@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-27T02:18:25.405598+00:00",
-    "old_git_sha": "28577da2aa5c307218e90a3e0a09bf4b82218f2f",
-    "new_timestamp": "2026-07-27T04:25:43.308514+00:00",
-    "new_git_sha": "a9900a478651ad3505390c73078f73561eebf185",
+    "old_timestamp": "2026-07-27T04:25:43.308514+00:00",
+    "old_git_sha": "a9900a478651ad3505390c73078f73561eebf185",
+    "new_timestamp": "2026-07-27T05:37:49.250941+00:00",
+    "new_git_sha": "dfef7a9d6945c5123ab2ab86ba1c0474f7756ef3",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 134,
+    "old_pass": 121,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 134,
+    "old_effective_pass": 121,
     "old_total": 142,
-    "old_pass_rate": 94.4,
-    "new_pass": 121,
+    "old_pass_rate": 85.2,
+    "new_pass": 134,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 121,
+    "new_effective_pass": 134,
     "new_total": 142,
-    "new_pass_rate": 85.2,
+    "new_pass_rate": 94.4,
     "old_mismatched_lines": 112,
     "new_mismatched_lines": 112,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
-    "newly_passing": 0,
-    "newly_failing": 13,
+    "newly_passing": 13,
+    "newly_failing": 0,
     "status_changed": 13,
     "unchanged": 128,
     "added": 0,
@@ -33,15 +33,15 @@
     {
       "test": "blend_modes/shader_as_mask",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -49,15 +49,15 @@
     {
       "test": "cache_as_bitmap/bitmap_changed",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 6,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 6,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -65,15 +65,15 @@
     {
       "test": "cache_as_bitmap/cab_mask_filters",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -84,12 +84,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 2,
+        "actual_lines": 4,
         "expected_lines": 19,
         "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 4,
+        "actual_lines": 2,
         "expected_lines": 19,
         "matching_lines": 2
       }
@@ -97,15 +97,15 @@
     {
       "test": "definefont4",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 14,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 14,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -113,15 +113,15 @@
     {
       "test": "filters/blur_fractional",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -129,15 +129,15 @@
     {
       "test": "filters/blur_pass_scaling",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -145,15 +145,15 @@
     {
       "test": "filters/blur_quality",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -161,15 +161,15 @@
     {
       "test": "filters/displacement_map",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -177,15 +177,15 @@
     {
       "test": "filters/displacement_map_scales_with_screen",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -193,15 +193,15 @@
     {
       "test": "filters/displacement_map_through_applyFilter",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -209,15 +209,15 @@
     {
       "test": "filters/displacement_map_through_filters",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -225,15 +225,15 @@
     {
       "test": "filters/glow_pass_scaling",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }
@@ -241,15 +241,15 @@
     {
       "test": "video/h264",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 0,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       }

@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-27T04:25:43.322217+00:00",
-    "git_sha": "a9900a478651ad3505390c73078f73561eebf185",
-    "duration_seconds": 34.99,
+    "timestamp": "2026-07-27T05:37:49.264940+00:00",
+    "git_sha": "dfef7a9d6945c5123ab2ab86ba1c0474f7756ef3",
+    "duration_seconds": 35.09,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -10,71 +10,71 @@
     "filtered": true
   },
   "total": 5,
-  "pass": 0,
+  "pass": 1,
   "ruffle_matched": 0,
-  "fail": 5,
-  "pass_rate": 0.0,
-  "effective_pass": 0,
-  "effective_pass_rate": 0.0,
+  "fail": 4,
+  "pass_rate": 20.0,
+  "effective_pass": 1,
+  "effective_pass_rate": 20.0,
   "breakdown": {
-    "output_mismatch": 5
+    "output_mismatch": 4
   },
   "tests": [
     {
       "test": "request_matching_profiles",
       "phases": {
-        "recomp": 0.008,
-        "compile": 5.423,
-        "run": 0.165
+        "recomp": 0.0,
+        "compile": 3.964,
+        "run": 0.115
       },
       "num_frames": 126,
       "error_signature": "ReferenceError: Error #1065: Variable Context3DProfile is not defined.",
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 190,
         "matching_lines": 0
       },
-      "duration": 5.6,
+      "duration": 4.08,
       "status": "output_mismatch",
-      "detail": "190 line(s) differ (actual=2, expected=190)",
-      "actual_output": "ReferenceError: Error #1065: Variable Context3DProfile is not defined.\n\tat Test()",
+      "detail": "190 line(s) differ (actual=0, expected=190)",
+      "actual_output": "",
       "expected_output": "Caught: ArgumentError: Error #2008: Parameter profile must be one of the accepted values.\nCaught: ArgumentError: Error #2008: Parameter profiles must be one of the accepted values.\nCaught: ArgumentError: Error #2008: Parameter profile must be one of the accepted values.\nRequesting profiles: standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: standardConstrained,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standardConstrained,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: standardConstrained,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profiles: baselineExtended,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standard,standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained,standard\nGot profile: standard\nAfter dispose: null\nRequesting profiles: baselineExtended,standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profiles: baselineExtended\nGot profile: baselineExtended\nAfter dispose: null\nRequesting profiles: baseline,standardExtended\nGot profile: standardExtended\n... (140 lines after) ..."
     },
     {
       "test": "request_profiles",
       "phases": {
-        "recomp": 0.004,
-        "compile": 4.869,
-        "run": 0.114
+        "recomp": 0.007,
+        "compile": 6.329,
+        "run": 0.165
       },
       "num_frames": 12,
       "error_signature": "ReferenceError: Error #1065: Variable Context3DProfile is not defined.",
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 16,
         "matching_lines": 0
       },
-      "duration": 4.99,
+      "duration": 6.51,
       "status": "output_mismatch",
-      "detail": "16 line(s) differ (actual=2, expected=16)",
-      "actual_output": "ReferenceError: Error #1065: Variable Context3DProfile is not defined.\n\tat Test()",
+      "detail": "16 line(s) differ (actual=0, expected=16)",
+      "actual_output": "",
       "expected_output": "Requesting profile: standardExtended\nGot profile: standardExtended\nAfter dispose: null\nRequesting profile: standard\nGot profile: standard\nAfter dispose: null\nRequesting profile: standardConstrained\nGot profile: standardConstrained\nAfter dispose: null\nRequesting profile: baselineExtended\nGot profile: baselineExtended\nAfter dispose: null\nRequesting profile: baseline\nGot profile: baseline\nAfter dispose: null\nRequesting profile: baselineConstrained"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
         "recomp": 0.015,
-        "compile": 5.735,
+        "compile": 5.576,
         "run": 0.215
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 6.11,
+      "duration": 5.95,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -87,25 +87,25 @@
         }
       },
       "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=2, expected=1)",
-      "actual_output": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)\n\tat Test()",
+      "detail": "1 line(s) differ (actual=0, expected=1)",
+      "actual_output": "",
       "expected_output": "Corner: ffff00ff"
     },
     {
       "test": "scissor_rectangle",
       "phases": {
         "recomp": 0.031,
-        "compile": 8.595,
+        "compile": 8.087,
         "run": 0.315
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.18,
+      "duration": 8.67,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -117,26 +117,23 @@
           "known_failure": false
         }
       },
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=2, expected=0)",
-      "actual_output": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)\n\tat Test()",
-      "expected_output": ""
+      "status": "pass"
     },
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.031,
-        "compile": 8.298,
-        "run": 0.265
+        "recomp": 0.033,
+        "compile": 9.011,
+        "run": 0.315
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 8.83,
+      "duration": 9.6,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -149,8 +146,8 @@
         }
       },
       "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=2, expected=1)",
-      "actual_output": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)\n\tat Test()",
+      "detail": "1 line(s) differ (actual=0, expected=1)",
+      "actual_output": "",
       "expected_output": "Setting rect: (x=10, y=20, w=0, h=300)"
     }
   ]
