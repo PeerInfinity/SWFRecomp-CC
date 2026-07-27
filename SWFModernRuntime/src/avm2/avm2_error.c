@@ -233,8 +233,23 @@ void avm2_try_pop_frame(Avm2TryFrame* tf)
 
 static void print_uncaught(Avm2Context* ctx, Avm2Value v)
 {
-	// Diagnostics only (stderr): uncaught errors don't produce trace output.
+	// Ruffle Avm2::uncaught_error (avm2.rs): in Debug player mode — what the
+	// test harness runs — Flash Player TRACES the error that escaped, so the
+	// line lands in the graded output. The text is Error::to_string(): the
+	// value coerced to a string, followed by the call stack the Error captured
+	// when it was built (the same "\n\tat X()" tail getStackTrace prints).
+	// A thrown non-Error value has no tail and prints on its own.
 	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	const Avm2String* tail = NULL;
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+	{
+		Avm2Value* t = avm2_object_find_dynamic(v.u.obj, "__stacktrace_tail",
+		                                        17);
+		if (t != NULL && t->kind == AVM2_VALUE_STRING) tail = t->u.str;
+	}
+	printf("%.*s", (int) s->len, s->utf8);
+	if (tail != NULL) printf("%.*s", (int) tail->len, tail->utf8);
+	putchar('\n');
 	fflush(stdout);
 	fprintf(stderr, "AVM2 uncaught error: %.*s\n", (int) s->len, s->utf8);
 }

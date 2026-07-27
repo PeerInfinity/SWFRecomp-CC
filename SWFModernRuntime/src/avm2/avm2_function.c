@@ -147,7 +147,25 @@ void avm2_setup_locals(Avm2Value* loc, uint32_t num_locals, Avm2Activation* act,
 		}
 		if (md->param_types != NULL && md->param_types[i] != 0)
 		{
+			// Ruffle coerces the whole signature in init_from_method, which
+			// runs BEFORE the callee's call-stack frame is pushed — so a
+			// #1034 here is attributed to the CALLER, exactly like the #1063
+			// above (loader_method's uncaught coercion error prints only
+			// `at Test/onFrame()`, never `at Test/load()`). The frame is put
+			// back if the coercion succeeds; if it throws, the longjmp
+			// unwinds past it anyway.
+			int popped = ctx->call_depth > 0;
+			Avm2CallFrame saved;
+			if (popped)
+			{
+				saved = ctx->call_frames[ctx->call_depth - 1];
+				avm2_callstack_pop(ctx);
+			}
 			v = avm2_coerce_to_type_mn(ctx, act->file, md->param_types[i], v);
+			if (popped)
+			{
+				avm2_callstack_push(ctx, &saved.method, saved.bound_class);
+			}
 		}
 		loc[i + 1] = v;
 	}
