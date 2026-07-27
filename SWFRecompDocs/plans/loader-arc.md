@@ -227,7 +227,7 @@ postmortemed against CI.
 | 2 | **Load pipeline without content** — `open`/`progress`/`complete`/`ioError` dispatch, byte accounting from the real source length, the three-state `bytes`, `#2124` for unknown types, `applicationDomain` from `LoaderContext`, `unload` resetting the stream | B | **+3** (`loader_unknown_content`, `loader_bytes_unknown_content`, `loaderinfo_more`) | small |
 | 3 | ~~**Image content** — stb decode → `BitmapData` → `Bitmap` as `content`, `contentType` per sniffed format~~ **SHIPPED `f6ba5c677`** | C (minus JXR) | **+3** (`loader_image`, `loader_bitmap_transparency`, `loader_loadbytes_invalid_png`) — all three, plus `loader_visibility_interactive` free; see §6 | medium |
 | 4 | ~~**URLLoader over bundled data**~~ **SHIPPED `28577da2a`** | G | **+1** (`url_loader`); prerequisite for two bucket-F tests | small |
-| 5 | ~~**Navigator fetch log**~~ **SHIPPED** | E | **+2** (`loader_method`, `loader_load`) — actual: `loader_method` only, plus 5 adopters outside the arc; see §7 | small-medium |
+| 5 | ~~**Navigator fetch log**~~ **SHIPPED** | E | **+2** (`loader_method`, `loader_load`) — actual **+4**, all adopters outside the arc; neither predicted test landed (§7) | small-medium |
 | 6 | **AVM2 child-SWF execution** — `MovieEntry` gains an ABC/script-init entry point, `generate_child_movie_file` handles `RecompiledABC`, `Loader.load`/`loadBytes` resolve through `findMovieEntry`, child root construction + `addChild` into the Loader, event ordering, LoaderInfo reset on reload | F (unblocked part) | **+6** (`loader_events`, `loader_loadbytes_events`, `loader_reuse`, `loader_loaderurl`, `loader_error_in_root_ctor`, `loader_loadbytes_url`) **+ up to 9** `from_shumway/as3-loader/*` | **large** |
 | 7 | **Loader hit-testing** | D (minus AVM1) | ~~+3~~ **+1** — image content alone passed `loader_visibility_interactive` and took `loader_noninteractive_try_click_root` to 4/5, so only `loader_try_click_root` is left and it needs tranche 6's SWF content (§6) | medium |
 | 8 | **Nested-child download + ApplicationDomain isolation** — recurse in `install_test_dir`/`find_child_swfs`, then per-movie domains with duplicate class names | F (blocked part) | **+4** (`loader_child_getdefinition`, `loader_duplicate_class`, `loader_duplicate_coerce`, `loader_duplicate_coerce_new_domain`) | large |
@@ -469,45 +469,72 @@ to `contentLoaderInfo.content` as `Loader.as` does, so it honours the
 
 ## 7. Postmortem — tranche 5 (navigator fetch log)
 
-**Predicted +2 (`loader_method`, `loader_load`), actual +6 — but only one of
-the two predicted tests.** `loader_method` passes; `loader_load` stops at
-126/128 on something the triage never looked at. The other five gains come
-from the adopters sweep and from a mechanism the triage did not know the
-tranche needed at all.
+**Predicted +2 (`loader_method`, `loader_load`), delivered +4 — and neither
+predicted test is among them.** Both need uncaught-error tracing, which
+turned out to be un-landable on its own (see "The tracing tripwire" below);
+`loader_load` is unreachable outright. The four gains are all adopters from
+the sweep.
 
 | Gain | Suite | Predicted? |
 |---|---|---|
-| `loader_method` | avm2 | yes |
 | `net_navigateToURL` | avm2 | sweep candidate |
 | `navigateToURL_target_normalize` | avm2 | sweep candidate |
 | `geturl_target_normalize` | avm1 | sweep candidate |
 | `geturl_opcode_target_normalize` | avm1 | sweep candidate |
-| `uncaught_error_basic` | avm2 | **no — not a `log_fetch` test at all** |
 
-Line movement in the still-failing tests: `loader_load` 12 → 126,
-`geturl` 0 → 4, `event_handler_exception` 1 → 5,
-`uncaught_errors_stringified` 1 → 2, `url_vars` 1 → 3. No test lost
+Line movement in the still-failing tests: `loader_load` 12 → 124,
+`loader_method` 16 → 83, `geturl` 0 → 4, `url_vars` 1 → 3. No test lost
 matching lines; `import_assets/empty_url` (the one `log_fetch` test that
 passed before this work, with **no** fetch lines expected) still passes.
 
+### The tracing tripwire (CI `30235525066`, reverted in `d1c307c51`)
+
+Uncaught-error tracing was implemented, verified, shipped as `3b401b5f9`,
+and **reverted after CI showed it costs 65 net passes**. Keep this: it is
+the most reusable thing the tranche produced.
+
+Ruffle's `Avm2::uncaught_error` calls `avm_trace` whenever the player is in
+Debug mode — which the test harness always is — so an error that escapes an
+event handler or a frame script is *graded output*. Our `print_uncaught`
+wrote to stderr only, with a comment asserting the opposite. Fixing it took
+`uncaught_error_basic` 0/2 → pass, `loader_method` 83 → 85 (a pass),
+`event_handler_exception` 1 → 5 and `uncaught_errors_stringified` 1 → 2.
+
+It also turned **71 tests** from pass to `output_mismatch`, because **288
+corpus tests expect ZERO trace lines** (image-only tests, graded on the
+render) and 55 of them were "passing" by printing nothing while silently
+swallowing an error we throw and Ruffle does not. The census of what those
+errors actually are — a ready-made worklist, and the reason the tracing must
+land *with* the platform-API work rather than before it:
+
+| n | First uncaught error |
+|---|---|
+| 21 | `#1010 A term is undefined … (accessing field: 0)` — Stage3D: `context3D` is undefined |
+| 18 | nested-path tests, not attributed by the quick census |
+| 8 | `#1065 Variable fscommand is not defined` |
+| 6 | `#1065 Variable ShaderJob is not defined` |
+| 6 | `#1065 BlurFilter` / `ColorMatrixFilter` |
+| ~12 | singletons: `PNGEncoderOptions`, `BitmapDataChannel`, `GraphicsBitmapFill`, `CapsStyle`, `GradientType`, `ColorTransform.color`, `drawRoundRectComplex`, `lineBitmapStyle`, `BreakOpportunity`, `#1508` invalid font |
+
+None of these are in the error machinery; every one is a missing platform
+API, and they cluster on exactly the blocks the feature-priority map already
+ranks next (Stage3D 13, PixelBender 25, filters). Re-land the two reverted
+commits at the *end* of that arc: they are worth +4 on their own and they
+make the whole class of "passes by printing nothing" impossible to reach
+again. The second commit is the matching attribution fix — Ruffle coerces a
+signature in `Activation::init_from_method`, before the callee's call-stack
+frame is pushed, so a `#1034` from an argument prints `at Caller/method()`
+and never the callee (`avm2_setup_locals` already popped the frame for the
+`#1063` arg-count check for exactly this reason).
+
 ### What the triage got wrong
 
-- **The blocker was not the log — it was uncaught-error tracing.** Both
-  target tests end on a `#1034` that escapes an `ENTER_FRAME` handler, and
-  the last two lines of each are that error plus its stack. Ruffle's
-  `Avm2::uncaught_error` calls `avm_trace` whenever the player is in Debug
-  mode, which the test harness always is, so an uncaught error is *graded
-  output*. Our `print_uncaught` wrote to stderr only, with a comment
-  asserting the opposite. That single change is worth more than the log
-  itself: it also took `uncaught_error_basic` to a pass and moved three
-  other tests, and it is the mechanism `loader_error_in_root_ctor`
-  (tranche 6) will need.
-- **Attribution: a parameter coercion belongs to the CALLER.** Ruffle
-  coerces the whole signature in `Activation::init_from_method`, which runs
-  before the callee's call-stack frame is pushed, so `loader_method`'s
-  `#1034` prints `at Test/onFrame()` and never `at Test/load()`. Our
-  `avm2_setup_locals` already popped the frame for the `#1063` arg-count
-  check for exactly this reason; the coercion needed the same treatment.
+- **The blocker for both predicted tests was not the log — it was
+  uncaught-error tracing**, which cannot land yet. Both end on a `#1034`
+  that escapes an `ENTER_FRAME` handler, and the last two lines of each are
+  that error plus its stack. See "The tracing tripwire" above: the mechanism
+  works, and is worth +4, but it is blocked behind ~18 missing platform APIs.
+  `loader_method` is left at 83/85 — everything except those two lines.
 - **`loader_load` is unreachable, and the reason has nothing to do with
   Loader.** Its expected `URLVariables` body is `cccc=true&aaa=bbb` — the
   bag was populated `aaa` then `cccc`. Ruffle's AVM2 dynamic properties live
@@ -574,13 +601,17 @@ the queue at the top of each round. `avm2_globals.c` gained
 `MovieClip.prototype.getURL`, reporting from both `actionGetURL` and
 `actionGetURL2`.
 
-Uncaught errors are a separate commit: `avm2_error.c`'s `print_uncaught`
-now traces `coerce_to_string(value)` plus the Error's `__stacktrace_tail`,
-and `avm2_function.c` drops the callee frame around parameter coercion.
+Uncaught errors were a separate commit (`3b401b5f9`) and are reverted in
+`d1c307c51`: `avm2_error.c`'s `print_uncaught` traced
+`coerce_to_string(value)` plus the Error's `__stacktrace_tail`, and
+`avm2_function.c` dropped the callee frame around parameter coercion. Both
+are recoverable verbatim with `git revert d1c307c51`.
 
 ### What tranche 6 inherits
 
-- Uncaught-error tracing already works, so `loader_error_in_root_ctor`
-  (0/4) needs only the child-SWF execution itself.
+- `loader_error_in_root_ctor` (0/4) needs uncaught-error tracing as well as
+  the child-SWF execution, so it cannot close until the tripwire commits
+  re-land. Do not count it in tranche 6's prediction.
 - `loader_load` will not pass on any amount of Loader work; do not re-file
   it under a later tranche.
+- `loader_method` is 83/85, held only by the same two tracing lines.

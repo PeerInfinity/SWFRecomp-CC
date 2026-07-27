@@ -39,15 +39,16 @@ Full plan + per-tranche postmortems:
   (predicted 4). Image payloads decode through stb into a
   `BitmapData`/`Bitmap` `content`, and `URLLoader` really reads bundled
   sibling assets.
-- **Tranche 5** (navigator fetch log): **+4 in this suite** — `loader_method`,
-  `net_navigateToURL`, `navigateToURL_target_normalize`,
-  `uncaught_error_basic` — plus 2 in avm1 (see that suite's status). The
-  runtime now emits Ruffle's `TestNavigatorBackend` request log under
-  `-DLOG_FETCH` (set from `log_fetch = true` in `test.toml`), shared between
-  both VMs in `SWFModernRuntime/src/utils.c`. `loader_load`, the second
-  predicted test, reaches 126/128 and stops on Ruffle's hash-ordered
-  property enumeration — see `avm1/_investigation/
-  RUFFLE_VS_FLASH_DIFFERENCES.md` §"AVM2 dynamic-property enumeration order".
+- **Tranche 5** (navigator fetch log): **+2 in this suite** —
+  `net_navigateToURL`, `navigateToURL_target_normalize` — plus 2 in avm1
+  (see that suite's status). The runtime now emits Ruffle's
+  `TestNavigatorBackend` request log under `-DLOG_FETCH` (set from
+  `log_fetch = true` in `test.toml`), shared between both VMs in
+  `SWFModernRuntime/src/utils.c`. **Neither predicted test landed:**
+  `loader_load` reaches 124/128 and stops on Ruffle's hash-ordered property
+  enumeration (`avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md`
+  §"AVM2 dynamic-property enumeration order"), and `loader_method` sits at
+  83/85 waiting on uncaught-error tracing.
 
 Findings worth having here rather than only in the plan:
 
@@ -71,16 +72,27 @@ Findings worth having here rather than only in the plan:
    `loadBytes` needs a bytes→movie identity (resolvable at build time in
    every corpus case). That is tranche 6, the one large item.
 
-A fifth finding, from tranche 5: **uncaught AVM2 errors are TRACED**, not
-just logged. Ruffle's `Avm2::uncaught_error` runs `error.to_string()` — the
-value coerced to a string plus the call stack the Error captured — through
-`avm_trace` whenever the player is in Debug mode, which the test harness
-always is. Our `print_uncaught` used to write only to stderr. Related:
-parameter coercion is attributed to the CALLER (Ruffle coerces the signature
-in `init_from_method`, before the callee's call-stack frame exists), so a
-`#1034` from an argument prints `at Caller/method()` and never the callee.
+A fifth finding, from tranche 5, and the most reusable thing in it:
+**uncaught AVM2 errors are TRACED**, not just logged. Ruffle's
+`Avm2::uncaught_error` runs `error.to_string()` — the value coerced to a
+string plus the call stack the Error captured — through `avm_trace` whenever
+the player is in Debug mode, which the test harness always is. Our
+`print_uncaught` writes only to stderr. Implementing it is worth **+4**
+(`uncaught_error_basic`, `loader_method`, and lines in
+`event_handler_exception` / `uncaught_errors_stringified`) but it **cost 65
+net passes in CI `30235525066` and was reverted** (`d1c307c51`): **288
+corpus tests expect ZERO trace lines** (image-only, graded on the render) and
+55 of them pass today by printing nothing while swallowing an error we throw
+and Ruffle does not. loader-arc.md §7 carries the census of the ~18 causes —
+Stage3D `context3D` undefined (21), `fscommand` (8), `ShaderJob` (6),
+`BlurFilter`/`ColorMatrixFilter` (6), and a dozen singletons. **Re-land
+`git revert d1c307c51` at the END of the Stage3D / PixelBender / filters
+work**, where it becomes a tripwire against exactly this failure mode.
+Related: parameter coercion is attributed to the CALLER (Ruffle coerces the
+signature in `init_from_method`, before the callee's call-stack frame
+exists), so a `#1034` from an argument prints `at Caller/method()`.
 
-Reachable: 11 of the 17 remaining avm2 failures (+ up to 9 in
+Reachable: 12 of the 19 remaining avm2 failures (+ up to 9 in
 `from_shumway/as3-loader`). Next up is tranche 6 (AVM2 child-SWF execution,
 +6 and up to 9 more in from_shumway) — the one large item in the arc.
 Won't-do: `loader_applicationDomain` (needs the real Flex framework SWZ).

@@ -285,7 +285,8 @@ on `movieclip_begin_gradient_fill` / `movieclip_line_gradient_style`.
 
 ## AVM2 dynamic-property enumeration order: `URLVariables.toString`
 
-**Test:** `avm2/loader_load` (126/128 — the only two lines that differ)
+**Test:** `avm2/loader_load` (124/128 — two of the four remaining lines;
+the other two are the uncaught-error tracing held back in `d1c307c51`)
 
 `URLVariables.toString` (Ruffle `globals/flash/net/URLVariables.as`) joins the
 bag's properties with `&` **in `for (p in this)` order**. That order is not
@@ -306,4 +307,5 @@ works around it by calling `.toString().split("&").sort()` before tracing.
 FNV-1a plus hashbrown's SIMD bucket layout, which would break the moment either
 crate changes.
 
-**Decision:** keep insertion order. `loader_load` is accepted at 126/128 lines.
+**Decision:** keep insertion order. `loader_load` cannot pass on any amount of
+Loader work.
