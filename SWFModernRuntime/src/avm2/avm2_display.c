@@ -40,9 +40,6 @@
 // findDataFile / findMovieEntry: the build-time registries of bundled sibling
 // assets that flash.display.Loader loads from (see the load pipeline below).
 #include <libswf/swf.h>
-// swf_log_fetch_* / SWF_LOG_FETCH_ENABLED: the Ruffle test-navigator request
-// log, shared with the AVM1 runtime (see the fetch-log block below).
-#include <utils.h>
 
 enum
 {
@@ -4127,170 +4124,6 @@ static const Avm2String* request_url(Avm2Context* ctx, Avm2Value v)
 	return (found && uv.kind == AVM2_VALUE_STRING) ? uv.u.str : NULL;
 }
 
-// --- Ruffle test-navigator fetch log ---------------------------------------
-//
-// `log_fetch = true` tests grade the request the player WOULD have made, in
-// TestNavigatorBackend::fetch's format (utils.h). What gets logged is the
-// `Request` that globals/flash/display/loader.rs::request_from_url_request
-// derives from the URLRequest, so this mirrors that conversion exactly — the
-// GET-appends-data rule, the last-wins/first-position header map, the
-// ByteArray-vs-toString payload, and the "empty payload demotes POST to GET"
-// rule are all observable in the log and nowhere else.
-//
-// The log is QUEUED, not printed: Ruffle's fetch runs inside the spawned load
-// future, which its harness only polls once the frame is over, so the block
-// lands after the calling frame's traces (loader_method interleaves
-// `undefined` from `trace(loader.load(req))` BEFORE its own fetch block).
-// avm2_loader_drain flushes it.
-
-#if SWF_LOG_FETCH_ENABLED
-
-#define AVM2_MAX_LOG_HEADERS 32
-
-static const Avm2String* log_str_prop(Avm2Context* ctx, Avm2Value v,
-                                      const char* name, uint32_t nlen)
-{
-	int found = 0;
-	Avm2Value pv = avm2_get_public_property(ctx, v, name, nlen, &found);
-	if (!found || pv.kind == AVM2_VALUE_NULL || pv.kind == AVM2_VALUE_UNDEFINED)
-		return NULL;
-	return avm2_coerce_to_string(ctx, pv);
-}
-
-static int log_str_eq(const Avm2String* s, const char* lit)
-{
-	size_t n = strlen(lit);
-	return s != NULL && s->len == n && memcmp(s->utf8, lit, n) == 0;
-}
-
-static void avm2_log_fetch_request(Avm2Context* ctx, Avm2Value request)
-{
-	if (request.kind != AVM2_VALUE_OBJECT) return;
-	// A null url is #2007 in Ruffle, thrown before any fetch is spawned.
-	const Avm2String* url = log_str_prop(ctx, request, "url", 3);
-	if (url == NULL) return;
-
-	const Avm2String* method = log_str_prop(ctx, request, "method", 6);
-	int is_post = log_str_eq(method, "POST") || log_str_eq(method, "post");
-
-	// requestHeaders: an IndexMap insert per URLRequestHeader entry, so a
-	// repeated name keeps its FIRST position but takes its LAST value.
-	// Non-URLRequestHeader array entries are skipped.
-	SwfLogPair headers[AVM2_MAX_LOG_HEADERS];
-	size_t nheaders = 0;
-	int found = 0;
-	Avm2Value hv = avm2_get_public_property(ctx, request, "requestHeaders", 14,
-	                                        &found);
-	if (found && hv.kind == AVM2_VALUE_OBJECT
-	    && avm2_array_ext(hv.u.obj) != NULL)
-	{
-		uint32_t n = avm2_array_ext(hv.u.obj)->length;
-		for (uint32_t i = 0; i < n; i++)
-		{
-			Avm2Value ev = avm2_array_get(hv.u.obj, i);
-			if (ev.kind != AVM2_VALUE_OBJECT) continue;
-			Avm2Class* c = avm2_value_class(ctx, ev);
-			if (c == NULL || c->name.name_len != 16
-			    || memcmp(c->name.name, "URLRequestHeader", 16) != 0) continue;
-			const Avm2String* hn = log_str_prop(ctx, ev, "name", 4);
-			const Avm2String* hval = log_str_prop(ctx, ev, "value", 5);
-			if (hn == NULL) hn = avm2_string_from_literal(ctx, "");
-			if (hval == NULL) hval = avm2_string_from_literal(ctx, "");
-			size_t slot = nheaders;
-			for (size_t j = 0; j < nheaders; j++)
-			{
-				if (headers[j].name_len == hn->len
-				    && memcmp(headers[j].name, hn->utf8, hn->len) == 0)
-				{
-					slot = j;
-					break;
-				}
-			}
-			if (slot == nheaders)
-			{
-				if (nheaders >= AVM2_MAX_LOG_HEADERS) continue;
-				nheaders++;
-				headers[slot].name = hn->utf8;
-				headers[slot].name_len = hn->len;
-			}
-			headers[slot].value = hval->utf8;
-			headers[slot].value_len = hval->len;
-		}
-	}
-
-	// The body. `data` null/undefined means no body at all; a GET instead
-	// appends the stringified data to the URL (Flash-correct, per Ruffle).
-	Avm2Value data = avm2_get_public_property(ctx, request, "data", 4, &found);
-	if (!found) data = avm2_undefined();
-	int has_data = !(data.kind == AVM2_VALUE_NULL
-	                 || data.kind == AVM2_VALUE_UNDEFINED);
-
-	char url_buf[2048];
-	const char* url_ptr = url->utf8;
-	size_t url_len = url->len;
-	const unsigned char* body = NULL;
-	size_t body_len = 0;
-	const Avm2String* mime = NULL;
-	int has_body = 0;
-
-	if (has_data && !is_post)
-	{
-		const Avm2String* ds = avm2_coerce_to_string(ctx, data);
-		int has_q = 0;
-		for (uint32_t i = 0; i < url->len; i++)
-			if (url->utf8[i] == '?') { has_q = 1; break; }
-		size_t n = 0;
-		for (uint32_t i = 0; i < url->len && n + 1 < sizeof(url_buf); i++)
-			url_buf[n++] = url->utf8[i];
-		if (!has_q && n + 1 < sizeof(url_buf)) url_buf[n++] = '?';
-		for (uint32_t i = 0; i < ds->len && n + 1 < sizeof(url_buf); i++)
-			url_buf[n++] = ds->utf8[i];
-		url_ptr = url_buf;
-		url_len = n;
-	}
-	else if (has_data)
-	{
-		Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(data);
-		if (ba != NULL)
-		{
-			body = (const unsigned char*) ba->bytes;
-			body_len = ba->len;
-		}
-		else
-		{
-			const Avm2String* ds = avm2_coerce_to_string(ctx, data);
-			body = (const unsigned char*) ds->utf8;
-			body_len = ds->len;
-		}
-		// An empty payload is no payload — and a request with no payload is
-		// sent as a GET no matter what `method` says.
-		if (body_len > 0)
-		{
-			has_body = 1;
-			mime = log_str_prop(ctx, request, "contentType", 11);
-			if (mime == NULL) mime = avm2_string_from_literal(ctx, "");
-		}
-	}
-	if (!has_body) is_post = 0;
-
-	int form = has_body
-		&& log_str_eq(mime, "application/x-www-form-urlencoded");
-	swf_log_fetch_queue(url_ptr, url_len, is_post ? "POST" : "GET",
-	                    is_post ? 4 : 3, headers, nheaders,
-	                    has_body ? mime->utf8 : NULL,
-	                    has_body ? mime->len : 0,
-	                    body, body_len, has_body, form);
-}
-
-#else
-
-static void avm2_log_fetch_request(Avm2Context* ctx, Avm2Value request)
-{
-	(void) ctx; (void) request;
-}
-
-#endif
-
 // Read `applicationDomain` off a LoaderContext argument (null when absent).
 static Avm2Object* loader_context_domain(Avm2Context* ctx, Avm2Value v)
 {
@@ -4482,13 +4315,7 @@ static void avm2_loader_drain(Avm2Context* ctx)
 	avm2_loader_run_exit_frame(ctx);
 	for (uint32_t round = 0; round < AVM2_MAX_LOAD_CHAIN; round++)
 	{
-		// The queued fetch log belongs to THIS round's requests: Ruffle logs
-		// inside fetch(), i.e. on the first poll of the future, before any of
-		// that load's events. A URL that resolves to nothing queues a log but
-		// no load, so it has to keep the loop alive on its own.
-		if (g_pending_load_count == 0 && g_pending_url_load_count == 0
-		    && !swf_log_fetch_pending()) break;
-		swf_log_fetch_flush();
+		if (g_pending_load_count == 0 && g_pending_url_load_count == 0) break;
 		avm2_loader_run_pending(ctx);
 		avm2_url_loader_run_pending(ctx);
 	}
@@ -4575,11 +4402,6 @@ static Avm2Value loader_load(Avm2Activation* act)
 	// Starting a load unloads whatever was there (Ruffle Loader.load).
 	loader_drop_content(ctx, self, ext);
 	Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, cli);
-
-	// The request is logged whether or not the URL resolves to a bundled
-	// asset — Ruffle spawns the fetch either way, and log_fetch tests point at
-	// hosts that were never going to answer.
-	avm2_log_fetch_request(ctx, act->argc > 0 ? act->args[0] : avm2_null());
 
 	Avm2PendingLoad pl;
 	memset(&pl, 0, sizeof(pl));
@@ -4773,7 +4595,6 @@ static void avm2_url_loader_run_pending(Avm2Context* ctx)
 static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request)
 {
 	if (url_loader_ext_of(self) == NULL) return;
-	avm2_log_fetch_request(ctx, request);
 	const Avm2String* url = request_url(ctx, request);
 	if (url == NULL) return;
 	Avm2PendingUrlLoad pl;
