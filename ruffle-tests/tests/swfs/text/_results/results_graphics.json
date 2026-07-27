@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-26T22:42:49.120209+00:00",
-    "git_sha": "9f4be9647bf4a230676ded70a4934b8b146402ff",
-    "duration_seconds": 199.32,
+    "timestamp": "2026-07-27T00:30:06.182721+00:00",
+    "git_sha": "8213dd4d61dd599ec86da3143e947b704ed6405c",
+    "duration_seconds": 204.49,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "auto_size/height",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.561,
+        "compile": 25.812,
         "run": 0.516
       },
       "num_frames": 1,
@@ -31,7 +31,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 24.17,
+      "duration": 26.43,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -48,9 +48,9 @@
     {
       "test": "auto_size/return",
       "phases": {
-        "recomp": 0.067,
-        "compile": 24.695,
-        "run": 0.315
+        "recomp": 0.068,
+        "compile": 26.921,
+        "run": 0.366
       },
       "num_frames": 1,
       "lines": {
@@ -58,7 +58,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 25.31,
+      "duration": 27.61,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -75,9 +75,9 @@
     {
       "test": "auto_size/width",
       "phases": {
-        "recomp": 0.066,
-        "compile": 23.68,
-        "run": 0.315
+        "recomp": 0.053,
+        "compile": 19.5,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -85,7 +85,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 24.26,
+      "duration": 19.98,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -103,8 +103,8 @@
       "test": "br_at_start",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.572,
-        "run": 0.367
+        "compile": 1.869,
+        "run": 0.465
       },
       "num_frames": 1,
       "lines": {
@@ -112,7 +112,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.14,
+      "duration": 2.58,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -130,7 +130,7 @@
       "test": "html_entity_parsing",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.222,
+        "compile": 5.81,
         "run": 0.165
       },
       "num_frames": 1,
@@ -139,7 +139,7 @@
         "expected_lines": 213,
         "matching_lines": 99
       },
-      "duration": 5.39,
+      "duration": 5.98,
       "status": "output_mismatch",
       "detail": "118 line(s) differ (actual=217, expected=213)",
       "actual_output": "Source: This is an ampersand: &amp;\nParsed: This is an ampersand: &\n\nSource: This is a less-than sign: &lt;\nParsed: This is a less-than sign: <\n\nSource: This is a greater-than sign: &gt;\nParsed: This is a greater-than sign: >\n\nSource: This is a quotation mark: &quot;\nParsed: This is a quotation mark: \"\n\nSource: This is an apostrophe: &apos;\nParsed: This is an apostrophe: '\n\nSource: This is a non-breaking space: &nbsp;\nParsed: This is a non-breaking space: \u00a0\n\nSource: &amp;\nParsed: &\n\nSource: &quot; is a quotation mark\nParsed: \" is a quotation mark\n\nSource: Suppose we have two objects, &quot;foo&quot; and &quot;bar&quot;\nParsed: Suppose we have two objects, \"foo\" and \"bar\"\n\nSource: This is how you write an empty string: &quot;&quot;\nParsed: This is how you write an empty string: \"\"\n\nSource: This entity should not be valid: &jjjjj;\nParsed: This entity should not be valid: &jjjjj;\n\nSource: This entity should not be valid: &1;\nParsed: This entity should not be valid: &1;\n\nSource: This entity should not be valid: &x2;\nParsed: This entity should not be valid: &x2;\n\nSource: This entity should not be valid: &;\nParsed: This entity should not be valid: &;\n\nSource: This is not an entity: amp;\nParsed: This is not an entity: amp;\n\nSource: ;\nParsed: ;\n\nSource: This is not an entity: &amp\nParsed: This is not an entity: &amp\n... (167 lines after) ...",
@@ -149,8 +149,8 @@
       "test": "links_in_scrolled_text",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.947,
-        "run": 0.215
+        "compile": 1.471,
+        "run": 0.165
       },
       "num_frames": 2,
       "lines": {
@@ -158,7 +158,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 2.17,
+      "duration": 1.64,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -168,8 +168,8 @@
       "test": "style_changes_in_html",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.508,
-        "run": 0.266
+        "compile": 20.132,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -177,7 +177,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.89,
+      "duration": 20.46,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -195,7 +195,7 @@
       "test": "text_caret_placement_align",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.134,
+        "compile": 25.659,
         "run": 0.165
       },
       "num_frames": 2,
@@ -204,7 +204,7 @@
         "expected_lines": 248,
         "matching_lines": 189
       },
-      "duration": 20.31,
+      "duration": 25.83,
       "status": "output_mismatch",
       "detail": "59 line(s) differ (actual=248, expected=248)",
       "actual_output": "    { \"type\": \"MouseMove\", \"pos\": [10, 12] },\n    { \"type\": \"MouseDown\", \"pos\": [10, 12], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [10, 12], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [42, 21] },\n    { \"type\": \"MouseDown\", \"pos\": [42, 21], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [42, 21], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [82, 24] },\n    { \"type\": \"MouseDown\", \"pos\": [82, 24], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [82, 24], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [175, 29] },\n    { \"type\": \"MouseDown\", \"pos\": [175, 29], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [175, 29], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [197, 44] },\n    { \"type\": \"MouseDown\", \"pos\": [197, 44], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [197, 44], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [100, 53] },\n    { \"type\": \"MouseDown\", \"pos\": [100, 53], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [100, 53], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [41, 81] },\n    { \"type\": \"MouseDown\", \"pos\": [41, 81], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [41, 81], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [21, 51] },\n    { \"type\": \"MouseDown\", \"pos\": [21, 51], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [21, 51], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [306, 83] },\n    { \"type\": \"MouseDown\", \"pos\": [306, 83], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [306, 83], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [239, 27] },\n    { \"type\": \"MouseDown\", \"pos\": [239, 27], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [239, 27], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [255, 39] },\n    { \"type\": \"MouseDown\", \"pos\": [255, 39], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [255, 39], \"btn\": \"Left\" },\nCaret placed at: 0 in text_left\n    { \"type\": \"MouseMove\", \"pos\": [322, 116] },\n    { \"type\": \"MouseDown\", \"pos\": [322, 116], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [322, 116], \"btn\": \"Left\" },\nCaret placed at: 0 in text_right\n    { \"type\": \"MouseMove\", \"pos\": [303, 149] },\n    { \"type\": \"MouseDown\", \"pos\": [303, 149], \"btn\": \"Left\" },\n... (198 lines after) ...",
@@ -213,8 +213,8 @@
     {
       "test": "text_caret_placement_leading",
       "phases": {
-        "recomp": 0.0,
-        "compile": 25.645,
+        "recomp": 0.044,
+        "compile": 26.341,
         "run": 0.165
       },
       "num_frames": 2,
@@ -223,7 +223,7 @@
         "expected_lines": 244,
         "matching_lines": 183
       },
-      "duration": 25.82,
+      "duration": 26.56,
       "status": "output_mismatch",
       "detail": "61 line(s) differ (actual=244, expected=244)",
       "actual_output": "    { \"type\": \"MouseMove\", \"pos\": [89, 18] },\n    { \"type\": \"MouseDown\", \"pos\": [89, 18], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [89, 18], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [106, 23] },\n    { \"type\": \"MouseDown\", \"pos\": [106, 23], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [106, 23], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [114, 26] },\n    { \"type\": \"MouseDown\", \"pos\": [114, 26], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [114, 26], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [123, 29] },\n    { \"type\": \"MouseDown\", \"pos\": [123, 29], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [123, 29], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [135, 31] },\n    { \"type\": \"MouseDown\", \"pos\": [135, 31], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [135, 31], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [149, 31] },\n    { \"type\": \"MouseDown\", \"pos\": [149, 31], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [149, 31], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [151, 33] },\n    { \"type\": \"MouseDown\", \"pos\": [151, 33], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [151, 33], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [154, 36] },\n    { \"type\": \"MouseDown\", \"pos\": [154, 36], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [154, 36], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [157, 34] },\n    { \"type\": \"MouseDown\", \"pos\": [157, 34], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [157, 34], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [161, 33] },\n    { \"type\": \"MouseDown\", \"pos\": [161, 33], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [161, 33], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [162, 33] },\n    { \"type\": \"MouseDown\", \"pos\": [162, 33], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [162, 33], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [162, 35] },\n    { \"type\": \"MouseDown\", \"pos\": [162, 35], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [162, 35], \"btn\": \"Left\" },\nCaret placed at: 0 in leading0\n    { \"type\": \"MouseMove\", \"pos\": [163, 33] },\n    { \"type\": \"MouseDown\", \"pos\": [163, 33], \"btn\": \"Left\" },\n... (194 lines after) ...",
@@ -232,8 +232,8 @@
     {
       "test": "text_caret_placement_scroll",
       "phases": {
-        "recomp": 0.043,
-        "compile": 24.879,
+        "recomp": 0.0,
+        "compile": 26.543,
         "run": 0.165
       },
       "num_frames": 2,
@@ -242,7 +242,7 @@
         "expected_lines": 108,
         "matching_lines": 81
       },
-      "duration": 25.1,
+      "duration": 26.72,
       "status": "output_mismatch",
       "detail": "27 line(s) differ (actual=108, expected=108)",
       "actual_output": "    { \"type\": \"MouseMove\", \"pos\": [44, 24] },\n    { \"type\": \"MouseDown\", \"pos\": [44, 24], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [44, 24], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [73, 50] },\n    { \"type\": \"MouseDown\", \"pos\": [73, 50], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [73, 50], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [118, 27] },\n    { \"type\": \"MouseDown\", \"pos\": [118, 27], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [118, 27], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [312, 24] },\n    { \"type\": \"MouseDown\", \"pos\": [312, 24], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [312, 24], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [519, 47] },\n    { \"type\": \"MouseDown\", \"pos\": [519, 47], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [519, 47], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [558, 23] },\n    { \"type\": \"MouseDown\", \"pos\": [558, 23], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [558, 23], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [429, 26] },\n    { \"type\": \"MouseDown\", \"pos\": [429, 26], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [429, 26], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [420, 47] },\n    { \"type\": \"MouseDown\", \"pos\": [420, 47], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [420, 47], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [169, 36] },\n    { \"type\": \"MouseDown\", \"pos\": [169, 36], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [169, 36], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [167, 39] },\n    { \"type\": \"MouseDown\", \"pos\": [167, 39], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [167, 39], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [143, 39] },\n    { \"type\": \"MouseDown\", \"pos\": [143, 39], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [143, 39], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [139, 38] },\n    { \"type\": \"MouseDown\", \"pos\": [139, 38], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [139, 38], \"btn\": \"Left\" },\nCaret placed at: 0\n    { \"type\": \"MouseMove\", \"pos\": [120, 38] },\n    { \"type\": \"MouseDown\", \"pos\": [120, 38], \"btn\": \"Left\" },\n... (58 lines after) ...",
@@ -252,7 +252,7 @@
       "test": "text_caret_placement_translated_bounds",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.899,
+        "compile": 19.84,
         "run": 0.215
       },
       "num_frames": 2,
@@ -261,7 +261,7 @@
         "expected_lines": 140,
         "matching_lines": 134
       },
-      "duration": 21.12,
+      "duration": 20.06,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=140, expected=140)",
       "actual_output": "... (38 lines before) ...\n    { \"type\": \"MouseUp\", \"pos\": [322, 110], \"btn\": \"Left\" },\nText with caret: This is an example text\\nand this is its second line|\n    { \"type\": \"MouseMove\", \"pos\": [209, 115] },\n    { \"type\": \"MouseDown\", \"pos\": [209, 115], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [209, 115], \"btn\": \"Left\" },\nText with caret: This is an example text\\nand this is its second line|\n    { \"type\": \"MouseMove\", \"pos\": [165, 109] },\n    { \"type\": \"MouseDown\", \"pos\": [165, 109], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [165, 109], \"btn\": \"Left\" },\nText with caret: This is an example text\\nand this is its second line|\n    { \"type\": \"MouseMove\", \"pos\": [86, 102] },\n    { \"type\": \"MouseDown\", \"pos\": [86, 102], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [86, 102], \"btn\": \"Left\" },\nText with caret: This is an example text\\nand this is its second line|\n    { \"type\": \"MouseMove\", \"pos\": [56, 101] },\n    { \"type\": \"MouseDown\", \"pos\": [56, 101], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [56, 101], \"btn\": \"Left\" },\nText with caret: This is an example text\\nand this is its second line|\n    { \"type\": \"MouseMove\", \"pos\": [26, 95] },\n    { \"type\": \"MouseDown\", \"pos\": [26, 95], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [26, 95], \"btn\": \"Left\" },\nText with caret: This is an example text\\nand this is its second line|\n    { \"type\": \"MouseMove\", \"pos\": [13, 86] },\n    { \"type\": \"MouseDown\", \"pos\": [13, 86], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [13, 86], \"btn\": \"Left\" },\nText with caret: This is an example text\\nand this is its second line|\n    { \"type\": \"MouseMove\", \"pos\": [14, 24] },\n    { \"type\": \"MouseDown\", \"pos\": [14, 24], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [14, 24], \"btn\": \"Left\" },\nText with caret: T|his is an example text\\nand this is its second line\n    { \"type\": \"MouseMove\", \"pos\": [14, 31] },\n    { \"type\": \"MouseDown\", \"pos\": [14, 31], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [14, 31], \"btn\": \"Left\" },\nText with caret: T|his is an example text\\nand this is its second line\n    { \"type\": \"MouseMove\", \"pos\": [14, 34] },\n    { \"type\": \"MouseDown\", \"pos\": [14, 34], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [14, 34], \"btn\": \"Left\" },\nText with caret: This is an example text\\na|nd this is its second line\n    { \"type\": \"MouseMove\", \"pos\": [15, 32] },\n    { \"type\": \"MouseDown\", \"pos\": [15, 32], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [15, 32], \"btn\": \"Left\" },\nText with caret: T|his is an example text\\nand this is its second line\n    { \"type\": \"MouseMove\", \"pos\": [17, 32] },\n    { \"type\": \"MouseDown\", \"pos\": [17, 32], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [17, 32], \"btn\": \"Left\" },\nText with caret: T|his is an example text\\nand this is its second line\n    { \"type\": \"MouseMove\", \"pos\": [18, 33] },\n    { \"type\": \"MouseDown\", \"pos\": [18, 33], \"btn\": \"Left\" },\n    { \"type\": \"MouseUp\", \"pos\": [18, 33], \"btn\": \"Left\" },\nText with caret: T|his is an example text\\nand this is its second line\n... (52 lines after) ...",
