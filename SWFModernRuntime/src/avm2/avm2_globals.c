@@ -1970,23 +1970,6 @@ static Avm2Value urlvars_to_string(Avm2Activation* act)
 	return avm2_string(acc);
 }
 
-// URLRequestHeader(name:String = "", value:String = "") — both params coerce
-// to String, so a non-string arg is stringified rather than stored raw.
-static Avm2Value urlreqheader_ctor(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	Avm2Object* self = act->this_val.kind == AVM2_VALUE_OBJECT
-		? act->this_val.u.obj : NULL;
-	if (self == NULL || self->slot_count < 3) return avm2_undefined();
-	for (int i = 0; i < 2; i++)
-	{
-		self->slots[i + 1] = (act->argc > (uint32_t) i)
-			? avm2_string(avm2_coerce_to_string(ctx, act->args[i]))
-			: avm2_string(avm2_string_from_literal(ctx, ""));
-	}
-	return avm2_undefined();
-}
-
 static Avm2Value net_str_const(Avm2Activation* act, const char* s)
 { return avm2_string(avm2_string_from_literal(act->ctx, s)); }
 static Avm2Value net_c_get(Avm2Activation* a){return net_str_const(a,"GET");}
@@ -2212,28 +2195,8 @@ static void register_net(Avm2Context* ctx)
 	avm2_builtin_add_static_getset(ctx, df, "BINARY", net_c_binary, NULL);
 	avm2_builtin_add_static_getset(ctx, df, "VARIABLES", net_c_vars, NULL);
 
-	// flash.net.URLRequestHeader — `public final class` with two public String
-	// vars (URLRequestHeader.as). They are real slots, not expandos: the fetch
-	// log reads them back off an array the script built.
-	{
-		Avm2Class* rh = avm2_builtin_class(ctx, "flash.net", "URLRequestHeader",
-		                                   b->object_class);
-		rh->flags |= AVM2_CLASS_FLAG_SEALED;
-		rh->instance_init.fn = urlreqheader_ctor;
-		rh->instance_init.debug_name = "URLRequestHeader";
-		static const char* const nv[2] = { "name", "value" };
-		for (int i = 0; i < 2; i++)
-		{
-			Avm2PropEntry e;
-			memset(&e, 0, sizeof(e));
-			e.key = avm2_public_key(nv[i], (uint32_t) strlen(nv[i]));
-			e.kind = AVM2_PROP_SLOT;
-			e.slot_index = rh->ivtable.slot_count + 1;
-			e.defining_class = rh;
-			rh->ivtable.slot_count++;
-			avm2_vtable_append(ctx, &rh->ivtable, &e);
-		}
-	}
+	(void) avm2_builtin_class(ctx, "flash.net", "URLRequestHeader",
+	                          b->object_class);
 
 	// flash.net.URLVariables — dynamic bag of properties (extends Object).
 	// toString is what makes it usable as URLRequest.data: an empty bag
