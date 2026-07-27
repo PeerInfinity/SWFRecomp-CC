@@ -1929,9 +1929,15 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             # An AVM2 child: its prefixed ABC/timeline tables compile into the
             # same build dir (the *.c glob picks them up) and the MovieEntry
             # points at the aggregate they end with.
+            # Only when the PARENT is an AVM2 test. An AVM1 parent does not
+            # compile src/avm2 at all (is_avm2 gates the whole module tree),
+            # so linking an AVM2 child's tables into it is an undefined-symbol
+            # wall — that is `mixed_avm/avm1_loads_avm2`, and it belongs to the
+            # dual-VM arc, not here. Same for a parent whose own ABC failed to
+            # emit (the deliberately-malformed `verify_method_info_*` SWFs).
             child_abc = child_recomp_dir / "RecompiledABC"
             child_tables_sym = None
-            if child_abc.exists():
+            if is_avm2 and child_abc.exists():
                 for f in child_abc.iterdir():
                     if f.suffix in (".c", ".h"):
                         shutil.copy2(f, build_dir)
