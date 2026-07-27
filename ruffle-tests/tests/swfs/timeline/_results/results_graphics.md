@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-27 21:16 UTC
+**Date**: 2026-07-27 23:00 UTC
 
-**Git SHA**: `1b63b2e6d9`
+**Git SHA**: `0121fd1346`
 
-**Run Duration**: 1m 56s
+**Run Duration**: 4m 7s
 
 ## Summary
 
@@ -31,18 +31,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 20.9s |  |
-| 2 | `frame_label_count_oom` | 1 | 2.1s |  |
-| 3 | `frame_script_cleanup` | 30 | 6.6s |  |
-| 4 | `frame_script_cleanup2` | 32 | 6.5s |  |
-| 5 | `frame_script_cleanup3` | 30 | 6.2s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 6.4s |  |
-| 7 | `frame_script_construct` | 25 | 6.3s |  |
-| 8 | `scene_count_oom` | 1 | 2.0s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 6.7s |  |
+| 1 | `clip_action_no_key_code` | 1 | 20.4s |  |
+| 2 | `frame_label_count_oom` | 1 | 20.6s |  |
+| 3 | `frame_script_cleanup` | 30 | 25.1s |  |
+| 4 | `frame_script_cleanup2` | 32 | 26.1s |  |
+| 5 | `frame_script_cleanup3` | 30 | 6.4s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 7.2s |  |
+| 7 | `frame_script_construct` | 25 | 24.5s |  |
+| 8 | `scene_count_oom` | 1 | 2.1s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 6.3s |  |
 | 10 | `swf_9_frame_script_cleanup_goto` | 30 | 6.5s |  |
-| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 6.4s |  |
-| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 6.8s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 25.4s |  |
+| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 6.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,9 +50,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 6.2s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 6.4s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 6.3s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 24.8s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 6.2s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 24.7s |  |
 
 ## Near-Passing Tests
 
