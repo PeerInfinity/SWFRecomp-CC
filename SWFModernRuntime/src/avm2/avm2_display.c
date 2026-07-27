@@ -3616,6 +3616,8 @@ typedef struct Avm2LoaderInfoExt
 	Avm2Object* shared_events;          // sharedEvents (lazy EventDispatcher)
 	Avm2Object* app_domain;             // LoaderContext's ApplicationDomain
 	const Avm2String* url;              // stream movie URL (LOADER only)
+	const Avm2String* loader_url;       // URL of the movie that ISSUED the load
+	                                    // (NULL = the root SWF's own URL)
 	const uint8_t* bytes;               // loaded source bytes (static storage)
 	uint32_t bytes_len;
 	uint32_t bytes_loaded;
@@ -3736,6 +3738,25 @@ static Avm2LoaderInfoExt* this_li(Avm2Activation* act)
 	return loaderinfo_ext_of(act->ctx, this_obj(act));
 }
 
+// The URL of the movie a DisplayObject belongs to. It is the base a relative
+// load URL resolves against, and the `loaderURL` stamped on whatever that
+// movie loads — both are per-issuer, not per-run: loader_loaderurl chains
+// test.swf -> load1.swf -> load2.swf and expects load2's loaderURL to name
+// load1. A Loader-loaded child root carries its own LoaderInfo (tranche 6a's
+// back-pointer); anything else belongs to the root SWF.
+static const Avm2String* movie_url_of(Avm2Context* ctx, Avm2Object* dobj)
+{
+	Avm2Object* root = dobj != NULL ? avm2_root_of(ctx, dobj) : NULL;
+	Avm2DisplayObjectExt* rext = root != NULL
+	                             ? avm2_display_ext_of(ctx, root) : NULL;
+	if (rext != NULL && rext->loader_info != NULL)
+	{
+		Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, rext->loader_info);
+		if (lx != NULL && lx->url != NULL) return lx->url;
+	}
+	return root_swf_url(ctx);
+}
+
 // The eight getters that describe the *loaded movie* throw while the stream is
 // NotYetLoaded (Ruffle make_error_2099): actionScriptVersion, childAllowsParent,
 // frameRate, height, parentAllowsChild, sameDomain, swfVersion, width.
@@ -3835,10 +3856,14 @@ static Avm2Value li_get_url(Avm2Activation* act)
 	return avm2_string(root_swf_url(act->ctx));
 }
 
-// loaderURL is the URL of the movie that *initiated* the load, so for every
-// LoaderInfo in a single-SWF run it is the root SWF's own URL.
+// loaderURL is the URL of the movie that *initiated* the load, recorded on the
+// LoaderInfo when the load is issued. Absent that (the root SWF, and anything
+// loaded before the stamp exists) it is the root SWF's own URL.
 static Avm2Value li_get_loader_url(Avm2Activation* act)
 {
+	Avm2LoaderInfoExt* ext = this_li(act);
+	if (ext != NULL && ext->loader_url != NULL)
+		return avm2_string(ext->loader_url);
 	return avm2_string(root_swf_url(act->ctx));
 }
 
@@ -4079,13 +4104,16 @@ static uint8_t loader_sniff(const uint8_t* d, uint32_t n)
 // Ruffle resolves a request URL against the loading movie's URL before the
 // load ever starts, so a relative "data.txt" is reported — and named in the
 // #2124 message — as "file:///data.txt".
+// `base` is the ISSUING movie's URL (movie_url_of), not the root SWF's — a
+// child that loads "sibling.swf" resolves it next to itself.
 static const Avm2String* loader_absolute_url(Avm2Context* ctx,
-                                             const Avm2String* url)
+                                             const Avm2String* url,
+                                             const Avm2String* base)
 {
 	if (url == NULL || url->utf8 == NULL) return url;
 	for (uint32_t i = 0; i + 3 <= (uint32_t) url->len; i++)
 		if (memcmp(url->utf8 + i, "://", 3) == 0) return url;
-	const Avm2String* base = root_swf_url(ctx);
+	if (base == NULL || base->len == 0) base = root_swf_url(ctx);
 	if (base == NULL || base->len == 0) return url;
 	uint32_t cut = 0;   // base up to and including its last '/'
 	for (uint32_t i = 0; i < (uint32_t) base->len; i++)
@@ -4173,6 +4201,7 @@ static void loaderinfo_reset_stream(Avm2LoaderInfoExt* lx)
 	lx->content = NULL;
 	lx->app_domain = NULL;
 	lx->url = NULL;
+	lx->loader_url = NULL;
 	lx->bytes = NULL;
 	lx->bytes_len = 0;
 	lx->bytes_loaded = 0;
@@ -4853,9 +4882,14 @@ static Avm2Value loader_load(Avm2Activation* act)
 	Avm2PendingLoad pl;
 	memset(&pl, 0, sizeof(pl));
 	if (url == NULL || !loader_resolve_url(url, &pl)) return avm2_undefined();
-	if (lx != NULL) lx->load_started = 1;
+	const Avm2String* issuer_url = movie_url_of(ctx, self);
+	if (lx != NULL)
+	{
+		lx->load_started = 1;
+		lx->loader_url = issuer_url;
+	}
 	pl.loader_info = cli;
-	pl.url = loader_absolute_url(ctx, url);
+	pl.url = loader_absolute_url(ctx, url, issuer_url);
 	pl.app_domain = act->argc > 1 ? loader_context_domain(ctx, act->args[1]) : NULL;
 	if (g_pending_load_count < AVM2_MAX_PENDING_LOADS)
 		g_pending_loads[g_pending_load_count++] = pl;
@@ -4882,7 +4916,11 @@ static Avm2Value loader_load_bytes(Avm2Activation* act)
 	Avm2ByteArrayExt* ba = act->argc > 0 ? avm2_bytearray_ext_of(act->args[0])
 	                                     : NULL;
 	if (ba == NULL) return avm2_undefined();
-	if (lx != NULL) lx->load_started = 1;
+	if (lx != NULL)
+	{
+		lx->load_started = 1;
+		lx->loader_url = movie_url_of(ctx, self);
+	}
 
 	Avm2PendingLoad pl;
 	memset(&pl, 0, sizeof(pl));
