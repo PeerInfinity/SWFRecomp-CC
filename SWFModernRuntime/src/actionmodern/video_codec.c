@@ -9,6 +9,25 @@
 #include <libswscale/swscale.h>
 #endif
 
+// Slack bytes appended to every sws_scale destination plane.
+//
+// libswscale converts in SIMD-sized chunks and can write past the end of the
+// last output row. Measured, not assumed: valgrind on visual/video_deblocking
+// reports two `Invalid write of size 8` at +0 and +16 past a 246,016-byte
+// (w*h*4) malloc'd block, from sws_scale. glibc detects the resulting arena
+// damage at the NEXT free — `free(): corrupted unsorted chunks` inside
+// av_frame_free — which is why the abort's backtrace pointed at cleanup code
+// and not at the writer. ASan does not see it either: the write comes from
+// libswscale.so, which is uninstrumented.
+//
+// FFmpeg's own av_image_alloc pads for exactly this reason. We keep plain
+// malloc (callers free() the buffer) and add the same slack; 64 is
+// AV_INPUT_BUFFER_PADDING_SIZE, FFmpeg's standard margin.
+//
+// Found by the CI crash-capture instrument, run 30309564809 shard 30
+// (SWFRecompDocs/guides/ci-crash-capture.md).
+#define SWS_DST_SLACK 64
+
 int video_codec_supported(int codec_id)
 {
 	switch (codec_id) {
@@ -88,7 +107,7 @@ static int decode_via_libavcodec(int codec_id,
 		                          /*saturation=*/1 << 16);
 	}
 
-	rgba = (unsigned char*)malloc((size_t)w * (size_t)h * 4);
+	rgba = (unsigned char*)malloc((size_t)w * (size_t)h * 4 + SWS_DST_SLACK);
 	if (!rgba) goto done;
 
 	uint8_t* dst_data[4] = { rgba, NULL, NULL, NULL };
@@ -120,7 +139,7 @@ int video_resample_rgba(const unsigned char* src_rgba, int src_w, int src_h,
 	if (!src_rgba || !out_rgba || src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0)
 		return 0;
 
-	unsigned char* dst = (unsigned char*)malloc((size_t)dst_w * (size_t)dst_h * 4);
+	unsigned char* dst = (unsigned char*)malloc((size_t)dst_w * (size_t)dst_h * 4 + SWS_DST_SLACK);
 	if (!dst) return 0;
 
 #ifdef SWF_HAVE_LIBAVCODEC
@@ -287,7 +306,7 @@ int video_decoder_decode(VideoDecoderCtx* ctx, int frame_type,
 		                          /*saturation=*/1 << 16);
 	}
 
-	rgba = (unsigned char*)malloc((size_t)w * (size_t)h * 4);
+	rgba = (unsigned char*)malloc((size_t)w * (size_t)h * 4 + SWS_DST_SLACK);
 	if (!rgba) goto done;
 
 	uint8_t* dst_data[4] = { rgba, NULL, NULL, NULL };
