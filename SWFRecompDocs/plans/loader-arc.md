@@ -231,13 +231,15 @@ postmortemed against CI.
 | 4 | ~~**URLLoader over bundled data**~~ **SHIPPED `28577da2a`** | G | **+1** (`url_loader`); prerequisite for two bucket-F tests | small |
 | 5 | ~~**Navigator fetch log**~~ **SHIPPED `a9900a478`, reverted, RE-LANDED `7a4dc6fba`** — the revert's `edittext_align` attribution did not survive reading the runs it cited (§7) | E | **+2** (`loader_method`, `loader_load`) — actual **+4**, all adopters outside the arc; neither predicted test landed (§7) | small-medium |
 | 6a | ~~**AVM2 child-SWF execution**~~ **SHIPPED `16955d6e8`+`e0d53f7c3`+`5a7162e20`** — emitter prefix/char-id base, `Avm2MovieTables`, register-on-load, the SWF arm of `loader_deliver` | F (unblocked part) | **+3** predicted, **+3** delivered (`loader_events`, `loader_reuse`, `loader_loadbytes_events`) + riders (§8) | **large** |
-| 6b/6c | Per-issuer URL base, AS3 self-load, child-root-ctor error print | F | **+3** (`loader_loaderurl`, `loader_loadbytes_url`, `loader_error_in_root_ctor`) | medium |
-| 7 | **Loader hit-testing** | D (minus AVM1) | ~~+3~~ **+1** — image content alone passed `loader_visibility_interactive` and took `loader_noninteractive_try_click_root` to 4/5, so only `loader_try_click_root` is left and it needs tranche 6's SWF content (§6) | medium |
+| 6b/6c | ~~Per-issuer URL base, AS3 self-load, child-root-ctor error print~~ **SHIPPED `d44c99991`+`3c0d4817f`+`0dbc5b41e`** | F | **+3** predicted, **+2 of the 3 named** delivered (`loader_loaderurl`, `loader_error_in_root_ctor`); `loader_loadbytes_url` reached 3/12 and stops at tranche 8 (§9) | medium |
+| 7 | ~~**Loader hit-testing**~~ **SHIPPED `3c0d4817f`** | D (minus AVM1) | ~~+3~~ **+1** predicted, **+1 delivered** (`loader_noninteractive_try_click_root`) plus the `mouse_children` rider (+78 lines). `loader_try_click_root` needs child-SWF shape bounds, deferred with child geometry (§9) | medium |
 | 8 | **Nested-child download + ApplicationDomain isolation** — recurse in `install_test_dir`/`find_child_swfs`, then per-movie domains with duplicate class names | F (blocked part) | **+4** (`loader_child_getdefinition`, `loader_duplicate_class`, `loader_duplicate_coerce`, `loader_duplicate_coerce_new_domain`) | large |
 
 **Won't-do (3 tests):** `loader_jpegxr`, `loader_jpegxr_alpha` (no JPEG-XR
 decoder; upstream feature-gates them), `loader_applicationDomain` (Flex
 framework SWZ). **Elsewhere (1):** `mouse_pick_loader_avm1` → dual-VM arc.
+**Both JPEG-XR tests now pass** — see §9; the won't-do was written against
+the format, and both tests only ever trace `contentType`.
 
 Reachable total: **26 of the 32** avm2 failures, plus up to 9 in
 from_shumway. Tranches 1+2 are **8 tests for a small amount of work** and
@@ -727,9 +729,14 @@ than from reading diffs. The other six are riders nobody scoped.
 | `edittext_align` | avm2 | segfault | the intermittent crash of §7, not a fix |
 | `simple_shapes/heavy_tesselation` | visual | recomp_fail | **flake, not a gain** — passed in `30290049993`, back to `recomp_fail` in `30293055978`. Counted in that run's +9 and excluded here |
 
-`as3-loader/loaderinfo/loaded-content-properties` went 36/48 → 43/48 without
-passing; the remainder is `sandboxBridge`, `uncaughtErrorEvents`,
-`isURLInaccessible` and a `#2098` — unrelated features, not Loader timing.
+`as3-loader/loaderinfo/loaded-content-properties` **did not move**: it is
+36/48 in the published results of every run in this arc, including
+`30290049993` itself. The "36/48 → 43/48" recorded here when §8 was written
+was never in CI — the standing rule is that a line-count claim comes from
+`results_graphics.json`, not from a local run. What it is still missing is
+`sandboxBridge`, `uncaughtErrorEvents`, `isURLInaccessible`, a `#2098`, and
+image-content `width`/`height`/`frameRate`/`swfVersion` — unrelated
+features, none of them Loader timing.
 
 Shipped in four commits: recompiler (`16955d6e8`), runtime (`e0d53f7c3`),
 harness (`5a7162e20`), and a follow-up (`2bc6c9b9b`) for the one thing CI
@@ -860,3 +867,141 @@ image and the two new pointers.
 - Per-movie `ApplicationDomain` isolation stays tranche 8. 6a runs one global
   domain with first-match-wins, so a child class name that collides with a
   parent's resolves to the parent's. None of the tranche-6 targets collide.
+
+## 9. Postmortem — tranches 6b + 6c + 7, and the arc's final scoreboard
+
+**Predicted +3, delivered +5 (CI `30301034257`, graphics/full, 3847 → 3852
+effective over the 4419-test intersection with `535885e66`, zero pass→fail
+regressions, no `compile_fail`/`segfault`/`timeout` bucket at all).** All
+three named targets landed, and for the second tranche running the
+prediction was right on the names — both times the estimate came from a
+design pass with file:line anchors rather than from reading diffs.
+
+| Gain | Suite | Baseline | Predicted? |
+|---|---|---|---|
+| `loader_loaderurl` | avm2 | 5/6 | yes (6b) |
+| `loader_error_in_root_ctor` | avm2 | 0/4 | yes (6c) |
+| `loader_noninteractive_try_click_root` | avm2 | 4/5 | yes (7) |
+| `mouse_children` | avm2 | 114/192 | **no** — 78 lines from the tranche-7 rule alone |
+| `sandbox_type_inherited` | avm2 | 1/2 | no |
+
+Shipped in three commits: `d44c99991` (6b-easy), `3c0d4817f` (7 + 6c, one
+commit because both land in `avm2_display.c` with interleaved hunks), and
+`0dbc5b41e` (the root-binding fix below, confirmed separately by
+`30303826686`).
+
+### What the tests taught
+
+- **`loaderURL` is per-issuer, and so is relative-URL resolution.** Both
+  hardcoded the root SWF's URL. `movie_url_of` walks a DisplayObject to its
+  root and reads 6a's `loader_info` back-pointer, and the issuing URL is
+  stamped onto the contentLoaderInfo at load time. The design called this
+  correctly; it was the one part of 6b that cost a single sitting.
+- **A movie ROOT is never a valid mouse target.** Ruffle's
+  `combine_with_parent` tests `target.loader_info().is_none()`, and
+  `run_mouse_pick` comments that "the root objects of stages and loaders do
+  not accept hit events". `pk_combine` honoured mouseChildren/mouseEnabled
+  and not this, so a click on the root movie's own Shape targeted the root
+  instead of falling through to the Stage. **This was scoped as a one-line
+  fix for one test and paid for 78 lines of `mouse_children`** — the rule is
+  load-bearing for the whole AVM2 hit-test surface, not for Loaders.
+- **A URLLoader could not read a bundled child SWF at all.** The design
+  assumed tranche 4's URLLoader path plus 6a's loadBytes size-match already
+  covered `loader_error_in_root_ctor`'s delivery. They did not:
+  `loader_resolve_url` answers a MovieEntry with `data == NULL` (the Loader
+  pipeline runs a child from its emitted tables, not from bytes), so the
+  fetch scored as a miss and fired #2032 — the test produced *zero* lines,
+  and the ctor-throw handling that was supposed to be the whole tranche was
+  never even reached. What was missing is the file **verbatim as it sits on
+  disk**: that is what Flash hands a binary URLLoader, and it is why a later
+  `loadBytes()` of the result matches the movie by FILE size exactly as an
+  `[Embed]` of the same file does. `MovieEntry.raw_bytes` is a fourth
+  zero-init-safe field, aliased to the decompressed image when the two are
+  equal.
+- **A loadBytes SWF's root is constructed at the next drain, not inside
+  `loadBytes()`.** `loader_error_in_root_ctor` reads
+  `contentLoaderInfo.content` on the statement after the call and expects
+  `null`. `loader_loadbytes_events` — which pinned this timing in 6a —
+  cannot see the difference, because `loadBytes` is the last statement in
+  its frame script. Its expected order (progress, progress, child ctor,
+  child framescript, init, complete) is satisfied by *both* placements,
+  which is exactly why 6a picked the wrong one and nothing caught it. The
+  fetch path keeps its inline boot: it delivers from inside the drain,
+  already past that tick's active-list flush.
+- **The uncaught-error print already existed.** `Error.getStackTrace`
+  returns `toString()` plus the `"\n\tat X()"` tail snapshotted when the
+  Error was constructed, which is character-for-character what the expected
+  output wants. Factoring that into `avm2_error_stack_string` and printing
+  it at the child-root-ctor call site is the whole of 6c's "new" behaviour —
+  no tracing infrastructure, and `d1c307c51` stays reverted. Deferring the
+  boot also *fixed the trace*: constructed inside `loadBytes`, the snapshot
+  would have carried the URLLoader `complete` handler's frames too.
+
+### The root-binding rule (`0dbc5b41e`) — 6b-stretch's real blocker
+
+`loader_loadbytes_url` did not stall on anything the design named. Its
+SymbolClass tag is `{ count=1, id=1, "Test" }` and the SWF **defines no
+character 1** — no DefineSprite, no PlaceObject, just DoABC + SymbolClass +
+ShowFrame. We bound the root only on `char_id == 0`, so the root came up a
+plain `MovieClip`, `Test` was constructed detached by the never-placed
+binding fallback, and the `addedToStage` handler where the entire test lives
+never ran.
+
+Ruffle's SymbolClass loop has an explicit arm for this: when
+`library.character_by_id(id)` is `None` the class becomes the movie's root
+class, whatever the id — *"most SWFs use id 0 here, but some obfuscated SWFs
+can use other invalid IDs"*. `avm2_display_char_is_defined` is the
+`character_by_id` equivalent, written against the `Avm2MovieTables` field
+list rather than from memory, because missing one table would silently
+promote a real symbol's class to root.
+
+**The blast radius is measurable and small: exactly the 10 corpus AVM2 tests
+with no char-0 binding** (903 have one and take the unchanged first pass).
+Six of the ten bind a *defined* character and are untouched by construction;
+all nine non-target tests still pass. That measurement is the reusable part
+— when a rule keys off a property of the emitted tables, count the corpus
+rows that have it before arguing about risk.
+
+### Where 6b-stretch stopped, and why it is tranche 8
+
+`loader_loadbytes_url` reached **3/12** (from 1/12): the root now reports its
+own `url` and `loaderURL`. The remaining nine lines need the MAIN movie to
+be loadable as a child, and every step of that is tranche-8 shaped:
+
+1. The `avm2_movie_tables` aggregate is emitted **only when `symbol_prefix`
+   is non-empty** (`abc_timeline.cpp:1889`) — i.e. only for children. The
+   main movie has no aggregate to point a self `MovieEntry` at.
+2. **`get_self_load` cannot detect this test.** The design's fix — also scan
+   `RecompiledABC/*.c` for the `"test.swf"` literal — does not fire, because
+   the self-load URL is never a literal: it is `loaderInfo.url`, captured at
+   runtime into `rootInstance.originalURL`. There is no static signal.
+3. Even with both, the movie is loaded **four times, each into a
+   `new ApplicationDomain()`** — which the test's own comment explains is
+   there because otherwise "the code attempts to register multiple Test
+   classes in the same registry". That is per-domain class identity with one
+   global first-match-wins domain: the tranche-8 stop condition, hit exactly
+   where the session brief predicted it would be.
+
+### Final scoreboard — the arc is closed except tranche 8
+
+31 `loader*`/`loaderinfo*` avm2 tests in the corpus as mirrored today.
+**21 pass**; the 10 that do not are fully accounted for:
+
+| Test | State | Disposition |
+|---|---|---|
+| `loader_child_getdefinition` 2/5, `loader_duplicate_class` 2/48, `loader_duplicate_coerce` 1/3, `loader_duplicate_coerce_new_domain` 1/4 | failing | **tranche 8** — nested-child download + per-movie ApplicationDomain |
+| `loader_loadbytes_url` 3/12 | failing | **tranche 8** (§ above) |
+| `loader_try_click_root` 1/16 | failing | needs child-SWF **shape bounds**; the AVM2 raster reads the global `shape_data` arrays by offset, so a child's prefixed copies cannot feed hit-testing either. Also wants sub-pixel stage coords (`248.25`). Deferred with child geometry (§8) |
+| `loader_load` 124/128 | failing | **retired to RUFFLE_VS_FLASH** — Ruffle's hash-ordered property enumeration (`avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` §"AVM2 dynamic-property enumeration order") |
+| `loader_method` 83/85 | failing | corpus-wide uncaught-error tracing — gated on the Stage3D/PixelBender/filters arcs (§7) |
+| `loader_applicationDomain` 0/4 | failing | **won't-do** — needs the real Flex `framework_*.swz` |
+| `loaderinfo_quine` 1/1005 | failing | **won't-do** — grades a byte-for-byte dump of the SWF's own bytes |
+
+Two of the three tests filed **won't-do at triage now pass**:
+`loader_jpegxr` (2/2) and `loader_jpegxr_alpha` (1/1). Sniffing JPEG-XR and
+deliberately *not* attempting a decode was enough — both only ever trace
+`contentType`. The won't-do list was written against "needs a JPEG-XR
+decoder", which was true of the format and false of the tests.
+
+Tranche 7 is **closed at +1 of its revised +1**; the "minus AVM1"
+`mouse_pick_loader_avm1` remains with the dual-VM arc.

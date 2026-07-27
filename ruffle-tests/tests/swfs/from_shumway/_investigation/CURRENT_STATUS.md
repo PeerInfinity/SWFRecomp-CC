@@ -9,9 +9,17 @@ here; this suite is otherwise an AVM1 document. Loader tranche 6a
 (`5a7162e20`) made a Loader-loaded AVM2 child SWF actually execute and took
 this suite **175 → 178 effective**: `as3-loader/LoaderTest` (5/9 →
 **ruffle-matched**), `as3-loader/bug1093712/loader`, and `as3-interfaces`.
-`as3-loader/loaderinfo/loaded-content-properties` improved 36/48 → 43/48
-without passing — what is left is `sandboxBridge`, `uncaughtErrorEvents`,
-`isURLInaccessible` and a `#2098`, none of them Loader timing.
+`as3-loader/loaderinfo/loaded-content-properties` stayed at **36/48** — an
+earlier note here claimed 43/48, which was never in CI (see `loader-arc.md`
+§8). What it is missing is `sandboxBridge`, `uncaughtErrorEvents`,
+`isURLInaccessible`, a `#2098`, and image-content `width`/`height`/
+`frameRate`/`swfVersion` — none of them Loader timing.
+
+**Loader tranches 6b + 6c + 7** (`d44c99991` + `3c0d4817f` + `0dbc5b41e`,
+CI `30301034257`) left this suite **flat at 178 effective** — no gains, no
+regressions, and no line moved in any `as3-loader` test. The arc's remaining
+yield here is behind tranche 8 (nested-child download + per-movie
+`ApplicationDomain`); `loader-arc.md` §9 has the closed-out scoreboard.
 
 ## Latest fixes (2026-05-08, in CI at `e0d15089` — Part C — child-SWF multi-frame advance)
 

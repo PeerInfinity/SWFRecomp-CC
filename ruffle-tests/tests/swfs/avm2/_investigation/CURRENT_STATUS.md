@@ -21,12 +21,13 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
-## Loader / LoaderInfo — tranches 1–6a SHIPPED (2026-07-26/27)
+## Loader / LoaderInfo — tranches 1–7 SHIPPED (2026-07-26/27)
 
 Full plan + per-tranche postmortems:
 **`SWFRecompDocs/plans/loader-arc.md`** (per-test triage of all 35
 `loader*`/`loaderinfo*` tests, 8 ranked tranches; §5 covers 1+2, §6 covers
-3+4, §7 covers 5, §8 covers 6a). The "flash.display.Loader (deferred)" line
+3+4, §7 covers 5, §8 covers 6a, §9 covers 6b/6c/7 and the arc's final
+scoreboard). The "flash.display.Loader (deferred)" line
 in the Stage 8/9 notes below is now out of date.
 
 - **Tranches 1+2** (`8213dd4d6`, CI `30226375815`): **+12** (predicted 8).
@@ -61,10 +62,27 @@ in the Stage 8/9 notes below is now out of date.
   its char ids offset by a `char_id_base`, the harness links them plus the
   decompressed movie image off `MovieEntry`, and `loader_deliver` registers
   the ABC, builds the root, runs its constructor, attaches it and catches it
-  up one frame. **NEXT = 6b**: `loader_loaderurl` (2/6) and
-  `loader_loadbytes_url` (1/12) want "the URL of the movie that ISSUED the
-  load"; `li_get_loader_url`/`loader_absolute_url` hardcode the root SWF's,
-  and 6a's `loader_info` back-pointer on a child root is the hook.
+  up one frame.
+- **Tranches 6b + 6c + 7** (`d44c99991` + `3c0d4817f` + `0dbc5b41e`, CI
+  `30301034257`): **+5** (predicted 3) — `loader_loaderurl`,
+  `loader_error_in_root_ctor`, `loader_noninteractive_try_click_root`, plus
+  riders `mouse_children` (114/192 -> 192/192) and `sandbox_type_inherited`.
+  `loaderURL` and relative-URL resolution became per-issuer (the issuing
+  movie's URL is stamped on the contentLoaderInfo at load time, read back
+  through 6a's `loader_info` back-pointer); a movie ROOT stopped being a
+  valid mouse target, which is a general AVM2 hit-test rule and is where the
+  `mouse_children` rider came from; a URLLoader can now fetch a bundled child
+  SWF (`MovieEntry.raw_bytes` — the file verbatim, which is what Flash hands
+  a binary URLLoader and what makes a later `loadBytes()` size-match work);
+  a loadBytes SWF's root is constructed at the next drain rather than inside
+  the call; and an uncaught error in a child root's constructor traces
+  `Error: …` + `	at Child()` and aborts init/complete.
+- **The arc is closed except tranche 8.** 21 of the 31 `loader*`/
+  `loaderinfo*` tests pass. Five of the ten failures are tranche 8 (nested
+  child download + per-movie `ApplicationDomain`), one needs child-SWF shape
+  bounds, one is a Ruffle-vs-Flash enumeration-order diff, one waits on
+  corpus-wide uncaught-error tracing, and two are won't-dos. Full
+  reconciliation: `loader-arc.md` §9.
 
 Findings worth having here rather than only in the plan:
 
