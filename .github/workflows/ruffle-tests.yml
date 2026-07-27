@@ -168,6 +168,13 @@ jobs:
     if: inputs.single_test != ''
     runs-on: ubuntu-latest
 
+    env:
+      # Same crash capture as the shards (see crash-capture-setup). Free here,
+      # and a single-test dispatch is the cheapest way to re-examine a crash
+      # that IS reproducible.
+      SWF_CORE_CAPTURE_DIR: /tmp/swf-cores
+      SWF_DEBUG_INFO: '1'
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -220,6 +227,9 @@ jobs:
       - name: Install Vulkan + libavcodec
         if: inputs.mode != 'no-graphics'
         uses: ./.github/actions/graphics-apt-deps
+
+      - name: Arm core dumps
+        uses: ./.github/actions/crash-capture-setup
 
       - name: Pin ccache directory
         run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
@@ -281,6 +291,12 @@ jobs:
           path: ruffle-tests/tests/swfs/**/_results/*.json
           retention-days: 30
           if-no-files-found: ignore
+
+      - name: Collect crash captures
+        if: always()
+        uses: ./.github/actions/crash-capture-collect
+        with:
+          artifact-name: crash-cores-single-test
 
   # --- Parallel runner path: shared setup ---
   setup-parallel:
@@ -432,6 +448,14 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      # Crash capture: verify_output.py preserves the core + the exact
+      # test_run + its sources under here whenever a test dies on a signal.
+      # Armed by the crash-capture-setup step below; unset => no-op.
+      SWF_CORE_CAPTURE_DIR: /tmp/swf-cores
+      # -g1 (line tables, no locals) so a captured core backtraces to
+      # file:line. Measured cost: no change in compile time, test_run 1.4 ->
+      # 2.3 MB. -g1 does not affect codegen.
+      SWF_DEBUG_INFO: '1'
       RUN_AVM1: ${{ needs.setup-parallel.outputs.run_avm1 }}
       RUN_AVM2: ${{ needs.setup-parallel.outputs.run_avm2 }}
       RUN_AVMPLUS: ${{ needs.setup-parallel.outputs.run_avmplus }}
@@ -490,6 +514,12 @@ jobs:
       - name: Install Vulkan + libavcodec
         if: inputs.mode != 'no-graphics'
         uses: ./.github/actions/graphics-apt-deps
+
+      # The shard job is the ONLY instrument that has ever reproduced
+      # avm2/edittext_align's intermittent segfault (loader-arc.md §7), and it
+      # used to discard the evidence. Arm cores here, collect at the end.
+      - name: Arm core dumps
+        uses: ./.github/actions/crash-capture-setup
 
       - name: Pin ccache directory
         run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
@@ -740,6 +770,14 @@ jobs:
           name: results-shard-${{ matrix.shard }}-gnash
           path: ruffle-tests/results-shard-gnash_*-${{ matrix.shard }}.json
           retention-days: 7
+
+      # No-op unless a test crashed: one `ls`, then gdb + upload only if a
+      # capture directory exists.
+      - name: Collect crash captures (shard ${{ matrix.shard }})
+        if: always()
+        uses: ./.github/actions/crash-capture-collect
+        with:
+          artifact-name: crash-cores-shard-${{ matrix.shard }}
 
       - name: ccache stats (shard ${{ matrix.shard }})
         if: always()

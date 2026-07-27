@@ -1,0 +1,68 @@
+name: Crash capture — collect
+description: >-
+  If any test crashed under crash-capture-setup, print a gdb backtrace into
+  the job log and upload the cores + binaries + sources as an artifact. On the
+  happy path this is a single `ls` — gdb is installed and the artifact is
+  uploaded only when a capture directory actually exists.
+
+inputs:
+  artifact-name:
+    description: "Artifact name; must be unique within the run (include the shard)."
+    default: crash-cores
+
+runs:
+  using: composite
+  steps:
+    - name: Detect crash captures
+      id: detect
+      shell: bash
+      run: |
+        # verify_output.py writes one directory per crashed test. No matches
+        # (the happy path) => the rest of this action no-ops.
+        shopt -s nullglob
+        dirs=(/tmp/swf-cores/*/)
+        if [ ${#dirs[@]} -eq 0 ]; then
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          echo "No crash captures."
+        else
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "::warning::Crash captures present: ${dirs[*]}"
+          du -sh "${dirs[@]}" || true
+        fi
+
+    - name: Backtrace crashed tests
+      if: steps.detect.outputs.found == 'true'
+      shell: bash
+      run: |
+        # Tolerant throughout: a diagnostic must not turn a run red by itself.
+        sudo apt-get update -qq && sudo apt-get install -y -qq gdb || {
+          echo '::warning::gdb install failed — cores are still uploaded'; exit 0; }
+        for d in /tmp/swf-cores/*/; do
+          echo "==================== $d ===================="
+          python3 -c "import json;m=json.load(open('$d/meta.json'));print('test:',m['test'],' suite:',m['suite'],' rc:',m['returncode'],' sha:',m['git_sha'])" || true
+          core=$(ls "$d"/core* 2>/dev/null | head -1)
+          bin="$d/test_run"
+          if [ -z "$core" ] || [ ! -f "$bin" ]; then
+            echo "  (no core and/or no binary — nothing to backtrace)"
+            continue
+          fi
+          case "$core" in
+            *.gz) gunzip -c "$core" > "$d/core.raw"; core="$d/core.raw" ;;
+          esac
+          gdb -batch -nx \
+              -ex 'set debuginfod enabled off' \
+              -ex 'thread apply all bt' \
+              -ex 'info registers' \
+              "$bin" "$core" 2>&1 | tail -300
+          rm -f "$d/core.raw"
+        done
+        exit 0
+
+    - name: Upload crash captures
+      if: steps.detect.outputs.found == 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: /tmp/swf-cores/*/
+        retention-days: 14
+        if-no-files-found: ignore

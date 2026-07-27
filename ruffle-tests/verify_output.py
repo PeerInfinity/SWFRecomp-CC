@@ -11,12 +11,16 @@ Pipeline for each test:
 
 import argparse
 import atexit
+import glob
 import json
 import os
 import re
+import resource
 import shutil
+import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
@@ -2223,6 +2227,11 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "-w",
         "-std=c17",
         opt_level,
+        # SWF_DEBUG_INFO=1 adds line tables (function names + file:line, no
+        # locals) so a core dump captured by SWF_CORE_CAPTURE_DIR yields a
+        # readable backtrace instead of bare symbol names. -g1 does not change
+        # codegen, so it cannot perturb the crash it is there to explain.
+        *(["-g1"] if os.environ.get("SWF_DEBUG_INFO") == "1" else []),
         *sanitizer_flags,
     ]
 
@@ -2646,6 +2655,153 @@ def extract_error_signature(stderr_text, max_len=200):
     return m.group(1)[:max_len]
 
 
+# --------------------------------------------------------------------------
+# Crash capture — preserve a core dump + the exact binary on SIGSEGV
+# --------------------------------------------------------------------------
+# Intermittent crashes that only reproduce in CI (see
+# SWFRecompDocs/plans/loader-arc.md §7) are unrootable from a status word.
+# When SWF_CORE_CAPTURE_DIR points at a writable directory, every test that
+# dies on a signal leaves behind, in <dir>/<suite>__<test>/:
+#
+#   core.gz          the core dump (whatever the kernel's core_pattern wrote)
+#   test_run         the exact unstripped binary the core belongs to
+#   sources.tar.gz   the generated + runtime .c/.h that built it
+#   meta.json        test, rc, pid, sha, shard, ldd, stderr tail
+#
+# The build dir is a TemporaryDirectory that dies with the test, so the copy
+# has to happen here, at the crash site. CI sets the env var on every shard
+# (.github/workflows/ruffle-tests.yml, "Enable core dumps"); locally it is
+# opt-in. Capture is bounded by SWF_CORE_CAPTURE_MAX (default 3) per process
+# so a shard that starts crashing everywhere cannot fill the runner disk.
+CORE_CAPTURE_DIR = os.environ.get("SWF_CORE_CAPTURE_DIR") or None
+try:
+    CORE_CAPTURE_MAX = max(0, int(os.environ.get("SWF_CORE_CAPTURE_MAX", "3")))
+except ValueError:
+    CORE_CAPTURE_MAX = 3
+
+_core_captures_done = 0
+_last_child_pid = None
+
+
+def enable_core_dumps():
+    """Raise RLIMIT_CORE to its hard limit so children can dump core.
+
+    Linux ships soft=0 by default; the hard limit is normally unlimited, so
+    this needs no privileges. The *pattern* (where the core lands) is a system
+    setting — CI sets it with sysctl; locally you get whatever is configured.
+    """
+    if not CORE_CAPTURE_DIR:
+        return
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_CORE)
+        resource.setrlimit(resource.RLIMIT_CORE, (hard, hard))
+        os.makedirs(CORE_CAPTURE_DIR, exist_ok=True)
+        print(f"[core-capture] enabled: dir={CORE_CAPTURE_DIR} "
+              f"rlimit={soft}->{hard} max={CORE_CAPTURE_MAX}")
+    except Exception as e:
+        print(f"[core-capture] could not raise RLIMIT_CORE: {e}")
+
+
+def _find_core_file(pid, deadline_s=15.0):
+    """Locate the core the kernel wrote for `pid`, waiting for it to appear.
+
+    Covers the two patterns we care about: CI's piped helper, which writes
+    <capture-dir>/core.<comm>.<pid>.gz, and a plain `core`/`core.<pid>` in the
+    cwd (the common local default). The dump is synchronous with process death
+    so it is normally already there, but a piped helper gzipping a multi-GB
+    sparse arena can lag — hence the poll.
+    """
+    pats = []
+    if CORE_CAPTURE_DIR:
+        pats += [os.path.join(CORE_CAPTURE_DIR, f"*{pid}*")]
+    pats += [f"core.{pid}", f"core.{pid}.*", "core", "core.gz"]
+    end = time.monotonic() + deadline_s
+    while True:
+        for pat in pats:
+            hits = sorted(h for h in glob.glob(pat) if os.path.isfile(h))
+            for h in hits:
+                # Wait out a core still being written: size must hold steady.
+                try:
+                    s1 = os.path.getsize(h)
+                    time.sleep(0.3)
+                    if os.path.getsize(h) == s1:
+                        return h
+                except OSError:
+                    continue
+        if time.monotonic() >= end:
+            return None
+        time.sleep(0.5)
+
+
+def capture_crash_artifacts(test_name, suite_tag, build_dir, pid, rc,
+                            stderr_text, entry=None):
+    """Preserve core + binary + sources for one crashed test. Best-effort."""
+    global _core_captures_done
+    if not CORE_CAPTURE_DIR:
+        return None
+    # Count directories already on disk, not just this process's captures: a
+    # CI shard runs ~10 verify_output.py invocations (one per suite), and the
+    # disk budget is shared across all of them.
+    try:
+        existing = len([p for p in Path(CORE_CAPTURE_DIR).iterdir() if p.is_dir()])
+    except OSError:
+        existing = _core_captures_done
+    if max(existing, _core_captures_done) >= CORE_CAPTURE_MAX:
+        print(f"[core-capture] SKIPPED {test_name}: {existing} capture(s) "
+              f"already present (SWF_CORE_CAPTURE_MAX={CORE_CAPTURE_MAX})")
+        return None
+    _core_captures_done += 1
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{suite_tag}__{test_name}")
+    dest = Path(CORE_CAPTURE_DIR) / safe
+    try:
+        dest.mkdir(parents=True, exist_ok=True)
+        core = _find_core_file(pid) if pid else None
+        if core:
+            shutil.move(core, str(dest / os.path.basename(core)))
+        binary = Path(build_dir) / "test_run"
+        ldd = ""
+        if binary.exists():
+            shutil.copy2(binary, dest / "test_run")
+            try:
+                ldd = subprocess.run(["ldd", str(binary)], capture_output=True,
+                                     text=True, timeout=30).stdout
+            except Exception:
+                pass
+        with tarfile.open(dest / "sources.tar.gz", "w:gz") as tar:
+            for src in sorted(Path(build_dir).glob("*.[ch]")):
+                tar.add(src, arcname=src.name)
+        meta = {
+            "test": test_name,
+            "suite": suite_tag,
+            "pid": pid,
+            "returncode": rc,
+            "core_file": os.path.basename(core) if core else None,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "host": socket.gethostname(),
+            "git_sha": os.environ.get("GITHUB_SHA") or _git_head_sha(),
+            "github_run_id": os.environ.get("GITHUB_RUN_ID"),
+            "github_job": os.environ.get("GITHUB_JOB"),
+            "ldd": ldd,
+            "stderr_tail": (stderr_text or "")[-8000:],
+            "entry": entry or {},
+        }
+        (dest / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
+        print(f"[core-capture] {test_name}: core={meta['core_file']} -> {dest}")
+        return str(dest)
+    except Exception as e:
+        print(f"[core-capture] FAILED for {test_name}: {e}")
+        return None
+
+
+def _git_head_sha():
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(PROJECT_ROOT),
+                              capture_output=True, text=True,
+                              timeout=10).stdout.strip()
+    except Exception:
+        return None
+
+
 def run_binary(build_dir, event_file=None, extra_env=None):
     """Run the compiled binary and capture output.
 
@@ -2670,6 +2826,8 @@ def run_binary(build_dir, event_file=None, extra_env=None):
         stderr=subprocess.PIPE,
         env=env,
     )
+    global _last_child_pid
+    _last_child_pid = proc.pid
     runaway = threading.Event()
 
     def _drain(stream, chunks, bound):
@@ -3089,6 +3247,7 @@ def _fmt_phases(pt):
 def main():
     global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
     args = parse_args()
+    enable_core_dumps()
 
     # The graphics-headless-legacy mode (swf_headless.c + HEADLESS_GRAPHICS)
     # was deleted. Its --headless alias errors rather than remapping to
@@ -3473,6 +3632,17 @@ def main():
                 fail_details[name] = f"{crash_status} ({crash_detail})"
                 entry.update(status=crash_status, detail=crash_detail,
                              duration=round(time.monotonic() - test_start, 2))
+                # Died on a signal (SIGSEGV, SIGABRT, ...) — preserve the core
+                # and the binary before this test's build dir is torn down.
+                # No-op unless SWF_CORE_CAPTURE_DIR is set.
+                if CORE_CAPTURE_DIR and (rc < 0 or rc >= 128):
+                    try:
+                        suite_tag = TESTS_DIR.name
+                    except Exception:
+                        suite_tag = "suite"
+                    capture_crash_artifacts(name, suite_tag, build_dir,
+                                            _last_child_pid, rc, run_stderr,
+                                            entry)
                 # Still compare output even for crashing tests
                 if raw_output and raw_output.strip():
                     crash_actual = filter_output(raw_output)

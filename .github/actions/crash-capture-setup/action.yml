@@ -1,0 +1,48 @@
+name: Crash capture — arm core dumps
+description: >-
+  Point kernel.core_pattern at a gzip helper so any test binary that dies on a
+  signal leaves a core in /tmp/swf-cores. Pair with crash-capture-collect at
+  the end of the job, and set SWF_CORE_CAPTURE_DIR=/tmp/swf-cores on the job
+  so verify_output.py preserves the matching binary + sources.
+
+  Why this exists: avm2/edittext_align has segfaulted intermittently in
+  full-shard graphics runs only — 0/70 local repros, 0/17 single-test CI
+  dispatches, ASan-clean — so the shard job is the only instrument that has
+  ever reproduced it, and it was throwing the evidence away. See
+  SWFRecompDocs/plans/loader-arc.md §7. This is a standing instrument for any
+  future intermittent, not a one-off. Cost on the happy path: three lines.
+
+runs:
+  using: composite
+  steps:
+    - name: Arm core dumps
+      shell: bash
+      # Deliberately no `set -e`, and every command is tolerant: an
+      # instrument must never be able to fail a test run. Composite-action
+      # steps do not support continue-on-error, so the tolerance lives here.
+      run: |
+        # World-writable and deliberately NOT sticky: the kernel's dump helper
+        # runs as root, so the files it writes are root-owned, and under a
+        # sticky bit the runner user could not rename them into the per-test
+        # subdirectory that verify_output.py creates.
+        sudo mkdir -p /tmp/swf-cores || mkdir -p /tmp/swf-cores
+        sudo chmod 0777 /tmp/swf-cores || true
+        # Pipe the dump through gzip instead of writing a plain core file.
+        # The native heap reserves 4 GB of address space (heap.c
+        # DEFAULT_FULL_HEAP_SIZE), so a plain core is a 4 GB *apparent-size*
+        # sparse file — cheap on disk but ruinous for anything that reads it
+        # end to end (a cross-filesystem move, artifact zipping). gzip -1
+        # turns those untouched pages into a few MB.
+        sudo tee /usr/local/bin/swf-core-dump.sh >/dev/null <<'HELPER'
+        #!/bin/sh
+        # argv: %e (comm) %p (pid); the core arrives on stdin.
+        exec /bin/gzip -1 > "/tmp/swf-cores/core.$1.$2.gz"
+        HELPER
+        sudo chmod 0755 /usr/local/bin/swf-core-dump.sh || true
+        sudo sysctl -w kernel.core_pattern='|/usr/local/bin/swf-core-dump.sh %e %p' \
+          || echo "::warning::could not set kernel.core_pattern — cores may be lost"
+        # RLIMIT_CORE is raised by verify_output.py's enable_core_dumps() in
+        # the process that spawns the test binaries — a `ulimit -c` here would
+        # die with this step's shell.
+        echo "core_pattern=$(cat /proc/sys/kernel/core_pattern)"
+        exit 0
