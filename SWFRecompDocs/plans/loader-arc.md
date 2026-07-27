@@ -707,9 +707,10 @@ are recoverable verbatim with `git revert d1c307c51`.
 
 ## 8. Postmortem — tranche 6a (AVM2 child-SWF execution)
 
-**Predicted +3, delivered +9 (CI `30290049993`, graphics/full,
-3839 → 3848 effective over the 4419-test intersection with `f6de1a7cf`,
-zero pass→fail regressions).** The prediction was exactly right on the named
+**Predicted +3, delivered +8 (CI `30293055978`, graphics/full,
+3839 → 3847 effective over the 4419-test intersection with `f6de1a7cf`,
+zero pass→fail regressions, zero `compile_fail`/`timeout`, `segfault`
+1 → 0).** The prediction was exactly right on the named
 targets — the first time in this arc — because it came from a dedicated
 design pass (`loader-arc-tranche6-design.md`) with file:line anchors rather
 than from reading diffs. The other six are riders nobody scoped.
@@ -724,7 +725,7 @@ than from reading diffs. The other six are riders nobody scoped.
 | `as3-loader/bug1093712/loader` | from_shumway | output_mismatch | no |
 | `as3-interfaces` | from_shumway | output_mismatch | no |
 | `edittext_align` | avm2 | segfault | the intermittent crash of §7, not a fix |
-| `simple_shapes/heavy_tesselation` | visual | recomp_fail | unrelated; a recomp timeout that did not recur |
+| `simple_shapes/heavy_tesselation` | visual | recomp_fail | **flake, not a gain** — passed in `30290049993`, back to `recomp_fail` in `30293055978`. Counted in that run's +9 and excluded here |
 
 `as3-loader/loaderinfo/loaded-content-properties` went 36/48 → 43/48 without
 passing; the remainder is `sandboxBridge`, `uncaughtErrorEvents`,
@@ -745,7 +746,9 @@ harness only compiles when the PARENT has its own `RecompiledABC` (`is_avm2`,
 dual-VM arc and explicitly out of scope) or a parent whose ABC deliberately
 fails to emit (the patched `verify_method_info_*` SWFs) hits an
 undefined-symbol wall at LINK, which the harness scores as `compile_fail`.
-Gating the copy on `is_avm2` restores all three.
+Gating the copy on `is_avm2` restores all three — confirmed by
+`30293055978`, whose histogram has no `compile_fail` bucket at all and no
+"other status moves" in either direction.
 
 Worth keeping: **a recompiler/harness change's blast radius shows up as
 `compile_fail`, and it is a LINK failure as often as a compile one.** The
