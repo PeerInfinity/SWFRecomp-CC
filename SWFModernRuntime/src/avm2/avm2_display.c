@@ -4115,6 +4115,15 @@ static void loader_drop_content(Avm2Context* ctx, Avm2Object* self,
 	loaderinfo_reset_stream(loaderinfo_ext_of(ctx, ext->content_loader_info));
 }
 
+// Read `url` off a URLRequest argument (NULL when absent or not a request).
+static const Avm2String* request_url(Avm2Context* ctx, Avm2Value v)
+{
+	if (v.kind != AVM2_VALUE_OBJECT) return NULL;
+	int found = 0;
+	Avm2Value uv = avm2_get_public_property(ctx, v, "url", 3, &found);
+	return (found && uv.kind == AVM2_VALUE_STRING) ? uv.u.str : NULL;
+}
+
 // Read `applicationDomain` off a LoaderContext argument (null when absent).
 static Avm2Object* loader_context_domain(Avm2Context* ctx, Avm2Value v)
 {
@@ -4298,13 +4307,17 @@ static void avm2_loader_run_exit_frame(Avm2Context* ctx)
 //     loader_bitmap_transparency needs: three sequential loads, each begun from
 //     the previous one's `complete` handler, all finishing inside its two ticks.
 #define AVM2_MAX_LOAD_CHAIN 16
+static void avm2_url_loader_run_pending(Avm2Context* ctx);
+static uint32_t g_pending_url_load_count;
+
 static void avm2_loader_drain(Avm2Context* ctx)
 {
 	avm2_loader_run_exit_frame(ctx);
-	for (uint32_t round = 0; round < AVM2_MAX_LOAD_CHAIN
-	                          && g_pending_load_count != 0; round++)
+	for (uint32_t round = 0; round < AVM2_MAX_LOAD_CHAIN; round++)
 	{
+		if (g_pending_load_count == 0 && g_pending_url_load_count == 0) break;
 		avm2_loader_run_pending(ctx);
+		avm2_url_loader_run_pending(ctx);
 	}
 }
 
@@ -4356,13 +4369,8 @@ static Avm2Value loader_load(Avm2Activation* act)
 	Avm2Object* cli = loader_ensure_cli(ctx, ext, self);
 	if (cli == NULL) return avm2_undefined();
 
-	const Avm2String* url = NULL;
-	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
-	{
-		int found = 0;
-		Avm2Value uv = avm2_get_public_property(ctx, act->args[0], "url", 3, &found);
-		if (found && uv.kind == AVM2_VALUE_STRING) url = uv.u.str;
-	}
+	const Avm2String* url = request_url(ctx, act->argc > 0 ? act->args[0]
+	                                                      : avm2_null());
 
 	if (url != NULL && avm2_str_contains(url, "AGI.swf")
 	    && g_agi_shell_class != NULL)
@@ -4449,6 +4457,241 @@ static Avm2Value loader_unload(Avm2Activation* act)
 	Avm2Object* self = this_obj(act);
 	loader_drop_content(ctx, self, loader_ext_of(ctx, self));
 	return avm2_undefined();
+}
+
+// --- flash.net.URLLoader ----------------------------------------------------
+//
+// Ruffle load_data_into_url_loader (core/src/loader.rs). It lives beside the
+// Loader pipeline rather than with the rest of flash.net in avm2_globals.c
+// because it shares this file's URL resolution, event dispatch and load drain;
+// the class itself is still created over there and wired through
+// avm2_display_wire_url_loader.
+//
+// On success the order is `open`, then bytesLoaded/bytesTotal/data, then
+// progress(len, len), httpStatus, complete — Ruffle fires `open` after the
+// fetch resolves precisely so that a file missing on disk fires no `open` at
+// all. On failure `data` is CLEARED to the empty value for the current
+// dataFormat (Flash does this, per the comment in Ruffle's error arm) and
+// httpStatus precedes an ioError carrying "Error #2032: Stream Error".
+
+typedef struct Avm2UrlLoaderExt
+{
+	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+	Avm2Value data;                     // undefined until the first delivery
+	const Avm2String* data_format;      // NULL == "text"
+	uint32_t bytes_loaded;
+	uint32_t bytes_total;
+} Avm2UrlLoaderExt;
+
+static Avm2Class* g_url_loader_class;
+
+static Avm2UrlLoaderExt* url_loader_ext_of(Avm2Object* o)
+{
+	if (o == NULL || o->cls == NULL || g_url_loader_class == NULL
+	    || !class_is_a(o->cls, g_url_loader_class))
+		return NULL;
+	return (Avm2UrlLoaderExt*) o->native_ext;
+}
+
+static int ul_format_is(const Avm2UrlLoaderExt* ext, const char* name)
+{
+	if (ext->data_format == NULL) return strcmp(name, "text") == 0;
+	size_t n = strlen(name);
+	return (size_t) ext->data_format->len == n
+	       && memcmp(ext->data_format->utf8, name, n) == 0;
+}
+
+// A queued URLLoader fetch. `found` distinguishes "bundled asset, here are the
+// bytes" from "no such file", which is the whole difference between the success
+// and #2032 paths.
+typedef struct Avm2PendingUrlLoad
+{
+	Avm2Object* loader;
+	const uint8_t* data;
+	uint32_t len;
+	uint8_t found;
+} Avm2PendingUrlLoad;
+
+#define AVM2_MAX_PENDING_URL_LOADS 32
+static Avm2PendingUrlLoad g_pending_url_loads[AVM2_MAX_PENDING_URL_LOADS];
+
+// Ruffle's set_data. `body`/`len` may be empty, which is exactly what the error
+// arm passes in to clear `data`.
+static void ul_set_data(Avm2Context* ctx, Avm2Object* self,
+                        Avm2UrlLoaderExt* ext, const uint8_t* body, uint32_t len)
+{
+	ext->bytes_loaded = len;
+	ext->bytes_total = len;
+	if (ul_format_is(ext, "binary"))
+	{
+		Avm2Value v = avm2_class_construct(ctx, ctx->builtins.bytearray_class,
+		                                   NULL, 0);
+		Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(v);
+		if (ba != NULL && len != 0)
+		{
+			avm2_bytearray_set_length_public(ctx, ba, len);
+			if (ba->bytes != NULL && ba->len == len) memcpy(ba->bytes, body, len);
+			ba->position = 0;   // the script reads from the start
+		}
+		ext->data = v;
+		return;
+	}
+	// "text" (and, for now, "variables" — no test exercises URLVariables as a
+	// URLLoader *response*, only as a request body, so parsing it would be
+	// untested code). Ruffle strips a leading BOM before handing the string on.
+	const uint8_t* p = body;
+	if (len >= 3 && p != NULL && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF)
+	{
+		p += 3;
+		len -= 3;
+	}
+	ext->data = avm2_string(avm2_string_new(ctx, (const char*) (p != NULL ? p : ""),
+	                                       len));
+	(void) self;
+}
+
+static void ul_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl)
+{
+	Avm2Object* self = pl->loader;
+	Avm2UrlLoaderExt* ext = url_loader_ext_of(self);
+	if (ext == NULL) return;
+
+	if (!pl->found)
+	{
+		ul_set_data(ctx, self, ext, NULL, 0);
+		Avm2Object* ev = avm2_http_status_event_new(
+			ctx, avm2_string_from_literal(ctx, "httpStatus"), 0, 0);
+		if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+		ev = avm2_io_error_event_new(
+			ctx, avm2_string_from_literal(ctx, "ioError"),
+			avm2_string_from_literal(ctx, "Error #2032: Stream Error"), 2032);
+		if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+		return;
+	}
+
+	dispatch_simple_event(ctx, self, "open", 0);
+	ul_set_data(ctx, self, ext, pl->data, pl->len);
+	Avm2Object* ev = avm2_progress_event_new(
+		ctx, avm2_string_from_literal(ctx, "progress"), (double) pl->len,
+		(double) pl->len);
+	if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+	ev = avm2_http_status_event_new(ctx,
+	                               avm2_string_from_literal(ctx, "httpStatus"),
+	                               0, 0);
+	if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+	dispatch_simple_event(ctx, self, "complete", 0);
+}
+
+static void avm2_url_loader_run_pending(Avm2Context* ctx)
+{
+	uint32_t n = g_pending_url_load_count;
+	if (n == 0) return;
+	Avm2PendingUrlLoad batch[AVM2_MAX_PENDING_URL_LOADS];
+	memcpy(batch, g_pending_url_loads, n * sizeof(Avm2PendingUrlLoad));
+	g_pending_url_load_count = 0;
+	for (uint32_t i = 0; i < n; i++) ul_deliver(ctx, &batch[i]);
+}
+
+// Queue a fetch. Like Loader.load it never resolves inside the calling frame.
+static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request)
+{
+	if (url_loader_ext_of(self) == NULL) return;
+	const Avm2String* url = request_url(ctx, request);
+	if (url == NULL) return;
+	Avm2PendingUrlLoad pl;
+	memset(&pl, 0, sizeof(pl));
+	pl.loader = self;
+	Avm2PendingLoad probe;
+	memset(&probe, 0, sizeof(probe));
+	// Unlike Loader.load, a URL that resolves to nothing is an ERROR here
+	// (#2032) rather than a silent no-op: url_loader asks for missingFile.bin
+	// on purpose.
+	if (loader_resolve_url(url, &probe) && probe.data != NULL)
+	{
+		pl.data = probe.data;
+		pl.len = probe.len;
+		pl.found = 1;
+	}
+	if (g_pending_url_load_count < AVM2_MAX_PENDING_URL_LOADS)
+		g_pending_url_loads[g_pending_url_load_count++] = pl;
+}
+
+static Avm2Value url_loader_init(Avm2Activation* act)
+{
+	// `new URLLoader(request)` starts the load immediately (URLLoader.as).
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		ul_start_load(act->ctx, this_obj(act), act->args[0]);
+	return avm2_undefined();
+}
+
+static Avm2Value url_loader_load(Avm2Activation* act)
+{
+	ul_start_load(act->ctx, this_obj(act),
+	              act->argc > 0 ? act->args[0] : avm2_null());
+	return avm2_undefined();
+}
+
+static Avm2Value ul_get_data(Avm2Activation* act)
+{
+	Avm2UrlLoaderExt* ext = url_loader_ext_of(this_obj(act));
+	return ext != NULL ? ext->data : avm2_undefined();
+}
+
+static Avm2Value ul_set_data_prop(Avm2Activation* act)
+{
+	Avm2UrlLoaderExt* ext = url_loader_ext_of(this_obj(act));
+	if (ext != NULL && act->argc > 0) ext->data = act->args[0];
+	return avm2_undefined();
+}
+
+static Avm2Value ul_get_data_format(Avm2Activation* act)
+{
+	Avm2UrlLoaderExt* ext = url_loader_ext_of(this_obj(act));
+	if (ext != NULL && ext->data_format != NULL)
+		return avm2_string(ext->data_format);
+	return avm2_string(avm2_string_from_literal(act->ctx, "text"));
+}
+
+static Avm2Value ul_set_data_format(Avm2Activation* act)
+{
+	Avm2UrlLoaderExt* ext = url_loader_ext_of(this_obj(act));
+	if (ext != NULL && act->argc > 0)
+		ext->data_format = avm2_coerce_to_string(act->ctx, act->args[0]);
+	return avm2_undefined();
+}
+
+static Avm2Value ul_get_bytes_loaded(Avm2Activation* act)
+{
+	Avm2UrlLoaderExt* ext = url_loader_ext_of(this_obj(act));
+	return avm2_number(ext != NULL ? (double) ext->bytes_loaded : 0);
+}
+
+static Avm2Value ul_get_bytes_total(Avm2Activation* act)
+{
+	Avm2UrlLoaderExt* ext = url_loader_ext_of(this_obj(act));
+	return avm2_number(ext != NULL ? (double) ext->bytes_total : 0);
+}
+
+static Avm2Value ul_close(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul)
+{
+	if (ul == NULL) return;
+	g_url_loader_class = ul;
+	ul->native_ext_size = sizeof(Avm2UrlLoaderExt);
+	ul->instance_init.fn = url_loader_init;
+	ul->instance_init.debug_name = "URLLoader";
+	avm2_builtin_add_method(ctx, ul, "load", url_loader_load);
+	avm2_builtin_add_method(ctx, ul, "close", ul_close);
+	avm2_builtin_add_getset(ctx, ul, "data", ul_get_data, ul_set_data_prop);
+	avm2_builtin_add_getset(ctx, ul, "dataFormat", ul_get_data_format,
+	                        ul_set_data_format);
+	avm2_builtin_add_getter(ctx, ul, "bytesLoaded", ul_get_bytes_loaded);
+	avm2_builtin_add_getter(ctx, ul, "bytesTotal", ul_get_bytes_total);
 }
 
 // --- InteractiveObject ---

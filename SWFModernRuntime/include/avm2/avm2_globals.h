@@ -514,12 +514,15 @@ Avm2Object* avm2_focus_event_new(Avm2Context* ctx, const Avm2String* type,
 Avm2Object* avm2_text_event_new(Avm2Context* ctx, const Avm2String* type,
                                 int bubbles, int cancelable,
                                 const Avm2String* text);
-// flash.events.ProgressEvent / IOErrorEvent, dispatched from C by the Loader
-// pipeline (avm2_display.c). Both are non-bubbling and non-cancelable.
+// flash.events.ProgressEvent / IOErrorEvent / HTTPStatusEvent, dispatched from
+// C by the Loader and URLLoader pipelines (avm2_display.c). All are
+// non-bubbling and non-cancelable.
 Avm2Object* avm2_progress_event_new(Avm2Context* ctx, const Avm2String* type,
                                     double bytes_loaded, double bytes_total);
 Avm2Object* avm2_io_error_event_new(Avm2Context* ctx, const Avm2String* type,
                                     const Avm2String* text, int32_t error_id);
+Avm2Object* avm2_http_status_event_new(Avm2Context* ctx, const Avm2String* type,
+                                       int32_t status, int redirected);
 // Was the event's default prevented (cancelled)? NULL-safe.
 int avm2_event_is_cancelled(Avm2Object* event);
 // Display parent hook used for ancestor walks; reads the display ext.
@@ -603,6 +606,10 @@ Avm2Object* avm2_bitmap_from_image_bytes(Avm2Context* ctx, const uint8_t* data,
 
 // Display module (avm2_display.c — Stage-5 tranche 2+).
 void avm2_register_display(Avm2Context* ctx);
+// Wire flash.net.URLLoader's ctor/methods/accessors. The class shell is created
+// with the rest of flash.net in avm2_globals.c, but its load pipeline shares
+// Loader's URL resolution, event dispatch and per-tick drain in avm2_display.c.
+void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
 // NULL when obj is not a DisplayObject descendant.
 Avm2DisplayObjectExt* avm2_display_ext_of(Avm2Context* ctx, Avm2Object* obj);
 // T4 Part B — CPU-composite a node's recorded flash.display.Graphics geometry

@@ -1276,6 +1276,22 @@ static Avm2Value hse_set_redirected(Avm2Activation* act)
 static Avm2Value hse_get_response_url(Avm2Activation* act)
 { Avm2EventExt* e = this_event(act); return (e && e->response_url) ? avm2_string(e->response_url) : avm2_null(); }
 
+// HTTPStatusEvent.as toString() — url_loader traces the whole event, so the
+// three extra fields must be there or it prints Event's four alone.
+static Avm2Value hse_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"HTTPStatusEvent", "type", "bubbles", "cancelable", "eventPhase",
+		"status", "redirected", "responseURL"
+	};
+	Avm2Value args[8];
+	for (int i = 0; i < 8; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 8);
+}
+
 static Avm2Value status_event_init(Avm2Activation* act)
 {
 	Avm2EventExt* ext = this_event(act);
@@ -1302,6 +1318,7 @@ static void sconst(Avm2Context* ctx, Avm2Class* cls, const char* n, const char* 
 // avm2_io_error_event_new), which the Loader pipeline dispatches from.
 static Avm2Class* g_progress_event_class;
 static Avm2Class* g_io_error_event_class;
+static Avm2Class* g_http_status_event_class;
 
 static void register_net_events(Avm2Context* ctx)
 {
@@ -1362,6 +1379,8 @@ static void register_net_events(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, hse, "status", hse_get_status);
 	avm2_builtin_add_getset(ctx, hse, "redirected", hse_get_redirected, hse_set_redirected);
 	avm2_builtin_add_getter(ctx, hse, "responseURL", hse_get_response_url);
+	event_override_method(ctx, hse, "toString", hse_to_string);
+	g_http_status_event_class = hse;
 	sconst(ctx, hse, "HTTP_STATUS", "httpStatus");
 	sconst(ctx, hse, "HTTP_RESPONSE_STATUS", "httpResponseStatus");
 
@@ -1403,6 +1422,23 @@ Avm2Object* avm2_io_error_event_new(Avm2Context* ctx, const Avm2String* type,
 	args[4] = avm2_integer(error_id);
 	Avm2Value v = avm2_class_construct(ctx, g_io_error_event_class, args, 5);
 	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+}
+
+Avm2Object* avm2_http_status_event_new(Avm2Context* ctx, const Avm2String* type,
+                                      int32_t status, int redirected)
+{
+	if (g_http_status_event_class == NULL) return NULL;
+	Avm2Value args[4];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(0);
+	args[2] = avm2_bool(0);
+	args[3] = avm2_integer(status);
+	Avm2Value v = avm2_class_construct(ctx, g_http_status_event_class, args, 4);
+	if (v.kind != AVM2_VALUE_OBJECT) return NULL;
+	// `redirected` is not a ctor parameter (Ruffle sets it after construction).
+	Avm2EventExt* ext = (Avm2EventExt*) v.u.obj->native_ext;
+	if (ext != NULL) ext->redirected = redirected ? 1 : 0;
+	return v.u.obj;
 }
 
 static void register_input_events(Avm2Context* ctx)

@@ -1916,7 +1916,6 @@ static Avm2Value net_c_vars(Avm2Activation* a){return net_str_const(a,"variables
 static Avm2Value net_noop(Avm2Activation* act){ (void)act; return avm2_undefined(); }
 static Avm2Value net_get_zero(Avm2Activation* act){ (void)act; return avm2_integer(0); }
 static Avm2Value net_get_null(Avm2Activation* act){ (void)act; return avm2_null(); }
-static Avm2Value net_get_text_fmt(Avm2Activation* act){ return net_str_const(act, "text"); }
 static Avm2Value net_get_true(Avm2Activation* act){ (void)act; return avm2_bool(1); }
 
 // flash.net.LocalConnection.domain — the domain of the SWF's own URL, matching
@@ -2042,16 +2041,12 @@ static void register_net(Avm2Context* ctx)
 	// flash.net.URLVariables — dynamic bag of properties (extends Object).
 	(void) avm2_builtin_class(ctx, "flash.net", "URLVariables", b->object_class);
 
-	// flash.net.URLLoader (extends EventDispatcher). load() is a no-op: there
-	// is no network layer, so no COMPLETE/IO_ERROR is dispatched.
+	// flash.net.URLLoader (extends EventDispatcher). The load pipeline reads
+	// bundled sibling assets and lives with Loader's in avm2_display.c, which
+	// owns the URL resolution, event dispatch and per-tick load drain.
 	Avm2Class* ul = avm2_builtin_class(ctx, "flash.net", "URLLoader",
 	                                   b->event_dispatcher_class);
-	avm2_builtin_add_method(ctx, ul, "load", net_noop);
-	avm2_builtin_add_method(ctx, ul, "close", net_noop);
-	avm2_builtin_add_getset(ctx, ul, "data", net_get_null, net_noop);
-	avm2_builtin_add_getset(ctx, ul, "dataFormat", net_get_text_fmt, net_noop);
-	avm2_builtin_add_getset(ctx, ul, "bytesLoaded", net_get_zero, NULL);
-	avm2_builtin_add_getset(ctx, ul, "bytesTotal", net_get_zero, NULL);
+	avm2_display_wire_url_loader(ctx, ul);
 
 	// flash.net.LocalConnection (extends EventDispatcher). There is no IPC
 	// layer, so connect/send/close are no-ops and no message is ever
