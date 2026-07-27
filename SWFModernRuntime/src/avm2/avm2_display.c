@@ -1028,19 +1028,32 @@ static Avm2Object* display_alloc_instance(Avm2Context* ctx, Avm2Class* cls)
 
 static uint64_t g_gp_ctors_run_fwd;
 
-static void display_run_constructor(Avm2Context* ctx, Avm2Object* obj)
+// Returns 1 when the constructor threw, writing the thrown value to *exc. The
+// catch-all frame swallows it either way; only the child-SWF root cares which
+// happened (loader_error_in_root_ctor).
+static int display_run_constructor_catching(Avm2Context* ctx, Avm2Object* obj,
+                                            Avm2Value* exc)
 {
 	g_gp_ctors_run_fwd++;
 	Avm2Class* cls = obj->cls;
 	Avm2TryFrame top;
 	avm2_try_push_catch_all(ctx, &top);
+	volatile int threw = 1;   // survives the longjmp
 	if (setjmp(top.jb) == 0)
 	{
 		avm2_call_method_ref(ctx, &cls->instance_init, cls,
 		                     cls->iscope != NULL ? cls->iscope : cls->scope,
 		                     avm2_object_value(obj), NULL, 0);
+		threw = 0;
 	}
+	if (threw && exc != NULL) *exc = top.exc;
 	avm2_try_pop_frame(&top);
+	return threw;
+}
+
+static void display_run_constructor(Avm2Context* ctx, Avm2Object* obj)
+{
+	display_run_constructor_catching(ctx, obj, NULL);
 }
 
 static void enter_frame_obj(Avm2Context* ctx, Avm2Object* obj);
@@ -3618,6 +3631,10 @@ typedef struct Avm2LoaderInfoExt
 	const Avm2String* url;              // stream movie URL (LOADER only)
 	const Avm2String* loader_url;       // URL of the movie that ISSUED the load
 	                                    // (NULL = the root SWF's own URL)
+	// A loadBytes SWF whose root is constructed at the next drain rather than
+	// inside the loadBytes() call (see loader_deliver). Static storage, so the
+	// conservative native_ext scan can only over-retain it.
+	const Avm2MovieTables* pending_boot;
 	const uint8_t* bytes;               // loaded source bytes (static storage)
 	uint32_t bytes_len;
 	uint32_t bytes_loaded;
@@ -4160,6 +4177,10 @@ typedef struct Avm2PendingLoad
 	const Avm2MovieTables* tables;  // child's emitted table set (NULL = none)
 	const uint8_t* swf_bytes;
 	uint32_t swf_bytes_len;
+	// The file as it sits on disk (see MovieEntry.raw_bytes). Only a URLLoader
+	// reads this; the Loader pipeline works off `tables` + `swf_bytes`.
+	const uint8_t* raw_bytes;
+	uint32_t raw_bytes_len;
 	uint8_t content_type;
 	uint8_t data_static;       // `data` is generated-static (safe to alias)
 } Avm2PendingLoad;
@@ -4202,6 +4223,7 @@ static void loaderinfo_reset_stream(Avm2LoaderInfoExt* lx)
 	lx->app_domain = NULL;
 	lx->url = NULL;
 	lx->loader_url = NULL;
+	lx->pending_boot = NULL;
 	lx->bytes = NULL;
 	lx->bytes_len = 0;
 	lx->bytes_loaded = 0;
@@ -4541,8 +4563,21 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 
 	// Constructed here, not by the next tick's construct walk: the ctor must
 	// observe a null stage and a null parent.
+	//
+	// An uncaught error in the ROOT constructor aborts the load outright: the
+	// debug player traces it, the content never becomes the Loader's child, and
+	// neither `init` nor `complete` ever fires (loader_error_in_root_ctor).
+	// The trace is LOCAL to this call site — the corpus-wide uncaught-error
+	// tracing of `d1c307c51` stays reverted.
 	cext->constructed = 1;
-	display_run_constructor(ctx, child);
+	Avm2Value exc = avm2_undefined();
+	if (display_run_constructor_catching(ctx, child, &exc))
+	{
+		const Avm2String* s = avm2_error_stack_string(ctx, exc);
+		printf("%.*s\n", (int) s->len, s->utf8);
+		lx->errored = 1;   // drops it from the active list (run_exit_frame)
+		return;
+	}
 
 	lx->content = child;
 	// content/url become readable at ATTACH, not at init: the child's own
@@ -4669,9 +4704,19 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 	lx->url = pl->url;
 	// The child SWF's root: constructed and attached after the final progress
 	// event, before init/complete (which the active list still defers a tick).
+	//
+	// A fetch delivers from inside the drain, past this tick's active-list
+	// flush, so its boot has to happen here to stay ahead of init/complete
+	// (loader_events). loadBytes runs in the middle of script execution
+	// instead, and Flash does NOT construct the root there: the statement
+	// after `loadBytes()` still reads `contentLoaderInfo.content` as null
+	// (loader_error_in_root_ctor). Hand it to the next drain, which boots it
+	// immediately before firing init/complete — the same position relative to
+	// the surrounding events that loader_loadbytes_events pins.
 	if (pl->content_type == LI_CT_SWF && pl->tables != NULL)
 	{
-		loader_boot_child_swf(ctx, li, lx, pl->tables);
+		if (from_bytes) lx->pending_boot = pl->tables;
+		else loader_boot_child_swf(ctx, li, lx, pl->tables);
 	}
 	// Third `bytes` state: the real source bytes, now that content is loaded.
 	// Only bundled assets are kept — their storage is generated-static and
@@ -4746,6 +4791,16 @@ static void avm2_loader_run_exit_frame(Avm2Context* ctx)
 	{
 		Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, batch[i]);
 		if (lx == NULL || lx->errored) continue;
+		// A loadBytes SWF's root is constructed here, immediately before its
+		// init/complete (loader_deliver). A throw out of that constructor sets
+		// `errored`, which skips both and drops the entry.
+		if (lx->pending_boot != NULL)
+		{
+			const Avm2MovieTables* t = lx->pending_boot;
+			lx->pending_boot = NULL;
+			loader_boot_child_swf(ctx, batch[i], lx, t);
+			if (lx->errored) continue;
+		}
 		if (lx->loaded) loaderinfo_fire_init_and_complete(ctx, batch[i]);
 		else loader_track_active(batch[i]);
 	}
@@ -4817,6 +4872,8 @@ static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
 		out->tables = (const Avm2MovieTables*) m->avm2_tables;
 		out->swf_bytes = m->swf_bytes;
 		out->swf_bytes_len = m->swf_bytes_len;
+		out->raw_bytes = m->raw_bytes;
+		out->raw_bytes_len = m->raw_bytes_len;
 		return 1;
 	}
 	return 0;
@@ -5110,11 +5167,25 @@ static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request)
 	// Unlike Loader.load, a URL that resolves to nothing is an ERROR here
 	// (#2032) rather than a silent no-op: url_loader asks for missingFile.bin
 	// on purpose.
-	if (loader_resolve_url(url, &probe) && probe.data != NULL)
+	if (loader_resolve_url(url, &probe))
 	{
-		pl.data = probe.data;
-		pl.len = probe.len;
-		pl.found = 1;
+		// A bundled data file answers with `data`; a recompiled child SWF has
+		// no `data` (the Loader pipeline runs it from its emitted tables) but
+		// does carry the on-disk file, which is what a fetch returns — Flash
+		// hands a URLLoader the compressed .swf verbatim, so a loadBytes() of
+		// the result matches the movie by its FILE size exactly as an [Embed]
+		// of the same file would (loader_error_in_root_ctor).
+		if (probe.data == NULL && probe.raw_bytes != NULL)
+		{
+			probe.data = probe.raw_bytes;
+			probe.len = probe.raw_bytes_len;
+		}
+		if (probe.data != NULL)
+		{
+			pl.data = probe.data;
+			pl.len = probe.len;
+			pl.found = 1;
+		}
 	}
 	if (g_pending_url_load_count < AVM2_MAX_PENDING_URL_LOADS)
 		g_pending_url_loads[g_pending_url_load_count++] = pl;
@@ -9002,6 +9073,19 @@ typedef struct { PkKind kind; Avm2Object* target; } Pk;
 
 static Pk pk_make(PkKind k, Avm2Object* t) { Pk p; p.kind = k; p.target = t; return p; }
 
+// "The root object of a loader or stage is never a valid target of hit events"
+// (Ruffle combine_with_parent, `target.loader_info().is_none()`). A movie root
+// is exactly the object that owns a LoaderInfo: the main SWF's root, and every
+// Loader-loaded child's root. A hit on one is absorbed by the parent as if the
+// parent had mouseChildren=false — which for the main root means the Stage, and
+// therefore no target at all (loader_noninteractive_try_click_root clicks the
+// root's own Shape and expects `[object Stage]`).
+static int pk_is_movie_root(Avm2Context* ctx, Avm2Object* o)
+{
+	Avm2DisplayObjectExt* e = o != NULL ? avm2_display_ext_of(ctx, o) : NULL;
+	return e != NULL && e->is_root && !e->is_stage;
+}
+
 // Ruffle Avm2MousePick::combine_with_parent.
 static Pk pk_combine(Avm2Context* ctx, Pk p, Avm2Object* parent)
 {
@@ -9011,7 +9095,7 @@ static Pk pk_combine(Avm2Context* ctx, Pk p, Avm2Object* parent)
 	switch (p.kind)
 	{
 	case PK_HIT:
-		if (pmc) return p;
+		if (pmc && !pk_is_movie_root(ctx, p.target)) return p;
 		return pme ? pk_make(PK_HIT, parent) : pk_make(PK_PROP, NULL);
 	case PK_PROP:
 		return pme ? pk_make(PK_HIT, parent) : pk_make(PK_PROP, NULL);

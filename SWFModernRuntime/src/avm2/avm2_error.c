@@ -431,6 +431,19 @@ static Avm2Value error_get_error_id(Avm2Activation* act)
 	return avm2_integer(0);
 }
 
+// The FP debug player's rendering of an uncaught error: its toString()
+// followed by the "\n\tat X()" tail snapshotted when the Error was
+// constructed — the same pair Error.getStackTrace() returns. A non-Error throw
+// (or an Error built before the snapshot existed) renders as just the head.
+const Avm2String* avm2_error_stack_string(Avm2Context* ctx, Avm2Value v)
+{
+	const Avm2String* head = avm2_coerce_to_string(ctx, v);
+	if (v.kind != AVM2_VALUE_OBJECT) return head;
+	Avm2Value* tail = avm2_object_find_dynamic(v.u.obj, "__stacktrace_tail", 17);
+	if (tail == NULL || tail->kind != AVM2_VALUE_STRING) return head;
+	return avm2_string_concat(ctx, head, tail->u.str);
+}
+
 static Avm2Value error_get_stack_trace(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;

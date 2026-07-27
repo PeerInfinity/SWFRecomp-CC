@@ -394,12 +394,18 @@ typedef struct MovieEntry {
 	u8 movie_id;                       // 0 = main SWF, 1+ = child SWFs (for per-movie export isolation)
 	u8 is_prelude;                     // 1 = prelude SWF (runs before main SWF, shares scope)
 	float (*transform_data_ptr)[16];   // pointer to child SWF's transform_data (NULL = use main SWF's)
-	// AVM2 child SWF (loader-arc tranche 6). All three are zero-init-safe:
+	// AVM2 child SWF (loader-arc tranche 6). All of these are zero-init-safe:
 	// NULL/0 means "AVM1 child, image shell, or self-load", which is every
 	// entry the generator produced before tranche 6.
 	const void* avm2_tables;           // const Avm2MovieTables* (avm2_abc.h)
 	const u8* swf_bytes;               // DECOMPRESSED movie image
 	u32 swf_bytes_len;                 // = the header's declared file length
+	// The file EXACTLY as it sits on disk, compression and all. This is what a
+	// URLLoader fetch of the .swf hands back (Flash does not decompress for a
+	// binary read), and therefore what a later loadBytes() sees — so its length
+	// is `file_size`, not `swf_bytes_len`.
+	const u8* raw_bytes;
+	u32 raw_bytes_len;
 } MovieEntry;
 
 // Find a pre-compiled movie entry by filename (defined in movie_registry.c when HAS_CHILD_MOVIES)

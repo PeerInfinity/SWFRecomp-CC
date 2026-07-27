@@ -1090,7 +1090,7 @@ def generate_image_movie_file(child_swf_name, build_dir, image_width, image_heig
     return prefix
 
 
-def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1, string_id_offset=0, is_prelude=False, avm2_tables_symbol=None, swf_bytes=None):
+def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1, string_id_offset=0, is_prelude=False, avm2_tables_symbol=None, swf_bytes=None, raw_bytes=None):
     """Generate a self-contained C file for a child SWF movie.
 
     Reads the recompiled C files from child_recomp_dir and generates a single
@@ -1494,6 +1494,21 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
             lines.append("    " + "".join(f"{b}," for b in swf_bytes[i:i + 16]))
         lines.append("};")
         bytes_ptr = f"{prefix}_swf_bytes"
+    # The untouched on-disk file, for a URLLoader fetch of the .swf (see the
+    # MovieEntry comment in swf.h). Emitted only when it actually differs from
+    # the decompressed image, so an uncompressed child bundles one copy.
+    raw_ptr = "NULL"
+    raw_len = 0
+    if raw_bytes:
+        raw_len = len(raw_bytes)
+        if swf_bytes and bytes(raw_bytes) == bytes(swf_bytes):
+            raw_ptr = bytes_ptr
+        else:
+            lines.append(f"static const u8 {prefix}_raw_bytes[] = {{")
+            for i in range(0, raw_len, 16):
+                lines.append("    " + "".join(f"{b}," for b in raw_bytes[i:i + 16]))
+            lines.append("};")
+            raw_ptr = f"{prefix}_raw_bytes"
     lines.append(f"MovieEntry {prefix}_movie_entry = {{")
     lines.append(f'    .filename = "{child_swf_name}",')
     lines.append(f"    .frame_funcs = {prefix}_frame_funcs,")
@@ -1509,6 +1524,8 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append(f"    .avm2_tables = {tables_ptr},")
     lines.append(f"    .swf_bytes = {bytes_ptr},")
     lines.append(f"    .swf_bytes_len = {bytes_len},")
+    lines.append(f"    .raw_bytes = {raw_ptr},")
+    lines.append(f"    .raw_bytes_len = {raw_len},")
     lines.append(f"}};")
     lines.append("")
 
@@ -1949,7 +1966,8 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
                 string_id_offset=next_string_id_offset,
                 is_prelude=child_is_prelude,
                 avm2_tables_symbol=child_tables_sym,
-                swf_bytes=decompressed_swf_bytes(child_swf))
+                swf_bytes=decompressed_swf_bytes(child_swf),
+                raw_bytes=child_swf.read_bytes() if child_swf.exists() else None)
             if prefix:
                 child_prefixes.append(prefix)
                 # Read child's MAX_STRING_ID and advance offset for next child

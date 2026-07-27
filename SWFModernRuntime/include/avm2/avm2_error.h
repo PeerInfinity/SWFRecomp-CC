@@ -67,6 +67,10 @@ void avm2_try_pop_frame(Avm2TryFrame* tf);
 // the process if no frame is installed at all.
 _Noreturn void avm2_throw(Avm2Context* ctx, Avm2Value value);
 
+// Render a thrown value the way the debug player traces an uncaught one
+// (toString() + the construction-time "\n\tat X()" tail).
+const Avm2String* avm2_error_stack_string(Avm2Context* ctx, Avm2Value v);
+
 // Construct an Error-family instance (does not throw).
 Avm2Value avm2_error_new(Avm2Context* ctx, Avm2Class* error_class, const char* message);
 // printf-style construct + throw. `error_class` NULL = plain Error.
