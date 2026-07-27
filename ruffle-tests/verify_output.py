@@ -21,6 +21,7 @@ import tempfile
 import threading
 import time
 import tomllib
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter
@@ -907,17 +908,34 @@ def find_child_swfs(test_dir):
     return children
 
 
-def recompile_child_swf(swf_path, output_dir):
-    """Recompile a child SWF into output_dir. Returns True on success."""
+def recompile_child_swf(swf_path, output_dir, symbol_prefix="", char_id_base=0):
+    """Recompile a child SWF into output_dir. Returns True on success.
+
+    symbol_prefix/char_id_base (loader-arc tranche 6) are handed to the
+    recompiler so an AVM2 child's RecompiledABC/ can be linked alongside the
+    parent's: every exported symbol and emitted file name gains the prefix and
+    every character id is offset by the base. Both default to the empty/zero
+    value, which reproduces the pre-tranche-6 output exactly.
+    """
     # Create a temp dir with the child SWF as test.swf
     with tempfile.TemporaryDirectory(prefix="swf_child_") as tmpdir:
         tmp = Path(tmpdir)
         shutil.copy2(swf_path, tmp / "test.swf")
-        shutil.copy2(RECOMP_CONFIG, tmp / "config.toml")
+        # The child needs its OWN config (the shared one has no per-child
+        # keys), so write it rather than passing RECOMP_CONFIG's path.
+        cfg = RECOMP_CONFIG.read_text()
+        if symbol_prefix or char_id_base:
+            cfg = cfg.replace(
+                'output_scripts_folder = "RecompiledScripts"',
+                'output_scripts_folder = "RecompiledScripts"\n'
+                f'symbol_prefix = "{symbol_prefix}"\n'
+                f'char_id_base = {char_id_base}')
+        child_cfg = tmp / "config.toml"
+        child_cfg.write_text(cfg)
         try:
             proc = subprocess.Popen(
                 ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
-                 str(RECOMP_BIN), str(RECOMP_CONFIG)],
+                 str(RECOMP_BIN), str(child_cfg)],
                 cwd=str(tmp),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -931,7 +949,7 @@ def recompile_child_swf(swf_path, output_dir):
             return False
 
         # Copy generated files to output_dir
-        for folder in ["RecompiledScripts", "RecompiledTags"]:
+        for folder in ["RecompiledScripts", "RecompiledTags", "RecompiledABC"]:
             src = tmp / folder
             dst = output_dir / folder
             if src.exists():
@@ -940,6 +958,45 @@ def recompile_child_swf(swf_path, output_dir):
                     if f.suffix in (".c", ".h"):
                         shutil.copy2(f, dst)
     return True
+
+
+def decompressed_swf_bytes(swf_path):
+    """Return a SWF's DECOMPRESSED image (FWS header + body), or None.
+
+    `LoaderInfo.bytes` is the uncompressed movie, so a CWS/ZWS file's byte
+    count there is the header's declared file length, not the file size on
+    disk (loader_events: an 893-byte CWS reports bytes.length == 1490 with
+    bytesTotal == 893). An already-uncompressed FWS is returned verbatim.
+    """
+    try:
+        raw = swf_path.read_bytes()
+    except OSError:
+        return None
+    if len(raw) < 8:
+        return None
+    sig = raw[0:3]
+    if sig == b"FWS":
+        return raw
+    if sig == b"CWS":
+        try:
+            body = zlib.decompress(raw[8:])
+        except zlib.error:
+            return None
+    elif sig == b"ZWS":
+        try:
+            import lzma
+            # SWF LZMA: 4-byte compressed length, 5-byte props, then the
+            # stream with no end marker and no size field.
+            props = raw[12:17]
+            dec = lzma.LZMADecompressor(
+                format=lzma.FORMAT_RAW,
+                filters=[lzma._decode_filter_properties(lzma.FILTER_LZMA1, props)])
+            body = dec.decompress(raw[17:])
+        except Exception:
+            return None
+    else:
+        return None
+    return b"FWS" + raw[3:8] + body
 
 
 def _sanitize_prefix(filename):
@@ -1033,7 +1090,7 @@ def generate_image_movie_file(child_swf_name, build_dir, image_width, image_heig
     return prefix
 
 
-def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1, string_id_offset=0, is_prelude=False):
+def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1, string_id_offset=0, is_prelude=False, avm2_tables_symbol=None, swf_bytes=None):
     """Generate a self-contained C file for a child SWF movie.
 
     Reads the recompiled C files from child_recomp_dir and generates a single
@@ -1422,6 +1479,21 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append(f"#include <libswf/swf.h>")
     lines.append("")
     td_ptr = f"{prefix}_transform_data" if has_child_transforms else "NULL"
+    # loader-arc tranche 6: AVM2 tables + the decompressed movie image.
+    # Both stay NULL for an AVM1 child, which is every entry before tranche 6.
+    tables_ptr = "NULL"
+    if avm2_tables_symbol:
+        lines.append("#include <avm2/avm2_abc.h>")
+        lines.append(f"extern const Avm2MovieTables {avm2_tables_symbol};")
+        tables_ptr = f"&{avm2_tables_symbol}"
+    bytes_ptr, bytes_len = "NULL", 0
+    if swf_bytes:
+        bytes_len = len(swf_bytes)
+        lines.append(f"static const u8 {prefix}_swf_bytes[] = {{")
+        for i in range(0, bytes_len, 16):
+            lines.append("    " + "".join(f"{b}," for b in swf_bytes[i:i + 16]))
+        lines.append("};")
+        bytes_ptr = f"{prefix}_swf_bytes"
     lines.append(f"MovieEntry {prefix}_movie_entry = {{")
     lines.append(f'    .filename = "{child_swf_name}",')
     lines.append(f"    .frame_funcs = {prefix}_frame_funcs,")
@@ -1434,6 +1506,9 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append(f"    .movie_id = {movie_id},")
     lines.append(f"    .is_prelude = {1 if is_prelude else 0},")
     lines.append(f"    .transform_data_ptr = {td_ptr},")
+    lines.append(f"    .avm2_tables = {tables_ptr},")
+    lines.append(f"    .swf_bytes = {bytes_ptr},")
+    lines.append(f"    .swf_bytes_len = {bytes_len},")
     lines.append(f"}};")
     lines.append("")
 
@@ -1465,6 +1540,11 @@ def generate_movie_registry(prefixes, build_dir):
     lines.append("            return g_movie_entries[i];")
     lines.append("    }")
     lines.append("    return NULL;")
+    lines.append("}")
+    lines.append("")
+    lines.append("MovieEntry* getMovieEntryAt(int idx) {")
+    lines.append("    int n = (int)(sizeof(g_movie_entries)/sizeof(g_movie_entries[0])) - 1;")
+    lines.append("    return (idx >= 0 && idx < n) ? g_movie_entries[idx] : NULL;")
     lines.append("}")
     lines.append("")
     lines.append("MovieEntry* getPreludeEntry(int idx) {")
@@ -1834,14 +1914,36 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
 
         child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
         child_recomp_dir.mkdir(exist_ok=True)
-        if recompile_child_swf(child_swf, child_recomp_dir):
+        # loader-arc tranche 6: an AVM2 child's tables link alongside the
+        # parent's under a per-child symbol prefix, with its character ids
+        # lifted clear of the parent's range. Char ids are u16 in the runtime
+        # tables, so the stride caps children at ~6 before wrapping — the
+        # corpus has at most two.
+        child_sym_prefix = f"{_sanitize_prefix(child_swf.name)}_"
+        child_char_base = child_movie_id * 10000
+        if recompile_child_swf(child_swf, child_recomp_dir,
+                               symbol_prefix=child_sym_prefix,
+                               char_id_base=child_char_base):
             # Detect prelude SWFs by filename convention (prelude_*.swf)
             child_is_prelude = child_swf.name.startswith("prelude_")
+            # An AVM2 child: its prefixed ABC/timeline tables compile into the
+            # same build dir (the *.c glob picks them up) and the MovieEntry
+            # points at the aggregate they end with.
+            child_abc = child_recomp_dir / "RecompiledABC"
+            child_tables_sym = None
+            if child_abc.exists():
+                for f in child_abc.iterdir():
+                    if f.suffix in (".c", ".h"):
+                        shutil.copy2(f, build_dir)
+                if (child_abc / f"{child_sym_prefix}abc_timeline.c").exists():
+                    child_tables_sym = f"{child_sym_prefix}avm2_movie_tables"
             prefix = generate_child_movie_file(
                 child_swf.name, child_recomp_dir, build_dir,
                 swf_file_size=child_file_size, movie_id=child_movie_id,
                 string_id_offset=next_string_id_offset,
-                is_prelude=child_is_prelude)
+                is_prelude=child_is_prelude,
+                avm2_tables_symbol=child_tables_sym,
+                swf_bytes=decompressed_swf_bytes(child_swf))
             if prefix:
                 child_prefixes.append(prefix)
                 # Read child's MAX_STRING_ID and advance offset for next child
