@@ -1,18 +1,18 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-27 02:18 UTC
+**Date**: 2026-07-27 04:25 UTC
 
-**Git SHA**: `28577da2aa`
+**Git SHA**: `a9900a4786`
 
-**Run Duration**: 0m 39s
+**Run Duration**: 0m 35s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 5 |
-| Passing | **1** (20.0%) |
-| Failing | 4 |
+| Passing | **0** (0.0%) |
+| Failing | 5 |
 | Total expected lines | 208 |
 | Matching lines | 0 (0.0%) |
 | Mismatched lines | 208 |
@@ -21,15 +21,13 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 4 | 100.0% |
+| Output Mismatch | 5 | 100.0% |
 
 ## Passing Tests
 
-**1 tests passing**
+**0 tests passing**
 
-| # | Test | Lines | Duration | Notes |
-|---|------|-------|----------|-------|
-| 1 | `scissor_rectangle` | 0 | 8.8s |  |
+No passing tests.
 
 ## Near-Passing Tests
 
@@ -53,11 +51,12 @@ No timeouts.
 
 ## All Output Mismatches
 
-**4 tests** with output mismatch, sorted by match rate (best first)
+**5 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `request_matching_profiles` | 0.0% | 0/190 | 0 | 190 |  |
-| 2 | `request_profiles` | 0.0% | 0/16 | 0 | 16 |  |
-| 3 | `sampler_odd_size` | 0.0% | 0/1 | 0 | 1 |  |
-| 4 | `scissor_rectangle_invalid` | 0.0% | 0/1 | 0 | 1 |  |
+| 1 | `request_matching_profiles` | 0.0% | 0/190 | 2 | 190 |  |
+| 2 | `request_profiles` | 0.0% | 0/16 | 2 | 16 |  |
+| 3 | `sampler_odd_size` | 0.0% | 0/2 | 2 | 1 |  |
+| 4 | `scissor_rectangle` | 0.0% | 0/2 | 2 | 0 |  |
+| 5 | `scissor_rectangle_invalid` | 0.0% | 0/2 | 2 | 1 |  |

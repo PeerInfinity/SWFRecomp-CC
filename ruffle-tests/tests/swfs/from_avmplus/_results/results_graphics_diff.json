@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-27T00:30:06.147132+00:00",
-    "old_git_sha": "8213dd4d61dd599ec86da3143e947b704ed6405c",
-    "new_timestamp": "2026-07-27T02:18:25.340006+00:00",
-    "new_git_sha": "28577da2aa5c307218e90a3e0a09bf4b82218f2f",
+    "old_timestamp": "2026-07-27T02:18:25.340006+00:00",
+    "old_git_sha": "28577da2aa5c307218e90a3e0a09bf4b82218f2f",
+    "new_timestamp": "2026-07-27T04:25:43.247836+00:00",
+    "new_git_sha": "a9900a478651ad3505390c73078f73561eebf185",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,144 @@
     "new_total": 1574,
     "new_pass_rate": 92.6,
     "old_mismatched_lines": 782,
-    "new_mismatched_lines": 782,
+    "new_mismatched_lines": 781,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 1,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 1574,
+    "unchanged": 1566,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "as3/RegExp/replace",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 7,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 7,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 1,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "e4x/Global/e13_1_2_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 10,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 10,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "e4x/XML/bug_564468",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 10,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 10,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "ecma3/Exceptions/exception_002_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 1,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "ecma3/Exceptions/exception_011_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 3,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 3,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "ecma3/JSON/Classes",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 6,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 6,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "regress/bug_550958",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 3,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 3,
+        "matching_lines": 2
+      }
+    }
+  ]
 }
