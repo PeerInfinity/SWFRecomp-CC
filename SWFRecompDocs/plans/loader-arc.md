@@ -707,24 +707,50 @@ are recoverable verbatim with `git revert d1c307c51`.
 
 ## 8. Postmortem — tranche 6a (AVM2 child-SWF execution)
 
-**Predicted +3, delivered +3 — the first tranche in this arc whose
-prediction was exactly right**, because it came from a dedicated design pass
-(`loader-arc-tranche6-design.md`) with file:line anchors rather than from
-reading diffs.
+**Predicted +3, delivered +9 (CI `30290049993`, graphics/full,
+3839 → 3848 effective over the 4419-test intersection with `f6de1a7cf`,
+zero pass→fail regressions).** The prediction was exactly right on the named
+targets — the first time in this arc — because it came from a dedicated
+design pass (`loader-arc-tranche6-design.md`) with file:line anchors rather
+than from reading diffs. The other six are riders nobody scoped.
 
-| Gain | Suite | Baseline lines |
-|---|---|---|
-| `loader_events` | avm2 | 19/92 |
-| `loader_reuse` | avm2 | 14/38 |
-| `loader_loadbytes_events` | avm2 | 11/30 |
+| Gain | Suite | Baseline | Predicted? |
+|---|---|---|---|
+| `loader_events` | avm2 | 19/92 | yes |
+| `loader_reuse` | avm2 | 14/38 | yes |
+| `loader_loadbytes_events` | avm2 | 11/30 | yes |
+| `displayobject_set_name_loaded` | avm2 | output_mismatch | no |
+| `as3-loader/LoaderTest` | from_shumway | 5/9 → ruffle match | design named it as the TRIPWIRE for wrong SWF init timing; it passed instead |
+| `as3-loader/bug1093712/loader` | from_shumway | output_mismatch | no |
+| `as3-interfaces` | from_shumway | output_mismatch | no |
+| `edittext_align` | avm2 | segfault | the intermittent crash of §7, not a fix |
+| `simple_shapes/heavy_tesselation` | visual | recomp_fail | unrelated; a recomp timeout that did not recur |
 
-Riders measured locally: `from_shumway/as3-loader/LoaderTest` 5/9 → **ruffle
-match** (effective pass), `as3-loader/loaderinfo/loaded-content-properties`
-36/48 → 43/48 (the remainder is `sandboxBridge`, `uncaughtErrorEvents`,
-`isURLInaccessible` and a `#2098` — unrelated features, not Loader timing).
+`as3-loader/loaderinfo/loaded-content-properties` went 36/48 → 43/48 without
+passing; the remainder is `sandboxBridge`, `uncaughtErrorEvents`,
+`isURLInaccessible` and a `#2098` — unrelated features, not Loader timing.
 
-Shipped in three commits: recompiler (`16955d6e8`), runtime (`e0d53f7c3`),
-harness (`5a7162e20`).
+Shipped in four commits: recompiler (`16955d6e8`), runtime (`e0d53f7c3`),
+harness (`5a7162e20`), and a follow-up (`2bc6c9b9b`) for the one thing CI
+caught.
+
+### The one thing CI caught: three new `compile_fail`
+
+`avm2/verify_method_info_oob`, `avm2/verify_method_info_duplicate` and
+`mixed_avm/avm1_loads_avm2` went `output_mismatch` → `compile_fail`, all one
+cause: the child loop copied a child's `RecompiledABC/` into `build_dir`
+unconditionally, and those files reference the AVM2 runtime — which the
+harness only compiles when the PARENT has its own `RecompiledABC` (`is_avm2`,
+`verify_output.py:1802`). An AVM1 parent (`avm1_loads_avm2`, which is the
+dual-VM arc and explicitly out of scope) or a parent whose ABC deliberately
+fails to emit (the patched `verify_method_info_*` SWFs) hits an
+undefined-symbol wall at LINK, which the harness scores as `compile_fail`.
+Gating the copy on `is_avm2` restores all three.
+
+Worth keeping: **a recompiler/harness change's blast radius shows up as
+`compile_fail`, and it is a LINK failure as often as a compile one.** The
+byte-identical-emission check proved the emitter was safe and said nothing
+about what the harness then chose to link.
 
 ### What the design got right
 
