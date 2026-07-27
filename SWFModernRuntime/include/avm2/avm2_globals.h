@@ -593,6 +593,13 @@ int avm2_bitmap_self_dims(Avm2Context* ctx, Avm2Object* obj, uint32_t* w, uint32
 // else a plain BitmapData is seeded from the embedded asset for char_id.
 void avm2_bitmap_seed_timeline(Avm2Context* ctx, Avm2Object* child,
                                uint16_t char_id, Avm2Class* bd_class);
+// Decode PNG/JPEG/GIF bytes (stb_image) into a fresh Bitmap display object
+// wrapping a BitmapData — flash.display.Loader's image content. `transparent`
+// comes from the source channel count. A malformed-but-self-describing buffer
+// yields an all-transparent bitmap at the header's size (Ruffle's behaviour);
+// NULL means even the header was unreadable.
+Avm2Object* avm2_bitmap_from_image_bytes(Avm2Context* ctx, const uint8_t* data,
+                                         uint32_t len);
 
 // Display module (avm2_display.c — Stage-5 tranche 2+).
 void avm2_register_display(Avm2Context* ctx);

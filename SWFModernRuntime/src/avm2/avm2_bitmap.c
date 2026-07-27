@@ -22,6 +22,8 @@
 
 #include <zlib.h>
 
+#include "stb_image.h"
+
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_cpu_raster.h>
 #include <avm2/avm2_error.h>
@@ -2710,6 +2712,81 @@ void avm2_bitmap_wire_bitmap(Avm2Context* ctx, Avm2Class* bitmap_cls)
 	                        bitmap_get_pixel_snapping, bitmap_set_pixel_snapping);
 	avm2_builtin_add_getset(ctx, bitmap_cls, "smoothing", bitmap_get_smoothing,
 	                        bitmap_set_smoothing);
+}
+
+// ---------------------------------------------------------------------------
+// Loaded image content (flash.display.Loader)
+// ---------------------------------------------------------------------------
+
+// Ruffle loader.rs, the ContentType::{Gif,Jpeg,Png} arm of movie_loader_data:
+// decode the fetched bytes, build a BitmapData whose `transparent` is "the
+// source carried an alpha channel" (BitmapFormat::supports_transparency), and
+// construct a real Bitmap over it — that Bitmap becomes the Loader's `content`
+// and its only child.
+//
+// A buffer that sniffed as an image but will not fully decode is NOT an error.
+// Ruffle's decode_png catches a malformed stream and hands back an EMPTY
+// bitmap at the header's declared dimensions (render/src/utils.rs; upstream
+// ruffle#18831). loader_loadbytes_invalid_png embeds exactly that: an IHDR
+// declaring 1024x512 with only ~128 rows' worth of IDAT, which stb rejects
+// with "not enough pixels" — the test still expects a Bitmap whose width is
+// 1024. Only a buffer whose header is unreadable gives up and returns NULL,
+// which leaves `content` null without inventing an ioError no test asserts.
+Avm2Object* avm2_bitmap_from_image_bytes(Avm2Context* ctx, const uint8_t* data,
+                                         uint32_t len)
+{
+	if (ctx == NULL || data == NULL || len == 0 || g_bitmap_class == NULL)
+		return NULL;
+
+	int w = 0, h = 0, comp = 0;
+	uint8_t* rgba = stbi_load_from_memory(data, (int) len, &w, &h, &comp, 4);
+	if (rgba == NULL && !stbi_info_from_memory(data, (int) len, &w, &h, &comp))
+		return NULL;
+	// No is_size_valid gate: that is the BitmapData *constructor's* per-version
+	// limit, and Ruffle does not apply it to loaded content. Only reject sizes
+	// that would overflow bd_alloc's 32-bit byte count.
+	if (w <= 0 || h <= 0 || (uint64_t) w * (uint64_t) h > 0x0FFFFFFFull)
+	{
+		stbi_image_free(rgba);
+		return NULL;
+	}
+
+	// stb reports the SOURCE channel count in `comp` even though we asked it
+	// to expand to 4, so it is what says whether the image carries alpha.
+	int transparent = (comp == 2 || comp == 4);
+
+	Avm2Object* bdo = bd_alloc_bare(ctx);
+	if (bdo == NULL)
+	{
+		stbi_image_free(rgba);
+		return NULL;
+	}
+	Avm2BitmapDataExt* bd = (Avm2BitmapDataExt*) bdo->native_ext;
+	bd_alloc(ctx, bd, (uint32_t) w, (uint32_t) h, transparent);
+	uint32_t n = (uint32_t) w * (uint32_t) h;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		if (rgba == NULL)
+		{
+			bd->pixels[i] = 0;   // malformed: Ruffle's empty bitmap
+			continue;
+		}
+		uint32_t r = rgba[i * 4 + 0];
+		uint32_t g = rgba[i * 4 + 1];
+		uint32_t b = rgba[i * 4 + 2];
+		uint32_t a = transparent ? rgba[i * 4 + 3] : 255u;
+		// Ruffle premultiply_alpha_rgba TRUNCATES (`as u8`), so floor — not
+		// the round-half-up of `premul` above, which mirrors Flash's
+		// setPixel32 path instead.
+		bd->pixels[i] = CMK(r * a / 255, g * a / 255, b * a / 255, a);
+	}
+	stbi_image_free(rgba);
+
+	// Construct through the class so the AS3 ctor runs (pixelSnapping "auto",
+	// smoothing false) exactly as Ruffle's `classes().bitmap.construct` does.
+	Avm2Value arg = avm2_object_value(bdo);
+	Avm2Value bmp = avm2_class_construct(ctx, g_bitmap_class, &arg, 1);
+	return bmp.kind == AVM2_VALUE_OBJECT ? bmp.u.obj : NULL;
 }
 
 // ---------------------------------------------------------------------------

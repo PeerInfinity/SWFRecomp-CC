@@ -2782,19 +2782,14 @@ static void run_due_timers(Avm2Context* ctx)
 }
 
 // Loader/LoaderInfo frame hooks (defined with the LoaderInfo state machine
-// below): queued fetches resolve at the frame's start, init/complete fire at
-// its end.
-static void avm2_loader_run_pending(Avm2Context* ctx);
+// below): queued fetches resolve, and init/complete fire, after the frame's
+// exitFrame broadcast.
 static void avm2_loaderinfo_run_exit_frame(Avm2Context* ctx);
-static void avm2_loader_run_exit_frame(Avm2Context* ctx);
+static void avm2_loader_drain(Avm2Context* ctx);
 
 void avm2_display_run_tick(Avm2Context* ctx)
 {
 	if (ctx->stage == NULL) return;
-
-	// Ruffle fetches queued loads from the player's preload tick, before the
-	// frame runs (player.rs::preload -> LoadManager::preload_tick).
-	avm2_loader_run_pending(ctx);
 
 	ctx->frame_phase = PHASE_ENTER;
 	for (uint32_t i = 0; i < g_orphan_count; i++)
@@ -2848,11 +2843,12 @@ void avm2_display_run_tick(Avm2Context* ctx)
 
 	ctx->frame_phase = PHASE_EXIT;
 	broadcast_named(ctx, "exitFrame");
-	// Ruffle run_exit_frame: the root movie's LoaderInfo, then every in-flight
-	// loader, fire init/complete here — after exitFrame, before the next
-	// frame's enterFrame (loaderinfo_events pins this ordering).
+	// Ruffle run_exit_frame: the root movie's LoaderInfo fires init/complete
+	// here — after exitFrame, before the next frame's enterFrame
+	// (loaderinfo_events pins this ordering). Loader fetches resolve right
+	// after, which is where Ruffle's test harness runs the async executor.
 	avm2_loaderinfo_run_exit_frame(ctx);
-	avm2_loader_run_exit_frame(ctx);
+	avm2_loader_drain(ctx);
 	orphan_cleanup(ctx);
 
 	ctx->frame_phase = PHASE_IDLE;
@@ -3569,6 +3565,8 @@ typedef struct Avm2LoaderInfoExt
 	Avm2Object* shared_events;          // sharedEvents (lazy EventDispatcher)
 	Avm2Object* app_domain;             // LoaderContext's ApplicationDomain
 	const Avm2String* url;              // stream movie URL (LOADER only)
+	const uint8_t* bytes;               // loaded source bytes (static storage)
+	uint32_t bytes_len;
 	uint32_t bytes_loaded;
 	uint32_t bytes_total;
 	uint8_t kind;
@@ -3813,9 +3811,9 @@ static Avm2Value li_get_shared_events(Avm2Activation* act)
 
 // Three-state (Ruffle get_bytes): null before anything starts loading, an
 // empty ByteArray while loading or after an unknown-type error, the real
-// (decompressed) SWF bytes once a movie is loaded. We have no source bytes to
-// hand back, so the loaded case is an empty ByteArray too — tranche 2 only
-// needs the first two states (loaderinfo_quine wants the real bytes).
+// source bytes once content is loaded. The third state only materialises for
+// content whose bytes we still hold (see loader_deliver) — a child SWF's are
+// not in the movie registry yet, so it keeps handing back an empty ByteArray.
 static Avm2Value li_get_bytes(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -3824,7 +3822,19 @@ static Avm2Value li_get_bytes(Avm2Activation* act)
 	if (ext->kind == LI_KIND_LOADER && !ext->load_started) return avm2_null();
 	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.bytearray_class,
 	                                   NULL, 0);
-	return v.kind == AVM2_VALUE_OBJECT ? v : avm2_null();
+	if (v.kind != AVM2_VALUE_OBJECT) return avm2_null();
+	if (ext->bytes != NULL && ext->bytes_len != 0)
+	{
+		Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(v);
+		if (ba != NULL)
+		{
+			avm2_bytearray_set_length_public(ctx, ba, ext->bytes_len);
+			if (ba->bytes != NULL && ba->len == ext->bytes_len)
+				memcpy(ba->bytes, ext->bytes, ext->bytes_len);
+			ba->position = 0;   // loader_loadbytes_events pins position 0
+		}
+	}
+	return v;
 }
 
 static Avm2Value li_get_parameters(Avm2Activation* act)
@@ -3895,19 +3905,19 @@ static void avm2_loaderinfo_run_exit_frame(Avm2Context* ctx)
 //
 // A Loader owns its own contentLoaderInfo (a LoaderInfo in the LOADER flavour
 // above), so listener registrations and every LoaderInfo getter are per
-// instance. `load`/`loadBytes` drive the state machine and the event sequence;
-// what they do NOT do yet is instantiate the loaded content — an AVM2 child
-// SWF has no runtime entry point (see SWFRecompDocs/plans/loader-arc.md
-// tranche 6), so `content` stays null and `bytes` hands back an empty
-// ByteArray. Everything a script can observe *about the load itself* (open /
-// progress / init / complete / ioError, byte counts, contentType, url,
-// applicationDomain) is real.
+// instance. `load`/`loadBytes` drive the state machine and the event sequence,
+// and an image payload is decoded into a real `Bitmap` content child. What
+// they still do NOT instantiate is a child SWF — an AVM2 child has no runtime
+// entry point (see SWFRecompDocs/plans/loader-arc.md tranche 6) — so `content`
+// stays null for `application/x-shockwave-flash`. Everything a script can
+// observe *about the load itself* (open / progress / init / complete / ioError,
+// byte counts, contentType, url, applicationDomain) is real.
 
 typedef struct Avm2LoaderExt
 {
 	Avm2DisplayObjectExt display;       // extends DisplayObjectContainer (MUST be first)
 	Avm2Object* content_loader_info;    // own LoaderInfo (EventDispatcher), lazily built
-	Avm2Object* content;                // loaded content (null until tranche 6)
+	Avm2Object* content;                // loaded content (SWF: null until tranche 6)
 } Avm2LoaderExt;
 
 static Avm2LoaderExt* loader_ext_of(Avm2Context* ctx, Avm2Object* o)
@@ -3948,10 +3958,15 @@ static Avm2Value loader_get_content_loader_info(Avm2Activation* act)
 	return cli != NULL ? avm2_object_value(cli) : avm2_null();
 }
 
+// Loader.as: `return this._contentLoaderInfo.content` — so it inherits the
+// expose_content gate and reads null until `init` has fired.
 static Avm2Value loader_get_content(Avm2Activation* act)
 {
-	Avm2LoaderExt* ext = loader_ext_of(act->ctx, this_obj(act));
+	Avm2Context* ctx = act->ctx;
+	Avm2LoaderExt* ext = loader_ext_of(ctx, this_obj(act));
 	if (ext == NULL || ext->content == NULL) return avm2_null();
+	Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, ext->content_loader_info);
+	if (lx != NULL && !lx->expose_content) return avm2_null();
 	return avm2_object_value(ext->content);
 }
 
@@ -4037,6 +4052,7 @@ typedef struct Avm2PendingLoad
 	const uint8_t* data;       // NULL when only a byte count is known
 	uint32_t len;
 	uint8_t content_type;
+	uint8_t data_static;       // `data` is generated-static (safe to alias)
 } Avm2PendingLoad;
 
 // Loads issued in one frame all resolve at the next frame's start; a handful
@@ -4076,8 +4092,27 @@ static void loaderinfo_reset_stream(Avm2LoaderInfoExt* lx)
 	lx->content = NULL;
 	lx->app_domain = NULL;
 	lx->url = NULL;
+	lx->bytes = NULL;
+	lx->bytes_len = 0;
 	lx->bytes_loaded = 0;
 	lx->bytes_total = 0;
+}
+
+// Drop whatever a Loader is currently showing: Ruffle's Loader::unload removes
+// the content from the display list as well as clearing the stream, and every
+// load() / loadBytes() begins with an implicit unload.
+static void loader_drop_content(Avm2Context* ctx, Avm2Object* self,
+                                Avm2LoaderExt* ext)
+{
+	if (ext == NULL) return;
+	Avm2DisplayObjectExt* pext = avm2_display_ext_of(ctx, self);
+	if (ext->content != NULL && pext != NULL
+	    && render_index_of(pext, ext->content) >= 0)
+	{
+		full_remove_child(ctx, pext, ext->content);
+	}
+	ext->content = NULL;
+	loaderinfo_reset_stream(loaderinfo_ext_of(ctx, ext->content_loader_info));
 }
 
 // Read `applicationDomain` off a LoaderContext argument (null when absent).
@@ -4137,15 +4172,50 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 		return;
 	}
 
-	// Known content. The stream becomes Swf (so the eight movie getters answer
-	// and contentType resolves once `init` fires); the content itself is not
-	// instantiated yet — see the Loader comment above.
+	// Known content. An image is decoded here — Ruffle builds the Bitmap before
+	// it reports the final progress — and becomes the Loader's `content` and,
+	// per movie_loader_complete, its child at index 0. JPEG-XR deliberately
+	// gets no decode attempt: stb cannot read it, and loader_jpegxr /
+	// loader_jpegxr_alpha only ever trace `contentType`, so sniffing it must
+	// keep short-circuiting here rather than falling into a failed decode.
+	// A SWF's content still awaits an AVM2 child entry point (loader-arc.md
+	// tranche 6), so `content` stays null for it.
+	int is_image = (pl->content_type == LI_CT_PNG || pl->content_type == LI_CT_JPEG
+	                || pl->content_type == LI_CT_GIF);
+	if (is_image && pl->data != NULL)
+	{
+		Avm2Object* bmp = avm2_bitmap_from_image_bytes(ctx, pl->data, pl->len);
+		if (bmp != NULL)
+		{
+			lx->content = bmp;
+			Avm2LoaderExt* lext = loader_ext_of(ctx, lx->loader);
+			if (lext != NULL)
+			{
+				lext->content = bmp;
+				insert_at_index(ctx, lx->loader, bmp, 0);
+			}
+		}
+	}
+
+	// The stream becomes Swf, so the eight movie getters answer and contentType
+	// resolves once `init` fires.
 	lx->bytes_loaded = pl->len;
 	ev = avm2_progress_event_new(ctx, avm2_string_from_literal(ctx, "progress"),
 	                             (double) pl->len, (double) pl->len);
 	if (ev != NULL) avm2_dispatch_event(ctx, li, ev);
 	lx->loaded = 1;
 	lx->url = pl->url;
+	// Third `bytes` state: the real source bytes, now that content is loaded.
+	// Only bundled assets are kept — their storage is generated-static and
+	// outlives everything. A loadBytes source ByteArray can be resized or
+	// dropped by the script afterwards, so its buffer is deliberately NOT
+	// aliased here (no test needs it yet; tranche 6's `loader_events` wants a
+	// child SWF's decompressed bytes, which come from the movie registry).
+	if (pl->data_static)
+	{
+		lx->bytes = pl->data;
+		lx->bytes_len = pl->len;
+	}
 	if (pl->app_domain != NULL)
 	{
 		lx->app_domain = pl->app_domain;
@@ -4157,12 +4227,25 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 		Avm2Value cur = avm2_current_domain_value(ctx);
 		lx->app_domain = cur.kind == AVM2_VALUE_OBJECT ? cur.u.obj : NULL;
 	}
+
+	// Ruffle movie_loader_complete calls fire_init_and_complete_events inline
+	// only when the content is NOT a MovieClip — i.e. for an image. A child
+	// SWF's init/complete are deferred to the clip's own on_exit_frame
+	// (movie_clip.rs), one tick later, and from_shumway as3-loader/LoaderTest
+	// pins that: its `enterFrame` sits between the last progress event and
+	// `init`. Anything else therefore waits on the active list, which the drain
+	// flushes at the START of a tick's loader phase.
+	//
+	// loadBytes is excluded as well: Ruffle delays a from_bytes image's complete
+	// by two post-frame callbacks, so keeping it on the active list holds it at
+	// this tick's boundary instead of firing inside the loadBytes call.
+	if (is_image && !from_bytes) loaderinfo_fire_init_and_complete(ctx, li);
 }
 
-// Frame-start hook: Ruffle fetches queued loads from the player's preload tick,
-// i.e. a load() issued during frame N is delivered at the start of frame N+1.
-// loaderinfo_more depends on the delay — it traces applicationDomain twice as
-// null before its `complete` handler ever runs.
+// Deliver every queued fetch. A load() issued during frame N never resolves
+// inside frame N — loaderinfo_more traces applicationDomain twice as null
+// before its `complete` handler ever runs — so this runs from the drain below,
+// past the frame's exitFrame.
 static void avm2_loader_run_pending(Avm2Context* ctx)
 {
 	uint32_t n = g_pending_load_count;
@@ -4181,9 +4264,9 @@ static void avm2_loader_run_pending(Avm2Context* ctx)
 	}
 }
 
-// End-of-frame hook: every tracked LoaderInfo whose stream reached Swf fires
-// init and then complete, after the frame's exitFrame broadcast. Entries whose
-// load has not resolved yet stay tracked; errored and completed ones drop out.
+// Every tracked LoaderInfo whose stream reached Swf fires init and then
+// complete. Entries whose load has not resolved yet stay tracked; errored and
+// completed ones drop out.
 static void avm2_loader_run_exit_frame(Avm2Context* ctx)
 {
 	uint32_t n = g_active_loader_info_count;
@@ -4197,6 +4280,31 @@ static void avm2_loader_run_exit_frame(Avm2Context* ctx)
 		if (lx == NULL || lx->errored) continue;
 		if (lx->loaded) loaderinfo_fire_init_and_complete(ctx, batch[i]);
 		else loader_track_active(batch[i]);
+	}
+}
+
+// End-of-frame hook, run right after the root LoaderInfo's own init/complete.
+//
+// Two stages, in this order:
+//
+//  1. Flush the active list — streams that resolved during an EARLIER tick and
+//     whose init/complete Ruffle defers by a frame (a child SWF's, via
+//     MovieClip::on_exit_frame), plus loadBytes deliveries from this tick.
+//  2. Resolve queued fetches. Ruffle's loads are async tasks and its test
+//     harness runs the executor to quiescence after every tick, so a fetch
+//     issued during the frame delivers its events once the frame is over — and
+//     a load STARTED by one of those handlers resolves in the same drain,
+//     because the executor picks up newly-spawned tasks. That is what
+//     loader_bitmap_transparency needs: three sequential loads, each begun from
+//     the previous one's `complete` handler, all finishing inside its two ticks.
+#define AVM2_MAX_LOAD_CHAIN 16
+static void avm2_loader_drain(Avm2Context* ctx)
+{
+	avm2_loader_run_exit_frame(ctx);
+	for (uint32_t round = 0; round < AVM2_MAX_LOAD_CHAIN
+	                          && g_pending_load_count != 0; round++)
+	{
+		avm2_loader_run_pending(ctx);
 	}
 }
 
@@ -4216,6 +4324,7 @@ static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
 		out->data = (const uint8_t*) d->content;
 		out->len = (uint32_t) d->content_length;
 		out->content_type = loader_sniff(out->data, out->len);
+		out->data_static = 1;
 		return 1;
 	}
 	MovieEntry* m = findMovieEntry(name);
@@ -4283,9 +4392,8 @@ static Avm2Value loader_load(Avm2Activation* act)
 	}
 
 	// Starting a load unloads whatever was there (Ruffle Loader.load).
+	loader_drop_content(ctx, self, ext);
 	Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, cli);
-	loaderinfo_reset_stream(lx);
-	ext->content = NULL;
 
 	Avm2PendingLoad pl;
 	memset(&pl, 0, sizeof(pl));
@@ -4313,9 +4421,8 @@ static Avm2Value loader_load_bytes(Avm2Activation* act)
 	Avm2Object* cli = loader_ensure_cli(ctx, ext, self);
 	if (cli == NULL) return avm2_undefined();
 
+	loader_drop_content(ctx, self, ext);
 	Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, cli);
-	loaderinfo_reset_stream(lx);
-	ext->content = NULL;
 
 	Avm2ByteArrayExt* ba = act->argc > 0 ? avm2_bytearray_ext_of(act->args[0])
 	                                     : NULL;
@@ -4339,10 +4446,8 @@ static Avm2Value loader_load_bytes(Avm2Activation* act)
 static Avm2Value loader_unload(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2LoaderExt* ext = loader_ext_of(ctx, this_obj(act));
-	if (ext == NULL) return avm2_undefined();
-	ext->content = NULL;
-	loaderinfo_reset_stream(loaderinfo_ext_of(ctx, ext->content_loader_info));
+	Avm2Object* self = this_obj(act);
+	loader_drop_content(ctx, self, loader_ext_of(ctx, self));
 	return avm2_undefined();
 }
 
@@ -9238,8 +9343,9 @@ void avm2_register_display(Avm2Context* ctx)
 	// flash.display.Loader (extends DisplayObjectContainer). `new Loader()` is
 	// non-throwing (concrete display_native_init, larger native_ext for the
 	// per-instance contentLoaderInfo/content); load/loadBytes drive the
-	// LoaderInfo state machine and event sequence but do not yet instantiate
-	// loaded content (loader-arc tranche 6), so `content` stays null.
+	// LoaderInfo state machine and event sequence, and decode an image payload
+	// into a Bitmap `content`. A child SWF is still not instantiated
+	// (loader-arc tranche 6), so `content` stays null for one.
 	Avm2Class* loader =
 		avm2_builtin_class(ctx, "flash.display", "Loader", doc);
 	loader->native_init = display_native_init;   // concrete: no #2012
