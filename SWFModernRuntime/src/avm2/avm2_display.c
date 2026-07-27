@@ -303,6 +303,37 @@ static const Avm2CharInfo* char_info(uint16_t char_id)
 	return NULL;
 }
 
+// Ruffle library.character_by_id(id).is_some(): does this movie DEFINE the
+// character at all? Used for the root SymbolClass binding — a binding whose id
+// names nothing is the movie's root class, whatever the id (movie_clip.rs's
+// `None =>` arm: "most SWFs use id 0 here, but some obfuscated SWFs can use
+// other invalid IDs"). Every table the emitter can define a character in is
+// checked; missing one would silently promote a real symbol's class to root.
+int avm2_display_char_is_defined(uint16_t char_id)
+{
+	if (char_id == 0) return 1;   // the main timeline is always character 0
+	if (char_info(char_id) != NULL) return 1;
+	for (uint32_t i = 0; i < avm2_generated_timeline_count; i++)
+		if (avm2_generated_timelines[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < avm2_generated_shape_geom_count; i++)
+		if (avm2_generated_shape_geom[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < avm2_generated_button_count; i++)
+		if (avm2_generated_buttons[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < avm2_generated_edittext_count; i++)
+		if (avm2_generated_edittexts[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < avm2_generated_statictext_count; i++)
+		if (avm2_generated_statictexts[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < avm2_generated_bitmap_count; i++)
+		if (avm2_generated_bitmaps[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < avm2_generated_binary_count; i++)
+		if (avm2_generated_binaries[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < avm2_generated_sound_count; i++)
+		if (avm2_generated_sounds[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < avm2_generated_font_count; i++)
+		if (avm2_generated_fonts[i].font_id == char_id) return 1;
+	return 0;
+}
+
 static const Avm2ShapeGeom* shape_geom_for(uint16_t char_id)
 {
 	for (uint32_t i = 0; i < avm2_generated_shape_geom_count; i++)

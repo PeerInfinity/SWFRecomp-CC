@@ -630,6 +630,9 @@ uint16_t avm2_display_char_for_class(Avm2Class* cls);
 // Build the stage + root (SymbolClass char 0 / bound placed symbols) and
 // remember them on ctx. Called from runSWF_avm2 after script eager-init.
 void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name);
+// Does the movie DEFINE this character? (Ruffle library.character_by_id.)
+// A SymbolClass binding to an id that names nothing binds the ROOT class.
+int avm2_display_char_is_defined(uint16_t char_id);
 // Load a CHILD movie's ABC files into the running context (loader-arc tranche
 // 6): grows ctx->files, publishes each script's traits into the domain and
 // eager-inits every file's last script. Idempotent per tables pointer — a

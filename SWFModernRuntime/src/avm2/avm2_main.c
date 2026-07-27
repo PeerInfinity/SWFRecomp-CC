@@ -355,8 +355,16 @@ void runSWF_avm2(SWFAppContext* app_context)
 	}
 
 	// Step 2: SymbolClass bindings were recorded by the recompiler; the
-	// root binding (char 0) is consumed in step 4. Non-root bindings are
-	// Stage 5 (timeline instantiation).
+	// root binding is consumed in step 4. Non-root bindings are Stage 5
+	// (timeline instantiation).
+	//
+	// The root binding is normally character 0, but Ruffle's SymbolClass loop
+	// (movie_clip.rs, the `None =>` arm) binds the ROOT for any id that names
+	// no character at all — "most SWFs use id 0 here, but some obfuscated SWFs
+	// can use other invalid IDs". loader_loadbytes_url is one: it binds Test to
+	// character 1 and defines no character 1, and without this its Test is
+	// constructed detached and never reaches the stage. A binding to a
+	// character that DOES exist stays a plain symbol binding.
 	const char* root_class = NULL;
 	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
 	{
@@ -364,6 +372,13 @@ void runSWF_avm2(SWFAppContext* app_context)
 		{
 			root_class = avm2_generated_symbol_classes[i].class_name;
 		}
+	}
+	for (uint32_t i = 0; root_class == NULL
+	                     && i < avm2_generated_symbol_class_count; i++)
+	{
+		uint16_t cid = avm2_generated_symbol_classes[i].char_id;
+		if (!avm2_display_char_is_defined(cid))
+			root_class = avm2_generated_symbol_classes[i].class_name;
 	}
 
 	// Step 3: eager-init each ABC's LAST script (the main/root script);
