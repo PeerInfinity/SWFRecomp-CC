@@ -18,6 +18,12 @@ namespace SWFRecomp
 		string output_tags_folder;
 		string output_scripts_folder;
 
+		// Multi-SWF emission (loader-arc tranche 6): see Config. Empty prefix
+		// and zero base = the main movie, and every emitter's output is then
+		// bit-for-bit what it was before these existed.
+		string avm2_symbol_prefix;
+		uint32_t avm2_char_id_base = 0;
+
 		// tag_main is buffered in memory (stringstream) rather than written
 		// directly to disk so the per-frame init prologue placeholder can
 		// be replaced once each frame's DoInitAction / ImportAssets calls

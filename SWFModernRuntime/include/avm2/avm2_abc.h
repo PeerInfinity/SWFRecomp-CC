@@ -513,6 +513,45 @@ extern const uint16_t avm2_generated_header_frames;  // header frame count
 extern const uint32_t avm2_generated_bg_color;       // 0xRRGGBB (SetBackgroundColor)
 
 // ---------------------------------------------------------------------------
+// Per-movie table aggregate (loader-arc tranche 6)
+// ---------------------------------------------------------------------------
+//
+// The MAIN movie has no Avm2MovieTables — it boots from the globals above,
+// which stay exactly as they are. A CHILD movie (a sibling .swf recompiled
+// with `symbol_prefix`/`char_id_base` set) emits its whole table set under
+// prefixed names plus one `<prefix>avm2_movie_tables` bundling them, and the
+// generated movie registry hangs it off MovieEntry.avm2_tables. Loader's SWF
+// arm registers the child from that pointer.
+//
+// Char ids inside a child's tables are already offset by `char_id_base`, so
+// they never collide with the parent's and the runtime's char lookups stay
+// keyed by a bare id — they just gain a second place to look. The movie's own
+// root timeline is the row whose char_id == char_id_base.
+typedef struct Avm2MovieTables
+{
+	const Avm2AbcFileData* const* abc_files;   uint32_t abc_file_count;
+	const Avm2SymbolClassBinding* symbol_classes; uint32_t symbol_class_count;
+	const Avm2TimelineData* timelines;         uint32_t timeline_count;
+	const Avm2CharInfo* chars;                 uint32_t char_count;
+	const Avm2ShapeGeom* shape_geom;           uint32_t shape_geom_count;
+	const Avm2SceneData* scenes;               uint32_t scene_count;
+	const Avm2ButtonData* buttons;             uint32_t button_count;
+	const Avm2EditTextData* edittexts;         uint32_t edittext_count;
+	const Avm2FontData* fonts;                 uint32_t font_count;
+	const Avm2StaticGlyph* static_glyphs;      uint32_t static_glyph_count;
+	const Avm2StaticTextData* statictexts;     uint32_t statictext_count;
+	const Avm2BitmapData* bitmaps;             uint32_t bitmap_count;
+	const Avm2BinaryData* binaries;            uint32_t binary_count;
+	const Avm2SoundData* sounds;               uint32_t sound_count;
+	const int32_t* stage_rect;                 // xmin xmax ymin ymax twips
+	uint16_t frame_rate;                       // 8.8 fixed
+	uint16_t header_frames;
+	uint32_t bg_color;
+	uint32_t char_id_base;
+	uint8_t swf_version;
+} Avm2MovieTables;
+
+// ---------------------------------------------------------------------------
 // Runtime-mutable per-file state
 // ---------------------------------------------------------------------------
 

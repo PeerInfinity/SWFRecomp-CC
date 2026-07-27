@@ -25,6 +25,11 @@ namespace SWFRecomp
 		swf_path = string(swf_path_view);
 		output_tags_folder = string(output_tags_folder_view);
 		output_scripts_folder = string(output_scripts_folder_view);
+
+		// Optional; absent means "this is the main movie" and every emitter
+		// keeps its pre-tranche-6 output exactly.
+		symbol_prefix = string(tbl["input"]["symbol_prefix"].value_or(""sv));
+		char_id_base = (uint32_t) tbl["input"]["char_id_base"].value_or(0);
 	}
 	
 	string_view Config::parseStringView(string key)

@@ -311,6 +311,10 @@ namespace SWFRecomp
 		// finalizeAbcEmit() writes the registry after all tags are parsed
 		// (called from recompile()).
 		abc::AbcEmitter* abc_emitter;
+		// Multi-SWF emission keys (loader-arc tranche 6), copied from the
+		// Context in the constructor. Empty/zero for the main movie.
+		std::string abc_symbol_prefix;
+		u32 abc_char_id_base = 0;
 		// Per-DefineShape geometry (char_id -> shape_data vertex range),
 		// recorded during interpretShape's tessellation pass and handed to the
 		// AVM2 timeline emitter (finalizeAbcEmit) so the AVM2 render walk can

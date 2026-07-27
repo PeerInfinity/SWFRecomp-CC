@@ -35,7 +35,15 @@ namespace abc
 	{
 	public:
 		// output_folder: "RecompiledABC" (created lazily on first tag).
-		explicit AbcEmitter(std::string output_folder = "RecompiledABC");
+		// symbol_prefix: prepended to every emitted FILE name and every
+		//   EXPORTED symbol, so a child movie's ABC can link alongside the
+		//   parent's (loader-arc tranche 6). Empty = main movie, and the
+		//   output is then byte-identical to the pre-tranche-6 emitter.
+		// char_id_base: added to the SymbolClass char ids in the registry,
+		//   matching the same offset applied to the timeline tables.
+		explicit AbcEmitter(std::string output_folder = "RecompiledABC",
+		                    std::string symbol_prefix = "",
+		                    u32 char_id_base = 0);
 
 		// Emits abc<i>_tables.c + abc<i>_methods.c for one DoABC tag.
 		// `bodies` is parallel to abc.method_bodies.
@@ -49,6 +57,8 @@ namespace abc
 
 	private:
 		std::string folder_;
+		std::string prefix_;
+		u32 char_id_base_ = 0;
 		bool dir_created_ = false;
 		int next_tag_index_ = 0;
 

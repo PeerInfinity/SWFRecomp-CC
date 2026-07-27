@@ -35,6 +35,8 @@ int main(int argc, char** argv)
 	context.swf_path = config.swf_path;
 	context.output_tags_folder = "RecompiledTags";
 	context.output_scripts_folder = "RecompiledScripts";
+	context.avm2_symbol_prefix = config.symbol_prefix;
+	context.avm2_char_id_base = config.char_id_base;
 	
 	SWFRecomp::recompile(context);
 	

@@ -13,7 +13,20 @@ namespace SWFRecomp
 		std::string swf_path;
 		std::string output_tags_folder;
 		std::string output_scripts_folder;
-		
+		// Optional multi-SWF keys (loader-arc tranche 6). Both default to the
+		// empty/zero value, and at those defaults the emitted output is
+		// byte-identical to what it was before they existed — a child SWF
+		// recompiled alongside a parent sets them, the main movie never does.
+		//   symbol_prefix: prepended to every EXPORTED symbol and to every
+		//     emitted file name in RecompiledABC/, so a child's tables can be
+		//     linked into the same binary as the parent's.
+		//   char_id_base:  added to every character id in the emitted tables,
+		//     making ids globally unique across movies (the AVM1 pipeline's
+		//     movie_id * 1000 trick). Char ids are u16 in the runtime tables,
+		//     so keep base + max_child_char_id under 65536.
+		std::string symbol_prefix;
+		uint32_t char_id_base = 0;
+
 		Config();
 		void parseFile(std::string path);
 		std::string_view parseStringView(std::string key);

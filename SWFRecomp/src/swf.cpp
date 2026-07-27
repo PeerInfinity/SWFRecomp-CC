@@ -368,6 +368,7 @@ namespace SWFRecomp
 	{
 		if (abc_emitter != nullptr)
 		{
+			int abc_tag_count = abc_emitter->tagCount();
 			abc_emitter->finalize(symbol_class_bindings, header.version);
 			printf("DoABC: wrote RecompiledABC registry (%d tag(s), %zu SymbolClass binding(s))\n",
 			       abc_emitter->tagCount(), symbol_class_bindings.size());
@@ -385,10 +386,17 @@ namespace SWFRecomp
 			tinfo.stage_ymin = header.frame_size.ymin;
 			tinfo.stage_ymax = header.frame_size.ymax;
 			tinfo.shape_geom = &avm2_shape_geom;
+			tinfo.symbol_prefix = abc_symbol_prefix;
+			tinfo.char_id_base = abc_char_id_base;
+			tinfo.abc_file_count = (u32) abc_tag_count;
+			tinfo.symbol_class_count =
+				(u32) (symbol_class_bindings.empty() ? 0
+				                                     : symbol_class_bindings.size());
 			abc::emitAvm2Timeline((const uint8_t*) tags_start,
 			                      (const uint8_t*) swf_buffer + header.file_length,
 			                      tinfo, "RecompiledABC");
-			printf("DoABC: wrote RecompiledABC/abc_timeline.c\n");
+			printf("DoABC: wrote RecompiledABC/%sabc_timeline.c\n",
+			       abc_symbol_prefix.c_str());
 		}
 	}
 	
@@ -422,6 +430,11 @@ namespace SWFRecomp
 							 is_as3(false),
 							 abc_emitter(nullptr)
 	{
+		// Multi-SWF emission keys, carried from the config (loader-arc
+		// tranche 6). Defaults ("" / 0) reproduce the main-movie output.
+		abc_symbol_prefix = context.avm2_symbol_prefix;
+		abc_char_id_base = context.avm2_char_id_base;
+
 		// Configure reusable struct records
 		//
 		// Using a SWFTag without parsing the header
@@ -6314,7 +6327,9 @@ namespace SWFRecomp
 
 						if (abc_emitter == nullptr)
 						{
-							abc_emitter = new abc::AbcEmitter();
+							abc_emitter = new abc::AbcEmitter(
+								"RecompiledABC", abc_symbol_prefix,
+								abc_char_id_base);
 						}
 						abc_emitter->emitAbcTag(abc_file, bodies);
 

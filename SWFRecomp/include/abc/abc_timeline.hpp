@@ -46,6 +46,18 @@ namespace abc
 		// Shape geometry table (char_id -> shape_data vertex range). NULL when
 		// the caller recorded none (e.g. a shapeless AS3 SWF).
 		const std::vector<Avm2ShapeGeomRec>* shape_geom = nullptr;
+		// Multi-SWF emission (loader-arc tranche 6). Empty prefix + zero base
+		// = the main movie: the emitted file is then byte-identical to the
+		// pre-tranche-6 output. A non-empty prefix additionally emits the
+		// `<prefix>avm2_movie_tables` aggregate the runtime registers a child
+		// movie from.
+		std::string symbol_prefix;
+		uint32_t char_id_base = 0;
+		// Sizes the aggregate needs as literals (a `const uint32_t` object is
+		// not a constant expression in C, so it cannot initialize a static
+		// struct). Filled from the ABC emitter by the caller.
+		uint32_t abc_file_count = 0;
+		uint32_t symbol_class_count = 0;
 	};
 
 	// tags_start points at the first RECORDHEADER after the SWF header;
