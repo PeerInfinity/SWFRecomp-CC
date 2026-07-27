@@ -25,9 +25,6 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
-// swf_log_navigate / SWF_LOG_FETCH_ENABLED: the Ruffle test-navigator request
-// log (utils.h), shared with the AVM1 runtime.
-#include <utils.h>
 
 void avm2_register_function_builtins(Avm2Context* ctx);
 
@@ -1904,89 +1901,6 @@ static Avm2Value urlreq_get_headers(Avm2Activation* act)
 static Avm2Value urlreq_set_headers(Avm2Activation* act)
 { Avm2UrlRequestExt* e = urlreq_ext(act); if (e && act->argc > 0) e->request_headers = act->args[0]; return avm2_undefined(); }
 
-// flash.utils.escapeMultiByte (globals/flash/utils.rs): ASCII alphanumerics
-// pass through, every other BYTE of the UTF-8 becomes %XX, and the string ends
-// at the first NUL. URLVariables.toString escapes both halves of every pair.
-static const Avm2String* urlvars_escape(Avm2Context* ctx, const Avm2String* s)
-{
-	char* out = (char*) avm2_alloc(ctx, s->len * 3 + 1);
-	uint32_t n = 0;
-	for (uint32_t i = 0; i < s->len; i++)
-	{
-		unsigned char c = (unsigned char) s->utf8[i];
-		if (c == 0) break;
-		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-		    || (c >= '0' && c <= '9')) out[n++] = (char) c;
-		else n += (uint32_t) snprintf(out + n, 4, "%%%02X", c);
-	}
-	return avm2_string_new(ctx, out, n);
-}
-
-// URLVariables.toString (URLVariables.as): "k=v" pairs joined with "&", in
-// enumeration order. An Array value expands to one pair per element, which is
-// how decode() represents a name that appeared more than once.
-//
-// Ruffle enumerates dynamic properties in HASH-TABLE order (its DynamicMap is
-// an FNV-hashed hashbrown table), we and Flash use insertion order — so a bag
-// with two or more names can stringify in a different order than a Ruffle
-// expectation. Its own `url_vars` test sorts the result to dodge exactly this
-// ("Ruffle's property iteration order is not consistent with Flash's (yet)");
-// `loader_load` does not, and is documented in RUFFLE_VS_FLASH_DIFFERENCES.md.
-static Avm2Value urlvars_to_string(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	const Avm2String* acc = avm2_string_from_literal(ctx, "");
-	if (act->this_val.kind != AVM2_VALUE_OBJECT) return avm2_string(acc);
-	Avm2Object* self = act->this_val.u.obj;
-	const Avm2String* amp = avm2_string_from_literal(ctx, "&");
-	const Avm2String* eq = avm2_string_from_literal(ctx, "=");
-	int first = 1;
-	for (uint32_t e = avm2_object_next_enumerant(self, 0); e != 0;
-	     e = avm2_object_next_enumerant(self, e))
-	{
-		Avm2Value kv = avm2_object_enumerant_name(ctx, self, e);
-		Avm2Value vv = avm2_object_enumerant_value(ctx, self, e);
-		const Avm2String* pe =
-			urlvars_escape(ctx, avm2_coerce_to_string(ctx, kv));
-		Avm2Object* arr = (vv.kind == AVM2_VALUE_OBJECT) ? vv.u.obj : NULL;
-		Avm2ArrayExt* ax = (arr != NULL) ? avm2_array_ext(arr) : NULL;
-		uint32_t count = (ax != NULL) ? ax->length : 1;
-		for (uint32_t i = 0; i < count; i++)
-		{
-			Avm2Value ev = vv;
-			if (ax != NULL)
-			{
-				ev = avm2_array_get(arr, i);
-				if (ev.kind == AVM2_VALUE_HOLE) continue;
-			}
-			if (!first) acc = avm2_string_concat(ctx, acc, amp);
-			first = 0;
-			acc = avm2_string_concat(ctx, acc, pe);
-			acc = avm2_string_concat(ctx, acc, eq);
-			acc = avm2_string_concat(ctx, acc,
-				urlvars_escape(ctx, avm2_coerce_to_string(ctx, ev)));
-		}
-	}
-	return avm2_string(acc);
-}
-
-// URLRequestHeader(name:String = "", value:String = "") — both params coerce
-// to String, so a non-string arg is stringified rather than stored raw.
-static Avm2Value urlreqheader_ctor(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	Avm2Object* self = act->this_val.kind == AVM2_VALUE_OBJECT
-		? act->this_val.u.obj : NULL;
-	if (self == NULL || self->slot_count < 3) return avm2_undefined();
-	for (int i = 0; i < 2; i++)
-	{
-		self->slots[i + 1] = (act->argc > (uint32_t) i)
-			? avm2_string(avm2_coerce_to_string(ctx, act->args[i]))
-			: avm2_string(avm2_string_from_literal(ctx, ""));
-	}
-	return avm2_undefined();
-}
-
 static Avm2Value net_str_const(Avm2Activation* act, const char* s)
 { return avm2_string(avm2_string_from_literal(act->ctx, s)); }
 static Avm2Value net_c_get(Avm2Activation* a){return net_str_const(a,"GET");}
@@ -2000,97 +1914,6 @@ static Avm2Value net_c_binary(Avm2Activation* a){return net_str_const(a,"binary"
 static Avm2Value net_c_vars(Avm2Activation* a){return net_str_const(a,"variables");}
 
 static Avm2Value net_noop(Avm2Activation* act){ (void)act; return avm2_undefined(); }
-// flash.net.navigateToURL(request, window) — globals/flash/net.rs. There is no
-// browser to navigate, so the call itself stays a no-op; what it DOES do is
-// report the request, which is the whole of what net_navigateToURL and
-// navigateToURL_target_normalize grade. Unlike fetch, navigate_to_url is a
-// plain synchronous backend call, so the block prints right here.
-#if SWF_LOG_FETCH_ENABLED
-
-#define AVM2_MAX_NAV_PARAMS 32
-
-static Avm2Value net_navigate_to_url(Avm2Activation* act)
-{
-	Avm2Context* ctx = act->ctx;
-	if (act->argc == 0 || act->args[0].kind != AVM2_VALUE_OBJECT)
-		return avm2_undefined();
-	Avm2Value request = act->args[0];
-	int found = 0;
-	// A null url is #2007 in Ruffle, before the navigator ever sees it.
-	Avm2Value uv = avm2_get_public_property(ctx, request, "url", 3, &found);
-	if (!found || uv.kind == AVM2_VALUE_NULL || uv.kind == AVM2_VALUE_UNDEFINED)
-		return avm2_undefined();
-	const Avm2String* url = avm2_coerce_to_string(ctx, uv);
-	Avm2Value mv = avm2_get_public_property(ctx, request, "method", 6, &found);
-	const Avm2String* method = found ? avm2_coerce_to_string(ctx, mv) : NULL;
-	int is_post = str_eq_lit(method, "POST") || str_eq_lit(method, "post");
-	// swf_log_navigate does the "_blank" normalization (Ruffle normalizes at
-	// the navigator sink, shared by both VMs).
-	const Avm2String* target = (act->argc > 1)
-		? avm2_coerce_to_string(ctx, act->args[1])
-		: avm2_string_from_literal(ctx, "");
-
-	// parse_data: URLVariables becomes the Param list; any other non-null data
-	// is stringified onto the URL's query instead.
-	Avm2Value data = avm2_get_public_property(ctx, request, "data", 4, &found);
-	if (!found) data = avm2_null();
-	SwfLogPair params[AVM2_MAX_NAV_PARAMS];
-	size_t nparams = 0;
-	char url_buf[2048];
-	const char* url_ptr = url->utf8;
-	size_t url_len = url->len;
-	Avm2Class* dcls = (data.kind == AVM2_VALUE_OBJECT)
-		? avm2_value_class(ctx, data) : NULL;
-	int is_vars = 0;
-	for (Avm2Class* c = dcls; c != NULL && !is_vars; c = c->super_class)
-	{
-		is_vars = (c->name.name_len == 12
-		           && memcmp(c->name.name, "URLVariables", 12) == 0);
-	}
-	if (is_vars)
-	{
-		Avm2Object* d = data.u.obj;
-		for (uint32_t e = avm2_object_next_enumerant(d, 0);
-		     e != 0 && nparams < AVM2_MAX_NAV_PARAMS;
-		     e = avm2_object_next_enumerant(d, e))
-		{
-			const Avm2String* k = avm2_coerce_to_string(ctx,
-				avm2_object_enumerant_name(ctx, d, e));
-			const Avm2String* v = avm2_coerce_to_string(ctx,
-				avm2_object_enumerant_value(ctx, d, e));
-			params[nparams].name = k->utf8;
-			params[nparams].name_len = k->len;
-			params[nparams].value = v->utf8;
-			params[nparams].value_len = v->len;
-			nparams++;
-		}
-	}
-	else if (data.kind != AVM2_VALUE_NULL)
-	{
-		const Avm2String* ds = avm2_coerce_to_string(ctx, data);
-		int has_q = 0;
-		for (uint32_t i = 0; i < url->len; i++)
-			if (url->utf8[i] == '?') { has_q = 1; break; }
-		size_t n = 0;
-		for (uint32_t i = 0; i < url->len && n + 1 < sizeof(url_buf); i++)
-			url_buf[n++] = url->utf8[i];
-		if (!has_q && n + 1 < sizeof(url_buf)) url_buf[n++] = '?';
-		for (uint32_t i = 0; i < ds->len && n + 1 < sizeof(url_buf); i++)
-			url_buf[n++] = ds->utf8[i];
-		url_ptr = url_buf;
-		url_len = n;
-	}
-
-	swf_log_navigate(url_ptr, url_len, target->utf8, target->len,
-	                 is_post ? "POST" : "GET", is_post ? 4 : 3,
-	                 params, nparams);
-	return avm2_undefined();
-}
-
-#else
-#define net_navigate_to_url net_noop
-#endif
-
 static Avm2Value net_get_zero(Avm2Activation* act){ (void)act; return avm2_integer(0); }
 static Avm2Value net_get_null(Avm2Activation* act){ (void)act; return avm2_null(); }
 static Avm2Value net_get_true(Avm2Activation* act){ (void)act; return avm2_bool(1); }
@@ -2212,38 +2035,11 @@ static void register_net(Avm2Context* ctx)
 	avm2_builtin_add_static_getset(ctx, df, "BINARY", net_c_binary, NULL);
 	avm2_builtin_add_static_getset(ctx, df, "VARIABLES", net_c_vars, NULL);
 
-	// flash.net.URLRequestHeader — `public final class` with two public String
-	// vars (URLRequestHeader.as). They are real slots, not expandos: the fetch
-	// log reads them back off an array the script built.
-	{
-		Avm2Class* rh = avm2_builtin_class(ctx, "flash.net", "URLRequestHeader",
-		                                   b->object_class);
-		rh->flags |= AVM2_CLASS_FLAG_SEALED;
-		rh->instance_init.fn = urlreqheader_ctor;
-		rh->instance_init.debug_name = "URLRequestHeader";
-		static const char* const nv[2] = { "name", "value" };
-		for (int i = 0; i < 2; i++)
-		{
-			Avm2PropEntry e;
-			memset(&e, 0, sizeof(e));
-			e.key = avm2_public_key(nv[i], (uint32_t) strlen(nv[i]));
-			e.kind = AVM2_PROP_SLOT;
-			e.slot_index = rh->ivtable.slot_count + 1;
-			e.defining_class = rh;
-			rh->ivtable.slot_count++;
-			avm2_vtable_append(ctx, &rh->ivtable, &e);
-		}
-	}
+	(void) avm2_builtin_class(ctx, "flash.net", "URLRequestHeader",
+	                          b->object_class);
 
 	// flash.net.URLVariables — dynamic bag of properties (extends Object).
-	// toString is what makes it usable as URLRequest.data: an empty bag
-	// stringifies to "" (and so sends no body at all), a populated one to a
-	// query string.
-	{
-		Avm2Class* uv = avm2_builtin_class(ctx, "flash.net", "URLVariables",
-		                                   b->object_class);
-		avm2_builtin_add_method(ctx, uv, "toString", urlvars_to_string);
-	}
+	(void) avm2_builtin_class(ctx, "flash.net", "URLVariables", b->object_class);
 
 	// flash.net.URLLoader (extends EventDispatcher). The load pipeline reads
 	// bundled sibling assets and lives with Loader's in avm2_display.c, which
@@ -2268,8 +2064,7 @@ static void register_net(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, lc, "isPerUser", net_get_true, net_noop);
 
 	// Package-level functions.
-	builtin_add_global_fn_ns(ctx, "flash.net", "navigateToURL",
-	                         net_navigate_to_url);
+	builtin_add_global_fn_ns(ctx, "flash.net", "navigateToURL", net_noop);
 	builtin_add_global_fn_ns(ctx, "flash.net", "sendToURL", net_noop);
 }
 

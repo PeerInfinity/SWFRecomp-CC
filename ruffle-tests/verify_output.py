@@ -1637,21 +1637,6 @@ def get_mock_date_time(test_dir):
     return None
 
 
-def get_log_fetch(test_dir):
-    """Parse log_fetch from test.toml.
-
-    Ruffle swaps in a TestNavigatorBackend that traces every request the player
-    would have made; tests with this flag grade that log interleaved with their
-    own traces. The runtime emits it only under -DLOG_FETCH, so every other test
-    stays byte-identical (see SWFModernRuntime/include/utils.h).
-    """
-    toml_path = test_dir / "test.toml"
-    if toml_path.exists():
-        if re.search(r"log_fetch\s*=\s*true", toml_path.read_text()):
-            return True
-    return False
-
-
 def get_self_load(test_dir):
     """Detect if the test loads itself (test.swf loads test.swf into a child MC).
 
@@ -1927,8 +1912,6 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         # 2001-02-03 04:05:06 NPT (UTC+5:45) = 981152406000 ms since epoch
         mock_time = 981152406000
     extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
-    if get_log_fetch(test_dir):
-        extra_defines.append("-DLOG_FETCH=1")
     if is_avm2:
         extra_defines.append("-DSWF_AVM2")
     viewport = get_viewport_dimensions(test_dir)
@@ -2330,8 +2313,6 @@ def compile_wasm(test_dir, num_frames, build_dir):
     if mock_time is None:
         mock_time = 981152406000
     extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
-    if get_log_fetch(test_dir):
-        extra_defines.append("-DLOG_FETCH=1")
     if has_children:
         extra_defines.append("-DHAS_CHILD_MOVIES")
     if has_data_files:

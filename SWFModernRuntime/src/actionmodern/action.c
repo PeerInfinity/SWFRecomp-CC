@@ -15400,53 +15400,6 @@ static ActionVar builtin_mc_getSWFVersion(SWFAppContext* app_context, ActionVar*
 	return result;
 }
 
-// The Ruffle test-navigator navigate log, defined beside actionGetURL below.
-// send_vars_method: 0 = none, 1 = GET, 2 = POST.
-#if SWF_LOG_FETCH_ENABLED
-static void avm1_log_navigate(SWFAppContext* app_context, const char* url,
-                              const char* target, u8 send_vars_method);
-static int avm1_var_to_utf8(SWFAppContext* app_context, const ActionVar* v,
-                            char* out, int cap);
-#else
-#define avm1_log_navigate(app_context, url, target, m) ((void) 0)
-#endif
-
-// MovieClip.prototype.getURL(url, window, method) — globals/movie_clip.rs
-// get_url. This is what a BARE `getURL(...)` in a timeline script resolves to
-// as well. There is no browser here, so the call still does nothing beyond
-// reporting the navigation the player would have made.
-static ActionVar builtin_mc_getURL(SWFAppContext* app_context, ActionVar* args,
-                                   u32 num_args, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	ActionVar result = {0};
-	result.type = ACTION_STACK_VALUE_UNDEFINED;
-#if SWF_LOG_FETCH_ENABLED
-	if (num_args == 0) return result;
-	char url_utf8[512], window_utf8[512], method_utf8[32];
-	avm1_var_to_utf8(app_context, &args[0], url_utf8, sizeof(url_utf8));
-	// An fscommand: URL never reaches the navigator.
-	if (strncasecmp(url_utf8, "FSCommand:", 10) == 0) return result;
-	window_utf8[0] = '\0';
-	if (num_args > 1)
-		avm1_var_to_utf8(app_context, &args[1], window_utf8, sizeof(window_utf8));
-	// Only a STRING third argument selects a method (Ruffle matches on
-	// Value::String); anything else means "no vars_method" and so no Method or
-	// Param lines at all.
-	u8 send_vars_method = 0;
-	if (num_args > 2 && args[2].type == ACTION_STACK_VALUE_STRING)
-	{
-		avm1_var_to_utf8(app_context, &args[2], method_utf8, sizeof(method_utf8));
-		if (strcasecmp(method_utf8, "GET") == 0) send_vars_method = 1;
-		else if (strcasecmp(method_utf8, "POST") == 0) send_vars_method = 2;
-	}
-	avm1_log_navigate(app_context, url_utf8, window_utf8, send_vars_method);
-#else
-	(void)app_context; (void)args; (void)num_args;
-#endif
-	return result;
-}
-
 static void initMovieClipPrototype(SWFAppContext* app_context)
 {
 	if (g_movieclip_constructor_init) return;
@@ -15546,16 +15499,6 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		{
 			g_mc_method_funcs[i].function_type = 2;
 			g_mc_method_funcs[i].advanced_func = (Function2Ptr) builtin_mc_getSWFVersion;
-		}
-
-		// MovieClip.prototype.getURL is a real function too — a bare
-		// `getURL(url, window)` in a timeline script resolves through the
-		// prototype chain to exactly this, and geturl_target_normalize grades
-		// what the navigator was handed.
-		if (mc_methods[i].len == 6 && strcmp(mc_methods[i].name, "getURL") == 0)
-		{
-			g_mc_method_funcs[i].function_type = 2;
-			g_mc_method_funcs[i].advanced_func = (Function2Ptr) builtin_mc_getURL;
 		}
 
 		if (function_count < MAX_FUNCTIONS)
@@ -33284,120 +33227,6 @@ static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieCli
  * @param url The URL to load (can be relative or absolute)
  * @param target The target window/frame/level
  */
-
-// --- Ruffle test-navigator navigate log (AVM1) ------------------------------
-//
-// `log_fetch = true` tests grade the request the player WOULD have made
-// (utils.h). Ruffle's action_get_url / action_get_url_2 hand everything that is
-// not an fscommand, a _level load or a loadMovie/loadVariables straight to
-// navigate_to_url_normalized, so this reports at those same two points and
-// changes nothing else — every non-log_fetch build compiles it out.
-#if SWF_LOG_FETCH_ENABLED
-
-#define AVM1_MAX_NAV_PARAMS 32
-#define AVM1_NAV_PARAM_BUF 4096
-
-// Coerce one ActionVar to UTF-8 through the stack, so it picks up the
-// interpreter's own number/object formatting instead of a second, divergent
-// copy of it. Returns the byte length written.
-static int avm1_var_to_utf8(SWFAppContext* app_context, const ActionVar* v,
-                            char* out, int cap)
-{
-	char str_buffer[17];
-	ActionVar copy = *v;
-	out[0] = '\0';
-	pushVar(app_context, &copy);
-	convertString(app_context, str_buffer);
-	u32 u16_len = VAL(u32, &STACK[SP + 8]);
-	const uint16_t* u16_ptr = (const uint16_t*) VAL(u64, &STACK[SP + 16]);
-	int n = 0;
-	if (u16_ptr != NULL && u16_len > 0)
-		n = u16_to_utf8(u16_ptr, u16_len, out, cap);
-	POP();
-	if (n < cap) out[n] = '\0';
-	return n;
-}
-
-// object_into_form_values (avm1/activation.rs): every enumerable property of
-// the scope's locals — for a frame script, the timeline clip's variable object
-// — coerced to a string. AVM1 enumeration is reverse-insertion order, hence the
-// backwards walk; `geturl` pins it ($version was inserted at movie load, so it
-// comes out last).
-//
-// Values are coerced through the stack so they pick up the interpreter's own
-// number/object formatting rather than a second, divergent copy of it. Names
-// and values are packed into `buf` because the property table's ActionVars are
-// UTF-16 and the log wants UTF-8.
-static size_t avm1_collect_form_values(SWFAppContext* app_context, MovieClip* mc,
-                                       SwfLogPair* out, size_t max,
-                                       char* buf, size_t buf_cap)
-{
-	if (mc == NULL || mc->dynamic_props == NULL) return 0;
-	ASObject* obj = (ASObject*) mc->dynamic_props;
-	size_t n = 0;
-	size_t used = 0;
-	char str_buffer[17];
-	for (int i = (int) obj->num_used - 1; i >= 0 && n < max; i--)
-	{
-		ASProperty* p = &obj->properties[i];
-		if (!(p->flags & PROPERTY_FLAG_ENUMERABLE)) continue;
-		if (p->name == NULL) continue;
-		if (used + p->name_length + 1 > buf_cap) break;
-		char* name_dst = buf + used;
-		memcpy(name_dst, p->name, p->name_length);
-		used += p->name_length;
-
-		// Coerce the value: push, convert in place, read back, pop.
-		ActionVar copy = p->value;
-		pushVar(app_context, &copy);
-		convertString(app_context, str_buffer);
-		u32 u16_len = VAL(u32, &STACK[SP + 8]);
-		const uint16_t* u16_ptr = (const uint16_t*) VAL(u64, &STACK[SP + 16]);
-		char* val_dst = buf + used;
-		int val_len = 0;
-		if (u16_ptr != NULL && u16_len > 0 && used < buf_cap)
-		{
-			val_len = u16_to_utf8(u16_ptr, u16_len, val_dst,
-			                      (int) (buf_cap - used));
-		}
-		POP();
-		used += (size_t) val_len;
-
-		out[n].name = name_dst;
-		out[n].name_len = p->name_length;
-		out[n].value = val_dst;
-		out[n].value_len = (size_t) val_len;
-		n++;
-	}
-	return n;
-}
-
-// send_vars_method: 0 = none (no Method/Param lines), 1 = GET, 2 = POST.
-static void avm1_log_navigate(SWFAppContext* app_context, const char* url,
-                              const char* target, u8 send_vars_method)
-{
-	if (url == NULL) url = "";
-	if (target == NULL) target = "";
-	SwfLogPair params[AVM1_MAX_NAV_PARAMS];
-	char buf[AVM1_NAV_PARAM_BUF];
-	size_t nparams = 0;
-	const char* method = NULL;
-	if (send_vars_method == 1 || send_vars_method == 2)
-	{
-		method = (send_vars_method == 2) ? "POST" : "GET";
-		extern MovieClip root_movieclip;
-		MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
-		nparams = avm1_collect_form_values(app_context, mc, params,
-		                                   AVM1_MAX_NAV_PARAMS, buf,
-		                                   sizeof(buf));
-	}
-	swf_log_navigate(url, strlen(url), target, strlen(target),
-	                 method, method != NULL ? strlen(method) : 0,
-	                 params, nparams);
-}
-
-#endif
-
 void actionGetURL(SWFAppContext* app_context, const char* url, const char* target)
 {
 	// Handle FSCommand: protocol (e.g. GetURL "FSCommand:quit", "")
@@ -33485,12 +33314,6 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		}
 		return;
 	}
-
-	// Everything past the fscommand and _level branches is a navigation as far
-	// as Ruffle is concerned (action_get_url has no named-clip case), so the
-	// report goes here — ahead of the named-clip loadMovie path we keep for
-	// real content. GetURL carries no vars_method, hence no Method line.
-	avm1_log_navigate(app_context, url, target, 0);
 
 	// Reserved browser frame targets are handled by the browser-navigation
 	// branch below (browser-WASM) or silently ignored (native / trace).
@@ -46609,14 +46432,9 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			actionGetURL(app_context, url_utf8, target_utf8);
 			return;
 		}
-
-		// The plain `getURL` case (action_get_url_2's tail): report the
-		// navigation, sending the scope's variables as form values when the
-		// action carries a method. Browser navigation itself is still not
-		// implemented here.
-		avm1_log_navigate(app_context, url_utf8, target_utf8, send_vars_method);
 	}
 
+	// Browser navigation not yet implemented
 	(void)send_vars_method;
 }
 
