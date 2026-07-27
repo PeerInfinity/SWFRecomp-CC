@@ -476,13 +476,13 @@ predicted test is among them.** Both need uncaught-error tracing, which is
 un-landable on its own (see "The tracing tripwire"), and `loader_load` is
 unreachable outright. The four gains are all adopters from the sweep.
 
-The four gains are **not on master**: tranche 5's code triggers an
-`avm2/edittext_align` segfault (§"The edittext_align crash" below) and is
-reverted in `d05e75eb2`. This section records work that is ready to re-land
-behind one small isolation experiment, plus a sampling error worth not
-repeating.
+The four gains were reverted (`d05e75eb2`) on an `avm2/edittext_align`
+segfault attribution that **does not hold up** — see §"The edittext_align
+crash" below, rewritten 2026-07-27. They are back on master as of `7a4dc6fba`,
+and the two `*_target_normalize` tests came out of `ignored_tests.txt` with
+them.
 
-| Gain (reverted; ready to re-land) | Suite | Predicted? |
+| Gain (on master, `7a4dc6fba`) | Suite | Predicted? |
 |---|---|---|
 | `net_navigateToURL` | avm2 | sweep candidate |
 | `navigateToURL_target_normalize` | avm2 | sweep candidate |
@@ -494,38 +494,60 @@ Line movement in the still-failing tests: `loader_load` 12 → 124,
 matching lines; `import_assets/empty_url` (the one `log_fetch` test that
 passed before this work, with **no** fetch lines expected) still passes.
 
-### The edittext_align crash — attributable, and the sampling error
+### The edittext_align crash — unattributed, and the instrument that was never checked
+
+*(Rewritten 2026-07-27. The previous version of this section claimed a
+deterministic 6/6-vs-6/6 A/B. It is wrong on its own evidence; the correction
+is below, and the tranche is back on master in `7a4dc6fba`.)*
 
 `avm2/edittext_align` emits all 60/60 correct lines and then SIGSEGVs, in
-graphics CI only (it passes `no-graphics` at every SHA tried). Tranche 5's
-code triggers it, which is why the tranche is **reverted** (`d05e75eb2`) and
-the +4 is not on master.
+graphics CI only (it passes `no-graphics` at every SHA tried).
 
-Both arms, single-test job, N>=5:
+**The single-test job does not reproduce this crash. At all. On any arm.**
+That is the finding that voids everything built on top of it. Every one of the
+twelve runs in the old table logs `Pass: 1 / Fail: 0` in its own "Verify
+single test" step — read them:
 
-| Arm | Runs | Result |
+| Arm | Runs | Old table said | The runs actually say |
+|---|---|---|---|
+| baseline `68325524d` | `30282115559`, `30283701453`, `30283714574`, `30283727127`, `30283739345`, `30283751123` | 6/6 pass | 6/6 pass |
+| with tranche 5 | `30281823960`, `30283224563`, `30283238013`, `30283250973`, `30283264090`, `30283277357` | 6/6 **segfault** | 6/6 **pass** |
+| tranche 5 minus `URLRequestHeader` (`t5-iso-v1`) | `30285702320`, `30285709303`, `30285715938`, `30285723078`, `30285729568` | — | 5/5 pass |
+
+Seventeen single-test dispatches, zero segfaults, both arms. `gh run view`'s
+**conclusion is `success` either way** — it reports whether the *job* finished,
+not whether the test passed — so an A/B read off conclusions produces exactly
+this: a clean-looking separation that isn't there. Read the `Verify single
+test` step's `Pass:`/`Fail:` lines, never the run conclusion.
+
+**The instrument that does reproduce it is a full shard run**, and its record
+doesn't support the attribution either. Status of `edittext_align` in
+`avm2/_results/results_graphics.json` across the last 25 published full
+graphics runs:
+
+| SHA | What it is | Result |
 |---|---|---|
-| baseline `68325524d` | `30282115559`, `30283701453`, `30283714574`, `30283727127`, `30283739345`, `30283751123` | **6/6 pass** |
-| with tranche 5 | `30281823960`, `30283224563`, `30283238013`, `30283250973`, `30283264090`, `30283277357` | **6/6 segfault** |
+| `1884c6ab9` (07-25) | pre-`add3e60ce` | segfault — the UAF `add3e60ce` fixed |
+| `24cb841ec`, `9f4be9647`, `8213dd4d6`, `28577da2a` | post-fix, no tranche 5 | pass ×4 |
+| `a9900a478` | **tranche 5 itself** | **pass** |
+| `dfef7a9d6` | tranche 5, tracing reverted | **segfault** |
 
-Permutation p ~ 1/924.
+One post-fix segfault, in 2 tranche-5-bearing runs vs 0 in 4 without. Fisher
+p ~ 0.33. Tranche 5's own commit passed. Unattributed.
 
-**One anomaly, recorded so it is not re-mistaken for signal:** run
-`30282637117` segfaulted at `e346c80f0`, whose build inputs are
-byte-identical to baseline (verified across `SWFModernRuntime/`, `SWFRecomp/`
-— which holds `MAIN_C` — and `verify_output.py`; only two generated `.md`
-reports differ). Against 6/6 pass on that arm it reads as a ~1-in-7
-background flake.
+**Even the refuted claim did not justify the revert.** It traded 4 verified
+passes for 1 intermittent segfault on a test whose 60/60 lines all match.
 
-**The methodology lesson, twice learned the hard way.** This attribution was
-first called settled on ONE trial per arm; then reversed to "~50% flake, not
-attributable" on ONE anomalous run against six; then settled again on N>=5
-per arm. Both wrong calls came from acting on a sample of one or two. The A/B
-was always the right *shape* — same job type, same environment, baseline vs
-head. **Establish the per-SHA repeat rate first, N>=5, in both directions,
-before and after concluding anything.** Note also that "flaky" is not "not a
-bug": this test was dismissed as a CI flake for months once before and turned
-out to be a genuine UAF (fixed `add3e60ce`).
+**The methodology lesson, now three wrong calls deep.** Settled on N=1 per arm;
+reversed on one anomaly against six; "settled" again on an N>=6 A/B whose runs
+were never read. N>=5 per arm was the right rule and it did not save this
+attribution, because **sample size cannot rescue an instrument that has no
+sensitivity to the thing being measured**. Before running the A/B, establish
+that the instrument reproduces the failure on the arm where it is *expected* —
+if the "bad" arm never fails under your probe, you are not measuring the bug.
+That check is one run and it was never done. Note also that "flaky" is not
+"not a bug": this test was dismissed as a CI flake for months once before and
+turned out to be a genuine UAF.
 
 **What is known about the crash itself** — still unexplained:
 
@@ -542,21 +564,16 @@ Both ASan runs only trip **LeakSanitizer** on pre-existing
 `verify_output --asan` score the test `runtime_error`. Read the SUMMARY line
 before calling an ASan run a reproduction.
 
-**The cheap next step, now that the trigger reproduces at 100%: bisect WITHIN
-tranche 5.** Its only always-on parts (everything else is behind
-`-DLOG_FETCH`, which no other test sets) are:
-
-1. `URLRequestHeader` gaining a constructor + two slots — needed *solely* by
-   `loader_load`, which is unreachable anyway, so this one is **free to
-   drop**;
-2. `URLVariables.toString`;
-3. `MovieClip.prototype.getURL` becoming a real function instead of a
-   name-only stub.
-
-`edittext_align` uses none of them, so whichever one triggers it is a pointer
-at the real bug, not at a mistake in tranche 5. A single-test dispatch is
-~2 min; 5 runs per variant isolates it. If (1) is the trigger, the +4 lands
-unchanged with it dropped.
+**What a next attempt would need.** Not a bisect — there is nothing to bisect
+until something reproduces on demand. The probe has to run in the *shard*
+environment (many tests sequentially in one job, under load), because that is
+the only place the crash has ever been seen: 0/17 single-test dispatches,
+0/70 local, 2/25 full runs. A `categories=avm2` dispatch is the smallest
+shard-shaped instrument; its base rate has to be characterized first, and at
+~8% the N needed to separate arms is large. Cheaper angles worth trying before
+spending that: run `edittext_align` under a shard-like sequential harness
+locally with the CI renderer, or instrument the exit path (the crash is after
+the last graded line, so it is in teardown/render-flush, not in the trace).
 
 ### The tracing tripwire (CI `30235525066`, reverted in `d1c307c51`)
 
