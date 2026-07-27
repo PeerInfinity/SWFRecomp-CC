@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-27T18:12:25.934960+00:00",
-    "git_sha": "5a7162e20401595b2ec4487dbe7c347cc47113be",
-    "duration_seconds": 110.54,
+    "timestamp": "2026-07-27T18:48:15.289665+00:00",
+    "git_sha": "2bc6c9b9b0c8ce4e5f1d42c31208bd1e9d20bc79",
+    "duration_seconds": 115.08,
     "total_available": 6,
     "shards": 30,
     "expected_shards": 30,
@@ -24,7 +24,7 @@
       "test": "device_font_glyph_fallback",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.655,
+        "compile": 24.928,
         "run": 0.165
       },
       "num_frames": 1,
@@ -33,7 +33,7 @@
         "expected_lines": 36,
         "matching_lines": 29
       },
-      "duration": 23.83,
+      "duration": 25.1,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=36, expected=36)",
       "actual_output": "Text: a\n  Text runs:\n    Text runs (1):\n    from 0 to 1: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0: x=2, y=2, width=6, height=13.6\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width=6\nText: ab\n  Text runs:\n    Text runs (1):\n    from 0 to 2: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0: x=2, y=2, width=6, height=13.6\n    1:\n      x=8, y=2\n      width is zero? false\n      height is zero? false\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width is zero? false\n    width is 10? false\nText: b\n  Text runs:\n    Text runs (1):\n    from 0 to 1: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0:\n      x=2, y=2\n      width is zero? false\n      height is zero? false\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width is zero? false\n    width is 10? false",
@@ -43,7 +43,7 @@
       "test": "device_font_kerning",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.74,
+        "compile": 24.763,
         "run": 0.215
       },
       "num_frames": 1,
@@ -52,7 +52,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 25.98,
+      "duration": 25.0,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -73,8 +73,8 @@
       "test": "device_font_list",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.216,
-        "run": 0.114
+        "compile": 24.474,
+        "run": 0.165
       },
       "num_frames": 1,
       "lines": {
@@ -82,7 +82,7 @@
         "expected_lines": 64,
         "matching_lines": 6
       },
-      "duration": 20.34,
+      "duration": 24.65,
       "status": "output_mismatch",
       "detail": "58 line(s) differ (actual=48, expected=64)",
       "actual_output": "Testing CSS font list fallback:\n  Embedded? = false\n  Font list? = Totally Unknown, TestFontA , TestFontB\nTesting TextFormat font list fallback:\n  Embedded? = false\n  Font list? = Totally Unknown, TestFontA , TestFontB\nTesting CSS font list fallback:\n  Embedded? = false\n  Font list? =  testFOntB  , TestFontA , TestFontB\nTesting TextFormat font list fallback:\n  Embedded? = false\n  Font list? =  testFOntB  , TestFontA , TestFontB\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = Totally Unknown, EmbeddedTestFontA, EmbeddedTestFontB\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = Totally Unknown, EmbeddedTestFontA, EmbeddedTestFontB\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA  \nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA  \nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA  \nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA  \nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   embeddedTESTFonta\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   embeddedTESTFonta",
@@ -92,7 +92,7 @@
       "test": "embed_matching/fallback_preferences",
       "phases": {
         "recomp": 0.195,
-        "compile": 25.568,
+        "compile": 26.43,
         "run": 0.516
       },
       "num_frames": 1,
@@ -101,7 +101,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 26.86,
+      "duration": 27.74,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -119,7 +119,7 @@
       "test": "embed_matching/match_style",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.981,
+        "compile": 6.01,
         "run": 0.315
       },
       "num_frames": 1,
@@ -128,7 +128,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.54,
+      "duration": 6.57,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -146,8 +146,8 @@
       "test": "embed_matching/no_font_found",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.143,
-        "run": 0.315
+        "compile": 5.253,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -155,7 +155,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.66,
+      "duration": 5.66,
       "image_comparisons": {
         "output": {
           "status": "pass",
