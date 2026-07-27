@@ -6,10 +6,13 @@
 # --- Navigator/getURL (Ruffle-internal tracing) ---
 # These tests trace Ruffle's internal navigator dispatch output
 # (`Navigator::navigate_to_url:` + URL/Target lines), not Flash trace output.
-# We don't emit Ruffle's navigator log, so these can never match line-for-line.
+# Loader-arc tranche 5 emits that log (utils.c swf_log_navigate, gated on the
+# per-test `log_fetch` key), so the two *_target_normalize tests now pass and
+# are no longer ignored. `geturl` stays: it additionally wants Param:/Body:
+# form values — the root timeline's variables in enumeration order — which live
+# in the global var_array/var_map with no insertion order to walk. Same gap as
+# `for (i in _root)`; see loader-arc.md §7.
 geturl
-geturl_target_normalize
-geturl_opcode_target_normalize
 
 # --- Network/form loading (no multi-SWF infrastructure needed) ---
 # These tests require network connections, HTTP POST, or browser-level form submission.
