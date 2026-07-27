@@ -6,18 +6,18 @@
     "total_available": 717,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 45,
+    "ignored_count": 43,
     "filtered": true
   },
-  "total": 672,
+  "total": 674,
   "pass": 635,
   "ruffle_matched": 12,
-  "fail": 25,
-  "pass_rate": 94.5,
+  "fail": 27,
+  "pass_rate": 94.2,
   "effective_pass": 647,
-  "effective_pass_rate": 96.3,
+  "effective_pass_rate": 96.0,
   "breakdown": {
-    "output_mismatch": 25,
+    "output_mismatch": 27,
     "ruffle_matched": 12
   },
   "tests": [
@@ -4321,6 +4321,44 @@
       },
       "duration": 1.32,
       "status": "pass"
+    },
+    {
+      "test": "geturl_opcode_target_normalize",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.225,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 45,
+        "matching_lines": 0
+      },
+      "duration": 1.23,
+      "status": "output_mismatch",
+      "detail": "45 line(s) differ (actual=0, expected=45)",
+      "actual_output": "",
+      "expected_output": "Navigator::navigate_to_url:\n  URL: https://example.com/0\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/1\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/2\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/3\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/4\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/5\n  Target: _self\nNavigator::navigate_to_url:\n  URL: https://example.com/6\n  Target: self\nNavigator::navigate_to_url:\n  URL: https://example.com/7\n  Target: myWindow\nNavigator::navigate_to_url:\n  URL: https://example.com/8\n  Target: \nNavigator::navigate_to_url:\n  URL: https://example.com/10\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/11\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/12\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/13\n  Target: _blank\nNavigator::navigate_to_url:\n  URL: https://example.com/14\n  Target: _self\nNavigator::navigate_to_url:\n  URL: https://example.com/15\n  Target: myWindow"
+    },
+    {
+      "test": "geturl_target_normalize",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.791,
+        "run": 0.004
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 35,
+        "expected_lines": 89,
+        "matching_lines": 4
+      },
+      "duration": 19.8,
+      "status": "output_mismatch",
+      "detail": "85 line(s) differ (actual=35, expected=89)",
+      "actual_output": "// target: [_blank]\n\n// target: [blank]\n\n// target: [BLANK]\n\n// target: [_Blank]\n\n// target: [_BLANK]\n\n// target: [bLaNk]\n\n// target: [_BlAnK]\n\n// target: [_self]\n\n// target: [self]\n\n// target: [_parent]\n\n// target: [parent]\n\n// target: [_top]\n\n// target: [top]\n\n// target: [myWindow]\n\n// target: []\n\n// target: [_custom]\n\n// target: [blanket]\n\n// target: [_blanker]",
+      "expected_output": "// target: [_blank]\nNavigator::navigate_to_url:\n  URL: https://example.com/0\n  Target: _blank\n\n// target: [blank]\nNavigator::navigate_to_url:\n  URL: https://example.com/1\n  Target: _blank\n\n// target: [BLANK]\nNavigator::navigate_to_url:\n  URL: https://example.com/2\n  Target: _blank\n\n// target: [_Blank]\nNavigator::navigate_to_url:\n  URL: https://example.com/3\n  Target: _blank\n\n// target: [_BLANK]\nNavigator::navigate_to_url:\n  URL: https://example.com/4\n  Target: _blank\n\n// target: [bLaNk]\nNavigator::navigate_to_url:\n  URL: https://example.com/5\n  Target: _blank\n\n// target: [_BlAnK]\nNavigator::navigate_to_url:\n  URL: https://example.com/6\n  Target: _blank\n\n// target: [_self]\nNavigator::navigate_to_url:\n  URL: https://example.com/7\n  Target: _self\n\n// target: [self]\nNavigator::navigate_to_url:\n  URL: https://example.com/8\n  Target: self\n\n// target: [_parent]\nNavigator::navigate_to_url:\n  URL: https://example.com/9\n  Target: _parent\n\n... (39 lines after) ..."
     },
     {
       "test": "global_array",

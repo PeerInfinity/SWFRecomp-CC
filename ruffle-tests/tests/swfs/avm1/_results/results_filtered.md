@@ -6,26 +6,26 @@
 
 **Run Duration**: 77m 45s
 
-**Filtered**: 45 tests ignored out of 717 available
+**Filtered**: 43 tests ignored out of 717 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 672 |
-| Passing | **635** (94.5%) |
+| Total tests | 674 |
+| Passing | **635** (94.2%) |
 | Ruffle-matched | 12 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **647** (96.3%) |
-| Failing | 25 |
-| Total expected lines | 107743 |
-| Matching lines | 104066 (96.6%) |
-| Mismatched lines | 3677 |
+| Effective pass | **647** (96.0%) |
+| Failing | 27 |
+| Total expected lines | 107877 |
+| Matching lines | 104070 (96.5%) |
+| Mismatched lines | 3807 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 25 | 100.0% |
+| Output Mismatch | 27 | 100.0% |
 
 ## Passing Tests
 
@@ -720,7 +720,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**25 tests** with output mismatch, sorted by match rate (best first)
+**27 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -747,8 +747,10 @@ No timeouts.
 | 21 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
 | 22 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
 | 23 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
-| 24 | `file_reference_list_asbroadcaster` | 0.0% | 0/9 | 6 | 9 |  |
-| 25 | `textfield_asbroadcaster` | 0.0% | 0/14 | 10 | 14 |  |
+| 24 | `geturl_target_normalize` | 4.5% | 4/89 | 35 | 89 |  |
+| 25 | `file_reference_list_asbroadcaster` | 0.0% | 0/9 | 6 | 9 |  |
+| 26 | `geturl_opcode_target_normalize` | 0.0% | 0/45 | 0 | 45 |  |
+| 27 | `textfield_asbroadcaster` | 0.0% | 0/14 | 10 | 14 |  |
 
 ## Investigation Documents
 
@@ -861,4 +863,4 @@ No timeouts.
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 5 | 5 | 0 |
 | 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 28 | 28 | 0 |
-| | *(tests not in any document)* | 212 | 179 | 33 |
+| | *(tests not in any document)* | 214 | 179 | 35 |
