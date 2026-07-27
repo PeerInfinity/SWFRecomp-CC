@@ -1,8 +1,9 @@
-# Loader arc — scoping (triage + tranches, no implementation yet)
+# Loader arc — triage + tranches
 
 **Created**: 2026-07-26 · **Baseline**: `9f4be9647`'s parent (`cf5b42970`),
 `avm2/_results/results_graphics.json` from CI `30185616752`.
-**Status**: SCOPING ONLY. Nothing in here has been implemented. The
+**Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`) — see
+§5 Postmortem at the bottom. Tranches 3–8 are still scoping only. The
 re-ranked feature-priority list puts the avm2-platform mass next, and
 `flash.display.Loader` is its largest single block.
 
@@ -259,3 +260,95 @@ five (`loaderinfo_events`'s event ordering, the Stage-LoaderInfo split,
 line the gate draws. It is small (one file), self-contained, and
 CI-verifiable, with the only regression risk being the three
 already-passing `loaderinfo_*` tests.
+
+## 5. Postmortem — tranches 1 + 2 (`8213dd4d6`, CI `30226375815`)
+
+**Predicted +8, actual +12. Zero regressions**; every crash bucket flat
+(`recomp_fail` 1, `runtime_error` 8, and segfault/timeout/compile_fail
+still absent corpus-wide). Corpus 3818 → 3830 effective over the
+4419-test intersection with `2a03793a6`; avm2 871 → 881, from_shumway
+172 → 174. All eight predicted tests pass; four more came free:
+
+| Gain | Suite | Predicted? |
+|---|---|---|
+| `loaderinfo_loadurl`, `loaderinfo_properties_not_loaded`, `stage_loaderinfo_properties`, `loaderinfo_events`, `jpeg_loader_context` | avm2 | yes (tranche 1) |
+| `loader_unknown_content`, `loader_bytes_unknown_content`, `loaderinfo_more` | avm2 | yes (tranche 2) |
+| `loader_jpegxr`, `loader_jpegxr_alpha` | avm2 | **no — filed as won't-do** |
+| `avm1movie` (→ ruffle_matched), `image-loading` | from_shumway | **no** |
+
+### What the triage got right
+
+Every per-test requirement in buckets A and B held exactly as written.
+The three non-negotiable constraints were the load-bearing ones:
+
+- Keying every gate on the **receiving instance's** stream state, never on
+  "is this a Loader's LoaderInfo", is what let `loaderinfo_properties`
+  (root, frame 2) and `loaderinfo_properties_not_loaded` (fresh Loader)
+  coexist. `loaderinfo_properties`'s reads really are on frame 2 — the
+  recompiled ABC puts `contentType` in `test_fla.MainTimeline::frame2` —
+  so hiding contentType until `init` costs nothing.
+- The Stage's LoaderInfo genuinely had to become a separate object. The
+  split is two lines in `do_get_loader_info` (dispatch on the display
+  ext's `is_stage`) plus a second lazily-built singleton.
+- Firing the root's init/complete immediately after the `exitFrame`
+  broadcast in `avm2_display_run_tick` (Ruffle `run_exit_frame`) produced
+  `loaderinfo_events`'s order on the first try.
+
+### What it got wrong
+
+- **`loader_jpegxr` and `loader_jpegxr_alpha` are not won't-do.** Both
+  were written off as needing a JPEG-XR decoder. They only `trace` the
+  `contentType`, and image comparisons do not gate pass/fail here, so
+  sniffing the `II\xBC` magic and reporting `image/jpegxr` is the entire
+  test. **Lesson: check what a test actually asserts before filing it
+  under a missing decoder** — the `[required_features]` key in
+  `test.toml` describes what *upstream Ruffle* needs to render the frame,
+  not what the trace output needs.
+- **Two `from_shumway` tests outside the scoped 9 came along too**:
+  `avm1movie` (→ ruffle-matched) and `image-loading` (→ pass). The scope
+  only counted the `as3-loader/*` directory, so the "up to 9 in
+  from_shumway" figure was a floor for the wrong reason — Loader work
+  reaches tests whose names never say "loader".
+- `loaderinfo_more` was filed as needing "a `complete` event" — true, but
+  it also pinned the **timing model**: `load()` must defer to the next
+  frame (its two `applicationDomain` traces are both null before the
+  handler runs), while `loader_bytes_unknown_content` proves `loadBytes`
+  is **synchronous** (its whole event sequence prints before the line
+  after the call). That asymmetry was not in the triage and is the single
+  most important behavioural detail in tranche 2.
+- The `#2124` message needs an **absolute** URL (`file:///data.txt`);
+  Ruffle resolves the request URL against the loading movie's URL before
+  the load starts. The triage quoted the message but not the resolution.
+
+### Line-count movement in the not-yet-passing tests
+
+No test anywhere lost matching lines. The largest gains sit in tranche 6's
+bucket, which is the next big block: `loader_events` 8 → 19,
+`loader_loadbytes_events` 2 → 11, `loader_reuse` 7 → 14,
+`from_shumway/as3-loader/loaderinfo/loaded-content-properties` 3 → 35,
+`as3-loader/LoaderTest` 1 → 5. Outside the arc, `delayed_symbolclass`
+3 → 16 and the three `large_preload_*` tests 4–8 → 16–19 — all of them
+were blocked on the same "a Loader never fires anything" hole.
+
+### Shape of the delivered code
+
+`SWFModernRuntime/src/avm2/avm2_display.c` holds the state machine
+(`Avm2LoaderInfoExt` with `kind`/`loaded`/`expose_content`/`init_fired`/
+`complete_fired`/`errored`/`content_type`), the pipeline
+(`loader_sniff`, `loader_resolve_url`, `loader_deliver`, a deferred-load
+queue drained at the tick's start, an active-load list drained after
+`exitFrame`), and the two frame hooks. `avm2_globals.c` holds
+`LoaderContext`/`JPEGLoaderContext`/`ImageDecodingPolicy`.
+`avm2_events.c` gained C-side `ProgressEvent`/`IOErrorEvent` constructors
+and the per-subclass `toString` field lists — the ErrorEvent family was
+inheriting `TextEvent`'s and printing `[TextEvent …]`, which would have
+broken every bucket-B and bucket-G expectation on its own.
+
+### What tranche 3 inherits
+
+`content` is still null for every load and `bytes` still hands back an
+empty ByteArray, because no loaded content is instantiated. The pipeline
+already sniffs PNG/JPEG/GIF correctly and marks the stream loaded, so
+tranche 3 is exactly "decode the bytes stb already can read into a
+`BitmapData`, wrap it in a `Bitmap`, and set it as the stream's root
+clip" — the events, byte accounting and `contentType` around it are done.

@@ -47,12 +47,17 @@ ruffle_matched (236), segfault (3), runtime_error (21), timeout (4) and
 compile_fail (1) **all flat in both**, with **zero pass→fail regressions**.
 Both gains are entirely inside `from_avmplus`.
 
+**Current, at `8213dd4d6` (CI `30226375815`, Loader tranches 1+2):
+3830/4419 effective (86.7%)**, 589 failing. The per-suite table below is
+kept at this figure; the arc rows further down each record the run they
+landed on.
+
 | Suite | eff/total | % | failing | character of the failures |
 |---|---|---|---|---|
 | from_avmplus | **1508/1574** | 95.8 | 66 | **language + builtins** (Tamarin acceptance) |
-| avm2 | 868/1218 | 71.3 | 350 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
+| avm2 | 881/1221 | 72.2 | 340 | **platform APIs** (Loader, net, input, PixelBender, Stage3D) |
 | avm1 | 655/717 | 91.4 | 62 | long tail |
-| from_shumway | 172/229 | 75.1 | 57 | AVM2 half: Loader, timeline nav, fuzz corpus |
+| from_shumway | 174/229 | 76.0 | 55 | AVM2 half: Loader, timeline nav, fuzz corpus |
 | from_gnash (5) | 371/403 | 92.1 | 32 | long tail |
 | misc (9 cats) | 170/205 | 82.9 | 35 | text/fonts/mixed_avm/stage3d markers |
 | regression | 70/70 | 100 | 0 | ours |
@@ -333,7 +338,7 @@ visible next to their yield, not because they are next.
 
 | Failing | Theme | Note |
 |---|---|---|
-| 32 | Loader / URLLoader / loaderInfo | **SCOPED 2026-07-26: `SWFRecompDocs/plans/loader-arc.md`** — per-test triage, 8 tranches, 26 of 32 reachable (+ up to 9 in from_shumway `as3-loader`); 3 won't-do (JPEG-XR ×2, Flex SWZ), 1 belongs to the dual-VM arc. **Not weeks-of-work-before-anything**: tranches 1+2 are 8 tests for a small, one-file change |
+| 21 | Loader / URLLoader / loaderInfo | **SCOPED + tranches 1–2 SHIPPED (`8213dd4d6`): `SWFRecompDocs/plans/loader-arc.md`** — per-test triage, 8 tranches. Tranches 1+2 delivered **+11** (pred. +8) for a small, mostly-one-file change; the two JPEG-XR tests turned out to be trace-only and passed with a magic-byte sniff, no decoder. **NEXT: tranche 3** (image content → `BitmapData`/`Bitmap`, +3) — the events, byte accounting and `contentType` around it are already done. Then tranche 6 (AVM2 child-SWF execution, +6 and up to 9 more in from_shumway) is the one genuinely large item |
 | 30 | Sockets, NetConnection, NetStream, FileReference, SharedObject | network stack |
 | 25 | Focus / Tab / Mouse / Keyboard input | partly reachable via `input.json` injection |
 | 25 | PixelBender (`Shader`) | needs a PBJ interpreter |
@@ -535,7 +540,8 @@ essentially in full; 2/177 was one linking bug, not missing features.
 | ~~—~~ | Builtin-container subclasses (five independent causes) | **11** (pred. 4-6) | medium | **DONE** `20a3d24c7`+`4c6b18d5c`+`505b330f2`+`81b18da78`+`ffe48dff6`, CI `30182973510` |
 | ~~—~~ | `as3/ByteArray` + `recursion/pcre_*` + `from_shumway/lzma_bytes` (five independent causes) | **11** (pred. 8–11) | medium | **DONE** `997d0c003`+`db7135ae5`+`e482c8b02`+`4cdea28fe`+`1884c6ab9`, CI `30185616752`; **timeout 3 → 0** |
 | ~~1~~ | Error-message formatting: `#1063` package-qualified names + `Error.getErrorMessage` | **2** (pred. 2) | small | **DONE `9f4be9647`, CI `30222595084`** (+2, 0 regressions, every crash bucket flat; corpus 3816 → 3818 effective over the 4419-test intersection with `cf5b42970`) — the diagnosis in this row was wrong: nothing was missing from arity checking. `wrong_arg_count` already produced all 7 lines and 6 differed only in how the function name was rendered (unqualified class for constructors; mxmlc's single-colon ABC debug name for methods). `error_geterrormessage` was a genuinely absent 705-entry message table, ported from Ruffle `error_messages.rs` |
-| 2 | avm2-platform mass: Loader (32), net/socket (30), input (25) | ~86 | large | **Loader now scoped**: `SWFRecompDocs/plans/loader-arc.md`. Start at its tranche 1 (per-instance LoaderInfo state machine, +5) |
+| ~~2~~ | Loader tranches 1+2: per-instance LoaderInfo state machine + load pipeline without content | **12** (pred. 8) | small | **DONE `8213dd4d6`, CI `30226375815`** (+12, 0 regressions, every crash bucket flat; corpus 3818 → 3830 effective over the 4419-test intersection with `2a03793a6`) — see `loader-arc.md` §5 Postmortem. The 8 predicted tests, plus `loader_jpegxr`/`loader_jpegxr_alpha` (mis-filed as won't-do: they only trace `contentType`, so a magic-byte sniff is the whole test) and `from_shumway` `avm1movie` + `image-loading`, neither of which the scope counted. No test anywhere lost matching lines |
+| 3 | avm2-platform mass: Loader (21 left), net/socket (30), input (25) | ~76 | large | **Loader tranche 3 next** (image content → `BitmapData`/`Bitmap`, +3, medium); then tranche 4 (URLLoader over bundled data, +1) and 5 (navigator fetch log, +2), both small. Tranche 6 (AVM2 child-SWF execution, +6 avm2 and up to +9 from_shumway) is the large one and the only tranche touching the recompiler + harness rather than just the runtime |
 
 **DONE — the `ecma3/JSON` arc.** `7ad4e0419`, CI `30176986441`: **+5**,
 0 regressions, crash histogram flat. **The diagnosis this table carried
