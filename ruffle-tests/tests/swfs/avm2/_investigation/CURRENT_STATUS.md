@@ -21,13 +21,13 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
-## Loader / LoaderInfo — tranches 1–5 SHIPPED (2026-07-26/27)
+## Loader / LoaderInfo — tranches 1–6a SHIPPED (2026-07-26/27)
 
 Full plan + per-tranche postmortems:
 **`SWFRecompDocs/plans/loader-arc.md`** (per-test triage of all 35
 `loader*`/`loaderinfo*` tests, 8 ranked tranches; §5 covers 1+2, §6 covers
-3+4, §7 covers 5). The "flash.display.Loader (deferred)" line in the Stage
-8/9 notes below is now out of date.
+3+4, §7 covers 5, §8 covers 6a). The "flash.display.Loader (deferred)" line
+in the Stage 8/9 notes below is now out of date.
 
 - **Tranches 1+2** (`8213dd4d6`, CI `30226375815`): **+12** (predicted 8).
   Per-instance `LoaderInfo` state machine — every getter now keys on the
@@ -39,9 +39,11 @@ Full plan + per-tranche postmortems:
   (predicted 4). Image payloads decode through stb into a
   `BitmapData`/`Bitmap` `content`, and `URLLoader` really reads bundled
   sibling assets.
-- **Tranche 5** (navigator fetch log): implemented, **REVERTED**
-  (`d05e75eb2`) — it triggers an `avm2/edittext_align` segfault, 6/6 vs 6/6
-  against baseline. Worth **+2 in this suite** —
+- **Tranche 5** (navigator fetch log): shipped, reverted on an
+  `avm2/edittext_align` attribution that did not survive reading the runs it
+  cited, **RE-LANDED `7a4dc6fba`** (§7 — every one of the twelve single-test
+  runs in that A/B logs `Pass: 1`; `gh run view`'s conclusion is `success`
+  for a segfaulting test). Worth **+2 in this suite** —
   `net_navigateToURL`, `navigateToURL_target_normalize` — plus 2 in avm1
   (see that suite's status). The runtime now emits Ruffle's
   `TestNavigatorBackend` request log under `-DLOG_FETCH` (set from
@@ -51,6 +53,18 @@ Full plan + per-tranche postmortems:
   enumeration (`avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md`
   §"AVM2 dynamic-property enumeration order"), and `loader_method` sits at
   83/85 waiting on uncaught-error tracing.
+- **Tranche 6a** (`16955d6e8`+`e0d53f7c3`+`5a7162e20`+`2bc6c9b9b`, CI
+  `30290049993`): **+9 corpus-wide** (predicted 3), **+4 in this suite** —
+  `loader_events`, `loader_reuse`, `loader_loadbytes_events`,
+  `displayobject_set_name_loaded`. A Loader-loaded AVM2 child SWF now really
+  runs: the recompiler emits a sibling's tables under a `symbol_prefix` with
+  its char ids offset by a `char_id_base`, the harness links them plus the
+  decompressed movie image off `MovieEntry`, and `loader_deliver` registers
+  the ABC, builds the root, runs its constructor, attaches it and catches it
+  up one frame. **NEXT = 6b**: `loader_loaderurl` (2/6) and
+  `loader_loadbytes_url` (1/12) want "the URL of the movie that ISSUED the
+  load"; `li_get_loader_url`/`loader_absolute_url` hardcode the root SWF's,
+  and 6a's `loader_info` back-pointer on a child root is the hook.
 
 Findings worth having here rather than only in the plan:
 

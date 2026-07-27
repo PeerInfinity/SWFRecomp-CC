@@ -2,6 +2,17 @@
 
 Last updated: 2026-05-08 (CI `e0d15089`, run `25578374215` — Part C: `avm1/moviecliploader` 6/7 → **PASS (7/7)**. Flat suite filtered effective 75/76 → **76/76 (100%)**; avm1 sub-tree raw 45 → 46 PASS. After Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]`, the loadee MC is now registered with `actionRegisterLevelAdvance` so `frame_funcs[1..N-1]` fire on subsequent ticks via the existing per-tick `actionAdvancePlayingLevels` path. Zero regressions across other suites.)
 
+## AVM2 half — `as3-loader` (2026-07-27, CI `30290049993`)
+
+The AVM2 sub-tree is tracked in `SWFRecompDocs/plans/loader-arc.md`, not
+here; this suite is otherwise an AVM1 document. Loader tranche 6a
+(`5a7162e20`) made a Loader-loaded AVM2 child SWF actually execute and took
+this suite **175 → 178 effective**: `as3-loader/LoaderTest` (5/9 →
+**ruffle-matched**), `as3-loader/bug1093712/loader`, and `as3-interfaces`.
+`as3-loader/loaderinfo/loaded-content-properties` improved 36/48 → 43/48
+without passing — what is left is `sandboxBridge`, `uncaughtErrorEvents`,
+`isURLInaccessible` and a `#2098`, none of them Loader timing.
+
 ## Latest fixes (2026-05-08, in CI at `e0d15089` — Part C — child-SWF multi-frame advance)
 
 - **`avm1/moviecliploader` → PASS (7/7).** Implements `complete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part C with one change in `SWFModernRuntime/src/actionmodern/action.c::actionFirePendingLoadInits`: after Phase 2 runs `entry->frame_funcs[0]` in the target MC's context, call `actionRegisterLevelAdvance(target, entry)` when `entry->frame_count > 1`. Reuses the existing per-tick mechanism that loadMovieNum (level loads) uses — `actionAdvancePlayingLevels` is called from `swf_core.c` / `swf_headless.c` top-of-tick, swaps to the loadee's display_list + transform_data + SWF version, runs `frame_funcs[current_frame]`, increments `current_frame`, drops the entry once `current_frame >= frame_count`. The "Level" naming is historical — it's a generic per-tick advance for any (MC, entry) pair.
