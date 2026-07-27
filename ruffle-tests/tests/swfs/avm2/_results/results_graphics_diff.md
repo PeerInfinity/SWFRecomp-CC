@@ -1,32 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `2bc6c9b9b0c8` (2026-07-27T18:48:15.203990+00:00)
-**Current:** `3c0d4817f878` (2026-07-27T20:41:44.826409+00:00)
+**Previous:** `3c0d4817f878` (2026-07-27T20:41:44.826409+00:00)
+**Current:** `1b63b2e6d9b3` (2026-07-27T21:16:13.869148+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 866 | 871 | +5 |
+| Passing | 871 | 870 | -1 |
 | Total | 1221 | 1221 | 0 |
-| Pass rate | 70.9% | 71.3% | +0.4% |
-| Mismatched lines | 45787 | 45698 | -89 |
-|   Decreased | | | -89 |
+| Pass rate | 71.3% | 71.3% | 0% |
+| Mismatched lines | 45698 | 45696 | -2 |
+|   Decreased | | | -2 |
 
-## Newly Passing (5)
+## Newly Failing (1)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `loader_error_in_root_ctor` | output_mismatch | 0/4 | 4/4 |
-| `loader_loaderurl` | output_mismatch | 5/6 | 6/6 |
-| `loader_noninteractive_try_click_root` | output_mismatch | 4/5 | 5/5 |
-| `mouse_children` | output_mismatch | 114/192 | 192/192 |
-| `sandbox_type_inherited` | output_mismatch | 1/2 | 2/2 |
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `edittext_align` | segfault | 60/60 | 60/60 |
 
-## Line Count Changed (3)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `mouse_wheel_events` | output_mismatch | 29/36 | 33/36 | -4 |
-| `font_registerfont` | output_mismatch | 8/129 | 8/129 | 0 |
-| `loader_try_click_root` | output_mismatch | 0/16 | 0/16 | 0 |
+| `loader_loadbytes_url` | output_mismatch | 1/12 | 3/12 | -2 |
