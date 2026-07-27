@@ -2,11 +2,11 @@
 
 **Created**: 2026-07-26 · **Baseline**: `9f4be9647`'s parent (`cf5b42970`),
 `avm2/_results/results_graphics.json` from CI `30185616752`.
-**Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`, §5 Postmortem),
-**tranches 3 + 4 SHIPPED** (`f6ba5c677` + `28577da2a`, §6 Postmortem).
-**Tranche 5 is implemented but REVERTED** (`d05e75eb2`, §7 Postmortem) — +4,
-blocked on an `edittext_align` segfault it triggers but does not explain.
-Tranches 6–8 are still scoping only;
+**Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`, §5), **3 + 4 SHIPPED**
+(`f6ba5c677` + `28577da2a`, §6), **5 SHIPPED then reverted then RE-LANDED**
+(`7a4dc6fba`, §7 — the revert's `edittext_align` attribution did not survive
+reading the runs it cited), **6a SHIPPED** (`16955d6e8` + `e0d53f7c3` +
+`5a7162e20`, §8). Tranches 6b/6c–8 are still scoping only;
 tranche 7 shrank to +1 as a side effect of 3. The re-ranked feature-priority
 list puts the avm2-platform mass next, and `flash.display.Loader` is its
 largest single block.
@@ -229,8 +229,9 @@ postmortemed against CI.
 | 2 | **Load pipeline without content** — `open`/`progress`/`complete`/`ioError` dispatch, byte accounting from the real source length, the three-state `bytes`, `#2124` for unknown types, `applicationDomain` from `LoaderContext`, `unload` resetting the stream | B | **+3** (`loader_unknown_content`, `loader_bytes_unknown_content`, `loaderinfo_more`) | small |
 | 3 | ~~**Image content** — stb decode → `BitmapData` → `Bitmap` as `content`, `contentType` per sniffed format~~ **SHIPPED `f6ba5c677`** | C (minus JXR) | **+3** (`loader_image`, `loader_bitmap_transparency`, `loader_loadbytes_invalid_png`) — all three, plus `loader_visibility_interactive` free; see §6 | medium |
 | 4 | ~~**URLLoader over bundled data**~~ **SHIPPED `28577da2a`** | G | **+1** (`url_loader`); prerequisite for two bucket-F tests | small |
-| 5 | **Navigator fetch log** — implemented, **reverted** (`d05e75eb2`) pending an `edittext_align` isolation | E | **+2** (`loader_method`, `loader_load`) — actual **+4**, all adopters outside the arc; neither predicted test landed (§7) | small-medium |
-| 6 | **AVM2 child-SWF execution** — `MovieEntry` gains an ABC/script-init entry point, `generate_child_movie_file` handles `RecompiledABC`, `Loader.load`/`loadBytes` resolve through `findMovieEntry`, child root construction + `addChild` into the Loader, event ordering, LoaderInfo reset on reload | F (unblocked part) | **+6** (`loader_events`, `loader_loadbytes_events`, `loader_reuse`, `loader_loaderurl`, `loader_error_in_root_ctor`, `loader_loadbytes_url`) **+ up to 9** `from_shumway/as3-loader/*` | **large** |
+| 5 | ~~**Navigator fetch log**~~ **SHIPPED `a9900a478`, reverted, RE-LANDED `7a4dc6fba`** — the revert's `edittext_align` attribution did not survive reading the runs it cited (§7) | E | **+2** (`loader_method`, `loader_load`) — actual **+4**, all adopters outside the arc; neither predicted test landed (§7) | small-medium |
+| 6a | ~~**AVM2 child-SWF execution**~~ **SHIPPED `16955d6e8`+`e0d53f7c3`+`5a7162e20`** — emitter prefix/char-id base, `Avm2MovieTables`, register-on-load, the SWF arm of `loader_deliver` | F (unblocked part) | **+3** predicted, **+3** delivered (`loader_events`, `loader_reuse`, `loader_loadbytes_events`) + riders (§8) | **large** |
+| 6b/6c | Per-issuer URL base, AS3 self-load, child-root-ctor error print | F | **+3** (`loader_loaderurl`, `loader_loadbytes_url`, `loader_error_in_root_ctor`) | medium |
 | 7 | **Loader hit-testing** | D (minus AVM1) | ~~+3~~ **+1** — image content alone passed `loader_visibility_interactive` and took `loader_noninteractive_try_click_root` to 4/5, so only `loader_try_click_root` is left and it needs tranche 6's SWF content (§6) | medium |
 | 8 | **Nested-child download + ApplicationDomain isolation** — recurse in `install_test_dir`/`find_child_swfs`, then per-movie domains with duplicate class names | F (blocked part) | **+4** (`loader_child_getdefinition`, `loader_duplicate_class`, `loader_duplicate_coerce`, `loader_duplicate_coerce_new_domain`) | large |
 
@@ -703,3 +704,130 @@ are recoverable verbatim with `git revert d1c307c51`.
 - `loader_load` will not pass on any amount of Loader work; do not re-file
   it under a later tranche.
 - `loader_method` is 83/85, held only by the same two tracing lines.
+
+## 8. Postmortem — tranche 6a (AVM2 child-SWF execution)
+
+**Predicted +3, delivered +3 — the first tranche in this arc whose
+prediction was exactly right**, because it came from a dedicated design pass
+(`loader-arc-tranche6-design.md`) with file:line anchors rather than from
+reading diffs.
+
+| Gain | Suite | Baseline lines |
+|---|---|---|
+| `loader_events` | avm2 | 19/92 |
+| `loader_reuse` | avm2 | 14/38 |
+| `loader_loadbytes_events` | avm2 | 11/30 |
+
+Riders measured locally: `from_shumway/as3-loader/LoaderTest` 5/9 → **ruffle
+match** (effective pass), `as3-loader/loaderinfo/loaded-content-properties`
+36/48 → 43/48 (the remainder is `sandboxBridge`, `uncaughtErrorEvents`,
+`isURLInaccessible` and a `#2098` — unrelated features, not Loader timing).
+
+Shipped in three commits: recompiler (`16955d6e8`), runtime (`e0d53f7c3`),
+harness (`5a7162e20`).
+
+### What the design got right
+
+- **Emitter-side prefixing beat the AVM1-style Python rewriter.** The
+  exported surface really is ~30 names plus file names, everything else was
+  already `static`, and `p = prefix_ + "abc" + tag` covered most of it in one
+  line. The one regex-shaped step that remained — the `avm2_generated_`
+  family in `abc_timeline.cpp` — is a single literal substitution over the
+  emitter's OWN output, applied once, where nothing is emitted pre-prefixed,
+  so it cannot double-apply.
+- **`char_id_base` kept the runtime's key a bare `uint16_t`.** The four
+  lookup scans gained a second source and nothing else changed; none of the
+  ~97 sites reading the `avm2_generated_*` globals were touched. Offsetting
+  in ONE function next to the scanner structs (`offsetCharIds`) is what makes
+  that reviewable — a missed id-valued field would silently resolve to the
+  *parent's* character, which is not a failure mode a test would name.
+- **"Do not touch the `:4418` timing gate"** was correct: the active list
+  already deferred a SWF's init/complete to the next drain, and nothing about
+  child execution needed rescheduling.
+- **The byte-identical invariant was worth the two extra recompiler
+  builds.** `RecompiledABC/` + `RecompiledTags/` + `RecompiledScripts/`
+  regenerated for one avm2 test, diffed against the pre-change binary: zero
+  difference. A recompiler change puts the whole corpus in play; this is the
+  cheapest possible proof that it does not.
+
+### What the design got wrong, and what the tests taught instead
+
+- **`Avm2MovieTables` cannot name the generated counts.** The design's struct
+  sketch initializes from `<p>avm2_generated_*_count`, but those are
+  `const uint32_t` OBJECTS, and C does not accept a const object as a
+  constant expression in a static initializer. Every count is emitted as a
+  literal instead, which meant threading `abc_file_count` /
+  `symbol_class_count` from the ABC emitter into `TimelineEmitInfo`. First
+  compile error of the tranche; would have been the first line of the design
+  had anyone tried it.
+- **"MovieEntry gains ONE field" became three.** The child's DECOMPRESSED
+  bytes are harness-generated (Python decompresses CWS/ZWS and rewrites the
+  header to FWS), not recompiler-generated, so they cannot live in the
+  emitted aggregate. `swf_bytes` / `swf_bytes_len` sit on `MovieEntry`
+  alongside `avm2_tables`. All three are zero-init-safe, which is the
+  property that actually mattered.
+- **Registration must NOT be idempotent.** The design says "idempotent per
+  movie (loader_reuse loads the same child twice)". The opposite is true:
+  Ruffle builds a *fresh movie* per load, so `loader_reuse` expects its
+  child's root script trace BOTH times. What is idempotent is the ABC
+  *loading* (files, domain entries, globals objects are reused); what
+  re-runs is the script init. Getting this backwards costs exactly one line
+  of output and is invisible until you read the expected file.
+- **`expose_content` flips at ATTACH, not at init.** The child's own
+  constructor reads `loaderInfo.url`/`content` as null, and its
+  `addedToStage` handler — one step later, still inside the same load —
+  reads both as populated (`loader_loadbytes_events`). Waiting for
+  `fire_init_and_complete` is one step too late.
+- **The child's first frame runs during the LOAD, not on the next tick.**
+  Ruffle's `catchup_display_object_to_frame`. Two details neither the design
+  nor Ruffle's prose gives you: (1) `check_has_pending_script` only runs when
+  `ctx->frame_phase == PHASE_CONSTRUCT`, so the catch-up has to borrow the
+  phase or the frame script is never armed — it advances the playhead and
+  then silently does nothing; (2) the catch-up IS the movie's first frame, so
+  `skip_next_enter_frame` must be set or a two-frame child runs 1,2,1,2 over
+  four ticks where Flash runs 1,1,2,1. Both were found by reading trailing
+  `Framescript frame N` lines, not by reasoning.
+
+### Shape of the delivered code
+
+Recompiler: `Config`/`Context`/`SWF` carry `symbol_prefix` + `char_id_base`;
+`AbcEmitter` prefixes `p` (which names both files and symbols) and
+`finalize()`'s registry; `abc_timeline.cpp` gains `offsetCharIds`, the
+rename pass, and the `<p>avm2_movie_tables` aggregate.
+
+Runtime: `Avm2MovieTables` in `avm2_abc.h`; `avm2_abc_register_movie` in
+`avm2_main.c`; `g_child_movies` + four extended scans, `loader_boot_child_swf`,
+`loaderinfo_fill_parameters`, the `loader_basename` query strip, the
+`from_fetch` HTTPStatusEvent gate, and the `loader_info` back-pointer on
+`Avm2DisplayObjectExt` (with `do_get_loader_info` walking to the root) in
+`avm2_display.c`. `getMovieEntryAt` joins the generated registry so
+`loadBytes` can match a payload with no filename.
+
+Harness: `recompile_child_swf` writes its own config with the per-child keys
+(it was previously copying the shared config into the temp dir and then
+passing the shared config's absolute path — the copy was dead) and copies
+back `RecompiledABC/`; `generate_child_movie_file` emits the decompressed
+image and the two new pointers.
+
+### What 6b/6c inherit
+
+- `loader_loaderurl` (2/6) and `loader_loadbytes_url` (1/12) need the
+  per-issuer URL base from design §2f: `li_get_loader_url` and
+  `loader_absolute_url` both hardcode the ROOT SWF's URL, and a child that
+  issues a load must resolve against its own. The `loader_info` back-pointer
+  landed in 6a is the hook — route both through the issuing DisplayObject's
+  root LoaderInfo.
+- `loader_error_in_root_ctor` (0/4) still needs the uncaught-error print at
+  the child-root-ctor call site. `loader_boot_child_swf`'s
+  `display_run_constructor` already runs under a catch-all try frame, so the
+  print goes there — NOT via resurrecting the corpus-wide tracing revert
+  (§7's tripwire).
+- **Child geometry rendering is still out of scope** and now explicitly
+  deferred: the AVM2 CPU raster reads the *global* `shape_data` arrays by
+  offset, which a child's prefixed copies cannot feed. These are
+  trace-graded tests, so it costs nothing today; a child SWF whose test
+  grades on an image would need the raster to take its vertex table from the
+  movie's tables.
+- Per-movie `ApplicationDomain` isolation stays tranche 8. 6a runs one global
+  domain with first-match-wins, so a child class name that collides with a
+  parent's resolves to the parent's. None of the tranche-6 targets collide.
