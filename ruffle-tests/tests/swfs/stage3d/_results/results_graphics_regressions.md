@@ -1,12 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 1/5 passing | Graphics: 1/5 passing
+Trace: 1/5 passing | Graphics: 0/5 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (1 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `scissor_rectangle` | Output Mismatch | 0/2 lines match |
 
 ## Graphics Improvements (0 tests)
 
