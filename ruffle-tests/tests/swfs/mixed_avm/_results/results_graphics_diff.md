@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `5a7162e20401` (2026-07-27T18:12:25.949080+00:00)
-**Current:** `2bc6c9b9b0c8` (2026-07-27T18:48:15.303744+00:00)
+**Previous:** `2bc6c9b9b0c8` (2026-07-27T18:48:15.303744+00:00)
+**Current:** `3c0d4817f878` (2026-07-27T20:41:44.930474+00:00)
 
 ## Summary
 
@@ -10,11 +10,6 @@
 | Passing | 3 | 3 | 0 |
 | Total | 11 | 11 | 0 |
 | Pass rate | 27.3% | 27.3% | 0% |
-| Mismatched lines | 30 | 34 | +4 |
-|   Increased | | | +4 |
+| Mismatched lines | 34 | 34 | 0 |
 
-## Status Changed (1)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `avm1_loads_avm2` | compile_fail | output_mismatch | - | 3/7 |
+No changes detected.
