@@ -39,7 +39,9 @@ Full plan + per-tranche postmortems:
   (predicted 4). Image payloads decode through stb into a
   `BitmapData`/`Bitmap` `content`, and `URLLoader` really reads bundled
   sibling assets.
-- **Tranche 5** (navigator fetch log, `a9900a478`): **+2 in this suite** —
+- **Tranche 5** (navigator fetch log): implemented, **REVERTED**
+  (`d05e75eb2`) — it triggers an `avm2/edittext_align` segfault, 6/6 vs 6/6
+  against baseline. Worth **+2 in this suite** —
   `net_navigateToURL`, `navigateToURL_target_normalize` — plus 2 in avm1
   (see that suite's status). The runtime now emits Ruffle's
   `TestNavigatorBackend` request log under `-DLOG_FETCH` (set from
@@ -92,12 +94,13 @@ Related: parameter coercion is attributed to the CALLER (Ruffle coerces the
 signature in `init_from_method`, before the callee's call-stack frame
 exists), so a `#1034` from an argument prints `at Caller/method()`.
 
-**`avm2/edittext_align` is a NONDETERMINISTIC graphics-CI segfault** (all
-60/60 lines correct, then SIGSEGV; ~50% per run; byte-identical builds give
-both outcomes — loader-arc.md §7 has the run table). It is a real
-pre-existing bug, not a flake to dismiss and not attributable to any recent
-commit. Expect the corpus segfault count to flicker 0/1 on unrelated work
-until the graphics job captures a core dump.
+**`avm2/edittext_align` segfaults in graphics CI whenever loader tranche 5's
+code is present** (all 60/60 lines correct, then SIGSEGV; 6/6 with vs 6/6
+without — loader-arc.md §7). The trigger is one of three class-registration
+changes the test never touches, so it points at an underlying bug rather than
+a mistake in that tranche; §7 carries the isolation experiment. ASan is clean
+even with `-DHEAP_PASSTHROUGH` instrumenting the arena, and there is no local
+repro in 70 runs.
 
 Reachable: 12 of the 19 remaining avm2 failures (+ up to 9 in
 `from_shumway/as3-loader`). Next up is tranche 6 (AVM2 child-SWF execution,

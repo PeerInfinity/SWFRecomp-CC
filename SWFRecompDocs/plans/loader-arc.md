@@ -3,8 +3,9 @@
 **Created**: 2026-07-26 · **Baseline**: `9f4be9647`'s parent (`cf5b42970`),
 `avm2/_results/results_graphics.json` from CI `30185616752`.
 **Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`, §5 Postmortem),
-**tranches 3 + 4 SHIPPED** (`f6ba5c677` + `28577da2a`, §6 Postmortem), and
-**tranche 5 SHIPPED** (`a9900a478`, §7 Postmortem, +4).
+**tranches 3 + 4 SHIPPED** (`f6ba5c677` + `28577da2a`, §6 Postmortem).
+**Tranche 5 is implemented but REVERTED** (`d05e75eb2`, §7 Postmortem) — +4,
+blocked on an `edittext_align` segfault it triggers but does not explain.
 Tranches 6–8 are still scoping only;
 tranche 7 shrank to +1 as a side effect of 3. The re-ranked feature-priority
 list puts the avm2-platform mass next, and `flash.display.Loader` is its
@@ -228,7 +229,7 @@ postmortemed against CI.
 | 2 | **Load pipeline without content** — `open`/`progress`/`complete`/`ioError` dispatch, byte accounting from the real source length, the three-state `bytes`, `#2124` for unknown types, `applicationDomain` from `LoaderContext`, `unload` resetting the stream | B | **+3** (`loader_unknown_content`, `loader_bytes_unknown_content`, `loaderinfo_more`) | small |
 | 3 | ~~**Image content** — stb decode → `BitmapData` → `Bitmap` as `content`, `contentType` per sniffed format~~ **SHIPPED `f6ba5c677`** | C (minus JXR) | **+3** (`loader_image`, `loader_bitmap_transparency`, `loader_loadbytes_invalid_png`) — all three, plus `loader_visibility_interactive` free; see §6 | medium |
 | 4 | ~~**URLLoader over bundled data**~~ **SHIPPED `28577da2a`** | G | **+1** (`url_loader`); prerequisite for two bucket-F tests | small |
-| 5 | ~~**Navigator fetch log**~~ **SHIPPED** (`a9900a478`; briefly reverted, restored `1ba22f724`) | E | **+2** (`loader_method`, `loader_load`) — actual **+4**, all adopters outside the arc; neither predicted test landed (§7) | small-medium |
+| 5 | **Navigator fetch log** — implemented, **reverted** (`d05e75eb2`) pending an `edittext_align` isolation | E | **+2** (`loader_method`, `loader_load`) — actual **+4**, all adopters outside the arc; neither predicted test landed (§7) | small-medium |
 | 6 | **AVM2 child-SWF execution** — `MovieEntry` gains an ABC/script-init entry point, `generate_child_movie_file` handles `RecompiledABC`, `Loader.load`/`loadBytes` resolve through `findMovieEntry`, child root construction + `addChild` into the Loader, event ordering, LoaderInfo reset on reload | F (unblocked part) | **+6** (`loader_events`, `loader_loadbytes_events`, `loader_reuse`, `loader_loaderurl`, `loader_error_in_root_ctor`, `loader_loadbytes_url`) **+ up to 9** `from_shumway/as3-loader/*` | **large** |
 | 7 | **Loader hit-testing** | D (minus AVM1) | ~~+3~~ **+1** — image content alone passed `loader_visibility_interactive` and took `loader_noninteractive_try_click_root` to 4/5, so only `loader_try_click_root` is left and it needs tranche 6's SWF content (§6) | medium |
 | 8 | **Nested-child download + ApplicationDomain isolation** — recurse in `install_test_dir`/`find_child_swfs`, then per-movie domains with duplicate class names | F (blocked part) | **+4** (`loader_child_getdefinition`, `loader_duplicate_class`, `loader_duplicate_coerce`, `loader_duplicate_coerce_new_domain`) | large |
@@ -475,12 +476,13 @@ predicted test is among them.** Both need uncaught-error tracing, which is
 un-landable on its own (see "The tracing tripwire"), and `loader_load` is
 unreachable outright. The four gains are all adopters from the sweep.
 
-The tranche was briefly reverted (`55775c6b6`) on a **wrong attribution** of
-the `avm2/edittext_align` crash and restored in `1ba22f724`; the section
-below records how the attribution went wrong, because the methodology error
-is the reusable part.
+The four gains are **not on master**: tranche 5's code triggers an
+`avm2/edittext_align` segfault (§"The edittext_align crash" below) and is
+reverted in `d05e75eb2`. This section records work that is ready to re-land
+behind one small isolation experiment, plus a sampling error worth not
+repeating.
 
-| Gain | Suite | Predicted? |
+| Gain (reverted; ready to re-land) | Suite | Predicted? |
 |---|---|---|
 | `net_navigateToURL` | avm2 | sweep candidate |
 | `navigateToURL_target_normalize` | avm2 | sweep candidate |
@@ -492,42 +494,40 @@ Line movement in the still-failing tests: `loader_load` 12 → 124,
 matching lines; `import_assets/empty_url` (the one `log_fetch` test that
 passed before this work, with **no** fetch lines expected) still passes.
 
-### The edittext_align crash — a real bug, and a wrong attribution
+### The edittext_align crash — attributable, and the sampling error
 
 `avm2/edittext_align` emits all 60/60 correct lines and then SIGSEGVs, in
-graphics CI only. It is **nondeterministic**, roughly a coin flip:
+graphics CI only (it passes `no-graphics` at every SHA tried). Tranche 5's
+code triggers it, which is why the tranche is **reverted** (`d05e75eb2`) and
+the +4 is not on master.
 
-| Run | SHA | Result |
+Both arms, single-test job, N>=5:
+
+| Arm | Runs | Result |
 |---|---|---|
-| `30230575524` | `28577da2a` | pass |
-| `30235525066` | `a9900a478` (log + tracing) | pass |
-| `30238729383` | post-tracing-revert | **segfault** |
-| `30281823960` | `a81aad257` | **segfault** |
-| `30282115559` | `68325524d` baseline | pass |
-| `30282637117` | `e346c80f0` - build inputs **byte-identical to baseline** | **segfault** |
+| baseline `68325524d` | `30282115559`, `30283701453`, `30283714574`, `30283727127`, `30283739345`, `30283751123` | **6/6 pass** |
+| with tranche 5 | `30281823960`, `30283224563`, `30283238013`, `30283250973`, `30283264090`, `30283277357` | **6/6 segfault** |
 
-The last two rows are the proof: the *same build* produced both outcomes.
-This tranche was reverted on the strength of rows 4-5 read as a clean A/B,
-and restored once row 6 showed the revert had not fixed anything.
+Permutation p ~ 1/924.
 
-**The methodology lesson, which is the reusable part: one trial per arm
-cannot attribute a ~50% flake.** The A/B was the right *shape* - same job
-type, same environment, baseline vs head - and still produced a confident,
-wrong answer. Before attributing any crash to a commit, establish the per-SHA
-repeat rate first (N>=5 on ONE arm); if it is neither 0 nor 100%,
-attribution by A/B is not available at all. The "non-monotonic, therefore
-heap-layout-sensitive" reading of rows 1-4 was over-fitting to noise.
+**One anomaly, recorded so it is not re-mistaken for signal:** run
+`30282637117` segfaulted at `e346c80f0`, whose build inputs are
+byte-identical to baseline (verified across `SWFModernRuntime/`, `SWFRecomp/`
+— which holds `MAIN_C` — and `verify_output.py`; only two generated `.md`
+reports differ). Against 6/6 pass on that arm it reads as a ~1-in-7
+background flake.
 
-What is genuinely known:
+**The methodology lesson, twice learned the hard way.** This attribution was
+first called settled on ONE trial per arm; then reversed to "~50% flake, not
+attributable" on ONE anomalous run against six; then settled again on N>=5
+per arm. Both wrong calls came from acting on a sample of one or two. The A/B
+was always the right *shape* — same job type, same environment, baseline vs
+head. **Establish the per-SHA repeat rate first, N>=5, in both directions,
+before and after concluding anything.** Note also that "flaky" is not "not a
+bug": this test was dismissed as a CI flake for months once before and turned
+out to be a genuine UAF (fixed `add3e60ce`).
 
-- The crash is real, pre-existing, and NOT caused by tranche 5.
-- It passes `no-graphics` at every SHA tried.
-- This test did something similar once before and was misfiled as a CI flake
-  for months - that time it *was* a real UAF, fixed in `add3e60ce`. "Flaky"
-  is not a synonym for "not a bug".
-
-**Diagnosis exhausted locally without a repro** — record this so nobody
-repeats it:
+**What is known about the crash itself** — still unexplained:
 
 | Probe | Result |
 |---|---|
@@ -542,10 +542,21 @@ Both ASan runs only trip **LeakSanitizer** on pre-existing
 `verify_output --asan` score the test `runtime_error`. Read the SUMMARY line
 before calling an ASan run a reproduction.
 
-**To fix it:** CI is the only reproducer and it yields no stack trace, so the
-prerequisite is **core-dump / gdb capture in the graphics job**. Until that
-exists, expect the corpus segfault count to flicker 0/1 between runs on
-unrelated commits, and do not let it gate unrelated work.
+**The cheap next step, now that the trigger reproduces at 100%: bisect WITHIN
+tranche 5.** Its only always-on parts (everything else is behind
+`-DLOG_FETCH`, which no other test sets) are:
+
+1. `URLRequestHeader` gaining a constructor + two slots — needed *solely* by
+   `loader_load`, which is unreachable anyway, so this one is **free to
+   drop**;
+2. `URLVariables.toString`;
+3. `MovieClip.prototype.getURL` becoming a real function instead of a
+   name-only stub.
+
+`edittext_align` uses none of them, so whichever one triggers it is a pointer
+at the real bug, not at a mistake in tranche 5. A single-test dispatch is
+~2 min; 5 runs per variant isolates it. If (1) is the trigger, the +4 lands
+unchanged with it dropped.
 
 ### The tracing tripwire (CI `30235525066`, reverted in `d1c307c51`)
 
