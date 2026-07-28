@@ -728,6 +728,13 @@ void avm2_text_input_control(Avm2Context* ctx, Avm2Object* focus,
 // Mouse wheel over a TextField: scroll by `delta_lines` (Ruffle EditText
 // event_dispatch(ClipEvent::MouseWheel)). Returns 1 if the field consumed it.
 int avm2_text_mouse_wheel(Avm2Context* ctx, Avm2Object* obj, int32_t delta_lines);
+// IME composition (Ruffle EditText::ime). `cursor_from`/`cursor_to` are UTF-8
+// byte offsets into `text`, or -1 for Ruffle's `None`; an empty `text` clears
+// the preedit. `commit_pending` is ensure_ime_committed, run on focus loss.
+void avm2_text_ime_preedit(Avm2Context* ctx, Avm2Object* obj, const char* text,
+                           int32_t cursor_from, int32_t cursor_to);
+void avm2_text_ime_commit(Avm2Context* ctx, Avm2Object* obj, const char* text);
+void avm2_text_ime_commit_pending(Avm2Context* ctx, Avm2Object* obj);
 // EditText flag accessors for the mouse-pick path (NULL-safe on the ext ptr).
 int avm2_text_is_selectable(struct Avm2EditTextExt* et);
 int avm2_text_was_static(struct Avm2EditTextExt* et);

@@ -9037,6 +9037,40 @@ static size_t g_live_in_head, g_live_in_tail;   // ring: [head, tail)
 static double g_mouse_x, g_mouse_y;       // stage pixels
 static uint8_t g_mouse_btn_down[3];       // left/middle/right
 static uint8_t g_key_down_map[256];       // modifier tracking by Flash keyCode
+
+// Ruffle input.rs `keys_down_phys_loc`: the (physical key, location) pairs a
+// KeyDown has claimed. A KeyUp with no matching entry is dropped as spurious.
+// Ruffle keys this on the winit PhysicalKey; the harness only carries the
+// Flash keyCode, which for every key the corpus exercises maps 1:1 onto the
+// physical key (both 'a' and 'A' are keyCode 65 / PhysicalKey::KeyA, both '"'
+// and '\'' are 222 / Quote, and an unmapped key is 0 / Unknown on both sides).
+#define AVM2_KEYS_DOWN_CAP 64
+static struct { int32_t code, loc; } g_keys_down_phys[AVM2_KEYS_DOWN_CAP];
+static uint32_t g_keys_down_phys_n;
+
+static void keys_down_phys_add(int32_t code, int32_t loc)
+{
+	for (uint32_t i = 0; i < g_keys_down_phys_n; i++)
+		if (g_keys_down_phys[i].code == code && g_keys_down_phys[i].loc == loc)
+			return;
+	if (g_keys_down_phys_n >= AVM2_KEYS_DOWN_CAP) return;
+	g_keys_down_phys[g_keys_down_phys_n].code = code;
+	g_keys_down_phys[g_keys_down_phys_n].loc = loc;
+	g_keys_down_phys_n++;
+}
+
+// Returns 1 if the pair was present (and removes it), 0 if the KeyUp is spurious.
+static int keys_down_phys_remove(int32_t code, int32_t loc)
+{
+	for (uint32_t i = 0; i < g_keys_down_phys_n; i++)
+	{
+		if (g_keys_down_phys[i].code != code || g_keys_down_phys[i].loc != loc)
+			continue;
+		g_keys_down_phys[i] = g_keys_down_phys[--g_keys_down_phys_n];
+		return 1;
+	}
+	return 0;
+}
 static Avm2Object* g_mouse_hovered;       // interactive object under mouse
 static Avm2Object* g_mouse_pressed[3];    // per-button press target
 static uint32_t g_left_click_index;       // increments per left press (dbl-click)
@@ -9200,6 +9234,31 @@ void avm2_input_load(const char* path)
 			{ sscanf(line + 11, "%d", &ev.code); ev.kind = IN_TEXT_INPUT; }
 		else if (strncmp(line, "TEXT_CONTROL ", 13) == 0)
 			{ sscanf(line + 13, "%31s", ev.ctrl); ev.kind = IN_TEXT_CONTROL; }
+		else if (strncmp(line, "IME_PREEDIT ", 12) == 0)
+		{
+			// "IME_PREEDIT <cursor_from> <cursor_to> <text>", both cursor
+			// fields -1 for Ruffle's `None`. The text runs to end of line and
+			// may be empty (a cleared preedit).
+			ev.kind = IN_IME_PREEDIT;
+			int consumed = 0;
+			if (sscanf(line + 12, "%d %d %n", &ev.code, &ev.code2, &consumed) < 2)
+				{ ev.code = -1; ev.code2 = -1; consumed = 0; }
+			const char* rest = line + 12 + consumed;
+			strncpy(ev.text, rest, sizeof(ev.text) - 1);
+			ev.text[sizeof(ev.text) - 1] = '\0';
+			size_t tl = strlen(ev.text);
+			while (tl > 0 && (ev.text[tl-1] == '\n' || ev.text[tl-1] == '\r'))
+				ev.text[--tl] = '\0';
+		}
+		else if (strncmp(line, "IME_COMMIT ", 11) == 0)
+		{
+			ev.kind = IN_IME_COMMIT;
+			strncpy(ev.text, line + 11, sizeof(ev.text) - 1);
+			ev.text[sizeof(ev.text) - 1] = '\0';
+			size_t tl = strlen(ev.text);
+			while (tl > 0 && (ev.text[tl-1] == '\n' || ev.text[tl-1] == '\r'))
+				ev.text[--tl] = '\0';
+		}
 		else if (strncmp(line, "FOCUSGAINED", 11) == 0)
 			ev.kind = IN_FOCUS_GAINED;
 		else if (strncmp(line, "FOCUSLOST", 9) == 0)
@@ -10098,11 +10157,28 @@ static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
 	}
 	case IN_KEY_DOWN:
 		if (ev->code >= 0 && ev->code < 256) g_key_down_map[ev->code] = 1;
+		keys_down_phys_add(ev->code, ev->code3);
 		input_handle_key(ctx, 1, ev->code, ev->code2, ev->code3);
 		break;
 	case IN_KEY_UP:
+		// Ruffle input.rs: "Ignore spurious KeyUp events that may happen e.g.
+		// during IME. We assume that in order for a key to generate KeyUp, it
+		// had to generate KeyDown for the same physical key and location."
+		// This is what swallows the dead-key `Unknown` releases and the
+		// `Char` releases an IME commit stands in for — it is a bookkeeping
+		// rule about physical keys, not a composition-active flag.
+		if (!keys_down_phys_remove(ev->code, ev->code3)) break;
 		if (ev->code >= 0 && ev->code < 256) g_key_down_map[ev->code] = 0;
 		input_handle_key(ctx, 0, ev->code, ev->code2, ev->code3);
+		break;
+	case IN_IME_PREEDIT:
+		if (g_stage_focus != NULL)
+			avm2_text_ime_preedit(ctx, g_stage_focus, ev->text, ev->code,
+			                      ev->code2);
+		break;
+	case IN_IME_COMMIT:
+		if (g_stage_focus != NULL)
+			avm2_text_ime_commit(ctx, g_stage_focus, ev->text);
 		break;
 	case IN_TEXT_INPUT:
 		input_handle_text(ctx, ev->code);
@@ -10269,14 +10345,19 @@ void avm2_input_pump_tick(Avm2Context* ctx)
 // Focus management (Ruffle focus_tracker.rs) + keyboard/text routing.
 // ---------------------------------------------------------------------------
 
+static int obj_tab_enabled(Avm2Context* ctx, Avm2Object* obj);
+
 static int is_focusable_by_mouse(Avm2Context* ctx, Avm2Object* obj)
 {
-	// Ruffle: AVM2 objects are mouse-focusable when tabEnabled is true. A
-	// TextField that is selectable is also mouse-focusable.
+	// Ruffle InteractiveObject::is_focusable_by_mouse — `is_action_script_3()
+	// && tab_enabled(context)`. `tab_enabled` includes the per-type DEFAULT
+	// (SimpleButton true, MovieClip when buttonMode, editable TextField), not
+	// just an explicitly assigned value. EditText overrides the whole thing to
+	// "true for AS3 content" (edit_text.rs:3166).
 	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
 	if (e == NULL || e->is_stage || e->is_root) return 0;
 	if (e->edittext != NULL) return 1;
-	return e->tab_enabled_set && e->tab_enabled_val;
+	return obj_tab_enabled(ctx, obj);
 }
 
 // Set focus to new_focus (may be NULL), firing FocusEvent focusOut/focusIn.
@@ -10288,6 +10369,11 @@ static void set_focus(Avm2Context* ctx, Avm2Object* new_focus)
 	if (new_focus != NULL)
 		avm2_text_apply_pending_bounds(ctx, new_focus);
 	g_stage_focus = new_focus;
+	// EditText::on_focus_changed(focused=false) runs BEFORE the AVM2 focusOut
+	// (Ruffle set_internal calls on_focus_changed then call_focus_handler), and
+	// commits any open IME composition — so the preedit becomes real text and
+	// fires its textInput before anything observes the focus change.
+	if (old != NULL) avm2_text_ime_commit_pending(ctx, old);
 	// focusOut on the old target (bubbles, related = new).
 	if (old != NULL)
 	{
@@ -10305,27 +10391,47 @@ static void set_focus(Avm2Context* ctx, Avm2Object* new_focus)
 	}
 }
 
+// Ruffle Player::update_focus_on_mouse_press + FocusTracker::set_by_mouse.
+//
+// The pressed object itself is the candidate — there is no walk up to the
+// nearest focusable ancestor (the pick already propagates to the parent when
+// a child is not a valid target). AVM2 content dispatches the focus-change
+// event even when that candidate is not focusable; only *setting* the focus
+// is filtered, which is what makes `mouseFocusChange` fire with a
+// `relatedObject` while `stage.focus` stays put.
 static void update_focus_on_press(Avm2Context* ctx, Avm2Object* pressed)
 {
-	// Walk up from the pressed object to the nearest mouse-focusable ancestor.
-	Avm2Object* focus = NULL;
-	for (Avm2Object* o = pressed; o != NULL; o = display_parent_obj(ctx, o))
+	// The stage is "no object" for focus purposes.
+	if (pressed == ctx->stage) pressed = NULL;
+	Avm2Object* old = g_stage_focus;
+	Avm2Object* target;
+	if (pressed != NULL)
 	{
-		if (is_focusable_by_mouse(ctx, o)) { focus = o; break; }
+		target = pressed;  // should_focus: always true for AS3 content
 	}
-	// A mouseFocusChange (cancelable) fires before the change when focus would
-	// move; if not cancelled, apply. (We do not model cancellation of the
-	// default yet — apply unconditionally.)
-	if (focus != g_stage_focus)
+	else if (old != NULL && is_focusable_by_mouse(ctx, old))
 	{
-		Avm2Object* related = focus;
-		Avm2Object* dispatch_on = g_stage_focus != NULL ? g_stage_focus : ctx->stage;
-		Avm2Object* ev = avm2_focus_event_new(ctx,
-			avm2_string_from_literal(ctx, "mouseFocusChange"), 1, 1, related, 0,
-			0, "none");
-		avm2_dispatch_event(ctx, dispatch_on, ev);
-		set_focus(ctx, focus);
+		target = NULL;  // clicking away clears a mouse-acquired focus
 	}
+	else
+	{
+		return;  // nothing was focusable either side; no event
+	}
+	// set_by_mouse: unchanged object dispatches nothing (unlike keyFocusChange).
+	if (old == target) return;
+	// dispatch_focus_change_event: the OLD focus is the target, falling back to
+	// the stage when there is none.
+	Avm2Object* dispatch_on = old != NULL ? old : ctx->stage;
+	Avm2Object* ev = avm2_focus_event_new(ctx,
+		avm2_string_from_literal(ctx, "mouseFocusChange"), 1, 1, target, 0,
+		0, "none");
+	avm2_dispatch_event(ctx, dispatch_on, ev);
+	Avm2EventExt* eext = (Avm2EventExt*) ev->native_ext;
+	if (eext != NULL && eext->cancelled) return;
+	// `new.filter(is_focusable_by_mouse)` — the event fires for anything, the
+	// focus only lands on something that can hold it.
+	if (target != NULL && !is_focusable_by_mouse(ctx, target)) target = NULL;
+	set_focus(ctx, target);
 }
 
 // tab_enabled (Ruffle InteractiveObject::tab_enabled): explicit value or the

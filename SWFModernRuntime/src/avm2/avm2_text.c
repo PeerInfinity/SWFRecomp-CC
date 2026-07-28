@@ -790,6 +790,12 @@ struct Avm2EditTextExt
 	// EditText-owned bounds (twips). Distinct from the display matrix.
 	int32_t bounds_x, bounds_y, bounds_w, bounds_h;
 	uint16_t font_id;
+	// IME composition (Ruffle ImeData). `ime_active` marks a live composition;
+	// [ime_start, ime_end) is the preedit's range inside `text`, and `ime_text`
+	// is the raw preedit string that a commit-on-focus-loss re-inputs.
+	uint8_t ime_active;
+	uint32_t ime_start, ime_end;
+	const Avm2String* ime_text;
 };
 typedef struct Avm2EditTextExt Avm2EditTextExt;
 
@@ -812,6 +818,7 @@ void avm2_text_gc_mark_edittext(struct Avm2EditTextExt* et)
 	avm2_gc_mark_string(et->text);
 	avm2_gc_mark_string(et->original_html);
 	avm2_gc_mark_string(et->restrict_str);
+	avm2_gc_mark_string(et->ime_text);
 	mark_format_fields_strings(&et->default_format);
 	for (uint32_t i = 0; i < et->span_count; i++)
 	{
@@ -6872,6 +6879,109 @@ void avm2_text_mouse_drag(Avm2Context* ctx, Avm2Object* obj,
 	else if (b_start < a_start && b_end < a_end) et_set_selection(et, a_end, b_start);
 	else et_set_selection(et, a_start < b_start ? a_start : b_start,
 	                      a_end > b_end ? a_end : b_end);
+}
+
+// ===========================================================================
+// IME composition (Ruffle edit_text.rs `ime` / ensure_ime_{started,finished,
+// committed}). A preedit is live, uncommitted text sitting in the field: it
+// shows and it counts towards `text`/`length`, but it fires no `textInput`.
+// Only a Commit event — or losing focus with a composition open — turns it
+// into real input.
+// ===========================================================================
+
+// UTF-8 byte offset -> UTF-16 index (Ruffle WStrToUtf8::utf16_index; an offset
+// past the end saturates at the string's UTF-16 length).
+static uint32_t byte_to_u16(const Avm2String* s, uint32_t byte_idx)
+{
+	uint32_t n = 0, i = 0;
+	while (i < s->len && i < byte_idx)
+	{
+		unsigned char c = (unsigned char) s->utf8[i];
+		if (c < 0x80) i += 1;
+		else if (c < 0xE0) i += 2;
+		else if (c < 0xF0) i += 3;
+		else { i += 4; n++; }  // non-BMP: two UTF-16 units
+		n++;
+	}
+	return n;
+}
+
+// Ruffle ensure_ime_started: open a composition at the current selection,
+// deleting whatever it covered.
+static void et_ime_start(Avm2Context* ctx, Avm2Object* obj, Avm2EditTextExt* et)
+{
+	if (et->ime_active) return;
+	uint32_t len = u16_length(et->text);
+	uint32_t start = et->sel_active ? (uint32_t) et->sel_begin : len;
+	uint32_t end = et->sel_active ? (uint32_t) et->sel_end : len;
+	if (start > len) start = len;
+	if (end > len) end = len;
+	spans_replace_text(ctx, et, start, end, empty_string(ctx));
+	et->ime_active = 1;
+	et->ime_start = start;
+	et->ime_end = start;
+	et->ime_text = empty_string(ctx);
+	et_relayout(ctx, et);
+	et_mirror(ctx, obj, et);
+}
+
+// Ruffle ensure_ime_finished: drop the preedit text and close the composition.
+static void et_ime_finish(Avm2Context* ctx, Avm2Object* obj, Avm2EditTextExt* et)
+{
+	if (!et->ime_active) return;
+	spans_replace_text(ctx, et, et->ime_start, et->ime_end, empty_string(ctx));
+	et_set_selection(et, et->ime_start, et->ime_start);
+	et->ime_active = 0;
+	et->ime_text = NULL;
+	et_relayout(ctx, et);
+	et_mirror(ctx, obj, et);
+}
+
+// ImeEvent::Preedit. An empty text means "preedit cleared".
+void avm2_text_ime_preedit(Avm2Context* ctx, Avm2Object* obj, const char* text,
+                           int32_t cursor_from, int32_t cursor_to)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et == NULL) return;
+	if (text == NULL || text[0] == '\0') { et_ime_finish(ctx, obj, et); return; }
+	et_ime_start(ctx, obj, et);
+	const Avm2String* t = avm2_string_new(ctx, text, (uint32_t) strlen(text));
+	uint32_t old_start = et->ime_start, old_end = et->ime_end;
+	spans_replace_text(ctx, et, old_start, old_end, t);
+	et->ime_start = old_start;
+	et->ime_end = old_start + u16_length(t);
+	et->ime_text = t;
+	et_relayout(ctx, et);
+	et_mirror(ctx, obj, et);
+	// The cursor arrives as UTF-8 byte offsets into the preedit text; a `None`
+	// cursor (-1 here) clears the selection instead of moving it.
+	if (cursor_from >= 0 && cursor_to >= 0)
+		et_set_selection(et, old_start + byte_to_u16(t, (uint32_t) cursor_from),
+		                 old_start + byte_to_u16(t, (uint32_t) cursor_to));
+	else
+		et->sel_active = 0;
+}
+
+// ImeEvent::Commit — plain text input, exactly as Ruffle routes it.
+void avm2_text_ime_commit(Avm2Context* ctx, Avm2Object* obj, const char* text)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et == NULL || text == NULL) return;
+	et_text_input_string(ctx, obj, et,
+	                     avm2_string_new(ctx, text, (uint32_t) strlen(text)));
+}
+
+// Ruffle ensure_ime_committed, called from EditText::on_focus_changed when the
+// field loses focus: the open preedit is removed and then re-entered as real
+// input, so it fires `textInput` and survives the focus change.
+void avm2_text_ime_commit_pending(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et == NULL || !et->ime_active) return;
+	const Avm2String* pending = et->ime_text;
+	et_ime_finish(ctx, obj, et);
+	if (pending != NULL && pending->len > 0)
+		et_text_input_string(ctx, obj, et, pending);
 }
 
 // Ruffle EditText::event_dispatch(ClipEvent::MouseWheel): the new scroll is
