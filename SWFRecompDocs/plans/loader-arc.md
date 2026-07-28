@@ -1061,3 +1061,155 @@ decoder", which was true of the format and false of the tests.
 
 Tranche 7 is **closed at +1 of its revised +1**; the "minus AVM1"
 `mouse_pick_loader_avm1` remains with the dual-VM arc.
+
+## 10. Tranche 8 — nested children, self-load, and per-movie ApplicationDomain
+
+### 10a. Phase A + B, shipped (`1617724eb`)
+
+**Two of the five targets were failing on ABSENT INPUT, not on anything we
+implement.** `install_test_dir()` (`download_tests.sh`) copied only top-level
+files and `find_child_swfs()` (`verify_output.py`) did not recurse, so the four
+duplicate-class tests' children — `child/child.swf`,
+`loader_domain_child/*.swf` — were never in our mirror. The tests loaded
+nothing and produced two lines apiece.
+
+Both now recurse, and the registry key changed from the child's BASENAME to its
+path **relative to the test dir**. That was forced, not cosmetic:
+`loader_duplicate_class` ships `loader_domain_child.swf` in three different
+subdirectories, so a basename can neither name the right movie nor generate
+distinct C symbols. `loader_resolve_url` tries the relative path first and
+falls back to the basename, which is what every flat child collapses to — no
+existing test changes key. A subtree with its own `test.swf` is a SEPARATE test
+(`avm2/large_preload_from_url/large_bytearray`) and is pruned from both walks.
+
+**The mirror's blast radius is exactly 10 test dirs** (computed against the
+upstream tree, not guessed): the six tranche-8 targets plus
+`avm1/localconnection`, `avm1/sandbox_type_remote`, `avm2/localconnection`,
+`avm2/sandbox_type_remote`, `avm2/cross_api_version_call_{newer,older}`. All
+six non-targets were re-run locally with their children restored.
+
+Emitter: `avm2_movie_tables` was emitted only for children (non-empty
+`symbol_prefix`). The main movie now gets one too, in a **file of its own** —
+`RecompiledABC/avm2_movie_tables.c` — rather than appended to `abc_timeline.c`,
+so that the §8 byte-identical invariant holds literally: regenerating an avm2
+test against the pre-change binary produces one new file and zero diffs
+anywhere else.
+
+`get_self_load` gained an `RecompiledABC` scan (the right generalization; a
+no-op for today's corpus — no AVM2 test.swf in the mirror contains the literal)
+and, for `loader_loadbytes_url`, an explicit flag. **The flag could not live in
+`test.toml`**: that file is downloaded, and `install_test_dir` overwrites it on
+every re-sync. It lives in `test.local.toml`, a git-tracked overlay whose name
+the downloader never writes. That is the reusable part — *per-test harness
+config for a downloaded test needs a filename upstream does not use.*
+
+Two runtime rules the tests then pinned:
+
+- **The root-binding `None =>` arm (§9, `0dbc5b41e`) applies to a LOADED movie
+  too.** `loader_loadbytes_url` binds `Test` to character 1 over a SWF that
+  defines no character 1; `loader_boot_child_swf` only looked for
+  `char_id == char_id_base`, so the loaded copy came up a bare `MovieClip` and
+  the entire test body — which lives in its `addedToStage` handler — never ran.
+  `movie_char_is_defined` is `avm2_display_char_is_defined` scoped to one
+  movie's tables. A rule discovered for the main movie is a rule for every
+  movie; §9 landed it in one of the two places it belongs.
+- **A loadBytes movie's URL is the ISSUING movie's URL plus
+  `/[[DYNAMIC]]/<n>`** (Ruffle `loader.rs::loader_loadbytes`). FP's `<n>` is a
+  player-wide counter that never resets; Ruffle pins it at 1 and so do we —
+  `loader_loadbytes_url` rewrites `/<digit>` to `/<id>` in ActionScript before
+  tracing, so the digit is unobservable and its SHAPE is what is graded.
+  `loaderURL` needed nothing: it is already the issuing movie's URL (§9's
+  `movie_url_of`), so fixing `url` fixed the chain's later levels for free.
+
+Local movement (CI in flight at `30326194497`):
+
+| Test | Suite | Before | After |
+|---|---|---|---|
+| `loader_duplicate_coerce` | avm2 | 1/3 | **pass** |
+| `loader_duplicate_coerce_new_domain` | avm2 | 1/4 | **pass** |
+| `loader_loadbytes_url` | avm2 | 3/12 | **pass** |
+| `localconnection` | avm1 | 433/579 | **pass** |
+| `localconnection` | avm2 | 76/890 | **pass** |
+| `cross_api_version_call_older` | avm2 | 0/12 | **pass** |
+| `as3-loader/LoaderLoadBytesTest2` | from_shumway | 2/3 | **pass** |
+| `loader_child_getdefinition` | avm2 | 2/5 | 4/5 |
+| `cross_api_version_call_newer` | avm2 | 0/12 | 11/12 |
+| `loader_duplicate_class` | avm2 | 2/48 | 3/48 (2 → 28 lines of output) |
+| `sandbox_type_remote` | avm2 | 0/3 | 1/3 |
+
+**Three of the five named targets landed in phase A/B, before any domain
+work** — and the four riders are all tests nobody scoped, every one of them a
+test whose children had been missing from the mirror since the import. The
+lesson is the cheap one: *when a test's actual output is a small constant
+fraction of its expected output, check that its INPUT is present before
+designing a feature.*
+
+### 10b. Phase C design — per-movie ApplicationDomain
+
+What is left needs real domains: `loader_child_getdefinition`'s last line (the
+child's `Parent` must win inside the child) and `loader_duplicate_class`.
+
+**Today** there is one domain: a flat `ctx->domain` entry array
+(`avm2_globals.c:38`), an FNV name index over it, `avm2_domain_find` returning
+the FIRST match (`:147`), and a singleton `g_current_domain` object (`:2283`)
+that `ApplicationDomain.currentDomain`, `LoaderInfo.applicationDomain` and
+`getDefinition`/`hasDefinition` all answer with.
+
+**The rule set, derived from the tests and checked against Ruffle's
+`domain.rs`:**
+
+1. Domains form a tree (`Domain.parent`, `domain.rs:39`).
+2. **Lookup checks SELF first, then ancestors** (`get_defining_script`,
+   `:204`).
+3. **Export SKIPS if the name already exists in self OR any ancestor**
+   (`export_definition`, `:333`). This is the load-bearing rule and it is why
+   first-match-wins already passes `loader_duplicate_coerce`: that test loads
+   its child into `ApplicationDomain.currentDomain`, the child's `MyDuplicate`
+   interface is therefore never exported, and `ConcreteFromChild` implements
+   the MAIN's interface — which is exactly what makes the cross-SWF coercion
+   succeed. **A naive "prefer the calling movie's own definitions" rule would
+   BREAK that passing test**; it was the first design considered and the test
+   killed it.
+4. `new ApplicationDomain()` with no argument parents to the SYSTEM domain, not
+   to the current one. `new ApplicationDomain(d)` parents to `d`.
+   `ApplicationDomain.currentDomain` is the CALLING file's domain.
+5. A `Loader.load` with no `LoaderContext` domain gets a fresh domain whose
+   parent is the loading movie's domain.
+6. `getDefinition`/`hasDefinition` resolve in the receiver's domain.
+
+Rule 4 is the whole difference between the two remaining failures and the two
+that already pass: `loader_child_getdefinition` and the first two loads of
+`loader_duplicate_class` use `new ApplicationDomain()` — an island with no path
+to the main movie's `Parent`/`DuplicateClass` — while
+`loader_duplicate_coerce{,_new_domain}` both chain to `currentDomain`.
+
+**Shape of the change** (contained, per the session gate):
+
+- `Avm2DomainScope { const Avm2DomainScope* parent; }`; `ctx->domain` keeps the
+  ONE flat entry array and the ONE name index, and each `Avm2DomainEntry` gains
+  a `scope`. Sibling domains are then the only ambiguity, resolved by ancestor
+  distance (self = 0), tie-broken by the existing lowest-index rule.
+- `Avm2AbcFileRt` gains `scope`; `avm2_domain_find` takes the calling file's.
+  Call sites: `avm2_ops.c` ×5, `avm2_class.c` ×2, `avm2_main.c` ×1,
+  `avm2_display.c` ×1.
+- `avm2_abc_register_movie` takes the scope the movie loads into;
+  `loader_context_domain` yields a scope; `g_current_domain` becomes one
+  ApplicationDomain object per scope, lazily built.
+
+**The perf rail, and how it is paid for at zero cost.** `avm2_domain_find` is
+on the property-lookup hot path two perf arcs measured, and
+`avm2_op_findpropstrict_ic` caches a resolved def object per call site under an
+`ic->ctx == ctx` guard whose comment already reads *"domain identity this entry
+was resolved against"*. Making that field the **scope** instead of the context
+is the entire IC change: identical comparison count, identical cache behaviour,
+and in a single-movie program every file shares the one root scope so the guard
+is trivially true exactly as often as before. The find itself keeps a
+`g_domain_scope_count == 1` fast path that is the current loop, byte for byte.
+
+**Honest ceiling.** Phase C's remaining yield is `loader_child_getdefinition`
+(+1, near-certain — one line, one rule) and `loader_duplicate_class` (48 lines
+that additionally want per-domain `getDefinition`, cross-domain instantiation,
+and four loads' worth of registration ordering; domains are necessary but very
+possibly not sufficient). Phases A + B already delivered the other three named
+targets. The tranche's +5 estimate is met without Phase C; Phase C is worth
+doing only while it stays the shape above.
