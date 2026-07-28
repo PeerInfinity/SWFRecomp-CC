@@ -27,6 +27,41 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
+## Input (focus / tab / mouse / keyboard) — TRIAGED (2026-07-28)
+
+Full plan: **`SWFRecompDocs/plans/input-arc.md`** (per-test triage, 8 ranked
+tranches). This supersedes the "~29 misses … mask hit-testing, SimpleButton
+highlight_bounds geometry + arrow navigation, IME, HTML link events,
+real-shape hit-testing" line in the Stage 8 section below, which is the
+same block seen four months earlier and without per-test causes.
+
+Census: **30 failing avm2 tests + 6 riders** (`text/text_caret_placement_*`
+×4, `text/links_in_scrolled_text`, `from_shumway/mouse/start_drag_lock`),
+not the 25 the feature-priority map quoted — the map bucketed the avm2
+suite only. Headlines:
+
+- The AVM2 input bridge is largely built (Stage 8 + since). **The AVM1
+  side of this arc is 100% green**, so every mechanism has a working
+  implementation to copy.
+- **Three tests fail purely because the harness's recorded input is
+  dropped**: `IN_FOCUS_GAINED`/`IN_FOCUS_LOST` are parsed by
+  `avm2_input_load` and then fall through `input_deliver`'s `default:`,
+  and `IME_PREEDIT`/`IME_COMMIT` are never parsed at all. AVM1 routes all
+  four (`src/libswf/input_events.c`).
+- **`MouseEvent.localX/localY/stageX/stageY` truncate to int**
+  (`avm2_events.c:806`), which is why every `mouse_pick_*` coordinate is
+  floored; `localX`/`localY` also have no setter, so `mouseevent_stagexy`
+  dies on `#1074` at line 2 of 35.
+- **There are no failing ContextMenu tests** anywhere in the corpus — the
+  map's "KeyboardEvent / ContextMenu / focus" gloss over-counted
+  ContextMenu at zero.
+- Five tests are dispositioned out: 4 need both VMs live in one player
+  (arc 8), and `tab_ordering_properties` is load-bearing on "our builtin
+  display classes are not sealed", an AVM2 object-model question.
+- **Caveat for anyone re-triaging from `_results/*.json`: those files
+  truncate `actual_output`/`expected_output` at ~51 lines.** Long tests
+  must be re-run locally before sizing.
+
 ## Loader / LoaderInfo — ARC CLOSED, all 8 tranches SHIPPED (2026-07-26/28)
 
 Full plan + per-tranche postmortems:
