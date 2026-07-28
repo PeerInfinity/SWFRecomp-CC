@@ -11458,6 +11458,31 @@ void avm2_render_finish(Avm2Context* ctx)
 	avm2_render_walk(ctx);
 	capture_save_last_frame();
 }
+
+// Release the WebGPU device/instance before the process exits.
+//
+// This is not (only) about leaks. swfStart's tail has always called
+// renderer_free; runSWF_avm2 never did, so an AVM2 graphics-native binary
+// returned from main with the Vulkan driver's worker threads still running.
+// _dl_fini then tore the shared libraries down underneath them. Captured core
+// (CI run 30314779577 shard 9, avm2/edittext_align — the intermittent
+// segfault of loader-arc.md §7): the main thread sits in
+// __GI_exit -> __run_exit_handlers -> _dl_fini, while a lavapipe worker
+// thread faults at address 0 inside LLVM's MCJIT (LLVMGetPointerToGlobal <-
+// libvulkan_lvp.so) — a shader still being JIT-compiled after the library
+// holding the JIT was unloaded. All trace output is already flushed by then,
+// which is why the test scored 60/60 correct lines AND a SIGSEGV.
+//
+// Releasing the device joins the driver's threads inside vkDestroyInstance,
+// so teardown becomes synchronous instead of a race with the dynamic linker.
+// Must run after avm2_render_finish (the last capture reads back through the
+// queue) and before heap teardown (render_webgpu_free frees from the heap).
+void avm2_render_shutdown(Avm2Context* ctx)
+{
+	if (context == NULL) return;
+	renderer_free(ctx->app, context);
+	context = NULL;
+}
 #endif  // OFFSCREEN_RENDER
 
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)

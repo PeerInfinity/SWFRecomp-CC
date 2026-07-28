@@ -517,6 +517,7 @@ void runSWF_avm2(SWFAppContext* app_context)
 #ifdef OFFSCREEN_RENDER
 	extern void avm2_render_frame(Avm2Context* ctx);
 	extern void avm2_render_finish(Avm2Context* ctx);
+	extern void avm2_render_shutdown(Avm2Context* ctx);
 #endif
 
 	// Stage-11 GC soak (AVM2_GC_SOAK=<ticks>): drive synthetic per-frame
@@ -686,6 +687,11 @@ void runSWF_avm2(SWFAppContext* app_context)
 		}
 		avm2_try_pop_frame(&top);
 	}
+	// Release the GPU device before returning to main. Not a leak cleanup:
+	// without it the process reaches _dl_fini with the Vulkan driver's worker
+	// threads still alive, which is the intermittent post-output SIGSEGV
+	// documented on avm2_render_shutdown.
+	avm2_render_shutdown(ctx);
 #endif
 
 	// AVM2_HEAP_STATS=1: end-of-run o1heap diagnostics (peak_allocated is
