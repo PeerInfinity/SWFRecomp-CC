@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 160/229 passing | Graphics: 167/229 passing
+Trace: 160/229 passing | Graphics: 168/229 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (7 tests)
+## Graphics Improvements (8 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -21,3 +21,4 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 5 | `flash_net_classes` | Ruffle Matched | 18/22 lines match |
 | 6 | `hittesting/mask-hit-test` | Ruffle Matched | 0/1 lines match |
 | 7 | `image-loading` | Output Mismatch | 0/4 lines match |
+| 8 | `mouse/start_drag_lock` | Output Mismatch | 2/3 lines match |
