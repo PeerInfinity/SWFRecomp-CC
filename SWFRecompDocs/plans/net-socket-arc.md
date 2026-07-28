@@ -3,11 +3,12 @@
 **Created**: 2026-07-28 · **Baseline**: `2ed94a302` (session start), per-suite
 `_results/results_graphics.json` from CI `30397635331` (the input-arc closeout
 run, SHA `bbefcf376`).
-**Status**: triage complete; **tranche 1 SHIPPED** (`937047612` + `f4b0e3a08`,
-CI `30403506144` graphics/full green) — **+9 net** (10 gains, 1 regression
-found and fixed). Corpus effective 3890 → **3899 / 4420**, `avm2` 926 →
-**935 / 1221**. Postmortem in §6. **NEXT: tranche 2** (socket.json replay,
-+12, medium-large).
+**Status**: triage complete; **tranche 1 SHIPPED** (`937047612` + `722dea0e9`,
+CI `30403506144` then `30405770263`, both graphics/full green) — **+10 vs +9
+predicted, zero regressions**. Corpus effective 3890 → **3901 / 4420** (the
+11th gain is an unrelated `visual` flake), `avm2` 926 → **936 / 1221**.
+Postmortem in §6. **NEXT: tranche 2** (socket.json replay, +12,
+medium-large).
 
 Scope of this document: the **net block** named as row 4e of
 `feature-priority-map.md` ("net/socket (29)"). The census below finds
@@ -424,14 +425,31 @@ scoped-but-unpredicted (the surplus inside buckets S/D/L/W).
 
 ## 6. Postmortem
 
-### Tranche 1 — SHIPPED `937047612`, CI `30403506144` (graphics, full)
+### Tranche 1 — SHIPPED `937047612` + `722dea0e9`, CI `30403506144` then `30405770263` (graphics, full)
 
-**+10 gains vs +9 predicted, minus one regression the triage missed = +9
-net.** Corpus effective **3890 → 3899 / 4420**; `avm2` **926 → 935 / 1221**;
-every other suite flat. Status histogram moved only
-`output_mismatch 522 → 513` / `pass 3650 → 3659`; `ruffle_matched` (240),
-`runtime_error` (7) and `recomp_fail` (1) all flat, and there is no
-`compile_fail`, `segfault` or `timeout` bucket in the run. All 34 jobs green.
+**+10 vs +9 predicted, zero regressions** after the follow-up. The first run
+landed the 10 gains and one regression (`air_hidden_lookup`, below); the
+verification run after the AIR gate is green on all 34 jobs with **no
+regressions at all**.
+
+Against the session-start baseline `2ed94a302`, corpus effective
+**3890 → 3901 / 4420 (+11)**; `avm2` **926 → 936 / 1221**. The eleventh gain
+is **not** ours: `visual/simple_shapes/heavy_tesselation` was `recomp_fail` in
+the baseline run and passes here, an unrelated CI-side flake — **the arc's
+gain is +10.** Status histogram moved `output_mismatch 522 → 512` /
+`pass 3650 → 3661` / `recomp_fail 1 → 0`; `ruffle_matched` (240) and
+`runtime_error` (7) flat, and there is no `compile_fail`, `segfault` or
+`timeout` bucket in either run.
+
+Three corpus-wide `matching_lines` drops, all benign and all the same cause:
+`avm2/all_classes/events/swf{10,11,12}` go 4 → 1 of ~1700. These dump
+`describeType` XML for every `flash.events` class, so **adding
+`NetStatusEvent` correctly** inserts a block and shifts the whole diff's
+alignment — the classic `results-diff-line-metrics-mislead` case where
+matching_lines falls on a fix. Verified by local run: the class now emits
+`base="flash.events.Event"` in the right sorted position, and these tests'
+real failure (the `describeType` shape itself) is untouched and belongs to
+another arc. `swf9` gained a line for the same reason.
 
 All ten predicted targets landed:
 
@@ -461,7 +479,7 @@ under a plain Flash Player runtime. The triage read `air_datagram_socket`'s
 `[player_options] runtime = "AIR"` and concluded "we gate nothing on runtime,
 so registering the class is enough" — which is true for that test and exactly
 backwards for its twin. Registering it unconditionally trades one test for the
-other. Fixed by `f4b0e3a08`: `verify_output.py` turns `runtime = "AIR"` into
+other. Fixed by `722dea0e9`: `verify_output.py` turns `runtime = "AIR"` into
 `-DSWF_RUNTIME_AIR` at both build sites and `avm2_net.c` gates the class on it,
 so both tests pass. The three `runtime = "AIR"` tests in the corpus are
 `air_datagram_socket`, `air_ifilepromise` and `native_menu_basic`; the latter
