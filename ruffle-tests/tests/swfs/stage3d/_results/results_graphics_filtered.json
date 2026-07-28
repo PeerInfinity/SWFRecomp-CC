@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-28T04:41:17.181212+00:00",
-    "git_sha": "38aa0a3009e56f73a90cf81843fa9ecf3fb02c2f",
-    "duration_seconds": 40.2,
+    "timestamp": "2026-07-28T17:38:01.831380+00:00",
+    "git_sha": "9263f71a0bfa098b73ba7d93cf1b80524370e25a",
+    "duration_seconds": 39.68,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -24,7 +24,7 @@
       "test": "request_matching_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.168,
+        "compile": 6.535,
         "run": 0.466
       },
       "num_frames": 126,
@@ -34,7 +34,7 @@
         "expected_lines": 190,
         "matching_lines": 0
       },
-      "duration": 6.64,
+      "duration": 7.01,
       "status": "output_mismatch",
       "detail": "190 line(s) differ (actual=0, expected=190)",
       "actual_output": "",
@@ -44,7 +44,7 @@
       "test": "request_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.119,
+        "compile": 6.597,
         "run": 0.315
       },
       "num_frames": 12,
@@ -54,7 +54,7 @@
         "expected_lines": 16,
         "matching_lines": 0
       },
-      "duration": 6.44,
+      "duration": 6.92,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=0, expected=16)",
       "actual_output": "",
@@ -63,8 +63,8 @@
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.032,
-        "compile": 8.517,
+        "recomp": 0.035,
+        "compile": 8.495,
         "run": 0.315
       },
       "num_frames": 1,
@@ -74,7 +74,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 9.1,
+      "duration": 9.11,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -94,9 +94,9 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.031,
-        "compile": 8.263,
-        "run": 0.315
+        "recomp": 0.018,
+        "compile": 6.515,
+        "run": 0.215
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
@@ -105,7 +105,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.86,
+      "duration": 6.92,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -122,9 +122,9 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.031,
-        "compile": 8.331,
-        "run": 0.265
+        "recomp": 0.032,
+        "compile": 8.82,
+        "run": 0.316
       },
       "num_frames": 1,
       "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
@@ -133,7 +133,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 8.87,
+      "duration": 9.41,
       "image_comparisons": {
         "output": {
           "status": "fail",
