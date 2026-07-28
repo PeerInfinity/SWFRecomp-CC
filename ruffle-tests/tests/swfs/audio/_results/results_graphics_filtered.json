@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-28T21:16:22.896062+00:00",
-    "git_sha": "bbefcf37694ed8f523426b7a6630fb6c4aaa7965",
-    "duration_seconds": 77.14,
+    "timestamp": "2026-07-28T22:42:30.857321+00:00",
+    "git_sha": "937047612d7001b8381aae545b38eeb57d5f69a3",
+    "duration_seconds": 76.75,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -24,17 +24,17 @@
       "test": "aac",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.872,
+        "compile": 6.717,
         "run": 0.767
       },
       "num_frames": 400,
-      "error_signature": "ReferenceError: Error #1065: Variable NetConnection is not defined.",
+      "error_signature": "ReferenceError: Error #1065: Variable Video is not defined.",
       "lines": {
         "actual_lines": 12,
         "expected_lines": 18,
         "matching_lines": 3
       },
-      "duration": 7.65,
+      "duration": 7.49,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=12, expected=18)",
       "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...",
@@ -44,17 +44,17 @@
       "test": "g711",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.234,
+        "compile": 6.532,
         "run": 1.018
       },
       "num_frames": 600,
-      "error_signature": "ReferenceError: Error #1065: Variable NetConnection is not defined.",
+      "error_signature": "ReferenceError: Error #1065: Variable Video is not defined.",
       "lines": {
         "actual_lines": 4,
         "expected_lines": 6,
         "matching_lines": 2
       },
-      "duration": 7.26,
+      "duration": 7.56,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=4, expected=6)",
       "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nStarting tone: tone_mulaw_mono.flv\nMeasuring...",
@@ -64,7 +64,7 @@
       "test": "g711_event_alaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.183,
+        "compile": 21.91,
         "run": 0.215
       },
       "num_frames": 2,
@@ -73,14 +73,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.41,
+      "duration": 22.13,
       "status": "pass"
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.015,
+        "compile": 21.128,
         "run": 0.215
       },
       "num_frames": 2,
@@ -89,15 +89,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.24,
+      "duration": 21.35,
       "status": "pass"
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
-        "recomp": 0.009,
-        "compile": 20.855,
-        "run": 0.416
+        "recomp": 0.007,
+        "compile": 17.528,
+        "run": 0.365
       },
       "num_frames": 120,
       "lines": {
@@ -105,7 +105,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.29,
+      "duration": 17.9,
       "status": "pass"
     }
   ]
