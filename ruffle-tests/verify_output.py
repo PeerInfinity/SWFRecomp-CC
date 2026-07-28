@@ -900,16 +900,55 @@ def filter_output(raw_output):
     return "\n".join(filtered)
 
 
+# Generated/infrastructure folders that are never a child SWF's home.
+_CHILD_SCAN_SKIP_DIRS = {
+    "RecompiledScripts", "RecompiledTags", "RecompiledABC",
+    "_investigation", "_results", "_image-test-output", "__pycache__",
+}
+
+
 def find_child_swfs(test_dir):
-    """Find child .swf/.png/.jpg files (non-test.swf) in a test directory."""
+    """Find child .swf/.png/.jpg files (non-test.swf) in a test directory.
+
+    Recurses into subdirectories (loader-arc tranche 8): four Loader tests keep
+    their children under `child/` or `loader_domain_child/` and load them by
+    relative path. A subdirectory that holds its own `test.swf` is a SEPARATE
+    test (`avm2/large_preload_from_url/large_bytearray`), not a child, and is
+    pruned — as are our own generated output folders.
+
+    Ordering is by path relative to the test dir, so a flat test's list — and
+    therefore every movie_id, char_id_base and symbol prefix derived from it —
+    is exactly what it was before the recursion landed.
+    """
     children = []
     image_exts = {".png", ".jpg", ".jpeg"}
-    for f in sorted(test_dir.iterdir()):
-        if f.suffix == ".swf" and f.name != "test.swf":
-            children.append(f)
-        elif f.suffix.lower() in image_exts:
-            children.append(f)
+    for dirpath, dirnames, filenames in os.walk(test_dir):
+        here = Path(dirpath)
+        dirnames[:] = sorted(
+            d for d in dirnames
+            if d not in _CHILD_SCAN_SKIP_DIRS
+            and not (here / d / "test.swf").exists())
+        for name in sorted(filenames):
+            f = here / name
+            if f.suffix == ".swf" and f.name != "test.swf":
+                children.append(f)
+            elif f.suffix.lower() in image_exts:
+                children.append(f)
+    children.sort(key=lambda p: p.relative_to(test_dir).as_posix())
     return children
+
+
+def _child_key(test_dir, child_swf):
+    """Registry key for a child SWF: its path relative to the test dir, POSIX.
+
+    This is what the test's own URL says (`"child/child.swf"`), what
+    `MovieEntry.filename` stores, and what the C symbol prefix is derived from.
+    A flat child keys as its bare filename, exactly as before.
+    """
+    try:
+        return child_swf.relative_to(test_dir).as_posix()
+    except ValueError:
+        return child_swf.name
 
 
 def recompile_child_swf(swf_path, output_dir, symbol_prefix="", char_id_base=0):
@@ -1756,20 +1795,26 @@ def get_log_fetch(test_dir):
 def get_self_load(test_dir):
     """Detect if the test loads itself (test.swf loads test.swf into a child MC).
 
-    Auto-detects by scanning recompiled scripts for a "test.swf" string literal.
-    Falls back to explicit self_load = true in test.toml for backward compatibility.
+    Auto-detects by scanning the recompiled AVM1 scripts and AVM2 ABC for a
+    "test.swf" string literal. Falls back to an explicit `self_load = true`.
+
+    An AS3 self-load can be invisible to both scans: `loader_loadbytes_url`
+    builds its URLRequest from `loaderInfo.url` at runtime, so its own filename
+    is nowhere in the emitted code. That test declares the flag instead —
+    see `test.local.toml` below.
     """
-    # Auto-detect: scan recompiled scripts for "test.swf" string reference
-    recomp_dir = test_dir / "RecompiledScripts"
-    if recomp_dir.exists():
+    # Auto-detect: scan recompiled output for a "test.swf" string reference
+    for folder in ("RecompiledScripts", "RecompiledABC"):
+        recomp_dir = test_dir / folder
+        if not recomp_dir.exists():
+            continue
         for f in recomp_dir.iterdir():
             if f.suffix == '.c' and '"test.swf"' in f.read_text(errors="replace"):
                 return True
-    # Fallback: explicit flag in test.toml
-    toml_path = test_dir / "test.toml"
-    if toml_path.exists():
-        text = toml_path.read_text()
-        if re.search(r"self_load\s*=\s*true", text):
+    # Fallback: explicit flag, in the upstream test.toml or our overlay.
+    for name in ("test.toml", "test.local.toml"):
+        path = test_dir / name
+        if path.exists() and re.search(r"self_load\s*=\s*true", path.read_text()):
             return True
     return False
 
@@ -1921,26 +1966,31 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     for child_idx, child_swf in enumerate(child_swfs):
         child_movie_id = child_idx + 1  # 0 = main SWF, 1+ = children
         child_file_size = child_swf.stat().st_size if child_swf.exists() else 0
+        # The registry key is the path the test's URL uses. Flat children key
+        # as their filename; a nested one keys as "child/child.swf", which is
+        # also what makes two same-named children in different subdirectories
+        # (loader_duplicate_class) distinct symbols.
+        child_name = _child_key(test_dir, child_swf)
 
         # Check if child is an image (PNG/JPEG with .swf extension)
         image_dims = _detect_image_child(child_swf)
         if image_dims is not None:
             prefix = generate_image_movie_file(
-                child_swf.name, build_dir,
+                child_name, build_dir,
                 image_width=image_dims[0], image_height=image_dims[1],
                 file_size=child_file_size, movie_id=child_movie_id)
             if prefix:
                 child_prefixes.append(prefix)
             continue
 
-        child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
+        child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_name)}"
         child_recomp_dir.mkdir(exist_ok=True)
         # loader-arc tranche 6: an AVM2 child's tables link alongside the
         # parent's under a per-child symbol prefix, with its character ids
         # lifted clear of the parent's range. Char ids are u16 in the runtime
         # tables, so the stride caps children at ~6 before wrapping — the
         # corpus has at most two.
-        child_sym_prefix = f"{_sanitize_prefix(child_swf.name)}_"
+        child_sym_prefix = f"{_sanitize_prefix(child_name)}_"
         child_char_base = child_movie_id * 10000
         if recompile_child_swf(child_swf, child_recomp_dir,
                                symbol_prefix=child_sym_prefix,
@@ -1965,7 +2015,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
                 if (child_abc / f"{child_sym_prefix}abc_timeline.c").exists():
                     child_tables_sym = f"{child_sym_prefix}avm2_movie_tables"
             prefix = generate_child_movie_file(
-                child_swf.name, child_recomp_dir, build_dir,
+                child_name, child_recomp_dir, build_dir,
                 swf_file_size=child_file_size, movie_id=child_movie_id,
                 string_id_offset=next_string_id_offset,
                 is_prelude=child_is_prelude,
@@ -2013,6 +2063,37 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         lines.append("extern void tagInit(SWFAppContext* app_context);")
         lines.append("extern frame_func frame_funcs[];")
         lines.append("")
+        # loader-arc tranche 8: an AS3 self-load goes through the same pipeline
+        # a child SWF does, so the entry needs the MAIN movie's aggregate (new
+        # in RecompiledABC/avm2_movie_tables.c) plus the bytes a URLLoader fetch
+        # of test.swf and the loadBytes size-match both work off.
+        sl_tables = "NULL"
+        sl_bytes_ptr, sl_bytes_len = "NULL", 0
+        sl_raw_ptr, sl_raw_len = "NULL", 0
+        if is_avm2 and (build_dir / "avm2_movie_tables.c").exists():
+            lines.append("#include <avm2/avm2_abc.h>")
+            lines.append("extern const Avm2MovieTables avm2_movie_tables;")
+            sl_tables = "&avm2_movie_tables"
+            sl_swf_bytes = decompressed_swf_bytes(test_swf_path)
+            sl_raw = test_swf_path.read_bytes() if test_swf_path.exists() else None
+            if sl_swf_bytes:
+                sl_bytes_len = len(sl_swf_bytes)
+                lines.append("static const u8 self_swf_bytes[] = {")
+                for i in range(0, sl_bytes_len, 16):
+                    lines.append("    " + "".join(f"{b}," for b in sl_swf_bytes[i:i + 16]))
+                lines.append("};")
+                sl_bytes_ptr = "self_swf_bytes"
+            if sl_raw:
+                sl_raw_len = len(sl_raw)
+                if sl_swf_bytes and bytes(sl_raw) == bytes(sl_swf_bytes):
+                    sl_raw_ptr = sl_bytes_ptr
+                else:
+                    lines.append("static const u8 self_raw_bytes[] = {")
+                    for i in range(0, sl_raw_len, 16):
+                        lines.append("    " + "".join(f"{b}," for b in sl_raw[i:i + 16]))
+                    lines.append("};")
+                    sl_raw_ptr = "self_raw_bytes"
+        lines.append("")
         lines.append("MovieEntry self_movie_entry = {")
         lines.append('    .filename = "test.swf",')
         lines.append("    .frame_funcs = frame_funcs,")
@@ -2023,6 +2104,11 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         lines.append(f"    .stage_height = {sl_height},")
         lines.append(f"    .file_size = {sl_file_size},")
         lines.append("    .movie_id = 0,")  # Self-load: same movie as parent
+        lines.append(f"    .avm2_tables = {sl_tables},")
+        lines.append(f"    .swf_bytes = {sl_bytes_ptr},")
+        lines.append(f"    .swf_bytes_len = {sl_bytes_len},")
+        lines.append(f"    .raw_bytes = {sl_raw_ptr},")
+        lines.append(f"    .raw_bytes_len = {sl_raw_len},")
         lines.append("};")
         (build_dir / "movie_self.c").write_text("\n".join(lines))
         child_prefixes.append("self")
@@ -2382,21 +2468,22 @@ def compile_wasm(test_dir, num_frames, build_dir):
     for child_idx, child_swf in enumerate(child_swfs):
         child_movie_id = child_idx + 1
         child_file_size = child_swf.stat().st_size if child_swf.exists() else 0
+        child_name = _child_key(test_dir, child_swf)
         image_dims = _detect_image_child(child_swf)
         if image_dims is not None:
             prefix = generate_image_movie_file(
-                child_swf.name, build_dir,
+                child_name, build_dir,
                 image_width=image_dims[0], image_height=image_dims[1],
                 file_size=child_file_size, movie_id=child_movie_id)
             if prefix:
                 child_prefixes.append(prefix)
             continue
-        child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
+        child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_name)}"
         child_recomp_dir.mkdir(exist_ok=True)
         if recompile_child_swf(child_swf, child_recomp_dir):
             child_is_prelude = child_swf.name.startswith("prelude_")
             prefix = generate_child_movie_file(
-                child_swf.name, child_recomp_dir, build_dir,
+                child_name, child_recomp_dir, build_dir,
                 swf_file_size=child_file_size, movie_id=child_movie_id,
                 string_id_offset=next_string_id_offset,
                 is_prelude=child_is_prelude)

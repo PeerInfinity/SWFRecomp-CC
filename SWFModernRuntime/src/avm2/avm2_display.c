@@ -4175,6 +4175,26 @@ static const Avm2String* loader_absolute_url(Avm2Context* ctx,
 	return avm2_string_new(ctx, buf, (uint32_t) n);
 }
 
+// The synthetic URL Flash gives a movie that arrived through `loadBytes`:
+// the ISSUING movie's URL with "/[[DYNAMIC]]/<n>" appended (Ruffle
+// loader.rs::loader_loadbytes). FP's <n> is a player-wide counter that never
+// resets; Ruffle pins it at 1, and so do we — loader_loadbytes_url, the only
+// test that grades this, rewrites "/<digit>" to "/<id>" in ActionScript before
+// it traces, so the digit's value is not observable and its SHAPE is.
+static const Avm2String* loader_dynamic_url(Avm2Context* ctx,
+                                            const Avm2String* loader_url)
+{
+	if (loader_url == NULL || loader_url->utf8 == NULL)
+		loader_url = root_swf_url(ctx);
+	if (loader_url == NULL || loader_url->utf8 == NULL) return NULL;
+	char buf[512];
+	int n = snprintf(buf, sizeof(buf), "%.*s/[[DYNAMIC]]/1",
+	                 (int) loader_url->len, loader_url->utf8);
+	if (n <= 0) return NULL;
+	if (n > (int) sizeof(buf) - 1) n = (int) sizeof(buf) - 1;
+	return avm2_string_new(ctx, buf, (uint32_t) n);
+}
+
 // Trailing path component of a URL, as the bundled-asset registries key them.
 static void loader_basename(const Avm2String* url, char* out, size_t out_len)
 {
@@ -4188,6 +4208,35 @@ static void loader_basename(const Avm2String* url, char* out, size_t out_len)
 	uint32_t start = 0;
 	for (uint32_t i = 0; i < end; i++)
 		if (url->utf8[i] == '/' || url->utf8[i] == '\\') start = i + 1;
+	uint32_t n = end - start;
+	if (n >= out_len) n = (uint32_t) out_len - 1;
+	memcpy(out, url->utf8 + start, n);
+	out[n] = '\0';
+}
+
+// The same URL keyed by its RELATIVE PATH rather than its trailing component
+// (loader-arc tranche 8). Four Loader tests keep their children in
+// subdirectories and load them as "child/child.swf"; two of
+// loader_duplicate_class's share a basename across directories, so the
+// basename alone cannot tell them apart. Writes nothing for an absolute URL —
+// the basename key is the only thing that can match one of those.
+static void loader_relpath(const Avm2String* url, char* out, size_t out_len)
+{
+	out[0] = '\0';
+	if (url == NULL || url->utf8 == NULL) return;
+	uint32_t end = 0;
+	while (end < (uint32_t) url->len && url->utf8[end] != '?'
+	       && url->utf8[end] != '#') end++;
+	for (uint32_t i = 0; i + 3 <= end; i++)
+		if (memcmp(url->utf8 + i, "://", 3) == 0) return;
+	uint32_t start = 0;
+	for (;;)
+	{
+		if (start + 2 <= end && url->utf8[start] == '.'
+		    && url->utf8[start + 1] == '/') { start += 2; continue; }
+		if (start < end && url->utf8[start] == '/') { start += 1; continue; }
+		break;
+	}
 	uint32_t n = end - start;
 	if (n >= out_len) n = (uint32_t) out_len - 1;
 	memcpy(out, url->utf8 + start, n);
@@ -4543,6 +4592,35 @@ static void loaderinfo_fill_parameters(Avm2Context* ctx,
 // adds fires `added` (parent = the child root, stage null) BEFORE the child
 // is attached to the Loader — so the ctor runs first, attachment second, and
 // the recursive addedToStage falls out of insert_at_index.
+// avm2_display_char_is_defined scoped to ONE loaded movie's tables rather than
+// the main movie's globals. Same table list, same reason for checking all of
+// them: missing one silently promotes a real symbol's class to root.
+static int movie_char_is_defined(const Avm2MovieTables* t, uint16_t char_id)
+{
+	if (char_id == (uint16_t) t->char_id_base) return 1;   // its own timeline
+	for (uint32_t i = 0; i < t->char_count; i++)
+		if (t->chars[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->timeline_count; i++)
+		if (t->timelines[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->shape_geom_count; i++)
+		if (t->shape_geom[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->button_count; i++)
+		if (t->buttons[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->edittext_count; i++)
+		if (t->edittexts[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->statictext_count; i++)
+		if (t->statictexts[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->bitmap_count; i++)
+		if (t->bitmaps[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->binary_count; i++)
+		if (t->binaries[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->sound_count; i++)
+		if (t->sounds[i].char_id == char_id) return 1;
+	for (uint32_t i = 0; i < t->font_count; i++)
+		if (t->fonts[i].font_id == char_id) return 1;
+	return 0;
+}
+
 static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
                                   Avm2LoaderInfoExt* lx,
                                   const Avm2MovieTables* tables)
@@ -4563,6 +4641,16 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 	for (uint32_t i = 0; i < tables->symbol_class_count; i++)
 	{
 		if (tables->symbol_classes[i].char_id == root_char)
+			root_name = tables->symbol_classes[i].class_name;
+	}
+	// Same `None =>` arm the main movie takes (avm2_main.c build_stage): a
+	// binding whose id names no character in THIS movie is its root class,
+	// whatever the id. loader_loadbytes_url self-loads a SWF that binds Test to
+	// character 1 and defines no character 1, so without this the loaded copy
+	// comes up a bare MovieClip and its whole test body never runs.
+	for (uint32_t i = 0; root_name == NULL && i < tables->symbol_class_count; i++)
+	{
+		if (!movie_char_is_defined(tables, tables->symbol_classes[i].char_id))
 			root_name = tables->symbol_classes[i].class_name;
 	}
 	Avm2Class* root_cls = ctx->builtins.movieclip_class;
@@ -4891,7 +4979,12 @@ static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
 		out->data_static = 1;
 		return 1;
 	}
-	MovieEntry* m = findMovieEntry(name);
+	// A nested child is registered under its relative path; everything else
+	// under its bare filename, which is what the relative path collapses to.
+	char rel[256];
+	loader_relpath(url, rel, sizeof(rel));
+	MovieEntry* m = rel[0] != '\0' ? findMovieEntry(rel) : NULL;
+	if (m == NULL) m = findMovieEntry(name);
 	if (m != NULL)
 	{
 		out->data = NULL;
@@ -5015,6 +5108,7 @@ static Avm2Value loader_load_bytes(Avm2Activation* act)
 	pl.loader_info = cli;
 	pl.data = ba->bytes;
 	pl.len = ba->len;
+	pl.url = loader_dynamic_url(ctx, lx != NULL ? lx->loader_url : NULL);
 	pl.content_type = loader_sniff(ba->bytes, ba->len);
 	// A loadBytes SWF payload carries no filename, so it is matched to a
 	// recompiled sibling movie by its file size — the payload IS one of the

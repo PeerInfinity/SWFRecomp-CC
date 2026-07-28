@@ -1,0 +1,7 @@
+# Harness config for this test, layered on top of the downloaded test.toml.
+# The downloader never writes this filename, so it survives a re-sync.
+#
+# loader_loadbytes_url recursively loads its own SWF, but it builds the
+# URLRequest from `loaderInfo.url` at runtime — "test.swf" appears nowhere in
+# the emitted C or ABC, so get_self_load()'s literal scan cannot see it.
+self_load = true

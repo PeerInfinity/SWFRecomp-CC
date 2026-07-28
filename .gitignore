@@ -137,6 +137,13 @@ ruffle-tests/tests/swfs/from_shumway/avm1/*/
 ruffle-tests/tests/swfs/avm2/*/
 !ruffle-tests/tests/swfs/avm2/_investigation/
 !ruffle-tests/tests/swfs/avm2/_results/
+# `test.local.toml` is OUR harness config for a downloaded test: the downloader
+# never writes that name, so it survives a re-sync where an edited test.toml
+# would be clobbered. loader_loadbytes_url needs `self_load` declared because
+# its self-load URL is built at runtime and has no static signal.
+!ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/
+ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/*
+!ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/test.local.toml
 
 # from_avmplus tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_avmplus/*/

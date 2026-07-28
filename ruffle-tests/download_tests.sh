@@ -185,6 +185,32 @@ install_test_dir() {
         esac
         cp "${data_file}" "${dest}/"
     done
+
+    # Nested child assets (loader-arc tranche 8). Four Loader tests keep their
+    # child SWFs in a subdirectory and load them by RELATIVE path
+    # ("child/child.swf", "loader_domain_child/loader_domain_child.swf"), so the
+    # flat copies above silently dropped them from the mirror. Preserve the
+    # layout — verify_output.py keys MovieEntry.filename by the same relative
+    # path, which is also what keeps two same-named children in different
+    # subdirectories distinct.
+    #
+    # A subtree with its own test.swf is a SEPARATE test that install_category
+    # discovers on its own pass (avm2/large_preload_from_url/large_bytearray);
+    # copying it here would duplicate it as a child of its parent test.
+    local nested rel sub skip
+    while IFS= read -r -d '' nested; do
+        rel="${nested#"${test_dir}"/}"
+        sub="$(dirname "${nested}")"
+        skip=false
+        while [[ "${sub}" != "${test_dir}" && "${sub}" != "/" ]]; do
+            if [[ -f "${sub}/test.swf" ]]; then skip=true; break; fi
+            sub="$(dirname "${sub}")"
+        done
+        ${skip} && continue
+        mkdir -p "${dest}/$(dirname "${rel}")"
+        cp "${nested}" "${dest}/${rel}"
+    done < <(find "${test_dir}" -mindepth 2 -type f \
+                  \( -name '*.swf' -o -name '*.as' -o -name '*.fla' \) -print0)
 }
 
 install_category() {

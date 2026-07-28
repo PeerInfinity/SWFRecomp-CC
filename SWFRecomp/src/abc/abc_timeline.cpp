@@ -1903,49 +1903,90 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		}
 		renamed.append(text, pos, std::string::npos);
 		text.swap(renamed);
-
-		// The abc registry's symbols live in <prefix>abc_registry.c, which
-		// this file does not include — declare them here.
-		const std::string& p = info.symbol_prefix;
-		text += "\n// --- per-movie aggregate (loader-arc tranche 6) ---\n";
-		text += "extern const Avm2AbcFileData* const " + p
-		      + "avm2_generated_abc_files[];\n";
-		text += "extern const Avm2SymbolClassBinding " + p
-		      + "avm2_generated_symbol_classes[];\n";
-		text += "\n";
-		text += "const Avm2MovieTables " + p + "avm2_movie_tables = {\n";
-		auto row = [&](const char* name, size_t count)
-		{
-			text += "\t" + p + "avm2_generated_" + name + ", "
-			      + std::to_string(count) + ",\n";
-		};
-		row("abc_files", info.abc_file_count);
-		row("symbol_classes", info.symbol_class_count);
-		row("timelines", sc.timelines.size());
-		row("chars", sc.chars.size());
-		row("shape_geom", agg_shape_geom_count);
-		row("scenes", sc.scenes.size());
-		row("buttons", sc.buttons.size());
-		row("edittexts", sc.edittexts.size());
-		row("fonts", sc.fonts.size());
-		row("static_glyphs", agg_static_glyph_count);
-		row("statictexts", sc.statictexts.size());
-		row("bitmaps", sc.bitmaps.size());
-		row("binaries", sc.binaries.size());
-		row("sounds", sc.sounds.size());
-		text += "\t" + p + "avm2_generated_stage_rect,\n";
-		text += "\t" + std::to_string(info.frame_rate) + ",\n";
-		text += "\t" + std::to_string(info.header_frame_count) + ",\n";
-		char bgbuf[16];
-		snprintf(bgbuf, sizeof(bgbuf), "0x%06X", sc.bg_color);
-		text += "\t" + std::string(bgbuf) + ",\n";
-		text += "\t" + std::to_string(info.char_id_base) + ",\n";
-		text += "\t" + std::to_string((unsigned) info.swf_version) + ",\n";
-		text += "};\n";
 	}
 
-	std::ofstream f(output_folder + "/" + info.symbol_prefix + "abc_timeline.c");
+	// The per-movie aggregate (loader-arc tranche 6 for children, tranche 8 for
+	// the main movie). A CHILD's is appended to its own prefixed timeline file,
+	// exactly as it has been since tranche 6. The MAIN movie's goes in a file of
+	// its own so that every other byte of RecompiledABC/ stays what it was —
+	// self-loading (loader_loadbytes_url) needs the main movie to be presentable
+	// as a child, and nothing else may notice.
+	const std::string& p = info.symbol_prefix;
+	std::string agg;
+	agg += "// --- per-movie aggregate (loader-arc tranche 6) ---\n";
+	// The abc registry's symbols live in <prefix>abc_registry.c, which neither
+	// file includes — declare them here.
+	agg += "extern const Avm2AbcFileData* const " + p
+	     + "avm2_generated_abc_files[];\n";
+	agg += "extern const Avm2SymbolClassBinding " + p
+	     + "avm2_generated_symbol_classes[];\n";
+	agg += "\n";
+	agg += "const Avm2MovieTables " + p + "avm2_movie_tables = {\n";
+	auto row = [&](const char* name, size_t count)
+	{
+		agg += "\t" + p + "avm2_generated_" + name + ", "
+		     + std::to_string(count) + ",\n";
+	};
+	row("abc_files", info.abc_file_count);
+	row("symbol_classes", info.symbol_class_count);
+	row("timelines", sc.timelines.size());
+	row("chars", sc.chars.size());
+	row("shape_geom", agg_shape_geom_count);
+	row("scenes", sc.scenes.size());
+	row("buttons", sc.buttons.size());
+	row("edittexts", sc.edittexts.size());
+	row("fonts", sc.fonts.size());
+	row("static_glyphs", agg_static_glyph_count);
+	row("statictexts", sc.statictexts.size());
+	row("bitmaps", sc.bitmaps.size());
+	row("binaries", sc.binaries.size());
+	row("sounds", sc.sounds.size());
+	agg += "\t" + p + "avm2_generated_stage_rect,\n";
+	agg += "\t" + std::to_string(info.frame_rate) + ",\n";
+	agg += "\t" + std::to_string(info.header_frame_count) + ",\n";
+	char bgbuf[16];
+	snprintf(bgbuf, sizeof(bgbuf), "0x%06X", sc.bg_color);
+	agg += "\t" + std::string(bgbuf) + ",\n";
+	agg += "\t" + std::to_string(info.char_id_base) + ",\n";
+	agg += "\t" + std::to_string((unsigned) info.swf_version) + ",\n";
+	agg += "};\n";
+
+	if (!p.empty())
+	{
+		text += "\n" + agg;
+	}
+
+	std::ofstream f(output_folder + "/" + p + "abc_timeline.c");
 	f << text;
+
+	if (p.empty())
+	{
+		// A standalone TU, so it has to name the tables it points at: the
+		// timeline file above defines them, this one only borrows them.
+		static const char* const kTableDecls[] = {
+			"const Avm2TimelineData avm2_generated_timelines[]",
+			"const Avm2CharInfo avm2_generated_chars[]",
+			"const Avm2ShapeGeom avm2_generated_shape_geom[]",
+			"const Avm2SceneData avm2_generated_scenes[]",
+			"const Avm2ButtonData avm2_generated_buttons[]",
+			"const Avm2EditTextData avm2_generated_edittexts[]",
+			"const Avm2FontData avm2_generated_fonts[]",
+			"const Avm2StaticGlyph avm2_generated_static_glyphs[]",
+			"const Avm2StaticTextData avm2_generated_statictexts[]",
+			"const Avm2BitmapData avm2_generated_bitmaps[]",
+			"const Avm2BinaryData avm2_generated_binaries[]",
+			"const Avm2SoundData avm2_generated_sounds[]",
+			"const int32_t avm2_generated_stage_rect[4]",
+		};
+		std::string main_tables;
+		main_tables += "// Generated by SWFRecomp (abc_timeline.cpp). Do not edit.\n";
+		main_tables += "#include \"abc_gen.h\"\n\n";
+		for (const char* d : kTableDecls)
+			main_tables += "extern " + std::string(d) + ";\n";
+		main_tables += "\n" + agg;
+		std::ofstream mf(output_folder + "/avm2_movie_tables.c");
+		mf << main_tables;
+	}
 }
 
 }  // namespace abc
