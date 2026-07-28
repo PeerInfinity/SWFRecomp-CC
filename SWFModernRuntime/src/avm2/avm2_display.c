@@ -9696,13 +9696,19 @@ static Avm2Value do_start_drag(Avm2Activation* act)
 			g_drag_has_constraint = 1;
 		}
 	}
-	update_drag(act->ctx);
+	// Ruffle's `start_drag` only *records* the drag; the object does not move
+	// until the next `update_drag` (mouse event or end of frame). A
+	// `startDrag(true)` inside a mouseDown handler therefore leaves x/y alone
+	// for the rest of that handler — see from_shumway/mouse/start_drag_lock,
+	// whose own comment reads "in FP x and y will update in about 70-100ms".
 	return avm2_undefined();
 }
 
 static Avm2Value do_stop_drag(Avm2Activation* act)
 {
-	(void) act;
+	// Ruffle sprite.rs::stop_drag: "We might not have had an opportunity to
+	// call `update_drag` if AS did `startDrag(mc); stopDrag();` in one go".
+	update_drag(act->ctx);
 	g_drag_object = NULL;
 	return avm2_undefined();
 }
