@@ -3,8 +3,11 @@
 **Created**: 2026-07-28 · **Baseline**: `ab92ddfbc` (session start), per-suite
 `_results/results_graphics.json` from CI `30185616752`/`30327940850` (the
 `38aa0a300` results merge).
-**Status**: TRIAGED. Tranche 1 gated on "≥5 tests needing pure event/API
-surface or harness replay plumbing" — **gate met** (8 candidates, §5).
+**Status**: TRIAGED; **tranche 1 SHIPPED** (`9263f71a0`, CI `30381234241`,
+**+10** vs predicted 7, zero regressions — §6). The tranche-1 gate ("≥5 tests
+needing pure event/API surface or harness replay plumbing") was met with 8
+candidates; all 8 landed plus 2 tranche-4 riders. 7 tranches remain (§5),
+worth a further ~+20.
 
 Scope of this document: the **input block** named as row 4e of
 `feature-priority-map.md` ("Focus / Tab / Mouse / Keyboard input, 25 tests,
@@ -376,8 +379,98 @@ Bucket I. Fold into whichever tranche is already touching the drag code.
 
 ## 6. Postmortem
 
-*(Filled in per tranche as each lands — actual vs predicted, and why any
-prediction missed. Nothing here until CI has reported.)*
+### Tranche 1 — SHIPPED `9263f71a0`, CI `30381234241` (graphics, full)
+
+**+10 actual vs +7 predicted**, zero regressions, zero `matching_lines`
+drops anywhere in the corpus. Corpus effective **3860 → 3870 / 4419**;
+`avm2` **902 → 912 / 1221 (74.7%)**; every other suite flat. Status
+histogram moved only `output_mismatch 551 → 541` / `pass 3619 → 3629`;
+`ruffle_matched` (241), `runtime_error` (7) and `recomp_fail` (1) all flat,
+and there is no `compile_fail`, `segfault` or `timeout` bucket in the run.
+
+All eight predicted targets landed:
+
+| Test | before | after |
+|---|---|---|
+| `mouseevent_stagexy` | 1/35 | pass |
+| `mouseevent_valueof_tostring` | 24/28 | pass |
+| `mouseevent_constr` | 62/66 | pass |
+| `focusrect_focuslost` | 7/9 | pass |
+| `focusrect_property` | 104/110 | pass |
+| `tab_ordering_stage_tab_children_remove_root` | 3/5 | pass |
+| `mouse_wheel_events` | 33/36 | pass |
+| `tab_ordering_tabbable` | 45/47 | pass |
+
+Plus **two riders the triage listed under tranche 4, not tranche 1**:
+
+- **`tab_ordering_stage_tab_children`** (15/32 → pass). §2 bucket D split
+  this into two defects — "half is the Stage-tabChildren proxy, the rest is
+  that `root.tabChildren = false` must actually stop traversal". The second
+  half did not exist: `fill_tab_order` already gates on the root's flag.
+  Nothing ever *set* that flag, because the Stage setter stored it on the
+  Stage's own ext. One fix, not two.
+- **`focus_events_key_basic`** (33/132 → pass). §2 bucket D guessed
+  correctly here — "automatic-order key computation for objects whose
+  bounds come from a SimpleButton state (same family as
+  `tab_ordering_tabbable`)". The consequence is that the
+  `highlight_bounds` fix is worth two tests, not one.
+
+### Where the triage was wrong, and the transferable lesson
+
+Item 8's diagnosis hedged: "suspect the empty-bounds path **or** the
+equal-key dedup". It was **both, in sequence** — and the ordering is the
+lesson. `obj_world_topleft` mapped invalid bounds to the *origin*, which
+gave a stateless `SimpleButton` the key `0`; the equal-key dedup — which
+reading `focus_tracker.rs::AutomaticTabOrdering::ignore_duplicates`
+confirmed is **correct and deliberately matches Flash** — then dropped it
+against `clip9.text`, also at `(0,0)`. The mechanism that visibly discarded
+the object was not the bug. **When a correct-looking mechanism produces a
+wrong result, check its input before changing the mechanism.**
+
+The narrower miss underneath it: the triage said SimpleButton bounds were
+"empty". Ruffle distinguishes *empty* from `Twips::INVALID` (`0x7ffffff`),
+and `Matrix * Rectangle::INVALID == Rectangle::INVALID` — so an invalid
+rect sorts to the far end of the order, not to the front. That distinction
+is the entire defect.
+
+### Partial credit visible in the rider sweep
+
+`mouse_pick_masking` went from *all seven* lines differing to two matching:
+the coordinate truncation was real and is gone, and what remains there is
+genuinely mask hit-testing (tranche 2). `focus_events_mouse_focusable`
+stayed at 110/112, which confirms its two lines are purely the
+`mouseFocusChange` `relatedObject` model (tranche 4) with no coordinate
+component. Both readings tighten tranche 2 and 4's predictions.
+
+### Process notes
+
+1. **The §0 truncation caveat paid for itself.** `focusrect_property`
+   really was the six-line fix the JSON implied; `tab_ordering_properties`
+   was a 173-line, three-cause test that would have blown this tranche had
+   it been sized from the JSON. Deferring it to bucket K was right, and the
+   local re-run is what showed why.
+2. **Every item was a Ruffle-source read, not a guess** —
+   `mouse_event.rs::local_to_stage_x`, `stage.rs::set_tab_children` +
+   `Stage.as:169`, `MouseEvent.as`'s `[API("662")]` block,
+   `edit_text.rs::event_dispatch`, `avm2_button.rs::highlight_bounds`,
+   `focus_tracker.rs::AutomaticTabOrdering`. That is the same pattern that
+   made the Loader arc's predictions hold, and the one prediction that
+   needed correcting (item 8) is the one where the first read stopped one
+   level too shallow.
+
+### Regression evidence
+
+58 tests re-run locally before the push (38 blast-radius canaries + the 20
+remaining arc tests), zero regressions, and CI agrees. Load-bearing
+canaries green: `mouse_children` 192/192, all four passing
+`tab_ordering_*`, all eight `focus_*`, the whole `mouse_*` dispatch set,
+`asymmetric_key_events` and `focus_events_mixed_key_mouse` (the other two
+tests whose `input.json` carries `FocusLost`), `from_shumway/mouse/`
+`{mouse_coords,start_drag}` (which print MouseEvent coordinates through the
+changed twips path), and all three `visual/focus_highlight/*` AVM2 tests
+(which consume the bounds code the tab-order fix changed). The link
+canaries `verify_method_info_{oob,duplicate}` and `mixed_avm/avm1_loads_
+avm2` still compile, link and run at their pre-existing `output_mismatch`.
 
 ---
 
@@ -385,4 +478,5 @@ prediction missed. Nothing here until CI has reported.)*
 
 | Tranche | Commit | CI | Yield |
 |---|---|---|---|
-| triage | (this doc) | — | — |
+| triage | `f410cc9f3` | — (docs only) | — |
+| 1 | `9263f71a0` | `30381234241` graphics/full, success | **+10** (pred. 7) |

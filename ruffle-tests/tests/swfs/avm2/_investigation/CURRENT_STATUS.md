@@ -1,6 +1,11 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-28 — **Loader arc CLOSED (tranche 8 shipped,
+Last updated: 2026-07-28 — **Input arc TRIAGED + tranche 1 SHIPPED
+(`9263f71a0`, CI `30381234241`, +10 vs predicted 7, zero regressions)**:
+avm2 902 → 912 / 1221 (74.7%). Per-test triage of all 30 failing input
+tests + 6 riders, and 7 remaining tranches, in
+`SWFRecompDocs/plans/input-arc.md`. See the Input section below.
+Prior: 2026-07-28 — **Loader arc CLOSED (tranche 8 shipped,
 `1617724eb` + `e2a7a651c`, CI `30326194497` + `30327940850`, +7 total,
 zero regressions)**: 25 of 31 `loader*` avm2 tests pass. Nested child SWFs
 are keyed by relative path, the main movie emits its own
@@ -27,13 +32,42 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
-## Input (focus / tab / mouse / keyboard) — TRIAGED (2026-07-28)
+## Input (focus / tab / mouse / keyboard) — TRIAGED + TRANCHE 1 SHIPPED (2026-07-28)
 
-Full plan: **`SWFRecompDocs/plans/input-arc.md`** (per-test triage, 8 ranked
-tranches). This supersedes the "~29 misses … mask hit-testing, SimpleButton
+Full plan + tranche-1 postmortem: **`SWFRecompDocs/plans/input-arc.md`**
+(per-test triage, 8 ranked tranches; §5 ranks them, §6 postmortems tranche
+1). This supersedes the "~29 misses … mask hit-testing, SimpleButton
 highlight_bounds geometry + arrow navigation, IME, HTML link events,
 real-shape hit-testing" line in the Stage 8 section below, which is the
 same block seen four months earlier and without per-test causes.
+
+- **Tranche 1** (`9263f71a0`, CI `30381234241` graphics/full): **+10**
+  (predicted 7), zero regressions, zero `matching_lines` drops corpus-wide.
+  avm2 **902 → 912 / 1221 (74.7%)**; corpus **3860 → 3870 / 4419**. Eight
+  items, all read off Ruffle source: MouseEvent `localX`/`localY` made
+  writable and un-truncated + `stageX`/`stageY` on the real three-branch
+  model + `isRelatedObjectInaccessible`; `IN_FOCUS_LOST`/`IN_FOCUS_GAINED`
+  routed in `input_deliver`; `focusRect` accepting `undefined` as null;
+  `Stage.tabChildren` as a write-through proxy to the AVM2 root; mouse
+  wheel scrolling a TextField; and `obj_world_topleft` modelling
+  `InteractiveObject::highlight_bounds` (SimpleButton hit-area, and
+  `Twips::INVALID` rather than the origin for invalid bounds).
+  Flipped: `mouseevent_{stagexy,valueof_tostring,constr}`,
+  `focusrect_{focuslost,property}`, `mouse_wheel_events`,
+  `tab_ordering_{tabbable,stage_tab_children,stage_tab_children_remove_root}`,
+  `focus_events_key_basic` — the last two were tranche-4 riders.
+  **The transferable lesson** (§6): the equal-key dedup that visibly
+  discarded the stateless SimpleButton was correct and deliberately
+  Flash-matching; the bug was its *input* (invalid bounds keyed at the
+  origin). When a correct-looking mechanism gives a wrong result, check its
+  input before changing the mechanism.
+- **NEXT**: tranche 2 (mask + non-interactive + text hit-testing, pred. +5)
+  or tranche 3 (caret placement + mouse selection, pred. +7 with the four
+  `text/text_caret_placement_*` riders). The rider sweep sharpened both:
+  `mouse_pick_masking` went from all-7-lines-differing to 2 matching once
+  the coordinate truncation was gone, so what remains there is purely mask
+  hit-testing; `focus_events_mouse_focusable` held at 110/112, confirming
+  its 2 lines are purely the `mouseFocusChange` `relatedObject` model.
 
 Census: **30 failing avm2 tests + 6 riders** (`text/text_caret_placement_*`
 ×4, `text/links_in_scrolled_text`, `from_shumway/mouse/start_drag_lock`),
