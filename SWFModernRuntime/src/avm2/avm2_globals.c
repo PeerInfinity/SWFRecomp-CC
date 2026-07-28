@@ -1795,14 +1795,21 @@ static void register_system(Avm2Context* ctx)
 	                               system_noop);
 }
 
-// flash.system.Security — minimal. Native/headless runs from a local file with
-// network disabled, so sandboxType is "localWithFile" (matches Ruffle's default
-// for a network-disabled local SWF; the sandbox_type_local_file test). The
-// domain-policy methods are no-ops (there is no cross-domain network layer);
-// the Newgrounds-style API preloaders call Security.allowDomain() at startup.
+// flash.system.Security — minimal. Native/headless runs from a local file, so
+// the sandbox is one of the two local ones, chosen by the SWF's own
+// FileAttributes.UseNetwork bit exactly as Ruffle does: a local SWF that asked
+// for network access is "localWithNetwork", one that did not is
+// "localWithFile" (sandbox_type_local_network vs sandbox_type_local_file).
+// `g_use_network` is set from the recompiler's SWF_USE_NETWORK by main.c and
+// is what AVM1's own Security.sandboxType already reads. The domain-policy
+// methods are no-ops (there is no cross-domain network layer); the
+// Newgrounds-style API preloaders call Security.allowDomain() at startup.
+extern int g_use_network;
+
 static Avm2Value security_get_sandbox_type(Avm2Activation* act)
 {
-	return avm2_string(avm2_string_from_literal(act->ctx, "localWithFile"));
+	return avm2_string(avm2_string_from_literal(act->ctx,
+		g_use_network ? "localWithNetwork" : "localWithFile"));
 }
 static Avm2Value security_get_exact_settings(Avm2Activation* act)
 {
@@ -2932,6 +2939,10 @@ void avm2_globals_init(Avm2Context* ctx)
 	// after avm2_register_events populates event_dispatcher_class (builtin
 	// classes snapshot their parent vtable at creation time).
 	register_net(ctx);
+	// flash.net transport classes (avm2_net.c): Socket, NetConnection,
+	// NetStream, Responder + the AIR/AV constant stubs. Same ordering
+	// constraint — three of them extend EventDispatcher.
+	avm2_register_net_transport(ctx);
 
 	// flash.text (avm2_text.c — Stage-6 TextFormat/TextField engine).
 	// Before display: the TextField class shell wires into it.

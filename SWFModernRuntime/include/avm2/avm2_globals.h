@@ -367,6 +367,10 @@ typedef struct Avm2EventExt
 	// --- StatusEvent ---
 	const Avm2String* status_code;
 	const Avm2String* status_level;
+	// --- NetStatusEvent ---
+	// The `info` bag. Reached by the GC through the conservative native_ext
+	// scan, like every other Avm2Object* in this struct.
+	Avm2Object* info;
 } Avm2EventExt;
 
 // DisplayObject instance state (avm2_display.c). One struct serves the
@@ -589,6 +593,12 @@ Avm2Object* avm2_io_error_event_new(Avm2Context* ctx, const Avm2String* type,
                                     const Avm2String* text, int32_t error_id);
 Avm2Object* avm2_http_status_event_new(Avm2Context* ctx, const Avm2String* type,
                                        int32_t status, int redirected);
+// flash.events.NetStatusEvent("netStatus"), dispatched from C by the
+// NetConnection state machine (avm2_net.c). `keys`/`values` build the `info`
+// bag in order; both arrays hold `count` NUL-terminated C strings.
+Avm2Object* avm2_net_status_event_new(Avm2Context* ctx,
+                                      const char* const* keys,
+                                      const char* const* values, int count);
 // Was the event's default prevented (cancelled)? NULL-safe.
 int avm2_event_is_cancelled(Avm2Object* event);
 // Display parent hook used for ancestor walks; reads the display ext.
@@ -602,6 +612,13 @@ Avm2Object* avm2_timer_event_new(Avm2Context* ctx, const Avm2String* type,
                                  int bubbles, int cancelable);
 // getTimer() elapsed-time value (ms since start), read off the timer clock.
 double avm2_timer_elapsed_ms(void);
+
+// flash.net transport classes (avm2_net.c): Socket, NetConnection, NetStream,
+// Responder, NetStreamPlayOptions, DatagramSocket, AVNetworkingParams. Runs
+// after avm2_register_events, like register_net — three of these extend
+// EventDispatcher and builtin classes snapshot their parent vtable at
+// creation time.
+void avm2_register_net_transport(Avm2Context* ctx);
 
 // flash.media Sound family (avm2_media.c — Stage 10).
 void avm2_register_media(Avm2Context* ctx);

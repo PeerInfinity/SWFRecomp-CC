@@ -1339,6 +1339,41 @@ static Avm2Value se_get_level(Avm2Activation* act)
 static Avm2Value se_set_level(Avm2Activation* act)
 { Avm2EventExt* e = this_event(act); if (e && act->argc > 0) e->status_level = avm2_coerce_to_string(act->ctx, act->args[0]); return avm2_undefined(); }
 
+// flash.events.NetStatusEvent — Event plus one Object field. Its `info` bag is
+// the whole payload of the NetConnection/NetStream status protocol, and
+// netconnection_close grades both the field values and the dispatch order.
+static Avm2Value net_status_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->info = (act->argc > 3 && act->args[3].kind == AVM2_VALUE_OBJECT)
+		? act->args[3].u.obj : NULL;
+	return avm2_undefined();
+}
+static Avm2Value nse_get_info(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act); return (e && e->info) ? avm2_object_value(e->info) : avm2_null(); }
+static Avm2Value nse_set_info(Avm2Activation* act)
+{
+	Avm2EventExt* e = this_event(act);
+	if (e && act->argc > 0)
+		e->info = (act->args[0].kind == AVM2_VALUE_OBJECT) ? act->args[0].u.obj : NULL;
+	return avm2_undefined();
+}
+static Avm2Value nse_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"NetStatusEvent", "type", "bubbles", "cancelable", "eventPhase", "info"
+	};
+	Avm2Value args[6];
+	for (int i = 0; i < 6; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 6);
+}
+
 static void sconst(Avm2Context* ctx, Avm2Class* cls, const char* n, const char* v)
 { avm2_builtin_add_static_const(ctx, cls, n, avm2_string(avm2_string_from_literal(ctx, v))); }
 
@@ -1347,6 +1382,7 @@ static void sconst(Avm2Context* ctx, Avm2Class* cls, const char* n, const char* 
 static Avm2Class* g_progress_event_class;
 static Avm2Class* g_io_error_event_class;
 static Avm2Class* g_http_status_event_class;
+static Avm2Class* g_net_status_event_class;
 
 static void register_net_events(Avm2Context* ctx)
 {
@@ -1420,6 +1456,16 @@ static void register_net_events(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, ste, "code", se_get_code, se_set_code);
 	avm2_builtin_add_getset(ctx, ste, "level", se_get_level, se_set_level);
 	sconst(ctx, ste, "STATUS", "status");
+
+	// flash.events.NetStatusEvent (extends Event).
+	Avm2Class* nse = avm2_builtin_class(ctx, "flash.events", "NetStatusEvent",
+	                                    b->event_class);
+	nse->instance_init.fn = net_status_init;
+	nse->instance_init.debug_name = "NetStatusEvent";
+	g_net_status_event_class = nse;
+	avm2_builtin_add_getset(ctx, nse, "info", nse_get_info, nse_set_info);
+	event_override_method(ctx, nse, "toString", nse_to_string);
+	sconst(ctx, nse, "NET_STATUS", "netStatus");
 }
 
 // The Loader pipeline (avm2_display.c) dispatches these from C; both events
@@ -1435,6 +1481,30 @@ Avm2Object* avm2_progress_event_new(Avm2Context* ctx, const Avm2String* type,
 	args[3] = avm2_number(bytes_loaded);
 	args[4] = avm2_number(bytes_total);
 	Avm2Value v = avm2_class_construct(ctx, g_progress_event_class, args, 5);
+	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+}
+
+// NetStatusEvent built from a NUL-terminated key/value list, mirroring Ruffle's
+// EventObject::net_status_event: the `info` bag is a plain dynamic Object whose
+// properties are set in the order given (netconnection_close sorts them itself,
+// but netstream_connect reads them straight back).
+Avm2Object* avm2_net_status_event_new(Avm2Context* ctx,
+                                      const char* const* keys,
+                                      const char* const* values, int count)
+{
+	if (g_net_status_event_class == NULL) return NULL;
+	Avm2Value info = avm2_class_construct(ctx, ctx->builtins.object_class, NULL, 0);
+	for (int i = 0; i < count; i++)
+	{
+		avm2_set_public_property(ctx, info, keys[i], (uint32_t) strlen(keys[i]),
+			avm2_string(avm2_string_from_literal(ctx, values[i])));
+	}
+	Avm2Value args[4];
+	args[0] = avm2_string(avm2_string_from_literal(ctx, "netStatus"));
+	args[1] = avm2_bool(0);
+	args[2] = avm2_bool(0);
+	args[3] = info;
+	Avm2Value v = avm2_class_construct(ctx, g_net_status_event_class, args, 4);
 	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
 }
 
