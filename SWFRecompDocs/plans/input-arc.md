@@ -3,11 +3,13 @@
 **Created**: 2026-07-28 · **Baseline**: `ab92ddfbc` (session start), per-suite
 `_results/results_graphics.json` from CI `30185616752`/`30327940850` (the
 `38aa0a300` results merge).
-**Status**: TRIAGED; **tranches 1–3 SHIPPED** — `9263f71a0` (**+10** vs
-predicted 7), `786d765ee` + `b27909297` (**+12** together, CI `30389013458`,
-exactly the predicted 5 + 7). **+22 so far** against a predicted 19, zero
-regressions in any tranche; postmortems in §6. 5 tranches remain (§5), worth
-a further ~+11.
+**Status**: **ARC CLOSED.** All 8 tranches shipped — `9263f71a0` (**+10** vs
+predicted 7), `786d765ee` + `b27909297` (**+12**, exactly the predicted
+5 + 7), then the closeout `803055ca5` / `5231abf0c` / `5f48fecd7` /
+`bbefcf376` (**+7**, including tranche 7 which the plan had deferred).
+**+29 total against a predicted +30**, zero regressions in any tranche.
+Postmortems in §6; every one of the 36 scoped tests is reconciled in §8 —
+29 shipped, 2 open with a named blocker, 5 dispositioned out.
 
 Scope of this document: the **input block** named as row 4e of
 `feature-priority-map.md` ("Focus / Tab / Mouse / Keyboard input, 25 tests,
@@ -338,30 +340,31 @@ press/drag/release and double/triple click on top. AVM1's
 `edittext_focus_selection` family already does this, so the layout query
 exists to copy.
 
-### Tranche 4 — focus event model · **predicted +4** · MEDIUM
+### Tranche 4 — focus event model · **predicted +4** · MEDIUM · **SHIPPED `5f48fecd7`, +2**
 
 Bucket D. `mouseFocusChange` must fire unconditionally with the correct
 `relatedObject`, and the automatic tab order must agree with Ruffle for
 SimpleButton-shaped bounds and for `root.tabChildren = false`.
 
-### Tranche 5 — IME composition · **predicted +2** · SMALL-MEDIUM
+### Tranche 5 — IME composition · **predicted +2** · SMALL-MEDIUM · **SHIPPED `5f48fecd7`, +2**
 
 Bucket B's other half. Parse `IME_PREEDIT`/`IME_COMMIT` in
 `avm2_input_load`, route to a new `avm2_text_ime_compose/commit` mirroring
 `actionTextFieldImeCompose/Commit`, and add the composition-active flag
 that swallows key events.
 
-### Tranche 6 — `TextEvent.LINK` · **predicted +2** · SMALL-MEDIUM
+### Tranche 6 — `TextEvent.LINK` · **predicted +2** · SMALL-MEDIUM · **SHIPPED `5231abf0c`, +1**
 
 Bucket H. Anchor spans already have to exist for HTML rendering; the work
 is hit-testing them on click and dispatching the event.
 
-### Tranche 7 — arrow-key directional focus · **predicted +2** · LARGE
+### Tranche 7 — arrow-key directional focus · **predicted +2** · LARGE · **SHIPPED `bbefcf376`, +1**
 
 Bucket E. 998 lines of acceptance for a two-test yield — schedule last
-despite `tab_ordering_arrows` looking dramatic.
+despite `tab_ordering_arrows` looking dramatic. (The LARGE label did not
+survive contact — see §6.)
 
-### Tranche 8 — `startDrag(lockCenter)` deferral · **predicted +1** · TRIVIAL
+### Tranche 8 — `startDrag(lockCenter)` deferral · **predicted +1** · TRIVIAL · **SHIPPED `803055ca5`, +1**
 
 Bucket I. Fold into whichever tranche is already touching the drag code.
 
@@ -629,6 +632,187 @@ too coarse to distinguish "same failure" from "different failure of the same
 size", and three tests in the `ruffle_matched` bucket looked like regressions
 under the coarse check and were not.
 
+### Closeout — tranches 8, 6, 4, 5, 7 — `803055ca5` / `5231abf0c` / `5f48fecd7` / `bbefcf376`
+
+All five remaining tranches shipped in one session. **+7 actual vs +9
+predicted for tranches 4/5/6/8, plus +1 from tranche 7, which the plan had
+deferred.** No tranche's *mechanism* fell short: the two missing tests were
+both scoping errors made at triage time, and both had already been paid for
+or belong to another VM. Details per tranche below; the reconciliation of
+all 36 scoped tests is §8.
+
+Order shipped was by ascending risk (8 → 6 → 4+5 → 7), not by the plan's
+yield ranking, because 4 and 5 both edit the same input path and had to be
+verified against each other.
+
+#### Tranche 8 — `803055ca5` · **+1 vs +1**
+
+`from_shumway/mouse/start_drag_lock`. Ruffle's `Sprite.startDrag` only
+*records* the drag; `Player::update_drag` moves the object, and it runs at
+the top of mouse-event handling and at the end of each frame — never inline
+from `startDrag`. We called `update_drag` from `do_start_drag`, so
+`startDrag(true)` inside a mouseDown handler snapped the object to the
+cursor before the handler's next statement. The test's own source comment
+("in FP x and y will update in about 70-100ms") is the spec. Also mirrors
+`stop_drag`'s own `update_drag` call, which exists for the
+`startDrag(mc); stopDrag();`-in-one-go case.
+
+#### Tranche 6 — `5231abf0c` · **+1 vs +2**
+
+`avm2/textfield_event` (0/66 → pass), first try. The span's `url` was
+already parsed from `<a href>`; the Press arm just never consulted it.
+Ruffle resolves the clicked index to a span, and a non-empty `url` goes to
+`open_url`, whose `event:` branch dispatches `TextEvent("link",
+bubbles=true, cancelable=false)`. One structural detail matters: the
+selectable gate lives inside `handle_click`, and the link lookup sits
+*outside* it — a non-selectable field still opens links.
+
+**The missing +1 is the third instance of the same triage error.** §3 filed
+`text/links_in_scrolled_text` as this tranche's rider on the strength of its
+symptom (a click on an `<a>` doesn't fire). It is an **AVM1** test —
+`asfunction:callback` — exactly like tranche 3's
+`text_caret_placement_translated_bounds`. Twice now, a rider grouped by
+symptom crossed a VM boundary. AVM1 already has the `asfunction` path; its
+real gap is that `ng_shared.c::ng_getCharIndexAtPoint` splits lines on
+`\r`/`\n` only — **no word wrap** — and ignores `scroll`. Instrumented, the
+click at (210, 263) resolves to char 337 when the anchor run is at 707..710:
+the field is 273px wide with 14 wrapped paragraphs and `scroll = 100`, so
+the index is off by the entire wrapping. Fixing it needs a wrap-aware line
+enumerator in `ng_shared.c` (the segmentation exists inside
+`ng_wrap_count_lines` / `ng_computeScrollMixedFont` but neither emits line
+*start offsets*) plus the vertical scroll offset. Left open — it is an AVM1
+text-layout job, not a `TextEvent` job.
+
+#### Tranche 4 — `5f48fecd7` · **+2 vs +4**
+
+`focus_events_mouse_focusable` (110/112) and `focus_events_mouse_basic`
+(30/260). Three defects in `update_focus_on_press`, all from the same
+misreading — that focus-on-press is a search for something focusable:
+
+1. We walked up to the nearest mouse-focusable ancestor and used it as both
+   the candidate *and* the event's `relatedObject`. Ruffle uses the
+   **pressed object itself**; the pick already propagates to the parent when
+   a child is not a valid target, so the walk is redundant *and* wrong.
+2. We gated the `mouseFocusChange` on the focus actually moving. Ruffle
+   gates on `old != pressed`. That is what makes the event fire on the Stage
+   with `relatedObject` set and `stage.focus` still `null` — the filter to
+   something focusable (`new.filter(is_focusable_by_mouse)`) happens *after*
+   the event, not before it.
+3. `preventDefault()` was ignored.
+
+Plus `is_focusable_by_mouse`, which read only an explicitly assigned
+`tabEnabled` where Ruffle's is `is_action_script_3() && tab_enabled()` —
+and `tab_enabled` carries the per-type default.
+
+**The shortfall is bookkeeping, not a miss.** Bucket D's other two tests,
+`focus_events_key_basic` and `tab_ordering_stage_tab_children`, had already
+flipped as tranche 1's riders (§6, tranche 1) — they are counted there. The
+reachable yield here was +2 the moment tranche 1 landed, and the
+post-tranche-3 sweep quoted in §7 recorded exactly that (it lists only the
+two remaining tests at their unchanged line counts). **A prediction is stale
+the moment an earlier tranche collects one of its tests; the arc total is
+right, the per-tranche number is not.**
+
+#### Tranche 5 — `5f48fecd7` · **+2 vs +2**
+
+`ime_linux_dead_keys` (0/10) and `edittext_ime_focus_lost` (0/9). The
+harness had emitted `IME_PREEDIT`/`IME_COMMIT` all along and the runtime
+had the enum values — nothing parsed or routed them. The port is
+`edit_text.rs::ime` plus `ensure_ime_{started,finished,committed}`: a
+preedit is live uncommitted text that shows and counts towards
+`text`/`length` but fires no `textInput`; only a Commit, or losing focus
+with a composition open, turns it into real input. The focus-loss commit
+hangs off `set_focus` **before** the focusOut dispatch, matching Ruffle's
+`on_focus_changed` → `call_focus_handler` order.
+
+**Where the triage was wrong.** §5 specified "a composition-active flag that
+swallows key events". No such flag exists anywhere in Ruffle. What actually
+suppresses the dead-key `Unknown` releases — and the `Char('a')` release
+that an IME commit stands in for — is a plain bookkeeping rule in
+`input.rs`: **a KeyUp is dropped unless a KeyDown claimed the same
+(physical key, location).** Its own comment says "Ignore spurious KeyUp
+events that may happen e.g. during IME", but it is not IME state; it is
+symmetric key accounting that IME merely exposes. Guessing the flag would
+have produced a mechanism that passes these two tests and diverges on every
+unpaired key event elsewhere. `avm2/asymmetric_key_events` — the test built
+specifically around unpaired key events — is the canary that proves the
+real rule, and it stayed green.
+
+Modelled with the Flash keyCode rather than a winit `PhysicalKey`, which is
+1:1 for every key the corpus exercises ('a'/'A' both 65/KeyA, `"`/`'` both
+222/Quote, unmapped 0/Unknown on both sides).
+
+#### Tranche 7 — `bbefcf376` · **+1 vs a deferral**
+
+The plan deferred this ("LARGE, worst yield-per-effort in the arc") and the
+closeout brief allowed building it only if a reading showed the triage had
+oversized it. It had. **The LARGE label was read off
+`tab_ordering_arrows`'s 998-line `output.txt` — that file is the acceptance
+table, not the work.** The test is ~60 declarative stages × 4 directions
+driven by one algorithm, and the algorithm —
+`focus_tracker.rs::NavigationOrdering::key` — is **~90 lines of rectangle
+arithmetic in one file**, no new subsystem. Sizing a task by its test's line
+count is the same mistake in the opposite direction from §0's truncation
+caveat: there, a 2-line JSON diff hid a 173-line test; here, a 998-line
+transcript hid 90 lines of code.
+
+`focus_events_key_navigation` (12/53) flipped, including its cancel branch.
+`tab_ordering_arrows` did **not**, and is left open — but it went from 1/998
+to tracking the transcript for 634 lines, and every remaining diff is the
+same non-navigation cause (below).
+
+**The finding that came out of it, and it is the arc's most reusable.**
+Making the navigation keys agree required **snapping highlight bounds to
+whole twips**. Ruffle's bounds are `Rectangle<Twips>` — integers — and ours
+were doubles. The keys compare rectangle edges with exact `<=`, and the
+"Size vs distance behind" stage puts two objects' `y_max` EXACTLY on the
+origin's: a sprite scaled to `height = 12` over 10px of content lands at
+12.0000005px and flips the comparison, focusing an object Flash excludes.
+That one snap moved the first navigation divergence from line 132 to line
+634.
+
+This is the **third** appearance of the same lesson in this arc — after
+tranche 1's `Twips::INVALID` (invalid bounds are a sentinel, not the origin)
+and tranche 2's `local_mouse` snap (localX/localY are always an exact twip
+count). **Ruffle's geometry is integer twips, and the quantization is
+load-bearing, not cosmetic. Any time a port compares Ruffle coordinates for
+equality or ordering, quantize first.**
+
+What still blocks `tab_ordering_arrows` is the same root cause one layer
+out: the **DisplayObject property getters** return unquantized geometry
+(`h=20.999999046325684` where Flash prints `21`), and the test's own
+mirroring arithmetic is built on those getters, so positions drift a twip
+(`dx=-10.050000000000011` for `-10`). Quantizing `width`/`height`/`x`/`y`
+corpus-wide is a change with blast radius far beyond this arc; recorded here
+as the one thing that would close bucket E.
+
+### Regression evidence — closeout
+
+Sweeps were run per tranche and then once cleanly over the union: **64 AVM2
+tests** after tranches 4+5+6+8 and **28 more** after tranche 7 — every
+`focus_*`, `tab_ordering_*`, `mouse_*`, `mouseevent_*`, `edittext_*`,
+`textfield_*` and `key_input_*` test, plus `mouse_children` (192/192),
+`loader_noninteractive_try_click_root`, and the link canaries
+`verify_method_info_{oob,duplicate}`. Load-bearing greens:
+`asymmetric_key_events` (the KeyUp rule) and `tab_ordering_automatic_
+advanced` (the test built by bisecting coordinates to pin the 6y+x order —
+the one most exposed to the twips snap).
+
+Every failure in both sweeps was pre-existing and verified so, not assumed:
+`textfield_input_events` and `mouse_pick_loader_avm1` by **byte-diffing the
+actual output against the CI baseline's**, `verify_method_info_*` against
+their recorded `output_mismatch`, and `tab_ordering_properties` by the
+stronger argument that it ships no `input.json`, so none of this session's
+code paths execute in it at all.
+
+**One process failure worth recording.** Mid-sweep source edits produced a
+phantom regression: `mouse_pick_button_mode` came back FAIL while
+`avm2_text.c` was being edited under a running sweep, and passed on a clean
+re-run. `verify_output.py` rebuilds the runtime per test, so **a canary
+sweep and a source edit cannot overlap** — the sweep grades whatever the
+tree happens to contain at each test's build. The tranche-4 sweep was
+discarded and re-run clean for this reason.
+
 ---
 
 ## 7. Commits
@@ -639,12 +823,111 @@ under the coarse check and were not.
 | 1 | `9263f71a0` | `30381234241` graphics/full, success | **+10** (pred. 7) |
 | 2 | `786d765ee` | `30389013458` graphics/full, success (with 3) | **+5** (pred. 5) |
 | 3 | `b27909297` | `30389013458` graphics/full, success | **+7** (pred. 7) |
+| 8 | `803055ca5` | `30397635331` graphics/full | **+1** (pred. 1) |
+| 6 | `5231abf0c` | `30397635331` graphics/full | **+1** (pred. 2) |
+| 4+5 | `5f48fecd7` | `30397635331` graphics/full | **+4** (pred. 6; 4 was +2 not +4) |
+| 7 | `bbefcf376` | `30397635331` graphics/full | **+1** (was deferred) |
 
-**Remaining**: tranche 4 (focus event model, +4) → 5 (IME, +2) → 6
-(`TextEvent.LINK`, +2) → 7 (arrow-key directional focus, +2, LARGE) → 8
-(`startDrag(lockCenter)`, +1, trivial). A post-tranche-3 sweep confirms none
-of their tests moved as a side effect: `focus_events_mouse_focusable` 110/112,
-`focus_events_mouse_basic` 30/260, `focus_events_key_navigation` 12/53,
-`tab_ordering_arrows` 1/998, `textfield_event` 0/66, `ime_linux_dead_keys`
-0/10, `edittext_ime_focus_lost` 0/9 — all unchanged, so those predictions
-stand as written.
+**Arc total: +29** against a predicted +30 for tranches 1–8. The single
+missing test is `text/links_in_scrolled_text`, which is not an AVM2 test at
+all (§6, closeout, tranche 6).
+
+**Remaining after tranche 3**: tranche 4 (focus event model, +4) → 5 (IME,
++2) → 6 (`TextEvent.LINK`, +2) → 7 (arrow-key directional focus, +2, LARGE)
+→ 8 (`startDrag(lockCenter)`, +1, trivial). A post-tranche-3 sweep confirms
+none of their tests moved as a side effect: `focus_events_mouse_focusable`
+110/112, `focus_events_mouse_basic` 30/260, `focus_events_key_navigation`
+12/53, `tab_ordering_arrows` 1/998, `textfield_event` 0/66,
+`ime_linux_dead_keys` 0/10, `edittext_ime_focus_lost` 0/9 — all unchanged,
+so those predictions stand as written. All five shipped in the closeout
+session below.
+
+---
+
+## 8. Final scoreboard — all 36 scoped tests reconciled
+
+Every test the §0 census found, and where it ended up. **29 shipped, 2 left
+open with a named blocker, 5 dispositioned out at triage.**
+
+### Shipped (29)
+
+| Test | Bucket | Tranche | Before |
+|---|---|---|---|
+| `mouseevent_stagexy` | A | 1 | 1/35 |
+| `mouseevent_valueof_tostring` | A | 1 | 24/28 |
+| `mouseevent_constr` | A | 1 | 62/66 |
+| `focusrect_focuslost` | B | 1 | 7/9 |
+| `focusrect_property` | C | 1 | 104/110 |
+| `tab_ordering_stage_tab_children_remove_root` | C | 1 | 3/5 |
+| `tab_ordering_tabbable` | C | 1 | 45/47 |
+| `mouse_wheel_events` | C | 1 | 33/36 |
+| `focus_events_key_basic` | D | 1 (rider) | 33/132 |
+| `tab_ordering_stage_tab_children` | D | 1 (rider) | 15/32 |
+| `mouse_pick_masking` | F | 2 | 0/7 |
+| `mouse_pick_dobj_mask` | F | 2 | 2/4 |
+| `mouse_pick_non_interactive_dobj_mask` | F | 2 | 0/3 |
+| `mouse_pick_non_interactive_bitmap_mask` | F | 2 | 2/4 |
+| `mouse_pick_text` | F | 2 | 4/8 |
+| `textbox_click` | G | 3 | 1/37 |
+| `edittext_mouse_selection` | G | 3 | 334/363 |
+| `selection` | G | 3 | 229/239 |
+| `text/text_caret_placement_align` | G rider | 3 | 189/248 |
+| `text/text_caret_placement_leading` | G rider | 3 | 183/244 |
+| `text/text_caret_placement_scroll` | G rider | 3 | 81/108 |
+| `text/text_caret_placement_translated_bounds` | G rider | 3 (AVM1) | 134/140 |
+| `focus_events_mouse_focusable` | D | 4 | 110/112 |
+| `focus_events_mouse_basic` | D | 4 | 30/260 |
+| `ime_linux_dead_keys` | B | 5 | 0/10 |
+| `edittext_ime_focus_lost` | B | 5 | 0/9 |
+| `textfield_event` | H | 6 | 0/66 |
+| `focus_events_key_navigation` | E | 7 | 12/53 |
+| `from_shumway/mouse/start_drag_lock` | I rider | 8 | 2/3 |
+
+### Left open with a named blocker (2)
+
+| Test | Bucket | Blocker |
+|---|---|---|
+| `text/links_in_scrolled_text` | H rider | **AVM1, not AVM2.** `ng_getCharIndexAtPoint` has no word wrap and ignores `scroll`; needs a wrap-aware line enumerator in `ng_shared.c`. Instrumented: resolves char 337 for an anchor at 707..710. |
+| `tab_ordering_arrows` | E | **DisplayObject property getters return unquantized geometry.** Navigation itself is correct (1/998 → 634 lines tracked after the twips snap); every residual diff is a printed `width`/`height`/`x`/`y`, or the test's own arithmetic drifting a twip off one. Needs corpus-wide twips quantization of those getters. |
+
+### Dispositioned out at triage (5) — unchanged verdicts
+
+| Test | Bucket | Why |
+|---|---|---|
+| `focus_events_mixed_avm_edittext` | J | Dual-VM: needs AVM1 handlers and AVM2 `FocusEvent`s interleaved in one player with a shared focus tracker. `feature-priority-map.md` arc 8. |
+| `selection_onsetfocus_mixed_avm` | J | Dual-VM |
+| `mouse_pick_avm1_root` | J | Dual-VM |
+| `mouse_pick_loader_avm1` | J | Dual-VM |
+| `tab_ordering_properties` | K | Load-bearing part is "builtin display classes are not sealed" — an AVM2 object-model question with corpus-wide blast radius, not an input question. |
+
+### Predicted vs actual, per tranche
+
+| Tranche | Predicted | Actual | Delta explained by |
+|---|---|---|---|
+| 1 | +7 | **+10** | Two bucket-D tests collected as riders; `highlight_bounds` was worth two tests, not one |
+| 2 | +5 | **+5** | — |
+| 3 | +7 | **+7** | — |
+| 4 | +4 | **+2** | Its other two tests were tranche 1's riders — already counted |
+| 5 | +2 | **+2** | — |
+| 6 | +2 | **+1** | Its rider is an AVM1 test |
+| 7 | +2 (deferred) | **+1** | Built after all; `tab_ordering_arrows` blocked on getter quantization |
+| 8 | +1 | **+1** | — |
+| **Total** | **+30** | **+29** | one test, and it is not AVM2 |
+
+### What the arc says about triage
+
+Three of the four per-tranche misses trace to **one** habit: grouping tests
+by *symptom* rather than by *which VM or mechanism owns them*. It cost a
+rider in tranche 3 (`text_caret_placement_translated_bounds`), a rider in
+tranche 6 (`links_in_scrolled_text`), and it is why tranche 4's number went
+stale. The fourth (tranche 7's LARGE) was the mirror-image error: sizing
+work by its **test's** line count. Both are cheap to avoid — read what the
+test asserts and which VM's API it calls before assigning it to a bucket,
+and re-check a tranche's prediction whenever an earlier one lands.
+
+Against that, the arc's *mechanism* predictions were near-perfect: every
+tranche whose targets it owned outright landed exactly on its number, and
+every fix in the arc came from reading Ruffle's source rather than inferring
+from a diff. The one place inference was used instead — tranche 5's
+"composition-active flag that swallows key events" — described a mechanism
+that does not exist.

@@ -2,6 +2,16 @@
 
 Last updated: 2026-05-08 (CI `e0d15089`, run `25578374215` — Part C: `avm1/moviecliploader` 6/7 → **PASS (7/7)**. Flat suite filtered effective 75/76 → **76/76 (100%)**; avm1 sub-tree raw 45 → 46 PASS. After Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]`, the loadee MC is now registered with `actionRegisterLevelAdvance` so `frame_funcs[1..N-1]` fire on subsequent ticks via the existing per-tick `actionAdvancePlayingLevels` path. Zero regressions across other suites.)
 
+## AVM2 half — `mouse/start_drag_lock` (2026-07-28, CI `30397635331`)
+
+`mouse/start_drag_lock` (2/3) flipped as **input arc tranche 8**
+(`803055ca5`): Ruffle's `Sprite.startDrag` only *records* the drag —
+`Player::update_drag` does the moving, at the top of mouse-event handling
+and at the end of each frame — so `startDrag(true)` inside a mouseDown
+handler must leave `x`/`y` alone for the rest of that handler. The test's
+own comment ("in FP x and y will update in about 70-100ms") is the spec.
+See `SWFRecompDocs/plans/input-arc.md` §8.
+
 ## AVM2 half — `as3-loader` (2026-07-27, CI `30290049993`)
 
 The AVM2 sub-tree is tracked in `SWFRecompDocs/plans/loader-arc.md`, not

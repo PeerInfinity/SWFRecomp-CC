@@ -1,6 +1,24 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-28 — **Input arc tranches 2 + 3 SHIPPED
+Last updated: 2026-07-28 — **Input arc CLOSED — all 8 tranches SHIPPED**
+(`803055ca5` + `5231abf0c` + `5f48fecd7` + `bbefcf376`, CI `30397635331`):
+the closeout added `startDrag(lockCenter)` deferral, `TextEvent.LINK` from
+HTML anchors, Ruffle's `set_by_mouse` focus model (the pressed object is the
+`mouseFocusChange` `relatedObject` even when it cannot take focus), IME
+composition (preedit / commit / commit-on-focus-loss, plus the KeyUp rule
+that drops a release with no matching press), and arrow-key directional
+navigation — tranche 7, which the plan had deferred as LARGE and which is
+~90 lines of rectangle arithmetic behind a 998-line acceptance table.
+**Arc total +29 against +30 predicted**, zero regressions in any of the
+eight. Of the 36 scoped tests: **29 shipped, 2 open with named blockers**
+(`text/links_in_scrolled_text` needs a wrap-aware `ng_getCharIndexAtPoint`
+in **AVM1**; `tab_ordering_arrows` needs `width`/`height`/`x`/`y` quantized
+to whole twips corpus-wide) **and 5 dispositioned out** (4 dual-VM, 1 sealed
+builtin classes). Full reconciliation in `SWFRecompDocs/plans/input-arc.md`
+§8. Recurring lesson, three times in one arc: **Ruffle's geometry is integer
+twips and the quantization is load-bearing, not cosmetic.**
+**NEXT per `feature-priority-map.md`: net/socket (29).**
+Prior: 2026-07-28 — **Input arc tranches 2 + 3 SHIPPED
 (`786d765ee` + `b27909297`, CI `30389013458`, +12 = exactly the predicted
 5 + 7, zero regressions)**: avm2 912 → **920 / 1221 (75.3%)**, `text` 5 → 9,
 corpus 3871 → 3883 / 4420. Mask + shape-accurate mouse hit-testing, then
