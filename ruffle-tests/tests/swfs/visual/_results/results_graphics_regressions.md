@@ -1,14 +1,12 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 135/142 passing | Graphics: 134/142 passing
+Trace: 135/142 passing | Graphics: 135/142 passing
 
-## Graphics Regressions (1 tests)
+## Graphics Regressions (0 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-| # | Test | Graphics Status | Detail |
-|---|------|-----------------|--------|
-| 1 | `video/deblocking` | Runtime Error | exit code -6 |
+No regressions.
 
 ## Graphics Improvements (0 tests)
 
