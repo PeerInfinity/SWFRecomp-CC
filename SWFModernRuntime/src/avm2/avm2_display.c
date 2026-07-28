@@ -10480,8 +10480,11 @@ static int obj_tab_children(Avm2Context* ctx, Avm2Object* obj)
 // entirely (avm2/tab_ordering_tabbable). Ruffle sorts it to the far end.
 #define TWIPS_INVALID 134217727.0   /* swf::Twips::INVALID == 0x7ffffff */
 
-static void obj_world_topleft(Avm2Context* ctx, Avm2Object* obj,
-                              double* x, double* y)
+// Ruffle InteractiveObject::highlight_bounds, as a whole rectangle.
+// `Rectangle::INVALID` sets ALL FOUR edges to `Twips::INVALID`, not just the
+// top-left (swf/src/types/rectangle.rs:84) — the directional-navigation keys
+// below compare every edge, so the full sentinel matters there.
+static void obj_highlight_bounds(Avm2Context* ctx, Avm2Object* obj, Rect* out)
 {
 	avm2_text_apply_pending_bounds(ctx, obj);
 	Mat m = display_world_matrix(ctx, obj);
@@ -10503,8 +10506,32 @@ static void obj_world_topleft(Avm2Context* ctx, Avm2Object* obj,
 	{
 		bounds_with_transform(ctx, obj, &m, &r);
 	}
-	*x = r.valid ? r.xmin : TWIPS_INVALID;
-	*y = r.valid ? r.ymin : TWIPS_INVALID;
+	if (r.valid)
+	{
+		// Ruffle's bounds are `Rectangle<Twips>` — whole twips. Ours are
+		// doubles, and the difference is load-bearing: a sprite scaled to
+		// `height = 12` over 10px of content lands at 12.0000005px here, and
+		// the navigation keys below compare rectangle edges with exact `<=`.
+		// `tab_ordering_arrows`'s "Size vs distance behind" stage puts two
+		// objects' `y_max` EXACTLY on the origin's, where a half-microtwip
+		// decides whether they are candidates at all. Same lesson as tranche
+		// 2's `local_mouse` snap.
+		out->valid = 1;
+		out->xmin = nearbyint(r.xmin); out->xmax = nearbyint(r.xmax);
+		out->ymin = nearbyint(r.ymin); out->ymax = nearbyint(r.ymax);
+		return;
+	}
+	out->valid = 0;
+	out->xmin = out->xmax = out->ymin = out->ymax = TWIPS_INVALID;
+}
+
+static void obj_world_topleft(Avm2Context* ctx, Avm2Object* obj,
+                              double* x, double* y)
+{
+	Rect r;
+	obj_highlight_bounds(ctx, obj, &r);
+	*x = r.xmin;
+	*y = r.ymin;
 }
 
 typedef struct { Avm2Object* obj; int32_t tab_index; int has_index;
@@ -10549,20 +10576,34 @@ static int tab_cmp_auto(const void* a, const void* b)
 	return x->fill_ord < y->fill_ord ? -1 : (x->fill_ord > y->fill_ord ? 1 : 0);
 }
 
-// Build the sorted tab order into `out` (Ruffle TabOrder::sort). Returns count.
-static uint32_t build_tab_order(Avm2Context* ctx, Avm2Object** out, uint32_t cap)
+// Ruffle TabOrder::fill + the tabIndex retention in `add_object`: once any
+// object carries a tabIndex, the order keeps ONLY such objects — for keyboard
+// navigation too, not just tabbing. Unsorted; `*any_index` reports which
+// ordering the caller should apply.
+static uint32_t collect_tab_order(Avm2Context* ctx, TabEnt* list, uint32_t cap,
+                                  int* any_index)
 {
-	TabEnt list[256];
 	uint32_t n = 0;
-	int any_index = 0;
-	fill_tab_order(ctx, ctx->stage, list, &n, 256, &any_index);
-	if (any_index)
+	*any_index = 0;
+	fill_tab_order(ctx, ctx->stage, list, &n, cap, any_index);
+	if (*any_index)
 	{
-		// Custom order: retain only tabIndex objects, sort by index.
 		uint32_t m = 0;
 		for (uint32_t i = 0; i < n; i++)
 			if (list[i].has_index) list[m++] = list[i];
 		n = m;
+	}
+	return n;
+}
+
+// Build the sorted tab order into `out` (Ruffle TabOrder::sort). Returns count.
+static uint32_t build_tab_order(Avm2Context* ctx, Avm2Object** out, uint32_t cap)
+{
+	TabEnt list[256];
+	int any_index = 0;
+	uint32_t n = collect_tab_order(ctx, list, 256, &any_index);
+	if (any_index)
+	{
 		qsort(list, n, sizeof(TabEnt), tab_cmp_custom);
 	}
 	else
@@ -10588,6 +10629,23 @@ static uint32_t build_tab_order(Avm2Context* ctx, Avm2Object** out, uint32_t cap
 	return k;
 }
 
+// Ruffle FocusTracker::set_by_key: a cancelable, bubbling `keyFocusChange` on
+// the current focus (or the Stage) with `relatedObject` = the candidate, then
+// the move — unless a listener called preventDefault().
+static void focus_change_by_key(Avm2Context* ctx, Avm2Object* next,
+                                int32_t key_code, int shift)
+{
+	Avm2Object* cur = g_stage_focus;
+	Avm2Object* dispatch_on = cur != NULL ? cur : ctx->stage;
+	Avm2Object* ev = avm2_focus_event_new(ctx,
+		avm2_string_from_literal(ctx, "keyFocusChange"), 1, 1, next, shift,
+		key_code, "none");
+	avm2_dispatch_event(ctx, dispatch_on, ev);
+	Avm2EventExt* eext = (Avm2EventExt*) ev->native_ext;
+	if (eext == NULL || !eext->cancelled)
+		set_focus(ctx, next);
+}
+
 static void input_handle_tab(Avm2Context* ctx, int shift)
 {
 	Avm2Object* order[256];
@@ -10611,16 +10669,111 @@ static void input_handle_tab(Avm2Context* ctx, int shift)
 			next = order[ni];
 		}
 	}
-	// keyFocusChange (cancelable, bubbles) on the current focus (or stage),
-	// relatedObject = the next-focus candidate.
-	Avm2Object* dispatch_on = cur != NULL ? cur : ctx->stage;
-	Avm2Object* ev = avm2_focus_event_new(ctx,
-		avm2_string_from_literal(ctx, "keyFocusChange"), 1, 1, next, shift, 9,
-		"none");
-	avm2_dispatch_event(ctx, dispatch_on, ev);
-	Avm2EventExt* eext = (Avm2EventExt*) ev->native_ext;
-	if (eext == NULL || !eext->cancelled)
-		set_focus(ctx, next);
+	focus_change_by_key(ctx, next, 9, shift);
+}
+
+// ---------------------------------------------------------------------------
+// Arrow-key directional focus (Ruffle FocusTracker::navigate +
+// NavigationOrdering). The algorithm is ~90 lines of rectangle arithmetic in
+// focus_tracker.rs; `avm2/tab_ordering_arrows` is its 998-line acceptance
+// table (60-odd declarative stages x 4 directions), not 998 lines of work.
+// ---------------------------------------------------------------------------
+
+enum { NAV_UP = 0, NAV_RIGHT, NAV_DOWN, NAV_LEFT };
+
+// x- or y-axis distance between two rectangles (Ruffle calculate_distance).
+static double nav_axis_distance(const Rect* a, const Rect* b, int vertical)
+{
+	double p = vertical ? a->ymax - b->ymin : a->xmax - b->xmin;
+	double q = vertical ? b->ymax - a->ymin : b->xmax - a->xmin;
+	return p > q ? p : q;
+}
+
+// NavigationOrdering::key. Returns 0 for Ruffle's `None` (object excluded);
+// otherwise fills the (category, distance) pair that objects are min'd by.
+// Category 0 is "directly behind the origin along the axis", category 1 is the
+// Down-only left/right band, category 2 is everything else by 2D distance.
+static int nav_key(const Rect* o, const Rect* t, int dir,
+                   int* cat, double* dist)
+{
+	switch (dir)
+	{
+	case NAV_DOWN:
+		if (t->ymax <= o->ymax) return 0;
+		if (t->xmax >= o->xmin && t->xmin <= o->xmax)
+			{ *cat = 0; *dist = t->ymin - o->ymin; return 1; }
+		// Down is the only direction with this rule: an object level with the
+		// origin outranks one further away, but never one behind it.
+		if (t->ymin <= o->ymax)
+			{ *cat = 1; *dist = nav_axis_distance(o, t, 0); return 1; }
+		break;
+	case NAV_UP:
+		if (t->ymax >= o->ymax) return 0;
+		if (t->xmax >= o->xmin && t->xmin <= o->xmax)
+			{ *cat = 0; *dist = o->ymax - t->ymax; return 1; }
+		break;
+	case NAV_RIGHT:
+		if (t->xmax <= o->xmax) return 0;
+		if (t->ymax >= o->ymin && t->ymin <= o->ymax)
+			{ *cat = 0; *dist = t->xmin - o->xmin; return 1; }
+		break;
+	case NAV_LEFT:
+		if (t->xmin >= o->xmin) return 0;
+		if (t->ymax >= o->ymin && t->ymin <= o->ymax)
+			{ *cat = 0; *dist = o->xmax - t->xmax; return 1; }
+		break;
+	default:
+		return 0;
+	}
+	double dx = nav_axis_distance(o, t, 0), dy = nav_axis_distance(o, t, 1);
+	*cat = 2;
+	*dist = dx * dx + dy * dy;
+	return 1;
+}
+
+static void input_handle_navigate(Avm2Context* ctx, int32_t key_code)
+{
+	int dir;
+	switch (key_code)
+	{
+	case 37: dir = NAV_LEFT; break;
+	case 38: dir = NAV_UP; break;
+	case 39: dir = NAV_RIGHT; break;
+	case 40: dir = NAV_DOWN; break;
+	default: return;
+	}
+	Avm2Object* cur = g_stage_focus;
+	if (cur == NULL) return;   // Ruffle: no focus, nothing to navigate from
+
+	Rect origin;
+	obj_highlight_bounds(ctx, cur, &origin);
+
+	// `navigate` reads the UNSORTED filled order and takes the minimum; ties go
+	// to the first in fill order (Rust `min_by_key` keeps the first minimum),
+	// and unlike the automatic order there is no equal-key dedup.
+	TabEnt list[256];
+	int any_index = 0;
+	uint32_t n = collect_tab_order(ctx, list, 256, &any_index);
+
+	Avm2Object* best = NULL;
+	int best_cat = 0;
+	double best_dist = 0.0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Rect t;
+		obj_highlight_bounds(ctx, list[i].obj, &t);
+		int cat = 0; double dist = 0.0;
+		if (!nav_key(&origin, &t, dir, &cat, &dist)) continue;
+		if (best != NULL
+		    && !(cat < best_cat || (cat == best_cat && dist < best_dist)))
+			continue;
+		best = list[i].obj; best_cat = cat; best_dist = dist;
+	}
+	// Nothing in that direction dispatches NOTHING — not even a cancelled
+	// keyFocusChange (focus_events_key_navigation's "Pressed right" from the
+	// rightmost sprite traces the keyDown and then falls silent).
+	if (best == NULL) return;
+	focus_change_by_key(ctx, best, key_code, 0);
 }
 
 static void input_handle_key(Avm2Context* ctx, int is_down, int32_t key_code,
@@ -10630,6 +10783,11 @@ static void input_handle_key(Avm2Context* ctx, int is_down, int32_t key_code,
 	// Tab drives focus traversal on keyDown (after the keyDown dispatch).
 	if (is_down && key_code == 9)
 		input_handle_tab(ctx, mod_shift());
+	// Arrows drive directional focus navigation, after the Tab branch
+	// (Ruffle player.rs: "KeyPress events also take precedence over keyboard
+	// navigation", then `NavigationDirection::from_key_code`).
+	if (is_down)
+		input_handle_navigate(ctx, key_code);
 	// Text editing keys route to the focused TextField.
 	if (is_down)
 		avm2_text_input_key(ctx, g_stage_focus, key_code, char_code, mod_shift());
