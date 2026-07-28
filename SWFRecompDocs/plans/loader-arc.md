@@ -2,14 +2,15 @@
 
 **Created**: 2026-07-26 · **Baseline**: `9f4be9647`'s parent (`cf5b42970`),
 `avm2/_results/results_graphics.json` from CI `30185616752`.
-**Status**: **tranches 1 + 2 SHIPPED** (`8213dd4d6`, §5), **3 + 4 SHIPPED**
-(`f6ba5c677` + `28577da2a`, §6), **5 SHIPPED then reverted then RE-LANDED**
+**Status**: **ARC CLOSED — all eight tranches shipped.** 1 + 2 (`8213dd4d6`,
+§5), 3 + 4 (`f6ba5c677` + `28577da2a`, §6), 5 shipped/reverted/RE-LANDED
 (`7a4dc6fba`, §7 — the revert's `edittext_align` attribution did not survive
-reading the runs it cited), **6a SHIPPED** (`16955d6e8` + `e0d53f7c3` +
-`5a7162e20`, §8). Tranches 6b/6c–8 are still scoping only;
-tranche 7 shrank to +1 as a side effect of 3. The re-ranked feature-priority
-list puts the avm2-platform mass next, and `flash.display.Loader` is its
-largest single block.
+reading the runs it cited), 6a (`16955d6e8` + `e0d53f7c3` + `5a7162e20`, §8),
+6b + 6c + 7 (`d44c99991` + `3c0d4817f` + `0dbc5b41e`, §9), and 8
+(`1617724eb` + `e2a7a651c`, §10). **25 of the 31 `loader*` avm2 tests pass**
+(was 3 at triage); the six that remain are dispositioned in §10c — two waiting
+on child-SWF geometry, one on corpus-wide uncaught-error tracing, one retired
+to RUFFLE_VS_FLASH, two won't-do.
 
 Scope of this document: the 35 avm2 tests whose name matches
 `loader`/`loaderinfo` (32 failing, 3 already passing:
@@ -1213,3 +1214,92 @@ and four loads' worth of registration ordering; domains are necessary but very
 possibly not sufficient). Phases A + B already delivered the other three named
 targets. The tranche's +5 estimate is met without Phase C; Phase C is worth
 doing only while it stays the shape above.
+
+### 10c. Actuals — the arc is CLOSED
+
+Two CI runs, both graphics/full, both with zero pass→fail regressions, no
+`compile_fail`/`segfault`/`timeout` bucket at all, and — checked corpus-wide
+across all 24 result sets — **zero `matching_lines` drops on any still-failing
+test**, which is the line-level version of the transition-diff lesson.
+
+| Run | SHA | Effective | Δ |
+|---|---|---|---|
+| `30326194497` (A + B) | `1617724eb` | 3853 → 3859 | **+6** |
+| `30327940850` (C) | `38aa0a300` | 3859 → 3860 | **+1** |
+
+**Predicted +5 for the tranche, delivered +7.**
+
+| Gain | Suite | Baseline | Phase | Predicted? |
+|---|---|---|---|---|
+| `loader_duplicate_coerce` | avm2 | 1/3 | A | yes |
+| `loader_duplicate_coerce_new_domain` | avm2 | 1/4 | A | yes |
+| `loader_loadbytes_url` | avm2 | 3/12 | A+B | yes |
+| `loader_child_getdefinition` | avm2 | 2/5 | C | yes |
+| `cross_api_version_call_older` | avm2 | 0/12 | A | **no** |
+| `localconnection` | avm1 | 433/579 | A | **no** |
+| `as3-loader/LoaderLoadBytesTest2` | from_shumway | 2/3 | A | **no** |
+
+Riders that moved without passing: `cross_api_version_call_newer` 0/12 →
+11/12, `stage_domain_getQualifiedDefinitionNames` 0/5 → 1/5,
+`loader_duplicate_class` 2/48 → 3/48 (2 → 44 lines of output).
+
+**Every rider is a test whose child SWFs had been missing from the mirror
+since the import.** That is the tranche's real lesson and it is a cheap one:
+*when a test's actual output is a small constant fraction of its expected
+output, check that its INPUT is present before designing a feature.* Two of
+the five named targets and all three riders needed no runtime work at all.
+
+A second, sharper one: **`--test=NAME` resolves to whichever suite owns the
+name, and `localconnection`/`sandbox_type_remote` exist in BOTH avm1 and
+avm2.** Two local "passes" reported mid-session were the avm1 tests; CI's
+truth is that `avm2/localconnection` stayed `output_mismatch` (its AVM2 child
+now runs and throws #1009 in `Child()`, 76 → 67 matching lines) and
+`avm2/sandbox_type_remote` never moved. Pass `--tests-dir` whenever a name
+could be ambiguous.
+
+#### Final scoreboard — 25 of the 31 `loader*` avm2 tests pass (was 21)
+
+| Test | State | Disposition |
+|---|---|---|
+| `loader_duplicate_class` 3/48 | failing | **child-SWF timeline character instantiation.** Domains are DONE for it: every `DuplicateClass` now resolves to the right SWF, including the fourth load correctly picking up `loader_same_domain`'s through the parent chain. What is missing is the placed MovieClip its constructors read (`this.childFromDomainChild` is `null`) — §8's deferred child-geometry work, a different arc |
+| `loader_load` 124/128 | failing | retired to `RUFFLE_VS_FLASH` (hash-ordered property enumeration) |
+| `loader_method` 83/85 | failing | corpus-wide uncaught-error tracing, gated on the Stage3D/PixelBender/filters arcs (§7) |
+| `loader_try_click_root` 0/16 | failing | child-SWF **shape bounds** — deferred with child geometry (§8). Note §9 recorded this as 1/16 from a stale run; CI has had it at 0/16 for the whole arc, unchanged by tranche 8 |
+| `loader_applicationDomain` 0/4 | failing | **won't-do** — needs the real Flex `framework_*.swz` |
+| `loaderinfo_quine` 1/1005 | failing | **won't-do** — grades a byte-for-byte dump of the SWF's own bytes |
+
+`mouse_pick_loader_avm1` (5/42) remains with the dual-VM arc, as tranche 7
+left it.
+
+**The Loader arc is closed.** Eight tranches, `cf5b42970` → `38aa0a300`,
+21 → 25 of the named set plus riders across avm1, avm2 and from_shumway; the
+six that remain are two won't-dos, two dispositioned to other arcs, one
+retired to RUFFLE_VS_FLASH, and one — `loader_duplicate_class` — waiting on
+child-SWF geometry, which is now the single named blocker for both it and
+`loader_try_click_root`.
+
+#### What phase C's design got right, and what it got wrong
+
+Right: **the export-skip rule was the whole change.** Making a definition
+export only when it is not already visible from the exporting scope means a
+single-movie program's entry list is byte-for-byte what it was, at most one
+entry per name is ever visible from a given scope, and resolution stays a
+plain "first visible match". Everything else — the parent chain, per-domain
+`getDefinition`, `ApplicationDomain.currentDomain` — follows from it.
+
+Wrong, and only the tests found it: **the scope has to be chosen BEFORE the
+root boots.** `loader_deliver` picked the movie's domain in the block that
+sets `app_domain`, which sits *after* the `loader_boot_child_swf` call that
+registers the ABC. The child therefore registered into the root domain and
+`loader_child_getdefinition` kept printing the main SWF's `Parent` with every
+other piece of the design already correct. One statement's position,
+invisible to reading.
+
+Also worth keeping: **the findprop IC's guard had to become the scope, not
+because of perf but because of correctness.** One generated call site can now
+run under two `Avm2AbcFileRt` of the same ABC in different domains — a
+self-load does exactly that four times — and a cached def object keyed only by
+the context would be shared across them. The change is a strict win on both
+axes: the same single comparison, strictly finer. `-DAVM2_FIND_VERIFY`, which
+cross-checks every IC answer against a full uncached resolve, is the cheap way
+to prove it and was clean on the domain-heavy tests.

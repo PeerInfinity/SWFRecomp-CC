@@ -1,6 +1,12 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-19 — **RWK base-compute lever 1 LANDED
+Last updated: 2026-07-28 — **Loader arc CLOSED (tranche 8 shipped,
+`1617724eb` + `e2a7a651c`, CI `30326194497` + `30327940850`, +7 total,
+zero regressions)**: 25 of 31 `loader*` avm2 tests pass. Nested child SWFs
+are keyed by relative path, the main movie emits its own
+`avm2_movie_tables`, and `ApplicationDomain` is per-movie with a real
+parent chain. See the Loader section below and `loader-arc.md` §10.
+Prior: 2026-07-19 — **RWK base-compute lever 1 LANDED
 (`8caf10e4e`, findpropstrict scope-hit inline cache)**: RWK browser
 gameplay 219→165 ms p50 on the real-GPU rig (1.33x; rAF p95 1.48x), native
 GC=0 TAS 1.54x, 98.7% of findpropstrict volume now replays from the IC.
@@ -21,13 +27,13 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
-## Loader / LoaderInfo — tranches 1–7 SHIPPED (2026-07-26/27)
+## Loader / LoaderInfo — ARC CLOSED, all 8 tranches SHIPPED (2026-07-26/28)
 
 Full plan + per-tranche postmortems:
 **`SWFRecompDocs/plans/loader-arc.md`** (per-test triage of all 35
 `loader*`/`loaderinfo*` tests, 8 ranked tranches; §5 covers 1+2, §6 covers
-3+4, §7 covers 5, §8 covers 6a, §9 covers 6b/6c/7 and the arc's final
-scoreboard). The "flash.display.Loader (deferred)" line
+3+4, §7 covers 5, §8 covers 6a, §9 covers 6b/6c/7, §10 covers 8 and the
+arc's final scoreboard). The "flash.display.Loader (deferred)" line
 in the Stage 8/9 notes below is now out of date.
 
 - **Tranches 1+2** (`8213dd4d6`, CI `30226375815`): **+12** (predicted 8).
@@ -77,15 +83,33 @@ in the Stage 8/9 notes below is now out of date.
   a loadBytes SWF's root is constructed at the next drain rather than inside
   the call; and an uncaught error in a child root's constructor traces
   `Error: …` + `	at Child()` and aborts init/complete.
-- **The arc is closed except tranche 8.** 21 of the 31 `loader*`/
-  `loaderinfo*` tests pass. Five of the ten failures are tranche 8 (nested
-  child download + per-movie `ApplicationDomain`), one needs child-SWF shape
-  bounds, one is a Ruffle-vs-Flash enumeration-order diff, one waits on
-  corpus-wide uncaught-error tracing, and two are won't-dos. Full
-  reconciliation: `loader-arc.md` §9.
+- **Tranche 8** (`1617724eb` A+B, CI `30326194497`, **+6**; `e2a7a651c` C,
+  CI `30327940850`, **+1**; predicted +5): nested child SWFs keyed by their
+  path RELATIVE to the test dir (the four duplicate-class tests keep children
+  in subdirectories, and `loader_duplicate_class` ships the same basename in
+  three of them), the main movie's own `avm2_movie_tables` in a new
+  `RecompiledABC/avm2_movie_tables.c`, AS3 self-load plus Flash's
+  `/[[DYNAMIC]]/<n>` URL for a loadBytes movie, and per-movie
+  `ApplicationDomain`. **Two of the five named targets and all three riders
+  were failing on ABSENT INPUT** — `install_test_dir()`/`find_child_swfs()`
+  never recursed, so those children had never been in our mirror.
+- **The arc is CLOSED.** 25 of the 31 `loader*`/`loaderinfo*` tests pass (3
+  at triage). Of the six failures, two wait on child-SWF geometry
+  (`loader_duplicate_class` needs timeline character instantiation,
+  `loader_try_click_root` needs shape bounds), one is a Ruffle-vs-Flash
+  enumeration-order diff, one waits on corpus-wide uncaught-error tracing,
+  and two are won't-dos. Full reconciliation: `loader-arc.md` §10c.
 
 Findings worth having here rather than only in the plan:
 
+0. **Check that a test's INPUT is present before designing a feature.** When
+   actual output is a small constant fraction of expected, suspect the
+   mirror. Tranche 8's three unscoped riders and two of its five targets
+   needed no runtime work at all. Related trap: `verify_output.py --test=NAME`
+   resolves to whichever suite owns the name, and `localconnection` /
+   `sandbox_type_remote` exist in BOTH avm1 and avm2 — pass `--tests-dir`
+   whenever a name could be ambiguous, or you will report the wrong suite's
+   result.
 1. **The load timing model is Ruffle's async executor, not "one frame
    later".** A fetch resolves *after* the frame that issued it, and a load
    started by the resulting `complete`/`ioError` handler resolves in the
