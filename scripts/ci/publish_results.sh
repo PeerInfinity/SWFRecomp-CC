@@ -112,6 +112,17 @@ git reset --hard HEAD
 # working tree files would be overwritten". The ones we need are already saved
 # to /tmp/results_backup.
 find ruffle-tests/tests/swfs -path '*/_results/*_previous.json' -delete 2>/dev/null || true
+# Same treatment for `*_current.json`, and this one is a self-perpetuating
+# trap rather than a one-off: the "Verify Flash-spec expected output" step
+# writes results_flash_current.json into the master checkout on EVERY run
+# (verify_output.py's incremental save), and the `git add -f '*/_results/*.json'`
+# sweep at the end of this script re-commits it to ruffle-test-results. Once
+# the branch tracks it, every later run's `git checkout -B ruffle-test-results`
+# below aborts with "untracked working tree files would be overwritten" — so
+# publishing stays broken until someone removes it by hand. Killed run
+# 30317408743's publish (the tests themselves were fine). The `git rm` further
+# down cannot help: it runs AFTER the checkout that fails.
+find ruffle-tests/tests/swfs -path '*/_results/*_current.json' -delete 2>/dev/null || true
 
 # Inherit from existing ruffle-test-results so prior runs' results (in any
 # mode) are preserved. Falls back to current HEAD if the branch doesn't exist
@@ -201,6 +212,13 @@ done
 # Regenerate markdown reports + cross-suite index for every mode.
 python3 scripts/generate_ruffle_results_markdown.py --scan || true
 python3 scripts/generate_results_index.py || true
+
+# Drop per-run intermediates from the working tree before the sweep below —
+# `git add -f '*/_results/*.json'` is indiscriminate, and re-adding a
+# *_current.json is what breaks the NEXT run's branch checkout (see the
+# matching note above the branch switch). Nothing reads these after the
+# process that wrote them exits.
+find ruffle-tests/tests/swfs -path '*/_results/*_current.json' -delete 2>/dev/null || true
 
 find ruffle-tests/tests/swfs -path '*/_results/*.json' -o -path '*/_results/*.md' | xargs git add -f 2>/dev/null || true
 git add -f RUFFLE_RESULTS*.md 2>/dev/null || true
