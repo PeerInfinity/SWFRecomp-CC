@@ -3,7 +3,11 @@
 **Created**: 2026-07-28 · **Baseline**: `2ed94a302` (session start), per-suite
 `_results/results_graphics.json` from CI `30397635331` (the input-arc closeout
 run, SHA `bbefcf376`).
-**Status**: triage complete; tranche 1 in progress.
+**Status**: triage complete; **tranche 1 SHIPPED** (`937047612` + `f4b0e3a08`,
+CI `30403506144` graphics/full green) — **+9 net** (10 gains, 1 regression
+found and fixed). Corpus effective 3890 → **3899 / 4420**, `avm2` 926 →
+**935 / 1221**. Postmortem in §6. **NEXT: tranche 2** (socket.json replay,
++12, medium-large).
 
 Scope of this document: the **net block** named as row 4e of
 `feature-priority-map.md` ("net/socket (29)"). The census below finds
@@ -420,4 +424,70 @@ scoped-but-unpredicted (the surplus inside buckets S/D/L/W).
 
 ## 6. Postmortem
 
-_(filled in per tranche as they ship)_
+### Tranche 1 — SHIPPED `937047612`, CI `30403506144` (graphics, full)
+
+**+10 gains vs +9 predicted, minus one regression the triage missed = +9
+net.** Corpus effective **3890 → 3899 / 4420**; `avm2` **926 → 935 / 1221**;
+every other suite flat. Status histogram moved only
+`output_mismatch 522 → 513` / `pass 3650 → 3659`; `ruffle_matched` (240),
+`runtime_error` (7) and `recomp_fail` (1) all flat, and there is no
+`compile_fail`, `segfault` or `timeout` bucket in the run. All 34 jobs green.
+
+All ten predicted targets landed:
+
+| Test | before | after |
+|---|---|---|
+| `socket_errors` | 0/56 | **pass** |
+| `netconnection_properties` | 0/78 | **pass** |
+| `netconnection_close` | 0/55 | **pass** |
+| `netstream_connect` | 0/7 | **pass** |
+| `netstream_client` | 0/10 | **pass** |
+| `responder_null_callbacks` | 0/1 | **pass** |
+| `av_networking_params` | 0/9 | **pass** |
+| `net_stream_play_options` | 0/6 | **pass** |
+| `air_datagram_socket` | 0/1 | **pass** |
+| `sandbox_type_local_network` | 0/1 | **pass** |
+
+Three more improved without flipping, all as predicted side effects:
+`amf_array_serialization` 4/17 → 6/17 (a `Responder` now exists, so the test
+gets past its first construction), `socket_connect` 0/4 → 2/4 (the two
+`connected` lines outside the CONNECT handler), `sandbox_type_remote`
+0/3 → 1/3.
+
+**What the triage got wrong — one regression, `avm2/air_hidden_lookup`
+(pass → 1/2).** `flash.net.DatagramSocket` is `[API("668")]`, i.e. AIR-only,
+and `air_hidden_lookup` asserts that `getDefinitionByName` on it **throws**
+under a plain Flash Player runtime. The triage read `air_datagram_socket`'s
+`[player_options] runtime = "AIR"` and concluded "we gate nothing on runtime,
+so registering the class is enough" — which is true for that test and exactly
+backwards for its twin. Registering it unconditionally trades one test for the
+other. Fixed by `f4b0e3a08`: `verify_output.py` turns `runtime = "AIR"` into
+`-DSWF_RUNTIME_AIR` at both build sites and `avm2_net.c` gates the class on it,
+so both tests pass. The three `runtime = "AIR"` tests in the corpus are
+`air_datagram_socket`, `air_ifilepromise` and `native_menu_basic`; the latter
+two were already failing on unrelated AIR classes and are unchanged.
+
+**Lesson to carry into tranche 3.** A `[player_options]` marker is not only a
+capability the harness must *provide* — it is also a capability the harness
+must *withhold* from every other test. The census's marker sweep found the
+tests that need a mock; it did not ask which tests assert the mock's absence.
+Bucket D (`FileReference`) has the same shape: `filereference_uninitialized`
+asserts that `extension` is **not** a property of `FileReference`, i.e. that
+the class is sealed, in the same breath as the other tests asserting that
+`browse()` works. Sweep for the negative assertion before adding the class.
+
+**What the triage got right.** The "no transport at all" separation held
+exactly: every one of the ten is a constant, a getter, or one synchronous
+event dispatch, and none of them needed a byte to move. Two findings paid for
+themselves immediately — Ruffle's two-variant protocol enum (which is why
+`connect("http://…")` reports `connected == false` while still answering
+`uri`, a shape no amount of guessing would have produced) and the fact that
+`error_init` already gives `flash.errors` subclasses `name = "Error"`, so the
+56-line `socket_errors` acceptance table needed no error work whatsoever.
+
+**Re-prediction of later tranches after tranche 1** (arc convention). Nothing
+tranche 1 revealed changes tranche 2's or 3's shape, and both remain the two
+largest blocks. One adjustment: tranche 5 (`IExternalizable` +
+`dynamicPropertyWriter`) is now slightly cheaper than scoped, because
+`Responder` and `NetConnection` exist and `avm2_net.c` is the obvious home for
+the `NetConnection.call` half of tranche 8 that will consume them.

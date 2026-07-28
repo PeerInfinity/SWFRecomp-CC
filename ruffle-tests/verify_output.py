@@ -768,6 +768,23 @@ def get_max_execution_duration(test_dir):
     return 0
 
 
+def get_runtime_is_air(test_dir):
+    """True when test.toml sets `[player_options] runtime = "AIR"`.
+
+    A handful of classes are AIR-only and must be INVISIBLE to a Flash Player
+    runtime — `avm2/air_hidden_lookup` asserts that `getDefinitionByName` on
+    `flash.net.DatagramSocket` throws, while `avm2/air_datagram_socket` (which
+    sets this flag) asserts that the same class constructs. Registering them
+    unconditionally trades one test for the other, so the runtime gates on
+    -DSWF_RUNTIME_AIR.
+    """
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return False
+    return bool(re.search(r'^\s*runtime\s*=\s*"AIR"\s*$',
+                          toml_path.read_text(), re.MULTILINE))
+
+
 def get_epsilon(test_dir):
     """Parse [approximations] epsilon from test.toml.
 
@@ -2146,6 +2163,8 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
     if get_log_fetch(test_dir):
         extra_defines.append("-DLOG_FETCH=1")
+    if get_runtime_is_air(test_dir):
+        extra_defines.append("-DSWF_RUNTIME_AIR=1")
     if is_avm2:
         extra_defines.append("-DSWF_AVM2")
     viewport = get_viewport_dimensions(test_dir)
@@ -2555,6 +2574,8 @@ def compile_wasm(test_dir, num_frames, build_dir):
     extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
     if get_log_fetch(test_dir):
         extra_defines.append("-DLOG_FETCH=1")
+    if get_runtime_is_air(test_dir):
+        extra_defines.append("-DSWF_RUNTIME_AIR=1")
     if has_children:
         extra_defines.append("-DHAS_CHILD_MOVIES")
     if has_data_files:

@@ -794,10 +794,17 @@ void avm2_register_net_transport(Avm2Context* ctx)
 		cls->native_ext_size = sizeof(Avm2ResponderExt);
 	}
 
-	// flash.net.DatagramSocket — `public class DatagramSocket {}` in AIR.
-	// Nothing but its existence is observable (air_datagram_socket traces it).
+	// flash.net.DatagramSocket — `[API("668")] public class DatagramSocket {}`,
+	// i.e. AIR 2.0 only. Its existence is the whole of what is observable, in
+	// BOTH directions: air_datagram_socket (runtime = "AIR") traces the
+	// instance, and air_hidden_lookup asserts that getDefinitionByName on it
+	// THROWS under a plain Flash Player runtime. Registering it unconditionally
+	// just trades one test for the other, so it is gated on the harness's
+	// -DSWF_RUNTIME_AIR.
+#ifdef SWF_RUNTIME_AIR
 	avm2_builtin_class(ctx, "flash.net", "DatagramSocket",
 	                   ctx->builtins.object_class);
+#endif
 
 	// flash.media.AVNetworkingParams — three Booleans whose only subtlety is
 	// that readSetCookieHeader defaults to TRUE while the other two default
