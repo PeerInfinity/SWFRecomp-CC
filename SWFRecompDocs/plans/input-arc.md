@@ -3,11 +3,11 @@
 **Created**: 2026-07-28 · **Baseline**: `ab92ddfbc` (session start), per-suite
 `_results/results_graphics.json` from CI `30185616752`/`30327940850` (the
 `38aa0a300` results merge).
-**Status**: TRIAGED; **tranche 1 SHIPPED** (`9263f71a0`, CI `30381234241`,
-**+10** vs predicted 7, zero regressions — §6). The tranche-1 gate ("≥5 tests
-needing pure event/API surface or harness replay plumbing") was met with 8
-candidates; all 8 landed plus 2 tranche-4 riders. 7 tranches remain (§5),
-worth a further ~+20.
+**Status**: TRIAGED; **tranches 1–3 SHIPPED** — `9263f71a0` (**+10** vs
+predicted 7), `786d765ee` + `b27909297` (**+12** together, CI `30389013458`,
+exactly the predicted 5 + 7). **+22 so far** against a predicted 19, zero
+regressions in any tranche; postmortems in §6. 5 tranches remain (§5), worth
+a further ~+11.
 
 Scope of this document: the **input block** named as row 4e of
 `feature-priority-map.md` ("Focus / Tab / Mouse / Keyboard input, 25 tests,
@@ -324,13 +324,13 @@ Blast radius: the mouse pipeline. Canaries `avm2/mouse_children` (192/192),
 `avm2/verify_method_info_oob`, `avm2/verify_method_info_duplicate`,
 `mixed_avm/avm1_loads_avm2`.
 
-### Tranche 2 — mask + non-interactive + text hit-testing · **predicted +5** · MEDIUM
+### Tranche 2 — mask + non-interactive + text hit-testing · **predicted +5** · MEDIUM · **SHIPPED `786d765ee`, +5**
 
 Bucket F. Ruffle `display_object.rs::hit_test_shape` with
 `HitTestOptions::MOUSE_PICK`, plus mask intersection in the pick walk and
 TextField box geometry. Depends on tranche 1 for coordinate precision.
 
-### Tranche 3 — caret placement + mouse selection · **predicted +7** · MEDIUM
+### Tranche 3 — caret placement + mouse selection · **predicted +7** · MEDIUM · **SHIPPED `b27909297`, +7**
 
 Bucket G plus the four `text/text_caret_placement_*` riders. One mechanism:
 map a stage point to a character index in the EditText layout, then wire
@@ -474,9 +474,177 @@ avm2` still compile, link and run at their pre-existing `output_mismatch`.
 
 ---
 
+### Tranches 2 + 3 — SHIPPED `786d765ee` + `b27909297`, CI `30389013458`
+
+Both shipped in one graphics/full run, success, all 30 shards. **+12 actual vs
++12 predicted**, zero regressions, zero `matching_lines` drops corpus-wide.
+Corpus effective **3871 → 3883 / 4420**; `avm2` **912 → 920 / 1221 (75.3%)`,
+`text` **5 → 9**; every other suite flat. The histogram moved only
+`output_mismatch 541 → 529` / `pass 3630 → 3643`; `runtime_error` (7) and
+`recomp_fail` (1) flat, and the run carries no `compile_fail`, `segfault` or
+`timeout` bucket.
+
+The 12 flips are exactly the 12 named targets — no riders in either
+direction, which is itself worth recording after tranche 1's +3 of them. One
+extra move that does not change the effective count but is a real upgrade:
+**`from_shumway/hittesting/mask-hit-test` went `ruffle_matched → pass`** —
+with shape-accurate masks it now matches the test's own `output.txt` rather
+than only matching Ruffle's divergent output.
+
+### Tranche 2 — `786d765ee`
+
+**+5 actual vs +5 predicted.** All five bucket-F targets flipped:
+`mouse_pick_masking` (0/7), `mouse_pick_dobj_mask` (2/4),
+`mouse_pick_non_interactive_dobj_mask` (0/3),
+`mouse_pick_non_interactive_bitmap_mask` (2/4), `mouse_pick_text` (4/8).
+
+Three mechanisms, all read off Ruffle rather than inferred:
+
+1. **Shape-accurate hit testing.** The pick was an AABB test. Placed
+   `DefineShape` characters now test the triangulated `shape_data` rows the
+   renderer already carries, and drawing-API content tests the `Avm2GfxPath`
+   tessellation — so the answer is a point-in-triangle sweep, not a rectangle.
+   Bitmap / TextField / StaticText deliberately keep the box, which is exactly
+   where Ruffle's `DisplayObject::hit_test_shape` default ("default to using
+   bounding box") sits: only `graphic.rs` and `movie_clip.rs` override it.
+   This is what lets `mouse_pick_masking`'s tilde-shaped clip mask reject a
+   point that is inside its own AABB.
+2. **`masker` / `maskee`.** The ext had `mask` but no back-pointer;
+   `set mask` now keeps the pair symmetric the way `DisplayObject::set_mask`
+   does. Both directions matter — a masked object misses outside its mask, and
+   a mask is never itself a target.
+3. **Timeline clip layers.** Children with `clip_depth > 0` are skipped as
+   targets and instead mask the range `(depth+1 ..= clip_depth)`, through
+   Ruffle's single reversed peekable cursor shared across both the interactive
+   and non-interactive child passes.
+
+**What the triage got wrong.** §2 bucket F said `mouse_pick_masking` needed the
+masked object to "pick as its mask's intersection". That reading is backwards:
+the mask is not intersected with anything, it is *consulted* — the pick either
+proceeds or turns into a `Miss`. And the test's actual blocker was the
+*timeline* clip-depth path (`maskObject`/`maskObjectChild` are clip layers),
+not the scripted `DisplayObject.mask` path the bucket described. Same file,
+different mechanism.
+
+**Two riders the bucket did not predict, both required for its own tests.**
+
+- **`local_mouse` had to snap to whole twips.** Ruffle's `global_to_local`
+  returns a `Point<Twips>`, so `localX`/`localY` are *always* an exact twip
+  count; `stageX`/`stageY` map that back through `Twips::from_pixels`, which
+  **truncates**. An unsnapped local landing a hair below a twip boundary
+  therefore came back one twip short — `mouse_pick_masking` printing 282.75
+  for an expected 282.8, and four such values in `mouse_pick_text`. Tranche 1
+  fixed the *model* of `stageX` (the three-branch `local_to_stage_x`); this is
+  the other half, and it was invisible until the mask work made the rest of
+  those two tests line up.
+- **A whole class of mouse events is suppressed at dispatch.**
+  `mouse_pick_text`'s spurious fifth `mouseDown` was not a hit-test error at
+  all: Ruffle's `interactive.rs::event_dispatch_to_avm2` opens with "Flash
+  appears to not fire events *at all* for a targeted EditText that was
+  originally created by the timeline" when that field is selectable. The pick
+  deliberately still *hits* such a field (that is what raises the I-beam
+  cursor); the event is dropped one layer later. Reading only `mouse_pick_avm2`
+  would have sent this the wrong way — the test's own source comment
+  ("Uncomment this line ... a new event should get generated") is the clue that
+  a hit was happening and the *event* was missing.
+
+**Regression evidence.** ~55 tests locally, all byte-identical to the tranche-1
+baseline: `mouse_children` 192/192, the whole `mouse_*` / `focus_*` /
+`tab_ordering_*` dispatch set, all six `visual/focus_highlight/*`,
+`from_shumway/mouse/{mouse_coords,start_drag}`, the `graphics_*` drawing tests
+(whose tessellation the pick now reads), `getobjectsunderpoint` /
+`MaskTest{,-2,-3}` / `clipping` / `hitTestStyleChange` / `invalidClipDepth`,
+and the link canaries `verify_method_info_{oob,duplicate}` +
+`mixed_avm/avm1_loads_avm2`.
+
+### Tranche 3 — `b27909297`
+
+**+7 actual vs +7 predicted.** `textbox_click` (1/37),
+`edittext_mouse_selection` (334/363), `selection` (229/239), and all four
+`text/text_caret_placement_*` riders.
+
+The core is a port of `edit_text.rs`: `screen_position_to_index`
+(local twips → layout coords → `find_line_index_by_y` → closest text box →
+the glyph whose half-advance the point passes), then `handle_click` /
+`handle_drag` on top, with the selection mode taken from the click index
+(0 character, 1 word, 2+ line) and a drag spanning the anchor's and the current
+position's selections *in that same mode*. Wiring detail that matters: the
+press runs **before** `update_focus_on_press` (Ruffle's dispatch loop is
+`handle_clip_event` → focus → `event_dispatch_to_avm2`), and the drag follows
+the **pressed** object rather than the hovered one, so a selection keeps
+extending after the cursor leaves the field.
+
+**Where the triage was wrong — twice, and both times about which VM/mechanism
+owned the test.**
+
+- **`selection` (229/239) is not a mouse test.** It has no `input.json` at all.
+  Its four remaining diffs are `TextField.caretIndex`, which Ruffle defines as
+  `selection.to()` — the *moving* end, not the numerically larger one. The two
+  differ exactly on a right-to-left selection: `setSelection(5, 2)` reads
+  caretIndex 2 / begin 2 / end 5, and we read 5. A one-line fix that the bucket
+  had filed under "off-by-one during `text_input`".
+- **`text_caret_placement_translated_bounds` is an AVM1 test.** §3 filed all
+  four `text_caret_placement_*` riders together, and the other three are AS3 —
+  but this one is AVM1 (`Mouse.addListener` / `Selection.setFocus`), so no
+  amount of AVM2 work could move it. Its real defect was in
+  `ng_shared.c::ng_getCharIndexAtPoint`, which never clamped its target line:
+  Ruffle's `find_line_index_by_y` returns `Err(max_line)` past the end, so a
+  click below the text lands on the *final* line. The field's box is 197px tall
+  for two lines of text, so six of its clicks sit in that empty region. §3's
+  claim that "the four show the same single symptom ... so they are one fix,
+  not four" was right about the symptom and wrong about the count: it was two
+  fixes, one per VM.
+
+**One thing the triage got right that was worth the caution.** §5 called this
+"one mechanism ... AVM1's `edittext_focus_selection` family already does this,
+so the layout query exists to copy". The AVM1 query existed but was not
+reusable (different layout model, different text storage), so the AVM2 side is
+a fresh port of Ruffle rather than a copy of `action.c`. The *value* of the
+AVM1 side turned out to be different: it is the regression oracle. 17 AVM1
+text canaries pin the shared `ng_shared.c` change.
+
+**Two details that only the corpus could have told us.**
+
+- An empty line still resolves. Ruffle's layout gives it a box with an empty
+  text range, so `font.evaluate` never fires and the result stays at the box's
+  start — that is what puts `textbox_click`'s caret at 97 and 98 on two
+  consecutive empty lines. Returning "no box → caret at end of text" (the
+  literal reading of `screen_position_to_index`'s `None`) collapsed both to
+  123 and, because the test only traces on *change*, desynchronised the whole
+  remaining transcript. A 36-line diff from one boundary case.
+- `edittext_mouse_selection`'s double/triple clicks are driven by explicit
+  `index` fields in `input.json` (47 of its 83 `MouseDown`s carry 1, 2 or 3),
+  so no time/distance click-index inference was needed. Worth recording
+  because the opposite would have been a determinism hazard: Ruffle's real
+  rule is a 500 ms + 2px window against a wall clock we do not have.
+
+**Regression evidence.** 60+ tests locally, zero changes: all 17 AVM1
+`edittext_*` / `selection*` / `text_blocks_clicks` canaries (`ng_shared.c` is
+shared AVM1 layout code — `edittext_place_caret`, `edittext_drag_select`,
+`edittext_focus_selection`, `edittext_align/scroll/hscroll/leading/margins`),
+the 19-test AVM2 edittext/textfield input set, and the four `from_shumway`
+hit-test/mask tests verified **byte-identical against a stashed session-start
+build** rather than against the results JSON — the JSON's `matching_lines` is
+too coarse to distinguish "same failure" from "different failure of the same
+size", and three tests in the `ruffle_matched` bucket looked like regressions
+under the coarse check and were not.
+
+---
+
 ## 7. Commits
 
 | Tranche | Commit | CI | Yield |
 |---|---|---|---|
 | triage | `f410cc9f3` | — (docs only) | — |
 | 1 | `9263f71a0` | `30381234241` graphics/full, success | **+10** (pred. 7) |
+| 2 | `786d765ee` | `30389013458` graphics/full, success (with 3) | **+5** (pred. 5) |
+| 3 | `b27909297` | `30389013458` graphics/full, success | **+7** (pred. 7) |
+
+**Remaining**: tranche 4 (focus event model, +4) → 5 (IME, +2) → 6
+(`TextEvent.LINK`, +2) → 7 (arrow-key directional focus, +2, LARGE) → 8
+(`startDrag(lockCenter)`, +1, trivial). A post-tranche-3 sweep confirms none
+of their tests moved as a side effect: `focus_events_mouse_focusable` 110/112,
+`focus_events_mouse_basic` 30/260, `focus_events_key_navigation` 12/53,
+`tab_ordering_arrows` 1/998, `textfield_event` 0/66, `ime_linux_dead_keys`
+0/10, `edittext_ime_focus_lost` 0/9 — all unchanged, so those predictions
+stand as written.

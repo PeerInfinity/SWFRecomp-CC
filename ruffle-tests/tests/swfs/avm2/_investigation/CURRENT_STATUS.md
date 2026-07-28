@@ -1,9 +1,15 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-28 — **Input arc TRIAGED + tranche 1 SHIPPED
+Last updated: 2026-07-28 — **Input arc tranches 2 + 3 SHIPPED
+(`786d765ee` + `b27909297`, CI `30389013458`, +12 = exactly the predicted
+5 + 7, zero regressions)**: avm2 912 → **920 / 1221 (75.3%)**, `text` 5 → 9,
+corpus 3871 → 3883 / 4420. Mask + shape-accurate mouse hit-testing, then
+caret placement and mouse selection. `from_shumway/hittesting/mask-hit-test`
+also moved `ruffle_matched → pass`. **NEXT: tranche 4** (focus event model,
+pred. +4). Prior: 2026-07-28 — **Input arc TRIAGED + tranche 1 SHIPPED
 (`9263f71a0`, CI `30381234241`, +10 vs predicted 7, zero regressions)**:
 avm2 902 → 912 / 1221 (74.7%). Per-test triage of all 30 failing input
-tests + 6 riders, and 7 remaining tranches, in
+tests + 6 riders, and 5 remaining tranches, in
 `SWFRecompDocs/plans/input-arc.md`. See the Input section below.
 Prior: 2026-07-28 — **Loader arc CLOSED (tranche 8 shipped,
 `1617724eb` + `e2a7a651c`, CI `30326194497` + `30327940850`, +7 total,
@@ -32,11 +38,11 @@ flat. Prior: raw-alloc reclamation (2026-07-17), collectable strings
 (2026-07-16), RWK-3 (browser demo + wasm heap gate), RWK-1/2, Stage 12
 sessions.
 
-## Input (focus / tab / mouse / keyboard) — TRIAGED + TRANCHE 1 SHIPPED (2026-07-28)
+## Input (focus / tab / mouse / keyboard) — TRIAGED + TRANCHES 1–3 SHIPPED (2026-07-28)
 
-Full plan + tranche-1 postmortem: **`SWFRecompDocs/plans/input-arc.md`**
-(per-test triage, 8 ranked tranches; §5 ranks them, §6 postmortems tranche
-1). This supersedes the "~29 misses … mask hit-testing, SimpleButton
+Full plan + per-tranche postmortems: **`SWFRecompDocs/plans/input-arc.md`**
+(per-test triage, 8 ranked tranches; §5 ranks them, §6 postmortems tranches
+1–3). **+22 so far against 19 predicted.** This supersedes the "~29 misses … mask hit-testing, SimpleButton
 highlight_bounds geometry + arrow navigation, IME, HTML link events,
 real-shape hit-testing" line in the Stage 8 section below, which is the
 same block seen four months earlier and without per-test causes.
@@ -61,13 +67,37 @@ same block seen four months earlier and without per-test causes.
   Flash-matching; the bug was its *input* (invalid bounds keyed at the
   origin). When a correct-looking mechanism gives a wrong result, check its
   input before changing the mechanism.
-- **NEXT**: tranche 2 (mask + non-interactive + text hit-testing, pred. +5)
-  or tranche 3 (caret placement + mouse selection, pred. +7 with the four
-  `text/text_caret_placement_*` riders). The rider sweep sharpened both:
-  `mouse_pick_masking` went from all-7-lines-differing to 2 matching once
-  the coordinate truncation was gone, so what remains there is purely mask
-  hit-testing; `focus_events_mouse_focusable` held at 110/112, confirming
-  its 2 lines are purely the `mouseFocusChange` `relatedObject` model.
+- **Tranches 2 + 3** (`786d765ee` + `b27909297`, CI `30389013458`
+  graphics/full): **+12**, exactly the predicted 5 + 7, zero regressions.
+  avm2 **912 → 920 / 1221 (75.3%)**, `text` 5 → 9; corpus **3871 → 3883 /
+  4420**. Tranche 2 replaced the AABB pick with Ruffle's real model —
+  triangulated shape hit-testing (placed `DefineShape` rows + the drawing-API
+  tessellation; Bitmap/TextField/StaticText keep the box, as Ruffle's default
+  `hit_test_shape` does), a symmetric `masker`/`maskee` pair, and timeline
+  clip layers. Tranche 3 ported `screen_position_to_index` + `handle_click` /
+  `handle_drag` with character/word/line selection modes.
+  Flipped: `mouse_pick_{masking,dobj_mask,non_interactive_dobj_mask,
+  non_interactive_bitmap_mask,text}`, `textbox_click`,
+  `edittext_mouse_selection`, `selection`, and all four
+  `text/text_caret_placement_*`. `from_shumway/hittesting/mask-hit-test` also
+  moved `ruffle_matched → pass`.
+  **Three transferable findings** (§6): (a) local mouse coordinates are
+  always an exact twip count in Ruffle (`global_to_local` returns
+  `Point<Twips>`) and `stageX`/`stageY` truncate on the way back, so an
+  unsnapped local reads one twip short; (b) Flash fires **no** mouse event at
+  all — not even to the Stage — when the target is a selectable
+  timeline-created `EditText`, and that suppression lives in
+  `event_dispatch_to_avm2`, *after* a successful pick; (c) two of the seven
+  tranche-3 tests were mis-bucketed by the triage — `selection` has no
+  `input.json` and is a `caretIndex == selection.to()` fix, and
+  `text_caret_placement_translated_bounds` is an **AVM1** test fixed in
+  `ng_shared.c`.
+- **NEXT**: tranche 4 (focus event model, pred. +4), then 5 (IME, +2), 6
+  (`TextEvent.LINK`, +2), 7 (arrow-key directional focus, +2, LARGE), 8
+  (`startDrag(lockCenter)`, +1, trivial). None of their tests moved as a side
+  effect of tranches 2–3 — `focus_events_mouse_focusable` holds at 110/112,
+  confirming its 2 lines are purely the `mouseFocusChange` `relatedObject`
+  model.
 
 Census: **30 failing avm2 tests + 6 riders** (`text/text_caret_placement_*`
 ×4, `text/links_in_scrolled_text`, `from_shumway/mouse/start_drag_lock`),
