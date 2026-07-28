@@ -781,6 +781,12 @@ struct Avm2EditTextExt
 	// Whether the runtime injected input has ever set a real selection (once a
 	// TextField is focused / clicked, the caret exists at end).
 	uint8_t sel_active;
+	// Ruffle EditText::last_click (ClickEventData): where the last press landed
+	// and its click index, so a drag can re-derive the anchor selection in the
+	// same mode (character / word / line) the press established.
+	uint8_t has_last_click;
+	uint32_t last_click_pos;
+	uint32_t last_click_index;
 	// EditText-owned bounds (twips). Distinct from the display matrix.
 	int32_t bounds_x, bounds_y, bounds_w, bounds_h;
 	uint16_t font_id;
@@ -4082,10 +4088,13 @@ static Avm2Value txt_get_selection_end(Avm2Activation* act)
 	Avm2EditTextExt* et = this_et(act);
 	return et != NULL ? avm2_integer(et->sel_end) : avm2_undefined();
 }
+// Ruffle text_field.rs::get_caret_index is `selection.to()` — the MOVING end,
+// not the numerically larger one. They differ exactly when the selection runs
+// right-to-left (setSelection(5, 2) reads caretIndex 2, begin 2, end 5).
 static Avm2Value txt_get_caret_index(Avm2Activation* act)
 {
 	Avm2EditTextExt* et = this_et(act);
-	return et != NULL ? avm2_integer(et->sel_end) : avm2_undefined();
+	return et != NULL ? avm2_integer(et->sel_to) : avm2_undefined();
 }
 
 static Avm2Value txt_set_selection(Avm2Activation* act)
@@ -6635,6 +6644,193 @@ static uint32_t et_find_new_pos(const Avm2EditTextExt* et, const char* code,
 		return et_prev_pos(et, cur);
 	}
 	return cur;
+}
+
+// ===========================================================================
+// Caret placement and mouse selection (Ruffle edit_text.rs
+// screen_position_to_index / handle_click / handle_drag).
+// ===========================================================================
+
+// Layout origin in LOCAL twips (Ruffle layout_to_local_matrix). Device-font
+// x-scaling is not modelled here; embedded fonts are a pure translation.
+static void et_layout_origin(Avm2Context* ctx, Avm2EditTextExt* et,
+                             int32_t* ox, int32_t* oy)
+{
+	LLayout* l = et_layout(ctx, et);
+	int32_t vscroll = 0;
+	if (et->scroll > 1 && (uint32_t) et->scroll <= l->line_count)
+		vscroll = l->lines[et->scroll - 1].y;
+	*ox = et->bounds_x + GUTTER - twips_from_px(et->hscroll);
+	*oy = et->bounds_y + GUTTER - vscroll;
+}
+
+// Ruffle Layout::find_line_index_by_y: the first line whose bottom (including
+// its leading) is past y, clamped into range. y < 0 lands on the first line.
+static uint32_t et_line_at_y(const LLayout* l, int32_t y)
+{
+	if (l->line_count == 0) return 0;
+	if (y < 0) return 0;
+	for (uint32_t i = 0; i < l->line_count; i++)
+	{
+		const LLine* ln = &l->lines[i];
+		if (y < ln->y + ln->h + ln->leading) return i;
+	}
+	return l->line_count - 1;
+}
+
+// Ruffle EditText::screen_position_to_index, given a point already mapped into
+// the field's LOCAL twips space. Returns -1 for Ruffle's `None` (a layout with
+// no text boxes at all), which the caller turns into "caret at end of text".
+int32_t avm2_text_index_at_local(Avm2Context* ctx, Avm2Object* obj,
+                                 int32_t local_x, int32_t local_y)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et == NULL || et->text == NULL) return -1;
+	LLayout* l = et_layout(ctx, et);
+	et_apply_lazy_bounds(et);
+	if (l->line_count == 0) return -1;
+
+	int32_t ox = 0, oy = 0;
+	et_layout_origin(ctx, et, &ox, &oy);
+	int32_t x = local_x - ox, y = local_y - oy;
+
+	const LLine* line = &l->lines[et_line_at_y(l, y)];
+
+	// Closest box in that line: the last one starting at or before x, or the
+	// first text box when x is left of them all.
+	const LBox* box = NULL;
+	for (uint32_t i = 0; i < line->box_count; i++)
+	{
+		const LBox* b = &line->boxes[i];
+		if (b->is_bullet) continue;
+		if (x >= b->x || box == NULL) box = b;
+		else break;
+	}
+	// An empty line still resolves — Ruffle's box has an empty text range, so
+	// `font.evaluate` never fires and the result stays at the box's start.
+	// Only a layout with no lines at all is Ruffle's `None`.
+	if (box == NULL) return (int32_t) line->start;
+	if (box->char_end == NULL || box->char_count == 0)
+		return (int32_t) box->start;
+
+	// Within the box: the caret snaps to whichever side of the glyph the point
+	// is nearer (Ruffle's `> x + advance / 2` split).
+	int32_t bx = x - box->x;
+	uint32_t result = 0;
+	for (uint32_t rel = 0; rel < box->char_count; rel++)
+	{
+		int32_t gx = rel == 0 ? 0 : box->char_end[rel - 1];
+		int32_t adv = box->char_end[rel] - gx;
+		if (bx >= gx) result = (bx > gx + adv / 2) ? rel + 1 : rel;
+	}
+	return (int32_t) (box->start + result);
+}
+
+// swf_is_whitespace plus a coarse UAX#29 word classification: runs of
+// alphanumerics / underscore form one word (so `word1_word2_word3` is a single
+// double-click selection), and any other non-space character stands alone.
+static int et_char_class(uint16_t c)
+{
+	if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return 0;
+	if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+	    || c == '_' || c >= 0x80)
+		return 1;
+	return 2;
+}
+
+static uint32_t et_prev_word(const uint16_t* u, uint32_t len, uint32_t pos)
+{
+	if (pos == 0 || pos > len) return 0;
+	if (et_char_class(u[pos - 1]) == 0) return pos;   // stop_on_space
+	int cls = et_char_class(u[pos - 1]);
+	if (cls == 2) return pos - 1;
+	uint32_t p = pos;
+	while (p > 0 && et_char_class(u[p - 1]) == 1) p--;
+	return p;
+}
+
+static uint32_t et_next_word(const uint16_t* u, uint32_t len, uint32_t pos)
+{
+	if (pos >= len) return len;
+	if (et_char_class(u[pos]) == 0) return pos;       // stop_on_space
+	int cls = et_char_class(u[pos]);
+	if (cls == 2) return pos + 1;
+	uint32_t p = pos;
+	while (p < len && et_char_class(u[p]) == 1) p++;
+	return p;
+}
+
+// Ruffle EditText::calculate_selection_at — the selection a press at `pos`
+// produces in the mode its click index selects (0 char, 1 word, 2+ line).
+static void et_selection_at(Avm2Context* ctx, Avm2EditTextExt* et, uint32_t pos,
+                            uint32_t mode, uint32_t* from, uint32_t* to)
+{
+	if (mode == 0) { *from = *to = pos; return; }
+	if (mode >= 2)
+	{
+		*from = et_prev_line(et, pos);
+		*to = et_next_line(et, pos);
+		return;
+	}
+	uint32_t len = 0;
+	uint16_t* u = et_units(ctx, et, &len);
+	*from = et_prev_word(u, len, pos);
+	*to = et_next_word(u, len, pos);
+}
+
+static void et_set_selection(Avm2EditTextExt* et, uint32_t from, uint32_t to)
+{
+	et->sel_from = (int32_t) from;
+	et->sel_to = (int32_t) to;
+	et->sel_begin = (int32_t) (from < to ? from : to);
+	et->sel_end = (int32_t) (from < to ? to : from);
+	et->sel_active = 1;
+}
+
+// Ruffle EditText::handle_click (via event_dispatch's ClipEvent::Press arm).
+// A press outside every text box puts the caret at the end of the text.
+void avm2_text_mouse_press(Avm2Context* ctx, Avm2Object* obj,
+                           uint32_t click_index, int32_t local_x, int32_t local_y)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et == NULL || !avm2_text_is_selectable(et)) return;
+	int32_t pos = avm2_text_index_at_local(ctx, obj, local_x, local_y);
+	if (pos < 0)
+	{
+		et->has_last_click = 0;
+		et_set_selection(et, u16_length(et->text), u16_length(et->text));
+		return;
+	}
+	et->has_last_click = 1;
+	et->last_click_pos = (uint32_t) pos;
+	et->last_click_index = click_index;
+	uint32_t mode = click_index >= 2 ? 2 : click_index;
+	uint32_t from = 0, to = 0;
+	et_selection_at(ctx, et, (uint32_t) pos, mode, &from, &to);
+	et_set_selection(et, from, to);
+}
+
+// Ruffle EditText::handle_drag: span the press-time selection and the current
+// one, so a word/line drag keeps extending in whole words/lines.
+void avm2_text_mouse_drag(Avm2Context* ctx, Avm2Object* obj,
+                          int32_t local_x, int32_t local_y)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et == NULL || !avm2_text_is_selectable(et) || !et->has_last_click) return;
+	int32_t pos = avm2_text_index_at_local(ctx, obj, local_x, local_y);
+	if (pos < 0) return;
+	uint32_t mode = et->last_click_index >= 2 ? 2 : et->last_click_index;
+	uint32_t af = 0, at = 0, bf = 0, bt = 0;
+	et_selection_at(ctx, et, et->last_click_pos, mode, &af, &at);
+	et_selection_at(ctx, et, (uint32_t) pos, mode, &bf, &bt);
+	uint32_t a_start = af < at ? af : at, a_end = af < at ? at : af;
+	uint32_t b_start = bf < bt ? bf : bt, b_end = bf < bt ? bt : bf;
+	// TextSelection::span_across — note the backwards case keeps `from` at the
+	// anchor's far edge, so selectionBeginIndex/EndIndex stay ordered.
+	if (a_start < b_start && a_end < b_end) et_set_selection(et, a_start, b_end);
+	else if (b_start < a_start && b_end < a_end) et_set_selection(et, a_end, b_start);
+	else et_set_selection(et, a_start < b_start ? a_start : b_start,
+	                      a_end > b_end ? a_end : b_end);
 }
 
 // Ruffle EditText::event_dispatch(ClipEvent::MouseWheel): the new scroll is

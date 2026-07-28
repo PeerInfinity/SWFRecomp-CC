@@ -1994,6 +1994,16 @@ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
 	if (text_y > 0 && line_height_px > 0)
 		target_line = (int)(text_y / line_height_px);
 	if (target_line < 0) target_line = 0;
+	// Ruffle Layout::find_line_index_by_y clamps past-the-end to the LAST line
+	// (`Err(max_line)`), so a click below the text places the caret on the final
+	// line rather than falling off into "end of text". Visible whenever the
+	// field box is much taller than its text — text/text_caret_placement_*.
+	{
+		int last_line = 0;
+		for (size_t i = 0; i < text_len; i++)
+			if (text[i] == '\r' || text[i] == '\n') last_line++;
+		if (target_line > last_line) target_line = last_line;
+	}
 
 	int current_line = 0;
 	size_t line_start_byte = 0;

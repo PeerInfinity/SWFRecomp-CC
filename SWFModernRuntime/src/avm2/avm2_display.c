@@ -9859,6 +9859,44 @@ static void dispatch_roll_over(Avm2Context* ctx, Avm2Object* self, Avm2Object* f
 // FocusEvent focusIn/focusOut. Defined in the focus section below.
 static void update_focus_on_press(Avm2Context* ctx, Avm2Object* pressed);
 
+// --- Caret placement / mouse selection bridge (avm2_text.c owns the layout
+// query; the display side owns the global -> local mapping) ---
+extern void avm2_text_mouse_press(Avm2Context* ctx, Avm2Object* obj,
+                                  uint32_t click_index,
+                                  int32_t local_x, int32_t local_y);
+extern void avm2_text_mouse_drag(Avm2Context* ctx, Avm2Object* obj,
+                                 int32_t local_x, int32_t local_y);
+
+// Mouse position in obj's local space, snapped to whole twips — Ruffle's
+// `self.global_to_local(*context.mouse_position)`, which is Point<Twips>.
+static int local_mouse_twips(Avm2Context* ctx, Avm2Object* obj,
+                             int32_t* lx, int32_t* ly)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || ext->edittext == NULL) return 0;
+	Mat m = display_world_matrix(ctx, obj);
+	Mat inv = mat_invert(&m);
+	double gx = g_mouse_x * 20.0, gy = g_mouse_y * 20.0;
+	*lx = (int32_t) round(inv.a * gx + inv.c * gy + inv.tx);
+	*ly = (int32_t) round(inv.b * gx + inv.d * gy + inv.ty);
+	return 1;
+}
+
+static void text_mouse_press(Avm2Context* ctx, Avm2Object* obj,
+                             uint32_t click_index)
+{
+	int32_t lx = 0, ly = 0;
+	if (local_mouse_twips(ctx, obj, &lx, &ly))
+		avm2_text_mouse_press(ctx, obj, click_index, lx, ly);
+}
+
+static void text_mouse_drag(Avm2Context* ctx, Avm2Object* obj)
+{
+	int32_t lx = 0, ly = 0;
+	if (local_mouse_twips(ctx, obj, &lx, &ly))
+		avm2_text_mouse_drag(ctx, obj, lx, ly);
+}
+
 // Env AVM2_MOUSE_DEBUG: compact "Class 'name'" label for a picked target.
 static void avm2_dbg_pick_label(Avm2Context* ctx, const char* tag, Avm2Object* o)
 {
@@ -9884,6 +9922,13 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 		avm2_dbg_pick_label(ctx, g_mouse_btn_down[0] ? "down" : "up", new_over);
 	Avm2Object* cur_over = g_mouse_hovered;
 	int left_down = g_mouse_btn_down[0];
+
+	// Ruffle EditText::event_dispatch(ClipEvent::MouseMove): a move while THIS
+	// field is the pressed object extends its selection. The MouseMove clip
+	// event goes to the pressed object, not the hovered one, so a drag that
+	// leaves the field keeps selecting.
+	if (is_moved && left_down && g_mouse_pressed[0] != NULL)
+		text_mouse_drag(ctx, g_mouse_pressed[0]);
 
 	if (is_moved)
 		dispatch_mouse(ctx, new_over != NULL ? new_over : stage,
@@ -9922,6 +9967,9 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 			if (over != NULL)
 			{
 				g_mouse_pressed[button] = over;
+				// Ruffle's dispatch loop runs handle_clip_event (EditText's
+				// caret placement) BEFORE update_focus_on_mouse_press.
+				if (button == 0) text_mouse_press(ctx, over, g_left_click_index);
 				if (button == 0) update_focus_on_press(ctx, over);
 				dispatch_mouse(ctx, over,
 					button == 0 ? "mouseDown" : button == 1 ? "middleMouseDown"
