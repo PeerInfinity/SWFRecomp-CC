@@ -8,6 +8,10 @@ predicted 7), `786d765ee` + `b27909297` (**+12**, exactly the predicted
 5 + 7), then the closeout `803055ca5` / `5231abf0c` / `5f48fecd7` /
 `bbefcf376` (**+7**, including tranche 7 which the plan had deferred).
 **+29 total against a predicted +30**, zero regressions in any tranche.
+Closeout CI `30397635331` (graphics/full) is green on all 34 jobs and lands
+**+7 exactly as predicted**: corpus effective 3883 → **3890 / 4420**, `avm2`
+920 → **926 / 1221**, `from_shumway` 179 → **180**, zero `matching_lines`
+drops corpus-wide and no `compile_fail` / `segfault` / `timeout` bucket.
 Postmortems in §6; every one of the 36 scoped tests is reconciled in §8 —
 29 shipped, 2 open with a named blocker, 5 dispositioned out.
 
@@ -634,9 +638,15 @@ under the coarse check and were not.
 
 ### Closeout — tranches 8, 6, 4, 5, 7 — `803055ca5` / `5231abf0c` / `5f48fecd7` / `bbefcf376`
 
-All five remaining tranches shipped in one session. **+7 actual vs +9
-predicted for tranches 4/5/6/8, plus +1 from tranche 7, which the plan had
-deferred.** No tranche's *mechanism* fell short: the two missing tests were
+All five remaining tranches shipped in one session, one CI run,
+`30397635331` (graphics/full, success, all 34 jobs). **+7 effective,
+exactly the number predicted going in**: +6 for tranches 4/5/6/8 against
+the plan's +9, plus +1 from tranche 7, which the plan had deferred. Corpus
+effective 3883 → 3890 / 4420; the status histogram moved only
+`output_mismatch 529 → 522` / `pass 3643 → 3650`, with `ruffle_matched`
+(240), `runtime_error` (7) and `recomp_fail` (1) all flat and no
+`compile_fail` / `segfault` / `timeout` bucket in the run. The seven flips
+are exactly the seven named targets — no riders in either direction. No tranche's *mechanism* fell short: the two missing tests were
 both scoping errors made at triage time, and both had already been paid for
 or belong to another VM. Details per tranche below; the reconciliation of
 all 36 scoped tests is §8.
@@ -757,9 +767,10 @@ caveat: there, a 2-line JSON diff hid a 173-line test; here, a 998-line
 transcript hid 90 lines of code.
 
 `focus_events_key_navigation` (12/53) flipped, including its cancel branch.
-`tab_ordering_arrows` did **not**, and is left open — but it went from 1/998
-to tracking the transcript for 634 lines, and every remaining diff is the
-same non-navigation cause (below).
+`tab_ordering_arrows` did **not**, and is left open — but CI puts it at
+**645/998 matching lines, up from 1**, and every remaining diff is the same
+non-navigation cause (below). That number is the evidence the algorithm
+itself is right.
 
 **The finding that came out of it, and it is the arc's most reusable.**
 Making the navigation keys agree required **snapping highlight bounds to
@@ -769,7 +780,7 @@ were doubles. The keys compare rectangle edges with exact `<=`, and the
 origin's: a sprite scaled to `height = 12` over 10px of content lands at
 12.0000005px and flips the comparison, focusing an object Flash excludes.
 That one snap moved the first navigation divergence from line 132 to line
-634.
+634, and the test from 1 to 645 matching lines.
 
 This is the **third** appearance of the same lesson in this arc — after
 tranche 1's `Twips::INVALID` (invalid bounds are a sentinel, not the origin)
@@ -823,10 +834,10 @@ discarded and re-run clean for this reason.
 | 1 | `9263f71a0` | `30381234241` graphics/full, success | **+10** (pred. 7) |
 | 2 | `786d765ee` | `30389013458` graphics/full, success (with 3) | **+5** (pred. 5) |
 | 3 | `b27909297` | `30389013458` graphics/full, success | **+7** (pred. 7) |
-| 8 | `803055ca5` | `30397635331` graphics/full | **+1** (pred. 1) |
-| 6 | `5231abf0c` | `30397635331` graphics/full | **+1** (pred. 2) |
-| 4+5 | `5f48fecd7` | `30397635331` graphics/full | **+4** (pred. 6; 4 was +2 not +4) |
-| 7 | `bbefcf376` | `30397635331` graphics/full | **+1** (was deferred) |
+| 8 | `803055ca5` | `30397635331` graphics/full, success | **+1** (pred. 1) |
+| 6 | `5231abf0c` | `30397635331` graphics/full, success | **+1** (pred. 2) |
+| 4+5 | `5f48fecd7` | `30397635331` graphics/full, success | **+4** (pred. 6; 4 was +2 not +4) |
+| 7 | `bbefcf376` | `30397635331` graphics/full, success | **+1** (was deferred) |
 
 **Arc total: +29** against a predicted +30 for tranches 1–8. The single
 missing test is `text/links_in_scrolled_text`, which is not an AVM2 test at
@@ -888,7 +899,7 @@ open with a named blocker, 5 dispositioned out at triage.**
 | Test | Bucket | Blocker |
 |---|---|---|
 | `text/links_in_scrolled_text` | H rider | **AVM1, not AVM2.** `ng_getCharIndexAtPoint` has no word wrap and ignores `scroll`; needs a wrap-aware line enumerator in `ng_shared.c`. Instrumented: resolves char 337 for an anchor at 707..710. |
-| `tab_ordering_arrows` | E | **DisplayObject property getters return unquantized geometry.** Navigation itself is correct (1/998 → 634 lines tracked after the twips snap); every residual diff is a printed `width`/`height`/`x`/`y`, or the test's own arithmetic drifting a twip off one. Needs corpus-wide twips quantization of those getters. |
+| `tab_ordering_arrows` | E | **DisplayObject property getters return unquantized geometry.** Navigation itself is correct — CI `30397635331` puts it at **645/998, up from 1**; every residual diff is a printed `width`/`height`/`x`/`y`, or the test's own arithmetic drifting a twip off one. Needs corpus-wide twips quantization of those getters. |
 
 ### Dispositioned out at triage (5) — unchanged verdicts
 

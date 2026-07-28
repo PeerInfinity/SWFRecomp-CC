@@ -47,16 +47,23 @@ ruffle_matched (236), segfault (3), runtime_error (21), timeout (4) and
 compile_fail (1) **all flat in both**, with **zero pass→fail regressions**.
 Both gains are entirely inside `from_avmplus`.
 
-**Current, at `b27909297` (CI `30389013458`, input arc tranches 2+3):
-3883/4420 effective (87.9%)**, 537 failing — **+12** over `36a0fd2c5`
-(exactly the predicted 5 + 7), in `avm2` (912 → 920 / 1221, 75.3%) and `text`
-(5 → 9); zero regressions and zero `matching_lines` drops corpus-wide. The run
-carries no `compile_fail`, `segfault` or `timeout` bucket; `runtime_error` (7)
-and `recomp_fail` (1) are flat. One extra move outside the effective count:
-`from_shumway/hittesting/mask-hit-test` went `ruffle_matched → pass`, i.e. it
-now matches its own `output.txt` rather than only Ruffle's divergent output.
-Prior: `9263f71a0` (CI `30381234241`, input arc tranche 1) 3870/4419, +10 over
-`ab92ddfbc`.
+**Current, at `bbefcf376` (CI `30397635331`, input arc CLOSEOUT — tranches
+8, 6, 4+5, 7): 3890/4420 effective (88.0%)**, 530 failing — **+7** over
+`079f9c86d`, exactly the number predicted going in, in `avm2` (920 → 926 /
+1221, 75.8%) and `from_shumway` (179 → 180). Zero regressions and zero
+`matching_lines` drops corpus-wide; the histogram moved only
+`output_mismatch 529 → 522` / `pass 3643 → 3650`, with `ruffle_matched` (240),
+`runtime_error` (7) and `recomp_fail` (1) flat and no `compile_fail`,
+`segfault` or `timeout` bucket. The seven flips are exactly the seven named
+targets, no riders either way. One large partial-credit move outside the
+effective count: `avm2/tab_ordering_arrows` **1 → 645 / 998** matching lines —
+the directional-navigation algorithm is correct and only the unquantized
+DisplayObject position/size getters keep it from passing.
+Prior: `b27909297` (CI `30389013458`, input arc tranches 2+3) 3883/4420, +12
+over `36a0fd2c5` (exactly the predicted 5 + 7), in `avm2` (912 → 920) and
+`text` (5 → 9), with `from_shumway/hittesting/mask-hit-test` moving
+`ruffle_matched → pass`. Prior: `9263f71a0` (CI `30381234241`, input arc
+tranche 1) 3870/4419, +10 over `ab92ddfbc`.
 
 Prior, at `1b63b2e6d` (CI `30303826686`, Loader tranches 6b+6c+7):
 **3851/4419 effective (87.1%)**, 568 failing — +5 gains over `535885e66`, all
@@ -356,7 +363,7 @@ visible next to their yield, not because they are next.
 |---|---|---|
 | 21 | Loader / URLLoader / loaderInfo | **ARC CLOSED (tranche 8 SHIPPED, CI `30326194497` + `30327940850`)** — 25 of 31 `loader*`/`loaderinfo*` avm2 tests pass; the 6 remaining are reconciled in `loader-arc.md` §10c (2 blocked on child-SWF geometry, 1 Ruffle-vs-Flash enumeration order, 1 uncaught-error tracing, 2 won't-do). **SCOPED + tranches 1–7 SHIPPED: `SWFRecompDocs/plans/loader-arc.md`** — per-test triage, 8 tranches. Tranches 1+2 (`8213dd4d6`) delivered **+12** (pred. +8) for a small, mostly-one-file change; the two JPEG-XR tests turned out to be trace-only and passed with a magic-byte sniff, no decoder. Tranches 3+4 (`f6ba5c677` + `28577da2a`) delivered **+6** (pred. +4): image content → `BitmapData`/`Bitmap`, and a real URLLoader over bundled sibling assets. Tranche 7 shrank to **+1** as a side effect — a Loader with image content already passes `loader_visibility_interactive`. **NEXT: tranche 5** (navigator fetch log, +2, small-medium); then tranche 6 (AVM2 child-SWF execution, +6 and up to 9 more in from_shumway) is the one genuinely large item |
 | 30 | Sockets, NetConnection, NetStream, FileReference, SharedObject | network stack |
-| 20 | Focus / Tab / Mouse / Keyboard input | **ARC CLOSED — all 8 tranches SHIPPED: `SWFRecompDocs/plans/input-arc.md`** (per-test triage, 8 ranked tranches, per-tranche postmortems, and a §8 scoreboard reconciling every scoped test). The 25 here was an avm2-only bucket; the real census was **30 avm2 + 6 riders** in `text/` and `from_shumway/mouse/`. **+29 vs +30 predicted**, zero regressions in any tranche. **29 shipped, 2 open with a named blocker, 5 dispositioned out** (4 dual-VM → arc 8, 1 blocked on sealed builtin classes); ContextMenu contributed **zero** failing tests. Tranche 1 `9263f71a0` **+10** vs 7 (MouseEvent value surface, `FocusLost` replay, `focusRect`/Stage-`tabChildren` scalars, wheel-scroll, `highlight_bounds` — which collected two of tranche 4's tests as riders). 2 `786d765ee` **+5** (shape hit-testing, `masker`/`maskee`, timeline clip layers). 3 `b27909297` **+7** (`screen_position_to_index` + click/drag selection). Closeout `803055ca5` / `5231abf0c` / `5f48fecd7` / `bbefcf376` **+7**: `startDrag` defers to `update_drag`, `TextEvent.LINK`, the `set_by_mouse` focus model (the pressed object is the `relatedObject` even when unfocusable), IME composition, and tranche 7 — which the plan had deferred as LARGE and which turned out to be ~90 lines of rectangle arithmetic behind a 998-line acceptance table. **The two open tests have named blockers**: `links_in_scrolled_text` needs a wrap-aware `ng_getCharIndexAtPoint` in **AVM1**, and `tab_ordering_arrows` needs `width`/`height`/`x`/`y` quantized to whole twips corpus-wide. Recurring lesson, three times over: **Ruffle's geometry is integer twips and the quantization is load-bearing** |
+| 20 | Focus / Tab / Mouse / Keyboard input | **ARC CLOSED — all 8 tranches SHIPPED: `SWFRecompDocs/plans/input-arc.md`** (per-test triage, 8 ranked tranches, per-tranche postmortems, and a §8 scoreboard reconciling every scoped test). The 25 here was an avm2-only bucket; the real census was **30 avm2 + 6 riders** in `text/` and `from_shumway/mouse/`. **+29 vs +30 predicted**, zero regressions in any tranche; the closeout run CI `30397635331` (graphics/full) landed **+7 exactly as predicted** — corpus 3883 → 3890/4420, avm2 920 → 926/1221. **29 shipped, 2 open with a named blocker, 5 dispositioned out** (4 dual-VM → arc 8, 1 blocked on sealed builtin classes); ContextMenu contributed **zero** failing tests. Tranche 1 `9263f71a0` **+10** vs 7 (MouseEvent value surface, `FocusLost` replay, `focusRect`/Stage-`tabChildren` scalars, wheel-scroll, `highlight_bounds` — which collected two of tranche 4's tests as riders). 2 `786d765ee` **+5** (shape hit-testing, `masker`/`maskee`, timeline clip layers). 3 `b27909297` **+7** (`screen_position_to_index` + click/drag selection). Closeout `803055ca5` / `5231abf0c` / `5f48fecd7` / `bbefcf376` **+7**: `startDrag` defers to `update_drag`, `TextEvent.LINK`, the `set_by_mouse` focus model (the pressed object is the `relatedObject` even when unfocusable), IME composition, and tranche 7 — which the plan had deferred as LARGE and which turned out to be ~90 lines of rectangle arithmetic behind a 998-line acceptance table. **The two open tests have named blockers**: `links_in_scrolled_text` needs a wrap-aware `ng_getCharIndexAtPoint` in **AVM1**, and `tab_ordering_arrows` needs `width`/`height`/`x`/`y` quantized to whole twips corpus-wide. Recurring lesson, three times over: **Ruffle's geometry is integer twips and the quantization is load-bearing** |
 | 25 | PixelBender (`Shader`) | needs a PBJ interpreter |
 | 22 | Display list / DisplayObject / Stage edge cases | closest to existing work |
 | 22 | Verifier / cpool / ABC edge cases | closest to existing work |

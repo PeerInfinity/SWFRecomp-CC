@@ -10,10 +10,16 @@ that drops a release with no matching press), and arrow-key directional
 navigation — tranche 7, which the plan had deferred as LARGE and which is
 ~90 lines of rectangle arithmetic behind a 998-line acceptance table.
 **Arc total +29 against +30 predicted**, zero regressions in any of the
-eight. Of the 36 scoped tests: **29 shipped, 2 open with named blockers**
+eight. Closeout CI `30397635331` green on all 34 jobs, **+7 exactly as
+predicted**: avm2 920 → **926 / 1221 (75.8%)**, from_shumway 179 → 180,
+corpus 3883 → **3890 / 4420**; histogram moved only
+`output_mismatch 529 → 522` / `pass 3643 → 3650`, no `compile_fail` /
+`segfault` / `timeout` bucket, zero `matching_lines` drops corpus-wide. Of the 36 scoped tests: **29 shipped, 2 open with named blockers**
 (`text/links_in_scrolled_text` needs a wrap-aware `ng_getCharIndexAtPoint`
 in **AVM1**; `tab_ordering_arrows` needs `width`/`height`/`x`/`y` quantized
-to whole twips corpus-wide) **and 5 dispositioned out** (4 dual-VM, 1 sealed
+to whole twips corpus-wide — CI has it at **645/998, up from 1**, which is
+the evidence the navigation algorithm itself is correct) **and 5
+dispositioned out** (4 dual-VM, 1 sealed
 builtin classes). Full reconciliation in `SWFRecompDocs/plans/input-arc.md`
 §8. Recurring lesson, three times in one arc: **Ruffle's geometry is integer
 twips and the quantization is load-bearing, not cosmetic.**
