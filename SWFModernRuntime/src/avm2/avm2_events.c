@@ -803,16 +803,36 @@ static Avm2Value mouse_event_init(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// localX/localY are plain writable Numbers (Ruffle MouseEvent.as backs them
+// with `_localX`/`_localY` slots and a get/set pair). They are NOT rounded:
+// the twips snap happens only on the way through local_to_global for
+// stageX/stageY, which is where the 0.05-px expected values come from.
 static Avm2Value me_get_local_x(Avm2Activation* act)
 {
-	double v = this_event(act)->local_x;
-	return avm2_number(isnan(v) ? NAN : (double) (int) v);  // localX is int-rounded to twips? no — keep as-is
+	return avm2_number(this_event(act)->local_x);
+}
+static Avm2Value me_set_local_x(Avm2Activation* act)
+{
+	this_event(act)->local_x = arg_num_default_nan(act, 0);
+	return avm2_undefined();
 }
 
 static Avm2Value me_get_local_y(Avm2Activation* act)
 {
-	double v = this_event(act)->local_y;
-	return avm2_number(isnan(v) ? NAN : (double) (int) v);
+	return avm2_number(this_event(act)->local_y);
+}
+static Avm2Value me_set_local_y(Avm2Activation* act)
+{
+	this_event(act)->local_y = arg_num_default_nan(act, 0);
+	return avm2_undefined();
+}
+
+static Avm2Value me_get_rel_inaccessible(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->related_object_inaccessible != 0); }
+static Avm2Value me_set_rel_inaccessible(Avm2Activation* act)
+{
+	this_event(act)->related_object_inaccessible = arg_bool(act, 0);
+	return avm2_undefined();
 }
 
 static Avm2Value me_get_related(Avm2Activation* act)
@@ -862,28 +882,36 @@ static Avm2Value me_get_movement_y(Avm2Activation* act)
 static Avm2Value me_set_movement_y(Avm2Activation* act)
 { this_event(act)->movement_y = arg_i32(act, 0); return avm2_undefined(); }
 
-// stageX/stageY: localX/localY mapped through the target's world matrix.
-// Ruffle computes these lazily; for our AABB harness we approximate by
-// returning localX/localY when there is no target (the common traced path
-// prints them only after a mapping we already applied at construction time).
-extern void avm2_display_event_stage_coords(Avm2Context* ctx, Avm2Object* target,
-                                            double lx, double ly,
-                                            double* sx, double* sy);
+// stageX/stageY (Ruffle mouse_event.rs::local_to_stage_{x,y}), three branches:
+//   * either local coordinate NaN      -> that axis's local value, unmapped
+//   * a display-object target          -> local_to_global through twips
+//   * anything else (no target at all) -> `local * 0.0` — signed zero, NOT the
+//     local value. A `new MouseEvent(...)` that was never dispatched therefore
+//     reads stageX == stageY == 0 however large its localX/localY are.
+extern int avm2_display_event_stage_coords(Avm2Context* ctx, Avm2Object* target,
+                                           double lx, double ly,
+                                           double* sx, double* sy);
 static Avm2Value me_get_stage_x(Avm2Activation* act)
 {
 	Avm2EventExt* ext = this_event(act);
 	double sx = ext->local_x, sy = ext->local_y;
-	avm2_display_event_stage_coords(act->ctx, ext->target, ext->local_x,
-	                                ext->local_y, &sx, &sy);
-	return avm2_number(isnan(sx) ? NAN : (double) (int) sx);
+	if (avm2_display_event_stage_coords(act->ctx, ext->target, ext->local_x,
+	                                    ext->local_y, &sx, &sy))
+		return avm2_number(sx);
+	if (isnan(ext->local_x) || isnan(ext->local_y))
+		return avm2_number(ext->local_x);
+	return avm2_number(ext->local_x * 0.0);
 }
 static Avm2Value me_get_stage_y(Avm2Activation* act)
 {
 	Avm2EventExt* ext = this_event(act);
 	double sx = ext->local_x, sy = ext->local_y;
-	avm2_display_event_stage_coords(act->ctx, ext->target, ext->local_x,
-	                                ext->local_y, &sx, &sy);
-	return avm2_number(isnan(sy) ? NAN : (double) (int) sy);
+	if (avm2_display_event_stage_coords(act->ctx, ext->target, ext->local_x,
+	                                    ext->local_y, &sx, &sy))
+		return avm2_number(sy);
+	if (isnan(ext->local_x) || isnan(ext->local_y))
+		return avm2_number(ext->local_y);
+	return avm2_number(ext->local_y * 0.0);
 }
 
 static Avm2Value me_update_after_event(Avm2Activation* act)
@@ -1464,8 +1492,10 @@ static void register_input_events(Avm2Context* ctx)
 	me->instance_init.fn = mouse_event_init;
 	me->instance_init.debug_name = "MouseEvent";
 	b->mouse_event_class = me;
-	avm2_builtin_add_getset(ctx, me, "localX", me_get_local_x, NULL);
-	avm2_builtin_add_getset(ctx, me, "localY", me_get_local_y, NULL);
+	avm2_builtin_add_getset(ctx, me, "localX", me_get_local_x, me_set_local_x);
+	avm2_builtin_add_getset(ctx, me, "localY", me_get_local_y, me_set_local_y);
+	avm2_builtin_add_getset(ctx, me, "isRelatedObjectInaccessible",
+	                        me_get_rel_inaccessible, me_set_rel_inaccessible);
 	avm2_builtin_add_getter(ctx, me, "stageX", me_get_stage_x);
 	avm2_builtin_add_getter(ctx, me, "stageY", me_get_stage_y);
 	avm2_builtin_add_getset(ctx, me, "relatedObject", me_get_related, me_set_related);

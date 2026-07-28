@@ -722,6 +722,9 @@ void avm2_text_input_key(Avm2Context* ctx, Avm2Object* focus, int32_t key_code,
 void avm2_text_input_char(Avm2Context* ctx, Avm2Object* focus, int32_t codepoint);
 void avm2_text_input_control(Avm2Context* ctx, Avm2Object* focus,
                              const char* ctrl, const char* clipboard);
+// Mouse wheel over a TextField: scroll by `delta_lines` (Ruffle EditText
+// event_dispatch(ClipEvent::MouseWheel)). Returns 1 if the field consumed it.
+int avm2_text_mouse_wheel(Avm2Context* ctx, Avm2Object* obj, int32_t delta_lines);
 // EditText flag accessors for the mouse-pick path (NULL-safe on the ext ptr).
 int avm2_text_is_selectable(struct Avm2EditTextExt* et);
 int avm2_text_was_static(struct Avm2EditTextExt* et);

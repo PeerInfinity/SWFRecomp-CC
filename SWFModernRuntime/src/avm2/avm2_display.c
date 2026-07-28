@@ -5531,7 +5531,9 @@ static Avm2Value io_set_focus_rect(Avm2Activation* act)
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext == NULL) return avm2_null();
 	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_null();
-	if (v.kind == AVM2_VALUE_NULL)
+	// focusRect is typed `Object`, so *both* null and undefined clear it and
+	// the getter then reads back null (avm2/focusrect_property).
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
 	{
 		ext->focus_rect_set = 0;
 	}
@@ -8777,6 +8779,26 @@ static Avm2Value stage_set_focus(Avm2Activation* act)
 }
 
 
+// Stage.tabChildren is a write-through proxy, not storage (Ruffle Stage.as:169
+// + stage.rs::set_tab_children): the getter is hardcoded true, and the setter
+// forwards the value to the AVM2 root. So `stage.tabChildren = false` leaves
+// stage.tabChildren === true and makes root.tabChildren === false.
+static Avm2Value stage_get_tab_children(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(1);
+}
+
+static Avm2Value stage_set_tab_children(Avm2Activation* act)
+{
+	Avm2Object* root = act->ctx->root;
+	Avm2DisplayObjectExt* rext = root != NULL
+		? avm2_display_ext_of(act->ctx, root) : NULL;
+	if (rext != NULL && act->argc > 0)
+		rext->tab_children = avm2_coerce_to_boolean(act->args[0]) ? 1 : 0;
+	return avm2_undefined();
+}
+
 static Avm2Value stage_invalidate(Avm2Activation* act)
 {
 	(void) act;
@@ -9531,18 +9553,25 @@ static void local_mouse(Avm2Context* ctx, Avm2Object* obj, double* lx, double* l
 	*ly = (inv.b * gx + inv.d * gy + inv.ty) / 20.0;
 }
 
-void avm2_display_event_stage_coords(Avm2Context* ctx, Avm2Object* target,
-                                     double lx, double ly, double* sx, double* sy)
+// Ruffle mouse_event.rs::local_to_stage_{x,y}: local pixels -> twips
+// (Twips::from_pixels truncates toward zero) -> the target's local_to_global
+// matrix -> back to pixels. Returns 1 when a display-object target supplied
+// the mapping; 0 means the caller must apply the no-target rule itself
+// (`local * 0.0`, i.e. 0 with the sign of the local coordinate).
+int avm2_display_event_stage_coords(Avm2Context* ctx, Avm2Object* target,
+                                    double lx, double ly, double* sx, double* sy)
 {
-	if (target == NULL || avm2_display_ext_of(ctx, target) == NULL || isnan(lx))
+	if (target == NULL || avm2_display_ext_of(ctx, target) == NULL
+	    || isnan(lx) || isnan(ly))
 	{
 		*sx = lx; *sy = ly;
-		return;
+		return 0;
 	}
 	Mat m = display_world_matrix(ctx, target);
-	double px = lx * 20.0, py = ly * 20.0;
+	double px = (double) (int32_t) (lx * 20.0), py = (double) (int32_t) (ly * 20.0);
 	*sx = (m.a * px + m.c * py + m.tx) / 20.0;
 	*sy = (m.b * px + m.d * py + m.ty) / 20.0;
+	return 1;
 }
 
 // Construct + dispatch a MouseEvent to a display object (its object2 is itself).
@@ -9759,6 +9788,7 @@ static void input_handle_key(Avm2Context* ctx, int is_down, int32_t key_code,
 static void input_handle_text(Avm2Context* ctx, int32_t codepoint);
 static void input_handle_text_control(Avm2Context* ctx, const char* ctrl);
 static void input_handle_tab(Avm2Context* ctx, int shift);
+static void set_focus(Avm2Context* ctx, Avm2Object* new_focus);
 
 static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
 {
@@ -9792,6 +9822,10 @@ static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
 	{
 		Avm2Object* target = g_mouse_hovered != NULL ? g_mouse_hovered : ctx->stage;
 		dispatch_mouse(ctx, target, "mouseWheel", NULL, ev->code, 1, 0);
+		// Ruffle player.rs dispatches the MouseEvent and *then* hands the same
+		// wheel to the target's own clip-event handler; the only AVM2 handler
+		// that consumes it is EditText, which scrolls itself.
+		avm2_text_mouse_wheel(ctx, target, ev->code);
 		break;
 	}
 	case IN_KEY_DOWN:
@@ -9815,6 +9849,14 @@ static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
 		if (buf != NULL) { memcpy(buf, ev->text, n + 1); g_clipboard_text = buf; }
 		break;
 	}
+	// The player *window* losing focus drops stage focus entirely, firing the
+	// usual focusOut with relatedObject = null (AVM1: actionWindowFocusLost).
+	// Regaining it restores nothing — Flash does not remember the old target.
+	case IN_FOCUS_LOST:
+		set_focus(ctx, NULL);
+		break;
+	case IN_FOCUS_GAINED:
+		break;
 	default:
 		break;
 	}
@@ -10050,16 +10092,45 @@ static int obj_tab_children(Avm2Context* ctx, Avm2Object* obj)
 	return e->tab_children != 0;
 }
 
-// world top-left (twips) for the automatic order key 6*y + x.
+// World top-left (twips) of the HIGHLIGHT bounds — the input to the automatic
+// order key 6*y + x. Ruffle InteractiveObject::highlight_bounds is the world
+// bounds, except for SimpleButton (avm2_button.rs:811), which uses its
+// hit-area child instead: a button's own render list is empty because its
+// states live outside it.
+//
+// Invalid bounds map to Twips::INVALID on BOTH axes, not to the origin
+// (`Matrix * Rectangle::INVALID == Rectangle::INVALID`, render/src/matrix.rs).
+// That distinction is load-bearing: a stateless `new SimpleButton()` has no
+// hit area, so keying it at 0 collides with every other object whose top-left
+// is (0,0) and the equal-key dedup below then drops it from the order
+// entirely (avm2/tab_ordering_tabbable). Ruffle sorts it to the far end.
+#define TWIPS_INVALID 134217727.0   /* swf::Twips::INVALID == 0x7ffffff */
+
 static void obj_world_topleft(Avm2Context* ctx, Avm2Object* obj,
                               double* x, double* y)
 {
 	avm2_text_apply_pending_bounds(ctx, obj);
 	Mat m = display_world_matrix(ctx, obj);
 	Rect r = { 0, 0, 0, 0, 0 };
-	bounds_with_transform(ctx, obj, &m, &r);
-	*x = r.valid ? r.xmin : 0;
-	*y = r.valid ? r.ymin : 0;
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	if (obj != NULL && class_is_a(obj->cls, ctx->builtins.simple_button_class))
+	{
+		Avm2Object* hit = e != NULL ? e->btn_hit : NULL;
+		Avm2DisplayObjectExt* he = hit != NULL
+			? avm2_display_ext_of(ctx, hit) : NULL;
+		if (he != NULL)
+		{
+			Mat hl = ext_matrix(he);
+			Mat hw = mat_mul(&m, &hl);
+			bounds_with_transform(ctx, hit, &hw, &r);
+		}
+	}
+	else
+	{
+		bounds_with_transform(ctx, obj, &m, &r);
+	}
+	*x = r.valid ? r.xmin : TWIPS_INVALID;
+	*y = r.valid ? r.ymin : TWIPS_INVALID;
 }
 
 typedef struct { Avm2Object* obj; int32_t tab_index; int has_index;
@@ -10634,6 +10705,8 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, stage, "align", stage_get_align, stage_set_align);
 	add_getset(ctx, stage, "scaleMode", stage_get_scale_mode, stage_set_scale_mode);
 	add_getset(ctx, stage, "focus", stage_get_focus, stage_set_focus);
+	add_getset(ctx, stage, "tabChildren", stage_get_tab_children,
+	           stage_set_tab_children);
 	avm2_builtin_add_method(ctx, stage, "invalidate", stage_invalidate);
 	// Stage overrides: DisplayObject-surface SETTERS throw 2071 (getters
 	// still work); textSnapshot's GETTER throws too. mouseChildren is

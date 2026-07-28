@@ -6637,6 +6637,23 @@ static uint32_t et_find_new_pos(const Avm2EditTextExt* et, const char* code,
 	return cur;
 }
 
+// Ruffle EditText::event_dispatch(ClipEvent::MouseWheel): the new scroll is
+// `scroll - delta.lines()` (so a downward wheel of -3 advances 3 lines),
+// clamped to [1, maxscroll] by set_scroll. Gated on mouseWheelEnabled; a wheel
+// that does not move the field is NotHandled.
+int avm2_text_mouse_wheel(Avm2Context* ctx, Avm2Object* obj, int32_t delta_lines)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, obj);
+	if (et == NULL || !et->mouse_wheel_enabled) return 0;
+	int32_t v = et->scroll - delta_lines;
+	if (v < 1) v = 1;
+	int32_t maxv = et_maxscroll(ctx, et);
+	if (v > maxv) v = maxv;
+	if (v == et->scroll) return 0;
+	et->scroll = v;
+	return 1;
+}
+
 void avm2_text_input_control(Avm2Context* ctx, Avm2Object* focus,
                              const char* ctrl, const char* clipboard)
 {
