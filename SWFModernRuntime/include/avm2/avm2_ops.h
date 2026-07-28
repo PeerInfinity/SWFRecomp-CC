@@ -49,7 +49,13 @@ Avm2Object* avm2_op_finddef(Avm2Activation* act, uint32_t mn_idx);
 // in avm2_ops.c for the full soundness argument.
 typedef struct Avm2FindCache
 {
-	Avm2Context* ctx;   // domain identity this entry was resolved against
+	// The DOMAIN this entry was resolved against (loader-arc tranche 8). It
+	// used to be the Avm2Context, back when there was exactly one domain per
+	// context; a scope is strictly finer and costs the same single compare.
+	// The same generated call site can now run under two Avm2AbcFileRt of the
+	// same ABC in different domains (a self-load, or one child SWF loaded into
+	// two domains), and those must not share a cached def object.
+	const struct Avm2DomainScope* scope;
 	Avm2Object* obj;    // cached domain-resolved def object (NULL = empty)
 	// Scope-walk HIT cache (avm2_op_findpropstrict_ic): populated only when
 	// the hit landed on the OUTER chain with a with-free checked prefix and

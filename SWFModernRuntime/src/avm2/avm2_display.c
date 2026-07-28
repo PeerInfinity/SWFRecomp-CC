@@ -1257,7 +1257,9 @@ static double goto_prof_now_ms(void)
 // Class resolution for characters
 // ---------------------------------------------------------------------------
 
-static Avm2Object* find_globals_for_dotted(Avm2Context* ctx, const char* dotted,
+static Avm2Object* find_globals_for_dotted(Avm2Context* ctx,
+                                           const Avm2DomainScope* scope,
+                                           const char* dotted,
                                            Avm2PropKey* out_key)
 {
 	const char* last_dot = strrchr(dotted, '.');
@@ -1277,13 +1279,19 @@ static Avm2Object* find_globals_for_dotted(Avm2Context* ctx, const char* dotted,
 	}
 	key.name_len = (uint32_t) strlen(key.name);
 	*out_key = key;
-	return avm2_domain_find(ctx, &key);
+	return avm2_domain_find(ctx, scope, &key);
 }
 
-static Avm2Class* class_for_dotted_name(Avm2Context* ctx, const char* dotted)
+// Resolve a SymbolClass name in a specific movie's domain. The main movie's
+// bindings use the root scope (class_for_dotted_name below); a LOADED movie's
+// root binding must use the domain it loaded into, or a child in a fresh
+// domain binds to the parent's same-named class.
+static Avm2Class* class_for_dotted_name_in(Avm2Context* ctx,
+                                           const Avm2DomainScope* scope,
+                                           const char* dotted)
 {
 	Avm2PropKey key;
-	Avm2Object* globals = find_globals_for_dotted(ctx, dotted, &key);
+	Avm2Object* globals = find_globals_for_dotted(ctx, scope, dotted, &key);
 	if (globals == NULL) return NULL;
 	const Avm2PropEntry* entry = avm2_vtable_find(globals->vtable, &key);
 	Avm2Value cls_val = avm2_undefined();
@@ -1302,6 +1310,11 @@ static Avm2Class* class_for_dotted_name(Avm2Context* ctx, const char* dotted)
 		return cls_val.u.obj->class_ref;
 	}
 	return NULL;
+}
+
+static Avm2Class* class_for_dotted_name(Avm2Context* ctx, const char* dotted)
+{
+	return class_for_dotted_name_in(ctx, avm2_domain_root_scope(ctx), dotted);
 }
 
 static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
@@ -3659,6 +3672,9 @@ typedef struct Avm2LoaderInfoExt
 	Avm2Object* loader;                 // owning Loader (NULL for ROOT/STAGE)
 	Avm2Object* shared_events;          // sharedEvents (lazy EventDispatcher)
 	Avm2Object* app_domain;             // LoaderContext's ApplicationDomain
+	// The domain the loaded movie's ABC registered into (tranche 8). Drives
+	// app_domain above, the movie's own name resolution, and its root binding.
+	const Avm2DomainScope* scope;
 	const Avm2String* url;              // stream movie URL (LOADER only)
 	const Avm2String* loader_url;       // URL of the movie that ISSUED the load
 	                                    // (NULL = the root SWF's own URL)
@@ -3803,6 +3819,21 @@ static const Avm2String* movie_url_of(Avm2Context* ctx, Avm2Object* dobj)
 		if (lx != NULL && lx->url != NULL) return lx->url;
 	}
 	return root_swf_url(ctx);
+}
+
+// The domain a DisplayObject's movie runs in - the scope counterpart of
+// movie_url_of. Anything not reached through a Loader is the root movie.
+static const Avm2DomainScope* movie_scope_of(Avm2Context* ctx, Avm2Object* dobj)
+{
+	Avm2Object* root = dobj != NULL ? avm2_root_of(ctx, dobj) : NULL;
+	Avm2DisplayObjectExt* rext = root != NULL
+	                             ? avm2_display_ext_of(ctx, root) : NULL;
+	if (rext != NULL && rext->loader_info != NULL)
+	{
+		Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, rext->loader_info);
+		if (lx != NULL && lx->scope != NULL) return lx->scope;
+	}
+	return avm2_domain_root_scope(ctx);
 }
 
 // The eight getters that describe the *loaded movie* throw while the stream is
@@ -4248,6 +4279,7 @@ typedef struct Avm2PendingLoad
 {
 	Avm2Object* loader_info;
 	Avm2Object* app_domain;    // the LoaderContext's domain, or NULL
+	const Avm2DomainScope* scope;   // ...as a resolution scope (NULL = fresh)
 	const Avm2String* url;
 	const uint8_t* data;       // NULL when only a byte count is known
 	uint32_t len;
@@ -4516,6 +4548,14 @@ static Avm2Object* loader_context_domain(Avm2Context* ctx, Avm2Value v)
 	return (found && d.kind == AVM2_VALUE_OBJECT) ? d.u.obj : NULL;
 }
 
+// ...and the scope it stands for. NULL means "no domain was requested", which
+// Ruffle answers with a fresh child of the loading movie's domain.
+static const Avm2DomainScope* loader_context_scope(Avm2Context* ctx, Avm2Value v)
+{
+	Avm2Object* o = loader_context_domain(ctx, v);
+	return o != NULL ? avm2_domain_scope_of_object(ctx, o) : NULL;
+}
+
 static int loader_hex_digit(char c)
 {
 	if (c >= '0' && c <= '9') return c - '0';
@@ -4626,7 +4666,13 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
                                   const Avm2MovieTables* tables)
 {
 	if (tables == NULL || lx == NULL || lx->loader == NULL) return;
-	avm2_abc_register_movie(ctx, tables);
+	// Everything this movie defines lands in ITS domain, and everything its
+	// code resolves starts there (avm2_abc_load stamps the scope onto each
+	// Avm2AbcFileRt). loader_deliver has already picked the scope: the
+	// LoaderContext's, or a fresh child of the loading movie's.
+	const Avm2DomainScope* scope = lx->scope != NULL
+		? lx->scope : avm2_domain_root_scope(ctx);
+	avm2_abc_register_movie(ctx, tables, scope);
 	if (g_child_movie_count < AVM2_MAX_CHILD_MOVIES)
 	{
 		uint32_t i = 0;
@@ -4656,7 +4702,7 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 	Avm2Class* root_cls = ctx->builtins.movieclip_class;
 	if (root_name != NULL)
 	{
-		Avm2Class* bound = class_for_dotted_name(ctx, root_name);
+		Avm2Class* bound = class_for_dotted_name_in(ctx, scope, root_name);
 		if (bound != NULL)
 		{
 			// Same #2023 gate as the main movie's root (build_stage).
@@ -4821,6 +4867,22 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 	if (ev != NULL) avm2_dispatch_event(ctx, li, ev);
 	lx->loaded = 1;
 	lx->url = pl->url;
+	// The movie's ApplicationDomain has to be settled BEFORE its root boots:
+	// loader_boot_child_swf registers the ABC into it, and every file the
+	// registration loads is stamped with it.
+	if (pl->scope != NULL)
+	{
+		lx->scope = pl->scope;
+	}
+	else
+	{
+		// No LoaderContext domain: Ruffle gives the movie a FRESH child domain
+		// of the LOADING movie's (Domain::movie_domain). That is what lets a
+		// child define its own class of a name the parent also has -
+		// loader_duplicate_class's first two loads.
+		lx->scope = avm2_domain_scope_new(ctx, movie_scope_of(ctx, lx->loader));
+	}
+	lx->app_domain = avm2_domain_scope_object(ctx, lx->scope);
 	// The child SWF's root: constructed and attached after the final progress
 	// event, before init/complete (which the active list still defers a tick).
 	//
@@ -4848,18 +4910,6 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 		lx->bytes = pl->data;
 		lx->bytes_len = pl->len;
 	}
-	if (pl->app_domain != NULL)
-	{
-		lx->app_domain = pl->app_domain;
-	}
-	else
-	{
-		// No LoaderContext: Ruffle gives the movie a fresh child domain of the
-		// loader's. We have one global domain, so hand that back.
-		Avm2Value cur = avm2_current_domain_value(ctx);
-		lx->app_domain = cur.kind == AVM2_VALUE_OBJECT ? cur.u.obj : NULL;
-	}
-
 	// Ruffle movie_loader_complete calls fire_init_and_complete_events inline
 	// only when the content is NOT a MovieClip — i.e. for an image. A child
 	// SWF's init/complete are deferred to the clip's own on_exit_frame
@@ -5072,6 +5122,7 @@ static Avm2Value loader_load(Avm2Activation* act)
 	pl.loader_info = cli;
 	pl.url = loader_absolute_url(ctx, url, issuer_url);
 	pl.app_domain = act->argc > 1 ? loader_context_domain(ctx, act->args[1]) : NULL;
+	pl.scope = act->argc > 1 ? loader_context_scope(ctx, act->args[1]) : NULL;
 	if (g_pending_load_count < AVM2_MAX_PENDING_LOADS)
 		g_pending_loads[g_pending_load_count++] = pl;
 	loader_track_active(cli);
@@ -5130,6 +5181,7 @@ static Avm2Value loader_load_bytes(Avm2Activation* act)
 		}
 	}
 	pl.app_domain = act->argc > 1 ? loader_context_domain(ctx, act->args[1]) : NULL;
+	pl.scope = act->argc > 1 ? loader_context_scope(ctx, act->args[1]) : NULL;
 	loader_deliver(ctx, cli, &pl, 1);
 	loader_track_active(cli);   // init/complete still land at the frame's end
 	return avm2_undefined();

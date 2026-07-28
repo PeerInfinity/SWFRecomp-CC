@@ -1947,7 +1947,7 @@ static Avm2Object* findproperty_domain_find(Avm2Activation* act, uint32_t mn_idx
 	{
 		if (avm2_propkey_from_qname(data, mn_idx, &key))
 		{
-			return avm2_domain_find(ctx, &key);
+			return avm2_domain_find(ctx, act->file->scope, &key);
 		}
 	}
 	else if (mn->kind == 0x09 || mn->kind == 0x0e)
@@ -1961,7 +1961,7 @@ static Avm2Object* findproperty_domain_find(Avm2Activation* act, uint32_t mn_idx
 			key.ns_kind = ns->kind;
 			key.ns_uri = data->strings[ns->name].utf8;
 			key.ns_len = data->strings[ns->name].len;
-			Avm2Object* g = avm2_domain_find(ctx, &key);
+			Avm2Object* g = avm2_domain_find(ctx, act->file->scope, &key);
 			if (g != NULL) return g;
 		}
 	}
@@ -1969,7 +1969,7 @@ static Avm2Object* findproperty_domain_find(Avm2Activation* act, uint32_t mn_idx
 	{
 		// Lazy name resolved by the caller: public key lookup.
 		key = avm2_public_key(name, name_len);
-		return avm2_domain_find(ctx, &key);
+		return avm2_domain_find(ctx, act->file->scope, &key);
 	}
 	return NULL;
 }
@@ -2058,7 +2058,7 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* g;
-	if (scope_stable && ic->ctx == ctx && ic->scope_kind == 2
+	if (scope_stable && ic->scope == act->file->scope && ic->scope_kind == 2
 	    && scope_n == 1 && !lscope[0].is_with && lscope[0].obj != NULL
 	    && lscope[0].obj->vtable == ic->l_vt0)
 	{
@@ -2067,7 +2067,7 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 		// the walk would return exactly this activation's lscope[0].obj.
 		g = lscope[0].obj;
 	}
-	else if (scope_stable && ic->ctx == ctx && ic->scope_kind == 1
+	else if (scope_stable && ic->scope == act->file->scope && ic->scope_kind == 1
 	    && act->outer == ic->outer && scope_n == ic->l_n
 	    && (scope_n == 0 || (!lscope[0].is_with && lscope[0].obj != NULL
 	                         && lscope[0].obj->vtable == ic->l_vt0)))
@@ -2080,7 +2080,7 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 		// scope_n unchanged) — so the replay is byte-identical to a walk.
 		g = ic->scope_obj;
 	}
-	else if (scope_stable && ic->ctx == ctx && ic->obj != NULL)
+	else if (scope_stable && ic->scope == act->file->scope && ic->obj != NULL)
 	{
 		// With-free method + a prior domain hit ⟹ the scope walk is a proven
 		// miss at this site: go straight to the cached def object.
@@ -2103,7 +2103,7 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 			{
 				if (outer_hit)
 				{
-					ic->ctx = ctx;
+					ic->scope = act->file->scope;
 					ic->outer = act->outer;
 					ic->l_n = scope_n;
 					ic->l_vt0 = (scope_n == 1) ? lscope[0].obj->vtable : NULL;
@@ -2112,7 +2112,7 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 				}
 				else if (scope_n == 1 && g == lscope[0].obj)
 				{
-					ic->ctx = ctx;
+					ic->scope = act->file->scope;
 					ic->l_vt0 = lscope[0].obj->vtable;
 					ic->l_n = 1;
 					ic->scope_kind = 2;
@@ -2121,7 +2121,7 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 		}
 		if (g == NULL)
 		{
-			if (ic->ctx == ctx && ic->obj != NULL)
+			if (ic->scope == act->file->scope && ic->obj != NULL)
 			{
 				g = ic->obj;   // cached domain hit (scope missed)
 			}
@@ -2133,7 +2133,7 @@ Avm2Object* avm2_op_findpropstrict_ic(Avm2Activation* act, const Avm2ScopeEntry*
 				g = findproperty_domain_find(act, mn_idx, name, name_len);
 				if (g != NULL)
 				{
-					ic->ctx = ctx;
+					ic->scope = act->file->scope;
 					ic->obj = g;
 				}
 				else
@@ -2384,7 +2384,7 @@ static Avm2Object* findproperty_key(Avm2Activation* act, const Avm2ScopeEntry* l
 			}
 		}
 	}
-	Avm2Object* g = avm2_domain_find(ctx, key);
+	Avm2Object* g = avm2_domain_find(ctx, act->file->scope, key);
 	if (g != NULL) return g;
 	if (public_ok)
 	{
@@ -2474,7 +2474,7 @@ Avm2Object* avm2_op_finddef(Avm2Activation* act, uint32_t mn_idx)
 	Avm2PropKey key;
 	if (avm2_propkey_from_qname(data, mn_idx, &key))
 	{
-		Avm2Object* g = avm2_domain_find(act->ctx, &key);
+		Avm2Object* g = avm2_domain_find(act->ctx, act->file->scope, &key);
 		if (g != NULL) return g;
 	}
 	else if (data->multinames[mn_idx].kind == 0x09
@@ -2490,7 +2490,7 @@ Avm2Object* avm2_op_finddef(Avm2Activation* act, uint32_t mn_idx)
 			key.ns_kind = ns->kind;
 			key.ns_uri = data->strings[ns->name].utf8;
 			key.ns_len = data->strings[ns->name].len;
-			Avm2Object* g = avm2_domain_find(act->ctx, &key);
+			Avm2Object* g = avm2_domain_find(act->ctx, act->file->scope, &key);
 			if (g != NULL) return g;
 		}
 	}

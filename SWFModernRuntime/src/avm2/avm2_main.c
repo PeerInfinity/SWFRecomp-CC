@@ -143,6 +143,11 @@ static Avm2AbcFileRt* avm2_abc_load(Avm2Context* ctx, const Avm2AbcFileData* dat
 	memset(file, 0, sizeof(Avm2AbcFileRt));
 	file->data = data;
 	file->ctx = ctx;
+	// The movie currently being registered owns this file. `loading` is the
+	// root scope for the main movie and everything a single-movie program ever
+	// loads; loader_boot_child_swf sets it around a child's registration.
+	file->scope = ctx->domain.loading != NULL ? ctx->domain.loading
+	                                          : avm2_domain_root_scope(ctx);
 	file->script_globals = avm2_alloc(ctx, data->script_count * sizeof(Avm2Object*));
 	file->script_init_state = avm2_alloc(ctx, data->script_count);
 	memset(file->script_init_state, AVM2_SCRIPT_UNINITIALIZED, data->script_count);
@@ -205,26 +210,32 @@ static Avm2AbcFileRt* avm2_abc_load(Avm2Context* ctx, const Avm2AbcFileData* dat
 // Loader delivery and idempotent, because loader_reuse loads the same child
 // twice and the second load must not re-run its scripts.
 //
-// One global domain for now: first match wins, so a name the parent already
-// defines resolves to the parent's. True per-movie ApplicationDomain isolation
-// is tranche 8; none of the tranche-6 targets collide.
-void avm2_abc_register_movie(Avm2Context* ctx, const Avm2MovieTables* tables)
+// `scope` is the ApplicationDomain the movie loads into (tranche 8): its
+// definitions export there, and every file it loads resolves from there. The
+// reuse table is keyed by (tables, scope) — the SAME movie loaded into a
+// DIFFERENT domain is a different registration, because its names must export
+// (or be shadowed) against that domain's chain, and its files' `scope` is
+// stamped once at load. loader_duplicate_class loads loader_domain_child twice
+// into two different domains and expects two different DuplicateClass answers.
+void avm2_abc_register_movie(Avm2Context* ctx, const Avm2MovieTables* tables,
+                             const Avm2DomainScope* scope)
 {
 	static const Avm2MovieTables* registered[8];
+	static const Avm2DomainScope* reg_scope[8];
 	static uint32_t reg_base[8];
 	static uint32_t registered_count;
 	if (ctx == NULL || tables == NULL) return;
 	uint32_t n = tables->abc_file_count;
 	if (n == 0) return;
+	if (scope == NULL) scope = avm2_domain_root_scope(ctx);
 	for (uint32_t i = 0; i < registered_count; i++)
 	{
-		if (registered[i] != tables) continue;
+		if (registered[i] != tables || reg_scope[i] != scope) continue;
 		// Already loaded — but Ruffle builds a FRESH movie for every load,
 		// so the scripts run again (loader_reuse loads the same child twice
 		// and expects its root script's trace both times). Re-arm the init
 		// state and re-run the eager script; the loaded ABC, its domain
-		// entries and its globals objects are reused rather than duplicated
-		// (one global domain, tranche 8 gives each load its own).
+		// entries and its globals objects are reused rather than duplicated.
 		for (uint32_t f = 0; f < n; f++)
 		{
 			Avm2AbcFileRt* file = ctx->files[reg_base[i] + f];
@@ -250,6 +261,7 @@ void avm2_abc_register_movie(Avm2Context* ctx, const Avm2MovieTables* tables)
 	if (registered_count < 8)
 	{
 		reg_base[registered_count] = base;
+		reg_scope[registered_count] = scope;
 		registered[registered_count++] = tables;
 	}
 	Avm2AbcFileRt** grown =
@@ -258,10 +270,13 @@ void avm2_abc_register_movie(Avm2Context* ctx, const Avm2MovieTables* tables)
 		memcpy(grown, ctx->files, base * sizeof(Avm2AbcFileRt*));
 	ctx->files = grown;
 	ctx->file_count = base + n;
+	const Avm2DomainScope* saved_loading = ctx->domain.loading;
+	ctx->domain.loading = scope;
 	for (uint32_t i = 0; i < n; i++)
 	{
 		ctx->files[base + i] = avm2_abc_load(ctx, tables->abc_files[i]);
 	}
+	ctx->domain.loading = saved_loading;
 	for (uint32_t i = 0; i < n; i++)
 	{
 		Avm2AbcFileRt* f = ctx->files[base + i];
@@ -302,7 +317,8 @@ static Avm2Object* find_root_class_globals(Avm2Context* ctx, const char* dotted,
 	}
 	key.name_len = (uint32_t) strlen(key.name);
 	*out_key = key;
-	return avm2_domain_find(ctx, &key);
+	// The main movie's own binding, so the root domain.
+	return avm2_domain_find(ctx, avm2_domain_root_scope(ctx), &key);
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +362,10 @@ void runSWF_avm2(SWFAppContext* app_context)
 	avm2_media_register_sounds(ctx);
 #endif
 
-	// Step 1: load all ABC files — no script inits yet.
+	// Step 1: load all ABC files — no script inits yet. The main movie owns
+	// the ROOT domain; every file in a single-movie program shares it, which
+	// is what makes the domain machinery cost nothing there (§10b).
+	ctx->domain.loading = avm2_domain_root_scope(ctx);
 	ctx->file_count = avm2_generated_abc_file_count;
 	ctx->files = avm2_alloc(ctx, ctx->file_count * sizeof(Avm2AbcFileRt*));
 	for (uint32_t i = 0; i < ctx->file_count; i++)

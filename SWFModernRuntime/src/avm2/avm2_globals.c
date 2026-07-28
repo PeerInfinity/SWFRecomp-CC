@@ -35,10 +35,74 @@ void avm2_register_function_builtins(Avm2Context* ctx);
 // Domain
 // ---------------------------------------------------------------------------
 
+static Avm2DomainEntry* dom_find_entry(Avm2Context* ctx,
+                                       const Avm2DomainScope* scope,
+                                       const Avm2PropKey* key);
+static const Avm2DomainScope* act_scope(Avm2Activation* act);
+
+// Is `owner` the querying scope or one of its ancestors? NULL owns the system
+// domain, which every chain terminates in, so it is visible to everyone.
+static int dom_scope_visible(const Avm2DomainScope* owner,
+                             const Avm2DomainScope* from)
+{
+	if (owner == NULL) return 1;
+	for (const Avm2DomainScope* s = from; s != NULL; s = s->parent)
+		if (s == owner) return 1;
+	return 0;
+}
+
+Avm2DomainScope* avm2_domain_root_scope(Avm2Context* ctx)
+{
+	Avm2Domain* d = &ctx->domain;
+	if (d->scope_count == 0)
+	{
+		d->scope_count = 1;   // `root` counts itself
+		d->root.next_all = NULL;
+		d->scopes = &d->root;
+	}
+	return &d->root;
+}
+
+Avm2DomainScope* avm2_domain_scope_new(Avm2Context* ctx,
+                                       const Avm2DomainScope* parent)
+{
+	Avm2Domain* d = &ctx->domain;
+	avm2_domain_root_scope(ctx);   // make sure the root is listed first
+	Avm2DomainScope* s = avm2_alloc(ctx, sizeof(Avm2DomainScope));
+	memset(s, 0, sizeof(*s));
+	s->parent = parent;
+	s->next_all = d->scopes;
+	d->scopes = s;
+	d->scope_count++;
+	return s;
+}
+
+const Avm2DomainScope* avm2_domain_scope_of_object(Avm2Context* ctx,
+                                                   Avm2Object* obj)
+{
+	if (obj == NULL) return NULL;
+	for (Avm2DomainScope* s = ctx->domain.scopes; s != NULL; s = s->next_all)
+		if (s->obj == obj) return s;
+	return NULL;
+}
+
 void avm2_domain_add(Avm2Context* ctx, const Avm2PropKey* key,
                      Avm2AbcFileRt* file, uint32_t script_index)
 {
 	Avm2Domain* d = &ctx->domain;
+	// A builtin belongs to the system domain no matter what is loading: the
+	// playerglobal surface is the root of every chain, and registration order
+	// against a movie load must not be able to capture it.
+	const Avm2DomainScope* into = (file == NULL) ? NULL
+		: (d->loading != NULL ? d->loading : avm2_domain_root_scope(ctx));
+	// Ruffle Domain::export_definition: a name already visible from this scope
+	// is NOT re-exported. In a single-movie program this reproduces the old
+	// first-match-wins result exactly (the shadowed entry was never reachable),
+	// and it is what makes a same-domain child SWF share its parent's classes —
+	// loader_duplicate_coerce's whole premise. Probing must NOT run the
+	// defining script's initializer, so it goes through the entry lookup rather
+	// than avm2_domain_find.
+	if (dom_find_entry(ctx, into, key) != NULL) return;
 	if (d->count == d->cap)
 	{
 		uint32_t new_cap = d->cap == 0 ? 16 : d->cap * 2;
@@ -54,6 +118,7 @@ void avm2_domain_add(Avm2Context* ctx, const Avm2PropKey* key,
 	e->key = *key;
 	e->file = file;
 	e->script_index = script_index;
+	e->scope = into;
 }
 
 void avm2_script_ensure_init(Avm2AbcFileRt* file, uint32_t script_index)
@@ -144,24 +209,42 @@ static const Avm2DomainIndex* dom_index_get(Avm2Domain* d)
 	return ix;
 }
 
-Avm2Object* avm2_domain_find(Avm2Context* ctx, const Avm2PropKey* key)
+// The first entry for `key` that is VISIBLE from `scope`. No script init — the
+// export probe needs a pure lookup.
+//
+// `multi` is the whole cost of domains for a program that has none: while only
+// the root scope exists every entry is visible by construction, so the test is
+// hoisted out and the loop body is byte-for-byte the pre-tranche-8 one.
+static Avm2DomainEntry* dom_find_entry(Avm2Context* ctx,
+                                       const Avm2DomainScope* scope,
+                                       const Avm2PropKey* key)
 {
 	Avm2Domain* d = &ctx->domain;
 	const Avm2DomainIndex* ix = dom_index_get(d);
+	const int multi = (d->scope_count > 1);
 	uint32_t h = dom_name_hash(key->name, key->name_len);
 	for (int32_t n = ix->buckets[h & ix->mask]; n >= 0; n = ix->nodes[n].next)
 	{
 		if (ix->nodes[n].hash != h) continue;
 		Avm2DomainEntry* e = &d->entries[ix->nodes[n].entry];
 		if (!avm2_propkey_matches(&e->key, key)) continue;
-		if (e->file == NULL)
-		{
-			return ctx->builtin_globals;
-		}
-		avm2_script_ensure_init(e->file, e->script_index);
-		return e->file->script_globals[e->script_index];
+		if (multi && !dom_scope_visible(e->scope, scope)) continue;
+		return e;
 	}
 	return NULL;
+}
+
+Avm2Object* avm2_domain_find(Avm2Context* ctx, const Avm2DomainScope* scope,
+                             const Avm2PropKey* key)
+{
+	Avm2DomainEntry* e = dom_find_entry(ctx, scope, key);
+	if (e == NULL) return NULL;
+	if (e->file == NULL)
+	{
+		return ctx->builtin_globals;
+	}
+	avm2_script_ensure_init(e->file, e->script_index);
+	return e->file->script_globals[e->script_index];
 }
 
 // ---------------------------------------------------------------------------
@@ -1272,6 +1355,13 @@ static void definition_key_split(const char* s, uint32_t len, Avm2PropKey* key)
 Avm2Value avm2_find_definition(Avm2Context* ctx, const char* s, uint32_t len,
                                int* found)
 {
+	return avm2_find_definition_in(ctx, avm2_domain_root_scope(ctx), s, len,
+	                               found);
+}
+
+Avm2Value avm2_find_definition_in(Avm2Context* ctx, const Avm2DomainScope* scope,
+                                  const char* s, uint32_t len, int* found)
+{
 	*found = 0;
 	// Vector.<...> names resolve to (and create on demand) the applied class
 	// (avmplus behavior; the name embeds dots that would break the split).
@@ -1283,7 +1373,7 @@ Avm2Value avm2_find_definition(Avm2Context* ctx, const char* s, uint32_t len,
 	}
 	Avm2PropKey key;
 	definition_key_split(s, len, &key);
-	Avm2Object* g = avm2_domain_find(ctx, &key);
+	Avm2Object* g = avm2_domain_find(ctx, scope, &key);
 	if (g != NULL)
 	{
 		const Avm2PropEntry* e = avm2_vtable_find(g->vtable, &key);
@@ -1319,7 +1409,11 @@ static Avm2Value global_get_definition_by_name(Avm2Activation* act)
 		? avm2_coerce_to_string(ctx, act->args[0])
 		: avm2_string_from_literal(ctx, "");
 	int found = 0;
-	Avm2Value v = avm2_find_definition(ctx, s->utf8, s->len, &found);
+	// Flash resolves getDefinitionByName in the CALLER's ApplicationDomain
+	// (loader_child_getdefinition: the child SWF's Parent must round-trip to
+	// the child's Parent, and "Child" exists only in the child's domain).
+	Avm2Value v = avm2_find_definition_in(ctx, act_scope(act), s->utf8, s->len,
+	                                      &found);
 	if (found) return v;
 	throw_1065_for_definition(ctx, s->utf8, s->len);
 }
@@ -1554,29 +1648,110 @@ static Avm2Value global_describe_type(Avm2Activation* act)
 // --- flash.system.ApplicationDomain (minimal: currentDomain +
 // hasDefinition/getDefinition over the single global domain) ---
 
-static Avm2Object* g_current_domain;
+static Avm2Class* g_appdomain_class;
 
-// GC root marker (Stage 11): the singleton ApplicationDomain instance,
-// plus the ByteArray backing domainMemory (avm2_mops.c) -- the script
-// may drop its only other reference and keep using the memory opcodes.
+// GC root marker (Stage 11): every live ApplicationDomain instance (one per
+// domain, built on first use and reachable from the scope list, which is not
+// itself GC-visible), plus the ByteArray backing domainMemory (avm2_mops.c) --
+// the script may drop its only other reference and keep using the memory
+// opcodes.
 void avm2_gc_mark_roots_globals(Avm2Context* ctx)
 {
-	avm2_gc_mark_object(g_current_domain);
+	for (Avm2DomainScope* s = ctx->domain.scopes; s != NULL; s = s->next_all)
+		avm2_gc_mark_object(s->obj);
 	avm2_gc_mark_object(ctx->domain_memory);
+}
+
+Avm2Object* avm2_domain_scope_object(Avm2Context* ctx,
+                                     const Avm2DomainScope* scope)
+{
+	if (scope == NULL) scope = avm2_domain_root_scope(ctx);
+	Avm2DomainScope* s = (Avm2DomainScope*) scope;
+	if (s->obj != NULL) return s->obj;
+	if (g_appdomain_class == NULL) return NULL;
+	Avm2Object* o = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 1);
+	o->cls = g_appdomain_class;
+	o->vtable = &g_appdomain_class->ivtable;
+	o->proto = g_appdomain_class->prototype_obj;
+	s->obj = o;
+	return o;
+}
+
+// The domain the CALLING code runs in. `act->file` is the ABC that contains the
+// running method, and every file carries the scope its movie loaded into, so
+// this is per-movie with no ambient "current movie" state.
+//
+// A native builtin (getDefinitionByName, ApplicationDomain.currentDomain) has
+// no file of its own, so it takes the innermost SCRIPT frame on the debug call
+// stack — which is its caller. That stack is pushed for every call already, so
+// reading it here costs nothing anyone else pays for.
+static const Avm2DomainScope* act_scope(Avm2Activation* act)
+{
+	if (act == NULL) return NULL;
+	if (act->file != NULL && act->file->scope != NULL) return act->file->scope;
+	Avm2Context* ctx = act->ctx;
+	for (uint32_t i = ctx->call_depth; i-- > 0; )
+	{
+		Avm2AbcFileRt* f = ctx->call_frames[i].method.file;
+		if (f != NULL && f->scope != NULL) return f->scope;
+	}
+	return avm2_domain_root_scope(ctx);
 }
 
 static Avm2Value appdomain_get_current(Avm2Activation* act)
 {
-	(void) act;
-	return avm2_object_value(g_current_domain);
+	return avm2_object_value(
+		avm2_domain_scope_object(act->ctx, act_scope(act)));
 }
 
-// Public accessor (LoaderInfo.applicationDomain returns the root domain).
+// `new ApplicationDomain(parentDomain = null)`. With no argument the parent is
+// the SYSTEM domain, not the current one — that is the whole difference between
+// loader_child_getdefinition (an island that cannot see the main SWF's Parent)
+// and loader_duplicate_coerce_new_domain (explicitly chained to currentDomain).
+static Avm2Value appdomain_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = act->this_val.kind == AVM2_VALUE_OBJECT
+		? act->this_val.u.obj : NULL;
+	if (self == NULL) return avm2_undefined();
+	const Avm2DomainScope* parent = NULL;
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		parent = avm2_domain_scope_of_object(ctx, act->args[0].u.obj);
+	Avm2DomainScope* s = avm2_domain_scope_new(ctx, parent);
+	s->obj = self;
+	return avm2_undefined();
+}
+
+// The scope an ApplicationDomain receiver stands for. A hand-built instance
+// that never went through the ctor answers with the root domain rather than
+// resolving nothing.
+static const Avm2DomainScope* appdomain_self_scope(Avm2Activation* act)
+{
+	Avm2Object* self = act->this_val.kind == AVM2_VALUE_OBJECT
+		? act->this_val.u.obj : NULL;
+	const Avm2DomainScope* s = avm2_domain_scope_of_object(act->ctx, self);
+	return s != NULL ? s : avm2_domain_root_scope(act->ctx);
+}
+
+static Avm2Value appdomain_get_parent(Avm2Activation* act)
+{
+	const Avm2DomainScope* s = appdomain_self_scope(act);
+	if (s->parent == NULL) return avm2_null();
+	return avm2_object_value(avm2_domain_scope_object(act->ctx, s->parent));
+}
+
+// Public accessor (LoaderInfo.applicationDomain when no movie domain is known).
 Avm2Value avm2_current_domain_value(Avm2Context* ctx)
 {
-	(void) ctx;
-	return g_current_domain != NULL ? avm2_object_value(g_current_domain)
-	                                : avm2_null();
+	Avm2Object* o = avm2_domain_scope_object(ctx, avm2_domain_root_scope(ctx));
+	return o != NULL ? avm2_object_value(o) : avm2_null();
+}
+
+// ...and for a specific domain (LoaderInfo.applicationDomain of a loaded movie).
+Avm2Value avm2_domain_scope_value(Avm2Context* ctx, const Avm2DomainScope* scope)
+{
+	Avm2Object* o = avm2_domain_scope_object(ctx, scope);
+	return o != NULL ? avm2_object_value(o) : avm2_null();
 }
 
 static Avm2Value appdomain_has_definition(Avm2Activation* act)
@@ -1585,7 +1760,8 @@ static Avm2Value appdomain_has_definition(Avm2Activation* act)
 	if (act->argc == 0) return avm2_bool(false);
 	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
 	int found = 0;
-	avm2_find_definition(ctx, s->utf8, s->len, &found);
+	avm2_find_definition_in(ctx, appdomain_self_scope(act), s->utf8, s->len,
+	                        &found);
 	return avm2_bool(found != 0);
 }
 
@@ -1596,7 +1772,8 @@ static Avm2Value appdomain_get_definition(Avm2Activation* act)
 		? avm2_coerce_to_string(ctx, act->args[0])
 		: avm2_string_from_literal(ctx, "");
 	int found = 0;
-	Avm2Value v = avm2_find_definition(ctx, s->utf8, s->len, &found);
+	Avm2Value v = avm2_find_definition_in(ctx, appdomain_self_scope(act),
+	                                      s->utf8, s->len, &found);
 	if (found) return v;
 	throw_1065_for_definition(ctx, s->utf8, s->len);
 }
@@ -2279,11 +2456,12 @@ static void register_application_domain(Avm2Context* ctx)
 	                                    ctx->builtins.object_class);
 	avm2_builtin_add_method(ctx, cls, "hasDefinition", appdomain_has_definition);
 	avm2_builtin_add_method(ctx, cls, "getDefinition", appdomain_get_definition);
+	avm2_builtin_add_getter(ctx, cls, "parentDomain", appdomain_get_parent);
+	cls->instance_init.fn = appdomain_ctor;
 	avm2_mops_register(ctx, cls);
-	g_current_domain = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 1);
-	g_current_domain->cls = cls;
-	g_current_domain->vtable = &cls->ivtable;
-	g_current_domain->proto = cls->prototype_obj;
+	g_appdomain_class = cls;
+	// The root movie's instance is built lazily like every other, so a program
+	// that never touches ApplicationDomain allocates nothing.
 	// Static getter currentDomain on the class object.
 	Avm2VTable* vt = class_static_vtable(ctx, cls);
 	Avm2PropEntry e;

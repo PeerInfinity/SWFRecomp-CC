@@ -566,6 +566,11 @@ struct Avm2AbcFileRt
 {
 	const Avm2AbcFileData* data;
 	Avm2Context* ctx;
+	// The ApplicationDomain this file's definitions live in and resolve
+	// against (loader-arc tranche 8). Every file of a single-movie program
+	// shares the root scope; a loaded movie gets the LoaderContext's domain or
+	// a fresh child of the loading movie's.
+	const struct Avm2DomainScope* scope;
 	Avm2Object** script_globals;  // one per script
 	uint8_t* script_init_state;
 	Avm2Class** classes;          // realized by NewClass; NULL until then

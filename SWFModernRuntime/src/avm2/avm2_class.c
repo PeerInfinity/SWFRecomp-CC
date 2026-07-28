@@ -1483,7 +1483,7 @@ static Avm2Class* avm2_class_for_mn_resolve(Avm2Context* ctx, Avm2AbcFileRt* fil
 	if (mn->kind == 0x07 || mn->kind == 0x0d)
 	{
 		if (!avm2_propkey_from_qname(data, mn_idx, &key)) return NULL;
-		globals = avm2_domain_find(ctx, &key);
+		globals = avm2_domain_find(ctx, file->scope, &key);
 	}
 	else if (mn->kind == 0x09 || mn->kind == 0x0e)
 	{
@@ -1496,7 +1496,7 @@ static Avm2Class* avm2_class_for_mn_resolve(Avm2Context* ctx, Avm2AbcFileRt* fil
 			key.ns_kind = ns->kind;
 			key.ns_uri = data->strings[ns->name].utf8;
 			key.ns_len = data->strings[ns->name].len;
-			globals = avm2_domain_find(ctx, &key);
+			globals = avm2_domain_find(ctx, file->scope, &key);
 		}
 	}
 	if (globals == NULL) return NULL;

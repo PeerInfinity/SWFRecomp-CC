@@ -16,11 +16,32 @@
 
 typedef struct Avm2Context Avm2Context;
 
+// One ApplicationDomain, as a resolution SCOPE (loader-arc tranche 8, §10b).
+// Domains form a tree; a lookup checks the querying scope, then its ancestors,
+// and finally the system domain — which is `scope == NULL`, the terminator of
+// every chain and the home of the builtins.
+//
+// Entries stay in ONE flat array with ONE name index (below): a definition is
+// exported only when the name is not already visible from the exporting scope
+// (Ruffle `Domain::export_definition`), so at most one entry per name is ever
+// visible from a given scope, and sibling domains are the only place two
+// entries with the same name can coexist. That invariant is what keeps
+// resolution a plain "first VISIBLE match" rather than a distance computation,
+// and it is why a single-movie program's entry list is exactly what it was
+// before domains existed.
+typedef struct Avm2DomainScope
+{
+	const struct Avm2DomainScope* parent;  // NULL = the system domain
+	struct Avm2Object* obj;   // the AS3 ApplicationDomain instance (lazy)
+	struct Avm2DomainScope* next_all;  // every scope, for GC + reverse lookup
+} Avm2DomainScope;
+
 typedef struct Avm2DomainEntry
 {
 	Avm2PropKey key;
 	Avm2AbcFileRt* file;    // NULL = builtin
 	uint32_t script_index;  // valid when file != NULL
+	const Avm2DomainScope* scope;  // NULL = system/builtin (visible to all)
 } Avm2DomainEntry;
 
 typedef struct Avm2Domain
@@ -28,6 +49,17 @@ typedef struct Avm2Domain
 	uint32_t count;
 	uint32_t cap;
 	Avm2DomainEntry* entries;
+	// The main movie's domain, parented to the system domain. Every file in a
+	// single-movie program shares it.
+	Avm2DomainScope root;
+	// The scope ABC files load into right now (set around a movie's
+	// registration). Avoids threading a scope through avm2_abc_load.
+	const Avm2DomainScope* loading;
+	Avm2DomainScope* scopes;   // list head (root first)
+	// Number of scopes ever created, `root` included. While it is 1 the
+	// visibility test is skipped outright — the perf rail of §10b: a
+	// single-movie program must pay nothing for domains it does not have.
+	uint32_t scope_count;
 	// Name-keyed lookup accelerator (avm2_globals.c, opaque), mirroring the
 	// Avm2VTable index: avm2_domain_find is a per-findproperty linear scan of
 	// every global class/function, so hashing by name makes it O(1)+small-
@@ -41,12 +73,33 @@ typedef struct Avm2Domain
 void avm2_globals_init(Avm2Context* ctx);
 
 // Domain registration (called during ABC load for every script trait).
+// Exports into `ctx->domain.loading`, and does nothing when the name is
+// already visible from there (Ruffle Domain::export_definition).
 void avm2_domain_add(Avm2Context* ctx, const Avm2PropKey* key,
                      Avm2AbcFileRt* file, uint32_t script_index);
 
 // Domain lookup: returns the globals object defining `key` (running the
 // defining script's initializer lazily if needed), or NULL if undefined.
-Avm2Object* avm2_domain_find(Avm2Context* ctx, const Avm2PropKey* key);
+// `scope` is the querying code's domain — the calling file's `scope`, or NULL
+// for a system-domain-only lookup.
+Avm2Object* avm2_domain_find(Avm2Context* ctx, const Avm2DomainScope* scope,
+                             const Avm2PropKey* key);
+
+// A fresh domain whose parent chain is `parent` (NULL = the system domain).
+Avm2DomainScope* avm2_domain_scope_new(Avm2Context* ctx,
+                                       const Avm2DomainScope* parent);
+
+// The main movie's domain. Also the fallback for any lookup with no file in
+// hand (builtin helpers, the root SymbolClass binding).
+Avm2DomainScope* avm2_domain_root_scope(Avm2Context* ctx);
+
+// The AS3 ApplicationDomain instance for a scope, built on first use.
+Avm2Object* avm2_domain_scope_object(Avm2Context* ctx,
+                                     const Avm2DomainScope* scope);
+// ...and the reverse: the scope an ApplicationDomain instance stands for, or
+// NULL if the value is not one.
+const Avm2DomainScope* avm2_domain_scope_of_object(Avm2Context* ctx,
+                                                   Avm2Object* obj);
 
 // Runs a script's initializer if it has not run yet (lazy or eager init).
 void avm2_script_ensure_init(Avm2AbcFileRt* file, uint32_t script_index);
@@ -225,6 +278,10 @@ Avm2Value avm2_current_domain_value(Avm2Context* ctx);
 // including on-demand "Vector.<...>" applications. Sets *found.
 Avm2Value avm2_find_definition(Avm2Context* ctx, const char* s, uint32_t len,
                                int* found);
+// ...resolved in a specific domain (getDefinitionByName runs in the CALLING
+// file's; ApplicationDomain.getDefinition in the receiver's).
+Avm2Value avm2_find_definition_in(Avm2Context* ctx, const Avm2DomainScope* scope,
+                                  const char* s, uint32_t len, int* found);
 
 // Vector machinery (avm2_vector.c).
 Avm2VectorExt* avm2_vector_ext(Avm2Object* obj);  // NULL if not a Vector
@@ -637,7 +694,8 @@ int avm2_display_char_is_defined(uint16_t char_id);
 // 6): grows ctx->files, publishes each script's traits into the domain and
 // eager-inits every file's last script. Idempotent per tables pointer — a
 // second load of the same child re-uses the already-loaded scripts.
-void avm2_abc_register_movie(Avm2Context* ctx, const Avm2MovieTables* tables);
+void avm2_abc_register_movie(Avm2Context* ctx, const Avm2MovieTables* tables,
+                             const Avm2DomainScope* scope);
 // One full frame tick: Enter -> Construct -> FrameScripts -> Exit
 // (Ruffle frame_lifecycle.rs run_all_phases_avm2).
 void avm2_display_run_tick(Avm2Context* ctx);
