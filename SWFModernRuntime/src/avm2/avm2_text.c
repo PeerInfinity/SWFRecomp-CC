@@ -6787,27 +6787,68 @@ static void et_set_selection(Avm2EditTextExt* et, uint32_t from, uint32_t to)
 	et->sel_active = 1;
 }
 
+// Ruffle TextSpans::resolve_position_as_span — the span that owns `pos`.
+static const Avm2TextSpan* et_span_at(const Avm2EditTextExt* et, uint32_t pos)
+{
+	uint32_t acc = 0;
+	for (uint32_t i = 0; i < et->span_count; i++)
+	{
+		if (pos < acc + et->spans[i].length) return &et->spans[i];
+		acc += et->spans[i].length;
+	}
+	return NULL;
+}
+
+// Ruffle EditText::open_url. Only the `event:` scheme is meaningful for an
+// AVM2 field: `asfunction:` needs an AVM1 parent (AVM1's own handler covers
+// that), and every other scheme is a navigator URL we have no browser for.
+static void et_open_url(Avm2Context* ctx, Avm2Object* obj, const Avm2String* url)
+{
+	static const char PREFIX[] = "event:";
+	const uint32_t plen = (uint32_t) (sizeof(PREFIX) - 1);
+	if (url == NULL || url->len < plen || url->utf8 == NULL) return;
+	if (memcmp(url->utf8, PREFIX, plen) != 0) return;
+	const Avm2String* text = avm2_string_new(ctx, url->utf8 + plen,
+	                                         url->len - plen);
+	Avm2Object* ev = avm2_text_event_new(ctx,
+		avm2_string_from_literal(ctx, "link"), 1, 0, text);
+	if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
+}
+
 // Ruffle EditText::handle_click (via event_dispatch's ClipEvent::Press arm).
 // A press outside every text box puts the caret at the end of the text.
 void avm2_text_mouse_press(Avm2Context* ctx, Avm2Object* obj,
                            uint32_t click_index, int32_t local_x, int32_t local_y)
 {
 	Avm2EditTextExt* et = edittext_of(ctx, obj);
-	if (et == NULL || !avm2_text_is_selectable(et)) return;
+	if (et == NULL) return;
+	int selectable = avm2_text_is_selectable(et);
 	int32_t pos = avm2_text_index_at_local(ctx, obj, local_x, local_y);
 	if (pos < 0)
 	{
-		et->has_last_click = 0;
-		et_set_selection(et, u16_length(et->text), u16_length(et->text));
+		// Ruffle takes the `None` arm before any link lookup.
+		if (selectable)
+		{
+			et->has_last_click = 0;
+			et_set_selection(et, u16_length(et->text), u16_length(et->text));
+		}
 		return;
 	}
-	et->has_last_click = 1;
-	et->last_click_pos = (uint32_t) pos;
-	et->last_click_index = click_index;
-	uint32_t mode = click_index >= 2 ? 2 : click_index;
-	uint32_t from = 0, to = 0;
-	et_selection_at(ctx, et, (uint32_t) pos, mode, &from, &to);
-	et_set_selection(et, from, to);
+	// `handle_click` carries the selectable gate; the link lookup that follows
+	// it in the Press arm does not — a non-selectable field still opens links.
+	if (selectable)
+	{
+		et->has_last_click = 1;
+		et->last_click_pos = (uint32_t) pos;
+		et->last_click_index = click_index;
+		uint32_t mode = click_index >= 2 ? 2 : click_index;
+		uint32_t from = 0, to = 0;
+		et_selection_at(ctx, et, (uint32_t) pos, mode, &from, &to);
+		et_set_selection(et, from, to);
+	}
+	const Avm2TextSpan* span = et_span_at(et, (uint32_t) pos);
+	if (span != NULL && span->fmt.url != NULL && span->fmt.url->len > 0)
+		et_open_url(ctx, obj, span->fmt.url);
 }
 
 // Ruffle EditText::handle_drag: span the press-time selection and the current
