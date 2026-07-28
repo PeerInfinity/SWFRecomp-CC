@@ -438,7 +438,10 @@ typedef struct Avm2DisplayObjectExt
 	int32_t tab_index;           // -1 = unset
 	uint8_t focus_rect_set, focus_rect_val;
 	Avm2Value meta_data;         // metaData (undefined = unset)
-	Avm2Object* mask;
+	Avm2Object* mask;            // Ruffle masker(): the object masking THIS one
+	// Ruffle maskee(): the object THIS one masks. Kept in sync by `set mask`.
+	// A maskee is never itself a mouse target and is skipped by the pick walk.
+	Avm2Object* maskee;
 
 	// Drawing API (flash.display.Graphics stub): cached instance +
 	// accumulated AABB of drawn geometry (twips), feeding self bounds.

@@ -3560,13 +3560,28 @@ static Avm2Value do_get_mask(Avm2Activation* act)
 	return avm2_object_value(ext->mask);
 }
 
+// Ruffle DisplayObject::set_mask keeps the pair symmetric: the old mask loses
+// its maskee back-pointer, the new one gains it. The pick walk reads `maskee`
+// to know an object is "only there to mask" and can never be a mouse target.
 static Avm2Value do_set_mask(Avm2Activation* act)
 {
+	Avm2Object* self = this_obj(act);
 	Avm2DisplayObjectExt* ext = this_display(act);
 	if (ext != NULL && act->argc > 0)
 	{
-		ext->mask = (act->args[0].kind == AVM2_VALUE_OBJECT)
+		Avm2Object* next = (act->args[0].kind == AVM2_VALUE_OBJECT)
 			? act->args[0].u.obj : NULL;
+		if (ext->mask != NULL && ext->mask != next)
+		{
+			Avm2DisplayObjectExt* old = avm2_display_ext_of(act->ctx, ext->mask);
+			if (old != NULL && old->maskee == self) old->maskee = NULL;
+		}
+		ext->mask = next;
+		if (next != NULL)
+		{
+			Avm2DisplayObjectExt* mext = avm2_display_ext_of(act->ctx, next);
+			if (mext != NULL) mext->maskee = self;
+		}
 	}
 	return avm2_undefined();
 }
@@ -9252,8 +9267,105 @@ static Rect self_bounds_full(Avm2Context* ctx, Avm2Object* obj,
 	return self;
 }
 
-// Does obj's OWN shape (self bounds) contain the stage point (twips)? Maps the
-// point into obj's local space so rotation/scale are honored (AABB hit test).
+// Resident recompiler geometry (generated draws.c), linked into every build —
+// see the matching extern near avm2_render_morph. Read here for shape-accurate
+// hit testing: each row is one vertex {x_bits(float), y_bits(float), ...} in
+// shape-LOCAL twips, three consecutive rows per triangle.
+extern uint32_t shape_data[][4];
+
+static inline float pick_bits_to_f(uint32_t u)
+{
+	float f;
+	memcpy(&f, &u, sizeof(f));
+	return f;
+}
+
+// Barycentric sign test, boundary inclusive (copy of libswf hit_test.c's
+// point_in_triangle, which the AVM1 side has used since the beginning).
+static int pick_tri_contains(double px, double py, double ax, double ay,
+                             double bx, double by, double cx, double cy)
+{
+	double d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+	double d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+	double d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+	int has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+	int has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+	return !(has_neg && has_pos);
+}
+
+static int pick_tris_contain(const float* v, uint32_t n, double lx, double ly)
+{
+	for (uint32_t t = 0; t + 3 <= n; t += 3)
+		if (pick_tri_contains(lx, ly,
+		                      v[t * 2],       v[t * 2 + 1],
+		                      v[(t + 1) * 2], v[(t + 1) * 2 + 1],
+		                      v[(t + 2) * 2], v[(t + 2) * 2 + 1]))
+			return 1;
+	return 0;
+}
+
+// Does obj carry real (triangulated) geometry we can test exactly, rather than
+// only a bounding box? Ruffle draws the same line: Graphic and MovieClip test
+// their shape / Drawing (shape_hit_test, Drawing::hit_test), while Bitmap,
+// EditText and StaticText fall through to DisplayObject::hit_test_shape's
+// "default to using bounding box".
+static int has_pick_geometry(Avm2DisplayObjectExt* ext)
+{
+	if (ext->shape_vert_count > 0 && !ext->is_morph_shape) return 1;
+	if (ext->graphics_obj != NULL)
+	{
+		Avm2GraphicsExt* g = (Avm2GraphicsExt*) ext->graphics_obj->native_ext;
+		if (g != NULL && (g->path_count > 0 || g->cmd_count > 0)) return 1;
+	}
+	return 0;
+}
+
+// Exact shape test in obj's LOCAL twips space: the placed timeline shape's
+// triangles, then the drawing API's tessellated fills and strokes.
+static int shape_contains_local(Avm2DisplayObjectExt* ext, double lx, double ly)
+{
+	if (ext->shape_vert_count > 0 && !ext->is_morph_shape)
+	{
+		uint32_t off = ext->shape_vert_offset, n = ext->shape_vert_count;
+		for (uint32_t t = 0; t + 3 <= n; t += 3)
+		{
+			const uint32_t* a = shape_data[off + t];
+			const uint32_t* b = shape_data[off + t + 1];
+			const uint32_t* c = shape_data[off + t + 2];
+			if (pick_tri_contains(lx, ly,
+			                      pick_bits_to_f(a[0]), pick_bits_to_f(a[1]),
+			                      pick_bits_to_f(b[0]), pick_bits_to_f(b[1]),
+			                      pick_bits_to_f(c[0]), pick_bits_to_f(c[1])))
+				return 1;
+		}
+	}
+	if (ext->graphics_obj != NULL)
+	{
+		Avm2GraphicsExt* g = (Avm2GraphicsExt*) ext->graphics_obj->native_ext;
+		if (g != NULL)
+		{
+			// Ruffle's Drawing::hit_test also tests the *pending* (un-endFilled)
+			// subpath; committing it here is exactly what the render walk does.
+			gfx_finalize_path(g);
+			for (uint32_t i = 0; i < g->path_count; i++)
+			{
+				Avm2GfxPath* p = &g->paths[i];
+				if (p->fill_kind != 0
+				    && pick_tris_contain(p->fill_verts, p->fill_vert_count, lx, ly))
+					return 1;
+				if (p->has_line
+				    && pick_tris_contain(p->line_verts, p->line_vert_count, lx, ly))
+					return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+// Does obj's OWN shape contain the stage point (twips)? Maps the point into
+// obj's local space so rotation/scale are honored, AABB-rejects against the
+// self bounds (Ruffle's `world_bounds().contains(point)` guard), and then —
+// for objects that carry triangulated geometry — tests the actual shape.
 static int point_in_self(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
@@ -9264,7 +9376,56 @@ static int point_in_self(Avm2Context* ctx, Avm2Object* obj, double px, double py
 	Mat inv = mat_invert(&m);
 	double lx = inv.a * px + inv.c * py + inv.tx;
 	double ly = inv.b * px + inv.d * py + inv.ty;
-	return lx >= self.xmin && lx <= self.xmax && ly >= self.ymin && ly <= self.ymax;
+	if (lx < self.xmin || lx > self.xmax || ly < self.ymin || ly > self.ymax)
+		return 0;
+	if (!has_pick_geometry(ext)) return 1;
+	return shape_contains_local(ext, lx, ly);
+}
+
+// Ruffle HitTestOptions (display_object.rs) — the two bits that reach us.
+#define HT_SKIP_MASK      1
+#define HT_SKIP_INVISIBLE 2
+#define HT_MOUSE_PICK     (HT_SKIP_MASK | HT_SKIP_INVISIBLE)
+
+// Ruffle DisplayObject::hit_test_shape. The container flavour (movie_clip.rs)
+// honors the masker/maskee pair and the timeline clip layers and recurses into
+// the render list; Graphic/Bitmap/EditText use the leaf flavour, which is just
+// "visible enough, and inside my shape". Point in stage twips.
+static int hit_test_shape_obj(Avm2Context* ctx, Avm2Object* obj,
+                              double px, double py, int options)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return 0;
+	int is_container = obj->cls != NULL
+	                   && class_is_a(obj->cls, ctx->builtins.sprite_class);
+	if (!is_container)
+		return ((options & HT_SKIP_INVISIBLE) == 0 || ext->visible)
+		       && point_in_self(ctx, obj, px, py);
+
+	// A maskee stays hit-testable while invisible: `visible = false` is how a
+	// mask is normally hidden, and the mask still has to answer hit tests.
+	if ((options & HT_SKIP_INVISIBLE) && !ext->visible && ext->maskee == NULL)
+		return 0;
+	if ((options & HT_SKIP_MASK) && ext->maskee != NULL) return 0;
+	if (ext->mask != NULL
+	    && !hit_test_shape_obj(ctx, ext->mask, px, py, HT_SKIP_INVISIBLE))
+		return 0;
+
+	int32_t clip_depth = 0;
+	for (uint32_t i = 0; i < ext->render_len; i++)
+	{
+		Avm2Object* child = ext->render_list[i];
+		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+		if (cext == NULL) continue;
+		if (cext->clip_depth > 0)
+			clip_depth = hit_test_shape_obj(ctx, child, px, py,
+			                                HT_SKIP_MASK | HT_SKIP_INVISIBLE)
+				? 0 : cext->clip_depth;
+		else if (cext->depth >= clip_depth
+		         && hit_test_shape_obj(ctx, child, px, py, options))
+			return 1;
+	}
+	return point_in_self(ctx, obj, px, py);
 }
 
 typedef enum { PK_MISS, PK_PROP, PK_HIT } PkKind;
@@ -9303,13 +9464,18 @@ static Pk pk_combine(Avm2Context* ctx, Pk p, Avm2Object* parent)
 	}
 }
 
-// Ruffle movie_clip.rs::mouse_pick_avm2 (AABB approximation; no masks/clip
-// layers). point in twips.
+// Ruffle movie_clip.rs::mouse_pick_avm2. point in twips.
 static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return pk_make(PK_MISS, NULL);
 	if (!ext->is_stage && !ext->visible) return pk_make(PK_MISS, NULL);
+
+	// Masked away, or busy being someone else's mask: not a target either way.
+	if (ext->mask != NULL
+	    && !hit_test_shape_obj(ctx, ext->mask, px, py, 0))
+		return pk_make(PK_MISS, NULL);
+	if (ext->maskee != NULL) return pk_make(PK_MISS, NULL);
 
 	// SimpleButton (Ruffle avm2_button.rs::mouse_pick_avm2): the visual/hit
 	// state children live in btn_hit/btn_up, NOT render_list, so the generic
@@ -9363,6 +9529,15 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 	}
 
 	Pk found_prop = pk_make(PK_MISS, NULL);
+	// Timeline clip layers: every child with clip_depth > 0 masks the depth
+	// range (depth+1 ..= clip_depth). Ruffle walks them as a single reversed,
+	// peekable cursor shared across BOTH child passes — the cursor only ever
+	// advances, so replicate it exactly rather than re-deriving per child.
+	int32_t clip_idx = (int32_t) ext->render_len - 1;
+	// A child in a clip layer's range is hit only if the layer's shape is hit.
+	int hit_options = HT_SKIP_INVISIBLE;
+	if (ext->maskee == NULL) hit_options |= HT_SKIP_MASK;
+
 	// Interactive children first (pass 0), then non-interactive (pass 1); each
 	// group top-down (reverse render order).
 	for (int pass = 0; pass < 2; pass++)
@@ -9373,6 +9548,10 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 			int ci = is_interactive(ctx, child);
 			if (pass == 0 && !ci) continue;
 			if (pass == 1 && ci) continue;
+			Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+			// Mask children — a clip layer or a `mask` target — are not clickable.
+			if (cext == NULL || cext->clip_depth > 0 || cext->maskee != NULL)
+				continue;
 			Pk res;
 			if (ci)
 			{
@@ -9380,13 +9559,30 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 			}
 			else
 			{
-				Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
-				if (cext != NULL && cext->visible && point_in_self(ctx, child, px, py))
+				int in = cext->visible && point_in_self(ctx, child, px, py)
+				         && (cext->mask == NULL
+				             || hit_test_shape_obj(ctx, cext->mask, px, py,
+				                                   hit_options));
+				if (in)
 					res = ext->mouse_enabled ? pk_make(PK_HIT, obj)
 					                         : pk_make(PK_PROP, NULL);
 				else
 					res = pk_make(PK_MISS, NULL);
 			}
+
+			// Apply the innermost clip layer that still covers this child's depth.
+			while (clip_idx >= 0)
+			{
+				Avm2Object* clip = ext->render_list[clip_idx];
+				Avm2DisplayObjectExt* clext = avm2_display_ext_of(ctx, clip);
+				if (clext == NULL || clext->clip_depth <= 0) { clip_idx--; continue; }
+				if (clext->depth + 1 > cext->depth) { clip_idx--; continue; }
+				if (cext->depth <= clext->clip_depth
+				    && !hit_test_shape_obj(ctx, clip, px, py, hit_options))
+					res = pk_make(PK_MISS, NULL);
+				break;
+			}
+
 			if (res.kind == PK_HIT) return pk_combine(ctx, res, obj);
 			if (res.kind == PK_PROP) found_prop = res;
 		}
@@ -9544,13 +9740,19 @@ static Avm2Value do_set_use_hand(Avm2Activation* act)
 }
 
 // local mouse position of obj (pixels).
+// Ruffle global_to_local returns a Point<TWIPS> — the local coordinate is an
+// integer number of twips, and MouseEvent.localX/localY are that integer's
+// to_pixels(). Snapping here is what makes stageX/stageY round-trip: they map
+// the local value back through local_to_global, and Twips::from_pixels
+// truncates, so an unsnapped local that landed a hair below a twip boundary
+// came back one twip short (mouse_pick_masking's 282.75-for-282.8).
 static void local_mouse(Avm2Context* ctx, Avm2Object* obj, double* lx, double* ly)
 {
 	Mat m = display_world_matrix(ctx, obj);
 	Mat inv = mat_invert(&m);
 	double gx = g_mouse_x * 20.0, gy = g_mouse_y * 20.0;
-	*lx = (inv.a * gx + inv.c * gy + inv.tx) / 20.0;
-	*ly = (inv.b * gx + inv.d * gy + inv.ty) / 20.0;
+	*lx = round(inv.a * gx + inv.c * gy + inv.tx) / 20.0;
+	*ly = round(inv.b * gx + inv.d * gy + inv.ty) / 20.0;
 }
 
 // Ruffle mouse_event.rs::local_to_stage_{x,y}: local pixels -> twips
@@ -9580,6 +9782,18 @@ static int dispatch_mouse(Avm2Context* ctx, Avm2Object* target,
                           int bubbles, int button)
 {
 	if (target == NULL) return 0;
+	// Ruffle interactive.rs::event_dispatch_to_avm2: "Flash appears to not fire
+	// events *at all* for a targeted EditText that was originally created by the
+	// timeline" — not even the Stage sees them. mouse_pick still HITS such a
+	// field (that is what puts the I-beam cursor up); the suppression is here,
+	// at dispatch, so the event is dropped rather than reassigned to an ancestor.
+	{
+		Avm2DisplayObjectExt* text = avm2_display_ext_of(ctx, target);
+		if (text != NULL && text->edittext != NULL
+		    && avm2_text_is_selectable(text->edittext)
+		    && avm2_text_was_static(text->edittext))
+			return 0;
+	}
 	double lx = NAN, ly = NAN;
 	local_mouse(ctx, target, &lx, &ly);
 	int button_down = g_mouse_btn_down[button < 0 || button > 2 ? 0 : button];
