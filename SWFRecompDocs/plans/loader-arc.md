@@ -497,11 +497,50 @@ Line movement in the still-failing tests: `loader_load` 12 → 124,
 matching lines; `import_assets/empty_url` (the one `log_fetch` test that
 passed before this work, with **no** fetch lines expected) still passes.
 
-### The edittext_align crash — unattributed, and the instrument that was never checked
+### The edittext_align crash — SOLVED 2026-07-28, and the instrument that was never checked
 
-*(Rewritten 2026-07-27. The previous version of this section claimed a
-deterministic 6/6-vs-6/6 A/B. It is wrong on its own evidence; the correction
-is below, and the tranche is back on master in `7a4dc6fba`.)*
+*(Rewritten 2026-07-27 after the attribution collapsed; resolved 2026-07-28
+when a core dump finally showed the actual cause. The history below is kept
+because the methodology lesson outlived the bug.)*
+
+**RESOLUTION (`55e973c5e`). It was never a heap bug and never anything to
+attribute to a tranche — it was the process exit racing the GPU driver's
+threads.** `swfStart`'s tail has always called `renderer_free`; `runSWF_avm2`
+never did, so an AVM2 graphics-native binary returned from `main` with the
+Vulkan driver's worker threads still running, and `_dl_fini` unloaded the
+shared libraries out from under them. From the captured core (CI run
+`30314779577`, shard 9 — the first time this crash was ever seen with evidence
+attached):
+
+| Thread | Where |
+|---|---|
+| main | `__GI_exit` → `__run_exit_handlers` → `_dl_fini` → `libselinux.so` |
+| faulting (pc = `0x0`) | `libvulkan_lvp.so` → `LLVMGetPointerToGlobal` → `MCJIT::finalizeObject` → `MCJIT::emitObject` → `PMTopLevelManager::schedulePass` |
+
+A lavapipe shader still being JIT-compiled called through a function pointer
+in a library that had already been torn down. `avm2_render_shutdown` releases
+the device so the driver joins its threads inside `vkDestroyInstance`.
+
+Every property that resisted eight months of inference falls out of this:
+
+| Observation | Explanation |
+|---|---|
+| graphics-only | no Vulkan/lavapipe in `no-graphics` |
+| always AFTER the last graded line | stdout is a pipe, so fully buffered — 60/60 delivered lines mean `fflush` already ran and the crash is strictly in `exit` |
+| ASan-clean twice | the fault is in uninstrumented driver/LLVM code, and it is a teardown race, not a heap error |
+| 0/70 local, and 0/6464 in a later CPU-starved local loop | this box is WSL2 with a different Mesa/LLVM build; the race needs the runner's timing |
+| 0/17 single-test CI dispatches | not a property of the job type at all — just ~8% odds sampled 17 times against an arm that also had to lose the timing race |
+| concentrated on a *text* test | glyph rendering triggers late shader JIT, so a compile is more likely to still be in flight at exit |
+| "code-independent" across tranches | it genuinely was: no tranche could affect it |
+
+**What actually found it**: a permanent CI crash-capture instrument
+(`SWFRecompDocs/guides/ci-crash-capture.md`, commit `0121fd134`) that preserves
+the core, the exact binary and its sources on any fatal signal, and prints a
+gdb backtrace into the job log. It caught the quarry on the 7th full-shard run
+— and on its *first* run caught an unrelated real bug, `visual/video_deblocking`
+(`sws_scale` writing 8 bytes past a `w*h*4` malloc, fixed in `4d38d70c3`).
+The lesson to keep: when inference has failed three times, stop inferring and
+go get the evidence — instrumenting CI cost one commit.
 
 `avm2/edittext_align` emits all 60/60 correct lines and then SIGSEGVs, in
 graphics CI only (it passes `no-graphics` at every SHA tried).
@@ -567,16 +606,16 @@ Both ASan runs only trip **LeakSanitizer** on pre-existing
 `verify_output --asan` score the test `runtime_error`. Read the SUMMARY line
 before calling an ASan run a reproduction.
 
-**What a next attempt would need.** Not a bisect — there is nothing to bisect
-until something reproduces on demand. The probe has to run in the *shard*
-environment (many tests sequentially in one job, under load), because that is
-the only place the crash has ever been seen: 0/17 single-test dispatches,
-0/70 local, 2/25 full runs. A `categories=avm2` dispatch is the smallest
-shard-shaped instrument; its base rate has to be characterized first, and at
-~8% the N needed to separate arms is large. Cheaper angles worth trying before
-spending that: run `edittext_align` under a shard-like sequential harness
-locally with the CI renderer, or instrument the exit path (the crash is after
-the last graded line, so it is in teardown/render-flush, not in the trace).
+**What the next attempt needed** *(written before the answer, kept because it
+scored itself)*: not a bisect — there was nothing to bisect until something
+reproduced on demand. Two of the three guesses here were right and one was
+wrong, which is a fair summary of what inference was worth on this bug. Right:
+the probe had to run in the shard environment, and the crash was in teardown
+rather than the trace. Wrong: "run it under a shard-like sequential harness
+locally with the CI renderer" — that was tried (6464 runs, 3 workers pinned to
+2 cores, lavapipe) and produced zero crashes, because the trigger is the
+runner's Mesa/LLVM build and timing, not sequential load. What actually worked
+was giving up on reproducing it locally and instead making CI keep the corpse.
 
 ### The tracing tripwire (CI `30235525066`, reverted in `d1c307c51`)
 
