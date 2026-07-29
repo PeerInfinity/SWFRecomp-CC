@@ -85,6 +85,42 @@ static const Avm2String* class_to_alias(Avm2Context* ctx, Avm2Class* cls)
 }
 
 // ---------------------------------------------------------------------------
+// flash.utils.IExternalizable + ObjectEncoding.dynamicPropertyWriter
+// ---------------------------------------------------------------------------
+
+static Avm2Class* g_externalizable_iface;   // flash.utils.IExternalizable
+static Avm2Class* g_dyn_prop_output_class;  // the IDynamicPropertyOutput impl
+static Avm2Value g_dyn_prop_writer;         // ObjectEncoding.dynamicPropertyWriter
+
+static int value_is_externalizable(Avm2Context* ctx, Avm2Value v)
+{
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return 0;
+	if (g_externalizable_iface == NULL || v.u.obj->cls == NULL) return 0;
+	return avm2_class_has_interface(ctx, v.u.obj->cls, g_externalizable_iface)
+	       ? 1 : 0;
+}
+
+// A fresh AMF3 ByteArray seeded with `n` bytes — the IDataOutput handed to
+// writeExternal (empty) and the IDataInput handed to readExternal (the rest of
+// the stream; its final `position` is how many bytes the body consumed).
+static Avm2Value ext_new_bytearray(Avm2Context* ctx, const uint8_t* src, uint32_t n)
+{
+	Avm2Value v = avm2_class_construct(ctx, ctx->builtins.bytearray_class, NULL, 0);
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(v);
+	if (ba != NULL)
+	{
+		ba->object_encoding = 3;
+		if (n > 0)
+		{
+			avm2_bytearray_set_length_public(ctx, ba, n);
+			memcpy(ba->bytes, src, n);
+		}
+		ba->position = 0;
+	}
+	return v;
+}
+
+// ---------------------------------------------------------------------------
 // Growable output buffer
 // ---------------------------------------------------------------------------
 
@@ -158,6 +194,7 @@ typedef struct TraitEntry
 {
 	const Avm2String* name;
 	int dynamic;
+	int externalizable;   // trait bit 0x04: the body is opaque IExternalizable data
 	uint32_t static_count;
 	const Avm2String** statics;
 } TraitEntry;
@@ -364,6 +401,26 @@ static int value_is_function(Avm2Value v)
 	       && v.u.obj->kind == AVM2_OBJ_FUNCTION;
 }
 
+// The writer whose stream an IDynamicPropertyOutput.writeDynamicProperty call
+// appends to. Set only for the duration of a writeDynamicProperties callback,
+// saved/restored so a nested dynamic object (whose own body re-enters the hook)
+// cannot retarget an outer one.
+static Amf3Wr* g_dpo_wr;
+
+static Avm2Value dpo_write_dynamic_property(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Amf3Wr* w = g_dpo_wr;
+	if (w == NULL) return avm2_undefined();
+	const Avm2String* name = (act->argc > 0)
+		? avm2_coerce_to_string(ctx, act->args[0])
+		: avm2_string_from_literal(ctx, "");
+	Avm2Value val = (act->argc > 1) ? act->args[1] : avm2_undefined();
+	w3_str(w, name->utf8, name->len);
+	w3_value(w, val);
+	return avm2_undefined();
+}
+
 // Generic object body: static values (sorted) then, when dynamic, the
 // name/value expando pairs and a terminator (flash-lso write_object_full
 // tail shared with write_trait_reference).
@@ -380,21 +437,91 @@ static void w3_object_body(Amf3Wr* w, Avm2Object* obj, int dynamic,
 	}
 	if (dynamic)
 	{
-		uint32_t idx = avm2_object_next_enumerant(obj, 0);
-		while (idx != 0)
+		// ObjectEncoding.dynamicPropertyWriter, when set, REPLACES the dynamic
+		// half: the hook decides which expandos reach the stream (and under
+		// which names), so no filtering of our own happens on this path — not
+		// even the function-valued skip below. AMF3 only, which is the only
+		// encoding ObjectEncoding's hook is documented against.
+		if (g_dyn_prop_writer.kind == AVM2_VALUE_OBJECT
+		    && g_dyn_prop_output_class != NULL)
 		{
-			Avm2Value name = avm2_object_enumerant_name(ctx, obj, idx);
-			Avm2Value val = avm2_object_enumerant_value(ctx, obj, idx);
-			if (!value_is_function(val))
+			Avm2Value out = avm2_class_construct(ctx, g_dyn_prop_output_class,
+			                                     NULL, 0);
+			Avm2Value args[2] = { recv, out };
+			Amf3Wr* saved = g_dpo_wr;
+			g_dpo_wr = w;
+			avm2_call_public_property(ctx, g_dyn_prop_writer,
+			                          "writeDynamicProperties", 22, args, 2);
+			g_dpo_wr = saved;
+		}
+		else
+		{
+			uint32_t idx = avm2_object_next_enumerant(obj, 0);
+			while (idx != 0)
 			{
-				const Avm2String* ns = avm2_coerce_to_string(ctx, name);
-				w3_str(w, ns->utf8, ns->len);
-				w3_value(w, val);
+				Avm2Value name = avm2_object_enumerant_name(ctx, obj, idx);
+				Avm2Value val = avm2_object_enumerant_value(ctx, obj, idx);
+				if (!value_is_function(val))
+				{
+					const Avm2String* ns = avm2_coerce_to_string(ctx, name);
+					w3_str(w, ns->utf8, ns->len);
+					w3_value(w, val);
+				}
+				idx = avm2_object_next_enumerant(obj, idx);
 			}
-			idx = avm2_object_next_enumerant(obj, idx);
 		}
 		w3_str(w, "", 0);
 	}
+}
+
+// An IExternalizable instance: trait bit 0x04, the class name, then an OPAQUE
+// body that writeExternal(IDataOutput) produces. Neither Ruffle nor flash-lso
+// writes this shape at all. Adobe's serializer shares the enclosing stream's
+// string/object reference tables with the body; we hand writeExternal a FRESH
+// ByteArray instead, which is self-consistent with the reader below and
+// byte-identical for any body that does not reference the outer graph.
+static void w3_object_external(Amf3Wr* w, Avm2Object* obj, const Avm2String* alias)
+{
+	Avm2Context* ctx = w->ctx;
+	buf_u8(&w->out, M3_OBJECT);
+
+	int32_t trait_idx = -1;
+	for (uint32_t i = 0; i < w->trait_count; i++)
+	{
+		TraitEntry* t = &w->traits[i];
+		if (!t->externalizable) continue;
+		if (!avm2_string_equals(t->name, alias)) continue;
+		trait_idx = (int32_t) i;
+		break;
+	}
+	if (trait_idx >= 0)
+	{
+		w3_u29(w, (int32_t) ((((uint32_t) trait_idx << 1) << 1) | 1));
+	}
+	else
+	{
+		if (w->trait_count == w->trait_cap)
+		{
+			uint32_t nc = w->trait_cap == 0 ? 8 : w->trait_cap * 2;
+			TraitEntry* g = avm2_alloc(ctx, nc * sizeof(TraitEntry));
+			memcpy(g, w->traits, w->trait_count * sizeof(TraitEntry));
+			w->traits = g;
+			w->trait_cap = nc;
+		}
+		TraitEntry* t = &w->traits[w->trait_count++];
+		memset(t, 0, sizeof(*t));
+		t->name = alias;
+		t->externalizable = 1;
+		// (0 statics << 4) | (externalizable << 2) | 3
+		w3_u29(w, 0x07);
+		w3_str(w, alias->utf8, alias->len);
+	}
+
+	Avm2Value out = ext_new_bytearray(ctx, NULL, 0);
+	Avm2Value objv = avm2_object_value(obj);
+	avm2_call_public_property(ctx, objv, "writeExternal", 13, &out, 1);
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(out);
+	if (ba != NULL && ba->len > 0) buf_put(&w->out, ba->bytes, ba->len);
 }
 
 static void w3_object(Amf3Wr* w, Avm2Object* obj)
@@ -404,6 +531,11 @@ static void w3_object(Amf3Wr* w, Avm2Object* obj)
 
 	const Avm2String* alias = class_to_alias(ctx, avm2_value_class(
 		ctx, avm2_object_value(obj)));
+	if (value_is_externalizable(ctx, avm2_object_value(obj)))
+	{
+		w3_object_external(w, obj, alias);
+		return;
+	}
 	int dynamic = 1;
 	Avm2Class* cls = obj->cls;
 	if (cls != NULL && (cls->flags & AVM2_CLASS_FLAG_SEALED)) dynamic = 0;
@@ -416,6 +548,7 @@ static void w3_object(Amf3Wr* w, Avm2Object* obj)
 	for (uint32_t i = 0; i < w->trait_count; i++)
 	{
 		TraitEntry* t = &w->traits[i];
+		if (t->externalizable) continue;
 		if (t->dynamic != dynamic) continue;
 		if (!avm2_string_equals(t->name, alias)) continue;
 		if (t->static_count != static_count) continue;
@@ -451,6 +584,7 @@ static void w3_object(Amf3Wr* w, Avm2Object* obj)
 		TraitEntry* t = &w->traits[w->trait_count++];
 		t->name = alias;
 		t->dynamic = dynamic;
+		t->externalizable = 0;
 		t->static_count = static_count;
 		t->statics = statics;
 
@@ -990,11 +1124,6 @@ static Avm2Value rd3_read_object(Rd* r)
 	}
 	else
 	{
-		if (u & 4)
-		{
-			// Externalizable (IExternalizable) — not implemented.
-			avm2_fatal("AMF3 readObject: externalizable objects unsupported");
-		}
 		if (r->trait_count == r->trait_cap)
 		{
 			uint32_t nc = r->trait_cap == 0 ? 8 : r->trait_cap * 2;
@@ -1004,20 +1133,59 @@ static Avm2Value rd3_read_object(Rd* r)
 			r->trait_cap = nc;
 		}
 		trait = &r->traits[r->trait_count++];
-		trait->dynamic = (u & 8) ? 1 : 0;
-		trait->static_count = u >> 4;
-		trait->name = rd3_str(r);
-		trait->statics = avm2_alloc(ctx, (trait->static_count + 1)
-		                                     * sizeof(Avm2String*));
-		for (uint32_t i = 0; i < trait->static_count; i++)
+		memset(trait, 0, sizeof(*trait));
+		trait->externalizable = (u & 4) ? 1 : 0;
+		if (trait->externalizable)
 		{
-			trait->statics[i] = rd3_str(r);
+			// Trait bit 0x04: no dynamic flag, no static names — just the
+			// class name, then a body only readExternal can interpret.
+			trait->name = rd3_str(r);
+		}
+		else
+		{
+			trait->dynamic = (u & 8) ? 1 : 0;
+			trait->static_count = u >> 4;
+			trait->name = rd3_str(r);
+			trait->statics = avm2_alloc(ctx, (trait->static_count + 1)
+			                                     * sizeof(Avm2String*));
+			for (uint32_t i = 0; i < trait->static_count; i++)
+			{
+				trait->statics[i] = rd3_str(r);
+			}
 		}
 	}
 
 	Avm2Class* cls = (trait->name->len > 0)
 		? alias_to_class(trait->name->utf8, trait->name->len)
 		: NULL;
+	if (trait->externalizable)
+	{
+		// The alias MUST resolve to a class implementing IExternalizable —
+		// there is no other way to interpret an opaque body.
+		if (cls == NULL || g_externalizable_iface == NULL
+		    || !avm2_class_has_interface(ctx, cls, g_externalizable_iface))
+		{
+			avm2_throw_error(ctx, ctx->builtins.error_class,
+			                 "Error #2173: Unable to read object in stream.  "
+			                 "The class %.*s does not implement "
+			                 "flash.utils.IExternalizable but is aliased to an "
+			                 "externalizable class.",
+			                 (int) trait->name->len, trait->name->utf8);
+		}
+		Avm2Value objv = avm2_class_construct(ctx, cls, NULL, 0);
+		rd3_obj_reserve(r, objv);
+		// Fresh reference tables inside the body, mirroring w3_object_external.
+		Avm2Value in = ext_new_bytearray(ctx, r->p + r->pos, r->n - r->pos);
+		avm2_call_public_property(ctx, objv, "readExternal", 12, &in, 1);
+		Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(in);
+		if (ba != NULL)
+		{
+			uint32_t used = ba->position;
+			if ((uint64_t) r->pos + used > r->n) rd_fail(r);
+			r->pos += used;
+		}
+		return objv;
+	}
 	if (cls == NULL) cls = ctx->builtins.object_class;
 	Avm2Value objv = avm2_class_construct(ctx, cls, NULL, 0);
 	rd3_obj_reserve(r, objv);
@@ -1441,6 +1609,40 @@ Avm2Value avm2_amf_read_object(Avm2Activation* act)
 // flash.net toplevel + registration
 // ---------------------------------------------------------------------------
 
+// Append a method entry keyed in an INTERFACE namespace (`ns` is the
+// "package:Iface" URI ASC emits, kind Namespace/Package — avm2_ns_fold treats
+// 0x08 and 0x16 alike). `fn` NULL means a declaration-only interface entry.
+static void amf_add_iface_method(Avm2Context* ctx, Avm2Class* cls,
+                                 const char* ns, const char* name,
+                                 Avm2MethodFn fn)
+{
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key.ns_kind = 0x16;
+	e.key.ns_uri = ns;
+	e.key.ns_len = (uint32_t) strlen(ns);
+	e.key.name = name;
+	e.key.name_len = (uint32_t) strlen(name);
+	e.kind = AVM2_PROP_METHOD;
+	e.method.fn = fn;
+	e.method.debug_name = name;
+	e.defining_class = cls;
+	avm2_vtable_append(ctx, &cls->ivtable, &e);
+}
+
+static Avm2Value oe_get_dyn_prop_writer(Avm2Activation* act)
+{
+	(void) act;
+	return g_dyn_prop_writer;
+}
+
+static Avm2Value oe_set_dyn_prop_writer(Avm2Activation* act)
+{
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_null();
+	g_dyn_prop_writer = (v.kind == AVM2_VALUE_OBJECT) ? v : avm2_null();
+	return avm2_undefined();
+}
+
 static Avm2Value net_register_class_alias(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -1529,6 +1731,11 @@ void avm2_gc_mark_roots_amf(Avm2Context* ctx)
 	for (uint32_t i = 0; i < g_so_cache_count; i++) avm2_gc_mark_object(g_so_cache[i].obj);
 	// registerClassAlias strings live only in this C-static registry.
 	for (AliasEntry* a = g_aliases; a != NULL; a = a->next) avm2_gc_mark_string(a->alias);
+	// ObjectEncoding.dynamicPropertyWriter is a script object held only here.
+	if (g_dyn_prop_writer.kind == AVM2_VALUE_OBJECT)
+	{
+		avm2_gc_mark_object(g_dyn_prop_writer.u.obj);
+	}
 }
 
 static Avm2SharedObjectExt* so_ext_of(Avm2Context* ctx, Avm2Object* o)
@@ -1633,13 +1840,66 @@ void avm2_register_amf(Avm2Context* ctx)
 		avm2_builtin_define_alias(ctx, key, avm2_object_value(fn));
 	}
 
-	// flash.net.ObjectEncoding constants.
+	// flash.utils.IExternalizable (interface). Instances of implementors
+	// serialize through writeExternal/readExternal and the AMF3 0x04 trait bit;
+	// the vtable entries carry the interface namespace so implementor classes
+	// get call-through aliases (avm2_class.c add_iface_aliases_from) and a call
+	// on an IExternalizable-typed reference resolves.
 	{
+		Avm2Class* ie = avm2_builtin_class(ctx, "flash.utils",
+		                                   "IExternalizable", NULL);
+		ie->flags |= AVM2_CLASS_FLAG_INTERFACE;
+		g_externalizable_iface = ie;
+		amf_add_iface_method(ctx, ie, "flash.utils:IExternalizable",
+		                     "writeExternal", NULL);
+		amf_add_iface_method(ctx, ie, "flash.utils:IExternalizable",
+		                     "readExternal", NULL);
+	}
+
+	// flash.net.IDynamicPropertyWriter / IDynamicPropertyOutput (interfaces)
+	// plus the internal implementation of the latter handed to
+	// writeDynamicProperties (Flash's own is flash.net::DynamicPropertyOutput).
+	// writeDynamicProperty appends straight into the serializer that is running.
+	{
+		Avm2Class* ipw = avm2_builtin_class(ctx, "flash.net",
+		                                    "IDynamicPropertyWriter", NULL);
+		ipw->flags |= AVM2_CLASS_FLAG_INTERFACE;
+		amf_add_iface_method(ctx, ipw, "flash.net:IDynamicPropertyWriter",
+		                     "writeDynamicProperties", NULL);
+
+		Avm2Class* ipo = avm2_builtin_class(ctx, "flash.net",
+		                                    "IDynamicPropertyOutput", NULL);
+		ipo->flags |= AVM2_CLASS_FLAG_INTERFACE;
+		amf_add_iface_method(ctx, ipo, "flash.net:IDynamicPropertyOutput",
+		                     "writeDynamicProperty", NULL);
+
+		Avm2Class* dpo = avm2_builtin_class(ctx, "flash.net",
+		                                    "DynamicPropertyOutput",
+		                                    b->object_class);
+		dpo->interface_count = 1;
+		dpo->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*));
+		dpo->interfaces[0] = ipo;
+		avm2_builtin_add_method(ctx, dpo, "writeDynamicProperty",
+		                        dpo_write_dynamic_property);
+		// Builtin classes never run avm2_class.c's interface-alias pass, so the
+		// call-through key an IDynamicPropertyOutput-typed reference uses (and
+		// that is the ONLY namespace ASC emits for it) is added by hand.
+		amf_add_iface_method(ctx, dpo, "flash.net:IDynamicPropertyOutput",
+		                     "writeDynamicProperty", dpo_write_dynamic_property);
+		g_dyn_prop_output_class = dpo;
+	}
+
+	// flash.net.ObjectEncoding constants + the dynamicPropertyWriter hook.
+	{
+		g_dyn_prop_writer = avm2_null();
 		Avm2Class* oe = avm2_builtin_class(ctx, "flash.net", "ObjectEncoding",
 		                                   b->object_class);
 		avm2_builtin_add_static_const(ctx, oe, "AMF0", avm2_uint_value(0));
 		avm2_builtin_add_static_const(ctx, oe, "AMF3", avm2_uint_value(3));
 		avm2_builtin_add_static_const(ctx, oe, "DEFAULT", avm2_uint_value(3));
+		avm2_builtin_add_static_getset(ctx, oe, "dynamicPropertyWriter",
+		                               oe_get_dyn_prop_writer,
+		                               oe_set_dyn_prop_writer);
 	}
 
 	// flash.net.SharedObject (extends EventDispatcher).

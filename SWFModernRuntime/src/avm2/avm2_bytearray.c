@@ -1378,38 +1378,68 @@ static void ba_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 // The IDataInput + IDataOutput method set, shared verbatim with
 // flash.net.Socket (avm2_net.c) — the two classes differ only in which buffer
 // each direction resolves to, which the alt resolver above decides.
+//
+// Every method is keyed TWICE: once public, once under the interface namespace
+// ("flash.utils:IDataInput" / ":IDataOutput"). ASC compiles a call on an
+// interface-typed reference to the interface namespace ALONE — never public —
+// and builtin classes never run avm2_class.c's interface-alias pass, which is
+// what supplies those keys for ABC classes. Without them, the IDataOutput
+// handed to IExternalizable.writeExternal has no callable writeObject
+// (from_avmplus as3/AMF/AMFSerializer).
+static void ba_add_io(Avm2Context* ctx, Avm2Class* cls, const char* iface,
+                      const char* name, Avm2MethodFn fn)
+{
+	avm2_builtin_add_method(ctx, cls, name, fn);
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key.ns_kind = 0x16;
+	e.key.ns_uri = iface;
+	e.key.ns_len = (uint32_t) strlen(iface);
+	e.key.name = name;
+	e.key.name_len = (uint32_t) strlen(name);
+	e.kind = AVM2_PROP_METHOD;
+	e.method.fn = fn;
+	e.method.debug_name = name;
+	e.defining_class = cls;
+	avm2_vtable_append(ctx, &cls->ivtable, &e);
+}
+
 void avm2_bytearray_install_data_input(Avm2Context* ctx, Avm2Class* cls)
 {
-	avm2_builtin_add_method(ctx, cls, "readBoolean", ba_read_boolean);
-	avm2_builtin_add_method(ctx, cls, "readByte", ba_read_byte);
-	avm2_builtin_add_method(ctx, cls, "readUnsignedByte", ba_read_unsigned_byte);
-	avm2_builtin_add_method(ctx, cls, "readShort", ba_read_short);
-	avm2_builtin_add_method(ctx, cls, "readUnsignedShort", ba_read_unsigned_short);
-	avm2_builtin_add_method(ctx, cls, "readInt", ba_read_int);
-	avm2_builtin_add_method(ctx, cls, "readUnsignedInt", ba_read_unsigned_int);
-	avm2_builtin_add_method(ctx, cls, "readFloat", ba_read_float);
-	avm2_builtin_add_method(ctx, cls, "readDouble", ba_read_double);
-	avm2_builtin_add_method(ctx, cls, "readBytes", ba_read_bytes_native);
-	avm2_builtin_add_method(ctx, cls, "readUTF", ba_read_utf);
-	avm2_builtin_add_method(ctx, cls, "readUTFBytes", ba_read_utf_bytes);
-	avm2_builtin_add_method(ctx, cls, "readMultiByte", ba_read_multi_byte);
-	avm2_builtin_add_method(ctx, cls, "readObject", avm2_amf_read_object);
+	#define BA_IN(n, f) ba_add_io(ctx, cls, "flash.utils:IDataInput", n, f)
+	BA_IN("readBoolean", ba_read_boolean);
+	BA_IN("readByte", ba_read_byte);
+	BA_IN("readUnsignedByte", ba_read_unsigned_byte);
+	BA_IN("readShort", ba_read_short);
+	BA_IN("readUnsignedShort", ba_read_unsigned_short);
+	BA_IN("readInt", ba_read_int);
+	BA_IN("readUnsignedInt", ba_read_unsigned_int);
+	BA_IN("readFloat", ba_read_float);
+	BA_IN("readDouble", ba_read_double);
+	BA_IN("readBytes", ba_read_bytes_native);
+	BA_IN("readUTF", ba_read_utf);
+	BA_IN("readUTFBytes", ba_read_utf_bytes);
+	BA_IN("readMultiByte", ba_read_multi_byte);
+	BA_IN("readObject", avm2_amf_read_object);
+	#undef BA_IN
 }
 
 void avm2_bytearray_install_data_output(Avm2Context* ctx, Avm2Class* cls)
 {
-	avm2_builtin_add_method(ctx, cls, "writeBoolean", ba_write_boolean);
-	avm2_builtin_add_method(ctx, cls, "writeByte", ba_write_byte);
-	avm2_builtin_add_method(ctx, cls, "writeShort", ba_write_short);
-	avm2_builtin_add_method(ctx, cls, "writeInt", ba_write_int);
-	avm2_builtin_add_method(ctx, cls, "writeUnsignedInt", ba_write_unsigned_int);
-	avm2_builtin_add_method(ctx, cls, "writeFloat", ba_write_float);
-	avm2_builtin_add_method(ctx, cls, "writeDouble", ba_write_double);
-	avm2_builtin_add_method(ctx, cls, "writeBytes", ba_write_bytes_native);
-	avm2_builtin_add_method(ctx, cls, "writeUTF", ba_write_utf);
-	avm2_builtin_add_method(ctx, cls, "writeUTFBytes", ba_write_utf_bytes);
-	avm2_builtin_add_method(ctx, cls, "writeMultiByte", ba_write_multi_byte);
-	avm2_builtin_add_method(ctx, cls, "writeObject", avm2_amf_write_object);
+	#define BA_OUT(n, f) ba_add_io(ctx, cls, "flash.utils:IDataOutput", n, f)
+	BA_OUT("writeBoolean", ba_write_boolean);
+	BA_OUT("writeByte", ba_write_byte);
+	BA_OUT("writeShort", ba_write_short);
+	BA_OUT("writeInt", ba_write_int);
+	BA_OUT("writeUnsignedInt", ba_write_unsigned_int);
+	BA_OUT("writeFloat", ba_write_float);
+	BA_OUT("writeDouble", ba_write_double);
+	BA_OUT("writeBytes", ba_write_bytes_native);
+	BA_OUT("writeUTF", ba_write_utf);
+	BA_OUT("writeUTFBytes", ba_write_utf_bytes);
+	BA_OUT("writeMultiByte", ba_write_multi_byte);
+	BA_OUT("writeObject", avm2_amf_write_object);
+	#undef BA_OUT
 }
 
 void avm2_bytearray_install_data_io(Avm2Context* ctx, Avm2Class* cls)
