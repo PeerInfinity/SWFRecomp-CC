@@ -1,21 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `72fdc5e933a6` (2026-07-29T04:05:29.832484+00:00)
-**Current:** `8c3b7673f18f` (2026-07-29T18:24:47.568968+00:00)
+**Previous:** `8c3b7673f18f` (2026-07-29T18:24:47.568968+00:00)
+**Current:** `6cf854900e0b` (2026-07-29T19:07:58.844325+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 168 | 170 | +2 |
+| Passing | 170 | 170 | 0 |
 | Total | 229 | 229 | 0 |
-| Pass rate | 73.4% | 74.2% | +0.8% |
-| Mismatched lines | 863 | 847 | -16 |
-|   Decreased | | | -16 |
+| Pass rate | 74.2% | 74.2% | 0% |
+| Mismatched lines | 847 | 847 | 0 |
 
-## Newly Passing (2)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `flash_net_URLLoader` | output_mismatch | 0/7 | 7/7 |
-| `stream1` | output_mismatch | 0/9 | 9/9 |
+No changes detected.
