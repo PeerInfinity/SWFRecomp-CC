@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-29T18:24:47.547396+00:00",
-    "git_sha": "8c3b7673f18fea4b2bd0085c75d892c504288604",
-    "duration_seconds": 54.44,
+    "timestamp": "2026-07-29T19:07:58.823716+00:00",
+    "git_sha": "6cf854900e0b7cc7a987796751be1fea3edf392a",
+    "duration_seconds": 50.63,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30,
@@ -24,7 +24,7 @@
       "test": "avm1_doabc",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.823,
+        "compile": 1.816,
         "run": 0.215
       },
       "num_frames": 1,
@@ -33,14 +33,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 2.05,
+      "duration": 2.04,
       "status": "pass"
     },
     {
       "test": "avm1_loads_avm2",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.855,
+        "compile": 1.867,
         "run": 0.215
       },
       "num_frames": 2,
@@ -49,7 +49,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 2.08,
+      "duration": 2.09,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "Created clip\nLoaded AVM2 movie into non-root\nLoaded AVM2 movie into root",
@@ -59,8 +59,8 @@
       "test": "avm1_loads_avm2_doaction",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.34,
-        "run": 0.165
+        "compile": 1.827,
+        "run": 0.215
       },
       "num_frames": 3,
       "lines": {
@@ -68,7 +68,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.51,
+      "duration": 2.05,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=4, expected=2)",
       "actual_output": "Hello from outer SWF\nOuter SWF: Called loadMovie\nHello from inner SWF (DoInitAction) - this shouldn't print\nHello from inner SWF - this shouldn't print",
@@ -78,7 +78,7 @@
       "test": "avm1_sprite_sc_ignored",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.783,
+        "compile": 1.865,
         "run": 0.215
       },
       "num_frames": 3,
@@ -87,15 +87,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 2.0,
+      "duration": 2.09,
       "status": "pass"
     },
     {
       "test": "avm2_doaction",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.636,
-        "run": 0.215
+        "compile": 6.598,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -103,15 +103,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 5.86,
+      "duration": 6.92,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.496,
-        "run": 0.266
+        "compile": 6.291,
+        "run": 0.265
       },
       "num_frames": 4,
       "lines": {
@@ -119,7 +119,7 @@
         "expected_lines": 14,
         "matching_lines": 1
       },
-      "duration": 6.77,
+      "duration": 6.56,
       "status": "output_mismatch",
       "detail": "13 line(s) differ (actual=6, expected=14)",
       "actual_output": "Starting load...\nnull\n[object ApplicationDomain]\nLoad complete!\n2007\nTypeError",
@@ -129,8 +129,8 @@
       "test": "avm2_loads_avm1_doabc",
       "phases": {
         "recomp": 0.006,
-        "compile": 6.744,
-        "run": 0.315
+        "compile": 6.171,
+        "run": 0.265
       },
       "num_frames": 4,
       "lines": {
@@ -138,7 +138,7 @@
         "expected_lines": 4,
         "matching_lines": 1
       },
-      "duration": 7.08,
+      "duration": 6.45,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=1, expected=4)",
       "actual_output": "Finished constructor of class of root MovieClip",
@@ -148,7 +148,7 @@
       "test": "avm2_loads_avm1_loads_avm2_doabc",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.371,
+        "compile": 2.851,
         "run": 0.265
       },
       "num_frames": 4,
@@ -157,7 +157,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 6.65,
+      "duration": 3.13,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=1, expected=3)",
       "actual_output": "Outer avm2 SWF: Called load",
@@ -167,8 +167,8 @@
       "test": "avm2_loads_avm1_loads_into_root",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.451,
-        "run": 0.265
+        "compile": 5.126,
+        "run": 0.215
       },
       "num_frames": 3,
       "lines": {
@@ -176,7 +176,7 @@
         "expected_lines": 2,
         "matching_lines": 1
       },
-      "duration": 6.73,
+      "duration": 5.35,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=1, expected=2)",
       "actual_output": "Loading avm1-outer...",
@@ -186,7 +186,7 @@
       "test": "avm2_loads_avm1_v10",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.487,
+        "compile": 6.194,
         "run": 0.265
       },
       "num_frames": 3,
@@ -196,7 +196,7 @@
         "expected_lines": 8,
         "matching_lines": 3
       },
-      "duration": 6.76,
+      "duration": 6.47,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=6, expected=8)",
       "actual_output": "Content before load: null\nContent after load: null\nNum children of main MC: 1\nGot error adding child: error 2007\nNum children of main MC after adding: 1\nContent after adding: null",
@@ -206,8 +206,8 @@
       "test": "avm2_loads_avm1_v9",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.091,
-        "run": 0.215
+        "compile": 6.547,
+        "run": 0.265
       },
       "num_frames": 3,
       "error_signature": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: x)",
@@ -216,7 +216,7 @@
         "expected_lines": 8,
         "matching_lines": 2
       },
-      "duration": 6.31,
+      "duration": 6.82,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=6, expected=8)",
       "actual_output": "Content before load: null\nContent after load: null\nNum children of main MC: 1\nGot error adding child: error 2007\nNum children of main MC after adding: 1\nContent after adding: null",
