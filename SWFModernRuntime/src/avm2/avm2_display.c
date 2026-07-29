@@ -37,6 +37,7 @@
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 #include <avm2/avm2_value.h>
+#include <dialog_events.h>
 #include <socket_events.h>
 // findDataFile / findMovieEntry: the build-time registries of bundled sibling
 // assets that flash.display.Loader loads from (see the load pipeline below).
@@ -5026,10 +5027,15 @@ static void avm2_loader_drain(Avm2Context* ctx)
 		// that load's events. A URL that resolves to nothing queues a log but
 		// no load, so it has to keep the loop alive on its own.
 		if (g_pending_load_count == 0 && g_pending_url_load_count == 0
-		    && !swf_log_fetch_pending()) break;
+		    && !swf_log_fetch_pending() && !swf_dialog_pending()) break;
 		swf_log_fetch_flush();
 		avm2_loader_run_pending(ctx);
 		avm2_url_loader_run_pending(ctx);
+		// File dialogs are futures on the same executor: one opened during the
+		// frame resolves here, and one opened from a resolution callback
+		// resolves in the same drain (filereference_save_and_browse chains
+		// save -> browse -> load under num_ticks = 1).
+		swf_dialog_pump();
 	}
 }
 

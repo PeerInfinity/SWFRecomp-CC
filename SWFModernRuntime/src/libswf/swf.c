@@ -10,6 +10,7 @@
 #include <variables.h>
 #include <renderer.h>
 #include <utils.h>
+#include <dialog_events.h>
 #include <socket_events.h>
 #include <heap.h>
 #include <audio/audio.h>
@@ -485,6 +486,7 @@ void tagMain(SWFAppContext* app_context)
 			    && !hasPlayingSounds()
 			    && !hasActiveNetStreams()
 			    && !swf_socket_pending()
+			    && !swf_dialog_pending()
 			    && !hasPlayingLevels()
 			    && !hasClipEnterFrameHandlers()
 			    && g_pending_mcl_load_count == 0
@@ -511,6 +513,7 @@ void tagMain(SWFAppContext* app_context)
 				    && !hasPlayingSounds()
 				    && !hasActiveNetStreams()
 				    && !swf_socket_pending()
+				    && !swf_dialog_pending()
 				    && !hasClipEnterFrameHandlers()) break;
 			}
 		}
@@ -1059,6 +1062,10 @@ void tagMain(SWFAppContext* app_context)
 		{
 			extern void swf_socket_tick(int owner);
 			swf_socket_tick(1);
+			// File dialogs resolve in the SAME tick as the frame that
+			// opened them (Ruffle polls the executor once the frame is
+			// over), unlike socket actions, which queue for the next.
+			swf_dialog_pump();
 		}
 
 		// Goto catch-up: when a script-initiated goto (e.g. mc.gotoAndStop("/:N")

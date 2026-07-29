@@ -748,3 +748,66 @@ void swf_socket_tick(int owner)
 	sock_deliver_actions();
 	for (int i = 0; i < g_conn_count; i++) sock_pump_conn(i);
 }
+
+// ---------------------------------------------------------------------------
+// Scripted file dialogs (dialog_events.h) — Ruffle TestUiBackend
+// ---------------------------------------------------------------------------
+//
+// A dialog is a future in Ruffle; here it is one queue entry that the frame
+// loop resolves after the frame's scripts, in FIFO order. Chaining matters:
+// a callback that opens another dialog (save -> browse) must still resolve
+// inside the same pump, because Ruffle's executor picks up newly spawned
+// futures in the same drain.
+
+#include <dialog_events.h>
+
+#define MAX_PENDING_DIALOGS 16
+
+typedef struct
+{
+	SwfDialogResolveFn fn;
+	void* target;
+	int success;
+} PendingDialog;
+
+static PendingDialog g_dialogs[MAX_PENDING_DIALOGS];
+static int g_dialog_head;
+static int g_dialog_count;
+
+void swf_dialog_queue(SwfDialogResolveFn fn, void* target, int success)
+{
+	if (fn == NULL) return;
+	if (g_dialog_count >= MAX_PENDING_DIALOGS) return;
+	int slot = (g_dialog_head + g_dialog_count) % MAX_PENDING_DIALOGS;
+	g_dialogs[slot].fn = fn;
+	g_dialogs[slot].target = target;
+	g_dialogs[slot].success = success;
+	g_dialog_count++;
+}
+
+int swf_dialog_pending(void)
+{
+	return g_dialog_count > 0;
+}
+
+void swf_dialog_pump(void)
+{
+	// Bounded so a callback that re-opens a dialog unconditionally cannot spin
+	// the frame loop forever; no corpus test chains more than three deep.
+	for (int guard = 0; guard < 64 && g_dialog_count > 0; guard++)
+	{
+		PendingDialog d = g_dialogs[g_dialog_head];
+		g_dialog_head = (g_dialog_head + 1) % MAX_PENDING_DIALOGS;
+		g_dialog_count--;
+		d.fn(d.target, d.success);
+	}
+}
+
+const char* swf_dialog_file_name(int index)
+{
+	static const char* const names[4] = {
+		"test.txt", "test1.txt", "test2.txt", "test3.txt"
+	};
+	if (index < 0 || index > 3) index = 0;
+	return names[index];
+}

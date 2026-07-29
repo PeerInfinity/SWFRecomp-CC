@@ -36,6 +36,7 @@
 #include <tag.h>
 #include <heap.h>
 #include <map.h>
+#include <dialog_events.h>
 #include <socket_events.h>
 #include <actionmodern/object.h>
 #include <actionmodern/action_internal.h>
@@ -36858,6 +36859,289 @@ static void initXMLSocketPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	                       (Function2Ptr) builtin_xmlsocket_setTimeout);
 }
 
+// ---------------------------------------------------------------------------
+// flash.net.FileReference / FileReferenceList (AVM1)
+// ---------------------------------------------------------------------------
+//
+// Ruffle: core/src/avm1/globals/file_reference{,_list}.rs plus the two
+// select_*_file_dialog_avm1 halves of loader.rs. The dialog itself is the
+// scripted mock in src/utils.c (dialog_events.h).
+//
+// Two things carry all the graded behaviour:
+//
+//  * Filter validation. `browse()` with no argument opens a dialog (with no
+//    filters, so the mock cancels); `browse(x)` for any non-Object x, or for
+//    an array that is empty / holds a non-Object / holds a filter missing an
+//    OWN description or extension / holds an empty one, returns false without
+//    opening anything. A field supplied by an addProperty GETTER counts as
+//    own; a getter that throws is swallowed and the field reads as missing;
+//    but an exception from `toString()` during the string coercion that
+//    follows PROPAGATES to the script. file_reference_list_browse_invalid_filters
+//    grades all eighteen cases.
+//
+//  * Delivery. Selection and cancellation arrive as AsBroadcaster messages —
+//    `broadcastMessage("onSelect"/"onCancel", target)` — with the ONE argument
+//    being the FileReference/FileReferenceList itself.
+//
+// The instance properties (name/type/size) are defined on SELECT, as own
+// DONT_ENUM|READ_ONLY|DONT_DELETE props, which is where Flash keeps them
+// (global_instance_decls). Before a selection they simply do not exist, so
+// they read as undefined — which is exactly what the pre-browse and
+// post-cancel dumps expect.
+
+static ASObject* g_file_reference_prototype;  // set in initFlashPackage
+static SWFAppContext* g_file_dialog_app;      // captured at browse()
+
+// Coerce to a UTF-8 C string through the ordinary conversion path, so a
+// throwing valueOf/toString unwinds to the script's try/catch the way it
+// would from any other native.
+static void filerefCoerceString(SWFAppContext* app_context, ActionVar* v,
+                                char* out, size_t out_size)
+{
+	out[0] = '\0';
+	pushVar(app_context, v);
+	convertString(app_context, NULL);
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_STRING)
+	{
+		const uint16_t* u16 = (const uint16_t*) (uintptr_t) STACK_TOP_VALUE;
+		u32 u16_len = STACK_TOP_N;
+		u16_to_utf8(u16, u16_len, out, out_size);
+	}
+	POP();
+}
+
+// One filter field, read as an OWN property. Returns 0 when the field is
+// absent — and also when an addProperty getter for it throws, because Ruffle
+// swallows that (`object.get(name, activation).ok()`).
+static int filerefOwnField(SWFAppContext* app_context, ASObject* el,
+                           const char* name, u32 name_len, ActionVar* out)
+{
+	ASProperty* p = findPropertyRaw(el, name, name_len);
+	if (p == NULL) return 0;
+	if (p->getter == NULL)
+	{
+		*out = p->value;
+		return 1;
+	}
+
+	u32 saved_sp = SP;
+	u32 saved_scope = scope_depth;
+	u32 saved_this = g_this_depth;
+	int ed = g_exception_state.depth;
+	if (ed >= MAX_EXCEPTION_DEPTH) return 0;
+	g_exception_state.frames[ed].saved_scope_depth = scope_depth;
+	g_exception_state.frames[ed].saved_sp = SP;
+	g_exception_state.frames[ed].has_jmp_buf = 1;
+	g_exception_state.depth = ed + 1;
+	int ok = 0;
+	if (setjmp(g_exception_state.frames[ed].handler) != 0)
+	{
+		// Getter threw: treat the field as missing, exactly like Ruffle.
+		g_exception_state.exception_thrown = false;
+		scope_depth = saved_scope;
+		g_this_depth = saved_this;
+		SP = saved_sp;
+	}
+	else
+	{
+		*out = invokeVirtualGetter(app_context, p, el);
+		ok = 1;
+	}
+	g_exception_state.frames[ed].has_jmp_buf = 0;
+	g_exception_state.depth = ed;
+	return ok;
+}
+
+// Ruffle parse_file_filters + parse_file_filter_array. Returns 1 when a dialog
+// should be opened (and sets *out_select from the magic description), 0 when
+// browse() should just answer false.
+static int filerefParseFilters(SWFAppContext* app_context, ActionVar* arg,
+                               int* out_select)
+{
+	*out_select = 0;
+	// No argument at all is valid and means "no filters"; any non-Object
+	// argument (string, number, null, undefined) is not.
+	if (arg == NULL) return 1;
+	if (arg->type != ACTION_STACK_VALUE_ARRAY) return 0;
+	ASArray* arr = (ASArray*) (uintptr_t) arg->data.numeric_value;
+	if (arr == NULL || arr->length == 0) return 0;  // empty array is rejected
+
+	for (u32 i = 0; i < arr->length; i++)
+	{
+		ActionVar* el_var = getArrayElement(arr, i);
+		if (el_var == NULL || el_var->type != ACTION_STACK_VALUE_OBJECT) return 0;
+		ASObject* el = (ASObject*) (uintptr_t) el_var->data.numeric_value;
+		if (el == NULL) return 0;
+
+		// All three fields are read BEFORE any of them is validated (Ruffle
+		// destructures a tuple), so a throwing getter on one is swallowed even
+		// when another is missing.
+		ActionVar desc_v = {0}, ext_v = {0}, mac_v = {0};
+		int has_desc = filerefOwnField(app_context, el, "description", 11, &desc_v);
+		int has_ext = filerefOwnField(app_context, el, "extension", 9, &ext_v);
+		int has_mac = filerefOwnField(app_context, el, "macType", 7, &mac_v);
+		if (!has_desc || !has_ext) return 0;
+
+		char desc[512], ext[512], mac[512];
+		filerefCoerceString(app_context, &desc_v, desc, sizeof(desc));
+		filerefCoerceString(app_context, &ext_v, ext, sizeof(ext));
+		if (has_mac) filerefCoerceString(app_context, &mac_v, mac, sizeof(mac));
+
+		if (desc[0] == '\0' || ext[0] == '\0') return 0;
+		if (strcmp(desc, SWF_DIALOG_MAGIC_FILTER) == 0) *out_select = 1;
+	}
+	return 1;
+}
+
+// Adopt the mock's simulated file onto a FileReference instance.
+static void filerefTakeSelection(SWFAppContext* app_context, ASObject* obj,
+                                 int name_index)
+{
+	// DONT_ENUM + READ_ONLY + DONT_DELETE — the flag set global_instance_decls
+	// records for a real Flash FileReference's own name/type/size.
+	const u8 ro = 0;
+	ActionVar v;
+	v = makeStringActionVar(app_context, swf_dialog_file_name(name_index),
+	                        (u32) strlen(swf_dialog_file_name(name_index)));
+	setPropertyWithFlags(app_context, obj, "name", 4, &v, ro);
+	v = makeStringActionVar(app_context, SWF_DIALOG_FILE_TYPE,
+	                        (u32) strlen(SWF_DIALOG_FILE_TYPE));
+	setPropertyWithFlags(app_context, obj, "type", 4, &v, ro);
+	memset(&v, 0, sizeof(v));
+	v.type = ACTION_STACK_VALUE_F64;
+	{ double d = (double) SWF_DIALOG_CONTENTS_LEN; memcpy(&v.data.numeric_value, &d, sizeof(double)); }
+	setPropertyWithFlags(app_context, obj, "size", 4, &v, ro);
+}
+
+static void filerefBroadcast(SWFAppContext* app_context, ASObject* obj,
+                             const char* event)
+{
+	ActionVar bargs[2];
+	bargs[0] = makeStringActionVar(app_context, event, (u32) strlen(event));
+	memset(&bargs[1], 0, sizeof(ActionVar));
+	bargs[1].type = ACTION_STACK_VALUE_OBJECT;
+	bargs[1].data.numeric_value = (u64) obj;
+	builtin_broadcaster_broadcastMessage(app_context, bargs, 2, NULL, (void*) obj);
+}
+
+static void filerefDialogResolve(void* target, int success)
+{
+	ASObject* obj = (ASObject*) target;
+	SWFAppContext* app_context = g_file_dialog_app;
+	if (obj == NULL || app_context == NULL) return;
+	if (success) filerefTakeSelection(app_context, obj, 0);
+	filerefBroadcast(app_context, obj, success ? "onSelect" : "onCancel");
+}
+
+static void filereflistDialogResolve(void* target, int success)
+{
+	ASObject* obj = (ASObject*) target;
+	SWFAppContext* app_context = g_file_dialog_app;
+	if (obj == NULL || app_context == NULL) return;
+	if (success)
+	{
+		// The multi-select mock hands back three files. `fileList` appears
+		// only on select — it stays undefined through a cancel, which
+		// file_reference_list_browse_cancel grades.
+		ASArray* list = allocArray(app_context, 3);
+		for (int i = 0; i < 3; i++)
+		{
+			ASObject* fr = allocObject(app_context, 8);
+			if (fr == NULL) continue;
+			retainObject(fr);
+			fr->native_type = NATIVE_FILEREF;
+			if (g_file_reference_prototype != NULL)
+			{
+				ActionVar pv = {0};
+				pv.type = ACTION_STACK_VALUE_OBJECT;
+				pv.data.numeric_value = (u64) g_file_reference_prototype;
+				setPropertyWithFlags(app_context, fr, "__proto__", 9, &pv,
+				                     PROPERTY_FLAG_WRITABLE);
+			}
+			filerefTakeSelection(app_context, fr, i + 1);
+			ActionVar fv = {0};
+			fv.type = ACTION_STACK_VALUE_OBJECT;
+			fv.data.numeric_value = (u64) fr;
+			setArrayElement(app_context, list, (u32) i, &fv);
+		}
+		ActionVar lv = {0};
+		lv.type = ACTION_STACK_VALUE_ARRAY;
+		lv.data.numeric_value = (u64) list;
+		// READ_ONLY | DONT_ENUM | DONT_DELETE (loader.rs define_value).
+		setPropertyWithFlags(app_context, obj, "fileList", 8, &lv, 0);
+	}
+	filerefBroadcast(app_context, obj, success ? "onSelect" : "onCancel");
+}
+
+// The two browse()s differ only in which dialog they open — single-file for a
+// FileReference, multi-file for a FileReferenceList — so they share
+// everything up to the queue call.
+static ActionVar filerefBrowseCommon(SWFAppContext* app_context, ActionVar* args,
+                                     u32 arg_count, void* this_obj,
+                                     SwfDialogResolveFn resolve)
+{
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) return ret;
+
+	int select = 0;
+	if (!filerefParseFilters(app_context, arg_count > 0 ? &args[0] : NULL, &select))
+		return ret;
+
+	g_file_dialog_app = app_context;
+	// The pending dialog is the only reference the mock holds, so the target
+	// has to outlive the frame that opened it.
+	retainObject(obj);
+	swf_dialog_queue(resolve, obj, select);
+	ret.data.numeric_value = 1;
+	return ret;
+}
+
+static ActionVar builtin_fileref_browse(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) registers;
+	return filerefBrowseCommon(app_context, args, arg_count, this_obj,
+	                           filerefDialogResolve);
+}
+
+static ActionVar builtin_filereflist_browse(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) registers;
+	return filerefBrowseCommon(app_context, args, arg_count, this_obj,
+	                           filereflistDialogResolve);
+}
+
+// Install the AsBroadcaster trio + a real zero-length `_listeners` Array on a
+// prototype, WITHOUT touching the property shape the stub established:
+// global_proto_decls and global_proto_decls_delete enumerate this family, so
+// the names, their order and their DONT_ENUM|DONT_DELETE flags all have to
+// stay byte-identical — only the values change. (installAsBroadcaster is not
+// reusable here: it makes `_listeners` deletable.)
+static void filerefInstallBroadcaster(SWFAppContext* app_context, ASObject* proto)
+{
+	initAsBroadcasterFuncs(app_context);
+	const u8 f = PROPERTY_FLAG_WRITABLE;  // DONT_ENUM + DONT_DELETE
+
+	// Insertion is LIFO relative to enumeration, so this is the reverse of the
+	// expected `_listeners, removeListener, addListener, broadcastMessage`.
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	fv.data.numeric_value = (u64) &g_ab_broadcastMessage_func;
+	setPropertyWithFlags(app_context, proto, "broadcastMessage", 16, &fv, f);
+	fv.data.numeric_value = (u64) &g_ab_addListener_func;
+	setPropertyWithFlags(app_context, proto, "addListener", 11, &fv, f);
+	fv.data.numeric_value = (u64) &g_ab_removeListener_func;
+	setPropertyWithFlags(app_context, proto, "removeListener", 14, &fv, f);
+
+	ASArray* listeners = allocArray(app_context, 4);
+	ActionVar lv = {0};
+	lv.type = ACTION_STACK_VALUE_ARRAY;
+	lv.data.numeric_value = (u64) listeners;
+	setPropertyWithFlags(app_context, proto, "_listeners", 10, &lv, f);
+}
+
 // ContextMenu.prototype: copy + hideBuiltInItems
 static ASFunction g_cm_copy_func;
 static ASFunction g_cm_hideBuiltIn_func;
@@ -38730,40 +39014,27 @@ static void initFlashPackage(SWFAppContext* app_context)
 	}
 
 	// FileReferenceList.prototype: browse, _listeners, removeListener, addListener, broadcastMessage
-	// All DONT_ENUM + DONT_DELETE, insertion order reversed for LIFO
+	// All DONT_ENUM + DONT_DELETE, insertion order reversed for LIFO.
+	// The SHAPE here is Flash's (global_proto_decls + global_proto_decls_delete
+	// enumerate it); only the bodies are real — the AsBroadcaster trio over a
+	// zero-length `_listeners` Array, and a browse() that opens the mock's
+	// multi-file dialog.
 	{
 		ASObject* p = fc_FileReferenceList.prototype_obj;
 		const u8 f = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE (only WRITABLE bit)
-		addStubMethodToProto(app_context, p, "broadcastMessage", 16, f);
-		addStubMethodToProto(app_context, p, "addListener", 11, f);
-		addStubMethodToProto(app_context, p, "removeListener", 14, f);
-		// _listeners = empty ASObject (type=[object])
-		{
-			ASObject* listeners = allocObject(app_context, 4);
-			setObjectProto(app_context, listeners);
-			ActionVar av = {0}; av.type = ACTION_STACK_VALUE_OBJECT;
-			av.data.numeric_value = (u64)listeners;
-			setPropertyWithFlags(app_context, p, "_listeners", 10, &av, f);
-		}
-		addStubMethodToProto(app_context, p, "browse", 6, f);
+		filerefInstallBroadcaster(app_context, p);
+		addNativeMethodToProto(app_context, p, "browse", 6, f,
+		                       (Function2Ptr) builtin_filereflist_browse);
 	}
 	// FileReference.prototype: deleteConvertedPPT..broadcastMessage
 	// All DONT_ENUM + DONT_DELETE, insertion order reversed for LIFO
 	{
 		ASObject* p = fc_FileReference.prototype_obj;
 		const u8 f = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
-		addStubMethodToProto(app_context, p, "broadcastMessage", 16, f);
-		addStubMethodToProto(app_context, p, "addListener", 11, f);
-		addStubMethodToProto(app_context, p, "removeListener", 14, f);
-		// _listeners = empty ASObject (type=[object])
-		{
-			ASObject* listeners = allocObject(app_context, 4);
-			setObjectProto(app_context, listeners);
-			ActionVar av = {0}; av.type = ACTION_STACK_VALUE_OBJECT;
-			av.data.numeric_value = (u64)listeners;
-			setPropertyWithFlags(app_context, p, "_listeners", 10, &av, f);
-		}
-		addStubMethodToProto(app_context, p, "browse", 6, f);
+		g_file_reference_prototype = p;
+		filerefInstallBroadcaster(app_context, p);
+		addNativeMethodToProto(app_context, p, "browse", 6, f,
+		                       (Function2Ptr) builtin_fileref_browse);
 		addStubMethodToProto(app_context, p, "upload", 6, f);
 		addStubMethodToProto(app_context, p, "download", 8, f);
 		addStubMethodToProto(app_context, p, "cancel", 6, f);

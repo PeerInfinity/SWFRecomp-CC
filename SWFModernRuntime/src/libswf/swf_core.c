@@ -22,6 +22,7 @@
 #include <variables.h>
 #include <object.h>
 #include <utils.h>
+#include <dialog_events.h>
 #include <socket_events.h>
 #include <heap.h>
 
@@ -979,6 +980,7 @@ void swfStart(SWFAppContext* app_context)
 			    && !hasPlayingSounds()
 			    && !hasActiveNetStreams()
 			    && !swf_socket_pending()
+			    && !swf_dialog_pending()
 			    && !hasClipEnterFrameHandlers()) break;
 		}
 
@@ -1170,6 +1172,7 @@ void swfStart(SWFAppContext* app_context)
 				    && !hasPlayingSounds()
 				    && !hasActiveNetStreams()
 				    && !swf_socket_pending()
+				    && !swf_dialog_pending()
 				    && !hasPlayingLevels()
 				    && !hasClipEnterFrameHandlers()
 				    && g_pending_mcl_load_count == 0
@@ -1253,6 +1256,10 @@ void swfStart(SWFAppContext* app_context)
 		{
 			extern void swf_socket_tick(int owner);
 			swf_socket_tick(1);
+			// File dialogs resolve in the SAME tick as the frame that
+			// opened them (Ruffle polls the executor once the frame is
+			// over), unlike socket actions, which queue for the next.
+			swf_dialog_pump();
 		}
 
 		// Per-tick button state re-evaluation (NO_GRAPHICS mode).
@@ -1555,6 +1562,9 @@ void swfStart(SWFAppContext* app_context)
 			// keep ticking, same as an active NetStream: the socket tick at the
 			// top of the loop is what would deliver it.
 			if (swf_socket_pending()) continue;
+			// A queued file dialog is the same kind of reason: the
+			// pump at the top of the loop is what would resolve it.
+			if (swf_dialog_pending()) continue;
 			break;
 		}
 		else if (manual_next_frame)
