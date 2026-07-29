@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-28T23:20:22.758131+00:00",
-    "git_sha": "d01a544957729556cbe9ef38046bcb08f29b9469",
-    "duration_seconds": 198.62,
+    "timestamp": "2026-07-29T01:25:02.059970+00:00",
+    "git_sha": "767a301d2baeac108169258c9a68c8f5054d8238",
+    "duration_seconds": 213.81,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "auto_size/height",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.865,
+        "compile": 26.957,
         "run": 0.516
       },
       "num_frames": 1,
@@ -31,7 +31,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 25.48,
+      "duration": 27.57,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -48,8 +48,8 @@
     {
       "test": "auto_size/return",
       "phases": {
-        "recomp": 0.067,
-        "compile": 24.692,
+        "recomp": 0.068,
+        "compile": 27.293,
         "run": 0.315
       },
       "num_frames": 1,
@@ -58,7 +58,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 25.3,
+      "duration": 27.92,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -75,9 +75,9 @@
     {
       "test": "auto_size/width",
       "phases": {
-        "recomp": 0.066,
-        "compile": 25.315,
-        "run": 0.316
+        "recomp": 0.056,
+        "compile": 25.669,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -85,7 +85,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 25.91,
+      "duration": 26.17,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -103,8 +103,8 @@
       "test": "br_at_start",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.478,
-        "run": 0.265
+        "compile": 1.623,
+        "run": 0.367
       },
       "num_frames": 1,
       "lines": {
@@ -112,7 +112,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.88,
+      "duration": 2.2,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -130,7 +130,7 @@
       "test": "html_entity_parsing",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.418,
+        "compile": 6.573,
         "run": 0.265
       },
       "num_frames": 1,
@@ -139,7 +139,7 @@
         "expected_lines": 213,
         "matching_lines": 99
       },
-      "duration": 6.69,
+      "duration": 6.85,
       "status": "output_mismatch",
       "detail": "118 line(s) differ (actual=217, expected=213)",
       "actual_output": "Source: This is an ampersand: &amp;\nParsed: This is an ampersand: &\n\nSource: This is a less-than sign: &lt;\nParsed: This is a less-than sign: <\n\nSource: This is a greater-than sign: &gt;\nParsed: This is a greater-than sign: >\n\nSource: This is a quotation mark: &quot;\nParsed: This is a quotation mark: \"\n\nSource: This is an apostrophe: &apos;\nParsed: This is an apostrophe: '\n\nSource: This is a non-breaking space: &nbsp;\nParsed: This is a non-breaking space: \u00a0\n\nSource: &amp;\nParsed: &\n\nSource: &quot; is a quotation mark\nParsed: \" is a quotation mark\n\nSource: Suppose we have two objects, &quot;foo&quot; and &quot;bar&quot;\nParsed: Suppose we have two objects, \"foo\" and \"bar\"\n\nSource: This is how you write an empty string: &quot;&quot;\nParsed: This is how you write an empty string: \"\"\n\nSource: This entity should not be valid: &jjjjj;\nParsed: This entity should not be valid: &jjjjj;\n\nSource: This entity should not be valid: &1;\nParsed: This entity should not be valid: &1;\n\nSource: This entity should not be valid: &x2;\nParsed: This entity should not be valid: &x2;\n\nSource: This entity should not be valid: &;\nParsed: This entity should not be valid: &;\n\nSource: This is not an entity: amp;\nParsed: This is not an entity: amp;\n\nSource: ;\nParsed: ;\n\nSource: This is not an entity: &amp\nParsed: This is not an entity: &amp\n... (167 lines after) ...",
@@ -149,8 +149,8 @@
       "test": "links_in_scrolled_text",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.918,
-        "run": 0.216
+        "compile": 1.794,
+        "run": 0.215
       },
       "num_frames": 2,
       "lines": {
@@ -158,7 +158,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 2.14,
+      "duration": 2.02,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -168,8 +168,8 @@
       "test": "style_changes_in_html",
       "phases": {
         "recomp": 0.0,
-        "compile": 17.056,
-        "run": 0.165
+        "compile": 20.671,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -177,7 +177,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.31,
+      "duration": 21.0,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -195,8 +195,8 @@
       "test": "text_caret_placement_align",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.358,
-        "run": 0.415
+        "compile": 26.937,
+        "run": 0.416
       },
       "num_frames": 2,
       "lines": {
@@ -204,15 +204,15 @@
         "expected_lines": 248,
         "matching_lines": 248
       },
-      "duration": 26.79,
+      "duration": 27.37,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_leading",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.433,
-        "run": 0.317
+        "compile": 25.22,
+        "run": 0.265
       },
       "num_frames": 2,
       "lines": {
@@ -220,15 +220,15 @@
         "expected_lines": 244,
         "matching_lines": 244
       },
-      "duration": 25.76,
+      "duration": 25.49,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_scroll",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.447,
-        "run": 0.265
+        "compile": 25.733,
+        "run": 0.315
       },
       "num_frames": 2,
       "lines": {
@@ -236,14 +236,14 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 20.72,
+      "duration": 26.06,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_translated_bounds",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.803,
+        "compile": 20.297,
         "run": 0.215
       },
       "num_frames": 2,
@@ -252,7 +252,7 @@
         "expected_lines": 140,
         "matching_lines": 140
       },
-      "duration": 20.03,
+      "duration": 20.52,
       "status": "pass"
     }
   ]
