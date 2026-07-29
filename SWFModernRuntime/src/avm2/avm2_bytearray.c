@@ -633,9 +633,31 @@ static uint32_t utf8_to_utf16(Avm2Context* ctx, const Avm2String* s, int little,
 // Natives
 // ---------------------------------------------------------------------------
 
-static Avm2ByteArrayExt* this_ba(Avm2Activation* act)
+// flash.net.Socket is this same IDataInput/IDataOutput surface over a pair of
+// buffers rather than one, so avm2_net.c registers the bodies below verbatim
+// and supplies its own ext through this hook. `write_dir` picks the buffer:
+// the read half backs every read*, the write half every write*. A ByteArray
+// `this` resolves before the hook is ever consulted and is unaffected.
+static Avm2BaAltResolver g_ba_alt_resolver;
+
+void avm2_bytearray_set_alt_resolver(Avm2BaAltResolver fn)
+{
+	g_ba_alt_resolver = fn;
+}
+
+Avm2ByteArrayExt* avm2_bytearray_ext_dir(Avm2Activation* act, int write_dir)
 {
 	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(act->this_val);
+	if (ba != NULL) return ba;
+	// The hook may throw on its own terms (an unconnected Socket raises
+	// IOError #2002 before any buffer exists).
+	if (g_ba_alt_resolver != NULL) return g_ba_alt_resolver(act, write_dir);
+	return NULL;
+}
+
+static Avm2ByteArrayExt* this_ba_dir(Avm2Activation* act, int write_dir)
+{
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_dir(act, write_dir);
 	if (ba == NULL)
 	{
 		avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
@@ -643,6 +665,19 @@ static Avm2ByteArrayExt* this_ba(Avm2Activation* act)
 		                 "incompatible object.");
 	}
 	return ba;
+}
+
+// Read direction is the default: every neutral accessor (position, length,
+// endian, clear, compress, …) is ByteArray-only, and Socket never registers
+// one of them.
+static Avm2ByteArrayExt* this_ba(Avm2Activation* act)
+{
+	return this_ba_dir(act, 0);
+}
+
+static Avm2ByteArrayExt* this_ba_w(Avm2Activation* act)
+{
+	return this_ba_dir(act, 1);
 }
 
 static Avm2Value arg_or_undef(Avm2Activation* act, uint32_t i)
@@ -845,7 +880,7 @@ static Avm2Value ba_read_double(Avm2Activation* act)
 
 static Avm2Value ba_write_boolean(Avm2Activation* act)
 {
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	uint8_t v = avm2_coerce_to_boolean(arg_or_undef(act, 0)) ? 1 : 0;
 	ba_write_bytes(act->ctx, ba, &v, 1);
 	return avm2_undefined();
@@ -853,7 +888,7 @@ static Avm2Value ba_write_boolean(Avm2Activation* act)
 
 static Avm2Value ba_write_byte(Avm2Activation* act)
 {
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	uint8_t v = (uint8_t) avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
 	ba_write_bytes(act->ctx, ba, &v, 1);
 	return avm2_undefined();
@@ -861,7 +896,7 @@ static Avm2Value ba_write_byte(Avm2Activation* act)
 
 static Avm2Value ba_write_short(Avm2Activation* act)
 {
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	ba_write_u16(act->ctx, ba,
 	             (uint16_t) avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0)));
 	return avm2_undefined();
@@ -869,7 +904,7 @@ static Avm2Value ba_write_short(Avm2Activation* act)
 
 static Avm2Value ba_write_int(Avm2Activation* act)
 {
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	ba_write_u32(act->ctx, ba,
 	             (uint32_t) avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0)));
 	return avm2_undefined();
@@ -877,14 +912,14 @@ static Avm2Value ba_write_int(Avm2Activation* act)
 
 static Avm2Value ba_write_unsigned_int(Avm2Activation* act)
 {
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	ba_write_u32(act->ctx, ba, avm2_coerce_to_u32(act->ctx, arg_or_undef(act, 0)));
 	return avm2_undefined();
 }
 
 static Avm2Value ba_write_float(Avm2Activation* act)
 {
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	float f = (float) avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
 	uint32_t bits;
 	memcpy(&bits, &f, 4);
@@ -894,7 +929,7 @@ static Avm2Value ba_write_float(Avm2Activation* act)
 
 static Avm2Value ba_write_double(Avm2Activation* act)
 {
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	double d = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
 	uint64_t bits;
 	memcpy(&bits, &d, 8);
@@ -909,7 +944,7 @@ static Avm2Value ba_write_double(Avm2Activation* act)
 static Avm2Value ba_write_bytes_native(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	Avm2Value arg0 = arg_or_undef(act, 0);
 	if (arg0.kind == AVM2_VALUE_NULL || arg0.kind == AVM2_VALUE_UNDEFINED)
 	{
@@ -985,7 +1020,7 @@ static Avm2Value ba_read_bytes_native(Avm2Activation* act)
 static Avm2Value ba_write_utf(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	const Avm2String* s = arg_string_non_null(act, 0, "value");
 	if (s->len > 0xFFFF) throw_2006(ctx);
 	ba_write_u16(ctx, ba, (uint16_t) s->len);
@@ -1005,7 +1040,7 @@ static Avm2Value ba_read_utf(Avm2Activation* act)
 static Avm2Value ba_write_utf_bytes(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	const Avm2String* s = arg_string_non_null(act, 0, "value");
 	ba_write_bytes(ctx, ba, (const uint8_t*) s->utf8, s->len);
 	return avm2_undefined();
@@ -1023,7 +1058,7 @@ static Avm2Value ba_read_utf_bytes(Avm2Activation* act)
 static Avm2Value ba_write_multi_byte(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2ByteArrayExt* ba = this_ba(act);
+	Avm2ByteArrayExt* ba = this_ba_w(act);
 	const Avm2String* s = arg_string_non_null(act, 0, "value");
 	const Avm2String* label = arg_string_non_null(act, 1, "charSet");
 	const char* iconv_name = NULL;
@@ -1327,6 +1362,39 @@ static void ba_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }
 
+// The IDataInput + IDataOutput method set, shared verbatim with
+// flash.net.Socket (avm2_net.c) — the two classes differ only in which buffer
+// each direction resolves to, which the alt resolver above decides.
+void avm2_bytearray_install_data_io(Avm2Context* ctx, Avm2Class* cls)
+{
+	avm2_builtin_add_method(ctx, cls, "readBoolean", ba_read_boolean);
+	avm2_builtin_add_method(ctx, cls, "readByte", ba_read_byte);
+	avm2_builtin_add_method(ctx, cls, "readUnsignedByte", ba_read_unsigned_byte);
+	avm2_builtin_add_method(ctx, cls, "readShort", ba_read_short);
+	avm2_builtin_add_method(ctx, cls, "readUnsignedShort", ba_read_unsigned_short);
+	avm2_builtin_add_method(ctx, cls, "readInt", ba_read_int);
+	avm2_builtin_add_method(ctx, cls, "readUnsignedInt", ba_read_unsigned_int);
+	avm2_builtin_add_method(ctx, cls, "readFloat", ba_read_float);
+	avm2_builtin_add_method(ctx, cls, "readDouble", ba_read_double);
+	avm2_builtin_add_method(ctx, cls, "readBytes", ba_read_bytes_native);
+	avm2_builtin_add_method(ctx, cls, "readUTF", ba_read_utf);
+	avm2_builtin_add_method(ctx, cls, "readUTFBytes", ba_read_utf_bytes);
+	avm2_builtin_add_method(ctx, cls, "readMultiByte", ba_read_multi_byte);
+	avm2_builtin_add_method(ctx, cls, "readObject", avm2_amf_read_object);
+	avm2_builtin_add_method(ctx, cls, "writeBoolean", ba_write_boolean);
+	avm2_builtin_add_method(ctx, cls, "writeByte", ba_write_byte);
+	avm2_builtin_add_method(ctx, cls, "writeShort", ba_write_short);
+	avm2_builtin_add_method(ctx, cls, "writeInt", ba_write_int);
+	avm2_builtin_add_method(ctx, cls, "writeUnsignedInt", ba_write_unsigned_int);
+	avm2_builtin_add_method(ctx, cls, "writeFloat", ba_write_float);
+	avm2_builtin_add_method(ctx, cls, "writeDouble", ba_write_double);
+	avm2_builtin_add_method(ctx, cls, "writeBytes", ba_write_bytes_native);
+	avm2_builtin_add_method(ctx, cls, "writeUTF", ba_write_utf);
+	avm2_builtin_add_method(ctx, cls, "writeUTFBytes", ba_write_utf_bytes);
+	avm2_builtin_add_method(ctx, cls, "writeMultiByte", ba_write_multi_byte);
+	avm2_builtin_add_method(ctx, cls, "writeObject", avm2_amf_write_object);
+}
+
 void avm2_register_bytearray(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -1373,32 +1441,7 @@ void avm2_register_bytearray(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, cls, "deflate", ba_deflate);
 	avm2_builtin_add_method(ctx, cls, "inflate", ba_inflate);
 	avm2_builtin_add_method(ctx, cls, "toString", ba_to_string);
-	avm2_builtin_add_method(ctx, cls, "readBoolean", ba_read_boolean);
-	avm2_builtin_add_method(ctx, cls, "readByte", ba_read_byte);
-	avm2_builtin_add_method(ctx, cls, "readUnsignedByte", ba_read_unsigned_byte);
-	avm2_builtin_add_method(ctx, cls, "readShort", ba_read_short);
-	avm2_builtin_add_method(ctx, cls, "readUnsignedShort", ba_read_unsigned_short);
-	avm2_builtin_add_method(ctx, cls, "readInt", ba_read_int);
-	avm2_builtin_add_method(ctx, cls, "readUnsignedInt", ba_read_unsigned_int);
-	avm2_builtin_add_method(ctx, cls, "readFloat", ba_read_float);
-	avm2_builtin_add_method(ctx, cls, "readDouble", ba_read_double);
-	avm2_builtin_add_method(ctx, cls, "readBytes", ba_read_bytes_native);
-	avm2_builtin_add_method(ctx, cls, "readUTF", ba_read_utf);
-	avm2_builtin_add_method(ctx, cls, "readUTFBytes", ba_read_utf_bytes);
-	avm2_builtin_add_method(ctx, cls, "readMultiByte", ba_read_multi_byte);
-	avm2_builtin_add_method(ctx, cls, "readObject", avm2_amf_read_object);
-	avm2_builtin_add_method(ctx, cls, "writeBoolean", ba_write_boolean);
-	avm2_builtin_add_method(ctx, cls, "writeByte", ba_write_byte);
-	avm2_builtin_add_method(ctx, cls, "writeShort", ba_write_short);
-	avm2_builtin_add_method(ctx, cls, "writeInt", ba_write_int);
-	avm2_builtin_add_method(ctx, cls, "writeUnsignedInt", ba_write_unsigned_int);
-	avm2_builtin_add_method(ctx, cls, "writeFloat", ba_write_float);
-	avm2_builtin_add_method(ctx, cls, "writeDouble", ba_write_double);
-	avm2_builtin_add_method(ctx, cls, "writeBytes", ba_write_bytes_native);
-	avm2_builtin_add_method(ctx, cls, "writeUTF", ba_write_utf);
-	avm2_builtin_add_method(ctx, cls, "writeUTFBytes", ba_write_utf_bytes);
-	avm2_builtin_add_method(ctx, cls, "writeMultiByte", ba_write_multi_byte);
-	avm2_builtin_add_method(ctx, cls, "writeObject", avm2_amf_write_object);
+	avm2_bytearray_install_data_io(ctx, cls);
 
 	avm2_proto_add_function(ctx, cls->prototype_obj, "toJSON", ba_proto_to_json);
 	avm2_proto_add_function(ctx, cls->prototype_obj, "toString", ba_to_string);

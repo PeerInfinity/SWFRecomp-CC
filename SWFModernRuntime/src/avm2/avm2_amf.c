@@ -1392,7 +1392,8 @@ static Avm2Value rd0_value(Rd* r)
 Avm2Value avm2_amf_write_object(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(act->this_val);
+	// Direction-aware: on a Socket this resolves to the outbound buffer.
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_dir(act, 1);
 	if (ba == NULL) return avm2_undefined();
 	Avm2Value obj = (act->argc > 0) ? act->args[0] : avm2_undefined();
 
@@ -1423,7 +1424,7 @@ Avm2Value avm2_amf_write_object(Avm2Activation* act)
 Avm2Value avm2_amf_read_object(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(act->this_val);
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_dir(act, 0);
 	if (ba == NULL) return avm2_undefined();
 	Rd r;
 	memset(&r, 0, sizeof(r));

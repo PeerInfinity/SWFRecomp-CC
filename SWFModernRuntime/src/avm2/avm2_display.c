@@ -37,6 +37,7 @@
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 #include <avm2/avm2_value.h>
+#include <socket_events.h>
 // findDataFile / findMovieEntry: the build-time registries of bundled sibling
 // assets that flash.display.Loader loads from (see the load pipeline below).
 #include <libswf/swf.h>
@@ -2958,6 +2959,13 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	avm2_loaderinfo_run_exit_frame(ctx);
 	avm2_loader_drain(ctx);
 	orphan_cleanup(ctx);
+
+	// Sockets: Ruffle's player.tick runs update_sockets right after the frame
+	// and before update_timers, then polls the mock transport once the tick is
+	// over (runner.rs do_tick -> executor.run). swf_socket_tick is both halves
+	// in that order — deliver, then pump — so an action queued during tick N
+	// is dispatched after frame N+1 runs. No-op with no socket.json loaded.
+	swf_socket_tick(2);
 
 	ctx->frame_phase = PHASE_IDLE;
 	// Render phase: stage.invalidate() requests one "render" broadcast.

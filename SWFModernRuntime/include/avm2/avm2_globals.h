@@ -203,6 +203,18 @@ typedef struct Avm2ByteArrayExt
 
 // NULL when the value is not a ByteArray (subclasses included).
 Avm2ByteArrayExt* avm2_bytearray_ext_of(Avm2Value v);
+
+// flash.net.Socket reuses the whole IDataInput/IDataOutput body set over a
+// buffer PAIR: reads drain the inbound buffer, writes fill the outbound one.
+// avm2_net.c registers a resolver so those bodies can be shared verbatim.
+// `write_dir` is 1 for write*, 0 for read*. Returning NULL means "not mine";
+// the resolver may also throw (an unconnected Socket raises IOError #2002).
+typedef Avm2ByteArrayExt* (*Avm2BaAltResolver)(Avm2Activation* act, int write_dir);
+void avm2_bytearray_set_alt_resolver(Avm2BaAltResolver fn);
+// ByteArray first, then the resolver. NULL when neither claims `this`.
+Avm2ByteArrayExt* avm2_bytearray_ext_dir(Avm2Activation* act, int write_dir);
+// Register the 28 IDataInput/IDataOutput natives on `cls`.
+void avm2_bytearray_install_data_io(Avm2Context* ctx, Avm2Class* cls);
 // Grow/shrink storage (clamps position; used by the [] index write path).
 void avm2_bytearray_set_length_public(Avm2Context* ctx, Avm2ByteArrayExt* ba,
                                       uint32_t new_len);
@@ -584,6 +596,11 @@ Avm2Object* avm2_focus_event_new(Avm2Context* ctx, const Avm2String* type,
 Avm2Object* avm2_text_event_new(Avm2Context* ctx, const Avm2String* type,
                                 int bubbles, int cancelable,
                                 const Avm2String* text);
+// flash.events.DataEvent (extends TextEvent) — one per NUL-delimited inbound
+// XMLSocket frame. `data` is TextEvent's `text` under another name.
+Avm2Object* avm2_data_event_new(Avm2Context* ctx, const Avm2String* type,
+                                int bubbles, int cancelable,
+                                const Avm2String* data);
 // flash.events.ProgressEvent / IOErrorEvent / HTTPStatusEvent, dispatched from
 // C by the Loader and URLLoader pipelines (avm2_display.c). All are
 // non-bubbling and non-cancelable.

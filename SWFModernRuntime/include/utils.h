@@ -75,3 +75,8 @@ void swf_log_navigate(const char* url, size_t url_len,
                       const char* target, size_t target_len,
                       const char* method, size_t method_len,
                       const SwfLogPair* params, size_t param_count);
+
+// Print one "Navigator::connect_socket" block immediately (4-space indent on
+// the Host/Port line — avm1/xml_socket_connect_null grades that literally).
+// Called from swf_socket_connect on every connect attempt, script or not.
+void swf_log_connect_socket(const char* host, size_t host_len, int port);

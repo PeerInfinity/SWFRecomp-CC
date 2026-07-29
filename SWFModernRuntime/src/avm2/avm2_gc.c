@@ -786,6 +786,7 @@ static void gc_collect(Avm2Context* ctx)
 	avm2_gc_mark_roots_events(ctx);
 	avm2_gc_mark_roots_amf(ctx);
 	avm2_gc_mark_roots_media(ctx);
+	avm2_gc_mark_roots_net(ctx);
 	avm2_gc_mark_roots_external(ctx);
 	avm2_gc_mark_roots_e4x(ctx);
 	// Flixel quadtree intrinsic: the AS3 `protected static _o / _oc` live as C

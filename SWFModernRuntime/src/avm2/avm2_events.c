@@ -1164,6 +1164,37 @@ static Avm2Value te_to_string(Avm2Activation* act)
 	                                 args, 6);
 }
 
+// flash.events.DataEvent extends TextEvent; `data` is TextEvent's `text`
+// under another name (Ruffle's DataEvent.as delegates both accessors to
+// super). Dispatched by XMLSocket for each NUL-delimited inbound frame.
+static Avm2Value de_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"DataEvent", "type", "bubbles", "cancelable", "eventPhase", "data"
+	};
+	Avm2Value args[6];
+	for (int i = 0; i < 6; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 6);
+}
+
+static Avm2Class* g_data_event_class;
+
+Avm2Object* avm2_data_event_new(Avm2Context* ctx, const Avm2String* type,
+                                int bubbles, int cancelable, const Avm2String* data)
+{
+	if (g_data_event_class == NULL) return NULL;
+	Avm2Value args[4];
+	args[0] = avm2_string(type);
+	args[1] = avm2_bool(bubbles != 0);
+	args[2] = avm2_bool(cancelable != 0);
+	args[3] = avm2_string(data != NULL ? data : avm2_string_from_literal(ctx, ""));
+	Avm2Value v = avm2_class_construct(ctx, g_data_event_class, args, 4);
+	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+}
+
 Avm2Object* avm2_text_event_new(Avm2Context* ctx, const Avm2String* type,
                                 int bubbles, int cancelable, const Avm2String* text)
 {
@@ -1555,6 +1586,18 @@ static void register_input_events(Avm2Context* ctx)
 		avm2_string(avm2_string_from_literal(ctx, "link")));
 	avm2_builtin_add_static_const(ctx, te, "TEXT_INPUT",
 		avm2_string(avm2_string_from_literal(ctx, "textInput")));
+
+	// flash.events.DataEvent (extends TextEvent) — XMLSocket's inbound frames.
+	Avm2Class* de = avm2_builtin_class(ctx, "flash.events", "DataEvent", te);
+	de->instance_init.fn = text_event_init;
+	de->instance_init.debug_name = "DataEvent";
+	g_data_event_class = de;
+	avm2_builtin_add_getset(ctx, de, "data", te_get_text, te_set_text);
+	event_override_method(ctx, de, "toString", de_to_string);
+	avm2_builtin_add_static_const(ctx, de, "DATA",
+		avm2_string(avm2_string_from_literal(ctx, "data")));
+	avm2_builtin_add_static_const(ctx, de, "UPLOAD_COMPLETE_DATA",
+		avm2_string(avm2_string_from_literal(ctx, "uploadCompleteData")));
 
 	// flash.events.MouseEvent.
 	Avm2Class* me = avm2_builtin_class(ctx, "flash.events", "MouseEvent",

@@ -550,6 +550,36 @@ def preprocess_input_json(src, dst, scale_factor=1.0):
     return sum(1 for l in lines if l == "WAIT")
 
 
+def preprocess_socket_json(src, dst):
+    """Convert socket.json to the runtime's line-based socket script.
+
+    Ruffle's `tests/socket-format` events map one-for-one:
+        Send{payload}      -> SEND <hex>
+        Receive{expected}  -> RECV <hex>
+        Disconnect         -> DISCONNECT
+        WaitForDisconnect  -> WAITDISCONNECT
+    An empty script ([]) still writes a file: its mere existence is what makes
+    connect() succeed (the mock in src/utils.c), which is exactly what
+    avm1/xml_socket_connect_null needs.
+    """
+    with open(src) as f:
+        events = json.load(f)
+    lines = []
+    for evt in events:
+        t = evt.get("type", "")
+        if t == "Send":
+            lines.append("SEND " + bytes(evt.get("payload", [])).hex())
+        elif t == "Receive":
+            lines.append("RECV " + bytes(evt.get("expected", [])).hex())
+        elif t == "Disconnect":
+            lines.append("DISCONNECT")
+        elif t == "WaitForDisconnect":
+            lines.append("WAITDISCONNECT")
+    with open(dst, "w") as f:
+        f.write("".join(l + "\n" for l in lines))
+    return len(lines)
+
+
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 TESTS_DIR = SCRIPT_DIR / "tests" / "swfs" / "avm1"
@@ -3686,6 +3716,13 @@ def main():
             sbn_cfg = test_dir / "swf_bridge_config.json"
             if sbn_cfg.exists():
                 run_env["SWF_BRIDGE_CONFIG"] = str(sbn_cfg)
+            # socket.json replay: argv slot 1 already belongs to the input
+            # event file, so the socket script travels by env var instead.
+            socket_json = test_dir / "socket.json"
+            if socket_json.exists():
+                socket_script = build_dir / "socket_script.txt"
+                preprocess_socket_json(socket_json, socket_script)
+                run_env["SWF_SOCKET_SCRIPT"] = str(socket_script)
             if has_image_cmps and args.uses_dawn:
                 triggers = []
                 for cmp_name, cmp_config in image_comparisons.items():

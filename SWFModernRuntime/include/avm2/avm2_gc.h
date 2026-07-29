@@ -112,6 +112,9 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx);
 void avm2_gc_mark_roots_events(Avm2Context* ctx);
 void avm2_gc_mark_roots_amf(Avm2Context* ctx);
 void avm2_gc_mark_roots_media(Avm2Context* ctx);
+// Live flash.net.Socket instances (and the XMLSocket half of a wrapped pair):
+// the mock transport holds them from C, exactly as Ruffle's Sockets map does.
+void avm2_gc_mark_roots_net(Avm2Context* ctx);
 void avm2_gc_mark_roots_globals(Avm2Context* ctx);
 void avm2_gc_mark_roots_external(Avm2Context* ctx);
 // E4X all-nodes registry: nodes are immortal non-census allocations whose

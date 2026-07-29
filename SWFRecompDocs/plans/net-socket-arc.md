@@ -7,8 +7,9 @@ run, SHA `bbefcf376`).
 CI `30403506144` then `30405770263`, both graphics/full green) — **+10 vs +9
 predicted, zero regressions**. Corpus effective 3890 → **3901 / 4420** (the
 11th gain is an unrelated `visual` flake), `avm2` 926 → **936 / 1221**.
-Postmortem in §6. **NEXT: tranche 2** (socket.json replay, +12,
-medium-large).
+**Tranche 2 SHIPPED** — socket.json replay + the Socket/XMLSocket data path;
+**14/14 targets pass locally in both modes** against a predicted 12.
+Postmortems in §6. **NEXT: tranche 3** (file dialogs, +10, medium).
 
 Scope of this document: the **net block** named as row 4e of
 `feature-priority-map.md` ("net/socket (29)"). The census below finds
@@ -509,3 +510,106 @@ largest blocks. One adjustment: tranche 5 (`IExternalizable` +
 `dynamicPropertyWriter`) is now slightly cheaper than scoped, because
 `Responder` and `NetConnection` exist and `avm2_net.c` is the obvious home for
 the `NetConnection.call` half of tranche 8 that will consume them.
+
+### Tranche 2 — SHIPPED, CI pending at write time
+
+**14/14 bucket-S targets pass locally, in BOTH modes, against a predicted 12.**
+The two 48-line `socket_read_big` / `socket_read_little` tests — named in §5 as
+"the ones with the most surface to get exactly right" — needed **no
+socket-specific read code at all**, which is where the +2 came from.
+
+Five pieces, in the order they were built:
+
+1. **The mock transport** (`src/utils.c`, ~330 lines). Ruffle's
+   `TestNavigatorBackend::connect_socket` spawns a future over the event list;
+   here the future is a per-connection **cursor** over the parsed script, the
+   player→server channel is an **outbox queue**, and the server→player channel
+   is one global **action queue**. `Receive` / `WaitForDisconnect` become "stop
+   advancing the cursor and return". Each connection replays the script from
+   its own cursor, because Ruffle clones the event list per connect.
+2. **`preprocess_socket_json`** in `verify_output.py` → `SEND/RECV <hex>`,
+   `DISCONNECT`, `WAITDISCONNECT`, handed to the runtime through
+   `SWF_SOCKET_SCRIPT` (argv slot 1 belongs to input events).
+3. **AVM2 `Socket`** — a ByteArray ext PAIR plus a **direction-aware alt
+   resolver** registered into `avm2_bytearray.c`. All 28 IDataInput/IDataOutput
+   bodies are shared verbatim; only the 11 `write*` entry points changed, from
+   `this_ba(act)` to `this_ba_w(act)`.
+4. **`flash.events.DataEvent`** (extends TextEvent, `data` = `text`) and a
+   native **`XMLSocket`** wrapping a private inner `Socket`.
+5. **AVM1 `XMLSocket`** — a pointer-keyed side table (the `NetConnection`
+   shape), NUL framing, and a real `onData` default that builds `new XML(...)`
+   and calls `this.onXML`.
+
+**The one real surprise, and the reusable lesson: our frame loops exit early;
+Ruffle's does not.** Both AVM1 loops (`swf_core.c`, `swf.c`) stop as soon as
+`quit_swf` is set and nothing is still asking to run — `hasActiveTimers()`,
+`hasPlayingSounds()`, `hasActiveNetStreams()`, … Ruffle's harness just runs its
+full `num_ticks`. A single-frame movie therefore died on tick 2, before the
+socket tick could deliver anything: four of the five AVM1 tests produced only
+the `onConnect` line, or nothing. The fix is a new `swf_socket_pending()` in
+the same idiom, added at **three** exit sites in `swf_core.c` (the `g_force_quit`
+gate, the past-last-frame gate, and the `current_frame >= g_frame_count` gate)
+and **two** in `swf.c`. The third `swf_core.c` site is the one that cost the
+extra debugging round — it sits ~300 lines *after* the socket tick, so tick 2
+pumped and then exited anyway.
+
+Generalize: **any new event source with its own tick cadence must also register
+as a reason for the AVM1 loop to keep ticking**, and the loop has more than one
+exit. `grep -n hasActiveNetStreams` finds all of them — it is already the
+canonical "an async subsystem is still live" predicate. The AVM2 loop
+(`avm2_display_run_tick`) has no such early exit and needed nothing.
+
+Two smaller findings:
+
+- **`bytesAvailable` does not need Ruffle's drain-from-front buffer.** Ruffle
+  pops the read buffer's front; we advance `position` and append inbound chunks
+  at the end. `bytesAvailable = len - position` is observationally identical for
+  every corpus test, and it makes `readBytes(ba, 0, 0)`'s "0 means the rest"
+  rule fall out of the existing ByteArray body unchanged.
+- **`XMLSocket.send(XML)` must use `toXMLString()`, not `toString()`.** The
+  distinction is load-bearing and the corpus pins it:
+  `<root>Hello!</root>.toString()` is the *text node* `Hello!`, so a
+  `toString()` implementation passes `avm1/xml_socket` and fails
+  `avm2/xml_socket`'s third `Receive`.
+
+**Blast radius, measured.** A stash-diff sweep over 25 canaries (ByteArray ×7,
+AMF ×3, NetConnection ×2, `air_hidden_lookup`, `verify_method_info_oob`, two
+input-driven tests, `all_classes/events/swf10`, `global_instance_decls`,
+`native_objects_swf6`, `mixed_avm/avm1_loads_avm2`,
+`from_avmplus/as3/AMF/AMFSerializer`) is **byte-identical except one**:
+`avm2/all_classes/events/swf10` goes from `DataEvent not accessible` to a real
+`describeType` block, shifting that dump's alignment. Exactly the
+`NetStatusEvent` case from tranche 1 — expect the same `matching_lines` dip on
+`all_classes/events/swf{9,10,11,12,30}` and read it as a fix, not a regression.
+Graphics-mode canaries were cross-checked against the no-graphics captures and
+differ only by Dawn's stderr warnings.
+
+The AVM1 `XMLSocket.prototype` shape was deliberately left **byte-identical to
+the stub's** — same six names, same order, same `DONT_ENUM | DONT_DELETE`
+flags, only the bodies replaced — because `global_instance_decls` enumerates
+this family. Ruffle's `timeout` accessor pair and its `onConnect`/`onClose`/
+`onXML` no-op defaults were NOT added: no corpus test observes them, and
+tranche 1's lesson cuts both ways (unobserved surface is surface that can only
+move someone else's lines).
+
+**Re-prediction of tranches 3–8 after tranche 2.**
+
+- **Tranche 3 (file dialogs, 14 candidates)** — was +10, now **+11**. The mock
+  scaffolding pattern is now proven end-to-end and reusable verbatim (script
+  file → env var → per-tick delivery), and `filereference_load`'s
+  `OPEN`/`PROGRESS`/`COMPLETE` ordering is the URLLoader drain the Loader arc
+  already ships. The AVM1 half now also has a home for its state (the side-table
+  idiom this tranche used for `XMLSocket`). Still the largest remaining block.
+  Watch item: `filereference_uninitialized` needs the class **sealed** (#1069 on
+  `extension`), the negative assertion §6's tranche-1 lesson warned about.
+- **Tranche 4 (`URLStream`, 2)** — was +2, now **+2 and cheaper**: `URLStream`
+  is `URLLoader`'s pipeline with an `IDataInput` face, and
+  `avm2_bytearray_install_data_io` + the alt resolver now make that face a
+  two-line addition rather than a port.
+- **Tranche 5 (AVM2 AMF gaps, 1)** — unchanged at **+1**.
+- **Tranche 6 (`LocalConnection`, 4)** — unchanged at **+3**.
+- **Tranche 7 (AVM1 AMF0 serializer, 9)** — unchanged at **+4**; still the one
+  genuinely large subsystem in the arc.
+- **Tranche 8 (AVM2 `NetConnection.call`, 3)** — unchanged at **+2**.
+
+Arc total if 3–8 land: **+23** on top of tranche 1+2's +24.

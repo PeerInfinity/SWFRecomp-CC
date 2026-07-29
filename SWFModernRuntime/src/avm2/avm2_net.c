@@ -10,8 +10,7 @@
 // that is what the corpus grades:
 //
 //   * `Socket` — every read/write/flush/close on an unconnected socket throws
-//     IOError #2002, which is the whole of `socket_errors` (56 lines). The
-//     buffers and the socket.json replay that fill them arrive in tranche 2.
+//     IOError #2002, which is the whole of `socket_errors` (56 lines).
 //   * `NetConnection` — a two-variant protocol model (Ruffle
 //     core/src/net_connection.rs): `connect(null)` opens a "local" connection
 //     that reports a fixed set of constants, `connect("http(s)://…")` opens a
@@ -21,8 +20,17 @@
 //   * The NetStatusEvent dispatch ORDER around connect/close, including the
 //     second, empty-code event Flash emits when an explicit close tears down a
 //     Flash Remoting connection — `netconnection_close` grades exactly that.
+//
+// Tranche 2 put a transport behind the socket half: a `Socket` now owns a
+// ByteArray ext PAIR (inbound / outbound) and reuses avm2_bytearray.c's 28
+// IDataInput/IDataOutput bodies verbatim through the direction-aware alt
+// resolver, while `XMLSocket` sits on top as a NUL-framed DataEvent source.
+// The bytes come from the scripted mock in src/utils.c (socket.json replay);
+// with no script loaded connect() opens nothing and the #2002 surface above
+// is exactly what remains.
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <avm2/avm2_abc.h>
@@ -30,8 +38,10 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_value.h>
+#include <socket_events.h>
 
 // ---------------------------------------------------------------------------
 // shared helpers
@@ -59,28 +69,62 @@ static int net2_arg_bool(Avm2Activation* act, uint32_t i, int dflt)
 // ---------------------------------------------------------------------------
 //
 // Ruffle's Socket is an EventDispatcher over a pair of buffers plus a handle
-// into the navigator's socket table. With no transport there is never a
-// handle, so `connected` is false and every operation that would touch the
-// wire raises #2002 — Ruffle's `Socket.as` guards each one with
-// `if (!this.connected) throw new IOError(...)`, and Flash renders that as
-// "Error: Error #2002: …" because Error's constructor stamps `this.name` from
-// *Error*'s prototype, not the subclass's (see avm2_error.c::error_init).
+// into the navigator's socket table. Every operation that would touch the
+// wire first asserts the socket is open and raises IOError #2002 otherwise —
+// Ruffle's socket.rs guards each native with `assert_socket_open!`, and Flash
+// renders that as "Error: Error #2002: …" because Error's constructor stamps
+// `this.name` from *Error*'s prototype, not the subclass's (see
+// avm2_error.c::error_init).
+//
+// The two buffers are plain Avm2ByteArrayExts, so all 28 IDataInput /
+// IDataOutput bodies are shared with flash.utils.ByteArray unchanged: reads
+// resolve to the inbound buffer, writes to the outbound one. Ruffle drains
+// its read buffer from the front; we advance `position` instead, which is
+// behaviourally identical (bytesAvailable = len - position) and lets an
+// inbound chunk simply append.
 
 typedef struct Avm2SocketExt
 {
 	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
-	uint8_t connected;
-	const Avm2String* endian;           // NULL == "bigEndian"
-	uint32_t object_encoding;
+	Avm2Object* self;                   // the dispatch callback's target
+	Avm2Object* xml_owner;              // set when this Socket backs an XMLSocket
+	int handle;                         // mock handle; 0 = never connected
+	Avm2ByteArrayExt in_buf;            // server -> player
+	Avm2ByteArrayExt out_buf;           // player -> server, drained by flush()
 	double timeout;
 } Avm2SocketExt;
 
 static Avm2Class* g_socket_class;
 
+// Live sockets are GC roots: Ruffle's `Sockets` map holds a GC pointer to each
+// target, so a socket whose only other reference is a closure over it must
+// survive until the connection ends.
+#define MAX_LIVE_SOCKETS 32
+static Avm2Object* g_live_sockets[MAX_LIVE_SOCKETS];
+static int g_live_socket_count;
+
+static void socket_root(Avm2Object* o)
+{
+	if (o == NULL) return;
+	for (int i = 0; i < g_live_socket_count; i++)
+		if (g_live_sockets[i] == o) return;
+	if (g_live_socket_count < MAX_LIVE_SOCKETS)
+		g_live_sockets[g_live_socket_count++] = o;
+}
+
+static int socket_obj_is(Avm2Object* o)
+{
+	if (o == NULL || g_socket_class == NULL) return 0;
+	for (Avm2Class* c = o->cls; c != NULL; c = c->super_class)
+		if (c == g_socket_class) return 1;
+	return 0;
+}
+
 static Avm2SocketExt* socket_ext(Avm2Activation* act)
 {
 	Avm2Object* o = net2_this(act);
-	return (o != NULL && o->native_ext != NULL) ? (Avm2SocketExt*) o->native_ext : NULL;
+	if (!socket_obj_is(o) || o->native_ext == NULL) return NULL;
+	return (Avm2SocketExt*) o->native_ext;
 }
 
 static _Noreturn void socket_throw_invalid(Avm2Context* ctx)
@@ -89,69 +133,224 @@ static _Noreturn void socket_throw_invalid(Avm2Context* ctx)
 	                 "Error #2002: Operation attempted on invalid socket.");
 }
 
-// Every wire operation funnels through here. Once tranche 2 gives the class a
-// real buffer pair this becomes the only guard that stays.
-static void socket_require_connected(Avm2Activation* act)
+static int socket_is_open(const Avm2SocketExt* e)
+{
+	return e != NULL && e->handle != 0 && swf_socket_is_connected(e->handle);
+}
+
+static Avm2SocketExt* socket_require_open(Avm2Activation* act)
 {
 	Avm2SocketExt* e = socket_ext(act);
-	if (e == NULL || !e->connected) socket_throw_invalid(act->ctx);
+	if (!socket_is_open(e)) socket_throw_invalid(act->ctx);
+	return e;
+}
+
+// avm2_bytearray.c's alt resolver: hands the ByteArray bodies whichever of
+// the two buffers matches the direction, after the same open-socket assert
+// every Ruffle native performs.
+static Avm2ByteArrayExt* socket_ba_resolve(Avm2Activation* act, int write_dir)
+{
+	Avm2Object* o = net2_this(act);
+	if (!socket_obj_is(o) || o->native_ext == NULL) return NULL;
+	Avm2SocketExt* e = (Avm2SocketExt*) o->native_ext;
+	if (!socket_is_open(e)) socket_throw_invalid(act->ctx);
+	return write_dir ? &e->out_buf : &e->in_buf;
 }
 
 static Avm2Value socket_init(Avm2Activation* act)
 {
+	Avm2Object* o = net2_this(act);
 	Avm2SocketExt* e = socket_ext(act);
 	if (e == NULL) return avm2_undefined();
-	e->connected = 0;
-	e->endian = NULL;
-	e->object_encoding = 3;
+	memset(&e->in_buf, 0, sizeof(e->in_buf));
+	memset(&e->out_buf, 0, sizeof(e->out_buf));
+	e->in_buf.object_encoding = 3;
+	e->out_buf.object_encoding = 3;
+	e->handle = 0;
+	e->self = o;
+	e->xml_owner = NULL;
 	e->timeout = 20000;
-	// Socket(host, port) with a non-null host connects immediately. There is
-	// no transport yet, so the constructor form behaves like the explicit
-	// connect() below: it opens nothing.
+	// Socket(host, port) with a non-null host connects immediately.
+	if (act->argc > 0 && act->args[0].kind != AVM2_VALUE_NULL
+	    && act->args[0].kind != AVM2_VALUE_UNDEFINED)
+	{
+		return avm2_call_public_property(act->ctx, act->this_val, "connect", 7,
+		                                 act->args, act->argc);
+	}
 	return avm2_undefined();
+}
+
+// XMLSocket's private listeners on its inner Socket (see the XMLSocket block
+// below); a no-op when this Socket is script-visible.
+static void xmlsocket_relay(Avm2Context* ctx, Avm2Object* xml_obj,
+                            Avm2SocketExt* sock, int action, size_t chunk_len);
+
+// Server -> player, delivered by the mock at the tick boundary.
+static void socket_dispatch(void* target, int action,
+                            const unsigned char* data, size_t len)
+{
+	Avm2Object* o = (Avm2Object*) target;
+	if (o == NULL || o->native_ext == NULL) return;
+	Avm2SocketExt* e = (Avm2SocketExt*) o->native_ext;
+	Avm2Context* ctx = avm2_get_context();
+
+	switch (action)
+	{
+	case SWF_SOCKET_CONNECT:
+	{
+		Avm2Object* ev = avm2_event_new(ctx, avm2_string_from_literal(ctx, "connect"),
+		                                0, 0);
+		if (ev != NULL) avm2_dispatch_event(ctx, o, ev);
+		break;
+	}
+	case SWF_SOCKET_DATA:
+	{
+		// Append at the end, leaving `position` (the read cursor) alone.
+		uint32_t at = e->in_buf.len;
+		avm2_bytearray_set_length_public(ctx, &e->in_buf, at + (uint32_t) len);
+		if (len > 0) memcpy(e->in_buf.bytes + at, data, len);
+		// bytesTotal is unused by socketData (Ruffle passes 0).
+		Avm2Object* ev = avm2_progress_event_new(
+			ctx, avm2_string_from_literal(ctx, "socketData"), (double) len, 0);
+		if (ev != NULL) avm2_dispatch_event(ctx, o, ev);
+		break;
+	}
+	case SWF_SOCKET_CLOSE:
+	{
+		e->in_buf.len = 0;
+		e->in_buf.position = 0;
+		e->out_buf.len = 0;
+		e->out_buf.position = 0;
+		Avm2Object* ev = avm2_event_new(ctx, avm2_string_from_literal(ctx, "close"),
+		                                0, 0);
+		if (ev != NULL) avm2_dispatch_event(ctx, o, ev);
+		break;
+	}
+	default:
+		break;
+	}
+	if (e->xml_owner != NULL) xmlsocket_relay(ctx, e->xml_owner, e, action, len);
 }
 
 static Avm2Value socket_connect(Avm2Activation* act)
 {
-	// No transport: the connection never establishes, so nothing changes and
-	// no event is dispatched. Tranche 2 replaces this wholesale.
-	(void) act;
+	Avm2Context* ctx = act->ctx;
+	Avm2SocketExt* e = socket_ext(act);
+	if (e == NULL) return avm2_undefined();
+
+	char host[512];
+	host[0] = '\0';
+	if (act->argc > 0)
+	{
+		const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+		if (s != NULL)
+		{
+			size_t n = s->len < sizeof(host) - 1 ? s->len : sizeof(host) - 1;
+			memcpy(host, s->utf8, n);
+			host[n] = '\0';
+		}
+	}
+	uint32_t port = act->argc > 1 ? avm2_coerce_to_u32(ctx, act->args[1]) : 0;
+	if (port > 0xFFFF)
+	{
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #2003: Invalid socket port number specified.");
+	}
+
+	socket_root(e->self);
+
+	int prev = e->handle;
+	// Flash's `host` is a C string and stops at a NUL (Ruffle sanitize_host);
+	// the copy above already truncates there.
+	e->handle = swf_socket_connect(host, (int) port, e->self, socket_dispatch);
+	// "When a new connection is created the existing one is closed" (AS3 docs).
+	if (prev != 0) swf_socket_close(prev);
 	return avm2_undefined();
 }
 
-static Avm2Value socket_wire_op(Avm2Activation* act)
+static Avm2Value socket_close(Avm2Activation* act)
 {
-	socket_require_connected(act);
+	Avm2SocketExt* e = socket_require_open(act);
+	swf_socket_close(e->handle);
+	return avm2_undefined();
+}
+
+// One flush() = one message on the wire. The write buffer is drained whole,
+// regardless of where `position` sits.
+static Avm2Value socket_flush(Avm2Activation* act)
+{
+	Avm2SocketExt* e = socket_require_open(act);
+	swf_socket_send(e->handle, e->out_buf.bytes, e->out_buf.len);
+	e->out_buf.len = 0;
+	e->out_buf.position = 0;
 	return avm2_undefined();
 }
 
 static Avm2Value socket_get_connected(Avm2Activation* act)
-{ Avm2SocketExt* e = socket_ext(act); return avm2_bool(e != NULL && e->connected); }
+{ return avm2_bool(socket_is_open(socket_ext(act))); }
 
 static Avm2Value socket_get_bytes_available(Avm2Activation* act)
+{
+	Avm2SocketExt* e = socket_ext(act);
+	if (e == NULL) return avm2_uint_value(0);
+	uint32_t p = e->in_buf.position, n = e->in_buf.len;
+	return avm2_uint_value(p <= n ? n - p : 0);
+}
+
+// bytesPending is a Ruffle stub_getter that returns 0 regardless.
+static Avm2Value socket_get_bytes_pending(Avm2Activation* act)
 { (void) act; return avm2_uint_value(0); }
 
 static Avm2Value socket_get_endian(Avm2Activation* act)
 {
 	Avm2SocketExt* e = socket_ext(act);
-	return (e != NULL && e->endian != NULL) ? avm2_string(e->endian)
-	                                        : net2_str(act, "bigEndian");
+	return net2_str(act, (e != NULL && e->in_buf.endian_little) ? "littleEndian"
+	                                                           : "bigEndian");
 }
 static Avm2Value socket_set_endian(Avm2Activation* act)
 {
+	Avm2Context* ctx = act->ctx;
 	Avm2SocketExt* e = socket_ext(act);
-	if (e != NULL && act->argc > 0)
-		e->endian = avm2_coerce_to_string(act->ctx, act->args[0]);
+	if (e == NULL) return avm2_undefined();
+	const Avm2String* s = act->argc > 0 ? avm2_coerce_to_string(ctx, act->args[0])
+	                                    : NULL;
+	int little;
+	if (s != NULL && s->len == 12 && memcmp(s->utf8, "littleEndian", 12) == 0)
+		little = 1;
+	else if (s != NULL && s->len == 9 && memcmp(s->utf8, "bigEndian", 9) == 0)
+		little = 0;
+	else
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2008: Parameter endian must be one of the "
+		                 "accepted values.");
+	}
+	// Mirrored into both halves: the shared ByteArray bodies read it off
+	// whichever ext the direction resolved to.
+	e->in_buf.endian_little = (uint8_t) little;
+	e->out_buf.endian_little = (uint8_t) little;
 	return avm2_undefined();
 }
 
 static Avm2Value socket_get_object_encoding(Avm2Activation* act)
-{ Avm2SocketExt* e = socket_ext(act); return avm2_uint_value(e ? e->object_encoding : 3); }
-static Avm2Value socket_set_object_encoding(Avm2Activation* act)
 {
 	Avm2SocketExt* e = socket_ext(act);
-	if (e != NULL && act->argc > 0)
-		e->object_encoding = avm2_coerce_to_u32(act->ctx, act->args[0]);
+	return avm2_uint_value(e != NULL ? e->in_buf.object_encoding : 3);
+}
+static Avm2Value socket_set_object_encoding(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2SocketExt* e = socket_ext(act);
+	if (e == NULL) return avm2_undefined();
+	uint32_t enc = act->argc > 0 ? avm2_coerce_to_u32(ctx, act->args[0]) : 3;
+	if (enc != 0 && enc != 3)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2008: Parameter objectEncoding must be one of "
+		                 "the accepted values.");
+	}
+	e->in_buf.object_encoding = (uint8_t) enc;
+	e->out_buf.object_encoding = (uint8_t) enc;
 	return avm2_undefined();
 }
 
@@ -171,6 +370,22 @@ static Avm2Value socket_set_timeout(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+void avm2_gc_mark_roots_net(Avm2Context* ctx)
+{
+	(void) ctx;
+	for (int i = 0; i < g_live_socket_count; i++)
+	{
+		Avm2Object* o = g_live_sockets[i];
+		if (o == NULL) continue;
+		avm2_gc_mark_object(o);
+		// An XMLSocket's inner Socket is reachable only from C, and the
+		// XMLSocket itself only from the inner Socket's back-pointer while
+		// the connection lives — mark both halves of the pair.
+		Avm2SocketExt* e = (Avm2SocketExt*) o->native_ext;
+		if (e != NULL && e->xml_owner != NULL) avm2_gc_mark_object(e->xml_owner);
+	}
+}
+
 static void register_socket(Avm2Context* ctx)
 {
 	Avm2Class* cls = avm2_builtin_class(ctx, "flash.net", "Socket",
@@ -179,32 +394,238 @@ static void register_socket(Avm2Context* ctx)
 	cls->instance_init.debug_name = "Socket";
 	cls->native_ext_size = sizeof(Avm2SocketExt);
 	g_socket_class = cls;
+	avm2_bytearray_set_alt_resolver(socket_ba_resolve);
 
 	avm2_builtin_add_method(ctx, cls, "connect", socket_connect);
+	avm2_builtin_add_method(ctx, cls, "close", socket_close);
+	avm2_builtin_add_method(ctx, cls, "flush", socket_flush);
 	avm2_builtin_add_getter(ctx, cls, "connected", socket_get_connected);
 	avm2_builtin_add_getter(ctx, cls, "bytesAvailable", socket_get_bytes_available);
-	avm2_builtin_add_getter(ctx, cls, "bytesPending", socket_get_bytes_available);
+	avm2_builtin_add_getter(ctx, cls, "bytesPending", socket_get_bytes_pending);
 	avm2_builtin_add_getset(ctx, cls, "endian", socket_get_endian, socket_set_endian);
 	avm2_builtin_add_getset(ctx, cls, "objectEncoding",
 	                        socket_get_object_encoding, socket_set_object_encoding);
 	avm2_builtin_add_getset(ctx, cls, "timeout",
 	                        socket_get_timeout, socket_set_timeout);
 
-	// Everything that touches the wire. On an unconnected socket they are all
-	// #2002, which is `socket_errors` in its entirety; tranche 2 splits this
-	// list into real read/write bodies over the buffer pair.
-	static const char* const wire_ops[] = {
-		"close", "flush",
-		"readBoolean", "readByte", "readBytes", "readDouble", "readFloat",
-		"readInt", "readMultiByte", "readObject", "readShort",
-		"readUnsignedByte", "readUnsignedInt", "readUnsignedShort", "readUTF",
-		"readUTFBytes",
-		"writeBoolean", "writeByte", "writeBytes", "writeDouble", "writeFloat",
-		"writeInt", "writeMultiByte", "writeObject", "writeShort",
-		"writeUnsignedInt", "writeUTF", "writeUTFBytes",
-	};
-	for (size_t i = 0; i < sizeof(wire_ops) / sizeof(wire_ops[0]); i++)
-		avm2_builtin_add_method(ctx, cls, wire_ops[i], socket_wire_op);
+	// The 28 IDataInput/IDataOutput bodies, shared verbatim with ByteArray.
+	// Each one resolves its buffer through socket_ba_resolve, which is also
+	// where the #2002 assert lives — that is the whole of `socket_errors`.
+	avm2_bytearray_install_data_io(ctx, cls);
+}
+
+// ---------------------------------------------------------------------------
+// flash.net.XMLSocket
+// ---------------------------------------------------------------------------
+//
+// In Ruffle this is playerglobal AS3 (XMLSocket.as) wrapping a private
+// flash.net.Socket; here it is the same wrapper written in C. Everything
+// script-visible delegates to the inner Socket — including its errors, which
+// is why close()/send() on an unconnected XMLSocket surface as IOError #2002
+// and why `timeout` inherits Socket's 250ms floor.
+//
+// Inbound bytes are re-framed: XMLSocket reads the chunk one byte at a time,
+// accumulating into a temp buffer and emitting a DataEvent at each NUL. The
+// temp buffer persists across chunks, so a frame may span them; a trailing
+// unterminated fragment is dropped by close().
+
+typedef struct Avm2XmlSocketExt
+{
+	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+	Avm2Object* socket;                 // the private inner flash.net.Socket
+	char* frame;                        // bytes since the last NUL
+	size_t frame_len, frame_cap;
+} Avm2XmlSocketExt;
+
+static Avm2Class* g_xml_socket_class;
+
+static Avm2XmlSocketExt* xmlsocket_ext(Avm2Activation* act)
+{
+	Avm2Object* o = net2_this(act);
+	if (o == NULL || o->native_ext == NULL || g_xml_socket_class == NULL) return NULL;
+	for (Avm2Class* c = o->cls; c != NULL; c = c->super_class)
+		if (c == g_xml_socket_class) return (Avm2XmlSocketExt*) o->native_ext;
+	return NULL;
+}
+
+static Avm2SocketExt* xmlsocket_inner(Avm2XmlSocketExt* x)
+{
+	if (x == NULL || x->socket == NULL) return NULL;
+	return (Avm2SocketExt*) x->socket->native_ext;
+}
+
+static void xmlsocket_frame_push(Avm2XmlSocketExt* x, unsigned char b)
+{
+	if (x->frame_len == x->frame_cap)
+	{
+		size_t ncap = x->frame_cap ? x->frame_cap * 2 : 64;
+		char* nf = (char*) realloc(x->frame, ncap);
+		if (nf == NULL) return;
+		x->frame = nf;
+		x->frame_cap = ncap;
+	}
+	x->frame[x->frame_len++] = (char) b;
+}
+
+static void xmlsocket_relay(Avm2Context* ctx, Avm2Object* xml_obj,
+                            Avm2SocketExt* sock, int action, size_t chunk_len)
+{
+	Avm2XmlSocketExt* x = (Avm2XmlSocketExt*) xml_obj->native_ext;
+	if (x == NULL) return;
+
+	if (action == SWF_SOCKET_CONNECT || action == SWF_SOCKET_CLOSE)
+	{
+		if (action == SWF_SOCKET_CLOSE) x->frame_len = 0;
+		Avm2Object* ev = avm2_event_new(
+			ctx, avm2_string_from_literal(
+				ctx, action == SWF_SOCKET_CONNECT ? "connect" : "close"), 0, 0);
+		if (ev != NULL) avm2_dispatch_event(ctx, xml_obj, ev);
+		return;
+	}
+	if (action != SWF_SOCKET_DATA) return;
+
+	// socketDataListener: exactly `bytesLoaded` readByte() calls, splitting at
+	// every NUL. Re-read the buffer position each time — a DataEvent handler
+	// may close the socket, and Ruffle's loop keeps reading its own chunk.
+	for (size_t i = 0; i < chunk_len; i++)
+	{
+		if (sock->in_buf.position >= sock->in_buf.len) break;
+		unsigned char b = sock->in_buf.bytes[sock->in_buf.position++];
+		if (b != 0)
+		{
+			xmlsocket_frame_push(x, b);
+			continue;
+		}
+		const Avm2String* s = avm2_string_new(
+			ctx, x->frame != NULL ? x->frame : "", (uint32_t) x->frame_len);
+		x->frame_len = 0;
+		Avm2Object* ev = avm2_data_event_new(
+			ctx, avm2_string_from_literal(ctx, "data"), 0, 0, s);
+		if (ev != NULL) avm2_dispatch_event(ctx, xml_obj, ev);
+	}
+}
+
+static Avm2Value xmlsocket_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* o = net2_this(act);
+	Avm2XmlSocketExt* x = xmlsocket_ext(act);
+	if (x == NULL) return avm2_undefined();
+	x->frame = NULL;
+	x->frame_len = 0;
+	x->frame_cap = 0;
+
+	Avm2Value sv = avm2_class_construct(ctx, g_socket_class, NULL, 0);
+	x->socket = (sv.kind == AVM2_VALUE_OBJECT) ? sv.u.obj : NULL;
+	Avm2SocketExt* s = xmlsocket_inner(x);
+	if (s != NULL) s->xml_owner = o;
+	// The inner Socket has no script-visible reference at all; root it now
+	// rather than at connect() so an unconnected XMLSocket stays intact.
+	socket_root(x->socket);
+
+	if (act->argc > 0 && act->args[0].kind != AVM2_VALUE_NULL
+	    && act->args[0].kind != AVM2_VALUE_UNDEFINED)
+	{
+		return avm2_call_public_property(ctx, act->this_val, "connect", 7,
+		                                 act->args, act->argc);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value xmlsocket_connect(Avm2Activation* act)
+{
+	Avm2XmlSocketExt* x = xmlsocket_ext(act);
+	if (x == NULL || x->socket == NULL) return avm2_undefined();
+	// A null host falls back to the movie's domain, which for our file://
+	// movies is "localhost" (Ruffle's XMLSocket.domain()).
+	Avm2Value args[2];
+	args[0] = (act->argc > 0 && act->args[0].kind != AVM2_VALUE_NULL)
+		? act->args[0] : net2_str(act, "localhost");
+	args[1] = act->argc > 1 ? act->args[1] : avm2_integer(0);
+	return avm2_call_public_property(act->ctx, avm2_object_value(x->socket),
+	                                 "connect", 7, args, 2);
+}
+
+static Avm2Value xmlsocket_close(Avm2Activation* act)
+{
+	Avm2XmlSocketExt* x = xmlsocket_ext(act);
+	if (x == NULL || x->socket == NULL) return avm2_undefined();
+	x->frame_len = 0;
+	return avm2_call_public_property(act->ctx, avm2_object_value(x->socket),
+	                                 "close", 5, NULL, 0);
+}
+
+static Avm2Value xmlsocket_send(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2XmlSocketExt* x = xmlsocket_ext(act);
+	if (x == NULL || x->socket == NULL) return avm2_undefined();
+	Avm2Value arg = act->argc > 0 ? act->args[0] : avm2_undefined();
+
+	// XML / XMLList serialise with toXMLString(); everything else toString().
+	// The distinction is load-bearing: <root>Hello!</root>.toString() is the
+	// text node "Hello!", not the markup.
+	const Avm2String* val;
+	if (arg.kind == AVM2_VALUE_OBJECT && arg.u.obj != NULL
+	    && (arg.u.obj->cls == ctx->builtins.xml_class
+	        || arg.u.obj->cls == ctx->builtins.xml_list_class))
+	{
+		Avm2Value s = avm2_call_public_property(ctx, arg, "toXMLString", 11, NULL, 0);
+		val = avm2_coerce_to_string(ctx, s);
+	}
+	else
+	{
+		val = avm2_coerce_to_string(ctx, arg);
+	}
+
+	Avm2Value sock = avm2_object_value(x->socket);
+	Avm2Value a0 = avm2_string(val);
+	avm2_call_public_property(ctx, sock, "writeUTFBytes", 13, &a0, 1);
+	Avm2Value zero = avm2_integer(0);
+	avm2_call_public_property(ctx, sock, "writeByte", 9, &zero, 1);
+	avm2_call_public_property(ctx, sock, "flush", 5, NULL, 0);
+	return avm2_undefined();
+}
+
+static Avm2Value xmlsocket_get_connected(Avm2Activation* act)
+{
+	Avm2SocketExt* s = xmlsocket_inner(xmlsocket_ext(act));
+	return avm2_bool(socket_is_open(s));
+}
+
+static Avm2Value xmlsocket_get_timeout(Avm2Activation* act)
+{
+	Avm2SocketExt* s = xmlsocket_inner(xmlsocket_ext(act));
+	return avm2_uint_value(s != NULL ? (uint32_t) s->timeout : 20000);
+}
+
+static Avm2Value xmlsocket_set_timeout(Avm2Activation* act)
+{
+	Avm2SocketExt* s = xmlsocket_inner(xmlsocket_ext(act));
+	if (s == NULL) return avm2_undefined();
+	// Delegates to Socket.timeout, so it inherits the 250ms floor — that is
+	// what avm2/xml_socket's "Timeout clamp" block (20000, then 0 -> 250)
+	// grades.
+	uint32_t v = act->argc > 0 ? avm2_coerce_to_u32(act->ctx, act->args[0]) : 0;
+	s->timeout = (v < 250) ? 250 : v;
+	return avm2_undefined();
+}
+
+static void register_xml_socket(Avm2Context* ctx)
+{
+	Avm2Class* cls = avm2_builtin_class(ctx, "flash.net", "XMLSocket",
+	                                    ctx->builtins.event_dispatcher_class);
+	cls->instance_init.fn = xmlsocket_init;
+	cls->instance_init.debug_name = "XMLSocket";
+	cls->native_ext_size = sizeof(Avm2XmlSocketExt);
+	g_xml_socket_class = cls;
+
+	avm2_builtin_add_method(ctx, cls, "connect", xmlsocket_connect);
+	avm2_builtin_add_method(ctx, cls, "close", xmlsocket_close);
+	avm2_builtin_add_method(ctx, cls, "send", xmlsocket_send);
+	avm2_builtin_add_getter(ctx, cls, "connected", xmlsocket_get_connected);
+	avm2_builtin_add_getset(ctx, cls, "timeout",
+	                        xmlsocket_get_timeout, xmlsocket_set_timeout);
 }
 
 // ---------------------------------------------------------------------------
@@ -782,6 +1203,7 @@ AVNP_STR_ACCESSORS(query_param, avnp_get_qp, avnp_set_qp)
 void avm2_register_net_transport(Avm2Context* ctx)
 {
 	register_socket(ctx);
+	register_xml_socket(ctx);
 	register_net_connection(ctx);
 	register_net_stream(ctx);
 

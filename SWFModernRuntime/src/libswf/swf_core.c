@@ -22,6 +22,7 @@
 #include <variables.h>
 #include <object.h>
 #include <utils.h>
+#include <socket_events.h>
 #include <heap.h>
 
 // Core runtime state - exported
@@ -977,6 +978,7 @@ void swfStart(SWFAppContext* app_context)
 			    && !hasActiveTimers()
 			    && !hasPlayingSounds()
 			    && !hasActiveNetStreams()
+			    && !swf_socket_pending()
 			    && !hasClipEnterFrameHandlers()) break;
 		}
 
@@ -1158,12 +1160,16 @@ void swfStart(SWFAppContext* app_context)
 				extern int hasPlayingSounds(void);
 				extern int hasActiveNetStreams(void);
 				extern int hasPlayingLevels(void);
+				// An open socket (or an undelivered socket action) keeps the
+				// player alive the same way an active NetStream does — the
+				// socket tick below is what would deliver it.
 				if (quit_swf && !(g_events && g_event_pos < g_event_count)
 				    && !actionHasEnterFrameHandlers()
 				    && !hasPlayingSprites()
 				    && !hasActiveTimers()
 				    && !hasPlayingSounds()
 				    && !hasActiveNetStreams()
+				    && !swf_socket_pending()
 				    && !hasPlayingLevels()
 				    && !hasClipEnterFrameHandlers()
 				    && g_pending_mcl_load_count == 0
@@ -1236,6 +1242,17 @@ void swfStart(SWFAppContext* app_context)
 		// Deliver queued input events for this tick (after frame scripts ran)
 		if (g_events) {
 			input_events_pump_tick(app_context);
+		}
+
+		// Sockets: Ruffle's player.tick runs update_sockets right after the
+		// frame, then polls the mock transport once the tick is over
+		// (runner.rs do_tick -> executor.run). swf_socket_tick is both halves
+		// in that order — deliver, then pump — so an action queued during
+		// tick N is dispatched after frame N+1 runs. No-op with no
+		// socket.json loaded.
+		{
+			extern void swf_socket_tick(int owner);
+			swf_socket_tick(1);
 		}
 
 		// Per-tick button state re-evaluation (NO_GRAPHICS mode).
@@ -1534,6 +1551,10 @@ void swfStart(SWFAppContext* app_context)
 			{ extern int hasPlayingLevels(void); if (hasPlayingLevels()) continue; }
 			{ extern int hasPlayingSounds(void); if (hasPlayingSounds()) continue; }
 			{ extern int hasActiveNetStreams(void); if (hasActiveNetStreams()) continue; }
+			// An open socket (or an undelivered socket action) is a reason to
+			// keep ticking, same as an active NetStream: the socket tick at the
+			// top of the loop is what would deliver it.
+			if (swf_socket_pending()) continue;
 			break;
 		}
 		else if (manual_next_frame)

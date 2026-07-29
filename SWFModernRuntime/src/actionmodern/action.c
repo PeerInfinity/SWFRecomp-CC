@@ -36,6 +36,7 @@
 #include <tag.h>
 #include <heap.h>
 #include <map.h>
+#include <socket_events.h>
 #include <actionmodern/object.h>
 #include <actionmodern/action_internal.h>
 #include <actionmodern/actionmath.h>
@@ -36556,7 +36557,270 @@ static void initVideoPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	addStubMethodToProto(app_context, ctor->prototype_obj, "clear", 5, mflags);
 }
 
-// XMLSocket.prototype: 6 methods
+// ---------------------------------------------------------------------------
+// XMLSocket (AVM1) — Ruffle core/src/avm1/globals/xml_socket.rs
+// ---------------------------------------------------------------------------
+//
+// Per-instance native state hangs off a pointer-keyed side table, the same
+// shape NetConnection/NetStream use above. The transport is the scripted mock
+// in src/utils.c; with no socket.json loaded connect() still returns true (it
+// always does — "we do not know yet whether the connection will succeed") but
+// nothing is ever opened, so send/close stay silent no-ops.
+//
+// Inbound framing is the part the corpus actually grades (xml_socket_segmented,
+// 29 lines): a chunk is appended to the read buffer and then COMPLETE
+// NUL-terminated frames are split off the FRONT one at a time, each handed to
+// onData without its NUL. The buffer is re-examined between calls because a
+// handler may close the socket — which clears it, dropping anything still
+// queued. A trailing unterminated fragment stays buffered and dies unfired at
+// disconnect.
+
+#define MAX_XMLSOCK_STATES 32
+typedef struct
+{
+	ASObject* obj;
+	SWFAppContext* app;   // captured at connect(); the mock callback has no ctx
+	int handle;       // mock handle; 0 = never connected
+	u32 timeout;
+	char* buf;        // inbound bytes since the last complete frame
+	size_t buf_len, buf_cap;
+} XmlSockState;
+static XmlSockState g_xmlsock_states[MAX_XMLSOCK_STATES];
+static int g_xmlsock_state_count = 0;
+
+static XmlSockState* xmlsock_find(ASObject* o)
+{
+	for (int i = 0; i < g_xmlsock_state_count; i++)
+		if (g_xmlsock_states[i].obj == o) return &g_xmlsock_states[i];
+	return NULL;
+}
+
+static XmlSockState* xmlsock_get(ASObject* o)
+{
+	XmlSockState* s = xmlsock_find(o);
+	if (s != NULL) return s;
+	if (g_xmlsock_state_count >= MAX_XMLSOCK_STATES) return NULL;
+	s = &g_xmlsock_states[g_xmlsock_state_count++];
+	memset(s, 0, sizeof(*s));
+	s->obj = o;
+	s->timeout = 20000;  // Ruffle's default
+	return s;
+}
+
+static void xmlsock_buf_append(XmlSockState* s, const unsigned char* d, size_t n)
+{
+	if (s->buf_len + n > s->buf_cap)
+	{
+		size_t ncap = s->buf_cap ? s->buf_cap : 64;
+		while (ncap < s->buf_len + n) ncap *= 2;
+		char* nb = (char*) realloc(s->buf, ncap);
+		if (nb == NULL) return;
+		s->buf = nb;
+		s->buf_cap = ncap;
+	}
+	memcpy(s->buf + s->buf_len, d, n);
+	s->buf_len += n;
+}
+
+// Server -> player, delivered by the mock at the tick boundary.
+static void xmlsock_dispatch(void* target, int action,
+                             const unsigned char* data, size_t len)
+{
+	ASObject* sock = (ASObject*) target;
+	if (sock == NULL) return;
+	XmlSockState* s = xmlsock_find(sock);
+	if (s == NULL || s->app == NULL) return;
+	SWFAppContext* app_context = s->app;
+
+	if (action == SWF_SOCKET_CONNECT)
+	{
+		ActionVar ok = {0};
+		ok.type = ACTION_STACK_VALUE_BOOLEAN;
+		ok.data.numeric_value = 1;
+		soundFireCallback(app_context, sock, "onConnect", 9, &ok, 1);
+		return;
+	}
+	if (action == SWF_SOCKET_CLOSE)
+	{
+		s->buf_len = 0;
+		soundFireCallback(app_context, sock, "onClose", 7, NULL, 0);
+		return;
+	}
+	if (action != SWF_SOCKET_DATA) return;
+
+	xmlsock_buf_append(s, data, len);
+	for (;;)
+	{
+		size_t pos = 0;
+		while (pos < s->buf_len && s->buf[pos] != '\0') pos++;
+		if (pos >= s->buf_len) break;  // no complete frame left
+		ActionVar msg = makeStringActionVar(app_context, s->buf, (u32) pos);
+		// Consume the frame (and its NUL) BEFORE the callback: the handler may
+		// close the socket, which clears whatever is left.
+		size_t rest = s->buf_len - (pos + 1);
+		if (rest > 0) memmove(s->buf, s->buf + pos + 1, rest);
+		s->buf_len = rest;
+		soundFireCallback(app_context, sock, "onData", 6, &msg, 1);
+	}
+}
+
+static ActionVar builtin_xmlsocket_connect(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 1;  // always true — the connect is asynchronous
+	ASObject* sock = (ASObject*) this_obj;
+	if (sock == NULL) return ret;
+	XmlSockState* s = xmlsock_get(sock);
+	if (s == NULL) return ret;
+
+	// No host / null / undefined falls back to the movie URL's domain, which
+	// for a file:// movie is "localhost" (Ruffle xml_socket.rs::connect).
+	char host[512];
+	if (arg_count < 1 || args[0].type == ACTION_STACK_VALUE_NULL
+	    || args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+	{
+		strcpy(host, "localhost");
+	}
+	else
+	{
+		int n = varToStringBufFull(app_context, &args[0], host, sizeof(host));
+		if (n < 0) host[0] = '\0';
+	}
+	u32 port = 0;
+	if (arg_count > 1)
+	{
+		double d = varToDoubleSimple(&args[1]);
+		port = (u32) ecmaToInt32(d) & 0xFFFFu;  // ECMA ToUint16
+	}
+
+	s->app = app_context;
+	int prev = s->handle;
+	s->handle = swf_socket_connect(host, (int) port, sock, xmlsock_dispatch);
+	if (prev != 0) swf_socket_close(prev);
+	return ret;
+}
+
+static ActionVar builtin_xmlsocket_send(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* sock = (ASObject*) this_obj;
+	if (sock == NULL) return ret;
+	XmlSockState* s = xmlsock_find(sock);
+	// Never connected: a silent no-op (Ruffle guards on the handle).
+	if (s == NULL || s->handle == 0) return ret;
+
+	// toString(arg) plus a terminating NUL, sent immediately — one send() is
+	// one message on the wire.
+	char buf[8192];
+	int n = 0;
+	if (arg_count > 0) n = varToStringBufFull(app_context, &args[0], buf, sizeof(buf) - 1);
+	else n = snprintf(buf, sizeof(buf), "undefined");
+	if (n < 0) n = 0;
+	buf[n] = '\0';
+	swf_socket_send(s->handle, (const unsigned char*) buf, (size_t) n + 1);
+	return ret;
+}
+
+static ActionVar builtin_xmlsocket_close(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) app_context; (void) args; (void) arg_count; (void) registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* sock = (ASObject*) this_obj;
+	if (sock == NULL) return ret;
+	XmlSockState* s = xmlsock_find(sock);
+	if (s == NULL || s->handle == 0) return ret;
+	swf_socket_close(s->handle);
+	// close_internal clears the read buffer, so a frame still queued behind
+	// the one being handled is discarded rather than delivered.
+	s->buf_len = 0;
+	return ret;
+}
+
+static ActionVar builtin_xmlsocket_getTimeout(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) app_context; (void) args; (void) arg_count; (void) registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_F64;
+	ASObject* sock = (ASObject*) this_obj;
+	XmlSockState* s = (sock != NULL) ? xmlsock_get(sock) : NULL;
+	double t = (s != NULL) ? (double) s->timeout : 20000.0;
+	memcpy(&ret.data.numeric_value, &t, sizeof(double));
+	return ret;
+}
+
+static ActionVar builtin_xmlsocket_setTimeout(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) app_context; (void) registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* sock = (ASObject*) this_obj;
+	if (sock == NULL || arg_count < 1) return ret;
+	XmlSockState* s = xmlsock_get(sock);
+	// AVM1 does NOT clamp to 250ms — that floor is AS3 Socket's
+	// (Ruffle xml_socket.rs carries a FIXME saying as much).
+	if (s != NULL) s->timeout = (u32) ecmaToInt32(varToDoubleSimple(&args[0]));
+	return ret;
+}
+
+// XMLSocket.prototype.onData default: parse the frame as XML and hand it to
+// this.onXML. Assigning onData on the instance REPLACES this entirely, which
+// is why xml_socket_on_data can assert onXML never runs.
+static ActionVar builtin_xmlsocket_onData(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* sock = (ASObject*) this_obj;
+	if (sock == NULL) return ret;
+
+	initXMLPrototype(app_context);
+	ASObject* doc = xml_create_document(app_context);
+	doc->native_type = NATIVE_XML;
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+	{
+		const uint16_t* u16 = varGetU16Ptr(&args[0]);
+		u32 u16_len = args[0].str_size;
+		char* buf = (char*) malloc((size_t) u16_len * 4 + 1);
+		if (buf != NULL)
+		{
+			u32 utf8_len = (u32) u16_to_utf8(u16, u16_len, buf, u16_len * 4 + 1);
+			xml_parse_into(app_context, doc, buf, utf8_len);
+			free(buf);
+		}
+	}
+	ActionVar xv = {0};
+	xv.type = ACTION_STACK_VALUE_OBJECT;
+	xv.data.numeric_value = (u64) doc;
+	soundFireCallback(app_context, sock, "onXML", 5, &xv, 1);
+	return ret;
+}
+
+// XMLSocket.prototype: 6 methods. The shape (names, order and flags) is
+// exactly the stub's — global_instance_decls enumerates this family, so only
+// the bodies changed.
+static void addNativeMethodToProto(SWFAppContext* app_context, ASObject* proto,
+                                   const char* name, u32 name_len, u8 flags,
+                                   Function2Ptr impl)
+{
+	if (g_proto_stub_func_count >= MAX_PROTO_STUB_FUNCS) return;
+	ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+	memset(fn, 0, sizeof(ASFunction));
+	strncpy(fn->name, name, 255);
+	fn->function_type = 2;
+	fn->advanced_func = impl;
+	setupNativeFuncOwnProps(app_context, fn);
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	fv.data.numeric_value = (u64) fn;
+	setPropertyWithFlags(app_context, proto, name, name_len, &fv, flags);
+}
+
 static void initXMLSocketPrototype(SWFAppContext* app_context, ASFunction* ctor)
 {
 	if (ctor->prototype_obj != NULL) return;
@@ -36570,26 +36834,18 @@ static void initXMLSocketPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
 	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
-	// connect() returns false (connection always fails in headless mode)
-	{
-		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
-			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
-			memset(fn, 0, sizeof(ASFunction));
-			strncpy(fn->name, "connect", 255);
-			fn->function_type = 2;
-			fn->advanced_func = (Function2Ptr) builtin_return_false;
-			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
-			ActionVar fv = {0};
-			fv.type = ACTION_STACK_VALUE_FUNCTION;
-			fv.data.numeric_value = (u64) fn;
-			setPropertyWithFlags(app_context, ctor->prototype_obj, "connect", 7, &fv, mflags);
-		}
-	}
-	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "onData", 6, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getTimeout", 10, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "setTimeout", 10, mflags);
+	addNativeMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags,
+	                       (Function2Ptr) builtin_xmlsocket_connect);
+	addNativeMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags,
+	                       (Function2Ptr) builtin_xmlsocket_send);
+	addNativeMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags,
+	                       (Function2Ptr) builtin_xmlsocket_close);
+	addNativeMethodToProto(app_context, ctor->prototype_obj, "onData", 6, mflags,
+	                       (Function2Ptr) builtin_xmlsocket_onData);
+	addNativeMethodToProto(app_context, ctor->prototype_obj, "getTimeout", 10, mflags,
+	                       (Function2Ptr) builtin_xmlsocket_getTimeout);
+	addNativeMethodToProto(app_context, ctor->prototype_obj, "setTimeout", 10, mflags,
+	                       (Function2Ptr) builtin_xmlsocket_setTimeout);
 }
 
 // ContextMenu.prototype: copy + hideBuiltInItems
@@ -74003,6 +74259,10 @@ void actionGcMarkRoots(void)
 			swfGcMarkObject(g_active_netstreams[i].ns_obj);
 	for (int i = 0; i < g_nc_state_count; i++)
 		swfGcMarkObject(g_nc_states[i].nc);
+	// XMLSocket side table: the mock transport holds each socket from C, the
+	// way Ruffle's Sockets map holds a GC pointer to its target.
+	for (int i = 0; i < g_xmlsock_state_count; i++)
+		swfGcMarkObject(g_xmlsock_states[i].obj);
 
 	// --- BitmapData native side table (pointer-keyed weak-map shape; rooted
 	// for the same identity-safety reason — matches today's "entries are

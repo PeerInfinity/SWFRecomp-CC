@@ -10,6 +10,7 @@
 #include <variables.h>
 #include <renderer.h>
 #include <utils.h>
+#include <socket_events.h>
 #include <heap.h>
 #include <audio/audio.h>
 #ifdef OFFSCREEN_RENDER
@@ -473,6 +474,9 @@ void tagMain(SWFAppContext* app_context)
 #else
 			int events_drained = 1;
 #endif
+			// An open socket (or an undelivered socket action) keeps the loop
+			// alive the same way an active NetStream does — the socket tick
+			// further down is what would deliver it. Mirrors swf_core.c.
 			if (quit_swf
 			    && events_drained
 			    && !actionHasEnterFrameHandlers()
@@ -480,6 +484,7 @@ void tagMain(SWFAppContext* app_context)
 			    && !hasActiveTimers()
 			    && !hasPlayingSounds()
 			    && !hasActiveNetStreams()
+			    && !swf_socket_pending()
 			    && !hasPlayingLevels()
 			    && !hasClipEnterFrameHandlers()
 			    && g_pending_mcl_load_count == 0
@@ -505,6 +510,7 @@ void tagMain(SWFAppContext* app_context)
 				    && !hasActiveTimers()
 				    && !hasPlayingSounds()
 				    && !hasActiveNetStreams()
+				    && !swf_socket_pending()
 				    && !hasClipEnterFrameHandlers()) break;
 			}
 		}
@@ -1045,6 +1051,14 @@ void tagMain(SWFAppContext* app_context)
 		{
 			extern void input_events_pump_tick(SWFAppContext* app_context);
 			input_events_pump_tick(app_context);
+		}
+
+		// Sockets: same cadence as swf_core.c (~line 1240) — deliver the
+		// actions queued last tick, then pump the socket.json script. No-op
+		// with no script loaded.
+		{
+			extern void swf_socket_tick(int owner);
+			swf_socket_tick(1);
 		}
 
 		// Goto catch-up: when a script-initiated goto (e.g. mc.gotoAndStop("/:N")
