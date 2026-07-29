@@ -1,29 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ae54fd789a5b` (2026-07-29T02:18:10.824503+00:00)
-**Current:** `72fdc5e933a6` (2026-07-29T04:05:29.708838+00:00)
+**Previous:** `72fdc5e933a6` (2026-07-29T04:05:29.708838+00:00)
+**Current:** `8c3b7673f18f` (2026-07-29T18:24:47.446451+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 919 | 929 | +10 |
+| Passing | 929 | 930 | +1 |
 | Total | 1221 | 1221 | 0 |
-| Pass rate | 75.3% | 76.1% | +0.8% |
-| Mismatched lines | 44016 | 43868 | -148 |
-|   Decreased | | | -148 |
+| Pass rate | 76.1% | 76.2% | +0.1% |
+| Mismatched lines | 43868 | 43863 | -5 |
+|   Decreased | | | -5 |
 
-## Newly Passing (10)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `filefilter_properties` | output_mismatch | 0/4 | 4/4 |
-| `filereference_browse_cancel` | output_mismatch | 0/3 | 3/3 |
-| `filereference_browse_select` | output_mismatch | 0/9 | 9/9 |
-| `filereference_load` | output_mismatch | 0/31 | 31/31 |
-| `filereference_save` | output_mismatch | 0/16 | 16/16 |
-| `filereference_save_and_browse` | output_mismatch | 0/42 | 42/42 |
-| `filereference_save_and_load` | output_mismatch | 0/22 | 22/22 |
-| `filereference_uninitialized` | output_mismatch | 0/8 | 8/8 |
-| `filereferencelist_browse_cancel` | output_mismatch | 0/6 | 6/6 |
-| `filereferencelist_browse_select` | output_mismatch | 0/7 | 7/7 |
+| `urlstream_basic` | output_mismatch | 0/5 | 5/5 |

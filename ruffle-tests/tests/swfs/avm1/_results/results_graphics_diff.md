@@ -1,33 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ae54fd789a5b` (2026-07-29T02:18:10.805572+00:00)
-**Current:** `72fdc5e933a6` (2026-07-29T04:05:29.684894+00:00)
+**Previous:** `72fdc5e933a6` (2026-07-29T04:05:29.684894+00:00)
+**Current:** `8c3b7673f18f` (2026-07-29T18:24:47.422189+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 646 | 651 | +5 |
+| Passing | 651 | 651 | 0 |
 | Total | 717 | 717 | 0 |
-| Pass rate | 90.1% | 90.8% | +0.7% |
-| Mismatched lines | 14945 | 14874 | -71 |
-|   Decreased | | | -71 |
+| Pass rate | 90.8% | 90.8% | 0% |
+| Mismatched lines | 14874 | 14874 | 0 |
 
-## Newly Passing (5)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `file_reference_browse_cancel` | output_mismatch | 10/21 | 21/21 |
-| `file_reference_list_asbroadcaster` | output_mismatch | 0/9 | 9/9 |
-| `file_reference_list_browse_cancel` | output_mismatch | 1/4 | 4/4 |
-| `file_reference_list_browse_invalid_filters` | output_mismatch | 18/36 | 36/36 |
-| `file_reference_list_browse_select` | output_mismatch | 1/7 | 7/7 |
-
-## Line Count Changed (4)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `file_reference_upload_httperror_dns_error` | output_mismatch | 1/18 | 8/18 | -7 |
-| `file_reference_upload_httperror_status_code` | output_mismatch | 1/23 | 8/23 | -7 |
-| `file_reference_upload_success` | output_mismatch | 1/23 | 8/23 | -7 |
-| `file_reference_download_success` | output_mismatch | 7/34 | 10/34 | -3 |
+No changes detected.
