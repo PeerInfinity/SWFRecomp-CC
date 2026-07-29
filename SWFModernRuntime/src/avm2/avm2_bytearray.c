@@ -638,20 +638,33 @@ static uint32_t utf8_to_utf16(Avm2Context* ctx, const Avm2String* s, int little,
 // and supplies its own ext through this hook. `write_dir` picks the buffer:
 // the read half backs every read*, the write half every write*. A ByteArray
 // `this` resolves before the hook is ever consulted and is unaffected.
-static Avm2BaAltResolver g_ba_alt_resolver;
+// More than one class borrows the bodies (Socket, URLStream), so the hook is a
+// chain: each resolver claims only its own class and returns NULL otherwise,
+// which makes the order immaterial.
+#define MAX_BA_ALT_RESOLVERS 4
+static Avm2BaAltResolver g_ba_alt_resolvers[MAX_BA_ALT_RESOLVERS];
+static int g_ba_alt_resolver_count;
 
 void avm2_bytearray_set_alt_resolver(Avm2BaAltResolver fn)
 {
-	g_ba_alt_resolver = fn;
+	if (fn == NULL) return;
+	for (int i = 0; i < g_ba_alt_resolver_count; i++)
+		if (g_ba_alt_resolvers[i] == fn) return;
+	if (g_ba_alt_resolver_count < MAX_BA_ALT_RESOLVERS)
+		g_ba_alt_resolvers[g_ba_alt_resolver_count++] = fn;
 }
 
 Avm2ByteArrayExt* avm2_bytearray_ext_dir(Avm2Activation* act, int write_dir)
 {
 	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(act->this_val);
 	if (ba != NULL) return ba;
-	// The hook may throw on its own terms (an unconnected Socket raises
+	// A hook may throw on its own terms (an unconnected Socket raises
 	// IOError #2002 before any buffer exists).
-	if (g_ba_alt_resolver != NULL) return g_ba_alt_resolver(act, write_dir);
+	for (int i = 0; i < g_ba_alt_resolver_count; i++)
+	{
+		ba = g_ba_alt_resolvers[i](act, write_dir);
+		if (ba != NULL) return ba;
+	}
 	return NULL;
 }
 
@@ -1365,7 +1378,7 @@ static void ba_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 // The IDataInput + IDataOutput method set, shared verbatim with
 // flash.net.Socket (avm2_net.c) — the two classes differ only in which buffer
 // each direction resolves to, which the alt resolver above decides.
-void avm2_bytearray_install_data_io(Avm2Context* ctx, Avm2Class* cls)
+void avm2_bytearray_install_data_input(Avm2Context* ctx, Avm2Class* cls)
 {
 	avm2_builtin_add_method(ctx, cls, "readBoolean", ba_read_boolean);
 	avm2_builtin_add_method(ctx, cls, "readByte", ba_read_byte);
@@ -1381,6 +1394,10 @@ void avm2_bytearray_install_data_io(Avm2Context* ctx, Avm2Class* cls)
 	avm2_builtin_add_method(ctx, cls, "readUTFBytes", ba_read_utf_bytes);
 	avm2_builtin_add_method(ctx, cls, "readMultiByte", ba_read_multi_byte);
 	avm2_builtin_add_method(ctx, cls, "readObject", avm2_amf_read_object);
+}
+
+void avm2_bytearray_install_data_output(Avm2Context* ctx, Avm2Class* cls)
+{
 	avm2_builtin_add_method(ctx, cls, "writeBoolean", ba_write_boolean);
 	avm2_builtin_add_method(ctx, cls, "writeByte", ba_write_byte);
 	avm2_builtin_add_method(ctx, cls, "writeShort", ba_write_short);
@@ -1393,6 +1410,12 @@ void avm2_bytearray_install_data_io(Avm2Context* ctx, Avm2Class* cls)
 	avm2_builtin_add_method(ctx, cls, "writeUTFBytes", ba_write_utf_bytes);
 	avm2_builtin_add_method(ctx, cls, "writeMultiByte", ba_write_multi_byte);
 	avm2_builtin_add_method(ctx, cls, "writeObject", avm2_amf_write_object);
+}
+
+void avm2_bytearray_install_data_io(Avm2Context* ctx, Avm2Class* cls)
+{
+	avm2_bytearray_install_data_input(ctx, cls);
+	avm2_bytearray_install_data_output(ctx, cls);
 }
 
 void avm2_register_bytearray(Avm2Context* ctx)

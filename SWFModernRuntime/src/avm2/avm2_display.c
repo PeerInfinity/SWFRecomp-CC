@@ -5277,6 +5277,7 @@ typedef struct Avm2PendingUrlLoad
 	const uint8_t* data;
 	uint32_t len;
 	uint8_t found;
+	uint8_t is_stream;   // the target is a URLStream, not a URLLoader
 } Avm2PendingUrlLoad;
 
 #define AVM2_MAX_PENDING_URL_LOADS 32
@@ -5316,8 +5317,15 @@ static void ul_set_data(Avm2Context* ctx, Avm2UrlLoaderExt* ext,
 	                                       len));
 }
 
+static void us_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl);
+
 static void ul_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl)
 {
+	if (pl->is_stream)
+	{
+		us_deliver(ctx, pl);
+		return;
+	}
 	Avm2Object* self = pl->loader;
 	Avm2UrlLoaderExt* ext = url_loader_ext_of(self);
 	if (ext == NULL) return;
@@ -5359,15 +5367,19 @@ static void avm2_url_loader_run_pending(Avm2Context* ctx)
 }
 
 // Queue a fetch. Like Loader.load it never resolves inside the calling frame.
-static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request)
+// `is_stream` picks the delivery half: URLStream borrows this whole pipeline
+// (Ruffle's URLStream.as is literally a URLLoader wrapper) and differs only in
+// where the bytes land and which events it re-dispatches.
+static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request,
+                          int is_stream)
 {
-	if (url_loader_ext_of(self) == NULL) return;
 	avm2_log_fetch_request(ctx, request);
 	const Avm2String* url = request_url(ctx, request);
 	if (url == NULL) return;
 	Avm2PendingUrlLoad pl;
 	memset(&pl, 0, sizeof(pl));
 	pl.loader = self;
+	pl.is_stream = (uint8_t) (is_stream != 0);
 	Avm2PendingLoad probe;
 	memset(&probe, 0, sizeof(probe));
 	// Unlike Loader.load, a URL that resolves to nothing is an ERROR here
@@ -5400,15 +5412,17 @@ static void ul_start_load(Avm2Context* ctx, Avm2Object* self, Avm2Value request)
 static Avm2Value url_loader_init(Avm2Activation* act)
 {
 	// `new URLLoader(request)` starts the load immediately (URLLoader.as).
-	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
-		ul_start_load(act->ctx, this_obj(act), act->args[0]);
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
+	    && url_loader_ext_of(this_obj(act)) != NULL)
+		ul_start_load(act->ctx, this_obj(act), act->args[0], 0);
 	return avm2_undefined();
 }
 
 static Avm2Value url_loader_load(Avm2Activation* act)
 {
+	if (url_loader_ext_of(this_obj(act)) == NULL) return avm2_undefined();
 	ul_start_load(act->ctx, this_obj(act),
-	              act->argc > 0 ? act->args[0] : avm2_null());
+	              act->argc > 0 ? act->args[0] : avm2_null(), 0);
 	return avm2_undefined();
 }
 
@@ -5473,6 +5487,169 @@ void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul)
 	                        ul_set_data_format);
 	avm2_builtin_add_getter(ctx, ul, "bytesLoaded", ul_get_bytes_loaded);
 	avm2_builtin_add_getter(ctx, ul, "bytesTotal", ul_get_bytes_total);
+}
+
+// --- flash.net.URLStream ----------------------------------------------------
+//
+// URLStream.as is a thin AS3 wrapper around a *private* URLLoader in binary
+// mode: it re-dispatches open/progress/httpStatus/complete/ioError and forwards
+// every IDataInput method to `_loader.data`. Here it is the same wrapper
+// written in C — one ByteArray ext as the sink, filled by the URLLoader fetch
+// pipeline above, and the 14 IDataInput bodies borrowed verbatim through
+// avm2_bytearray.c's alt resolver (the mechanism tranche 2 built for Socket).
+// Nothing actually streams in either player: the bytes land all at once when
+// the fetch resolves, which is what `urlstream_basic` grades (bytesAvailable
+// is 0 in the `open` handler and the full length from `progress` on).
+
+typedef struct Avm2UrlStreamExt
+{
+	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+	Avm2ByteArrayExt buf;               // == the private URLLoader's binary data
+	uint8_t connected;                  // load() sets it, close() clears it
+} Avm2UrlStreamExt;
+
+static Avm2Class* g_url_stream_class;
+
+static Avm2UrlStreamExt* url_stream_ext_of(Avm2Object* o)
+{
+	if (o == NULL || o->cls == NULL || g_url_stream_class == NULL
+	    || !class_is_a(o->cls, g_url_stream_class))
+		return NULL;
+	return (Avm2UrlStreamExt*) o->native_ext;
+}
+
+// avm2_bytearray.c's alt resolver. Only IDataInput is registered on the class,
+// so the direction is always read; an unloaded stream still resolves, and the
+// empty buffer makes every read raise the ByteArray EOFError, exactly as
+// Ruffle's forwarding to a zero-length `_loader.data` does.
+static Avm2ByteArrayExt* url_stream_ba_resolve(Avm2Activation* act, int write_dir)
+{
+	(void) write_dir;
+	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
+	return ext != NULL ? &ext->buf : NULL;
+}
+
+static void us_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl)
+{
+	Avm2Object* self = pl->loader;
+	Avm2UrlStreamExt* ext = url_stream_ext_of(self);
+	if (ext == NULL) return;
+
+	if (!pl->found)
+	{
+		Avm2Object* ev = avm2_http_status_event_new(
+			ctx, avm2_string_from_literal(ctx, "httpStatus"), 0, 0);
+		if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+		// The wrapper builds a bare `new IOErrorEvent(IO_ERROR)`, so unlike
+		// URLLoader's the relayed event carries no text.
+		ev = avm2_io_error_event_new(ctx,
+		                             avm2_string_from_literal(ctx, "ioError"),
+		                             avm2_string_from_literal(ctx, ""), 0);
+		if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+		return;
+	}
+
+	dispatch_simple_event(ctx, self, "open", 0);
+	// Append behind the read cursor, the Socket convention: `position` is the
+	// only thing bytesAvailable subtracts.
+	uint32_t at = ext->buf.len;
+	avm2_bytearray_set_length_public(ctx, &ext->buf, at + pl->len);
+	if (pl->len != 0 && ext->buf.bytes != NULL && ext->buf.len == at + pl->len)
+		memcpy(ext->buf.bytes + at, pl->data, pl->len);
+	Avm2Object* ev = avm2_progress_event_new(
+		ctx, avm2_string_from_literal(ctx, "progress"), (double) pl->len,
+		(double) pl->len);
+	if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+	ev = avm2_http_status_event_new(ctx,
+	                                avm2_string_from_literal(ctx, "httpStatus"),
+	                                0, 0);
+	if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+	dispatch_simple_event(ctx, self, "complete", 0);
+}
+
+static Avm2Value url_stream_load(Avm2Activation* act)
+{
+	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
+	if (ext == NULL) return avm2_undefined();
+	ul_start_load(act->ctx, this_obj(act),
+	              act->argc > 0 ? act->args[0] : avm2_null(), 1);
+	ext->connected = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value url_stream_close(Avm2Activation* act)
+{
+	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
+	if (ext != NULL) ext->connected = 0;
+	return avm2_undefined();
+}
+
+static Avm2Value us_get_connected(Avm2Activation* act)
+{
+	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
+	return avm2_bool(ext != NULL && ext->connected != 0);
+}
+
+static Avm2Value us_get_bytes_available(Avm2Activation* act)
+{
+	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
+	if (ext == NULL || ext->buf.position >= ext->buf.len) return avm2_uint_value(0);
+	return avm2_uint_value(ext->buf.len - ext->buf.position);
+}
+
+static Avm2Value us_get_endian(Avm2Activation* act)
+{
+	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
+	return avm2_string(avm2_string_from_literal(
+		act->ctx, (ext != NULL && ext->buf.endian_little) ? "littleEndian"
+		                                                  : "bigEndian"));
+}
+
+static Avm2Value us_set_endian(Avm2Activation* act)
+{
+	Avm2UrlStreamExt* ext = url_stream_ext_of(this_obj(act));
+	const Avm2String* s = act->argc > 0
+		? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	int little = s != NULL && s->len == 12 && memcmp(s->utf8, "littleEndian", 12) == 0;
+	int big = s != NULL && s->len == 9 && memcmp(s->utf8, "bigEndian", 9) == 0;
+	if (!little && !big)
+	{
+		avm2_throw_error(act->ctx, act->ctx->builtins.argument_error_class,
+		                 "Error #2008: Parameter endian must be one of the "
+		                 "accepted values.");
+	}
+	if (ext != NULL) ext->buf.endian_little = (uint8_t) little;
+	return avm2_undefined();
+}
+
+// Ruffle stubs both halves (`stub_getter`/`stub_setter`) and always reports 0.
+static Avm2Value us_get_object_encoding(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_uint_value(0);
+}
+
+static Avm2Value us_set_object_encoding(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+void avm2_display_wire_url_stream(Avm2Context* ctx, Avm2Class* us)
+{
+	if (us == NULL) return;
+	g_url_stream_class = us;
+	us->native_ext_size = sizeof(Avm2UrlStreamExt);
+	avm2_bytearray_set_alt_resolver(url_stream_ba_resolve);
+	avm2_builtin_add_method(ctx, us, "load", url_stream_load);
+	avm2_builtin_add_method(ctx, us, "close", url_stream_close);
+	avm2_builtin_add_getter(ctx, us, "connected", us_get_connected);
+	avm2_builtin_add_getter(ctx, us, "bytesAvailable", us_get_bytes_available);
+	avm2_builtin_add_getset(ctx, us, "endian", us_get_endian, us_set_endian);
+	avm2_builtin_add_getset(ctx, us, "objectEncoding", us_get_object_encoding,
+	                        us_set_object_encoding);
+	// IDataInput only — URLStream has no write half.
+	avm2_bytearray_install_data_input(ctx, us);
 }
 
 // --- InteractiveObject ---
@@ -9132,6 +9309,12 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx)
 	}
 	for (uint32_t i = 0; i < g_active_loader_info_count; i++)
 		avm2_gc_mark_object(g_active_loader_infos[i]);
+	// Same for an in-flight URLLoader/URLStream: between load() and the drain
+	// the queue can be the only reference (urlstream_basic drops its stream
+	// into listener closures the stream itself owns, a cycle nothing else
+	// reaches).
+	for (uint32_t i = 0; i < g_pending_url_load_count; i++)
+		avm2_gc_mark_object(g_pending_url_loads[i].loader);
 	avm2_gc_mark_object(g_mouse_hovered);
 	for (int i = 0; i < 3; i++) avm2_gc_mark_object(g_mouse_pressed[i]);
 	avm2_gc_mark_object(g_drag_object);

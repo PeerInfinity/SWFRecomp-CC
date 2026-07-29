@@ -2436,6 +2436,13 @@ static void register_net(Avm2Context* ctx)
 	                                   b->event_dispatcher_class);
 	avm2_display_wire_url_loader(ctx, ul);
 
+	// flash.net.URLStream (extends EventDispatcher, implements IDataInput) —
+	// the same fetch pipeline with a ByteArray sink instead of a `data`
+	// property. Also lives in avm2_display.c for that reason.
+	Avm2Class* us = avm2_builtin_class(ctx, "flash.net", "URLStream",
+	                                   b->event_dispatcher_class);
+	avm2_display_wire_url_stream(ctx, us);
+
 	// flash.net.LocalConnection (extends EventDispatcher). There is no IPC
 	// layer, so connect/send/close are no-ops and no message is ever
 	// delivered; `domain` is the one live property (games use it as a

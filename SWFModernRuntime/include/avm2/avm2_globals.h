@@ -213,7 +213,10 @@ typedef Avm2ByteArrayExt* (*Avm2BaAltResolver)(Avm2Activation* act, int write_di
 void avm2_bytearray_set_alt_resolver(Avm2BaAltResolver fn);
 // ByteArray first, then the resolver. NULL when neither claims `this`.
 Avm2ByteArrayExt* avm2_bytearray_ext_dir(Avm2Activation* act, int write_dir);
-// Register the 28 IDataInput/IDataOutput natives on `cls`.
+// Register the 28 IDataInput/IDataOutput natives on `cls`. The halves are also
+// available separately: flash.net.URLStream implements IDataInput only.
+void avm2_bytearray_install_data_input(Avm2Context* ctx, Avm2Class* cls);
+void avm2_bytearray_install_data_output(Avm2Context* ctx, Avm2Class* cls);
 void avm2_bytearray_install_data_io(Avm2Context* ctx, Avm2Class* cls);
 // Grow/shrink storage (clamps position; used by the [] index write path).
 void avm2_bytearray_set_length_public(Avm2Context* ctx, Avm2ByteArrayExt* ba,
@@ -710,6 +713,7 @@ void avm2_register_display(Avm2Context* ctx);
 // with the rest of flash.net in avm2_globals.c, but its load pipeline shares
 // Loader's URL resolution, event dispatch and per-tick drain in avm2_display.c.
 void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
+void avm2_display_wire_url_stream(Avm2Context* ctx, Avm2Class* us);
 // NULL when obj is not a DisplayObject descendant.
 Avm2DisplayObjectExt* avm2_display_ext_of(Avm2Context* ctx, Avm2Object* obj);
 // T4 Part B — CPU-composite a node's recorded flash.display.Graphics geometry

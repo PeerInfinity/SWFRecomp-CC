@@ -1673,7 +1673,12 @@ def generate_movie_registry(prefixes, build_dir):
 def find_data_files(test_dir):
     """Find data files (non-.swf, non-.fla, non-config) in a test directory.
     These are files like testvars.txt that loadVariables loads at runtime."""
-    skip_names = {"test.swf", "test.fla", "test.toml", "test.as", "output.txt",
+    # `test.as` is NOT skipped: Ruffle's test navigator serves every sibling
+    # file, and from_shumway/flash_net_URLLoader fetches its own source with a
+    # URLLoader (2674 bytes) and grades the body. `Test.as` was already bundled
+    # everywhere for the same reason; excluding the lowercase spelling was an
+    # accident of the original loadVariables implementation.
+    skip_names = {"test.swf", "test.fla", "test.toml", "output.txt",
                    "output.ruffle.txt", "input.json", "test_harness.c"}
     skip_suffixes = {".swf", ".fla", ".toml", ".json", ".c", ".h", ".py"}
     data_files = []
@@ -1731,12 +1736,22 @@ def generate_data_registry(data_files, build_dir):
     # its dynamic bitmap texture array to fit MCL image loads (.gif/.jpg/.png).
     # Uses stbi_info_from_memory (declared locally to avoid pulling in all of
     # stb_image.h from a generated file).
+    # Only files that are actually images are probed: stb's TGA/PNM sniffers are
+    # loose enough that arbitrary text could be misread as a huge image, and the
+    # result sizes a GPU texture array.
+    image_suffixes = {".png", ".jpg", ".jpeg", ".gif", ".bmp"}
+    image_indices = [i for i, (_, filename, _) in enumerate(var_names)
+                     if Path(filename).suffix.lower() in image_suffixes]
     lines.append("extern int stbi_info_from_memory(const unsigned char* buffer, int len,")
     lines.append("    int* x, int* y, int* comp);")
     lines.append("")
+    lines.append("static const int g_data_image_files[] = { "
+                 + "".join(f"{i}, " for i in image_indices) + "-1 };")
+    lines.append("")
     lines.append("void getDataFilesMaxImageDims(int* out_w, int* out_h) {")
     lines.append("    int max_w = 0, max_h = 0;")
-    lines.append("    for (int i = 0; g_data_files[i].filename != NULL; i++) {")
+    lines.append("    for (int k = 0; g_data_image_files[k] >= 0; k++) {")
+    lines.append("        int i = g_data_image_files[k];")
     lines.append("        int w = 0, h = 0, comp = 0;")
     lines.append("        if (stbi_info_from_memory(")
     lines.append("                (const unsigned char*)g_data_files[i].content,")
