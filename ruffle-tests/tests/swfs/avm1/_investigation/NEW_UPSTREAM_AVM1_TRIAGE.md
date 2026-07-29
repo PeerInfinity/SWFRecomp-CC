@@ -116,3 +116,10 @@ Changes vs the 2026-06-19 state of this doc:
 3. ~~`set_property_values/swf5-7`~~ — **BLOCKED/unpromotable** (float precision on `_x`/`_y`←Inf; no RM file). See `blocked/SET_PROPERTY_VALUES_PLAN.md`. Don't re-investigate.
 
 Bucket A is genuinely blocked on infrastructure (AMF codec, file-dialog input, multi-SWF child frames) — low ROI until a shipped game or a larger test cohort needs those subsystems.
+
+**Update 2026-07-29 — two of those three blockers are gone.** The net/socket arc
+took them as tranches: file-dialog input in tranche 3/3b, and the **AMF codec in
+tranche 7** (`702d38a35`, 11/11 targets, `SWFRecompDocs/plans/net-socket-arc.md`
+§6-7). Every `amf_*` row below now passes, as do `localconnection_top_level`,
+`netconnection_serialize_arrays` and `netconnection_send_remote`. Only multi-SWF
+child-frame execution is still open in bucket A.

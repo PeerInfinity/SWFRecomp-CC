@@ -1,6 +1,41 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-07-27 — **navigator log (+2), implemented but REVERTED**
+Last updated: 2026-07-29 — **the AMF codec group is CLOSED** (net/socket arc
+tranche 7, `702d38a35` + `698bdddfa`, CI `30494443127` graphics/full). All
+**eleven** AMF / `NetConnection.call` / `SharedObject` targets pass, against a
+predicted +7; suite `avm1` **675 → 686** effective, corpus **3939 → 3950/4420**,
+zero regressions. Full postmortem and the byte-level rules:
+`SWFRecompDocs/plans/net-socket-arc.md` §6-7.
+
+New: `SWFModernRuntime/src/actionmodern/avm1_amf.c` (the AMF0 writer/reader,
+`SharedObject.getLocal`'s same-run cache, and the per-connection
+`NetConnection.call` queue) plus `src/amf_packet.c` (remoting packet framing,
+VM-agnostic so AVM2's tranche 8 reuses it). `LocalConnection` is now a real wire
+channel — arguments serialize at `send()` and deserialize at delivery, which is
+what `localconnection_top_level` grades. Three of the eleven are `known_failure`
+upstream and pass FULLY, because the implementation follows Flash rather than
+Ruffle on the three points where they differ (the uniform array rule at every
+nesting level, nested typed objects, and a reference table that counts only
+referenceable values).
+
+Landed with it, each surfaced by one of the targets rather than by review:
+`addProperty` now creates an ordinary *enumerable* property (`setProperty`
+force-hides the names `constructor`/`__proto__`; Flash's `addProperty` does not);
+a `SUPER` thisArg binds the instance it proxies, so `super.m.apply(super, args)`
+no longer lands on `_global`; Flash's array-index scanner is integer-only, so
+`arr[2.5]` and huge exponent-form subscripts no longer bump `length`; and
+`setArrayElement`'s capacity arithmetic no longer overflows u32 into an
+out-of-bounds write.
+
+**Filtered failures are down to 11** (from 20): `set_property_values/*` ×4
+(blocked, see below), the `looping_child_swf*` trio + `load_cancel_via_
+removemovieclip` + `remove_different_level` (multi-SWF child-frame execution),
+`shared_stack` (11/16 — the AVM1 value stack shared across clips within a tick,
+NOT SharedObject; net/socket arc bucket Z, a cheap standalone fix), and
+`textfield_asbroadcaster` (0/14). The AMF and FileReference infrastructure
+blockers named in the entry below are both gone.
+
+Prior entry: 2026-07-27 — **navigator log (+2), implemented but REVERTED**
 (`d05e75eb2`): it triggers an `avm2/edittext_align` segfault (6/6 vs 6/6
 against baseline — `SWFRecompDocs/plans/loader-arc.md` §7 has the run table
 and the isolation experiment that should free it). When it lands:

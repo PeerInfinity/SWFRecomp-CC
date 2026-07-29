@@ -407,7 +407,7 @@ Bucket L. A per-player channel map with Ruffle's name rules (host prefixes,
 AVM2 halves. `avm2/localconnection` (890 lines) is the specification; predict
 it does **not** land in this tranche.
 
-### Tranche 7 — AVM1 AMF0 serializer + `NetConnection.call` · **predicted +4, re-scoped 2026-07-29 to +7 of 11** · LARGE
+### Tranche 7 — AVM1 AMF0 serializer + `NetConnection.call` · **predicted +4, re-scoped 2026-07-29 to +7 of 11 · SHIPPED, actual 11/11** · LARGE
 
 Bucket W (9 candidates; the scoping pass in §7 corrects the census to 11 and
 retires two assumed subsystems — `.sol` file I/O and a `.sol`-input reader are
@@ -419,11 +419,14 @@ and the load-bearing unknown is now the **`super()` native-constructor
 upgrade** (2 tests) plus byte-exact reference counting (`amf0_serde_suite`
 only).
 
-### Tranche 8 — AVM2 `NetConnection.call` wire · **predicted +2** · MEDIUM
+### Tranche 8 — AVM2 `NetConnection.call` wire · **predicted +2** · MEDIUM (→ SMALL after tranche 7)
 
 Bucket X's remaining three. Depends on tranche 1's `NetConnection` and
 tranche 7's settled array-promotion rule; the AMF0 writer itself already
-exists.
+exists. After tranche 7 the packet framing (`src/amf_packet.c`) is done and
+VM-agnostic, the response-dispatch shape is implemented and graded, and
+`avm2/netconnection_send_remote`'s `localhost/test{1,2,3}` are already bundled
+— see §6's tranche-7 re-prediction.
 
 ### Won't-do in this arc
 
@@ -991,6 +994,192 @@ pre-change build over 11 canaries — `global_proto_decls` (7,462 lines),
 input to tranche 7, though: the AVM1 `FileReference` side table is now the
 precedent for where AVM1 native state lives when Flash does not expose it, and
 tranche 7's `SharedObject` `.sol` persistence will want the same shape.
+
+### Tranche 7 — SHIPPED `702d38a35` + `698bdddfa`, CI `30494443127` (graphics, full) then `30496277452`
+
+**11 of 11, against a predicted +7. Zero regressions.** Every row of §7.6's
+dependency matrix landed, including the three the prediction treated as upside
+(the two `super()`-upgrade tests and `netconnection_send_remote`) and the one it
+called a stretch (`amf0_serde_suite`). All three `known_failure` targets are FULL
+passes, not `ruffle_matched`.
+
+Against baseline `056c9d3ce`, corpus effective **3939 → 3950 / 4420 (+11)`**;
+`avm1` **675 → 686**. No other suite moved. Status histogram:
+`output_mismatch 473 → 462` / `pass 3699 → 3710`, with `ruffle_matched` (240),
+`runtime_error` (7) and `recomp_fail` (1) all flat and no `segfault`, `timeout`
+or `compile_fail` bucket on either side. `REGRESSIONS: 0`,
+`OTHER STATUS MOVES: 0`, and **zero** `matching_lines` drift among the tests
+that fail on both sides — the +11 is exactly the eleven targets and nothing
+else.
+
+Run `30494443127` is nonetheless RED, and the reason is worth recording: its
+`wasm-link-smoke` job failed with eight undefined symbols out of `action.o` and
+`swf_core.o`. `build_test.sh` and `build_wasm_avm2.sh` keep their own explicit
+source lists — they do NOT link `libswfruntime.a` the way `build_wasm_test.sh`
+and `deploy_wasm_demo.sh` do — so adding a runtime file means editing FOUR
+places, not two: `CMakeLists.txt`, `verify_output.py`, and those two scripts.
+Fixed in `698bdddfa`, and run `30496277452` (a `single_test` dispatch, which
+does not publish) is green on both `WASM link-smoke` and the test itself, so
+`amf0_serde_suite` is confirmed passing in CI graphics mode as well as locally.
+The 30 corpus shards were never affected — they build natively.
+
+| Test | before | after | §7.6 confidence |
+|---|---|---|---|
+| `localconnection_top_level` | 4/7 | **pass** | high |
+| `amf_array_serialization` | 3/10 | **pass** | high (beats known_failure) |
+| `netconnection_serialize_arrays` | 1/6 | **pass** | high (beats known_failure) |
+| `amf_serialize_typed_objects` | 1/6 | **pass** | high |
+| `amf_swf6_serialize_typed_objects` | 1/6 | **pass** | high |
+| `amf_swf6_case_insensitive_typed_objects` | 1/6 | **pass** | high |
+| `amf_swf8_case_sensitive_typed_objects` | 1/6 | **pass** | high |
+| `amf_sharedobject_strict_array_serialization` | 2/3 | **pass** | medium (7.5) |
+| `amf_strict_array_serialization` | 1/7 | **pass** | medium (7.5) |
+| `netconnection_send_remote` | 2/50 | **pass** | medium |
+| `amf0_serde_suite` | 16/144 | **pass** | **stretch** |
+
+#### Which §7 claims held
+
+Every byte-level rule in §7.2 held exactly as recorded, first try: the uniform
+array rule with `0x06` hole padding, native-Array-ness as the sole shape input
+(a demoted real array stays `0x0A`, an Object wearing `Array.prototype` stays
+`0x03`), `length` excluded from the key set that decides the shape, ECMAArray's
+u32 being the `length` property with entries in insertion order, getters never
+invoked, functions omitted as property values but serialized as plain objects at
+top level, display objects undefined at every level, the typed-object resolution
+order and its "inherited `constructor` does not count / `ASSetPropFlags` is
+irrelevant" corollaries, the SWF-version registry split at 7, and the
+latest-casing rule for SWF≤6. §7.3's packet layout, response-URI-per-flush,
+`mustUnderstand` default and zero-argument failure `onStatus` all held too.
+§7.1's three retirements held: no `.sol` I/O, no `.sol` reader, and the AVM2
+`rd0_*` reader really was the right shape to port.
+
+**§7.1's "zero harness work, 5th tranche running" did NOT hold** — the one
+question it flagged as open (does `find_data_files` recurse?) answers *no*, and
+neither does `download_tests.sh`. Both now carry nested data files keyed by the
+path relative to the test directory, because Ruffle's navigator maps
+`http://<host>/<path>` to `<test_dir>/<host>/<path>`
+(`tests/framework/src/backends/navigator.rs`) and
+`netconnection_send_remote`'s scripted responses live in `localhost/test{1,2,3}`.
+The exclusion filter (asasm/abc build layout, nested image/video sources) was
+checked against the whole upstream corpus: it admits exactly the two
+`netconnection_send_remote/localhost/` sets. `large_bytearray`'s five 100 KB
+`.bin` files sit behind their own `test.swf` and stay excluded by the
+separate-test rule that was already there for Loader children.
+
+**§7.5 was wrong in the useful direction: the "one hard mechanism" was already
+90% built.** It scoped the `super()` array upgrade as needing a `native_type`
+flag plus an attached ASArray side table with index/length routing through the
+property paths. In fact `invokeNativeSuperConstructor`'s Array arm has set
+`native_type = NATIVE_ARRAY` on the receiver `ASObject` — storing indices as
+ordinary string-keyed properties beside a `length` — since long before this arc.
+The gap was only `length` bookkeeping on index writes: extend when a write lands
+at or past the end, truncate when `length` shrinks. About fifty lines in
+`actionSetMember`'s object arm, plus an array-like view over a `NATIVE_ARRAY`
+`ASObject` in the writer. **Lesson: before designing a side table for a
+"structurally impossible" conversion, grep for whether a partial form of it
+already exists.** Both tests then passed with no further work — and
+`amf_sharedobject_strict_array_serialization` turned out to grade only three
+trace lines (the litmus, a banner, and the flush), so the `.sol` in its
+directory never mattered at all.
+
+#### The stretch target, and what actually made it pass
+
+`amf0_serde_suite` came down to `Array.length`, twice.
+
+**First: Flash's array-index scanner is INTEGER-ONLY** — an optional `-`, then
+digits, whole string consumed. `arr[2.5]` and `arr[9223372036854775807]` (which
+AVM1 stringifies to `"9.2233720368548e+18"`) are plain string properties that do
+**not** touch `length`; integral spellings, including negative ones and digit
+runs far past 2^64, do. Our extended-index arm fell back to `strtod` and so
+accepted both, which is why `arr_negative` serialized with an ECMAArray length of
+3 where Flash says 1, and why `arr_sparse` reported 49153 — `ToUint32` of the
+*decimal* `9.2233720368548e+18` is 49152, not the 0 the exact `2^63` would give.
+`array_length` pins the accepting side of this rule and is unchanged; nothing in
+it uses a non-integral key.
+
+**Second: a signed length increase can be an unsigned decrease, and Flash
+truncates on it.** `a[4294967295]` takes `length` from 2147483649 to 0 by u32
+wrap. The elements past the new end are really gone, not merely out of range:
+`arr_sparse[0]` reads back **undefined** even though the following
+`a[4294967296]` puts `length` back to 1. That single truncation is what makes
+Flash's `arr_sparse` serialize with no `"0"`/`"4"` pairs at all — and those two
+pairs are exactly 28 bytes, which is exactly the gap between our `getSize()` of
+1607 and the expected 1579. One fix, three graded lines.
+
+The remaining serde-suite delta was the reference table, and the answer is that
+**the AVM1 reader does not rebuild the reference graph at all.** It never
+populates the table, so every `0x07` reads as undefined and a DAG that survived
+the writer arrives broken. The test grades that directly:
+`ref_strict_is_exact` is **false** on the LocalConnection channel, which
+round-trips, against **true** on the SharedObject channel, which reads the live
+cached instance and never serializes. §7.2 predicted this ("fresh EMPTY cache per
+LC-delivered argument"); the implementation is simply a `rd_ref_claim` that
+returns -1.
+
+#### Three bugs outside the new files, each surfaced by a target
+
+- **`addProperty` must create an ORDINARY enumerable property.** `setProperty`
+  force-clears `ENUMERABLE` for the names `constructor` and `__proto__` — they
+  are DontEnum wherever the runtime itself installs them — but Flash's
+  `addProperty` does not, so a virtual `constructor` appears in for-in and in the
+  stream. `amf_serialize_typed_objects` cases 11 and 17 were the entire diff
+  after everything else matched: two missing `constructor` → `0x06` pairs.
+- **A `SUPER` thisArg binds the instance it proxies.** `super` is a view onto
+  `this`, not an object of its own. `super.call.apply(super, arguments)` — the
+  whole body of `netconnection_send_remote`'s `CustomNetConnection` — fell
+  through `Function.apply`'s primitive arm to `_global`, so the builtin ran with
+  the wrong receiver, found no `uri`, and the test stalled after its second trace
+  line with no error of any kind. Three thisArg extraction sites in `action.c`
+  needed the arm; a `SUPER` value's `numeric_value` is already the receiver's
+  `ASObject*`.
+- **`setArrayElement`'s growth overflowed u32.** `(index + 1) * 2` wraps to 0 for
+  any index at or past `0x7FFFFFFF`, and a wrapped capacity of 0 made `realloc`
+  *shrink* the block while the write below still used the huge index — an
+  out-of-bounds write reachable from ordinary script assignment, not just from
+  the new reader. Computed in 64 bits with a cap now. The reader independently
+  caps at the same 1 MiB `actionSetMember` uses and stores bigger keys as named
+  properties, because an ECMAArray in this stream legitimately carries
+  `"4294967295"`.
+
+#### Shape of the code
+
+`amf_packet.c` is deliberately VM-agnostic — it frames and parses packets over
+byte ranges the caller has already serialized, and mentions no VM type — so
+tranche 8 (AVM2 `NetConnection.call`) reuses it as-is. `avm1_amf.c` holds the
+codec, `SharedObject`, and the per-connection call queue. The queue drains once
+per tick into ONE packet, at a new call site immediately before
+`processLocalConnectionMessages` in both frame loops: after frame scripts **and**
+after timers, so a call issued from either lands in the same tick's packet, and
+before LC delivery because that is the interleaving Flash's own
+`amf_array_serialization` output shows. Tranche 2's five-site `quit_swf`
+exit-gate list was re-checked and needs **no** entry — unlike a socket, the drain
+is synchronous and always empties the queue, so nothing is ever left pending
+across a tick boundary.
+
+#### Re-prediction of tranches 5, 6, 8 after tranche 7
+
+- **Tranche 5 — AVM2 AMF gaps · was +1 · now +1, and cheaper.** Unchanged in
+  scope, but the Flash-vs-flash-lso rules are now pinned by a passing AVM1
+  implementation, so if any of bucket X turns out to want the uniform array rule
+  or nested typed objects, the semantics are settled and only `avm2_amf.c`'s `w0`
+  writer needs the port. Note `avm2_amf.c`'s `w0_value` still emits ECMAArray for
+  every array and never `0x0A`/`0x0F`/`0x10` — that is now known to be Ruffle's
+  behaviour, not Flash's.
+- **Tranche 6 — `LocalConnection` registry · was +3 · now +3, and SMALL rather
+  than LARGE.** Its cost estimate assumed argument marshalling was still ahead of
+  it. LC is now a real wire channel (serialize at `send`, deserialize at
+  delivery, with Flash's type translations), and `localconnection_top_level` —
+  which §7.0 moved out of bucket L on the grounds that its three failing lines
+  were pure serialization — is already passing. What is left in bucket L is the
+  registry semantics proper.
+- **Tranche 8 — AVM2 `NetConnection.call` wire · was +2 · now +2, and MEDIUM
+  drops toward SMALL.** The packet framing exists and is VM-agnostic; the
+  response-dispatch shape (`/N/onResult`, `/N/onStatus`, 1-based per flush,
+  silent drop on a malformed packet, zero-argument `onStatus` on a failed fetch)
+  is implemented and graded; `avm2/netconnection_send_remote`'s
+  `localhost/test{1,2,3}` are already bundled by this tranche's harness change.
+  What remains is AVM2-side: `nc_call`'s stub, and whatever the AVM2 executor
+  wants for response timing (see `avm2-loader-timing-is-executor-drain`).
 
 ## 7. Tranche 7 scoping (2026-07-29, pre-implementation)
 
