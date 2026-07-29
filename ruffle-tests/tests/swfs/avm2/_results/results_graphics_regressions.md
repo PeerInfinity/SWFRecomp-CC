@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 843/1221 passing | Graphics: 910/1221 passing
+Trace: 843/1221 passing | Graphics: 919/1221 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (67 tests)
+## Graphics Improvements (76 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -72,12 +72,21 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 56 | `sandbox_type_inherited` | Output Mismatch | 1/2 lines match |
 | 57 | `sandbox_type_local_network` | Output Mismatch | 0/1 lines match |
 | 58 | `selection` | Output Mismatch | 229/239 lines match |
-| 59 | `socket_errors` | Output Mismatch | 0/56 lines match |
-| 60 | `stage_loaderinfo_properties` | Output Mismatch | 22/24 lines match |
-| 61 | `tab_ordering_stage_tab_children` | Output Mismatch | 15/35 lines match |
-| 62 | `tab_ordering_stage_tab_children_remove_root` | Output Mismatch | 3/5 lines match |
-| 63 | `tab_ordering_tabbable` | Output Mismatch | 45/47 lines match |
-| 64 | `textbox_click` | Output Mismatch | 1/37 lines match |
-| 65 | `textfield_event` | Output Mismatch | 0/66 lines match |
-| 66 | `url_loader` | Output Mismatch | 0/25 lines match |
-| 67 | `wrong_arg_count` | Output Mismatch | 1/7 lines match |
+| 59 | `socket_after_disconnect` | Output Mismatch | 0/1 lines match |
+| 60 | `socket_close` | Output Mismatch | 0/2 lines match |
+| 61 | `socket_connect` | Output Mismatch | 0/4 lines match |
+| 62 | `socket_errors` | Output Mismatch | 0/56 lines match |
+| 63 | `socket_read_big` | Output Mismatch | 0/48 lines match |
+| 64 | `socket_read_little` | Output Mismatch | 0/48 lines match |
+| 65 | `socket_read_write_object` | Output Mismatch | 0/8 lines match |
+| 66 | `socket_write_big` | Output Mismatch | 0/15 lines match |
+| 67 | `socket_write_little` | Output Mismatch | 0/14 lines match |
+| 68 | `stage_loaderinfo_properties` | Output Mismatch | 22/24 lines match |
+| 69 | `tab_ordering_stage_tab_children` | Output Mismatch | 15/35 lines match |
+| 70 | `tab_ordering_stage_tab_children_remove_root` | Output Mismatch | 3/5 lines match |
+| 71 | `tab_ordering_tabbable` | Output Mismatch | 45/47 lines match |
+| 72 | `textbox_click` | Output Mismatch | 1/37 lines match |
+| 73 | `textfield_event` | Output Mismatch | 0/66 lines match |
+| 74 | `url_loader` | Output Mismatch | 0/25 lines match |
+| 75 | `wrong_arg_count` | Output Mismatch | 1/7 lines match |
+| 76 | `xml_socket` | Output Mismatch | 0/11 lines match |
