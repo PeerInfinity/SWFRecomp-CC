@@ -407,14 +407,17 @@ Bucket L. A per-player channel map with Ruffle's name rules (host prefixes,
 AVM2 halves. `avm2/localconnection` (890 lines) is the specification; predict
 it does **not** land in this tranche.
 
-### Tranche 7 — AVM1 AMF0 serializer + `NetConnection.call` · **predicted +4** · LARGE
+### Tranche 7 — AVM1 AMF0 serializer + `NetConnection.call` · **predicted +4, re-scoped 2026-07-29 to +7 of 11** · LARGE
 
-Bucket W (9 candidates). A new `ActionVar → AMF0` writer plus reader, the
-`Object.registerClass` alias table on the write side, SharedObject `.sol`
-persistence, and `NetConnection.call` packet framing into the fetch log.
-Predict 4 of 9: the strict-vs-ECMA array promotion rule is the load-bearing
-unknown and four of these tests are `known_failure`, so several can only
-reach `ruffle_matched`.
+Bucket W (9 candidates; the scoping pass in §7 corrects the census to 11 and
+retires two assumed subsystems — `.sol` file I/O and a `.sol`-input reader are
+NOT needed). Full scoping, mechanism inventory, per-test dependency matrix,
+and the risk register are in **§7** below. Headline: the strict-vs-ECMA rule
+is fully resolved from Flash-recorded bytes (numeric-keys-only → StrictArray
+`0x0A` with `0x06` holes on the wire; LSO/`getSize` mode keeps ECMAArray),
+and the load-bearing unknown is now the **`super()` native-constructor
+upgrade** (2 tests) plus byte-exact reference counting (`amf0_serde_suite`
+only).
 
 ### Tranche 8 — AVM2 `NetConnection.call` wire · **predicted +2** · MEDIUM
 
@@ -988,3 +991,214 @@ pre-change build over 11 canaries — `global_proto_decls` (7,462 lines),
 input to tranche 7, though: the AVM1 `FileReference` side table is now the
 precedent for where AVM1 native state lives when Flash does not expose it, and
 tranche 7's `SharedObject` `.sol` persistence will want the same shape.
+
+## 7. Tranche 7 scoping (2026-07-29, pre-implementation)
+
+Two very-thorough sweeps (our runtime; Ruffle @ `75c3cec57` — note: a fork
+with local AMF commits of 2026-07-24; some `*.ruffle.txt`/`*.ruffle.sol`
+snapshots predate them) plus local `--diff` runs of every candidate.
+
+### 7.0 Census correction — bucket W is 11 tests, not 9
+
+In (prefix sweep, the tranche-3b lesson):
+- `avm1/netconnection_send_remote` (2/50) — the full `NetConnection.call`
+  lifecycle: 4 sequential connects, `addHeader`, scripted AMF *response*
+  packets (`localhost/test{1,2,3}` files), `Responder`-object callbacks,
+  `onStatus()` with zero args on fetch failure, and a
+  `CustomNetConnection extends NetConnection` subclass calling
+  `super.call.apply(super, arguments)`.
+- `avm1/localconnection_top_level` (4/7) — moved from bucket L: its 3
+  failing lines are pure serialization (`TextField → undefined`,
+  `Function → [object Object]` plain-object round-trip, function result
+  undefined). No registry work needed — our LC already delivers.
+
+Out:
+- `shared_stack` (11/16) — NOT SharedObject: it tests that the AVM1 value
+  stack is shared across clips/frames within a tick (Ruffle commit
+  `5931b2982` "Clear stack only between frames"). Bucket Z; possible cheap
+  standalone fix, not this tranche.
+- `shared_object` / `shared_object_self_ref` — two-run persistence protocol
+  (`output1.txt`/`output2.txt`); our runner is single-shot. Stay in
+  `ignored_tests.txt`.
+- `from_shumway/flash_net_SharedObject` — already `ruffle_matched`
+  (effective); upstream `known_failure`, zero corpus gain available.
+
+### 7.1 What the sweeps retired (assumed subsystems NOT needed)
+
+1. **`.sol` file I/O — none.** Ruffle's `TestStorageBackend` is an
+   in-memory map that STARTS EMPTY; a shipped `.sol` is an *expected
+   output* fixture, never an input. Our harness reads no
+   `[shared_objects."…"]` toml table and diffs no `.sol` — only
+   `output.txt` lines grade. So: no TCSO header parser, no file writes.
+   `getSize()` must still return the byte length a full LSO write *would*
+   produce (`body + 10 + 2+len(name)+3+1 + 6`; `amf0_serde_suite` expects
+   1579) — compute from an in-memory serialize.
+2. **`.sol`-input reader — not needed.** `amf0_serde_suite`'s
+   "VERIFYING CHANNEL: SharedObject" block reads the *live cached
+   instance* (same-run `getLocal` identity), not a deserialized file.
+   An AMF0 **reader is still required**, but only for (a) LC in-process
+   round-trip and (b) NC response-packet dispatch — and our AVM2
+   `rd0_*` reader (avm2_amf.c:1252-1386) already handles every marker;
+   the AVM1 reader is a port of that, building ActionVars.
+3. **Harness work — zero, again** (5th tranche running). `log_fetch`
+   arrives as `-DLOG_FETCH=1`; the VM-agnostic fetch logger
+   (`utils.c:176-230`) already produces the exact Rust `{:02X?}` format;
+   `.sol` and the scripted `localhost/test{1,2,3}` response files are
+   embedded by `find_data_files` (verify `localhost/` subdir recursion —
+   the one open harness question; `findDataFile` matches basename, so
+   "test1" resolves regardless of path prefix).
+
+### 7.2 The Flash serialization rules (from recorded bytes — all resolved)
+
+**Two writer paths** (Ruffle `core/src/avm1/amf.rs`; Flash behaves the same
+way except where noted):
+- **Path A — top-level values** (each `NC.call`/`LC.send` argument,
+  `addHeader` value): display objects and `Value::MovieClip` → `0x06`
+  undefined; native Array → array rule below; XML → `0x0F` (u32 len +
+  UTF-8); Date → `0x0B` (f64 ms + u16 tz always 0); Function objects →
+  serialized as objects (own enumerable props); other objects → `0x03` or
+  typed `0x10`.
+- **Path B — nested values + the whole SharedObject `data` tree**:
+  functions **omitted entirely** (property not written); getters NEVER
+  invoked (virtual property → `0x06`, `// Flash never evaluates getters
+  during AMF serialization`); throwing `__resolve` swallowed.
+
+**The array rule** (was the arc's load-bearing unknown; now proven from
+Flash-recorded `output.txt` bytes):
+- Wire channels (NC packet, LC): every key parses as usize → **StrictArray
+  `0x0A`**, densified 0..max(length, maxIndex+1), holes emitted as `0x06`
+  (sparse `[0],[5]` → strict count 6 with four `0x06`). Any non-numeric
+  key (incl. `-1`, `2.5`) → **ECMAArray `0x08`** (u32 = `length` prop, all
+  entries as named pairs, insertion order). Plain Object with `length` →
+  `0x03`, always: the decision input is native-Array-ness, NOT the proto
+  chain (a "demoted" real array stays `0x0A`; an Object with
+  `__proto__ = Array.prototype` stays `0x03`).
+- LSO mode (`getSize`, flush byte-count): nested dense arrays stay
+  **ECMAArray**, sparse writes only present keys (no hole padding) —
+  Flash's own `.sol` proves it. One serializer, an `lso_mode` flag.
+- **Ruffle's known bug** (`known_failure` on amf_array_serialization,
+  netconnection_serialize_arrays, amf0_serde_suite): path B always emits
+  ECMAArray nested, and never emits nested typed objects. Implementing
+  Flash's uniform rule beats Ruffle → full passes.
+- Huge indices: key strings are AVM1 number→string forms (`2^63` →
+  `"9.2233720368547e+18"`), `length` is a truncating u32 cast.
+
+**Typed objects `0x10`** (top-level only in Ruffle; Flash also emits them
+NESTED — part of beating the serde suite): resolution at *serialization*
+time: (1) own non-virtual `constructor` prop; (2) stored `__constructor__`
+(chain walk, stops at virtual); (3) ptr-compare against the registerClass
+registry, **last registration wins**; alias string wins over function
+identity; re-pointed alias: old ctor → `0x03`; `ASSetPropFlags` irrelevant;
+inherited-via-proto `constructor` does NOT count.
+SWF-version: split at **version ≥ 7** (our `registered_class.c:73` already
+splits there — the "swf8" test name is cosmetic). SWF6 re-registration
+under different casing collapses to ONE entry and emits the **latest
+casing** — our CI registry lowercases keys and DISCARDS original casing
+(`registered_class.c:165,176`); it needs an original-casing field plus a
+ctor→alias reverse lookup (AVM2's `class_to_alias` avm2_amf.c:78-85 is the
+model; registered_class.c exports no iterator today).
+
+**Reference table `0x07`** (`amf0_serde_suite` only): fresh table per
+top-level value; Flash slots ONLY referenceable values — Object, Typed,
+ECMAArray, StrictArray, Date, XML (primitives never; the synthetic
+StrictArray wrapping call args doesn't count either). Ruffle increments on
+every element (its `07 003A` vs Flash `07 000F`) — copying flash-lso's
+counter would be copying the bug. Reader side: fresh EMPTY cache per
+LC-delivered argument and per NC response → cross-references and cycles
+resolve to `undefined` (Flash's own graded output agrees:
+`ref_strict_is_exact: false`).
+
+**Strings**: standard u16-length UTF-8, `0x0C` LongString only >65535.
+Unpaired surrogates are NOT actually exercised (Rascal left `\uD83D` as
+literal ASCII text) — do not build CESU-8 handling for this tranche.
+
+### 7.3 NetConnection.call machinery
+
+Current state: `connect`/`close` real (`builtin_nc_connect`,
+`NCState` pointer side-table action.c:2579-2596), `call`/`addHeader` pure
+stubs (action.c:36363-36364). No packet framing code exists anywhere in the
+repo (avm2 `nc_call` is also stubbed "tranche 8" — build the framing module
+VM-agnostic and both tranches share it).
+
+- Packet: `00 00 | u16 header_count | per-header (u16 name-len, name, u8
+  mustUnderstand, u32 EXACT value-len, AMF0 value) | u16 msg_count |
+  per-msg (target URI, response URI "/N" 1-based PER FLUSH, u32 exact body
+  len, StrictArray of args — always, even zero args)`.
+- `addHeader`: one header per name ASCII-case-insensitive (replace in
+  place), `mustUnderstand` DEFAULTS TO TRUE, value serialized at
+  addHeader time; headers re-sent with EVERY packet.
+- Queue per NC; per-tick flush drains the whole queue into ONE packet →
+  `swf_log_fetch_queue(url=connect uri, POST, application/x-amf, body)`.
+  AVM1 has NO fetch-log call site today — add the queue site and a flush
+  at the LC end-of-frame analogue (`swf_core.c:1480` / `swf.c:1203`), and
+  re-check tranche 2's five-site exit-gate list (`quit_swf` sits between
+  the frame funcs and the pump).
+- Response: fetch resolves `http://host:port/path` → embedded data file
+  (basename match makes `localhost/test1` findable); parse response
+  packet; target `/N/onResult|/N/onStatus` → 1-based responder index;
+  deserialize with fresh cache; invalid responses silently ignored; fetch
+  FAILURE → `nc.onStatus()` with ZERO arguments.
+- connect semantics deltas from ours to verify: `connect(null)` fires
+  Connect.Success sync; `http://` fires NOTHING and `isConnected` stays
+  FALSE for remoting; `close()` on remoting fires Closed + one extra
+  empty `onStatus()`.
+
+### 7.4 SharedObject minimal-real surface
+
+`getLocal(name)` → per-full-name same-run cache (AVM2's `g_so_cache`
+pattern, avm2_amf.c:1519-1574) with the name-validation/null rules
+(forbidden chars ``~%&\;:"',<>?# `` + space → null; localPath must be a
+literal-string path-prefix; `#` prefix when name contains `/`); `data`
+DONT_DELETE; `flush()` → true (empty body: true without "writing");
+`getSize()` → full-LSO byte length via lso_mode serialize; `clear()`
+empties `data` in place. No onStatus/Flush.Pending. REGRESSION WATCH:
+`shared_object_serialize_typed_objects` currently passes 1/1 — verify its
+one line still matches once getLocal is real.
+
+### 7.5 The `super()` upgrade — the tranche's one hard mechanism
+
+`amf_strict_array_serialization` + `amf_sharedobject_strict_array_serialization`
+both run: plain Object with `__proto__.{__constructor__: Array}` calls
+`super()` inside a method → Flash converts the receiver into a REAL array
+in place (litmus: `o[5]=x` then `o.length === 6` → "Did super() upgrade
+instance? YES"; then `length = 1` truncates, and the object serializes as
+StrictArray count 1). Ruffle passes: its `NativeObject::Array` is a bit it
+can set on an existing object. Our `ASObject` vs `ASArray` struct split
+makes in-place conversion impossible — this needs either a native_type
+`upgraded-array` flag + attached ASArray side-table with index/length
+routing in the property paths (post-dispatch-consolidation there are fewer
+sites, but this touches hot paths — keep the flag check cheap), or another
+mechanism. WITHOUT it those 2 tests cannot pass (no output.ruffle.txt →
+no ruffle_matched fallback; the Body bytes also depend on it). Related but
+separate: `netconnection_send_remote`'s `super.call.apply(super,
+arguments)` through an AS2 subclass of NetConnection (action.c:58444
+currently returns undefined for native-class super) — method-through-super
+dispatch, not an upgrade.
+
+### 7.6 Dependency matrix and prediction — **+7 of 11**
+
+| test | needs | confidence |
+|---|---|---|
+| localconnection_top_level | writer+reader (LC round-trip) | high |
+| amf_array_serialization | + NC wire, SO cache | high (beats known_failure) |
+| netconnection_serialize_arrays | writer + NC wire | high (beats known_failure) |
+| amf_serialize_typed_objects | + typed objects | high |
+| amf_swf6_serialize_typed_objects | + registry casing | high |
+| amf_swf6_case_insensitive_typed_objects | same | high |
+| amf_swf8_case_sensitive_typed_objects | same | high |
+| amf_sharedobject_strict_array_serialization | + super()-upgrade, flush | medium (7.5) |
+| amf_strict_array_serialization | + super()-upgrade | medium (7.5) |
+| netconnection_send_remote | + responses, subclass super | medium |
+| amf0_serde_suite | + byte-exact refs, getSize | stretch |
+
+Predict **+7** (the seven "high" rows); the two super()-upgrade tests, the
+send_remote lifecycle, and the serde suite are upside, not the base case.
+Ship order: 7a writer/reader + LC + SO (yields 1-2 rows alone) → 7b NC
+wire (4 more rows) → 7c registry casing (already partly in 7b's rows) →
+7d super()-upgrade → 7e send_remote + serde suite polish.
+
+Regression canaries for the local stash-diff sweep: `localconnection`
+(579 lines, currently raw-pointer arg passing — serializing MUST NOT
+change its output), `localconnection_properties`, `netconnection_close`,
+`shared_object_serialize_typed_objects`, `xml_socket_*` (flush-point
+neighbours), `file_reference_*` (same pump sites), plus the 11 targets.
