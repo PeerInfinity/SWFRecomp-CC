@@ -36993,24 +36993,69 @@ static int filerefParseFilters(SWFAppContext* app_context, ActionVar* arg,
 	return 1;
 }
 
-// Adopt the mock's simulated file onto a FileReference instance.
-static void filerefTakeSelection(SWFAppContext* app_context, ASObject* obj,
-                                 int name_index)
+// Ruffle's FileReferenceData carries an `is_initialised` flag and the selected
+// file's bytes, neither of which is script-visible. Both matter to upload():
+// uploading before a browse answers false, and onProgress reports the stored
+// data's length. A pointer-keyed side table is the AVM1 idiom for this (the
+// same shape NetConnection and XMLSocket use), and it keeps the instance's own
+// property set exactly what global_instance_decls records.
+#define MAX_FILEREF_STATE 32
+typedef struct FileRefState
+{
+	ASObject* obj;
+	u32 data_len;
+} FileRefState;
+static FileRefState g_fileref_state[MAX_FILEREF_STATE];
+static int g_fileref_state_count;
+
+static FileRefState* filerefStateFind(ASObject* obj)
+{
+	for (int i = 0; i < g_fileref_state_count; i++)
+		if (g_fileref_state[i].obj == obj) return &g_fileref_state[i];
+	return NULL;
+}
+
+static void filerefStateSet(ASObject* obj, u32 data_len)
+{
+	FileRefState* s = filerefStateFind(obj);
+	if (s == NULL)
+	{
+		if (g_fileref_state_count >= MAX_FILEREF_STATE) return;
+		s = &g_fileref_state[g_fileref_state_count++];
+		s->obj = obj;
+	}
+	s->data_len = data_len;
+}
+
+// Adopt a simulated file onto a FileReference instance. `name` is the mock's
+// for browse() and the SAVE HINT for download() — Ruffle's save dialog builds
+// its TestFileSelection from the requested file name, which is why
+// file_reference_download_success reports `debug-success.txt` and not
+// `test.txt`.
+static void filerefTakeSelectionNamed(SWFAppContext* app_context, ASObject* obj,
+                                      const char* name, u32 size)
 {
 	// DONT_ENUM + READ_ONLY + DONT_DELETE — the flag set global_instance_decls
 	// records for a real Flash FileReference's own name/type/size.
 	const u8 ro = 0;
 	ActionVar v;
-	v = makeStringActionVar(app_context, swf_dialog_file_name(name_index),
-	                        (u32) strlen(swf_dialog_file_name(name_index)));
+	v = makeStringActionVar(app_context, name, (u32) strlen(name));
 	setPropertyWithFlags(app_context, obj, "name", 4, &v, ro);
 	v = makeStringActionVar(app_context, SWF_DIALOG_FILE_TYPE,
 	                        (u32) strlen(SWF_DIALOG_FILE_TYPE));
 	setPropertyWithFlags(app_context, obj, "type", 4, &v, ro);
 	memset(&v, 0, sizeof(v));
 	v.type = ACTION_STACK_VALUE_F64;
-	{ double d = (double) SWF_DIALOG_CONTENTS_LEN; memcpy(&v.data.numeric_value, &d, sizeof(double)); }
+	{ double d = (double) size; memcpy(&v.data.numeric_value, &d, sizeof(double)); }
 	setPropertyWithFlags(app_context, obj, "size", 4, &v, ro);
+	filerefStateSet(obj, size);
+}
+
+static void filerefTakeSelection(SWFAppContext* app_context, ASObject* obj,
+                                 int name_index)
+{
+	filerefTakeSelectionNamed(app_context, obj, swf_dialog_file_name(name_index),
+	                          SWF_DIALOG_CONTENTS_LEN);
 }
 
 static void filerefBroadcast(SWFAppContext* app_context, ASObject* obj,
@@ -37111,6 +37156,285 @@ static ActionVar builtin_filereflist_browse(SWFAppContext* app_context, ActionVa
 	(void) registers;
 	return filerefBrowseCommon(app_context, args, arg_count, this_obj,
 	                           filereflistDialogResolve);
+}
+
+// ---------------------------------------------------------------------------
+// FileReference.download / FileReference.upload
+// ---------------------------------------------------------------------------
+//
+// Ruffle: file_reference.rs::{download,upload} plus loader.rs::
+// {download_file_dialog,upload_file}. Each is ONE future — download awaits the
+// save dialog and THEN the fetch, firing every callback in a single update —
+// so the whole sequence runs inside one resolution callback here, and the
+// dialog queue's ordinary pump is all the scheduling either needs. upload()
+// opens no dialog at all; it rides the same queue purely to be async, which is
+// what puts its events after the onSelect handler that started it.
+//
+// The transport is the test navigator's three magic query strings
+// (tests/framework/src/backends/navigator.rs): "?debug-success" answers
+// "Hello, World!", "?debug-error-statuscode" is an HttpNotOk with a zero-length
+// body, "?debug-error-dns" an InvalidDomain. Anything else would be a real
+// fetch, which for these two entry points can only fail.
+
+enum
+{
+	FR_FETCH_OK = 0,
+	FR_FETCH_STATUS,     // Error::HttpNotOk
+	FR_FETCH_DNS,        // Error::InvalidDomain
+	FR_FETCH_ERROR       // Error::FetchError
+};
+
+static int filerefClassifyUrl(const char* url)
+{
+	if (strstr(url, "?debug-success") != NULL) return FR_FETCH_OK;
+	if (strstr(url, "?debug-error-statuscode") != NULL) return FR_FETCH_STATUS;
+	if (strstr(url, "?debug-error-dns") != NULL) return FR_FETCH_DNS;
+	return FR_FETCH_ERROR;
+}
+
+// Rust url::Url::parse, only as far as the corpus needs it: an absolute URL
+// must start with a scheme. "@" and "baddomain" have none, and that is the
+// whole of download()'s two false cases. The path is returned because a
+// download with no explicit file name derives one from its last segment; note
+// Url normalizes an empty path to "/" for the special schemes, so
+// download("http://example.com") derives the EMPTY name (and the save dialog
+// then cancels, which is file_reference_download_cancel).
+static int filerefParseUrl(const char* url, char* out_scheme, size_t scheme_size,
+                           char* out_path, size_t path_size)
+{
+	if (url == NULL || !isalpha((unsigned char) url[0])) return 0;
+	size_t i = 0;
+	while (url[i] != '\0' && url[i] != ':')
+	{
+		char c = url[i];
+		if (!isalnum((unsigned char) c) && c != '+' && c != '-' && c != '.') return 0;
+		i++;
+	}
+	if (url[i] != ':') return 0;
+	if (out_scheme != NULL && scheme_size > 0)
+	{
+		size_t n = i < scheme_size - 1 ? i : scheme_size - 1;
+		for (size_t k = 0; k < n; k++)
+			out_scheme[k] = (char) tolower((unsigned char) url[k]);
+		out_scheme[n] = '\0';
+	}
+	const char* p = url + i + 1;
+	if (p[0] == '/' && p[1] == '/')
+	{
+		p += 2;   // skip the authority
+		while (*p != '\0' && *p != '/' && *p != '?' && *p != '#') p++;
+	}
+	const char* end = p;
+	while (*end != '\0' && *end != '?' && *end != '#') end++;
+	if (out_path != NULL && path_size > 0)
+	{
+		size_t n = (size_t) (end - p);
+		if (n >= path_size) n = path_size - 1;
+		memcpy(out_path, p, n);
+		out_path[n] = '\0';
+	}
+	return 1;
+}
+
+// One in-flight download/upload. The dialog queue carries only
+// (callback, target, code), so the URL and the derived file name travel in a
+// slot the callback is handed as its target.
+#define MAX_FILEREF_OPS 8
+typedef struct FileRefOp
+{
+	int in_use;
+	ASObject* obj;
+	char url[512];
+	char file_name[256];
+	u32 data_len;
+} FileRefOp;
+static FileRefOp g_fileref_ops[MAX_FILEREF_OPS];
+
+static FileRefOp* filerefOpAlloc(void)
+{
+	for (int i = 0; i < MAX_FILEREF_OPS; i++)
+	{
+		if (g_fileref_ops[i].in_use) continue;
+		memset(&g_fileref_ops[i], 0, sizeof(FileRefOp));
+		g_fileref_ops[i].in_use = 1;
+		return &g_fileref_ops[i];
+	}
+	return NULL;
+}
+
+static void filerefBroadcastProgress(SWFAppContext* app_context, ASObject* obj,
+                                     u32 loaded, u32 total)
+{
+	ActionVar bargs[4];
+	bargs[0] = makeStringActionVar(app_context, "onProgress", 10);
+	memset(&bargs[1], 0, sizeof(ActionVar));
+	bargs[1].type = ACTION_STACK_VALUE_OBJECT;
+	bargs[1].data.numeric_value = (u64) obj;
+	for (int i = 0; i < 2; i++)
+	{
+		memset(&bargs[2 + i], 0, sizeof(ActionVar));
+		bargs[2 + i].type = ACTION_STACK_VALUE_F64;
+		double d = (double) (i == 0 ? loaded : total);
+		memcpy(&bargs[2 + i].data.numeric_value, &d, sizeof(double));
+	}
+	builtin_broadcaster_broadcastMessage(app_context, bargs, 4, NULL, (void*) obj);
+}
+
+// loader.rs::download_file_dialog. `code` is the mock's dialog verdict.
+static void filerefDownloadResolve(void* target, int code)
+{
+	FileRefOp* op = (FileRefOp*) target;
+	SWFAppContext* app_context = g_file_dialog_app;
+	if (op == NULL) return;
+	ASObject* obj = op->obj;
+	if (obj == NULL || app_context == NULL) { op->in_use = 0; return; }
+
+	if (!code)
+	{
+		filerefBroadcast(app_context, obj, "onCancel");
+		op->in_use = 0;
+		return;
+	}
+
+	// onSelect and onOpen are fired against the INITIAL dialog result, before
+	// the download has produced anything.
+	filerefTakeSelectionNamed(app_context, obj, op->file_name,
+	                          SWF_DIALOG_CONTENTS_LEN);
+	filerefBroadcast(app_context, obj, "onSelect");
+
+	switch (filerefClassifyUrl(op->url))
+	{
+	case FR_FETCH_OK:
+		filerefBroadcast(app_context, obj, "onOpen");
+		// write_and_refresh + a second init_from_file_selection: onProgress and
+		// onComplete see the DOWNLOADED bytes, not the placeholder.
+		filerefTakeSelectionNamed(app_context, obj, op->file_name,
+		                          SWF_DIALOG_CONTENTS_LEN);
+		filerefBroadcastProgress(app_context, obj, SWF_DIALOG_CONTENTS_LEN,
+		                         SWF_DIALOG_CONTENTS_LEN);
+		filerefBroadcast(app_context, obj, "onComplete");
+		break;
+	case FR_FETCH_DNS:
+		// The connection never opened, so there is no onOpen.
+		printf("Error opening URL '%s'\n", op->url);
+		filerefBroadcast(app_context, obj, "onIOError");
+		break;
+	case FR_FETCH_STATUS:
+		filerefBroadcast(app_context, obj, "onOpen");
+		printf("Error opening URL '%s'\n", op->url);
+		filerefBroadcast(app_context, obj, "onIOError");
+		// Flash still runs onProgress after an error, but only when the
+		// connection had been established. HttpNotOk carries the error body's
+		// length, which the test navigator sets to 0.
+		filerefBroadcastProgress(app_context, obj, 0, 0);
+		break;
+	default:
+		filerefBroadcast(app_context, obj, "onOpen");
+		printf("Error opening URL '%s'\n", op->url);
+		filerefBroadcast(app_context, obj, "onIOError");
+		break;
+	}
+	op->in_use = 0;
+}
+
+// loader.rs::upload_file. onOpen is unconditional — it precedes the match on
+// the fetch result.
+static void filerefUploadResolve(void* target, int code)
+{
+	FileRefOp* op = (FileRefOp*) target;
+	SWFAppContext* app_context = g_file_dialog_app;
+	if (op == NULL) return;
+	ASObject* obj = op->obj;
+	if (obj == NULL || app_context == NULL) { op->in_use = 0; return; }
+
+	filerefBroadcast(app_context, obj, "onOpen");
+	switch (code)
+	{
+	case FR_FETCH_OK:
+		filerefBroadcastProgress(app_context, obj, op->data_len, op->data_len);
+		filerefBroadcast(app_context, obj, "onComplete");
+		break;
+	case FR_FETCH_STATUS:
+		filerefBroadcastProgress(app_context, obj, op->data_len, op->data_len);
+		filerefBroadcast(app_context, obj, "onHTTPError");
+		break;
+	default:
+		// InvalidDomain, and a plain fetch error, both surface as onIOError.
+		filerefBroadcast(app_context, obj, "onIOError");
+		break;
+	}
+	op->in_use = 0;
+}
+
+static ActionVar builtin_fileref_download(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL || arg_count == 0) return ret;
+
+	char url[512], path[512], file_name[256];
+	filerefCoerceString(app_context, &args[0], url, sizeof(url));
+	if (!filerefParseUrl(url, NULL, 0, path, sizeof(path))) return ret;
+
+	if (arg_count > 1)
+	{
+		filerefCoerceString(app_context, &args[1], file_name, sizeof(file_name));
+	}
+	else
+	{
+		const char* last = path;
+		for (const char* q = path; *q != '\0'; q++)
+			if (*q == '/') last = q + 1;
+		snprintf(file_name, sizeof(file_name), "%s", last);
+	}
+
+	FileRefOp* op = filerefOpAlloc();
+	if (op == NULL) return ret;
+	op->obj = obj;
+	snprintf(op->url, sizeof(op->url), "%s", url);
+	snprintf(op->file_name, sizeof(op->file_name), "%s", file_name);
+
+	g_file_dialog_app = app_context;
+	retainObject(obj);
+	// The save dialog's verdict is the file-name hint, exactly as in browse().
+	swf_dialog_queue(filerefDownloadResolve, op,
+	                 strcmp(file_name, SWF_DIALOG_MAGIC_SAVE) == 0);
+	ret.data.numeric_value = 1;   // the dialog was displayed
+	return ret;
+}
+
+static ActionVar builtin_fileref_upload(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void) registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL) return ret;
+
+	// Nothing browsed yet means nothing to upload.
+	FileRefState* st = filerefStateFind(obj);
+	if (st == NULL || arg_count == 0) return ret;
+
+	char url[512], scheme[16];
+	filerefCoerceString(app_context, &args[0], url, sizeof(url));
+	if (!filerefParseUrl(url, scheme, sizeof(scheme), NULL, 0)) return ret;
+	if (strcmp(scheme, "http") != 0 && strcmp(scheme, "https") != 0) return ret;
+
+	FileRefOp* op = filerefOpAlloc();
+	if (op == NULL) return ret;
+	op->obj = obj;
+	op->data_len = st->data_len;
+	snprintf(op->url, sizeof(op->url), "%s", url);
+
+	g_file_dialog_app = app_context;
+	retainObject(obj);
+	swf_dialog_queue(filerefUploadResolve, op, filerefClassifyUrl(url));
+	ret.data.numeric_value = 1;
+	return ret;
 }
 
 // Install the AsBroadcaster trio + a real zero-length `_listeners` Array on a
@@ -39035,8 +39359,10 @@ static void initFlashPackage(SWFAppContext* app_context)
 		filerefInstallBroadcaster(app_context, p);
 		addNativeMethodToProto(app_context, p, "browse", 6, f,
 		                       (Function2Ptr) builtin_fileref_browse);
-		addStubMethodToProto(app_context, p, "upload", 6, f);
-		addStubMethodToProto(app_context, p, "download", 8, f);
+		addNativeMethodToProto(app_context, p, "upload", 6, f,
+		                       (Function2Ptr) builtin_fileref_upload);
+		addNativeMethodToProto(app_context, p, "download", 8, f,
+		                       (Function2Ptr) builtin_fileref_download);
 		addStubMethodToProto(app_context, p, "cancel", 6, f);
 		addStubMethodToProto(app_context, p, "convertToPPT", 12, f);
 		addStubMethodToProto(app_context, p, "deleteConvertedPPT", 18, f);
