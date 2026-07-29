@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-26T20:13:07.910957+00:00",
-    "old_git_sha": "8df2d730c3f0341ecf5228464ad0e649428cad39",
-    "new_timestamp": "2026-07-29T01:40:49.593531+00:00",
-    "new_git_sha": "767a301d2baeac108169258c9a68c8f5054d8238",
+    "old_timestamp": "2026-07-29T01:40:49.593531+00:00",
+    "old_git_sha": "767a301d2baeac108169258c9a68c8f5054d8238",
+    "new_timestamp": "2026-07-29T03:45:41.078226+00:00",
+    "new_git_sha": "72fdc5e933a6c32ecea4be6e398c9a3aac819699",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1457,
+    "old_pass": 1458,
     "old_ruffle_matched": 51,
-    "old_effective_pass": 1508,
+    "old_effective_pass": 1509,
     "old_total": 1574,
     "old_pass_rate": 92.6,
     "new_pass": 1458,
@@ -18,45 +18,16 @@
     "new_effective_pass": 1509,
     "new_total": 1574,
     "new_pass_rate": 92.6,
-    "old_mismatched_lines": 888,
+    "old_mismatched_lines": 782,
     "new_mismatched_lines": 782,
     "increased_mismatches": 0,
-    "decreased_mismatches": 106,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 2,
-    "unchanged": 1572,
+    "status_changed": 0,
+    "unchanged": 1574,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "as3/AMF/AMFSerializer",
-      "change_type": "changed",
-      "old_status": "segfault",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 118,
-        "expected_lines": 225,
-        "matching_lines": 117
-      },
-      "new_lines": {
-        "actual_lines": 225,
-        "expected_lines": 225,
-        "matching_lines": 223
-      }
-    },
-    {
-      "test": "ecma3/Exceptions/bug127913",
-      "change_type": "changed",
-      "old_status": "segfault",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    }
-  ]
+  "changes": []
 }
