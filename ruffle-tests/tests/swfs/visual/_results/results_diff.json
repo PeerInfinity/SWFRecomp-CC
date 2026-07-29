@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-26T09:20:04.989591+00:00",
-    "old_git_sha": "b615844ac34104b9665678e2ff9223ea069380ae",
-    "new_timestamp": "2026-07-26T20:13:07.970589+00:00",
-    "new_git_sha": "8df2d730c3f0341ecf5228464ad0e649428cad39",
+    "old_timestamp": "2026-07-26T20:13:07.970589+00:00",
+    "old_git_sha": "8df2d730c3f0341ecf5228464ad0e649428cad39",
+    "new_timestamp": "2026-07-29T01:40:49.637957+00:00",
+    "new_git_sha": "767a301d2baeac108169258c9a68c8f5054d8238",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 135,
     "old_total": 142,
     "old_pass_rate": 95.1,
-    "new_pass": 135,
+    "new_pass": 136,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 135,
-    "new_total": 142,
+    "new_effective_pass": 136,
+    "new_total": 143,
     "new_pass_rate": 95.1,
     "old_mismatched_lines": 112,
     "new_mismatched_lines": 112,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 142,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "video/h264_multinalu",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }
