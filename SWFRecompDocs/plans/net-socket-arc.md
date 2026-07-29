@@ -3,15 +3,19 @@
 **Created**: 2026-07-28 · **Baseline**: `2ed94a302` (session start), per-suite
 `_results/results_graphics.json` from CI `30397635331` (the input-arc closeout
 run, SHA `bbefcf376`).
-**Status**: triage complete; **tranche 1 SHIPPED** (`937047612` + `722dea0e9`,
-CI `30403506144` then `30405770263`, both graphics/full green) — **+10 vs +9
-predicted, zero regressions**. Corpus effective 3890 → **3901 / 4420** (the
-11th gain is an unrelated `visual` flake), `avm2` 926 → **936 / 1221**.
-**Tranche 2 SHIPPED** (`767a301d2` + `e173acc9a`, CI `30412279387` /
-`30412301703` then `30414817519`) — socket.json replay + the Socket/XMLSocket
-data path, **+14 vs +12 predicted, zero regressions**. Corpus effective
-3901 → **3914 / 4420**; `avm2` 936 → **945 / 1221**, `avm1` 658 → **663**.
-Postmortems in §6. **NEXT: tranche 3** (file dialogs, re-predicted +11).
+**Status**: triage complete; **tranches 1–4 SHIPPED**, every one over its
+prediction with zero regressions. Full postmortems in §6.
+
+| Tranche | Commit / CI | Predicted | Actual | Corpus effective |
+|---|---|---|---|---|
+| 1 — pure class surface | `937047612` + `722dea0e9` / `30403506144`, `30405770263` | +9 | **+10** | 3890 → 3901 |
+| 2 — `socket.json` + Socket/XMLSocket | `767a301d2` + `e173acc9a` / `30412279387`, `30414817519` | +12 | **+14** | 3901 → 3914 |
+| 3 — file dialogs | `72fdc5e93` / `30418985155`, `30418993536` | +11 | **+15** | 3914 → 3929 |
+| 4 — `URLStream` | `8c3b7673f` / `30477186369` | +2 | **+3** | 3929 → **3932 / 4420** |
+
+Per-suite at tranche 4: `avm2` **956 / 1221**, `avm1` **668**,
+`from_shumway` **182**.
+**NEXT: tranche 3b** (AVM1 `FileReference.download`/`upload`, +5).
 
 Scope of this document: the **net block** named as row 4e of
 `feature-priority-map.md` ("net/socket (29)"). The census below finds
@@ -246,7 +250,8 @@ socket classes' buffers), split across both VMs.
 | Suite | Test | lines | Note |
 |---|---|---|---|
 | avm2 | `urlstream_basic` | 0/5 | `URLStream` = `URLLoader`'s fetch pipeline with an `IDataInput` face (`bytesAvailable`, `readUTFBytes`) and `OPEN`/`PROGRESS`/`COMPLETE` in that order. The sibling asset (`data.txt`) is bundled and `findDataFile` already resolves it — this is the URLLoader path with a different sink. |
-| from_shumway | `flash_net_URLLoader` | 0/7 | `openHandler`/`progressHandler` (`bytesLoaded=2674 bytesTotal=2674`)/`httpStatusHandler`/`completeHandler` order over its own `test.swf`. Same pipeline; listed here because it is one fix away from bucket U's, not because it needs `URLStream`. |
+| from_shumway | `flash_net_URLLoader` | 0/7 | `openHandler`/`progressHandler` (`bytesLoaded=2674 bytesTotal=2674`)/`httpStatusHandler`/`completeHandler` order over its own **source file** (`test.as`, not `test.swf`). Same pipeline; listed here because it is one fix away from bucket U's, not because it needs `URLStream`. |
+| from_shumway | `stream1` | 0/9 | **Added post-hoc** — a `URLStream` test the sweeps missed, because its NAME says `stream1` and it ships no `.as` source to grep. `readByte`/`readUnsignedShort`/`readBytes` over `stream1.swf.bin` in both endiannesses. |
 
 ### Bucket L — `LocalConnection` as an in-process registry · 4 tests
 
@@ -378,11 +383,12 @@ in AVM1, both over the §3 mock. `filereference_save_and_load` is
 `known_failure` (ceiling `ruffle_matched`) and the two 30-plus-line
 `load`/`save_and_browse` tests carry the most ordering risk.
 
-### Tranche 4 — `URLStream` · **predicted +2** · SMALL
+### Tranche 4 — `URLStream` · **predicted +2** (**actual +3**) · SMALL
 
 Bucket U. `URLStream` is `URLLoader`'s existing fetch pipeline with an
 `IDataInput` sink; `from_shumway/flash_net_URLLoader` rides on the same event
-ordering.
+ordering. The third gain, `from_shumway/stream1`, is a `URLStream` test §0's
+sweeps could not see — see the postmortem.
 
 ### Tranche 5 — AVM2 AMF gaps · **predicted +1** · SMALL
 
@@ -795,3 +801,93 @@ point — sweep the test-name prefix as well as the mechanism.**
 - **Tranche 8 (AVM2 `NetConnection.call`, 3)** — unchanged at **+2**.
 
 Arc total if 3b + 4–8 land: **+17** on top of tranche 1+2+3's **+39**.
+
+### Tranche 4 — SHIPPED `8c3b7673f`, CI `30477186369` (graphics, full)
+
+**+3 vs +2 predicted, zero regressions.** Corpus effective
+**3929 → 3932 / 4420**; `avm2` **955 → 956 / 1221**, `from_shumway`
+**180 → 182**. `REGRESSIONS: 0`, `OTHER STATUS MOVES: 0`, and the status
+histogram moves only `output_mismatch 483 → 480` / `pass 3689 → 3692` — no new
+`segfault` / `timeout` / `runtime_error` / `compile_fail` bucket.
+
+Both bucket-U targets landed, plus one the census missed.
+
+| Test | before | after |
+|---|---|---|
+| `avm2/urlstream_basic` | 0/5 | **pass** |
+| `from_shumway/flash_net_URLLoader` | 0/7 | **pass** |
+| `from_shumway/stream1` | 0/9 | **pass** (census miss) |
+
+**`from_shumway/stream1` is the +1, and it is tranche 3's census lesson
+repeating in a new key.** It is a `URLStream` test — it loads
+`stream1.swf.bin` and grades `readByte`/`readUnsignedShort`/`readBytes` over
+the result — but §0's name sweep looks for `urlstream` in the *test name* and
+its name is `stream1`, while the content sweep greps `*.as` sources and this
+test ships only a `test.fla`. **A sweep over test names plus `.as` sources is
+blind to any suite whose tests carry no source file**; from_shumway has 14
+such directories. Grepping the compiled `test.swf` for class names would have
+found it.
+
+**The IDataInput face cost two lines, exactly as re-predicted.** Tranche 2
+generalised the ByteArray bodies over an alt resolver so `Socket` could put a
+buffer PAIR behind them; `URLStream` registers a second resolver over its
+single sink and inherits all 14 read bodies unchanged. The one structural
+change is that `avm2_bytearray.c`'s hook became a short **chain** rather than
+one slot — each resolver claims only its own class and returns NULL otherwise,
+so registration order is immaterial. `install_data_io` also split into
+input/output halves: `URLStream` has no write side, and Ruffle's `URLStream.as`
+implements `IDataInput` only.
+
+`URLStream` itself is Ruffle's wrapper written in C: `URLStream.as` is a thin
+AS3 shell around a *private* `URLLoader` in binary mode, re-dispatching
+open/progress/httpStatus/complete/ioError and forwarding every read to
+`_loader.data`. So it lives beside `URLLoader` in `avm2_display.c` and shares
+the fetch pipeline outright — `ul_start_load` grew an `is_stream` flag and the
+delivery half forks on it. Nothing streams in either player (the bytes land all
+at once when the fetch resolves), which is what `urlstream_basic` grades:
+`bytesAvailable` is 0 in the `open` handler and the full length from `progress`
+on.
+
+**The `from_shumway` rider needed no `URLStream` at all — it was a harness
+gap.** `flash_net_URLLoader` subclasses `URLLoader` and fetches its OWN SOURCE
+(`test.as`, 2674 bytes), grading the body and the
+`OPEN`/`PROGRESS`/`HTTP_STATUS`/`COMPLETE` order, which we already emitted in
+that order. It failed because `verify_output.py::find_data_files` excluded
+`test.as` from the bundled sibling assets, so the fetch 404'd into #2032.
+Ruffle's test navigator serves *every* sibling file, and `Test.as` (capital T,
+the avm1/avm2 spelling) was already bundled everywhere — excluding the
+lowercase spelling was an accident of the original loadVariables
+implementation, not a decision. Un-skipping it bundles a source file into 290
+tests; the only behavioural gate that flips is `-DHAS_DATA_FILES`, whose arms
+return early on a `findDataFile` miss exactly as the stub does, and no corpus
+file names `"test.as"` anywhere (one comment in
+`visual/filters/avm1_convolution_initialization` aside).
+
+One hardening that change earned: `getDataFilesMaxImageDims` now probes only
+files with an image suffix. It sizes a GPU texture array from
+`stbi_info_from_memory`, and stb's TGA/PNM sniffers are loose enough that 290
+new text files were worth not feeding them.
+
+Also GC-rooted the pending `URLLoader`/`URLStream` queue, which the Loader
+queue beside it already was: between `load()` and the drain that queue can be
+the only reference to the target, and `urlstream_basic` drops its stream into
+listener closures the stream itself owns — a cycle nothing else reaches.
+
+**Blast radius, measured.** Stash-diff of the actual `--diff` output against a
+pre-change build over 12 canaries — `avm2/socket_read_big`,
+`avm2/socket_errors` (the resolver chain), `avm2/url_loader`,
+`avm2/loader_events` (the pipeline refactor),
+`avm2/bytearray_readobject_amf3` (the `data_io` split),
+`avm1/netstream_play_flv` (bundled images + the dims scan),
+`avm1/mcl_loadclip_properties`, `avm1/native_objects_swf6`, `avm1/xml_socket`,
+`avm1/loadvariables`, `visual/filters/avm1_convolution_initialization` (all
+newly `HAS_DATA_FILES`) and `from_shumway/flash_net_URLRequest` — is
+**byte-identical on all twelve**. Unlike tranches 1 and 2 there is no
+`describeType` dip to read as a fix: `avm2/all_classes` has no `net`
+subdirectory.
+
+**Re-prediction of tranches 5–8 after tranche 4.** Nothing here touches AMF,
+`LocalConnection` or the AVM1 serializer, so tranche 5 stays **+1**, 6 stays
+**+3**, 7 stays **+4** and 8 stays **+2**. One note for whoever writes the next
+census: re-run the sweep against compiled `test.swf` class names before sizing
+a tranche in `from_shumway` or `from_gnash`.
