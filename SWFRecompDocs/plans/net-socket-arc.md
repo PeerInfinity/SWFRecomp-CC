@@ -7,9 +7,11 @@ run, SHA `bbefcf376`).
 CI `30403506144` then `30405770263`, both graphics/full green) — **+10 vs +9
 predicted, zero regressions**. Corpus effective 3890 → **3901 / 4420** (the
 11th gain is an unrelated `visual` flake), `avm2` 926 → **936 / 1221**.
-**Tranche 2 SHIPPED** — socket.json replay + the Socket/XMLSocket data path;
-**14/14 targets pass locally in both modes** against a predicted 12.
-Postmortems in §6. **NEXT: tranche 3** (file dialogs, +10, medium).
+**Tranche 2 SHIPPED** (`767a301d2` + `e173acc9a`, CI `30412279387` /
+`30412301703` then `30414817519`) — socket.json replay + the Socket/XMLSocket
+data path, **+14 vs +12 predicted, zero regressions**. Corpus effective
+3901 → **3914 / 4420**; `avm2` 936 → **945 / 1221**, `avm1` 658 → **663**.
+Postmortems in §6. **NEXT: tranche 3** (file dialogs, re-predicted +11).
 
 Scope of this document: the **net block** named as row 4e of
 `feature-priority-map.md` ("net/socket (29)"). The census below finds
@@ -511,7 +513,20 @@ largest blocks. One adjustment: tranche 5 (`IExternalizable` +
 `Responder` and `NetConnection` exist and `avm2_net.c` is the obvious home for
 the `NetConnection.call` half of tranche 8 that will consume them.
 
-### Tranche 2 — SHIPPED, CI pending at write time
+### Tranche 2 — SHIPPED `767a301d2` + `e173acc9a`, CI `30412279387` / `30412301703` then `30414817519`
+
+**+14 vs +12 predicted, zero regressions.** All 14 bucket-S targets, in BOTH
+modes. Against the session-start baseline `6a622700c`, corpus effective
+**3901 → 3914 / 4420**; `avm2` **936 → 945 / 1221**, `avm1` **658 → 663**.
+The no-graphics run lands on identical per-suite numbers, so the new tick hook
+keeps mode parity in both frame loops. The verification run reports
+`OTHER STATUS MOVES: 0`.
+
+The one row `corpus_status_diff` lists as a regression,
+`visual/simple_shapes/heavy_tesselation` (`pass → recomp_fail`), is a
+**recompiler timeout** at the harness's 30s limit: it reproduces locally
+against an untouched recompiler and flipped the *other* way during tranche 1.
+Not ours.
 
 **14/14 bucket-S targets pass locally, in BOTH modes, against a predicted 12.**
 The two 48-line `socket_read_big` / `socket_read_little` tests — named in §5 as
