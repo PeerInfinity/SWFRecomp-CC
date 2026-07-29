@@ -370,7 +370,7 @@ two socket classes' buffer plumbing on top. Adds the
 `swf_log_fetch_queue`. Predict 12 of 14 — the two `read_big`/`read_little`
 48-line tests are the ones with the most surface to get exactly right.
 
-### Tranche 3 — file dialogs · **predicted +10** · MEDIUM
+### Tranche 3 — file dialogs · **predicted +10** (re-predicted +11; **actual +15**) · MEDIUM
 
 Bucket D (14 candidates). `FileReference`/`FileReferenceList`/`FileFilter` in
 AVM2 (sealed, so absent properties throw #1069) and real `browse()`/`save()`
@@ -661,3 +661,137 @@ Also worth recording: `visual/simple_shapes/heavy_tesselation` went
 - **Tranche 8 (AVM2 `NetConnection.call`, 3)** — unchanged at **+2**.
 
 Arc total if 3–8 land: **+23** on top of tranche 1+2's +24.
+
+### Tranche 3 — SHIPPED `72fdc5e93`, CI `30418985155` (graphics) / `30418993536` (no-graphics), both `full`
+
+**+15 vs +11 predicted, zero regressions.** Both modes land on identical
+per-suite numbers: corpus effective **3914 → 3929 / 4420**, `avm2`
+**945 → 955 / 1221**, `avm1` **663 → 668**. `REGRESSIONS (effective -> fail):
+0`; the only `OTHER STATUS MOVES` rows are the four
+`from_gnash/actionscript.all/XMLSocket-v{5,6,7,8}` going
+`ruffle_matched → pass`, which is tranche 2's `connect()` fix showing up
+against a baseline whose merged results predate it — a gain, and not this
+tranche's.
+
+All 14 bucket-D targets passed, plus **`avm2/filefilter_properties`**, which
+the §4 census missed: it was 0/4 purely for want of a `FileFilter` class, and
+its expected output ends in `TypeError #2023: Class Test$ must inherit from
+Sprite` because its `package { public class Test {} }` does not extend Sprite.
+That is the whole +4 over prediction — three of it from `save_and_load`,
+`save_and_browse` and `load` all landing (they were flagged as the
+ordering-risk trio), one from the census miss.
+
+**No harness work at all.** Unlike `input.json` and `socket.json`, the dialog
+mock is keyed off test CONTENT — a filter described `debug-select-success`, or
+a save hint of exactly `debug-success.txt` — so `verify_output.py`, `test.toml`
+handling and the compile defines are untouched. `dialog_events.h` +
+~60 lines in `src/utils.c` is the entire mock: a FIFO of
+`(callback, opaque target, success)` that both VMs share, with the caller
+applying the mock's rules and the queue owning only the timing.
+
+**Timing was the loader drain, exactly as re-predicted.** A dialog opened
+during a frame resolves in the SAME tick, right after that frame's scripts,
+and one opened from a resolution callback resolves in the same drain —
+`filereference_save_and_browse` chains save → COMPLETE → browse → SELECT →
+load under `num_ticks = 1`. AVM2 rides `avm2_loader_drain`'s existing
+round loop (`swf_dialog_pending()` joins the break condition,
+`swf_dialog_pump()` runs per round); AVM1 pumps at the `swf_socket_tick(1)`
+call site in both frame loops.
+
+**Tranche 2's frame-loop lesson applied up front, and it cost nothing.**
+`swf_dialog_pending()` went into all five AVM1 early-exit gates
+(`grep -n hasActiveNetStreams` still finds them) in the same commit as the
+pump, rather than after a debugging round. Worth noting *why* it was needed
+even though dialogs are same-tick: `funcs[current_frame]` runs at
+`swf_core.c:1097` and the socket/dialog tick is at `:1256`, but the
+`quit_swf` gate sits between them at `:1174` — a one-frame movie sets
+`quit_swf` in its own frame script and would exit before ever reaching the
+pump.
+
+**Flash-strict, and it beat the scoped ceiling.** `filereference_save_and_load`
+is `known_failure = true` **and** `ignore = true` upstream: Ruffle's mock
+pre-fills the save destination with the same `Hello, World!`, so its
+`load()`-after-save succeeds, fires COMPLETE, and re-enters the handler that
+called it — a stack overflow. `output.txt` is Flash's behaviour and Flash's
+behaviour is implementable in two rules: a save-derived selection reports
+`size` **0** until its COMPLETE fires (it is not on disk yet), and `load()`
+on one throws **#2037**. Implemented, the test is a full `pass` rather than
+the `ruffle_matched` §5 budgeted. **Fourth instance of "the oracle is
+Ruffle's *behaviour*, not Ruffle's *code*" — and the first where the
+`known_failure` flag pointed at a place we could do BETTER than Ruffle rather
+than merely avoid copying its bug.** Safe because the other save tests comment
+their `size` dumps out (a `/* FIXME */` block in each), which was verified
+before writing the rule, not after.
+
+**The sealed-class watch item landed as written.** `filereference_uninitialized`
+wants `ReferenceError #1069: Property extension not found on
+flash.net.FileReference` — `extension` is `[API("661")]` AIR-only in Ruffle's
+`FileReference.as`. One line (`cls->flags |= AVM2_CLASS_FLAG_SEALED`) turns
+the existing miss path (`avm2_ops.c::getproperty_common`) from "yield
+undefined" into that error, with the qualified name already correct. The
+negative assertion is graded twice — `filereference_browse_select` repeats it
+on a *selected* file — so registering `extension` "for completeness" would
+have cost two tests, not one.
+
+**AVM1: shape frozen, bodies replaced.** `global_proto_decls`,
+`global_proto_decls_delete` and `global_instance_decls` all enumerate this
+family, so `FileReference.prototype` keeps its ten names in their exact
+insertion order with `DONT_ENUM | DONT_DELETE`, and `FileReferenceList.prototype`
+its five. `installAsBroadcaster` is deliberately NOT reused — it makes
+`_listeners` deletable (`PROPERTY_FLAG_CONFIGURABLE`), and
+`global_proto_decls_delete` asserts `DONT_DELETE`. The only value changes are
+the four stub bodies becoming real and `_listeners` becoming a zero-length
+`Array` instead of a plain `ASObject`, which is what
+`file_reference_list_asbroadcaster` reads `.length` off (`typeof` is `object`
+either way, so the enumeration dumps do not move).
+
+The AVM1 filter validator is where the AVM1 half's complexity actually lives
+(`file_reference_list_browse_invalid_filters`, 18 graded cases): fields must
+be OWN properties, an `addProperty` getter counts as own, a getter that
+THROWS is swallowed and the field reads as missing, but an exception from
+`toString()` during the string coercion that follows PROPAGATES to the
+script. The swallow needs a C-level `setjmp` frame on
+`g_exception_state` (the `call_on_construct_handler` idiom at
+`action.c:35439`); the propagate needs only *not* installing one.
+
+**Blast radius, measured.** Stash-diff of the actual `--diff` output against a
+pre-change build over eight canaries — `global_proto_decls` (7,462 lines),
+`global_proto_decls_delete`, `global_instance_decls`, `native_objects_swf6`,
+`globals_swf5`, `mixed_avm/avm1_loads_avm2`, `all_classes/events/swf10`,
+`verify_method_info_oob` — is **byte-identical on all eight**. Unlike tranches
+1 and 2 there is no `describeType` dip to read as a fix: `all_classes` has no
+`net` subdirectory, so three new `flash.net` classes shift nothing. The two
+other corpus files that mention `FileReference`
+(`bitmapdata_colortransform`, `large_preload_image_from_bytes`) have it inside
+`/* */` blocks.
+
+**Census gap found: the seven AVM1 `file_reference_{download,upload}_*` tests
+are in no bucket at all.** §4 scoped bucket D from the *dialog* mock's
+surface and missed the family members that reach it through `download()` /
+`upload()`. They are now one mechanism away each — `download(url, name)` is
+the save dialog plus a URL fetch plus the four-event `onSelect`/`onOpen`/
+`onProgress`/`onComplete` sequence; `upload()` is that sequence over a
+selection `browse()` already produces. `file_reference_download_success`
+already improved on this tranche's browse() work alone (its first three
+graded lines are filter-rejection cases). Generalize: **a census organised by
+MECHANISM will miss tests that reach that mechanism through a different entry
+point — sweep the test-name prefix as well as the mechanism.**
+
+**Re-prediction of tranches 4–8 after tranche 3.**
+
+- **NEW — tranche 3b (AVM1 `FileReference.download`/`upload`, 7 candidates)**
+  — predict **+5**. The dialog mock, the AsBroadcaster delivery and the
+  property-init path all exist; what is missing is the save dialog's AVM1
+  entry point, the URL fetch (the AVM1 side of the Loader arc's resolver) and
+  an `httperror` branch that four of the seven grade. Cheaper than tranche 6
+  or 7 and larger than tranches 4 or 5, so it slots in right after tranche 4.
+- **Tranche 4 (`URLStream`, 2)** — **+2 and still cheap**; unchanged by this
+  tranche, which touched neither the fetch pipeline nor `IDataInput`. It stays
+  separate from tranche 3 rather than folding in: this run was already
+  dispatched when the fold was considered, and the two share no code.
+- **Tranche 5 (AVM2 AMF gaps, 1)** — unchanged at **+1**.
+- **Tranche 6 (`LocalConnection`, 4)** — unchanged at **+3**.
+- **Tranche 7 (AVM1 AMF0 serializer, 9)** — unchanged at **+4**.
+- **Tranche 8 (AVM2 `NetConnection.call`, 3)** — unchanged at **+2**.
+
+Arc total if 3b + 4–8 land: **+17** on top of tranche 1+2+3's **+39**.
