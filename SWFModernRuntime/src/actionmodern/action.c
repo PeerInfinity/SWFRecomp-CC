@@ -44,6 +44,7 @@
 #include <actionmodern/actiondate.h>
 #include <actionmodern/actionrando.h>
 #include <actionmodern/actionregclass.h>
+#include <actionmodern/avm1_amf.h>
 #include <actionmodern/actiontimer.h>
 #include <actionmodern/action_queue.h>
 #include <actionmodern/video_codec.h>
@@ -2716,7 +2717,14 @@ typedef struct {
 typedef struct {
 	char channel_key[256];
 	char method[256];
-	ActionVar args[MAX_LC_MSG_ARGS];
+	// LocalConnection is a WIRE channel: each argument is serialized to AMF0 at
+	// send() time and deserialized at delivery, so the receiver gets a deep copy
+	// carrying Flash's own type translations (a display object becomes
+	// undefined, a function becomes a plain object, an XML document survives as
+	// XML). Owning the bytes also means a string argument cannot dangle between
+	// send and end-of-frame delivery.
+	unsigned char* arg_data[MAX_LC_MSG_ARGS];
+	size_t arg_len[MAX_LC_MSG_ARGS];
 	int num_args;
 	ASObject* sender;
 	int had_receiver;     // 1 if channel had listener at send time
@@ -2901,10 +2909,17 @@ static ActionVar builtin_lc_send(SWFAppContext* app_context, ActionVar* args, u3
 	msg->sender = lc;
 	msg->had_receiver = had_receiver;
 
-	// Copy extra args (args beyond channel_name and method_name)
+	// Serialize the extra args (everything past channel_name and method_name).
+	// Each argument gets its own reference table — Flash starts a fresh one per
+	// top-level value, so a cross-argument reference does not resolve.
 	msg->num_args = 0;
 	for (u32 i = 2; i < arg_count && msg->num_args < MAX_LC_MSG_ARGS; i++)
-		msg->args[msg->num_args++] = args[i];
+	{
+		size_t n = 0;
+		msg->arg_data[msg->num_args] = avm1AmfSerializeArg(app_context, &args[i], &n);
+		msg->arg_len[msg->num_args] = n;
+		msg->num_args++;
+	}
 
 	ret.data.numeric_value = 1; // true
 	return ret;
@@ -3037,26 +3052,30 @@ void processLocalConnectionMessages(SWFAppContext* app_context)
 	for (int i = 0; i < count; i++)
 	{
 		LCMessage* msg = &msgs[i];
-		if (!msg->had_receiver)
-		{
-			// No receiver at send time → error
-			lc_dispatch_onStatus(app_context, msg->sender, "error");
-			continue;
-		}
-
-		// Re-check if channel has a receiver at delivery time
-		ASObject* receiver = lc_find_receiver(msg->channel_key);
+		ASObject* receiver = msg->had_receiver
+			? lc_find_receiver(msg->channel_key) : NULL;
 		if (receiver == NULL)
 		{
-			// Receiver gone → error
+			// No receiver at send time, or it went away before delivery → error
 			lc_dispatch_onStatus(app_context, msg->sender, "error");
-			continue;
 		}
-
-		// Success: fire onStatus status, then call method on receiver
-		lc_dispatch_onStatus(app_context, msg->sender, "status");
-		lc_dispatch_method(app_context, receiver, msg->method,
-		                   msg->num_args > 0 ? msg->args : NULL, msg->num_args);
+		else
+		{
+			// Deserialize on delivery, so the receiver sees a deep copy.
+			ActionVar delivered[MAX_LC_MSG_ARGS];
+			for (int a = 0; a < msg->num_args; a++)
+				delivered[a] = avm1AmfDeserializeArg(app_context, msg->arg_data[a],
+				                                    msg->arg_len[a]);
+			// Success: fire onStatus status, then call method on receiver
+			lc_dispatch_onStatus(app_context, msg->sender, "status");
+			lc_dispatch_method(app_context, receiver, msg->method,
+			                   msg->num_args > 0 ? delivered : NULL, msg->num_args);
+		}
+		for (int a = 0; a < msg->num_args; a++)
+		{
+			free(msg->arg_data[a]);
+			msg->arg_data[a] = NULL;
+		}
 	}
 }
 
@@ -3858,6 +3877,8 @@ static ActionVar builtin_nc_connect(SWFAppContext* app_context, ActionVar* args,
 	if (was_active)
 		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Closed", "status");
 	st->has_remote = 0;
+	// Queued calls and addHeader state belong to the old connection.
+	avm1AmfNetConnectionReset(nc);
 
 	if (is_success)
 	{
@@ -3952,6 +3973,7 @@ static ActionVar builtin_nc_close(SWFAppContext* app_context, ActionVar* args, u
 		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
 		setPropertyWithFlags(app_context, nc, "isConnected", 11, &bv, PROPERTY_FLAG_PERM_READONLY);
 		st->has_remote = 0;
+		avm1AmfNetConnectionReset(nc);
 		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Closed", "status");
 
 		// Remote connections also fire a second onStatus with an undefined
@@ -4363,7 +4385,9 @@ static ActionVar builtin_object_addProperty(SWFAppContext* app_context, ActionVa
 			break;
 		}
 	}
+	int _addprop_created = 0;
 	if (prop == NULL) {
+		_addprop_created = 1;
 		ActionVar marker = {0};
 		marker.type = ACTION_STACK_VALUE_UNDEFINED;
 		setProperty(app_context, obj, prop_name, prop_name_len, &marker);
@@ -4378,6 +4402,13 @@ static ActionVar builtin_object_addProperty(SWFAppContext* app_context, ActionVa
 	if (prop != NULL) {
 		prop->getter = (void*) getter;
 		prop->setter = (void*) setter;
+		// A property addProperty just created is an ORDINARY enumerable one.
+		// setProperty force-clears ENUMERABLE for the names "constructor" and
+		// "__proto__" (they are DontEnum wherever the runtime itself installs
+		// them), but Flash's addProperty does not: a virtual `constructor` shows
+		// up in for-in and in AMF0 serialization
+		// (amf_serialize_typed_objects cases 11 and 17).
+		if (_addprop_created) prop->flags |= PROPERTY_FLAG_ENUMERABLE;
 		ret.data.numeric_value = 1; // true
 	}
 	return ret;
@@ -35758,6 +35789,48 @@ static ActionVar makeStringActionVar(SWFAppContext* app_context, const char* str
 	return ret;
 }
 
+// Exported forms of the two string helpers above/below, for subsystem files
+// carved out of action.c (avm1_amf.c). actionVarToUtf8Alloc coerces through the
+// VM stack rather than varToStringBuf so objects run their own toString — the
+// AMF0 writer needs that for XML documents — and it allocates, because a
+// serialized XML document has no useful size bound.
+ActionVar actionMakeStringVar(SWFAppContext* app_context, const char* utf8, u32 len)
+{
+	return makeStringActionVar(app_context, utf8, len);
+}
+
+char* actionVarToUtf8Alloc(SWFAppContext* app_context, ActionVar* v, u32* out_len)
+{
+	char str_buffer[17];
+	ActionVar copy = *v;
+	pushVar(app_context, &copy);
+	convertString(app_context, str_buffer);
+	u32 u16_len = VAL(u32, &STACK[SP + 8]);
+	const uint16_t* u16_ptr = (const uint16_t*) VAL(u64, &STACK[SP + 16]);
+	size_t cap = (size_t) u16_len * 3 + 1;
+	char* out = (char*) malloc(cap);
+	u32 n = 0;
+	if (out != NULL)
+	{
+		if (u16_ptr != NULL && u16_len > 0)
+			n = (u32) u16_to_utf8(u16_ptr, u16_len, out, (int) cap);
+		out[n] = '\0';
+	}
+	POP();
+	if (out_len != NULL) *out_len = n;
+	return out;
+}
+
+ASObject* actionCreateXmlDocument(SWFAppContext* app_context, const char* utf8, u32 len)
+{
+	initXMLPrototype(app_context);
+	ASObject* doc = xml_create_document(app_context);
+	doc->native_type = NATIVE_XML;
+	if (utf8 != NULL && len > 0)
+		xml_parse_into(app_context, doc, utf8, len);
+	return doc;
+}
+
 // Stage.align normalization: filter to L/T/R/B chars (case-insensitive), uppercase, deduplicate, canonical order
 static void normalizeStageAlign(const char* input, u32 input_len, char* out, u32* out_len)
 {
@@ -36360,8 +36433,9 @@ static void initNetConnectionPrototype(SWFAppContext* app_context, ASFunction* c
 		fv.data.numeric_value = (u64)&g_nc_close_func;
 		setPropertyWithFlags(app_context, ctor->prototype_obj, "close", 5, &fv, mflags);
 	}
-	addStubMethodToProto(app_context, ctor->prototype_obj, "call", 4, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "addHeader", 9, mflags);
+	// call / addHeader are real: they queue AMF0 remoting messages that the
+	// per-tick drain packs into one packet (avm1_amf.c).
+	avm1AmfInitNetConnection(app_context, ctor->prototype_obj);
 	// READ_ONLY undefined at front
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "nearNonce", 9, &undef_val, 0);
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "farNonce", 8, &undef_val, 0);
@@ -36538,6 +36612,10 @@ static void initSharedObjectPrototype(SWFAppContext* app_context, ASFunction* ct
 	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = getDiskUsage_fn;
 	fv.data.numeric_value = (u64) getDiskUsage_fn;
 	setPropertyWithFlags(app_context, ctor->own_props, "getDiskUsage", 12, &fv, PROPERTY_FLAG_WRITABLE);
+
+	// Replace getLocal + flush/getSize/clear with the real, same-run-cached
+	// implementations (avm1_amf.c). Everything else stays a stub.
+	avm1AmfInitSharedObject(app_context, ctor);
 }
 
 // Video.prototype: 2 methods
@@ -47548,6 +47626,66 @@ void actionInitArray(SWFAppContext* app_context)
 	PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 }
 
+// --- Objects a native Array constructor upgraded in place ------------------
+//
+// `super()` inside a method of an object whose prototype carries
+// `__constructor__: Array` turns the RECEIVER into a real array, in place
+// (invokeNativeSuperConstructor's Array arm sets native_type = NATIVE_ARRAY and
+// installs a `length`). Its indices then live as ordinary string-keyed
+// properties, so the array-ness that remains to emulate is `length`
+// bookkeeping: writing an index at or past the end extends it, and shortening
+// `length` drops the indices past the new end.
+//
+// Pinned by amf_strict_array_serialization / amf_sharedobject_strict_array_
+// serialization, whose litmus is `o[5] = x` then `o.length === 6`.
+static int asArrayIndexName(const char* name, u32 len, unsigned long* out)
+{
+	if (len == 0 || len > 10) return 0;
+	unsigned long v = 0;
+	for (u32 i = 0; i < len; i++)
+	{
+		if (name[i] < '0' || name[i] > '9') return 0;
+		v = v * 10 + (unsigned long) (name[i] - '0');
+	}
+	if (v > 4294967294UL) return 0;
+	if (out != NULL) *out = v;
+	return 1;
+}
+
+static void asArrayObjectAfterSet(SWFAppContext* app_context, ASObject* obj,
+                                  const char* name, u32 name_len)
+{
+	unsigned long idx;
+	if (asArrayIndexName(name, name_len, &idx))
+	{
+		ActionVar* lp = getProperty(obj, "length", 6);
+		double cur = (lp != NULL) ? varToDoubleSimple(lp) : 0.0;
+		if (!(cur >= (double) idx + 1.0))
+		{
+			ActionVar nv = makeF64((double) idx + 1.0);
+			setProperty(app_context, obj, "length", 6, &nv);
+		}
+		return;
+	}
+	if (name_len == 6 && memcmp(name, "length", 6) == 0)
+	{
+		ActionVar* lp = getProperty(obj, "length", 6);
+		if (lp == NULL) return;
+		double nl = varToDoubleSimple(lp);
+		if (!(nl >= 0.0)) nl = 0.0;
+		// Backwards so removals cannot skip an entry.
+		for (u32 i = obj->num_used; i > 0; i--)
+		{
+			ASProperty* pr = &obj->properties[i - 1];
+			if (pr->name == NULL || (uintptr_t) pr->name < 4096) continue;
+			unsigned long pidx;
+			if (!asArrayIndexName(pr->name, pr->name_length, &pidx)) continue;
+			if ((double) pidx < nl) continue;
+			deleteProperty(app_context, obj, pr->name, pr->name_length);
+		}
+	}
+}
+
 void actionSetMember(SWFAppContext* app_context)
 {
 	// Stack layout (from top to bottom):
@@ -48629,6 +48767,8 @@ void actionSetMember(SWFAppContext* app_context)
 			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
+			if (obj->native_type == NATIVE_ARRAY)
+				asArrayObjectAfterSet(app_context, obj, prop_name, prop_name_len);
 		}
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
@@ -48767,12 +48907,34 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				else
 				{
-					// Try as double → ecmaToUint32
-					double d = strtod(prop_name, &endptr);
-					if (*endptr == '\0' && !isnan(d) && !isinf(d))
+					// Extended index: an optional '-' followed by digits, whole
+					// string consumed. Flash's index scanner is integer-only, so
+					// a key like "2.5" or the "9.2233720368548e+18" that AVM1
+					// produces for a huge numeric subscript is a plain string
+					// property that does NOT touch `length` — pinned by
+					// amf0_serde_suite's arr_negative and arr_sparse, both of
+					// which Flash serializes with an ECMAArray length of 1.
+					// Integral spellings, including negative ones and digit runs
+					// far past 2^64, DO count (array_length).
+					int _idx_scannable = (prop_name_len > 0);
+					for (u32 _i = 0; _idx_scannable && _i < prop_name_len; _i++)
 					{
-						idx_u32 = ecmaToUint32(d);
-						has_index = 1;
+						if (_i == 0 && prop_name[0] == '-')
+						{
+							if (prop_name_len < 2) _idx_scannable = 0;
+							continue;
+						}
+						if (prop_name[_i] < '0' || prop_name[_i] > '9')
+							_idx_scannable = 0;
+					}
+					if (_idx_scannable)
+					{
+						double d = strtod(prop_name, &endptr);
+						if (*endptr == '\0' && !isnan(d) && !isinf(d))
+						{
+							idx_u32 = ecmaToUint32(d);
+							has_index = 1;
+						}
 					}
 				}
 
@@ -48827,6 +48989,7 @@ void actionSetMember(SWFAppContext* app_context)
 				//   as new length (not +1), unsigned comparison
 				if (has_index)
 				{
+					u32 old_len = arr->length;
 					u32 new_len = idx_u32 + 1;  // u32 wrapping
 					if (arr->length <= 2147483647u)
 					{
@@ -48840,6 +49003,22 @@ void actionSetMember(SWFAppContext* app_context)
 						// Overflow region: signed comparison for all indices
 						if ((int32_t)new_len > (int32_t)arr->length)
 							arr->length = new_len;
+					}
+					// A signed increase can be an UNSIGNED decrease — the wrap at
+					// 2^32 (`a[4294967295]` taking length from 2147483649 to 0).
+					// Flash's length setter truncates on an unsigned shrink, so the
+					// elements past the new end are really gone, not merely out of
+					// range: amf0_serde_suite reads arr_sparse[0] back as undefined
+					// even though the last assignment left length at 1.
+					if (arr->length < old_len)
+					{
+						u32 clear_to = (old_len < arr->capacity) ? old_len : arr->capacity;
+						for (u32 i = arr->length; i < clear_to; i++)
+						{
+							arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
+							arr->elements[i].data.numeric_value = 0;
+							arr->elements[i].str_size = 0;
+						}
 					}
 				}
 			}
@@ -64384,7 +64563,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						if (call_mc && call_mc->dynamic_props)
 							this_obj = (void*) call_mc->dynamic_props;
 					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
-					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
+					           args[0].type == ACTION_STACK_VALUE_ARRAY ||
+					           args[0].type == ACTION_STACK_VALUE_SUPER) {
+						// A SUPER thisArg binds the INSTANCE it proxies: `super`
+						// is a view onto `this`, not an object of its own, so
+						// `super.m.apply(super, args)` must not fall through the
+						// primitive arm to _global (netconnection_send_remote's
+						// CustomNetConnection.call). numeric_value is already the
+						// receiver's ASObject*.
 						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
 					} else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
 					           args[0].type == ACTION_STACK_VALUE_NULL) {
@@ -64641,8 +64827,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						break;
 					}
 				}
+				int _addprop_created = 0;
 				if (prop == NULL)
 				{
+					_addprop_created = 1;
 					// Create the property with UNDEFINED value
 					ActionVar marker = {0};
 					marker.type = ACTION_STACK_VALUE_UNDEFINED;
@@ -64662,6 +64850,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				{
 					prop->getter = (void*)getter;
 					prop->setter = (void*)setter;
+					// Freshly created by addProperty -> ordinary enumerable
+					// property, even for the names setProperty force-hides.
+					if (_addprop_created) prop->flags |= PROPERTY_FLAG_ENUMERABLE;
 					result = 1; // boolean true
 				}
 				} // _valid_accessors
@@ -65133,7 +65324,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						break;
 					}
 				}
+				int _addprop_created = 0;
 				if (prop == NULL) {
+					_addprop_created = 1;
 					ActionVar marker = {0};
 					marker.type = ACTION_STACK_VALUE_UNDEFINED;
 					setProperty(app_context, obj, prop_name_ap, prop_name_ap_len, &marker);
@@ -65148,6 +65341,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (prop != NULL) {
 					prop->getter = (void*)getter;
 					prop->setter = (void*)setter;
+					if (_addprop_created) prop->flags |= PROPERTY_FLAG_ENUMERABLE;
 					result = 1; // boolean true
 				}
 				} // _valid_accessors
@@ -65601,7 +65795,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_override_this.data.numeric_value = (u64)(uintptr_t)call_mc;
 						g_override_this_set = 1;
 					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
-					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
+					           args[0].type == ACTION_STACK_VALUE_ARRAY ||
+					           args[0].type == ACTION_STACK_VALUE_SUPER) {
+						// A SUPER thisArg binds the INSTANCE it proxies: `super`
+						// is a view onto `this`, not an object of its own, so
+						// `super.m.apply(super, args)` must not fall through the
+						// primitive arm to _global (netconnection_send_remote's
+						// CustomNetConnection.call). numeric_value is already the
+						// receiver's ASObject*.
 						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
 					} else if (args[0].type == ACTION_STACK_VALUE_FUNCTION) {
 						// Function as thisArg — pass own_props (or create them)
@@ -65888,7 +66089,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_override_this.data.numeric_value = (u64)(uintptr_t)apply_this_mc;
 						g_override_this_set = 1;
 					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
-					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
+					           args[0].type == ACTION_STACK_VALUE_ARRAY ||
+					           args[0].type == ACTION_STACK_VALUE_SUPER) {
+						// A SUPER thisArg binds the INSTANCE it proxies: `super`
+						// is a view onto `this`, not an object of its own, so
+						// `super.m.apply(super, args)` must not fall through the
+						// primitive arm to _global (netconnection_send_remote's
+						// CustomNetConnection.call). numeric_value is already the
+						// receiver's ASObject*.
 						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
 					} else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
 					           args[0].type == ACTION_STACK_VALUE_NULL) {
@@ -74773,6 +74981,11 @@ void actionGcMarkRoots(void)
 		swfGcMarkFunctionPtr(function_registry[i]);
 	for (ASFunction* f = g_gc_fn_head; f != NULL; f = f->gc_next)
 		swfGcMarkFunctionPtr(f);
+	// SharedObject cache + NetConnection queues (avm1_amf.c file-scope tables).
+	{
+		extern void avm1AmfGcMarkRoots(void);
+		avm1AmfGcMarkRoots();
+	}
 	for (int i = 0; i < NUM_STUB_CTORS; i++)
 		swfGcMarkFunctionPtr(&g_stub_ctors[i]);
 	swfGcMarkFunctionPtr(&g_object_constructor_static);
@@ -74852,11 +75065,10 @@ void actionGcMarkRoots(void)
 	// --- LocalConnection channels + queued messages.
 	for (int i = 0; i < g_lc_channel_count; i++)
 		swfGcMarkObject(g_lc_channels[i].receiver);
-	for (int i = 0; i < g_lc_message_count; i++) {
+	// Queued arguments are AMF0 byte buffers now, not live ActionVars, so the
+	// sender is the only object a pending message keeps alive.
+	for (int i = 0; i < g_lc_message_count; i++)
 		swfGcMarkObject(g_lc_messages[i].sender);
-		for (int j = 0; j < g_lc_messages[i].num_args && j < MAX_LC_MSG_ARGS; j++)
-			swfGcMarkVar(&g_lc_messages[i].args[j]);
-	}
 
 	// --- NetStream / NetConnection side tables (keyed by object pointer —
 	// rooting keeps pointer-identity lookups valid; entries are never
@@ -74962,11 +75174,10 @@ void actionGcScrubStashes(const void* p)
 
 	for (int i = 0; i < g_lc_channel_count; i++)
 		if ((const void*)g_lc_channels[i].receiver == p) g_lc_channels[i].receiver = NULL;
-	for (int i = 0; i < g_lc_message_count; i++) {
+	// A queued message's arguments are serialized bytes, so only the sender can
+	// alias a freed object.
+	for (int i = 0; i < g_lc_message_count; i++)
 		if ((const void*)g_lc_messages[i].sender == p) g_lc_messages[i].sender = NULL;
-		for (int j = 0; j < g_lc_messages[i].num_args && j < MAX_LC_MSG_ARGS; j++)
-			gcScrubVar(&g_lc_messages[i].args[j], p);
-	}
 
 	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++) {
 		if ((const void*)g_active_netstreams[i].ns_obj == p) {

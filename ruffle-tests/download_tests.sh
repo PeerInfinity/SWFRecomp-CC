@@ -194,6 +194,15 @@ install_test_dir() {
     # path, which is also what keeps two same-named children in different
     # subdirectories distinct.
     #
+    # Plain nested DATA files come along too (net/socket tranche 7): Ruffle's
+    # test navigator maps `http://<host>/<path>` to `<test_dir>/<host>/<path>`,
+    # so netconnection_send_remote's scripted AMF response packets live in
+    # `localhost/test{1,2,3}` and are fetched by that relative path. Excluded by
+    # name are the things no test ever fetches and that would only bloat the
+    # generated data registry: the asasm/abc build layout under `test-*/`, and
+    # nested image/video sources (`visual/video/*/source_frames`) — top-level
+    # images are still bundled, as they always were.
+    #
     # A subtree with its own test.swf is a SEPARATE test that install_category
     # discovers on its own pass (avm2/large_preload_from_url/large_bytearray);
     # copying it here would duplicate it as a child of its parent test.
@@ -210,7 +219,10 @@ install_test_dir() {
         mkdir -p "${dest}/$(dirname "${rel}")"
         cp "${nested}" "${dest}/${rel}"
     done < <(find "${test_dir}" -mindepth 2 -type f \
-                  \( -name '*.swf' -o -name '*.as' -o -name '*.fla' \) -print0)
+                  ! -name '*.asasm' ! -name '*.abc' \
+                  ! -name '*.png' ! -name '*.jpg' ! -name '*.jpeg' \
+                  ! -name '*.gif' ! -name '*.bmp' ! -name '*.mp4' \
+                  ! -name '*.md' ! -name 'NOTES' -print0)
 }
 
 install_category() {

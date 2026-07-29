@@ -1672,7 +1672,15 @@ def generate_movie_registry(prefixes, build_dir):
 
 def find_data_files(test_dir):
     """Find data files (non-.swf, non-.fla, non-config) in a test directory.
-    These are files like testvars.txt that loadVariables loads at runtime."""
+    These are files like testvars.txt that loadVariables loads at runtime.
+
+    Returns a list of (key, Path). The key is the path RELATIVE to the test
+    directory, which is what findDataFile is looked up by: Ruffle's test
+    navigator maps `http://<host>/<path>` to `<test_dir>/<host>/<path>`
+    (tests/framework/src/backends/navigator.rs), so a scripted response served
+    from `http://localhost:8000/test1` lives at `localhost/test1` and has to
+    keep that spelling. Flat siblings key by their bare filename as before.
+    """
     # `test.as` is NOT skipped: Ruffle's test navigator serves every sibling
     # file, and from_shumway/flash_net_URLLoader fetches its own source with a
     # URLLoader (2674 bytes) and grades the body. `Test.as` was already bundled
@@ -1682,14 +1690,24 @@ def find_data_files(test_dir):
                    "output.ruffle.txt", "input.json", "test_harness.c"}
     skip_suffixes = {".swf", ".fla", ".toml", ".json", ".c", ".h", ".py"}
     data_files = []
-    for f in sorted(test_dir.iterdir()):
-        if f.is_dir():
-            continue
-        if f.name in skip_names:
-            continue
-        if f.suffix in skip_suffixes:
-            continue
-        data_files.append(f)
+
+    def walk(d, prefix):
+        for f in sorted(d.iterdir()):
+            if f.is_dir():
+                # A subtree with its own test.swf is a SEPARATE test that the
+                # runner discovers on its own pass — never a served asset of
+                # this one.
+                if (f / "test.swf").exists():
+                    continue
+                walk(f, prefix + f.name + "/")
+                continue
+            if f.name in skip_names:
+                continue
+            if f.suffix in skip_suffixes:
+                continue
+            data_files.append((prefix + f.name, f))
+
+    walk(test_dir, "")
     return data_files
 
 
@@ -1702,10 +1720,10 @@ def generate_data_registry(data_files, build_dir):
     lines.append("")
 
     var_names = []
-    for df in data_files:
+    for key, df in data_files:
         content = df.read_bytes()
-        var_name = "data_" + re.sub(r'[^a-zA-Z0-9]', '_', df.name)
-        var_names.append((var_name, df.name, len(content)))
+        var_name = "data_" + re.sub(r'[^a-zA-Z0-9]', '_', key)
+        var_names.append((var_name, key, len(content)))
         # Emit as a C byte array to handle any content safely
         if content:
             hex_bytes = ", ".join(f"0x{b:02x}" for b in content)
@@ -1895,6 +1913,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "src/actionmodern/math.c",
         "src/actionmodern/date.c",
         "src/actionmodern/registered_class.c",
+        "src/actionmodern/avm1_amf.c",
         "src/actionmodern/timer.c",
         "src/actionmodern/variables.c",
         "src/actionmodern/object.c",
@@ -1904,6 +1923,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "src/actionmodern/video_codec.c",
         "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
+        "src/amf_packet.c",
         "src/libswf/tag.c",
         "src/libswf/tag_stubs.c",
         "src/libswf/shape_hit_test.c",
@@ -2471,6 +2491,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
         "src/actionmodern/math.c",
         "src/actionmodern/date.c",
         "src/actionmodern/registered_class.c",
+        "src/actionmodern/avm1_amf.c",
         "src/actionmodern/timer.c",
         "src/actionmodern/variables.c",
         "src/actionmodern/object.c",
@@ -2480,6 +2501,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
         "src/actionmodern/video_codec.c",
         "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
+        "src/amf_packet.c",
         "src/libswf/tag.c",
         "src/libswf/ng_shared.c",
         "src/libswf/hit_test.c",

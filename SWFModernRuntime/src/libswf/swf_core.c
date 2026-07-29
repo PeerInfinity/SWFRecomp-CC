@@ -1475,6 +1475,16 @@ void swfStart(SWFAppContext* app_context)
 				extern void processNetStreams(SWFAppContext*, double);
 				processNetStreams(app_context, frame_duration_ms);
 			}
+			// Drain queued NetConnection.call messages into one AMF0 packet per
+			// connection, report it, and dispatch the scripted response. Sits
+			// just before LocalConnection delivery: after frame scripts AND
+			// after timers, so a call from either lands in this tick's packet,
+			// and before LC delivery because that is the order Flash's own
+			// interleaved output shows (amf_array_serialization).
+			{
+				extern void avm1AmfFlushNetConnections(SWFAppContext*);
+				avm1AmfFlushNetConnections(app_context);
+			}
 			// Process LocalConnection messages (end-of-frame delivery)
 			{
 				extern void processLocalConnectionMessages(SWFAppContext*);

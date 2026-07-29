@@ -29,6 +29,7 @@ set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/math.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/date.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/registered_class.c
+    ${PROJECT_SOURCE_DIR}/src/actionmodern/avm1_amf.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/timer.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/variables.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/object.c
@@ -36,6 +37,7 @@ set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/sprite_frame_scripts.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/video_codec.c
     ${PROJECT_SOURCE_DIR}/src/utils.c
+    ${PROJECT_SOURCE_DIR}/src/amf_packet.c
 
     # Compile hashmap file directly to avoid undefined symbols on Linux
     ${PROJECT_SOURCE_DIR}/lib/c-hashmap/map.c

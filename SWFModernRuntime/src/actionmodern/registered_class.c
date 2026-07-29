@@ -37,6 +37,14 @@ extern int ng_forEachExportName(size_t char_id, int (*callback)(const char* name
 
 typedef struct {
 	char symbol_name[128];
+	// The spelling the LAST registerClass call used. Identical to symbol_name in
+	// the case-sensitive registry; in the case-insensitive one symbol_name is
+	// lowercased for matching, so the original casing has to be kept beside it —
+	// AMF0 typed-object serialization writes the alias back out verbatim, and
+	// registering "sharedalias" then "SharedAlias" under SWF6 collapses to ONE
+	// entry that Flash then emits as "SharedAlias"
+	// (amf_swf6_case_insensitive_typed_objects).
+	char original_name[128];
 	void* constructor; // ASFunction* or NULL (unregistered)
 } RegisteredClassEntry;
 
@@ -154,6 +162,8 @@ static void registerClassForSymbolVersion(const char* symbol_name, void* constru
 		{
 			strncpy(g_registered_classes_cs[g_registered_class_count_cs].symbol_name, symbol_name, 127);
 			g_registered_classes_cs[g_registered_class_count_cs].symbol_name[127] = '\0';
+			strncpy(g_registered_classes_cs[g_registered_class_count_cs].original_name, symbol_name, 127);
+			g_registered_classes_cs[g_registered_class_count_cs].original_name[127] = '\0';
 			g_registered_classes_cs[g_registered_class_count_cs].constructor = constructor;
 			g_registered_class_count_cs++;
 		}
@@ -168,6 +178,9 @@ static void registerClassForSymbolVersion(const char* symbol_name, void* constru
 			if (strcmp(g_registered_classes_ci[i].symbol_name, lower) == 0)
 			{
 				g_registered_classes_ci[i].constructor = constructor;
+				// Latest spelling wins, even though the key does not change.
+				strncpy(g_registered_classes_ci[i].original_name, symbol_name, 127);
+				g_registered_classes_ci[i].original_name[127] = '\0';
 				return;
 			}
 		}
@@ -175,10 +188,43 @@ static void registerClassForSymbolVersion(const char* symbol_name, void* constru
 		{
 			strncpy(g_registered_classes_ci[g_registered_class_count_ci].symbol_name, lower, 127);
 			g_registered_classes_ci[g_registered_class_count_ci].symbol_name[127] = '\0';
+			strncpy(g_registered_classes_ci[g_registered_class_count_ci].original_name, symbol_name, 127);
+			g_registered_classes_ci[g_registered_class_count_ci].original_name[127] = '\0';
 			g_registered_classes_ci[g_registered_class_count_ci].constructor = constructor;
 			g_registered_class_count_ci++;
 		}
 	}
+}
+
+// Reverse lookup: the alias an AMF0 typed object serializes under, or NULL when
+// the constructor has no live registration. When one constructor is registered
+// under several aliases the LATEST registration wins
+// (amf_serialize_typed_objects cases D and F: "SecondAlias.Class",
+// "TripleAlias.Three"), and a re-pointed alias leaves the old constructor with
+// nothing, so it falls back to an anonymous object (case E). Registry choice
+// follows g_swf_version, the same split registerClass itself uses.
+const char* actionLookupClassAlias(void* constructor)
+{
+	if (constructor == NULL) return NULL;
+	const RegisteredClassEntry* table;
+	size_t count;
+	if (g_swf_version >= 7)
+	{
+		table = g_registered_classes_cs;
+		count = g_registered_class_count_cs;
+	}
+	else
+	{
+		table = g_registered_classes_ci;
+		count = g_registered_class_count_ci;
+	}
+	const char* found = NULL;
+	for (size_t i = 0; i < count; i++)
+	{
+		if (table[i].constructor == constructor)
+			found = table[i].original_name;
+	}
+	return (found != NULL && found[0] != '\0') ? found : NULL;
 }
 
 // ==================================================================

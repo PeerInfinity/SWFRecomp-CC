@@ -1200,6 +1200,7 @@ void tagMain(SWFAppContext* app_context)
 			extern void processLoadVarsLoads(SWFAppContext*);
 			extern void processSoundPlayback(SWFAppContext*, double);
 			extern void processNetStreams(SWFAppContext*, double);
+			extern void avm1AmfFlushNetConnections(SWFAppContext*);
 			extern void processLocalConnectionMessages(SWFAppContext*);
 			extern void actionFlushPendingOnLoads(SWFAppContext*);
 			double frame_duration_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;
@@ -1208,6 +1209,8 @@ void tagMain(SWFAppContext* app_context)
 			processLoadVarsLoads(app_context);
 			processSoundPlayback(app_context, frame_duration_ms);
 			processNetStreams(app_context, frame_duration_ms);
+			// Mirrors swf_core.c: NetConnection packet drain before LC delivery.
+			avm1AmfFlushNetConnections(app_context);
 			processLocalConnectionMessages(app_context);
 			actionFlushPendingOnLoads(app_context);
 		}

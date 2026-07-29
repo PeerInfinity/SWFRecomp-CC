@@ -93,10 +93,11 @@ if [ "$RUN_ONLY" != true ]; then
     COMMON_SRCS=(
         actionmodern/action.c actionmodern/math.c actionmodern/date.c
         actionmodern/registered_class.c actionmodern/timer.c
+        actionmodern/avm1_amf.c
         actionmodern/variables.c actionmodern/object.c
         actionmodern/action_queue.c actionmodern/sprite_frame_scripts.c
         actionmodern/image_decode.c actionmodern/video_codec.c
-        utils.c
+        utils.c amf_packet.c
         libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
         libswf/ng_shared.c libswf/hit_test.c libswf/stb_image_impl.c
         memory/heap.c

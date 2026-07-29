@@ -28,6 +28,13 @@ void actionRegisterClassForSymbol(const char* symbol_name, void* constructor);
 // choose the registry. Returns ASFunction* (as void*) or NULL.
 void* lookupRegisteredClass(const char* symbol_name);
 
+// Reverse lookup for AMF0 typed-object serialization: the alias a
+// constructor is currently registered under, or NULL. Latest registration
+// wins when one constructor has several aliases; the returned string keeps
+// the casing of that registration (the SWF<=6 registry lowercases its key
+// but not this). Registry choice follows g_swf_version.
+const char* actionLookupClassAlias(void* constructor);
+
 // Version-explicit variant: swf_version is typically the defining SWF
 // version of the export (for timeline sprites) or the attaching
 // clip's movie version (for attachMovie).

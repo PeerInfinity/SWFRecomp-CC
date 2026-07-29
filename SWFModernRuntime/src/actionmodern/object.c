@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -1726,10 +1727,22 @@ void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, Action
 		return;
 	}
 
-	// Grow array if needed
+	// Grow array if needed. The capacity is computed in 64 bits: `(index + 1) * 2`
+	// overflows u32 for any index at or past 0x7FFFFFFF, and a wrapped capacity of
+	// 0 made realloc shrink the block while the write below still used the huge
+	// index — an out-of-bounds write, not a failed allocation. Callers that can
+	// see arbitrary indices (the AMF0 reader, script assignment) cap the index
+	// themselves and store big ones as named properties; this is the backstop.
 	if (index >= arr->capacity)
 	{
-		u32 new_capacity = (index + 1) * 2;  // Grow to accommodate index
+		unsigned long long want = ((unsigned long long) index + 1) * 2;
+		if (want > 0xFFFFFFFFull
+		    || want > (unsigned long long) (SIZE_MAX / sizeof(ActionVar)))
+		{
+			fprintf(stderr, "ERROR: Failed to grow array\n");
+			return;
+		}
+		u32 new_capacity = (u32) want;
 		ActionVar* new_elements = (ActionVar*) realloc(arr->elements,
 		                                                sizeof(ActionVar) * new_capacity);
 		if (new_elements == NULL)

@@ -128,6 +128,20 @@ void pushUndefined(SWFAppContext* app_context);
 // (including objects with toString).
 ActionStackValueType convertString(SWFAppContext* app_context, char* var_str);
 
+// Coerce any value to a UTF-8 string through the VM stack (so objects run
+// their own toString) and return it in a fresh malloc'd, NUL-terminated
+// buffer. Writes the byte length (excluding the NUL) to *out_len when non-NULL.
+// Caller frees. Returns NULL only on allocation failure.
+char* actionVarToUtf8Alloc(SWFAppContext* app_context, ActionVar* v, u32* out_len);
+
+// Build a STRING ActionVar from UTF-8 bytes (the exported form of action.c's
+// makeStringActionVar, for subsystem files).
+ActionVar actionMakeStringVar(SWFAppContext* app_context, const char* utf8, u32 len);
+
+// Build an XML document object from UTF-8 markup — the equivalent of
+// `new XML(source)`. Used by the AMF0 reader for the 0x0F XML marker.
+ASObject* actionCreateXmlDocument(SWFAppContext* app_context, const char* utf8, u32 len);
+
 // Flush a deferred onChanged handler queued by replaceSel, if any.
 // Timer tick hook — called from processTimers after each timer fires.
 void actionFlushPendingOnChanged(SWFAppContext* app_context);
