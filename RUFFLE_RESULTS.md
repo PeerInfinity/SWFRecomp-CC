@@ -2,20 +2,20 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `767a301d2bae`  
-**Date:** 2026-07-29 01:40 UTC  
-**Total duration:** 8h49m50s
+**Commit:** `72fdc5e933a6`  
+**Date:** 2026-07-29 03:45 UTC  
+**Total duration:** 9h19m20s
 
 ## Results by Suite
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | audio | 3 | 5 | 60.0% | [details](ruffle-tests/tests/swfs/audio/_results/results.md) |
-| avm1 | 646 | 717 | 90.1% | [details](ruffle-tests/tests/swfs/avm1/_results/results.md) |
-| avm2 | 919 | 1221 | 75.3% | [details](ruffle-tests/tests/swfs/avm2/_results/results.md) |
+| avm1 | 651 | 717 | 90.8% | [details](ruffle-tests/tests/swfs/avm1/_results/results.md) |
+| avm2 | 929 | 1221 | 76.1% | [details](ruffle-tests/tests/swfs/avm2/_results/results.md) |
 | fonts | 3 | 6 | 50.0% | [details](ruffle-tests/tests/swfs/fonts/_results/results.md) |
 | from_avmplus | 1458 | 1574 | 92.6% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results.md) |
-| from_gnash/actionscript.all | 131 | 243 | 53.9% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results.md) |
+| from_gnash/actionscript.all | 135 | 243 | 55.6% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results.md) |
 | from_gnash/misc-ming.all | 69 | 111 | 62.2% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results.md) |
 | from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results.md) |
 | from_gnash/misc-swfc.all | 11 | 20 | 55.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results.md) |
@@ -30,18 +30,18 @@
 | text | 9 | 11 | 81.8% | [details](ruffle-tests/tests/swfs/text/_results/results.md) |
 | timeline | 12 | 17 | 70.6% | [details](ruffle-tests/tests/swfs/timeline/_results/results.md) |
 | visual | 136 | 143 | 95.1% | [details](ruffle-tests/tests/swfs/visual/_results/results.md) |
-| **Total** | **3716** | **4467** | **83.2%** | |
+| **Total** | **3735** | **4467** | **83.6%** | |
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | audio | 5 | 24 | 20.8% |
-| avm1 | 116,218 | 131,176 | 88.6% |
-| avm2 | 107,237 | 151,253 | 70.9% |
+| avm1 | 116,302 | 131,176 | 88.7% |
+| avm2 | 107,385 | 151,253 | 71.0% |
 | fonts | 35 | 104 | 33.7% |
 | from_avmplus | 85,214 | 85,996 | 99.1% |
-| from_gnash/actionscript.all | 30,340 | 38,791 | 78.2% |
+| from_gnash/actionscript.all | 30,356 | 38,791 | 78.3% |
 | from_gnash/misc-ming.all | 4,054 | 5,248 | 77.2% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
 | from_gnash/misc-swfc.all | 441 | 580 | 76.0% |
@@ -56,15 +56,15 @@
 | text | 858 | 973 | 88.2% |
 | timeline | 333 | 371 | 89.8% |
 | visual | 238 | 350 | 68.0% |
-| **Total** | **347,940** | **418,980** | **83.0%** |
+| **Total** | **348,188** | **418,980** | **83.1%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch | recomp_fail | runtime_error |
 |-------|-----------------:|-------------:|---------------:|
 | audio | 2 | - | - |
-| avm1 | 54 | - | - |
-| avm2 | 273 | - | 3 |
+| avm1 | 49 | - | - |
+| avm2 | 263 | - | 3 |
 | fonts | 3 | - | - |
 | from_avmplus | 61 | - | 4 |
 | from_gnash/actionscript.all | 13 | - | - |
@@ -82,7 +82,7 @@
 | text | 2 | - | - |
 | timeline | 2 | - | - |
 | visual | 6 | 1 | - |
-| **Total** | **497** | **1** | **7** |
+| **Total** | **482** | **1** | **7** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -176,27 +176,17 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | 8 | - | 340 | 13 |
-| avm2 | 76 | - | 3248 | 70 |
-| from_avmplus | 1 | - | 106 | - |
-| from_gnash/actionscript.all | - | - | - | 16 |
-| from_shumway | 8 | - | 78 | - |
-| mixed_avm | - | - | 3 | - |
-| text | 4 | - | 153 | - |
+| avm1 | 5 | - | 84 | - |
+| avm2 | 10 | - | 148 | - |
+| from_gnash/actionscript.all | - | - | 16 | - |
 
-**avm1 — newly passing:** `geturl_opcode_target_normalize`, `geturl_target_normalize`, `localconnection`, `xml_socket`, `xml_socket_close_in_handler`, `xml_socket_connect_null`, `xml_socket_on_data`, `xml_socket_segmented`
+**avm1 — newly passing:** `file_reference_browse_cancel`, `file_reference_list_asbroadcaster`, `file_reference_list_browse_cancel`, `file_reference_list_browse_invalid_filters`, `file_reference_list_browse_select`
 
-**avm2 — newly passing:** `air_datagram_socket`, `av_networking_params`, `cross_api_version_call_older`, `displayobject_set_name_loaded`, `edittext_ime_focus_lost`, `edittext_mouse_selection`, `error_geterrormessage`, `focus_events_key_basic`, `focus_events_key_navigation`, `focus_events_mouse_basic`, `focus_events_mouse_focusable`, `focusrect_focuslost`, `focusrect_property`, `ime_linux_dead_keys`, `jpeg_loader_context`, `loader_bitmap_transparency`, `loader_bytes_unknown_content`, `loader_child_getdefinition`, `loader_duplicate_coerce`, `loader_duplicate_coerce_new_domain`, `loader_error_in_root_ctor`, `loader_events`, `loader_image`, `loader_jpegxr`, `loader_jpegxr_alpha`, `loader_loadbytes_events`, `loader_loadbytes_invalid_png`, `loader_loadbytes_url`, `loader_loaderurl`, `loader_noninteractive_try_click_root`, `loader_reuse`, `loader_unknown_content`, `loader_visibility_interactive`, `loaderinfo_events`, `loaderinfo_loadurl`, `loaderinfo_more`, `loaderinfo_properties_not_loaded`, `mouse_children`, `mouse_pick_dobj_mask`, `mouse_pick_masking`, `mouse_pick_non_interactive_bitmap_mask`, `mouse_pick_non_interactive_dobj_mask`, `mouse_pick_text`, `mouse_wheel_events`, `mouseevent_constr`, `mouseevent_stagexy`, `mouseevent_valueof_tostring`, `navigateToURL_target_normalize`, `net_navigateToURL`, `net_stream_play_options`, `netconnection_close`, `netconnection_properties`, `netstream_client`, `netstream_connect`, `responder_null_callbacks`, `sandbox_type_inherited`, `sandbox_type_local_network`, `selection`, `socket_after_disconnect`, `socket_close`, `socket_connect`, `socket_errors`, `socket_read_big`, `socket_read_little`, `socket_read_write_object`, `socket_write_big`, `socket_write_little`, `stage_loaderinfo_properties`, `tab_ordering_stage_tab_children`, `tab_ordering_stage_tab_children_remove_root`, `tab_ordering_tabbable`, `textbox_click`, `textfield_event`, `url_loader`, `wrong_arg_count`, `xml_socket`
+**avm2 — newly passing:** `filefilter_properties`, `filereference_browse_cancel`, `filereference_browse_select`, `filereference_load`, `filereference_save`, `filereference_save_and_browse`, `filereference_save_and_load`, `filereference_uninitialized`, `filereferencelist_browse_cancel`, `filereferencelist_browse_select`
 
-**from_avmplus — newly passing:** `ecma3/Exceptions/bug127913`
+**from_gnash/actionscript.all — newly passing:** `XMLSocket-v5`, `XMLSocket-v6`, `XMLSocket-v7`, `XMLSocket-v8`
 
-**from_gnash/actionscript.all — newly failing:** `XMLSocket-v5`, `XMLSocket-v6`, `XMLSocket-v7`, `XMLSocket-v8`
-
-**from_shumway — newly passing:** `as3-interfaces`, `as3-loader/LoaderLoadBytesTest2`, `as3-loader/bug1093712/loader`, `flash_net_URLRequest`, `flash_net_classes`, `hittesting/mask-hit-test`, `image-loading`, `mouse/start_drag_lock`
-
-**text — newly passing:** `text_caret_placement_align`, `text_caret_placement_leading`, `text_caret_placement_scroll`, `text_caret_placement_translated_bounds`
-
-*Comparing `8df2d730c3f0` → `767a301d2bae`*
+*Comparing `767a301d2bae` → `72fdc5e933a6`*
 
 ## Flash-Spec Results
 
@@ -211,139 +201,139 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### audio
 
 - **Pass:** 3/5 (60.0%)
-- **Duration:** 1m12s across 30 shards
+- **Duration:** 1m08s across 30 shards
 - **Lines:** 5/24 matching (20.8%)
-- **Avg test duration:** 14.5s — slowest: `stream_incomplete_loop` (20.9s)
+- **Avg test duration:** 13.7s — slowest: `stream_incomplete_loop` (20.9s)
 
 ### avm1
 
-- **Pass:** 646/717 (90.1%)
-- **Duration:** 59m11s across 30 shards
-- **Lines:** 116,218/131,176 matching (88.6%)
-- **Avg test duration:** 4.9s — slowest: `define_font_glyph_table_order` (40.7s)
+- **Pass:** 651/717 (90.8%)
+- **Duration:** 1h14m34s across 30 shards
+- **Lines:** 116,302/131,176 matching (88.7%)
+- **Avg test duration:** 6.2s — slowest: `movieclip_invalid_get_bounds_7` (50.2s)
 
 ### avm2
 
-- **Pass:** 919/1221 (75.3%)
-- **Duration:** 2h42m36s across 30 shards
-- **Lines:** 107,237/151,253 matching (70.9%)
-- **Avg test duration:** 7.9s — slowest: `away3d_advanced_shallow_water_demo` (77.3s)
+- **Pass:** 929/1221 (76.1%)
+- **Duration:** 2h45m26s across 30 shards
+- **Lines:** 107,385/151,253 matching (71.0%)
+- **Avg test duration:** 8.1s — slowest: `away3d_advanced_shallow_water_demo` (77.7s)
 
 ### fonts
 
 - **Pass:** 3/6 (50.0%)
-- **Duration:** 1m50s across 30 shards
+- **Duration:** 1m46s across 30 shards
 - **Lines:** 35/104 matching (33.7%)
-- **Avg test duration:** 18.4s — slowest: `embed_matching/fallback_preferences` (26.3s)
+- **Avg test duration:** 17.7s — slowest: `device_font_kerning` (25.3s)
 
 ### from_avmplus
 
 - **Pass:** 1458/1574 (92.6%)
-- **Duration:** 2h27m45s across 30 shards
+- **Duration:** 2h21m31s across 30 shards
 - **Lines:** 85,214/85,996 matching (99.1%)
-- **Avg test duration:** 5.6s — slowest: `ecma3/Statements/eregress_74474_003` (51.0s)
+- **Avg test duration:** 5.3s — slowest: `ecma3/Statements/eregress_74474_003` (64.7s)
 
 ### from_gnash/actionscript.all
 
-- **Pass:** 131/243 (53.9%)
-- **Duration:** 25m54s across 30 shards
-- **Lines:** 30,340/38,791 matching (78.2%)
-- **Avg test duration:** 6.3s — slowest: `MovieClip-v8` (64.2s)
+- **Pass:** 135/243 (55.6%)
+- **Duration:** 34m23s across 30 shards
+- **Lines:** 30,356/38,791 matching (78.3%)
+- **Avg test duration:** 8.4s — slowest: `MovieClip-v8` (70.2s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 69/111 (62.2%)
-- **Duration:** 29m17s across 30 shards
+- **Duration:** 33m02s across 30 shards
 - **Lines:** 4,054/5,248 matching (77.2%)
-- **Avg test duration:** 15.8s — slowest: `matrix_test` (107.7s)
+- **Avg test duration:** 17.8s — slowest: `matrix_test` (76.3s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m31s across 30 shards
+- **Duration:** 2m26s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 16.8s — slowest: `function_test` (21.6s)
+- **Avg test duration:** 16.2s — slowest: `exception` (20.9s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 11/20 (55.0%)
-- **Duration:** 4m53s across 30 shards
+- **Duration:** 5m46s across 30 shards
 - **Lines:** 441/580 matching (76.0%)
-- **Avg test duration:** 14.6s — slowest: `edittext_test1` (23.1s)
+- **Avg test duration:** 17.3s — slowest: `movieclip_destruction_test2` (21.9s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 6m28s across 30 shards
+- **Duration:** 6m25s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 19.4s — slowest: `dict_event` (21.5s)
+- **Avg test duration:** 19.2s — slowest: `missing_bitmap` (20.9s)
 
 ### from_shumway
 
 - **Pass:** 168/229 (73.4%)
-- **Duration:** 39m27s across 30 shards
+- **Duration:** 39m51s across 30 shards
 - **Lines:** 1,621/2,484 matching (65.3%)
-- **Avg test duration:** 10.3s — slowest: `acid/acid-large` (75.7s)
+- **Avg test duration:** 10.4s — slowest: `acid/acid-large` (77.2s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 1m34s across 30 shards
+- **Duration:** 1m32s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 2.0s — slowest: `text-bind` (20.3s)
+- **Avg test duration:** 1.9s — slowest: `label` (20.8s)
 
 ### import_assets
 
 - **Pass:** 1/3 (33.3%)
-- **Duration:** 42s across 30 shards
+- **Duration:** 43s across 30 shards
 - **Lines:** 2/14 matching (14.3%)
-- **Avg test duration:** 13.9s — slowest: `avm1_non_swf_import` (20.5s)
+- **Avg test duration:** 14.3s — slowest: `avm1_non_swf_import` (21.1s)
 
 ### mixed_avm
 
 - **Pass:** 3/11 (27.3%)
 - **Duration:** 44s across 30 shards
 - **Lines:** 19/53 matching (35.8%)
-- **Avg test duration:** 4.0s — slowest: `avm2_loads_avm1` (5.9s)
+- **Avg test duration:** 4.0s — slowest: `avm2_loads_avm1_loads_into_root` (5.8s)
 
 ### regression
 
 - **Pass:** 70/70 (100%)
-- **Duration:** 11m37s across 30 shards
+- **Duration:** 14m47s across 30 shards
 - **Lines:** 481/481 matching (100%)
-- **Avg test duration:** 9.9s — slowest: `avm2_timeline_gradients` (41.6s)
+- **Avg test duration:** 12.6s — slowest: `avm2_timeline_gradients` (25.8s)
 
 ### stage3d
 
 - **Pass:** 1/5 (20.0%)
-- **Duration:** 36s across 30 shards
+- **Duration:** 34s across 30 shards
 - **Lines:** 0/208 matching (0%)
-- **Avg test duration:** 7.1s — slowest: `scissor_rectangle` (8.2s)
+- **Avg test duration:** 6.8s — slowest: `scissor_rectangle_invalid` (8.1s)
 
 ### swf
 
 - **Pass:** 4/5 (80.0%)
-- **Duration:** 26s across 30 shards
+- **Duration:** 42s across 30 shards
 - **Lines:** 51/57 matching (89.5%)
-- **Avg test duration:** 5.2s — slowest: `swf_length_too_short_no_second_frame` (20.8s)
+- **Avg test duration:** 8.3s — slowest: `convolution_filter_big_matrix` (20.1s)
 
 ### text
 
 - **Pass:** 9/11 (81.8%)
-- **Duration:** 3m16s across 30 shards
+- **Duration:** 3m15s across 30 shards
 - **Lines:** 858/973 matching (88.2%)
-- **Avg test duration:** 17.8s — slowest: `text_caret_placement_align` (25.4s)
+- **Avg test duration:** 17.7s — slowest: `text_caret_placement_leading` (25.8s)
 
 ### timeline
 
 - **Pass:** 12/17 (70.6%)
-- **Duration:** 2m30s across 30 shards
+- **Duration:** 3m48s across 30 shards
 - **Lines:** 333/371 matching (89.8%)
-- **Avg test duration:** 8.8s — slowest: `frame_script_cleanup` (25.6s)
+- **Avg test duration:** 13.4s — slowest: `frame_script_cleanup2` (25.5s)
 
 ### visual
 
 - **Pass:** 136/143 (95.1%)
-- **Duration:** 27m13s across 30 shards
+- **Duration:** 26m49s across 30 shards
 - **Lines:** 238/350 matching (68.0%)
-- **Avg test duration:** 11.4s — slowest: `definefont4` (91.9s)
+- **Avg test duration:** 11.2s — slowest: `definefont4` (90.2s)

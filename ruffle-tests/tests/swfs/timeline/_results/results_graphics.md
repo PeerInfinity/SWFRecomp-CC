@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-29 02:18 UTC
+**Date**: 2026-07-29 04:05 UTC
 
-**Git SHA**: `ae54fd789a`
+**Git SHA**: `72fdc5e933`
 
-**Run Duration**: 4m 9s
+**Run Duration**: 3m 22s
 
 ## Summary
 
@@ -31,18 +31,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 20.5s |  |
-| 2 | `frame_label_count_oom` | 1 | 20.3s |  |
-| 3 | `frame_script_cleanup` | 30 | 25.3s |  |
-| 4 | `frame_script_cleanup2` | 32 | 25.1s |  |
-| 5 | `frame_script_cleanup3` | 30 | 7.3s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 7.2s |  |
-| 7 | `frame_script_construct` | 25 | 25.8s |  |
-| 8 | `scene_count_oom` | 1 | 1.8s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 6.7s |  |
-| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 6.9s |  |
+| 1 | `clip_action_no_key_code` | 1 | 21.5s |  |
+| 2 | `frame_label_count_oom` | 1 | 2.0s |  |
+| 3 | `frame_script_cleanup` | 30 | 7.1s |  |
+| 4 | `frame_script_cleanup2` | 32 | 26.9s |  |
+| 5 | `frame_script_cleanup3` | 30 | 5.8s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 6.8s |  |
+| 7 | `frame_script_construct` | 25 | 22.1s |  |
+| 8 | `scene_count_oom` | 1 | 2.2s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 7.0s |  |
+| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 7.0s |  |
 | 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 24.2s |  |
-| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 7.0s |  |
+| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 4.8s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,9 +50,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 24.7s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 6.7s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 24.8s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 25.2s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 6.4s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 18.1s |  |
 
 ## Near-Passing Tests
 
