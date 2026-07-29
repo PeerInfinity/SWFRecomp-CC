@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-29T19:07:58.828291+00:00",
-    "git_sha": "6cf854900e0b7cc7a987796751be1fea3edf392a",
-    "duration_seconds": 43.04,
+    "timestamp": "2026-07-29T22:35:44.233654+00:00",
+    "git_sha": "702d38a3599f1d81b55278223c4c0ac67f936302",
+    "duration_seconds": 41.98,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "request_matching_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.757,
+        "compile": 6.771,
         "run": 0.466
       },
       "num_frames": 126,
@@ -32,7 +32,7 @@
         "expected_lines": 190,
         "matching_lines": 0
       },
-      "duration": 7.23,
+      "duration": 7.25,
       "status": "output_mismatch",
       "detail": "190 line(s) differ (actual=0, expected=190)",
       "actual_output": "",
@@ -42,8 +42,8 @@
       "test": "request_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.593,
-        "run": 0.315
+        "compile": 6.366,
+        "run": 0.265
       },
       "num_frames": 12,
       "error_signature": "ReferenceError: Error #1065: Variable Context3DProfile is not defined.",
@@ -52,7 +52,7 @@
         "expected_lines": 16,
         "matching_lines": 0
       },
-      "duration": 6.92,
+      "duration": 6.64,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=0, expected=16)",
       "actual_output": "",
@@ -61,8 +61,8 @@
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.032,
-        "compile": 8.87,
+        "recomp": 0.036,
+        "compile": 8.748,
         "run": 0.315
       },
       "num_frames": 1,
@@ -72,7 +72,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 9.46,
+      "duration": 9.36,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -92,8 +92,8 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.032,
-        "compile": 8.942,
+        "recomp": 0.031,
+        "compile": 8.606,
         "run": 0.315
       },
       "num_frames": 1,
@@ -103,7 +103,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.53,
+      "duration": 9.19,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -120,8 +120,8 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.035,
-        "compile": 8.967,
+        "recomp": 0.031,
+        "compile": 8.645,
         "run": 0.315
       },
       "num_frames": 1,
@@ -131,7 +131,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 9.58,
+      "duration": 9.23,
       "image_comparisons": {
         "output": {
           "status": "fail",
