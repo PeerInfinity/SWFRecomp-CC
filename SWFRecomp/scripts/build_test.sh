@@ -164,8 +164,10 @@ cp "${SWFMODERN_SRC}/actionmodern/math.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/date.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/timer.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/registered_class.c" "${BUILD_DIR}/"
+cp "${SWFMODERN_SRC}/actionmodern/avm1_amf.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${BUILD_DIR}/"
 cp "${SWFMODERN_SRC}/utils.c" "${BUILD_DIR}/"
+cp "${SWFMODERN_SRC}/amf_packet.c" "${BUILD_DIR}/"
 
 # Archipelago Rando class (opt-in via WITH_AP=1). rando.c is a no-op stub
 # unless compiled with -DWITH_AP. The backend impl differs by target:

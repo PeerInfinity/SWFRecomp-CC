@@ -73,9 +73,10 @@ cp -p "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${SRC_DIR}/"
 RUNTIME_C=(
     actionmodern/action.c actionmodern/math.c actionmodern/date.c
     actionmodern/registered_class.c actionmodern/timer.c actionmodern/variables.c
+    actionmodern/avm1_amf.c
     actionmodern/object.c actionmodern/action_queue.c actionmodern/sprite_frame_scripts.c
     actionmodern/image_decode.c actionmodern/video_codec.c
-    utils.c
+    utils.c amf_packet.c
     libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
     libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c libswf/stb_image_impl.c
     audio/audio.c audio/audio_output_web.c
