@@ -592,6 +592,39 @@ this family. Ruffle's `timeout` accessor pair and its `onConnect`/`onClose`/
 tranche 1's lesson cuts both ways (unobserved surface is surface that can only
 move someone else's lines).
 
+**What CI caught that the local sweep did not — and it is the tranche-1
+lesson for the third time.** The graphics/full run (`30412279387`) landed all
+14 targets (`avm1` 658→663, `avm2` 936→945, effective 3901→3914) with **no
+pass→fail regression**, but moved four tests `pass → ruffle_matched`:
+`from_gnash/actionscript.all/XMLSocket-v{5,6,7,8}`. Effective count unchanged
+— and that is exactly why it is easy to miss.
+
+Those four assert `socketObj.connect(host, port) == false` for an unreachable
+host. **Flash returns false when no connection is established**; Ruffle
+returns true unconditionally, with a comment saying it cannot know
+synchronously because connecting is asynchronous — which is why all four are
+`known_failure = true` upstream and ship an `output.ruffle.txt`. Our old stub
+returned false and therefore scored a full `pass`, i.e. **better than Ruffle**.
+Copying Ruffle's `Ok(true.into())` verbatim silently traded that away.
+
+Our transport is a script, so we *do* know synchronously: with no
+`socket.json` nothing is ever opened. `connect()` now returns
+`s->handle != 0`, which is Flash's rule, restores all four to `pass`, and is
+invisible to the five bucket-S AVM1 tests (none reads the return value).
+
+Generalize, third instance: **the oracle is Ruffle's *behaviour*, not Ruffle's
+*code* — and a `known_failure` upstream marks a place where the two differ.**
+Tranche 1 lost `air_hidden_lookup` by adding a class Ruffle gates; tranche 2
+nearly lost four gnash tests by adopting a return value Ruffle itself
+documents as wrong. Before porting a Ruffle body verbatim, check whether any
+corpus test that exercises it is `known_failure` — that flag is upstream
+saying "we know this is not Flash".
+
+Also worth recording: `visual/simple_shapes/heavy_tesselation` went
+`pass → recomp_fail` in the same run. It is a **recompiler timeout** at the
+30s harness limit (it fails locally on an untouched recompiler and flipped the
+*other* way during tranche 1) — a load-dependent flake, not a regression.
+
 **Re-prediction of tranches 3–8 after tranche 2.**
 
 - **Tranche 3 (file dialogs, 14 candidates)** — was +10, now **+11**. The mock

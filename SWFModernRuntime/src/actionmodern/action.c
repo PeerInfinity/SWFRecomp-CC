@@ -36669,7 +36669,7 @@ static ActionVar builtin_xmlsocket_connect(SWFAppContext* app_context, ActionVar
 	(void) registers;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_BOOLEAN;
-	ret.data.numeric_value = 1;  // always true — the connect is asynchronous
+	ret.data.numeric_value = 0;
 	ASObject* sock = (ASObject*) this_obj;
 	if (sock == NULL) return ret;
 	XmlSockState* s = xmlsock_get(sock);
@@ -36699,6 +36699,16 @@ static ActionVar builtin_xmlsocket_connect(SWFAppContext* app_context, ActionVar
 	int prev = s->handle;
 	s->handle = swf_socket_connect(host, (int) port, sock, xmlsock_dispatch);
 	if (prev != 0) swf_socket_close(prev);
+
+	// Flash returns false when no connection is established and true
+	// otherwise; Ruffle returns true unconditionally because connecting is
+	// asynchronous and it cannot know yet (xml_socket.rs says so in a
+	// comment). Our transport is a script, so we DO know synchronously —
+	// no script means nothing was ever opened, which is Flash's false.
+	// from_gnash/actionscript.all/XMLSocket-v{5,6,7,8} assert exactly this
+	// (`socketObj.connect(host, port) == false` for an unreachable host) and
+	// are `known_failure` upstream precisely because Ruffle answers true.
+	ret.data.numeric_value = (s->handle != 0) ? 1 : 0;
 	return ret;
 }
 
