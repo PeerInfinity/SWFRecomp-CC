@@ -158,7 +158,16 @@ body are dropped, but pops are not undone. The asymmetry is load-bearing
 
 ## Quick Summary
 
-- **Pass rate (CI `035950cf`)**: 605/648 (93.4%) raw, **614/648 (94.8%) effective** (raw + 9 ruffle_matched), **608/608 (100.0%) filtered** — zero filtered failures.
+- **Pass rate (CI `30480184835`, 2026-07-29, graphics/full)**: **675 / 717
+  effective** (658 pass + 17 ruffle_matched, 42 fail). The suite grew from 648
+  to 717 tests with the 2026-07-24 full-corpus import (no AVM-filtering any
+  more), so the older figures below
+  are not comparable — they were measured against the filtered 648-test
+  mirror. Recent movement is the net/socket arc
+  (`SWFRecompDocs/plans/net-socket-arc.md`): tranche 2 +5 (`xml_socket*`),
+  tranche 3 +5 (`file_reference_*` browse), tranche 3b +7
+  (`file_reference_{download,upload}_*`).
+- **Pass rate (CI `035950cf`, historical, 648-test filtered mirror)**: 605/648 (93.4%) raw, **614/648 (94.8%) effective** (raw + 9 ruffle_matched), **608/608 (100.0%) filtered** — zero filtered failures.
 - **Test count**: 648 (unchanged). 40 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
 - **Image test baseline**: 14/31 strict image match, 10/31 tolerance pass.
 - **Main failure types** (raw): output_mismatch (34), runtime_error/segfault/timeout (0), compile_fail (0).

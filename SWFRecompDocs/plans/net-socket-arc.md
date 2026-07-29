@@ -11,11 +11,13 @@ prediction with zero regressions. Full postmortems in §6.
 | 1 — pure class surface | `937047612` + `722dea0e9` / `30403506144`, `30405770263` | +9 | **+10** | 3890 → 3901 |
 | 2 — `socket.json` + Socket/XMLSocket | `767a301d2` + `e173acc9a` / `30412279387`, `30414817519` | +12 | **+14** | 3901 → 3914 |
 | 3 — file dialogs | `72fdc5e93` / `30418985155`, `30418993536` | +11 | **+15** | 3914 → 3929 |
-| 4 — `URLStream` | `8c3b7673f` / `30477186369` | +2 | **+3** | 3929 → **3932 / 4420** |
+| 4 — `URLStream` | `8c3b7673f` / `30477186369` | +2 | **+3** | 3929 → 3932 |
+| 3b — AVM1 download/upload | `6cf854900` / `30480184835` | +5 | **+7** | 3932 → **3939 / 4420** |
 
-Per-suite at tranche 4: `avm2` **956 / 1221**, `avm1` **668**,
-`from_shumway` **182**.
-**NEXT: tranche 3b** (AVM1 `FileReference.download`/`upload`, +5).
+Per-suite at tranche 3b: `avm2` **956 / 1221**, `avm1` **675**,
+`from_shumway` **182**. Arc total so far: **+49**.
+**NEXT: tranche 5** (AVM2 AMF gaps, +1) — but tranche 7 (AVM1 AMF0
+serializer, +4, LARGE) is the one that unblocks the rest of buckets W and L.
 
 Scope of this document: the **net block** named as row 4e of
 `feature-priority-map.md` ("net/socket (29)"). The census below finds
@@ -786,7 +788,7 @@ point — sweep the test-name prefix as well as the mechanism.**
 **Re-prediction of tranches 4–8 after tranche 3.**
 
 - **NEW — tranche 3b (AVM1 `FileReference.download`/`upload`, 7 candidates)**
-  — predict **+5**. The dialog mock, the AsBroadcaster delivery and the
+  — predict **+5** (**actual +7 — all seven**). The dialog mock, the AsBroadcaster delivery and the
   property-init path all exist; what is missing is the save dialog's AVM1
   entry point, the URL fetch (the AVM1 side of the Loader arc's resolver) and
   an `httperror` branch that four of the seven grade. Cheaper than tranche 6
@@ -891,3 +893,98 @@ subdirectory.
 **+3**, 7 stays **+4** and 8 stays **+2**. One note for whoever writes the next
 census: re-run the sweep against compiled `test.swf` class names before sizing
 a tranche in `from_shumway` or `from_gnash`.
+
+### Tranche 3b — SHIPPED `6cf854900`, CI `30480184835` (graphics, full)
+
+**+7 vs +5 predicted, zero regressions — all seven candidates, no misses.**
+Corpus effective **3932 → 3939 / 4420**; `avm1` **668 → 675**. `REGRESSIONS: 0`,
+`OTHER STATUS MOVES: 0`, histogram moves only `output_mismatch 480 → 473` /
+`pass 3692 → 3699`.
+
+| Test | before | after |
+|---|---|---|
+| `file_reference_download_cancel` | 1/7 | **pass** |
+| `file_reference_download_success` | 6/34 | **pass** |
+| `file_reference_download_httperror_dns_error` | 1/13 | **pass** |
+| `file_reference_download_httperror_status_code` | 1/23 | **pass** |
+| `file_reference_upload_success` | 8/23 | **pass** |
+| `file_reference_upload_httperror_dns_error` | 8/18 | **pass** |
+| `file_reference_upload_httperror_status_code` | 8/23 | **pass** |
+
+**The +2 over prediction is the `httperror` branch being cheaper than scoped.**
+§6's tranche-3 re-prediction budgeted the four `httperror` tests as the risky
+half ("an `httperror` branch that four of the seven grade"). It is not a branch
+that needs a real transport at all: Ruffle's test navigator answers three magic
+**query strings** — `?debug-success` returns `Hello, World!`,
+`?debug-error-statuscode` an `HttpNotOk` with a zero-length body,
+`?debug-error-dns` an `InvalidDomain` — and every one of the seven URLs carries
+one. `strstr` on the URL is the entire transport. **Generalize: when a Ruffle
+test's URL contains a `?debug-` marker, the navigator never reaches the disk,
+so the "fetch" is a three-way switch, not a fetch.**
+
+**Zero harness work again, for the third mock in a row.** Like the file dialog
+(tranche 3) and unlike `input.json` / `socket.json`, everything here is keyed
+off test CONTENT. `verify_output.py`, `test.toml` handling and the compile
+defines are untouched; the whole tranche is `action.c`.
+
+**Timing needed nothing new.** In Ruffle `download_file_dialog` is ONE future:
+it awaits the save dialog, then the fetch, then fires every callback in a
+single `update`. So the whole sequence runs inside one resolution callback on
+tranche 3's dialog queue, and the AVM1 pump's existing "keep going until the
+queue is empty" loop covers the rest. `upload()` opens **no dialog at all** —
+it rides the same queue purely to be async, which is exactly what puts its
+events after the `onSelect` handler that called it (all three upload tests call
+`upload()` from inside `onSelect`).
+
+**Three orderings are load-bearing, and each is graded by exactly one test.**
+
+- **download / `InvalidDomain` fires NO `onOpen`** — the connection never
+  opened. `HttpNotOk` fires `onOpen`, the `Error opening URL '…'` trace,
+  `onIOError`, and **then** `onProgress`: Flash still runs `onProgress` after
+  an error, but only once the connection was established, and the reported
+  length is the *error body's* (0 from the test navigator), not the file's.
+- **upload fires `onOpen` unconditionally**, before it looks at the result;
+  `HttpNotOk` then reports `onProgress(13, 13)` and `onHTTPError`,
+  `InvalidDomain` only `onIOError`. Note the asymmetry with download: upload's
+  error path uses `onHTTPError` where download's uses `onIOError`.
+- **download's `onSelect` reports the SAVE HINT as `name`**, not the mock's
+  `test.txt` — Ruffle's save dialog builds its `TestFileSelection` from the
+  requested file name. That is why `file_reference_download_success` expects
+  `N:debug-success.txt` while every browse-derived test expects `N:test.txt`,
+  and it is the one place the two dialog kinds' simulated selections differ.
+
+**The two `false` cases are `Url::parse` failures.** `download("@")` and
+`download("baddomain")` have no scheme. Implemented as a scheme scan rather
+than a URL parser, which is all the corpus needs. With no explicit file name
+the save hint is the URL path's last segment — and `Url` normalizes an empty
+path to `/` for the special schemes, so `download("http://example.com")`
+derives the **empty** name, the save dialog cancels, and the call still returns
+**true** because a dialog *was* displayed. That is `file_reference_download_cancel`
+in full. `upload()` additionally requires a prior selection and an http(s)
+scheme.
+
+**State that Flash does not expose stays out of the property set.** Ruffle's
+`FileReferenceData` carries `is_initialised` and the selected bytes; both
+matter to `upload()` (uploading before a browse answers false; `onProgress`
+reports the stored data's length) and neither is script-visible. They live in a
+pointer-keyed side table — the `NetConnection`/`XMLSocket` idiom — rather than
+as hidden own properties, because `global_instance_decls` enumerates this
+family. The prototype shape is otherwise untouched: `upload` and `download`
+were already present as stubs, and `addStubMethodToProto` →
+`addNativeMethodToProto` is the same property, same order, same
+`DONT_ENUM | DONT_DELETE` flags, with only `advanced_func` different.
+
+**Blast radius, measured.** Stash-diff of the actual `--diff` output against a
+pre-change build over 11 canaries — `global_proto_decls` (7,462 lines),
+`global_proto_decls_delete`, `global_instance_decls`, `native_objects_swf6`,
+`file_reference_browse_cancel`, `file_reference_list_browse_select`,
+`file_reference_list_browse_invalid_filters`,
+`file_reference_list_asbroadcaster`, `avm2/filereference_load`,
+`avm2/filereference_save_and_browse`, `avm1/xml_socket` — is
+**byte-identical on all eleven**.
+
+**Re-prediction of tranches 5–8 after tranche 3b.** Unchanged: **+1 / +3 / +4 /
++2**. Nothing here touched AMF, `LocalConnection` or the AVM1 serializer. One
+input to tranche 7, though: the AVM1 `FileReference` side table is now the
+precedent for where AVM1 native state lives when Flash does not expose it, and
+tranche 7's `SharedObject` `.sol` persistence will want the same shape.
