@@ -1715,12 +1715,17 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             "src/avm2/avm2_bytearray.c",
             "src/avm2/avm2_mops.c",
             "src/avm2/avm2_amf.c",
+            # avm2_net.c had drifted out of this list (it is only used by the
+            # KEEP_BUILD_DIR game-bring-up path, never by CI), which left
+            # avm2_globals.c's avm2_register_net_transport undefined.
+            "src/avm2/avm2_net.c",
             "src/avm2/avm2_date.c",
             "src/avm2/avm2_e4x.c",
             "src/avm2/avm2_xml.c",
             "src/avm2/avm2_events.c",
             "src/avm2/avm2_text.c",
             "src/avm2/avm2_display.c",
+            "src/avm2/avm2_stage3d.c",
             "src/avm2/avm2_bitmap.c",
             "src/avm2/avm2_cpu_raster.c",
             "src/avm2/avm2_media.c",

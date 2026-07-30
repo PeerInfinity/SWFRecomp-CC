@@ -660,6 +660,21 @@ double avm2_timer_elapsed_ms(void);
 // EventDispatcher and builtin classes snapshot their parent vtable at
 // creation time.
 void avm2_register_net_transport(Avm2Context* ctx);
+
+// flash.display.Stage3D + the flash.display3D family + flash.geom.Matrix3D
+// (avm2_stage3d.c). Runs AFTER avm2_register_display: it hangs the `stage3Ds`
+// getter off the Stage class, and its Matrix3D replaces the shell that used to
+// be minted in register_display.
+void avm2_register_stage3d(Avm2Context* ctx);
+// The four Stage3D singletons (created lazily, pinned, stable identity).
+Avm2Object* avm2_stage3d_at(Avm2Context* ctx, uint32_t index);
+// Ruffle Stage::check_requested_context3ds (frame_lifecycle.rs:104): create the
+// Context3D for any Stage3D that asked for one this frame and dispatch
+// `context3DCreate`. Called from avm2_display_run_tick at the END of the frame,
+// after the exitFrame broadcast and the LoaderInfo exit-frame hook.
+void avm2_stage3d_check_requested(Avm2Context* ctx);
+// flash.geom.Vector3D, owned by avm2_display.c (see the note there).
+Avm2Class* avm2_geom_vector3d_class(void);
 // Drain every NetConnection's queued call()s into one Flash Remoting packet per
 // connection, log the fetch, and dispatch the scripted response. Called once per
 // tick from avm2_display_run_tick at the loader/executor drain point.

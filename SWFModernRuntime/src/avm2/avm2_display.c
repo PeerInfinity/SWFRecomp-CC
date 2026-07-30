@@ -2958,6 +2958,13 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// (loaderinfo_events pins this ordering). Loader fetches resolve right
 	// after, which is where Ruffle's test harness runs the async executor.
 	avm2_loaderinfo_run_exit_frame(ctx);
+	// Stage3D context creation is DEFERRED to exactly here (Ruffle
+	// frame_lifecycle.rs:104, right after broadcast_frame_exited and its
+	// LoadManager::run_exit_frame): a requestContext3D made during frame N
+	// gets its Context3D and its `context3DCreate` event at the END of frame
+	// N, before frame N+1's enterFrame. avm2/context3d_creation grades that
+	// interleaving line by line.
+	avm2_stage3d_check_requested(ctx);
 	// LocalConnection delivery sits where Ruffle runs
 	// LocalConnections::update_connections: inside run_frame, after the AVM2
 	// phases and BEFORE the NetConnection flush below (avm2/amf_array_
@@ -8201,6 +8208,13 @@ static Avm2Value transform_set_matrix(Avm2Activation* act)
 }
 
 static Avm2Class* g_colortransform_class;
+// flash.geom.Vector3D. avm2_stage3d.c's Matrix3D constructs one for `position`
+// / transformVector, and avm2_builtin_class always MINTS a class rather than
+// looking one up, so the handle has to be shared rather than re-registered.
+static Avm2Class* g_vector3d_class;
+
+Avm2Class* avm2_geom_vector3d_class(void)
+{ return g_vector3d_class; }
 
 static Avm2Value colortransform_init(Avm2Activation* act)
 {
@@ -11344,11 +11358,11 @@ void avm2_register_display(Avm2Context* ctx)
 	           transform_get_pixel_bounds, NULL);
 	g_transform_class = geom_transform;
 
-	// flash.geom.Matrix3D + PerspectiveProjection constructible stubs.
+	// flash.geom.PerspectiveProjection + Vector3D constructible stubs.
+	// Matrix3D used to be a bare stub here too; it is a real class now and
+	// lives in avm2_stage3d.c (setProgramConstantsFromMatrix needs it), which
+	// registers AFTER this — so creating a shell here would shadow it.
 	{
-		Avm2Class* m3 = avm2_builtin_class(ctx, "flash.geom", "Matrix3D",
-		                                   b->object_class);
-		(void) m3;
 		Avm2Class* pp = avm2_builtin_class(ctx, "flash.geom",
 		                                   "PerspectiveProjection",
 		                                   b->object_class);
@@ -11357,6 +11371,7 @@ void avm2_register_display(Avm2Context* ctx)
 		                                   b->object_class);
 		v3->instance_init.fn = geom_vector3d_init;
 		v3->instance_init.debug_name = "Vector3D";
+		g_vector3d_class = v3;
 	}
 
 	// flash.geom.ColorTransform (8 numeric slots + FP toString).

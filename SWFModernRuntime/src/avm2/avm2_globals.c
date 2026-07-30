@@ -2986,6 +2986,11 @@ void avm2_globals_init(Avm2Context* ctx)
 	// its accessors here, and BitmapData needs the display char registry.
 	avm2_register_bitmap(ctx);
 
+	// flash.display.Stage3D + flash.display3D.* + flash.geom.Matrix3D
+	// (avm2_stage3d.c). After display: it registers the `stage.stage3Ds`
+	// getter on the Stage class and takes over Matrix3D from it.
+	avm2_register_stage3d(ctx);
+
 	// flash.utils.Timer (avm2_display.c) + flash.media Sound family
 	// (avm2_media.c) — Stage 10. After events (Timer extends EventDispatcher)
 	// and display (Sound.play returns a SoundChannel display-independent obj).
