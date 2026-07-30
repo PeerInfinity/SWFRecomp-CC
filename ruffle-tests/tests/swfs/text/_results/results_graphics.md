@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-30 01:47 UTC
+**Date**: 2026-07-30 03:40 UTC
 
-**Git SHA**: `34171042fc`
+**Git SHA**: `dfbbfc1afa`
 
-**Run Duration**: 3m 31s
+**Run Duration**: 3m 33s
 
 ## Summary
 
@@ -29,15 +29,15 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `auto_size/height` | 1 | 26.6s |  |
-| 2 | `auto_size/return` | 12 | 26.1s |  |
-| 3 | `auto_size/width` | 6 | 26.7s |  |
-| 4 | `br_at_start` | 0 | 2.9s |  |
-| 5 | `style_changes_in_html` | 0 | 21.7s |  |
-| 6 | `text_caret_placement_align` | 248 | 22.6s |  |
-| 7 | `text_caret_placement_leading` | 244 | 27.9s |  |
-| 8 | `text_caret_placement_scroll` | 108 | 27.2s |  |
-| 9 | `text_caret_placement_translated_bounds` | 140 | 20.0s |  |
+| 1 | `auto_size/height` | 1 | 27.3s |  |
+| 2 | `auto_size/return` | 12 | 26.6s |  |
+| 3 | `auto_size/width` | 6 | 25.8s |  |
+| 4 | `br_at_start` | 0 | 2.7s |  |
+| 5 | `style_changes_in_html` | 0 | 19.5s |  |
+| 6 | `text_caret_placement_align` | 248 | 26.5s |  |
+| 7 | `text_caret_placement_leading` | 244 | 26.7s |  |
+| 8 | `text_caret_placement_scroll` | 108 | 26.9s |  |
+| 9 | `text_caret_placement_translated_bounds` | 140 | 21.7s |  |
 
 ## Near-Passing Tests
 
