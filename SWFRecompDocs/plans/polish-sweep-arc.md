@@ -159,4 +159,47 @@ XML/e13_4_4_32/v9, Namespace/e13_2_5}`, `regress/bug_483783`,
 
 ## 2. Fix batches
 
-*(filled in as batches ship)*
+Every batch was predicted before coding and canary-checked before push,
+with canaries chosen by **content-grep**, not by name (the encoding1
+lesson — a name-based list misses the tests that reach a mechanism
+through their data).
+
+| Batch | Commit | Bucket | Predicted | Actual | Notes |
+|---|---|---|---|---|---|
+| 1 | `f50ac436b` | B1 avmplus VerifyError messages | +7 | **+7** | exactly on prediction |
+| 2 | `846ef6538` | B2 `Math` not callable/constructible | +6 | **+6** | one cause, two suites |
+| 3 | `c045e044c` | B6 `#1081` split + B7 apply/call arity | +5 | **+3** | B5 dropped mid-batch (see below); `WildcardOperator` is a separate mechanism |
+| 4 | `22404706d` | B9 qualified names in `#1074` + B8 e4x PI AttributeName | +3 | **+3** | |
+
+Local total **+19**. CI verification: run `30526275513`
+(graphics/`categories=full`), baseline `dae7ec9e7`.
+
+### Things that cost prediction accuracy
+
+- **`fail()`'s code was already right, only its text was wrong.** The
+  entire B1 bucket was a *message-formatting* bug, not a detection gap —
+  every one of those verifier faults was already being caught with the
+  correct `Error #NNNN`. Two codes *were* genuinely wrong
+  (method-index → #1027, class-index → #1060, dxns → #1015 not #1114),
+  and those were only visible because the corpus asserts the number.
+- **A mechanism can need fixing twice in one file.** e4x has separate
+  `xml_kind_filter` and `list_kind_filter`; fixing the XML one made
+  `e13_4_4_28` pass and left `e13_5_4_17` failing on the identical
+  assertion. Always check whether XMLList has its own copy.
+- **`Function.prototype.apply.length` reads the ivtable trait, not the
+  prototype function.** The prototype copies already declared the right
+  arities; the shadowing ivtable methods (per
+  `avm2-typed-prototype-trait-shadowing`) did not. Registering an ES3
+  method in two places means declaring its arity in two places.
+- **B5 (astral-plane UTF-8) was dropped after diagnosis, not after a
+  failed fix.** `invalid_utf8` line 11 and `stylesheet` line 70 need a
+  CESU-8 surrogate pair to survive round-trip, and the runtime carries a
+  documented constraint — *our strings are UTF-8 and cannot hold a lone
+  surrogate* — so every decoder deliberately maps a surrogate-range code
+  point to U+FFFD. Making 🐌 work needs WTF-8 storage or a
+  pair-combining pass across every UTF-8 decoder. That is its own
+  scoping job, not a polish edit.
+- **Two of the four `matching == expected` tests are "stop producing
+  output" fixes**, which no amount of added behaviour will reach.
+  `mixed_avm/avm1_loads_avm2_doaction` literally expects the inner SWF's
+  DoAction *not* to run.

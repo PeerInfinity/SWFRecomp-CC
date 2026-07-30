@@ -563,13 +563,26 @@ static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
 	}
 	// Miss: dynamic receivers yield undefined for public names; a
 	// non-public multiname can never match an expando prop (1081 on a
-	// dynamic receiver). avmplus's split is on the MULTINAME, not the
-	// receiver: `isAttr() || !containsAnyPublicNamespace()` is #1081 and
-	// everything else is #1069 (as3/Vector/bug_678952 reads `v.@attr` off a
-	// sealed Vector and asserts #1081; as3/RuntimeErrors/
-	// Error1081ReadSealedErrorNs and as3/Expressions/QualifiedReferences/
-	// WildcardOperator read a non-public name off a sealed one and assert
-	// the same code).
+	// dynamic receiver). Sealed receivers throw 1069 -- except for an
+	// ATTRIBUTE multiname, which avmplus routes to 1081 as well
+	// (Toplevel: `isAttr() || !containsAnyPublicNamespace()`; as3/Vector/
+	// bug_678952 reads `v.@attr` off a sealed Vector and asserts #1081).
+	//
+	// Do NOT widen this to `!mn_public`: a non-public QName miss on a
+	// SEALED receiver is #1069, which avm2/catch_class (`AS3::hasOwnProperty`
+	// on the catch scope object) and as3/Definitions/Classes/Ext/
+	// AccStatPropViaSubClass (a static in the base class's namespace,
+	// reached through the subclass) both pin. Tried in the polish sweep and
+	// reverted -- it cost those two to win one.
+	//
+	// The remaining #1081 case, as3/RuntimeErrors/Error1081ReadSealedErrorNs,
+	// is NOT reachable from here: it reads a PUBLIC name (`a.name`) off a
+	// sealed, interface-typed receiver, so Ruffle's own split
+	// (script_object.rs get_dynamic_property: `!valid_dynamic_name() &&
+	// has_multiple_ns()`, where valid_dynamic_name is
+	// `contains_public_namespace() && !is_attribute()`) never even fires --
+	// that #1081 comes from a different site, which a future batch has to
+	// identify rather than broadening the condition here.
 	int dynamic = recv.kind == AVM2_VALUE_OBJECT && object_is_dynamic(recv.u.obj);
 	if (dynamic && mn_public)
 	{
@@ -579,7 +592,7 @@ static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
 	class_name_of(ctx, recv, cn, sizeof(cn));
 	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 	                 "Error #%s: Property %.*s not found on %s and there is "
-	                 "no default value.", (mn_attr || !mn_public) ? "1081" : "1069",
+	                 "no default value.", (dynamic || mn_attr) ? "1081" : "1069",
 	                 (int) name_len, name, cn);
 }
 
