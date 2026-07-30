@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-30T05:13:12.516391+00:00",
-    "git_sha": "e4859db87771c1135792506194fc00b17e08a8cb",
-    "duration_seconds": 75.76,
+    "timestamp": "2026-07-30T07:00:20.448134+00:00",
+    "git_sha": "9277e0e1b2147017a69c44d067fd9234dc7f4751",
+    "duration_seconds": 79.85,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -24,8 +24,8 @@
       "test": "aac",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.313,
-        "run": 0.817
+        "compile": 6.717,
+        "run": 0.767
       },
       "num_frames": 400,
       "error_signature": "ReferenceError: Error #1065: Variable Video is not defined.",
@@ -34,7 +34,7 @@
         "expected_lines": 18,
         "matching_lines": 3
       },
-      "duration": 8.14,
+      "duration": 7.49,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=12, expected=18)",
       "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...",
@@ -44,8 +44,8 @@
       "test": "g711",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.526,
-        "run": 1.017
+        "compile": 6.627,
+        "run": 1.018
       },
       "num_frames": 600,
       "error_signature": "ReferenceError: Error #1065: Variable Video is not defined.",
@@ -54,7 +54,7 @@
         "expected_lines": 6,
         "matching_lines": 2
       },
-      "duration": 7.55,
+      "duration": 7.66,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=4, expected=6)",
       "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nStarting tone: tone_mulaw_mono.flv\nMeasuring...",
@@ -64,7 +64,7 @@
       "test": "g711_event_alaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.149,
+        "compile": 20.689,
         "run": 0.215
       },
       "num_frames": 2,
@@ -73,15 +73,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.37,
+      "duration": 20.91,
       "status": "pass"
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 14.881,
-        "run": 0.164
+        "compile": 20.965,
+        "run": 0.215
       },
       "num_frames": 2,
       "lines": {
@@ -89,14 +89,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.05,
+      "duration": 21.19,
       "status": "pass"
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
         "recomp": 0.01,
-        "compile": 21.928,
+        "compile": 21.868,
         "run": 0.416
       },
       "num_frames": 120,
@@ -105,7 +105,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.36,
+      "duration": 22.3,
       "status": "pass"
     }
   ]
