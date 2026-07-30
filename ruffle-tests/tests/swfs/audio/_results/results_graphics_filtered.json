@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-30T15:55:17.785741+00:00",
-    "git_sha": "0612bc78e68afe94f4270551725fbd11b8f8b81f",
-    "duration_seconds": 79.06,
+    "timestamp": "2026-07-30T17:36:27.686492+00:00",
+    "git_sha": "1ca0ab117c5a690b8b71008d056617154079ab67",
+    "duration_seconds": 74.88,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -23,48 +23,48 @@
     {
       "test": "aac",
       "phases": {
-        "recomp": 0.0,
-        "compile": 6.705,
-        "run": 0.767
+        "recomp": 0.006,
+        "compile": 5.636,
+        "run": 0.616
       },
       "num_frames": 400,
-      "error_signature": "ReferenceError: Error #1065: Variable Video is not defined.",
+      "error_signature": "TypeError: Error #1006: computeSpectrum is not a function.",
       "lines": {
-        "actual_lines": 12,
+        "actual_lines": 24,
         "expected_lines": 18,
         "matching_lines": 3
       },
-      "duration": 7.48,
+      "duration": 6.26,
       "status": "output_mismatch",
-      "detail": "15 line(s) differ (actual=12, expected=18)",
-      "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...",
+      "detail": "21 line(s) differ (actual=24, expected=18)",
+      "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()",
       "expected_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nPASS\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nPASS\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nPASS\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nPASS\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nPASS\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...\nPASS"
     },
     {
       "test": "g711",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.972,
+        "compile": 7.293,
         "run": 1.018
       },
       "num_frames": 600,
-      "error_signature": "ReferenceError: Error #1065: Variable Video is not defined.",
+      "error_signature": "TypeError: Error #1006: computeSpectrum is not a function.",
       "lines": {
-        "actual_lines": 4,
+        "actual_lines": 8,
         "expected_lines": 6,
         "matching_lines": 2
       },
-      "duration": 8.0,
+      "duration": 8.32,
       "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=4, expected=6)",
-      "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nStarting tone: tone_mulaw_mono.flv\nMeasuring...",
+      "detail": "6 line(s) differ (actual=8, expected=6)",
+      "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()",
       "expected_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nPASS\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nPASS"
     },
     {
       "test": "g711_event_alaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.633,
+        "compile": 16.4,
         "run": 0.165
       },
       "num_frames": 2,
@@ -73,15 +73,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.8,
+      "duration": 16.57,
       "status": "pass"
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.721,
-        "run": 0.165
+        "compile": 21.573,
+        "run": 0.215
       },
       "num_frames": 2,
       "lines": {
@@ -89,14 +89,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.89,
+      "duration": 21.8,
       "status": "pass"
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
         "recomp": 0.009,
-        "compile": 21.152,
+        "compile": 21.212,
         "run": 0.416
       },
       "num_frames": 120,
@@ -105,7 +105,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.58,
+      "duration": 21.64,
       "status": "pass"
     }
   ]

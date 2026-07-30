@@ -1,65 +1,177 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-30T14:23:01.841261+00:00",
-    "old_git_sha": "0241861f4a7793e65607d27fc7141c5caf5c82f1",
-    "new_timestamp": "2026-07-30T15:55:17.827547+00:00",
-    "new_git_sha": "0612bc78e68afe94f4270551725fbd11b8f8b81f",
+    "old_timestamp": "2026-07-30T15:55:17.827547+00:00",
+    "old_git_sha": "0612bc78e68afe94f4270551725fbd11b8f8b81f",
+    "new_timestamp": "2026-07-30T17:36:27.725752+00:00",
+    "new_git_sha": "1ca0ab117c5a690b8b71008d056617154079ab67",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 171,
+    "old_pass": 173,
     "old_ruffle_matched": 12,
-    "old_effective_pass": 183,
+    "old_effective_pass": 185,
     "old_total": 229,
-    "old_pass_rate": 74.7,
+    "old_pass_rate": 75.5,
     "new_pass": 173,
     "new_ruffle_matched": 12,
     "new_effective_pass": 185,
     "new_total": 229,
     "new_pass_rate": 75.5,
-    "old_mismatched_lines": 829,
-    "new_mismatched_lines": 825,
+    "old_mismatched_lines": 825,
+    "new_mismatched_lines": 764,
     "increased_mismatches": 0,
-    "decreased_mismatches": 4,
-    "newly_passing": 2,
+    "decreased_mismatches": 61,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 2,
-    "unchanged": 227,
+    "status_changed": 0,
+    "unchanged": 220,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "acid/acid-filter",
+      "test": "acid/acid-shapes",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 120,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 120,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm1movie",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 13,
+        "matching_lines": 4
+      },
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 13,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "avm2/flash/geom/matrix3d/Matrix3DClass",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 56,
+        "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 56,
+        "expected_lines": 56,
+        "matching_lines": 51
+      }
+    },
+    {
+      "test": "avm2/flash/geom/matrix3d/TransformBasics",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 13,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 11,
+        "expected_lines": 13,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "avm2/flash/geom/perspectiveprojection/PerspectiveProjectionClass",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 20,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 16
+      }
+    },
+    {
+      "test": "esc",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
       "old_lines": {
         "actual_lines": 0,
         "expected_lines": 2,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
+        "actual_lines": 13,
         "expected_lines": 2,
-        "matching_lines": 2
+        "matching_lines": 0
       }
     },
     {
-      "test": "timeline/nav/filters",
+      "test": "getobjectsunderpoint",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 6
+        "actual_lines": 1,
+        "expected_lines": 34,
+        "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 8,
+        "actual_lines": 3,
+        "expected_lines": 34,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "hittesting/hittesting",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 18,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 18,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "timeline/nav/clipDepth",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
         "expected_lines": 8,
-        "matching_lines": 8
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 9,
+        "expected_lines": 8,
+        "matching_lines": 1
       }
     }
   ]
