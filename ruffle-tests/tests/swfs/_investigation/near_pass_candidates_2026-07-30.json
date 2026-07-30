@@ -1,0 +1,1550 @@
+[
+ {
+  "suite": "audio",
+  "test": "g711",
+  "status": "output_mismatch",
+  "exp": 6,
+  "match": 2,
+  "act": 4,
+  "gap": 4
+ },
+ {
+  "suite": "avm1",
+  "test": "load_cancel_via_removemovieclip",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 4,
+  "act": 8,
+  "gap": 0
+ },
+ {
+  "suite": "avm1",
+  "test": "native_objects_swf6",
+  "status": "output_mismatch",
+  "exp": 115,
+  "match": 114,
+  "act": 115,
+  "gap": 1
+ },
+ {
+  "suite": "avm1",
+  "test": "remove_different_level",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 2,
+  "act": 2,
+  "gap": 1
+ },
+ {
+  "suite": "avm1",
+  "test": "string_relational_compare",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 3,
+  "act": 4,
+  "gap": 1
+ },
+ {
+  "suite": "avm1",
+  "test": "form_loader_encoding_3",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 1,
+  "act": 3,
+  "gap": 2
+ },
+ {
+  "suite": "avm1",
+  "test": "sandbox_type_remote",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 1,
+  "act": 1,
+  "gap": 2
+ },
+ {
+  "suite": "avm1",
+  "test": "form_loader_encoding_2",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 0,
+  "act": 3,
+  "gap": 3
+ },
+ {
+  "suite": "avm1",
+  "test": "geturl",
+  "status": "output_mismatch",
+  "exp": 7,
+  "match": 4,
+  "act": 4,
+  "gap": 3
+ },
+ {
+  "suite": "avm1",
+  "test": "shared_stack",
+  "status": "output_mismatch",
+  "exp": 16,
+  "match": 11,
+  "act": 12,
+  "gap": 5
+ },
+ {
+  "suite": "avm2",
+  "test": "button_nested_frame_simple",
+  "status": "output_mismatch",
+  "exp": 27,
+  "match": 27,
+  "act": 39,
+  "gap": 0
+ },
+ {
+  "suite": "avm2",
+  "test": "accessibility",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "air_ifilepromise",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "applicationdomain_hasdefinition_null",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 1,
+  "act": 2,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "blend_mode_null",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "button_bounds",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "button_hittest",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 1,
+  "act": 2,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "construct_interface",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 2,
+  "act": 3,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "cpool_index_invalid_bytecode_3",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "cross_api_version_call_newer",
+  "status": "output_mismatch",
+  "exp": 12,
+  "match": 11,
+  "act": 12,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "displayobject_opaque_background",
+  "status": "output_mismatch",
+  "exp": 6,
+  "match": 5,
+  "act": 6,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "instantiate_root_character",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 3,
+  "act": 4,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "invalid_utf8",
+  "status": "output_mismatch",
+  "exp": 12,
+  "match": 11,
+  "act": 12,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "mouse_pick_avm1_root",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 1,
+  "act": 2,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "property_is_enumerable_reset",
+  "status": "output_mismatch",
+  "exp": 23,
+  "match": 22,
+  "act": 23,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "scope_optimizations",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 3,
+  "act": 4,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "scopes_dont_cache/order-1",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "scopes_dont_cache/order-2",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "stylesheet",
+  "status": "output_mismatch",
+  "exp": 221,
+  "match": 220,
+  "act": 221,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "system_setclipboard_null",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "textline_name",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "verify_exception_target_two_jumps",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "verify_illegal_opcode",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "verify_jump_to_middle_of_op",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "verify_method_info_oob",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "xml_appendchild_swf_v21",
+  "status": "output_mismatch",
+  "exp": 13,
+  "match": 12,
+  "act": 14,
+  "gap": 1
+ },
+ {
+  "suite": "avm2",
+  "test": "av_tag_data",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "bitmapdata_draw_alpha_erase",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 6,
+  "act": 8,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "constructprop_method",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "constructsuper_null",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 2,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "displayobject_hittestpoint",
+  "status": "output_mismatch",
+  "exp": 49,
+  "match": 47,
+  "act": 49,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "displayobject_hittestpoint_root",
+  "status": "output_mismatch",
+  "exp": 13,
+  "match": 11,
+  "act": 13,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "displayobjectcontainer_getobjectsunderpoint",
+  "status": "output_mismatch",
+  "exp": 15,
+  "match": 13,
+  "act": 13,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "error_tostring_more",
+  "status": "output_mismatch",
+  "exp": 86,
+  "match": 84,
+  "act": 86,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "graphic_linkage",
+  "status": "output_mismatch",
+  "exp": 9,
+  "match": 7,
+  "act": 9,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "issue_8630_placeremoveplace",
+  "status": "output_mismatch",
+  "exp": 15,
+  "match": 13,
+  "act": 15,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "loader_method",
+  "status": "output_mismatch",
+  "exp": 85,
+  "match": 83,
+  "act": 83,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "movieclip_hittest",
+  "status": "output_mismatch",
+  "exp": 67,
+  "match": 65,
+  "act": 67,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "parse_float_swf10",
+  "status": "output_mismatch",
+  "exp": 81,
+  "match": 79,
+  "act": 81,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "parse_int",
+  "status": "output_mismatch",
+  "exp": 135,
+  "match": 133,
+  "act": 135,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "pixelbender_effect_glassDisplace_shaderfilter",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 2,
+  "act": 2,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "property_priority_definition_names_order",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "sandbox_type_remote",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 1,
+  "act": 1,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "security_domain_current",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "sound_rootless",
+  "status": "output_mismatch",
+  "exp": 7,
+  "match": 5,
+  "act": 5,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "supercalls_weird",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "swz",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "uncaught_error_basic",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "verify_dxns_without_flag",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 1,
+  "act": 3,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "verify_method_info_duplicate",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "avm2",
+  "test": "activation_class",
+  "status": "output_mismatch",
+  "exp": 6,
+  "match": 3,
+  "act": 5,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "bitmapdata_zero_size",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 5,
+  "act": 5,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "cpool_index_invalid_bytecode_2",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 0,
+  "act": 3,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "generate_random_bytes",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 0,
+  "act": 0,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "issue_8630_placeremoveplace_scriptremove",
+  "status": "output_mismatch",
+  "exp": 16,
+  "match": 13,
+  "act": 16,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "method_without_body",
+  "status": "runtime_error",
+  "exp": 3,
+  "match": 0,
+  "act": 0,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "netstream_flv_date",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 1,
+  "act": 1,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "print_job_options",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 0,
+  "act": 0,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "property_priority_chained",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 1,
+  "act": 4,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "static_text",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 0,
+  "act": 1,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "stylesheet_transform",
+  "status": "output_mismatch",
+  "exp": 307,
+  "match": 304,
+  "act": 307,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "system_exit",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 0,
+  "act": 2,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "verification",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 5,
+  "act": 8,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "verify_stack",
+  "status": "output_mismatch",
+  "exp": 5,
+  "match": 2,
+  "act": 5,
+  "gap": 3
+ },
+ {
+  "suite": "avm2",
+  "test": "game_input",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 0,
+  "act": 0,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "loader_applicationDomain",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 0,
+  "act": 0,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "loader_load",
+  "status": "output_mismatch",
+  "exp": 128,
+  "match": 124,
+  "act": 126,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "method_association",
+  "status": "output_mismatch",
+  "exp": 5,
+  "match": 1,
+  "act": 4,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "newclass_mismatched",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 0,
+  "act": 2,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "place_and_lookup/swf10",
+  "status": "output_mismatch",
+  "exp": 33,
+  "match": 29,
+  "act": 32,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "place_and_lookup/swf9",
+  "status": "output_mismatch",
+  "exp": 33,
+  "match": 29,
+  "act": 32,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "sound_constructor_with_args",
+  "status": "output_mismatch",
+  "exp": 6,
+  "match": 2,
+  "act": 2,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "stage_domain_getQualifiedDefinitionNames",
+  "status": "output_mismatch",
+  "exp": 5,
+  "match": 1,
+  "act": 1,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "stylesheet_parse_color",
+  "status": "output_mismatch",
+  "exp": 69,
+  "match": 65,
+  "act": 69,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "subclass_superclass_linked_symbol",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 0,
+  "act": 6,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "verify_typecheck",
+  "status": "runtime_error",
+  "exp": 4,
+  "match": 0,
+  "act": 0,
+  "gap": 4
+ },
+ {
+  "suite": "avm2",
+  "test": "bom",
+  "status": "output_mismatch",
+  "exp": 9,
+  "match": 4,
+  "act": 9,
+  "gap": 5
+ },
+ {
+  "suite": "avm2",
+  "test": "doabc_and_symbolclass_script_init_normal",
+  "status": "output_mismatch",
+  "exp": 6,
+  "match": 1,
+  "act": 6,
+  "gap": 5
+ },
+ {
+  "suite": "avm2",
+  "test": "getouterscope_two_classobjects",
+  "status": "output_mismatch",
+  "exp": 13,
+  "match": 8,
+  "act": 9,
+  "gap": 5
+ },
+ {
+  "suite": "avm2",
+  "test": "perspective_projection_basic",
+  "status": "output_mismatch",
+  "exp": 40,
+  "match": 35,
+  "act": 40,
+  "gap": 5
+ },
+ {
+  "suite": "avm2",
+  "test": "selection_onsetfocus_mixed_avm",
+  "status": "output_mismatch",
+  "exp": 5,
+  "match": 0,
+  "act": 0,
+  "gap": 5
+ },
+ {
+  "suite": "avm2",
+  "test": "superinterface_call",
+  "status": "output_mismatch",
+  "exp": 20,
+  "match": 15,
+  "act": 15,
+  "gap": 5
+ },
+ {
+  "suite": "fonts",
+  "test": "device_font_kerning",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 0,
+  "act": 4,
+  "gap": 4
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/Definitions/Super/SuperRuntimeError",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 2,
+  "act": 3,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/Definitions/Variable/AccessPrivateClassVariable_rt",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/Definitions/Variable/ConstVariables_custom1",
+  "status": "output_mismatch",
+  "exp": 17,
+  "match": 16,
+  "act": 17,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1052InvalidUriPassed",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1064CannotCallMethodAsConstructor",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1075MathNotAFunction",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1076MathNotAConstructor",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1081ReadSealedErrorNs",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1120CannotDeleteProperty",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/QName/e13_3_2",
+  "status": "output_mismatch",
+  "exp": 49,
+  "match": 48,
+  "act": 49,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/XML/e13_4_4_17",
+  "status": "output_mismatch",
+  "exp": 19,
+  "match": 18,
+  "act": 19,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/XML/e13_4_4_28",
+  "status": "output_mismatch",
+  "exp": 13,
+  "match": 12,
+  "act": 13,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/XML/e13_4_4_32/v9",
+  "status": "output_mismatch",
+  "exp": 9,
+  "match": 8,
+  "act": 9,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/XMLList/e13_5_4_17",
+  "status": "output_mismatch",
+  "exp": 10,
+  "match": 9,
+  "act": 10,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Exceptions/exception_001_rt",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Exceptions/exception_002_rt",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Exceptions/expression_005_rt",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Expressions/e11_2_2_10_rt",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Function/e15_3_4_3_1",
+  "status": "output_mismatch",
+  "exp": 14,
+  "match": 13,
+  "act": 14,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Function/e15_3_4_4_1_rt",
+  "status": "output_mismatch",
+  "exp": 10,
+  "match": 9,
+  "act": 10,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/ObjectObjects/hasOwnProperty",
+  "status": "output_mismatch",
+  "exp": 10,
+  "match": 9,
+  "act": 10,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Statements/e12_10",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Unicode/utf8count",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 2,
+  "act": 3,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "recursion/pcre_find_fixedlength",
+  "status": "output_mismatch",
+  "exp": 20,
+  "match": 19,
+  "act": 20,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "regress/bug_483783",
+  "status": "runtime_error",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "regress/bug_550958",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 2,
+  "act": 2,
+  "gap": 1
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/Expressions/QualifiedReferences/WildcardOperator",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 1,
+  "act": 3,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1050CannotConvertToPrimitive",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 1,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1117InvalidXmlName",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 1,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1119DeleteDoesNotSupportXMLListOperand",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 1,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/Namespace/e13_2_5",
+  "status": "output_mismatch",
+  "exp": 36,
+  "match": 34,
+  "act": 36,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/Regress/regress-263935",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 3,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/Regress/regress-524214",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 1,
+  "act": 11,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Exceptions/exception_011_rt",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 1,
+  "act": 1,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/ObjectObjects/isPrototypeOf",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 6,
+  "act": 8,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/String/e15_5_4_5_4",
+  "status": "output_mismatch",
+  "exp": 323,
+  "match": 321,
+  "act": 323,
+  "gap": 2
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/RuntimeErrors/Error1115NotAConstructor/v10",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 0,
+  "act": 3,
+  "gap": 3
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/XML/e13_4_4_36",
+  "status": "output_mismatch",
+  "exp": 16,
+  "match": 13,
+  "act": 16,
+  "gap": 3
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/GlobalObject/e15_1_2_2_2",
+  "status": "output_mismatch",
+  "exp": 31,
+  "match": 28,
+  "act": 31,
+  "gap": 3
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/String/e15_5_5_1",
+  "status": "output_mismatch",
+  "exp": 10,
+  "match": 7,
+  "act": 10,
+  "gap": 3
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/Expressions/e11_1_1",
+  "status": "output_mismatch",
+  "exp": 39,
+  "match": 35,
+  "act": 39,
+  "gap": 4
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Number/toLocaleString_rt",
+  "status": "output_mismatch",
+  "exp": 48,
+  "match": 44,
+  "act": 48,
+  "gap": 4
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/Statements/eforin_001",
+  "status": "output_mismatch",
+  "exp": 16,
+  "match": 12,
+  "act": 16,
+  "gap": 4
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "as3/Definitions/Classes/Ext/ExtPublicClassPriv",
+  "status": "output_mismatch",
+  "exp": 6,
+  "match": 1,
+  "act": 6,
+  "gap": 5
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "e4x/Global/isXMLNameTypeErr",
+  "status": "output_mismatch",
+  "exp": 5,
+  "match": 0,
+  "act": 3,
+  "gap": 5
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "ecma3/TypeConversion/e9_3_1_3_rt",
+  "status": "output_mismatch",
+  "exp": 94,
+  "match": 89,
+  "act": 94,
+  "gap": 5
+ },
+ {
+  "suite": "from_avmplus",
+  "test": "misc/bug_508617",
+  "status": "runtime_error",
+  "exp": 5,
+  "match": 0,
+  "act": 0,
+  "gap": 5
+ },
+ {
+  "suite": "from_gnash/misc-swfc.all",
+  "test": "sound",
+  "status": "output_mismatch",
+  "exp": 7,
+  "match": 7,
+  "act": 12,
+  "gap": 0
+ },
+ {
+  "suite": "from_shumway",
+  "test": "acid/acid-text-2",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "as3-loader/LoaderTest2",
+  "status": "output_mismatch",
+  "exp": 7,
+  "match": 6,
+  "act": 7,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "as3-loader/bug1157243/empty",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "as3-loader/bug1157243/invalid",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "blendmode/blendmode_1",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 1,
+  "act": 2,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "stroke1",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 4,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "timeline/nav/matrix",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 7,
+  "act": 8,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "timeline/nav/morphShape",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 3,
+  "act": 4,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "timeline/nav/ratio",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 3,
+  "act": 4,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "timeline/nav/ratio2",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 3,
+  "act": 4,
+  "gap": 1
+ },
+ {
+  "suite": "from_shumway",
+  "test": "acid/acid-filter",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "acid/acid-morph",
+  "status": "output_mismatch",
+  "exp": 6,
+  "match": 4,
+  "act": 6,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "bitmapdata/getpixel-from-embedded",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 2,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "blendmode/blendmode_2",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 2,
+  "act": 3,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "esc",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 0,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "timeline/nav/blendMode",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 6,
+  "act": 8,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "timeline/nav/cacheAsBitmap",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 6,
+  "act": 8,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "timeline/nav/colorTransform",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 6,
+  "act": 8,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "timeline/nav/filters",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 6,
+  "act": 8,
+  "gap": 2
+ },
+ {
+  "suite": "from_shumway",
+  "test": "as3-loader/LoaderLoadBytesTest",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 1,
+  "act": 3,
+  "gap": 3
+ },
+ {
+  "suite": "from_shumway",
+  "test": "fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052",
+  "status": "output_mismatch",
+  "exp": 19,
+  "match": 14,
+  "act": 19,
+  "gap": 5
+ },
+ {
+  "suite": "mixed_avm",
+  "test": "avm1_loads_avm2_doaction",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 2,
+  "act": 4,
+  "gap": 0
+ },
+ {
+  "suite": "mixed_avm",
+  "test": "avm2_loads_avm1_loads_into_root",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 1,
+  "act": 1,
+  "gap": 1
+ },
+ {
+  "suite": "mixed_avm",
+  "test": "avm2_loads_avm1_loads_avm2_doabc",
+  "status": "output_mismatch",
+  "exp": 3,
+  "match": 1,
+  "act": 1,
+  "gap": 2
+ },
+ {
+  "suite": "mixed_avm",
+  "test": "avm2_loads_avm1_doabc",
+  "status": "output_mismatch",
+  "exp": 4,
+  "match": 1,
+  "act": 1,
+  "gap": 3
+ },
+ {
+  "suite": "mixed_avm",
+  "test": "avm1_loads_avm2",
+  "status": "output_mismatch",
+  "exp": 7,
+  "match": 3,
+  "act": 3,
+  "gap": 4
+ },
+ {
+  "suite": "mixed_avm",
+  "test": "avm2_loads_avm1_v10",
+  "status": "output_mismatch",
+  "exp": 8,
+  "match": 3,
+  "act": 6,
+  "gap": 5
+ },
+ {
+  "suite": "text",
+  "test": "links_in_scrolled_text",
+  "status": "output_mismatch",
+  "exp": 1,
+  "match": 0,
+  "act": 0,
+  "gap": 1
+ },
+ {
+  "suite": "visual",
+  "test": "filters/avm1_convolution_initialization",
+  "status": "output_mismatch",
+  "exp": 18,
+  "match": 17,
+  "act": 18,
+  "gap": 1
+ },
+ {
+  "suite": "visual",
+  "test": "avm2_button_scroll_rect",
+  "status": "output_mismatch",
+  "exp": 2,
+  "match": 0,
+  "act": 2,
+  "gap": 2
+ }
+]

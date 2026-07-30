@@ -120,7 +120,34 @@ holds: never an arc, only riders. Their causes as diagnosed:
 `Error1117InvalidXmlName`, `Error1119DeleteDoesNotSupportXMLListOperand`)
 are six unrelated one-assertion causes — left on the board.
 
+### Full inventory (generated)
+
+`ruffle-tests/tests/swfs/_investigation/NEAR_PASS_TRIAGE_2026-07-30.md`
+carries all 172 candidates as a table — suite, test, gap, post-sweep
+status, bucket, and the first differing line — with the machine-readable
+candidate list beside it as `near_pass_candidates_2026-07-30.json`. It is
+generated from the tranche-0 diff sweep and is the working input for every
+bucket below that is still open.
+
+Accurate split from that table (the hand-written list further down was
+incomplete — it named ~55 of them):
+
+| | count |
+|---|---:|
+| candidates | 172 |
+| shipped by session 1 | 19 |
+| **still open, in a named bucket** | **56** |
+| **still open, unbucketed single cause** | **97** |
+
+So the tail is *larger* than this arc doc's prose first suggested: after
+the ranked buckets are exhausted there are ~97 tests that each need their
+own diagnosis-to-fix, which is the real reason a polish session yields
++19 rather than +40-60. The named-bucket remainder (56) is where the
+next session's leverage is, and B3/B4 are 17 of it.
+
 ### Leftover singles with a diagnosed cause (for a future session)
+
+*(a partial hand list, superseded by the generated table above)*
 
 `avm2/accessibility` (`Accessibility.active`), `air_ifilepromise`
 (`IFilePromise` class), `security_domain_current` (`SecurityDomain`),
@@ -156,6 +183,8 @@ are six unrelated one-assertion causes — left on the board.
 `Unicode/utf8count`), `e4x/{QName/e13_3_2, XML/e13_4_4_17,
 XML/e13_4_4_32/v9, Namespace/e13_2_5}`, `regress/bug_483783`,
 `regress/bug_550958`.
+
+(The generated table is authoritative for the complete set.)
 
 ## 2. Fix batches
 

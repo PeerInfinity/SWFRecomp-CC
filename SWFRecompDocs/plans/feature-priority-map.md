@@ -815,7 +815,10 @@ filters arc scoping pass while its CI runs or after.
 
 Tranche 0 confirmed the count exactly — **172 candidates**, and the
 bucketing is in `polish-sweep-arc.md` §1 (12 ranked takeable buckets,
-5 deferred-with-diagnosis, ~60 leftover singles each with a cause).
+5 deferred-with-diagnosis) with the full generated inventory at
+`ruffle-tests/tests/swfs/_investigation/NEAR_PASS_TRIAGE_2026-07-30.md`.
+The accurate split: 19 shipped, **56 still open inside a named bucket, 97
+open as unbucketed single causes**.
 Four batches shipped for **+19, zero regressions**: corpus
 **3999 → 4018 / 4421 (90.9%)**, avm2 998 → 1006, from_avmplus
 1510 → 1521. Well under the `8e8370df1` precedent of +40-60/session, and
