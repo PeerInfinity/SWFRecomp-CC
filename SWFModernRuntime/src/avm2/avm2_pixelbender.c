@@ -1001,6 +1001,17 @@ static Avm2Value shader_ctor(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// DisplayObject.blendShader's gate. Ruffle reads `Shader.data` and raises
+// #2007 when it is null (display_object.rs:1144-1167) — a `new Shader()` with
+// no bytecode parsed nothing, so it has no ShaderData.
+int avm2_shader_blend_state(Avm2Value v)
+{
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj->cls != g_shader_class) return 0;
+	Avm2ShaderExt* ext = (Avm2ShaderExt*) v.u.obj->native_ext;
+	if (ext == NULL || ext->data.kind != AVM2_VALUE_OBJECT) return 1;
+	return 2;
+}
+
 static Avm2Value shader_get_data(Avm2Activation* act)
 { return shader_ext(act)->data; }
 
@@ -1024,8 +1035,1059 @@ static Avm2Value shader_set_precision(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
-// ShaderJob (start() is tranche P2 — a silent no-op keeps the render-only
-// PixelBender siblings at their 0-trace-line passes)
+// The evaluator (tranche P2)
+//
+// Ruffle has NO CPU PixelBender evaluator — `run_pixelbender_shader` exists
+// only in the wgpu backend, which transpiles the PBJ program to WGSL via
+// render/naga-pixelbender. So this is a from-scratch interpreter whose
+// SEMANTICS are transliterated from that transpiler (lib.rs:857-1420), not its
+// plumbing. The model it encodes:
+//
+//   * Two register banks, vec4-f32 and vec4-i32, indexed independently. EVERY
+//     register is a full vec4 regardless of the declared width — a scalar load
+//     is a splat and the destination write mask throws the padding away.
+//     Registers are zero-initialised per pixel (naga locals with init: None
+//     become WGSL `var`s, which are zero-valued).
+//   * A source load swizzles by the register's channel list and pads the
+//     remaining lanes with the register's W component (lib.rs:1620-1630).
+//     A handful of opcodes (Sqrt/Length/Distance/Dot/Normalize/Cross/the
+//     matrix multiplies) need the UNpadded value because padding would change
+//     the answer; their scalar results are splatted back out afterwards.
+//   * The destination write is a ZIP, not a channel match: source component i
+//     goes to the i-th SET bit of the mask (lib.rs:1744-1780). `mov f0.b, f1.r`
+//     and `mov f0.b, f1.g` differ only in the source swizzle.
+//   * Matrices live column-major across consecutive float registers: a 2x2 in
+//     one vec4, a 3x3 in the RGB of three, a 4x4 in four.
+//   * Deliberate Flash Player bugs are copied verbatim: Sign is (x>0)-(x<0)
+//     rather than a native sign (so sign(NaN) is 0), BoolToFloat always
+//     returns the zero vector, IntToBool is the identity, and LogicalNot is a
+//     BITWISE not.
+//   * Select is not a comparison against zero: the condition must EQUAL one.
+//     `if` is the ordinary != 0.
+//
+// The ten opcodes Ruffle leaves unimplemented (Exp2/Log/Log2/MatMatMul/
+// LogicalXor/BoolToInt/VectorEqual/VectorNotEqual/BoolAny/BoolAll) panic
+// there and appear in no corpus shader; here they leave the destination
+// untouched rather than aborting the job.
+// ---------------------------------------------------------------------------
+
+#define PB_MAX_TEX 16
+
+static Avm2ShaderJobExt* sj_ext(Avm2Activation* act);
+
+typedef struct PbVal
+{
+	uint8_t kind;      // PBJ_KIND_FLOAT / PBJ_KIND_INT
+	float f[4];
+	int32_t i[4];
+} PbVal;
+
+// Column-major: c[col][row].
+typedef struct PbMat
+{
+	int cols;
+	float c[4][4];
+} PbMat;
+
+typedef struct PbTexture
+{
+	int present;
+	uint32_t w, h;
+	uint8_t channels;
+	const float* data;   // w*h*channels, row major
+	const uint32_t* bgra; // premultiplied ARGB (BitmapData input) when non-NULL
+} PbTexture;
+
+typedef struct PbEval
+{
+	const PbjShader* sh;
+	float* fr;           // 4 * nreg
+	int32_t* ir;         // 4 * nreg
+	float* fr_base;      // post-parameter snapshot, copied in per pixel
+	int32_t* ir_base;
+	uint32_t nreg;
+	PbTexture tex[PB_MAX_TEX];
+} PbEval;
+
+static float pb_clampf(float v, float lo, float hi)
+{
+	return v < lo ? lo : (v > hi ? hi : v);
+}
+
+// WGSL `i32(f)` truncates toward zero and is undefined out of range; clamp so
+// a NaN or a huge float can never trap.
+static int32_t pb_f2i(float f)
+{
+	if (isnan(f)) return 0;
+	if (f >= 2147483520.0f) return INT32_MAX;
+	if (f <= -2147483520.0f) return INT32_MIN;
+	return (int32_t) f;
+}
+
+// Load a register, swizzled. `n` is how many lanes are meaningful; the rest
+// are filled with the register's W channel exactly as naga's padding does.
+static void pb_load(const PbEval* ev, const PbjReg* r, PbVal* out)
+{
+	uint32_t base = (r->index < ev->nreg ? r->index : 0) * 4;
+	out->kind = r->kind;
+	for (int i = 0; i < 4; i++)
+	{
+		int c = (i < r->nchan) ? r->chan[i] : 3;
+		if (c > 3) c = 3;   // a matrix channel never reaches here
+		if (r->kind == PBJ_KIND_FLOAT) out->f[i] = ev->fr[base + (uint32_t) c];
+		else out->i[i] = ev->ir[base + (uint32_t) c];
+	}
+}
+
+static int pb_nchan(const PbjReg* r) { return r->nchan > 0 ? r->nchan : 1; }
+
+// Matrices are read from consecutive float registers; a 2x2 packs into one.
+static void pb_load_matrix(const PbEval* ev, const PbjReg* r, PbMat* out)
+{
+	memset(out, 0, sizeof(*out));
+	uint32_t idx = r->index;
+	if (r->chan[0] == PBJ_CH_M2X2)
+	{
+		out->cols = 2;
+		const float* v = &ev->fr[(idx < ev->nreg ? idx : 0) * 4];
+		out->c[0][0] = v[0]; out->c[0][1] = v[1];
+		out->c[1][0] = v[2]; out->c[1][1] = v[3];
+		return;
+	}
+	int n = (r->chan[0] == PBJ_CH_M3X3) ? 3 : 4;
+	out->cols = n;
+	for (int col = 0; col < n; col++)
+	{
+		uint32_t ri = idx + (uint32_t) col;
+		const float* v = &ev->fr[(ri < ev->nreg ? ri : 0) * 4];
+		for (int row = 0; row < n; row++) out->c[col][row] = v[row];
+	}
+}
+
+static void pb_store_matrix(PbEval* ev, const PbjReg* dst, const PbMat* m);
+
+// emit_dest_store: source component i lands in the i-th SET mask bit.
+static void pb_store(PbEval* ev, const PbjReg* dst, const PbVal* v)
+{
+	if (dst->nchan == 1 && dst->chan[0] > PBJ_CH_A)
+	{
+		// A matrix destination fed a vector value — not reachable from any
+		// shader the parser accepts; drop it rather than scribble.
+		return;
+	}
+	uint32_t base = (dst->index < ev->nreg ? dst->index : 0) * 4;
+	for (int i = 0; i < dst->nchan; i++)
+	{
+		int dc = dst->chan[i];
+		if (dc > 3) continue;
+		if (dst->kind == PBJ_KIND_FLOAT)
+		{
+			ev->fr[base + (uint32_t) dc] =
+				(v->kind == PBJ_KIND_FLOAT) ? v->f[i] : (float) v->i[i];
+		}
+		else
+		{
+			ev->ir[base + (uint32_t) dc] =
+				(v->kind == PBJ_KIND_INT) ? v->i[i] : pb_f2i(v->f[i]);
+		}
+	}
+}
+
+// A matrix destination distributes the columns over consecutive registers
+// (lib.rs:1660-1740); a 2x2 collapses into a single vec4.
+static void pb_store_matrix(PbEval* ev, const PbjReg* dst, const PbMat* m)
+{
+	uint32_t idx = dst->index;
+	if (dst->chan[0] == PBJ_CH_M2X2)
+	{
+		float* v = &ev->fr[(idx < ev->nreg ? idx : 0) * 4];
+		v[0] = m->c[0][0]; v[1] = m->c[0][1];
+		v[2] = m->c[1][0]; v[3] = m->c[1][1];
+		return;
+	}
+	int n = (dst->chan[0] == PBJ_CH_M3X3) ? 3 : 4;
+	for (int col = 0; col < n; col++)
+	{
+		uint32_t ri = idx + (uint32_t) col;
+		float* v = &ev->fr[(ri < ev->nreg ? ri : 0) * 4];
+		for (int row = 0; row < n; row++) v[row] = m->c[col][row];
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Texture sampling — CLAMP to edge. (Transparent-black for out-of-range coords
+// is a ShaderFilter-only mode; a ShaderJob always clamps — lib.rs:106-118.)
+// The incoming coordinate is in PIXELS.
+// ---------------------------------------------------------------------------
+
+static void pb_texel(const PbTexture* t, int32_t x, int32_t y, float out[4])
+{
+	out[0] = out[1] = out[2] = 0.0f;
+	out[3] = (t->channels < 3) ? 1.0f : 0.0f;
+	if (!t->present || t->w == 0 || t->h == 0) { out[3] = 0.0f; return; }
+	if (x < 0) x = 0;
+	if (y < 0) y = 0;
+	if ((uint32_t) x >= t->w) x = (int32_t) t->w - 1;
+	if ((uint32_t) y >= t->h) y = (int32_t) t->h - 1;
+	uint32_t off = ((uint32_t) y * t->w + (uint32_t) x);
+	if (t->bgra != NULL)
+	{
+		uint32_t c = t->bgra[off];
+		out[0] = (float) ((c >> 16) & 0xFF) / 255.0f;
+		out[1] = (float) ((c >> 8) & 0xFF) / 255.0f;
+		out[2] = (float) (c & 0xFF) / 255.0f;
+		out[3] = (float) ((c >> 24) & 0xFF) / 255.0f;
+		return;
+	}
+	const float* p = &t->data[off * t->channels];
+	for (uint32_t k = 0; k < t->channels; k++) out[k] = p[k];
+	// R32Float / Rg32Float reads fill the missing lanes with (0,0,0,1); the
+	// 3-channel case is an Rgba32Float whose alpha was padded with 0.
+	if (t->channels < 3) out[3] = 1.0f;
+}
+
+static void pb_sample(const PbTexture* t, float cx, float cy, int linear,
+                      float out[4])
+{
+	if (!linear)
+	{
+		pb_texel(t, (int32_t) floorf(cx), (int32_t) floorf(cy), out);
+		return;
+	}
+	float tx = cx - 0.5f, ty = cy - 0.5f;
+	float fx = floorf(tx), fy = floorf(ty);
+	float ax = tx - fx, ay = ty - fy;
+	float c00[4], c10[4], c01[4], c11[4];
+	pb_texel(t, (int32_t) fx, (int32_t) fy, c00);
+	pb_texel(t, (int32_t) fx + 1, (int32_t) fy, c10);
+	pb_texel(t, (int32_t) fx, (int32_t) fy + 1, c01);
+	pb_texel(t, (int32_t) fx + 1, (int32_t) fy + 1, c11);
+	for (int k = 0; k < 4; k++)
+	{
+		float top = c00[k] + (c10[k] - c00[k]) * ax;
+		float bot = c01[k] + (c11[k] - c01[k]) * ax;
+		out[k] = top + (bot - top) * ay;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Opcode dispatch
+// ---------------------------------------------------------------------------
+
+static void pb_splat(PbVal* v, float s)
+{
+	v->kind = PBJ_KIND_FLOAT;
+	for (int i = 0; i < 4; i++) v->f[i] = s;
+}
+
+static void pb_exec_normal(PbEval* ev, const PbjOp* op)
+{
+	PbVal src, dstv, res;
+	int is_matrix_src = (op->src.nchan == 1 && op->src.chan[0] > PBJ_CH_A);
+
+	if (is_matrix_src)
+	{
+		PbMat m;
+		pb_load_matrix(ev, &op->src, &m);
+		switch (op->opcode)
+		{
+			case 0x1D:  // Mov
+				if (op->dst.nchan == 1 && op->dst.chan[0] > PBJ_CH_A)
+				{
+					pb_store_matrix(ev, &op->dst, &m);
+				}
+				return;
+			case 0x22:  // MatVecMul: dst = src(matrix) * dst(vector)
+			{
+				pb_load(ev, &op->dst, &dstv);
+				res.kind = PBJ_KIND_FLOAT;
+				for (int row = 0; row < 4; row++) res.f[row] = 0.0f;
+				for (int col = 0; col < m.cols; col++)
+				{
+					for (int row = 0; row < m.cols; row++)
+					{
+						res.f[row] += m.c[col][row] * dstv.f[col];
+					}
+				}
+				pb_store(ev, &op->dst, &res);
+				return;
+			}
+			case 0x21:  // VecMatMul: dst = dst(vector) * src(matrix)
+			{
+				pb_load(ev, &op->dst, &dstv);
+				res.kind = PBJ_KIND_FLOAT;
+				for (int col = 0; col < 4; col++) res.f[col] = 0.0f;
+				for (int col = 0; col < m.cols; col++)
+				{
+					float acc = 0.0f;
+					for (int row = 0; row < m.cols; row++)
+					{
+						acc += dstv.f[row] * m.c[col][row];
+					}
+					res.f[col] = acc;
+				}
+				pb_store(ev, &op->dst, &res);
+				return;
+			}
+			default:
+				return;   // MatMatMul and friends: Ruffle panics, we no-op
+		}
+	}
+
+	pb_load(ev, &op->src, &src);
+	int si = (src.kind == PBJ_KIND_INT);
+	int sn = pb_nchan(&op->src);
+	res.kind = PBJ_KIND_FLOAT;
+
+	switch (op->opcode)
+	{
+		case 0x1D:  // Mov
+			res = src;
+			break;
+		case 0x04:  // Rcp — vec4(1.0) / src
+			for (int i = 0; i < 4; i++) res.f[i] = 1.0f / src.f[i];
+			break;
+		case 0x01:  // Add
+		case 0x02:  // Sub
+		case 0x03:  // Mul
+		case 0x05:  // Div
+		{
+			pb_load(ev, &op->dst, &dstv);
+			int ii = si && (op->dst.kind == PBJ_KIND_INT);
+			res.kind = ii ? PBJ_KIND_INT : PBJ_KIND_FLOAT;
+			for (int i = 0; i < 4; i++)
+			{
+				if (ii)
+				{
+					int32_t a = dstv.i[i], b = src.i[i];
+					switch (op->opcode)
+					{
+						case 0x01: res.i[i] = a + b; break;
+						case 0x02: res.i[i] = a - b; break;
+						case 0x03: res.i[i] = a * b; break;
+						default:   res.i[i] = (b == 0) ? 0 : a / b; break;
+					}
+				}
+				else
+				{
+					float a = dstv.f[i], b = src.f[i];
+					switch (op->opcode)
+					{
+						case 0x01: res.f[i] = a + b; break;
+						case 0x02: res.f[i] = a - b; break;
+						case 0x03: res.f[i] = a * b; break;
+						default:   res.f[i] = a / b; break;
+					}
+				}
+			}
+			break;
+		}
+		case 0x2D:  // LogicalAnd
+		case 0x2E:  // LogicalOr
+		{
+			// Both sides are coerced to bool component-wise and the bool
+			// result is converted straight back to a float 0.0/1.0.
+			pb_load(ev, &op->dst, &dstv);
+			for (int i = 0; i < 4; i++)
+			{
+				int a = si ? (dstv.i[i] != 0) : (dstv.f[i] != 0.0f);
+				int b = si ? (src.i[i] != 0) : (src.f[i] != 0.0f);
+				int r = (op->opcode == 0x2D) ? (a && b) : (a || b);
+				res.f[i] = r ? 1.0f : 0.0f;
+			}
+			break;
+		}
+		case 0x2C:  // LogicalNot — Flash implements `!` as a BITWISE not
+			res.kind = PBJ_KIND_INT;
+			for (int i = 0; i < 4; i++) res.i[i] = ~src.i[i];
+			break;
+		case 0x1B:  // Ceil
+			for (int i = 0; i < 4; i++) res.f[i] = ceilf(src.f[i]);
+			break;
+		case 0x1A:  // Floor
+			for (int i = 0; i < 4; i++) res.f[i] = floorf(src.f[i]);
+			break;
+		case 0x1C:  // Fract
+			for (int i = 0; i < 4; i++) res.f[i] = src.f[i] - floorf(src.f[i]);
+			break;
+		case 0x24:  // Length — the UNpadded source, splatted
+		{
+			float acc = 0.0f;
+			for (int i = 0; i < sn; i++) acc += src.f[i] * src.f[i];
+			pb_splat(&res, sqrtf(acc));
+			break;
+		}
+		case 0x25:  // Distance
+		{
+			pb_load(ev, &op->dst, &dstv);
+			int dn = pb_nchan(&op->dst);
+			int n = dn < sn ? dn : sn;
+			float acc = 0.0f;
+			for (int i = 0; i < n; i++)
+			{
+				float d = dstv.f[i] - src.f[i];
+				acc += d * d;
+			}
+			pb_splat(&res, sqrtf(acc));
+			break;
+		}
+		case 0x26:  // DotProduct
+		{
+			pb_load(ev, &op->dst, &dstv);
+			int dn = pb_nchan(&op->dst);
+			int n = dn < sn ? dn : sn;
+			float acc = 0.0f;
+			for (int i = 0; i < n; i++) acc += dstv.f[i] * src.f[i];
+			pb_splat(&res, acc);
+			break;
+		}
+		case 0x27:  // CrossProduct — dst x src
+		{
+			pb_load(ev, &op->dst, &dstv);
+			float a0 = dstv.f[0], a1 = dstv.f[1], a2 = dstv.f[2];
+			float b0 = src.f[0], b1 = src.f[1], b2 = src.f[2];
+			res.f[0] = a1 * b2 - a2 * b1;
+			res.f[1] = a2 * b0 - a0 * b2;
+			res.f[2] = a0 * b1 - a1 * b0;
+			res.f[3] = 0.0f;
+			break;
+		}
+		case 0x23:  // Normalize
+		{
+			float acc = 0.0f;
+			for (int i = 0; i < sn; i++) acc += src.f[i] * src.f[i];
+			float len = sqrtf(acc);
+			if (sn == 1) { pb_splat(&res, src.f[0] / len); break; }
+			for (int i = 0; i < 4; i++) res.f[i] = src.f[i] / len;
+			break;
+		}
+		case 0x09:  // Min
+		case 0x0A:  // Max
+		case 0x0B:  // Step
+		{
+			pb_load(ev, &op->dst, &dstv);
+			for (int i = 0; i < 4; i++)
+			{
+				float a = src.f[i], b = dstv.f[i];
+				if (op->opcode == 0x09) res.f[i] = a < b ? a : b;
+				else if (op->opcode == 0x0A) res.f[i] = a > b ? a : b;
+				else res.f[i] = (b < a) ? 0.0f : 1.0f;   // step(edge=src, x=dst)
+			}
+			break;
+		}
+		case 0x07:  // Pow — pow(dst, src)
+			pb_load(ev, &op->dst, &dstv);
+			for (int i = 0; i < 4; i++) res.f[i] = powf(dstv.f[i], src.f[i]);
+			break;
+		case 0x06:  // Atan2 — atan2(dst, src)
+			pb_load(ev, &op->dst, &dstv);
+			for (int i = 0; i < 4; i++) res.f[i] = atan2f(dstv.f[i], src.f[i]);
+			break;
+		case 0x08:  // Mod
+		{
+			pb_load(ev, &op->dst, &dstv);
+			int ii = si && (op->dst.kind == PBJ_KIND_INT);
+			res.kind = ii ? PBJ_KIND_INT : PBJ_KIND_FLOAT;
+			for (int i = 0; i < 4; i++)
+			{
+				if (ii) res.i[i] = (src.i[i] == 0) ? 0 : dstv.i[i] % src.i[i];
+				else res.f[i] = fmodf(dstv.f[i], src.f[i]);
+			}
+			break;
+		}
+		case 0x18:  // Abs
+			for (int i = 0; i < 4; i++) res.f[i] = fabsf(src.f[i]);
+			break;
+		case 0x0C: for (int i = 0; i < 4; i++) res.f[i] = sinf(src.f[i]); break;
+		case 0x0D: for (int i = 0; i < 4; i++) res.f[i] = cosf(src.f[i]); break;
+		case 0x0E: for (int i = 0; i < 4; i++) res.f[i] = tanf(src.f[i]); break;
+		case 0x0F: for (int i = 0; i < 4; i++) res.f[i] = asinf(src.f[i]); break;
+		case 0x10: for (int i = 0; i < 4; i++) res.f[i] = acosf(src.f[i]); break;
+		case 0x11: for (int i = 0; i < 4; i++) res.f[i] = atanf(src.f[i]); break;
+		case 0x12: for (int i = 0; i < 4; i++) res.f[i] = expf(src.f[i]); break;
+		case 0x16:  // Sqrt — UNpadded, scalar result re-splatted
+		{
+			if (sn == 1) { pb_splat(&res, sqrtf(src.f[0])); break; }
+			for (int i = 0; i < 4; i++) res.f[i] = sqrtf(src.f[i]);
+			break;
+		}
+		case 0x17:  // RSqrt — rsqrt(0) = +inf and rsqrt(-1) = NaN both survive
+		{           // to the quantizer, which maps them to 0xff / 0x00.
+			if (sn == 1) { pb_splat(&res, 1.0f / sqrtf(src.f[0])); break; }
+			for (int i = 0; i < 4; i++) res.f[i] = 1.0f / sqrtf(src.f[i]);
+			break;
+		}
+		case 0x19:  // Sign — (x > 0) - (x < 0), NOT the native sign: this is
+			        // how Flash gets sign(NaN) == 0.
+			for (int i = 0; i < 4; i++)
+			{
+				float x = src.f[i];
+				res.f[i] = (float) ((x > 0.0f) ? 1 : 0) - (float) ((x < 0.0f) ? 1 : 0);
+			}
+			break;
+		case 0x1E:  // FloatToInt — WGSL round(), i.e. ties-to-even
+			for (int i = 0; i < 4; i++) res.f[i] = rintf(src.f[i]);
+			break;
+		case 0x1F:  // IntToFloat
+			for (int i = 0; i < 4; i++) res.f[i] = (float) src.i[i];
+			break;
+		case 0x37:  // FloatToBool
+			for (int i = 0; i < 4; i++) res.f[i] = (src.f[i] != 0.0f) ? 1.0f : 0.0f;
+			break;
+		case 0x38:  // BoolToFloat — Flash always yields zero here
+			for (int i = 0; i < 4; i++) res.f[i] = 0.0f;
+			break;
+		case 0x39:  // IntToBool — a no-op in Flash
+			res = src;
+			break;
+		case 0x28:  // Equal
+		case 0x29:  // NotEqual
+		case 0x2A:  // LessThan
+		case 0x2B:  // LessThanEqual
+		{
+			// Comparisons ignore the encoded destination and write their
+			// result to the R component of INT register 0.
+			pb_load(ev, &op->dst, &dstv);
+			for (int i = 0; i < 4; i++)
+			{
+				int r;
+				if (si && op->dst.kind == PBJ_KIND_INT)
+				{
+					int32_t a = dstv.i[i], b = src.i[i];
+					r = (op->opcode == 0x28) ? (a == b)
+					  : (op->opcode == 0x29) ? (a != b)
+					  : (op->opcode == 0x2A) ? (a < b) : (a <= b);
+				}
+				else
+				{
+					float a = dstv.f[i], b = src.f[i];
+					r = (op->opcode == 0x28) ? (a == b)
+					  : (op->opcode == 0x29) ? (a != b)
+					  : (op->opcode == 0x2A) ? (a < b) : (a <= b);
+				}
+				res.f[i] = r ? 1.0f : 0.0f;
+			}
+			PbjReg cmp_dst;
+			memset(&cmp_dst, 0, sizeof(cmp_dst));
+			cmp_dst.index = 0;
+			cmp_dst.kind = PBJ_KIND_INT;
+			cmp_dst.nchan = 1;
+			cmp_dst.chan[0] = PBJ_CH_R;
+			pb_store(ev, &cmp_dst, &res);
+			return;
+		}
+		default:
+			return;   // an opcode Ruffle panics on: leave the destination be
+	}
+	pb_store(ev, &op->dst, &res);
+}
+
+// Executes the whole program for one pixel. `blocks` is scratch for the
+// if/else stack (Ruffle nests naga blocks; an interpreter tracks liveness).
+static void pb_exec(PbEval* ev, uint8_t* blocks, uint32_t nblocks)
+{
+	uint32_t depth = 0;
+	int active = 1;
+	for (uint32_t k = 0; k < ev->sh->nops; k++)
+	{
+		const PbjOp* op = &ev->sh->ops[k];
+		switch (op->kind)
+		{
+			case PBJ_OPK_IF:
+			{
+				if (depth >= nblocks) break;
+				PbVal c;
+				pb_load(ev, &op->src, &c);
+				int cond = (op->src.kind == PBJ_KIND_INT)
+					? (c.i[0] != 0) : (c.f[0] != 0.0f);
+				blocks[depth] = (uint8_t) ((active ? 1 : 0) | (cond ? 2 : 0));
+				depth++;
+				active = active && cond;
+				break;
+			}
+			case PBJ_OPK_ELSE:
+			{
+				if (depth == 0 || depth > nblocks) break;
+				uint8_t fr = blocks[depth - 1];
+				active = (fr & 1) && !(fr & 2);
+				break;
+			}
+			case PBJ_OPK_ENDIF:
+			{
+				if (depth == 0) break;
+				depth--;
+				active = (blocks[depth] & 1) != 0;
+				break;
+			}
+			case PBJ_OPK_NOP:
+				break;
+			default:
+			{
+				if (!active) break;
+				if (op->kind == PBJ_OPK_LOAD_FLOAT)
+				{
+					PbVal v;
+					pb_splat(&v, op->fval);
+					pb_store(ev, &op->dst, &v);
+				}
+				else if (op->kind == PBJ_OPK_LOAD_INT)
+				{
+					PbVal v;
+					v.kind = PBJ_KIND_INT;
+					for (int i = 0; i < 4; i++) v.i[i] = op->ival;
+					pb_store(ev, &op->dst, &v);
+				}
+				else if (op->kind == PBJ_OPK_SELECT)
+				{
+					PbVal c, a, b;
+					pb_load(ev, &op->cond, &c);
+					// The condition must EQUAL one, not merely be non-zero.
+					int t = (op->cond.kind == PBJ_KIND_INT)
+						? (c.i[0] == 1) : (c.f[0] == 1.0f);
+					pb_load(ev, &op->src, &a);
+					pb_load(ev, &op->src2, &b);
+					pb_store(ev, &op->dst, t ? &a : &b);
+				}
+				else if (op->kind == PBJ_OPK_SAMPLE_NEAREST
+				         || op->kind == PBJ_OPK_SAMPLE_LINEAR)
+				{
+					PbVal coord, v;
+					pb_load(ev, &op->src, &coord);
+					const PbTexture* t = (op->tf < PB_MAX_TEX)
+						? &ev->tex[op->tf] : &ev->tex[0];
+					v.kind = PBJ_KIND_FLOAT;
+					pb_sample(t, coord.f[0], coord.f[1],
+					          op->kind == PBJ_OPK_SAMPLE_LINEAR, v.f);
+					pb_store(ev, &op->dst, &v);
+				}
+				else
+				{
+					pb_exec_normal(ev, op);
+				}
+				break;
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ShaderJob.start
+// ---------------------------------------------------------------------------
+
+static uint32_t pb_output_channels(const PbjShader* sh, const PbjParam** out_p)
+{
+	const PbjParam* p = pbj_output_param(sh);
+	if (out_p != NULL) *out_p = p;
+	if (p == NULL) return 0;
+	switch (p->param_type)
+	{
+		case 0x1: return 1;
+		case 0x2: return 2;
+		case 0x3: return 3;
+		case 0x4: return 4;
+		default: return 0;
+	}
+}
+
+// PixelBenderType::from_avm2_value (core/src/pixel_bender.rs:27-147). The
+// stored `.value` must be an Array (or null); elements are read ONLY as
+// Number/Integer — a Boolean, String, Object, Array or undefined raises
+// #2004. Missing/short elements pad with 0 and EXTRA ELEMENTS ARE NEVER READ,
+// so `[1,2,3,4,"test"]` on a float4 succeeds. Array holes read as 0.
+static int pb_value_from_avm2(Avm2Context* ctx, Avm2Value value,
+                              uint8_t param_type, float* fout, int32_t* iout)
+{
+	uint32_t nf = pbj_float_count(param_type);
+	uint32_t ni = (nf > 0) ? 0 : pbj_int_count(param_type);
+	uint32_t n = (nf > 0) ? nf : ni;
+	(void) ctx;
+	Avm2ArrayExt* arr = NULL;
+	if (value.kind == AVM2_VALUE_OBJECT)
+	{
+		arr = avm2_array_ext(value.u.obj);
+	}
+	for (uint32_t i = 0; i < n; i++)
+	{
+		double d = 0.0;
+		if (arr != NULL && i < arr->length)
+		{
+			// A hole (or anything past the dense run) reads as 0.
+			Avm2Value e = (i < arr->dense_len) ? arr->elems[i] : avm2_integer(0);
+			if (e.kind == AVM2_VALUE_HOLE) e = avm2_integer(0);
+			if (e.kind == AVM2_VALUE_INTEGER) d = (double) e.u.i;
+			else if (e.kind == AVM2_VALUE_NUMBER) d = e.u.d;
+			else return 0;   // #2004
+		}
+		if (nf > 0)
+		{
+			fout[i] = (float) d;
+		}
+		else
+		{
+			// Rust `as i16`: truncate toward zero, SATURATE, NaN -> 0.
+			double t = (d != d) ? 0.0 : trunc(d);
+			if (t > 32767.0) t = 32767.0;
+			if (t < -32768.0) t = -32768.0;
+			iout[i] = (int32_t) (int16_t) t;
+		}
+	}
+	return 1;
+}
+
+// The metadata defaultValue, else an all-zero value of the parameter's type
+// (shader_job.rs get_default_shader_param_value). Reached when the test
+// overwrote `shader.data.foo` itself, replacing the ShaderParameter.
+static void pb_value_default(const PbjParam* p, float* fout, int32_t* iout)
+{
+	uint32_t nf = pbj_float_count(p->param_type);
+	uint32_t ni = (nf > 0) ? 0 : pbj_int_count(p->param_type);
+	for (uint32_t i = 0; i < nf; i++) fout[i] = 0.0f;
+	for (uint32_t i = 0; i < ni; i++) iout[i] = 0;
+	for (uint32_t j = 0; j < p->nmeta; j++)
+	{
+		if (strcmp(p->meta[j].key, "defaultValue") != 0) continue;
+		const PbjValue* v = &p->meta[j].value;
+		for (uint32_t i = 0; i < nf; i++) fout[i] = v->f[i];
+		for (uint32_t i = 0; i < ni && i < 4; i++) iout[i] = v->i[i];
+		return;
+	}
+}
+
+_Noreturn static void pb_throw_2004(Avm2Context* ctx)
+{
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #2004: One of the parameters is invalid.");
+}
+
+// clamp(x, 0, 1) * 255, round-to-nearest; NaN -> 0x00, +inf -> 0xff.
+static uint32_t pb_unorm8(float x)
+{
+	if (isnan(x)) return 0;
+	x = pb_clampf(x, 0.0f, 1.0f);
+	return (uint32_t) floorf(x * 255.0f + 0.5f);
+}
+
+static Avm2Value sj_start(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2ShaderJobExt* job = sj_ext(act);
+
+	if (job->shader.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	Avm2ShaderExt* sx = (Avm2ShaderExt*) job->shader.u.obj->native_ext;
+	if (sx == NULL || sx->data.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	Avm2Object* data = sx->data.u.obj;
+	Avm2ShaderDataExt* dx = (Avm2ShaderDataExt*) data->native_ext;
+	if (dx == NULL || dx->shader == NULL) return avm2_undefined();
+	const PbjShader* sh = dx->shader;
+
+	// ---- register bank sizing -------------------------------------------
+	uint32_t maxreg = 0;
+	for (uint32_t i = 0; i < sh->nparams; i++)
+	{
+		if (sh->params[i].is_texture) continue;
+		uint32_t hi = sh->params[i].reg.index + 4;
+		if (hi > maxreg) maxreg = hi;
+	}
+	for (uint32_t i = 0; i < sh->nops; i++)
+	{
+		const PbjOp* o = &sh->ops[i];
+		const PbjReg* rs[4] = { &o->dst, &o->src, &o->src2, &o->cond };
+		for (int k = 0; k < 4; k++)
+		{
+			uint32_t hi = rs[k]->index + 4;
+			if (hi > maxreg) maxreg = hi;
+		}
+	}
+	if (maxreg < 4) maxreg = 4;
+	if (maxreg > 4096) maxreg = 4096;
+
+	PbEval ev;
+	memset(&ev, 0, sizeof(ev));
+	ev.sh = sh;
+	ev.nreg = maxreg;
+	ev.fr = calloc(maxreg * 4, sizeof(float));
+	ev.ir = calloc(maxreg * 4, sizeof(int32_t));
+	ev.fr_base = calloc(maxreg * 4, sizeof(float));
+	ev.ir_base = calloc(maxreg * 4, sizeof(int32_t));
+	uint8_t* blocks = calloc(sh->nops + 1, 1);
+	float* owned[PB_MAX_TEX];
+	memset(owned, 0, sizeof(owned));
+
+	// A throw must not leak the scratch, so everything that can raise is
+	// staged before the buffers are handed to the interpreter.
+	int err = 0;               // 2004 / 2165 / 2162
+	const char* err_name = sh->name;
+	const PbjParam* out_param = NULL;
+	uint32_t out_channels = pb_output_channels(sh, &out_param);
+	const PbjReg* out_coord_reg = NULL;
+
+	// ---- parameters -----------------------------------------------------
+	for (uint32_t i = 0; i < sh->nparams && !err; i++)
+	{
+		const PbjParam* p = &sh->params[i];
+		if (p->is_texture)
+		{
+			Avm2Value* slot = avm2_object_find_dynamic(data, p->name,
+			                                           (uint32_t) strlen(p->name));
+			if (slot == NULL || slot->kind != AVM2_VALUE_OBJECT) continue;
+			Avm2Object* sin = slot->u.obj;
+			if (sin->cls != g_shaderinput_class) continue;
+			Avm2ShaderInputExt* ix = (Avm2ShaderInputExt*) sin->native_ext;
+			if (ix == NULL || ix->input.kind != AVM2_VALUE_OBJECT) continue;
+			if (p->tex_index >= PB_MAX_TEX) continue;
+			PbTexture* t = &ev.tex[p->tex_index];
+			t->channels = p->tex_channels ? p->tex_channels : 4;
+
+			Avm2BitmapDataExt* bd = avm2_bitmapdata_ext_of(ctx, ix->input);
+			if (bd != NULL)
+			{
+				t->present = 1;
+				t->w = bd->width;
+				t->h = bd->height;
+				t->channels = 4;
+				t->bgra = bd->pixels;
+				continue;
+			}
+			uint32_t w = (ix->width > 0) ? (uint32_t) ix->width : 0;
+			uint32_t h = (ix->height > 0) ? (uint32_t) ix->height : 0;
+			uint32_t need = w * h * t->channels;
+			Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(ix->input);
+			Avm2VectorExt* vec = avm2_vector_ext(ix->input.u.obj);
+			if (ba != NULL)
+			{
+				// ByteArray inputs are asserted little-endian upstream.
+				uint32_t have = ba->len / 4;
+				if (have < need) { err = 2165; break; }
+				float* buf = malloc((size_t) (need ? need : 1) * sizeof(float));
+				for (uint32_t k = 0; k < need; k++)
+				{
+					memcpy(&buf[k], ba->bytes + (size_t) k * 4, 4);
+				}
+				owned[p->tex_index] = buf;
+				t->present = 1; t->w = w; t->h = h; t->data = buf;
+			}
+			else if (vec != NULL)
+			{
+				if (vec->length < need) { err = 2165; break; }
+				float* buf = malloc((size_t) (need ? need : 1) * sizeof(float));
+				for (uint32_t k = 0; k < need; k++)
+				{
+					buf[k] = (float) avm2_coerce_to_number(ctx, vec->elems[k]);
+				}
+				owned[p->tex_index] = buf;
+				t->present = 1; t->w = w; t->h = h; t->data = buf;
+			}
+			continue;
+		}
+		if (p->qualifier == 2) continue;                 // out params
+		if (strcmp(p->name, "_OutCoord") == 0)
+		{
+			out_coord_reg = &p->reg;
+			continue;
+		}
+
+		float fv[16];
+		int32_t iv[4];
+		memset(fv, 0, sizeof(fv));
+		memset(iv, 0, sizeof(iv));
+		Avm2Value* slot = avm2_object_find_dynamic(data, p->name,
+		                                           (uint32_t) strlen(p->name));
+		int replaced = (slot == NULL || slot->kind != AVM2_VALUE_OBJECT
+		                || slot->u.obj->cls != g_shaderparameter_class);
+		if (replaced)
+		{
+			pb_value_default(p, fv, iv);
+		}
+		else
+		{
+			Avm2ShaderParamExt* px = (Avm2ShaderParamExt*) slot->u.obj->native_ext;
+			if (!pb_value_from_avm2(ctx, px->value, p->param_type, fv, iv))
+			{
+				err = 2004;
+				break;
+			}
+		}
+
+		// Bind into the register bank exactly as add_arguments does.
+		PbVal v;
+		if (p->reg.nchan == 1 && p->reg.chan[0] > PBJ_CH_A)
+		{
+			PbMat m;
+			memset(&m, 0, sizeof(m));
+			int n = (p->reg.chan[0] == PBJ_CH_M2X2) ? 2
+			      : (p->reg.chan[0] == PBJ_CH_M3X3) ? 3 : 4;
+			m.cols = n;
+			for (int col = 0; col < n; col++)
+			{
+				for (int row = 0; row < n; row++) m.c[col][row] = fv[col * n + row];
+			}
+			pb_store_matrix(&ev, &p->reg, &m);
+			continue;
+		}
+		if (pbj_float_count(p->param_type) > 0)
+		{
+			v.kind = PBJ_KIND_FLOAT;
+			for (int k = 0; k < 4; k++) v.f[k] = fv[k];
+		}
+		else
+		{
+			v.kind = PBJ_KIND_INT;
+			for (int k = 0; k < 4; k++) v.i[k] = iv[k];
+		}
+		pb_store(&ev, &p->reg, &v);
+	}
+
+	// ---- target ---------------------------------------------------------
+	Avm2BitmapDataExt* target_bd = NULL;
+	Avm2ByteArrayExt* target_ba = NULL;
+	Avm2VectorExt* target_vec = NULL;
+	uint32_t out_w = 0, out_h = 0;
+	if (!err)
+	{
+		if (job->target.kind == AVM2_VALUE_OBJECT)
+		{
+			target_bd = avm2_bitmapdata_ext_of(ctx, job->target);
+			if (target_bd == NULL)
+			{
+				target_ba = avm2_bytearray_ext_of(job->target);
+				target_vec = avm2_vector_ext(job->target.u.obj);
+			}
+		}
+		if (target_bd != NULL)
+		{
+			out_w = target_bd->width;
+			out_h = target_bd->height;
+		}
+		else
+		{
+			out_w = (job->width > 0) ? (uint32_t) job->width : 0;
+			out_h = (job->height > 0) ? (uint32_t) job->height : 0;
+		}
+		// The output-channel gate fires before anything is rendered.
+		if (out_channels != 3 && out_channels != 4) err = 2162;
+	}
+
+	// ---- run ------------------------------------------------------------
+	float* pixels = NULL;
+	uint32_t npix = out_w * out_h;
+	if (!err && out_param != NULL && npix > 0)
+	{
+		memcpy(ev.fr_base, ev.fr, (size_t) maxreg * 4 * sizeof(float));
+		memcpy(ev.ir_base, ev.ir, (size_t) maxreg * 4 * sizeof(int32_t));
+		pixels = malloc((size_t) npix * 4 * sizeof(float));
+		uint32_t obase = (out_param->reg.index < maxreg ? out_param->reg.index : 0) * 4;
+		for (uint32_t y = 0; y < out_h; y++)
+		{
+			for (uint32_t x = 0; x < out_w; x++)
+			{
+				memcpy(ev.fr, ev.fr_base, (size_t) maxreg * 4 * sizeof(float));
+				memcpy(ev.ir, ev.ir_base, (size_t) maxreg * 4 * sizeof(int32_t));
+				if (out_coord_reg != NULL)
+				{
+					PbVal c;
+					c.kind = PBJ_KIND_FLOAT;
+					c.f[0] = (float) x + 0.5f;   // pixel CENTRE
+					c.f[1] = (float) y + 0.5f;
+					c.f[2] = 0.0f;
+					c.f[3] = 0.0f;
+					pb_store(&ev, out_coord_reg, &c);
+				}
+				pb_exec(&ev, blocks, sh->nops + 1);
+				float* dst = &pixels[(size_t) (y * out_w + x) * 4];
+				for (uint32_t k = 0; k < 4; k++)
+				{
+					dst[k] = (k < out_channels)
+						? ev.fr[obase + out_param->reg.chan[k]] : 0.0f;
+				}
+				// A 3-channel output forces alpha to 1.0.
+				if (out_channels == 3) dst[3] = 1.0f;
+			}
+		}
+	}
+
+	// ---- writeback ------------------------------------------------------
+	if (!err && out_param != NULL && out_channels != 0)
+	{
+		if (target_bd != NULL)
+		{
+			for (uint32_t i = 0; i < npix; i++)
+			{
+				const float* s = &pixels[(size_t) i * 4];
+				uint32_t a = target_bd->transparency ? pb_unorm8(s[3]) : 255;
+				target_bd->pixels[i] = (a << 24) | (pb_unorm8(s[0]) << 16)
+					| (pb_unorm8(s[1]) << 8) | pb_unorm8(s[2]);
+			}
+		}
+		else if (target_ba != NULL)
+		{
+			// Raw f32 little-endian at offset 0; `position` is left alone.
+			uint32_t nfloat = npix * out_channels;
+			uint32_t need = nfloat * 4;
+			uint32_t saved_pos = target_ba->position;
+			if (target_ba->len < need)
+			{
+				avm2_bytearray_set_length_public(ctx, target_ba, need);
+			}
+			for (uint32_t i = 0; i < npix; i++)
+			{
+				for (uint32_t k = 0; k < out_channels; k++)
+				{
+					memcpy(target_ba->bytes + ((size_t) i * out_channels + k) * 4,
+					       &pixels[(size_t) i * 4 + k], 4);
+				}
+			}
+			target_ba->position = saved_pos;
+		}
+		else if (target_vec != NULL)
+		{
+			uint32_t nfloat = npix * out_channels;
+			Avm2Value* elems = avm2_alloc(ctx, (nfloat ? nfloat : 1)
+			                                   * (uint32_t) sizeof(Avm2Value));
+			for (uint32_t i = 0; i < npix; i++)
+			{
+				for (uint32_t k = 0; k < out_channels; k++)
+				{
+					elems[(size_t) i * out_channels + k] =
+						avm2_number((double) pixels[(size_t) i * 4 + k]);
+				}
+			}
+			target_vec->elems = elems;
+			target_vec->length = nfloat;
+			target_vec->cap = nfloat ? nfloat : 1;
+		}
+		else
+		{
+			err = 2004;   // an unusable target errors AFTER the run
+		}
+	}
+
+	free(pixels);
+	free(ev.fr);
+	free(ev.ir);
+	free(ev.fr_base);
+	free(ev.ir_base);
+	free(blocks);
+	for (int i = 0; i < PB_MAX_TEX; i++) free(owned[i]);
+
+	if (err == 2162)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2162: The Shader output type is not "
+		                 "compatible for this operation.");
+	}
+	if (err == 2165)
+	{
+		// %1 is the SHADER's name, not the input's.
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2165: The Shader input %s does not have "
+		                 "enough data.", err_name != NULL ? err_name : "");
+	}
+	if (err) pb_throw_2004(ctx);
+	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// ShaderJob
 // ---------------------------------------------------------------------------
 
 static Avm2ShaderJobExt* sj_ext(Avm2Activation* act)
@@ -1182,7 +2244,7 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, sj, "width", sj_get_width, sj_set_width);
 	avm2_builtin_add_getset(ctx, sj, "height", sj_get_height, sj_set_height);
 	avm2_builtin_add_getter(ctx, sj, "progress", sj_get_progress);
-	avm2_builtin_add_method(ctx, sj, "start", sj_noop);
+	avm2_builtin_add_method(ctx, sj, "start", sj_start);
 	avm2_builtin_add_method(ctx, sj, "cancel", sj_noop);
 
 	// flash.display.ShaderPrecision / ShaderParameterType constant bags.

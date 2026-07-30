@@ -683,6 +683,9 @@ void avm2_register_pixelbender(Avm2Context* ctx);
 // flash.filters.BitmapFilter shell, owned by avm2_text.c —
 // avm2_builtin_class always mints, so subclasses share it via this accessor.
 Avm2Class* avm2_filters_bitmapfilter_class(void);
+// DisplayObject.blendShader's two gates (display_object.rs set_blend_shader):
+// 0 = not a Shader at all, 1 = a Shader with a null `data` (#2007), 2 = usable.
+int avm2_shader_blend_state(Avm2Value v);
 // Drain every NetConnection's queued call()s into one Flash Remoting packet per
 // connection, log the fetch, and dispatch the scripted response. Called once per
 // tick from avm2_display_run_tick at the loader/executor drain point.

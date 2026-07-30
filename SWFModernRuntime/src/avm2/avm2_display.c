@@ -8426,6 +8426,33 @@ STUB_GETSET(do_contextmenu, "__contextMenu", avm2_null())
 STUB_GETSET(do_blendmode, "__blendMode",
             avm2_string(avm2_string_from_literal(act->ctx, "normal")))
 
+// blendShader is write-only in DisplayObject.as. Assigning a usable Shader
+// also flips blendMode to "shader" (display_object.rs:2108-2111), and that
+// survives a later blendMode change — we only have to model the flip, since
+// nothing reads the shader back.
+static Avm2Value do_blendshader_set(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	if (v.kind != AVM2_VALUE_OBJECT)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter shader must be non-null.");
+	}
+	if (avm2_shader_blend_state(v) != 2)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter data must be non-null.");
+	}
+	Avm2Object* self = this_obj(act);
+	if (self != NULL)
+	{
+		avm2_object_set_dynamic(ctx, self, "__blendMode", 11,
+			avm2_string(avm2_string_from_literal(ctx, "shader")))->dont_enum = 1;
+	}
+	return avm2_undefined();
+}
+
 static Avm2Value do_get_zero(Avm2Activation* act)
 {
 	(void) act;
@@ -11090,6 +11117,7 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, dobj, "accessibilityProperties", do_accessprops_get,
 	           do_accessprops_set);
 	add_getset(ctx, dobj, "blendMode", do_blendmode_get, do_blendmode_set);
+	add_getset(ctx, dobj, "blendShader", NULL, do_blendshader_set);
 	add_getset(ctx, dobj, "scale9Grid", do_scrollrect_get, do_scrollrect_set);
 	add_getset(ctx, dobj, "z", do_get_zero, do_set_noop);
 	add_getset(ctx, dobj, "rotationX", do_get_zero, do_set_noop);
@@ -11545,6 +11573,25 @@ void avm2_register_display(Avm2Context* ctx)
 		disp_sconst(ctx, sds, "NORMAL", "normal");
 		disp_sconst(ctx, sds, "FULL_SCREEN", "fullScreen");
 		disp_sconst(ctx, sds, "FULL_SCREEN_INTERACTIVE", "fullScreenInteractive");
+
+		// The three constant bags Graphics.beginGradientFill's own signature
+		// names — its `type`/`spreadMethod`/`interpolationMethod` arguments
+		// are compared as strings, so these only have to exist.
+		Avm2Class* gtc = avm2_builtin_class(ctx, "flash.display",
+		                                    "GradientType", b->object_class);
+		disp_sconst(ctx, gtc, "LINEAR", "linear");
+		disp_sconst(ctx, gtc, "RADIAL", "radial");
+
+		Avm2Class* spm = avm2_builtin_class(ctx, "flash.display",
+		                                    "SpreadMethod", b->object_class);
+		disp_sconst(ctx, spm, "PAD", "pad");
+		disp_sconst(ctx, spm, "REFLECT", "reflect");
+		disp_sconst(ctx, spm, "REPEAT", "repeat");
+
+		Avm2Class* ipm = avm2_builtin_class(ctx, "flash.display",
+		                                    "InterpolationMethod", b->object_class);
+		disp_sconst(ctx, ipm, "RGB", "rgb");
+		disp_sconst(ctx, ipm, "LINEAR_RGB", "linearRGB");
 
 		// FlashPunk's Draw uses LineScaleMode for graphics.lineStyle.
 		Avm2Class* lsm = avm2_builtin_class(ctx, "flash.display",
