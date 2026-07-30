@@ -583,6 +583,14 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 					if (existing != NULL && (existing->kind == AVM2_PROP_SETTER
 					                         || existing->kind == AVM2_PROP_GETSET))
 					{
+						// The setter half we are merging onto keeps ITS
+						// declaring class: this getter override does not
+						// re-bind it.
+						if (existing->setter_defining_class == NULL)
+						{
+							existing->setter_defining_class = existing->defining_class;
+							existing->setter_scope = existing->method_scope;
+						}
 						existing->kind = AVM2_PROP_GETSET;
 						existing->method = ref;
 						existing->defining_class = defining_class;
@@ -599,6 +607,10 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 					{
 						existing->kind = AVM2_PROP_GETSET;
 						existing->setter = ref;
+						// This half is ours even when the getter half
+						// stays the inherited one.
+						existing->setter_defining_class = defining_class;
+						existing->setter_scope = scope;
 						continue;
 					}
 					e.kind = AVM2_PROP_SETTER;

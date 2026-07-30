@@ -936,12 +936,15 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 			return;
 		}
 		case AVM2_PROP_SETTER:
-			avm2_call_method_ref(ctx, &e->setter, e->defining_class,
-			                     e->method_scope, recv, &value, 1);
-			return;
 		case AVM2_PROP_GETSET:
-			avm2_call_method_ref(ctx, &e->setter, e->defining_class,
-			                     e->method_scope, recv, &value, 1);
+			// The setter half may be declared by a different (deeper) class
+			// than the getter — see setter_defining_class.
+			avm2_call_method_ref(ctx, &e->setter,
+			                     e->setter_defining_class != NULL
+			                       ? e->setter_defining_class : e->defining_class,
+			                     e->setter_defining_class != NULL
+			                       ? e->setter_scope : e->method_scope,
+			                     recv, &value, 1);
 			return;
 		case AVM2_PROP_GETTER:
 		{

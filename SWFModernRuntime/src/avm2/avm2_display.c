@@ -10678,6 +10678,10 @@ static void add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 			e->setter.fn = setter;
 			e->setter.debug_name = name;
 			e->defining_class = cls;
+			// Both halves are ours now — drop any per-setter binding the
+			// inherited entry carried.
+			e->setter_defining_class = NULL;
+			e->setter_scope = NULL;
 			return;
 		}
 	}

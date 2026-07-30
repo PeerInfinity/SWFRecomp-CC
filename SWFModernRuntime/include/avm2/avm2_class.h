@@ -49,6 +49,15 @@ typedef struct Avm2PropEntry
 	Avm2MethodRef setter;           // SETTER half
 	Avm2Class* defining_class;      // bound_class for method dispatch
 	Avm2ScopeChain* method_scope;   // captured outer scope for the method
+	// A GETSET's two halves can be declared by DIFFERENT classes: AS3 lets a
+	// subclass override only the setter (or only the getter) and inherit the
+	// other half. The setter then has to run bound to ITS own class, or a
+	// `super.prop = v` inside it resolves against the wrong grandparent
+	// (away3d Entity overrides arcane::implicitPartition's setter alone and
+	// calls super — bound to ObjectContainer3D it looked past it to Object3D
+	// and threw #1069). NULL = the setter shares `defining_class` above.
+	Avm2Class* setter_defining_class;
+	Avm2ScopeChain* setter_scope;
 } Avm2PropEntry;
 
 // Per-slot metadata (Ruffle's slot_table): survives name shadowing, so a

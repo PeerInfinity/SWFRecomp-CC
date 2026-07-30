@@ -5803,12 +5803,35 @@ static Avm2Value txt_noop_method(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-// flash.ui.ContextMenu.customItems — returns a fresh, discardable Array so the
-// game's `contextMenu.customItems.push(item)` succeeds. The right-click menu is
-// cosmetic; headless never reads the list back, so no persistence is needed.
+// flash.ui.ContextMenu.customItems — a real, writable Array (AS3 declares it
+// `public var`, so a read-only accessor made `contextMenu.customItems = [...]`
+// throw #1074; away3d's demo does exactly that). The list is kept per instance
+// and lazily created on first read so `customItems.push(item)` also works. The
+// right-click menu itself is still cosmetic — nothing consumes the list.
 static Avm2Value cm_customitems_get(Avm2Activation* act)
 {
-	return avm2_object_value(avm2_array_new(act->ctx, 0));
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = act->this_val.kind == AVM2_VALUE_OBJECT
+		? act->this_val.u.obj : NULL;
+	if (self == NULL) return avm2_object_value(avm2_array_new(ctx, 0));
+	Avm2Value* v = avm2_object_find_dynamic(self, "__customItems", 13);
+	if (v != NULL) return *v;
+	Avm2Value arr = avm2_object_value(avm2_array_new(ctx, 0));
+	avm2_object_set_dynamic(ctx, self, "__customItems", 13, arr)->dont_enum = 1;
+	return arr;
+}
+
+static Avm2Value cm_customitems_set(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = act->this_val.kind == AVM2_VALUE_OBJECT
+		? act->this_val.u.obj : NULL;
+	if (self != NULL && act->argc > 0)
+	{
+		avm2_object_set_dynamic(ctx, self, "__customItems", 13,
+		                        act->args[0])->dont_enum = 1;
+	}
+	return avm2_undefined();
 }
 
 // flash.ui.ContextMenuItem — cosmetic. Ctor ignores its (caption, ...) args;
@@ -6349,7 +6372,8 @@ void avm2_register_text(Avm2Context* ctx)
 		Avm2Class* cm = avm2_builtin_class(ctx, "flash.ui", "ContextMenu",
 		                                   ctx->builtins.event_dispatcher_class);
 		avm2_builtin_add_method(ctx, cm, "hideBuiltInItems", txt_noop_method);
-		avm2_builtin_add_getset(ctx, cm, "customItems", cm_customitems_get, NULL);
+		avm2_builtin_add_getset(ctx, cm, "customItems", cm_customitems_get,
+		                        cm_customitems_set);
 
 		Avm2Class* cmi = avm2_builtin_class(ctx, "flash.ui", "ContextMenuItem",
 		                                    ctx->builtins.event_dispatcher_class);
