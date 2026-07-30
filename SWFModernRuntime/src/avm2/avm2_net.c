@@ -35,6 +35,7 @@
 // event-dispatch and per-instance-ext idioms; see the block above
 // register_file_reference for the model.
 
+#include <setjmp.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -385,6 +386,8 @@ static Avm2Value socket_set_timeout(Avm2Activation* act)
 static void gc_mark_roots_file(void);
 // NetConnection call-queue roots (the remoting half, defined below).
 static void gc_mark_roots_nc_queue(void);
+// LocalConnection channel-map + message-queue roots (defined below).
+static void gc_mark_roots_lc(void);
 
 void avm2_gc_mark_roots_net(Avm2Context* ctx)
 {
@@ -402,6 +405,7 @@ void avm2_gc_mark_roots_net(Avm2Context* ctx)
 	}
 	gc_mark_roots_file();
 	gc_mark_roots_nc_queue();
+	gc_mark_roots_lc();
 }
 
 static void register_socket(Avm2Context* ctx)
@@ -1418,6 +1422,424 @@ void avm2_net_flush_connections(Avm2Context* ctx)
 }
 
 // ---------------------------------------------------------------------------
+// flash.net.LocalConnection (tranche 6)
+// ---------------------------------------------------------------------------
+//
+// Ruffle's model (core/src/local_connection.rs +
+// avm2/object/local_connection_object.rs), which is a per-PLAYER channel map,
+// not any kind of IPC: every endpoint the corpus exercises lives in the same
+// player (the main movie plus the child SWFs the Loader arc executes), so a
+// send is a queued in-process message.
+//
+//   * The channel key is the connection name lowercased, prefixed with
+//     "<superdomain>:" unless it starts with '_' (a global channel). A `connect`
+//     name may not contain ':' at all; a `send` name may, and then carries its
+//     own domain.
+//   * `send` decides "is there a listener" TWICE: once now (no listener ->
+//     queue a plain failure) and once at delivery (gone by then -> failure
+//     too). Whatever holds the name at delivery is what receives.
+//   * Delivery is next-tick, in queue order, and each message dispatches the
+//     SENDER's StatusEvent (level "status"/"error", code always null) before
+//     invoking the callee. A callee that throws produces an AsyncErrorEvent on
+//     the RECEIVER — not on the sender (avm2/localconnection grades that
+//     directly: "receiver received event AsyncErrorEvent.ASYNC_ERROR").
+//   * Arguments cross as AMF0, serialized at send and deserialized at delivery,
+//     so the callee gets a deep copy with Flash's type translations. That is the
+//     same wire the NetConnection packet above uses.
+//
+// Not modelled: the AVM1 half of the registry. Our AVM1 LocalConnection
+// (action.c) keeps its own channel map, so an AVM1<->AVM2 send finds no
+// listener. Only avm2/localconnection needs it, and that test needs more
+// besides.
+
+#define LC_MAX_CHANNELS 32
+#define LC_MAX_QUEUE 64
+#define LC_MAX_ARGS 16
+#define LC_MAX_NAME 256
+
+typedef struct Avm2LocalConnectionExt
+{
+	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+	Avm2Value client;                   // defaults to the connection itself
+	char key[LC_MAX_NAME];              // registered channel key ("" = closed)
+} Avm2LocalConnectionExt;
+
+typedef struct LcChannel
+{
+	char key[LC_MAX_NAME];
+	Avm2Object* obj;
+} LcChannel;
+
+typedef struct LcMessage
+{
+	Avm2Object* sender;
+	char key[LC_MAX_NAME];       // resolved channel key
+	char method[LC_MAX_NAME];    // callee method name (UTF-8)
+	unsigned char* args[LC_MAX_ARGS];
+	size_t arg_len[LC_MAX_ARGS];
+	int argc;
+	int failure;                 // 1 = no listener at send time
+} LcMessage;
+
+static Avm2Class* g_local_connection_class;
+static LcChannel g_lc_channels[LC_MAX_CHANNELS];
+static int g_lc_channel_count;
+static LcMessage g_lc_queue[LC_MAX_QUEUE];
+static int g_lc_queue_count;
+
+static Avm2LocalConnectionExt* lc_ext_of(Avm2Object* o)
+{
+	if (o == NULL || o->native_ext == NULL || g_local_connection_class == NULL)
+		return NULL;
+	for (const Avm2Class* c = o->cls; c != NULL; c = c->super_class)
+		if (c == g_local_connection_class) return (Avm2LocalConnectionExt*) o->native_ext;
+	return NULL;
+}
+
+static Avm2LocalConnectionExt* lc_ext(Avm2Activation* act)
+{ return lc_ext_of(net2_this(act)); }
+
+// The domain a name with no explicit one belongs to: everything after the LAST
+// dot of the movie's domain (Ruffle get_superdomain).
+static const char* lc_superdomain(void)
+{
+	const char* d = avm2_local_connection_domain();
+	const char* dot = strrchr(d, '.');
+	return (dot != NULL) ? dot + 1 : d;
+}
+
+static void lc_lower(char* s)
+{
+	for (; *s != '\0'; s++)
+		if (*s >= 'A' && *s <= 'Z') *s = (char) (*s - 'A' + 'a');
+}
+
+// connect(): '_'-prefixed names are global, everything else is scoped to the
+// superdomain. (A ':' is rejected before this by the caller.)
+static void lc_connect_key(const Avm2String* name, char* out, size_t cap)
+{
+	if (name->len > 0 && name->utf8[0] == '_')
+		snprintf(out, cap, "%.*s", (int) name->len, name->utf8);
+	else
+		snprintf(out, cap, "%s:%.*s", lc_superdomain(), (int) name->len, name->utf8);
+	lc_lower(out);
+}
+
+// send(): a name that already carries a ':' is used as-is; otherwise the same
+// rule as connect().
+static void lc_send_key(const Avm2String* name, char* out, size_t cap)
+{
+	char buf[LC_MAX_NAME];
+	snprintf(buf, sizeof(buf), "%.*s", (int) name->len, name->utf8);
+	lc_lower(buf);
+	if (strchr(buf, ':') != NULL || buf[0] == '_')
+		snprintf(out, cap, "%s", buf);
+	else
+		snprintf(out, cap, "%s:%s", lc_superdomain(), buf);
+	lc_lower(out);
+}
+
+static Avm2Object* lc_find_listener(const char* key)
+{
+	for (int i = 0; i < g_lc_channel_count; i++)
+		if (strcmp(g_lc_channels[i].key, key) == 0) return g_lc_channels[i].obj;
+	return NULL;
+}
+
+static void lc_unregister(const char* key)
+{
+	for (int i = 0; i < g_lc_channel_count; i++)
+	{
+		if (strcmp(g_lc_channels[i].key, key) != 0) continue;
+		for (int j = i; j < g_lc_channel_count - 1; j++)
+			g_lc_channels[j] = g_lc_channels[j + 1];
+		g_lc_channel_count--;
+		return;
+	}
+}
+
+// The channel and queue hold the only references to a connection that is
+// otherwise unreachable from script between send and delivery.
+static void gc_mark_roots_lc(void)
+{
+	for (int i = 0; i < g_lc_channel_count; i++)
+		avm2_gc_mark_object(g_lc_channels[i].obj);
+	for (int i = 0; i < g_lc_queue_count; i++)
+		avm2_gc_mark_object(g_lc_queue[i].sender);
+}
+
+static _Noreturn void lc_throw_2007(Avm2Context* ctx, const char* param)
+{
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #2007: Parameter %s must be non-null.", param);
+}
+
+static _Noreturn void lc_throw_2085(Avm2Context* ctx, const char* param)
+{
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #2085: Parameter %s must be non-empty string.", param);
+}
+
+static _Noreturn void lc_throw_2004(Avm2Context* ctx, int type_error)
+{
+	avm2_throw_error(ctx,
+	                 type_error ? ctx->builtins.type_error_class
+	                            : ctx->builtins.argument_error_class,
+	                 "Error #2004: One of the parameters is invalid.");
+}
+
+// A non-null String argument, Ruffle's ParametersExt::get_string_non_null.
+static const Avm2String* lc_arg_string(Avm2Activation* act, uint32_t i,
+                                       const char* param)
+{
+	Avm2Value v = (i < act->argc) ? act->args[i] : avm2_undefined();
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+		lc_throw_2007(act->ctx, param);
+	return avm2_coerce_to_string(act->ctx, v);
+}
+
+static Avm2Value lc_init(Avm2Activation* act)
+{
+	Avm2LocalConnectionExt* e = lc_ext(act);
+	if (e == NULL) return avm2_undefined();
+	e->key[0] = '\0';
+	// LocalConnection.as: the client defaults to the connection itself.
+	e->client = act->this_val;
+	return avm2_undefined();
+}
+
+static Avm2Value lc_connect(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = net2_this(act);
+	Avm2LocalConnectionExt* e = lc_ext(act);
+	const Avm2String* name = lc_arg_string(act, 0, "connectionName");
+	if (name->len == 0) lc_throw_2085(ctx, "connectionName");
+	if (memchr(name->utf8, ':', name->len) != NULL) lc_throw_2004(ctx, 0);
+	if (e == NULL || self == NULL) return avm2_undefined();
+
+	char key[LC_MAX_NAME];
+	lc_connect_key(name, key, sizeof(key));
+	// #2082 covers BOTH "this object is already connected" and "someone else
+	// holds the name" — Ruffle notes the message is misleading in the latter case.
+	if (e->key[0] != '\0' || lc_find_listener(key) != NULL
+	    || g_lc_channel_count >= LC_MAX_CHANNELS)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2082: Connect failed because the object is "
+		                 "already connected.");
+	}
+	snprintf(g_lc_channels[g_lc_channel_count].key,
+	         sizeof(g_lc_channels[0].key), "%s", key);
+	g_lc_channels[g_lc_channel_count].obj = self;
+	g_lc_channel_count++;
+	snprintf(e->key, sizeof(e->key), "%s", key);
+	return avm2_undefined();
+}
+
+static Avm2Value lc_close(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2LocalConnectionExt* e = lc_ext(act);
+	if (e == NULL) return avm2_undefined();
+	if (e->key[0] == '\0')
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2083: Close failed because the object is not "
+		                 "connected.");
+	}
+	lc_unregister(e->key);
+	e->key[0] = '\0';
+	return avm2_undefined();
+}
+
+// The method names LocalConnection's own surface owns; a send naming one of them
+// is an ArgumentError rather than a delivery.
+static int lc_method_is_reserved(const Avm2String* m)
+{
+	static const char* const names[6] = {
+		"send", "connect", "close", "allowDomain", "allowInsecureDomain", "domain"
+	};
+	for (int i = 0; i < 6; i++)
+	{
+		size_t n = strlen(names[i]);
+		if (m->len == n && memcmp(m->utf8, names[i], n) == 0) return 1;
+	}
+	return 0;
+}
+
+static Avm2Value lc_send(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = net2_this(act);
+	const Avm2String* cname = lc_arg_string(act, 0, "connectionName");
+	const Avm2String* method = lc_arg_string(act, 1, "methodName");
+	if (cname->len == 0) lc_throw_2085(ctx, "connectionName");
+	if (method->len == 0) lc_throw_2085(ctx, "methodName");
+	if (lc_method_is_reserved(method)) lc_throw_2004(ctx, 0);
+	if (self == NULL || g_lc_queue_count >= LC_MAX_QUEUE) return avm2_undefined();
+
+	LcMessage* m = &g_lc_queue[g_lc_queue_count];
+	memset(m, 0, sizeof(*m));
+	m->sender = self;
+	lc_send_key(cname, m->key, sizeof(m->key));
+	snprintf(m->method, sizeof(m->method), "%.*s", (int) method->len, method->utf8);
+	// The arguments are serialized NOW: the callee must see a deep copy, and the
+	// queue outlives the frame that built the values.
+	uint32_t n = (act->argc > 2) ? act->argc - 2 : 0;
+	if (n > LC_MAX_ARGS) n = LC_MAX_ARGS;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		size_t len = 0;
+		m->args[i] = avm2_amf0_write_value(ctx, act->args[2 + i], &len);
+		m->arg_len[i] = len;
+	}
+	m->argc = (int) n;
+	m->failure = (lc_find_listener(m->key) == NULL) ? 1 : 0;
+	g_lc_queue_count++;
+	return avm2_undefined();
+}
+
+static Avm2Value lc_get_client(Avm2Activation* act)
+{
+	Avm2LocalConnectionExt* e = lc_ext(act);
+	return (e != NULL) ? e->client : avm2_undefined();
+}
+
+static Avm2Value lc_set_client(Avm2Activation* act)
+{
+	Avm2LocalConnectionExt* e = lc_ext(act);
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	// Anything that is not an object — null and undefined included — is #2004.
+	if (v.kind != AVM2_VALUE_OBJECT) lc_throw_2004(act->ctx, 1);
+	if (e != NULL) e->client = v;
+	return avm2_undefined();
+}
+
+static Avm2Value lc_get_domain_prop(Avm2Activation* act)
+{
+	return avm2_string(avm2_string_from_literal(act->ctx,
+	                                            avm2_local_connection_domain()));
+}
+
+static Avm2Value lc_noop(Avm2Activation* act)
+{ (void) act; return avm2_undefined(); }
+
+static Avm2Value lc_get_true(Avm2Activation* act)
+{ (void) act; return avm2_bool(1); }
+
+// --- delivery ---
+
+static void lc_send_status(Avm2Context* ctx, Avm2Object* conn, const char* level)
+{
+	if (conn == NULL) return;
+	Avm2Object* ev = avm2_status_event_new(ctx, NULL, level);
+	if (ev != NULL) avm2_dispatch_event(ctx, conn, ev);
+}
+
+// Invoke the callee's method, catching whatever it throws: a thrown Error
+// becomes an AsyncErrorEvent on the RECEIVER, carrying both the #2095 text and
+// the error itself.
+static void lc_run_method(Avm2Context* ctx, Avm2Object* receiver, LcMessage* m)
+{
+	Avm2LocalConnectionExt* e = lc_ext_of(receiver);
+	if (e == NULL) return;
+	Avm2Value args[LC_MAX_ARGS];
+	for (int i = 0; i < m->argc; i++)
+		args[i] = avm2_amf0_read_value(ctx, m->args[i], m->arg_len[i]);
+
+	static const Avm2AbcException catch_any = { 0, 0xFFFFFFFF, 0, 0, 0, 1 };
+	Avm2TryFrame tf;
+	avm2_try_push_frame(ctx, &tf, &catch_any, 1, NULL);
+	tf.op_index = 1;
+	if (setjmp(tf.jb) == 0)
+	{
+		// Ruffle calls this as a script `client.method(...)` would, so a name a
+		// SEALED client does not define raises the getproperty error #1069 (both
+		// LocalConnection tests grade that text) while a dynamic one gets the
+		// #1006 the call itself raises on undefined. Both come out of the shared
+		// property path — LocalConnection is a sealed class, so a default client
+		// (the connection itself) takes the first branch.
+		uint32_t mlen = (uint32_t) strlen(m->method);
+		avm2_call_public_property(ctx, e->client, m->method, mlen,
+		                          m->argc > 0 ? args : NULL, (uint32_t) m->argc);
+		avm2_try_pop_frame(&tf);
+		return;
+	}
+	Avm2Value err = tf.exc;
+	avm2_try_pop_frame(&tf);
+	char text[LC_MAX_NAME + 96];
+	snprintf(text, sizeof(text),
+	         "Error #2095: flash.net.LocalConnection was unable to invoke "
+	         "callback %s.", m->method);
+	Avm2Object* ev = avm2_async_error_event_new(
+		ctx, avm2_string_from_literal(ctx, text),
+		(err.kind == AVM2_VALUE_OBJECT) ? err.u.obj : NULL);
+	if (ev != NULL) avm2_dispatch_event(ctx, receiver, ev);
+}
+
+// Per-tick delivery, called from avm2_display_run_tick right after the frame's
+// AVM2 phases — where Ruffle runs LocalConnections::update_connections, which is
+// BEFORE its NetConnection flush (avm2/amf_array_serialization traces the
+// delivered message ahead of both remoting packets).
+void avm2_net_deliver_local_connections(Avm2Context* ctx)
+{
+	if (g_lc_queue_count == 0) return;
+	// Take the whole queue first: a callee may send, and that belongs to the
+	// next tick (Ruffle mem::take).
+	LcMessage batch[LC_MAX_QUEUE];
+	int count = g_lc_queue_count;
+	memcpy(batch, g_lc_queue, (size_t) count * sizeof(LcMessage));
+	g_lc_queue_count = 0;
+
+	for (int i = 0; i < count; i++)
+	{
+		LcMessage* m = &batch[i];
+		Avm2Object* receiver = m->failure ? NULL : lc_find_listener(m->key);
+		if (receiver == NULL)
+		{
+			lc_send_status(ctx, m->sender, "error");
+		}
+		else
+		{
+			lc_send_status(ctx, m->sender, "status");
+			lc_run_method(ctx, receiver, m);
+		}
+		for (int a = 0; a < m->argc; a++)
+		{
+			free(m->args[a]);
+			m->args[a] = NULL;
+		}
+	}
+}
+
+static void register_local_connection(Avm2Context* ctx)
+{
+	g_lc_channel_count = 0;
+	g_lc_queue_count = 0;
+	Avm2Class* cls = avm2_builtin_class(ctx, "flash.net", "LocalConnection",
+	                                    ctx->builtins.event_dispatcher_class);
+	cls->instance_init.fn = lc_init;
+	cls->instance_init.debug_name = "LocalConnection";
+	cls->native_ext_size = sizeof(Avm2LocalConnectionExt);
+	// Sealed, like the AS3 class: a send naming a method the default client (the
+	// connection itself) does not have must raise #1069, not silently find
+	// undefined.
+	cls->flags |= AVM2_CLASS_FLAG_SEALED;
+	g_local_connection_class = cls;
+	avm2_builtin_add_getter(ctx, cls, "domain", lc_get_domain_prop);
+	avm2_builtin_add_method(ctx, cls, "connect", lc_connect);
+	avm2_builtin_add_method(ctx, cls, "send", lc_send);
+	avm2_builtin_add_method(ctx, cls, "close", lc_close);
+	avm2_builtin_add_method(ctx, cls, "allowDomain", lc_noop);
+	avm2_builtin_add_method(ctx, cls, "allowInsecureDomain", lc_noop);
+	avm2_builtin_add_getset(ctx, cls, "client", lc_get_client, lc_set_client);
+	avm2_builtin_add_getset(ctx, cls, "isPerUser", lc_get_true, lc_noop);
+	// AIR-era static; true everywhere a player exists.
+	avm2_builtin_add_static_const(ctx, cls, "isSupported", avm2_bool(1));
+}
+
+// ---------------------------------------------------------------------------
 // flash.net.NetStream
 // ---------------------------------------------------------------------------
 //
@@ -2253,6 +2675,8 @@ void avm2_register_net_transport(Avm2Context* ctx)
 	register_net_connection(ctx);
 	register_net_stream(ctx);
 	register_file_reference(ctx);
+
+	register_local_connection(ctx);
 
 	// flash.net.Responder.
 	{

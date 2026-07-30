@@ -1316,6 +1316,28 @@ static Avm2Value error_event_init(Avm2Activation* act)
 static Avm2Value ee_get_error_id(Avm2Activation* act)
 { Avm2EventExt* e = this_event(act); return avm2_integer(e ? e->error_id : 0); }
 
+// AsyncErrorEvent(type, bubbles, cancelable, text, error:Error = null): the 5th
+// argument is an Error OBJECT where its ErrorEvent base takes an errorID, so it
+// needs its own init. from_shumway/localconnection traces `event.error`.
+static Avm2Value async_error_event_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->text = act->argc > 3 ? avm2_coerce_to_string(act->ctx, act->args[3])
+		: avm2_string_from_literal(act->ctx, "");
+	ext->error_obj = (act->argc > 4 && act->args[4].kind == AVM2_VALUE_OBJECT)
+		? act->args[4].u.obj : NULL;
+	return avm2_undefined();
+}
+static Avm2Value asye_get_error(Avm2Activation* act)
+{
+	Avm2EventExt* e = this_event(act);
+	return (e != NULL && e->error_obj != NULL)
+		? avm2_object_value(e->error_obj) : avm2_null();
+}
+
 static Avm2Value http_status_init(Avm2Activation* act)
 {
 	Avm2EventExt* ext = this_event(act);
@@ -1357,9 +1379,31 @@ static Avm2Value status_event_init(Avm2Activation* act)
 	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
 	ext->bubbles = arg_bool(act, 1);
 	ext->cancelable = arg_bool(act, 2);
-	ext->status_code = act->argc > 3 ? avm2_coerce_to_string(act->ctx, act->args[3]) : NULL;
-	ext->status_level = act->argc > 4 ? avm2_coerce_to_string(act->ctx, act->args[4]) : NULL;
+	// `code` and `level` are String-typed, so null/undefined coerce to NULL —
+	// not to the string "null". localconnection_send traces `code=null`.
+	ext->status_code = (act->argc > 3 && act->args[3].kind != AVM2_VALUE_NULL
+	                    && act->args[3].kind != AVM2_VALUE_UNDEFINED)
+		? avm2_coerce_to_string(act->ctx, act->args[3]) : NULL;
+	ext->status_level = (act->argc > 4 && act->args[4].kind != AVM2_VALUE_NULL
+	                     && act->args[4].kind != AVM2_VALUE_UNDEFINED)
+		? avm2_coerce_to_string(act->ctx, act->args[4]) : NULL;
 	return avm2_undefined();
+}
+
+// StatusEvent.as toString() — localconnection_send traces the whole event, so
+// the two extra fields must be there or it prints Event's four alone.
+static Avm2Value ste_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"StatusEvent", "type", "bubbles", "cancelable", "eventPhase",
+		"code", "level"
+	};
+	Avm2Value args[7];
+	for (int i = 0; i < 7; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 7);
 }
 static Avm2Value se_get_code(Avm2Activation* act)
 { Avm2EventExt* e = this_event(act); return (e && e->status_code) ? avm2_string(e->status_code) : avm2_null(); }
@@ -1412,6 +1456,8 @@ static void sconst(Avm2Context* ctx, Avm2Class* cls, const char* n, const char* 
 // avm2_io_error_event_new), which the Loader pipeline dispatches from.
 static Avm2Class* g_progress_event_class;
 static Avm2Class* g_io_error_event_class;
+static Avm2Class* g_status_event_class;
+static Avm2Class* g_async_error_event_class;
 static Avm2Class* g_http_status_event_class;
 static Avm2Class* g_net_status_event_class;
 
@@ -1461,10 +1507,12 @@ static void register_net_events(Avm2Context* ctx)
 
 	Avm2Class* ase = avm2_builtin_class(ctx, "flash.events",
 	                                    "AsyncErrorEvent", er);
-	ase->instance_init.fn = error_event_init;
+	ase->instance_init.fn = async_error_event_init;
 	ase->instance_init.debug_name = "AsyncErrorEvent";
 	event_override_method(ctx, ase, "toString", asye_to_string);
+	avm2_builtin_add_getter(ctx, ase, "error", asye_get_error);
 	sconst(ctx, ase, "ASYNC_ERROR", "asyncError");
+	g_async_error_event_class = ase;
 
 	// flash.events.HTTPStatusEvent (extends Event).
 	Avm2Class* hse = avm2_builtin_class(ctx, "flash.events", "HTTPStatusEvent",
@@ -1486,7 +1534,9 @@ static void register_net_events(Avm2Context* ctx)
 	ste->instance_init.debug_name = "StatusEvent";
 	avm2_builtin_add_getset(ctx, ste, "code", se_get_code, se_set_code);
 	avm2_builtin_add_getset(ctx, ste, "level", se_get_level, se_set_level);
+	event_override_method(ctx, ste, "toString", ste_to_string);
 	sconst(ctx, ste, "STATUS", "status");
+	g_status_event_class = ste;
 
 	// flash.events.NetStatusEvent (extends Event).
 	Avm2Class* nse = avm2_builtin_class(ctx, "flash.events", "NetStatusEvent",
@@ -1536,6 +1586,38 @@ Avm2Object* avm2_net_status_event_new(Avm2Context* ctx,
 	args[2] = avm2_bool(0);
 	args[3] = info;
 	Avm2Value v = avm2_class_construct(ctx, g_net_status_event_class, args, 4);
+	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+}
+
+// StatusEvent / AsyncErrorEvent built from C by LocalConnection delivery
+// (avm2_net.c), matching Ruffle's LocalConnectionObject::{send_status,run_method}
+// argument lists exactly: both events are non-bubbling and non-cancelable, the
+// status event's `code` is null, and the async error carries the thrown Error.
+Avm2Object* avm2_status_event_new(Avm2Context* ctx, const Avm2String* code,
+                                  const char* level)
+{
+	if (g_status_event_class == NULL) return NULL;
+	Avm2Value args[5];
+	args[0] = avm2_string(avm2_string_from_literal(ctx, "status"));
+	args[1] = avm2_bool(0);
+	args[2] = avm2_bool(0);
+	args[3] = (code != NULL) ? avm2_string(code) : avm2_null();
+	args[4] = avm2_string(avm2_string_from_literal(ctx, level));
+	Avm2Value v = avm2_class_construct(ctx, g_status_event_class, args, 5);
+	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+}
+
+Avm2Object* avm2_async_error_event_new(Avm2Context* ctx, const Avm2String* text,
+                                       Avm2Object* error_obj)
+{
+	if (g_async_error_event_class == NULL) return NULL;
+	Avm2Value args[5];
+	args[0] = avm2_string(avm2_string_from_literal(ctx, "asyncError"));
+	args[1] = avm2_bool(0);
+	args[2] = avm2_bool(0);
+	args[3] = avm2_string(text);
+	args[4] = (error_obj != NULL) ? avm2_object_value(error_obj) : avm2_null();
+	Avm2Value v = avm2_class_construct(ctx, g_async_error_event_class, args, 5);
 	return v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
 }
 

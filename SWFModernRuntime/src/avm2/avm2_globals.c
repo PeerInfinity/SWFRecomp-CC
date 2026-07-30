@@ -2354,12 +2354,14 @@ static const char* lc_domain_from_url(const char* url)
 	return host;
 }
 
-static Avm2Value lc_get_domain(Avm2Activation* act)
+// The movie's LocalConnection domain (Ruffle LocalConnections::get_domain): the
+// SWF URL's host, with "localhost" for file:// and for IP literals.
+const char* avm2_local_connection_domain(void)
 {
 #ifdef SWF_URL
-	return net_str_const(act, lc_domain_from_url(SWF_URL));
+	return lc_domain_from_url(SWF_URL);
 #else
-	return net_str_const(act, "localhost");
+	return "localhost";
 #endif
 }
 
@@ -2443,20 +2445,10 @@ static void register_net(Avm2Context* ctx)
 	                                   b->event_dispatcher_class);
 	avm2_display_wire_url_stream(ctx, us);
 
-	// flash.net.LocalConnection (extends EventDispatcher). There is no IPC
-	// layer, so connect/send/close are no-ops and no message is ever
-	// delivered; `domain` is the one live property (games use it as a
-	// cheap origin check).
-	Avm2Class* lc = avm2_builtin_class(ctx, "flash.net", "LocalConnection",
-	                                   b->event_dispatcher_class);
-	avm2_builtin_add_getter(ctx, lc, "domain", lc_get_domain);
-	avm2_builtin_add_method(ctx, lc, "connect", net_noop);
-	avm2_builtin_add_method(ctx, lc, "send", net_noop);
-	avm2_builtin_add_method(ctx, lc, "close", net_noop);
-	avm2_builtin_add_method(ctx, lc, "allowDomain", net_noop);
-	avm2_builtin_add_method(ctx, lc, "allowInsecureDomain", net_noop);
-	avm2_builtin_add_getset(ctx, lc, "client", net_get_null, net_noop);
-	avm2_builtin_add_getset(ctx, lc, "isPerUser", net_get_true, net_noop);
+	// flash.net.LocalConnection is a real in-process channel registry as of
+	// net/socket tranche 6 and lives with the other connection classes in
+	// avm2_net.c (register_local_connection); only the domain rule stays here,
+	// beside the URL parsing it shares with the rest of this file.
 
 	// Package-level functions.
 	builtin_add_global_fn_ns(ctx, "flash.net", "navigateToURL",

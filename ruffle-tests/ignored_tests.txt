@@ -76,7 +76,11 @@ shared_object_self_ref
 # These tests require features not yet implemented in any test execution mode.
 # They may be removed from this list as capabilities are added.
 # See _investigation/FEATURE_SCOPE.md for details.
-localconnection
+# (localconnection removed 2026-07-29 — the in-process channel registry landed in
+# net/socket tranche 6, so avm1/localconnection, from_shumway/localconnection and
+# avm2/localconnection_send all pass. avm2/localconnection itself is 589/890: its
+# remaining half needs an AVM1<->AVM2 delivery bridge, which is a real gap rather
+# than absent infrastructure, so it is left visible in the filtered results.)
 # (edittext_ime_focus_lost removed — IME implemented, now passing)
 sandbox_type_remote
 

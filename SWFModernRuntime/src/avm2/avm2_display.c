@@ -2958,6 +2958,11 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// (loaderinfo_events pins this ordering). Loader fetches resolve right
 	// after, which is where Ruffle's test harness runs the async executor.
 	avm2_loaderinfo_run_exit_frame(ctx);
+	// LocalConnection delivery sits where Ruffle runs
+	// LocalConnections::update_connections: inside run_frame, after the AVM2
+	// phases and BEFORE the NetConnection flush below (avm2/amf_array_
+	// serialization traces its delivered message ahead of both remoting packets).
+	avm2_net_deliver_local_connections(ctx);
 	avm2_loader_drain(ctx);
 	// NetConnection.call: the queued packet is sent and its scripted response
 	// dispatched at the same executor-drain point a Loader fetch resolves at, so

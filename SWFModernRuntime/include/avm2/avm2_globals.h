@@ -395,6 +395,11 @@ typedef struct Avm2EventExt
 	// The `info` bag. Reached by the GC through the conservative native_ext
 	// scan, like every other Avm2Object* in this struct.
 	Avm2Object* info;
+	// --- AsyncErrorEvent ---
+	// `error`, the Error instance the failed callback threw. AsyncErrorEvent's
+	// 5th constructor argument is an Error OBJECT, not the errorID its
+	// ErrorEvent base takes.
+	Avm2Object* error_obj;
 } Avm2EventExt;
 
 // DisplayObject instance state (avm2_display.c). One struct serves the
@@ -628,6 +633,13 @@ Avm2Object* avm2_http_status_event_new(Avm2Context* ctx, const Avm2String* type,
 Avm2Object* avm2_net_status_event_new(Avm2Context* ctx,
                                       const char* const* keys,
                                       const char* const* values, int count);
+// flash.events.StatusEvent("status"), dispatched from C by LocalConnection.
+// `code` NULL means the null Flash itself passes there.
+Avm2Object* avm2_status_event_new(Avm2Context* ctx, const Avm2String* code,
+                                  const char* level);
+// flash.events.AsyncErrorEvent("asyncError") — `error` is the thrown Error.
+Avm2Object* avm2_async_error_event_new(Avm2Context* ctx, const Avm2String* text,
+                                       Avm2Object* error_obj);
 // Was the event's default prevented (cancelled)? NULL-safe.
 int avm2_event_is_cancelled(Avm2Object* event);
 // Display parent hook used for ancestor walks; reads the display ext.
@@ -652,6 +664,12 @@ void avm2_register_net_transport(Avm2Context* ctx);
 // connection, log the fetch, and dispatch the scripted response. Called once per
 // tick from avm2_display_run_tick at the loader/executor drain point.
 void avm2_net_flush_connections(Avm2Context* ctx);
+// Deliver this tick's queued LocalConnection messages (sender StatusEvent, then
+// the callee's method, then an AsyncErrorEvent on the receiver if it threw).
+// Called from avm2_display_run_tick right after the frame's AVM2 phases.
+void avm2_net_deliver_local_connections(Avm2Context* ctx);
+// The movie's LocalConnection domain (avm2_globals.c owns the URL parsing).
+const char* avm2_local_connection_domain(void);
 
 // flash.media Sound family (avm2_media.c — Stage 10).
 void avm2_register_media(Avm2Context* ctx);
