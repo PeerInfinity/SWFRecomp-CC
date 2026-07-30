@@ -220,6 +220,14 @@ throw, `globals_swf6/7/8`) stayed green.
 
 ### F3 — NOT LANDED: the blocker census was 34, not 6
 
+> **Superseded 2026-07-30** — the 22-test worklist below was worked to
+> completion in `SWFRecompDocs/plans/uncaught-error-worklist.md`. The
+> platform-API gaps are closed (+7, zero regressions); the trace itself
+> measured +2/−5 on its own and is reverted again, with **four** blockers
+> left instead of 22. Read that doc, not this table, before the next
+> attempt — and note its §1 lesson: two of the biggest-looking rows below
+> were worth exactly zero corpus delta.
+
 The scoping said F3's blockers were "exactly the six zero-trace image-only
 avm2 `bitmapdata_*` tests". That under-read `d1c307c51`'s own revert message,
 which lists ~18 causes across 71 tests. Measured directly this session (the
