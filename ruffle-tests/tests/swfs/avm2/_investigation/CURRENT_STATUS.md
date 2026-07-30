@@ -1,6 +1,38 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-30 — **shader/3D arc: the Stage3D side is COMPLETE**
+Last updated: 2026-07-30 — **shader/3D arc: PixelBender tranche P1 SHIPPED**
+(`SWFRecompDocs/plans/shader3d-arc.md` §6.2; `e4859db87`, CI `30514420826`
+graphics/full green). **+8 against +8 predicted, zero regressions, crash
+histogram flat.** The suite is **980 / 1221 (80.3%)**; the corpus is
+**3981 / 4421**. New file `SWFModernRuntime/src/avm2/avm2_pixelbender.c`: the
+PBJ bytecode parser (a transliteration of Ruffle's
+`render/pixel_bender/src/parser.rs`) plus the `flash.display`
+Shader/ShaderData/ShaderParameter/ShaderInput/ShaderJob surface and a
+`flash.filters.ShaderFilter` value holder. All 8 targets landed on the first
+run — `pixelbender_param_qualifier` (512 lines), `pixelbender_shaderdata`
+(49), `pixelbender_select_kinds`, `pixelbender_dithering`,
+`pixelbender_eof`, `pixelbender_parse_errors`, `pixelbender_no_out_param`,
+`shaderparameter_value`.
+
+**There is still no evaluator** — `ShaderJob.start` ships as a silent no-op,
+which is what keeps the six render-only PixelBender siblings
+(`pixelbender_images` + five `effect_*`) at their zero-trace-line passes now
+that their `new Shader(...)` runs a real parser. Two things are worth
+carrying forward. The graded 5-frame stack trace
+(`ShaderData/_setByteCode()` → `ShaderData()` → `Shader/set byteCode()` →
+`Shader()` → `Test()`) forced the C surface to reproduce Ruffle's AS-side
+call shape exactly — ctor through the real `byteCode` **setter**, setter
+constructs ShaderData, ShaderData's ctor calls the parser through its own
+method-ref frame — a design constraint that has to be built in rather than
+retrofitted. And two census entries labelled "parser" work
+(`pixelbender_padding_bytes`, `pixelbender_multiple_out_params`) actually
+grade `getPixel32` pixels, so they moved into P2's basket: the census had
+recorded each test's *subject* instead of the shape of its *expected lines*.
+**NEXT: P2 — the from-scratch evaluator**, the arc's one genuinely LARGE
+item (predicted +14 of 17; live risks are unorm8 half-way rounding and
+`_OutCoord` pixel-center).
+
+Previously: 2026-07-30 — **shader/3D arc: the Stage3D side is COMPLETE**
 (`SWFRecompDocs/plans/shader3d-arc.md` §6; tranches S1 + S2 shipped together
 as `dfbbfc1af`, CI `30510274980` graphics/full green). **+16 against +11
 predicted, zero regressions, crash histogram flat.** The suite is

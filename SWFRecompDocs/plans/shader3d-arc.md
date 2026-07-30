@@ -3,8 +3,10 @@
 **Status**: scoped 2026-07-30. **Stage3D side COMPLETE** — tranches S1 + S2
 shipped `dfbbfc1af` (CI `30510274980`, graphics/full, green): **+16 against
 +11 predicted**, all 15 scoped Stage3D-side targets green plus one rider,
-zero regressions (§6). PixelBender side (P1 → P2 → P3) not started.
-Oracle: Ruffle @ `75c3cec57` (local fork).
+zero regressions (§6). **PixelBender P1 COMPLETE** — shipped `e4859db87`
+(CI `30514420826`, graphics/full, green): **+8 against +8 predicted**, all 8
+targets green, zero regressions (§6.2). **P2 (the evaluator) is next and is
+the whole remaining bulk.** Oracle: Ruffle @ `75c3cec57` (local fork).
 
 ## 0. The decision this replaces
 
@@ -173,7 +175,7 @@ positions, and whatever else its .as enumerates. Pure bytecode
 validation; the AGAL assembler itself is test-side AS (already runs).
 
 ### Tranche P1 — PBJ parser + Shader/ShaderData/ShaderParameter surface ·
-predicted +6 of 8 · MEDIUM
+predicted +8 of 8 · **SHIPPED, +8 of 8** · MEDIUM
 Port parser.rs (strings NUL-terminated; floats BIG-endian f32; ints/regs
 little-endian; swizzle/mask encodings; metadata association rule
 parser.rs:799-834; validation: float-only Ceil/Sign, Select kind rules,
@@ -183,7 +185,7 @@ Yields: parse_errors, select_kinds, shaderdata, dithering,
 shaderparameter_value, param_qualifier (its 512 lines are #2004-no-out
 repeats), and — gated on the stack-trace risk — eof + no_out_param.
 
-### Tranche P2 — the evaluator + ShaderJob · predicted +14 of 18 · LARGE
+### Tranche P2 — the evaluator + ShaderJob · predicted +14 of 17 · LARGE
 C interpreter per §2/§3.3-3.5: vec4f/vec4i banks, the 45 opcodes
 (semantics from naga-pixelbender lib.rs:857-1420 — copy Sign's
 (x>0)-(x<0), BoolToFloat=zero-vec quirk, IntToBool=identity), if/else/
@@ -203,8 +205,10 @@ generateFilterRect 512×512 growth — touches the filter pipeline).
 **Arc prediction: +32 of 42** at scoping; **revised to +38 of 42** after
 S1+S2 (§6 — S1 landed 14 of 14 rather than 10, S2 its 1, one Matrix3D rider
 arrived, and P1 rises from +6 to +8 because the stack-trace risk is
-retired). **16 of that banked.** Re-predict after each tranche (arc
-convention).
+retired); **held at +38 of 42** after P1 (§6.2 — P1 delivered its 8 exactly;
+P2's denominator drops 18 → 17 on a census correction that moves no test).
+**24 of that banked** (S1+S2's 16 + P1's 8). Re-predict after each tranche
+(arc convention).
 
 ## 5. Named risks
 
@@ -233,7 +237,7 @@ convention).
 
 ## 6. Postmortems
 
-### S1 + S2 — SHIPPED `dfbbfc1af`, CI `30510274980` (graphics/full, green)
+### 6.1 · S1 + S2 — SHIPPED `dfbbfc1af`, CI `30510274980` (graphics/full, green)
 
 **+16 against +11 predicted (S1 +10, S2 +1). Zero regressions, zero other
 status moves, crash histogram flat.** Corpus 3957 → **3973 / 4421**;
@@ -324,3 +328,109 @@ Stage3D-side candidates the tranches scoped, plus the Matrix3D rider; P1
 rises by 2). Remaining Stage3D-side census entries: none — all 15 are
 green, and the 21 render-only siblings held at pass throughout (verified
 as pre-push canaries and again in CI).
+
+### 6.2 · P1 — SHIPPED `e4859db87`, CI `30514420826` (graphics/full, green)
+
+**+8 against +8 predicted. Zero regressions, zero other status moves, crash
+histogram flat.** Corpus 3973 → **3981 / 4421**; avm2 972 → **980 / 1221**.
+The only histogram movement was `output_mismatch 440 → 432` / `pass 3732 →
+3740`; `runtime_error` 7 → 7, `recomp_fail` 1 → 1, no `segfault` / `timeout`
+/ `compile_fail` bucket on either side. Baseline `5a4978935` (the commit
+before this work). Intersection 4421 tests on both sides — no lost shard.
+
+**All 8 targets passed on the first local run**, before any debugging:
+`pixelbender_parse_errors` 6/6, `pixelbender_eof` 7/7,
+`pixelbender_no_out_param` 6/6, `pixelbender_select_kinds` 8/8,
+`pixelbender_shaderdata` 49/49, `pixelbender_dithering` 8/8,
+`shaderparameter_value` 4/4, `pixelbender_param_qualifier` 512/512. Nothing
+in the pre-flight risk list bit, so the interesting content of this
+postmortem is what the tranche revealed about the *next* one.
+
+**§5.1's retirement held, and the design constraint it left behind was the
+whole architecture of the file.** The two stack-trace tests grade five frames
+(`ShaderData/_setByteCode()` → `ShaderData()` → `Shader/set byteCode()` →
+`Shader()` → `Test()`), and the only way to produce them is to reproduce
+Ruffle's AS-side call shape exactly: `Shader`'s ctor assigns through the real
+`byteCode` **setter** (`avm2_set_public_property`, which dispatches the
+GETSET entry and so pushes a frame named `set byteCode`), the setter calls
+`avm2_class_construct(ShaderData)` (pushing the iinit frame that renders as
+the bare `ShaderData()`), and `ShaderData`'s ctor invokes the parser through
+an explicit `avm2_call_method_ref` with a hand-built `Avm2MethodRef` named
+`_setByteCode` and `bound_class = ShaderData`. Three frames for what could
+have been one C function. The cost of getting this wrong is invisible until
+the trace is graded, so **the frame shape has to be designed in, not
+retrofitted** — a single `shader_ctor` that parsed inline would have passed
+six of the eight targets and looked finished.
+
+**The `Shader()` ctor gate is `if (bytecode)`, i.e. AS truthiness, not a null
+check.** `new Shader()` and `new Shader(null)` leave `data` null and parse
+nothing; anything truthy goes through the setter. An empty `ByteArray` is
+truthy (it is an object), which is exactly what `pixelbender_parse_errors`
+relies on: a zero-length shader parses to zero params, hits
+`MissingOutputParameter`, and raises #2004 — the shortest possible input
+already exercises the validate path.
+
+**Ruffle's `skip_padding` cannot fail, and that is load-bearing.** It streams
+through `io::copy(&mut data.by_ref().take(n), &mut sink())`, which copies
+*fewer* than `n` bytes at EOF and returns `Ok`. So a truncated **pad** is not
+an EOF, while a truncated **operand** is. Transliterating `skip_padding` as a
+bounds-checked read would have turned `Else`/`EndIf`/`If`-tail truncations
+into #2030 where Flash reports #2004 (or no error at all). The reader here
+clamps on skip and only sets `err = 2030` in `rd_u8`.
+
+**Two census entries were mis-attributed to P1 and belong to P2.**
+`pixelbender_padding_bytes` (22 lines) and `pixelbender_multiple_out_params`
+(1 line) are described in §1 as parser work — padding-skipping and
+last-out-param-wins — and both rules are indeed now implemented and correct.
+But both tests grade **`getPixel32` output**, so they cannot pass until the
+evaluator runs: they currently sit at `ffffffff` where Flash records
+`ffffff00` / `ff999999`. This is the generic trap that the
+`bucket-by-vm-not-symptom` habit is supposed to catch and didn't: the census
+recorded *which mechanism the test is about* rather than *what its expected
+lines are made of*. **When sizing a tranche, read the expected output's
+shape, not the test's subject.** Net effect on the arc is zero — the two
+tests move from P1's basket to P2's, which is why P2's denominator drops
+18 → 17 while its absolute prediction stands.
+
+**`param_qualifier`'s second loop does not need P2** (the check the tranche
+plan explicitly asked for). Its 256 `passed`/`failed` lines come from
+`shaderJob.shader.data.src.value = [1]` — a ShaderParameter *assignment*,
+which is P1 surface — and the `ShaderJob` it builds is never `start()`ed. The
+one `failed` line is `i == 2`, where the byte makes `src` an **out** param, so
+`data.src` is skipped by the ShaderData surface and the assignment throws
+#1010 on undefined. That is the skip rule being graded directly, not
+execution.
+
+**Small mechanical notes.** (1) `flash.filters.ShaderFilter` needed the
+`BitmapFilter` shell that `avm2_text.c` mints; per §6.1's
+`avm2_builtin_class` lesson it is shared through a new
+`avm2_filters_bitmapfilter_class()` accessor rather than re-registered —
+re-registering would have replaced the live class with an empty one and taken
+`DropShadowFilter`'s superclass with it. (2) A new `avm2/*.c` file needs only
+**two** of the four build lists: `verify_output.py` and
+`verify_output_keep.py`. `build_wasm_avm2.sh` globs `avm2/*.c`, and
+`CMakeLists.txt` / `build_test.sh` enumerate `actionmodern/` sources only —
+the "FOUR build lists" rule from `698bdddfa` is about *actionmodern* files.
+(3) `ShaderJob.start` ships as a silent no-op, which is what keeps the six
+render-only PixelBender siblings (`pixelbender_images` + five `effect_*`) at
+their zero-trace-line passes now that their `new Shader(...)` runs a real
+parser. All six were verified as pre-push canaries and again in CI.
+
+**Re-prediction for the remaining PixelBender tranches.**
+
+* **P2 (evaluator + ShaderJob): +14 of 17, absolute unchanged** (denominator
+  corrected from 18 by the two pixel-graded tests above, which are already
+  inside the +14). Nothing P1 touched informs §5.2 (unorm8 half-way
+  rounding) or §5.4 (`_OutCoord` pixel-center); both remain the real risks
+  and both are pixel-parity risks, i.e. exactly the class of problem P1 had
+  none of. One thing P1 *does* hand over: the parsed `PbjShader` is retained
+  on each ShaderData's `native_ext` (`Avm2ShaderDataExt::shader`), so P2
+  starts from a validated IR rather than re-reading bytes, and the
+  `PbjOp`/`PbjReg` structs already carry the swizzle/mask/matrix-channel
+  decoding the evaluator's zip rule needs. Test the 4×4 `pixelbender_input`
+  case early, as §5.4 says; and resolve any half-way rounding case from the
+  test's recorded byte rather than from a rounding-mode guess.
+* **P3 (tails): +1 of 2, unchanged.**
+
+**Arc prediction: +38 of 42, held. 24 banked** (16 Stage3D-side + 8 from P1).
+Remaining PixelBender census entries: 19 — the 17 in P2 and the 2 in P3.
