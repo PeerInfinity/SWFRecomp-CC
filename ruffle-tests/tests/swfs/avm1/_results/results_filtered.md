@@ -6,26 +6,26 @@
 
 **Run Duration**: 74m 35s
 
-**Filtered**: 43 tests ignored out of 717 available
+**Filtered**: 42 tests ignored out of 717 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 674 |
-| Passing | **641** (95.1%) |
+| Total tests | 675 |
+| Passing | **641** (95.0%) |
 | Ruffle-matched | 12 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **653** (96.9%) |
-| Failing | 21 |
-| Total expected lines | 107877 |
-| Matching lines | 104236 (96.6%) |
-| Mismatched lines | 3641 |
+| Effective pass | **653** (96.7%) |
+| Failing | 22 |
+| Total expected lines | 107927 |
+| Matching lines | 104238 (96.6%) |
+| Mismatched lines | 3689 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 21 | 100.0% |
+| Output Mismatch | 22 | 100.0% |
 
 ## Passing Tests
 
@@ -725,7 +725,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**21 tests** with output mismatch, sorted by match rate (best first)
+**22 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -749,7 +749,8 @@ No timeouts.
 | 18 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
 | 19 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
 | 20 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
-| 21 | `textfield_asbroadcaster` | 0.0% | 0/14 | 10 | 14 |  |
+| 21 | `netconnection_send_remote` | 4.0% | 2/50 | 2 | 50 | [48](ruffle-tests/tests/swfs/avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md) [66](ruffle-tests/tests/swfs/avm1/_investigation/complete/NETCONNECTION_PLAN.md) |
+| 22 | `textfield_asbroadcaster` | 0.0% | 0/14 | 10 | 14 |  |
 
 ## Investigation Documents
 
@@ -802,7 +803,7 @@ No timeouts.
 | 45 | [GETTEXTSNAPSHOT_CONSTRUCTOR_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/GETTEXTSNAPSHOT_CONSTRUCTOR_PLAN.md) | 1 | 1 | 0 |
 | 46 | [GLOBALS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/GLOBALS_PLAN.md) | 26 | 26 | 0 |
 | 47 | [HIT_TESTING_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/HIT_TESTING_PLAN.md) | 16 | 16 | 0 |
-| 48 | [IGNORED_INFRASTRUCTURE_TESTS.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md) | 7 | 7 | 0 |
+| 48 | [IGNORED_INFRASTRUCTURE_TESTS.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md) | 8 | 7 | 1 |
 | 49 | [infinite_recursion_function.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/infinite_recursion_function.md) | 3 | 3 | 0 |
 | 50 | [INPUT_DEAD_KEYS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/INPUT_DEAD_KEYS_PLAN.md) | 1 | 1 | 0 |
 | 51 | [issue_768.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/issue_768.md) | 1 | 1 | 0 |
@@ -820,7 +821,7 @@ No timeouts.
 | 63 | [MOVIECLIPLOADER_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/MOVIECLIPLOADER_PLAN.md) | 14 | 14 | 0 |
 | 64 | [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NATIVE_INTROSPECTION_PLAN.md) | 15 | 15 | 0 |
 | 65 | [NATIVE_OBJECTS_UPDATED_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NATIVE_OBJECTS_UPDATED_PLAN.md) | 2 | 2 | 0 |
-| 66 | [NETCONNECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NETCONNECTION_PLAN.md) | 1 | 1 | 0 |
+| 66 | [NETCONNECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NETCONNECTION_PLAN.md) | 2 | 1 | 1 |
 | 67 | [object_string_coerce.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/object_string_coerce.md) | 2 | 2 | 0 |
 | 68 | [OBJECT_WATCH_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/OBJECT_WATCH_PLAN.md) | 3 | 3 | 0 |
 | 69 | [OOP_SUPER_EXTENDS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/OOP_SUPER_EXTENDS_PLAN.md) | 8 | 8 | 0 |
