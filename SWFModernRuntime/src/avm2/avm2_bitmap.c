@@ -27,6 +27,7 @@
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_cpu_raster.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_filters.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <memory/heap.h>
@@ -2421,6 +2422,104 @@ static Avm2Value bd_noop(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// ---------------------------------------------------------------------------
+// applyFilter / generateFilterRect (filters arc F2)
+// ---------------------------------------------------------------------------
+
+// ColorMatrixFilter, on the CPU. Ruffle runs this through the renderer
+// (render/wgpu/shaders/filter/color_matrix.wgsl): unpremultiply, apply the
+// 4x5 matrix in 0..1 space with the bias column divided by 255, clamp, then
+// re-premultiply.
+static uint32_t color_matrix_pixel(uint32_t straight, const float* m)
+{
+	double c[4];
+	c[0] = (double) CR(straight) / 255.0;
+	c[1] = (double) CG(straight) / 255.0;
+	c[2] = (double) CB(straight) / 255.0;
+	c[3] = (double) CA(straight) / 255.0;
+	uint32_t out[4];
+	for (int row = 0; row < 4; row++)
+	{
+		double v = (double) m[row * 5 + 4] / 255.0;
+		for (int col = 0; col < 4; col++) v += (double) m[row * 5 + col] * c[col];
+		if (!(v > 0.0)) v = 0.0;
+		if (v > 1.0) v = 1.0;
+		out[row] = (uint32_t) (v * 255.0 + 0.5);
+	}
+	return CMK(out[0], out[1], out[2], out[3]);
+}
+
+static Avm2Value bd_apply_filter(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2BitmapDataExt* dst = this_bd(act);
+	check_valid(ctx, dst);
+	Avm2BitmapDataExt* src = avm2_bitmapdata_ext_of(ctx, arg(act, 0));
+	if (src == NULL || src->disposed) return avm2_undefined();
+	Avm2Value fv = arg(act, 3);
+	if (fv.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	Avm2FilterVal f;
+	if (!avm2_filter_from_object(ctx, fv.u.obj, &f)) return avm2_undefined();
+
+	int32_t sx, sy, sw, sh;
+	rect_to_xywh(ctx, arg(act, 1), &sx, &sy, &sw, &sh);
+	int32_t dx, dy;
+	read_point_i32(ctx, arg(act, 2), &dx, &dy);
+
+	// A gradient bevel/glow with no blur AND no distance contributes nothing
+	// over the composited source, so the whole pass is a straight copy. Any
+	// other kind we do not raster stays a no-op (matching the pre-arc stub).
+	int passthrough = (f.kind == AVM2_FILTER_GRADIENT_GLOW
+	                   || f.kind == AVM2_FILTER_GRADIENT_BEVEL)
+	                  && f.blur_x == 0 && f.blur_y == 0 && f.distance == 0;
+	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough)
+	{
+		avm2_filter_release(ctx, &f);
+		return avm2_undefined();
+	}
+
+	PixelRegion src_region = pr_for_region_i32(sx, sy, sw, sh);
+	pr_clamp(&src_region, src->width, src->height);
+	PixelRegion dst_region = pr_whole(dst->width, dst->height);
+	int32_t size_x = (int32_t) pr_w(&src_region);
+	int32_t size_y = (int32_t) pr_h(&src_region);
+	pr_clamp_intersection(&dst_region, dx, dy, (int32_t) src_region.x_min,
+	                      (int32_t) src_region.y_min, size_x, size_y, &src_region);
+	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
+	for (uint32_t y = 0; y < rh; y++)
+	{
+		for (uint32_t x = 0; x < rw; x++)
+		{
+			uint32_t raw = bd_get_raw(src, src_region.x_min + x, src_region.y_min + y);
+			uint32_t straight = src->transparency ? unmul(raw) : raw;
+			uint32_t outc = passthrough ? straight
+			                            : color_matrix_pixel(straight, f.cm);
+			bd_set_raw(dst, dst_region.x_min + x, dst_region.y_min + y,
+			           premul(outc, dst->transparency));
+		}
+	}
+	avm2_filter_release(ctx, &f);
+	return avm2_undefined();
+}
+
+// generateFilterRect (bitmap_data.rs): every filter kind is a stub that hands
+// back the source rect — EXCEPT ShaderFilter, whose arm returns the target
+// BitmapData's OWN rect and ignores sourceRect entirely.
+static Avm2Value bd_generate_filter_rect(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2BitmapDataExt* bd = this_bd(act);
+	check_valid(ctx, bd);
+	if (avm2_filter_is_shader_filter(ctx, arg(act, 1)))
+	{
+		return avm2_object_value(make_rectangle(ctx, 0, 0, (double) bd->width,
+		                                        (double) bd->height));
+	}
+	double x, y, w, h;
+	rect_by_name(ctx, arg(act, 0), &x, &y, &w, &h);
+	return avm2_object_value(make_rectangle(ctx, x, y, w, h));
+}
+
 // copyChannel (operations.rs): copy one source channel into a dest channel.
 static Avm2Value bd_copy_channel(Avm2Activation* act)
 {
@@ -2840,7 +2939,8 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, bd, "unlock", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "draw", bd_draw);
 	avm2_builtin_add_method(ctx, bd, "drawWithQuality", bd_noop);
-	avm2_builtin_add_method(ctx, bd, "applyFilter", bd_noop);
+	avm2_builtin_add_method(ctx, bd, "applyFilter", bd_apply_filter);
+	avm2_builtin_add_method(ctx, bd, "generateFilterRect", bd_generate_filter_rect);
 	avm2_builtin_add_method(ctx, bd, "merge", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "paletteMap", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "perlinNoise", bd_noop);

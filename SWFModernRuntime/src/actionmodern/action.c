@@ -58479,7 +58479,12 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		FILTER_SET_BOOL("preserveAlpha", 13, (num_args > 5) ? (int)varToDoubleSimple(&args[5]) : 1);
 		FILTER_SET_BOOL("clamp", 5, (num_args > 6) ? (int)varToDoubleSimple(&args[6]) : 1);
 		FILTER_SET_F64("color", 5, (num_args > 7) ? varToDoubleSimple(&args[7]) : 0.0);
-		FILTER_SET_F64("alpha", 5, (num_args > 8) ? varToDoubleSimple(&args[8]) : 0.0);
+		// "Despite the documentation": passing the 8th (color) argument forces
+		// the alpha byte to 255 even when alpha itself is omitted. Only the
+		// no-color form defaults to 0. (visual/filters/avm1_convolution_
+		// initialization; AVM2's ConvolutionFilter does NOT do this.)
+		FILTER_SET_F64("alpha", 5, (num_args > 8) ? varToDoubleSimple(&args[8])
+		                         : ((num_args > 7) ? 1.0 : 0.0));
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
