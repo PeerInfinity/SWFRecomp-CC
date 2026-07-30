@@ -1441,12 +1441,71 @@ static void apply_place_matrix(Avm2DisplayObjectExt* ext, const Avm2TimelineOp* 
 	ext->scale_rot_cached = 0;
 }
 
+// SWF numeric blend id -> the AS name DisplayObject.blendMode reports
+// (swf/src/types.rs BlendMode::from_u8 + Display; 1 aliases 0, and anything
+// out of range degrades to "normal").
+static const char* blend_mode_name(uint8_t id)
+{
+	switch (id)
+	{
+		case 2:  return "layer";
+		case 3:  return "multiply";
+		case 4:  return "screen";
+		case 5:  return "lighten";
+		case 6:  return "darken";
+		case 7:  return "difference";
+		case 8:  return "add";
+		case 9:  return "subtract";
+		case 10: return "invert";
+		case 11: return "alpha";
+		case 12: return "erase";
+		case 13: return "overlay";
+		case 14: return "hardlight";
+		default: return "normal";
+	}
+}
+
+// blendMode / cacheAsBitmap are stored as dont_enum dyn props (the same slots
+// the AS getters read), so the timeline can seed them without an activation.
+static void set_blend_mode_name(Avm2Context* ctx, Avm2Object* obj, const char* name)
+{
+	if (obj == NULL) return;
+	avm2_object_set_dynamic(ctx, obj, "__blendMode", 11,
+		avm2_string(avm2_string_from_literal(ctx, name)))->dont_enum = 1;
+}
+
+static void set_cache_as_bitmap(Avm2Context* ctx, Avm2Object* obj, int on)
+{
+	if (obj == NULL) return;
+	avm2_object_set_dynamic(ctx, obj, "__cacheAsBitmap", 15,
+		avm2_bool(on != 0))->dont_enum = 1;
+}
+
 static void apply_place_object(Avm2Context* ctx, Avm2Object* child,
                                const Avm2TimelineOp* op)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, child);
 	if (ext == NULL) return;
 	apply_place_matrix(ext, op);
+	if (op->flags & AVM2_TLF_HAS_CXFORM)
+	{
+		ext->cx_rm = op->cx_mult[0];
+		ext->cx_gm = op->cx_mult[1];
+		ext->cx_bm = op->cx_mult[2];
+		ext->alpha_fixed8 = op->cx_mult[3];
+		ext->cx_ra = op->cx_add[0];
+		ext->cx_ga = op->cx_add[1];
+		ext->cx_ba = op->cx_add[2];
+		ext->cx_aa = op->cx_add[3];
+	}
+	if (op->flags & AVM2_TLF_HAS_BLEND)
+	{
+		set_blend_mode_name(ctx, child, blend_mode_name(op->blend_mode));
+	}
+	if (op->flags & AVM2_TLF_HAS_CACHE)
+	{
+		set_cache_as_bitmap(ctx, child, op->bitmap_cache != 0);
+	}
 	if (op->flags & AVM2_TLF_HAS_VISIBLE)
 	{
 		ext->visible = op->visible ? 1 : 0;
@@ -2223,6 +2282,176 @@ typedef struct GotoCmd
 	uint32_t index;         // op order for sorting
 } GotoCmd;
 
+// The effective placement a goto command resolves to, i.e. Ruffle's merged
+// `GotoPlaceObject::place_object`. Two things happen here that a raw tag op
+// does not do on its own:
+//
+//  1. On a REWIND, a Place (character, not a move) has every animatable
+//     property DEFAULTED in (GotoPlaceObject::new): matrix, colour transform,
+//     ratio, blend mode, bitmap caching and filters. That is what makes a
+//     rewind to frame 1 undo a later frame's tint/blend/transform even though
+//     frame 1's tag never mentions them. Purposely omitted, exactly as in
+//     Ruffle: name, clipDepth (initial placement only) and visibility (which
+//     persists across a rewind).
+//  2. Later modify ops at the same depth are folded on top, field by field
+//     (GotoPlaceObject::merge), so `survives_rewind` and the apply step both
+//     see the final state rather than the first tag.
+static void goto_effective_place(const GotoCmd* cmd, int is_rewind,
+                                 Avm2TimelineOp* out)
+{
+	*out = *cmd->place;
+	if (is_rewind && (out->flags & AVM2_TLF_HAS_CHAR)
+	    && (out->flags & AVM2_TLF_MOVE) == 0)
+	{
+		if ((out->flags & AVM2_TLF_HAS_MATRIX) == 0)
+		{
+			out->mtx_a = 1; out->mtx_b = 0; out->mtx_c = 0; out->mtx_d = 1;
+			out->mtx_tx = 0; out->mtx_ty = 0;
+			out->flags |= AVM2_TLF_HAS_MATRIX;
+		}
+		if ((out->flags & AVM2_TLF_HAS_CXFORM) == 0)
+		{
+			out->cx_mult[0] = 256; out->cx_mult[1] = 256;
+			out->cx_mult[2] = 256; out->cx_mult[3] = 256;
+			out->cx_add[0] = 0; out->cx_add[1] = 0;
+			out->cx_add[2] = 0; out->cx_add[3] = 0;
+			out->flags |= AVM2_TLF_HAS_CXFORM;
+		}
+		if ((out->flags & AVM2_TLF_HAS_RATIO) == 0)
+		{
+			out->ratio = 0;
+			out->flags |= AVM2_TLF_HAS_RATIO;
+		}
+		if ((out->flags & AVM2_TLF_HAS_BLEND) == 0)
+		{
+			out->blend_mode = 0;
+			out->flags |= AVM2_TLF_HAS_BLEND;
+		}
+		if ((out->flags & AVM2_TLF_HAS_CACHE) == 0)
+		{
+			out->bitmap_cache = 0;
+			out->flags |= AVM2_TLF_HAS_CACHE;
+		}
+		if ((out->flags & AVM2_TLF_HAS_FILTERS) == 0)
+		{
+			out->filter_count = 0;
+			out->filters = NULL;
+			out->flags |= AVM2_TLF_HAS_FILTERS;
+		}
+	}
+	for (uint32_t i = 0; i < cmd->mod_count; i++)
+	{
+		const Avm2TimelineOp* m = cmd->mods[i];
+		if (m->flags & AVM2_TLF_HAS_MATRIX)
+		{
+			out->mtx_a = m->mtx_a; out->mtx_b = m->mtx_b;
+			out->mtx_c = m->mtx_c; out->mtx_d = m->mtx_d;
+			out->mtx_tx = m->mtx_tx; out->mtx_ty = m->mtx_ty;
+			out->flags |= AVM2_TLF_HAS_MATRIX;
+		}
+		if (m->flags & AVM2_TLF_HAS_CXFORM)
+		{
+			for (int k = 0; k < 4; k++)
+			{
+				out->cx_mult[k] = m->cx_mult[k];
+				out->cx_add[k] = m->cx_add[k];
+			}
+			out->flags |= AVM2_TLF_HAS_CXFORM;
+		}
+		if (m->flags & AVM2_TLF_HAS_RATIO)
+		{
+			out->ratio = m->ratio;
+			out->flags |= AVM2_TLF_HAS_RATIO;
+		}
+		if (m->flags & AVM2_TLF_HAS_BLEND)
+		{
+			out->blend_mode = m->blend_mode;
+			out->flags |= AVM2_TLF_HAS_BLEND;
+		}
+		if (m->flags & AVM2_TLF_HAS_CACHE)
+		{
+			out->bitmap_cache = m->bitmap_cache;
+			out->flags |= AVM2_TLF_HAS_CACHE;
+		}
+		if (m->flags & AVM2_TLF_HAS_VISIBLE)
+		{
+			out->visible = m->visible;
+			out->flags |= AVM2_TLF_HAS_VISIBLE;
+		}
+		if (m->flags & AVM2_TLF_HAS_FILTERS)
+		{
+			out->filter_count = m->filter_count;
+			out->filters = m->filters;
+			out->flags |= AVM2_TLF_HAS_FILTERS;
+		}
+	}
+}
+
+// Ruffle MovieClip::survives_rewind. A child that predates the rewind target
+// survives untouched — EXCEPT a morph shape, whose interpolation ratio still
+// has to be re-checked. Everything else is decided by a per-field comparison
+// against the final placement at that depth, and which fields count depends
+// on the object's type: a shape/text/morph compares everything, a
+// button/edittext/bitmap/video skips the transform, and a MovieClip is
+// decided by its ratio alone.
+static int survives_rewind(Avm2Context* ctx, Avm2DisplayObjectExt* cext,
+                           const GotoCmd* cmds, uint32_t cmd_count,
+                           uint16_t clamped)
+{
+	int candidate = (cext->place_frame > (int32_t) clamped)
+	                || cext->placed_by_avm2_script;
+	if (!candidate && !cext->is_morph_shape) return 1;
+
+	const GotoCmd* final_cmd = NULL;
+	for (uint32_t k = 0; k < cmd_count; k++)
+	{
+		if (cmds[k].depth == cext->depth && cmds[k].place != NULL)
+		{
+			final_cmd = &cmds[k];
+			break;
+		}
+	}
+	if (final_cmd == NULL) return 0;
+
+	Avm2TimelineOp eff;
+	goto_effective_place(final_cmd, 1, &eff);
+
+	int id_eq = (eff.flags & AVM2_TLF_HAS_CHAR)
+	            && eff.char_id == cext->char_id;
+	int ratio_eq = ((eff.flags & AVM2_TLF_HAS_RATIO) == 0)
+	               || eff.ratio == cext->ratio;
+	int clip_eq = ((eff.flags & AVM2_TLF_HAS_CLIP_DEPTH) == 0)
+	              || (int32_t) eff.clip_depth == cext->clip_depth;
+	int cx_eq = ((eff.flags & AVM2_TLF_HAS_CXFORM) == 0)
+	            || (eff.cx_mult[0] == cext->cx_rm && eff.cx_mult[1] == cext->cx_gm
+	                && eff.cx_mult[2] == cext->cx_bm
+	                && eff.cx_mult[3] == cext->alpha_fixed8
+	                && eff.cx_add[0] == cext->cx_ra && eff.cx_add[1] == cext->cx_ga
+	                && eff.cx_add[2] == cext->cx_ba && eff.cx_add[3] == cext->cx_aa);
+	int mtx_eq = ((eff.flags & AVM2_TLF_HAS_MATRIX) == 0)
+	             || (eff.mtx_a == cext->mtx_a && eff.mtx_b == cext->mtx_b
+	                 && eff.mtx_c == cext->mtx_c && eff.mtx_d == cext->mtx_d
+	                 && eff.mtx_tx == cext->mtx_tx && eff.mtx_ty == cext->mtx_ty);
+
+	const Avm2CharInfo* ci = char_info(cext->char_id);
+	uint8_t kind = (ci != NULL) ? ci->kind : (uint8_t) AVM2_CHAR_SPRITE;
+	(void) ctx;
+	switch (kind)
+	{
+		case AVM2_CHAR_MORPHSHAPE:
+		case AVM2_CHAR_SHAPE:
+		case AVM2_CHAR_TEXT:
+			return ratio_eq && id_eq && clip_eq && mtx_eq && cx_eq;
+		case AVM2_CHAR_BUTTON:
+		case AVM2_CHAR_EDITTEXT:
+		case AVM2_CHAR_BITMAP:
+		case AVM2_CHAR_VIDEO:
+			return ratio_eq && id_eq && clip_eq;
+		default:
+			return ratio_eq;
+	}
+}
+
 static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_implicit)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
@@ -2346,46 +2575,13 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 	if (is_rewind)
 	{
 		// Remove children that don't survive the rewind (Ruffle
-		// survives_rewind): a non-script child placed AT OR BEFORE the
-		// target frame survives unconditionally; later children survive
-		// only when the final placement at their depth re-places the same
-		// character with equal matrix/ratio/clip-depth.
+		// survives_rewind).
 		for (uint32_t i = ext->render_len; i > 0; i--)
 		{
 			Avm2Object* child = ext->render_list[i - 1];
 			Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
 			if (cext == NULL) continue;
-			int candidate = (cext->place_frame > (int32_t) clamped)
-			                || cext->placed_by_avm2_script;
-			int survives;
-			if (!candidate)
-			{
-				survives = 1;
-			}
-			else
-			{
-				survives = 0;
-				for (uint32_t k = 0; k < cmd_count; k++)
-				{
-					if (cmds[k].depth != cext->depth || cmds[k].place == NULL)
-					{
-						continue;
-					}
-					const Avm2TimelineOp* op = cmds[k].place;
-					int id_eq = (op->char_id == cext->char_id);
-					int ratio_eq = ((op->flags & AVM2_TLF_HAS_RATIO) == 0)
-					               || op->ratio == 0;
-					int clip_eq = ((op->flags & AVM2_TLF_HAS_CLIP_DEPTH) == 0)
-					              || op->clip_depth == cext->clip_depth;
-					int mtx_eq = ((op->flags & AVM2_TLF_HAS_MATRIX) == 0)
-					             || (op->mtx_a == cext->mtx_a && op->mtx_b == cext->mtx_b
-					                 && op->mtx_c == cext->mtx_c && op->mtx_d == cext->mtx_d
-					                 && op->mtx_tx == cext->mtx_tx
-					                 && op->mtx_ty == cext->mtx_ty);
-					survives = id_eq && ratio_eq && clip_eq && mtx_eq;
-					break;
-				}
-			}
+			int survives = survives_rewind(ctx, cext, cmds, cmd_count, clamped);
 			if (!survives)
 			{
 				if (cext->placed_by_avm2_script)
@@ -2408,20 +2604,31 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 		Avm2Object* child = child_by_depth(ext, cmd->depth);
 		Avm2DisplayObjectExt* cext = child != NULL
 			? avm2_display_ext_of(ctx, child) : NULL;
+		// A rewind resolves each command to its EFFECTIVE placement first:
+		// defaults filled in for everything the target frame's tag leaves
+		// unmentioned, later modify ops folded on top. A forward goto keeps
+		// the raw tag and replays its trailing modify ops below.
+		Avm2TimelineOp eff;
+		const Avm2TimelineOp* place = cmd->place;
+		if (is_rewind)
+		{
+			goto_effective_place(cmd, 1, &eff);
+			place = &eff;
+		}
 		if (child != NULL && cext != NULL && is_rewind)
 		{
 			// Rewind always modifies the surviving child in place
 			// (survives_rewind scrubbed the mismatches above).
-			apply_place_object(ctx, child, cmd->place);
+			apply_place_object(ctx, child, place);
 		}
 		else if (child != NULL && cext != NULL
-		         && (cmd->place->flags & AVM2_TLF_MOVE))
+		         && (place->flags & AVM2_TLF_MOVE))
 		{
 			// Forward-goto Replace: SAME display object, per-type
 			// character swap + place_frame update (Ruffle goto arm
 			// Replace(id) + prev_child).
-			replace_child_character(ctx, child, cmd->place->char_id);
-			apply_place_object(ctx, child, cmd->place);
+			replace_child_character(ctx, child, place->char_id);
+			apply_place_object(ctx, child, place);
 			cext->place_frame = cmd->frame;
 		}
 		else
@@ -2436,11 +2643,11 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 				// Looping goto defers creation to the Enter-phase add
 				// queue... static tables make immediate creation
 				// equivalent here; keep immediate for simplicity.
-				fresh = instantiate_child(ctx, obj, cmd->place);
+				fresh = instantiate_child(ctx, obj, place);
 			}
 			else
 			{
-				fresh = instantiate_child(ctx, obj, cmd->place);
+				fresh = instantiate_child(ctx, obj, place);
 			}
 			if (fresh != NULL)
 			{
@@ -2449,7 +2656,7 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 			}
 			child = fresh;
 		}
-		if (child != NULL)
+		if (child != NULL && !is_rewind)
 		{
 			for (uint32_t mi = 0; mi < cmd->mod_count; mi++)
 			{
@@ -9029,16 +9236,83 @@ static Avm2Value colortransform_concat(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// Fixed8 (Ruffle Fixed8::from_f64: multiply then saturate to i16).
+static int16_t to_fixed8(double v)
+{
+	double s = v * 256.0;
+	if (isnan(s)) return 0;
+	if (s >= 32767.0) return 32767;
+	if (s <= -32768.0) return -32768;
+	return (int16_t) s;
+}
+
+static int16_t to_i16_trunc(double v)
+{
+	if (isnan(v)) return 0;
+	if (v >= 32767.0) return 32767;
+	if (v <= -32768.0) return -32768;
+	return (int16_t) v;
+}
+
 static Avm2Value transform_get_color_transform(Avm2Activation* act)
 {
-	// Identity color transform (per-object color transforms are not
-	// tracked in NO_GRAPHICS mode).
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2DisplayObjectExt* ext = NULL;
+	if (self != NULL && self->native_ext != NULL)
+	{
+		Avm2TransformExt* text = self->native_ext;
+		if (text->target != NULL) ext = avm2_display_ext_of(ctx, text->target);
+	}
+	if (ext == NULL)
+	{
+		return avm2_class_construct(ctx, g_colortransform_class, NULL, 0);
+	}
+	Avm2Value args[8] = {
+		avm2_number((double) ext->cx_rm / 256.0),
+		avm2_number((double) ext->cx_gm / 256.0),
+		avm2_number((double) ext->cx_bm / 256.0),
+		avm2_number((double) ext->alpha_fixed8 / 256.0),
+		avm2_number(ext->cx_ra), avm2_number(ext->cx_ga),
+		avm2_number(ext->cx_ba), avm2_number(ext->cx_aa),
+	};
+	return avm2_class_construct(ctx, g_colortransform_class, args, 8);
+}
+
+// Ruffle Transform.as: concatenatedColorTransform is a stub that hands back a
+// fresh identity ColorTransform, NOT the concatenation up the parent chain.
+static Avm2Value transform_get_concat_color_transform(Avm2Activation* act)
+{
 	return avm2_class_construct(act->ctx, g_colortransform_class, NULL, 0);
 }
 
 static Avm2Value transform_set_color_transform(Avm2Activation* act)
 {
-	(void) act;
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL || act->argc < 1)
+	{
+		return avm2_undefined();
+	}
+	Avm2TransformExt* text = self->native_ext;
+	if (text->target == NULL) return avm2_undefined();
+	Avm2Value v = act->args[0];
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL
+	    || v.u.obj->slot_count < 9)
+	{
+		return avm2_undefined();
+	}
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
+	if (ext == NULL) return avm2_undefined();
+	Avm2Object* ct = v.u.obj;
+	ext->cx_rm = to_fixed8(avm2_coerce_to_number(ctx, ct->slots[1]));
+	ext->cx_gm = to_fixed8(avm2_coerce_to_number(ctx, ct->slots[2]));
+	ext->cx_bm = to_fixed8(avm2_coerce_to_number(ctx, ct->slots[3]));
+	ext->alpha_fixed8 = to_fixed8(avm2_coerce_to_number(ctx, ct->slots[4]));
+	ext->cx_ra = to_i16_trunc(avm2_coerce_to_number(ctx, ct->slots[5]));
+	ext->cx_ga = to_i16_trunc(avm2_coerce_to_number(ctx, ct->slots[6]));
+	ext->cx_ba = to_i16_trunc(avm2_coerce_to_number(ctx, ct->slots[7]));
+	ext->cx_aa = to_i16_trunc(avm2_coerce_to_number(ctx, ct->slots[8]));
 	return avm2_undefined();
 }
 
@@ -9405,8 +9679,49 @@ static Avm2Value io_request_soft_keyboard(Avm2Activation* act)
 STUB_GETSET(io_softkbdarea, "__softKeyboardInputAreaOfInterest", avm2_null())
 STUB_GETSET(do_accessimpl, "__accessibilityImplementation", avm2_null())
 STUB_GETSET(do_contextmenu, "__contextMenu", avm2_null())
-STUB_GETSET(do_blendmode, "__blendMode",
-            avm2_string(avm2_string_from_literal(act->ctx, "normal")))
+static Avm2Value do_blendmode_get(Avm2Activation* act)
+{
+	return dyn_prop_get(act, "__blendMode",
+	                    avm2_string(avm2_string_from_literal(act->ctx, "normal")));
+}
+
+// Assigning a name outside ExtendedBlendMode throws ArgumentError #2008 and
+// leaves the old value in place (display_object.rs set_blend_mode); null or
+// undefined is the earlier #2007 non-null check.
+static Avm2Value do_blendmode_set(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter blendMode must be non-null.");
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	static const char* const known[] = {
+		"normal", "layer", "multiply", "screen", "lighten", "darken",
+		"difference", "add", "subtract", "invert", "alpha", "erase",
+		"overlay", "hardlight", "shader",
+	};
+	int ok = 0;
+	for (size_t i = 0; i < sizeof(known) / sizeof(known[0]); i++)
+	{
+		if (gfx_str_is(s, known[i])) { ok = 1; break; }
+	}
+	if (!ok)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2008: Parameter blendMode must be one of "
+		                 "the accepted values.");
+	}
+	Avm2Object* self = this_obj(act);
+	if (self != NULL)
+	{
+		avm2_object_set_dynamic(ctx, self, "__blendMode", 11,
+		                        avm2_string(s))->dont_enum = 1;
+	}
+	return avm2_undefined();
+}
 
 // blendShader is write-only in DisplayObject.as. Assigning a usable Shader
 // also flips blendMode to "shader" (display_object.rs:2108-2111), and that
@@ -10069,6 +10384,9 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 	ext->scale_x = 1;
 	ext->scale_y = 1;
 	ext->alpha_fixed8 = 256;
+	ext->cx_rm = 256;
+	ext->cx_gm = 256;
+	ext->cx_bm = 256;
 	ext->mouse_enabled = 1;
 	ext->mouse_children = 1;
 	ext->tab_children = 1;
@@ -12385,7 +12703,7 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, geom_transform, "colorTransform", transform_get_color_transform,
 	           transform_set_color_transform);
 	add_getset(ctx, geom_transform, "concatenatedColorTransform",
-	           transform_get_color_transform, NULL);
+	           transform_get_concat_color_transform, NULL);
 	add_getset(ctx, geom_transform, "concatenatedMatrix",
 	           transform_get_concatenated_matrix, NULL);
 	add_getset(ctx, geom_transform, "matrix3D", transform_get_matrix3d,

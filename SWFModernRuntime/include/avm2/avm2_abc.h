@@ -215,6 +215,9 @@ enum
 	AVM2_TLF_HAS_RATIO = 1 << 5,
 	AVM2_TLF_HAS_VISIBLE = 1 << 6,  // PlaceObject3 visible flag present
 	AVM2_TLF_HAS_FILTERS = 1 << 7,  // PlaceObject3 SurfaceFilterList present
+	AVM2_TLF_HAS_CXFORM = 1 << 8,   // CXFORM(WITHALPHA) present
+	AVM2_TLF_HAS_BLEND = 1 << 9,    // PlaceObject3 BlendMode present
+	AVM2_TLF_HAS_CACHE = 1 << 10,   // PlaceObject3 BitmapCache present
 };
 
 // One PlaceObject3 SurfaceFilterList entry, kept in the SWF's own fixed-point
@@ -246,7 +249,7 @@ typedef struct Avm2TagFilter
 typedef struct Avm2TimelineOp
 {
 	uint8_t kind;    // AVM2_TLOP_*
-	uint8_t flags;   // AVM2_TLF_*
+	uint16_t flags;  // AVM2_TLF_*
 	uint8_t visible; // valid when HAS_VISIBLE
 	uint16_t char_id;
 	uint16_t depth;
@@ -260,6 +263,12 @@ typedef struct Avm2TimelineOp
 	// flag, which is how a PlaceObject3 CLEARS a depth's filters).
 	uint16_t filter_count;
 	const Avm2TagFilter* filters;
+	// CXFORM (valid when HAS_CXFORM), in Ruffle's ColorTransform layout:
+	// Fixed8 multipliers (256 = 1.0) and i16 addends, R/G/B/A order.
+	int16_t cx_mult[4];
+	int16_t cx_add[4];
+	uint8_t blend_mode;    // SWF numeric blend id (valid when HAS_BLEND)
+	uint8_t bitmap_cache;  // valid when HAS_CACHE
 } Avm2TimelineOp;
 
 typedef struct Avm2FrameLabelData

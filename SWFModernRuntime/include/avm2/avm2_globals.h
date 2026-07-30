@@ -464,6 +464,12 @@ typedef struct Avm2DisplayObjectExt
 	double scale_x, scale_y;     // unit values (may be NaN)
 	double skew;                 // radians
 	int16_t alpha_fixed8;        // 8.8 fixed a_multiply; default 256
+	// The rest of the ColorTransform (Ruffle layout: Fixed8 multipliers,
+	// i16 addends). aMultiplier lives in alpha_fixed8 above, which is what
+	// keeps DisplayObject.alpha and transform.colorTransform.alphaMultiplier
+	// the same storage. Defaults: multipliers 256, addends 0.
+	int16_t cx_rm, cx_gm, cx_bm;
+	int16_t cx_ra, cx_ga, cx_ba, cx_aa;
 	// InteractiveObject.
 	uint8_t mouse_enabled;       // default 1
 	uint8_t double_click_enabled;

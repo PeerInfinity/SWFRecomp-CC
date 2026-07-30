@@ -202,6 +202,36 @@ void skipCxform(ByteReader& r, bool with_alpha)
 	br.align();
 }
 
+// CXFORMWITHALPHA -> Ruffle's ColorTransform layout: Fixed8 multipliers
+// (256 = 1.0) and i16 addends. Absent terms keep their identity value, which
+// is what makes a PlaceObject that carries a cxform with only add terms leave
+// the multipliers alone.
+struct CxformRec
+{
+	int16_t mult[4] = { 256, 256, 256, 256 };
+	int16_t add[4] = { 0, 0, 0, 0 };
+};
+
+CxformRec parseCxform(ByteReader& r, bool with_alpha)
+{
+	CxformRec cx;
+	BitReader br(r);
+	uint32_t has_add = br.ub(1);
+	uint32_t has_mult = br.ub(1);
+	uint32_t nbits = br.ub(4);
+	uint32_t terms = with_alpha ? 4 : 3;
+	if (has_mult)
+	{
+		for (uint32_t i = 0; i < terms; i++) cx.mult[i] = (int16_t) br.sb(nbits);
+	}
+	if (has_add)
+	{
+		for (uint32_t i = 0; i < terms; i++) cx.add[i] = (int16_t) br.sb(nbits);
+	}
+	br.align();
+	return cx;
+}
+
 // SurfaceFilterList skip (PlaceObject3 / ButtonRecord2). Filter payload
 // sizes per SWF spec.
 void skipFilterList(ByteReader& r)
@@ -539,7 +569,7 @@ struct SoundAsset
 struct TOp
 {
 	uint8_t kind = 0;
-	uint8_t flags = 0;
+	uint16_t flags = 0;
 	uint8_t visible = 1;
 	uint16_t char_id = 0;
 	uint16_t depth = 0;
@@ -550,6 +580,9 @@ struct TOp
 	Matrix mtx;
 	bool has_filters = false;
 	std::vector<TagFilterRec> filters;
+	CxformRec cx;
+	uint8_t blend_mode = 0;
+	uint8_t bitmap_cache = 0;
 };
 
 // Flag bits mirror AVM2_TLF_* in avm2_abc.h.
@@ -563,6 +596,9 @@ enum
 	TLF_HAS_RATIO = 1 << 5,
 	TLF_HAS_VISIBLE = 1 << 6,
 	TLF_HAS_FILTERS = 1 << 7,
+	TLF_HAS_CXFORM = 1 << 8,
+	TLF_HAS_BLEND = 1 << 9,
+	TLF_HAS_CACHE = 1 << 10,
 };
 
 struct Timeline
@@ -815,6 +851,13 @@ struct Scanner
 			op.depth = r.u16();
 			op.mtx = parseMatrix(r);
 			op.flags = TLF_HAS_CHAR | TLF_HAS_MATRIX;
+			// PlaceObject (v1) carries a trailing CXFORM only when the tag
+			// body has bytes left (Ruffle read.rs read_place_object).
+			if (r.ok(1))
+			{
+				op.cx = parseCxform(r, false);
+				op.flags |= TLF_HAS_CXFORM;
+			}
 			tl.current.push_back(op);
 			return;
 		}
@@ -857,7 +900,11 @@ struct Scanner
 			op.mtx = parseMatrix(r);
 			op.flags |= TLF_HAS_MATRIX;
 		}
-		if (has_color) skipCxform(r, true);
+		if (has_color)
+		{
+			op.cx = parseCxform(r, true);
+			op.flags |= TLF_HAS_CXFORM;
+		}
 		if (has_ratio)
 		{
 			op.ratio = r.u16();
@@ -884,8 +931,16 @@ struct Scanner
 				op.has_filters = true;
 				op.flags |= TLF_HAS_FILTERS;
 			}
-			if (has_blend) r.u8();
-			if (has_cache) r.u8();
+			if (has_blend)
+			{
+				op.blend_mode = r.u8();
+				op.flags |= TLF_HAS_BLEND;
+			}
+			if (has_cache)
+			{
+				op.bitmap_cache = r.u8();
+				op.flags |= TLF_HAS_CACHE;
+			}
 			if (has_visible)
 			{
 				op.visible = r.u8();
@@ -1681,7 +1736,13 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 					    << ", " << fmtFloat(op.mtx.a) << ", " << fmtFloat(op.mtx.b)
 					    << ", " << fmtFloat(op.mtx.c) << ", " << fmtFloat(op.mtx.d)
 					    << ", " << op.mtx.tx << ", " << op.mtx.ty
-					    << ", " << op.filters.size() << ", " << flist << " },\n";
+					    << ", " << op.filters.size() << ", " << flist
+					    << ", " << op.cx.mult[0] << ", " << op.cx.mult[1]
+					    << ", " << op.cx.mult[2] << ", " << op.cx.mult[3]
+					    << ", " << op.cx.add[0] << ", " << op.cx.add[1]
+					    << ", " << op.cx.add[2] << ", " << op.cx.add[3]
+					    << ", " << (int) op.blend_mode
+					    << ", " << (int) op.bitmap_cache << " },\n";
 				}
 			}
 			out << "};\n";
