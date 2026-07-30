@@ -2520,6 +2520,107 @@ static Avm2Value bd_generate_filter_rect(Avm2Activation* act)
 	return avm2_object_value(make_rectangle(ctx, x, y, w, h));
 }
 
+// ---------------------------------------------------------------------------
+// encode(rect, compressor, byteArray) — PNG only
+// ---------------------------------------------------------------------------
+
+// PNG chunk: length, type, payload, CRC32. `out` must have room for len + 12.
+static uint32_t png_chunk(uint8_t* out, const char* type, const uint8_t* data,
+                          uint32_t len)
+{
+	out[0] = (uint8_t)(len >> 24); out[1] = (uint8_t)(len >> 16);
+	out[2] = (uint8_t)(len >>  8); out[3] = (uint8_t) len;
+	memcpy(out + 4, type, 4);
+	if (len != 0) memcpy(out + 8, data, len);
+	uLong crc = crc32(0, out + 4, len + 4);
+	out[8 + len] = (uint8_t)(crc >> 24); out[9 + len] = (uint8_t)(crc >> 16);
+	out[10 + len] = (uint8_t)(crc >> 8); out[11 + len] = (uint8_t) crc;
+	return len + 12;
+}
+
+// BitmapData.encode(rect, compressor, byteArray):ByteArray — Ruffle appends the
+// encoded image at the ByteArray's current position and returns the same array.
+// Only PNGEncoderOptions is honored: a straight RGBA8 (or RGB8 for an opaque
+// BitmapData) non-interlaced PNG, filter type 0 on every row. JPEGEncoderOptions
+// would need a DCT encoder and no graded line reaches it, so it writes nothing.
+static Avm2Value bd_encode(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2BitmapDataExt* bd = this_bd(act);
+	check_valid(ctx, bd);
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(arg(act, 2));
+	if (ba == NULL) return avm2_null();
+
+	// Only PNG. Anything else leaves the array untouched but still returns it.
+	Avm2Value opts = arg(act, 1);
+	char opt_name[128] = "";
+	if (opts.kind == AVM2_VALUE_OBJECT && opts.u.obj != NULL)
+		avm2_class_qname_buf(opts.u.obj->cls, opt_name, (int) sizeof(opt_name));
+	if (strstr(opt_name, "PNG") == NULL) return arg(act, 2);
+
+	int32_t rx, ry, rw, rh;
+	rect_to_xywh(ctx, arg(act, 0), &rx, &ry, &rw, &rh);
+	PixelRegion r = pr_for_region_i32(rx, ry, rw, rh);
+	pr_clamp(&r, bd->width, bd->height);
+	uint32_t w = pr_w(&r), h = pr_h(&r);
+	if (w == 0 || h == 0) return arg(act, 2);
+
+	uint32_t nch = bd->transparency ? 4 : 3;
+	size_t raw_len = (size_t) h * (1 + (size_t) w * nch);
+	uint8_t* raw = malloc(raw_len);
+	if (raw == NULL) return arg(act, 2);
+	uint8_t* p = raw;
+	for (uint32_t yy = r.y_min; yy < r.y_max; yy++)
+	{
+		*p++ = 0;  // filter: None
+		for (uint32_t xx = r.x_min; xx < r.x_max; xx++)
+		{
+			uint32_t argb = unmul(bd_get_raw(bd, xx, yy));
+			*p++ = (uint8_t)(argb >> 16);
+			*p++ = (uint8_t)(argb >> 8);
+			*p++ = (uint8_t) argb;
+			if (nch == 4) *p++ = (uint8_t)(argb >> 24);
+		}
+	}
+
+	uLongf zlen = (uLongf) compressBound((uLong) raw_len);
+	uint8_t* zbuf = malloc(zlen);
+	if (zbuf == NULL || compress2(zbuf, &zlen, raw, (uLong) raw_len, 9) != Z_OK)
+	{
+		free(raw); free(zbuf);
+		return arg(act, 2);
+	}
+	free(raw);
+
+	uint8_t ihdr[13];
+	ihdr[0] = (uint8_t)(w >> 24); ihdr[1] = (uint8_t)(w >> 16);
+	ihdr[2] = (uint8_t)(w >>  8); ihdr[3] = (uint8_t) w;
+	ihdr[4] = (uint8_t)(h >> 24); ihdr[5] = (uint8_t)(h >> 16);
+	ihdr[6] = (uint8_t)(h >>  8); ihdr[7] = (uint8_t) h;
+	ihdr[8] = 8;                       // bit depth
+	ihdr[9] = nch == 4 ? 6 : 2;        // color type: RGBA / RGB
+	ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;  // deflate, adaptive filter, no interlace
+
+	size_t total = 8 + (13 + 12) + ((size_t) zlen + 12) + 12;
+	uint8_t* png = malloc(total);
+	if (png == NULL) { free(zbuf); return arg(act, 2); }
+	static const uint8_t kSig[8] = { 137, 'P', 'N', 'G', '\r', '\n', 26, '\n' };
+	memcpy(png, kSig, 8);
+	size_t off = 8;
+	off += png_chunk(png + off, "IHDR", ihdr, 13);
+	off += png_chunk(png + off, "IDAT", zbuf, (uint32_t) zlen);
+	off += png_chunk(png + off, "IEND", NULL, 0);
+	free(zbuf);
+
+	uint32_t pos = ba->position;
+	if ((size_t) pos + off > ba->len)
+		avm2_bytearray_set_length_public(ctx, ba, (uint32_t)(pos + off));
+	memcpy(ba->bytes + pos, png, off);
+	ba->position = (uint32_t)(pos + off);
+	free(png);
+	return arg(act, 2);
+}
+
 // copyChannel (operations.rs): copy one source channel into a dest channel.
 static Avm2Value bd_copy_channel(Avm2Activation* act)
 {
@@ -2932,6 +3033,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, bd, "getColorBoundsRect", bd_get_color_bounds_rect);
 	avm2_builtin_add_method(ctx, bd, "copyChannel", bd_copy_channel);
 	avm2_builtin_add_method(ctx, bd, "scroll", bd_scroll);
+	avm2_builtin_add_method(ctx, bd, "encode", bd_encode);
 
 	// Image-only ops (graded in Stage 9): keep them callable no-ops so the
 	// vacuous image-comparison tests keep running.
@@ -2944,4 +3046,32 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, bd, "merge", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "paletteMap", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "perlinNoise", bd_noop);
+
+	// flash.display.BitmapDataChannel — the bit flags copyChannel /
+	// DisplacementMapFilter's componentX/Y are spelled with. copyChannel
+	// itself has been real since Stage 9; only the constant bag was missing,
+	// so every caller that spelled the channel this way died at the getlex.
+	{
+		Avm2Class* c = avm2_builtin_class(ctx, "flash.display",
+		                                  "BitmapDataChannel",
+		                                  ctx->builtins.object_class);
+		avm2_builtin_add_static_const(ctx, c, "RED", avm2_integer(1));
+		avm2_builtin_add_static_const(ctx, c, "GREEN", avm2_integer(2));
+		avm2_builtin_add_static_const(ctx, c, "BLUE", avm2_integer(4));
+		avm2_builtin_add_static_const(ctx, c, "ALPHA", avm2_integer(8));
+	}
+
+	// flash.display.{PNG,JPEG,JPEGXR}EncoderOptions — value bags handed to
+	// BitmapData.encode. bitmapdata_colortransform imports PNGEncoderOptions
+	// for a commented-out encode call and still getlexes the class.
+	{
+		Avm2Class* png = avm2_builtin_class(ctx, "flash.display",
+		                                    "PNGEncoderOptions",
+		                                    ctx->builtins.object_class);
+		(void) png;
+		Avm2Class* jpg = avm2_builtin_class(ctx, "flash.display",
+		                                    "JPEGEncoderOptions",
+		                                    ctx->builtins.object_class);
+		(void) jpg;
+	}
 }

@@ -1694,6 +1694,417 @@ static Avm2Value matrix3d_set_position(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
+// recompose / decompose / transformVectors (Ruffle geom/Matrix3D.as)
+// ---------------------------------------------------------------------------
+
+static void m3d_set_component(Avm2Context* ctx, Avm2Object* v, const char* name,
+                              double d)
+{
+	if (v != NULL)
+		avm2_set_public_property(ctx, avm2_object_value(v), name, 1,
+		                         avm2_number(d));
+}
+
+// Every orientation-taking entry point validates first: anything outside the
+// three Orientation3D constants is #2187, a plain Error.
+static void m3d_check_orientation(Avm2Context* ctx, const Avm2String* s)
+{
+	if (s != NULL && (s3d_str_is(s, "eulerAngles")
+	                  || s3d_str_is(s, "axisAngle")
+	                  || s3d_str_is(s, "quaternion")))
+	{
+		return;
+	}
+	char buf[256];
+	snprintf(buf, sizeof(buf),
+	         "Error #2187: Invalid orientation style %.*s.  Value must be one "
+	         "of 'Orientation3D.EULER_ANGLES', 'Orientation3D.AXIS_ANGLE', or "
+	         "'Orientation3D.QUATERNION'.",
+	         s != NULL ? (int) s->len : 4, s != NULL ? s->utf8 : "null");
+	avm2_throw_error(ctx, ctx->builtins.error_class, buf);
+}
+
+static const Avm2String* m3d_orientation_arg(Avm2Activation* act, uint32_t i)
+{
+	if (act->argc > i && act->args[i].kind != AVM2_VALUE_UNDEFINED)
+		return avm2_coerce_to_string(act->ctx, act->args[i]);
+	return avm2_string_from_literal(act->ctx, "eulerAngles");
+}
+
+// recompose(components:Vector.<Vector3D>, orientationStyle="eulerAngles").
+// components is [translation, rotation, scale]. A zero scale component is
+// replaced by 1e-15 rather than left at 0 (so the matrix stays invertible) and
+// makes the call report false — note the .as's own `components[2].y == 0`
+// typo in the third arm, which we replicate.
+static Avm2Value matrix3d_recompose(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Matrix3DExt* e = matrix3d_ext(act);
+	const Avm2String* os = m3d_orientation_arg(act, 1);
+	m3d_check_orientation(ctx, os);
+	if (e == NULL) return avm2_bool(0);
+	Avm2Object* cv = s3d_arg_object(act, 0);
+	Avm2VectorExt* comps = cv != NULL ? avm2_vector_ext(cv) : NULL;
+	if (comps == NULL || comps->length < 3) return avm2_bool(0);
+
+	Avm2Object* t = comps->elems[0].kind == AVM2_VALUE_OBJECT
+		? comps->elems[0].u.obj : NULL;
+	Avm2Object* r = comps->elems[1].kind == AVM2_VALUE_OBJECT
+		? comps->elems[1].u.obj : NULL;
+	Avm2Object* sc = comps->elems[2].kind == AVM2_VALUE_OBJECT
+		? comps->elems[2].u.obj : NULL;
+	double sx3 = m3d_component(ctx, sc, "x");
+	double sy3 = m3d_component(ctx, sc, "y");
+	double sz3 = m3d_component(ctx, sc, "z");
+
+	m3d_identity(e->m);
+	double* m = e->m;
+	if (s3d_str_is(os, "eulerAngles"))
+	{
+		double cx = cos(m3d_component(ctx, r, "x"));
+		double cy = cos(m3d_component(ctx, r, "y"));
+		double cz = cos(m3d_component(ctx, r, "z"));
+		double sx = sin(m3d_component(ctx, r, "x"));
+		double sy = sin(m3d_component(ctx, r, "y"));
+		double sz = sin(m3d_component(ctx, r, "z"));
+		m[0] = cy * cz * sx3;
+		m[1] = cy * sz * sx3;
+		m[2] = -sy * sx3;
+		m[3] = 0;
+		m[4] = (sx * sy * cz - cx * sz) * sy3;
+		m[5] = (sx * sy * sz + cx * cz) * sy3;
+		m[6] = sx * cy * sy3;
+		m[7] = 0;
+		m[8] = (cx * sy * cz + sx * sz) * sz3;
+		m[9] = (cx * sy * sz - sx * cz) * sz3;
+		m[10] = cx * cy * sz3;
+		m[11] = 0;
+	}
+	else
+	{
+		double x = m3d_component(ctx, r, "x");
+		double y = m3d_component(ctx, r, "y");
+		double z = m3d_component(ctx, r, "z");
+		double w = m3d_component(ctx, r, "w");
+		if (s3d_str_is(os, "axisAngle"))
+		{
+			x *= sin(w / 2); y *= sin(w / 2); z *= sin(w / 2);
+			w = cos(w / 2);
+		}
+		m[0] = (1 - 2 * y * y - 2 * z * z) * sx3;
+		m[1] = (2 * x * y + 2 * w * z) * sx3;
+		m[2] = (2 * x * z - 2 * w * y) * sx3;
+		m[3] = 0;
+		m[4] = (2 * x * y - 2 * w * z) * sy3;
+		m[5] = (1 - 2 * x * x - 2 * z * z) * sy3;
+		m[6] = (2 * y * z + 2 * w * x) * sy3;
+		m[7] = 0;
+		m[8] = (2 * x * z + 2 * w * y) * sz3;
+		m[9] = (2 * y * z - 2 * w * x) * sz3;
+		m[10] = (1 - 2 * x * x - 2 * y * y) * sz3;
+		m[11] = 0;
+	}
+	m[12] = m3d_component(ctx, t, "x");
+	m[13] = m3d_component(ctx, t, "y");
+	m[14] = m3d_component(ctx, t, "z");
+	m[15] = 1;
+
+	if (sx3 == 0) m[0] = 1e-15;
+	if (sy3 == 0) m[5] = 1e-15;
+	if (sz3 == 0) m[10] = 1e-15;
+	// The .as tests components[2].y twice; that is upstream's typo, not ours.
+	return avm2_bool(!(sx3 == 0 || sy3 == 0 || sy3 == 0));
+}
+
+static Avm2Value matrix3d_decompose(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Matrix3DExt* e = matrix3d_ext(act);
+	const Avm2String* os = m3d_orientation_arg(act, 0);
+	m3d_check_orientation(ctx, os);
+	if (e == NULL || g_vector3d_class == NULL) return avm2_null();
+
+	double mr[16];
+	memcpy(mr, e->m, sizeof(mr));
+	double px = mr[12], py = mr[13], pz = mr[14];
+	mr[12] = mr[13] = mr[14] = 0;
+
+	double sx = sqrt(mr[0] * mr[0] + mr[1] * mr[1] + mr[2] * mr[2]);
+	double sy = sqrt(mr[4] * mr[4] + mr[5] * mr[5] + mr[6] * mr[6]);
+	double sz = sqrt(mr[8] * mr[8] + mr[9] * mr[9] + mr[10] * mr[10]);
+	if (mr[0] * (mr[5] * mr[10] - mr[6] * mr[9])
+	  - mr[1] * (mr[4] * mr[10] - mr[6] * mr[8])
+	  + mr[2] * (mr[4] * mr[9] - mr[5] * mr[8]) < 0)
+	{
+		sz = -sz;
+	}
+	mr[0] /= sx; mr[1] /= sx; mr[2] /= sx;
+	mr[4] /= sy; mr[5] /= sy; mr[6] /= sy;
+	mr[8] /= sz; mr[9] /= sz; mr[10] /= sz;
+
+	double rx = 0, ry = 0, rz = 0, rw = 0;
+	if (s3d_str_is(os, "axisAngle"))
+	{
+		rw = acos((mr[0] + mr[5] + mr[10] - 1) / 2);
+		double len = sqrt((mr[6] - mr[9]) * (mr[6] - mr[9])
+		                + (mr[8] - mr[2]) * (mr[8] - mr[2])
+		                + (mr[1] - mr[4]) * (mr[1] - mr[4]));
+		if (len != 0)
+		{
+			rx = (mr[6] - mr[9]) / len;
+			ry = (mr[8] - mr[2]) / len;
+			rz = (mr[1] - mr[4]) / len;
+		}
+	}
+	else if (s3d_str_is(os, "quaternion"))
+	{
+		double tr = mr[0] + mr[5] + mr[10];
+		if (tr > 0)
+		{
+			rw = sqrt(1 + tr) / 2;
+			rx = (mr[6] - mr[9]) / (4 * rw);
+			ry = (mr[8] - mr[2]) / (4 * rw);
+			rz = (mr[1] - mr[4]) / (4 * rw);
+		}
+		else if (mr[0] > mr[5] && mr[0] > mr[10])
+		{
+			rx = sqrt(1 + mr[0] - mr[5] - mr[10]) / 2;
+			rw = (mr[6] - mr[9]) / (4 * rx);
+			ry = (mr[1] + mr[4]) / (4 * rx);
+			rz = (mr[8] + mr[2]) / (4 * rx);
+		}
+		else if (mr[5] > mr[10])
+		{
+			ry = sqrt(1 + mr[5] - mr[0] - mr[10]) / 2;
+			rx = (mr[1] + mr[4]) / (4 * ry);
+			rw = (mr[8] - mr[2]) / (4 * ry);
+			rz = (mr[6] + mr[9]) / (4 * ry);
+		}
+		else
+		{
+			rz = sqrt(1 + mr[10] - mr[0] - mr[5]) / 2;
+			rx = (mr[8] + mr[2]) / (4 * rz);
+			ry = (mr[6] + mr[9]) / (4 * rz);
+			rw = (mr[1] - mr[4]) / (4 * rz);
+		}
+	}
+	else
+	{
+		ry = asin(-mr[2]);
+		if (mr[2] != 1 && mr[2] != -1)
+		{
+			rx = atan2(mr[6], mr[10]);
+			rz = atan2(mr[1], mr[0]);
+		}
+		else
+		{
+			rz = 0;
+			rx = atan2(mr[4], mr[5]);
+		}
+	}
+
+	Avm2Class* vec_cls = avm2_vector_apply(ctx, g_vector3d_class);
+	Avm2Object* out = avm2_vector_new(ctx, vec_cls, 0, 0);
+	Avm2Value pa[4] = { avm2_number(px), avm2_number(py), avm2_number(pz),
+	                    avm2_number(0) };
+	avm2_vector_set_index(ctx, out, 0,
+		avm2_class_construct(ctx, g_vector3d_class, pa, 3));
+	Avm2Value ra[4] = { avm2_number(rx), avm2_number(ry), avm2_number(rz),
+	                    avm2_number(rw) };
+	avm2_vector_set_index(ctx, out, 1,
+		avm2_class_construct(ctx, g_vector3d_class, ra, 4));
+	Avm2Value sa[3] = { avm2_number(sx), avm2_number(sy), avm2_number(sz) };
+	avm2_vector_set_index(ctx, out, 2,
+		avm2_class_construct(ctx, g_vector3d_class, sa, 3));
+	return avm2_object_value(out);
+}
+
+// transformVectors(vin:Vector.<Number>, vout:Vector.<Number>): floor(len/3)*3
+// components are consumed; a fixed vout that is too short is #1126.
+static Avm2Value matrix3d_transform_vectors(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Matrix3DExt* e = matrix3d_ext(act);
+	Avm2Object* vin_o = s3d_arg_object(act, 0);
+	Avm2Object* vout_o = s3d_arg_object(act, 1);
+	Avm2VectorExt* vin = vin_o != NULL ? avm2_vector_ext(vin_o) : NULL;
+	Avm2VectorExt* vout = vout_o != NULL ? avm2_vector_ext(vout_o) : NULL;
+	if (vin == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter vin must be non-null.");
+	}
+	if (vout == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter vout must be non-null.");
+	}
+	if (e == NULL) return avm2_undefined();
+	uint32_t n = (vin->length / 3) * 3;
+	if (n > vout->length && vout->fixed)
+	{
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #1126: Cannot change the length of a fixed "
+		                 "Vector.");
+	}
+	const double* m = e->m;
+	for (uint32_t i = 0; i < n; i += 3)
+	{
+		double x = avm2_coerce_to_number(ctx, vin->elems[i]);
+		double y = avm2_coerce_to_number(ctx, vin->elems[i + 1]);
+		double z = avm2_coerce_to_number(ctx, vin->elems[i + 2]);
+		double ox = m[0] * x + m[4] * y + m[8] * z + m[12];
+		double oy = m[1] * x + m[5] * y + m[9] * z + m[13];
+		double oz = m[2] * x + m[6] * y + m[10] * z + m[14];
+		avm2_vector_set_index(ctx, vout_o, i, avm2_number(ox));
+		avm2_vector_set_index(ctx, vout_o, i + 1, avm2_number(oy));
+		avm2_vector_set_index(ctx, vout_o, i + 2, avm2_number(oz));
+		vout = avm2_vector_ext(vout_o);
+		if (vout == NULL) break;
+	}
+	return avm2_undefined();
+}
+
+// copyColumnTo/copyRowTo — the read direction of the pair already registered.
+static Avm2Value matrix3d_copy_vec_to(Avm2Activation* act, int column)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Matrix3DExt* e = matrix3d_ext(act);
+	uint32_t idx = act->argc > 0 ? avm2_coerce_to_u32(ctx, act->args[0]) : 0;
+	if (idx > 3)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2004: One of the parameters is invalid.");
+	}
+	Avm2Object* v = s3d_arg_object(act, 1);
+	if (e == NULL || v == NULL) return avm2_undefined();
+	static const char* const n[4] = { "x", "y", "z", "w" };
+	for (int k = 0; k < 4; k++)
+	{
+		int off = column ? (int) idx * 4 + k : k * 4 + (int) idx;
+		m3d_set_component(ctx, v, n[k], e->m[off]);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value matrix3d_copy_column_to(Avm2Activation* act)
+{ return matrix3d_copy_vec_to(act, 1); }
+static Avm2Value matrix3d_copy_row_to(Avm2Activation* act)
+{ return matrix3d_copy_vec_to(act, 0); }
+
+// The write direction of the same pair: read x/y/z/w off the Vector3D into the
+// column (or row) of the matrix.
+static Avm2Value matrix3d_copy_vec_from(Avm2Activation* act, int column)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Matrix3DExt* e = matrix3d_ext(act);
+	uint32_t idx = act->argc > 0 ? avm2_coerce_to_u32(ctx, act->args[0]) : 0;
+	if (idx > 3)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2004: One of the parameters is invalid.");
+	}
+	Avm2Object* v = s3d_arg_object(act, 1);
+	if (e == NULL || v == NULL) return avm2_undefined();
+	static const char* const n[4] = { "x", "y", "z", "w" };
+	for (int k = 0; k < 4; k++)
+	{
+		int off = column ? (int) idx * 4 + k : k * 4 + (int) idx;
+		e->m[off] = m3d_component(ctx, v, n[k]);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value matrix3d_copy_column_from(Avm2Activation* act)
+{ return matrix3d_copy_vec_from(act, 1); }
+static Avm2Value matrix3d_copy_row_from(Avm2Activation* act)
+{ return matrix3d_copy_vec_from(act, 0); }
+
+static Avm2Value matrix3d_copy_to_matrix3d(Avm2Activation* act)
+{
+	Avm2Matrix3DExt* e = matrix3d_ext(act);
+	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object(act, 0));
+	if (e != NULL && o != NULL) memcpy(o->m, e->m, sizeof(o->m));
+	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// flash.geom.Utils3D (Ruffle geom/Utils3D.as, itself from OpenFL)
+// ---------------------------------------------------------------------------
+
+// projectVector(m, v): transformVector then divide x/y/z by the resulting w.
+// w itself is left as the transformed w, which is why the test can print it.
+static Avm2Value utils3d_project_vector(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Matrix3DExt* e = matrix3d_ext_of(s3d_arg_object(act, 0));
+	Avm2Object* v = s3d_arg_object(act, 1);
+	if (e == NULL || v == NULL || g_vector3d_class == NULL) return avm2_null();
+	double x = m3d_component(ctx, v, "x");
+	double y = m3d_component(ctx, v, "y");
+	double z = m3d_component(ctx, v, "z");
+	const double* m = e->m;
+	double ox = m[0] * x + m[4] * y + m[8] * z + m[12];
+	double oy = m[1] * x + m[5] * y + m[9] * z + m[13];
+	double oz = m[2] * x + m[6] * y + m[10] * z + m[14];
+	double ow = m[3] * x + m[7] * y + m[11] * z + m[15];
+	Avm2Value args[4] = { avm2_number(ox / ow), avm2_number(oy / ow),
+	                      avm2_number(oz / ow), avm2_number(ow) };
+	return avm2_class_construct(ctx, g_vector3d_class, args, 4);
+}
+
+// projectVectors(m, verts, projectedVerts, uvts): both output vectors GROW to
+// the sizes the loop needs before it runs, which is why a caller can pass empty
+// ones. uvts[i+2] receives 1/w — the other two slots of each triple are left
+// exactly as the caller had them (the test's "deliberately missing" tail).
+static Avm2Value utils3d_project_vectors(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Matrix3DExt* e = matrix3d_ext_of(s3d_arg_object(act, 0));
+	Avm2Object* verts_o = s3d_arg_object(act, 1);
+	Avm2Object* pv_o = s3d_arg_object(act, 2);
+	Avm2Object* uv_o = s3d_arg_object(act, 3);
+	Avm2VectorExt* verts = verts_o != NULL ? avm2_vector_ext(verts_o) : NULL;
+	if (e == NULL || verts == NULL || pv_o == NULL || uv_o == NULL)
+		return avm2_undefined();
+	uint32_t vlen = verts->length;
+
+	// Grow through the public `length` setter — vec_resize is private to
+	// avm2_vector.c, and a bare index write past the end would be #1125.
+	Avm2VectorExt* uv = avm2_vector_ext(uv_o);
+	if (uv != NULL && uv->length < vlen)
+	{
+		avm2_set_public_property(ctx, avm2_object_value(uv_o), "length", 6,
+		                         avm2_uint_value(vlen));
+	}
+	Avm2VectorExt* pv = avm2_vector_ext(pv_o);
+	uint32_t need = (vlen / 3) * 2;
+	if (pv != NULL && pv->length < need)
+	{
+		avm2_set_public_property(ctx, avm2_object_value(pv_o), "length", 6,
+		                         avm2_uint_value(need));
+	}
+
+	const double* n = e->m;
+	uint32_t j = 0;
+	for (uint32_t i = 0; i + 2 < vlen; i += 3, j += 2)
+	{
+		verts = avm2_vector_ext(verts_o);
+		if (verts == NULL) break;
+		double x = avm2_coerce_to_number(ctx, verts->elems[i]);
+		double y = avm2_coerce_to_number(ctx, verts->elems[i + 1]);
+		double z = avm2_coerce_to_number(ctx, verts->elems[i + 2]);
+		double x1 = x * n[0] + y * n[4] + z * n[8] + n[12];
+		double y1 = x * n[1] + y * n[5] + z * n[9] + n[13];
+		double w1 = x * n[3] + y * n[7] + z * n[11] + n[15];
+		avm2_vector_set_index(ctx, pv_o, j, avm2_number(x1 / w1));
+		avm2_vector_set_index(ctx, pv_o, j + 1, avm2_number(y1 / w1));
+		avm2_vector_set_index(ctx, uv_o, i + 2, avm2_number(1.0 / w1));
+	}
+	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -1801,6 +2212,11 @@ static void register_constant_classes(Avm2Context* ctx)
 	avm2_builtin_add_static_const(ctx, cm, "ALL", avm2_integer(7));
 }
 
+// The flash.geom.Matrix3D handle, for PerspectiveProjection.toMatrix3D in
+// avm2_display.c (avm2_builtin_class MINTS, so it must be shared not re-made).
+Avm2Class* avm2_stage3d_matrix3d_class(void)
+{ return g_matrix3d_class; }
+
 static void register_matrix3d(Avm2Context* ctx)
 {
 	Avm2Class* m = avm2_builtin_class(ctx, "flash.geom", "Matrix3D",
@@ -1833,6 +2249,37 @@ static void register_matrix3d(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, m, "transformVector", matrix3d_transform_vector);
 	avm2_builtin_add_method(ctx, m, "deltaTransformVector",
 	                        matrix3d_delta_transform_vector);
+	avm2_builtin_add_method(ctx, m, "transformVectors",
+	                        matrix3d_transform_vectors);
+	avm2_builtin_add_method(ctx, m, "recompose", matrix3d_recompose);
+	avm2_builtin_add_method(ctx, m, "decompose", matrix3d_decompose);
+	avm2_builtin_add_method(ctx, m, "copyColumnTo", matrix3d_copy_column_to);
+	avm2_builtin_add_method(ctx, m, "copyRowTo", matrix3d_copy_row_to);
+	avm2_builtin_add_method(ctx, m, "copyColumnFrom", matrix3d_copy_column_from);
+	avm2_builtin_add_method(ctx, m, "copyRowFrom", matrix3d_copy_row_from);
+	avm2_builtin_add_method(ctx, m, "copyToMatrix3D", matrix3d_copy_to_matrix3d);
+	// pointAt is a stub in Ruffle too (stub_method, no matrix change), so a
+	// caller sees an unchanged matrix rather than an error.
+	avm2_builtin_add_method(ctx, m, "pointAt", s3d_noop);
+	avm2_builtin_add_method(ctx, m, "interpolateTo", s3d_noop);
+	avm2_builtin_add_static_method(ctx, m, "interpolate", s3d_noop);
+
+	// flash.geom.Orientation3D — the three strings recompose/decompose accept.
+	Avm2Class* o3 = avm2_builtin_class(ctx, "flash.geom", "Orientation3D",
+	                                   ctx->builtins.object_class);
+	s3d_sconst(ctx, o3, "AXIS_ANGLE", "axisAngle");
+	s3d_sconst(ctx, o3, "EULER_ANGLES", "eulerAngles");
+	s3d_sconst(ctx, o3, "QUATERNION", "quaternion");
+
+	// flash.geom.Utils3D. projectVector/projectVectors divide through by the
+	// transformed w; pointTowards is a stub in Ruffle as well.
+	Avm2Class* u3 = avm2_builtin_class(ctx, "flash.geom", "Utils3D",
+	                                   ctx->builtins.object_class);
+	avm2_builtin_add_static_method(ctx, u3, "projectVector",
+	                               utils3d_project_vector);
+	avm2_builtin_add_static_method(ctx, u3, "projectVectors",
+	                               utils3d_project_vectors);
+	avm2_builtin_add_static_method(ctx, u3, "pointTowards", s3d_noop);
 }
 
 void avm2_register_stage3d(Avm2Context* ctx)

@@ -5995,6 +5995,166 @@ static Avm2Value rectangle_offset(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// --- Rectangle edge/corner accessors (Ruffle geom/Rectangle.as:22-83) ------
+// The class is SEALED, so a script that writes `r.left = n` without these
+// raises #1056 rather than creating an expando (stage3d_bitmap died there).
+// Setting an edge moves that edge only: `left` keeps `right` fixed by folding
+// the delta into width, while `right` just resizes.
+
+static double rect_slot(Avm2Activation* act, Avm2Object* self, int i)
+{
+	return avm2_coerce_to_number(act->ctx, self->slots[i]);
+}
+
+static Avm2Object* rect_self(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	return (self != NULL && self->slot_count >= 5) ? self : NULL;
+}
+
+#define RECT_EDGE_GET(fn, expr)                                            \
+	static Avm2Value fn(Avm2Activation* act)                               \
+	{                                                                      \
+		Avm2Object* s = rect_self(act);                                    \
+		if (s == NULL) return avm2_undefined();                            \
+		double x = rect_slot(act, s, 1), y = rect_slot(act, s, 2);         \
+		double w = rect_slot(act, s, 3), h = rect_slot(act, s, 4);         \
+		(void) x; (void) y; (void) w; (void) h;                            \
+		return avm2_number(expr);                                          \
+	}
+
+RECT_EDGE_GET(rectangle_get_left,   x)
+RECT_EDGE_GET(rectangle_get_right,  x + w)
+RECT_EDGE_GET(rectangle_get_top,    y)
+RECT_EDGE_GET(rectangle_get_bottom, y + h)
+#undef RECT_EDGE_GET
+
+static Avm2Value rectangle_set_left(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double v = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
+	s->slots[3] = avm2_number(rect_slot(act, s, 3) + rect_slot(act, s, 1) - v);
+	s->slots[1] = avm2_number(v);
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_set_right(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double v = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
+	s->slots[3] = avm2_number(v - rect_slot(act, s, 1));
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_set_top(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double v = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
+	s->slots[4] = avm2_number(rect_slot(act, s, 4) + rect_slot(act, s, 2) - v);
+	s->slots[2] = avm2_number(v);
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_set_bottom(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double v = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
+	s->slots[4] = avm2_number(v - rect_slot(act, s, 2));
+	return avm2_undefined();
+}
+
+// Point-valued corners. Reading the argument's x/y goes through the public
+// property path so a plain Object with x/y works, exactly as the .as does.
+static Avm2Value rect_make_point(Avm2Context* ctx, double x, double y)
+{
+	extern Avm2Class* avm2_display_point_class(Avm2Context* ctx);
+	Avm2Value args[2] = { avm2_number(x), avm2_number(y) };
+	return avm2_class_construct(ctx, avm2_display_point_class(ctx), args, 2);
+}
+
+static void rect_arg_xy(Avm2Activation* act, double* x, double* y)
+{
+	Avm2Value v = arg_or_undef(act, 0);
+	*x = avm2_coerce_to_number(act->ctx,
+		avm2_get_public_property(act->ctx, v, "x", 1, NULL));
+	*y = avm2_coerce_to_number(act->ctx,
+		avm2_get_public_property(act->ctx, v, "y", 1, NULL));
+}
+
+static Avm2Value rectangle_get_topleft(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	return rect_make_point(act->ctx, rect_slot(act, s, 1), rect_slot(act, s, 2));
+}
+
+static Avm2Value rectangle_set_topleft(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double px, py;
+	rect_arg_xy(act, &px, &py);
+	s->slots[3] = avm2_number(rect_slot(act, s, 3) + rect_slot(act, s, 1) - px);
+	s->slots[4] = avm2_number(rect_slot(act, s, 4) + rect_slot(act, s, 2) - py);
+	s->slots[1] = avm2_number(px);
+	s->slots[2] = avm2_number(py);
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_get_bottomright(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	return rect_make_point(act->ctx, rect_slot(act, s, 1) + rect_slot(act, s, 3),
+	                       rect_slot(act, s, 2) + rect_slot(act, s, 4));
+}
+
+static Avm2Value rectangle_set_bottomright(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double px, py;
+	rect_arg_xy(act, &px, &py);
+	s->slots[3] = avm2_number(px - rect_slot(act, s, 1));
+	s->slots[4] = avm2_number(py - rect_slot(act, s, 2));
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_get_size(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	return rect_make_point(act->ctx, rect_slot(act, s, 3), rect_slot(act, s, 4));
+}
+
+static Avm2Value rectangle_set_size(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double px, py;
+	rect_arg_xy(act, &px, &py);
+	s->slots[3] = avm2_number(px);
+	s->slots[4] = avm2_number(py);
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_copy_from(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	Avm2Value src = arg_or_undef(act, 0);
+	if (s == NULL || src.kind != AVM2_VALUE_OBJECT || src.u.obj == NULL
+	    || src.u.obj->slot_count < 5)
+	{
+		return avm2_undefined();
+	}
+	for (int i = 1; i <= 4; i++) s->slots[i] = src.u.obj->slots[i];
+	return avm2_undefined();
+}
+
 static Avm2Value rectangle_inflate(Avm2Activation* act)
 {
 	Avm2Object* self = this_obj(act);
@@ -6181,19 +6341,62 @@ void avm2_register_text(Avm2Context* ctx)
 
 	// flash.text.engine: FontDescription + its constant classes.
 	{
-		struct { const char* name; const char* consts[3]; const char* vals[3]; } cc[5] = {
-			{ "FontWeight", { "NORMAL", "BOLD", NULL }, { "normal", "bold", NULL } },
-			{ "FontPosture", { "NORMAL", "ITALIC", NULL }, { "normal", "italic", NULL } },
-			{ "FontLookup", { "DEVICE", "EMBEDDED_CFF", NULL }, { "device", "embeddedCFF", NULL } },
-			{ "RenderingMode", { "NORMAL", "CFF", NULL }, { "normal", "cff", NULL } },
-			{ "CFFHinting", { "NONE", "HORIZONTAL_STEM", NULL }, { "none", "horizontalStem", NULL } },
+		// Every pure-constant class in Ruffle's globals/flash/text/engine.
+		// The Text Layout Framework a DefineFont4 movie embeds getlexes these
+		// at class-init time, so a missing bag kills the whole script.
+		#define K NULL
+		struct { const char* name; const char* consts[8]; const char* vals[8]; }
+		cc[] = {
+			{ "FontWeight", { "NORMAL", "BOLD", K }, { "normal", "bold", K } },
+			{ "FontPosture", { "NORMAL", "ITALIC", K }, { "normal", "italic", K } },
+			{ "FontLookup", { "DEVICE", "EMBEDDED_CFF", K }, { "device", "embeddedCFF", K } },
+			{ "RenderingMode", { "NORMAL", "CFF", K }, { "normal", "cff", K } },
+			{ "CFFHinting", { "NONE", "HORIZONTAL_STEM", K }, { "none", "horizontalStem", K } },
+			{ "BreakOpportunity", { "ALL", "ANY", "AUTO", "NONE", K },
+			  { "all", "any", "auto", "none", K } },
+			{ "DigitCase", { "DEFAULT", "LINING", "OLD_STYLE", K },
+			  { "default", "lining", "oldStyle", K } },
+			{ "DigitWidth", { "DEFAULT", "PROPORTIONAL", "TABULAR", K },
+			  { "default", "proportional", "tabular", K } },
+			{ "JustificationStyle", { "PRIORITIZE_LEAST_ADJUSTMENT",
+			    "PUSH_IN_KINSOKU", "PUSH_OUT_ONLY", K },
+			  { "prioritizeLeastAdjustment", "pushInKinsoku", "pushOutOnly", K } },
+			{ "Kerning", { "AUTO", "OFF", "ON", K }, { "auto", "off", "on", K } },
+			{ "LigatureLevel", { "COMMON", "EXOTIC", "MINIMUM", "NONE",
+			    "UNCOMMON", K },
+			  { "common", "exotic", "minimum", "none", "uncommon", K } },
+			{ "LineJustification", { "ALL_BUT_LAST", "ALL_BUT_MANDATORY_BREAK",
+			    "ALL_INCLUDING_LAST", "UNJUSTIFIED", K },
+			  { "allButLast", "allButMandatoryBreak", "allIncludingLast",
+			    "unjustified", K } },
+			{ "TabAlignment", { "CENTER", "DECIMAL", "END", "START", K },
+			  { "center", "decimal", "end", "start", K } },
+			{ "TextBaseline", { "ASCENT", "DESCENT", "IDEOGRAPHIC_BOTTOM",
+			    "IDEOGRAPHIC_CENTER", "IDEOGRAPHIC_TOP", "ROMAN",
+			    "USE_DOMINANT_BASELINE", K },
+			  { "ascent", "descent", "ideographicBottom", "ideographicCenter",
+			    "ideographicTop", "roman", "useDominantBaseline", K } },
+			{ "TextLineCreationResult", { "COMPLETE", "EMERGENCY",
+			    "INSUFFICIENT_WIDTH", "SUCCESS", K },
+			  { "complete", "emergency", "insufficientWidth", "success", K } },
+			{ "TextLineValidity", { "INVALID", "POSSIBLY_INVALID", "STATIC",
+			    "VALID", K },
+			  { "invalid", "possiblyInvalid", "static", "valid", K } },
+			{ "TextRotation", { "AUTO", "ROTATE_0", "ROTATE_180", "ROTATE_270",
+			    "ROTATE_90", K },
+			  { "auto", "rotate0", "rotate180", "rotate270", "rotate90", K } },
+			{ "TypographicCase", { "CAPS", "CAPS_AND_SMALL_CAPS", "DEFAULT",
+			    "LOWERCASE", "SMALL_CAPS", "TITLE", "UPPERCASE", K },
+			  { "caps", "capsAndSmallCaps", "default", "lowercase", "smallCaps",
+			    "title", "uppercase", K } },
 		};
-		for (int i = 0; i < 5; i++)
+		#undef K
+		for (size_t i = 0; i < sizeof(cc) / sizeof(cc[0]); i++)
 		{
 			Avm2Class* c = avm2_builtin_class(ctx, "flash.text.engine",
 			                                  cc[i].name,
 			                                  ctx->builtins.object_class);
-			for (int k = 0; k < 3 && cc[i].consts[k] != NULL; k++)
+			for (int k = 0; k < 8 && cc[i].consts[k] != NULL; k++)
 			{
 				avm2_builtin_add_static_const(ctx, c, cc[i].consts[k],
 					avm2_string(avm2_string_from_literal(ctx, cc[i].vals[k])));
@@ -6253,6 +6456,23 @@ void avm2_register_text(Avm2Context* ctx)
 		                        rectangle_offset);
 		avm2_builtin_add_method(ctx, g_rectangle_class, "inflate",
 		                        rectangle_inflate);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "copyFrom",
+		                        rectangle_copy_from);
+		avm2_builtin_add_getset(ctx, g_rectangle_class, "left",
+		                        rectangle_get_left, rectangle_set_left);
+		avm2_builtin_add_getset(ctx, g_rectangle_class, "right",
+		                        rectangle_get_right, rectangle_set_right);
+		avm2_builtin_add_getset(ctx, g_rectangle_class, "top",
+		                        rectangle_get_top, rectangle_set_top);
+		avm2_builtin_add_getset(ctx, g_rectangle_class, "bottom",
+		                        rectangle_get_bottom, rectangle_set_bottom);
+		avm2_builtin_add_getset(ctx, g_rectangle_class, "topLeft",
+		                        rectangle_get_topleft, rectangle_set_topleft);
+		avm2_builtin_add_getset(ctx, g_rectangle_class, "bottomRight",
+		                        rectangle_get_bottomright,
+		                        rectangle_set_bottomright);
+		avm2_builtin_add_getset(ctx, g_rectangle_class, "size",
+		                        rectangle_get_size, rectangle_set_size);
 		static const char* const textrun_fields[3] = {
 			"beginIndex", "endIndex", "textFormat",
 		};

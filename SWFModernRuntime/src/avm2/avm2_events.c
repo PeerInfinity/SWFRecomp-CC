@@ -1726,6 +1726,41 @@ static void register_input_events(Avm2Context* ctx)
 				avm2_string(avm2_string_from_literal(ctx, mc[i].v)));
 	}
 
+	// flash.events.TouchEvent. Headless never generates one, but a movie that
+	// feature-checks for touch getlexes the class at class-init time (away3d's
+	// demo does), so the constant bag has to exist. Its instance surface is
+	// MouseEvent's plus the touch ids, which is what the .as declares.
+	{
+		Avm2Class* te = avm2_builtin_class(ctx, "flash.events", "TouchEvent",
+		                                   b->event_class);
+		te->instance_init.fn = mouse_event_init;
+		te->instance_init.debug_name = "TouchEvent";
+		avm2_builtin_add_getset(ctx, te, "localX", me_get_local_x, me_set_local_x);
+		avm2_builtin_add_getset(ctx, te, "localY", me_get_local_y, me_set_local_y);
+		avm2_builtin_add_getter(ctx, te, "stageX", me_get_stage_x);
+		avm2_builtin_add_getter(ctx, te, "stageY", me_get_stage_y);
+		avm2_builtin_add_getset(ctx, te, "ctrlKey", me_get_ctrl, me_set_ctrl);
+		avm2_builtin_add_getset(ctx, te, "altKey", me_get_alt, me_set_alt);
+		avm2_builtin_add_getset(ctx, te, "shiftKey", me_get_shift, me_set_shift);
+		avm2_builtin_add_method(ctx, te, "updateAfterEvent", me_update_after_event);
+		static const struct { const char* n; const char* v; } tc[] = {
+			{ "TOUCH_BEGIN", "touchBegin" }, { "TOUCH_END", "touchEnd" },
+			{ "TOUCH_MOVE", "touchMove" }, { "TOUCH_OUT", "touchOut" },
+			{ "TOUCH_OVER", "touchOver" }, { "TOUCH_ROLL_OUT", "touchRollOut" },
+			{ "TOUCH_ROLL_OVER", "touchRollOver" }, { "TOUCH_TAP", "touchTap" },
+			{ "PROXIMITY_BEGIN", "proximityBegin" },
+			{ "PROXIMITY_END", "proximityEnd" },
+			{ "PROXIMITY_MOVE", "proximityMove" },
+			{ "PROXIMITY_OUT", "proximityOut" },
+			{ "PROXIMITY_OVER", "proximityOver" },
+			{ "PROXIMITY_ROLL_OUT", "proximityRollOut" },
+			{ "PROXIMITY_ROLL_OVER", "proximityRollOver" },
+		};
+		for (size_t i = 0; i < sizeof(tc) / sizeof(tc[0]); i++)
+			avm2_builtin_add_static_const(ctx, te, tc[i].n,
+				avm2_string(avm2_string_from_literal(ctx, tc[i].v)));
+	}
+
 	// flash.events.KeyboardEvent.
 	Avm2Class* ke = avm2_builtin_class(ctx, "flash.events", "KeyboardEvent",
 	                                   b->event_class);

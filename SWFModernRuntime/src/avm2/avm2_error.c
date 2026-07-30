@@ -224,6 +224,12 @@ void avm2_try_push_catch_all(Avm2Context* ctx, Avm2TryFrame* tf)
 	ctx->try_top = tf;
 }
 
+void avm2_try_push_catch_all_silent(Avm2Context* ctx, Avm2TryFrame* tf)
+{
+	avm2_try_push_catch_all(ctx, tf);
+	tf->silent = 1;
+}
+
 void avm2_try_pop_frame(Avm2TryFrame* tf)
 {
 	// Frames above tf (from callees that longjmp'd past their pop) are
@@ -234,6 +240,10 @@ void avm2_try_pop_frame(Avm2TryFrame* tf)
 static void print_uncaught(Avm2Context* ctx, Avm2Value v)
 {
 	// Diagnostics only (stderr): uncaught errors don't produce trace output.
+	//
+	// Only frames the PLAYER LOOP discards reach here — a catch-all the
+	// runtime installs to render the error itself is marked `silent`
+	// (loader_error_in_root_ctor would otherwise print its line twice).
 	const Avm2String* s = avm2_coerce_to_string(ctx, v);
 	fflush(stdout);
 	fprintf(stderr, "AVM2 uncaught error: %.*s\n", (int) s->len, s->utf8);
@@ -249,7 +259,7 @@ _Noreturn void avm2_throw(Avm2Context* ctx, Avm2Value value)
 	{
 		if (tf->catch_all)
 		{
-			print_uncaught(ctx, value);
+			if (!tf->silent) print_uncaught(ctx, value);
 			ctx->try_top = tf;  // drop frames above
 			ctx->call_depth = tf->saved_call_depth;
 			tf->exc = value;

@@ -1009,21 +1009,39 @@ static void full_remove_child(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
 			// alone (the setter is observably NOT invoked), read errors are
 			// swallowed entirely, and any other value is nulled — even one
 			// that is not this child (remove_child_clear_field).
-			Avm2TryFrame top;
-			avm2_try_push_catch_all(ctx, &top);
-			if (setjmp(top.jb) == 0)
+			//
+			// The two halves need SEPARATE frames because they report
+			// differently (Ruffle container.rs remove_child_from_render_list):
+			// a throwing GETTER is swallowed outright — "they don't make it to
+			// flashlog or to uncaught error events" — while a throwing SETTER
+			// goes to Avm2::uncaught_error and is traced.
+			Avm2Value cur = avm2_undefined();
+			int read_ok = 0;
 			{
-				Avm2Value cur = avm2_get_public_property(
-					ctx, avm2_object_value(cext->parent),
-					cext->name->utf8, cext->name->len, NULL);
-				if (cur.kind != AVM2_VALUE_NULL && cur.kind != AVM2_VALUE_UNDEFINED)
+				Avm2TryFrame gtop;
+				avm2_try_push_catch_all_silent(ctx, &gtop);
+				if (setjmp(gtop.jb) == 0)
+				{
+					cur = avm2_get_public_property(
+						ctx, avm2_object_value(cext->parent),
+						cext->name->utf8, cext->name->len, NULL);
+					read_ok = 1;
+				}
+				avm2_try_pop_frame(&gtop);
+			}
+			if (read_ok && cur.kind != AVM2_VALUE_NULL
+			    && cur.kind != AVM2_VALUE_UNDEFINED)
+			{
+				Avm2TryFrame stop;
+				avm2_try_push_catch_all(ctx, &stop);
+				if (setjmp(stop.jb) == 0)
 				{
 					avm2_set_public_property(ctx, avm2_object_value(cext->parent),
 					                         cext->name->utf8, cext->name->len,
 					                         avm2_null());
 				}
+				avm2_try_pop_frame(&stop);
 			}
-			avm2_try_pop_frame(&top);
 		}
 		cext->parent = NULL;
 		// Never-constructed children have no AVM2 life to continue
@@ -1071,7 +1089,12 @@ static int display_run_constructor_catching(Avm2Context* ctx, Avm2Object* obj,
 	g_gp_ctors_run_fwd++;
 	Avm2Class* cls = obj->cls;
 	Avm2TryFrame top;
-	avm2_try_push_catch_all(ctx, &top);
+	// A caller that asks for `exc` renders the error itself (the loaded SWF's
+	// root ctor does), so print_uncaught must stay out of that path or the
+	// traced line appears twice. A caller that discards it is a genuine
+	// uncaught error and keeps the normal reporting.
+	if (exc != NULL) avm2_try_push_catch_all_silent(ctx, &top);
+	else avm2_try_push_catch_all(ctx, &top);
 	volatile int threw = 1;   // survives the longjmp
 	if (setjmp(top.jb) == 0)
 	{
@@ -7465,6 +7488,65 @@ static Avm2Value gfx_draw_rect(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// drawRoundRectComplex(x, y, w, h, tl, tr, bl, br) — the four radii are
+// approximated away exactly like drawRoundRect's single radius (AABB unchanged).
+static Avm2Value gfx_draw_round_rect_complex(Avm2Activation* act)
+{
+	return gfx_draw_rect(act);
+}
+
+// cubicCurveTo(c1x, c1y, c2x, c2y, ax, ay). Our command stream carries
+// quadratics only (that is what the SWF shape record has), so the cubic is
+// split into 8 sub-curves by de Casteljau and each is replaced by its
+// least-squares quadratic (control = (3*C1 - P0 + 3*C2 - P3)/4). At 8 segments
+// the deviation is far below a twip for any on-screen curve.
+static Avm2Value gfx_cubic_curve_to(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (act->argc < 6) return avm2_undefined();
+	Avm2Context* ctx = act->ctx;
+	double c1x = avm2_coerce_to_number(ctx, act->args[0]);
+	double c1y = avm2_coerce_to_number(ctx, act->args[1]);
+	double c2x = avm2_coerce_to_number(ctx, act->args[2]);
+	double c2y = avm2_coerce_to_number(ctx, act->args[3]);
+	double ax  = avm2_coerce_to_number(ctx, act->args[4]);
+	double ay  = avm2_coerce_to_number(ctx, act->args[5]);
+	if (ext != NULL)
+	{
+		draw_union_point(ext, c1x, c1y);
+		draw_union_point(ext, c2x, c2y);
+		draw_union_point(ext, ax, ay);
+	}
+	if (g == NULL) return avm2_undefined();
+	if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);
+	double p0x = g->pen_x, p0y = g->pen_y;
+	const int N = 8;
+	for (int i = 0; i < N; i++)
+	{
+		double t0 = (double) i / N, t1 = (double)(i + 1) / N;
+		// Cubic point + derivative-scaled control points on [t0, t1].
+		#define CUB(t, a, b, c, d) ((1 - (t)) * (1 - (t)) * (1 - (t)) * (a) \
+			+ 3 * (1 - (t)) * (1 - (t)) * (t) * (b) \
+			+ 3 * (1 - (t)) * (t) * (t) * (c) + (t) * (t) * (t) * (d))
+		#define DER(t, a, b, c, d) (3 * (1 - (t)) * (1 - (t)) * ((b) - (a)) \
+			+ 6 * (1 - (t)) * (t) * ((c) - (b)) + 3 * (t) * (t) * ((d) - (c)))
+		double dt = t1 - t0;
+		double sx = CUB(t0, p0x, c1x, c2x, ax), sy = CUB(t0, p0y, c1y, c2y, ay);
+		double ex = CUB(t1, p0x, c1x, c2x, ax), ey = CUB(t1, p0y, c1y, c2y, ay);
+		double b1x = sx + DER(t0, p0x, c1x, c2x, ax) * dt / 3.0;
+		double b1y = sy + DER(t0, p0y, c1y, c2y, ay) * dt / 3.0;
+		double b2x = ex - DER(t1, p0x, c1x, c2x, ax) * dt / 3.0;
+		double b2y = ey - DER(t1, p0y, c1y, c2y, ay) * dt / 3.0;
+		#undef CUB
+		#undef DER
+		double qx = (3 * b1x - sx + 3 * b2x - ex) * 0.25;
+		double qy = (3 * b1y - sy + 3 * b2y - ey) * 0.25;
+		gfx_add_cmd(g, 2, (float) ex, (float) ey, (float) qx, (float) qy);
+	}
+	return avm2_undefined();
+}
+
 // drawCircle(x, y, r) / drawEllipse via 4 cubic-equivalent quadratic arcs.
 static Avm2Value gfx_draw_circle(Avm2Activation* act)
 {
@@ -7493,6 +7575,163 @@ static Avm2Value gfx_draw_circle(Avm2Activation* act)
 			}
 		}
 	}
+	return avm2_undefined();
+}
+
+// drawEllipse(x, y, w, h) — x/y is the TOP-LEFT corner, not the centre. It used
+// to share drawRect's body, which drew a box where Flash draws an oval.
+static Avm2Value gfx_draw_ellipse(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (act->argc < 4) return avm2_undefined();
+	double x = avm2_coerce_to_number(act->ctx, act->args[0]);
+	double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+	double w = avm2_coerce_to_number(act->ctx, act->args[2]);
+	double h = avm2_coerce_to_number(act->ctx, act->args[3]);
+	if (ext != NULL)
+	{
+		draw_union_point(ext, x, y);
+		draw_union_point(ext, x + w, y + h);
+	}
+	if (g == NULL) return avm2_undefined();
+	double rx = w * 0.5, ry = h * 0.5, cx = x + rx, cy = y + ry;
+	const int N = 8;
+	double kct = 1.0 / cos(M_PI / N);
+	gfx_add_cmd(g, 0, (float)(cx + rx), (float) cy, 0, 0);
+	for (int i = 0; i < N; i++)
+	{
+		double a0 = 2.0 * M_PI * i / N, a1 = 2.0 * M_PI * (i + 1) / N;
+		double am = (a0 + a1) * 0.5;
+		double ex = cx + rx * cos(a1), ey = cy + ry * sin(a1);
+		double ccx = cx + rx * kct * cos(am), ccy = cy + ry * kct * sin(am);
+		gfx_add_cmd(g, 2, (float) ex, (float) ey, (float) ccx, (float) ccy);
+	}
+	return avm2_undefined();
+}
+
+// beginBitmapFill(bitmap, matrix, repeat, smooth) / lineBitmapStyle(...) /
+// lineGradientStyle(...). The command stream carries a solid or gradient fill
+// and a SOLID stroke; a bitmap fill and any non-solid stroke have no
+// representation in it. Rather than silently keeping whatever style was
+// current — which is what the old gfx_noop did, so a beginBitmapFill leaked the
+// previous colour onto the next shape — each of these flushes the pending
+// subpath and clears the style it governs. gfx_line_style already documents
+// that convention for a fill-typed stroke.
+static Avm2Value gfx_begin_bitmap_fill(Avm2Activation* act)
+{
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL) return avm2_undefined();
+	gfx_finalize_path(g);
+	g->cur_fill = 0;
+	return avm2_undefined();
+}
+
+static Avm2Value gfx_line_fill_style(Avm2Activation* act)
+{
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL) return avm2_undefined();
+	gfx_finalize_path(g);
+	g->cur_line = 0;
+	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// flash.media.Video — a DisplayObject whose bounds are its declared size
+// ---------------------------------------------------------------------------
+
+// Ruffle core/src/bitmap.rs is_size_valid: the same limits BitmapData uses,
+// version-gated. Video's ctor reaches it only for a non-zero pair.
+static int video_size_valid(uint32_t swf_version, uint32_t w, uint32_t h)
+{
+	if (w == 0 || h == 0) return 0;
+	if (swf_version <= 9) return w <= 2880 && h <= 2880;
+	if (swf_version <= 12)
+		return w < 0x2000 && h < 0x2000 && (uint64_t) w * h < 0x1000000;
+	// Undocumented but reliable (Ruffle's own comment).
+	return w <= 0x6666666 && h <= 0x6666666
+	    && (uint64_t) w * (uint64_t) h < 0x20000000;
+}
+
+// Video(width:int = 320, height:int = 240) -> globals/flash/media/video.rs
+// `init`. Negative EITHER dimension is #2006; a ZERO in either falls back to
+// the 320x240 default pair (Adobe's documented behaviour, and why
+// `new Video(100, 0)` is 320x240 rather than 100x240). The resulting size is
+// the object's intrinsic bounds, so width/height/scaleX all fall out of the
+// existing DisplayObject machinery.
+static Avm2Value video_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2DisplayObjectExt* ext = this_display(act);
+	int32_t w = act->argc > 0 ? avm2_coerce_to_i32(ctx, act->args[0]) : 320;
+	int32_t h = act->argc > 1 ? avm2_coerce_to_i32(ctx, act->args[1]) : 240;
+	if (w < 0 || h < 0)
+	{
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #2006: The supplied index is out of bounds.");
+	}
+	if (w == 0 || h == 0)
+	{
+		w = 320; h = 240;
+	}
+	else if (!video_size_valid(ctx->swf_version, (uint32_t) w, (uint32_t) h))
+	{
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #2006: The supplied index is out of bounds.");
+	}
+	if (ext != NULL)
+	{
+		draw_union_point(ext, 0, 0);
+		draw_union_point(ext, (double) w, (double) h);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value video_get_deblocking(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	Avm2Value* v = self != NULL
+		? avm2_object_find_dynamic(self, "_deblocking", 11) : NULL;
+	return v != NULL ? *v : avm2_integer(0);
+}
+
+static Avm2Value video_set_deblocking(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || act->argc < 1) return avm2_undefined();
+	avm2_object_set_dynamic(act->ctx, self, "_deblocking", 11,
+		avm2_integer(avm2_coerce_to_i32(act->ctx, act->args[0])))->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value video_get_smoothing(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	Avm2Value* v = self != NULL
+		? avm2_object_find_dynamic(self, "_smoothing", 10) : NULL;
+	return v != NULL ? *v : avm2_bool(0);
+}
+
+static Avm2Value video_set_smoothing(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || act->argc < 1) return avm2_undefined();
+	avm2_object_set_dynamic(act->ctx, self, "_smoothing", 10,
+		avm2_bool(avm2_coerce_to_boolean(act->args[0]) ? 1 : 0))->dont_enum = 1;
+	return avm2_undefined();
+}
+
+// videoWidth/videoHeight are stubbed to 0 in Ruffle too (no decoder is
+// attached in the test harness), and are getter-only so a write raises #1074.
+static Avm2Value video_get_zero(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_integer(0);
+}
+
+static Avm2Value video_noop(Avm2Activation* act)
+{
+	(void) act;
 	return avm2_undefined();
 }
 
@@ -7811,6 +8050,72 @@ static Avm2Value graphicspath_init(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// --- GraphicsPath's own path builders (Ruffle GraphicsPath.as:40-113) ------
+// Each one lazily creates the two vectors, pushes ONE command id and its
+// coordinates. The two "wide" variants exist purely so their record is the same
+// width as curveTo's — the leading pair is arbitrary and ignored on consumption,
+// which is why Ruffle pushes literal zeroes.
+
+// Append to the `commands`/`data` dynamic slot, creating the Vector if the
+// property is still null. `elem` is the builtin Vector.<T> class to mint.
+static void gp_push(Avm2Activation* act, Avm2Object* self, const char* prop,
+                    uint32_t plen, Avm2Class* vec_class, const Avm2Value* vals,
+                    uint32_t n)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value* slot = avm2_object_find_dynamic(self, prop, plen);
+	Avm2Object* vecobj = (slot != NULL && slot->kind == AVM2_VALUE_OBJECT)
+		? slot->u.obj : NULL;
+	if (vecobj == NULL || avm2_vector_ext(vecobj) == NULL)
+	{
+		vecobj = avm2_vector_new(ctx, vec_class, 0, 0);
+		avm2_object_set_dynamic(ctx, self, prop, plen,
+		                        avm2_object_value(vecobj));
+	}
+	// Re-read the ext each round: appending may reallocate the backing store.
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2VectorExt* vec = avm2_vector_ext(vecobj);
+		if (vec == NULL) return;
+		avm2_vector_set_index(ctx, vecobj, vec->length, vals[i]);
+	}
+}
+
+// cmd id, then `n` coordinate arguments read straight off the activation.
+static Avm2Value gp_emit(Avm2Activation* act, int cmd, const double* extra,
+                         uint32_t nextra, uint32_t nargs)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	Avm2Value c = avm2_integer(cmd);
+	gp_push(act, self, "commands", 8, act->ctx->builtins.vector_int_class,
+	        &c, 1);
+	Avm2Value data[6];
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < nextra; i++) data[n++] = avm2_number(extra[i]);
+	for (uint32_t i = 0; i < nargs && n < 6; i++)
+	{
+		data[n++] = avm2_number(avm2_coerce_to_number(act->ctx,
+			i < act->argc ? act->args[i] : avm2_undefined()));
+	}
+	gp_push(act, self, "data", 4, act->ctx->builtins.vector_double_class,
+	        data, n);
+	return avm2_undefined();
+}
+
+static Avm2Value graphicspath_move_to(Avm2Activation* act)
+{ return gp_emit(act, 1, NULL, 0, 2); }
+static Avm2Value graphicspath_line_to(Avm2Activation* act)
+{ return gp_emit(act, 2, NULL, 0, 2); }
+static Avm2Value graphicspath_curve_to(Avm2Activation* act)
+{ return gp_emit(act, 3, NULL, 0, 4); }
+static Avm2Value graphicspath_cubic_curve_to(Avm2Activation* act)
+{ return gp_emit(act, 6, NULL, 0, 6); }
+static Avm2Value graphicspath_wide_move_to(Avm2Activation* act)
+{ static const double z[2] = { 0, 0 }; return gp_emit(act, 4, z, 2, 2); }
+static Avm2Value graphicspath_wide_line_to(Avm2Activation* act)
+{ static const double z[2] = { 0, 0 }; return gp_emit(act, 5, z, 2, 2); }
+
 static Avm2Value graphicspath_get_winding(Avm2Activation* act)
 {
 	Avm2Object* self = this_obj(act);
@@ -7888,6 +8193,12 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	gp->instance_init.debug_name = "GraphicsPath";
 	avm2_builtin_add_getset(ctx, gp, "winding", graphicspath_get_winding,
 	                        graphicspath_set_winding);
+	avm2_builtin_add_method(ctx, gp, "moveTo", graphicspath_move_to);
+	avm2_builtin_add_method(ctx, gp, "lineTo", graphicspath_line_to);
+	avm2_builtin_add_method(ctx, gp, "curveTo", graphicspath_curve_to);
+	avm2_builtin_add_method(ctx, gp, "cubicCurveTo", graphicspath_cubic_curve_to);
+	avm2_builtin_add_method(ctx, gp, "wideMoveTo", graphicspath_wide_move_to);
+	avm2_builtin_add_method(ctx, gp, "wideLineTo", graphicspath_wide_line_to);
 	GFX_IMPLEMENTS_IGRAPHICSDATA(gp);
 	g_graphicspath_class = gp;
 
@@ -7932,6 +8243,33 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	disp_sconst(ctx, tc, "NONE", "none");
 	disp_sconst(ctx, tc, "POSITIVE", "positive");
 	disp_sconst(ctx, tc, "NEGATIVE", "negative");
+
+	// CapsStyle / JointStyle — lineStyle's 6th and 7th arguments are compared
+	// as strings, so the bags only have to exist (LineScaleMode already did).
+	Avm2Class* caps = avm2_builtin_class(ctx, "flash.display", "CapsStyle",
+	                                     object_class);
+	disp_sconst(ctx, caps, "NONE", "none");
+	disp_sconst(ctx, caps, "ROUND", "round");
+	disp_sconst(ctx, caps, "SQUARE", "square");
+
+	Avm2Class* joint = avm2_builtin_class(ctx, "flash.display", "JointStyle",
+	                                      object_class);
+	disp_sconst(ctx, joint, "BEVEL", "bevel");
+	disp_sconst(ctx, joint, "MITER", "miter");
+	disp_sconst(ctx, joint, "ROUND", "round");
+
+	// The two remaining IGraphicsData carriers. GraphicsBitmapFill/
+	// GraphicsEndFill sit in the same drawGraphicsData stream as the three
+	// registered above, so they get the same non-sealed shape + marker.
+	const char* more_fills[2] = { "GraphicsBitmapFill", "GraphicsEndFill" };
+	for (int i = 0; i < 2; i++)
+	{
+		Avm2Class* fc = avm2_builtin_class(ctx, "flash.display", more_fills[i],
+		                                   object_class);
+		fc->interface_count = 1;
+		fc->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*));
+		fc->interfaces[0] = igd;
+	}
 }
 
 // ===========================================================================
@@ -8230,8 +8568,51 @@ static Avm2Value geom_matrix_copy_column_from(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-// flash.geom.Vector3D minimal init (x,y,z,w dynamic props) so Matrix
-// copyRow/copyColumnFrom read real components.
+// ---------------------------------------------------------------------------
+// flash.geom.Vector3D — a direct port of Ruffle's geom/Vector3D.as
+// ---------------------------------------------------------------------------
+// x/y/z/w are dynamic props (Matrix3D's copyRow/copyColumnFrom and
+// setProgramConstantsFromMatrix already read them by name). Almost every
+// mutator here deliberately leaves `w` ALONE — only the constructor, clone and
+// crossProduct write it — and crossProduct always sets it to 1. nearEquals
+// carries a Flash Player bug Ruffle documents and replicates: with allFour it
+// compares the OTHER vector's raw w against the tolerance instead of the
+// difference.
+
+static Avm2Class* g_vector3d_class;
+
+static double v3_get(Avm2Context* ctx, Avm2Object* o, const char* n)
+{
+	if (o == NULL) return 0.0;
+	Avm2Value* v = avm2_object_find_dynamic(o, n, 1);
+	return v != NULL ? avm2_coerce_to_number(ctx, *v) : 0.0;
+}
+
+static void v3_set(Avm2Context* ctx, Avm2Object* o, const char* n, double d)
+{
+	if (o != NULL) avm2_object_set_dynamic(ctx, o, n, 1, avm2_number(d));
+}
+
+static Avm2Object* v3_self(Avm2Activation* act)
+{
+	return this_obj(act);
+}
+
+// Argument 0 as an object; null/undefined yields NULL and every component
+// then reads 0, which is what an untyped `null` coerces to in the .as body.
+static Avm2Object* v3_arg(Avm2Activation* act, uint32_t i)
+{
+	return (act->argc > i && act->args[i].kind == AVM2_VALUE_OBJECT)
+		? act->args[i].u.obj : NULL;
+}
+
+static Avm2Value v3_make(Avm2Context* ctx, double x, double y, double z, double w)
+{
+	Avm2Value a[4] = { avm2_number(x), avm2_number(y), avm2_number(z),
+	                   avm2_number(w) };
+	return avm2_class_construct(ctx, g_vector3d_class, a, 4);
+}
+
 static Avm2Value geom_vector3d_init(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -8242,10 +8623,238 @@ static Avm2Value geom_vector3d_init(Avm2Activation* act)
 	{
 		double v = (uint32_t) i < act->argc
 			? avm2_coerce_to_number(ctx, act->args[i]) : 0.0;
-		avm2_object_set_dynamic(ctx, self, n[i], (uint32_t) strlen(n[i]),
-		                        avm2_number(v));
+		avm2_object_set_dynamic(ctx, self, n[i], 1, avm2_number(v));
 	}
 	return avm2_undefined();
+}
+
+static double v3_length_squared(Avm2Context* ctx, Avm2Object* o)
+{
+	double x = v3_get(ctx, o, "x"), y = v3_get(ctx, o, "y"),
+	       z = v3_get(ctx, o, "z");
+	return x * x + y * y + z * z;
+}
+
+static Avm2Value v3_get_length(Avm2Activation* act)
+{
+	return avm2_number(sqrt(v3_length_squared(act->ctx, v3_self(act))));
+}
+
+static Avm2Value v3_get_length_squared(Avm2Activation* act)
+{
+	return avm2_number(v3_length_squared(act->ctx, v3_self(act)));
+}
+
+static Avm2Value v3_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act);
+	char n[3][40];
+	avm2_format_number(n[0], sizeof(n[0]), v3_get(ctx, s, "x"));
+	avm2_format_number(n[1], sizeof(n[1]), v3_get(ctx, s, "y"));
+	avm2_format_number(n[2], sizeof(n[2]), v3_get(ctx, s, "z"));
+	char buf[160];
+	snprintf(buf, sizeof(buf), "Vector3D(%s, %s, %s)", n[0], n[1], n[2]);
+	return avm2_string(avm2_string_from_literal(ctx, buf));
+}
+
+// add/subtract drop w (the result's w is 0, not either operand's).
+static Avm2Value v3_add(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	return v3_make(ctx, v3_get(ctx, s, "x") + v3_get(ctx, a, "x"),
+	                    v3_get(ctx, s, "y") + v3_get(ctx, a, "y"),
+	                    v3_get(ctx, s, "z") + v3_get(ctx, a, "z"), 0);
+}
+
+static Avm2Value v3_subtract(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	return v3_make(ctx, v3_get(ctx, s, "x") - v3_get(ctx, a, "x"),
+	                    v3_get(ctx, s, "y") - v3_get(ctx, a, "y"),
+	                    v3_get(ctx, s, "z") - v3_get(ctx, a, "z"), 0);
+}
+
+static Avm2Value v3_increment_by(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	v3_set(ctx, s, "x", v3_get(ctx, s, "x") + v3_get(ctx, a, "x"));
+	v3_set(ctx, s, "y", v3_get(ctx, s, "y") + v3_get(ctx, a, "y"));
+	v3_set(ctx, s, "z", v3_get(ctx, s, "z") + v3_get(ctx, a, "z"));
+	return avm2_undefined();
+}
+
+static Avm2Value v3_decrement_by(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	v3_set(ctx, s, "x", v3_get(ctx, s, "x") - v3_get(ctx, a, "x"));
+	v3_set(ctx, s, "y", v3_get(ctx, s, "y") - v3_get(ctx, a, "y"));
+	v3_set(ctx, s, "z", v3_get(ctx, s, "z") - v3_get(ctx, a, "z"));
+	return avm2_undefined();
+}
+
+static Avm2Value v3_clone(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act);
+	return v3_make(ctx, v3_get(ctx, s, "x"), v3_get(ctx, s, "y"),
+	               v3_get(ctx, s, "z"), v3_get(ctx, s, "w"));
+}
+
+static Avm2Value v3_copy_from(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	v3_set(ctx, s, "x", v3_get(ctx, a, "x"));
+	v3_set(ctx, s, "y", v3_get(ctx, a, "y"));
+	v3_set(ctx, s, "z", v3_get(ctx, a, "z"));
+	return avm2_undefined();
+}
+
+static Avm2Value v3_equals(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	int all_four = act->argc > 1 && avm2_coerce_to_boolean(act->args[1]);
+	int eq = v3_get(ctx, s, "x") == v3_get(ctx, a, "x")
+	      && v3_get(ctx, s, "y") == v3_get(ctx, a, "y")
+	      && v3_get(ctx, s, "z") == v3_get(ctx, a, "z")
+	      && (!all_four || v3_get(ctx, s, "w") == v3_get(ctx, a, "w"));
+	return avm2_bool(eq);
+}
+
+static Avm2Value v3_near_equals(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	double tol = act->argc > 1 ? avm2_coerce_to_number(ctx, act->args[1]) : 0.0;
+	int all_four = act->argc > 2 && avm2_coerce_to_boolean(act->args[2]);
+	int eq = fabs(v3_get(ctx, s, "x") - v3_get(ctx, a, "x")) < tol
+	      && fabs(v3_get(ctx, s, "y") - v3_get(ctx, a, "y")) < tol
+	      && fabs(v3_get(ctx, s, "z") - v3_get(ctx, a, "z")) < tol
+	      // FP BUG (replicated): the w arm forgets the subtraction.
+	      && (!all_four || fabs(v3_get(ctx, a, "w")) < tol);
+	return avm2_bool(eq);
+}
+
+static Avm2Value v3_set_to(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act);
+	static const char* const n[3] = { "x", "y", "z" };
+	for (int i = 0; i < 3; i++)
+	{
+		v3_set(ctx, s, n[i], avm2_coerce_to_number(ctx,
+			(uint32_t) i < act->argc ? act->args[i] : avm2_undefined()));
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value v3_scale_by(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act);
+	double k = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0.0;
+	v3_set(ctx, s, "x", v3_get(ctx, s, "x") * k);
+	v3_set(ctx, s, "y", v3_get(ctx, s, "y") * k);
+	v3_set(ctx, s, "z", v3_get(ctx, s, "z") * k);
+	return avm2_undefined();
+}
+
+static Avm2Value v3_negate(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act);
+	v3_set(ctx, s, "x", v3_get(ctx, s, "x") * -1.0);
+	v3_set(ctx, s, "y", v3_get(ctx, s, "y") * -1.0);
+	v3_set(ctx, s, "z", v3_get(ctx, s, "z") * -1.0);
+	return avm2_undefined();
+}
+
+static Avm2Value v3_project(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act);
+	double w = v3_get(ctx, s, "w");
+	v3_set(ctx, s, "x", v3_get(ctx, s, "x") / w);
+	v3_set(ctx, s, "y", v3_get(ctx, s, "y") / w);
+	v3_set(ctx, s, "z", v3_get(ctx, s, "z") / w);
+	return avm2_undefined();
+}
+
+// normalize() returns the ORIGINAL length. A zero length zeroes the vector; a
+// NaN length (i.e. any NaN component) makes all three NaN — the `else` arm of
+// the .as, which `len > 0` deliberately falls through to.
+static Avm2Value v3_normalize(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act);
+	double len = sqrt(v3_length_squared(ctx, s));
+	if (len == 0)
+	{
+		v3_set(ctx, s, "x", 0); v3_set(ctx, s, "y", 0); v3_set(ctx, s, "z", 0);
+	}
+	else if (len > 0)
+	{
+		v3_set(ctx, s, "x", v3_get(ctx, s, "x") / len);
+		v3_set(ctx, s, "y", v3_get(ctx, s, "y") / len);
+		v3_set(ctx, s, "z", v3_get(ctx, s, "z") / len);
+	}
+	else
+	{
+		double nan = (double) NAN;
+		v3_set(ctx, s, "x", nan); v3_set(ctx, s, "y", nan);
+		v3_set(ctx, s, "z", nan);
+	}
+	return avm2_number(len);
+}
+
+static Avm2Value v3_dot_product(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	return avm2_number(v3_get(ctx, s, "x") * v3_get(ctx, a, "x")
+	                 + v3_get(ctx, s, "y") * v3_get(ctx, a, "y")
+	                 + v3_get(ctx, s, "z") * v3_get(ctx, a, "z"));
+}
+
+static Avm2Value v3_cross_product(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = v3_self(act), *a = v3_arg(act, 0);
+	double sx = v3_get(ctx, s, "x"), sy = v3_get(ctx, s, "y"),
+	       sz = v3_get(ctx, s, "z");
+	double ax = v3_get(ctx, a, "x"), ay = v3_get(ctx, a, "y"),
+	       az = v3_get(ctx, a, "z");
+	// w is always 1 here, "for whatever reason" (Ruffle's own note).
+	return v3_make(ctx, sy * az - sz * ay, sz * ax - sx * az,
+	               sx * ay - sy * ax, 1);
+}
+
+static Avm2Value v3_angle_between(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* a = v3_arg(act, 0), *b = v3_arg(act, 1);
+	double dot = v3_get(ctx, a, "x") * v3_get(ctx, b, "x")
+	           + v3_get(ctx, a, "y") * v3_get(ctx, b, "y")
+	           + v3_get(ctx, a, "z") * v3_get(ctx, b, "z");
+	double la = sqrt(v3_length_squared(ctx, a));
+	double lb = sqrt(v3_length_squared(ctx, b));
+	return avm2_number(acos(dot / (la * lb)));
+}
+
+static Avm2Value v3_distance(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* p1 = v3_arg(act, 0), *p2 = v3_arg(act, 1);
+	double dx = v3_get(ctx, p2, "x") - v3_get(ctx, p1, "x");
+	double dy = v3_get(ctx, p2, "y") - v3_get(ctx, p1, "y");
+	double dz = v3_get(ctx, p2, "z") - v3_get(ctx, p1, "z");
+	return avm2_number(sqrt(dx * dx + dy * dy + dz * dz));
 }
 
 static Avm2Value geom_matrix_to_string(Avm2Activation* act)
@@ -8319,7 +8928,7 @@ static Avm2Class* g_colortransform_class;
 // flash.geom.Vector3D. avm2_stage3d.c's Matrix3D constructs one for `position`
 // / transformVector, and avm2_builtin_class always MINTS a class rather than
 // looking one up, so the handle has to be shared rather than re-registered.
-static Avm2Class* g_vector3d_class;
+// (Declared just above the Vector3D method bodies, which need it for v3_make.)
 
 Avm2Class* avm2_geom_vector3d_class(void)
 { return g_vector3d_class; }
@@ -8362,6 +8971,62 @@ static Avm2Value colortransform_to_string(Avm2Activation* act)
 	if (off < (int) sizeof(buf) - 1) buf[off++] = ')';
 	buf[off] = '\0';
 	return avm2_string(avm2_string_new(act->ctx, buf, (uint32_t) off));
+}
+
+// ColorTransform.color (Ruffle geom/ColorTransform.as:47-58): reads the three
+// offsets packed as RGB; writing it zeroes the RGB multipliers and rewrites the
+// offsets, so the object becomes a flat tint. The class is SEALED, so without
+// the accessor `ct.color = n` raised #1056 instead.
+static Avm2Value colortransform_get_color(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->slot_count < 9) return avm2_undefined();
+	Avm2Context* ctx = act->ctx;
+	uint32_t r = avm2_coerce_to_u32(ctx, self->slots[5]);
+	uint32_t g = avm2_coerce_to_u32(ctx, self->slots[6]);
+	uint32_t b = avm2_coerce_to_u32(ctx, self->slots[7]);
+	return avm2_uint_value(((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF));
+}
+
+static Avm2Value colortransform_set_color(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->slot_count < 9 || act->argc < 1)
+		return avm2_undefined();
+	uint32_t c = avm2_coerce_to_u32(act->ctx, act->args[0]);
+	self->slots[1] = avm2_integer(0);
+	self->slots[2] = avm2_integer(0);
+	self->slots[3] = avm2_integer(0);
+	self->slots[5] = avm2_uint_value((c >> 16) & 0xFF);
+	self->slots[6] = avm2_uint_value((c >> 8) & 0xFF);
+	self->slots[7] = avm2_uint_value(c & 0xFF);
+	return avm2_undefined();
+}
+
+// concat(second): Ruffle geom/ColorTransform.as:60 — offsets pick up the
+// receiver's multiplier scaling first, then the multipliers compose.
+static Avm2Value colortransform_concat(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2Value sv = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (self == NULL || self->slot_count < 9 || sv.kind != AVM2_VALUE_OBJECT
+	    || sv.u.obj == NULL || sv.u.obj->slot_count < 9)
+	{
+		return avm2_undefined();
+	}
+	Avm2Object* o = sv.u.obj;
+	// slots 1-4 multipliers (r,g,b,a), 5-8 offsets (r,g,b,a).
+	for (int i = 0; i < 4; i++)
+	{
+		double mul = avm2_coerce_to_number(ctx, self->slots[1 + i]);
+		double off = avm2_coerce_to_number(ctx, self->slots[5 + i]);
+		double omul = avm2_coerce_to_number(ctx, o->slots[1 + i]);
+		double ooff = avm2_coerce_to_number(ctx, o->slots[5 + i]);
+		self->slots[5 + i] = avm2_number(off + mul * ooff);
+		self->slots[1 + i] = avm2_number(mul * omul);
+	}
+	return avm2_undefined();
 }
 
 static Avm2Value transform_get_color_transform(Avm2Activation* act)
@@ -8423,6 +9088,202 @@ static Avm2Value transform_get_matrix3d(Avm2Activation* act)
 static Avm2Value transform_set_stub(Avm2Activation* act)
 {
 	(void) act;
+	return avm2_undefined();
+}
+
+// --- flash.geom.PerspectiveProjection ---------------------------------------
+// Ruffle render/src/perspective_projection.rs: fov 55 degrees, centre (250,250),
+// and a focal length derived from the projection width — 500 when the object is
+// the stage or has no display object, otherwise the stage width. toMatrix3D
+// builds a bare projection matrix from that focal length.
+//
+// transform.perspectiveProjection is NON-NULL for the stage and the root and
+// null for every other object (perspective_projection_basic grades exactly
+// that). Assigning null does not make the stage's null — the getter simply
+// re-mints the default — so "assign null" is stored as "no override".
+
+static Avm2Class* g_pperspective_class;
+
+static double pp_slot(Avm2Context* ctx, Avm2Object* o, const char* n,
+                      uint32_t nlen, double dflt)
+{
+	Avm2Value* v = o != NULL ? avm2_object_find_dynamic(o, n, nlen) : NULL;
+	return v != NULL ? avm2_coerce_to_number(ctx, *v) : dflt;
+}
+
+// The projection width: 500 unless the object is a non-stage DisplayObject,
+// in which case it is the stage width.
+static double pp_width(Avm2Activation* act, Avm2Object* self)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value* t = self != NULL
+		? avm2_object_find_dynamic(self, "__target", 8) : NULL;
+	if (t == NULL || t->kind != AVM2_VALUE_OBJECT) return 500.0;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, t->u.obj);
+	if (ext == NULL || ext->is_stage) return 500.0;
+	return (double) ((avm2_generated_stage_rect[1]
+	                  - avm2_generated_stage_rect[0]) / 20);
+}
+
+static double pp_focal_length(Avm2Activation* act, Avm2Object* self)
+{
+	double fov = pp_slot(act->ctx, self, "__fov", 5, 55.0);
+	double rad = fov * (M_PI / 180.0);
+	// Ruffle computes this half in f32 (`... as f32`), so keep the cast.
+	return (double) (float) ((pp_width(act, self) / 2.0) * tan((M_PI - rad) / 2.0));
+}
+
+static Avm2Value pp_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	avm2_object_set_dynamic(ctx, self, "__fov", 5, avm2_number(55.0))
+		->dont_enum = 1;
+	avm2_object_set_dynamic(ctx, self, "__cx", 4, avm2_number(250.0))
+		->dont_enum = 1;
+	avm2_object_set_dynamic(ctx, self, "__cy", 4, avm2_number(250.0))
+		->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value pp_get_fov(Avm2Activation* act)
+{
+	return avm2_number(pp_slot(act->ctx, this_obj(act), "__fov", 5, 55.0));
+}
+
+static Avm2Value pp_set_fov(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	double fov = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0.0;
+	if (fov <= 0.0 || fov >= 180.0)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2182: Invalid fieldOfView value.  The value "
+		                 "must be greater than 0 and less than 180.");
+	}
+	if (self != NULL)
+		avm2_object_set_dynamic(ctx, self, "__fov", 5, avm2_number(fov))
+			->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value pp_get_focal_length(Avm2Activation* act)
+{
+	return avm2_number(pp_focal_length(act, this_obj(act)));
+}
+
+static Avm2Value pp_set_focal_length(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	double fl = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0.0;
+	if (fl <= 0.0)
+	{
+		char buf[128];
+		char num[40];
+		avm2_format_number(num, sizeof(num), fl);
+		snprintf(buf, sizeof(buf),
+		         "Error #2186: Invalid focalLength %s.", num);
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class, buf);
+	}
+	double fov = atan((pp_width(act, self) / 2.0) / fl) / (M_PI / 180.0) * 2.0;
+	if (self != NULL)
+		avm2_object_set_dynamic(ctx, self, "__fov", 5, avm2_number(fov))
+			->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value pp_get_center(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	extern Avm2Class* avm2_display_point_class(Avm2Context* ctx);
+	Avm2Value a[2] = { avm2_number(pp_slot(ctx, self, "__cx", 4, 250.0)),
+	                   avm2_number(pp_slot(ctx, self, "__cy", 4, 250.0)) };
+	return avm2_class_construct(ctx, avm2_display_point_class(ctx), a, 2);
+}
+
+static Avm2Value pp_set_center(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2Value p = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (self == NULL) return avm2_undefined();
+	double x = avm2_coerce_to_number(ctx,
+		avm2_get_public_property(ctx, p, "x", 1, NULL));
+	double y = avm2_coerce_to_number(ctx,
+		avm2_get_public_property(ctx, p, "y", 1, NULL));
+	avm2_object_set_dynamic(ctx, self, "__cx", 4, avm2_number(x))->dont_enum = 1;
+	avm2_object_set_dynamic(ctx, self, "__cy", 4, avm2_number(y))->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value pp_to_matrix3d(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	double fl = pp_focal_length(act, this_obj(act));
+	extern Avm2Class* avm2_stage3d_matrix3d_class(void);
+	Avm2Class* m3d = avm2_stage3d_matrix3d_class();
+	if (m3d == NULL) return avm2_null();
+	static const int kOnes[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+	                               0, 0, 0, 0 };
+	Avm2Object* raw = avm2_vector_new(ctx, ctx->builtins.vector_double_class,
+	                                  0, 0);
+	for (int i = 0; i < 16; i++)
+	{
+		double d = (i == 0 || i == 5) ? fl : (double) kOnes[i];
+		avm2_vector_set_index(ctx, raw, (uint32_t) i, avm2_number(d));
+	}
+	Avm2Value arg = avm2_object_value(raw);
+	return avm2_class_construct(ctx, m3d, &arg, 1);
+}
+
+// transform.perspectiveProjection: the override stored on the target, else a
+// freshly minted default for the stage/root, else null.
+static Avm2Value transform_get_perspective_projection(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL || g_pperspective_class == NULL)
+		return avm2_null();
+	Avm2Object* target = ((Avm2TransformExt*) self->native_ext)->target;
+	if (target == NULL) return avm2_null();
+	Avm2Value* stored = avm2_object_find_dynamic(target, "__pproj", 7);
+	if (stored != NULL && stored->kind == AVM2_VALUE_OBJECT) return *stored;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, target);
+	if (ext == NULL || (!ext->is_stage && !ext->is_root)) return avm2_null();
+	Avm2Value pp = avm2_class_construct(ctx, g_pperspective_class, NULL, 0);
+	if (pp.kind == AVM2_VALUE_OBJECT)
+	{
+		avm2_object_set_dynamic(ctx, pp.u.obj, "__target", 8,
+		                        avm2_object_value(target))->dont_enum = 1;
+	}
+	return pp;
+}
+
+static Avm2Value transform_set_perspective_projection(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL) return avm2_undefined();
+	Avm2Object* target = ((Avm2TransformExt*) self->native_ext)->target;
+	if (target == NULL) return avm2_undefined();
+	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_null();
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+	{
+		avm2_object_set_dynamic(ctx, v.u.obj, "__target", 8,
+		                        avm2_object_value(target))->dont_enum = 1;
+		avm2_object_set_dynamic(ctx, target, "__pproj", 7, v)->dont_enum = 1;
+	}
+	else
+	{
+		// "No override" — the stage/root getter then re-mints its default,
+		// while a plain object goes back to null.
+		avm2_object_set_dynamic(ctx, target, "__pproj", 7, avm2_null())
+			->dont_enum = 1;
+	}
 	return avm2_undefined();
 }
 
@@ -11427,6 +12288,23 @@ void avm2_register_display(Avm2Context* ctx)
 	b->bitmap_class = bitmap;
 	avm2_bitmap_wire_bitmap(ctx, bitmap);
 
+	// flash.media.Video (extends DisplayObject). It lives here rather than in
+	// avm2_media.c because everything it needs — display_native_init and the
+	// draw-AABB that gives it intrinsic bounds — is private to this file.
+	Avm2Class* video = avm2_builtin_class(ctx, "flash.media", "Video", dobj);
+	video->native_init = display_native_init;
+	video->instance_init.fn = video_init;
+	video->instance_init.debug_name = "Video";
+	avm2_builtin_add_getset(ctx, video, "deblocking", video_get_deblocking,
+	                        video_set_deblocking);
+	avm2_builtin_add_getset(ctx, video, "smoothing", video_get_smoothing,
+	                        video_set_smoothing);
+	avm2_builtin_add_getter(ctx, video, "videoWidth", video_get_zero);
+	avm2_builtin_add_getter(ctx, video, "videoHeight", video_get_zero);
+	avm2_builtin_add_method(ctx, video, "attachNetStream", video_noop);
+	avm2_builtin_add_method(ctx, video, "attachCamera", video_noop);
+	avm2_builtin_add_method(ctx, video, "clear", video_noop);
+
 	// flash.text.TextField / StaticText. The property surface lives in
 	// avm2_text.c (Stage 6); the class shell stays here so the display
 	// alloc hook and timeline instantiation wire up.
@@ -11445,16 +12323,23 @@ void avm2_register_display(Avm2Context* ctx)
 	graphics->native_ext_size = sizeof(Avm2GraphicsExt);
 	avm2_builtin_add_method(ctx, graphics, "beginFill", gfx_begin_fill);
 	avm2_builtin_add_method(ctx, graphics, "beginGradientFill", gfx_begin_gradient_fill);
-	avm2_builtin_add_method(ctx, graphics, "beginBitmapFill", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "beginBitmapFill", gfx_begin_bitmap_fill);
+	avm2_builtin_add_method(ctx, graphics, "lineBitmapStyle", gfx_line_fill_style);
+	avm2_builtin_add_method(ctx, graphics, "lineGradientStyle", gfx_line_fill_style);
+	avm2_builtin_add_method(ctx, graphics, "lineShaderStyle", gfx_line_fill_style);
+	avm2_builtin_add_method(ctx, graphics, "beginShaderFill", gfx_begin_bitmap_fill);
 	avm2_builtin_add_method(ctx, graphics, "endFill", gfx_end_fill);
 	avm2_builtin_add_method(ctx, graphics, "lineStyle", gfx_line_style);
 	avm2_builtin_add_method(ctx, graphics, "clear", gfx_clear);
 	avm2_builtin_add_method(ctx, graphics, "moveTo", gfx_move_to);
 	avm2_builtin_add_method(ctx, graphics, "lineTo", gfx_line_to);
 	avm2_builtin_add_method(ctx, graphics, "curveTo", gfx_curve_to);
+	avm2_builtin_add_method(ctx, graphics, "cubicCurveTo", gfx_cubic_curve_to);
 	avm2_builtin_add_method(ctx, graphics, "drawRect", gfx_draw_rect);
 	avm2_builtin_add_method(ctx, graphics, "drawRoundRect", gfx_draw_rect);
-	avm2_builtin_add_method(ctx, graphics, "drawEllipse", gfx_draw_rect);
+	avm2_builtin_add_method(ctx, graphics, "drawRoundRectComplex",
+	                        gfx_draw_round_rect_complex);
+	avm2_builtin_add_method(ctx, graphics, "drawEllipse", gfx_draw_ellipse);
 	avm2_builtin_add_method(ctx, graphics, "drawCircle", gfx_draw_circle);
 	avm2_builtin_add_method(ctx, graphics, "copyFrom", gfx_noop);
 	g_graphics_class = graphics;
@@ -11506,7 +12391,8 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, geom_transform, "matrix3D", transform_get_matrix3d,
 	           transform_set_stub);
 	add_getset(ctx, geom_transform, "perspectiveProjection",
-	           transform_get_matrix3d, transform_set_stub);
+	           transform_get_perspective_projection,
+	           transform_set_perspective_projection);
 	add_getset(ctx, geom_transform, "pixelBounds",
 	           transform_get_pixel_bounds, NULL);
 	g_transform_class = geom_transform;
@@ -11519,12 +12405,45 @@ void avm2_register_display(Avm2Context* ctx)
 		Avm2Class* pp = avm2_builtin_class(ctx, "flash.geom",
 		                                   "PerspectiveProjection",
 		                                   b->object_class);
-		(void) pp;
+		pp->instance_init.fn = pp_init;
+		pp->instance_init.debug_name = "PerspectiveProjection";
+		g_pperspective_class = pp;
+		avm2_builtin_add_getset(ctx, pp, "fieldOfView", pp_get_fov, pp_set_fov);
+		avm2_builtin_add_getset(ctx, pp, "focalLength", pp_get_focal_length,
+		                        pp_set_focal_length);
+		avm2_builtin_add_getset(ctx, pp, "projectionCenter", pp_get_center,
+		                        pp_set_center);
+		avm2_builtin_add_method(ctx, pp, "toMatrix3D", pp_to_matrix3d);
 		Avm2Class* v3 = avm2_builtin_class(ctx, "flash.geom", "Vector3D",
 		                                   b->object_class);
 		v3->instance_init.fn = geom_vector3d_init;
 		v3->instance_init.debug_name = "Vector3D";
 		g_vector3d_class = v3;
+		avm2_builtin_add_getter(ctx, v3, "length", v3_get_length);
+		avm2_builtin_add_getter(ctx, v3, "lengthSquared", v3_get_length_squared);
+		avm2_builtin_add_method(ctx, v3, "toString", v3_to_string);
+		avm2_builtin_add_method(ctx, v3, "add", v3_add);
+		avm2_builtin_add_method(ctx, v3, "subtract", v3_subtract);
+		avm2_builtin_add_method(ctx, v3, "incrementBy", v3_increment_by);
+		avm2_builtin_add_method(ctx, v3, "decrementBy", v3_decrement_by);
+		avm2_builtin_add_method(ctx, v3, "clone", v3_clone);
+		avm2_builtin_add_method(ctx, v3, "copyFrom", v3_copy_from);
+		avm2_builtin_add_method(ctx, v3, "equals", v3_equals);
+		avm2_builtin_add_method(ctx, v3, "nearEquals", v3_near_equals);
+		avm2_builtin_add_method(ctx, v3, "setTo", v3_set_to);
+		avm2_builtin_add_method(ctx, v3, "scaleBy", v3_scale_by);
+		avm2_builtin_add_method(ctx, v3, "negate", v3_negate);
+		avm2_builtin_add_method(ctx, v3, "project", v3_project);
+		avm2_builtin_add_method(ctx, v3, "normalize", v3_normalize);
+		avm2_builtin_add_method(ctx, v3, "dotProduct", v3_dot_product);
+		avm2_builtin_add_method(ctx, v3, "crossProduct", v3_cross_product);
+		avm2_builtin_add_static_method(ctx, v3, "angleBetween", v3_angle_between);
+		avm2_builtin_add_static_method(ctx, v3, "distance", v3_distance);
+		// The three axis constants. describeType reports them in this order
+		// (Z before X before Y), which is the order Ruffle's .as declares.
+		avm2_builtin_add_static_const(ctx, v3, "Z_AXIS", v3_make(ctx, 0, 0, 1, 0));
+		avm2_builtin_add_static_const(ctx, v3, "X_AXIS", v3_make(ctx, 1, 0, 0, 0));
+		avm2_builtin_add_static_const(ctx, v3, "Y_AXIS", v3_make(ctx, 0, 1, 0, 0));
 	}
 
 	// flash.geom.ColorTransform (8 numeric slots + FP toString).
@@ -11551,6 +12470,9 @@ void avm2_register_display(Avm2Context* ctx)
 			avm2_vtable_append(ctx, &ct->ivtable, &e);
 		}
 		avm2_builtin_add_method(ctx, ct, "toString", colortransform_to_string);
+		avm2_builtin_add_method(ctx, ct, "concat", colortransform_concat);
+		avm2_builtin_add_getset(ctx, ct, "color", colortransform_get_color,
+		                        colortransform_set_color);
 		g_colortransform_class = ct;
 	}
 

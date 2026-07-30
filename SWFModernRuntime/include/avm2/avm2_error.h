@@ -32,6 +32,12 @@ typedef struct Avm2TryFrame
 	Avm2AbcFileRt* file;
 	uint32_t op_index;        // updated by the body before each op
 	uint8_t catch_all;        // top-level frame: catches everything
+	// A catch-all the RUNTIME installs to handle the error itself (the loaded
+	// SWF's root constructor renders its own trace). Ruffle only routes an
+	// error to Avm2::uncaught_error where the player loop discards it, so a
+	// silent frame must not also go through print_uncaught — otherwise
+	// loader_error_in_root_ctor's traced line appears twice.
+	uint8_t silent;
 	uint32_t saved_call_depth;  // debug call stack unwound to here on catch
 	// Set by dispatch before the longjmp:
 	Avm2Value exc;
@@ -60,6 +66,8 @@ void avm2_try_push_frame(Avm2Context* ctx, Avm2TryFrame* tf,
                          const Avm2AbcException* excs, uint32_t exc_count,
                          Avm2AbcFileRt* file);
 void avm2_try_push_catch_all(Avm2Context* ctx, Avm2TryFrame* tf);
+// As above, but the caller reports the error itself (see `silent`).
+void avm2_try_push_catch_all_silent(Avm2Context* ctx, Avm2TryFrame* tf);
 void avm2_try_pop_frame(Avm2TryFrame* tf);
 
 // Throw a value: longjmp to the innermost matching handler; if only the
