@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-30 17:36 UTC
+**Date**: 2026-07-30 18:36 UTC
 
-**Git SHA**: `1ca0ab117c`
+**Git SHA**: `2358a37b1c`
 
-**Run Duration**: 2m 46s
+**Run Duration**: 2m 42s
 
 ## Summary
 
@@ -31,17 +31,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 17.1s |  |
-| 2 | `frame_label_count_oom` | 1 | 2.2s |  |
-| 3 | `frame_script_cleanup` | 30 | 8.0s |  |
-| 4 | `frame_script_cleanup2` | 32 | 7.8s |  |
-| 5 | `frame_script_cleanup3` | 30 | 7.5s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 7.7s |  |
-| 7 | `frame_script_construct` | 25 | 7.5s |  |
-| 8 | `scene_count_oom` | 1 | 2.0s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 26.5s |  |
+| 1 | `clip_action_no_key_code` | 1 | 21.3s |  |
+| 2 | `frame_label_count_oom` | 1 | 2.1s |  |
+| 3 | `frame_script_cleanup` | 30 | 7.8s |  |
+| 4 | `frame_script_cleanup2` | 32 | 7.5s |  |
+| 5 | `frame_script_cleanup3` | 30 | 8.1s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 8.0s |  |
+| 7 | `frame_script_construct` | 25 | 7.7s |  |
+| 8 | `scene_count_oom` | 1 | 2.3s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 26.9s |  |
 | 10 | `swf_9_frame_script_cleanup_goto` | 30 | 7.5s |  |
-| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 7.6s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 7.9s |  |
 | 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 7.5s |  |
 
 ## Ruffle-Matched Tests
@@ -50,8 +50,8 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 6.0s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 7.7s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 7.3s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 7.4s |  |
 | 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 7.5s |  |
 
 ## Near-Passing Tests
