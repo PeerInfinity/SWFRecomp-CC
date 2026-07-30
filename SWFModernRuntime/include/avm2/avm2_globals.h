@@ -477,6 +477,11 @@ typedef struct Avm2DisplayObjectExt
 	int32_t tab_index;           // -1 = unset
 	uint8_t focus_rect_set, focus_rect_val;
 	Avm2Value meta_data;         // metaData (undefined = unset)
+	// scrollRect (whole-pixel-rounded twips; see avm2_display.c). When set it
+	// REPLACES this object's bounds with a box of the rect's size at the
+	// object's own origin.
+	uint8_t has_scroll_rect;
+	int32_t sr_xmin, sr_ymin, sr_xmax, sr_ymax;
 	Avm2Object* mask;            // Ruffle masker(): the object masking THIS one
 	// Ruffle maskee(): the object THIS one masks. Kept in sync by `set mask`.
 	// A maskee is never itself a mouse target and is skipped by the pick walk.

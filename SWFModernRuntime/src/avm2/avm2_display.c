@@ -489,6 +489,20 @@ static Mat mat_identity(void)
 	return m;
 }
 
+// Ruffle render/src/matrix.rs round_to_i32. Every translation Ruffle produces
+// is an INTEGER twip: the f32 product is rounded half-to-even and lands in an
+// i32 before the (already integral) translation is added. Our Mat carries
+// doubles, so a composed matrix would otherwise drift a fraction of a twip and
+// `width`/`height` would read back 20.999999046325684 where Ruffle and Flash
+// both say 21 (see the ruffle-geometry-is-integer-twips note).
+static double round_twips_f32(float f)
+{
+	if (!isfinite(f)) return 0;                       // NaN / Infinity -> 0
+	if (f >= 2147483648.0f || f <= -2147483648.0f)
+		return (double) INT32_MIN;                    // out of range clamps
+	return (double) (int32_t) nearbyintf(f);          // FE_TONEAREST = ties-even
+}
+
 static Mat mat_mul(const Mat* m, const Mat* n)  // m * n
 {
 	Mat r;
@@ -496,8 +510,10 @@ static Mat mat_mul(const Mat* m, const Mat* n)  // m * n
 	r.b = m->b * n->a + m->d * n->b;
 	r.c = m->a * n->c + m->c * n->d;
 	r.d = m->b * n->c + m->d * n->d;
-	r.tx = m->a * n->tx + m->c * n->ty + m->tx;
-	r.ty = m->b * n->tx + m->d * n->ty + m->ty;
+	r.tx = round_twips_f32((float) ((float) m->a * (float) n->tx
+	                                + (float) m->c * (float) n->ty)) + m->tx;
+	r.ty = round_twips_f32((float) ((float) m->b * (float) n->tx
+	                                + (float) m->d * (float) n->ty)) + m->ty;
 	return r;
 }
 
@@ -525,8 +541,15 @@ static void rect_union_xform(Rect* acc, const Rect* src, const Mat* m)
 	{
 		for (int j = 0; j < 2; j++)
 		{
-			double x = m->a * xs[i] + m->c * ys[j] + m->tx;
-			double y = m->b * xs[i] + m->d * ys[j] + m->ty;
+			// Matrix * Point<Twips>: the rotate/scale part rounds to a
+			// whole twip before the translation is added, exactly as in
+			// Ruffle. Corner-by-corner, so a transformed box is integral.
+			double x = round_twips_f32((float) ((float) m->a * (float) xs[i]
+			                                    + (float) m->c * (float) ys[j]))
+			           + m->tx;
+			double y = round_twips_f32((float) ((float) m->b * (float) xs[i]
+			                                    + (float) m->d * (float) ys[j]))
+			           + m->ty;
 			rect_union_point(acc, x, y);
 		}
 	}
@@ -588,6 +611,20 @@ static void bounds_with_transform(Avm2Context* ctx, Avm2Object* obj,
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
+	// A scrollRect completely overrides the object's bounds — children
+	// included — with a box of the rect's SIZE at the object's own origin
+	// (Ruffle display_object.rs bounds_with_transform).
+	if (ext->has_scroll_rect)
+	{
+		Rect sr;
+		sr.valid = 1;
+		sr.xmin = 0;
+		sr.ymin = 0;
+		sr.xmax = ext->sr_xmax - ext->sr_xmin;
+		sr.ymax = ext->sr_ymax - ext->sr_ymin;
+		rect_union_xform(acc, &sr, m);
+		return;
+	}
 	{
 		Rect self = display_self_bounds(ext);
 		// flash.display.Bitmap self bounds come from its cached BitmapData
@@ -605,6 +642,24 @@ static void bounds_with_transform(Avm2Context* ctx, Avm2Object* obj,
 			}
 		}
 		rect_union_xform(acc, &self, m);
+	}
+	// A SimpleButton has no inherent bounds and is not a container: its box
+	// comes from the child for the CURRENT state, which lives in btn_up /
+	// btn_over / … rather than the render list (Ruffle avm2_button.rs
+	// bounds_with_transform). Trace runs never leave the Up state.
+	if (ext->btn_up != NULL || ext->btn_over != NULL || ext->btn_down != NULL)
+	{
+		Avm2Object* state = ext->btn_up;
+		if (state != NULL)
+		{
+			Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, state);
+			if (sext != NULL)
+			{
+				Mat sm = ext_matrix(sext);
+				Mat combined = mat_mul(m, &sm);
+				bounds_with_transform(ctx, state, &combined, acc);
+			}
+		}
 	}
 	for (uint32_t i = 0; i < ext->render_len; i++)
 	{
@@ -3504,8 +3559,23 @@ static Avm2Value do_local_to_global(Avm2Activation* act)
 	return point_transform_native(act, 0);
 }
 
-// hitTestPoint(x, y, shapeFlag=false): AABB world-bounds test (applies
-// pending autosize bounds like hit_test_object).
+// Defined with the mouse-pick machinery further down; hitTestPoint's
+// shapeFlag arm is the same walk the picker uses.
+static int hit_test_shape_obj(Avm2Context* ctx, Avm2Object* obj,
+                              double px, double py, int options);
+#define HT_AVM_HIT_TEST 1  /* == HT_SKIP_MASK, declared with the picker */
+
+// hitTestPoint(x, y, shapeFlag=false) — Ruffle display_object.rs
+// hit_test_point.
+//
+// The coordinates are documented as stage-relative, and for anything inside a
+// Loader-loaded movie they really are. For the PLAYER's own root (the movie
+// with no Loader above it) Flash instead reads them as root-relative, matching
+// AVM1 hitTest — so a rotated/moved root moves the point with it
+// (movieclip_hittest's "inside now because of _root._rotation").
+//
+// shapeFlag picks the exact-shape walk, and an object that is not on the stage
+// answers false outright no matter where its shape is.
 static Avm2Value do_hit_test_point(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -3513,11 +3583,42 @@ static Avm2Value do_hit_test_point(Avm2Activation* act)
 	if (self == NULL) return avm2_bool(false);
 	double x = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0;
 	double y = act->argc > 1 ? avm2_coerce_to_number(ctx, act->args[1]) : 0;
+	int shape_flag = act->argc > 2 && avm2_coerce_to_boolean(act->args[2]);
 	avm2_text_apply_pending_bounds(ctx, self);
+
+	double tx = x * 20.0, ty = y * 20.0;
+	{
+		Avm2Object* root = NULL;
+		for (Avm2Object* n = self; n != NULL; )
+		{
+			Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, n);
+			if (e == NULL) break;
+			if (e->is_root && !e->is_stage) { root = n; break; }
+			n = e->parent;
+		}
+		Avm2DisplayObjectExt* rext = root != NULL
+			? avm2_display_ext_of(ctx, root) : NULL;
+		// A Loader-loaded child root carries its own LoaderInfo; the player
+		// root does not, and that is the one whose local space the point is in.
+		if (rext != NULL && rext->loader_info == NULL)
+		{
+			Mat rm = display_world_matrix(ctx, root);
+			double gx = rm.a * tx + rm.c * ty + rm.tx;
+			double gy = rm.b * tx + rm.d * ty + rm.ty;
+			tx = gx;
+			ty = gy;
+		}
+	}
+
+	if (shape_flag)
+	{
+		if (!is_on_stage(ctx, self)) return avm2_bool(false);
+		return avm2_bool(hit_test_shape_obj(ctx, self, tx, ty,
+		                                    HT_AVM_HIT_TEST) != 0);
+	}
 	Mat m = display_world_matrix(ctx, self);
 	Rect r = { 0, 0, 0, 0, 0 };
 	bounds_with_transform(ctx, self, &m, &r);
-	double tx = x * 20.0, ty = y * 20.0;
 	int hit = r.valid && tx >= r.xmin && tx <= r.xmax && ty >= r.ymin
 	          && ty <= r.ymax;
 	return avm2_bool(hit != 0);
@@ -9667,7 +9768,59 @@ static Avm2Value do_cab_set(Avm2Activation* act)
 	return avm2_undefined();
 }
 STUB_GETSET(do_opaquebg, "__opaqueBackground", avm2_null())
-STUB_GETSET(do_scrollrect, "__scrollRect", avm2_null())
+// scale9Grid keeps the old dyn-prop stub. It used to SHARE the scrollRect
+// accessors, which would now have made a scale9Grid assignment resize the
+// object's bounds.
+STUB_GETSET(do_scale9grid, "__scale9Grid", avm2_null())
+
+// scrollRect. Ruffle object_to_rectangle: x/y and x+width/y+height are each
+// rounded to a whole PIXEL, half-to-even, before becoming twips — which is why
+// Rectangle(2.2, 2.2, 0.3, 0.3) reads back as (x=2, y=2, w=0, h=0). Stored as
+// the committed rect; Flash's one-frame delay before localToGlobal and hit
+// tests see it is NOT modelled (nothing here consults it but the bounds).
+static double round_half_to_even(double v)
+{
+	double r = nearbyint(v);           // FE_TONEAREST == half-to-even
+	if (!isfinite(v)) return 0;
+	return r;
+}
+
+static Avm2Value do_scrollrect_get(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL || !ext->has_scroll_rect) return avm2_null();
+	extern Avm2Value avm2_text_new_rectangle(Avm2Context* ctx, double x, double y,
+	                                         double w, double h);
+	return avm2_text_new_rectangle(ctx, ext->sr_xmin / 20.0, ext->sr_ymin / 20.0,
+	                               (ext->sr_xmax - ext->sr_xmin) / 20.0,
+	                               (ext->sr_ymax - ext->sr_ymin) / 20.0);
+}
+
+static Avm2Value do_scrollrect_set(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL) return avm2_undefined();
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL
+	    || v.u.obj->slot_count < 5)
+	{
+		ext->has_scroll_rect = 0;
+		return avm2_undefined();
+	}
+	Avm2Object* r = v.u.obj;
+	double x = avm2_coerce_to_number(ctx, r->slots[1]);
+	double y = avm2_coerce_to_number(ctx, r->slots[2]);
+	double w = avm2_coerce_to_number(ctx, r->slots[3]);
+	double h = avm2_coerce_to_number(ctx, r->slots[4]);
+	ext->sr_xmin = (int32_t) round_half_to_even(x) * 20;
+	ext->sr_ymin = (int32_t) round_half_to_even(y) * 20;
+	ext->sr_xmax = (int32_t) round_half_to_even(x + w) * 20;
+	ext->sr_ymax = (int32_t) round_half_to_even(y + h) * 20;
+	ext->has_scroll_rect = 1;
+	return avm2_undefined();
+}
 STUB_GETSET(do_accessprops, "__accessibilityProperties", avm2_null())
 STUB_GETSET(io_needssoftkbd, "__needsSoftKeyboard", avm2_bool(false))
 
@@ -10996,6 +11149,7 @@ static int point_in_self(Avm2Context* ctx, Avm2Object* obj, double px, double py
 // Ruffle HitTestOptions (display_object.rs) — the two bits that reach us.
 #define HT_SKIP_MASK      1
 #define HT_SKIP_INVISIBLE 2
+#define HT_SKIP_CHILDREN  4
 #define HT_MOUSE_PICK     (HT_SKIP_MASK | HT_SKIP_INVISIBLE)
 
 // Ruffle DisplayObject::hit_test_shape. The container flavour (movie_clip.rs)
@@ -11023,7 +11177,8 @@ static int hit_test_shape_obj(Avm2Context* ctx, Avm2Object* obj,
 		return 0;
 
 	int32_t clip_depth = 0;
-	for (uint32_t i = 0; i < ext->render_len; i++)
+	for (uint32_t i = 0; (options & HT_SKIP_CHILDREN) == 0 && i < ext->render_len;
+	     i++)
 	{
 		Avm2Object* child = ext->render_list[i];
 		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
@@ -11227,6 +11382,76 @@ static Avm2Object* run_mouse_pick(Avm2Context* ctx)
 		}
 	}
 	return NULL;
+}
+
+// DisplayObjectContainer.getObjectsUnderPoint (Ruffle
+// display_object_container.rs). A depth-first pre-order walk from the receiver:
+// children are pushed in REVERSE render order so they pop front-to-back, and
+// each node is tested with SKIP_CHILDREN so it answers for its OWN shape only.
+// The receiver itself is walked but never reported. Point is stage-relative.
+static Avm2Value doc_get_objects_under_point(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	Avm2Value pv = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (self == NULL || pv.kind != AVM2_VALUE_OBJECT || pv.u.obj == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter point must be non-null.");
+	}
+	double px = 0, py = 0;
+	if (pv.u.obj->slot_count > 2)
+	{
+		px = avm2_coerce_to_number(ctx, pv.u.obj->slots[1]) * 20.0;
+		py = avm2_coerce_to_number(ctx, pv.u.obj->slots[2]) * 20.0;
+	}
+
+	Avm2Value* out = NULL;
+	uint32_t out_n = 0, out_cap = 0;
+	Avm2Object** stack = NULL;
+	uint32_t stack_n = 0, stack_cap = 0;
+	#define GOUP_PUSH(arr, n, cap, v, type) \
+		do { \
+			if ((n) == (cap)) { \
+				uint32_t nc = (cap) ? (cap) * 2 : 16; \
+				type* nb = realloc((arr), nc * sizeof(type)); \
+				if (nb == NULL) break; \
+				(arr) = nb; (cap) = nc; \
+			} \
+			(arr)[(n)++] = (v); \
+		} while (0)
+
+	GOUP_PUSH(stack, stack_n, stack_cap, self, Avm2Object*);
+	while (stack_n > 0)
+	{
+		Avm2Object* node = stack[--stack_n];
+		Avm2DisplayObjectExt* next = avm2_display_ext_of(ctx, node);
+		if (next == NULL) continue;
+		if (node != self
+		    && hit_test_shape_obj(ctx, node, px, py,
+		                          HT_SKIP_MASK | HT_SKIP_INVISIBLE
+		                          | HT_SKIP_CHILDREN))
+		{
+			Avm2Value v = avm2_object_value(node);
+			GOUP_PUSH(out, out_n, out_cap, v, Avm2Value);
+		}
+		for (uint32_t i = next->render_len; i > 0; i--)
+		{
+			GOUP_PUSH(stack, stack_n, stack_cap, next->render_list[i - 1],
+			          Avm2Object*);
+		}
+	}
+	#undef GOUP_PUSH
+	free(stack);
+	Avm2Object* arr = avm2_array_from_values(ctx, out, out_n);
+	free(out);
+	return avm2_object_value(arr);
+}
+
+static Avm2Value doc_are_inaccessible_objects_under_point(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(false);
 }
 
 // --- Drag (Sprite.startDrag / stopDrag / dropTarget; Ruffle update_drag) ---
@@ -12422,7 +12647,7 @@ void avm2_register_display(Avm2Context* ctx)
 	           do_accessprops_set);
 	add_getset(ctx, dobj, "blendMode", do_blendmode_get, do_blendmode_set);
 	add_getset(ctx, dobj, "blendShader", NULL, do_blendshader_set);
-	add_getset(ctx, dobj, "scale9Grid", do_scrollrect_get, do_scrollrect_set);
+	add_getset(ctx, dobj, "scale9Grid", do_scale9grid_get, do_scale9grid_set);
 	add_getset(ctx, dobj, "z", do_get_zero, do_set_noop);
 	add_getset(ctx, dobj, "rotationX", do_get_zero, do_set_noop);
 	add_getset(ctx, dobj, "rotationY", do_get_zero, do_set_noop);
@@ -12499,6 +12724,10 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, doc, "swapChildrenAt", doc_swap_children_at);
 	avm2_builtin_add_method(ctx, doc, "contains", doc_contains);
 	avm2_builtin_add_method(ctx, doc, "stopAllMovieClips", doc_stop_all_movie_clips);
+	avm2_builtin_add_method(ctx, doc, "getObjectsUnderPoint",
+	                        doc_get_objects_under_point);
+	avm2_builtin_add_method(ctx, doc, "areInaccessibleObjectsUnderPoint",
+	                        doc_are_inaccessible_objects_under_point);
 	avm2_builtin_add_getter(ctx, doc, "numChildren", doc_get_num_children);
 	add_getset(ctx, doc, "mouseChildren", doc_get_mouse_children,
 	           doc_set_mouse_children);
@@ -12869,7 +13098,7 @@ void avm2_register_display(Avm2Context* ctx)
 			{ "name", do_get_name }, { "opaqueBackground", do_opaquebg_get },
 			{ "rotation", do_get_rotation }, { "rotationX", do_get_zero },
 			{ "rotationY", do_get_zero }, { "rotationZ", do_get_rotation },
-			{ "scale9Grid", do_scrollrect_get }, { "scaleX", do_get_scale_x },
+			{ "scale9Grid", do_scale9grid_get }, { "scaleX", do_get_scale_x },
 			{ "scaleY", do_get_scale_y }, { "scaleZ", do_get_one },
 			{ "scrollRect", do_scrollrect_get }, { "tabEnabled", io_get_tab_enabled },
 			{ "tabIndex", io_get_tab_index }, { "transform", do_get_transform },
