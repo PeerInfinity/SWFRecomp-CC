@@ -2,6 +2,21 @@
 
 Last updated: 2026-05-08 (CI `e0d15089`, run `25578374215` — Part C: `avm1/moviecliploader` 6/7 → **PASS (7/7)**. Flat suite filtered effective 75/76 → **76/76 (100%)**; avm1 sub-tree raw 45 → 46 PASS. After Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]`, the loadee MC is now registered with `actionRegisterLevelAdvance` so `frame_funcs[1..N-1]` fire on subsequent ticks via the existing per-tick `actionAdvancePlayingLevels` path. Zero regressions across other suites.)
 
+## AVM2 half — `localconnection` + `encoding1` (2026-07-29, CI `30505002399`)
+
+`localconnection` (3/12) passes as **net/socket tranche 6** (`34171042f`): the
+AVM2 `LocalConnection` channel registry, with Ruffle's asymmetry — the
+StatusEvent goes to the SENDER, the AsyncErrorEvent for a callee that threw goes
+to the RECEIVER. Its receiver is a child SWF the Loader arc already executes, so
+no cross-VM work was needed. Suite **183 / 229**.
+
+`encoding1` is worth remembering as a **canary**: it dumps
+`ByteArray.writeObject`'s AMF0 bytes, and it is what caught tranche 8 promoting a
+dense array to a StrictArray on every channel. Flash promotes only on the
+NetConnection/LocalConnection **wire**; `ByteArray` and an LSO body keep
+ECMAArray (fixed in `8a302905d`). The test's name mentions no codec and it ships
+no `.as` source, which is exactly why 46 name-chosen local canaries missed it.
+
 ## AVM2 half — `mouse/start_drag_lock` (2026-07-28, CI `30397635331`)
 
 `mouse/start_drag_lock` (2/3) flipped as **input arc tranche 8**

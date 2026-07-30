@@ -1,6 +1,16 @@
 # from_avmplus Suite — Current Status
 
-Last updated: 2026-07-26 — **eight arcs landed, all CI-confirmed: `static
+Last updated: 2026-07-29 — **`as3/AMF/AMFSerializer` is 225/225**, so the AMF
+acceptance directory is complete. Its last two lines were
+`ObjectEncoding.dynamicPropertyWriter` and `IExternalizable`, shipped as
+net/socket tranche 5 (`6a07045c4`, CI `30499537278`) — but the actual blocker was
+neither: ByteArray's `IDataInput`/`IDataOutput` methods were keyed public only,
+and ASC compiles a call on an interface-TYPED reference to the interface
+namespace alone, so `output.writeObject(...)` inside `writeExternal` raised
+`#1069`. Builtin classes never run `avm2_class.c`'s interface-alias pass. Suite
+**1510 / 1574**. See `SWFRecompDocs/plans/net-socket-arc.md` §6.
+
+Previously: 2026-07-26 — **eight arcs landed, all CI-confirmed: `static
 const` is read-only, the `ecma3/FunctionObjects` arc, typed builtin
 prototypes, the `as3/Vector` arc, the `ecma3/JSON` arc, the Alchemy
 domain-memory (mops) arc, the builtin-container-subclass arc, and the

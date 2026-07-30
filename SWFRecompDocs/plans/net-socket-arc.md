@@ -3,8 +3,9 @@
 **Created**: 2026-07-28 · **Baseline**: `2ed94a302` (session start), per-suite
 `_results/results_graphics.json` from CI `30397635331` (the input-arc closeout
 run, SHA `bbefcf376`).
-**Status**: triage complete; **tranches 1–4 SHIPPED**, every one over its
-prediction with zero regressions. Full postmortems in §6.
+**Status**: **ARC CLOSED 2026-07-29 at +66.** All nine ships landed, every one
+at or over its prediction. Full postmortems in §6; final accounting, census
+disposition and ranked lessons in **§8**.
 
 | Tranche | Commit / CI | Predicted | Actual | Corpus effective |
 |---|---|---|---|---|
@@ -12,12 +13,20 @@ prediction with zero regressions. Full postmortems in §6.
 | 2 — `socket.json` + Socket/XMLSocket | `767a301d2` + `e173acc9a` / `30412279387`, `30414817519` | +12 | **+14** | 3901 → 3914 |
 | 3 — file dialogs | `72fdc5e93` / `30418985155`, `30418993536` | +11 | **+15** | 3914 → 3929 |
 | 4 — `URLStream` | `8c3b7673f` / `30477186369` | +2 | **+3** | 3929 → 3932 |
-| 3b — AVM1 download/upload | `6cf854900` / `30480184835` | +5 | **+7** | 3932 → **3939 / 4420** |
+| 3b — AVM1 download/upload | `6cf854900` / `30480184835` | +5 | **+7** | 3932 → 3939 |
+| 7 — AVM1 AMF0 + `NetConnection.call` | `702d38a35` + `698bdddfa` / `30494443127` | +7 | **+11** | 3939 → 3950 |
+| 5 — AVM2 AMF gaps | `6a07045c4` / `30499537278` | +1 | **+1** | 3951 → 3952 |
+| 8 — AVM2 `NetConnection.call` | `01f30d3f5` + `8a302905d` / `30501480658` | +2 | **+2** | 3952 → 3953 |
+| 6 — `LocalConnection` registry | `34171042f` / `30505002399` | +3 | **+3** | 3953 → **3957 / 4421** |
 
-Per-suite at tranche 3b: `avm2` **956 / 1221**, `avm1` **675**,
-`from_shumway` **182**. Arc total so far: **+49**.
-**NEXT: tranche 5** (AVM2 AMF gaps, +1) — but tranche 7 (AVM1 AMF0
-serializer, +4, LARGE) is the one that unblocks the rest of buckets W and L.
+Per-suite at close: `avm2` **960 / 1221**, `avm1` **687**, `from_shumway`
+**183**, `from_avmplus` **1510**. **Arc total: +66** against a §5 prediction of
++43 (+52 summed per tranche after the census corrections).
+**NEXT is not in this arc**: `feature-priority-map.md`'s net row is closed; the
+next row by yield is the PixelBender 25 / Stage3D 13 scoping decision. The one
+scoped-but-unlanded item is the **AVM1↔AVM2 LocalConnection delivery bridge**
+(`avm2/localconnection`, 589/890) — a standalone follow-up, sized in §6's
+tranche-6 postmortem.
 
 Scope of this document: the **net block** named as row 4e of
 `feature-priority-map.md` ("net/socket (29)"). The census below finds
@@ -392,14 +401,14 @@ Bucket U. `URLStream` is `URLLoader`'s existing fetch pipeline with an
 ordering. The third gain, `from_shumway/stream1`, is a `URLStream` test §0's
 sweeps could not see — see the postmortem.
 
-### Tranche 5 — AVM2 AMF gaps · **predicted +1** · SMALL
+### Tranche 5 — AVM2 AMF gaps · **predicted +1** (**actual +1; SHIPPED**) · SMALL
 
 Bucket X's first row. `IExternalizable` + `ObjectEncoding.dynamicPropertyWriter`
 in `avm2_amf.c`. One test, two lines, but it is the last thing standing
 between us and a 225/225 on the avmplus AMF acceptance suite — and both hooks
 are prerequisites for anything that serialises user classes over a wire.
 
-### Tranche 6 — `LocalConnection` registry · **predicted +3** · LARGE
+### Tranche 6 — `LocalConnection` registry · **predicted +3** (re-predicted SMALL after tranche 7; **actual +3; SHIPPED**) · LARGE
 
 Bucket L. A per-player channel map with Ruffle's name rules (host prefixes,
 `_`-prefixed names, case sensitivity, protected method names), `StatusEvent`
@@ -419,7 +428,7 @@ and the load-bearing unknown is now the **`super()` native-constructor
 upgrade** (2 tests) plus byte-exact reference counting (`amf0_serde_suite`
 only).
 
-### Tranche 8 — AVM2 `NetConnection.call` wire · **predicted +2** · MEDIUM (→ SMALL after tranche 7)
+### Tranche 8 — AVM2 `NetConnection.call` wire · **predicted +2** (**actual +2; SHIPPED**) · MEDIUM (→ SMALL after tranche 7)
 
 Bucket X's remaining three. Depends on tranche 1's `NetConnection` and
 tranche 7's settled array-promotion rule; the AMF0 writer itself already
@@ -437,6 +446,10 @@ VM-agnostic, the response-dispatch shape is implemented and graded, and
 
 **Arc total if tranches 1–8 land: +43**, leaving 10 dispositioned and 11
 scoped-but-unpredicted (the surplus inside buckets S/D/L/W).
+
+**Outcome: all nine ships landed for +66** — every tranche met or beat its
+prediction, and the surplus above came in too. Final accounting, per-bucket
+disposition and the ranked lessons are in **§8**.
 
 ---
 
@@ -1181,6 +1194,177 @@ across a tick boundary.
   What remains is AVM2-side: `nc_call`'s stub, and whatever the AVM2 executor
   wants for response timing (see `avm2-loader-timing-is-executor-drain`).
 
+### Tranche 5 — SHIPPED `6a07045c4`, CI `30499537278` (graphics, full)
+
+**+1 vs +1 predicted, zero regressions.** Corpus effective **3951 → 3952 / 4421**;
+`from_avmplus` **1509 → 1510**. `REGRESSIONS: 0`, `OTHER STATUS MOVES: 0`, and the
+histogram moves only `output_mismatch 462 → 461` / `pass 3710 → 3711`.
+`from_avmplus/as3/AMF/AMFSerializer` finishes **225/225**, closing the avmplus AMF
+acceptance suite.
+
+Both hooks were about as small as scoped — the AMF3 externalizable trait bit and a
+static accessor pair — but **the blocker was a third thing neither §7 nor the
+tranche note predicted, and it was not in `avm2_amf.c` at all.**
+
+**A builtin class that "implements" an AS3 interface needs its methods keyed
+TWICE.** `writeExternal(output:IDataOutput)` calls `output.writeObject(...)`, and
+ASC compiles a call on an interface-typed reference to the **interface
+namespace alone** — `flash.utils:IDataOutput::writeObject`, never public. ABC
+classes get those keys from `avm2_class.c`'s interface-alias pass
+(`add_iface_aliases_from`); builtin classes never run it, so ByteArray's 26
+IDataInput/IDataOutput methods were unreachable through an IDataOutput-typed
+parameter and the call raised `#1069`. Both halves are now installed under the
+public key and the interface key, which Socket and URLStream inherit for free.
+The same rule is why the `IDynamicPropertyOutput` handed to
+`writeDynamicProperties` carries an explicit `flash.net:IDynamicPropertyOutput::
+writeDynamicProperty` entry. **Generalize: the corpus only notices a missing
+interface alias when a test passes an instance through an interface-TYPED
+parameter, which no amount of grepping for the method name will reveal.**
+(`avm2_ns_fold` folds namespace kind 0x08 and 0x16 together, so one 0x16-keyed
+entry answers ASC's 0x08 multiname.)
+
+Two smaller findings worth keeping:
+
+- **An externalizable class-def joins the trait table, so the table entry needs an
+  `externalizable` field.** Without it a plain object with the same alias, zero
+  statics and `dynamic = false` matches the externalizable entry and emits a trait
+  *reference* that the reader then interprets as an opaque body.
+- **The reader cannot know an opaque body's length, so the ByteArray it hands
+  `readExternal` is the answer.** It gets the whole remaining stream and its final
+  `position` is how many bytes the body consumed. That also fixes the framing
+  question in the other direction: Adobe's serializer shares the enclosing
+  stream's string/object reference tables with the body, we give it a fresh
+  ByteArray, and the two choices are indistinguishable for any body that does not
+  reference the outer graph — which is every body in the corpus.
+
+`ObjectEncoding.dynamicPropertyWriter` REPLACES the dynamic half of an object
+body rather than filtering it: the hook decides which expandos reach the stream
+and under what names, so the writer applies none of its own filtering on that
+path (not even the function-valued skip). The active writer is a saved/restored
+file static, so a nested dynamic object re-entering the hook cannot retarget an
+outer serializer.
+
+### Tranche 8 — SHIPPED `01f30d3f5` + `8a302905d`, CI `30501480658` (graphics, full)
+
+**+2 vs +2 predicted, and one regression — found by CI, not by the local
+canaries.** Corpus effective **3952 → 3953 / 4421**; `avm2` **956 → 958 (+2)`,
+`from_shumway` **182 → 181 (-1)**. The third target,
+`avm2/amf_array_serialization`, went 6/17 → 16/17 with **both** remoting packets
+byte-exact and landed as a pass in tranche 6, which supplied its LocalConnection
+leg.
+
+| Test | before | after |
+|---|---|---|
+| `avm2/netconnection_send_remote` | 0/50 | **pass** (also un-ignored) |
+| `avm2/netconnection_serialize_arrays` | 1/6 | **pass** (beats known_failure) |
+| `avm2/amf_array_serialization` | 6/17 | 16/17 → pass in tranche 6 |
+
+§6's re-prediction held: `amf_packet.c` was reused **unchanged**, and the whole
+AVM2 side is the queue, the two stubs, and the AMF0 writer's Flash rules. The
+response-dispatch shape, the per-flush `/N` numbering and the case-insensitive
+header replacement all came across as-is.
+
+**The regression is the arc's best canary lesson.** `from_shumway/encoding1`
+(pass → output_mismatch) dumps `ByteArray.writeObject`'s AMF0 bytes for a dense
+`["a", {}]`, and Flash writes that as an **ECMAArray** — so the StrictArray
+promotion is CHANNEL-scoped, exactly as AVM1's is between the wire and an LSO
+body: a NetConnection/LocalConnection packet promotes, local serialization does
+not. Gated behind a `wire_mode` flag that only the NC/LC entry point sets
+(`8a302905d`). The other three writer changes — typed objects `0x10`, XML `0x0F`,
+the reference table — apply on every channel, as they do in AVM1.
+
+Why 46 local canaries missed it: **the canary list was built from test NAMES**
+(everything matching `amf|bytearray|socket|net`), and `encoding1` says nothing
+about either. It ships no `.as` source, either — the same blindness tranche 4
+recorded for `stream1`. **Generalize: a serializer change must pick canaries by
+CONTENT — grep the expected outputs for hex dumps (`Body: [` / long `[0-9A-F,]`
+runs) — because the tests that pin bytes are exactly the ones whose names do not
+mention the codec.**
+
+Two mechanisms outside the wire, each surfaced by a target:
+
+- **`flash.system.fscommand` did not exist.** `netconnection_send_remote` calls
+  `fscommand("exit")` and then `removeEventListener`, so the `#1065` killed the
+  *unregistration*, and the movie kept tracing `# End of Test N` for every
+  remaining tick. Ruffle's harness recognises only `quit` and `captureImage`;
+  `"exit"` is an unknown command that does **nothing**. The test does not need
+  the player to exit — it needs the call not to throw.
+- **`addHeader`'s `mustUnderstand` defaults to FALSE in AVM2 and TRUE in AVM1.**
+  Same method name, opposite default, and each VM's recorded bytes pin its own:
+  AVM2's default is the AS3 signature's (`mustUnderstand:Boolean = false`).
+
+And one general-runtime finding, from the one target that needed a plain object
+serialized: **dynamic-property enumeration puts integer-spelled keys BEFORE string
+keys.** Two recorded outputs pin the pair of rules — `{"0": "fake_0", "length": 1}`
+serializes `"0"` first (Flash and Ruffle bytes agree), while the all-string
+`{a: this.test, b: true}` traces as `{"b":true,"a":…}`, reverse of source, because
+`newobject` sets a literal's pairs last-first. Tail-appending satisfies only the
+second. **Generalize: when two graded outputs disagree about "insertion order",
+look for a KEY-CLASS partition before concluding the insertion direction is
+wrong** — both players key an integer-spelled property by its integer value
+(Ruffle `DynamicKey::Uint`, avmplus an int atom) and enumerate that class first.
+
+### Tranche 6 — SHIPPED `34171042f`, CI `30505002399` (graphics, full)
+
+**+3 vs +3 predicted, zero regressions**, and the stretch target moves from
+67/890 to **589/890**. Corpus effective **3953 → 3957 / 4421**; `avm2`
+**958 → 960**, `from_shumway` **181 → 183**. The run's fourth gain is
+`from_shumway/encoding1` coming back — tranche 8's regression, fixed in
+`8a302905d` and verified here — so the tranche's own yield is +3.
+`REGRESSIONS: 0`, `OTHER STATUS MOVES: 0`.
+
+| Test | before | after |
+|---|---|---|
+| `avm2/localconnection_send` | 0/4 | **pass** |
+| `from_shumway/localconnection` | 3/12 | **pass** |
+| `avm2/amf_array_serialization` | 16/17 | **pass** (beats known_failure) |
+| `avm2/localconnection` | 67/890 | 589/890 (stretch, as predicted) |
+
+§6's re-prediction that this was SMALL rather than LARGE held: the wire was
+already built, so the tranche is registry semantics plus two event gaps.
+
+**The plan's instruction to check the stretch test's `#1009` first paid for
+itself in one local run.** It was not a Loader-arc leftover: the AVM2 child does
+`lc.client = {}` then `lc.client.test = …`, and the stub's `client` getter
+returned **null**. The 890-line spec test was blocked by this tranche's own stub,
+not by another arc — which is why implementing `client` alone took it from 67
+matching lines to nearly 600.
+
+**Ruffle's asymmetry is the load-bearing rule: the StatusEvent goes to the
+SENDER, the AsyncErrorEvent to the RECEIVER.** `avm2/localconnection` grades it
+in words ("receiver received event AsyncErrorEvent.ASYNC_ERROR"), and getting it
+backwards would have failed both LC tests while looking plausible. The other
+Ruffle rules transferred verbatim: the double "is anyone listening" check (at
+send AND at delivery, so whatever holds the name at delivery is what receives),
+`'_'`-prefixed names skipping the superdomain prefix, a `':'` rejected by
+`connect` but honoured by `send`, and the six reserved method names.
+
+**Sealing the class is what produces `#1069`, with no special-casing.** A send
+naming a method the default client (the connection itself) lacks must raise
+`ReferenceError #1069`, not "not a function". Marking the builtin class SEALED
+routes it through the shared property path, which already had the behaviour —
+the first attempt special-cased it inside the delivery function and was deleted.
+
+Two event gaps neither the census nor §4 saw, both because nothing had ever
+constructed these events from C:
+
+- **`AsyncErrorEvent`'s 5th constructor argument is an Error OBJECT**, where its
+  `ErrorEvent` base reads an `errorID` there. It had been sharing
+  `error_event_init`, so `event.error` was unreachable.
+- **`StatusEvent` had no `toString` override**, so tracing one printed `Event`'s
+  four fields without `code`/`level` — and its String-typed `code`/`level` must
+  keep a **null** rather than coerce it to the string `"null"`
+  (`localconnection_send` grades `code=null`).
+
+**What is left in `avm2/localconnection` is the AVM1↔AVM2 delivery bridge.** Our
+AVM1 LocalConnection keeps its own channel map in `action.c`, so a cross-VM send
+finds no listener and the test's "Calling an AVM1 movie" half — the argument-
+translation battery against `avm1child` — still fails. Both halves of the bridge
+now exist (each VM has an AMF0 codec and a compatible key format); what is
+missing is one shared registry plus a delivery entry point per VM. That is the
+arc's one scoped-but-unlanded item, and it is a standalone follow-up, not a
+tranche.
+
 ## 7. Tranche 7 scoping (2026-07-29, pre-implementation)
 
 Two very-thorough sweeps (our runtime; Ruffle @ `75c3cec57` — note: a fork
@@ -1391,3 +1575,115 @@ Regression canaries for the local stash-diff sweep: `localconnection`
 change its output), `localconnection_properties`, `netconnection_close`,
 `shared_object_serialize_typed_objects`, `xml_socket_*` (flush-point
 neighbours), `file_reference_*` (same pump sites), plus the 11 targets.
+
+---
+
+## 8. Arc closeout (2026-07-29) — **CLOSED at +66**
+
+Nine ships across eight numbered tranches (3b included), **+66 corpus tests**
+against a §5 prediction of +43. Corpus effective **3890 → 3957 / 4421** across the
+arc (the one test of difference from the summed tranche gains is the
+`heavy_tesselation` CI flake documented in tranche 1); `avm2` **926 → 960**,
+`avm1` **658 → 687**, `from_shumway` **180 → 183**, `from_avmplus`
+**1509 → 1510**. Every tranche beat or matched its prediction, and exactly one
+regression was introduced and fixed inside the arc
+(`from_shumway/encoding1`, tranche 8).
+
+| Tranche | Predicted | Actual | Ship |
+|---|---|---|---|
+| 1 — class surface, no transport | +9 | **+10** | `937047612` + `722dea0e9` |
+| 2 — `socket.json` replay | +12 | **+14** | `767a301d2` + `e173acc9a` |
+| 3 — file dialogs | +11 | **+15** | `72fdc5e93` |
+| 3b — download/upload | +5 | **+7** | `6cf854900` |
+| 4 — `URLStream` | +2 | **+3** | `8c3b7673f` |
+| 7 — AVM1 AMF0 + `NetConnection.call` | +7 | **+11** | `702d38a35` + `698bdddfa` |
+| 5 — AVM2 AMF gaps | +1 | **+1** | `6a07045c4` |
+| 8 — AVM2 `NetConnection.call` | +2 | **+2** | `01f30d3f5` + `8a302905d` |
+| 6 — `LocalConnection` registry | +3 | **+3** | `34171042f` |
+| **total** | **+52** | **+66** | |
+
+(The +43 headline in §5 predates the three census corrections — tranche 3b's
+seven tests, bucket W's 11-not-9, and `stream1` — which is why the summed
+per-tranche prediction is +52.)
+
+### Final disposition of the census
+
+| Bucket | Tests | Landed | Left |
+|---|---|---|---|
+| P — class surface | 10 | 10 | — |
+| S — socket replay | 14 | 14 | — |
+| D — file dialogs | 14 | 14 (+2 census misses: `filefilter_properties`, and 3b's seven) | — |
+| U — `URLStream` | 3 | 3 | — |
+| L — `LocalConnection` | 4 | 3 | `avm2/localconnection` (589/890 — the AVM1↔AVM2 bridge) |
+| W — AVM1 AMF0 + NC | 11 | 11 | — |
+| X — AVM2 AMF + NC wire | 4 | 4 | — |
+| M — media transport | 6 | 0 | **won't-do in this arc** (FLV demux + AAC/G.711/H.263 decode) |
+| Z — caught by the sweeps, not net | 4 | 0 | not net; two are not even enumerated |
+
+Everything the arc set out to do is done except **one half of one test**. Bucket M
+stays dispositioned out — `netstream_flv_date` (4 lines, wants only `onMetaData`
+off an FLV's AMF0 metadata tag) remains the cheapest re-entry point if a media
+arc ever opens. Bucket Z's four are unrelated property-flag / native-identity
+questions, plus two two-run tests the harness does not enumerate.
+
+Also shipped along the way, none of it in the census: `flash.system.fscommand`,
+`flash.utils.IExternalizable`, `ObjectEncoding.dynamicPropertyWriter`,
+`AsyncErrorEvent.error`, `StatusEvent.toString`, ByteArray's interface-namespace
+method aliases, integer-key-first dynamic enumeration, a VM-agnostic AMF0
+remoting packet module (`src/amf_packet.c`), and three heap/overflow fixes
+reachable from ordinary script (`setArrayElement`'s u32 growth overflow, the
+AMF0 cyclic-graph recursion, `addProperty`'s enumerable flag).
+
+### Lessons, ranked by how much they would have saved
+
+1. **Bucket by OWNER, then re-predict after every tranche.** Six of the nine
+   tranches beat their prediction, and every overshoot has the same cause: a
+   mechanism built for tranche N turned out to be most of tranche N+1. The
+   re-predictions in §6 (tranche 6 LARGE → SMALL, tranche 8 MEDIUM → SMALL) were
+   what made the last three tranches cheap, and they were only possible because
+   each postmortem asked "what does this change make free?" explicitly.
+2. **Canaries must be chosen by CONTENT, not by name.** The arc's one regression
+   (`encoding1`) and its two census misses (`stream1`, `filefilter_properties`)
+   are the same failure: a name-and-`.as`-source sweep is blind to tests that
+   ship no source and whose names do not mention the mechanism. For a serializer,
+   grep the expected OUTPUTS for hex dumps; for a class, grep for the error
+   number.
+3. **Read the oracle's source, not its behaviour, for the rules — but read
+   FLASH's recorded bytes for the values.** Ruffle's source gave the arc every
+   state machine (the NetConnection two-variant enum, the LocalConnection double
+   listener check, the sender/receiver event asymmetry, the file-dialog and
+   socket mock contracts) and got them right first try. Where Ruffle's own
+   *output* was the reference it was wrong four times — the `known_failure`
+   tests — and Flash's bytes settled each one. `known_failure` upstream means
+   **Ruffle is not the oracle**; treating those as `ruffle_matched` ceilings
+   would have left seven full passes on the table.
+4. **A "structurally impossible" conversion is usually already half-built.**
+   Tranche 7 scoped the `super()` array upgrade as a new side table plus routing
+   through the property paths; `NATIVE_ARRAY` had been on the receiver for
+   months and the gap was fifty lines of `length` bookkeeping. Grep for a partial
+   form before designing the mechanism.
+5. **Zero harness work, six tranches running.** Every mock the arc needed
+   (`socket.json`, the file dialog, the `?debug-` fetch switch, the scripted
+   remoting responses) is keyed off test CONTENT, so `verify_output.py` changed
+   once in the whole arc — to embed nested data files, and only because Ruffle's
+   navigator maps a URL path to a subdirectory.
+6. **Interface-typed parameters are an invisible dependency.** A builtin class
+   that implements an AS3 interface needs its methods keyed under the interface
+   namespace as well as public, and nothing reveals the omission until a test
+   passes an instance through such a parameter (tranche 5's `#1069`).
+7. **When two graded outputs disagree about ordering, look for a key-class
+   partition.** Integer-spelled dynamic keys enumerate before string keys in both
+   players; assuming a single insertion order (either direction) cannot satisfy
+   both recorded outputs.
+8. **A new runtime `.c` file registers in FOUR places.** `CMakeLists.txt`,
+   `verify_output.py`, `build_test.sh`, `build_wasm_avm2.sh` — the last two keep
+   their own source lists. CI's `wasm-link-smoke` job catches the omission, which
+   is how tranche 7 found it.
+
+### What this unlocks next
+
+`feature-priority-map.md`'s net row is CLOSED. The AMF codecs, the remoting
+packet framing and the LocalConnection registry are now shared infrastructure:
+anything that serialises user classes over a wire (Flash Remoting games, AMF
+save files, cross-SWF messaging) has a working substrate in both VMs. The next
+row by yield is the **PixelBender 25 / Stage3D 13** scoping decision.

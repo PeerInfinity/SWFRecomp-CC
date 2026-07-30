@@ -1,6 +1,18 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-28 — **Input arc CLOSED — all 8 tranches SHIPPED**
+Last updated: 2026-07-29 — **net/socket arc CLOSED at +66**
+(`SWFRecompDocs/plans/net-socket-arc.md` §8; nine ships, every one at or over
+prediction, one regression introduced and fixed inside the arc). The suite is
+**960 / 1221 (78.6%)**; the corpus is **3957 / 4421**. The last three tranches
+were 5 (AVM2 `IExternalizable` + `ObjectEncoding.dynamicPropertyWriter` — the
+avmplus AMF acceptance suite is now 225/225), 8 (AVM2 `NetConnection.call` over
+the shared `src/amf_packet.c` framing, plus Flash's AMF0 writer rules) and 6
+(the `LocalConnection` channel registry). One scoped item is unlanded: the
+AVM1↔AVM2 LocalConnection delivery bridge, which is the whole remainder of
+`avm2/localconnection` (67/890 → **589/890**). Next per
+`feature-priority-map.md`: the PixelBender 25 / Stage3D 13 scoping decision.
+
+Previously: 2026-07-28 — **Input arc CLOSED — all 8 tranches SHIPPED**
 (`803055ca5` + `5231abf0c` + `5f48fecd7` + `bbefcf376`, CI `30397635331`):
 the closeout added `startDrag(lockCenter)` deferral, `TextEvent.LINK` from
 HTML anchors, Ruffle's `set_by_mouse` focus model (the pressed object is the
@@ -23,7 +35,8 @@ dispositioned out** (4 dual-VM, 1 sealed
 builtin classes). Full reconciliation in `SWFRecompDocs/plans/input-arc.md`
 §8. Recurring lesson, three times in one arc: **Ruffle's geometry is integer
 twips and the quantization is load-bearing, not cosmetic.**
-**NEXT per `feature-priority-map.md`: net/socket (29).**
+**NEXT per `feature-priority-map.md`: PixelBender 25 / Stage3D 13** — the
+net/socket row is CLOSED (+66; see the header).
 Prior: 2026-07-28 — **Input arc tranches 2 + 3 SHIPPED
 (`786d765ee` + `b27909297`, CI `30389013458`, +12 = exactly the predicted
 5 + 7, zero regressions)**: avm2 912 → **920 / 1221 (75.3%)**, `text` 5 → 9,
