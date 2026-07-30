@@ -473,6 +473,24 @@ static const char* class_name_of(Avm2Context* ctx, Avm2Value recv, char* buf, in
 	return buf;
 }
 
+// avmplus names a property in an error message by its full multiname:
+// "Package1:ns1::classItem7" for a trait in a user namespace, and the bare
+// local name for a public one (a public namespace has an empty URI).
+// as3/Definitions/Variable/ConstVariables_custom1 asserts the qualified form
+// in #1074.
+static const char* prop_name_of(const Avm2PropKey* key, const char* name,
+                                uint32_t name_len, char* buf, int size)
+{
+	if (key == NULL || key->ns_len == 0 || key->ns_uri == NULL)
+	{
+		snprintf(buf, (size_t) size, "%.*s", (int) name_len, name);
+		return buf;
+	}
+	snprintf(buf, (size_t) size, "%.*s::%.*s", (int) key->ns_len, key->ns_uri,
+	         (int) name_len, name);
+	return buf;
+}
+
 // Read the resolved property's value with `recv` as the getter receiver.
 static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* r,
                               const char* name, uint32_t name_len)
@@ -888,10 +906,13 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 		{
 			if (e->is_const && !allow_const)
 			{
+				char pn[192];
 				class_name_of(ctx, recv, cn, sizeof(cn));
 				avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 				                 "Error #1074: Illegal write to read-only property "
-				                 "%.*s on %s.", (int) name_len, name, cn);
+				                 "%s on %s.",
+				                 prop_name_of(&e->key, name, name_len, pn, sizeof(pn)),
+				                 cn);
 			}
 			Avm2Value cv = value;
 			if (e->type_mn != 0 && e->type_file != NULL)
@@ -910,10 +931,15 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 			                     e->method_scope, recv, &value, 1);
 			return;
 		case AVM2_PROP_GETTER:
+		{
+			char pn[192];
 			class_name_of(ctx, recv, cn, sizeof(cn));
 			avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 			                 "Error #1074: Illegal write to read-only property "
-			                 "%.*s on %s.", (int) name_len, name, cn);
+			                 "%s on %s.",
+			                 prop_name_of(&e->key, name, name_len, pn, sizeof(pn)),
+			                 cn);
+		}
 		case AVM2_PROP_METHOD:
 		default:
 			class_name_of(ctx, recv, cn, sizeof(cn));

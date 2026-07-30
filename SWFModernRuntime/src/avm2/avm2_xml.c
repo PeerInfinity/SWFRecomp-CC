@@ -1840,6 +1840,15 @@ static Avm2Value xml_kind_filter(Avm2Activation* act, uint8_t kind, int match_pi
 	if (match_pi_name)
 	{
 		name = name_arg_default_any(act, 0, 0);
+		// ToXMLName turns a leading '@' into an AttributeName, and an
+		// attribute name can never match a processing instruction -- so
+		// `processingInstructions('@xml-stylesheet')` is the EMPTY list, not
+		// the PI whose target happens to be spelled the same
+		// (e4x/XML/e13_4_4_28, e4x/XMLList/e13_5_4_17).
+		if (name.is_attribute)
+		{
+			return avm2_object_value(out);
+		}
 	}
 	if (node->kind == E4X_ELEMENT)
 	{
@@ -2317,7 +2326,12 @@ static Avm2Value list_kind_filter(Avm2Activation* act, uint8_t kind, int match_p
 	memset(&name, 0, sizeof(name));
 	if (match_pi_name)
 	{
+		// Same AttributeName rule as xml_kind_filter (e4x/XMLList/e13_5_4_17).
 		name = name_arg_default_any(act, 0, 0);
+		if (name.is_attribute)
+		{
+			return avm2_object_value(out);
+		}
 	}
 	for (uint32_t i = 0; i < le->count; i++)
 	{
