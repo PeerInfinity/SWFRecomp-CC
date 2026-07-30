@@ -5757,6 +5757,19 @@ static Avm2Value font_register_font(Avm2Activation* act)
 			}
 			return avm2_undefined();
 		}
+		// Ruffle's rule is `Character::Font(_)` — a DefineFont4 (CFF) counts,
+		// and so does a glyph-less DefineFont3. The recompiler does not parse
+		// either into `avm2_generated_fonts`, so `font_by_id` misses them and
+		// we would raise a #1508 Flash never raises (font_enumeratefonts binds
+		// its second symbol to a DefineFont4). A bound symbol that names no
+		// PLACEABLE character is such a font: fonts are the one character kind
+		// the emitter deliberately leaves out of every placement table. There
+		// is nothing to add to the enumeration list, but accepting it is what
+		// Flash does.
+		if (char_id != 0 && !avm2_display_char_is_defined(char_id))
+		{
+			return avm2_undefined();
+		}
 	}
 	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
 	                 "Error #1508: The value specified for argument font is "
@@ -5870,6 +5883,10 @@ static Avm2Value rectangle_intersects(Avm2Activation* act)
 	double ax, ay, aw, ah, bx, by, bw, bh;
 	rect_xywh(act->ctx, self, &ax, &ay, &aw, &ah);
 	rect_xywh(act->ctx, other, &bx, &by, &bw, &bh);
+	// Ruffle geom/Rectangle.as:157 tests isEmpty() on BOTH rects first. Without
+	// it a zero-size rect at the origin "intersects" anything spanning it —
+	// `new Rectangle().intersects(new Rectangle(-1,-3,5,7))` reads true.
+	if (aw <= 0 || ah <= 0 || bw <= 0 || bh <= 0) return avm2_bool(false);
 	bool hit = (ax < bx + bw) && (ax + aw > bx)
 	        && (ay < by + bh) && (ay + ah > by);
 	return avm2_bool(hit);
@@ -6139,6 +6156,43 @@ static Avm2Value rectangle_set_size(Avm2Activation* act)
 	rect_arg_xy(act, &px, &py);
 	s->slots[3] = avm2_number(px);
 	s->slots[4] = avm2_number(py);
+	return avm2_undefined();
+}
+
+// containsPoint / offsetPoint / inflatePoint — the Point-taking siblings of
+// contains/offset/inflate (Ruffle geom/Rectangle.as:107-130).
+static Avm2Value rectangle_contains_point(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_bool(false);
+	double px, py;
+	rect_arg_xy(act, &px, &py);
+	double x = rect_slot(act, s, 1), y = rect_slot(act, s, 2);
+	double w = rect_slot(act, s, 3), h = rect_slot(act, s, 4);
+	return avm2_bool(px >= x && px < x + w && py >= y && py < y + h);
+}
+
+static Avm2Value rectangle_offset_point(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double px, py;
+	rect_arg_xy(act, &px, &py);
+	s->slots[1] = avm2_number(rect_slot(act, s, 1) + px);
+	s->slots[2] = avm2_number(rect_slot(act, s, 2) + py);
+	return avm2_undefined();
+}
+
+static Avm2Value rectangle_inflate_point(Avm2Activation* act)
+{
+	Avm2Object* s = rect_self(act);
+	if (s == NULL) return avm2_undefined();
+	double px, py;
+	rect_arg_xy(act, &px, &py);
+	s->slots[1] = avm2_number(rect_slot(act, s, 1) - px);
+	s->slots[2] = avm2_number(rect_slot(act, s, 2) - py);
+	s->slots[3] = avm2_number(rect_slot(act, s, 3) + 2 * px);
+	s->slots[4] = avm2_number(rect_slot(act, s, 4) + 2 * py);
 	return avm2_undefined();
 }
 
@@ -6458,6 +6512,12 @@ void avm2_register_text(Avm2Context* ctx)
 		                        rectangle_inflate);
 		avm2_builtin_add_method(ctx, g_rectangle_class, "copyFrom",
 		                        rectangle_copy_from);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "containsPoint",
+		                        rectangle_contains_point);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "offsetPoint",
+		                        rectangle_offset_point);
+		avm2_builtin_add_method(ctx, g_rectangle_class, "inflatePoint",
+		                        rectangle_inflate_point);
 		avm2_builtin_add_getset(ctx, g_rectangle_class, "left",
 		                        rectangle_get_left, rectangle_set_left);
 		avm2_builtin_add_getset(ctx, g_rectangle_class, "right",
