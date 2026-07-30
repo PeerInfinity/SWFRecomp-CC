@@ -1,6 +1,38 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-29 — **net/socket arc CLOSED at +66**
+Last updated: 2026-07-30 — **shader/3D arc: the Stage3D side is COMPLETE**
+(`SWFRecompDocs/plans/shader3d-arc.md` §6; tranches S1 + S2 shipped together
+as `dfbbfc1af`, CI `30510274980` graphics/full green). **+16 against +11
+predicted, zero regressions, crash histogram flat.** The suite is
+**972 / 1221 (79.6%)**; the corpus is **3973 / 4421**; the whole `stage3d`
+category is **5 / 5**. All 15 scoped Stage3D-side targets landed —
+`request_matching_profiles` (190 lines), `stage3d_context3d_string_args`
+(158), `stage3d_blend` (81), `stage3d_agal_upload_errors` (66),
+`stage3d_x_y`, `stage3d_program_constants_invalid_input`,
+`request_profiles`, `context3d_creation`, `stage3d_errors`,
+`stage3d_errors_swf_29`, `stage3d_errors_atf`,
+`stage3d_multistage_triangle`, `sampler_odd_size`,
+`scissor_rectangle_invalid`, `stage_stage3Ds_vector` — plus one rider the
+census missed, `matrix3d_invert` (0/18 → 18/18). New file
+`SWFModernRuntime/src/avm2/avm2_stage3d.c`.
+
+**There is no GPU behind any of it, and none is needed**: every graded line
+in the Stage3D block is a trace, produced by profile negotiation, by the
+deferred `context3DCreate` timing, or by an argument validator. The 21
+render-only `stage3d_*` siblings grade an *image* and zero trace lines, so
+the requirement there was that the surface be reachable and **silent** —
+verified as pre-push canaries and again in CI. Two named risks came in
+cheaper than budgeted: `stage3d_errors_atf`'s #3679/#3675 both fire on ATF
+*header* fields before any pixel data is read (a 20-line header parse, no
+JPEG-XR decoder despite the test's `jpegxr` feature marker), and
+**builtin-frame stack traces turned out to be free** — our builtin methods
+already push a call frame with `bound_class` set, so
+`flash.display3D::Program3D/upload()` renders with no new mechanism. That
+retires the arc's §5.1 risk and raises PixelBender tranche P1 from +6 to +8.
+**NEXT: the PixelBender side** (P1 parser + surface, then P2 — the
+evaluator, which is the arc's one genuinely LARGE item).
+
+Previously: 2026-07-29 — **net/socket arc CLOSED at +66**
 (`SWFRecompDocs/plans/net-socket-arc.md` §8; nine ships, every one at or over
 prediction, one regression introduced and fixed inside the arc). The suite is
 **960 / 1221 (78.6%)**; the corpus is **3957 / 4421**. The last three tranches

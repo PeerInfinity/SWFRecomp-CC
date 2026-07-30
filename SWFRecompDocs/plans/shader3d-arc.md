@@ -1,7 +1,10 @@
 # Shader/3D arc (PixelBender + Stage3D) — scoping
 
-**Status**: scoped 2026-07-30 (pre-implementation). Census + oracle sweeps
-done; no tranche shipped yet. Oracle: Ruffle @ `75c3cec57` (local fork).
+**Status**: scoped 2026-07-30. **Stage3D side COMPLETE** — tranches S1 + S2
+shipped `dfbbfc1af` (CI `30510274980`, graphics/full, green): **+16 against
++11 predicted**, all 15 scoped Stage3D-side targets green plus one rider,
+zero regressions (§6). PixelBender side (P1 → P2 → P3) not started.
+Oracle: Ruffle @ `75c3cec57` (local fork).
 
 ## 0. The decision this replaces
 
@@ -56,7 +59,7 @@ pass trivially (0 trace lines). `tests.rs:9-60` in the pixel_bender crate
 has a golden parsed-shader fixture; the corpus tests ship `.pbasm`
 sidecars that are readable specs per test.
 
-### Stage3D side — 15 candidates, ~750 graded lines
+### Stage3D side — 15 candidates, ~750 graded lines — **ALL 15 GREEN** (S1+S2, `dfbbfc1af`)
 
 | test | lines | needs |
 |---|---|---|
@@ -152,7 +155,7 @@ pixel-independent, no tiles; `_OutCoord` is pixel-CENTER (x+0.5, y+0.5).
 
 Order: S1 first (cheapest, proven shape), then P1→P2, then the tails.
 
-### Tranche S1 — Stage3D API surface · predicted +10 of 14 · MEDIUM
+### Tranche S1 — Stage3D API surface · predicted +10 of 14 · **SHIPPED, +14 of 14** · MEDIUM
 `stage.stage3Ds` (Vector of 4, stable identity), Stage3D x/y +
 requestContext3D/MatchingProfiles per §3.6, deferred context3DCreate at
 the end-of-frame phase, Context3D as a validating no-op surface (profile
@@ -163,7 +166,7 @@ scissor_rectangle_invalid (methods must accept valid input silently).
 Excluded: agal_upload_errors (S2). Risks: context3d_creation's
 event-vs-frame interleaving; errors_atf's messages.
 
-### Tranche S2 — AGAL validator · predicted +1 · SMALL-MEDIUM
+### Tranche S2 — AGAL validator · predicted +1 · **SHIPPED, +1** · SMALL-MEDIUM
 `agal_upload_errors` (66 lines): Program3D.upload validation — #3612
 little-endian check, #3696 sampler-register consistency with token
 positions, and whatever else its .as enumerates. Pure bytecode
@@ -197,26 +200,127 @@ blendMode side effect — no execution needed). Stretch:
 glassDisplace_shaderfilter (ShaderFilter identity semantics +
 generateFilterRect 512×512 growth — touches the filter pipeline).
 
-**Arc prediction: +32 of 42.** Re-predict after each tranche (arc
+**Arc prediction: +32 of 42** at scoping; **revised to +38 of 42** after
+S1+S2 (§6 — S1 landed 14 of 14 rather than 10, S2 its 1, one Matrix3D rider
+arrived, and P1 rises from +6 to +8 because the stack-trace risk is
+retired). **16 of that banked.** Re-predict after each tranche (arc
 convention).
 
 ## 5. Named risks
 
-1. **Builtin stack-trace frames** (P1): two tests grade
-   `ShaderData/_setByteCode()`-shaped frames from inside `new Shader()`.
-   If our getStackTrace can't represent builtin-internal frames, those 2
-   tests cap below full pass. Check how existing error-stack tests
-   handle builtin frames FIRST; budget a mechanism if absent.
+1. ~~**Builtin stack-trace frames** (P1)~~ — **RETIRED by S1+S2.** Our
+   builtin methods already push a call frame with `bound_class` set, so
+   `avm2_callstack_frame_name` renders the qualified
+   `flash.display3D::Program3D/upload()` form with no new mechanism;
+   `agal_upload_errors` (3 AS frames under a builtin one) and
+   `context3d_creation` (a handler-only trace) both passed first try. P1's
+   two stack-trace tests are no longer capped — but their 5-frame traces do
+   constrain P1's DESIGN: Shader/ShaderData must be split into the same call
+   shape Ruffle's AS-side classes have.
 2. **unorm8 rounding parity** (P2): expected bytes come from Flash (and
    Ruffle's GPU agrees) — round-to-nearest on clamp*255, NaN→0, ∞→255.
    Exact-half cases unverified; if a test hits one, resolve from its
    recorded byte, not from a rounding-mode guess.
-3. **End-of-frame event phase** (S1): context3DCreate must land after
-   exitFrame of the requesting frame and before enterFrame of the next
-   (context3d_creation grades the interleaving exactly).
+3. ~~**End-of-frame event phase** (S1)~~ — **RESOLVED, held exactly.**
+   Ruffle's slot (`frame_lifecycle.rs:104`, after `broadcast_frame_exited`
+   and its `LoadManager::run_exit_frame`) maps one-to-one onto our
+   `broadcast_named("exitFrame")` + `avm2_loaderinfo_run_exit_frame`.
+   Only the main tick gets the hook — `run_inner_goto_frame` does not call
+   `check_requested_context3ds`, so neither do our goto/nested-frame
+   `exitFrame` broadcasts.
 4. **`_OutCoord` is pixel-center** — off-by-half errors will pass 1×1
    tests and fail `input`'s 4×4; test the 4×4 case early in P2.
 
 ## 6. Postmortems
 
-(append per tranche as shipped)
+### S1 + S2 — SHIPPED `dfbbfc1af`, CI `30510274980` (graphics/full, green)
+
+**+16 against +11 predicted (S1 +10, S2 +1). Zero regressions, zero other
+status moves, crash histogram flat.** Corpus 3957 → **3973 / 4421**;
+avm2 960 → **972 / 1221**; `stage3d` 1 → **5 / 5** (the category is now
+complete). Histogram moved only `output_mismatch 456 → 440` /
+`pass 3716 → 3732`; `runtime_error` 7 → 7, `recomp_fail` 1 → 1, no
+`segfault` / `timeout` / `compile_fail` bucket on either side. Baseline
+`0a2424415` (the commit before this work).
+
+Both tranches shipped as one commit and one CI run: S2 is a self-contained
+validator behind `Program3D.upload` and S1 had to exist before it could be
+reached at all, so splitting them would have cost a second 33-minute run
+for no extra signal.
+
+**Every one of the 15 scoped targets landed.** The prediction of "+10 of
+14" for S1 was hedged against three named risks; all three came in cheaper
+than budgeted:
+
+| Named risk | Outcome |
+|---|---|
+| §5.3 end-of-frame event phase | Held exactly. `avm2/context3d_creation` passed first try: Ruffle's slot is right after `broadcast_frame_exited` + `LoadManager::run_exit_frame`, which maps one-to-one onto our `broadcast_named("exitFrame")` + `avm2_loaderinfo_run_exit_frame`. |
+| §4-S1 `errors_atf`'s messages | Much cheaper than feared. Both graded checks (#3679 size, #3675 cubemap) fire on ATF *header* fields before any pixel data is read, so a 20-line header parse was the whole cost — no JPEG-XR decoder, despite the test's `[required_features] jpegxr = true`. |
+| §5.1 builtin stack-trace frames (budgeted for P1) | Partially retired early. `context3d_creation` wanted a `getStackTrace()` from inside the event handler and `agal_upload_errors` wanted `at flash.display3D::Program3D/upload()` atop three AS frames. **Both came out free**: our builtin methods already push a call frame with `bound_class` set, so `avm2_callstack_frame_name` renders the qualified builtin form without any synthetic push. |
+
+**One rider the census missed**: `avm2/matrix3d_invert` (0/18 → 18/18).
+`flash.geom.Matrix3D` was a bare constructible stub, and
+`setProgramConstantsFromMatrix` plus `stage3d_blend`'s
+appendScale/appendTranslation forced a real one; `invert` fell out of the
+same 4×4 arithmetic. The other five Matrix3D-family tests (`matrix3d`,
+`matrix3d_compose`, `utils3d`, `geom_transform`,
+`perspective_projection`) still fail — they grade `decompose`/`recompose`,
+`pointAt`, `interpolate` and PerspectiveProjection, none of which this
+tranche needed. **That is a small named follow-on, not part of the shader
+arc**: ~5 avm2 tests + 3 in `from_shumway` behind a completed
+`flash.geom` 3D surface.
+
+**The load-bearing implementation note** (cost 20 minutes of debugging
+avoided by reading the helper first): `avm2_builtin_class` always MINTS a
+class and re-binds the global name — it never looks one up. So taking over
+`flash.geom.Matrix3D` from `avm2_display.c` meant *deleting* the shell
+there, not extending it, and `flash.geom.Vector3D` (which has a real ctor
+in that file) had to be shared through a new `avm2_geom_vector3d_class()`
+accessor rather than re-registered. Re-registering it would have silently
+replaced a working class with an empty one.
+
+**§3.6's negotiation rules all held**: the fixed priority list, the
+highest-ranked-requested-wins rule regardless of vector order, and the
+singular-"profile"/plural-"profiles" #2008 split. The one thing §3.6
+under-explained is *why* the tick counts are what they are:
+`request_profiles` needs 12 ticks for 6 profiles and
+`request_matching_profiles` 126 for 63 subsets, but each produces one cycle
+*fewer* than the arithmetic suggests (16 lines not 18; 190 not 192) —
+because the `ENTER_FRAME` listener is installed in the constructor, i.e.
+during frame 1's *construct* phase, after frame 1's enterFrame has already
+fired. The deferred-creation delay and the missed first enterFrame are two
+separate off-by-ones and both are graded.
+
+**Two things worth knowing for anyone reading the AGAL validator**: the
+validation ORDER is graded (parse vertex → parse fragment → sampler-config
+pass on the fragment only, per `ShaderPairAgal::new`), so a bad vertex
+program masks a bad fragment one; and #3696's token number is a 1-based
+index into ALL operations, not just the `tex` ones. Ruffle `unwrap()`s
+`RegisterType::from_u16` and would panic on register-type bits 7-15 — we
+treat an unknown register type as "no error" rather than copy the panic or
+invent an error code for it (same policy as §3.1's parser panics).
+
+**Re-prediction for the PixelBender side.** Nothing learned here changes
+the P1/P2/P3 estimates much — the Stage3D block was validation work and
+PixelBender is a parser plus an interpreter, which shares no mechanism with
+it. Two adjustments:
+
+* **P1 (parser + Shader/ShaderData surface): +8 of 8, was +6 of 8.** The
+  §5.1 stack-trace risk that capped this at 6 is retired: builtin frames
+  render correctly with no new mechanism, so `pixelbender_eof` and
+  `pixelbender_no_out_param` are no longer gated. Their 5-frame traces
+  (`ShaderData/_setByteCode()` → `ShaderData()` → `Shader/set byteCode()` →
+  `Shader()` → `Test()`) do still need our Shader/ShaderData to be split
+  into the same call shape Ruffle's AS-side classes have, which is a design
+  constraint on P1, not a missing capability.
+* **P2 (evaluator + ShaderJob): +14 of 18, unchanged.** §5.2 (unorm8
+  rounding parity) and §5.4 (`_OutCoord` pixel-center) are both untouched
+  by S1/S2 and remain the real risks. Test the 4×4 `pixelbender_input` case
+  early, as §5.4 says.
+* **P3 (tails): +1 of 2, unchanged.**
+
+**Arc prediction revised: +32 → +38 of 42** (S1+S2 delivered 15 of the 15
+Stage3D-side candidates the tranches scoped, plus the Matrix3D rider; P1
+rises by 2). Remaining Stage3D-side census entries: none — all 15 are
+green, and the 21 render-only siblings held at pass throughout (verified
+as pre-push canaries and again in CI).
