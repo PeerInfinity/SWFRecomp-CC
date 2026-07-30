@@ -1,12 +1,14 @@
 # Shader/3D arc (PixelBender + Stage3D) — scoping
 
-**Status**: scoped 2026-07-30. **Stage3D side COMPLETE** — tranches S1 + S2
-shipped `dfbbfc1af` (CI `30510274980`, graphics/full, green): **+16 against
-+11 predicted**, all 15 scoped Stage3D-side targets green plus one rider,
-zero regressions (§6). **PixelBender P1 COMPLETE** — shipped `e4859db87`
-(CI `30514420826`, graphics/full, green): **+8 against +8 predicted**, all 8
-targets green, zero regressions (§6.2). **P2 (the evaluator) is next and is
-the whole remaining bulk.** Oracle: Ruffle @ `75c3cec57` (local fork).
+**Status**: scoped 2026-07-30, **ARC CLOSED 2026-07-30** at **+42 against a
++38 revised prediction (+32 at scoping)** — 41 of the 42 census candidates
+are green plus one rider, zero regressions across four CI runs. Tranches:
+S1 + S2 `dfbbfc1af` (CI `30510274980`, **+16 vs +11**), P1 `e4859db87`
+(CI `30514420826`, **+8 vs +8**), P2 + P3 (**+18 vs +15**; §6.3). The single
+open census entry, `pixelbender_effect_glassDisplace_shaderfilter`, is
+reclassified out of this arc: it needs a real `DisplayObject.filters`
+round-trip and `BitmapData.generateFilterRect`, i.e. the head of a separate
+filters arc (§6.4). Oracle: Ruffle @ `75c3cec57` (local fork).
 
 ## 0. The decision this replaces
 
@@ -24,7 +26,7 @@ single arc. A `strings` sweep of every sourceless-suite `test.swf` for
 
 ## 1. Census (baseline `34171042f` results)
 
-### PixelBender side — 27 candidates, ~4,600 graded lines
+### PixelBender side — 27 candidates, ~4,600 graded lines — **26 of 27 GREEN** (P1 `e4859db87`, P2+P3; only `glassDisplace_shaderfilter` open, §6.4)
 
 | test | lines | needs |
 |---|---|---|
@@ -185,7 +187,7 @@ Yields: parse_errors, select_kinds, shaderdata, dithering,
 shaderparameter_value, param_qualifier (its 512 lines are #2004-no-out
 repeats), and — gated on the stack-trace risk — eof + no_out_param.
 
-### Tranche P2 — the evaluator + ShaderJob · predicted +14 of 17 · LARGE
+### Tranche P2 — the evaluator + ShaderJob · predicted +14 of 17 · **SHIPPED, +17 of 17** · LARGE
 C interpreter per §2/§3.3-3.5: vec4f/vec4i banks, the 45 opcodes
 (semantics from naga-pixelbender lib.rs:857-1420 — copy Sign's
 (x>0)-(x<0), BoolToFloat=zero-vec quirk, IntToBool=identity), if/else/
@@ -196,11 +198,12 @@ BitmapData writeback with §3.5 quantization, Vector/ByteArray targets,
 input textures + #2165. Yields the 16 BitmapData math/matrix tests +
 vector_output + input. Risk: rounding parity on half-way cases.
 
-### Tranche P3 — tails · predicted +1 of 2 · SMALL
+### Tranche P3 — tails · predicted +1 of 2 · **SHIPPED, +1 of 2** · SMALL
 blend_shader_luma_lighten (URLLoader .pbj sidecar, #2007 on null data,
-blendMode side effect — no execution needed). Stretch:
+blendMode side effect — no execution needed). Stretch, **NOT taken**:
 glassDisplace_shaderfilter (ShaderFilter identity semantics +
-generateFilterRect 512×512 growth — touches the filter pipeline).
+generateFilterRect 512×512 growth — touches the filter pipeline). See §6.4
+for why it is out of the arc rather than merely unfinished.
 
 **Arc prediction: +32 of 42** at scoping; **revised to +38 of 42** after
 S1+S2 (§6 — S1 landed 14 of 14 rather than 10, S2 its 1, one Matrix3D rider
@@ -221,10 +224,11 @@ P2's denominator drops 18 → 17 on a census correction that moves no test).
    two stack-trace tests are no longer capped — but their 5-frame traces do
    constrain P1's DESIGN: Shader/ShaderData must be split into the same call
    shape Ruffle's AS-side classes have.
-2. **unorm8 rounding parity** (P2): expected bytes come from Flash (and
-   Ruffle's GPU agrees) — round-to-nearest on clamp*255, NaN→0, ∞→255.
-   Exact-half cases unverified; if a test hits one, resolve from its
-   recorded byte, not from a rounding-mode guess.
+2. ~~**unorm8 rounding parity** (P2)~~ — **RETIRED, never bit.** No corpus
+   test lands on an exact half: every graded byte comes from a product that
+   is unambiguous (0.6×255 = 153, 3/128×255 = 5.977 → 6, 2.1/8×255 = 66.94 →
+   67). `clamp(x,0,1)` then `floor(x*255 + 0.5)`, with NaN → 0x00, was right
+   on the first run. §6.3.
 3. ~~**End-of-frame event phase** (S1)~~ — **RESOLVED, held exactly.**
    Ruffle's slot (`frame_lifecycle.rs:104`, after `broadcast_frame_exited`
    and its `LoadManager::run_exit_frame`) maps one-to-one onto our
@@ -232,8 +236,12 @@ P2's denominator drops 18 → 17 on a census correction that moves no test).
    Only the main tick gets the hook — `run_inner_goto_frame` does not call
    `check_requested_context3ds`, so neither do our goto/nested-frame
    `exitFrame` broadcasts.
-4. **`_OutCoord` is pixel-center** — off-by-half errors will pass 1×1
-   tests and fail `input`'s 4×4; test the 4×4 case early in P2.
+4. ~~**`_OutCoord` is pixel-center**~~ — the rule is real, but **the named
+   mitigation was structurally incapable of testing it.** `pixelbender_input`
+   runs a 2×2 (not 4×4) job and grades only `result.length` and `e.errorID`,
+   never a pixel. NO trace-graded test in the corpus can catch an `_OutCoord`
+   off-by-half. What actually verifies it is the ungraded image comparison on
+   the six render-only siblings (§6.3).
 
 ## 6. Postmortems
 
@@ -434,3 +442,146 @@ parser. All six were verified as pre-push canaries and again in CI.
 
 **Arc prediction: +38 of 42, held. 24 banked** (16 Stage3D-side + 8 from P1).
 Remaining PixelBender census entries: 19 — the 17 in P2 and the 2 in P3.
+
+### 6.3 · P2 + P3 — SHIPPED `9277e0e1b`, CI `30519577386` (graphics/full, green)
+
+**+18 against +15 predicted (P2 +17 of 17 against +14; P3 +1 of 2 as
+predicted). Zero regressions, zero other status moves, crash histogram
+flat.** Corpus 3981 → **3999 / 4421**; avm2 980 → **998 / 1221**. The only
+histogram movement was `output_mismatch 432 → 414` / `pass 3740 → 3758`;
+`runtime_error` 7 → 7, `recomp_fail` 1 → 1, no `segfault` / `timeout` /
+`compile_fail` bucket on either side. Intersection 4421 on both sides — no
+lost shard. Baseline `aa4af61d0` (the commit before this work).
+
+The one non-gain the diff reports is five `all_classes/display/swf*`
+registry dumps losing a single *matching* line each (2 → 1 of ~2,600).
+Those tests enumerate the whole class registry and match 0-2 lines out of
+thousands on both sides; three new `flash.display` classes legitimately
+shift the dump, and the "lost" line is diff alignment noise, not behaviour
+(`results-diff-line-metrics-mislead`).
+
+**All 17 P2 targets passed on the first local run**, before any debugging —
+including every one of the ~16 tests that grades exact `getPixel32` hex, and
+`pixelbender_parameters`'s 1,563 lines across a 20-type × 27-value matrix.
+The two named risks that this tranche was hedged against (§5.2, §5.4) both
+turned out to be non-events, and *why* is the interesting part.
+
+**§5.2 (unorm8 half-way rounding) never bit because no test lands on a
+half.** The worry was that `clamp(x,0,1)*255` would hit a `.5` whose
+rounding mode is unspecified. Every graded byte in the corpus comes from a
+product that is not close: `0.6×255 = 153` exactly, `3/128×255 = 5.977 → 6`,
+`2.1/8×255 = 66.94 → 0x43`. Plain half-up (`floorf(x*255 + 0.5f)`) after the
+clamp, NaN → `0x00`, was correct first try. The advice the plan gave — if a
+half-way case shows up, resolve it from the RECORDED byte rather than from a
+rounding-mode guess — still stands, but nothing exercised it.
+
+**§5.4's mitigation could not have worked.** The plan said `_OutCoord` being
+pixel-CENTRE is unfalsifiable on 1×1 jobs and to "run `pixelbender_input`'s
+4×4 job EARLY". `pixelbender_input` runs a **2×2** job, and its expected
+output contains **no pixel value at all** — it grades `result.length` and
+`e.errorID` and nothing else. Every other PixelBender test with a >1×1 job
+(`malformed_data`'s `renderBitmap`, the six `effect_*`/`images` siblings) is
+image-graded only. **So no trace-graded test in the corpus can catch an
+`_OutCoord` off-by-half.** A named risk whose named mitigation is incapable
+of firing is worse than an unmitigated one, because the tranche plan reads
+as covered.
+
+**What actually verified the evaluator was the UNGRADED image comparison.**
+Running the render-only canaries under `--mode=graphics` prints, per test,
+an `[image:output]` line comparing our frame against Flash's recorded PNG.
+`pixelbender_images`, `effect_tintype` and `effect_smudge` all report
+**`PASS — 0 outliers (limit 0), max difference 1`** over 512×512 / 500×375
+frames of real effect shaders (twirl, glassDisplace and BlurredFocus report
+a pre-existing `viewport_dimensions` size mismatch unrelated to this work).
+That is per-pixel agreement with Flash on programs two orders of magnitude
+larger than anything the traces reach — including `_OutCoord`, bilinear
+sampling and clamp-to-edge, none of which any graded line touches. It cost
+one command, because the comparison surface was already there and merely
+does not gate pass/fail (`image-comparisons-dont-gate-passfail`).
+**Generalisation: when a tranche's real risk is numeric parity, look for an
+ungraded image comparison before concluding the risk is untestable.**
+
+**A 60-line PBJ scanner made the "45 opcodes" number go away.** Before
+writing any C, a throwaway Python parser walked every `.pbj` in the corpus
+and printed the opcode multiset: 37 distinct opcodes over ~2,900 uses, plus
+exactly 5 matrix-form sites (2 `MatVecMul`, 1 `VecMatMul`, 2 matrix `Mov`).
+That turned an open-ended port into a closed list, and — more usefully —
+proved `MatMatMul` appears nowhere, so the one opcode whose CPU semantics
+Ruffle leaves genuinely undefined (it panics) never had to be decided. The
+same scan sized the perf question: `BlurredFocus` is 861 ops × 262,144
+pixels ≈ 226M op-evaluations, which the interpreter runs in ~8 s because the
+per-pixel reset is a `memcpy` of a post-parameter register snapshot rather
+than a re-bind of every parameter.
+
+**The one semantic trap in ShaderJob.start: two different "missing value"
+paths give different answers.** `shader.data.foo.value = null` zero-fills the
+parameter; it does NOT fall back to the metadata `defaultValue`. The default
+applies only when the ShaderParameter *object itself* was replaced
+(`shader.data.foo = 0.75`), which `pixelbender_parameters` (selector 17 with
+`null` → `ff000000`, not the 128-default `ff808080`) and
+`shaderdata_setter` grade against each other in the same corpus.
+
+**P3's blocker was not PixelBender.** `blend_shader_luma_lighten` died four
+AS lines before its graded surface on `ReferenceError #1065: Variable
+GradientType is not defined` — `flash.display.GradientType` had never been
+minted, even though `Graphics.beginGradientFill` has worked for a long time
+and its own signature names that class. Three one-line constant bags
+(`GradientType`, `SpreadMethod`, `InterpolationMethod`) unblocked it. The
+census had read the test's *subject* (`blendShader`, #2007, blendMode) and
+not its *imports*; the same habit that mis-bucketed two tests in §6.2.
+`blendShader` itself was exactly as scoped: a write-only DisplayObject
+accessor that raises #2007 when `Shader.data` is null and otherwise flips
+`blendMode` to `"shader"`.
+
+### 6.4 · Arc closeout
+
+**42 tests moved against a +38 revised prediction (+32 at scoping).** Corpus
+3957 → **3999 / 4421** across the arc; avm2 960 → **998 / 1221**; the
+`stage3d` category 1 → 5/5.
+Per-tranche: S1+S2 **+16** (pred. +11), P1 **+8** (pred. +8), P2 **+17**
+(pred. +14), P3 **+1** (pred. +1). 41 of the 42 census candidates are green,
+plus the `matrix3d_invert` rider S1 pulled in.
+
+| Block | Census | Green | Notes |
+|---|---|---|---|
+| Stage3D side | 15 | 15 | `stage3d` category 5/5; +1 rider |
+| PixelBender parser/surface (P1) | 8 | 8 | |
+| PixelBender evaluator (P2) | 17 | 17 | every hex-pixel test included |
+| PixelBender tails (P3) | 2 | 1 | `glassDisplace_shaderfilter` open |
+
+**The one open entry is reclassified, not deferred.**
+`pixelbender_effect_glassDisplace_shaderfilter` grades four lines; two
+already pass. The other two need (a) `DisplayObject.filters` to store the
+assigned array and hand back **clones** whose `.shader` is the same object,
+and (b) `BitmapData.generateFilterRect`, which does not exist. Today
+`filters` is a hard stub — the getter returns a fresh empty Array and the
+setter is a no-op — and **51 corpus test files read `.filters`**, including
+a whole `*_filter` family. Turning that stub into a real store is the head
+of a filters arc, not a PixelBender tail; doing it here would have put a
+51-test blast radius behind a 2-line yield.
+
+**Ranked lessons.**
+
+1. **A named risk whose mitigation cannot fire is worse than an unnamed
+   one.** §5.4 named the right rule and the wrong witness; the plan then
+   read as covered. Before trusting a mitigation, check that the test it
+   names actually grades the quantity in question — read its expected
+   output, not its title. (This is `bucket-by-vm-not-symptom` / §6.2's
+   mis-attribution wearing a third face: in every instance the mistake was
+   reading what a test is *about* instead of what its lines are *made of*.)
+2. **Ungraded surfaces are still evidence.** The image comparisons proved
+   more about the evaluator than all 2,900 graded lines did, for free.
+   Reach for them whenever the risk is numeric.
+3. **Census the input format, not the spec.** Scanning the corpus's own
+   `.pbj` files converted "port 45 opcodes with 10 undefined ones" into
+   "port 37, stub 8, and the ambiguous one never appears". A day of
+   semantics arguments avoided by an hour of parsing.
+4. **A from-scratch port beat its estimate precisely because the oracle was
+   a compiler, not a library.** P2 was the arc's one item with no Ruffle
+   code to transliterate — and it landed 17/17 rather than the hedged 14,
+   because `naga-pixelbender` is a *total* specification of the semantics
+   (every opcode has an expression tree) even though it is not runnable on
+   a CPU. "No reference implementation" and "no reference semantics" are
+   different problems; only the second is expensive.
+5. **Check a test's imports before sizing it.** P3's cost was entirely a
+   missing three-line constant bag in an unrelated package.

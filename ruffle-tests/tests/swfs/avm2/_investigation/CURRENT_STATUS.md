@@ -1,6 +1,42 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-30 — **shader/3D arc: PixelBender tranche P1 SHIPPED**
+Last updated: 2026-07-30 — **shader/3D arc CLOSED: PixelBender tranches
+P2 + P3 SHIPPED** (`SWFRecompDocs/plans/shader3d-arc.md` §6.3-6.4;
+`9277e0e1b`, CI `30519577386` graphics/full green). **+18 against +15
+predicted, zero regressions, zero other status moves, crash histogram
+flat.** The suite is **998 / 1221 (81.7%)**; the corpus is **3999 / 4421**.
+
+P2 is the arc's one LARGE tranche and the one place Ruffle cannot be
+transliterated — `run_pixelbender_shader` exists only in its wgpu backend, so
+there is no CPU evaluator to port. `avm2_pixelbender.c` gains a from-scratch
+interpreter whose semantics come from the naga transpiler
+(`render/naga-pixelbender/src/lib.rs:857-1420`), which is a *total*
+specification even though it is not runnable on a CPU. **All 17 P2 targets
+passed on the first local run**, including every test that grades exact
+`getPixel32` hex and `pixelbender_parameters`'s 1,563 lines across a 20-type
+× 27-value matrix. P3 added `blend_shader_luma_lighten`.
+
+Three things worth carrying forward. **A named risk whose mitigation cannot
+fire is worse than an unnamed one**: the plan said to test `_OutCoord`'s
+pixel-CENTRE rule against `pixelbender_input`, but that test grades
+`result.length` and `e.errorID` and never a pixel — no trace-graded test in
+the corpus can catch an off-by-half there. **Ungraded surfaces are still
+evidence**: running the six render-only PixelBender siblings under
+`--mode=graphics` reports `[image:output] PASS — 0 outliers, max difference
+1` against Flash's recorded 512×512 / 500×375 PNGs, which validates
+`_OutCoord`, bilinear sampling and clamp-to-edge that no graded line
+touches. And **check a test's imports before sizing it**: P3's actual
+blocker was `flash.display.GradientType` never having been minted, four AS
+lines before its graded surface.
+
+**One test remains open and is reclassified out of the arc.**
+`pixelbender_effect_glassDisplace_shaderfilter` needs a real
+`DisplayObject.filters` round-trip (assigned array in, clones out, same
+`.shader` identity) plus `BitmapData.generateFilterRect`. `filters` is a
+hard stub today and **51 corpus test files read it**, so that is the head of
+a filters arc, not a PixelBender tail.
+
+Previously: 2026-07-30 — **shader/3D arc: PixelBender tranche P1 SHIPPED**
 (`SWFRecompDocs/plans/shader3d-arc.md` §6.2; `e4859db87`, CI `30514420826`
 graphics/full green). **+8 against +8 predicted, zero regressions, crash
 histogram flat.** The suite is **980 / 1221 (80.3%)**; the corpus is
