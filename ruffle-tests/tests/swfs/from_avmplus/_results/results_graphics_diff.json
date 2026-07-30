@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-30T05:13:12.467187+00:00",
-    "old_git_sha": "e4859db87771c1135792506194fc00b17e08a8cb",
-    "new_timestamp": "2026-07-30T07:00:20.398305+00:00",
-    "new_git_sha": "9277e0e1b2147017a69c44d067fd9234dc7f4751",
+    "old_timestamp": "2026-07-30T07:00:20.398305+00:00",
+    "old_git_sha": "9277e0e1b2147017a69c44d067fd9234dc7f4751",
+    "new_timestamp": "2026-07-30T08:52:49.868130+00:00",
+    "new_git_sha": "c045e044c6673bbcaac349b0eb17088e66832ae7",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,182 @@
     "old_effective_pass": 1510,
     "old_total": 1574,
     "old_pass_rate": 92.7,
-    "new_pass": 1459,
+    "new_pass": 1467,
     "new_ruffle_matched": 51,
-    "new_effective_pass": 1510,
+    "new_effective_pass": 1518,
     "new_total": 1574,
-    "new_pass_rate": 92.7,
+    "new_pass_rate": 93.2,
     "old_mismatched_lines": 780,
-    "new_mismatched_lines": 780,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 1574,
+    "new_mismatched_lines": 772,
+    "increased_mismatches": 1,
+    "decreased_mismatches": 9,
+    "newly_passing": 9,
+    "newly_failing": 1,
+    "status_changed": 10,
+    "unchanged": 1564,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "as3/Definitions/Classes/Ext/AccStatPropViaSubClass",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "as3/RuntimeErrors/Error1075MathNotAFunction",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "as3/RuntimeErrors/Error1076MathNotAConstructor",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "as3/RuntimeErrors/Error1081ReadSealedErrorNs",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "ecma3/Exceptions/exception_001_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "ecma3/Exceptions/exception_002_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "ecma3/Exceptions/expression_005_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "ecma3/Expressions/e11_2_2_10_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "ecma3/Function/e15_3_4_3_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 13
+      },
+      "new_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      }
+    },
+    {
+      "test": "ecma3/Function/e15_3_4_4_1_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      }
+    }
+  ]
 }
