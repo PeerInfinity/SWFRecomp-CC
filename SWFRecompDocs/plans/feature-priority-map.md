@@ -810,3 +810,27 @@ low-confidence oracle material.
 
 Recommended order: polish sweep first (tranche 0 + first fix batches),
 filters arc scoping pass while its CI runs or after.
+
+### Polish sweep session 1 result (2026-07-30, CI `30548659769`)
+
+Tranche 0 confirmed the count exactly — **172 candidates**, and the
+bucketing is in `polish-sweep-arc.md` §1 (12 ranked takeable buckets,
+5 deferred-with-diagnosis, ~60 leftover singles each with a cause).
+Four batches shipped for **+19, zero regressions**: corpus
+**3999 → 4018 / 4421 (90.9%)**, avm2 998 → 1006, from_avmplus
+1510 → 1521. Well under the `8e8370df1` precedent of +40-60/session, and
+the reason is structural: after the big arcs closed, the residue really
+is a long tail of one-mechanism-per-test, so a batch is 2-8 tests, not
+20. Buckets still open and ranked are in the arc doc — the largest
+untaken ones are **B4 hit-testing/bounds** (8 tests, 13 lines) and **B3
+`from_shumway/timeline/nav`** (8 + 2 riders), both medium rather than
+polish-sized.
+
+Two ranking corrections this session produced:
+- The **uncaught-error-tracing re-land** moves from "later, after the
+  Stage3D/PixelBender/filters arcs" to specifically **the filters arc's
+  closeout** — its blocker census is now exactly the filter classes.
+- The **astral-plane UTF-8 pair** (`invalid_utf8`, `stylesheet`) is NOT
+  polish: the runtime holds strings as UTF-8 and cannot represent a lone
+  surrogate, so a CESU-8 pair needs WTF-8 storage or a pair-combining
+  pass across every decoder. Size it on its own before taking it.

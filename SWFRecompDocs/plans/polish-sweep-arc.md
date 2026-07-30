@@ -166,13 +166,76 @@ through their data).
 
 | Batch | Commit | Bucket | Predicted | Actual | Notes |
 |---|---|---|---|---|---|
-| 1 | `f50ac436b` | B1 avmplus VerifyError messages | +7 | **+7** | exactly on prediction |
+| 1 | `f50ac436b` | B1 avmplus VerifyError messages | +7 | **+8** | +1 CI-only rider: `cpool_index_invalid_bytecode_1` sat OUTSIDE the ≤5-line window and passed anyway |
 | 2 | `846ef6538` | B2 `Math` not callable/constructible | +6 | **+6** | one cause, two suites |
-| 3 | `c045e044c` | B6 `#1081` split + B7 apply/call arity | +5 | **+3** | B5 dropped mid-batch (see below); `WildcardOperator` is a separate mechanism |
+| 3 | `c045e044c` | B6 `#1081` split + B7 apply/call arity | +5 | **+2** | B5 dropped mid-batch; `#1081` half REVERTED in `0241861f4` after CI (see §3) |
 | 4 | `22404706d` | B9 qualified names in `#1074` + B8 e4x PI AttributeName | +3 | **+3** | |
 
-Local total **+19**. CI verification: run `30526275513`
-(graphics/`categories=full`), baseline `dae7ec9e7`.
+**Final: +19, zero regressions, zero other status moves.** Verified by CI
+`30548659769` (graphics/`categories=full`) against baseline `dae7ec9e7`:
+corpus **3999 → 4018 / 4421**, avm2 998 → 1006 (+8), from_avmplus
+1510 → 1521 (+11). Histogram otherwise flat — `runtime_error` 7 → 7,
+`recomp_fail` 1 → 1, `ruffle_matched` 241 → 241, and still no
+segfault / timeout / compile_fail bucket. The intermediate run
+`30526275513` (batches 1–3) read +17 / 2 regressions before the revert.
+
+The `ruffle_matched` count holding at 241 is the load-bearing check for
+this arc specifically: two batches changed error-message TEXT, and a
+`ruffle_matched` grade depends on our output staying a subset of Ruffle's
+diffs, so it can flip without crossing the pass/fail line. Read the
+"OTHER STATUS MOVES" line, not just regressions, after any
+message-formatting change.
+
+## 3. Postmortem
+
+### The one regression pair, and what it taught
+
+Batch 3 widened the sealed-read error split from `dynamic || mn_attr` to
+`mn_attr || !mn_public`, which won
+`as3/RuntimeErrors/Error1081ReadSealedErrorNs` and lost **two** passing
+tests: `avm2/catch_class` (`AS3::hasOwnProperty` on the catch scope
+object) and `as3/Definitions/Classes/Ext/AccStatPropViaSubClass` (a
+static in the base class's namespace, reached through the subclass). Both
+pin **#1069** for a non-public **QName** miss on a sealed receiver, so
+`!mn_public` is simply the wrong generalization — it traded two for one.
+Reverted in `0241861f4`.
+
+The valuable part is why the surviving target is unreachable from there.
+`Error1081ReadSealedErrorNs` reads `a.name` — a **public** name — off a
+sealed, interface-typed receiver. Ruffle's split
+(`script_object.rs::get_dynamic_property`) is
+`!valid_dynamic_name() && has_multiple_ns()`, where `valid_dynamic_name`
+is `contains_public_namespace() && !is_attribute()`. For a public name
+that predicate is TRUE, so the branch never fires: **that #1081 comes
+from a different site entirely.** Finding that site is the follow-up;
+broadening `getproperty_common` is not, and both the code comment and
+`0241861f4`'s message say so explicitly to stop a re-attempt.
+
+Canaries did not catch this, and could not have as chosen: they were
+picked by content-grep for `Error #1069` / `1081` in **expected output**,
+and `AccStatPropViaSubClass`'s expected text is just `PASSED!` — the
+error code lives in its *assertion*, not its output. For an
+error-taxonomy change, grep the test **sources** for the code too, not
+only the expected output.
+
+### Method notes worth reusing
+
+- **Triage economics.** `verify_output.py` gives each invocation its own
+  `/tmp/swf_verify_*` dir, so invocations are parallel-safe: 28
+  eight-test batches at `-P 5` triaged all 172 candidates in ~12 minutes,
+  where the first sequential attempt was ~10 minutes for 9 tests. Also:
+  `--recompile` regenerates RecompiledScripts but does **not** rebuild
+  the recompiler binary — a recompiler fix looks like a no-op until you
+  `cmake --build SWFRecomp/build`.
+- **A stale census makes the cheapest-looking batch a trap.** The
+  uncaught-error-tracing re-land reads as 34 lines for +4, and half its
+  blocker census closed with the shader arc — but re-checking the other
+  half against today's tree found every filter class still absent. It
+  belongs to the filters arc's closeout.
+- **Predictions were accurate where the bucket was one mechanism**
+  (B1, B2, B8, B9 all landed exactly) and wrong where "same missing line
+  shape" hid two rules (B6). Same-symptom is not same-cause even inside
+  one error code.
 
 ### Things that cost prediction accuracy
 

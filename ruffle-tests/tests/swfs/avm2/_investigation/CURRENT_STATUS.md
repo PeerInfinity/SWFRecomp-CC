@@ -1,6 +1,25 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-30 — **shader/3D arc CLOSED: PixelBender tranches
+Last updated: 2026-07-30 — **near-pass polish sweep, session 1**
+(`SWFRecompDocs/plans/polish-sweep-arc.md`; CI `30548659769` graphics/full
+green). Corpus-wide **+19, zero regressions, zero other status moves**;
+this suite **998 → 1006 / 1221 (82.4%)**, corpus **4018 / 4421 (90.9%)**.
+The avm2 gains are all one bucket plus a rider: the verifier now emits
+avmplus's exact `Error #NNNN` wording, which the runtime also parses back
+into `errorID` — `cpool_index_invalid_bytecode_{1,2,3}`, `verification`,
+`verify_dxns_without_flag`, `verify_jump_to_middle_of_op`, `verify_stack`,
+and `construct_interface` (which now names the interface in #1001 rather
+than the literal "undefined"). `cpool_index_invalid_bytecode_1` was a free
+rider — it sat outside the ≤5-missing-line triage window.
+
+One regression pair was introduced and reverted inside the sweep:
+widening the sealed-read #1081/#1069 split cost `catch_class` (and
+avmplus's `AccStatPropViaSubClass`) to win one avmplus test. A non-public
+**QName** miss on a sealed receiver is **#1069**; see the arc doc §3 for
+the real rule and why `Error1081ReadSealedErrorNs` is thrown from a
+different site.
+
+Previously — **shader/3D arc CLOSED: PixelBender tranches
 P2 + P3 SHIPPED** (`SWFRecompDocs/plans/shader3d-arc.md` §6.3-6.4;
 `9277e0e1b`, CI `30519577386` graphics/full green). **+18 against +15
 predicted, zero regressions, zero other status moves, crash histogram
