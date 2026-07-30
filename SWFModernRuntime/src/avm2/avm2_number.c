@@ -453,6 +453,27 @@ static Avm2Value math_random(Avm2Activation* act)
 	return avm2_number((double) raw / 2147483648.0);
 }
 
+// `Math` is a pure static namespace: avmplus gives it neither a call nor a
+// construct behaviour and has dedicated errors for each attempt. Without
+// these hooks `Math()` would fall through to the generic one-arg class
+// coercion (#1112) and `new Math()` would happily hand back an instance.
+// Only Math gets this -- `JSON()` really is #1112 (ecma3/JSON/e15_12_0).
+static Avm2Value math_class_call(Avm2Context* ctx, Avm2Class* cls,
+                                 const Avm2Value* args, uint32_t argc)
+{
+	(void) cls; (void) args; (void) argc;
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #1075: Math is not a function.");
+}
+
+static Avm2Value math_class_construct(Avm2Context* ctx, Avm2Class* cls,
+                                      const Avm2Value* args, uint32_t argc)
+{
+	(void) cls; (void) args; (void) argc;
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #1076: Math is not a constructor.");
+}
+
 // ---------------------------------------------------------------------------
 // Number static math (Flash 11.3 / API 680)
 // ---------------------------------------------------------------------------
@@ -638,6 +659,8 @@ void avm2_register_number(Avm2Context* ctx)
 
 	Avm2Class* math = avm2_builtin_class(ctx, "", "Math", b->object_class);
 	b->math_class = math;
+	math->native_call = math_class_call;
+	math->native_construct = math_class_construct;
 	avm2_builtin_add_static_method(ctx, math, "abs", math_abs);
 	avm2_builtin_add_static_method(ctx, math, "acos", math_acos);
 	avm2_builtin_add_static_method(ctx, math, "asin", math_asin);
