@@ -2,6 +2,34 @@
 
 Last updated: 2026-05-08 (CI `e0d15089`, run `25578374215` — Part C: `avm1/moviecliploader` 6/7 → **PASS (7/7)**. Flat suite filtered effective 75/76 → **76/76 (100%)**; avm1 sub-tree raw 45 → 46 PASS. After Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]`, the loadee MC is now registered with `actionRegisterLevelAdvance` so `frame_funcs[1..N-1]` fire on subsequent ticks via the existing per-tick `actionAdvancePlayingLevels` path. Zero regressions across other suites.)
 
+## `timeline/nav` + `blendmode` — polish sweep B3 (2026-07-30, CI `30583810264`)
+
+Suite **185 → 196 / 229**, the biggest single move this suite has had.
+Eleven tests, from one family with two sub-causes
+(`SWFRecompDocs/plans/polish-sweep-arc.md` §4):
+
+- **The recompiler was parsing PlaceObject's CXFORM, BlendMode and
+  BitmapCache and throwing them away** (`skipCxform`,
+  `if (has_blend) r.u8();`), so `transform.colorTransform` was a hardcoded
+  identity, `blendMode` always `"normal"` and `cacheAsBitmap` always
+  false. They now ride the timeline op table into the AS properties.
+  Gains: `timeline/nav/{colorTransform, blendMode, cacheAsBitmap}` and
+  `blendmode/{blendmode_1, blendmode_2}` (the latter also needed
+  `blendMode`'s setter to throw `#2008` on an unknown name).
+- **Backward navigation re-creates a character by a per-FIELD comparison,
+  not by direction.** `nav/ratio` wants a new object on frame 1 and
+  `nav/ratio2` wants the same one off the identical test shape — the rule
+  is Ruffle's `survives_rewind`, whose field set depends on the object's
+  type (MovieClip = ratio alone) and which re-checks morph shapes even
+  when they predate the target frame. Plus the rewind default-fill that
+  resets every animatable property the target frame's tag leaves
+  unmentioned. Gains: `nav/{ratio, ratio2, morphShape, matrix}`, and
+  `nav/clipDepth` (outside the near-pass window) rose to
+  `ruffle_matched`.
+
+`stroke1` also passed, from the same session's integer-twips
+quantization of matrix composition and bounds transforms.
+
 ## AVM2 half — `localconnection` + `encoding1` (2026-07-29, CI `30505002399`)
 
 `localconnection` (3/12) passes as **net/socket tranche 6** (`34171042f`): the

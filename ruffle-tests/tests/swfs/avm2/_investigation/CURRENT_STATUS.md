@@ -1,6 +1,35 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-30 — **filters arc CLOSED** (F1 + F2 shipped, F3
+Last updated: 2026-07-30 — **near-pass polish sweep session 2** (buckets
+B3 + B4 and two riders; `SWFRecompDocs/plans/polish-sweep-arc.md` §4; CI
+`30583810264` graphics/full green). Corpus-wide **+21, zero regressions,
+zero other status moves**; this suite **1026 → 1035 / 1221 (84.8%)**,
+corpus **4062 / 4421 (91.9%)**. Prediction was +16.
+
+Nine avm2 gains, from four unrelated mechanisms: `hitTestPoint` gained its
+`shapeFlag` arm, its on-stage gate and Flash's root-relative coordinate
+rule (`displayobject_hittestpoint`, `..._root`, `movieclip_hittest`);
+SimpleButton gained bounds from its current state child (`button_bounds`,
+`button_hittest`); `getObjectsUnderPoint` and
+`areInaccessibleObjectsUnderPoint` now exist; and `scrollRect` became
+real storage with a bounds override — it had been SHARING its accessors
+with `scale9Grid`. `blendMode`'s setter now validates
+(`blend_mode_null`), and `tab_ordering_arrows` — the input arc's last
+open test — fell to the integer-twips quantization
+(`mat_mul` / `rect_union_xform` now round the f32 rotate/scale product
+half-to-even into a whole twip before adding the translation, as Ruffle
+does everywhere).
+
+Two riders landed with no corpus delta but real value: the AVM2
+recompiler now decodes `DefineBits`/`JPEG2`/`3`/`4` characters (reusing
+the AVM1 recompiler's stb_image path), and a getter/setter pair's two
+halves may now be declared by different classes — a half-override used to
+run bound to the wrong class, which is how away3d's
+`super.implicitPartition` resolved past its own declarer. Both close
+blockers in
+`SWFRecompDocs/plans/uncaught-error-worklist.md` §3/§6.
+
+Previously: 2026-07-30 — **filters arc CLOSED** (F1 + F2 shipped, F3
 measured and not landed; `SWFRecompDocs/plans/filters-arc.md` §6; CI
 `30555976332` graphics/full green). Corpus-wide **+16, zero regressions,
 zero other status moves**; this suite **1006 → 1019 / 1221 (83.5%)**,

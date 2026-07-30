@@ -215,6 +215,33 @@ diffs, so it can flip without crossing the pass/fail line. Read the
 "OTHER STATUS MOVES" line, not just regressions, after any
 message-formatting change.
 
+### Session 2 — the two medium buckets, plus two riders
+
+Baseline `cbdddd750` (corpus 4041/4421). Predictions were re-made from
+this session's own reading of the diffs, not carried over from §1.
+
+| Batch | Commit | Bucket | Predicted | Actual (local) | Notes |
+|---|---|---|---|---|---|
+| 5 | `f1a80bdc8` | B3 timeline/nav PlaceObject state + rewind recreate | +9 of 10 | **+9 (+1)** | `nav/filters` had already been closed by the filters arc; `blendmode_3` already passed. `nav/clipDepth`, outside the window, rose to `ruffle_matched` |
+| 6 | `92ca512ed` | B4 hit-test + interactive bounds | +7 of 8 | **+12** | 4 mechanisms, not 1; the integer-twips quantization carried four unpredicted riders |
+| R1 | `387cfce60` | embedded JPEG characters for AVM2 | 0 corpus | **0 corpus** | closes 2 of the 4 uncaught-error worklist blockers; `define_bits_jpeg2_huge` 2 → 13 lines |
+| R2 | `ff7151c15` | away3d `#1069 implicitPartition` | 0 corpus | **0 corpus** | a real property-resolution bug of ours; see §4 |
+
+**Final: +21, zero regressions, zero other status moves.** CI
+`30583810264` (graphics/`categories=full`) against `cbdddd750`: corpus
+**4041 → 4062 / 4421 (91.9%)**, avm2 1026 → 1035 (+9), from_shumway
+185 → 196 (+11), visual 137 → 138 (+1). Histogram otherwise flat —
+`runtime_error` 7 → 7, `recomp_fail` 1 → 1, and still no segfault /
+timeout / compile_fail bucket at all. No shard was lost.
+
+The 21: the seven `timeline/nav` targets, `blendmode_1`, `blendmode_2`,
+the six B4 targets, `visual/avm2_button_scroll_rect`, and **five CI-only
+riders** — `tab_ordering_arrows` and `flash_media_video_rotation_probe`
+(integer twips, both predicted locally), plus `blend_mode_null` (the new
+`#2008` validation), `from_shumway/stroke1` (integer twips) and
+`timeline/nav/clipDepth`, which was outside the ≤5-line window entirely
+and rose to `ruffle_matched`.
+
 ## 3. Postmortem
 
 ### The one regression pair, and what it taught
@@ -295,3 +322,167 @@ only the expected output.
   output" fixes**, which no amount of added behaviour will reach.
   `mixed_avm/avm1_loads_avm2_doaction` literally expects the inner SWF's
   DoAction *not* to run.
+
+## 4. Session-2 postmortem (B3, B4, and the two riders)
+
+### B3 — the paired tests ARE the specification
+
+The triage's warning was load-bearing and worth generalising. `ratio`
+wants `New object placed on frame 1: true` and `ratio2` wants `false` off
+the *same* test shape; `ratio3` wants `false` again. Diffing the three
+SWFs gives the rule directly — the only thing that changes between them
+is which `ratio` value frame 1's `PlaceObject` carries and which value
+the object is holding when the rewind starts. So the decision is
+`old.ratio == final_placement.ratio`, not anything about direction. Our
+old code compared the placement's ratio against the **constant 0**
+instead of against the object, which is why we got `ratio` and `ratio2`
+wrong in *opposite* directions — a shape that reads like two bugs and is
+one.
+
+Two details of Ruffle's `survives_rewind` are invisible from the diffs
+and have to be read out of the source:
+
+- **The field set depends on the object's TYPE.** A shape/text/morph
+  compares id, ratio, clipDepth, matrix and colour transform; a
+  button/edittext/bitmap/video skips the transform; a MovieClip is
+  decided by its **ratio alone**. Comparing everything for everything
+  (what we did) is not a conservative approximation — it makes a
+  MovieClip that merely moved fail to survive.
+- **A morph shape is re-checked even when it predates the target
+  frame.** Every other child that old is waved through untouched. That
+  single `&& old_object.as_morph_shape().is_none()` is the whole of
+  `nav/morphShape`.
+
+The other half of B3 was simpler than it looked: `colorTransform`,
+`blendMode` and `cacheAsBitmap` were being **parsed and thrown away** by
+the recompiler — `skipCxform`, `if (has_blend) r.u8();`. Same shape as
+the filters arc's finding (a tag field that never reaches the AS
+property), and worth checking for first whenever a "tag state not
+visible" row appears: look at the *parser* before the runtime.
+
+The rewind default-fill (`GotoPlaceObject::new`'s
+`get_or_insert_default` on matrix / cxform / ratio / blend / cache /
+filters) is what makes those properties *reset* on the way back — and it
+is easy to miss because the tag being replayed genuinely has no such
+field. Note what Ruffle purposely omits: name, clipDepth and
+**visibility**, which persists across a rewind unlike everything else.
+
+### B4 — one bucket label, four mechanisms
+
+B4 was filed as "hit-testing and interactive bounds" and predicted +5 of
+8. It is really four unrelated gaps that happen to be graded by the same
+kind of assertion:
+
+1. `hitTestPoint` ignored `shapeFlag` entirely, and the exact-shape walk
+   it needed had *already been written* by the input arc
+   (`hit_test_shape_obj`). The fix was three lines of routing plus the
+   on-stage gate.
+2. `hitTestPoint`'s coordinates are **root-relative for the player's own
+   root** and stage-relative everywhere else. Nothing about the failing
+   lines says so; it comes out of Ruffle's `is_player_root` branch.
+3. SimpleButton had no bounds at all, because its state children are not
+   in the render list.
+4. `scrollRect` was a stub, and — the part that would have bitten a
+   careless fix — it **shared its accessors with `scale9Grid`**, so
+   making it real would silently have made a `scale9Grid` assignment
+   resize the object.
+
+**The lesson to carry: a bucket label that names a SYMPTOM ("hit
+testing") predicts nothing about effort.** This is the same trap as
+`worklist-labels-name-symptoms-not-owners`, one level up: there, a
+worklist row named a symptom rather than an owner; here, a whole bucket
+did. B3 by contrast was one family and landed exactly on prediction.
+
+### The integer-twips quantization, finally taken
+
+`ruffle-geometry-is-integer-twips` had recorded "still open: the
+DisplayObject property getters return unquantized geometry… quantizing
+them is corpus-wide and wants its own scoped item", and named
+`avm2/tab_ordering_arrows` as the sole test blocked on it. It turned out
+to be **two functions**: `mat_mul` and `rect_union_xform` (`mat_invert`
+already did it). Ruffle rounds the f32 rotate/scale product half-to-even
+into an i32 twip *before* adding the already-integral translation, at
+every matrix compose and every `Matrix * Point`. Doing the same made
+`width` read back `21` instead of `20.999999046325684`, which is what
+`tab_ordering_arrows` had been failing on, and carried
+`flash_media_video_rotation_probe` and `localconnection` with it.
+
+**It was corpus-wide but not risky, for a reason worth stating:** the
+expected outputs come from Flash, which is *also* integer twips, so
+quantizing can only move us toward the oracle. 176 content-grepped
+canaries across the bounds / hit-test / focus / transform families
+showed zero regressions and zero status losses, and `bounds_mode` gained
+20 matching lines. When a memory says "corpus-wide, wants its own scoped
+item", check whether the *change* is corpus-wide or only its *blast
+radius* — those are different, and only the first is expensive.
+
+### Rider 1 — the fix was already in the other recompiler
+
+The uncaught-error worklist recorded "embedded JPEG assets for AVM2" as a
+residual blocker needing "a decode hop". In fact the **AVM1 tag
+recompiler has decoded DefineBits/JPEG2/3/4 with stb_image since
+forever**, including the two SWF quirks that make raw stb refuse the data
+(the spurious `FF D9 FF D8` Flash's exporter leaves in the stream, and
+the stripped trailing EOI). Hoisting three static helpers into a shared
+header and writing ~90 lines over them was the whole job.
+
+Generalisation: **before pricing a recompiler feature, check whether the
+OTHER recompiler already has it.** The two paths (`swf.cpp` for AVM1
+tags, `abc/abc_timeline.cpp` for AVM2 characters) parse the same tag
+stream and have drifted apart feature by feature; `abc_timeline.cpp` is
+the younger one and is missing things `swf.cpp` solved years ago. The
+same check is worth making for the other named blocker, name-only font
+characters.
+
+Corpus delta is zero, as predicted — `stage3d_raytrace` and
+`stage3d_texture` have empty expected output and already "passed" while
+throwing #1009 on stderr. The value is that two of the worklist's four
+blockers are closed, and any AVM2 game with a JPEG asset now renders it.
+
+### Rider 2 — a getter/setter pair is TWO declarations
+
+away3d's `#1069 implicitPartition` was a genuine property-resolution bug:
+`Entity` overrides only the **setter** of the inherited
+`arcane::implicitPartition` and calls `super.implicitPartition = value`
+inside it. Our vtable kept one `defining_class` per property, and the
+setter-merge path updated the method pointer without it — so the
+overriding setter ran bound to `ObjectContainer3D`, and `super` resolved
+to `Object3D`, which does not declare the property.
+
+**AS3 lets the two halves of an accessor be declared by different
+classes.** Anything that stores "the class that declared this property"
+as a single field is wrong for a half-override, in both directions (a
+getter-only override must not re-bind the setter it inherited either).
+
+Two method notes from finding it:
+
+- The `#1069` did **not** come from `getproperty_common`, which is where
+  a "property not found" bug obviously lives. It came from
+  `avm2_op_setsuper`. An `AVM2_DEBUG_1069` print at the site that
+  actually threw took two minutes and pointed straight at
+  `bound=ObjectContainer3D super=Object3D`, which named the bug outright.
+  For an error thrown from N sites, instrument before reasoning.
+- The demo is a **chain** of gaps, not one: past `#1069` it hit `#1074`
+  on `ContextMenu.customItems` (declared `public var` in AS3, so a
+  read-only accessor was simply wrong — now a real per-instance Array),
+  and past that a `#1009` on a null `.width`, which is Stage3D-side and
+  is recorded in the worklist rather than chased here. A demo SWF is a
+  *sequence* of one-line blockers; each fix buys the next one, and the
+  right stopping point is where the next cause changes subsystem.
+
+### Prediction accuracy, session 2
+
++21 against +16 predicted, and every unit of the overshoot came from
+**one** change — the integer-twips quantization, which is a *shared
+mechanism* and therefore overshoots by the same rule
+`shared-mechanism-fixes-overshoot-estimates` already records. The
+per-bucket predictions themselves were good (B3 exactly right; B4's
++7-of-8 target list was right and the extra came from the rider).
+
+Both CI-only riders that surprised us were **outside the ≤5-line
+near-pass window** — `blend_mode_null`, `from_shumway/stroke1`,
+`timeline/nav/clipDepth` — which is the same thing session 1 saw with
+`cpool_index_invalid_bytecode_1`. **The near-pass candidate list is a
+lower bound on a batch's yield, never an upper one:** it is filtered by
+line gap, and a mechanism fix does not care how many lines a test was
+missing.

@@ -155,14 +155,30 @@ version-gated `is_size_valid` limits apply.
 Two causes are genuinely bigger than this worklist and are recorded here
 rather than bodged:
 
-- **`stage3d_raytrace`, `stage3d_texture`** — `#1009` on a null
+- ~~**`stage3d_raytrace`, `stage3d_texture`** — `#1009` on a null
   `bitmapData`. Root cause found: the recompiler registers
   `DefineBits`/`JPEG2`/`JPEG3`/`JPEG4` as characters but emits **no**
   `BitmapAsset` for them (only `DefineBitsLossless{,2}` gets pixel data,
   `abc_timeline.cpp` ~1313). So every AVM2 movie with a JPEG-embedded asset
   sees `bitmapData == null`. Fixing it is an embedded-JPEG-assets feature
   (recompiler-side, plus a decode hop — `image_decode.c` already exists
-  runtime-side), not a worklist item.
+  runtime-side), not a worklist item.~~
+  **CLOSED 2026-07-30, `387cfce60`** (polish-sweep session 2, rider 1). It
+  did not need a runtime decode hop at all: the **AVM1 tag recompiler had
+  already been decoding these tags with stb_image**, including the two SWF
+  quirks that make raw stb refuse the data (Flash's spurious `FF D9 FF D8`
+  and the stripped trailing EOI). The three helpers moved to
+  `SWFRecomp/include/jpeg_helpers.hpp` and `abc_timeline.cpp` gained
+  `decodeJpegCharacter` over them — JPEGTables prepended for a plain
+  DefineBits, JPEG3/4's zlib alpha plane applied, PNG/GIF-in-JPEG2
+  handled, and the character's bounds taken from the decoded size.
+  `stage3d_raytrace` now carries six 512×512 assets, `stage3d_texture`
+  one; `visual/define_bits_jpeg2_huge` went 2 → 13 of 19 matching lines
+  (its remainder is the RUNTIME Loader decode of two huge JPEGs, a
+  different path). **Method note for the font blocker below: check
+  `swf.cpp` before pricing anything in `abc_timeline.cpp` — the AVM2
+  character scanner is the younger of the two and is missing things the
+  AVM1 one solved years ago.**
 - **`visual/definefont4`** — needs the whole Text Layout Framework
   (`ElementFormat`, `TextBlock`, `TextElement`, `GroupElement`, `TextLine`).
   The SWF embeds all of TLF; the twelve constant bags added in bucket A get
@@ -273,3 +289,41 @@ the 22 uncaught-error signatures.
 JPEG assets for AVM2 (`stage3d_raytrace`, `stage3d_texture`), the Text
 Layout Framework (`visual/definefont4`), and away3d's #1069
 `implicitPartition`. Four tests, three causes.
+
+## 6. Update — polish-sweep session 2 (2026-07-30) closed two of the three
+
+Two of the three causes above are now fixed, both as riders of the
+near-pass polish sweep (`SWFRecompDocs/plans/polish-sweep-arc.md` §4):
+
+- **Embedded JPEG assets** — `387cfce60`, see the struck-through §3 entry.
+- **away3d `#1069 implicitPartition`** — `ff7151c15`. It was a real
+  property-resolution bug of ours, exactly as suspected, and a
+  generalisable one: **AS3 lets the two halves of a getter/setter pair be
+  declared by DIFFERENT classes.** `Entity` overrides only the setter of
+  the inherited `arcane::implicitPartition` and calls
+  `super.implicitPartition = value`; our vtable kept a single
+  `defining_class` per property and the setter-merge path never updated
+  it, so the overriding setter ran bound to `ObjectContainer3D` and
+  `super` resolved past it to `Object3D`. Each half now carries its own
+  binding (`setter_defining_class` / `setter_scope`).
+  Finding it needed instrumentation rather than reasoning: the throw came
+  from `avm2_op_setsuper`, **not** from `getproperty_common` where a
+  "property not found" bug obviously lives.
+
+**The away3d demo is a CHAIN, and the next link is named here rather than
+chased.** Past `#1069` it hit `#1074` on `ContextMenu.customItems`
+(declared `public var` in AS3, so our read-only accessor was simply
+wrong — now a real per-instance Array, same commit), and past that it
+dies on:
+
+> `TypeError: Error #1009: Cannot access a property or method of a null
+> object reference. (accessing field: width)`
+
+which is Stage3D-side (the demo is a Stage3D app) and belongs to whoever
+picks up the remaining 3D surface — not to this worklist and not to a
+polish batch.
+
+So the trace's blocker list is now **two tests, two causes**:
+`visual/definefont4` (Text Layout Framework) and
+`away3d_advanced_shallow_water_demo` (the `#1009` above). The re-land
+itself still measures +2/−5 on its own until both are gone.
