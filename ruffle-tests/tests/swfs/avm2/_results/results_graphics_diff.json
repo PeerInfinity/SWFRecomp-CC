@@ -1,31 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-30T01:47:24.771467+00:00",
-    "old_git_sha": "34171042fc78b0ad280e3dc5ffa72fecb46e7361",
-    "new_timestamp": "2026-07-30T03:40:10.829765+00:00",
-    "new_git_sha": "dfbbfc1afa81ec6b773ed9fc5651c48b3e08cb92",
+    "old_timestamp": "2026-07-30T03:40:10.829765+00:00",
+    "old_git_sha": "dfbbfc1afa81ec6b773ed9fc5651c48b3e08cb92",
+    "new_timestamp": "2026-07-30T05:13:12.427417+00:00",
+    "new_git_sha": "e4859db87771c1135792506194fc00b17e08a8cb",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 934,
+    "old_pass": 946,
     "old_ruffle_matched": 26,
-    "old_effective_pass": 960,
+    "old_effective_pass": 972,
     "old_total": 1221,
-    "old_pass_rate": 76.5,
-    "new_pass": 946,
+    "old_pass_rate": 77.5,
+    "new_pass": 954,
     "new_ruffle_matched": 26,
-    "new_effective_pass": 972,
+    "new_effective_pass": 980,
     "new_total": 1221,
-    "new_pass_rate": 77.5,
-    "old_mismatched_lines": 43273,
-    "new_mismatched_lines": 42859,
+    "new_pass_rate": 78.1,
+    "old_mismatched_lines": 42859,
+    "new_mismatched_lines": 40449,
     "increased_mismatches": 0,
-    "decreased_mismatches": 414,
-    "newly_passing": 12,
+    "decreased_mismatches": 2410,
+    "newly_passing": 8,
     "newly_failing": 0,
-    "status_changed": 12,
-    "unchanged": 1199,
+    "status_changed": 8,
+    "unchanged": 1189,
     "added": 0,
     "removed": 0
   },
@@ -36,12 +36,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 258,
+        "actual_lines": 264,
         "expected_lines": 2569,
         "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 264,
+        "actual_lines": 300,
         "expected_lines": 2569,
         "matching_lines": 2
       }
@@ -52,12 +52,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 258,
+        "actual_lines": 264,
         "expected_lines": 2593,
         "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 264,
+        "actual_lines": 300,
         "expected_lines": 2593,
         "matching_lines": 2
       }
@@ -68,12 +68,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 258,
+        "actual_lines": 264,
         "expected_lines": 2593,
         "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 264,
+        "actual_lines": 300,
         "expected_lines": 2593,
         "matching_lines": 2
       }
@@ -84,12 +84,12 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 258,
+        "actual_lines": 264,
         "expected_lines": 2671,
         "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 264,
+        "actual_lines": 300,
         "expected_lines": 2671,
         "matching_lines": 2
       }
@@ -100,14 +100,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 258,
+        "actual_lines": 264,
         "expected_lines": 2936,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 264,
+        "actual_lines": 300,
         "expected_lines": 2936,
-        "matching_lines": 0
+        "matching_lines": 1
       }
     },
     {
@@ -116,169 +116,121 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 258,
-        "expected_lines": 1959,
-        "matching_lines": 2
-      },
-      "new_lines": {
         "actual_lines": 264,
         "expected_lines": 1959,
         "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 300,
+        "expected_lines": 1959,
+        "matching_lines": 2
       }
     },
     {
-      "test": "all_classes/display3D/swf12",
+      "test": "pixelbender_ceil",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 18,
-        "expected_lines": 61,
-        "matching_lines": 1
+        "actual_lines": 16,
+        "expected_lines": 77,
+        "matching_lines": 5
       },
       "new_lines": {
-        "actual_lines": 109,
-        "expected_lines": 61,
-        "matching_lines": 1
+        "actual_lines": 77,
+        "expected_lines": 77,
+        "matching_lines": 25
       }
     },
     {
-      "test": "all_classes/display3D/swf13",
+      "test": "pixelbender_conditional",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 18,
-        "expected_lines": 326,
+        "actual_lines": 0,
+        "expected_lines": 138,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 109,
-        "expected_lines": 326,
-        "matching_lines": 0
+        "actual_lines": 138,
+        "expected_lines": 138,
+        "matching_lines": 77
       }
     },
     {
-      "test": "all_classes/display3D/swf30",
+      "test": "pixelbender_conversions",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 18,
-        "expected_lines": 412,
-        "matching_lines": 0
+        "actual_lines": 1,
+        "expected_lines": 270,
+        "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 109,
-        "expected_lines": 412,
-        "matching_lines": 1
+        "actual_lines": 270,
+        "expected_lines": 270,
+        "matching_lines": 184
       }
     },
     {
-      "test": "context3d_creation",
+      "test": "pixelbender_dithering",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
         "actual_lines": 0,
-        "expected_lines": 9,
+        "expected_lines": 8,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
       }
     },
     {
-      "test": "matrix3d",
+      "test": "pixelbender_div",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 36,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 24
+      }
+    },
+    {
+      "test": "pixelbender_effect_glassDisplace_shaderfilter",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 4,
+        "matching_lines": 0
+      },
+      "new_lines": {
         "actual_lines": 2,
-        "expected_lines": 57,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 22,
-        "expected_lines": 57,
-        "matching_lines": 19
+        "expected_lines": 4,
+        "matching_lines": 2
       }
     },
     {
-      "test": "matrix3d_invert",
+      "test": "pixelbender_eof",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 18,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 18
-      }
-    },
-    {
-      "test": "stage3d_agal_upload_errors",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 66,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 66,
-        "expected_lines": 66,
-        "matching_lines": 66
-      }
-    },
-    {
-      "test": "stage3d_blend",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 81,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 81,
-        "expected_lines": 81,
-        "matching_lines": 81
-      }
-    },
-    {
-      "test": "stage3d_context3d_string_args",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 158,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 158,
-        "expected_lines": 158,
-        "matching_lines": 158
-      }
-    },
-    {
-      "test": "stage3d_errors",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 3,
         "expected_lines": 7,
-        "matching_lines": 0
+        "matching_lines": 1
       },
       "new_lines": {
         "actual_lines": 7,
@@ -287,28 +239,76 @@
       }
     },
     {
-      "test": "stage3d_errors_atf",
+      "test": "pixelbender_input",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 3,
-        "matching_lines": 0
+        "actual_lines": 4,
+        "expected_lines": 103,
+        "matching_lines": 4
       },
       "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
+        "actual_lines": 103,
+        "expected_lines": 103,
+        "matching_lines": 63
       }
     },
     {
-      "test": "stage3d_errors_swf_29",
+      "test": "pixelbender_logicalnot",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 20,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "pixelbender_malformed_data",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 190,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 176,
+        "expected_lines": 190,
+        "matching_lines": 37
+      }
+    },
+    {
+      "test": "pixelbender_multiple_out_params",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "pixelbender_no_out_param",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 6,
         "matching_lines": 0
       },
@@ -319,67 +319,227 @@
       }
     },
     {
-      "test": "stage3d_multistage_triangle",
+      "test": "pixelbender_outputs",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 3,
+        "actual_lines": 5,
+        "expected_lines": 13,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "stage3d_program_constants_invalid_input",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 21,
+        "actual_lines": 15,
+        "expected_lines": 13,
         "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
       }
     },
     {
-      "test": "stage3d_x_y",
+      "test": "pixelbender_padding_bytes",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 0,
+        "actual_lines": 66,
         "expected_lines": 22,
         "matching_lines": 0
       },
       "new_lines": {
         "actual_lines": 22,
         "expected_lines": 22,
-        "matching_lines": 22
+        "matching_lines": 0
       }
     },
     {
-      "test": "stage_stage3Ds_vector",
+      "test": "pixelbender_param_qualifier",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 256,
+        "expected_lines": 512,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 512,
+        "expected_lines": 512,
+        "matching_lines": 512
+      }
+    },
+    {
+      "test": "pixelbender_parameters",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1563,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 1563,
+        "expected_lines": 1563,
+        "matching_lines": 1058
+      }
+    },
+    {
+      "test": "pixelbender_parameters_bool",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 240,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 240,
+        "expected_lines": 240,
+        "matching_lines": 216
+      }
+    },
+    {
+      "test": "pixelbender_parameters_int_vs_bool",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 54,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 54,
+        "expected_lines": 54,
+        "matching_lines": 36
+      }
+    },
+    {
+      "test": "pixelbender_parse_errors",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "pixelbender_rsqrt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 24,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 24,
+        "expected_lines": 24,
+        "matching_lines": 16
+      }
+    },
+    {
+      "test": "pixelbender_select_kinds",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "pixelbender_shaderdata",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
         "actual_lines": 0,
-        "expected_lines": 1,
+        "expected_lines": 49,
         "matching_lines": 0
       },
       "new_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 49
+      }
+    },
+    {
+      "test": "pixelbender_shaderdata_setter",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 99,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 99,
+        "expected_lines": 99,
+        "matching_lines": 67
+      }
+    },
+    {
+      "test": "pixelbender_sign",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 16,
+        "expected_lines": 60,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 26
+      }
+    },
+    {
+      "test": "pixelbender_vector_output",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
         "actual_lines": 1,
-        "expected_lines": 1,
+        "expected_lines": 11,
         "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 11,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "shaderparameter_value",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 4,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
       }
     }
   ]

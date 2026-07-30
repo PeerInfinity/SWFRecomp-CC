@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-30T01:47:24.890246+00:00",
-    "old_git_sha": "34171042fc78b0ad280e3dc5ffa72fecb46e7361",
-    "new_timestamp": "2026-07-30T03:40:10.956031+00:00",
-    "new_git_sha": "dfbbfc1afa81ec6b773ed9fc5651c48b3e08cb92",
+    "old_timestamp": "2026-07-30T03:40:10.956031+00:00",
+    "old_git_sha": "dfbbfc1afa81ec6b773ed9fc5651c48b3e08cb92",
+    "new_timestamp": "2026-07-30T05:13:12.556512+00:00",
+    "new_git_sha": "e4859db87771c1135792506194fc00b17e08a8cb",
     "partial": false,
     "same_commit": false
   },
@@ -18,49 +18,16 @@
     "new_effective_pass": 183,
     "new_total": 229,
     "new_pass_rate": 74.7,
-    "old_mismatched_lines": 838,
+    "old_mismatched_lines": 829,
     "new_mismatched_lines": 829,
     "increased_mismatches": 0,
-    "decreased_mismatches": 9,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 227,
+    "unchanged": 229,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm2/flash/geom/matrix3d/Matrix3DClass",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 56,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 56,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "avm2/flash/geom/matrix3d/TransformBasics",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 13,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 13,
-        "matching_lines": 5
-      }
-    }
-  ]
+  "changes": []
 }
