@@ -1,6 +1,6 @@
 # Uncaught-error worklist — closing F3
 
-**Status**: IN PROGRESS (this session, 2026-07-30). Continues
+**Status**: **CLOSED 2026-07-30** — +7, zero regressions (CI `30568586764`). Continues
 `filters-arc.md` §6 "F3 — NOT LANDED", whose 22-test per-cause table is the
 worklist. That section stays as the historical record; this doc is the
 close-out.
@@ -250,3 +250,26 @@ worth recording: Ruffle traces the same line, so its reference output
 already contains it. That is independent confirmation the change is
 behaviourally right — and the reason it can only ever cost `pass` tests,
 never `ruffle_matched` ones.
+
+## 5. Confirming run — CI `30568586764` (graphics/full, baseline `b95ca09d7`)
+
+**+7 effective, ZERO regressions, histogram flat.** Corpus 4034 -> 4041 of
+4421 (91.4%); avm2 1019 -> 1026, every other suite unchanged.
+`output_mismatch` 379 -> 372, `ruffle_matched` 241 -> 241, `runtime_error`
+7 -> 7, `recomp_fail` 1 -> 1, and no segfault / timeout / compile_fail
+bucket appears on either side.
+
+The seven: `vector3d`, `utils3d`, `matrix3d`, `matrix3d_compose`,
+`perspective_projection_basic`, `flash_media_video_constructor`,
+`rectangle`.
+
+Against a prediction of "+6 to +8 from the census riders, 0 from the 22
+worklist tests themselves" this is dead on — and the framing in §0 is why
+the prediction was possible at all. The worklist tests contributed exactly
+what they were predicted to contribute: nothing, plus the removal of 18 of
+the 22 uncaught-error signatures.
+
+**Left for the next attempt at the trace** (§3 for root causes): embedded
+JPEG assets for AVM2 (`stage3d_raytrace`, `stage3d_texture`), the Text
+Layout Framework (`visual/definefont4`), and away3d's #1069
+`implicitPartition`. Four tests, three causes.
