@@ -4279,6 +4279,15 @@ typedef struct Avm2StyleSheetExt
 
 static Avm2Class* g_stylesheet_class;
 
+// flash.filters.BitmapFilter shell — shared with avm2_pixelbender.c's
+// ShaderFilter through the accessor (avm2_builtin_class always mints, so a
+// subclass registered elsewhere must not re-register the super).
+static Avm2Class* g_bitmapfilter_class;
+Avm2Class* avm2_filters_bitmapfilter_class(void)
+{
+	return g_bitmapfilter_class;
+}
+
 static Avm2StyleSheetExt* stylesheet_ext_of(Avm2Object* obj)
 {
 	if (obj == NULL || obj->native_ext == NULL || g_stylesheet_class == NULL)
@@ -6131,6 +6140,7 @@ void avm2_register_text(Avm2Context* ctx)
 		Avm2Class* f = avm2_builtin_class(ctx, "flash.filters",
 		                                  "BitmapFilter",
 		                                  ctx->builtins.object_class);
+		g_bitmapfilter_class = f;
 		Avm2Class* ds = avm2_builtin_class(ctx, "flash.filters",
 		                                   "DropShadowFilter", f);
 		(void) ds;

@@ -2991,6 +2991,10 @@ void avm2_globals_init(Avm2Context* ctx)
 	// getter on the Stage class and takes over Matrix3D from it.
 	avm2_register_stage3d(ctx);
 
+	// PixelBender surface (avm2_pixelbender.c — shader/3d arc tranche P1).
+	// After text: ShaderFilter extends the BitmapFilter shell minted there.
+	avm2_register_pixelbender(ctx);
+
 	// flash.utils.Timer (avm2_display.c) + flash.media Sound family
 	// (avm2_media.c) — Stage 10. After events (Timer extends EventDispatcher)
 	// and display (Sound.play returns a SoundChannel display-independent obj).

@@ -675,6 +675,14 @@ Avm2Object* avm2_stage3d_at(Avm2Context* ctx, uint32_t index);
 void avm2_stage3d_check_requested(Avm2Context* ctx);
 // flash.geom.Vector3D, owned by avm2_display.c (see the note there).
 Avm2Class* avm2_geom_vector3d_class(void);
+// PixelBender: the PBJ parser + flash.display Shader/ShaderData/
+// ShaderParameter/ShaderInput/ShaderJob + flash.filters.ShaderFilter
+// (avm2_pixelbender.c, shader/3d arc tranche P1). Runs AFTER
+// avm2_register_text (ShaderFilter extends its BitmapFilter shell).
+void avm2_register_pixelbender(Avm2Context* ctx);
+// flash.filters.BitmapFilter shell, owned by avm2_text.c —
+// avm2_builtin_class always mints, so subclasses share it via this accessor.
+Avm2Class* avm2_filters_bitmapfilter_class(void);
 // Drain every NetConnection's queued call()s into one Flash Remoting packet per
 // connection, log the fetch, and dispatch the scripted response. Called once per
 // tick from avm2_display_run_tick at the loader/executor drain point.
