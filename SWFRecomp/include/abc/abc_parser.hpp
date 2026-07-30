@@ -229,6 +229,7 @@ namespace abc
 		u32 arg1 = 0;      // first u30 operand (index / register / num_args / line)
 		u32 arg2 = 0;      // second u30 operand (num_args / index_register)
 		s32 offset = 0;    // s24 branch offset / LookupSwitch default offset
+		u32 code_offset = 0;  // byte offset of this op within the method body
 		u8 byte_arg = 0;   // GetScopeObject index / Debug register / PushByte value
 		bool bool_arg = false;              // Debug is_local_register
 		std::vector<s32> case_offsets;      // LookupSwitch cases (count = case_count field + 1)

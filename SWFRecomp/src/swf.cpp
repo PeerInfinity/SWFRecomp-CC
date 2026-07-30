@@ -6307,7 +6307,8 @@ namespace SWFRecomp
 					abc::VerifyError verr;
 					if (!abc::validateAbcFile(abc_file, verr))
 					{
-						fprintf(stderr, "DoABC: validation failed: %s\n", verr.message.c_str());
+						fprintf(stderr, "DoABC: validation failed: %s (%s)\n",
+						        verr.message.c_str(), verr.detail.c_str());
 					}
 					else
 					{

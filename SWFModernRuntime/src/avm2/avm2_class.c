@@ -1255,8 +1255,13 @@ Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
 {
 	if (cls->flags & AVM2_CLASS_FLAG_INTERFACE)
 	{
+		// avmplus names the missing implementation after the interface's own
+		// constructor slot -- `new ITest()` reports "The method ITest() is
+		// not implemented." (construct_interface).
 		avm2_throw_error(ctx, ctx->builtins.verify_error_class,
-		                 "Error #1001: The method undefined is not implemented.");
+		                 "Error #1001: The method %.*s() is not implemented.",
+		                 (int) cls->name.name_len,
+		                 cls->name.name != NULL ? cls->name.name : "undefined");
 	}
 	if (cls->native_construct != NULL)
 	{

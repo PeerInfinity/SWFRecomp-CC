@@ -11,11 +11,180 @@ namespace SWFRecomp
 {
 namespace abc
 {
-	static bool fail(VerifyError& err, int code, const string& msg)
+	// avmplus's text for the codes whose message carries no operands, so the
+	// wording follows from the code alone. Sourced from the same table the
+	// runtime generates from Ruffle's error_messages.rs (avm2_error.c).
+	static const char* avmplusVerifyText(int code)
+	{
+		switch (code)
+		{
+			case 1017: return "Scope stack overflow occurred.";
+			case 1018: return "Scope stack underflow occurred.";
+			case 1020: return "Code cannot fall off the end of a method.";
+			case 1021: return "At least one branch target was not on a valid "
+			                  "instruction in the method.";
+			case 1023: return "Stack overflow occurred.";
+			case 1024: return "Stack underflow occurred.";
+			case 1054: return "Illegal range or target offsets in exception handler.";
+			case 1072: return "Disp_id 0 is illegal.";
+			case 1107: return "The ABC data is corrupt, attempt to read out of bounds.";
+			case 1113: return "OP_newactivation used in method without "
+			                  "NEED_ACTIVATION flag.";
+			case 1124: return "OP_hasnext2 requires object and index to be "
+			                  "distinct registers.";
+			default:   return nullptr;
+		}
+	}
+
+	// The operand-free path: `detail` is ours, the message is avmplus's.
+	static bool fail(VerifyError& err, int code, const string& detail)
 	{
 		err.code = code;
-		err.message = msg;
+		err.detail = detail;
+		const char* text = avmplusVerifyText(code);
+		err.message = "Error #" + to_string(code) + ": "
+		            + (text != nullptr ? string(text) : detail);
 		return false;
+	}
+
+	// The operand-carrying path: the caller has already filled avmplus's
+	// placeholders (`Cpool index %1 is out of range %2.` and friends).
+	static bool failFilled(VerifyError& err, int code, const string& text,
+	                       const string& detail)
+	{
+		err.code = code;
+		err.detail = detail;
+		err.message = "Error #" + to_string(code) + ": " + text;
+		return false;
+	}
+
+	// #1032 "Cpool index %1 is out of range %2." — `limit` is the size of the
+	// pool the index missed, which is what avmplus prints (as3/cpool tests
+	// assert both numbers).
+	static bool failCpool(VerifyError& err, u32 index, size_t limit,
+	                      const string& what)
+	{
+		return failFilled(err, 1032,
+		                  "Cpool index " + to_string(index) + " is out of range "
+		                  + to_string(limit) + ".",
+		                  what + " cpool index " + to_string(index)
+		                  + " out of range " + to_string(limit));
+	}
+
+	// avmplus describeMethod: "Class/method()" for an instance method,
+	// "Class()" for a constructor, "Class$/method()" for a static one,
+	// "global$init()" for a script initializer. The class part is the
+	// multiname rendered as "package::Local", so a package-less class (which
+	// is what every verify_* test uses) prints as its bare local name.
+	static string multinameDisplay(const AbcFile& abc, u32 mn_index)
+	{
+		const auto& MN = abc.pool.multinames;
+		const auto& S = abc.pool.strings;
+		const auto& NS = abc.pool.namespaces;
+		if (mn_index == 0 || mn_index >= MN.size())
+		{
+			return string();
+		}
+		const AbcMultiname& mn = MN[mn_index];
+		string ns_name;
+		if (mn.ns != 0 && mn.ns < NS.size() && NS[mn.ns].name < S.size())
+		{
+			ns_name = S[NS[mn.ns].name];
+		}
+		string local = mn.name < S.size() ? S[mn.name] : string();
+		return ns_name.empty() ? local : ns_name + "::" + local;
+	}
+
+	// The method half of describeMethod is the trait's LOCAL name only --
+	// avmplus prints "Test/dxnsMethod()" even though the trait's QName sits
+	// in the class's protected namespace ("Test:dxnsMethod").
+	static string multinameLocal(const AbcFile& abc, u32 mn_index)
+	{
+		const auto& MN = abc.pool.multinames;
+		const auto& S = abc.pool.strings;
+		if (mn_index == 0 || mn_index >= MN.size())
+		{
+			return string();
+		}
+		u32 si = MN[mn_index].name;
+		return si < S.size() ? S[si] : string();
+	}
+
+	static string methodDisplayName(const AbcFile& abc, u32 method_index)
+	{
+		for (const AbcInstance& inst : abc.instances)
+		{
+			string cls = multinameDisplay(abc, inst.name);
+			if (inst.init_method == method_index)
+			{
+				return cls + "()";
+			}
+			for (const AbcTrait& t : inst.traits)
+			{
+				if (t.method_or_class != method_index)
+				{
+					continue;
+				}
+				if (t.kind == TraitKindType::Method || t.kind == TraitKindType::Function)
+				{
+					return cls + "/" + multinameLocal(abc, t.name) + "()";
+				}
+				if (t.kind == TraitKindType::Getter)
+				{
+					return cls + "/get " + multinameLocal(abc, t.name) + "()";
+				}
+				if (t.kind == TraitKindType::Setter)
+				{
+					return cls + "/set " + multinameLocal(abc, t.name) + "()";
+				}
+			}
+		}
+		for (size_t ci = 0; ci < abc.classes.size(); ++ci)
+		{
+			string cls = ci < abc.instances.size()
+			           ? multinameDisplay(abc, abc.instances[ci].name) : string();
+			if (abc.classes[ci].init_method == method_index)
+			{
+				return cls + "$cinit()";
+			}
+			for (const AbcTrait& t : abc.classes[ci].traits)
+			{
+				if (t.method_or_class == method_index
+				    && (t.kind == TraitKindType::Method
+				        || t.kind == TraitKindType::Function
+				        || t.kind == TraitKindType::Getter
+				        || t.kind == TraitKindType::Setter))
+				{
+					return cls + "$/" + multinameLocal(abc, t.name) + "()";
+				}
+			}
+		}
+		for (const AbcScript& script : abc.scripts)
+		{
+			if (script.init_method == method_index)
+			{
+				return "global$init()";
+			}
+			for (const AbcTrait& t : script.traits)
+			{
+				if (t.method_or_class == method_index
+				    && (t.kind == TraitKindType::Method
+				        || t.kind == TraitKindType::Function))
+				{
+					return multinameLocal(abc, t.name) + "()";
+				}
+			}
+		}
+		if (method_index < abc.methods.size())
+		{
+			u32 si = abc.methods[method_index].name;
+			if (si != 0 && si < abc.pool.strings.size()
+			    && !abc.pool.strings[si].empty())
+			{
+				return abc.pool.strings[si] + "()";
+			}
+		}
+		return "MethodInfo-" + to_string(method_index) + "()";
 	}
 
 	// === whole-file cross-reference validation ===
@@ -330,7 +499,7 @@ namespace abc
 	{
 		if (index == 0 || index >= abc.pool.multinames.size())
 		{
-			fail(err, 1032, "multiname cpool index out of range: " + to_string(index));
+			failCpool(err, index, abc.pool.multinames.size(), "multiname");
 			return false;
 		}
 		out = &abc.pool.multinames[index];
@@ -382,8 +551,11 @@ namespace abc
 		{
 			if (index >= max_locals)
 			{
-				return fail(err, 1025, "access of out-of-range local register "
-				            + to_string(index));
+				return failFilled(err, 1025,
+				                  "An invalid register " + to_string(index)
+				                  + " was accessed.",
+				                  "access of out-of-range local register "
+				                  + to_string(index));
 			}
 			return true;
 		};
@@ -471,7 +643,7 @@ namespace abc
 			{
 				if (raw.arg1 == 0 || raw.arg1 >= pool.ints.size())
 				{
-					return fail(err, 1032, "int cpool index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, pool.ints.size(), "int");
 				}
 				op.op = IrOpcode::PushInt;
 				op.imm = pool.ints[raw.arg1];
@@ -481,7 +653,7 @@ namespace abc
 			{
 				if (raw.arg1 == 0 || raw.arg1 >= pool.uints.size())
 				{
-					return fail(err, 1032, "uint cpool index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, pool.uints.size(), "uint");
 				}
 				op.op = IrOpcode::PushUint;
 				op.arg1 = raw.arg1;
@@ -491,7 +663,7 @@ namespace abc
 			{
 				if (raw.arg1 == 0 || raw.arg1 >= pool.doubles.size())
 				{
-					return fail(err, 1032, "double cpool index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, pool.doubles.size(), "double");
 				}
 				op.op = IrOpcode::PushDouble;
 				op.arg1 = raw.arg1;
@@ -501,7 +673,7 @@ namespace abc
 			{
 				if (raw.arg1 == 0 || raw.arg1 >= pool.strings.size())
 				{
-					return fail(err, 1032, "string cpool index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, pool.strings.size(), "string");
 				}
 				op.op = IrOpcode::PushString;
 				op.arg1 = raw.arg1;
@@ -511,7 +683,7 @@ namespace abc
 			{
 				if (raw.arg1 == 0 || raw.arg1 >= pool.namespaces.size())
 				{
-					return fail(err, 1032, "namespace cpool index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, pool.namespaces.size(), "namespace");
 				}
 				op.op = IrOpcode::PushNamespace;
 				op.arg1 = raw.arg1;
@@ -566,13 +738,19 @@ namespace abc
 				// Order matters: object register first, then index register.
 				if (raw.arg1 >= max_locals)
 				{
-					return fail(err, 1025, "access of out-of-range local register "
-					            + to_string(raw.arg1));
+					return failFilled(err, 1025,
+					                  "An invalid register " + to_string(raw.arg1)
+					                  + " was accessed.",
+					                  "access of out-of-range local register "
+					                  + to_string(raw.arg1));
 				}
 				if (raw.arg2 >= max_locals)
 				{
-					return fail(err, 1025, "access of out-of-range local register "
-					            + to_string(raw.arg2));
+					return failFilled(err, 1025,
+					                  "An invalid register " + to_string(raw.arg2)
+					                  + " was accessed.",
+					                  "access of out-of-range local register "
+					                  + to_string(raw.arg2));
 				}
 				if (raw.arg1 == raw.arg2)
 				{
@@ -598,7 +776,10 @@ namespace abc
 				{
 					return fail(err, 1072, "disp_id 0 is illegal");
 				}
-				return fail(err, 1051, "illegal early binding access");
+				return failFilled(err, 1051,
+					                  "Illegal early binding access to "
+					                  + methodDisplayName(abc, body.method) + ".",
+					                  "illegal early binding access");
 			}
 			case AbcOpcode::CallProperty: return withMultiname(IrOpcode::CallProperty);
 			case AbcOpcode::CallPropLex: return withMultiname(IrOpcode::CallPropLex);
@@ -618,7 +799,11 @@ namespace abc
 			{
 				if (raw.arg1 >= abc.methods.size())
 				{
-					return fail(err, 1032, "method index out of range: " + to_string(raw.arg1));
+					return failFilled(err, 1027,
+					                  "Method_info " + to_string(raw.arg1)
+					                  + " exceeds method_count=" + to_string(abc.methods.size())
+					                  + ".",
+					                  "method index out of range: " + to_string(raw.arg1));
 				}
 				op.op = IrOpcode::CallStatic;
 				op.arg1 = raw.arg1;
@@ -684,7 +869,10 @@ namespace abc
 			{
 				if (raw.arg1 == 0)
 				{
-					return fail(err, 1026, "slot 0 exceeds slot count");
+					return failFilled(err, 1026,
+					                  "Slot 0 exceeds slotCount=0 of "
+					                  + methodDisplayName(abc, body.method) + ".",
+					                  "slot 0 exceeds slot count");
 				}
 				switch (raw.opcode)
 				{
@@ -699,7 +887,10 @@ namespace abc
 			{
 				if (raw.arg1 == 0)
 				{
-					return fail(err, 1026, "slot 0 exceeds slot count");
+					return failFilled(err, 1026,
+					                  "Slot 0 exceeds slotCount=0 of "
+					                  + methodDisplayName(abc, body.method) + ".",
+					                  "slot 0 exceeds slot count");
 				}
 				// Split like Ruffle, but with GetGlobalScope in place of the
 				// runtime-dependent GetScopeObject/GetOuterScope choice.
@@ -756,7 +947,11 @@ namespace abc
 			{
 				if (raw.arg1 >= abc.methods.size())
 				{
-					return fail(err, 1032, "method index out of range: " + to_string(raw.arg1));
+					return failFilled(err, 1027,
+					                  "Method_info " + to_string(raw.arg1)
+					                  + " exceeds method_count=" + to_string(abc.methods.size())
+					                  + ".",
+					                  "method index out of range: " + to_string(raw.arg1));
 				}
 				op.op = IrOpcode::NewFunction;
 				op.arg1 = raw.arg1;
@@ -766,7 +961,11 @@ namespace abc
 			{
 				if (raw.arg1 >= abc.classes.size())
 				{
-					return fail(err, 1032, "class index out of range: " + to_string(raw.arg1));
+					return failFilled(err, 1060,
+					                  "ClassInfo " + to_string(raw.arg1)
+					                  + " exceeds class_count=" + to_string(abc.classes.size())
+					                  + ".",
+					                  "class index out of range: " + to_string(raw.arg1));
 				}
 				op.op = IrOpcode::NewClass;
 				op.arg1 = raw.arg1;
@@ -776,7 +975,7 @@ namespace abc
 			{
 				if (raw.arg1 >= body.exceptions.size())
 				{
-					return fail(err, 1032, "exception index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, body.exceptions.size(), "exception");
 				}
 				op.op = IrOpcode::NewCatch;
 				op.arg1 = raw.arg1;
@@ -944,11 +1143,14 @@ namespace abc
 			{
 				if (!(method.flags & METHOD_SET_DXNS))
 				{
-					return fail(err, 1114, "dxns used in method without SET_DXNS flag");
+					return failFilled(err, 1015,
+					                  "Method " + methodDisplayName(abc, body.method)
+					                  + " cannot set default xml namespace",
+					                  "dxns used in method without SET_DXNS flag");
 				}
 				if (raw.arg1 == 0 || raw.arg1 >= pool.strings.size())
 				{
-					return fail(err, 1032, "string cpool index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, pool.strings.size(), "string");
 				}
 				op.op = IrOpcode::Dxns;
 				op.arg1 = raw.arg1;
@@ -958,7 +1160,10 @@ namespace abc
 			{
 				if (!(method.flags & METHOD_SET_DXNS))
 				{
-					return fail(err, 1114, "dxnslate used in method without SET_DXNS flag");
+					return failFilled(err, 1015,
+					                  "Method " + methodDisplayName(abc, body.method)
+					                  + " cannot set default xml namespace",
+					                  "dxnslate used in method without SET_DXNS flag");
 				}
 				simple(IrOpcode::DxnsLate);
 				break;
@@ -987,7 +1192,7 @@ namespace abc
 			{
 				if (raw.arg1 >= pool.strings.size())
 				{
-					return fail(err, 1032, "string cpool index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, pool.strings.size(), "string");
 				}
 				op.op = IrOpcode::Debug;
 				op.arg1 = raw.arg1;
@@ -999,7 +1204,7 @@ namespace abc
 			{
 				if (raw.arg1 >= pool.strings.size())
 				{
-					return fail(err, 1032, "string cpool index out of range: " + to_string(raw.arg1));
+					return failCpool(err, raw.arg1, pool.strings.size(), "string");
 				}
 				op.op = IrOpcode::DebugFile;
 				op.arg1 = raw.arg1;
@@ -1024,7 +1229,12 @@ namespace abc
 			{
 				// readOp folds GetLocal0-3/SetLocal0-3, so every remaining
 				// opcode is handled above; this is unreachable for valid ops.
-				return fail(err, 1011, "unhandled opcode in translation");
+				return failFilled(err, 1011,
+				                  "Method " + methodDisplayName(abc, body.method)
+				                  + " contained illegal opcode "
+				                  + to_string((unsigned) raw.opcode)
+				                  + " at offset " + to_string(raw.code_offset) + ".",
+				                  "unhandled opcode in translation");
 			}
 		}
 
@@ -1229,7 +1439,7 @@ namespace abc
 	{
 		if (body_index >= abc.method_bodies.size())
 		{
-			return fail(err, 1032, "method body index out of range");
+			return failCpool(err, body_index, abc.method_bodies.size(), "method body");
 		}
 		const AbcMethodBody& body = abc.method_bodies[body_index];
 		const AbcMethod& method = abc.methods[body.method];
@@ -1246,12 +1456,16 @@ namespace abc
 		bool is_variadic = (method.flags & (METHOD_NEED_ARGUMENTS | METHOD_NEED_REST)) != 0;
 		if ((size_t) max_locals < 1 + param_count + (is_variadic ? 1 : 0))
 		{
-			return fail(err, 1025, "access of out-of-range local register "
-			            + to_string(1 + param_count));
+			return failFilled(err, 1025,
+			                  "An invalid register " + to_string(1 + param_count)
+			                  + " was accessed.",
+			                  "access of out-of-range local register "
+			                  + to_string(1 + param_count));
 		}
 		if (body.code.empty())
 		{
-			return fail(err, 1043, "invalid code length 0");
+			return failFilled(err, 1043, "Invalid code_length=0.",
+				                  "invalid code length 0");
 		}
 
 		size_t code_len = body.code.size();
@@ -1294,7 +1508,15 @@ namespace abc
 						// Code flow continued past the end of the method.
 						return fail(err, 1020, "code cannot fall off the end of a method");
 					}
-					return fail(err, 1011, e.what());
+					// The unknown byte is still sitting at the op's start;
+					// avmplus reports it in decimal with its code offset.
+					unsigned bad = prev_pos >= 0 && prev_pos < (s64) code_len
+					             ? (unsigned) body.code[(size_t) prev_pos] : 0u;
+					return failFilled(err, 1011,
+					                  "Method " + methodDisplayName(abc, body.method)
+					                  + " contained illegal opcode " + to_string(bad)
+					                  + " at offset " + to_string(prev_pos) + ".",
+					                  e.what());
 				}
 
 				if (opCanThrowError(raw.opcode))
@@ -1481,7 +1703,10 @@ namespace abc
 				const AbcMultiname& mn = abc.pool.multinames[exc.type_name];
 				if (mn.hasLazyComponent())
 				{
-					return fail(err, 1014, "exception type multiname has runtime components");
+					return failFilled(err, 1014,
+					                  "Class " + multinameDisplay(abc, exc.type_name)
+					                  + " could not be found.",
+					                  "exception type multiname has runtime components");
 				}
 			}
 			if (exc.variable_name != 0)
@@ -1665,17 +1890,21 @@ namespace abc
 				{
 					if (stack_at[entry.idx] != entry.stack)
 					{
-						return fail(err, 1030, "stack depth unbalanced at op "
-						            + to_string(entry.idx) + " ("
-						            + to_string(stack_at[entry.idx]) + " != "
-						            + to_string(entry.stack) + ")");
+						return failFilled(err, 1030,
+						                  "Stack depth is unbalanced. "
+						                  + to_string(stack_at[entry.idx]) + " != "
+						                  + to_string(entry.stack) + ".",
+						                  "stack depth unbalanced at op "
+						                  + to_string(entry.idx));
 					}
 					if (scope_at[entry.idx] != entry.scope)
 					{
-						return fail(err, 1031, "scope depth unbalanced at op "
-						            + to_string(entry.idx) + " ("
-						            + to_string(scope_at[entry.idx]) + " != "
-						            + to_string(entry.scope) + ")");
+						return failFilled(err, 1031,
+						                  "Scope depth is unbalanced. "
+						                  + to_string(scope_at[entry.idx]) + " != "
+						                  + to_string(entry.scope) + ".",
+						                  "scope depth unbalanced at op "
+						                  + to_string(entry.idx));
 					}
 					continue;
 				}
@@ -1710,8 +1939,12 @@ namespace abc
 
 				if (op.op == IrOpcode::GetScopeObject && (s32) op.arg1 >= entry.scope)
 				{
-					return fail(err, 1019, "getscopeobject " + to_string(op.arg1)
-					            + " is out of bounds at op " + to_string(entry.idx));
+					return failFilled(err, 1019,
+					                  "Getscopeobject " + to_string(op.arg1)
+					                  + " is out of bounds.",
+					                  "getscopeobject " + to_string(op.arg1)
+					                  + " is out of bounds at op "
+					                  + to_string(entry.idx));
 				}
 
 				if (new_stack > (s32) out.computed_max_stack)

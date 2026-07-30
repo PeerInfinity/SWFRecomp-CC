@@ -593,6 +593,7 @@ namespace abc
 	RawOp readOp(AbcReader& r)
 	{
 		RawOp op;
+		op.code_offset = (u32) r.pos();
 		u8 byte = r.readU8();
 		op.opcode = (AbcOpcode) byte;
 

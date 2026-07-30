@@ -233,7 +233,16 @@ namespace abc
 	struct VerifyError
 	{
 		int code = 0;
+		// avmplus's own wording, always "Error #<code>: <text>". Both
+		// Error.toString() and the errorID getter are derived from this exact
+		// string at runtime (avm2_error.c parses the "Error #NNNN: " prefix
+		// back out), so scripts that catch a VerifyError see it verbatim.
 		std::string message;
+		// Our internal diagnostic wording, for stderr only. avmplus collapses
+		// whole families of distinct faults onto one message (every branch
+		// problem is #1021, every handler-range problem is #1054), so this is
+		// what you actually want when debugging the recompiler.
+		std::string detail;
 	};
 }
 }
