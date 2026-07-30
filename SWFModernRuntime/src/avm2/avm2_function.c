@@ -377,8 +377,13 @@ void avm2_register_function_builtins(Avm2Context* ctx)
 		cls->prototype_obj = fproto;
 		avm2_gc_pin(fproto);  // GC: class prototypes are immortal (structural)
 	}
-	avm2_builtin_add_method(ctx, cls, "call", fn_call);
-	avm2_builtin_add_method(ctx, cls, "apply", fn_apply);
+	// The declared arities matter: Function.prototype is a real Function
+	// instance, so `Function.prototype.apply.length` resolves `apply`
+	// through the ivtable trait (which shadows the ES3 prototype function),
+	// and it is THIS method ref's param_count that fn_get_length reports.
+	// ecma3/Function/e15_3_4_3_1 pins 2 and e15_3_4_4_1_rt pins 1.
+	avm2_builtin_add_method_n(ctx, cls, "call", fn_call, 1);
+	avm2_builtin_add_method_n(ctx, cls, "apply", fn_apply, 2);
 	avm2_builtin_add_getter(ctx, cls, "length", fn_get_length);
 	// ES3-compat layer on Function.prototype (Ruffle globals/Function.as).
 	avm2_proto_add_function_n(ctx, cls->prototype_obj, "call", fn_call, 1);
