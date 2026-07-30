@@ -52,6 +52,7 @@
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_filters.h>
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
@@ -714,6 +715,9 @@ typedef struct Avm2ShaderJobExt
 typedef struct Avm2ShaderFilterExt
 {
 	Avm2Value shader;
+	// The four extensions the .filters round trip reads back (filters.rs
+	// avm2_to_shader_filter). Order here is left, right, top, bottom.
+	int32_t ext_lrtb[4];
 } Avm2ShaderFilterExt;
 
 static const char* PBJ_TYPE_NAMES[0x11] =
@@ -2162,7 +2166,9 @@ static Avm2ShaderFilterExt* sf_ext(Avm2Activation* act)
 
 static Avm2Value sf_ctor(Avm2Activation* act)
 {
-	sf_ext(act)->shader = (act->argc > 0) ? act->args[0] : avm2_null();
+	Avm2ShaderFilterExt* e = sf_ext(act);
+	e->shader = (act->argc > 0) ? act->args[0] : avm2_null();
+	memset(e->ext_lrtb, 0, sizeof(e->ext_lrtb));
 	return avm2_undefined();
 }
 
@@ -2173,6 +2179,56 @@ static Avm2Value sf_set_shader(Avm2Activation* act)
 {
 	sf_ext(act)->shader = (act->argc > 0) ? act->args[0] : avm2_null();
 	return avm2_undefined();
+}
+
+// leftExtension / rightExtension / topExtension / bottomExtension: plain `int`
+// slots, read back through the .filters round trip.
+#define SF_EXT_ACCESSORS(name, idx) \
+	static Avm2Value sf_get_##name(Avm2Activation* act) \
+	{ return avm2_integer(sf_ext(act)->ext_lrtb[idx]); } \
+	static Avm2Value sf_set_##name(Avm2Activation* act) \
+	{ \
+		sf_ext(act)->ext_lrtb[idx] = act->argc > 0 \
+			? avm2_coerce_to_i32(act->ctx, act->args[0]) : 0; \
+		return avm2_undefined(); \
+	}
+
+SF_EXT_ACCESSORS(left, 0)
+SF_EXT_ACCESSORS(right, 1)
+SF_EXT_ACCESSORS(top, 2)
+SF_EXT_ACCESSORS(bottom, 3)
+
+// --- accessors for the flash.filters conversion layer (avm2_filters.c) ---
+
+Avm2Class* avm2_pixelbender_shaderfilter_class(void)
+{
+	return g_shaderfilter_class;
+}
+
+int avm2_pixelbender_shaderfilter_read(Avm2Object* obj, Avm2Value* shader,
+                                       int32_t* ext_lrtb)
+{
+	if (obj == NULL || obj->native_ext == NULL) return 0;
+	Avm2ShaderFilterExt* e = (Avm2ShaderFilterExt*) obj->native_ext;
+	// The Shader is kept BY IDENTITY: the rebuilt ShaderFilter is a different
+	// object, but `newFilter.shader === oldFilter.shader`.
+	*shader = e->shader;
+	memcpy(ext_lrtb, e->ext_lrtb, sizeof(e->ext_lrtb));
+	return 1;
+}
+
+Avm2Value avm2_pixelbender_shaderfilter_new(Avm2Context* ctx, Avm2Value shader,
+                                            const int32_t* ext_lrtb)
+{
+	if (g_shaderfilter_class == NULL) return avm2_null();
+	Avm2Value args[1] = { shader };
+	Avm2Value v = avm2_class_construct(ctx, g_shaderfilter_class, args, 1);
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj->native_ext != NULL)
+	{
+		Avm2ShaderFilterExt* e = (Avm2ShaderFilterExt*) v.u.obj->native_ext;
+		memcpy(e->ext_lrtb, ext_lrtb, sizeof(e->ext_lrtb));
+	}
+	return v;
 }
 
 // ---------------------------------------------------------------------------
@@ -2275,8 +2331,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 		}
 	}
 
-	// flash.filters.ShaderFilter — extends the BitmapFilter shell minted in
-	// avm2_text.c. avm2_builtin_class always MINTS (never looks up), so the
+	// flash.filters.ShaderFilter — extends the BitmapFilter base minted in
+	// avm2_filters.c. avm2_builtin_class always MINTS (never looks up), so the
 	// super comes through an accessor rather than a re-registration.
 	{
 		Avm2Class* super = avm2_filters_bitmapfilter_class();
@@ -2288,6 +2344,14 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 		sf->instance_init.fn = sf_ctor;
 		sf->instance_init.debug_name = "ShaderFilter";
 		avm2_builtin_add_getset(ctx, sf, "shader", sf_get_shader, sf_set_shader);
+		avm2_builtin_add_getset(ctx, sf, "leftExtension",
+		                       sf_get_left, sf_set_left);
+		avm2_builtin_add_getset(ctx, sf, "rightExtension",
+		                       sf_get_right, sf_set_right);
+		avm2_builtin_add_getset(ctx, sf, "topExtension",
+		                       sf_get_top, sf_set_top);
+		avm2_builtin_add_getset(ctx, sf, "bottomExtension",
+		                       sf_get_bottom, sf_set_bottom);
 	}
 
 	(void) g_shader_class;

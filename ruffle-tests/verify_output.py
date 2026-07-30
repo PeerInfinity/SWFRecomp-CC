@@ -1978,6 +1978,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             "src/avm2/avm2_display.c",
             "src/avm2/avm2_stage3d.c",
             "src/avm2/avm2_pixelbender.c",
+            "src/avm2/avm2_filters.c",
             "src/avm2/avm2_bitmap.c",
             "src/avm2/avm2_cpu_raster.c",
             "src/avm2/avm2_media.c",

@@ -236,6 +236,166 @@ void skipFilterList(ByteReader& r)
 	}
 }
 
+// One parsed SurfaceFilterList entry, in the SWF's own fixed-point encoding
+// (mirrors Avm2TagFilter). The runtime re-derives every AS-visible number from
+// these bits with the same arithmetic an AS-authored filter goes through, so a
+// tag-authored filter and a script-authored one quantize identically.
+struct TagFilterRec
+{
+	uint8_t kind = 0;      // 1=blur 2=dropshadow 3=glow 4=bevel
+	                       // 5=convolution 6=colormatrix 7=gradglow 8=gradbevel
+	int32_t blur_x = 0, blur_y = 0, angle = 0, distance = 0;
+	int16_t strength = 0;
+	uint8_t quality = 0, inner = 0, knockout = 0, on_top = 0, composite = 0;
+	uint32_t color = 0;  uint8_t alpha = 0;
+	uint32_t color2 = 0; uint8_t alpha2 = 0;
+	std::vector<float> cm;             // 20 entries (ColorMatrix)
+	uint8_t conv_cols = 0, conv_rows = 0;
+	std::vector<float> conv_matrix;
+	float divisor = 0.0f, bias = 0.0f;
+	uint8_t preserve_alpha = 0, clamp = 0;
+	std::vector<uint32_t> grad_colors;
+	std::vector<uint8_t> grad_alphas, grad_ratios;
+};
+
+static float readF32(ByteReader& r)
+{
+	uint32_t bits = r.u32();
+	float f;
+	memcpy(&f, &bits, 4);
+	return f;
+}
+
+// RGBA -> packed 0xRRGGBB + separate alpha byte (Ruffle's swf::Color layout).
+static void readRgba(ByteReader& r, uint32_t& rgb, uint8_t& a)
+{
+	uint8_t cr = r.u8(), cg = r.u8(), cb = r.u8();
+	a = r.u8();
+	rgb = ((uint32_t) cr << 16) | ((uint32_t) cg << 8) | cb;
+}
+
+// Full SurfaceFilterList parse (PlaceObject3). Bit layouts follow Ruffle's
+// swf/src/read.rs read_filter + the *FilterFlags constants: DropShadow/Glow
+// keep passes in bits 0-4, Bevel/Gradient in bits 0-3, Blur in bits 3-7.
+void readFilterList(ByteReader& r, std::vector<TagFilterRec>& out)
+{
+	uint32_t n = r.u8();
+	for (uint32_t i = 0; i < n && r.ok(1); i++)
+	{
+		uint8_t id = r.u8();
+		TagFilterRec f;
+		switch (id)
+		{
+			case 0:  // DropShadow
+			{
+				f.kind = 2;
+				readRgba(r, f.color, f.alpha);
+				f.blur_x = (int32_t) r.u32();
+				f.blur_y = (int32_t) r.u32();
+				f.angle = (int32_t) r.u32();
+				f.distance = (int32_t) r.u32();
+				f.strength = (int16_t) r.u16();
+				uint8_t fl = r.u8();
+				f.inner = (fl >> 7) & 1;
+				f.knockout = (fl >> 6) & 1;
+				f.composite = (fl >> 5) & 1;
+				f.quality = fl & 0x1F;
+				break;
+			}
+			case 1:  // Blur
+			{
+				f.kind = 1;
+				f.blur_x = (int32_t) r.u32();
+				f.blur_y = (int32_t) r.u32();
+				f.quality = (uint8_t) ((r.u8() >> 3) & 0x1F);
+				break;
+			}
+			case 2:  // Glow
+			{
+				f.kind = 3;
+				readRgba(r, f.color, f.alpha);
+				f.blur_x = (int32_t) r.u32();
+				f.blur_y = (int32_t) r.u32();
+				f.strength = (int16_t) r.u16();
+				uint8_t fl = r.u8();
+				f.inner = (fl >> 7) & 1;
+				f.knockout = (fl >> 6) & 1;
+				f.composite = (fl >> 5) & 1;
+				f.quality = fl & 0x1F;
+				break;
+			}
+			case 3:  // Bevel — highlight first, then shadow (the spec has it backwards)
+			{
+				f.kind = 4;
+				readRgba(r, f.color2, f.alpha2);
+				readRgba(r, f.color, f.alpha);
+				f.blur_x = (int32_t) r.u32();
+				f.blur_y = (int32_t) r.u32();
+				f.angle = (int32_t) r.u32();
+				f.distance = (int32_t) r.u32();
+				f.strength = (int16_t) r.u16();
+				uint8_t fl = r.u8();
+				f.inner = (fl >> 7) & 1;
+				f.knockout = (fl >> 6) & 1;
+				f.composite = (fl >> 5) & 1;
+				f.on_top = (fl >> 4) & 1;
+				f.quality = fl & 0x0F;
+				break;
+			}
+			case 4:  // GradientGlow
+			case 7:  // GradientBevel
+			{
+				f.kind = (id == 4) ? 7 : 8;
+				uint32_t nc = r.u8();
+				for (uint32_t c = 0; c < nc; c++)
+				{
+					uint32_t rgb; uint8_t a;
+					readRgba(r, rgb, a);
+					f.grad_colors.push_back(rgb);
+					f.grad_alphas.push_back(a);
+				}
+				for (uint32_t c = 0; c < nc; c++) f.grad_ratios.push_back(r.u8());
+				f.blur_x = (int32_t) r.u32();
+				f.blur_y = (int32_t) r.u32();
+				f.angle = (int32_t) r.u32();
+				f.distance = (int32_t) r.u32();
+				f.strength = (int16_t) r.u16();
+				uint8_t fl = r.u8();
+				f.inner = (fl >> 7) & 1;
+				f.knockout = (fl >> 6) & 1;
+				f.composite = (fl >> 5) & 1;
+				f.on_top = (fl >> 4) & 1;
+				f.quality = fl & 0x0F;
+				break;
+			}
+			case 5:  // Convolution
+			{
+				f.kind = 5;
+				f.conv_cols = r.u8();
+				f.conv_rows = r.u8();
+				f.divisor = readF32(r);
+				f.bias = readF32(r);
+				uint32_t entries = (uint32_t) f.conv_cols * f.conv_rows;
+				for (uint32_t e = 0; e < entries && r.ok(4); e++)
+					f.conv_matrix.push_back(readF32(r));
+				readRgba(r, f.color, f.alpha);
+				uint8_t fl = r.u8();
+				f.clamp = (fl >> 1) & 1;
+				f.preserve_alpha = fl & 1;
+				break;
+			}
+			case 6:  // ColorMatrix
+			{
+				f.kind = 6;
+				for (int m = 0; m < 20; m++) f.cm.push_back(readF32(r));
+				break;
+			}
+			default: r.p = r.end; return;   // unknown: bail on this list
+		}
+		if (f.kind != 0) out.push_back(std::move(f));
+	}
+}
+
 // Decode a DefineBitsLossless/2 payload to STRAIGHT RGBA (R,G,B,A per pixel,
 // row-major). Ported from Ruffle render/src/utils.rs decode_define_bits_lossless.
 // `version` is 1 or 2; `format` is the SWF BitmapFormat byte (3 ColorMap8,
@@ -388,6 +548,8 @@ struct TOp
 	bool has_name = false;
 	std::string name;
 	Matrix mtx;
+	bool has_filters = false;
+	std::vector<TagFilterRec> filters;
 };
 
 // Flag bits mirror AVM2_TLF_* in avm2_abc.h.
@@ -400,6 +562,7 @@ enum
 	TLF_HAS_CLIP_DEPTH = 1 << 4,
 	TLF_HAS_RATIO = 1 << 5,
 	TLF_HAS_VISIBLE = 1 << 6,
+	TLF_HAS_FILTERS = 1 << 7,
 };
 
 struct Timeline
@@ -713,7 +876,14 @@ struct Scanner
 		}
 		if (is_po3)
 		{
-			if (has_filters) skipFilterList(r);
+			if (has_filters)
+			{
+				// An empty list is meaningful (it CLEARS the depth's filters),
+				// so the flag rides on the op, not on a non-zero count.
+				readFilterList(r, op.filters);
+				op.has_filters = true;
+				op.flags |= TLF_HAS_FILTERS;
+			}
 			if (has_blend) r.u8();
 			if (has_cache) r.u8();
 			if (has_visible)
@@ -1410,13 +1580,98 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		const Timeline& tl = sc.timelines[t];
 		size_t total_ops = 0;
 		for (auto& f : tl.frames) total_ops += f.size();
-		if (total_ops > 0)
+		// SurfaceFilterList payloads first: each op that carries a non-empty
+		// list gets its own tables, named by (timeline, op index).
 		{
-			out << "static const Avm2TimelineOp tl_" << t << "_ops[] = {\n";
+			size_t op_index = 0;
 			for (auto& f : tl.frames)
 			{
 				for (auto& op : f)
 				{
+					size_t oi = op_index++;
+					if (!op.has_filters || op.filters.empty()) continue;
+					std::string base = "tlf_" + std::to_string(t) + "_"
+					                 + std::to_string(oi);
+					for (size_t fi = 0; fi < op.filters.size(); fi++)
+					{
+						const TagFilterRec& fr = op.filters[fi];
+						std::string sfx = base + "_" + std::to_string(fi);
+						if (!fr.cm.empty())
+						{
+							out << "static const float " << sfx << "_cm[] = {";
+							for (size_t k = 0; k < fr.cm.size(); k++)
+								out << (k ? ", " : " ") << fmtFloat(fr.cm[k]);
+							out << " };\n";
+						}
+						if (!fr.conv_matrix.empty())
+						{
+							out << "static const float " << sfx << "_cv[] = {";
+							for (size_t k = 0; k < fr.conv_matrix.size(); k++)
+								out << (k ? ", " : " ") << fmtFloat(fr.conv_matrix[k]);
+							out << " };\n";
+						}
+						if (!fr.grad_colors.empty())
+						{
+							out << "static const uint32_t " << sfx << "_gc[] = {";
+							for (size_t k = 0; k < fr.grad_colors.size(); k++)
+								out << (k ? ", " : " ") << fr.grad_colors[k] << "u";
+							out << " };\n";
+							out << "static const uint8_t " << sfx << "_ga[] = {";
+							for (size_t k = 0; k < fr.grad_alphas.size(); k++)
+								out << (k ? ", " : " ") << (int) fr.grad_alphas[k];
+							out << " };\n";
+							out << "static const uint8_t " << sfx << "_gr[] = {";
+							for (size_t k = 0; k < fr.grad_ratios.size(); k++)
+								out << (k ? ", " : " ") << (int) fr.grad_ratios[k];
+							out << " };\n";
+						}
+					}
+					out << "static const Avm2TagFilter " << base << "[] = {\n";
+					for (size_t fi = 0; fi < op.filters.size(); fi++)
+					{
+						const TagFilterRec& fr = op.filters[fi];
+						std::string sfx = base + "_" + std::to_string(fi);
+						out << "\t{ " << (int) fr.kind
+						    << ", " << fr.blur_x << ", " << fr.blur_y
+						    << ", " << fr.angle << ", " << fr.distance
+						    << ", " << (int) fr.strength << ", " << (int) fr.quality
+						    << ", " << (int) fr.inner << ", " << (int) fr.knockout
+						    << ", " << (int) fr.on_top << ", " << (int) fr.composite
+						    << ", " << fr.color << "u, " << (int) fr.alpha
+						    << ", " << fr.color2 << "u, " << (int) fr.alpha2
+						    << ", " << (fr.cm.empty() ? std::string("NULL")
+						                              : sfx + "_cm")
+						    << ", " << (int) fr.conv_cols << ", " << (int) fr.conv_rows
+						    << ", " << (fr.conv_matrix.empty() ? std::string("NULL")
+						                                       : sfx + "_cv")
+						    << ", " << fr.conv_matrix.size()
+						    << ", " << fmtFloat(fr.divisor) << ", " << fmtFloat(fr.bias)
+						    << ", " << (int) fr.preserve_alpha << ", " << (int) fr.clamp
+						    << ", " << fr.grad_colors.size()
+						    << ", " << (fr.grad_colors.empty() ? std::string("NULL")
+						                                       : sfx + "_gc")
+						    << ", " << (fr.grad_colors.empty() ? std::string("NULL")
+						                                       : sfx + "_ga")
+						    << ", " << (fr.grad_colors.empty() ? std::string("NULL")
+						                                       : sfx + "_gr")
+						    << " },\n";
+					}
+					out << "};\n";
+				}
+			}
+		}
+		if (total_ops > 0)
+		{
+			out << "static const Avm2TimelineOp tl_" << t << "_ops[] = {\n";
+			size_t op_index = 0;
+			for (auto& f : tl.frames)
+			{
+				for (auto& op : f)
+				{
+					size_t oi = op_index++;
+					std::string flist = (op.has_filters && !op.filters.empty())
+						? ("tlf_" + std::to_string(t) + "_" + std::to_string(oi))
+						: std::string("NULL");
 					out << "\t{ " << (int) op.kind << ", " << (int) op.flags
 					    << ", " << (int) op.visible << ", " << op.char_id
 					    << ", " << op.depth << ", " << op.clip_depth << ", "
@@ -1425,7 +1680,8 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 					                    : std::string("NULL"))
 					    << ", " << fmtFloat(op.mtx.a) << ", " << fmtFloat(op.mtx.b)
 					    << ", " << fmtFloat(op.mtx.c) << ", " << fmtFloat(op.mtx.d)
-					    << ", " << op.mtx.tx << ", " << op.mtx.ty << " },\n";
+					    << ", " << op.mtx.tx << ", " << op.mtx.ty
+					    << ", " << op.filters.size() << ", " << flist << " },\n";
 				}
 			}
 			out << "};\n";

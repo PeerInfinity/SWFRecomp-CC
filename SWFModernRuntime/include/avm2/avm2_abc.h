@@ -214,7 +214,34 @@ enum
 	AVM2_TLF_HAS_CLIP_DEPTH = 1 << 4,
 	AVM2_TLF_HAS_RATIO = 1 << 5,
 	AVM2_TLF_HAS_VISIBLE = 1 << 6,  // PlaceObject3 visible flag present
+	AVM2_TLF_HAS_FILTERS = 1 << 7,  // PlaceObject3 SurfaceFilterList present
 };
+
+// One PlaceObject3 SurfaceFilterList entry, kept in the SWF's own fixed-point
+// encoding so the runtime's AS-facing round trip does the exact same integer
+// math as an AS-authored filter (see avm2_filters.c). `kind` matches
+// Avm2FilterKind 1..8 — a tag list can never carry a displacement-map or
+// shader filter.
+typedef struct Avm2TagFilter
+{
+	uint8_t kind;
+	int32_t blur_x, blur_y;    // Fixed16 bits
+	int32_t angle, distance;   // Fixed16 bits (radians / pixels)
+	int16_t strength;          // Fixed8 bits
+	uint8_t quality;           // passes (0..15)
+	uint8_t inner, knockout, on_top, composite_source;
+	uint32_t color;  uint8_t alpha;    // shadow / glow / convolution default
+	uint32_t color2; uint8_t alpha2;   // bevel highlight
+	const float* cm;                   // 20 entries, ColorMatrix only
+	uint8_t conv_cols, conv_rows;
+	const float* conv_matrix; uint32_t conv_len;
+	float divisor, bias;
+	uint8_t preserve_alpha, clamp;
+	uint8_t grad_count;
+	const uint32_t* grad_colors;
+	const uint8_t* grad_alphas;
+	const uint8_t* grad_ratios;
+} Avm2TagFilter;
 
 typedef struct Avm2TimelineOp
 {
@@ -229,6 +256,10 @@ typedef struct Avm2TimelineOp
 	// Matrix (valid when HAS_MATRIX): scale/rot as f32, translate twips.
 	float mtx_a, mtx_b, mtx_c, mtx_d;
 	int32_t mtx_tx, mtx_ty;
+	// SurfaceFilterList (valid when HAS_FILTERS; an empty list still sets the
+	// flag, which is how a PlaceObject3 CLEARS a depth's filters).
+	uint16_t filter_count;
+	const Avm2TagFilter* filters;
 } Avm2TimelineOp;
 
 typedef struct Avm2FrameLabelData

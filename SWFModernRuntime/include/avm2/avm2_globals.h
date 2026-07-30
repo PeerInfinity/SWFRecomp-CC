@@ -568,6 +568,13 @@ typedef struct Avm2DisplayObjectExt
 	// `loader.contentLoaderInfo === loader.content.loaderInfo` true.
 	// NULL = the main movie, whose objects answer g_root_loader_info.
 	Avm2Object* loader_info;
+
+	// DisplayObject.filters (filters arc F1). Stored as VALUES, never as the
+	// AS objects the script handed us — which is what makes mutating an
+	// assigned filter afterwards a no-op, and every getter call hand back
+	// brand-new objects. A non-empty list also forces cacheAsBitmap on.
+	struct Avm2FilterVal* filters;
+	uint32_t filter_count;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.
@@ -675,14 +682,18 @@ Avm2Object* avm2_stage3d_at(Avm2Context* ctx, uint32_t index);
 void avm2_stage3d_check_requested(Avm2Context* ctx);
 // flash.geom.Vector3D, owned by avm2_display.c (see the note there).
 Avm2Class* avm2_geom_vector3d_class(void);
+// PlaceObject3 SurfaceFilterList -> a display object's stored filter list.
+struct Avm2TagFilter;
+void avm2_display_apply_tag_filters(Avm2Context* ctx, Avm2Object* obj,
+                                    const struct Avm2TagFilter* tags, uint32_t count);
 // PixelBender: the PBJ parser + flash.display Shader/ShaderData/
 // ShaderParameter/ShaderInput/ShaderJob + flash.filters.ShaderFilter
 // (avm2_pixelbender.c, shader/3d arc tranche P1). Runs AFTER
-// avm2_register_text (ShaderFilter extends its BitmapFilter shell).
+// avm2_register_filters (ShaderFilter extends its BitmapFilter base).
 void avm2_register_pixelbender(Avm2Context* ctx);
-// flash.filters.BitmapFilter shell, owned by avm2_text.c —
-// avm2_builtin_class always mints, so subclasses share it via this accessor.
-Avm2Class* avm2_filters_bitmapfilter_class(void);
+// flash.filters (avm2_filters.h): the nine filter classes, the three constant
+// bags, and the .filters conversion layer. avm2_filters.h also declares
+// avm2_filters_bitmapfilter_class(), the accessor ShaderFilter shares.
 // DisplayObject.blendShader's two gates (display_object.rs set_blend_shader):
 // 0 = not a Shader at all, 1 = a Shader with a null `data` (#2007), 2 = usable.
 int avm2_shader_blend_state(Avm2Value v);

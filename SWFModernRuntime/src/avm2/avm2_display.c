@@ -28,6 +28,7 @@
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_cpu_raster.h>
 #include <avm2/avm2_error.h>
+#include <avm2/avm2_filters.h>
 #include <tesselator.h>  // T4 Part B: runtime Graphics tessellation (libtess2)
 #include <memory/heap.h>
 
@@ -1433,6 +1434,19 @@ static void apply_place_object(Avm2Context* ctx, Avm2Object* child,
 	if (op->flags & AVM2_TLF_HAS_RATIO)
 	{
 		ext->ratio = op->ratio;
+	}
+	// SurfaceFilterList. An empty list on a PlaceObject3 is meaningful — it
+	// clears whatever the depth had. So is a fresh (non-move) placement with
+	// no list at all: on a timeline rewind the depth is re-placed from frame
+	// 1, and the object must not keep the filters a later frame gave it
+	// (filter_rewind's "No filter" line). A plain MOVE keeps them.
+	if (op->flags & AVM2_TLF_HAS_FILTERS)
+	{
+		avm2_display_apply_tag_filters(ctx, child, op->filters, op->filter_count);
+	}
+	else if ((op->flags & AVM2_TLF_MOVE) == 0)
+	{
+		avm2_display_apply_tag_filters(ctx, child, NULL, 0);
 	}
 }
 
@@ -3633,15 +3647,109 @@ static Avm2Value do_set_metadata(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// Drop a display object's stored filter list (also the free path for a swept
+// object: each entry may own an out-of-line convolution matrix).
+static void clear_filters(Avm2Context* ctx, Avm2DisplayObjectExt* ext)
+{
+	if (ext->filters == NULL) { ext->filter_count = 0; return; }
+	for (uint32_t i = 0; i < ext->filter_count; i++)
+		avm2_filter_release(ctx, &ext->filters[i]);
+	heap_free(ctx->app, ext->filters);
+	ext->filters = NULL;
+	ext->filter_count = 0;
+}
+
+// Ruffle display_object.rs set_filters + recheck_cache_as_bitmap.
+static void store_filters(Avm2Context* ctx, Avm2DisplayObjectExt* ext,
+                          const Avm2FilterVal* src, uint32_t count)
+{
+	clear_filters(ctx, ext);
+	if (count == 0) return;
+	ext->filters = (Avm2FilterVal*) avm2_alloc(ctx,
+		count * (uint32_t) sizeof(Avm2FilterVal));
+	if (ext->filters == NULL) return;
+	for (uint32_t i = 0; i < count; i++)
+		avm2_filter_copy(ctx, &ext->filters[i], &src[i]);
+	ext->filter_count = count;
+}
+
+// PlaceObject3 SurfaceFilterList -> the object's filter list. The tag already
+// holds the quantized form, so no AS-side conversion is involved.
+void avm2_display_apply_tag_filters(Avm2Context* ctx, Avm2Object* obj,
+                                    const Avm2TagFilter* tags, uint32_t count)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return;
+	clear_filters(ctx, ext);
+	if (count == 0 || tags == NULL) return;
+	ext->filters = (Avm2FilterVal*) avm2_alloc(ctx,
+		count * (uint32_t) sizeof(Avm2FilterVal));
+	if (ext->filters == NULL) return;
+	for (uint32_t i = 0; i < count; i++)
+		avm2_filter_from_tag(&tags[i], &ext->filters[i]);
+	ext->filter_count = count;
+}
+
 static Avm2Value do_get_filters(Avm2Activation* act)
 {
-	// Filters are not implemented: always a fresh empty Array.
-	return avm2_object_value(avm2_array_new(act->ctx, 0));
+	Avm2Context* ctx = act->ctx;
+	Avm2DisplayObjectExt* ext = this_display(act);
+	Avm2Object* arr = avm2_array_new(ctx, 0);
+	if (ext == NULL) return avm2_object_value(arr);
+	// Brand-new objects every call: `o.filters === o.filters` is FALSE, and
+	// `o.filters[0].blurX = 9` cannot reach the stored value.
+	for (uint32_t i = 0; i < ext->filter_count; i++)
+		avm2_array_push(ctx, arr, avm2_filter_to_object(ctx, &ext->filters[i]));
+	return avm2_object_value(arr);
 }
 
 static Avm2Value do_set_filters(Avm2Activation* act)
 {
-	(void) act;
+	Avm2Context* ctx = act->ctx;
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL) return avm2_undefined();
+	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
+	// A non-Object (undefined / null / a number) CLEARS the list, no error.
+	if (v.kind != AVM2_VALUE_OBJECT)
+	{
+		clear_filters(ctx, ext);
+		return avm2_undefined();
+	}
+	Avm2ArrayExt* ae = avm2_array_ext(v.u.obj);
+	// An Object that is not an Array is a silent no-op — the previous list
+	// survives untouched.
+	if (ae == NULL) return avm2_undefined();
+
+	// Convert into a scratch list FIRST: a bad element throws #2005 and the
+	// previous list must be preserved. avm2_throw_error does not return, so
+	// the scratch list is simply abandoned to the collector's free path.
+	uint32_t n = ae->length;
+	Avm2FilterVal* tmp = NULL;
+	uint32_t count = 0;
+	if (n > 0)
+	{
+		tmp = (Avm2FilterVal*) avm2_alloc(ctx, n * (uint32_t) sizeof(Avm2FilterVal));
+		if (tmp == NULL) return avm2_undefined();
+	}
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2Value e = avm2_array_get(v.u.obj, i);
+		// A true HOLE is skipped silently; a stored `undefined` is NOT a hole
+		// and does throw.
+		if (e.kind == AVM2_VALUE_HOLE) continue;
+		if (e.kind != AVM2_VALUE_OBJECT
+		    || !avm2_filter_from_object(ctx, e.u.obj, &tmp[count]))
+		{
+			// The parameter index is HARDCODED 0 whatever the position.
+			avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+				"Error #2005: Parameter 0 is of the incorrect type. "
+				"Should be type Filter.");
+		}
+		count++;
+	}
+	store_filters(ctx, ext, tmp, count);
+	for (uint32_t i = 0; i < count; i++) avm2_filter_release(ctx, &tmp[i]);
+	if (tmp != NULL) heap_free(ctx->app, tmp);
 	return avm2_undefined();
 }
 
@@ -8409,7 +8517,20 @@ static void dyn_prop_set(Avm2Activation* act, const char* key)
 	static Avm2Value fn##_set(Avm2Activation* act) \
 	{ dyn_prop_set(act, key); return avm2_undefined(); }
 
-STUB_GETSET(do_cab, "__cacheAsBitmap", avm2_bool(false))
+// cacheAsBitmap's GETTER is is_bitmap_cached(), not the stored preference:
+// a non-empty filter list forces it true (display_object.rs
+// recheck_cache_as_bitmap). The setter only records the preference.
+static Avm2Value do_cab_get(Avm2Activation* act)
+{
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext != NULL && ext->filter_count > 0) return avm2_bool(true);
+	return dyn_prop_get(act, "__cacheAsBitmap", avm2_bool(false));
+}
+static Avm2Value do_cab_set(Avm2Activation* act)
+{
+	dyn_prop_set(act, "__cacheAsBitmap");
+	return avm2_undefined();
+}
 STUB_GETSET(do_opaquebg, "__opaqueBackground", avm2_null())
 STUB_GETSET(do_scrollrect, "__scrollRect", avm2_null())
 STUB_GETSET(do_accessprops, "__accessibilityProperties", avm2_null())
@@ -9424,6 +9545,9 @@ void avm2_display_gc_trace_ext(Avm2Object* o)
 	for (uint32_t i = 0; i < ext->depth_len; i++) avm2_gc_mark_object(ext->depth_list[i].child);
 	for (uint32_t i = 0; i < ext->frame_script_cap; i++) avm2_gc_mark_value(ext->frame_scripts[i]);
 	if (ext->edittext != NULL) avm2_text_gc_mark_edittext(ext->edittext);
+	// A stored ShaderFilter keeps its Shader BY IDENTITY, and the filter list
+	// is out of line — the conservative blob scan never sees it.
+	avm2_filter_gc_mark(ext->filters, ext->filter_count);
 }
 
 // GC free hook: a swept DisplayObject's ext owns separately-allocated arrays
@@ -9439,6 +9563,7 @@ void avm2_display_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
 	if (ext->depth_list != NULL) heap_free(ctx->app, ext->depth_list);
 	if (ext->frame_scripts != NULL) heap_free(ctx->app, ext->frame_scripts);
 	if (ext->queued_places != NULL) heap_free(ctx->app, ext->queued_places);
+	clear_filters(ctx, ext);
 }
 
 void avm2_input_load(const char* path)

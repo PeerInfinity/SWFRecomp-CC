@@ -20,6 +20,7 @@
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_e4x.h>
+#include <avm2/avm2_filters.h>
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
@@ -2991,8 +2992,12 @@ void avm2_globals_init(Avm2Context* ctx)
 	// getter on the Stage class and takes over Matrix3D from it.
 	avm2_register_stage3d(ctx);
 
+	// flash.filters (avm2_filters.c — filters arc F1). Must precede
+	// pixelbender: ShaderFilter extends the BitmapFilter base minted here.
+	avm2_register_filters(ctx);
+
 	// PixelBender surface (avm2_pixelbender.c — shader/3d arc tranche P1).
-	// After text: ShaderFilter extends the BitmapFilter shell minted there.
+	// After filters: ShaderFilter extends the BitmapFilter base minted there.
 	avm2_register_pixelbender(ctx);
 
 	// flash.utils.Timer (avm2_display.c) + flash.media Sound family
