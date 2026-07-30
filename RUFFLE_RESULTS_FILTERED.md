@@ -12,7 +12,7 @@
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | audio | 3 | 5 | 60.0% | [details](ruffle-tests/tests/swfs/audio/_results/results_filtered.md) |
-| avm1 | 641 | 674 | 95.1% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
+| avm1 | 641 | 675 | 95.0% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
 | avm2 | 795 | 994 | 80.0% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
 | fonts | 3 | 6 | 50.0% | [details](ruffle-tests/tests/swfs/fonts/_results/results_filtered.md) |
 | from_avmplus | 1458 | 1574 | 92.6% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_filtered.md) |
@@ -31,16 +31,16 @@
 | text | 9 | 11 | 81.8% | [details](ruffle-tests/tests/swfs/text/_results/results_filtered.md) |
 | timeline | 12 | 17 | 70.6% | [details](ruffle-tests/tests/swfs/timeline/_results/results_filtered.md) |
 | visual | 136 | 143 | 95.1% | [details](ruffle-tests/tests/swfs/visual/_results/results_filtered.md) |
-| **Total** | **3565** | **4137** | **86.2%** | |
+| **Total** | **3565** | **4138** | **86.2%** | |
 
-*330 tests ignored.*
+*329 tests ignored.*
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | audio | 5 | 24 | 20.8% |
-| avm1 | 104,236 | 107,877 | 96.6% |
+| avm1 | 104,238 | 107,927 | 96.6% |
 | avm2 | 98,579 | 126,695 | 77.8% |
 | fonts | 35 | 104 | 33.7% |
 | from_avmplus | 85,214 | 85,996 | 99.1% |
@@ -59,14 +59,14 @@
 | text | 858 | 973 | 88.2% |
 | timeline | 333 | 371 | 89.8% |
 | visual | 238 | 350 | 68.0% |
-| **Total** | **325,761** | **362,734** | **89.8%** |
+| **Total** | **325,763** | **362,784** | **89.8%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch | recomp_fail | ruffle_matched | runtime_error |
 |-------|-----------------:|-------------:|----------------:|---------------:|
 | audio | 2 | - | - | - |
-| avm1 | 21 | - | 12 | - |
+| avm1 | 22 | - | 12 | - |
 | avm2 | 194 | - | 2 | 3 |
 | fonts | 3 | - | - | - |
 | from_avmplus | 61 | - | 51 | 4 |
@@ -85,7 +85,7 @@
 | text | 2 | - | - | - |
 | timeline | 2 | - | 3 | - |
 | visual | 6 | 1 | - | - |
-| **Total** | **356** | **1** | **208** | **7** |
+| **Total** | **357** | **1** | **208** | **7** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -181,10 +181,10 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm1
 
-- **Pass:** 641/674 (95.1%)
-- **Ignored:** 43 tests
+- **Pass:** 641/675 (95.0%)
+- **Ignored:** 42 tests
 - **Duration:** 1h14m34s across 30 shards
-- **Lines:** 104,236/107,877 matching (96.6%)
+- **Lines:** 104,238/107,927 matching (96.6%)
 - **Avg test duration:** 6.1s — slowest: `movieclip_invalid_get_bounds_7` (50.2s)
 
 ### avm2
