@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-30T14:23:01.824286+00:00",
-    "old_git_sha": "0241861f4a7793e65607d27fc7141c5caf5c82f1",
-    "new_timestamp": "2026-07-30T15:55:17.804948+00:00",
-    "new_git_sha": "0612bc78e68afe94f4270551725fbd11b8f8b81f",
+    "old_timestamp": "2026-07-30T15:55:17.804948+00:00",
+    "old_git_sha": "0612bc78e68afe94f4270551725fbd11b8f8b81f",
+    "new_timestamp": "2026-07-30T17:36:27.704520+00:00",
+    "new_git_sha": "1ca0ab117c5a690b8b71008d056617154079ab67",
     "partial": false,
     "same_commit": false
   },
@@ -25,9 +25,42 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 11,
+    "unchanged": 9,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm2_loads_avm1_v10",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 8,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "avm2_loads_avm1_v9",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 8,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 2
+      }
+    }
+  ]
 }

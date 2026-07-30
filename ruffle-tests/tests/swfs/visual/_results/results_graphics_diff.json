@@ -1,49 +1,65 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-30T14:23:01.817304+00:00",
-    "old_git_sha": "0241861f4a7793e65607d27fc7141c5caf5c82f1",
-    "new_timestamp": "2026-07-30T15:55:17.795713+00:00",
-    "new_git_sha": "0612bc78e68afe94f4270551725fbd11b8f8b81f",
+    "old_timestamp": "2026-07-30T15:55:17.795713+00:00",
+    "old_git_sha": "0612bc78e68afe94f4270551725fbd11b8f8b81f",
+    "new_timestamp": "2026-07-30T17:36:27.695892+00:00",
+    "new_git_sha": "1ca0ab117c5a690b8b71008d056617154079ab67",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 136,
+    "old_pass": 137,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 136,
+    "old_effective_pass": 137,
     "old_total": 143,
-    "old_pass_rate": 95.1,
-    "new_pass": 137,
+    "old_pass_rate": 95.8,
+    "new_pass": 136,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 137,
+    "new_effective_pass": 136,
     "new_total": 143,
-    "new_pass_rate": 95.8,
-    "old_mismatched_lines": 112,
+    "new_pass_rate": 95.1,
+    "old_mismatched_lines": 111,
     "new_mismatched_lines": 111,
     "increased_mismatches": 0,
-    "decreased_mismatches": 1,
-    "newly_passing": 1,
-    "newly_failing": 0,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
+    "newly_failing": 1,
     "status_changed": 1,
-    "unchanged": 142,
+    "unchanged": 141,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "filters/avm1_convolution_initialization",
+      "test": "define_bits_jpeg2_huge",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 17
+        "actual_lines": 2,
+        "expected_lines": 19,
+        "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 18
+        "actual_lines": 4,
+        "expected_lines": 19,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "definefont4",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 0,
+        "matching_lines": 0
       }
     }
   ]
