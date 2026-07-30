@@ -219,6 +219,10 @@ typedef struct Amf3Wr
 	// AMF0 reference table (a separate index space from the AMF3 one).
 	ObjEntry* objs0;
 	uint32_t obj0_count, obj0_cap;
+	// AMF0 only: is this a WIRE channel (NetConnection packet / LocalConnection
+	// send) rather than a local serialization (ByteArray.writeObject)? Only the
+	// wire promotes a dense array to a StrictArray — see w0_value's array arm.
+	int wire_mode;
 } Amf3Wr;
 
 static void w3_u29(Amf3Wr* w, int32_t i)
@@ -827,11 +831,12 @@ static void w3_value(Amf3Wr* w, Avm2Value v)
 // pinned against Flash-recorded bytes). It differs from flash-lso/Ruffle in
 // four ways, each of which some `known_failure` test in the corpus grades:
 //
-//   1. Arrays: a native Array whose every own enumerable key is an index is a
-//      StrictArray 0x0A, densified to max(length, maxIndex+1) with 0x06 for the
-//      holes, at EVERY nesting level. One non-index key demotes the whole value
-//      to an ECMAArray 0x08 whose u32 is `length`, entries in enumeration order.
-//      Ruffle always writes ECMAArray.
+//   1. Arrays, on a WIRE channel only: a native Array whose every own
+//      enumerable key is an index is a StrictArray 0x0A, densified to
+//      max(length, maxIndex+1) with 0x06 for the holes, at EVERY nesting level.
+//      One non-index key demotes the whole value to an ECMAArray 0x08 whose u32
+//      is `length`, entries in enumeration order. Ruffle always writes
+//      ECMAArray, on every channel.
 //   2. An aliased class serializes as a typed object 0x10 carrying the alias,
 //      nested as well as at top level (Ruffle passes class_def None always).
 //   3. XML writes as 0x0F (u32 length + markup).
@@ -841,6 +846,13 @@ static void w3_value(Amf3Wr* w, Avm2Value v)
 //      runs out. Primitives never take a slot. The reader reserves in the same
 //      order, which is what keeps the two index spaces in step.
 
+// The array rule is CHANNEL-dependent, exactly as it is in AVM1 (there between
+// the wire and an LSO body): a NetConnection/LocalConnection packet promotes a
+// dense array to a StrictArray, while ByteArray.writeObject keeps the ECMAArray
+// form for every array shape. from_shumway/encoding1 pins the ByteArray side
+// (a dense ["a", {}] is `08 00000002` with "0"/"1" keys) and
+// netconnection_serialize_arrays the wire side (the same shape is `0A`).
+//
 // A StrictArray is densified, so `a[2147483647] = x` would emit two gigabytes
 // of 0x06. Flash really would; we write a (bounded) ECMAArray instead rather
 // than hang. Nothing in the corpus comes within four orders of magnitude.
@@ -975,8 +987,8 @@ static void w0_value(Amf3Wr* w, Avm2Value v)
 	if (obj->kind == AVM2_OBJ_ARRAY)
 	{
 		if (w0_ref_or_store(w, obj)) return;
-		// The uniform Flash array rule (see the header comment): StrictArray
-		// unless some own enumerable key is not an index.
+		// The Flash array rule (see the header comment): on a WIRE channel,
+		// StrictArray unless some own enumerable key is not an index.
 		Avm2ArrayExt* ext = avm2_array_ext(obj);
 		uint32_t length = (ext != NULL) ? ext->length : 0;
 		int has_non_index = 0;
@@ -1005,7 +1017,7 @@ static void w0_value(Amf3Wr* w, Avm2Value v)
 		}
 		int64_t count = (max_index >= 0) ? max_index + 1 : 0;
 		if ((int64_t) length > count) count = (int64_t) length;
-		if (!has_non_index && count <= W0_MAX_STRICT)
+		if (w->wire_mode && !has_non_index && count <= W0_MAX_STRICT)
 		{
 			buf_u8(&w->out, M0_STRICT);
 			buf_u32be(&w->out, (uint32_t) count);
@@ -1753,6 +1765,7 @@ unsigned char* avm2_amf0_write_value(Avm2Context* ctx, Avm2Value v, size_t* out_
 	memset(&w, 0, sizeof(w));
 	w.ctx = ctx;
 	w.out.ctx = ctx;
+	w.wire_mode = 1;   // NetConnection / LocalConnection: arrays promote
 	w0_value(&w, v);
 	return amf_copy_out(&w, out_len);
 }
