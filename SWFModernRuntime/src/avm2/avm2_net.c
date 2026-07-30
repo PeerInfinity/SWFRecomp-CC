@@ -48,8 +48,11 @@
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_value.h>
+#include <amf_packet.h>
 #include <dialog_events.h>
+#include <libswf/swf.h>   // DataFileEntry / findDataFile (bundled response packets)
 #include <socket_events.h>
+#include <utils.h>        // swf_log_fetch_queue / SWF_LOG_FETCH_ENABLED
 
 // ---------------------------------------------------------------------------
 // shared helpers
@@ -380,6 +383,8 @@ static Avm2Value socket_set_timeout(Avm2Activation* act)
 
 // FileReference/FileReferenceList roots (the file half, defined below).
 static void gc_mark_roots_file(void);
+// NetConnection call-queue roots (the remoting half, defined below).
+static void gc_mark_roots_nc_queue(void);
 
 void avm2_gc_mark_roots_net(Avm2Context* ctx)
 {
@@ -396,6 +401,7 @@ void avm2_gc_mark_roots_net(Avm2Context* ctx)
 		if (e != NULL && e->xml_owner != NULL) avm2_gc_mark_object(e->xml_owner);
 	}
 	gc_mark_roots_file();
+	gc_mark_roots_nc_queue();
 }
 
 static void register_socket(Avm2Context* ctx)
@@ -720,6 +726,11 @@ static void nc_dispatch_empty_status(Avm2Context* ctx, Avm2Object* self)
 	if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
 }
 
+// A close (or a re-connect) drops the queued calls AND the accumulated headers:
+// netconnection_send_remote's test 4 packet carries zero headers even though
+// test 3 added two. Defined with the queue below.
+static void nc_reset_conn(Avm2Object* nc);
+
 // NetConnections::close. `is_explicit` distinguishes a user close() from the
 // implicit teardown that a second connect() performs on the previous handle;
 // only the explicit one gets the second event.
@@ -730,6 +741,7 @@ static void nc_close_open(Avm2Context* ctx, Avm2Object* self,
 	int was_remoting = (e->protocol == NC_PROTO_REMOTING);
 	e->protocol = NC_PROTO_NONE;
 	e->uri = NULL;
+	nc_reset_conn(self);
 	nc_dispatch_status(ctx, self, "NetConnection.Connect.Closed");
 	if (is_explicit && was_remoting) nc_dispatch_empty_status(ctx, self);
 }
@@ -903,13 +915,202 @@ static Avm2Value nc_set_proxy_type(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-// NetConnection.call requires an open connection (#2126) and then sends an AMF
-// packet, which is tranche 8. Failing the same way Ruffle does on a closed
-// connection is free and correct; the send itself is not modelled.
+// ---------------------------------------------------------------------------
+// NetConnection.call / addHeader — the Flash Remoting wire (tranche 8)
+// ---------------------------------------------------------------------------
+//
+// The packet framing is src/amf_packet.c, shared verbatim with AVM1 (tranche 7)
+// because it knows nothing about either VM: it frames byte ranges the caller has
+// already serialized. The AVM2 differences from the AVM1 path are all at the
+// edges:
+//
+//   * the arguments go through avm2_amf.c's writers, and an objectEncoding of
+//     AMF3 sets the packet's version u16 to 3 and prefixes every argument with
+//     the AMF0 0x11 avmplus escape (amf_array_serialization pins both bodies);
+//   * a response dispatches to the Responder's result/status CLOSURE rather than
+//     to an onResult/onStatus property;
+//   * a failed fetch is a NetStatusEvent — code NetConnection.Call.Failed,
+//     description "HTTP: Failed", details the URL, level "error" — not AVM1's
+//     zero-argument onStatus.
+//
+// Queue drain: once per tick from avm2_display_run_tick, at the loader/executor
+// drain point (Ruffle's harness polls the async executor there, so the fetch log
+// and the response callbacks both land after the calling frame's traces).
+
+#define NC_MAX_CONNS 16
+#define NC_QUEUE 32
+#define NC_HEADERS 16
+#define NC_DRAIN_ROUNDS 8
+
+typedef struct NcMessage
+{
+	char target[AMF_PACKET_MAX_NAME];
+	unsigned char* body;     // AMF0 StrictArray of the call arguments
+	size_t body_len;
+	Avm2Object* responder;   // NULL when the call passed null/undefined
+} NcMessage;
+
+typedef struct NcHeader
+{
+	char name[AMF_PACKET_MAX_NAME];
+	int must_understand;
+	unsigned char* value;
+	size_t value_len;
+} NcHeader;
+
+typedef struct NcConn
+{
+	Avm2Object* nc;
+	NcHeader headers[NC_HEADERS];
+	int header_count;
+	NcMessage msgs[NC_QUEUE];
+	int msg_count;
+} NcConn;
+
+static NcConn g_nc_conns[NC_MAX_CONNS];
+static int g_nc_conn_count;
+
+static NcConn* nc_conn_of(Avm2Object* nc, int create)
+{
+	for (int i = 0; i < g_nc_conn_count; i++)
+		if (g_nc_conns[i].nc == nc) return &g_nc_conns[i];
+	if (!create || g_nc_conn_count >= NC_MAX_CONNS) return NULL;
+	NcConn* c = &g_nc_conns[g_nc_conn_count++];
+	memset(c, 0, sizeof(*c));
+	c->nc = nc;
+	return c;
+}
+
+// The remoting endpoint, as a NUL-terminated copy. 0 when this connection
+// cannot carry a call (never connected, or connect(null)).
+static int nc_uri_of(Avm2NetConnectionExt* e, char* out, size_t cap)
+{
+	if (e == NULL || e->protocol != NC_PROTO_REMOTING || e->uri == NULL) return 0;
+	if (e->uri->len + 1 > cap) return 0;
+	memcpy(out, e->uri->utf8, e->uri->len);
+	out[e->uri->len] = '\0';
+	return 1;
+}
+
+// One call's arguments, as the synthetic AMF0 StrictArray Flash always wraps
+// them in — even for a call with no arguments (`0A 00 00 00 00`). Each argument
+// is serialized on its own, with its own reference tables.
+static unsigned char* nc_build_args(Avm2Context* ctx, const Avm2Value* args,
+                                    uint32_t first, uint32_t argc,
+                                    int amf3, size_t* out_len)
+{
+	AmfBuf b;
+	amf_buf_init(&b);
+	uint32_t n = (argc > first) ? argc - first : 0;
+	amf_buf_u8(&b, 0x0A);
+	amf_buf_u32be(&b, n);
+	for (uint32_t i = first; i < argc; i++)
+	{
+		size_t len = 0;
+		unsigned char* one = amf3
+			? avm2_amf3_write_value_tagged(ctx, args[i], &len)
+			: avm2_amf0_write_value(ctx, args[i], &len);
+		if (one != NULL) amf_buf_put(&b, one, len);
+		free(one);
+	}
+	if (out_len != NULL) *out_len = b.len;
+	return b.data;
+}
+
 static Avm2Value nc_call(Avm2Activation* act)
-{ nc_require_open(act); return avm2_undefined(); }
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2NetConnectionExt* e = nc_require_open(act);
+	Avm2Object* self = net2_this(act);
+	if (self == NULL || act->argc < 1) return avm2_undefined();
+
+	char url[512];
+	if (!nc_uri_of(e, url, sizeof(url))) return avm2_undefined();
+
+	const Avm2String* target = avm2_coerce_to_string(ctx, act->args[0]);
+	NcConn* c = nc_conn_of(self, 1);
+	if (c == NULL || c->msg_count >= NC_QUEUE) return avm2_undefined();
+
+	NcMessage* m = &c->msgs[c->msg_count];
+	uint32_t tn = target->len;
+	if (tn >= sizeof(m->target)) tn = sizeof(m->target) - 1;
+	memcpy(m->target, target->utf8, tn);
+	m->target[tn] = '\0';
+	m->responder = NULL;
+	if (act->argc > 1 && act->args[1].kind == AVM2_VALUE_OBJECT)
+		m->responder = act->args[1].u.obj;
+	m->body = nc_build_args(ctx, act->args, 2, act->argc,
+	                        e->object_encoding == 3, &m->body_len);
+	c->msg_count++;
+	return avm2_undefined();
+}
+
 static Avm2Value nc_add_header(Avm2Activation* act)
-{ (void) act; return avm2_undefined(); }
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2NetConnectionExt* e = nc_ext(act);
+	Avm2Object* self = net2_this(act);
+	if (self == NULL || e == NULL || act->argc < 1) return avm2_undefined();
+
+	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
+	NcConn* c = nc_conn_of(self, 1);
+	if (c == NULL) return avm2_undefined();
+
+	// addHeader(operation:String, mustUnderstand:Boolean = false,
+	// param:Object = null) — the AS3 signature's default is FALSE, and
+	// netconnection_send_remote's bare addHeader("Duplicate") puts a 00 in the
+	// packet. (AVM1's own addHeader defaults the other way; tranche 7 pinned
+	// that from Flash's bytes too.)
+	int must = (act->argc > 1)
+		? (avm2_coerce_to_boolean(act->args[1]) ? 1 : 0) : 0;
+
+	// The value is serialized NOW, at addHeader time, and the header is then
+	// re-sent with every packet until it is replaced. A MISSING value is null,
+	// not undefined: netconnection_send_remote's bare `addHeader("Duplicate")`
+	// puts an 0x05 in the packet.
+	Avm2Value vv = (act->argc > 2) ? act->args[2] : avm2_null();
+	size_t vlen = 0;
+	unsigned char* val = (e->object_encoding == 3)
+		? avm2_amf3_write_value_tagged(ctx, vv, &vlen)
+		: avm2_amf0_write_value(ctx, vv, &vlen);
+
+	char nbuf[AMF_PACKET_MAX_NAME];
+	uint32_t nn = name->len;
+	if (nn >= sizeof(nbuf)) nn = sizeof(nbuf) - 1;
+	memcpy(nbuf, name->utf8, nn);
+	nbuf[nn] = '\0';
+
+	// One header per name, matched ASCII-case-insensitively and replaced in
+	// place so the packet order does not change.
+	NcHeader* slot = NULL;
+	for (int i = 0; i < c->header_count; i++)
+	{
+		const char* a = c->headers[i].name;
+		const char* b = nbuf;
+		int same = 1;
+		for (size_t k = 0;; k++)
+		{
+			char ca = a[k], cb = b[k];
+			if (ca >= 'A' && ca <= 'Z') ca = (char) (ca - 'A' + 'a');
+			if (cb >= 'A' && cb <= 'Z') cb = (char) (cb - 'A' + 'a');
+			if (ca != cb) { same = 0; break; }
+			if (ca == '\0') break;
+		}
+		if (same) { slot = &c->headers[i]; break; }
+	}
+	if (slot == NULL)
+	{
+		if (c->header_count >= NC_HEADERS) { free(val); return avm2_undefined(); }
+		slot = &c->headers[c->header_count++];
+		slot->value = NULL;
+	}
+	memcpy(slot->name, nbuf, nn + 1);
+	slot->must_understand = must;
+	free(slot->value);
+	slot->value = val;
+	slot->value_len = vlen;
+	return avm2_undefined();
+}
 
 static Avm2Value nc_static_get_default_encoding(Avm2Activation* act)
 { (void) act; return avm2_uint_value(g_nc_default_object_encoding); }
@@ -962,16 +1163,17 @@ static void register_net_connection(Avm2Context* ctx)
 // flash.net.Responder
 // ---------------------------------------------------------------------------
 //
-// Responder(result:Function, status:Function = null). The callbacks are only
-// reachable from NetConnection.call, which does not send yet, so they are
-// stored and never invoked. `responder_null_callbacks` grades the one thing
-// that is observable today: the class exists and stringifies.
+// Responder(result:Function, status:Function = null). The callbacks are
+// reachable only from a NetConnection.call response: the packet's "/N/onResult"
+// or "/N/onStatus" target picks which of the pair runs (see nc_flush_one).
 
 typedef struct Avm2ResponderExt
 {
 	Avm2Value result_fn;
 	Avm2Value status_fn;
 } Avm2ResponderExt;
+
+static Avm2Class* g_responder_class;
 
 static Avm2Value responder_init(Avm2Activation* act)
 {
@@ -981,6 +1183,238 @@ static Avm2Value responder_init(Avm2Activation* act)
 	e->result_fn = act->argc > 0 ? act->args[0] : avm2_null();
 	e->status_fn = act->argc > 1 ? act->args[1] : avm2_null();
 	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// NetConnection queue drain (needs Avm2ResponderExt, hence its position here)
+// ---------------------------------------------------------------------------
+
+static void nc_clear_queue(NcConn* c)
+{
+	for (int i = 0; i < c->msg_count; i++)
+	{
+		free(c->msgs[i].body);
+		c->msgs[i].body = NULL;
+		c->msgs[i].responder = NULL;
+	}
+	c->msg_count = 0;
+}
+
+// The connection and every queued call's Responder are reachable only from this
+// file's C table between the call and the drain.
+static void gc_mark_roots_nc_queue(void)
+{
+	for (int i = 0; i < g_nc_conn_count; i++)
+	{
+		avm2_gc_mark_object(g_nc_conns[i].nc);
+		for (int j = 0; j < g_nc_conns[i].msg_count; j++)
+			avm2_gc_mark_object(g_nc_conns[i].msgs[j].responder);
+	}
+}
+
+static void nc_reset_conn(Avm2Object* nc)
+{
+	NcConn* c = nc_conn_of(nc, 0);
+	if (c == NULL) return;
+	nc_clear_queue(c);
+	for (int i = 0; i < c->header_count; i++)
+	{
+		free(c->headers[i].value);
+		c->headers[i].value = NULL;
+	}
+	c->header_count = 0;
+}
+
+static Avm2ResponderExt* responder_ext_of(Avm2Object* o)
+{
+	if (o == NULL || o->native_ext == NULL || g_responder_class == NULL) return NULL;
+	for (const Avm2Class* c = o->cls; c != NULL; c = c->super_class)
+		if (c == g_responder_class) return (Avm2ResponderExt*) o->native_ext;
+	return NULL;
+}
+
+typedef struct NcRespCtx
+{
+	Avm2Context* ctx;
+	NcMessage* msgs;   // snapshot of the flushed batch
+	int msg_count;
+} NcRespCtx;
+
+// A response target is "/<1-based responder index>/onResult" or ".../onStatus".
+// Anything else (or an index with no responder behind it) is ignored, which is
+// what Flash does with a bogus response.
+static int nc_response_msg(const char* target, size_t target_len,
+                           const unsigned char* body, size_t body_len,
+                           void* user)
+{
+	NcRespCtx* rc = (NcRespCtx*) user;
+	if (target == NULL || target_len < 4 || target[0] != '/') return 0;
+	size_t i = 1;
+	long idx = 0;
+	if (target[i] < '0' || target[i] > '9') return 0;
+	while (i < target_len && target[i] >= '0' && target[i] <= '9')
+	{
+		idx = idx * 10 + (target[i] - '0');
+		i++;
+	}
+	if (i >= target_len || target[i] != '/') return 0;
+	i++;
+	size_t mlen = target_len - i;
+	const char* method = target + i;
+	int is_result = (mlen == 8 && memcmp(method, "onResult", 8) == 0);
+	int is_status = (mlen == 8 && memcmp(method, "onStatus", 8) == 0);
+	if (!is_result && !is_status) return 0;
+	if (idx < 1 || idx > rc->msg_count) return 0;
+
+	Avm2ResponderExt* re = responder_ext_of(rc->msgs[idx - 1].responder);
+	if (re == NULL) return 0;
+	Avm2Value fn = is_result ? re->result_fn : re->status_fn;
+	if (fn.kind != AVM2_VALUE_OBJECT) return 0;
+
+	Avm2Value arg = avm2_amf0_read_value(rc->ctx, body, body_len);
+	avm2_call_value(rc->ctx, fn, avm2_null(), &arg, 1);
+	return 0;
+}
+
+// Resolve a remoting URL to a bundled scripted response packet. Tests keep those
+// beside the SWF (netconnection_send_remote's localhost/test1..3), and
+// findDataFile is keyed by the bare filename as well as the relative path, so
+// both spellings are worth trying.
+static DataFileEntry* nc_resolve_response(const char* url)
+{
+	const char* scheme = strstr(url, "://");
+	const char* rest = (scheme != NULL) ? scheme + 3 : url;
+	const char* slash = strchr(rest, '/');
+	if (slash == NULL || slash[1] == '\0') return NULL;
+
+	// "localhost:8000/test1" -> try "localhost/test1" then "test1".
+	char rel[512];
+	size_t hostlen = (size_t) (slash - rest);
+	const char* colon = memchr(rest, ':', hostlen);
+	size_t hnlen = (colon != NULL) ? (size_t) (colon - rest) : hostlen;
+	if (hnlen + 1 + strlen(slash + 1) + 1 <= sizeof(rel))
+	{
+		memcpy(rel, rest, hnlen);
+		rel[hnlen] = '/';
+		snprintf(rel + hnlen + 1, sizeof(rel) - hnlen - 1, "%s", slash + 1);
+		DataFileEntry* d = findDataFile(rel);
+		if (d != NULL && d->content != NULL) return d;
+	}
+	const char* base = strrchr(url, '/');
+	base = (base != NULL) ? base + 1 : url;
+	if (base[0] == '\0') return NULL;
+	DataFileEntry* d = findDataFile(base);
+	if (d != NULL && d->content != NULL) return d;
+	return NULL;
+}
+
+// A fetch that resolves to nothing is a failed request. Ruffle's
+// NetConnection::on_fetch_error path: code NetConnection.Call.Failed,
+// description "HTTP: Failed", details the URL, level "error".
+static void nc_dispatch_call_failed(Avm2Context* ctx, Avm2Object* self,
+                                    const char* url)
+{
+	static const char* const keys[4] = { "code", "description", "details", "level" };
+	const char* values[4];
+	values[0] = "NetConnection.Call.Failed";
+	values[1] = "HTTP: Failed";
+	values[2] = url;
+	values[3] = "error";
+	Avm2Object* ev = avm2_net_status_event_new(ctx, keys, values, 4);
+	if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
+}
+
+static void nc_flush_one(Avm2Context* ctx, NcConn* c)
+{
+	Avm2NetConnectionExt* e = (c->nc != NULL && c->nc->native_ext != NULL)
+		? (Avm2NetConnectionExt*) c->nc->native_ext : NULL;
+	char url[512];
+	if (!nc_uri_of(e, url, sizeof(url)))
+	{
+		// The connection closed between the call and the drain: Flash drops the
+		// queued messages.
+		nc_clear_queue(c);
+		return;
+	}
+
+	// Take the batch out of the queue first: a responder callback may issue more
+	// calls, and those belong to the NEXT packet.
+	NcMessage batch[NC_QUEUE];
+	int count = c->msg_count;
+	memcpy(batch, c->msgs, (size_t) count * sizeof(NcMessage));
+	c->msg_count = 0;
+
+	AmfPacketHeader hdrs[NC_HEADERS];
+	for (int i = 0; i < c->header_count; i++)
+	{
+		snprintf(hdrs[i].name, sizeof(hdrs[i].name), "%s", c->headers[i].name);
+		hdrs[i].must_understand = c->headers[i].must_understand;
+		hdrs[i].value = c->headers[i].value;
+		hdrs[i].value_len = c->headers[i].value_len;
+	}
+
+	// Response URIs are "/1".."/N", numbered per FLUSH, not per connection
+	// lifetime (netconnection_send_remote test 3 batches two calls as /1 and /2
+	// after earlier flushes already used /1).
+	AmfPacketMessage pmsgs[NC_QUEUE];
+	for (int i = 0; i < count; i++)
+	{
+		snprintf(pmsgs[i].target, sizeof(pmsgs[i].target), "%s", batch[i].target);
+		snprintf(pmsgs[i].response, sizeof(pmsgs[i].response), "/%d", i + 1);
+		pmsgs[i].body = batch[i].body;
+		pmsgs[i].body_len = batch[i].body_len;
+	}
+
+	AmfBuf packet;
+	amf_buf_init(&packet);
+	amf_packet_build(&packet, (e->object_encoding == 3) ? 3u : 0u,
+	                 hdrs, (size_t) c->header_count, pmsgs, (size_t) count);
+
+#if SWF_LOG_FETCH_ENABLED
+	// Ruffle logs inside fetch(), i.e. before any of the response's events, so
+	// the block is queued and flushed right here — ahead of the callbacks below.
+	swf_log_fetch_queue(url, strlen(url), "POST", 4, NULL, 0,
+	                    "application/x-amf", 17,
+	                    packet.data, packet.len, 1, 0);
+	swf_log_fetch_flush();
+#endif
+
+	DataFileEntry* resp = nc_resolve_response(url);
+	if (resp != NULL)
+	{
+		NcRespCtx rc;
+		rc.ctx = ctx;
+		rc.msgs = batch;
+		rc.msg_count = count;
+		amf_packet_parse((const unsigned char*) resp->content,
+		                 (size_t) resp->content_length, nc_response_msg, &rc);
+	}
+	else
+	{
+		nc_dispatch_call_failed(ctx, c->nc, url);
+	}
+
+	amf_buf_free(&packet);
+	for (int i = 0; i < count; i++) free(batch[i].body);
+}
+
+// Per-tick drain, called from avm2_display_run_tick's loader/executor drain
+// point. Synchronous and exhaustive, so nothing is ever left pending across a
+// tick boundary (a responder callback that issues more calls gets its own
+// packet, up to NC_DRAIN_ROUNDS).
+void avm2_net_flush_connections(Avm2Context* ctx)
+{
+	for (int round = 0; round < NC_DRAIN_ROUNDS; round++)
+	{
+		int did = 0;
+		for (int i = 0; i < g_nc_conn_count; i++)
+		{
+			if (g_nc_conns[i].msg_count == 0) continue;
+			nc_flush_one(ctx, &g_nc_conns[i]);
+			did = 1;
+		}
+		if (!did) return;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1827,6 +2261,7 @@ void avm2_register_net_transport(Avm2Context* ctx)
 		cls->instance_init.fn = responder_init;
 		cls->instance_init.debug_name = "Responder";
 		cls->native_ext_size = sizeof(Avm2ResponderExt);
+		g_responder_class = cls;
 	}
 
 	// flash.net.DatagramSocket — `[API("668")] public class DatagramSocket {}`,

@@ -38,7 +38,8 @@ xml_socket_segmented
 
 # --- Video streaming (NetStream/NetConnection) ---
 # These tests require video/network streaming APIs.
-netconnection_send_remote
+# (netconnection_send_remote removed 2026-07-29 — the Flash Remoting wire is
+# implemented in both VMs: AVM1 in net/socket tranche 7, AVM2 in tranche 8.)
 # Trace passes (2/2). Image diff is a documented Ruffle vs Flash divergence:
 # expected.png is a bit-exact stamp of rufflelogo.png (the source asset),
 # inconsistent with both Flash's render-at-declared-bounds rule and Ruffle's

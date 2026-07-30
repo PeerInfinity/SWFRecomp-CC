@@ -104,6 +104,21 @@ int avm2_object_delete_dynamic_obj(Avm2Object* obj, Avm2Object* key)
 	return 0;
 }
 
+// Is this name the CANONICAL spelling of a u32 index? ("0" yes, "00" and "-1"
+// no — those round-trip as strings, so both players keep them string-keyed.)
+static int dyn_key_is_index(const char* name, uint32_t name_len)
+{
+	if (name_len == 0 || name_len > 10) return 0;
+	if (name_len > 1 && name[0] == '0') return 0;
+	uint64_t v = 0;
+	for (uint32_t i = 0; i < name_len; i++)
+	{
+		if (name[i] < '0' || name[i] > '9') return 0;
+		v = v * 10 + (uint64_t) (name[i] - '0');
+	}
+	return v <= 4294967294ULL;
+}
+
 Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const char* name,
                                      uint32_t name_len, Avm2Value value)
 {
@@ -126,7 +141,42 @@ Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const ch
 	p->value = value;
 	p->next = NULL;
 	p->dont_enum = 0;
-	// Append at tail: enumeration order is insertion order.
+	// Enumeration order: integer-spelled keys come BEFORE string keys, with
+	// insertion order holding inside each group.
+	//
+	// Both players key an integer-spelled dynamic property by its integer value
+	// (Ruffle DynamicKey::Uint; avmplus interns it as an int atom) and enumerate
+	// it ahead of the string keys. Two recorded outputs pin the pair of rules:
+	// `{"0": "fake_0", "length": 1}` serializes "0" first (avm2
+	// amf_array_serialization, Flash AND Ruffle bytes agree) even though
+	// newobject sets the literal's pairs LAST-first, while the all-string
+	// `{a: this.test, b: true}` traces as `{"b":true,"a":…}` — reverse of source
+	// — from that same last-first insertion (avm2 json_stringify_function).
+	// Appending at the tail satisfies only the second.
+	if (dyn_key_is_index(name, name_len))
+	{
+		// Insert after the last integer-like entry: the list stays partitioned,
+		// so that entry is always found by scanning from the head.
+		Avm2DynProp* prev = NULL;
+		for (Avm2DynProp* q = obj->dyn_props; q != NULL; q = q->next)
+		{
+			if (q->key_obj != NULL
+			    || !dyn_key_is_index(q->name.utf8, q->name.len)) break;
+			prev = q;
+		}
+		if (prev == NULL)
+		{
+			p->next = obj->dyn_props;
+			obj->dyn_props = p;
+		}
+		else
+		{
+			p->next = prev->next;
+			prev->next = p;
+		}
+		if (p->next == NULL) obj->dyn_tail = p;
+		return p;
+	}
 	if (obj->dyn_tail != NULL)
 	{
 		obj->dyn_tail->next = p;

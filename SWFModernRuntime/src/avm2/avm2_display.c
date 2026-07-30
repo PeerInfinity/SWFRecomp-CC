@@ -2959,6 +2959,11 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// after, which is where Ruffle's test harness runs the async executor.
 	avm2_loaderinfo_run_exit_frame(ctx);
 	avm2_loader_drain(ctx);
+	// NetConnection.call: the queued packet is sent and its scripted response
+	// dispatched at the same executor-drain point a Loader fetch resolves at, so
+	// the fetch log and the Responder callbacks follow the calling frame's traces
+	// (netconnection_send_remote pins that interleaving).
+	avm2_net_flush_connections(ctx);
 	orphan_cleanup(ctx);
 
 	// Sockets: Ruffle's player.tick runs update_sockets right after the frame

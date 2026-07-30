@@ -216,6 +216,9 @@ typedef struct Amf3Wr
 	uint32_t trait_count, trait_cap;
 	ObjEntry* objs;
 	uint32_t obj_count, obj_cap;
+	// AMF0 reference table (a separate index space from the AMF3 one).
+	ObjEntry* objs0;
+	uint32_t obj0_count, obj0_cap;
 } Amf3Wr;
 
 static void w3_u29(Amf3Wr* w, int32_t i)
@@ -817,15 +820,31 @@ static void w3_value(Amf3Wr* w, Avm2Value v)
 }
 
 // ---------------------------------------------------------------------------
-// AMF0 writer (flash-lso amf0/write.rs; no reference table on write)
+// AMF0 writer — Flash Player's behaviour, not flash-lso's
 // ---------------------------------------------------------------------------
 //
-// Unlike the AMF3 writer above this one keeps no object table, so an object
-// graph with a cycle recurses until the C stack runs out. The AMF0 *reader*
-// does support 0x07 references and reserves in the same order the writer
-// visits, so the symmetric fix is available — nothing in the corpus writes a
-// cyclic graph at objectEncoding 0, so it is left alone rather than perturb
-// AMF0 bytes for repeated (acyclic) objects.
+// Ported from the AVM1 implementation (avm1_amf.c, net-socket-arc.md §7.2,
+// pinned against Flash-recorded bytes). It differs from flash-lso/Ruffle in
+// four ways, each of which some `known_failure` test in the corpus grades:
+//
+//   1. Arrays: a native Array whose every own enumerable key is an index is a
+//      StrictArray 0x0A, densified to max(length, maxIndex+1) with 0x06 for the
+//      holes, at EVERY nesting level. One non-index key demotes the whole value
+//      to an ECMAArray 0x08 whose u32 is `length`, entries in enumeration order.
+//      Ruffle always writes ECMAArray.
+//   2. An aliased class serializes as a typed object 0x10 carrying the alias,
+//      nested as well as at top level (Ruffle passes class_def None always).
+//   3. XML writes as 0x0F (u32 length + markup).
+//   4. A reference table: every repeated REFERENCEABLE value (object, typed
+//      object, either array shape, Date, XML) collapses to 0x07 + u16 index,
+//      which is also what stops a cyclic graph from recursing until the C stack
+//      runs out. Primitives never take a slot. The reader reserves in the same
+//      order, which is what keeps the two index spaces in step.
+
+// A StrictArray is densified, so `a[2147483647] = x` would emit two gigabytes
+// of 0x06. Flash really would; we write a (bounded) ECMAArray instead rather
+// than hang. Nothing in the corpus comes within four orders of magnitude.
+#define W0_MAX_STRICT 65536
 
 enum
 {
@@ -839,6 +858,47 @@ static void w0_short_str(Amf3Wr* w, const char* p, uint32_t n)
 {
 	buf_u16be(&w->out, (uint16_t) n);
 	buf_put(&w->out, p, n);
+}
+
+// An AMF0 index key: pure ASCII digits, no sign, in u32 range. Flash's own
+// bytes confirm `-1` and `2.5` count as non-numeric and so demote an array.
+static int w0_key_is_index(const char* name, uint32_t len, uint32_t* out)
+{
+	if (len == 0 || len > 10) return 0;
+	uint64_t v = 0;
+	for (uint32_t i = 0; i < len; i++)
+	{
+		if (name[i] < '0' || name[i] > '9') return 0;
+		v = v * 10 + (uint64_t) (name[i] - '0');
+	}
+	if (v > 4294967294ULL) return 0;
+	if (out != NULL) *out = (uint32_t) v;
+	return 1;
+}
+
+// AMF0 reference gate: a repeated referenceable value becomes 0x07 + u16 index.
+// Returns 1 when a reference was emitted (nothing else to write).
+static int w0_ref_or_store(Amf3Wr* w, Avm2Object* obj)
+{
+	for (uint32_t i = 0; i < w->obj0_count; i++)
+	{
+		if (w->objs0[i].src == obj)
+		{
+			buf_u8(&w->out, M0_REF);
+			buf_u16be(&w->out, (uint16_t) i);
+			return 1;
+		}
+	}
+	if (w->obj0_count == w->obj0_cap)
+	{
+		uint32_t nc = w->obj0_cap == 0 ? 16 : w->obj0_cap * 2;
+		ObjEntry* g = avm2_alloc(w->ctx, nc * sizeof(ObjEntry));
+		memcpy(g, w->objs0, w->obj0_count * sizeof(ObjEntry));
+		w->objs0 = g;
+		w->obj0_cap = nc;
+	}
+	w->objs0[w->obj0_count++].src = obj;
+	return 0;
 }
 
 static void w0_object_body(Amf3Wr* w, Avm2Object* obj)
@@ -914,12 +974,54 @@ static void w0_value(Amf3Wr* w, Avm2Value v)
 	}
 	if (obj->kind == AVM2_OBJ_ARRAY)
 	{
-		// Ruffle AMF0 arrays: ECMA array, u32 = Array.length, every entry
-		// as a named element (dense indices become string names).
+		if (w0_ref_or_store(w, obj)) return;
+		// The uniform Flash array rule (see the header comment): StrictArray
+		// unless some own enumerable key is not an index.
 		Avm2ArrayExt* ext = avm2_array_ext(obj);
-		buf_u8(&w->out, M0_ECMA);
-		buf_u32be(&w->out, ext->length);
+		uint32_t length = (ext != NULL) ? ext->length : 0;
+		int has_non_index = 0;
+		int64_t max_index = -1;
 		uint32_t idx = avm2_object_next_enumerant(obj, 0);
+		while (idx != 0)
+		{
+			Avm2Value name = avm2_object_enumerant_name(ctx, obj, idx);
+			Avm2Value val = avm2_object_enumerant_value(ctx, obj, idx);
+			// A function-valued property is omitted from the stream entirely, so
+			// it cannot demote the array either.
+			if (!value_is_function(val))
+			{
+				const Avm2String* ns = avm2_coerce_to_string(ctx, name);
+				uint32_t k;
+				if (w0_key_is_index(ns->utf8, ns->len, &k))
+				{
+					if ((int64_t) k > max_index) max_index = (int64_t) k;
+				}
+				else
+				{
+					has_non_index = 1;
+				}
+			}
+			idx = avm2_object_next_enumerant(obj, idx);
+		}
+		int64_t count = (max_index >= 0) ? max_index + 1 : 0;
+		if ((int64_t) length > count) count = (int64_t) length;
+		if (!has_non_index && count <= W0_MAX_STRICT)
+		{
+			buf_u8(&w->out, M0_STRICT);
+			buf_u32be(&w->out, (uint32_t) count);
+			for (int64_t i = 0; i < count; i++)
+			{
+				Avm2Value ev = avm2_array_get(obj, (uint32_t) i);
+				if (ev.kind == AVM2_VALUE_HOLE) buf_u8(&w->out, M0_UNDEF);
+				else w0_value(w, ev);
+			}
+			return;
+		}
+		// ECMA array: u32 = Array.length, every entry as a named element (dense
+		// indices become string names).
+		buf_u8(&w->out, M0_ECMA);
+		buf_u32be(&w->out, length);
+		idx = avm2_object_next_enumerant(obj, 0);
 		while (idx != 0)
 		{
 			Avm2Value name = avm2_object_enumerant_name(ctx, obj, idx);
@@ -939,10 +1041,25 @@ static void w0_value(Amf3Wr* w, Avm2Value v)
 	Avm2DateExt* date = avm2_date_ext_of(v);
 	if (date != NULL)
 	{
+		if (w0_ref_or_store(w, obj)) return;
 		buf_u8(&w->out, M0_DATE);
 		buf_f64be(&w->out, date->millis);
 		buf_u16be(&w->out, 0);
 		return;
+	}
+	{
+		// XML (not XMLList): 0x0F + u32 length + the markup, same string the
+		// AMF3 XmlString arm writes.
+		Avm2XmlExt* xe = avm2_xml_ext_of(v);
+		if (xe != NULL)
+		{
+			if (w0_ref_or_store(w, obj)) return;
+			const Avm2String* xs = avm2_e4x_to_xml_string(ctx, xe->node);
+			buf_u8(&w->out, M0_XML);
+			buf_u32be(&w->out, xs->len);
+			buf_put(&w->out, xs->utf8, xs->len);
+			return;
+		}
 	}
 	if (obj->kind == AVM2_OBJ_VECTOR || avm2_bytearray_ext_of(v) != NULL
 	    || avm2_is_dictionary(obj))
@@ -951,8 +1068,19 @@ static void w0_value(Amf3Wr* w, Avm2Value v)
 		buf_u8(&w->out, M0_UNSUPPORTED);
 		return;
 	}
-	// Anonymous object (Ruffle passes class_def None for AMF0 always).
-	buf_u8(&w->out, M0_OBJECT);
+	if (w0_ref_or_store(w, obj)) return;
+	// A registerClassAlias'd class writes as a typed object carrying the alias
+	// (Flash does this nested too); everything else is anonymous.
+	const Avm2String* alias = class_to_alias(ctx, avm2_value_class(ctx, v));
+	if (alias != NULL && alias->len > 0)
+	{
+		buf_u8(&w->out, M0_TYPED);
+		w0_short_str(w, alias->utf8, alias->len);
+	}
+	else
+	{
+		buf_u8(&w->out, M0_OBJECT);
+	}
 	w0_object_body(w, obj);
 }
 
@@ -1473,11 +1601,21 @@ static Avm2Value rd0_value(Rd* r)
 		case M0_BOOL: return avm2_bool(rd_u8(r) != 0);
 		case M0_STR: return avm2_string(rd0_short_str(r));
 		case M0_LONGSTR:
-		case M0_XML:
 		{
 			uint32_t len = rd_u32be(r);
 			const uint8_t* p = rd_bytes(r, len);
 			return avm2_string(avm2_string_new(ctx, (const char*) p, len));
+		}
+		case M0_XML:
+		{
+			// Read as a String (Ruffle amf0 read), but the slot is still
+			// reserved: XML is referenceable on the WRITE side, so skipping it
+			// here would shift every later index in a Flash-produced stream.
+			uint32_t len = rd_u32be(r);
+			const uint8_t* p = rd_bytes(r, len);
+			Avm2Value s = avm2_string(avm2_string_new(ctx, (const char*) p, len));
+			rd0_ref_reserve(r, s);
+			return s;
 		}
 		case M0_NULL: return avm2_null();
 		case M0_UNDEF: return avm2_undefined();
@@ -1544,7 +1682,10 @@ static Avm2Value rd0_value(Rd* r)
 			double millis = rd_f64be(r);
 			(void) rd_u16be(r);  // timezone
 			Avm2Value arg = avm2_number(millis);
-			return avm2_class_construct(ctx, ctx->builtins.date_class, &arg, 1);
+			Avm2Value d = avm2_class_construct(ctx, ctx->builtins.date_class,
+			                                   &arg, 1);
+			rd0_ref_reserve(r, d);  // referenceable, like the writer's table
+			return d;
 		}
 		case M0_UNSUPPORTED: return avm2_undefined();
 		case M0_AMF3: return rd3_value(r);
@@ -1587,6 +1728,58 @@ Avm2Value avm2_amf_write_object(Avm2Activation* act)
 	memcpy(ba->bytes + pos, w.out.b, w.out.len);
 	ba->position = pos + w.out.len;
 	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// Single-value codec entry points for the NetConnection wire (avm2_net.c)
+// ---------------------------------------------------------------------------
+//
+// The buffers are malloc'd, not GC-allocated: they live in amf_packet.c's
+// AmfBuf world (the queue holds them across ticks, and amf_packet_build reads
+// them as plain byte ranges), so the caller free()s them. Each call gets FRESH
+// reference/string/trait tables, which is exactly the per-argument framing Flash
+// uses — one table per top-level value, not one per packet.
+static unsigned char* amf_copy_out(Amf3Wr* w, size_t* out_len)
+{
+	unsigned char* p = (unsigned char*) malloc(w->out.len > 0 ? w->out.len : 1);
+	if (p != NULL && w->out.len > 0) memcpy(p, w->out.b, w->out.len);
+	if (out_len != NULL) *out_len = (p != NULL) ? w->out.len : 0;
+	return p;
+}
+
+unsigned char* avm2_amf0_write_value(Avm2Context* ctx, Avm2Value v, size_t* out_len)
+{
+	Amf3Wr w;
+	memset(&w, 0, sizeof(w));
+	w.ctx = ctx;
+	w.out.ctx = ctx;
+	w0_value(&w, v);
+	return amf_copy_out(&w, out_len);
+}
+
+// The AMF0 "avmplus object" escape (0x11) followed by one AMF3 value — how an
+// objectEncoding = AMF3 NetConnection carries each call argument.
+unsigned char* avm2_amf3_write_value_tagged(Avm2Context* ctx, Avm2Value v,
+                                            size_t* out_len)
+{
+	Amf3Wr w;
+	memset(&w, 0, sizeof(w));
+	w.ctx = ctx;
+	w.out.ctx = ctx;
+	buf_u8(&w.out, M0_AMF3);
+	w3_value(&w, v);
+	return amf_copy_out(&w, out_len);
+}
+
+Avm2Value avm2_amf0_read_value(Avm2Context* ctx, const unsigned char* p, size_t n)
+{
+	Rd r;
+	memset(&r, 0, sizeof(r));
+	r.ctx = ctx;
+	r.p = p;
+	r.n = (uint32_t) n;
+	r.pos = 0;
+	return rd0_value(&r);
 }
 
 Avm2Value avm2_amf_read_object(Avm2Activation* act)

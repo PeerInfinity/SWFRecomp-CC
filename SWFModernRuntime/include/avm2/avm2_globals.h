@@ -179,6 +179,15 @@ void avm2_register_dictionary(Avm2Context* ctx);  // flash.utils.Dictionary
 int avm2_is_dictionary(Avm2Object* obj);
 void avm2_register_bytearray(Avm2Context* ctx);  // flash.utils.ByteArray (+Endian)
 void avm2_register_amf(Avm2Context* ctx);  // flash.net alias fns
+// Single-value AMF codec for the NetConnection wire (avm2_net.c). The returned
+// buffers are MALLOC'd — free() them — because the call queue holds them across
+// ticks and amf_packet.c reads them as plain byte ranges. Each call gets fresh
+// reference tables, which is Flash's per-top-level-value framing.
+unsigned char* avm2_amf0_write_value(Avm2Context* ctx, Avm2Value v, size_t* out_len);
+// The AMF0 0x11 "avmplus object" escape + one AMF3 value (objectEncoding = AMF3).
+unsigned char* avm2_amf3_write_value_tagged(Avm2Context* ctx, Avm2Value v,
+                                            size_t* out_len);
+Avm2Value avm2_amf0_read_value(Avm2Context* ctx, const unsigned char* p, size_t n);
 void avm2_register_date(Avm2Context* ctx); // Date (ECMA-262 §15.9 + AS3)
 void avm2_register_external(Avm2Context* ctx);  // flash.external.ExternalInterface
 
@@ -639,6 +648,10 @@ double avm2_timer_elapsed_ms(void);
 // EventDispatcher and builtin classes snapshot their parent vtable at
 // creation time.
 void avm2_register_net_transport(Avm2Context* ctx);
+// Drain every NetConnection's queued call()s into one Flash Remoting packet per
+// connection, log the fetch, and dispatch the scripted response. Called once per
+// tick from avm2_display_run_tick at the loader/executor drain point.
+void avm2_net_flush_connections(Avm2Context* ctx);
 
 // flash.media Sound family (avm2_media.c — Stage 10).
 void avm2_register_media(Avm2Context* ctx);

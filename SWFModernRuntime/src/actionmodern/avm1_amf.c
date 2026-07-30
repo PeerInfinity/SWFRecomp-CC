@@ -1737,7 +1737,9 @@ static void nc_flush_one(SWFAppContext* app_context, NcConn* c)
 
 	AmfBuf packet;
 	amf_buf_init(&packet);
-	amf_packet_build(&packet, hdrs, (size_t) c->header_count,
+	// AVM1 NetConnection is AMF0-only (there is no objectEncoding property), so
+	// the packet version is always 0.
+	amf_packet_build(&packet, 0, hdrs, (size_t) c->header_count,
 	                 pmsgs, (size_t) count);
 
 #if SWF_LOG_FETCH_ENABLED

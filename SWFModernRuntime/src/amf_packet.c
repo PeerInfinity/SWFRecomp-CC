@@ -81,11 +81,11 @@ void amf_buf_short_str(AmfBuf* b, const char* s, size_t n)
 	amf_buf_put(b, s, n);
 }
 
-void amf_packet_build(AmfBuf* out,
+void amf_packet_build(AmfBuf* out, unsigned version,
                       const AmfPacketHeader* headers, size_t header_count,
                       const AmfPacketMessage* messages, size_t message_count)
 {
-	amf_buf_u16be(out, 0);   // version
+	amf_buf_u16be(out, version);
 	amf_buf_u16be(out, (unsigned) header_count);
 	for (size_t i = 0; i < header_count; i++)
 	{

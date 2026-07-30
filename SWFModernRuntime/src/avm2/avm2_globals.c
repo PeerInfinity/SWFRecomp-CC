@@ -2700,6 +2700,36 @@ void avm2_builtin_add_flash_utils_fn(Avm2Context* ctx, const char* name,
 	builtin_add_global_fn_ns(ctx, "flash.utils", name, fn);
 }
 
+// flash.system.fscommand(command, args) — Ruffle hands it to the
+// FsCommandProvider (avm2/globals/flash/system.rs), and its test harness
+// recognises exactly "quit" and "captureImage", warning on anything else. The
+// unknown-command arm matters: netconnection_send_remote calls
+// fscommand("exit"), which does nothing at all, so the movie keeps ticking and
+// what actually stops its output is the removeEventListener on the next line.
+// The two known commands map onto the same globals AVM1's FSCommand: URL path
+// uses (action.c actionGetURL).
+static Avm2Value global_fscommand(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc < 1) return avm2_undefined();
+	const Avm2String* cmd = avm2_coerce_to_string(ctx, act->args[0]);
+	if (cmd->len == 4 && memcmp(cmd->utf8, "quit", 4) == 0)
+	{
+		extern int quit_swf;
+		extern int g_force_quit;
+		quit_swf = 1;
+		g_force_quit = 1;
+	}
+#ifdef OFFSCREEN_RENDER
+	else if (cmd->len == 12 && memcmp(cmd->utf8, "captureImage", 12) == 0)
+	{
+		extern void capture_on_fscommand(void);
+		capture_on_fscommand();
+	}
+#endif
+	return avm2_undefined();
+}
+
 void avm2_register_toplevel(Avm2Context* ctx)
 {
 	avm2_builtin_add_global_fn(ctx, "trace", native_trace);
@@ -2716,6 +2746,7 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	avm2_builtin_add_global_fn_n(ctx, "decodeURI", global_decode_uri, 1);
 	avm2_builtin_add_global_fn_n(ctx, "decodeURIComponent",
 	                             global_decode_uri_component, 1);
+	builtin_add_global_fn_ns(ctx, "flash.system", "fscommand", global_fscommand);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "getQualifiedClassName",
 	                         global_get_qualified_class_name);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "getDefinitionByName",

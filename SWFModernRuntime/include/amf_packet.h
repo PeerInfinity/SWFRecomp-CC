@@ -74,8 +74,10 @@ typedef struct AmfPacketMessage
 	size_t body_len;
 } AmfPacketMessage;
 
-// Append a complete packet to `out`.
-void amf_packet_build(AmfBuf* out,
+// Append a complete packet to `out`. `version` is the leading u16: 0 for an
+// AMF0 connection, 3 when objectEncoding is AMF3 (in which case the caller has
+// already prefixed each value with the AMF0 0x11 avmplus escape).
+void amf_packet_build(AmfBuf* out, unsigned version,
                       const AmfPacketHeader* headers, size_t header_count,
                       const AmfPacketMessage* messages, size_t message_count);
 
