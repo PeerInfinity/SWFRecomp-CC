@@ -178,3 +178,75 @@ rather than bodged:
 
 Because of those, F3 is landed **with the residual regressions named**
 rather than at zero — see §4 for the measured trade.
+
+## 4. Result — CI `30564063781` (graphics/full, baseline `b95ca09d7`)
+
+**+8 gains, −5 regressions, net +3; histogram completely flat** (no
+segfault / timeout / compile_fail / runtime_error move, `ruffle_matched`
+241 → 241, `recomp_fail` 1 → 1). Corpus 4034 → 4037 of 4421; avm2
+1019 → 1023, visual 137 → 136.
+
+Attributing the two commits separately is what decided the endgame:
+
+| | gains | regressions | net |
+|---|---|---|---|
+| platform-API work (`678e82e30`) | 6 | 0 | **+6** |
+| uncaught-error trace (`1ca0ab117`) | 2 | 5 | **−3** |
+| follow-up (`3dd78effc`, measured locally) | 2 | −1 recovered | **+3** |
+
+Gains: `vector3d` (24 → 397/397), `utils3d` (0 → 7/7), `matrix3d`
+(19 → 57/57), `matrix3d_compose` (0 → 34/34),
+`perspective_projection_basic` (35 → 40/40),
+`flash_media_video_constructor` (25 → 156/156) from the platform work;
+`uncaught_error_basic` (0/2 → pass) and `loader_method` (83 → 85/85, it
+needed the parameter-coercion frame pop) from the trace. Plus `rectangle`
+(1 → 1094/1094) and `font_enumeratefonts` recovered in the follow-up.
+
+Regressions, all five from the trace: `away3d_advanced_shallow_water_demo`,
+`font_enumeratefonts` (recovered), `stage3d_raytrace`, `stage3d_texture`,
+`visual/definefont4`.
+
+### The trace is reverted again — but the worklist went 22 → 4
+
+`ac2325c6f` reverts `1ca0ab117`. The landing condition was "the list is
+empty, or every survivor is understood and harmless"; all four survivors are
+understood and NONE is harmless, since each costs a corpus test. Keeping the
+trace is worth −2 effective tests against reverting it.
+
+**What stayed landed** is everything that made the re-land *correct*: the
+`silent` catch-all frame (so `loader_error_in_root_ctor` can render its own
+error without `print_uncaught` duplicating it) and the split getter/setter
+frames in removeChild's field clearing. Only the stdout write and the
+coercion frame pop came back out. Re-landing is this revert's inverse.
+
+### Predicted vs actual, per bucket
+
+| bucket | predicted | actual |
+|---|---|---|
+| BitmapDataChannel (5) | 0 corpus, unblocks 5 | exactly that — 5 worklist tests silent, no rider anywhere |
+| Graphics APIs (5) | 0 corpus, unblocks 5 | exactly that; the "two failing gradient tests" did not exist |
+| Video (2 + 3 riders) | +1 to +3 | **+1** (`_constructor`); `_setter` 1→33/40 and `_rotation_probe` 1→20/27 stall on integer-twips bounds |
+| 3D geom (1 + ~10 riders) | +3 to +5 | **+4**, plus `perspective_projection` 4→1368/1443 and two from_shumway tests within 5 lines |
+| Stage3D trio | 3 unblocked | **0** — the trio was never "Stage3D": two are embedded-JPEG, one was `Rectangle.left` |
+| singletons | 4 unblocked | 3 unblocked, `definefont4` is TLF |
+| re-land | ~+4 | **+2**, and −4 against it |
+
+**Where the estimate went wrong, and why it is a repeatable lesson:** the
+worklist's own labels named the *symptom class*, not the *owner*. "Stage3D
+(3)" was one sealed-Rectangle accessor and two recompiler asset gaps;
+"BreakOpportunity (1)" was the Text Layout Framework. Both times the cheap
+name hid the expensive cause and vice versa. The census in §1 is the only
+step that priced anything correctly — and it priced the two buckets the
+scoping had ranked highest at exactly zero.
+
+### The risk set is bigger than `status == pass`
+
+`error_signature` is also recorded for `ruffle_matched` tests, and a
+`ruffle_matched` test that gains a line can lose that status — so the
+computable risk set is `status IN (pass, ruffle_matched) AND
+error_signature != null`, **29** tests, not 22. All seven `ruffle_matched`
+ones were re-run under the trace and every one KEPT its status, for a reason
+worth recording: Ruffle traces the same line, so its reference output
+already contains it. That is independent confirmation the change is
+behaviourally right — and the reason it can only ever cost `pass` tests,
+never `ruffle_matched` ones.
