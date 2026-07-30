@@ -6,15 +6,15 @@
     "total_available": 717,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 42,
+    "ignored_count": 41,
     "filtered": true
   },
-  "total": 675,
-  "pass": 641,
+  "total": 676,
+  "pass": 642,
   "ruffle_matched": 12,
   "fail": 22,
   "pass_rate": 95.0,
-  "effective_pass": 653,
+  "effective_pass": 654,
   "effective_pass_rate": 96.7,
   "breakdown": {
     "output_mismatch": 22,
@@ -5677,6 +5677,22 @@
         "matching_lines": 49
       },
       "duration": 1.39,
+      "status": "pass"
+    },
+    {
+      "test": "localconnection",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 2.525,
+        "run": 0.008
+      },
+      "num_frames": 300,
+      "lines": {
+        "actual_lines": 579,
+        "expected_lines": 579,
+        "matching_lines": 579
+      },
+      "duration": 2.55,
       "status": "pass"
     },
     {

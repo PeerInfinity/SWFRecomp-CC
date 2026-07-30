@@ -1,28 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6a07045c4406` (2026-07-30T00:01:22.485822+00:00)
-**Current:** `a584ada71e19` (2026-07-30T00:38:00.944629+00:00)
+**Previous:** `a584ada71e19` (2026-07-30T00:38:00.944629+00:00)
+**Current:** `34171042fc78` (2026-07-30T01:47:24.771467+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 930 | 932 | +2 |
+| Passing | 932 | 934 | +2 |
 | Total | 1221 | 1221 | 0 |
-| Pass rate | 76.2% | 76.3% | +0.1% |
-| Mismatched lines | 43863 | 43810 | -53 |
-|   Decreased | | | -53 |
+| Pass rate | 76.3% | 76.5% | +0.2% |
+| Mismatched lines | 43810 | 43273 | -537 |
+|   Decreased | | | -537 |
 
 ## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `netconnection_send_remote` | output_mismatch | 2/50 | 50/50 |
-| `netconnection_serialize_arrays` | output_mismatch | 1/6 | 6/6 |
+| `amf_array_serialization` | output_mismatch | 6/17 | 17/17 |
+| `localconnection_send` | output_mismatch | 0/4 | 4/4 |
 
-## Line Count Changed (2)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `amf_array_serialization` | output_mismatch | 6/17 | 6/17 | 0 |
-| `localconnection` | output_mismatch | 67/890 | 67/890 | 0 |
+| `localconnection` | output_mismatch | 67/890 | 589/890 | -522 |
