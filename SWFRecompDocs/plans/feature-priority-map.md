@@ -758,3 +758,55 @@ a histogram of uncaught errors can no longer see it.
 Regression-guard every one of these with
 `gh workflow run ruffle-tests.yml --ref master -f mode=graphics -f categories=full`
 — they all touch shared AVM2 runtime code.
+
+---
+
+## Re-rank 2026-07-30 (post shader/3D close — corpus 3999/4421, 422 failing)
+
+Method: fresh clustering of all 422 effective-failures across every suite
+(incl. the five from_gnash sub-suite results — nested `_results`, mind the
+denominator), a filters census by test-content grep, and a near-pass
+inventory. Numbers at `9277e0e1b` / CI `30519577386`.
+
+**The board has become a long tail, and its head is not a mechanism — it
+is polish density.** 172 of the 422 (41%) are **near-passes missing ≤5
+lines**, distributed: avm2 82, from_avmplus 48, from_shumway 21, avm1 9,
+mixed_avm 6, others 6. Dozens are 0/1 single-assertion tests (the
+`as3/RuntimeErrors` singles, `ecma3/Exceptions/*_rt`, the 8-test
+`avm2/verify_*` family at 15 missing lines total); four fail with
+matching == expected (extra/wrong-order actual lines). No remaining
+family is both large and coherent: `all_classes/*` (25) is the built-in
+API-surface progress meter, the avmplus trio as3/ecma3/e4x (59 failing)
+is itself mostly near-passes, and `from_shumway/fuzz` (16) is
+low-confidence oracle material.
+
+### Ranking
+
+1. **Near-pass polish sweep** (NEW ARC — `polish-sweep-arc.md`, to be
+   created by its tranche 0). 172 candidates. Tranche 0 is a mechanized
+   triage: run every candidate with `--diff` (batched `--test=` args),
+   bucket by CAUSE per [[triage-bucket-by-vm-not-symptom]], rank buckets,
+   then ship fix batches. Causes already visible from this pass: error
+   messages needing namespace-qualified names (the map's old polish table
+   row, still live), verifier error edge cases (8 tests), single-line
+   error-format assertions. Yield unknowable pre-triage but the density
+   is unmatched; precedent (`8e8370df1` cleanup batch) says +40-60 per
+   session is realistic. NOTE the standing warning: as3/RuntimeErrors as
+   a *directory* is still the worst yield-per-effort on the board — the
+   sweep takes its cheap members as bucket riders, never as an arc.
+2. **Filters arc** (census by content-grep: **13 direct trace-graded
+   targets, ~1,150 graded lines** — the 11 `*_filter` avm2 value-object
+   tests + `displayobject_filters` + `filters_array_holes` — plus riders
+   `glassDisplace_shaderfilter`, `visual/avm1_convolution_initialization`,
+   and partial-line progress in `stage_properties2`, the avm1 global
+   decls dumps, and `all_classes/display/*`). Mechanism: filter classes
+   as value objects (defaults/coercion/clone — the same test shape as the
+   shader arc's parameter surface), `DisplayObject.filters` from hard
+   stub to store-in/CLONE-out (51 files read it — the blast radius that
+   kept this out of the shader arc), `BitmapData.generateFilterRect`.
+   Needs its own Ruffle oracle sweep before predicting. MEDIUM-LARGE.
+3. **Tails**, ride-along tier: flash.geom 3D follow-on (~8), AVM1↔AVM2
+   LocalConnection bridge (1 + infrastructure), child-SWF geometry (2).
+
+Recommended order: polish sweep first (tranche 0 + first fix batches),
+filters arc scoping pass while its CI runs or after.
