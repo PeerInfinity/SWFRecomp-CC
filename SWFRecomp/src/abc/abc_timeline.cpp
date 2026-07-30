@@ -12,6 +12,8 @@
 #include <vector>
 
 #include <zlib.h>
+#include <stb_image.h>
+#include <jpeg_helpers.hpp>
 
 namespace SWFRecomp
 {
@@ -30,6 +32,7 @@ enum
 	TAG_PLACE_OBJECT = 4,
 	TAG_REMOVE_OBJECT = 5,
 	TAG_DEFINE_BITS = 6,
+	TAG_JPEG_TABLES = 8,
 	TAG_DEFINE_BUTTON = 7,
 	TAG_SET_BACKGROUND_COLOR = 9,
 	TAG_DEFINE_SOUND = 14,
@@ -549,6 +552,91 @@ struct BitmapAsset
 	std::vector<uint8_t> rgba;  // empty if decode failed
 };
 
+// Decode a DefineBits / DefineBitsJPEG2/3/4 payload to STRAIGHT RGBA.
+//
+// `img` is the image section (JPEG, or — SWF8+ — a PNG or GIF89a smuggled
+// through the same tag). `tables` is the movie's JPEGTables payload, which
+// plain DefineBits (tag 6) needs prepended because its own data carries no
+// Huffman/quantization tables. `alpha_z` is DefineBitsJPEG3/4's zlib alpha
+// plane, one byte per pixel, applied over the (always opaque) JPEG decode.
+//
+// Returns false if the format is unrecognised or stb refuses the data; the
+// caller then leaves the character with no pixels, exactly as before.
+bool decodeJpegCharacter(const uint8_t* img, size_t img_len,
+                         const uint8_t* tables, size_t tables_len,
+                         const uint8_t* alpha_z, size_t alpha_z_len,
+                         uint32_t& out_w, uint32_t& out_h,
+                         std::vector<uint8_t>& out)
+{
+	if (img == NULL || img_len == 0) return false;
+	SWFRecomp::JpegTagFormat fmt = SWFRecomp::detectImageFormat(img, img_len);
+
+	int w = 0, h = 0, comp = 0;
+	uint8_t* pixels = NULL;
+	int channels = 3;
+
+	if (fmt == SWFRecomp::JpegTagFormat::Jpeg)
+	{
+		// Glue [tables][image] together, then apply the two SWF quirk fixes.
+		// The tables payload ends with its own EOI, which the interior
+		// EOI+SOI splice removes along with the image's leading SOI.
+		std::vector<uint8_t> buf;
+		buf.reserve(tables_len + img_len + 2);
+		if (tables != NULL && tables_len >= 2)
+		{
+			buf.assign(tables, tables + tables_len);
+		}
+		buf.insert(buf.end(), img, img + img_len);
+		size_t len = buf.size();
+		buf.resize(len + 2);
+		SWFRecomp::stripInvalidJpegMarkers(buf.data(), len);
+		SWFRecomp::appendTrailingEoiIfMissing(buf.data(), len, buf.size());
+		pixels = stbi_load_from_memory(buf.data(), (int) len, &w, &h, &comp, 3);
+	}
+	else if (fmt == SWFRecomp::JpegTagFormat::Png
+	         || fmt == SWFRecomp::JpegTagFormat::Gif)
+	{
+		pixels = stbi_load_from_memory(img, (int) img_len, &w, &h, &comp, 4);
+		channels = 4;
+	}
+	if (pixels == NULL || w <= 0 || h <= 0)
+	{
+		if (pixels != NULL) stbi_image_free(pixels);
+		return false;
+	}
+
+	// DefineBitsJPEG3/4 alpha plane (JPEG content only — a PNG/GIF payload
+	// carries its own alpha and the section is ignored, as in swf.cpp).
+	std::vector<uint8_t> alpha;
+	if (alpha_z != NULL && alpha_z_len > 0
+	    && fmt == SWFRecomp::JpegTagFormat::Jpeg)
+	{
+		alpha.resize((size_t) w * h);
+		uLongf alen = (uLongf) alpha.size();
+		if (uncompress(alpha.data(), &alen, (const Bytef*) alpha_z,
+		               (uLong) alpha_z_len) != Z_OK
+		    || (size_t) alen != alpha.size())
+		{
+			alpha.clear();
+		}
+	}
+
+	out.assign((size_t) w * h * 4, 0);
+	for (size_t i = 0; i < (size_t) w * h; i++)
+	{
+		const uint8_t* px = pixels + i * (size_t) channels;
+		out[i * 4 + 0] = px[0];
+		out[i * 4 + 1] = px[1];
+		out[i * 4 + 2] = px[2];
+		out[i * 4 + 3] = !alpha.empty() ? alpha[i]
+		                 : (channels == 4 ? px[3] : 0xFF);
+	}
+	stbi_image_free(pixels);
+	out_w = (uint32_t) w;
+	out_h = (uint32_t) h;
+	return true;
+}
+
 struct BinaryAsset
 {
 	uint16_t char_id;
@@ -827,6 +915,8 @@ struct Scanner
 	std::vector<FontDef> fonts;
 	std::vector<StaticTextDef> statictexts;
 	std::vector<BitmapAsset> bitmaps;
+	// JPEGTables (tag 8) payload: the shared tables a plain DefineBits needs.
+	std::vector<uint8_t> jpeg_tables;
 	std::vector<BinaryAsset> binaries;
 	std::vector<SoundAsset> sounds;
 	struct CsmSettings
@@ -1369,7 +1459,63 @@ struct Scanner
 			case TAG_DEFINE_BITS_JPEG2:
 			case TAG_DEFINE_BITS_JPEG3:
 			case TAG_DEFINE_BITS_JPEG4:
-				defineChar(body, 5 /* BITMAP */, false);
+			{
+				// These used to register the character and drop its pixels, so
+				// every AVM2 movie with a JPEG-embedded asset read
+				// `bitmapData == null`. Decode at recompile time, like the
+				// lossless path and like the AVM1 recompiler already does.
+				CharInfo ci;
+				ci.char_id = body.u16();
+				ci.kind = 5;  // BITMAP
+				uint32_t alpha_off = 0;
+				if (code == TAG_DEFINE_BITS_JPEG3 || code == TAG_DEFINE_BITS_JPEG4)
+				{
+					alpha_off = body.u32();
+					if (code == TAG_DEFINE_BITS_JPEG4) body.u16();  // DeblockParam
+				}
+				const uint8_t* img = (const uint8_t*) body.p;
+				size_t avail = (size_t) (body.end - body.p);
+				size_t img_len = avail;
+				const uint8_t* alpha_z = NULL;
+				size_t alpha_z_len = 0;
+				if (alpha_off != 0 && alpha_off <= avail)
+				{
+					img_len = alpha_off;
+					alpha_z = img + alpha_off;
+					alpha_z_len = avail - alpha_off;
+				}
+				BitmapAsset ba;
+				ba.char_id = ci.char_id;
+				ba.width = 0;
+				ba.height = 0;
+				ba.transparency = (code == TAG_DEFINE_BITS_JPEG3
+				                   || code == TAG_DEFINE_BITS_JPEG4) ? 1 : 0;
+				uint32_t w = 0, h = 0;
+				if (decodeJpegCharacter(img, img_len,
+				                        jpeg_tables.empty() ? NULL : jpeg_tables.data(),
+				                        jpeg_tables.size(), alpha_z, alpha_z_len,
+				                        w, h, ba.rgba))
+				{
+					ba.width = (uint16_t) w;
+					ba.height = (uint16_t) h;
+					ci.bounds[0] = 0;
+					ci.bounds[1] = (int32_t) w * 20;
+					ci.bounds[2] = 0;
+					ci.bounds[3] = (int32_t) h * 20;
+					bitmaps.push_back(ba);
+				}
+				else
+				{
+					fprintf(stderr, "AVM2 recompiler: DefineBits char_id=%u: "
+					        "image decode failed; no pixel data emitted.\n",
+					        ci.char_id);
+				}
+				chars.push_back(ci);
+				break;
+			}
+			case TAG_JPEG_TABLES:
+				// Shared Huffman/quantization tables for plain DefineBits.
+				jpeg_tables.assign(body.p, body.end);
 				break;
 			case TAG_DEFINE_BITS_LOSSLESS:
 			case TAG_DEFINE_BITS_LOSSLESS2:
