@@ -1,14 +1,16 @@
 # Filters arc — scoping
 
-**Status**: scoped 2026-07-30 (pre-implementation). Census: **15 direct
-targets** (13 filter tests + 2 uncaught-error-rider tests), predicted
-**+12**. Oracle: Ruffle @ `75c3cec57` — **PROVENANCE CAVEAT**: the local
-clone has corrupted text in `ConvolutionFilter.as:56-60` (`this.matrixull`,
-`this.preserveAlpharue`) and a real bug in `filters.rs:888,893` (gradient
-`alpha`/`ratio` read from `colors_array`; not exercised by any graded
-line). Verify against github before copying either; everywhere else,
-`output.txt` is Flash's recording and none of the targets is
-`known_failure`.
+**Status**: **CLOSED 2026-07-30** — F1 + F2 shipped, F3 measured and NOT
+landed (§6). CI `30555976332` graphics/full: **+16, zero regressions**
+against a +12 prediction. Census was 15 direct targets (13 filter tests +
+2 uncaught-error riders), predicted +12.
+
+Oracle: Ruffle @ `437be1498` (re-fetched from upstream this session; was
+`75c3cec57`). The original PROVENANCE CAVEAT here — that the local clone had
+corrupted `ConvolutionFilter.as` text and a gradient bug in `filters.rs` — is
+**withdrawn**: both are upstream's own content, see §6 "Provenance
+correction". `output.txt` remains the authority for every rule and none of
+the targets is `known_failure`.
 
 ## 1. The structural key
 
@@ -159,4 +161,114 @@ shader arc's ShaderFilter silently forks its base class.
 
 ## 6. Postmortems
 
-(append per tranche)
+### Arc result — CI `30555976332` (graphics/full, baseline `41d8d6865`)
+
+**+16, zero regressions, zero other status moves.** Corpus 4018 → 4034 of
+4421 (91.2%); avm2 1006 → 1019, from_shumway 183 → 185, visual 136 → 137.
+Histogram flat (`ruffle_matched` 241 → 241, `runtime_error` 7 → 7,
+`recomp_fail` 1 → 1, no segfault/timeout/compile_fail). Prediction was +12
+**including** F3; F1+F2 alone delivered +16 and F3 did not land (below).
+
+| tranche | predicted | landed | commit |
+|---|---|---|---|
+| F1 value objects + round trip + tag parsing | +8 of 10 | **+11** (10 census + `filter_rewind`) | `a250f0573` |
+| F2 the three odd ones | +2 of 3 | **+3** | `0612bc78e` |
+| F3 uncaught-error re-land | +2 | **0 — not landed**, costs 22 | — |
+| unscoped riders | — | +2 (`from_shumway acid/acid-filter`, `timeline/nav/filters`) | |
+
+### F1 — the tag path was in a different table than the census assumed
+
+The scoping called PlaceObject3 filter parsing "the least-known cost", and it
+was the only real cost — but not where §1 looked. `tag.c` DOES carry a full
+eight-kind filter list (`tagBeginFilterList` / `ng_getFilterListDataByDepth`,
+feeding the AVM1 `mc.filters` getter), which made the tag half look nearly
+free. It is unreachable from AVM2: an AVM2 movie runs `abc_timeline.c`'s
+static `Avm2TimelineData` tables and never executes `tagMain.c` at all
+(`app_context.frame_funcs` is NULL). `abc_timeline.cpp` had a
+`skipFilterList` and nothing else. **Two runtimes, two tag tables — check
+which one the VM under test actually reads before pricing a tag feature.**
+
+Second structural finding, cheap once seen: keep the SWF's own fixed-point
+BITS in the native value (`Avm2FilterVal`) rather than a re-derived double.
+A tag-authored filter and a script-authored one then reach AS through
+exactly one division, so they quantize identically and the tag path needs no
+re-quantization pass. The alternative — storing dequantized doubles and
+re-quantizing on import — silently loses alpha bytes: `229/255*255` is
+`228.99999999999997` in IEEE, and the truncating cast turns 229 into 228.
+
+Precision worked out exactly as §2 predicted, with one confirmation worth
+recording: `strength` 1.2 reading back as the graded `1.19921875` (307/256)
+**proves** `Fixed8::from_f64` truncates rather than rounds, and that pins
+every other fixed-point conversion in the file at once.
+
+`filter_rewind` (not in the census, 2/8 at baseline) went to 7/8 for free
+from the tag parse, and to 8/8 with one line: a fresh (non-MOVE) placement
+carrying no filter list must CLEAR the depth. Our runtime reuses the display
+object across a rewind, so without the clear it kept the filters a later
+frame had given it. A plain MOVE keeps them.
+
+### F2 — three tests, three unrelated mechanisms, all small
+
+`filters_array_holes` needed a real CPU `applyFilter`; the color-matrix pass
+is a direct port of `color_matrix.wgsl` (unpremultiply → 4×5 in 0..1 with the
+bias column over 255 → clamp → re-premultiply), and the zero-blur gradient
+passthrough is a straight copy. `generateFilterRect` was not registered at
+all; its ShaderFilter arm ignores `sourceRect` entirely. The AVM1
+convolution quirk was one line, and all seven AVM1 canaries (`bitmap_filters`
+548, `native_subclasses` 191, from_shumway `avm1/filters` 149, the mapPoint
+throw, `globals_swf6/7/8`) stayed green.
+
+### F3 — NOT LANDED: the blocker census was 34, not 6
+
+The scoping said F3's blockers were "exactly the six zero-trace image-only
+avm2 `bitmapdata_*` tests". That under-read `d1c307c51`'s own revert message,
+which lists ~18 causes across 71 tests. Measured directly this session (the
+re-land applied to a worktree, then every at-risk test re-run):
+
+**The risk set is computable, not guessable.** `results.json` records
+`error_signature` for PASSING tests too, and it is populated from exactly one
+source — `print_uncaught`'s stderr line. So *every* test that can regress on
+this change is `status == pass AND error_signature != null`, no sweep needed
+to find them. Today that is **34 tests** (21 avm2, 13 visual); across the
+whole corpus nothing else can move.
+
+F1 closed **12 of the 34** (the BlurFilter / ColorMatrixFilter / GlowFilter /
+`filters=` ones, including six of the seven `bitmapdata_*`). Re-running the
+remaining 22 with the re-land applied: **all 22 regress**, against a gain of
+~4. Net −18. Not landed; `avm2_error.c` + `avm2_function.c` are untouched.
+
+The remaining 22, grouped — this is the ready-made worklist, and F3 lands
+the day it is empty:
+
+| cause | tests |
+|---|---|
+| `BitmapDataChannel` undefined | `bitmapdata_copychannel`, visual `filters/displacement_map{,_scales_with_screen,_through_applyFilter,_through_filters}` (5) |
+| Graphics API gaps (`lineBitmapStyle`, `lineGradientStyle`, `drawRoundRectComplex`, `CapsStyle`, `GraphicsBitmapFill`) | `graphics_bitmaps`, `graphics_gradients`, `graphics_round_rects`, `graphics_direct_commands`, `graphics_bitmap_fill` (5) |
+| Stage3D | `stage3d_bitmap`, `stage3d_raytrace`, `stage3d_texture` (3) |
+| `Video` undefined | visual `video/h264`, `video/h264_multinalu` (2) |
+| `PNGEncoderOptions` | `bitmapdata_colortransform` (1) |
+| `BreakOpportunity` | visual `definefont4` (1) |
+| ColorTransform property creation (#1056) | `displayobject_colortransform_nested` (1) |
+| `away3d` `recompose` (#1006) | `away3d_advanced_shallow_water_demo` (1) |
+| `registerFont` rejects a valid font (#1508) | `font_enumeratefonts` (1) |
+| **real bug in the re-land**: the error prints TWICE for a loaded SWF's root ctor | `loader_error_in_root_ctor` (1) |
+| output shifts after the traced line | `remove_child_clear_field` (1) |
+
+Two of those are evidence *about* the re-land rather than about a platform
+gap. `loader_error_in_root_ctor`'s expected output CONTAINS the traced error
+once — so Flash really does trace uncaught errors, we already emit it through
+another path, and `print_uncaught` duplicates it. Fix that before the next
+attempt. Conversely `font_enumeratefonts` expects NO trace, which means the
+#1508 is ours and Flash never threw it.
+
+### Provenance correction
+
+The scoping's PROVENANCE CAVEAT is wrong and should not be carried forward.
+`~/CC/ruffle` was re-fetched from `https://github.com/ruffle-rs/ruffle.git`
+this session (`75c3cec57` → `437be1498`, 28 commits, our 12 local patches
+re-applied cleanly). `ConvolutionFilter.as`'s `this.matrixull` /
+`preserveAlpharue` and the `filters.rs:888,893` gradient bug are **upstream's
+own content**, not a corrupted local clone. The clone was never suspect; only
+`clone()` is broken upstream, and no graded line touches it. The gradient bug
+(alpha and ratio read from `colors_array`) is real and we implement the
+correct per-array rule instead — still unexercised by any graded line.

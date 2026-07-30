@@ -398,7 +398,7 @@ visible next to their yield, not because they are next.
 | 13 | Stage3D / Context3D | **ARC CLOSED, +16** (`shader3d-arc.md` §6; tranches S1+S2, `dfbbfc1af`, CI `30510274980`). Census was 15 not 13, none of it GPU-graded; all 15 green plus a `matrix3d_invert` rider. `stage3d` category 5/5 |
 | 9 | TextField / EditText / StyleSheet | |
 | 8 | Security / sandbox / ApplicationDomain | |
-| 8 | Filters / blend modes | **The one open shader-arc test lands here.** `DisplayObject.filters` is a hard stub — the getter returns a fresh empty Array, the setter is a no-op — and `BitmapData.generateFilterRect` does not exist. **51 corpus test files read `.filters`**, so turning the stub into a real store (assigned array in, CLONES out, with the same `.shader` identity) is an arc of its own rather than a tail on anything. `pixelbender_effect_glassDisplace_shaderfilter` already passes 2 of its 4 lines and needs exactly those two mechanisms; see `shader3d-arc.md` §6.4 |
+| 8 | Filters / blend modes | **ARC CLOSED 2026-07-30, +16 against +12** (`SWFRecompDocs/plans/filters-arc.md` §6; CI `30555976332`, zero regressions). F1 built the nine filter classes + three constant bags + the one conversion layer that owns every quantization rule, and — the arc's real cost — the PlaceObject3 SurfaceFilterList parse in `abc_timeline.cpp`, because an AVM2 movie runs its own static timeline tables and NEVER executes `tagMain.c`, so `tag.c`'s existing eight-kind filter list (which serves AVM1 `mc.filters`) was unreachable. F2 added a CPU `applyFilter`, `generateFilterRect`, and the AVM1 8th-arg alpha quirk. F3 (the uncaught-error re-land) did NOT land: its blocker census is 34 tests, F1 closed 12, the other 22 are a platform-API worklist in that doc's §6. Historical scoping below. **The one open shader-arc test landed here.** `DisplayObject.filters` is a hard stub — the getter returns a fresh empty Array, the setter is a no-op — and `BitmapData.generateFilterRect` does not exist. **51 corpus test files read `.filters`**, so turning the stub into a real store (assigned array in, CLONES out, with the same `.shader` identity) is an arc of its own rather than a tail on anything. `pixelbender_effect_glassDisplace_shaderfilter` already passes 2 of its 4 lines and needs exactly those two mechanisms; see `shader3d-arc.md` §6.4 |
 | 7 | Text Layout Framework (`textline`, `textblock`, FTE) | |
 | 5 | Sound / audio | |
 | 4 | `describeType` / avmplus introspection | |
@@ -833,6 +833,12 @@ Two ranking corrections this session produced:
 - The **uncaught-error-tracing re-land** moves from "later, after the
   Stage3D/PixelBender/filters arcs" to specifically **the filters arc's
   closeout** — its blocker census is now exactly the filter classes.
+  **CORRECTED 2026-07-30 by measurement**: that was wrong. The census is
+  34 tests, not the six filter ones; the filters arc closed 12 of them and
+  the other 22 all still regress against a ~4 gain, so F3 did not land.
+  The risk set is computable — `status == pass AND error_signature != null`
+  in `results.json` — and the remaining 22 are grouped per cause in
+  `filters-arc.md` §6. Re-attempt when that list is empty.
 - The **astral-plane UTF-8 pair** (`invalid_utf8`, `stylesheet`) is NOT
   polish: the runtime holds strings as UTF-8 and cannot represent a lone
   surrogate, so a CESU-8 pair needs WTF-8 storage or a pair-combining

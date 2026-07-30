@@ -1,6 +1,34 @@
 # avm2 Suite — Current Status
 
-Last updated: 2026-07-30 — **near-pass polish sweep, session 1**
+Last updated: 2026-07-30 — **filters arc CLOSED** (F1 + F2 shipped, F3
+measured and not landed; `SWFRecompDocs/plans/filters-arc.md` §6; CI
+`30555976332` graphics/full green). Corpus-wide **+16, zero regressions,
+zero other status moves**; this suite **1006 → 1019 / 1221 (83.5%)**,
+corpus **4034 / 4421 (91.2%)**. Prediction was +12 including F3.
+
+`flash.filters` is now a real nine-class surface plus three constant bags
+(`avm2_filters.c`): the AS classes coerce nothing, and ONE conversion layer
+on the `DisplayObject.filters` round trip owns every quantization rule. The
+avm2 gains are the nine `*_filter` tests, `displayobject_filters`,
+`filter_rewind`, `filters_array_holes`, and
+`pixelbender_effect_glassDisplace_shaderfilter`; `visual/filters/
+avm1_convolution_initialization` and two from_shumway filter tests rode
+along.
+
+The tag half was the whole cost, and it was not where the scoping looked:
+an AVM2 movie runs `abc_timeline.c`'s static tables and never executes
+`tagMain.c`, so `tag.c`'s existing eight-kind filter list (which serves
+AVM1 `mc.filters`) was unreachable. `abc_timeline.cpp` now parses the
+PlaceObject3 SurfaceFilterList into `Avm2TagFilter` tables.
+
+F3 (re-landing the uncaught-error tracing, `3b401b5f9`) did NOT land: its
+blocker census is **34 tests, not the six the scoping named**. F1 closed
+12 of them; the other 22 all still regress, against a gain of ~4. The
+per-cause worklist is in the arc doc §6 — and the risk set is computable
+from `results.json` alone (`status == pass AND error_signature != null`),
+so it never needs a sweep to find.
+
+Previously — **near-pass polish sweep, session 1**
 (`SWFRecompDocs/plans/polish-sweep-arc.md`; CI `30548659769` graphics/full
 green). Corpus-wide **+19, zero regressions, zero other status moves**;
 this suite **998 → 1006 / 1221 (82.4%)**, corpus **4018 / 4421 (90.9%)**.
