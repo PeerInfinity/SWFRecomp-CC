@@ -12,7 +12,7 @@
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | audio | 3 | 5 | 60.0% | [details](ruffle-tests/tests/swfs/audio/_results/results_filtered.md) |
-| avm1 | 641 | 675 | 95.0% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
+| avm1 | 642 | 676 | 95.0% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
 | avm2 | 795 | 994 | 80.0% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
 | fonts | 3 | 6 | 50.0% | [details](ruffle-tests/tests/swfs/fonts/_results/results_filtered.md) |
 | from_avmplus | 1458 | 1574 | 92.6% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_filtered.md) |
@@ -31,16 +31,16 @@
 | text | 9 | 11 | 81.8% | [details](ruffle-tests/tests/swfs/text/_results/results_filtered.md) |
 | timeline | 12 | 17 | 70.6% | [details](ruffle-tests/tests/swfs/timeline/_results/results_filtered.md) |
 | visual | 136 | 143 | 95.1% | [details](ruffle-tests/tests/swfs/visual/_results/results_filtered.md) |
-| **Total** | **3565** | **4138** | **86.2%** | |
+| **Total** | **3566** | **4139** | **86.2%** | |
 
-*329 tests ignored.*
+*328 tests ignored.*
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | audio | 5 | 24 | 20.8% |
-| avm1 | 104,238 | 107,927 | 96.6% |
+| avm1 | 104,817 | 108,506 | 96.6% |
 | avm2 | 98,579 | 126,695 | 77.8% |
 | fonts | 35 | 104 | 33.7% |
 | from_avmplus | 85,214 | 85,996 | 99.1% |
@@ -59,7 +59,7 @@
 | text | 858 | 973 | 88.2% |
 | timeline | 333 | 371 | 89.8% |
 | visual | 238 | 350 | 68.0% |
-| **Total** | **325,763** | **362,784** | **89.8%** |
+| **Total** | **326,342** | **363,363** | **89.8%** |
 
 ## Failure Breakdown
 
@@ -181,10 +181,10 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm1
 
-- **Pass:** 641/675 (95.0%)
-- **Ignored:** 42 tests
+- **Pass:** 642/676 (95.0%)
+- **Ignored:** 41 tests
 - **Duration:** 1h14m34s across 30 shards
-- **Lines:** 104,238/107,927 matching (96.6%)
+- **Lines:** 104,817/108,506 matching (96.6%)
 - **Avg test duration:** 6.1s — slowest: `movieclip_invalid_get_bounds_7` (50.2s)
 
 ### avm2
