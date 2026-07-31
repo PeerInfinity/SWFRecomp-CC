@@ -1,226 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-31T14:52:54.940098+00:00",
-    "old_git_sha": "a28b3e2cbb40465dbfa97ddaa15a663868b665f5",
-    "new_timestamp": "2026-07-31T20:03:56.688394+00:00",
-    "new_git_sha": "b4d4457f16e24a406b3328e7f30b55c825c7dc47",
+    "old_timestamp": "2026-07-31T20:03:56.688394+00:00",
+    "old_git_sha": "b4d4457f16e24a406b3328e7f30b55c825c7dc47",
+    "new_timestamp": "2026-07-31T20:48:45.142625+00:00",
+    "new_git_sha": "16343c6e1b7a93f90e3534862e55870425986aea",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1481,
+    "old_pass": 1490,
     "old_ruffle_matched": 51,
-    "old_effective_pass": 1532,
+    "old_effective_pass": 1541,
     "old_total": 1574,
-    "old_pass_rate": 94.1,
+    "old_pass_rate": 94.7,
     "new_pass": 1490,
     "new_ruffle_matched": 51,
     "new_effective_pass": 1541,
     "new_total": 1574,
     "new_pass_rate": 94.7,
-    "old_mismatched_lines": 726,
+    "old_mismatched_lines": 696,
     "new_mismatched_lines": 696,
     "increased_mismatches": 0,
-    "decreased_mismatches": 30,
-    "newly_passing": 9,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 9,
-    "unchanged": 1562,
+    "status_changed": 0,
+    "unchanged": 1574,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "as3/Definitions/Classes/ClassDef/Bug118272Package",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "as3/Definitions/Classes/Ext/ExtPublicClassPriv",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "as3/Definitions/Super/SuperRuntimeError",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "as3/Definitions/Variable/AccessPrivateClassVariable_rt",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "as3/Expressions/QualifiedReferences/WildcardOperator",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "e4x/Expressions/e11_1_1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 35
-      },
-      "new_lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      }
-    },
-    {
-      "test": "e4x/Expressions/e11_1_2",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 24,
-        "expected_lines": 20,
-        "matching_lines": 12
-      },
-      "new_lines": {
-        "actual_lines": 23,
-        "expected_lines": 20,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "e4x/Namespace/e13_2_5",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 36,
-        "expected_lines": 36,
-        "matching_lines": 34
-      },
-      "new_lines": {
-        "actual_lines": 36,
-        "expected_lines": 36,
-        "matching_lines": 36
-      }
-    },
-    {
-      "test": "e4x/QName/e13_3_2",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 48
-      },
-      "new_lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 49
-      }
-    },
-    {
-      "test": "e4x/Regress/regress-263935",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 2,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 2,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "e4x/Statements/e12_1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 11
-      },
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 13
-      }
-    }
-  ]
+  "changes": []
 }
