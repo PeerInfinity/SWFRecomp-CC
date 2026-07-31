@@ -357,26 +357,62 @@ const Avm2PropEntry* avm2_vtable_find(const Avm2VTable* vt, const Avm2PropKey* k
 }
 
 // A multiname carrying a namespace SET can match SEVERAL vtable entries at
-// once — a subclass may redeclare an inherited name in a different namespace
-// (`property_priority_chained`: base declares `field1` internal, the subclass
-// declares it public, and the read site's set holds both). The winner is the
-// MOST DERIVED declaration. Ruffle gets this from PropertyMap::insert doing
-// `bucket.insert(0, ..)` — it PREPENDS, so its `.next()` yields the most
-// recently inserted entry. Our vtable is built base-first and appends own
-// traits, so "most derived" is the HIGHEST entry index: set-matching lookups
-// must take the LAST match, not the first. Exact-key lookups
-// (avm2_vtable_find) are unaffected — one (name, ns) pair has one entry.
+// once, because a class may declare the same NAME in two different namespaces
+// that the site's set both contains. Flash resolves that PER VTABLE, walking
+// the class chain most-derived first; our vtable is flattened, so the tie is
+// broken on the entry's DEFINING CLASS instead. Two corpus tests pin the two
+// directions and only this rule satisfies both:
+//
+//   property_priority_chained          base: field1 internal / field2 public
+//                                      sub:  field1 public   / field2 internal
+//     -> the SUBCLASS declaration wins, even though the base's entry comes
+//        first in the flattened order.
+//   getter_different_namespace_setter  base: getter virtualprop ns A
+//                                            setter virtualprop ns B
+//                                      sub:  getter virtualprop ns A (override)
+//     -> a WRITE must find the subclass's getter-only entry and throw #1074,
+//        NOT the base's setter in the other namespace. Ruffle gets this one
+//        wrong (`known_failure = true`), and its test.toml names the reason:
+//        "correct handling requires per-vtable lookup; with flattened vtables,
+//        overridden traits would need to be hackily promoted ahead of
+//        inherited traits" — i.e. plain "last entry wins" is the hack, and it
+//        breaks exactly this case.
+//
+// So: keep the match whose defining class is most derived, and on a TIE keep
+// the FIRST — which leaves every single-match lookup (the overwhelming
+// majority, and all builtins, whose entries carry no defining class) behaving
+// exactly as before. Exact-key lookups (avm2_vtable_find) never multi-match.
 static int mn_kind_is_ns_set(const Avm2AbcFileData* data, uint32_t mn_idx)
 {
 	uint8_t k = data->multinames[mn_idx].kind;
 	return k == 0x09 || k == 0x0e || k == 0x1b || k == 0x1c;
 }
 
+// Depth of `cls` below the root (Object = 0). NULL (a builtin//native entry
+// with no declaring ABC class) sorts lowest so it never displaces a real one.
+static int class_derive_depth(const Avm2Class* cls)
+{
+	int d = 0;
+	for (const Avm2Class* c = cls; c != NULL; c = c->super_class)
+	{
+		if (++d > 256) break;   // cycle guard
+	}
+	return d;
+}
+
+// Should `cand` displace the currently-held `cur` for a ns-set match?
+static int entry_more_derived(const Avm2PropEntry* cand, const Avm2PropEntry* cur)
+{
+	if (cur == NULL) return 1;
+	return class_derive_depth(cand->defining_class)
+	     > class_derive_depth(cur->defining_class);
+}
+
 const Avm2PropEntry* avm2_vtable_find_mn(const Avm2VTable* vt, const Avm2AbcFileData* data,
                                          uint32_t mn_idx)
 {
 	if (vt == NULL) return NULL;
-	const int last_wins = mn_kind_is_ns_set(data, mn_idx);
+	const int multi = mn_kind_is_ns_set(data, mn_idx);
 	const Avm2PropEntry* found = NULL;
 	const Avm2VTableIndex* ix = vt_index_get(vt);
 	if (ix != NULL)
@@ -385,25 +421,21 @@ const Avm2PropEntry* avm2_vtable_find_mn(const Avm2VTable* vt, const Avm2AbcFile
 		uint32_t name_len;
 		avm2_mn_name(data, mn_idx, &name, &name_len);
 		uint32_t h = vt_name_hash(name, name_len);
-		// The chain runs in ASCENDING entry index (vt_index_build walks
-		// high->low), so "keep the last match" == "most derived wins".
 		for (int32_t n = ix->buckets[h & ix->mask]; n >= 0; n = ix->nodes[n].next)
 		{
 			if (ix->nodes[n].hash != h) continue;
 			const Avm2PropEntry* e = &vt->entries[ix->nodes[n].entry];
 			if (!avm2_mn_match(data, mn_idx, &e->key)) continue;
-			found = e;
-			if (!last_wins) return found;
+			if (!multi) return e;
+			if (entry_more_derived(e, found)) found = e;
 		}
 		return found;
 	}
 	for (uint32_t i = 0; i < vt->count; i++)
 	{
-		if (avm2_mn_match(data, mn_idx, &vt->entries[i].key))
-		{
-			found = &vt->entries[i];
-			if (!last_wins) return found;
-		}
+		if (!avm2_mn_match(data, mn_idx, &vt->entries[i].key)) continue;
+		if (!multi) return &vt->entries[i];
+		if (entry_more_derived(&vt->entries[i], found)) found = &vt->entries[i];
 	}
 	return found;
 }
@@ -470,7 +502,7 @@ const Avm2PropEntry* avm2_vtable_find_mn_named(const Avm2VTable* vt,
 	// 9 hashes + 9 bucket walks for what is one bucket's worth of work.
 	// Set matches take the LAST hit (most-derived wins) — see the comment on
 	// avm2_vtable_find_mn.
-	const int last_wins = (set != NULL);
+	const int multi = (set != NULL);
 	const Avm2PropEntry* found = NULL;
 	const Avm2VTableIndex* ix = vt_index_get(vt);
 	if (ix != NULL)
@@ -491,8 +523,8 @@ const Avm2PropEntry* avm2_vtable_find_mn_named(const Avm2VTable* vt,
 				avm2_key_ns_from_abc(&key, data, ns_idx);
 				if (avm2_propkey_matches(&e->key, &key))
 				{
-					found = e;
-					if (!last_wins) return found;
+					if (!multi) return e;
+					if (entry_more_derived(e, found)) found = e;
 					break;
 				}
 			}
@@ -513,8 +545,8 @@ const Avm2PropEntry* avm2_vtable_find_mn_named(const Avm2VTable* vt,
 			avm2_key_ns_from_abc(&key, data, ns_idx);
 			if (avm2_propkey_matches(&e->key, &key))
 			{
-				found = e;
-				if (!last_wins) return found;
+				if (!multi) return e;
+				if (entry_more_derived(e, found)) found = e;
 				break;
 			}
 		}
