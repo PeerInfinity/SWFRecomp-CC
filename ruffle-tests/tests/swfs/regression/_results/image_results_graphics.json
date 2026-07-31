@@ -1,0 +1,90 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-31T04:42:11.310022+00:00",
+    "suite": "regression",
+    "stem": "results_graphics",
+    "git_sha": "8e63d3f376a201f380a397587b77e103ccfe713a",
+    "source": "results_graphics.json",
+    "incomplete": false
+  },
+  "tests_with_comparisons": 5,
+  "comparisons": 5,
+  "pass": 2,
+  "fail": 0,
+  "skip": 3,
+  "no_render": 0,
+  "fail_known_failure": 0,
+  "pass_rate": 40.0,
+  "results": [
+    {
+      "suite": "regression",
+      "test": "avm2_graphics_runtime",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "skip",
+      "message": "No expected image: output.expected.png",
+      "reason": "no_expected_image"
+    },
+    {
+      "suite": "regression",
+      "test": "avm2_morph",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "skip",
+      "message": "No expected image: output.expected.png",
+      "reason": "no_expected_image"
+    },
+    {
+      "suite": "regression",
+      "test": "avm2_timeline_gradients",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 128",
+      "max_diff": 128,
+      "expected_source": "repo",
+      "width": 400,
+      "height": 400,
+      "total_channels": 640000,
+      "diff_channels": 214,
+      "mean_diff": 0.022,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 255,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm2_timeline_solid",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "skip",
+      "message": "No expected image: output.expected.png",
+      "reason": "no_expected_image"
+    },
+    {
+      "suite": "regression",
+      "test": "avm2_timeline_stroke_gradient",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 255",
+      "max_diff": 255,
+      "expected_source": "repo",
+      "width": 400,
+      "height": 400,
+      "total_channels": 640000,
+      "diff_channels": 320,
+      "mean_diff": 0.0249,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 255,
+      "excess_outliers": 0
+    }
+  ]
+}
