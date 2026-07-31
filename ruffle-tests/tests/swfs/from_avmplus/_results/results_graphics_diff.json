@@ -1,193 +1,225 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-31T05:17:46.016988+00:00",
-    "old_git_sha": "c146dc66ef9a5f770695e80e6d1fe53c9cfe6c0d",
-    "new_timestamp": "2026-07-31T14:52:54.940098+00:00",
-    "new_git_sha": "a28b3e2cbb40465dbfa97ddaa15a663868b665f5",
+    "old_timestamp": "2026-07-31T14:52:54.940098+00:00",
+    "old_git_sha": "a28b3e2cbb40465dbfa97ddaa15a663868b665f5",
+    "new_timestamp": "2026-07-31T20:03:56.688394+00:00",
+    "new_git_sha": "b4d4457f16e24a406b3328e7f30b55c825c7dc47",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1472,
+    "old_pass": 1481,
     "old_ruffle_matched": 51,
-    "old_effective_pass": 1523,
+    "old_effective_pass": 1532,
     "old_total": 1574,
-    "old_pass_rate": 93.5,
-    "new_pass": 1481,
+    "old_pass_rate": 94.1,
+    "new_pass": 1490,
     "new_ruffle_matched": 51,
-    "new_effective_pass": 1532,
+    "new_effective_pass": 1541,
     "new_total": 1574,
-    "new_pass_rate": 94.1,
-    "old_mismatched_lines": 761,
-    "new_mismatched_lines": 726,
+    "new_pass_rate": 94.7,
+    "old_mismatched_lines": 726,
+    "new_mismatched_lines": 696,
     "increased_mismatches": 0,
-    "decreased_mismatches": 35,
+    "decreased_mismatches": 30,
     "newly_passing": 9,
     "newly_failing": 0,
     "status_changed": 9,
-    "unchanged": 1564,
+    "unchanged": 1562,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "as3/RuntimeErrors/Error1050CannotConvertToPrimitive",
+      "test": "as3/Definitions/Classes/ClassDef/Bug118272Package",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 2,
+        "actual_lines": 6,
+        "expected_lines": 6,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
       }
     },
     {
-      "test": "as3/RuntimeErrors/Error1064CannotCallMethodAsConstructor",
+      "test": "as3/Definitions/Classes/Ext/ExtPublicClassPriv",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
+        "actual_lines": 6,
+        "expected_lines": 6,
         "matching_lines": 1
-      }
-    },
-    {
-      "test": "as3/RuntimeErrors/Error1117InvalidXmlName",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 2,
-        "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
       }
     },
     {
-      "test": "as3/RuntimeErrors/Error1119DeleteDoesNotSupportXMLListOperand",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 2,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "as3/RuntimeErrors/Error1120CannotDeleteProperty",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "e4x/Expressions/e11_3_1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 35,
-        "expected_lines": 20,
-        "matching_lines": 10
-      },
-      "new_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      }
-    },
-    {
-      "test": "e4x/Global/e13_1_2_1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 10,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 293,
-        "expected_lines": 10,
-        "matching_lines": 7
-      }
-    },
-    {
-      "test": "e4x/Global/isXMLNameTypeErr",
+      "test": "as3/Definitions/Super/SuperRuntimeError",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
         "actual_lines": 3,
-        "expected_lines": 5,
+        "expected_lines": 3,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "as3/Definitions/Variable/AccessPrivateClassVariable_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
       }
     },
     {
-      "test": "ecma3/ObjectObjects/isPrototypeOf",
+      "test": "as3/Expressions/QualifiedReferences/WildcardOperator",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 6
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
       }
     },
     {
-      "test": "ecma3/String/e15_5_5_1",
+      "test": "as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 7
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "e4x/Expressions/e11_1_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 39,
+        "expected_lines": 39,
+        "matching_lines": 35
+      },
+      "new_lines": {
+        "actual_lines": 39,
+        "expected_lines": 39,
+        "matching_lines": 39
+      }
+    },
+    {
+      "test": "e4x/Expressions/e11_1_2",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 24,
+        "expected_lines": 20,
+        "matching_lines": 12
+      },
+      "new_lines": {
+        "actual_lines": 23,
+        "expected_lines": 20,
+        "matching_lines": 17
+      }
+    },
+    {
+      "test": "e4x/Namespace/e13_2_5",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 34
+      },
+      "new_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      }
+    },
+    {
+      "test": "e4x/QName/e13_3_2",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 48
+      },
+      "new_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 49
+      }
+    },
+    {
+      "test": "e4x/Regress/regress-263935",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 2,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "e4x/Statements/e12_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 11
+      },
+      "new_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 13
       }
     }
   ]
