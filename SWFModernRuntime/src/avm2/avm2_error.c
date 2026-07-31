@@ -414,6 +414,56 @@ static Avm2Value error_init(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// DRMManagerError(message, id, subErrorID) — Error's two-parameter ctor plus
+// a third field, stored dont-enum beside errorID.
+static Avm2Value drm_manager_error_init(Avm2Activation* act)
+{
+	error_init(act);
+	Avm2Context* ctx = act->ctx;
+	if (act->this_val.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	Avm2Value sub = (act->argc > 2)
+		? avm2_integer(avm2_coerce_to_i32(ctx, act->args[2]))
+		: avm2_integer(0);
+	Avm2DynProp* p = avm2_object_set_dynamic(ctx, act->this_val.u.obj,
+	                                         "_subErrorID", 11, sub);
+	p->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value drm_get_sub_error_id(Avm2Activation* act)
+{
+	if (act->this_val.kind == AVM2_VALUE_OBJECT)
+	{
+		Avm2Value* v = avm2_object_find_dynamic(act->this_val.u.obj,
+		                                        "_subErrorID", 11);
+		if (v != NULL) return *v;
+	}
+	return avm2_integer(0);
+}
+
+// "DRMManagerError: 'msg', error ID:'42', subErrorID:'10'" — nothing like
+// Error.prototype.toString's "name: message".
+static Avm2Value drm_error_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value msg = avm2_get_public_property(ctx, act->this_val, "message", 7, NULL);
+	Avm2Value eid = avm2_get_public_property(ctx, act->this_val, "errorID", 7, NULL);
+	Avm2Value sub = drm_get_sub_error_id(act);
+	char buf[64];
+	const Avm2String* out = avm2_string_from_literal(ctx, "DRMManagerError: '");
+	out = avm2_string_concat(ctx, out, avm2_coerce_to_string(ctx, msg));
+	out = avm2_string_concat(ctx, out,
+	                         avm2_string_from_literal(ctx, "', error ID:'"));
+	snprintf(buf, sizeof(buf), "%d", (int) avm2_coerce_to_i32(ctx, eid));
+	out = avm2_string_concat(ctx, out, avm2_string_from_literal(ctx, buf));
+	out = avm2_string_concat(ctx, out,
+	                         avm2_string_from_literal(ctx, "', subErrorID:'"));
+	snprintf(buf, sizeof(buf), "%d", (int) avm2_coerce_to_i32(ctx, sub));
+	out = avm2_string_concat(ctx, out, avm2_string_from_literal(ctx, buf));
+	out = avm2_string_concat(ctx, out, avm2_string_from_literal(ctx, "'"));
+	return avm2_string(out);
+}
+
 // Error.prototype.toString: "" message → name, else "name: message".
 static Avm2Value error_proto_to_string(Avm2Activation* act)
 {
@@ -1325,11 +1375,15 @@ void avm2_register_error(Avm2Context* ctx)
 	}
 	{
 		// DRMManagerError uniquely sets NO prototype.name (Ruffle
-		// DRMManagerError.as note; error_prototype asserts undefined).
+		// DRMManagerError.as note; error_prototype asserts undefined). It is
+		// also the only flash.errors class with a THIRD constructor parameter
+		// and its own toString, both of which error_tostring_more grades.
 		Avm2Class* cls = avm2_builtin_class(ctx, "flash.errors", "DRMManagerError",
 		                                    b->error_class);
 		cls->native_call = error_call;
-		cls->instance_init.fn = error_init;
+		cls->instance_init.fn = drm_manager_error_init;
 		cls->instance_init.debug_name = "DRMManagerError";
+		avm2_builtin_add_getter(ctx, cls, "subErrorID", drm_get_sub_error_id);
+		avm2_builtin_add_method(ctx, cls, "toString", drm_error_to_string);
 	}
 }

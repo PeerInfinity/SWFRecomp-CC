@@ -618,6 +618,38 @@ void avm2_gc_mark_roots_media(Avm2Context* ctx)
 }
 
 // ---------------------------------------------------------------------------
+// flash.media.AVTagData — a value object carrying an AV tag's payload and
+// the media time it belongs to. Both are read-only after construction.
+// ---------------------------------------------------------------------------
+
+static Avm2Value avtagdata_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->this_val.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	Avm2Object* self = act->this_val.u.obj;
+	Avm2Value data = (act->argc > 0) ? act->args[0] : avm2_null();
+	if (data.kind != AVM2_VALUE_NULL && data.kind != AVM2_VALUE_UNDEFINED)
+		data = avm2_string(avm2_coerce_to_string(ctx, data));
+	double local = (act->argc > 1) ? avm2_coerce_to_number(ctx, act->args[1])
+	                               : 0.0;
+	avm2_object_set_dynamic(ctx, self, "_data", 5, data)->dont_enum = 1;
+	avm2_object_set_dynamic(ctx, self, "_localTime", 10,
+	                        avm2_number(local))->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value avtagdata_get_data(Avm2Activation* act)
+{
+	return avm2_get_public_property(act->ctx, act->this_val, "_data", 5, NULL);
+}
+
+static Avm2Value avtagdata_get_local_time(Avm2Activation* act)
+{
+	return avm2_get_public_property(act->ctx, act->this_val, "_localTime", 10,
+	                                NULL);
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -685,4 +717,26 @@ void avm2_register_media(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, snd, "play", sound_play);
 	avm2_builtin_add_method(ctx, snd, "close", sound_close);
 	avm2_builtin_add_method(ctx, snd, "load", sound_load);
+
+	// flash.media.StageVideo — [Ruffle(Abstract)], no members at all. Only
+	// abstract_classes reads it.
+	{
+		Avm2Class* sv = avm2_builtin_class(ctx, "flash.media", "StageVideo",
+		                                   b->object_class);
+		sv->flags |= AVM2_CLASS_FLAG_SEALED;
+		avm2_builtin_set_abstract(ctx, sv);
+	}
+
+	// flash.media.AVTagData(data, localTime) — a two-field value object with
+	// getter-only access. The backing fields are dont-enum dynamic props so
+	// the GC traces them for free (no native_ext, no mark hook).
+	{
+		Avm2Class* tag = avm2_builtin_class(ctx, "flash.media", "AVTagData",
+		                                    b->object_class);
+		tag->instance_init.fn = avtagdata_ctor;
+		tag->instance_init.debug_name = "AVTagData";
+		avm2_builtin_add_getset(ctx, tag, "data", avtagdata_get_data, NULL);
+		avm2_builtin_add_getset(ctx, tag, "localTime", avtagdata_get_local_time,
+		                        NULL);
+	}
 }

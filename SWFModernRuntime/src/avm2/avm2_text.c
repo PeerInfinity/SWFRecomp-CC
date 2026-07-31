@@ -8404,6 +8404,15 @@ static Avm2Class* make_slot_class(Avm2Context* ctx, const char* ns,
 
 void avm2_register_text(Avm2Context* ctx)
 {
+	// flash.text.TextSnapshot — [Ruffle(Abstract)]; only a Sprite's
+	// `textSnapshot` getter can mint one, which we do not implement, so the
+	// class exists purely to resolve (abstract_classes reads it).
+	{
+		Avm2Class* ts = avm2_builtin_class(ctx, "flash.text", "TextSnapshot",
+		                                   ctx->builtins.object_class);
+		ts->native_init = fte_abstract_init;
+	}
+
 	Avm2Class* tf = avm2_builtin_class(ctx, "flash.text", "TextFormat",
 	                                   ctx->builtins.object_class);
 	g_textformat_class = tf;

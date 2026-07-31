@@ -251,6 +251,11 @@ Avm2ScopeChain* avm2_scope_capture(Avm2Context* ctx, const Avm2ScopeChain* outer
 // Class realization (NewClass) and construction (ConstructProp / root).
 Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t class_idx,
                              Avm2Class* super_class, Avm2ScopeChain* scope);
+// True while a native_init hook is running for a SCRIPT `new`, false for an
+// internal C mint. See avm2_class.c for why the two must be distinguished.
+int avm2_class_alloc_is_script_new(void);
+void avm2_class_arm_script_construct(void);
+
 Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
                                const Avm2Value* args, uint32_t argc);
 

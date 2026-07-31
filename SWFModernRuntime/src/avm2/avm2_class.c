@@ -1262,9 +1262,38 @@ uint8_t avm2_class_instance_kind(Avm2Context* ctx, const Avm2Class* cls)
 	return kind;
 }
 
+// Was THIS allocation a script `new`, or an internal C mint?
+//
+// Many playerglobal classes are [Ruffle(Abstract)] — `new Graphics()` is
+// #2012 — while the runtime itself mints them constantly (DisplayObject's
+// `graphics` getter, requestContext3D, SharedObject.getLocal, ...). Both go
+// through avm2_class_construct, so an unconditional native_init gate would
+// break the internal mints; TextLine and MorphShape each carry their own
+// ad-hoc flag for exactly this reason.
+//
+// The discriminator is free: avm2_construct_value is called ONLY from
+// avm2_ops.c's construct* opcodes, i.e. only for a script `new`. It arms the
+// flag; the first alloc_instance to see it consumes it, so a constructor body
+// that internally mints an abstract class is (correctly) not a script `new`.
+static int g_script_construct_armed;
+
+void avm2_class_arm_script_construct(void)
+{
+	g_script_construct_armed = 1;
+}
+
+static int g_alloc_is_script_new;
+
+int avm2_class_alloc_is_script_new(void)
+{
+	return g_alloc_is_script_new;
+}
+
 Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
                                const Avm2Value* args, uint32_t argc)
 {
+	int script_new = g_script_construct_armed;
+	g_script_construct_armed = 0;
 	if (cls->flags & AVM2_CLASS_FLAG_INTERFACE)
 	{
 		// avmplus names the missing implementation after the interface's own
@@ -1297,7 +1326,10 @@ Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
 	}
 	if (cls->native_init != NULL)
 	{
+		int saved = g_alloc_is_script_new;
+		g_alloc_is_script_new = script_new;
 		cls->native_init(ctx, obj);
+		g_alloc_is_script_new = saved;
 	}
 	Avm2Value this_val = avm2_object_value(obj);
 	avm2_call_method_ref(ctx, &cls->instance_init, cls,
@@ -1314,6 +1346,7 @@ Avm2Value avm2_construct_value(Avm2Context* ctx, Avm2Value ctor,
 		Avm2Object* o = ctor.u.obj;
 		if (o->kind == AVM2_OBJ_CLASS)
 		{
+			avm2_class_arm_script_construct();
 			return avm2_class_construct(ctx, o->class_ref, args, argc);
 		}
 		if (o->kind == AVM2_OBJ_FUNCTION)

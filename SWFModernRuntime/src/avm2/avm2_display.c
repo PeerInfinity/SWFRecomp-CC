@@ -10666,6 +10666,21 @@ static void morphshape_native_init(Avm2Context* ctx, Avm2Object* obj)
 	display_native_init(ctx, obj);
 }
 
+// flash.display.Stage: `new Stage()` is #2012, but display_alloc_instance
+// mints the real stage through this same hook — and it does NOT go through
+// avm2_class_alloc_instance, so avm2_class_alloc_is_script_new() is false
+// there for free.
+static void stage_native_init(Avm2Context* ctx, Avm2Object* obj)
+{
+	if (avm2_class_alloc_is_script_new())
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2012: Stage$ class cannot be instantiated.");
+		return;
+	}
+	display_native_init(ctx, obj);
+}
+
 // Sprite constructor body (runs at super() time): constructChildren
 // (Ruffle sprite.rs construct_children) — construct_frame on each child,
 // so timeline children placed before the ctor get their constructors
@@ -12906,9 +12921,22 @@ void avm2_register_display(Avm2Context* ctx)
 	textfield->native_init = display_native_init;
 	g_textfield_class = textfield;
 	avm2_text_init_textfield_class(ctx, textfield);
+	// StaticText is [Ruffle(Abstract)] but IS timeline-instantiable, so it
+	// takes MorphShape's conditional gate rather than the unconditional
+	// abstract one: a script `new StaticText()` is #2012, a DefineText
+	// placement is not.
 	Avm2Class* statictext = avm2_builtin_class(ctx, "flash.text", "StaticText", dobj);
-	statictext->native_init = display_native_init;
+	statictext->native_init = morphshape_native_init;
 	g_statictext_class = statictext;
+
+	// flash.display.AVM1Movie — the DisplayObject wrapper an AVM2 movie sees
+	// around a loaded AVM1 child. We do not execute cross-VM children yet, so
+	// nothing ever mints one; the class exists to resolve.
+	{
+		Avm2Class* avm1movie = avm2_builtin_class(ctx, "flash.display",
+		                                          "AVM1Movie", dobj);
+		avm1movie->native_init = display_native_init_abstract;
+	}
 
 	// flash.display.Graphics (bounds-only stub); graphics getter on both
 	// Shape and Sprite.
@@ -13102,9 +13130,11 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, button, "useHandCursor", btn_handcursor_get, btn_handcursor_set);
 	add_getset(ctx, button, "trackAsMenu", btn_trackasmenu_get, btn_trackasmenu_set);
 
-	// flash.display.Stage.
+	// flash.display.Stage. [Ruffle(Abstract)] to script, but the player mints
+	// the one real stage itself — so the gate is script-only, like MorphShape's
+	// is timeline-only.
 	Avm2Class* stage = avm2_builtin_class(ctx, "flash.display", "Stage", doc);
-	stage->native_init = display_native_init;
+	stage->native_init = stage_native_init;
 	b->stage_class = stage;
 	add_getset(ctx, stage, "frameRate", stage_get_frame_rate, stage_set_frame_rate);
 	add_getset(ctx, stage, "color", stage_get_color, stage_set_color);

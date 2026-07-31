@@ -147,6 +147,13 @@ void avm2_builtin_add_static_method_n(Avm2Context* ctx, Avm2Class* cls, const ch
                                       Avm2MethodFn fn, uint32_t param_count);
 void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char* name,
                                    Avm2Value value);
+// Make `new Cls()` throw "Error #2012: <Name>$ class cannot be instantiated."
+// — the [Ruffle(Abstract)] gate, for a class with no display/FTE machinery
+// of its own to hang it on.
+void avm2_builtin_set_abstract(Avm2Context* ctx, Avm2Class* cls);
+// As above, but only a script `new` is refused — for a class the runtime
+// itself still mints (Graphics, Stage, the Stage3D resource family).
+void avm2_builtin_set_abstract_script_only(Avm2Context* ctx, Avm2Class* cls);
 // Static accessor pair on the class object (setter may be NULL).
 void avm2_builtin_add_static_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
                                     Avm2MethodFn getter, Avm2MethodFn setter);
