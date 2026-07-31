@@ -211,6 +211,13 @@ ruffle-tests/image_results.json
 ruffle-image-results.md
 ruffle-image-results.html
 
+# The published image-comparison dashboard is GENERATED at Pages-build time by
+# scripts/generate_image_dashboard.py (numbers from master's per-suite
+# image_results_graphics.json, PNGs fetched from the ruffle-image-results
+# branch). Never commit it — the deploy workflow rebuilds it every run, same as
+# docs/recompiler/build_info.json and the generated example SWFs.
+docs/image-dashboard/
+
 # Local-only SWF batch artifacts (build_swf_batch.sh / clean_swf_batch.sh)
 docs/examples/local_batch/
 docs2/examples/local_batch/

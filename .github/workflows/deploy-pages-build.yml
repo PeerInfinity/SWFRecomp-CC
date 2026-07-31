@@ -80,6 +80,30 @@ jobs:
             fi
           done
 
+      # The dashboard's numbers come from master (per-suite
+      # _results/image_results_graphics.json, merged from ruffle-test-results).
+      # The rendered PNGs come from ruffle-image-results, which is force-pushed
+      # as one commit per image run and must never be merged into master — so
+      # fetch it here and copy only what the page needs into the artifact. This
+      # step is best-effort by design: a missing or stale images branch must
+      # degrade the page to a table, not fail the deploy.
+      - name: Fetch published render images (best effort)
+        continue-on-error: true
+        run: |
+          rm -rf "$RUNNER_TEMP/imgbranch"
+          mkdir -p "$RUNNER_TEMP/imgbranch"
+          git fetch --depth=1 origin ruffle-image-results
+          git archive FETCH_HEAD | tar -x -C "$RUNNER_TEMP/imgbranch"
+          echo "Fetched $(find "$RUNNER_TEMP/imgbranch" -name '*.png' | wc -l) PNGs."
+
+      - name: Build image-comparison dashboard
+        run: |
+          python3 scripts/generate_image_dashboard.py \
+            --stem=graphics \
+            --out=docs/image-dashboard/index.html \
+            --asset-dir=docs/image-dashboard/img \
+            --images-dir="$RUNNER_TEMP/imgbranch"
+
       - name: Install WASI-SDK
         run: |
           WASI_VERSION=30
