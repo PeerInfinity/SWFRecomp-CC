@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `1f90974ab1b5`  
-**Date:** 2026-07-31 03:52 UTC  
-**Total duration:** 9h50m57s
+**Commit:** `8e63d3f376a2`  
+**Date:** 2026-07-31 04:42 UTC  
+**Total duration:** 9h53m27s
 
 ## Results by Suite
 
@@ -160,16 +160,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm2 | 3 | - | 8 | - |
-| from_avmplus | 2 | - | 8 | - |
+*No changes since last run.*
 
-**avm2 — newly passing:** `parse_int`, `place_and_lookup/swf10`, `place_and_lookup/swf9`
-
-**from_avmplus — newly passing:** `ecma3/GlobalObject/e15_1_2_2_2`, `ecma3/TypeConversion/e9_3_1_3_rt`
-
-*Comparing `a62c4ce61a6c` → `1f90974ab1b5`*
+*Comparing `1f90974ab1b5` → `8e63d3f376a2`*
 
 ## Per-Suite Details
 
@@ -183,9 +176,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### avm1
 
 - **Pass:** 669/718 (93.2%)
-- **Duration:** 56m56s across 30 shards
+- **Duration:** 58m55s across 30 shards
 - **Lines:** 116,625/131,178 matching (88.9%)
-- **Avg test duration:** 4.7s — slowest: `netstream_play_flv_screen` (36.8s)
+- **Avg test duration:** 4.9s — slowest: `netstream_play_flv_screen` (37.9s)
 
 ### avm2
 
@@ -274,9 +267,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 ### regression
 
 - **Pass:** 70/70 (100%)
-- **Duration:** 9m58s across 30 shards
+- **Duration:** 10m29s across 30 shards
 - **Lines:** 481/481 matching (100%)
-- **Avg test duration:** 8.5s — slowest: `avm2_timeline_gradients` (29.3s)
+- **Avg test duration:** 8.9s — slowest: `avm2_graphics_runtime` (27.1s)
 
 ### stage3d
 
