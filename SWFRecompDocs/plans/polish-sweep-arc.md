@@ -486,3 +486,172 @@ near-pass window** — `blend_mode_null`, `from_shumway/stroke1`,
 lower bound on a batch's yield, never an upper one:** it is filtered by
 line gap, and a mechanism fix does not care how many lines a test was
 missing.
+
+## 5. Session 3 — the re-triage, and the missing-class cluster
+
+Baseline `af2ac0795` (corpus **4079/4422**). The session opened with a
+mandatory re-verification, and it paid for itself immediately: the
+tranche-0 ledger is several arcs stale.
+
+### 5.1 Step 0 — what the re-triage found
+
+Regenerating the near-pass list from today's `results_graphics.json`
+(same rule, same 19 leaf suites):
+
+| | tranche 0 | now |
+|---|---:|---:|
+| candidates | 172 | **136** |
+| avm2 | 82 | 67 |
+| from_avmplus | 48 | 37 |
+| from_shumway | 21 | 12 |
+
+42 ledger rows are gone (fixed by sessions 1–2, the FTE arc, the filters
+arc and the shader arc), and **6 candidates are NEW** —
+`flash_media_video_setter`, `xml_list_delete_clear_parent`, from_shumway
+`Matrix3DClass` / `PerspectiveProjectionClass` / `hittesting`, and
+`visual/simple_shapes/heavy_tesselation` (a `recomp_fail`). The new ones
+are all *near-passes created by a prior arc's partial fix* — a test that
+was 40 lines short is now 4 short. **The near-pass list regenerates
+itself as the corpus improves; never carry one forward.**
+
+Of the 130 survivors, only ~15 are still in a named bucket (B1 verifier
+messages 6, B10/B11/B12/B9 two each, B4 one). The rest is the 93-single
+tail plus 12 `D-crossvm` and the standing skips.
+
+### 5.2 The uncaught-error re-land is still blocked — by two tests
+
+The corpus-wide query (`status == pass AND error_signature != null`)
+returns exactly **2** survivors, down from 22 → 4:
+
+| test | signature today | expected output |
+|---|---|---|
+| `avm2/away3d_advanced_shallow_water_demo` | `#1065 ContextMenuEvent is not defined` | **0 bytes** |
+| `visual/definefont4` | `#1009 … (accessing field: getEffectiveLineHeight)` | **0 bytes** |
+
+Both have `expected_lines == 0`, so **any** traced line flips them
+pass → fail. The re-land measures +2 / −2 today; it is not landed, and
+`ac2325c6f` stays.
+
+What the query *did* show is that both survivors' causes have MOVED
+since the last attempt, which is the useful part:
+
+- `definefont4`'s blocker is no longer `#1065 ContentElement` — the FTE
+  arc built that, so TLF now runs much further and dies on a null
+  `getEffectiveLineHeight`. It is still "the Text Layout Framework", but
+  a strictly later part of it, and the fix is now "finish TLF" rather
+  than "start TLF".
+- away3d's is no longer the Stage3D `#1009 width` recorded in
+  `uncaught-error-worklist.md` §6 — it is `#1065 ContextMenuEvent`, an
+  ordinary missing class, and past it the chain continues. **A demo
+  SWF's blocker is a moving target: re-read the signature before pricing
+  it, because each landed fix buys the next link and the recorded one
+  goes stale.**
+
+The `ruffle_matched` half of the risk set (7 tests) is unchanged and
+still harmless for the reason §4.5 of the worklist records: Ruffle
+traces the same line, so its reference output already contains it.
+
+### 5.3 Batches
+
+| Batch | Commit | Cluster | Predicted | Actual (local) |
+|---|---|---|---|---|
+| 7 | `a62c4ce61` | missing playerglobal classes | +10 | **+10** |
+| 8 | `da8a5f5df` | parseInt numerics + placed Video | +5 | **+5** |
+
+**Batch 7 — the missing-class cluster.** Clustering the 93 singles by
+their *current* `error_signature` rather than by their ledger bucket
+made one group jump out: nine tests whose first `getlex` throws
+`#1065 Variable X is not defined`, i.e. a playerglobal class that simply
+does not exist. Nine unrelated-looking singles, one mechanism.
+
+Adding the classes also closed `avm2/abstract_classes` (132 lines), the
+FTE arc's "endgame, no partial credit" rider — because eight of the
+fourteen classes it was missing were already on the batch's list. The
+census `fte-arc.md` §6 recorded was **off by one**: `WorkerDomain` is
+also absent, so it was 14 remaining, not 13.
+
+**Batch 8 — parseInt + Video.** Two clusters of one mechanism each; see
+the commit message for the numeric rule.
+
+### 5.4 Postmortem
+
+**Clustering by `error_signature` beats clustering by symptom.** The
+tranche-0 ledger's bucket column called all nine of batch 7's tests
+"single", because their *first differing lines* look nothing alike
+(`false`, `[class IFilePromise]`, `test string`, `785077`, …). Their
+error signatures are identical in shape. `results_graphics.json` already
+carries the field; one `Counter` over it found in seconds what a
+diff-reading pass had classified as nine separate problems. This is the
+converse of `bucket-by-vm` and of B4's lesson: a SYMPTOM prices nothing,
+but a THROWN ERROR names its own owner.
+
+**A "class exists" fix has an inverse assertion somewhere.** Adding
+`flash.desktop.IFilePromise` for `air_ifilepromise` would have broken
+`air_hidden_lookup`, a passing test that asserts the very same name is
+**inaccessible** from a plain Flash Player SWF. The discriminator was
+already in the tree (`[player_options] runtime = "AIR"` →
+`-DSWF_RUNTIME_AIR`). Content-grepping the PASSING corpus for each new
+class name is what caught it, and it is the check to repeat for every
+future class-stub batch: **before adding a name, grep for a test that
+wants it absent.**
+
+**Distinguishing a script `new` from an internal mint was free.** Twenty
+already-registered classes needed the #2012 abstract gate, and the
+runtime mints most of them itself. Both prior gates in the tree
+(`TextLine`, `MorphShape`) carry an ad-hoc boolean for exactly this. The
+general discriminator turned out to cost nothing: `avm2_construct_value`
+is called ONLY from `avm2_ops.c`'s `construct*` opcodes, so it arms a
+flag the first `alloc_instance` consumes — which also, correctly, makes
+a constructor body's own internal mints not-a-script-new. New gates
+should use `avm2_class_alloc_is_script_new()` rather than a new boolean.
+The one exception is a class whose internal mint bypasses
+`avm2_class_alloc_instance` entirely (`Stage`, via
+`display_alloc_instance`) — there the flag is simply false already, and
+the class needs its own chained hook only because it already had a
+native_init to preserve.
+
+**avmplus's parseInt is exact for a power-of-two radix and inexact
+otherwise, and only three graded lines reveal it.** Two of them wanted
+the exact answer and one wanted the double chain's — which is what
+turned a plausible "just be exact everywhere" fix (which broke a
+previously-passing line) into the right rule. **When two lines pull one
+way and a third pulls the other, the third is the specification**, the
+same shape as B3's `ratio`/`ratio2` pair in §4.
+
+**The parallel canary sweep produces floating-point false positives.**
+`verify-output-parallel-batching` records that `verify_output.py` is
+parallel-safe, and it is — for *triage*. At `-P 6` with `--save-actual`,
+seven number-formatting tests (`utils3d`, `number_tofixed`,
+`number_toprecision`, `number_toexponential`, `coerce_string_precision`,
+`parse_float`, …) reported f64-instead-of-f32 values and full-precision
+instead of shortest-round-trip printing. **Every one passed on a clean
+sequential re-run.** So: parallel sweeps are fine for reading diffs and
+for finding *structural* regressions, but any floating-point mismatch
+they report must be re-run sequentially before it is believed. Related
+hazard, also observed: do not edit runtime sources while a sweep is
+running — a test that compiles mid-edit reports garbage.
+
+### 5.5 Diagnosed causes left on the board (not taken)
+
+- **`avm2/scopes_dont_cache/order-{1,2}`** (+ the related
+  `scope_optimizations`, `getouterscope_two_classobjects`) — a
+  hand-generated ABC (`generate.py` upstream) whose `findpropstrict`
+  uses a **MultinameL**: the name arrives on the runtime stack, and the
+  namespace SET is `{outer, inner}`. Our scope walk resolves through
+  `avm2_vtable_find_mn(vtable, data, mn_idx)`, which is keyed on the
+  static multiname index alone and therefore cannot match a
+  runtime-named multiname at all — hence `#1065 Variable value is not
+  defined` on the very first lookup. Fixing it means threading a runtime
+  name through `findproperty_scope_walk` (and the recompiler's
+  emission). A real feature, not a polish edit.
+- **`avm2/issue_8630_placeremoveplace{,_scriptremove}`** — a
+  place/remove/place cycle where the re-placed child's `width` should be
+  `2.75` and reads `0.75` (and, in the `_scriptremove` variant, should
+  return to `0` and stays `2.75`). A TextField-bounds × timeline
+  interaction, not a one-liner.
+- **`avm2/parse_float_swf10`** — three causes in one test: two
+  exponent-precision rows and the SWF≤10 `parseFloat("1.2345.678")`
+  quirk (Flash yields `12345.678`, i.e. it drops the FIRST decimal
+  point). Left as a genuine single.
+- The **B1 verifier-message remainder** (6), **B9/B10/B11/B12** (2 each)
+  and **B6** (the documented dead end) are unchanged from §1.

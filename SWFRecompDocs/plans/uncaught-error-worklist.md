@@ -327,3 +327,40 @@ So the trace's blocker list is now **two tests, two causes**:
 `visual/definefont4` (Text Layout Framework) and
 `away3d_advanced_shallow_water_demo` (the `#1009` above). The re-land
 itself still measures +2/−5 on its own until both are gone.
+
+
+## 7. Update — polish-sweep session 3 (2026-07-31): still 2 blockers, both moved
+
+The corpus-wide query `status == pass AND error_signature != null` now
+returns exactly **two** tests, and neither can absorb a traced line:
+
+| test | signature | expected |
+|---|---|---|
+| `avm2/away3d_advanced_shallow_water_demo` | `#1065 ContextMenuEvent is not defined` | 0 bytes |
+| `visual/definefont4` | `#1009 … (accessing field: getEffectiveLineHeight)` | 0 bytes |
+
+`expected_lines == 0` for both, so the re-land measures **+2 / −2**.
+NOT landed; `ac2325c6f` stays, and the re-land remains that revert's
+inverse.
+
+**Both causes MOVED since §6, which is the finding worth recording.**
+§6 named them as "the Text Layout Framework" and "the Stage3D `#1009`
+on a null `.width`". Today:
+
+- `definefont4` no longer dies at `#1065 ContentElement` — the FTE arc
+  built that class, so TLF runs much further and now dies on a null
+  `getEffectiveLineHeight`. Still TLF, but the ask has changed from
+  "start it" to "finish it".
+- away3d no longer reports the Stage3D `#1009` at all. Its next link is
+  an ordinary missing class, `ContextMenuEvent` — cheap on its own, but
+  the demo is a chain and the link after it is unknown until that one
+  lands.
+
+**Lesson: a blocker recorded against a demo SWF goes stale every time
+anything lands.** Re-run the query and re-read the signature before
+pricing the re-land; do not price it from this document's history. The
+query itself is two lines over `results_graphics.json` and is the only
+step that was ever accurate.
+
+The `ruffle_matched` half of the risk set (7 tests) is unchanged and
+still harmless, for §4.5's reason.
