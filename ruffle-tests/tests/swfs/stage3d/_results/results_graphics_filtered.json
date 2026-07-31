@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-31T03:17:16.434451+00:00",
-    "git_sha": "a62c4ce61a6c52c3facc76473399f769a4334f0a",
-    "duration_seconds": 43.71,
+    "timestamp": "2026-07-31T03:52:57.722967+00:00",
+    "git_sha": "1f90974ab1b5475b2fac80b02bbaefe2ec7c9a5b",
+    "duration_seconds": 46.65,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -22,7 +22,7 @@
       "test": "request_matching_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.505,
+        "compile": 7.683,
         "run": 0.466
       },
       "num_frames": 126,
@@ -31,15 +31,15 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 7.98,
+      "duration": 8.16,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.007,
-        "run": 0.265
+        "compile": 7.267,
+        "run": 0.315
       },
       "num_frames": 12,
       "lines": {
@@ -47,14 +47,14 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 7.28,
+      "duration": 7.59,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.036,
-        "compile": 9.646,
+        "recomp": 0.032,
+        "compile": 9.563,
         "run": 0.315
       },
       "num_frames": 1,
@@ -63,7 +63,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 10.26,
+      "duration": 10.15,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -81,7 +81,7 @@
       "test": "scissor_rectangle",
       "phases": {
         "recomp": 0.035,
-        "compile": 9.462,
+        "compile": 9.755,
         "run": 0.315
       },
       "num_frames": 1,
@@ -90,7 +90,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 10.08,
+      "duration": 10.37,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -107,9 +107,9 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.018,
-        "compile": 7.401,
-        "run": 0.215
+        "recomp": 0.031,
+        "compile": 9.484,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -117,7 +117,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.81,
+      "duration": 10.07,
       "image_comparisons": {
         "output": {
           "status": "fail",

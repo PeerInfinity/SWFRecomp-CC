@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 1458/1574 passing | Graphics: 1470/1574 passing
+Trace: 1458/1574 passing | Graphics: 1472/1574 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (12 tests)
+## Graphics Improvements (14 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -26,3 +26,5 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 10 | `ecma3/Expressions/e11_2_2_10_rt` | Output Mismatch | 0/1 lines match |
 | 11 | `ecma3/Function/e15_3_4_3_1` | Output Mismatch | 13/14 lines match |
 | 12 | `ecma3/Function/e15_3_4_4_1_rt` | Output Mismatch | 9/10 lines match |
+| 13 | `ecma3/GlobalObject/e15_1_2_2_2` | Output Mismatch | 28/31 lines match |
+| 14 | `ecma3/TypeConversion/e9_3_1_3_rt` | Output Mismatch | 89/94 lines match |
