@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-31T05:17:49.259310+00:00",
+    "suite": "import_assets",
+    "stem": "results_graphics",
+    "git_sha": "c146dc66ef9a5f770695e80e6d1fe53c9cfe6c0d",
+    "source": "results_graphics.json",
+    "incomplete": false
+  },
+  "tests_with_comparisons": 1,
+  "comparisons": 1,
+  "pass": 0,
+  "fail": 1,
+  "skip": 0,
+  "no_render": 0,
+  "fail_known_failure": 0,
+  "pass_rate": 0.0,
+  "results": [
+    {
+      "suite": "import_assets",
+      "test": "avm1_imports_avm1",
+      "comparison": "output",
+      "trace_status": "output_mismatch",
+      "known_failure": false,
+      "status": "fail",
+      "message": "Image comparison failed: 18197 outliers exceed limit of 500, max difference 255",
+      "reason": "pixel_mismatch",
+      "max_diff": 255,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
+      "diff_channels": 27793,
+      "mean_diff": 4.6579,
+      "outliers": 18197,
+      "max_outliers": 500,
+      "tolerance": 100,
+      "excess_outliers": 17697
+    }
+  ]
+}
