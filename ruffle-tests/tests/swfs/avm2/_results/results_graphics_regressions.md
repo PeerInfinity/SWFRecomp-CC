@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 929/1221 passing | Graphics: 1018/1222 passing
+Trace: 929/1221 passing | Graphics: 1026/1222 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (89 tests)
+## Graphics Improvements (97 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -96,10 +96,18 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 80 | `tabstop_properties` | Output Mismatch | 0/105 lines match |
 | 81 | `text_element_basic` | Output Mismatch | 0/34 lines match |
 | 82 | `text_engine_groupelement` | Output Mismatch | 1/64 lines match |
-| 83 | `urlstream_basic` | Output Mismatch | 0/5 lines match |
-| 84 | `utils3d` | Output Mismatch | 0/7 lines match |
-| 85 | `vector3d` | Output Mismatch | 24/397 lines match |
-| 86 | `verification` | Output Mismatch | 5/8 lines match |
-| 87 | `verify_dxns_without_flag` | Output Mismatch | 1/3 lines match |
-| 88 | `verify_jump_to_middle_of_op` | Output Mismatch | 0/1 lines match |
-| 89 | `verify_stack` | Output Mismatch | 2/5 lines match |
+| 83 | `textblock_createline_errors` | Output Mismatch | 0/23 lines match |
+| 84 | `textblock_createline_fte` | Output Mismatch | 0/9 lines match |
+| 85 | `textblock_properties` | Output Mismatch | 0/118 lines match |
+| 86 | `textline_inapplicable_properties` | Output Mismatch | 0/10 lines match |
+| 87 | `textline_name` | Output Mismatch | 0/1 lines match |
+| 88 | `textline_splitting_basic` | Output Mismatch | 0/76 lines match |
+| 89 | `textline_throwerror` | Output Mismatch | 0/30 lines match |
+| 90 | `textline_validity` | Output Mismatch | 1/162 lines match |
+| 91 | `urlstream_basic` | Output Mismatch | 0/5 lines match |
+| 92 | `utils3d` | Output Mismatch | 0/7 lines match |
+| 93 | `vector3d` | Output Mismatch | 24/397 lines match |
+| 94 | `verification` | Output Mismatch | 5/8 lines match |
+| 95 | `verify_dxns_without_flag` | Output Mismatch | 1/3 lines match |
+| 96 | `verify_jump_to_middle_of_op` | Output Mismatch | 0/1 lines match |
+| 97 | `verify_stack` | Output Mismatch | 2/5 lines match |
