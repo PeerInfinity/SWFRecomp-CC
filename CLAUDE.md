@@ -28,6 +28,12 @@ to make the pipeline resumable across sessions.
   runs `full`.
   Policy: `ruffle-tests/tests/swfs/_investigation/FULL_SUITE_IMPORT_AUDIT.md`
   §"Which tests run when".
+- **CI images** (`.claude/pipeline-handoff.md` §"`images`"): `images=false`
+  is the per-change default and must stay that way — `images=true` is a
+  deliberate render-baseline run (publishes `image_results_graphics.json`
+  and force-pushes failing PNGs to the `ruffle-image-results` branch).
+  Image comparisons never gate trace pass/fail. Baseline:
+  `SWFRecompDocs/plans/graphics-image-baseline.md`.
 - Still ask before anything genuinely irreversible or out of scope (force-pushing
   over others' work, rewriting published history, deleting branches, etc.).
 - A failing-but-completed CI run is a result to report, not a blocker — surface

@@ -51,11 +51,16 @@ SUITES = [
     "from_gnash/misc-swfc.all",
 ]
 
-# Suites whose test trees are nested inside another suite's tree. When taking
-# the test.toml census for the parent, skip anything that belongs to a child.
-NESTED_CHILDREN = {
-    "from_shumway": ["from_shumway/avm1"],
-}
+# Suites whose test tree is physically INSIDE another suite's tree. The parent
+# suite's own run walks recursively, so it already grades these tests (as
+# `avm1/text-bind` etc.) and the nested suite's results are a duplicate view of
+# the same comparisons, not additional ones. They keep their own _results dir
+# because the workflow gives them their own shard tag — but a corpus roll-up
+# that sums both double-counts them. Same trap as the 4414-vs-4463 trace
+# denominator. image_baseline_report.py excludes these from its totals; the
+# census here deliberately does NOT skip them, so the parent's rows carry full
+# stats instead of landing in the un-binnable "uncensused" path.
+NESTED_SUITES = {"from_shumway/avm1"}
 
 SKIP_DIRS = {"_investigation", "_results", "_image-test-output", "__pycache__",
              "__framework__"}
@@ -66,14 +71,11 @@ def census_suite(suite):
     root = SWFS_ROOT / suite
     if not root.is_dir():
         return {}
-    excluded = [SWFS_ROOT / c for c in NESTED_CHILDREN.get(suite, [])]
     out = {}
     for toml in root.rglob("test.toml"):
         d = toml.parent
         if any(part in SKIP_DIRS or part.startswith("_") for part in
                d.relative_to(root).parts):
-            continue
-        if any(str(d).startswith(str(x) + os.sep) or d == x for x in excluded):
             continue
         cmps = parse_image_comparisons(d)
         if cmps:

@@ -1,0 +1,294 @@
+# Graphics image-comparison baseline
+
+**First corpus-wide pixel baseline, 2026-07-31**, from run
+[30604886586](https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/30604886586)
+(`mode=graphics categories=full images=true`) at commit `c146dc66e`.
+Characterisation only — this session built the instrument and measured; it did
+not chase a single rendering bug, and choosing the first graphics arc from
+these numbers is deliberately left to a later session.
+
+**Headline: 159/566 image comparisons pass (28.1%), against 4094/4422 (92.6%)
+on trace.** Those are two different instruments measuring two different things
+and neither number corrects the other. See §"What this instrument can and
+can't tell us" before quoting either.
+
+## How to reproduce this
+
+```bash
+gh workflow run ruffle-tests.yml --ref master \
+  -f mode=graphics -f categories=full -f images=true
+# then, after merging origin/ruffle-test-results:
+python3 scripts/image_baseline_report.py --stem=graphics
+```
+
+- Per-suite data: `ruffle-tests/tests/swfs/<suite>/_results/image_results_graphics.json`
+- Failing PNGs + browsable index: the `ruffle-image-results` branch (one
+  force-pushed commit per image run; never merged to master).
+- Pipeline details and the `images` input: `.claude/pipeline-handoff.md`
+  §"`images`".
+
+Renders are graded on CI's **lavapipe** software Vulkan, which is
+deterministic. Local Dawn runs are advisory only.
+
+## Corpus-wide totals
+
+| metric | count | share |
+|---|---:|---:|
+| comparisons | 566 | 100.0% |
+| pass | 159 | 28.1% |
+| fail | 403 | 71.2% |
+| skip | 4 | 0.7% |
+| — of which produced no render at all | 5 | 0.9% |
+| — failures Ruffle itself marks known_failure | 23 | 4.1% |
+
+379 tests carry `[image_comparisons]`; 290 have at least one failing comparison.
+
+## Per suite
+
+| suite | comparisons | pass | fail | skip | no_render | pass rate |
+|---|---:|---:|---:|---:|---:|---:|
+| `visual` | 213 | 32 | 180 | 1 | 0 | 15.0% |
+| `avm2` | 123 | 32 | 91 | 0 | 0 | 26.0% |
+| `from_shumway` | 123 | 30 | 93 | 0 | 5 | 24.4% |
+| `avm1` | 69 | 60 | 9 | 0 | 0 | 87.0% |
+| `from_gnash/misc-ming.all` | 18 | 0 | 18 | 0 | 0 | 0.0% |
+| `regression` | 5 | 2 | 0 | 3 | 0 | 40.0% |
+| `text` | 5 | 0 | 5 | 0 | 0 | 0.0% |
+| `fonts` | 4 | 1 | 3 | 0 | 0 | 25.0% |
+| `stage3d` | 3 | 0 | 3 | 0 | 0 | 0.0% |
+| `from_gnash/misc-swfmill.all` | 2 | 2 | 0 | 0 | 0 | 100.0% |
+| `import_assets` | 1 | 0 | 1 | 0 | 0 | 0.0% |
+| **total** | **566** | **159** | **403** | **4** | **5** | **28.1%** |
+
+## Outlier-magnitude histogram
+
+Failures binned by `excess_outliers` — channels past the test's OWN `max_outliers` budget — as a fraction of the image's total channels (width x height x 4). Binning on excess rather than raw difference is what makes the bands comparable across tests: every tolerance in the corpus was recorded against real Flash output and they differ wildly.
+
+| band | failures | share of failures | |
+|---|---:|---:|---|
+| a_epsilon (<=100 channels over) | 22 | 5.5% | `##` |
+| b_tiny (<0.1% of channels) | 22 | 5.5% | `##` |
+| c_small (0.1-1%) | 76 | 18.9% | `#####` |
+| d_moderate (1-10%) | 117 | 29.0% | `########` |
+| e_large (10-50%) | 104 | 25.8% | `#######` |
+| f_catastrophic (>=50%) | 45 | 11.2% | `###` |
+| no_render | 5 | 1.2% | `#` |
+| size_mismatch | 12 | 3.0% | `#` |
+
+Peak single-channel difference on the same failures (an orthogonal axis: a huge count of 1-LSB drifts and a handful of totally wrong pixels both fail, and they mean very different things):
+
+| max_diff | failures |
+|---|---:|
+| 0 | 12 |
+| 1-2 | 2 |
+| 9-32 | 1 |
+| 33-128 | 30 |
+| 129-255 | 353 |
+| unknown | 5 |
+
+## Failure families
+
+Clustered by test-name/feature keyword. A family is a hypothesis about which subsystem owns the cluster, not a diagnosis.
+
+| family | failures | near-miss (<=100 channels over) | catastrophic (>=50%) |
+|---|---:|---:|---:|
+| Text: EditText / layout / HTML | 71 | 14 | 0 |
+| Shumway acid render tests | 49 | 0 | 5 |
+| Filters (blur/glow/drop-shadow/…) | 32 | 0 | 0 |
+| Stage3D / AGAL / shaders | 32 | 0 | 17 |
+| BitmapData / drawing API | 29 | 0 | 0 |
+| Video / NetStream | 24 | 0 | 16 |
+| Blend modes | 23 | 0 | 0 |
+| Masks / clipping | 20 | 0 | 0 |
+| Gradients | 19 | 1 | 0 |
+| (unclassified) | 19 | 0 | 2 |
+| Focus highlight / focus rect | 18 | 0 | 0 |
+| Text: embedded fonts / glyphs | 15 | 0 | 0 |
+| Timeline / frames | 11 | 7 | 0 |
+| Buttons | 11 | 0 | 1 |
+| Scale-9 / transforms / matrices | 9 | 0 | 3 |
+| Morph shapes / tweens | 8 | 0 | 0 |
+| Shapes / fills / tessellation | 6 | 0 | 0 |
+| Loader / external assets | 5 | 0 | 1 |
+| Display list / depth / visibility | 1 | 0 | 0 |
+| Strokes / line styles | 1 | 0 | 0 |
+
+### Largest single failures
+
+| suite | test | cmp | outliers / budget | max_diff | band |
+|---|---|---|---:|---:|---|
+| `visual` | video/deblocking | output | 3243005 / 0 | 255 | f_catastrophic (>=50%) |
+| `avm2` | pixelbender_dithering | output | 2764800 / 19929 | 162 | f_catastrophic (>=50%) |
+| `avm2` | stage3d_stencil | output | 1920000 / 0 | 255 | f_catastrophic (>=50%) |
+| `avm2` | away3d_advanced_shallow_water_demo | output | 1619525 / 400 | 255 | f_catastrophic (>=50%) |
+| `avm2` | stage3d_fractal | output | 1101097 / 100 | 255 | f_catastrophic (>=50%) |
+| `avm2` | stage3d_blend | output | 1019956 / 4975 | 255 | e_large (10-50%) |
+| `avm2` | pixelbender_effect_glassDisplace_shaderfilter | output | 879464 / 380 | 255 | e_large (10-50%) |
+| `visual` | filters/blur_quality | output | 821415 / 0 | 255 | e_large (10-50%) |
+| `avm2` | stage3d_ignore_sampler_override | output | 788484 / 1935 | 255 | f_catastrophic (>=50%) |
+| `from_shumway` | acid/acid-big | output | 786432 / 20 | 255 | f_catastrophic (>=50%) |
+| `visual` | filters/blur_fractional | output | 774090 / 0 | 255 | e_large (10-50%) |
+| `visual` | video/colorconversion/vp6 | output | 771570 / 0 | 255 | f_catastrophic (>=50%) |
+| `visual` | video/vp6_dispsize | output | 771570 / 0 | 255 | f_catastrophic (>=50%) |
+| `visual` | video/colorconversion/vp6a | output | 731370 / 0 | 240 | f_catastrophic (>=50%) |
+| `from_shumway` | acid/acid-text-5 | output | 709635 / 0 | 255 | e_large (10-50%) |
+| `visual` | filters/bevel_full | output | 693304 / 18 | 255 | e_large (10-50%) |
+| `visual` | video/colorconversion/h263 | output | 686351 / 0 | 255 | f_catastrophic (>=50%) |
+| `stage3d` | scissor_rectangle | output | 657946 / 0 | 255 | f_catastrophic (>=50%) |
+| `avm2` | stage3d_raytrace | output | 657121 / 10 | 245 | f_catastrophic (>=50%) |
+| `stage3d` | scissor_rectangle_invalid | output | 657072 / 0 | 255 | f_catastrophic (>=50%) |
+| `visual` | filters/bevel_outer | output | 648832 / 18 | 255 | e_large (10-50%) |
+| `from_shumway` | bitmapbuttons | output | 618042 / 0 | 255 | f_catastrophic (>=50%) |
+| `avm2` | stage3d_texture | output | 615306 / 117 | 255 | f_catastrophic (>=50%) |
+| `visual` | filters/bevel_inner | output | 606316 / 18 | 254 | e_large (10-50%) |
+| `avm2` | stage3d_agal_cross_product | output | 599874 / 10 | 255 | f_catastrophic (>=50%) |
+
+### Closest misses
+
+| suite | test | cmp | outliers / budget | max_diff |
+|---|---|---|---:|---:|
+| `avm1` | edittext_stylesheet | output | 6 / 0 | 95 |
+| `from_shumway` | timeline/timeline_loop | output.02 | 83 / 70 | 79 |
+| `from_shumway` | timeline/timeline_loop | output.07 | 83 / 70 | 79 |
+| `from_shumway` | timeline/timeline_loop | output.06 | 108 / 90 | 79 |
+| `from_shumway` | timeline/timeline_loop | output.11 | 108 / 90 | 79 |
+| `from_shumway` | timeline/timeline_loop | output.15 | 108 / 90 | 79 |
+| `from_shumway` | timeline/timeline_loop | output.16 | 108 / 90 | 79 |
+| `visual` | edittext/edittext_caret_empty | output.03 | 21 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.02 | 36 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.01 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.04 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.05 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.06 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.07 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.08 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.09 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.10 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.11 | 48 / 0 | 255 |
+| `visual` | edittext/edittext_caret_empty | output.12 | 48 / 0 | 255 |
+| `visual` | drawing_api/gradient_focal_point | output | 60 / 0 | 39 |
+| `avm2` | displayobject_hittestpoint_boundary | output | 976 / 900 | 255 |
+| `visual` | cache_as_bitmap/edittext_hscroll | output.01 | 96 / 0 | 255 |
+| `from_shumway` | flash_text_TextField2 | output | 115 / 10 | 247 |
+| `visual` | focus_highlight/focus_highlight_avm1_button | output.02 | 168 / 0 | 204 |
+| `avm2` | error_stack_trace_release_swf17 | output | 200 / 0 | 255 |
+
+## Skips
+
+| reason | count |
+|---|---:|
+| `no_expected_image` | 3 |
+| `test_recomp_fail` | 1 |
+
+| suite | test | cmp | reason | trace status |
+|---|---|---|---|---|
+| `regression` | avm2_graphics_runtime | output | `no_expected_image` | pass |
+| `regression` | avm2_morph | output | `no_expected_image` | pass |
+| `regression` | avm2_timeline_solid | output | `no_expected_image` | pass |
+| `visual` | simple_shapes/heavy_tesselation | output | `test_recomp_fail` | recomp_fail |
+
+## Expected-image provenance
+
+| source | comparisons |
+|---|---:|
+| `repo` | 557 |
+| `unrecorded` | 9 |
+
+`upstream_checkout` means the expected PNG resolved only through the local `~/CC/ruffle` fallback, which does not exist on CI. Any nonzero count there is a hole in the CI baseline.
+
+## Observations from this baseline
+
+Four things stand out, recorded here as observations, not as work items.
+
+**1. Twelve failures are pure viewport size mismatches, and most are exactly
+2x.** `visual/edittext/edittext_*_scale2` renders 100x100 against an expected
+200x200; `visual/filters/*_scales_with_screen` render at half the expected
+width and height; `avm2/stage_scale_factor` renders 550x400 against 1100x800.
+The harness already parses a scale factor (`get_scale_factor`, used to scale
+input event coordinates) but the capture viewport does not follow it. These
+never reach a pixel comparison at all — a size mismatch short-circuits before
+any channel is compared — so they are 12 failures with what looks like one
+cause, and they are invisible in every magnitude band.
+
+**2. The near-miss band is small: 44 of 403 failures (10.9%) are within 0.1%
+of channels of passing**, and only 22 are within 100 channels. This is the
+opposite of what the trace corpus's near-pass analysis found, and it is the
+single most useful number here: the pixel gap is mostly *structural*, not
+antialiasing noise. 266 failures (66%) are in the moderate/large/catastrophic
+bands. Whatever is wrong is mostly wrong in a way you can see.
+
+**3. `max_diff` says the same thing from the other side:** 354 of 403 failures
+peak at a channel difference of 129-255, i.e. somewhere in the frame a pixel
+is roughly the opposite of what it should be. Only 2 failures peak at 1-2.
+A corpus dominated by sub-pixel AA drift would look exactly inverse.
+
+**4. The three largest families are three different stories.** Text/EditText
+(72) holds most of the near-misses — 14 of the 22 epsilon-band failures are
+text, consistent with glyph rasterisation drift rather than wrong layout.
+Stage3D/shaders (32) and Video/NetStream (24) are the reverse: 17 and 16 of
+them are catastrophic, which is what an unimplemented backend looks like
+rather than an inaccurate one. The 49 Shumway `acid/*` tests are whole-page
+composites — one wrong subsystem fails the whole image, so they are a poor
+first target and a good final one.
+
+**Not measured here:** render tests that crash never reach their comparison.
+One (`visual/simple_shapes/heavy_tesselation`) shows up as
+`skip/test_recomp_fail`; the corpus's 7 runtime errors and 1 recomp failure
+are trace-side numbers. Five `from_shumway/acid` comparisons produced no
+actual PNG at all (`no_render`) — the run finished but the capture trigger
+never fired.
+
+**Three `regression` tests declare `[image_comparisons]` with no expected
+PNG** (`avm2_graphics_runtime`, `avm2_morph`, `avm2_timeline_solid`). They are
+ours, hand-written, with no upstream to fetch a golden from, so they record as
+`skip/no_expected_image` rather than silently vanishing. Generating a golden
+from our own renderer would make the assertion circular; left as-is
+deliberately. Every other comparison in the corpus (563/566) resolves its
+expected PNG from the in-repo test directory — nothing depends on the local
+`~/CC/ruffle` fallback that CI does not have.
+
+## What this instrument can and can't tell us
+
+**It is not a pass/fail metric, and it is not wired into one.** A test's status
+comes from the trace comparison alone. Almost every `[image_comparisons]` test
+ships an empty or trivial `output.txt`, so it trace-passes no matter what a
+single pixel looks like — which is why the corpus can be 92.6% green on trace
+and 28% green on pixels at the same time with neither number being wrong. Do
+not average them, and do not read a rise in one as progress on the other.
+
+**Tolerances are per-test and Flash-recorded, not ours.** Every `tolerance` /
+`max_outliers` pair in the corpus came from upstream Ruffle, tuned against the
+real Flash Player's output on their renderer. A test allowed 50,000 outlier
+channels is not a lax test — it is a test whose author found that much
+legitimate drift between two correct renderers. This is why the histogram bins
+on `excess_outliers` (channels past that test's own budget) rather than on raw
+difference: raw difference is not comparable between two tests, and excess is.
+
+**Lavapipe AA differences are expected to dominate the near-miss band.** CI
+grades on lavapipe (software Vulkan), the expected PNGs were produced by
+Ruffle's renderer, and neither matches the other's edge antialiasing exactly.
+A handful of channels over budget along shape boundaries is the signature of
+that, not of a rendering bug. Treat the epsilon band as noise until something
+else implicates it; treat the large and catastrophic bands as signal.
+
+**A local render is not this measurement.** Local Dawn/WSL2 output is not
+pixel-identical to CI's lavapipe even for comparisons CI grades as passing —
+`bitmapdata_copypixels` matches in the mean locally while showing ~25k
+tolerance-0 outliers from sub-pixel drift. Reproduce a failure locally to
+*understand* it; re-measure on CI to *claim* it.
+
+**Crashes are absent from the pixel verdict, not passing it.** A render test
+that segfaults or times out never reaches its comparison. Those appear here as
+`skip` with a `test_segfault` / `test_timeout` reason rather than as failures,
+so the fail count understates how much of the corpus renders wrongly. The skip
+table is the place to look for them.
+
+**A passing comparison is a weaker claim than it sounds.** It says the final
+captured frame is within budget of the expected PNG at the configured trigger.
+Most triggers are `last_frame`; a test that renders every intermediate frame
+wrongly and lands correctly still passes.
+
+**What it can tell us, and is the point of building it:** which rendering
+subsystems are systematically wrong rather than marginally wrong, how large
+each cluster is, and whether a change moved pixels — measured the same way
+twice, on the same deterministic renderer.

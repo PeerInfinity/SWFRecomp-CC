@@ -177,6 +177,19 @@ install_test_dir() {
     done
 
     # Copy data files (testvars.txt, variables, etc.)
+    #
+    # This loop is also what mirrors the `<cmp>.expected.png` golden images
+    # that `[image_comparisons]` grades against — they are top-level files and
+    # match no exclusion below, so they come down with everything else. They
+    # are NOT git-tracked (only the two hand-made regression goldens are), so
+    # CI's per-run re-download is the only thing that puts them on the runner:
+    # verify_output.py's fallback to a local ~/CC/ruffle checkout does not
+    # exist there. Never add `*.png` to the exclusion list here. The guard is
+    # `python3 scripts/build_image_report.py --audit`, which CI runs on every
+    # images=true dispatch and which reports any comparison with no in-repo
+    # expected PNG. (The nested-asset `find` further down DOES exclude images
+    # on purpose — no comparison name contains a path separator, so no
+    # expected PNG has ever lived in a subdirectory.)
     for data_file in "${test_dir}"/*; do
         [[ -f "${data_file}" ]] || continue
         base="$(basename "${data_file}")"

@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-07-31T05:17:49.351297+00:00",
+    "timestamp": "2026-07-31T05:20:41.757858+00:00",
     "suite": "from_shumway",
     "stem": "results_graphics",
     "git_sha": "c146dc66ef9a5f770695e80e6d1fe53c9cfe6c0d",
     "source": "results_graphics.json",
     "incomplete": false
   },
-  "tests_with_comparisons": 70,
+  "tests_with_comparisons": 71,
   "comparisons": 123,
   "pass": 30,
   "fail": 93,
@@ -1652,6 +1652,27 @@
     },
     {
       "suite": "from_shumway",
+      "test": "avm1/text-bind",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "fail",
+      "message": "Image comparison failed: 1934 outliers exceed limit of 100, max difference 158",
+      "reason": "pixel_mismatch",
+      "max_diff": 158,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
+      "diff_channels": 10316,
+      "mean_diff": 0.7064,
+      "outliers": 1934,
+      "max_outliers": 100,
+      "tolerance": 128,
+      "excess_outliers": 1834
+    },
+    {
+      "suite": "from_shumway",
       "test": "avm2/flash/display/bitmapdata/bitmapdata-clone",
       "comparison": "output",
       "trace_status": "pass",
@@ -2492,18 +2513,6 @@
       "max_outliers": 90,
       "tolerance": 32,
       "excess_outliers": 18
-    },
-    {
-      "suite": "from_shumway",
-      "test": "avm1/text-bind",
-      "comparison": "output",
-      "trace_status": "pass",
-      "status": "fail",
-      "message": "Image comparison failed: 1934 outliers exceed limit of 100, max difference 158",
-      "max_diff": 158,
-      "known_failure": false,
-      "reason": "pixel_mismatch",
-      "uncensused": true
     }
   ]
 }

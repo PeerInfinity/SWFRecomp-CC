@@ -11,6 +11,33 @@ The `ruffle-tests.yml` workflow accepts a `mode` input:
 
 All modes push results to the same branch (`ruffle-test-results`) — only the filenames differ. Rationale + reversion criterion: `SWFRecompDocs/plans/mode-consolidation-plan.md` Phase 2 (if the weekly canary ever catches a divergence graphics missed, restore dual per-change runs). Note when reading a red graphics run: the apt/Vulkan shard flakes (see `graphics-ci-aptget-flaky-shards` memory) need triage before being called regressions. (The old `case-v6` flake no longer exists — it was 3 real heap bugs, fixed 2026-05-28 in `d905efdb1`; a case-v6 failure today is a genuine regression.)
 
+### `images` — the image-comparison instrument (opt-in, default off)
+
+`-f images=true` (graphics mode only) turns on a **separate instrument** that
+does not affect trace pass/fail. **Leave it off for the per-change pipeline**:
+it exists for deliberate render-baseline runs, and with it off every verify
+command line, results file and published artifact is exactly what it was.
+
+What it adds:
+
+- `verify_output.py --images` asserts Pillow rather than degrading silently
+  (a dedicated preflight step fails the shard job, because the verify calls
+  themselves are `|| true`) and records per-comparison magnitude stats.
+- `--image-out-dir` exports the actual + difference PNG of **failing**
+  comparisons only.
+- `scripts/build_image_report.py` writes per-suite
+  `_results/image_results_graphics.json`, published on `ruffle-test-results`
+  alongside the trace results.
+- `scripts/ci/publish_images.sh` force-pushes the failing PNGs plus an
+  `index.md` to **`ruffle-image-results`** as a single commit per run. That
+  branch is rebuilt from scratch every time — never merge it into master.
+
+Caveats: image comparisons already run in every graphics shard regardless of
+this input (they are gated on `mode`); the input controls the *instrument*
+around them. Renders are graded on CI's lavapipe software Vulkan — local Dawn
+renders are not pixel-identical to it and are advisory only. Baseline and
+interpretation: `SWFRecompDocs/plans/graphics-image-baseline.md`.
+
 ### WASM link is now CI-observable
 
 Every `ruffle-tests.yml` dispatch (any mode / any `parallel` / with or without `single_test`) also runs a **`wasm-link-smoke`** job that compiles+links one trace-WASM demo (`swf_core.c` path) and one browser-WASM graphics demo (`swf.c` path). A runtime change that breaks either WASM link turns the run red as its own named job. So the old manual smoke ritual (from the `wasm-build-modes-rot-without-ci` memory) is **no longer needed to catch link/compile breakage** — CI catches it. Still run a manual browser smoke for **behavioural** checks (rendering, interactivity), which this job deliberately does NOT do (compile+link only, no execution).
