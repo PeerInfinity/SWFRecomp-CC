@@ -553,10 +553,31 @@ traces the same line, so its reference output already contains it.
 
 ### 5.3 Batches
 
-| Batch | Commit | Cluster | Predicted | Actual (local) |
+| Batch | Commit | Cluster | Predicted | Actual (CI) |
 |---|---|---|---|---|
 | 7 | `a62c4ce61` | missing playerglobal classes | +10 | **+10** |
 | 8 | `da8a5f5df` | parseInt numerics + placed Video | +5 | **+5** |
+
+**Final: +15, zero regressions, zero other status moves, histogram
+completely flat.** Corpus **4079 -> 4094 / 4422 (92.6%)**.
+
+- CI `30599630053` (graphics/`categories=full`, baseline `af2ac0795`):
+  4079 -> 4089, avm2 1052 -> 1062. `output_mismatch` 335 -> 325,
+  `ruffle_matched` 242 -> 242, `runtime_error` 7 -> 7, `recomp_fail`
+  1 -> 1, no segfault / timeout / compile_fail bucket on either side.
+- CI `30601250181` (same dispatch, baseline `7f26178e3`): 4089 -> 4094,
+  avm2 1062 -> 1065, from_avmplus 1521 -> 1523. Histogram otherwise
+  identical.
+
+**Both batches landed EXACTLY on prediction, with zero CI-only riders** —
+the first session in this arc where that happened. Sessions 1 and 2 each
+overshot (+8 vs +7, +21 vs +16) and the overshoot always came from a
+*shared* mechanism carrying tests outside the near-pass window. Neither
+of this session's clusters is shared: a class that does not exist blocks
+exactly the tests that name it, and `AVM2_CHAR_VIDEO` reaches exactly
+the movies that place a video. **Prediction accuracy is a property of
+the cluster's blast radius, not of the estimator** — a *name*-keyed
+cluster prices exactly, a *behaviour*-keyed one overshoots.
 
 **Batch 7 — the missing-class cluster.** Clustering the 93 singles by
 their *current* `error_signature` rather than by their ledger bucket
