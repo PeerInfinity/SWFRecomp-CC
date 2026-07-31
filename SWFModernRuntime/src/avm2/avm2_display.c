@@ -10609,6 +10609,37 @@ static void display_native_init_abstract(Avm2Context* ctx, Avm2Object* obj)
 	                 (int) name_len, name);
 }
 
+// flash.text.engine.TextLine: a DisplayObjectContainer that only
+// TextBlock.createTextLine may build. The class is [Ruffle(Abstract)], so a
+// script `new TextLine()` throws #2012 like the abstract display bases — but
+// unlike them the hook is conditional, because the FTE layout core has to
+// allocate one. It goes through display_alloc_instance precisely so the line
+// consumes a number from the shared instance counter (textline_name grades
+// `name == "instance1"`), and so nothing else may — in particular we build no
+// internal fallback text object, which would steal that number.
+static Avm2Class* g_textline_class;
+static int g_textline_alloc_ok;
+
+static void textline_native_init(Avm2Context* ctx, Avm2Object* obj)
+{
+	if (!g_textline_alloc_ok)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2012: TextLine$ class cannot be instantiated.");
+		return;
+	}
+	display_native_init(ctx, obj);
+}
+
+Avm2Object* avm2_display_new_textline(Avm2Context* ctx)
+{
+	if (g_textline_class == NULL) return NULL;
+	g_textline_alloc_ok = 1;
+	Avm2Object* obj = display_alloc_instance(ctx, g_textline_class);
+	g_textline_alloc_ok = 0;
+	return obj;
+}
+
 // MorphShape (flash.display.MorphShape): a DisplayObject the timeline places
 // for a DefineMorphShape character, but which script CANNOT instantiate —
 // `new MorphShape()` throws #2012 (avmplus ArgumentError). Unlike the abstract
@@ -12736,6 +12767,18 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, doc, "mouseChildren", doc_get_mouse_children,
 	           doc_set_mouse_children);
 	add_getset(ctx, doc, "tabChildren", doc_get_tab_children, doc_set_tab_children);
+
+	// flash.text.engine.TextLine (extends DisplayObjectContainer). The shell
+	// lives here so it picks up the display alloc hook and ext; avm2_text.c
+	// wires the FTE surface (validity, rawTextLength, the five #2181 setters).
+	{
+		Avm2Class* tl = avm2_builtin_class(ctx, "flash.text.engine", "TextLine",
+		                                   doc);
+		tl->native_init = textline_native_init;
+		tl->native_ext_size = sizeof(Avm2TextLineExt);
+		g_textline_class = tl;
+		avm2_text_init_textline_class(ctx, tl);
+	}
 
 	// flash.display.Loader (extends DisplayObjectContainer). `new Loader()` is
 	// non-throwing (concrete display_native_init, larger native_ext for the

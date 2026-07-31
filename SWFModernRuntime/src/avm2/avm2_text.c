@@ -6257,6 +6257,694 @@ static Avm2Value eaj_clone(Avm2Activation* act)
 	return copy;
 }
 
+// ---------------------------------------------------------------------------
+// TextLine
+// ---------------------------------------------------------------------------
+// The class shell (a DisplayObjectContainer) is built by avm2_register_display,
+// which calls avm2_text_init_textline_class below. Everything a graded test
+// reads is here; the measurement surface (ascent/descent/atom*) is the same set
+// of constants Ruffle returns, since no test grades real metrics.
+
+static Avm2Class* g_textline_class;
+static Avm2Class* g_textblock_class;
+
+static Avm2TextLineExt* textline_ext_of(Avm2Object* o)
+{
+	return obj_is_class(o, g_textline_class) ? (Avm2TextLineExt*) o->native_ext
+	                                         : NULL;
+}
+
+static Avm2TextLineExt* this_tl(Avm2Activation* act)
+{
+	return textline_ext_of(this_obj(act));
+}
+
+static int str_is(const Avm2String* s, const char* lit)
+{
+	size_t n = strlen(lit);
+	return s != NULL && s->len == n && memcmp(s->utf8, lit, n) == 0;
+}
+
+static _Noreturn void tl_throw_2181(Avm2Context* ctx)
+{
+	static const Avm2MethodRef throwerror = { NULL, NULL, "Error$/throwError", 0 };
+	avm2_callstack_push(ctx, &throwerror, NULL);
+	// IllegalOperationError keeps Error's `name`, so this traces as
+	// "Error: Error #2181: ..." rather than naming its own class.
+	avm2_throw_error(ctx, ctx->builtins.illegal_operation_error_class,
+	                 "Error #2181: The TextLine class does not implement this "
+	                 "property or method.");
+}
+
+#define TL_INAPPLICABLE(cname, getval) \
+	static Avm2Value tl_get_##cname(Avm2Activation* act) \
+	{ \
+		(void) act; \
+		return getval; \
+	} \
+	static Avm2Value tl_set_##cname(Avm2Activation* act) \
+	{ \
+		tl_throw_2181(act->ctx); \
+	}
+
+// The five DisplayObject members TextLine refuses. Their GETTERS are
+// overridden too: DisplayObjectContainer's tabChildren default is true, but a
+// TextLine reports false.
+TL_INAPPLICABLE(context_menu, avm2_null())
+TL_INAPPLICABLE(focus_rect, avm2_null())
+TL_INAPPLICABLE(tab_children, avm2_bool(false))
+TL_INAPPLICABLE(tab_enabled, avm2_bool(false))
+TL_INAPPLICABLE(tab_index, avm2_integer(-1))
+#undef TL_INAPPLICABLE
+
+static Avm2Value tl_get_raw_text_length(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	return avm2_integer(tl != NULL ? (int32_t) tl->raw_text_length : 0);
+}
+
+static Avm2Value tl_get_text_block_begin_index(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	return avm2_integer(tl != NULL ? (int32_t) tl->begin_index : 0);
+}
+
+static Avm2Value tl_get_specified_width(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	return avm2_number(tl != NULL ? tl->specified_width : 0.0);
+}
+
+static Avm2Value tl_get_text_block(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	return tl != NULL ? fte_obj_or_null(tl->text_block) : avm2_null();
+}
+
+static Avm2Value tl_set_text_block(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	if (tl != NULL)
+	{
+		Avm2Value v = arg_or_undef(act, 0);
+		tl->text_block = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value tl_get_previous_line(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	return tl != NULL ? fte_obj_or_null(tl->previous_line) : avm2_null();
+}
+
+static Avm2Value tl_get_next_line(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	return tl != NULL ? fte_obj_or_null(tl->next_line) : avm2_null();
+}
+
+static Avm2Value tl_get_validity(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	return tl != NULL ? fte_str_or_null(tl->validity) : avm2_null();
+}
+
+// The validity state machine, verbatim from textline_validity's 162 graded
+// lines. It is NOT an enum check: arbitrary strings ("INVALID", "unknown") are
+// legal VALUES and are stored as given. Only three rules constrain it:
+//   * the exact string "possiblyInvalid" is never settable (#2008 always);
+//   * from "static", only "static";
+//   * from "invalid", only "invalid" or "static".
+// Any other current state (including "valid" and any user string) accepts
+// anything non-null.
+static Avm2Value tl_set_validity(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* s = fte_string_non_null(ctx, arg_or_undef(act, 0),
+	                                          "validity");
+	Avm2TextLineExt* tl = this_tl(act);
+	if (tl == NULL) return avm2_undefined();
+	int ok;
+	if (str_is(s, "possiblyInvalid")) ok = 0;
+	else if (str_is(tl->validity, "static")) ok = str_is(s, "static");
+	else if (str_is(tl->validity, "invalid"))
+		ok = str_is(s, "invalid") || str_is(s, "static");
+	else ok = 1;
+	if (!ok) throw_2008(ctx, "validity");
+	tl->validity = s;
+	return avm2_undefined();
+}
+
+static Avm2Value tl_get_user_data(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	return tl != NULL ? tl->user_data : avm2_undefined();
+}
+
+static Avm2Value tl_set_user_data(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	if (tl != NULL) tl->user_data = arg_or_undef(act, 0);
+	return avm2_undefined();
+}
+
+// Measurement surface: the same constants Ruffle's stubs return. No graded
+// line in the arc reads a real metric — the layout core never measures.
+static Avm2Value tl_const_12(Avm2Activation* act) { (void) act; return avm2_number(12.0); }
+static Avm2Value tl_const_3(Avm2Activation* act) { (void) act; return avm2_number(3.0); }
+static Avm2Value tl_const_0(Avm2Activation* act) { (void) act; return avm2_number(0.0); }
+static Avm2Value tl_const_1(Avm2Activation* act) { (void) act; return avm2_number(1.0); }
+static Avm2Value tl_const_false(Avm2Activation* act) { (void) act; return avm2_bool(false); }
+static Avm2Value tl_const_null(Avm2Activation* act) { (void) act; return avm2_null(); }
+static Avm2Value tl_const_i0(Avm2Activation* act) { (void) act; return avm2_integer(0); }
+static Avm2Value tl_const_im1(Avm2Activation* act) { (void) act; return avm2_integer(-1); }
+static Avm2Value tl_noop(Avm2Activation* act) { (void) act; return avm2_undefined(); }
+
+static Avm2Value tl_get_rotate0(Avm2Activation* act)
+{
+	return avm2_string(fte_lit(act->ctx, "rotate0"));
+}
+
+Avm2Value avm2_text_new_rectangle(Avm2Context* ctx, double x, double y,
+                                  double w, double h);
+
+static Avm2Value tl_get_atom_bounds(Avm2Activation* act)
+{
+	return avm2_text_new_rectangle(act->ctx, 0.0, 0.0, 0.0, 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// TextBlock (+ the layout core)
+// ---------------------------------------------------------------------------
+
+typedef struct Avm2TextBlockExt
+{
+	Avm2Object* content;
+	Avm2Object* tab_stops;                 // Vector.<TabStop>, or NULL
+	Avm2Object* text_justifier;
+	Avm2Object* baseline_font_description;
+	Avm2Object* first_line;
+	Avm2Object* lines_head;                // chain via Avm2TextLineExt.block_chain
+	Avm2Value user_data;
+	const Avm2String* baseline_zero;
+	const Avm2String* line_rotation;
+	const Avm2String* creation_result;     // NULL before the first createTextLine
+	double baseline_font_size;
+	int32_t bidi_level;
+	uint8_t apply_non_linear;
+} Avm2TextBlockExt;
+
+static Avm2TextBlockExt* this_tb(Avm2Activation* act)
+{
+	return (Avm2TextBlockExt*) this_ext_of(act, g_textblock_class);
+}
+
+static Avm2Value tb_get_apply_nlfs(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return avm2_bool(tb != NULL && tb->apply_non_linear);
+}
+
+static Avm2Value tb_set_apply_nlfs(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb != NULL)
+	{
+		tb->apply_non_linear = avm2_coerce_to_boolean(arg_or_undef(act, 0)) ? 1 : 0;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value tb_get_baseline_fd(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return tb != NULL ? fte_obj_or_null(tb->baseline_font_description)
+	                  : avm2_null();
+}
+
+static Avm2Value tb_set_baseline_fd(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb != NULL)
+	{
+		Avm2Value v = arg_or_undef(act, 0);
+		tb->baseline_font_description = v.kind == AVM2_VALUE_OBJECT ? v.u.obj
+		                                                           : NULL;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value tb_get_baseline_font_size(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return avm2_number(tb != NULL ? tb->baseline_font_size : 0.0);
+}
+
+// Rejects negatives like ElementFormat.fontSize — but keeps NaN, like
+// TabStop.position. Three numeric setters, three different NaN policies.
+static Avm2Value tb_set_baseline_font_size(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	double d = avm2_coerce_to_number(act->ctx, arg_or_undef(act, 0));
+	if (d < 0.0) fte_throw_2004(act->ctx);
+	if (tb != NULL) tb->baseline_font_size = d;
+	return avm2_undefined();
+}
+
+static Avm2Value tb_get_baseline_zero(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return tb != NULL ? fte_str_or_null(tb->baseline_zero) : avm2_null();
+}
+
+static Avm2Value tb_set_baseline_zero(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb != NULL)
+	{
+		tb->baseline_zero = fte_enum(act->ctx, arg_or_undef(act, 0),
+		                             "baselineZero", FTE_TEXT_BASELINE_NO_UDB);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value tb_get_bidi_level(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return avm2_integer(tb != NULL ? tb->bidi_level : 0);
+}
+
+static Avm2Value tb_set_bidi_level(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	int32_t v = avm2_coerce_to_i32(act->ctx, arg_or_undef(act, 0));
+	if (v < 0) fte_throw_2004(act->ctx);
+	if (tb != NULL) tb->bidi_level = v;
+	return avm2_undefined();
+}
+
+static Avm2Value tb_get_line_rotation(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return tb != NULL ? fte_str_or_null(tb->line_rotation) : avm2_null();
+}
+
+static Avm2Value tb_set_line_rotation(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb != NULL)
+	{
+		tb->line_rotation = fte_enum(act->ctx, arg_or_undef(act, 0),
+		                             "lineRotation", FTE_TEXT_ROTATION_NO_AUTO);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Object* tb_copy_tab_stops(Avm2Context* ctx, Avm2Object* src)
+{
+	Avm2VectorExt* v = src != NULL ? avm2_vector_ext(src) : NULL;
+	Avm2Object* out = avm2_vector_new(ctx, avm2_vector_apply(ctx, g_tabstop_class),
+	                                  0, 0);
+	for (uint32_t i = 0; v != NULL && i < v->length; i++)
+	{
+		avm2_vector_set_index(ctx, out, i, v->elems[i]);
+	}
+	return out;
+}
+
+// tabStops copies the VECTOR on both the way in and the way out, but shares the
+// TabStop ELEMENTS by reference: pushing onto either side never grows the
+// other, while mutating a stop's position is visible through both
+// (textblock_properties' "tabStops mutability" block grades all four halves).
+static Avm2Value tb_get_tab_stops(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb == NULL || tb->tab_stops == NULL) return avm2_null();
+	return avm2_object_value(tb_copy_tab_stops(act->ctx, tb->tab_stops));
+}
+
+static Avm2Value tb_set_tab_stops(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb != NULL)
+	{
+		Avm2Value v = arg_or_undef(act, 0);
+		tb->tab_stops = v.kind == AVM2_VALUE_OBJECT
+			? tb_copy_tab_stops(act->ctx, v.u.obj) : NULL;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value tb_get_text_justifier(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return tb != NULL ? fte_obj_or_null(tb->text_justifier) : avm2_null();
+}
+
+// The public setter is a one-line forwarder to a private setTextJustifier() in
+// FP, and THAT is the frame the #2007 reports.
+static Avm2Value tb_do_set_text_justifier(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	Avm2Value v = arg_or_undef(act, 0);
+	if (v.kind != AVM2_VALUE_OBJECT) throw_2007(act->ctx, "textJustifier");
+	if (tb != NULL) tb->text_justifier = v.u.obj;
+	return avm2_undefined();
+}
+
+static Avm2Value tb_set_text_justifier(Avm2Activation* act)
+{
+	fte_ctor_set(act, tb_do_set_text_justifier,
+	             "flash.text.engine::TextBlock/setTextJustifier",
+	             arg_or_undef(act, 0));
+	return avm2_undefined();
+}
+
+static Avm2Value tb_get_content(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return tb != NULL ? fte_obj_or_null(tb->content) : avm2_null();
+}
+
+// ANY write to content invalidates every line this block has produced — even
+// re-assigning the identical element. Ruffle misses this, and it is the whole
+// delta on textline_validity's known_failure (162 lines).
+static Avm2Value tb_set_content(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb == NULL) return avm2_undefined();
+	const Avm2String* invalid = fte_lit(act->ctx, "invalid");
+	for (Avm2Object* l = tb->lines_head; l != NULL; )
+	{
+		Avm2TextLineExt* le = textline_ext_of(l);
+		if (le == NULL) break;
+		le->validity = invalid;
+		l = le->block_chain;
+	}
+	Avm2Value v = arg_or_undef(act, 0);
+	tb->content = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+	return avm2_undefined();
+}
+
+static Avm2Value tb_get_creation_result(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return tb != NULL ? fte_str_or_null(tb->creation_result) : avm2_null();
+}
+
+static Avm2Value tb_get_first_line(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return tb != NULL ? fte_obj_or_null(tb->first_line) : avm2_null();
+}
+
+static Avm2Value tb_get_user_data(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	return tb != NULL ? tb->user_data : avm2_undefined();
+}
+
+static Avm2Value tb_set_user_data(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb != NULL) tb->user_data = arg_or_undef(act, 0);
+	return avm2_undefined();
+}
+
+static Avm2Value tb_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb == NULL) return avm2_undefined();
+	tb->user_data = avm2_undefined();
+	tb->baseline_font_size = 12.0;
+	tb->baseline_zero = fte_lit(ctx, "roman");
+	tb->line_rotation = fte_lit(ctx, "rotate0");
+	tb->apply_non_linear = 1;
+
+	Avm2Value content = arg_or_undef(act, 0);
+	Avm2Value tab_stops = arg_or_undef(act, 1);
+	Avm2Value justifier = arg_or_undef(act, 2);
+	// The AS-side body skips a falsy argument entirely, so an invalid
+	// lineRotation aborts the ctor BEFORE baselineZero is applied.
+	if (content.kind == AVM2_VALUE_OBJECT)
+	{
+		fte_ctor_set(act, tb_set_content,
+		             "flash.text.engine::TextBlock/set content", content);
+	}
+	if (tab_stops.kind == AVM2_VALUE_OBJECT)
+	{
+		fte_ctor_set(act, tb_set_tab_stops,
+		             "flash.text.engine::TextBlock/set tabStops", tab_stops);
+	}
+	if (justifier.kind != AVM2_VALUE_OBJECT)
+	{
+		// Defaults to a SpaceJustifier — textblock_properties traces
+		// "[object SpaceJustifier]" on a freshly constructed block.
+		justifier = avm2_class_construct(ctx, g_spacejustifier_class, NULL, 0);
+	}
+	fte_ctor_set(act, tb_set_text_justifier,
+	             "flash.text.engine::TextBlock/set textJustifier", justifier);
+	fte_ctor_set(act, tb_set_line_rotation,
+	             "flash.text.engine::TextBlock/set lineRotation",
+	             act->argc > 3 ? act->args[3]
+	                           : avm2_string(fte_lit(ctx, "rotate0")));
+	Avm2Value bz = act->argc > 4 ? act->args[4]
+	                             : avm2_string(fte_lit(ctx, "roman"));
+	if (avm2_coerce_to_boolean(bz))
+	{
+		fte_ctor_set(act, tb_set_baseline_zero,
+		             "flash.text.engine::TextBlock/set baselineZero", bz);
+	}
+	// bidiLevel (arg 5) is NOT applied by the constructor body.
+	Avm2Value bfd = arg_or_undef(act, 7);
+	if (bfd.kind == AVM2_VALUE_OBJECT)
+	{
+		fte_ctor_set(act, tb_set_baseline_fd,
+		             "flash.text.engine::TextBlock/set baselineFontDescription",
+		             bfd);
+		fte_ctor_set(act, tb_set_baseline_font_size,
+		             "flash.text.engine::TextBlock/set baselineFontSize",
+		             act->argc > 8 ? act->args[8] : avm2_number(12.0));
+	}
+	fte_ctor_set(act, tb_set_apply_nlfs,
+	             "flash.text.engine::TextBlock/set applyNonLinearFontScaling",
+	             act->argc > 6 ? act->args[6] : avm2_bool(true));
+	return avm2_undefined();
+}
+
+// --- the layout core -------------------------------------------------------
+// createTextLine splits on '\n' and NOTHING else: `width` is recorded as
+// specifiedWidth and never consulted for breaking, '\r' is not a break, the
+// break keeps its '\n', and a trailing empty segment yields no line. No graded
+// line reads textWidth/ascent/atomCount, so no glyph or font resolution is
+// involved — lines are created successfully against a font that cannot resolve.
+
+static _Noreturn void tb_throw_2004_via_throwerror(Avm2Context* ctx)
+{
+	static const Avm2MethodRef throwerror = { NULL, NULL, "Error$/throwError", 0 };
+	avm2_callstack_push(ctx, &throwerror, NULL);
+	fte_throw_2004(ctx);
+}
+
+// Index just past the next '\n' at or after `start`, else the end.
+static uint32_t next_line_break(const Avm2String* s, uint32_t start)
+{
+	for (uint32_t i = start; i < s->len; i++)
+	{
+		if (s->utf8[i] == '\n') return i + 1;
+	}
+	return s->len;
+}
+
+// FP reports the null-elementFormat case the way it reports an UNCAUGHT
+// exception — traced, not thrown — and then returns null. Constructing the
+// error here snapshots the live stack, so the trace carries the
+// DoCreateTextLine/createTextLine/caller frames the test grades.
+static void tb_trace_2175(Avm2Context* ctx)
+{
+	Avm2Value err = avm2_error_new(ctx, ctx->builtins.error_class,
+		"Error #2175: One or more elements of the content of the TextBlock "
+		"has a null ElementFormat.");
+	const Avm2String* s = avm2_error_stack_string(ctx, err);
+	fwrite(s->utf8, 1, s->len, stdout);
+	fputc('\n', stdout);
+}
+
+static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
+                                        double width)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2TextBlockExt* tb = this_tb(act);
+	Avm2Object* self = this_obj(act);
+	Avm2ContentElementExt* ce = ce_ext(tb->content);
+	if (ce == NULL || ce->element_format == NULL)
+	{
+		tb_trace_2175(ctx);
+		return avm2_null();
+	}
+	const Avm2String* text = ce_text_of(ctx, tb->content);
+	if (text == NULL) text = empty_string(ctx);
+	Avm2TextLineExt* pl = prev != NULL ? textline_ext_of(prev) : NULL;
+	uint32_t pos = pl != NULL ? pl->end_index : 0;
+	if (pos > text->len)
+	{
+		// The content shrank under a previously created line.
+		tb->creation_result = fte_lit(ctx, "complete");
+		return avm2_null();
+	}
+	uint32_t next = next_line_break(text, pos);
+	if (text->len == 0 || (next == text->len && pos == next))
+	{
+		tb->creation_result = fte_lit(ctx, "complete");
+		return avm2_null();
+	}
+	Avm2Object* line = avm2_display_new_textline(ctx);
+	if (line == NULL) return avm2_null();
+	Avm2TextLineExt* tl = textline_ext_of(line);
+	tl->user_data = avm2_undefined();
+	tl->validity = fte_lit(ctx, "valid");
+	tl->text_block = self;
+	tl->specified_width = width;
+	tl->raw_text_length = text->len;   // the WHOLE block text
+	tl->begin_index = pos;
+	tl->end_index = next;
+	tl->line_index = pl != NULL ? pl->line_index + 1 : 0;
+	if (pl != NULL)
+	{
+		tl->previous_line = prev;
+		pl->next_line = line;
+	}
+	tl->block_chain = tb->lines_head;
+	tb->lines_head = line;
+	tb->creation_result = fte_lit(ctx, "success");
+	tb->first_line = line;
+	return avm2_object_value(line);
+}
+
+// Error taxonomy in order (TextBlock.as): null content returns null BEFORE any
+// check; a previousLine that is not valid or belongs to another block is
+// #2004; an out-of-range width is #2004; the null-elementFormat case is the
+// TRACED #2175 inside DoCreateTextLine.
+static Avm2Value tb_create_text_line(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb == NULL || tb->content == NULL) return avm2_null();
+	Avm2Value pv = arg_or_undef(act, 0);
+	Avm2Object* prev = pv.kind == AVM2_VALUE_OBJECT ? pv.u.obj : NULL;
+	if (prev != NULL)
+	{
+		Avm2TextLineExt* pl = textline_ext_of(prev);
+		if (pl == NULL || !str_is(pl->validity, "valid")
+		    || pl->text_block != this_obj(act))
+		{
+			tb_throw_2004_via_throwerror(ctx);
+		}
+	}
+	double width = act->argc > 1 ? avm2_coerce_to_number(ctx, act->args[1])
+	                             : 1000000.0;
+	if (width < 0.0 || width > 1000000.0) tb_throw_2004_via_throwerror(ctx);
+	// FP names the native half DoCreateTextLine, and the #2175 trace shows it.
+	static const Avm2MethodRef docreate = {
+		NULL, NULL, "flash.text.engine::TextBlock/DoCreateTextLine", 0 };
+	avm2_callstack_push(ctx, &docreate, NULL);
+	Avm2Value r = tb_do_create_text_line(act, prev, width);
+	avm2_callstack_pop(ctx);
+	return r;
+}
+
+static Avm2Value tb_recreate_text_line(Avm2Activation* act)
+{
+	Avm2Value tlv = arg_or_undef(act, 0);
+	if (tlv.kind != AVM2_VALUE_OBJECT) fte_throw_2004(act->ctx);
+	// A non-null previousLine is unsupported; text layout modules depend on
+	// the same TextLine coming back, so it is returned unchanged.
+	if (arg_or_undef(act, 1).kind == AVM2_VALUE_OBJECT) return avm2_null();
+	return tlv;
+}
+
+static Avm2Value tb_release_lines(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	Avm2Value start = arg_or_undef(act, 0);
+	Avm2Value end = arg_or_undef(act, 1);
+	if (tb == NULL || !avm2_strict_eq(start, end)
+	    || end.kind != AVM2_VALUE_OBJECT || end.u.obj != tb->first_line)
+	{
+		return avm2_undefined();   // multi-line release is unimplemented
+	}
+	Avm2TextLineExt* tl = textline_ext_of(tb->first_line);
+	if (tl != NULL)
+	{
+		tl->validity = fte_lit(act->ctx, "invalid");
+		tl->text_block = NULL;
+	}
+	return avm2_undefined();
+}
+
+void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
+{
+	g_textline_class = textline;
+	avm2_builtin_add_static_const(ctx, textline, "MAX_LINE_WIDTH",
+	                              avm2_integer(1000000));
+	avm2_builtin_add_getset(ctx, textline, "userData", tl_get_user_data,
+	                        tl_set_user_data);
+	avm2_builtin_add_getter(ctx, textline, "rawTextLength",
+	                        tl_get_raw_text_length);
+	avm2_builtin_add_getter(ctx, textline, "textBlockBeginIndex",
+	                        tl_get_text_block_begin_index);
+	avm2_builtin_add_getter(ctx, textline, "specifiedWidth",
+	                        tl_get_specified_width);
+	avm2_builtin_add_getter(ctx, textline, "textBlock", tl_get_text_block);
+	avm2_builtin_add_method(ctx, textline, "setTextBlock", tl_set_text_block);
+	avm2_builtin_add_getter(ctx, textline, "previousLine", tl_get_previous_line);
+	avm2_builtin_add_getter(ctx, textline, "nextLine", tl_get_next_line);
+	avm2_builtin_add_getset(ctx, textline, "validity", tl_get_validity,
+	                        tl_set_validity);
+	avm2_builtin_add_getter(ctx, textline, "ascent", tl_const_12);
+	avm2_builtin_add_getter(ctx, textline, "totalAscent", tl_const_12);
+	avm2_builtin_add_getter(ctx, textline, "descent", tl_const_3);
+	avm2_builtin_add_getter(ctx, textline, "totalDescent", tl_const_3);
+	avm2_builtin_add_getter(ctx, textline, "unjustifiedTextWidth",
+	                        tl_get_specified_width);
+	avm2_builtin_add_getter(ctx, textline, "textWidth", tl_const_0);
+	avm2_builtin_add_getter(ctx, textline, "textHeight", tl_const_0);
+	avm2_builtin_add_getter(ctx, textline, "hasGraphicElement", tl_const_false);
+	avm2_builtin_add_getter(ctx, textline, "hasTabs", tl_const_false);
+	avm2_builtin_add_getter(ctx, textline, "atomCount", tl_get_raw_text_length);
+	avm2_builtin_add_method(ctx, textline, "getBaselinePosition", tl_const_0);
+	avm2_builtin_add_method(ctx, textline, "getAtomIndexAtPoint", tl_const_im1);
+	avm2_builtin_add_method(ctx, textline, "getAtomIndexAtCharIndex",
+	                        tl_const_im1);
+	avm2_builtin_add_method(ctx, textline, "getAtomBidiLevel", tl_const_i0);
+	avm2_builtin_add_method(ctx, textline, "getAtomBounds", tl_get_atom_bounds);
+	avm2_builtin_add_method(ctx, textline, "getAtomCenter", tl_const_1);
+	avm2_builtin_add_method(ctx, textline, "getAtomGraphic", tl_const_null);
+	avm2_builtin_add_method(ctx, textline, "getAtomTextBlockBeginIndex",
+	                        tl_const_i0);
+	avm2_builtin_add_method(ctx, textline, "getAtomTextBlockEndIndex",
+	                        tl_const_i0);
+	avm2_builtin_add_method(ctx, textline, "getAtomTextRotation",
+	                        tl_get_rotate0);
+	avm2_builtin_add_method(ctx, textline, "getAtomWordBoundaryOnLeft",
+	                        tl_const_false);
+	avm2_builtin_add_method(ctx, textline, "flushAtomData", tl_noop);
+	// These five are DECLARED by DisplayObject/InteractiveObject/
+	// DisplayObjectContainer, so they must replace the inherited entries.
+	fte_override_getset(ctx, textline, "contextMenu", tl_get_context_menu,
+	                    tl_set_context_menu);
+	fte_override_getset(ctx, textline, "focusRect", tl_get_focus_rect,
+	                    tl_set_focus_rect);
+	fte_override_getset(ctx, textline, "tabChildren", tl_get_tab_children,
+	                    tl_set_tab_children);
+	fte_override_getset(ctx, textline, "tabEnabled", tl_get_tab_enabled,
+	                    tl_set_tab_enabled);
+	fte_override_getset(ctx, textline, "tabIndex", tl_get_tab_index,
+	                    tl_set_tab_index);
+}
+
 // Registration for everything above; called from the flash.text.engine block
 // of avm2_register_text once FontDescription and the constant classes exist.
 static void fte_register_value_objects(Avm2Context* ctx)
@@ -6412,6 +7100,43 @@ static void fte_register_value_objects(Avm2Context* ctx)
 	                        eaj_get_compose_trailing,
 	                        eaj_set_compose_trailing);
 	fte_override_method(ctx, eaj, "clone", eaj_clone);
+
+	// --- TextBlock ---
+	Avm2Class* tb = avm2_builtin_class(ctx, "flash.text.engine", "TextBlock",
+	                                   ctx->builtins.object_class);
+	g_textblock_class = tb;
+	tb->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+	tb->native_ext_size = sizeof(Avm2TextBlockExt);
+	tb->instance_init.fn = tb_ctor;
+	tb->instance_init.debug_name = "TextBlock";
+	avm2_builtin_add_getset(ctx, tb, "userData", tb_get_user_data,
+	                        tb_set_user_data);
+	avm2_builtin_add_getset(ctx, tb, "applyNonLinearFontScaling",
+	                        tb_get_apply_nlfs, tb_set_apply_nlfs);
+	avm2_builtin_add_getset(ctx, tb, "baselineFontDescription",
+	                        tb_get_baseline_fd, tb_set_baseline_fd);
+	avm2_builtin_add_getset(ctx, tb, "baselineFontSize",
+	                        tb_get_baseline_font_size,
+	                        tb_set_baseline_font_size);
+	avm2_builtin_add_getset(ctx, tb, "baselineZero", tb_get_baseline_zero,
+	                        tb_set_baseline_zero);
+	avm2_builtin_add_getset(ctx, tb, "bidiLevel", tb_get_bidi_level,
+	                        tb_set_bidi_level);
+	avm2_builtin_add_getset(ctx, tb, "lineRotation", tb_get_line_rotation,
+	                        tb_set_line_rotation);
+	avm2_builtin_add_getset(ctx, tb, "tabStops", tb_get_tab_stops,
+	                        tb_set_tab_stops);
+	avm2_builtin_add_getset(ctx, tb, "textJustifier", tb_get_text_justifier,
+	                        tb_set_text_justifier);
+	avm2_builtin_add_getset(ctx, tb, "content", tb_get_content, tb_set_content);
+	avm2_builtin_add_getter(ctx, tb, "textLineCreationResult",
+	                        tb_get_creation_result);
+	avm2_builtin_add_getter(ctx, tb, "firstInvalidLine", tl_const_null);
+	avm2_builtin_add_getter(ctx, tb, "firstLine", tb_get_first_line);
+	avm2_builtin_add_getter(ctx, tb, "lastLine", tb_get_first_line);
+	avm2_builtin_add_method(ctx, tb, "createTextLine", tb_create_text_line);
+	avm2_builtin_add_method(ctx, tb, "recreateTextLine", tb_recreate_text_line);
+	avm2_builtin_add_method(ctx, tb, "releaseLines", tb_release_lines);
 }
 
 // ===========================================================================

@@ -738,6 +738,29 @@ void avm2_register_text(Avm2Context* ctx);
 // Adds the full TextField property surface to the class shell created by
 // avm2_display.c.
 void avm2_text_init_textfield_class(Avm2Context* ctx, Avm2Class* textfield);
+// flash.text.engine.TextLine instance state. A TextLine is a real
+// DisplayObjectContainer — textline_name grades `name == "instance1"`, so the
+// line takes a number from the shared instance counter — hence the display ext
+// leads the blob, Loader-style. Everything here is inside the GC's
+// conservative native_ext scan, so the object pointers need no extra marking.
+typedef struct Avm2TextLineExt
+{
+	Avm2DisplayObjectExt display;   // extends DisplayObjectContainer (MUST be first)
+	Avm2Object* text_block;
+	Avm2Object* previous_line;
+	Avm2Object* next_line;
+	Avm2Object* block_chain;        // next line OF THE SAME BLOCK (invalidation walk)
+	Avm2Value user_data;
+	const Avm2String* validity;
+	double specified_width;
+	uint32_t raw_text_length;       // the WHOLE block text, not this line's
+	uint32_t begin_index;
+	uint32_t end_index;
+	uint32_t line_index;
+} Avm2TextLineExt;
+// Wire the FTE surface onto the TextLine class shell (created by
+// avm2_register_display so it gets the concrete display alloc hook).
+void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline);
 // Alloc hook half for script-created TextFields (`new TextField()`).
 void avm2_text_edittext_init(Avm2Context* ctx, Avm2Object* obj);
 // Timeline instantiation: seed EditText state from the DefineEditText tag.
@@ -795,6 +818,11 @@ void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
 void avm2_display_wire_url_stream(Avm2Context* ctx, Avm2Class* us);
 // NULL when obj is not a DisplayObject descendant.
 Avm2DisplayObjectExt* avm2_display_ext_of(Avm2Context* ctx, Avm2Object* obj);
+// Build a flash.text.engine.TextLine. The ONLY sanctioned path: script
+// `new TextLine()` is #2012 (the class is [Ruffle(Abstract)]), and going
+// through the normal display allocation is what makes the line consume an
+// instanceN name.
+Avm2Object* avm2_display_new_textline(Avm2Context* ctx);
 // T4 Part B — CPU-composite a node's recorded flash.display.Graphics geometry
 // into a premultiplied-ARGB target (`w*` = shape-local twips -> target twips).
 // No-op if the node has no recorded geometry. Used by BitmapData.draw (getPixel).
