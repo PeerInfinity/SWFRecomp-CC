@@ -28,32 +28,40 @@ Roll-up correctness is delegated, deliberately:
 
 Where the pixels come from
 --------------------------
-Expected PNGs live in the repo (`<test>/<cmp>.expected.png`). Actual and
-difference PNGs live ONLY on the force-pushed `ruffle-image-results` branch
-(failing comparisons only — passing renders are never published). Two ways to
-reach them:
+Two different places, neither of them a plain checkout:
 
-  --images-dir DIR   A checkout/export of that branch (either the branch root
-                     or its `images/` subdir). PNGs are COPIED into
-                     --asset-dir, so the deployed page is self-contained and
-                     nothing is committed to master. This is what the Pages
-                     build does.
-  --raw-base URL     Fall back to raw.githubusercontent.com links. Tradeoff:
-                     the branch is force-pushed on every image run, so raw
-                     links go stale mid-cache — a viewer can see this run's
-                     numbers next to a previous run's pixels. Only use when
-                     copying is impractical.
+  * Actual + difference PNGs live ONLY on the force-pushed
+    `ruffle-image-results` branch, and only for FAILING comparisons — a passing
+    render is never published, which is why passing rows have no thumbnails.
+    Point `--images-dir` at a checkout/export of that branch (its root or its
+    `images/` subdir).
+  * Expected PNGs are NOT in this repo. The upstream test data is downloaded
+    per run by `ruffle-tests/download_tests.sh` and every suite dir except
+    `regression` is gitignored, so a fresh checkout has no goldens at all.
+    Point `--expected-dir` at a checkout of ruffle-rs/ruffle; the Pages build
+    gets one in ~7s with a blob-filtered sparse checkout of `*.expected.png`
+    (no SWFs). The work tree is still checked first, so a machine that HAS run
+    download_tests.sh uses its own copy.
 
-If neither resolves (branch missing, stale, or not fetched), the page still
-builds: the table renders without thumbnails and carries a visible note. The
-build must never fail because the images branch is unavailable.
+With `--asset-dir`, everything the page needs is COPIED into the output, so the
+deployed site is self-contained and nothing is committed to master.
+`--raw-base` is the fallback: raw.githubusercontent.com links instead of
+copies. Tradeoff — the images branch is force-pushed on every image run, so raw
+links go stale mid-cache and a viewer can see this run's numbers beside a
+previous run's pixels.
+
+If a source does not resolve (branch missing, stale, or not fetched), the page
+still builds: the affected rows render without thumbnails and the page carries
+a visible note. The build must never fail because an image source is
+unavailable.
 
 Usage:
     # CI / Pages build — self-contained, images copied in
     python3 scripts/generate_image_dashboard.py \
         --out=docs/image-dashboard/index.html \
         --asset-dir=docs/image-dashboard/img \
-        --images-dir=/tmp/imgbranch
+        --images-dir=/tmp/imgbranch \
+        --expected-dir=/tmp/ruffle-expected
 
     # No images branch to hand — table only, with the degraded-mode note
     python3 scripts/generate_image_dashboard.py --out=/tmp/dash.html
@@ -81,8 +89,10 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 from build_image_report import near_miss_band  # noqa: E402
 from image_baseline_report import family_of, load  # noqa: E402
 
-RAW_EXPECTED_PREFIX = "master/ruffle-tests/tests/swfs"
 RAW_ACTUAL_PREFIX = "ruffle-image-results/images"
+# Expected PNGs are not in this repo at any ref (see _expected_root), so the raw
+# fallback has to reach upstream Ruffle for them, not our own master.
+RAW_EXPECTED_BASE = "https://raw.githubusercontent.com/ruffle-rs/ruffle/master/tests/tests/swfs"
 
 
 # ---------------------------------------------------------------------------
@@ -168,10 +178,31 @@ def _images_root(images_dir):
     return p if p.is_dir() else None
 
 
-def attach_images(rows, out_path, images_dir, asset_dir, raw_base, local):
+def _expected_root(expected_dir):
+    """Where to look for `<cmp>.expected.png` when it is not in the work tree.
+
+    The upstream test data — expected PNGs included — is downloaded per run by
+    `ruffle-tests/download_tests.sh` and is NOT committed (every suite dir but
+    `regression` is gitignored). A fresh checkout therefore has no goldens at
+    all, which is why the Pages build fetches them straight from upstream
+    Ruffle with a blob-filtered sparse checkout of `*.expected.png` (~7s, no
+    SWFs) and points this at it. Accepts the clone root or the `swfs` dir.
+    """
+    if not expected_dir:
+        return None
+    p = Path(expected_dir)
+    for sub in (Path("tests/tests/swfs"), Path("tests/swfs"), Path(".")):
+        if (p / sub).is_dir():
+            return p / sub
+    return None
+
+
+def attach_images(rows, out_path, images_dir, asset_dir, raw_base, local,
+                  expected_dir=None):
     """Populate row['imgs'] = {kind: url}. Returns a stats dict for the page's
     provenance note. Never raises on a missing/partial images source."""
     root = _images_root(images_dir)
+    exp_root = _expected_root(expected_dir)
     asset_dir = Path(asset_dir) if asset_dir else None
     out_dir = out_path.parent
     stats = Counter()
@@ -203,8 +234,10 @@ def attach_images(rows, out_path, images_dir, asset_dir, raw_base, local):
                     if (d / f"{cmp_name}.{kind}.png").exists():
                         imgs[kind] = rel(d / f"{cmp_name}.{kind}.png")
         elif mode == "raw":
-            imgs["expected"] = (f"{raw_base}/{RAW_EXPECTED_PREFIX}/{suite}/{test}/"
-                                f"{cmp_name}.expected.png")
+            if want_actual:
+                imgs["expected"] = (f"{RAW_EXPECTED_BASE}/{suite}/{test}/"
+                                    f"{cmp_name}.expected.png")
+                stats["with_expected"] += 1
             if want_actual:
                 for kind in ("actual", "difference"):
                     imgs[kind] = (f"{raw_base}/{RAW_ACTUAL_PREFIX}/{suite}/{test}/"
@@ -212,9 +245,12 @@ def attach_images(rows, out_path, images_dir, asset_dir, raw_base, local):
             stats["raw"] += 1
         elif mode in ("copy", "link"):
             src_expected = SWFS_ROOT / suite / test / f"{cmp_name}.expected.png"
+            if not src_expected.exists() and exp_root is not None:
+                src_expected = exp_root / suite / test / f"{cmp_name}.expected.png"
             sources = {}
             if want_actual and src_expected.exists():
                 sources["expected"] = src_expected
+                stats["with_expected"] += 1
             if want_actual:
                 for kind in ("actual", "difference"):
                     p = root / suite / test / f"{cmp_name}.{kind}.png"
@@ -659,7 +695,16 @@ def build_page(reports, rows, stem, img_stats, images_dir, raw_base, local):
                         f'run and may be older or newer than these results; those rows '
                         f'render as table entries only.</div>')
 
-    footnote = ("Expected PNGs come from the test directories on <code>master</code>; "
+    if (mode in ("copy", "link") and img_stats["failures"]
+            and not img_stats["with_expected"]):
+        degraded += ('<div class="banner degraded"><b>No expected images available.</b> '
+                     'The upstream test data is downloaded per run and is not committed, '
+                     'so this build found no <code>&lt;cmp&gt;.expected.png</code> to '
+                     'show beside our render. Pass <code>--expected-dir</code> pointing '
+                     'at a checkout of ruffle-rs/ruffle.</div>')
+
+    footnote = ("Expected PNGs come from the upstream Ruffle test data (fetched at "
+                "build time — it is downloaded per run, not committed); "
                 "actual and difference PNGs come from the force-pushed "
                 "<code>ruffle-image-results</code> branch, which publishes FAILING "
                 "comparisons only — a passing render is never saved, which is why "
@@ -708,6 +753,11 @@ def main():
     ap.add_argument("--asset-dir",
                     help="Copy the PNGs the page needs here (makes the site "
                          "self-contained). Without it, --images-dir is linked in place.")
+    ap.add_argument("--expected-dir",
+                    help="Where to find <cmp>.expected.png when the work tree has "
+                         "none — the upstream test data is downloaded per run and is "
+                         "not committed. Point at a checkout of ruffle-rs/ruffle "
+                         "(its root, or its tests/tests/swfs dir).")
     ap.add_argument("--raw-base",
                     help="Fallback base URL for raw.githubusercontent.com links, e.g. "
                          "https://raw.githubusercontent.com/PeerInfinity/SWFRecomp-CC. "
@@ -729,7 +779,8 @@ def main():
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     stats = attach_images(rows, out, args.images_dir, args.asset_dir, args.raw_base,
-                          local=bool(args.local_json))
+                          local=bool(args.local_json),
+                          expected_dir=args.expected_dir)
     out.write_text(build_page(reports, rows, stem, stats, args.images_dir,
                               args.raw_base, bool(args.local_json)))
 
@@ -737,7 +788,8 @@ def main():
     print(f"{out}: {tot['pass']}/{len(rows)} comparisons pass "
           f"({tot['fail']} fail, {tot['skip']} skip) across {len(reports)} suites; "
           f"images mode={stats['mode']}, "
-          f"{stats['with_actual']}/{stats['failures']} failures have a rendered PNG")
+          f"{stats['with_actual']}/{stats['failures']} failures have a rendered PNG, "
+          f"{stats['with_expected']}/{stats['failures']} have an expected PNG")
     return 0
 
 
