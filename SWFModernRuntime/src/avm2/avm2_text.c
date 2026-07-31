@@ -5233,6 +5233,20 @@ static _Noreturn void fte_throw_2012(Avm2Context* ctx, const char* what)
 	                 "Error #2012: %s class cannot be instantiated.", what);
 }
 
+// The generic abstract-class alloc hook: `new <Name>()` is
+// "Error #2012: <Name>$ class cannot be instantiated." — the `$` form the
+// avmplus class-object throws, matching avm2_display.c's abstract display
+// bases. (ContentElement's message deliberately omits the `$`; it is thrown
+// from the constructor body, not the allocator.)
+static void fte_abstract_init(Avm2Context* ctx, Avm2Object* obj)
+{
+	const char* name = obj->cls != NULL ? obj->cls->name.name : "?";
+	uint32_t nlen = obj->cls != NULL ? obj->cls->name.name_len : 1;
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #2012: %.*s$ class cannot be instantiated.",
+	                 (int) nlen, name);
+}
+
 static _Noreturn void fte_throw_2004(Avm2Context* ctx)
 {
 	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
@@ -7100,6 +7114,19 @@ static void fte_register_value_objects(Avm2Context* ctx)
 	                        eaj_get_compose_trailing,
 	                        eaj_set_compose_trailing);
 	fte_override_method(ctx, eaj, "clone", eaj_clone);
+
+	// --- TextLineMirrorRegion ---
+	// An empty abstract final class. The only thing scripts can observe is
+	// that `new TextLineMirrorRegion()` throws #2012 with the `$` in the
+	// message (abstract_classes grades that row) — note ContentElement's
+	// #2012 message has NO `$`, which is why that one is hand-written.
+	{
+		Avm2Class* tlmr = avm2_builtin_class(ctx, "flash.text.engine",
+		                                     "TextLineMirrorRegion",
+		                                     ctx->builtins.object_class);
+		tlmr->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+		tlmr->native_init = fte_abstract_init;
+	}
 
 	// --- TextBlock ---
 	Avm2Class* tb = avm2_builtin_class(ctx, "flash.text.engine", "TextBlock",

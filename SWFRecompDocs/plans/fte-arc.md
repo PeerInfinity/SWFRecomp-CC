@@ -180,4 +180,147 @@ mode=graphics categories=full.
 
 ## 6. Postmortems
 
-(append per tranche)
+### T1 — value objects + validation core · predicted +8 of 9, **shipped 9 of 9**
+Commit `f89fa6cd4`; CI `30591520622` (graphics/full): **+9, zero
+regressions, status histogram flat**, corpus 4062 → 4071/4422, avm2
+1035 → 1044.
+
+What §1–§3 got right: the eager-setter model, the constructor-through-
+setters ordering (including trackingRight-before-trackingLeft), and the
+per-property numeric quirks all held exactly as scoped. `content_element_basic`
+beat its known_failure on the single predicted delta — the missing
+`at Error$/throwError()` frame.
+
+Two corrections to the scoping:
+
+1. **§1 over-generalised `Error.throwError`.** It claimed the frame appears
+   on "TabStop / ElementFormat / TextLine setters". `output.txt` says
+   otherwise: ElementFormat's and TabStop's setters report their `set <prop>()`
+   frame *directly*, with no throwError above it — visible because both
+   tests print `getStackTrace()` (tabstop) or its first two lines
+   (element_format), and the throwError frame would be first if it existed.
+   The frame is real for **ContentElement's #2012**, **TextLine's #2181**
+   and **TextBlock.createTextLine's #2004** only. Reading the graded output
+   before writing the setter is what caught it; the spec's prose would have
+   produced 3 wrong tests.
+
+2. **A vtable bug the arc did not predict, and would have silently lost 2
+   tests to.** `avm2_builtin_class` copies the super's ivtable entries
+   FIRST, and property lookup is first-match-wins. So a builtin subclass
+   that re-registers an inherited member does not override it — it appends
+   an entry that can never be reached. Both justifier `clone()` overrides
+   resolved to `TextJustifier.clone()` (which returns null), so
+   `sj.clone() as SpaceJustifier` was null and both clone tests died on
+   #1009. Fixed with `fte_override_method` / `fte_override_getset`, which
+   rewrite the inherited entry's payload in place. This is a general trap
+   for any future builtin class hierarchy, not an FTE quirk.
+
+### T2 — TextBlock + TextLine + the layout core · predicted +6 of 8, **shipped 8 of 8**
+Commit `cebf30b89`.
+
+§2's central claim — the layout core is a `\n` splitter, and our glyph /
+device-font machinery is not a dependency — was exactly right, and it is
+what made this tranche small. Both hedges evaporated: the traced-not-thrown
+#2175 is three lines once you construct the error at the site (its
+construction-time stack snapshot IS the graded frame list), and the
+instance-counter interaction is a non-issue precisely *because* we build
+no internal fallback text object. Ruffle allocates an EditText per line for
+measurement; we skip it, so the shared counter number goes to the TextLine
+and `textline_name` gets its "instance1" for free. Building the fallback
+would have been the bug.
+
+`textline_validity` beat its known_failure on the predicted rule (any write
+to `TextBlock.content` invalidates the block's lines). Worth restating
+because it is counterintuitive: `validity` is **not** an enum-validated
+property. Arbitrary strings are legal values stored verbatim; only three
+rules constrain it (exact `"possiblyInvalid"` never settable; from
+`"static"` only `"static"`; from `"invalid"` only `"invalid"` or
+`"static"`).
+
+Structural note: `TextLine` is a real `DisplayObjectContainer`, so its class
+shell has to live in `avm2_display.c` (it needs the concrete display alloc
+hook and the display ext, Loader-style, with `Avm2TextLineExt` leading with
+`Avm2DisplayObjectExt`). `avm2_text.c` wires the FTE surface onto it through
+`avm2_text_init_textline_class`, mirroring the existing
+`avm2_text_init_textfield_class` split. Keeping the whole ext in one
+conservatively-scanned blob avoided adding a GC mark hook.
+
+Three numeric setters now exist with three different NaN policies, and the
+arc's §3 warning against generalising was well placed:
+`ElementFormat.fontSize` scrubs NaN→0, `TabStop.position` keeps it,
+`TextBlock.baselineFontSize` keeps it. All three reject negatives with #2004.
+
+### T3 — riders · predicted +1 of 3, **shipped 0, and the prediction was
+based on a misread baseline**
+
+- **`visual/definefont4` was ALREADY PASSING** at the arc's baseline
+  (`2db1eeb94`, status `pass`, 0/0 lines). §4 listed it as a candidate;
+  it never was one. It passes because the expectation is a 0-byte trace and
+  TLF dies early with `#1065 Variable ContentElement is not defined` — an
+  uncaught error, which goes to stderr and leaves the trace file empty. The
+  image comparison does not gate pass/fail in this harness.
+
+  That inverts the item: T3's definefont4 work is a **regression check, not
+  a gain**. With FTE present, TLF no longer dies at ContentElement and runs
+  further into code we have never exercised — if any of it traced (our own
+  #2175 emission being the obvious candidate), the test would flip
+  pass → fail. Verified locally after T1+T2: still passes. The 30-class /
+  ~35-member checklist is therefore moot as a *target*; what mattered was
+  that nothing new reaches stdout.
+
+  Consequence for the gate: `GraphicElement` and `FontMetrics` were
+  deliberately **not** added. No test grades either, and each one pushes TLF
+  further into unexercised code — pure regression risk against a test that
+  already passes. Recorded as gaps below.
+
+- **`avm2/abstract_classes` is unreachable.** Census of its 43 listed
+  classes: **14 do not exist** in our runtime — `Accessibility`,
+  `AVM1Movie`, `DRMManager`, `DRMPlaybackTimeWindow`, `DRMVoucher`,
+  `GameInputControl`, `IME`, `MessageChannel`, `Multitouch`,
+  `SecurityDomain`, `StageVideo`, `TextLineMirrorRegion`, `TextSnapshot`,
+  `Worker`. The test builds a single array literal from all of them, so the
+  FIRST missing name (`Accessibility`, which is also first in the array)
+  kills the constructor and the test scores 0/132. No partial credit is
+  available: it is all-or-nothing on 14 unrelated subsystems
+  (accessibility, DRM, workers, IME, multitouch, text snapshots).
+
+  §4 also claimed "the `<Name>$ class cannot be instantiated` mechanism
+  itself is missing". It is not — `avm2_display.c`'s
+  `display_native_init_abstract` and `morphshape_native_init` have produced
+  exactly that message for the display bases for some time. What was missing
+  was classes, not the gate.
+
+  The two FTE-owned rows are now complete: `TextLine`'s #2012 gate landed
+  with T2 (conditional, since the layout core must be able to allocate one),
+  and `TextLineMirrorRegion` is added here as an empty abstract final class.
+  `ContentElement` is explicitly excluded by the test.
+
+  Remaining gaps for whoever takes `abstract_classes` later: the 13
+  non-FTE classes above. It needs its own scoping — the work is 13 class
+  stubs across six unrelated subsystems, none of which this arc owns.
+
+### Arc result: **+17 of 20** (predicted +15)
+
+18 of 18 direct FTE tests pass, including both upstream `known_failure`s
+(`content_element_basic`, `textline_validity`). The two riders yielded
+nothing: `definefont4` was already green, `abstract_classes` is blocked on
+14 missing non-FTE classes.
+
+### Lessons
+
+- **The graded `output.txt` overrules the scoping prose, and it is cheap to
+  check.** §1's throwError claim was wrong for two whole classes; five
+  minutes reading `element_format_properties`' expected output settled it
+  before a line of C was written.
+- **A "candidate" test that already passes is a regression risk wearing a
+  gain's clothes.** Always read the baseline status of a rider before
+  budgeting yield for it — and once you know it is already green, the
+  correct move is to add LESS, not more.
+- **First-match-wins vtables make builtin overrides silent no-ops.** Any
+  future builtin class that re-declares an inherited member needs
+  `fte_override_*`-style in-place replacement. The failure mode is not a
+  crash; it is the base implementation quietly winning.
+- **Not building the thing Ruffle builds was the right call twice**: no
+  internal fallback EditText (it would have stolen the graded instance
+  name), and no GraphicElement/FontMetrics (they would have pushed a
+  passing test into unexercised code).
