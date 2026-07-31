@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-31T03:52:57.618019+00:00",
-    "old_git_sha": "1f90974ab1b5475b2fac80b02bbaefe2ec7c9a5b",
-    "new_timestamp": "2026-07-31T05:17:45.983134+00:00",
-    "new_git_sha": "c146dc66ef9a5f770695e80e6d1fe53c9cfe6c0d",
+    "old_timestamp": "2026-07-31T05:17:45.983134+00:00",
+    "old_git_sha": "c146dc66ef9a5f770695e80e6d1fe53c9cfe6c0d",
+    "new_timestamp": "2026-07-31T14:52:54.908152+00:00",
+    "new_git_sha": "a28b3e2cbb40465dbfa97ddaa15a663868b665f5",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,150 @@
     "old_effective_pass": 1065,
     "old_total": 1222,
     "old_pass_rate": 85.0,
-    "new_pass": 1039,
+    "new_pass": 1046,
     "new_ruffle_matched": 26,
-    "new_effective_pass": 1065,
+    "new_effective_pass": 1072,
     "new_total": 1222,
-    "new_pass_rate": 85.0,
+    "new_pass_rate": 85.6,
     "old_mismatched_lines": 33529,
-    "new_mismatched_lines": 33529,
+    "new_mismatched_lines": 33505,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 24,
+    "newly_passing": 7,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 1222,
+    "status_changed": 7,
+    "unchanged": 1214,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "applicationdomain_getqualifieddefinitionnames",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 9,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "applicationdomain_hasdefinition_null",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "constructprop_method",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "core_exceptions",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 46,
+        "expected_lines": 47,
+        "matching_lines": 41
+      },
+      "new_lines": {
+        "actual_lines": 47,
+        "expected_lines": 47,
+        "matching_lines": 45
+      }
+    },
+    {
+      "test": "displayobject_opaque_background",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "property_is_enumerable_reset",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 22
+      },
+      "new_lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 23
+      }
+    },
+    {
+      "test": "property_priority_definition_names_order",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "stage_domain_getQualifiedDefinitionNames",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 5,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    }
+  ]
 }

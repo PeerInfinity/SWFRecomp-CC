@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-31T03:52:57.650321+00:00",
-    "old_git_sha": "1f90974ab1b5475b2fac80b02bbaefe2ec7c9a5b",
-    "new_timestamp": "2026-07-31T05:17:46.016988+00:00",
-    "new_git_sha": "c146dc66ef9a5f770695e80e6d1fe53c9cfe6c0d",
+    "old_timestamp": "2026-07-31T05:17:46.016988+00:00",
+    "old_git_sha": "c146dc66ef9a5f770695e80e6d1fe53c9cfe6c0d",
+    "new_timestamp": "2026-07-31T14:52:54.940098+00:00",
+    "new_git_sha": "a28b3e2cbb40465dbfa97ddaa15a663868b665f5",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,182 @@
     "old_effective_pass": 1523,
     "old_total": 1574,
     "old_pass_rate": 93.5,
-    "new_pass": 1472,
+    "new_pass": 1481,
     "new_ruffle_matched": 51,
-    "new_effective_pass": 1523,
+    "new_effective_pass": 1532,
     "new_total": 1574,
-    "new_pass_rate": 93.5,
+    "new_pass_rate": 94.1,
     "old_mismatched_lines": 761,
-    "new_mismatched_lines": 761,
+    "new_mismatched_lines": 726,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 35,
+    "newly_passing": 9,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 1574,
+    "status_changed": 9,
+    "unchanged": 1564,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "as3/RuntimeErrors/Error1050CannotConvertToPrimitive",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "as3/RuntimeErrors/Error1064CannotCallMethodAsConstructor",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "as3/RuntimeErrors/Error1117InvalidXmlName",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "as3/RuntimeErrors/Error1119DeleteDoesNotSupportXMLListOperand",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "as3/RuntimeErrors/Error1120CannotDeleteProperty",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "e4x/Expressions/e11_3_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 35,
+        "expected_lines": 20,
+        "matching_lines": 10
+      },
+      "new_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      }
+    },
+    {
+      "test": "e4x/Global/e13_1_2_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 10,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 293,
+        "expected_lines": 10,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "e4x/Global/isXMLNameTypeErr",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 5,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "ecma3/ObjectObjects/isPrototypeOf",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "ecma3/String/e15_5_5_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 7
+      },
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      }
+    }
+  ]
 }
