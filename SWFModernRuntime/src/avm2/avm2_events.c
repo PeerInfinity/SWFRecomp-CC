@@ -36,6 +36,7 @@ static Avm2PropKey events_key(const char* ns, const char* name)
 	k.name = name;
 	k.name_len = (uint32_t) strlen(name);
 	k.ns_kind = 0x16;
+	k.ns_priv = NULL;
 	k.ns_uri = ns;
 	k.ns_len = (uint32_t) strlen(ns);
 	return k;

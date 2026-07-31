@@ -303,6 +303,7 @@ static Avm2Object* find_root_class_globals(Avm2Context* ctx, const char* dotted,
 	const char* last_dot = strrchr(dotted, '.');
 	Avm2PropKey key;
 	key.ns_kind = 0x16;
+	key.ns_priv = NULL;
 	if (last_dot != NULL)
 	{
 		key.ns_uri = dotted;

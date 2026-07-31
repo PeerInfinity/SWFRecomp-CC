@@ -1347,6 +1347,7 @@ static Avm2Object* find_globals_for_dotted(Avm2Context* ctx,
 	const char* last_dot = strrchr(dotted, '.');
 	Avm2PropKey key;
 	key.ns_kind = 0x16;
+	key.ns_priv = NULL;
 	if (last_dot != NULL)
 	{
 		key.ns_uri = dotted;
@@ -3548,6 +3549,7 @@ static Avm2Value point_transform_native(Avm2Activation* act, int to_local)
 	// flash.geom.Point lives in the builtin domain.
 	Avm2PropKey key = avm2_public_key("Point", 5);
 	key.ns_kind = 0x16;
+	key.ns_priv = NULL;
 	key.ns_uri = "flash.geom";
 	key.ns_len = 10;
 	(void) key;

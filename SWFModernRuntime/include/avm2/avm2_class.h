@@ -24,6 +24,14 @@ typedef struct Avm2PropKey
 	uint8_t ns_kind;
 	const char* ns_uri;
 	uint32_t ns_len;
+	// PrivateNamespace (kind 0x05) identity. avmplus/Ruffle compare private
+	// namespaces by the identity of the constant-pool entry, never by URI
+	// (ASC emits one Private entry per class, all with the SAME empty name),
+	// so a URI compare makes every class's privates alias every other's.
+	// This is the address of the owning Avm2AbcNamespace record — unique per
+	// (ABC file, pool index) and stable for the process. NULL for every
+	// non-private key; only consulted when BOTH keys are private.
+	const void* ns_priv;
 } Avm2PropKey;
 
 typedef enum Avm2PropKind
@@ -203,6 +211,11 @@ int avm2_propkey_matches(const Avm2PropKey* a, const Avm2PropKey* b);
 // register public-keyed methods only.
 int avm2_propkey_is_public(const Avm2PropKey* k);
 Avm2PropKey avm2_public_key(const char* name, uint32_t name_len);
+// Fill a key's namespace half from an ABC constant-pool namespace index
+// (kind + URI + the private-identity token). Use this everywhere a key is
+// built from `data->namespaces[i]` — a hand-rolled copy silently drops
+// ns_priv and reintroduces private-namespace aliasing.
+void avm2_key_ns_from_abc(Avm2PropKey* k, const Avm2AbcFileData* data, uint32_t ns_idx);
 
 // Multiname resolution against a file's pools. propkey_from_qname fails
 // (returns 0) on lazy multinames; mn_match handles QName* and static

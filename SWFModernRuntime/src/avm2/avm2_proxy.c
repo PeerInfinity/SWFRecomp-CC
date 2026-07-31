@@ -43,6 +43,7 @@ Avm2Value avm2_proxy_call_hook(Avm2Context* ctx, Avm2Object* obj, const char* mn
 	key.name = mname;
 	key.name_len = (uint32_t) strlen(mname);
 	key.ns_kind = 0x16;
+	key.ns_priv = NULL;
 	key.ns_uri = PROXY_NS;
 	key.ns_len = sizeof(PROXY_NS) - 1;
 	const Avm2PropEntry* e = avm2_vtable_find(obj->vtable, &key);
@@ -191,6 +192,7 @@ void avm2_register_proxy(Avm2Context* ctx)
 		key.name = "flash_proxy";
 		key.name_len = 11;
 		key.ns_kind = 0x16;
+		key.ns_priv = NULL;
 		key.ns_uri = "flash.utils";
 		key.ns_len = 11;
 		Avm2Object* ns = avm2_namespace_new(

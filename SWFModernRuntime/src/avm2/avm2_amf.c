@@ -2028,6 +2028,7 @@ void avm2_register_amf(Avm2Context* ctx)
 	{
 		Avm2PropKey key;
 		key.ns_kind = 0x16;
+		key.ns_priv = NULL;
 		key.ns_uri = "flash.net";
 		key.ns_len = 9;
 		key.name = "registerClassAlias";

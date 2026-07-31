@@ -266,6 +266,7 @@ static Avm2PropKey builtin_key(const char* ns, const char* name)
 	k.name = name;
 	k.name_len = (uint32_t) strlen(name);
 	k.ns_kind = 0x16;  // package
+	k.ns_priv = NULL;
 	k.ns_uri = ns;
 	k.ns_len = (uint32_t) strlen(ns);
 	return k;
@@ -275,7 +276,8 @@ static Avm2PropKey builtin_key(const char* ns, const char* name)
 // its package-qualified key (dynamic props are public-only, so a
 // package-qualified multiname like flash.display.MovieClip would never
 // match one).
-static void builtin_global_define(Avm2Context* ctx, Avm2PropKey key, Avm2Value value)
+static void builtin_global_define_ro(Avm2Context* ctx, Avm2PropKey key, Avm2Value value,
+                                     int read_only)
 {
 	Avm2Object* g = ctx->builtin_globals;
 	Avm2VTable* vt = (Avm2VTable*) g->vtable;
@@ -289,6 +291,7 @@ static void builtin_global_define(Avm2Context* ctx, Avm2PropKey key, Avm2Value v
 	memset(&e, 0, sizeof(e));
 	e.key = key;
 	e.kind = AVM2_PROP_SLOT;
+	e.is_const = (uint8_t) (read_only != 0);
 	e.slot_index = vt->slot_count + 1;
 	vt->slot_count++;
 	avm2_vtable_append(ctx, vt, &e);
@@ -305,6 +308,15 @@ static void builtin_global_define(Avm2Context* ctx, Avm2PropKey key, Avm2Value v
 		g->slot_count = new_count;
 	}
 	g->slots[e.slot_index] = value;
+}
+
+// Playerglobal declares every class and every global constant as a Class /
+// Const trait, both of which Ruffle installs as CONST slots (vtable.rs) --
+// so `Object = new Object()` throws #1074 rather than clobbering the class
+// slot. Our builtins are native, so the read-only flag has to be set here.
+static void builtin_global_define(Avm2Context* ctx, Avm2PropKey key, Avm2Value value)
+{
+	builtin_global_define_ro(ctx, key, value, 0);
 }
 
 // Expose a value on the builtin globals + domain under an arbitrary key
@@ -363,7 +375,7 @@ Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name
 	p->dont_enum = 1;
 
 	// Expose on the builtin globals object + in the domain.
-	builtin_global_define(ctx, cls->name, avm2_object_value(cobj));
+	builtin_global_define_ro(ctx, cls->name, avm2_object_value(cobj), 1);
 	avm2_domain_add(ctx, &cls->name, NULL, 0);
 	return cls;
 }
@@ -680,6 +692,16 @@ static Avm2Value object_proto_property_is_enumerable(Avm2Activation* act)
 			Avm2Value v = avm2_array_get(obj, (uint32_t) idx);
 			return avm2_bool(v.kind != AVM2_VALUE_HOLE);
 		}
+	}
+	// Namespace exposes prefix/uri as ENUMERABLE (Ruffle namespace_object.rs
+	// overrides property_is_enumerable for exactly those two). QName has no
+	// such override, so its uri/localName enumerate in for-in yet report
+	// false here -- an avmplus quirk, not an oversight
+	// (e4x/Namespace/e13_2_5 tests 3-6 pin both halves).
+	if (obj->cls == ctx->builtins.namespace_class)
+	{
+		return avm2_bool((name->len == 6 && memcmp(name->utf8, "prefix", 6) == 0)
+		                 || (name->len == 3 && memcmp(name->utf8, "uri", 3) == 0));
 	}
 	// Skip TOMBSTONES (and object-keyed Dictionary entries): a deleted
 	// property leaves its entry in the list with its dont_enum flag intact,
@@ -1395,6 +1417,7 @@ static Avm2Value global_get_qualified_class_name(Avm2Activation* act)
 static void definition_key_split(const char* s, uint32_t len, Avm2PropKey* key)
 {
 	key->ns_kind = 0x16;
+	key->ns_priv = NULL;
 	key->ns_uri = s;
 	key->ns_len = 0;
 	key->name = s;
@@ -3262,7 +3285,7 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	for (int i = 0; i < 3; i++)
 	{
 		Avm2PropKey key = builtin_key("", const_names[i]);
-		builtin_global_define(ctx, key, const_vals[i]);
+		builtin_global_define_ro(ctx, key, const_vals[i], 1);
 		avm2_domain_add(ctx, &key, NULL, 0);
 	}
 }

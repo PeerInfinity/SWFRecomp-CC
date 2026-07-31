@@ -49,11 +49,25 @@ static E4XName e4x_name_from_rtns(Avm2Context* ctx, Avm2Value ns_val,
 	{
 		E4XName name;
 		memset(&name, 0, sizeof(name));
+		// `local == NULL` is the E4X any-name (`ns::*` / `@ns::*`): the
+		// caller passes NULL for multiname name index 0 rather than the
+		// empty string, which would match no node at all
+		// (e4x/Expressions/e11_1_1 `y1.@ns::*`).
 		name.local = local;
 		name.is_attribute = (uint8_t) attr;
 		name.is_qname = 1;
 		name.single_uri = n->uri;
 		name.single_is_real = 1;
+		return name;
+	}
+	if (local == NULL)
+	{
+		// `ns::*` where the runtime namespace has an empty URI: any name,
+		// any namespace (the `*` branch of avm2_e4x_name_from_string).
+		E4XName name;
+		memset(&name, 0, sizeof(name));
+		name.any_ns = 1;
+		name.is_attribute = (uint8_t) attr;
 		return name;
 	}
 	return avm2_e4x_name_from_string(ctx, local, attr);
@@ -551,6 +565,59 @@ static Avm2Value resolved_get(Avm2Context* ctx, Avm2Value recv, const Resolved* 
 // GetProperty / SetProperty / InitProperty / DeleteProperty
 // ---------------------------------------------------------------------------
 
+// avmplus qualifies a reference with its namespace URI in the #1056 / #1069 /
+// #1077 / #1081 messages when the site multiname carries EXACTLY ONE namespace
+// and that namespace has a non-empty URI (Ruffle Multiname::as_uri). Compiled
+// `obj.name` sites carry a whole ns SET and print bare; an explicit
+// `obj.ns::name` is a one-namespace QName and prints `uri::name`
+// (avm2/core_exceptions lines 32/36). Returns NULL when the bare local name
+// is what avmplus would print.
+static const char* mn_display_name(const Avm2AbcFileData* data, uint32_t mn_idx,
+                                   const char* name, uint32_t name_len,
+                                   char* buf, size_t size)
+{
+	const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
+	uint32_t ns_idx;
+	switch (mn->kind)
+	{
+		case 0x07: case 0x0d:
+			ns_idx = mn->ns;
+			break;
+		case 0x09: case 0x0e:
+		{
+			const Avm2AbcNsSet* set = &data->ns_sets[mn->ns_set];
+			if (set->count != 1) return NULL;
+			ns_idx = set->ns_indices[0];
+			break;
+		}
+		default:
+			return NULL;
+	}
+	const Avm2AbcNamespace* ns = &data->namespaces[ns_idx];
+	const Avm2String* uri = &data->strings[ns->name];
+	if (uri->len == 0) return NULL;
+	snprintf(buf, size, "%.*s::%.*s", (int) uri->len, uri->utf8,
+	         (int) name_len, name);
+	return buf;
+}
+
+// A wildcard-name site (`obj.*` / `obj.ns::*`, ABC multiname name index 0).
+// Ruffle script_object.rs get_dynamic_property: a wildcard that reaches the
+// dynamic lookup is #1081 on an OBJECT receiver and #1069 on a PRIMITIVE one
+// -- the sealed/dynamic split does not apply
+// (as3/Expressions/QualifiedReferences/WildcardOperator asserts all three).
+static int mn_is_wildcard_name(const Avm2AbcFileData* data, uint32_t mn_idx)
+{
+	const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
+	switch (mn->kind)
+	{
+		case 0x07: case 0x0d: case 0x09: case 0x0e:
+			return mn->name == 0;
+		default:
+			return 0;
+	}
+}
+
 static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
                                     const char* name, uint32_t name_len,
                                     int resolved_ok, const Resolved* r,
@@ -650,6 +717,25 @@ static Avm2Value getproperty_static_impl(Avm2Activation* act, Avm2Value recv,
 	}
 	Resolved r;
 	int ok = resolve_mn(act, recv, mn_idx, &r);
+	char dbuf[256];
+	if (!ok)
+	{
+		// Only on the throw path: the qualified spelling costs an snprintf,
+		// and every resolved read would pay it (the class_name_of lesson).
+		const char* disp = mn_display_name(act->file->data, mn_idx, name, name_len,
+		                                   dbuf, sizeof(dbuf));
+		if (disp != NULL) { name = disp; name_len = (uint32_t) strlen(disp); }
+		if (mn_is_wildcard_name(act->file->data, mn_idx))
+		{
+			char cn[160];
+			class_name_of(act->ctx, recv, cn, sizeof(cn));
+			avm2_throw_error(act->ctx, act->ctx->builtins.reference_error_class,
+			                 "Error #%s: Property %.*s not found on %s and there "
+			                 "is no default value.",
+			                 recv.kind == AVM2_VALUE_OBJECT ? "1081" : "1069",
+			                 (int) name_len, name, cn);
+		}
+	}
 	return getproperty_common(act, recv, name, name_len, ok, &r,
 	                          avm2_mn_has_public_ns(act->file->data, mn_idx),
 	                          mn_is_attribute_kind(act->file->data, mn_idx));
@@ -748,9 +834,15 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 			return (v != NULL) ? *v : avm2_undefined();
 		}
 		// A QName object as the lazy name resolves by its own uri::local
-		// key (Ruffle fill_with_runtime_params — qname_indexing).
+		// key (Ruffle fill_with_runtime_params — qname_indexing) — but NOT
+		// on an XML receiver, where the QName is an E4X name and must reach
+		// avm2_e4x_name_from_value below with the site's attribute flag
+		// (`x1.bravo.@[q3]`, e4x/QName/e13_3_2 + e4x/Expressions/e11_1_1).
 		const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
-		if (q != NULL) return getproperty_qname(act, recv, q);
+		if (q != NULL && !avm2_value_is_xmlish(recv))
+		{
+			return getproperty_qname(act, recv, q);
+		}
 	}
 	if (avm2_value_is_xmlish(recv))
 	{
@@ -965,8 +1057,12 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 	}
 }
 
-static void setproperty_miss(Avm2Context* ctx, Avm2Value recv,
-                             const char* name, uint32_t name_len, Avm2Value value)
+// `disp` (may be NULL) is the namespace-qualified spelling used in the #1056
+// message only -- the dynamic-property store always uses the LOCAL name.
+static void setproperty_miss_disp(Avm2Context* ctx, Avm2Value recv,
+                                  const char* name, uint32_t name_len,
+                                  Avm2Value value,
+                                  const Avm2AbcFileData* data, uint32_t mn_idx)
 {
 	if (recv.kind == AVM2_VALUE_OBJECT && object_is_dynamic(recv.u.obj))
 	{
@@ -975,9 +1071,19 @@ static void setproperty_miss(Avm2Context* ctx, Avm2Value recv,
 	}
 	char cn[160];
 	class_name_of(ctx, recv, cn, sizeof(cn));
+	char dbuf[256];
+	const char* disp = (data != NULL)
+		? mn_display_name(data, mn_idx, name, name_len, dbuf, sizeof(dbuf)) : NULL;
+	if (disp != NULL) { name = disp; name_len = (uint32_t) strlen(disp); }
 	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 	                 "Error #1056: Cannot create property %.*s on %s.",
 	                 (int) name_len, name, cn);
+}
+
+static void setproperty_miss(Avm2Context* ctx, Avm2Value recv,
+                             const char* name, uint32_t name_len, Avm2Value value)
+{
+	setproperty_miss_disp(ctx, recv, name, name_len, value, NULL, 0);
 }
 
 static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
@@ -1040,7 +1146,8 @@ static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 		avm2_array_set(act->ctx, recv.u.obj, idx, value);
 		return;
 	}
-	setproperty_miss(act->ctx, recv, name, name_len, value);
+	setproperty_miss_disp(act->ctx, recv, name, name_len, value,
+	                      act->file->data, mn_idx);
 }
 
 void avm2_op_setproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
@@ -1491,6 +1598,7 @@ static int key_from_ns_value(Avm2Value ns_val, const char* name, uint32_t name_l
 	key->name = name;
 	key->name_len = name_len;
 	key->ns_kind = (n->kind != 0) ? n->kind : 0x16;
+	key->ns_priv = NULL;
 	key->ns_uri = n->uri->utf8;
 	key->ns_len = n->uri->len;
 	return avm2_propkey_is_public(key);
@@ -1511,6 +1619,7 @@ static int key_from_qname_ext(const Avm2QNameExt* q, Avm2PropKey* key, int* any_
 	key->name = name;
 	key->name_len = name_len;
 	key->ns_kind = 0x16;
+	key->ns_priv = NULL;
 	key->ns_uri = q->uri->utf8;
 	key->ns_len = q->uri->len;
 	return avm2_propkey_is_public(key);
@@ -1659,9 +1768,11 @@ Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t
 	}
 	if (avm2_value_is_xmlish(recv))
 	{
-		E4XName n = e4x_name_from_rtns(ctx, ns_val,
-		                               avm2_string_new(ctx, name, name_len),
-		                               mn_is_attribute_kind(act->file->data, mn_idx));
+		E4XName n = e4x_name_from_rtns(
+			ctx, ns_val,
+			act->file->data->multinames[mn_idx].name != 0
+				? avm2_string_new(ctx, name, name_len) : NULL,
+			mn_is_attribute_kind(act->file->data, mn_idx));
 		Avm2Value out;
 		if (avm2_xml_get_name(ctx, recv, &n, &out)) return out;
 	}
@@ -2020,12 +2131,9 @@ static Avm2Object* findproperty_domain_find(Avm2Activation* act, uint32_t mn_idx
 		const Avm2AbcNsSet* set = &data->ns_sets[mn->ns_set];
 		for (uint32_t i = 0; i < set->count; i++)
 		{
-			const Avm2AbcNamespace* ns = &data->namespaces[set->ns_indices[i]];
 			key.name = data->strings[mn->name].utf8;
 			key.name_len = data->strings[mn->name].len;
-			key.ns_kind = ns->kind;
-			key.ns_uri = data->strings[ns->name].utf8;
-			key.ns_len = data->strings[ns->name].len;
+			avm2_key_ns_from_abc(&key, data, set->ns_indices[i]);
 			Avm2Object* g = avm2_domain_find(ctx, act->file->scope, &key);
 			if (g != NULL) return g;
 		}
@@ -2549,12 +2657,9 @@ Avm2Object* avm2_op_finddef(Avm2Activation* act, uint32_t mn_idx)
 		const Avm2AbcNsSet* set = &data->ns_sets[mn->ns_set];
 		for (uint32_t i = 0; i < set->count; i++)
 		{
-			const Avm2AbcNamespace* ns = &data->namespaces[set->ns_indices[i]];
 			key.name = data->strings[mn->name].utf8;
 			key.name_len = data->strings[mn->name].len;
-			key.ns_kind = ns->kind;
-			key.ns_uri = data->strings[ns->name].utf8;
-			key.ns_len = data->strings[ns->name].len;
+			avm2_key_ns_from_abc(&key, data, set->ns_indices[i]);
 			Avm2Object* g = avm2_domain_find(act->ctx, act->file->scope, &key);
 			if (g != NULL) return g;
 		}
@@ -3016,17 +3121,37 @@ Avm2Value avm2_op_newclass(Avm2Activation* act, uint32_t class_idx, Avm2Value ba
                            const Avm2ScopeEntry* lscope, uint32_t scope_n)
 {
 	Avm2Context* ctx = act->ctx;
+	// Ruffle activation.rs op_new_class, in order:
+	//   1. coerce the base VALUE to Class -- a non-class, non-null base is a
+	//      failed coercion (#1034), NOT a base-class mismatch;
+	//   2. null base for a class that declares a superclass -> #1009;
+	//   3. only then, a real class object that isn't the DECLARED super -> #1108.
+	// (newclass_mismatched asserts exactly 1034 / 1009 / 1108 for those three.)
+	base = avm2_coerce_to_class(ctx, ctx->builtins.class_class, base);
 	Avm2Class* super = NULL;
 	if (base.kind == AVM2_VALUE_OBJECT && base.u.obj != NULL
 	    && base.u.obj->kind == AVM2_OBJ_CLASS)
 	{
 		super = base.u.obj->class_ref;
 	}
-	else if (base.kind != AVM2_VALUE_NULL)
 	{
-		avm2_throw_error(ctx, ctx->builtins.verify_error_class,
-		                 "Error #1108: The OP_newclass opcode was used with the "
-		                 "incorrect base class.");
+		// Compare by NAME, not object identity: two domains can hold distinct
+		// class objects for one declared superclass and avmplus accepts that,
+		// so identity would throw #1108 on valid programs.
+		uint32_t super_mn = act->file->data->classes[class_idx].super_mn;
+		if (super_mn != 0)
+		{
+			if (super == NULL)
+			{
+				avm2_throw_null_or_undefined(ctx, avm2_null(), NULL, 0);
+			}
+			if (!avm2_mn_match(act->file->data, super_mn, &super->name))
+			{
+				avm2_throw_error(ctx, ctx->builtins.verify_error_class,
+				                 "Error #1108: The OP_newclass opcode was used "
+				                 "with the incorrect base class.");
+			}
+		}
 	}
 	Avm2ScopeChain* scope = avm2_scope_capture(ctx, act->outer, lscope, scope_n);
 	Avm2Class* cls = avm2_class_define(ctx, act->file, class_idx, super, scope);

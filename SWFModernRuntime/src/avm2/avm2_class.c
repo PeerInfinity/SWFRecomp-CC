@@ -80,7 +80,18 @@ Avm2PropKey avm2_public_key(const char* name, uint32_t name_len)
 	k.ns_kind = 0x16;
 	k.ns_uri = "";
 	k.ns_len = 0;
+	k.ns_priv = NULL;
 	return k;
+}
+
+void avm2_key_ns_from_abc(Avm2PropKey* k, const Avm2AbcFileData* data, uint32_t ns_idx)
+{
+	const Avm2AbcNamespace* ns = &data->namespaces[ns_idx];
+	k->ns_kind = ns->kind;
+	k->ns_uri = data->strings[ns->name].utf8;
+	k->ns_len = data->strings[ns->name].len;
+	// The pool record's address is the private namespace's identity.
+	k->ns_priv = (ns->kind == 0x05) ? (const void*) ns : NULL;
 }
 
 int avm2_propkey_matches(const Avm2PropKey* a, const Avm2PropKey* b)
@@ -94,6 +105,11 @@ int avm2_propkey_matches(const Avm2PropKey* a, const Avm2PropKey* b)
 	int pb = key_ns_is_public(kb, b->ns_uri, b->ns_len);
 	if (pa || pb) return pa && pb;
 	if (ka != kb) return 0;
+	// Private namespaces are compared by pool-entry identity (Ruffle
+	// namespace.rs: "private namespaces are always compared by pointer
+	// identity"). Their URIs are all empty, so a URI-only compare would let
+	// Class2 read Class1's `private var`.
+	if (ka == 0x05) return a->ns_priv == b->ns_priv;
 	if (a->ns_len != b->ns_len) return 0;
 	if (a->ns_len > 0 && memcmp(a->ns_uri, b->ns_uri, a->ns_len) != 0) return 0;
 	return 1;
@@ -102,12 +118,9 @@ int avm2_propkey_matches(const Avm2PropKey* a, const Avm2PropKey* b)
 static void propkey_from_parts(const Avm2AbcFileData* data, uint32_t ns_idx,
                                uint32_t name_idx, Avm2PropKey* out)
 {
-	const Avm2AbcNamespace* ns = &data->namespaces[ns_idx];
 	out->name = data->strings[name_idx].utf8;
 	out->name_len = data->strings[name_idx].len;
-	out->ns_kind = ns->kind;
-	out->ns_uri = data->strings[ns->name].utf8;
-	out->ns_len = data->strings[ns->name].len;
+	avm2_key_ns_from_abc(out, data, ns_idx);
 }
 
 int avm2_propkey_from_qname(const Avm2AbcFileData* data, uint32_t mn_idx, Avm2PropKey* out)
@@ -430,13 +443,10 @@ const Avm2PropEntry* avm2_vtable_find_mn_named(const Avm2VTable* vt,
 	for (uint32_t i = 0; i < count; i++)
 	{
 		uint32_t ns_idx = (set != NULL) ? set->ns_indices[i] : single_ns;
-		const Avm2AbcNamespace* ns = &data->namespaces[ns_idx];
 		Avm2PropKey key;
 		key.name = name;
 		key.name_len = name_len;
-		key.ns_kind = ns->kind;
-		key.ns_uri = data->strings[ns->name].utf8;
-		key.ns_len = data->strings[ns->name].len;
+		avm2_key_ns_from_abc(&key, data, ns_idx);
 		const Avm2PropEntry* e = avm2_vtable_find(vt, &key);
 		if (e != NULL) return e;
 	}
@@ -499,7 +509,13 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 			case 6:  // Const
 			{
 				e.kind = AVM2_PROP_SLOT;
-				e.is_const = (t->kind == 6);
+				// Class traits are READ-ONLY, like Const (Ruffle vtable.rs:
+				// `TraitKind::Const | TraitKind::Class => new_const_slot`).
+				// Without this, `Object = new Object()` at script scope
+				// silently overwrites the global's class slot instead of
+				// throwing #1074 -- and then every later script init that
+				// pushes `Object` as a newclass base gets a plain object.
+				e.is_const = (t->kind == 6 || t->kind == 4);
 				uint32_t slot_id = t->slot_or_disp_id;
 				if (slot_id == 0)
 				{
@@ -1123,11 +1139,8 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 
 	if (cd->has_protected_ns)
 	{
-		const Avm2AbcNamespace* pns = &file->data->namespaces[cd->protected_ns];
 		cls->has_protected_ns = 1;
-		cls->protected_key.ns_kind = pns->kind;
-		cls->protected_key.ns_uri = file->data->strings[pns->name].utf8;
-		cls->protected_key.ns_len = file->data->strings[pns->name].len;
+		avm2_key_ns_from_abc(&cls->protected_key, file->data, cd->protected_ns);
 	}
 
 	const Avm2AbcMethodData* iinit = &file->data->methods[cd->instance_init];
@@ -1173,6 +1186,7 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 					e.key.ns_kind = cls->protected_key.ns_kind;
 					e.key.ns_uri = cls->protected_key.ns_uri;
 					e.key.ns_len = cls->protected_key.ns_len;
+					e.key.ns_priv = cls->protected_key.ns_priv;
 					if (avm2_vtable_find(&cls->ivtable, &e.key) == NULL)
 					{
 						avm2_vtable_append(ctx, &cls->ivtable, &e);
@@ -1555,10 +1569,7 @@ static Avm2Class* avm2_class_for_mn_resolve(Avm2Context* ctx, Avm2AbcFileRt* fil
 		{
 			key.name = data->strings[mn->name].utf8;
 			key.name_len = data->strings[mn->name].len;
-			const Avm2AbcNamespace* ns = &data->namespaces[set->ns_indices[i]];
-			key.ns_kind = ns->kind;
-			key.ns_uri = data->strings[ns->name].utf8;
-			key.ns_len = data->strings[ns->name].len;
+			avm2_key_ns_from_abc(&key, data, set->ns_indices[i]);
 			globals = avm2_domain_find(ctx, file->scope, &key);
 		}
 	}

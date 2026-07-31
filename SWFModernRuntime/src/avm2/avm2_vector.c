@@ -1358,6 +1358,7 @@ void avm2_register_vector(Avm2Context* ctx)
 		key.name = aliases[i].name;
 		key.name_len = (uint32_t) strlen(aliases[i].name);
 		key.ns_kind = 0x17;  // PackageInternalNs
+		key.ns_priv = NULL;
 		key.ns_uri = "__AS3__.vec";
 		key.ns_len = 11;
 		avm2_builtin_define_alias(ctx, key,

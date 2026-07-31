@@ -2002,7 +2002,14 @@ namespace abc
 		// declaring instance + trait index. found=false on no-match, ambiguity
 		// (same local name appears more than once in the chain), or non-slot.
 		struct Found { bool ok = false; int declInst = -1; int traitIdx = -1; };
-		Found findUniqueSlot(int inst, const string& name) const
+		// `site_mn` (0 = skip) is the multiname of the READ/WRITE site: the
+		// found trait must ns-match it, not merely share its local name.
+		// Without that check a subclass's `this.privArray` binds to the
+		// SUPERCLASS's `private var privArray` slot at compile time and the
+		// runtime's #1069 never runs (as3/Definitions/Classes/Ext/
+		// ExtPublicClassPriv). Local-name matching stays for the shadowing
+		// (`hits`) bail, which must stay ns-blind to be conservative.
+		Found findUniqueSlot(int inst, const string& name, u32 site_mn = 0) const
 		{
 			Found res; int hits = 0, cur = inst, guard = 0;
 			while (cur >= 0 && cur < (int) abc.instances.size() && guard++ < 64)
@@ -2021,6 +2028,12 @@ namespace abc
 				cur = typeMnToInst(in.super_name);
 			}
 			if (hits != 1) res.ok = false;  // ambiguous/shadowed → bail
+			if (res.ok && site_mn != 0
+			    && !mnMatchesQName(site_mn,
+			                       abc.instances[res.declInst].traits[res.traitIdx].name))
+			{
+				res.ok = false;  // name matches, namespace does not
+			}
 			return res;
 		}
 		// Does any STRICT subclass of `cls` declare a trait with local name
@@ -2117,7 +2130,12 @@ namespace abc
 		// Package 0x16), public/AS3-builtin unification, uri string compare.
 		// Trait names are QNames; a site multiname matches on its QName ns or
 		// any ns in its set.
-		struct NsKey { u8 folded = 0x16; string uri; };
+		// `priv` is the PrivateNamespace identity: ASC emits one Private pool
+		// entry per class, ALL with the same (empty) name, and avmplus/Ruffle
+		// compare private namespaces by entry identity, never by URI. Within
+		// one ABC the pool index IS that identity (runtime mirror:
+		// Avm2PropKey::ns_priv, the pool record's address). 0 = not private.
+		struct NsKey { u8 folded = 0x16; string uri; u32 priv = 0; };
 		NsKey nsKeyOf(u32 ns_idx) const
 		{
 			NsKey k;
@@ -2128,6 +2146,7 @@ namespace abc
 				k.folded = (kind == 0x08) ? 0x16 : kind;
 				k.uri = ns.name < abc.pool.strings.size()
 					? abc.pool.strings[ns.name] : "";
+				if (kind == 0x05) k.priv = ns_idx;
 			}
 			return k;
 		}
@@ -2140,7 +2159,9 @@ namespace abc
 		{
 			bool pa = nsKeyPublic(a), pb = nsKeyPublic(b);
 			if (pa || pb) return pa && pb;
-			return a.folded == b.folded && a.uri == b.uri;
+			if (a.folded != b.folded) return false;
+			if (a.folded == 0x05) return a.priv == b.priv;
+			return a.uri == b.uri;
 		}
 		// Does the site multiname `mn` (QName 0x07/0x0d or static Multiname
 		// 0x09/0x0e) match the trait QName `tname`? (avm2_mn_match mirror)
@@ -2237,7 +2258,7 @@ namespace abc
 			if (!chainDefinesMn(cls, mn)) return r;
 			string nm = localName(mn);
 			if (subclassRedeclares(cls, nm)) return r;
-			Found f = findUniqueSlot(cls, nm);
+			Found f = findUniqueSlot(cls, nm, mn);
 			if (!f.ok) return r;
 			int K = computeSlotIndex(f.declInst, f.traitIdx);
 			if (K <= 0) return r;
@@ -2726,7 +2747,7 @@ namespace abc
 				{
 					// Lever A: this.field.
 					string name = M.localName(op.arg1);
-					AbcTypeModel::Found fnd = M.findUniqueSlot(thisCls, name);
+					AbcTypeModel::Found fnd = M.findUniqueSlot(thisCls, name, op.arg1);
 					int K = (fnd.ok && !M.subclassRedeclares(thisCls, name))
 						? M.computeSlotIndex(fnd.declInst, fnd.traitIdx) : -1;
 					if (K > 0) spec[i] = K;
