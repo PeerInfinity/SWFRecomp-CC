@@ -843,3 +843,26 @@ Two ranking corrections this session produced:
   polish: the runtime holds strings as UTF-8 and cannot represent a lone
   surrogate, so a CESU-8 pair needs WTF-8 storage or a pair-combining
   pass across every decoder. Size it on its own before taking it.
+
+### Polish sweep sessions 2-4 (headline update, 2026-07-31)
+
+| session | commit(s) | CI | corpus | delta |
+|---|---|---|---|---|
+| 2 | `f1a80bdc8` `92ca512ed` `387cfce60` `ff7151c15` | `30583810264` | 4041 -> 4062 / 4421 (91.9%) | +21 |
+| 3 | `a62c4ce61` `da8a5f5df` | `30599630053` + `30601250181` | 4079 -> 4094 / 4422 (92.6%) | +15 |
+| 4 | `a28b3e2cb` | `30638028597` | **4094 -> 4110 / 4422 (92.9%)** | **+16** |
+
+**Current headline: 4110 / 4422 effective (92.9%), 312 failing.**
+Histogram `pass` 3868, `ruffle_matched` 242, `output_mismatch` 304,
+`runtime_error` 7, `recomp_fail` 1, and still **no segfault / timeout /
+compile_fail bucket at all**. Every session so far: zero regressions,
+zero other status moves.
+
+The near-pass candidate list keeps shrinking as the arc runs — 172 ->
+136 -> **122** — and it regenerates rather than depletes (each session
+finds a handful of NEW near-passes that a prior arc's partial fix moved
+into the window). Session 4's takeaway for ranking: the
+`as3/RuntimeErrors` directory is still not an arc, but it is a rich
+source of *riders* once a candidate is keyed by the throw site its
+assertion names rather than by its directory. Details and the remaining
+diagnosed-but-untaken items are in `polish-sweep-arc.md` §6.

@@ -676,3 +676,186 @@ running — a test that compiles mid-edit reports garbage.
   point). Left as a genuine single.
 - The **B1 verifier-message remainder** (6), **B9/B10/B11/B12** (2 each)
   and **B6** (the documented dead end) are unchanged from §1.
+
+## 6. Session 4 — the error-taxonomy cluster, and a dry signature well
+
+Baseline `a28b3e2cb` (corpus **4094/4422**, results from CI
+`30604886586`). CI `30638028597` (graphics/`categories=full`,
+`images=false`): **4094 -> 4110 / 4422 (92.9%)**, avm2 1065 -> 1072
+(+7), from_avmplus 1523 -> 1532 (+9). `output_mismatch` 320 -> 304,
+`ruffle_matched` 242 -> 242, `runtime_error` 7 -> 7, `recomp_fail`
+1 -> 1, still no segfault / timeout / compile_fail bucket on either
+side. **Zero regressions, zero other status moves.**
+
+### 6.1 Step 0 — the list regenerated again
+
+Same rule, same 19 leaf suites:
+
+| | tranche 0 | session 3 | now |
+|---|---:|---:|---:|
+| candidates | 172 | 136 | **122** |
+| avm2 | 82 | 67 | 55 |
+| from_avmplus | 48 | 37 | 35 |
+| from_shumway | 21 | 12 | 12 |
+
+Gap histogram `0:5 1:42 2:31 3:14 4:17 5:13`; status `output_mismatch
+117`, `runtime_error 4`, `recomp_fail 1`. The regeneration cost about
+five minutes and is still mandatory — §5.1's finding holds every time.
+
+One schema note for whoever writes the next script: the per-test line
+counts live under a nested `lines` object
+(`t['lines']['expected_lines']`), not at the top level. Reading them
+with `t.get('expected_lines', 0)` silently yields 0 for every test and
+produces a "328 candidates, all gap 0" list that looks plausible.
+
+### 6.2 Step 1 — the signature well is dry, so cluster on the THROW ITSELF
+
+Session 3's headline move was a `Counter` over `error_signature`. Run
+again here it returns almost nothing: **only 18 of the 122 candidates
+carry a signature at all**, and the largest group is 3. Session 3
+harvested that vein — the missing-class batch removed exactly the tests
+whose first `getlex` threw.
+
+What replaced it: read the candidates' first differing line for the
+*shape* `expected: Error #NNNN got: no error`. That is not a symptom, it
+is a **thrown error that never happened** — the same "the error names its
+owner" property as a signature, recorded on the expected side instead of
+the actual side. Nine of the 122 have it, and they cluster by the SITE
+that should have thrown, not by the error number:
+
+| rule | tests |
+|---|---|
+| `delete` on a primitive -> #1120 | `Error1120CannotDeleteProperty`, `ecma3/String/e15_5_5_1` |
+| construct a class-bound method -> #1064 | `Error1064CannotCallMethodAsConstructor`, `avm2/constructprop_method` |
+| `delete` with an XMLList operand -> #1119 | `Error1119DeleteDoesNotSupportXMLListOperand` |
+| `XML.setName(undefined)` -> #1117 | `Error1117InvalidXmlName` |
+| `isXMLName` absent -> #1050 not #1065 | `Error1050CannotConvertToPrimitive`, `e4x/Global/isXMLNameTypeErr` |
+
+Note what this does to the standing `as3/RuntimeErrors` policy. Six of
+those tests are RuntimeErrors members, which §1(c) called "six unrelated
+one-assertion causes, left on the board". They were unrelated *as a
+directory*; they are five two-line fixes once each is keyed by its
+throw site, and two of them carry a non-RuntimeErrors sibling with them.
+**The policy ("never an arc, only riders") is right, but a rider needs a
+mechanism to ride — this session's mechanism was "read the assertion for
+the throw that should have happened".**
+
+### 6.3 Batches
+
+| Batch | Cluster | Predicted | Actual (CI) |
+|---|---|---|---|
+| 9 | error taxonomy: 5 targeted throws | +8 | **+9** |
+| 10 | ApplicationDomain: gQDN / hasDefinition(null) / currentDomain identity | +3 | **+4** |
+| 11 | object model: enumerable tombstones, isPrototypeOf on primitives, opaqueBackground | +3 | **+3** |
+
+Shipped as one commit (`a28b3e2cb`) because all three touch
+`avm2_globals.c`; attribution above is by test name, which is exact.
+
+The **two CI-only riders** were both outside the ≤5-line window, as in
+every prior session: `avm2/applicationdomain_getqualifieddefinitionnames`
+(a second gQDN test — the name-keyed batch found it without being told)
+and `from_avmplus/e4x/Expressions/e11_3_1` (the #1119 rule). +16 against
++14 predicted.
+
+### 6.4 What each fix actually was
+
+- **#1120 is about the RECEIVER'S KIND, not about traits.** Ruffle's
+  `Value::delete_property` answers true/false for every *object* and
+  throws unconditionally for every *primitive*. Our code returned `false`
+  for non-objects, which is the ES3 answer. The reason this reaches an
+  ecma3 String test at all is that `new String()` yields a String
+  **value** in AVM2, so `delete s.length` is a delete on a primitive.
+  Reading the rule off Ruffle's match arms took two minutes; reasoning
+  from the three failing assertions would have suggested "sealed traits
+  throw", which is wrong and would have broken
+  `as3/Vector/initializer_expressions` and `ecma3/Number/e15_7_3_1_1`,
+  both of which assert `delete <trait>` === **false**.
+- **#1064 keys on the method's bound class**, so it fires for a method
+  closure, a prototype method and `arguments.callee` alike, and never for
+  a `newfunction` closure. Our function objects already carried
+  `fn_bound_class` for exactly the set Ruffle gates on; the fix was the
+  gate, not the plumbing.
+- **#1119's operand is the property NAME, not the receiver.** `delete
+  books.book.(@publisher == "Adobe")` compiles to a filter that leaves an
+  XMLList on the stack *as the runtime name*, so the check belongs in the
+  `_dyn` (runtime-name) delete op and nowhere else.
+- **`setName(undefined)` is a QName-constructor rule.** setName routes
+  its argument through `new QName(name)`, and the QName constructor maps
+  a single `undefined` to the EMPTY local name rather than the string
+  `"undefined"`. Empty is not an XML name, so the existing #1117 check
+  fires on its own once the argument is mapped correctly. A fix in the
+  *caller's* argument handling, not in the validator.
+- **`isXMLName` was simply absent**, and its absence was *disguised*:
+  both its tests reported `expected Error #1050 got Error #1065`, which
+  reads like a taxonomy bug in the coercion path. It is a missing global
+  — and #1050 already worked, so registering the function was the whole
+  fix for both. **`#1065 Variable X is not defined` inside a "wrong error
+  code" assertion is the missing-name signal wearing a disguise.**
+- **`propertyIsEnumerable` matched TOMBSTONES.** `delete` leaves the
+  entry in the dynamic-property list with its `dont_enum` intact, and a
+  later assignment appends a *fresh, enumerable* entry behind it; the
+  enumerable accessors were the only readers in the file not skipping
+  `p->dead`. Everything else — enumeration, lookup, set — already did,
+  which is why the property both "iterated over" and reported
+  non-enumerable in the same trace. **A contradiction between two lines
+  of the same test names the reader that is out of step.**
+- **`isPrototypeOf` must walk a primitive's chain** (its class's
+  prototype object). Same root cause as #1120: `new String("x")` is a
+  value.
+- **`opaqueBackground` is declared `Object`,** so assigning `undefined`
+  stores the AS3 coercion — `null`. A one-line consequence of a
+  *signature*, invisible from the runtime code.
+- **`getQualifiedDefinitionNames` was free** — the domain already stores
+  every script definition with its scope and namespace; the method is a
+  filtered walk of `ctx->domain.entries`. `currentDomain === currentDomain
+  === false` cost more: it means minting a fresh wrapper per read, so the
+  scope now travels in the wrapper's `native_ext` and many wrappers can
+  name one scope (`scope->obj` stays the cached wrapper that GC-marks the
+  domain).
+
+### 6.5 Method notes
+
+- **The parallel canary sweep has a SECOND false-positive mode: compile
+  timeouts.** §5.4 recorded floating-point noise at `-P 6`. At `-P 8`,
+  `ecma3/Statements/eregress_74474_{002,003}` reported FAIL — they each
+  need ~65 s of *gcc* (not run) time, and lose the race under load. Both
+  pass sequentially. Generalised rule: **any parallel-sweep failure whose
+  test has a long `phases.compile` in `results_graphics.json` is presumed
+  false** — check that field before believing it, the same way §5.4 says
+  to re-run float mismatches.
+- **Capture the verify verdict from the SUMMARY block, not the progress
+  line.** A sweep keyed on `grep -o '\.\.\. \(PASS\|FAIL\)'` returned
+  `NORUN` for all 228 tests inside a nested-quoted `bash -c`, which the
+  status comparison then reported as 68 regressions. Parsing
+  `^Pass: *N` / `^Fail: *N` is quoting-proof and unambiguous.
+- **Restricting canaries to baseline-PASSING tests halves the sweep.**
+  229 canaries at `-P 8` took ~11 minutes; the unrestricted 320-directory
+  version would have been ~40. A regression is by definition a
+  pass -> fail move, so nothing is lost.
+
+### 6.6 Left on the board (diagnosed, not taken)
+
+Everything in §5.5 still stands, plus:
+
+- **`ecma3/ObjectObjects/hasOwnProperty`** — `str.hasOwnProperty("split")`
+  must be **false** for a String primitive. Our String class registers
+  its methods as PUBLIC ivtable traits, where avmplus has them in the
+  `AS3` namespace with only the prototype copy public. Fixing this test
+  means moving that surface, which is [[avm2-es3-prototype-surface]]'s
+  job, not a polish edit. (`isPrototypeOf`, its neighbour in the same
+  cluster, was independent and shipped.)
+- **`ecma3/Statements/e12_10`** — `with (7) x = valueOf()` must yield a
+  *number*. Ruffle's scope stack holds a `Value`, ours holds an
+  `Avm2Object*`, so `pushwith` on a primitive boxes it and `valueOf`
+  returns the box. Widening `Avm2ScopeEntry` is a recompiler+runtime
+  change.
+- **`avm2/system_exit`** — wants a three-line `getStackTrace()` including
+  a native frame (`at flash.system::System$/exit()`). The #2017 throw is
+  trivial; the stack-trace format is the actual work.
+- **`avm2/newclass_mismatched`** — three hand-built ABC cases wanting
+  #1034 / #1009 / #1108 where we give #1108 first. Our `newclass`
+  base-class check is both too strict and too early; it also blanks
+  `as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp` (a VALID
+  program we reject with #1108). Worth taking next — it is one site with
+  two graded tests — but it needs the ABC disassembled to order the three
+  cases.
