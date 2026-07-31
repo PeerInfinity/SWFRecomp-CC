@@ -1,161 +1,65 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-31T05:17:45.983134+00:00",
-    "old_git_sha": "c146dc66ef9a5f770695e80e6d1fe53c9cfe6c0d",
-    "new_timestamp": "2026-07-31T14:52:54.908152+00:00",
-    "new_git_sha": "a28b3e2cbb40465dbfa97ddaa15a663868b665f5",
+    "old_timestamp": "2026-07-31T14:52:54.908152+00:00",
+    "old_git_sha": "a28b3e2cbb40465dbfa97ddaa15a663868b665f5",
+    "new_timestamp": "2026-07-31T20:03:56.656352+00:00",
+    "new_git_sha": "b4d4457f16e24a406b3328e7f30b55c825c7dc47",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1039,
+    "old_pass": 1046,
     "old_ruffle_matched": 26,
-    "old_effective_pass": 1065,
+    "old_effective_pass": 1072,
     "old_total": 1222,
-    "old_pass_rate": 85.0,
-    "new_pass": 1046,
+    "old_pass_rate": 85.6,
+    "new_pass": 1048,
     "new_ruffle_matched": 26,
-    "new_effective_pass": 1072,
+    "new_effective_pass": 1074,
     "new_total": 1222,
-    "new_pass_rate": 85.6,
-    "old_mismatched_lines": 33529,
-    "new_mismatched_lines": 33505,
+    "new_pass_rate": 85.8,
+    "old_mismatched_lines": 33505,
+    "new_mismatched_lines": 33499,
     "increased_mismatches": 0,
-    "decreased_mismatches": 24,
-    "newly_passing": 7,
+    "decreased_mismatches": 6,
+    "newly_passing": 2,
     "newly_failing": 0,
-    "status_changed": 7,
-    "unchanged": 1214,
+    "status_changed": 2,
+    "unchanged": 1220,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "applicationdomain_getqualifieddefinitionnames",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 9,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "applicationdomain_hasdefinition_null",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "constructprop_method",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 2,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
       "test": "core_exceptions",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 46,
+        "actual_lines": 47,
         "expected_lines": 47,
-        "matching_lines": 41
+        "matching_lines": 45
       },
       "new_lines": {
         "actual_lines": 47,
         "expected_lines": 47,
-        "matching_lines": 45
+        "matching_lines": 47
       }
     },
     {
-      "test": "displayobject_opaque_background",
+      "test": "newclass_mismatched",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 5
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "property_is_enumerable_reset",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 23,
-        "expected_lines": 23,
-        "matching_lines": 22
-      },
-      "new_lines": {
-        "actual_lines": 23,
-        "expected_lines": 23,
-        "matching_lines": 23
-      }
-    },
-    {
-      "test": "property_priority_definition_names_order",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 2,
+        "actual_lines": 2,
+        "expected_lines": 4,
         "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "stage_domain_getQualifiedDefinitionNames",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 5,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
       }
     }
   ]

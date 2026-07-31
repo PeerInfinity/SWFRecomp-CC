@@ -1,12 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 70/70 passing | Graphics: 70/70 passing
+Trace: 70/70 passing | Graphics: 69/70 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (1 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `avm2_findprop_this_resolution` | Output Mismatch | 12/13 lines match |
 
 ## Graphics Improvements (0 tests)
 
