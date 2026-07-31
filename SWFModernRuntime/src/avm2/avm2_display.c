@@ -257,6 +257,7 @@ static int g_timeline_instantiation;
 
 static Avm2Class* g_textfield_class;
 static Avm2Class* g_statictext_class;
+static Avm2Class* g_video_class;
 static Avm2Class* g_morphshape_class;
 static uint8_t g_stage_invalidated_flag;
 
@@ -1444,6 +1445,12 @@ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 			return g_textfield_class;
 		case AVM2_CHAR_BITMAP:
 			return ctx->builtins.bitmap_class;
+		case AVM2_CHAR_VIDEO:
+			// The AVM2 character scanner has recorded DefineVideoStream as
+			// kind 7 all along; only this arm was missing, so every placed
+			// video instantiated as a MovieClip (place_and_lookup/swf{9,10}).
+			return g_video_class != NULL ? g_video_class
+			                             : ctx->builtins.movieclip_class;
 		default:
 			return ctx->builtins.movieclip_class;
 	}
@@ -12901,6 +12908,7 @@ void avm2_register_display(Avm2Context* ctx)
 	// avm2_media.c because everything it needs — display_native_init and the
 	// draw-AABB that gives it intrinsic bounds — is private to this file.
 	Avm2Class* video = avm2_builtin_class(ctx, "flash.media", "Video", dobj);
+	g_video_class = video;
 	video->native_init = display_native_init;
 	video->instance_init.fn = video_init;
 	video->instance_init.debug_name = "Video";

@@ -951,11 +951,27 @@ static Avm2Value global_is_finite(Avm2Activation* act)
 	return avm2_bool(isfinite(d) != 0);
 }
 
+// parseInt/parseFloat declare `s:String`, so an explicit `undefined` argument
+// takes the AS3 String coercion to *null* and then stringifies as "null" —
+// the same rule the five URI natives above document. `parseInt(undefined, 32)`
+// is therefore parseInt("null", 32) == 785077, not parseInt("undefined", 32).
+// With NO argument at all the parameter is genuinely absent and the result is
+// NaN.
+static const Avm2String* numeric_parse_arg(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->args[0].kind == AVM2_VALUE_UNDEFINED)
+	{
+		return avm2_string_from_literal(ctx, "null");
+	}
+	return avm2_coerce_to_string(ctx, act->args[0]);
+}
+
 static Avm2Value global_parse_int(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	if (act->argc == 0) return avm2_number(NAN);
-	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	const Avm2String* s = numeric_parse_arg(act);
 	int32_t radix = act->argc > 1 ? avm2_coerce_to_i32(ctx, act->args[1]) : 0;
 	return avm2_number(avm2_string_to_int(s->utf8, s->len, radix, false));
 }
@@ -964,7 +980,7 @@ static Avm2Value global_parse_float(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	if (act->argc == 0) return avm2_number(NAN);
-	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	const Avm2String* s = numeric_parse_arg(act);
 	double d;
 	if (avm2_string_to_f64(s->utf8, s->len, false, &d))
 	{
