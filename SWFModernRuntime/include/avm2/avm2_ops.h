@@ -253,6 +253,10 @@ void avm2_op_setproperty_static_ic(Avm2Activation* act, Avm2Value recv, uint32_t
 void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                              Avm2Value name, Avm2Value value, int interp);
 void avm2_op_initproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value val);
+// InitProperty with a runtime name (MultinameL): same resolution as
+// avm2_op_setproperty_dyn, but an init may write a const slot.
+void avm2_op_initproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                              Avm2Value name, Avm2Value value, int interp);
 
 // Compile-time slot-bound STORE (recompiler store-path specialization): the
 // recompiler proved the receiver's static class is a sealed ABC class whose
@@ -361,6 +365,11 @@ Avm2Value avm2_op_callsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx
                             const Avm2Value* args, uint32_t argc);
 Avm2Value avm2_op_getsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx);
 void avm2_op_setsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value value);
+// `super[expr]` — runtime local name, static ns set.
+Avm2Value avm2_op_getsuper_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                               Avm2Value name);
+void avm2_op_setsuper_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                          Avm2Value name, Avm2Value value);
 
 // Construction.
 Avm2Value avm2_op_construct(Avm2Activation* act, Avm2Value ctor,

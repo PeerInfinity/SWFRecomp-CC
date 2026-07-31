@@ -895,10 +895,14 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 			return out;
 		}
 	}
-	if (!mn_public)
 	{
-		// Non-public ns set (dict.test::["name"]): traits keyed in any of
-		// the set's namespaces still match.
+		// A ns-set multiname matches a trait in ANY namespace of the set, and
+		// a TRAIT beats a dynamic property (Ruffle VTable::get_trait runs
+		// before the dynamic-prop probe). The set routinely contains the
+		// public ns *alongside* the enclosing package/internal ones, so this
+		// must not be gated on the set being non-public: `SuperProps` reads
+		// an `internal var y` as `this["y"]` from a site whose set holds both,
+		// and a public-key-only lookup misses the fixed property entirely.
 		const Avm2PropEntry* e = avm2_vtable_find_mn_named(
 			avm2_value_vtable(ctx, recv), act->file->data, mn_idx,
 			ns->utf8, ns->len);
@@ -1289,11 +1293,14 @@ void avm2_op_setproperty_slot_c(Avm2Activation* act, Avm2Value recv, uint32_t sl
 static void setproperty_qname(Avm2Activation* act, Avm2Value recv,
                               const Avm2QNameExt* q, Avm2Value value);
 
-void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
-                             Avm2Value name_val, Avm2Value value, int interp)
+// Shared body of the runtime-named store ops. `allow_const` is the only
+// difference between SetProperty and InitProperty (an init may write a const
+// slot / a read-only trait — that is what the *Property init form is FOR).
+static void setproperty_dyn_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                                 Avm2Value name_val, Avm2Value value, int interp,
+                                 int allow_const)
 {
 	Avm2Context* ctx = act->ctx;
-	(void) mn_idx;
 	{
 		// FAST-path-only, like the get side (dictionary_access_no_pubns).
 		Avm2Object* dict;
@@ -1354,8 +1361,10 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	{
 		return;
 	}
-	if (!mn_public)
 	{
+		// Same ns-set-wide trait rule as the read side above: a write through
+		// `obj[expr]` must hit the fixed property when one of the site's
+		// namespaces declares it, rather than minting an expando.
 		const Avm2PropEntry* e = avm2_vtable_find_mn_named(
 			avm2_value_vtable(ctx, recv), act->file->data, mn_idx,
 			ns->utf8, ns->len);
@@ -1364,7 +1373,7 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 			Resolved r2;
 			memset(&r2, 0, sizeof(r2));
 			r2.entry = e;
-			setproperty_resolved(ctx, recv, &r2, ns->utf8, ns->len, value, 0);
+			setproperty_resolved(ctx, recv, &r2, ns->utf8, ns->len, value, allow_const);
 			return;
 		}
 	}
@@ -1372,7 +1381,7 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 	Resolved r;
 	if (resolve_key(ctx, recv, &key, mn_public, &r))
 	{
-		setproperty_resolved(ctx, recv, &r, ns->utf8, ns->len, value, 0);
+		setproperty_resolved(ctx, recv, &r, ns->utf8, ns->len, value, allow_const);
 		return;
 	}
 	if (mn_public
@@ -1392,6 +1401,22 @@ void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 		                 (int) ns->len, ns->utf8, cn);
 	}
 	setproperty_miss(ctx, recv, ns->utf8, ns->len, value);
+}
+
+void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                             Avm2Value name_val, Avm2Value value, int interp)
+{
+	setproperty_dyn_impl(act, recv, mn_idx, name_val, value, interp, 0);
+}
+
+// InitProperty with a runtime name (MultinameL). ASC emits this for
+// `this[expr] = v` inside a constructor and, in `misc/bug_508617` /
+// `as3/Definitions/Super/SuperProps`, for the class-init store of a
+// namespace-set-qualified slot whose local name is computed.
+void avm2_op_initproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                              Avm2Value name_val, Avm2Value value, int interp)
+{
+	setproperty_dyn_impl(act, recv, mn_idx, name_val, value, interp, 1);
 }
 
 // Declared trait visible to `delete` on this receiver. A class object's own
@@ -1587,13 +1612,22 @@ Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32
 
 // Key from a popped Namespace value. Returns whether the namespace is the
 // public (empty-URI) one, i.e. whether dynamic props are reachable.
-static int key_from_ns_value(Avm2Value ns_val, const char* name, uint32_t name_len,
+static int key_from_ns_value(Avm2Context* ctx, Avm2Value ns_val,
+                             const char* name, uint32_t name_len,
                              Avm2PropKey* key)
 {
 	Avm2NamespaceExt* n = avm2_namespace_ext_of(ns_val);
 	if (n == NULL)
 	{
-		avm2_fatal("lazy-ns property op: popped namespace is not a Namespace value");
+		// The RTQName/RTQNameL namespace operand is verified LATE: avmplus
+		// coerces it to Namespace at the op and reports a catchable
+		// VerifyError #1058 when it isn't one (rtqname_not_namespace catches
+		// it and prints e.name / e.errorID). It is not a fatal.
+		char cn[160];
+		class_name_of(ctx, ns_val, cn, sizeof(cn));
+		avm2_throw_error(ctx, ctx->builtins.verify_error_class,
+		                 "Error #1058: Illegal operand type: %s must be Namespace.",
+		                 cn);
 	}
 	key->name = name;
 	key->name_len = name_len;
@@ -1777,7 +1811,7 @@ Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t
 		if (avm2_xml_get_name(ctx, recv, &n, &out)) return out;
 	}
 	Avm2PropKey key;
-	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	int pub = key_from_ns_value(act->ctx, ns_val, name, name_len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
 	return getproperty_common(act, recv, name, name_len, ok, &r, pub, 0);
@@ -1806,7 +1840,7 @@ Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32
 		if (avm2_xml_get_name(ctx, recv, &n, &out)) return out;
 	}
 	Avm2PropKey key;
-	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
+	int pub = key_from_ns_value(act->ctx, ns_val, s->utf8, s->len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
 	return getproperty_common(act, recv, s->utf8, s->len, ok, &r, pub, 0);
@@ -1828,7 +1862,7 @@ static void setproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 		if (avm2_xml_set_name(ctx, recv, &n, value)) return;
 	}
 	Avm2PropKey key;
-	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	int pub = key_from_ns_value(act->ctx, ns_val, name, name_len, &key);
 	Resolved r;
 	if (resolve_key(ctx, recv, &key, pub, &r))
 	{
@@ -1883,7 +1917,7 @@ static Avm2Value deleteproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 	}
 	if (recv.kind != AVM2_VALUE_OBJECT) return avm2_bool(false);
 	Avm2PropKey key;
-	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	int pub = key_from_ns_value(act->ctx, ns_val, name, name_len, &key);
 	const Avm2VTable* vt = avm2_value_vtable(ctx, recv);
 	if (delete_trait_find(ctx, recv, vt, &key) != NULL)
 	{
@@ -2048,6 +2082,98 @@ static int scope_defines_mn(Avm2Activation* act, const Avm2ScopeEntry* se, uint3
 	}
 	Resolved r;
 	return resolve_mn(act, sv, mn_idx, &r);
+}
+
+// --- Runtime-named multinames (MultinameL / MultinameLA) -------------------
+// A MultinameL carries a namespace SET but takes its local name off the
+// operand stack, so none of the mn_idx-keyed lookups above can match it. The
+// ONLY correct order is to test the whole ns set at EACH scope level, not one
+// namespace across the whole chain: `scopes_dont_cache` pins exactly that —
+// the set is {outer, inner} and the answer is the inner global purely because
+// it sits higher on the scope stack. avm2_vtable_find_mn_named already walks
+// the set against a single vtable, which is the per-level primitive.
+
+// Is `mn_idx` a runtime-named multiname (name off the stack, ns set static)?
+static int mn_is_lazy_name_set(const Avm2AbcFileData* data, uint32_t mn_idx)
+{
+	uint8_t k = data->multinames[mn_idx].kind;
+	return k == 0x1b || k == 0x1c;   // MultinameL / MultinameLA
+}
+
+// scope_defines_mn for a MultinameL: the ns set applies at this one level.
+static int scope_defines_named(Avm2Activation* act, const Avm2ScopeEntry* se,
+                               uint32_t mn_idx, const char* name, uint32_t name_len)
+{
+	if (se->obj == NULL) return 0;
+	if (!se->is_with)
+	{
+		return avm2_vtable_find_mn_named(se->obj->vtable, act->file->data, mn_idx,
+		                                 name, name_len) != NULL;
+	}
+	Avm2Value sv = avm2_object_value(se->obj);
+	if (avm2_value_is_xmlish(sv))
+	{
+		return avm2_xml_has_property_via_in(
+			act->ctx, sv, avm2_string_new(act->ctx, name, name_len));
+	}
+	// with-scopes expose dynamic props too, so try each namespace in the set
+	// as a full key resolve.
+	const Avm2AbcFileData* data = act->file->data;
+	const Avm2AbcNsSet* set = &data->ns_sets[data->multinames[mn_idx].ns_set];
+	for (uint32_t i = 0; i < set->count; i++)
+	{
+		Avm2PropKey key;
+		key.name = name;
+		key.name_len = name_len;
+		avm2_key_ns_from_abc(&key, data, set->ns_indices[i]);
+		Resolved r;
+		if (resolve_key(act->ctx, sv, &key, avm2_propkey_is_public(&key), &r)) return 1;
+	}
+	return 0;
+}
+
+static Avm2Object* findproperty_scope_walk_named(Avm2Activation* act,
+                                                 const Avm2ScopeEntry* lscope,
+                                                 uint32_t scope_n, uint32_t mn_idx,
+                                                 const char* name, uint32_t name_len)
+{
+	for (uint32_t i = scope_n; i > 0; i--)
+	{
+		if (scope_defines_named(act, &lscope[i - 1], mn_idx, name, name_len))
+		{
+			return lscope[i - 1].obj;
+		}
+	}
+	if (act->outer != NULL)
+	{
+		for (uint32_t i = act->outer->count; i > 0; i--)
+		{
+			if (scope_defines_named(act, &act->outer->entries[i - 1], mn_idx,
+			                        name, name_len))
+			{
+				return act->outer->entries[i - 1].obj;
+			}
+		}
+	}
+	return NULL;
+}
+
+// Domain phase for a MultinameL: the runtime name against each ns in the set.
+static Avm2Object* findproperty_domain_find_named(Avm2Activation* act, uint32_t mn_idx,
+                                                  const char* name, uint32_t name_len)
+{
+	const Avm2AbcFileData* data = act->file->data;
+	const Avm2AbcNsSet* set = &data->ns_sets[data->multinames[mn_idx].ns_set];
+	for (uint32_t i = 0; i < set->count; i++)
+	{
+		Avm2PropKey key;
+		key.name = name;
+		key.name_len = name_len;
+		avm2_key_ns_from_abc(&key, data, set->ns_indices[i]);
+		Avm2Object* g = avm2_domain_find(act->ctx, act->file->scope, &key);
+		if (g != NULL) return g;
+	}
+	return NULL;
 }
 
 // --- FindProperty resolution, split into the three phases so the plain op and
@@ -2592,7 +2718,6 @@ Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* 
 	// Resolve the runtime name to a string and search scope objects for a
 	// public property of that name (with-scope semantics apply the same).
 	Avm2Context* ctx = act->ctx;
-	(void) mn_idx;
 	{
 		const Avm2QNameExt* q = avm2_qname_ext_of(name);
 		if (q != NULL)
@@ -2604,6 +2729,16 @@ Avm2Object* avm2_op_findproperty_dyn(Avm2Activation* act, const Avm2ScopeEntry* 
 		}
 	}
 	const Avm2String* ns = avm2_coerce_to_string(ctx, name);
+	if (mn_is_lazy_name_set(act->file->data, mn_idx))
+	{
+		// MultinameL: the static half is a ns SET, tested at each scope level
+		// with the runtime name. Run before the public-key search below so a
+		// non-public trait at an inner scope wins over an outer public one.
+		Avm2Object* g = findproperty_scope_walk_named(act, lscope, scope_n, mn_idx,
+		                                              ns->utf8, ns->len);
+		if (g == NULL) g = findproperty_domain_find_named(act, mn_idx, ns->utf8, ns->len);
+		if (g != NULL) return g;
+	}
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
 	return findproperty_key(act, lscope, scope_n, &key, 1, strict);
 }
@@ -2616,7 +2751,7 @@ Avm2Object* avm2_op_findproperty_rtns(Avm2Activation* act, const Avm2ScopeEntry*
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
 	Avm2PropKey key;
-	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	int pub = key_from_ns_value(act->ctx, ns_val, name, name_len, &key);
 	return findproperty_key(act, lscope, scope_n, &key, pub, strict);
 }
 
@@ -2637,7 +2772,7 @@ Avm2Object* avm2_op_findproperty_rtns_l(Avm2Activation* act, const Avm2ScopeEntr
 	}
 	const Avm2String* s = avm2_coerce_to_string(act->ctx, name_val);
 	Avm2PropKey key;
-	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
+	int pub = key_from_ns_value(act->ctx, ns_val, s->utf8, s->len, &key);
 	return findproperty_key(act, lscope, scope_n, &key, pub, strict);
 }
 
@@ -2868,7 +3003,7 @@ Avm2Value avm2_op_callproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_
 		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
 	}
 	Avm2PropKey key;
-	int pub = key_from_ns_value(ns_val, name, name_len, &key);
+	int pub = key_from_ns_value(act->ctx, ns_val, name, name_len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
 	if (!ok && avm2_value_is_xmlish(recv))
@@ -2895,7 +3030,7 @@ Avm2Value avm2_op_callproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint3
 		avm2_throw_null_or_undefined(ctx, recv, s->utf8, s->len);
 	}
 	Avm2PropKey key;
-	int pub = key_from_ns_value(ns_val, s->utf8, s->len, &key);
+	int pub = key_from_ns_value(act->ctx, ns_val, s->utf8, s->len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
 	if (!ok && avm2_value_is_xmlish(recv))
@@ -2991,18 +3126,18 @@ Avm2Value avm2_op_callsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx
 	}
 }
 
-Avm2Value avm2_op_getsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
+// Shared tails of Get/SetSuper. The static-multiname and MultinameL forms
+// differ ONLY in how `name` and the super-vtable entry are obtained, so the
+// null check, the #1069 throw and avmplus's setsuper leniency live here once.
+static Avm2Value getsuper_common(Avm2Activation* act, Avm2Value recv, Avm2Class* super,
+                                 const Avm2PropEntry* e,
+                                 const char* name, uint32_t name_len)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2Class* super = super_class_of(act);
-	const char* name;
-	uint32_t name_len;
-	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
 	if (value_is_null_like(recv))
 	{
 		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
 	}
-	const Avm2PropEntry* e = avm2_vtable_find_mn(&super->ivtable, act->file->data, mn_idx);
 	if (e == NULL)
 	{
 		avm2_throw_1069(ctx, name, name_len, super);
@@ -3013,18 +3148,15 @@ Avm2Value avm2_op_getsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
 	return resolved_get(ctx, recv, &r, name, name_len);
 }
 
-void avm2_op_setsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value value)
+static void setsuper_common(Avm2Activation* act, Avm2Value recv, Avm2Class* super,
+                            const Avm2PropEntry* e,
+                            const char* name, uint32_t name_len, Avm2Value value)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2Class* super = super_class_of(act);
-	const char* name;
-	uint32_t name_len;
-	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
 	if (value_is_null_like(recv))
 	{
 		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
 	}
-	const Avm2PropEntry* e = avm2_vtable_find_mn(&super->ivtable, act->file->data, mn_idx);
 	if (e == NULL)
 	{
 		avm2_throw_1069(ctx, name, name_len, super);
@@ -3049,6 +3181,54 @@ void avm2_op_setsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2
 	memset(&r, 0, sizeof(r));
 	r.entry = e;
 	setproperty_resolved(ctx, recv, &r, name, name_len, value, 0);
+}
+
+Avm2Value avm2_op_getsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
+{
+	Avm2Class* super = super_class_of(act);
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	return getsuper_common(act, recv, super,
+	                       avm2_vtable_find_mn(&super->ivtable, act->file->data, mn_idx),
+	                       name, name_len);
+}
+
+void avm2_op_setsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Avm2Value value)
+{
+	Avm2Class* super = super_class_of(act);
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	setsuper_common(act, recv, super,
+	                avm2_vtable_find_mn(&super->ivtable, act->file->data, mn_idx),
+	                name, name_len, value);
+}
+
+// Get/SetSuper with a runtime name (`super[expr]`). The multiname's ns SET is
+// still static, so the entry lookup is avm2_vtable_find_mn_named against the
+// superclass ivtable — `as3/Definitions/Super/SuperInForLoop` writes
+// `super[p] = v` inside a for-in over the property names.
+Avm2Value avm2_op_getsuper_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                               Avm2Value name_val)
+{
+	Avm2Class* super = super_class_of(act);
+	const Avm2String* s = avm2_coerce_to_string(act->ctx, name_val);
+	return getsuper_common(act, recv, super,
+	                       avm2_vtable_find_mn_named(&super->ivtable, act->file->data,
+	                                                 mn_idx, s->utf8, s->len),
+	                       s->utf8, s->len);
+}
+
+void avm2_op_setsuper_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                          Avm2Value name_val, Avm2Value value)
+{
+	Avm2Class* super = super_class_of(act);
+	const Avm2String* s = avm2_coerce_to_string(act->ctx, name_val);
+	setsuper_common(act, recv, super,
+	                avm2_vtable_find_mn_named(&super->ivtable, act->file->data,
+	                                          mn_idx, s->utf8, s->len),
+	                s->utf8, s->len, value);
 }
 
 // ---------------------------------------------------------------------------

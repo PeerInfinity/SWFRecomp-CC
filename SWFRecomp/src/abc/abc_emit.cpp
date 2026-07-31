@@ -1360,7 +1360,17 @@ namespace abc
 				    << ");" << endl;
 				return true;
 			case IrOpcode::InitProperty:
-				if (mnLazyName(abc, op.arg1) || mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyName(abc, op.arg1))
+				{
+					// MultinameL: [obj, name, value]. Init semantics (a const
+					// slot is writable) are the only difference from
+					// SetPropertySlow's lazy-name arm.
+					out << "\tsp -= 3; avm2_op_initproperty_dyn(act, stk[sp], "
+					    << op.arg1 << ", stk[sp + 1], stk[sp + 2], "
+					    << (bc.interp_mode ? 1 : 0) << ");" << endl;
+					return true;
+				}
 				if (os.store_slot >= 0)
 				{
 					emitStoreSlot(out, op.arg1, os, /*is_init=*/1);
@@ -1487,12 +1497,26 @@ namespace abc
 				    << "); sp++;" << endl;
 				return true;
 			case IrOpcode::GetSuper:
-				if (mnLazyName(abc, op.arg1) || mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyName(abc, op.arg1))
+				{
+					// `super[expr]`: [obj, name]
+					out << "\tsp -= 2; stk[sp] = avm2_op_getsuper_dyn(act, stk[sp], "
+					    << op.arg1 << ", stk[sp + 1]); sp++;" << endl;
+					return true;
+				}
 				out << "\tstk[sp - 1] = avm2_op_getsuper(act, stk[sp - 1], "
 				    << op.arg1 << ");" << endl;
 				return true;
 			case IrOpcode::SetSuper:
-				if (mnLazyName(abc, op.arg1) || mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyNs(abc, op.arg1)) return false;
+				if (mnLazyName(abc, op.arg1))
+				{
+					// `super[expr] = v`: [obj, name, value]
+					out << "\tsp -= 3; avm2_op_setsuper_dyn(act, stk[sp], " << op.arg1
+					    << ", stk[sp + 1], stk[sp + 2]);" << endl;
+					return true;
+				}
 				out << "\tsp -= 2; avm2_op_setsuper(act, stk[sp], " << op.arg1
 				    << ", stk[sp + 1]);" << endl;
 				return true;

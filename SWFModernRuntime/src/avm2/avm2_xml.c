@@ -454,10 +454,6 @@ static void xml_set_local(Avm2Context* ctx, Avm2Object* xml_obj, E4XNode* node,
 		const Avm2String* s = c_is_string ? c_str
 		                     : (vl != NULL) ? list_join_space(ctx, vl)
 		                     : avm2_coerce_to_string(ctx, c);
-		if (name->local == NULL)
-		{
-			return;  // can't set the any-attribute
-		}
 		uint32_t first_idx;
 		E4XNode* first;
 		if (avm2_e4x_remove_matching(ctx, node, name, 1, &first_idx, &first))
@@ -479,7 +475,7 @@ static void xml_set_local(Avm2Context* ctx, Avm2Object* xml_obj, E4XNode* node,
 				                avm2_string(first->local), avm2_string(old_value));
 			}
 		}
-		else
+		else if (name->local != NULL)
 		{
 			E4XNamespace ns;
 			E4XNamespace* nsp = name_namespace(ctx, name, &ns) ? &ns : NULL;
@@ -488,6 +484,10 @@ static void xml_set_local(Avm2Context* ctx, Avm2Object* xml_obj, E4XNode* node,
 			avm2_xml_notify(ctx, node, "attributeAdded",
 			                avm2_string(name->local), avm2_string(s));
 		}
+		// An any-name (`x.@* = v`) can only REWRITE: ECMA-357 9.1.1.2 keeps the
+		// first matching attribute, deletes the rest, and assigns to it — but
+		// it never CREATES one, since there is no name to create. The read
+		// half of the wildcard rule shipped in session 5; this is the write.
 		return;
 	}
 

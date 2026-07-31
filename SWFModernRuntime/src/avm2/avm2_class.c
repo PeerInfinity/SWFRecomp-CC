@@ -356,10 +356,28 @@ const Avm2PropEntry* avm2_vtable_find(const Avm2VTable* vt, const Avm2PropKey* k
 	return NULL;
 }
 
+// A multiname carrying a namespace SET can match SEVERAL vtable entries at
+// once — a subclass may redeclare an inherited name in a different namespace
+// (`property_priority_chained`: base declares `field1` internal, the subclass
+// declares it public, and the read site's set holds both). The winner is the
+// MOST DERIVED declaration. Ruffle gets this from PropertyMap::insert doing
+// `bucket.insert(0, ..)` — it PREPENDS, so its `.next()` yields the most
+// recently inserted entry. Our vtable is built base-first and appends own
+// traits, so "most derived" is the HIGHEST entry index: set-matching lookups
+// must take the LAST match, not the first. Exact-key lookups
+// (avm2_vtable_find) are unaffected — one (name, ns) pair has one entry.
+static int mn_kind_is_ns_set(const Avm2AbcFileData* data, uint32_t mn_idx)
+{
+	uint8_t k = data->multinames[mn_idx].kind;
+	return k == 0x09 || k == 0x0e || k == 0x1b || k == 0x1c;
+}
+
 const Avm2PropEntry* avm2_vtable_find_mn(const Avm2VTable* vt, const Avm2AbcFileData* data,
                                          uint32_t mn_idx)
 {
 	if (vt == NULL) return NULL;
+	const int last_wins = mn_kind_is_ns_set(data, mn_idx);
+	const Avm2PropEntry* found = NULL;
 	const Avm2VTableIndex* ix = vt_index_get(vt);
 	if (ix != NULL)
 	{
@@ -367,22 +385,27 @@ const Avm2PropEntry* avm2_vtable_find_mn(const Avm2VTable* vt, const Avm2AbcFile
 		uint32_t name_len;
 		avm2_mn_name(data, mn_idx, &name, &name_len);
 		uint32_t h = vt_name_hash(name, name_len);
+		// The chain runs in ASCENDING entry index (vt_index_build walks
+		// high->low), so "keep the last match" == "most derived wins".
 		for (int32_t n = ix->buckets[h & ix->mask]; n >= 0; n = ix->nodes[n].next)
 		{
 			if (ix->nodes[n].hash != h) continue;
 			const Avm2PropEntry* e = &vt->entries[ix->nodes[n].entry];
-			if (avm2_mn_match(data, mn_idx, &e->key)) return e;
+			if (!avm2_mn_match(data, mn_idx, &e->key)) continue;
+			found = e;
+			if (!last_wins) return found;
 		}
-		return NULL;
+		return found;
 	}
 	for (uint32_t i = 0; i < vt->count; i++)
 	{
 		if (avm2_mn_match(data, mn_idx, &vt->entries[i].key))
 		{
-			return &vt->entries[i];
+			found = &vt->entries[i];
+			if (!last_wins) return found;
 		}
 	}
-	return NULL;
+	return found;
 }
 
 const Avm2PropEntry* avm2_vtable_find_public(const Avm2VTable* vt,
@@ -440,17 +463,63 @@ const Avm2PropEntry* avm2_vtable_find_mn_named(const Avm2VTable* vt,
 			return NULL;
 	}
 	uint32_t count = (set != NULL) ? set->count : 1;
-	for (uint32_t i = 0; i < count; i++)
+	// Hash the (single, runtime) name ONCE and walk its bucket once, testing
+	// each same-name entry against the whole ns set — the ns sets ASC emits
+	// for `obj[expr]` inside a class run to 7-9 namespaces, and this op sits
+	// on the dynamic-property fast path, so a find-per-namespace would mean
+	// 9 hashes + 9 bucket walks for what is one bucket's worth of work.
+	// Set matches take the LAST hit (most-derived wins) — see the comment on
+	// avm2_vtable_find_mn.
+	const int last_wins = (set != NULL);
+	const Avm2PropEntry* found = NULL;
+	const Avm2VTableIndex* ix = vt_index_get(vt);
+	if (ix != NULL)
 	{
-		uint32_t ns_idx = (set != NULL) ? set->ns_indices[i] : single_ns;
-		Avm2PropKey key;
-		key.name = name;
-		key.name_len = name_len;
-		avm2_key_ns_from_abc(&key, data, ns_idx);
-		const Avm2PropEntry* e = avm2_vtable_find(vt, &key);
-		if (e != NULL) return e;
+		uint32_t h = vt_name_hash(name, name_len);
+		for (int32_t n = ix->buckets[h & ix->mask]; n >= 0; n = ix->nodes[n].next)
+		{
+			if (ix->nodes[n].hash != h) continue;
+			const Avm2PropEntry* e = &vt->entries[ix->nodes[n].entry];
+			if (e->key.name_len != name_len
+			    || memcmp(e->key.name, name, name_len) != 0) continue;
+			for (uint32_t i = 0; i < count; i++)
+			{
+				uint32_t ns_idx = (set != NULL) ? set->ns_indices[i] : single_ns;
+				Avm2PropKey key;
+				key.name = name;
+				key.name_len = name_len;
+				avm2_key_ns_from_abc(&key, data, ns_idx);
+				if (avm2_propkey_matches(&e->key, &key))
+				{
+					found = e;
+					if (!last_wins) return found;
+					break;
+				}
+			}
+		}
+		return found;
 	}
-	return NULL;
+	for (uint32_t i = 0; i < vt->count; i++)
+	{
+		const Avm2PropEntry* e = &vt->entries[i];
+		if (e->key.name_len != name_len
+		    || memcmp(e->key.name, name, name_len) != 0) continue;
+		for (uint32_t j = 0; j < count; j++)
+		{
+			uint32_t ns_idx = (set != NULL) ? set->ns_indices[j] : single_ns;
+			Avm2PropKey key;
+			key.name = name;
+			key.name_len = name_len;
+			avm2_key_ns_from_abc(&key, data, ns_idx);
+			if (avm2_propkey_matches(&e->key, &key))
+			{
+				found = e;
+				if (!last_wins) return found;
+				break;
+			}
+		}
+	}
+	return found;
 }
 
 static Avm2PropEntry* vtable_find_mut(Avm2VTable* vt, const Avm2PropKey* key)
@@ -914,8 +983,25 @@ Avm2Value avm2_call_method_ref(Avm2Context* ctx, const Avm2MethodRef* m,
 			// constructors) — deliberate no-op.
 			return avm2_undefined();
 		}
-		avm2_fatal("AVM2: call to method '%s' with no body",
-		           m->debug_name ? m->debug_name : "<anon>");
+		// A declared-but-bodyless ABC method: avmplus reports this LATE, at
+		// the call, as a catchable VerifyError #1001 (method_without_body
+		// catches it and prints e / e.errorID). Not a fatal. The method is
+		// named the way a stack frame names it ("Class/method").
+		const char* dn = (m->debug_name != NULL && m->debug_name[0] != '\0')
+		                 ? m->debug_name : "<anonymous>";
+		char qual[224];
+		if (bound_class != NULL)
+		{
+			char cq[128];
+			avm2_class_qname_colons_buf(bound_class, cq, sizeof(cq));
+			snprintf(qual, sizeof(qual), "%s/%s", cq, dn);
+		}
+		else
+		{
+			snprintf(qual, sizeof(qual), "%s", dn);
+		}
+		avm2_throw_error(ctx, ctx->builtins.verify_error_class,
+		                 "Error #1001: The method %s() is not implemented.", qual);
 	}
 	avm2_stack_check(ctx);
 	Avm2Activation act;
