@@ -348,7 +348,7 @@ def build_comparison(ruffle_dir: Path, swfrecomp_build: Path, total: int,
         shutil.copy2(b, s_copy)
         # compare_images writes "<actual_stem>.difference.png" next to s_copy
         # whenever there is any pixel difference (independent of pass/fail).
-        passed, msg, max_diff = vo.compare_images(
+        passed, msg, max_diff, _stats = vo.compare_images(
             s_copy, r_copy, [{"tolerance": tolerance, "max_outliers": max_outliers}])
         if not passed and first_frame < 0:
             first_frame, first_msg = frame, f"max_diff={max_diff} ({msg})"

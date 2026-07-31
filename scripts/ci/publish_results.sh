@@ -28,6 +28,8 @@ set -e
 MODE="${MODE:?MODE (inputs.mode) must be set}"
 LIMIT="${LIMIT:-0}"
 RUN_URL="${RUN_URL:-}"
+# "true" when this run built image_results_graphics.json; see the backup loop.
+IMAGES="${IMAGES:-false}"
 
 # Return the working tree to the commit we started on, whatever happens below.
 #
@@ -73,8 +75,24 @@ fi
 # 2026-07-26, which froze the "Flash-Spec Results" table in RUFFLE_RESULTS.md
 # at a 2.5-month-old snapshot. Any future non-mode-derived result stem needs
 # adding here too.
+#
+# image_results_graphics.json is the second such stem (2026-07-30). It is
+# CONDITIONAL, which results_flash.json is not, and the condition matters in
+# both directions:
+#   * images=true  — this run regenerated it, so it must ride to /tmp or the
+#     checkout below replaces it with the branch's copy and the freshly
+#     measured image baseline is lost (the classic trap).
+#   * images=false — this run did NOT regenerate it, and the copy sitting in
+#     the work tree came from the MASTER checkout, which lags the branch
+#     between results merges. Backing that up would push a stale image
+#     baseline over a newer one. Leaving it out lets the checkout inherit the
+#     branch's copy untouched, which is exactly right.
+EXTRA_STEMS="results_flash.json"
+if [ "${IMAGES:-false}" = "true" ]; then
+  EXTRA_STEMS="$EXTRA_STEMS image_results_graphics.json"
+fi
 find ruffle-tests/tests/swfs -path '*/_results' -type d | while read -r dir; do
-  for name in "${STEM}.json" "${STEM}_previous.json" results_flash.json; do
+  for name in "${STEM}.json" "${STEM}_previous.json" $EXTRA_STEMS; do
     if [ -f "$dir/$name" ]; then
       mkdir -p "/tmp/results_backup/$dir"
       cp "$dir/$name" "/tmp/results_backup/$dir/"

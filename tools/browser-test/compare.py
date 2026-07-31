@@ -103,7 +103,7 @@ def cmd_images(args) -> int:
         print(f"error: {b} does not exist", file=sys.stderr)
         return 2
     checks = [{"tolerance": args.tolerance, "max_outliers": args.max_outliers}]
-    passed, msg, max_diff = vo.compare_images(a, b, checks)
+    passed, msg, max_diff, _stats = vo.compare_images(a, b, checks)
     print(f"a:         {a}")
     print(f"b:         {b}")
     print(f"tolerance: {args.tolerance}  max_outliers: {args.max_outliers}")

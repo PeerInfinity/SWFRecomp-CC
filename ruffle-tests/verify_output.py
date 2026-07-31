@@ -32,10 +32,13 @@ from collections import Counter
 
 # Optional PIL import for image comparisons
 try:
+    import PIL
     from PIL import Image
     HAS_PIL = True
+    PIL_VERSION = getattr(PIL, "__version__", "unknown")
 except ImportError:
     HAS_PIL = False
+    PIL_VERSION = None
 
 RUFFLE_KEY_TO_FLASH = {
     # Control keys
@@ -361,7 +364,12 @@ def compare_images(actual_path, expected_path, checks):
                 Test passes if ANY check passes.
 
     Returns:
-        (passed: bool, message: str, max_diff: int)
+        (passed: bool, message: str, max_diff: int, stats: dict)
+
+    `stats` carries the magnitude data the image-baseline report needs
+    (outlier counts, mean/peak channel drift, the check that decided the
+    verdict). It is always a dict; on an early bail-out (no Pillow, missing
+    file, size mismatch) it holds only `error`.
 
     Algorithm (matching Ruffle):
     1. Both images are converted to RGBA.
@@ -373,28 +381,35 @@ def compare_images(actual_path, expected_path, checks):
     6. max_diff is the maximum single-channel difference across all pixels.
     """
     if not HAS_PIL:
-        return False, "Pillow not installed, skipping image comparison", 0
+        return (False, "Pillow not installed, skipping image comparison", 0,
+                {"error": "no_pillow"})
 
     actual_path = Path(actual_path)
     expected_path = Path(expected_path)
 
     if not actual_path.exists():
-        return False, f"Actual image not found: {actual_path}", 0
+        return (False, f"Actual image not found: {actual_path}", 0,
+                {"error": "no_actual"})
     if not expected_path.exists():
-        return False, f"Expected image not found: {expected_path}", 0
+        return (False, f"Expected image not found: {expected_path}", 0,
+                {"error": "no_expected"})
 
     try:
         actual_img = Image.open(actual_path).convert("RGBA")
         expected_img = Image.open(expected_path).convert("RGBA")
     except Exception as e:
-        return False, f"Failed to open image: {e}", 0
+        return (False, f"Failed to open image: {e}", 0,
+                {"error": "open_failed"})
 
     # Check dimensions
     if actual_img.size != expected_img.size:
         return (False,
                 f"Image size mismatch: actual {actual_img.size[0]}x{actual_img.size[1]}, "
                 f"expected {expected_img.size[0]}x{expected_img.size[1]}",
-                0)
+                0,
+                {"error": "size_mismatch",
+                 "actual_size": list(actual_img.size),
+                 "expected_size": list(expected_img.size)})
 
     # Compute per-pixel per-channel absolute difference
     actual_data = actual_img.tobytes()
@@ -404,11 +419,26 @@ def compare_images(actual_path, expected_path, checks):
     num_pixels = actual_img.size[0] * actual_img.size[1]
     difference_data = bytearray(num_pixels * 4)
     max_diff = 0
+    sum_diff = 0
+    nonzero_channels = 0
     for i in range(num_pixels * 4):
         d = abs(actual_data[i] - expected_data[i])
         difference_data[i] = d
-        if d > max_diff:
-            max_diff = d
+        if d:
+            sum_diff += d
+            nonzero_channels += 1
+            if d > max_diff:
+                max_diff = d
+
+    total_channels = num_pixels * 4
+    stats = {
+        "width": actual_img.size[0],
+        "height": actual_img.size[1],
+        "total_channels": total_channels,
+        "max_diff": max_diff,
+        "diff_channels": nonzero_channels,
+        "mean_diff": round(sum_diff / total_channels, 4) if total_channels else 0.0,
+    }
 
     # Save the difference image whenever there's something to look at.
     # Skips strict passes (max_diff=0 → an all-black PNG that adds no
@@ -453,6 +483,7 @@ def compare_images(actual_path, expected_path, checks):
     # Try each check -- test passes if ANY check passes (Ruffle semantics)
     best_outliers = None
     best_max_outliers = None
+    best_tolerance = None
     for check in checks:
         tolerance = check["tolerance"]
         max_outliers = check["max_outliers"]
@@ -467,22 +498,66 @@ def compare_images(actual_path, expected_path, checks):
             outliers += (difference_data[base + 3] > tolerance)
 
         if outliers <= max_outliers:
+            stats.update(outliers=outliers, max_outliers=max_outliers,
+                         tolerance=tolerance, excess_outliers=0)
             return (True,
                     f"Image check passed: {outliers} outliers (limit {max_outliers}), "
                     f"max difference {max_diff}",
-                    max_diff)
+                    max_diff, stats)
 
         # Track the closest failing check for the error message
         if best_outliers is None or outliers < best_outliers:
             best_outliers = outliers
             best_max_outliers = max_outliers
+            best_tolerance = tolerance
 
     # All checks failed. The difference image was already saved above
     # (or skipped, if max_diff was 0 — which can't happen on a fail).
+    # `excess_outliers` is the near-miss axis the baseline report bins on:
+    # how far past its own budget this comparison went, not how far from zero.
+    stats.update(outliers=best_outliers, max_outliers=best_max_outliers,
+                 tolerance=best_tolerance,
+                 excess_outliers=best_outliers - best_max_outliers)
     return (False,
             f"Image comparison failed: {best_outliers} outliers exceed limit of "
             f"{best_max_outliers}, max difference {max_diff}",
-            max_diff)
+            max_diff, stats)
+
+
+def suite_tag():
+    """Corpus-relative name of the suite currently being run.
+
+    `TESTS_DIR` is rebound by main() from --tests-dir, so this is read at call
+    time. Falls back to the bare directory name for an out-of-corpus tree
+    (e.g. a scratch --tests-dir under /tmp).
+    """
+    swfs_root = SCRIPT_DIR / "tests" / "swfs"
+    try:
+        return TESTS_DIR.resolve().relative_to(swfs_root.resolve()).as_posix()
+    except ValueError:
+        return TESTS_DIR.name
+
+
+def export_failing_images(out_dir, test_name, cmp_name, actual_png):
+    """Copy one FAILING comparison's actual + difference PNG into `out_dir`.
+
+    Layout is `out_dir/<suite>/<test>/<cmp>.{actual,difference}.png` — suite
+    included because shards run several suites into one export dir and test
+    names are only unique within a suite. Passing renders are deliberately not
+    exported: the point of the images branch is a small, review-sized set of
+    what is wrong, and 159 correct PNGs per run is neither.
+
+    Best-effort — a failed copy must not change a test's verdict.
+    """
+    try:
+        dest = Path(out_dir) / suite_tag() / test_name
+        dest.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(actual_png), str(dest / f"{cmp_name}.actual.png"))
+        diff_png = Path(actual_png).parent / (Path(actual_png).stem + ".difference.png")
+        if diff_png.exists():
+            shutil.copy2(str(diff_png), str(dest / f"{cmp_name}.difference.png"))
+    except Exception as e:
+        print(f"    [images] export failed for {test_name}/{cmp_name}: {e}")
 
 
 def preprocess_input_json(src, dst, scale_factor=1.0):
@@ -3405,6 +3480,17 @@ examples:
              "(e.g. --expected-suffix=flash uses output.flash.txt). "
              "Only tests that have the alternate file are included.")
     parser.add_argument(
+        "--images", action="store_true",
+        help="Image-comparison instrument mode (graphics only). Asserts Pillow is "
+             "installed instead of degrading silently, records per-comparison "
+             "magnitude stats in the results JSON, and exports the actual + "
+             "difference PNG of every FAILING comparison to --image-out-dir. "
+             "Does NOT change trace pass/fail: image results never gate status.")
+    parser.add_argument(
+        "--image-out-dir", metavar="DIR",
+        help="With --images: directory to export failing comparisons into, as "
+             "DIR/<suite>/<test>/<cmp>.{actual,difference}.png. Created on demand.")
+    parser.add_argument(
         "--wasm", action="store_true",
         help="Build WASM instead of native (requires emsdk). Implies --deploy if --deploy-dir given.")
     parser.add_argument(
@@ -3439,6 +3525,34 @@ def main():
     if args.mode is None:
         args.mode = "no-graphics"
     args.uses_dawn = (args.mode == "graphics")
+
+    # --images is the image-comparison INSTRUMENT switch. Everything it turns
+    # on is additive (extra JSON fields, exported PNGs); the trace verdict is
+    # untouched, and without the flag the run behaves exactly as before.
+    #
+    # Its one hard job is to stop the silent degradation: compare_images()
+    # returns "Pillow not installed, skipping" when HAS_PIL is false, and the
+    # caller records nothing at all — so a CI run with a broken pip step would
+    # publish an empty image baseline and read as "no failures". Fail loudly
+    # here instead. This check runs before any test does, so it costs nothing.
+    if args.images:
+        if not HAS_PIL:
+            print("error: --images requires Pillow, which is not installed. "
+                  "Install it (`python3 -m pip install Pillow`) or drop --images; "
+                  "refusing to run and publish an empty image baseline.",
+                  file=sys.stderr)
+            sys.exit(2)
+        if not args.uses_dawn:
+            print(f"error: --images requires --mode=graphics (got "
+                  f"{args.mode!r}); no renders are produced otherwise.",
+                  file=sys.stderr)
+            sys.exit(2)
+        print(f"[images] image-comparison instrument ON (Pillow {PIL_VERSION})"
+              + (f", exporting failures to {args.image_out_dir}"
+                 if args.image_out_dir else ", no --image-out-dir (no PNG export)"))
+    elif args.image_out_dir:
+        print("error: --image-out-dir requires --images.", file=sys.stderr)
+        sys.exit(2)
 
     # Expected-output filename is resolved per-test via
     # resolve_expected_filename, which honors --expected-suffix first, then
@@ -3863,27 +3977,36 @@ def main():
             image_results = {}
             if image_comparisons and HAS_PIL:
                 for cmp_name, cmp_config in image_comparisons.items():
-                    # Look for expected PNG: local test dir first, then Ruffle upstream
+                    # Look for expected PNG: local test dir first, then Ruffle
+                    # upstream. The upstream fallback is a LOCAL-ONLY
+                    # convenience — ~/CC/ruffle does not exist on CI, so a
+                    # comparison that only resolves through it passes locally
+                    # and skips in CI. Record which source won so the baseline
+                    # report can tell those apart instead of guessing.
                     expected_png = test_dir / f"{cmp_name}.expected.png"
+                    expected_source = "repo"
                     if not expected_png.exists() and RUFFLE_UPSTREAM.exists():
                         upstream_png = RUFFLE_UPSTREAM / name / f"{cmp_name}.expected.png"
                         if upstream_png.exists():
                             expected_png = upstream_png
+                            expected_source = "upstream_checkout"
                     # Actual PNG: look in build_dir (produced by test binary)
                     actual_png = build_dir / f"{cmp_name}.png"
                     if not expected_png.exists():
                         image_results[cmp_name] = {
                             "status": "skip",
                             "message": f"No expected image: {cmp_name}.expected.png",
+                            "reason": "no_expected_image",
                         }
                         continue
                     if not actual_png.exists():
                         image_results[cmp_name] = {
                             "status": "fail",
                             "message": f"No actual image produced for {cmp_name}",
+                            "reason": "no_render",
                         }
                         continue
-                    passed, message, max_diff = compare_images(
+                    passed, message, max_diff, cmp_stats = compare_images(
                         actual_png, expected_png, cmp_config["checks"])
                     image_results[cmp_name] = {
                         "status": "pass" if passed else "fail",
@@ -3892,6 +4015,17 @@ def main():
                         "trigger": cmp_config["trigger"],
                         "known_failure": cmp_config.get("known_failure", False),
                     }
+                    if args.images:
+                        # Instrument-mode extras. Gated so a normal run's
+                        # results JSON stays byte-for-byte what it was.
+                        image_results[cmp_name]["stats"] = cmp_stats
+                        image_results[cmp_name]["expected_source"] = expected_source
+                        if not passed:
+                            image_results[cmp_name]["reason"] = cmp_stats.get(
+                                "error", "pixel_mismatch")
+                    if args.images and args.image_out_dir and not passed:
+                        export_failing_images(args.image_out_dir, name, cmp_name,
+                                              actual_png)
                     # Save actual and difference images to test dir for inspection
                     if args.verbose:
                         saved_actual = test_dir / f"{cmp_name}.actual.png"

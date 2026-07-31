@@ -41,6 +41,14 @@ on:
           - 'graphics'
           - 'no-graphics'
         default: 'graphics'
+      images:
+        description: 'Image-comparison instrument: assert Pillow, record pixel magnitude stats, publish failing PNGs to ruffle-image-results (graphics mode only)'
+        required: false
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+        default: 'false'
       single_test:
         description: 'Run a single test by name (overrides categories; auto-uses single runner)'
         required: false
@@ -82,6 +90,11 @@ on:
         description: 'Build mode (graphics | no-graphics); graphics is the per-change default since 2026-07-23'
         required: false
         default: 'graphics'
+        type: string
+      images:
+        description: 'Image-comparison instrument (true/false); graphics mode only'
+        required: false
+        default: 'false'
         type: string
       single_test:
         description: 'Run a single test by name'
@@ -462,6 +475,16 @@ jobs:
       RUN_MISC: ${{ needs.setup-parallel.outputs.run_misc }}
       RUN_SHUMWAY: ${{ needs.setup-parallel.outputs.run_shumway }}
       RUN_GNASH: ${{ needs.setup-parallel.outputs.run_gnash }}
+      # Image-comparison instrument (images=true). Appended UNQUOTED to every
+      # verify_output.py invocation below, so when the input is off this is the
+      # empty string and each command line is byte-identical to what it was.
+      #
+      # Image comparisons themselves already ran in every graphics shard (they
+      # are gated on `mode`, not on this input, and Pillow has been installed
+      # here all along). What the flag adds is: a hard failure instead of a
+      # silent skip if Pillow is missing, the per-comparison magnitude stats
+      # the baseline report bins on, and the PNG export collected below.
+      IMAGE_ARGS: ${{ inputs.images == 'true' && '--images --image-out-dir=/tmp/swf-image-out' || '' }}
 
     strategy:
       fail-fast: false
@@ -478,6 +501,25 @@ jobs:
 
       - name: Install Python dependencies
         run: python3 -m pip install --upgrade pip Pillow
+
+      # verify_output.py's image comparison degrades SILENTLY without Pillow
+      # (compare_images returns "not installed, skipping" and the caller
+      # records nothing), so a broken pip step above would publish an empty
+      # image baseline that reads as "no failures". The verify invocations are
+      # all `|| true`, so verify_output's own --images guard cannot fail the
+      # job — this step is what turns a missing Pillow red. Costs one import
+      # on the runs that ask for images and nothing at all otherwise.
+      - name: Verify Pillow is present (images=true)
+        if: inputs.images == 'true'
+        run: |
+          if [ "${{ inputs.mode }}" = "no-graphics" ]; then
+            echo "::error::images=true requires mode=graphics; no renders are produced in no-graphics mode."
+            exit 1
+          fi
+          python3 - <<'EOF' || { echo "::error::images=true but Pillow is not importable — refusing to produce an empty image baseline."; exit 1; }
+          import PIL
+          print("Pillow", PIL.__version__)
+          EOF
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential ccache
@@ -582,7 +624,7 @@ jobs:
           python3 ruffle-tests/verify_output.py -v \
             --mode='${{ inputs.mode }}' \
             --json=ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json \
-            --shard="$SHARD" $LIMIT_ARGS || true
+            --shard="$SHARD" $LIMIT_ARGS $IMAGE_ARGS || true
 
       - name: Upload AVM1 results
         if: always()
@@ -604,7 +646,7 @@ jobs:
             --mode='${{ inputs.mode }}' \
             --tests-dir="$REGRESSION_DIR" \
             --json=ruffle-tests/results-shard-regression-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" $IMAGE_ARGS || true
 
       - name: Upload regression results
         if: always()
@@ -630,7 +672,7 @@ jobs:
             --mode='${{ inputs.mode }}' \
             --tests-dir="$AVM2_DIR" \
             --json=ruffle-tests/results-shard-avm2-${{ matrix.shard }}.json \
-            --shard="$SHARD" $LIMIT_ARGS || true
+            --shard="$SHARD" $LIMIT_ARGS $IMAGE_ARGS || true
 
       - name: Upload AVM2 results
         if: always()
@@ -656,7 +698,7 @@ jobs:
             --mode='${{ inputs.mode }}' \
             --tests-dir="$AVMPLUS_DIR" \
             --json=ruffle-tests/results-shard-avmplus-${{ matrix.shard }}.json \
-            --shard="$SHARD" $LIMIT_ARGS || true
+            --shard="$SHARD" $LIMIT_ARGS $IMAGE_ARGS || true
 
       - name: Upload from_avmplus results
         if: always()
@@ -681,7 +723,7 @@ jobs:
               --mode='${{ inputs.mode }}' \
               --tests-dir="$dir" \
               --json=ruffle-tests/results-shard-misc_${name}-${{ matrix.shard }}.json \
-              --shard="$SHARD" || true
+              --shard="$SHARD" $IMAGE_ARGS || true
           done
 
       - name: Upload misc results
@@ -704,12 +746,12 @@ jobs:
             --mode='${{ inputs.mode }}' \
             --tests-dir="$SHUMWAY_AVM1_DIR" \
             --json=ruffle-tests/results-shard-shumway_avm1-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" $IMAGE_ARGS || true
           python3 ruffle-tests/verify_output.py -v \
             --mode='${{ inputs.mode }}' \
             --tests-dir="$SHUMWAY_FLAT_DIR" \
             --json=ruffle-tests/results-shard-shumway_flat-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" $IMAGE_ARGS || true
 
       - name: Upload Shumway results
         if: always()
@@ -731,22 +773,22 @@ jobs:
             --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_SWFMILL_DIR" \
             --json=ruffle-tests/results-shard-gnash_swfmill-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" $IMAGE_ARGS || true
           python3 ruffle-tests/verify_output.py -v \
             --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_AS_DIR" \
             --json=ruffle-tests/results-shard-gnash_as-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" $IMAGE_ARGS || true
           python3 ruffle-tests/verify_output.py -v \
             --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_MTASC_DIR" \
             --json=ruffle-tests/results-shard-gnash_mtasc-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" $IMAGE_ARGS || true
           python3 ruffle-tests/verify_output.py -v \
             --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_MING_DIR" \
             --json=ruffle-tests/results-shard-gnash_ming-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" $IMAGE_ARGS || true
           # gotoFrame2Test (misc-ming) and gotoFrameFromInterval2 (misc-swfc)
           # were excluded as "hanging" in 4b79110d6; both are now fixed and
           # grade PASS / ruffle_matched, so they are no longer excluded.
@@ -760,7 +802,7 @@ jobs:
             --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_SWFC_DIR" \
             --json=ruffle-tests/results-shard-gnash_swfc-${{ matrix.shard }}.json \
-            --shard="$SHARD" \
+            --shard="$SHARD" $IMAGE_ARGS \
             --exclude=gotoFrameFromInterval || true
 
       - name: Upload Gnash results
@@ -770,6 +812,18 @@ jobs:
           name: results-shard-${{ matrix.shard }}-gnash
           path: ruffle-tests/results-shard-gnash_*-${{ matrix.shard }}.json
           retention-days: 7
+
+      # Failing image comparisons only — verify_output --image-out-dir writes
+      # nothing for a passing render, so this artifact is empty on a shard
+      # whose renders were all correct (hence if-no-files-found: ignore).
+      - name: Upload failing image PNGs (shard ${{ matrix.shard }})
+        if: always() && inputs.images == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-shard-${{ matrix.shard }}
+          path: /tmp/swf-image-out
+          retention-days: 7
+          if-no-files-found: ignore
 
       # No-op unless a test crashed: one `ls`, then gdb + upload only if a
       # capture directory exists.
@@ -916,6 +970,7 @@ jobs:
           # results file is written (all downstream steps are `if: always()`,
           # so the labelled partial results still publish).
           incomplete = []
+          written_suites = []
 
           for tag, out_dir in categories.items():
               pattern = f"artifacts/results-shard-*/results-shard-{tag}-*.json"
@@ -998,6 +1053,13 @@ jobs:
               os.makedirs(out_dir, exist_ok=True)
               with open(f"{out_dir}/{out_filename}", "w") as fp:
                   json.dump(report, fp, indent=2)
+              # Record that THIS run produced this suite's results. The image
+              # report reads it so a `categories=avm1` run does not rebuild
+              # (and republish) image results for avm2 et al. from the master
+              # checkout's copy of results_graphics.json, which is only as
+              # fresh as the last results merge.
+              written_suites.append(
+                  out_dir.replace("ruffle-tests/tests/swfs/", "").replace("/_results", ""))
 
               suffix = f" — INCOMPLETE ({missing_shards} shards missing)" if missing_shards > 0 else ""
               if ruffle_matched_count:
@@ -1006,6 +1068,9 @@ jobs:
                         f" {effective_pass}/{total} effective ({report['effective_pass_rate']}%){suffix}")
               else:
                   print(f"  {pass_count}/{total} passing ({report['pass_rate']}%){suffix}")
+
+          with open("image_suites.txt", "w") as fp:
+              fp.write("\n".join(written_suites) + "\n")
 
           if incomplete:
               print()
@@ -1019,6 +1084,53 @@ jobs:
                     "before quoting a corpus total.")
               raise SystemExit(1)
           EOF
+
+      # --- Image-comparison instrument (images=true only) ---
+      #
+      # The image VERDICTS already ride inside each suite's results JSON (one
+      # `image_comparisons` block per test entry) and were merged by the step
+      # above along with everything else — no separate shard JSON exists or is
+      # needed. What these steps add is the flat per-suite instrument file, and
+      # the failing PNGs.
+      - name: Download failing image PNGs
+        if: always() && inputs.images == 'true'
+        uses: actions/download-artifact@v7
+        with:
+          pattern: image-shard-*
+          path: ${{ runner.temp }}/image-artifacts
+          merge-multiple: true
+
+      - name: Build per-suite image results
+        if: always() && inputs.images == 'true'
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          case "$MODE" in
+            graphics) STEM=results_graphics ;;
+            *)        STEM=results ;;
+          esac
+          # Coverage audit first, against the tree CI actually graded (the
+          # test SWFs are re-downloaded fresh every run, so this catches an
+          # upstream test added since the last local sync). Deliberately does
+          # not fail the job: three regression tests legitimately ship no
+          # expected PNG, and a missing one is recorded as an explicit
+          # skip/no_expected_image row rather than vanishing.
+          python3 scripts/build_image_report.py --audit
+          python3 scripts/build_image_report.py --stem="$STEM" \
+            --suites-file=image_suites.txt
+
+      # Force-pushes a single commit to ruffle-image-results. Must run BEFORE
+      # the results publish below: that script switches the work tree onto the
+      # ruffle-test-results branch, which would take scripts/ and the results
+      # JSONs this one reads out from under it.
+      - name: Publish failing images to ruffle-image-results
+        if: always() && inputs.images == 'true' && inputs.extra_defines == ''
+        env:
+          IMAGE_SRC: ${{ runner.temp }}/image-artifacts
+          STEM: ${{ inputs.mode == 'graphics' && 'results_graphics' || 'results' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/ci/publish_images.sh
 
       - name: Verify Flash-spec expected output
         if: always()
@@ -1137,6 +1249,7 @@ jobs:
         env:
           MODE: ${{ inputs.mode }}
           LIMIT: ${{ inputs.limit }}
+          IMAGES: ${{ inputs.images }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         # Run from a copy outside the work tree: the script switches branches,
         # so the on-disk scripts/ci/publish_results.sh is replaced (or removed)
