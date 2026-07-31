@@ -9774,7 +9774,26 @@ static Avm2Value do_cab_set(Avm2Activation* act)
 	dyn_prop_set(act, "__cacheAsBitmap");
 	return avm2_undefined();
 }
-STUB_GETSET(do_opaquebg, "__opaqueBackground", avm2_null())
+// `opaqueBackground` is declared `Object`, so assigning UNDEFINED stores the
+// AS3 coercion of undefined to Object — null — and reads back as `null`, not
+// `undefined` (displayobject_opaque_background's third read).
+static Avm2Value do_opaquebg_get(Avm2Activation* act)
+{
+	return dyn_prop_get(act, "__opaqueBackground", avm2_null());
+}
+static Avm2Value do_opaquebg_set(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self != NULL)
+	{
+		Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+		if (v.kind == AVM2_VALUE_UNDEFINED) v = avm2_null();
+		avm2_object_set_dynamic(act->ctx, self, "__opaqueBackground",
+		                        (uint32_t) strlen("__opaqueBackground"),
+		                        v)->dont_enum = 1;
+	}
+	return avm2_undefined();
+}
 // scale9Grid keeps the old dyn-prop stub. It used to SHARE the scrollRect
 // accessors, which would now have made a scale9Grid assignment resize the
 // object's bounds.

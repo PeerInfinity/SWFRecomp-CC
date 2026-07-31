@@ -1469,6 +1469,15 @@ static Avm2Value n_xml_set_name(Avm2Activation* act)
 		local = (q->local != NULL) ? q->local : avm2_string_from_literal(ctx, "*");
 		uri = q->uri;
 	}
+	else if (name.kind == AVM2_VALUE_UNDEFINED)
+	{
+		// setName routes its argument through `new QName(name)`, and the
+		// QName constructor maps a single UNDEFINED argument to the EMPTY
+		// local name rather than the string "undefined" (Ruffle
+		// globals/q_name.rs). An empty name is not an XML name, so this is
+		// the whole of Error1117InvalidXmlName's `xml.setName(undefined)`.
+		local = avm2_string_from_literal(ctx, "");
+	}
 	else
 	{
 		local = avm2_coerce_to_string(ctx, name);

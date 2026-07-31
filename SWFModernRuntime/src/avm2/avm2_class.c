@@ -1351,6 +1351,19 @@ Avm2Value avm2_construct_value(Avm2Context* ctx, Avm2Value ctor,
 		}
 		if (o->kind == AVM2_OBJ_FUNCTION)
 		{
+			if (o->fn_bound_class != NULL)
+			{
+				// A METHOD (class-bound) can never be constructed, however it
+				// was obtained — a method closure off an instance, a prototype
+				// method, `arguments.callee` inside a method (Ruffle
+				// FunctionObject::construct, the `method.bound_class()` gate).
+				// Only `newfunction` closures reach the ES3 path below.
+				const char* fname = o->fn_method.debug_name;
+				avm2_throw_error(ctx, ctx->builtins.type_error_class,
+				                 "Error #1064: Cannot call method %s as "
+				                 "constructor.",
+				                 fname != NULL ? fname : "?");
+			}
 			// ES3 constructor call: new object, proto = fn.prototype,
 			// call with this = the new object; an object return value
 			// replaces the new object.

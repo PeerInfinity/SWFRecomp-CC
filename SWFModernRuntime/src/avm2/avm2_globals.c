@@ -78,10 +78,18 @@ Avm2DomainScope* avm2_domain_scope_new(Avm2Context* ctx,
 	return s;
 }
 
+// Defined with the ApplicationDomain natives below.
+static const Avm2DomainScope* appdomain_object_scope(Avm2Object* obj);
+
 const Avm2DomainScope* avm2_domain_scope_of_object(Avm2Context* ctx,
                                                    Avm2Object* obj)
 {
 	if (obj == NULL) return NULL;
+	// A scope can have MANY wrapper objects (currentDomain mints a fresh one
+	// per read), so the wrapper's own record wins over the scope->obj scan,
+	// which only ever finds the cached one.
+	const Avm2DomainScope* own = appdomain_object_scope(obj);
+	if (own != NULL) return own;
 	for (Avm2DomainScope* s = ctx->domain.scopes; s != NULL; s = s->next_all)
 		if (s->obj == obj) return s;
 	return NULL;
@@ -621,12 +629,27 @@ static Avm2Value object_as3_has_own_property(Avm2Activation* act)
 
 static Avm2Value object_proto_is_prototype_of(Avm2Activation* act)
 {
-	if (act->argc == 0 || act->args[0].kind != AVM2_VALUE_OBJECT
-	    || act->this_val.kind != AVM2_VALUE_OBJECT)
+	if (act->argc == 0 || act->this_val.kind != AVM2_VALUE_OBJECT
+	    || act->args[0].kind == AVM2_VALUE_NULL
+	    || act->args[0].kind == AVM2_VALUE_UNDEFINED)
 	{
 		return avm2_bool(false);
 	}
-	for (Avm2Object* p = act->args[0].u.obj->proto; p != NULL; p = p->proto)
+	// A PRIMITIVE has a prototype chain too — its class's prototype object
+	// (Ruffle object.rs is_prototype_of walks Value::proto, not Object::proto).
+	// `new String("x")` yields a String VALUE, so ecma3/ObjectObjects/
+	// isPrototypeOf's `String.prototype.isPrototypeOf(str)` lands here.
+	Avm2Object* start;
+	if (act->args[0].kind == AVM2_VALUE_OBJECT)
+	{
+		start = act->args[0].u.obj->proto;
+	}
+	else
+	{
+		Avm2Class* cls = avm2_value_class(act->ctx, act->args[0]);
+		start = (cls != NULL) ? cls->prototype_obj : NULL;
+	}
+	for (Avm2Object* p = start; p != NULL; p = p->proto)
 	{
 		if (p == act->this_val.u.obj) return avm2_bool(true);
 	}
@@ -658,8 +681,14 @@ static Avm2Value object_proto_property_is_enumerable(Avm2Activation* act)
 			return avm2_bool(v.kind != AVM2_VALUE_HOLE);
 		}
 	}
+	// Skip TOMBSTONES (and object-keyed Dictionary entries): a deleted
+	// property leaves its entry in the list with its dont_enum flag intact,
+	// and re-assigning the name appends a FRESH, enumerable entry behind it
+	// (avm2_object_set_dynamic). Matching the dead one made
+	// property_is_enumerable_reset report the pre-delete flag forever.
 	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 	{
+		if (p->dead || p->key_obj != NULL) continue;
 		if (p->name.len == name->len && memcmp(p->name.utf8, name->utf8, name->len) == 0)
 		{
 			return avm2_bool(!p->dont_enum);
@@ -686,6 +715,7 @@ static Avm2Value object_proto_set_property_is_enumerable(Avm2Activation* act)
 	Avm2Object* obj = act->this_val.u.obj;
 	for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 	{
+		if (p->dead || p->key_obj != NULL) continue;
 		if (p->name.len == name->len && memcmp(p->name.utf8, name->utf8, name->len) == 0)
 		{
 			p->dont_enum = enumerable ? 0 : 1;
@@ -949,6 +979,21 @@ static Avm2Value global_is_finite(Avm2Activation* act)
 {
 	double d = act->argc > 0 ? avm2_coerce_to_number(act->ctx, act->args[0]) : NAN;
 	return avm2_bool(isfinite(d) != 0);
+}
+
+// `isXMLName(string:* = undefined):Boolean` (Ruffle globals/toplevel.rs).
+// null/undefined answer false WITHOUT coercing; everything else stringifies
+// first — which is where Error1050CannotConvertToPrimitive's object (whose
+// toString returns `this`) picks up its #1050 from avm2_coerce_to_string.
+static Avm2Value global_is_xml_name(Avm2Activation* act)
+{
+	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (v.kind == AVM2_VALUE_UNDEFINED || v.kind == AVM2_VALUE_NULL)
+	{
+		return avm2_bool(false);
+	}
+	return avm2_bool(avm2_e4x_is_xml_name(
+		avm2_coerce_to_string(act->ctx, v)) != 0);
 }
 
 // parseInt/parseFloat declare `s:String`, so an explicit `undefined` argument
@@ -1682,17 +1727,46 @@ void avm2_gc_mark_roots_globals(Avm2Context* ctx)
 	avm2_gc_mark_roots_platform_stubs();
 }
 
+// An ApplicationDomain instance carries the scope it stands for in its
+// native_ext, so that MANY objects can name the SAME scope —
+// `ApplicationDomain.currentDomain` mints a fresh wrapper on every read
+// (Ruffle DomainObject::from_domain), and `currentDomain === currentDomain`
+// is therefore FALSE. `scope->obj` stays the one CACHED wrapper, which is
+// what GC-marks the domain and what the reverse lookup falls back to.
+static Avm2Object* appdomain_object_new(Avm2Context* ctx,
+                                        const Avm2DomainScope* scope)
+{
+	if (g_appdomain_class == NULL) return NULL;
+	Avm2Object* o = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 1);
+	o->cls = g_appdomain_class;
+	o->vtable = &g_appdomain_class->ivtable;
+	o->proto = g_appdomain_class->prototype_obj;
+	const Avm2DomainScope** slot = avm2_alloc(ctx, sizeof(*slot));
+	*slot = scope;
+	o->native_ext = (void*) slot;
+	o->native_ext_size = sizeof(*slot);
+	return o;
+}
+
+// The scope recorded on an ApplicationDomain instance, or NULL when the object
+// is not one (or predates the ctor, i.e. was hand-built by a script).
+static const Avm2DomainScope* appdomain_object_scope(Avm2Object* obj)
+{
+	if (obj == NULL || obj->cls != g_appdomain_class || obj->native_ext == NULL)
+	{
+		return NULL;
+	}
+	return *(const Avm2DomainScope**) obj->native_ext;
+}
+
 Avm2Object* avm2_domain_scope_object(Avm2Context* ctx,
                                      const Avm2DomainScope* scope)
 {
 	if (scope == NULL) scope = avm2_domain_root_scope(ctx);
 	Avm2DomainScope* s = (Avm2DomainScope*) scope;
 	if (s->obj != NULL) return s->obj;
-	if (g_appdomain_class == NULL) return NULL;
-	Avm2Object* o = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 1);
-	o->cls = g_appdomain_class;
-	o->vtable = &g_appdomain_class->ivtable;
-	o->proto = g_appdomain_class->prototype_obj;
+	Avm2Object* o = appdomain_object_new(ctx, scope);
+	if (o == NULL) return NULL;
 	s->obj = o;
 	return o;
 }
@@ -1720,8 +1794,15 @@ static const Avm2DomainScope* act_scope(Avm2Activation* act)
 
 static Avm2Value appdomain_get_current(Avm2Activation* act)
 {
-	return avm2_object_value(
-		avm2_domain_scope_object(act->ctx, act_scope(act)));
+	Avm2Context* ctx = act->ctx;
+	const Avm2DomainScope* s = act_scope(act);
+	if (s == NULL) s = avm2_domain_root_scope(ctx);
+	// A FRESH wrapper per read — stage_domain_getQualifiedDefinitionNames
+	// asserts `currentDomain === currentDomain` is false. Touch the cached
+	// wrapper first so the scope stays GC-rooted either way.
+	(void) avm2_domain_scope_object(ctx, s);
+	Avm2Object* o = appdomain_object_new(ctx, s);
+	return o != NULL ? avm2_object_value(o) : avm2_null();
 }
 
 // `new ApplicationDomain(parentDomain = null)`. With no argument the parent is
@@ -1739,6 +1820,13 @@ static Avm2Value appdomain_ctor(Avm2Activation* act)
 		parent = avm2_domain_scope_of_object(ctx, act->args[0].u.obj);
 	Avm2DomainScope* s = avm2_domain_scope_new(ctx, parent);
 	s->obj = self;
+	if (self->native_ext == NULL)
+	{
+		const Avm2DomainScope** slot = avm2_alloc(ctx, sizeof(*slot));
+		*slot = s;
+		self->native_ext = (void*) slot;
+		self->native_ext_size = sizeof(*slot);
+	}
 	return avm2_undefined();
 }
 
@@ -1774,10 +1862,56 @@ Avm2Value avm2_domain_scope_value(Avm2Context* ctx, const Avm2DomainScope* scope
 	return o != NULL ? avm2_object_value(o) : avm2_null();
 }
 
+// `getQualifiedDefinitionNames():Vector.<String>` — every SCRIPT definition
+// exported into THIS domain, in export order, as "ns::name" (bare local name
+// for the public package). Builtins belong to the system domain and are not
+// listed; private-namespace names are filtered out, exactly as Ruffle's
+// application_domain.rs get_qualified_definition_names does.
+static Avm2Value appdomain_get_qualified_definition_names(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	const Avm2DomainScope* self = appdomain_self_scope(act);
+	Avm2Class* vec_cls = avm2_vector_apply(ctx, ctx->builtins.string_class);
+	Avm2Object* out = avm2_vector_new(ctx, vec_cls, 0, 0);
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < ctx->domain.count; i++)
+	{
+		const Avm2DomainEntry* e = &ctx->domain.entries[i];
+		if (e->file == NULL || e->scope != self) continue;
+		if (e->key.ns_kind == 0x05) continue;  // PrivateNs
+		const Avm2String* s;
+		if (e->key.ns_len == 0 || e->key.ns_uri == NULL)
+		{
+			s = avm2_string_new(ctx, e->key.name, e->key.name_len);
+		}
+		else
+		{
+			uint32_t len = e->key.ns_len + 2 + e->key.name_len;
+			char* buf = avm2_alloc(ctx, len + 1);
+			memcpy(buf, e->key.ns_uri, e->key.ns_len);
+			memcpy(buf + e->key.ns_len, "::", 2);
+			memcpy(buf + e->key.ns_len + 2, e->key.name, e->key.name_len);
+			buf[len] = '\0';
+			s = avm2_string_new(ctx, buf, len);
+		}
+		avm2_vector_set_index(ctx, out, n++, avm2_string(s));
+	}
+	return avm2_object_value(out);
+}
+
 static Avm2Value appdomain_has_definition(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	if (act->argc == 0) return avm2_bool(false);
+	// `hasDefinition(name:String)` — an explicit null (and the undefined that
+	// the String coercion turns INTO null) answers false without a lookup, it
+	// does not go looking for a definition literally named "null" (Ruffle
+	// application_domain.rs has_definition, args.try_get_string -> None).
+	if (act->args[0].kind == AVM2_VALUE_NULL
+	    || act->args[0].kind == AVM2_VALUE_UNDEFINED)
+	{
+		return avm2_bool(false);
+	}
 	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
 	int found = 0;
 	avm2_find_definition_in(ctx, appdomain_self_scope(act), s->utf8, s->len,
@@ -2788,6 +2922,8 @@ static void register_application_domain(Avm2Context* ctx)
 	Avm2Class* cls = avm2_builtin_class(ctx, "flash.system", "ApplicationDomain",
 	                                    ctx->builtins.object_class);
 	avm2_builtin_add_method(ctx, cls, "hasDefinition", appdomain_has_definition);
+	avm2_builtin_add_method(ctx, cls, "getQualifiedDefinitionNames",
+	                        appdomain_get_qualified_definition_names);
 	avm2_builtin_add_method(ctx, cls, "getDefinition", appdomain_get_definition);
 	avm2_builtin_add_getter(ctx, cls, "parentDomain", appdomain_get_parent);
 	cls->instance_init.fn = appdomain_ctor;
@@ -3055,6 +3191,7 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	avm2_register_timer_fns(ctx);
 	avm2_builtin_add_global_fn_n(ctx, "isNaN", global_is_nan, 1);
 	avm2_builtin_add_global_fn_n(ctx, "isFinite", global_is_finite, 1);
+	avm2_builtin_add_global_fn_n(ctx, "isXMLName", global_is_xml_name, 1);
 	avm2_builtin_add_global_fn_n(ctx, "parseInt", global_parse_int, 2);
 	avm2_builtin_add_global_fn_n(ctx, "parseFloat", global_parse_float, 1);
 	avm2_builtin_add_global_fn_n(ctx, "escape", global_escape, 1);

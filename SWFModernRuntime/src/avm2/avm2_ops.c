@@ -1316,7 +1316,16 @@ static Avm2Value deleteproperty_common(Avm2Activation* act, Avm2Value recv,
 	}
 	if (recv.kind != AVM2_VALUE_OBJECT)
 	{
-		return avm2_bool(false);
+		// `delete` against a PRIMITIVE receiver throws; only objects ever
+		// answer true/false (Ruffle value.rs Value::delete_property — the
+		// non-Object arm is unconditionally ReferenceErrorCode::InvalidDelete).
+		// `new String()` yields a String *value*, not an object, so
+		// ecma3/String/e15_5_5_1's `delete s.length` lands here too.
+		char cn[160];
+		class_name_of(ctx, recv, cn, sizeof(cn));
+		avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+		                 "Error #1120: Cannot delete property %.*s on %s.",
+		                 (int) name_len, name, cn);
 	}
 	Avm2Object* obj = recv.u.obj;
 	uint32_t idx;
@@ -1406,6 +1415,17 @@ Avm2Value avm2_op_deleteproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32
                                      Avm2Value name_val)
 {
 	(void) mn_idx;
+	// ECMA-357 11.3.1: `delete` with an XMLList operand is a TypeError. The
+	// operand is the RUNTIME NAME, not the receiver — `delete
+	// books.book.(@publisher == "Adobe")` compiles to a filter that leaves an
+	// XMLList on the stack as the property name (Ruffle activation.rs
+	// op_delete_property, the has_lazy_name arm).
+	if (avm2_xmllist_ext_of(name_val) != NULL)
+	{
+		avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
+		                 "Error #1119: Delete operator is not supported with "
+		                 "operand of type XMLList.");
+	}
 	{
 		Avm2Object* dict;
 		Avm2Object* key;
