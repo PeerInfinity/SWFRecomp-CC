@@ -859,3 +859,210 @@ Everything in §5.5 still stands, plus:
   program we reject with #1108). Worth taking next — it is one site with
   two graded tests — but it needs the ABC disassembled to order the three
   cases.
+
+## 7. Session 5 — the namespace axis
+
+Baseline `b4d4457f1` / CI `30659262052` (graphics/`categories=full`,
+`images=false`): **4110 -> 4121 / 4422 (93.2%)**, avm2 1072 -> 1074 (+2),
+from_avmplus 1532 -> 1541 (+9), regression 70 -> 70. `output_mismatch`
+304 -> 293, `ruffle_matched` 242 -> 242, `runtime_error` 7 -> 7,
+`recomp_fail` 1 -> 1, still no segfault / timeout / compile_fail bucket.
+**Zero unexplained regressions, zero other status moves.** (The run itself
+scored 4120 with one flagged regression — `regression/avm2_findprop_this_resolution`,
+whose expected output this session's own fix invalidated; see §7.5.)
+
+### 7.1 Step 0 — the list keeps regenerating
+
+| | tranche 0 | s3 | s4 | now |
+|---|---:|---:|---:|---:|
+| candidates | 172 | 136 | 122 | **110** |
+| avm2 | 82 | 67 | 55 | 50 |
+| from_avmplus | 48 | 37 | 35 | 28 |
+| from_shumway | 21 | 12 | 12 | 12 |
+
+Gap histogram `0:5 1:37 2:26 3:14 4:16 5:12`; status `output_mismatch 105`,
+`runtime_error 4`, `recomp_fail 1`. The nested-`lines` schema note from
+§6.1 is still the one thing that silently corrupts the list.
+
+### 7.2 Step 1 — BOTH prior keys are dry; the third axis is the NAMESPACE
+
+- Session 3's key (`Counter` over `error_signature`): **16 of 110** carry a
+  signature, largest group **2**. Dry, as §6.2 already found.
+- Session 4's key (`expected: Error #NNNN got: no error` on the expected
+  side): **zero hits**. That session harvested its own vein completely.
+
+The replacement came from reading the 108 collected diffs for a shared
+*mechanism* rather than a shared spelling, and one appeared in three
+different corners at once:
+
+| corner | tests |
+|---|---|
+| private-member access must fail across classes | `AccessPrivateClassVariable_rt`, `ExtPublicClassPriv`, `SuperRuntimeError` |
+| a namespace-qualified name must be SPELLED in the error | `core_exceptions` |
+| a namespaced/wildcard name must reach the right resolver | `WildcardOperator`, `e4x/QName/e13_3_2`, `e4x/Expressions/e11_1_1`, `e4x/Namespace/e13_2_5` |
+
+Nothing in the diff TEXT groups these — `subclass PASSED!`, `Cannot create
+property ns::asdf`, `|value3| got ||`, `|true| got |false|` look unrelated.
+They group by *which part of a multiname the runtime got wrong*.
+**When both the actual-side and expected-side error keys run dry, cluster on
+the ENGINE STRUCTURE the tests exercise, not on any string in the diff.**
+
+### 7.3 Batches
+
+| Batch | Cluster | Predicted | Actual (CI) |
+|---|---|---|---|
+| 12 | newclass ordering + read-only class traits | +2 | **+3** |
+| 13 | private-namespace IDENTITY | +3 | **+3** |
+| 14 | qualified spellings, wildcards, E4X names | +5 | **+5** |
+
+Shipped as one commit (`b4d4457f1`) — batches 13 and 14 both rewrite
+`avm2_ops.c`'s key construction. The single CI-only rider,
+`as3/Definitions/Classes/ClassDef/Bug118272Package` (0/6 -> 6/6), was
+outside the ≤5-line window, as in every prior session. +11 against +10.
+
+### 7.4 What each fix actually was
+
+- **The #1108 we threw was a VICTIM, not a cause.** The brief named
+  `newclass_mismatched` + `Error1074IllegalWriteToReadOnlyProp` as one site
+  with two graded tests, on the evidence that both showed
+  `VerifyError #1108: OP_newclass ... incorrect base class`. They are two
+  unrelated bugs. Error1074's program is `Object = new Object()`, which
+  must throw **#1074** — class traits are read-only (Ruffle vtable.rs:
+  `TraitKind::Const | TraitKind::Class => new_const_slot`). We allowed the
+  write, so the global's `Object` slot became a plain object, and the
+  *next* script init to push `Object` as a newclass base died on #1108
+  before printing a line. **The test's NAME named its owner; the error we
+  emitted named a downstream victim three scripts away.** Our builtins are
+  native rather than a playerglobal ABC, so `avm2_builtin_class` and the
+  three global constants had to be given the const flag by hand.
+- **newclass has three ordered arms, and ours had one.** Ruffle coerces the
+  base VALUE to `Class` first (a non-class base is a failed **coercion**,
+  #1034), then rejects a null base under a declared super (#1009), and only
+  then compares against the declared superclass (#1108). Our #1108 check
+  compares the base's **QName against `super_mn`**, not object identity:
+  Ruffle compares `Class` objects, but two domains can legitimately hold
+  distinct class objects for one declared superclass, and identity would
+  throw #1108 on a valid program.
+- **Private namespaces are compared by IDENTITY, and we compared URIs.**
+  ASC emits one PrivateNamespace pool entry per class, *all with the same
+  empty name* — Ruffle's `namespace.rs` says so in a comment: "private
+  namespaces are always compared by pointer identity of the enclosing Gc".
+  A URI compare therefore makes every class's privates alias every other
+  class's, so `Class2` could read `Class1`'s `private var`. `Avm2PropKey`
+  gains `ns_priv` (the pool record's address — unique per (file, index),
+  stable for the process), consulted **only when both keys are private**,
+  which is why the ~60 hand-built keys that never carry kind 0x05 needed no
+  audit beyond a NULL init.
+- **The same rule was needed TWICE in the recompiler, in two different
+  matchers.** `nsKeysMatch` is a documented mirror of `avm2_propkey_matches`
+  and took the identical two-line change (within one ABC the pool index IS
+  the identity). But fixing it changed nothing for
+  `ExtPublicClassPriv` lines 4-5, because `this.privArray` never reaches a
+  runtime multiname match at all: `analyzeSlotSpec`'s lever A resolves it
+  through `findUniqueSlot`, which searches the superclass chain **by local
+  name only** and bakes a `getproperty_slot`. It now requires the found
+  trait to ns-match the site multiname. *A "mirror the runtime" comment on
+  one function does not mean the file has only one matcher* — grep for the
+  other consumers of the same fact before believing a single edit covers
+  the recompiler.
+- **#1056/#1069 qualify a name only when the site multiname has EXACTLY ONE
+  namespace with a non-empty URI** (Ruffle `Multiname::as_uri`). That is
+  what makes the rule safe corpus-wide: a compiled `obj.name` carries a
+  whole ns SET and keeps printing bare; only an explicit `obj.ns::name`
+  qualifies.
+- **A wildcard name (`obj.*`) is #1081 on an object and #1069 on a
+  primitive**, and the sealed/dynamic split does not apply. Ruffle spells
+  this out in a comment on `get_dynamic_property`'s `local_name() == None`
+  arm; the failing assertions alone suggest "dynamic receivers should
+  throw", which would have broken every expando read in the corpus.
+- **A QName as a runtime property name was intercepted before the xmlish
+  check**, so `x1.bravo.@[q3]` resolved as a generic `uri::local` key and
+  never reached E4X. One `&& !avm2_value_is_xmlish(recv)`.
+- **`ns::*` passed the EMPTY string where NULL (any-name) was meant.**
+  `avm2_op_getproperty_rtns` builds the E4X name from `avm2_mn_name`, which
+  returns `""` for multiname name index 0 — the ABC any-name sentinel. An
+  empty local name matches no node, so `y1.@ns::*` counted 0 instead of 2.
+- **`Namespace.prefix`/`.uri` report `propertyIsEnumerable == true`**
+  (namespace_object.rs overrides it). QName has no such override, so its
+  `uri`/`localName` enumerate in for-in yet report **false** — and
+  `e4x/Namespace/e13_2_5` pins both halves. Same shape as §6.4's tombstone
+  bug: our for-in already yielded them, so the two readers contradicted
+  each other and the odd one out was the one to fix.
+
+### 7.5 The one regression was a test this project wrote to predict it
+
+`regression/avm2_findprop_this_resolution` went pass -> output_mismatch on
+line 8 (`sub.readShadowed`). Its own README had carried this since it was
+written:
+
+> mxmlc emits private namespaces with EMPTY uris (unique only by pool
+> index); our runtime compares namespaces by (kind, uri) … Real Flash keeps
+> private namespaces distinct per class and would print `base-shadowed` …
+> **if private-ns identity is ever fixed, update this line.**
+
+Expected output and README updated. `Base.readShadowed()` reads BASE's
+`private var shadowed` even on a `Sub` receiver, because private members
+are not virtual — which is what the fix now produces.
+
+Two process lessons, both cheap:
+
+- **A hand-written regression test can be a NOTE TO THE FUTURE, and the
+  note is in its README, not in the corpus.** Before committing an
+  engine-semantics change, grep `ruffle-tests/tests/swfs/regression/*/README.md`
+  for the mechanism — this one names it outright.
+- **`regression` was the one suite the canary set omitted**, because the
+  canary was built from `avm2` / `from_avmplus` / `from_shumway` results
+  alone. It is 70 tests and takes ~5 minutes. Always include it: it is the
+  suite most likely to pin OUR behavior rather than the oracle's.
+
+### 7.6 Method notes
+
+- **A header change makes a local canary sweep ~5x more expensive.** This
+  session touched `avm2_class.h`, so every test's build recompiled the
+  whole runtime and ccache could not help across tests (per-test
+  `MOCK_DATE_TIME` already splits the cache). Measured throughput was
+  **~13 tests/min at `-P 7` on 8 cores** (load average ~11 — saturated),
+  where a source-only change runs several times faster. A 636-test canary
+  was abandoned mid-run for a 310-test focused one; the focused set went
+  310/310 in ~25 min. **Price the canary AFTER deciding whether the change
+  touches a header** — and remember CI grades 4422 tests in 33 minutes on
+  30 shards, which is ~50x the local rate, so past ~300 canaries the right
+  move is to push.
+- **`git checkout <file>` to drop debug instrumentation also drops the real
+  edits in that file.** `avm2_ops.c` held both the `fprintf` probes and the
+  newclass fix; the checkout reverted all of it silently and the loss was
+  only visible because `git diff --stat` stopped listing the file. Strip
+  probes with a targeted edit, or commit the real work first.
+- **Instrument at the throw site, then print the RECEIVER, not the code.**
+  Two `fprintf`s inside the #1108 branch — first the value kind, then
+  `class_name_of` — turned "newclass rejects a valid program" into "the
+  global's `Object` slot holds an Object instance", which named the real
+  bug (a missing #1074) in one step. This is §4's "for an error thrown from
+  N sites, instrument before reasoning", one level further: instrument the
+  VALUE, not just the site.
+- **The eager-snprintf trap from §4 nearly repeated.** The first cut of the
+  qualified-name change computed `mn_display_name` on every static
+  getproperty and every dynamic-property store. Both were moved onto the
+  throw path before the canary ran.
+
+### 7.7 Left on the board
+
+Everything in §5.5 and §6.6 still stands, minus `newclass_mismatched` and
+`Error1074IllegalWriteToReadOnlyProp` (shipped). New this session:
+
+- **`avm2/activation_class`** — an activation object wants #1069 for a
+  missing method (we give #1006), #1069 for `AS3::hasOwnProperty` (we give
+  #1081) and #1056 for a dynamic write (we produce nothing). Three
+  different rules on one receiver KIND; needs the activation object's
+  sealed/dynamic model settled first, not three patches.
+- **`avm2/property_priority_chained`** — a chained-shadowing read picks the
+  superclass field where the subclass's is wanted. Adjacent to the
+  recompiler slot lever this session touched (`findUniqueSlot` /
+  `subclassRedeclares`), and worth taking next by whoever has that code
+  paged in.
+- **`e4x/XML/e13_4_4_36`** — `setNamespace` must MINT a prefix (`aaa:`) for
+  the re-namespaced child rather than re-declaring a default `xmlns`. A
+  prefix-allocation rule, not a matching rule.
+- **`e4x/Regress/regress-524214`** — `x.@* = 1` (wildcard attribute
+  ASSIGNMENT) writes the wrong attribute set. The read half of the
+  wildcard rule shipped this session; the write half is its own site.

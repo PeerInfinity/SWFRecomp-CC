@@ -5,7 +5,7 @@ base.callOwn: own-method
 base.readGlobalCollide: global-helper
 base.readStatic: base-static
 sub.readField: 42
-sub.readShadowed: sub-shadowed
+sub.readShadowed: base-shadowed
 sub.readOwnShadow: sub-shadowed
 sub.callOwn: sub-own-method
 dyn.readField: dyn-field

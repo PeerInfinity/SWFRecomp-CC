@@ -14,11 +14,17 @@ mainly by upstream avm2 tests compiled with the older ASC
 (es4_protected_inheritance, class_supercalls_errors) and by the RWK/Flixel
 games; this test pins the RESOLUTION SEMANTICS the lever must preserve.
 
-Caveat, line 8 (`sub.readShadowed: sub-shadowed`): mxmlc emits private
-namespaces with EMPTY uris (unique only by pool index); our runtime compares
-namespaces by (kind, uri), so Base's and Sub's private namespaces conflate
-and Sub's shadowing slot overrides Base's ivtable entry. Real Flash keeps
-private namespaces distinct per class (lexical private scoping) and would
-print `base-shadowed`. Pre-existing runtime behavior, unrelated to the
-find→this lever (identical output with SWF_NO_FIND_THIS=1 SWF_NO_SLOT_SPEC=1);
-if private-ns identity is ever fixed, update this line.
+Line 8 (`sub.readShadowed: base-shadowed`) is the private-namespace
+identity row, and it was FIXED in the polish sweep's session 5 (`b4d4457f1`).
+It used to read `sub-shadowed`: mxmlc emits private namespaces with EMPTY
+uris (unique only by pool index), our runtime compared namespaces by
+(kind, uri), so Base's and Sub's private namespaces conflated and Sub's
+shadowing slot overrode Base's ivtable entry. Real Flash keeps private
+namespaces distinct per class (lexical private scoping), and `Base`'s
+`readShadowed()` reads BASE's `private var shadowed` even on a `Sub`
+receiver — private members are not virtual. `Avm2PropKey::ns_priv` (runtime)
+and `NsKey::priv` + the `findUniqueSlot` site check (recompiler) now
+compare private namespaces by pool-entry identity, so this row prints what
+Flash prints. This test was the only place in the corpus that pinned the
+old behavior, which is why it is the one row this file predicted would
+flip.

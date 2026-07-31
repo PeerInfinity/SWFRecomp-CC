@@ -844,25 +844,32 @@ Two ranking corrections this session produced:
   surrogate, so a CESU-8 pair needs WTF-8 storage or a pair-combining
   pass across every decoder. Size it on its own before taking it.
 
-### Polish sweep sessions 2-4 (headline update, 2026-07-31)
+### Polish sweep sessions 2-5 (headline update, 2026-07-31)
 
 | session | commit(s) | CI | corpus | delta |
 |---|---|---|---|---|
 | 2 | `f1a80bdc8` `92ca512ed` `387cfce60` `ff7151c15` | `30583810264` | 4041 -> 4062 / 4421 (91.9%) | +21 |
 | 3 | `a62c4ce61` `da8a5f5df` | `30599630053` + `30601250181` | 4079 -> 4094 / 4422 (92.6%) | +15 |
-| 4 | `a28b3e2cb` | `30638028597` | **4094 -> 4110 / 4422 (92.9%)** | **+16** |
+| 4 | `a28b3e2cb` | `30638028597` | 4094 -> 4110 / 4422 (92.9%) | +16 |
+| 5 | `b4d4457f1` | `30659262052` | **4110 -> 4121 / 4422 (93.2%)** | **+11** |
 
-**Current headline: 4110 / 4422 effective (92.9%), 312 failing.**
-Histogram `pass` 3868, `ruffle_matched` 242, `output_mismatch` 304,
+**Current headline: 4121 / 4422 effective (93.2%), 301 failing.**
+Histogram `pass` 3879, `ruffle_matched` 242, `output_mismatch` 293,
 `runtime_error` 7, `recomp_fail` 1, and still **no segfault / timeout /
-compile_fail bucket at all**. Every session so far: zero regressions,
-zero other status moves.
+compile_fail bucket at all**. Zero unexplained regressions and zero other
+status moves in every session; session 5's single flagged regression was
+`regression/avm2_findprop_this_resolution`, a hand-written test whose own
+README had asked for that line to be updated when private-namespace
+identity was fixed.
 
 The near-pass candidate list keeps shrinking as the arc runs — 172 ->
-136 -> **122** — and it regenerates rather than depletes (each session
-finds a handful of NEW near-passes that a prior arc's partial fix moved
-into the window). Session 4's takeaway for ranking: the
-`as3/RuntimeErrors` directory is still not an arc, but it is a rich
-source of *riders* once a candidate is keyed by the throw site its
-assertion names rather than by its directory. Details and the remaining
-diagnosed-but-untaken items are in `polish-sweep-arc.md` §6.
+136 -> 122 -> **110** — and it regenerates rather than depletes (each
+session finds a handful of NEW near-passes that a prior arc's partial fix
+moved into the window). Session 5's takeaway for ranking: **both
+error-keyed clustering axes are now mined out** (`error_signature` covers
+16 of 110 with a largest group of 2; session 4's
+`expected #NNNN got: no error` shape returns nothing). What paid instead
+was clustering on the ENGINE STRUCTURE the candidates exercise — here the
+multiname's namespace half — which grouped tests whose diff text has
+nothing in common. Details and the remaining diagnosed-but-untaken items
+are in `polish-sweep-arc.md` §7.
