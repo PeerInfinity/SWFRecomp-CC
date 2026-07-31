@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 43m 31s
+**Run Duration**: 43m 33s
 
 ## Summary
 
@@ -182,11 +182,11 @@
 | 149 | `stroke1` | 1 | 7.3s |  |
 | 150 | `stylesheet` | 3 | 7.8s |  |
 | 151 | `targetPath1` | 8 | 2.0s |  |
-| 152 | `timeline/Timeline3` | 5 | 26.3s |  |
-| 153 | `timeline/Timeline4` | 5 | 26.2s |  |
+| 152 | `timeline/Timeline3` | 5 | 27.3s |  |
+| 153 | `timeline/Timeline4` | 5 | 27.2s |  |
 | 154 | `timeline/Timeline8` | 5 | 7.6s |  |
-| 155 | `timeline/Timeline9` | 11 | 7.6s |  |
-| 156 | `timeline/events/timeline_events_fp10` | 67 | 7.9s |  |
+| 155 | `timeline/Timeline9` | 11 | 7.7s |  |
+| 156 | `timeline/events/timeline_events_fp10` | 67 | 8.0s |  |
 | 157 | `timeline/events/timeline_events_fp9` | 48 | 7.5s |  |
 | 158 | `timeline/nav/blendMode` | 8 | 7.2s |  |
 | 159 | `timeline/nav/cacheAsBitmap` | 8 | 7.0s |  |

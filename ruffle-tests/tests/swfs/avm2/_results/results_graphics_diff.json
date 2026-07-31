@@ -1,154 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-31T20:48:45.110707+00:00",
-    "old_git_sha": "16343c6e1b7a93f90e3534862e55870425986aea",
-    "new_timestamp": "2026-07-31T23:03:09.622963+00:00",
+    "old_timestamp": "2026-07-31T23:03:09.622963+00:00",
+    "old_git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
+    "new_timestamp": "2026-07-31T23:26:31.509869+00:00",
     "new_git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 1048,
-    "old_ruffle_matched": 26,
-    "old_effective_pass": 1074,
-    "old_total": 1222,
-    "old_pass_rate": 85.8,
+    "old_pass": 1051,
+    "old_ruffle_matched": 27,
+    "old_effective_pass": 1078,
+    "old_total": 1224,
+    "old_pass_rate": 85.9,
     "new_pass": 1051,
     "new_ruffle_matched": 27,
     "new_effective_pass": 1078,
     "new_total": 1224,
     "new_pass_rate": 85.9,
-    "old_mismatched_lines": 33499,
+    "old_mismatched_lines": 33576,
     "new_mismatched_lines": 33576,
-    "increased_mismatches": 2,
-    "decreased_mismatches": 16,
-    "newly_passing": 4,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 6,
-    "unchanged": 1216,
-    "added": 2,
+    "status_changed": 0,
+    "unchanged": 1224,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "getter_different_namespace_setter",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "method_without_body",
-      "change_type": "changed",
-      "old_status": "runtime_error",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 3,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "property_priority_chained",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "rtqname_not_namespace",
-      "change_type": "changed",
-      "old_status": "runtime_error",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 12,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 12,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "scopes_dont_cache/order-1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "scopes_dont_cache/order-2",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "textblock_line_changes",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 158,
-        "expected_lines": 158,
-        "matching_lines": 125
-      }
-    },
-    {
-      "test": "textblock_recreateline",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 89,
-        "expected_lines": 98,
-        "matching_lines": 40
-      }
-    }
-  ]
+  "changes": []
 }

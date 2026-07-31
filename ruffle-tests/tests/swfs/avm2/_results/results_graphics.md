@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 199m 8s
+**Run Duration**: 199m 2s
 
 ## Summary
 
@@ -915,33 +915,33 @@
 | 881 | `string_indexof_lastindexof` | 87 | 7.4s |  |
 | 882 | `string_length` | 16 | 7.1s |  |
 | 883 | `string_locale_compare` | 39 | 7.4s |  |
-| 884 | `string_match` | 51 | 19.6s |  |
+| 884 | `string_match` | 51 | 7.7s |  |
 | 885 | `string_relational_compare` | 4 | 7.3s |  |
-| 886 | `string_replace` | 51 | 7.5s |  |
+| 886 | `string_replace` | 51 | 7.6s |  |
 | 887 | `string_search` | 41 | 7.5s |  |
-| 888 | `string_slice_substr_substring` | 170 | 8.4s |  |
-| 889 | `string_split` | 29 | 7.4s |  |
-| 890 | `string_substr_negative` | 21 | 7.2s |  |
-| 891 | `string_substr_weird` | 182 | 7.2s |  |
-| 892 | `subtract` | 1058 | 18.6s |  |
-| 893 | `super_get_call` | 12 | 7.3s |  |
-| 894 | `supercall_two_classobjects` | 2 | 7.3s |  |
-| 895 | `swf8` | 1 | 7.2s |  |
-| 896 | `swf_10_queued_goto_scripts_construct` | 52 | 7.6s |  |
-| 897 | `swf_9_goto_in_enter_frame` | 17 | 7.4s |  |
-| 898 | `swf_9_goto_in_enter_frame_simple` | 15 | 7.4s |  |
+| 888 | `string_slice_substr_substring` | 170 | 8.6s |  |
+| 889 | `string_split` | 29 | 7.5s |  |
+| 890 | `string_substr_negative` | 21 | 7.3s |  |
+| 891 | `string_substr_weird` | 182 | 7.3s |  |
+| 892 | `subtract` | 1058 | 19.9s |  |
+| 893 | `super_get_call` | 12 | 7.4s |  |
+| 894 | `supercall_two_classobjects` | 2 | 7.4s |  |
+| 895 | `swf8` | 1 | 7.3s |  |
+| 896 | `swf_10_queued_goto_scripts_construct` | 52 | 7.7s |  |
+| 897 | `swf_9_goto_in_enter_frame` | 17 | 7.5s |  |
+| 898 | `swf_9_goto_in_enter_frame_simple` | 15 | 7.5s |  |
 | 899 | `swf_9_queued_goto_scripts` | 6 | 7.4s |  |
-| 900 | `swf_9_queued_goto_scripts_construct` | 28 | 1.4s |  |
+| 900 | `swf_9_queued_goto_scripts_construct` | 28 | 1.3s |  |
 | 901 | `swf_9_versioning` | 2 | 7.3s |  |
 | 902 | `swf_wrong_frame_count` | 38 | 7.7s |  |
-| 903 | `swf_wrong_frame_count_isplaying` | 22 | 26.0s |  |
-| 904 | `symbol_class_binary_data` | 8 | 7.3s |  |
+| 903 | `swf_wrong_frame_count_isplaying` | 22 | 26.6s |  |
+| 904 | `symbol_class_binary_data` | 8 | 7.4s |  |
 | 905 | `symbol_class_conflict` | 4 | 7.8s |  |
-| 906 | `symbol_class_root_not_zero` | 1 | 7.2s |  |
-| 907 | `symbolclass_invalid_utf8` | 2 | 7.3s |  |
-| 908 | `tab_ordering_arrows` | 998 | 27.6s |  |
-| 909 | `tab_ordering_automatic_advanced` | 184 | 8.2s |  |
-| 910 | `tab_ordering_automatic_basic` | 45 | 7.4s |  |
+| 906 | `symbol_class_root_not_zero` | 1 | 7.3s |  |
+| 907 | `symbolclass_invalid_utf8` | 2 | 7.5s |  |
+| 908 | `tab_ordering_arrows` | 998 | 28.9s |  |
+| 909 | `tab_ordering_automatic_advanced` | 184 | 8.3s |  |
+| 910 | `tab_ordering_automatic_basic` | 45 | 7.6s |  |
 | 911 | `tab_ordering_children` | 116 | 19.8s |  |
 | 912 | `tab_ordering_custom_basic` | 34 | 7.5s |  |
 | 913 | `tab_ordering_stage_tab_children` | 32 | 7.5s |  |
@@ -1113,7 +1113,7 @@
 | 21 | `soundchannel_position` | 74 | 74 | 27.4s |  |
 | 22 | `soundchannel_soundcomplete` | 10 | 10 | 7.6s |  |
 | 23 | `sprite_dropTarget` | 4 | 15 | 7.4s |  |
-| 24 | `swf_9_goto_in_construct_frame` | 12 | 12 | 26.4s |  |
+| 24 | `swf_9_goto_in_construct_frame` | 12 | 12 | 27.1s |  |
 | 25 | `uint_toexponential` | 100 | 100 | 6.5s |  |
 | 26 | `uint_toprecision` | 433 | 433 | 6.2s |  |
 | 27 | `weird_superinterface_properties` | 1 | 1 | 25.3s |  |

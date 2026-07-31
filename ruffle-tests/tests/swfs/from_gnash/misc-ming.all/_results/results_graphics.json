@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-31T23:03:09.769688+00:00",
+    "timestamp": "2026-07-31T23:26:31.663150+00:00",
     "git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
-    "duration_seconds": 1669.04,
+    "duration_seconds": 1670.75,
     "total_available": 111,
     "shards": 30,
     "expected_shards": 30
@@ -1854,8 +1854,8 @@
       "test": "register_class/RegisterClassTest3",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.778,
-        "run": 0.266
+        "compile": 22.71,
+        "run": 0.265
       },
       "num_frames": 30,
       "lines": {
@@ -1863,15 +1863,15 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 22.05,
+      "duration": 22.98,
       "status": "pass"
     },
     {
       "test": "register_class/RegisterClassTest4",
       "phases": {
-        "recomp": 0.032,
-        "compile": 3.919,
-        "run": 0.315
+        "recomp": 0.0,
+        "compile": 3.938,
+        "run": 0.317
       },
       "num_frames": 30,
       "lines": {
@@ -1879,7 +1879,7 @@
         "expected_lines": 42,
         "matching_lines": 6
       },
-      "duration": 4.27,
+      "duration": 4.26,
       "status": "output_mismatch",
       "detail": "51 line(s) differ (actual=57, expected=42)",
       "actual_output": "1 undefined\nBug ctor: 0\nload _level0.mc.Segments c: 0\n2 0\n1 0\n2 0\n1 0\nunload _level0.mc.Segments c: 0\n2 undefined\n1 undefined\n2 undefined\n1 undefined\nBug ctor: 1\nload _level0.mc.Segments c: 1\n2 1\n1 1\n2 1\nPASSED: _global.real.length  ==  12 [RegisterClassTest4.c:152]\nFAILED: expected: 'undefined,0,0,0,0,0,0,1,1,1,1,2' obtained: undefined,0,0,0,0,undefined,undefined,undefined,undefined,1,1,1 [RegisterClassTest4.c:154] \nPASSED: _global.fns.length  ==  12 [RegisterClassTest4.c:156]\nPASSED: _global.fns[0]  ==  'undefined' [RegisterClassTest4.c:157]\nPASSED: _global.fns[1]  ==  'function' [RegisterClassTest4.c:158]\nPASSED: _global.fns[2]  ==  'function' [RegisterClassTest4.c:159]\nPASSED: _global.fns[3]  ==  'function' [RegisterClassTest4.c:160]\nPASSED: _global.fns[4]  ==  'function' [RegisterClassTest4.c:161]\nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:162] \nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:163] \nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:164] \nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:165] \nPASSED: _global.fns[9]  ==  'function' [RegisterClassTest4.c:166]\nPASSED: _global.fns[10]  ==  'function' [RegisterClassTest4.c:167]\nPASSED: _global.fns[11]  ==  'function' [RegisterClassTest4.c:168]\nFAILED: expected: 3 obtained: 2 [RegisterClassTest4.c:170] \nunload _level0.mc.Segments c: 1\n#passed: 10\n#failed: 6\n#total tests run: 16\nBug ctor: 2\nload _level0.mc.Segments c: 2\nBug ctor: 3\nload _level0.mc.Segments c: 3\nBug ctor: 4\nload _level0.mc.Segments c: 4\nBug ctor: 5\nload _level0.mc.Segments c: 5\nBug ctor: 6\nload _level0.mc.Segments c: 6\nBug ctor: 7\nload _level0.mc.Segments c: 7\nBug ctor: 8\n... (7 lines after) ...",
@@ -1889,8 +1889,8 @@
       "test": "register_class/registerClassTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.251,
-        "run": 0.265
+        "compile": 25.092,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -1898,7 +1898,7 @@
         "expected_lines": 51,
         "matching_lines": 51
       },
-      "duration": 24.52,
+      "duration": 25.32,
       "status": "pass"
     },
     {

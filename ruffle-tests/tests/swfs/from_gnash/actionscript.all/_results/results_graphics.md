@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 25m 5s
+**Run Duration**: 25m 6s
 
 ## Summary
 
@@ -142,13 +142,13 @@
 | 109 | `case-v6` | 73 | 4.3s |  |
 | 110 | `case-v7` | 67 | 4.3s |  |
 | 111 | `case-v8` | 67 | 2.3s |  |
-| 112 | `delete-v5` | 61 | 3.9s |  |
-| 113 | `delete-v6` | 61 | 3.3s |  |
-| 114 | `delete-v7` | 61 | 3.5s |  |
+| 112 | `delete-v5` | 61 | 4.0s |  |
+| 113 | `delete-v6` | 61 | 3.5s |  |
+| 114 | `delete-v7` | 61 | 3.7s |  |
 | 115 | `delete-v8` | 61 | 2.5s |  |
-| 116 | `enumerate-v5` | 6 | 2.8s |  |
-| 117 | `enumerate-v6` | 49 | 3.9s |  |
-| 118 | `enumerate-v7` | 49 | 3.5s |  |
+| 116 | `enumerate-v5` | 6 | 2.9s |  |
+| 117 | `enumerate-v6` | 49 | 4.0s |  |
+| 118 | `enumerate-v7` | 49 | 3.7s |  |
 | 119 | `enumerate-v8` | 49 | 2.3s |  |
 | 120 | `flash-v5` | 10 | 2.4s |  |
 | 121 | `flash-v6` | 10 | 2.7s |  |

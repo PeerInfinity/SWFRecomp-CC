@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 43m 31s
+**Run Duration**: 43m 33s
 
 **Filtered**: 46 tests ignored out of 229 available
 
@@ -160,11 +160,11 @@
 | 125 | `mouse/start_drag_lock` | 3 | 7.2s |  |
 | 126 | `movieinfo1` | 3 | 1.9s |  |
 | 127 | `targetPath1` | 8 | 2.0s |  |
-| 128 | `timeline/Timeline3` | 5 | 26.3s |  |
-| 129 | `timeline/Timeline4` | 5 | 26.2s |  |
+| 128 | `timeline/Timeline3` | 5 | 27.3s |  |
+| 129 | `timeline/Timeline4` | 5 | 27.2s |  |
 | 130 | `timeline/Timeline8` | 5 | 7.6s |  |
-| 131 | `timeline/Timeline9` | 11 | 7.6s |  |
-| 132 | `timeline/events/timeline_events_fp10` | 67 | 7.9s |  |
+| 131 | `timeline/Timeline9` | 11 | 7.7s |  |
+| 132 | `timeline/events/timeline_events_fp10` | 67 | 8.0s |  |
 | 133 | `timeline/events/timeline_events_fp9` | 48 | 7.5s |  |
 | 134 | `timeline/nav/blendMode` | 8 | 7.2s |  |
 | 135 | `timeline/nav/cacheAsBitmap` | 8 | 7.0s |  |

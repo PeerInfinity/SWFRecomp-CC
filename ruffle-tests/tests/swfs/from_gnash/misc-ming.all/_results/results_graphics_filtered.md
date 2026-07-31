@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 27m 49s
+**Run Duration**: 27m 51s
 
 **Filtered**: 2 tests ignored out of 111 available
 
@@ -89,8 +89,8 @@
 | 54 | `new_child_in_unload_test` | 11 | 28.1s |  |
 | 55 | `place_and_remove_object_insane_test` | 22 | 21.9s |  |
 | 56 | `place_and_remove_object_test` | 13 | 21.5s |  |
-| 57 | `register_class/RegisterClassTest3` | 12 | 22.1s |  |
-| 58 | `register_class/registerClassTest` | 51 | 24.5s |  |
+| 57 | `register_class/RegisterClassTest3` | 12 | 23.0s |  |
+| 58 | `register_class/registerClassTest` | 51 | 25.3s |  |
 | 59 | `replace_shapes1test` | 23 | 3.1s |  |
 | 60 | `replace_sprites1test` | 21 | 0.9s |  |
 | 61 | `reverse_execute_PlaceObject2_test1` | 8 | 0.9s |  |

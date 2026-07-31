@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 193m 27s
+**Run Duration**: 193m 35s
 
 **Filtered**: 0 tests ignored out of 1574 available
 
@@ -1281,57 +1281,57 @@
 | 1245 | `ecma3/String/e15_5_4_5_2` | 31 | 7.9s |  |
 | 1246 | `ecma3/String/e15_5_4_5_3` | 28 | 7.6s |  |
 | 1247 | `ecma3/String/e15_5_4_5_5` | 269 | 7.7s |  |
-| 1248 | `ecma3/String/e15_5_4_5_6_rt` | 11 | 8.3s |  |
-| 1249 | `ecma3/String/e15_5_4_6_1` | 578 | 8.0s |  |
-| 1250 | `ecma3/String/e15_5_4_6_2_rt` | 232 | 9.5s |  |
-| 1251 | `ecma3/String/e15_5_4_7_1` | 654 | 8.0s |  |
-| 1252 | `ecma3/String/e15_5_4_7_2` | 72 | 8.2s |  |
-| 1253 | `ecma3/String/e15_5_4_7_3_rt` | 5 | 8.0s |  |
-| 1254 | `ecma3/String/e15_5_4_8_1_rt` | 30 | 9.2s |  |
-| 1255 | `ecma3/String/e15_5_4_8_3` | 13 | 7.7s |  |
-| 1256 | `ecma3/String/e15_5_4_8_477132` | 1 | 7.5s |  |
-| 1257 | `ecma3/String/e15_5_4_9_1_rt` | 22 | 8.5s |  |
-| 1258 | `ecma3/String/e15_5_5_1` | 10 | 8.0s |  |
-| 1259 | `ecma3/String/ematch_001` | 24 | 7.7s |  |
-| 1260 | `ecma3/String/ematch_002` | 32 | 7.8s |  |
-| 1261 | `ecma3/String/ematch_003` | 10 | 7.7s |  |
-| 1262 | `ecma3/String/ematch_004` | 8 | 7.8s |  |
-| 1263 | `ecma3/String/eregress_104375` | 3 | 7.6s |  |
-| 1264 | `ecma3/String/eregress_137879` | 7 | 7.6s |  |
-| 1265 | `ecma3/String/eregress_137890` | 1 | 7.6s |  |
+| 1248 | `ecma3/String/e15_5_4_5_6_rt` | 11 | 8.5s |  |
+| 1249 | `ecma3/String/e15_5_4_6_1` | 578 | 8.2s |  |
+| 1250 | `ecma3/String/e15_5_4_6_2_rt` | 232 | 10.1s |  |
+| 1251 | `ecma3/String/e15_5_4_7_1` | 654 | 8.3s |  |
+| 1252 | `ecma3/String/e15_5_4_7_2` | 72 | 8.4s |  |
+| 1253 | `ecma3/String/e15_5_4_7_3_rt` | 5 | 8.2s |  |
+| 1254 | `ecma3/String/e15_5_4_8_1_rt` | 30 | 9.6s |  |
+| 1255 | `ecma3/String/e15_5_4_8_3` | 13 | 7.9s |  |
+| 1256 | `ecma3/String/e15_5_4_8_477132` | 1 | 7.7s |  |
+| 1257 | `ecma3/String/e15_5_4_9_1_rt` | 22 | 8.8s |  |
+| 1258 | `ecma3/String/e15_5_5_1` | 10 | 8.1s |  |
+| 1259 | `ecma3/String/ematch_001` | 24 | 7.9s |  |
+| 1260 | `ecma3/String/ematch_002` | 32 | 7.9s |  |
+| 1261 | `ecma3/String/ematch_003` | 10 | 7.8s |  |
+| 1262 | `ecma3/String/ematch_004` | 8 | 7.9s |  |
+| 1263 | `ecma3/String/eregress_104375` | 3 | 7.8s |  |
+| 1264 | `ecma3/String/eregress_137879` | 7 | 7.7s |  |
+| 1265 | `ecma3/String/eregress_137890` | 1 | 7.7s |  |
 | 1266 | `ecma3/String/eregress_83293` | 9 | 7.7s |  |
-| 1267 | `ecma3/String/ereplace_001` | 15 | 8.0s |  |
+| 1267 | `ecma3/String/ereplace_001` | 15 | 7.9s |  |
 | 1268 | `ecma3/String/esplit_001` | 18 | 7.7s |  |
 | 1269 | `ecma3/String/esplit_002` | 94 | 8.0s |  |
 | 1270 | `ecma3/String/esplit_003` | 86 | 7.9s |  |
-| 1271 | `ecma3/String/localeCompare_rt` | 4 | 7.7s |  |
+| 1271 | `ecma3/String/localeCompare_rt` | 4 | 7.8s |  |
 | 1272 | `ecma3/String/replace_439458` | 5 | 7.6s |  |
 | 1273 | `ecma3/String/search` | 8 | 7.7s |  |
-| 1274 | `ecma3/String/split_407156` | 1 | 7.5s |  |
+| 1274 | `ecma3/String/split_407156` | 1 | 7.6s |  |
 | 1275 | `ecma3/String/split_504567` | 1 | 7.6s |  |
-| 1276 | `ecma3/String/substr` | 24 | 8.0s |  |
-| 1277 | `ecma3/String/toLocaleLowerCase` | 387 | 8.1s |  |
-| 1278 | `ecma3/String/toLocaleLowerCase2` | 96 | 8.0s |  |
-| 1279 | `ecma3/String/toLocaleLowerCase3` | 240 | 8.0s |  |
-| 1280 | `ecma3/String/toLocaleLowerCase4` | 96 | 7.9s |  |
-| 1281 | `ecma3/String/toLocaleLowerCase5` | 131 | 8.1s |  |
+| 1276 | `ecma3/String/substr` | 24 | 8.1s |  |
+| 1277 | `ecma3/String/toLocaleLowerCase` | 387 | 8.2s |  |
+| 1278 | `ecma3/String/toLocaleLowerCase2` | 96 | 8.1s |  |
+| 1279 | `ecma3/String/toLocaleLowerCase3` | 240 | 8.1s |  |
+| 1280 | `ecma3/String/toLocaleLowerCase4` | 96 | 8.1s |  |
+| 1281 | `ecma3/String/toLocaleLowerCase5` | 131 | 8.2s |  |
 | 1282 | `ecma3/String/toLocaleLowerCase6` | 96 | 2.0s |  |
-| 1283 | `ecma3/String/toLocaleUpperCase` | 96 | 8.0s |  |
-| 1284 | `ecma3/String/toLocaleUpperCase2` | 128 | 8.0s |  |
-| 1285 | `ecma3/String/toLocaleUpperCase3` | 768 | 8.1s |  |
+| 1283 | `ecma3/String/toLocaleUpperCase` | 96 | 8.1s |  |
+| 1284 | `ecma3/String/toLocaleUpperCase2` | 128 | 8.2s |  |
+| 1285 | `ecma3/String/toLocaleUpperCase3` | 768 | 8.2s |  |
 | 1286 | `ecma3/String/toLocaleUpperCase4` | 1 | 8.1s |  |
-| 1287 | `ecma3/String/toLocaleUpperCase5` | 387 | 8.1s |  |
+| 1287 | `ecma3/String/toLocaleUpperCase5` | 387 | 8.2s |  |
 | 1288 | `ecma3/TypeConversion/e9_2_rt` | 36 | 7.9s |  |
-| 1289 | `ecma3/TypeConversion/e9_3` | 15 | 7.7s |  |
-| 1290 | `ecma3/TypeConversion/e9_3_1` | 9 | 7.7s |  |
-| 1291 | `ecma3/TypeConversion/e9_3_1_1` | 189 | 10.2s |  |
-| 1292 | `ecma3/TypeConversion/e9_3_1_2` | 12 | 7.7s |  |
-| 1293 | `ecma3/TypeConversion/e9_3_1_3_rt` | 94 | 8.5s |  |
-| 1294 | `ecma3/TypeConversion/e9_4_1` | 19 | 7.8s |  |
-| 1295 | `ecma3/TypeConversion/e9_4_2` | 19 | 7.8s |  |
-| 1296 | `ecma3/TypeConversion/e9_5_2` | 56 | 8.1s |  |
-| 1297 | `ecma3/TypeConversion/e9_6` | 34 | 7.8s |  |
-| 1298 | `ecma3/TypeConversion/e9_7` | 38 | 8.0s |  |
+| 1289 | `ecma3/TypeConversion/e9_3` | 15 | 7.9s |  |
+| 1290 | `ecma3/TypeConversion/e9_3_1` | 9 | 7.8s |  |
+| 1291 | `ecma3/TypeConversion/e9_3_1_1` | 189 | 10.8s |  |
+| 1292 | `ecma3/TypeConversion/e9_3_1_2` | 12 | 7.8s |  |
+| 1293 | `ecma3/TypeConversion/e9_3_1_3_rt` | 94 | 8.7s |  |
+| 1294 | `ecma3/TypeConversion/e9_4_1` | 19 | 7.9s |  |
+| 1295 | `ecma3/TypeConversion/e9_4_2` | 19 | 7.9s |  |
+| 1296 | `ecma3/TypeConversion/e9_5_2` | 56 | 8.2s |  |
+| 1297 | `ecma3/TypeConversion/e9_6` | 34 | 8.0s |  |
+| 1298 | `ecma3/TypeConversion/e9_7` | 38 | 8.2s |  |
 | 1299 | `ecma3/TypeConversion/e9_9_1_rt` | 48 | 8.0s |  |
 | 1300 | `ecma3/Types/e8_1` | 3 | 7.3s |  |
 | 1301 | `ecma3/Types/e8_2` | 2 | 7.3s |  |

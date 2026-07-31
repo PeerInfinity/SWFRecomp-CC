@@ -1,18 +1,18 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 30m 23s
+**Run Duration**: 31m 1s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 139 |
-| Passing | **135** (97.1%) |
-| Failing | 4 |
+| Total tests | 143 |
+| Passing | **138** (96.5%) |
+| Failing | 5 |
 | Total expected lines | 350 |
 | Matching lines | 252 (72.0%) |
 | Mismatched lines | 98 |
@@ -21,11 +21,12 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 4 | 100.0% |
+| Output Mismatch | 4 | 80.0% |
+| Recomp Fail | 1 | 20.0% |
 
 ## Passing Tests
 
-**135 tests passing**
+**138 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -148,22 +149,25 @@
 | 117 | `simple_shapes/gradients/focal_radial` | 0 | 2.5s |  |
 | 118 | `simple_shapes/gradients/gradients` | 0 | 2.5s |  |
 | 119 | `simple_shapes/gradients/radial` | 0 | 2.6s |  |
-| 120 | `simple_shapes/masks` | 0 | 2.2s |  |
-| 121 | `simple_shapes/masks_equal_clipdepth` | 0 | 2.0s |  |
-| 122 | `simple_shapes/overlaps` | 0 | 2.2s |  |
-| 123 | `simple_shapes/scroll_rect_mask` | 0 | 2.1s |  |
-| 124 | `simple_shapes/strokes/scale` | 0 | 1.1s |  |
-| 125 | `simple_shapes/text_field_mask` | 0 | 1.4s |  |
-| 126 | `simple_shapes/winding_rule` | 0 | 1.1s |  |
-| 127 | `text/String_path_variable_button` | 0 | 1.2s |  |
-| 128 | `video/colorconversion/h263` | 0 | 21.0s |  |
-| 129 | `video/colorconversion/vp6` | 0 | 2.6s |  |
-| 130 | `video/colorconversion/vp6a` | 0 | 2.8s |  |
-| 131 | `video/deblocking` | 0 | 24.0s |  |
-| 132 | `video/h264` | 0 | 27.7s |  |
-| 133 | `video/h264_multinalu` | 0 | 26.2s |  |
-| 134 | `video/vp6_alphaoffset` | 0 | 21.3s |  |
-| 135 | `video/vp6_dispsize` | 0 | 21.8s |  |
+| 120 | `simple_shapes/gradients/reflect` | 0 | 2.7s |  |
+| 121 | `simple_shapes/gradients/repeat` | 0 | 2.6s |  |
+| 122 | `simple_shapes/layers` | 0 | 2.4s |  |
+| 123 | `simple_shapes/masks` | 0 | 2.2s |  |
+| 124 | `simple_shapes/masks_equal_clipdepth` | 0 | 2.0s |  |
+| 125 | `simple_shapes/overlaps` | 0 | 2.2s |  |
+| 126 | `simple_shapes/scroll_rect_mask` | 0 | 2.1s |  |
+| 127 | `simple_shapes/strokes/scale` | 0 | 1.1s |  |
+| 128 | `simple_shapes/text_field_mask` | 0 | 1.4s |  |
+| 129 | `simple_shapes/winding_rule` | 0 | 1.1s |  |
+| 130 | `text/String_path_variable_button` | 0 | 1.2s |  |
+| 131 | `video/colorconversion/h263` | 0 | 21.0s |  |
+| 132 | `video/colorconversion/vp6` | 0 | 2.6s |  |
+| 133 | `video/colorconversion/vp6a` | 0 | 2.8s |  |
+| 134 | `video/deblocking` | 0 | 24.0s |  |
+| 135 | `video/h264` | 0 | 27.7s |  |
+| 136 | `video/h264_multinalu` | 0 | 26.2s |  |
+| 137 | `video/vp6_alphaoffset` | 0 | 21.3s |  |
+| 138 | `video/vp6_dispsize` | 0 | 21.8s |  |
 
 ## Near-Passing Tests
 

@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 199m 8s
+**Run Duration**: 199m 2s
 
 **Filtered**: 227 tests ignored out of 1224 available
 
@@ -749,31 +749,31 @@
 | 713 | `string_indexof_lastindexof` | 87 | 7.4s |  |
 | 714 | `string_length` | 16 | 7.1s |  |
 | 715 | `string_locale_compare` | 39 | 7.4s |  |
-| 716 | `string_match` | 51 | 19.6s |  |
-| 717 | `string_replace` | 51 | 7.5s |  |
+| 716 | `string_match` | 51 | 7.7s |  |
+| 717 | `string_replace` | 51 | 7.6s |  |
 | 718 | `string_search` | 41 | 7.5s |  |
-| 719 | `string_slice_substr_substring` | 170 | 8.4s |  |
-| 720 | `string_split` | 29 | 7.4s |  |
-| 721 | `string_substr_negative` | 21 | 7.2s |  |
-| 722 | `string_substr_weird` | 182 | 7.2s |  |
-| 723 | `subtract` | 1058 | 18.6s |  |
-| 724 | `super_get_call` | 12 | 7.3s |  |
-| 725 | `supercall_two_classobjects` | 2 | 7.3s |  |
-| 726 | `swf8` | 1 | 7.2s |  |
-| 727 | `swf_10_queued_goto_scripts_construct` | 52 | 7.6s |  |
-| 728 | `swf_9_goto_in_enter_frame` | 17 | 7.4s |  |
-| 729 | `swf_9_goto_in_enter_frame_simple` | 15 | 7.4s |  |
+| 719 | `string_slice_substr_substring` | 170 | 8.6s |  |
+| 720 | `string_split` | 29 | 7.5s |  |
+| 721 | `string_substr_negative` | 21 | 7.3s |  |
+| 722 | `string_substr_weird` | 182 | 7.3s |  |
+| 723 | `subtract` | 1058 | 19.9s |  |
+| 724 | `super_get_call` | 12 | 7.4s |  |
+| 725 | `supercall_two_classobjects` | 2 | 7.4s |  |
+| 726 | `swf8` | 1 | 7.3s |  |
+| 727 | `swf_10_queued_goto_scripts_construct` | 52 | 7.7s |  |
+| 728 | `swf_9_goto_in_enter_frame` | 17 | 7.5s |  |
+| 729 | `swf_9_goto_in_enter_frame_simple` | 15 | 7.5s |  |
 | 730 | `swf_9_queued_goto_scripts` | 6 | 7.4s |  |
-| 731 | `swf_9_queued_goto_scripts_construct` | 28 | 1.4s |  |
+| 731 | `swf_9_queued_goto_scripts_construct` | 28 | 1.3s |  |
 | 732 | `swf_9_versioning` | 2 | 7.3s |  |
 | 733 | `swf_wrong_frame_count` | 38 | 7.7s |  |
-| 734 | `swf_wrong_frame_count_isplaying` | 22 | 26.0s |  |
-| 735 | `symbol_class_binary_data` | 8 | 7.3s |  |
-| 736 | `symbol_class_root_not_zero` | 1 | 7.2s |  |
-| 737 | `symbolclass_invalid_utf8` | 2 | 7.3s |  |
-| 738 | `tab_ordering_arrows` | 998 | 27.6s |  |
-| 739 | `tab_ordering_automatic_advanced` | 184 | 8.2s |  |
-| 740 | `tab_ordering_automatic_basic` | 45 | 7.4s |  |
+| 734 | `swf_wrong_frame_count_isplaying` | 22 | 26.6s |  |
+| 735 | `symbol_class_binary_data` | 8 | 7.4s |  |
+| 736 | `symbol_class_root_not_zero` | 1 | 7.3s |  |
+| 737 | `symbolclass_invalid_utf8` | 2 | 7.5s |  |
+| 738 | `tab_ordering_arrows` | 998 | 28.9s |  |
+| 739 | `tab_ordering_automatic_advanced` | 184 | 8.3s |  |
+| 740 | `tab_ordering_automatic_basic` | 45 | 7.6s |  |
 | 741 | `tab_ordering_children` | 116 | 19.8s |  |
 | 742 | `tab_ordering_custom_basic` | 34 | 7.5s |  |
 | 743 | `tab_ordering_stage_tab_children` | 32 | 7.5s |  |

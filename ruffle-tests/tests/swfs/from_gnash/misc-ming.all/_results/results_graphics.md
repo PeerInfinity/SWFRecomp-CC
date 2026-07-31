@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 27m 49s
+**Run Duration**: 27m 51s
 
 ## Summary
 
@@ -88,8 +88,8 @@
 | 55 | `opcode_guard_test` | 18 | 22.1s |  |
 | 56 | `place_and_remove_object_insane_test` | 22 | 21.9s |  |
 | 57 | `place_and_remove_object_test` | 13 | 21.5s |  |
-| 58 | `register_class/RegisterClassTest3` | 12 | 22.1s |  |
-| 59 | `register_class/registerClassTest` | 51 | 24.5s |  |
+| 58 | `register_class/RegisterClassTest3` | 12 | 23.0s |  |
+| 59 | `register_class/registerClassTest` | 51 | 25.3s |  |
 | 60 | `replace_shapes1test` | 23 | 3.1s |  |
 | 61 | `replace_sprites1test` | 21 | 0.9s |  |
 | 62 | `reverse_execute_PlaceObject2_test1` | 8 | 0.9s |  |

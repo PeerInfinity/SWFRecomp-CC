@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 59m 9s
+**Run Duration**: 59m 15s
 
 **Filtered**: 41 tests ignored out of 718 available
 
@@ -585,25 +585,25 @@
 | 550 | `tab_ordering_events` | 150 | 2.7s | [92](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PLAN.md) |
 | 551 | `tab_ordering_events_mouse` | 65 | 2.5s | [92](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PLAN.md) |
 | 552 | `tab_ordering_movieclip_enabled_default` | 462 | 2.3s | [92](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PLAN.md) |
-| 553 | `tab_ordering_properties` | 293 | 3.6s | [93](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PROPERTIES_PLAN.md) |
+| 553 | `tab_ordering_properties` | 293 | 8.9s | [93](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PROPERTIES_PLAN.md) |
 | 554 | `tab_ordering_reverse` | 51 | 2.3s | [92](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PLAN.md) |
 | 555 | `tab_ordering_tabbable` | 47 | 2.5s | [92](ruffle-tests/tests/swfs/avm1/_investigation/complete/TAB_ORDERING_PLAN.md) |
 | 556 | `target_clip_removed` | 5 | 2.3s | [79](ruffle-tests/tests/swfs/avm1/_investigation/complete/SCRIPT_HALTING_PLAN.md) [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
 | 557 | `target_clip_swf5` | 2 | 2.1s | [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
 | 558 | `target_clip_swf6` | 2 | 1.8s | [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
 | 559 | `target_path` | 14 | 2.2s |  |
-| 560 | `target_paths/swf4` | 818 | 22.5s |  |
+| 560 | `target_paths/swf4` | 818 | 23.9s |  |
 | 561 | `tell_target` | 34 | 2.4s | [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
-| 562 | `tell_target_invalid` | 5 | 21.0s | [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
-| 563 | `tell_target_invalid_swf6` | 4 | 1.1s | [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
+| 562 | `tell_target_invalid` | 5 | 21.6s | [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
+| 563 | `tell_target_invalid_swf6` | 4 | 1.0s | [94](ruffle-tests/tests/swfs/avm1/_investigation/complete/TELLTARGET_PLAN.md) |
 | 564 | `text_blocks_clicks` | 4 | 2.2s | [47](ruffle-tests/tests/swfs/avm1/_investigation/blocked/HIT_TESTING_PLAN.md) |
 | 565 | `text_format` | 1146 | 2.3s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
 | 566 | `text_format_display` | 21 | 2.0s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
 | 567 | `text_format_font_max_length` | 2 | 2.0s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
-| 568 | `text_format_get_text_extent_undefined_width` | 10 | 2.1s |  |
+| 568 | `text_format_get_text_extent_undefined_width` | 10 | 2.0s |  |
 | 569 | `text_format_rounding_swf7` | 840 | 2.1s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
 | 570 | `text_format_rounding_swf8` | 840 | 1.9s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
-| 571 | `textfield_background_color` | 11 | 2.2s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
+| 571 | `textfield_background_color` | 11 | 2.1s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
 | 572 | `textfield_border_color` | 11 | 2.1s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
 | 573 | `textfield_cache_as_bitmap` | 1 | 7.5s | [6](ruffle-tests/tests/swfs/avm1/_investigation/complete/BITMAP_DATA_PLAN.md) [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
 | 574 | `textfield_maxchars` | 3 | 2.2s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
@@ -700,8 +700,8 @@
 | 5 | `load_cancel_via_unloadclip` | 2 | 2 | 2.0s |  |
 | 6 | `load_cancel_via_unloadmovie` | 3 | 3 | 1.9s |  |
 | 7 | `swf4_vars` | 3 | 4 | 2.0s |  |
-| 8 | `target_paths/swf5` | 654 | 654 | 1.1s |  |
-| 9 | `target_paths/swf6` | 654 | 654 | 1.1s |  |
+| 8 | `target_paths/swf5` | 654 | 654 | 1.0s |  |
+| 9 | `target_paths/swf6` | 654 | 654 | 1.0s |  |
 | 10 | `textfield_props_swf5` | 2 | 103 | 2.3s | [95](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTFIELD_PLAN.md) |
 | 11 | `virtual_property_recursion_swf6` | 3 | 261 | 0.8s |  |
 | 12 | `watch_recursion_double_swf6` | 42 | 3109 | 2.0s |  |

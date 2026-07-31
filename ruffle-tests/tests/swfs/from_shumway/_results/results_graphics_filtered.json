@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-31T23:03:09.741426+00:00",
+    "timestamp": "2026-07-31T23:26:31.633176+00:00",
     "git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
-    "duration_seconds": 2610.77,
+    "duration_seconds": 2612.96,
     "total_available": 229,
     "shards": 30,
     "expected_shards": 30,
@@ -3451,7 +3451,7 @@
       "test": "targetPath1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.822,
+        "compile": 1.808,
         "run": 0.215
       },
       "num_frames": 1,
@@ -3460,14 +3460,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 2.04,
+      "duration": 2.03,
       "status": "pass"
     },
     {
       "test": "timeline/Timeline3",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.014,
+        "compile": 26.992,
         "run": 0.265
       },
       "num_frames": 20,
@@ -3476,7 +3476,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 26.34,
+      "duration": 27.31,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3494,7 +3494,7 @@
       "test": "timeline/Timeline4",
       "phases": {
         "recomp": 0.007,
-        "compile": 25.894,
+        "compile": 26.916,
         "run": 0.215
       },
       "num_frames": 10,
@@ -3503,7 +3503,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 26.2,
+      "duration": 27.21,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3521,8 +3521,8 @@
       "test": "timeline/Timeline8",
       "phases": {
         "recomp": 0.007,
-        "compile": 7.292,
-        "run": 0.315
+        "compile": 7.332,
+        "run": 0.265
       },
       "num_frames": 13,
       "lines": {
@@ -3530,15 +3530,15 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 7.62,
+      "duration": 7.61,
       "status": "pass"
     },
     {
       "test": "timeline/Timeline9",
       "phases": {
         "recomp": 0.007,
-        "compile": 7.284,
-        "run": 0.316
+        "compile": 7.403,
+        "run": 0.315
       },
       "num_frames": 32,
       "lines": {
@@ -3546,14 +3546,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 7.62,
+      "duration": 7.74,
       "status": "pass"
     },
     {
       "test": "timeline/events/timeline_events_fp10",
       "phases": {
         "recomp": 0.011,
-        "compile": 7.573,
+        "compile": 7.667,
         "run": 0.265
       },
       "num_frames": 4,
@@ -3562,7 +3562,7 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 7.86,
+      "duration": 7.95,
       "status": "pass"
     },
     {

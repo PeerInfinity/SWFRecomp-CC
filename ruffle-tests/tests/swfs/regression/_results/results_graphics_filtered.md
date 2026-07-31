@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-31 23:03 UTC
+**Date**: 2026-07-31 23:26 UTC
 
 **Git SHA**: `569a215e41`
 
-**Run Duration**: 12m 1s
+**Run Duration**: 12m 2s
 
 **Filtered**: 0 tests ignored out of 70 available
 
@@ -85,8 +85,8 @@
 | 58 | `root_enterframe_cross_swf_version` | 3 | 21.1s |  |
 | 59 | `sort_comparator_captured_scope` | 2 | 20.8s |  |
 | 60 | `sort_comparator_type1_args` | 5 | 1.9s |  |
-| 61 | `string_prim_method_type1_args` | 19 | 2.0s |  |
-| 62 | `timer_cross_swf_version` | 3 | 20.8s |  |
+| 61 | `string_prim_method_type1_args` | 19 | 1.9s |  |
+| 62 | `timer_cross_swf_version` | 3 | 21.3s |  |
 | 63 | `timer_type1_args` | 14 | 21.6s |  |
 | 64 | `watch_cross_swf_version` | 6 | 21.7s |  |
 | 65 | `watch_mc_reentrant_setmember` | 3 | 0.8s |  |

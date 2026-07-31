@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-31T20:48:45.201507+00:00",
-    "old_git_sha": "16343c6e1b7a93f90e3534862e55870425986aea",
-    "new_timestamp": "2026-07-31T23:03:09.712849+00:00",
+    "old_timestamp": "2026-07-31T23:03:09.712849+00:00",
+    "old_git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
+    "new_timestamp": "2026-07-31T23:26:31.602865+00:00",
     "new_git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 138,
+    "old_pass": 135,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 138,
-    "old_total": 143,
-    "old_pass_rate": 96.5,
-    "new_pass": 135,
+    "old_effective_pass": 135,
+    "old_total": 139,
+    "old_pass_rate": 97.1,
+    "new_pass": 138,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 135,
-    "new_total": 139,
-    "new_pass_rate": 97.1,
+    "new_effective_pass": 138,
+    "new_total": 143,
+    "new_pass_rate": 96.5,
     "old_mismatched_lines": 98,
     "new_mismatched_lines": 98,
     "increased_mismatches": 0,
@@ -29,54 +26,53 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 139,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 4
+    "added": 4,
+    "removed": 0
   },
   "changes": [
     {
       "test": "simple_shapes/gradients/reflect",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "simple_shapes/gradients/repeat",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "simple_shapes/heavy_tesselation",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "recomp_fail",
-      "new_status": null,
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "recomp_fail",
       "old_lines": null,
       "new_lines": null
     },
     {
       "test": "simple_shapes/layers",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     }
   ]
 }

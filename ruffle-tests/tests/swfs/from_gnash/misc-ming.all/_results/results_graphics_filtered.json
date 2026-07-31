@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-31T23:03:09.769688+00:00",
+    "timestamp": "2026-07-31T23:26:31.663150+00:00",
     "git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
-    "duration_seconds": 1669.04,
+    "duration_seconds": 1670.75,
     "total_available": 111,
     "shards": 30,
     "expected_shards": 30,
@@ -1841,8 +1841,8 @@
       "test": "register_class/RegisterClassTest3",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.778,
-        "run": 0.266
+        "compile": 22.71,
+        "run": 0.265
       },
       "num_frames": 30,
       "lines": {
@@ -1850,15 +1850,15 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 22.05,
+      "duration": 22.98,
       "status": "pass"
     },
     {
       "test": "register_class/registerClassTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.251,
-        "run": 0.265
+        "compile": 25.092,
+        "run": 0.215
       },
       "num_frames": 30,
       "lines": {
@@ -1866,7 +1866,7 @@
         "expected_lines": 51,
         "matching_lines": 51
       },
-      "duration": 24.52,
+      "duration": 25.32,
       "status": "pass"
     },
     {
