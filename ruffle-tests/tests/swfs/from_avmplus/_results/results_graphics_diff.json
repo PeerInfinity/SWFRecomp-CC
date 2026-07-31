@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-31T20:03:56.688394+00:00",
-    "old_git_sha": "b4d4457f16e24a406b3328e7f30b55c825c7dc47",
-    "new_timestamp": "2026-07-31T20:48:45.142625+00:00",
-    "new_git_sha": "16343c6e1b7a93f90e3534862e55870425986aea",
+    "old_timestamp": "2026-07-31T20:48:45.142625+00:00",
+    "old_git_sha": "16343c6e1b7a93f90e3534862e55870425986aea",
+    "new_timestamp": "2026-07-31T23:03:09.656508+00:00",
+    "new_git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,86 @@
     "old_effective_pass": 1541,
     "old_total": 1574,
     "old_pass_rate": 94.7,
-    "new_pass": 1490,
-    "new_ruffle_matched": 51,
-    "new_effective_pass": 1541,
+    "new_pass": 1493,
+    "new_ruffle_matched": 52,
+    "new_effective_pass": 1545,
     "new_total": 1574,
-    "new_pass_rate": 94.7,
+    "new_pass_rate": 94.9,
     "old_mismatched_lines": 696,
-    "new_mismatched_lines": 696,
+    "new_mismatched_lines": 655,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 41,
+    "newly_passing": 4,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 1574,
+    "status_changed": 4,
+    "unchanged": 1570,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "as3/Definitions/Super/SuperInForLoop",
+      "change_type": "changed",
+      "old_status": "runtime_error",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 16,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 16
+      }
+    },
+    {
+      "test": "as3/Definitions/Super/SuperProps",
+      "change_type": "changed",
+      "old_status": "runtime_error",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 21,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      }
+    },
+    {
+      "test": "e4x/Regress/regress-524214",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 11,
+        "expected_lines": 3,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "misc/bug_508617",
+      "change_type": "changed",
+      "old_status": "runtime_error",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 5,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 2
+      }
+    }
+  ]
 }
