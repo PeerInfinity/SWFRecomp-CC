@@ -1030,6 +1030,67 @@ static const E4XNamespace* anc_find_uri(const AncNs* anc, const Avm2String* uri)
 	return NULL;
 }
 
+// Same lookup, OUTERMOST frame first. ECMA-357 13.3.5.4 [[GetNamespace]] step
+// 2 lets an implementation pick arbitrarily when several in-scope namespaces
+// share the uri; avmplus picks the ANCESTOR one (e4x/XML/e13_4_4_36 row 7:
+// abc->zzz.com on <a>, def->zzz.com on <b> serializes as
+// <abc:b xmlns:def="http://www.zzz.com">). Only the NAME->prefix resolution
+// uses this; avm2_e4x_in_scope_namespaces must stay inner-first, since that
+// order is what lets an inner prefix SHADOW an outer one (row 6).
+static const E4XNamespace* anc_find_uri_outer(const AncNs* anc, const Avm2String* uri)
+{
+	if (anc == NULL) return NULL;
+	const E4XNamespace* r = anc_find_uri_outer(anc->prev, uri);
+	if (r != NULL) return r;
+	for (uint32_t i = 0; i < anc->count; i++)
+	{
+		if (str_eq(anc->list[i].uri, uri)) return &anc->list[i];
+	}
+	return NULL;
+}
+
+// Is `p` bound as a prefix anywhere in the chain? A NULL prefix and a
+// zero-length prefix are the same thing (both print as xmlns="...").
+static int anc_prefix_taken(const AncNs* anc, const char* p, uint32_t len)
+{
+	for (const AncNs* a = anc; a != NULL; a = a->prev)
+	{
+		for (uint32_t i = 0; i < a->count; i++)
+		{
+			const Avm2String* q = a->list[i].prefix;
+			uint32_t qlen = (q == NULL) ? 0 : q->len;
+			if (qlen != len) continue;
+			if (len == 0 || memcmp(q->utf8, p, len) == 0) return 1;
+		}
+	}
+	return 0;
+}
+
+// ECMA-357 10.2.1 step 11: a namespace whose prefix is UNDEFINED gets an
+// "arbitrary implementation defined" prefix at serialization time, chosen so
+// that it collides with nothing in (AncestorNamespaces u namespaceDeclarations).
+// avmplus takes the EMPTY prefix when it is free (so the decl prints as
+// xmlns="...") and "aaa" otherwise — e4x/XML/e13_4_4_36 rows 4/5 pin exactly
+// that, and Rhino's own comment in the same test says it mints "ns" instead,
+// i.e. this is genuinely implementation-defined and must be matched to avmplus.
+// Returning NULL for the empty case (rather than an interned "") keeps
+// anc_contains_exact's NULL-vs-"" distinction untouched for descendants.
+// Only the FIRST mint is observable anywhere in the corpus; the aaa -> aab ->
+// ... odometer is an extrapolation from that single datapoint.
+static const Avm2String* mint_prefix(Avm2Context* ctx, const AncNs* here)
+{
+	if (!anc_prefix_taken(here, "", 0)) return NULL;
+	char buf[4] = { 'a', 'a', 'a', '\0' };
+	for (;;)
+	{
+		if (!anc_prefix_taken(here, buf, 3)) return avm2_string_new(ctx, buf, 3);
+		int k = 2;
+		while (k >= 0 && buf[k] == 'z') { buf[k] = 'a'; k--; }
+		if (k < 0) return avm2_string_new(ctx, "aaa", 3);
+		buf[k]++;
+	}
+}
+
 static int anc_contains_exact(const AncNs* anc, const E4XNamespace* ns)
 {
 	for (const AncNs* a = anc; a != NULL; a = a->prev)
@@ -1101,7 +1162,9 @@ static void to_xml_string_inner(Avm2Context* ctx, const E4XNode* node, Buf* b,
 	AncNs here = { decls, decl_count, ancestors };
 	if (node->has_ns && anc_find_uri(&here, node->ns.uri) == NULL && decl_count < 64)
 	{
-		decls[decl_count++] = node->ns;
+		E4XNamespace d = node->ns;
+		if (str_is_empty(d.prefix) && d.uri->len > 0) d.prefix = mint_prefix(ctx, &here);
+		decls[decl_count++] = d;
 		here.count = decl_count;
 	}
 	for (uint32_t i = 0; i < node->attr_count; i++)
@@ -1109,7 +1172,9 @@ static void to_xml_string_inner(Avm2Context* ctx, const E4XNode* node, Buf* b,
 		const E4XNode* a = node->attributes[i];
 		if (a->has_ns && anc_find_uri(&here, a->ns.uri) == NULL && decl_count < 64)
 		{
-			decls[decl_count++] = a->ns;
+			E4XNamespace d = a->ns;
+			if (str_is_empty(d.prefix) && d.uri->len > 0) d.prefix = mint_prefix(ctx, &here);
+			decls[decl_count++] = d;
 			here.count = decl_count;
 		}
 	}
@@ -1117,7 +1182,7 @@ static void to_xml_string_inner(Avm2Context* ctx, const E4XNode* node, Buf* b,
 	// Prefix lookup: non-empty prefix of the namespace covering a uri.
 	#define PREFIX_OF(nsvar, out_prefix) \
 		do { \
-			const E4XNamespace* _f = anc_find_uri(&here, (nsvar).uri); \
+			const E4XNamespace* _f = anc_find_uri_outer(&here, (nsvar).uri); \
 			out_prefix = (_f != NULL && _f->prefix != NULL && _f->prefix->len > 0) \
 			                 ? _f->prefix : NULL; \
 		} while (0)
@@ -1196,7 +1261,7 @@ static void to_xml_string_inner(Avm2Context* ctx, const E4XNode* node, Buf* b,
 	buf_lit(b, "</");
 	if (node->has_ns)
 	{
-		const E4XNamespace* f = anc_find_uri(&here, node->ns.uri);
+		const E4XNamespace* f = anc_find_uri_outer(&here, node->ns.uri);
 		if (f != NULL && f->prefix != NULL && f->prefix->len > 0)
 		{
 			buf_str(b, f->prefix);

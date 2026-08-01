@@ -273,7 +273,8 @@ static double f64_powi(double a, int32_t b)
 	return recip ? 1.0 / r : r;
 }
 
-bool avm2_string_to_f64(const char* s, uint32_t len, bool strict, double* out_d)
+bool avm2_string_to_f64(Avm2Context* ctx, const char* s, uint32_t len, bool strict,
+                        double* out_d)
 {
 	const char* p = s;
 	const char* end = s + len;
@@ -338,8 +339,16 @@ bool avm2_string_to_f64(const char* s, uint32_t len, bool strict, double* out_d)
 
 	if (strict && p < end && *p != '\0') return false;
 
-	// Accumulate over the consumed span only (SWF >= 11 semantics).
-	const char* span_end = p;
+	// Bug compatibility (Ruffle value.rs string_to_f64, bugzilla 513018): SWF
+	// >= 11 accumulates over the SCANNED prefix only, but SWF <= 10 re-walks
+	// the WHOLE remainder, so a SECOND '.' RESETS the fractional-digit count
+	// instead of ending the number — parseFloat("1.2345.678") is 12345.678 and
+	// parseFloat("1.2345.6e50") is 12345.6 (avm2/parse_float_swf10). Both
+	// accumulator arms below break on the first byte that is neither a digit
+	// nor '.', exactly like Ruffle's two loops, so this one line covers both.
+	// Inert on the `strict` path: strict already rejected trailing garbage
+	// above, so p == end there.
+	const char* span_end = (ctx == NULL || ctx->swf_version >= 11) ? p : end;
 
 	double result = 0.0;
 	int decimal_digits = -1;
@@ -613,7 +622,7 @@ double avm2_coerce_to_number(Avm2Context* ctx, Avm2Value v)
 		case AVM2_VALUE_STRING:
 		{
 			double d;
-			if (avm2_string_to_f64(v.u.str->utf8, v.u.str->len, true, &d))
+			if (avm2_string_to_f64(ctx, v.u.str->utf8, v.u.str->len, true, &d))
 			{
 				return d;
 			}

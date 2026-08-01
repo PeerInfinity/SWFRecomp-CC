@@ -1842,6 +1842,21 @@ static int determine_next_frame(const Avm2DisplayObjectExt* ext)
 	return NEXT_FRAME_FIRST;
 }
 
+// One depth's slot in Ruffle's per-depth QueuedTagList
+// (core/src/display_object/movie_clip.rs:4845-4905):
+//
+//   enum QueuedTagList { None, Add(t), Remove(t), RemoveThenAdd(t, t) }
+//
+// encoded here as (remove_op, add_op) op indices, -1 = absent. `add_idx` is
+// where the Add landed in ext->queued_places, so a later Remove can VOID it.
+typedef struct Avm2QueuedDepth
+{
+	int32_t depth;
+	int32_t remove_op;
+	int32_t add_op;
+	int32_t add_idx;
+} Avm2QueuedDepth;
+
 // run_frame_internal (AS3 arm): queue place ops, run removals, advance.
 static void run_frame_internal(Avm2Context* ctx, Avm2Object* obj, int run_display)
 {
@@ -1870,8 +1885,14 @@ static void run_frame_internal(Avm2Context* ctx, Avm2Object* obj, int run_displa
 
 	if (run_display)
 	{
-		// Queue placements (executed after this returns, still Enter
-		// phase); run removals NOW (before the frame number advances).
+		// Ruffle's per-depth QueuedTagList. BOTH place and remove tags are
+		// QUEUED: a Remove ANNIHILATES an earlier queued Add at the same depth
+		// (Add -> queue_remove -> None), so a place/remove/place run inside ONE
+		// frame ends at the LAST place with no removal fired at all
+		// (issue_8630_placeremoveplace). Removals still drain before the frame
+		// number advances ("we deliberately run all removals before the frame
+		// number or tag position updates"); placements drain later, in
+		// flush_queued_places.
 		ext->queued_place_count = 0;
 		uint32_t nplaces = 0;
 		for (uint32_t i = op_start; i < op_end; i++)
@@ -1882,36 +1903,83 @@ static void run_frame_internal(Avm2Context* ctx, Avm2Object* obj, int run_displa
 		{
 			ext->queued_places = avm2_alloc(ctx, nplaces * sizeof(int32_t));
 		}
+		Avm2QueuedDepth* qd = NULL;
+		uint32_t qd_count = 0;
+		if (op_end > op_start)
+		{
+			qd = avm2_alloc(ctx, (op_end - op_start) * sizeof(Avm2QueuedDepth));
+		}
 		for (uint32_t i = op_start; i < op_end; i++)
 		{
 			const Avm2TimelineOp* op = &tl->ops[i];
+			if (op->kind != AVM2_TLOP_PLACE && op->kind != AVM2_TLOP_REMOVE) continue;
+			Avm2QueuedDepth* s = NULL;
+			for (uint32_t k = 0; k < qd_count; k++)
+			{
+				if (qd[k].depth == (int32_t) op->depth) { s = &qd[k]; break; }
+			}
+			if (s == NULL)
+			{
+				s = &qd[qd_count++];
+				s->depth = (int32_t) op->depth;
+				s->remove_op = -1;
+				s->add_op = -1;
+				s->add_idx = -1;
+			}
 			if (op->kind == AVM2_TLOP_PLACE)
 			{
-				// QueuedTagList: one queued Add per depth — the FIRST wins
-				// (place_object_same_depth_frame).
-				int dup = 0;
-				for (uint32_t k = 0; k < ext->queued_place_count; k++)
+				if ((op->flags & AVM2_TLF_HAS_CHAR) == 0)
 				{
-					const Avm2TimelineOp* q = &tl->ops[ext->queued_places[k]];
-					if (q->depth == op->depth && (op->flags & AVM2_TLF_HAS_CHAR)
-					    && (q->flags & AVM2_TLF_HAS_CHAR))
-					{
-						fprintf(stderr, "AVM2 timeline: failed to queue place at "
-						        "depth %u (already queued)\n", op->depth);
-						dup = 1;
-						break;
-					}
-				}
-				if (!dup)
-				{
+					// A modify-only place tag is not an Add: it neither
+					// displaces a queued Add nor is cancelled by a Remove.
 					ext->queued_places[ext->queued_place_count++] = (int32_t) i;
+					continue;
 				}
+				if (s->add_op >= 0 && s->remove_op < 0)
+				{
+					// Add -> queue_add: the FIRST wins, with a warning
+					// (place_object_same_depth_frame).
+					fprintf(stderr, "AVM2 timeline: failed to queue place at "
+					        "depth %u (already queued)\n", op->depth);
+					continue;
+				}
+				if (s->add_op >= 0)
+				{
+					// RemoveThenAdd -> queue_add: the LAST wins, silently.
+					ext->queued_places[s->add_idx] = -1;
+				}
+				s->add_op = (int32_t) i;
+				s->add_idx = (int32_t) ext->queued_place_count;
+				ext->queued_places[ext->queued_place_count++] = (int32_t) i;
 			}
-			else if (op->kind == AVM2_TLOP_REMOVE)
+			else
 			{
-				run_remove_op(ctx, obj, op);
+				if (s->add_op >= 0)
+				{
+					// Add -> None (annihilate), or RemoveThenAdd -> Remove(r),
+					// which keeps the FIRST remove. Either way the queued Add
+					// is dropped.
+					ext->queued_places[s->add_idx] = -1;
+					s->add_op = -1;
+					s->add_idx = -1;
+					continue;
+				}
+				// None/Remove -> Remove(new).
+				s->remove_op = (int32_t) i;
 			}
 		}
+		for (uint32_t i = op_start; i < op_end; i++)
+		{
+			for (uint32_t k = 0; k < qd_count; k++)
+			{
+				if (qd[k].remove_op == (int32_t) i)
+				{
+					run_remove_op(ctx, obj, &tl->ops[i]);
+					break;
+				}
+			}
+		}
+		if (qd != NULL) heap_free(ctx->app, qd);
 	}
 
 	ext->current_frame++;
@@ -1931,6 +1999,8 @@ static void flush_queued_places(Avm2Context* ctx, Avm2Object* obj)
 	ext->queued_place_count = 0;
 	for (uint32_t i = 0; i < n; i++)
 	{
+		// -1 = an Add that a later Remove at the same depth annihilated.
+		if (ext->queued_places[i] < 0) continue;
 		run_place_op(ctx, obj, &tl->ops[ext->queued_places[i]]);
 	}
 }

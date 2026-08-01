@@ -639,23 +639,29 @@ void avm2_register_string(Avm2Context* ctx)
 	cls->native_construct = string_construct;
 	cls->native_call = string_construct;
 
+	// `length` stays PUBLIC (avmplus has String::length in the public ns), but
+	// every instance METHOD is AS3-keyed, which is avmplus's shape: only the
+	// String.prototype copies below are public, so
+	// `new String("JScript").hasOwnProperty("split")` is false
+	// (from_avmplus ecma3/ObjectObjects/hasOwnProperty). Dispatch is
+	// unaffected — avm2_propkey_matches folds AS3 onto public both ways.
 	avm2_builtin_add_getter(ctx, cls, "length", string_get_length);
-	avm2_builtin_add_method(ctx, cls, "charAt", string_char_at);
-	avm2_builtin_add_method(ctx, cls, "charCodeAt", string_char_code_at);
-	avm2_builtin_add_method(ctx, cls, "concat", string_concat_method);
-	avm2_builtin_add_method(ctx, cls, "indexOf", string_index_of);
-	avm2_builtin_add_method(ctx, cls, "lastIndexOf", string_last_index_of);
-	avm2_builtin_add_method(ctx, cls, "localeCompare", string_locale_compare);
-	avm2_builtin_add_method(ctx, cls, "slice", string_slice);
-	avm2_builtin_add_method(ctx, cls, "split", avm2_string_split_plain);
-	avm2_builtin_add_method(ctx, cls, "substr", string_substr);
-	avm2_builtin_add_method(ctx, cls, "substring", string_substring);
-	avm2_builtin_add_method(ctx, cls, "toLowerCase", string_to_lower_case);
-	avm2_builtin_add_method(ctx, cls, "toLocaleLowerCase", string_to_lower_case);
-	avm2_builtin_add_method(ctx, cls, "toUpperCase", string_to_upper_case);
-	avm2_builtin_add_method(ctx, cls, "toLocaleUpperCase", string_to_upper_case);
-	avm2_builtin_add_method(ctx, cls, "toString", string_to_string);
-	avm2_builtin_add_method(ctx, cls, "valueOf", string_to_string);
+	avm2_builtin_add_method_as3(ctx, cls, "charAt", string_char_at);
+	avm2_builtin_add_method_as3(ctx, cls, "charCodeAt", string_char_code_at);
+	avm2_builtin_add_method_as3(ctx, cls, "concat", string_concat_method);
+	avm2_builtin_add_method_as3(ctx, cls, "indexOf", string_index_of);
+	avm2_builtin_add_method_as3(ctx, cls, "lastIndexOf", string_last_index_of);
+	avm2_builtin_add_method_as3(ctx, cls, "localeCompare", string_locale_compare);
+	avm2_builtin_add_method_as3(ctx, cls, "slice", string_slice);
+	avm2_builtin_add_method_as3(ctx, cls, "split", avm2_string_split_plain);
+	avm2_builtin_add_method_as3(ctx, cls, "substr", string_substr);
+	avm2_builtin_add_method_as3(ctx, cls, "substring", string_substring);
+	avm2_builtin_add_method_as3(ctx, cls, "toLowerCase", string_to_lower_case);
+	avm2_builtin_add_method_as3(ctx, cls, "toLocaleLowerCase", string_to_lower_case);
+	avm2_builtin_add_method_as3(ctx, cls, "toUpperCase", string_to_upper_case);
+	avm2_builtin_add_method_as3(ctx, cls, "toLocaleUpperCase", string_to_upper_case);
+	avm2_builtin_add_method_as3(ctx, cls, "toString", string_to_string);
+	avm2_builtin_add_method_as3(ctx, cls, "valueOf", string_to_string);
 	avm2_builtin_add_static_method(ctx, cls, "fromCharCode", string_from_char_code);
 
 	// ES3-compat layer: the same methods also live on String.prototype as

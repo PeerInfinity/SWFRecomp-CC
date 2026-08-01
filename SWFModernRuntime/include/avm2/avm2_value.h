@@ -99,8 +99,11 @@ uint32_t avm2_f64_to_wrapping_u32(double d);
 
 // String parsing (Ruffle value.rs string_to_int / string_to_f64).
 double avm2_string_to_int(const char* s, uint32_t len, int32_t radix, bool strict);
-// Returns false if unparseable (out_d untouched).
-bool avm2_string_to_f64(const char* s, uint32_t len, bool strict, double* out_d);
+// Returns false if unparseable (out_d untouched). `ctx` may be NULL; it is
+// read only for ctx->swf_version (the SWF <= 10 double-dot bug compatibility,
+// Ruffle value.rs / bugzilla 513018).
+bool avm2_string_to_f64(Avm2Context* ctx, const char* s, uint32_t len, bool strict,
+                        double* out_d);
 
 // AVM2 Number.toString() formatting (Ruffle value.rs coerce_to_string
 // Number arm: shortest round-trip decimal inside [1e-6, 1e21), otherwise

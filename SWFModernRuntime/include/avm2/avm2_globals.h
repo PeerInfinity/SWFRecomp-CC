@@ -135,6 +135,11 @@ void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
 // `Cls.prototype.method.length` resolves to.
 void avm2_builtin_add_method_n(Avm2Context* ctx, Avm2Class* cls, const char* name,
                                Avm2MethodFn fn, uint32_t param_count);
+// ...keyed in the AS3 builtin namespace instead of public (avmplus's shape for
+// a builtin class's INSTANCE methods; the public copies live on the
+// prototype). Invisible to dispatch, visible to hasOwnProperty.
+void avm2_builtin_add_method_as3(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                 Avm2MethodFn fn);
 void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn);
 // Instance accessor pair (setter may be NULL for a getter-only prop).

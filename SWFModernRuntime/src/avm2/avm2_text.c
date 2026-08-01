@@ -4390,7 +4390,7 @@ static double style_parse_float(Avm2Context* ctx, Avm2Value v)
 {
 	const Avm2String* s = avm2_coerce_to_string(ctx, v);
 	double d;
-	if (!avm2_string_to_f64(s->utf8, s->len, false, &d)) return 0.0 / 0.0;
+	if (!avm2_string_to_f64(ctx, s->utf8, s->len, false, &d)) return 0.0 / 0.0;
 	return d;
 }
 

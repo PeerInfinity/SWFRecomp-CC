@@ -402,6 +402,31 @@ void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	avm2_builtin_add_method_n(ctx, cls, name, fn, 0);
 }
 
+// Same, but keyed in the AS3 BUILTIN namespace rather than public. avmplus
+// puts a builtin class's instance methods there, with only the prototype
+// copies public — which is what makes
+// `new String("JScript").hasOwnProperty("split")` false
+// (from_avmplus ecma3/ObjectObjects/hasOwnProperty). Dispatch is unaffected:
+// avm2_propkey_matches folds AS3 <-> public in both directions, so a public
+// call site and an explicit AS3::name site both still resolve. The only
+// readers that see the difference are avm2_vtable_find_public's callers
+// (hasOwnProperty and the Flixel fingerprint gate).
+void avm2_builtin_add_method_as3(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                 Avm2MethodFn fn)
+{
+	Avm2PropEntry e;
+	memset(&e, 0, sizeof(e));
+	e.key = builtin_key("http://adobe.com/AS3/2006/builtin", name);
+	e.kind = AVM2_PROP_METHOD;
+	e.method.fn = fn;
+	e.method.file = NULL;
+	e.method.debug_name = name;
+	e.method.param_count = 0;
+	e.defining_class = cls;
+	e.method_scope = NULL;
+	avm2_vtable_append(ctx, &cls->ivtable, &e);
+}
+
 void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn)
 {
@@ -1049,7 +1074,7 @@ static Avm2Value global_parse_float(Avm2Activation* act)
 	if (act->argc == 0) return avm2_number(NAN);
 	const Avm2String* s = numeric_parse_arg(act);
 	double d;
-	if (avm2_string_to_f64(s->utf8, s->len, false, &d))
+	if (avm2_string_to_f64(ctx, s->utf8, s->len, false, &d))
 	{
 		return avm2_number(d);
 	}
