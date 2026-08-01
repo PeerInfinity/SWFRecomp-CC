@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-31T23:03:09.730134+00:00",
+    "timestamp": "2026-07-31T23:26:31.621248+00:00",
     "git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
-    "duration_seconds": 721.23,
+    "duration_seconds": 721.68,
     "total_available": 70,
     "shards": 30,
     "expected_shards": 30
@@ -1023,7 +1023,7 @@
       "test": "string_prim_method_type1_args",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.833,
+        "compile": 1.778,
         "run": 0.165
       },
       "num_frames": 1,
@@ -1032,14 +1032,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 2.01,
+      "duration": 1.95,
       "status": "pass"
     },
     {
       "test": "timer_cross_swf_version",
       "phases": {
         "recomp": 0.005,
-        "compile": 20.598,
+        "compile": 21.102,
         "run": 0.165
       },
       "num_frames": 5,
@@ -1048,7 +1048,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 20.77,
+      "duration": 21.28,
       "status": "pass"
     },
     {
