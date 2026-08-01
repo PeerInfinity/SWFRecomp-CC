@@ -7,8 +7,16 @@
 // stack/scope-depth check (max_stack / max_scope_depth validation) that
 // Ruffle leaves to avmplus semantics.
 //
-// The type-lattice optimizer (Ruffle's optimizer/) is deliberately NOT here;
-// that is a later stage per SWFRecompDocs/plans/avm2-support-plan.md §4.1.
+// A static operand TYPE pass runs after the depth pass (see the long comment
+// above runTypeLattice in abc_verifier.cpp): a linear walk with a four-value
+// lattice — Unknown / Any / Class(C) / ClassOf(C) — that resets everything to
+// Unknown at every branch, switch and exception target, and raises avmplus's
+// #1058 / #1051 / #1026 ONLY on affirmatively-known-wrong operands. Scoped in
+// SWFRecompDocs/plans/abc-verifier-type-lattice-arc.md. Ruffle's full
+// early-binding optimizer (optimizer/type_aware.rs) is still NOT here: this
+// pass raises errors, it never changes which object a name resolves to.
+
+#include <string>
 
 #include <abc/abc_ir.hpp>
 #include <abc/abc_parser.hpp>
@@ -28,5 +36,14 @@ namespace abc
 	// Verifies one method body and translates it to IR.
 	// Returns false and fills `err` on verification failure.
 	bool verifyMethodBody(const AbcFile& abc, u32 body_index, IrMethod& out, VerifyError& err);
+
+	// Drops the type pass's cached per-AbcFile AbcTypeModel. validateAbcFile
+	// already calls this; callers that verify bodies without validating first
+	// must call it themselves.
+	void resetVerifierTypeModel();
+
+	// Names the SWF in the SWF_VERIFY_TYPES=<csv> audit report's first column.
+	// No effect unless that env var is set.
+	void setVerifierSourceLabel(const std::string& label);
 }
 }

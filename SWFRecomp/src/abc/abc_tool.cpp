@@ -136,6 +136,9 @@ namespace abc
 	{
 		CheckResult result;
 
+		// Names this SWF in the SWF_VERIFY_TYPES audit CSV (no-op otherwise).
+		setVerifierSourceLabel(path);
+
 		Context context;
 		context.swf_path = path;
 		SWF swf(context);

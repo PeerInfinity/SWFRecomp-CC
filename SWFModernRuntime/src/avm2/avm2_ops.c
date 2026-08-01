@@ -2034,6 +2034,26 @@ static const Avm2PropEntry* find_slot_entry(const Avm2VTable* vt, uint32_t slot_
 	return NULL;
 }
 
+// A slot index past the object's slot array. The recompiler's static type
+// lattice catches this at verify time whenever it can prove the base's class
+// (abc_verifier.cpp, #1026), but the lattice is deliberately partial — it
+// defaults to "we don't know" and never throws on an uninferred operand — so
+// the op still has to handle the case. avmplus's own #1026 is a VerifyError,
+// and a VerifyError is catchable; making this a fatal killed the process
+// before any buffered trace output was flushed, losing the whole test.
+// Slot arrays carry an unused element 0, so the avmplus-visible slotCount is
+// one less than `slot_count`.
+_Noreturn static void throw_slot_out_of_range(Avm2Activation* act, Avm2Value objv,
+                                              const Avm2Object* obj, uint32_t slot)
+{
+	char cn[160];
+	class_name_of(act->ctx, objv, cn, sizeof(cn));
+	uint32_t declared = (obj != NULL && obj->slot_count > 0) ? obj->slot_count - 1 : 0;
+	avm2_throw_error(act->ctx, act->ctx->builtins.verify_error_class,
+	                 "Error #1026: Slot %u exceeds slotCount=%u of %s.",
+	                 slot, declared, cn);
+}
+
 Avm2Value avm2_op_getslot(Avm2Activation* act, Avm2Value objv, uint32_t index0)
 {
 	if (value_is_null_like(objv))
@@ -2044,8 +2064,7 @@ Avm2Value avm2_op_getslot(Avm2Activation* act, Avm2Value objv, uint32_t index0)
 	uint32_t slot = index0 + 1;  // IR is 0-based; slot arrays are 1-based
 	if (obj == NULL || slot >= obj->slot_count)
 	{
-		avm2_fatal("GetSlot %u out of range (slot_count %u)", slot,
-		           obj != NULL ? obj->slot_count : 0);
+		throw_slot_out_of_range(act, objv, obj, slot);
 	}
 	return obj->slots[slot];
 }
@@ -2061,8 +2080,7 @@ void avm2_op_setslot(Avm2Activation* act, Avm2Value objv, uint32_t index0, Avm2V
 	uint32_t slot = index0 + 1;
 	if (obj == NULL || slot >= obj->slot_count)
 	{
-		avm2_fatal("SetSlot %u out of range (slot_count %u)", slot,
-		           obj != NULL ? obj->slot_count : 0);
+		throw_slot_out_of_range(act, objv, obj, slot);
 	}
 	const Avm2PropEntry* e = find_slot_entry(obj->vtable, slot);
 	if (e != NULL && e->type_mn != 0 && e->type_file != NULL)

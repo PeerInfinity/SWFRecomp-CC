@@ -1,4 +1,5 @@
 #include <abc/abc_verifier.hpp>
+#include <abc/abc_typemodel.hpp>
 
 #include <cstdio>
 #include <unordered_set>
@@ -287,6 +288,12 @@ namespace abc
 
 	bool validateAbcFile(const AbcFile& abc, VerifyError& err)
 	{
+		// Both drivers call this exactly once per AbcFile, immediately before
+		// their per-body verify loop — the one place that can safely drop the
+		// type-lattice's cached AbcTypeModel (AbcFile is a stack local in both,
+		// so its ADDRESS is recycled between DoABC tags and is not an identity).
+		resetVerifierTypeModel();
+
 		const ConstantPool& pool = abc.pool;
 
 		for (size_t i = 1; i < pool.namespaces.size(); ++i)
@@ -1241,188 +1248,586 @@ namespace abc
 		return true;
 	}
 
-	// Per-op operand-stack effect on the resolved IR. `extra` multiname pops
-	// (lazy name/ns) are included. `scope_delta` covers pushscope/pushwith/
-	// popscope.
-	static void stackEffect(const IrOp& op, const AbcFile& abc,
-	                        u32& pops, u32& pushes, s32& scope_delta)
+	// =====================================================================
+	// Static operand TYPE lattice (SWFRecompDocs/plans/
+	// abc-verifier-type-lattice-arc.md). A second, read-only linear walk over
+	// the resolved IR that raises the four avmplus type errors the depth pass
+	// cannot see: #1058 (lookupswitch discriminant / RTQName namespace
+	// operand), #1051 (early-bound slot access through `*`) and #1026 (slot
+	// index past the class's slotCount).
+	//
+	// THE CONSERVATIVE DIRECTION IS THE WHOLE DESIGN. avmplus throws whenever
+	// an operand is "not provably typed", which is safe for avmplus only
+	// because its lattice models every op — for avmplus, "we didn't infer it"
+	// and "the program says `*`" are the same set. Ours models a few dozen ops
+	// out of ~160, so those two sets are wildly different, and conflating them
+	// would report a property of THIS FILE as a property of the program. A
+	// false positive here is not a wrong trace line: abc_emit.cpp lowers an
+	// unverified body to avm2_verify_error_body(), i.e. it DELETES the method.
+	//
+	// Hence: four values, `Unknown` NEVER throws, and we throw only on an
+	// affirmatively-known-wrong type.
+	//
+	//   Unknown  — our inference does not model this. Bottom for decisions.
+	//   Any      — affirmatively the `*` type (CoerceA of an AFFIRMATIVE input
+	//              only, so Unknown can never launder itself into a throw).
+	//   Class(C) — affirmatively an instance of C (an ABC instance index, or
+	//              one of ten builtin names resolved only when no ABC class
+	//              shadows the name).
+	//   ClassOf(C) — affirmatively the class OBJECT for C; exists purely so
+	//              `construct` can produce Class(C). Never throws.
+	//
+	// Merge rule: there isn't one. At every branch target, switch target and
+	// exception handler target the entire stack and all locals reset to
+	// Unknown — the same "join = unknown" bail abc_emit.cpp's shipping TK/TV
+	// coerce-elision lattice already uses. No fixpoint, no worklist re-entry,
+	// no termination argument, and it cannot be unsound in the throwing
+	// direction. It is also what makes this safe on real code: ASC's switch
+	// idiom lands its discriminant at a merge point, so all 641 corpus
+	// lookupswitch sites but one are Unknown, and 99.1% of getslot bases are
+	// GetScopeObject/GetGlobalScope, which we never type.
+	//
+	// SWF_VERIFY_TYPES=<csv> turns the whole pass report-only: every predicate
+	// hit is appended to the CSV and verification still SUCCEEDS. That is the
+	// Stage-0 audit harness — sweep the corpus, and any row naming a test
+	// other than the two this arc targets is a lattice bug to be fixed by
+	// weakening inference, never by an exception list.
+	// =====================================================================
+
+	// Builtin class names we resolve, and only ever on a public-namespace
+	// QName whose local name NO ABC class in this file declares.
+	enum LatBuiltin : u8
 	{
-		pops = 0;
-		pushes = 0;
-		scope_delta = 0;
+		LB_NONE = 0, LB_OBJECT, LB_INT, LB_UINT, LB_NUMBER, LB_STRING,
+		LB_BOOLEAN, LB_NAMESPACE, LB_FUNCTION, LB_ARRAY, LB_CLASS
+	};
 
-		u32 lazy = 0;
-		switch (op.op)
+	static const char* latBuiltinName(u8 b)
+	{
+		switch (b)
 		{
-			case IrOpcode::CallProperty:
-			case IrOpcode::CallPropLex:
-			case IrOpcode::CallPropVoid:
-			case IrOpcode::CallSuper:
-			case IrOpcode::ConstructProp:
-			case IrOpcode::GetPropertyStatic:
-			case IrOpcode::GetPropertyFast:
-			case IrOpcode::GetPropertySlow:
-			case IrOpcode::SetPropertyStatic:
-			case IrOpcode::SetPropertyFast:
-			case IrOpcode::SetPropertySlow:
-			case IrOpcode::InitProperty:
-			case IrOpcode::DeleteProperty:
-			case IrOpcode::GetSuper:
-			case IrOpcode::SetSuper:
-			case IrOpcode::GetDescendants:
-			case IrOpcode::FindProperty:
-			case IrOpcode::FindPropStrict:
-			case IrOpcode::FindDef:
+			case LB_OBJECT:    return "Object";
+			case LB_INT:       return "int";
+			case LB_UINT:      return "uint";
+			case LB_NUMBER:    return "Number";
+			case LB_STRING:    return "String";
+			case LB_BOOLEAN:   return "Boolean";
+			case LB_NAMESPACE: return "Namespace";
+			case LB_FUNCTION:  return "Function";
+			case LB_ARRAY:     return "Array";
+			case LB_CLASS:     return "Class";
+			default:           return "*";
+		}
+	}
+
+	static u8 latBuiltinOf(const string& n)
+	{
+		if (n == "Object")    return LB_OBJECT;
+		if (n == "int")       return LB_INT;
+		if (n == "uint")      return LB_UINT;
+		if (n == "Number")    return LB_NUMBER;
+		if (n == "String")    return LB_STRING;
+		if (n == "Boolean")   return LB_BOOLEAN;
+		if (n == "Namespace") return LB_NAMESPACE;
+		if (n == "Function")  return LB_FUNCTION;
+		if (n == "Array")     return LB_ARRAY;
+		if (n == "Class")     return LB_CLASS;
+		return LB_NONE;
+	}
+
+	enum class LatKind : u8 { Unknown = 0, Any, Class, ClassOf };
+
+	struct LatValue
+	{
+		LatKind k = LatKind::Unknown;
+		int inst = -1;    // ABC instance index, or -1 when `bi` names a builtin
+		u8 bi = LB_NONE;  // builtin id, or LB_NONE when `inst` is the class
+	};
+
+	static LatValue latClassInst(int inst)
+	{
+		LatValue v; v.k = LatKind::Class; v.inst = inst; return v;
+	}
+	static LatValue latClassBuiltin(u8 b)
+	{
+		LatValue v; v.k = LatKind::Class; v.bi = b; return v;
+	}
+	static LatValue latAny()
+	{
+		LatValue v; v.k = LatKind::Any; return v;
+	}
+
+	// Display name of an affirmative value, for the avmplus message operand.
+	static string latName(const AbcTypeModel& M, const LatValue& v)
+	{
+		if (v.k == LatKind::Any) return "*";
+		if (v.inst >= 0 && v.inst < (int) M.abc.instances.size())
+		{
+			string n = M.localName(M.abc.instances[v.inst].name);
+			return n.empty() ? "*" : n;
+		}
+		return latBuiltinName(v.bi);
+	}
+
+	// Resolve a TYPE multiname to the lattice. ABC classes win, and only when
+	// the local name is UNAMBIGUOUS across the file (nameCount == 1); a
+	// builtin resolves only when NO ABC class claims the name (nameCount == 0)
+	// and the multiname is a public-namespace QName — so a user class named
+	// `Namespace` resolves to neither the builtin nor (if it is one of several)
+	// itself. Anything else is Unknown.
+	static LatValue latResolveTypeMn(const AbcTypeModel& M, const AbcFile& abc, u32 mn)
+	{
+		if (mn == 0 || mn >= abc.pool.multinames.size()) return LatValue{};
+		string n = M.localName(mn);
+		if (n.empty()) return LatValue{};
+		auto it = M.nameCount.find(n);
+		int cnt = (it == M.nameCount.end()) ? 0 : it->second;
+		if (cnt > 1) return LatValue{};
+		if (cnt == 1)
+		{
+			int inst = M.typeMnToInst(mn);
+			return inst >= 0 ? latClassInst(inst) : LatValue{};
+		}
+		u8 b = latBuiltinOf(n);
+		if (b == LB_NONE) return LatValue{};
+		const AbcMultiname& m = abc.pool.multinames[mn];
+		u8 kind = (u8) m.kind;
+		if (kind != 0x07 && kind != 0x0d) return LatValue{};   // QName / QNameA
+		if (!AbcTypeModel::nsKeyPublic(M.nsKeyOf(m.ns))) return LatValue{};
+		return latClassBuiltin(b);
+	}
+
+	// Is this value affirmatively "a Namespace"? A user class that happens to
+	// be named Namespace counts as one for the purposes of NOT throwing: we
+	// cannot tell it apart from the builtin, so we decline to decide.
+	static bool latIsNamespace(const AbcTypeModel& M, const LatValue& v)
+	{
+		if (v.bi == LB_NAMESPACE) return true;
+		if (v.inst >= 0) return latName(M, v) == "Namespace";
+		return false;
+	}
+
+	// One predicate hit: everything the Stage-0 CSV and the armed failure both
+	// need.
+	struct LatHit
+	{
+		u32 op_index = 0;
+		int code = 0;
+		string message;    // avmplus wording, verbatim, for the thrown error
+		string detail;     // our diagnostic wording, stderr only
+		string inferred;   // the inferred operand type, for the CSV
+	};
+
+	// Per-AbcFile AbcTypeModel cache. Building the model is O(classes*traits);
+	// a large SWF has ~96k bodies, so it must not be rebuilt per body. The
+	// cache is invalidated by validateAbcFile(), which BOTH drivers (swf.cpp
+	// and abc_tool.cpp) call exactly once per AbcFile immediately before their
+	// body loop — so a recycled stack address can never serve a stale model.
+	static const AbcFile* g_lat_model_abc = nullptr;
+	static AbcTypeModel* g_lat_model = nullptr;
+
+	void resetVerifierTypeModel()
+	{
+		delete g_lat_model;
+		g_lat_model = nullptr;
+		g_lat_model_abc = nullptr;
+	}
+
+	static const AbcTypeModel& latModelFor(const AbcFile& abc)
+	{
+		if (g_lat_model == nullptr || g_lat_model_abc != &abc)
+		{
+			delete g_lat_model;
+			g_lat_model = new AbcTypeModel(abc);
+			g_lat_model_abc = &abc;
+		}
+		return *g_lat_model;
+	}
+
+	// Does this body contain any op a predicate could fire on? Building the
+	// type model and running the walk is pure waste otherwise, and the vast
+	// majority of bodies qualify for the skip.
+	static bool latBodyHasCandidate(const AbcFile& abc, const IrMethod& out)
+	{
+		for (const IrOp& op : out.ops)
+		{
+			switch (op.op)
 			{
-				const AbcMultiname& mn = abc.pool.multinames[op.arg1];
-				lazy = (mn.hasLazyName() ? 1 : 0) + (mn.hasLazyNs() ? 1 : 0);
-				break;
+				case IrOpcode::LookupSwitch:
+				case IrOpcode::GetSlot:
+				case IrOpcode::SetSlot:
+					return true;
+				case IrOpcode::CallProperty: case IrOpcode::CallPropLex:
+				case IrOpcode::CallPropVoid: case IrOpcode::CallSuper:
+				case IrOpcode::ConstructProp:
+				case IrOpcode::GetPropertyStatic: case IrOpcode::GetPropertyFast:
+				case IrOpcode::GetPropertySlow:
+				case IrOpcode::SetPropertyStatic: case IrOpcode::SetPropertyFast:
+				case IrOpcode::SetPropertySlow:
+				case IrOpcode::InitProperty: case IrOpcode::DeleteProperty:
+				case IrOpcode::GetSuper: case IrOpcode::SetSuper:
+				case IrOpcode::GetDescendants:
+				case IrOpcode::FindProperty: case IrOpcode::FindPropStrict:
+				case IrOpcode::FindDef:
+				{
+					if (op.arg1 < abc.pool.multinames.size()
+					    && abc.pool.multinames[op.arg1].hasLazyNs())
+					{
+						return true;
+					}
+					break;
+				}
+				default: break;
 			}
-			default: break;
+		}
+		return false;
+	}
+
+	// The linear walk. `stack_at` is the depth pass's per-op result: negative
+	// means unreachable, otherwise the (unique, already-agreed) operand depth
+	// on entry. Read-only over `out`; appends every hit, lowest op index
+	// first.
+	static void runTypeLattice(const AbcFile& abc, const AbcTypeModel& M,
+	                           const AbcMethodBody& body, const IrMethod& out,
+	                           const std::vector<s32>& stack_at,
+	                           std::vector<LatHit>& hits)
+	{
+		const size_t n = out.ops.size();
+		if (n == 0) return;
+
+		// Every op whose incoming state must be discarded: op 0, every branch
+		// / switch / exception-handler target, and every op that does not
+		// physically follow its predecessor in the flow.
+		std::vector<char> reset(n, 0);
+		reset[0] = 1;
+		for (size_t i = 0; i < n; i++)
+		{
+			const IrOp& op = out.ops[i];
+			bool terminator = false;
+			switch (op.op)
+			{
+				case IrOpcode::Jump:
+					if (op.target < n) reset[op.target] = 1;
+					terminator = true;
+					break;
+				case IrOpcode::IfTrue:
+				case IrOpcode::IfFalse:
+					if (op.target < n) reset[op.target] = 1;
+					break;
+				case IrOpcode::LookupSwitch:
+					if (op.target < n) reset[op.target] = 1;
+					for (u32 t : op.switch_targets)
+					{
+						if (t < n) reset[t] = 1;
+					}
+					terminator = true;
+					break;
+				case IrOpcode::ReturnValue:
+				case IrOpcode::ReturnVoid:
+				case IrOpcode::Throw:
+					terminator = true;
+					break;
+				default: break;
+			}
+			if (terminator && i + 1 < n) reset[i + 1] = 1;
+		}
+		for (const IrException& e : out.exceptions)
+		{
+			if (e.active && e.target_op < n) reset[e.target_op] = 1;
 		}
 
-		switch (op.op)
+		std::vector<LatValue> locals(body.num_locals);
+		std::vector<LatValue> stk;
+		bool broken = true;   // forces a reset at the first modelled op
+
+		for (size_t i = 0; i < n; i++)
 		{
-			// pop 2, push 1
-			case IrOpcode::Add: case IrOpcode::AddI:
-			case IrOpcode::Subtract: case IrOpcode::SubtractI:
-			case IrOpcode::Multiply: case IrOpcode::MultiplyI:
-			case IrOpcode::Divide: case IrOpcode::Modulo:
-			case IrOpcode::LShift: case IrOpcode::RShift: case IrOpcode::URShift:
-			case IrOpcode::BitAnd: case IrOpcode::BitOr: case IrOpcode::BitXor:
-			case IrOpcode::Equals: case IrOpcode::StrictEquals:
-			case IrOpcode::LessThan: case IrOpcode::LessEquals:
-			case IrOpcode::GreaterThan: case IrOpcode::GreaterEquals:
-			case IrOpcode::In: case IrOpcode::InstanceOf:
-			case IrOpcode::IsTypeLate: case IrOpcode::AsTypeLate:
-			case IrOpcode::HasNext:
-			case IrOpcode::NextName: case IrOpcode::NextValue:
+			if (stack_at[i] < 0)
 			{
-				pops = 2; pushes = 1;
-				break;
+				broken = true;   // unreachable: the next op does not follow us
+				continue;
+			}
+			if (broken || reset[i] || (s32) stk.size() != stack_at[i])
+			{
+				stk.assign((size_t) stack_at[i], LatValue{});
+				std::fill(locals.begin(), locals.end(), LatValue{});
+				broken = false;
 			}
 
-			// pop 1, push 1
-			case IrOpcode::Negate: case IrOpcode::NegateI:
-			case IrOpcode::BitNot: case IrOpcode::Not:
-			case IrOpcode::Increment: case IrOpcode::IncrementI:
-			case IrOpcode::Decrement: case IrOpcode::DecrementI:
-			case IrOpcode::TypeOf:
-			case IrOpcode::ConvertO: case IrOpcode::ConvertS:
-			case IrOpcode::CoerceA: case IrOpcode::CoerceB: case IrOpcode::CoerceD:
-			case IrOpcode::CoerceI: case IrOpcode::CoerceO: case IrOpcode::CoerceS:
-			case IrOpcode::CoerceU: case IrOpcode::Coerce:
-			case IrOpcode::AsType: case IrOpcode::IsType:
-			case IrOpcode::CheckFilter:
-			case IrOpcode::EscXAttr: case IrOpcode::EscXElem:
-			case IrOpcode::Li8: case IrOpcode::Li16: case IrOpcode::Li32:
-			case IrOpcode::Lf32: case IrOpcode::Lf64:
-			case IrOpcode::Sxi1: case IrOpcode::Sxi8: case IrOpcode::Sxi16:
-			case IrOpcode::NewClass:
+			const IrOp& op = out.ops[i];
+			u32 pops = 0, pushes = 0;
+			s32 scope_delta = 0;
+			stackEffect(op, abc, pops, pushes, scope_delta);
+			if (stk.size() < pops)
 			{
-				pops = 1; pushes = 1;
-				break;
+				broken = true;   // cannot happen post-depth-check; bail anyway
+				continue;
 			}
 
-			// pure pushes
-			case IrOpcode::PushInt: case IrOpcode::PushUint: case IrOpcode::PushDouble:
-			case IrOpcode::PushString: case IrOpcode::PushNamespace:
-			case IrOpcode::PushNaN: case IrOpcode::PushNull:
-			case IrOpcode::PushUndefined: case IrOpcode::PushTrue: case IrOpcode::PushFalse:
-			case IrOpcode::GetLocal:
-			case IrOpcode::GetScopeObject: case IrOpcode::GetOuterScope:
-			case IrOpcode::GetGlobalScope: case IrOpcode::GetGlobalSlot:
-			case IrOpcode::NewFunction: case IrOpcode::NewCatch: case IrOpcode::NewActivation:
-			case IrOpcode::HasNext2:
+			// peek(d) = the operand d slots below the top, pre-pop.
+			auto peek = [&](u32 d) -> LatValue
 			{
-				pushes = 1;
-				break;
+				return (d < stk.size()) ? stk[stk.size() - 1 - d] : LatValue{};
+			};
+
+			// ---- predicates -------------------------------------------
+			if (op.op == IrOpcode::LookupSwitch)
+			{
+				LatValue v = peek(0);
+				if (v.k == LatKind::Class && v.bi != LB_INT)
+				{
+					LatHit h;
+					h.op_index = (u32) i;
+					h.code = 1058;
+					h.inferred = latName(M, v);
+					h.message = "Error #1058: Illegal operand type: "
+					          + h.inferred + " must be int.";
+					h.detail = "lookupswitch index is statically " + h.inferred
+					         + " at op " + to_string(i);
+					hits.push_back(h);
+				}
 			}
 
-			case IrOpcode::Dup: { pops = 1; pushes = 2; break; }
-			case IrOpcode::Swap: { pops = 2; pushes = 2; break; }
-			case IrOpcode::Pop: case IrOpcode::SetLocal:
-			case IrOpcode::SetGlobalSlot: case IrOpcode::DxnsLate:
-			case IrOpcode::IfTrue: case IrOpcode::IfFalse:
-			case IrOpcode::LookupSwitch:
-			case IrOpcode::ReturnValue: case IrOpcode::Throw:
+			// RTQName / RTQNameL: the runtime namespace operand must be a
+			// Namespace. Operand layout (see abc_emit.cpp's rtns lowering) is
+			// [obj, ns, name] for the get/call/construct-prop family and
+			// [obj, ns, name, value] for the set family, i.e. the ns always
+			// sits exactly one slot above the object => depth `pops - 2`.
+			// find* has no object operand, so the ns is the deepest of its
+			// own pops => depth `pops - 1`.
+			if (op.arg1 < abc.pool.multinames.size()
+			    && abc.pool.multinames[op.arg1].hasLazyNs())
 			{
-				pops = 1;
-				break;
+				bool is_find = op.op == IrOpcode::FindProperty
+				            || op.op == IrOpcode::FindPropStrict
+				            || op.op == IrOpcode::FindDef;
+				s32 depth = (s32) pops - (is_find ? 1 : 2);
+				if (depth >= 0 && depth < (s32) stk.size())
+				{
+					LatValue v = peek((u32) depth);
+					bool wrong = (v.k == LatKind::Any)
+					          || (v.k == LatKind::Class && !latIsNamespace(M, v));
+					if (wrong)
+					{
+						LatHit h;
+						h.op_index = (u32) i;
+						h.code = 1058;
+						h.inferred = latName(M, v);
+						h.message = "Error #1058: Illegal operand type: "
+						          + h.inferred + " must be Namespace.";
+						h.detail = "runtime namespace operand is statically "
+						         + h.inferred + " at op " + to_string(i);
+						hits.push_back(h);
+					}
+				}
 			}
 
-			case IrOpcode::PushScope: case IrOpcode::PushWith:
+			if (op.op == IrOpcode::GetSlot || op.op == IrOpcode::SetSlot)
 			{
-				pops = 1;
-				scope_delta = 1;
-				break;
-			}
-			case IrOpcode::PopScope:
-			{
-				scope_delta = -1;
-				break;
-			}
-
-			case IrOpcode::GetSlot: { pops = 1; pushes = 1; break; }
-			case IrOpcode::SetSlot: { pops = 2; break; }
-
-			// property family (lazy pops included)
-			case IrOpcode::GetPropertyStatic: case IrOpcode::GetPropertyFast:
-			case IrOpcode::GetPropertySlow:
-			case IrOpcode::GetSuper: case IrOpcode::DeleteProperty:
-			case IrOpcode::GetDescendants:
-			{
-				pops = 1 + lazy; pushes = 1;
-				break;
-			}
-			case IrOpcode::SetPropertyStatic: case IrOpcode::SetPropertyFast:
-			case IrOpcode::SetPropertySlow:
-			case IrOpcode::InitProperty: case IrOpcode::SetSuper:
-			{
-				pops = 2 + lazy;
-				break;
-			}
-			case IrOpcode::FindProperty: case IrOpcode::FindPropStrict:
-			case IrOpcode::FindDef:
-			{
-				pops = lazy; pushes = 1;
-				break;
-			}
-
-			// calls
-			case IrOpcode::Call: { pops = op.arg2 + 2; pushes = 1; break; }
-			case IrOpcode::CallStatic: { pops = op.arg2 + 1; pushes = 1; break; }
-			case IrOpcode::CallProperty: case IrOpcode::CallPropLex:
-			case IrOpcode::CallSuper:
-			{
-				pops = op.arg2 + 1 + lazy; pushes = 1;
-				break;
-			}
-			case IrOpcode::CallPropVoid:
-			{
-				pops = op.arg2 + 1 + lazy;
-				break;
-			}
-			case IrOpcode::Construct: { pops = op.arg2 + 1; pushes = 1; break; }
-			case IrOpcode::ConstructProp: { pops = op.arg2 + 1 + lazy; pushes = 1; break; }
-			case IrOpcode::ConstructSuper: { pops = op.arg2 + 1; break; }
-
-			// allocation
-			case IrOpcode::NewObject: { pops = op.arg2 * 2; pushes = 1; break; }
-			case IrOpcode::NewArray: { pops = op.arg2; pushes = 1; break; }
-			case IrOpcode::ApplyType: { pops = op.arg2 + 1; pushes = 1; break; }
-
-			// memory stores
-			case IrOpcode::Si8: case IrOpcode::Si16: case IrOpcode::Si32:
-			case IrOpcode::Sf32: case IrOpcode::Sf64:
-			{
-				pops = 2;
-				break;
+				// getslot pops the base; setslot pops the value THEN the base.
+				LatValue base = peek(op.op == IrOpcode::SetSlot ? 1 : 0);
+				if (base.k == LatKind::Any)
+				{
+					LatHit h;
+					h.op_index = (u32) i;
+					h.code = 1051;
+					h.inferred = "*";
+					h.message = "Error #1051: Illegal early binding access to *.";
+					h.detail = "early-bound slot access through `*` at op "
+					         + to_string(i);
+					hits.push_back(h);
+				}
+				else if (base.k == LatKind::Class && base.inst >= 0
+				         && M.isSealed(base.inst))
+				{
+					// slotCountOf is -1 whenever any ancestor leaves the ABC
+					// (native base => unknown slot origin), which is exactly
+					// the "do not claim" rule this predicate needs.
+					int sc = M.slotCountOf(base.inst);
+					string cn = latName(M, base);
+					auto nit = M.nameCount.find(cn);
+					bool unique = nit != M.nameCount.end() && nit->second == 1;
+					if (sc >= 0 && unique && (s32) op.arg1 >= sc)
+					{
+						LatHit h;
+						h.op_index = (u32) i;
+						h.code = 1026;
+						h.inferred = cn;
+						h.message = "Error #1026: Slot " + to_string(op.arg1 + 1)
+						          + " exceeds slotCount=" + to_string(sc)
+						          + " of " + cn + ".";
+						h.detail = "slot " + to_string(op.arg1 + 1)
+						         + " exceeds slotCount=" + to_string(sc)
+						         + " of " + cn + " at op " + to_string(i);
+						hits.push_back(h);
+					}
+				}
 			}
 
-			// everything else: no stack effect
-			default: break;
+			// ---- transfer ---------------------------------------------
+			// Ops with their own stack shuffling are handled first; the rest
+			// pop `pops` and push `pushes` copies of one computed result.
+			if (op.op == IrOpcode::Dup)
+			{
+				LatValue v = peek(0);
+				stk.push_back(v);
+				continue;
+			}
+			if (op.op == IrOpcode::Swap)
+			{
+				LatValue a = peek(0), b = peek(1);
+				stk[stk.size() - 1] = b;
+				stk[stk.size() - 2] = a;
+				continue;
+			}
+			if (op.op == IrOpcode::SetLocal)
+			{
+				if (op.arg1 < locals.size()) locals[op.arg1] = peek(0);
+				stk.pop_back();
+				continue;
+			}
+			if (op.op == IrOpcode::Kill || op.op == IrOpcode::IncLocal
+			    || op.op == IrOpcode::IncLocalI || op.op == IrOpcode::DecLocal
+			    || op.op == IrOpcode::DecLocalI)
+			{
+				if (op.arg1 < locals.size()) locals[op.arg1] = LatValue{};
+				continue;   // no stack effect
+			}
+			if (op.op == IrOpcode::HasNext2)
+			{
+				// Writes both register operands; the pushed Boolean is not
+				// worth modelling next to that.
+				if (op.arg1 < locals.size()) locals[op.arg1] = LatValue{};
+				if (op.arg2 < locals.size()) locals[op.arg2] = LatValue{};
+				stk.push_back(LatValue{});
+				continue;
+			}
+
+			LatValue result;
+			switch (op.op)
+			{
+				case IrOpcode::PushInt:   result = latClassBuiltin(LB_INT); break;
+				case IrOpcode::PushUint:  result = latClassBuiltin(LB_UINT); break;
+				case IrOpcode::PushDouble:
+				case IrOpcode::PushNaN:   result = latClassBuiltin(LB_NUMBER); break;
+				case IrOpcode::PushString:
+				case IrOpcode::ConvertS:
+				case IrOpcode::CoerceS:   result = latClassBuiltin(LB_STRING); break;
+				case IrOpcode::PushTrue:
+				case IrOpcode::PushFalse:
+				case IrOpcode::CoerceB:   result = latClassBuiltin(LB_BOOLEAN); break;
+				case IrOpcode::PushNamespace:
+					result = latClassBuiltin(LB_NAMESPACE); break;
+				case IrOpcode::NewObject: result = latClassBuiltin(LB_OBJECT); break;
+				case IrOpcode::NewArray:  result = latClassBuiltin(LB_ARRAY); break;
+				case IrOpcode::NewFunction:
+					result = latClassBuiltin(LB_FUNCTION); break;
+				case IrOpcode::CoerceI:   result = latClassBuiltin(LB_INT); break;
+				case IrOpcode::CoerceU:   result = latClassBuiltin(LB_UINT); break;
+				case IrOpcode::CoerceD:   result = latClassBuiltin(LB_NUMBER); break;
+				case IrOpcode::Coerce:
+					result = latResolveTypeMn(M, abc, op.arg1); break;
+				case IrOpcode::ConstructProp:
+					result = latResolveTypeMn(M, abc, op.arg1); break;
+				case IrOpcode::CoerceA:
+				{
+					// `Any` ONLY from an affirmative input. Unknown in,
+					// Unknown out — otherwise every unmodelled value would
+					// launder itself into a throwing #1051 through a coerce_a.
+					result = (peek(0).k != LatKind::Unknown) ? latAny() : LatValue{};
+					break;
+				}
+				case IrOpcode::Construct:
+				{
+					LatValue callee = peek(op.arg2);
+					if (callee.k == LatKind::ClassOf)
+					{
+						result = callee;
+						result.k = LatKind::Class;
+					}
+					break;
+				}
+				case IrOpcode::GetLocal:
+					result = (op.arg1 < locals.size()) ? locals[op.arg1] : LatValue{};
+					break;
+				case IrOpcode::GetPropertyStatic:
+				{
+					// The getlex idiom only: FindPropStrict(mn) immediately
+					// followed by GetPropertyStatic(mn) naming an ABC class
+					// yields that class's class OBJECT. Deliberately NOT a
+					// general "read a property off a typed receiver" rule —
+					// FindPropStrict itself stays Unknown.
+					if (peek(0).k == LatKind::Unknown && i > 0
+					    && out.ops[i - 1].op == IrOpcode::FindPropStrict
+					    && out.ops[i - 1].arg1 == op.arg1)
+					{
+						LatValue t = latResolveTypeMn(M, abc, op.arg1);
+						if (t.k == LatKind::Class && t.inst >= 0)
+						{
+							result = t;
+							result.k = LatKind::ClassOf;
+						}
+					}
+					break;
+				}
+				default: break;   // Unknown
+			}
+
+			for (u32 p = 0; p < pops; p++) stk.pop_back();
+			for (u32 p = 0; p < pushes; p++) stk.push_back(result);
 		}
+	}
+
+	// Method kind, for the Stage-0 CSV (R9: a hit on an init in a passing test
+	// is a hard stop, so the sweep has to be able to see them).
+	static const char* latMethodKind(const AbcFile& abc, u32 method_index)
+	{
+		for (const AbcScript& s : abc.scripts)
+		{
+			if (s.init_method == method_index) return "script_init";
+		}
+		for (const AbcClass& c : abc.classes)
+		{
+			if (c.init_method == method_index) return "class_init";
+		}
+		for (const AbcInstance& in : abc.instances)
+		{
+			if (in.init_method == method_index) return "ctor";
+		}
+		return "method";
+	}
+
+	// Report-only label for the CSV's first column (the SWF being verified).
+	// abc_tool.cpp sets it per input file; empty everywhere else.
+	static string g_lat_source_label;
+
+	void setVerifierSourceLabel(const string& label)
+	{
+		g_lat_source_label = label;
+	}
+
+	static void latWriteCsv(const char* path, const AbcFile& abc,
+	                        const AbcMethodBody& body, const IrMethod& out,
+	                        const std::vector<LatHit>& hits)
+	{
+		FILE* f = fopen(path, "a");
+		if (f == nullptr) return;
+		u32 mi = out.method_index;
+		string mname = "?";
+		if (mi < abc.methods.size() && abc.methods[mi].name < abc.pool.strings.size()
+		    && abc.methods[mi].name != 0)
+		{
+			mname = abc.pool.strings[abc.methods[mi].name];
+		}
+		for (const LatHit& h : hits)
+		{
+			fprintf(f, "%s,%s,%s,%u,%u,%d,%s,\"%s\"\n",
+			        g_lat_source_label.c_str(), mname.c_str(),
+			        latMethodKind(abc, mi), out.body_index, h.op_index,
+			        h.code, h.inferred.c_str(), h.detail.c_str());
+		}
+		(void) body;
+		fclose(f);
 	}
 
 	// === main entry ===
@@ -1852,6 +2257,11 @@ namespace abc
 		// Static stack/scope-depth checking (max_stack / max_scope_depth
 		// validation). Depths at every op are computed over the CFG and must
 		// agree on every path (avmplus errors 1030/1031 on mismatch).
+		// `stack_at` outlives the block: the static TYPE pass below reuses it
+		// both as the reachability map and as the authoritative depth at each
+		// op (a mismatch against its own model is a hard reset — see
+		// runTypeLattice).
+		std::vector<s32> stack_at(out.ops.size(), -1);
 		{
 			s64 local_scope_max = (s64) body.max_scope_depth - (s64) body.init_scope_depth;
 
@@ -1861,7 +2271,6 @@ namespace abc
 				s32 stack;
 				s32 scope;
 			};
-			std::vector<s32> stack_at(out.ops.size(), -1);
 			std::vector<s32> scope_at(out.ops.size(), -1);
 			std::vector<SimEntry> sim_list;
 
@@ -1990,6 +2399,33 @@ namespace abc
 						sim_list.push_back({ entry.idx + 1, new_stack, new_scope });
 						break;
 					}
+				}
+			}
+		}
+
+		// Static operand TYPE pass. Runs only after the depth pass has
+		// SUCCEEDED, as a separate read-only walk, so every body without a
+		// type error behaves bit-identically to before and a body with both a
+		// depth and a type problem still reports the depth one (avmplus order).
+		if (latBodyHasCandidate(abc, out))
+		{
+			std::vector<LatHit> hits;
+			runTypeLattice(abc, latModelFor(abc), body, out, stack_at, hits);
+			if (!hits.empty())
+			{
+				const char* csv = getenv("SWF_VERIFY_TYPES");
+				if (csv != nullptr)
+				{
+					// Report-only audit mode: record and pass.
+					latWriteCsv(csv, abc, body, out, hits);
+				}
+				else
+				{
+					// Lowest op index wins (hits are appended in walk order).
+					err.code = hits[0].code;
+					err.message = hits[0].message;
+					err.detail = hits[0].detail;
+					return false;
 				}
 			}
 		}

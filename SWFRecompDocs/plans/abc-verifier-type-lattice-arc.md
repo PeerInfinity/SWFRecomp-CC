@@ -1,6 +1,30 @@
 # ABC Verifier Static Type Lattice — Arc Scoping
 
-Status: **scoped, not started** (2026-07-31)
+Status: **Stage 0 + Stage 1 landed** (2026-07-31). Stage 2 and Stage 3 remain
+open. What shipped:
+
+- `SWFRecomp/include/abc/abc_typemodel.hpp` — `AbcTypeModel` + `TK`/`TV` +
+  the single `stackEffect`, promoted out of `abc_emit.cpp`/`abc_verifier.cpp`
+  (§8 Stage 0 step 1). `irStackEffect` is now a wrapper. Emission verified
+  byte-identical on 9 spot-checked tests.
+- The lattice walk in `abc_verifier.cpp`, running after the depth pass, with
+  all four §4.3 predicates armed, and `SWF_VERIFY_TYPES=<csv>` as the
+  permanent report-only audit mode (§8 Stage 0 step 2).
+- **Stage 0 sweep result: 7 rows over all 4,473 corpus SWFs (92,529 bodies) —
+  `verify_typecheck` ×4 and `rtqname_not_namespace` ×3, and nothing else.**
+  The exit criterion was met on the first run; no predicate needed weakening.
+- The §8 step 4 robustness fix: `avm2_op_getslot`/`avm2_op_setslot`'s
+  out-of-range `avm2_fatal` is now a catchable `VerifyError #1026`
+  (`throw_slot_out_of_range` in `avm2_ops.c`).
+- Yield: `verify_typecheck` `runtime_error` → **pass**,
+  `rtqname_not_namespace` 9/12 → **pass**. `scope_optimizations` unchanged at
+  3/4, as scoped (§3.3).
+
+Original scoping below, unchanged.
+
+---
+
+Status when scoped: **scoped, not started** (2026-07-31)
 Origin: `SWFRecompDocs/plans/polish-sweep-arc.md` §8.7 ("Taken and
 deliberately NOT taken").
 Scope: recompiler only (`SWFRecomp/src/abc/abc_verifier.cpp`). No runtime
