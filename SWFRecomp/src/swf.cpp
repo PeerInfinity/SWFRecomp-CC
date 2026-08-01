@@ -3247,6 +3247,20 @@ namespace SWFRecomp
 
 			case SWF_TAG_DO_ACTION:
 			{
+				// Symmetric half of the DoABC gate below (SWF_TAG_DO_ABC):
+				// an AS3 SWF's AVM1 tags are INERT. Flash picks the VM from
+				// the FileAttributes AS3 bit and never runs DoAction /
+				// DoInitAction bytecode in an AVM2 movie (Ruffle gates the
+				// same way on movie.is_action_script_3() — avm1/mod.rs
+				// run_stack_frame_for_action is only reached from an AVM1
+				// movie). mixed_avm/avm1_loads_avm2_doaction loads a child
+				// SWF that carries both, and its DoAction/DoInitAction
+				// bodies trace "this shouldn't print".
+				if (is_as3)
+				{
+					printf("DoAction: ignored (FileAttributes AS3 bit set — AVM2 SWF)\n");
+					break;
+				}
 				context.out_script_header << endl << "void script_" << to_string(next_script_i) << "(SWFAppContext* app_context);";
 
 				ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
@@ -3303,6 +3317,12 @@ namespace SWFRecomp
 			
 			case SWF_TAG_DO_INIT_ACTION:
 			{
+				// An AS3 SWF's AVM1 tags are inert — see SWF_TAG_DO_ACTION.
+				if (is_as3)
+				{
+					printf("DoInitAction: ignored (FileAttributes AS3 bit set — AVM2 SWF)\n");
+					break;
+				}
 				// SpriteId (UI16) — identifies which sprite this init action belongs to
 				tag.setFieldCount(1);
 				tag.configureNextField(SWF_FIELD_UI16);
@@ -5917,6 +5937,15 @@ namespace SWFRecomp
 
 						case SWF_TAG_DO_ACTION:
 						{
+							// An AS3 SWF's AVM1 tags are inert — see the
+							// top-level SWF_TAG_DO_ACTION case. The sprite
+							// sub-tag loop does NOT auto-advance cur_pos, so
+							// skip past the body explicitly.
+							if (is_as3)
+							{
+								cur_pos += sub_tag.length;
+								break;
+							}
 							// DoAction inside sprite — create script file and emit
 							// inline actionQueueScript at this tag's SWF position.
 							// Phase 7b: the SWF-tag-order queue position is
@@ -6021,6 +6050,13 @@ namespace SWFRecomp
 
 						case SWF_TAG_DO_INIT_ACTION:
 						{
+							// An AS3 SWF's AVM1 tags are inert — see the
+							// top-level SWF_TAG_DO_ACTION case.
+							if (is_as3)
+							{
+								cur_pos += sub_tag.length;
+								break;
+							}
 							// DoInitAction inside DefineSprite — parse SpriteId and emit
 							// guarded call inline at this tag's SWF position.
 							// Phase 7b: DoInitAction continues to fire synchronously

@@ -348,6 +348,38 @@ static Avm2Object* find_root_class_globals(Avm2Context* ctx, const char* dotted,
 	return avm2_domain_find(ctx, avm2_domain_root_scope(ctx), &key);
 }
 
+// Does any timeline or button state in the main movie place `char_id`?
+// (The generated tables are the whole movie: every DefineSprite timeline is
+// in avm2_generated_timelines, every DefineButton record in
+// avm2_generated_buttons.)
+static int symbol_char_is_placed(uint16_t char_id)
+{
+	for (uint32_t t = 0; t < avm2_generated_timeline_count; t++)
+	{
+		const Avm2TimelineData* tl = &avm2_generated_timelines[t];
+		uint32_t nops = tl->frame_op_starts[tl->frame_count];
+		for (uint32_t o = 0; o < nops; o++)
+		{
+			if ((tl->ops[o].flags & 1 /* HAS_CHAR */)
+			    && tl->ops[o].char_id == char_id)
+			{
+				return 1;
+			}
+		}
+	}
+	for (uint32_t b = 0; b < avm2_generated_button_count; b++)
+	{
+		for (uint32_t r = 0; r < avm2_generated_buttons[b].record_count; r++)
+		{
+			if (avm2_generated_buttons[b].records[r].char_id == char_id)
+			{
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
@@ -466,38 +498,33 @@ void runSWF_avm2(SWFAppContext* app_context)
 		// the pre-display construct-once behavior (the single-frame
 		// test-movie pattern several Stage-2 baseline tests rely on).
 		// Best-effort: a binding whose defining script aborted is skipped.
-		for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
+		//
+		// …but ONLY when the movie has no placed binding at all. Flash never
+		// constructs an instance for a SymbolClass row (Ruffle
+		// movie_clip.rs preload_symbol_class only *registers* the class);
+		// this loop is a compatibility crutch for single-frame test movies
+		// whose one bound character is defined but never placed. A movie
+		// that DOES place at least one of its bound characters is a real
+		// display-list movie, and its remaining bindings are library
+		// artifacts — Flash-authored SWFs export a base class's symbol
+		// alongside the subclass that extends it
+		// (subclass_superclass_linked_symbol: SuperClass is exported but
+		// only SubClass is ever placed, and running SuperClass's ctor
+		// standalone printed a whole extra before/after pair ahead of the
+		// real instance's chain).
+		int any_placed = 0;
+		for (uint32_t i = 0; i < avm2_generated_symbol_class_count && !any_placed; i++)
+		{
+			if (avm2_generated_symbol_classes[i].class_name == NULL) continue;
+			any_placed = symbol_char_is_placed(
+				avm2_generated_symbol_classes[i].char_id);
+		}
+		for (uint32_t i = 0; !any_placed && i < avm2_generated_symbol_class_count; i++)
 		{
 			const char* cname = avm2_generated_symbol_classes[i].class_name;
 			if (cname == NULL) continue;
 			uint16_t cid = avm2_generated_symbol_classes[i].char_id;
-			int placed = 0;
-			for (uint32_t t = 0; t < avm2_generated_timeline_count && !placed; t++)
-			{
-				const Avm2TimelineData* tl = &avm2_generated_timelines[t];
-				uint32_t nops = tl->frame_op_starts[tl->frame_count];
-				for (uint32_t o = 0; o < nops; o++)
-				{
-					if ((tl->ops[o].flags & 1 /* HAS_CHAR */)
-					    && tl->ops[o].char_id == cid)
-					{
-						placed = 1;
-						break;
-					}
-				}
-			}
-			for (uint32_t b = 0; b < avm2_generated_button_count && !placed; b++)
-			{
-				for (uint32_t r = 0; r < avm2_generated_buttons[b].record_count; r++)
-				{
-					if (avm2_generated_buttons[b].records[r].char_id == cid)
-					{
-						placed = 1;
-						break;
-					}
-				}
-			}
-			if (placed) continue;
+			if (symbol_char_is_placed(cid)) continue;
 			Avm2PropKey key;
 			Avm2Object* globals = find_root_class_globals(ctx, cname, &key);
 			if (globals == NULL) continue;
