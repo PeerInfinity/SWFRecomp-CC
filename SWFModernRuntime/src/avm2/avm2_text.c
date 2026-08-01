@@ -2499,25 +2499,62 @@ static int name_eq_ci(const Avm2String* a, const char* b)
 	return strncasecmp(a->utf8, b, bl) == 0;
 }
 
+// One exact (name, bold, italic) probe of the generated embedded-font table.
+// Ruffle's FontMap is keyed on exactly this tuple (library.rs FontQuery), and
+// FontMap::register uses `or_insert`, so the FIRST registered face wins — which
+// is the generated table's order.
+static const Avm2FontData* find_embedded_font(const Avm2String* name,
+                                              int bold, int italic)
+{
+	for (uint32_t i = 0; i < avm2_generated_font_count; i++)
+	{
+		const Avm2FontData* fd = &avm2_generated_fonts[i];
+		if (fd->glyph_count > 0
+		    && name_eq_ci(name, fd->name)
+		    && (fd->bold != 0) == (bold != 0)
+		    && (fd->italic != 0) == (italic != 0))
+			return fd;
+	}
+	return NULL;
+}
+
 // Ruffle resolve_font: embedded lookup by name+bold+italic (only when the
 // field embeds fonts), else the device fallback.
+//
+// The fallback ORDER is load-bearing — ruffle core/src/library.rs:761
+// (`FontMap::find`) opens with "The order here is specific, and tested in
+// tests/swfs/fonts/embed_matching/fallback_preferences":
+//   1. exact (name, bold, italic);
+//   2. if bold XOR italic: bold-italic, then regular, then the other one;
+//   3. else: (bold-italic only) regular; then bold; then italic;
+//      then (regular only) bold-italic.
+// Only a full miss drops to the metrics-only device face.
 static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields* fmt)
 {
 	LFont f;
 	if (!et->device_font)
 	{
-		for (uint32_t i = 0; i < avm2_generated_font_count; i++)
+		int bold = fmt->bold != 0, italic = fmt->italic != 0;
+		const Avm2FontData* fd = find_embedded_font(fmt->font, bold, italic);
+		if (fd == NULL && (bold ^ italic))
 		{
-			const Avm2FontData* fd = &avm2_generated_fonts[i];
-			if (fd->glyph_count > 0
-			    && name_eq_ci(fmt->font, fd->name)
-			    && (fd->bold != 0) == (fmt->bold != 0)
-			    && (fd->italic != 0) == (fmt->italic != 0))
-			{
-				f.data = fd;
-				f.is_device = 0;
-				return f;
-			}
+			fd = find_embedded_font(fmt->font, 1, 1);
+			if (fd == NULL) fd = find_embedded_font(fmt->font, 0, 0);
+			if (fd == NULL) fd = find_embedded_font(fmt->font, !bold, !italic);
+		}
+		else if (fd == NULL)
+		{
+			if (bold && italic) fd = find_embedded_font(fmt->font, 0, 0);
+			if (fd == NULL) fd = find_embedded_font(fmt->font, 1, 0);
+			if (fd == NULL) fd = find_embedded_font(fmt->font, 0, 1);
+			if (fd == NULL && !bold && !italic)
+				fd = find_embedded_font(fmt->font, 1, 1);
+		}
+		if (fd != NULL)
+		{
+			f.data = fd;
+			f.is_device = 0;
+			return f;
 		}
 	}
 	f.data = &noto_device_font;
@@ -3493,6 +3530,115 @@ static const Avm2TextFormatFields* span_at_pos(const Avm2EditTextExt* et,
 	                          : &et->default_format;
 }
 
+// avm2_display.c: does this display object currently hold stage focus?
+int avm2_display_object_has_focus(Avm2Object* obj);
+
+// Ruffle EditText::visible_selection (edit_text.rs:1059) — a selection is only
+// painted when it is a real range and the field has focus (or carries
+// alwaysShowSelection); a bare caret additionally needs an editable field.
+static int et_visible_selection(Avm2Object* obj, const Avm2EditTextExt* et,
+                                int32_t* out_start, int32_t* out_end,
+                                int* out_focused)
+{
+	if (et == NULL || !et->sel_active) return 0;
+	int focused = avm2_display_object_has_focus(obj);
+	if (et->sel_begin == et->sel_end)
+	{
+		if (!focused || et->read_only) return 0;
+	}
+	else if (!focused && !et->always_show_selection)
+		return 0;
+	*out_start = et->sel_begin;
+	*out_end = et->sel_end;
+	*out_focused = focused;
+	return 1;
+}
+
+// Layout-space x bounds of unit position `pos` on `line` (Ruffle
+// LayoutLine::char_x_bounds). 0 when the position sits in no box (e.g. the
+// newline that terminates the line) — callers then keep their line-bounds
+// fallback, exactly like Ruffle's unwrap_or_else.
+static int line_char_x_bounds(const LLine* line, uint32_t pos,
+                              int32_t* x0, int32_t* x1)
+{
+	for (uint32_t bi = 0; bi < line->box_count; bi++)
+	{
+		const LBox* b = &line->boxes[bi];
+		if (b->char_end == NULL || b->char_count == 0) continue;
+		if (pos < b->start || pos >= b->start + b->char_count) continue;
+		uint32_t i = pos - b->start;
+		*x0 = b->x + (i > 0 ? b->char_end[i - 1] : 0);
+		*x1 = b->x + b->char_end[i];
+		return 1;
+	}
+	return 0;
+}
+
+// Selection-background rectangles in field-local twips — Ruffle
+// render_selection_background / _for_line (edit_text.rs:1131-1196). Each entry
+// is {x, y, w, h}; the box is clipped to the line, and only covers the line's
+// leading when the selection continues past the line. *out_color receives
+// Color::BLACK when focused and Color::GRAY otherwise. Returns the rect count;
+// *out is avm2_alloc'ed and owned by the caller (heap_free it).
+uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
+                                         int32_t** out, uint32_t* out_color)
+{
+	*out = NULL;
+	*out_color = 0;
+	Avm2EditTextExt* et = edittext_of(ctx, tf_obj);
+	if (et == NULL || et->text == NULL) return 0;
+	int32_t sel_s = 0, sel_e = 0;
+	int focused = 0;
+	if (!et_visible_selection(tf_obj, et, &sel_s, &sel_e, &focused)) return 0;
+	if (sel_s >= sel_e) return 0;            // caret: no background to fill
+	*out_color = focused ? 0x000000u : 0x808080u;
+
+	LLayout* l = et_layout(ctx, et);
+	et_apply_lazy_bounds(et);
+	int32_t vscroll = 0;
+	if (et->scroll > 1 && (uint32_t) et->scroll <= l->line_count)
+		vscroll = l->lines[et->scroll - 1].y;
+	int32_t off_x = et->bounds_x + GUTTER - twips_from_px(et->hscroll);
+	int32_t off_y = et->bounds_y + GUTTER - vscroll;
+	uint32_t skip = et->scroll > 1 ? (uint32_t) (et->scroll - 1) : 0;
+
+	int32_t* r = NULL;
+	uint32_t n = 0, cap = 0;
+	for (uint32_t li = skip; li < l->line_count; li++)
+	{
+		LLine* line = &l->lines[li];
+		int32_t ls = sel_s, le = sel_e;
+		if (ls < (int32_t) line->start) ls = (int32_t) line->start;
+		if (ls > (int32_t) line->end) ls = (int32_t) line->end;
+		if (le < (int32_t) line->start) le = (int32_t) line->start;
+		if (le > (int32_t) line->end) le = (int32_t) line->end;
+		if (ls >= le) continue;
+		// A selection running past this line covers its leading too.
+		int32_t leading = (le == sel_e) ? 0 : line->leading;
+		int32_t x0 = line->x, x1 = line->x + line->w, t0 = 0, t1 = 0;
+		line_char_x_bounds(line, (uint32_t) ls, &x0, &t1);
+		line_char_x_bounds(line, (uint32_t) (le - 1), &t0, &x1);
+		(void) t0; (void) t1;
+		if (x1 <= x0) continue;
+		if (n == cap)
+		{
+			uint32_t ncap = cap ? cap * 2 : 8;
+			int32_t* nr = avm2_alloc(ctx, ncap * 4 * sizeof(int32_t));
+			if (n > 0) memcpy(nr, r, n * 4 * sizeof(int32_t));
+			if (r != NULL) heap_free(ctx->app, r);
+			r = nr;
+			cap = ncap;
+		}
+		r[n * 4 + 0] = off_x + x0;
+		r[n * 4 + 1] = off_y + line->y;
+		r[n * 4 + 2] = x1 - x0;
+		r[n * 4 + 3] = line->h + leading;
+		n++;
+	}
+	*out = r;
+	return n;
+}
+
 // Collect the rendered glyphs of a TextField in field-local twips, matching
 // Ruffle EditText::render_text: layout_to_local (bounds origin + gutter -
 // scroll offsets) composed with render_layout_box (box origin) and
@@ -3525,6 +3671,12 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 
 	uint32_t text_len;
 	uint16_t* units = et_units(ctx, et, &text_len);
+
+	// Selected glyphs render inverted (Ruffle render_layout_box:1259-1268 pushes
+	// ColorTransform::IDENTITY over the selected run — "Set text color to white").
+	int32_t sel_s = 0, sel_e = 0;
+	int sel_focus = 0;
+	int has_sel = et_visible_selection(tf_obj, et, &sel_s, &sel_e, &sel_focus);
 
 	uint32_t cap = 0, n = 0;
 	Avm2GlyphPlacement* gl = NULL;
@@ -3580,7 +3732,10 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 					                + (i > 0 ? b->char_end[i - 1] : 0);
 					gl[n].y_twips = baseline;
 					gl[n].scale = scale;
-					gl[n].color = color;
+					gl[n].color =
+						(has_sel && (int32_t) (b->start + i) >= sel_s
+						 && (int32_t) (b->start + i) < sel_e)
+						? 0xFFFFFFu : color;
 					n++;
 				}
 				i += step;
@@ -7270,6 +7425,34 @@ int avm2_text_self_bounds(Avm2EditTextExt* et, int32_t* out_xywh)
 	out_xywh[2] = et->bounds_w;
 	out_xywh[3] = et->bounds_h;
 	return 1;
+}
+
+// EditText box (background/border) state for the renderers — Ruffle
+// EditText::render_self (edit_text.rs:2704-2733) consumes exactly these plus
+// is_device_font(). Bounds come from self_bounds (lazy autosize applied).
+// out_flags: bit0 background, bit1 border, bit2 device font.
+// Returns 1 when there is a box to draw at all.
+int avm2_text_box_info(Avm2EditTextExt* et, int32_t* out_xywh,
+                       uint32_t* out_flags, uint32_t* out_bg,
+                       uint32_t* out_border)
+{
+	if (et == NULL) return 0;
+	if (!avm2_text_self_bounds(et, out_xywh)) return 0;
+	uint32_t f = 0;
+	if (et->background) f |= 1u;
+	if (et->border) f |= 2u;
+	if (et->device_font) f |= 4u;
+	*out_flags = f;
+	*out_bg = et->background_color & 0xFFFFFFu;
+	*out_border = et->border_color & 0xFFFFFFu;
+	return (f & 3u) != 0;
+}
+
+// Ruffle EditText::is_device_font (edit_text.rs:651) — render_self's
+// rotate/shear/reflect cull keys off it.
+int avm2_text_is_device_font(Avm2EditTextExt* et)
+{
+	return et != NULL && et->device_font != 0;
 }
 
 // Temporarily suppress pending lazy bounds (pixelBounds reads the raw

@@ -1152,6 +1152,14 @@ static void insert_at_index(Avm2Context* ctx, Avm2Object* parent, Avm2Object* ch
 static Avm2Object* g_stage_focus;
 static void set_focus(Avm2Context* ctx, Avm2Object* new_focus);
 
+// Stage-focus test, exported to the text engine for visible_selection()
+// (Ruffle edit_text.rs:1059 — a selection is only painted when the field is
+// focused, or when alwaysShowSelection is set).
+int avm2_display_object_has_focus(Avm2Object* obj)
+{
+	return obj != NULL && obj == g_stage_focus;
+}
+
 // Focus-highlight state (Ruffle focus_tracker.rs `Highlight`):
 // 0 = Inactive, 1 = ActiveHidden, 2 = ActiveVisible. Cached at focus-change
 // time; see avm2_update_highlight for how it is derived and avm2_render_walk
@@ -14397,26 +14405,21 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 uint32_t avm2_statictext_collect_glyphs(Avm2Context* ctx,
                                         const Avm2StaticTextData* st,
                                         Avm2GlyphPlacement** out);
+// avm2_text.c: EditText box state (background/border/device font) and the
+// selection-background geometry — renderer-only accessors.
+int avm2_text_box_info(struct Avm2EditTextExt* et, int32_t* out_xywh,
+                       uint32_t* out_flags, uint32_t* out_bg,
+                       uint32_t* out_border);
+int avm2_text_is_device_font(struct Avm2EditTextExt* et);
+uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
+                                         int32_t** out, uint32_t* out_color);
 
-// Native TEXT/EDITTEXT — draw a timeline-placed TextField on the GPU. GPU twin of
-// avm2_cpu_raster_text: collect the laid-out glyphs, tessellate each glyph's
-// flattened outline (field-local twips: x_twips + scale*px, y_twips + scale*py)
-// with libtess2 NONZERO winding (the same rule the CPU scanline uses, so glyph
-// holes render), and draw per glyph via renderer_draw_tris under one
-// world-transform + alpha-cxform slot. Chosen glyph-geometry form: runtime-
-// tessellate outlines -> tris (the T4/T6 runtime-tris path — crisp, scale-
-// independent). Device-font glyphs (no outlines) and x-clip to the field bounds
-// are skipped (see avm2-native-text-render-plan.md). CPU twin: avm2_cpu_raster_text.
-// Shared GPU glyph draw (placement-source-agnostic): tessellate + draw an
-// already-collected Avm2GlyphPlacement[] under one world-transform + alpha-cxform
-// slot. Both EditText (avm2_render_text) and static text (avm2_render_statictext)
-// feed it, so the two sources share ONE GPU draw path. Caller owns `gl`.
-static void avm2_render_glyphs(Avm2Context* ctx, const Avm2GlyphPlacement* gl,
-                              uint32_t n, const Mat* world, double alpha)
+// One world-transform + alpha-cxform slot pair for a text field (field-local
+// twips -> stage). The selection fill and the glyphs both draw under it,
+// mirroring Ruffle's single transform-stack push per EditText.
+static void avm2_text_slots(const Mat* world, double alpha,
+                            uint32_t* out_xid, uint32_t* out_cxid)
 {
-	if (gl == NULL || n == 0) return;
-
-	// One world-transform slot (field-local twips -> stage) for the whole field.
 	uint32_t xid = 0;
 	if (g_avm2_xform_next < context->xform_slot_count)
 	{
@@ -14435,6 +14438,214 @@ static void avm2_render_glyphs(Avm2Context* ctx, const Avm2GlyphPlacement* gl,
 		cxid = g_avm2_cxform_next++;
 		renderer_write_cxform(context, cxid, cx);
 	}
+	*out_xid = xid;
+	*out_cxid = cxid;
+}
+
+// ---------------------------------------------------------------------------
+// EditText background + border (Ruffle EditText::render_self,
+// edit_text.rs:2704-2733) — drawn BEFORE the glyph mask, choosing
+// draw_device_text_box (:2845-2910) or draw_text_box (:2930-2958) on
+// is_device_font(). Both are computed in STAGE twips: the border's 1px width is
+// deliberately NOT transformed by the field matrix (render/src/lines.rs
+// emulate_line_as_rect: "the thickness and line caps should not be
+// transformed"), so these go through transform slot 0 (the recompiler's
+// identity matrix, swf.cpp:659) rather than the field's own slot. Rotation and
+// shear still land, because the corner points are transformed by hand.
+// ---------------------------------------------------------------------------
+
+// Twips rounding helpers mirroring Ruffle's Twips methods.
+static double tw_trunc_to_pixel(double t) { return trunc(t / 20.0) * 20.0; }
+static double tw_round_to_pixel_ties_even(double t)
+{
+	return nearbyint(t / 20.0) * 20.0;
+}
+
+// One solid quad in stage twips (p = 4 corners in order), as two triangles.
+static void avm2_draw_quad(const double p[8], uint32_t rgb, double alpha)
+{
+	static const int idx[6] = { 0, 1, 2, 0, 2, 3 };
+	float v[12];
+	for (int i = 0; i < 6; i++)
+	{
+		v[i * 2]     = (float) p[idx[i] * 2];
+		v[i * 2 + 1] = (float) p[idx[i] * 2 + 1];
+	}
+	renderer_draw_tris(context, v, 6,
+	                   (float) ((rgb >> 16) & 0xFF) / 255.0f,
+	                   (float) ((rgb >> 8) & 0xFF) / 255.0f,
+	                   (float) (rgb & 0xFF) / 255.0f,
+	                   (float) alpha, 0, 0);
+}
+
+// Axis-aligned 1px border piece, stage twips, through the identity slot.
+static void avm2_border_rect(double x, double y, double w, double h,
+                             uint32_t rgb, double alpha)
+{
+	renderer_draw_rect(context, (float) x, (float) y, (float) w, (float) h,
+	                   (float) ((rgb >> 16) & 0xFF) / 255.0f,
+	                   (float) ((rgb >> 8) & 0xFF) / 255.0f,
+	                   (float) (rgb & 0xFF) / 255.0f,
+	                   (float) alpha, 0, 0);
+}
+
+// Ruffle emulate_line_as_rect (render/src/lines.rs): a 1px-thick rectangle
+// fitted between two already-transformed stage points, both offset by HALF_PX.
+// Only the rotated/sheared fallback uses it — see avm2_render_textbox for why
+// the axis-aligned case is emitted as whole-pixel rects instead.
+static void avm2_draw_border_line(double ax, double ay, double bx, double by,
+                                  uint32_t rgb, double alpha)
+{
+	double dx = (bx - ax) / 20.0, dy = (by - ay) / 20.0;   // pixels
+	double len = sqrt(dx * dx + dy * dy);
+	if (len <= 0.0) return;
+	double ux = dx / len, uy = dy / len;                   // cos/sin of the angle
+	double tx = ax + 10.0 + 10.0 * uy;                     // HALF_PX = 10 twips
+	double ty = ay + 10.0 - 10.0 * ux;
+	double la = ux * len, lb = uy * len, lc = -uy, ld = ux;
+	double p[8] = {
+		tx,                     ty,
+		la * 20.0 + tx,         lb * 20.0 + ty,
+		(la + lc) * 20.0 + tx,  (lb + ld) * 20.0 + ty,
+		lc * 20.0 + tx,         ld * 20.0 + ty,
+	};
+	avm2_draw_quad(p, rgb, alpha);
+}
+
+static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+                                double alpha)
+{
+	int32_t bb[4];
+	uint32_t flags = 0, bg = 0, bc = 0;
+	if (!avm2_text_box_info(et, bb, &flags, &bg, &bc)) return;
+	int has_bg = (flags & 1u) != 0, has_border = (flags & 2u) != 0;
+	double wpx = (double) bb[2] / 20.0, hpx = (double) bb[3] / 20.0;
+
+	if ((flags & 4u) != 0)
+	{
+		// draw_device_text_box: the bounds are transformed, then snapped to whole
+		// pixels. The caller's cull guarantees positive-scale-only, so the
+		// transformed rect stays axis-aligned.
+		double x0 = world->a * bb[0] + world->c * bb[1] + world->tx;
+		double y0 = world->b * bb[0] + world->d * bb[1] + world->ty;
+		double x1 = world->a * (bb[0] + bb[2]) + world->c * (bb[1] + bb[3])
+		            + world->tx;
+		double y1 = world->b * (bb[0] + bb[2]) + world->d * (bb[1] + bb[3])
+		            + world->ty;
+		double w = tw_round_to_pixel_ties_even(x1 - x0);
+		double h = tw_round_to_pixel_ties_even(y1 - y0);
+		x0 = tw_round_to_pixel_ties_even(x0);
+		y0 = tw_round_to_pixel_ties_even(y0);
+		if (has_bg)
+			renderer_draw_rect(context, (float) x0, (float) y0,
+			                   (float) w, (float) h,
+			                   (float) ((bg >> 16) & 0xFF) / 255.0f,
+			                   (float) ((bg >> 8) & 0xFF) / 255.0f,
+			                   (float) (bg & 0xFF) / 255.0f,
+			                   (float) alpha, 0, 0);
+		if (has_border)
+		{
+			// Four INDEPENDENT 1px draw_line calls (edit_text.rs:2878-2909). Each
+			// create_box's -HALF_PX is cancelled by draw_line's +HALF_PX, so the top
+			// line runs (x_min, y_min+0.5px) -> (x_min+w, y_min+0.5px) and the left
+			// line is its transpose; unlike the closed line-strip of draw_line_rect
+			// every edge keeps both terminal pixels, so the outline is symmetric.
+			avm2_border_rect(x0, y0, w + 20.0, 20.0, bc, alpha);
+			avm2_border_rect(x0, y0 + h, w + 20.0, 20.0, bc, alpha);
+			avm2_border_rect(x0, y0, 20.0, h + 20.0, bc, alpha);
+			avm2_border_rect(x0 + w, y0, 20.0, h + 20.0, bc, alpha);
+		}
+		return;
+	}
+
+	// draw_text_box: box matrix = world * create_box(w_px, h_px, x_min, y_min),
+	// then EditTextPixelSnapping for the default (high) quality
+	// (edit_text.rs:3613-3630).
+	double ba = world->a * wpx, bbm = world->b * wpx;
+	double bcm = world->c * hpx, bd = world->d * hpx;
+	double btx = trunc(world->a * bb[0] + world->c * bb[1] + world->tx);
+	double bty = trunc(world->b * bb[0] + world->d * bb[1] + world->ty);
+	int x_snap = fabs(bcm) < 0.001 || fabs(bd) < 0.001;
+	int y_snap = fabs(ba) < 0.001 || fabs(bbm) < 0.001;
+	btx = tw_trunc_to_pixel(btx + 2.0);
+	bty = tw_trunc_to_pixel(bty + 2.0);
+	if (x_snap) { ba = nearbyint(ba - 0.35); bbm = nearbyint(bbm - 0.35); }
+	if (y_snap) { bcm = nearbyint(bcm - 0.35); bd = nearbyint(bd - 0.35); }
+	double p[8] = {
+		btx,                      bty,
+		ba * 20.0 + btx,          bbm * 20.0 + bty,
+		(ba + bcm) * 20.0 + btx,  (bbm + bd) * 20.0 + bty,
+		bcm * 20.0 + btx,         bd * 20.0 + bty,
+	};
+	if (has_bg) avm2_draw_quad(p, bg, alpha);
+	if (!has_border) return;
+	if (fabs(bbm) < 1e-6 && fabs(bcm) < 1e-6 && ba >= 0.0 && bd >= 0.0)
+	{
+		// draw_line_rect draws the box outline as a CLOSED 1px line strip
+		// (descriptors.rs indices_line_rect = [0,1,2,3,0]) offset by HALF_PX, so
+		// on an axis-aligned box it rasterises to crisp whole-pixel edges that
+		// INCLUDE all four corners: for a w x h box at (x,y) the ink is rows y and
+		// y+h over columns x..x+w and columns x and x+w over rows y..y+h.
+		// Measured off avm2/edittext_autosize_height_dynamic's expected PNG (a
+		// 36x44 field at the origin: row 0 and row 44 both inked x=0..36).
+		// visual/edittext/edittext_selection_leading agrees, except that its
+		// bottom-right corner is antialiased to 0x6F6F6F rather than solid — well
+		// inside the test's tolerance of 128, and much closer than leaving it
+		// blank (144 off white).
+		double bx = btx, by = bty, bw = ba * 20.0, bh = bd * 20.0;
+		avm2_border_rect(bx, by, bw + 20.0, 20.0, bc, alpha);        // top
+		avm2_border_rect(bx, by + bh, bw + 20.0, 20.0, bc, alpha);   // bottom
+		avm2_border_rect(bx, by, 20.0, bh + 20.0, bc, alpha);        // left
+		avm2_border_rect(bx + bw, by, 20.0, bh + 20.0, bc, alpha);   // right
+		return;
+	}
+	// Rotated / sheared: fall back to Ruffle's emulated 1px line rects, whose
+	// thickness is deliberately not transformed.
+	avm2_draw_border_line(p[0], p[1], p[2], p[3], bc, alpha);
+	avm2_draw_border_line(p[2], p[3], p[4], p[5], bc, alpha);
+	avm2_draw_border_line(p[4], p[5], p[6], p[7], bc, alpha);
+	avm2_draw_border_line(p[6], p[7], p[0], p[1], bc, alpha);
+}
+
+// Native TEXT/EDITTEXT — draw a timeline-placed TextField on the GPU. GPU twin of
+// avm2_cpu_raster_text: collect the laid-out glyphs, tessellate each glyph's
+// flattened outline (field-local twips: x_twips + scale*px, y_twips + scale*py)
+// with libtess2 NONZERO winding (the same rule the CPU scanline uses, so glyph
+// holes render), and draw per glyph via renderer_draw_tris under one
+// world-transform + alpha-cxform slot. Chosen glyph-geometry form: runtime-
+// tessellate outlines -> tris (the T4/T6 runtime-tris path — crisp, scale-
+// independent). Device-font glyphs (no outlines) and x-clip to the field bounds
+// are skipped (see avm2-native-text-render-plan.md). CPU twin: avm2_cpu_raster_text.
+// Shared GPU glyph draw (placement-source-agnostic): tessellate + draw an
+// already-collected Avm2GlyphPlacement[] under one world-transform + alpha-cxform
+// slot. Both EditText (avm2_render_text) and static text (avm2_render_statictext)
+// feed it, so the two sources share ONE GPU draw path. Caller owns `gl`.
+// T5: glyph triangles are batched into ONE renderer_draw_tris per COLOUR RUN
+// instead of one per glyph. Identical vertices in identical order, but ~20x
+// fewer dynamic rect slots and draw calls — the per-frame dynamic budget
+// (MAX_DYNAMIC_RECTS / MAX_DYNAMIC_VERTICES, render_webgpu.c) used to truncate
+// a dense page of text mid-word.
+// `nfloats` is the x,y pair count * 2 (the batch grows in floats).
+static void avm2_flush_glyph_batch(const float* v, uint32_t nfloats,
+                                   uint32_t color, uint32_t xid, uint32_t cxid)
+{
+	if (v == NULL || nfloats < 6) return;
+	renderer_draw_tris(context, v, nfloats / 2,
+	                   (float) ((color >> 16) & 0xFF) / 255.0f,
+	                   (float) ((color >> 8) & 0xFF) / 255.0f,
+	                   (float) (color & 0xFF) / 255.0f,
+	                   1.0f, xid, cxid);
+}
+
+static void avm2_render_glyphs(Avm2Context* ctx, const Avm2GlyphPlacement* gl,
+                              uint32_t n, uint32_t xid, uint32_t cxid)
+{
+	(void) ctx;
+	if (gl == NULL || n == 0) return;
+
+	float* batch = NULL;
+	uint32_t bn = 0, bcap = 0, bcolor = 0;
+	int bopen = 0;
 
 	for (uint32_t gi = 0; gi < n; gi++)
 	{
@@ -14479,23 +14690,32 @@ static void avm2_render_glyphs(Avm2Context* ctx, const Avm2GlyphPlacement* gl,
 				int nt = tessGetElementCount(tess);
 				if (nt > 0)
 				{
-					float* verts = (float*) malloc((size_t) nt * 3 * 2 * sizeof(float));
-					if (verts != NULL)
+					if (bopen && gl[gi].color != bcolor)
+					{
+						avm2_flush_glyph_batch(batch, bn, bcolor, xid, cxid);
+						bn = 0;
+						bopen = 0;
+					}
+					bcolor = gl[gi].color;
+					bopen = 1;
+					uint32_t need = bn + (uint32_t) nt * 6;
+					if (need > bcap)
+					{
+						uint32_t ncap = bcap ? bcap : 4096;
+						while (ncap < need) ncap *= 2;
+						float* nb = (float*) realloc(batch,
+						                            (size_t) ncap * sizeof(float));
+						if (nb != NULL) { batch = nb; bcap = ncap; }
+					}
+					if (need <= bcap)
 					{
 						for (int i = 0; i < nt; i++)
 							for (int j = 0; j < 3; j++)
 							{
 								TESSindex idx = el[i * 3 + j];
-								verts[i * 6 + j * 2]     = v[idx * 2];
-								verts[i * 6 + j * 2 + 1] = v[idx * 2 + 1];
+								batch[bn++] = v[idx * 2];
+								batch[bn++] = v[idx * 2 + 1];
 							}
-						uint32_t col = gl[gi].color;
-						float r = (float) ((col >> 16) & 0xFF) / 255.0f;
-						float gg = (float) ((col >> 8) & 0xFF) / 255.0f;
-						float b = (float) (col & 0xFF) / 255.0f;
-						renderer_draw_tris(context, verts, (uint32_t) nt * 3,
-						                   r, gg, b, 1.0f, xid, cxid);
-						free(verts);
 					}
 				}
 			}
@@ -14503,6 +14723,8 @@ static void avm2_render_glyphs(Avm2Context* ctx, const Avm2GlyphPlacement* gl,
 		}
 		free(pts);
 	}
+	if (bopen) avm2_flush_glyph_batch(batch, bn, bcolor, xid, cxid);
+	free(batch);
 }
 
 // EditText/TextField GPU entry: collect the field's laid-out glyphs, draw via the
@@ -14513,16 +14735,43 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL || ext->edittext == NULL) return;
+
+	// Ruffle render_self (edit_text.rs:2690-2702): a device-font EditText is not
+	// rendered AT ALL when its transform is rotated, sheared or reflected.
+	if (avm2_text_is_device_font(ext->edittext))
+	{
+		const double ALLOWED_SHEAR = 0.006;
+		if (!(fabs(world->b) < ALLOWED_SHEAR && fabs(world->c) < ALLOWED_SHEAR
+		      && world->a > 0.0 && world->d > 0.0))
+			return;
+	}
+
+	// Box first (Ruffle draws it before pushing the glyph mask), then the
+	// selection background, then the glyphs (render_text:1119-1126).
+	avm2_render_textbox(ext->edittext, world, alpha);
+
+	int32_t* sel = NULL;
+	uint32_t sel_color = 0;
+	uint32_t sn = avm2_edittext_collect_selection(ctx, obj, &sel, &sel_color);
 	Avm2GlyphPlacement* gl = NULL;
 	int32_t clip[4];
 	uint32_t n = avm2_edittext_collect_glyphs(ctx, obj, &gl, clip);
-	if (n == 0)
+	if (sn > 0 || n > 0)
 	{
-		if (gl != NULL) heap_free(ctx->app, gl);
-		return;
+		uint32_t xid = 0, cxid = 0;
+		avm2_text_slots(world, alpha, &xid, &cxid);
+		for (uint32_t i = 0; i < sn; i++)
+			renderer_draw_rect(context,
+			                   (float) sel[i * 4], (float) sel[i * 4 + 1],
+			                   (float) sel[i * 4 + 2], (float) sel[i * 4 + 3],
+			                   (float) ((sel_color >> 16) & 0xFF) / 255.0f,
+			                   (float) ((sel_color >> 8) & 0xFF) / 255.0f,
+			                   (float) (sel_color & 0xFF) / 255.0f,
+			                   1.0f, xid, cxid);
+		avm2_render_glyphs(ctx, gl, n, xid, cxid);
 	}
-	avm2_render_glyphs(ctx, gl, n, world, alpha);
-	heap_free(ctx->app, gl);
+	if (sel != NULL) heap_free(ctx->app, sel);
+	if (gl != NULL) heap_free(ctx->app, gl);
 }
 
 // Static text (DefineText/2 -> StaticText) GPU entry: same shared glyph draw,
@@ -14539,7 +14788,9 @@ static void avm2_render_statictext(Avm2Context* ctx, Avm2Object* obj,
 		if (gl != NULL) heap_free(ctx->app, gl);
 		return;
 	}
-	avm2_render_glyphs(ctx, gl, n, world, alpha);
+	uint32_t xid = 0, cxid = 0;
+	avm2_text_slots(world, alpha, &xid, &cxid);
+	avm2_render_glyphs(ctx, gl, n, xid, cxid);
 	heap_free(ctx->app, gl);
 }
 

@@ -970,8 +970,14 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 	// dynamic createTextField with a border emits 4 draw_rect calls (one per
 	// border edge), plus one draw_tris per glyph rendered. Tests like
 	// avm1/edittext_stylesheet create 60+ text fields with borders + glyphs.
-	#define MAX_DYNAMIC_RECTS 1024    // max color slots for dynamic rendering
-	#define MAX_DYNAMIC_VERTICES 32768 // max vertices for dynamic rendering
+	// T5 (2026-08-01): raised 1024/32768 -> 4096/262144. The old vertex budget
+	// capped native text at ~74 DefineFont3 glyphs per FRAME (a 30pt glyph
+	// tessellates to ~340-440 vertices), which truncated a dense page mid-word
+	// (fonts/embed_matching/fallback_preferences stopped inside "Regular" and
+	// blanked every field below it). Cost: the dynamic vertex staging mirror and
+	// its GPU region grow 0.5 MB -> 4 MB, the colour region 16 KB -> 64 KB.
+	#define MAX_DYNAMIC_RECTS 4096      // max color slots for dynamic rendering
+	#define MAX_DYNAMIC_VERTICES 262144 // max vertices for dynamic rendering
 	{
 		u32 orig_verts = (u32)(ctx->shape_data_size / (4 * sizeof(u32)));
 		size_t extra_bytes = (size_t)MAX_DYNAMIC_VERTICES * 4 * sizeof(u32);
