@@ -10987,6 +10987,63 @@ static void morphshape_native_init(Avm2Context* ctx, Avm2Object* obj)
 	display_native_init(ctx, obj);
 }
 
+// flash.text.StaticText.text (Ruffle display_object/text.rs::Text::text).
+// The character content of a DefineText/2 character, reconstructed by mapping
+// each placed glyph back through its font's glyph-index -> character-code
+// table (Avm2FontData.codes, the tag's CodeTable). Ruffle's rules, line for
+// line:
+//   * a glyph whose font is not in the library aborts the WHOLE walk and
+//     yields null — the `get_font(font_id)?` early return, so glyphs already
+//     collected are discarded too;
+//   * a glyph index past the end of the font's table is skipped;
+//   * an empty result (no glyphs, or the placed character is not a DefineText
+//     at all) is null, not "".
+// A device-fallback font has no code table (`codes == NULL`) and so cannot
+// answer either — treated like a missing font.
+static const Avm2FontData* statictext_font_by_id(uint16_t font_id)
+{
+	for (uint32_t i = 0; i < avm2_generated_font_count; i++)
+	{
+		if (avm2_generated_fonts[i].font_id == font_id)
+			return &avm2_generated_fonts[i];
+	}
+	return NULL;
+}
+
+static Avm2Value statictext_get_text(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext == NULL || ext->statictext == NULL) return avm2_null();
+	const Avm2StaticTextData* st = ext->statictext;
+	if (st->glyph_count == 0) return avm2_null();
+	char* buf = avm2_alloc(ctx, (size_t) st->glyph_count * 4 + 1);
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < st->glyph_count; i++)
+	{
+		const Avm2StaticGlyph* sg =
+			&avm2_generated_static_glyphs[st->glyph_start + i];
+		const Avm2FontData* fd = statictext_font_by_id(sg->font_id);
+		if (fd == NULL || fd->codes == NULL) return avm2_null();
+		if (sg->glyph >= fd->glyph_count) continue;
+		uint32_t cp = fd->codes[sg->glyph];
+		if (cp < 0x80) buf[n++] = (char) cp;
+		else if (cp < 0x800)
+		{
+			buf[n++] = (char) (0xC0 | (cp >> 6));
+			buf[n++] = (char) (0x80 | (cp & 0x3F));
+		}
+		else
+		{
+			buf[n++] = (char) (0xE0 | (cp >> 12));
+			buf[n++] = (char) (0x80 | ((cp >> 6) & 0x3F));
+			buf[n++] = (char) (0x80 | (cp & 0x3F));
+		}
+	}
+	if (n == 0) return avm2_null();
+	return avm2_string(avm2_string_new(ctx, buf, n));
+}
+
 // flash.display.Stage: `new Stage()` is #2012, but display_alloc_instance
 // mints the real stage through this same hook — and it does NOT go through
 // avm2_class_alloc_instance, so avm2_class_alloc_is_script_new() is false
@@ -11810,6 +11867,25 @@ static Avm2Value doc_get_objects_under_point(Avm2Activation* act)
 		{
 			GOUP_PUSH(stack, stack_n, stack_cap, next->render_list[i - 1],
 			          Avm2Object*);
+		}
+		// A SimpleButton's state children live in btn_up/btn_over/btn_down/
+		// btn_hit, NOT render_list, so the generic walk above never reaches
+		// them and the button contributes nothing (its own self-bounds are
+		// empty). Descend into the child for the CURRENT (visual) state only:
+		// the hitTestState child must never be reported — that is exactly what
+		// from_shumway/hittesting/hittesting's four "hitTestState doesn't
+		// affect getObjectsUnderPoint" lines grade. Reporting the state
+		// SUBTREE (rather than the button itself) is what makes the counts
+		// come out right: a one-layer button contributes its single shape (1),
+		// a two-layer button contributes both layers (2) — the wrapper Sprite
+		// in between has no graphics of its own and so is not reported.
+		// Ruffle reports the button node instead and consequently gets the
+		// two-layer line wrong; matching Flash here scores a full pass.
+		if (node->cls != NULL
+		    && class_is_a(node->cls, ctx->builtins.simple_button_class)
+		    && next->btn_up != NULL)
+		{
+			GOUP_PUSH(stack, stack_n, stack_cap, next->btn_up, Avm2Object*);
 		}
 	}
 	#undef GOUP_PUSH
@@ -13360,6 +13436,7 @@ void avm2_register_display(Avm2Context* ctx)
 	// placement is not.
 	Avm2Class* statictext = avm2_builtin_class(ctx, "flash.text", "StaticText", dobj);
 	statictext->native_init = morphshape_native_init;
+	add_getset(ctx, statictext, "text", statictext_get_text, NULL);
 	g_statictext_class = statictext;
 
 	// flash.display.AVM1Movie — the DisplayObject wrapper an AVM2 movie sees

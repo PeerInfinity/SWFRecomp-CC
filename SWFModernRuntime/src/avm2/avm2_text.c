@@ -4423,21 +4423,40 @@ static Avm2TextFormatFields style_transform(Avm2Context* ctx, Avm2Object* obj)
 	v = style_prop(ctx, obj, "color");
 	if (style_truthy(v))
 	{
-		// innerParseColor: "#rrggbb" -> number, else 0.
+		// innerParseColor (Ruffle style_sheet.rs::inner_parse_color): strip
+		// the leading '#', TRIM TRAILING WHITESPACE, then require 1..=6
+		// remaining chars that parse whole as base-16; anything else is 0.
+		// The trailing trim is load-bearing: a CSS declaration
+		// `color: #ff0000 ;` stores the value WITH its trailing space, while
+		// `#ff0000 0` still has 8 chars after the trim and collapses to 0.
+		// (AVM1's copy in action.c is deliberately stricter — exactly 6 hex
+		// digits, no trim — matching Ruffle's separate avm1 parse_color.)
 		const Avm2String* cs = avm2_coerce_to_string(ctx, v);
 		uint32_t rgb = 0;
 		int ok = 0;
-		if (cs->len >= 1 && cs->utf8[0] == '#' && cs->len <= 7)
+		if (cs->len >= 1 && cs->utf8[0] == '#')
 		{
-			ok = 1;
-			for (uint32_t i = 1; i < cs->len && ok; i++)
+			uint32_t end = cs->len;
+			while (end > 1)
 			{
-				char c = cs->utf8[i];
-				int d;
-				if (c >= '0' && c <= '9') d = c - '0';
-				else if ((c | 32) >= 'a' && (c | 32) <= 'f') d = (c | 32) - 'a' + 10;
-				else { ok = 0; break; }
-				rgb = (rgb << 4) | (uint32_t) d;
+				char t = cs->utf8[end - 1];
+				if (t != ' ' && t != '\t' && t != '\n' && t != '\r'
+				    && t != '\f' && t != '\v') break;
+				end--;
+			}
+			uint32_t n = end - 1;
+			if (n >= 1 && n <= 6)
+			{
+				ok = 1;
+				for (uint32_t i = 1; i < end; i++)
+				{
+					char c = cs->utf8[i];
+					int d;
+					if (c >= '0' && c <= '9') d = c - '0';
+					else if ((c | 32) >= 'a' && (c | 32) <= 'f') d = (c | 32) - 'a' + 10;
+					else { ok = 0; break; }
+					rgb = (rgb << 4) | (uint32_t) d;
+				}
 			}
 		}
 		if (!ok) rgb = 0;
@@ -4456,17 +4475,26 @@ static Avm2TextFormatFields style_transform(Avm2Context* ctx, Avm2Object* obj)
 		{ f.display = DISPLAY_INLINE; f.present |= TFP_DISPLAY; }
 		else if (ds->len == 4 && memcmp(ds->utf8, "none", 4) == 0)
 		{ f.display = DISPLAY_NONE; f.present |= TFP_DISPLAY; }
+		// StyleSheet.as does a plain `result.display = formatObject.display`,
+		// and the TextFormat.display setter CLEARS the field on any
+		// unrecognised value — so `display: invalid` reads back as null
+		// rather than leaving new TextFormat()'s default "block" in place.
+		else f.present &= ~(uint32_t) TFP_DISPLAY;
 	}
 	v = style_prop(ctx, obj, "fontFamily");
 	if (style_truthy(v))
 	{
-		// innerParseFontFamily: split on commas, trim leading spaces, map
-		// mono/sans-serif/serif to device names, rejoin.
+		// innerParseFontFamily (Ruffle html/style_sheet.rs::parse_font_list):
+		// split on commas, trim LEADING spaces only (trailing spaces are part
+		// of the name), map mono/sans-serif/serif to device names, rejoin.
+		// An EMPTY entry is dropped outright — separator included — so
+		// "a b c, d e   f  ,  ,  g h" rejoins as "a b c,d e   f  ,g h", not
+		// "...,,g h". Ruffle expresses this as "only emit the ',' when the
+		// result is already non-empty, and only emit non-empty values".
 		const Avm2String* fs = avm2_coerce_to_string(ctx, v);
 		SB out;
 		sb_init(&out);
 		uint32_t pos = 0;
-		int first = 1;
 		while (pos < fs->len)
 		{
 			while (pos < fs->len && fs->utf8[pos] == ' ') pos++;
@@ -4474,24 +4502,22 @@ static Avm2TextFormatFields style_transform(Avm2Context* ctx, Avm2Object* obj)
 			while (pos < fs->len && fs->utf8[pos] != ',') pos++;
 			uint32_t vlen = pos - start;
 			if (pos < fs->len) pos++;
-			if (!first) sb_ch(ctx, &out, ',');
-			first = 0;
-			if (vlen == 4 && memcmp(fs->utf8 + start, "mono", 4) == 0)
+			const char* val = fs->utf8 + start;
+			if (vlen == 4 && memcmp(val, "mono", 4) == 0)
 			{
-				sb_bytes(ctx, &out, "_typewriter", 11);
+				val = "_typewriter"; vlen = 11;
 			}
-			else if (vlen == 10 && memcmp(fs->utf8 + start, "sans-serif", 10) == 0)
+			else if (vlen == 10 && memcmp(val, "sans-serif", 10) == 0)
 			{
-				sb_bytes(ctx, &out, "_sans", 5);
+				val = "_sans"; vlen = 5;
 			}
-			else if (vlen == 5 && memcmp(fs->utf8 + start, "serif", 5) == 0)
+			else if (vlen == 5 && memcmp(val, "serif", 5) == 0)
 			{
-				sb_bytes(ctx, &out, "_serif", 6);
+				val = "_serif"; vlen = 6;
 			}
-			else
-			{
-				sb_bytes(ctx, &out, fs->utf8 + start, vlen);
-			}
+			if (vlen == 0) continue;
+			if (out.len > 0) sb_ch(ctx, &out, ',');
+			sb_bytes(ctx, &out, val, vlen);
 		}
 		f.font = sb_str(ctx, &out);
 		f.present |= TFP_FONT;
@@ -4672,7 +4698,15 @@ static Avm2Value ss_transform(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Value v = arg_or_undef(act, 0);
-	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return avm2_null();
+	// StyleSheet.as: `if (!formatObject) return null;` — a FALSY argument
+	// (null/undefined/0/"") short-circuits, but a truthy non-object then has
+	// `formatObject.color` read off it, which on a sealed receiver (e.g. a
+	// Number) raises #1069 instead of yielding a default TextFormat.
+	if (!avm2_coerce_to_boolean(v)) return avm2_null();
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL)
+	{
+		avm2_throw_1069(ctx, "color", 5, avm2_value_class(ctx, v));
+	}
 	Avm2TextFormatFields f = style_transform(ctx, v.u.obj);
 	return avm2_object_value(textformat_object_from_fields(ctx, &f));
 }
