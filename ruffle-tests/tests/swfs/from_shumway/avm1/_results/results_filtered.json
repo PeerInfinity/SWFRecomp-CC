@@ -6,15 +6,15 @@
     "total_available": 47,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 3,
+    "ignored_count": 1,
     "filtered": true
   },
-  "total": 44,
-  "pass": 44,
+  "total": 46,
+  "pass": 46,
   "ruffle_matched": 0,
   "fail": 0,
   "pass_rate": 100.0,
-  "effective_pass": 44,
+  "effective_pass": 46,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
@@ -371,6 +371,22 @@
       "status": "pass"
     },
     {
+      "test": "moviecliploader",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.326,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.33,
+      "status": "pass"
+    },
+    {
       "test": "nativeinheritance",
       "phases": {
         "recomp": 0.0,
@@ -592,6 +608,22 @@
         "matching_lines": 18
       },
       "duration": 1.09,
+      "status": "pass"
+    },
+    {
+      "test": "text-bind",
+      "phases": {
+        "recomp": 0.016,
+        "compile": 16.586,
+        "run": 0.002
+      },
+      "num_frames": 6,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 16.61,
       "status": "pass"
     },
     {

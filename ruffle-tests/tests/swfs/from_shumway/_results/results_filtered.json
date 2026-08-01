@@ -6,21 +6,37 @@
     "total_available": 229,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 46,
+    "ignored_count": 22,
     "filtered": true
   },
-  "total": 183,
-  "pass": 148,
+  "total": 207,
+  "pass": 168,
   "ruffle_matched": 8,
-  "fail": 27,
-  "pass_rate": 80.9,
-  "effective_pass": 156,
-  "effective_pass_rate": 85.2,
+  "fail": 31,
+  "pass_rate": 81.2,
+  "effective_pass": 176,
+  "effective_pass_rate": 85.0,
   "breakdown": {
-    "output_mismatch": 27,
+    "output_mismatch": 31,
     "ruffle_matched": 8
   },
   "tests": [
+    {
+      "test": "3_joystick",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.141,
+        "run": 0.004
+      },
+      "num_frames": 21,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 24.15,
+      "status": "pass"
+    },
     {
       "test": "MaskTest",
       "phases": {
@@ -51,6 +67,22 @@
         "matching_lines": 0
       },
       "duration": 5.66,
+      "status": "pass"
+    },
+    {
+      "test": "ZeroClipboardTest",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.521,
+        "run": 0.004
+      },
+      "num_frames": 9,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 23.53,
       "status": "pass"
     },
     {
@@ -826,6 +858,23 @@
         "matching_lines": 11
       },
       "duration": 1.2,
+      "status": "pass"
+    },
+    {
+      "test": "as3-interfaces",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 24.85,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 24.87,
       "status": "pass"
     },
     {
@@ -2020,6 +2069,38 @@
       "status": "pass"
     },
     {
+      "test": "button1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.472,
+        "run": 0.004
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 2.48,
+      "status": "pass"
+    },
+    {
+      "test": "button2",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.635,
+        "run": 0.004
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.65,
+      "status": "pass"
+    },
+    {
       "test": "button3",
       "phases": {
         "recomp": 0.0,
@@ -2033,6 +2114,22 @@
         "matching_lines": 1
       },
       "duration": 1.41,
+      "status": "pass"
+    },
+    {
+      "test": "captions",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.79,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 4.8,
       "status": "pass"
     },
     {
@@ -2068,6 +2165,40 @@
       "status": "pass"
     },
     {
+      "test": "encoding1",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 4.546,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 4.56,
+      "status": "pass"
+    },
+    {
+      "test": "flash_events_Event",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.811,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 20.82,
+      "status": "pass"
+    },
+    {
       "test": "flash_geom_ColorTransform",
       "phases": {
         "recomp": 0.0,
@@ -2081,6 +2212,57 @@
         "matching_lines": 0
       },
       "duration": 20.92,
+      "status": "pass"
+    },
+    {
+      "test": "flash_net_URLLoader",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 22.797,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 7,
+        "matching_lines": 0
+      },
+      "duration": 22.81,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=1, expected=7)",
+      "actual_output": "httpStatusHandler: 1",
+      "expected_output": "openHandler: 1\nprogressHandler: 2 bytesLoaded=2674 bytesTotal=2674\nhttpStatusHandler: 2\ncompleteHandler: 2\n2674\nPASS: flash.net::URLLoader/load ()\nPASS: flash.net::URLLoader/addEventListener ()"
+    },
+    {
+      "test": "flash_net_URLRequest",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.991,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 5.0,
+      "status": "pass"
+    },
+    {
+      "test": "flash_net_classes",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.143,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 22
+      },
+      "duration": 5.15,
       "status": "pass"
     },
     {
@@ -2101,6 +2283,22 @@
       "ours_diff_count": 5,
       "status": "ruffle_matched",
       "detail": "diffs 5 \u2286 ruffle 8"
+    },
+    {
+      "test": "flash_utils_Timer",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.881,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 4.89,
+      "status": "pass"
     },
     {
       "test": "fscommand1",
@@ -2381,6 +2579,39 @@
       "status": "pass"
     },
     {
+      "test": "hardwrap",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.747,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.76,
+      "status": "pass"
+    },
+    {
+      "test": "hitTestStyleChange",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.904,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 23.92,
+      "status": "pass"
+    },
+    {
       "test": "hittesting/hittesting",
       "phases": {
         "recomp": 0.0,
@@ -2417,6 +2648,23 @@
       "status": "pass"
     },
     {
+      "test": "image-loading",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.777,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 5.79,
+      "status": "pass"
+    },
+    {
       "test": "invalidClipDepth",
       "phases": {
         "recomp": 0.0,
@@ -2430,6 +2678,76 @@
         "matching_lines": 0
       },
       "duration": 20.55,
+      "status": "pass"
+    },
+    {
+      "test": "local2global",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.648,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.66,
+      "status": "pass"
+    },
+    {
+      "test": "localconnection",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 5.924,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 12,
+        "matching_lines": 3
+      },
+      "duration": 5.94,
+      "status": "output_mismatch",
+      "detail": "9 line(s) differ (actual=5, expected=12)",
+      "actual_output": "Before connect\nAfter connect\nConnecting a second time fails:\nBefore send\nAfter send",
+      "expected_output": "Before connect\nAfter connect\nConnecting a second time fails:\nArgumentError: Error #2082: Connect failed because the object is already connected.\nBefore send\nAfter send\nFirst send fails, but doesn't throw an asyncError\nSecond and third sends succeed\nAsyncError caught. Text: Error #2095: flash.net.LocalConnection was unable to invoke callback lcHandler_failing., error: ReferenceError: Error #1069: Property lcHandler_failing not found on LCReceive and there is no default value.\nSecond and third sends succeed\nReceived via LocalConnection: Message sent via LocalConnection\nAsyncError caught. Text: Error #2095: flash.net.LocalConnection was unable to invoke callback lcHandler., error: Error: fooo"
+    },
+    {
+      "test": "lzma",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.491,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 5.5,
+      "status": "pass"
+    },
+    {
+      "test": "lzma_bytes",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.209,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 24.22,
       "status": "pass"
     },
     {
@@ -2481,6 +2799,22 @@
       "status": "pass"
     },
     {
+      "test": "movieclip",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.344,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 4.35,
+      "status": "pass"
+    },
+    {
       "test": "movieinfo1",
       "phases": {
         "recomp": 0.0,
@@ -2494,6 +2828,78 @@
         "matching_lines": 3
       },
       "duration": 1.04,
+      "status": "pass"
+    },
+    {
+      "test": "slider_component",
+      "phases": {
+        "recomp": 0.192,
+        "compile": 8.822,
+        "run": 0.008
+      },
+      "num_frames": 11,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 9.03,
+      "status": "pass"
+    },
+    {
+      "test": "stream1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.636,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "error_signature": "ReferenceError: Error #1065: Variable URLStream is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 9,
+        "matching_lines": 0
+      },
+      "duration": 4.65,
+      "status": "output_mismatch",
+      "detail": "9 line(s) differ (actual=0, expected=9)",
+      "actual_output": "",
+      "expected_output": "progress: 9/9\nstart: 9\nbyte BE: 18\nword BE: 13398\nbyte LE: 18\nword LE: 22068\nmid: 3\nbuf: 119,136,153\nend: 0"
+    },
+    {
+      "test": "stroke1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.11,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable fscommand is not defined.",
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 5.12,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=4, expected=1)",
+      "actual_output": "ERROR: (3,3) shall be outside\nERROR: (3,50) shall be outside\nERROR: (314, 282) shall be outside\nDone",
+      "expected_output": "Done"
+    },
+    {
+      "test": "stylesheet",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.396,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 5.41,
       "status": "pass"
     },
     {

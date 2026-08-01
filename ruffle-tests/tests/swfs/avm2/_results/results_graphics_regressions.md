@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 929/1221 passing | Graphics: 1080/1224 passing
+Trace: 929/1221 passing | Graphics: 1084/1224 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (150 tests)
+## Graphics Improvements (154 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -133,34 +133,38 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 117 | `stage_domain_getQualifiedDefinitionNames` | Output Mismatch | 1/5 lines match |
 | 118 | `stage_stage3Ds_vector` | Output Mismatch | 0/1 lines match |
 | 119 | `static_text` | Output Mismatch | 0/3 lines match |
-| 120 | `stylesheet` | Output Mismatch | 220/221 lines match |
-| 121 | `supercalls_weird` | Output Mismatch | 0/2 lines match |
-| 122 | `superinterface_call` | Output Mismatch | 15/20 lines match |
-| 123 | `superinterface_instanceof` | Output Mismatch | 4/18 lines match |
-| 124 | `system_setclipboard_null` | Output Mismatch | 0/1 lines match |
-| 125 | `tab_ordering_arrows` | Output Mismatch | 645/1000 lines match |
-| 126 | `tabstop_properties` | Output Mismatch | 0/105 lines match |
-| 127 | `text_element_basic` | Output Mismatch | 0/34 lines match |
-| 128 | `text_engine_groupelement` | Output Mismatch | 1/64 lines match |
-| 129 | `textblock_createline_errors` | Output Mismatch | 0/23 lines match |
-| 130 | `textblock_createline_fte` | Output Mismatch | 0/9 lines match |
-| 131 | `textblock_properties` | Output Mismatch | 0/118 lines match |
-| 132 | `textline_inapplicable_properties` | Output Mismatch | 0/10 lines match |
-| 133 | `textline_name` | Output Mismatch | 0/1 lines match |
-| 134 | `textline_splitting_basic` | Output Mismatch | 0/76 lines match |
-| 135 | `textline_throwerror` | Output Mismatch | 0/30 lines match |
-| 136 | `textline_validity` | Output Mismatch | 1/162 lines match |
-| 137 | `uncaught_error_basic` | Output Mismatch | 0/2 lines match |
-| 138 | `url_vars` | Output Mismatch | 3/27 lines match |
-| 139 | `urlstream_basic` | Output Mismatch | 0/5 lines match |
-| 140 | `utils3d` | Output Mismatch | 0/7 lines match |
-| 141 | `vector3d` | Output Mismatch | 24/397 lines match |
-| 142 | `verification` | Output Mismatch | 5/8 lines match |
-| 143 | `verify_dxns_without_flag` | Output Mismatch | 1/3 lines match |
-| 144 | `verify_exception_target_two_jumps` | Output Mismatch | 0/1 lines match |
-| 145 | `verify_illegal_opcode` | Output Mismatch | 0/1 lines match |
-| 146 | `verify_jump_to_middle_of_op` | Output Mismatch | 0/1 lines match |
-| 147 | `verify_method_info_oob` | Output Mismatch | 0/1 lines match |
-| 148 | `verify_stack` | Output Mismatch | 2/5 lines match |
-| 149 | `verify_typecheck` | Runtime Error | 0/4 lines match |
-| 150 | `xml_appendchild_swf_v21` | Output Mismatch | 12/14 lines match |
+| 120 | `statictext_text` | Output Mismatch | 0/8 lines match |
+| 121 | `stylesheet` | Output Mismatch | 220/221 lines match |
+| 122 | `stylesheet_parse_color` | Output Mismatch | 65/69 lines match |
+| 123 | `stylesheet_transform` | Output Mismatch | 304/307 lines match |
+| 124 | `subclass_superclass_linked_symbol` | Output Mismatch | 0/6 lines match |
+| 125 | `supercalls_weird` | Output Mismatch | 0/2 lines match |
+| 126 | `superinterface_call` | Output Mismatch | 15/20 lines match |
+| 127 | `superinterface_instanceof` | Output Mismatch | 4/18 lines match |
+| 128 | `system_setclipboard_null` | Output Mismatch | 0/1 lines match |
+| 129 | `tab_ordering_arrows` | Output Mismatch | 645/1000 lines match |
+| 130 | `tabstop_properties` | Output Mismatch | 0/105 lines match |
+| 131 | `text_element_basic` | Output Mismatch | 0/34 lines match |
+| 132 | `text_engine_groupelement` | Output Mismatch | 1/64 lines match |
+| 133 | `textblock_createline_errors` | Output Mismatch | 0/23 lines match |
+| 134 | `textblock_createline_fte` | Output Mismatch | 0/9 lines match |
+| 135 | `textblock_properties` | Output Mismatch | 0/118 lines match |
+| 136 | `textline_inapplicable_properties` | Output Mismatch | 0/10 lines match |
+| 137 | `textline_name` | Output Mismatch | 0/1 lines match |
+| 138 | `textline_splitting_basic` | Output Mismatch | 0/76 lines match |
+| 139 | `textline_throwerror` | Output Mismatch | 0/30 lines match |
+| 140 | `textline_validity` | Output Mismatch | 1/162 lines match |
+| 141 | `uncaught_error_basic` | Output Mismatch | 0/2 lines match |
+| 142 | `url_vars` | Output Mismatch | 3/27 lines match |
+| 143 | `urlstream_basic` | Output Mismatch | 0/5 lines match |
+| 144 | `utils3d` | Output Mismatch | 0/7 lines match |
+| 145 | `vector3d` | Output Mismatch | 24/397 lines match |
+| 146 | `verification` | Output Mismatch | 5/8 lines match |
+| 147 | `verify_dxns_without_flag` | Output Mismatch | 1/3 lines match |
+| 148 | `verify_exception_target_two_jumps` | Output Mismatch | 0/1 lines match |
+| 149 | `verify_illegal_opcode` | Output Mismatch | 0/1 lines match |
+| 150 | `verify_jump_to_middle_of_op` | Output Mismatch | 0/1 lines match |
+| 151 | `verify_method_info_oob` | Output Mismatch | 0/1 lines match |
+| 152 | `verify_stack` | Output Mismatch | 2/5 lines match |
+| 153 | `verify_typecheck` | Runtime Error | 0/4 lines match |
+| 154 | `xml_appendchild_swf_v21` | Output Mismatch | 12/14 lines match |
