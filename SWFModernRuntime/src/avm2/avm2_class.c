@@ -1069,10 +1069,10 @@ Avm2Value avm2_call_method_ref(Avm2Context* ctx, const Avm2MethodRef* m,
 	act.callee = NULL;
 	// Default XML namespace propagation (Ruffle activation.rs): callees
 	// inherit the caller's dxns; SET_DXNS methods start fresh. Restored on
-	// return (exception unwinds restore via the try-frame snapshot).
+	// return.
 	const Avm2String* saved_dxns = ctx->dxns;
 	if (m->file != NULL
-	    && (m->file->data->methods[m->method_index].flags & (1u << 6)) != 0)
+	    && (m->file->data->methods[m->method_index].flags & AVM2_METHOD_SET_DXNS) != 0)
 	{
 		ctx->dxns = NULL;
 	}
@@ -1135,9 +1135,22 @@ Avm2Value avm2_call_function_obj(Avm2Context* ctx, Avm2Object* fnobj,
 	act.args = args;
 	act.argc = argc;
 	act.callee = fnobj;
+	// Same default-XML-namespace rule as avm2_call_method_ref above. This is
+	// the OTHER of the runtime's two Avm2Activation construction sites, and
+	// it is the one script-level `function` declarations and closures are
+	// invoked through, so without this a `default xml namespace` statement in
+	// such a function would leak out to its caller.
+	const Avm2String* saved_dxns = ctx->dxns;
+	if (fnobj->fn_method.file != NULL
+	    && (fnobj->fn_method.file->data->methods[fnobj->fn_method.method_index].flags
+	        & AVM2_METHOD_SET_DXNS) != 0)
+	{
+		ctx->dxns = NULL;
+	}
 	avm2_callstack_push(ctx, &fnobj->fn_method, fnobj->fn_bound_class);
 	Avm2Value result = fnobj->fn_method.fn(&act);
 	avm2_callstack_pop(ctx);
+	ctx->dxns = saved_dxns;
 	return result;
 }
 

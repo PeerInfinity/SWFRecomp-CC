@@ -47,9 +47,11 @@ struct Avm2Context
 	uint8_t swf_version;  // for string_to_f64 bug compatibility
 	uint8_t bytearray_default_encoding;  // ByteArray.defaultObjectEncoding
 	// The default XML namespace URI (Dxns/DxnsLate), or NULL. Dynamically
-	// scoped: avm2_call_method_ref saves/restores it around every call and
-	// resets it for methods with the SET_DXNS flag (Ruffle activation.rs
-	// default_xml_namespace propagation).
+	// scoped: avm2_call_method_ref AND avm2_call_function_obj (the runtime's
+	// only two Avm2Activation construction sites) save/restore it around
+	// every call and reset it for methods with the AVM2_METHOD_SET_DXNS flag
+	// (Ruffle activation.rs default_xml_namespace propagation). NOTE: an
+	// exception unwind does NOT restore it — there is no try-frame snapshot.
 	const Avm2String* dxns;
 	// Alchemy/CrossBridge domain memory (avm2_mops.c). `domain_memory` is
 	// the ByteArray object assigned to ApplicationDomain.domainMemory, or

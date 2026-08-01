@@ -1,0 +1,21 @@
+# from_avmplus suite ignore list — created 2026-08-01.
+#
+# filter_results.py picks this up automatically for
+# from_avmplus/_results/results*.json (it looks for ignored_tests.txt beside
+# the _results directory). Names are the forward-slashed test paths used in
+# results.json, e.g. "ecma3/Statements/eforin_001".
+#
+# Keep this list SMALL and evidence-backed: an entry here must have a
+# corresponding write-up in a disposition doc explaining why the diff is
+# permanent. Do NOT add tests here just because they currently fail.
+
+# --- Implementation-defined for...in enumeration order ---
+# ECMA-262 through ES5 leaves for...in order implementation-defined. Both
+# tests print in enumeration order, so their expected output records
+# avmplus's hashtable layout rather than a behavioural requirement. Every
+# line on BOTH sides is `PASSED!` — only the sequence differs — and avmplus,
+# Ruffle and we each produce a different order, so `ruffle_matched` is
+# unreachable too. Ours is insertion order (the ES2015+ rule).
+# See avm1/_investigation/ACCEPTED_DIFFS.md Category 12.
+ecma3/Statements/eforin_001
+ecma3/Statements/eforin_002

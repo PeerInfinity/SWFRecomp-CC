@@ -1,3 +1,13 @@
+# from_shumway suite ignore list.
+#
+# PRUNED 2026-08-01 (46 -> 22 entries, 24 removed). Criterion: an entry was
+# removed iff its status in _results/results_graphics.json at feb8882b0 is
+# exactly `pass`. Entries still failing or `ruffle_matched` were kept. This
+# moves no graded number (the headline corpus figure is the UNFILTERED
+# effective_pass, and ignored tests are run and counted there either way); it
+# only fixes the filtered report, which the stale entries had made
+# meaningless.
+
 # Fuzz-generated SWFs we cannot match — divergent runtime state on noise inputs
 #
 # These are the 16 `from_shumway/fuzz/*` tests that still fail after the
@@ -10,7 +20,7 @@
 # reasons (irregular tag streams, unusual runtime-state interactions). They are
 # not mapped to any user-facing feature, so we filter them out of the headline
 # pass-rate metric rather than chasing each individually. Listed in upstream
-# (Shumway) commit order.
+# (Shumway) commit order. All 16 re-confirmed still failing on 2026-08-01.
 fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82
 fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096
 fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77
@@ -28,34 +38,19 @@ fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897
 fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052
 fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b
 
-# AVM2/AS3 tests — our AVM1 recompiler cannot execute these
-3_joystick
+# AVM2/AS3 tests — originally listed because "our AVM1 recompiler cannot
+# execute these". AVM2 support has since landed, and the 2026-08-01 prune
+# removed the 24 entries that now fully `pass`: 3_joystick, ZeroClipboardTest,
+# as3-interfaces, button1, button2, captions, encoding1, flash_events_Event,
+# flash_net_URLLoader, flash_net_URLRequest, flash_net_classes,
+# flash_utils_Timer, hardwrap, hitTestStyleChange, image-loading, local2global,
+# localconnection, lzma, lzma_bytes, movieclip, slider_component, stream1,
+# stroke1, stylesheet. What remains below is a real divergence list, not a
+# capability list — 4 are `ruffle_matched` (we match Ruffle, not Flash) and
+# 2 are outright failing.
 MaskTest-3
-ZeroClipboardTest
-as3-interfaces
 avm1movie
-button1
-button2
-captions
-encoding1
 esc
-flash_events_Event
 flash_net_SharedObject
-flash_net_URLLoader
-flash_net_URLRequest
-flash_net_classes
 flash_text_TextField2
-flash_utils_Timer
 getobjectsunderpoint
-hardwrap
-hitTestStyleChange
-image-loading
-local2global
-localconnection
-lzma
-lzma_bytes
-movieclip
-slider_component
-stream1
-stroke1
-stylesheet

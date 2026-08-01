@@ -1,12 +1,19 @@
-# Ruffle known_failure — test fails in Ruffle's own test suite
-hitarea
-moviecliploader
+# from_shumway/avm1 suite ignore list.
+#
+# PRUNED 2026-08-01 (3 -> 1 entries, 2 removed). Criterion: an entry was
+# removed iff its status in _results/results_graphics.json at feb8882b0 is
+# exactly `pass`. Removed: `moviecliploader` (now passes despite being a
+# Ruffle known_failure — i.e. we match Flash where Ruffle does not) and
+# `text-bind` (see below).
+#
+# `text-bind` note: the entry that lived here described an IMAGE diff (device
+# font ~14px too low, ~1900 outliers) but sat in a TRACE-axis list, where it
+# had no effect on the pixel board — scripts/image_triage.py classifies a
+# suite-local ignore as "TRACE-axis triage, kept on the board". The trace test
+# passes, so the entry is gone from here; the image rationale remains live in
+# avm1/_investigation/ACCEPTED_DIFFS.md and in its summary table.
 
-# Device-font file mismatch (NOT sub-pixel rasterization): "SUCCESS" renders with
-# correct glyphs but ~14px too low. The test ships its own NotoSans.ttf (0.7656 em
-# ascent) + fonts.conf, which Ruffle resolves for `_sans`; our recompiler synthesizes
-# from its bundled NotoSans.ttf (1.069 em) — byte-identical to Ruffle's OWN default
-# fallback font, so we match Ruffle's default in the general case (real games).
-# The ~1900 outliers are the vertical offset + AA. Documented in
-# avm1/_investigation/ACCEPTED_DIFFS.md::text-bind.
-text-bind
+# Ruffle known_failure — test fails in Ruffle's own test suite.
+# `hitarea` is `ruffle_matched`: we match Ruffle but not Flash's output.txt,
+# so it is a real remaining divergence and stays listed.
+hitarea

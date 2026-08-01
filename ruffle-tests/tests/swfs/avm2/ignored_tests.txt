@@ -1,204 +1,54 @@
 # avm2 suite ignore list — seeded 2026-07-10 from the upstream corpus, before
 # any AVM2 implementation exists (see SWFRecompDocs/plans/avm2-support-plan.md).
 # Buckets below are mechanical classifications of ~/CC/ruffle avm2 test.tomls
-# + directory-name prefixes; re-triage each bucket as support grows. The
-# phase-1 target set is the ~694 trace-only tests NOT listed here (plus the
-# non-ignored remainder as tranches land).
+# + directory-name prefixes; re-triage each bucket as support grows.
+#
+# PRUNED 2026-08-01 (223 -> 51 entries, 172 removed). Criterion: an entry was
+# removed iff its status in _results/results_graphics.json at feb8882b0 is
+# exactly `pass` — i.e. we fully match the Flash-expected output.txt and the
+# ignore entry was hiding a win. Entries still failing, `ruffle_matched` (we
+# match Ruffle but not Flash — a real remaining divergence), or recording an
+# UPSTREAM disable decision were kept. Note this moves no graded number: the
+# headline corpus figure is the UNFILTERED effective_pass, and ignored tests
+# are run and counted there either way. It only fixes the *filtered* report,
+# which the stale entries had made meaningless (avm2 filtered 907/997 91.0%
+# -> 1080/1170 92.3%). Pixel axis is unaffected: scripts/image_triage.py
+# classifies a suite-local ignore as "TRACE-axis triage, kept on the board".
+#
+# Bucket-by-bucket prune: GPU/shader/AIR 63 of 63 (bucket emptied), host I/O
+# 38 of 50, image-comparison 68 of 76, upstream known_failure 3 of 32,
+# upstream ignore=true 0 of 2.
 
-# GPU / shader / AIR (permanently out of scope for this runner)
-agal_compiler
-air_datagram_socket
-air_hidden_lookup
-air_ifilepromise
-pixelbender_ceil
-pixelbender_conditional
-pixelbender_conversions
-pixelbender_dithering
-pixelbender_div
-pixelbender_effect_BlurredFocus
-pixelbender_effect_glassDisplace
-pixelbender_effect_glassDisplace_shaderfilter
-pixelbender_effect_smudge
-pixelbender_effect_tintype
-pixelbender_effect_twirl
-pixelbender_eof
-pixelbender_images
-pixelbender_input
-pixelbender_logicalnot
-pixelbender_malformed_data
-pixelbender_multiple_out_params
-pixelbender_no_out_param
-pixelbender_outputs
-pixelbender_padding_bytes
-pixelbender_param_qualifier
-pixelbender_parameters
-pixelbender_parameters_bool
-pixelbender_parameters_int_vs_bool
-pixelbender_parse_errors
-pixelbender_rsqrt
-pixelbender_select_kinds
-pixelbender_shaderdata
-pixelbender_shaderdata_setter
-pixelbender_sign
-pixelbender_vector_output
-stage3d_agal_cross_product
-stage3d_agal_upload_errors
-stage3d_bitmap
-stage3d_blend
-stage3d_context3d_string_args
-stage3d_errors
-stage3d_errors_atf
-stage3d_errors_swf_29
-stage3d_float1_index
-stage3d_fractal
-stage3d_ignore_sampler_override
-stage3d_multistage_triangle
-stage3d_program_constants_bytearray_be
-stage3d_program_constants_bytearray_le
-stage3d_program_constants_invalid_input
-stage3d_raytrace
-stage3d_rotating_cube
-stage3d_sampler
-stage3d_sampler_partial_upload
-stage3d_stencil
-stage3d_texture
-stage3d_texture_bytearray
-stage3d_texture_bytearray_compressed_alpha
-stage3d_texture_bytearray_compressed_raw_alpha
-stage3d_triangle
-stage3d_triangle_bytes4
-stage3d_triangle_float1
-stage3d_triangle_index_upload
+# GPU / shader / AIR
+# (Bucket emptied by the 2026-08-01 prune: all 63 entries — agal_compiler,
+# air_* x3, pixelbender_* x31, stage3d_* x28 — now `pass` on the trace axis,
+# so the original "permanently out of scope for this runner" claim is
+# factually wrong for every one of them. Re-add individually with evidence
+# if a genuinely GPU-dependent avm2 test lands.)
 
 # Host I/O: network / audio / video / camera (out of scope for a headless trace runner; re-triage if sync shims land)
 audio_computespectrum
-filereference_browse_cancel
-filereference_browse_select
-filereference_load
-filereference_save
-filereference_save_and_browse
-filereference_save_and_load
-filereference_uninitialized
-filereferencelist_browse_cancel
-filereferencelist_browse_select
 localconnection
-localconnection_send
-netconnection_close
-netconnection_properties
-netconnection_send_remote
-netconnection_serialize_arrays
-netstream_client
-netstream_connect
 netstream_flv_date
 netstream_play_flv
 netstream_play_stop_replay
 netstream_seek_flv
-socket_after_disconnect
-socket_close
-socket_connect
-socket_errors
-socket_read_big
-socket_read_little
-socket_read_write_object
-socket_write_big
-socket_write_little
 sound_constructor_with_args
-sound_embeddedprops
 sound_load_multiple
-sound_play
 sound_rootless
-sound_valueof
 soundchannel_position
 soundchannel_soundcomplete
-soundchannel_soundtransform
-soundchannel_soundtransform_exists
-soundchannel_stop
-soundmixer_buffertime
 soundmixer_soundtransform
-soundmixer_stopall
-soundtransform
-url_loader
-url_vars
-urlrequest
-urlstream_basic
 
 # Image-comparison tests (need the graphics renderer; revisit with a future avm2 graphics mode)
-away3d_advanced_shallow_water_demo
-bitmap_pixelsnapping
-bitmap_subclass_properties
-bitmapdata_applyfilter_blur
-bitmapdata_applyfilter_colormatrix
-bitmapdata_applyfilter_destpoint
-bitmapdata_applyfilter_destpoint_edges
-bitmapdata_clone
-bitmapdata_colortransform
-bitmapdata_copychannel
-bitmapdata_copypixels
-bitmapdata_draw
 bitmapdata_draw_alpha_erase
-bitmapdata_draw_colortransform
-bitmapdata_draw_cpu_overwrite_gpu
-bitmapdata_draw_filters
-bitmapdata_draw_masks
-bitmapdata_draw_rotation
-bitmapdata_draw_self_via_graphic
-bitmapdata_draw_stage
-bitmapdata_drawwithquality
-bitmapdata_embedded
-bitmapdata_fillrect
-bitmapdata_filter_sourcerect
-bitmapdata_opaque
-bitmapdata_pixeldissolve_image
-bitmapdata_sync
-blend_multiply_alpha
-blend_scroll
-blend_shader_luma_lighten
 blend_transform
-displayobject_blendmode
-displayobject_colortransform_nested
-displayobject_getbounds_shape
 displayobject_hittestpoint_boundary
-displayobject_mask
-displayobject_opaque_background
 displayobject_scrollrect
-displayobject_set_matrix_nested
-edittext_always_show_selection
-edittext_autosize_align
-edittext_autosize_height_dynamic
-edittext_autosize_lazy_bounds_visual
-edittext_get_char_index_at_point
-edittext_get_line_index_at_point
 edittext_tag_indent
-error_stack_trace_debug_swf17
-error_stack_trace_debug_swf18
-error_stack_trace_release_swf17
-error_stack_trace_release_swf18
-focus_root_movie
-focus_stage
-focusrect
-focusrect_focuslost
 geom_transform
-graphics_bad_direct_commands
-graphics_bitmap_fill
-graphics_bitmaps
-graphics_direct_commands
 graphics_draw_path
-graphics_draw_triangles
-graphics_gradients
-graphics_gradients_nulls
-graphics_simple_shapes
-loader_events
-loader_image
-loader_jpegxr
-loader_jpegxr_alpha
-loader_loadbytes_events
-mask_reapply
-mouse_pick_dobj_mask
-mouse_pick_non_interactive_bitmap_mask
-mouse_pick_non_interactive_dobj_mask
-sprite_with_frames
 stage_scale_factor
-symbol_class_conflict
 
 # Upstream known_failure = true (Ruffle itself fails these)
 all_classes/events/swf10
@@ -206,7 +56,6 @@ all_classes/events/swf11
 all_classes/events/swf12
 all_classes/events/swf30
 all_classes/events/swf9
-amf_array_serialization
 array_access_oob_interpreter
 array_sort_swf10_64bit
 avm1_root
@@ -224,15 +73,17 @@ int_toexponential
 int_toprecision
 simplebutton_childevents_multichild
 simplebutton_childevents_script_order
-simplebutton_childevents_sprite
 slot_holes_fail
 slot_id_exceeds_trait_count
 sprite_dropTarget
 swf_9_goto_in_construct_frame
-tab_ordering_stage_tab_children_remove_root
 uint_toexponential
 uint_toprecision
 weird_superinterface_properties
+
 # --- upstream ignore = true in test.toml (Stage 3 audit, 2026-07-11) ---
+# bytearray_oom currently `pass`, but the entry records an UPSTREAM decision
+# (the test is disabled in its own test.toml), not our own scope call, so the
+# 2026-08-01 prune kept it.
 bytearray_oom
 number_tostring

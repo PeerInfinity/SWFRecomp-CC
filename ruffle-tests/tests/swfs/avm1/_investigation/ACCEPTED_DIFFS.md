@@ -275,18 +275,27 @@ dimensions stored on MovieClip). Removed 2026-04-06.
 Tests that Ruffle itself marks as `known_failure = true` in their `test.toml`. These tests
 don't pass in Ruffle either, so matching their expected output is not meaningful.
 
-### `string_paths_reference_launder` — Ruffle known failure (stack_push issue)
+### ~~`string_paths_reference_launder` — Ruffle known failure (stack_push issue)~~ — RESOLVED 2026-08-01
 
-**Ruffle test.toml:**
+**Now PASS** (`avm1/_results/results_graphics.json` at `feb8882b0`). Removed
+from `ruffle-tests/ignored_tests.txt` in the same change.
+
+**Ruffle test.toml (still):**
 ```toml
 known_failure = true # See the comment in `stack_push` in avm1/activiation.rs for details
 ```
 
-Ruffle marks this test as a known failure due to an architectural limitation in their AVM1
-stack push implementation. We produce `0` / `undefined` instead of `100` / `50`. Since Ruffle
-also fails this test, there is no correct reference to match against.
+The entry recorded that we produced `0` / `undefined` where the test expects `100` / `50`,
+and concluded that because Ruffle also fails the test "there is no correct reference to
+match against". That second step was the error: the test is graded against Flash's
+`output.txt`, which IS a valid reference — `known_failure = true` says only that *Ruffle*
+fails it, not that the expectation is unreliable (see memory `t2`:
+"known_failure upstream = Ruffle NOT oracle"). Our path-resolution work has since made us
+match `output.txt` in full, so this is a case where we match Flash and Ruffle does not.
 
-**Decision:** Accept; Ruffle known failure, no valid reference output.
+**Decision:** Closed. Kept here as a worked example of the "Ruffle known failure ⇒
+unfixable" inference being wrong; a `known_failure` upstream test is a *candidate*, not a
+disposition.
 
 ### `tab_ordering_properties_tab_index_edge_case` — Conflicting test expectations (tabIndex coercion)
 
@@ -594,6 +603,85 @@ banding in the diff), a distinct next target. Do not file these as accepted.
 
 ---
 
+## Category 12: Implementation-Defined `for...in` Enumeration Order
+
+ECMA-262 (all editions through ES5, which is what AS3/avmplus tracks) leaves the
+order in which `for...in` visits an object's own properties **implementation-
+defined**. Where a test's expected output was captured by simply *printing in
+enumeration order*, that expectation records one engine's hash-table layout, not
+a behavioural requirement. Matching it would mean reproducing avmplus's internal
+hashtable — including its capacity, hash function and collision order — which is
+neither specified nor stable, and would still not match Ruffle.
+
+Diagnostic that identifies this class: **every line on both sides is a `PASSED!`**
+(or otherwise identical in content) and only the *sequence* differs. If any
+assertion actually fails, it is a real bug and does not belong here.
+
+### `from_avmplus/ecma3/Statements/eforin_001` (4 diff lines of 16)
+
+Source (`Test.as:19-24`) enumerates the literal
+`{ length:4, company:"netscape", year:2000, 0:"zero" }`. Three engines, three
+different orders — and **none of them is insertion order**:
+
+| engine | order |
+|---|---|
+| avmplus (`output.txt`, the graded oracle) | `0, company, year, length` |
+| Ruffle (`output.ruffle.txt`) | `year, company, length, 0` |
+| ours | `0, year, company, length` |
+| (insertion order, for reference) | `length, company, year, 0` |
+
+```diff
+  object[0] PASSED!
+- object[company] PASSED!
+- object[year] PASSED!
++ object[year] PASSED!
++ object[company] PASSED!
+  object[length] PASSED!
+```
+
+All 16 assertions PASS on both sides; the test is checking `object[prop]` values
+and `properties.length`, and every one of those checks succeeds. Our leading `0`
+is our documented integer-keys-first dynamic-property rule, which also matches
+modern ECMAScript (ES2015 `OrdinaryOwnPropertyKeys`: integer-like keys ascending,
+then string keys in insertion order).
+
+### `from_avmplus/ecma3/Statements/eforin_002` (10 diff lines of 10)
+
+Same mechanism, on an object built by successive assignments
+(`Test.as:22-26`: `value`, `valueOf`, `toString`, `toNumber`, `toBoolean`):
+
+| engine | order |
+|---|---|
+| avmplus (`output.txt`) | `toString, value, toNumber, toBoolean, valueOf` |
+| Ruffle (`output.ruffle.txt`) | `toBoolean, value, toString, valueOf, toNumber` |
+| ours | `value, valueOf, toString, toNumber, toBoolean` — **exactly insertion order** |
+
+```diff
+- for...in loop in a with loop.  (true)[toString] == toString PASSED!
+  for...in loop in a with loop.  (true)[value] == value PASSED!
++ for...in loop in a with loop.  (true)[valueOf] == valueOf PASSED!
++ for...in loop in a with loop.  (true)[toString] == toString PASSED!
+```
+
+Again every line is `PASSED!` on both sides. Here our order is the *most*
+defensible of the three: plain insertion order, which is what ES2015+ mandates
+for string keys and what every modern engine produces.
+
+**Why `ruffle_matched` cannot rescue these:** promotion requires our diff set to
+be a subset of Ruffle's diffs against `output.txt`. Ruffle's order differs from
+both avmplus's *and* ours, so different lines differ and the subset test fails.
+There is no reachable non-failing status.
+
+**Decision:** Accept, both tests. The expected output pins one engine's hash
+order for an explicitly implementation-defined operation; our order is
+spec-defensible and is the one modern ECMAScript specifies. Changing our
+enumeration order to chase avmplus would be a pure curve-fit that would also
+regress the many corpus tests which depend on insertion-order enumeration —
+and would still leave Ruffle unmatched. Added to
+`ruffle-tests/tests/swfs/from_avmplus/ignored_tests.txt` (2026-08-01).
+
+---
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
@@ -613,7 +701,7 @@ banding in the diff), a distinct next target. Do not file these as accepted.
 | `mcl_replace_root_swf7_to_swf5` | Ruffle vs Flash (SWF7 undefined concatenation) | 1 | Accept; our `"" + undefined` = `"undefined"` is correct per Flash |
 | `mcl_replace_root_swf7_to_swf6` | Ruffle vs Flash (SWF7 undefined concatenation) | 1 | Accept; same as above |
 | ~~`movieclip_state_values`~~ | ~~Missing feature~~ | ~~75~~ | **REMOVED** — now PASS (114/114) via image loading support |
-| `string_paths_reference_launder` | Ruffle known failure (stack_push) | 2 | Accept; Ruffle also fails this test |
+| ~~`string_paths_reference_launder`~~ | ~~Ruffle known failure (stack_push)~~ | ~~2~~ | **RESOLVED 2026-08-01** — now PASS; we match Flash where Ruffle does not. De-listed from `ruffle-tests/ignored_tests.txt` |
 | `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 7 | Accept; proprietary Flash font metrics |
 | `from_shumway/avm1/text-bind` | Image: device-font file mismatch — text ~14px too low (test ships a 0.7656 em NotoSans + fonts.conf; we use our 1.069 em bundled Noto, which matches Ruffle's default fallback) | ~1900 px | Accept; device-font vertical metrics depend on which font resolves `_sans`; we match Ruffle's default |
@@ -623,3 +711,5 @@ banding in the diff), a distinct next target. Do not file these as accepted.
 | `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision | ~52k image outliers, max diff 64 | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render, residual diff is decoder fixed-point arithmetic |
 | `watch_special_recursion_swf7` | Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay; no `output.ruffle.txt` | ~part of test | Accept; segfault fixed, o1 matches Flash (65 fires); see Category 10 |
 | `watch_special_recursion_double_swf7` | Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay | ~63 | Accept; segfault fixed; see Category 10 |
+| `from_avmplus/ecma3/Statements/eforin_001` | Implementation-defined `for...in` order (Category 12) | 4 of 16 | Accept; every line is `PASSED!` on both sides, only the sequence differs; avmplus, Ruffle and we produce three different orders and none is insertion order |
+| `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |

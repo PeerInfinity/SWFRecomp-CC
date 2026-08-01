@@ -297,7 +297,13 @@ static Avm2Value qname_construct(Avm2Context* ctx, Avm2Class* cls,
 		                          : avm2_coerce_to_string(ctx, arg0);
 		if (!(l->len == 1 && l->utf8[0] == '*'))
 		{
-			uri = empty;  // public namespace
+			// ECMA-357 13.3.2 step 4b: the one-argument form takes its
+			// namespace from the DEFAULT XML NAMESPACE in effect at the call,
+			// not from the public namespace. With no `default xml namespace`
+			// statement the dxns is the unnamed namespace, so this still
+			// yields "" in the overwhelmingly common case.
+			const Avm2String* d = avm2_dxns_uri(ctx);
+			uri = (d != NULL) ? d : empty;
 			local = l;
 		}
 		// else: any namespace, any name

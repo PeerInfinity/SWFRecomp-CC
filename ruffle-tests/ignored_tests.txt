@@ -2,6 +2,29 @@
 # These require runtime features unavailable in NO_GRAPHICS trace-only mode,
 # or have unclear expected behavior that needs further investigation.
 # One test name per line. Lines starting with # are comments. Blank lines ignored.
+#
+# PRUNED 2026-08-01 (43 -> 26 entries, 17 removed). Criterion: an entry was
+# removed iff it is `pass` in EVERY suite whose results_graphics.json contains
+# it (this list is GLOBAL — it applies to all 20 result files, so a name that
+# still fails in one suite must stay even if it passes in another; `date` is
+# exactly that case, avm1 output_mismatch / avm2 pass). Entries still failing
+# or `ruffle_matched` were kept. This moves no graded number — the headline
+# corpus figure is the UNFILTERED effective_pass and ignored tests are run and
+# counted there either way — it only fixes the filtered report.
+#
+# TWO TRAPS for whoever prunes this file next:
+#  1. Unlike a per-suite list, a GLOBAL entry is also an IMAGE-axis
+#     disposition: scripts/image_triage.py returns image_axis=True for
+#     `test in ignored_global` (and image_axis=False, "kept on the board",
+#     for suite-local lists). So an entry whose rationale is a render
+#     divergence must stay even when the TRACE test passes. That is why
+#     `netstream_play_flv_screen` was NOT pruned — its trace passes, but its
+#     image comparison fails and this entry is what dispositions it.
+#  2. `shared_object` / `shared_object_self_ref` never appear in any results
+#     file, but the directories DO exist upstream — they ship output1.txt /
+#     output2.txt and no output.txt, so discover_tests() skips them entirely.
+#     The entries are inert; they were kept as documentation, not pruned as
+#     "nonexistent".
 
 # --- Navigator/getURL (Ruffle-internal tracing) ---
 # These tests trace Ruffle's internal navigator dispatch output
@@ -16,8 +39,8 @@ geturl
 
 # --- Network/form loading (no multi-SWF infrastructure needed) ---
 # These tests require network connections, HTTP POST, or browser-level form submission.
-form_loader_encoding_2
-form_loader_encoding_3
+# (form_loader_encoding_2, form_loader_encoding_3 removed 2026-08-01 — both now
+#  `pass`; the net/socket tranches supplied the infrastructure they needed.)
 form_loader_encoding_4
 load_vars
 loadvariables_method
@@ -25,12 +48,10 @@ stylesheet_load
 
 # --- XML networking/sockets ---
 # These tests require network connections or XML HTTP loading.
+# (xml_socket, xml_socket_close_in_handler, xml_socket_connect_null,
+#  xml_socket_on_data, xml_socket_segmented removed 2026-08-01 — all now
+#  `pass`, xml_socket in BOTH avm1 and avm2. Only xml_getbytes still fails.)
 xml_getbytes
-xml_socket
-xml_socket_close_in_handler
-xml_socket_connect_null
-xml_socket_on_data
-xml_socket_segmented
 
 # --- Sound/audio ---
 # These tests require audio playback or streaming.
@@ -45,18 +66,17 @@ xml_socket_segmented
 # inconsistent with both Flash's render-at-declared-bounds rule and Ruffle's
 # own matrix-scale rule. We render correctly per Flash; see
 # RUFFLE_VS_FLASH_DIFFERENCES.md "Video Display Object Render Bounds".
+# DO NOT PRUNE on trace status: the trace test passes, and this entry exists
+# for the IMAGE axis (see trap 1 in the header). Re-verified failing on the
+# image board 2026-08-01.
 netstream_play_flv_screen
 
 # --- FileReference (OS file picker + network upload/download) ---
-# These tests require native file dialogs and HTTP file transfer.
-file_reference_browse_cancel
-file_reference_download_cancel
-file_reference_download_httperror_dns_error
-file_reference_download_httperror_status_code
-file_reference_download_success
-file_reference_upload_httperror_dns_error
-file_reference_upload_httperror_status_code
-file_reference_upload_success
+# All 8 entries removed 2026-08-01 — file_reference_{browse_cancel,
+# download_cancel, download_httperror_dns_error, download_httperror_status_code,
+# download_success, upload_httperror_dns_error, upload_httperror_status_code,
+# upload_success} all now `pass`. None has an image comparison, so pruning them
+# is trace-axis-only. Bucket emptied.
 
 # --- ExternalInterface (browser JavaScript bridge) ---
 # external_interface now passes via test_harness.c mock approach
@@ -90,8 +110,14 @@ sandbox_type_remote
 # (removed_base_clip_tell_target removed 2026-06-11 — upstream Ruffle 71864d539
 #  dropped the speculative "Target not found" trace, vindicating Flash's silent
 #  failure; the remaining GOOD!/BAD gap was a real SetTarget bug, now fixed.)
-string_paths_reference_launder
-string_relational_compare
+# (string_paths_reference_launder removed 2026-08-01 — now `pass` per
+#  avm1/_results/results_graphics.json. Still `known_failure = true`
+#  upstream, so this is a case
+#  where we match Flash and Ruffle does not; the ACCEPTED_DIFFS.md Category-7
+#  entry has been marked RESOLVED in the same change.)
+# (string_relational_compare removed 2026-08-01 — now `pass` in BOTH avm1 and
+#  avm2 (verified locally). The RUFFLE_VS_FLASH_DIFFERENCES.md entry has been
+#  marked RESOLVED in the same change; see it for what changed.)
 # globals_swf5: Ruffle exposes LocalConnection/NetConnection/Video in SWF5; Flash hides them.
 # Gnash tests (LocalConnection-v5, NetConnection-v5, Video-v5) confirm Flash behavior.
 globals_swf5

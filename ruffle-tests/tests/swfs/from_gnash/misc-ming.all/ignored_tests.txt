@@ -9,18 +9,16 @@
 #      alignment)
 #
 # See from_gnash/_investigation/ACCEPTED_DIFFS.md for explanations.
-
-# opcode_guard_test — Gnash's expected output omits the "Target not found"
-# warning that Flash / Ruffle (and we) emit on `setTarget('non-exist-target')`.
-# We get every assertion right (PASSED on all 11 checks) while Ruffle fails
-# the Construct / Load / Unload event handler assertions; so our trace has
-# 19 lines vs Flash's 18 (one extra warning line) and Ruffle's 18 (different
-# missing event lines balance the warning). Because we are MORE correct than
-# Ruffle, our diff-set against Flash is at different indices than Ruffle's
-# diff-set, so the verify_output.py subset_match cannot promote us. The test
-# is upstream `known_failure = true`. Cannot suppress the warning without
-# breaking AVM1 tell_target_invalid / path_string / tell_target / etc.
-opcode_guard_test
+#
+# PRUNED 2026-08-01 (2 -> 1 entries, 1 removed). Criterion: an entry was
+# removed iff its status in _results/results_graphics.json at feb8882b0 is
+# exactly `pass`.
+#
+# (opcode_guard_test removed 2026-08-01 — now `pass`. The entry described an
+#  extra "Target not found" warning line that Gnash's expected output omits,
+#  making our trace 19 lines vs Flash's 18; that extra line is gone and we now
+#  match in full. Historical detail in
+#  from_gnash/_investigation/ACCEPTED_DIFFS.md.)
 
 # register_class/RegisterClassTest4 — Flash-quirky construct/load/unload
 # cycle. Ruffle itself diverges from Flash by 33+ lines (its

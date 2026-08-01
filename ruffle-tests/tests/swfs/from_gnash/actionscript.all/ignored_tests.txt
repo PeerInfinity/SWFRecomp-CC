@@ -14,6 +14,13 @@
 #      or the test has no known_failure/output.ruffle.txt in the Ruffle repo)
 #
 # See from_gnash/_investigation/ACCEPTED_DIFFS.md for the historical list.
+#
+# PRUNED 2026-08-01 (7 -> 4 entries, 3 removed). Criterion: an entry was
+# removed iff its status in _results/results_graphics.json at feb8882b0 is
+# exactly `pass`. Removed: getvariable-v5, getvariable-v7, getvariable-v8
+# (their Dejagnu #passed/#failed counter divergence is gone — all three now
+# match Gnash's expected output in full). The remaining 4 were re-confirmed
+# still `output_mismatch`.
 
 # argstest-v6/v7/v8 — recursive native-object enumeration walk. Several native
 # objects the test descends into (PrintJob, MovieClipLoader, LocalConnection,
@@ -28,19 +35,12 @@ argstest-v6
 argstest-v7
 argstest-v8
 
-# getvariable-v5/v7/v8 — three small Flash-correct PASSes (line 105 modern
-# Flash _level0-as-member; line 121 SWF<=6 case-insensitive THIS; line 208
-# slash-path crossing non-MC returns undefined) leave the trailing Dejagnu
-# #passed/#failed counters off-by-one against Gnash's expected output. v6
-# auto-promotes via ruffle_matched (Ruffle has both extra divergences so its
-# counter also diverges); v5/v7/v8 each have only one divergence and Ruffle's
-# extra PASS+FAIL cancel in counters, leaving us with counter lines outside
-# Ruffle's diff set so subset-match fails. Replicating Ruffle's bugs would
-# diverge from Flash. See _investigation/ACCEPTED_DIFFS.md Category 1 and
-# _investigation/complete/GETVARIABLE_VN_PLAN.md.
-getvariable-v5
-getvariable-v7
-getvariable-v8
+# (getvariable-v5/v7/v8 removed 2026-08-01 — all three now `pass`. The entry
+#  described a trailing Dejagnu #passed/#failed counter off-by-one caused by
+#  three Flash-correct PASSes that Gnash's expected output did not anticipate;
+#  that divergence is resolved and the counters now match. Historical detail:
+#  _investigation/ACCEPTED_DIFFS.md Category 1 and
+#  _investigation/complete/GETVARIABLE_VN_PLAN.md.)
 
 # array-v5 — sort-mutating-comparator UB (Flash in-place avmplus sort).
 # A comparator that pops the array mid-sort yields DIFFERENT Flash results per

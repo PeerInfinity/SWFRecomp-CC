@@ -6,6 +6,9 @@
 #     (no known_failure / no output.ruffle.txt sidecar)
 #
 # See from_gnash/_investigation/ACCEPTED_DIFFS.md for explanations.
+#
+# Re-triaged 2026-08-01 against _results/results_graphics.json at feb8882b0:
+# both entries are still `output_mismatch`, so nothing was pruned here.
 
 # sound — interactive Flash session timing trace; requires sound-position
 # wall-clock simulation we don't implement. Expected output truncates at line 7

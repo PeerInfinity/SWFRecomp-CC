@@ -94,6 +94,10 @@ enum
 	AVM2_METHOD_HAS_OPTIONAL = 1 << 3,
 	AVM2_METHOD_IGNORE_REST = 1 << 4,
 	AVM2_METHOD_NATIVE = 1 << 5,
+	// SET_DXNS: the method body contains a dxns/dxnslate op, so it must start
+	// with a FRESH default XML namespace instead of inheriting the caller's
+	// (avmplus MethodInfo::setsDxns, Ruffle activation.rs).
+	AVM2_METHOD_SET_DXNS = 1 << 6,
 };
 
 typedef struct Avm2AbcMethodData

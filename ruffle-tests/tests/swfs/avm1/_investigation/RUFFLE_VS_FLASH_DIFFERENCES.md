@@ -73,11 +73,24 @@ This affects only the `onLoadStart` callback (1 line per test). All other callba
 
 **Decision:** Accept 1-line diff per test. Our SWF7 `"" + undefined` = `"undefined"` behavior is correct per Flash spec.
 
-## String Relational Comparison Uses UTF-8 Bytes vs UTF-16 Code Units
+## ~~String Relational Comparison Uses UTF-8 Bytes vs UTF-16 Code Units~~ — RESOLVED 2026-08-01
 
-**Test:** `string_relational_compare` (3/4 lines match)
+**Test:** `string_relational_compare` — now **PASS (4/4)** in both `avm1` and `avm2`
+(re-verified locally at `feb8882b0`). Removed from `ruffle-tests/ignored_tests.txt`
+in the same change.
 
-Flash Player compares strings using UTF-16 code unit values (matching ECMAScript spec). Ruffle compares strings using UTF-8 byte ordering (equivalent to Unicode code point comparison), as seen in `core/src/avm1/value.rs:490`: `a.bytes().lt(b.bytes())`.
+**This entry's premise was wrong.** It asserted that Flash Player compares strings
+using UTF-16 code unit values (matching the ECMAScript spec), and defended our
+code-unit comparison as the Flash-correct behaviour. In fact AVM1 stores strings as
+UTF-8 and Flash's relational operators compare *those bytes*, which is **code-point**
+order, not UTF-16 code-unit order — Ruffle does the same
+(`core/src/avm1/value.rs:490`: `a.bytes().lt(b.bytes())`). Flash and Ruffle agree
+here; our implementation was the odd one out, so this was never a Ruffle-vs-Flash
+divergence. The runtime now compares by code point in `u16_cmp`
+(`SWFModernRuntime/src/actionmodern/action.c:284-292`), whose comment records the
+same reasoning. Equality callers are unaffected either way.
+
+The original (incorrect) analysis is preserved below so the reversal is traceable.
 
 This difference manifests when comparing BMP characters above U+D800 with supplementary characters encoded as surrogate pairs. For `"\uFF61" < "\uD800\uDC02"`:
 - Flash (UTF-16 code units): first code units 0xFF61 vs 0xD800 → 0xFF61 > 0xD800 → `false`
@@ -89,7 +102,10 @@ This difference manifests when comparing BMP characters above U+D800 with supple
 +    false
 ```
 
-**Decision:** Accept 1-line diff. Our UTF-16 code unit comparison matches Flash Player and ECMAScript spec. Add to ignored_tests.txt.
+**Original decision (SUPERSEDED — see the RESOLVED note at the top of this section):**
+Accept 1-line diff. Our UTF-16 code unit comparison matches Flash Player and ECMAScript spec. Add to ignored_tests.txt.
+
+**Current decision:** compare by code point; the test passes; entry closed.
 
 ## Filter Angle Property Precision
 

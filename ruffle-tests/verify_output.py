@@ -1904,9 +1904,26 @@ def recompile_swf(test_dir, force=False):
         if p.exists():
             shutil.rmtree(p)
 
-    # Recompiler wall-clock timeout (seconds). Default 30; override with the
-    # SWFRECOMP_RECOMPILE_TIMEOUT env var for large SWFs (e.g. multi-MB games).
-    recompile_timeout = 30
+    # Recompiler wall-clock timeout (seconds). Override with the
+    # SWFRECOMP_RECOMPILE_TIMEOUT env var for very large SWFs (e.g. multi-MB
+    # games).
+    #
+    # Raised 30 -> 300 on 2026-08-01. The old 30 s cap was the *only* thing
+    # failing visual/simple_shapes/heavy_tesselation: that SWF recompiles
+    # SUCCESSFULLY in ~119 s of CPU (104 user + 14 sys, measured) and the test
+    # then passes, so `recomp_fail` was a harness artifact reported as a
+    # corpus failure. Sizing note: wall clock for that recompile ranged 55 s
+    # (idle machine) to 205 s (8-way-contended machine) for the same work, so
+    # a cap anywhere near the CPU figure is a load-dependent flake generator.
+    # 300 s keeps a real cap — a runaway/looping recompile is still killed —
+    # with ~2.5x headroom over the slowest known-good corpus test. The cost of
+    # raising it is paid only by runs that were going to fail anyway.
+    #
+    # Deliberately NOT a per-test `recompile_timeout` key in test.toml:
+    # download_tests.sh copies test.toml verbatim from the upstream corpus
+    # (see its "Copy the essential files" loop), so any key we add to a
+    # mirrored test's test.toml is silently clobbered on the next re-sync.
+    recompile_timeout = 300
     _to_env = os.environ.get("SWFRECOMP_RECOMPILE_TIMEOUT")
     if _to_env:
         try:
