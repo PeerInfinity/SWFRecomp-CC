@@ -1397,3 +1397,96 @@ the predicate exists TWICE); `avm1/form_loader_encoding_{2,3}` (AVM1
 legacy charsets); main-movie root-class binding + child non-root bindings
 (riders follow-up); embedded Flex `BitmapAsset` chain (away3d's next
 error if the character-binding synergy ever regresses).
+
+## 10. Session 8 (2026-07-31/08-01) — second fan-out: +23, one reverted trap
+
+Baseline `1c7c23761` (4153/4424) → `07c119c50`: **4176/4424 (94.4%)**, CI
+`30687131663` then corrective `30688965712` (both graphics/`categories=full`,
+success). avm1 687→690, avm2 1095→**1107** (+12), from_avmplus
+1553→**1560** (+7), from_shumway 196→197. Histogram: `pass` 3909→3932,
+`output_mismatch` 268→246, **`runtime_error` 2→1**, `ruffle_matched` flat
+at 244, `recomp_fail` 1. **Final: zero regressions, zero other status
+moves.** Raw agent reports: `session8-fanout-reports/`.
+
+**Method: the §9 two-wave fan-out, repeated.** Wave 1 = five read-only
+diagnosis agents (triage regen + the §9.2 board) with the already-scoped
+lattice arc's implementation launched immediately alongside; wave 2 = seven
+implementation agents in isolated worktrees. Eight patches applied to
+master serially (`3e36127c9`..`3ebcb54f1`), one trivial conflict
+(`ul_set_data` — resolved to exactly Ruffle's shape: `strip_bom` feeding
+the URLVariables ctor), one combined CI, one corrective commit.
+
+### 10.1 Ledger (23 = 22 predicted-and-landed + 1 CI-only rider)
+
+| Patch | Commit | Yield |
+|---|---|---|
+| AVM1 charsets (B11: cp1252 + generated Shift-JIS, Ruffle detection order) | `3e36127c9` | +2 |
+| escapeMultiByte/unescapeMultiByte + URLVariables ctor/decode | `daaee588b` | +2 |
+| E4X name-parts C1 (ns KIND for any-ns; attr/any-name on write+delete; two version gates) | `9c67067f2` | +7 |
+| super in script inits / class-side frames + class-object scope fallback | `7ccca2c18` | +1 |
+| XML 1.0 name tables (both predicate copies) + shared `avm2_strip_bom` | `b74aa0a82` | +1 |
+| ABC verifier type lattice, Stage 0+1 (arc doc shipped as scoped) | `a835b09fb` | +2 |
+| `transformed_by_script` gate (10 set sites, not the brief's 6) | `2a7715b7c` | +1 |
+| C2 singles + C3 file-level ABC error path | `3ebcb54f1` | +7 → **+6** after revert |
+| TextField-gate revert | `07c119c50` | +7 recovered, −1 given back |
+
+CI-only rider: `avm2/superinterface_instanceof`, carried by the
+superinterface cache-lifetime fix — outside the ≤5-line window, as in
+every session (§4.5's rule holds: the near-pass list is a lower bound).
+
+### 10.2 The one regression event — chasing an already-dispositioned test
+
+CI `30687131663` scored +17 with **7 regressions**, all from one line of
+the C2 batch: gating the `TextField` global to SWF7+ to win
+`avm1/native_objects_swf6` line 56. Seven tests (avm1 `globals_swf6`,
+`textfield_props_swf5/6`, `focusrect_property_swf6`; gnash `TextField-v5`,
+`toString_valueOf-v5/v6`) pin the global as `[type Function]` and
+`new TextField()` as an object at v5/v6. The test the gate won is
+`known_failure` upstream, its Flash capture contradicts the Ruffle-passing
+`textfield_props_swf6` on the same behavior at the same SWF version — and
+this project had **already dispositioned it**: `ACCEPTED_DIFFS.md`
+Category 2 carries the exact entry and the test sits in
+`ignored_tests.txt`. Full revert (`07c119c50`); the narrow middle ground
+(gate construction only) was measured and scores WORSE than reverting
+(5-of-7 recovered vs 7-of-7).
+
+**New brief rule (memory `triage-check-accepted-diffs-first`): every
+triage row and every wave-2 brief checks its targets against
+`ACCEPTED_DIFFS.md`, `RUFFLE_VS_FLASH_DIFFERENCES.md` and
+`ignored_tests.txt` before pricing** — the near-pass regeneration reads
+`results_graphics.json`, which has no memory of dispositions.
+
+### 10.3 Wave-1 findings worth keeping
+
+- **The near-pass list is almost a true inventory now**: 78 candidates,
+  refilled by exactly ONE row after s7's +24 (prior sessions refilled
+  5–10). `error_signature` is fully dry (max group 1). The paying keys
+  were structural: an E4X ops-layer cluster, a `--dump-abc` corpus census,
+  and the `runtime_error` population (still the cheapest read).
+- **`avm2/bom` can NEVER pass** — no `output.ruffle.txt` exists (Ruffle
+  passes it) and 3 lines are URLVariables enumeration order (fixture is
+  `lastName`-first; ours is insertion order = Flash). Dispositioned in
+  RUFFLE_VS_FLASH_DIFFERENCES.md; ceiling measured at 6/9. The adjacent
+  find (`escapeMultiByte` + `URLVariables.decode`) was worth more than the
+  target.
+- **Two session-7 sizings were wrong in opposite directions**:
+  `supercalls_weird` needed no "class-side super chain" (Ruffle binds a
+  static frame's super flatly to `Class` — ~20 lines, one file), while
+  `transformed_by_script` had TEN set sites, not six.
+- Root-class binding riders: **NO-GO measured** — zero corpus tests
+  blocked; main-movie binding would regress the 177 from_avmplus tests
+  whose expected output ends at the #2023 throw. New finding filed:
+  `class_for_char`'s child arm resolves via the ROOT domain scope, the
+  larger half of `loader_duplicate_class`.
+
+### 10.4 Left on the board
+
+§9.2 minus shipped, plus: `e12_1` (needs recompiler `SETS_DXNS` + an
+oracle ruling on single-arg `new QName(n)` DXNS capture — Ruffle does NOT
+capture, avmplus does), `scope_optimizations` (lattice Stage 3, separate
+arc), C3.3 (trailing #1065 after file-level VerifyError: net 0, wins
+`verify_method_info_duplicate` but demotes `verify_method_info_oob`),
+`loader_duplicate_class` (3 independent fixes incl. the child-domain
+resolution above), and the stale `avm2/ignored_tests.txt` bucket
+(`url_vars`, `url_loader`, `urlrequest` listed but passing — prune pass
+wanted).
